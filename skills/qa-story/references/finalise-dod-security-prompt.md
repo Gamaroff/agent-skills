@@ -53,6 +53,16 @@ The list is data as well as prose: `probe-boundary-signals.mjs` (beside `securit
 writer, a formatter, a schema migration, a logging change — none of these are boundaries, however
 security-adjacent they look. Probe mode must **not** fire on them.
 
+**A refusal whose input is repository state is a boundary** — a git hook, a guard driven by
+`git status`. Its input is the index, not an argument, and "takes no caller-supplied value" does not
+make it `false`. Once the engine's `shell-argv:` form exists (task.181), probe it there with a
+`--fixture-setup` that stages each case. Until then record `boundary: true`; the zero-guard will
+fire, and closing it takes a recorded override (obs #221).
+
+**Test code is not exempt by location.** A test double whose refusal backs an assertion — a fake
+`gh` that refuses writes so an eval can assert "never posts" — is a boundary: the agent under test
+chooses its input (obs #276).
+
 **Record the decision explicitly**, as the `boundary:` field of the returned YAML — `true` when the
 rule fired, `false` when it did not, or `internal` in the one case below. Do **not** signal the decision
 by leaving `probes` empty: an empty `probes` is also the correct output for a boundary that *was* probed

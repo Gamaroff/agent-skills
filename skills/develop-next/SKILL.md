@@ -123,7 +123,7 @@ Act on the JSON `status`:
 
 Invoke the item's named command (`/develop-story <path>`, `/develop-task <path>` or `/develop-bug <path>`), prepending this directive to the invocation context (same mechanism as the lite-mode directive in `develop-pipeline-autonomous-defaults.md` — the pipeline's own reference files are AUTO-GENERATED and must not be edited). Mark `dispatched: true` in the run state.
 
-> **AUTONOMOUS RUN (develop-next):** For the Phase 0d Upfront Setup questions, take the auto-derived recommended option for **every** question without prompting — whatever that pipeline's question set is. For `/develop-story` and `/develop-task` that is Q1 = base branch, `develop` and Q2 = PR target, `develop`. For `/develop-bug` it is Q1 = branch model (**bugfix** unless the bug is explicitly a production regression), with Q2 base branch and Q3 PR target auto-derived from Q1 — do **not** re-map the story/task Q-numbers onto it. For the Phase 0b resume prompt, choose "Resume from last completed step". Record every auto-answer in the Decisions Log. All existing HALT conditions remain HALTs.
+> **AUTONOMOUS RUN (develop-next):** For the Phase 0d Upfront Setup questions, take the auto-derived recommended option for **every** question without prompting — whatever that pipeline's question set is. For `/develop-story` and `/develop-task` that is Q1 = base branch, `develop` and Q2 = PR target, `develop`. For `/develop-bug` it is Q1 = branch model (**bugfix** unless the bug is explicitly a production regression), with Q2 base branch and Q3 PR target auto-derived from Q1 — do **not** re-map the story/task Q-numbers onto it. For the Phase 0b resume prompt, take the option Phase 0b marks **(Recommended)** — after a finalise DoD-gaps halt that is "Re-enter QA at 5a"; only when no option is marked, choose "Resume from last completed step". Record every auto-answer in the Decisions Log. All existing HALT conditions remain HALTs.
 
 If the pipeline HALTs (review NO-GO, develop stall, 5 QA cycles without PASS, qa-fix with no changes, DoD gaps, unexpected status): **STOP** — surface the pipeline's own HALT report verbatim, send a push notification, do not merge, do not tick. Leave the run-state file in place so the next invocation resumes here.
 
@@ -229,6 +229,13 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
          fi ;;
      esac
      ```
+
+     **The engine is not always a quick check.** With `ci.docsOnly.checkCommand` configured, it runs
+     that command inside the call, and a test suite there can outlive the tool timeout. So either
+     re-sample the head's rollup once first and call the engine only if the head is still pending, or
+     run the block backgrounded with its output in a file (`> .claude/state/ci-tree-eq.log 2>&1`),
+     ending it with `echo "CI_TREE_EQ=$CI_TREE_EQ"`, and read that line on the notification — never
+     as a foreground call (obs #270).
 
      When `CI_TREE_EQ` is set, the PR head's own CI has **not** finished and the reading is satisfied
      because every file changed since a green first-parent ancestor is documentation (per

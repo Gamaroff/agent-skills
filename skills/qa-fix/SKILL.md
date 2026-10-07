@@ -524,7 +524,7 @@ Options:
 - Wait for user responses to clarifying questions
 - Update fix plan based on user decisions
 - Record the chosen approach in the Dev Agent Record — **not** as its own Change Log row. The
-  Change Log gets exactly one row on loop exit (see the authorised-sections list below); a row per
+  Change Log gets one row per fix cycle (see the authorised-sections list below); a row per
   decision is the churn this format exists to avoid.
 
 **A safety flag named in a `suggested_action` is a claim about the installed binary — execute it
@@ -607,7 +607,7 @@ it — before the third patch, not after it.
 
 | Move | When it is right |
 | ---- | ---------------- |
-| **Consolidate the contract** | The subject is a record the skill passes between its own steps (a state file, run-state JSON, a handoff record), or a rule stated at several sites. Define it once: a field / writer / readers table; ownership moved into the skill's script so a test holds it; or one statement plus citations plus a single-statement test (task.130). |
+| **Consolidate the contract** | The subject is a record the skill passes between its own steps (a state file, run-state JSON, a handoff record), or a rule stated at several sites. Define it once: a field / writer / readers table; ownership moved into the skill's script so a test holds it; or one statement plus citations plus a single-statement test (task.130). When the subject is a deny-list over a parser's input, consolidating means an allow-list of the accepted shapes that refuses everything else; copying more of the parser is still a patch (obs #276). |
 | **Scope the claim** | The subject is a best-effort derivation (compatibility, migration, inference) that lacks the fact it needs. Flag the value `unverifiable`, document the limitation, or drop the precision. Do not add another rule (task.143 cycles 3 and 6). |
 | **Waive** | As in Step 2.5, with the reason stated. |
 | **Patch** | Allowed. Say why neither structural move applies — for example, the findings are distinct defects in the deliverable itself (task.117 gates 1→2, where the offer fires and patch is the right answer). |
@@ -702,6 +702,12 @@ edited file restates it by definition, so a working run finds at least one file.
 comes from a wrong phrase or from a cwd outside the repository, where the failing `git grep` is
 swallowed by the process substitution. Fix the phrase or the cwd and re-run. Never record 0.
 
+**For a rule the work item restates, the population is wider than the command.** The command skips
+`docs/` and `CHANGELOG.md`, but the same change wrote the rule into the work item's own document
+and the branch's CHANGELOG entry, and those drift the same way. Check both and list them in the
+`Probe:` block. Where a success criterion restates the rule, prefer citing the shipped rule over
+restating it, so one edit cannot leave a second statement behind (obs #254).
+
 The `Probe:` block the row requires, so a probe that ran can be told apart from one that was read:
 
 ```
@@ -734,6 +740,16 @@ sites** rather than synthetic strings — each counter-example above was a real 
 | **Should merge** | Two inputs a real call site treats as one — does the new rule give them one key? |
 | **Should not merge** | Two inputs a real call site treats as two — does the new rule still give them two? |
 | **Which direction did the last fix move?** | A fix for a split pushes toward merging, and vice versa — the test must carry the pair for the direction the finding did **not** name |
+
+**For a fix to a writer, a refusal or an input class, test the property, not the repro.** A repro
+is one point in its input class, and a test that counts the token the finding named passes on a
+residue of the same class:
+
+| Probe | Ask |
+| ----- | --- |
+| **Is the writer idempotent?** | For a stacking, upsert, replace-in-place or normaliser fix, assert that write N and write N+1 are byte-identical, with only the payload varied — not a count of the token the finding named (obs #237) |
+| **Does the fix hold across the input class?** | Vary what precedes and follows the trigger, and where else the same token appears. A destructive-write post-condition compares the bytes outside the edited span; a count of what must exist cannot see a deletion (obs #238) |
+| **Which documented shapes does the new refusal reject?** | For a new refusal or completeness check over a shared input, run it against every documented shape of that input — its reference doc's examples — not only this repository's instance (obs #248) |
 
 **Review the combination, not only each fix.** At least one real lifecycle defect was caused by
 two earlier fixes that were each correct alone. After the last fix in a cycle, re-read the full diff
@@ -774,10 +790,12 @@ Iterate until:
   - Debug Log References (commands/results like lint/test output)
   - Completion Notes List (what changed, why, how)
   - File List (all added/modified/deleted files)
-- ✅ Change Log — ONE row on **exiting** the fix loop, not one per finding and not one per cycle.
-  Put the iteration count in the Description; the per-cycle detail belongs in the implementation
-  report. Blank `Version` (only `/finalise` bumps it), `Author` = `qa-fix`. Bump frontmatter
-  `updated` in the same edit. Canonical format:
+- ✅ Change Log — ONE row per fix cycle, not one per finding. Append it after the gate row it
+  answers, and never rewrite it: qa-fix cannot see which cycle is the loop's last, and a rewritten
+  row reads as a dropped row to `change-log.js --check-append-only` (obs #183). Put the iteration
+  count in the Description; the per-cycle detail belongs in the implementation report. Blank
+  `Version` (only `/finalise` bumps it), `Author` = `qa-fix`. Bump frontmatter `updated` in the
+  same edit. Canonical format:
   [document-change-log.md](references/document-change-log.md):
 
   `| 2026-05-14 |  | QA findings fixed — gate PASS (9/10), 2 iterations | qa-fix |`
@@ -1165,8 +1183,8 @@ Cross-reference: `finalise` uses the same MCP call shape at lines 827-832 (`cont
 - **QA findings contain ambiguities or multiple options** (Step 2a)
   - Use AskUserQuestion to clarify approach before implementing
   - Do not proceed with fixes until user provides clear direction
-  - Record the chosen approach in the Dev Agent Record (the single Change Log row is written on
-    loop exit and summarises the cycle, not each decision)
+  - Record the chosen approach in the Dev Agent Record (the cycle's one Change Log row
+    summarises the cycle, not each decision)
 
 ## Completion Checklist
 
@@ -1187,7 +1205,7 @@ Before marking complete:
 - ✅ Story file updated (authorized sections only)
 - ✅ Story Bug Reports section updated with current statuses
 - ✅ File List complete and accurate
-- ✅ Change Log: exactly ONE row added for this fix loop, with the iteration count in the Description
+- ✅ Change Log: exactly ONE row appended for this fix cycle, after its gate row, with the iteration count in the Description; no earlier row rewritten
 - ✅ Status set correctly per Status Rule
 - ✅ **Post Fix Summary to PR** (Step 7 — BLOCKING): Confirm platform-appropriate comment call (`gh pr comment` on GitHub / Bitbucket REST on Bitbucket) exited with code 0. Workflow is not done until this is verified.
 - ✅ **Tracker comment** (non-blocking): If `jira_key` / `github_issue` is present in story/task frontmatter, `tracker-comment.js` was invoked and its `reason` read; failure is logged but does not block completion.

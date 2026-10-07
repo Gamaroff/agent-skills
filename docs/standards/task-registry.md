@@ -53,6 +53,13 @@ loud rather than silent. If it fires, tick the row by hand; do not disable the c
 > the case that does conflict is **adjacent row numbers in one batch**, which a frontier of
 > consecutive tasks makes likely. The resolution is always "keep both rows". This is a known cost of
 > giving the tick an owner, not a defect in the disjointness check.
+>
+> **`/create-task` hits the same conflict.** It appends the next row on `develop`. When an earlier
+> task's PR is still open, `/finalise` has already ticked that task's row on the feature branch, and
+> when the two rows are adjacent the open PR reports a content conflict. File the new task after
+> that PR merges, or expect to merge `develop` into the PR branch, keeping both rows. task.161 was
+> created while task.160's PR #499 was open, and the merge that resolved it pushed a new PR head
+> after acceptance (obs #202).
 
 Engine: [`shared/resources/registry-tick.js`](../../shared/resources/registry-tick.js), called from
 [`finalise`](../../skills/finalise/SKILL.md). A **story** run calls the same CLI and it returns

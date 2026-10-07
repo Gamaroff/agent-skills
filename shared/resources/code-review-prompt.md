@@ -239,6 +239,10 @@ So on **cycle 2 only** (exactly one prior gate exists):
 - For every change to a dedupe, cache or record key, a normaliser or an equality predicate, find
   **one pair that must be the same and one that must differ** — a key changed to fix one direction
   has usually broken the other (the identity-rule table in `qa-fix` Step 3.5, obs #169).
+- For every change that runs a configured command, compiles a caller-supplied pattern or loops over
+  input it does not bound, probe the **resource bounds**: a timeout kills the whole process tree, a
+  matcher stays linear on a repeated pattern, and the command does not run against a working tree it
+  did not expect (obs #249).
 
 Cycles 3+ keep the narrowed scope. This is affordable because the pipeline's convergence check ends
 the loop shortly after cycle 3 when it is not converging: the trade is **two deep cycles instead of

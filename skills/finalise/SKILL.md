@@ -620,6 +620,11 @@ decision, not the zero-guard: no corpus sink models this input.
 finding, not a pass. See the `probe mode executed no candidates` check above. An **absent**
 `probes_executed` counts as zero here: a count that was never reported is not evidence that work
 happened.
+
+When the engine declined the entry (`entry-not-probeable`, or no form reaches it), only two
+remedies clear this guard: (1) make the entry reachable — export it, make the script sourceable, or
+add an engine form — then re-probe; (2) a recorded human override. A by-hand probe (the probe
+boundary rule's §5.1) is evidence for that override, labelled so, never a closure (obs #232).
 {else if no probe in security_result.probes has reproduced == true:}
 ✅ **The boundary held** — every candidate returned its expected verdict.
 {endif}
@@ -745,6 +750,11 @@ Use the **Decision Matrix** from `references/definition-of-done-checklist.md` to
 | Docs Updated?                | `DOCS_OVERALL` (PASS/NOT_APPLICABLE counts as pass) |
 | Security Passed?             | `SEC_OVERALL` (PASS/NOT_APPLICABLE counts as pass)  |
 | Compliance Passed?           | `COMP_OVERALL` (PASS/NOT_APPLICABLE counts as pass) |
+
+**When the host requires no reviews** (`pr_review_decision` is `null`, as on a single-maintainer
+repo), the "Tests & PR Approved?" column is satisfied by the newest co-located `*.pr-review.*.md`
+(the pipeline's Step 5c `/review-pr` report) with verdict APPROVE or CONCERNS, cited by path in the
+DoD. A `null` decision with no such report is a gap (obs #253).
 
 ### CI status is a DoD gate — check it, do not assume it
 
@@ -891,7 +901,13 @@ done
 `NONE` once the re-sample loop has run, ask the tree-equivalence engine whether every file changed
 since a green first-parent ancestor is documentation. It exits **0 for `tree-equivalent` and for
 nothing else** — every other answer, including a failed read, exits 1 — so this `if` cannot round a
-"no" up to green:
+"no" up to green.
+
+**This call costs whatever `ci.docsOnly.checkCommand` costs (obs #262).** When that key is set, the
+engine runs the command before it answers — often minutes, longer than a tool call's timeout. Run
+the block backgrounded with its result written to a file you read on a later turn, as the Step 7.6c
+poll does; or re-sample the head's rollup once more first and call the engine only if it is still
+`PENDING`/`NONE`:
 
 ```bash
 # INPUTS, re-bound in THIS block (a fresh shell has none): the rollup read above and the PR number.
@@ -1200,6 +1216,9 @@ If all DoD criteria are met, finalize the running summary, update the story/task
 
 4. **Add DoD Verification Section to Document Body:**
    - Add a "## Definition of Done - PASSED ✅" section to the document
+   - **Place it immediately before the change-log block**: before a `## Change Log` heading that sits
+     directly above `<!-- change-log-start -->`, else before the marker itself — never between the
+     markers, where every later append carries it as prose inside the log (obs #229)
    - Summarize all verified criteria
    - **If QA reports exist**, include QA findings and reference the QA report
    - Include review date and reviewer
@@ -2354,6 +2373,7 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
 
 4. **Add Gap Report to Document Body:**
    - Add a "## Definition of Done - Gaps Identified" section
+   - Place it the same way as 7.4: immediately before the change-log block, never between the markers
    - List all specific gaps by category
    - **If QA reports exist**, include QA gate findings and top issues
    - Provide actionable next steps
@@ -2455,14 +2475,15 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
      case "$DOC_FILE" in *'{'* | '') echo "HALT: DOC_FILE must be bound in this block"; exit 1 ;; esac
      GAP_REPORT_BODY=$(awk '/^## Definition of Done - Gaps Identified/{f=1;next} /^## /{f=0} f' "$DOC_FILE")
    fi
-   # Unmet criteria across every section of the gap report — an unchecked box.
+   # Unmet criteria across every section of the gap report — an unchecked box,
+   # indented too: 8.4's example nests them under a numbered list (obs #212).
    # `grep -c` prints 0 and EXITS 1 when it matches nothing, so `|| true` (never
    # `|| echo 0`, which would append a second zero and make the value "0\n0").
    if [ "$DOC_KIND" = "bug" ]; then
      # The helper's `count` is the one definition of the bug-mode gap list (8.1, 8.3 and here).
      GAP_COUNT=$(bash .agents/skills/finalise/references/fill-verification-complete.sh "$DOD_PATH" count) || exit 1
    else
-     GAP_COUNT=$(printf '%s' "$GAP_REPORT_BODY" | grep -c '^- \[ \]' || true)
+     GAP_COUNT=$(printf '%s' "$GAP_REPORT_BODY" | grep -c '^[[:space:]]*- \[ \]' || true)
      GAP_COUNT=${GAP_COUNT:-0}
    fi
    # Bug mode: the template always fills Step 5 (Decision, QA record, CI rollup), so the

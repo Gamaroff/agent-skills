@@ -248,6 +248,14 @@ TEST_LOG=".claude/state/test-output-${ITER}-$(date +%s).log"
 TEST_EXIT=$?
 ```
 
+**When the gate can outlive the tool timeout, start it with `run_in_background`** and let the log
+carry the exit code: `<fastGateCommand> > "$TEST_LOG" 2>&1; echo "TEST_EXIT=$?" >> "$TEST_LOG"`.
+Mark the wait before yielding —
+`bash .agents/skills/{develop-story|develop-task}/references/set-waiting-on.sh "step-3 fast gate iter $ITER" --kind task --budget-minutes {M}`
+(`develop-pipeline-hooks.md` §"waiting_on") — and on the notification `--clear` it and read the
+`TEST_EXIT=` line (`grep '^TEST_EXIT=' "$TEST_LOG"`). A foreground call killed at the timeout loses
+its exit code, and can leave a moved `.agents/skills` unrestored.
+
 ### On Test Failure (TEST_EXIT != 0)
 
 Dispatch the Agent tool with `subagent_type="Explore"` using the prompt from `shared/resources/test-failure-triage-prompt.md`. Substitute `<log_path>` with `$TEST_LOG`. Mark the wait: `bash .agents/skills/{develop-story|develop-task}/references/set-waiting-on.sh "step-3 test triage iter $ITER"` beside the dispatch, `… --clear` once the triage summary is read. Persist the returned triage YAML as a JSON artifact at `.summaries/step-3-test-triage-<ITER>.json` (schema per `shared/resources/subagent-summary-artifact.md`). Update the implementation report `Subagent summary ref` column with the artifact path.

@@ -115,6 +115,7 @@ Snapshot-specific fields (when the winner is `last-halt.json`):
 QA-loop fields (lock or snapshot, both optional — absent on a run that predates task.123):
 - `qa_phase` (`5a|5b|5c`) → the loop's sub-position when the run stopped; report it in `deltas_since_pause` as `{ "path": null, "concern": "lock qa_phase: 5b" }` when `LOCK_STEP` is 5
 - `extra_cycles_granted` / `qa_max_cycles` (integers) → a grant recorded by a previous re-entry and the absolute budget it set; report both in `deltas_since_pause` as `{ "path": null, "concern": "extra_cycles_granted: {k}; qa_max_cycles: {n}" }` so the operator sees the budget the run will resume under. When `halt_reason` matches `loop-limit|not-converging`, also report the highest `gate.{N}` on disk against the count of `### QA Cycle` entries in the implementation report — a difference is a cycle the operator ran outside the loop, and the resume contract's **Re-entry after a QA loop escalation** back-fills it
+- **Count, do not read.** Any cycle number or entry count you report comes from a command, never from the report's prose: the cycle from `bash .agents/skills/{develop-story|develop-task}/references/qa-cycle.sh "{DOC_DIR}"`, the entry count from `grep -c '^### QA Cycle' "{report_path}"` (task.172: a count read from prose said 5 where both commands said 4)
 
 > A snapshot tagged `pause_reason: "precompact"` was left by the PreCompact hook before it removed the lock — surface it to the user as "resume from the compaction pause at step X?" rather than a hard terminal halt.
 
@@ -166,6 +167,9 @@ Build `EXPECTED` = the set of `(step, path)` pairs the table names. Then:
   - **A record at step 8 recommends 8, never 9.** There is no step 9. A lock, snapshot or claim at
     step 8 means Step 8 has not passed its Completion Checklist — the checklist's own `--complete`
     is the lock's one terminal remover (task 161) — so recommend 8: re-run Step 8
+  - **A record at step 5 recommends 5, never 6.** Steps 5 and 6 are one lock step: the lock reads
+    `current_step: 5` for the whole QA loop and advances `5 → 7`, so no lock is ever at 6. Recommend
+    5 and report the lock's `qa_phase` as the sub-position (Step 1, QA-loop fields)
 - **An expected summary for `LOCK_STEP` is missing**: `recommended_step = LOCK_STEP` (re-execute)
   - Rationale: lock was updated but step may not have fully completed (interrupted mid-step)
 - **An expected summary for an earlier step is missing**: add to `blocking_issues`:
@@ -213,10 +217,10 @@ Emit the result object with all fields. Do NOT emit any other text.
 | Condition | `recommended_step` |
 |-----------|-------------------|
 | Lock absent / unreadable | 1 |
-| Every summary the report's `Subagent summary ref` column names is present and valid (a `—` cell expects nothing) | LOCK_STEP + 1, or 8 when LOCK_STEP is 8 |
+| Every summary the report's `Subagent summary ref` column names is present and valid (a `—` cell expects nothing) | LOCK_STEP + 1 (5 when LOCK_STEP is 5, with its `qa_phase`), or 8 when LOCK_STEP is 8 |
 | The report names a summary for LOCK_STEP and it is absent | LOCK_STEP (re-execute) |
 | The report names a summary for an earlier step and it is absent | LOCK_STEP (conservative) + blocking_issue |
-| Report without the `Subagent summary ref` column | LOCK_STEP + 1, or 8 when LOCK_STEP is 8 (nothing expected) + a `deltas_since_pause` note |
+| Report without the `Subagent summary ref` column | LOCK_STEP + 1 (5 when LOCK_STEP is 5, with its `qa_phase`), or 8 when LOCK_STEP is 8 (nothing expected) + a `deltas_since_pause` note |
 | Report missing or unreadable | LOCK_STEP (conservative) + blocking_issue |
 | Branch missing | Same as above + blocking_issue |
 | A `last-halt.json` for this document whose PR is `MERGED` | not a candidate — reported as `stale-snapshot`; the orchestrator deletes |

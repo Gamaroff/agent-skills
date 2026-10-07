@@ -58,6 +58,12 @@ treat an empty result as `10`); the QA diff reviewer's Step 3b post-condition an
 surface map both wait against this number. Start the clock at dispatch and record it in the
 Decisions Log with the outcome: `dispatched HH:MMZ → returned HH:MMZ` or `→ killed at N minutes`.
 
+**Arm the deadline at dispatch.** Beside the dispatch, start a background `sleep $((BUDGET*60))`;
+its completion notification is the deadline event. When it fires and the agent has not returned,
+stop the agent and do the pass inline then — not at the next unrelated notification. Nothing else
+checks the budget at its deadline: on task.156 four agents ran two to three times over theirs,
+because each overrun was noticed only when some later event arrived (obs #250).
+
 **Every time in that record is measured, never recalled.** Read `date -u +%H:%MZ` in a tool call at
 dispatch and again when the completion notification arrives; when the notification reports the
 agent's own duration (`duration_ms`), that number is the duration — write it, do not subtract two

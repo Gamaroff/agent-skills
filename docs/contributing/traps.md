@@ -148,6 +148,16 @@ test file reads a high-resolution clock (`process.hrtime`, `performance.now`) wi
 The **stdout-drain premise test is not load-sensitive any more** (fixed 2026-09-04; the payload is
 now sized from the pipe buffer). A failure there is real. Do not re-run it away.
 
+### A nested `node --test` must drop `NODE_TEST_CONTEXT`
+
+A `node --test` spawned from inside a `node --test` run inherits the parent's
+`NODE_TEST_CONTEXT`. The child then reports to the (absent) parent runner instead of printing, so its
+`ℹ pass N` summary and its stdout come back empty. On task.156 the same `pass 2` figure read `stale`
+in the test and `confirmed` at a terminal. Delete the variable from the child's env:
+`skills/session-handoff/tests/continuation.test.js` (`verifyRows`) and
+`evals/shared/tests/fake-gh.test.mjs` both do. Do not "fix" the figure or the assertion instead —
+the tool is right, the child's environment is not a terminal's (obs #251).
+
 ### zsh `nomatch` aborts a command with an unmatched glob — before it runs
 
 On macOS the login shell is zsh, and zsh's default `nomatch` turns an unmatched glob into an error
