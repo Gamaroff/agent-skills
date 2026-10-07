@@ -33,6 +33,7 @@ import {
   git,
   gitAsync,
   ghStub,
+  ghCalls,
   runAsync,
   cleanup,
 } from "./lib/executed-prose.mjs";
@@ -237,6 +238,7 @@ const CHECK4_NO_TABLE =
 // ── The block, from the step document ─────────────────────────────────────────
 
 const VERIFY = path.join(ROOT, "shared", "resources", "verify-push-state.sh");
+const PR_READ = path.join(ROOT, "shared", "resources", "pr-read.sh");
 const LOCK_HELPER = path.join(
   ROOT,
   "shared",
@@ -254,6 +256,8 @@ function checklist(extra = "") {
   return bind(code, {
     ".agents/skills/{develop-story|develop-task|develop-bug}/references/verify-push-state.sh":
       VERIFY,
+    ".agents/skills/{develop-story|develop-task|develop-bug}/references/pr-read.sh":
+      PR_READ,
     ".agents/skills/{develop-story|develop-task|develop-bug}/references/advance-pipeline-lock.sh":
       LOCK_HELPER,
     "{work-item-dir}": WORK_ITEM,
@@ -262,7 +266,8 @@ function checklist(extra = "") {
 }
 
 // A fixture repo whose feature branch carries the report, committed and pushed, with a `gh` that
-// answers the PR's base. No lock, no test logs, no halt snapshot — checks 1, 2 and 2b pass.
+// answers pr-read.sh's one read — number, head (this commit) and base. No lock, no test logs, no
+// halt snapshot — checks 1, 2 and 2b pass, and check 5 compares the PR head.
 // Async, so the concurrent cases below overlap instead of queueing behind sync git spawns.
 async function setup(reportText) {
   const fx = fixtureRepo();
@@ -270,7 +275,10 @@ async function setup(reportText) {
   await gitAsync(fx.work, "add", "-A");
   await gitAsync(fx.work, "commit", "-q", "-m", "report");
   await gitAsync(fx.work, "push", "-q");
-  const gh = ghStub(fx.dir, 'case "$*" in *baseRefName*) echo develop ;; esac');
+  const gh = ghStub(
+    fx.dir,
+    'case "$*" in *baseRefName*) echo "7 $(git rev-parse HEAD) develop" ;; esac',
+  );
   return { ...fx, ...gh };
 }
 
@@ -294,6 +302,9 @@ test("the extracted checklist carries check 3 and a scoped check 5", () => {
     code,
     /verify-push-state\.sh --base "\$BASE_BRANCH" "\$\{SCOPE_ARGS\[@\]\}"/,
   );
+  // The base is read through pr-read.sh on both forges, never through a bare `gh` (Bitbucket fix).
+  assert.match(code, /pr_read "\$\{PR_ARGS\[@\]\}"/);
+  assert.doesNotMatch(code, /^[^#\n]*\bgh pr view\b/m);
 });
 
 test("the step document names the general-bug registry as develop-bug's extra scope", () => {
@@ -1017,6 +1028,121 @@ test("the paused-and-resumed fixture carries both unfinished tokens outside the 
     /^## Pipeline Paused — /m,
     "the hook's pause section is missing",
   );
+});
+
+// ── Bitbucket: the base and the PR head are read over REST, never through gh ──
+// The consumer report this fixes: on a Bitbucket remote the block halted on "no PR on this branch"
+// for a branch that had one, because the base was read through `gh` only. Here the remote is
+// configured as a Bitbucket URL (insteadOf keeps the fetch local), `gh` answers nothing, and a fake
+// curl answers the REST API. Check 5 then compares the PR head too, because PR_NUMBER is bound from
+// the same read.
+async function setupBitbucket(reportText, { status, head, prNumber }) {
+  const fx = await setup(reportText);
+  const url = "https://bitbucket.org/acme/wallet.git";
+  await gitAsync(fx.work, "config", `url.${fx.origin}.insteadOf`, url);
+  await gitAsync(fx.work, "remote", "set-url", "origin", url);
+  fs.writeFileSync(path.join(fx.dir, "gh-body.sh"), "exit 1\n");
+  const sha = head ?? git(fx.work, "rev-parse", "HEAD").trim().slice(0, 12);
+  const branch = git(fx.work, "symbolic-ref", "--short", "HEAD").trim();
+  const pr = {
+    id: 601,
+    description: "line one\nline\ttwo",
+    source: { commit: { hash: sha }, branch: { name: branch } },
+    destination: { branch: { name: "develop" } },
+  };
+  // Raw control characters in the description, as real PRs carry and jq rejects.
+  const one = JSON.stringify(pr).replace("\\n", "\n").replace("\\t", "\t");
+  const body = path.join(fx.dir, "bb-body.json");
+  fs.writeFileSync(body, `{"values": [${one}]}`);
+  fs.writeFileSync(path.join(fx.dir, "bb-pr.json"), one);
+  const curl = path.join(fx.bin, "curl");
+  fs.writeFileSync(
+    curl,
+    [
+      "#!/usr/bin/env bash",
+      'out=""; url=""',
+      'while [ $# -gt 0 ]; do case "$1" in -o) out="$2"; shift 2 ;; *) url="$1"; printf \'%s\\n\' "$1" >> "$FAKE_CURL_LOG"; shift ;; esac; done',
+      'case "$url" in */pullrequests/*) cat "$FAKE_BB_PR" > "$out" ;; *) cat "$FAKE_BB_LIST" > "$out" ;; esac',
+      'printf "%s" "$FAKE_CURL_STATUS"',
+      "",
+    ].join("\n"),
+  );
+  fs.chmodSync(curl, 0o755);
+  const cfg = path.join(fx.dir, "bb-config.yaml");
+  fs.writeFileSync(cfg, "vcs: bitbucket\n");
+  return {
+    ...fx,
+    env: {
+      SKILLS_CONFIG_FILE: cfg,
+      BITBUCKET_ACCESS_TOKEN: "t",
+      FAKE_CURL_LOG: path.join(fx.dir, "curl.log"),
+      FAKE_BB_LIST: body,
+      FAKE_BB_PR: path.join(fx.dir, "bb-pr.json"),
+      FAKE_CURL_STATUS: String(status),
+      ...(prNumber ? { PR_NUMBER: prNumber } : {}),
+    },
+  };
+}
+
+function runBitbucket(shell, fx) {
+  return runAsync(shell, checklist(), {
+    cwd: fx.work,
+    bin: fx.bin,
+    env: { IMPLEMENTATION_REPORT: REPORT, ...fx.env },
+  });
+}
+
+describe("executed against a Bitbucket remote", { concurrency: true }, () => {
+  for (const sh of SHELLS) {
+    test(`[${sh}] the base and the PR head bind from the Bitbucket API, and gh is never asked`, async () => {
+      const fx = await setupBitbucket(finished("Task"), { status: 200 });
+      try {
+        const r = await runBitbucket(sh, fx);
+        assert.equal(r.status, 0, `stdout: ${r.stdout}\nstderr: ${r.stderr}`);
+        assert.match(r.stdout, /PR #601 head == local HEAD/);
+        assert.match(r.stdout, /✅ Step 8 post-conditions verified/);
+        assert.deepEqual(ghCalls(fx.argvLog), []);
+        const calls = fs.readFileSync(fx.env.FAKE_CURL_LOG, "utf8");
+        assert.match(calls, /repositories\/acme\/wallet\/pullrequests$/m);
+        assert.match(calls, /repositories\/acme\/wallet\/pullrequests\/601$/m);
+      } finally {
+        cleanup(fx.dir);
+      }
+    });
+
+    // PR_NUMBER bound by the caller: both reads go to /pullrequests/601, and the --pr argument
+    // reaches each callee as two words under zsh too.
+    test(`[${sh}] a stale PR head on Bitbucket fails check 5, naming both SHAs`, async () => {
+      const fx = await setupBitbucket(finished("Task"), {
+        status: 200,
+        head: "0123456789ab",
+        prNumber: "601",
+      });
+      try {
+        const r = await runBitbucket(sh, fx);
+        assert.equal(r.status, 1, `stdout: ${r.stdout}`);
+        assert.match(r.stdout, /PR #601 head != local HEAD/);
+        assert.match(r.stdout, /PR head: 0123456789ab/);
+      } finally {
+        cleanup(fx.dir);
+      }
+    });
+
+    test(`[${sh}] an HTTP 404 from Bitbucket halts naming the read and the status, not "no PR on this branch"`, async () => {
+      const fx = await setupBitbucket(finished("Task"), { status: 404 });
+      try {
+        const r = await runBitbucket(sh, fx);
+        assert.equal(r.status, 1, `stdout: ${r.stdout}`);
+        assert.match(
+          r.stdout,
+          /cannot bind BASE_BRANCH — could not read the open PR for branch '[^']+' on Bitbucket \(HTTP 404\)/,
+        );
+        assert.doesNotMatch(r.stdout, /no PR on this branch/);
+      } finally {
+        cleanup(fx.dir);
+      }
+    });
+  }
 });
 
 // ── check 3 — every template variant, finished, passes ────────────────────────
