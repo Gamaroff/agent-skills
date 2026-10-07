@@ -6,6 +6,14 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`/review-pr` can audit a merged Bitbucket PR.** Step 6 checks finding anchors against the PR
+  head, and its only route to a head whose branch was deleted was GitHub's `pull/<n>/head` — Bitbucket
+  keeps no such ref, so the review stopped with `bad-rev`. The new `scripts/resolve-head-rev.sh` tries
+  `origin/<head-branch>`, `pull/<n>/head`, a Bitbucket fork's branch, the Bitbucket source commit
+  (reachable after a merge-commit merge), and for a squash merge the merge commit, which the report
+  names as a weaker check. With no route it exits 1 naming each one tried. Step 1b binds the
+  Bitbucket inputs (`SOURCE_HASH`, `MERGE_HASH`, `FORK_URL`), and Step 4 detects a Bitbucket
+  cross-fork PR. Tested against real repositories served over `file://`, under bash and zsh.
 - **`/qa-fix` no longer re-reads an old `REQUEST CHANGES` PR review as open work.** The findings
   ingester took the highest-numbered `*.pr-review.*.md` on every call, so after Step 5c's review
   had been fixed, every later QA cycle re-fed its HIGH findings. `/review-pr` now records the gate

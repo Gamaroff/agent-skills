@@ -403,6 +403,15 @@ curl -sf "${BB_CURL_AUTH[@]}" \
 
 Bind `PR_NUMBER`, `PR_URL`, `PR_TITLE`, `PR_BODY`, `HEAD_BRANCH`, `BASE_BRANCH`, `PR_STATE`.
 
+On Bitbucket also bind what Step 6 needs to find the PR head once its branch is gone — Bitbucket
+keeps no `pull/<n>/head` ref:
+
+| Variable | From the PR JSON | Empty when |
+| --- | --- | --- |
+| `SOURCE_HASH` | `.source.commit.hash` | never |
+| `MERGE_HASH` | `.merge_commit.hash` | the PR is not merged |
+| `FORK_URL` | `https://bitbucket.org/` + `.source.repository.full_name` + `.git` | `.source.repository.full_name` equals `.destination.repository.full_name` (not a cross-fork PR) |
+
 **A bare number that is an issue (GitHub only).** When `KIND=pr` came from a bare number (no
 `TARGET_HOST`) and `gh pr view` fails, run `gh issue view "$PR" --json number`. The PR error for an
 issue number is identical to the one for a number that does not exist
@@ -527,7 +536,7 @@ fi
 the diff comes back empty — which an unchecked path reports as "no changes to review". That silently
 breaks the *"audit a merged PR after the fact"* case this skill explicitly supports.
 
-**Cross-fork PRs**: `origin/$HEAD_BRANCH` also does not exist when the head is a fork branch. Detect that up front (`headRepositoryOwner` ≠ the base repo owner) and set `USE_API_DIFF=1` without attempting the fetch at all. Either route — cross-fork, or any fetch/diff failure above — lands here:
+**Cross-fork PRs**: `origin/$HEAD_BRANCH` also does not exist when the head is a fork branch. Detect that up front (GitHub: `headRepositoryOwner` ≠ the base repo owner; Bitbucket: `FORK_URL` is set) and set `USE_API_DIFF=1` without attempting the fetch at all. Either route — cross-fork, or any fetch/diff failure above — lands here:
 
 ```bash
 gh pr diff "$PR_NUMBER" > "$DIFF_FILE"                                          # GitHub
@@ -590,10 +599,18 @@ it, from the repository root:
 # {findings-json}: a scratch path (mktemp) holding {"code_review":{…},"pr_conformance":{…}} as parsed
 # in Step 5. Steps 7 and 8 read the same file, so write it once, here.
 FINDINGS_JSON="{findings-json}"
-# The PR head, never the checked-out tree: origin/$HEAD_BRANCH on Step 4's git route. On the
-# API-diff route (merged or cross-fork PR) fetch the head first — GitHub keeps it at
-# pull/<n>/head: `git fetch -q origin "pull/{pr-number}/head"` and use FETCH_HEAD.
-HEAD_REV="{origin/<head-branch> | FETCH_HEAD}"
+# The PR head, never the checked-out tree. One script tries every route, first hit wins:
+# origin/<head-branch>, GitHub's pull/<n>/head, a Bitbucket fork's branch, the Bitbucket source
+# commit, and — for a squash-merged Bitbucket PR whose branch is gone — its merge commit.
+# The Bitbucket inputs come from Step 1b; leave one empty ("") when it does not apply.
+source .agents/skills/review-pr/references/resolve-platform.sh || exit 1   # VCS
+HEAD=$(bash .agents/skills/review-pr/scripts/resolve-head-rev.sh --vcs "$VCS" \
+  --head-branch "{head-branch}" --base-branch "{base-branch}" --pr "{pr-number}" \
+  --source-hash "{source-hash}" --merge-hash "{merge-hash}" --fork-url "{fork-url}") \
+  || { echo "HALT: no PR head commit to check anchors against (see the routes tried above)"; exit 1; }
+HEAD_REV=$(printf '%s\n' "$HEAD" | sed -n 's/^rev=//p')
+HEAD_VIA=$(printf '%s\n' "$HEAD" | sed -n 's/^via=//p')
+printf 'HEAD_REV=%s HEAD_VIA=%s\n' "$HEAD_REV" "$HEAD_VIA"
 command node .agents/skills/review-pr/references/finding-anchors.js \
   --findings-file "$FINDINGS_JSON" --root "$(git rev-parse --show-toplevel)" \
   --rev "$HEAD_REV" --annotate "$FINDINGS_JSON" --json
@@ -609,9 +626,16 @@ line it meant. **A malformed anchor is never dropped.** It renders with `⚠️ 
 after its `ref`, keeps the reviewer's value in the machine-readable block with its `anchor_check`
 beside it, and is left out of `--inline` (Step 8), so it reaches the PR only through the summary
 comment. The checker reports and never repairs: guessing the intended line would hide the reviewer
-defect this exists to show. If the head commit is not available locally the checker exits 2
-`bad-rev` and annotates nothing: fetch the head (on the API-diff route, `pull/<n>/head` as above)
-and re-run. Never render the findings as checked without a run that exited 0 or 1.
+defect this exists to show. `resolve-head-rev.sh` hands the checker a commit that exists locally, so
+`bad-rev` now means the call is wrong. When no route resolves, the script exits 1 naming every route
+it tried, and the review HALTs rather than render unchecked anchors. Never render the findings as
+checked without a run that exited 0 or 1.
+
+**`HEAD_VIA=merge-commit` is a weaker check, and the report says so.** Bitbucket keeps no ref for a
+PR head; after a squash merge with the branch deleted, the head commit is gone from every ref, and
+the merge commit is the nearest real tree. It matches the PR head for every file only the PR
+changed. Where the base changed the same file, an anchor can read `text-mismatch` — flagged, never
+falsely `ok`. Before this route existed, auditing such a PR stopped here with `bad-rev`.
 
 The two schemas are deliberately parallel (`id` / `category` / `severity` / `confidence` / `finding` / `suggested_action`), so one rendering path serves both:
 
@@ -723,7 +747,7 @@ ALWAYS use this exact template structure:
 
 {rendered CR-* findings, or "None."}
 
-**Anchors:** {n} checked against `{HEAD_REV}` — {m} unverified ({verdict counts}), or "all verified"
+**Anchors:** {n} checked against `{HEAD_REV}` (via `{HEAD_VIA}`; `merge-commit` means a squash-merged Bitbucket PR, checked against the merge result) — {m} unverified ({verdict counts}), or "all verified"
 
 ## Machine-Readable Findings
 
