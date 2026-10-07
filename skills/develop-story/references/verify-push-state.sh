@@ -269,17 +269,32 @@ else
 fi
 
 # ── 5. The PR points at this exact commit ─────────────────────────────────────
-# Optional: only when a PR number is supplied and gh is available. This mirrors
-# the develop-batch merge gate's head-SHA check, moved earlier so a false report
-# is caught at the moment it would be made rather than at merge time.
+# Optional: only when a PR number is supplied. This mirrors the develop-batch
+# merge gate's head-SHA check, moved earlier so a false report is caught at the
+# moment it would be made rather than at merge time.
+#
+# The read goes through pr-read.sh, which branches on VCS. It used to be `gh` only,
+# and on a Bitbucket remote `gh` returns nothing — so a correct, fully pushed run
+# FAILED here. On Bitbucket every unreadable PR (no credential, 401/403/404) is a
+# named failure carrying its HTTP status, never a skip: Bitbucket answers an
+# unauthenticated read of a private repo with 404, so a skip would pass silently.
+# Only "GitHub, and gh is not on PATH" stays a skip, as it always was.
 if [ -n "$PR" ]; then
-  if ! command -v gh >/dev/null 2>&1; then
-    note "! gh not on PATH — PR head check skipped (not a failure)"
+  SELF_DIR=$(cd "$(dirname "$0")" 2>/dev/null && pwd -P)
+  # shellcheck source=pr-read.sh
+  if ! source "$SELF_DIR/pr-read.sh" 2>/dev/null; then
+    fail "pr-read.sh not found beside verify-push-state.sh — cannot read PR #${PR} (re-run the bundler)"
   else
-    PR_SHA=$(gh pr view "$PR" --json headRefOid --jq .headRefOid 2>/dev/null)
-    if [ -z "$PR_SHA" ]; then
-      fail "could not read PR #${PR} head — cannot confirm the PR matches this commit"
-    elif [ "$PR_SHA" != "$HEAD_SHA" ]; then
+    pr_read --pr "$PR" --remote "$REMOTE"
+    PR_RC=$?
+    PR_SHA="$PR_READ_HEAD"
+    if [ "$PR_RC" -eq 3 ]; then
+      note "! gh not on PATH — PR head check skipped (not a failure)"
+    elif [ "$PR_RC" -ne 0 ] || [ -z "$PR_SHA" ]; then
+      fail "could not read PR #${PR} head — cannot confirm the PR matches this commit${PR_READ_ERROR:+ (${PR_READ_ERROR})}"
+    # By prefix: Bitbucket returns a 12-character hash in some responses. A full GitHub SHA makes
+    # this an equality test. Under 7 characters is too short to identify a commit — not a match.
+    elif [ "${#PR_SHA}" -lt 7 ] || [ "${HEAD_SHA#"$PR_SHA"}" = "$HEAD_SHA" ]; then
       fail "PR #${PR} head != local HEAD — the PR does not contain this commit"
       note "      local:   ${HEAD_SHA}"
       note "      PR head: ${PR_SHA}"

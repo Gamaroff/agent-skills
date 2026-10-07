@@ -286,6 +286,117 @@ EXIT=$( cd "$R" && bash "$SCRIPT" --base main --scope linkdir/r.md >/dev/null 2>
 [ "$EXIT" = "2" ] && pass "--scope through a tracked symlinked directory → exit 2" \
                   || fail "--scope through a tracked symlinked directory → exit 2" "got exit $EXIT"
 
+# ── 33–40. Check 5 on Bitbucket: the PR is read over REST, never through gh ──────
+# A fake curl on PATH stands in for the Bitbucket API: it writes $FAKE_CURL_BODY to curl's -o target,
+# prints $FAKE_CURL_STATUS for -w, and logs every call. No case reaches the network.
+FAKEBIN="$TMPROOT/fakebin"; mkdir -p "$FAKEBIN"
+cat > "$FAKEBIN/curl" <<'SH'
+#!/usr/bin/env bash
+out=""
+while [ $# -gt 0 ]; do
+  case "$1" in -o) out="$2"; shift 2 ;; *) printf '%s\n' "$1" >> "$FAKE_CURL_LOG"; shift ;; esac
+done
+[ -n "$out" ] && cat "$FAKE_CURL_BODY" > "$out"
+printf '%s' "$FAKE_CURL_STATUS"
+SH
+chmod +x "$FAKEBIN/curl"
+# A gh that answers for GitHub-arm cases, and must never be called on a Bitbucket remote.
+cat > "$FAKEBIN/gh" <<'SH'
+#!/usr/bin/env bash
+echo gh-called >> "$FAKE_CURL_LOG"
+# Answers whichever --jq it is asked, so the same cases run against check 5 before and after the
+# pr-read.sh change — the proof that GitHub behaviour did not move.
+jq=""; while [ $# -gt 0 ]; do [ "$1" = --jq ] && jq="$2"; shift; done
+case "$jq" in
+  .headRefOid) printf '%s\n' "$FAKE_GH_HEAD" ;;
+  *)           printf '%s %s %s\n' 7 "$FAKE_GH_HEAD" main ;;
+esac
+SH
+chmod +x "$FAKEBIN/gh"
+BBCFG="$TMPROOT/bb-config.yaml"; printf 'vcs: bitbucket\n' > "$BBCFG"
+GHCFG="$TMPROOT/gh-config.yaml"; printf 'vcs: github\n' > "$GHCFG"
+
+# A pushed repo whose origin is configured as a Bitbucket URL; insteadOf keeps check 4's fetch local.
+bb_repo() {
+  local R; R=$(new_repo "$1"); commit_work "$R"
+  ( cd "$R" && git push --quiet -u origin feature/x 2>/dev/null \
+      && git config url."$TMPROOT/$1.git".insteadOf https://bitbucket.org/acme/wallet.git \
+      && git remote set-url origin https://bitbucket.org/acme/wallet.git )
+  echo "$R"
+}
+# bb_body FILE HASH — a PR body whose description carries raw control characters (a tab, a bare
+# newline inside the string): jq rejects them, json.loads(strict=False) does not.
+bb_body() {
+  printf '{"id": 601, "description": "line one\nline\ttwo", "source": {"commit": {"hash": "%s"}}, "destination": {"branch": {"name": "develop"}}}' "$2" > "$1"
+}
+run_bb() {  # run_bb REPO STATUS [env...] — check 5 with --pr 601 on the Bitbucket config
+  local R="$1" ST="$2"; shift 2
+  : > "$TMPROOT/curl.log"
+  ( cd "$R" && env -u BITBUCKET_ACCESS_TOKEN -u BITBUCKET_USERNAME -u BITBUCKET_API_TOKEN -u BITBUCKET_APP_PASSWORD \
+      PATH="$FAKEBIN:$PATH" SKILLS_CONFIG_FILE="$BBCFG" FAKE_CURL_LOG="$TMPROOT/curl.log" \
+      FAKE_CURL_BODY="$TMPROOT/bb-body.json" FAKE_CURL_STATUS="$ST" "$@" \
+      bash "$SCRIPT" --base main --pr 601 2>&1 )
+}
+
+R=$(bb_repo bb-match)
+HEAD12=$(cd "$R" && git rev-parse HEAD | cut -c1-12)
+bb_body "$TMPROOT/bb-body.json" "$HEAD12"
+OUT=$(run_bb "$R" 200 BITBUCKET_ACCESS_TOKEN=t); EXIT=$?
+if [ "$EXIT" = "0" ] && printf '%s\n' "$OUT" | grep -q "PR #601 head == local HEAD" \
+   && grep -q '/repositories/acme/wallet/pullrequests/601$' "$TMPROOT/curl.log" \
+   && ! grep -q gh-called "$TMPROOT/curl.log"; then
+  pass "Bitbucket: PR head (12-char hash) == local HEAD → exit 0, read over REST, gh never called"
+else
+  fail "Bitbucket: PR head (12-char hash) == local HEAD → exit 0, read over REST, gh never called" "got exit $EXIT: $OUT / $(cat "$TMPROOT/curl.log")"
+fi
+
+R=$(bb_repo bb-mismatch)
+LOCAL=$(cd "$R" && git rev-parse HEAD)
+bb_body "$TMPROOT/bb-body.json" "0123456789ab"
+OUT=$(run_bb "$R" 200 BITBUCKET_ACCESS_TOKEN=t); EXIT=$?
+if [ "$EXIT" = "1" ] && printf '%s\n' "$OUT" | grep -q "PR #601 head != local HEAD" \
+   && printf '%s\n' "$OUT" | grep -q "local:   $LOCAL" && printf '%s\n' "$OUT" | grep -q "PR head: 0123456789ab"; then
+  pass "Bitbucket: PR head != local HEAD → exit 1, both SHAs named"
+else
+  fail "Bitbucket: PR head != local HEAD → exit 1, both SHAs named" "got exit $EXIT: $OUT"
+fi
+
+for ST in 404 403 401; do
+  R=$(bb_repo "bb-http-$ST")
+  OUT=$(run_bb "$R" "$ST" BITBUCKET_ACCESS_TOKEN=t); EXIT=$?
+  if [ "$EXIT" = "1" ] && printf '%s\n' "$OUT" | grep -q "could not read PR #601 on Bitbucket (HTTP $ST)" \
+     && ! printf '%s\n' "$OUT" | grep -qi "skipped"; then
+    pass "Bitbucket: HTTP $ST → exit 1 with the status named, never a skip"
+  else
+    fail "Bitbucket: HTTP $ST → exit 1 with the status named, never a skip" "got exit $EXIT: $OUT"
+  fi
+done
+
+R=$(bb_repo bb-nocred)
+OUT=$(run_bb "$R" 200); EXIT=$?
+if [ "$EXIT" = "1" ] && printf '%s\n' "$OUT" | grep -q "no Bitbucket credential" \
+   && ! printf '%s\n' "$OUT" | grep -qi "skipped" && [ ! -s "$TMPROOT/curl.log" ]; then
+  pass "Bitbucket: no credential → exit 1, named, no request sent, never a skip"
+else
+  fail "Bitbucket: no credential → exit 1, named, no request sent, never a skip" "got exit $EXIT: $OUT"
+fi
+
+# GitHub is unchanged: gh answers, curl is never called, and the comparison is exact.
+R=$(new_repo gh-match); commit_work "$R"
+( cd "$R" && git push --quiet -u origin feature/x 2>/dev/null )
+for CASE in match mismatch; do
+  [ "$CASE" = match ] && GH_HEAD=$(cd "$R" && git rev-parse HEAD) || GH_HEAD=0123456789abcdef0123456789abcdef01234567
+  : > "$TMPROOT/curl.log"
+  OUT=$( cd "$R" && PATH="$FAKEBIN:$PATH" SKILLS_CONFIG_FILE="$GHCFG" FAKE_CURL_LOG="$TMPROOT/curl.log" \
+           FAKE_GH_HEAD="$GH_HEAD" bash "$SCRIPT" --base main --pr 7 2>&1 ); EXIT=$?
+  WANT=0; [ "$CASE" = mismatch ] && WANT=1
+  if [ "$EXIT" = "$WANT" ] && grep -q gh-called "$TMPROOT/curl.log" && [ "$(grep -vc gh-called "$TMPROOT/curl.log")" = 0 ]; then
+    pass "GitHub: PR head $CASE → exit $WANT, read through gh only"
+  else
+    fail "GitHub: PR head $CASE → exit $WANT, read through gh only" "got exit $EXIT: $OUT"
+  fi
+done
+
 # --help survives the header the bundler prepends to every copy under skills/*/references/.
 HCOPY="$TMPROOT/bundled-copy.sh"
 { head -1 "$SCRIPT"; echo "# <!-- AUTO-GENERATED — DO NOT EDIT -->"; tail -n +2 "$SCRIPT"; } > "$HCOPY"
