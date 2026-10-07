@@ -5,7 +5,7 @@ type: task
 description: "The shared code-review prompt names its line coordinate unambiguously (the line in the PR-head source file, never the patch) and quotes the line it means, and a shared checker verifies every path:line anchor against the file before any of the four dispatching skills renders, posts or gates on it."
 tags: [review-pr, review-code, qa-task, qa-story, code-review-prompt, observation]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-10-07
 updated: 2026-10-07
@@ -16,7 +16,8 @@ github_issue: 595
 
 # Technical Task: Code-review findings anchor to source lines
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.194.review.1.code-review-anchors-name-source-lines.md` implemented 2026-10-07
 **GitHub Issue**: [#595](https://github.com/Gamaroff/agent-skills/issues/595)
 
 ---
@@ -122,28 +123,41 @@ that dispatch the code reviewer: `/review-pr`, `/review-code`, `/qa-task` and `/
 
     | Verdict | Meaning |
     |---|---|
-    | `ok` | the line exists and `line_text`, when given, matches it after trimming |
+    | `ok` | the line exists and `line_text` matches it: both sides have runs of whitespace collapsed to one space and are trimmed, and `line_text` may be a substring of the line |
     | `unchecked-text` | the line exists, but no `line_text` was given (range checked only) |
-    | `no-line` | the anchor is not `path:line`, so there is nothing to check (an AC id, or a bare path) |
+    | `no-line` | the anchor is not `path:line`, so there is nothing to check: an AC id, a bare path, a range (`x.ts:42-58`), or a compound `ref` such as `AC-3 / x.js:8`. A path never contains whitespace, so the anchor pattern is `^(\S+):(-?\d+)$` |
     | `no-such-file` | the path does not exist at the PR head |
     | `out-of-range` | the line is greater than the file's line count, or less than 1 |
     | `text-mismatch` | the line exists but its text is not `line_text` |
 
-  - A CLI: `--findings-file <json> --root <dir> [--rev <git-rev>] --json`. With `--rev`, it reads the
-    file with `git show <rev>:<path>`, so a merged PR or a different checked-out branch is checked
-    against the right tree. The exit codes follow the repository convention: 0 when every anchor is
-    `ok`, `unchecked-text` or `no-line`; 1 when any is malformed; 2 on a usage error. `reason` is
-    `ok` or `malformed-anchors`. `--json` lists the verdict for each finding.
+  - A CLI: `--findings-file <json> --root <dir> [--rev <git-rev>] [--annotate <out-file>] --json`.
+    With `--rev`, it reads the file with `git show <rev>:<path>`, so a merged PR or a different
+    checked-out branch is checked against the right tree. With `--annotate`, it writes the input JSON
+    back to `<out-file>` with each finding carrying `anchor_check: <verdict>`, so a caller's jq can
+    filter on the verdict without joining two files. The exit codes follow the repository
+    convention: 0 when every anchor is `ok`, `unchecked-text` or `no-line`; 1 when any is malformed;
+    2 on a usage error. `reason` is `ok` or `malformed-anchors`. `--json` lists the verdict for each
+    finding.
+  - **The verdict key is `anchor_check`, everywhere.** `/review-pr`'s `--inline` jq already uses
+    `anchor` as a temporary key holding the `path:line` (`skills/review-pr/SKILL.md:835`). A verdict
+    under the same name would be overwritten there, and the filter would drop every finding.
   - The two non-ok families are kept apart on purpose. `no-line` means "nothing to verify", which is
     correct for an AC reference. `out-of-range` and `text-mismatch` mean "the reviewer is wrong".
-- **Callers.** Each dispatcher runs the checker on the parsed findings, before it renders, posts or
-  maps anything to a gate:
+- **Callers.** Each dispatcher writes the parsed findings to a `mktemp` JSON file and runs the
+  checker on it, in the same fenced block, before it renders, posts or maps anything to a gate:
   - A malformed anchor is **not dropped**. It renders with the marker `⚠️ unverified anchor`, is
     removed from the `--inline` set (it goes to the summary comment instead), and is never mapped to
     the gate `top_issues[]` with a location it does not have.
   - `/review-pr` records the verdicts in the report's scope note. Its machine-readable `ref` keeps the
-    reviewer's value and gains `anchor: <verdict>`, so `/qa-fix` can tell a verified location from an
-    unverified one.
+    reviewer's value and gains `anchor_check: <verdict>`, so `/qa-fix` can tell a verified location
+    from an unverified one.
+  - **Which tree each caller checks** (`--rev`):
+
+    | Caller | `--rev` | Why |
+    |---|---|---|
+    | `/review-pr` | `origin/$HEAD_BRANCH`; the PR head SHA (`gh pr view --json headRefOid`) on the API-diff route | Step 4 already fetches the head branch; a merged or cross-fork PR has none |
+    | `/qa-task`, `/qa-story` | `HEAD` | their diff is `$BASE...HEAD`, so uncommitted edits are not under review |
+    | `/review-code` | none for a working-tree target; the PR head for a PR target | a working-tree review reviews the files on disk |
 
 ### Important Clarifications
 
@@ -177,7 +191,7 @@ that dispatch the code reviewer: `/review-pr`, `/review-code`, `/qa-task` and `/
 
 ## 5. Breaking Changes
 
-**None — API stable.** `line_text` is a new optional field, and `anchor` in `/review-pr`'s
+**None — API stable.** `line_text` is a new optional field, and `anchor_check` in `/review-pr`'s
 machine-readable block is a new optional key. Readers that ignore unknown keys are unaffected.
 Existing reports without either field stay valid.
 
@@ -191,9 +205,9 @@ Existing reports without either field stay valid.
 
 **Files**: `shared/resources/code-review-prompt.md`, `shared/resources/pr-conformance-prompt.md`
 
-- [ ] Define `file_line` as the PR-head source line (the `+` side), never a patch line, at the `Rules:` bullet that currently reads "from the diff"
-- [ ] Add `line_text` to the schema example and the rules (trimmed source text of that line)
-- [ ] State the same rule for a `path:line` `ref` in the conformance prompt, with `line_text` optional
+- [x] Define `file_line` as the PR-head source line (the `+` side), never a patch line, at the `Rules:` bullet that currently reads "from the diff"
+- [x] Add `line_text` to the schema example and the rules (trimmed source text of that line)
+- [x] State the same rule for a `path:line` `ref` in the conformance prompt, with `line_text` optional
 
 **Dependencies**: none.
 
@@ -201,9 +215,9 @@ Existing reports without either field stay valid.
 
 **Files**: `shared/resources/finding-anchors.js`, `shared/resources/tests/finding-anchors.test.mjs`
 
-- [ ] `checkAnchors(findings, { readFile })`: pure, reads `file_line` or `ref`, returns the six verdicts
-- [ ] CLI with `--findings-file`, `--root`, `--rev`, `--json`; exit 0/1/2; `reason` `ok` / `malformed-anchors`
-- [ ] Unit tests, including the PR #594 shape and the long-file control (Testing Strategy)
+- [x] `checkAnchors(findings, { readFile })`: pure, reads `file_line` or `ref` with the pattern `^(\S+):(-?\d+)$`, returns the six verdicts
+- [x] CLI with `--findings-file`, `--root`, `--rev`, `--annotate`, `--json`; exit 0/1/2; `reason` `ok` / `malformed-anchors`
+- [x] Unit tests, including the PR #594 shape and the long-file control (Testing Strategy)
 
 **Dependencies**: Phase 1 fixes the field names the checker reads.
 
@@ -211,10 +225,12 @@ Existing reports without either field stay valid.
 
 **Files**: `skills/review-pr/SKILL.md`, `skills/review-code/SKILL.md`, `skills/qa-task/SKILL.md`, `skills/qa-story/SKILL.md`
 
-- [ ] `review-pr` Step 6: run the checker before rendering; mark malformed anchors; add `anchor:` to the machine-readable block; drop malformed anchors from the `--inline` set
-- [ ] `review-code`: run it before render, `--comment` and `--fix` (a `--fix` must never edit an unverified line)
-- [ ] `qa-task` Step 3b and `qa-story` Phase 1.6: run it before render and before the `top_issues[]` mapping
-- [ ] `npm run bundle`, then `npm run bundle:check`
+- [x] `review-pr` Step 6: run the checker with `--annotate` before rendering; mark malformed anchors; add `anchor_check:` to the machine-readable block; the `--inline` jq reads the annotated file and keeps only `anchor_check` `ok` or `unchecked-text`
+- [x] `review-code`: run it before render, `--comment` and `--fix` (a `--fix` must never edit an unverified line); same `--inline` filter
+- [x] `qa-task` Step 3b and `qa-story` Phase 1.6: run it with `--rev HEAD` before render and before the `top_issues[]` mapping
+- [x] Each call writes the findings JSON with `mktemp` and runs the checker in the same fenced block, with `--rev` per the Callers table
+- [x] Extend the jq-run tests in `skills/review-pr/tests/review-pr.test.js` and `skills/review-code/tests/review-code.test.js`: an annotated fixture where `text-mismatch` is excluded and `ok` / `unchecked-text` are kept
+- [x] `npm run bundle`, then `npm run bundle:check`
 
 **Dependencies**: Phase 2.
 
@@ -222,8 +238,8 @@ Existing reports without either field stay valid.
 
 **Files**: `evals/shared/tests/finding-anchors-callers.test.mjs`, `CHANGELOG.md`
 
-- [ ] Population test: the set of `SKILL.md` files that dispatch `code-review-prompt.md` is derived by grep, and each must invoke `finding-anchors.js`; non-vacuity floor of 4
-- [ ] CHANGELOG `[Unreleased]` › Fixed entry
+- [x] Population test: the population is every `skills/*/SKILL.md` that mentions `code-review-prompt.md` (the bare filename, so a dispatcher phrased differently is still caught), minus a cite-only allowlist that is empty today and needs a reason per entry. Each member must invoke `finding-anchors.js`, carry the `⚠️ unverified anchor` marker, and state its rule for `--fix` (review-code) or `top_issues[]` (qa-task, qa-story); non-vacuity floor of 4
+- [x] CHANGELOG `[Unreleased]` › Fixed entry
 
 **Dependencies**: Phase 3.
 
@@ -250,6 +266,7 @@ dispatching it, so they are excluded.
 
 8. 🆕 `shared/resources/tests/finding-anchors.test.mjs`: engine unit tests (already reached by the `npm test` glob `'shared/resources/tests/*.test.mjs'`)
 9. 🆕 `evals/shared/tests/finding-anchors-callers.test.mjs`: population guard (reached by `'evals/shared/tests/*.test.mjs'`)
+10. ✅ `skills/review-pr/tests/review-pr.test.js` and `skills/review-code/tests/review-code.test.js`: extend the existing tests that extract and run the `--inline` jq program (`review-pr.test.js:708`, `review-code.test.js:282`)
 
 ### Files to Modify (Dependencies)
 
@@ -257,8 +274,8 @@ None. Node built-ins only (`node:fs`, `node:child_process`).
 
 ### Files to Modify (Documentation)
 
-10. ✅ `CHANGELOG.md`
-11. Generated: `skills/{review-pr,review-code,qa-task,qa-story}/references/{code-review-prompt.md,finding-anchors.js}`, and `review-pr/references/pr-conformance-prompt.md`, via `npm run bundle`. Never hand-edited.
+11. ✅ `CHANGELOG.md`
+12. Generated: `skills/{review-pr,review-code,qa-task,qa-story}/references/{code-review-prompt.md,finding-anchors.js}`, and `review-pr/references/pr-conformance-prompt.md`, via `npm run bundle`. Never hand-edited.
 
 ### Files to Delete
 
@@ -276,11 +293,18 @@ None.
   - **Control: a long file where a wrong line is in range** (the case the motivating incident does
     not show). A 120-line file, `file_line` 77 with `line_text` taken from line 8 gives
     `text-mismatch`. The same file with the correct line gives `ok`.
-  - The other verdicts: `no-such-file`, `no-line` (`AC-3`, a bare path), `unchecked-text` (no
-    `line_text`), and line `0` or a negative line giving `out-of-range`.
-  - Whitespace: `line_text` with different indentation still matches (both sides trimmed).
+  - The other verdicts: `no-such-file`, `no-line` (`AC-3`, a bare path, a range `x.ts:42-58`, and the
+    compound `ref` `AC-3 / scripts/smoke/slugify.js:8` the conformance lens emitted on PR #594),
+    `unchecked-text` (no `line_text`), and line `0` or a negative line giving `out-of-range`.
+  - Whitespace: `line_text` with different indentation or internal spacing still matches (both sides
+    collapsed and trimmed); a `line_text` that is a substring of the line matches.
+  - **SC-7:** a counting injected `readFile`; three findings on two paths give exactly two reads.
   - CLI: exit 0 when every finding is clean, 1 on any malformed anchor, 2 on a missing
-    `--findings-file`; `--json` gives one verdict per finding; `--rev` reads through `git show`.
+    `--findings-file`; `--json` gives one verdict per finding; `--rev` reads through `git show`;
+    `--annotate` writes the input back with `anchor_check` on every finding.
+- **`--inline` filter (SC-6):** the existing tests that extract and run the `--inline` jq program from
+  `skills/review-pr/SKILL.md` and `skills/review-code/SKILL.md` gain an annotated fixture. A
+  `text-mismatch` finding is excluded; `ok` and `unchecked-text` findings are posted.
 - **Command**: `command node --test shared/resources/tests/finding-anchors.test.mjs`
 
 ### Integration Tests
@@ -309,27 +333,28 @@ Not applicable. One file read per distinct path, over at most 20 findings per le
 
 ### Functional
 
-- [ ] **SC-1** `code-review-prompt.md` defines `file_line` as the PR-head source line and explicitly excludes a patch-file line
-- [ ] **SC-2** `code-review-prompt.md`'s schema and rules carry `line_text`
-- [ ] **SC-3** `checkAnchors` returns each of the six verdicts on the inputs named in Testing Strategy, including `out-of-range` for the PR #594 shape and `text-mismatch` for the long-file control
-- [ ] **SC-4** The CLI exits 0, 1 and 2 as specified, and `--rev` reads the file at that revision
-- [ ] **SC-5** All four dispatchers run the checker before rendering; a malformed anchor renders with `⚠️ unverified anchor` and is never dropped
-- [ ] **SC-6** No malformed anchor reaches `--inline` posting, a `review-code --fix` edit, or a `top_issues[]` entry with that location
+- [x] **SC-1** `code-review-prompt.md` defines `file_line` as the PR-head source line and explicitly excludes a patch-file line
+- [x] **SC-2** `code-review-prompt.md`'s schema and rules carry `line_text`
+- [x] **SC-3** `checkAnchors` returns each of the six verdicts on the inputs named in Testing Strategy, including `out-of-range` for the PR #594 shape and `text-mismatch` for the long-file control
+- [x] **SC-4** The CLI exits 0, 1 and 2 as specified, and `--rev` reads the file at that revision
+- [x] **SC-5** (documentation) Each of the four dispatcher `SKILL.md` files runs the checker in a fenced block before rendering, and states that a malformed anchor renders with `⚠️ unverified anchor` and is never dropped. Held by the population test.
+- [x] **SC-6a** No malformed anchor reaches `--inline` posting. Held by the extended jq-run tests in `review-pr.test.js` and `review-code.test.js`.
+- [x] **SC-6b** (documentation) `review-code/SKILL.md` says `--fix` skips a malformed finding; `qa-task/SKILL.md` and `qa-story/SKILL.md` say a malformed finding's `top_issues[]` entry carries `(location unverified: …)`. Held by the population test.
 
 ### Performance
 
-- [ ] **SC-7** The checker reads each distinct path once per run
+- [x] **SC-7** The checker reads each distinct path once per run. Held by the counting-`readFile` unit test.
 
 ### Code Quality
 
-- [ ] **SC-8** `npm test` passes, with the two new test files reached by existing globs
-- [ ] **SC-9** `npm run bundle:check` passes, with no `UNREACHED` copy
-- [ ] **SC-10** `python skills/create-skill/scripts/quick_validate.py skills/<skill>` passes for each of the four skills
-- [ ] **SC-11** Mutation proof: removing the checker call from any one dispatcher turns the population test red, and removing the `line_text` comparison turns the long-file control red
+- [x] **SC-8** `npm test` passes, with the two new test files reached by existing globs
+- [x] **SC-9** `npm run bundle:check` passes, with no `UNREACHED` copy
+- [x] **SC-10** `python skills/create-skill/scripts/quick_validate.py skills/<skill>` passes for each of the four skills
+- [x] **SC-11** Mutation proof: removing the checker call from any one dispatcher turns the population test red, and removing the `line_text` comparison turns the long-file control red
 
 ### Migration
 
-- [ ] **SC-12** CHANGELOG `[Unreleased]` › Fixed entry names the four skills and the new field
+- [x] **SC-12** CHANGELOG `[Unreleased]` › Fixed entry names the four skills and the new field
 
 ---
 
@@ -395,6 +420,9 @@ None.
 | Date       | Version | Description                                    | Author      |
 | ---------- | ------- | ---------------------------------------------- | ----------- |
 | 2026-10-07 | 1.0     | Initial draft — cut from observation #290 | create-task |
+| 2026-10-07 | 1.1     | Review 1 (6/10 → 9/10): anchor pattern `^(\S+):` (compound ref was parsed as a path); `--annotate` + `anchor_check` key; `--rev` per caller; bare-filename population; SC-5/SC-6 re-scoped, SC-7 test named | review-task |
+| 2026-10-07 |         | Status → ready-for-development | review-task |
+| 2026-10-07 |         | Implemented — 1 engine + 1 test file, 2 prompts, 4 dispatcher skills, 3 test files extended/added (28 new cases); status → ready-for-review | develop |
 <!-- change-log-end -->
 
 ---
@@ -403,19 +431,68 @@ None.
 
 ### Phase 1: Prompt contract
 
-- [ ] Complete
+- [x] Complete
 
 ### Phase 2: Checker engine
 
-- [ ] Complete
+- [x] Complete
 
 ### Phase 3: Wire the four dispatchers
 
-- [ ] Complete
+- [x] Complete
 
 ### Phase 4: Population guard and release notes
 
-- [ ] Complete
+- [x] Complete
+
+---
+
+## Implementation Summary
+
+**Completion Date**: 2026-10-07 (develop-task run 1, inline implementation from the plan)
+
+**Approach**: four phases from the plan, in order, with review 1's seven fixes applied first. The
+engine and its tests came before the wiring, so each dispatcher's block was written against a
+checker that already ran.
+
+- **Phase 1**: `code-review-prompt.md` defines `file_line` as the PR-head line (the `+` side of the
+  hunk header) and never a patch line, names `<DIFF_FILE>` in the rule, and adds `line_text` to the
+  schema and rules. `pr-conformance-prompt.md` states the same rule for a `path:line` `ref`, citing
+  its sibling by bare filename.
+- **Phase 2**: `shared/resources/finding-anchors.js` (CommonJS, `require.main` guard): pure
+  `checkAnchors` with a per-run read cache, the anchor pattern `^(\S+):(-?\d+)$`, collapse-and-substring
+  text matching, and a CLI with `--findings-file`, `--root`, `--rev` (`git show`, path confined to
+  the root), `--annotate` (writes `anchor_check` on each finding) and `--json`; exit 0/1/2.
+- **Phase 3**: `/review-pr` Step 6 runs the checker against the PR head (`origin/<head>`, or
+  `FETCH_HEAD` after `git fetch origin pull/<n>/head` on the API route) before rendering, marks
+  malformed anchors, adds `anchor_check` to the machine-readable block (five rules now), and filters
+  `--inline` on it. `/review-code` gains Step 2b (no `--rev` for working-tree targets, `HEAD` for a
+  range or PR), the render marker, the `--inline` filter and the `--fix` skip. `/qa-task` Step 3b and
+  `/qa-story` Phase 1.6 write the block to a `mktemp` file through a quoted heredoc (`line_text`
+  quotes source, which carries quotes and dollar signs), run the checker with `--rev HEAD`, mark the
+  finding in `## Code Review` and the report template, and map a malformed bug into `top_issues[]` as
+  `(location unverified: …)` with `file: null` for `no-such-file`. `npm run bundle`: closure +1 for
+  each of the four skills (`finding-anchors.js`).
+- **Phase 4**: `evals/shared/tests/finding-anchors-callers.test.mjs` (population on the bare
+  filename, empty `CITE_ONLY`, floor 4; `FINDING_ANCHORS_ROOT` for mutation proofs) and the
+  CHANGELOG `[Unreleased]` › Fixed entry.
+
+**Testing Results**: `finding-anchors.test.mjs` 19/19; `finding-anchors-callers.test.mjs` 9/9;
+`review-pr.test.js` 248/248 (600 s at load average 65–80; the slowest cases are the pre-existing
+Step 0b shell tests). Mutation proofs: removing the call from `qa-story` (in a copy) turned its
+population case red; replacing the `line_text` comparison with `true` turned the long-file control
+and the mismatch-detail case red; removing the `anchor_check` select from `review-pr`'s `--inline`
+jq turned the jq-run test red; restoring the plan's original `^(.+?):` turned the compound-`ref`
+case red. Every original was restored and compared with `cmp`. `bundle:check`: 129 skills, 0
+problems. `quick_validate.py`: all four skills valid. Fast gate (`npm run ci:fast`, `.agents/skills`
+moved aside): 5474/5477 pass; the 2 failures were the LOAD-SENSITIVE file-budget assertions in
+`bundle-missing-source.test.js` and `test-clean-checkout.test.js` (load average 45–80), both green
+run alone (`fail 0`); the same `test-clean-checkout.test.js` failed on a clean `develop` worktree
+under the same load.
+
+**Deferred Work**: none. The integration run (`/review-pr 594` against the fixture branch) is QA's
+to record (Testing Strategy § Integration Tests). The review's two Optional items (a minimum
+`line_text` length; pinning the range anchor, which is done) stay as written in the review report.
 
 ---
 
@@ -441,4 +518,4 @@ None.
 
 ### Future Improvements
 
-- `/qa-fix` ingester: skip or flag findings whose `anchor:` is not `ok`.
+- `/qa-fix` ingester: skip or flag findings whose `anchor_check:` is malformed.
