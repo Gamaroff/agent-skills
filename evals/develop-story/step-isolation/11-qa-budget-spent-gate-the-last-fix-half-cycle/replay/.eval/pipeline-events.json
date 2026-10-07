@@ -21,6 +21,6 @@
   {"skill":"qa-fix","args":"gate=docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/story.5.1.gate.5.example.yml","status":"completed","timestamp":10500},
   {"skill":"qa-story","args":null,"status":"started","timestamp":11000},
   {"skill":"qa-story","args":null,"status":"completed","timestamp":11500},
-  {"skill":"review-pr","args":"--effort medium --comment","status":"started","timestamp":12000},
-  {"skill":"review-pr","args":"--effort medium --comment","status":"completed","timestamp":12500}
+  {"skill":"review-pr","args":"--effort medium --comment --no-code","status":"started","timestamp":12000},
+  {"skill":"review-pr","args":"--effort medium --comment --no-code","status":"completed","timestamp":12500}
 ]

@@ -745,7 +745,7 @@ ALWAYS use this exact template structure:
 
 ## Code Review Findings
 
-{rendered CR-* findings, or "None."}
+{rendered CR-* findings, "None.", or "Skipped (`--no-code`)." — never "None." for a lens that did not run}
 
 **Anchors:** {n} checked against `{HEAD_REV}` (via `{HEAD_VIA}`; `merge-commit` means a squash-merged Bitbucket PR, checked against the merge result) — {m} unverified ({verdict counts}), or "all verified"
 
@@ -1002,8 +1002,8 @@ copy that file and its transitive dependencies into this skill, which does not n
 (`/develop-bug` does not call this skill — it runs its own verify loop.)
 
 **Only the conformance lens is new value there.** Those pipelines' QA step already runs the code
-reviewer every cycle with `code_review_blocking=true`, so 5c's code lens is duplication. Its
-conformance lens is not duplicated anywhere: whether the diff *covers* what the work item promised,
+reviewer every cycle with `code_review_blocking=true`, so 5c passes `--no-code` and runs the
+conformance lens alone; its verdict comes from conformance findings only. The conformance lens is not duplicated anywhere: whether the diff *covers* what the work item promised,
 whether it drifted outside that *scope*, whether the artifact *trail* is complete and honest, and
 whether the work item is *consistent* with what shipped. That gap is why the wiring exists.
 

@@ -21,6 +21,6 @@
   {"skill":"qa-fix","args":"gate=docs/tasks/task.42.example/task.42.gate.5.example.yml","status":"completed","timestamp":10500},
   {"skill":"qa-task","args":null,"status":"started","timestamp":11000},
   {"skill":"qa-task","args":null,"status":"completed","timestamp":11500},
-  {"skill":"review-pr","args":"--effort medium --comment","status":"started","timestamp":12000},
-  {"skill":"review-pr","args":"--effort medium --comment","status":"completed","timestamp":12500}
+  {"skill":"review-pr","args":"--effort medium --comment --no-code","status":"started","timestamp":12000},
+  {"skill":"review-pr","args":"--effort medium --comment --no-code","status":"completed","timestamp":12500}
 ]

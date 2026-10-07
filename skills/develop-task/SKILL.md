@@ -214,7 +214,8 @@ See `references/develop-pipeline-step-4-create-pr.md` for the full Step 4 protoc
 See `references/develop-pipeline-step-5-6-qa-loop.md` for the full Steps 5–6 protocol: QA cycle counter setup, gate file location, QA skill invocation (with lite mode directive), PASS/CONCERNS/FAIL branching, no-code-change HALT, qa-fix invocation, commit/push per cycle, escalation entry, and loop limit HALT message.
 
 **The loop's exit gate is Step 5c — `/review-pr`, not the QA gate.** A gate that reads `PASS` or
-`WAIVED` hands to 5c, which runs `/review-pr --effort {medium|low} --comment` over the open PR.
+`WAIVED` hands to 5c, which runs `/review-pr --effort {medium|low} --comment --no-code` over the open PR —
+the conformance lens only, since the QA step already ran the code reviewer.
 `REQUEST CHANGES` routes back to 5b `/qa-fix` and consumes a cycle from the **shared** 5-cycle
 budget; `CONCERNS` records findings without blocking; `APPROVE` exits to Step 7. The
 `ready-for-merge` stage fires there, after the review clears — not on the QA gate. `/review-pr`
