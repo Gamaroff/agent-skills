@@ -55,6 +55,20 @@ Canonical filename patterns used across the library. Skills enforce these patter
 | Definition of Done | `task.{n}.dod.{n}.{name}.md` | `task.44.dod.1.database-migration.md` |
 | Tracker handover | `task.{n}.handover.{n}.{name}.{md,sh,json}` | `task.44.handover.1.database-migration.md` |
 
+### General bug artifacts
+
+Co-located in `docs/bugs/bug.{number}.{name}/`.
+
+| Artifact | Pattern | Example |
+|---|---|---|
+| Review report (`/review-bug`) | `bug.{n}.{name}.review.{n}.{name}.md` | `bug.7.login-timeout.review.1.fix-readiness.md` |
+| Implementation report (`/develop-bug`) | `bug.{n}.implementation.{n}.{name}.md` | `bug.7.implementation.1.login-timeout.md` |
+| Definition of Done (`/finalise --bug`) | `bug.{n}.dod.{n}.{name}.md` | `bug.7.dod.1.login-timeout.md` |
+
+The review report carries the bug file's full stem; the other two carry the short id. Readers of the
+implementation report also accept the full-stem form older runs wrote. No PR review row yet:
+`/review-pr` does not state the prefix it uses beside a general bug.
+
 ### Epic and PRD artifacts
 
 | Artifact | Pattern | Example |

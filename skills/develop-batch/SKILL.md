@@ -286,8 +286,10 @@ and `inflight[r] ≤` a probe's effective capacity when one is configured. In-fl
    > operations; do not touch the main working tree or any sibling worktree.
    > For the Phase 0d Upfront Setup questions, take the auto-derived recommended option
    > for every question without prompting (Q1 = base branch, `<baseBranch>`; Q2 = base
-   > branch, `<baseBranch>`). For the Phase 0b resume prompt, choose "Resume from last
-   > completed step". Record every auto-answer in the Decisions Log. Run the pipeline to
+   > branch, `<baseBranch>`). For the Phase 0b resume prompt, take the option Phase 0b
+   > marks **(Recommended)** — after a finalise DoD-gaps halt that is "Re-enter QA at
+   > 5a"; only when no option is marked, choose "Resume from last completed step".
+   > Record every auto-answer in the Decisions Log. Run the pipeline to
    > an open, green, `accepted` PR and report back the PR number and final QA status.
    > Do **not** merge the PR — the batch orchestrator owns merging. All existing HALT
    > conditions remain HALTs.
@@ -449,6 +451,13 @@ merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
          fi ;;
      esac
      ```
+
+     **The engine is not always a quick check.** With `ci.docsOnly.checkCommand` configured, it runs
+     that command inside the call, and a test suite there can outlive the tool timeout. So either
+     re-sample the head's rollup once first and call the engine only if the head is still pending, or
+     run the block backgrounded with its output in a file (`> .claude/state/ci-tree-eq.log 2>&1`),
+     ending it with `echo "CI_TREE_EQ=$CI_TREE_EQ"`, and read that line on the notification — never
+     as a foreground call (obs #270).
 
      When `CI_TREE_EQ` is set, the PR head's own CI has **not** finished and the reading is satisfied
      because every file changed since a green first-parent ancestor is documentation (per

@@ -313,6 +313,46 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **The 2026-10-06 observation review lands 48 prose rules across the pipeline skills.** Each one
+  closes an observed failure. They are grouped here by where they act:
+  - **QA (`qa-task`, `qa-story`, `qa-fix`).** A success criterion with no test is verified against
+    `file:line` in the code, never against the checkbox, and is classified the way `/finalise` will
+    classify it. A boundary with zero probes executed is a QA finding, not a `reasoned` pass.
+    Provenance checks the work item's scope before calling a finding pre-existing. A promoted
+    finding's severity is lowered only with a measured check. Mutation proofs wait for the diff
+    reviewer to return. The cycle-2 refute pass now probes resource bounds. qa-task Step 13
+    re-checks the read-back before posting. qa-story's gate path is the story directory. qa-fix
+    writes one Change Log row per fix cycle and gains probes for writer idempotency, input classes
+    and new refusals over a shared input (obs #183, 194, 210, 212, 224, 226, 231, 236, 237, 238,
+    248, 249, 254, 266, 267, 276).
+  - **`/finalise` and its DoD prompts.** "Each/every" criteria are checked member by member. A
+    wall-clock figure must record its load and be measured on the head commit. A 5c pr-review
+    report fills the PR-approved column when the host requires no reviews. A zero-probe FAIL lists
+    only the remedies that clear the guard. The DoD section lands above the change-log markers. The
+    tree-equivalence call is backgrounded. Indented gap checkboxes are counted. Repository-state
+    refusals and assertion-backing test doubles are boundaries. Probe fixtures carry a colliding
+    sibling, and carried-over cases files are re-checked (obs #209, 212, 221, 223, 229, 232, 253,
+    259, 262, 268, 276).
+  - **Develop pipeline (`develop-pipeline-*` step docs, `develop-next`, `develop-batch`).** Any
+    yield to a background job is a wait. The fast gate runs backgrounded when it can outlive the
+    tool timeout. A first-time HIGH (`0, 0, 1`) no longer trips the convergence check. The pre-5c
+    commit is gated on the read-back in one block. A still-valid gate resumes at 5b. A step-5 lock
+    resumes at 5, never 6. Subagent budgets are armed at dispatch. Step 2 does not duplicate the
+    review skill's tracker comment. This cycle's bug reports are staged with the gate.
+    Orchestrators take the option Phase 0b marks Recommended (obs #171, 183, 187, 193, 195, 227,
+    246, 247, 250, 260, 270, 277).
+  - **`mutation-proving.md`.** A run that printed nothing is `not-run`. A new vacuity shape covers an
+    absence asserted after a wait. `git stash pop` is not tied to its own push. A covered count
+    assertion does not establish idempotency. A prose-to-code fix is proved at unit level (obs
+    #192, 214, 225, 237, 274).
+  - **Authoring (`create-skill`, `create-task`, `create-bug-report`, docs).** The shared-literal
+    rule sentence now survives bundling. Executed-prose tests bind only declared names.
+    Derived-value comparisons guard on non-empty. Adapted third-party material is pinned and
+    executed. Behavioural evidence needs a control case. The docs commit belongs on `develop`. A
+    cross-repository blocker is free text, never `task.N`. traps.md covers `NODE_TEST_CONTEXT`, the
+    eval recipes cover clean-fixture claims, and file-naming.md lists general-bug artifacts (obs
+    #175, 176, 185, 188, 202, 240, 243, 244, 251, 256, 272, 273).
+
 - **`/wireloom` is now `/wireframe`.** The skill directory moved to `skills/wireframe/` and its
   `name:` changed; `create-story` and `review-story` now invoke `wireframe`. The Wireloom DSL keeps
   its name: the ```` ```wireloom ```` fence, the `wireloom` npm package, `WIRELOOM_MODULE` and the

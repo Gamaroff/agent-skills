@@ -260,6 +260,13 @@ under zsh with no gate is not `0` — the pipeline never runs and the value is e
 puts the file there cannot see any of this: for every optional-file lookup, execute the block once
 with the file **absent**, under zsh.
 
+**A comparison of two derived values fails open the same way.** When a derivation fails, `$(…)`
+captures an empty string on both sides, `[ "" != "" ]` is false, and the guard never fires. So a
+guard that compares two derived values requires both to be non-empty first:
+`[ -n "$A" ] && [ -n "$B" ] && [ "$A" != "$B" ]`. Its test needs a mismatch case, not only a match.
+`/review-pr`'s first host check had a `sed` whose `|` delimiter collided with its `|` alternation;
+sed failed, both hosts came back empty, and a PR on the wrong host passed (task.176, obs #256).
+
 ### Shell matrices are derived from `zshAvailable()`, never hardcoded
 
 **The rule.** A test that spawns a shell takes its matrix from
@@ -278,18 +285,29 @@ was after `/finalise` had assembled its DoD. The repository already shipped the 
 **The criterion, stated honestly:** *both shells agree wherever both exist, and the matrix says which
 ran* — not *both shells always run*.
 
+**An executed-prose test binds only what the document declares.** A test that cuts a fenced block
+out of a shipped document binds its declared placeholders (`{name}`, `<name>`) and any input the
+document names as coming from an earlier step. Nothing else: no function stub for a word the
+document uses as prose, no variable another block sets, no env var the block reads unbound. Run
+each block in its own `run()` call, because an agent runs each block in a fresh shell; a value that
+crosses blocks crosses through a file the blocks themselves write and read. Any extra name the test
+must supply to make a block pass is the finding. task.147's tests prepended `HALT() { exit 1; }`
+and a `SCOPE_PATHS` array; both hid defects that only the QA gates found (obs #185).
+
 ### Inside `shared/resources/`, a `shared/resources/` literal is a bundling instruction
 
 **The rule.** In any file under `shared/resources/` — `.md` as much as `.js` — cite a sibling by
-**bare filename** (`see tracker-card-summary.md`, `the engine is change-log.js`). A literal
-`references/<file>` is not a reference; it is an instruction to the bundler to copy `<file>`
-into every skill that bundles the file you are writing. That is what the literal is *for* when a
-skill's own `SKILL.md` writes it, and it is the wrong tool inside a shared source, where the copy
-lands in every downstream skill whether or not any of them reads it. The bundler then reports the
-new copies as untracked, `bundle:check` fails on the committed tree, and the author learns the rule
+**bare filename** (`see tracker-card-summary.md`, `the engine is change-log.js`). A literal that
+puts the shared-resources directory in front of the filename is not a reference; it is an
+instruction to the bundler to copy `<file>` into every skill that bundles the file you are writing.
+That is what the literal is *for* when a skill's own `SKILL.md` writes it, and it is the wrong tool
+inside a shared source, where the copy lands in every downstream skill whether or not any of them
+reads it. The bundler then reports the new copies as untracked, `bundle:check` fails on the committed tree, and the author learns the rule
 from a red CI run rather than from the file that should have taught it (obs #114 — a test path cited
 in `authoring-card-preflight.md` cost a second push in one QA cycle). The rule lived only as a comment
 in `jira-sync.js`; it lives here now, and in AGENTS.md § Shared Resources.
+The literal is described in words here because a skill file cannot hold it: the bundler rewrote
+an earlier form of this sentence to name `references/<file>`, which says the opposite (obs #175).
 
 ### Cite or depend — a reference is one of two edges
 
@@ -487,6 +505,13 @@ When editing the (newly-generated or existing) skill, remember that the skill is
 #### Start with Reusable Skill Contents
 
 To begin implementation, start with the reusable resources identified above: `scripts/`, `references/`, and `assets/` files. Note that this step may require user input. For example, when implementing a `brand-guidelines` skill, the user may need to provide brand assets or templates to store in `assets/`, or documentation to store in `references/`.
+
+When `references/` adapts another project's documentation, the shipped tool is the authority, not
+the upstream docs. Pin the upstream version the skill documents, diff its docs against that
+version's changelog, and run every example through the shipped tool before bundling it. Then add a
+test that keeps the examples executable, with a floor on how many it finds. Wireloom's upstream
+`AGENTS.md` stopped at v0.5.2 while npm shipped 0.7.0, and 4 of its 35 examples did not parse
+(obs #244).
 
 Also, delete any example files and directories not needed for the skill. The initialization script creates example files in `scripts/`, `references/`, and `assets/` to demonstrate structure, but most skills won't need all of them.
 

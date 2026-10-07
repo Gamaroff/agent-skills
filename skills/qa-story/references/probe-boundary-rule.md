@@ -251,7 +251,12 @@ takes it.
     prints `12`. Name a cases file with `--cases-file <path>` whose `expected`
     is the function's own contract (`tests/fixtures/shell-fn/gh-labels.cases.json`
     is the one for `gh_labels_filter`); keep `--sink filename` — it selects the
-    materialised fixture directory the runner runs in.
+    materialised fixture directory the runner runs in. **A cases file carried
+    from an earlier cycle is re-checked before a reproduced case is reported:**
+    compare the case's `expected` with the committed suite's own cases and with
+    what the latest fix changed. A stale expectation is a cases-file edit, not a
+    finding (task.177 reported two at QA cycles 2 and 3). Prefer re-deriving the
+    cases each cycle (obs #259).
   - **A function or script whose body names `gh` is answered by a fixture, not
     the network:** add `--fake-gh <dir>`, a directory holding an executable `gh`
     (this repository's is `tests/fixtures/fake-gh`; a consumer supplies its
@@ -408,6 +413,14 @@ takes it.
   the engine can reach it, and §5.1 is how it is tested.
 - **No probe opens a network connection.** Both motivating defects are pure
   composers; if a target needs the network, that is a decline.
+- **A probe sees one input, not the population behind it.** When the
+  boundary's output is an identity — an id, key or path another command later
+  resolves — build the fixture through the producer the real path uses (the
+  engine's own scan, say), in a population that holds a colliding sibling
+  (same key, different record), and assert where the downstream resolver
+  lands, not only whether the boundary accepted the input. One entry per
+  fixture cannot see a coercion upstream or a first-match resolve downstream;
+  task.150 spent three QA cycles finding them one layer at a time (obs #209).
 
 The precondition — a pure-ish predicate, composer, single-argument script or
 argv-driven Node CLI — is what the boundary rule selects for anyway. If it turns

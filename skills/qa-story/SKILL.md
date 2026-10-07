@@ -414,6 +414,11 @@ as coverage for a defect this cycle fixed, **revert the behaviour it names and
 confirm that test goes red** — full procedure, the outcomes table, and the shapes
 vacuity takes: [`references/mutation-proving.md`](references/mutation-proving.md).
 
+**Mutate only a tree no other agent is reading.** A mutation makes the tree lie while it is applied.
+Run the proofs after the Phase 1.6 diff reviewer has returned, or in a scratch worktree
+(`git worktree add --detach "$SCRATCH" HEAD`), never in the working tree a dispatched reviewer is
+still reading (obs #266).
+
 **A green suite is also evidence about the platform it ran on, and only that platform.** When the change set passes an environment-derived value (`os.tmpdir()`, `$TMPDIR`, `$HOME`) to a consumer that validates it, the platform-variance check in the diff-review step applies here too: run the affected tests once under the other value (`TMPDIR=/tmp node --test …`) before crediting them as coverage. A suite that is green on macOS and red on Linux CI is not a flake; it is the fixture path failing a containment check it never met locally (obs #17).
 
 Run it as the procedure says, not from memory — the steps below exist because a
@@ -1048,6 +1053,12 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
    predicate, whether or not it touches a lifecycle: find one pair that must be the same and one
    that must differ. A key changed to fix one direction has usually broken the other.
 
+   Resource bounds — for every change that runs a configured command, compiles a caller-supplied
+   pattern, or loops over input it does not bound: a timeout must kill the whole process tree, not
+   only the `sh -c` it spawned; a matcher must stay linear on a repeated pattern (time it at growing
+   N); and the command must not run against a working tree it did not expect. No later cycle
+   re-reads code it did not change, so these bounds are probed here or not at all.
+
    Review the COMBINATION, not only each change: at least one real lifecycle defect of the shape
    above was caused by two earlier fixes that were each correct alone.
    ```
@@ -1111,7 +1122,11 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
    wrote — equal to `executed` in the engine's JSON), never counted by hand; the gate's
    `nfr_validation.security.evidence` may read `measured` only when that total is positive. An empty
    findings list with `probes_executed: 0` is a review that read the boundary and did not test it,
-   which is the defect this item closes. `boundary: false` is the common case and a legitimate skip — record it in the QA
+   which is the defect this item closes. So when `boundary: true` and the run record's
+   `totals.executed` is 0, that is a QA finding, not a `reasoned` pass: name the remedy in it — make
+   the entry reachable (an export, an entry form that fits), or record that the DoD will need an
+   override — because finalise's zero-guard fails the same record. By-hand probes never count toward
+   `probes_executed` (obs #212, #231). `boundary: false` is the common case and a legitimate skip — record it in the QA
    report's `## Code Review` section rather than leaving `probes_executed` absent. The record names
    each predicate-shaped function the diff adds and the signal it lacks — a `boundary: false` with no
    candidates named is not a decision (obs #156). The field is three-valued — `true | false | internal`:
@@ -1148,8 +1163,12 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
 5b. **Provenance — is a reproduced finding new to this change?** For every `category: bug` finding
    this step reproduced, run the same input against the PR **base** before it can enter the gate:
    `git show "origin/${BASE}:${file}"` into a scratch copy and execute the reproduction there, and
-   where a fixture corpus exists, scan it for the shape. **Identical output on base and zero corpus
-   hits ⇒ `pre-existing`**: record both measurements beside the finding, keep its severity and
+   where a fixture corpus exists, scan it for the shape. **Check scope before classifying.** When the
+   story names this defect class as in scope (its Overview, Motivation or Success Criteria list the
+   shape, or it names the residual id), identical output on base means the story is unfinished, not
+   that the finding is someone else's: keep it in `top_issues[]`, or route it to the story's
+   `## Deferred Work` with the criterion amended (obs #267). Out of scope, **identical output on base
+   and zero corpus hits ⇒ `pre-existing`**: record both measurements beside the finding, keep its severity and
    confidence exactly as returned, do **not** enter it in `top_issues[]`, and route it to the gate's
    `recommendations.future` with a named follow-up. Not a downgrade — only the attribution changes,
    and both measurements are in the report (obs #116; qa-task Step 3b carries the same rule).
@@ -1174,6 +1193,12 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
    ```
 
    `$CODE_REVIEW_BLOCKING_ARG` comes from the `code_review_blocking=` token in Skill `args` (see **Input Handling**). When `CR_BLOCKING=true`, append each `category: bug` + `confidence: high` finding to the gate `top_issues[]` as `{ id, severity, file, finding, suggested_action, suggested_owner: dev }` — `file` is the path from the finding's own `file:line`, which every code-review finding already carries; the existing **Gate Decision Criteria** then apply unchanged. Otherwise — resolved advisory, or every cleanup or non-high-confidence finding — the gate is **unaffected**.
+
+   **Re-rating a promoted finding.** QA may lower a promoted finding's severity only with a measured
+   plausibility check: a corpus count, and whether any writer or template in the repository can
+   produce the shape. Record the reviewer's original severity beside the new one, in the gate finding
+   and in the QA report. Confidence is never changed. Without the measurement, the returned severity
+   stands (obs #236).
 
 7. `rm -f "$DIFF_FILE"`.
 
@@ -1378,6 +1403,18 @@ an angle bracket in a `description`.)
 - Validate edge cases are handled
 - **Validate against Definition of Done Agent findings (Phase 1.5)** for AC implementation status
 - **Cross-reference Test Coverage Agent (Phase 1.5)** to ensure all ACs have test coverage
+
+**Classify each acceptance criterion the way finalise will, then verify it from evidence, never from its
+checkbox.** Finalise's AC agent (`finalise-dod-ac-prompt.md` Step 3, in the `finalise` skill) sorts
+every criterion into a behaviour criterion, which needs a committed test that runs per PR, or one of
+the test-free kinds Step 3 lists; that step owns the list. A criterion a named test holds cites the
+test. A criterion no test holds is verified by reading the code it describes: cite the `file:line`
+that makes it true, not the developer's checkbox or the implementation report's say-so, or mark it
+**unverified** (a measured criterion cites its committed measurement and command, as Step 3 asks).
+Performance and structural criteria ("defined once", "one pass", "offline") are the usual case,
+because no test carries them (obs #210). A behaviour criterion whose only evidence is a hand run,
+with no committed per-PR test, is a **MEDIUM** finding in `top_issues[]`, so it enters the fix loop
+rather than halting at finalise (obs #224).
 
 #### Phase 6: Documentation and Comments
 
@@ -1846,7 +1883,7 @@ For each issue in `top_issues`, include a `suggested_owner`:
 After review:
 
 1. Create QA report file: `story.[epic].[story].qa.[number].[descriptive-name].md` (co-located with story file)
-2. Create quality gate file: `{qa.qaLocation}/gates/[prd-path]/story.[epic].[story].gate.[number].[descriptive-name].yml`
+2. Create quality gate file: `story.[epic].[story].gate.[number].[descriptive-name].yml` (co-located with story file — the directory `qa-cycle.sh` searches; a gate written elsewhere is one no later step finds, obs #194)
 3. **Update Story/Task File with QA Results**:
 
    **Replace the whole `## QA Testing Results` section from the gate just written — never patch
@@ -1997,7 +2034,7 @@ After review:
    # From the repository root. {story-file} is the story (or task) document items 3a–3d just edited — substitute it; the script
    # refuses an unsubstituted placeholder (exit 2), so a block run as delivered
    # cannot pass by reading nothing.
-   node .agents/skills/qa-story/references/qa-read-back.js --doc "{story-file}"
+   command node .agents/skills/qa-story/references/qa-read-back.js --doc "{story-file}"
    ```
 
    `qa-read-back.js` is the read-back, defined once for both QA skills and tested directly
@@ -2856,7 +2893,7 @@ NFR assessment: {qa.qaLocation}/assessments/{epic}.{story}-nfr-{YYYYMMDD}.md
 **Always print at the end:**
 
 ```
-Gate NFR block ready → paste into {qa.qaLocation}/gates/{epic}.{story}-{slug}.yml under nfr_validation
+Gate NFR block ready → paste into {story-directory}/story.{epic}.{story}.gate.{N}.{slug}.yml under nfr_validation
 ```
 
 ### NFR Quick Reference

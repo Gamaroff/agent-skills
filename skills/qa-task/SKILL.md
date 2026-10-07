@@ -586,6 +586,12 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
    predicate, whether or not it touches a lifecycle: find one pair that must be the same and one
    that must differ. A key changed to fix one direction has usually broken the other.
 
+   Resource bounds — for every change that runs a configured command, compiles a caller-supplied
+   pattern, or loops over input it does not bound: a timeout must kill the whole process tree, not
+   only the `sh -c` it spawned; a matcher must stay linear on a repeated pattern (time it at growing
+   N); and the command must not run against a working tree it did not expect. No later cycle
+   re-reads code it did not change, so these bounds are probed here or not at all.
+
    Review the COMBINATION, not only each change: at least one real lifecycle defect of the shape
    above was caused by two earlier fixes that were each correct alone.
    ```
@@ -649,7 +655,11 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
    wrote — equal to `executed` in the engine's JSON), never counted by hand; the gate's
    `nfr_validation.security.evidence` may read `measured` only when that total is positive. An empty
    findings list with `probes_executed: 0` is a review that read the boundary and did not test it,
-   which is the defect this item closes. `boundary: false` is the common case and a legitimate skip — record it in the QA
+   which is the defect this item closes. So when `boundary: true` and the run record's
+   `totals.executed` is 0, that is a QA finding, not a `reasoned` pass: name the remedy in it — make
+   the entry reachable (an export, an entry form that fits), or record that the DoD will need an
+   override — because finalise's zero-guard fails the same record. By-hand probes never count toward
+   `probes_executed` (obs #212, #231). `boundary: false` is the common case and a legitimate skip — record it in the QA
    report's `## Code Review` section rather than leaving `probes_executed` absent. The record names
    each predicate-shaped function the diff adds and the signal it lacks — a `boundary: false` with no
    candidates named is not a decision (obs #156). The field is three-valued — `true | false | internal`:
@@ -686,8 +696,12 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
 5b. **Provenance — is a reproduced finding new to this change?** For every `category: bug` finding
    this step reproduced, run the same input against the PR **base** before it can enter the gate:
    `git show "origin/${BASE}:${file}"` into a scratch copy and execute the reproduction there, and
-   where a fixture corpus exists, scan it for the shape. **Identical output on base and zero corpus
-   hits ⇒ `pre-existing`**: record both measurements beside the finding, keep its severity and
+   where a fixture corpus exists, scan it for the shape. **Check scope before classifying.** When the
+   task names this defect class as in scope (its Overview, Motivation or Success Criteria list the
+   shape, or it names the residual id), identical output on base means the task is unfinished, not
+   that the finding is someone else's: keep it in `top_issues[]`, or route it to the task's
+   `## Deferred Work` with the criterion amended (obs #267). Out of scope, **identical output on base
+   and zero corpus hits ⇒ `pre-existing`**: record both measurements beside the finding, keep its severity and
    confidence exactly as returned, do **not** enter it in `top_issues[]`, and route it to the gate's
    `recommendations.future` with a named follow-up. This is not a downgrade — nothing about the
    finding changes except its attribution, and both measurements are in the report for the next
@@ -717,6 +731,12 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
 
    `$CODE_REVIEW_BLOCKING_ARG` comes from the `code_review_blocking=` token in Skill `args` (see **Pipeline Skill args**). When `CR_BLOCKING=true`, append each finding that is `category: bug` AND `confidence: high` to the gate `top_issues[]` as `{ id, severity, file, finding, suggested_action, suggested_owner: dev }` — `file` is the path from the finding's own `file:line`, which every code-review finding already carries (Step 10's deterministic rules then decide). Otherwise — resolved advisory, or every cleanup or non-high-confidence finding — the gate is **unaffected**.
 
+   **Re-rating a promoted finding.** QA may lower a promoted finding's severity only with a measured
+   plausibility check: a corpus count, and whether any writer or template in the repository can
+   produce the shape. Record the reviewer's original severity beside the new one, in the gate finding
+   and in the QA report. Confidence is never changed. Without the measurement, the returned severity
+   stands (obs #236).
+
 7. `rm -f "$DIFF_FILE"`.
 
 **Post-condition — the findings block is in hand.** This step ends when the dispatched reviewer's `code_review:` block is in hand and recorded. A dispatched review that has not returned is **outstanding**, and the pass is not complete: the gate step refuses to write a gate and the PR-comment step refuses to publish one while a review is outstanding. Waiting is bounded by the wall-clock budget in `references/develop-pipeline-autonomous-defaults.md` §Subagents; a reviewer past its budget is recorded as `killed at N minutes` (never `stalled`) and the pass is performed inline per that table, with the independence loss recorded. A reviewer that is **unavailable** (no subagent dispatch in this session) or **failed** (returned nothing usable) is handled by the same table — and **output-file size is not a liveness signal**: a small or stale output file says nothing about whether the reviewer is working. The reason this is written down: task.106's gate 1 (`PASS` 95) was written and posted while its diff review was still running; the review returned a high and a medium minutes later (obs #56).
@@ -730,6 +750,11 @@ A green suite says the tests ran, not that they can fail. Before crediting a tes
 as coverage for a defect this cycle fixed, **revert the behaviour it names and
 confirm that test goes red** — full procedure, the outcomes table, and the shapes
 vacuity takes: [`references/mutation-proving.md`](references/mutation-proving.md).
+
+**Mutate only a tree no other agent is reading.** A mutation makes the tree lie while it is applied.
+Run the proofs after the Step 3b diff reviewer has returned, or in a scratch worktree
+(`git worktree add --detach "$SCRATCH" HEAD`), never in the working tree a dispatched reviewer is
+still reading (obs #266).
 
 **A green suite is also evidence about the platform it ran on, and only that platform.** When the change set passes an environment-derived value (`os.tmpdir()`, `$TMPDIR`, `$HOME`) to a consumer that validates it, the platform-variance check in the diff-review step applies here too: run the affected tests once under the other value (`TMPDIR=/tmp node --test …`) before crediting them as coverage. A suite that is green on macOS and red on Linux CI is not a flake; it is the fixture path failing a containment check it never met locally (obs #17).
 
@@ -874,6 +899,18 @@ other `category: bug` finding. No new report or gate schema.
 ### Step 5: Verify Success Criteria
 
 For each success criterion, compare target vs actual:
+
+**Classify each success criterion the way finalise will, then verify it from evidence, never from its
+checkbox.** Finalise's AC agent (`finalise-dod-ac-prompt.md` Step 3, in the `finalise` skill) sorts
+every criterion into a behaviour criterion, which needs a committed test that runs per PR, or one of
+the test-free kinds Step 3 lists; that step owns the list. A criterion a named test holds cites the
+test. A criterion no test holds is verified by reading the code it describes: cite the `file:line`
+that makes it true, not the developer's checkbox or the implementation report's say-so, or mark it
+**unverified** (a measured criterion cites its committed measurement and command, as Step 3 asks).
+Performance and structural criteria ("defined once", "one pass", "offline") are the usual case,
+because no test carries them (obs #210). A behaviour criterion whose only evidence is a hand run,
+with no committed per-PR test, is a **MEDIUM** finding in `top_issues[]`, so it enters the fix loop
+rather than halting at finalise (obs #224).
 
 **Functional Criteria:**
 
@@ -1460,7 +1497,7 @@ Step 13**: a check that runs before the claim is written cannot check it.
 # From the repository root. {task-file} is the task document this QA run just edited — substitute it; the script
 # refuses an unsubstituted placeholder (exit 2), so a block run as delivered
 # cannot pass by reading nothing.
-node .agents/skills/qa-task/references/qa-read-back.js --doc "{task-file}"
+command node .agents/skills/qa-task/references/qa-read-back.js --doc "{task-file}"
 ```
 
 `qa-read-back.js` is the read-back, defined once for both QA skills and tested directly
@@ -1527,6 +1564,9 @@ fi
 **Write the body to a file, then post it.** Always `--body-file`, never an inline `--body`: the body below carries backticks, `$(…)` and newlines, and an inline string invites the shell to evaluate them before `gh` ever sees them. The file is also what the Bitbucket arm reads.
 
 ```bash
+# Step 12b's rule, re-checked here: every block runs as its own shell, and a run that
+# batches 12b and 13 drops the prose between them (obs #226).
+command node .agents/skills/qa-task/references/qa-read-back.js --doc "{task-file}" >/dev/null || { echo "HALT: read-back not clean — not posting"; exit 1; }
 mkdir -p .claude/state
 BODY_FILE=.claude/state/qa-comment-body.md
 cat > "$BODY_FILE" <<'EOF'

@@ -135,6 +135,12 @@ You don't need both local and CI live setups — pick one.
 | Agent backend (Gemini, Goose, Aider, …) | `evals/shared/drivers/<name>.mjs` (see `evals/shared/README.md#adding-a-driver-for-another-agent`) |
 | Structural assertion fn | `evals/shared/assertions.mjs` + register in `runner.mjs` switch + test in `evals/shared/tests/assertions.test.mjs` |
 
+**A scenario that expects a clean verdict is a claim that its fixture is clean.** Before its first
+live run, build the sandbox with `KEEP_SANDBOX=1` (the runner then leaves it in place), run the
+fixture's own checks inside it — its test command, every count its trail claims — and record the
+result. task.185's `/review-pr` "happy" fixture claimed "3 tests pass"; its test script ran one, and
+the skill under test returned REQUEST CHANGES, correctly (obs #273).
+
 ### 11. "I want to run the develop-task evals"
 
 ```bash

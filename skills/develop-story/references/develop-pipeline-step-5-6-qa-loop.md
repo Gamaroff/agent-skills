@@ -291,13 +291,15 @@ contract; the skills perform the writes. Canonical format:
 | Writer     | When                          | Row                                                     |
 | ---------- | ----------------------------- | ------------------------------------------------------- |
 | `qa-story` / `qa-task` | each QA cycle, alongside its QA Results section | `\| 2026-05-14 \|  \| QA gate CONCERNS (6/10) — 2 findings \| qa-story \|` |
-| `qa-fix`   | on **exiting** the fix loop   | `\| 2026-05-14 \|  \| QA findings fixed — gate PASS (9/10), 2 iterations \| qa-fix \|` |
+| `qa-fix`   | each fix cycle, after that cycle's gate row | `\| 2026-05-14 \|  \| QA findings fixed — cycle 2, 3 findings \| qa-fix \|` |
 
 Three rules make this loop's history readable rather than a churn log:
 
 - **`Version` stays blank.** Only `/finalise` bumps it, at acceptance.
-- **`qa-fix` writes once per loop exit, not once per finding or per cycle.** Put the iteration
-  count in the Description. The per-cycle detail already lives in the QA Iteration History section
+- **`qa-fix` writes once per fix cycle, not once per finding.** Append the row after the gate row
+  it answers and never rewrite an earlier one: `qa-fix` cannot see the loop's exit, and a rewritten
+  row reads as a dropped row to `change-log.js --check-append-only`. Put the cycle number in the
+  Description. The per-cycle detail already lives in the QA Iteration History section
   of the implementation report, which is its proper home.
 - **`qa-gate` writes nothing to the document — ever.** It owns the `.yml` and only the `.yml`.
   The verdict row is written by `qa-story` / `qa-task`, which already own document sections. See
@@ -382,6 +384,21 @@ to run (task.123 QA cycle 2, CR-4). The row's value set is exactly `{Proceeding 
 **On any gate that reaches 5c**, commit this cycle's gate `.yml` and QA report `.md` and push once
 before invoking `/review-pr` — there is no `fix(...)` commit on this path to carry them, and 5c reads
 the artifact trail off the branch. See **Where the gate and QA report get committed** in 5b.
+
+**That commit is conditional on the QA skill's read-back** (Step 12b, `qa-read-back.js`, exit 0).
+If you re-run the read-back here, run it in the same fenced block as the commit, with its output in a
+file, so a HALT stops the commit rather than scrolling past it:
+
+```bash
+RB_LOG=".claude/state/qa-read-back-${QA_CYCLE}.log"
+command node .agents/skills/{qa-task|qa-story}/references/qa-read-back.js --doc "{work item file}" \
+  > "$RB_LOG" 2>&1 || { cat "$RB_LOG"; exit 1; }
+git commit -m "{the path-1 message}"
+```
+
+Never pipe a gating check into `tail` or `head`: the exit status becomes `tail`'s, and a truncated
+HALT cannot be diagnosed after the fact (obs #260 — task.177 committed over a read-back HALT whose
+problem line `tail -1` had dropped).
 
 > **A clean gate no longer exits the loop on its own.** It hands to **5c**, which runs
 > `/review-pr` over the open PR and is the only thing that can exit to Step 7. The
@@ -533,10 +550,11 @@ the pipeline noticed.
    and deliberately does not count HIGH: the HIGH count stays the awk's (engine property 2), so the
    two guards can never disagree about it.
 
-3. **From cycle 3 onward, if `HIGH_N > 0` AND `HIGH_N >= HIGH_{N-1}` AND `HIGH_{N-1} >= HIGH_{N-2}`
-   — i.e. HIGH findings *remain* and the count has failed to strictly decrease across two
-   consecutive cycles — the loop is not converging. Stop and escalate.** Do not run 5b. Go to
-   **Loop Escalation** below and use the *QA Loop Not Converging* variant.
+3. **From cycle 3 onward, if `HIGH_N > 0` AND `HIGH_{N-2} > 0` AND `HIGH_N >= HIGH_{N-1}` AND
+   `HIGH_{N-1} >= HIGH_{N-2}` — i.e. HIGH findings were present at all three readings and the
+   count has failed to strictly decrease across two consecutive cycles — the loop is not
+   converging. Stop and escalate.** Do not run 5b. Go to **Loop Escalation** below and use the
+   *QA Loop Not Converging* variant.
 
    **`HIGH_N > 0` is a precondition, not a refinement.** The check exists to catch a loop that
    *fails to reduce* HIGH findings; a sequence with none has nothing to reduce. Without the
@@ -545,6 +563,11 @@ the pipeline noticed.
    exactly the sequence task.110 produced at cycle 3 (obs #71, #77), and the prose two paragraphs
    up already excluded it; the formula did not. State the precondition in the check itself so a
    reader implementing the formula cannot drop it.
+
+   **`HIGH_{N-2} > 0` is the same precondition, two readings back.** "Remain and stop falling"
+   needs a HIGH at every reading. A HIGH first raised at cycle N — `0, 0, 1` — has had no cycle to
+   be reduced: it is a defect in the last fix, not a loop that stopped working, and it routes to 5b
+   like any open queue (obs #227; task.140 escalated on exactly this sequence).
 
    Cycles 1 and 2 never trip it: the rule needs three readings to see a flat line, and a single
    flat cycle is normal.
@@ -557,6 +580,8 @@ the pipeline noticed.
    | `0, 0, 0` | **no** | `HIGH_N = 0`: nothing to reduce; the loop routes on the open queue (medium/low) instead |
    | `3, 0, 0` | no | `HIGH_N = 0` |
    | `2, 2, 1` | no | `1 >= 2` is false — the count fell |
+   | `0, 0, 1` | **no** | `HIGH_{N-2} = 0`: a first-time HIGH has had no cycle to be reduced; route to 5b |
+   | `0, 1, 1` | no, not yet | `HIGH_{N-2} = 0`; if the next gate reads `1` again, `1, 1, 1` trips |
 
    On the observed `7, 7, 7, 7, 4` sequence this trips at the end of cycle 3 — `7 >= 7` and
    `7 >= 7` — cutting three futile cycles.
@@ -1073,19 +1098,24 @@ After fixes are applied:
    this cycle's gate and QA report, which are still untracked. Gating before they are staged reports
    both links dead, and spends one of step 0a's two bounded attempts on the cycle's own evidence
    (obs #171; task.143 cycles 1 and 6: "attempt 1 red … gate.1/qa.1 were not yet staged, attempt 2
-   green after staging them"). Staging them here makes the gate measure the tree the `fix(...)`
-   commit will carry:
+   green after staging them"). The same holds for any bug report the cycle filed: the work item
+   links to it, and it is untracked too (task.146 cycle 1: gate.1, qa.1, bug.1 and bug.2 all read
+   dead). Staging them here makes the gate measure the tree the `fix(...)` commit will carry:
 
    ```bash
-   # Stage-before-gate: this cycle's gate and QA report, and nothing else.
+   # Stage-before-gate: this cycle's gate, QA report and bug reports, and nothing else.
    GATE_FILE="{the latest gate file — resolved per §Finding the Latest Gate File}"
    QA_FILE="{this cycle's QA report — the .qa. file carrying the gate's cycle number}"
    git add -- "$GATE_FILE" "$QA_FILE"
+   # This cycle's bug reports: the untracked *.bug.<n>.* files beside the QA report
+   # (earlier cycles' are already committed).
+   git ls-files --others --exclude-standard -- "$(dirname "$QA_FILE")" \
+     | grep '\.bug\.[0-9]' | while IFS= read -r BUG_FILE; do git add -- "$BUG_FILE"; done
    ```
 
    **After step 0, never before it.** A staged new file shows in `git diff --stat HEAD`, so staging
    first would make step 0's no-change HALT unreachable. Step 1 unstages only the implementation
-   report, so these two stay staged into the commit. On a cycle that reached 5b through a 5c
+   report, so these stay staged into the commit. On a cycle that reached 5b through a 5c
    `REQUEST CHANGES` verdict both files are already committed (path 1), and this `git add` is a
    no-op.
 
@@ -1098,6 +1128,14 @@ After fixes are applied:
    <fastGateCommand> > "$FIX_LOG" 2>&1
    GATE_EXIT=$?
    ```
+
+   **When the gate can outlive the tool timeout, start it with `run_in_background`** and let the log
+   carry the exit code: `<fastGateCommand> > "$FIX_LOG" 2>&1; echo "GATE_EXIT=$?" >> "$FIX_LOG"`.
+   Mark the wait before yielding —
+   `bash .agents/skills/{develop-story|develop-task}/references/set-waiting-on.sh "5b fast gate cycle {N}" --kind task --budget-minutes {M}`
+   (`develop-pipeline-hooks.md` §"waiting_on") — and on the notification `--clear` it and read the
+   `GATE_EXIT=` line (`grep '^GATE_EXIT=' "$FIX_LOG"`). A foreground
+   call killed at the timeout loses its exit code, and can leave a moved `.agents/skills` unrestored.
 
    `<fastGateCommand>` is `develop.fastGateCommand` from `skills-config.yaml` — the same fast tier
    the develop loop runs (see

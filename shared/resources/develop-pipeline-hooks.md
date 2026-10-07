@@ -128,6 +128,8 @@ bash .agents/skills/{develop-story|develop-task|develop-bug}/references/set-wait
 
 **Which sites mark a wait.** The dispatch sites are enumerated by grep, never by hand — `subagent_type=`, `dispatch an Explore subagent`, `run_in_background`, `gh pr checks --watch` over `develop-pipeline-step-*.md` (the step docs beside this file), `skills/develop-*/SKILL.md`, `skills/develop-bug/references/*.md` and the sub-skills the loop invokes (`qa-task`, `qa-story`, `review-pr`, `finalise`). Each such site calls `set-waiting-on.sh` beside its dispatch and `--clear` where it reads the result. **Phase 0a's resume detector is exempt** — no lock exists while it runs. Foreground `sleep` loops as a way of "holding the turn open" while a background task runs are retired by this field: yield the turn with the wait marked, and let the notification wake the orchestrator.
 
+**The rule is a property, not that list.** The grep finds the waits a step doc names; it cannot find one no doc names. **Any yield while a background job owns the step's next action is a wait** — a subagent, a `run_in_background` command no step doc mentions, and a foreground command the tool timeout moved to the background. Mark it with `set-waiting-on.sh "<label>"` before yielding (with `--budget-minutes N` when it can outlast the default), and `--clear` it on the notification. An unmarked yield reads as a stall, and the re-prompt names the step's sub-skill — obeyed literally, it restarts a step that is half done.
+
 **Output**: either empty stdout (allow stop) or JSON:
 ```json
 {"decision": "block", "reason": "🔁 PIPELINE-CONTINUE-REQUIRED — DO NOT STOP\n..."}

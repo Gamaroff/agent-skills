@@ -174,6 +174,8 @@ From this, auto-generate:
 - **Directory Path**: `docs/tasks/task.[ID].[kebab-case-name]/`
 - **File Path**: `task.[ID].[kebab-case-name].md`
 - **Registry update** (after the task doc + plan are written, in Step 5): add a new row to `task-registry.md` and increment **Next Available Task Number**. Commit the registry update in the same commit as the new task files.
+  - **Which branch.** That commit belongs on `develop`. When HEAD is a feature branch for a different work item, say so, and hand the commit to the user as a named step: committed there, the docs and the counter bump ride into that branch's PR (obs #188).
+  - **An open PR on the row above.** When an earlier task's PR is still open, its `/finalise` tick rewrites that row, and the new row beside it conflicts. File after that PR merges, or expect to merge `develop` into the PR branch keeping both rows (`docs/standards/task-registry.md`, obs #202).
 
 ### 1.1 Entry from the Observation Log (`--from-observation`)
 
@@ -256,6 +258,13 @@ other."* One note per split, not one per task, and written in the same commit as
 the first is untested and the second tests nothing. Split by **outcome delivered**, never by where the
 diff lands. If two candidate tasks would each leave the tree in a state nobody would merge alone, they
 are one task.
+
+**A blocker in another repository is never written `task.N`.** The registry reads `task.N` in the
+`Depends on` cell as a task in *this* registry, so another repository's task.127 binds to this
+repository's unrelated task.127. Write it as free text after ` — `, naming the repository
+(`— blocked on <other-repo> task.127`), and give the task a Phase 0 that HALTs until the blocker is
+met. The selector does not parse free text and may pick the task, so the Phase 0 HALT is what stops
+it (obs #243).
 
 ### 1.5 Analyse Git History for Technical Context
 
@@ -881,6 +890,14 @@ Consumer Tests:
 - Scope: [dependent code]
 - Risk areas: [specific code]
 ```
+
+**Behavioural evidence needs a control case when it re-runs its own example.** When the evidence for
+a new check, rule or prompt re-runs the incident that motivated it, and the change quotes that
+incident, a pass may mean the reviewer recognised the example rather than applied the rule. Add a
+control: an instance of the same defect class the change's text never mentions, varied in every
+dimension the rule depends on (not only the function or file), plus one correct instance the rule
+must leave alone. task.145's control varied the function but not the state, and the refute pass
+found the misfire no hand-run document could show (obs #176).
 
 ### Section 9: Success Criteria
 

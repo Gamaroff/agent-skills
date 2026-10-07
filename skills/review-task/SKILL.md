@@ -1126,7 +1126,10 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
        does not hold it.
      - **A bound no per-PR test could assert** (wall-clock runtime, CI duration) is held by a
        **measured bound**: a **numeric bound** with **the command that measures it**, which finalise
-       passes as a measured criterion on its committed measurement.
+       passes as a measured criterion on its committed measurement. For a wall-clock bound the
+       command records the load it ran under (`uptime` beside `time`), and finalise fails a figure
+       not taken on the PR's head commit (obs #268). Prefer a bound a test can assert (an operation
+       count, per-document work) over seconds.
      - **A criterion that states no numeric bound** is held by its planned per-PR test: finalise
        sends it down the behaviour path and passes it on that test.
 

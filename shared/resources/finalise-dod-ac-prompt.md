@@ -35,6 +35,7 @@ For each AC item extracted in Step 1:
 3. Also search for a test file (`.spec.ts`, `.test.ts`, `.spec.js`) that covers the AC — grep for the same key terms.
 4. **Citation rule**: A `PASS` requires BOTH a non-null `code_citation` AND a non-null `test_citation`. Missing either → `FAIL`. No exceptions.
 5. **Execution rule**: the cited test must actually run in a lane that gates this change. A test that exists but never executes on the PR is not evidence — it is a citation. Determine the lane from the test's path and the project's CI config (e.g. a `paths-ignore`d job, a suite excluded by the runner's default scope, a directory the per-PR job does not select). If the cited test does not run per-PR, set `status: FAIL` and name the lane in `note`, even though the file exists.
+6. **Quantifier rule**: a criterion over a set ("each test", "every file", "all call sites") is checked member by member. List the members from `<DIFF_FILE>`, map each one to its evidence, and put every unmapped member in `note`. `PASS` only when that list is empty. Evidence that some members are covered proves "at least one", not "each".
 
 ⚠️ **A ticked AC checkbox is a claim, not evidence.** Verify against the diff and the test lane; never treat the story's own checkbox as satisfying either rule. Both failure modes below have occurred and neither was caught by the checkbox:
 
@@ -52,6 +53,7 @@ For each AC item extracted in Step 1:
   - `code_citation` is the line of a **committed** artifact that records the measurement and the command that produced it (typically the implementation report or a QA report). **Read that line.** `note` states the bound, the measured value and the command.
   - `test_citation` is `"NOT_APPLICABLE: measured criterion"`.
   - `PASS` when the criterion states a bound, the cited measurement meets it, and the command is named. `FAIL` when the measurement is uncited or uncommitted, or when it misses the bound. A criterion that states no numeric bound ("no measurable change", "fast enough") is not a measured criterion: it takes the behaviour path, and fails there without a test.
+  - A wall-clock bound decays with every later commit and every change in machine load. Its cited measurement must record the load it ran under (`uptime` beside `time`) and be taken on the PR's head commit. A figure from an earlier commit, or with no load recorded, is `FAIL` with `note: "re-measure"`.
 
 `test_runs_per_pr` is `null` on all three kinds: the execution rule reads a test lane, and none has a test in one. **A behaviour criterion never takes any of these paths**, and a bound a per-PR test could assert is a behaviour criterion. "Hard to test" is not "no unit tests applicable", and describing a behaviour in a document does not make it a documentation criterion. Before this rule existed, every run failed its CHANGELOG criterion for having no test and the orchestrator overrode it by hand; a check that is overridden on every run is not a check.
 
