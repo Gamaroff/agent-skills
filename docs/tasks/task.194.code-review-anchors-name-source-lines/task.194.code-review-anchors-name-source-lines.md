@@ -5,9 +5,11 @@ type: task
 description: "The shared code-review prompt names its line coordinate unambiguously (the line in the PR-head source file, never the patch) and quotes the line it means, and a shared checker verifies every path:line anchor against the file before any of the four dispatching skills renders, posts or gates on it."
 tags: [review-pr, review-code, qa-task, qa-story, code-review-prompt, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-07
+completed_date: 2026-10-07
+pr_number: 596
 updated: 2026-10-07
 assignee:
 estimated_effort_hours: 16
@@ -16,7 +18,7 @@ github_issue: 595
 
 # Technical Task: Code-review findings anchor to source lines
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.194.review.1.code-review-anchors-name-source-lines.md` implemented 2026-10-07
 **GitHub Issue**: [#595](https://github.com/Gamaroff/agent-skills/issues/595)
 
@@ -437,11 +439,40 @@ None.
 - All cycle 2 fixes verified; bugs 1–5 closed.
 - Advisory (reproduced, confidence medium): exit 1 conflates malformed anchors with an unloadable script at the four dispatcher blocks; a `--root` absent from the `--rev` tree passes the preflight. Both are recorded in the gate's `recommendations.future`.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.194.qa.3.code-review-anchors-name-source-lines.md`
+**Gate File**: `task.194.gate.3.code-review-anchors-name-source-lines.yml`
+**Gate Status**: ⚠️ CONCERNS (NFR-level reservation; no open `top_issues`)
+**Quality Score**: 90/100 (three cycles: 80 → 70 → 90; bugs 1–5 closed)
+**PR Review (Step 5c)**: ⚠️ CONCERNS — `task.194.pr-review.1.code-review-anchors-name-source-lines.md`
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 13/13 (SC-1 – SC-12), each with a code citation and, for behaviour criteria, a per-PR test
+✅ **Tests:** `finding-anchors.test.mjs` 23, `finding-anchors-callers.test.mjs` 9, extended jq-run tests; broader suites 3238/3238
+✅ **PR:** #596; no reviews required on this host — Step 5c `/review-pr` stands in
+✅ **CI:** reading 1 SUCCESS @ `d0eef60c` (test, validate, link-check, shellcheck, branch policy)
+✅ **Documentation:** CHANGELOG `[Unreleased]` › Fixed; four dispatcher `SKILL.md` files and both lens prompts
+✅ **Security Review:** PASS — no secrets, no shell-interpolated exec; `makeReader` containment probed by the engine, 11 executed, 0 reproduced (`task.194.dod.1.security.run.json`)
+⚠️ **Compliance Review:** NOT_APPLICABLE — internal tooling
+
+**Advisory follow-ups (not blocking):** gate 3 `recommendations.future` (exit 1 also meaning "checker did not load"; a `--root` absent from the `--rev` tree; `--inline` block binding; Bitbucket head fetch) and the PR review's CR-1 – CR-4 (dispatcher population scope, `no-line` for a malformed `file_line`, Bitbucket head SHA, `--staged` index reads).
+
+**Task marked as ACCEPTED on:** 2026-10-07
+
+**Detailed Verification Log:** See `task.194.dod.1.code-review-anchors-name-source-lines.md` for complete verification evidence and timestamps.
+
+---
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                    | Author      |
-| ---------- | ------- | ---------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-07 | 1.0     | Initial draft — cut from observation #290 | create-task |
 | 2026-10-07 | 1.1     | Review 1 (6/10 → 9/10): anchor pattern `^(\S+):` (compound ref was parsed as a path); `--annotate` + `anchor_check` key; `--rev` per caller; bare-filename population; SC-5/SC-6 re-scoped, SC-7 test named | review-task |
 | 2026-10-07 |         | Status → ready-for-development | review-task |
@@ -451,6 +482,7 @@ None.
 | 2026-10-07 |         | QA gate CONCERNS (70/100) — 4 findings (CR2-1 --rev ignores --root, CR2-2 bad --root, CR2-3 stale prose, CR2-4 dir anchor); cycle 1 fixes verified | qa-task |
 | 2026-10-07 |         | QA findings fixed — CR2-1..CR2-4: one `checkTree()` preflight (bad-root, bad-rev) and root-relative `cat-file blob` reads; stale review-pr prose; 2 iterations | qa-fix |
 | 2026-10-07 |         | QA gate CONCERNS (90/100) — 0 gated findings, 2 advisory (reliability NFR); cycle 2 fixes verified, bugs 1–5 closed | qa-task |
+| 2026-10-07 | 1.2 | DoD passed — accepted (PR #596) | finalise |
 <!-- change-log-end -->
 
 ---
