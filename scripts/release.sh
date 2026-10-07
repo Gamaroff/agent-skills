@@ -55,6 +55,7 @@ RETRY=false
 RETRY_TAG=""
 SYNC_DEVELOP=true
 SKIP_CI_CHECK=false
+CI_CERTIFIED=false
 WOULD_REFUSE=""
 REPO_SLUG="Gamaroff/agent-skills"
 
@@ -193,6 +194,7 @@ if [[ "$RETRY" == false ]]; then
   [[ -n "$CI_REASON" ]] || CI_REASON="unverifiable"
   if [[ "$CI_REASON" == "green" ]]; then
     ok "CI green for ${LOCAL:0:8} — ${CI_DETAIL}"
+    CI_CERTIFIED=true
   elif [[ "$SKIP_CI_CHECK" == true ]]; then
     warn "CI is ${CI_REASON} for ${LOCAL:0:8} — ${CI_DETAIL}"
     warn "Proceeding UNVERIFIED against CI (--skip-ci-check)"
@@ -254,7 +256,16 @@ if [[ "$DRY_RUN" == true ]]; then
 else
   # A red here is either a real failure or a load-timing one; the failure text
   # says which (obs #157). Print the rule at the moment it is needed.
-  if ! env -u CLEAN_CHECKOUT_CMD npm run test:clean-checkout; then
+  # Whole-file time budgets (fileBudgetMs in spawn-budget.mjs) measure contention in a full
+  # local run, not the file's speed: on 2026-10-07 two files took 10-47 s here and 7-8.5 s
+  # alone, and blocked v0.53.0 four times. CI's green Test run on this SHA (step 1b) already
+  # enforced them, so a certified release relaxes them. --skip-ci-check means nothing
+  # enforced them, so the normal budget stays.
+  GATE_ENV=(-u CLEAN_CHECKOUT_CMD)
+  if [[ "$CI_CERTIFIED" == true ]]; then
+    GATE_ENV+=(TEST_FILE_BUDGET_MS=600000)
+  fi
+  if ! env "${GATE_ENV[@]}" npm run test:clean-checkout; then
     err "npm run test:clean-checkout failed."
     echo "  If the failing assertion says LOAD-SENSITIVE, re-run that file alone"
     echo "  (command node --test <file>). If it passes alone, re-run the release —"

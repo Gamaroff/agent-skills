@@ -24,11 +24,15 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { makeConsumerRoot } from "../lib/consumer-root.mjs";
-import { loadSensitive } from "../../../shared/resources/spawn-budget.mjs";
+import {
+  fileBudgetMs,
+  loadSensitive,
+} from "../../../shared/resources/spawn-budget.mjs";
 
-// Task 154 AC6: this file runs in under 10 s. Timed from module load, so every
-// test and fixture counts; a failing root after-hook fails the run.
-const FILE_BUDGET_MS = 10_000;
+// Task 154 AC6: a whole-file time budget. Timed from module load, so every
+// test and fixture counts; a failing root after-hook fails the run. The budget
+// is shared and env-tunable: fileBudgetMs() in spawn-budget.mjs.
+const FILE_BUDGET_MS = fileBudgetMs("CONSUMER_ROOT");
 const FILE_STARTED = process.hrtime.bigint();
 after(() => {
   const ms = Number(process.hrtime.bigint() - FILE_STARTED) / 1e6;
