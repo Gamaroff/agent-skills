@@ -889,8 +889,8 @@ test("the skill 5c invokes is installed and named as this file expects", () => {
   for (const effort of ["medium", "low"]) {
     assert.match(
       section5c(),
-      new RegExp(`/review-pr --effort ${effort} --comment`),
-      `the ${effort}-effort invocation must carry both flags the contract depends on`,
+      new RegExp(`/review-pr --effort ${effort} --comment --no-code`),
+      `the ${effort}-effort invocation must carry --comment, and --no-code: 5a already ran the code reviewer over this diff`,
     );
   }
   // And the unparseable form must not come back.

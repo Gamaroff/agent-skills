@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Changed
+
+- **Step 5c runs `/review-pr --no-code` — the conformance lens only.** `/qa-story` and `/qa-task`
+  already run the code reviewer over the same diff every cycle with `code_review_blocking=true`, so
+  5c's code lens was a second review of that diff costing a subagent per run. The develop-story and
+  develop-task 5c invocations now pass `--no-code` in standard and lite mode, and the verdict comes
+  from conformance findings alone. A work item that opted out with `code_review_blocking: false`
+  stays opted out, rather than having its code findings reach a `REQUEST CHANGES` path at 5c. The
+  report's Code Review Findings section reads "Skipped (`--no-code`)." rather than "None.".
+
 ### Fixed
 
 - **`/review-pr` can audit a merged Bitbucket PR.** Step 6 checks finding anchors against the PR

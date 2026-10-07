@@ -7,6 +7,6 @@
   {"skill":"qa-fix","args":"gate=docs/tasks/task.42.example/task.42.gate.7.example.yml","status":"completed","timestamp":3500},
   {"skill":"qa-task","args":null,"status":"started","timestamp":4000},
   {"skill":"qa-task","args":null,"status":"completed","timestamp":4500},
-  {"skill":"review-pr","args":"--effort medium --comment","status":"started","timestamp":5000},
-  {"skill":"review-pr","args":"--effort medium --comment","status":"completed","timestamp":5500}
+  {"skill":"review-pr","args":"--effort medium --comment --no-code","status":"started","timestamp":5000},
+  {"skill":"review-pr","args":"--effort medium --comment --no-code","status":"completed","timestamp":5500}
 ]

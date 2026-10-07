@@ -1299,7 +1299,8 @@ gate**: 5a and 5b can cycle without it, but nothing leaves the loop except throu
 > is it.
 
 **Why this exists, and what is genuinely new.** `/qa-story` and `/qa-task` already dispatch the
-**code** reviewer every cycle, so 5c's code lens is duplication and is not the reason it runs. Its
+**code** reviewer every cycle, so 5c passes `--no-code` and runs without its code lens — a second
+code review of the same diff costs a subagent and adds nothing. Its
 **conformance** lens has no counterpart anywhere in the pipeline: does the diff *cover* what the
 work item promised, did it drift outside that *scope*, is the artifact *trail* complete and honest,
 is the work item *consistent* with what shipped. A run can otherwise reach `accepted` with a
@@ -1348,10 +1349,10 @@ done
 
 ```bash
 # standard mode
-/review-pr --effort medium --comment
+/review-pr --effort medium --comment --no-code
 
 # lite mode — degrades the review, never skips it
-/review-pr --effort low --comment
+/review-pr --effort low --comment --no-code
 ```
 
 > **Written as two concrete invocations, not one `{medium|low}` placeholder.** zsh parses a
@@ -1365,6 +1366,11 @@ done
   current branch.
 - **`--effort`**: `medium` in standard mode, `low` in lite mode. Lite **degrades** the review; it
   never skips it. See [`shared/resources/develop-pipeline-lite-mode.md`](develop-pipeline-lite-mode.md).
+- **`--no-code`**: always, in both modes. `/qa-story` and `/qa-task` already ran the code reviewer
+  over this diff in 5a, with `code_review_blocking=true`, so 5c runs the **conformance lens only**
+  and its verdict comes from conformance findings alone. A work item that opted out with
+  `code_review_blocking: false` stays opted out: a 5c code lens would hand its code findings a
+  `REQUEST CHANGES` path the opt-out exists to remove.
 - **`--comment` is passed explicitly and is not optional here.** `/review-pr` otherwise asks before
   posting, and the pipeline cannot prompt. Steps 5–6 and 7 already comment on the PR, so this is
   authorised ground rather than a new outward-facing capability.
