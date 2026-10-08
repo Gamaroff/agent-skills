@@ -37,6 +37,14 @@ All notable changes to this project will be documented in this file. Format foll
   glob or a directory widened one ref in the same way. Every git call in the 5c classify and stage
   blocks is now `--literal-pathspecs`, and a ref clears only when `git ls-files` names exactly that
   path (task.173 QA cycle 8).
+- **A path through any spelling of `.git` is never documentation.** `isDocsPath` accepted
+  `docs/.git/hooks/pre-commit`, as well as git's own look-alike spellings (`.GIT`, a zero-width
+  character, a trailing dot, the NTFS short name `git~1`). The 5c classifier was already safe,
+  because git refuses to track such a path, but the predicate itself is now right as well. Found by
+  task.173 DoD run 4.
+- **CI installs zsh.** The suites that run documented shell blocks run each one under bash and zsh,
+  and they silently dropped the zsh variant on the Linux runner, so a zsh-only regression passed CI.
+  The test workflow now installs zsh beside the awk variants (task.173 QA cycle 10, CR10-3).
 
 ## [v0.55.0] - 2026-10-07
 

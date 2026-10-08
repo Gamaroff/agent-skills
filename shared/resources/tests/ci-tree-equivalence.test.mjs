@@ -3003,6 +3003,35 @@ test("SEC-5: a path containing a control character is never documentation (task.
   assert.equal(eng.isDocsPath("docs/caf\u00e9.md", globs), true);
 });
 
+test("SEC-6: a path through any spelling of .git is never documentation", () => {
+  const globs = ["docs/**", "**/*.md"];
+  for (const bad of [
+    "docs/.git/hooks/pre-commit",
+    "docs/.git/config",
+    "docs/.GIT/config",
+    "docs/.Git/x.md",
+    "docs/.git\u200c/config", // HFS+ ignorable (ZWNJ)
+    "docs/.g\u200bit/x.md", // HFS+ ignorable (ZWSP) inside the name
+    "docs/.git\ufeff/x.md", // BOM
+    "docs/.git./config", // NTFS trailing dot
+    "docs/GIT~1/config", // NTFS short name
+    ".git/x.md",
+    "a/.git/b/c.md",
+  ]) {
+    assert.equal(eng.isDocsPath(bad, globs), false, JSON.stringify(bad));
+  }
+  // Names that merely start with .git are ordinary files and stay documentation.
+  for (const ok of [
+    "docs/.github/x.md",
+    "docs/.gitignore.md",
+    "docs/.gitkeep",
+    "docs/git/x.md",
+    "docs/a.git.md",
+  ]) {
+    assert.equal(eng.isDocsPath(ok, globs), true, JSON.stringify(ok));
+  }
+});
+
 test("SEC-4: a path with a dot or empty segment is never documentation", () => {
   const globs = ["docs/**", "**/*.md"];
   for (const bad of [
