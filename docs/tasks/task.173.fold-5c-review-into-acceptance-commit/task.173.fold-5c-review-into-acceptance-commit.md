@@ -5,7 +5,7 @@ type: task
 description: "On APPROVE or CONCERNS, the 5c PR-review report and any doc-only CONCERNS fixes are staged, not committed, and ride /finalise's 6a acceptance commit. This removes one pushed tail commit and one CI run per item. Every other commit in the pipeline commits only its own paths, so the staged set cannot be swept into the wrong commit."
 tags: [develop-story, develop-task, finalise, qa-loop, review-pr, ci, performance, consumer-handoff]
 category: refactoring
-status: ready-for-development
+status: ready-for-review
 priority: Medium
 created: 2026-10-01
 updated: 2026-10-08
@@ -16,7 +16,7 @@ github_issue: 540
 
 # Technical Task: Fold the 5c review and its doc-only fixes into the acceptance commit
 
-**Status:** Ready for Development
+**Status:** Ready for Review
 
 **Review**: ✅ All review recommendations from `task.173.review.1.fold-5c-review-into-acceptance-commit.md` implemented 2026-10-08
 
@@ -209,25 +209,25 @@ Standalone `/finalise` stages nothing extra and behaves as today.
 
 This phase is independent and ships value alone. It closes the latent 8a refusal.
 
-- [ ] 8a: `git commit … -- <touched>`
-- [ ] PreCompact hook: `git commit … -- "$REPORT"`, plus a test that a staged sibling survives a pause
+- [x] 8a: `git commit … -- <touched>`
+- [x] PreCompact hook: `git commit … -- "$REPORT"`, plus a test that a staged sibling survives a pause
 
 ### Phase 2: the 5c carry path (Risk: Medium)
 
 Depends on Phase 1 and on task.172 (`ci.docsOnly.patterns`).
 
-- [ ] The *Carry the review into the acceptance commit* subsection, and the `APPROVE`/`CONCERNS` table rows pointing at it
-- [ ] The doc-only test reads `ci.docsOnly.patterns` through `glob-match.js`, with no second definition
-- [ ] The `**Carried to 6a**` line in the QA Cycle entry
+- [x] The *Carry the review into the acceptance commit* subsection, and the `APPROVE`/`CONCERNS` table rows pointing at it
+- [x] The doc-only test reads `ci.docsOnly.patterns` through `glob-match.js`, with no second definition — via task.172's own reader (`readConfig` + `isDocsPath` in `ci-tree-equivalence.js`, which calls `matchesAnyGlob`), so the defaults and the path guards are one definition too
+- [x] The `**Carried to 6a**` line in the QA Cycle entry
 
 ### Phase 3: 6a states what it carries (Risk: Low)
 
-- [ ] The 6a comment, and the `; 5c review carried` suffix keyed on staged paths beyond `ADD_PATHS`
-- [ ] A step-7 doc line noting that the boundary check passes because 6a commits the 5c set
+- [x] The 6a comment, and the `; 5c review carried` suffix keyed on staged paths beyond `ADD_PATHS`
+- [x] A step-7 doc line noting that the boundary check passes because 6a commits the 5c set
 
 ### Phase 4: docs and validation (Risk: Low)
 
-- [ ] `npm run bundle`, CHANGELOG `[Unreleased]`, `npm run ci`
+- [x] `npm run bundle`, CHANGELOG `[Unreleased]`, `npm run ci`
 
 ---
 
@@ -251,6 +251,7 @@ Depends on Phase 1 and on task.172 (`ci.docsOnly.patterns`).
 ### Generated (`npm run bundle`)
 
 9. The bundled copies of the step docs and hook under `skills/{develop-story,develop-task,develop-bug}/references/`
+10. New bundled copies in `skills/{develop-story,develop-task}/references/`: `ci-tree-equivalence.js` (and its `bb-auth.js` dependency) and `doc-links.js`, which the 5c carry blocks call
 
 ### Files to Delete
 
@@ -295,26 +296,26 @@ None.
 
 ### Functional
 
-- [ ] A run whose 5c returns `CONCERNS` with only doc-only findings pushes no commit between the last QA push and 6a (Phase 2) — held by the 5c carry-block test
-- [ ] The 6a commit carries the review report and the doc fixes, and the step-7 boundary check passes (Phase 3) — held by the 6a carry test
-- [ ] 8a with a staged 5c set commits only `touched`, and `--git-base` exits 0 (Phase 1) — held by the 8a narrowing test
-- [ ] A PreCompact pause with a staged 5c set commits only the report (Phase 1) — held by the `develop-pipeline-on-precompact.test.sh` staged-sibling case
-- [ ] A non-doc `CONCERNS` finding is recorded and not fixed, exactly as today — held by the doc-only classification test and the carry-block test's non-doc path
+- [x] A run whose 5c returns `CONCERNS` with only doc-only findings pushes no commit between the last QA push and 6a (Phase 2) — held by the 5c carry-block test
+- [x] The 6a commit carries the review report and the doc fixes, and the step-7 boundary check passes (Phase 3) — held by the 6a carry test
+- [x] 8a with a staged 5c set commits only `touched`, and `--git-base` exits 0 (Phase 1) — held by the 8a narrowing test
+- [x] A PreCompact pause with a staged 5c set commits only the report (Phase 1) — held by the `develop-pipeline-on-precompact.test.sh` staged-sibling case
+- [x] A non-doc `CONCERNS` finding is recorded and not fixed, exactly as today — held by the doc-only classification test and the carry-block test's non-doc path
 
 ### Performance
 
-- [ ] Pushed commits after the last QA cycle drop from three to two on a doc-only `CONCERNS` run — held by the 5c carry-block test (zero commits between the QA head and 6a, where the pre-change path made one)
-- [ ] CI runs triggered after the last QA cycle drop by one on the same run — follows from the criterion above: the pipeline pushes every tail commit and each push triggers one CI run; no separate per-PR test
+- [x] Pushed commits after the last QA cycle drop from three to two on a doc-only `CONCERNS` run — held by the 5c carry-block test (zero commits between the QA head and 6a, where the pre-change path made one)
+- [x] CI runs triggered after the last QA cycle drop by one on the same run — follows from the criterion above: the pipeline pushes every tail commit and each push triggers one CI run; no separate per-PR test
 
 ### Code Quality
 
-- [ ] Each new test is mutation-proved red on revert
-- [ ] `npm run ci` green; `npm run validate -- skills/finalise/` passes; `bundle:check` clean
+- [x] Each new test is mutation-proved red on revert
+- [x] `npm run ci` green; `npm run validate -- skills/finalise/` passes; `bundle:check` clean
 
 ### Migration
 
-- [ ] CHANGELOG `[Unreleased]` entry
-- [ ] The 5c subsection states the doc-only rule once, and the table rows point at it
+- [x] CHANGELOG `[Unreleased]` entry
+- [x] The 5c subsection states the doc-only rule once, and the table rows point at it
 
 ---
 
@@ -367,6 +368,41 @@ None identified. The acceptance commit already carries the staged report today.
 
 ---
 
+## Implementation Notes
+
+**Completed:** 2026-10-08 (pipeline run 1, Step 3 inline — the plan file named every hunk).
+
+**Summary.** Phase 1 narrowed the two index-sweeping commits: `/finalise` 8a is now a fenced block
+that commits `-- "${TOUCHED[@]}"` (read from the finding record, zsh-safe), and the PreCompact hook
+commits `-- "$REPORT"`. Phase 2 added *Carry the review into the acceptance commit* to the 5c
+section as two fenced blocks: a classifier that prints `doc-only` / `record` per finding, and a
+stage block that stages the report and each doc-only fix, restores anything that is not doc-only or
+fails `doc-links.js`, and HALTs if `HEAD` moved. Phase 3 made 6a state that it commits the full
+index, and suffix its message `; 5c review carried` when the index holds paths beyond `ADD_PATHS`
+and the registry.
+
+**Approach — two departures from the plan, both recorded in the implementation report.**
+
+1. **The finding's path comes from `ref`, not `file:`.** `/review-pr`'s machine-readable block
+   has no `file:` key; it has `ref: "path:line"` (or an `AC-n` id). The classifier strips the
+   quotes and the `:line` suffix; an id-only `ref` is not a path and is recorded.
+2. **The doc-only test calls task.172's reader, not `glob-match.js` directly.** `readConfig` +
+   `isDocsPath` in `ci-tree-equivalence.js` own the default patterns and the path guards (`..`,
+   the config file itself, gitlinks); `isDocsPath` calls `matchesAnyGlob`. Calling the matcher
+   directly would have restated the default list here.
+
+**Testing results.** `shared/resources/tests/acceptance-commit-carries-5c.test.mjs`: 5 tests × bash
+and zsh = 10, all pass. `develop-pipeline-on-precompact.test.sh` scenario 17: pass (19/19).
+`npm run ci:fast`: 5,522 tests, 0 failures. `npm run ci` (incl. `eval:all`): exit 0. `bundle:check`: 0 problems. `validate skills/finalise/`: ✓.
+Mutation proofs (each restored after): 8a bare commit → 2 red; 6a suffix dropped → 2 red; 6a suffix
+always on → 2 red; a commit inside the carry block → 2 red; classifier marks everything doc-only →
+2 red; stage block skips the doc check → 2 red; stage block skips the restore → 2 red; hook bare
+commit → scenario 17 red.
+
+**Deferred work.** None.
+
+---
+
 <!-- change-log-start -->
 
 ## Change Log
@@ -376,6 +412,8 @@ None identified. The acceptance commit already carries the staged report today.
 | 2026-10-01 | 1.0     | Initial draft | create-task |
 | 2026-10-08 | 1.1     | Review passed (8/10) — 4 Important fixes applied: executable 5c carry block, criteria mapped to tests, index-sweeper search recorded, pause-commit doc sweep; anchors refreshed | review-task |
 | 2026-10-08 |         | Status → ready-for-development | review-task |
+| 2026-10-08 |         | Implemented — 8 source files, 1 new test file (10 cases), 1 new hook scenario | develop-task (inline) |
+| 2026-10-08 |         | Status → ready-for-review | develop-task (inline) |
 
 <!-- change-log-end -->
 
@@ -383,10 +421,10 @@ None identified. The acceptance commit already carries the staged report today.
 
 ## Progress Tracking
 
-- [ ] Phase 1: narrow the index-sweeping commits
-- [ ] Phase 2: the 5c carry path
-- [ ] Phase 3: 6a states what it carries
-- [ ] Phase 4: docs and validation
+- [x] Phase 1: narrow the index-sweeping commits
+- [x] Phase 2: the 5c carry path
+- [x] Phase 3: 6a states what it carries
+- [x] Phase 4: docs and validation
 
 ---
 
