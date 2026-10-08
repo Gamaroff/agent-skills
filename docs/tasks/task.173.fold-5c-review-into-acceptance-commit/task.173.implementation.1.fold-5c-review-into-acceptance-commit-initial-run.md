@@ -3,7 +3,7 @@
 **Task**: `task.173.fold-5c-review-into-acceptance-commit.md`
 **Run Number**: 1
 **Started**: 2026-10-08 05:12
-**Status**: In Progress
+**Status**: Halted — DoD gaps
 
 ---
 
@@ -36,7 +36,7 @@ Narrow the two index-sweeping commits (finalise 8a, PreCompact pause) to their o
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline (plan file); 1 iteration; 4/4 phases; ci:fast + npm run ci green; 8 mutation proofs | —                    |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #613: https://github.com/Gamaroff/agent-skills/pull/613 | —                    |
 | 5–6. qa-task / qa-fix loop | ✅ Done | `task.173.qa.{N}.*.md`; `task.173.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | Re-entry +2 (budget 7): 7 cycles; gates FAIL/CONCERNS×5/PASS 100; HIGH 1,0,0,0,0,0,0; 5c PR review CONCERNS (PC-1, PC-2; 2 fixes carried to 6a; bug.2 not fixed) | —                    |
-| 7. finalise                | ❌ Failed | `task.173.dod.{N}.*.md`; task `status: accepted`                      | Run 1: 3 gaps, resolved (`d073291c`). Run 2 (`task.173.dod.2…`): 1 gap. AC8's re-scope under-counts its exceptions | —                    |
+| 7. finalise                | ❌ Failed | `task.173.dod.{N}.*.md`; task `status: accepted`                      | Run 1: 3 gaps (resolved, `d073291c`). Run 2: 1 gap (resolved, `23dd41df`). Run 3: 1 gap — `isDocsPath` accepts an embedded NUL; under zsh the 5c classifier clears a code file (medium; code fix needed) | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
@@ -109,6 +109,7 @@ Narrow the two index-sweeping commits (finalise 8a, PreCompact pause) to their o
 - Resume: `reenter-qa-after-finalise.sh` refused (`no-code-moved`), confirming a document-only fix; lock restored at step 7 via `advance-pipeline-lock.sh --restore`; `/finalise` re-run.
 - DoD run 2 (`task.173.dod.2.fold-5c-review-into-acceptance-commit.md`): AC PARTIAL, Security PASS, Compliance NOT_APPLICABLE, Docs PASS. CI reading 1: SUCCESS @ d073291c120209e2caabbe046f4e7ac3105bce92 over 5 checks (the head's own run). Security probed the classify block's `isDocsPath` predicate in both bundled copies: 66 executed, 0 reproduced (`task.173.dod.security.run.json`). The git-state arms rest on the operator's override. AC8 FAIL: the re-scope I wrote named two `no-red-untested` exceptions, but the record also holds CR2-2's HALT branch (qa.3:70), CR3-1's `absorbed` binding, and five prose-only fixes with no guarding test (CR-5, CR2-3, CR3-3, CR3-4, CR4-1). That was my error in executing the operator's re-scope. 8a did not apply (no executed defect to mutation-prove). HALT; gaps PR comment posted.
 - Run-2 gap closed within the operator's re-scope decision: AC8 now lists every QA fix by its recorded outcome (covered, `no-red-untested` ×3, `absorbed` ×1, prose-only ×5). Document-only, so the run resumes at Step 7.
+- DoD run 3 (`task.173.dod.3.fold-5c-review-into-acceptance-commit.md`): AC PASS 11/11, Docs PASS, Compliance NOT_APPLICABLE, Security FAIL. CI reading 1: SUCCESS @ 23dd41dfd00ab2ef99aee7924dd4c40aa236e043 over 5 checks. The security agent probed `isDocsPath` with a different cases file than run 2 (59 executed, 3 reproduced). An embedded-NUL path is accepted, and under zsh the classify block clears `src/a.js\0.md` as doc-only for a tracked code file. The orchestrator reproduced it (zsh `CLEARED`, bash `record`). It is contained by the stage block's exact-match check. Severity medium, so 8a's evaluator refuses (`severity-low`). HALT; this needs a code fix and QA re-entry at 5a.
 
 ---
 

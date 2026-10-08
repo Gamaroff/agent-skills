@@ -481,6 +481,26 @@ CR6-1 closed. No open entries. Two advisory wording/robustness items (CR7-1, CR6
 **Estimated Effort:** Small (document-only)
 
 **Detailed Verification Log:** See `task.173.dod.2.fold-5c-review-into-acceptance-commit.md`.
+## Definition of Done - Gaps Identified — run 3
+
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**Gate Status**: ✅ PASS (`task.173.gate.7.fold-5c-review-into-acceptance-commit.yml`, 100/100)
+
+### Missing Criteria:
+
+1. **Security Review:**
+   - [ ] `isDocsPath` accepts a path with an embedded NUL. Under zsh, the 5c classify block then clears a tracked code file (`src/a.js\0.md`) as doc-only. Medium. The stage block's exact-match check contains it.
+
+### Next Steps:
+
+- [ ] Refuse control characters in the doc-only decision (`isDocsPath` or the classify block), with a zsh test. This is a code fix, so it re-enters QA at 5a.
+
+**Estimated Effort:** Small
+
+**Detailed Verification Log:** See `task.173.dod.3.fold-5c-review-into-acceptance-commit.md`.
 <!-- change-log-start -->
 ## Change Log
 
@@ -508,6 +528,7 @@ CR6-1 closed. No open entries. Two advisory wording/robustness items (CR7-1, CR6
 | 2026-10-08 |  | DoD gaps resolved by operator decision — AC8 re-scoped; bug.2 closed; security zero-guard override recorded | develop-task |
 | 2026-10-08 |  | DoD incomplete — 1 gap identified (run 2) | finalise |
 | 2026-10-08 |  | AC8 exception list corrected to the record (DoD run 2 gap) | develop-task |
+| 2026-10-08 |  | DoD incomplete — 1 gap identified (run 3) | finalise |
 <!-- change-log-end -->
 
 ---
