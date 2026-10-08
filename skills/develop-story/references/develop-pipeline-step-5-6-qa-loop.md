@@ -1415,8 +1415,10 @@ it. That is the behaviour before this change: the set is review evidence, and no
 **A finding is doc-only when the path in its `ref` matches `ci.docsOnly.patterns`** — task.172's
 set, read through its own reader (`readConfig` + `isDocsPath` in `ci-tree-equivalence.js`), so
 there is one definition of "documentation" and its default lives in the configuration reference, not
-here. **It may be fixed here only when the file is also tracked and clean against `HEAD`, and is
-neither an implementation report nor this review report.** The implementation report is uncommitted
+here. **It may be fixed here only when the path names exactly one tracked file, read literally, that is
+clean against `HEAD` and is neither an implementation report nor this review report.** Git reads a
+path argument as a pathspec, so a `ref` such as `:!*.md`, a glob or a directory would otherwise
+name many files at once (task.173 QA-8). The implementation report is uncommitted
 by design at 5c (Step 8 owns it), and a fix that later fails a check is undone with
 `git checkout HEAD`. That command is safe only on a file that held no other work. A `ref` with no
 path (an `AC-n` id), a path outside the patterns, and a path that fails the second test are
@@ -1455,7 +1457,7 @@ if [ -s "$ELIGIBLE" ]; then
   ELIG_HEAD=$(head -1 "$ELIGIBLE")
   while IFS= read -r q; do
     case "$q" in '# '*) continue ;; esac
-    git diff --quiet HEAD -- "$q" 2>/dev/null && continue
+    git --literal-pathspecs diff --quiet HEAD -- "$q" 2>/dev/null && continue
     if [ "$ELIG_HEAD" = "# review: $PR_REVIEW" ]; then
       echo "HALT: $q already carries a 5c edit — run the stage block, do not re-classify"
     else
@@ -1503,11 +1505,16 @@ command node -e '
   if (printed !== entries) { console.error(`${entries} finding entries, ${printed} classified — an entry has no id: first or no ref:`); process.exit(1); }
 ' "$PR_REVIEW" > "$CLASSIFIED" || { echo "HALT: cannot classify $PR_REVIEW — the findings are neither fixed nor recorded"; exit 1; }
 # Second test, in the shell where git is: tracked, clean against HEAD, not Step 8's report, not the review.
+# Git reads a path argument as a PATHSPEC, isDocsPath reads it as a FILE NAME, and the two disagree:
+# `:!*.md` passes the predicate under the default patterns and names every non-markdown file to git
+# (task.173 QA-8, CR8-1). So every git call in this block and the stage block is literal, and a ref
+# clears only when it names exactly one tracked file — no glob, directory or magic can widen it.
 while IFS=' ' read -r VERDICT ID REST; do
   if [ "$VERDICT" != "doc-only" ]; then echo "$VERDICT $ID $REST"; continue; fi
   case "$REST" in *.implementation.*) echo "record $ID $REST (the implementation report is Step 8's)"; continue ;; esac
   [ "$REST" != "$PR_REVIEW" ] || { echo "record $ID $REST (the review report itself)"; continue; }
-  if git ls-files --error-unmatch -- "$REST" >/dev/null 2>&1 && git diff --quiet HEAD -- "$REST"; then
+  if [ "$(git -c core.quotePath=false --literal-pathspecs ls-files -- "$REST" 2>/dev/null)" = "$REST" ] \
+     && git --literal-pathspecs diff --quiet HEAD -- "$REST"; then
     echo "doc-only $ID $REST"; printf '%s\n' "$REST" >> "$ELIGIBLE"
   else
     echo "record $ID $REST (untracked, or holds uncommitted work — not fixed at 5c)"
@@ -1538,7 +1545,7 @@ case "$DOC_LINKS" in *'{'*) echo "HALT: substitute the skill name in DOC_LINKS";
 [ -f "$DOC_LINKS" ] || { echo "HALT: $DOC_LINKS not found"; exit 1; }
 command -v node >/dev/null 2>&1 || { echo "HALT: node is not on PATH — the link check cannot run"; exit 1; }
 HEAD_BEFORE=$(git rev-parse HEAD)
-git add -- "$PR_REVIEW" || { echo "HALT: cannot stage $PR_REVIEW"; exit 1; }
+git --literal-pathspecs add -- "$PR_REVIEW" || { echo "HALT: cannot stage $PR_REVIEW"; exit 1; }
 CARRIED=("$PR_REVIEW")
 HANDLED=""   # one outcome per path: a path listed twice is handled once (task.173 QA-2, CR-4)
 for p in "${CARRY_FIXED[@]}"; do
@@ -1546,7 +1553,7 @@ for p in "${CARRY_FIXED[@]}"; do
   HANDLED="$HANDLED$p"$'\n'
   grep -qxF -- "$p" "$ELIGIBLE" 2>/dev/null \
     || { echo "HALT: $p was not cleared by the classify block — left untouched; undo that edit by hand"; exit 1; }
-  git add -- "$p" || { echo "HALT: cannot stage $p"; exit 1; }
+  git --literal-pathspecs add -- "$p" || { echo "HALT: cannot stage $p"; exit 1; }
   # doc-links.js: 0 = links resolve, 1 = a dead link (the only exit that undoes the fix), anything
   # else = the check could not run — HALT, staged as it is, rather than discard a fix over a tool error.
   LINKS_RC=0
@@ -1557,12 +1564,12 @@ for p in "${CARRY_FIXED[@]}"; do
     CARRIED+=("$p")
   elif [ "$LINKS_RC" -ne 1 ]; then
     # Unstaged, edit kept: staged, a resume would carry a fix whose check never ran (QA-3, CR-2).
-    git restore --staged -- "$p" \
+    git --literal-pathspecs restore --staged -- "$p" \
       || { echo "HALT: doc-links.js exited $LINKS_RC on $p, and $p is STILL STAGED — unstage it by hand"; exit 1; }
     echo "HALT: doc-links.js exited $LINKS_RC on $p — the check did not run; the edit is kept, unstaged"; exit 1
   else
     echo "NOT CARRIED: $p — a dead link; the 5c edit is undone, finding recorded"
-    git checkout HEAD -- "$p" || { echo "HALT: cannot restore $p"; exit 1; }
+    git --literal-pathspecs checkout HEAD -- "$p" || { echo "HALT: cannot restore $p"; exit 1; }
   fi
 done
 # This block commits nothing and pushes nothing. If HEAD moved, something here did.

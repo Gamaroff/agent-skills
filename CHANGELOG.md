@@ -32,6 +32,11 @@ All notable changes to this project will be documented in this file. Format foll
   as doc-only for a tracked code file. The stage block's exact-match check still refused the carry.
   Any character from U+0000 to U+001F, or U+007F, now reads the path as code, which is the
   fail-safe answer (task.173 DoD run 3).
+- **The 5c classifier reads a review `ref` as one literal file, never as a git pathspec.** Under the
+  default patterns, `:!*.md` passed `isDocsPath` and git resolved it to every non-markdown file. A
+  glob or a directory widened one ref in the same way. Every git call in the 5c classify and stage
+  blocks is now `--literal-pathspecs`, and a ref clears only when `git ls-files` names exactly that
+  path (task.173 QA cycle 8).
 
 ## [v0.55.0] - 2026-10-07
 

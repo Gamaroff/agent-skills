@@ -272,7 +272,7 @@ ELIGIBLE=""
 ELIG_HEAD=$(head -1 .claude/state/5c-carry-eligible.txt 2>/dev/null)
 case "$ELIG_HEAD" in
   "# review: $WI_DIR"/*.pr-review.*.md)
-    [ -n "$(git diff --cached --name-only -- "${ELIG_HEAD#\# review: }")" ] && ELIGIBLE=.claude/state/5c-carry-eligible.txt ;;
+    [ -n "$(git --literal-pathspecs diff --cached --name-only -- "${ELIG_HEAD#\# review: }")" ] && ELIGIBLE=.claude/state/5c-carry-eligible.txt ;;
 esac
 CARRY_LINES=""; REST_LINES=""
 while IFS= read -r line; do

@@ -214,6 +214,74 @@ for (const shell of SHELLS) {
     );
   });
 
+  test(`[${shell}] 5c classify: a ref git would read as a pathspec — magic, glob, directory — is recorded, never cleared (task.173 QA-8 CR8-1)`, () => {
+    const { root, g, write } = fiveCRepo();
+    // The consumer default patterns: under them `:!*.md` and `:(exclude)*.md` pass isDocsPath.
+    write(
+      "skills-config.yaml",
+      'ci:\n  docsOnly:\n    patterns:\n      - "**/*.md"\n      - "docs/**"\n',
+    );
+    write("src/a.js", "x\n");
+    g("add", "--", "src/a.js", "skills-config.yaml");
+    g("commit", "-q", "-m", "code");
+    write(
+      REVIEW_PATH,
+      reviewBody(
+        [
+          entry("PC-1", '":!*.md"'),
+          entry("PC-2", '":(exclude)*.md:12"'),
+          entry("PC-3", '"docs/tasks/task.9.x/*.md"'),
+          entry("PC-4", '"docs/tasks/task.9.x"'),
+          entry("PC-5", '"docs/tasks/task.9.x/task.9.notes.md:1"'),
+        ].join(""),
+      ),
+    );
+    g("add", "--", REVIEW_PATH);
+    const r = run(shell, root, classifyBlock());
+    assert.equal(r.status, 0, r.stderr + r.stdout);
+    for (const id of ["PC-1", "PC-2", "PC-3", "PC-4"]) {
+      assert.match(r.stdout, new RegExp(`^record ${id} `, "m"), id);
+      assert.doesNotMatch(r.stdout, new RegExp(`doc-only ${id} `), id);
+    }
+    // A plain, tracked, clean doc still clears: the literal check narrows nothing legitimate.
+    assert.match(
+      r.stdout,
+      /^doc-only PC-5 docs\/tasks\/task\.9\.x\/task\.9\.notes\.md$/m,
+    );
+    assert.equal(
+      readFileSync(join(root, ".claude/state/5c-carry-eligible.txt"), "utf8"),
+      `# review: ${REVIEW_PATH}\ndocs/tasks/task.9.x/task.9.notes.md\n`,
+    );
+  });
+
+  test(`[${shell}] 5c carry: a cleared file whose NAME holds a glob character is staged literally, never as a pattern (task.173 QA-8 CR8-1)`, () => {
+    const { root, g, write } = fiveCRepo();
+    const STAR = "docs/tasks/task.9.x/a*.md";
+    const SIBLING = "docs/tasks/task.9.x/ab.md";
+    write(STAR, "# Star\n");
+    write(SIBLING, "# Sibling\n");
+    g("add", "--", STAR, SIBLING);
+    g("commit", "-q", "-m", "a file named with a star");
+    write(REVIEW_PATH, reviewBody(entry("PC-1", `"${STAR}:1"`)));
+    g("add", "--", REVIEW_PATH);
+    assert.equal(run(shell, root, classifyBlock()).status, 0);
+    assert.match(
+      readFileSync(join(root, ".claude/state/5c-carry-eligible.txt"), "utf8"),
+      /^docs\/tasks\/task\.9\.x\/a\*\.md$/m,
+    );
+    write(STAR, "# Star\n\nfixed\n");
+    // Someone's unrelated edit to a file the glob `a*.md` would also name.
+    write(SIBLING, "# Sibling\n\nunrelated\n");
+    const r = run(shell, root, stageBlock([STAR]));
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    const staged = g("diff", "--cached", "--name-only").split("\n");
+    assert.ok(staged.includes(STAR), staged.join(","));
+    assert.ok(
+      !staged.includes(SIBLING),
+      "the sibling the glob would match stays unstaged",
+    );
+  });
+
   test(`[${shell}] 5c classify: an unreadable findings block HALTs; an empty one is a clean zero`, () => {
     for (const [body, ok] of [
       ["# PR Review\n\nno machine-readable section\n", false],

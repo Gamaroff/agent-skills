@@ -409,24 +409,24 @@ commit → scenario 17 red.
 
 ## QA Testing Results
 
-**QA Status**: PASS
+**QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-08
-**Quality Score**: 100/100
-**Gate Decision**: PASS
+**Quality Score**: 70/100
+**Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.173.qa.7.fold-5c-review-into-acceptance-commit.md](./task.173.qa.7.fold-5c-review-into-acceptance-commit.md)
-- **Gate File**: [task.173.gate.7.fold-5c-review-into-acceptance-commit.yml](./task.173.gate.7.fold-5c-review-into-acceptance-commit.yml)
+- **Full Report**: [task.173.qa.8.fold-5c-review-into-acceptance-commit.md](./task.173.qa.8.fold-5c-review-into-acceptance-commit.md)
+- **Gate File**: [task.173.gate.8.fold-5c-review-into-acceptance-commit.yml](./task.173.gate.8.fold-5c-review-into-acceptance-commit.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5550
+- **Tests Executed**: 5553
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **Critical Issues**: 1
+- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-CR6-1 closed. No open entries. Two advisory wording/robustness items (CR7-1, CR6-2) are carried in the gate's `recommendations.future`.
+The DoD run-3 NUL gap is closed. One HIGH (CR8-1): a review `ref` written as git pathspec magic (`:!*.md`) is cleared by the 5c classifier under the default patterns, and git reads it as every non-markdown file.
 
 ## Definition of Done - Gaps Identified — run 1 (historical, superseded)
 
@@ -530,6 +530,8 @@ CR6-1 closed. No open entries. Two advisory wording/robustness items (CR7-1, CR6
 | 2026-10-08 |  | AC8 exception list corrected to the record (DoD run 2 gap) | develop-task |
 | 2026-10-08 |  | DoD incomplete — 1 gap identified (run 3) | finalise |
 | 2026-10-08 |  | DoD run-3 gap fixed — isDocsPath refuses control characters; re-enters QA | develop-task |
+| 2026-10-08 |  | QA gate FAIL (70/100) — 1 finding (1 high) | qa-task |
+| 2026-10-08 |  | QA findings fixed — cycle 8, 1 finding (CR8-1) | qa-fix |
 <!-- change-log-end -->
 
 ---

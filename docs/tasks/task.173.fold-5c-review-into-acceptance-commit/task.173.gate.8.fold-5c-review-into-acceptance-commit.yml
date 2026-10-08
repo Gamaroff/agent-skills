@@ -1,0 +1,69 @@
+schema: 2
+task: 'task.173.fold-5c-review-into-acceptance-commit'
+task_title: 'Fold the 5c review and its doc-only fixes into the acceptance commit'
+gate: FAIL
+status_reason: 'Cycle 8 (unscoped safety re-probe after the finalise DoD security gap): the NUL fix holds, but a ref written as git pathspec magic (":!*.md") passes isDocsPath under the default patterns and git reads it as every non-markdown file, so the 5c classifier clears it and the stage block would add, restore or check out all code (HIGH).'
+reviewer: 'QA Engineer'
+head: '3d49e349440ff2780f116ab9e023332551bb46f1'
+updated: '2026-10-08T17:42:37Z'
+
+top_issues:
+  - id: 'CR8-1'
+    severity: high
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'The classify block''s tracked-and-clean test (line 1509) passes the ref to git as a pathspec while isDocsPath judged it as a literal filename. Under the default patterns, ":!*.md", ":(exclude)*.md" and ":^*.md" pass isDocsPath, and git resolves them to every tracked non-markdown file (2,256 here, bash and zsh), so the ref is cleared onto the eligible list and the stage block''s git add / restore / checkout (lines 1548, 1559, 1564) act on all code. Wildcards and directory refs widen one entry to many files in the same way. Promoted (bug, high/high). Bug: task.173.bug.3.'
+    suggested_action: 'Make every git call in the classify and stage blocks literal (--literal-pathspecs), and require git ls-files to name exactly the one path given. Have isDocsPath refuse a path beginning with ":" or containing glob characters. Add a ":!*.md" case under the default patterns, run under bash and zsh, plus a unit case.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 5553
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 28
+    notes: 'isDocsPath probed via the engine (task.173.qa.8.security.run.json, cases file task.173.qa.8.security.cases.json, repo and default patterns): engages, 0 reproduced; the control-character fix holds. The pathspec-magic escape (CR8-1) lies in how the classify block hands the ref to git, which the engine cannot reach (fenced Markdown); the reviewer reproduced it by hand under bash and zsh. Not counted in probes_executed.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Unchanged.'
+  maintainability:
+    status: PASS
+    notes: 'Unchanged.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR8-1 in qa-fix cycle 8.'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'shared/resources/ci-tree-equivalence.js', 'shared/resources/tests/acceptance-commit-carries-5c.test.mjs']
+  future:
+    - action: 'CR8-2 (medium/low, advisory, not reproduced): the tracked-and-clean test ignores the file mode; a tracked symlink in docs/ pointing at code would be cleared and an edit through it would not be carried. Record mode-120000 paths.'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+    - action: 'CR7-1 (advisory): the stale-arm HALT says "commit it".'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+    - action: 'CR6-2 (advisory): a git diff failure is read as dirty.'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['CR8-1 fixed']
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 1
+  fix_date: '2026-10-08'
+  total_iterations: 7
+  verification_method: 'Unscoped safety re-probe; the DoD run-3 NUL gap is closed (SEC-5, zsh classify case, engine probe 28/0); CR8-1 found'
