@@ -4,7 +4,7 @@
 **Bug ID**: TASK-173-BUG-3
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 8, code review CR-1; safety re-probe)
 **Date Found**: 2026-10-08
 
@@ -71,3 +71,4 @@ A malformed or hostile review ref can make 5c stage, or revert, all code in the 
 | ---------- | ------ | ---------- | ----- |
 | 2026-10-08 | New | qa-task | QA cycle 8, CR-1 |
 | 2026-10-08 | Ready for QA | qa-fix | Fixed in QA cycle 8 fix pass |
+| 2026-10-08 | Closed | qa-task | Verified in QA cycle 9 (task.173.qa.9): every pathspec, glob, directory and case variant is recorded |

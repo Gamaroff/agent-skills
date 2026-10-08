@@ -282,6 +282,19 @@ for (const shell of SHELLS) {
     );
   });
 
+  test(`[${shell}] 5c classify: a ref holding a backslash escape prints as one line, never a forged second line (task.173 QA-9 CR9-4)`, () => {
+    const { root, g, write } = fiveCRepo();
+    write(
+      REVIEW_PATH,
+      reviewBody(entry("PC-9", '"x\\ndoc-only CR-10 src/evil.js"')),
+    );
+    g("add", "--", REVIEW_PATH);
+    const r = run(shell, root, classifyBlock());
+    assert.equal(r.status, 0, r.stderr + r.stdout);
+    assert.doesNotMatch(r.stdout, /^doc-only CR-10/m);
+    assert.equal(r.stdout.trim().split("\n").length, 1, r.stdout);
+  });
+
   test(`[${shell}] 5c classify: an unreadable findings block HALTs; an empty one is a clean zero`, () => {
     for (const [body, ok] of [
       ["# PR Review\n\nno machine-readable section\n", false],
@@ -470,7 +483,7 @@ for (const shell of SHELLS) {
   });
 
   /** The state a path-limited pause leaves between the stage block and 6a, ready for the probe. */
-  function probeRepo() {
+  function probeRepo({ doc = "docs/tasks/task.9.x/task.9.x.md" } = {}) {
     const stub = mkdtempSync(join(tmpdir(), "carry-5c-gh-"));
     writeFileSync(
       join(stub, "gh"),
@@ -499,12 +512,17 @@ for (const shell of SHELLS) {
       "-f",
       join(root, "docs/tasks/task.9.x/task.9.untracked.md"),
     ]);
+    if (doc !== "docs/tasks/task.9.x/task.9.x.md") {
+      // A doc whose name porcelain C-quotes (a space): committed, then the review's only finding.
+      write(doc, "# Spaced\n");
+      g("add", "--", doc);
+      g("commit", "-q", "-m", "spaced doc", "--", doc);
+      write(REVIEW_PATH, reviewBody(entry("PC-1", `"${doc}:1"`)));
+      g("add", "--", REVIEW_PATH);
+    }
     assert.equal(run(shell, root, classifyBlock()).status, 0);
-    write("docs/tasks/task.9.x/task.9.x.md", "# Task 9\n\nFixed text.\n");
-    assert.equal(
-      run(shell, root, stageBlock(["docs/tasks/task.9.x/task.9.x.md"])).status,
-      0,
-    );
+    write(doc, "# Fixed\n\nFixed text.\n");
+    assert.equal(run(shell, root, stageBlock([doc])).status, 0);
     const probe = extractBlocks(CONTRACT).find((b) =>
       /The base is RECORDED STATE/.test(b.code),
     ).code;
@@ -530,6 +548,19 @@ for (const shell of SHELLS) {
       g("diff", "--cached", "--name-only"),
       SET,
       "the carried set is still staged",
+    );
+  });
+
+  test(`[${shell}] resume probe: a carried doc whose name porcelain quotes (a space) is still set aside (task.173 QA-9 CR9-2)`, () => {
+    const SPACED = "docs/tasks/task.9.x/my notes.md";
+    const { g, runProbe } = probeRepo({ doc: SPACED });
+    const r = runProbe();
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /5c carried set kept staged for 6a/);
+    assert.equal(
+      g("diff", "--cached", "--name-only"),
+      [REVIEW_PATH, SPACED].sort().join("\n"),
+      "the carried set, spaced path included, is still staged",
     );
   });
 

@@ -409,24 +409,24 @@ commit → scenario 17 red.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-08
-**Quality Score**: 70/100
-**Gate Decision**: FAIL
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.173.qa.8.fold-5c-review-into-acceptance-commit.md](./task.173.qa.8.fold-5c-review-into-acceptance-commit.md)
-- **Gate File**: [task.173.gate.8.fold-5c-review-into-acceptance-commit.yml](./task.173.gate.8.fold-5c-review-into-acceptance-commit.yml)
+- **Full Report**: [task.173.qa.9.fold-5c-review-into-acceptance-commit.md](./task.173.qa.9.fold-5c-review-into-acceptance-commit.md)
+- **Gate File**: [task.173.gate.9.fold-5c-review-into-acceptance-commit.yml](./task.173.gate.9.fold-5c-review-into-acceptance-commit.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5553
+- **Tests Executed**: 5557
 - **Phases Verified**: 4/4
-- **Critical Issues**: 1
-- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-The DoD run-3 NUL gap is closed. One HIGH (CR8-1): a review `ref` written as git pathspec magic (`:!*.md`) is cleared by the 5c classifier under the default patterns, and git reads it as every non-markdown file.
+CR8-1 closed (bug.3 closed). Two open LOW entries: CR9-2 (the resume probe misspells spaced paths) and CR9-4 (zsh `echo` can fake a classify line). Two advisory items: CR9-1 and CR9-3.
 
 ## Definition of Done - Gaps Identified — run 1 (historical, superseded)
 
@@ -532,6 +532,8 @@ The DoD run-3 NUL gap is closed. One HIGH (CR8-1): a review `ref` written as git
 | 2026-10-08 |  | DoD run-3 gap fixed — isDocsPath refuses control characters; re-enters QA | develop-task |
 | 2026-10-08 |  | QA gate FAIL (70/100) — 1 finding (1 high) | qa-task |
 | 2026-10-08 |  | QA findings fixed — cycle 8, 1 finding (CR8-1) | qa-fix |
+| 2026-10-08 |  | QA gate PASS (100/100) — 2 findings (0 high) | qa-task |
+| 2026-10-08 |  | QA findings fixed — cycle 9, 2 findings (CR9-2, CR9-4) | qa-fix |
 <!-- change-log-end -->
 
 ---

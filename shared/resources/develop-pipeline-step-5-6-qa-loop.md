@@ -1440,11 +1440,13 @@ another report, or a report that is no longer staged.
 ```bash
 # INPUT, bound in THIS block: the PR review report this 5c pass wrote.
 PR_REVIEW="{work-item-dir}/{prefix}.pr-review.{n}.{name}.md"
-case "$PR_REVIEW" in *'{'*) echo "HALT: substitute PR_REVIEW before running this block"; exit 1 ;; esac
-[ -f "$PR_REVIEW" ] || { echo "HALT: $PR_REVIEW not found — /review-pr writes it before the verdict"; exit 1; }
+case "$PR_REVIEW" in *'{'*) printf '%s\n' "HALT: substitute PR_REVIEW before running this block"; exit 1 ;; esac
+[ -f "$PR_REVIEW" ] || { printf '%s\n' "HALT: $PR_REVIEW not found — /review-pr writes it before the verdict"; exit 1; }
 mkdir -p .claude/state
 CLASSIFIED=.claude/state/5c-carry-classified.txt
 ELIGIBLE=.claude/state/5c-carry-eligible.txt   # the paths the stage block below may touch
+# Every line that carries a ref or a path is printed with printf '%s', never echo: zsh's echo interprets
+# backslash escapes, so a ref holding \n printed a fake classify line (task.173 QA-9, CR9-4).
 # Classify runs ONCE per 5c pass, before any edit. Re-run after the edits, it would rebuild the list
 # from a tree where every fixed path is now dirty and drop them all (task.173 QA-2, CR-5).
 # A listed path that is dirty against HEAD changed after a 5c pass cleared it, whatever the header
@@ -1458,14 +1460,14 @@ if [ -s "$ELIGIBLE" ]; then
     case "$q" in '# '*) continue ;; esac
     git --literal-pathspecs diff --quiet HEAD -- "$q" 2>/dev/null && continue
     if [ "$ELIG_HEAD" = "# review: $PR_REVIEW" ]; then
-      echo "HALT: $q already carries a 5c edit — run the stage block, do not re-classify"
+      printf '%s\n' "HALT: $q already carries a 5c edit — run the stage block, do not re-classify"
     else
-      echo "HALT: $q changed after the 5c pass for ${ELIG_HEAD#\# review: } cleared it — inspect git diff HEAD -- $q; if it is that pass's fix, carry it with that pass's stage block, otherwise it is not a 5c edit: commit it or set it aside yourself; then re-classify"
+      printf '%s\n' "HALT: $q changed after the 5c pass for ${ELIG_HEAD#\# review: } cleared it — inspect git diff HEAD -- $q; if it is that pass's fix, carry it with that pass's stage block, otherwise it is not a 5c edit: commit it or set it aside yourself; then re-classify"
     fi
     exit 1
   done < "$ELIGIBLE"
   [ "$ELIG_HEAD" = "# review: $PR_REVIEW" ] \
-    || echo "replacing a stale eligible list ($ELIG_HEAD) — every path it names is clean"
+    || printf '%s\n' "replacing a stale eligible list ($ELIG_HEAD) — every path it names is clean"
 fi
 printf '# review: %s\n' "$PR_REVIEW" > "$ELIGIBLE"
 # One line per finding in the report's Machine-Readable Findings block. The engine exits 1 when it
@@ -1502,21 +1504,21 @@ command node -e '
     }
   }
   if (printed !== entries) { console.error(`${entries} finding entries, ${printed} classified — an entry has no id: first or no ref:`); process.exit(1); }
-' "$PR_REVIEW" > "$CLASSIFIED" || { echo "HALT: cannot classify $PR_REVIEW — the findings are neither fixed nor recorded"; exit 1; }
+' "$PR_REVIEW" > "$CLASSIFIED" || { printf '%s\n' "HALT: cannot classify $PR_REVIEW — the findings are neither fixed nor recorded"; exit 1; }
 # Second test, in the shell where git is: tracked, clean against HEAD, not Step 8's report, not the review.
 # Git reads a path argument as a PATHSPEC, isDocsPath reads it as a FILE NAME, and the two disagree:
 # `:!*.md` passes the predicate under the default patterns and names every non-markdown file to git
 # (task.173 QA-8, CR8-1). So every git call in this block and the stage block is literal, and a ref
 # clears only when it names exactly one tracked file — no glob, directory or magic can widen it.
 while IFS=' ' read -r VERDICT ID REST; do
-  if [ "$VERDICT" != "doc-only" ]; then echo "$VERDICT $ID $REST"; continue; fi
-  case "$REST" in *.implementation.*) echo "record $ID $REST (the implementation report is Step 8's)"; continue ;; esac
-  [ "$REST" != "$PR_REVIEW" ] || { echo "record $ID $REST (the review report itself)"; continue; }
+  if [ "$VERDICT" != "doc-only" ]; then printf '%s\n' "$VERDICT $ID $REST"; continue; fi
+  case "$REST" in *.implementation.*) printf '%s\n' "record $ID $REST (the implementation report is Step 8's)"; continue ;; esac
+  [ "$REST" != "$PR_REVIEW" ] || { printf '%s\n' "record $ID $REST (the review report itself)"; continue; }
   if [ "$(git -c core.quotePath=false --literal-pathspecs ls-files -- "$REST" 2>/dev/null)" = "$REST" ] \
      && git --literal-pathspecs diff --quiet HEAD -- "$REST"; then
-    echo "doc-only $ID $REST"; printf '%s\n' "$REST" >> "$ELIGIBLE"
+    printf '%s\n' "doc-only $ID $REST"; printf '%s\n' "$REST" >> "$ELIGIBLE"
   else
-    echo "record $ID $REST (untracked, or holds uncommitted work — not fixed at 5c)"
+    printf '%s\n' "record $ID $REST (untracked, or holds uncommitted work — not fixed at 5c)"
   fi
 done < "$CLASSIFIED"
 ```
@@ -1534,25 +1536,25 @@ doc-only, leave `CARRY_FIXED` empty: the block then only asserts the report is s
 PR_REVIEW="{work-item-dir}/{prefix}.pr-review.{n}.{name}.md"
 # Quoted on purpose: unquoted, zsh drops the braces and the placeholder guard below cannot see it.
 CARRY_FIXED=("{each path the doc-only fixes changed, quoted — write CARRY_FIXED=() when none}")
-case "$PR_REVIEW ${CARRY_FIXED[*]}" in *'{'*) echo "HALT: substitute PR_REVIEW and CARRY_FIXED before running this block"; exit 1 ;; esac
+case "$PR_REVIEW ${CARRY_FIXED[*]}" in *'{'*) printf '%s\n' "HALT: substitute PR_REVIEW and CARRY_FIXED before running this block"; exit 1 ;; esac
 ELIGIBLE=.claude/state/5c-carry-eligible.txt   # written by the classify block above
 # The checker must be runnable before anything is staged or restored: an unsubstituted skill name
 # or a missing node would otherwise read as "dead link" and undo a valid fix (task.173 QA-2, CR-2).
 # Quoted: unquoted, the placeholder's | splits the line into a pipeline (task.173 QA-3, CR-6).
 DOC_LINKS=".agents/skills/{develop-story|develop-task}/references/doc-links.js"
-case "$DOC_LINKS" in *'{'*) echo "HALT: substitute the skill name in DOC_LINKS"; exit 1 ;; esac
-[ -f "$DOC_LINKS" ] || { echo "HALT: $DOC_LINKS not found"; exit 1; }
-command -v node >/dev/null 2>&1 || { echo "HALT: node is not on PATH — the link check cannot run"; exit 1; }
+case "$DOC_LINKS" in *'{'*) printf '%s\n' "HALT: substitute the skill name in DOC_LINKS"; exit 1 ;; esac
+[ -f "$DOC_LINKS" ] || { printf '%s\n' "HALT: $DOC_LINKS not found"; exit 1; }
+command -v node >/dev/null 2>&1 || { printf '%s\n' "HALT: node is not on PATH — the link check cannot run"; exit 1; }
 HEAD_BEFORE=$(git rev-parse HEAD)
-git --literal-pathspecs add -- "$PR_REVIEW" || { echo "HALT: cannot stage $PR_REVIEW"; exit 1; }
+git --literal-pathspecs add -- "$PR_REVIEW" || { printf '%s\n' "HALT: cannot stage $PR_REVIEW"; exit 1; }
 CARRIED=("$PR_REVIEW")
 HANDLED=""   # one outcome per path: a path listed twice is handled once (task.173 QA-2, CR-4)
 for p in "${CARRY_FIXED[@]}"; do
   printf '%s' "$HANDLED" | grep -qxF -- "$p" && continue
   HANDLED="$HANDLED$p"$'\n'
   grep -qxF -- "$p" "$ELIGIBLE" 2>/dev/null \
-    || { echo "HALT: $p was not cleared by the classify block — left untouched; undo that edit by hand"; exit 1; }
-  git --literal-pathspecs add -- "$p" || { echo "HALT: cannot stage $p"; exit 1; }
+    || { printf '%s\n' "HALT: $p was not cleared by the classify block — left untouched; undo that edit by hand"; exit 1; }
+  git --literal-pathspecs add -- "$p" || { printf '%s\n' "HALT: cannot stage $p"; exit 1; }
   # doc-links.js: 0 = links resolve, 1 = a dead link (the only exit that undoes the fix), anything
   # else = the check could not run — HALT, staged as it is, rather than discard a fix over a tool error.
   LINKS_RC=0
@@ -1564,16 +1566,16 @@ for p in "${CARRY_FIXED[@]}"; do
   elif [ "$LINKS_RC" -ne 1 ]; then
     # Unstaged, edit kept: staged, a resume would carry a fix whose check never ran (QA-3, CR-2).
     git --literal-pathspecs restore --staged -- "$p" \
-      || { echo "HALT: doc-links.js exited $LINKS_RC on $p, and $p is STILL STAGED — unstage it by hand"; exit 1; }
-    echo "HALT: doc-links.js exited $LINKS_RC on $p — the check did not run; the edit is kept, unstaged"; exit 1
+      || { printf '%s\n' "HALT: doc-links.js exited $LINKS_RC on $p, and $p is STILL STAGED — unstage it by hand"; exit 1; }
+    printf '%s\n' "HALT: doc-links.js exited $LINKS_RC on $p — the check did not run; the edit is kept, unstaged"; exit 1
   else
-    echo "NOT CARRIED: $p — a dead link; the 5c edit is undone, finding recorded"
-    git --literal-pathspecs checkout HEAD -- "$p" || { echo "HALT: cannot restore $p"; exit 1; }
+    printf '%s\n' "NOT CARRIED: $p — a dead link; the 5c edit is undone, finding recorded"
+    git --literal-pathspecs checkout HEAD -- "$p" || { printf '%s\n' "HALT: cannot restore $p"; exit 1; }
   fi
 done
 # This block commits nothing and pushes nothing. If HEAD moved, something here did.
-[ "$(git rev-parse HEAD)" = "$HEAD_BEFORE" ] || { echo "HALT: HEAD moved during the 5c carry — nothing may commit before 6a"; exit 1; }
-echo "Carried to 6a: ${CARRIED[*]}"
+[ "$(git rev-parse HEAD)" = "$HEAD_BEFORE" ] || { printf '%s\n' "HALT: HEAD moved during the 5c carry — nothing may commit before 6a"; exit 1; }
+printf '%s\n' "Carried to 6a: ${CARRIED[*]}"
 ```
 
 Write the block's last line onto the cycle's QA Cycle entry as `**Carried to 6a**: {paths}`, and

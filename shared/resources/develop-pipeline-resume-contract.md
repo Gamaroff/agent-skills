@@ -273,6 +273,16 @@ case "$ELIG_HEAD" in
   "# review: $WI_DIR"/*.pr-review.*.md)
     [ -n "$(git --literal-pathspecs diff --cached --name-only -- "${ELIG_HEAD#\# review: }")" ] && ELIGIBLE=.claude/state/5c-carry-eligible.txt ;;
 esac
+# How git spells each listed path in $DIRTY: ask git, with the same flags, rather than compare a raw
+# list entry against a status line — porcelain C-quotes a path with a space or non-ASCII byte, and
+# the list holds it raw, so a carried `docs/my notes.md` never matched (task.173 QA-9, CR9-2).
+CARRY_EXPECT=""
+if [ -n "$ELIGIBLE" ]; then
+  while IFS= read -r e; do
+    case "$e" in '# '*|'') continue ;; esac
+    CARRY_EXPECT="$CARRY_EXPECT$(git --literal-pathspecs status --porcelain --no-renames -- "$e")"$'\n'
+  done < "$ELIGIBLE"
+fi
 CARRY_LINES=""; REST_LINES=""
 while IFS= read -r line; do
   [ -n "$line" ] || continue
@@ -280,7 +290,7 @@ while IFS= read -r line; do
   case "$st" in
     "A "|"M ")
       case "$p" in "$WI_DIR"/*.pr-review.*.md) CARRY_LINES="$CARRY_LINES$line"$'\n'; continue ;; esac
-      if [ -n "$ELIGIBLE" ] && grep -qxF -- "$p" "$ELIGIBLE"; then
+      if [ -n "$ELIGIBLE" ] && printf '%s' "$CARRY_EXPECT" | grep -qxF -- "$line"; then
         CARRY_LINES="$CARRY_LINES$line"$'\n'; continue
       fi ;;
   esac
