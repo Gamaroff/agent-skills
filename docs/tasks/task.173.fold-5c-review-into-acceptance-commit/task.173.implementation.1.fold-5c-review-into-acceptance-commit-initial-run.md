@@ -3,7 +3,7 @@
 **Task**: `task.173.fold-5c-review-into-acceptance-commit.md`
 **Run Number**: 1
 **Started**: 2026-10-08 05:12
-**Status**: Escalated
+**Status**: Halted — DoD gaps
 
 ---
 
@@ -35,8 +35,8 @@ Narrow the two index-sweeping commits (finalise 8a, PreCompact pause) to their o
 | 2. review-task             | ✅ Done | `task.173.review.{N}.{name}.md` exists (or skip logged)               | `task.173.review.1.…md`: READY TO IMPLEMENT 8/10, 0 Critical / 4 Important (applied) / 3 Optional; Planned → Ready for Development | —                    |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline (plan file); 1 iteration; 4/4 phases; ci:fast + npm run ci green; 8 mutation proofs | —                    |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #613: https://github.com/Gamaroff/agent-skills/pull/613 | —                    |
-| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.173.qa.{N}.*.md`; `task.173.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | Loop limit (9 cycles incl. 2 re-entries); gate 9 PASS 100 with 2 LOW, fixed in `96026663` and ungated; route 2c declined (medium-not-falling) | —                    |
-| 7. finalise                | ⏳ Pending | `task.173.dod.{N}.*.md`; task `status: accepted`                      | Runs 1–3 gaps (see Issues Log/Decisions); pending after QA re-entry | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.173.qa.{N}.*.md`; `task.173.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 10 cycles (5 + 2 granted + 2 QA re-entry + 1 granted); gate 10 PASS 100; 5c PR review APPROVE (pr-review.2) | —                    |
+| 7. finalise                | ❌ Failed | `task.173.dod.{N}.*.md`; task `status: accepted`                      | Runs 1–3 gaps resolved. Run 4 (`task.173.dod.4…`): 1 gap — AC8's enumerated fix list is stale | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
@@ -115,6 +115,13 @@ Narrow the two index-sweeping commits (finalise 8a, PreCompact pause) to their o
 - QA cycle 8: /qa-task (code_review_blocking=true, matrix passed). Unscoped safety re-probe by judgement: no clause fired literally, but the re-entry came from a boundary defect. Boundary: true (obs #298); engine probe on `isDocsPath`, both pattern sets, cases persisted (obs #299), 28/0, with a discrimination check. Reviewer 279.6 s. Gate 8 FAIL 70: CR8-1 HIGH promoted and reproduced by the orchestrator. Convergence: no trip (HIGH 0,0,1). Route: continue. Third strike: none. Narrowing: false (high-findings-remain).
 - QA Cycle 8 — changes-requested: stage-disabled. qa-fix ingester not dispatched: the orchestrator wrote gate 8 in this context (independence loss recorded). Fast gate 5,556/0 on attempt 1. `c2d063ba` pushed once; PR OPEN; qa-fix comments posted (PR, and tracker `qa-fix-8`).
 - QA cycle 9: a mandatory safety re-probe (clause 1: gate 8 security FAIL), unscoped. Reviewer 260.6 s (read-only, so verified against the real index). Engine 28/0 with persisted cases. Step 4b: 0 findings on both changed docs. Gate 9 PASS 100 with 2 open LOW (promoted low/high). Route: continue (high-findings-remain: HIGH 1 then 0). The 5b fix is cycle 9 of 9.
+- QA loop re-entry (2026-10-08, operator "Go ahead" on "resume with 1 more cycle"): 1 extra cycle granted; 0 cycle(s) run outside the loop back-filled from disk. grant-qa-cycles.sh: QA_CYCLE=9, qa_max_cycles=10; lock restored from halt snapshot.
+- QA cycle 10: /qa-task scoped to `96026663` (clause 1 false). Reviewer 215.8 s; engine 28/0. Gate 10 PASS 100, top_issues empty → route 1 → 5c.
+- 5c: /review-pr → APPROVE (PC-1..3 LOW, scope). The marker comment was updated in place. The stage block carried the report; HEAD unchanged. ready-for-merge: stage-disabled.
+- DoD run 4 (`task.173.dod.4.fold-5c-review-into-acceptance-commit.md`): AC PARTIAL (AC8), Docs PASS, Compliance NOT_APPLICABLE. Security PASS by override, with 104 probes; its cases were persisted by the orchestrator because the agent was read-only. CI reading 1: SUCCESS @ 3e439274c86487b56920fc63607109385a9823e8 over 5 checks.
+  - AC8 failed again because its list predates the NUL fix and cycles 8–9. That is my lapse: the enumeration should have been extended each cycle.
+  - Security reproduced a LOW: `isDocsPath` accepts a `.git` segment. It is identical on origin/develop (measured), so it is pre-existing and out of scope. It fails closed in the 5c path. → follow-up.
+  - HALT; gaps PR comment posted.
 
 ---
 
@@ -286,6 +293,17 @@ _Track each QA review/fix cycle._
 **Action**: Escalating — loop limit reached
 **Fixes Applied**: CR9-4: every line in the 5c classify and stage blocks that prints a ref or a path uses `printf '%s'`, not `echo` (23 lines). CR9-2: the resume probe matches a carried entry by asking git for each listed path's status line with the same flags as `$DIRTY`, rather than grepping a C-quoted `p` against the raw list. Tests: a backslash-escape ref prints one line; a spaced carried doc is set aside on resume. 48/48. Mutation: echo restored → zsh red (bash is green by nature, the defect's asymmetry); raw-list grep restored → bash and zsh red. Fast gate attempt 1 red: an environmental `git commit` "unable to create temporary file" inside the resume-probe fixture setup, zsh (load average ~18), before any changed code ran.
 **Commit**: `96026663`
+
+### QA Cycle 10 — 2026-10-08
+**Gate Result**: PASS
+**Issues Found**: none open. CR9-2 and CR9-4 closed (the new tests go red on the pre-fix docs). Advisory: CR10-1 (low/medium, a directory entry in the eligible list), CR10-2 (low/low, review-report arm quoting), CR10-3 (cleanup, CI installs no zsh, verified).
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: APPROVE
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+**PR Review report**: `task.173.pr-review.2.fold-5c-review-into-acceptance-commit.md` (conformance only): APPROVE, with 3 LOW scope findings. The Files Summary does not list `ci-tree-equivalence.js`, its SEC-5 test or `configuration.md`, all added by the DoD run-3 fix.
+**Carried to 6a**: task.173.pr-review.2.fold-5c-review-into-acceptance-commit.md (APPROVE, so no doc-only fixes)
 
 ---
 

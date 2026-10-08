@@ -501,6 +501,20 @@ CR9-2 and CR9-4 are closed. No open entries. Advisory follow-ups, including inst
 **Estimated Effort:** Small
 
 **Detailed Verification Log:** See `task.173.dod.3.fold-5c-review-into-acceptance-commit.md`.
+## Definition of Done - Gaps Identified — run 4
+
+**Status:** IN PROGRESS
+
+### Missing Criteria:
+
+1. **Acceptance Criteria:**
+   - [ ] AC8 enumerates the QA fixes, and the list predates the run-3 NUL fix and QA cycles 8–9. CR8-1's literal restore, checkout and probe header (`no-red-untested`) are not named.
+
+### Next Steps:
+
+- [ ] Rewrite AC8 to cite the record rather than restate it.
+
+**Detailed Verification Log:** See `task.173.dod.4.fold-5c-review-into-acceptance-commit.md`.
 <!-- change-log-start -->
 ## Change Log
 
@@ -535,6 +549,7 @@ CR9-2 and CR9-4 are closed. No open entries. Advisory follow-ups, including inst
 | 2026-10-08 |  | QA gate PASS (100/100) — 2 findings (0 high) | qa-task |
 | 2026-10-08 |  | QA findings fixed — cycle 9, 2 findings (CR9-2, CR9-4) | qa-fix |
 | 2026-10-08 |  | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-10-08 |  | DoD incomplete — 1 gap identified (run 4) | finalise |
 <!-- change-log-end -->
 
 ---
