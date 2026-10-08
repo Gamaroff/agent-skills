@@ -411,21 +411,21 @@ commit → scenario 17 red.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-08
-**Quality Score**: 80/100
+**Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.173.qa.3.fold-5c-review-into-acceptance-commit.md](./task.173.qa.3.fold-5c-review-into-acceptance-commit.md)
-- **Gate File**: [task.173.gate.3.fold-5c-review-into-acceptance-commit.yml](./task.173.gate.3.fold-5c-review-into-acceptance-commit.yml)
+- **Full Report**: [task.173.qa.4.fold-5c-review-into-acceptance-commit.md](./task.173.qa.4.fold-5c-review-into-acceptance-commit.md)
+- **Gate File**: [task.173.gate.4.fold-5c-review-into-acceptance-commit.yml](./task.173.gate.4.fold-5c-review-into-acceptance-commit.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5540
+- **Tests Executed**: 5548
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-Cycle-2 fixes verified. Seven issues remain: two MEDIUM (the eligible list is stale and tied to no work item; a HALT leaves an unchecked fix staged) and five LOW.
+Cycle-3 fixes verified. One MEDIUM remains: the 8a overlap recovery hint would restore the rejected fix (CR4-1). Three LOW.
 
 <!-- change-log-start -->
 
@@ -444,6 +444,8 @@ Cycle-2 fixes verified. Seven issues remain: two MEDIUM (the eligible list is st
 | 2026-10-08 |         | QA findings fixed — cycle 2, 6 findings (CR2-1..CR2-6) | qa-fix |
 | 2026-10-08 |         | QA gate CONCERNS (80/100) — 7 findings (0 high) | qa-task |
 | 2026-10-08 |         | QA findings fixed — cycle 3, 7 findings (CR3-1..CR3-7) | qa-fix |
+| 2026-10-08 |         | QA gate CONCERNS (90/100) — 4 findings (0 high) | qa-task |
+| 2026-10-08 |         | QA findings fixed — cycle 4, 4 findings (CR4-1..CR4-4) | qa-fix |
 
 <!-- change-log-end -->
 

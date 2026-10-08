@@ -476,6 +476,15 @@ for (const shell of SHELLS) {
       const r = runProbe();
       assert.equal(r.status, 1, `${shape}: ${r.stdout}`);
       assert.match(r.stdout, /HALT: dirty tree on resume/, shape);
+      // The HALT must list the path that is NOT carried — not only some other dirt (QA-4 CR-4).
+      const halted = r.stdout.split("HALT:")[1];
+      assert.match(
+        halted,
+        shape === "other-dirt"
+          ? /src\/other\.js/
+          : /docs\/tasks\/task\.9\.x\/task\.9\.x\.md/,
+        `${shape}: the HALT names the uncarried path`,
+      );
     }
   });
 
@@ -538,6 +547,22 @@ for (const shell of SHELLS) {
       assert.equal(r.status, 0, r.stderr + r.stdout);
       assert.equal(r.stdout.trim(), 'record CR-1 "skills/x/SKILL.md:4"');
     }
+  });
+
+  test(`[${shell}] 5c classify: a stale list from another pass is replaced, not obeyed (QA-4 CR-2)`, () => {
+    const { root, write } = fiveCRepo();
+    // Another pass's list: its review is not this one, and its listed path is dirty.
+    write(
+      ".claude/state/5c-carry-eligible.txt",
+      "# review: docs/tasks/task.9.x/task.9.pr-review.0.old.md\ndocs/tasks/task.9.x/task.9.dirty.md\n",
+    );
+    const r = run(shell, root, classifyBlock());
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /replacing a stale eligible list/);
+    assert.match(
+      readFileSync(join(root, ".claude/state/5c-carry-eligible.txt"), "utf8"),
+      new RegExp("^# review: " + REVIEW_PATH.replace(/\./g, "\\.")),
+    );
   });
 
   // ── /finalise 6a ────────────────────────────────────────────────────────────

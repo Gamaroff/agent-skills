@@ -1446,12 +1446,16 @@ CLASSIFIED=.claude/state/5c-carry-classified.txt
 ELIGIBLE=.claude/state/5c-carry-eligible.txt   # the paths the stage block below may touch
 # Classify runs ONCE per 5c pass, before any edit. Re-run after the edits, it would rebuild the list
 # from a tree where every fixed path is now dirty and drop them all (task.173 QA-2, CR-5).
-if [ -s "$ELIGIBLE" ]; then
+# The guard reads only THIS pass's list (line 1 names this review). A list another pass left behind
+# holds none of this pass's edits, so it is replaced, not obeyed (task.173 QA-4, CR-2).
+if [ -s "$ELIGIBLE" ] && [ "$(head -1 "$ELIGIBLE")" = "# review: $PR_REVIEW" ]; then
   while IFS= read -r q; do
     case "$q" in '# '*) continue ;; esac
     git diff --quiet HEAD -- "$q" 2>/dev/null \
       || { echo "HALT: $q already carries a 5c edit — run the stage block, do not re-classify"; exit 1; }
   done < "$ELIGIBLE"
+elif [ -s "$ELIGIBLE" ]; then
+  echo "replacing a stale eligible list ($(head -1 "$ELIGIBLE")) — another 5c pass wrote it"
 fi
 printf '# review: %s\n' "$PR_REVIEW" > "$ELIGIBLE"
 # One line per finding in the report's Machine-Readable Findings block. The engine exits 1 when it
@@ -1544,7 +1548,8 @@ for p in "${CARRY_FIXED[@]}"; do
     CARRIED+=("$p")
   elif [ "$LINKS_RC" -ne 1 ]; then
     # Unstaged, edit kept: staged, a resume would carry a fix whose check never ran (QA-3, CR-2).
-    git restore --staged -- "$p"
+    git restore --staged -- "$p" \
+      || { echo "HALT: doc-links.js exited $LINKS_RC on $p, and $p is STILL STAGED — unstage it by hand"; exit 1; }
     echo "HALT: doc-links.js exited $LINKS_RC on $p — the check did not run; the edit is kept, unstaged"; exit 1
   else
     echo "NOT CARRIED: $p — a dead link; the 5c edit is undone, finding recorded"
