@@ -33,13 +33,17 @@ jobs:
       # refuse a clean config on Debian, or accept a merge key on macOS — a divergence in the
       # permissive direction, on the tier a stock consumer host actually runs. The section skips
       # with a printed notice when a variant is missing, so without this step it silently covers one.
-      - name: Install awk variants
+      #
+      # zsh is the macOS default shell, and the suites that run documented shell blocks run each one
+      # under bash AND zsh. A missing zsh drops the zsh variant without failing, so a regression that
+      # shows only under zsh passed CI (task.173 QA cycle 10, CR10-3: the printf/echo pin).
+      - name: Install awk variants and zsh
         # `apt-get update` first, and deliberately: this step runs BEFORE the suite, so a stale
         # package index on the runner would fail the whole job for a reason unrelated to the change
         # under test. The install is a prerequisite for §45, not the thing being verified.
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends gawk mawk
+          sudo apt-get install -y --no-install-recommends gawk mawk zsh
 
       - name: Install dependencies
         run: npm ci

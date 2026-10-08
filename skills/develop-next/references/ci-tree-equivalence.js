@@ -112,6 +112,22 @@ const val = async (x) => (typeof x === "function" ? x() : x);
 const CONFIG_BASENAME = "skills-config.yaml";
 
 /**
+ * Is one path segment a spelling of `.git`? Git itself refuses these names (is_hfs_dotgit /
+ * is_ntfs_dotgit), because on a case-insensitive or Unicode-folding filesystem they ARE the
+ * repository directory: any case, HFS+-ignorable code points (zero-width and directional marks,
+ * U+FEFF), trailing dots or spaces, and the NTFS short name `git~1`. A path through one names the
+ * repository's internals, never documentation, so no pattern may accept it.
+ */
+const DOTGIT_IGNORABLE = /[\u200b-\u200f\u202a-\u202e\u206a-\u206f\ufeff]/g;
+function isDotGitSegment(seg) {
+  const folded = seg
+    .replace(DOTGIT_IGNORABLE, "")
+    .replace(/[. ]+$/, "")
+    .toLowerCase();
+  return folded === ".git" || folded === "git~1";
+}
+
+/**
  * Is a changed path documentation? Three things make it NOT, whatever `patterns` say:
  *
  *  - It is the rule's own configuration file. `readConfig` reads the head being judged, so a commit
@@ -130,6 +146,9 @@ const CONFIG_BASENAME = "skills-config.yaml";
  *  - It has a `.`, `..` or empty segment. `docs/../src/a.js` matches `docs/**` as a string yet names
  *    `src/a.js`; git refuses to check such a name out, but a hand-built tree can carry one, and the
  *    rule must not read it as documentation (DoD security gate).
+ *  - It has a segment that is a spelling of `.git` (`isDotGitSegment`): the repository's own
+ *    internals. Git refuses to track such a path, so the 5c classifier already recorded it, but the
+ *    predicate accepted it under `docs/**` (task.173 DoD run 4, a pre-existing LOW).
  *  - It matches none of the patterns.
  */
 function isDocsPath(file, globs) {
@@ -138,6 +157,7 @@ function isDocsPath(file, globs) {
   if (file.split("/").some((seg) => seg === "" || seg === "." || seg === ".."))
     return false;
   if (file.startsWith(GITLINK_PREFIX)) return false; // a submodule pointer: no pattern may accept it (CR3-8)
+  if (file.split("/").some(isDotGitSegment)) return false; // the repository's internals, in any spelling
   if (file.split("/").pop() === CONFIG_BASENAME) return false;
   if (normalisePath(file) !== file) return false;
   return matchesAnyGlob(file, globs);
