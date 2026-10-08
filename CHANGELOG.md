@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Changed
+
+- **The 5c PR review now rides `/finalise`'s acceptance commit, so a run pushes one commit fewer.**
+  On `APPROVE` or `CONCERNS`, the develop pipelines stage the PR review report and commit nothing
+  between 5c and `/finalise` 6a. On `CONCERNS`, a finding whose `ref` path matches
+  `ci.docsOnly.patterns` may be fixed at 5c and staged too. Any other finding is still recorded and
+  not fixed. Both steps are fenced blocks in `develop-pipeline-step-5-6-qa-loop.md`
+  ("Carry the review into the acceptance commit"). 6a already commits the whole index. It now says
+  so, and its message ends `; 5c review carried` when it carries anything beyond the acceptance
+  artefacts and the registry. On tinker-city PR #981 the separate 5c commit cost a push and a full
+  CI run (task.173).
+- **`/finalise` 8a's fix commit and the PreCompact pause commit commit only their own paths.** A
+  bare `git commit` in either swept the staged 5c set into the wrong commit. In 8a, the
+  `--git-base` check then refused healthy work for "a file the record did not name". 8a is now a
+  fenced block that commits `-- <touched>`, and the pause hook commits `-- <report>`.
+
 ## [v0.55.0] - 2026-10-07
 
 ### Fixed

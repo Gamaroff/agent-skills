@@ -138,7 +138,10 @@ deliberately unchanged, so **no Version bump**:
 registry — **push them, assert each is tracked and on `origin/<branch>`, and take a second CI
 reading on that pushed head**, all *before* its own PR comment, tracker comment, issue close and
 board move. Every side-effect in this document therefore runs against a pushed, CI-green acceptance
-commit. Two consequences for the orchestrator:
+commit. 6a commits the whole index, so it also carries what 5c staged — the PR review report and any
+doc-only `CONCERNS` fixes (task.173; step 5–6 § "Carry the review into the acceptance commit") —
+and its message then ends `; 5c review carried`. That set is committed by 6a, never left dirty, so
+the boundary check below does not see it. Two consequences for the orchestrator:
 
 - **Step 8 no longer carries the acceptance artefacts.** It commits the implementation report (and
   nothing else new), so `git status` after `/finalise` returns should show only the report modified —

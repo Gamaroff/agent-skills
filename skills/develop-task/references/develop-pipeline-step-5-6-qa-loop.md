@@ -1390,8 +1390,8 @@ gate.
 | Verdict | Action |
 | --- | --- |
 | 🚨 **REQUEST CHANGES** | Return to **5b** and run `/qa-fix` with the review's findings (see the invocation below). **Do not increment the counter here** — 5b's step 7 increments it on exit, exactly as on any other cycle. A review-driven fix is a cycle like any other, and it is counted in the same one place. |
-| ⚠️ **CONCERNS** | Record the findings in the QA Cycle entry and the implementation report. **Do not block.** Signal `ready-for-merge`, exit the loop, proceed to Step 7. |
-| ✅ **APPROVE** | Signal `ready-for-merge`, exit the loop, proceed to Step 7. |
+| ⚠️ **CONCERNS** | Record the findings in the QA Cycle entry and the implementation report. **Do not block.** Signal `ready-for-merge`, carry the review into the acceptance commit (below; doc-only findings may be fixed there), exit the loop, proceed to Step 7. |
+| ✅ **APPROVE** | Signal `ready-for-merge`, carry the review into the acceptance commit (below), exit the loop, proceed to Step 7. |
 | ❌ **Review failed** — `/review-pr` HALTed, could not resolve a PR, or errored | **Not a verdict, and not an exit.** Log it in the Issues Log, record `review failed` on the cycle's `**PR Review**` row, the gate and QA report are already committed by path 1 — do not commit again — and **HALT** naming the PR and the failure. Do **not** fall through to Step 7: 5c is the only exit, so a run that skips it silently finalises without the check this step exists to add. |
 
 > **Why the failure arm is spelled out.** A gate that reaches 5c from 5a (§5c routes 1, 2, 2b and 3) does so without entering 5b, so
@@ -1399,6 +1399,91 @@ gate.
 > is first discovered *by* `/review-pr`, and `/review-pr` HALTs with text addressed to a human. Without
 > this row the orchestrator has no arm for that state, and the likeliest improvisation is the one
 > outcome that must never happen: proceeding to `/finalise` with no review.
+
+#### Carry the review into the acceptance commit (APPROVE / CONCERNS)
+
+**Nothing is committed or pushed between this verdict and `/finalise` 6a.** 6a commits the whole
+index, so what is staged here rides the acceptance commit, and the run pushes one commit fewer than a
+separate "5c review" commit would (task.173). Staged, not committed: a local commit would move
+`HEAD` past the pushed head, and `/finalise` records CI reading 1 against `HEAD`. The other
+commits that can run before 6a are path-limited for the same reason — `/finalise` 8a commits only
+its `touched` paths and the PreCompact pause commit only the report — so this set cannot land in
+the wrong commit.
+
+**A finding is doc-only when the path in its `ref` matches `ci.docsOnly.patterns`.** That is
+task.172's set, read through its own reader (`readConfig` + `isDocsPath` in
+`ci-tree-equivalence.js`), so there is one definition of "documentation" and its default lives in
+the configuration reference, not here. A `ref` with no path (an `AC-n` id), or a path outside the
+patterns, is **recorded and not fixed**, exactly as before: a code change after the last QA cycle is
+what the loop exists to prevent. Classify on `CONCERNS` before touching anything:
+
+```bash
+# INPUT, bound in THIS block: the PR review report this 5c pass wrote.
+PR_REVIEW="{work-item-dir}/{prefix}.pr-review.{n}.{name}.md"
+case "$PR_REVIEW" in *'{'*) echo "HALT: substitute PR_REVIEW before running this block"; exit 1 ;; esac
+[ -f "$PR_REVIEW" ] || { echo "HALT: $PR_REVIEW not found — /review-pr writes it before the verdict"; exit 1; }
+# One line per finding in the report's Machine-Readable Findings block:
+#   doc-only <id> <path>   — may be fixed here, then staged by the block below
+#   record <id> <ref>      — record it on the QA Cycle entry; do not fix it
+command node -e '
+  const fs = require("fs");
+  const { readConfig, isDocsPath } = require("./.agents/skills/{develop-story|develop-task}/references/ci-tree-equivalence.js");
+  const patterns = readConfig(process.cwd()).patterns;
+  const text = fs.readFileSync(process.argv[1], "utf8");
+  const tail = text.split("## Machine-Readable Findings")[1] || "";
+  const fence = String.fromCharCode(96).repeat(3);   // no literal fence inside a fenced block
+  const yaml = (tail.split(fence + "yaml")[1] || "").split(fence)[0];
+  let id = null;
+  const flush = (ref) => {
+    const p = ref.replace(/^["\x27]|["\x27]$/g, "").replace(/:\d+(-\d+)?$/, "");
+    console.log(isDocsPath(p, patterns) ? `doc-only ${id} ${p}` : `record ${id} ${ref}`);
+  };
+  for (const line of yaml.split("\n")) {
+    const m = line.match(/^\s*-\s+id:\s*(\S+)/);
+    if (m) { id = m[1]; continue; }
+    const r = line.match(/^\s+ref:\s*(.+?)\s*$/);
+    if (r && id) { flush(r[1]); id = null; }
+  }' "$PR_REVIEW"
+```
+
+Apply the `doc-only` findings — and only those — then run the block below. It stages the review
+report (`/review-pr` already staged it; staging again is a no-op) and each changed path that
+re-checks as doc-only and passes `doc-links.js`. A path that fails either check is restored and its
+finding recorded, not fixed. On `APPROVE`, or a `CONCERNS` with nothing doc-only, leave
+`CARRY_FIXED` empty: the block then only asserts the report is staged.
+
+```bash
+# INPUTS, bound in THIS block: the report, and every path the doc-only fixes changed (repo-relative).
+PR_REVIEW="{work-item-dir}/{prefix}.pr-review.{n}.{name}.md"
+CARRY_FIXED=({the paths the doc-only fixes changed, space-separated and quoted — leave empty when none})
+case "$PR_REVIEW" in *'{'*) echo "HALT: substitute PR_REVIEW before running this block"; exit 1 ;; esac
+HEAD_BEFORE=$(git rev-parse HEAD)
+git add -- "$PR_REVIEW" || { echo "HALT: cannot stage $PR_REVIEW"; exit 1; }
+CARRIED=("$PR_REVIEW")
+for p in "${CARRY_FIXED[@]}"; do
+  if command node -e '
+       const { readConfig, isDocsPath } = require("./.agents/skills/{develop-story|develop-task}/references/ci-tree-equivalence.js");
+       process.exit(isDocsPath(process.argv[1], readConfig(process.cwd()).patterns) ? 0 : 1);' "$p" \
+     && git add -- "$p" \
+     && { case "$p" in
+            *.md) command node .agents/skills/{develop-story|develop-task}/references/doc-links.js --file "$p" ;;
+            *) true ;;
+          esac; }; then
+    CARRIED+=("$p")
+  else
+    echo "NOT CARRIED: $p — outside ci.docsOnly.patterns, unstageable, or a dead link; restored, finding recorded"
+    git checkout HEAD -- "$p" 2>/dev/null || { git rm -q --cached -- "$p" 2>/dev/null; rm -f -- "$p"; }
+  fi
+done
+# This block commits nothing and pushes nothing. If HEAD moved, something here did.
+[ "$(git rev-parse HEAD)" = "$HEAD_BEFORE" ] || { echo "HALT: HEAD moved during the 5c carry — nothing may commit before 6a"; exit 1; }
+echo "Carried to 6a: ${CARRIED[*]}"
+```
+
+Write the block's last line onto the cycle's QA Cycle entry as `**Carried to 6a**: {paths}`, and
+record every `NOT CARRIED` and `record` line there as a finding not fixed. The implementation
+report itself is still Step 8's. A crash after this block leaves the set staged; a resume into
+Step 7 finds it there and 6a carries it — the index is durable across processes.
 
 The 5-cycle budget is **shared**, not additional. A run whose review returns REQUEST CHANGES
 therefore consumes a cycle it would not have consumed before, and can reach Loop Escalation on a
