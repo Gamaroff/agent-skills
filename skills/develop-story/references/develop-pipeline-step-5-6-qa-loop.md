@@ -1421,7 +1421,20 @@ by design at 5c (Step 8 owns it), and a fix that later fails a check is undone w
 `git checkout HEAD`. That command is safe only on a file that held no other work. A `ref` with no
 path (an `AC-n` id), a path outside the patterns, and a path that fails the second test are
 **recorded and not fixed**, exactly as before. A code change after the last QA cycle is what the loop
-exists to prevent. Classify on `CONCERNS` before touching anything:
+exists to prevent. Classify on `CONCERNS` before touching anything.
+
+**The eligible list is one record with one writer** (task.173 QA-3, consolidated):
+
+| `.claude/state/5c-carry-eligible.txt` | |
+| --- | --- |
+| Shape | line 1 `# review: <the work item's PR review report>`; then one cleared path per line |
+| Writer | the classify block below, once per 5c pass, before any edit |
+| Readers | the stage block below; the resume contract's working-tree probe, **only** when line 1 names a review report inside the resuming work item's directory and that report is itself staged |
+| Deleter | Step 8, beside Step 4's records, once every check has passed |
+
+A list from another work item or an earlier pass is therefore never read as current: its header names
+another report, or a report that is no longer staged.
+
 
 ```bash
 # INPUT, bound in THIS block: the PR review report this 5c pass wrote.
@@ -1435,11 +1448,12 @@ ELIGIBLE=.claude/state/5c-carry-eligible.txt   # the paths the stage block below
 # from a tree where every fixed path is now dirty and drop them all (task.173 QA-2, CR-5).
 if [ -s "$ELIGIBLE" ]; then
   while IFS= read -r q; do
+    case "$q" in '# '*) continue ;; esac
     git diff --quiet HEAD -- "$q" 2>/dev/null \
       || { echo "HALT: $q already carries a 5c edit — run the stage block, do not re-classify"; exit 1; }
   done < "$ELIGIBLE"
 fi
-: > "$ELIGIBLE"
+printf '# review: %s\n' "$PR_REVIEW" > "$ELIGIBLE"
 # One line per finding in the report's Machine-Readable Findings block. The engine exits 1 when it
 # cannot read the block, or when an entry yields no line: "nothing to classify" and "could not
 # parse" must not look alike (task.173 QA-1, CR-2). An empty `findings: []` is a clean zero.
@@ -1456,7 +1470,9 @@ command node -e '
   // The block ends at a fence on a line of its own (CommonMark), never at the first triple
   // backtick anywhere: one inside a quoted finding would cut the block short (task.173 QA-2, CR-6).
   const body = fenced[1];
-  const close = body.search(new RegExp("\n[ \t]*" + fence + "[ \t]*(\n|$)"));
+  // Three or more backticks, optional trailing blanks and CR: a CRLF report and a longer closing
+  // fence are both valid CommonMark closes (task.173 QA-3, CR-5).
+  const close = body.search(new RegExp("\n[ \t]*" + fence + "\x60*[ \t]*\r?(\n|$)"));
   if (close < 0) { console.error("the yaml fence under ## Machine-Readable Findings never closes"); process.exit(1); }
   const lines = body.slice(0, close).split("\n");
   const entries = lines.filter((l) => /^\s*-\s+\S/.test(l)).length;
@@ -1503,8 +1519,10 @@ case "$PR_REVIEW ${CARRY_FIXED[*]}" in *'{'*) echo "HALT: substitute PR_REVIEW a
 ELIGIBLE=.claude/state/5c-carry-eligible.txt   # written by the classify block above
 # The checker must be runnable before anything is staged or restored: an unsubstituted skill name
 # or a missing node would otherwise read as "dead link" and undo a valid fix (task.173 QA-2, CR-2).
-[ -f .agents/skills/{develop-story|develop-task}/references/doc-links.js ] \
-  || { echo "HALT: doc-links.js not found — substitute the skill name in this block"; exit 1; }
+# Quoted: unquoted, the placeholder's | splits the line into a pipeline (task.173 QA-3, CR-6).
+DOC_LINKS=".agents/skills/{develop-story|develop-task}/references/doc-links.js"
+case "$DOC_LINKS" in *'{'*) echo "HALT: substitute the skill name in DOC_LINKS"; exit 1 ;; esac
+[ -f "$DOC_LINKS" ] || { echo "HALT: $DOC_LINKS not found"; exit 1; }
 command -v node >/dev/null 2>&1 || { echo "HALT: node is not on PATH — the link check cannot run"; exit 1; }
 HEAD_BEFORE=$(git rev-parse HEAD)
 git add -- "$PR_REVIEW" || { echo "HALT: cannot stage $PR_REVIEW"; exit 1; }
@@ -1520,12 +1538,14 @@ for p in "${CARRY_FIXED[@]}"; do
   # else = the check could not run — HALT, staged as it is, rather than discard a fix over a tool error.
   LINKS_RC=0
   case "$p" in
-    *.md) command node .agents/skills/{develop-story|develop-task}/references/doc-links.js --file "$p"; LINKS_RC=$? ;;
+    *.md) command node "$DOC_LINKS" --file "$p"; LINKS_RC=$? ;;
   esac
   if [ "$LINKS_RC" -eq 0 ]; then
     CARRIED+=("$p")
   elif [ "$LINKS_RC" -ne 1 ]; then
-    echo "HALT: doc-links.js exited $LINKS_RC on $p — the check did not run; nothing was undone"; exit 1
+    # Unstaged, edit kept: staged, a resume would carry a fix whose check never ran (QA-3, CR-2).
+    git restore --staged -- "$p"
+    echo "HALT: doc-links.js exited $LINKS_RC on $p — the check did not run; the edit is kept, unstaged"; exit 1
   else
     echo "NOT CARRIED: $p — a dead link; the 5c edit is undone, finding recorded"
     git checkout HEAD -- "$p" || { echo "HALT: cannot restore $p"; exit 1; }
@@ -1538,11 +1558,13 @@ echo "Carried to 6a: ${CARRIED[*]}"
 
 Write the block's last line onto the cycle's QA Cycle entry as `**Carried to 6a**: {paths}`, and
 record every `NOT CARRIED` and `record` line there as a finding not fixed. The implementation
-report itself is still Step 8's. A crash or a PreCompact pause after this block leaves the set
-staged. The resume contract's working-tree probe sets it aside (staged, nothing unstaged on top, the
-work item's review report or a path in `.claude/state/5c-carry-eligible.txt`) instead of halting on
-it. A resume into Step 7 then finds the set still staged and 6a carries it, because the index is
-durable across processes.
+report itself is still Step 8's. A PreCompact pause after this block commits the report alone and
+leaves the set staged. The resume contract's working-tree probe sets the set aside (staged, nothing
+unstaged on top, and either the work item's review report or a path in the eligible list above)
+instead of halting on it. A resume into Step 7 then finds the set still staged and 6a carries it,
+because the index is durable across processes. **A crash is different:** the implementation report
+still holds this cycle's uncommitted entries, the probe HALTs on it as class (c), and the 5c set stays
+staged for whoever resolves the HALT.
 
 The 5-cycle budget is **shared**, not additional. A run whose review returns REQUEST CHANGES
 therefore consumes a cycle it would not have consumed before, and can reach Loop Escalation on a

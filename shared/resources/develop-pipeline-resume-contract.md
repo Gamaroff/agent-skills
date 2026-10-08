@@ -249,7 +249,8 @@ bundled copy the run had produced. So the probe runs **first**, and it **classif
 report and the doc-only fixes 5c staged for `/finalise` 6a to carry. A path-limited pause commit
 leaves them staged on purpose. An entry staged `A` or `M` with nothing unstaged on top, that is either
 the work item's `*.pr-review.*.md` or a path listed in `.claude/state/5c-carry-eligible.txt`, is
-printed, then kept out of (a), (b) and (c). (a) must never discard it, and (c) must not HALT on what
+printed, then kept out of (a), (b) and (c). The list counts only when its header line names this
+work item's review report and that report is staged. (a) must never discard it, and (c) must not HALT on what
 a resume into Step 7 is meant to carry.
 
 ```bash
@@ -264,6 +265,14 @@ DIRTY=$(git status --porcelain --no-renames)
 # must not HALT on it. An entry qualifies only with index column A or M, a clean worktree column,
 # and a path that is the work item's own PR review report or one the 5c classify block cleared.
 WI_DIR=$(dirname "{implementation-report-path}")
+# The eligible list counts only when its header names this work item's review report and that
+# report is itself staged; a list left by another work item or an earlier pass is ignored (task.173 QA-3).
+ELIGIBLE=""
+ELIG_HEAD=$(head -1 .claude/state/5c-carry-eligible.txt 2>/dev/null)
+case "$ELIG_HEAD" in
+  "# review: $WI_DIR"/*.pr-review.*.md)
+    [ -n "$(git diff --cached --name-only -- "${ELIG_HEAD#\# review: }")" ] && ELIGIBLE=.claude/state/5c-carry-eligible.txt ;;
+esac
 CARRY_LINES=""; REST_LINES=""
 while IFS= read -r line; do
   [ -n "$line" ] || continue
@@ -271,7 +280,7 @@ while IFS= read -r line; do
   case "$st" in
     "A "|"M ")
       case "$p" in "$WI_DIR"/*.pr-review.*.md) CARRY_LINES="$CARRY_LINES$line"$'\n'; continue ;; esac
-      if grep -qxF -- "$p" .claude/state/5c-carry-eligible.txt 2>/dev/null; then
+      if [ -n "$ELIGIBLE" ] && grep -qxF -- "$p" "$ELIGIBLE"; then
         CARRY_LINES="$CARRY_LINES$line"$'\n'; continue
       fi ;;
   esac

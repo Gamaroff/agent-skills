@@ -2705,7 +2705,9 @@ commits, a file the record did not name, a ref git cannot answer. Exit 0 → `gi
 exit 1 → Step 8, with the commit left local. To drop it, run `git reset --soft "$CI_HEAD_1"` and then
 `git restore --source="$CI_HEAD_1" --staged --worktree -- <touched>`. Never use `--hard`: it would also
 destroy the 5c review report and any doc-only fixes staged for 6a to carry, which no commit holds
-(task.173 QA-2, CR-3). The
+(task.173 QA-2, CR-3). One exception: when a `touched` path is also a 5c-carried doc fix (listed in
+`.claude/state/5c-carry-eligible.txt`), the fix commit took the 5c edit with it, and restoring that
+path from `CI_HEAD_1` loses the 5c edit too. Save its content first and restore it after. The
 run before the commit cannot do this check, and that is why there are three runs, not two.
 
 **3. Retake CI reading 1 on the fix head.** The decision reading from Step 6 was taken on a commit

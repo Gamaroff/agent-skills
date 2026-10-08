@@ -244,7 +244,8 @@ Depends on Phase 1 and on task.172 (`ci.docsOnly.patterns`).
 6. `shared/resources/develop-pipeline-hooks.md` (`:50`) and `shared/resources/develop-pipeline-pause.md`
    (`:141`): both restate the pause commit as `git add <report> && git commit …`; update to the path-limited form (review 1, I4)
 7. `shared/resources/develop-pipeline-resume-contract.md`: the Phase 0b working-tree probe sets the staged 5c carried set aside rather than HALTing on it (QA cycle 2, CR2-1). A path-limited pause leaves the set staged.
-7a. `CHANGELOG.md`
+7a. `shared/resources/develop-pipeline-step-8-commit.md`: Step 8 deletes `.claude/state/5c-carry-*.txt` beside Step 4's records (QA cycle 3, CR3-1).
+7b. `CHANGELOG.md`
 
 ### Files to Add
 
@@ -410,21 +411,21 @@ commit → scenario 17 red.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-08
-**Quality Score**: 70/100
+**Quality Score**: 80/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.173.qa.2.fold-5c-review-into-acceptance-commit.md](./task.173.qa.2.fold-5c-review-into-acceptance-commit.md)
-- **Gate File**: [task.173.gate.2.fold-5c-review-into-acceptance-commit.yml](./task.173.gate.2.fold-5c-review-into-acceptance-commit.yml)
+- **Full Report**: [task.173.qa.3.fold-5c-review-into-acceptance-commit.md](./task.173.qa.3.fold-5c-review-into-acceptance-commit.md)
+- **Gate File**: [task.173.gate.3.fold-5c-review-into-acceptance-commit.yml](./task.173.gate.3.fold-5c-review-into-acceptance-commit.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5530
+- **Tests Executed**: 5540
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Cycle-1 fixes verified. Three MEDIUM issues remain: a pause between 5c and 6a now HALTs on resume (CR2-1); a doc-links failure that is not a dead link takes the restore branch (CR2-2); and the 8a recovery hint `git reset --hard` destroys the carried set (CR2-3). Three LOW issues (CR2-4–6).
+Cycle-2 fixes verified. Seven issues remain: two MEDIUM (the eligible list is stale and tied to no work item; a HALT leaves an unchecked fix staged) and five LOW.
 
 <!-- change-log-start -->
 
@@ -441,6 +442,8 @@ Cycle-1 fixes verified. Three MEDIUM issues remain: a pause between 5c and 6a no
 | 2026-10-08 |         | QA findings fixed — cycle 1, 5 findings (CR-1..CR-5) | qa-fix |
 | 2026-10-08 |         | QA gate CONCERNS (70/100) — 6 findings (0 high) | qa-task |
 | 2026-10-08 |         | QA findings fixed — cycle 2, 6 findings (CR2-1..CR2-6) | qa-fix |
+| 2026-10-08 |         | QA gate CONCERNS (80/100) — 7 findings (0 high) | qa-task |
+| 2026-10-08 |         | QA findings fixed — cycle 3, 7 findings (CR3-1..CR3-7) | qa-fix |
 
 <!-- change-log-end -->
 

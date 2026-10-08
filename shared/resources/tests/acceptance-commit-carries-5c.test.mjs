@@ -185,7 +185,7 @@ for (const shell of SHELLS) {
     ]);
     assert.equal(
       readFileSync(join(root, ".claude/state/5c-carry-eligible.txt"), "utf8"),
-      "docs/tasks/task.9.x/task.9.x.md\ndocs/tasks/task.9.x/task.9.notes.md\n",
+      `# review: ${REVIEW_PATH}\ndocs/tasks/task.9.x/task.9.x.md\ndocs/tasks/task.9.x/task.9.notes.md\n`,
     );
   });
 
@@ -331,7 +331,12 @@ for (const shell of SHELLS) {
       .replace(/^CARRY_FIXED=\("\{[^\n]*\}"\)$/m, `CARRY_FIXED=("${p}")`);
     const r = run(shell, root, block);
     assert.equal(r.status, 1, r.stdout);
-    assert.match(r.stdout, /HALT: doc-links\.js not found/);
+    assert.match(r.stdout, /HALT: substitute the skill name in DOC_LINKS/);
+    assert.equal(
+      r.stderr,
+      "",
+      "no parse error: the guard HALTs on purpose (QA-3 CR-6)",
+    );
     assert.match(
       readFileSync(join(root, p), "utf8"),
       /Fixed text/,
@@ -371,76 +376,167 @@ for (const shell of SHELLS) {
     ]);
   });
 
-  test(`[${shell}] resume probe: the staged 5c set is set aside, not HALTed on; other dirt still HALTs (QA-2 CR-1)`, () => {
-    const probe = extractBlocks(CONTRACT).find((b) =>
-      /The base is RECORDED STATE/.test(b.code),
-    ).code;
+  /** The state a path-limited pause leaves between the stage block and 6a, ready for the probe. */
+  function probeRepo() {
     const stub = mkdtempSync(join(tmpdir(), "carry-5c-gh-"));
     writeFileSync(
       join(stub, "gh"),
       "#!/bin/sh\necho 'no pull requests found for branch' >&2\nexit 1\n",
       { mode: 0o755 },
     );
-    for (const extra of [null, "src/other.js"]) {
-      const { root, g, write } = fiveCRepo();
-      // A base the probe can bind: the report row, and origin/develop.
-      write(IMPL_PATH, "| Feature branch base | develop |\n");
-      g("add", "--", IMPL_PATH);
-      g("commit", "-q", "-m", "report", "--", IMPL_PATH);
-      const remote = mkdtempSync(join(tmpdir(), "carry-5c-remote-"));
-      spawnSync("git", ["init", "-q", "--bare", remote]);
-      g("remote", "add", "origin", remote);
-      g("push", "-q", "origin", "HEAD:develop");
-      g("fetch", "-q", "origin");
-      // State after a path-limited pause between the stage block and 6a: only the 5c set is dirty.
-      g(
-        "restore",
-        "--staged",
-        "--worktree",
-        "--source=HEAD",
-        "--",
-        "docs/tasks/task.9.x/task.9.dirty.md",
-      );
-      spawnSync("rm", [
-        "-f",
-        join(root, "docs/tasks/task.9.x/task.9.untracked.md"),
-      ]);
-      assert.equal(run(shell, root, classifyBlock()).status, 0);
-      write("docs/tasks/task.9.x/task.9.x.md", "# Task 9\n\nFixed text.\n");
-      assert.equal(
-        run(shell, root, stageBlock(["docs/tasks/task.9.x/task.9.x.md"]))
-          .status,
-        0,
-      );
-      if (extra) {
-        write(extra, "x\n");
-        g("add", "--", extra);
-      }
-      const r = spawnSync(shell, ["-s", "--"], {
+    const repo = fiveCRepo();
+    const { root, g, write } = repo;
+    write(IMPL_PATH, "| Feature branch base | develop |\n");
+    g("add", "--", IMPL_PATH);
+    g("commit", "-q", "-m", "report", "--", IMPL_PATH);
+    const remote = mkdtempSync(join(tmpdir(), "carry-5c-remote-"));
+    spawnSync("git", ["init", "-q", "--bare", remote]);
+    g("remote", "add", "origin", remote);
+    g("push", "-q", "origin", "HEAD:develop");
+    g("fetch", "-q", "origin");
+    g(
+      "restore",
+      "--staged",
+      "--worktree",
+      "--source=HEAD",
+      "--",
+      "docs/tasks/task.9.x/task.9.dirty.md",
+    );
+    spawnSync("rm", [
+      "-f",
+      join(root, "docs/tasks/task.9.x/task.9.untracked.md"),
+    ]);
+    assert.equal(run(shell, root, classifyBlock()).status, 0);
+    write("docs/tasks/task.9.x/task.9.x.md", "# Task 9\n\nFixed text.\n");
+    assert.equal(
+      run(shell, root, stageBlock(["docs/tasks/task.9.x/task.9.x.md"])).status,
+      0,
+    );
+    const probe = extractBlocks(CONTRACT).find((b) =>
+      /The base is RECORDED STATE/.test(b.code),
+    ).code;
+    const runProbe = () =>
+      spawnSync(shell, ["-s", "--"], {
         input: probe.replaceAll("{implementation-report-path}", IMPL_PATH),
         encoding: "utf8",
         cwd: root,
         env: { PATH: `${stub}:${process.env.PATH}`, HOME: process.env.HOME },
       });
-      if (extra) {
-        assert.equal(r.status, 1, r.stdout + r.stderr);
-        assert.match(r.stdout, /HALT: dirty tree on resume/);
-        assert.match(r.stdout, /src\/other\.js/);
-      } else {
-        assert.equal(r.status, 0, r.stdout + r.stderr);
-        assert.match(r.stdout, /5c carried set kept staged for 6a/);
+    return { ...repo, runProbe };
+  }
+  const SET = [REVIEW_PATH, "docs/tasks/task.9.x/task.9.x.md"]
+    .sort()
+    .join("\n");
+
+  test(`[${shell}] resume probe: the staged 5c set is set aside, not HALTed on (QA-2 CR-1)`, () => {
+    const { g, runProbe } = probeRepo();
+    const r = runProbe();
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /5c carried set kept staged for 6a/);
+    assert.equal(
+      g("diff", "--cached", "--name-only"),
+      SET,
+      "the carried set is still staged",
+    );
+  });
+
+  test(`[${shell}] resume probe: other dirt, a carried path with an unstaged change, or a stale list still HALTs (QA-2 CR-1, QA-3 CR-1/CR-7)`, () => {
+    for (const shape of [
+      "other-dirt",
+      "MM",
+      "stale-header",
+      "review-unstaged",
+      "review-committed",
+    ]) {
+      const { root, g, write, runProbe } = probeRepo();
+      if (shape === "other-dirt") {
+        write("src/other.js", "x\n");
+        g("add", "--", "src/other.js");
       }
-      assert.equal(
-        g("diff", "--cached", "--name-only"),
-        [
-          REVIEW_PATH,
+      if (shape === "MM")
+        write(
           "docs/tasks/task.9.x/task.9.x.md",
-          ...(extra ? [extra] : []),
-        ]
-          .sort()
-          .join("\n"),
-        "the carried set is still staged",
-      );
+          "# Task 9\n\nFixed, then edited again.\n",
+        );
+      if (shape === "stale-header") {
+        const eligible = join(root, ".claude/state/5c-carry-eligible.txt");
+        writeFileSync(
+          eligible,
+          readFileSync(eligible, "utf8").replace(
+            /^# review: .*$/m,
+            "# review: docs/tasks/task.8.y/task.8.pr-review.1.y.md",
+          ),
+        );
+      }
+      if (shape === "review-unstaged")
+        g("restore", "--staged", "--", REVIEW_PATH);
+      // A list from an earlier pass whose review is already committed: stale, never current.
+      if (shape === "review-committed")
+        g("commit", "-q", "-m", "review", "--", REVIEW_PATH);
+      const r = runProbe();
+      assert.equal(r.status, 1, `${shape}: ${r.stdout}`);
+      assert.match(r.stdout, /HALT: dirty tree on resume/, shape);
+    }
+  });
+
+  test(`[${shell}] resume probe: an overlay beside the carried set is discarded and the set kept (QA-3 CR-7)`, () => {
+    const { root, g, write, runProbe } = probeRepo();
+    // HEAD moves past the base on one file; the working tree then holds the base's bytes for it.
+    write("skills/x/SKILL.md", "# Skill\n\nchanged on the branch\n");
+    g("commit", "-q", "-m", "branch change", "--", "skills/x/SKILL.md");
+    write("skills/x/SKILL.md", "# Skill\n\noriginal\n");
+    const r = runProbe();
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /overlay discarded: 1 tracked/);
+    assert.equal(
+      g("diff", "--cached", "--name-only"),
+      SET,
+      "the carried set survives the discard",
+    );
+    assert.equal(g("status", "--porcelain", "--", "skills/x/SKILL.md"), "");
+    assert.ok(root);
+  });
+
+  test(`[${shell}] 5c carry: a link check that cannot run HALTs with the edit kept and unstaged (QA-3 CR-2)`, () => {
+    const { root, g, qaHead } = fiveCRepo();
+    assert.equal(run(shell, root, classifyBlock()).status, 0);
+    const p = "docs/tasks/task.9.x/task.9.x.md";
+    writeFileSync(join(root, p), "# Task 9\n\nFixed text.\n");
+    const r = spawnSync(shell, ["-s", "--"], {
+      input: stageBlock([p]),
+      encoding: "utf8",
+      cwd: root,
+      // An invalid NODE_OPTIONS makes node exit 9: the checker did not run.
+      env: {
+        PATH: process.env.PATH,
+        HOME: process.env.HOME,
+        NODE_OPTIONS: "--no-such-node-flag",
+      },
+    });
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stdout, /the check did not run; the edit is kept, unstaged/);
+    assert.match(readFileSync(join(root, p), "utf8"), /Fixed text/);
+    assert.equal(
+      g("diff", "--cached", "--name-only", "--", p),
+      "",
+      "not staged — a resume must not carry it",
+    );
+    assert.equal(g("rev-parse", "HEAD"), qaHead);
+  });
+
+  test(`[${shell}] 5c classify: a CRLF report and a four-backtick close both parse (QA-3 CR-5)`, () => {
+    for (const body of [
+      reviewBody(entry("CR-1", '"skills/x/SKILL.md:4"')).replace(/\n/g, "\r\n"),
+      reviewBody(entry("CR-1", '"skills/x/SKILL.md:4"')).replace(
+        /\n```\n$/,
+        "\n````\n",
+      ),
+    ]) {
+      const { root, write } = scratchRepo();
+      write(REVIEW_PATH, body);
+      const r = run(shell, root, classifyBlock());
+      assert.equal(r.status, 0, r.stderr + r.stdout);
+      assert.equal(r.stdout.trim(), 'record CR-1 "skills/x/SKILL.md:4"');
     }
   });
 
