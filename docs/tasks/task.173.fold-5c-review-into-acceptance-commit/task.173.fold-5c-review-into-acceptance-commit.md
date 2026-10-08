@@ -313,7 +313,7 @@ None.
 
 ### Code Quality
 
-- [x] Each new test is mutation-proved red on revert
+- [x] Each behaviour this task added, and each QA fix, has its guarding test mutation-proved red on revert: the 8 initial proofs (§ Testing results) and the per-cycle proofs in the implementation report's QA Iteration History. Two fixes are recorded `no-red-untested` rather than proved: cycle 3's Step 8 eligible-list deletion and CR4-3's checked restore. _Re-scoped 2026-10-08 by operator decision at the Step 7 DoD halt. The original wording ("each new test") required a per-test mapping of all 19 tests, which was never recorded._
 - [x] `npm run ci` green; `npm run validate -- skills/finalise/` passes; `bundle:check` clean
 
 ### Migration
@@ -428,9 +428,9 @@ commit → scenario 17 red.
 ### Key Findings
 CR6-1 closed. No open entries. Two advisory wording/robustness items (CR7-1, CR6-2) are carried in the gate's `recommendations.future`.
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 1 (historical, superseded)
 
-**Status:** IN PROGRESS
+**Status:** IN PROGRESS at run 1. All three gaps were resolved by operator decision on 2026-10-08 (below), before `/finalise` was re-run.
 
 ### QA Gate Status
 
@@ -442,19 +442,19 @@ CR6-1 closed. No open entries. Two advisory wording/robustness items (CR7-1, CR6
 ### Missing Criteria:
 
 1. **Acceptance Criteria:**
-   - [ ] AC8: each new test is mutation-proved red on revert. The proofs are recorded as per-cycle totals and cannot be traced test by test.
+   - [x] AC8: each new test is mutation-proved red on revert. The proofs are recorded as per-cycle totals and cannot be traced test by test. **Resolved:** AC8 was re-scoped to what the record shows (§ Success Criteria), naming the two `no-red-untested` fixes.
 
 2. **Security Review:**
-   - [ ] The probe zero-guard fired. The 5c classify/stage allow-list (`shared/resources/develop-pipeline-step-5-6-qa-loop.md:1505-1514`) is a boundary that no engine form can probe, so `probes_executed: 0`.
+   - [x] The probe zero-guard fired. The 5c classify/stage allow-list (`shared/resources/develop-pipeline-step-5-6-qa-loop.md:1505-1514`) is a boundary that no engine form can probe, so `probes_executed: 0`. **Resolved by recorded human override.** The operator accepted it on 2026-10-08 ("Go ahead", on the recommendation to sign off citing the suite). Engine: unverifiable — no entry form executes a fenced Markdown block, and `shell-argv:` (task.181) does not exist yet. Evidence: `shared/resources/tests/acceptance-commit-carries-5c.test.mjs`, 38 cases under bash and zsh. It executes the classify and stage blocks against scratch repositories on every PR: untracked, dirty, implementation-report and review-report paths refused; dirty listed paths HALT in both arms; a stale list is replaced only when clean. Precedent: task.133, task.125.
 
 3. **Trail:**
-   - [ ] `task.173.bug.2.classifier-silent-on-unparsed-findings.md` still reads `Ready for QA` (5c PR review PC-1).
+   - [x] `task.173.bug.2.classifier-silent-on-unparsed-findings.md` still reads `Ready for QA` (5c PR review PC-1). **Resolved:** closed, citing QA cycle 2.
 
 ### Next Steps:
 
-- [ ] AC8: map each test to a recorded red run, re-running the proofs where none exists. Or re-scope AC8 to "each fix's test is mutation-proved", by recorded decision.
-- [ ] Security: make the entry probeable (a sourceable script, or `shell-argv:` from task.181) and probe it. Or record a human override citing the 38-case suite that executes these blocks.
-- [ ] Close bug.2, citing QA cycle 2.
+- [x] AC8: map each test to a recorded red run, re-running the proofs where none exists. Or re-scope AC8 to "each fix's test is mutation-proved", by recorded decision. (Re-scoped.)
+- [x] Security: make the entry probeable (a sourceable script, or `shell-argv:` from task.181) and probe it. Or record a human override citing the 38-case suite that executes these blocks. (Override recorded.)
+- [x] Close bug.2, citing QA cycle 2.
 
 **Estimated Effort:** Medium
 
@@ -485,6 +485,7 @@ CR6-1 closed. No open entries. Two advisory wording/robustness items (CR7-1, CR6
 | 2026-10-08 |         | QA findings fixed — cycle 6, 1 finding (CR6-1) | qa-fix |
 | 2026-10-08 |         | QA gate PASS (100/100) — 0 findings | qa-task |
 | 2026-10-08 |  | DoD incomplete — 3 gaps identified | finalise |
+| 2026-10-08 |  | DoD gaps resolved by operator decision — AC8 re-scoped; bug.2 closed; security zero-guard override recorded | develop-task |
 <!-- change-log-end -->
 
 ---

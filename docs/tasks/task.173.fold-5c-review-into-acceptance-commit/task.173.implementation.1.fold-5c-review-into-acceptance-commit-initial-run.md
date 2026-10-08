@@ -105,6 +105,7 @@ Narrow the two index-sweeping commits (finalise 8a, PreCompact pause) to their o
 - Decision: GAPS (3). Fix-and-recheck (8a) not applicable: two sections FAIL. Gaps row in the task Change Log; gap report section in the task body (status unchanged, ready-for-review); gaps PR comment posted. 6a did not run, so the 5c carried set (pr-review.1, bug.1, task doc) stays staged and rides this HALT commit, per §5c's HALT exception.
 - finalise's lock self-advance (`--skill finalise` → 8) not run: it means "Step 7 done", and this path HALTs at 7.
 - The security agent reversed QA's `boundary: false` across all 7 cycles. That is a QA-vs-DoD disagreement worth a look: QA recorded the 5c classify block as non-boundary, while the DoD's Step 1b reads its allow-list over repository state as one.
+- **Operator decision at the DoD halt (2026-10-08, "Go ahead" on the recommendation).** (1) AC8 re-scoped to what the record shows: each added behaviour and each QA fix has its guarding test mutation-proved, with the two `no-red-untested` fixes named (cycle 3's Step 8 deletion, CR4-3). (2) Security zero-guard accepted by recorded human override. Engine: unverifiable, because no entry form executes a fenced Markdown block. Evidence: the 38-case `acceptance-commit-carries-5c.test.mjs` suite, which executes the classify and stage blocks per PR. Precedent: task.133 and task.125. (3) bug.2 closed via `status-history.js`, citing QA cycle 2. All three are document-only, so per the resume contract the run resumes at Step 7 rather than re-entering QA.
 
 ---
 

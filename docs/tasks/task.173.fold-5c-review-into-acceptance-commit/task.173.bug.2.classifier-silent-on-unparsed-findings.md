@@ -4,7 +4,7 @@
 **Bug ID**: TASK-173-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 1, code review CR-2)
 **Date Found**: 2026-10-08
 
@@ -48,3 +48,4 @@ list) under bash and zsh; mutation-proved (count check removed → red).
 | ---------- | ------------ | ---------- | ------------------------------ |
 | 2026-10-08 | New | qa-task | QA cycle 1, CR-2 |
 | 2026-10-08 | Ready for QA | qa-fix | Fixed in QA cycle 1 fix pass |
+| 2026-10-08 | Closed | develop-task (operator decision) | Fix verified in QA cycle 2 (task.173.qa.2, Re-Review Context: CR-2 FIXED); closes DoD gap 3 / PR review PC-1 |
