@@ -3,7 +3,7 @@
 **Task**: `task.173.fold-5c-review-into-acceptance-commit.md`
 **Run Number**: 1
 **Started**: 2026-10-08 05:12
-**Status**: Halted — DoD gaps
+**Status**: In Progress
 
 ---
 
@@ -122,6 +122,7 @@ Narrow the two index-sweeping commits (finalise 8a, PreCompact pause) to their o
   - AC8 failed again because its list predates the NUL fix and cycles 8–9. That is my lapse: the enumeration should have been extended each cycle.
   - Security reproduced a LOW: `isDocsPath` accepts a `.git` segment. It is identical on origin/develop (measured), so it is pre-existing and out of scope. It fails closed in the 5c path. → follow-up.
   - HALT; gaps PR comment posted.
+- Run-4 gap closed within the operator's AC8 decision. AC8 now cites a Mutation-proof ledger in § Testing results: one row per behaviour or fix, the run-3 and cycle 8–9 fixes included, and CR8-1's three `no-red-untested` sites named. The pr-review.2 scope LOWs (PC-1..3) were also closed by adding the DoD-run-3 files to § 7. Document-only, so the run resumes at Step 7.
 
 ---
 

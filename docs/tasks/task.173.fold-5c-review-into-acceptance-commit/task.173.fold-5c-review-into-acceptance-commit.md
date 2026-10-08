@@ -247,6 +247,8 @@ Depends on Phase 1 and on task.172 (`ci.docsOnly.patterns`).
 7. `shared/resources/develop-pipeline-resume-contract.md`: the Phase 0b working-tree probe sets the staged 5c carried set aside rather than HALTing on it (QA cycle 2, CR2-1). A path-limited pause leaves the set staged.
 7a. `shared/resources/develop-pipeline-step-8-commit.md`: Step 8 deletes `.claude/state/5c-carry-*.txt` beside Step 4's records (QA cycle 3, CR3-1).
 7b. `CHANGELOG.md`
+7c. `shared/resources/ci-tree-equivalence.js` and `shared/resources/tests/ci-tree-equivalence.test.mjs` (SEC-5): `isDocsPath` refuses a path containing a control character (DoD run 3; task.172's module, consumed by the 5c classifier).
+7d. `docs/reference/configuration.md` (`:331`): control characters added to the never-docs path forms (DoD run 3).
 
 ### Files to Add
 
@@ -313,7 +315,7 @@ None.
 
 ### Code Quality
 
-- [x] Each behaviour this task added, and each QA fix that has a guarding test, is mutation-proved red on revert, or is named here with its recorded outcome. **Proved (`covered`):** the 8 initial proofs (§ Testing results) and the QA-fix proofs CR-1 ×3, CR-2, CR-3, CR-4 (qa.2:106); CR2-1 ×2, CR2-2, CR2-4, CR2-5, CR2-6 (qa.3:69); CR3-1 staged check, CR3-2, CR3-5, CR3-6, CR3-7; CR4-2, CR4-4 (implementation report, QA cycles 3–4); CR5-1 (qa.6:75); CR6-1 (qa.7:75). **Not proved, by recorded outcome:** `no-red-untested` — cycle 3's Step 8 eligible-list deletion, CR4-3's checked restore, and CR2-2's doc-links "exit other than 0/1" HALT branch (qa.3:70); `absorbed` — CR3-1's work-item binding (nothing went red). **No guarding test (prose-only fixes):** CR-5, CR2-3, CR3-3, CR3-4, CR4-1. _Re-scoped 2026-10-08 by operator decision at the Step 7 DoD halt; the original wording ("each new test") required a per-test mapping of all 19 tests that was never recorded. Corrected the same day after DoD run 2 found the first re-scope listed only two of the exceptions._
+- [x] Every behaviour this task added, and every fix made after it, has a recorded mutation outcome in the **Mutation-proof ledger** (§ Testing results): `covered` (its guarding test went red on revert), `no-red-untested`, `absorbed`, or prose-only (no guarding test). A fix missing from the ledger fails this criterion. _Re-scoped 2026-10-08 by operator decision at the Step 7 DoD halt. The original wording ("each new test") required a per-test mapping that was never recorded. Corrected after DoD run 2. Rewritten after DoD run 4 to cite one ledger instead of listing the fixes inline, because the inline list went stale with every later cycle (obs #254)._
 - [x] `npm run ci` green; `npm run validate -- skills/finalise/` passes; `bundle:check` clean
 
 ### Migration
@@ -402,6 +404,31 @@ Mutation proofs (each restored after): 8a bare commit → 2 red; 6a suffix dropp
 always on → 2 red; a commit inside the carry block → 2 red; classifier marks everything doc-only →
 2 red; stage block skips the doc check → 2 red; stage block skips the restore → 2 red; hook bare
 commit → scenario 17 red.
+
+**Mutation-proof ledger.** One row per behaviour or fix. Outcome tokens are from `mutation-proving.md`.
+
+| Source | Behaviour or fix | Outcome | Evidence |
+| --- | --- | --- | --- |
+| Initial | 8a bare commit; 6a suffix dropped; 6a suffix always on; a commit inside the carry block; classifier marks all doc-only; stage skips the doc check; stage skips the restore; hook bare commit | covered (×8) | this section, above |
+| QA 1 | CR-1 ×3, CR-2, CR-3, CR-4 | covered | qa.2:106 |
+| QA 1 | CR-5 (HALT-commit carry stated) | prose-only | implementation report, QA Cycle 1 |
+| QA 2 | CR2-1 ×2, CR2-2, CR2-4, CR2-5, CR2-6 | covered | qa.3:69 |
+| QA 2 | CR2-2's doc-links "exit other than 0/1" HALT branch | no-red-untested | qa.3:70 |
+| QA 2 | CR2-3 (8a hint soft reset) | prose-only | implementation report, QA Cycle 2 |
+| QA 3 | CR3-1 staged check, CR3-2, CR3-5, CR3-6, CR3-7 | covered | implementation report, QA Cycle 3 |
+| QA 3 | CR3-1 work-item binding | absorbed | implementation report, QA Cycle 3 |
+| QA 3 | Step 8 eligible-list deletion | no-red-untested | implementation report, QA Cycle 3 |
+| QA 3 | CR3-3, CR3-4 | prose-only | implementation report, QA Cycle 3 |
+| QA 4 | CR4-2, CR4-4 | covered | implementation report, QA Cycle 4 |
+| QA 4 | CR4-3 (restore failure HALTs STILL STAGED) | no-red-untested | implementation report, QA Cycle 4 |
+| QA 4 | CR4-1 (8a overlap recovery scoped) | prose-only | implementation report, QA Cycle 4 |
+| QA 5 | CR5-1 | covered | qa.6:75 |
+| QA 6 | CR6-1 | covered | qa.7:75 |
+| DoD 3 | `isDocsPath` refuses control characters | covered: SEC-5 (node, both shells), and the classify case red under zsh only | implementation report, Decisions Log (DoD run 3) |
+| QA 8 | CR8-1 exact-one-path clearance; literal `git add` | covered (bash and zsh) | implementation report, QA Cycle 8 |
+| QA 8 | CR8-1 literal `restore`, `checkout`, and probe header check | no-red-untested | implementation report, QA Cycle 8 |
+| QA 9 | CR9-2 (the probe matches git's own spelling) | covered (bash and zsh) | implementation report, QA Cycle 9 |
+| QA 9 | CR9-4 (`printf` for untrusted output) | covered under zsh only; CI installs no zsh, so no per-PR red (CR10-3) | implementation report, QA Cycle 9 |
 
 **Deferred work.** None.
 
@@ -501,18 +528,18 @@ CR9-2 and CR9-4 are closed. No open entries. Advisory follow-ups, including inst
 **Estimated Effort:** Small
 
 **Detailed Verification Log:** See `task.173.dod.3.fold-5c-review-into-acceptance-commit.md`.
-## Definition of Done - Gaps Identified — run 4
+## Definition of Done - Gaps Identified — run 4 (historical, superseded)
 
-**Status:** IN PROGRESS
+**Status:** IN PROGRESS at run 4. Resolved on 2026-10-08: AC8 now cites the Mutation-proof ledger (§ Testing results), within the operator's AC8 decision.
 
 ### Missing Criteria:
 
 1. **Acceptance Criteria:**
-   - [ ] AC8 enumerates the QA fixes, and the list predates the run-3 NUL fix and QA cycles 8–9. CR8-1's literal restore, checkout and probe header (`no-red-untested`) are not named.
+   - [x] AC8 enumerates the QA fixes, and the list predates the run-3 NUL fix and QA cycles 8–9. CR8-1's literal restore, checkout and probe header (`no-red-untested`) are not named.
 
 ### Next Steps:
 
-- [ ] Rewrite AC8 to cite the record rather than restate it.
+- [x] Rewrite AC8 to cite the record rather than restate it.
 
 **Detailed Verification Log:** See `task.173.dod.4.fold-5c-review-into-acceptance-commit.md`.
 <!-- change-log-start -->
@@ -550,6 +577,7 @@ CR9-2 and CR9-4 are closed. No open entries. Advisory follow-ups, including inst
 | 2026-10-08 |  | QA findings fixed — cycle 9, 2 findings (CR9-2, CR9-4) | qa-fix |
 | 2026-10-08 |  | QA gate PASS (100/100) — 0 findings | qa-task |
 | 2026-10-08 |  | DoD incomplete — 1 gap identified (run 4) | finalise |
+| 2026-10-08 |  | AC8 cites a Mutation-proof ledger (DoD run 4 gap) | develop-task |
 <!-- change-log-end -->
 
 ---
