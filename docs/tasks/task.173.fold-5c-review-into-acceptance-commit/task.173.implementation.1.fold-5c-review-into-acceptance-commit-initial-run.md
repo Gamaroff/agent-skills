@@ -3,7 +3,7 @@
 **Task**: `task.173.fold-5c-review-into-acceptance-commit.md`
 **Run Number**: 1
 **Started**: 2026-10-08 05:12
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -36,8 +36,8 @@ Narrow the two index-sweeping commits (finalise 8a, PreCompact pause) to their o
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline (plan file); 1 iteration; 4/4 phases; ci:fast + npm run ci green; 8 mutation proofs | —                    |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #613: https://github.com/Gamaroff/agent-skills/pull/613 | —                    |
 | 5–6. qa-task / qa-fix loop | ✅ Done | `task.173.qa.{N}.*.md`; `task.173.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 10 cycles (5 + 2 granted + 2 QA re-entry + 1 granted); gate 10 PASS 100; 5c PR review APPROVE (pr-review.2) | —                    |
-| 7. finalise                | ❌ Failed | `task.173.dod.{N}.*.md`; task `status: accepted`                      | Runs 1–3 gaps resolved. Run 4 (`task.173.dod.4…`): 1 gap — AC8's enumerated fix list is stale | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 7. finalise                | ✅ Done | `task.173.dod.{N}.*.md`; task `status: accepted`                      | DoD run 5 ACCEPTED (`task.173.dod.5…`); runs 1–4 found gaps, all resolved. CI 1 SUCCESS @6dfd8a6e, CI 2 SUCCESS @93e7f9f8; issue #540 closed; board Done | —                    |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | Final report commit + push | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -123,6 +123,10 @@ Narrow the two index-sweeping commits (finalise 8a, PreCompact pause) to their o
   - Security reproduced a LOW: `isDocsPath` accepts a `.git` segment. It is identical on origin/develop (measured), so it is pre-existing and out of scope. It fails closed in the 5c path. → follow-up.
   - HALT; gaps PR comment posted.
 - Run-4 gap closed within the operator's AC8 decision. AC8 now cites a Mutation-proof ledger in § Testing results: one row per behaviour or fix, the run-3 and cycle 8–9 fixes included, and CR8-1's three `no-red-untested` sites named. The pr-review.2 scope LOWs (PC-1..3) were also closed by adding the DoD-run-3 files to § 7. Document-only, so the run resumes at Step 7.
+- DoD run 5 (`task.173.dod.5.fold-5c-review-into-acceptance-commit.md`): AC 11/11 PASS (the AC8 ledger matches the record), Docs PASS, Compliance NOT_APPLICABLE. Security: the agent's FAIL reproduces run 4 (the zero-guard on the fenced git-state arms, plus the pre-existing `.git` LOW). It is PASS by the recorded human override (task.133/125 precedent), with the pre-existing LOW (identical on origin/develop) routed to a follow-up. 104 probes, re-run from the persisted run-4 cases file. Decision: ACCEPTED.
+- CI reading 1: SUCCESS @ 6dfd8a6e9c826f168f3206fa518b806987d322ae over 5 checks; CI reading 2: SUCCESS @ 93e7f9f873b41f317fb70c476d8ea98160ccb24d over 5 checks (check-runs confirmed on that SHA, `test` 19:08:14–19:10:49Z).
+- 6a acceptance commit `93e7f9f8`: "docs(task.173): accept — DoD, sprint review; registry ticked; 5c review carried". **The `; 5c review carried` suffix is inaccurate.** The 5c review (pr-review.2) had already gone in with the run-4 HALT commit `72452549`. The suffix fired because the orchestrator staged the DoD-5 security run record beside the acceptance artefacts. Recorded here rather than rewriting pushed history.
+- Registry: `ticked`. 6d: (task 173) cited under [Unreleased]. Canonical PR summary posted; DoD body posted to the PR; issue #540: Document link already durable, `done` comment posted, closed (verified CLOSED); board `done`: already.
 
 ---
 
@@ -310,10 +314,18 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-10-08 19:12 UTC
+**Final Status**: Completed
 **Branch**: feature/task.173.fold-5c-review-into-acceptance-commit
 **PR**: https://github.com/Gamaroff/agent-skills/pull/613
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 10 (5 + 2 granted + 2 QA re-entry after finalise DoD run 3 + 1 granted); 2 PR reviews (5c CONCERNS, then APPROVE); 5 DoD runs (runs 1–4 found gaps, run 5 accepted)
+**DoD Summary**: `task.173.dod.5.fold-5c-review-into-acceptance-commit.md` (ACCEPTED)
+**Tracker debt**: none
+
+### Completion Summary
+
+**What was implemented.** The 5c PR review no longer gets its own pushed commit. On APPROVE or CONCERNS, the review report is staged rather than committed, and so are any doc-only fixes, and `/finalise` 6a's acceptance commit carries them. A doc-only fix is allowed only when the finding's `ref` names exactly one tracked, clean documentation file, read literally. `/finalise` 8a and the PreCompact pause commit now commit only their own paths, and the resume probe sets the staged 5c set aside instead of halting on it.
+
+**QA iterations.** There were 10 QA cycles, two 5c reviews and five DoD runs. Cycles 1–5 closed one HIGH and then a narrowing series of MEDIUMs around the eligible-list record. They ended at the loop limit, and the operator granted 2 more. Cycle 7 passed, but `/finalise` then found 3 gaps. The operator resolved them: AC8 was re-scoped, the security zero-guard was accepted by human override, and bug.2 was closed. DoD run 2 found my AC8 re-scope incomplete. DoD run 3 found a real defect: `isDocsPath` accepted an embedded NUL. That fix re-entered QA. Cycle 8's unscoped re-probe found the most serious defect of the run, a ref read as a git pathspec (`:!*.md`). Cycle 9 found two LOWs, cycle 10 passed, and the second 5c review approved. DoD run 4 found AC8's list stale again, so it now cites a Mutation-proof ledger. DoD run 5 accepted.
+
+**Notable decisions.** The operator granted extra cycles twice. The fenced git-state arms of the 5c blocks were accepted by human override, because no probe-engine form reaches fenced Markdown. The CR8-1 fix took the consolidate move: an allow-list of one literal tracked file, not another deny rule. A pre-existing `.git`-segment LOW in task.172's `isDocsPath`, and the advisory findings (CR6-2, CR7-1, CR8-2, CR9-1, CR9-3, CR10-1..3, the last including that CI has no zsh), are left as follow-ups. Observations #297–#300 were logged.
