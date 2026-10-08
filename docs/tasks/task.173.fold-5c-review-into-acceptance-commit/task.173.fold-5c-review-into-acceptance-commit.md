@@ -481,9 +481,9 @@ CR6-1 closed. No open entries. Two advisory wording/robustness items (CR7-1, CR6
 **Estimated Effort:** Small (document-only)
 
 **Detailed Verification Log:** See `task.173.dod.2.fold-5c-review-into-acceptance-commit.md`.
-## Definition of Done - Gaps Identified — run 3
+## Definition of Done - Gaps Identified — run 3 (historical, superseded)
 
-**Status:** IN PROGRESS
+**Status:** IN PROGRESS at run 3. Resolved on 2026-10-08 by a code fix (operator "Go ahead"): `isDocsPath` now refuses any path containing a control character. The fix re-enters QA at 5a.
 
 ### QA Gate Status
 
@@ -492,11 +492,11 @@ CR6-1 closed. No open entries. Two advisory wording/robustness items (CR7-1, CR6
 ### Missing Criteria:
 
 1. **Security Review:**
-   - [ ] `isDocsPath` accepts a path with an embedded NUL. Under zsh, the 5c classify block then clears a tracked code file (`src/a.js\0.md`) as doc-only. Medium. The stage block's exact-match check contains it.
+   - [x] `isDocsPath` accepts a path with an embedded NUL. Under zsh, the 5c classify block then clears a tracked code file (`src/a.js\0.md`) as doc-only. Medium. The stage block's exact-match check contains it.
 
 ### Next Steps:
 
-- [ ] Refuse control characters in the doc-only decision (`isDocsPath` or the classify block), with a zsh test. This is a code fix, so it re-enters QA at 5a.
+- [x] Refuse control characters in the doc-only decision (`isDocsPath` or the classify block), with a zsh test. This is a code fix, so it re-enters QA at 5a.
 
 **Estimated Effort:** Small
 
@@ -529,6 +529,7 @@ CR6-1 closed. No open entries. Two advisory wording/robustness items (CR7-1, CR6
 | 2026-10-08 |  | DoD incomplete — 1 gap identified (run 2) | finalise |
 | 2026-10-08 |  | AC8 exception list corrected to the record (DoD run 2 gap) | develop-task |
 | 2026-10-08 |  | DoD incomplete — 1 gap identified (run 3) | finalise |
+| 2026-10-08 |  | DoD run-3 gap fixed — isDocsPath refuses control characters; re-enters QA | develop-task |
 <!-- change-log-end -->
 
 ---

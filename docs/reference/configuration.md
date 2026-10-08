@@ -328,7 +328,7 @@ enough, and all four sites call it. A reading is satisfied when:
 
 1. the head's rollup is `PENDING` or `NONE` (a `FAILURE`, `CANCELLED` or `UNKNOWN` head never qualifies);
 2. a first-parent ancestor of the head (at most 20 back) has a green rollup of **its own checks**: every check ran and succeeded, **and has settled**: its newest completed check or status is at least `ci.docsOnly.settleSeconds` old (a push registers its fast lanes first, so a green read in the first minutes can be a partial rollup). **Any skipped or neutral check makes the ancestor not green** (a paths-filter job can succeed while its tests are skipped), and a nearer docs-only ancestor that is **red** stops the walk rather than being walked past (a cancelled one is walked past: cancel-in-progress cancels every superseded push);
-3. every file changed between that ancestor and the head matches `ci.docsOnly.patterns`. A path in an unusual form (a backslash, a leading space or slash), a `skills-config.yaml` anywhere in the delta, and a submodule pointer are never docs, whatever the patterns say, so a commit cannot widen the rule that judges it; and
+3. every file changed between that ancestor and the head matches `ci.docsOnly.patterns`. A path in an unusual form (a backslash, a leading space or slash, a control character such as a NUL), a `skills-config.yaml` anywhere in the delta, and a submodule pointer are never docs, whatever the patterns say, so a commit cannot widen the rule that judges it; and
 4. `ci.docsOnly.checkCommand`, when set, exits 0.
 
 The site then records `SUCCESS (tree-equivalent to <sha12>)`, **never plain `SUCCESS`**, so the record

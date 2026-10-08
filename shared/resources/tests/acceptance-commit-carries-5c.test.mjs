@@ -189,6 +189,31 @@ for (const shell of SHELLS) {
     );
   });
 
+  test(`[${shell}] 5c classify: a ref carrying a NUL is recorded, never cleared — even when git would read it as a tracked file (task.173 DoD run 3)`, () => {
+    const { root, g, write } = fiveCRepo();
+    // The consumer default patterns: under them `src/a.js<NUL>.md` matches the markdown glob. This
+    // repository's own `docs/**` override would hide the defect (no code path matches it).
+    write(
+      "skills-config.yaml",
+      'ci:\n  docsOnly:\n    patterns:\n      - "**/*.md"\n      - "docs/**"\n',
+    );
+    // A tracked, clean code file: what git sees when the NUL cuts the argument.
+    write("src/a.js", "x\n");
+    g("add", "--", "src/a.js", "skills-config.yaml");
+    g("commit", "-q", "-m", "code");
+    write(REVIEW_PATH, reviewBody(entry("PC-7", '"src/a.js\u0000.md"')));
+    g("add", "--", REVIEW_PATH);
+    const r = run(shell, root, classifyBlock());
+    assert.equal(r.status, 0, r.stderr + r.stdout);
+    assert.match(r.stdout, /^record PC-7 /m);
+    assert.doesNotMatch(r.stdout, /doc-only PC-7/);
+    assert.equal(
+      readFileSync(join(root, ".claude/state/5c-carry-eligible.txt"), "utf8"),
+      `# review: ${REVIEW_PATH}\n`,
+      "nothing cleared",
+    );
+  });
+
   test(`[${shell}] 5c classify: an unreadable findings block HALTs; an empty one is a clean zero`, () => {
     for (const [body, ok] of [
       ["# PR Review\n\nno machine-readable section\n", false],

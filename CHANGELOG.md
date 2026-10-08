@@ -23,6 +23,16 @@ All notable changes to this project will be documented in this file. Format foll
   that set aside rather than halting on it. 8a's recovery hint is now a soft reset, because
   `--hard` would destroy the staged set.
 
+### Fixed
+
+- **A path containing a control character is never documentation.** `isDocsPath`
+  (`ci-tree-equivalence.js`, task.172) accepted a path with an embedded NUL. The 5c classify block
+  hands it a `ref` read from the PR review report, and under zsh a NUL survives `read` while `git`
+  sees the argument cut at it. Under the default patterns, `src/a.js<NUL>.md` was therefore cleared
+  as doc-only for a tracked code file. The stage block's exact-match check still refused the carry.
+  Any character from U+0000 to U+001F, or U+007F, now reads the path as code, which is the
+  fail-safe answer (task.173 DoD run 3).
+
 ## [v0.55.0] - 2026-10-07
 
 ### Fixed
