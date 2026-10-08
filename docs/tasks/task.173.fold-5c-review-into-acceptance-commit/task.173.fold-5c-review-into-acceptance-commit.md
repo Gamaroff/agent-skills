@@ -416,17 +416,17 @@ commit → scenario 17 red.
 **Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.173.qa.9.fold-5c-review-into-acceptance-commit.md](./task.173.qa.9.fold-5c-review-into-acceptance-commit.md)
-- **Gate File**: [task.173.gate.9.fold-5c-review-into-acceptance-commit.yml](./task.173.gate.9.fold-5c-review-into-acceptance-commit.yml)
+- **Full Report**: [task.173.qa.10.fold-5c-review-into-acceptance-commit.md](./task.173.qa.10.fold-5c-review-into-acceptance-commit.md)
+- **Gate File**: [task.173.gate.10.fold-5c-review-into-acceptance-commit.yml](./task.173.gate.10.fold-5c-review-into-acceptance-commit.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5557
+- **Tests Executed**: 5561
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-CR8-1 closed (bug.3 closed). Two open LOW entries: CR9-2 (the resume probe misspells spaced paths) and CR9-4 (zsh `echo` can fake a classify line). Two advisory items: CR9-1 and CR9-3.
+CR9-2 and CR9-4 are closed. No open entries. Advisory follow-ups, including installing zsh on CI, are in the gate's `recommendations.future`.
 
 ## Definition of Done - Gaps Identified — run 1 (historical, superseded)
 
@@ -534,6 +534,7 @@ CR8-1 closed (bug.3 closed). Two open LOW entries: CR9-2 (the resume probe missp
 | 2026-10-08 |  | QA findings fixed — cycle 8, 1 finding (CR8-1) | qa-fix |
 | 2026-10-08 |  | QA gate PASS (100/100) — 2 findings (0 high) | qa-task |
 | 2026-10-08 |  | QA findings fixed — cycle 9, 2 findings (CR9-2, CR9-4) | qa-fix |
+| 2026-10-08 |  | QA gate PASS (100/100) — 0 findings | qa-task |
 <!-- change-log-end -->
 
 ---
