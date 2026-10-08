@@ -3,7 +3,7 @@
 **Task**: `task.173.fold-5c-review-into-acceptance-commit.md`
 **Run Number**: 1
 **Started**: 2026-10-08 05:12
-**Status**: Halted — DoD gaps
+**Status**: Escalated
 
 ---
 
@@ -35,8 +35,8 @@ Narrow the two index-sweeping commits (finalise 8a, PreCompact pause) to their o
 | 2. review-task             | ✅ Done | `task.173.review.{N}.{name}.md` exists (or skip logged)               | `task.173.review.1.…md`: READY TO IMPLEMENT 8/10, 0 Critical / 4 Important (applied) / 3 Optional; Planned → Ready for Development | —                    |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline (plan file); 1 iteration; 4/4 phases; ci:fast + npm run ci green; 8 mutation proofs | —                    |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #613: https://github.com/Gamaroff/agent-skills/pull/613 | —                    |
-| 5–6. qa-task / qa-fix loop | ✅ Done | `task.173.qa.{N}.*.md`; `task.173.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | Re-entry +2 (budget 7): 7 cycles; gates FAIL/CONCERNS×5/PASS 100; HIGH 1,0,0,0,0,0,0; 5c PR review CONCERNS (PC-1, PC-2; 2 fixes carried to 6a; bug.2 not fixed) | —                    |
-| 7. finalise                | ❌ Failed | `task.173.dod.{N}.*.md`; task `status: accepted`                      | Run 1: 3 gaps (resolved, `d073291c`). Run 2: 1 gap (resolved, `23dd41df`). Run 3: 1 gap — `isDocsPath` accepts an embedded NUL; under zsh the 5c classifier clears a code file (medium; code fix needed) | —                    |
+| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.173.qa.{N}.*.md`; `task.173.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | Loop limit (9 cycles incl. 2 re-entries); gate 9 PASS 100 with 2 LOW, fixed in `96026663` and ungated; route 2c declined (medium-not-falling) | —                    |
+| 7. finalise                | ⏳ Pending | `task.173.dod.{N}.*.md`; task `status: accepted`                      | Runs 1–3 gaps (see Issues Log/Decisions); pending after QA re-entry | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
@@ -110,6 +110,11 @@ Narrow the two index-sweeping commits (finalise 8a, PreCompact pause) to their o
 - DoD run 2 (`task.173.dod.2.fold-5c-review-into-acceptance-commit.md`): AC PARTIAL, Security PASS, Compliance NOT_APPLICABLE, Docs PASS. CI reading 1: SUCCESS @ d073291c120209e2caabbe046f4e7ac3105bce92 over 5 checks (the head's own run). Security probed the classify block's `isDocsPath` predicate in both bundled copies: 66 executed, 0 reproduced (`task.173.dod.security.run.json`). The git-state arms rest on the operator's override. AC8 FAIL: the re-scope I wrote named two `no-red-untested` exceptions, but the record also holds CR2-2's HALT branch (qa.3:70), CR3-1's `absorbed` binding, and five prose-only fixes with no guarding test (CR-5, CR2-3, CR3-3, CR3-4, CR4-1). That was my error in executing the operator's re-scope. 8a did not apply (no executed defect to mutation-prove). HALT; gaps PR comment posted.
 - Run-2 gap closed within the operator's re-scope decision: AC8 now lists every QA fix by its recorded outcome (covered, `no-red-untested` ×3, `absorbed` ×1, prose-only ×5). Document-only, so the run resumes at Step 7.
 - DoD run 3 (`task.173.dod.3.fold-5c-review-into-acceptance-commit.md`): AC PASS 11/11, Docs PASS, Compliance NOT_APPLICABLE, Security FAIL. CI reading 1: SUCCESS @ 23dd41dfd00ab2ef99aee7924dd4c40aa236e043 over 5 checks. The security agent probed `isDocsPath` with a different cases file than run 2 (59 executed, 3 reproduced). An embedded-NUL path is accepted, and under zsh the classify block clears `src/a.js\0.md` as doc-only for a tracked code file. The orchestrator reproduced it (zsh `CLEARED`, bash `record`). It is contained by the stage block's exact-match check. Severity medium, so 8a's evaluator refuses (`severity-low`). HALT; this needs a code fix and QA re-entry at 5a.
+- Operator "Go ahead" on the recommended source fix. `isDocsPath` refuses a path containing U+0000–U+001F or U+007F (`shared/resources/ci-tree-equivalence.js` plus 5 bundled copies). Tests: SEC-5 in `ci-tree-equivalence.test.mjs` (7 control-character paths false; a non-ASCII printable path still true), and a classify-block test under the consumer default patterns in `acceptance-commit-carries-5c.test.mjs`. Mutation: guard reverted, then SEC-5 red and the zsh classify case red (bash stays green because bash drops the NUL on `read`, which was the defect's own asymmetry) → covered. The first version of the classify test ran under this repo's `docs/**` override and could not reproduce the defect; that was caught by the mutation proof and fixed. Population: `configuration.md:331` (unusual-form list) updated; `finalise/SKILL.md:930` unaffected (it restates only the config file and submodule rules). CHANGELOG `[Unreleased]` › Fixed entry. The code changed, so the resume re-enters QA at 5a.
+- QA re-entry after finalise DoD gaps: reenter-qa: re-entered QA at step 5 / qa_phase 5a — qa_max_cycles=9 (base 7), gate_head=ed10bc82fb48dc59d833ecc0c293c574fa74a6fe
+- QA cycle 8: /qa-task (code_review_blocking=true, matrix passed). Unscoped safety re-probe by judgement: no clause fired literally, but the re-entry came from a boundary defect. Boundary: true (obs #298); engine probe on `isDocsPath`, both pattern sets, cases persisted (obs #299), 28/0, with a discrimination check. Reviewer 279.6 s. Gate 8 FAIL 70: CR8-1 HIGH promoted and reproduced by the orchestrator. Convergence: no trip (HIGH 0,0,1). Route: continue. Third strike: none. Narrowing: false (high-findings-remain).
+- QA Cycle 8 — changes-requested: stage-disabled. qa-fix ingester not dispatched: the orchestrator wrote gate 8 in this context (independence loss recorded). Fast gate 5,556/0 on attempt 1. `c2d063ba` pushed once; PR OPEN; qa-fix comments posted (PR, and tracker `qa-fix-8`).
+- QA cycle 9: a mandatory safety re-probe (clause 1: gate 8 security FAIL), unscoped. Reviewer 260.6 s (read-only, so verified against the real index). Engine 28/0 with persisted cases. Step 4b: 0 findings on both changed docs. Gate 9 PASS 100 with 2 open LOW (promoted low/high). Route: continue (high-findings-remain: HIGH 1 then 0). The 5b fix is cycle 9 of 9.
 
 ---
 
@@ -150,6 +155,32 @@ The pipeline completed 5 qa-task/qa-fix cycles without a clean PASS.
 3. **Trail: bug.2 still `Ready for QA`.** 5c PC-1 named both bugs, but its `ref` named only bug.1, so 5c could carry only that fix (obs #297). Close bug.2, citing QA cycle 2.
 
 Items 1 (as a re-scope) and 3 are document-only. Item 2 is code only if the entry is extracted. A code fix re-enters QA at 5a on resume; a document-only fix resumes at 7.
+
+### QA Loop Limit Reached (re-entry) — 2026-10-08
+
+The pipeline completed 9 qa-task/qa-fix cycles: the original 5, 2 granted on re-entry (cycles 6–7, which reached 5c and Step 7), and 2 granted by the QA re-entry after finalise DoD run 3 (cycles 8–9). No gate has read the final fix `96026663`.
+
+**Final gate status**: PASS 100 (gate 9). Its two open LOW entries, CR9-2 and CR9-4, were fixed in `96026663`; that fix is ungated.
+**HIGH findings per cycle**: 1, 0, 0, 0, 0, 0, 0, 1, 0. The HIGH at cycle 8 was CR8-1, fixed in `c2d063ba` and closed at gate 9.
+**MEDIUM findings per cycle**: 1, 3, 2, 1, 1, 1, 0, 0, 0
+**Remaining issues** (from gate 9):
+- CR9-2 (low, `shared/resources/develop-pipeline-resume-contract.md`): the resume probe spelled a carried path differently from the eligible list. **Fixed in `96026663`, ungated.**
+- CR9-4 (low, `shared/resources/develop-pipeline-step-5-6-qa-loop.md`): zsh's `echo` forged a classify line from a backslash escape in a ref. **Fixed in `96026663`, ungated.**
+- Advisory, not fixed: CR9-1 (medium/medium: the classify block reads patterns from the working-tree config), CR9-3 (low/medium: the clean test ignores the index), CR8-2 (medium/low: symlink mode), CR7-1 and CR6-2.
+
+**What was attempted per cycle** (cycles 1–5: see the earlier escalation entry):
+- Cycle 6 (CONCERNS 90): fixed CR6-1, the stale-arm HALT offering `git checkout` (`ed10bc82`).
+- Cycle 7 (PASS 100): 5c CONCERNS. Finalise run 1 found 3 gaps (operator-resolved); run 2 found AC8's exception list incomplete (corrected); run 3 found an embedded NUL in `isDocsPath` (`3d49e349`). The run then re-entered QA.
+- Cycle 8 (FAIL 70, unscoped safety re-probe): fixed CR8-1 HIGH, a ref read as a pathspec, with literal pathspecs and an exact-one-path rule (`c2d063ba`).
+- Cycle 9 (PASS 100, 2 open LOW, mandatory re-probe): fixed CR9-2 and CR9-4 (`96026663`).
+- Gate-the-last-fix half-cycle (route 2c) declined: `medium-not-falling` ("MEDIUM reads 0, 0, 0 over cycles 7–9 — route 2c needs it strictly falling").
+
+**Likely root cause**: the shape of the route-2c rule, not a failing loop. Every security re-probe of the 5c carry surface has found another way in which the classifier, git and the shell spell one string differently: NUL, pathspec magic, C-quoting, echo escapes. Each was fixed and mutation-proved. Severity is falling (HIGH → LOW), but MEDIUM is already 0, so "strictly falling" cannot hold, and the last fix stays ungated by construction. Separately, the 5c carry's input is an untrusted report string handed to three readers. Each re-probe finds a new seam, which is a sign the surface is wider than the feature needs.
+
+**Recommended next steps**:
+1. Re-run `/develop-task` and take "Resume at 5a with 1 more cycle", so a gate reads `96026663`. If it reads clean, the run leaves through 5c to Step 7. This is the cheapest path.
+2. Or run `/qa-task` once by hand on `96026663`. Phase 0b counts that gate from disk.
+3. If re-probes keep finding seams, narrow the surface: drop the doc-only fix half of the 5c carry (task § 11 "Partial Rollback") and keep only the review-report carry. That removes the untrusted-ref-to-git path entirely.
 
 ## QA Iteration History
 
@@ -232,6 +263,29 @@ _Track each QA review/fix cycle._
 **PR Review report**: `task.173.pr-review.1.fold-5c-review-into-acceptance-commit.md` (conformance lens only, `--effort medium --no-code`): PC-1 (trail, medium/high: bug.1 and bug.2 still Ready for QA), PC-2 (consistency, medium/medium: no `pr_number`, and the body names tinker-city PR #981, which /finalise would read).
 **Carried to 6a**: task.173.pr-review.1.fold-5c-review-into-acceptance-commit.md task.173.bug.1.carry-restore-wipes-uncommitted-work.md task.173.fold-5c-review-into-acceptance-commit.md
 **Not fixed (recorded)**: PC-1's bug.2 half. `task.173.bug.2.classifier-silent-on-unparsed-findings.md` is named only in the finding text, not in its `ref`, so the classifier never cleared it and 5c may not edit it. bug.2 still reads Ready for QA.
+
+### QA Cycle 8 — 2026-10-08
+**Origin**: QA re-entry after finalise DoD gaps (run 3, code fix `3d49e349`)
+**Gate Result**: FAIL
+**Issues Found**: 1 open — CR8-1 (HIGH: the 5c classify block clears a ref that git reads as pathspec magic, `:!*.md` → every non-markdown file, under the default patterns, bash and zsh; bug task.173.bug.3). Advisory: CR8-2 (medium/low, symlink mode). The DoD run-3 NUL gap is closed; the engine probe on `isDocsPath` engages, 28 executed / 0 reproduced (cases file persisted).
+**HIGH findings**: 1
+**MEDIUM findings**: 0
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 8 of 9)
+**Fixes Applied**: CR8-1. The 5c classify and stage blocks and the resume probe's header check are `--literal-pathspecs`, and a ref clears only when `git ls-files` names exactly that path. Step 2.6 move: consolidate (an allow-list of the accepted shape, not a new `isDocsPath` deny rule). The rule at qa-loop.md:1417 is reworded. Tests: magic, glob and directory refs recorded under the default patterns; a `*`-named file staged literally. 44/44. Mutation: clearance reverted → red; non-literal `git add` → red; both reds under bash and zsh. The literal restore, checkout and probe header are `no-red-untested`. Probe population: `tracked and clean` / `tracked, clean` → qa-loop.md only (updated); `error-unmatch` → step-4, step-7 and finalise unaffected (pipeline-computed paths). CHANGELOG Fixed entry. Bug task.173.bug.3 → Ready for QA.
+**Commit**: `c2d063ba`
+
+### QA Cycle 9 — 2026-10-08
+**Gate Result**: PASS (2 open LOW)
+**Issues Found**: CR8-1 closed (bug.3 closed). Promoted (bug, low/high): CR9-2 (the resume probe reads C-quoted `git status` paths, so a spaced carried path never matches; fails loud) and CR9-4 (zsh `echo` interprets backslashes in an untrusted ref and fakes a classify line; reproduced). Advisory: CR9-1 (medium/medium, working-tree config), CR9-3 (low/medium, the index is ignored).
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Escalating — loop limit reached
+**Fixes Applied**: CR9-4: every line in the 5c classify and stage blocks that prints a ref or a path uses `printf '%s'`, not `echo` (23 lines). CR9-2: the resume probe matches a carried entry by asking git for each listed path's status line with the same flags as `$DIRTY`, rather than grepping a C-quoted `p` against the raw list. Tests: a backslash-escape ref prints one line; a spaced carried doc is set aside on resume. 48/48. Mutation: echo restored → zsh red (bash is green by nature, the defect's asymmetry); raw-list grep restored → bash and zsh red. Fast gate attempt 1 red: an environmental `git commit` "unable to create temporary file" inside the resume-probe fixture setup, zsh (load average ~18), before any changed code ran.
+**Commit**: `96026663`
 
 ---
 
