@@ -22,6 +22,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
+import { extractBlocks } from "../qa-execute-snippets.mjs";
 import { makeConsumerRoot } from "../../../evals/shared/lib/consumer-root.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -32,6 +33,10 @@ const QA_LOOP = readFileSync(
 );
 const FINALISE = readFileSync(
   join(REPO_ROOT, "skills/finalise/SKILL.md"),
+  "utf8",
+);
+const CONTRACT = readFileSync(
+  join(REPO_ROOT, "shared/resources/develop-pipeline-resume-contract.md"),
   "utf8",
 );
 const RECHECK_CLI = join(
@@ -296,6 +301,147 @@ for (const shell of SHELLS) {
     assert.equal(r.status, 1, r.stdout + r.stderr);
     assert.match(r.stdout, /HALT: substitute PR_REVIEW and CARRY_FIXED/);
     assert.equal(g("rev-parse", "HEAD"), qaHead);
+  });
+
+  test(`[${shell}] 5c carry: a path listed twice gets one outcome (QA-2 CR-4)`, () => {
+    const { root, g } = fiveCRepo();
+    assert.equal(run(shell, root, classifyBlock()).status, 0);
+    writeFileSync(
+      join(root, "docs/tasks/task.9.x/task.9.notes.md"),
+      "# Notes\n\n[dead](missing-file.md)\n",
+    );
+    const p = "docs/tasks/task.9.x/task.9.notes.md";
+    const r = run(shell, root, stageBlock([p, p]));
+    assert.equal(r.status, 0, r.stderr + r.stdout);
+    assert.equal((r.stdout.match(/NOT CARRIED: /g) || []).length, 1);
+    assert.doesNotMatch(
+      r.stdout.split("\n").find((l) => l.startsWith("Carried to 6a:")),
+      /task\.9\.notes\.md/,
+    );
+    assert.equal(g("diff", "--cached", "--name-only", "--", p), "");
+  });
+
+  test(`[${shell}] 5c carry: an unsubstituted skill name HALTs before anything is undone (QA-2 CR-2)`, () => {
+    const { root, g, qaHead } = fiveCRepo();
+    assert.equal(run(shell, root, classifyBlock()).status, 0);
+    const p = "docs/tasks/task.9.x/task.9.x.md";
+    writeFileSync(join(root, p), "# Task 9\n\nFixed text.\n");
+    const block = fenceAfter(QA_LOOP, CARRY, 1)
+      .replace(/^PR_REVIEW="\{[^\n]*"$/m, `PR_REVIEW="${REVIEW_PATH}"`)
+      .replace(/^CARRY_FIXED=\("\{[^\n]*\}"\)$/m, `CARRY_FIXED=("${p}")`);
+    const r = run(shell, root, block);
+    assert.equal(r.status, 1, r.stdout);
+    assert.match(r.stdout, /HALT: doc-links\.js not found/);
+    assert.match(
+      readFileSync(join(root, p), "utf8"),
+      /Fixed text/,
+      "the fix survives",
+    );
+    assert.equal(g("rev-parse", "HEAD"), qaHead);
+  });
+
+  test(`[${shell}] 5c classify: re-running after the edits HALTs instead of dropping them (QA-2 CR-5)`, () => {
+    const { root } = fiveCRepo();
+    assert.equal(run(shell, root, classifyBlock()).status, 0);
+    writeFileSync(
+      join(root, "docs/tasks/task.9.x/task.9.x.md"),
+      "# Task 9\n\nFixed text.\n",
+    );
+    const r = run(shell, root, classifyBlock());
+    assert.equal(r.status, 1, r.stdout);
+    assert.match(r.stdout, /already carries a 5c edit — run the stage block/);
+    assert.match(
+      readFileSync(join(root, ".claude/state/5c-carry-eligible.txt"), "utf8"),
+      /task\.9\.x\.md/,
+      "the eligible list survives",
+    );
+  });
+
+  test(`[${shell}] 5c classify: a triple backtick inside a finding does not cut the block (QA-2 CR-6)`, () => {
+    const { root, write } = scratchRepo();
+    const tricky =
+      '  - id: CR-1\n    ref: "skills/x/SKILL.md:4"\n    finding: "see ```bash fence"\n' +
+      entry("CR-2", '"skills/y/SKILL.md:9"');
+    write(REVIEW_PATH, reviewBody(tricky));
+    const r = run(shell, root, classifyBlock());
+    assert.equal(r.status, 0, r.stderr + r.stdout);
+    assert.deepEqual(r.stdout.trim().split("\n"), [
+      'record CR-1 "skills/x/SKILL.md:4"',
+      'record CR-2 "skills/y/SKILL.md:9"',
+    ]);
+  });
+
+  test(`[${shell}] resume probe: the staged 5c set is set aside, not HALTed on; other dirt still HALTs (QA-2 CR-1)`, () => {
+    const probe = extractBlocks(CONTRACT).find((b) =>
+      /The base is RECORDED STATE/.test(b.code),
+    ).code;
+    const stub = mkdtempSync(join(tmpdir(), "carry-5c-gh-"));
+    writeFileSync(
+      join(stub, "gh"),
+      "#!/bin/sh\necho 'no pull requests found for branch' >&2\nexit 1\n",
+      { mode: 0o755 },
+    );
+    for (const extra of [null, "src/other.js"]) {
+      const { root, g, write } = fiveCRepo();
+      // A base the probe can bind: the report row, and origin/develop.
+      write(IMPL_PATH, "| Feature branch base | develop |\n");
+      g("add", "--", IMPL_PATH);
+      g("commit", "-q", "-m", "report", "--", IMPL_PATH);
+      const remote = mkdtempSync(join(tmpdir(), "carry-5c-remote-"));
+      spawnSync("git", ["init", "-q", "--bare", remote]);
+      g("remote", "add", "origin", remote);
+      g("push", "-q", "origin", "HEAD:develop");
+      g("fetch", "-q", "origin");
+      // State after a path-limited pause between the stage block and 6a: only the 5c set is dirty.
+      g(
+        "restore",
+        "--staged",
+        "--worktree",
+        "--source=HEAD",
+        "--",
+        "docs/tasks/task.9.x/task.9.dirty.md",
+      );
+      spawnSync("rm", [
+        "-f",
+        join(root, "docs/tasks/task.9.x/task.9.untracked.md"),
+      ]);
+      assert.equal(run(shell, root, classifyBlock()).status, 0);
+      write("docs/tasks/task.9.x/task.9.x.md", "# Task 9\n\nFixed text.\n");
+      assert.equal(
+        run(shell, root, stageBlock(["docs/tasks/task.9.x/task.9.x.md"]))
+          .status,
+        0,
+      );
+      if (extra) {
+        write(extra, "x\n");
+        g("add", "--", extra);
+      }
+      const r = spawnSync(shell, ["-s", "--"], {
+        input: probe.replaceAll("{implementation-report-path}", IMPL_PATH),
+        encoding: "utf8",
+        cwd: root,
+        env: { PATH: `${stub}:${process.env.PATH}`, HOME: process.env.HOME },
+      });
+      if (extra) {
+        assert.equal(r.status, 1, r.stdout + r.stderr);
+        assert.match(r.stdout, /HALT: dirty tree on resume/);
+        assert.match(r.stdout, /src\/other\.js/);
+      } else {
+        assert.equal(r.status, 0, r.stdout + r.stderr);
+        assert.match(r.stdout, /5c carried set kept staged for 6a/);
+      }
+      assert.equal(
+        g("diff", "--cached", "--name-only"),
+        [
+          REVIEW_PATH,
+          "docs/tasks/task.9.x/task.9.x.md",
+          ...(extra ? [extra] : []),
+        ]
+          .sort()
+          .join("\n"),
+        "the carried set is still staged",
+      );
+    }
   });
 
   // ── /finalise 6a ────────────────────────────────────────────────────────────

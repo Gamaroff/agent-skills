@@ -18,7 +18,10 @@ All notable changes to this project will be documented in this file. Format foll
 - **`/finalise` 8a's fix commit and the PreCompact pause commit commit only their own paths.** A
   bare `git commit` in either swept the staged 5c set into the wrong commit. In 8a, the
   `--git-base` check then refused healthy work for "a file the record did not name". 8a is now a
-  fenced block that commits `-- <touched>`, and the pause hook commits `-- <report>`.
+  fenced block that commits `-- <touched>`, and the pause hook commits `-- <report>`. A pause between
+  5c and 6a therefore leaves the 5c set staged, so the resume contract's working-tree probe now sets
+  that set aside rather than halting on it. 8a's recovery hint is now a soft reset, because
+  `--hard` would destroy the staged set.
 
 ## [v0.55.0] - 2026-10-07
 

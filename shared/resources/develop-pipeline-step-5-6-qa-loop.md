@@ -1430,6 +1430,14 @@ case "$PR_REVIEW" in *'{'*) echo "HALT: substitute PR_REVIEW before running this
 mkdir -p .claude/state
 CLASSIFIED=.claude/state/5c-carry-classified.txt
 ELIGIBLE=.claude/state/5c-carry-eligible.txt   # the paths the stage block below may touch
+# Classify runs ONCE per 5c pass, before any edit. Re-run after the edits, it would rebuild the list
+# from a tree where every fixed path is now dirty and drop them all (task.173 QA-2, CR-5).
+if [ -s "$ELIGIBLE" ]; then
+  while IFS= read -r q; do
+    git diff --quiet HEAD -- "$q" 2>/dev/null \
+      || { echo "HALT: $q already carries a 5c edit — run the stage block, do not re-classify"; exit 1; }
+  done < "$ELIGIBLE"
+fi
 : > "$ELIGIBLE"
 # One line per finding in the report's Machine-Readable Findings block. The engine exits 1 when it
 # cannot read the block, or when an entry yields no line: "nothing to classify" and "could not
@@ -1444,7 +1452,12 @@ command node -e '
   if (sections.length < 2) { console.error("no ## Machine-Readable Findings section"); process.exit(1); }
   const fenced = sections[1].split(fence + "yaml");
   if (fenced.length < 2) { console.error("no yaml fence under ## Machine-Readable Findings"); process.exit(1); }
-  const lines = fenced[1].split(fence)[0].split("\n");
+  // The block ends at a fence on a line of its own (CommonMark), never at the first triple
+  // backtick anywhere: one inside a quoted finding would cut the block short (task.173 QA-2, CR-6).
+  const body = fenced[1];
+  const close = body.search(new RegExp("\n[ \t]*" + fence + "[ \t]*(\n|$)"));
+  if (close < 0) { console.error("the yaml fence under ## Machine-Readable Findings never closes"); process.exit(1); }
+  const lines = body.slice(0, close).split("\n");
   const entries = lines.filter((l) => /^\s*-\s+\S/.test(l)).length;
   let id = null, printed = 0;
   for (const line of lines) {
@@ -1487,19 +1500,31 @@ PR_REVIEW="{work-item-dir}/{prefix}.pr-review.{n}.{name}.md"
 CARRY_FIXED=("{each path the doc-only fixes changed, quoted — write CARRY_FIXED=() when none}")
 case "$PR_REVIEW ${CARRY_FIXED[*]}" in *'{'*) echo "HALT: substitute PR_REVIEW and CARRY_FIXED before running this block"; exit 1 ;; esac
 ELIGIBLE=.claude/state/5c-carry-eligible.txt   # written by the classify block above
+# The checker must be runnable before anything is staged or restored: an unsubstituted skill name
+# or a missing node would otherwise read as "dead link" and undo a valid fix (task.173 QA-2, CR-2).
+[ -f .agents/skills/{develop-story|develop-task}/references/doc-links.js ] \
+  || { echo "HALT: doc-links.js not found — substitute the skill name in this block"; exit 1; }
+command -v node >/dev/null 2>&1 || { echo "HALT: node is not on PATH — the link check cannot run"; exit 1; }
 HEAD_BEFORE=$(git rev-parse HEAD)
 git add -- "$PR_REVIEW" || { echo "HALT: cannot stage $PR_REVIEW"; exit 1; }
 CARRIED=("$PR_REVIEW")
+HANDLED=""   # one outcome per path: a path listed twice is handled once (task.173 QA-2, CR-4)
 for p in "${CARRY_FIXED[@]}"; do
+  printf '%s' "$HANDLED" | grep -qxF -- "$p" && continue
+  HANDLED="$HANDLED$p"$'\n'
   grep -qxF -- "$p" "$ELIGIBLE" 2>/dev/null \
     || { echo "HALT: $p was not cleared by the classify block — left untouched; undo that edit by hand"; exit 1; }
   git add -- "$p" || { echo "HALT: cannot stage $p"; exit 1; }
+  # doc-links.js: 0 = links resolve, 1 = a dead link (the only exit that undoes the fix), anything
+  # else = the check could not run — HALT, staged as it is, rather than discard a fix over a tool error.
+  LINKS_RC=0
   case "$p" in
-    *.md) LINKS_OK=false; command node .agents/skills/{develop-story|develop-task}/references/doc-links.js --file "$p" && LINKS_OK=true ;;
-    *) LINKS_OK=true ;;
+    *.md) command node .agents/skills/{develop-story|develop-task}/references/doc-links.js --file "$p"; LINKS_RC=$? ;;
   esac
-  if [ "$LINKS_OK" = true ]; then
+  if [ "$LINKS_RC" -eq 0 ]; then
     CARRIED+=("$p")
+  elif [ "$LINKS_RC" -ne 1 ]; then
+    echo "HALT: doc-links.js exited $LINKS_RC on $p — the check did not run; nothing was undone"; exit 1
   else
     echo "NOT CARRIED: $p — a dead link; the 5c edit is undone, finding recorded"
     git checkout HEAD -- "$p" || { echo "HALT: cannot restore $p"; exit 1; }
@@ -1512,8 +1537,11 @@ echo "Carried to 6a: ${CARRIED[*]}"
 
 Write the block's last line onto the cycle's QA Cycle entry as `**Carried to 6a**: {paths}`, and
 record every `NOT CARRIED` and `record` line there as a finding not fixed. The implementation
-report itself is still Step 8's. A crash after this block leaves the set staged; a resume into
-Step 7 finds it there and 6a carries it — the index is durable across processes.
+report itself is still Step 8's. A crash or a PreCompact pause after this block leaves the set
+staged. The resume contract's working-tree probe sets it aside (staged, nothing unstaged on top, the
+work item's review report or a path in `.claude/state/5c-carry-eligible.txt`) instead of halting on
+it. A resume into Step 7 then finds the set still staged and 6a carries it, because the index is
+durable across processes.
 
 The 5-cycle budget is **shared**, not additional. A run whose review returns REQUEST CHANGES
 therefore consumes a cycle it would not have consumed before, and can reach Loop Escalation on a

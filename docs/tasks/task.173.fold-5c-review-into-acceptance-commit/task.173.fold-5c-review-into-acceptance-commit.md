@@ -243,7 +243,8 @@ Depends on Phase 1 and on task.172 (`ci.docsOnly.patterns`).
 5. `shared/resources/develop-pipeline-step-7-finalise.md`: one line
 6. `shared/resources/develop-pipeline-hooks.md` (`:50`) and `shared/resources/develop-pipeline-pause.md`
    (`:141`): both restate the pause commit as `git add <report> && git commit …`; update to the path-limited form (review 1, I4)
-7. `CHANGELOG.md`
+7. `shared/resources/develop-pipeline-resume-contract.md`: the Phase 0b working-tree probe sets the staged 5c carried set aside rather than HALTing on it (QA cycle 2, CR2-1). A path-limited pause leaves the set staged.
+7a. `CHANGELOG.md`
 
 ### Files to Add
 
@@ -406,24 +407,24 @@ commit → scenario 17 red.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-08
 **Quality Score**: 70/100
-**Gate Decision**: FAIL
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.173.qa.1.fold-5c-review-into-acceptance-commit.md](./task.173.qa.1.fold-5c-review-into-acceptance-commit.md)
-- **Gate File**: [task.173.gate.1.fold-5c-review-into-acceptance-commit.yml](./task.173.gate.1.fold-5c-review-into-acceptance-commit.yml)
+- **Full Report**: [task.173.qa.2.fold-5c-review-into-acceptance-commit.md](./task.173.qa.2.fold-5c-review-into-acceptance-commit.md)
+- **Gate File**: [task.173.gate.2.fold-5c-review-into-acceptance-commit.yml](./task.173.gate.2.fold-5c-review-into-acceptance-commit.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5522
+- **Tests Executed**: 5530
 - **Phases Verified**: 4/4
-- **Critical Issues**: 1
+- **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-CR-1 (HIGH): the 5c carry restore discards all uncommitted work in a refused path, including the implementation report. CR-2 (MEDIUM): the classifier is silent on unparsed findings. CR-3–CR-5 (LOW): placeholder guard, 6a path normalisation, and an overclaim about HALT commits.
+Cycle-1 fixes verified. Three MEDIUM issues remain: a pause between 5c and 6a now HALTs on resume (CR2-1); a doc-links failure that is not a dead link takes the restore branch (CR2-2); and the 8a recovery hint `git reset --hard` destroys the carried set (CR2-3). Three LOW issues (CR2-4–6).
 
 <!-- change-log-start -->
 
@@ -438,6 +439,8 @@ CR-1 (HIGH): the 5c carry restore discards all uncommitted work in a refused pat
 | 2026-10-08 |         | Status → ready-for-review | develop-task (inline) |
 | 2026-10-08 |         | QA gate FAIL (70/100) — 5 findings (1 high) | qa-task |
 | 2026-10-08 |         | QA findings fixed — cycle 1, 5 findings (CR-1..CR-5) | qa-fix |
+| 2026-10-08 |         | QA gate CONCERNS (70/100) — 6 findings (0 high) | qa-task |
+| 2026-10-08 |         | QA findings fixed — cycle 2, 6 findings (CR2-1..CR2-6) | qa-fix |
 
 <!-- change-log-end -->
 
