@@ -5,10 +5,10 @@ type: task
 description: "On APPROVE or CONCERNS, the 5c PR-review report and any doc-only CONCERNS fixes are staged, not committed, and ride /finalise's 6a acceptance commit. This removes one pushed tail commit and one CI run per item. Every other commit in the pipeline commits only its own paths, so the staged set cannot be swept into the wrong commit."
 tags: [develop-story, develop-task, finalise, qa-loop, review-pr, ci, performance, consumer-handoff]
 category: refactoring
-status: planned
+status: ready-for-development
 priority: Medium
 created: 2026-10-01
-updated: 2026-10-01
+updated: 2026-10-08
 assignee:
 estimated_effort_hours: 8
 github_issue: 540
@@ -16,7 +16,9 @@ github_issue: 540
 
 # Technical Task: Fold the 5c review and its doc-only fixes into the acceptance commit
 
-**Status:** Planned
+**Status:** Ready for Development
+
+**Review**: ✅ All review recommendations from `task.173.review.1.fold-5c-review-into-acceptance-commit.md` implemented 2026-10-08
 
 **GitHub Issue**: [#540](https://github.com/Gamaroff/agent-skills/issues/540)
 
@@ -62,17 +64,17 @@ become two), with no evidence lost.
 ### Current Problems
 
 1. **5c `APPROVE` and `CONCERNS` have no commit rule, so orchestrators invent one.** The verdict
-   table (`shared/resources/develop-pipeline-step-5-6-qa-loop.md:1315`) says to record `CONCERNS`
+   table (`shared/resources/develop-pipeline-step-5-6-qa-loop.md:1392`) says to record `CONCERNS`
    findings and "Do not block". It says nothing about the review report file or about fixing
    doc-only findings. tinker-city's run applied them in a separate pushed commit (`b8f0c781`), which
    then needed its own CI reading 1.
 2. **The report already rides 6a, but by accident.** `/review-pr` stages its report
-   (`skills/review-pr/SKILL.md:421`, `git add "{work-item-dir}/{prefix}.pr-review.{n}.{name}.md"`)
-   and says "the pipeline commits these files next anyway" (`:427`). `/finalise` 6a stages its own
-   paths and then runs a bare `git commit` (`skills/finalise/SKILL.md:1302`), which commits the
+   (`skills/review-pr/SKILL.md:808`, `git add "{work-item-dir}/{prefix}.pr-review.{n}.{name}.md"`)
+   and says "the pipeline commits these files next anyway" (`:814`). `/finalise` 6a stages its own
+   paths and then runs a bare `git commit` (`skills/finalise/SKILL.md:1370`), which commits the
    whole index, staged report included. Nothing states this, so nothing protects it.
 3. **Two other commits sweep the index too.** `/finalise` 8a commits with a bare `git commit`
-   (`skills/finalise/SKILL.md:2537`). Its `--git-base` check (`:2545`) refuses "a file the record did
+   (`skills/finalise/SKILL.md:2655`). Its `--git-base` check (`:2663`) refuses "a file the record did
    not name", so a staged 5c report there sends the run to Step 8 on healthy work. The PreCompact
    hook (`shared/resources/develop-pipeline-on-precompact.sh:212`) commits and pushes the whole index
    under a "pipeline paused" message.
@@ -91,20 +93,20 @@ become two), with no evidence lost.
 
 ### Current Architecture
 
-Each current-state name below was grepped on 2026-10-01.
+Each current-state name below was grepped on 2026-10-01; line numbers re-measured on `develop` @ `3a62c860` on 2026-10-08 (review 1).
 
-- **5c verdict table:** `shared/resources/develop-pipeline-step-5-6-qa-loop.md:1314–1317`
-  (`| ⚠️ **CONCERNS** | Record the findings …`). No commit or push instruction between `:1187`
+- **5c verdict table:** `shared/resources/develop-pipeline-step-5-6-qa-loop.md:1391–1393`
+  (`| ⚠️ **CONCERNS** | Record the findings …`). No commit or push instruction between `:1258`
   (`### 5c. PR Conformance Review (shared)`) and the Step 7 transition, apart from the path-1
-  assertions at `:1253–1267`, which concern the gate and QA report.
-- **6a:** `skills/finalise/SKILL.md:1239` (`6a. **Acceptance commit + push.**`), with
+  gate commit before 5c (`:383–396`), which concerns the gate and QA report.
+- **6a:** `skills/finalise/SKILL.md:1307` (`6a. **Acceptance commit + push.**`), with
   `git add "${ADD_PATHS[@]}"` and then `git commit -m "${COMMIT_MSG}${REG_SUFFIX}"`. The comment at
-  `:1257` reads "The implementation report is NOT staged here". The idempotency guard is
+  `:1325` reads "The implementation report is NOT staged here". The idempotency guard is
   `git diff --cached --quiet`.
-- **Post-finalise boundary check:** `shared/resources/develop-pipeline-step-7-finalise.md:147`
+- **Post-finalise boundary check:** `shared/resources/develop-pipeline-step-7-finalise.md:154`
   (`OTHER=$(git status --porcelain | …`). Any dirty path other than the implementation report
   HALTs. 6a must therefore commit everything staged before it, which it does today.
-- **8a:** `skills/finalise/SKILL.md:2537` (`` `git commit` — one commit``) and `:2545`
+- **8a:** `skills/finalise/SKILL.md:2655` (`` `git commit` — one commit``) and `:2663`
   (`finalise-fix-and-recheck.mjs … --git-base "$CI_HEAD_1"`), which derives `touched` from
   `git diff --name-only <base>..HEAD` and refuses a file the record did not name.
 - **PreCompact hook:** `shared/resources/develop-pipeline-on-precompact.sh:211–212` (`git add
@@ -120,7 +122,9 @@ a scratch repo). Stage `a` and `b`, then `git commit -m only -- a`. The commit c
 ### Target Architecture
 
 - **5c, `APPROVE` or `CONCERNS`:** one new subsection, *Carry the review into the acceptance
-  commit*.
+  commit*. Its steps are a **fenced bash block** (review 1, I1; obs #258), not a numbered list, so the
+  test extracts and runs the block the orchestrator runs. The block contains no `git commit` and no
+  `git push`.
   1. Assert the review report is staged (`git diff --cached --name-only` lists it). Stage it if it
      is not.
   2. On `CONCERNS`, a finding is **doc-only** when its `file:` matches `ci.docsOnly.patterns`.
@@ -131,10 +135,32 @@ a scratch repo). Stage `a` and `b`, then `git commit -m only -- a`. The commit c
      …`). The report itself is still Step 8's.
 - **6a:** the comment states that the commit carries the full index: the acceptance artefacts plus
   anything 5c staged. When the index holds paths beyond `ADD_PATHS` and the registry, the message
-  gains `; 5c review carried`. Nothing else in 6a changes: `ADD_PATHS`, the guard and the push all
-  stay as they are.
+  gains `; 5c review carried`. Both sides of the comparison are repo-root-relative with any leading `./`
+  stripped, or every path reads as extra. In a standalone `/finalise`, anything the operator staged
+  by hand counts as carried, and the suffix then states that truthfully. Nothing else in 6a changes:
+  `ADD_PATHS`, the guard and the push all stay as they are.
 - **8a:** the commit becomes `git commit -m … -- <touched>`, which leaves 5c's staged paths for 6a.
 - **PreCompact hook:** `git commit -m … -- "$REPORT"`. A pause commits the report only.
+
+### Index-sweeping commits — the search, and each site classified (review 1, I3)
+
+Search: `git grep -nE 'git commit( |$)' -- 'shared/resources/*.md' 'shared/resources/*.sh' 'skills/*/SKILL.md'`,
+filtered to the develop pipelines, `/finalise` and `/review-pr`, plus every `/commit-changes` invocation in
+those sources. Run on 2026-10-08:
+
+| Site | When it runs relative to 5c | Disposition |
+| --- | --- | --- |
+| `/finalise` 8a fix commit (`skills/finalise/SKILL.md:2655`) | after 5c, before 6a | **Narrowed** (Phase 1) |
+| PreCompact pause commit (`develop-pipeline-on-precompact.sh:212`) | any time | **Narrowed** (Phase 1) |
+| `/finalise` 6a (`skills/finalise/SKILL.md:1370`) | after 5c | **Carries** the set (Phase 3) |
+| QA path-1 gate commit (`develop-pipeline-step-5-6-qa-loop.md:395`) | before 5c | Untouched: no carried set exists yet |
+| 5b `/commit-changes` `fix(...)` sweep | before 5c (REQUEST CHANGES stays in the loop) | Untouched |
+| HALT-report `/commit-changes` sweep | any HALT | Untouched: a carried set rides it and is pushed; nothing is lost |
+| Step 8 `/commit-changes --scope` | after 6a | Untouched: 6a already committed the set |
+
+The one state in which a carried set meets an untouched sweeper is a `/finalise` DoD-gaps HALT followed by
+re-entry at 5a (task.170): the HALT commit sweeps the set and pushes it. That is today's behaviour, and the
+set is review evidence, so carrying it there loses nothing.
 
 ### Same-class mechanism inventory (obs #103)
 
@@ -155,6 +181,7 @@ a scratch repo). Stage `a` and `b`, then `git commit -m only -- a`. The commit c
 - ✅ `skills/finalise/SKILL.md`: the 6a comment and message suffix, and the 8a path-limited commit
 - ✅ `shared/resources/develop-pipeline-on-precompact.sh`: the path-limited pause commit
 - ✅ `shared/resources/develop-pipeline-step-7-finalise.md`: one line noting that 6a carries the 5c set
+- ✅ `shared/resources/develop-pipeline-hooks.md` and `develop-pipeline-pause.md`: the pause-commit restatements
 - ✅ Tests and bundle
 
 ### Out of Scope
@@ -213,15 +240,17 @@ Depends on Phase 1 and on task.172 (`ci.docsOnly.patterns`).
 3. `shared/resources/develop-pipeline-on-precompact.sh`: the pause commit
 4. `shared/resources/develop-pipeline-on-precompact.test.sh`: the staged-sibling case
 5. `shared/resources/develop-pipeline-step-7-finalise.md`: one line
-6. `CHANGELOG.md`
+6. `shared/resources/develop-pipeline-hooks.md` (`:50`) and `shared/resources/develop-pipeline-pause.md`
+   (`:141`): both restate the pause commit as `git add <report> && git commit …`; update to the path-limited form (review 1, I4)
+7. `CHANGELOG.md`
 
 ### Files to Add
 
-7. `shared/resources/tests/acceptance-commit-carries-5c.test.mjs`: carry and narrowing tests
+8. `shared/resources/tests/acceptance-commit-carries-5c.test.mjs`: carry and narrowing tests
 
 ### Generated (`npm run bundle`)
 
-8. The bundled copies of the step docs and hook under `skills/{develop-story,develop-task,develop-bug}/references/`
+9. The bundled copies of the step docs and hook under `skills/{develop-story,develop-task,develop-bug}/references/`
 
 ### Files to Delete
 
@@ -232,6 +261,11 @@ None.
 ## 8. Testing Strategy
 
 ### Behaviour tests (scratch git repos)
+
+- **5c carry block:** extract the *Carry the review into the acceptance commit* fenced block from
+  `develop-pipeline-step-5-6-qa-loop.md` and run it in a scratch repo whose `HEAD` is the "last QA
+  push", with a `pr-review` file staged and one doc-only plus one non-doc finding. `HEAD` is unchanged
+  (zero commits since the QA head), the doc path is staged, the non-doc path is not.
 
 - **6a carry:** stage a `pr-review` file and a doc fix, then run the 6a block extracted from
   `SKILL.md`. One commit carries the acceptance artefacts and both 5c paths. The message ends
@@ -261,16 +295,16 @@ None.
 
 ### Functional
 
-- [ ] A run whose 5c returns `CONCERNS` with only doc-only findings pushes no commit between the last QA push and 6a (Phase 2)
-- [ ] The 6a commit carries the review report and the doc fixes, and the step-7 boundary check passes (Phase 3)
-- [ ] 8a with a staged 5c set commits only `touched`, and `--git-base` exits 0 (Phase 1)
-- [ ] A PreCompact pause with a staged 5c set commits only the report (Phase 1)
-- [ ] A non-doc `CONCERNS` finding is recorded and not fixed, exactly as today
+- [ ] A run whose 5c returns `CONCERNS` with only doc-only findings pushes no commit between the last QA push and 6a (Phase 2) — held by the 5c carry-block test
+- [ ] The 6a commit carries the review report and the doc fixes, and the step-7 boundary check passes (Phase 3) — held by the 6a carry test
+- [ ] 8a with a staged 5c set commits only `touched`, and `--git-base` exits 0 (Phase 1) — held by the 8a narrowing test
+- [ ] A PreCompact pause with a staged 5c set commits only the report (Phase 1) — held by the `develop-pipeline-on-precompact.test.sh` staged-sibling case
+- [ ] A non-doc `CONCERNS` finding is recorded and not fixed, exactly as today — held by the doc-only classification test and the carry-block test's non-doc path
 
 ### Performance
 
-- [ ] Pushed commits after the last QA cycle drop from three to two on a doc-only `CONCERNS` run
-- [ ] CI runs triggered after the last QA cycle drop by one on the same run
+- [ ] Pushed commits after the last QA cycle drop from three to two on a doc-only `CONCERNS` run — held by the 5c carry-block test (zero commits between the QA head and 6a, where the pre-change path made one)
+- [ ] CI runs triggered after the last QA cycle drop by one on the same run — follows from the criterion above: the pipeline pushes every tail commit and each push triggers one CI run; no separate per-PR test
 
 ### Code Quality
 
@@ -340,6 +374,8 @@ None identified. The acceptance commit already carries the staged report today.
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-10-01 | 1.0     | Initial draft | create-task |
+| 2026-10-08 | 1.1     | Review passed (8/10) — 4 Important fixes applied: executable 5c carry block, criteria mapped to tests, index-sweeper search recorded, pause-commit doc sweep; anchors refreshed | review-task |
+| 2026-10-08 |         | Status → ready-for-development | review-task |
 
 <!-- change-log-end -->
 
