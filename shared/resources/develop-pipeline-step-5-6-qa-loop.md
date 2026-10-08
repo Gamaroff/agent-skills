@@ -1445,16 +1445,24 @@ CLASSIFIED=.claude/state/5c-carry-classified.txt
 ELIGIBLE=.claude/state/5c-carry-eligible.txt   # the paths the stage block below may touch
 # Classify runs ONCE per 5c pass, before any edit. Re-run after the edits, it would rebuild the list
 # from a tree where every fixed path is now dirty and drop them all (task.173 QA-2, CR-5).
-# The guard reads only THIS pass's list (line 1 names this review). A list another pass left behind
-# holds none of this pass's edits, so it is replaced, not obeyed (task.173 QA-4, CR-2).
-if [ -s "$ELIGIBLE" ] && [ "$(head -1 "$ELIGIBLE")" = "# review: $PR_REVIEW" ]; then
+# A listed path that is dirty against HEAD is an edit some 5c pass made and has not carried, whatever
+# the header says: a re-run /review-pr writes a new {n}, so "another pass" and "this pass" can share
+# one record. Refuse in both arms; only the remedy differs. A list is replaced only when every path it
+# names is clean (task.173 QA-5, CR-1).
+if [ -s "$ELIGIBLE" ]; then
+  ELIG_HEAD=$(head -1 "$ELIGIBLE")
   while IFS= read -r q; do
     case "$q" in '# '*) continue ;; esac
-    git diff --quiet HEAD -- "$q" 2>/dev/null \
-      || { echo "HALT: $q already carries a 5c edit — run the stage block, do not re-classify"; exit 1; }
+    git diff --quiet HEAD -- "$q" 2>/dev/null && continue
+    if [ "$ELIG_HEAD" = "# review: $PR_REVIEW" ]; then
+      echo "HALT: $q already carries a 5c edit — run the stage block, do not re-classify"
+    else
+      echo "HALT: $q holds an uncarried 5c edit recorded for ${ELIG_HEAD#\# review: } — carry it with that pass's stage block, or undo it (git checkout HEAD -- $q), then re-classify"
+    fi
+    exit 1
   done < "$ELIGIBLE"
-elif [ -s "$ELIGIBLE" ]; then
-  echo "replacing a stale eligible list ($(head -1 "$ELIGIBLE")) — another 5c pass wrote it"
+  [ "$ELIG_HEAD" = "# review: $PR_REVIEW" ] \
+    || echo "replacing a stale eligible list ($ELIG_HEAD) — every path it names is clean"
 fi
 printf '# review: %s\n' "$PR_REVIEW" > "$ELIGIBLE"
 # One line per finding in the report's Machine-Readable Findings block. The engine exits 1 when it

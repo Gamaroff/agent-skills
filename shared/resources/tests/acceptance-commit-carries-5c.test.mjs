@@ -549,20 +549,40 @@ for (const shell of SHELLS) {
     }
   });
 
-  test(`[${shell}] 5c classify: a stale list from another pass is replaced, not obeyed (QA-4 CR-2)`, () => {
-    const { root, write } = fiveCRepo();
-    // Another pass's list: its review is not this one, and its listed path is dirty.
-    write(
-      ".claude/state/5c-carry-eligible.txt",
-      "# review: docs/tasks/task.9.x/task.9.pr-review.0.old.md\ndocs/tasks/task.9.x/task.9.dirty.md\n",
-    );
-    const r = run(shell, root, classifyBlock());
-    assert.equal(r.status, 0, r.stdout + r.stderr);
-    assert.match(r.stdout, /replacing a stale eligible list/);
-    assert.match(
-      readFileSync(join(root, ".claude/state/5c-carry-eligible.txt"), "utf8"),
-      new RegExp("^# review: " + REVIEW_PATH.replace(/\./g, "\\.")),
-    );
+  test(`[${shell}] 5c classify: a stale list is replaced only when its paths are clean; a dirty one HALTs (QA-4 CR-2, QA-5 CR-1)`, () => {
+    const STALE = "# review: docs/tasks/task.9.x/task.9.pr-review.0.old.md\n";
+    // All listed paths clean: replaced, and the run says so.
+    {
+      const { root, write } = fiveCRepo();
+      write(
+        ".claude/state/5c-carry-eligible.txt",
+        STALE + "docs/tasks/task.9.x/task.9.notes.md\n",
+      );
+      const r = run(shell, root, classifyBlock());
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+      assert.match(r.stdout, /replacing a stale eligible list/);
+      assert.match(
+        readFileSync(join(root, ".claude/state/5c-carry-eligible.txt"), "utf8"),
+        new RegExp("^# review: " + REVIEW_PATH.replace(/\./g, "\\.")),
+      );
+    }
+    // A listed path still dirty: an uncarried edit, whichever pass wrote the list — HALT, list kept.
+    {
+      const { root, write } = fiveCRepo();
+      const listed = STALE + "docs/tasks/task.9.x/task.9.dirty.md\n";
+      write(".claude/state/5c-carry-eligible.txt", listed);
+      const r = run(shell, root, classifyBlock());
+      assert.equal(r.status, 1, r.stdout);
+      assert.match(
+        r.stdout,
+        /holds an uncarried 5c edit recorded for docs\/tasks\/task\.9\.x\/task\.9\.pr-review\.0\.old\.md/,
+      );
+      assert.equal(
+        readFileSync(join(root, ".claude/state/5c-carry-eligible.txt"), "utf8"),
+        listed,
+        "the record survives",
+      );
+    }
   });
 
   // ── /finalise 6a ────────────────────────────────────────────────────────────

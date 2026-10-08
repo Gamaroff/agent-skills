@@ -415,17 +415,17 @@ commit → scenario 17 red.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.173.qa.4.fold-5c-review-into-acceptance-commit.md](./task.173.qa.4.fold-5c-review-into-acceptance-commit.md)
-- **Gate File**: [task.173.gate.4.fold-5c-review-into-acceptance-commit.yml](./task.173.gate.4.fold-5c-review-into-acceptance-commit.yml)
+- **Full Report**: [task.173.qa.5.fold-5c-review-into-acceptance-commit.md](./task.173.qa.5.fold-5c-review-into-acceptance-commit.md)
+- **Gate File**: [task.173.gate.5.fold-5c-review-into-acceptance-commit.yml](./task.173.gate.5.fold-5c-review-into-acceptance-commit.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5548
+- **Tests Executed**: 5550
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Cycle-3 fixes verified. One MEDIUM remains: the 8a overlap recovery hint would restore the rejected fix (CR4-1). Three LOW.
+One MEDIUM (CR5-1): the cycle-4 stale-list arm replaces the eligible list without checking its paths.
 
 <!-- change-log-start -->
 
@@ -446,6 +446,8 @@ Cycle-3 fixes verified. One MEDIUM remains: the 8a overlap recovery hint would r
 | 2026-10-08 |         | QA findings fixed — cycle 3, 7 findings (CR3-1..CR3-7) | qa-fix |
 | 2026-10-08 |         | QA gate CONCERNS (90/100) — 4 findings (0 high) | qa-task |
 | 2026-10-08 |         | QA findings fixed — cycle 4, 4 findings (CR4-1..CR4-4) | qa-fix |
+| 2026-10-08 |         | QA gate CONCERNS (90/100) — 1 finding (0 high) | qa-task |
+| 2026-10-08 |         | QA findings fixed — cycle 5, 1 finding (CR5-1) | qa-fix |
 
 <!-- change-log-end -->
 
