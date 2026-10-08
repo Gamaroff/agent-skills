@@ -1367,10 +1367,12 @@ standalone.
    REG_SUFFIX=$(git diff --cached --quiet -- docs/tasks/task-registry.md 2>/dev/null || echo '; registry ticked')
    # Anything staged beyond the acceptance artefacts and the registry is 5c's carried set (or, in a
    # standalone run, whatever the operator staged by hand — the suffix then says so truthfully).
-   # Both sides are repo-root-relative with any leading `./` stripped, or every artefact would
-   # read as carried.
+   # git spells the artefacts' names on both sides: a pathspec diff over ADD_PATHS normalises an
+   # absolute, `./`-prefixed or doubled-slash path to the name the full list prints, where a string
+   # comparison read every artefact as carried (task.173 QA-1, CR-4).
+   EXPECTED=$(git -c core.quotePath=false diff --cached --name-only -- "${ADD_PATHS[@]}" docs/tasks/task-registry.md)
    CARRIED=$(git -c core.quotePath=false diff --cached --name-only \
-     | grep -vxF -f <(printf '%s\n' "${ADD_PATHS[@]}" docs/tasks/task-registry.md | sed 's|^\./||') || true)
+     | grep -vxF -f <(printf '%s\n' "$EXPECTED") || true)
    CARRY_SUFFIX=""
    [ -n "$CARRIED" ] && CARRY_SUFFIX='; 5c review carried'
    # Idempotent on re-run: when the artefacts are already committed there is nothing staged, and

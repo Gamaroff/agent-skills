@@ -2,7 +2,7 @@
 id: task.173
 title: "[Task 173] Fold the 5c review and its doc-only fixes into the acceptance commit"
 type: task
-description: "On APPROVE or CONCERNS, the 5c PR-review report and any doc-only CONCERNS fixes are staged, not committed, and ride /finalise's 6a acceptance commit. This removes one pushed tail commit and one CI run per item. Every other commit in the pipeline commits only its own paths, so the staged set cannot be swept into the wrong commit."
+description: "On APPROVE or CONCERNS, the 5c PR-review report and any doc-only CONCERNS fixes are staged, not committed, and ride /finalise's 6a acceptance commit. This removes one pushed tail commit and one CI run per item. The two other commits on the path to acceptance (8a, the PreCompact pause) commit only their own paths; a HALT commit in that window carries the set and pushes it."
 tags: [develop-story, develop-task, finalise, qa-loop, review-pr, ci, performance, consumer-handoff]
 category: refactoring
 status: ready-for-review
@@ -40,7 +40,8 @@ whatever CI rules the consumer has.
   acceptance commit. This task makes that path stated and asserted, where today it is accidental.
 - **Commits that sweep the index.** Two other commits in the pipeline commit the whole index:
   `/finalise` 8a's fix commit and the PreCompact pause commit. Both are narrowed to their own paths,
-  so the staged set cannot land in the wrong commit.
+  so on the path to acceptance the staged set cannot land in the wrong commit. A HALT commit in that
+  window still carries it (§ 3, index-sweeping commits).
 
 **Out of scope, by operator decision (2026-10-01):** removing the Step 8 report commit. Step 7
 writes report lines after 6a (CI reading 2, the PR comment, issue close, board move), so that commit
@@ -403,6 +404,27 @@ commit → scenario 17 red.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-08
+**Quality Score**: 70/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.173.qa.1.fold-5c-review-into-acceptance-commit.md](./task.173.qa.1.fold-5c-review-into-acceptance-commit.md)
+- **Gate File**: [task.173.gate.1.fold-5c-review-into-acceptance-commit.yml](./task.173.gate.1.fold-5c-review-into-acceptance-commit.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 5522
+- **Phases Verified**: 4/4
+- **Critical Issues**: 1
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+CR-1 (HIGH): the 5c carry restore discards all uncommitted work in a refused path, including the implementation report. CR-2 (MEDIUM): the classifier is silent on unparsed findings. CR-3–CR-5 (LOW): placeholder guard, 6a path normalisation, and an overclaim about HALT commits.
+
 <!-- change-log-start -->
 
 ## Change Log
@@ -414,6 +436,8 @@ commit → scenario 17 red.
 | 2026-10-08 |         | Status → ready-for-development | review-task |
 | 2026-10-08 |         | Implemented — 8 source files, 1 new test file (10 cases), 1 new hook scenario | develop-task (inline) |
 | 2026-10-08 |         | Status → ready-for-review | develop-task (inline) |
+| 2026-10-08 |         | QA gate FAIL (70/100) — 5 findings (1 high) | qa-task |
+| 2026-10-08 |         | QA findings fixed — cycle 1, 5 findings (CR-1..CR-5) | qa-fix |
 
 <!-- change-log-end -->
 

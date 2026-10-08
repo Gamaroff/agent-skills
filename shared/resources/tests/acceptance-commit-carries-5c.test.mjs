@@ -109,93 +109,113 @@ function run(shell, root, script) {
 }
 
 const REVIEW_PATH = "docs/tasks/task.9.x/task.9.pr-review.1.x.md";
-const REVIEW_BODY = `# PR Review
-
-## Machine-Readable Findings
-
-\`\`\`yaml
-reviewed_gate: task.9.gate.1.x.yml
-findings:
-  - id: PC-1
-    category: trail
-    severity: low
-    confidence: high
-    ref: "docs/tasks/task.9.x/task.9.x.md:12"
-    anchor_check: ok
-    finding: "x"
-    suggested_action: "y"
-  - id: CR-1
-    category: cleanup
-    severity: low
-    confidence: high
-    ref: "skills/x/SKILL.md:40"
-    anchor_check: ok
-    finding: "x"
-    suggested_action: "y"
-  - id: PC-2
-    category: coverage
-    severity: low
-    confidence: high
-    ref: "AC-2"
-    anchor_check: no-line
-    finding: "x"
-    suggested_action: "y"
-truncated_count: 0
-\`\`\`
-`;
+const IMPL_PATH = "docs/tasks/task.9.x/task.9.implementation.1.x.md";
+const entry = (id, ref) =>
+  `  - id: ${id}\n    category: trail\n    severity: low\n    confidence: high\n    ref: ${ref}\n    anchor_check: ok\n    finding: "x"\n    suggested_action: "y"\n`;
+const reviewBody = (entries) =>
+  "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: task.9.gate.1.x.yml\nfindings:\n" +
+  entries +
+  "truncated_count: 0\n```\n";
+const REVIEW_BODY = reviewBody(
+  [
+    entry("PC-1", '"docs/tasks/task.9.x/task.9.x.md:12"'),
+    entry("CR-1", '"skills/x/SKILL.md:40"'),
+    entry("PC-2", '"AC-2"'),
+    entry("PC-3", `"${IMPL_PATH}:3"`),
+    entry("PC-4", '"docs/tasks/task.9.x/task.9.dirty.md:1"'),
+    entry("PC-5", '"docs/tasks/task.9.x/task.9.untracked.md"'),
+    entry("PC-6", '"docs/tasks/task.9.x/task.9.notes.md:1"'),
+  ].join(""),
+);
 
 const subst = (block) =>
   block
     .replaceAll("{develop-story|develop-task}", "develop-task")
     .replace(/^PR_REVIEW="\{[^\n]*"$/m, `PR_REVIEW="${REVIEW_PATH}"`);
+const CARRY = "#### Carry the review into the acceptance commit";
+const classifyBlock = () => subst(fenceAfter(QA_LOOP, CARRY, 0));
+const stageBlock = (paths) =>
+  subst(fenceAfter(QA_LOOP, CARRY, 1)).replace(
+    /^CARRY_FIXED=\("\{[^\n]*\}"\)$/m,
+    `CARRY_FIXED=(${paths.map((p) => `"${p}"`).join(" ")})`,
+  );
+
+/** The repo state at 5c: the last QA push, plus the run's uncommitted bookkeeping. */
+function fiveCRepo() {
+  const repo = scratchRepo();
+  const { g, write } = repo;
+  write("docs/tasks/task.9.x/task.9.x.md", "# Task 9\n\nOld text.\n");
+  write("docs/tasks/task.9.x/task.9.notes.md", "# Notes\n");
+  write("docs/tasks/task.9.x/task.9.dirty.md", "# Dirty\n");
+  write(IMPL_PATH, "# Report\n");
+  write("skills/x/SKILL.md", "# Skill\n\noriginal\n");
+  g("add", "-A");
+  g("commit", "-q", "-m", "last QA push");
+  // Uncommitted by design at 5c: the implementation report's QA Cycle entries, and other work.
+  write(IMPL_PATH, "# Report\n\n### QA Cycle 1\nentries Step 8 will commit\n");
+  write(
+    "docs/tasks/task.9.x/task.9.dirty.md",
+    "# Dirty\n\nsomeone's unsaved work\n",
+  );
+  write("docs/tasks/task.9.x/task.9.untracked.md", "# New\n");
+  // /review-pr wrote and staged its report.
+  write(REVIEW_PATH, REVIEW_BODY);
+  g("add", "--", REVIEW_PATH);
+  return { ...repo, qaHead: g("rev-parse", "HEAD") };
+}
 
 for (const shell of SHELLS) {
-  test(`[${shell}] 5c classify: a finding is doc-only exactly when its ref path matches ci.docsOnly.patterns`, () => {
-    const { root, write } = scratchRepo();
-    write(REVIEW_PATH, REVIEW_BODY);
-    const block = subst(
-      fenceAfter(
-        QA_LOOP,
-        "#### Carry the review into the acceptance commit",
-        0,
-      ),
-    );
-    const r = run(shell, root, block);
+  test(`[${shell}] 5c classify: doc-only needs the patterns AND a tracked, clean file that is neither Step 8's report nor the review`, () => {
+    const { root } = fiveCRepo();
+    const r = run(shell, root, classifyBlock());
     assert.equal(r.status, 0, r.stderr + r.stdout);
     assert.deepEqual(r.stdout.trim().split("\n"), [
       "doc-only PC-1 docs/tasks/task.9.x/task.9.x.md",
       'record CR-1 "skills/x/SKILL.md:40"',
       'record PC-2 "AC-2"',
+      `record PC-3 ${IMPL_PATH} (the implementation report is Step 8's)`,
+      "record PC-4 docs/tasks/task.9.x/task.9.dirty.md (untracked, or holds uncommitted work — not fixed at 5c)",
+      "record PC-5 docs/tasks/task.9.x/task.9.untracked.md (untracked, or holds uncommitted work — not fixed at 5c)",
+      "doc-only PC-6 docs/tasks/task.9.x/task.9.notes.md",
     ]);
+    assert.equal(
+      readFileSync(join(root, ".claude/state/5c-carry-eligible.txt"), "utf8"),
+      "docs/tasks/task.9.x/task.9.x.md\ndocs/tasks/task.9.x/task.9.notes.md\n",
+    );
   });
 
-  test(`[${shell}] 5c carry: stages the report and the doc fix, restores a non-doc fix, and moves no HEAD`, () => {
-    const { root, g, write } = scratchRepo();
-    write("docs/tasks/task.9.x/task.9.x.md", "# Task 9\n\nOld text.\n");
-    write("docs/tasks/task.9.x/task.9.notes.md", "# Notes\n");
-    write("skills/x/SKILL.md", "# Skill\n\noriginal\n");
-    g("add", "-A");
-    g("commit", "-q", "-m", "last QA push");
-    const qaHead = g("rev-parse", "HEAD");
-    // /review-pr wrote and staged its report; the orchestrator applied three fixes.
-    write(REVIEW_PATH, REVIEW_BODY);
-    g("add", "--", REVIEW_PATH);
+  test(`[${shell}] 5c classify: an unreadable findings block HALTs; an empty one is a clean zero`, () => {
+    for (const [body, ok] of [
+      ["# PR Review\n\nno machine-readable section\n", false],
+      [reviewBody("  - id: PC-1\n    category: trail\n"), false], // an entry with no ref:
+      [reviewBody('  - category: trail\n    ref: "docs/a.md"\n'), false], // first key is not id:
+      [reviewBody(""), true], // findings: [] in effect — nothing to classify
+    ]) {
+      const { root, write } = scratchRepo();
+      write(REVIEW_PATH, body);
+      const r = run(shell, root, classifyBlock());
+      if (ok) {
+        assert.equal(r.status, 0, r.stderr + r.stdout);
+        assert.equal(r.stdout.trim(), "");
+      } else {
+        assert.equal(r.status, 1, `expected a HALT for: ${body}\n${r.stdout}`);
+        assert.match(r.stdout, /HALT: cannot classify/);
+      }
+    }
+  });
+
+  test(`[${shell}] 5c carry: stages the report and a cleared doc fix, undoes a dead-link fix, and moves no HEAD`, () => {
+    const { root, g, write, qaHead } = fiveCRepo();
+    assert.equal(run(shell, root, classifyBlock()).status, 0);
     write("docs/tasks/task.9.x/task.9.x.md", "# Task 9\n\nFixed text.\n");
     write(
       "docs/tasks/task.9.x/task.9.notes.md",
       "# Notes\n\n[dead](missing-file.md)\n",
     );
-    write("skills/x/SKILL.md", "# Skill\n\nedited at 5c\n");
-    const block = subst(
-      fenceAfter(
-        QA_LOOP,
-        "#### Carry the review into the acceptance commit",
-        1,
-      ),
-    ).replace(
-      /^CARRY_FIXED=\(\{[^\n]*\}\)$/m,
-      'CARRY_FIXED=("docs/tasks/task.9.x/task.9.x.md" "docs/tasks/task.9.x/task.9.notes.md" "skills/x/SKILL.md")',
-    );
+    const block = stageBlock([
+      "docs/tasks/task.9.x/task.9.x.md",
+      "docs/tasks/task.9.x/task.9.notes.md",
+    ]);
     assert.doesNotMatch(
       block,
       /git (commit|push)/,
@@ -210,23 +230,13 @@ for (const shell of SHELLS) {
     );
     assert.equal(
       g("diff", "--cached", "--name-only"),
-      [
-        "docs/tasks/task.9.x/task.9.pr-review.1.x.md",
-        "docs/tasks/task.9.x/task.9.x.md",
-      ].join("\n"),
+      [REVIEW_PATH, "docs/tasks/task.9.x/task.9.x.md"].sort().join("\n"),
     );
     assert.equal(
-      g(
-        "status",
-        "--porcelain",
-        "--",
-        "skills/x/SKILL.md",
-        "docs/tasks/task.9.x/task.9.notes.md",
-      ),
+      g("status", "--porcelain", "--", "docs/tasks/task.9.x/task.9.notes.md"),
       "",
-      "the non-doc fix and the dead-link fix are restored, not left dirty",
+      "the dead-link fix is undone, not left dirty",
     );
-    assert.match(r.stdout, /NOT CARRIED: skills\/x\/SKILL\.md/);
     assert.match(
       r.stdout,
       /NOT CARRIED: docs\/tasks\/task\.9\.x\/task\.9\.notes\.md/,
@@ -235,6 +245,57 @@ for (const shell of SHELLS) {
       r.stdout,
       /^Carried to 6a: docs\/tasks\/task\.9\.x\/task\.9\.pr-review\.1\.x\.md docs\/tasks\/task\.9\.x\/task\.9\.x\.md$/m,
     );
+    // Step 8's report was never touched: its uncommitted entries survive, unstaged.
+    assert.match(
+      readFileSync(join(root, IMPL_PATH), "utf8"),
+      /entries Step 8 will commit/,
+    );
+    assert.equal(g("diff", "--cached", "--name-only", "--", IMPL_PATH), "");
+  });
+
+  test(`[${shell}] 5c carry: a path the classifier did not clear HALTs and is left exactly as it was (CR-1)`, () => {
+    const { root, g, write, qaHead } = fiveCRepo();
+    assert.equal(run(shell, root, classifyBlock()).status, 0);
+    for (const p of [
+      IMPL_PATH,
+      "docs/tasks/task.9.x/task.9.dirty.md",
+      "skills/x/SKILL.md",
+    ]) {
+      write(
+        p,
+        readFileSync(join(root, p), "utf8") +
+          "\n[dead](nope.md) edited at 5c\n",
+      );
+      const before = readFileSync(join(root, p), "utf8");
+      const r = run(shell, root, stageBlock([p]));
+      assert.equal(r.status, 1, `${p}: ${r.stdout}`);
+      assert.match(r.stdout, /was not cleared by the classify block/);
+      assert.equal(
+        readFileSync(join(root, p), "utf8"),
+        before,
+        `${p} must be untouched`,
+      );
+      assert.equal(
+        g("diff", "--cached", "--name-only", "--", p),
+        "",
+        `${p} must not be staged`,
+      );
+    }
+    assert.equal(g("rev-parse", "HEAD"), qaHead);
+  });
+
+  test(`[${shell}] 5c carry: an unsubstituted CARRY_FIXED HALTs before touching anything (CR-3)`, () => {
+    const { root, g, qaHead } = fiveCRepo();
+    const block = subst(fenceAfter(QA_LOOP, CARRY, 1));
+    assert.match(
+      block,
+      /^CARRY_FIXED=\("\{/m,
+      "the placeholder is still in the shipped block",
+    );
+    const r = run(shell, root, block);
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stdout, /HALT: substitute PR_REVIEW and CARRY_FIXED/);
+    assert.equal(g("rev-parse", "HEAD"), qaHead);
   });
 
   // ── /finalise 6a ────────────────────────────────────────────────────────────
@@ -309,6 +370,26 @@ for (const shell of SHELLS) {
         "docs/tasks/task.9.x/task.9.x.md",
       ],
     );
+  });
+
+  test(`[${shell}] 6a with an absolute or ./-prefixed document path: still no false suffix (CR-4)`, () => {
+    for (const prefix of ["ABS", "./"]) {
+      const { root, g } = sixAFixture();
+      const dir =
+        (prefix === "ABS" ? root + "/" : prefix) + "docs/tasks/task.9.x";
+      const block = fenceAfter(FINALISE, "6a. **Acceptance commit + push.**", 0)
+        .replace(/^STEM="\{[^\n]*$/m, 'STEM="task.9"')
+        .replace(/^DOC_KIND="\{[^\n]*$/m, 'DOC_KIND="task"')
+        .replaceAll("{document-directory}", dir)
+        .replaceAll("{document-path}", dir + "/task.9.x.md");
+      const r = run(shell, root, block);
+      assert.equal(r.status, 0, r.stderr + r.stdout);
+      assert.equal(
+        g("log", "-1", "--format=%s"),
+        "docs(task.9): accept — DoD, sprint review",
+        `${prefix}: nothing was carried, so no suffix`,
+      );
+    }
   });
 
   // ── /finalise 8a ────────────────────────────────────────────────────────────
