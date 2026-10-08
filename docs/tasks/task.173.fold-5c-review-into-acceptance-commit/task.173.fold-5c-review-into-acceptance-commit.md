@@ -461,6 +461,26 @@ CR6-1 closed. No open entries. Two advisory wording/robustness items (CR7-1, CR6
 **Gap Report Generated:** 2026-10-08
 
 **Detailed Verification Log:** See `task.173.dod.1.fold-5c-review-into-acceptance-commit.md` for the complete verification evidence.
+## Definition of Done - Gaps Identified — run 2
+
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**Gate Status**: ✅ PASS (`task.173.gate.7.fold-5c-review-into-acceptance-commit.yml`, 100/100)
+
+### Missing Criteria:
+
+1. **Acceptance Criteria:**
+   - [ ] AC8: the re-scoped criterion names two `no-red-untested` exceptions, but the record holds more. CR2-2's HALT branch is a third `no-red-untested` (qa.3:70). CR3-1's binding is `absorbed`. Five prose-only fixes (CR-5, CR2-3, CR3-3, CR3-4, CR4-1) have no guarding test.
+
+### Next Steps:
+
+- [ ] Correct AC8's exception list to match the record.
+
+**Estimated Effort:** Small (document-only)
+
+**Detailed Verification Log:** See `task.173.dod.2.fold-5c-review-into-acceptance-commit.md`.
 <!-- change-log-start -->
 ## Change Log
 
@@ -486,6 +506,7 @@ CR6-1 closed. No open entries. Two advisory wording/robustness items (CR7-1, CR6
 | 2026-10-08 |         | QA gate PASS (100/100) — 0 findings | qa-task |
 | 2026-10-08 |  | DoD incomplete — 3 gaps identified | finalise |
 | 2026-10-08 |  | DoD gaps resolved by operator decision — AC8 re-scoped; bug.2 closed; security zero-guard override recorded | develop-task |
+| 2026-10-08 |  | DoD incomplete — 1 gap identified (run 2) | finalise |
 <!-- change-log-end -->
 
 ---
