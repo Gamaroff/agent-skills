@@ -12,6 +12,7 @@ updated: 2026-10-08
 assignee:
 estimated_effort_hours: 8
 github_issue: 540
+pr_number: 613
 ---
 
 # Technical Task: Fold the 5c review and its doc-only fixes into the acceptance commit
@@ -427,12 +428,44 @@ commit → scenario 17 red.
 ### Key Findings
 CR6-1 closed. No open entries. Two advisory wording/robustness items (CR7-1, CR6-2) are carried in the gate's `recommendations.future`.
 
-<!-- change-log-start -->
+## Definition of Done - Gaps Identified
 
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**QA Report**: `task.173.qa.7.fold-5c-review-into-acceptance-commit.md`
+**Gate File**: `task.173.gate.7.fold-5c-review-into-acceptance-commit.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+### Missing Criteria:
+
+1. **Acceptance Criteria:**
+   - [ ] AC8: each new test is mutation-proved red on revert. The proofs are recorded as per-cycle totals and cannot be traced test by test.
+
+2. **Security Review:**
+   - [ ] The probe zero-guard fired. The 5c classify/stage allow-list (`shared/resources/develop-pipeline-step-5-6-qa-loop.md:1505-1514`) is a boundary that no engine form can probe, so `probes_executed: 0`.
+
+3. **Trail:**
+   - [ ] `task.173.bug.2.classifier-silent-on-unparsed-findings.md` still reads `Ready for QA` (5c PR review PC-1).
+
+### Next Steps:
+
+- [ ] AC8: map each test to a recorded red run, re-running the proofs where none exists. Or re-scope AC8 to "each fix's test is mutation-proved", by recorded decision.
+- [ ] Security: make the entry probeable (a sourceable script, or `shell-argv:` from task.181) and probe it. Or record a human override citing the 38-case suite that executes these blocks.
+- [ ] Close bug.2, citing QA cycle 2.
+
+**Estimated Effort:** Medium
+
+**Gap Report Generated:** 2026-10-08
+
+**Detailed Verification Log:** See `task.173.dod.1.fold-5c-review-into-acceptance-commit.md` for the complete verification evidence.
+<!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-01 | 1.0     | Initial draft | create-task |
 | 2026-10-08 | 1.1     | Review passed (8/10) — 4 Important fixes applied: executable 5c carry block, criteria mapped to tests, index-sweeper search recorded, pause-commit doc sweep; anchors refreshed | review-task |
 | 2026-10-08 |         | Status → ready-for-development | review-task |
@@ -451,7 +484,7 @@ CR6-1 closed. No open entries. Two advisory wording/robustness items (CR7-1, CR6
 | 2026-10-08 |         | QA gate CONCERNS (90/100) — 1 finding (0 high) | qa-task |
 | 2026-10-08 |         | QA findings fixed — cycle 6, 1 finding (CR6-1) | qa-fix |
 | 2026-10-08 |         | QA gate PASS (100/100) — 0 findings | qa-task |
-
+| 2026-10-08 |  | DoD incomplete — 3 gaps identified | finalise |
 <!-- change-log-end -->
 
 ---

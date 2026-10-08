@@ -3,7 +3,7 @@
 **Task**: `task.173.fold-5c-review-into-acceptance-commit.md`
 **Run Number**: 1
 **Started**: 2026-10-08 05:12
-**Status**: Escalated
+**Status**: Halted — DoD gaps
 
 ---
 
@@ -35,8 +35,8 @@ Narrow the two index-sweeping commits (finalise 8a, PreCompact pause) to their o
 | 2. review-task             | ✅ Done | `task.173.review.{N}.{name}.md` exists (or skip logged)               | `task.173.review.1.…md`: READY TO IMPLEMENT 8/10, 0 Critical / 4 Important (applied) / 3 Optional; Planned → Ready for Development | —                    |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline (plan file); 1 iteration; 4/4 phases; ci:fast + npm run ci green; 8 mutation proofs | —                    |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #613: https://github.com/Gamaroff/agent-skills/pull/613 | —                    |
-| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.173.qa.{N}.*.md`; `task.173.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | Loop limit: 5 cycles, gates FAIL/CONCERNS×4, HIGH 1,0,0,0,0; last fix 6eb59e6c ungated (half-cycle declined: medium-not-falling) | —                    |
-| 7. finalise                | ⏳ Pending | `task.173.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.173.qa.{N}.*.md`; `task.173.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | Re-entry +2 (budget 7): 7 cycles; gates FAIL/CONCERNS×5/PASS 100; HIGH 1,0,0,0,0,0,0; 5c PR review CONCERNS (PC-1, PC-2; 2 fixes carried to 6a; bug.2 not fixed) | —                    |
+| 7. finalise                | ❌ Failed | `task.173.dod.{N}.*.md`; task `status: accepted`                      | DoD gaps (3): AC8 mutation proofs not traceable per test; security probe zero-guard (5c allow-list unprobeable); bug.2 still Ready for QA. `task.173.dod.1.…md` | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
@@ -91,6 +91,20 @@ Narrow the two index-sweeping commits (finalise 8a, PreCompact pause) to their o
 - QA-start board re-assert: in-review → stage-disabled.
 - QA Cycle 1 — changes-requested: stage-disabled. qa-fix ingester not dispatched: the orchestrator wrote gate 1 in this context (independence loss recorded). No ambiguity; no third strike; no narrowing-residue offer. Fix pushed once (`c8733a5a`); PR state OPEN.
 - QA cycle 1: /qa-task (code_review_blocking=true, matrix passed). Gate 1 FAIL 70/100. Reviewer 199.6 s. CR-1 promoted (high/high); CR-2..CR-5 adopted by QA after reading. Bugs: task.173.bug.1, task.173.bug.2.
+- QA loop re-entry (2026-10-08, operator choice "Resume at 5a with 2 more cycles"): 2 extra cycles granted; 0 cycle(s) run outside the loop back-filled from disk. grant-qa-cycles.sh: QA_CYCLE=5, qa_max_cycles=7; lock restored from halt snapshot.
+- QA cycle 6: /qa-task (code_review_blocking=true, matrix passed). Scoped to the cycle-5 fix (8 files). Reviewer 122.9 s. Gate 6 CONCERNS 90. CR6-1 adopted by QA (medium/medium, not auto-promoted); CR6-2 advisory. ci:fast 5,549/0. Convergence: no trip. Route classifier: continue (not-a-pass-gate).
+- QA Cycle 6 — changes-requested: stage-disabled. Third strike: none (no HIGH). Narrowing offer: "Narrowing residue — every MEDIUM on gates 5 and 6 names shared/resources/develop-pipeline-step-5-6-qa-loop.md (CR5-1, CR6-1); HIGH 0 on both." qa-fix ingester not dispatched: the orchestrator wrote gate 6 in this context (independence loss recorded).
+- QA Cycle 6 fix: fast gate 5,549/0 (attempt 1). `ed10bc82` pushed once; PR state OPEN (inline gh pr view). qa-fix PR comment and tracker comment `qa-fix-6` posted.
+- QA cycle 7: /qa-task (code_review_blocking=true, matrix passed). Scoped to `ed10bc82` (7 files). Reviewer 81.3 s. One finding, CR7-1, medium/medium and not auto-promoted. QA re-rated it LOW with a measured plausibility check: the classify block lists only `isDocsPath`, tracked and clean paths, and Step 8 deletes the list, so the worst case is a documentation commit that `/finalise` catches loudly. CR6-1 (adopted at medium) differed: its remedy could discard work. Gate 7 PASS 100, top_issues empty → route 1 → 5c. The operator may overrule the re-rating.
+- 5c: /review-pr --effort medium --comment --no-code → CONCERNS (PC-1 trail medium/high, PC-2 consistency medium/medium). The lens's first PC-2 `ref` broke the template's ref grammar (prose); the lens re-emitted it as the task-document path. Classified both as doc-only; fixed bug.1 status (Closed, citing QA cycle 2) and added `pr_number: 613`; stage block carried 3 paths, HEAD unchanged. bug.2 not fixable at 5c (not in any ref). ready-for-merge: stage-disabled. PR comment posted.
+
+### Step 7 — Finalise
+
+- /finalise (task mode, STEM task.173, DoD file `task.173.dod.1.fold-5c-review-into-acceptance-commit.md`). Four DoD agents in parallel: AC PARTIAL (10/11; AC8 FAIL), Security FAIL (probe zero-guard), Compliance NOT_APPLICABLE, Docs PASS.
+- CI reading 1: SUCCESS @ d0a95bdc8b0ff9006ab9c4bb72ceb75b52d2f4cb over 5 checks.
+- Decision: GAPS (3). Fix-and-recheck (8a) not applicable: two sections FAIL. Gaps row in the task Change Log; gap report section in the task body (status unchanged, ready-for-review); gaps PR comment posted. 6a did not run, so the 5c carried set (pr-review.1, bug.1, task doc) stays staged and rides this HALT commit, per §5c's HALT exception.
+- finalise's lock self-advance (`--skill finalise` → 8) not run: it means "Step 7 done", and this path HALTs at 7.
+- The security agent reversed QA's `boundary: false` across all 7 cycles. That is a QA-vs-DoD disagreement worth a look: QA recorded the 5c classify block as non-boundary, while the DoD's Step 1b reads its allow-list over repository state as one.
 
 ---
 
@@ -123,6 +137,14 @@ The pipeline completed 5 qa-task/qa-fix cycles without a clean PASS.
 3. If the eligible-list machinery keeps generating findings, consider descoping the doc-only *fix* half (task § 11 "Partial Rollback"): keep the carry of the review report, and drop doc-only fixes at 5c.
 
 ---
+
+### Finalise DoD Gaps — 2026-10-08
+
+1. **AC8: mutation proofs not traceable per test.** The criterion says each new test is mutation-proved red on revert. The records are per-cycle totals, and none names its test. Close it by mapping each of the 19 tests (×bash/zsh) plus hook scenario 17 to a recorded red run (re-running where none exists), or by re-scoping AC8 to "each fix's test is mutation-proved" by recorded decision.
+2. **Security zero-guard.** The 5c classify/stage blocks (`shared/resources/develop-pipeline-step-5-6-qa-loop.md:1505-1514`) are an allow-list over repository state, a boundary under Step 1b. No probe-engine form reaches a fenced Markdown block, so `probes_executed: 0`. Close it by making the entry reachable (extract to a sourceable script, or land `shell-argv:` from task.181) and probing it, or by recording a human override that cites the 38-case committed suite executing these blocks.
+3. **Trail: bug.2 still `Ready for QA`.** 5c PC-1 named both bugs, but its `ref` named only bug.1, so 5c could carry only that fix (obs #297). Close bug.2, citing QA cycle 2.
+
+Items 1 (as a re-scope) and 3 are document-only. Item 2 is code only if the entry is extracted. A code fix re-enters QA at 5a on resume; a document-only fix resumes at 7.
 
 ## QA Iteration History
 
@@ -182,6 +204,29 @@ _Track each QA review/fix cycle._
 **Action**: Escalating — loop limit reached
 **Fixes Applied**: CR5-1 classify guard refuses a dirty listed path in both arms; stale list replaced only when clean. Tests 38/38; mutation-proved. Fast gate attempt 1 red: bundle-missing-source.test.js 27.5 s over its LOAD-SENSITIVE 20 s budget (load average 92; the file passed alone, 7/7, 6.4 s); attempt 2 green 5,550/0.
 **Commit**: `6eb59e6c`
+
+### QA Cycle 6 — 2026-10-08
+**Gate Result**: CONCERNS
+**Issues Found**: 2 — CR6-1 (MEDIUM: the stale-arm HALT offers `git checkout HEAD -- $q` for a dirty path the block cannot attribute to a 5c edit), CR6-2 (LOW, advisory: `git diff` failure read as dirty). CR5-1 closed and mutation-proved.
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 6 of 7)
+**Fixes Applied**: CR6-1 stale-arm HALT reworded: names the path as changed since the old pass cleared it, says to inspect the diff, and no longer calls it a 5c edit or offers `git checkout`. Step 2.6 move: scope the claim (pipeline narrowing offer). Probe population 1 (`carries a 5c edit`; the same-review arm is unaffected because this pass wrote that list). Test asserts no `git checkout` and no attribution; mutation-proved (covered, bash + zsh). Tests 38/38. CR6-2 left advisory.
+**Commit**: `ed10bc82`
+
+### QA Cycle 7 — 2026-10-08
+**Gate Result**: PASS
+**Issues Found**: none open. CR6-1 closed and mutation-proved. CR7-1 (reviewer medium/medium; QA re-rated LOW on a measured basis, since the list holds only tracked, clean, doc-only paths): the stale-arm HALT says "commit it". Advisory, in `recommendations.future` with CR6-2.
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: CONCERNS
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+**PR Review report**: `task.173.pr-review.1.fold-5c-review-into-acceptance-commit.md` (conformance lens only, `--effort medium --no-code`): PC-1 (trail, medium/high: bug.1 and bug.2 still Ready for QA), PC-2 (consistency, medium/medium: no `pr_number`, and the body names tinker-city PR #981, which /finalise would read).
+**Carried to 6a**: task.173.pr-review.1.fold-5c-review-into-acceptance-commit.md task.173.bug.1.carry-restore-wipes-uncommitted-work.md task.173.fold-5c-review-into-acceptance-commit.md
+**Not fixed (recorded)**: PC-1's bug.2 half. `task.173.bug.2.classifier-silent-on-unparsed-findings.md` is named only in the finding text, not in its `ref`, so the classifier never cleared it and 5c may not edit it. bug.2 still reads Ready for QA.
 
 ---
 

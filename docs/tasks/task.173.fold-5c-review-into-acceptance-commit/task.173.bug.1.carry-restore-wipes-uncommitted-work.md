@@ -4,7 +4,7 @@
 **Bug ID**: TASK-173-BUG-1
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 1, code review CR-1)
 **Date Found**: 2026-10-08
 
@@ -76,3 +76,4 @@ removed → red; clean/tracked test removed → red; implementation exclusion re
 | ---------- | ------------ | ---------- | ------------------------------ |
 | 2026-10-08 | New | qa-task | QA cycle 1, CR-1 |
 | 2026-10-08 | Ready for QA | qa-fix | Fixed in QA cycle 1 fix pass |
+| 2026-10-08 | Closed | develop-task (5c) | Fix verified in QA cycle 2 (task.173.qa.2, Re-Review Context: CR-1 FIXED); closed per PR review PC-1 |
