@@ -5,7 +5,7 @@ type: task
 description: "On APPROVE or CONCERNS, the 5c PR-review report and any doc-only CONCERNS fixes are staged, not committed, and ride /finalise's 6a acceptance commit. This removes one pushed tail commit and one CI run per item. The two other commits on the path to acceptance (8a, the PreCompact pause) commit only their own paths; a HALT commit in that window carries the set and pushes it."
 tags: [develop-story, develop-task, finalise, qa-loop, review-pr, ci, performance, consumer-handoff]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-01
 updated: 2026-10-08
@@ -13,11 +13,12 @@ assignee:
 estimated_effort_hours: 8
 github_issue: 540
 pr_number: 613
+completed_date: 2026-10-08
 ---
 
 # Technical Task: Fold the 5c review and its doc-only fixes into the acceptance commit
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.173.review.1.fold-5c-review-into-acceptance-commit.md` implemented 2026-10-08
 
@@ -542,6 +543,28 @@ CR9-2 and CR9-4 are closed. No open entries. Advisory follow-ups, including inst
 - [x] Rewrite AC8 to cite the record rather than restate it.
 
 **Detailed Verification Log:** See `task.173.dod.4.fold-5c-review-into-acceptance-commit.md`.
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.173.qa.10.fold-5c-review-into-acceptance-commit.md`
+**Gate File**: `task.173.gate.10.fold-5c-review-into-acceptance-commit.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified (DoD run 5):
+
+✅ **Acceptance Criteria:** 11/11. AC8 is held by the Mutation-proof ledger (§ Testing results)
+✅ **Tests & PR:** PR #613, 5c review APPROVE (`task.173.pr-review.2…`); CI green on `6dfd8a6e`
+✅ **Documentation:** the step docs, finalise `SKILL.md`, `configuration.md` and the CHANGELOG are updated
+✅ **Security Review:** PASS. 104 engine probes on `isDocsPath`; the 5c git-state arms rest on the recorded human override citing the 48-case suite; a pre-existing `.git`-segment LOW goes to a follow-up
+✅ **Compliance Review:** NOT_APPLICABLE
+
+**Task marked as ACCEPTED on:** 2026-10-08
+
+**Detailed Verification Log:** See `task.173.dod.5.fold-5c-review-into-acceptance-commit.md` for the complete verification evidence. Runs 1–4 found gaps, and their gap reports above are historical.
 <!-- change-log-start -->
 ## Change Log
 
@@ -578,6 +601,7 @@ CR9-2 and CR9-4 are closed. No open entries. Advisory follow-ups, including inst
 | 2026-10-08 |  | QA gate PASS (100/100) — 0 findings | qa-task |
 | 2026-10-08 |  | DoD incomplete — 1 gap identified (run 4) | finalise |
 | 2026-10-08 |  | AC8 cites a Mutation-proof ledger (DoD run 4 gap) | develop-task |
+| 2026-10-08 | 1.2 | DoD passed — accepted (PR #613) | finalise |
 <!-- change-log-end -->
 
 ---
