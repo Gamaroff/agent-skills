@@ -537,12 +537,16 @@ fi
 # Real git this time (the shim is removed for the scenario), so "committed" means a
 # commit object exists. `git push` fails harmlessly (no remote) — it is best-effort.
 rm -f "$SHIM_BIN/git"
-run_precompact_in_repo() { # $1 = dir, $2 = report body file
+run_precompact_in_repo() { # $1 = dir, $2 = report body file, $3 = optional sibling path to leave STAGED
   local dir="$1"
   mkdir -p "$dir/.claude/state" "$dir/stdin" "$dir/docs/tasks/task.42.x"
   ( cd "$dir" && git init -q && git config user.email t@t && git config user.name t && git config commit.gpgsign false ) >/dev/null 2>&1
   cp "$2" "$dir/report.md"
   ( cd "$dir" && git add report.md && git commit -qm init ) >/dev/null 2>&1
+  if [ -n "${3:-}" ]; then
+    printf 'staged by 5c\n' > "$dir/$3"
+    ( cd "$dir" && git add -- "$3" ) >/dev/null 2>&1
+  fi
   printf '{"skill":"develop-task","current_step":5,"branch":"feature/x","report_path":"report.md","task_or_story_directory":"docs/tasks/task.42.x","pr_url":"","tracker":"","tracker_issue":""}\n' \
     > "$dir/.claude/state/develop-pipeline.lock"
   (cd "$dir" && PATH="$SHIM_BIN:$PATH" GH_LOG="$dir/gh.log" GH_STDIN_DIR="$dir/stdin" \
@@ -572,6 +576,22 @@ if [ "$(cd "$S16B" && git rev-list --count HEAD)" = "1" ] && grep -q '^## Pipeli
   pass "lint fails: pause entry appended but NOT committed; signal and stderr say so; snapshot written, lock removed"
 else
   fail "lint fails → not committed" "commits=$(cd "$S16B" && git rev-list --count HEAD) stderr=$(head -2 "$S16B/stderr.log") signal=$(echo "$OUT" | grep -o 'Implementation report appended[^\\]*' | head -1)"
+fi
+
+# ── Scenario 17: the pause commit carries the report ONLY (task.173) ─────────
+# 5c stages its PR review report (and any doc-only fixes) for /finalise 6a to carry.
+# A pause between 5c and 6a must not sweep them into a "pipeline paused" commit:
+# the commit names the report, and the sibling is still staged afterwards.
+S17="$TMPDIR_TEST/s17"
+SIBLING="docs/tasks/task.42.x/task.42.pr-review.1.x.md"
+OUT=$(run_precompact_in_repo "$S17" "$GREEN_REPORT" "$SIBLING")
+S17_FILES=$(cd "$S17" && git show --name-only --format= HEAD)
+S17_STATUS=$(cd "$S17" && git status --porcelain -- "$SIBLING")
+if [ "$(cd "$S17" && git rev-list --count HEAD)" = "2" ] && [ "$S17_FILES" = "report.md" ] \
+   && [ "$S17_STATUS" = "A  $SIBLING" ]; then
+  pass "staged 5c sibling: the pause commit carries report.md only, and the sibling stays staged for 6a"
+else
+  fail "pause commit is path-limited" "commits=$(cd "$S17" && git rev-list --count HEAD) files=[$S17_FILES] status=[$S17_STATUS]"
 fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────

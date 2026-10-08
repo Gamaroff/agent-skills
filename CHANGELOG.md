@@ -4,6 +4,40 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Changed
+
+- **The 5c PR review now rides `/finalise`'s acceptance commit, so a run pushes one commit fewer.**
+  On `APPROVE` or `CONCERNS`, the develop pipelines stage the PR review report and commit nothing
+  between 5c and `/finalise` 6a. On `CONCERNS`, a finding whose `ref` path matches
+  `ci.docsOnly.patterns` may be fixed at 5c and staged too. Any other finding is still recorded and
+  not fixed. Both steps are fenced blocks in `develop-pipeline-step-5-6-qa-loop.md`
+  ("Carry the review into the acceptance commit"). 6a already commits the whole index. It now says
+  so, and its message ends `; 5c review carried` when it carries anything beyond the acceptance
+  artefacts and the registry. On tinker-city PR #981 the separate 5c commit cost a push and a full
+  CI run (task.173).
+- **`/finalise` 8a's fix commit and the PreCompact pause commit commit only their own paths.** A
+  bare `git commit` in either swept the staged 5c set into the wrong commit. In 8a, the
+  `--git-base` check then refused healthy work for "a file the record did not name". 8a is now a
+  fenced block that commits `-- <touched>`, and the pause hook commits `-- <report>`. A pause between
+  5c and 6a therefore leaves the 5c set staged, so the resume contract's working-tree probe now sets
+  that set aside rather than halting on it. 8a's recovery hint is now a soft reset, because
+  `--hard` would destroy the staged set.
+
+### Fixed
+
+- **A path containing a control character is never documentation.** `isDocsPath`
+  (`ci-tree-equivalence.js`, task.172) accepted a path with an embedded NUL. The 5c classify block
+  hands it a `ref` read from the PR review report, and under zsh a NUL survives `read` while `git`
+  sees the argument cut at it. Under the default patterns, `src/a.js<NUL>.md` was therefore cleared
+  as doc-only for a tracked code file. The stage block's exact-match check still refused the carry.
+  Any character from U+0000 to U+001F, or U+007F, now reads the path as code, which is the
+  fail-safe answer (task.173 DoD run 3).
+- **The 5c classifier reads a review `ref` as one literal file, never as a git pathspec.** Under the
+  default patterns, `:!*.md` passed `isDocsPath` and git resolved it to every non-markdown file. A
+  glob or a directory widened one ref in the same way. Every git call in the 5c classify and stage
+  blocks is now `--literal-pathspecs`, and a ref clears only when `git ls-files` names exactly that
+  path (task.173 QA cycle 8).
+
 ## [v0.55.0] - 2026-10-07
 
 ### Fixed

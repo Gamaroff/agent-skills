@@ -2986,6 +2986,23 @@ test("SEC-3: checkCommand is not run over uncommitted code; uncommitted document
   }
 });
 
+test("SEC-5: a path containing a control character is never documentation (task.173 DoD run 3)", () => {
+  const globs = ["docs/**", "**/*.md"];
+  for (const bad of [
+    "src/a.js\u0000.md",
+    "docs/safe.txt\u0000.js",
+    "docs/a\n.md",
+    "docs/a\t.md",
+    "docs/a\r.md",
+    "docs/a\u001b.md",
+    "docs/a\u007f.md",
+  ]) {
+    assert.equal(eng.isDocsPath(bad, globs), false, JSON.stringify(bad));
+  }
+  // Printable non-ASCII is not a control character: still documentation.
+  assert.equal(eng.isDocsPath("docs/caf\u00e9.md", globs), true);
+});
+
 test("SEC-4: a path with a dot or empty segment is never documentation", () => {
   const globs = ["docs/**", "**/*.md"];
   for (const bad of [

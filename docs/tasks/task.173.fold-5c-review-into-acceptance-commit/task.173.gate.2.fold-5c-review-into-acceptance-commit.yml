@@ -1,0 +1,97 @@
+schema: 2
+task: 'task.173.fold-5c-review-into-acceptance-commit'
+task_title: 'Fold the 5c review and its doc-only fixes into the acceptance commit'
+gate: CONCERNS
+status_reason: 'Cycle 2 refute pass: no HIGH. Three MEDIUM — a PreCompact pause between 5c and 6a now HALTs on resume (the narrowed pause commit leaves the 5c set staged and the Phase 0b probe calls it (c)); a doc-links usage/runtime failure takes the destructive restore branch; the 8a recovery hint git reset --hard destroys the carried set. Three LOW adopted.'
+reviewer: 'QA Engineer'
+head: 'c8733a5a420290732fe5dd3af80aeec4daaae3f0'
+updated: '2026-10-08T04:07:13Z'
+
+top_issues:
+  - id: 'CR2-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: 'Phase 0b working-tree probe classifies the staged 5c carried set (pr-review report, cleared doc fixes) as (c) and HALTs "dirty tree on resume"; before this branch the bare pause commit swept it, so a pause between 5c and 6a resumed cleanly. The carry subsection (develop-pipeline-step-5-6-qa-loop.md:1515) claims a resume carries it.'
+    suggested_action: 'Teach the probe to set the 5c carried set aside (staged, worktree-clean, the work item pr-review report or a path in .claude/state/5c-carry-eligible.txt) before classifying; add a resume test.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR2-2'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'Stage block treats every non-zero doc-links.js exit (2 usage, missing node, unsubstituted skill placeholder) as a dead link and restores the file, silently discarding a valid fix.'
+    suggested_action: 'Restore only on exit 1; HALT untouched on any other exit; guard the skill-name placeholder.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR2-3'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: '8a recovery hint "git reset --hard CI_HEAD_1" would delete the staged 5c review report (never committed) and revert staged doc fixes. Adopted by QA from reviewer medium/medium.'
+    suggested_action: 'Hint a soft reset plus a path-limited restore of touched; state that --hard destroys the carried set.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR2-4'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'A path listed twice in CARRY_FIXED gets two outcomes: restored on the first pass, then reported carried (unstaged) on the second.'
+    suggested_action: 'Give each path one outcome — skip a path already handled.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR2-5'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'Re-running classify after the doc edits truncates the eligible list and drops every applied fix (now dirty), so the stage block HALTs. Adopted by QA from reviewer low/medium.'
+    suggested_action: 'Refuse to re-classify while a listed path carries an edit; state that classify runs once per 5c pass, before any edit.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR2-6'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'Classifier ends the findings block at the first triple backtick anywhere (one inside a quoted finding: cuts it), and the entry/print counts still agree up to the cut — later entries silently unclassified. Adopted by QA from reviewer low/medium.'
+    suggested_action: 'Find the closing fence as a line of its own (CommonMark).'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 5530
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'No new untrusted-input surface. boundary: false — accept/refuse delegates to isDocsPath (task.172) plus a tracked/clean git test; recorded in the QA report.'
+  performance:
+    status: PASS
+    notes: 'Unchanged from cycle 1.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR2-1 resume HALT regression; CR2-2 and CR2-3 destructive paths on error/recovery.'
+  maintainability:
+    status: PASS
+    notes: 'Blocks extracted and executed by the committed test under bash and zsh.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR2-1..CR2-6 in qa-fix cycle 2; add a resume-probe test with a staged 5c set.'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'skills/finalise/SKILL.md']
+  future: []
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR2-1..CR2-3 fixed']
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-10-08'
+  total_iterations: 1
+  verification_method: 'Refute pass re-read the cycle-1 fixes; CR-1..CR-5 closed (TASK-173-BUG-1, -2 verified)'

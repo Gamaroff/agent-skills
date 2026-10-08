@@ -1,0 +1,83 @@
+schema: 2
+task: 'task.173.fold-5c-review-into-acceptance-commit'
+task_title: 'Fold the 5c review and its doc-only fixes into the acceptance commit'
+gate: FAIL
+status_reason: 'Code review CR-1 (high/high): the 5c carry restore runs git checkout HEAD on a refused path, discarding all uncommitted work in it — including the implementation report, which is uncommitted by design at 5c and classifies as doc-only. Four further findings adopted for the same fix cycle.'
+reviewer: 'QA Engineer'
+head: '8b6e0c1788350623152dcd433204dcbdff7e493e'
+updated: '2026-10-08T03:46:49Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: high
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'Carry stage block restore (git checkout HEAD -- "$p", else git rm --cached + rm -f) discards all uncommitted work in the file; the implementation report (uncommitted at 5c, doc-only by pattern) can be carried into 6a or wiped. Bug: task.173.bug.1.carry-restore-wipes-uncommitted-work.md'
+    suggested_action: 'Refuse *.implementation.* and $PR_REVIEW in the classifier and the stage loop; HALT rather than restore a path that was dirty against HEAD before the 5c edit.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-2'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'Classifier prints nothing and exits 0 both for "no findings" and for an unparseable report (missing section/fence, entry without id:/ref:). Adopted by QA from reviewer medium/medium. Bug: task.173.bug.2.classifier-silent-on-unparsed-findings.md'
+    suggested_action: 'Count - id: entries vs printed lines; HALT on a missing section/fence or any entry that produced no line.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-3'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'CARRY_FIXED has no unsubstituted-placeholder guard; run verbatim, placeholder words reach rm -f and the block still prints Carried to 6a. Adopted by QA from reviewer low/medium.'
+    suggested_action: 'Add a case "${CARRY_FIXED[*]}" in *"{"*) HALT guard beside the PR_REVIEW one.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-4'
+    severity: low
+    file: 'skills/finalise/SKILL.md'
+    finding: '6a CARRIED is an exact string match normalising only a leading ./; an absolute or trailing-slash {document-directory} makes every artefact read as carried and the suffix lie. Adopted by QA from reviewer low/medium.'
+    suggested_action: 'Let git normalise: subtract git diff --cached --name-only -- "${ADD_PATHS[@]}" (plus the registry) from the full staged list.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-5'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'The carry subsection claims the staged set "cannot land in the wrong commit", but HALT commits through /commit-changes between 5c and 6a (Step 7 DoD-gaps halt, terminal-HALT report commit, qa-fix on re-entry) are not path-limited. The task document classifies them; the step doc overclaims. Adopted by QA from reviewer low/medium.'
+    suggested_action: 'State that a HALT commit in that window carries the staged set (pushed, nothing lost), matching the task document §3 classification.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 5522
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'No auth, network or untrusted input added. boundary: false — the carry blocks delegate accept/reject to the existing isDocsPath (task.172, probed there); the new code is path plumbing and git staging, recorded in the QA report.'
+  performance:
+    status: PASS
+    notes: 'Removes one push and one CI run per doc-only CONCERNS run; the classifier is one node process.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1 data-loss path in the restore; CR-2 silent parse failure.'
+  maintainability:
+    status: PASS
+    notes: 'Blocks are extracted and executed by the committed test; one definition of docs patterns reused.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1 (and CR-2..CR-5) in the qa-fix cycle; extend acceptance-commit-carries-5c.test.mjs with an implementation-report ref and a dirty-before-edit restore case.'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'skills/finalise/SKILL.md']
+  future: []
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

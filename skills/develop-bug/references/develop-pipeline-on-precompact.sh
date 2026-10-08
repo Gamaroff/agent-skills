@@ -208,9 +208,13 @@ if [ -n "$REPORT" ] && [ -f "$REPORT" ]; then
   fi
 
   # Best-effort commit + push — only over a report the linter accepted.
+  # Path-limited (`-- "$REPORT"`): 5c may have staged the PR review report and doc-only fixes for
+  # /finalise 6a to carry into the acceptance commit. A bare `git commit` would sweep them into a
+  # "pipeline paused" commit; `--` commits the report alone and leaves the rest of the index
+  # staged (task.173).
   if [ "$REPORT_LINT_OK" = true ]; then
     git add "$REPORT" 2>/dev/null || true
-    git commit -m "docs(${SKILL}): pipeline paused at step ${CURRENT_STEP} — context compaction imminent" >/dev/null 2>&1 || true
+    git commit -m "docs(${SKILL}): pipeline paused at step ${CURRENT_STEP} — context compaction imminent" -- "$REPORT" >/dev/null 2>&1 || true
     git push origin HEAD >/dev/null 2>&1 || true
   fi
 fi

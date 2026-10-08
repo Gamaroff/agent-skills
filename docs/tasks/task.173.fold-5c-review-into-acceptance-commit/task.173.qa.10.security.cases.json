@@ -1,0 +1,170 @@
+[
+  {
+    "id": "nul-md-suffix",
+    "direction": "hostile",
+    "input": "src/a.js\u0000.md",
+    "why": "git cuts the argv at NUL and sees src/a.js (DoD run 3)"
+  },
+  {
+    "id": "nul-docs-js",
+    "direction": "hostile",
+    "input": "docs/safe.txt\u0000.js",
+    "why": "NUL inside a docs path"
+  },
+  {
+    "id": "newline",
+    "direction": "hostile",
+    "input": "docs/a\n.md",
+    "why": "a newline splits a line-oriented consumer"
+  },
+  {
+    "id": "tab",
+    "direction": "hostile",
+    "input": "docs/a\t.md",
+    "why": "tab: control character"
+  },
+  {
+    "id": "cr",
+    "direction": "hostile",
+    "input": "docs/a\r.md",
+    "why": "carriage return"
+  },
+  {
+    "id": "esc",
+    "direction": "hostile",
+    "input": "docs/a\u001b.md",
+    "why": "escape"
+  },
+  {
+    "id": "del",
+    "direction": "hostile",
+    "input": "docs/a.md",
+    "why": "DEL"
+  },
+  {
+    "id": "code-js",
+    "direction": "hostile",
+    "input": "src/a.js",
+    "why": "code is never documentation"
+  },
+  {
+    "id": "code-sh",
+    "direction": "hostile",
+    "input": "shared/resources/x.sh",
+    "why": "code"
+  },
+  {
+    "id": "dot-dot",
+    "direction": "hostile",
+    "input": "docs/../src/a.js",
+    "why": "traversal segment"
+  },
+  {
+    "id": "dot-dot-lead",
+    "direction": "hostile",
+    "input": "../docs/a.md",
+    "why": "leading traversal"
+  },
+  {
+    "id": "dot-seg",
+    "direction": "hostile",
+    "input": "docs/./a.md",
+    "why": "dot segment"
+  },
+  {
+    "id": "empty-seg",
+    "direction": "hostile",
+    "input": "docs//a.md",
+    "why": "empty segment"
+  },
+  {
+    "id": "trailing-slash",
+    "direction": "hostile",
+    "input": "docs/a.md/",
+    "why": "empty final segment"
+  },
+  {
+    "id": "absolute",
+    "direction": "hostile",
+    "input": "/docs/a.md",
+    "why": "leading slash normalised by the matcher"
+  },
+  {
+    "id": "dot-slash",
+    "direction": "hostile",
+    "input": "./docs/a.md",
+    "why": "./ prefix"
+  },
+  {
+    "id": "backslash",
+    "direction": "hostile",
+    "input": "docs\\evil.js",
+    "why": "backslash normalised into docs/"
+  },
+  {
+    "id": "lead-space",
+    "direction": "hostile",
+    "input": " docs/x.js",
+    "why": "leading space"
+  },
+  {
+    "id": "trail-space",
+    "direction": "hostile",
+    "input": "docs/x.js ",
+    "why": "trailing space"
+  },
+  {
+    "id": "config",
+    "direction": "hostile",
+    "input": "skills-config.yaml",
+    "why": "the rule config is never docs"
+  },
+  {
+    "id": "config-nested",
+    "direction": "hostile",
+    "input": "docs/skills-config.yaml",
+    "why": "config basename anywhere"
+  },
+  {
+    "id": "gitlink",
+    "direction": "hostile",
+    "input": ":gitlink:docs/vendor",
+    "why": "a submodule pointer"
+  },
+  {
+    "id": "empty",
+    "direction": "hostile",
+    "input": "",
+    "why": "empty string"
+  },
+  {
+    "id": "docs-md",
+    "direction": "legitimate",
+    "input": "docs/a.md",
+    "why": "a doc"
+  },
+  {
+    "id": "docs-nested",
+    "direction": "legitimate",
+    "input": "docs/tasks/task.1.x/task.1.x.md",
+    "why": "a work-item doc"
+  },
+  {
+    "id": "docs-hidden",
+    "direction": "legitimate",
+    "input": "docs/.hidden.md",
+    "why": "dotfile, not a dot segment"
+  },
+  {
+    "id": "docs-dots",
+    "direction": "legitimate",
+    "input": "docs/a..b.md",
+    "why": "two dots inside a name"
+  },
+  {
+    "id": "docs-unicode",
+    "direction": "legitimate",
+    "input": "docs/café.md",
+    "why": "printable non-ASCII"
+  }
+]

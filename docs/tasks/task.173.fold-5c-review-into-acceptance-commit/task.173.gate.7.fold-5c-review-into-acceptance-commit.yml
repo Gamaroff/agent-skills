@@ -1,0 +1,57 @@
+schema: 2
+task: 'task.173.fold-5c-review-into-acceptance-commit'
+task_title: 'Fold the 5c review and its doc-only fixes into the acceptance commit'
+gate: PASS
+status_reason: 'Cycle 7 (scoped to the cycle-6 fix): CR6-1 closed and mutation-proved. One new reviewer finding (CR7-1, the HALT says "commit it") is rated LOW and advisory: the list holds only tracked, clean, doc-only paths, so the worst case is a doc commit that /finalise catches loudly. No open entries.'
+reviewer: 'QA Engineer'
+head: 'ed10bc82fb48dc59d833ecc0c293c574fa74a6fe'
+updated: '2026-10-08T16:39:13Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 5550
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'No new untrusted-input surface. boundary: false (see QA report 1).'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'CR6-1 closed: the stale-arm HALT no longer offers to discard work. CR7-1 (wording) and CR6-2 (exit-code folding) are advisory; both fail loud.'
+  maintainability:
+    status: PASS
+    notes: 'Unchanged.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR7-1 (reviewer medium/medium, QA re-rated LOW, advisory): the stale-arm HALT says "commit it or set it aside yourself"; a commit here moves HEAD past the pushed head before /finalise 6a. Say "set it aside (stash), or commit it through /commit-changes and push" to match the HALT exception at lines 1409-1412.'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+    - action: 'CR6-2 (low/low, advisory): the classify guard folds a git diff failure (exit 128, e.g. a blank list line) into the dirty HALT; branch on the exit code and skip blank lines.'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: '2026-10-08'
+  total_iterations: 6
+  verification_method: 'Scoped review of the cycle-6 fix; CR6-1 closed, mutation-proved (covered, bash + zsh)'

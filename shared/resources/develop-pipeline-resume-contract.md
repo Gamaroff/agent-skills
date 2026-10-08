@@ -245,12 +245,59 @@ bundled copy the run had produced. So the probe runs **first**, and it **classif
 | **(b) bundle drift** | every entry is under `skills/*/references/` — bundled copies out of date with their sources | `npm run bundle -- --check \|\| npm run bundle`, then continue |
 | **(c) anything else** | an entry the probe cannot classify — real uncommitted work, an untracked file the base does not have, a mix; and an **unbindable base** (no PR, no report row, no `**Branch model:**` line), which makes the whole tree (c) | **HALT**: print the entries and stop. A resume that guesses here is the task.116 overlay again |
 
+**Set aside before classifying: the 5c carried set** (task.173). It is the work item's PR review
+report and the doc-only fixes 5c staged for `/finalise` 6a to carry. A path-limited pause commit
+leaves them staged on purpose. An entry staged `A` or `M` with nothing unstaged on top, that is either
+the work item's `*.pr-review.*.md` or a path listed in `.claude/state/5c-carry-eligible.txt`, is
+printed, then kept out of (a), (b) and (c). The list counts only when its header line names this
+work item's review report and that report is staged. (a) must never discard it, and (c) must not HALT on what
+a resume into Step 7 is meant to carry.
+
 ```bash
 # `--no-renames`: a staged rename would otherwise print as one `R  old -> new` entry whose
 # "path" is the whole arrow expression — a pathspec that matches nothing, is quiet under `git
 # diff`, and is "discarded" without effect (task.124 QA cycle 2, CR-4). Split, it is a `D` and
 # an `A`, each a real path; the `A` is not in the base and so is class (c).
 DIRTY=$(git status --porcelain --no-renames)
+# The 5c carried set (task.173) is resumable state, not dirt: the PR review report and the doc-only
+# fixes 5c staged for /finalise 6a to carry, with nothing unstaged on top. The path-limited pause
+# commit leaves it staged, so set it aside BEFORE classifying — (a) must never discard it and (c)
+# must not HALT on it. An entry qualifies only with index column A or M, a clean worktree column,
+# and a path that is the work item's own PR review report or one the 5c classify block cleared.
+WI_DIR=$(dirname "{implementation-report-path}")
+# The eligible list counts only when its header names this work item's review report and that
+# report is itself staged; a list left by another work item or an earlier pass is ignored (task.173 QA-3).
+ELIGIBLE=""
+ELIG_HEAD=$(head -1 .claude/state/5c-carry-eligible.txt 2>/dev/null)
+case "$ELIG_HEAD" in
+  "# review: $WI_DIR"/*.pr-review.*.md)
+    [ -n "$(git --literal-pathspecs diff --cached --name-only -- "${ELIG_HEAD#\# review: }")" ] && ELIGIBLE=.claude/state/5c-carry-eligible.txt ;;
+esac
+# How git spells each listed path in $DIRTY: ask git, with the same flags, rather than compare a raw
+# list entry against a status line — porcelain C-quotes a path with a space or non-ASCII byte, and
+# the list holds it raw, so a carried `docs/my notes.md` never matched (task.173 QA-9, CR9-2).
+CARRY_EXPECT=""
+if [ -n "$ELIGIBLE" ]; then
+  while IFS= read -r e; do
+    case "$e" in '# '*|'') continue ;; esac
+    CARRY_EXPECT="$CARRY_EXPECT$(git --literal-pathspecs status --porcelain --no-renames -- "$e")"$'\n'
+  done < "$ELIGIBLE"
+fi
+CARRY_LINES=""; REST_LINES=""
+while IFS= read -r line; do
+  [ -n "$line" ] || continue
+  st=${line:0:2}; p=${line:3}
+  case "$st" in
+    "A "|"M ")
+      case "$p" in "$WI_DIR"/*.pr-review.*.md) CARRY_LINES="$CARRY_LINES$line"$'\n'; continue ;; esac
+      if [ -n "$ELIGIBLE" ] && printf '%s' "$CARRY_EXPECT" | grep -qxF -- "$line"; then
+        CARRY_LINES="$CARRY_LINES$line"$'\n'; continue
+      fi ;;
+  esac
+  REST_LINES="$REST_LINES$line"$'\n'
+done <<< "$DIRTY"
+[ -z "$CARRY_LINES" ] || { echo "5c carried set kept staged for 6a:"; printf '%s' "$CARRY_LINES"; }
+DIRTY=$(printf '%s' "$REST_LINES")
 if [ -n "$DIRTY" ]; then
   # The base is RECORDED STATE, never a bare shell variable with a `develop` default: nothing in
   # any pipeline binds BASE_BRANCH, so `${BASE_BRANCH:-develop}` probed every hotfix off `main`
@@ -313,7 +360,8 @@ if [ -n "$DIRTY" ]; then
     # satisfied vacuously by the very entry a bad pathspec never addressed (QA cycle 2, CR-4).
     # A discard that succeeded and left anything behind is the failure the probe exists to
     # stop, so it is a HALT, not a warning.
-    LEFT=$(git status --porcelain --no-renames)
+    # Minus the carried set, which was set aside above and is still staged by design.
+    LEFT=$(git status --porcelain --no-renames | grep -vxF -f <(printf '%s' "$CARRY_LINES") || true)
     if [ -n "$LEFT" ]; then
       echo "HALT: overlay discard left entries behind — classify by hand before resuming:"; printf '%s\n' "$LEFT"; exit 1
     fi

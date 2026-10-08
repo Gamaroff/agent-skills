@@ -1324,6 +1324,10 @@ standalone.
    # prose beside this block, so the block HALTed verbatim on every bug run (TASK-125-BUG-16).
    # The implementation report is NOT staged here — the orchestrator's Step 8 owns its final
    # commit, and staging it would split its history.
+   # The commit below carries the FULL INDEX, not only these paths: in a develop pipeline, 5c
+   # stages the PR review report and any doc-only CONCERNS fixes and commits nothing, so they ride
+   # this commit (task.173; develop-pipeline-step-5-6-qa-loop.md § "Carry the review into the
+   # acceptance commit"). The message says so when it happens — CARRY_SUFFIX below.
    # The DoD path is resolved FIRST, zsh-safe and by number, and checked — a bare glob inside
    # the array assignment aborted the whole script under zsh before the HALT below could
    # print (cycle-8 CR-5; ordering: TASK-125-BUG-21).
@@ -1361,13 +1365,23 @@ standalone.
    # The suffix is keyed on the registry being STAGED, not on the file existing — a story run in
    # a repo that keeps a task registry would otherwise claim a tick it did not make.
    REG_SUFFIX=$(git diff --cached --quiet -- docs/tasks/task-registry.md 2>/dev/null || echo '; registry ticked')
+   # Anything staged beyond the acceptance artefacts and the registry is 5c's carried set (or, in a
+   # standalone run, whatever the operator staged by hand — the suffix then says so truthfully).
+   # git spells the artefacts' names on both sides: a pathspec diff over ADD_PATHS normalises an
+   # absolute, `./`-prefixed or doubled-slash path to the name the full list prints, where a string
+   # comparison read every artefact as carried (task.173 QA-1, CR-4).
+   EXPECTED=$(git -c core.quotePath=false diff --cached --name-only -- "${ADD_PATHS[@]}" docs/tasks/task-registry.md)
+   CARRIED=$(git -c core.quotePath=false diff --cached --name-only \
+     | grep -vxF -f <(printf '%s\n' "$EXPECTED") || true)
+   CARRY_SUFFIX=""
+   [ -n "$CARRIED" ] && CARRY_SUFFIX='; 5c review carried'
    # Idempotent on re-run: when the artefacts are already committed there is nothing staged, and
    # `git commit` would exit 1 for "nothing to commit" — indistinguishable from a hook rejection.
    # Skip the COMMIT in that case (never the push, and never `--allow-empty`).
    if git diff --cached --quiet; then
      echo "acceptance artefacts already committed — skipping commit, pushing"
    else
-     git commit -m "${COMMIT_MSG}${REG_SUFFIX}"
+     git commit -m "${COMMIT_MSG}${REG_SUFFIX}${CARRY_SUFFIX}"
      COMMIT_EXIT=$?
      [ "$COMMIT_EXIT" -eq 0 ] || { echo "HALT: acceptance commit rejected (exit $COMMIT_EXIT) — see output above"; exit 1; }
    fi
@@ -2652,7 +2666,29 @@ line `Fix-and-recheck refused: {ids}` in the gap report's Blocking Issues Summar
   it to be non-empty, to name the test, and to carry a red marker (`not ok` / `✖` / `ℹ fail N`);
   a flipped boolean with no recorded run halts on `mutation-proved`. **Exit 0 is the licence for
   the commit; exit 1 is Step 8.**
-- `git commit` — one commit, message `fix(<stem>): finalise DoD <section> — <finding, one line>`.
+- Commit — one commit, message `fix(<stem>): finalise DoD <section> — <finding, one line>`,
+  **path-limited to `touched`**. 5c may have staged the PR review report and doc-only fixes for 6a to
+  carry into the acceptance commit (task.173). A bare `git commit` sweeps them into this fix
+  commit, and the `--git-base` run below then refuses it for a file the record did not name — on
+  healthy work. `--` commits the named paths and leaves the rest of the index staged for 6a:
+
+  ```bash
+  STEM="{story.{epic}.{story} | task.{id} — the work item's filename stem}"
+  MSG_TAIL="{section} — {the finding, one line}"
+  case "$STEM$MSG_TAIL" in *'{'*) echo "HALT: STEM and MSG_TAIL must be substituted in this block"; exit 1 ;; esac
+  # The commit's paths are the record's `touched`, read in THIS block — zsh-safe, no bare glob.
+  TOUCHED=()
+  while IFS= read -r p; do [ -n "$p" ] && TOUCHED+=("$p"); done \
+    < <(command node -e 'for (const p of JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).touched || []) console.log(p)' .claude/state/finalise-fix-finding.json)
+  [ "${#TOUCHED[@]}" -gt 0 ] || { echo "HALT: the finding record names no touched paths"; exit 1; }
+  # Add first: `git commit -- <path>` refuses a path git does not yet know (a new test file).
+  git add -- "${TOUCHED[@]}"
+  ADD_EXIT=$?
+  [ "$ADD_EXIT" -eq 0 ] || { echo "HALT: git add of the touched paths failed (exit $ADD_EXIT)"; exit 1; }
+  git commit -m "fix(${STEM}): finalise DoD ${MSG_TAIL}" -- "${TOUCHED[@]}"
+  COMMIT_EXIT=$?
+  [ "$COMMIT_EXIT" -eq 0 ] || { echo "HALT: 8a fix commit rejected (exit $COMMIT_EXIT) — see output above"; exit 1; }
+  ```
 
 **2b. Re-run the evaluator on the record, then push.** The second run licensed the *commit* on a
 forecast (`"commits": 1` typed before any commit existed; `touched` as the paths the fix *would*
@@ -2666,7 +2702,14 @@ node references/finalise-fix-and-recheck.mjs \
 `--git-base` derives `commits` from `git rev-list --count <base>..HEAD` and `touched` from
 `git diff --name-only <base>..HEAD` and **refuses** a record that disagrees with either — two
 commits, a file the record did not name, a ref git cannot answer. Exit 0 → `git push origin HEAD`;
-exit 1 → Step 8, with the commit left local (it is one `git reset --hard "$CI_HEAD_1"` away). The
+exit 1 → Step 8, with the commit left local. To drop it, run `git reset --soft "$CI_HEAD_1"` and then
+`git restore --source="$CI_HEAD_1" --staged --worktree -- <touched>`. Never use `--hard`: it would also
+destroy the 5c review report and any doc-only fixes staged for 6a to carry, which no commit holds
+(task.173 QA-2, CR-3). One exception: a `touched` path that is also a 5c-carried doc fix (listed in
+`.claude/state/5c-carry-eligible.txt`). The fix commit took the 5c edit with it, so the 5c-only content
+survives nowhere: not in the index, not in the tree, not in any commit. Restore the path from
+`CI_HEAD_1`, re-apply the doc-only fix from its finding in the PR review report, and re-run the 5c
+stage block for that path (task.173 QA-4, CR-1). The
 run before the commit cannot do this check, and that is why there are three runs, not two.
 
 **3. Retake CI reading 1 on the fix head.** The decision reading from Step 6 was taken on a commit

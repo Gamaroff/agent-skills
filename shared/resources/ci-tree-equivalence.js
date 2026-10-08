@@ -121,6 +121,11 @@ const CONFIG_BASENAME = "skills-config.yaml";
  *    hand-typed gate values: it trims, strips a leading `/` and turns `\` into `/`. Git emits paths
  *    verbatim, so a file literally named `docs\evil.js` or ` docs/x.js` must not be normalised into
  *    `docs/**` (CR-4).
+ *  - It contains a control character (U+0000–U+001F, U+007F). Git never emits a NUL, but a caller
+ *    that hands this predicate a path read from a document can: the 5c classify block reads a review
+ *    report's `ref`, and under zsh a NUL survives `read` while `git` sees the argument cut at it, so
+ *    `src/a.js<NUL>.md` matched the default markdown glob here and then passed git's tracked-and-clean test as
+ *    `src/a.js` (task.173 DoD run 3). Refusing reads the path as code, the fail-safe answer.
  *  - It has a `.`, `..` or empty segment. `docs/../src/a.js` matches `docs/**` as a string yet names
  *    `src/a.js`; git refuses to check such a name out, but a hand-built tree can carry one, and the
  *    rule must not read it as documentation (DoD security gate).
@@ -128,6 +133,7 @@ const CONFIG_BASENAME = "skills-config.yaml";
  */
 function isDocsPath(file, globs) {
   if (typeof file !== "string" || file === "") return false;
+  if (/[\u0000-\u001f\u007f]/.test(file)) return false; // control characters: never documentation
   if (file.split("/").some((seg) => seg === "" || seg === "." || seg === ".."))
     return false;
   if (file.startsWith(GITLINK_PREFIX)) return false; // a submodule pointer: no pattern may accept it (CR3-8)
