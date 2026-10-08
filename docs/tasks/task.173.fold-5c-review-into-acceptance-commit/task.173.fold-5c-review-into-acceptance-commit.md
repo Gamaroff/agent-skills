@@ -313,7 +313,7 @@ None.
 
 ### Code Quality
 
-- [x] Each behaviour this task added, and each QA fix, has its guarding test mutation-proved red on revert: the 8 initial proofs (§ Testing results) and the per-cycle proofs in the implementation report's QA Iteration History. Two fixes are recorded `no-red-untested` rather than proved: cycle 3's Step 8 eligible-list deletion and CR4-3's checked restore. _Re-scoped 2026-10-08 by operator decision at the Step 7 DoD halt. The original wording ("each new test") required a per-test mapping of all 19 tests, which was never recorded._
+- [x] Each behaviour this task added, and each QA fix that has a guarding test, is mutation-proved red on revert, or is named here with its recorded outcome. **Proved (`covered`):** the 8 initial proofs (§ Testing results) and the QA-fix proofs CR-1 ×3, CR-2, CR-3, CR-4 (qa.2:106); CR2-1 ×2, CR2-2, CR2-4, CR2-5, CR2-6 (qa.3:69); CR3-1 staged check, CR3-2, CR3-5, CR3-6, CR3-7; CR4-2, CR4-4 (implementation report, QA cycles 3–4); CR5-1 (qa.6:75); CR6-1 (qa.7:75). **Not proved, by recorded outcome:** `no-red-untested` — cycle 3's Step 8 eligible-list deletion, CR4-3's checked restore, and CR2-2's doc-links "exit other than 0/1" HALT branch (qa.3:70); `absorbed` — CR3-1's work-item binding (nothing went red). **No guarding test (prose-only fixes):** CR-5, CR2-3, CR3-3, CR3-4, CR4-1. _Re-scoped 2026-10-08 by operator decision at the Step 7 DoD halt; the original wording ("each new test") required a per-test mapping of all 19 tests that was never recorded. Corrected the same day after DoD run 2 found the first re-scope listed only two of the exceptions._
 - [x] `npm run ci` green; `npm run validate -- skills/finalise/` passes; `bundle:check` clean
 
 ### Migration
@@ -461,9 +461,9 @@ CR6-1 closed. No open entries. Two advisory wording/robustness items (CR7-1, CR6
 **Gap Report Generated:** 2026-10-08
 
 **Detailed Verification Log:** See `task.173.dod.1.fold-5c-review-into-acceptance-commit.md` for the complete verification evidence.
-## Definition of Done - Gaps Identified — run 2
+## Definition of Done - Gaps Identified — run 2 (historical, superseded)
 
-**Status:** IN PROGRESS
+**Status:** IN PROGRESS at run 2. Resolved on 2026-10-08 by correcting AC8's exception list, within the operator's re-scope decision.
 
 ### QA Gate Status
 
@@ -472,11 +472,11 @@ CR6-1 closed. No open entries. Two advisory wording/robustness items (CR7-1, CR6
 ### Missing Criteria:
 
 1. **Acceptance Criteria:**
-   - [ ] AC8: the re-scoped criterion names two `no-red-untested` exceptions, but the record holds more. CR2-2's HALT branch is a third `no-red-untested` (qa.3:70). CR3-1's binding is `absorbed`. Five prose-only fixes (CR-5, CR2-3, CR3-3, CR3-4, CR4-1) have no guarding test.
+   - [x] AC8: the re-scoped criterion names two `no-red-untested` exceptions, but the record holds more. CR2-2's HALT branch is a third `no-red-untested` (qa.3:70). CR3-1's binding is `absorbed`. Five prose-only fixes (CR-5, CR2-3, CR3-3, CR3-4, CR4-1) have no guarding test.
 
 ### Next Steps:
 
-- [ ] Correct AC8's exception list to match the record.
+- [x] Correct AC8's exception list to match the record. (Corrected: every QA fix is now listed by its recorded outcome.)
 
 **Estimated Effort:** Small (document-only)
 
@@ -507,6 +507,7 @@ CR6-1 closed. No open entries. Two advisory wording/robustness items (CR7-1, CR6
 | 2026-10-08 |  | DoD incomplete — 3 gaps identified | finalise |
 | 2026-10-08 |  | DoD gaps resolved by operator decision — AC8 re-scoped; bug.2 closed; security zero-guard override recorded | develop-task |
 | 2026-10-08 |  | DoD incomplete — 1 gap identified (run 2) | finalise |
+| 2026-10-08 |  | AC8 exception list corrected to the record (DoD run 2 gap) | develop-task |
 <!-- change-log-end -->
 
 ---

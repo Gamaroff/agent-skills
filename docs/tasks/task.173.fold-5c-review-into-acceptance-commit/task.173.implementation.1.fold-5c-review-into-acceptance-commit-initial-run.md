@@ -3,7 +3,7 @@
 **Task**: `task.173.fold-5c-review-into-acceptance-commit.md`
 **Run Number**: 1
 **Started**: 2026-10-08 05:12
-**Status**: Halted — DoD gaps
+**Status**: In Progress
 
 ---
 
@@ -108,6 +108,7 @@ Narrow the two index-sweeping commits (finalise 8a, PreCompact pause) to their o
 - **Operator decision at the DoD halt (2026-10-08, "Go ahead" on the recommendation).** (1) AC8 re-scoped to what the record shows: each added behaviour and each QA fix has its guarding test mutation-proved, with the two `no-red-untested` fixes named (cycle 3's Step 8 deletion, CR4-3). (2) Security zero-guard accepted by recorded human override. Engine: unverifiable, because no entry form executes a fenced Markdown block. Evidence: the 38-case `acceptance-commit-carries-5c.test.mjs` suite, which executes the classify and stage blocks per PR. Precedent: task.133 and task.125. (3) bug.2 closed via `status-history.js`, citing QA cycle 2. All three are document-only, so per the resume contract the run resumes at Step 7 rather than re-entering QA.
 - Resume: `reenter-qa-after-finalise.sh` refused (`no-code-moved`), confirming a document-only fix; lock restored at step 7 via `advance-pipeline-lock.sh --restore`; `/finalise` re-run.
 - DoD run 2 (`task.173.dod.2.fold-5c-review-into-acceptance-commit.md`): AC PARTIAL, Security PASS, Compliance NOT_APPLICABLE, Docs PASS. CI reading 1: SUCCESS @ d073291c120209e2caabbe046f4e7ac3105bce92 over 5 checks (the head's own run). Security probed the classify block's `isDocsPath` predicate in both bundled copies: 66 executed, 0 reproduced (`task.173.dod.security.run.json`). The git-state arms rest on the operator's override. AC8 FAIL: the re-scope I wrote named two `no-red-untested` exceptions, but the record also holds CR2-2's HALT branch (qa.3:70), CR3-1's `absorbed` binding, and five prose-only fixes with no guarding test (CR-5, CR2-3, CR3-3, CR3-4, CR4-1). That was my error in executing the operator's re-scope. 8a did not apply (no executed defect to mutation-prove). HALT; gaps PR comment posted.
+- Run-2 gap closed within the operator's re-scope decision: AC8 now lists every QA fix by its recorded outcome (covered, `no-red-untested` ×3, `absorbed` ×1, prose-only ×5). Document-only, so the run resumes at Step 7.
 
 ---
 
