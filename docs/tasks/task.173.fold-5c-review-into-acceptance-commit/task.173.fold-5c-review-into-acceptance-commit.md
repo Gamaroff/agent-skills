@@ -408,24 +408,24 @@ commit → scenario 17 red.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-08
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.173.qa.6.fold-5c-review-into-acceptance-commit.md](./task.173.qa.6.fold-5c-review-into-acceptance-commit.md)
-- **Gate File**: [task.173.gate.6.fold-5c-review-into-acceptance-commit.yml](./task.173.gate.6.fold-5c-review-into-acceptance-commit.yml)
+- **Full Report**: [task.173.qa.7.fold-5c-review-into-acceptance-commit.md](./task.173.qa.7.fold-5c-review-into-acceptance-commit.md)
+- **Gate File**: [task.173.gate.7.fold-5c-review-into-acceptance-commit.yml](./task.173.gate.7.fold-5c-review-into-acceptance-commit.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 5550
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-CR5-1 closed. One MEDIUM (CR6-1): the stale-arm HALT offers `git checkout` for a dirty path the block cannot attribute to a 5c edit.
+CR6-1 closed. No open entries. Two advisory wording/robustness items (CR7-1, CR6-2) are carried in the gate's `recommendations.future`.
 
 <!-- change-log-start -->
 
@@ -450,6 +450,7 @@ CR5-1 closed. One MEDIUM (CR6-1): the stale-arm HALT offers `git checkout` for a
 | 2026-10-08 |         | QA findings fixed — cycle 5, 1 finding (CR5-1) | qa-fix |
 | 2026-10-08 |         | QA gate CONCERNS (90/100) — 1 finding (0 high) | qa-task |
 | 2026-10-08 |         | QA findings fixed — cycle 6, 1 finding (CR6-1) | qa-fix |
+| 2026-10-08 |         | QA gate PASS (100/100) — 0 findings | qa-task |
 
 <!-- change-log-end -->
 
