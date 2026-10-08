@@ -566,7 +566,7 @@ for (const shell of SHELLS) {
         new RegExp("^# review: " + REVIEW_PATH.replace(/\./g, "\\.")),
       );
     }
-    // A listed path still dirty: an uncarried edit, whichever pass wrote the list — HALT, list kept.
+    // A listed path still dirty: changed since it was cleared, whichever pass wrote the list — HALT, list kept.
     {
       const { root, write } = fiveCRepo();
       const listed = STALE + "docs/tasks/task.9.x/task.9.dirty.md\n";
@@ -575,8 +575,11 @@ for (const shell of SHELLS) {
       assert.equal(r.status, 1, r.stdout);
       assert.match(
         r.stdout,
-        /holds an uncarried 5c edit recorded for docs\/tasks\/task\.9\.x\/task\.9\.pr-review\.0\.old\.md/,
+        /changed after the 5c pass for docs\/tasks\/task\.9\.x\/task\.9\.pr-review\.0\.old\.md cleared it — inspect/,
       );
+      // Never offers to discard the change: the list cannot prove it is a 5c edit (QA-6 CR-1).
+      assert.doesNotMatch(r.stdout, /git checkout/);
+      assert.doesNotMatch(r.stdout, /uncarried 5c edit/);
       assert.equal(
         readFileSync(join(root, ".claude/state/5c-carry-eligible.txt"), "utf8"),
         listed,

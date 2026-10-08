@@ -415,8 +415,8 @@ commit → scenario 17 red.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.173.qa.5.fold-5c-review-into-acceptance-commit.md](./task.173.qa.5.fold-5c-review-into-acceptance-commit.md)
-- **Gate File**: [task.173.gate.5.fold-5c-review-into-acceptance-commit.yml](./task.173.gate.5.fold-5c-review-into-acceptance-commit.yml)
+- **Full Report**: [task.173.qa.6.fold-5c-review-into-acceptance-commit.md](./task.173.qa.6.fold-5c-review-into-acceptance-commit.md)
+- **Gate File**: [task.173.gate.6.fold-5c-review-into-acceptance-commit.yml](./task.173.gate.6.fold-5c-review-into-acceptance-commit.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 5550
@@ -425,7 +425,7 @@ commit → scenario 17 red.
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-One MEDIUM (CR5-1): the cycle-4 stale-list arm replaces the eligible list without checking its paths.
+CR5-1 closed. One MEDIUM (CR6-1): the stale-arm HALT offers `git checkout` for a dirty path the block cannot attribute to a 5c edit.
 
 <!-- change-log-start -->
 
@@ -448,6 +448,8 @@ One MEDIUM (CR5-1): the cycle-4 stale-list arm replaces the eligible list withou
 | 2026-10-08 |         | QA findings fixed — cycle 4, 4 findings (CR4-1..CR4-4) | qa-fix |
 | 2026-10-08 |         | QA gate CONCERNS (90/100) — 1 finding (0 high) | qa-task |
 | 2026-10-08 |         | QA findings fixed — cycle 5, 1 finding (CR5-1) | qa-fix |
+| 2026-10-08 |         | QA gate CONCERNS (90/100) — 1 finding (0 high) | qa-task |
+| 2026-10-08 |         | QA findings fixed — cycle 6, 1 finding (CR6-1) | qa-fix |
 
 <!-- change-log-end -->
 

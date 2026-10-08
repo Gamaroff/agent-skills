@@ -1445,10 +1445,11 @@ CLASSIFIED=.claude/state/5c-carry-classified.txt
 ELIGIBLE=.claude/state/5c-carry-eligible.txt   # the paths the stage block below may touch
 # Classify runs ONCE per 5c pass, before any edit. Re-run after the edits, it would rebuild the list
 # from a tree where every fixed path is now dirty and drop them all (task.173 QA-2, CR-5).
-# A listed path that is dirty against HEAD is an edit some 5c pass made and has not carried, whatever
-# the header says: a re-run /review-pr writes a new {n}, so "another pass" and "this pass" can share
-# one record. Refuse in both arms; only the remedy differs. A list is replaced only when every path it
-# names is clean (task.173 QA-5, CR-1).
+# A listed path that is dirty against HEAD changed after a 5c pass cleared it, whatever the header
+# says: a re-run /review-pr writes a new {n}, so "another pass" and "this pass" can share one record.
+# Refuse in both arms; only the remedy differs. A list is replaced only when every path it names is
+# clean (task.173 QA-5, CR-1). The list names what was cleared, not what was edited, so the stale arm
+# never calls the change a 5c edit and never offers to undo it (task.173 QA-6, CR-1).
 if [ -s "$ELIGIBLE" ]; then
   ELIG_HEAD=$(head -1 "$ELIGIBLE")
   while IFS= read -r q; do
@@ -1457,7 +1458,7 @@ if [ -s "$ELIGIBLE" ]; then
     if [ "$ELIG_HEAD" = "# review: $PR_REVIEW" ]; then
       echo "HALT: $q already carries a 5c edit — run the stage block, do not re-classify"
     else
-      echo "HALT: $q holds an uncarried 5c edit recorded for ${ELIG_HEAD#\# review: } — carry it with that pass's stage block, or undo it (git checkout HEAD -- $q), then re-classify"
+      echo "HALT: $q changed after the 5c pass for ${ELIG_HEAD#\# review: } cleared it — inspect git diff HEAD -- $q; if it is that pass's fix, carry it with that pass's stage block, otherwise it is not a 5c edit: commit it or set it aside yourself; then re-classify"
     fi
     exit 1
   done < "$ELIGIBLE"

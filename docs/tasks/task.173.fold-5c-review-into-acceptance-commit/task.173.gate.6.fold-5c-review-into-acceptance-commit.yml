@@ -1,0 +1,64 @@
+schema: 2
+task: 'task.173.fold-5c-review-into-acceptance-commit'
+task_title: 'Fold the 5c review and its doc-only fixes into the acceptance commit'
+gate: CONCERNS
+status_reason: 'Cycle 6 (scoped to the cycle-5 fix): CR5-1 closed and mutation-proved. One MEDIUM: the new stale-arm HALT tells the operator to undo a listed path with git checkout, though the block cannot prove the dirt is a 5c edit.'
+reviewer: 'QA Engineer'
+head: '0d316038db82b2a4fea122b4925b7367ff4d48af'
+updated: '2026-10-08T16:25:43Z'
+
+top_issues:
+  - id: 'CR6-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'The stale-arm HALT (line 1460) calls any dirty listed path an uncarried 5c edit and offers git checkout HEAD -- $q as a remedy. The list records paths the classifier cleared, not paths 5c edited, so the dirt may be other work; the remedy contradicts the section rule that the block never discards work it cannot prove is its own (line 1521). Adopted by QA from reviewer medium/medium; severity kept.'
+    suggested_action: 'Word the stale-arm HALT as dirty since a 5c pass cleared it, inspect the diff before acting; drop the bare git checkout remedy (or gate it on confirming the diff is the fix the old review named); align the line 1448 comment and the test regex.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 5550
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'No new untrusted-input surface. boundary: false (see QA report 1).'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR6-1: a HALT remedy can discard work the block cannot attribute.'
+  maintainability:
+    status: PASS
+    notes: 'Unchanged.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR6-1 in qa-fix cycle 6.'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'shared/resources/tests/acceptance-commit-carries-5c.test.mjs']
+  future:
+    - action: 'CR6-2 (low/low, advisory): classify guard folds a git diff failure (exit 128, e.g. a blank list line) into the dirty HALT; branch on the exit code and skip blank lines.'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR6-1 fixed']
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: '2026-10-08'
+  total_iterations: 5
+  verification_method: 'Scoped review of the cycle-5 fix; CR5-1 closed, mutation-proved (covered, bash + zsh)'
