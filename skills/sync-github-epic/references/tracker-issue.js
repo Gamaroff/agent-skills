@@ -73,6 +73,10 @@ const path = require("path");
 const { execFileSync, execSync } = require("child_process");
 
 const dm = require("./defer-mutation.js");
+const {
+  wordsForControlEscapes,
+  rewriteNotice,
+} = require("./github-body-text.js");
 
 const GIT_EXEC_OPTS = {
   encoding: "utf-8",
@@ -1221,6 +1225,12 @@ function run({
     if (!body.trim()) {
       output.err(`Error: --body-file is empty: ${args.bodyFile}`);
       return { exitCode: 2 };
+    }
+    // GitHub stores a literal \u0000-\u001f escape as caret notation (obs #303).
+    const words = wordsForControlEscapes(body);
+    if (words.count) {
+      output.err(rewriteNotice(words.count));
+      body = words.text;
     }
   }
 

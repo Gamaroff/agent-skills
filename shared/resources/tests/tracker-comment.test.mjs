@@ -2171,3 +2171,34 @@ test("jira addComment labels its deferred record with `desired`, not the body's 
     "absent `desired` falls back to the body's first line",
   );
 });
+
+// ── Control-character escapes (obs #303) ────────────────────────────────────
+
+test("github: a literal \\u0000 in a comment body is sent as U+0000", async () => {
+  const dir = withRepo();
+  const f = bodyFile(dir, "the path held \\u0000");
+  const gh = stubGh();
+  const r = await cli.run({
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--quiet",
+    ],
+    execImpl: gh.execImpl,
+    repoRoot: dir,
+    env: { ...baseEnv },
+    sleepImpl: () => {},
+  });
+  assert.equal(r.reason, "posted");
+  const sent = gh.calls.find(
+    (c) => c.argv[0] === "issue" && c.argv[1] === "comment",
+  );
+  assert.match(sent.input, /the path held U\+0000/);
+  assert.doesNotMatch(sent.input, /\\u0000/);
+});

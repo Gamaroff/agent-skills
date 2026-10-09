@@ -42,6 +42,10 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **GitHub bodies no longer lose a quoted control-character escape.** GitHub stores `\u0000` as
+  `\^@` and `\u001f` as `\^_`. `tracker-issue.js`, `tracker-comment.js` (GitHub only) and `create-pr`
+  now send each `\u0000`–`\u001f` escape as `U+00XX` through the new `github-body-text.js`, and say
+  how many they rewrote (obs #303).
 - **Route 2c (gate the last fix) fires when the last gate raised no MEDIUM.** "Strictly falling"
   had no room to fall at 0, so a PASS gate with only LOW fixes escalated by construction (task.173
   cycle 9: MEDIUM `0, 0, 0`; task.143: `1, 1, 0`) (obs #300).
