@@ -1,11 +1,11 @@
 ---
 name: finalise-dod-security-prompt
-description: Explore subagent prompt for the /finalise DoD security review — a story-type-aware grep checklist, plus a probe mode that executes candidate inputs against a boundary deliverable instead of inspecting it. Substitute <STORY_FILE> and <STORY_TYPE> before dispatching.
+description: Explore subagent prompt for the /finalise DoD security review — a story-type-aware grep checklist, plus a probe mode that executes candidate inputs against a boundary deliverable instead of inspecting it. Substitute <STORY_FILE>, <STORY_TYPE> and <DOD_N> before dispatching.
 ---
 
 # Security Review — Explore Subagent Prompt
 
-**Usage**: Dispatch as an Explore subagent from `/finalise` Steps 3–5 parallel dispatch. Substitute `<STORY_FILE>` and `<STORY_TYPE>` before sending. Story type values: `api` | `ui` | `data` | `auth` | `infrastructure` | `task` | `refactoring`.
+**Usage**: Dispatch as an Explore subagent from `/finalise` Steps 3–5 parallel dispatch. Substitute `<STORY_FILE>`, `<STORY_TYPE>` and `<DOD_N>` (the number of the DoD run dispatching you) before sending. Story type values: `api` | `ui` | `data` | `auth` | `infrastructure` | `task` | `refactoring`.
 
 ---
 
@@ -163,6 +163,16 @@ each re-derive a candidate set from prose test different things and reach differ
 that imports the corpus tests what is known to get past the control. If you find an input the corpus
 does not have, add it there — every later probe then gets it for free.
 
+**A cases file is written to disk, beside the record, before the run.** When the corpus does not fit
+the control and you pass `--cases-file`, write it to `<STORY_DIR>/<stem>.dod.<DOD_N>.security.cases.json`,
+beside this run's record. Pass that path, never process substitution and never a temp file,
+and name it in `summary`. If you cannot write into `<STORY_DIR>`, write both the cases file and the
+record to `$TMPDIR` and return their paths, and the orchestrator copies them in. A verdict whose inputs
+were never saved cannot be re-run. On task.173, two DoD runs gave opposite verdicts on unchanged code,
+and the earlier run's inputs no longer existed (obs #299). The record carries `<DOD_N>` for the same
+reason: a fixed record path is overwritten by the next DoD run, and the earlier DoD file's probe count
+then cites a record that no longer holds it (obs #302).
+
 **3. Execute them.** Run the probe engine, `shared/resources/security-probe.mjs`, against the entry
 point with the sink you chose, and **run it** with `--record` so the count of what executed is
 written by the engine and not by you. Do not reason abstractly about what the code would return —
@@ -178,7 +188,7 @@ reasoning about it is precisely what the checklist already does, and what it get
 node PROMPT_DIR/security-probe.mjs \
   --sink <sink> --entry '<path-from-repo-root>#<exportName>' \
   --repo-root "$(git rev-parse --show-toplevel)" \
-  --record <STORY_DIR>/<stem>.dod.security.run.json --json
+  --record <STORY_DIR>/<stem>.dod.<DOD_N>.security.run.json --json
 
 # A JS export that takes a CONFIGURATION ARGUMENT after its input — `(text, opts)`,
 # like report-lint.js#lintReport — takes --args-json: a JSON array of fixed
@@ -188,7 +198,7 @@ node PROMPT_DIR/security-probe.mjs \
   --sink markdown-structure --entry '<path-from-repo-root>/report-lint.js#lintReport' \
   --args-json '<[{"sections": <the loadTemplate() result>}], as JSON>' \
   --repo-root "$(git rev-parse --show-toplevel)" \
-  --record <STORY_DIR>/<stem>.dod.security.run.json --json
+  --record <STORY_DIR>/<stem>.dod.<DOD_N>.security.run.json --json
 
 # A SHELL SCRIPT boundary (one positional argument) takes the shell entry form —
 # same flags, same record, same count. The sink must be a materialised one
@@ -197,7 +207,7 @@ node PROMPT_DIR/security-probe.mjs \
 node PROMPT_DIR/security-probe.mjs \
   --sink filename --entry 'shell:<path-from-repo-root>' \
   --repo-root "$(git rev-parse --show-toplevel)" \
-  --record <STORY_DIR>/<stem>.dod.security.run.json --json
+  --record <STORY_DIR>/<stem>.dod.<DOD_N>.security.run.json --json
 
 # A SOURCED LIBRARY boundary (header says "source it", or functions with no
 # top-level call — probe-boundary-rule.md §5 has the signal) takes the shell-fn
@@ -212,7 +222,7 @@ node PROMPT_DIR/security-probe.mjs \
   --sink filename --entry 'shell-fn:<path-from-repo-root>#<function>' \
   --cases-file <path-to-cases.json> --fake-gh <dir-holding-an-executable-gh> \
   --repo-root "$(git rev-parse --show-toplevel)" \
-  --record <STORY_DIR>/<stem>.dod.security.run.json --json
+  --record <STORY_DIR>/<stem>.dod.<DOD_N>.security.run.json --json
 
 # A NODE CLI boundary (a .mjs/.js script whose decision sits behind its flags —
 # task.141's `uat-status.mjs --env`) takes the cli form: node runs the script
@@ -228,7 +238,7 @@ node PROMPT_DIR/security-probe.mjs \
   --argv '["--flag-before","value","--guarded-flag","{input}"]' \
   --cases-file <path-to-cases.json> --name '<control name>' \
   --repo-root "$(git rev-parse --show-toplevel)" \
-  --record <STORY_DIR>/<stem>.dod.security.run.json --json
+  --record <STORY_DIR>/<stem>.dod.<DOD_N>.security.run.json --json
 ```
 
 **Building the `--args-json` value** for `lintReport`: it is `[{"sections": …}]`, where `sections` is

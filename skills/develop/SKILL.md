@@ -1091,6 +1091,12 @@ npx nx test {lib-name} --coverage
 
 ## Anti-Patterns to Avoid
 
+- Never patch a document with `String.replace(old, newString)`. A `$'`, `$&` or `$1` in the
+  replacement string is a substitution pattern: on one task it spliced 3,389 lines into a `SKILL.md`.
+  Use split/join with an asserted match count, or a replacer **function**. After any scripted patch,
+  assert one structural invariant of the file before moving on, such as its H1 count or its line
+  count against the expected delta. That check catches the defect when the first rule is
+  forgotten (obs #292)
 - Never create `__tests__/` directories (use co-location)
 - Never import server utilities in React Native
 - Never hash passwords or sign JWTs client-side

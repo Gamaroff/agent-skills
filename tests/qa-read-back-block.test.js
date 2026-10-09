@@ -40,25 +40,39 @@ const SKILLS = [
   {
     skill: "qa-task",
     heading: "### Step 12b: Read the claims back",
+    postHeading: "### Step 13: Post PR Comment — Best-effort, non-blocking",
     placeholder: "{task-file}",
   },
   {
     skill: "qa-story",
     heading: "### Review Completion",
+    postHeading: "### Review Completion",
     placeholder: "{story-file}",
   },
 ];
 
-function blockOf(skill, heading) {
+function fencesOf(skill, heading) {
   const lines = sectionOf(
     fs.readFileSync(path.join(REPO_ROOT, "skills", skill, "SKILL.md"), "utf8"),
     heading,
   );
   assert.ok(lines, `${skill}: heading not found: ${heading}`);
-  const fences = [
-    ...lines.join("\n").matchAll(/^( *)```bash\n([\s\S]*?)^\1```/gm),
-  ].filter((m) => m[2].includes("qa-read-back.js"));
-  assert.equal(fences.length, 1, `${skill}: exactly one read-back block`);
+  return [...lines.join("\n").matchAll(/^( *)```bash\n([\s\S]*?)^\1```/gm)];
+}
+
+// The read-back block is the one whose exit status IS the verdict: its call ends
+// the line. A guard that re-runs the read-back before posting (`… || { …; exit 1; }`)
+// mentions the script too, and must be allowed to (obs #288) — pinning "exactly one
+// block mentions qa-read-back.js" forbade every later guard.
+function blockOf(skill, heading) {
+  const fences = fencesOf(skill, heading).filter((m) =>
+    /qa-read-back\.js --doc "[^"]*"[ \t]*$/m.test(m[2]),
+  );
+  assert.equal(
+    fences.length,
+    1,
+    `${skill}: exactly one read-back verdict block`,
+  );
   const indent = fences[0][1].length;
   return fences[0][2]
     .split("\n")
@@ -181,3 +195,45 @@ test.describe("read-back blocks, as delivered", { concurrency: true }, () => {
     }
   }
 });
+
+// The posting block re-checks the read-back before it posts (obs #226 for qa-task,
+// #288 for qa-story). Executed, not grepped: the guard lines are lifted from the
+// block that writes the PR comment body and run against a stale and a clean doc.
+function postGuardOf(skill, heading) {
+  const fences = fencesOf(skill, heading).filter((m) =>
+    m[2].includes("BODY_FILE=.claude/state/qa-comment-body.md"),
+  );
+  assert.equal(fences.length, 1, `${skill}: exactly one PR comment body block`);
+  const body = fences[0][2];
+  const cut = body.indexOf("mkdir -p .claude/state");
+  assert.ok(cut > 0, `${skill}: the body block has no guard before it writes`);
+  return body.slice(0, cut);
+}
+
+test.describe(
+  "posting blocks refuse to post over a failed read-back",
+  { concurrency: true },
+  () => {
+    for (const s of SKILLS) {
+      const guard = postGuardOf(s.skill, s.postHeading)
+        .split(s.placeholder)
+        .join(DOC);
+      for (const [name, mutate, exit] of [
+        ["clean → continues", undefined, 0],
+        ["a stale updated: → HALT, nothing posted", CASES[1].mutate, 1],
+      ]) {
+        test(`${s.skill}: ${name}`, async () => {
+          const root = consumerRepo(s.skill, mutate);
+          try {
+            const r = await run("bash", guard, root);
+            assert.equal(r.status, exit, r.out);
+            if (exit)
+              assert.match(r.out, /HALT: read-back not clean — not posting/);
+          } finally {
+            fs.rmSync(root, { recursive: true, force: true });
+          }
+        });
+      }
+    }
+  },
+);

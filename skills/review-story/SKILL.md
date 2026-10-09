@@ -1120,6 +1120,14 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
       Step 7 ×4; all three one-argv `rm` HALT sites were in orchestrator `SKILL.md` files, none in
       the step docs
     - Flag as **Important** when the list and the search disagree, or the search is missing
+17. **Field names a plan consumes from another skill** (obs #296):
+    - Trigger: the plan parses or consumes another skill's output — a YAML block, a JSON record, a
+      report section, a gate field
+    - Require the document to name the producing skill and the exact field names, and check each
+      against the producer's documented schema (its prompt template, its output contract, or a real
+      artefact it wrote)
+    - Flag as **Important** a field the producer does not emit. A plan that reads a field nobody
+      writes passes every review and fails only at runtime, as a silently empty value
 
 **Common Hallucination Patterns to Detect**:
 

@@ -307,6 +307,10 @@ Closes #{GITHUB_ISSUE}
 
 If no issue number is available, do NOT add the Related Issues section.
 
+**Never put a literal control-character escape in the body.** GitHub rewrites the text `\u0000` to
+`\^@` and `\u001f` to `\^_` on save, whatever the payload held, so a PR fixing a control-character
+bug misquotes its own subject. Name the character in words: `NUL (U+0000)`, `U+001F` (obs #233).
+
 ### Step 6: Create the Pull Request
 
 Branch on `PLATFORM`:
