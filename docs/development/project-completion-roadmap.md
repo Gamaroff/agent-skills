@@ -20,8 +20,7 @@ finished work. Rules:
 §"Registry fallback frontier".
 
 Add a phase only to express *sequencing* the registries cannot: a deliberate order, a dependency
-chain, a human gate. **No phase is open**: Phase 8 (T186) closed 2026-10-06, and selection now falls
-through to the registries.
+chain, a human gate. **Phase 9 is open** (2026-10-09): B18 then T201. Phase 8 (T186) closed 2026-10-06.
 
 > ⚠️ **A phase costs upkeep that a registry row does not, and the cost is not obvious.** Roadmap rows
 > are matched on the **checkbox alone** — they do **not** consult the target document's frontmatter.
@@ -69,6 +68,18 @@ Read only by `--batch`. Two rows conflict when they share a tag that **either** 
 | `pipeline-lock`    | `shared/resources/advance-pipeline-lock.sh`, `advance-pipeline-lock.test.sh`  |
 
 ---
+
+## PHASE 9 — up-front pipeline answers (opened 2026-10-09)
+
+An **override**: without it the registry fallback selects B18 (bugs outrank tasks) and then every
+lower-numbered task before T201 — 175, 180, 181, 184, 188–195 and 196–200 — because T201 is `Medium`
+with the highest number. T201 goes second because its Phase 2 replaces the orchestrators' prose
+directive with `--defaults` and "depends on bug.18's directive fix landing first". **Tick each row
+`[x]` the moment its item is closed or accepted** — a phase row is matched on its checkbox, not the
+document.
+
+- [ ] **B18** `develop-next` and `develop-batch` hardcode the Phase 0d base branch, overriding `epic-integration` · deps: none · touches: orchestrators!, pipeline-steps~, selection~ · /develop-bug docs/bugs/bug.18.autonomous-runs-hardcode-base-branch/bug.18.autonomous-runs-hardcode-base-branch.md
+- [ ] **T201** Pipeline up-front answers and speed modes · deps: B18 · touches: pipeline-steps!, orchestrators~, pipeline-lock~, bundles~, test-harness~, docs-pipeline~ · /develop-task docs/tasks/task.201.pipeline-upfront-answers-and-speed-modes/task.201.pipeline-upfront-answers-and-speed-modes.md
 
 ---
 
@@ -180,3 +191,4 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-10-06 | **Phases 6 and 7 archived** to `roadmap-history.md`. Both were fully ticked: Phase 6 (task.141 follow-ups, T143–T146) and Phase 7 (the 2026-09-24 observation review, T147–T154 and T158). 13 rows moved verbatim with their `touches:` tags and acceptance annotations, so a `deps:` naming any of them still resolves there. Phase 8 (T186) is now the only open phase. |
 | 2026-10-06 | **T186 accepted + merged — PR #576 merged** (`f1adccad`). Eval harness hardening and the task.185 leftovers, in four independent phases. (1) The runner and `repeat.mjs` share one assertion table (`assertion-dispatch.mjs`, `driver-name.mjs`): a never-settling setup is could-not-run, an unknown assertion `fn` is a usage error before any run, and a scenario with no assertion its driver runs is refused; the opt-in exit codes move to 73/74/75. (2) The fake `gh` gains a `refusal` field and closes the version, `-R` and `pick()` gaps. (3) `pr-inline-comment.js` sends `-X GET`. (4) `next_numbered` replaces counting at six skill sites. QA ran 3 cycles: CR-1 and CR-3 were fixed, then C2-CR-1, a regression from the first `jq` fix that skipped replay runs, was fixed; the loop left by the Diminishing-returns exit. 5c CONCERNS. **Two `/finalise` runs:** run 1 found AC6's zsh arm had no CI lane; the operator recorded a scope note (zsh verified locally, the task.185/176 precedent), and run 2 accepted (30 probes, 0 reproduced). Merge gate `npm run ci` green. Issue #575 closed. Phase 8 is fully ticked — archive it at the next housekeeping |
 | 2026-10-06 | **Phase 8 archived** to `roadmap-history.md`. Its one row, T186, moved verbatim with its `touches:` tags and acceptance annotation, so a `deps:` naming it still resolves there. No phase is open: `/develop-next` selects from the registries (next: T173). |
+| 2026-10-09 | **Phase 9 opened** with two rows, B18 then T201, as an override ahead of the registry fallback, which would select B18 first but then every lower-numbered task (175, 180, 181, 184, 188–200) before T201. Reason: T201 Phase 2 replaces the orchestrator directive bug.18 corrects, and its registry row already declares `bug.18` as a dependency. Both documents were filed the same day (issues #620, #621). |
