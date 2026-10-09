@@ -89,6 +89,7 @@ Example: Creating `story.309.2.3A` while on `feature/story.309.2.3` → likely a
 | **Feature (story)** | `feature/story.<epic>.<story>.<name>` | `feature/story.180.3.quick-re-search-functionality` |
 | **Feature (task)**  | `feature/task.<id>.<name>`            | `feature/task.123.api-validation`                   |
 | **Feature (desc)**  | `feature/<kebab-case-description>`    | `feature/user-authentication`                       |
+| **Bugfix**          | `bugfix/<bug-file-stem>`              | `bugfix/task.110.bug.1.whitelist-admits-mutating-shapes` |
 | **Hotfix**          | `hotfix/v<version>`                   | `hotfix/v1.2.1`                                     |
 | **Release**         | `release/v<version>`                  | `release/v1.3.0`                                    |
 
@@ -108,7 +109,19 @@ Input: story.178.8.example-feature.md
  → Type: feature (from story)
  → Branch Name: feature/story.178.8.example-feature
  → Base: TBD (will ask user)
+
+Input: task.110.bug.1.whitelist-admits-mutating-shapes.md   (also story.E.S.bug.M.*, bug.N.*)
+ → Type: bugfix (from bug report)
+ → Branch Name: bugfix/task.110.bug.1.whitelist-admits-mutating-shapes
+ → Base: TBD (will ask user; develop-bug passes its Q2 answer)
 ```
+
+> **A bug branch is the bug file's stem, verbatim, under `bugfix/`.** The stem already carries the bug's
+> identity in all three modes (`bug.N`, `task.N.bug.M`, `story.E.S.bug.M`), so do not shorten it or
+> re-separate it. Before this row existed, `develop-bug` runs improvised the name and merged branches
+> came out as `bugfix/bug.17.<name>`, `bugfix/task.144-<name>` and `bugfix/obs-126-<name>`; anything
+> that keys on a branch name then had to accept all of them (obs #304). A production hotfix still takes
+> the **Hotfix** row (`hotfix/v<version>`), which carries no work-item id.
 
 > **`feature/epic.*` and `epic/*` are different things.** `feature/epic.{n}.{name}` is an ordinary
 > short-lived branch for editing the epic **document** (what `/review-epic` creates). `epic/{n}.{name}`
@@ -400,6 +413,7 @@ verbatim.
 | **Feature (story)**             | `develop`    | `develop` (via PR)       | Story implementation                                                              |
 | **Feature (task)**              | user choice  | user choice (via PR)     | Technical task implementation                                                     |
 | **Epic integration** (`epic/*`) | `develop`    | `develop` (via PR, once) | Opt-in: a whole epic's stories merge here, then it lands on `develop` as one unit |
+| **Bugfix** (`bugfix/*`)         | `develop`    | `develop` (via PR)       | One bug report's fix (`develop-bug`); branch = the bug file's stem               |
 | **Release**                     | `develop`    | `main` & `develop`       | Release prep & bug fixes                                                          |
 | **Hotfix**                      | `main`       | `main` & `develop`       | Emergency prod fixes                                                              |
 

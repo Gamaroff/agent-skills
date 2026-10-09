@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **`create-branch` names a bug branch after the bug file.** A new **Bugfix** row,
+  `bugfix/<bug-file-stem>` (e.g. `bugfix/task.110.bug.1.whitelist-admits-mutating-shapes`), covers the
+  bug files `develop-bug` hands it. Without one, merged bug branches came out in three shapes (obs #304).
 - **Nine prose rules from the 2026-10-09 observation review.** `develop`: scripted document edits
   use split/join or a replacer function, then assert a structural invariant (obs #292). `qa-fix` Step
   3.5: probe for the old behaviour's observable, not the text you edited (#293). `create-skill`: a
