@@ -20,7 +20,9 @@
 #   bash .agents/skills/{develop-story|develop-task}/references/set-qa-phase.sh 5a|5b|5c
 #
 # Behaviour:
-#   • No lock file           → exit 0, silent noop (standalone invocation — nothing to mark)
+#   • No lock file           → exit 0, silent noop (standalone invocation — nothing to mark),
+#                              UNLESS a halt snapshot / claim for the current branch exists
+#                              (advance-pipeline-lock.sh --paused-here) → exit 1 naming --restore (obs #275)
 #   • jq missing             → exit 0, warn to stderr (degraded, same as advance-pipeline-lock.sh)
 #   • argument not 5a|5b|5c  → exit 1, usage to stderr, lock untouched
 #   • lock not a JSON object → exit 1, lock untouched, no success line
@@ -45,8 +47,20 @@ case "$PHASE" in
   *) usage ;;
 esac
 
-# No lock = no active pipeline = nothing to mark.
-[ -f "$LOCK" ] || exit 0
+# No lock = no active pipeline = nothing to mark — unless a pipeline on THIS branch was paused or
+# halted and its lock not yet rebuilt. Then a silent noop is the defect: after a compaction the
+# session runs on without a lock, every mark is lost, and the Stop hook is inert (obs #275).
+# bundle-dependency: shared/resources/advance-pipeline-lock.sh
+if [ ! -f "$LOCK" ]; then
+  ADVANCE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/advance-pipeline-lock.sh"
+  PAUSED=""
+  [ -f "$ADVANCE" ] && PAUSED=$(bash "$ADVANCE" --paused-here 2>/dev/null)
+  if [ -n "$PAUSED" ]; then
+    echo "set-qa-phase: no lock, but '$PAUSED' records a paused or halted pipeline on this branch. Rebuild the lock first: advance-pipeline-lock.sh --restore <doc-dir>. If that run is finished, delete the snapshot." >&2
+    exit 1
+  fi
+  exit 0
+fi
 
 if ! command -v jq >/dev/null 2>&1; then
   echo "set-qa-phase: jq not found — qa_phase not written (degraded mode)" >&2
