@@ -6,6 +6,23 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **Nine prose rules from the 2026-10-09 observation review.** `develop`: scripted document edits
+  use split/join or a replacer function, then assert a structural invariant (obs #292). `qa-fix` Step
+  3.5: probe for the old behaviour's observable, not the text you edited (#293). `create-skill`: a
+  sourced shell library avoids zsh special parameter names (#295). `review-task` check 21 and
+  `review-story` check 17: field names a plan consumes are checked against the producer (#296).
+  `review-pr`: a conformance `ref` names one location, and a bug identical on the PR base is
+  `pre-existing` and stays out of the verdict, which `/qa-fix` then skips (#297, #271). `qa-task` /
+  `qa-story`: runnable prose that gates on repository state is a boundary (#298). QA runs
+  `/bin/bash -n` on changed scripts under macOS bash 3.2 (#265). `/finalise` saves the security
+  agent's cases file, and its run record is numbered per DoD run (#299, #302). `create-pr` and the
+  tracker card summary never carry a literal control-character escape (#233).
+- **Step 4 checks the implementation report's links before its first commit**, as the three other
+  report writers already did (obs #198).
+- **A grant after a `not-converging` halt re-enters at 5b.** That halt fires before 5b, so the
+  latest gate's fix never ran; re-entering at 5a re-raised the same HIGH and spent the grant.
+  `grant-qa-cycles.sh` reads `halt_reason` before its restore drops it and prints `reenter_at`
+  (obs #228).
 - **The 5c PR review now rides `/finalise`'s acceptance commit, so a run pushes one commit fewer.**
   On `APPROVE` or `CONCERNS`, the develop pipelines stage the PR review report and commit nothing
   between 5c and `/finalise` 6a. On `CONCERNS`, a finding whose `ref` path matches
@@ -25,6 +42,23 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **GitHub bodies no longer lose a quoted control-character escape.** GitHub stores `\u0000` as
+  `\^@` and `\u001f` as `\^_`. `tracker-issue.js`, `tracker-comment.js` (GitHub only) and `create-pr`
+  now send each `\u0000`–`\u001f` escape as `U+00XX` through the new `github-body-text.js`, and say
+  how many they rewrote (obs #303).
+- **Route 2c (gate the last fix) fires when the last gate raised no MEDIUM.** "Strictly falling"
+  had no room to fall at 0, so a PASS gate with only LOW fixes escalated by construction (task.173
+  cycle 9: MEDIUM `0, 0, 0`; task.143: `1, 1, 0`) (obs #300).
+- **`tracker-comment.js` reads its marker back after a post that errored.** A comment that landed
+  while the response was lost now reports `posted` with `confirmedBy: "read-back"`; one still absent
+  reports `unverifiable` with `writeAttempted: true` (obs #217).
+- **`create-task --from-observation` no longer seeds `description: "1."`.** A leading list marker is
+  skipped, a description under 20 characters is refused for the skill to ask, and the seeded title
+  is the bare name (obs #291).
+- **`qa-story` re-checks the read-back before posting**, as `qa-task` does. The block test now pins
+  the verdict block's property, not a count of mentions, which had forbidden the guard (obs #288).
+- **CI fails, rather than skips, when a tool a suite probes for is missing**
+  (`tests/ci-tool-skips.test.js`, obs #301).
 - **A path containing a control character is never documentation.** `isDocsPath`
   (`ci-tree-equivalence.js`, task.172) accepted a path with an embedded NUL. The 5c classify block
   hands it a `ref` read from the PR review report, and under zsh a NUL survives `read` while `git`

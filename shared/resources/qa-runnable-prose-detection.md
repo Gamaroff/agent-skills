@@ -246,7 +246,7 @@ claiming more than the mechanism delivers.
 
 ### 3a. The zsh arm is guarded
 
-`zsh` is not guaranteed to exist — CI runs on `ubuntu-latest`. Guard it the way this repository already
+`zsh` is not guaranteed to exist on every host. This repository's CI installs it (`test.yml`, since PR #614), but a consumer's CI may not. Guard it the way this repository already
 guards its one hand-written parity suite (the `tracker-access` shell test suite, §12 "zsh parity"):
 
 ```bash
@@ -260,6 +260,16 @@ fi
 When zsh is absent, run the bash arm alone and record `zsh-unavailable` as **information**. It must not
 raise a finding, and it must not trip the zero-executed rule in §4 — a missing interpreter is not a
 defect in the work item under review.
+
+### 3b. macOS `/bin/bash` 3.2 parses every changed script
+
+macOS ships `/bin/bash` 3.2, and a hook or script run as `bash x.sh` from a hook runner gets that
+version, not a newer Homebrew bash. Syntax that 3.2 cannot parse, such as `${var,,}`, `declare -A`,
+`mapfile`, `&>>` or `;&`, passes every bash 5 check and fails on the first macOS user. When
+`/bin/bash --version` reports major version 3, run `/bin/bash -n` on every `.sh` the change set adds
+or modifies, and record the command and its result. A parse failure is a `category: bug` finding at
+`high` confidence. On a host without a 3.x `/bin/bash`, record `bash-3.2 parse: not available on this
+host` as information (obs #265).
 
 ---
 

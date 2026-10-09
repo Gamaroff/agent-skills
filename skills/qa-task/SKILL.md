@@ -652,7 +652,12 @@ JSON
    function whose purpose is to accept or reject (a classifier, validator, parser, sanitiser, or
    any predicate whose `false` prevents an action). The signals and the
    explicit negative case are stated once, in Step 1b of `references/finalise-dod-security-prompt.md`;
-   do not restate them here. When the rule fires, the probe engine is the harness — **run it**:
+   do not restate them here. **Runnable prose is in scope:** a fenced bash block in a `SKILL.md` or a
+   `shared/resources/*.md` that clears, refuses or HALTs on repository state is a boundary under that
+   Step 1b's repo-state signal, exactly as a script would be. When no engine form reaches it, record
+   `boundary: true` and the zero-guard finding naming the remedy (an extracted script, or task.181's
+   `shell-argv:`), never `boundary: false`. QA recorded `false` on task.173's 5c classify block for
+   seven cycles, and `/finalise` then raised the same boundary as a DoD gap (obs #298). When the rule fires, the probe engine is the harness — **run it**:
    `node references/security-probe.mjs --sink <sink> --entry '<path>#<export>' --repo-root "$(git rev-parse --show-toplevel)" --record <work-item-dir>/<stem>.qa.<N>.security.run.json --json`
    — or, for a **shell-script** boundary (one positional argument; a script whose header says it
    refuses / never guesses / fails closed is one by its own words), the shell entry form with the

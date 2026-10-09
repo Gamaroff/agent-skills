@@ -614,10 +614,14 @@ This convention ensures the cycle budget is respected across resumes.
      `{doc-directory}` — because a stale snapshot persists by design.
    - It **never lowers** a `qa_max_cycles` the lock already carries.
    - It **writes three fields atomically** — `extra_cycles_granted = k` (the record),
-     `qa_max_cycles = base + k` (the budget) and `qa_phase = 5a` (an accepted grant *is* a 5a
-     re-entry; a Stop between the grant and a separate `set-qa-phase.sh` call would otherwise name
-     `/qa-fix`) — via `mktemp` + `mv`, removing its temp file on every failure, and prints the
-     budget back from the written lock.
+     `qa_max_cycles = base + k` (the budget) and `qa_phase`, the re-entry point — via `mktemp` +
+     `mv`, removing its temp file on every failure, and prints the budget and `reenter_at` back from
+     the written lock. **The re-entry point depends on where the halt stopped** (obs #228): a
+     `loop-limit` halt ran its last 5b, so the grant writes `5a` and the next gate reads that fix; a
+     `not-converging` halt fired at 5a *before* 5b, so the grant writes `5b` and the latest gate's
+     queue goes to `/qa-fix` first. Re-entering a not-converging halt at 5a reviews unchanged code,
+     re-raises the same HIGH and trips the check again, spending the grant with no fix attempted
+     (task.140). The script reads `halt_reason` from the candidate before its restore drops it.
 
    The loop then runs with **`QA_MAX_CYCLES` = the lock's `qa_max_cycles`** (absent → 5). The
    budget is **relative to the reconstructed count, not to 5**: a grant of `k` must deliver `k`
@@ -633,9 +637,10 @@ This convention ensures the cycle budget is respected across resumes.
    `evals/shared/tests/qa-loop-lock-fields-parity.test.mjs` fails when any file disagrees. **Do not
    reuse `MAX_ITER`**: that is the Step 3 develop-loop bound (below), a different budget over a
    different loop.
-4. **Re-enter at 5a as cycle `NEXT_CYCLE`.** The grant already wrote `qa_phase: 5a` and restored
-   the lock; 5a's own first action (`set-qa-phase.sh 5a`) then runs as on any cycle and is a noop
-   here. **A declined grant, or a grant the script refused (exit 1 — surface its stderr line to the
+4. **Re-enter at the phase the grant printed (`reenter_at`).** `5a` → as cycle `NEXT_CYCLE`; 5a's
+   own first action (`set-qa-phase.sh 5a`) then runs as on any cycle and is a noop here. `5b` → run
+   5b on the latest gate as cycle `QA_CYCLE` (the cycle the halt interrupted), then 5a as
+   `NEXT_CYCLE`. **A declined grant, or a grant the script refused (exit 1 — surface its stderr line to the
    user), does not re-enter the loop at all**: no lock is restored, no cycle runs, and the run
    returns to the halt message's own three options. That is the one statement of the declined path;
    the step-5-6 HALT messages and both SKILL.md Phase 0b blocks point here rather than restating it

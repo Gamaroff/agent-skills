@@ -146,6 +146,11 @@ pr_conformance:
 Rules:
 - Sort findings: coverage, then trail, then consistency, then scope; within each, high → medium → low.
 - `id` is PC-{n}. `finding`/`suggested_action` are single sentences.
+- One location per finding. `ref` is exactly ONE of the four forms — never prose, never two paths,
+  never a path followed by commentary. A finding that applies to several files is emitted once per
+  file, each with the same `finding` text and its own `ref`. The develop pipelines' 5c carry fixes
+  only the path a `ref` names, so a second file named only in the `finding` text is never fixed
+  (obs #297: bug.1 and bug.2 shared one finding; only bug.1 could be closed).
 - When `ref` is `path:line`, line is the line number IN THE PR-HEAD VERSION OF THE FILE (the `+` side
   of the hunk header), NEVER a line number in the patch file — the same definition as `file_line` in
   code-review-prompt.md. An optional `line_text` (that line's source text, trimmed) may accompany it;

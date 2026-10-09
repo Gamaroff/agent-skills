@@ -35,7 +35,10 @@
  *   posted          the comment was created
  *   already         exactly one marker match — it is already there
  *   unverifiable    2+ marker matches, or the comment list could not be read;
- *                   NOT posted, and deliberately not resolved either
+ *                   NOT posted, and deliberately not resolved either. After a
+ *                   post that errored, the payload also carries
+ *                   `writeAttempted: true`: re-query before suspecting a
+ *                   missing comment (obs #217)
  *   deferred        access.tracker is not `full`; recorded, not performed
  *   no-credentials  no usable auth; the caller may fall back to MCP
  *   dry-run         --dry-run; nothing read, nothing written
@@ -67,6 +70,10 @@ const { execFileSync, execSync } = require("child_process");
 
 const dm = require("./defer-mutation.js");
 const { renderLead, LEAD_STAGES } = require("./stakeholder-summary.js");
+const {
+  wordsForControlEscapes,
+  rewriteNotice,
+} = require("./github-body-text.js");
 
 const GIT_EXEC_OPTS = {
   encoding: "utf-8",
@@ -474,12 +481,23 @@ function ghFindMarker(execImpl, issue, marker) {
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
+// A post that errored may still have landed: the API created the comment and
+// the response was lost. Before reporting `unverifiable`, the marker is read
+// back, with a short backoff for a list that lags the write (obs #217: a
+// `qa-gate-2` comment existed, and the run reported it could not tell).
+const READ_BACK_DELAYS_MS = [1000, 2000];
+
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
 async function run({
   argv = process.argv,
   execImpl = execFileSync,
   repoRoot = "",
   fetchImpl = undefined,
   env = process.env,
+  sleepImpl = sleepSync,
 } = {}) {
   const root = repoRootOf(repoRoot);
 
@@ -563,6 +581,16 @@ async function run({
   } catch (e) {
     output.err(`Error: ${e.message}`);
     return { exitCode: 2 };
+  }
+
+  // GitHub stores a literal \u0000-\u001f escape as caret notation; Jira keeps
+  // it, so only the GitHub body is rewritten (obs #303).
+  if (tracker === "github") {
+    const words = wordsForControlEscapes(body);
+    if (words.count) {
+      output.err(rewriteNotice(words.count));
+      body = words.text;
+    }
   }
 
   const issue = String(args.issue).trim();
@@ -751,14 +779,33 @@ async function run({
         root,
         fetchImpl,
         skipCode,
+        sleepImpl,
       })
-    : runGithub({ args, issue, body, output, emit, execImpl, skipCode });
+    : runGithub({
+        args,
+        issue,
+        body,
+        output,
+        emit,
+        execImpl,
+        skipCode,
+        sleepImpl,
+      });
 }
 
 // ---------------------------------------------------------------------------
 // GitHub path
 // ---------------------------------------------------------------------------
-function runGithub({ args, issue, body, output, emit, execImpl, skipCode }) {
+function runGithub({
+  args,
+  issue,
+  body,
+  output,
+  emit,
+  execImpl,
+  skipCode,
+  sleepImpl = sleepSync,
+}) {
   if (!ghAvailable(execImpl)) {
     output.info(
       "ℹ️  gh is unavailable or unauthenticated — no comment posted.",
@@ -813,8 +860,20 @@ function runGithub({ args, issue, body, output, emit, execImpl, skipCode }) {
     });
   } catch (e) {
     output.warn(`⚠️  gh issue comment failed: ${e.message}`);
+    if (args.stage) {
+      const marker = markerHtml(args.stage);
+      const seen = readBack(sleepImpl, () =>
+        ghFindMarker(execImpl, issue, marker),
+      );
+      if (seen) return emit(seen, seen.posted ? 0 : skipCode);
+    }
     return emit(
-      { posted: false, reason: "unverifiable", cause: "post-failed" },
+      {
+        posted: false,
+        reason: "unverifiable",
+        cause: "post-failed",
+        writeAttempted: true,
+      },
       skipCode,
     );
   }
@@ -838,6 +897,7 @@ async function runJira({
   root,
   fetchImpl,
   skipCode,
+  sleepImpl = sleepSync,
 }) {
   // eslint-disable-next-line global-require
   const jira = require("./jira-sync.js");
@@ -925,8 +985,19 @@ async function runJira({
     });
   } catch (e) {
     output.warn(`⚠️  Jira comment failed: ${e.message}`);
+    if (args.stage) {
+      const seen = await readBackAsync(sleepImpl, () =>
+        jira.findCommentsByMarker({ ...common, momentId: args.stage }),
+      );
+      if (seen) return emit(seen, seen.posted ? 0 : skipCode);
+    }
     return emit(
-      { posted: false, reason: "unverifiable", cause: "post-failed" },
+      {
+        posted: false,
+        reason: "unverifiable",
+        cause: "post-failed",
+        writeAttempted: true,
+      },
       skipCode,
     );
   }
@@ -944,6 +1015,57 @@ async function runJira({
     `💬 Commented on ${issue}${args.stage ? ` (${args.stage})` : ""}.`,
   );
   return emit({ posted: true, reason: "posted", id: result.id || null }, 0);
+}
+
+/**
+ * The verdict a read-back after an errored post supports, or null when it
+ * supports none. Exactly one marker: the post landed, so it is `posted`, marked
+ * as confirmed by the read rather than by the write's response. Two or more: the
+ * post landed beside an earlier one — ambiguous, never resolved here. None after
+ * every delay: the post is unconfirmed, and the caller reports that.
+ */
+function readBackVerdict(found) {
+  if (!found || found.unreadable) return null;
+  if (found.count === 1)
+    return { posted: true, reason: "posted", confirmedBy: "read-back" };
+  if (found.count > 1)
+    return {
+      posted: false,
+      reason: "unverifiable",
+      matches: found.count,
+      writeAttempted: true,
+    };
+  return null;
+}
+
+function readBack(sleepImpl, find) {
+  for (const ms of READ_BACK_DELAYS_MS) {
+    sleepImpl(ms);
+    let found;
+    try {
+      found = find();
+    } catch (_) {
+      continue;
+    }
+    const v = readBackVerdict(found);
+    if (v) return v;
+  }
+  return null;
+}
+
+async function readBackAsync(sleepImpl, find) {
+  for (const ms of READ_BACK_DELAYS_MS) {
+    sleepImpl(ms);
+    let found;
+    try {
+      found = await find();
+    } catch (_) {
+      continue;
+    }
+    const v = readBackVerdict(found);
+    if (v) return v;
+  }
+  return null;
 }
 
 /** First non-empty line, trimmed of markdown marks — the record's `desired`. */

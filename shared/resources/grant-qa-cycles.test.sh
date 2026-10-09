@@ -73,6 +73,17 @@ elif ! echo "$ERR" | grep -q "lock restored from"; then
 else
   pass "no lock → restored from snapshot (halt fields dropped, pipeline fields kept, qa_phase 5b → 5a), grant written: 6 + 2 = 8"
 fi
+
+# A not-converging halt stopped at 5a, BEFORE its 5b: the grant re-enters at 5b on the latest gate,
+# so the fix that cycle never ran happens first (obs #228). A loop-limit halt (above) re-enters at 5a.
+D="$T/not-converging"; L="$D/state/lock.json"; S="$D/state/last-halt.json"; mkdir -p "$D/state"; mkdoc "$D/doc" 1 2 3
+printf '{"skill":"develop-task","current_step":5,"qa_phase":"5a","task_or_story_directory":"%s","branch":"feature/x","halted_at":"2026-09-30T00:00:00Z","halt_reason":"not-converging","halt_step":"5"}\n' "$D/doc" > "$S"
+OUT=$(run "$L" "$S" "$D/doc" 2 2>/dev/null); RC=$?
+if [ "$RC" -eq 0 ] && [ "$(jq -r '.qa_phase' "$L")" = "5b" ] && [ "$(jq -r '.qa_max_cycles' "$L")" = "5" ] && echo "$OUT" | grep -q "reenter_at=5b"; then
+  pass "not-converging halt → re-enter at 5b on the latest gate (task.140's shape: gate 3, k=2 → budget 5)"
+else
+  fail "not-converging re-entry" "rc=$RC out=$OUT lock=$(cat "$L" 2>/dev/null)"
+fi
 # The snapshot is consumed by the restore (task.124): a snapshot that outlives its run is
 # offered as a resume for merged work on the next invocation (obs #88).
 [ ! -f "$S" ] && pass "snapshot consumed by the restore (task.124)" || fail "snapshot consumed" "still present: $(cat "$S")"

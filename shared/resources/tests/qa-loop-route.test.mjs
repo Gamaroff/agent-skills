@@ -363,6 +363,34 @@ const ROWS = [
     reason: "not-a-pass-gate",
   },
   {
+    label:
+      "2c fires: MEDIUM held at 0, 0 → 0 with LOW-only entries on a PASS gate — task.173 cycle 9 (obs #300)",
+    input: {
+      cycle: 9,
+      highCounts: [1, 0, 1, 0, 0, 0, 1, 1, 0],
+      mediumCounts: [3, 2, 2, 1, 1, 0, 0, 0],
+      latestGateContent: fixture("pass-low-only.yml"),
+      budgetSpent: true,
+      lastCycleAction: FIX,
+    },
+    route: ROUTES.GATE_THE_LAST_FIX,
+    reason: "gate-the-last-fix",
+  },
+  {
+    label:
+      "2c fires: MEDIUM fell to 0 without falling strictly, 1, 1 → 0 — task.143 run 2 (obs #300)",
+    input: {
+      cycle: 7,
+      highCounts: [0, 0, 0, 0, 0, 0, 0],
+      mediumCounts: [2, 1, 2, 0, 1, 1],
+      latestGateContent: fixture("pass-low-only.yml"),
+      budgetSpent: true,
+      lastCycleAction: FIX,
+    },
+    route: ROUTES.GATE_THE_LAST_FIX,
+    reason: "gate-the-last-fix",
+  },
+  {
     label: "task.143 cycle 5 at the budget — the real run's route 2c decline",
     input: {
       cycle: 5,

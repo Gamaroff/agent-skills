@@ -476,7 +476,7 @@ Read each prompt file to get the template, substitute the placeholder values, th
 | Agent                | Prompt file                                    | Key substitutions                                            |
 | -------------------- | ---------------------------------------------- | ------------------------------------------------------------ |
 | 1. AC traceability   | `references/finalise-dod-ac-prompt.md`         | `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>`, `<DIFF_FILE>` |
-| 2. Security review   | `references/finalise-dod-security-prompt.md`   | `<STORY_FILE>`, `<STORY_TYPE>`                               |
+| 2. Security review   | `references/finalise-dod-security-prompt.md`   | `<STORY_FILE>`, `<STORY_TYPE>`, `<DOD_N>` (Step 0's `$DOD_N`) |
 | 3. Compliance review | `references/finalise-dod-compliance-prompt.md` | `<STORY_FILE>`                                               |
 | 4. Docs & changelog  | `references/finalise-dod-docs-prompt.md`       | `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>`                |
 
@@ -485,6 +485,13 @@ Each agent returns YAML. Capture: `AC_RESULT`, `SECURITY_RESULT`, `COMPLIANCE_RE
 **Bug mode (`ac-agent`):** skip — a bug report has no acceptance criteria, so agent 1's prompt has nothing to trace. Its slot is taken by the fix-evidence agent below; still four agents, still one message.
 
 **Bug mode (`fix-evidence`):** run — dispatch `references/finalise-dod-fix-evidence-prompt.md` as agent 1 with `<BUG_FILE>`, `<PR_NUMBER>`, `<DIFF_FILE>` and `<IMPL_REPORT>` (the newest implementation report beside the bug in **either** shape the pipeline has written — `{bug-prefix}.implementation.*.md` or `{bug-prefix}.{name}.implementation.*.md`, the two prefixes `references/bug-doc.js` accepts (TASK-125-BUG-13) — or empty). It checks the five things a bug fix must show — the expected behaviour is implemented, a regression test asserts it *and runs per PR*, the test is recorded red without the fix, a new guard states its scope, bundled copies match their source — and returns `fix_evidence:` YAML in the same PASS/FAIL-with-citation contract as `ac_traceability:`. Capture it **as `AC_RESULT`** so Steps 3c–6 read one variable: `AC_OVERALL` is `fix_evidence.overall`, and the Step 6 column "All Acceptance Criteria Met?" reads "all fix-evidence checks PASS". `STORY_TYPE` is `bug` for the other three agents, which need no bug variant.
+
+> **The security agent's evidence lands in the work-item directory before Step 3d.** The run record
+> (`{stem}.dod.{N}.security.run.json` and its `.d/`) and any cases file
+> (`{stem}.dod.{N}.security.cases.json`), both numbered by this run's `$DOD_N` (obs #302), must be under the work-item directory, because the 6a
+> acceptance commit carries them. A read-only agent may report that it wrote them elsewhere. Copy
+> them in from the paths it returns, and treat a `--cases-file` it ran but did not save as
+> `probes_executed` that cannot be re-run: re-dispatch once, asking for the file (obs #299).
 
 > **`SECURITY_RESULT` carries a `boundary:` flag and, when it is true, `probes_executed:` and `probes[]`.**
 > `boundary: true` means the security agent's Step 1b identified a **boundary deliverable** — a predicate,
