@@ -12,8 +12,9 @@ task-ref: task.201.pipeline-upfront-answers-and-speed-modes.md
 ## Overview
 
 Ship in five independent phases, measurement first. Re-grep every `path:line` before editing: line
-numbers are as of `develop` at `7d712757`. Resolve the task's open decisions (waiver approver,
-orchestrator access to `fast`, Step 2 content-identity check) before Phase 3.
+numbers are as of `develop` at `7d712757`. The three owner decisions are settled (2026-10-09) and
+recorded in the task's Important Clarifications: the invoker approves waivers, autonomous runs are
+`fast` by policy only, and Step 2 reuse is keyed on `reviewed_blob:`.
 
 ## Phase-by-Phase Implementation Guide
 
@@ -40,17 +41,24 @@ orchestrator access to `fast`, Step 2 content-identity check) before Phase 3.
 
 ### Phase 3: Step 2 reuse
 
-- In `shared/resources/develop-pipeline-step-2-review.md`: before invoking `review-*`, look for a
-  co-located review/validate artifact whose recorded document identity matches the current document;
-  if found, skip and log `Step 2 reused: <artifact>`.
-- Verify: an edited document after review is re-reviewed; an unedited one is not.
+- `review-task`, `review-story` and `review-bug` write `reviewed_blob: <git hash-object of the
+  document>` into their report, taken **after** Step 8.5's fixes and Step 9's status edit, so the
+  review's own edits do not invalidate it.
+- In `shared/resources/develop-pipeline-step-2-review.md`: before invoking `review-*`, find the newest
+  co-located review/validate artifact; if its `reviewed_blob:` equals `git hash-object` of the current
+  document, skip and log `Step 2 reused: <artifact>`. An artifact with no `reviewed_blob:` (written
+  before this change) is never reused.
+- Verify: an edited document after review is re-reviewed; an unedited one is not; a legacy artifact
+  without the field is not reused.
 
 ### Phase 4: Speed modes and waivers
 
 - `shared/resources/develop-pipeline-lite-mode.md`: add `fast`, the skip vocabulary
   (`review`, `qa-depth`, `review-pr-depth`) and the floor list.
 - Read `pipeline.defaultMode` and `pipeline.skippable` from `skills-config.yaml`; refuse a skip
-  outside the allow-list.
+  outside the allow-list. `develop-next` and `develop-batch` take no `--mode` flag: they run `fast`
+  only through `pipeline.defaultMode` (owner decision).
+- `waiver.approved_by` is the invoking developer (`git config user.name`).
 - QA loop and finalise: a skipped step writes `gate: WAIVED` with `waiver.reason` and
   `waiver.approved_by`; the DoD renders the waiver.
 - Verify: guard that a skip never produces `PASS`; no floor step is reachable by any flag.
