@@ -192,7 +192,7 @@ Follow the generic mechanics in [`references/develop-pipeline-step-1-create-bran
 
 - **work item** = the bug file; **work-item dir** = the bug directory; **id** = the bug prefix (`story.{e}.{s}.bug.{n}` / `task.{id}.bug.{n}` / `bug.{N}`).
 - **Branch base and type** come from Phase 0d:
-  - **Bugfix** (default) → invoke `/create-branch` with the bug file; select `develop` as the base when asked (Q2 answer).
+  - **Bugfix** (default) → invoke `/create-branch` with the bug file; select `develop` as the base when asked (Q2 answer). The branch is `bugfix/{bug file stem}` (create-branch's **Bugfix** row, e.g. `bugfix/task.110.bug.1.whitelist-admits-mutating-shapes`): never a shortened or re-separated form.
   - **Hotfix** (Q1 = production hotfix) → invoke `/create-branch --hotfix v{X.Y.Z}` (branch off `main`). The version is the Q-derived next patch; if unknown, ask once during Step 1.
 - **Ensure a tracker issue** (runs *before* the lock is written, so the lock records a real issue rather than an empty field it then contradicts). Branch on `TRACKER`:
   - `TRACKER=jira` → invoke `ensure-bug-jira-issue` with `BUG_FILE_PATH={bug file}`. On return `BUG_JIRA_KEY` is a key or empty.
