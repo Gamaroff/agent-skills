@@ -35,9 +35,12 @@ function workItemOf(docPath) {
   return m ? m[1] : null;
 }
 
-// True when the branch names this work item: the id is followed by "." or the end of the
-// last path segment, so task.20 never matches feature/task.200.x. A story also matches its
-// epic's integration branch epic/{E}.<name>.
+// True when the branch's last path segment starts with the document's id or its parent's id
+// (task.N for task.N.bug.M, story.E.S for story.E.S.bug.M), followed by ".", "-" or the end,
+// so task.20 never matches feature/task.200.x but bugfix/task.144-cli-decline matches task.144.
+// A story also matches its epic's integration branch. A hotfix/v* branch carries no id and
+// matches a bug document only (review I1). Unit-table rows: bugfix/bug.17.<name>,
+// bugfix/task.144-<name>, hotfix/v1.2.1 (bug yes, task no), feature/task.N.<name> for task.N.bug.M.
 function branchNamesWorkItem(branch, docPath) { … }
 
 function resolveDocLinkBranch({ explicit, configured, upstream, defaultBranch, docPath }) {
@@ -84,32 +87,36 @@ today's behaviour (upstream used), so an unmigrated caller cannot regress. Pass 
 all four `sync-jira-{epic,story,task,bug}` scripts (`lib.resolveDocBranch(args.docBranch)`, e.g.
 `skills/sync-jira-task/scripts/sync-jira-task.js:543`).
 
-Population test: `git grep -n 'DOC_BRANCH=.*@{u}' -- 'skills/*/SKILL.md'` must be empty, and
-`git grep -c 'doc-link-branch.js --doc'` over the same files must be ≥ 8.
+Population test, keyed on the derivation rather than the variable name (review I3): every `rev-parse`
+of `@{u}` or `@{upstream}` in `skills/*/SKILL.md` and `shared/resources/*.{js,sh,md}` is either inside
+`doc-link-branch.js` or the allowlisted tracking check at `develop-pipeline-step-1-create-branch.md:77`,
+and `doc-link-branch.js --doc` appears at least 8 times across `skills/*/SKILL.md`. Its control case is a
+fixture line `BR=$(git rev-parse --abbrev-ref @{upstream})` that the test must flag.
+
+The `resolveDocBranch` tests at `skills/sync-jira-task/tests/sync-jira-task.test.js:2023-2055` (and the
+one in each of the `sync-jira-epic` and `sync-jira-story` suites) call it without `docPath` and stay
+green unchanged. Add a `docPath` case beside them: an unrelated upstream resolves to the default
+(review I2).
+
+In `ensure-bug-github-issue` and `sync-github-bug`, keep `BASE` and feed it the resolver's branch, so
+`PARENT_DOC_URL` follows the bug's branch (review O1).
 
 ### Phase 3: develop-bug gate order
 
 1. `skills/develop-bug/SKILL.md` Step 1: delete the "Ensure a tracker issue" bullet and the "Signal Work
-   Started" bullet. The lock bullet writes `"tracker_issue": ""`. Keep the historical paragraph about
-   bug cards, moved to Step 2b.
-2. New `### Step 2b: Open the Tracker Issue`, after READY TO FIX: the moved bullets, then
-   `jq --arg t "$TRACKER_ISSUE" '.tracker_issue = $t'` on the lock (mktemp + mv), then Signal Work Started.
-3. HALT rows at `skills/develop-bug/SKILL.md:291-293`: each runs the cleanup block before halting:
-
-   ```bash
-   BASE="{Q2_answer}"; BR=$(git branch --show-current)
-   if git diff --name-only "$BASE"...HEAD | grep -qv '^{bug-directory}/'; then
-     echo "Branch $BR has commits outside the bug directory; kept."
-   else
-     TIP=$(git rev-parse HEAD); git checkout -q "$BASE"
-     git branch -D "$BR" && echo "Deleted $BR (was $TIP)."
-     git ls-remote --exit-code --heads origin "$BR" >/dev/null 2>&1 && git push -q origin --delete "$BR"
-   fi
-   ```
-
-   Uncommitted bug-directory edits from `review-bug` validate-and-apply must be committed or stashed
-   first. Decide which, and say so in the HALT message.
-4. Resume contract: a `develop-bug` lock past Step 2 with `tracker_issue: ""` re-enters at Step 2b.
+   Started" bullet, and state that Step 1 declines `create-branch`'s optional push. The lock bullet
+   writes `"tracker_issue": ""` and no `tracker_step`. Keep the historical paragraph about bug cards,
+   moved to Step 2b.
+2. New `### Step 2b: Open the Tracker Issue`, after READY TO FIX: the moved bullets, then one write on
+   the lock (mktemp + mv, the `grant-qa-cycles.sh` shape):
+   `jq --arg t "$TRACKER_ISSUE" '.tracker_issue = $t | .tracker_step = "opened"'`, then Signal Work
+   Started.
+3. HALT rows at `skills/develop-bug/SKILL.md:291-293`: no cleanup. Each message names the local bug
+   branch and the `review-bug` report path, says nothing was pushed or posted, and leaves deleting the
+   branch to the operator (review I6, operator decision 2026-10-09).
+4. Resume contract: re-enter at 2b when the lock has neither `tracker_step` nor `tracker_issue` and the
+   newest review verdict is READY TO FIX. State the six states listed in the task's Clarifications,
+   including the pre-change lock (issue set, no `tracker_step`), which skips 2b.
 
 ### Phase 4: create-bug-report
 
@@ -128,4 +135,6 @@ the grep beside the list, so `review-bug`'s stale scan can re-run it.
 - `shared/resources/tests/doc-link-branch.test.mjs`: table-driven over `resolveDocLinkBranch`, plus the CLI in a
   fixture repo with an upstream set (`git init`, `git remote add`, `git branch -u`).
 - Mutation-prove: drop the `branchNamesWorkItem` check (unrelated branch test goes red); drop the `.`/end anchor
-  (`task.20` control goes red); move `ensure-bug-*` back into Step 1 (step-order test goes red).
+  (`task.20` control goes red); move `ensure-bug-*` back into Step 1 (step-order test goes red); write `tracker_issue` without
+  `tracker_step` in Step 2b (resume-contract test goes red); remove `"-"` from the separator set
+  (`bugfix/task.144-…` row goes red).
