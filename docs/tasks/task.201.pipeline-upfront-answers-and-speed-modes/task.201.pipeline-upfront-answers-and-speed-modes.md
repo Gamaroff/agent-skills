@@ -5,7 +5,7 @@ type: task
 description: "Let a developer answer the develop pipelines' setup questions and choose a speed mode at invocation — resolved by flag, then consumer policy, then the derived recommendation, asking only on conflict — with every skip recorded as a WAIVED gate, and per-step timestamps so the effect can be measured."
 tags: [develop-story, develop-task, develop-bug, develop-next, develop-batch, phase-0, lite-mode, qa-gate]
 category: feature
-status: draft
+status: planned
 priority: Medium
 created: 2026-10-09
 updated: 2026-10-09
@@ -16,7 +16,7 @@ github_issue: 621
 
 # Technical Task: Pipeline up-front answers and speed modes
 
-**Status:** Draft
+**Status:** Planned
 **GitHub Issue**: [#621](https://github.com/Gamaroff/agent-skills/issues/621)
 
 ---
@@ -149,9 +149,19 @@ the skip is logged but the verdict is earned.
 - **No new Phase 0 questions.** The mode is a flag or policy, never asked. The existing ban on
   undocumented questions stands.
 - **Step 2 reuse is automatic, not a flag**: when a `review-*` or `--validate` artifact for the
-  document exists and the document's content has not changed since (compare against the artifact's
-  recorded document `updated:` or blob hash), Step 2 is skipped and logged. This is the largest
-  measured lever and needs no developer action.
+  document exists and the document's content has not changed since, Step 2 is skipped and logged.
+  "Not changed" is decided by **blob hash** (owner decision, 2026-10-09): the review artifact records
+  `reviewed_blob:` — `git hash-object` of the document — taken **after** the review's own Step 8.5
+  fixes and Step 9 status edit, and Step 2 reuses the review only when the current document's hash
+  matches. A date comparison is not used: `updated:` is date-only, so a same-day edit after the
+  review would slip through. This is the largest measured lever and needs no developer action.
+- **Waiver approver is the invoking developer** (owner decision, 2026-10-09). `waiver.approved_by`
+  is the invoker (`git config user.name`). The authorisation is the consumer's `pipeline.skippable`
+  allow-list, which the repository owner sets; the waiver is visible in the gate, the DoD and the PR.
+- **Autonomous runs are fast by policy only** (owner decision, 2026-10-09). `develop-next` and
+  `develop-batch` take no `--mode` flag; they run `fast` only when `skills-config.yaml` sets
+  `pipeline.defaultMode: fast`. Speed for unattended work is a standing decision by the repository
+  owner, not a per-invocation one.
 - **Generic**: no consumer branch, board or status names; all limits come from `skills-config.yaml`.
 
 ---
@@ -289,12 +299,14 @@ In the reporting consumer: re-run the step-timing measurement over the first ~15
 - **Skips eroding evidence** — mitigated by the floor, the default-empty allow-list, and WAIVED never
   reading as PASS.
 - **Self-approval** — `waiver.approved_by` set to the invoking developer lets one person skip and sign.
-  Open question for the owner: is that acceptable, or must policy name an approver role?
+  Accepted by the owner (2026-10-09): the consumer's `pipeline.skippable` allow-list is the
+  authorisation, it defaults to empty, and every waiver is visible in the gate, DoD and PR.
 
 ### Medium Risk Areas
 
-- **Stale review reuse** — a review of an older revision reused after edits. Mitigated by comparing
-  content identity, not dates alone.
+- **Stale review reuse** — a review of an older revision reused after edits. Mitigated by the
+  `reviewed_blob:` hash, taken after the review's own edits; any later change to the document forces
+  a re-review.
 - **Prompt growth in Phase 0** — this is a prompt edit governed by the Rule of Three; prefer a tested
   resolver to more prose.
 
@@ -323,6 +335,8 @@ A floor step skipped; a skip recorded as PASS; a run asking a question it was gi
 | Date       | Version | Description                                                                                   | Author |
 | ---------- | ------- | --------------------------------------------------------------------------------------------- | ------ |
 | 2026-10-09 | 1.0     | Initial draft — design from the rebirth-wallet consumer, with its step-timing measurement     | Claude |
+| 2026-10-09 | 1.1     | Owner decisions recorded: invoker approves waivers; autonomous fast mode by policy only; Step 2 reuse keyed on `reviewed_blob:` | Claude |
+| 2026-10-09 |         | Status → planned | Claude |
 <!-- change-log-end -->
 
 ---
@@ -354,6 +368,12 @@ A floor step skipped; a skip recorded as PASS; a run asking a question it was gi
 
 ## Notes
 
-Open decisions for the owner before `planned`: the waiver approver (self or role); whether `fast`
-should be offered to `develop-next`/`develop-batch` runs via policy only; the exact content-identity
-check for Step 2 reuse.
+Owner decisions (2026-10-09), recorded in Important Clarifications and Risk Assessment:
+
+| Decision | Answer |
+| --- | --- |
+| Waiver approver | The invoking developer; `pipeline.skippable` is the authorisation |
+| `fast` for `develop-next` / `develop-batch` | Policy only (`pipeline.defaultMode: fast`); no orchestrator flag |
+| Step 2 content identity | `reviewed_blob:` (`git hash-object`), recorded after the review's own edits |
+
+Sequencing: roadmap Phase 9 runs bug.18 first; T201 depends on it.
