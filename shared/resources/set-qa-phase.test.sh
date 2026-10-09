@@ -131,6 +131,35 @@ else
   echo "  SKIP  zsh caller (zsh not on this host)"
 fi
 
+# ── obs #275: no lock, but a pipeline on THIS branch was paused or halted ─────
+# A snapshot persists by design after a terminal HALT, so only one whose `branch` is the
+# current branch stops the helper; another branch's is a finished run and stays a noop.
+FX="$TMPDIR_TEST/paused-repo"; mkdir -p "$FX/.claude/state"
+git -C "$FX" init -q -b feature/x >/dev/null 2>&1 || { git -C "$FX" init -q >/dev/null 2>&1; git -C "$FX" checkout -q -b feature/x; }
+git -C "$FX" -c user.email=a@b -c user.name=a commit -q --allow-empty -m init
+FX_LOCK="$FX/.claude/state/develop-pipeline.lock"
+FX_SNAP="$FX/.claude/state/develop-pipeline.last-halt.json"
+snap() { printf '{"skill":"develop-task","branch":"%s","current_step":5,"halt_reason":"x"}\n' "$1" > "$2"; }
+fx_run() { ( cd "$FX" && PIPELINE_LOCK="$FX_LOCK" bash "$SCRIPT" 5b ); }
+
+snap feature/x "$FX_SNAP"
+OUT=$(fx_run 2>&1); RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q -- '--restore' && [ ! -f "$FX_LOCK" ]; then
+  pass "no lock + halt snapshot for this branch → exit 1 naming --restore, nothing created (obs #275)"
+else
+  fail "paused run on this branch refuses" "rc=$RC out=$OUT"
+fi
+snap feature/other "$FX_SNAP"
+OUT=$(fx_run 2>&1); RC=$?
+[ "$RC" -eq 0 ] && [ -z "$OUT" ] && pass "no lock + snapshot for another branch → silent noop (a finished run)" || fail "other-branch snapshot noops" "rc=$RC out=$OUT"
+rm -f "$FX_SNAP"; snap feature/x "$FX_LOCK.pausing.4242"
+OUT=$(fx_run 2>&1); RC=$?
+[ "$RC" -eq 1 ] && pass "no lock + orphaned pause claim for this branch → exit 1" || fail "claim on this branch refuses" "rc=$RC out=$OUT"
+git -C "$FX" checkout -q --detach
+OUT=$(fx_run 2>&1); RC=$?
+[ "$RC" -eq 0 ] && [ -z "$OUT" ] && pass "detached HEAD → noop (no branch to match)" || fail "detached HEAD noops" "rc=$RC out=$OUT"
+rm -f "$FX_LOCK.pausing.4242"
+
 echo ""
 echo "  set-qa-phase.test.sh: $PASS passed, $FAIL failed."
 [ "$FAIL" -eq 0 ]

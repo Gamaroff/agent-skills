@@ -42,6 +42,12 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`set-qa-phase.sh` and `set-waiting-on.sh` stop when a paused run on this branch has no lock.**
+  After a compaction, the summary carried the pre-pause lock state, the session never ran `--restore`,
+  and both helpers no-oped silently until Step 7 (task.185). They now exit 1 naming
+  `advance-pipeline-lock.sh --restore` when a halt snapshot or pause claim records the current branch.
+  The new read-only `advance-pipeline-lock.sh --paused-here` answers that question once for both. A
+  snapshot for another branch, a finished run, stays a silent no-op (obs #275).
 - **GitHub bodies no longer lose a quoted control-character escape.** GitHub stores `\u0000` as
   `\^@` and `\u001f` as `\^_`. `tracker-issue.js`, `tracker-comment.js` (GitHub only) and `create-pr`
   now send each `\u0000`–`\u001f` escape as `U+00XX` through the new `github-body-text.js`, and say
