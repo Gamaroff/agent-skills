@@ -1748,8 +1748,11 @@ The route fires — `gate-the-last-fix` — only when **all** of:
    and ended on a HIGH-0 gate (task.130 `0,1,0,1,0`; task.125 `1,1,0,1,0` — obs #139). Both were
    granted a cycle by hand and read clean. A blocker on the last gate still escalates with its
    evidence — that fix is not owed a half-cycle.
-3. `MEDIUM_N < MEDIUM_{N-1} < MEDIUM_{N-2}` — strictly falling across the last three gates. Flat, or
-   fell-then-plateaued, is not evidence that one more gate would clear.
+3. `MEDIUM_N < MEDIUM_{N-1} < MEDIUM_{N-2}` — strictly falling across the last three gates — **or
+   `MEDIUM_N == 0`**. Flat, or fell-then-plateaued, above 0 is not evidence that one more gate would
+   clear. At 0 there is no room left to fall: the last gate raised only LOW entries, and a fix that
+   answers only LOW is the fix one more gate is most likely to clear. task.173's PASS-100 gate
+   (MEDIUM `0, 0, 0`) escalated a two-line LOW fix no gate had read (obs #300).
 
 **On `gate-the-last-fix`:**
 

@@ -414,8 +414,8 @@ test("QA_MAX_CYCLES is the lock's qa_max_cycles — reconstructed count plus the
   // restoring the lock from the halt snapshot when the HALT removed it (C2-CR-1).
   assert.match(
     text.grantScript,
-    /'\.extra_cycles_granted = \$k \| \.qa_max_cycles = \(\$c \+ \$k\) \| \.qa_phase = "5a"'/,
-    "grant-qa-cycles.sh must write qa_max_cycles as the reconstructed count plus the grant, and qa_phase 5a, in one write (C3-CR-3)",
+    /'\.extra_cycles_granted = \$k \| \.qa_max_cycles = \(\$c \+ \$k\) \| \.qa_phase = \$p'/,
+    "grant-qa-cycles.sh must write qa_max_cycles as the reconstructed count plus the grant, and the re-entry qa_phase, in one write (C3-CR-3, obs #228)",
   );
   // task.124: the restore moved into advance-pipeline-lock.sh --restore, the ONE restore path.
   // The field stripping lives there; the grant script must call it and must not carry its own.
