@@ -79,7 +79,12 @@ function readJournal(dir) {
 }
 
 /** A `gh` stub that answers `issue view` from a canned comment list. */
-function stubGh({ comments = [], viewFails = false, postFails = false } = {}) {
+function stubGh({
+  comments = [],
+  viewFails = false,
+  postFails = false,
+  postLandsThenFails = false,
+} = {}) {
   const calls = [];
   const execImpl = (bin, argv, opts) => {
     calls.push({ bin, argv, input: opts && opts.input });
@@ -102,6 +107,11 @@ function stubGh({ comments = [], viewFails = false, postFails = false } = {}) {
     }
     if (argv[0] === "issue" && argv[1] === "comment") {
       if (postFails) throw new Error("gh comment failed");
+      if (postLandsThenFails) {
+        // The API created the comment and the response was lost (obs #217).
+        comments.push({ body: opts.input });
+        throw new Error("gh comment: connection reset");
+      }
       return "";
     }
     throw new Error(`unexpected gh call: ${argv.join(" ")}`);
@@ -974,10 +984,74 @@ test("a failed gh post reports unverifiable, never a silent success", async () =
     execImpl: gh.execImpl,
     repoRoot: dir,
     env: { ...baseEnv },
+    sleepImpl: () => {},
   });
   assert.equal(r.reason, "unverifiable");
   assert.equal(r.cause, "post-failed");
   assert.equal(r.posted, false);
+  assert.equal(r.writeAttempted, true, "the caller is told a write was tried");
+});
+
+test("a gh post that errors after the comment landed reports posted, from the read-back (obs #217)", async () => {
+  const dir = withRepo();
+  const f = bodyFile(dir, "body");
+  const gh = stubGh({ postLandsThenFails: true });
+  const slept = [];
+  const r = await cli.run({
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--stage",
+      "qa-gate-2",
+      "--quiet",
+    ],
+    execImpl: gh.execImpl,
+    repoRoot: dir,
+    env: { ...baseEnv },
+    sleepImpl: (ms) => slept.push(ms),
+  });
+  assert.equal(r.reason, "posted");
+  assert.equal(r.posted, true);
+  assert.equal(r.confirmedBy, "read-back");
+  assert.equal(r.exitCode, 0);
+  assert.deepEqual(slept, [1000], "one backoff, then the read found it");
+  assert.equal(
+    gh.calls.filter((c) => c.argv[0] === "issue" && c.argv[1] === "comment")
+      .length,
+    1,
+    "the read-back never posts a second time",
+  );
+});
+
+test("a gh post that errors with no comment landed reads back every delay, then reports unverifiable", async () => {
+  const dir = withRepo();
+  const f = bodyFile(dir, "body");
+  const gh = stubGh({ postFails: true });
+  const slept = [];
+  const r = await cli.run({
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--quiet",
+    ],
+    execImpl: gh.execImpl,
+    repoRoot: dir,
+    env: { ...baseEnv },
+    sleepImpl: (ms) => slept.push(ms),
+  });
+  assert.equal(r.reason, "unverifiable");
+  assert.equal(r.writeAttempted, true);
+  assert.deepEqual(slept, [1000, 2000]);
 });
 
 // ── Jira branch (QA-6) ──────────────────────────────────────────────────────
@@ -1215,9 +1289,17 @@ test("jira: a failed POST reports unverifiable", async () => {
     fetchImpl: j.fetchImpl,
     repoRoot: dir,
     env: { ...JIRA_ENV },
+    sleepImpl: () => {},
   });
   assert.equal(r.reason, "unverifiable");
   assert.equal(r.cause, "post-failed");
+  assert.equal(r.writeAttempted, true);
+  // The read-back looked again after the failed POST (obs #217).
+  const posts = j.calls.findIndex((c) => c.method === "POST");
+  assert.ok(
+    j.calls.slice(posts + 1).some((c) => c.method === "GET"),
+    "no read-back GET after the failed POST",
+  );
 });
 
 test("jira: no credentials → no-credentials, the MCP fallback's only cue", async () => {

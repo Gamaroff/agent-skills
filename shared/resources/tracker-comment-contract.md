@@ -196,10 +196,10 @@ the malformed document that risk was about.
 
 | `reason` | Means | Do |
 |---|---|---|
-| `posted` | The comment was created | Nothing |
+| `posted` | The comment was created. `confirmedBy: "read-back"` means the post errored and the engine then found its marker, so the comment landed (obs #217) | Nothing |
 | `already` | Exactly one marker match — this moment was already commented | Nothing. This is a resume, not a failure |
 | `deferred` | `access.tracker` is not `full`; recorded for the handover | Nothing — the record **is** the deliverable |
-| `unverifiable` | 2+ marker matches, or the comment list could not be read | Log in the Issues Log and continue. **Never post anyway** |
+| `unverifiable` | 2+ marker matches, or the comment list could not be read, or a post errored and the marker was still absent after the engine's read-back. The last case carries `writeAttempted: true` | Log in the Issues Log and continue. **Never post anyway**. With `writeAttempted: true`, re-query before suspecting a missing comment |
 | `no-credentials` | No usable auth | The one case where the MCP fallback applies — below |
 | `dry-run` | `--dry-run` was passed; nothing read, nothing written | Nothing |
 
