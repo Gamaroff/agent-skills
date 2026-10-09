@@ -1,8 +1,8 @@
 # Task Registry
 
 **Purpose:** Central tracking for all task numbers in this repo.
-**Last Updated:** 2026-10-07
-**Next Available Task Number:** **201**
+**Last Updated:** 2026-10-09
+**Next Available Task Number:** **202**
 
 ## How to use
 
@@ -242,6 +242,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 198 | [Skill reference and discoverability docs](task.198.skill-reference-and-discoverability-docs/task.198.skill-reference-and-discoverability-docs.md) | planned | documentation | Medium | 2026-10-07 | [#601](https://github.com/Gamaroff/agent-skills/issues/601) | — after PR #598 merges; 27 doc-drift findings: commands and activation phrases, skills missing from or wrongly named in maps and READMEs |
 | 199 | [Setup, configuration and process docs](task.199.setup-config-and-process-docs/task.199.setup-config-and-process-docs.md) | planned | documentation | Medium | 2026-10-07 | [#602](https://github.com/Gamaroff/agent-skills/issues/602) | — after PR #598 merges; 20 doc-drift findings: install wizard, credentials file, hooks, platform resolution, pipeline moments, release.sh CI check, bug docs |
 | 200 | [Tracker side effects after their gate](task.200.tracker-side-effects-after-their-gate/task.200.tracker-side-effects-after-their-gate.md) | planned | refactoring | Medium | 2026-10-09 | [#616](https://github.com/Gamaroff/agent-skills/issues/616) | — develop-bug opens its tracker issue only after review-bug's READY TO FIX and cleans up a paperwork-only branch on a halt; one doc-link-branch resolver replaces nine @{u} derivations so a card links to the document's own branch or the default (obs #220, #287) |
+| 201 | [Pipeline up-front answers and speed modes](task.201.pipeline-upfront-answers-and-speed-modes/task.201.pipeline-upfront-answers-and-speed-modes.md) | draft | feature | Medium | 2026-10-09 | [#621](https://github.com/Gamaroff/agent-skills/issues/621) | bug.18 · developer-supplied Phase 0d answers (flag → policy → recommendation → ask), `--defaults` replacing the orchestrator directive, automatic Step 2 reuse, `--mode fast`/`--skip` within a consumer allow-list recorded as WAIVED, per-step timestamps; from a consumer step-timing measurement |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
