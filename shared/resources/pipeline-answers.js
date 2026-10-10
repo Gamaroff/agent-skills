@@ -385,11 +385,28 @@ function resolveSkips(pipeline, flags, policy, invoker, refused, persisted) {
   const requested = Array.isArray(flags.skip) ? flags.skip : [];
   // Same rule as the mode: a resumed run keeps the skips it recorded.
   if (Array.isArray(persisted.skips) && pipeline !== "bug") {
-    const kept = persisted.skips.filter((s) => SKIP_VOCABULARY.includes(s));
+    // Still re-checked against the CURRENT allow-list: the consumer owns the
+    // ceiling, and a skip it withdrew between the halt and the resume is
+    // withdrawn from the resumed run too (gate 2, CR-7).
+    const kept = [];
+    for (const s of persisted.skips) {
+      if (!SKIP_VOCABULARY.includes(s)) continue;
+      if (!policy.skippable.includes(s)) {
+        refused.push({
+          flag: "develop.skippable",
+          value: s,
+          reason: `this run recorded --skip ${s}, but develop.skippable no longer lists it — the skip is withdrawn`,
+        });
+        continue;
+      }
+      if (!kept.includes(s)) kept.push(s);
+    }
+    // Sets, compared both ways: duplicates must not make two sets equal (CR-6).
+    const want = new Set(requested.map((s) => String(s).trim()));
+    const have = new Set(kept);
     const same =
       requested.length === 0 ||
-      (requested.length === kept.length &&
-        requested.every((s) => kept.includes(s)));
+      (want.size === have.size && [...want].every((s) => have.has(s)));
     if (!same)
       refused.push({
         flag: "--skip",
@@ -514,6 +531,16 @@ function resolveAnswers(input) {
         source: SOURCES.PERSISTED,
         reason: conflict,
       });
+    } else if (
+      (q.key === "base" || q.key === "target") &&
+      recommended !== null &&
+      !isRefName(recommended) &&
+      (flags.defaults === true || pipeline === "bug")
+    ) {
+      // A recommendation is recorded only when it is a name this module would
+      // accept from a flag — an epic's integration_branch is used verbatim from
+      // the epic document, so it is checked like any other value (gate 2, CR-3).
+      conflict = `the recommended ${q.key === "base" ? "base" : "PR target"} "${recommended}" is not a branch name this pipeline will pass to git`;
     } else if (pipeline === "bug" && q.key !== "branchModel") {
       // develop-bug never asks Q2/Q3: they follow Q1 (develop-bug §0d). With Q1
       // still to be asked, they are derived from its answer, not asked themselves.
@@ -567,22 +594,49 @@ function resolveAnswers(input) {
       ? SOURCES.FLAG
       : SOURCES.NONE;
 
-  const shortened = mode === "lite" || mode === "fast";
-  const effective = {
-    runReview: !skips.includes("review"),
-    qaDepth: shortened || skips.includes("qa-depth") ? "direct-tools" : "full",
-    reviewPrEffort:
-      shortened || skips.includes("review-pr-depth") ? "low" : "medium",
-  };
-
-  const waived = skips.filter((s) => STEP_SKIPS.includes(s));
-  const waiver = waived.length
-    ? {
+  // On a resume the waiver is the one the lock recorded — its approver is the
+  // developer who asked for the skip, not whoever resumes the run (gate 2, CR-1).
+  // A recorded step skip whose waiver names no approver, resumed by someone
+  // with no git user.name, cannot be approved by anyone: the skip is withdrawn
+  // with the reason, exactly as a fresh skip with no approver is refused.
+  const pw = persistedAnswers.waiver;
+  const persistedWaiver =
+    skipsPersisted && pw && typeof pw === "object" && str(pw.approved_by)
+      ? {
+          active: true,
+          reason: str(pw.reason),
+          approved_by: str(pw.approved_by),
+        }
+      : null;
+  let waived = skips.filter((s) => STEP_SKIPS.includes(s));
+  if (waived.length && !persistedWaiver && !str(invoker)) {
+    for (const s of waived)
+      refused.push({
+        flag: "--skip",
+        value: s,
+        reason:
+          "a skipped step is recorded as a waiver, and a waiver needs an approver — none is recorded and git config user.name is unset",
+      });
+    answers.skips = skips.filter((s) => !STEP_SKIPS.includes(s));
+    waived = [];
+  }
+  const finalSkips = answers.skips;
+  const waiver = !waived.length
+    ? null
+    : persistedWaiver || {
         active: true,
         reason: waived.map((s) => `${s} skipped: --skip ${s}`).join("; "),
         approved_by: str(invoker),
-      }
-    : null;
+      };
+
+  const shortened = mode === "lite" || mode === "fast";
+  const effective = {
+    runReview: !finalSkips.includes("review"),
+    qaDepth:
+      shortened || finalSkips.includes("qa-depth") ? "direct-tools" : "full",
+    reviewPrEffort:
+      shortened || finalSkips.includes("review-pr-depth") ? "low" : "medium",
+  };
 
   return {
     pipeline,
@@ -649,7 +703,7 @@ function gateFor(input) {
 // ── CLI ────────────────────────────────────────────────────────────────────
 
 const USAGE = `usage:
-  pipeline-answers.js resolve --pipeline story|task|bug --args "<skill arguments>"
+  pipeline-answers.js resolve --pipeline story|task|bug (--args "<skill arguments>" | --args-stdin)
       [--derived-base B] [--derived-target T] [--epic-branch E] [--branch-model-derived M]
       [--detector lite|standard] [--policy-mode M] [--policy-skippable "a, b"]
       [--persisted-file LOCK.json] [--invoker NAME] [--json]
@@ -662,6 +716,7 @@ function cliOptions(argv) {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--json") opts.json = true;
+    else if (a === "--args-stdin") opts["args-stdin"] = true;
     else if (a.startsWith("--") && i + 1 < argv.length)
       opts[a.slice(2)] = argv[++i];
     else opts._bad = a;
@@ -673,7 +728,11 @@ function readPersisted(file) {
   if (!file) return null;
   try {
     const lock = JSON.parse(require("node:fs").readFileSync(file, "utf8"));
-    return lock && typeof lock.answers === "object" ? lock.answers : null;
+    if (!lock || typeof lock.answers !== "object" || lock.answers === null)
+      return null;
+    // The lock's waiver travels with its answers: a resume keeps the approver
+    // the skip was recorded with (gate 2, CR-1).
+    return { ...lock.answers, waiver: lock.waiver || null };
   } catch {
     // A missing or unreadable lock is the legacy / no-lock state: nothing persisted.
     return null;
@@ -709,7 +768,37 @@ function main(argv) {
       process.exitCode = 2;
       return;
     }
-    const parsed = parseArgs(o.args || "");
+    // --args-stdin: the skill's arguments arrive on stdin, from a quoted heredoc,
+    // so no quote, $ or backtick in them is ever seen by a shell (gate 2, CR-2).
+    let rawArgs = o.args || "";
+    if (o["args-stdin"]) {
+      try {
+        rawArgs = require("node:fs").readFileSync(0, "utf8").trim();
+      } catch {
+        rawArgs = "";
+      }
+    }
+    if (/^\{[^}]*\}$/.test(rawArgs.trim())) {
+      process.stderr.write(
+        `unsubstituted placeholder: --args ${rawArgs.trim()}\n${USAGE}\n`,
+      );
+      process.exitCode = 2;
+      return;
+    }
+    // The lite verdict is lite or standard. Anything else is a call that did
+    // not substitute it, and silently reading it as standard is the guess this
+    // module refuses to make (gate 2, CR-8).
+    if (
+      o.detector !== undefined &&
+      !["lite", "standard"].includes(o.detector)
+    ) {
+      process.stderr.write(
+        `--detector must be lite or standard, not "${o.detector}"\n${USAGE}\n`,
+      );
+      process.exitCode = 2;
+      return;
+    }
+    const parsed = parseArgs(rawArgs);
     out = resolveAnswers({
       pipeline: o.pipeline,
       flags: parsed.flags,

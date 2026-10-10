@@ -641,6 +641,7 @@ module.exports = {
   reportReviewedBlob,
   isReviewedBlobLine,
   blankNonProse,
+  splitFrontmatter,
   taskUpdatedDate,
   // classify
   classifyReviewReport,

@@ -18,7 +18,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -150,58 +150,68 @@ test("2: §0d (story/task) and develop-bug §0d call resolve with flags the CLI 
   }
 });
 
-/** Variables a block reads but never assigns. Single-quoted text (jq programs) is not shell. */
+/**
+ * Variables a block reads before any line of it assigns them. Single-quoted text
+ * (jq programs) and quoted-heredoc bodies are not shell. Order counts: a read
+ * above its assignment is unbound when that line runs (gate 2, CR-9).
+ */
 function unboundReads(block) {
+  block = block.replace(/<<'(\w+)'[^\n]*\n[\s\S]*?\n\1(?=\n|$)/g, "");
   block = block.replace(/'[^'\n]*'/g, "''");
-  const reads = new Set(
-    [...block.matchAll(/\$\{?([A-Za-z_][A-Za-z0-9_]*)/g)].map((m) => m[1]),
-  );
-  const assigned = new Set(
-    [...block.matchAll(/(?:^|[\s;(])([A-Za-z_][A-Za-z0-9_]*)=/gm)].map(
-      (m) => m[1],
-    ),
-  );
-  return [...reads].filter((n) => !assigned.has(n));
+  const firstAssign = new Map();
+  for (const m of block.matchAll(/(?:^|[\s;(])([A-Za-z_][A-Za-z0-9_]*)=/gm))
+    if (!firstAssign.has(m[1])) firstAssign.set(m[1], m.index);
+  const out = new Set();
+  for (const m of block.matchAll(/\$\{?([A-Za-z_][A-Za-z0-9_]*)/g)) {
+    const at = firstAssign.get(m[1]);
+    if (at === undefined || at > m.index) out.add(m[1]);
+  }
+  return [...out];
 }
 
-test("2c: every task.201 block binds what it reads (gate 1, QA-1 — each fenced block is its own shell)", () => {
-  const sites = [
-    [
-      "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md",
-      "pipeline-answers.js resolve",
-    ],
-    [
-      "skills/develop-bug/references/develop-bug-step-0-resolve-bug.md",
-      "pipeline-answers.js resolve",
-    ],
-    [
-      "shared/resources/develop-pipeline-step-5-6-qa-loop.md",
-      "pipeline-answers.js gate",
-    ],
-    [
-      "shared/resources/develop-pipeline-step-1-create-branch.md",
-      "pipeline-answers.json",
-    ],
-  ];
-  for (const [file, marker] of sites) {
-    const blocks = bashBlocks(read(file)).filter((b) => b.includes(marker));
-    assert.equal(
-      blocks.length,
-      1,
-      `${file}: expected one block containing ${marker}`,
-    );
-    assert.deepEqual(
-      unboundReads(blocks[0]),
-      [],
-      `${file}: reads a variable no line of the block assigns`,
-    );
+// The population: every fenced block, in every source file this repository
+// executes, that calls one of task.201's engines or reads the lock fields it
+// adds. Derived, not listed — a hand list misses the site nobody named.
+const POPULATION_RE =
+  /pipeline-answers|record-reviewed-blob|hash-object|\.answers\b|\.waiver\b/;
+function sourceFiles() {
+  const out = [];
+  for (const f of readdirSync(join(ROOT, "shared/resources")))
+    if (f.endsWith(".md")) out.push(`shared/resources/${f}`);
+  for (const sk of readdirSync(join(ROOT, "skills"))) {
+    if (existsSync(join(ROOT, "skills", sk, "SKILL.md")))
+      out.push(`skills/${sk}/SKILL.md`);
   }
-  // Non-vacuity: the rule sees a read the block does not bind.
+  out.push("skills/develop-bug/references/develop-bug-step-0-resolve-bug.md");
+  return out;
+}
+
+test("2c: every block that touches task.201's engines binds what it reads, before it reads it (QA-1, CR-9)", () => {
+  const hits = [];
+  for (const file of sourceFiles())
+    for (const b of bashBlocks(read(file)))
+      if (POPULATION_RE.test(b)) hits.push([file, b]);
+  // Non-vacuity floor: §0d, develop-bug §0d, Step 1, Step 2, the QA loop and three review skills.
+  assert.ok(
+    hits.length >= 8,
+    `population is only ${hits.length} — the scan found less than the change touched`,
+  );
+  const bad = hits
+    .map(([f, b]) => [f, unboundReads(b)])
+    .filter(([, r]) => r.length);
+  assert.deepEqual(
+    bad,
+    [],
+    "a block reads a variable no earlier line of it assigns",
+  );
+  // The rule sees a read the block does not bind, and one above its assignment.
   assert.deepEqual(unboundReads('x --detector "$PIPELINE_MODE"'), [
     "PIPELINE_MODE",
   ]);
+  assert.deepEqual(unboundReads('echo "$A"\nA=1'), ["A"]);
   assert.deepEqual(unboundReads('A=$(date)\necho "$A"'), []);
   assert.deepEqual(unboundReads("jq '.x = $a' f"), []);
+  assert.deepEqual(unboundReads("cat <<'EOF'\n$NOT_SHELL\nEOF\n"), []);
 });
 
 test("2b: the 0f summary shows a source for every answer", () => {

@@ -97,11 +97,13 @@ Q3 (and must match the branch model, or the question is asked with the conflict 
 ```bash
 mkdir -p .claude/state
 command node .agents/skills/develop-bug/references/pipeline-answers.js resolve \
-  --pipeline bug --args "{the skill's arguments, verbatim}" \
+  --pipeline bug --args-stdin \
   --branch-model-derived "{Q1's Recommended option: bugfix or hotfix}" \
   --persisted-file .claude/state/develop-pipeline.lock \
-  --invoker "$(git config user.name)" --json > .claude/state/pipeline-answers.json \
+  --invoker "$(git config user.name)" --json > .claude/state/pipeline-answers.json <<'ARGS' \
   || { echo "HALT: pipeline-answers.js could not resolve the up-front answers"; exit 1; }
+{the skill's arguments, verbatim}
+ARGS
 jq -c '{answers, sources, questions: [.questions[].id], refused}' .claude/state/pipeline-answers.json
 ```
 

@@ -155,3 +155,39 @@ test("4c: re-stamping is idempotent — write N and write N+1 are byte-identical
   const once = stampReport("# R\n\n**Reviewed:** 2026-10-10\nbody\n", BLOB);
   assert.equal(stampReport(once, BLOB), once);
 });
+
+test("5a: frontmatter is what the reader calls frontmatter — quoted and spaced keys go (gate 2, CR-4)", () => {
+  const old = "a".repeat(40);
+  for (const key of [
+    `reviewed_blob: ${old}`,
+    `"reviewed_blob": ${old}`,
+    `reviewed_blob : ${old}`,
+  ]) {
+    const out = stampReport(
+      `---\ntype: review\n${key}\n---\n**Reviewed:** 2026-10-10\n`,
+      BLOB,
+    );
+    assert.deepEqual(
+      reportReviewedBlob(out),
+      { blob: BLOB, ambiguous: false },
+      key,
+    );
+  }
+  // A --- block the reader does not accept as YAML is body, for the writer too.
+  const notYaml = stampReport(
+    `---\nsome prose, not yaml\nreviewed_blob: ${old}\n---\n**Reviewed:** 2026-10-10\n`,
+    BLOB,
+  );
+  assert.deepEqual(reportReviewedBlob(notYaml), {
+    blob: BLOB,
+    ambiguous: false,
+  });
+});
+
+test("5b: a stamp line that opens a comment keeps the comment; nothing below changes view (CR-5)", () => {
+  const old = "a".repeat(40);
+  const text = `# R\n\n**Reviewed:** 2026-10-10\n**reviewed_blob:** ${old} <!-- note\nreviewed_blob: ${"b".repeat(40)}\n-->\nbody\n`;
+  const out = stampReport(text, BLOB);
+  assert.ok(out.includes("<!-- note"), "the comment opener survives");
+  assert.deepEqual(reportReviewedBlob(out), { blob: BLOB, ambiguous: false });
+});

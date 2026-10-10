@@ -670,6 +670,193 @@ test("11g: the CLI refuses an unsubstituted {placeholder} (exit 2), never reads 
   assert.match(err, /unsubstituted placeholder: --epic-branch/);
 });
 
+// ── 12. QA cycle 2 fixes (gate 2) ──────────────────────────────────────────
+
+test("12a: a resume keeps the lock's waiver and its approver, whoever resumes (CR-1)", () => {
+  const persisted = {
+    base: "develop",
+    target: "develop",
+    mode: "standard",
+    skips: ["review"],
+    waiver: {
+      active: true,
+      reason: "review skipped: --skip review",
+      approved_by: "Original Dev",
+    },
+  };
+  for (const invoker of ["Someone Else", ""]) {
+    const r = run("doc.md", { policy: ALL, persisted, invoker });
+    assert.equal(r.waiver.approved_by, "Original Dev", JSON.stringify(invoker));
+    assert.deepEqual(r.answers.skips, ["review"]);
+  }
+});
+
+test("12b: a recorded step skip with no approver anywhere is withdrawn, with the reason", () => {
+  const r = run("doc.md", {
+    policy: ALL,
+    persisted: {
+      mode: "standard",
+      skips: ["review"],
+      base: "develop",
+      target: "develop",
+    },
+    invoker: "",
+  });
+  assert.deepEqual(r.answers.skips, []);
+  assert.equal(r.waiver, null);
+  assert.equal(r.effective.runReview, true);
+  assert.match(r.refused[0].reason, /needs an approver/);
+});
+
+test("12c: --args-stdin passes quoted values untouched; an unsubstituted args placeholder is exit 2 (CR-2)", () => {
+  const base = [
+    MODULE_PATH,
+    "resolve",
+    "--pipeline",
+    "task",
+    "--args-stdin",
+    "--derived-base",
+    "develop",
+    "--derived-target",
+    "develop",
+    "--policy-skippable",
+    "review, qa-depth",
+    "--invoker",
+    "Dev",
+    "--json",
+  ];
+  const out = JSON.parse(
+    execFileSync(process.execPath, base, {
+      input: 'doc.md --defaults --skip "review, qa-depth" $(touch PWNED)\n',
+      encoding: "utf8",
+    }),
+  );
+  assert.deepEqual(out.answers.skips, ["review", "qa-depth"]);
+  assert.ok(
+    out.positional.includes("$(touch"),
+    "the substitution reached the parser as text, unexpanded",
+  );
+  let code = 0;
+  try {
+    execFileSync(process.execPath, base, {
+      input: "{the skill's arguments, verbatim}\n",
+      stdio: "pipe",
+    });
+  } catch (e) {
+    code = e.status;
+  }
+  assert.equal(code, 2);
+});
+
+test("12d: a recommendation that is not a safe ref name is asked about under --defaults (CR-3)", () => {
+  const r = run("doc.md --defaults", {
+    pipeline: "story",
+    derived: { ...TASK, epicBranch: "epic/x y" },
+  });
+  assert.deepEqual(
+    r.questions.map((q) => q.id),
+    ["Q1", "Q2"],
+  );
+  assert.match(r.questions[0].reason, /not a branch name/);
+});
+
+test("12e: duplicate --skip values cannot make different sets compare equal (CR-6)", () => {
+  const r = run("doc.md --skip qa-depth,qa-depth", {
+    policy: ALL,
+    persisted: {
+      mode: "standard",
+      skips: ["qa-depth", "review"],
+      base: "develop",
+      target: "develop",
+    },
+  });
+  assert.match(
+    r.refused.find((x) => x.flag === "--skip").reason,
+    /already recorded skips/,
+  );
+});
+
+test("12f: a persisted skip the allow-list no longer lists is withdrawn on resume (CR-7)", () => {
+  const r = run("doc.md", {
+    policy: { skippable: ["qa-depth"] },
+    persisted: {
+      mode: "standard",
+      skips: ["review", "qa-depth"],
+      base: "develop",
+      target: "develop",
+    },
+  });
+  assert.deepEqual(r.answers.skips, ["qa-depth"]);
+  assert.match(r.refused[0].reason, /no longer lists it/);
+});
+
+test("12g: --detector accepts only lite or standard (CR-8)", () => {
+  for (const bad of ["Lite", "lite mode", ""]) {
+    let code = 0;
+    try {
+      execFileSync(
+        process.execPath,
+        [
+          MODULE_PATH,
+          "resolve",
+          "--pipeline",
+          "task",
+          "--args",
+          "doc.md",
+          "--detector",
+          bad,
+          "--json",
+        ],
+        { stdio: "pipe" },
+      );
+    } catch (e) {
+      code = e.status;
+    }
+    assert.equal(code, 2, JSON.stringify(bad));
+  }
+});
+
+test("12h: resolve reads the lock's waiver beside its answers", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pa-w-"));
+  const lock = join(dir, "lock.json");
+  writeFileSync(
+    lock,
+    JSON.stringify({
+      answers: {
+        base: "develop",
+        target: "develop",
+        mode: "standard",
+        skips: ["review"],
+      },
+      waiver: {
+        active: true,
+        reason: "review skipped: --skip review",
+        approved_by: "Original Dev",
+      },
+    }),
+  );
+  const out = JSON.parse(
+    execFileSync(
+      process.execPath,
+      [
+        MODULE_PATH,
+        "resolve",
+        "--pipeline",
+        "task",
+        "--args",
+        "doc.md",
+        "--policy-skippable",
+        "review",
+        "--persisted-file",
+        lock,
+        "--json",
+      ],
+      { encoding: "utf8" },
+    ),
+  );
+  assert.equal(out.waiver.approved_by, "Original Dev");
+});
+
 // ── 10. mutation proof ─────────────────────────────────────────────────────
 // Revert one rule in a copy of the module; the case named beside it must fail.
 

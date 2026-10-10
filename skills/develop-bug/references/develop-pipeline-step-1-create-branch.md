@@ -185,7 +185,7 @@ what this pipeline's resume reads:
 ```bash
 if [ -f .claude/state/pipeline-answers.json ]; then
   jq --slurpfile a .claude/state/pipeline-answers.json \
-     '. + {answers: $a[0].answers, answer_sources: $a[0].sources, waiver: $a[0].waiver}' \
+     '. + {answers: $a[0].answers, answer_sources: $a[0].sources, waiver: (.waiver // $a[0].waiver)}' \
      .claude/state/develop-pipeline.lock > .claude/state/develop-pipeline.lock.tmp \
     && mv .claude/state/develop-pipeline.lock.tmp .claude/state/develop-pipeline.lock \
     && rm -f .claude/state/pipeline-answers.json
@@ -193,7 +193,9 @@ fi
 ```
 
 `advance-pipeline-lock.sh` rewrites the lock with `jq` and `--restore` deletes only the halt/pause
-fields and `waiting_on`, so `answers` survives every advance, pause and restore. A lock written before
+fields and `waiting_on`, so `answers` survives every advance, pause and restore. A waiver already in
+the lock is kept (`.waiver // …`): §0d also runs this block on a resume, and the approver is the
+developer who asked for the skip, not whoever resumes the run (gate 2, CR-1). A lock written before
 task.201 has no `answers`; §0d then asks as it always did.
 
 ### Shared note

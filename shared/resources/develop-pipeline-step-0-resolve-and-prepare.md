@@ -701,6 +701,8 @@ asked about with the conflict stated. The rule lives once, in the engine — nev
 | `--skip review,qa-depth,review-pr-depth` | skips (never asked) | `develop.skippable` — the allow-list, default empty |
 
 ```bash
+# The skill's arguments go in the quoted heredoc at the end, never inside a "…" string:
+# a quote, $ or backtick in them would break the quoting or be expanded (gate 2, CR-2).
 # Every input is a {placeholder} substituted into THIS block — none is a shell variable
 # carried from another block, which would not exist here: the skill's raw arguments,
 # the two Recommended options derived above, the epic pre-check's integration branch
@@ -711,14 +713,16 @@ POLICY_MODE=$(read_nested_config_key develop defaultMode)
 POLICY_SKIPPABLE=$(read_nested_config_key develop skippable)
 mkdir -p .claude/state
 command node .agents/skills/{develop-story|develop-task}/references/pipeline-answers.js resolve \
-  --pipeline {story|task} --args "{the skill's arguments, verbatim}" \
+  --pipeline {story|task} --args-stdin \
   --derived-base "{Q1's Recommended option}" --derived-target "{Q2's Recommended option}" \
   --epic-branch "{EPIC_BRANCH from the epic pre-check, or empty}" \
   --detector "{PIPELINE_MODE from 0a-parallel: lite or standard}" \
   --policy-mode "$POLICY_MODE" --policy-skippable "$POLICY_SKIPPABLE" \
   --persisted-file .claude/state/develop-pipeline.lock \
-  --invoker "$(git config user.name)" --json > .claude/state/pipeline-answers.json \
+  --invoker "$(git config user.name)" --json > .claude/state/pipeline-answers.json <<'ARGS' \
   || { echo "HALT: pipeline-answers.js could not resolve the up-front answers"; exit 1; }
+{the skill's arguments, verbatim}
+ARGS
 jq -c '{answers, sources, questions: [.questions[].id], refused, effective}' .claude/state/pipeline-answers.json
 ```
 

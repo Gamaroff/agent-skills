@@ -33,6 +33,7 @@ const {
   reportReviewedBlob,
   isReviewedBlobLine,
   blankNonProse,
+  splitFrontmatter,
 } = require("./review-report-freshness.js");
 
 const ANCHOR_RE =
@@ -49,31 +50,39 @@ const ANCHOR_RE =
  */
 function stampReport(reportText, blob) {
   const eol = reportText.includes("\r\n") ? "\r\n" : "\n";
-  let lines = reportText.split(/\r?\n/);
-  // Frontmatter: a first line of `---` and its closer. Its stamp key goes.
-  let bodyStart = 0;
-  if (lines[0] !== undefined && lines[0].trim() === "---") {
-    const close = lines.findIndex(
-      (l, i) => i > 0 && (l.trim() === "---" || l.trim() === "..."),
-    );
-    if (close > 0) {
-      lines = lines.filter(
-        (l, i) => !(i > 0 && i < close && /^reviewed_blob:/.test(l)),
-      );
-      bodyStart =
-        lines.findIndex(
-          (l, i) => i > 0 && (l.trim() === "---" || l.trim() === "..."),
-        ) + 1;
+  const lines = reportText.split(/\r?\n/);
+  // Frontmatter is what the READER calls frontmatter (gate 2, CR-4): its
+  // splitFrontmatter rejects a `---` block that is not YAML, and such a block
+  // stays body here too. Within real frontmatter, every key spelling the reader
+  // accepts (`reviewed_blob:`, `"reviewed_blob":`, `reviewed_blob :`) goes.
+  const { body: bodyText } = splitFrontmatter(reportText);
+  const bodyLines =
+    bodyText === reportText ? lines.length : bodyText.split(/\r?\n/).length;
+  const fmEnd = lines.length - bodyLines;
+  const head = lines
+    .slice(0, fmEnd)
+    .filter((l, i) => i === 0 || !/^\s*["']?reviewed_blob["']?\s*:/.test(l));
+  let body = lines.slice(fmEnd);
+  const prose = blankNonProse(body.join("\n")).split("\n");
+  // A stamp line is deleted only when the raw line IS the stamp. A line that
+  // carries more than its prose view shows (an unclosed `<!--`, a trailing
+  // comment) keeps its other content; its hash is rewritten instead, so the
+  // reader still sees one hash and nothing below it changes view (CR-5).
+  const out = [];
+  const outProse = [];
+  body.forEach((l, i) => {
+    const view = prose[i] || "";
+    if (!isReviewedBlobLine(view)) {
+      out.push(l);
+      outProse.push(view);
+    } else if (l.trim() !== view.trim()) {
+      out.push(l.replace(/[0-9a-fA-F]{40}(?:[0-9a-fA-F]{24})?/, blob));
+      outProse.push(view);
     }
-  }
-  const head = lines.slice(0, bodyStart);
-  let body = lines.slice(bodyStart);
-  let prose = blankNonProse(body.join("\n")).split("\n");
-  const keep = body.map((_, i) => !isReviewedBlobLine(prose[i] || ""));
-  body = body.filter((_, i) => keep[i]);
-  prose = prose.filter((_, i) => keep[i]);
+  });
+  body = out;
   const stamp = `**reviewed_blob:** ${blob}`;
-  const at = prose.findIndex((l) => ANCHOR_RE.test(l));
+  const at = outProse.findIndex((l) => ANCHOR_RE.test(l));
   if (at >= 0) body.splice(at + 1, 0, stamp);
   else {
     while (body.length && body[body.length - 1] === "") body.pop();
