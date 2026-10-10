@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Major'
 priority: 'High'
 created: '2026-10-09'
@@ -11,7 +11,7 @@ description: 'develop-next and develop-batch hardcode the Phase 0d base and PR-t
 
 **Bug ID**: bug.18
 **Related**: none — cross-cutting (`develop-next` · `develop-batch` · Phase 0d)
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Priority**: High
 **Severity**: Major
 **Created**: 2026-10-09
@@ -258,15 +258,14 @@ The reported failure no longer reproduces.
 | 2026-10-10 | Ready for QA | develop-bug | Fix implemented + regression tests; `npm run ci:fast` 5175 pass / 0 fail |
 | 2026-10-10 | Ready for QA | develop-bug | Fix verified — bug scenario gone (verify cycle 1; 3 non-blocking review findings applied) |
 | 2026-10-10 | Ready for QA | finalise | DoD verified — bug.18.dod.1.autonomous-runs-hardcode-base-branch.md |
+| 2026-10-10 | Closed | develop-bug | Fix verified and accepted |
 
 ---
 
 ## Resolution Summary
 
-[Will be completed when bug is closed]
-
-**Final Status**: [Closed status]
-**Total Iterations**: [Number]
-**Time to Resolution**: [Duration]
-**Final Fix Details**: [Summary]
-**Lessons Learned**: [Key takeaways]
+**Final Status**: Closed — Fixed
+**Total Iterations**: 1
+**Time to Resolution**: 1 day (filed 2026-10-09, closed 2026-10-10)
+**Final Fix Details**: Both orchestrator directives restated Phase 0d's per-item branch answers as constants, so an `epic-integration` story was told to use `develop`. `develop-next`'s directive now takes Phase 0d's Recommended option and names no branch. `develop-batch`'s names `<baseBranch>` (its worktree's base) only beside a HALT for an integration branch. `select-next.mjs --batch` excludes `epic-integration` stories with a logged reason and names unresolved epics in `lint.warnings`. PR #625.
+**Lessons Learned**: An instruction that says "take the recommendation" and then names the answer has two answers, and the named one wins. A directive that hands work to another skill should defer to that skill's derivation, or state the exception it handles. The new guard (`orchestrator-directive-branch-literal.test.mjs`) makes that rule mechanical for both orchestrators. The review also showed that a deferral can be wrong in the other direction: Phase 0d's own option reads `develop`, which is not every consumer's base, so `develop-batch` still has to name its worktree's base.
