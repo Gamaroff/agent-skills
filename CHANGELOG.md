@@ -6,6 +6,13 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **`npm install` links the skill directories in a contributor checkout.** The `prepare` script now
+  runs `scripts/link-skills.sh`, which creates the gitignored `.agents/skills -> ../skills` and
+  `.claude/skills -> ../.agents/skills` links. It is skipped when `CI` is set, so CI's checkout keeps
+  failing on any test that reaches `.agents/skills/…` from the repository root (obs #149). It never
+  replaces an existing path and always exits 0. `CLAUDE.md` is now a symlink to `AGENTS.md` instead
+  of a three-line `@AGENTS.md` import stub.
+
 - **`create-branch` names a bug branch after the bug file.** A new **Bugfix** row,
   `bugfix/<bug-file-stem>` (e.g. `bugfix/task.110.bug.1.whitelist-admits-mutating-shapes`), covers the
   bug files `develop-bug` hands it. Without one, merged bug branches came out in three shapes (obs #304).
