@@ -15,7 +15,7 @@ Policy baseline (user-ratified 2026-07-11): auto-merge everything green; auto-an
 - User says `/develop-next` (one item) or `/loop /develop-next` (continuous).
 - User says "do the next roadmap item", "keep the roadmap rolling", "what's next — build it".
 - `--dry-run`: report which item would be selected and why, then stop. **Read-only** — no checkout, no pull, no state file, no pipeline actions.
-- `--batch` (planning aid, not a loop mode): `node .agents/skills/develop-next/scripts/select-next.mjs --batch` prints a **maximal set of ready rows that can be developed concurrently in separate git worktrees** — dependency-ready (same predicate as selection) **and** write-disjoint (no two share a `touches:` tag either marks `!`). Emits the batch, the soft overlaps accepted, rows held back by hard conflicts, and `git worktree add … develop` commands. Requires rows to carry `touches:` annotations (see [references/roadmap-selection.md](references/roadmap-selection.md) §Parallel batch). Advisory — runs nothing; the operator fans out worktrees and **merges to `develop` serially**.
+- `--batch` (planning aid, not a loop mode): `node .agents/skills/develop-next/scripts/select-next.mjs --batch` prints a **maximal set of ready rows that can be developed concurrently in separate git worktrees** — dependency-ready (same predicate as selection) **and** write-disjoint (no two share a `touches:` tag either marks `!`). Emits the batch, the soft overlaps accepted, rows held back by hard conflicts or by an `epic-integration` epic (bug.18 — a worktree cut from the base branch cannot honour an integration branch), and `git worktree add … develop` commands. Requires rows to carry `touches:` annotations (see [references/roadmap-selection.md](references/roadmap-selection.md) §Parallel batch). Advisory — runs nothing; the operator fans out worktrees and **merges to `develop` serially**.
 
 ## Configuration
 
@@ -123,7 +123,15 @@ Act on the JSON `status`:
 
 Invoke the item's named command (`/develop-story <path>`, `/develop-task <path>` or `/develop-bug <path>`), prepending this directive to the invocation context (same mechanism as the lite-mode directive in `develop-pipeline-autonomous-defaults.md` — the pipeline's own reference files are AUTO-GENERATED and must not be edited). Mark `dispatched: true` in the run state.
 
-> **AUTONOMOUS RUN (develop-next):** For the Phase 0d Upfront Setup questions, take the auto-derived recommended option for **every** question without prompting — whatever that pipeline's question set is. For `/develop-story` and `/develop-task` that is Q1 = base branch, `develop` and Q2 = PR target, `develop`. For `/develop-bug` it is Q1 = branch model (**bugfix** unless the bug is explicitly a production regression), with Q2 base branch and Q3 PR target auto-derived from Q1 — do **not** re-map the story/task Q-numbers onto it. For the Phase 0b resume prompt, take the option Phase 0b marks **(Recommended)** — after a finalise DoD-gaps halt that is "Re-enter QA at 5a"; only when no option is marked, choose "Resume from last completed step". Record every auto-answer in the Decisions Log. All existing HALT conditions remain HALTs.
+> **AUTONOMOUS RUN (develop-next):** For the Phase 0d Upfront Setup questions, take the option Phase 0d marks **(Recommended)** for **every** question without prompting — whatever that pipeline's question set is — and never substitute an answer of your own. The recommendation is derived per item: for a `/develop-story` whose epic declares `branch_model: epic-integration` it is that epic's integration branch for both the base and the PR target, and Q1 and Q2 must agree. For `/develop-bug`, Q1 is the branch model (**bugfix** unless the bug is explicitly a production regression), with Q2 base branch and Q3 PR target auto-derived from Q1 — do **not** re-map the story/task Q-numbers onto it. For the Phase 0b resume prompt, take the option Phase 0b marks **(Recommended)** — after a finalise DoD-gaps halt that is "Re-enter QA at 5a"; only when no option is marked, choose "Resume from last completed step". Record every auto-answer, and the option it took, in the Decisions Log. All existing HALT conditions remain HALTs.
+
+The directive names no branch, on purpose. Phase 0d derives the base and PR target per item: an
+`epic-integration` story's answer is its epic's integration branch, everything else gets `develop`,
+exactly as an interactive run that accepts the recommendations would. A directive that states the
+answer as a constant overrides that derivation for exactly the items it exists for (bug.18).
+`evals/shared/tests/orchestrator-directive-branch-literal.test.mjs` fails on any branch literal in this
+directive. (`develop-batch`'s may name the base its worktree was cut from, but only beside a HALT for
+an integration branch.)
 
 If the pipeline HALTs (review NO-GO, develop stall, 5 QA cycles without PASS, qa-fix with no changes, DoD gaps, unexpected status): **STOP** — surface the pipeline's own HALT report verbatim, send a push notification, do not merge, do not tick. Leave the run-state file in place so the next invocation resumes here.
 

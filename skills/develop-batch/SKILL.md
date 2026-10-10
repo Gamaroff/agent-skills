@@ -28,7 +28,7 @@ not consider — **write-conflict** between concurrent items — is decided here
 - User says "action the next batch", "develop the parallel frontier", "fan out the next
   worktrees and merge them".
 - `--dry-run`: report which rows the batch would contain, the soft overlaps accepted, the
-  rows held back by hard conflicts, and the worktree commands — then stop. **Read-only** —
+  rows held back by hard conflicts or an `epic-integration` epic, and the worktree commands — then stop. **Read-only** —
   no worktrees, no checkout/pull, no state file, no pipeline actions.
 
 For a single item (no worktrees), or to stop at every phase boundary, use `/develop-next`
@@ -189,7 +189,15 @@ Selection rules, the two batching axes, and marker vocabulary:
   `--dry-run`: print them and **stop here**. Otherwise write the run-state file with every
   `batch[]` item (a 1-item batch is fine — it degrades to a single worktree). Surface
   `softOverlaps[]` explicitly: these are the `~` tags whose second merger will rebase, and
-  `excluded[]`: ready rows held back by a hard `!` conflict, deferred to the next batch.
+  `excluded[]`: ready rows held back by a hard `!` conflict, deferred to the next batch,
+  and stories whose epic declares `branch_model: epic-integration` (reason starting
+  `epic-integration:`). A batch never runs those: its worktree is cut from, and rebased
+  onto, `<baseBranch>`, which would land the story outside its epic's integration branch
+  (bug.18). Tell the operator to run each one with `/develop-next`, whose Phase 0d bases it
+  on the integration branch.
+  A story whose epic the selector could not find stays in the batch, and `lint.warnings`
+  names it (`<id>: could not resolve its epic …`). Report that line: the dispatched
+  pipeline's integration-branch HALT is then the only check left for that item.
   Also surface `unannotated[]` (and the matching `lint.warnings` line): rows batched with
   no `touches:` field, whose write-disjointness is **assumed, not verified**. Two or more
   together is a co-scheduling risk — report it in both `--dry-run` and live runs, and advise
@@ -202,8 +210,9 @@ Selection rules, the two batching axes, and marker vocabulary:
   annotation, so write-disjointness cannot be established for them — see
   [`roadmap-selection.md`](../develop-next/references/roadmap-selection.md) §"Registry
   fallback frontier"), so an empty batch does **not** mean the registries are empty.
-  **STOP**: report `excluded[]` + `skippedPhases[]` so the operator sees why, tell them to
-  run `/develop-next` for the registry frontier (or author a phase with `touches:` tags if
+  **STOP**: report `excluded[]` + `skippedPhases[]` so the operator sees why — an
+  `epic-integration:` exclusion can empty a batch on its own — tell them to
+  run `/develop-next` for those and for the registry frontier (or author a phase with `touches:` tags if
   the items should run in parallel), send a push notification.
 - **`halt`** (no parseable roadmap content, exit 1) → **HALT**: surface `lint.errors`
   verbatim. The selector is deliberately tolerant; a halt means the file could not be
@@ -244,7 +253,10 @@ and `inflight[r] ≤` a probe's effective capacity when one is configured. In-fl
    ```
 
    Mark `worktreeCreated: true`. This is an isolated checkout on its own scratch branch off
-   the base — the pipeline cuts its own `feature/…` branch inside it. Then **seed it**: copy
+   the base — the pipeline cuts its own `feature/…` branch inside it. Cutting every worktree
+   from `<baseBranch>` is correct only because the selector keeps `epic-integration`
+   stories out of `batch[]` (bug.18): for every item that reaches this step, Phase 0d
+   recommends the base branch. Then **seed it**: copy
    every `developBatch.worktreeSeedPaths` entry from the main tree into `<dir>`. A fresh
    worktree carries no gitignored files, and a missing runner config typically degrades
    *silently* rather than failing.
@@ -284,9 +296,13 @@ and `inflight[r] ≤` a probe's effective capacity when one is configured. In-fl
    > **AUTONOMOUS RUN (develop-batch):** You are running this pipeline inside the git
    > worktree at `<dir>` — set your working directory to `<dir>` for all git and file
    > operations; do not touch the main working tree or any sibling worktree.
-   > For the Phase 0d Upfront Setup questions, take the auto-derived recommended option
-   > for every question without prompting (Q1 = base branch, `<baseBranch>`; Q2 = base
-   > branch, `<baseBranch>`). For the Phase 0b resume prompt, take the option Phase 0b
+   > For the Phase 0d Upfront Setup questions, take the option Phase 0d marks
+   > **(Recommended)** for every question without prompting, except the two this
+   > paragraph answers. This worktree was cut from `<baseBranch>`, and the batch admits
+   > no `epic-integration` story, so the base and the PR target are both `<baseBranch>`.
+   > If Phase 0d's epic pre-check finds an integration branch for this item anyway, HALT
+   > and report it rather than choosing — the item does not belong in a batch. For the
+   > Phase 0b resume prompt, take the option Phase 0b
    > marks **(Recommended)** — after a finalise DoD-gaps halt that is "Re-enter QA at
    > 5a"; only when no option is marked, choose "Resume from last completed step".
    > Record every auto-answer in the Decisions Log. Run the pipeline to
@@ -373,7 +389,9 @@ with `pipelineDone: true` and not `halted`, in `batch[]` order, reusing `develop
 merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
 
 1. **Rebase on the current tip** (for the 2nd and later merges): in the item's worktree,
-   `git fetch origin && git rebase origin/<baseBranch>` onto its `feature/…` branch. This
+   `git fetch origin && git rebase origin/<baseBranch>` onto its `feature/…` branch (every
+   batch item is based on `<baseBranch>`; `epic-integration` stories never enter a batch,
+   so this never replays an integration branch's commits — bug.18). This
    trivially resolves the `softOverlaps[]` (a new Prisma model, an appended `imports:[]`
    line, another registry row) against whatever earlier items in this batch already landed.
    A non-trivial rebase conflict → mark the item `halted`, report it, and continue with the
@@ -502,8 +520,9 @@ merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
    ```
 
    On merge failure (conflict, protection): mark the item `halted`, report, continue. Mark
-   `merged: true`. Story/task PRs target `<baseBranch>` directly — no epic integration
-   branch.
+   `merged: true`. Every batch PR targets `<baseBranch>` directly: the selector keeps
+   `epic-integration` stories, whose PRs target their epic's integration branch, out of a
+   batch (bug.18).
 4. **Signal the `pr-merged` stage for _this_ item**, after its merge succeeds and before its
    tick. Read the issue key from **this item's** document frontmatter — never from a
    batch-level variable:

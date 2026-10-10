@@ -12,7 +12,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { writeFileSync, mkdtempSync, symlinkSync } from "node:fs";
+import { writeFileSync, mkdtempSync, mkdirSync, symlinkSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -34,6 +34,7 @@ const {
   parseTouches,
   parseRegistry,
   parseFrontmatterStatus,
+  storyBranchModel,
   registryFrontier,
   parseDepCell,
   TASK_ELIGIBLE_STATUSES,
@@ -2882,4 +2883,177 @@ test("B8: the code lifecycles match docs/standards/bug-documents.md", () => {
       `  doc:  ${parsed.sort().join(", ")}\n` +
       `  code: ${[...BUG_LIFECYCLE_STATUSES].sort().join(", ")}`,
   );
+});
+
+// ── bug.18: an epic-integration story never enters a parallel batch ──────────
+//
+// Phase 0d recommends the epic's integration branch for a story whose epic declares
+// `branch_model: epic-integration`. A batch worktree is cut from, and rebased onto,
+// the base branch, so such a story would land on the base branch early and the
+// rebase would replay the epic's earlier commits. The batch excludes it with a
+// logged reason and leaves it to `/develop-next` or an interactive run.
+
+const EPIC_BATCH_ROADMAP = [
+  "# PHASE 1 — MVP",
+  "## Epic 8",
+  "- [ ] **8.1** Ordinary story · deps: — · touches: +own · /develop-story docs/p/e8/story.8.1.a/story.8.1.a.md",
+  "- [ ] **8.2** Integration story · deps: — · touches: +own · /develop-story docs/p/e9/story.9.1.b/story.9.1.b.md",
+  "- [ ] **T5** A task · deps: — · touches: +own · /develop-task docs/tasks/task.5.x/task.5.x.md",
+  "",
+].join("\n");
+
+test("bug.18: --batch excludes a story whose epic declares epic-integration, with a reason", () => {
+  const asked = [];
+  const b = selectBatch(parseRoadmap(EPIC_BATCH_ROADMAP), {
+    branchModelOf: (row) => {
+      asked.push(row.id);
+      return {
+        resolved: true,
+        model: row.id === "8.2" ? "epic-integration" : null,
+      };
+    },
+  });
+  assert.deepEqual(
+    b.batch.map((r) => r.id),
+    ["8.1", "T5"],
+  );
+  assert.equal(b.excluded.length, 1);
+  assert.equal(b.excluded[0].id, "8.2");
+  assert.match(b.excluded[0].reason, /^epic-integration:/);
+  assert.match(b.excluded[0].reason, /\/develop-next/);
+  assert.ok(
+    !b.worktrees.some((w) => w.id === "8.2"),
+    "no worktree is planned for the excluded story",
+  );
+  assert.deepEqual(asked, ["8.1", "8.2"], "only /develop-story rows are asked");
+  assert.match(b.detail, /1 held back/);
+});
+
+test("bug.18: a develop-direct or undeclared epic keeps the story in the batch, silently", () => {
+  for (const model of [null, "develop-direct"]) {
+    const b = selectBatch(parseRoadmap(EPIC_BATCH_ROADMAP), {
+      branchModelOf: () => ({ resolved: true, model }),
+    });
+    assert.deepEqual(
+      b.batch.map((r) => r.id),
+      ["8.1", "8.2", "T5"],
+      `branch model ${JSON.stringify(model)} must not exclude`,
+    );
+    assert.deepEqual(b.lint.warnings, [], "a resolved epic is not a warning");
+  }
+});
+
+test("bug.18: an unresolved epic keeps the story in the batch but names it in lint.warnings", () => {
+  const b = selectBatch(parseRoadmap(EPIC_BATCH_ROADMAP), {
+    branchModelOf: (row) =>
+      row.id === "8.2"
+        ? { resolved: false, reason: "epic document not found" }
+        : { resolved: true, model: null },
+  });
+  assert.deepEqual(
+    b.batch.map((r) => r.id),
+    ["8.1", "8.2", "T5"],
+  );
+  assert.equal(b.lint.warnings.length, 1);
+  assert.match(
+    b.lint.warnings[0],
+    /^8\.2: could not resolve its epic \(epic document not found\).*\/develop-next/,
+  );
+});
+
+test("bug.18: with no branchModelOf, selectBatch behaves as before (pure default)", () => {
+  const b = selectBatch(parseRoadmap(EPIC_BATCH_ROADMAP));
+  assert.deepEqual(
+    b.batch.map((r) => r.id),
+    ["8.1", "8.2", "T5"],
+  );
+});
+
+test("bug.18: storyBranchModel reads the epic from epic_source, then the enclosing epic directory", () => {
+  const files = {
+    "/r/docs/p/epics/epic.9.int/epic.9.int.md":
+      "---\ntype: epic\nbranch_model: epic-integration # opt-in\n---\n",
+    "/r/docs/p/epics/epic.9.int/stories/story.9.1.b/story.9.1.b.md":
+      "---\ntype: story\nepic: epic.9.int\n---\n",
+    "/r/docs/p/epics/epic.8.dd/epic.8.dd.md": "---\ntype: epic\n---\n",
+    "/r/docs/p/epics/epic.8.dd/stories/story.8.1.a/story.8.1.a.md":
+      "---\ntype: story\nepic: epic.8.dd\n---\n",
+    "/r/elsewhere/story.9.2.c.md":
+      "---\ntype: story\nepic: epic.9.int\nepic_source: '../docs/p/epics/epic.9.int/epic.9.int.md'\n---\n",
+    "/r/elsewhere/story.9.3.d.md": "---\ntype: story\nepic: epic.9.int\n---\n",
+  };
+  const read = (p) => (p in files ? files[p] : null);
+  assert.deepEqual(
+    storyBranchModel(
+      "/r/docs/p/epics/epic.9.int/stories/story.9.1.b/story.9.1.b.md",
+      read,
+    ),
+    { resolved: true, model: "epic-integration" },
+    "enclosing epic directory named by `epic:`",
+  );
+  assert.deepEqual(
+    storyBranchModel("/r/elsewhere/story.9.2.c.md", read),
+    { resolved: true, model: "epic-integration" },
+    "epic_source, relative to the story file",
+  );
+  assert.deepEqual(
+    storyBranchModel(
+      "/r/docs/p/epics/epic.8.dd/stories/story.8.1.a/story.8.1.a.md",
+      read,
+    ),
+    { resolved: true, model: null },
+    "an epic that declares nothing",
+  );
+  assert.deepEqual(
+    storyBranchModel("/r/elsewhere/story.9.3.d.md", read),
+    { resolved: false, reason: "epic document not found" },
+    "an epic that cannot be found is unresolved, never guessed",
+  );
+  assert.deepEqual(storyBranchModel("/r/missing.md", read), {
+    resolved: false,
+    reason: "story unreadable",
+  });
+});
+
+test("bug.18 CLI: --batch excludes an epic-integration story found on disk", () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "select-next-epic-int-"));
+  const put = (rel, body) => {
+    const p = path.join(root, rel);
+    mkdirSync(path.dirname(p), { recursive: true });
+    writeFileSync(p, body);
+  };
+  put(
+    "docs/p/epics/epic.9.int/epic.9.int.md",
+    "---\ntype: epic\nbranch_model: epic-integration\n---\n",
+  );
+  put(
+    "docs/p/epics/epic.9.int/stories/story.9.1.b/story.9.1.b.md",
+    "---\ntype: story\nepic: epic.9.int\n---\n",
+  );
+  put("docs/p/epics/epic.8.dd/epic.8.dd.md", "---\ntype: epic\n---\n");
+  put(
+    "docs/p/epics/epic.8.dd/stories/story.8.1.a/story.8.1.a.md",
+    "---\ntype: story\nepic: epic.8.dd\n---\n",
+  );
+  put(
+    "roadmap.md",
+    [
+      "# PHASE 1 — MVP",
+      "- [ ] **8.1** Ordinary · deps: — · touches: +own · /develop-story docs/p/epics/epic.8.dd/stories/story.8.1.a/story.8.1.a.md",
+      "- [ ] **9.1** Integration · deps: — · touches: +own · /develop-story docs/p/epics/epic.9.int/stories/story.9.1.b/story.9.1.b.md",
+      "",
+    ].join("\n"),
+  );
+  const out = execFileSync(
+    process.execPath,
+    [SCRIPT, "--batch", "--roadmap", "roadmap.md"],
+    { encoding: "utf-8", cwd: root },
+  );
+  const r = JSON.parse(out);
+  assert.deepEqual(
+    r.batch.map((x) => x.id),
+    ["8.1"],
+  );
+  assert.equal(r.excluded[0].id, "9.1");
+  assert.match(r.excluded[0].reason, /^epic-integration:/);
 });
