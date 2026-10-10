@@ -42,7 +42,7 @@ Miss this and `npm test` fails on *the real repository is clean under `--check`*
 **Pre-commit hook (automatic):** the hook lives at `.githooks/pre-commit` (committed to git) and runs `npm run bundle` whenever `shared/resources/` or a `SKILL.md` is staged, then stages the `references/` files **that run changed**. It is wired up automatically via the `prepare` npm script — no manual step needed after a fresh clone:
 
 ```bash
-npm install   # runs `git config core.hooksPath .githooks` via prepare script
+npm install   # prepare: `git config core.hooksPath .githooks`, then links .agents/skills and .claude/skills
 ```
 
 Two behaviours are worth knowing, both there to keep a commit's bundled copies matching the source it carries:

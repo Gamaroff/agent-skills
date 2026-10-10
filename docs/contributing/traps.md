@@ -31,6 +31,9 @@ An earlier handoff said "`npm` is fine". It is not; it was never checked.
 
 Not just one file — **the whole directory**. `.agents/skills/foo/…` and `skills/foo/…` are the same
 file on disk; editing either edits both. Only the `skills/` path is git-tracked.
+`npm install` creates it, plus `.claude/skills -> ../.agents/skills` for Claude Code (the `prepare`
+script runs `scripts/link-skills.sh`), except when `CI` is set — CI's checkout must not have them,
+for the reason below.
 
 The symlink is gitignored, so **a test run in place passes on it where CI fails**: any test that
 reaches `.agents/skills/…` from the repository root resolves it here and nowhere else (obs #149 —
