@@ -866,15 +866,30 @@ function buildRationale(model, row, phase, skipped, phaseNotes) {
  * @returns {string|null} lowercase-kebab status, or null
  */
 export function parseFrontmatterStatus(text) {
+  const v = frontmatterScalar(text, "status");
+  return v ? v.toLowerCase() : null;
+}
+
+/**
+ * Read one top-level scalar out of a document's YAML frontmatter — same
+ * deliberately minimal reading as `parseFrontmatterStatus`: trailing comment
+ * and surrounding quotes stripped, case preserved. Null when absent.
+ *
+ * @param {string} text
+ * @param {string} key
+ * @returns {string|null}
+ */
+function frontmatterScalar(text, key) {
   if (typeof text !== "string") return null;
   const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
   if (!m) return null;
-  const line = m[1].split(/\r?\n/).find((l) => /^status\s*:/.test(l));
+  const keyRe = new RegExp(`^${key}\\s*:`);
+  const line = m[1].split(/\r?\n/).find((l) => keyRe.test(l));
   if (!line) return null;
-  let v = line.replace(/^status\s*:/, "").trim();
+  let v = line.replace(keyRe, "").trim();
   v = v.replace(/\s+#.*$/, "").trim(); // strip a trailing comment
   v = v.replace(/^['"]|['"]$/g, "").trim();
-  return v ? v.toLowerCase() : null;
+  return v || null;
 }
 
 /** A markdown table separator row (`| --- | :--: |`). */
@@ -1464,6 +1479,51 @@ function worktreeFor(row) {
   };
 }
 
+/** The epic branch model a parallel batch cannot honour (bug.18). */
+const EPIC_INTEGRATION = "epic-integration";
+
+/**
+ * The `branch_model:` a story's parent epic declares, lowercased — or null when
+ * the epic declares none or cannot be found. Phase 0d's own pre-check reads the
+ * same key, and treats an unresolvable epic the same way: unset, never guessed.
+ *
+ * The epic is found from the story's `epic_source:` (relative to the story file,
+ * then to the working directory), else from `epic:` — the epic's directory stem —
+ * by walking up to the enclosing directory of that name, where the standard
+ * layout nests every story (docs/standards/story-documents.md).
+ *
+ * @param {string} storyPath  absolute path of the story document
+ * @param {(p: string) => string|null} read  file reader; null when unreadable
+ * @returns {string|null}
+ */
+export function storyBranchModel(storyPath, read) {
+  const story = read(storyPath);
+  if (!story) return null;
+  const candidates = [];
+  const source = frontmatterScalar(story, "epic_source");
+  if (source)
+    candidates.push(
+      path.resolve(path.dirname(storyPath), source),
+      path.resolve(source),
+    );
+  const stem = frontmatterScalar(story, "epic");
+  if (stem)
+    for (let dir = path.dirname(storyPath); ; dir = path.dirname(dir)) {
+      if (path.basename(dir) === stem) {
+        candidates.push(path.join(dir, `${stem}.md`));
+        break;
+      }
+      if (path.dirname(dir) === dir) break;
+    }
+  for (const p of candidates) {
+    const epic = read(p);
+    if (!epic) continue;
+    const model = frontmatterScalar(epic, "branch_model");
+    return model ? model.toLowerCase() : null;
+  }
+  return null;
+}
+
 /**
  * Greedily pack a maximal conflict-free batch from the earliest actionable phase.
  * Document order is the tie-breaker, so the batch always leads with the row
@@ -1477,12 +1537,23 @@ function worktreeFor(row) {
  * row is kept, the rest deferred to `excluded` (belt-and-suspenders for teams that
  * want conflicts impossible by construction). Default is warn-only (non-breaking).
  *
+ * `opts.branchModelOf(row)` returns the branch model of a `/develop-story` row's
+ * epic (see `storyBranchModel`). A story whose epic declares `epic-integration`
+ * is excluded: a batch worktree is cut from, and rebased onto, the base branch,
+ * which would land the story on the base branch early and replay the epic's
+ * earlier commits on rebase (bug.18). It is left to `/develop-next` or an
+ * interactive run, whose Phase 0d bases it on the integration branch. Without
+ * the callback no row is excluded for its branch model, which keeps this
+ * function pure for callers that read nothing from disk.
+ *
  * @param {object} model
- * @param {{requireTouches?: boolean}} [opts]
+ * @param {{requireTouches?: boolean, branchModelOf?: (row: object) => string|null}} [opts]
  * @returns {{status:"batch"|"halt", ...}}
  */
 export function selectBatch(model, opts = {}) {
   const requireTouches = opts.requireTouches === true;
+  const branchModelOf =
+    typeof opts.branchModelOf === "function" ? opts.branchModelOf : null;
   const lint = { errors: model.errors, warnings: model.warnings };
   if (model.errors.length)
     return { status: "halt", haltReason: model.errors[0], batch: [], lint };
@@ -1508,6 +1579,21 @@ export function selectBatch(model, opts = {}) {
     const batch = [];
     const excluded = [];
     for (const row of ready) {
+      if (
+        branchModelOf &&
+        row.command === "/develop-story" &&
+        branchModelOf(row) === EPIC_INTEGRATION
+      ) {
+        excluded.push({
+          id: row.id,
+          line: row.line,
+          reason:
+            "epic-integration: its epic cuts stories from an integration branch, " +
+            "which a batch worktree (cut from and rebased onto the base branch) " +
+            "cannot honour — run it with /develop-next or interactively",
+        });
+        continue;
+      }
       let clash = null;
       for (const picked of batch) {
         const tag = hardConflict(row, picked);
@@ -1569,7 +1655,7 @@ export function selectBatch(model, opts = {}) {
     return {
       status: "batch",
       phase: phase.name,
-      detail: `${batch.length} row(s) can develop in parallel; ${excluded.length} held back by hard conflicts`,
+      detail: `${batch.length} row(s) can develop in parallel; ${excluded.length} held back (hard conflicts or epic-integration)`,
       skippedPhases,
       batch: batch.map((r) => ({
         id: r.id,
@@ -1733,7 +1819,15 @@ function main() {
         // `touches:` data, so write-disjointness cannot be established for them
         // and they must never enter a parallel batch.
         roadmap: args.roadmap,
-        ...selectBatch(model, { requireTouches: args.requireTouches }),
+        ...selectBatch(model, {
+          requireTouches: args.requireTouches,
+          // Paths in the roadmap are repository-relative, like --roadmap's.
+          branchModelOf: (row) =>
+            storyBranchModel(
+              path.resolve(row.commandArg),
+              (p) => readOrEmpty(p) || null,
+            ),
+        }),
       }
     : { roadmap: args.roadmap, ...selectNext(model, { loadRegistries }) };
   process.stdout.write(JSON.stringify(result, null, 2) + "\n");

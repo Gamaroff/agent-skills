@@ -45,6 +45,14 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **Autonomous runs take Phase 0d's branch recommendation, not a hardcoded one (bug.18).** The
+  `develop-next` and `develop-batch` directives named `develop` / `<baseBranch>` as the base and PR
+  target, overriding the epic's integration branch that Phase 0d recommends for an
+  `epic-integration` story. Both directives now defer to the recommendation and name no branch; a
+  guard test fails on a branch literal in either. `select-next.mjs --batch` excludes
+  `epic-integration` stories with a logged reason, because a batch worktree is cut from and rebased
+  onto the base branch; `/develop-next` runs them instead.
+
 - **`set-qa-phase.sh` and `set-waiting-on.sh` stop when a paused run on this branch has no lock.**
   After a compaction, the summary carried the pre-pause lock state, the session never ran `--restore`,
   and both helpers no-oped silently until Step 7 (task.185). They now exit 1 naming
