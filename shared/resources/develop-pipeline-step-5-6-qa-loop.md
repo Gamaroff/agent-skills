@@ -217,7 +217,7 @@ Log the bypass reason in the Decisions Log (`Traceability mapper skipped: {reaso
 
 **Invoke `/qa-story`**
 
-Invoke the `/qa-story` skill with the story file path. If `PIPELINE_MODE=lite`, prefix the invocation with explicit context: "Use **direct tools only** for this review — skip parallel agents regardless of the adaptive strategy decision. This story is running in lite mode."
+Invoke the `/qa-story` skill with the story file path. If the run's mode is `lite` or `fast`, or `--skip qa-depth` is in force (the lock's `answers.mode` / `answers.skips`, resolved in §0d), prefix the invocation with explicit context: "Use **direct tools only** for this review — skip parallel agents regardless of the adaptive strategy decision. This story is running in lite mode." When the lock carries a `waiver`, also prefix the waiver directive from the lite-mode contract (§"Directive Passed to the QA Skill").
 
 **Code-review-and-fix loop (pipeline default).** Always pass the run-level override `code_review_blocking=true`. This makes the diff code review qa-story already runs (Phase 1.6) gate the build on high-confidence correctness bugs, which then flow into this loop's qa-fix step (5b) and get fixed and re-reviewed each cycle. A story opts **out** with `code_review_blocking: false` in its frontmatter (escape hatch) — the override never overrides an explicit `false`. See the **Opt-in to blocking** resolution matrix in `shared/resources/code-review-prompt.md`.
 
@@ -265,7 +265,7 @@ Skip this pre-step when `PIPELINE_MODE=lite` OR `HAS_SUCCESS_CRITERIA_TABLE=fals
 
 **Invoke `/qa-task`**
 
-Invoke the `/qa-task` skill with the task file path. If `PIPELINE_MODE=lite`, prefix the invocation with explicit context: "Use **direct tools only** for this review — skip parallel agents regardless of the adaptive strategy decision. This task is running in lite mode."
+Invoke the `/qa-task` skill with the task file path. If the run's mode is `lite` or `fast`, or `--skip qa-depth` is in force (the lock's `answers.mode` / `answers.skips`, resolved in §0d), prefix the invocation with explicit context: "Use **direct tools only** for this review — skip parallel agents regardless of the adaptive strategy decision. This task is running in lite mode." When the lock carries a `waiver`, also prefix the waiver directive from the lite-mode contract (§"Directive Passed to the QA Skill").
 
 **Code-review-and-fix loop (pipeline default).** Always pass the run-level override `code_review_blocking=true`. This makes the diff code review qa-task already runs (Step 3b) gate the build on high-confidence correctness bugs, which then flow into this loop's qa-fix step (5b) and get fixed and re-reviewed each cycle. A task opts **out** with `code_review_blocking: false` in its frontmatter (escape hatch) — the override never overrides an explicit `false`. See the **Opt-in to blocking** resolution matrix in `shared/resources/code-review-prompt.md`.
 
@@ -306,6 +306,42 @@ Three rules make this loop's history readable rather than a churn log:
 
 A QA cycle that finds nothing still writes its verdict row: the verdict is the event being
 recorded, not the findings.
+
+### Recording a waived step (shared)
+
+Runs after the QA skill writes its gate and **before** the outcome branching below reads it — and only
+when the lock carries a `waiver` (a step was removed by `--skip`, task.201). **The QA skill writes the
+gate; this step only checks it** — dev-side steps never modify a gate file. The waiver directive the QA
+skill was given (lite-mode contract, §"Directive Passed to the QA Skill") tells it to record `WAIVED`
+for a review that would otherwise read `PASS` or `CONCERNS`. The engine's rule is a fixed point, so the
+recorded gate is correct exactly when the engine, given it, returns it unchanged:
+
+```bash
+LOCK=.claude/state/develop-pipeline.lock
+if [ "$(jq -r '.waiver.active // false' "$LOCK")" = "true" ]; then
+  GATE_FILE="{the latest gate file, per Finding the Latest Gate File}"
+  RECORDED=$(sed -nE 's/^gate:[[:space:]]*"?([A-Z]+)"?.*/\1/p' "$GATE_FILE" | head -1)
+  EXPECTED=$(command node .agents/skills/{develop-story|develop-task}/references/pipeline-answers.js gate \
+    --earned "$RECORDED" --skips "$(jq -r '.answers.skips | join(",")' "$LOCK")" \
+    --waiver-reason "$(jq -r '.waiver.reason' "$LOCK")" \
+    --approved-by "$(jq -r '.waiver.approved_by' "$LOCK")" --json | jq -r '.gate')
+  if [ "$EXPECTED" != "$RECORDED" ]; then
+    echo "WAIVER NOT RECORDED: gate reads $RECORDED, a skipped step requires $EXPECTED"
+  elif [ "$RECORDED" = "WAIVED" ] && ! grep -qE '^[[:space:]]+approved_by:[[:space:]]*"?[^"[:space:]]' "$GATE_FILE"; then
+    echo "WAIVER NOT RECORDED: gate reads WAIVED with no waiver.approved_by"
+  else
+    echo "waiver recorded: $RECORDED"
+  fi
+fi
+```
+
+- `waiver recorded` → continue to the outcome branching; the `WAIVED` arm routes it to 5c like any
+  accepted waiver, and a `FAIL` takes the `FAIL` arm — **a waiver never masks a failure**.
+- `WAIVER NOT RECORDED` → the QA skill wrote a verdict a skipped step cannot earn. Re-invoke it once,
+  same cycle, with the waiver directive restated first. If the second gate still fails the check,
+  **HALT**: a skipped step must never reach 5c reading `PASS`.
+
+Log `Gate {N}: {RECORDED} — waiver {recorded / re-invoked / HALT}` in the Decisions Log.
 
 ### Outcome branching (shared)
 
@@ -1351,7 +1387,7 @@ done
 # standard mode
 /review-pr --effort medium --comment --no-code
 
-# lite mode — degrades the review, never skips it
+# lite or fast mode, or --skip review-pr-depth — degrades the review, never skips it
 /review-pr --effort low --comment --no-code
 ```
 
@@ -1364,7 +1400,8 @@ done
 
 - **Target**: the open PR for this branch — pass nothing and `/review-pr` resolves it from the
   current branch.
-- **`--effort`**: `medium` in standard mode, `low` in lite mode. Lite **degrades** the review; it
+- **`--effort`**: `medium` in standard mode, `low` in lite mode — and in fast mode, or with
+  `--skip review-pr-depth` in force (the lock's `answers`). Lite **degrades** the review; it
   never skips it. See [`shared/resources/develop-pipeline-lite-mode.md`](develop-pipeline-lite-mode.md).
 - **`--no-code`**: always, in both modes. `/qa-story` and `/qa-task` already ran the code reviewer
   over this diff in 5a, with `code_review_blocking=true`, so 5c runs the **conformance lens only**

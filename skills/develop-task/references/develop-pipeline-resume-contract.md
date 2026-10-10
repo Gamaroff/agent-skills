@@ -229,6 +229,21 @@ Pass `recommended_step` to Phase 0b. Phase 0b only verifies artifacts for steps 
 
 ---
 
+### Persisted up-front answers (task.201)
+
+Step 1 writes §0d's resolved answers into the lock (`answers`, `answer_sources`, `waiver`), and §0d's
+answer resolution reads them back through `--persisted-file`, so a resume asks nothing they settle.
+The states the rule holds in, each pinned by a test:
+
+| State | What §0d does | Test |
+| --- | --- | --- |
+| Live lock carrying `answers` | Reuses them (source `persisted`); asks nothing they settle | `pipeline-answers.test.mjs` 7a |
+| Lock rebuilt by `--restore` from a halt snapshot or an orphaned claim | Same — `--restore` deletes only the halt/pause fields and `waiting_on`, so `answers` survives | `advance-pipeline-lock.test.sh` scenario 13 |
+| Legacy lock or snapshot with no `answers` (written before task.201) | Today's rule: questions already in the Decisions Log are not re-asked | `pipeline-answers.test.mjs` 7b |
+| No lock and no snapshot (re-invocation over an existing report) | As the legacy row | `pipeline-answers.test.mjs` 9b |
+| Re-invocation flags that disagree with the persisted answers | A conflict: asked, with both values stated — never silently overwritten either way | `pipeline-answers.test.mjs` 7c |
+| A persisted answer the epic now contradicts | Asked, with the conflict stated | `pipeline-answers.test.mjs` 7d |
+
 ## Phase 0b — Resume Artifact Verification (CRITICAL)
 
 ### Working-tree probe — before any artifact is trusted (task.124, obs #85)

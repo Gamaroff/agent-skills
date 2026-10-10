@@ -69,6 +69,23 @@
 //                                a verdict with a reason instead. Same discipline as
 //                                tracker-workflow.js.
 //
+//   5. CONTENT IDENTITY BEATS DATES WHEN THE REPORT CARRIES IT (task.201). A
+//                                report written by a review skill after task.201
+//                                records `reviewed_blob:` — `git hash-object` of
+//                                the document, taken after the review's own fixes
+//                                and status edit. When it is present, the hash
+//                                alone decides: equal → `fresh`, different →
+//                                `stale`, whatever the dates say. `updated:` is
+//                                date-only, so a same-day edit after a review
+//                                slipped through the date rule. A report WITHOUT
+//                                the field keeps the date rule below unchanged,
+//                                so a legacy report is judged exactly as before.
+//                                The caller computes the document's hash and
+//                                passes it in (`taskBlob`): property 1 stands, the
+//                                module still reads no file. A report that names
+//                                a blob when the caller passed none, or that names
+//                                two different blobs, is `stale` (property 3).
+//
 // Dates are compared as ISO `YYYY-MM-DD` strings, never as Date objects. String
 // order is date order for that format, and it has no timezone — a Date would
 // reintroduce the machine-dependence property 1 exists to remove.
@@ -388,6 +405,46 @@ function taskUpdatedDate(taskContent) {
   return validIso(raw);
 }
 
+// ── content identity ───────────────────────────────────────────────────────
+
+// A git object id: SHA-1 (40 hex) or SHA-256 (64 hex). Anything else is not one.
+const BLOB_RE = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
+
+// The body form the review skills write — `**reviewed_blob:** <hash>` — plus the
+// bare `reviewed_blob: <hash>` line and a backticked hash. Matched on the blanked
+// body, so a `reviewed_blob:` inside a fenced example is not the report's own.
+const REVIEWED_BLOB_RE = new RegExp(
+  String.raw`^ {0,3}(?:[-*][ \t]+)?(?:\*\*)?reviewed_blob(?:\*\*)?:(?:\*\*)?[ \t]*` +
+    "`?([0-9a-fA-F]{40,64})`?" +
+    String.raw`[ \t]*$`,
+  "gm",
+);
+
+/**
+ * The document hash a review report says it reviewed.
+ * @returns {{ blob: string|null, ambiguous: boolean }} — `ambiguous` when the
+ *   report names more than one distinct hash.
+ */
+function reportReviewedBlob(reportContent) {
+  if (typeof reportContent !== "string" || reportContent === "")
+    return { blob: null, ambiguous: false };
+  const { frontmatter, body } = splitFrontmatter(reportContent);
+  const found = new Set();
+  if (Object.prototype.hasOwnProperty.call(frontmatter, "reviewed_blob")) {
+    const v = String(frontmatter.reviewed_blob)
+      .replace(/^["'`]|["'`]$/g, "")
+      .toLowerCase();
+    if (BLOB_RE.test(v)) found.add(v);
+  }
+  for (const m of blankNonProse(body).matchAll(REVIEWED_BLOB_RE)) {
+    const v = m[1].toLowerCase();
+    if (BLOB_RE.test(v)) found.add(v);
+  }
+  if (found.size === 0) return { blob: null, ambiguous: false };
+  if (found.size > 1) return { blob: null, ambiguous: true };
+  return { blob: [...found][0], ambiguous: false };
+}
+
 // ── the verdict ────────────────────────────────────────────────────────────
 
 const VERDICTS = Object.freeze({
@@ -401,12 +458,15 @@ const VERDICTS = Object.freeze({
  *
  * @param {object} input
  * @param {string} input.taskContent    full text of the task document
+ * @param {string|null} [input.taskBlob]  `git hash-object` of the task document,
+ *   computed by the caller. Consulted only when the report records
+ *   `reviewed_blob:`; a report without one is judged by dates as before.
  * @param {string|null} input.reportContent  full text of the newest review
  *   report, or null/"" when no report exists. The CALLER resolves which report
  *   that is — see the note on globbing in the step-2 resource; report filenames
  *   come in at least three shapes and `sort | tail -1` does not order them.
  * @returns {{verdict: string, reason: string, taskDate: string|null,
- *            reportDate: string|null}}
+ *            reportDate: string|null, reportBlob?: string|null}}
  */
 function classifyReviewReport(input) {
   // Read the two properties defensively. The header promises this never throws,
@@ -414,9 +474,11 @@ function classifyReviewReport(input) {
   // crashed pipeline step rather than a decision.
   let taskContent;
   let reportContent;
+  let taskBlob;
   try {
     taskContent = input && input.taskContent;
     reportContent = input && input.reportContent;
+    taskBlob = input && input.taskBlob;
   } catch {
     return {
       verdict: VERDICTS.STALE,
@@ -438,6 +500,47 @@ function classifyReviewReport(input) {
   }
 
   const reportDate = reportReviewedDate(reportContent);
+
+  // Property 5: a report that records what it reviewed is judged on that alone.
+  const { blob: reportBlob, ambiguous } = reportReviewedBlob(reportContent);
+  if (ambiguous) {
+    return {
+      verdict: VERDICTS.STALE,
+      reason: "report-blob-ambiguous",
+      taskDate,
+      reportDate,
+      reportBlob: null,
+    };
+  }
+  if (reportBlob !== null) {
+    const current =
+      typeof taskBlob === "string" ? taskBlob.trim().toLowerCase() : "";
+    if (!BLOB_RE.test(current)) {
+      return {
+        verdict: VERDICTS.STALE,
+        reason: "task-blob-unavailable",
+        taskDate,
+        reportDate,
+        reportBlob,
+      };
+    }
+    if (current === reportBlob) {
+      return {
+        verdict: VERDICTS.FRESH,
+        reason: "blob-match",
+        taskDate,
+        reportDate,
+        reportBlob,
+      };
+    }
+    return {
+      verdict: VERDICTS.STALE,
+      reason: "blob-mismatch",
+      taskDate,
+      reportDate,
+      reportBlob,
+    };
+  }
 
   if (reportDate === null) {
     // Two distinct causes, and the halt message has to tell them apart: a reader
@@ -505,6 +608,14 @@ function describeVerdict(result, opts) {
       return `${reportPath} is dated ${result.reportDate}, older than the task's \`updated: ${result.taskDate}\` — it reviewed an earlier version of this card`;
     case "input-unreadable":
       return "the task or report content could not be read, so freshness could not be established";
+    case "report-blob-ambiguous":
+      return `${reportPath} records more than one \`reviewed_blob:\`, so which revision it reviewed cannot be established`;
+    case "task-blob-unavailable":
+      return `${reportPath} records the revision it reviewed, but the task document's hash was not supplied, so the two cannot be compared`;
+    case "blob-mismatch":
+      return `${reportPath} reviewed revision ${String(result.reportBlob).slice(0, 12)}, and the task document has changed since — it reviewed an earlier version of this card`;
+    case "blob-match":
+      return `${reportPath} reviewed this exact revision of the task document (\`reviewed_blob:\` ${String(result.reportBlob).slice(0, 12)})`;
     case "current":
       return `${reportPath} is dated ${result.reportDate}, not older than the task's \`updated: ${result.taskDate}\``;
     default:
@@ -516,6 +627,7 @@ module.exports = {
   // read
   reportReviewedDate,
   reportDateToken,
+  reportReviewedBlob,
   taskUpdatedDate,
   // classify
   classifyReviewReport,

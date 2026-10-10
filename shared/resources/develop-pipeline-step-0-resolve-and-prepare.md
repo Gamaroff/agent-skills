@@ -296,7 +296,7 @@ find {task-directory} -maxdepth 1 -name "task.{id}.implementation.*.md" 2>/dev/n
 
 ### Shared Resume Logic
 
-If resuming: read the existing implementation report, identify the last ✅ step, and verify each completed step's artifact before skipping it. **Except the Step 8 row:** when the resume record (lock, halt snapshot or orphaned claim) is at step 8, that row is not evidence; follow the step-8 rule in `shared/resources/develop-pipeline-resume-contract.md` Phase 0b. Skip upfront questions already recorded in the Decisions Log.
+If resuming: read the existing implementation report, identify the last ✅ step, and verify each completed step's artifact before skipping it. **Except the Step 8 row:** when the resume record (lock, halt snapshot or orphaned claim) is at step 8, that row is not evidence; follow the step-8 rule in `shared/resources/develop-pipeline-resume-contract.md` Phase 0b. Skip upfront questions already answered: §0d's answer resolution reads the lock's `answers` (via `--persisted-file`) and asks nothing they settle; for a lock or snapshot written before task.201, which carries no `answers`, skip the questions already recorded in the Decisions Log, as before. The restore below keeps `answers`: `--restore` strips only the halt/pause fields and `waiting_on`.
 
 **Restore the lock before anything advances it (task.124 QA cycle 2, CR-2).** A resume skips Step 1, which is the lock's only ordinary writer, and every terminal HALT and PreCompact pause removed the lock and left a superset of it behind. When the resume detector's `source` is `halt_snapshot` or `orphaned_claim`, the operator chooses **Resume**, **and** resume contract § Restore the lock (both resume paths) says the restore runs here — and only then — run the command below, before Phase 0b verification and before any step banner. Which snapshots restore here and which wait for the grant is that section's to say; it is the rule's one statement, and this paragraph carries no copy of it (task.130):
 
@@ -596,7 +596,7 @@ Check the current branch:
 git branch --show-current
 ```
 
-Use the `AskUserQuestion` tool to ask all applicable questions in a single call. Auto-derived values are presented as the **first (Recommended)** option — selecting it requires only one keypress, but the user retains override capability via "Other".
+Use the `AskUserQuestion` tool to ask, in a single call, the questions [§ Answer resolution](#answer-resolution--ask-only-what-nothing-answers) below leaves open — with no flags and no policy that is every question, as before. Auto-derived values are presented as the **first (Recommended)** option — selecting it requires only one keypress, but the user retains override capability via "Other".
 
 **qa-planning skip is silent** — the pipeline always skips `/qa-planning`. Do **not** prompt for it. Record `"qa-planning: skipped (auto)"` in the Decisions Log.
 
@@ -681,14 +681,70 @@ If the user selects "Other" for Q1 or Q2, follow up with a plain text request fo
 
 **No Q3** — qa-planning skip is silent (see paragraph above).
 
+### Answer resolution — ask only what nothing answers
+
+Every answer resolves in one order: **flag → consumer policy → derived recommendation → ask**
+(task.201). The flags come from the skill's own arguments; the policy is the `develop:` block of
+`skills-config.yaml`; the derived recommendation is the **(Recommended)** option the Q1/Q2 sections
+above build. A flag is **validated, never blindly obeyed**: one that contradicts the epic's
+`branch_model`, breaks Q1/Q2 agreement, or disagrees with the answer already recorded for this run is
+asked about with the conflict stated. The rule lives once, in the engine — never read the flags by eye:
+
+> Engine source: `shared/resources/pipeline-answers.js` (bundled into each skill as `references/pipeline-answers.js`). Speed modes, skips and the floor: `shared/resources/develop-pipeline-lite-mode.md#speed-modes-and-skips`.
+
+| Flag | Answers | Policy key |
+| --- | --- | --- |
+| `--base <branch>` | Q1 | — |
+| `--target <branch>` | Q2 | — |
+| `--defaults` | every question still open, with its Recommended option | — |
+| `--mode standard\|lite\|fast` | the speed mode (never asked) | `develop.defaultMode` |
+| `--skip review,qa-depth,review-pr-depth` | skips (never asked) | `develop.skippable` — the allow-list, default empty |
+
+```bash
+# INPUTS, bound in THIS block: the skill's raw arguments, the two Recommended options
+# derived above, EPIC_BRANCH (story; empty otherwise), and PIPELINE_MODE from 0a-parallel.
+: "${PIPELINE_MODE:?bind PIPELINE_MODE from the 0a-parallel aggregation}"
+source .agents/skills/{develop-story|develop-task}/references/read-config.sh || exit 1
+POLICY_MODE=$(read_nested_config_key develop defaultMode)
+POLICY_SKIPPABLE=$(read_nested_config_key develop skippable)
+mkdir -p .claude/state
+command node .agents/skills/{develop-story|develop-task}/references/pipeline-answers.js resolve \
+  --pipeline {story|task} --args "{the skill's arguments, verbatim}" \
+  --derived-base "{Q1's Recommended option}" --derived-target "{Q2's Recommended option}" \
+  --epic-branch "${EPIC_BRANCH:-}" --detector "$PIPELINE_MODE" \
+  --policy-mode "$POLICY_MODE" --policy-skippable "$POLICY_SKIPPABLE" \
+  --persisted-file .claude/state/develop-pipeline.lock \
+  --invoker "$(git config user.name)" --json > .claude/state/pipeline-answers.json \
+  || { echo "HALT: pipeline-answers.js could not resolve the up-front answers"; exit 1; }
+jq -c '{answers, sources, questions: [.questions[].id], refused, effective}' .claude/state/pipeline-answers.json
+```
+
+Act on the result:
+
+- **`questions[]`** is exactly the set to ask — each with its `recommended` option, which leads as
+  **(Recommended)**, and its `reason`. A `reason` naming a conflict is stated in the question text
+  ("`--base develop` was given, but …"). Ask nothing else; ask nothing the result already answers.
+- **After asking**, record each answer back into the file, so Step 1 persists what was decided, not
+  what was offered:
+  `jq --arg v "{answer}" '.answers.{base|target} = $v | .sources.{base|target} = "asked"' .claude/state/pipeline-answers.json > .claude/state/pipeline-answers.tmp && mv .claude/state/pipeline-answers.tmp .claude/state/pipeline-answers.json`
+- **`answers.mode`** replaces `PIPELINE_MODE` for the rest of the run (`lite` and `fast` shorten QA as
+  the lite-mode contract describes); **`answers.skips`** and **`effective`** are what Step 2 and
+  Steps 5–6 read. A skip that removes a step carries **`waiver`** — the QA gate will read `WAIVED`.
+- **`refused[]`** is never silent: log each entry's flag, value and reason in the Decisions Log, and
+  show it in 0f. The run continues without it — a refused `--skip` runs the step, a refused `--mode`
+  falls through to policy or the detector.
+- **`errors[]`** (an unrecognised flag) is logged, not fatal.
+
+Log one Decisions Log line per answer: `{question}: {value} — source: {flag|policy|persisted|recommended|asked|detector}`.
+
 **Required-question count check (mandatory — prevents silent prompt drops).** Before issuing the `AskUserQuestion` tool call, count the questions you are about to send and verify against this table:
 
-| Scenario        | Required questions in the call    | Count |
-| --------------- | --------------------------------- | ----- |
-| `develop-story` | Q1 (branch base) + Q2 (PR target) | **2** |
-| `develop-task`  | Q1 (branch base) + Q2 (PR target) | **2** |
+| Scenario        | Required questions in the call                                         | Count            |
+| --------------- | ---------------------------------------------------------------------- | ---------------- |
+| `develop-story` | Q1 (branch base) + Q2 (PR target), minus every one the resolver answered | **`questions[]`** |
+| `develop-task`  | Q1 (branch base) + Q2 (PR target), minus every one the resolver answered | **`questions[]`** |
 
-Resume cases skip any question whose answer is already recorded in the Decisions Log (typical resume: 0 questions).
+With no flags and no policy that is **2**, exactly as before. `--defaults` with nothing in conflict is **0** — skip the `AskUserQuestion` call entirely. Resume cases skip any question the lock's `answers` settles (a legacy lock: any already recorded in the Decisions Log) — typical resume: 0 questions.
 
 If your count does not match the required count for the detected scenario, fix the call before invoking the tool. Do NOT invent additional questions ("Run mode?", "Auto-continue?", etc.) — pipeline mode is autonomous (lite-mode detection runs in 0a-parallel Agent 3) and any other policy comes from `shared/resources/develop-pipeline-autonomous-defaults.md`. Adding undocumented questions causes UX drift and may suppress the documented ones (observed regression in live-github-test).
 
@@ -730,7 +786,9 @@ when the journal is empty") a non-finding rather than a `section-missing`.
 
 ## 0f. Pre-flight Summary
 
-Print this to the user before any irreversible action:
+Print this to the user before any irreversible action. Each answer carries its **source** from §0d's
+answer resolution (`flag`, `policy`, `persisted`, `recommended`, `asked`, `detector`), so a run that
+asked nothing still shows where every answer came from:
 
 #### develop-story
 
@@ -738,8 +796,11 @@ Print this to the user before any irreversible action:
 🚀 Starting automated story pipeline
 
 Story:        {story filename}
-Branch:       feature/story.{epic}.{story}.{name} ← {Q1 base branch}
-PR target:    {Q2 answer}
+Branch:       feature/story.{epic}.{story}.{name} ← {Q1 base branch}   [{sources.base}]
+PR target:    {Q2 answer}   [{sources.target}]
+Mode:         {answers.mode}   [{sources.mode}]
+Skips:        {answers.skips, or "none"}{ — WAIVED gate, approved by {waiver.approved_by}, when a step is skipped}
+Refused:      {each refused flag and its reason, or omit the line}
 Report:       {report file path}
 
 Pipeline will now run hands-free.
@@ -753,8 +814,11 @@ Press Ctrl+C now to abort before any changes are made.
 🚀 Starting automated task pipeline
 
 Task:         {task filename}
-Branch:       feature/task.{id}.{name} ← {Q1 base branch}
-PR target:    {Q2 answer}
+Branch:       feature/task.{id}.{name} ← {Q1 base branch}   [{sources.base}]
+PR target:    {Q2 answer}   [{sources.target}]
+Mode:         {answers.mode}   [{sources.mode}]
+Skips:        {answers.skips, or "none"}{ — WAIVED gate, approved by {waiver.approved_by}, when a step is skipped}
+Refused:      {each refused flag and its reason, or omit the line}
 Report:       {report file path}
 
 Pipeline will now run hands-free.
