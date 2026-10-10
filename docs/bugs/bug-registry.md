@@ -44,7 +44,7 @@
 | 15 | [`observation-log doctor`'s activation check is cwd-relative and false-negatives silently](bug.15.doctor-activation-check-cwd-relative/bug.15.doctor-activation-check-cwd-relative.md) | closed | Minor | Medium | 2026-09-12 | observation log |
 | 16 | [The `main` guard is a silent no-op when the script is reached through a symlink](bug.16.main-guard-silent-noop-under-symlink/bug.16.main-guard-silent-noop-under-symlink.md) | closed | Major | Medium | 2026-09-23 | CLI entry points (6 files, 5 skills) |
 | 17 | [Under zsh, `choose_candidate()` accepts a candidate directory with an embedded NUL](bug.17.zsh-nul-truncates-candidate-directory/bug.17.zsh-nul-truncates-candidate-directory.md) | closed | Minor | Low | 2026-09-30 | pipeline lock (`advance-pipeline-lock.sh`) |
-| 18 | [`develop-next` and `develop-batch` hardcode the Phase 0d base branch, overriding `epic-integration`](bug.18.autonomous-runs-hardcode-base-branch/bug.18.autonomous-runs-hardcode-base-branch.md) | new | Major | High | 2026-10-09 | autonomous orchestrators (`develop-next`, `develop-batch`) |
+| 18 | [`develop-next` and `develop-batch` hardcode the Phase 0d base branch, overriding `epic-integration`](bug.18.autonomous-runs-hardcode-base-branch/bug.18.autonomous-runs-hardcode-base-branch.md) | ready-for-qa | Major | High | 2026-10-09 | autonomous orchestrators (`develop-next`, `develop-batch`) |
 
 ---
 
