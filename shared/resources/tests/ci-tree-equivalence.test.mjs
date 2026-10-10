@@ -2308,6 +2308,57 @@ test("obs #3: a check listed twice in reading 1 does not hold the poll to MAX_WA
   }
 });
 
+// ── obs #4: a timeout never publishes a SUCCESS that did not qualify ────────
+
+test("obs #4: MAX_WAIT on a SUCCESS still below the floor writes UNDECIDED, not SUCCESS", () => {
+  const { dir, green } = greenThenDocs(1);
+  const partial = rollupFile(["shellcheck", "link-check", "validate"]);
+  try {
+    const head = git(dir, "rev-parse", "HEAD");
+    const r = runPoll({
+      dir,
+      head,
+      green,
+      rollup: "SUCCESS",
+      maxWait: 90,
+      expectedChecks: "5",
+      rollupJson: partial.file,
+    });
+    assert.equal(r.line, `UNDECIDED ${head} 3 90s TREE_EQ=`, r.stderr);
+    assert.match(
+      finalise,
+      /\| `UNDECIDED` +\| \*\*HALT `ci-not-green-on-acceptance-head`\.\*\*/,
+      "the 6c reader table must HALT on UNDECIDED",
+    );
+  } finally {
+    cleanup(dir);
+    cleanup(partial.work);
+  }
+});
+
+test("obs #4: the sample taken as MAX_WAIT runs out is still judged, so a qualifying one is SUCCESS", () => {
+  const { dir, green } = greenThenDocs(1);
+  const full = rollupFile(PR625_HEAD);
+  try {
+    const head = git(dir, "rev-parse", "HEAD");
+    // maxWait 30: the loop's only decided() runs at WAITED=0 (never decides); the 30 s sample is
+    // taken after it, and only the post-loop judgement can accept it.
+    const r = runPoll({
+      dir,
+      head,
+      green,
+      rollup: "SUCCESS",
+      maxWait: 30,
+      expectedChecks: "5",
+      rollupJson: full.file,
+    });
+    assert.equal(r.line, `SUCCESS ${head} 5 30s TREE_EQ=`, r.stderr);
+  } finally {
+    cleanup(dir);
+    cleanup(full.work);
+  }
+});
+
 test("6c poll: a FAILURE head stays terminal and never consults the engine", () => {
   const { dir, green } = greenThenDocs(1);
   try {
