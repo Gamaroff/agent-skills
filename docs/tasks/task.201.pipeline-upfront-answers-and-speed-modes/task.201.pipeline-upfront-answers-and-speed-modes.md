@@ -428,7 +428,7 @@ authorisation; `develop.skippable` is one comma-separated line (the config reade
 `review` skip with no `git config user.name` is refused; the QA skill writes the waived gate and the
 pipeline only checks it (dev-side steps never modify gate files).
 
-**Files.** Added: `shared/resources/pipeline-answers.js`, `shared/resources/record-reviewed-blob.js`,
+**Files.** Added: `shared/resources/pipeline-answers.js` (incl. `isRefName`, QA cycle 1), `shared/resources/record-reviewed-blob.js`,
 `shared/resources/tests/{pipeline-answers,pipeline-answers-docs,record-reviewed-blob}.test.mjs`.
 Modified: `shared/resources/` step 0, 1, 2, 5–6, 8 docs, lite-mode contract, resume contract,
 autonomous defaults, implementation-report template, `review-report-freshness.js` (+ its test),
@@ -448,6 +448,30 @@ autonomous defaults, implementation-report template, `review-report-freshness.js
 `AUTONOMOUS RUN` literal: the directive blockquote and its opener stay, so the skill-shape tests still
 hold as written.
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-10
+**Quality Score**: 50/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.201.qa.1.pipeline-upfront-answers-and-speed-modes.md](./task.201.qa.1.pipeline-upfront-answers-and-speed-modes.md)
+- **Gate File**: [task.201.gate.1.pipeline-upfront-answers-and-speed-modes.yml](./task.201.gate.1.pipeline-upfront-answers-and-speed-modes.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 5263
+- **Phases Verified**: 5/5 (3 passed)
+- **Critical Issues**: 1
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+
+### Key Findings
+- QA-1 (high): the §0d resolve block reads `PIPELINE_MODE` / `EPIC_BRANCH` it never binds.
+- QA-2 (medium): resume re-resolves mode and skips instead of reusing them.
+- QA-3 (medium): branch flag values are not validated before they reach git.
+- CR-4 (low): the reviewed_blob writer and reader disagree on the line's spellings.
+
 ## Change Log
 
 | Date       | Version | Description                                                                                   | Author |
@@ -458,6 +482,8 @@ hold as written.
 | 2026-10-10 | 1.2     | Review 7/10 → 8/10 after fixes: policy keys moved under `develop:`; `fast` no longer claims a `/review-task --validate` mode; Step 2 reuse extends `review-report-freshness.js`; waiver never masks FAIL; resume states listed; progress-table readers and directive-pinning tests listed; criterion → test map; consumer re-measurement moved to Deferred Work | review-task |
 | 2026-10-10 |         | Status → ready-for-development | review-task |
 | 2026-10-10 |         | Implemented — 2 engines + 3 test files added, 30 files modified, 6 tests extended | develop |
+| 2026-10-10 |         | QA gate FAIL (50/100) — 4 findings (1 high, 2 medium, 1 low) | qa-task |
+| 2026-10-10 |         | QA findings fixed — cycle 1, 4 findings (QA-1 placeholders in §0d, QA-2 persisted mode/skips, QA-3 isRefName probed 35/35, CR-4/CR-5 one stamp matcher) | qa-fix |
 <!-- change-log-end -->
 
 ---

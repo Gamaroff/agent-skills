@@ -524,6 +524,152 @@ test("9c: gate --json decides the verdict", () => {
   assert.equal(out.waiver.approved_by, "Dev");
 });
 
+// ── 11. QA cycle 1 fixes (gate 1: QA-2, QA-3) ─────────────────────────────
+
+test("11a: a branch flag that is not a safe ref name is asked about, never applied", () => {
+  for (const bad of [
+    "-f",
+    "--upload-pack=x",
+    "a b",
+    "$(touch x)",
+    "a;b",
+    "a..b",
+    "feature/",
+    ".hidden",
+    "x.lock",
+    "a//b",
+    "a@{1}",
+  ]) {
+    const r = run(`doc.md --defaults --base=${JSON.stringify(bad)}`);
+    assert.equal(r.answers.base, null, bad);
+    assert.deepEqual(
+      r.questions.map((q) => q.id),
+      ["Q1"],
+      bad,
+    );
+    assert.match(r.questions[0].reason, /not a branch name/, bad);
+  }
+});
+
+test("11b: isRefName accepts the branch shapes the pipelines use", () => {
+  for (const ok of [
+    "develop",
+    "main",
+    "feature/task.201.pipeline-upfront-answers",
+    "epic/178.feature-ui",
+    "release/v1.2.0",
+    "hotfix/v1.2.1",
+    "user_1/fix-2",
+  ])
+    assert.equal(A.isRefName(ok), true, ok);
+  for (const bad of [
+    "",
+    "-x",
+    "a b",
+    "a..b",
+    "a/",
+    "/a",
+    "a.",
+    "a.lock",
+    "a/.b",
+    "a//b",
+    "a`b",
+    "a$b",
+    "a\nb",
+  ])
+    assert.equal(A.isRefName(bad), false, JSON.stringify(bad));
+});
+
+test("11c: a resumed run keeps its persisted mode and refuses a different --mode", () => {
+  const r = run("doc.md --mode fast", {
+    policy: ALL,
+    persisted: {
+      base: "develop",
+      target: "develop",
+      mode: "standard",
+      skips: [],
+    },
+  });
+  assert.equal(r.answers.mode, "standard");
+  assert.equal(r.sources.mode, "persisted");
+  assert.match(
+    r.refused.find((x) => x.flag === "--mode").reason,
+    /already recorded mode "standard"/,
+  );
+});
+
+test("11d: a resumed run keeps its persisted skips and refuses a different --skip", () => {
+  const r = run("doc.md --skip qa-depth", {
+    policy: ALL,
+    persisted: {
+      base: "develop",
+      target: "develop",
+      mode: "standard",
+      skips: ["review"],
+    },
+  });
+  assert.deepEqual(r.answers.skips, ["review"]);
+  assert.equal(r.sources.skips, "persisted");
+  assert.equal(r.effective.runReview, false);
+  assert.match(
+    r.refused.find((x) => x.flag === "--skip").reason,
+    /already recorded skips \[review\]/,
+  );
+});
+
+test("11e: a resumed run with matching flags refuses nothing", () => {
+  const r = run("doc.md --mode standard --skip review", {
+    policy: ALL,
+    persisted: {
+      mode: "standard",
+      skips: ["review"],
+      base: "develop",
+      target: "develop",
+    },
+  });
+  assert.deepEqual(r.refused, []);
+});
+
+test("11f: a policy changed between start and resume does not change the mode", () => {
+  const r = run("doc.md", {
+    policy: { defaultMode: "fast" },
+    persisted: {
+      mode: "standard",
+      skips: [],
+      base: "develop",
+      target: "develop",
+    },
+  });
+  assert.equal(r.answers.mode, "standard");
+});
+
+test("11g: the CLI refuses an unsubstituted {placeholder} (exit 2), never reads it as a value", () => {
+  let code = 0;
+  let err = "";
+  try {
+    execFileSync(
+      process.execPath,
+      [
+        MODULE_PATH,
+        "resolve",
+        "--pipeline",
+        "story",
+        "--args",
+        "doc.md",
+        "--epic-branch",
+        "{EPIC_BRANCH from the epic pre-check, or empty}",
+        "--json",
+      ],
+      { stdio: "pipe" },
+    );
+  } catch (e) {
+    code = e.status;
+    err = String(e.stderr);
+  }
+  assert.equal(code, 2);
+  assert.match(err, /unsubstituted placeholder: --epic-branch/);
+});
+
 // ── 10. mutation proof ─────────────────────────────────────────────────────
 // Revert one rule in a copy of the module; the case named beside it must fail.
 
@@ -592,6 +738,17 @@ test("10: each rule is what holds its case", () => {
     freeFast.resolveAnswers({ pipeline: "task", flags: { mode: "fast" } })
       .answers.mode,
     "fast",
+  );
+
+  // Ref-name check removed → 11a's "-f" would be recorded as the base.
+  const anyRef = mutant("&& !isRefName(value))", "&& false)");
+  assert.equal(
+    anyRef.resolveAnswers({
+      pipeline: "task",
+      flags: { base: "-f", defaults: true },
+      derived: TASK,
+    }).answers.base,
+    "-f",
   );
 
   // Persisted-disagreement check removed → 7c's flag would silently overwrite.

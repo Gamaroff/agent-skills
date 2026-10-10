@@ -30,26 +30,57 @@
 
 const fs = require("node:fs");
 const { execFileSync } = require("node:child_process");
-const { reportReviewedBlob } = require("./review-report-freshness.js");
+const {
+  reportReviewedBlob,
+  isReviewedBlobLine,
+  blankNonProse,
+} = require("./review-report-freshness.js");
 
-const LINE_RE = /^ {0,3}\*\*reviewed_blob:\*\*.*$/;
 const ANCHOR_RE =
   /^ {0,3}(?:[-*][ \t]+)?\*\*(?:Reviewed|Review Date)(?:\*\*:|:\*\*|\*\*)/;
 
 /**
  * Pure: the report text with exactly one `**reviewed_blob:**` line for `blob`.
+ *
+ * Every earlier stamp is removed with the READER's matcher, in every spelling it
+ * accepts, and from frontmatter too — a stamp the reader can see but the writer
+ * leaves behind makes the report ambiguous (gate 1, CR-4). Both the removal and
+ * the anchor search run on the reader's blanked-prose view, so a `**Reviewed:**`
+ * or a stamp inside a fenced example is neither moved nor chosen (CR-5).
  */
 function stampReport(reportText, blob) {
   const eol = reportText.includes("\r\n") ? "\r\n" : "\n";
-  const lines = reportText.split(/\r?\n/).filter((l) => !LINE_RE.test(l));
-  const stamp = `**reviewed_blob:** ${blob}`;
-  const at = lines.findIndex((l) => ANCHOR_RE.test(l));
-  if (at >= 0) lines.splice(at + 1, 0, stamp);
-  else {
-    while (lines.length && lines[lines.length - 1] === "") lines.pop();
-    lines.push("", stamp, "");
+  let lines = reportText.split(/\r?\n/);
+  // Frontmatter: a first line of `---` and its closer. Its stamp key goes.
+  let bodyStart = 0;
+  if (lines[0] !== undefined && lines[0].trim() === "---") {
+    const close = lines.findIndex(
+      (l, i) => i > 0 && (l.trim() === "---" || l.trim() === "..."),
+    );
+    if (close > 0) {
+      lines = lines.filter(
+        (l, i) => !(i > 0 && i < close && /^reviewed_blob:/.test(l)),
+      );
+      bodyStart =
+        lines.findIndex(
+          (l, i) => i > 0 && (l.trim() === "---" || l.trim() === "..."),
+        ) + 1;
+    }
   }
-  return lines.join(eol);
+  const head = lines.slice(0, bodyStart);
+  let body = lines.slice(bodyStart);
+  let prose = blankNonProse(body.join("\n")).split("\n");
+  const keep = body.map((_, i) => !isReviewedBlobLine(prose[i] || ""));
+  body = body.filter((_, i) => keep[i]);
+  prose = prose.filter((_, i) => keep[i]);
+  const stamp = `**reviewed_blob:** ${blob}`;
+  const at = prose.findIndex((l) => ANCHOR_RE.test(l));
+  if (at >= 0) body.splice(at + 1, 0, stamp);
+  else {
+    while (body.length && body[body.length - 1] === "") body.pop();
+    body.push("", stamp, "");
+  }
+  return [...head, ...body].join(eol);
 }
 
 function record(doc, report) {

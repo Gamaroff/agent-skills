@@ -701,9 +701,11 @@ asked about with the conflict stated. The rule lives once, in the engine — nev
 | `--skip review,qa-depth,review-pr-depth` | skips (never asked) | `develop.skippable` — the allow-list, default empty |
 
 ```bash
-# INPUTS, bound in THIS block: the skill's raw arguments, the two Recommended options
-# derived above, EPIC_BRANCH (story; empty otherwise), and PIPELINE_MODE from 0a-parallel.
-: "${PIPELINE_MODE:?bind PIPELINE_MODE from the 0a-parallel aggregation}"
+# Every input is a {placeholder} substituted into THIS block — none is a shell variable
+# carried from another block, which would not exist here: the skill's raw arguments,
+# the two Recommended options derived above, the epic pre-check's integration branch
+# (story only — empty for a task, or a story whose epic declares none), and the
+# 0a-parallel aggregation's PIPELINE_MODE (lite or standard).
 source .agents/skills/{develop-story|develop-task}/references/read-config.sh || exit 1
 POLICY_MODE=$(read_nested_config_key develop defaultMode)
 POLICY_SKIPPABLE=$(read_nested_config_key develop skippable)
@@ -711,7 +713,8 @@ mkdir -p .claude/state
 command node .agents/skills/{develop-story|develop-task}/references/pipeline-answers.js resolve \
   --pipeline {story|task} --args "{the skill's arguments, verbatim}" \
   --derived-base "{Q1's Recommended option}" --derived-target "{Q2's Recommended option}" \
-  --epic-branch "${EPIC_BRANCH:-}" --detector "$PIPELINE_MODE" \
+  --epic-branch "{EPIC_BRANCH from the epic pre-check, or empty}" \
+  --detector "{PIPELINE_MODE from 0a-parallel: lite or standard}" \
   --policy-mode "$POLICY_MODE" --policy-skippable "$POLICY_SKIPPABLE" \
   --persisted-file .claude/state/develop-pipeline.lock \
   --invoker "$(git config user.name)" --json > .claude/state/pipeline-answers.json \
@@ -724,6 +727,9 @@ Act on the result:
 - **`questions[]`** is exactly the set to ask — each with its `recommended` option, which leads as
   **(Recommended)**, and its `reason`. A `reason` naming a conflict is stated in the question text
   ("`--base develop` was given, but …"). Ask nothing else; ask nothing the result already answers.
+- **On a resume** — a lock already exists, so Step 1, which writes the answers into it, will not run —
+  merge the file into the lock as soon as the questions are settled, with Step 1's "Persist the
+  resolved answers" block. Otherwise an answer asked on resume lives only in this run's memory.
 - **After asking**, record each answer back into the file, so Step 1 persists what was decided, not
   what was offered:
   `jq --arg v "{answer}" '.answers.{base|target} = $v | .sources.{base|target} = "asked"' .claude/state/pipeline-answers.json > .claude/state/pipeline-answers.tmp && mv .claude/state/pipeline-answers.tmp .claude/state/pipeline-answers.json`

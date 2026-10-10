@@ -109,3 +109,49 @@ test("3: a missing input reports its reason and exits 0; bad usage exits 2", () 
   }
   assert.equal(code, 2);
 });
+
+test("4a: a stamp in any spelling the reader accepts is replaced, not doubled (gate 1, CR-4)", () => {
+  for (const old of [
+    `reviewed_blob: ${"a".repeat(40)}`,
+    `- **reviewed_blob:** ${"a".repeat(40)}`,
+    `**reviewed_blob**: \`${"a".repeat(40)}\``,
+  ]) {
+    const out = stampReport(`# R\n\n**Reviewed:** 2026-10-10\n${old}\n`, BLOB);
+    assert.deepEqual(
+      reportReviewedBlob(out),
+      { blob: BLOB, ambiguous: false },
+      old,
+    );
+  }
+  const fm = stampReport(
+    `---\nreviewed_blob: ${"a".repeat(40)}\n---\n**Reviewed:** 2026-10-10\n`,
+    BLOB,
+  );
+  assert.deepEqual(reportReviewedBlob(fm), { blob: BLOB, ambiguous: false });
+  assert.ok(
+    fm.startsWith("---\n---\n"),
+    "the frontmatter key is removed, the block kept",
+  );
+});
+
+test("4b: a Reviewed line or a stamp inside a fence is neither moved nor chosen (CR-5)", () => {
+  const fenced =
+    "# R\n\n```\n**Reviewed:** example\nreviewed_blob: " +
+    "a".repeat(40) +
+    "\n```\n\n**Reviewed:** 2026-10-10\n";
+  const out = stampReport(fenced, BLOB);
+  assert.ok(
+    out.includes("reviewed_blob: " + "a".repeat(40)),
+    "the fenced example is untouched",
+  );
+  assert.ok(
+    out.includes(`**Reviewed:** 2026-10-10\n**reviewed_blob:** ${BLOB}`),
+    "the stamp follows the prose line",
+  );
+  assert.deepEqual(reportReviewedBlob(out), { blob: BLOB, ambiguous: false });
+});
+
+test("4c: re-stamping is idempotent — write N and write N+1 are byte-identical", () => {
+  const once = stampReport("# R\n\n**Reviewed:** 2026-10-10\nbody\n", BLOB);
+  assert.equal(stampReport(once, BLOB), once);
+});

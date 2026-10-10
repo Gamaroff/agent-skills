@@ -421,6 +421,16 @@ const REVIEWED_BLOB_RE = new RegExp(
 );
 
 /**
+ * Is this one line a `reviewed_blob:` stamp, in any spelling the reader
+ * accepts? Exported so the one writer (record-reviewed-blob.js) removes exactly
+ * what this module reads — one matcher, not two that drift (task.201 gate 1,
+ * CR-4). The caller decides whether the line is prose; this tests the shape.
+ */
+function isReviewedBlobLine(line) {
+  return new RegExp(REVIEWED_BLOB_RE.source).test(String(line));
+}
+
+/**
  * The document hash a review report says it reviewed.
  * @returns {{ blob: string|null, ambiguous: boolean }} — `ambiguous` when the
  *   report names more than one distinct hash.
@@ -628,6 +638,8 @@ module.exports = {
   reportReviewedDate,
   reportDateToken,
   reportReviewedBlob,
+  isReviewedBlobLine,
+  blankNonProse,
   taskUpdatedDate,
   // classify
   classifyReviewReport,

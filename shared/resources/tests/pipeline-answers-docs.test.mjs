@@ -150,6 +150,60 @@ test("2: §0d (story/task) and develop-bug §0d call resolve with flags the CLI 
   }
 });
 
+/** Variables a block reads but never assigns. Single-quoted text (jq programs) is not shell. */
+function unboundReads(block) {
+  block = block.replace(/'[^'\n]*'/g, "''");
+  const reads = new Set(
+    [...block.matchAll(/\$\{?([A-Za-z_][A-Za-z0-9_]*)/g)].map((m) => m[1]),
+  );
+  const assigned = new Set(
+    [...block.matchAll(/(?:^|[\s;(])([A-Za-z_][A-Za-z0-9_]*)=/gm)].map(
+      (m) => m[1],
+    ),
+  );
+  return [...reads].filter((n) => !assigned.has(n));
+}
+
+test("2c: every task.201 block binds what it reads (gate 1, QA-1 — each fenced block is its own shell)", () => {
+  const sites = [
+    [
+      "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md",
+      "pipeline-answers.js resolve",
+    ],
+    [
+      "skills/develop-bug/references/develop-bug-step-0-resolve-bug.md",
+      "pipeline-answers.js resolve",
+    ],
+    [
+      "shared/resources/develop-pipeline-step-5-6-qa-loop.md",
+      "pipeline-answers.js gate",
+    ],
+    [
+      "shared/resources/develop-pipeline-step-1-create-branch.md",
+      "pipeline-answers.json",
+    ],
+  ];
+  for (const [file, marker] of sites) {
+    const blocks = bashBlocks(read(file)).filter((b) => b.includes(marker));
+    assert.equal(
+      blocks.length,
+      1,
+      `${file}: expected one block containing ${marker}`,
+    );
+    assert.deepEqual(
+      unboundReads(blocks[0]),
+      [],
+      `${file}: reads a variable no line of the block assigns`,
+    );
+  }
+  // Non-vacuity: the rule sees a read the block does not bind.
+  assert.deepEqual(unboundReads('x --detector "$PIPELINE_MODE"'), [
+    "PIPELINE_MODE",
+  ]);
+  assert.deepEqual(unboundReads('A=$(date)\necho "$A"'), []);
+  assert.deepEqual(unboundReads("jq '.x = $a' f"), []);
+});
+
 test("2b: the 0f summary shows a source for every answer", () => {
   const text = read(
     "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md",

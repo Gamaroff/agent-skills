@@ -41,15 +41,6 @@ const REPO_ROOT = path.resolve(__dirname, "..");
 
 // Declared inputs — `file#NAME`: why the document may read it unbound.
 const INPUTS = new Map([
-  // task.201: §0d's answer-resolution block reads two values Phase 0 derived earlier, in another block.
-  [
-    "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md#PIPELINE_MODE",
-    "re-bound input (0a-parallel's lite verdict); the `:?` is the loud-failure guard",
-  ],
-  [
-    "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md#EPIC_BRANCH",
-    "input from §0d's epic pre-check (story only); empty is the correct value for a task",
-  ],
   [
     "skills/create-issue/SKILL.md#JIRA_PROJECT_KEY",
     "environment knob (Jira project), documented in the skill's env table",

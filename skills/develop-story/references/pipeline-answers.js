@@ -116,6 +116,34 @@ const FLAG_FOR = Object.freeze({
   branchModel: "--branch-model",
 });
 
+// ── branch names ───────────────────────────────────────────────────────────
+
+/**
+ * Is `value` a branch name this module will record as an answer?
+ *
+ * An answer is later interpolated into git commands in prose (`git checkout
+ * <base>`, `gh pr create --base <target>`), so the rule is git's own ref-name
+ * rules (git-check-ref-format) narrowed to a conservative character set: letters,
+ * digits, `.`, `_`, `-` and `/`. That refuses whitespace and every shell
+ * metacharacter outright, and the structural rules refuse what git refuses — a
+ * leading `-` (read as an option: `--base=-f`), `..`, `//`, a component starting
+ * with `.`, a trailing `/` or `.`, and a `.lock` suffix. Narrower than git, on
+ * purpose: a name git would accept but this refuses is asked about, with the
+ * reason, which costs one question; the reverse costs an argument injection.
+ */
+function isRefName(value) {
+  if (typeof value !== "string" || value === "" || value.length > 255)
+    return false;
+  if (!/^[A-Za-z0-9._/-]+$/.test(value)) return false;
+  if (value.startsWith("-") || value.startsWith("/")) return false;
+  if (value.endsWith("/") || value.endsWith(".") || value.endsWith(".lock"))
+    return false;
+  if (value.includes("..") || value.includes("//")) return false;
+  return value
+    .split("/")
+    .every((c) => c !== "" && !c.startsWith(".") && !c.endsWith(".lock"));
+}
+
 // ── argument parsing ───────────────────────────────────────────────────────
 
 // Split a skill's argument string into words. Quotes group; nothing expands.
@@ -246,6 +274,8 @@ function recommendationFor(pipeline, key, derived, answers) {
  * Checked for flags and persisted answers alike.
  */
 function conflictFor(pipeline, key, value, derived, answers) {
+  if ((key === "base" || key === "target") && !isRefName(value))
+    return `"${value}" is not a branch name this pipeline will pass to git (letters, digits, . _ - / only; no leading -, no .., no .lock)`;
   if (pipeline === "bug") {
     if (key === "branchModel" && !BUG_MODELS[value])
       return `unknown branch model "${value}" — one of ${Object.keys(BUG_MODELS).join(", ")}`;
@@ -271,10 +301,24 @@ function conflictFor(pipeline, key, value, derived, answers) {
   return null;
 }
 
-function resolveMode(pipeline, flags, policy, derived, refused) {
+function resolveMode(pipeline, flags, policy, derived, refused, persisted) {
   const detector = derived.detectorMode === "lite" ? "lite" : "standard";
   const policyMode = str(policy.defaultMode);
   const skippable = policy.skippable;
+
+  // A resumed run keeps the mode it started with: the lock holds it, and every
+  // step after Phase 0 reads the lock, not this result. A resume flag that
+  // disagrees is refused with the reason rather than applied to 0f alone.
+  const persistedMode = str(persisted.mode);
+  if (MODES.includes(persistedMode) && pipeline !== "bug") {
+    if (flags.mode !== undefined && str(flags.mode) !== persistedMode)
+      refused.push({
+        flag: "--mode",
+        value: flags.mode,
+        reason: `this run already recorded mode "${persistedMode}" — a resumed run keeps one mode; start fresh to change it`,
+      });
+    return { mode: persistedMode, source: SOURCES.PERSISTED };
+  }
 
   if (pipeline === "bug") {
     if (flags.mode !== undefined)
@@ -338,8 +382,23 @@ function resolveMode(pipeline, flags, policy, derived, refused) {
   return { mode: detector, source: SOURCES.DETECTOR };
 }
 
-function resolveSkips(pipeline, flags, policy, invoker, refused) {
+function resolveSkips(pipeline, flags, policy, invoker, refused, persisted) {
   const requested = Array.isArray(flags.skip) ? flags.skip : [];
+  // Same rule as the mode: a resumed run keeps the skips it recorded.
+  if (Array.isArray(persisted.skips) && pipeline !== "bug") {
+    const kept = persisted.skips.filter((s) => SKIP_VOCABULARY.includes(s));
+    const same =
+      requested.length === 0 ||
+      (requested.length === kept.length &&
+        requested.every((s) => kept.includes(s)));
+    if (!same)
+      refused.push({
+        flag: "--skip",
+        value: requested.join(","),
+        reason: `this run already recorded skips [${kept.join(", ") || "none"}] — a resumed run keeps them; start fresh to change them`,
+      });
+    return { skips: kept, persisted: true };
+  }
   const skips = [];
   for (const raw of requested) {
     const s = String(raw).trim();
@@ -358,7 +417,7 @@ function resolveSkips(pipeline, flags, policy, invoker, refused) {
     if (reason) refused.push({ flag: "--skip", value: s, reason });
     else if (!skips.includes(s)) skips.push(s);
   }
-  return skips;
+  return { skips, persisted: false };
 }
 
 function normalisePolicy(policy) {
@@ -489,13 +548,25 @@ function resolveAnswers(input) {
     policy,
     derived,
     refused,
+    persistedAnswers,
   );
   answers.mode = mode;
   sources.mode = modeSource;
 
-  const skips = resolveSkips(pipeline, flags, policy, invoker, refused);
+  const { skips, persisted: skipsPersisted } = resolveSkips(
+    pipeline,
+    flags,
+    policy,
+    invoker,
+    refused,
+    persistedAnswers,
+  );
   answers.skips = skips;
-  sources.skips = skips.length ? SOURCES.FLAG : SOURCES.NONE;
+  sources.skips = skipsPersisted
+    ? SOURCES.PERSISTED
+    : skips.length
+      ? SOURCES.FLAG
+      : SOURCES.NONE;
 
   const shortened = mode === "lite" || mode === "fast";
   const effective = {
@@ -618,6 +689,20 @@ function main(argv) {
     process.exitCode = 2;
     return;
   }
+  // A value still wearing its {placeholder} braces is a call the agent did not
+  // substitute. Read as a branch it would conflict with every flag; read as a
+  // detector verdict it would silently mean "standard". Neither is a decision.
+  const unsubstituted = Object.entries(o).filter(
+    ([k, v]) =>
+      k !== "args" && typeof v === "string" && /^\{[^}]*\}$/.test(v.trim()),
+  );
+  if (unsubstituted.length) {
+    process.stderr.write(
+      `unsubstituted placeholder: ${unsubstituted.map(([k, v]) => `--${k} ${v}`).join(", ")}\n${USAGE}\n`,
+    );
+    process.exitCode = 2;
+    return;
+  }
   let out;
   if (cmd === "resolve") {
     if (!o.pipeline) {
@@ -687,6 +772,7 @@ module.exports = {
   QUESTION_SETS,
   // parse
   parseArgs,
+  isRefName,
   splitList,
   // resolve
   resolveAnswers,
