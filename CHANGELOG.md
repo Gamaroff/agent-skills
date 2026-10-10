@@ -45,6 +45,13 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`/finalise`'s CI-reading-2 poll no longer publishes an unqualified `SUCCESS` on timeout.** When
+  `MAX_WAIT` ran out, the poll printed the last sampled state. So a rollup that read `SUCCESS` but
+  stayed below reading 1's check floor, or never settled, was accepted as green: the partial-rollup
+  case the floor exists to refuse (obs #4). The final sample is now judged once after the loop, and a
+  `SUCCESS` that still does not qualify is written `UNDECIDED`, which the reader HALTs on. Two poll
+  cases, each mutation-proved, cover the HALT and the qualifying last sample.
+
 - **`/finalise`'s CI-reading-2 check floor counts distinct checks.** Reading 1's `CI_CHECKS_1` and
   the 6c poll's `checks()` counted rollup entries. One check can be listed twice, so a head that
   listed it once could never reach the floor, and the poll ran out its whole `MAX_WAIT` (25 minutes)

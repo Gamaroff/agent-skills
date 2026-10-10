@@ -1507,6 +1507,7 @@ standalone.
 #!/usr/bin/env bash
 # usage: finalise-ci-poll.sh <PR_NUMBER> <EXPECTED_HEAD> <MAX_WAIT_SECONDS> <RESULT_FILE> [EXPECTED_CHECKS] [ENGINE]
 # Writes ONE line to RESULT_FILE when it concludes: "<STATE> <HEAD> <CHECKS> <WAITED>s TREE_EQ=<sha12 or empty>".
+# <STATE> is the rollup token, or UNDECIDED when MAX_WAIT ran out on a SUCCESS that never qualified.
 # ENGINE is the path of ci-tree-equivalence.js; absent means the docs-only rule is off for this poll.
 PR_NUMBER=${1}; EXPECTED_HEAD=${2}; MAX_WAIT=${3}; RESULT=${4}; EXPECTED_CHECKS=${5:-0}; ENGINE=${6:-}
 TREE_EQ=""; TE_LATCHED=0
@@ -1565,10 +1566,19 @@ decided() {
     *) return 1 ;;
   esac
 }
+DECIDED=0
 while [ "$WAITED" -lt "$MAX_WAIT" ]; do
-  decided && break
+  decided && { DECIDED=1; break; }
   sleep 30; WAITED=$((WAITED + 30)); PREV_CHECKS=$CHECKS; STATE=$(rollup); CHECKS=$(checks)
 done
+# MAX_WAIT ran out. The last sample was taken after the loop's last decided(), so judge it once.
+# Only a SUCCESS is re-judged: decided() on a PENDING/NONE head asks the engine, and FAILURE is
+# terminal for the reader anyway. A SUCCESS that still fails the floor or the stable-count rule is
+# NOT a green reading: printed as sampled, the reader accepted a rollup that stayed partial for the
+# whole wait, which is the case the floor exists to refuse (obs #4). UNDECIDED makes the reader HALT.
+if [ "$DECIDED" -eq 0 ] && [ "$STATE" = SUCCESS ]; then
+  decided || STATE=UNDECIDED
+fi
 printf '%s %s %s %ss TREE_EQ=%s\n' "$STATE" "$(sampled_head)" "$CHECKS" "$WAITED" "$TREE_EQ" > "$RESULT"
 POLLEOF
    # CI_CHECKS_1 is the check count reading 1 was green over (Step 6 records it beside CI_ROLLUP).
@@ -1619,6 +1629,7 @@ POLLEOF
    | `SUCCESS`                                  | Proceed to action 7. Record `CI reading 2: SUCCESS @ {CI_HEAD_2}` — or, when `CI_TREE_EQ_2` is set, `CI reading 2: SUCCESS (tree-equivalent to {CI_TREE_EQ_2}) @ {CI_HEAD_2}`, never plain `SUCCESS`: the acceptance commit's own CI did not finish and the docs-only rule satisfied the reading |
    | `FAILURE`                                  | **HALT `ci-not-green-on-acceptance-head`.** The acceptance commit is pushed and `status: accepted` is on the branch — do **not** revert it; report the failing job(s) and stop before any side-effect. The human decides whether the red is the docs commit or the code |
    | `PENDING` / `NONE` / `CANCELLED` / `UNKNOWN` past `MAX_WAIT` | **HALT `ci-not-green-on-acceptance-head`** with the last sampled state. Waiting past the bound is a judgement for a human; assuming green is not a judgement at all |
+   | `UNDECIDED`                                | **HALT `ci-not-green-on-acceptance-head`.** `MAX_WAIT` ran out on a rollup that read `SUCCESS` without meeting the check floor (`CI_CHECKS_2` below reading 1's count) or without its count settling. Report both counts: a partial rollup is not a green reading, however long it was waited on (obs #4) |
 
    > **The poll is a background job by construction, not by advice.** `gh pr checks --watch` is
    > forbidden for the same reason (see `develop-next` Step 3): a wait that lives inside one tool
