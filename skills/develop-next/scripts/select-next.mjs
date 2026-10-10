@@ -1483,9 +1483,12 @@ function worktreeFor(row) {
 const EPIC_INTEGRATION = "epic-integration";
 
 /**
- * The `branch_model:` a story's parent epic declares, lowercased — or null when
- * the epic declares none or cannot be found. Phase 0d's own pre-check reads the
- * same key, and treats an unresolvable epic the same way: unset, never guessed.
+ * The `branch_model:` a story's parent epic declares. Returns
+ * `{ resolved: true, model }` once the epic is found — `model` lowercased, or
+ * null when the epic declares none — and `{ resolved: false, reason }` when the
+ * story or its epic cannot be read. The two are kept apart because the right
+ * response differs: an epic that declares nothing is develop-direct, while one
+ * that could not be found might be an integration epic nobody looked at.
  *
  * The epic is found from the story's `epic_source:` (relative to the story file,
  * then to the working directory), else from `epic:` — the epic's directory stem —
@@ -1494,11 +1497,11 @@ const EPIC_INTEGRATION = "epic-integration";
  *
  * @param {string} storyPath  absolute path of the story document
  * @param {(p: string) => string|null} read  file reader; null when unreadable
- * @returns {string|null}
+ * @returns {{resolved: true, model: string|null} | {resolved: false, reason: string}}
  */
 export function storyBranchModel(storyPath, read) {
   const story = read(storyPath);
-  if (!story) return null;
+  if (!story) return { resolved: false, reason: "story unreadable" };
   const candidates = [];
   const source = frontmatterScalar(story, "epic_source");
   if (source)
@@ -1519,9 +1522,15 @@ export function storyBranchModel(storyPath, read) {
     const epic = read(p);
     if (!epic) continue;
     const model = frontmatterScalar(epic, "branch_model");
-    return model ? model.toLowerCase() : null;
+    return { resolved: true, model: model ? model.toLowerCase() : null };
   }
-  return null;
+  return {
+    resolved: false,
+    reason:
+      source || stem
+        ? "epic document not found"
+        : "story names no epic_source: or epic:",
+  };
 }
 
 /**
@@ -1537,17 +1546,19 @@ export function storyBranchModel(storyPath, read) {
  * row is kept, the rest deferred to `excluded` (belt-and-suspenders for teams that
  * want conflicts impossible by construction). Default is warn-only (non-breaking).
  *
- * `opts.branchModelOf(row)` returns the branch model of a `/develop-story` row's
- * epic (see `storyBranchModel`). A story whose epic declares `epic-integration`
+ * `opts.branchModelOf(row)` returns what `storyBranchModel` returns for a
+ * `/develop-story` row's document. A story whose epic declares `epic-integration`
  * is excluded: a batch worktree is cut from, and rebased onto, the base branch,
  * which would land the story on the base branch early and replay the epic's
  * earlier commits on rebase (bug.18). It is left to `/develop-next` or an
- * interactive run, whose Phase 0d bases it on the integration branch. Without
- * the callback no row is excluded for its branch model, which keeps this
- * function pure for callers that read nothing from disk.
+ * interactive run, whose Phase 0d bases it on the integration branch. A story
+ * whose epic cannot be resolved stays in the batch, as Phase 0d leaves
+ * `EPIC_BRANCH` unset for it, but is named in `lint.warnings` so the guess is
+ * visible. Without the callback no row is excluded for its branch model, which
+ * keeps this function pure for callers that read nothing from disk.
  *
  * @param {object} model
- * @param {{requireTouches?: boolean, branchModelOf?: (row: object) => string|null}} [opts]
+ * @param {{requireTouches?: boolean, branchModelOf?: (row: object) => ({resolved: boolean, model?: string|null, reason?: string})}} [opts]
  * @returns {{status:"batch"|"halt", ...}}
  */
 export function selectBatch(model, opts = {}) {
@@ -1579,11 +1590,17 @@ export function selectBatch(model, opts = {}) {
     const batch = [];
     const excluded = [];
     for (const row of ready) {
-      if (
-        branchModelOf &&
-        row.command === "/develop-story" &&
-        branchModelOf(row) === EPIC_INTEGRATION
-      ) {
+      const branch =
+        branchModelOf && row.command === "/develop-story"
+          ? branchModelOf(row)
+          : null;
+      if (branch && !branch.resolved)
+        model.warnings.push(
+          `${row.id}: could not resolve its epic (${branch.reason}) — batched as ` +
+            `develop-direct; if its epic declares branch_model: epic-integration, ` +
+            `run it with /develop-next instead`,
+        );
+      if (branch && branch.resolved && branch.model === EPIC_INTEGRATION) {
         excluded.push({
           id: row.id,
           line: row.line,

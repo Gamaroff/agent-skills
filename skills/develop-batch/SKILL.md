@@ -195,6 +195,9 @@ Selection rules, the two batching axes, and marker vocabulary:
   onto, `<baseBranch>`, which would land the story outside its epic's integration branch
   (bug.18). Tell the operator to run each one with `/develop-next`, whose Phase 0d bases it
   on the integration branch.
+  A story whose epic the selector could not find stays in the batch, and `lint.warnings`
+  names it (`<id>: could not resolve its epic …`). Report that line: the dispatched
+  pipeline's integration-branch HALT is then the only check left for that item.
   Also surface `unannotated[]` (and the matching `lint.warnings` line): rows batched with
   no `touches:` field, whose write-disjointness is **assumed, not verified**. Two or more
   together is a co-scheduling risk — report it in both `--dry-run` and live runs, and advise
@@ -294,11 +297,12 @@ and `inflight[r] ≤` a probe's effective capacity when one is configured. In-fl
    > worktree at `<dir>` — set your working directory to `<dir>` for all git and file
    > operations; do not touch the main working tree or any sibling worktree.
    > For the Phase 0d Upfront Setup questions, take the option Phase 0d marks
-   > **(Recommended)** for every question without prompting, and never substitute an
-   > answer of your own. The base and PR-target recommendations must both be the branch
-   > this worktree was cut from: if Phase 0d recommends any other branch for either (an
-   > epic integration branch, say), HALT and report it rather than choosing — the item
-   > does not belong in a batch. For the Phase 0b resume prompt, take the option Phase 0b
+   > **(Recommended)** for every question without prompting, except the two this
+   > paragraph answers. This worktree was cut from `<baseBranch>`, and the batch admits
+   > no `epic-integration` story, so the base and the PR target are both `<baseBranch>`.
+   > If Phase 0d's epic pre-check finds an integration branch for this item anyway, HALT
+   > and report it rather than choosing — the item does not belong in a batch. For the
+   > Phase 0b resume prompt, take the option Phase 0b
    > marks **(Recommended)** — after a finalise DoD-gaps halt that is "Re-enter QA at
    > 5a"; only when no option is marked, choose "Resume from last completed step".
    > Record every auto-answer in the Decisions Log. Run the pipeline to

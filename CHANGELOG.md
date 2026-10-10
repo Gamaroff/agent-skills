@@ -48,10 +48,12 @@ All notable changes to this project will be documented in this file. Format foll
 - **Autonomous runs take Phase 0d's branch recommendation, not a hardcoded one (bug.18).** The
   `develop-next` and `develop-batch` directives named `develop` / `<baseBranch>` as the base and PR
   target, overriding the epic's integration branch that Phase 0d recommends for an
-  `epic-integration` story. Both directives now defer to the recommendation and name no branch; a
-  guard test fails on a branch literal in either. `select-next.mjs --batch` excludes
-  `epic-integration` stories with a logged reason, because a batch worktree is cut from and rebased
-  onto the base branch; `/develop-next` runs them instead.
+  `epic-integration` story. `develop-next`'s directive now defers to the recommendation and names no
+  branch. `develop-batch`'s still names `<baseBranch>`, the base its worktree was cut from, but HALTs
+  the item if Phase 0d finds an integration branch. A guard test enforces both rules.
+  `select-next.mjs --batch` excludes `epic-integration` stories with a logged reason, because a batch
+  worktree is cut from and rebased onto the base branch, and names any story whose epic it cannot
+  find in `lint.warnings`. `/develop-next` runs the excluded stories instead.
 
 - **`set-qa-phase.sh` and `set-waiting-on.sh` stop when a paused run on this branch has no lock.**
   After a compaction, the summary carried the pre-pause lock state, the session never ran `--restore`,

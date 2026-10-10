@@ -129,8 +129,9 @@ The directive names no branch, on purpose. Phase 0d derives the base and PR targ
 `epic-integration` story's answer is its epic's integration branch, everything else gets `develop`,
 exactly as an interactive run that accepts the recommendations would. A directive that states the
 answer as a constant overrides that derivation for exactly the items it exists for (bug.18).
-`evals/shared/tests/orchestrator-directive-branch-literal.test.mjs` fails on a branch literal in this
-directive or in `develop-batch`'s.
+`evals/shared/tests/orchestrator-directive-branch-literal.test.mjs` fails on any branch literal in this
+directive. (`develop-batch`'s may name the base its worktree was cut from, but only beside a HALT for
+an integration branch.)
 
 If the pipeline HALTs (review NO-GO, develop stall, 5 QA cycles without PASS, qa-fix with no changes, DoD gaps, unexpected status): **STOP** — surface the pipeline's own HALT report verbatim, send a push notification, do not merge, do not tick. Leave the run-state file in place so the next invocation resumes here.
 

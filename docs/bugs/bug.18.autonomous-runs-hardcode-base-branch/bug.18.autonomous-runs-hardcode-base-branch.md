@@ -166,18 +166,21 @@ and the batch selector could not see an item's branch model.
   question and never substitute an answer, and names the per-item case (an `epic-integration`
   story's answer is its epic's integration branch; Q1 and Q2 agree). No branch is named. A
   paragraph after it says why, and points at the guard.
-- `develop-batch`'s directive defers to Phase 0d the same way, and adds a check instead of a
-  constant: if the base or PR-target recommendation is not the branch the worktree was cut from,
-  the pipeline HALTs and reports it rather than choosing. The worktree, rebase and merge
+- `develop-batch`'s directive takes Phase 0d's Recommended option for every question except base and
+  PR target. It answers those with `<baseBranch>`, the branch its worktree was cut from, because
+  Phase 0d's own option always reads `develop` and not every consumer's base is `develop`. It also
+  HALTs the item, rather than choosing, if Phase 0d's epic pre-check finds an integration branch.
+  The worktree, rebase and merge
   paragraphs now state why cutting from and rebasing onto `<baseBranch>` is correct (no
   `epic-integration` story reaches a batch), and `excluded[]` and the empty-batch STOP tell the
   operator to run such stories with `/develop-next`.
 - `select-next.mjs`: new exported `storyBranchModel(storyPath, read)` finds the epic the way Phase 0d
   does (`epic_source:` relative to the story, then the working directory; else the enclosing
   directory named by `epic:`) and returns its `branch_model:`, or null when the epic declares none or
-  cannot be found. `selectBatch` takes an optional `branchModelOf(row)` and moves an
-  `epic-integration` `/develop-story` row to `excluded[]` with a reason starting
-  `epic-integration:`. `main()` wires it for `--batch`. Without the callback `selectBatch` is
+  cannot be found. It returns `{ resolved, model | reason }`, so "the epic declares nothing" is
+  kept apart from "the epic could not be found". `selectBatch` takes an optional
+  `branchModelOf(row)`. It moves an `epic-integration` `/develop-story` row to `excluded[]` with a
+  reason starting `epic-integration:`, and names an unresolved one in `lint.warnings`. `main()` wires it for `--batch`. Without the callback `selectBatch` is
   unchanged.
 - Support for `epic-integration` items in a batch (worktree from, and rebase onto, the integration
   branch) is not built here. The report named exclusion as the smaller safe fix, and support can
@@ -195,14 +198,18 @@ and the batch selector could not see an item's branch model.
   `selectBatch` exclusion, CLI wiring.
 - `skills/develop-next/references/roadmap-selection.md` — §Parallel batch documents the exclusion.
 - `evals/shared/tests/orchestrator-directive-branch-literal.test.mjs` — added regression guard.
-- `evals/develop-next/unit/select-next.test.mjs` — added 5 `bug.18` cases (exclusion with reason,
-  develop-direct/unresolved kept, pure default, `storyBranchModel` resolution, CLI on disk).
+  `develop-next` may name no branch. `develop-batch` may name one only beside an
+  integration-branch HALT. Neither may answer by question number.
+- `evals/develop-next/unit/select-next.test.mjs` — added 6 `bug.18` cases (exclusion with reason,
+  develop-direct/undeclared kept silently, unresolved kept with a warning, pure default,
+  `storyBranchModel` resolution, CLI on disk).
 - `CHANGELOG.md` — Unreleased › Fixed entry.
 
 **Testing**:
 
-- The guard fails on the pre-fix directives (both orchestrators) and passes after the fix. Its own
-  mutation case shows it catches each spelling used before the fix and none of the new wording.
+- The guard fails on the pre-fix directives (both orchestrators), shown again after the review
+  rework by running it against `develop`'s two SKILL.md files, and passes after the fix. Its own
+  mutation case rejects each pre-fix clause and accepts the fixed wording.
 - 3 of the 5 new `select-next` cases fail on the pre-fix selector and pass after it. The other 2 pin
   the unchanged default.
 - `node --test` over the develop-next/develop-batch protocol and unit suites plus the guard: 251
@@ -217,6 +224,29 @@ and the batch selector could not see an item's branch model.
    it, list the story in a roadmap, and run `select-next.mjs --batch`. The story appears in
    `excluded[]` with an `epic-integration:` reason and gets no worktree.
 
+#### QA Verification (Ready for QA → Closed/Reopened)
+
+**Date**: 2026-10-10
+**Verified by**: develop-bug
+
+**Verification Result**: ✅ Fixed
+
+**Notes**: The regression guard `orchestrator-directive-branch-literal.test.mjs` passes, and it fails
+against `develop`'s pre-fix SKILL.md files. The 6 `bug.18` cases in `select-next.test.mjs` pass, and
+3 of them failed before the fix. `npm run ci:fast` is green (5176 pass / 0 fail).
+
+`/review-code` found no blocking findings. It raised 3 non-blocking ones (2 bugs at confidence
+medium, 1 bug at confidence low), and all were applied in this cycle:
+
+- **CR-1/CR-2**: the batch directive names `<baseBranch>` again, beside an integration-branch HALT.
+  The base is otherwise unknown inside a worktree, and Phase 0d's option always reads `develop`.
+- **CR-3**: an unresolved epic is now told apart from an epic that declares nothing, and is named in
+  `lint.warnings`.
+
+The reported failure no longer reproduces.
+
+**Decision**: Closed (finalised in Step 7)
+
 ---
 
 ## Status History
@@ -226,6 +256,7 @@ and the batch selector could not see an item's branch model.
 | 2026-10-09 | New    | Claude     | Found from the rebirth-wallet consumer while designing up-front pipeline answers (task.201); filed as #620 |
 | 2026-10-10 | In Progress | develop-bug | Reproduced (guard + 3 selector tests fail on pre-fix code); investigation started |
 | 2026-10-10 | Ready for QA | develop-bug | Fix implemented + regression tests; `npm run ci:fast` 5175 pass / 0 fail |
+| 2026-10-10 | Ready for QA | develop-bug | Fix verified — bug scenario gone (verify cycle 1; 3 non-blocking review findings applied) |
 
 ---
 

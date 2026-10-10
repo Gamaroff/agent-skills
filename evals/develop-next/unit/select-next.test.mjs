@@ -2907,7 +2907,10 @@ test("bug.18: --batch excludes a story whose epic declares epic-integration, wit
   const b = selectBatch(parseRoadmap(EPIC_BATCH_ROADMAP), {
     branchModelOf: (row) => {
       asked.push(row.id);
-      return row.id === "8.2" ? "epic-integration" : null;
+      return {
+        resolved: true,
+        model: row.id === "8.2" ? "epic-integration" : null,
+      };
     },
   });
   assert.deepEqual(
@@ -2926,17 +2929,36 @@ test("bug.18: --batch excludes a story whose epic declares epic-integration, wit
   assert.match(b.detail, /1 held back/);
 });
 
-test("bug.18: a develop-direct or unresolved epic keeps the story in the batch", () => {
-  for (const model of [null, "develop-direct", ""]) {
+test("bug.18: a develop-direct or undeclared epic keeps the story in the batch, silently", () => {
+  for (const model of [null, "develop-direct"]) {
     const b = selectBatch(parseRoadmap(EPIC_BATCH_ROADMAP), {
-      branchModelOf: () => model,
+      branchModelOf: () => ({ resolved: true, model }),
     });
     assert.deepEqual(
       b.batch.map((r) => r.id),
       ["8.1", "8.2", "T5"],
       `branch model ${JSON.stringify(model)} must not exclude`,
     );
+    assert.deepEqual(b.lint.warnings, [], "a resolved epic is not a warning");
   }
+});
+
+test("bug.18: an unresolved epic keeps the story in the batch but names it in lint.warnings", () => {
+  const b = selectBatch(parseRoadmap(EPIC_BATCH_ROADMAP), {
+    branchModelOf: (row) =>
+      row.id === "8.2"
+        ? { resolved: false, reason: "epic document not found" }
+        : { resolved: true, model: null },
+  });
+  assert.deepEqual(
+    b.batch.map((r) => r.id),
+    ["8.1", "8.2", "T5"],
+  );
+  assert.equal(b.lint.warnings.length, 1);
+  assert.match(
+    b.lint.warnings[0],
+    /^8\.2: could not resolve its epic \(epic document not found\).*\/develop-next/,
+  );
 });
 
 test("bug.18: with no branchModelOf, selectBatch behaves as before (pure default)", () => {
@@ -2961,33 +2983,36 @@ test("bug.18: storyBranchModel reads the epic from epic_source, then the enclosi
     "/r/elsewhere/story.9.3.d.md": "---\ntype: story\nepic: epic.9.int\n---\n",
   };
   const read = (p) => (p in files ? files[p] : null);
-  assert.equal(
+  assert.deepEqual(
     storyBranchModel(
       "/r/docs/p/epics/epic.9.int/stories/story.9.1.b/story.9.1.b.md",
       read,
     ),
-    "epic-integration",
+    { resolved: true, model: "epic-integration" },
     "enclosing epic directory named by `epic:`",
   );
-  assert.equal(
+  assert.deepEqual(
     storyBranchModel("/r/elsewhere/story.9.2.c.md", read),
-    "epic-integration",
+    { resolved: true, model: "epic-integration" },
     "epic_source, relative to the story file",
   );
-  assert.equal(
+  assert.deepEqual(
     storyBranchModel(
       "/r/docs/p/epics/epic.8.dd/stories/story.8.1.a/story.8.1.a.md",
       read,
     ),
-    null,
+    { resolved: true, model: null },
     "an epic that declares nothing",
   );
-  assert.equal(
+  assert.deepEqual(
     storyBranchModel("/r/elsewhere/story.9.3.d.md", read),
-    null,
+    { resolved: false, reason: "epic document not found" },
     "an epic that cannot be found is unresolved, never guessed",
   );
-  assert.equal(storyBranchModel("/r/missing.md", read), null);
+  assert.deepEqual(storyBranchModel("/r/missing.md", read), {
+    resolved: false,
+    reason: "story unreadable",
+  });
 });
 
 test("bug.18 CLI: --batch excludes an epic-integration story found on disk", () => {
