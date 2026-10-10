@@ -257,6 +257,7 @@ The reported failure no longer reproduces.
 | 2026-10-10 | In Progress | develop-bug | Reproduced (guard + 3 selector tests fail on pre-fix code); investigation started |
 | 2026-10-10 | Ready for QA | develop-bug | Fix implemented + regression tests; `npm run ci:fast` 5175 pass / 0 fail |
 | 2026-10-10 | Ready for QA | develop-bug | Fix verified — bug scenario gone (verify cycle 1; 3 non-blocking review findings applied) |
+| 2026-10-10 | Ready for QA | finalise | DoD verified — bug.18.dod.1.autonomous-runs-hardcode-base-branch.md |
 
 ---
 
