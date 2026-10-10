@@ -6,7 +6,7 @@ in [`docs/contributing/traps.md`](../docs/contributing/traps.md); read them befo
 
 **Every figure below was measured in the session that wrote this file, on 2026-09-15, and carries
 the command that produced it.** Do not trust the date — re-measure:
-`command node .agents/skills/session-handoff/scripts/handoff-verify.mjs` reports every line below as
+`command node skills/session-handoff/scripts/handoff-verify.mjs` reports every line below as
 `confirmed`, `stale` (with the new value) or `unverifiable` (with why). This file is the first one
 written by that skill's write mode (task.110); the 2026-09-10 file it replaces is kept, annotated, as
 `skills/session-handoff/tests/fixtures/handoff-2026-09-10.txt` — its whole value is that its figures
@@ -89,7 +89,7 @@ this file is a pointer by construction. A figure you did not re-measure is writt
 mode reports it `stale` rather than confirming it by accident.
 
 **The observation backlog was last reviewed 2026-09-12** (`last-review-date.txt`). Parked entries
-unpark when their task merges, and only the review re-checks them. <!-- cmd: cat /Users/gamaroff/.claude/projects/-Users-gamaroff-Development-Projects-agent-skills/skill-observations/last-review-date.txt; expect: 2026-09-12 -->
+unpark when their task merges, and only the review re-checks them. <!-- cmd: cat {observation-workspace}/skill-observations/last-review-date.txt; expect: 2026-09-12 -->
 
 ---
 
@@ -172,5 +172,5 @@ docs/contributing/releases.md                    the release procedure and its c
 Pipeline conventions: `AGENTS.md`. Anti-patterns (consumer-facing): `docs/reference/anti-patterns.md`.
 Design rationale: `docs/reference/faq.md`. Observation log: resolved by
 `shared/resources/resolve-observation-workspace.sh`, never from the cwd — **51 files on disk**,
-highest id **90**, **25 open** (ids 65+, written by sessions since the 09-12 review — the next `/observe-work --review` has work) and 27 parked. <!-- cmd: command node skills/observe-work/references/observation-log.js queue --workspace /Users/gamaroff/.claude/projects/-Users-gamaroff-Development-Projects-agent-skills --json; expect: /"total": 52/ -->
+highest id **90**, **25 open** (ids 65+, written by sessions since the 09-12 review — the next `/observe-work --review` has work) and 27 parked. <!-- cmd: command node skills/observe-work/references/observation-log.js queue --workspace {observation-workspace} --json; expect: /"total": 52/ -->
 Staged skill edits: `~/.claude/projects/-Users-gamaroff-Development-Projects-agent-skills/skill-updates/PENDING.md`.

@@ -83,6 +83,15 @@ each is `unverifiable` with its reason, and none of them fails the run.
   the bold spans on the line. `<!-- cmd: <command>; expect: <figure> -->` overrides the figures with
   one explicit one — plain text, or `/regex/` for a range (`expect: /2026-09-(0[8-9]|[1-3][0-9])/`).
 - Fenced code blocks are skipped entirely.
+- **`{observation-workspace}` stands for the observation log's workspace**, which lives outside
+  the repository at a path that differs per machine. Write `cat {observation-workspace}/skill-observations/last-review-date.txt`
+  or pass `--workspace {observation-workspace}` to the observation-log engine, never the absolute path
+  the writing machine resolved: spelled out, a probe reads `command failed` on every other machine,
+  because the path is wrong, not the state. The verifier resolves the placeholder once per run, through
+  `references/resolve-observation-workspace.sh` (the resolver every observation-log caller
+  sources). It substitutes per token, before the whitelist judges the line, so the resolved path is
+  held to the same rules as a written one. An unresolvable workspace is `unverifiable` with the
+  resolver's own reason.
 
 ### How a figure is compared
 

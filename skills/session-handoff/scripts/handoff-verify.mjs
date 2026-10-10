@@ -1439,10 +1439,58 @@ export function tokenize(cmd) {
 }
 
 /**
+ * The one placeholder a probe may write in place of a machine-specific path. The observation log
+ * lives outside the repository, under a path that differs per machine (`~/.claude/projects/<the
+ * project's encoded path>`), so a probe that spelled it out read `unverifiable — command failed` on
+ * every other machine: the path was wrong, not the state (obs #1). The verifier resolves the
+ * placeholder through the same resolver every observation-log caller sources, once per run.
+ */
+export const OBSERVATION_WORKSPACE = "{observation-workspace}";
+
+const RESOLVER_PATH = fileURLToPath(
+  new URL("../references/resolve-observation-workspace.sh", import.meta.url),
+);
+
+/**
+ * Resolve the observation workspace by sourcing the bundled resolver in `cwd`. The resolver is a
+ * fixed file shipped beside this script, run with no shell input from the handoff, so a probe
+ * cannot reach it. Returns { ok: true, value } or { ok: false, detail } — never throws.
+ */
+export function resolveObservationWorkspace(
+  cwd,
+  { resolver = RESOLVER_PATH, env = process.env } = {},
+) {
+  if (!fs.existsSync(resolver))
+    return { ok: false, detail: `resolver not found at ${resolver}` };
+  const r = spawnSync(
+    "bash",
+    [
+      "-c",
+      'source "$1" >/dev/null || exit 1; printf "%s" "$OBS_WORKSPACE"',
+      "resolve-observation-workspace",
+      resolver,
+    ],
+    { cwd, env, encoding: "utf8", timeout: 10_000 },
+  );
+  const why = (r.stderr || "").trim().split("\n")[0];
+  if (r.error) return { ok: false, detail: String(r.error.message || r.error) };
+  if (r.status !== 0)
+    return { ok: false, detail: why || `resolver exited ${r.status}` };
+  if (!r.stdout || !path.isAbsolute(r.stdout))
+    return { ok: false, detail: "resolver returned no absolute path" };
+  return { ok: true, value: r.stdout };
+}
+
+/**
  * Whitelist decision for one command string.
  * Returns { ok: true, argv } or { ok: false, detail }.
+ *
+ * `opts.resolveWorkspace()` answers `{observation-workspace}`: { ok, value } or { ok: false, detail }.
+ * The placeholder is replaced per TOKEN, after quoting is honoured and BEFORE every check below, so
+ * the resolved path is judged exactly as if the author had written it: an absolute path is still
+ * refused wherever the binary's spec refuses one. An unresolvable placeholder refuses the line.
  */
-export function isAllowed(cmd, whitelist = WHITELIST) {
+export function isAllowed(cmd, whitelist = WHITELIST, opts = {}) {
   if (typeof cmd !== "string" || !cmd.trim())
     return { ok: false, detail: "no command" };
   if (RAW_REFUSED.test(cmd)) return { ok: false, detail: "shell operator" };
@@ -1450,6 +1498,18 @@ export function isAllowed(cmd, whitelist = WHITELIST) {
   if (argv === null) return { ok: false, detail: "unterminated quote" };
   if (argv[0] === "command") argv.shift();
   if (!argv.length) return { ok: false, detail: "no command" };
+  if (argv.some((a) => a.includes(OBSERVATION_WORKSPACE))) {
+    const ws = opts.resolveWorkspace
+      ? opts.resolveWorkspace()
+      : { ok: false, detail: "no resolver supplied" };
+    if (!ws || !ws.ok)
+      return {
+        ok: false,
+        detail: `${OBSERVATION_WORKSPACE} not resolvable: ${ws?.detail ?? "no answer"}`,
+      };
+    for (let i = 0; i < argv.length; i++)
+      argv[i] = argv[i].split(OBSERVATION_WORKSPACE).join(ws.value);
+  }
   if (
     argv.some(
       (a) =>
@@ -1840,6 +1900,10 @@ export async function verify(figures, opts = {}) {
   const whitelist = opts.whitelist ?? WHITELIST;
   const cwd = opts.cwd ?? process.cwd();
   const timeoutMs = (opts.timeoutSeconds ?? 60) * 1000;
+  // Resolved at most once per run, and only when a probe names the placeholder.
+  let workspace;
+  const resolveWorkspace = () =>
+    (workspace ??= (opts.resolveWorkspace ?? resolveObservationWorkspace)(cwd));
 
   const lines = [];
   for (const fig of figures) {
@@ -1881,7 +1945,7 @@ export async function verify(figures, opts = {}) {
     }
     let allowed;
     try {
-      allowed = isAllowed(fig.command, whitelist);
+      allowed = isAllowed(fig.command, whitelist, { resolveWorkspace });
     } catch (e) {
       // A rule that throws is a verdict on one line, never a lost run.
       allowed = { ok: false, detail: `could not judge: ${e.message || e}` };

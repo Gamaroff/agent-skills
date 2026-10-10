@@ -45,6 +45,15 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **Handoff probes no longer hard-code one machine's observation workspace (obs #1).** A probe that
+  read the observation log spelled out `/Users/<name>/.claude/projects/<encoded path>`, so on any
+  other machine it read `unverifiable — command failed` because the path was wrong, not because the
+  state had changed. Probes now write `{observation-workspace}`. `handoff-verify.mjs` resolves it once
+  per run through the bundled `resolve-observation-workspace.sh`, substituting per token before the
+  whitelist judges the line, and reports an unresolvable workspace with the resolver's own reason.
+  This repository's `AGENTS.md` and handoff now name `skills/session-handoff/…`, which exists in every
+  clone. The shipped skill keeps the consumer's `.agents/skills/…` path.
+
 - **`/finalise`'s CI-reading-2 poll no longer publishes an unqualified `SUCCESS` on timeout.** When
   `MAX_WAIT` ran out, the poll printed the last sampled state. So a rollup that read `SUCCESS` but
   stayed below reading 1's check floor, or never settled, was accepted as green: the partial-rollup
