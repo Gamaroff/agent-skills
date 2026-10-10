@@ -158,7 +158,7 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
      | `accepted`        | `WAIVED`               | no                                 | merge (the waiver is a recorded human decision)           |
      | `accepted`        | `CONCERNS` / `WAIVED`  | **yes**                            | **HALT** — an open finding survived finalise              |
      | `accepted`        | `FAIL`                 | any                                | **HALT**                                                  |
-     | not `accepted`    | any                    | any                                | **HALT** — finalise did not accept                        |
+     | not `accepted`    | any                    | any                                | **HALT** — finalise did not accept (story / task; a bug item takes the table below) |
      | `accepted`        | missing / unparseable  | —                                  | **HALT** — cannot establish the no-open-finding condition |
 
      An entry is open when its `status:` is absent or reads `open`; `resolved`, `fixed`, `closed`,
@@ -169,6 +169,27 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
      waived, not open. Without this clause every waived gate matched the HALT row and the waiver row
      could never fire. The two clauses below are about *this commit* and cannot be inferred from
      `accepted` — they stay regardless of the row matched here.
+
+     **A `/develop-bug` item is gated by its own rows, not the table above.** A bug never reads
+     `accepted`: its lifecycle ends at `closed`, and `/finalise --bug` deliberately skips that write. It
+     also has no gate file, because the develop-bug verify loop writes none. Read literally, the table
+     above HALTs every bug (obs #2). These are the three facts that stand in for `accepted` plus the
+     gate. Read them from the bug's own directory, keyed on its prefix (`bug.18`, `task.67.bug.3`),
+     never its parent's:
+
+     | Bug `status` | Newest `{bug-prefix}.dod.{N}.*.md` reads | Newest implementation report's last `**Verdict**:` | Action |
+     | :----------- | :--------------------------------------- | :------------------------------------------------- | :----- |
+     | `closed`     | `**Final Status:** ✅ ACCEPTED`           | `PASS`                                             | merge  |
+     | `closed`     | `**Final Status:** ✅ ACCEPTED`           | anything else, or none                             | **HALT** — the verify loop did not pass |
+     | `closed`     | anything else, or no DoD file            | any                                                | **HALT** — `/finalise --bug` did not accept |
+     | not `closed` | any                                      | any                                                | **HALT** — develop-bug Step 7 Part B did not close the bug |
+
+     The verdict is read with the exact-token rule `/finalise --bug` Step 7.6b uses: the first word
+     after the colon, with its bold stripped, is exactly `PASS`. A `PASS` cycle already means no
+     blocking review finding stayed open (develop-bug Step 5a), so there is no `top_issues[]` to read.
+     Both report filename shapes count (`{bug-prefix}.implementation.*` and
+     `{bug-prefix}.*.implementation.*`), ordered by the report number. The head-SHA, CI and quality-gate
+     clauses below apply to a bug exactly as to a story or task.
    - **Head-SHA check** — the PR's source commit must equal `git rev-parse HEAD` on the local PR branch. Mismatch means the branch moved since it was tested → **HALT** (never gate one commit and merge another).
 
      ```bash
