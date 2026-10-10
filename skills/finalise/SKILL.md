@@ -820,7 +820,11 @@ CI_ROLLUP=$(gh pr view "$PR_NUMBER" --json statusCheckRollup \
 # How many checks that reading was green over. Reading 2's poll uses it as a floor: a fresh push
 # registers its fast lanes first, and a rollup that is SUCCESS across three checks while the slow
 # lanes have not yet appeared is not a decision (obs #87). Record it beside CI_ROLLUP.
-CI_CHECKS_1=$(gh pr view "$PR_NUMBER" --json statusCheckRollup -q '.statusCheckRollup | length' 2>/dev/null || echo 0)
+# DISTINCT checks (a CheckRun's name, a StatusContext's context), never rollup entries: one check
+# can be listed twice, and a floor counted in entries could never be met by a head that listed it
+# once — the poll then ran out its whole MAX_WAIT on a green head (obs #3, PR #625). The poll's
+# checks() below uses the same query, so the floor and the reading count one unit.
+CI_CHECKS_1=$(gh pr view "$PR_NUMBER" --json statusCheckRollup -q '[.statusCheckRollup[] | (.name // .context // "")] | unique | length' 2>/dev/null || echo 0)
 ```
 
 #### Bitbucket (`PLATFORM=bitbucket`)
@@ -1517,8 +1521,9 @@ rollup() { : ...the Step 6 rollup query for this platform, verbatim — copy it,
 sampled_head() { gh pr view "$PR_NUMBER" --json headRefOid -q .headRefOid 2>/dev/null || echo unknown; }
 # How many checks the rollup is green OVER. A push registers its fast lanes first; a rollup
 # sampled in that window is SUCCESS across three checks while the slow lanes have not yet
-# appeared (obs #87). Bitbucket: the pipeline count for the head commit.
-checks() { gh pr view "$PR_NUMBER" --json statusCheckRollup -q '.statusCheckRollup | length' 2>/dev/null || echo 0; }
+# appeared (obs #87). Distinct checks, the same query as CI_CHECKS_1 (obs #3).
+# Bitbucket: the pipeline count for the head commit.
+checks() { gh pr view "$PR_NUMBER" --json statusCheckRollup -q '[.statusCheckRollup[] | (.name // .context // "")] | unique | length' 2>/dev/null || echo 0; }
 WAITED=0; PREV_CHECKS=-1
 STATE=$(rollup); CHECKS=$(checks)
 # A terminal state is accepted only when ALL of:

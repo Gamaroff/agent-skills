@@ -434,3 +434,58 @@ test("registry-tick.js is bundled beside develop-next so Step 4's call resolves"
     constants.R_OK,
   );
 });
+
+// ── obs #2: a bug item has its own verify-green rows ─────────────────────────
+//
+// The Step 3 table keys on `status: accepted` and a gate file. A bug ends at `closed` and has no
+// gate file, so read literally that table HALTed every /develop-bug item. The bug rows name the
+// three facts that stand in for them, and develop-batch points at them rather than copying them.
+
+function bugGateRows(text) {
+  return text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => /^\| (not )?`closed`\s*\|/.test(l));
+}
+
+test("SKILL.md Step 3: a /develop-bug item is gated by closed + DoD ACCEPTED + verify PASS (obs #2)", () => {
+  const rows = bugGateRows(skill);
+  assert.equal(rows.length, 4, `expected 4 bug rows, found ${rows.length}`);
+  const merge = rows.filter((r) => /\|\s*merge\s*\|$/.test(r));
+  assert.equal(merge.length, 1, "exactly one bug row merges");
+  assert.match(merge[0], /^\| `closed`/);
+  assert.match(merge[0], /✅ ACCEPTED/);
+  assert.match(merge[0], /\| `PASS`\s*\|/);
+  // Every other row HALTs, and together they cover the three ways the facts can fail.
+  const halts = rows.filter((r) => r !== merge[0]);
+  for (const r of halts) assert.match(r, /\*\*HALT\*\*/);
+  assert.ok(
+    halts.some((r) => /^\| not `closed`/.test(r)),
+    "not closed → HALT",
+  );
+  assert.ok(
+    halts.some((r) => /no DoD file/.test(r)),
+    "no accepted DoD → HALT",
+  );
+  assert.ok(
+    halts.some((r) => /verify loop did not pass/.test(r)),
+    "verdict not PASS → HALT",
+  );
+  // The story/task table's "not accepted" row must not swallow a bug item.
+  assert.match(
+    skill,
+    /\| not `accepted`[^\n]*a bug item takes the table below/,
+  );
+});
+
+test("develop-batch SKILL.md defers to develop-next's bug rows instead of copying them (obs #2)", async () => {
+  const batch = await readFile(
+    path.join(REPO_ROOT, "skills", "develop-batch", "SKILL.md"),
+    "utf-8",
+  );
+  assert.equal(bugGateRows(batch).length, 0, "the bug rows are not copied");
+  assert.match(
+    batch.replace(/\s+/g, " "),
+    /A `\/develop-bug` item never reads `accepted` and has no gate file: it is gated by the bug rows in `develop-next` Step 3/,
+  );
+});

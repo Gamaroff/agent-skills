@@ -45,6 +45,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`/finalise`'s CI-reading-2 check floor counts distinct checks.** Reading 1's `CI_CHECKS_1` and
+  the 6c poll's `checks()` counted rollup entries. One check can be listed twice, so a head that
+  listed it once could never reach the floor, and the poll ran out its whole `MAX_WAIT` (25 minutes)
+  on a green head (PR #625). Both now use one query over distinct check names. A test runs that
+  query through the poll on a rollup with a duplicated entry.
+- **`develop-next` Step 3 gates a bug item on its own evidence.** The verify-green table keyed on
+  `status: accepted` and a gate file, neither of which a bug has, so read literally it HALTed every
+  `/develop-bug` item. New bug rows require `status: closed`, a DoD reading `✅ ACCEPTED` and a last
+  verify verdict of `PASS`. `develop-batch` points at them instead of copying them.
+
 - **Autonomous runs take Phase 0d's branch recommendation, not a hardcoded one (bug.18).** The
   `develop-next` and `develop-batch` directives named `develop` / `<baseBranch>` as the base and PR
   target, overriding the epic's integration branch that Phase 0d recommends for an
