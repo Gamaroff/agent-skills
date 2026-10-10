@@ -191,3 +191,13 @@ test("5b: a stamp line that opens a comment keeps the comment; nothing below cha
   assert.ok(out.includes("<!-- note"), "the comment opener survives");
   assert.deepEqual(reportReviewedBlob(out), { blob: BLOB, ambiguous: false });
 });
+
+test("5c: a nested reviewed_blob key is neither read nor removed (gate 3, CR-2)", () => {
+  const text = `---\nmeta:\n  reviewed_blob: ${"a".repeat(40)}\n---\n**Reviewed:** 2026-10-10\n`;
+  const out = stampReport(text, BLOB);
+  assert.ok(
+    out.includes(`  reviewed_blob: ${"a".repeat(40)}`),
+    "the nested key is untouched",
+  );
+  assert.deepEqual(reportReviewedBlob(out), { blob: BLOB, ambiguous: false });
+});

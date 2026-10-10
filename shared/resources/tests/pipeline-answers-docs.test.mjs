@@ -18,7 +18,15 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync, existsSync } from "node:fs";
+import {
+  readFileSync,
+  readdirSync,
+  existsSync,
+  mkdtempSync,
+  writeFileSync,
+} from "node:fs";
+import { execFileSync } from "node:child_process";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -151,12 +159,34 @@ test("2: §0d (story/task) and develop-bug §0d call resolve with flags the CLI 
 });
 
 /**
+ * Remove the BODY of every quoted heredoc (`<<'TAG'`) and nothing else. The
+ * command that opens it may continue over backslash-ended lines — `|| { … }` in
+ * the §0d blocks — and those lines are shell, so they stay (gate 3, CR-3).
+ */
+function stripQuotedHeredocBodies(block) {
+  const lines = block.split("\n");
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    out.push(lines[i]);
+    const m = lines[i].match(/<<'(\w+)'/);
+    if (!m) continue;
+    let j = i;
+    while (j < lines.length - 1 && /\\\s*$/.test(lines[j]))
+      out.push(lines[++j]);
+    j++;
+    while (j < lines.length && lines[j] !== m[1]) j++;
+    i = j;
+  }
+  return out.join("\n");
+}
+
+/**
  * Variables a block reads before any line of it assigns them. Single-quoted text
  * (jq programs) and quoted-heredoc bodies are not shell. Order counts: a read
  * above its assignment is unbound when that line runs (gate 2, CR-9).
  */
 function unboundReads(block) {
-  block = block.replace(/<<'(\w+)'[^\n]*\n[\s\S]*?\n\1(?=\n|$)/g, "");
+  block = stripQuotedHeredocBodies(block);
   block = block.replace(/'[^'\n]*'/g, "''");
   const firstAssign = new Map();
   for (const m of block.matchAll(/(?:^|[\s;(])([A-Za-z_][A-Za-z0-9_]*)=/gm))
@@ -212,6 +242,10 @@ test("2c: every block that touches task.201's engines binds what it reads, befor
   assert.deepEqual(unboundReads('A=$(date)\necho "$A"'), []);
   assert.deepEqual(unboundReads("jq '.x = $a' f"), []);
   assert.deepEqual(unboundReads("cat <<'EOF'\n$NOT_SHELL\nEOF\n"), []);
+  assert.deepEqual(
+    unboundReads("cmd <<'EOF' \\\n  || echo \"$GONE\"\nbody $NOT_SHELL\nEOF\n"),
+    ["GONE"],
+  );
 });
 
 test("2b: the 0f summary shows a source for every answer", () => {
@@ -274,4 +308,50 @@ test("4b: every review skill stamps its report from a fenced block", () => {
     );
     assert.match(calls[0], /--doc .* --report /, skill);
   }
+});
+
+test("3c: Step 1's merge writes the waiver §0d resolved — a withdrawn skip leaves none (gate 3, CR-1)", () => {
+  const block = bashBlocks(
+    read("shared/resources/develop-pipeline-step-1-create-branch.md"),
+  ).find((b) => b.includes("pipeline-answers.json"));
+  const program = block.match(/'(\. \+ \{answers:[^']*)'/)[1];
+  const dir = mkdtempSync(join(tmpdir(), "merge-"));
+  const merge = (lock, resolved) => {
+    writeFileSync(join(dir, "lock.json"), JSON.stringify(lock));
+    writeFileSync(join(dir, "res.json"), JSON.stringify(resolved));
+    return JSON.parse(
+      execFileSync(
+        "jq",
+        [
+          "--slurpfile",
+          "a",
+          join(dir, "res.json"),
+          program,
+          join(dir, "lock.json"),
+        ],
+        { encoding: "utf8" },
+      ),
+    );
+  };
+  const oldWaiver = {
+    active: true,
+    reason: "review skipped: --skip review",
+    approved_by: "Dev",
+  };
+  // A resume that withdrew the skip: the resolver returns no waiver, and the lock must not keep one.
+  assert.equal(
+    merge(
+      { current_step: 5, waiver: oldWaiver },
+      { answers: { skips: [] }, sources: {}, waiver: null },
+    ).waiver,
+    null,
+  );
+  // A resume that kept it: the resolver carries the lock's waiver forward, and it lands unchanged.
+  assert.deepEqual(
+    merge(
+      { current_step: 5, waiver: oldWaiver },
+      { answers: { skips: ["review"] }, sources: {}, waiver: oldWaiver },
+    ).waiver,
+    oldWaiver,
+  );
 });

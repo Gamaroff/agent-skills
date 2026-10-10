@@ -54,15 +54,17 @@ function stampReport(reportText, blob) {
   const lines = reportText.split(/\r?\n/);
   // Frontmatter is what the READER calls frontmatter (gate 2, CR-4): its
   // splitFrontmatter rejects a `---` block that is not YAML, and such a block
-  // stays body here too. Within real frontmatter, every key spelling the reader
-  // accepts (`reviewed_blob:`, `"reviewed_blob":`, `reviewed_blob :`) goes.
+  // stays body here too. Within real frontmatter, every TOP-LEVEL key spelling
+  // the reader accepts (`reviewed_blob:`, `"reviewed_blob":`, `reviewed_blob :`)
+  // goes — column 0 only, like the reader's own key match; a nested key is
+  // neither read nor removed (gate 3, CR-2).
   const { body: bodyText } = splitFrontmatter(reportText);
   const bodyLines =
     bodyText === reportText ? lines.length : bodyText.split(/\r?\n/).length;
   const fmEnd = lines.length - bodyLines;
   const head = lines
     .slice(0, fmEnd)
-    .filter((l, i) => i === 0 || !/^\s*["']?reviewed_blob["']?\s*:/.test(l));
+    .filter((l, i) => i === 0 || !/^["']?reviewed_blob["']?\s*:/.test(l));
   let body = lines.slice(fmEnd);
   const prose = blankNonProse(body.join("\n")).split("\n");
   // A stamp line is deleted only when the raw line IS the stamp. A line that

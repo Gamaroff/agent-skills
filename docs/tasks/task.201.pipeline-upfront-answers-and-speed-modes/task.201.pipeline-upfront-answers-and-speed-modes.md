@@ -453,24 +453,23 @@ hold as written.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-10
-**Quality Score**: 70/100
+**Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.201.qa.2.pipeline-upfront-answers-and-speed-modes.md](./task.201.qa.2.pipeline-upfront-answers-and-speed-modes.md)
-- **Gate File**: [task.201.gate.2.pipeline-upfront-answers-and-speed-modes.yml](./task.201.gate.2.pipeline-upfront-answers-and-speed-modes.yml)
+- **Full Report**: [task.201.qa.3.pipeline-upfront-answers-and-speed-modes.md](./task.201.qa.3.pipeline-upfront-answers-and-speed-modes.md)
+- **Gate File**: [task.201.gate.3.pipeline-upfront-answers-and-speed-modes.yml](./task.201.gate.3.pipeline-upfront-answers-and-speed-modes.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5274
-- **Phases Verified**: 5/5 (3 passed)
+- **Tests Executed**: 5284
+- **Phases Verified**: 5/5 (4 passed)
 - **Critical Issues**: 0
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- Gate 1's four findings fixed and mutation-proven.
-- CR-1 (medium): a resume rebuilds the waiver from the resuming invoker.
-- CR-2 (medium): §0d pastes raw arguments inside a double-quoted shell string.
-- Three low and four advisory findings in the stamp writer and the resume comparison.
+- Gate 2's nine findings fixed; two mutation-proven this cycle.
+- CR-1 (medium): Step 1's merge keeps a waiver the resolver withdrew.
+- CR-2 (low) and CR-3 (cleanup) in the stamp writer and the docs test.
 
 ## Change Log
 
@@ -486,6 +485,8 @@ hold as written.
 | 2026-10-10 |         | QA findings fixed — cycle 1, 4 findings (QA-1 placeholders in §0d, QA-2 persisted mode/skips, QA-3 isRefName probed 35/35, CR-4/CR-5 one stamp matcher) | qa-fix |
 | 2026-10-10 |         | QA gate CONCERNS (70/100) — 9 findings (2 medium, 3 low promoted; 4 advisory) | qa-task |
 | 2026-10-10 |         | QA findings fixed — cycle 2, 9 findings (CR-1 resume keeps the lock's waiver; CR-2 arguments via quoted heredoc; CR-3 recommendation ref-checked; CR-4/CR-5 writer uses the reader's frontmatter, keeps comments; CR-6/CR-7 resume skip sets and allow-list; CR-8 strict --detector; CR-9 derived 2c population) | qa-fix |
+| 2026-10-10 |         | QA gate CONCERNS (90/100) — 3 findings (1 medium, 1 low, 1 cleanup) | qa-task |
+| 2026-10-10 |         | QA findings fixed — cycle 3, 3 findings (CR-1 merge writes the resolved waiver, tested against the doc's own jq; CR-2 column-0 key; CR-3 heredoc strip keeps continuation lines) | qa-fix |
 <!-- change-log-end -->
 
 ---
