@@ -157,6 +157,30 @@ Leave the `Status` cell at the bug's **current** lifecycle status — this step 
 
 **Never**: change the bug lifecycle `status`, edit the codebase, or fabricate reproduction detail that isn't derivable from the report/evidence. If reproducibility cannot be established even after edits, the recommendation stays **NEEDS DETAIL** (or STALE) — do not upgrade it to READY.
 
+## Step 6.6: Record the Reviewed Revision
+
+**Purpose**: stamp the review report with the exact revision of the document it reviewed, so a
+develop pipeline's Step 2 can reuse this review instead of running it again (task.201).
+
+**When to Execute**: always, when a review report file was written — after every edit this review
+makes to the document (fixes, Status History rows), because the hash must include them. Skip it
+only when no report file exists (action plan only).
+
+```bash
+command node .agents/skills/review-bug/references/record-reviewed-blob.js \
+  --doc "{BUG_FILE}" --report "{review report path}" --json
+```
+
+> Engine source: `references/record-reviewed-blob.js` (bundled into each skill as `references/record-reviewed-blob.js`).
+
+It writes `**reviewed_blob:** <git hash-object of the document>` under the report's `**Reviewed:**`
+line, and reads it back. Read `reason`: `written` needs nothing; any other value (`no-doc`,
+`no-report`, `git-failed`, `unreadable-after-write`) is logged and the review continues — the cost of
+a missing stamp is one re-review, never a halt. **Edit the document after this step and the stamp is
+stale by design**: Step 2 then reviews it again.
+
+---
+
 ## Step 7: Tracker Comment (graceful — non-blocking)
 
 Only if the bug has `github_issue`/`jira_key` in frontmatter (skip silently otherwise — most bugs have none). Post a short review-outcome comment (recommendation, score, issue counts, review-file path) — one call, both trackers:

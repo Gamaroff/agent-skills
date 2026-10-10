@@ -40,6 +40,7 @@ const MODULE_PATH = join(__dirname, "..", "review-report-freshness.js");
 
 const {
   reportReviewedDate,
+  reportReviewedBlob,
   taskUpdatedDate,
   classifyReviewReport,
   VERDICTS,
@@ -894,4 +895,113 @@ test("the develop-story TABLES in the step-2 resource are untouched by this chan
       "Prose and code fences inside those sections are deliberately NOT pinned — " +
       "only the tables are.",
   );
+});
+
+// ── 7. content identity (task.201) ─────────────────────────────────────────
+// A report that records `reviewed_blob:` is judged on the hash alone; a report
+// without it keeps the date rule unchanged. The caller supplies `taskBlob`.
+
+const BLOB_A = "a".repeat(40);
+const BLOB_B = "b".repeat(40);
+const blobReport = (date, blobLine) =>
+  `# Review\n\n**Reviewed:** ${date}\n${blobLine}\n`;
+
+test("7a: a matching blob is fresh even when the report's date is older", () => {
+  const r = classifyReviewReport({
+    taskContent: task("2026-10-10"),
+    taskBlob: BLOB_A,
+    reportContent: blobReport("2026-10-01", `**reviewed_blob:** ${BLOB_A}`),
+  });
+  assert.equal(r.verdict, "fresh");
+  assert.equal(r.reason, "blob-match");
+});
+
+test("7b: a different blob is stale even on the same day (the date rule's blind spot)", () => {
+  const r = classifyReviewReport({
+    taskContent: task("2026-10-10"),
+    taskBlob: BLOB_B,
+    reportContent: blobReport("2026-10-10", `**reviewed_blob:** ${BLOB_A}`),
+  });
+  assert.equal(r.verdict, "stale");
+  assert.equal(r.reason, "blob-mismatch");
+});
+
+test("7c: a legacy report (no blob) keeps today's date verdict", () => {
+  const r = classifyReviewReport({
+    taskContent: task("2026-10-10"),
+    taskBlob: BLOB_B,
+    reportContent: blobReport("2026-10-10", ""),
+  });
+  assert.equal(r.verdict, "fresh");
+  assert.equal(r.reason, "current");
+});
+
+test("7d: a report blob with no task blob supplied is stale, never fresh", () => {
+  const r = classifyReviewReport({
+    taskContent: task("2026-10-10"),
+    reportContent: blobReport("2026-10-10", `reviewed_blob: ${BLOB_A}`),
+  });
+  assert.equal(r.verdict, "stale");
+  assert.equal(r.reason, "task-blob-unavailable");
+});
+
+test("7e: two different blobs in one report are ambiguous → stale", () => {
+  const r = classifyReviewReport({
+    taskContent: task("2026-10-10"),
+    taskBlob: BLOB_A,
+    reportContent: blobReport(
+      "2026-10-10",
+      `reviewed_blob: ${BLOB_A}\nreviewed_blob: ${BLOB_B}`,
+    ),
+  });
+  assert.equal(r.reason, "report-blob-ambiguous");
+});
+
+test("7f: a blob inside a fenced example is not the report's own", () => {
+  const r = classifyReviewReport({
+    taskContent: task("2026-10-10"),
+    taskBlob: BLOB_B,
+    reportContent: blobReport(
+      "2026-10-10",
+      "```\nreviewed_blob: " + BLOB_A + "\n```",
+    ),
+  });
+  assert.equal(r.reason, "current");
+});
+
+test("7g: every blob spelling the writers use is read, frontmatter included", () => {
+  for (const line of [
+    `**reviewed_blob:** ${BLOB_A}`,
+    `reviewed_blob: \`${BLOB_A}\``,
+    `**reviewed_blob**: ${BLOB_A}`,
+  ]) {
+    assert.equal(
+      reportReviewedBlob(blobReport("2026-10-10", line)).blob,
+      BLOB_A,
+      line,
+    );
+  }
+  assert.equal(
+    reportReviewedBlob(`---\nreviewed_blob: ${BLOB_A}\n---\n# R\n`).blob,
+    BLOB_A,
+  );
+});
+
+test("7h: each blob reason has its own message", () => {
+  for (const reason of [
+    "blob-match",
+    "blob-mismatch",
+    "task-blob-unavailable",
+    "report-blob-ambiguous",
+  ]) {
+    const msg = describeVerdict(
+      { reason, reportBlob: BLOB_A },
+      { reportPath: "r.md" },
+    );
+    assert.notEqual(
+      msg,
+      "review report freshness could not be determined",
+      reason,
+    );
+  }
 });

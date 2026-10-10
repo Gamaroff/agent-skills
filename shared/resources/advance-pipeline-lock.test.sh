@@ -422,6 +422,16 @@ run_restore_scenarios() {
     pass "[$SH] --restore: no lock + snapshot → lock at halt_step 5 (numeric), halt fields stripped, snapshot consumed"
   fi
 
+  # task.201: the resolved up-front answers survive the restore, so a resume asks nothing they settle
+  printf '{"task_or_story_directory":"%s","current_step":4,"answers":{"base":"develop","target":"develop","mode":"standard","skips":[]},"answer_sources":{"base":"recommended"},"halted_at":"t","halt_reason":"x","halt_step":"4"}\n' "$R/doc" > "$S"
+  rm -f "$L"
+  PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$R/doc" >/dev/null 2>&1; RC=$?
+  if [ "$RC" -eq 0 ] && [ "$(jq -c '[.answers.base, .answers.target, .answer_sources.base, .current_step]' "$L")" = '["develop","develop","recommended",4]' ]; then
+    pass "[$SH] --restore: the lock's answers and answer_sources survive (task.201)"
+  else
+    fail "[$SH] --restore: the lock's answers and answer_sources survive (task.201)" "rc=$RC lock: $(jq -c . "$L" 2>/dev/null)"
+  fi
+
   # a waiting_on captured in a PreCompact snapshot does not survive the restore (QA cycle 2, CR-3)
   printf '{"task_or_story_directory":"%s","current_step":3,"paused_at":"t","pause_reason":"precompact","waiting_on":{"kind":"agent","label":"stale","since":"2026-01-01T00:00:00Z","budget_minutes":10}}\n' "$R/doc" > "$S"
   rm -f "$L"

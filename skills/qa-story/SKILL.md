@@ -27,6 +27,14 @@ When invoked from the `/develop-story` orchestrator, the call may be prefixed wi
 
 If invoked outside the pipeline (no lite directive), the normal Adaptive Review Strategy applies.
 
+**Waiver directive (task.201).** When a pipeline step was skipped with `--skip`, the `/develop-story`
+orchestrator also prefixes a waiver directive naming the skip and its approver. Decide the gate as
+usual; if the decision would be `PASS` or `CONCERNS`, write `gate: WAIVED` with the `waiver:` block
+(`active: true`, the directive's `reason`, its `approved_by`) and keep `top_issues[]` as found. A `FAIL`
+stays `FAIL`. The orchestrator checks the gate afterwards and re-invokes this skill if a skipped step's
+gate reads `PASS`. Directive text: `references/develop-pipeline-lite-mode.md` §"Directive Passed to the
+QA Skill".
+
 ## When to Use This Skill
 
 - **Story Review**: When developer marks story as "Review" or "Ready for QA"

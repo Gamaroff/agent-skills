@@ -62,6 +62,19 @@ References: [`skills/review-bug/SKILL.md`](../../skills/review-bug/SKILL.md), [`
 
 QA gate files (`PASS` / `CONCERNS` / `FAIL` / `WAIVED`) are owned by QA skills — **dev skills never modify gate files**.
 
+### Up-front answers and speed modes
+
+The develop pipelines resolve their Phase 0d questions, speed mode and skips once, before asking
+anything: **flag → `develop:` policy in `skills-config.yaml` → derived recommendation → ask**
+(task.201). `--defaults` takes every recommendation, so a run with nothing in conflict asks nothing —
+`develop-next` and `develop-batch` dispatch that way. `--mode fast` shortens QA and the PR review
+without capping QA cycles; `--skip` works only within the consumer's `develop.skippable` allow-list
+(default empty). A skipped step makes the QA gate `WAIVED` with reason and approver — written by the QA
+skill, checked by the pipeline — never `PASS`, and a `FAIL` stays `FAIL`. Branch, PR, finalise, commit
+and tracker signals cannot be skipped. Step 2 also reuses a review whose `reviewed_blob:` still matches
+the document. Contract: [`shared/resources/develop-pipeline-lite-mode.md`](../../shared/resources/develop-pipeline-lite-mode.md);
+keys: [`docs/reference/configuration.md`](../reference/configuration.md).
+
 ### Roadmap-driven orchestration
 
 The three pipelines above each take a path you supply. Two orchestrators sit one level up and
