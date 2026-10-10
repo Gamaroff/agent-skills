@@ -470,6 +470,31 @@ hold as written.
 - No open issues. Four QA cycles closed 17 findings (1 high), each fix test-backed; the last cycle's fixes are mutation-proven.
 - One advisory cleanup (test temp directory) routed to future work.
 
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**Gate File**: `task.201.gate.4.pipeline-upfront-answers-and-speed-modes.yml`
+**Gate Status**: ✅ PASS (100/100) · **PR review (5c)**: ✅ APPROVE
+
+### Missing Criteria:
+
+1. **Acceptance Criteria:**
+   - [ ] AC10 — "No consumer-specific names" is held by no committed per-PR test (the limits half is held by tests 4a and 4g)
+
+### Next Steps:
+
+- [ ] **BLOCKING**: add a test that scans the task.201 engines and the shared resources it changed for consumer-repository names, with a non-vacuity case; the change re-enters QA at 5a
+
+**Estimated Effort:** Small (under 1 hour)
+
+**Gap Report Generated:** 2026-10-10
+**QA Gate Reference**: See `task.201.gate.4.pipeline-upfront-answers-and-speed-modes.yml`
+
+**Detailed Verification Log:** See `task.201.dod.1.pipeline-upfront-answers-and-speed-modes.md` for complete verification evidence.
+
 ## Change Log
 
 | Date       | Version | Description                                                                                   | Author |
@@ -487,6 +512,7 @@ hold as written.
 | 2026-10-10 |         | QA gate CONCERNS (90/100) — 3 findings (1 medium, 1 low, 1 cleanup) | qa-task |
 | 2026-10-10 |         | QA findings fixed — cycle 3, 3 findings (CR-1 merge writes the resolved waiver, tested against the doc's own jq; CR-2 column-0 key; CR-3 heredoc strip keeps continuation lines) | qa-fix |
 | 2026-10-10 |         | QA gate PASS (100/100) — 0 open findings, 1 advisory cleanup | qa-task |
+| 2026-10-10 |         | DoD incomplete — 1 gap identified (AC10 unpinned) | finalise |
 <!-- change-log-end -->
 
 ---
