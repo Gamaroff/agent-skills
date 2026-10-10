@@ -185,3 +185,16 @@ pattern matches one nested level and silently misses the rest. On task.108 it ma
 out of 57 and the guard's total floor never noticed. Use the `:(glob)` magic —
 `':(glob)shared/resources/**/*.md'` — or walk the directory with `find`, and give every corpus its
 own non-vacuity floor so the miss is a printed zero rather than a fraction of a total.
+
+### The bundler reads a skill's `tests/` too — a quoted path there is a dependency
+
+`npm run bundle` and `bundle:check` discover a skill's dependencies from **every** `.md` and `.js` file
+under its directory, `tests/` included. So a test that quotes a shared-resource path, or spells out
+an invocation of another skill's `references/` engine, makes `--check` demand a bundled copy the skill
+never uses (`MISSING … has a shared source but no bundled copy`). It has cost two sessions. On
+2026-09-15 (task.110) a fixture quoting a real handoff demanded six copies, and was sidestepped with a
+`.txt` fixture. On 2026-10-10 (PR #629) one test line invoking
+`skills/observe-work/…/observation-log.js` in `session-handoff`'s tests demanded `observation-log.js`
+and `yaml-subset.js`. Assemble such paths from parts in the test, as `handoff-verify.test.js` does
+(`const REFS = "refer" + "ences"`, `const SHARED = "shared/" + "resources"`). The real fix, a `tests/`
+exclusion in `bundle_skill.py`, is not filed.
