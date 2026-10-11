@@ -36,9 +36,9 @@ First pipeline run for task.201: per-step timestamps, one answer-resolution cont
 | 2. review-task             | ✅ Done    | `task.201.review.{N}.{name}.md` exists (or skip logged)               | `task.201.review.1.*.md`; 7/10 → 8/10 after fixes; READY TO IMPLEMENT; Planned → Ready for Development (time not measured) | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline; 1 iteration; ci:fast green (5263/0) (time not measured) | `.summaries/step-3-test-triage-1.json` |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #632: https://github.com/Gamaroff/agent-skills/pull/632 (time not measured) | —                    |
-| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.201.qa.{N}.*.md`; `task.201.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 4 cycles; gate 4 PASS 100; 5c APPROVE (pr-review.1); 17 findings fixed across 3 fix cycles (time not measured); re-entered at 5a 2026-10-11 after DoD gap fix `efa7f2a6`; cycles 5–6 (gate 5 FAIL → fix → gate 6 PASS 100); 5c CONCERNS (pr-review.2) | `.summaries/step-3-test-triage-1.json` |
-| 7. finalise                | ❌ Failed  | `task.201.dod.{N}.*.md`; task `status: accepted`                      | run 1: DoD GAPS — dod.1: AC10 unpinned (1 gap); CI reading 1 SUCCESS @ 532eb2ad; security re-probed 72/72. Run 2: DoD GAPS — dod.2: AC10 (limits holder mis-cited; §0d config read unpinned; develop-bug step-0 reference outside the name scan); CI reading 1 SUCCESS @ a1008634; security 72/72 held; 8a refused (no severity; outside Files Summary) | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.201.qa.{N}.*.md`; `task.201.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 4 cycles; gate 4 PASS 100; 5c APPROVE (pr-review.1); 17 findings fixed across 3 fix cycles (time not measured); re-entered at 5a 2026-10-11 after DoD gap fix `efa7f2a6`; cycles 5–6 (gate 5 FAIL → fix → gate 6 PASS 100); 5c CONCERNS (pr-review.2); re-entered at 5a again after DoD run-2 fix `2149dba5`: cycles 7–8 (gate 7 CONCERNS 90 → fix `debadda8` → gate 8 PASS 100, route 2b); 5c APPROVE (pr-review.3) | `.summaries/step-3-test-triage-1.json` |
+| 7. finalise                | ✅ Done    | `task.201.dod.{N}.*.md`; task `status: accepted`                      | run 1: DoD GAPS — dod.1: AC10 unpinned (1 gap); CI reading 1 SUCCESS @ 532eb2ad; security re-probed 72/72. Run 2: DoD GAPS — dod.2: AC10 (limits holder mis-cited; §0d config read unpinned; develop-bug step-0 reference outside the name scan); CI reading 1 SUCCESS @ a1008634; security 72/72 held; 8a refused (no severity; outside Files Summary). Run 3: ACCEPTED — dod.3: 12/12; CI reading 1 SUCCESS @ 63034e77, reading 2 SUCCESS (tree-equivalent to debadda8) @ 06f17286; security 72/72 held | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Report committed and pushed at 2026-10-11T06:09Z | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -129,6 +129,25 @@ First pipeline run for task.201: per-step timestamps, one answer-resolution cont
 - CI reading 1: SUCCESS @ `a10086347444` (5 checks).
 - HALT `finalise-dod-gaps`, step 7. Resume: fix the three AC10 items (a test change), commit, re-run `/develop-next` → Phase 0b "Re-enter QA at 5a" (Recommended).
 
+### Resume — QA re-entry after finalise run 2 DoD gaps — 2026-10-11
+
+- Gap fix: commit `2149dba5` (tests `pipeline-answers-docs.test.mjs` 2d + widened `pipeline-answers-generic.test.mjs` population; task doc AC10 row re-cited). Pushed at resume.
+- Phase 0b resume prompt — auto-answered **"Re-enter QA at 5a"** (Recommended), per the develop-next autonomous directive.
+- QA re-entry after finalise DoD gaps: `reenter-qa: re-entered QA at step 5 / qa_phase 5a — qa_max_cycles=8 (base 6), gate_head=5508cfe180c0110e0259dc371f7bd8a37b9fa969`.
+- Restored lock still carries no `answers` (legacy row) — nothing re-asked. Mode stays `standard`; traceability mapper still skipped (no criteria table).
+
+### Step 7 — finalise run 3 — 2026-10-11
+
+- DoD summary: docs/tasks/task.201.pipeline-upfront-answers-and-speed-modes/task.201.dod.3.pipeline-upfront-answers-and-speed-modes.md — ✅ ACCEPTED, 12/12 criteria with per-PR tests; docs PASS; compliance N/A.
+- Security: the read-only agent could not create the probe engine's sandbox or record and returned `probe mode executed no candidates`; the orchestrator ran the command it named — 72 executed, 0 reproduced (`task.201.dod.3.security.run.json`).
+- CI reading 1: SUCCESS @ `63034e778ebd` (5 checks); CI reading 2: SUCCESS (tree-equivalent to `debadda8e805`) @ `06f1728678b2` (acceptance commit `06f17286`, docs-only; 5 checks after 30 s).
+- Acceptance commit carried the 5c review (`task.201.pr-review.3`); registry row ticked (`registry-tick.js` → ticked); CHANGELOG cites task.201.
+- DoD body posted to PR — comment URL: https://github.com/Gamaroff/agent-skills/pull/632#issuecomment-6106106007; canonical summary: https://github.com/Gamaroff/agent-skills/pull/632#issuecomment-6106102592.
+- GitHub issue #621 — close: CLOSED ✅ (`done` comment posted; Document link already on a durable branch).
+- GitHub board: `done` → already (Agent Skills: Done).
+- Tracker actions journal: empty — no tracker debt.
+- Task completed: task.201 accepted.
+
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
@@ -206,12 +225,33 @@ _Track each QA review/fix cycle._
 **Loop exit**: n/a — this exit not taken
 **Action**: Proceeding to 5c (PR conformance review) → CONCERNS, exit to Step 7
 
+### QA Cycle 7 — 2026-10-11
+**Gate Result**: CONCERNS (90/100) — re-entry after finalise run 2 DoD gaps
+**Issues Found**: 1 open — CR-1 (medium/high) test 2d inherits `SKILLS_CONFIG_FILE` from the runner env; 1 low advisory (CR-2 `argOf` not confined to the resolve span)
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — route classifier `continue (not-a-pass-gate)`
+**Action**: Running qa-fix (cycle 7 of 8)
+**Fix**: `debadda8` — CR-1 2d isolated from the runner env and run under both config tiers; CR-2 policy flags read from the resolve span; fast gate 5305/0; both mutation-proven. changes-requested: stage-disabled. Narrowing offer: not signalled (no-medium).
+
+### QA Cycle 8 — 2026-10-11
+**Gate Result**: PASS (100/100)
+**Issues Found**: 1 low promoted (CR-1 awk iteration unproven) → carried; 3 low advisory (CR-2 python tier unpinned, CR-3 env allowlist, CR-4 stacked doc comment)
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: APPROVE — pr-review.3: PC-1 (low) no `pr_number`; PC-2 (low) run-2 gap section still IN PROGRESS — both left to /finalise; staged for the acceptance commit
+**Loop exit**: Cosmetic-residue exit taken — PASS gate at cycle 8 with HIGH 0 for cycles 7 and 8; all 1 open findings are LOW and are carried to the gate's recommendations.future by id (CR-1). This is a CLEAN exit, not a stall: nothing is blocked and nothing is being accepted over; a full qa-fix cycle for cosmetic findings is what this route exists to avoid.
+**Action**: Proceeding to 5c (PR conformance review)
+
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-10-11T06:09Z
+**Final Status**: Completed
 **Branch**: feature/task.201.pipeline-upfront-answers-and-speed-modes
 **PR**: https://github.com/Gamaroff/agent-skills/pull/632
-**QA Iterations**: {populated at end}
-**DoD Summary**: docs/tasks/task.201.pipeline-upfront-answers-and-speed-modes/task.201.dod.1.pipeline-upfront-answers-and-speed-modes.md (GAPS)
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 8 (cycles 1–4, re-entry 5–6 after DoD run 1, re-entry 7–8 after DoD run 2)
+**DoD Summary**: docs/tasks/task.201.pipeline-upfront-answers-and-speed-modes/task.201.dod.3.pipeline-upfront-answers-and-speed-modes.md (ACCEPTED; runs 1 and 2 GAPS)
+**Tracker debt**: none
+
+**Completion Summary**: Implemented developer-supplied Phase 0d answers (flag → policy → recommendation → ask) in a single engine, `pipeline-answers.js`; `--defaults` replaces the develop-next/develop-batch directive; `--mode fast` and `--skip` are bounded by `develop.defaultMode` / `develop.skippable` and recorded as WAIVED gates; Step 2 reuses a current review by its git blob; implementation reports carry a UTC timestamp per step. Eight QA cycles over three passes: DoD runs 1 and 2 each found gaps only in AC10 (consumer names / limits from config), each closed by a test change that re-entered QA at 5a. DoD run 3 accepted 12/12 with 72 security probes held. Notable decisions: autonomous fast mode by owner policy only; waivers approved by the invoker; one low QA finding (awk tier of docs test 2d unproven) carried to Deferred Work.
