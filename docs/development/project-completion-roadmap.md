@@ -5,7 +5,7 @@ How to use this document: work top to bottom. Only `[ ]` rows are candidates; `[
 [`roadmap-history.md`](./roadmap-history.md), so a `deps:` entry naming no current row means
 _already shipped_, not an error. Resolve any such reference there.
 
-**Phases 1 through 9 are complete and archived** to
+**Phases 1 through 10 are complete and archived** to
 [`roadmap-history.md`](./roadmap-history.md) — resolve any `deps:` naming a row you cannot find here
 against that file. The rows under "Deferred / human-gated" remain invisible to selection.
 
@@ -20,7 +20,7 @@ finished work. Rules:
 §"Registry fallback frontier".
 
 Add a phase only to express *sequencing* the registries cannot: a deliberate order, a dependency
-chain, a human gate. **Phase 10 is fully ticked** (T188 — closed 2026-10-11); archive it at the next housekeeping. Phase 9 (B18, T201) closed and was archived 2026-10-11.
+chain, a human gate. No phase is open: Phase 10 (T188) closed and was archived 2026-10-11, so `/develop-next` selects from the registries.
 
 > ⚠️ **A phase costs upkeep that a registry row does not, and the cost is not obvious.** Roadmap rows
 > are matched on the **checkbox alone** — they do **not** consult the target document's frontmatter.
@@ -69,19 +69,6 @@ Read only by `--batch`. Two rows conflict when they share a tag that **either** 
 
 ---
 
-## PHASE 10 — resume from evidence (opened 2026-10-11)
-
-An **override**: without it the registry fallback selects T175, then 180, 181 and 184 before T188,
-because the fallback takes the lowest-numbered task. T188 goes first because the defect it fixes
-stalls an unattended loop: a `/develop-next` run whose pipeline HALTed resumes into Step 3 and
-HALTs on "not accepted" every time, even after the halt is cleared (obs #9, folded into task.188
-v1.1; also obs #180, #197, #286). **Tick the row `[x]` the moment the task is accepted** — a phase
-row is matched on its checkbox, not the document.
-
-- [x] **T188** Resume from evidence, not flags · deps: none · touches: orchestrators!, test-harness~ · /develop-task docs/tasks/task.188.resume-from-evidence-not-flags/task.188.resume-from-evidence-not-flags.md — ✅ **accepted + merged** ([PR #634](https://github.com/Gamaroff/agent-skills/pull/634), `46223ec0`; QA PASS 100/100 after 4 cycles, DoD accepted on run 2 with a recorded security override, CI 5/5). A merge is judged by `gh pr view --json state`, not `gh pr merge`'s exit code; develop-next records a pipeline HALT (`halted`/`haltKind`/`prNumber`) and surfaces it on resume; both orchestrators reconcile `merged` (and develop-next `ticked`) from the PR and the roadmap row before routing.
-
----
-
 ## Deferred / human-gated
 
 Rows here are invisible to selection. Move a row up into a phase when it becomes actionable.
@@ -93,7 +80,7 @@ Rows here are invisible to selection. Move a row up into a phase when it becomes
 
 ## Housekeeping
 
-- [x] Archive accepted rows to `roadmap-history.md` at each phase close — Phase 5 archived 2026-09-12; Phases 6, 7 and 8 archived 2026-10-06; Phase 9 archived 2026-10-11
+- [x] Archive accepted rows to `roadmap-history.md` at each phase close — Phase 5 archived 2026-09-12; Phases 6, 7 and 8 archived 2026-10-06; Phases 9 and 10 archived 2026-10-11
 - [ ] If a phase is ever re-opened: tick its rows `[x]` as each item is accepted — an unticked row for an accepted item is still selected and stalls the loop
 
 **Registry-selected items need no row here.** When selection falls through to the registries (the
@@ -196,3 +183,4 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-10-11 | **Phase 9 archived** to `roadmap-history.md`. Both rows (B18, T201) moved verbatim with their `touches:` tags and acceptance annotations, so a `deps:` naming either still resolves there. |
 | 2026-10-11 | **Phase 10 opened** — T188 (resume from evidence, not flags) ahead of the registry fallback's T175. Obs #9 showed that a `/develop-next` run whose pipeline HALTed loops on Step 3's "not accepted" HALT even after the halt is cleared; T188 v1.1 carries the fix. A one-row override; archive it when T188 is accepted. |
 | 2026-10-11 | **T188 accepted + merged — PR #634 merged** (`46223ec0`). develop-next and develop-batch resume from evidence, not flags: the GitHub merge arm reads the PR's state after `gh pr merge` (obs #197), develop-next's run state records a pipeline HALT and Step 0.1 surfaces it before routing (obs #286, #9), and a reconcile block advances `merged` / `ticked` from the PR and the roadmap row — origin, then the local base — halting on anything it cannot read (obs #180). QA ran 4 cycles (80 → 40 → 90 → 100); 5c APPROVE. DoD run 1 stopped on the security probe zero-guard (fenced-prose boundary, no probe entry form); the operator recorded an override on the executed fixture evidence and run 2 accepted 11/11. Merge gate `npm run ci` green (5334 tests). Issue #587 closed. Phase 10 is fully ticked — archive it at the next housekeeping |
+| 2026-10-11 | **Phase 10 archived** to `roadmap-history.md`. Its one row, T188, moved verbatim with its `touches:` tags and acceptance annotation, so a `deps:` naming it still resolves there. No phase is open: `/develop-next` selects from the registries (next: T175). |

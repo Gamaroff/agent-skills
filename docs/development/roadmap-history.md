@@ -3,7 +3,7 @@
 Completed phases from [`project-completion-roadmap.md`](./project-completion-roadmap.md), archived
 at phase close so the live roadmap shows only what is still in play.
 
-**Phases 1 through 9 are archived here.**
+**Phases 1 through 10 are archived here.**
 
 **These rows still satisfy `deps:`.** A `deps:` entry naming a row that appears in no current phase
 means _already shipped_, not a dangling reference — this file is where to resolve it.
@@ -228,3 +228,14 @@ document.
 
 - [x] **B18** `develop-next` and `develop-batch` hardcode the Phase 0d base branch, overriding `epic-integration` · deps: none · touches: orchestrators!, pipeline-steps~, selection~ · /develop-bug docs/bugs/bug.18.autonomous-runs-hardcode-base-branch/bug.18.autonomous-runs-hardcode-base-branch.md — ✅ **accepted + merged** ([PR #625](https://github.com/Gamaroff/agent-skills/pull/625), `748eb85e`; DoD accepted, verify PASS in 1 cycle, CI 5/5). `develop-next`'s directive names no branch; `develop-batch`'s names its worktree base only beside an integration-branch HALT; `--batch` excludes `epic-integration` stories. **T201 is unblocked.**
 - [x] **T201** Pipeline up-front answers and speed modes · deps: B18 · touches: pipeline-steps!, orchestrators~, pipeline-lock~, bundles~, test-harness~, docs-pipeline~ · /develop-task docs/tasks/task.201.pipeline-upfront-answers-and-speed-modes/task.201.pipeline-upfront-answers-and-speed-modes.md — ✅ **accepted + merged** ([PR #632](https://github.com/Gamaroff/agent-skills/pull/632), `b5a266ff`; QA PASS 100/100 after 8 cycles, DoD accepted on run 3, CI 5/5). Phase 0d answers resolve flag → policy → recommendation → ask in `pipeline-answers.js`; `--defaults` replaces the orchestrator directive; `--mode fast` / `--skip` within `develop.skippable` gate as WAIVED; Step 2 reuses a current review by blob; per-step UTC timestamps.
+
+## PHASE 10 — resume from evidence (opened 2026-10-11, closed 2026-10-11)
+
+An **override**: without it the registry fallback selects T175, then 180, 181 and 184 before T188,
+because the fallback takes the lowest-numbered task. T188 goes first because the defect it fixes
+stalls an unattended loop: a `/develop-next` run whose pipeline HALTed resumes into Step 3 and
+HALTs on "not accepted" every time, even after the halt is cleared (obs #9, folded into task.188
+v1.1; also obs #180, #197, #286). **Tick the row `[x]` the moment the task is accepted** — a phase
+row is matched on its checkbox, not the document.
+
+- [x] **T188** Resume from evidence, not flags · deps: none · touches: orchestrators!, test-harness~ · /develop-task docs/tasks/task.188.resume-from-evidence-not-flags/task.188.resume-from-evidence-not-flags.md — ✅ **accepted + merged** ([PR #634](https://github.com/Gamaroff/agent-skills/pull/634), `46223ec0`; QA PASS 100/100 after 4 cycles, DoD accepted on run 2 with a recorded security override, CI 5/5). A merge is judged by `gh pr view --json state`, not `gh pr merge`'s exit code; develop-next records a pipeline HALT (`halted`/`haltKind`/`prNumber`) and surfaces it on resume; both orchestrators reconcile `merged` (and develop-next `ticked`) from the PR and the roadmap row before routing.
