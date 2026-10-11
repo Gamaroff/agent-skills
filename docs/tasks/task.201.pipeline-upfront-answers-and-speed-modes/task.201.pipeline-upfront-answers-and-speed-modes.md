@@ -5,18 +5,20 @@ type: task
 description: "Let a developer answer the develop pipelines' setup questions and choose a speed mode at invocation — resolved by flag, then consumer policy, then the derived recommendation, asking only on conflict — with every skip recorded as a WAIVED gate, and per-step timestamps so the effect can be measured."
 tags: [develop-story, develop-task, develop-bug, develop-next, develop-batch, phase-0, lite-mode, qa-gate]
 category: feature
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-09
 updated: 2026-10-11
 assignee:
 estimated_effort_hours: 24
 github_issue: 621
+pr_number: 632
+completed_date: 2026-10-11
 ---
 
 # Technical Task: Pipeline up-front answers and speed modes
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.201.review.1.pipeline-upfront-answers-and-speed-modes.md` implemented 2026-10-10
 **GitHub Issue**: [#621](https://github.com/Gamaroff/agent-skills/issues/621)
 
@@ -341,7 +343,7 @@ Post-merge only — recorded under Notes, Deferred Work.
 ### Code Quality
 
 - [x] No consumer-specific names; all limits from `skills-config.yaml`.
-- [ ] `npm run bundle` clean; bundled copies regenerated; `npm run ci` green (covers `lint:shell`,
+- [x] `npm run bundle` clean; bundled copies regenerated; `npm run ci` green (covers `lint:shell`,
       `validate:all` and `check:generated`).
 
 ### Criterion → test (review 2026-10-10)
@@ -496,9 +498,9 @@ hold as written.
 
 **Detailed Verification Log:** See `task.201.dod.1.pipeline-upfront-answers-and-speed-modes.md` for complete verification evidence.
 
-## Definition of Done - Gaps Identified
+## Definition of Done — run 2 gaps (historical, superseded by run 3 below)
 
-**Status:** IN PROGRESS
+**Status:** SUPERSEDED — closed by `2149dba5` and `debadda8`, verified at QA gates 7–8; run 3 (`task.201.dod.3`) re-verified every criterion
 
 ### QA Gate Status
 
@@ -531,10 +533,35 @@ hold as written.
 
 - **CR-1** (LOW) — carried to gate 8 `recommendations.future` (route 2b, cycle 8): nothing proves the `awk` iteration of docs test 2d ran tier 2; print the tier that ran and assert it.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.201.qa.8.pipeline-upfront-answers-and-speed-modes.md`
+**Gate File**: `task.201.gate.8.pipeline-upfront-answers-and-speed-modes.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (8 QA cycles)
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 12/12 — each with code evidence and a test that runs per PR
+✅ **PR Review:** PR #632; the host requires no reviews — `task.201.pr-review.3` APPROVE
+✅ **CI:** SUCCESS on `63034e77` — test, validate, shellcheck, link-check, branch policy
+✅ **Documentation:** CHANGELOG `[Unreleased]`, configuration reference, workflows doc, skill and contract files
+✅ **Security Review:** PASS — boundary `pipeline-answers.js#isRefName` probed, 72 candidates, 0 reproduced
+⚠️ **Compliance Review:** NOT_APPLICABLE — developer pipeline tooling
+
+**Task marked as ACCEPTED on:** 2026-10-11
+
+**Detailed Verification Log:** See `task.201.dod.3.pipeline-upfront-answers-and-speed-modes.md` for complete verification evidence and timestamps.
+
+<!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                                                                   | Author |
-| ---------- | ------- | --------------------------------------------------------------------------------------------- | ------ |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-09 | 1.0     | Initial draft — design from the rebirth-wallet consumer, with its step-timing measurement     | Claude |
 | 2026-10-09 | 1.1     | Owner decisions recorded: invoker approves waivers; autonomous fast mode by policy only; Step 2 reuse keyed on `reviewed_blob:` | Claude |
 | 2026-10-09 |         | Status → planned | Claude |
@@ -558,9 +585,10 @@ hold as written.
 | 2026-10-11 |         | QA gate CONCERNS (90/100) — 1 finding (CR-1 medium) | qa-task |
 | 2026-10-11 |         | QA findings fixed — cycle 7, 2 findings (CR-1 test 2d isolated from the runner env and run under both config tiers; CR-2 policy flags read from the resolve span) | qa-fix |
 | 2026-10-11 |         | QA gate PASS (100/100) — 0 open findings; 1 low carried to Deferred Work (route 2b), 3 low advisory | qa-task |
-<!-- change-log-end -->
+| 2026-10-11 | 1.3 | DoD passed — accepted (PR #632) | finalise |
 
 ---
+<!-- change-log-end -->
 
 ## Progress Tracking
 
