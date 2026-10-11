@@ -1,0 +1,67 @@
+schema: 2
+task: 'task.201.pipeline-upfront-answers-and-speed-modes'
+task_title: 'Pipeline up-front answers and speed modes'
+gate: FAIL
+status_reason: 'Re-entry after the finalise DoD gap. The new AC10 scan test has a hole: its section() reader treats a fenced bash `# comment` as a heading, so §0d is scanned only to line 702 and the resolver block is never read. Mutation-proven: a consumer name in that block leaves the test green.'
+reviewer: 'QA Engineer'
+head: 'e8569b272524e6d3696350cc15c238b5a0d93119'
+updated: '2026-10-11T04:44:30Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: high
+    file: 'shared/resources/tests/pipeline-answers-generic.test.mjs'
+    finding: 'section() does not skip fenced code, so a fenced bash `# comment` (step-0 line 703) ends the §0d section early and lines 703–763, the resolver call block, are never scanned; the >5-line floor still passes.'
+    suggested_action: 'Track fence state in section() for both the start and end match, and add a case proving a fenced `# comment` does not end a section.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 5303
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [5]
+  ci: 'not read this cycle'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'The change set is a test file and documents; no boundary is delivered (boundary: false).'
+  performance:
+    status: PASS
+    notes: 'No hot path; the scan is 10 file reads.'
+  reliability:
+    status: PASS
+    notes: 'Fast gate green: 5303 tests, 0 failures.'
+  maintainability:
+    status: CONCERNS
+    notes: 'The AC10 guard is partial (CR-1), and its population is hand-picked (CR-2, advisory).'
+
+bug_resolution:
+  previous_gate: 4
+  closed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1: make section() fence-aware and pin it with a non-vacuity case.'
+      refs: ['shared/resources/tests/pipeline-answers-generic.test.mjs']
+  future:
+    - action: 'CR-2 (medium/medium, advisory): derive the scanned population from the files task.201 changed, or list each with an exemption reason.'
+      refs: ['shared/resources/tests/pipeline-answers-generic.test.mjs']
+    - action: 'CR-3 cleanup: `/\bRAPP-\d+/` is redundant with `/\bRAPP\b/`.'
+      refs: ['shared/resources/tests/pipeline-answers-generic.test.mjs']
+    - action: 'Carried: test 3c leaves its mkdtemp directory behind; develop-bug-step-0-resolve-bug.md:39 pre-existing block failure.'
+      refs: ['shared/resources/tests/pipeline-answers-docs.test.mjs', 'skills/develop-bug/references/develop-bug-step-0-resolve-bug.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['CR-1 fixed and re-reviewed']

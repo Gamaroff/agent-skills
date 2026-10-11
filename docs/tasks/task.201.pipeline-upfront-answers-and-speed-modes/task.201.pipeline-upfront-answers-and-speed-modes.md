@@ -5,7 +5,7 @@ type: task
 description: "Let a developer answer the develop pipelines' setup questions and choose a speed mode at invocation — resolved by flag, then consumer policy, then the derived recommendation, asking only on conflict — with every skip recorded as a WAIVED gate, and per-step timestamps so the effect can be measured."
 tags: [develop-story, develop-task, develop-bug, develop-next, develop-batch, phase-0, lite-mode, qa-gate]
 category: feature
-status: ready-for-review
+status: in-progress
 priority: Medium
 created: 2026-10-09
 updated: 2026-10-11
@@ -16,7 +16,7 @@ github_issue: 621
 
 # Technical Task: Pipeline up-front answers and speed modes
 
-**Status:** Ready for Review
+**Status:** In Progress
 **Review**: ✅ All review recommendations from `task.201.review.1.pipeline-upfront-answers-and-speed-modes.md` implemented 2026-10-10
 **GitHub Issue**: [#621](https://github.com/Gamaroff/agent-skills/issues/621)
 
@@ -451,25 +451,25 @@ hold as written.
 
 ## QA Testing Results
 
-**QA Status**: PASS
+**QA Status**: FAIL
 **QA Engineer**: QA Engineer
-**Testing Date**: 2026-10-10
-**Quality Score**: 100/100
-**Gate Decision**: PASS
+**Testing Date**: 2026-10-11
+**Quality Score**: 80/100
+**Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.201.qa.4.pipeline-upfront-answers-and-speed-modes.md](./task.201.qa.4.pipeline-upfront-answers-and-speed-modes.md)
-- **Gate File**: [task.201.gate.4.pipeline-upfront-answers-and-speed-modes.yml](./task.201.gate.4.pipeline-upfront-answers-and-speed-modes.yml)
+- **Full Report**: [task.201.qa.5.pipeline-upfront-answers-and-speed-modes.md](./task.201.qa.5.pipeline-upfront-answers-and-speed-modes.md)
+- **Gate File**: [task.201.gate.5.pipeline-upfront-answers-and-speed-modes.yml](./task.201.gate.5.pipeline-upfront-answers-and-speed-modes.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5286
+- **Tests Executed**: 5303
 - **Phases Verified**: 5/5
-- **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **Critical Issues**: 1
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-- No open issues. Four QA cycles closed 17 findings (1 high), each fix test-backed; the last cycle's fixes are mutation-proven.
-- One advisory cleanup (test temp directory) routed to future work.
+- CR-1 (high): the AC10 scan test reads a fenced `# comment` as a heading, so §0d's resolver block is never scanned. Mutation-proven.
+- CR-2 (medium, advisory): the scanned population is hand-picked. CR-3: a redundant pattern.
 
 ## Definition of Done - Gaps Identified
 
@@ -515,6 +515,7 @@ hold as written.
 | 2026-10-10 |         | QA gate PASS (100/100) — 0 open findings, 1 advisory cleanup | qa-task |
 | 2026-10-10 |         | DoD incomplete — 1 gap identified (AC10 unpinned) | finalise |
 | 2026-10-11 |         | DoD gap fixed — AC10 pinned by `pipeline-answers-generic.test.mjs`; re-entering QA at 5a | develop |
+| 2026-10-11 |         | QA gate FAIL (80/100) — 1 finding (1 high: the AC10 scan skips fenced text) | qa-task |
 <!-- change-log-end -->
 
 ---
