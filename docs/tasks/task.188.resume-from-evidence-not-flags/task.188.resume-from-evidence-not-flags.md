@@ -428,6 +428,30 @@ None.
 - **Non-critical**: a resume that STOPs on a stale `halted` flag → forward-fix the clearing note.
 
 ---
+
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-11
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.188.qa.1.resume-from-evidence-not-flags.md](./task.188.qa.1.resume-from-evidence-not-flags.md)
+- **Gate File**: [task.188.gate.1.resume-from-evidence-not-flags.yml](./task.188.gate.1.resume-from-evidence-not-flags.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 106
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+- CR-1 (medium): the Step 0.1 merge reconciliation reads `VCS` before Step 0 resolves it — a silent no-op on Bitbucket.
+- QA-1 (medium): the tick reconciliation reports a failed look as "not ticked", routing to a duplicate Step 4 tick.
+- QA-2 (low): prose boundaries cannot be probed yet (`probes_executed: 0`); finalise will need an override.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -438,6 +462,8 @@ None.
 | 2026-10-11 | 1.2 | Review passed (8/10) — named the HALT surface and the `prNumber` source, added the reconstruction-states table, re-anchored line numbers to `d91baba2` | review-task |
 | 2026-10-11 |  | Status → ready-for-development | review-task |
 | 2026-10-11 |  | Implemented — 5 files (develop-next, develop-batch, guard test, 2 shape tests) + CHANGELOG; 33 new tests — 25 executed (bash here, bash+zsh on CI), 8 shape | develop |
+| 2026-10-11 |  | QA gate CONCERNS (80/100) — 3 findings (2 medium, 1 low) | qa-task |
+| 2026-10-11 |  | QA findings fixed — CR-1 (reconciliation refuses an unbound VCS), QA-1 (three-valued tick check, unknown halts); 6 new executed cases, 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

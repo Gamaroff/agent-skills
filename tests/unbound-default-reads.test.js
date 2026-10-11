@@ -64,6 +64,13 @@ const INPUTS = new Map([
     "skills/develop-next/SKILL.md#CI_ROLLUP",
     "re-bound input of the docs-only arm (the one-shot rollup read); the `:?` is the loud-failure guard",
   ],
+  // task.188 (QA cycle 1, CR-1): Step 0.1's reconciliation runs before item 6, which binds VCS by
+  // SOURCING resolve-platform.sh — a writer this guard cannot see. The `:?` is the refusal itself:
+  // unbound, the block stops rather than taking the gh arm on a Bitbucket remote.
+  [
+    "skills/develop-next/SKILL.md#VCS",
+    "bound by sourcing resolve-platform.sh (Step 0 item 6); the `:?` refuses a reconciliation run before it",
+  ],
   [
     "skills/develop-next/SKILL.md#PR_HEAD",
     're-bound input of the docs-only arm (the PR head); the `:?` stops `--head ""` reaching the engine',

@@ -471,6 +471,39 @@ describe(
         });
       }
 
+      // CR-1 (task.188 QA cycle 1): run as Step 0.1 runs it, before item 6, with no VCS bound. The block
+      // must refuse, not default to the gh arm — on a Bitbucket remote that reconciles nothing, silently.
+      test(`[${sh}] merge flag: an unbound VCS refuses before any query and leaves the file alone`, async () => {
+        const fx = fixtureRepo();
+        try {
+          const before = {
+            item: "T9",
+            prNumber: 7,
+            merged: false,
+            ticked: false,
+          };
+          writeState(fx.work, "develop-next.state.json", before);
+          const gh = ghStub(fx.dir, ghBody({ state: "MERGED" }));
+          const code = bind(
+            blockBy(
+              readDoc("skills/develop-next/SKILL.md"),
+              DN_MERGE_RECONCILE,
+            ),
+            { "<mergedPr>": "" },
+          );
+          const r = await runAsync(sh, code, { cwd: fx.work, bin: gh.bin });
+          assert.notEqual(r.status, 0, "an unbound VCS must not run");
+          assert.match(r.stdout + r.stderr, /Resolve the platform/);
+          assert.deepEqual(ghCalls(gh.argvLog), []);
+          assert.deepEqual(
+            readState(fx.work, "develop-next.state.json"),
+            before,
+          );
+        } finally {
+          cleanup(fx.dir);
+        }
+      });
+
       test(`[${sh}] merge flag: an already-merged file is not re-queried and stays merged`, async () => {
         const fx = fixtureRepo();
         try {
@@ -505,15 +538,42 @@ describe(
       });
 
       // The roadmap row is read on origin, through the selector's parser, by the exact id. T1 and T10
-      // are the prefix traps a loose pattern would tick; T11 is archived to roadmap-history.md.
+      // are the prefix traps a loose pattern would tick; T11 is archived to roadmap-history.md; T12 is
+      // ticked only in the local checkout. The failure rows are the third answer (task.188 QA cycle 1,
+      // QA-1): a look that fails reads `unknown` and exits 1 — never `not-ticked`, which would route
+      // to a duplicate Step 4 tick.
       for (const c of [
         { item: "T9", want: "ticked" },
         { item: "T10", want: "not-ticked" },
         { item: "T1", want: "not-ticked" },
         { item: "T11", want: "ticked" },
         { item: "T12", want: "not-ticked" },
+        {
+          item: "T9",
+          want: "ticked",
+          noHistory: true,
+          label: "no history file",
+        },
+        {
+          item: "T9",
+          want: "unknown",
+          base: "no-such-branch",
+          label: "fetch fails",
+        },
+        {
+          item: "T9",
+          want: "unknown",
+          roadmap: "docs/development/missing.md",
+          label: "roadmap not on origin",
+        },
+        {
+          item: "T9",
+          want: "unknown",
+          selector: "/nonexistent/select-next.mjs",
+          label: "parser cannot load",
+        },
       ]) {
-        test(`[${sh}] tick flag: row ${c.item} on origin reads ${c.want}`, async () => {
+        test(`[${sh}] tick flag: row ${c.item}${c.label ? ` (${c.label})` : ""} reads ${c.want}`, async () => {
           const fx = fixtureRepo();
           try {
             git(fx.work, "checkout", "-q", "develop");
@@ -525,15 +585,15 @@ describe(
                 "- [ ] **T10** Open row · deps: none\n" +
                 "- [x] **T100** Done row whose id starts with T10 · deps: none\n",
             );
-            write(
-              fx.work,
-              "docs/development/roadmap-history.md",
-              "# Roadmap History\n\n## PHASE 0 — archived\n\n- [x] **T11** Archived row · deps: none\n",
-            );
+            if (!c.noHistory)
+              write(
+                fx.work,
+                "docs/development/roadmap-history.md",
+                "# Roadmap History\n\n## PHASE 0 — archived\n\n- [x] **T11** Archived row · deps: none\n",
+              );
             git(fx.work, "add", "-A");
             git(fx.work, "commit", "-q", "-m", "roadmap");
             git(fx.work, "push", "-q", "origin", "develop");
-            // The local checkout ticks T12 without pushing: only origin counts.
             write(
               fx.work,
               "docs/development/roadmap.md",
@@ -548,24 +608,23 @@ describe(
                 DN_ROW_RECONCILE,
               ),
               {
-                "<baseBranch>": "develop",
-                "<roadmapPath>": "docs/development/roadmap.md",
+                "<baseBranch>": c.base ?? "develop",
+                "<roadmapPath>": c.roadmap ?? "docs/development/roadmap.md",
                 "<item>": c.item,
                 "$PWD/.agents/skills/develop-next/scripts/select-next.mjs":
-                  SELECTOR,
+                  c.selector ?? SELECTOR,
               },
             );
             const r = await runAsync(sh, code, { cwd: fx.work });
-            assert.equal(
-              r.status,
-              0,
-              `stdout: ${r.stdout}\nstderr: ${r.stderr}`,
-            );
+            const out = `stdout: ${r.stdout}\nstderr: ${r.stderr}`;
+            assert.equal(r.status, c.want === "unknown" ? 1 : 0, out);
             assert.match(
               r.stdout,
-              new RegExp(`: ${c.want}\\s*$`, "m"),
-              r.stdout,
+              new RegExp(`: ${c.want}(\\s|\\(|$)`, "m"),
+              out,
             );
+            if (c.want === "unknown")
+              assert.doesNotMatch(r.stdout, /: (not-)?ticked\s*$/m, out);
             assert.equal(
               fs.existsSync(
                 path.join(fx.work, ".claude/state/dn-roadmap-row.md"),
