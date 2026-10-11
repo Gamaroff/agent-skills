@@ -451,25 +451,26 @@ hold as written.
 
 ## QA Testing Results
 
-**QA Status**: PASS
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-11
-**Quality Score**: 100/100
-**Gate Decision**: PASS
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.201.qa.6.pipeline-upfront-answers-and-speed-modes.md](./task.201.qa.6.pipeline-upfront-answers-and-speed-modes.md)
-- **Gate File**: [task.201.gate.6.pipeline-upfront-answers-and-speed-modes.yml](./task.201.gate.6.pipeline-upfront-answers-and-speed-modes.yml)
+- **Full Report**: [task.201.qa.7.pipeline-upfront-answers-and-speed-modes.md](./task.201.qa.7.pipeline-upfront-answers-and-speed-modes.md)
+- **Gate File**: [task.201.gate.7.pipeline-upfront-answers-and-speed-modes.yml](./task.201.gate.7.pipeline-upfront-answers-and-speed-modes.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5304
+- **Tests Executed**: 5305
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-- The AC10 gap is closed: the consumer-name scan reads whole files over a derived population and is mutation-proven, including the fenced-block case cycle 5 found.
-- Two low advisory findings on the scan's population routed to future work.
+- DoD run 2's three AC10 gaps are closed (`2149dba5`); test 2d is mutation-proven.
+- CR-1 (medium, open): test 2d inherits `SKILLS_CONFIG_FILE` from the runner environment and goes red when it is set.
+- CR-2 (low, advisory): `argOf` does not confine itself to the resolve command span.
 
 ## Definition of Done — run 1 gaps (historical, superseded by run 2 below)
 
@@ -551,6 +552,8 @@ hold as written.
 | 2026-10-11 |         | QA gate PASS (100/100) — 0 open findings, 2 low advisory | qa-task |
 | 2026-10-11 |         | DoD incomplete — 1 gap (AC10: mis-cited limits holder, config read unpinned, one file outside the name scan) | finalise |
 | 2026-10-11 |         | DoD gap fixed — AC10 citation corrected; docs test 2d pins §0d's config read; hand-authored skill references added to the name scan; re-entering QA at 5a | develop |
+| 2026-10-11 |         | QA gate CONCERNS (90/100) — 1 finding (CR-1 medium) | qa-task |
+| 2026-10-11 |         | QA findings fixed — cycle 7, 2 findings (CR-1 test 2d isolated from the runner env and run under both config tiers; CR-2 policy flags read from the resolve span) | qa-fix |
 <!-- change-log-end -->
 
 ---

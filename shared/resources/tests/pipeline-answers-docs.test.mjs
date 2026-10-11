@@ -54,7 +54,8 @@ function usageFlags(engine) {
 }
 
 /** Flags passed on the engine's command line inside one fenced block. */
-function flagsPassedTo(block, engine, sub) {
+/** The `${engine} ${sub}` command line, its backslash continuations joined; null when absent. */
+function commandSpan(block, engine, sub) {
   const at = block.indexOf(`${engine} ${sub}`);
   if (at < 0) return null;
   // The command continues while lines end in a backslash.
@@ -64,7 +65,13 @@ function flagsPassedTo(block, engine, sub) {
     cmd.push(l);
     if (!/\\\s*$/.test(l)) break;
   }
-  return cmd.join(" ").match(/(?<![\w-])--[a-z][a-z-]*/g) || [];
+  return cmd.join(" ");
+}
+
+function flagsPassedTo(block, engine, sub) {
+  const span = commandSpan(block, engine, sub);
+  if (span === null) return null;
+  return span.match(/(?<![\w-])--[a-z][a-z-]*/g) || [];
 }
 
 // ── 1. timestamps ──────────────────────────────────────────────────────────
@@ -263,16 +270,22 @@ test("2b: the 0f summary shows a source for every answer", () => {
  * Run §0d's own config-reading lines, then print the two values its resolve call
  * hands over, in a directory holding `config` as skills-config.yaml (none when
  * null). Returns [policy-mode, policy-skippable] exactly as the CLI would see them.
+ * `tier` pins read-config.sh's parser ("awk" forces tier 2; "" lets it choose).
+ * The child gets the runner's env minus the config overrides: an inherited
+ * SKILLS_CONFIG_FILE redirects the read away from the fixture (gate 7, CR-1).
  */
-function policyHandedToResolve(block, config) {
+function policyHandedToResolve(block, config, tier = "") {
   const lines = block.split("\n");
   const source = lines.filter((l) => /^\s*source .*read-config\.sh/.test(l));
   const assigns = lines.filter((l) => /^\s*POLICY_[A-Z_]+=/.test(l));
   assert.equal(source.length, 1, "§0d sources read-config.sh once");
   assert.equal(assigns.length, 2, "§0d binds POLICY_MODE and POLICY_SKIPPABLE");
-  // The value each flag receives, as written on the resolve command line.
+  // The value each flag receives, read from the resolve command line itself — a
+  // --policy-* flag elsewhere in the block is not what resolve is handed (gate 7, CR-2).
+  const span = commandSpan(block, "pipeline-answers.js", "resolve");
+  assert.ok(span, "§0d calls pipeline-answers.js resolve");
   const argOf = (flag) => {
-    const m = block.match(new RegExp(`${flag}\\s+("[^"]*"|\\S+)`));
+    const m = span.match(new RegExp(`${flag}\\s+("[^"]*"|\\S+)`));
     assert.ok(m, `the resolve call passes ${flag}`);
     return m[1];
   };
@@ -289,7 +302,15 @@ function policyHandedToResolve(block, config) {
   const dir = mkdtempSync(join(tmpdir(), "policy-"));
   if (config !== null) writeFileSync(join(dir, "skills-config.yaml"), config);
   try {
-    return execFileSync("bash", ["-c", script], { cwd: dir, encoding: "utf8" })
+    const env = { ...process.env };
+    delete env.SKILLS_CONFIG_FILE;
+    delete env.AGENT_SKILLS_CONFIG_TIER;
+    if (tier) env.AGENT_SKILLS_CONFIG_TIER = tier;
+    return execFileSync("bash", ["-c", script], {
+      cwd: dir,
+      encoding: "utf8",
+      env,
+    })
       .replace(/\n$/, "")
       .split("\n");
   } finally {
@@ -301,21 +322,28 @@ test("2d: §0d reads develop.defaultMode / develop.skippable from skills-config.
   const block = bashBlocks(
     read("shared/resources/develop-pipeline-step-0-resolve-and-prepare.md"),
   ).find((b) => flagsPassedTo(b, "pipeline-answers.js", "resolve"));
-  // Two configs that differ give two different hand-offs: a literal in place of the
-  // config read, or a --policy-* flag fed from anything else, cannot pass both.
-  assert.deepEqual(
-    policyHandedToResolve(
-      block,
-      "develop:\n  defaultMode: fast\n  skippable: review, qa-depth\n",
-    ),
-    ["fast", "review, qa-depth"],
-  );
-  assert.deepEqual(
-    policyHandedToResolve(block, "develop:\n  defaultMode: lite\n"),
-    ["lite", ""],
-  );
-  // No config: nothing is invented — the engine's own defaults apply.
-  assert.deepEqual(policyHandedToResolve(block, null), ["", ""]);
+  // Both parser tiers: the default choice and the awk fallback must hand over the same values.
+  for (const tier of ["", "awk"]) {
+    const t = `tier ${tier || "default"}`;
+    // Two configs that differ give two different hand-offs: a literal in place of the
+    // config read, or a --policy-* flag fed from anything else, cannot pass both.
+    assert.deepEqual(
+      policyHandedToResolve(
+        block,
+        "develop:\n  defaultMode: fast\n  skippable: review, qa-depth\n",
+        tier,
+      ),
+      ["fast", "review, qa-depth"],
+      t,
+    );
+    assert.deepEqual(
+      policyHandedToResolve(block, "develop:\n  defaultMode: lite\n", tier),
+      ["lite", ""],
+      t,
+    );
+    // No config: nothing is invented — the engine's own defaults apply.
+    assert.deepEqual(policyHandedToResolve(block, null, tier), ["", ""], t);
+  }
 });
 
 // ── 3. waivers ─────────────────────────────────────────────────────────────

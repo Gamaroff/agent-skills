@@ -1,0 +1,66 @@
+schema: 2
+task: 'task.201.pipeline-upfront-answers-and-speed-modes'
+task_title: 'Pipeline up-front answers and speed modes'
+gate: CONCERNS
+status_reason: 'DoD run 2 gaps closed by 2149dba5 (test 2d pins the §0d config read; name scan widened). One medium code-review bug promoted: 2d inherits SKILLS_CONFIG_FILE from the runner env and goes red (or reads a foreign config) when it is set.'
+reviewer: 'QA Engineer'
+head: '2149dba5a64bee690bc70097d13f81e965d8079e'
+updated: '2026-10-11T05:50:20Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/tests/pipeline-answers-docs.test.mjs'
+    finding: 'Test 2d runs read-config.sh with the runner process.env; a SKILLS_CONFIG_FILE other than skills-config.yaml redirects the read away from the cwd fixture. Reproduced: SKILLS_CONFIG_FILE=/nonexistent.yaml node --test --test-name-pattern=2d → 0 pass / 1 fail.'
+    suggested_action: 'Pass an explicit env to execFileSync with SKILLS_CONFIG_FILE removed (or pinned to the fixture path); pin AGENT_SKILLS_CONFIG_TIER or run per tier.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 5305
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+  ci: 'not read this cycle'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'The change set since gate 6 is two test files and documents; no boundary is delivered (boundary: false).'
+  performance:
+    status: PASS
+    notes: 'Test 2d spawns bash three times; negligible.'
+  reliability:
+    status: PASS
+    notes: 'Fast gate green: 5305 tests, 0 failures. 2d is environment-sensitive (CR-1) — tracked as a top issue.'
+  maintainability:
+    status: PASS
+    notes: '2d executes the documented lines rather than restating them.'
+
+bug_resolution:
+  previous_gate: 6
+  closed: []
+  dod_gaps_closed: ['AC10 limits holder re-cited', 'AC10 §0d config read pinned (2d)', 'AC10 develop-bug step-0 reference in name scan']
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1: isolate test 2d from the runner environment.'
+      refs: ['shared/resources/tests/pipeline-answers-docs.test.mjs']
+  future:
+    - action: 'Advisory (low/medium) CR-2: argOf reads the first --policy-* match anywhere in the block, not on the resolve command span; read it from the joined resolve span and assert both flags are present there.'
+      refs: ['shared/resources/tests/pipeline-answers-docs.test.mjs']
+    - action: 'Carried from gate 6: population filter reads only .md/.js in shared/resources; record ALSO_CHANGED enumeration; test 3c leaves its mkdtemp dir; develop-bug-step-0-resolve-bug.md:39 pre-existing block failure.'
+      refs: ['shared/resources/tests/pipeline-answers-generic.test.mjs', 'shared/resources/tests/pipeline-answers-docs.test.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 fixed']
