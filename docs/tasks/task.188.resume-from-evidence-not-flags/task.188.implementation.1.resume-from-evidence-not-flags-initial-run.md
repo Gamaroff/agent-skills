@@ -3,7 +3,7 @@
 **Task**: `task.188.resume-from-evidence-not-flags.md`
 **Run Number**: 1
 **Started**: 2026-10-11 15:35
-**Status**: In Progress
+**Status**: Complete
 
 ---
 
@@ -36,8 +36,8 @@ Make develop-next and develop-batch judge a merge by PR state, record a pipeline
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline (plan + surface map); 4/4 phases; commits `7afb1f1`, `51b0327`; 33 new tests | —                    | 2026-10-11T13:56Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #634: https://github.com/Gamaroff/agent-skills/pull/634 | —                    | 2026-10-11T13:56Z |
 | 5–6. qa-task / qa-fix loop | ✅ Done | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 4 cycles: CONCERNS 80 → FAIL 40 → CONCERNS 90 → PASS 100; 5c APPROVE | —                    | 2026-10-11T14:55Z |
-| 7. finalise                | ⚠️ Needs Attention | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      | DoD GAPS — 1 gap: security probe zero-guard on a prose boundary (needs a recorded human override); AC 11/11, docs PASS, compliance N/A, CI reading 1 SUCCESS @ 4935a1a3 | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 7. finalise                | ✅ Done | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      | Run 1 GAPS (security zero-guard) → resumed after the operator's override → run 2 ACCEPTED (`task.188.dod.2.*`); CI reading 1 SUCCESS @ 85a2720e; CI reading 2 SUCCESS (tree-equivalent to 85a2720e205a) @ f7154ee9 | —                    | 2026-10-11T16:40Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | Acceptance commit f7154ee9; this report committed and pushed | —                    | 2026-10-11T16:40Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -83,6 +83,7 @@ Make develop-next and develop-batch judge a merge by PR state, record a pipeline
 - 5c: /review-pr APPROVE (PR comment posted, marker `agent-skills-pr-review`); ready-for-merge → stage-disabled.
 - QA Cycle 3 — convergence check: HIGH sequence [0, 2, 0], not stalled. Route classifier: `Loop route: continue (not-a-pass-gate) — the gate reads CONCERNS — route 2b is PASS-only; a CONCERNS token is a reservation 5c must see raised, not carried (and route 2 declined: high-findings-remain).` changes-requested: stage-disabled.
 - QA cycle 1 fast gate: pushed over a red attempt 2 whose only failure is `tests/bundle-missing-source.test.js`'s LOAD-SENSITIVE file budget — pre-existing and environmental (fails identically with the change stashed; passes with BUNDLE_MISSING_SOURCE_FILE_BUDGET_MS=60000). CI on the PR is the arbiter.
+- Step 7 resume (2026-10-11T16:40Z): the operator approved the security override in-session ("Go ahead") after the HALT report. /finalise resumed at Step 7 with no QA re-entry, because nothing changed in the code since 4935a1a3. DoD run 2 carries Steps 1–4 from run 1 and records the override (task.125 / task.133 format). Acceptance commit f7154ee9 also ticked the registry. CI reading 1: SUCCESS @ 85a2720e (5 checks); CI reading 2: SUCCESS (tree-equivalent to 85a2720e205a) @ f7154ee9. The canonical PR comment was posted. Issue #587: done comment posted, closed (state CLOSED), board `already`. The CHANGELOG cites task 188.
 
 ---
 
@@ -159,10 +160,10 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: halted at Step 7
-**Final Status**: Escalated — finalise DoD gaps (human decision required)
+**Finished**: 2026-10-11T16:40Z (resumed at Step 7 after the operator's override)
+**Final Status**: Complete — accepted (security zero-guard closed by a recorded human override)
 **Branch**: feature/task.188.resume-from-evidence-not-flags
 **PR**: https://github.com/Gamaroff/agent-skills/pull/634
 **QA Iterations**: 4 (final gate PASS 100; 5c APPROVE)
-**DoD Summary**: docs/tasks/task.188.resume-from-evidence-not-flags/task.188.dod.1.resume-from-evidence-not-flags.md (❌ GAPS)
+**DoD Summary**: docs/tasks/task.188.resume-from-evidence-not-flags/task.188.dod.2.resume-from-evidence-not-flags.md (✅ ACCEPTED; run 1 GAPS)
 **Tracker debt**: none
