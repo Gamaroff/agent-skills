@@ -36,8 +36,8 @@ First pipeline run for task.201: per-step timestamps, one answer-resolution cont
 | 2. review-task             | ✅ Done    | `task.201.review.{N}.{name}.md` exists (or skip logged)               | `task.201.review.1.*.md`; 7/10 → 8/10 after fixes; READY TO IMPLEMENT; Planned → Ready for Development (time not measured) | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline; 1 iteration; ci:fast green (5263/0) (time not measured) | `.summaries/step-3-test-triage-1.json` |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #632: https://github.com/Gamaroff/agent-skills/pull/632 (time not measured) | —                    |
-| 5–6. qa-task / qa-fix loop | 🔄 In Progress | `task.201.qa.{N}.*.md`; `task.201.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 4 cycles; gate 4 PASS 100; 5c APPROVE (pr-review.1); 17 findings fixed across 3 fix cycles (time not measured); re-entered at 5a 2026-10-11 after DoD gap fix `efa7f2a6` | `.summaries/step-3-test-triage-1.json` |
-| 7. finalise                | ⏳ Pending | `task.201.dod.{N}.*.md`; task `status: accepted`                      | run 1: DoD GAPS — dod.1: AC10 unpinned (1 gap); CI reading 1 SUCCESS @ 532eb2ad; security re-probed 72/72. Re-run pending after QA re-entry | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.201.qa.{N}.*.md`; `task.201.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 4 cycles; gate 4 PASS 100; 5c APPROVE (pr-review.1); 17 findings fixed across 3 fix cycles (time not measured); re-entered at 5a 2026-10-11 after DoD gap fix `efa7f2a6`; cycles 5–6 (gate 5 FAIL → fix → gate 6 PASS 100); 5c CONCERNS (pr-review.2) | `.summaries/step-3-test-triage-1.json` |
+| 7. finalise                | ❌ Failed  | `task.201.dod.{N}.*.md`; task `status: accepted`                      | run 1: DoD GAPS — dod.1: AC10 unpinned (1 gap); CI reading 1 SUCCESS @ 532eb2ad; security re-probed 72/72. Run 2: DoD GAPS — dod.2: AC10 (limits holder mis-cited; §0d config read unpinned; develop-bug step-0 reference outside the name scan); CI reading 1 SUCCESS @ a1008634; security 72/72 held; 8a refused (no severity; outside Files Summary) | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
@@ -121,6 +121,14 @@ First pipeline run for task.201: per-step timestamps, one answer-resolution cont
 - QA re-entry after finalise DoD gaps: `reenter-qa: re-entered QA at step 5 / qa_phase 5a — qa_max_cycles=6 (base 4), gate_head=59261730058d`.
 - Restored lock carries no `answers` (the run started before task.201's Step 1 persisted them): legacy row — nothing re-asked; Q1/Q2 stay as logged at startup.
 
+### Step 7 — finalise run 2 — 2026-10-11
+
+- DoD GAPS (`task.201.dod.2`): AC10 only — 11/12 criteria PASS with per-PR tests. Docs PASS; security PASS (72 probes, 0 reproduced); compliance N/A.
+- AC10 gaps: (1) the criterion row cites `pipeline-answers-docs.test.mjs` 4a/4g, but the holders are `pipeline-answers.test.mjs` 4a/4g; (2) no test pins §0d reading `develop.*` from `skills-config.yaml`; (3) the name scan omits `skills/develop-bug/references/develop-bug-step-0-resolve-bug.md`. (3) is the same point as 5c PC-1, which was recorded at CONCERNS and not fixed.
+- Fix-and-recheck (8a) refused: `severity-low` (no severity on the AC finding), `inside-files-summary`, `mutation-proved`.
+- CI reading 1: SUCCESS @ `a10086347444` (5 checks).
+- HALT `finalise-dod-gaps`, step 7. Resume: fix the three AC10 items (a test change), commit, re-run `/develop-next` → Phase 0b "Re-enter QA at 5a" (Recommended).
+
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
@@ -193,9 +201,10 @@ _Track each QA review/fix cycle._
 **Issues Found**: none open — 2 low advisory (population extension filter; `ALSO_CHANGED` completeness)
 **HIGH findings**: 0
 **MEDIUM findings**: 0
-**PR Review**: pending — 5c not yet run
+**PR Review**: CONCERNS — pr-review.2: PC-1 (medium/medium) AC10 scan omits the hand-authored develop-bug-step-0-resolve-bug.md (0 consumer hits today; recorded, not fixed — a test path); PC-2 (low) run-1 gap section stale, left to /finalise; PC-3 (low) no `pr_number`, left to /finalise
+**Carried to 6a**: docs/tasks/task.201.pipeline-upfront-answers-and-speed-modes/task.201.pr-review.2.pipeline-upfront-answers-and-speed-modes.md
 **Loop exit**: n/a — this exit not taken
-**Action**: Proceeding to 5c (PR conformance review)
+**Action**: Proceeding to 5c (PR conformance review) → CONCERNS, exit to Step 7
 
 ## Completion
 

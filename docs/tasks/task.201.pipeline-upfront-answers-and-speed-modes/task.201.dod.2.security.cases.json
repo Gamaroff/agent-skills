@@ -1,0 +1,578 @@
+[
+  {
+    "id": "shell-exec.quote-split-single",
+    "sink": "shell-exec",
+    "input": "who'am'i",
+    "why": "Quote removal rejoins the word to `whoami`, so a matcher comparing the raw token sees a command name that is on no list at all.",
+    "correct": "Compare the effective command word — after quote removal — not the literal token.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.quote-split-double",
+    "sink": "shell-exec",
+    "input": "to\"u\"ch /tmp/x",
+    "why": "Double quotes split the same way: the effective command is `touch`, which writes.",
+    "correct": "Apply quote removal before matching.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.backslash-escape",
+    "sink": "shell-exec",
+    "input": "t\\ouch /tmp/x",
+    "why": "`\\o` is just `o` after escape removal, so the effective command is `touch`.",
+    "correct": "Apply escape removal before matching.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.glob-bracket",
+    "sink": "shell-exec",
+    "input": "/usr/bin/[t]ouch /tmp/x",
+    "why": "Pathname expansion resolves `[t]ouch` to `touch`; the literal never equals the name a list is keyed on.",
+    "correct": "Treat glob metacharacters in a command word as unresolvable and deny, rather than matching the unexpanded literal.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.glob-question",
+    "sink": "shell-exec",
+    "input": "/usr/bin/touc? /tmp/x",
+    "why": "`?` matches any single character, so the expansion is `touch`.",
+    "correct": "Same as the bracket case: an unresolvable command word is a deny.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.tilde-traversal",
+    "sink": "shell-exec",
+    "input": "~/../../usr/bin/whoami",
+    "why": "Tilde expansion followed by `..` traversal reaches an absolute path that a prefix check on `~/` is satisfied by and never sees.",
+    "correct": "Expand and normalise to a real path before deciding, then match on the result.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.escaped-tool-name",
+    "sink": "shell-exec",
+    "input": "g\\h pr comment 1 --body x",
+    "why": "Escape removal yields `gh`, so a rule keyed on the tool name `gh` does not fire and an outbound write posts.",
+    "correct": "Apply escape removal before matching the tool name.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.quote-split-curl",
+    "sink": "shell-exec",
+    "input": "cu'r'l -X POST https://x/",
+    "why": "Quote removal yields `curl`, and the request is a POST — a network write from a command that scanned as unknown.",
+    "correct": "Apply quote removal before matching.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.heredoc-redirect",
+    "sink": "shell-exec",
+    "input": "cat <<EOF > /tmp/x",
+    "why": "The write is in the redirection, not in the command word. `cat` inspects as read-only and the statement creates a file.",
+    "correct": "Parse redirections separately from the command word; any `>` or `>>` target is a write regardless of what precedes it.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.heredoc-append-rc",
+    "sink": "shell-exec",
+    "input": "cat <<'EOF' >> ~/.zshrc",
+    "why": "The same shape, appending to a shell rc file — a persistent change that runs again in every future shell.",
+    "correct": "Treat `>>` as a write, and a write to a shell rc path as persistent, regardless of the command word.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.sed-inplace-trailing",
+    "sink": "shell-exec",
+    "input": "sed 's/a/b/' -i file.txt",
+    "why": "`-i` edits in place, and here it sits in trailing position — after the script operand — where a check that only inspects leading flags never looks.",
+    "correct": "Scan every argument position for write-capable flags, not just the leading run.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.sed-inplace-after-e",
+    "sink": "shell-exec",
+    "input": "sed -e 's/a/b/' -i file.txt",
+    "why": "The same trailing `-i`, now separated from the command by a flag that takes an operand — which is what makes a positional heuristic stop early.",
+    "correct": "Consume each flag's operand while scanning, and keep scanning to the end of the argument list.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.sort-output-long",
+    "sink": "shell-exec",
+    "input": "sort --output=/tmp/x file.txt",
+    "why": "`sort` reads as a read-only filter, and `--output=` writes a file. The write is in a flag the tool's reputation does not suggest.",
+    "correct": "Know the write-capable flags of every tool named by hand, in long and short form (`-o` and `--output`).",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.git-diff-output",
+    "sink": "shell-exec",
+    "input": "git diff --output=/tmp/x",
+    "why": "`git diff` is the canonical read-only subcommand, and `--output=` makes it write.",
+    "correct": "Match on the (subcommand, flags) pair, not on the subcommand alone.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.keyword-if",
+    "sink": "shell-exec",
+    "input": "if touch /tmp/x; then echo hi; fi",
+    "why": "A shell keyword occupies command position, so a parser reading the first word sees `if` and swallows the whole segment — never reaching the `touch` inside it.",
+    "correct": "Recurse into keyword-introduced compound commands and classify each contained command on its own.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.keyword-elif",
+    "sink": "shell-exec",
+    "input": "elif touch /tmp/x; then echo hi; fi",
+    "why": "The same escape through a different keyword; enumerating `if` alone leaves the rest reachable.",
+    "correct": "Recurse into every compound-command keyword, not a hand-picked subset.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.keyword-while",
+    "sink": "shell-exec",
+    "input": "while touch /tmp/x; do break; done",
+    "why": "The loop condition is a command, and it runs — at least once — before the body is ever considered.",
+    "correct": "Classify the loop condition as a command in its own right.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.keyword-until",
+    "sink": "shell-exec",
+    "input": "until touch /tmp/x; do break; done",
+    "why": "As `while`, with the sense inverted and the same command position unexamined.",
+    "correct": "Classify the loop condition as a command in its own right.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.keyword-case",
+    "sink": "shell-exec",
+    "input": "case x in a) touch /tmp/x;; esac",
+    "why": "`case` puts commands after a pattern and a `)`, a position that whitespace tokenisation does not recognise as command-initial.",
+    "correct": "Parse the case-arm structure and classify each arm's commands.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.git-global-flag-operand",
+    "sink": "shell-exec",
+    "input": "git -C log push origin main",
+    "why": "`-C` takes a directory operand. Reading the token after the flags as the subcommand yields `log` — read-only — when the real subcommand is `push`, which writes to a remote.",
+    "correct": "Consume each global flag's operand before reading the subcommand.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.redirect-glued",
+    "sink": "shell-exec",
+    "input": "echo pwned>/tmp/x",
+    "why": "No space before `>`, so whitespace tokenisation produces the single word `pwned>/tmp/x` and reports no redirection at all.",
+    "correct": "Tokenise redirection operators independently of whitespace — the shell does.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.redirect-glued-cat",
+    "sink": "shell-exec",
+    "input": "cat README.md>/tmp/x",
+    "why": "The same gluing, now attached to a filename, which makes the resulting token look even more like an ordinary operand.",
+    "correct": "Split redirection operators out of every token before classifying.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.redirect-glued-append",
+    "sink": "shell-exec",
+    "input": "echo pwned>>/tmp/x",
+    "why": "The append form glued the same way; a scan that special-cases a spaced ` > ` misses both.",
+    "correct": "Handle `>`, `>>`, `>|` and fd-prefixed forms as operators, not as text.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.quote-state-span",
+    "sink": "shell-exec",
+    "input": "echo \"it's fine\"; touch /tmp/x; echo \"don't\"",
+    "why": "The apostrophe inside a double-quoted string opens a single-quote span for a scanner that ignores which quote type is already open. The span it then blanks runs across the `touch`, deleting it from the scan.",
+    "correct": "Track quote state per character, recording the enclosing quote type; an apostrophe inside double quotes is a literal.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.heredoc-in-quoted-example",
+    "sink": "shell-exec",
+    "input": "echo \"example: cat <<EOF\"\ntouch /tmp/x",
+    "why": "A heredoc marker inside a quoted string is text, not a heredoc. Treating it as one consumes the following real command as heredoc body and never classifies it.",
+    "correct": "Recognise heredoc operators only outside quoted spans.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.sed-w-flag",
+    "sink": "shell-exec",
+    "input": "sed -n 's/a/b/w /tmp/x' README.md",
+    "why": "`sed` writes a file through the `w` flag inside the script — with neither `-i` nor a shell redirection to notice.",
+    "correct": "Parse the sed script itself, not only the tool's flags.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.sed-w-command",
+    "sink": "shell-exec",
+    "input": "sed 'w /tmp/x' README.md",
+    "why": "The bare `w` command form, which does not even carry a substitution to draw attention to the script.",
+    "correct": "Parse the sed script; treat `w` and `W` as writes wherever they appear in it.",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.h0",
+    "sink": "shell-exec",
+    "input": "-f",
+    "why": "a branch value is interpolated into git commands in prose",
+    "correct": "refused (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.h1",
+    "sink": "shell-exec",
+    "input": "--upload-pack=touch /tmp/x",
+    "why": "a branch value is interpolated into git commands in prose",
+    "correct": "refused (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.h2",
+    "sink": "shell-exec",
+    "input": "$(touch /tmp/x)",
+    "why": "a branch value is interpolated into git commands in prose",
+    "correct": "refused (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.h3",
+    "sink": "shell-exec",
+    "input": "a`id`b",
+    "why": "a branch value is interpolated into git commands in prose",
+    "correct": "refused (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.h4",
+    "sink": "shell-exec",
+    "input": "develop;touch /tmp/x",
+    "why": "a branch value is interpolated into git commands in prose",
+    "correct": "refused (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.h5",
+    "sink": "shell-exec",
+    "input": "develop&&id",
+    "why": "a branch value is interpolated into git commands in prose",
+    "correct": "refused (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.h6",
+    "sink": "shell-exec",
+    "input": "develop|id",
+    "why": "a branch value is interpolated into git commands in prose",
+    "correct": "refused (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.h7",
+    "sink": "shell-exec",
+    "input": "dev\telop",
+    "why": "a branch value is interpolated into git commands in prose",
+    "correct": "refused (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.h8",
+    "sink": "shell-exec",
+    "input": "develop\n",
+    "why": "a branch value is interpolated into git commands in prose",
+    "correct": "refused (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.h9",
+    "sink": "shell-exec",
+    "input": "develop\rx",
+    "why": "a branch value is interpolated into git commands in prose",
+    "correct": "refused (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.h10",
+    "sink": "shell-exec",
+    "input": "dev\u0000elop",
+    "why": "a branch value is interpolated into git commands in prose",
+    "correct": "refused (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.h11",
+    "sink": "shell-exec",
+    "input": "main@{1}",
+    "why": "a branch value is interpolated into git commands in prose",
+    "correct": "refused (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.h12",
+    "sink": "shell-exec",
+    "input": "main~1",
+    "why": "a branch value is interpolated into git commands in prose",
+    "correct": "refused (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.h13",
+    "sink": "shell-exec",
+    "input": "main^",
+    "why": "a branch value is interpolated into git commands in prose",
+    "correct": "refused (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.h14",
+    "sink": "shell-exec",
+    "input": "a:b",
+    "why": "a branch value is interpolated into git commands in prose",
+    "correct": "refused (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.h15",
+    "sink": "shell-exec",
+    "input": "feat*",
+    "why": "a branch value is interpolated into git commands in prose",
+    "correct": "refused (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.h16",
+    "sink": "shell-exec",
+    "input": "feat?",
+    "why": "a branch value is interpolated into git commands in prose",
+    "correct": "refused (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.h17",
+    "sink": "shell-exec",
+    "input": "feat[1]",
+    "why": "a branch value is interpolated into git commands in prose",
+    "correct": "refused (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.h18",
+    "sink": "shell-exec",
+    "input": "a\\b",
+    "why": "a branch value is interpolated into git commands in prose",
+    "correct": "refused (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.h19",
+    "sink": "shell-exec",
+    "input": "a..b",
+    "why": "a branch value is interpolated into git commands in prose",
+    "correct": "refused (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.h20",
+    "sink": "shell-exec",
+    "input": "a/.hidden",
+    "why": "a branch value is interpolated into git commands in prose",
+    "correct": "refused (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.h21",
+    "sink": "shell-exec",
+    "input": "a.lock/b",
+    "why": "a branch value is interpolated into git commands in prose",
+    "correct": "refused (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.h22",
+    "sink": "shell-exec",
+    "input": "a.lock",
+    "why": "a branch value is interpolated into git commands in prose",
+    "correct": "refused (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.h23",
+    "sink": "shell-exec",
+    "input": "a/",
+    "why": "a branch value is interpolated into git commands in prose",
+    "correct": "refused (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.h24",
+    "sink": "shell-exec",
+    "input": "/a",
+    "why": "a branch value is interpolated into git commands in prose",
+    "correct": "refused (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.h25",
+    "sink": "shell-exec",
+    "input": "a//b",
+    "why": "a branch value is interpolated into git commands in prose",
+    "correct": "refused (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.h26",
+    "sink": "shell-exec",
+    "input": "a.",
+    "why": "a branch value is interpolated into git commands in prose",
+    "correct": "refused (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.h27",
+    "sink": "shell-exec",
+    "input": "",
+    "why": "a branch value is interpolated into git commands in prose",
+    "correct": "refused (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.h28",
+    "sink": "shell-exec",
+    "input": "devеlop",
+    "why": "a branch value is interpolated into git commands in prose",
+    "correct": "refused (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.h29",
+    "sink": "shell-exec",
+    "input": "develop；id",
+    "why": "a branch value is interpolated into git commands in prose",
+    "correct": "refused (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.h30",
+    "sink": "shell-exec",
+    "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "why": "a branch value is interpolated into git commands in prose",
+    "correct": "refused (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.h31",
+    "sink": "shell-exec",
+    "input": "dev\"elop",
+    "why": "a branch value is interpolated into git commands in prose",
+    "correct": "refused (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.h32",
+    "sink": "shell-exec",
+    "input": "$HOME",
+    "why": "a branch value is interpolated into git commands in prose",
+    "correct": "refused (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.h33",
+    "sink": "shell-exec",
+    "input": "develop --force",
+    "why": "a branch value is interpolated into git commands in prose",
+    "correct": "refused (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "refname.l0",
+    "sink": "shell-exec",
+    "input": "develop",
+    "why": "a branch shape the pipelines use",
+    "correct": "accepted (true)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "refname.l1",
+    "sink": "shell-exec",
+    "input": "main",
+    "why": "a branch shape the pipelines use",
+    "correct": "accepted (true)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "refname.l2",
+    "sink": "shell-exec",
+    "input": "feature/task.201.pipeline-upfront-answers-and-speed-modes",
+    "why": "a branch shape the pipelines use",
+    "correct": "accepted (true)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "refname.l3",
+    "sink": "shell-exec",
+    "input": "epic/178.feature-ui",
+    "why": "a branch shape the pipelines use",
+    "correct": "accepted (true)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "refname.l4",
+    "sink": "shell-exec",
+    "input": "release/v1.2.0",
+    "why": "a branch shape the pipelines use",
+    "correct": "accepted (true)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "refname.l5",
+    "sink": "shell-exec",
+    "input": "hotfix/v1.2.1",
+    "why": "a branch shape the pipelines use",
+    "correct": "accepted (true)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "refname.l6",
+    "sink": "shell-exec",
+    "input": "user_1/fix-2",
+    "why": "a branch shape the pipelines use",
+    "correct": "accepted (true)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "refname.l7",
+    "sink": "shell-exec",
+    "input": "bugfix/bug.18.x",
+    "why": "a branch shape the pipelines use",
+    "correct": "accepted (true)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "refname.l8",
+    "sink": "shell-exec",
+    "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "why": "a branch shape the pipelines use",
+    "correct": "accepted (true)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "refname.l9",
+    "sink": "shell-exec",
+    "input": "v1.2",
+    "why": "a branch shape the pipelines use",
+    "correct": "accepted (true)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "refname.l10",
+    "sink": "shell-exec",
+    "input": "feature/-x",
+    "why": "a branch shape the pipelines use",
+    "correct": "accepted (true)",
+    "direction": "legitimate"
+  }
+]

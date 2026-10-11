@@ -1,0 +1,19 @@
+{
+  "sink": "shell-exec",
+  "entry": "shared/resources/pipeline-answers.js#isRefName",
+  "name": null,
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 72,
+  "passed": 72,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": null,
+  "ran_at": "2026-10-11T04:58:46.337Z"
+}

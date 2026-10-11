@@ -471,9 +471,9 @@ hold as written.
 - The AC10 gap is closed: the consumer-name scan reads whole files over a derived population and is mutation-proven, including the fenced-block case cycle 5 found.
 - Two low advisory findings on the scan's population routed to future work.
 
-## Definition of Done - Gaps Identified
+## Definition of Done — run 1 gaps (historical, superseded by run 2 below)
 
-**Status:** IN PROGRESS
+**Status:** SUPERSEDED — closed in part by QA cycles 5–6; run 2 re-verified every criterion
 
 ### QA Gate Status
 
@@ -483,11 +483,11 @@ hold as written.
 ### Missing Criteria:
 
 1. **Acceptance Criteria:**
-   - [ ] AC10 — "No consumer-specific names" is held by no committed per-PR test (the limits half is held by tests 4a and 4g)
+   - [x] AC10 — "No consumer-specific names" is held by no committed per-PR test (the limits half is held by tests 4a and 4g)
 
 ### Next Steps:
 
-- [ ] **BLOCKING**: add a test that scans the task.201 engines and the shared resources it changed for consumer-repository names, with a non-vacuity case; the change re-enters QA at 5a
+- [x] **BLOCKING**: add a test that scans the task.201 engines and the shared resources it changed for consumer-repository names, with a non-vacuity case; the change re-enters QA at 5a
 
 **Estimated Effort:** Small (under 1 hour)
 
@@ -495,6 +495,37 @@ hold as written.
 **QA Gate Reference**: See `task.201.gate.4.pipeline-upfront-answers-and-speed-modes.yml`
 
 **Detailed Verification Log:** See `task.201.dod.1.pipeline-upfront-answers-and-speed-modes.md` for complete verification evidence.
+
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**QA Report**: `task.201.qa.6.pipeline-upfront-answers-and-speed-modes.md`
+**Gate File**: `task.201.gate.6.pipeline-upfront-answers-and-speed-modes.yml`
+**Gate Status**: ✅ PASS (100/100) · **PR review (5c)**: ⚠️ CONCERNS (`task.201.pr-review.2`)
+
+### Missing Criteria:
+
+1. **Acceptance Criteria:**
+   - [ ] AC10 — the limits half is mis-cited: the criterion row names `pipeline-answers-docs.test.mjs` 4a/4g; the holders are `pipeline-answers.test.mjs` 4a/4g
+   - [ ] AC10 — no test pins that §0d reads `develop.defaultMode` / `develop.skippable` through `read_nested_config_key` and passes them as `--policy-mode` / `--policy-skippable`
+   - [ ] AC10 — the consumer-name scan omits the hand-authored `skills/develop-bug/references/develop-bug-step-0-resolve-bug.md` (0 hits today)
+
+### Next Steps:
+
+- **BLOCKING**: add a docs-test case pinning §0d's config read and its `--policy-*` hand-off, with a mutation proof
+- **BLOCKING**: add the hand-authored develop-bug step-0 reference to the scan population
+- **BLOCKING**: correct the AC10 citation in the criterion row and the generic test's header
+- The fix is a test change, so it re-enters QA at 5a
+
+**Estimated Effort:** Small (under 1 hour)
+
+**Gap Report Generated:** 2026-10-11
+**QA Gate Reference**: See `task.201.gate.6.pipeline-upfront-answers-and-speed-modes.yml`
+
+**Detailed Verification Log:** See `task.201.dod.2.pipeline-upfront-answers-and-speed-modes.md` for complete verification evidence.
 
 ## Change Log
 
@@ -518,6 +549,7 @@ hold as written.
 | 2026-10-11 |         | QA gate FAIL (80/100) — 1 finding (1 high: the AC10 scan skips fenced text) | qa-task |
 | 2026-10-11 |         | QA findings fixed — cycle 5, 3 findings (CR-1 section reader replaced by whole-file scan; CR-2 population derived; CR-3 redundant pattern dropped) | qa-fix |
 | 2026-10-11 |         | QA gate PASS (100/100) — 0 open findings, 2 low advisory | qa-task |
+| 2026-10-11 |         | DoD incomplete — 1 gap (AC10: mis-cited limits holder, config read unpinned, one file outside the name scan) | finalise |
 <!-- change-log-end -->
 
 ---
