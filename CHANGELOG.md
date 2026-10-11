@@ -77,6 +77,17 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`develop-next` and `develop-batch` resume from evidence, not flags (task.188).** A merge is
+  judged by the PR's state (`gh pr view --json state`), never by `gh pr merge`'s exit code, which also
+  covers local follow-ups: a merge that landed before a network error no longer reads as failed, and a
+  command that exits 0 on an unmerged PR halts instead of deleting its branch (obs #197).
+  `develop-next`'s run state gains `prNumber`, `halted` and `haltKind` (develop-batch's meanings); a
+  pipeline HALT is recorded, and Step 0.1 surfaces it and stops instead of routing to Step 3
+  (obs #286, #195). Before routing, Step 0.1 in both skills reconciles `merged` from the PR state, and
+  `develop-next` reconciles `ticked` from the roadmap row on `origin` — so a finished item is no longer
+  re-merged or re-ticked (obs #180) — and a dispatched item whose document is not `accepted`
+  re-dispatches Step 2 rather than halting at Step 3 (obs #9). An existing run-state file resumes
+  unchanged.
 - **`/finalise` runs the security probe when its read-only agent cannot (obs #10).** The DoD security
   agent is an Explore subagent, and the probe engine creates a sandbox and writes a run record. On
   task.201 the agent refused both and returned a zero-guard FAIL on a boundary that held (72

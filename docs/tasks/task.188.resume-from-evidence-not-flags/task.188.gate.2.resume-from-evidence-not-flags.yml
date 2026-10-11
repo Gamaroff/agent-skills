@@ -1,0 +1,80 @@
+schema: 2
+task: 'task.188.resume-from-evidence-not-flags'
+task_title: 'Resume from evidence, not flags'
+gate: FAIL
+status_reason: 'Refute pass: cycle 1''s unbound-VCS guard refuses on every real run (each fenced block is its own shell), and the tick check cannot see a tick committed locally but not pushed, so the duplicate-row case it exists for still routes to Step 4.'
+reviewer: 'QA Engineer'
+head: '7f5ee9344a28a1540e614baf48f7ef27e2a3aaca'
+updated: '2026-10-11T14:21:21Z'
+
+top_issues:
+  - id: 'CR2-1'
+    severity: high
+    file: 'skills/develop-next/SKILL.md'
+    finding: 'The merge-flag reconciliation block reads VCS (and BB_CURL_AUTH, BB_WORKSPACE, BB_REPO) that nothing in the block binds; the writer is item 6''s separate block, so the cycle-1 :? guard refuses on every real run and the reconciliation never executes. The test injects VCS=github and the new INPUTS entry declares the cross-block writer, so neither sees it. (Subsumes reviewer CR-5: the Bitbucket guard checked BB_API, a constant, not the credential.)'
+    suggested_action: 'Resolve the platform inside the block (source resolve-platform.sh; on Bitbucket derive BB_* and source bitbucket-auth.sh), drop the INPUTS entry, and test the block with no VCS injected expecting it to resolve.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR2-2'
+    severity: high
+    file: 'skills/develop-next/SKILL.md'
+    finding: 'The tick check reads only origin/<baseBranch>, so a tick Step 4 committed locally but could not push (the documented merged: true, ticked: false recovery path) reads not-ticked and routes to Step 4, which re-ticks and adds a duplicate Change Log row.'
+    suggested_action: 'Also read the row on the local <baseBranch>; ticked there but not on origin is a fourth answer, ticked-unpushed, which routes to a push and then ticked: true, never a re-tick.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR2-3'
+    severity: medium
+    file: 'skills/develop-next/SKILL.md'
+    finding: 'With prNumber null the reconciliation accepts any merged PR on the item''s branch, without the already-done guard''s status: accepted precondition; a reopened bug (selector-eligible, same bugfix/<stem> branch) matches its earlier fix''s merged PR and is marked merged (reviewer CR-3, medium confidence; verified by QA against roadmap-selection.md''s bug floor).'
+    suggested_action: 'Bind <mergedPr> from the branch query only when the document reads accepted (bug: closed), as the already-done guard does; otherwise leave it empty.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR2-4'
+    severity: medium
+    file: 'skills/develop-next/SKILL.md'
+    finding: 'The stated rule "both arms judge the merge by the PR''s state" and the Step 0.1 claim that Step 3 makes a re-run merge safe are false on Bitbucket, whose arm judges the POST response (reviewer CR-4, medium confidence; verified by QA at the Bitbucket arm).'
+    suggested_action: 'Scope both claims to what the arms do — the GitHub arm re-queries state; the Bitbucket arm reads the response and its parsing note requires a re-query before any retry — the Bitbucket arm itself stays out of scope (task §4).'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 40
+
+evidence:
+  tests_reviewed: 111
+  phases_verified: '4/4'
+  ci: 'not read at QA (gated at finalise)'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Boundary: true; no engine form reaches a fenced prose block; covered by the executed fixture harness. DoD override needed at finalise (carried from cycle 1, QA-2).'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: FAIL
+    notes: 'CR2-1 makes the merge reconciliation inert on every real run; CR2-2 leaves the duplicate-tick path open.'
+  maintainability:
+    status: PASS
+    notes: 'CR2-4 is a claim to correct, not a structural problem.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR2-1..CR2-4, each with an executed or shape case.'
+      refs: ['skills/develop-next/SKILL.md', 'shared/resources/tests/merge-delete-branch-guard.test.mjs', 'tests/unbound-default-reads.test.js']
+  future:
+    - action: 'DoD override for the zero-probe prose boundary until task.181 shell-argv; a Bitbucket stub for the guard test; re-query .state on the Bitbucket merge arm.'
+      refs: ['skills/develop-next/SKILL.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['CR2-1..CR2-4 fixed']

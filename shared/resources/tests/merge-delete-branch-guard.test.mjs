@@ -13,6 +13,8 @@
 import test, { describe } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 import {
   ROOT,
   SHELLS,
@@ -80,11 +82,23 @@ function siteScript(site) {
   return PRELUDE + bind(code, { "<PR#>": "7", "<mergeStrategy>": "squash" });
 }
 
-const GH_OK = 'case "$*" in *headRefName*) echo feature/x ;; esac\nexit 0';
-const GH_NO_HEAD = "exit 0";
-// The merge is refused (a conflict, or branch protection); every other gh call answers.
-const GH_MERGE_FAILS =
-  'case "$*" in *headRefName*) echo feature/x ;; *"pr merge"*) echo "merge refused" >&2; exit 1 ;; esac\nexit 0';
+// The gh stub's answers, set per case: the head branch, the PR's state as `gh pr view --json state`
+// reports it after the merge, and `gh pr merge`'s exit code. The two are independent on purpose —
+// the merge verdict is the state, never the exit code (task.188, obs #197).
+function ghBody({ head = "feature/x", state = "MERGED", mergeExit = 0 } = {}) {
+  return [
+    'case "$*" in',
+    head ? `  *headRefName*) echo ${head} ;;` : "",
+    `  *"--json state"*) echo ${state} ;;`,
+    `  *"pr merge"*) [ ${mergeExit} -eq 0 ] || { echo "merge failed" >&2; exit ${mergeExit}; } ;;`,
+    "esac",
+    "exit 0",
+  ].join("\n");
+}
+const GH_OK = ghBody();
+const GH_NO_HEAD = ghBody({ head: "" });
+// The merge is refused (a conflict, or branch protection): the command fails and the PR stays open.
+const GH_MERGE_FAILS = ghBody({ state: "OPEN", mergeExit: 1 });
 
 function mergeCalls(argvLog) {
   return ghCalls(argvLog).filter((c) => c.startsWith("pr merge"));
@@ -216,6 +230,62 @@ describe("executed against fixtures", { concurrency: true }, () => {
         }
       });
 
+      // The merge verdict (task.188, obs #197). `gh pr merge` exits non-zero when a local follow-up
+      // fails after the server merged; it can also exit 0 on a PR that did not merge. The PR's state
+      // decides both. The last two rows are the control: a block that only rewords the exit check
+      // passes the first rows and fails these.
+      for (const c of [
+        { tree: "clean", mergeExit: 1, state: "MERGED", ok: true },
+        { tree: "dirty", mergeExit: 1, state: "MERGED", ok: true },
+        { tree: "clean", mergeExit: 1, state: "OPEN", ok: false },
+        { tree: "dirty", mergeExit: 1, state: "OPEN", ok: false },
+        { tree: "clean", mergeExit: 0, state: "OPEN", ok: false },
+        { tree: "dirty", mergeExit: 0, state: "OPEN", ok: false },
+      ]) {
+        test(`[${sh}] ${site.file} — ${c.tree} tree, merge exits ${c.mergeExit}, PR ${c.state} → ${c.ok ? "exits 0, remote branch deleted" : "halts, deletes nothing"}`, async () => {
+          const fx = fixtureRepo();
+          try {
+            await gitAsync(fx.work, "checkout", "-q", "develop");
+            if (c.tree === "dirty")
+              write(fx.work, "package.json", '{"another":"session"}\n');
+            const gh = ghStub(
+              fx.dir,
+              ghBody({ state: c.state, mergeExit: c.mergeExit }),
+            );
+            const r = await runAsync(sh, siteScript(site), {
+              cwd: fx.work,
+              bin: gh.bin,
+            });
+            const out = `stdout: ${r.stdout}\nstderr: ${r.stderr}`;
+            assert.equal(mergeCalls(gh.argvLog).length, 1, out);
+            if (c.ok) {
+              assert.equal(
+                r.status,
+                0,
+                `a merge that landed read as failed — ${out}`,
+              );
+              assert.equal(
+                await remoteHasAsync(fx, "feature/x"),
+                false,
+                `the remote branch of a merged PR survived — ${out}`,
+              );
+            } else {
+              assert.notEqual(
+                r.status,
+                0,
+                `a PR that is ${c.state} read as merged — ${out}`,
+              );
+              assert.ok(
+                await remoteHasAsync(fx, "feature/x"),
+                `the head branch of an UNMERGED PR was deleted — ${out}`,
+              );
+            }
+          } finally {
+            cleanup(fx.dir);
+          }
+        });
+      }
+
       test(`[${sh}] ${site.file} — an unbindable head branch halts before any merge`, async () => {
         const fx = fixtureRepo();
         try {
@@ -311,3 +381,413 @@ describe("executed against fixtures", { concurrency: true }, () => {
     });
   }
 });
+
+// ── Step 0.1 reconciliation: flags advance from evidence before any routing (task.188) ─────
+
+const DN_MERGE_RECONCILE = "# Step 0.1 reconciliation, merge flag.";
+const DN_ROW_RECONCILE = "# Step 0.1 reconciliation, tick flag";
+const DB_MERGE_RECONCILE = "# Step 0.1 reconciliation (develop-batch)";
+const SELECTOR = `${ROOT}/skills/develop-next/scripts/select-next.mjs`;
+// The merge-flag block resolves its own platform (task.188 QA cycle 2, CR2-1); point its sourced paths
+// at this checkout, since the fixture repository has no .agents/skills.
+const DN_REFS = {
+  ".agents/skills/develop-next/references/resolve-platform.sh": `${ROOT}/skills/develop-next/references/resolve-platform.sh`,
+  ".agents/skills/develop-next/references/bitbucket-auth.sh": `${ROOT}/skills/develop-next/references/bitbucket-auth.sh`,
+};
+
+function readState(work, name) {
+  return JSON.parse(
+    fs.readFileSync(path.join(work, ".claude/state", name), "utf8"),
+  );
+}
+
+function writeState(work, name, obj) {
+  write(work, `.claude/state/${name}`, `${JSON.stringify(obj, null, 2)}\n`);
+}
+
+describe(
+  "develop-next Step 0.1 reconciliation, executed",
+  { concurrency: true },
+  () => {
+    for (const sh of SHELLS) {
+      for (const c of [
+        { prNumber: 7, mergedPr: "", state: "MERGED", merged: true, calls: 1 },
+        { prNumber: 7, mergedPr: "", state: "OPEN", merged: false, calls: 1 },
+        { prNumber: 7, mergedPr: "", state: "CLOSED", merged: false, calls: 1 },
+        {
+          prNumber: null,
+          mergedPr: "7",
+          state: "MERGED",
+          merged: true,
+          calls: 1,
+        },
+        {
+          prNumber: null,
+          mergedPr: "",
+          state: "MERGED",
+          merged: false,
+          calls: 0,
+        },
+      ]) {
+        test(`[${sh}] merge flag: prNumber ${c.prNumber}, merged-PR query '${c.mergedPr}', PR ${c.state} → merged: ${c.merged}`, async () => {
+          const fx = fixtureRepo();
+          try {
+            writeState(fx.work, "develop-next.state.json", {
+              item: "T9",
+              source: "roadmap",
+              dispatched: true,
+              prNumber: c.prNumber,
+              merged: false,
+              ticked: false,
+            });
+            const gh = ghStub(fx.dir, ghBody({ state: c.state }));
+            // No VCS injected: the block resolves its own platform (task.188 QA cycle 2, CR2-1).
+            const code = bind(
+              blockBy(
+                readDoc("skills/develop-next/SKILL.md"),
+                DN_MERGE_RECONCILE,
+              ),
+              { "<mergedPr>": c.mergedPr, ...DN_REFS },
+            );
+            const r = await runAsync(sh, code, { cwd: fx.work, bin: gh.bin });
+            assert.equal(
+              r.status,
+              0,
+              `stdout: ${r.stdout}\nstderr: ${r.stderr}`,
+            );
+            const st = readState(fx.work, "develop-next.state.json");
+            assert.equal(st.merged, c.merged, r.stdout);
+            assert.equal(
+              st.ticked,
+              false,
+              "reconciling merged must not touch ticked",
+            );
+            if (c.merged) assert.equal(st.prNumber, 7);
+            assert.equal(
+              ghCalls(gh.argvLog).filter((l) => l.includes("--json state"))
+                .length,
+              c.calls,
+            );
+          } finally {
+            cleanup(fx.dir);
+          }
+        });
+      }
+
+      // CR2-1 (task.188 QA cycle 2): every fenced block is its own shell, so nothing item 6 bound
+      // reaches this one. Run with VCS explicitly unset — as a real run is — the block must resolve
+      // the platform itself and reconcile, neither refuse nor fall silently to a no-op.
+      test(`[${sh}] merge flag: with VCS unset the block resolves the platform itself and reconciles`, async () => {
+        const fx = fixtureRepo();
+        try {
+          writeState(fx.work, "develop-next.state.json", {
+            item: "T9",
+            prNumber: 7,
+            merged: false,
+            ticked: false,
+          });
+          const gh = ghStub(fx.dir, ghBody({ state: "MERGED" }));
+          const code =
+            "unset VCS BB_API BB_CURL_AUTH\n" +
+            bind(
+              blockBy(
+                readDoc("skills/develop-next/SKILL.md"),
+                DN_MERGE_RECONCILE,
+              ),
+              { "<mergedPr>": "", ...DN_REFS },
+            );
+          const r = await runAsync(sh, code, { cwd: fx.work, bin: gh.bin });
+          assert.equal(r.status, 0, `stdout: ${r.stdout}\nstderr: ${r.stderr}`);
+          assert.equal(
+            readState(fx.work, "develop-next.state.json").merged,
+            true,
+            r.stdout,
+          );
+          assert.deepEqual(
+            ghCalls(gh.argvLog).filter((l) => l.includes("--json state")),
+            ["pr view 7 --json state -q .state"],
+          );
+        } finally {
+          cleanup(fx.dir);
+        }
+      });
+
+      // CR3-3 (task.188 QA cycle 3): a write that fails must not be reported as a reconciled flag.
+      test(`[${sh}] merge flag: a failed run-state write halts and is not reported as reconciled`, async () => {
+        const fx = fixtureRepo();
+        try {
+          const before = {
+            item: "T9",
+            prNumber: null,
+            merged: false,
+            ticked: false,
+          };
+          writeState(fx.work, "develop-next.state.json", before);
+          const gh = ghStub(fx.dir, ghBody({ state: "MERGED" }));
+          // A non-numeric PR number reaches the gh stub (which answers MERGED) and then fails jq --argjson.
+          const code = bind(
+            blockBy(
+              readDoc("skills/develop-next/SKILL.md"),
+              DN_MERGE_RECONCILE,
+            ),
+            { "<mergedPr>": "not-a-number", ...DN_REFS },
+          );
+          const r = await runAsync(sh, code, { cwd: fx.work, bin: gh.bin });
+          assert.notEqual(
+            r.status,
+            0,
+            `stdout: ${r.stdout}\nstderr: ${r.stderr}`,
+          );
+          assert.match(
+            r.stdout,
+            /HALT: PR #not-a-number is MERGED but merged: true could not be written/,
+          );
+          assert.doesNotMatch(r.stdout, /reconciled:/);
+          assert.deepEqual(
+            readState(fx.work, "develop-next.state.json"),
+            before,
+          );
+        } finally {
+          cleanup(fx.dir);
+        }
+      });
+
+      test(`[${sh}] merge flag: an already-merged file is not re-queried and stays merged`, async () => {
+        const fx = fixtureRepo();
+        try {
+          writeState(fx.work, "develop-next.state.json", {
+            item: "T9",
+            prNumber: 7,
+            merged: true,
+            ticked: false,
+          });
+          const gh = ghStub(fx.dir, ghBody({ state: "OPEN" }));
+          const code = bind(
+            blockBy(
+              readDoc("skills/develop-next/SKILL.md"),
+              DN_MERGE_RECONCILE,
+            ),
+            { "<mergedPr>": "", ...DN_REFS },
+          );
+          const r = await runAsync(sh, code, { cwd: fx.work, bin: gh.bin });
+          assert.equal(r.status, 0, r.stderr);
+          assert.equal(
+            readState(fx.work, "develop-next.state.json").merged,
+            true,
+          );
+          assert.deepEqual(ghCalls(gh.argvLog), []);
+        } finally {
+          cleanup(fx.dir);
+        }
+      });
+
+      // The roadmap row is read on origin, through the selector's parser, by the exact id. T1 and T10
+      // are the prefix traps a loose pattern would tick; T11 is archived to roadmap-history.md; T12 is
+      // ticked only in the local checkout. The failure rows are the third answer (task.188 QA cycle 1,
+      // QA-1): a look that fails reads `unknown` and exits 1 — never `not-ticked`, which would route
+      // to a duplicate Step 4 tick.
+      for (const c of [
+        { item: "T9", want: "ticked" },
+        { item: "T10", want: "not-ticked" },
+        { item: "T1", want: "not-ticked" },
+        { item: "T11", want: "ticked" },
+        { item: "T12", want: "not-ticked" },
+        // CR3-1 (task.188 QA cycle 3): Step 4 edited the roadmap and crashed before its commit. The
+        // check does not infer from uncommitted edits — it halts for the operator.
+        {
+          item: "T12",
+          want: "uncommitted",
+          dirty: true,
+          label: "edited, not committed",
+        },
+        // CR2-2 (task.188 QA cycle 2): Step 4 committed the tick and the push never landed.
+        {
+          item: "T12",
+          want: "ticked-unpushed",
+          commitLocal: true,
+          label: "committed locally, not pushed",
+        },
+        {
+          item: "T9",
+          want: "ticked",
+          noHistory: true,
+          label: "no history file",
+        },
+        {
+          item: "T9",
+          want: "unknown",
+          base: "no-such-branch",
+          label: "fetch fails",
+        },
+        {
+          item: "T9",
+          want: "unknown",
+          roadmap: "docs/development/missing.md",
+          label: "roadmap not on origin",
+        },
+        {
+          item: "T9",
+          want: "unknown",
+          selector: "/nonexistent/select-next.mjs",
+          label: "parser cannot load",
+        },
+      ]) {
+        test(`[${sh}] tick flag: row ${c.item}${c.label ? ` (${c.label})` : ""} reads ${c.want}`, async () => {
+          const fx = fixtureRepo();
+          try {
+            git(fx.work, "checkout", "-q", "develop");
+            write(
+              fx.work,
+              "docs/development/roadmap.md",
+              "# Roadmap\n\n## PHASE 1 — fixture\n\n" +
+                "- [x] **T9** Done row · deps: none\n" +
+                "- [ ] **T10** Open row · deps: none\n" +
+                "- [x] **T100** Done row whose id starts with T10 · deps: none\n",
+            );
+            if (!c.noHistory)
+              write(
+                fx.work,
+                "docs/development/roadmap-history.md",
+                "# Roadmap History\n\n## PHASE 0 — archived\n\n- [x] **T11** Archived row · deps: none\n",
+              );
+            git(fx.work, "add", "-A");
+            git(fx.work, "commit", "-q", "-m", "roadmap");
+            git(fx.work, "push", "-q", "origin", "develop");
+            // T12 is ticked locally only: left uncommitted (dirty) or committed and never pushed.
+            if (c.dirty || c.commitLocal)
+              write(
+                fx.work,
+                "docs/development/roadmap.md",
+                "# Roadmap\n\n## PHASE 1 — fixture\n\n- [x] **T12** Local only · deps: none\n",
+              );
+            if (c.commitLocal) {
+              git(fx.work, "add", "-A");
+              git(
+                fx.work,
+                "commit",
+                "-q",
+                "-m",
+                "tick T12 (push never landed)",
+              );
+            }
+            fs.mkdirSync(path.join(fx.work, ".claude/state"), {
+              recursive: true,
+            });
+            const code = bind(
+              blockBy(
+                readDoc("skills/develop-next/SKILL.md"),
+                DN_ROW_RECONCILE,
+              ),
+              {
+                "<baseBranch>": c.base ?? "develop",
+                "<roadmapPath>": c.roadmap ?? "docs/development/roadmap.md",
+                "<item>": c.item,
+                "$PWD/.agents/skills/develop-next/scripts/select-next.mjs":
+                  c.selector ?? SELECTOR,
+              },
+            );
+            const r = await runAsync(sh, code, { cwd: fx.work });
+            const out = `stdout: ${r.stdout}\nstderr: ${r.stderr}`;
+            const halts = c.want === "unknown" || c.want === "uncommitted";
+            assert.equal(r.status, halts ? 1 : 0, out);
+            assert.match(
+              r.stdout,
+              new RegExp(`: ${c.want}(\\s|\\(|$)`, "m"),
+              out,
+            );
+            if (halts)
+              assert.doesNotMatch(r.stdout, /: (not-)?ticked\s*$/m, out);
+            assert.equal(
+              fs.existsSync(
+                path.join(fx.work, ".claude/state/dn-roadmap-row.md"),
+              ),
+              false,
+              "the scratch copy is removed",
+            );
+          } finally {
+            cleanup(fx.dir);
+          }
+        });
+      }
+
+      test(`[${sh}] develop-batch: merged advances only for a non-terminal item whose PR is MERGED`, async () => {
+        const fx = fixtureRepo();
+        try {
+          writeState(fx.work, "develop-batch.state.json", {
+            items: [
+              {
+                id: "T1",
+                prNumber: 7,
+                merged: false,
+                ticked: false,
+                halted: false,
+              },
+              {
+                id: "T2",
+                prNumber: 8,
+                merged: false,
+                ticked: false,
+                halted: true,
+              },
+              {
+                id: "T3",
+                prNumber: null,
+                merged: false,
+                ticked: false,
+                halted: false,
+              },
+            ],
+          });
+          const gh = ghStub(fx.dir, ghBody({ state: "MERGED" }));
+          const code = blockBy(
+            readDoc("skills/develop-batch/SKILL.md"),
+            DB_MERGE_RECONCILE,
+          );
+          const r = await runAsync(sh, code, { cwd: fx.work, bin: gh.bin });
+          assert.equal(r.status, 0, `stdout: ${r.stdout}\nstderr: ${r.stderr}`);
+          const items = readState(fx.work, "develop-batch.state.json").items;
+          assert.deepEqual(
+            items.map((i) => i.merged),
+            [true, false, false],
+          );
+          assert.deepEqual(
+            ghCalls(gh.argvLog).filter((l) => l.includes("--json state")),
+            ["pr view 7 --json state -q .state"],
+          );
+        } finally {
+          cleanup(fx.dir);
+        }
+      });
+
+      test(`[${sh}] develop-batch: an OPEN PR leaves the item unmerged`, async () => {
+        const fx = fixtureRepo();
+        try {
+          writeState(fx.work, "develop-batch.state.json", {
+            items: [
+              {
+                id: "T1",
+                prNumber: 7,
+                merged: false,
+                ticked: false,
+                halted: false,
+              },
+            ],
+          });
+          const gh = ghStub(fx.dir, ghBody({ state: "OPEN" }));
+          const code = blockBy(
+            readDoc("skills/develop-batch/SKILL.md"),
+            DB_MERGE_RECONCILE,
+          );
+          const r = await runAsync(sh, code, { cwd: fx.work, bin: gh.bin });
+          assert.equal(r.status, 0, r.stderr);
+          assert.equal(
+            readState(fx.work, "develop-batch.state.json").items[0].merged,
+            false,
+          );
+        } finally {
+          cleanup(fx.dir);
+        }
+      });
+    }
+  },
+);

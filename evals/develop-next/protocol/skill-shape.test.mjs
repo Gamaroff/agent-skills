@@ -489,3 +489,127 @@ test("develop-batch SKILL.md defers to develop-next's bug rows instead of copyin
     /A `\/develop-bug` item never reads `accepted` and has no gate file: it is gated by the bug rows in `develop-next` Step 3/,
   );
 });
+
+// ── task.188: resume from evidence, not flags ───────────────────────────────
+
+test("run state documents prNumber, halted and haltKind, and a file without them resumes unchanged", () => {
+  const state = section(skill, "## Run state", "## Step 0");
+  for (const field of [
+    '"prNumber": null',
+    '"halted": false',
+    '"haltKind": null',
+  ])
+    assert.ok(state.includes(field), `run-state schema lacks ${field}`);
+  assert.match(state, /file without them resumes unchanged/i);
+  assert.match(state, /missing field reads as `false` \/ `null`/);
+});
+
+test("Step 0.1: halt check, then reconciliation, then routing (obs #180, #286)", () => {
+  const step0 = section(skill, "## Step 0", "## Step 1");
+  const halt = step0.indexOf("**a. A recorded HALT first.**");
+  const reconcile = step0.indexOf(
+    "**b. Reconcile the flags against the evidence**",
+  );
+  const route = step0.indexOf("**c. Route on the reconciled flags:**");
+  assert.ok(halt > 0, "halt branch missing");
+  assert.ok(reconcile > halt, "reconciliation must follow the halt check");
+  assert.ok(route > reconcile, "routing must follow the reconciliation");
+  const haltText = step0.slice(halt, reconcile);
+  assert.match(haltText, /`halted: true`/);
+  assert.match(haltText, /never route a halted run, and never to Step 3/);
+  assert.match(haltText, /develop-pipeline\.last-halt\.json/);
+  assert.match(
+    haltText,
+    /set `halted: false`/,
+    "says how an operator clears it",
+  );
+  // Both reconciliation blocks sit between the halt check and the routing.
+  const recon = step0.slice(reconcile, route);
+  assert.match(recon, /# Step 0\.1 reconciliation, merge flag\./);
+  assert.match(recon, /# Step 0\.1 reconciliation, tick flag/);
+  assert.match(recon, /only ever \*\*advances\*\* a flag/);
+});
+
+test("Step 0.1 routing: a reconciled file goes to Step 5; a not-accepted dispatch goes to Step 2, never Step 3 (obs #9)", () => {
+  const step0 = section(skill, "## Step 0", "## Step 1");
+  const table = step0.slice(
+    step0.indexOf("**c. Route on the reconciled flags:**"),
+  );
+  assert.match(table, /\| `merged: true, ticked: true` \| Step 5/);
+  assert.match(
+    table,
+    /\| `merged: true, ticked: false` \(recorded\) \| Step 4/,
+  );
+  // CR3-2 (task.188 QA cycle 3): a merge reconciled this run runs Step 3's post-merge items first.
+  assert.match(
+    table,
+    /`merged` advanced by this reconciliation \| Step 3's post-merge items first[^|]*signal `pr-merged`[^|]*then Step 4/,
+  );
+  assert.match(
+    table,
+    /\| `dispatched: true, merged: false`, document `accepted` \(bug: `closed`\) \| Step 3/,
+  );
+  assert.match(
+    table,
+    /\| `dispatched: true, merged: false`, document not `accepted` \(bug: not `closed`\) \| Step 2 with `--defaults`/,
+  );
+  // The old flag-only route must be gone.
+  assert.doesNotMatch(
+    step0,
+    /`dispatched: true, merged: false` → go to Step 3/,
+  );
+});
+
+test("Step 1's already-done guard and Step 0.1 cite one merged-PR query", () => {
+  assert.equal(
+    (skill.match(/#### Find the item's merged PR/g) || []).length,
+    1,
+    "the query is defined exactly once",
+  );
+  const step0 = section(skill, "## Step 0", "## Step 1");
+  const step1 = section(skill, "## Step 1", "## Step 2");
+  assert.match(
+    step0,
+    /\[Find the item's merged PR\]\(#find-the-items-merged-pr\)/,
+  );
+  assert.match(
+    step1,
+    /\[Find the item's merged PR\]\(#find-the-items-merged-pr\)/,
+  );
+});
+
+test("Step 2 records a pipeline HALT as halted: true before stopping (obs #286)", () => {
+  const step2 = section(skill, "## Step 2", "## Step 3");
+  assert.match(step2, /write `halted: true` and `haltKind: "pipeline-halt"`/);
+  assert.match(step2, /`prNumber`/);
+});
+
+test("Step 3 states the merge-verdict rule beside the Bitbucket parsing note (obs #197)", () => {
+  const step3 = section(skill, "## Step 3", "## Step 4");
+  const rule = step3.indexOf(
+    "The GitHub arm judges the merge by the PR's state, never by `gh pr merge`'s exit status",
+  );
+  const note = step3.indexOf("**Parsing note (Bitbucket):**");
+  assert.ok(
+    rule > 0 && note > rule,
+    "the rule sits just before the parsing note",
+  );
+  assert.ok(note - rule < 900, "and beside it, not elsewhere in Step 3");
+  // CR2-4 (task.188 QA cycle 2): the Bitbucket arm judges the POST response, so the rule must not
+  // claim it judges by state.
+  assert.doesNotMatch(step3, /Both arms judge the merge by the PR's state/);
+});
+
+test("Step 0.1: the merge-flag block resolves its own platform; the branch fallback needs accepted (CR2-1, CR2-3)", () => {
+  const step0 = section(skill, "## Step 0", "## Step 1");
+  assert.match(
+    step0,
+    /source \.agents\/skills\/develop-next\/references\/resolve-platform\.sh \|\| exit 1/,
+  );
+  assert.doesNotMatch(step0, /\$\{VCS:\?/);
+  assert.match(
+    step0,
+    /only when the item's document reads `accepted` \(bug: `closed`\)/,
+  );
+  assert.match(step0, /`ticked-unpushed` → push it/);
+});

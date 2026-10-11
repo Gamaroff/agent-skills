@@ -393,3 +393,33 @@ test("Step 3 lane: the acceptance record branches on source with all three arms"
     "already checks for a dirty registry",
   );
 });
+
+// ── task.188: resume from evidence, not flags ───────────────────────────────
+
+test("Step 0.1 reconciles merged from the PR state before resuming on the flags (obs #180)", () => {
+  const step0 = skill.slice(
+    skill.indexOf("## Step 0"),
+    skill.indexOf("## Step 1"),
+  );
+  const recon = step0.indexOf("**Reconcile first, then route**");
+  const block = step0.indexOf("# Step 0.1 reconciliation (develop-batch)");
+  const resume = step0.indexOf("**Resume**: skip items already");
+  assert.ok(recon > 0, "reconciliation missing from Step 0.1");
+  assert.ok(
+    block > recon && resume > block,
+    "reconciliation must precede the flag routing",
+  );
+  assert.match(step0.slice(recon, resume), /`MERGED` → set `merged: true`/);
+  assert.match(
+    step0.slice(recon, resume),
+    /only advances a flag, never clears one/,
+  );
+});
+
+test("Step 3 merge cites develop-next's state verdict instead of restating the rule (obs #197)", () => {
+  assert.match(
+    skill,
+    /judged by the PR's state, never by `gh pr merge`'s exit status — the rule is\s+stated once, in `develop-next` Step 3/,
+  );
+  assert.doesNotMatch(skill, /gh pr merge <PR#> --<mergeStrategy> \|\| exit 1/);
+});

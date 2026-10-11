@@ -136,7 +136,30 @@ independently via its own Phase 0b machinery.
    gate. If plan mode is active, STOP and say so — do not dispatch. (This is observed, not
    hypothetical: it killed 4 of 5 running pipelines in a live batch.)
 1. **Run-state check.** If `.claude/state/develop-batch.state.json` exists, a prior batch
-   did not finish — do **not** select a new batch. **Resume**: skip items already
+   did not finish — do **not** select a new batch. **Reconcile first, then route** (obs #180):
+   a crash between an item's merge and its flag write leaves `merged: false` on a PR that
+   merged, and routing on that flag would merge it again. For each non-terminal item (not
+   `ticked`, not `halted`) with a `prNumber` and `merged: false`, read the PR's state —
+   `MERGED` → set `merged: true`. Reconciliation only advances a flag, never clears one; a
+   query that fails leaves the item as recorded. The rule is `develop-next` Step 0.1's;
+   `ticked` is not reconciled here (a Future Improvement in task.188).
+
+   ```bash
+   # Step 0.1 reconciliation (develop-batch): merged ← the PR's state, per non-terminal item.
+   STATE_FILE=.claude/state/develop-batch.state.json
+   for PR_NUMBER in $(jq -r '.items[]
+       | select((.ticked // false) != true and (.halted // false) != true
+                and (.merged // false) != true and .prNumber != null)
+       | .prNumber' "$STATE_FILE"); do
+     if [ "$(gh pr view "$PR_NUMBER" --json state -q .state)" = "MERGED" ]; then
+       jq --argjson n "$PR_NUMBER" '(.items[] | select(.prNumber == $n) | .merged) = true' \
+         "$STATE_FILE" > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"
+       echo "reconciled: PR #$PR_NUMBER is MERGED — merged: true"
+     fi
+   done
+   ```
+
+   **Resume**: skip items already
    `ticked`; for each non-terminal item, resume from its recorded flags exactly as the
    per-item lane below would (`merged: true, ticked: false` → tick it; `dispatched: true,
    pipelineDone: false` → treat as **interrupted** and re-admit it via Step 2's planner —
@@ -509,12 +532,23 @@ merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
    # Bind the head branch before the merge; an empty binding is a halt, never a delete of "".
    HEAD_BRANCH=$(gh pr view <PR#> --json headRefName -q .headRefName)
    [ -n "$HEAD_BRANCH" ] || { echo "cannot bind the PR head branch"; exit 1; }
-   if [ -z "$(git status --porcelain)" ]; then
+   DIRTY=$(git status --porcelain)
+   if [ -z "$DIRTY" ]; then
      gh pr merge <PR#> --<mergeStrategy> --delete-branch
+     MERGE_EXIT=$?
    else
      # A dirty main checkout: --delete-branch's local switch would abort and skip the remote
      # delete (obs #142). Merge without it, then delete the remote branch directly.
-     gh pr merge <PR#> --<mergeStrategy> || exit 1
+     gh pr merge <PR#> --<mergeStrategy>
+     MERGE_EXIT=$?
+   fi
+   # The PR's state is the verdict, not the exit code (develop-next Step 3, obs #197).
+   PR_STATE=$(gh pr view <PR#> --json state -q .state)
+   [ "$PR_STATE" = "MERGED" ] \
+     || { echo "PR <PR#> is '${PR_STATE}' after gh pr merge (exit $MERGE_EXIT)"; exit 1; }
+   [ "$MERGE_EXIT" -eq 0 ] \
+     || echo "⚠️  PR <PR#> merged, but gh pr merge exited $MERGE_EXIT — a local follow-up failed"
+   if [ -n "$DIRTY" ] || [ "$MERGE_EXIT" -ne 0 ]; then
      # The merge has happened; a failed delete (already auto-deleted) is a warning, never the
      # block's status, or a merged item reads as halted (task.147 QA-1, CR-5).
      git push origin --delete "$HEAD_BRANCH" \
@@ -522,8 +556,10 @@ merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
    fi
    ```
 
-   On merge failure (conflict, protection): mark the item `halted`, report, continue. Mark
-   `merged: true`. Every batch PR targets `<baseBranch>` directly: the selector keeps
+   The merge is judged by the PR's state, never by `gh pr merge`'s exit status — the rule is
+   stated once, in `develop-next` Step 3, beside its Bitbucket parsing note. On merge failure
+   (the PR is not `MERGED`: a conflict, protection): mark the item `halted`, report, continue.
+   Mark `merged: true`. Every batch PR targets `<baseBranch>` directly: the selector keeps
    `epic-integration` stories, whose PRs target their epic's integration branch, out of a
    batch (bug.18).
 4. **Signal the `pr-merged` stage for _this_ item**, after its merge succeeds and before its
