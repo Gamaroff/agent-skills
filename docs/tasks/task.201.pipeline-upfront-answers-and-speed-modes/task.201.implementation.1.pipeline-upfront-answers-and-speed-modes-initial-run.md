@@ -188,6 +188,15 @@ _Track each QA review/fix cycle._
 **Loop exit**: n/a — this exit not taken
 **Action**: Running qa-fix (cycle 5 of 6)
 
+### QA Cycle 6 — 2026-10-11
+**Gate Result**: PASS
+**Issues Found**: none open — 2 low advisory (population extension filter; `ALSO_CHANGED` completeness)
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: pending — 5c not yet run
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+
 ## Completion
 
 **Finished**: {populated at end}

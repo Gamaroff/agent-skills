@@ -451,25 +451,25 @@ hold as written.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-11
-**Quality Score**: 80/100
-**Gate Decision**: FAIL
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.201.qa.5.pipeline-upfront-answers-and-speed-modes.md](./task.201.qa.5.pipeline-upfront-answers-and-speed-modes.md)
-- **Gate File**: [task.201.gate.5.pipeline-upfront-answers-and-speed-modes.yml](./task.201.gate.5.pipeline-upfront-answers-and-speed-modes.yml)
+- **Full Report**: [task.201.qa.6.pipeline-upfront-answers-and-speed-modes.md](./task.201.qa.6.pipeline-upfront-answers-and-speed-modes.md)
+- **Gate File**: [task.201.gate.6.pipeline-upfront-answers-and-speed-modes.yml](./task.201.gate.6.pipeline-upfront-answers-and-speed-modes.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5303
+- **Tests Executed**: 5304
 - **Phases Verified**: 5/5
-- **Critical Issues**: 1
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-- CR-1 (high): the AC10 scan test reads a fenced `# comment` as a heading, so §0d's resolver block is never scanned. Mutation-proven.
-- CR-2 (medium, advisory): the scanned population is hand-picked. CR-3: a redundant pattern.
+- The AC10 gap is closed: the consumer-name scan reads whole files over a derived population and is mutation-proven, including the fenced-block case cycle 5 found.
+- Two low advisory findings on the scan's population routed to future work.
 
 ## Definition of Done - Gaps Identified
 
@@ -517,6 +517,7 @@ hold as written.
 | 2026-10-11 |         | DoD gap fixed — AC10 pinned by `pipeline-answers-generic.test.mjs`; re-entering QA at 5a | develop |
 | 2026-10-11 |         | QA gate FAIL (80/100) — 1 finding (1 high: the AC10 scan skips fenced text) | qa-task |
 | 2026-10-11 |         | QA findings fixed — cycle 5, 3 findings (CR-1 section reader replaced by whole-file scan; CR-2 population derived; CR-3 redundant pattern dropped) | qa-fix |
+| 2026-10-11 |         | QA gate PASS (100/100) — 0 open findings, 2 low advisory | qa-task |
 <!-- change-log-end -->
 
 ---
