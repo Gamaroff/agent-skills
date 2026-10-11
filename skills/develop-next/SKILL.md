@@ -97,9 +97,11 @@ reads on a resume — the work-item path alone cannot say which arm applies. Thi
          PR_STATE=$(gh pr view "$PR_NUMBER" --json state -q .state)
        fi
        if [ "$PR_STATE" = "MERGED" ]; then
+         # The record follows the write, never precedes it: a failed write is a HALT, not a reconciled flag.
          jq --argjson n "$PR_NUMBER" '.merged = true | .prNumber = $n' "$STATE_FILE" > "$STATE_FILE.tmp" \
-           && mv "$STATE_FILE.tmp" "$STATE_FILE"
-         echo "reconciled: PR #$PR_NUMBER is MERGED — merged: true"
+           && mv "$STATE_FILE.tmp" "$STATE_FILE" \
+           && echo "reconciled: PR #$PR_NUMBER is MERGED — merged: true" \
+           || { rm -f "$STATE_FILE.tmp"; echo "HALT: PR #$PR_NUMBER is MERGED but merged: true could not be written"; exit 1; }
        fi
      fi
      ```
@@ -112,11 +114,17 @@ reads on a resume — the work-item path alone cannot say which arm applies. Thi
      #   ticked-unpushed  — not on origin, but committed on the local <baseBranch>:
      #                      Step 4 ticked and the push never landed                      (exit 0)
      #   not-ticked       — on neither                                                   (exit 0)
+     #   uncommitted      — the roadmap has uncommitted edits: Step 4 may have ticked and
+     #                      crashed before its commit, and nothing here can tell           (exit 1, HALT)
      #   unknown          — a look failed (fetch, a missing roadmap, a read, the parser) (exit 1, HALT)
      # A failed look must not read as "not ticked", and an unpushed tick must not either: both route to
      # Step 4, which re-ticks and adds a second Change Log row (task.188 QA cycles 1–2, QA-1, CR2-2).
      ROW="roadmap row <item> on <baseBranch>"
      SCRATCH=.claude/state/dn-roadmap-row.md
+     # Uncommitted roadmap edits are not inferred from — they are the operator's to commit or discard
+     # (task.188 QA cycle 3, CR3-1). Staged or not: compare the working tree against HEAD.
+     git diff --quiet HEAD -- "<roadmapPath>" "$(dirname "<roadmapPath>")/roadmap-history.md" 2>/dev/null \
+       || { echo "$ROW: uncommitted (the roadmap has uncommitted edits — commit or discard them, then resume)"; exit 1; }
      SELECTOR="$PWD/.agents/skills/develop-next/scripts/select-next.mjs"
      # row_state — reads the ref named by $REF (a variable, not a positional: the harness substitutes
      # dollar-digit tokens in a delivered SKILL.md). 0 ticked, 3 not ticked, 1 could not look. The history
@@ -157,14 +165,15 @@ reads on a resume — the work-item path alone cannot say which arm applies. Thi
      echo "$ROW: $ROW_TICKED"
      ```
 
-     `ticked` → set `ticked: true`. `ticked-unpushed` → push it (`git push origin <baseBranch>`, with Step 4's non-ff rule), then set `ticked: true` — never a second tick. `not-ticked` → leave it. `unknown` → **HALT** with that line: route nowhere until the look succeeds.
+     `ticked` → set `ticked: true`. `ticked-unpushed` → push it (`git push origin <baseBranch>`, with Step 4's non-ff rule), then set `ticked: true` — never a second tick. `not-ticked` → leave it. `uncommitted` or `unknown` → **HALT** with that line: route nowhere until the operator has committed or discarded the edits, or the look succeeds.
 
    **c. Route on the reconciled flags:**
 
    | Flags after reconciliation | Route |
    | :-- | :-- |
    | `merged: true, ticked: true` | Step 5 — everything happened; report and delete the run state |
-   | `merged: true, ticked: false` | Step 4 |
+   | `merged: true, ticked: false`, `merged` advanced by this reconciliation | Step 3's post-merge items first — delete the remote head branch if it is still there (a failed delete is a warning) and signal `pr-merged` — then Step 4. The crash came between the merge and its flag write, so those items may never have run |
+   | `merged: true, ticked: false` (recorded) | Step 4 |
    | `dispatched: true, merged: false`, document `accepted` (bug: `closed`) | Step 3 |
    | `dispatched: true, merged: false`, document not `accepted` (bug: not `closed`) | Step 2 with `--defaults` — the pipeline's Phase 0b offers its own resume option (after a finalise DoD-gaps halt: "Re-enter QA at 5a"); Step 3 would only HALT on "not accepted" (obs #9) |
    | otherwise | Step 2 |

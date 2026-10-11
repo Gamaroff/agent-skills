@@ -512,6 +512,46 @@ describe(
         }
       });
 
+      // CR3-3 (task.188 QA cycle 3): a write that fails must not be reported as a reconciled flag.
+      test(`[${sh}] merge flag: a failed run-state write halts and is not reported as reconciled`, async () => {
+        const fx = fixtureRepo();
+        try {
+          const before = {
+            item: "T9",
+            prNumber: null,
+            merged: false,
+            ticked: false,
+          };
+          writeState(fx.work, "develop-next.state.json", before);
+          const gh = ghStub(fx.dir, ghBody({ state: "MERGED" }));
+          // A non-numeric PR number reaches the gh stub (which answers MERGED) and then fails jq --argjson.
+          const code = bind(
+            blockBy(
+              readDoc("skills/develop-next/SKILL.md"),
+              DN_MERGE_RECONCILE,
+            ),
+            { "<mergedPr>": "not-a-number", ...DN_REFS },
+          );
+          const r = await runAsync(sh, code, { cwd: fx.work, bin: gh.bin });
+          assert.notEqual(
+            r.status,
+            0,
+            `stdout: ${r.stdout}\nstderr: ${r.stderr}`,
+          );
+          assert.match(
+            r.stdout,
+            /HALT: PR #not-a-number is MERGED but merged: true could not be written/,
+          );
+          assert.doesNotMatch(r.stdout, /reconciled:/);
+          assert.deepEqual(
+            readState(fx.work, "develop-next.state.json"),
+            before,
+          );
+        } finally {
+          cleanup(fx.dir);
+        }
+      });
+
       test(`[${sh}] merge flag: an already-merged file is not re-queried and stays merged`, async () => {
         const fx = fixtureRepo();
         try {
@@ -552,6 +592,14 @@ describe(
         { item: "T1", want: "not-ticked" },
         { item: "T11", want: "ticked" },
         { item: "T12", want: "not-ticked" },
+        // CR3-1 (task.188 QA cycle 3): Step 4 edited the roadmap and crashed before its commit. The
+        // check does not infer from uncommitted edits — it halts for the operator.
+        {
+          item: "T12",
+          want: "uncommitted",
+          dirty: true,
+          label: "edited, not committed",
+        },
         // CR2-2 (task.188 QA cycle 2): Step 4 committed the tick and the push never landed.
         {
           item: "T12",
@@ -605,11 +653,13 @@ describe(
             git(fx.work, "add", "-A");
             git(fx.work, "commit", "-q", "-m", "roadmap");
             git(fx.work, "push", "-q", "origin", "develop");
-            write(
-              fx.work,
-              "docs/development/roadmap.md",
-              "# Roadmap\n\n## PHASE 1 — fixture\n\n- [x] **T12** Local only · deps: none\n",
-            );
+            // T12 is ticked locally only: left uncommitted (dirty) or committed and never pushed.
+            if (c.dirty || c.commitLocal)
+              write(
+                fx.work,
+                "docs/development/roadmap.md",
+                "# Roadmap\n\n## PHASE 1 — fixture\n\n- [x] **T12** Local only · deps: none\n",
+              );
             if (c.commitLocal) {
               git(fx.work, "add", "-A");
               git(
@@ -638,13 +688,14 @@ describe(
             );
             const r = await runAsync(sh, code, { cwd: fx.work });
             const out = `stdout: ${r.stdout}\nstderr: ${r.stderr}`;
-            assert.equal(r.status, c.want === "unknown" ? 1 : 0, out);
+            const halts = c.want === "unknown" || c.want === "uncommitted";
+            assert.equal(r.status, halts ? 1 : 0, out);
             assert.match(
               r.stdout,
               new RegExp(`: ${c.want}(\\s|\\(|$)`, "m"),
               out,
             );
-            if (c.want === "unknown")
+            if (halts)
               assert.doesNotMatch(r.stdout, /: (not-)?ticked\s*$/m, out);
             assert.equal(
               fs.existsSync(

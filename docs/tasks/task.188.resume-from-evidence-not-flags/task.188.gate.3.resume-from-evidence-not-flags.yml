@@ -1,0 +1,77 @@
+schema: 2
+task: 'task.188.resume-from-evidence-not-flags'
+task_title: 'Resume from evidence, not flags'
+gate: CONCERNS
+status_reason: 'Cycle 2 fixes hold (CR2-1..CR2-4 closed, no HIGH). Three narrower gaps remain in the reconciliation: an uncommitted Step 4 tick reads not-ticked, a reconciled merge skips Step 3''s post-merge items, and the merge-flag success line prints over a failed write.'
+reviewer: 'QA Engineer'
+head: '853c1d2d88b9520ce418109352ece7daaf0abe39'
+updated: '2026-10-11T14:44:57Z'
+
+top_issues:
+  - id: 'CR3-1'
+    severity: medium
+    file: 'skills/develop-next/SKILL.md'
+    finding: 'The tick check reads not-ticked when Step 4 edited the roadmap (row + Change Log) and crashed before git commit, so the resume re-ticks and adds a second Change Log row — the class the task promises against (reviewer CR-1, medium confidence; verified by QA: the working-tree-only T12 fixture is asserted not-ticked).'
+    suggested_action: 'When the roadmap differs from HEAD in the working tree and its row is ticked there, answer ticked-uncommitted, which routes to Step 4''s commit and push, never a re-tick.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR3-2'
+    severity: low
+    file: 'skills/develop-next/SKILL.md'
+    finding: 'A merge flag advanced by reconciliation routes straight to Step 4 and skips Step 3''s post-merge items — the remote head-branch delete on the dirty or failed-follow-up path, and the pr-merged signal (reviewer CR-2, medium confidence).'
+    suggested_action: 'Route a merge reconciled this run through Step 3''s post-merge items (delete the remote head branch if still present, signal pr-merged) before Step 4.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR3-3'
+    severity: low
+    file: 'skills/develop-next/SKILL.md'
+    finding: 'The merge-flag block prints "reconciled … merged: true" and exits 0 even when the jq/mv write fails (e.g. a non-numeric <mergedPr>), so the record and the file disagree (reviewer CR-3, medium confidence).'
+    suggested_action: 'Chain the echo on the write and HALT with exit 1 when the write fails; add an executed case.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 115
+  phases_verified: '4/4'
+  ci: 'not read at QA (gated at finalise)'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+bug_resolution:
+  previous_gate: 2
+  closed: ['CR2-1', 'CR2-2', 'CR2-3', 'CR2-4']
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Boundary: true; no engine form reaches a fenced prose block; DoD override needed at finalise.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR3-1..CR3-3: narrow crash windows in the reconciliation.'
+  maintainability:
+    status: PASS
+    notes: 'Blocks self-contained; four-answer tick check documented in the block header.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR3-1..CR3-3 with executed or shape cases.'
+      refs: ['skills/develop-next/SKILL.md']
+  future:
+    - action: 'DoD override for the zero-probe prose boundary; a Bitbucket stub for the guard test.'
+      refs: ['shared/resources/tests/merge-delete-branch-guard.test.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR3-1 fixed']

@@ -536,7 +536,15 @@ test("Step 0.1 routing: a reconciled file goes to Step 5; a not-accepted dispatc
     step0.indexOf("**c. Route on the reconciled flags:**"),
   );
   assert.match(table, /\| `merged: true, ticked: true` \| Step 5/);
-  assert.match(table, /\| `merged: true, ticked: false` \| Step 4/);
+  assert.match(
+    table,
+    /\| `merged: true, ticked: false` \(recorded\) \| Step 4/,
+  );
+  // CR3-2 (task.188 QA cycle 3): a merge reconciled this run runs Step 3's post-merge items first.
+  assert.match(
+    table,
+    /`merged` advanced by this reconciliation \| Step 3's post-merge items first[^|]*signal `pr-merged`[^|]*then Step 4/,
+  );
   assert.match(
     table,
     /\| `dispatched: true, merged: false`, document `accepted` \(bug: `closed`\) \| Step 3/,

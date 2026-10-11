@@ -175,8 +175,10 @@ The states Step 0.1 must hold in, after the halt check and the reconciliation (d
 | `dispatched: true, merged: false`              | document `accepted` (bug: `closed`), PR `OPEN`   | Step 3                                 |
 | `dispatched: true, merged: false`              | document not `accepted` / not `closed`           | Step 2 with `--defaults` (obs #9)      |
 | `dispatched: true, merged: false`              | PR `CLOSED` unmerged                             | Step 3, whose verdict HALTs on `CLOSED` |
-| `merged: false` → `true` (reconciled)          | PR `MERGED` (obs #180)                           | continue down this table               |
-| `merged: true, ticked: false`, roadmap source  | row unticked on `origin/<baseBranch>`            | Step 4                                 |
+| `merged: false` → `true` (reconciled)          | PR `MERGED` (obs #180)                           | Step 3's post-merge items, then down this table |
+| `merged: true, ticked: false`, roadmap source  | row unticked on `origin/<baseBranch>` and locally | Step 4                                 |
+| `merged: true, ticked: false` → `true`         | row ticked on the local base only (push never landed) | push, then Step 5                   |
+| `merged: true, ticked: false`, roadmap source  | roadmap has uncommitted edits, or the look failed | HALT (`uncommitted` / `unknown`)       |
 | `merged: true, ticked: false` → `true`         | row ticked on origin, or archived as accepted    | Step 5                                 |
 | `merged: true, ticked: false`, registry source | —                                                | Step 4 (its arm answers `already`)     |
 | `merged: true, ticked: true`                   | crash between the tick and Step 5's delete       | Step 5                                 |
@@ -433,27 +435,25 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-11
-**Quality Score**: 40/100
-**Gate Decision**: FAIL
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.188.qa.2.resume-from-evidence-not-flags.md](./task.188.qa.2.resume-from-evidence-not-flags.md)
-- **Gate File**: [task.188.gate.2.resume-from-evidence-not-flags.yml](./task.188.gate.2.resume-from-evidence-not-flags.yml)
+- **Full Report**: [task.188.qa.3.resume-from-evidence-not-flags.md](./task.188.qa.3.resume-from-evidence-not-flags.md)
+- **Gate File**: [task.188.gate.3.resume-from-evidence-not-flags.yml](./task.188.gate.3.resume-from-evidence-not-flags.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 111
+- **Tests Executed**: 115
 - **Phases Verified**: 4/4
-- **Critical Issues**: 2
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: PASS
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- CR2-1 (high): the merge reconciliation binds no `VCS` in its own shell — cycle 1's guard refuses on every real run.
-- CR2-2 (high): the tick check reads only `origin`; a tick committed but not pushed routes to a re-tick.
-- CR2-3 (medium): the branch fallback lacks the `accepted` precondition — a reopened bug matches an earlier merged PR.
-- CR2-4 (medium): the "both arms judge by state" claim is false for Bitbucket.
+- Cycle 2's four findings are fixed.
+- CR3-1 (medium): an uncommitted Step 4 tick reads `not-ticked`; CR3-2, CR3-3 (low): a reconciled merge skips Step 3's post-merge items; the success line prints over a failed write.
 
 <!-- change-log-start -->
 ## Change Log
@@ -469,6 +469,8 @@ None.
 | 2026-10-11 |  | QA findings fixed — CR-1 (reconciliation refuses an unbound VCS), QA-1 (three-valued tick check, unknown halts); 6 new executed cases, 1 iteration | qa-fix |
 | 2026-10-11 |  | QA gate FAIL (40/100) — 4 findings (2 high, 2 medium), refute pass | qa-task |
 | 2026-10-11 |  | QA findings fixed — CR2-1 (merge reconciliation resolves its own platform), CR2-2 (ticked-unpushed answer), CR2-3 (branch fallback needs accepted), CR2-4 (Bitbucket claim scoped); 2 new executed cases, 1 shape test, 2 iterations | qa-fix |
+| 2026-10-11 |  | QA gate CONCERNS (90/100) — 3 findings (1 medium, 2 low); cycle 2's four closed | qa-task |
+| 2026-10-11 |  | QA findings fixed — CR3-1 (uncommitted roadmap edits halt), CR3-2 (reconciled merge runs Step 3's post-merge items), CR3-3 (failed write halts); reconstruction table synced; 2 new executed cases, 3 iterations | qa-fix |
 <!-- change-log-end -->
 
 ---
