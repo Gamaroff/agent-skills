@@ -5,7 +5,7 @@ type: task
 description: "Let a developer answer the develop pipelines' setup questions and choose a speed mode at invocation — resolved by flag, then consumer policy, then the derived recommendation, asking only on conflict — with every skip recorded as a WAIVED gate, and per-step timestamps so the effect can be measured."
 tags: [develop-story, develop-task, develop-bug, develop-next, develop-batch, phase-0, lite-mode, qa-gate]
 category: feature
-status: in-progress
+status: ready-for-review
 priority: Medium
 created: 2026-10-09
 updated: 2026-10-11
@@ -16,7 +16,7 @@ github_issue: 621
 
 # Technical Task: Pipeline up-front answers and speed modes
 
-**Status:** In Progress
+**Status:** Ready for Review
 **Review**: ✅ All review recommendations from `task.201.review.1.pipeline-upfront-answers-and-speed-modes.md` implemented 2026-10-10
 **GitHub Issue**: [#621](https://github.com/Gamaroff/agent-skills/issues/621)
 
@@ -358,7 +358,7 @@ Post-merge only — recorded under Notes, Deferred Work.
 | Step 2 skipped on a current review | `review-report-freshness.test.mjs` blob cases (match, mismatch, legacy) |
 | ISO timestamp per step | template test asserting the `Completed (UTC)` column in all three variants |
 | Orchestrators no longer restate the questions | extended `orchestrator-directive-branch-literal.test.mjs` |
-| No consumer-specific names; all limits from `skills-config.yaml` | `pipeline-answers-generic.test.mjs` (names: the engines whole and task.201's sections, with a non-vacuity case) + `pipeline-answers-docs.test.mjs` 4a/4g (limits) — added after DoD gap 1 |
+| No consumer-specific names; all limits from `skills-config.yaml` | `pipeline-answers-generic.test.mjs` (names: every shipped file that cites task.201 or that it changed, scanned whole; pre-existing examples exempted by exact line; non-vacuity and stale-exemption cases) + `pipeline-answers-docs.test.mjs` 4a/4g (limits) — added after DoD gap 1 |
 
 ### Migration
 
@@ -516,6 +516,7 @@ hold as written.
 | 2026-10-10 |         | DoD incomplete — 1 gap identified (AC10 unpinned) | finalise |
 | 2026-10-11 |         | DoD gap fixed — AC10 pinned by `pipeline-answers-generic.test.mjs`; re-entering QA at 5a | develop |
 | 2026-10-11 |         | QA gate FAIL (80/100) — 1 finding (1 high: the AC10 scan skips fenced text) | qa-task |
+| 2026-10-11 |         | QA findings fixed — cycle 5, 3 findings (CR-1 section reader replaced by whole-file scan; CR-2 population derived; CR-3 redundant pattern dropped) | qa-fix |
 <!-- change-log-end -->
 
 ---

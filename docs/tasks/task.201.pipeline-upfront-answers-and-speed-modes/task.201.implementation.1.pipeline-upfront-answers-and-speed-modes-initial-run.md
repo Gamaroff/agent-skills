@@ -178,6 +178,16 @@ _Track each QA review/fix cycle._
 
 ---
 
+### QA Cycle 5 — 2026-10-11
+**Origin**: re-entry after the finalise DoD-gaps halt (`reenter-qa-after-finalise.sh`, budget 6)
+**Gate Result**: FAIL
+**Issues Found**: 1 — CR-1 (high): the AC10 scan's `section()` reads a fenced `# comment` as a heading, so §0d's resolver block is unscanned. Advisory: CR-2 hand-picked population; CR-3 redundant pattern
+**HIGH findings**: 1
+**MEDIUM findings**: 0
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 5 of 6)
+
 ## Completion
 
 **Finished**: {populated at end}
