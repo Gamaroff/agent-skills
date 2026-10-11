@@ -388,6 +388,12 @@ const DN_MERGE_RECONCILE = "# Step 0.1 reconciliation, merge flag.";
 const DN_ROW_RECONCILE = "# Step 0.1 reconciliation, tick flag";
 const DB_MERGE_RECONCILE = "# Step 0.1 reconciliation (develop-batch)";
 const SELECTOR = `${ROOT}/skills/develop-next/scripts/select-next.mjs`;
+// The merge-flag block resolves its own platform (task.188 QA cycle 2, CR2-1); point its sourced paths
+// at this checkout, since the fixture repository has no .agents/skills.
+const DN_REFS = {
+  ".agents/skills/develop-next/references/resolve-platform.sh": `${ROOT}/skills/develop-next/references/resolve-platform.sh`,
+  ".agents/skills/develop-next/references/bitbucket-auth.sh": `${ROOT}/skills/develop-next/references/bitbucket-auth.sh`,
+};
 
 function readState(work, name) {
   return JSON.parse(
@@ -435,17 +441,14 @@ describe(
               ticked: false,
             });
             const gh = ghStub(fx.dir, ghBody({ state: c.state }));
-            const code =
-              "VCS=github\n" +
-              bind(
-                blockBy(
-                  readDoc("skills/develop-next/SKILL.md"),
-                  DN_MERGE_RECONCILE,
-                ),
-                {
-                  "<mergedPr>": c.mergedPr,
-                },
-              );
+            // No VCS injected: the block resolves its own platform (task.188 QA cycle 2, CR2-1).
+            const code = bind(
+              blockBy(
+                readDoc("skills/develop-next/SKILL.md"),
+                DN_MERGE_RECONCILE,
+              ),
+              { "<mergedPr>": c.mergedPr, ...DN_REFS },
+            );
             const r = await runAsync(sh, code, { cwd: fx.work, bin: gh.bin });
             assert.equal(
               r.status,
@@ -471,33 +474,38 @@ describe(
         });
       }
 
-      // CR-1 (task.188 QA cycle 1): run as Step 0.1 runs it, before item 6, with no VCS bound. The block
-      // must refuse, not default to the gh arm — on a Bitbucket remote that reconciles nothing, silently.
-      test(`[${sh}] merge flag: an unbound VCS refuses before any query and leaves the file alone`, async () => {
+      // CR2-1 (task.188 QA cycle 2): every fenced block is its own shell, so nothing item 6 bound
+      // reaches this one. Run with VCS explicitly unset — as a real run is — the block must resolve
+      // the platform itself and reconcile, neither refuse nor fall silently to a no-op.
+      test(`[${sh}] merge flag: with VCS unset the block resolves the platform itself and reconciles`, async () => {
         const fx = fixtureRepo();
         try {
-          const before = {
+          writeState(fx.work, "develop-next.state.json", {
             item: "T9",
             prNumber: 7,
             merged: false,
             ticked: false,
-          };
-          writeState(fx.work, "develop-next.state.json", before);
+          });
           const gh = ghStub(fx.dir, ghBody({ state: "MERGED" }));
-          const code = bind(
-            blockBy(
-              readDoc("skills/develop-next/SKILL.md"),
-              DN_MERGE_RECONCILE,
-            ),
-            { "<mergedPr>": "" },
-          );
+          const code =
+            "unset VCS BB_API BB_CURL_AUTH\n" +
+            bind(
+              blockBy(
+                readDoc("skills/develop-next/SKILL.md"),
+                DN_MERGE_RECONCILE,
+              ),
+              { "<mergedPr>": "", ...DN_REFS },
+            );
           const r = await runAsync(sh, code, { cwd: fx.work, bin: gh.bin });
-          assert.notEqual(r.status, 0, "an unbound VCS must not run");
-          assert.match(r.stdout + r.stderr, /Resolve the platform/);
-          assert.deepEqual(ghCalls(gh.argvLog), []);
+          assert.equal(r.status, 0, `stdout: ${r.stdout}\nstderr: ${r.stderr}`);
+          assert.equal(
+            readState(fx.work, "develop-next.state.json").merged,
+            true,
+            r.stdout,
+          );
           assert.deepEqual(
-            readState(fx.work, "develop-next.state.json"),
-            before,
+            ghCalls(gh.argvLog).filter((l) => l.includes("--json state")),
+            ["pr view 7 --json state -q .state"],
           );
         } finally {
           cleanup(fx.dir);
@@ -514,17 +522,13 @@ describe(
             ticked: false,
           });
           const gh = ghStub(fx.dir, ghBody({ state: "OPEN" }));
-          const code =
-            "VCS=github\n" +
-            bind(
-              blockBy(
-                readDoc("skills/develop-next/SKILL.md"),
-                DN_MERGE_RECONCILE,
-              ),
-              {
-                "<mergedPr>": "",
-              },
-            );
+          const code = bind(
+            blockBy(
+              readDoc("skills/develop-next/SKILL.md"),
+              DN_MERGE_RECONCILE,
+            ),
+            { "<mergedPr>": "", ...DN_REFS },
+          );
           const r = await runAsync(sh, code, { cwd: fx.work, bin: gh.bin });
           assert.equal(r.status, 0, r.stderr);
           assert.equal(
@@ -548,6 +552,13 @@ describe(
         { item: "T1", want: "not-ticked" },
         { item: "T11", want: "ticked" },
         { item: "T12", want: "not-ticked" },
+        // CR2-2 (task.188 QA cycle 2): Step 4 committed the tick and the push never landed.
+        {
+          item: "T12",
+          want: "ticked-unpushed",
+          commitLocal: true,
+          label: "committed locally, not pushed",
+        },
         {
           item: "T9",
           want: "ticked",
@@ -599,6 +610,16 @@ describe(
               "docs/development/roadmap.md",
               "# Roadmap\n\n## PHASE 1 — fixture\n\n- [x] **T12** Local only · deps: none\n",
             );
+            if (c.commitLocal) {
+              git(fx.work, "add", "-A");
+              git(
+                fx.work,
+                "commit",
+                "-q",
+                "-m",
+                "tick T12 (push never landed)",
+              );
+            }
             fs.mkdirSync(path.join(fx.work, ".claude/state"), {
               recursive: true,
             });

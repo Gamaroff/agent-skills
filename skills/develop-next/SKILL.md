@@ -68,17 +68,24 @@ reads on a resume — the work-item path alone cannot say which arm applies. Thi
 
    **a. A recorded HALT first.** `halted: true` → surface the HALT and **STOP**: never route a halted run, and never to Step 3. Surface, verbatim: `halt_step` and `halt_reason` from `.claude/state/develop-pipeline.last-halt.json` when it exists; then the implementation report's QA-loop escalation entry when the loop wrote one (only loop-limit and not-converging halts do), otherwise the report's newest Issues Log entry and its `**Final Status**:` line. Send a push notification. **To clear it:** fix the cause, then set `halted: false` in the run-state file to resume this item (routing below sends it back through Step 2, whose pipeline offers its own resume option), or delete the file to drop the item and select afresh.
 
-   **b. Reconcile the flags against the evidence** (obs #180). The flags summarise facts that live on the platform and on `origin`; a crash between an action and its flag write leaves them behind. Reconciliation only ever **advances** a flag — it never clears one, and a PR query that fails leaves the flags as recorded (Step 3's state verdict makes a re-run merge safe). The tick check is the exception: its `unknown` is a **HALT**, because Step 4's roadmap arm is not idempotent — a re-tick adds a second Change Log row. **Resolve the platform first** — run item 6's block before this reconciliation; both queries talk to the host, and the merge-flag block refuses an unbound `VCS` rather than defaulting to GitHub:
+   **b. Reconcile the flags against the evidence** (obs #180). The flags summarise facts that live on the platform and on `origin`; a crash between an action and its flag write leaves them behind. Reconciliation only ever **advances** a flag — it never clears one, and a PR query that fails leaves the flags as recorded (on GitHub, Step 3's state verdict makes the re-run merge safe; on Bitbucket, Step 3's parsing note requires a `.state` re-query before any retry). The tick check is the exception: its `unknown` is a **HALT**, because Step 4's roadmap arm is not idempotent — a re-tick adds a second Change Log row. Each block below resolves what it needs **itself**: every fenced block runs as its own shell, so item 6's platform binding does not reach it:
 
-   - `merged: false` → read the item's PR state. The PR is `prNumber` when recorded; otherwise bind it from [Find the item's merged PR](#find-the-items-merged-pr) below and record it. `MERGED` → set `merged: true`.
+   - `merged: false` → read the item's PR state. The PR is `prNumber` when recorded; otherwise bind it from [Find the item's merged PR](#find-the-items-merged-pr) below — **only when the item's document reads `accepted` (bug: `closed`)**, the already-done guard's own precondition, and empty otherwise: a `reopened` bug reuses its branch name, and its earlier fix's merged PR is not this run's merge. `MERGED` → set `merged: true`.
 
      ```bash
-     # Step 0.1 reconciliation, merge flag. INPUTS: VCS (and on Bitbucket the BB_* credentials) from
-     # item 6, the run-state file, and <mergedPr> — the answer of "Find the item's merged PR" when
-     # prNumber is not recorded (or empty). An unbound VCS is a refusal, never GitHub by default: on a
-     # Bitbucket remote the gh arm would fail and reconcile nothing, silently (task.188 QA cycle 1, CR-1).
-     : "${VCS:?run Step 0 item 6 (Resolve the platform) before reconciling}"
-     [ "$VCS" != "bitbucket" ] || : "${BB_API:?run Step 0 item 6 (Resolve the platform) before reconciling}"
+     # Step 0.1 reconciliation, merge flag. INPUTS: the run-state file, and <mergedPr> — the answer of
+     # "Find the item's merged PR" when prNumber is not recorded and the document reads accepted (bug:
+     # closed); empty otherwise. The platform is resolved HERE, not inherited from item 6: this block is
+     # its own shell, and an inherited VCS is unbound in it (task.188 QA cycle 2, CR2-1).
+     source .agents/skills/develop-next/references/resolve-platform.sh || exit 1
+     if [ "$VCS" = "bitbucket" ]; then
+       BB_PATH=$(git remote get-url origin | sed -E 's|.*bitbucket\.org[:/]||; s|\.git$||')
+       BB_WORKSPACE=${BB_PATH%%/*}
+       BB_REPO=${BB_PATH##*/}
+       BB_API="https://api.bitbucket.org/2.0"
+       source .agents/skills/develop-next/references/bitbucket-auth.sh \
+         || { echo "HALT: no Bitbucket credential resolved — cannot reconcile the merge flag"; exit 1; }
+     fi
      STATE_FILE=.claude/state/develop-next.state.json
      PR_NUMBER=$(jq -r '.prNumber // empty' "$STATE_FILE")
      [ -n "$PR_NUMBER" ] || PR_NUMBER="<mergedPr>"
@@ -100,42 +107,57 @@ reads on a resume — the work-item path alone cannot say which arm applies. Thi
    - `merged: true, ticked: false`, `source: roadmap` → read the item's row on `origin/<baseBranch>`, and in the `roadmap-history.md` beside the roadmap (a row archived at phase close is gone from the roadmap). The row is matched by the item id the selector recorded, through the selector's own parser — never a loose pattern. A registry source needs nothing here: Step 4's registry arm answers `already` on its own.
 
      ```bash
-     # Step 0.1 reconciliation, tick flag (roadmap source only). Three answers, never two: "ticked"
-     # and "not-ticked" exit 0; "unknown" — the look itself failed — exits 1 and is a HALT. A failed
-     # look must not read as "not ticked": that routes to Step 4, which re-ticks the row and adds a
-     # second Change Log row (task.188 QA cycle 1, QA-1).
-     ROW="roadmap row <item> on origin/<baseBranch>"
+     # Step 0.1 reconciliation, tick flag (roadmap source only). Four answers, never two:
+     #   ticked           — a ticked row with this id is on origin/<baseBranch>          (exit 0)
+     #   ticked-unpushed  — not on origin, but committed on the local <baseBranch>:
+     #                      Step 4 ticked and the push never landed                      (exit 0)
+     #   not-ticked       — on neither                                                   (exit 0)
+     #   unknown          — a look failed (fetch, a missing roadmap, a read, the parser) (exit 1, HALT)
+     # A failed look must not read as "not ticked", and an unpushed tick must not either: both route to
+     # Step 4, which re-ticks and adds a second Change Log row (task.188 QA cycles 1–2, QA-1, CR2-2).
+     ROW="roadmap row <item> on <baseBranch>"
      SCRATCH=.claude/state/dn-roadmap-row.md
+     SELECTOR="$PWD/.agents/skills/develop-next/scripts/select-next.mjs"
+     # row_state — reads the ref named by $REF (a variable, not a positional: the harness substitutes
+     # dollar-digit tokens in a delivered SKILL.md). 0 ticked, 3 not ticked, 1 could not look. The history
+     # file beside the roadmap is read too (a row archived at phase close); its absence is normal, an
+     # unreadable one is not.
+     row_state() {
+       git cat-file -e "$REF:<roadmapPath>" 2>/dev/null || return 1
+       for f in "<roadmapPath>" "$(dirname "<roadmapPath>")/roadmap-history.md"; do
+         git cat-file -e "$REF:$f" 2>/dev/null || continue
+         git show "$REF:$f" > "$SCRATCH" || return 1
+         # The script path goes LAST: select-next.mjs runs its CLI when argv[1] is its own path.
+         command node --input-type=module -e '
+           const fs = await import("node:fs");
+           const { parseRoadmap } = await import(process.argv[3]);
+           const rows = parseRoadmap(fs.readFileSync(process.argv[1], "utf8")).rows;
+           process.exit(rows.some((r) => r.id === process.argv[2] && r.ticked) ? 0 : 3);
+         ' "$SCRATCH" "<item>" "$SELECTOR"
+         case $? in 0) return 0 ;; 3) ;; *) return 1 ;; esac
+       done
+       return 3
+     }
      git fetch -q origin <baseBranch> || { echo "$ROW: unknown (git fetch failed)"; exit 1; }
-     git cat-file -e "origin/<baseBranch>:<roadmapPath>" 2>/dev/null \
-       || { echo "$ROW: unknown (<roadmapPath> is not on origin/<baseBranch>)"; exit 1; }
-     ROW_TICKED=not-ticked
-     for f in "<roadmapPath>" "$(dirname "<roadmapPath>")/roadmap-history.md"; do
-       # No history file is normal (nothing archived yet); a file that exists and cannot be read is not.
-       git cat-file -e "origin/<baseBranch>:$f" 2>/dev/null || continue
-       git show "origin/<baseBranch>:$f" > "$SCRATCH" \
-         || { rm -f "$SCRATCH"; echo "$ROW: unknown (git show $f failed)"; exit 1; }
-       # The script path goes LAST: select-next.mjs runs its CLI when argv[1] is its own path.
-       # Exit 0 = a ticked row with this id, 3 = none; anything else (a failed import, a parse error)
-       # is the reader breaking, and reads as unknown.
-       command node --input-type=module -e '
-         const fs = await import("node:fs");
-         const { parseRoadmap } = await import(process.argv[3]);
-         const rows = parseRoadmap(fs.readFileSync(process.argv[1], "utf8")).rows;
-         process.exit(rows.some((r) => r.id === process.argv[2] && r.ticked) ? 0 : 3);
-       ' "$SCRATCH" "<item>" "$PWD/.agents/skills/develop-next/scripts/select-next.mjs"
-       rc=$?
-       case "$rc" in
-         0) ROW_TICKED=ticked ;;
-         3) ;;
-         *) rm -f "$SCRATCH"; echo "$ROW: unknown (roadmap parser exited $rc on $f)"; exit 1 ;;
-       esac
-     done
+     REF="origin/<baseBranch>"; row_state; rc=$?
+     case $rc in
+       0) ROW_TICKED=ticked ;;
+       3) ROW_TICKED=not-ticked
+          if git rev-parse -q --verify "refs/heads/<baseBranch>" >/dev/null; then
+            REF="refs/heads/<baseBranch>"; row_state; rc=$?
+            case $rc in
+              0) ROW_TICKED=ticked-unpushed ;;
+              3) ;;
+              *) rm -f "$SCRATCH"; echo "$ROW: unknown (could not read the local <baseBranch>)"; exit 1 ;;
+            esac
+          fi ;;
+       *) rm -f "$SCRATCH"; echo "$ROW: unknown (could not read origin/<baseBranch>)"; exit 1 ;;
+     esac
      rm -f "$SCRATCH"
      echo "$ROW: $ROW_TICKED"
      ```
 
-     `ticked` → set `ticked: true`. `not-ticked` → leave it. `unknown` → **HALT** with that line: route nowhere until the look succeeds.
+     `ticked` → set `ticked: true`. `ticked-unpushed` → push it (`git push origin <baseBranch>`, with Step 4's non-ff rule), then set `ticked: true` — never a second tick. `not-ticked` → leave it. `unknown` → **HALT** with that line: route nowhere until the look succeeds.
 
    **c. Route on the reconciled flags:**
 
@@ -470,11 +492,12 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
 
    On merge failure (conflict, protection): **HALT** with the platform's output verbatim. Mark `merged: true` in the run state only on success.
 
-   > **Both arms judge the merge by the PR's state, never by the merging command's status: a
-   > command can fail after the server merged, and claim success on a PR that did not.** The GitHub
-   > arm reads `gh pr view --json state`; the Bitbucket arm reads `.state` from the merge response.
-   > The resume reconciliation in Step 0.1 applies the same rule to a run that crashed between the
-   > merge and the run-state write. `develop-batch` Step 3 cites this rule.
+   > **The GitHub arm judges the merge by the PR's state, never by `gh pr merge`'s exit status: a
+   > command can fail after the server merged, and claim success on a PR that did not.** It reads
+   > `gh pr view --json state` after the merge. The Bitbucket arm judges the merge response's
+   > `.state`, which can fail to parse on a merge that landed — so on Bitbucket the parsing note below
+   > is the rule: re-query `.state` before any retry. The resume reconciliation in Step 0.1 reads the
+   > PR's state on both platforms. `develop-batch` Step 3 (GitHub only) cites this rule.
    >
    > **Parsing note (Bitbucket):** the merge response embeds rendered HTML that can contain raw control characters, which makes some `jq` invocations fail on the _response_ even though the merge itself succeeded. **Never retry a merge on a parse error** — re-query `GET …/pullrequests/${PR_ID}` and check `.state` first, or you risk a duplicate merge attempt against an already-merged PR.
 

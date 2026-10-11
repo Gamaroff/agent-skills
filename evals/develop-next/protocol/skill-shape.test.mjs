@@ -579,12 +579,29 @@ test("Step 2 records a pipeline HALT as halted: true before stopping (obs #286)"
 test("Step 3 states the merge-verdict rule beside the Bitbucket parsing note (obs #197)", () => {
   const step3 = section(skill, "## Step 3", "## Step 4");
   const rule = step3.indexOf(
-    "Both arms judge the merge by the PR's state, never by the merging command's status",
+    "The GitHub arm judges the merge by the PR's state, never by `gh pr merge`'s exit status",
   );
   const note = step3.indexOf("**Parsing note (Bitbucket):**");
   assert.ok(
     rule > 0 && note > rule,
     "the rule sits just before the parsing note",
   );
-  assert.ok(note - rule < 800, "and beside it, not elsewhere in Step 3");
+  assert.ok(note - rule < 900, "and beside it, not elsewhere in Step 3");
+  // CR2-4 (task.188 QA cycle 2): the Bitbucket arm judges the POST response, so the rule must not
+  // claim it judges by state.
+  assert.doesNotMatch(step3, /Both arms judge the merge by the PR's state/);
+});
+
+test("Step 0.1: the merge-flag block resolves its own platform; the branch fallback needs accepted (CR2-1, CR2-3)", () => {
+  const step0 = section(skill, "## Step 0", "## Step 1");
+  assert.match(
+    step0,
+    /source \.agents\/skills\/develop-next\/references\/resolve-platform\.sh \|\| exit 1/,
+  );
+  assert.doesNotMatch(step0, /\$\{VCS:\?/);
+  assert.match(
+    step0,
+    /only when the item's document reads `accepted` \(bug: `closed`\)/,
+  );
+  assert.match(step0, /`ticked-unpushed` → push it/);
 });
