@@ -36,8 +36,8 @@ First pipeline run for task.201: per-step timestamps, one answer-resolution cont
 | 2. review-task             | ✅ Done    | `task.201.review.{N}.{name}.md` exists (or skip logged)               | `task.201.review.1.*.md`; 7/10 → 8/10 after fixes; READY TO IMPLEMENT; Planned → Ready for Development (time not measured) | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline; 1 iteration; ci:fast green (5263/0) (time not measured) | `.summaries/step-3-test-triage-1.json` |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #632: https://github.com/Gamaroff/agent-skills/pull/632 (time not measured) | —                    |
-| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.201.qa.{N}.*.md`; `task.201.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 4 cycles; gate 4 PASS 100; 5c APPROVE (pr-review.1); 17 findings fixed across 3 fix cycles (time not measured) | `.summaries/step-3-test-triage-1.json` |
-| 7. finalise                | ❌ Failed  | `task.201.dod.{N}.*.md`; task `status: accepted`                      | DoD GAPS — dod.1: AC10 unpinned (1 gap); CI reading 1 SUCCESS @ 532eb2ad; security re-probed 72/72 | —                    |
+| 5–6. qa-task / qa-fix loop | 🔄 In Progress | `task.201.qa.{N}.*.md`; `task.201.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 4 cycles; gate 4 PASS 100; 5c APPROVE (pr-review.1); 17 findings fixed across 3 fix cycles (time not measured); re-entered at 5a 2026-10-11 after DoD gap fix `efa7f2a6` | `.summaries/step-3-test-triage-1.json` |
+| 7. finalise                | ⏳ Pending | `task.201.dod.{N}.*.md`; task `status: accepted`                      | run 1: DoD GAPS — dod.1: AC10 unpinned (1 gap); CI reading 1 SUCCESS @ 532eb2ad; security re-probed 72/72. Re-run pending after QA re-entry | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
@@ -113,6 +113,13 @@ First pipeline run for task.201: per-step timestamps, one answer-resolution cont
 - HALT: finalise DoD gaps. Resume: fix AC10 (add the test), commit, then re-run `/develop-next` — Phase 0b offers "Re-enter QA at 5a" (Recommended).
 
 ---
+
+### Resume — QA re-entry after finalise DoD gaps — 2026-10-11
+
+- Gap fix: `shared/resources/tests/pipeline-answers-generic.test.mjs` pins AC10 (consumer names) — commit `efa7f2a6`; mutation-proven (a consumer name injected into §0d turns test 3 red).
+- Phase 0b resume prompt — auto-answered **"Re-enter QA at 5a"** (Recommended), per the develop-next autonomous directive.
+- QA re-entry after finalise DoD gaps: `reenter-qa: re-entered QA at step 5 / qa_phase 5a — qa_max_cycles=6 (base 4), gate_head=59261730058d`.
+- Restored lock carries no `answers` (the run started before task.201's Step 1 persisted them): legacy row — nothing re-asked; Q1/Q2 stay as logged at startup.
 
 ## Issues Log
 
