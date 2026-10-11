@@ -451,15 +451,15 @@ hold as written.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-11
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.201.qa.7.pipeline-upfront-answers-and-speed-modes.md](./task.201.qa.7.pipeline-upfront-answers-and-speed-modes.md)
-- **Gate File**: [task.201.gate.7.pipeline-upfront-answers-and-speed-modes.yml](./task.201.gate.7.pipeline-upfront-answers-and-speed-modes.yml)
+- **Full Report**: [task.201.qa.8.pipeline-upfront-answers-and-speed-modes.md](./task.201.qa.8.pipeline-upfront-answers-and-speed-modes.md)
+- **Gate File**: [task.201.gate.8.pipeline-upfront-answers-and-speed-modes.yml](./task.201.gate.8.pipeline-upfront-answers-and-speed-modes.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 5305
@@ -468,9 +468,8 @@ hold as written.
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-- DoD run 2's three AC10 gaps are closed (`2149dba5`); test 2d is mutation-proven.
-- CR-1 (medium, open): test 2d inherits `SKILLS_CONFIG_FILE` from the runner environment and goes red when it is set.
-- CR-2 (low, advisory): `argOf` does not confine itself to the resolve command span.
+- Gate 7's two findings on docs test 2d are closed and mutation-proven.
+- One low finding (CR-1, the awk iteration is unproven) carried to Deferred Work by route 2b; three low advisories in the gate's future work.
 
 ## Definition of Done — run 1 gaps (historical, superseded by run 2 below)
 
@@ -528,6 +527,10 @@ hold as written.
 
 **Detailed Verification Log:** See `task.201.dod.2.pipeline-upfront-answers-and-speed-modes.md` for complete verification evidence.
 
+## Deferred Work
+
+- **CR-1** (LOW) — carried to gate 8 `recommendations.future` (route 2b, cycle 8): nothing proves the `awk` iteration of docs test 2d ran tier 2; print the tier that ran and assert it.
+
 ## Change Log
 
 | Date       | Version | Description                                                                                   | Author |
@@ -554,6 +557,7 @@ hold as written.
 | 2026-10-11 |         | DoD gap fixed — AC10 citation corrected; docs test 2d pins §0d's config read; hand-authored skill references added to the name scan; re-entering QA at 5a | develop |
 | 2026-10-11 |         | QA gate CONCERNS (90/100) — 1 finding (CR-1 medium) | qa-task |
 | 2026-10-11 |         | QA findings fixed — cycle 7, 2 findings (CR-1 test 2d isolated from the runner env and run under both config tiers; CR-2 policy flags read from the resolve span) | qa-fix |
+| 2026-10-11 |         | QA gate PASS (100/100) — 0 open findings; 1 low carried to Deferred Work (route 2b), 3 low advisory | qa-task |
 <!-- change-log-end -->
 
 ---
