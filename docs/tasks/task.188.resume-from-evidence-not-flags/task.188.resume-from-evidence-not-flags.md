@@ -5,18 +5,20 @@ type: task
 description: "develop-next and develop-batch resume from the PR's state and the roadmap tick rather than their own run-state flags: a merge is judged by the PR's state, not gh pr merge's exit code; a pipeline HALT is recorded in the run state and surfaced on resume; and stale merged/ticked flags are reconciled before routing."
 tags: [develop-next, develop-batch, observation, run-state, resume, merge]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-07
 updated: 2026-10-11
 assignee:
 estimated_effort_hours: 16
 github_issue: 587
+completed_date: 2026-10-11
+pr_number: 634
 ---
 
 # Technical Task: Resume from evidence, not flags
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.188.review.1.resume-from-evidence-not-flags.md` implemented 2026-10-11
 **GitHub Issue**: [#587](https://github.com/Gamaroff/agent-skills/issues/587)
 
@@ -455,9 +457,9 @@ None.
 - Four QA cycles: 3 + 4 + 3 findings fixed; cycle 4 found two advisory LOW items (recorded as future work).
 - Security is `reasoned` with `probes_executed: 0` — the boundary is prose no probe entry form reaches; finalise needs a DoD override.
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 1 (historical, superseded by run 2 below)
 
-**Status:** IN PROGRESS
+**Status:** SUPERSEDED — the one gap was closed by a recorded human override; see `task.188.dod.2.resume-from-evidence-not-flags.md`
 
 ### QA Gate Status
 
@@ -485,6 +487,30 @@ All 11 success criteria pass, CI is green on `4935a1a3`, and docs and compliance
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.188.qa.4.resume-from-evidence-not-flags.md`
+**Gate File**: `task.188.gate.4.resume-from-evidence-not-flags.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (4 cycles) · Step 5c PR review: ✅ APPROVE
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 11/11 met. The behaviour criteria rest on executed cases in `shared/resources/tests/merge-delete-branch-guard.test.mjs` and on the develop-next and develop-batch skill-shape suites.
+✅ **PR Review & Tests:** PR #634; 5c review APPROVE; CI 5/5 green on `85a2720e`
+✅ **Documentation:** CHANGELOG `[Unreleased]` › Fixed; both SKILL.md files updated
+✅ **Security Review:** PASS by human override of the probe zero-guard. The boundary is fenced prose that no probe entry form reaches. The override rests on the executed fixture cases in the guard test (precedent task.125 / task.133; follow-up task.181).
+⚠️ **Compliance Review:** not applicable
+
+**Task marked as ACCEPTED on:** 2026-10-11
+
+**Detailed Verification Log:** See `task.188.dod.2.resume-from-evidence-not-flags.md` for complete verification evidence and timestamps (run 1: `task.188.dod.1.resume-from-evidence-not-flags.md`).
+
+---
 <!-- change-log-start -->
 ## Change Log
 
@@ -503,6 +529,7 @@ All 11 success criteria pass, CI is green on `4935a1a3`, and docs and compliance
 | 2026-10-11 |  | QA findings fixed — CR3-1 (uncommitted roadmap edits halt), CR3-2 (reconciled merge runs Step 3's post-merge items), CR3-3 (failed write halts); reconstruction table synced; 2 new executed cases, 3 iterations | qa-fix |
 | 2026-10-11 |  | QA gate PASS (100/100) — cycle 3's three closed; 2 advisory LOW items to future work | qa-task |
 | 2026-10-11 |  | DoD incomplete — 1 gap identified (security probe zero-guard on a prose boundary; needs a recorded override) | finalise |
+| 2026-10-11 | 1.3 | DoD verified — accepted (PR #634); security zero-guard closed by a recorded human override | finalise |
 <!-- change-log-end -->
 
 ---
