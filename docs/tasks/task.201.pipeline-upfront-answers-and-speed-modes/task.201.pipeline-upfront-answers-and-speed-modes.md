@@ -358,7 +358,7 @@ Post-merge only — recorded under Notes, Deferred Work.
 | Step 2 skipped on a current review | `review-report-freshness.test.mjs` blob cases (match, mismatch, legacy) |
 | ISO timestamp per step | template test asserting the `Completed (UTC)` column in all three variants |
 | Orchestrators no longer restate the questions | extended `orchestrator-directive-branch-literal.test.mjs` |
-| No consumer-specific names; all limits from `skills-config.yaml` | `pipeline-answers-generic.test.mjs` (names: every shipped file that cites task.201 or that it changed, scanned whole; pre-existing examples exempted by exact line; non-vacuity and stale-exemption cases) + `pipeline-answers-docs.test.mjs` 4a/4g (limits) — added after DoD gap 1 |
+| No consumer-specific names; all limits from `skills-config.yaml` | Names: `pipeline-answers-generic.test.mjs` (every shipped file that cites task.201 or that it changed, hand-authored skill references included, scanned whole; pre-existing examples exempted by exact line; non-vacuity and stale-exemption cases). Limits: `pipeline-answers.test.mjs` 4a/4g (the engine's limits are the policy it is given) + `pipeline-answers-docs.test.mjs` 2d (§0d reads `develop.defaultMode`/`develop.skippable` from `skills-config.yaml` and passes them as `--policy-*`, executed against three configs). Added after DoD runs 1 and 2 |
 
 ### Migration
 
@@ -509,9 +509,9 @@ hold as written.
 ### Missing Criteria:
 
 1. **Acceptance Criteria:**
-   - [ ] AC10 — the limits half is mis-cited: the criterion row names `pipeline-answers-docs.test.mjs` 4a/4g; the holders are `pipeline-answers.test.mjs` 4a/4g
-   - [ ] AC10 — no test pins that §0d reads `develop.defaultMode` / `develop.skippable` through `read_nested_config_key` and passes them as `--policy-mode` / `--policy-skippable`
-   - [ ] AC10 — the consumer-name scan omits the hand-authored `skills/develop-bug/references/develop-bug-step-0-resolve-bug.md` (0 hits today)
+   - [x] AC10 — the limits half is mis-cited: the criterion row names `pipeline-answers-docs.test.mjs` 4a/4g; the holders are `pipeline-answers.test.mjs` 4a/4g
+   - [x] AC10 — no test pins that §0d reads `develop.defaultMode` / `develop.skippable` through `read_nested_config_key` and passes them as `--policy-mode` / `--policy-skippable`
+   - [x] AC10 — the consumer-name scan omits the hand-authored `skills/develop-bug/references/develop-bug-step-0-resolve-bug.md` (0 hits today)
 
 ### Next Steps:
 
@@ -550,6 +550,7 @@ hold as written.
 | 2026-10-11 |         | QA findings fixed — cycle 5, 3 findings (CR-1 section reader replaced by whole-file scan; CR-2 population derived; CR-3 redundant pattern dropped) | qa-fix |
 | 2026-10-11 |         | QA gate PASS (100/100) — 0 open findings, 2 low advisory | qa-task |
 | 2026-10-11 |         | DoD incomplete — 1 gap (AC10: mis-cited limits holder, config read unpinned, one file outside the name scan) | finalise |
+| 2026-10-11 |         | DoD gap fixed — AC10 citation corrected; docs test 2d pins §0d's config read; hand-authored skill references added to the name scan; re-entering QA at 5a | develop |
 <!-- change-log-end -->
 
 ---

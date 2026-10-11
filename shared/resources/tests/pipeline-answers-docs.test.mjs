@@ -8,7 +8,8 @@
 //   1. Timestamps — every Pipeline Progress table ends in `Completed (UTC)`, every
 //      row has the header's cell count, and every orchestrator stamps it.
 //   2. Answer resolution — §0d and develop-bug §0d call `resolve` from a fenced
-//      block, with no flag the CLI does not define.
+//      block, with no flag the CLI does not define; §0d's policy flags carry the
+//      values its own lines read from skills-config.yaml (2d, executed).
 //   3. Waivers — the QA loop calls `gate` from a fenced block; the lite-mode
 //      contract and finalise say a FAIL stays FAIL and the DoD shows the waiver.
 //   4. Step 2 reuse — the freshness call passes the document's hash, and every
@@ -24,6 +25,7 @@ import {
   existsSync,
   mkdtempSync,
   writeFileSync,
+  rmSync,
 } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
@@ -255,6 +257,65 @@ test("2b: the 0f summary shows a source for every answer", () => {
   const f = text.slice(text.indexOf("## 0f. Pre-flight Summary"));
   for (const k of ["sources.base", "sources.target", "sources.mode"])
     assert.equal(f.split(k).length - 1, 2, `0f: ${k} in both banners`);
+});
+
+/**
+ * Run §0d's own config-reading lines, then print the two values its resolve call
+ * hands over, in a directory holding `config` as skills-config.yaml (none when
+ * null). Returns [policy-mode, policy-skippable] exactly as the CLI would see them.
+ */
+function policyHandedToResolve(block, config) {
+  const lines = block.split("\n");
+  const source = lines.filter((l) => /^\s*source .*read-config\.sh/.test(l));
+  const assigns = lines.filter((l) => /^\s*POLICY_[A-Z_]+=/.test(l));
+  assert.equal(source.length, 1, "§0d sources read-config.sh once");
+  assert.equal(assigns.length, 2, "§0d binds POLICY_MODE and POLICY_SKIPPABLE");
+  // The value each flag receives, as written on the resolve command line.
+  const argOf = (flag) => {
+    const m = block.match(new RegExp(`${flag}\\s+("[^"]*"|\\S+)`));
+    assert.ok(m, `the resolve call passes ${flag}`);
+    return m[1];
+  };
+  const script = [
+    // .agents/skills is the consumer's install; the in-tree bundled copy is the same file.
+    source[0].replace(
+      /\.agents\/skills\/\{develop-story\|develop-task\}\/references\//,
+      `${join(ROOT, "skills/develop-task/references")}/`,
+    ),
+    ...assigns,
+    `printf '%s\\n' ${argOf("--policy-mode")}`,
+    `printf '%s\\n' ${argOf("--policy-skippable")}`,
+  ].join("\n");
+  const dir = mkdtempSync(join(tmpdir(), "policy-"));
+  if (config !== null) writeFileSync(join(dir, "skills-config.yaml"), config);
+  try {
+    return execFileSync("bash", ["-c", script], { cwd: dir, encoding: "utf8" })
+      .replace(/\n$/, "")
+      .split("\n");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test("2d: §0d reads develop.defaultMode / develop.skippable from skills-config.yaml and hands them to resolve (DoD run 2, AC10)", () => {
+  const block = bashBlocks(
+    read("shared/resources/develop-pipeline-step-0-resolve-and-prepare.md"),
+  ).find((b) => flagsPassedTo(b, "pipeline-answers.js", "resolve"));
+  // Two configs that differ give two different hand-offs: a literal in place of the
+  // config read, or a --policy-* flag fed from anything else, cannot pass both.
+  assert.deepEqual(
+    policyHandedToResolve(
+      block,
+      "develop:\n  defaultMode: fast\n  skippable: review, qa-depth\n",
+    ),
+    ["fast", "review, qa-depth"],
+  );
+  assert.deepEqual(
+    policyHandedToResolve(block, "develop:\n  defaultMode: lite\n"),
+    ["lite", ""],
+  );
+  // No config: nothing is invented — the engine's own defaults apply.
+  assert.deepEqual(policyHandedToResolve(block, null), ["", ""]);
 });
 
 // ── 3. waivers ─────────────────────────────────────────────────────────────

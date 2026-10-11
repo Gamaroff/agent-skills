@@ -5,7 +5,9 @@
 // ones most likely to leak into what it ships. This scans every shipped file
 // task.201 wrote into — WHOLE, so no fence, comment or heading can end the scan
 // early — for that consumer's identifiers. The other half of AC10, "all limits
-// from skills-config.yaml", is held by pipeline-answers-docs.test.mjs 4a/4g.
+// from skills-config.yaml", is held by pipeline-answers.test.mjs 4a/4g (the
+// engine takes its limits from the policy it is given) and
+// pipeline-answers-docs.test.mjs 2d (§0d reads that policy from skills-config.yaml).
 //
 // The population is derived, not listed: every shipped document or engine that
 // cites `task.201`, plus the files task.201 changed without citing itself
@@ -42,14 +44,29 @@ function consumerHits(text) {
     .filter((l) => CONSUMER_NAMES.some((re) => re.test(l.text)));
 }
 
-/** Shipped files: top-level shared resources, each skill's SKILL.md, and the reference/operations docs. */
+// A bundled copy carries this marker; a hand-authored reference does not. The
+// copies are scanned through their shared/resources source, so only the
+// hand-authored references are added (DoD run 2: develop-bug's own step-0 doc,
+// which task.201 changed, was outside the population).
+const GENERATED_RE = /^<!-- AUTO-GENERATED — DO NOT EDIT/m;
+
+/** Shipped files: top-level shared resources, each skill's SKILL.md and hand-authored references, and the reference/operations docs. */
 function shippedFiles() {
   const out = [];
   for (const f of readdirSync(join(ROOT, "shared/resources")))
     if (/\.(md|js)$/.test(f)) out.push(`shared/resources/${f}`);
-  for (const d of readdirSync(join(ROOT, "skills")))
+  for (const d of readdirSync(join(ROOT, "skills"))) {
     if (existsSync(join(ROOT, "skills", d, "SKILL.md")))
       out.push(`skills/${d}/SKILL.md`);
+    const refs = join(ROOT, "skills", d, "references");
+    if (existsSync(refs))
+      for (const f of readdirSync(refs))
+        if (
+          f.endsWith(".md") &&
+          !GENERATED_RE.test(read(`skills/${d}/references/${f}`))
+        )
+          out.push(`skills/${d}/references/${f}`);
+  }
   for (const dir of ["docs/reference", "docs/operations"])
     for (const f of readdirSync(join(ROOT, dir)))
       if (f.endsWith(".md")) out.push(`${dir}/${f}`);
@@ -131,6 +148,7 @@ test("2: the population is the files task.201 touched, and is not vacuous", () =
     "skills/develop-task/SKILL.md",
     "skills/develop-story/SKILL.md",
     "skills/develop-bug/SKILL.md",
+    "skills/develop-bug/references/develop-bug-step-0-resolve-bug.md",
   ])
     assert.ok(pop.includes(must), `${must} missing from the population`);
 });
