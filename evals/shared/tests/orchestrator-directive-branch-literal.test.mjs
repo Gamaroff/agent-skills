@@ -118,6 +118,55 @@ for (const { skill, branchAllowed } of ORCHESTRATORS) {
   });
 }
 
+// task.201: the directive hands the answers to Phase 0d's answer resolution with
+// `--defaults` and no longer restates the question set. A question number in the
+// directive is a restatement — the drift class bug.18 came from.
+const QUESTION_NUMBER_RE = /\bQ[1-9]\b/g;
+
+/** task.201 problems with one directive; [] when it conforms. */
+function restatements(directive) {
+  const flat = directive.replace(/\s+/g, " ");
+  const problems = (flat.match(QUESTION_NUMBER_RE) || []).map(
+    (h) => `restates the question set ("${h}")`,
+  );
+  if (!flat.includes("--defaults"))
+    problems.push("does not hand the answers to Phase 0d with --defaults");
+  return problems;
+}
+
+for (const { skill } of ORCHESTRATORS) {
+  const file = path.join(REPO_ROOT, "skills", skill, "SKILL.md");
+  const text = readFileSync(file, "utf-8");
+  const directive = extractDirective(text, skill);
+
+  test(`${skill}: the directive passes --defaults and restates no question (task.201)`, () => {
+    assert.deepEqual(restatements(directive), []);
+  });
+
+  test(`${skill}: the dispatched command carries --defaults (task.201)`, () => {
+    // The dispatch instruction sits above the directive, in the same step.
+    const before = text.slice(0, text.indexOf(`**AUTONOMOUS RUN (${skill})`));
+    const dispatch = before.slice(before.lastIndexOf("\n## ") + 1);
+    assert.match(
+      dispatch,
+      /--defaults/,
+      `${skill}'s dispatch step never passes --defaults`,
+    );
+  });
+}
+
+test("the task.201 rule rejects the pre-task.201 develop-next directive (mutation proof)", () => {
+  const pre201 =
+    "For `/develop-bug`, Q1 is the branch model (**bugfix** unless the bug is explicitly a production regression), with Q2 base branch and Q3 PR target auto-derived from Q1.";
+  assert.notDeepEqual(restatements(pre201), []);
+  assert.deepEqual(
+    restatements(
+      "The command carries `--defaults`, so the Phase 0d Upfront Setup questions resolve.",
+    ),
+    [],
+  );
+});
+
 test("the rules reject each pre-fix directive and accept the fixed shapes (mutation proof)", () => {
   // Verbatim pre-fix clauses.
   const oldNext =

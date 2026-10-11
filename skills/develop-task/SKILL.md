@@ -30,6 +30,23 @@ Hooks noop outside pipeline runs — zero overhead when no `.claude/state/develo
 
 ---
 
+## Invocation Flags — Answer Up Front, Choose the Speed
+
+`/develop-task <path> [--defaults] [--base <branch>] [--target <branch>] [--mode standard|lite|fast] [--skip review,qa-depth,review-pr-depth]`
+
+- `--defaults` takes Phase 0d's **(Recommended)** option for every question nothing else answers, so
+  the run asks nothing. `develop-next` and `develop-batch` invoke with it.
+- `--base` / `--target` answer Q1 / Q2. They are **validated, never blindly obeyed**: one that
+  contradicts the epic's `branch_model` or Q1/Q2 agreement is asked about, with the conflict stated.
+- `--mode` and `--skip` are bounded by `develop.defaultMode` / `develop.skippable` in
+  `skills-config.yaml`. The allow-list defaults to empty, so a skip is refused (with the reason, and the
+  run continues unskipped) until the consumer opts in. A skipped step makes the QA gate `WAIVED`, never
+  `PASS`; branch, PR, finalise, commit and tracker signals can never be skipped.
+
+Resolution order, conflicts and the 0f source column: `references/develop-pipeline-step-0-resolve-and-prepare.md` §0d "Answer resolution". Modes, skips and the floor: `references/develop-pipeline-lite-mode.md` §"Speed Modes and Skips".
+
+---
+
 ## Phase 0: Resolve & Prepare
 
 See `references/develop-pipeline-step-0-resolve-and-prepare.md` for the full resolve-and-prepare protocol: file/issue resolution (0a), pipeline state check (0b), upfront context reading including status handling and lite-mode detection (0c), tracker signal/board update procedure (0c-reg — **defined in step-0 but invoked from Step 1** after the lock is written; see step-1 §"Signal Work Started"), upfront prompts via AskUserQuestion (0d — Q1 base + Q2 PR target with auto-derived recommended option; qa-planning silent skip, no Q3), implementation report creation with templates (0e), and pre-flight summary (0f).
@@ -131,7 +148,7 @@ This prevents context accumulation across the 8-step pipeline.
 Every step ends with the same four actions, executed *in order, with no text output between them*:
 
 1. **Bash tool call** advancing the lock to the next step (use the helper: `bash .agents/skills/develop-task/references/advance-pipeline-lock.sh {N+1}`). **This must be the first call** — it is the binding side-effect that anchors the orchestrator into "still working" mode and signals to the `Stop` hook that the pipeline has advanced. After Step 8, issue `--complete` instead of a number (a numeric advance with no lock is an error): Step 8's Completion Checklist already ran `--complete` as its last action, so this one is a no-op — the helper exits 0 when there is no lock (task 161). (This call is idempotent: a sub-skill normally self-advances the lock as its own last action, so this re-advance noops — but issuing it unconditionally is the deterministic, single-instruction behaviour.)
-2. **Edit the implementation report** Pipeline Progress row for the just-completed step (`✅ Done`), then **read it back**. **After Step 8 this edit is a no-op:** Step 8 set its own row to `✅ Done` before its commit (step-8 doc § Final Implementation Report Update), and the Completion Checklist's check 5 has already required a clean tree, so any change here would be uncommitted dirt. Confirm the row is finished by check 4's own test (its Status cell starts with `✅`, or reads `⏭️ Skipped`) and change nothing (task 160). A row that fails that test after Step 8 is a **HALT, not an edit**: the Completion Checklist should have refused it, so something wrote the report after the checklist ran. The read-back is lint call site (1) of the four the report-lint contract names, and it is a tool call, not prose:
+2. **Edit the implementation report** Pipeline Progress row for the just-completed step (`✅ Done`) — and, when its `Completed (UTC)` cell is empty, write `date -u +%Y-%m-%dT%H:%MZ` into it; a resumed step keeps the time it first finished, so never overwrite a filled cell (task.201) — then **read it back**. **After Step 8 this edit is a no-op:** Step 8 set its own row to `✅ Done` before its commit (step-8 doc § Final Implementation Report Update), and the Completion Checklist's check 5 has already required a clean tree, so any change here would be uncommitted dirt. Confirm the row is finished by check 4's own test (its Status cell starts with `✅`, or reads `⏭️ Skipped`) and change nothing (task 160). A row that fails that test after Step 8 is a **HALT, not an edit**: the Completion Checklist should have refused it, so something wrote the report after the checklist ran. The read-back is lint call site (1) of the four the report-lint contract names, and it is a tool call, not prose:
 
    ```bash
    command node .agents/skills/develop-task/references/report-lint.js --file "{implementation-report-path}" --json; rc=$?

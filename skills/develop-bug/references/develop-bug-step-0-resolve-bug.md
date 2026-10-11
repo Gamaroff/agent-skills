@@ -87,7 +87,31 @@ Ask all branch decisions upfront, once, so Steps 1 and 4 run without further pro
 
 **Q3 — PR target.** Auto-set from Q1: `develop` for bugfix, `main` for hotfix. This becomes `--base` in Step 4.
 
-Store the answers as `BRANCH_MODEL`, `BASE_BRANCH`, `PR_TARGET`. Log all three in the Decisions Log. If the run is fully autonomous (invoked from a batch/loop), apply the recommended defaults and record `auto-answered` per row.
+**Answer resolution — ask only what nothing answers (task.201).** The same contract as the story and
+task pipelines' §0d, over this question set: **flag → recommendation → ask**, each flag validated
+against the branch model. `--branch-model bugfix|hotfix` answers Q1, `--base` / `--target` answer Q2 /
+Q3 (and must match the branch model, or the question is asked with the conflict stated), and
+`--defaults` takes the Recommended option for every question still open. `--mode` and `--skip` are
+**refused** here, with the reason: this pipeline has its own lite rule and no QA gate to hold a waiver.
+
+```bash
+mkdir -p .claude/state
+command node .agents/skills/develop-bug/references/pipeline-answers.js resolve \
+  --pipeline bug --args-stdin \
+  --branch-model-derived "{Q1's Recommended option: bugfix or hotfix}" \
+  --persisted-file .claude/state/develop-pipeline.lock \
+  --invoker "$(git config user.name)" --json > .claude/state/pipeline-answers.json <<'ARGS' \
+  || { echo "HALT: pipeline-answers.js could not resolve the up-front answers"; exit 1; }
+{the skill's arguments, verbatim}
+ARGS
+jq -c '{answers, sources, questions: [.questions[].id], refused}' .claude/state/pipeline-answers.json
+```
+
+Ask exactly `questions[]` (with no flags that is Q1 alone; Q2 and Q3 report `derived-from-Q1` and are
+set from the Q1 answer as above). Log every `refused[]` entry with its reason. Step 1 writes the answers
+into the lock, so a resume asks nothing they settle.
+
+Store the answers as `BRANCH_MODEL`, `BASE_BRANCH`, `PR_TARGET`. Log all three in the Decisions Log with each one's source (`flag`, `persisted`, `recommended`, `derived-from-Q1`, `asked`). An autonomous run (a batch or loop) passes `--defaults`, which records `recommended` per row — it never restates the answers in prose.
 
 ---
 
@@ -116,15 +140,15 @@ started: '{YYYY-MM-DDTHH:MM:SSZ}'
 
 ## Pipeline Progress
 
-| Step | Skill | Status | Notes | Subagent summary ref |
-|------|-------|--------|-------|----------------------|
-| 1 | create-branch | ⏳ Pending | | |
-| 2 | review-bug | ⏳ Pending | | |
-| 3 | investigate-fix | ⏳ Pending | | |
-| 4 | create-pr | ⏳ Pending | | |
-| 5–6 | verify-fix loop | ⏳ Pending | | |
-| 7 | finalise-close | ⏳ Pending | | |
-| 8 | commit-changes | ⏳ Pending | | |
+| Step | Skill | Status | Notes | Subagent summary ref | Completed (UTC) |
+|------|-------|--------|-------|----------------------|-----------------|
+| 1 | create-branch | ⏳ Pending | | | |
+| 2 | review-bug | ⏳ Pending | | | |
+| 3 | investigate-fix | ⏳ Pending | | | |
+| 4 | create-pr | ⏳ Pending | | | |
+| 5–6 | verify-fix loop | ⏳ Pending | | | |
+| 7 | finalise-close | ⏳ Pending | | | |
+| 8 | commit-changes | ⏳ Pending | | | |
 
 ## Decisions Log
 

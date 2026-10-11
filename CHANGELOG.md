@@ -4,7 +4,32 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **Develop pipelines take their answers and their speed up front (task.201).** `/develop-story`,
+  `/develop-task` and `/develop-bug` accept `--defaults` (take every Phase 0d recommendation, ask
+  nothing), `--base` / `--target` (and `--branch-model` for bugs), `--mode standard|lite|fast` and
+  `--skip review,qa-depth,review-pr-depth`. Every answer resolves **flag → `skills-config.yaml`
+  `develop:` policy → derived recommendation → ask**, in one tested engine
+  (`shared/resources/pipeline-answers.js`); a flag that contradicts the epic's `branch_model`, Q1/Q2
+  agreement or the answer already recorded is asked about, never applied. The 0f summary shows each
+  answer's source, and the answers persist in the pipeline lock so a resume asks nothing already
+  answered. `develop.skippable` defaults to empty; a skipped step writes the QA gate as `WAIVED` with
+  reason and approver, never `PASS`, and a `FAIL` stays `FAIL`. Branch, PR, finalise, commit and
+  tracker signals are never skippable. With no flags and no policy, behaviour is unchanged.
+- **Step 2 reuses a review of the same revision.** Review reports now record `**reviewed_blob:**` —
+  `git hash-object` of the document after the review's own edits (`record-reviewed-blob.js`, called by
+  `review-task`, `review-story` and `review-bug`). Step 2 reuses a report exactly when the hash still
+  matches, a same-day edit included; a report written before this change keeps the date rule.
+- **Per-step timestamps.** Implementation reports gain a `Completed (UTC)` column in Pipeline Progress,
+  stamped once by the Step Transition Protocol, so step timing can be measured instead of reconstructed
+  from commits.
+
 ### Changed
+
+- **`develop-next` and `develop-batch` dispatch with `--defaults`** instead of restating Phase 0d's
+  answers in a prose directive — the restatement that drifted in bug.18. `develop-batch` passes
+  `--defaults --base <baseBranch> --target <baseBranch>` and keeps its HALT for an integration branch.
 
 - **`npm install` links the skill directories in a contributor checkout.** The `prepare` script now
   runs `scripts/link-skills.sh`, which creates the gitignored `.agents/skills -> ../skills` and

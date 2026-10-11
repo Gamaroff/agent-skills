@@ -283,7 +283,8 @@ and `inflight[r] ≤` a probe's effective capacity when one is configured. In-fl
    than its root one, carries the credentials a test run needs.
 
 2. **Dispatch one agent per admitted worktree.** Run the item's named command
-   (`worktrees[].run`, e.g. `/develop-task <path>`; `/develop-story` and `/develop-bug` dispatch identically) **with its working directory set to
+   (`worktrees[].run`, e.g. `/develop-task <path>`; `/develop-story` and `/develop-bug` dispatch identically)
+   **followed by `--defaults --base <baseBranch> --target <baseBranch>`**, **with its working directory set to
    `<dir>`**, prepending the directive below. Mark `dispatched: true`.
 
    **Dispatch in the background** so individual completions can be observed. This is what
@@ -296,12 +297,11 @@ and `inflight[r] ≤` a probe's effective capacity when one is configured. In-fl
    > **AUTONOMOUS RUN (develop-batch):** You are running this pipeline inside the git
    > worktree at `<dir>` — set your working directory to `<dir>` for all git and file
    > operations; do not touch the main working tree or any sibling worktree.
-   > For the Phase 0d Upfront Setup questions, take the option Phase 0d marks
-   > **(Recommended)** for every question without prompting, except the two this
-   > paragraph answers. This worktree was cut from `<baseBranch>`, and the batch admits
-   > no `epic-integration` story, so the base and the PR target are both `<baseBranch>`.
-   > If Phase 0d's epic pre-check finds an integration branch for this item anyway, HALT
-   > and report it rather than choosing — the item does not belong in a batch. For the
+   > The command carries `--defaults --base <baseBranch> --target <baseBranch>`, so the
+   > Phase 0d Upfront Setup questions resolve without prompting: this worktree was cut from
+   > `<baseBranch>`, and the batch admits no `epic-integration` story. If Phase 0d still asks
+   > — its epic pre-check found an integration branch, so the given base conflicts — HALT
+   > and report it rather than choosing: the item does not belong in a batch. For the
    > Phase 0b resume prompt, take the option Phase 0b
    > marks **(Recommended)** — after a finalise DoD-gaps halt that is "Re-enter QA at
    > 5a"; only when no option is marked, choose "Resume from last completed step".

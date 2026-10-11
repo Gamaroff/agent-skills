@@ -1,0 +1,56 @@
+schema: 2
+task: 'task.201.pipeline-upfront-answers-and-speed-modes'
+task_title: 'Pipeline up-front answers and speed modes'
+gate: PASS
+status_reason: 'Gate 3 findings fixed; the Step 1 merge test runs the document''s own jq program and is mutation-proven. The scoped review found one advisory cleanup (a test temp directory left behind).'
+reviewer: 'QA Engineer'
+head: '59261730058dffb29d1d4027f313a97adbcd4faa'
+updated: '2026-10-10T20:02:08Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 5286
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+  ci: 'not read this cycle'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 35
+    notes: 'isRefName probe (task.201.qa.2.security.run.json); arguments via a quoted heredoc.'
+  performance:
+    status: PASS
+    notes: 'No hot path.'
+  reliability:
+    status: PASS
+    notes: 'Resume keeps or withdraws the waiver with the skip; merge tested on both shapes.'
+  maintainability:
+    status: PASS
+    notes: 'One stamp matcher; derived test populations.'
+
+bug_resolution:
+  previous_gate: 3
+  closed: ['CR-1', 'CR-2', 'CR-3']
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Cleanup: test 3c leaves its mkdtemp directory behind — remove it in a finally.'
+      refs: ['shared/resources/tests/pipeline-answers-docs.test.mjs']
+    - action: 'Pre-existing: skills/develop-bug/references/develop-bug-step-0-resolve-bug.md:39 block exits 1 on base and head alike.'
+      refs: ['skills/develop-bug/references/develop-bug-step-0-resolve-bug.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

@@ -1,0 +1,62 @@
+schema: 2
+task: 'task.201.pipeline-upfront-answers-and-speed-modes'
+task_title: 'Pipeline up-front answers and speed modes'
+gate: CONCERNS
+status_reason: 'Gate 2 findings fixed and mutation-proven. Step 1''s merge now keeps the lock''s old waiver even when a resume withdraws the skip, so a withdrawn review skip would still demand a WAIVED gate.'
+reviewer: 'QA Engineer'
+head: '465e230a5a1485c8a6b17e6519887db94bc49e7d'
+updated: '2026-10-10T19:55:26Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-1-create-branch.md'
+    finding: 'The merge keeps (.waiver // $a[0].waiver), so a resume that withdraws the review skip (allow-list change, or no approver) leaves waiver.active true in the lock; the QA directive then asks for WAIVED on a step that ran and the waived-gate check reports WAIVER NOT RECORDED.'
+    suggested_action: 'Write $a[0].waiver as resolved — resolveAnswers already carries the persisted waiver forward — and test the merge on a resumed lock whose skip was withdrawn.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 5284
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [2]
+  ci: 'not read this cycle'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 35
+    notes: 'isRefName probe (task.201.qa.2.security.run.json); arguments reach the resolver via a quoted heredoc.'
+  performance:
+    status: PASS
+    notes: 'No hot path.'
+  reliability:
+    status: CONCERNS
+    notes: 'Withdrawn skip keeps its waiver in the lock (CR-1).'
+  maintainability:
+    status: PASS
+    notes: 'CR-2 (nested key) and CR-3 (heredoc strip scope) are low/advisory.'
+
+bug_resolution:
+  previous_gate: 2
+  closed: ['CR-1', 'CR-2', 'CR-3', 'CR-4', 'CR-5', 'CR-6', 'CR-7', 'CR-8', 'CR-9']
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1; take CR-2 (column-0 key match) and CR-3 (heredoc strip keeps the command''s continuation lines) with it.'
+      refs: ['shared/resources/develop-pipeline-step-1-create-branch.md', 'shared/resources/record-reviewed-blob.js', 'shared/resources/tests/pipeline-answers-docs.test.mjs']
+  future:
+    - action: 'Pre-existing: skills/develop-bug/references/develop-bug-step-0-resolve-bug.md:39 block exits 1 on base and head alike.'
+      refs: ['skills/develop-bug/references/develop-bug-step-0-resolve-bug.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 fixed']

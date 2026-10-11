@@ -344,6 +344,11 @@ superseded)`). If it is not, that is itself a finding: an unmarked stale PASS ba
      - Check `waiver.active` and understand why issues were waived
      - Verify waiver is appropriate and documented
      - Consider waived issues in acceptance decision
+     - **Show the waiver in the DoD file**, beside the gate status, as one line —
+       `**Waiver**: {waiver.reason} — approved by {waiver.approved_by}`. A pipeline step skipped with
+       `--skip` (task.201) reaches the DoD only through this line, so a reader of the DoD or its PR
+       comment sees the skip rather than a gate that merely reads `WAIVED`. A waiver with no
+       `approved_by` is not documented: list it as a DoD gap.
 
 6. **Document QA Report Findings:**
    - If QA reports exist, reference them in the final DoD verification section

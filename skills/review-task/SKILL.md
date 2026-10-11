@@ -1952,6 +1952,28 @@ Status Updated: "Planned" → "Ready for Development"
 User Can Now: Run `/develop` to begin implementation
 ```
 
+### Step 9a: Record the Reviewed Revision
+
+**Purpose**: stamp the review report with the exact revision of the document it reviewed, so a
+develop pipeline's Step 2 can reuse this review instead of running it again (task.201).
+
+**When to Execute**: always, when a review report file was written — after every edit this review
+makes to the document (fixes, Change Log rows, status), because the hash must include them. Skip it
+only when no report file exists (action plan only).
+
+```bash
+command node .agents/skills/review-task/references/record-reviewed-blob.js \
+  --doc "{task-file-path}" --report "{review report path}" --json
+```
+
+> Engine source: `references/record-reviewed-blob.js` (bundled into each skill as `references/record-reviewed-blob.js`).
+
+It writes `**reviewed_blob:** <git hash-object of the document>` under the report's `**Reviewed:**`
+line, and reads it back. Read `reason`: `written` needs nothing; any other value (`no-doc`,
+`no-report`, `git-failed`, `unreadable-after-write`) is logged and the review continues — the cost of
+a missing stamp is one re-review, never a halt. **Edit the document after this step and the stamp is
+stale by design**: Step 2 then reviews it again.
+
 ---
 
 ### Step 10: Post Tracker Comment (graceful — non-blocking)

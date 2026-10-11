@@ -20,8 +20,9 @@ recorded in the task's Important Clarifications: the invoker approves waivers, a
 
 ### Phase 1: Step timestamps
 
-- Add a `Completed (UTC)` column to the Pipeline Progress table in
-  `shared/resources/implementation-report-template.md`.
+- Append a `Completed (UTC)` column (last, after `Subagent summary ref`) to the Pipeline Progress
+  table of all three variants in `shared/resources/implementation-report-template.md`; update every
+  reader the task's Phase 1 grep lists.
 - Each step doc that ticks its row writes `date -u +%Y-%m-%dT%H:%MZ` into it.
 - Verify: a dry run produces one timestamp per completed step; resume does not overwrite earlier ones.
 
@@ -34,10 +35,11 @@ recorded in the task's Important Clarifications: the invoker approves waivers, a
 - Parse `--base`, `--target`, `--defaults` from the skill arguments in `develop-{story,task}`.
 - §0f: add a source per line (`flag` / `policy` / `recommended` / `asked`).
 - Persist resolved answers in the run state / lock; §0b resume reads them back before asking.
-- `develop-next:126` and `develop-batch:287-289`: replace the prose directive with `--defaults`
-  (coordinate with bug.18).
-- Verify: the resolver's case table, each case mutation-proved; a guard test that no orchestrator
-  directive names a Q1/Q2 branch literal.
+- `develop-next:126` and `develop-batch:296-310`: replace the directive's Phase 0d/0b answer
+  sentences with `--defaults` (the directive itself stays; bug.18 has landed). Update the tests that
+  pin `AUTONOMOUS RUN` (task § Tests).
+- Verify: the resolver's case table, each case mutation-proved; the existing branch-literal guard
+  (bug.18) extended to assert `--defaults`.
 
 ### Phase 3: Step 2 reuse
 
@@ -46,18 +48,19 @@ recorded in the task's Important Clarifications: the invoker approves waivers, a
   review's own edits do not invalidate it.
 - In `shared/resources/develop-pipeline-step-2-review.md`: before invoking `review-*`, find the newest
   co-located review/validate artifact; if its `reviewed_blob:` equals `git hash-object` of the current
-  document, skip and log `Step 2 reused: <artifact>`. An artifact with no `reviewed_blob:` (written
-  before this change) is never reused.
+  document, skip and log `Step 2 reused: <artifact>`. Implement it inside `classifyReviewReport` in
+  `shared/resources/review-report-freshness.js`: `reviewed_blob:` present → hash equality decides;
+  absent (a report written before this change) → today's date verdict, unchanged.
 - Verify: an edited document after review is re-reviewed; an unedited one is not; a legacy artifact
-  without the field is not reused.
+  without the field gets today's date verdict.
 
 ### Phase 4: Speed modes and waivers
 
 - `shared/resources/develop-pipeline-lite-mode.md`: add `fast`, the skip vocabulary
   (`review`, `qa-depth`, `review-pr-depth`) and the floor list.
-- Read `pipeline.defaultMode` and `pipeline.skippable` from `skills-config.yaml`; refuse a skip
+- Read `develop.defaultMode` and `develop.skippable` from `skills-config.yaml`; refuse a skip
   outside the allow-list. `develop-next` and `develop-batch` take no `--mode` flag: they run `fast`
-  only through `pipeline.defaultMode` (owner decision).
+  only through `develop.defaultMode` (owner decision).
 - `waiver.approved_by` is the invoking developer (`git config user.name`).
 - QA loop and finalise: a skipped step writes `gate: WAIVED` with `waiver.reason` and
   `waiver.approved_by`; the DoD renders the waiver.

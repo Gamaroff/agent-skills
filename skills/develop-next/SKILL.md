@@ -121,14 +121,18 @@ Act on the JSON `status`:
 
 ## Step 2 — Dispatch the pipeline
 
-Invoke the item's named command (`/develop-story <path>`, `/develop-task <path>` or `/develop-bug <path>`), prepending this directive to the invocation context (same mechanism as the lite-mode directive in `develop-pipeline-autonomous-defaults.md` — the pipeline's own reference files are AUTO-GENERATED and must not be edited). Mark `dispatched: true` in the run state.
+Invoke the item's named command **with `--defaults`** (`/develop-story <path> --defaults`, `/develop-task <path> --defaults` or `/develop-bug <path> --defaults`), prepending this directive to the invocation context (same mechanism as the lite-mode directive in `develop-pipeline-autonomous-defaults.md` — the pipeline's own reference files are AUTO-GENERATED and must not be edited). Mark `dispatched: true` in the run state.
 
-> **AUTONOMOUS RUN (develop-next):** For the Phase 0d Upfront Setup questions, take the option Phase 0d marks **(Recommended)** for **every** question without prompting — whatever that pipeline's question set is — and never substitute an answer of your own. The recommendation is derived per item: for a `/develop-story` whose epic declares `branch_model: epic-integration` it is that epic's integration branch for both the base and the PR target, and Q1 and Q2 must agree. For `/develop-bug`, Q1 is the branch model (**bugfix** unless the bug is explicitly a production regression), with Q2 base branch and Q3 PR target auto-derived from Q1 — do **not** re-map the story/task Q-numbers onto it. For the Phase 0b resume prompt, take the option Phase 0b marks **(Recommended)** — after a finalise DoD-gaps halt that is "Re-enter QA at 5a"; only when no option is marked, choose "Resume from last completed step". Record every auto-answer, and the option it took, in the Decisions Log. All existing HALT conditions remain HALTs.
+> **AUTONOMOUS RUN (develop-next):** The command carries `--defaults`, so the Phase 0d Upfront Setup questions resolve to the option Phase 0d marks **(Recommended)** without prompting — whatever that pipeline's question set is, derived per item by Phase 0d's own answer resolution, never restated here. Never substitute an answer of your own. If Phase 0d still has a question to ask (a conflict it states rather than settles), HALT and report it: nobody is present to answer. For the Phase 0b resume prompt, take the option Phase 0b marks **(Recommended)** — after a finalise DoD-gaps halt that is "Re-enter QA at 5a"; only when no option is marked, choose "Resume from last completed step". Record every auto-answer, and the option it took, in the Decisions Log. All existing HALT conditions remain HALTs.
 
-The directive names no branch, on purpose. Phase 0d derives the base and PR target per item: an
-`epic-integration` story's answer is its epic's integration branch, everything else gets `develop`,
+The directive names no branch and no question, on purpose. `--defaults` hands the answers to Phase
+0d's answer resolution (`pipeline-answers.js`, task.201), which derives the base and PR target per item:
+an `epic-integration` story's answer is its epic's integration branch, everything else gets `develop`,
 exactly as an interactive run that accepts the recommendations would. A directive that states the
-answer as a constant overrides that derivation for exactly the items it exists for (bug.18).
+answer as a constant overrides that derivation for exactly the items it exists for (bug.18), and one
+that restates the question set drifts from it — this one did, until task.201 replaced it with the flag.
+Speed is not chosen here either: `develop-next` takes no `--mode`, and an unattended run is `fast`
+only when the repository owner sets `develop.defaultMode: fast`.
 `evals/shared/tests/orchestrator-directive-branch-literal.test.mjs` fails on any branch literal in this
 directive. (`develop-batch`'s may name the base its worktree was cut from, but only beside a HALT for
 an integration branch.)
