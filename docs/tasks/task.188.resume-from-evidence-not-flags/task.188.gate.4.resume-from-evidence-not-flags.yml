@@ -1,0 +1,58 @@
+schema: 2
+task: 'task.188.resume-from-evidence-not-flags'
+task_title: 'Resume from evidence, not flags'
+gate: PASS
+status_reason: 'Cycle 3 fixes hold (CR3-1..CR3-3 closed). All functional criteria held by executed and shape tests; the fast gate is green. Two advisory LOW items remain, recorded as future work.'
+reviewer: 'QA Engineer'
+head: '30046a6c2e829c8767c8f78d697c078a94fcdf0d'
+updated: '2026-10-11T14:52:34Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 122
+  phases_verified: '4/4'
+  ci: 'not read at QA (gated at finalise)'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+bug_resolution:
+  previous_gate: 3
+  closed: ['CR3-1', 'CR3-2', 'CR3-3']
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Boundary: true (the merge verdict and reconciliation refuse on platform and repository state). No security-probe entry form reaches a fenced prose block; the executed fixture harness covers the hostile states. Finalise needs a recorded DoD override until task.181 shell-argv exists.'
+  performance:
+    status: PASS
+    notes: 'One gh pr view per merge and per resume.'
+  reliability:
+    status: PASS
+    notes: 'Reconciliation advances flags only from evidence; every could-not-look state halts.'
+  maintainability:
+    status: PASS
+    notes: 'Blocks are self-contained and executed by the guard harness; rules stated once.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Tick-block header comment says "Four answers" but lists five (reviewer cycle 4 CR-2, cleanup) — drop the count.'
+      refs: ['skills/develop-next/SKILL.md']
+    - action: 'The uncommitted check maps a failed git diff (exit 128, e.g. no HEAD) to uncommitted rather than unknown (reviewer cycle 4 CR-1, low/medium) — both halt, so only the message differs.'
+      refs: ['skills/develop-next/SKILL.md']
+    - action: 'DoD override for the zero-probe prose boundary; a Bitbucket stub for the guard test; re-query .state on the Bitbucket merge arm.'
+      refs: ['shared/resources/tests/merge-delete-branch-guard.test.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

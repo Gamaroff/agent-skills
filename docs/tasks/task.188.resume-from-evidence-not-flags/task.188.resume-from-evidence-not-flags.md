@@ -435,25 +435,25 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-11
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.188.qa.3.resume-from-evidence-not-flags.md](./task.188.qa.3.resume-from-evidence-not-flags.md)
-- **Gate File**: [task.188.gate.3.resume-from-evidence-not-flags.yml](./task.188.gate.3.resume-from-evidence-not-flags.yml)
+- **Full Report**: [task.188.qa.4.resume-from-evidence-not-flags.md](./task.188.qa.4.resume-from-evidence-not-flags.md)
+- **Gate File**: [task.188.gate.4.resume-from-evidence-not-flags.yml](./task.188.gate.4.resume-from-evidence-not-flags.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 115
+- **Tests Executed**: 122
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-- Cycle 2's four findings are fixed.
-- CR3-1 (medium): an uncommitted Step 4 tick reads `not-ticked`; CR3-2, CR3-3 (low): a reconciled merge skips Step 3's post-merge items; the success line prints over a failed write.
+- Four QA cycles: 3 + 4 + 3 findings fixed; cycle 4 found two advisory LOW items (recorded as future work).
+- Security is `reasoned` with `probes_executed: 0` — the boundary is prose no probe entry form reaches; finalise needs a DoD override.
 
 <!-- change-log-start -->
 ## Change Log
@@ -471,6 +471,7 @@ None.
 | 2026-10-11 |  | QA findings fixed — CR2-1 (merge reconciliation resolves its own platform), CR2-2 (ticked-unpushed answer), CR2-3 (branch fallback needs accepted), CR2-4 (Bitbucket claim scoped); 2 new executed cases, 1 shape test, 2 iterations | qa-fix |
 | 2026-10-11 |  | QA gate CONCERNS (90/100) — 3 findings (1 medium, 2 low); cycle 2's four closed | qa-task |
 | 2026-10-11 |  | QA findings fixed — CR3-1 (uncommitted roadmap edits halt), CR3-2 (reconciled merge runs Step 3's post-merge items), CR3-3 (failed write halts); reconstruction table synced; 2 new executed cases, 3 iterations | qa-fix |
+| 2026-10-11 |  | QA gate PASS (100/100) — cycle 3's three closed; 2 advisory LOW items to future work | qa-task |
 <!-- change-log-end -->
 
 ---
