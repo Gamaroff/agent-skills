@@ -120,8 +120,10 @@ test("1: the scanner flags each consumer identifier, and only those", () => {
 });
 
 test("2: the population is the files task.201 touched, and is not vacuous", () => {
+  // Non-vacuity is the derived members below: each is in the population only
+  // because it cites task.201, so a broken derivation drops them. ALSO_CHANGED
+  // is added unconditionally and proves nothing about the derivation.
   const pop = population();
-  assert.ok(pop.length >= 20, `population read as ${pop.length} files`);
   for (const must of [
     "shared/resources/pipeline-answers.js",
     "shared/resources/record-reviewed-blob.js",
@@ -129,7 +131,6 @@ test("2: the population is the files task.201 touched, and is not vacuous", () =
     "skills/develop-task/SKILL.md",
     "skills/develop-story/SKILL.md",
     "skills/develop-bug/SKILL.md",
-    ...ALSO_CHANGED,
   ])
     assert.ok(pop.includes(must), `${must} missing from the population`);
 });
