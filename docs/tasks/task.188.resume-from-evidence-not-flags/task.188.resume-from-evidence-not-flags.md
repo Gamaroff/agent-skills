@@ -8,7 +8,7 @@ category: refactoring
 status: planned
 priority: Medium
 created: 2026-10-07
-updated: 2026-10-07
+updated: 2026-10-11
 assignee:
 estimated_effort_hours: 16
 github_issue: 587
@@ -146,8 +146,10 @@ flowchart TD
   H -- no --> R[reconcile: PR state → merged; roadmap row on origin → ticked]
   R --> M{merged?}
   M -- no --> D{dispatched?}
-  D -- yes --> S3[Step 3: merge]
-  D -- no --> S2[Step 2: dispatch]
+  D -- yes --> AC{document accepted?}
+  AC -- yes --> S3[Step 3: merge]
+  AC -- no --> S2[Step 2: dispatch]
+  D -- no --> S2
   M -- yes --> T{ticked?}
   T -- no --> S4[Step 4: tick]
   T -- yes --> S5[Step 5: report, delete run state]
@@ -220,6 +222,11 @@ None. New run-state fields are additive and default to `false`/`null`. An existi
 - [ ] Step 0.1: check `halted` first; surface the implementation report's escalation block (fallback
   `.claude/state/develop-pipeline.last-halt.json`); STOP. Say how an operator clears it (fix, then
   set `halted: false` or delete the file).
+- [ ] Step 0.1: route `dispatched: true, merged: false` to Step 3 **only when the document reads
+  `accepted`** (bug: `closed`); otherwise re-dispatch Step 2 with `--defaults`, so the pipeline's
+  Phase 0b offers its own resume option (after a finalise DoD-gaps halt: "Re-enter QA at 5a").
+  Without this, a cleared `halted: false` run still lands in Step 3 and HALTs on "not accepted"
+  every time (observation #9, task.201 on 2026-10-11).
 - [ ] skill-shape test: the halt branch precedes the routing sentence in Step 0.1, and Step 2 names
   `halted: true`.
 
@@ -312,6 +319,9 @@ Not applicable: one extra `gh pr view` call per merge and per resume.
 - [ ] develop-next's run state documents `halted`, `haltKind` and `prNumber`; Step 2 writes
   `halted: true` on a pipeline HALT; Step 0.1 checks `halted` before any routing — held by
   `evals/develop-next/protocol/skill-shape.test.mjs` (Phase 2).
+- [ ] A cleared run (`halted: false`, `dispatched: true`, `merged: false`) whose document is not
+  `accepted` routes to Step 2 with `--defaults`, never Step 3 — held by
+  `evals/develop-next/protocol/skill-shape.test.mjs` (Phase 2).
 - [ ] Both skills' Step 0.1 reconciles `merged` from the PR state, and develop-next reconciles
   `ticked` from the roadmap row, before routing — held by both skill-shape tests (Phase 3).
 - [ ] The roadmap-row check, lifted and run against a fixture, reports ticked for an `[x]` row and
@@ -387,13 +397,13 @@ None.
 - **Non-critical**: a resume that STOPs on a stale `halted` flag → forward-fix the clearing note.
 
 ---
-
 <!-- change-log-start -->
 ## Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-10-07 | 1.0 | Initial draft — cut from observations #180, #197, #286 | create-task |
+| 2026-10-11 | 1.1 | Folded in observation #9: a dispatched, unmerged run whose document is not accepted re-dispatches Step 2, never Step 3 (Phase 2 item, criterion, diagram) | Claude |
 <!-- change-log-end -->
 
 ---
@@ -423,6 +433,7 @@ None.
 - Observation #180 — develop-next resume trusts stale run-state flags over the PR and tick they summarise
 - Observation #197 — develop-next GitHub merge arm reads gh pr merge's exit code as the verdict; a post-merge network failure reads as not merged
 - Observation #286 — develop-next resume has no recorded halt: a HALTed pipeline routes to Step 3 (carrier for #195)
+- Observation #9 (2026-10-11) — develop-next resume maps dispatched-not-merged to Step 3 even when the pipeline HALTed; after a fix, the run must re-dispatch Step 2, not merge
 - `shared/resources/tests/merge-delete-branch-guard.test.mjs` (task.147) — the merge-site harness this task extends
 
 ---
