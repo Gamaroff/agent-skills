@@ -498,6 +498,32 @@ Each agent returns YAML. Capture: `AC_RESULT`, `SECURITY_RESULT`, `COMPLIANCE_RE
 > them in from the paths it returns, and treat a `--cases-file` it ran but did not save as
 > `probes_executed` that cannot be re-run: re-dispatch once, asking for the file (obs #299).
 
+> **When the record is still absent, `/finalise` runs the probe itself (obs #10).** A read-only
+> agent may refuse to create the engine's sandbox or its record. It then returns `probes_executed: 0`,
+> the `probe mode executed no candidates` FAIL and its `probe_command`. That FAIL describes the agent's
+> tool class, not the boundary. On task.201 it would have reached Step 6 as a security FAIL on a
+> boundary that held (72 executed, 0 reproduced). Before Step 3c, when `boundary: true` and this run's
+> `${STEM}.dod.${DOD_N}.security.run.json` is in neither the work-item directory nor a path the agent
+> returned:
+>
+> 1. **Cases.** If `probe_command` passes `--cases-file` and that file is absent, write the agent's
+>    `probe_cases` to it, under the work-item directory. With neither, re-dispatch once, asking for them.
+> 2. **Run.** First check that the command's `--record` is this run's record path in the work-item
+>    directory. Correct a command that records anywhere else; do not run it as given. Then run it from
+>    the repository root.
+> 3. **Replace, from the record.** Set `probes_executed` to its `totals.executed`. Rebuild `probes[]`
+>    from the engine's `cases[]`, keeping each whose outcome differs from its direction, with its input
+>    verbatim. When the count is non-zero, drop the agent's `probe mode executed no candidates` check.
+>    Recompute `overall` from what remains: FAIL if any check or general check FAILs or any probe
+>    reproduced, otherwise PASS. A rebuilt probe carries **no `severity`**, so Step 8a reads it as not-low and halts.
+>    Re-dispatch the agent with the record path if you want it graded.
+> 4. **Say so.** Add `- Probe run by /finalise — the security agent could not execute it` under the
+>    security section's Probe Results.
+>
+> A zero from this run still takes the zero-guard: then the engine declined the entry, which is the
+> guard's real case. With no `probe_command` either, the zero-guard stands and the section is
+> re-dispatched once.
+
 > **`SECURITY_RESULT` carries a `boundary:` flag and, when it is true, `probes_executed:` and `probes[]`.**
 > `boundary: true` means the security agent's Step 1b identified a **boundary deliverable** — a predicate,
 > validator, classifier or allow/deny-list — and it then generated candidate inputs, **executed** them
