@@ -5,7 +5,7 @@ How to use this document: work top to bottom. Only `[ ]` rows are candidates; `[
 [`roadmap-history.md`](./roadmap-history.md), so a `deps:` entry naming no current row means
 _already shipped_, not an error. Resolve any such reference there.
 
-**Phases 1 through 8 are complete and archived** to
+**Phases 1 through 9 are complete and archived** to
 [`roadmap-history.md`](./roadmap-history.md) — resolve any `deps:` naming a row you cannot find here
 against that file. The rows under "Deferred / human-gated" remain invisible to selection.
 
@@ -20,7 +20,7 @@ finished work. Rules:
 §"Registry fallback frontier".
 
 Add a phase only to express *sequencing* the registries cannot: a deliberate order, a dependency
-chain, a human gate. **Phase 9 is fully ticked** (B18, T201 — closed 2026-10-11); archive it at the next housekeeping. Phase 8 (T186) closed 2026-10-06.
+chain, a human gate. **Phase 10 is open** (T188, ahead of the registry's T175). Phase 9 (B18, T201) closed and was archived 2026-10-11.
 
 > ⚠️ **A phase costs upkeep that a registry row does not, and the cost is not obvious.** Roadmap rows
 > are matched on the **checkbox alone** — they do **not** consult the target document's frontmatter.
@@ -69,17 +69,16 @@ Read only by `--batch`. Two rows conflict when they share a tag that **either** 
 
 ---
 
-## PHASE 9 — up-front pipeline answers (opened 2026-10-09)
+## PHASE 10 — resume from evidence (opened 2026-10-11)
 
-An **override**: without it the registry fallback selects B18 (bugs outrank tasks) and then every
-lower-numbered task before T201 — 175, 180, 181, 184, 188–195 and 196–200 — because T201 is `Medium`
-with the highest number. T201 goes second because its Phase 2 replaces the orchestrators' prose
-directive with `--defaults` and "depends on bug.18's directive fix landing first". **Tick each row
-`[x]` the moment its item is closed or accepted** — a phase row is matched on its checkbox, not the
-document.
+An **override**: without it the registry fallback selects T175, then 180, 181 and 184 before T188,
+because the fallback takes the lowest-numbered task. T188 goes first because the defect it fixes
+stalls an unattended loop: a `/develop-next` run whose pipeline HALTed resumes into Step 3 and
+HALTs on "not accepted" every time, even after the halt is cleared (obs #9, folded into task.188
+v1.1; also obs #180, #197, #286). **Tick the row `[x]` the moment the task is accepted** — a phase
+row is matched on its checkbox, not the document.
 
-- [x] **B18** `develop-next` and `develop-batch` hardcode the Phase 0d base branch, overriding `epic-integration` · deps: none · touches: orchestrators!, pipeline-steps~, selection~ · /develop-bug docs/bugs/bug.18.autonomous-runs-hardcode-base-branch/bug.18.autonomous-runs-hardcode-base-branch.md — ✅ **accepted + merged** ([PR #625](https://github.com/Gamaroff/agent-skills/pull/625), `748eb85e`; DoD accepted, verify PASS in 1 cycle, CI 5/5). `develop-next`'s directive names no branch; `develop-batch`'s names its worktree base only beside an integration-branch HALT; `--batch` excludes `epic-integration` stories. **T201 is unblocked.**
-- [x] **T201** Pipeline up-front answers and speed modes · deps: B18 · touches: pipeline-steps!, orchestrators~, pipeline-lock~, bundles~, test-harness~, docs-pipeline~ · /develop-task docs/tasks/task.201.pipeline-upfront-answers-and-speed-modes/task.201.pipeline-upfront-answers-and-speed-modes.md — ✅ **accepted + merged** ([PR #632](https://github.com/Gamaroff/agent-skills/pull/632), `b5a266ff`; QA PASS 100/100 after 8 cycles, DoD accepted on run 3, CI 5/5). Phase 0d answers resolve flag → policy → recommendation → ask in `pipeline-answers.js`; `--defaults` replaces the orchestrator directive; `--mode fast` / `--skip` within `develop.skippable` gate as WAIVED; Step 2 reuses a current review by blob; per-step UTC timestamps.
+- [ ] **T188** Resume from evidence, not flags · deps: none · touches: orchestrators!, test-harness~ · /develop-task docs/tasks/task.188.resume-from-evidence-not-flags/task.188.resume-from-evidence-not-flags.md
 
 ---
 
@@ -94,7 +93,7 @@ Rows here are invisible to selection. Move a row up into a phase when it becomes
 
 ## Housekeeping
 
-- [x] Archive accepted rows to `roadmap-history.md` at each phase close — Phase 5 archived 2026-09-12; Phases 6, 7 and 8 archived 2026-10-06
+- [x] Archive accepted rows to `roadmap-history.md` at each phase close — Phase 5 archived 2026-09-12; Phases 6, 7 and 8 archived 2026-10-06; Phase 9 archived 2026-10-11
 - [ ] If a phase is ever re-opened: tick its rows `[x]` as each item is accepted — an unticked row for an accepted item is still selected and stalls the loop
 
 **Registry-selected items need no row here.** When selection falls through to the registries (the
@@ -194,3 +193,5 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-10-09 | **Phase 9 opened** with two rows, B18 then T201, as an override ahead of the registry fallback, which would select B18 first but then every lower-numbered task (175, 180, 181, 184, 188–200) before T201. Reason: T201 Phase 2 replaces the orchestrator directive bug.18 corrects, and its registry row already declares `bug.18` as a dependency. Both documents were filed the same day (issues #620, #621). |
 | 2026-10-10 | **B18 closed — PR #625 merged** (`748eb85e`). Both autonomous-orchestrator directives stated Phase 0d's per-item branch answers as constants, overriding the integration branch Phase 0d recommends for an `epic-integration` story. `develop-next` now takes the Recommended option and names no branch. `develop-batch` names `<baseBranch>`, its worktree's base, only beside a HALT for an integration branch: the review (CR-1/CR-2) showed that blind deferral would HALT every item on a non-`develop` base, because Phase 0d's own option reads `develop`. `select-next.mjs --batch` excludes `epic-integration` stories with a logged reason, and names an epic it cannot find in `lint.warnings` (CR-3). A per-orchestrator guard (`orchestrator-directive-branch-literal.test.mjs`) is red on both pre-fix SKILL.md files, and 6 selector cases were added. One verify cycle, 3 non-blocking review findings applied; `/finalise --bug` accepted; `npm run ci` green. Observations #2 (Step 3's verify-green table has no bug row) and #3 (finalise's CI-reading-2 floor counts duplicated rollup entries) logged. **T201 is next.** |
 | 2026-10-11 | **T201 accepted + merged — PR #632 merged** (`b5a266ff`). The develop pipelines take their Phase 0d answers and their speed up front. One engine, `pipeline-answers.js`, resolves each answer flag → policy → recommendation → ask, asking only on a conflict it states; `develop-next` and `develop-batch` pass `--defaults` instead of restating the question set (the bug.18 class). `--mode standard\|lite\|fast` and `--skip` are bounded by `develop.defaultMode` / `develop.skippable` (empty by default), and a skip makes the gate `WAIVED` with reason and approver, never `PASS`; the floor steps cannot be skipped. Step 2 reuses a review whose `reviewed_blob:` matches the document; implementation reports carry a UTC timestamp per step. QA ran 8 cycles in three passes: DoD runs 1 and 2 each found gaps only in AC10 (consumer names, limits from config), closed by test changes that re-entered QA at 5a; run 3 accepted 12/12 (72 probes, 0 reproduced). 5c APPROVE (pr-review.3). Merge gate `npm run ci` green (5305 tests). Issue #621 closed. Phase 9 is fully ticked — archive it at the next housekeeping |
+| 2026-10-11 | **Phase 9 archived** to `roadmap-history.md`. Both rows (B18, T201) moved verbatim with their `touches:` tags and acceptance annotations, so a `deps:` naming either still resolves there. |
+| 2026-10-11 | **Phase 10 opened** — T188 (resume from evidence, not flags) ahead of the registry fallback's T175. Obs #9 showed that a `/develop-next` run whose pipeline HALTed loops on Step 3's "not accepted" HALT even after the halt is cleared; T188 v1.1 carries the fix. A one-row override; archive it when T188 is accepted. |
