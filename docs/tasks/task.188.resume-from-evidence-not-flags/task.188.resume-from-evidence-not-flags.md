@@ -5,7 +5,7 @@ type: task
 description: "develop-next and develop-batch resume from the PR's state and the roadmap tick rather than their own run-state flags: a merge is judged by the PR's state, not gh pr merge's exit code; a pipeline HALT is recorded in the run state and surfaced on resume; and stale merged/ticked flags are reconciled before routing."
 tags: [develop-next, develop-batch, observation, run-state, resume, merge]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-10-07
 updated: 2026-10-11
@@ -16,7 +16,8 @@ github_issue: 587
 
 # Technical Task: Resume from evidence, not flags
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.188.review.1.resume-from-evidence-not-flags.md` implemented 2026-10-11
 **GitHub Issue**: [#587](https://github.com/Gamaroff/agent-skills/issues/587)
 
 ---
@@ -77,7 +78,7 @@ guard test and both skill-shape tests; a CHANGELOG entry.
 
 ### Current Architecture
 
-Line numbers are from `develop` at `0b6003fe`, paired with the text they point at.
+Line numbers are from `develop` at `d91baba2` (re-anchored at review; first written against `0b6003fe`), paired with the text they point at — the text is the authority if they drift again.
 
 - **develop-next run state** (`skills/develop-next/SKILL.md:37`, `## Run state (crash safety +
   single-flight)`): `item`, `source`, `command`, `commandArg`, `dispatched`, `merged`, `ticked`,
@@ -90,22 +91,24 @@ Line numbers are from `develop` at `0b6003fe`, paired with the text they point a
   selection.
 - **develop-next Step 2** (`:122`): on a pipeline HALT, "Leave the run-state file in place so the
   next invocation resumes here". No field records the HALT.
-- **develop-next Step 3 GitHub merge arm** (`:313`, `gh pr merge "$PR_ID" --"$mergeStrategy"
-  --delete-branch`, and `:318`, the dirty-tree arm `|| { echo "HALT: gh pr merge failed …"; exit 1;
-  }`): the exit status is the verdict. The Bitbucket arm (`:303`) checks `.state = "MERGED"` from the
-  response, and its parsing note (`:330`) says "Never retry a merge on a parse error — re-query …
+- **develop-next Step 3 GitHub merge arm** (`:346`, `gh pr merge "$PR_ID" --"$mergeStrategy"
+  --delete-branch`, and `:351`, the dirty-tree arm `|| { echo "HALT: gh pr merge failed …"; exit 1;
+  }`): the exit status is the verdict. The Bitbucket arm (`:336`) checks `.state = "MERGED"` from the
+  response, and its parsing note (`:363`) says "Never retry a merge on a parse error — re-query …
   `.state` first".
-- **develop-next Step 4 roadmap arm** (`:392`, `### \`item.source\` = \`roadmap\``) ticks the row
+- **develop-next Step 4 roadmap arm** (`:425`, `### \`item.source\` = \`roadmap\``) ticks the row
   `[x]` and **adds a Change Log row**. Running it twice adds two rows. The registry arms answer
-  `already` through `registry-tick.js` (`:447`, `Then log \`already\` and mark \`ticked: true\``).
+  `already` through `registry-tick.js` (`:480`, `Then log \`already\` and mark \`ticked: true\``).
 - **develop-batch** already records halts per item: `"halted": false`, `"haltKind": null` and
-  `"prNumber": null` in the item schema (`skills/develop-batch/SKILL.md:96-113`), set by Step 2's
-  report table (`:328`, `| **HALT** — its own gate failed … | \`halted: true\` + \`haltKind\` + the
+  `"prNumber": null` in the item schema (`skills/develop-batch/SKILL.md:104-112`), set by Step 2's
+  report table (`:344`, `| **HALT** — its own gate failed … | \`halted: true\` + \`haltKind\` + the
   report verbatim`). Its Step 0.1 (`:138`, `1. **Run-state check.**`) routes on flags with no
-  query, and its Step 3 merge (`:492`, `gh pr merge <PR#> --<mergeStrategy> --delete-branch`) has the
+  query, and its Step 3 merge (`:513`, `gh pr merge <PR#> --<mergeStrategy> --delete-branch`, and `:517`, the
+  dirty-tree arm `gh pr merge <PR#> --<mergeStrategy> || exit 1`) has the
   same exit-code verdict.
 - **The pipeline's own halt snapshot** is `.claude/state/develop-pipeline.last-halt.json`, written by
-  a terminal HALT (`shared/resources/advance-pipeline-lock.sh:61`).
+  a terminal HALT (`shared/resources/advance-pipeline-lock.sh:61`). It is the lock plus `halted_at`,
+  `halt_reason` and `halt_step`, so it also carries the lock's `pr_url` (written at Step 4).
 - **Tests.** `shared/resources/tests/merge-delete-branch-guard.test.mjs` lifts every
   `gh pr merge … --delete-branch` block from shipped sources (floor 2: develop-next and develop-batch)
   and runs it against a `gh` stub that records argv, under bash and zsh. Its cases include "a refused
@@ -124,8 +127,13 @@ Line numbers are from `develop` at `0b6003fe`, paired with the text they point a
   note it generalises, and cited from develop-batch.
 - **A recorded HALT.** develop-next's run state gains `halted`, `haltKind` and `prNumber` with
   develop-batch's meanings. Step 2 sets `halted: true` and `haltKind` (`pipeline-halt`) and points
-  at the implementation report. Step 0.1 checks `halted` **first**: it surfaces the report's
-  escalation block (or `develop-pipeline.last-halt.json` when the report has none) and STOPs. A
+  at the implementation report. `prNumber` comes from the PR number in the pipeline's lock or halt
+  snapshot `pr_url` (written at Step 4), falling back to the implementation report's `**PR**:` line;
+  it stays `null` when the pipeline halted before Step 4. Step 0.1 checks `halted` **first** and
+  surfaces, verbatim: `halt_step` and `halt_reason` from `develop-pipeline.last-halt.json` when
+  present; the report's QA-loop escalation entry when the QA loop wrote one (only loop-limit and
+  not-converging halts do); otherwise the report's newest Issues Log entry and its `**Final
+  Status**:` line. Then it STOPs. A
   `halted` run never routes to Step 3.
 - **Reconciliation before routing.** A new first item in Step 0.1 of both skills, before the
   existing routing:
@@ -155,10 +163,32 @@ flowchart TD
   T -- yes --> S5[Step 5: report, delete run state]
 ```
 
+### Reconstruction states
+
+The states Step 0.1 must hold in, after the halt check and the reconciliation (develop-next):
+
+| Run-state flags (after reconciliation)        | Platform / tree evidence                         | Route                                  |
+| --------------------------------------------- | ------------------------------------------------ | -------------------------------------- |
+| `halted: true` (any other flags)               | —                                                | surface the HALT, STOP                 |
+| `dispatched: false`                            | no PR found                                      | Step 2                                 |
+| `dispatched: true, merged: false`              | document `accepted` (bug: `closed`), PR `OPEN`   | Step 3                                 |
+| `dispatched: true, merged: false`              | document not `accepted` / not `closed`           | Step 2 with `--defaults` (obs #9)      |
+| `dispatched: true, merged: false`              | PR `CLOSED` unmerged                             | Step 3, whose verdict HALTs on `CLOSED` |
+| `merged: false` → `true` (reconciled)          | PR `MERGED` (obs #180)                           | continue down this table               |
+| `merged: true, ticked: false`, roadmap source  | row unticked on `origin/<baseBranch>`            | Step 4                                 |
+| `merged: true, ticked: false` → `true`         | row ticked on origin, or archived as accepted    | Step 5                                 |
+| `merged: true, ticked: false`, registry source | —                                                | Step 4 (its arm answers `already`)     |
+| `merged: true, ticked: true`                   | crash between the tick and Step 5's delete       | Step 5                                 |
+
+No PR found (`prNumber` null and the branch query empty) leaves `merged` as recorded. A PR query that
+fails (network, auth) leaves the flags as recorded and routes on them, as today — reconciliation can
+only advance a flag, never clear one.
+
 ### Important Clarifications
 
 - develop-batch already has `halted`/`haltKind`. This task adds no field to it; it adds the
-  reconciliation block and the merge verdict.
+  reconciliation block (`merged` only) and the merge verdict. Reconciling develop-batch's `ticked`
+  is out of scope: its tick reuses develop-next Step 4 per item, and is a Future Improvement below.
 - The pipeline's own lock and Phase 0b resume are unchanged. Step 0.2 (the pipeline-lock check)
   still re-enters a pipeline that is mid-flight.
 
@@ -200,12 +230,12 @@ None. New run-state fields are additive and default to `false`/`null`. An existi
 **Risk**: Medium (a merge site). **Files**: `skills/develop-next/SKILL.md`,
 `skills/develop-batch/SKILL.md`, `shared/resources/tests/merge-delete-branch-guard.test.mjs`.
 
-- [ ] develop-next Step 3 GitHub arm: bind `STATE` from `gh pr view --json state` after the merge in
+- [x] develop-next Step 3 GitHub arm: bind `STATE` from `gh pr view --json state` after the merge in
   both branches of the clean/dirty `if`; `MERGED` continues, anything else HALTs with real
   `exit 1`.
-- [ ] State the rule once beside the Bitbucket parsing note; develop-batch Step 3 cites it and
+- [x] State the rule once beside the Bitbucket parsing note; develop-batch Step 3 cites it and
   applies the same block shape.
-- [ ] Extend the guard test's `gh` stub to answer `pr view --json state`, and add, per site and
+- [x] Extend the guard test's `gh` stub to answer `pr view --json state`, and add, per site and
   shell: "merge exits 1 but the PR is MERGED → block exits 0 (and the dirty arm deletes the remote
   branch)"; "merge exits 1 and the PR is OPEN → block exits 1, deletes nothing". The existing
   "refused merge" case keeps passing with the stub answering `OPEN`.
@@ -215,19 +245,20 @@ None. New run-state fields are additive and default to `false`/`null`. An existi
 **Risk**: Low. **Files**: `skills/develop-next/SKILL.md`,
 `evals/develop-next/protocol/skill-shape.test.mjs`. **Depends on**: none.
 
-- [ ] Run-state schema: add `prNumber`, `halted`, `haltKind`; say a missing field reads as
+- [x] Run-state schema: add `prNumber`, `halted`, `haltKind`; say a missing field reads as
   `false`/`null`.
-- [ ] Step 2: on a pipeline HALT, write `halted: true`, `haltKind: "pipeline-halt"` before stopping.
-  Record `prNumber` when the pipeline reports one.
-- [ ] Step 0.1: check `halted` first; surface the implementation report's escalation block (fallback
-  `.claude/state/develop-pipeline.last-halt.json`); STOP. Say how an operator clears it (fix, then
+- [x] Step 2: on a pipeline HALT, write `halted: true`, `haltKind: "pipeline-halt"` before stopping.
+  Record `prNumber` from the lock or halt snapshot's `pr_url`, else the report's `**PR**:` line.
+- [x] Step 0.1: check `halted` first; surface the halt as Target Architecture § A recorded HALT
+  lists (snapshot `halt_step`/`halt_reason`, then the report's escalation entry or newest Issues Log
+  entry and `**Final Status**:`); STOP. Say how an operator clears it (fix, then
   set `halted: false` or delete the file).
-- [ ] Step 0.1: route `dispatched: true, merged: false` to Step 3 **only when the document reads
+- [x] Step 0.1: route `dispatched: true, merged: false` to Step 3 **only when the document reads
   `accepted`** (bug: `closed`); otherwise re-dispatch Step 2 with `--defaults`, so the pipeline's
   Phase 0b offers its own resume option (after a finalise DoD-gaps halt: "Re-enter QA at 5a").
   Without this, a cleared `halted: false` run still lands in Step 3 and HALTs on "not accepted"
   every time (observation #9, task.201 on 2026-10-11).
-- [ ] skill-shape test: the halt branch precedes the routing sentence in Step 0.1, and Step 2 names
+- [x] skill-shape test: the halt branch precedes the routing sentence in Step 0.1, and Step 2 names
   `halted: true`.
 
 ### Phase 3: Reconcile flags before routing (obs #180)
@@ -235,18 +266,18 @@ None. New run-state fields are additive and default to `false`/`null`. An existi
 **Risk**: Medium. **Files**: `skills/develop-next/SKILL.md`, `skills/develop-batch/SKILL.md`, both
 skill-shape tests. **Depends on**: Phase 2 (`prNumber`).
 
-- [ ] Move the already-done guard's PR query into one named block cited by Step 1 and Step 0.1.
-- [ ] Step 0.1 reconciliation in develop-next: PR state → `merged`; roadmap row on
+- [x] Move the already-done guard's PR query into one named block cited by Step 1 and Step 0.1.
+- [x] Step 0.1 reconciliation in develop-next: PR state → `merged`; roadmap row on
   `origin/<baseBranch>` → `ticked` (roadmap source only); then route; fully reconciled → Step 5.
-- [ ] develop-batch Step 0.1: the same reconciliation per non-terminal item with a `prNumber`.
-- [ ] skill-shape tests: reconciliation precedes routing in both skills; the routing sentence names
+- [x] develop-batch Step 0.1: the same reconciliation per non-terminal item with a `prNumber`.
+- [x] skill-shape tests: reconciliation precedes routing in both skills; the routing sentence names
   Step 5 for a reconciled file.
 
 ### Phase 4: Changelog
 
 **Risk**: Low. **Files**: `CHANGELOG.md`.
 
-- [ ] `[Unreleased]` › Fixed entry citing obs #180, #197 and #286 (#195).
+- [x] `[Unreleased]` › Fixed entry citing obs #180, #197 and #286 (#195).
 
 ---
 
@@ -404,6 +435,9 @@ None.
 |------|---------|-------------|--------|
 | 2026-10-07 | 1.0 | Initial draft — cut from observations #180, #197, #286 | create-task |
 | 2026-10-11 | 1.1 | Folded in observation #9: a dispatched, unmerged run whose document is not accepted re-dispatches Step 2, never Step 3 (Phase 2 item, criterion, diagram) | Claude |
+| 2026-10-11 | 1.2 | Review passed (8/10) — named the HALT surface and the `prNumber` source, added the reconstruction-states table, re-anchored line numbers to `d91baba2` | review-task |
+| 2026-10-11 |  | Status → ready-for-development | review-task |
+| 2026-10-11 |  | Implemented — 5 files (develop-next, develop-batch, guard test, 2 shape tests) + CHANGELOG; 33 new tests — 25 executed (bash here, bash+zsh on CI), 8 shape | develop |
 <!-- change-log-end -->
 
 ---
@@ -412,19 +446,19 @@ None.
 
 ### Phase 1: Merge verdict from the PR's state
 
-- [ ] Not started
+- [x] Complete (2026-10-11)
 
 ### Phase 2: A recorded HALT
 
-- [ ] Not started
+- [x] Complete (2026-10-11)
 
 ### Phase 3: Reconcile flags before routing
 
-- [ ] Not started
+- [x] Complete (2026-10-11)
 
 ### Phase 4: Changelog
 
-- [ ] Not started
+- [x] Complete (2026-10-11)
 
 ---
 
@@ -448,6 +482,8 @@ None.
 - Never chain the merge to the next commit: Step 4's re-sync stays a block of its own (obs #142).
 
 ### Future Improvements
+
+- Reconcile develop-batch's per-item `ticked` from the roadmap row, as develop-next does.
 
 - A Bitbucket stub for the guard test, so the Bitbucket arm's `.state` rule is executed, not only
   stated.
