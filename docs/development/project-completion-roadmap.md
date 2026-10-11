@@ -20,7 +20,7 @@ finished work. Rules:
 §"Registry fallback frontier".
 
 Add a phase only to express *sequencing* the registries cannot: a deliberate order, a dependency
-chain, a human gate. **Phase 10 is open** (T188, ahead of the registry's T175). Phase 9 (B18, T201) closed and was archived 2026-10-11.
+chain, a human gate. **Phase 10 is fully ticked** (T188 — closed 2026-10-11); archive it at the next housekeeping. Phase 9 (B18, T201) closed and was archived 2026-10-11.
 
 > ⚠️ **A phase costs upkeep that a registry row does not, and the cost is not obvious.** Roadmap rows
 > are matched on the **checkbox alone** — they do **not** consult the target document's frontmatter.
@@ -78,7 +78,7 @@ HALTs on "not accepted" every time, even after the halt is cleared (obs #9, fold
 v1.1; also obs #180, #197, #286). **Tick the row `[x]` the moment the task is accepted** — a phase
 row is matched on its checkbox, not the document.
 
-- [ ] **T188** Resume from evidence, not flags · deps: none · touches: orchestrators!, test-harness~ · /develop-task docs/tasks/task.188.resume-from-evidence-not-flags/task.188.resume-from-evidence-not-flags.md
+- [x] **T188** Resume from evidence, not flags · deps: none · touches: orchestrators!, test-harness~ · /develop-task docs/tasks/task.188.resume-from-evidence-not-flags/task.188.resume-from-evidence-not-flags.md — ✅ **accepted + merged** ([PR #634](https://github.com/Gamaroff/agent-skills/pull/634), `46223ec0`; QA PASS 100/100 after 4 cycles, DoD accepted on run 2 with a recorded security override, CI 5/5). A merge is judged by `gh pr view --json state`, not `gh pr merge`'s exit code; develop-next records a pipeline HALT (`halted`/`haltKind`/`prNumber`) and surfaces it on resume; both orchestrators reconcile `merged` (and develop-next `ticked`) from the PR and the roadmap row before routing.
 
 ---
 
@@ -195,3 +195,4 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-10-11 | **T201 accepted + merged — PR #632 merged** (`b5a266ff`). The develop pipelines take their Phase 0d answers and their speed up front. One engine, `pipeline-answers.js`, resolves each answer flag → policy → recommendation → ask, asking only on a conflict it states; `develop-next` and `develop-batch` pass `--defaults` instead of restating the question set (the bug.18 class). `--mode standard\|lite\|fast` and `--skip` are bounded by `develop.defaultMode` / `develop.skippable` (empty by default), and a skip makes the gate `WAIVED` with reason and approver, never `PASS`; the floor steps cannot be skipped. Step 2 reuses a review whose `reviewed_blob:` matches the document; implementation reports carry a UTC timestamp per step. QA ran 8 cycles in three passes: DoD runs 1 and 2 each found gaps only in AC10 (consumer names, limits from config), closed by test changes that re-entered QA at 5a; run 3 accepted 12/12 (72 probes, 0 reproduced). 5c APPROVE (pr-review.3). Merge gate `npm run ci` green (5305 tests). Issue #621 closed. Phase 9 is fully ticked — archive it at the next housekeeping |
 | 2026-10-11 | **Phase 9 archived** to `roadmap-history.md`. Both rows (B18, T201) moved verbatim with their `touches:` tags and acceptance annotations, so a `deps:` naming either still resolves there. |
 | 2026-10-11 | **Phase 10 opened** — T188 (resume from evidence, not flags) ahead of the registry fallback's T175. Obs #9 showed that a `/develop-next` run whose pipeline HALTed loops on Step 3's "not accepted" HALT even after the halt is cleared; T188 v1.1 carries the fix. A one-row override; archive it when T188 is accepted. |
+| 2026-10-11 | **T188 accepted + merged — PR #634 merged** (`46223ec0`). develop-next and develop-batch resume from evidence, not flags: the GitHub merge arm reads the PR's state after `gh pr merge` (obs #197), develop-next's run state records a pipeline HALT and Step 0.1 surfaces it before routing (obs #286, #9), and a reconcile block advances `merged` / `ticked` from the PR and the roadmap row — origin, then the local base — halting on anything it cannot read (obs #180). QA ran 4 cycles (80 → 40 → 90 → 100); 5c APPROVE. DoD run 1 stopped on the security probe zero-guard (fenced-prose boundary, no probe entry form); the operator recorded an override on the executed fixture evidence and run 2 accepted 11/11. Merge gate `npm run ci` green (5334 tests). Issue #587 closed. Phase 10 is fully ticked — archive it at the next housekeeping |
