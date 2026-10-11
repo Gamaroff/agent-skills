@@ -77,6 +77,13 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`/finalise` runs the security probe when its read-only agent cannot (obs #10).** The DoD security
+  agent is an Explore subagent, and the probe engine creates a sandbox and writes a run record. On
+  task.201 the agent refused both and returned a zero-guard FAIL on a boundary that held (72
+  executed, 0 reproduced). The agent now always returns `probe_command` (and `probe_cases` when it
+  could not write the cases file); when the record is absent, `/finalise` runs the command and takes
+  the count and probes from the record. A rebuilt probe carries no severity, so it halts rather than
+  taking the low-severity path.
 - **Handoff probes no longer hard-code one machine's observation workspace (obs #1).** A probe that
   read the observation log spelled out `/Users/<name>/.claude/projects/<encoded path>`, so on any
   other machine it read `unverifiable — command failed` because the path was wrong, not because the

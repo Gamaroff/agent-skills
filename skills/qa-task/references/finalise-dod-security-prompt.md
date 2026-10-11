@@ -168,7 +168,9 @@ does not have, add it there — every later probe then gets it for free.
 the control and you pass `--cases-file`, write it to `<STORY_DIR>/<stem>.dod.<DOD_N>.security.cases.json`,
 beside this run's record. Pass that path, never process substitution and never a temp file,
 and name it in `summary`. If you cannot write into `<STORY_DIR>`, write both the cases file and the
-record to `$TMPDIR` and return their paths, and the orchestrator copies them in. A verdict whose inputs
+record to `$TMPDIR` and return their paths, and the orchestrator copies them in. If you cannot write
+any file at all, return the cases verbatim as `probe_cases:` and the orchestrator writes them to that
+path before it runs the probe (step 3). A verdict whose inputs
 were never saved cannot be re-run. On task.173, two DoD runs gave opposite verdicts on unchanged code,
 and the earlier run's inputs no longer existed (obs #299). The record carries `<DOD_N>` for the same
 reason: a fixed record path is overwritten by the next DoD run, and the earlier DoD file's probe count
@@ -178,6 +180,13 @@ then cites a record that no longer holds it (obs #302).
 point with the sink you chose, and **run it** with `--record` so the count of what executed is
 written by the engine and not by you. Do not reason abstractly about what the code would return —
 reasoning about it is precisely what the checklist already does, and what it gets wrong.
+
+**Return the command whether or not you ran it.** `probe_command:` is the exact engine invocation
+below, with this run's `--record` path. `/finalise` runs that command itself when this run's record is
+not in the work-item directory after you return, and takes the count and the probes from the record
+it writes. If your tool class will not let you run the engine (it creates a sandbox and writes the
+record), do not compose a count. Return `probes_executed: 0`, the `probe mode executed no candidates`
+FAIL and `probe_command:`. The orchestrator's run replaces all three (obs #10).
 
 ```bash
 # The engine ships BESIDE this prompt file (in this repository: shared/resources;
@@ -333,6 +342,11 @@ security_review:
   probes_executed: 0 # REQUIRED when boundary is true. Every candidate actually run, including
     # the legitimate inputs of step 5 and every candidate that behaved correctly —
     # totals.executed from the engine's run record (--record), never composed by hand.
+  probe_command: "node <PROMPT_DIR>/security-probe.mjs --sink <sink> --entry '<entry>' --repo-root <root> --record <STORY_DIR>/<stem>.dod.<DOD_N>.security.run.json --json"
+    # REQUIRED when boundary is true, whether or not you ran it. /finalise runs it when the
+    # record is absent from the work-item directory (Step 4, step 3).
+  probe_cases: [] # ONLY when probe_command passes --cases-file and you could not write that
+    # file: the cases JSON array, verbatim. /finalise writes it to that path before running.
   probes: # only candidates that REPRODUCED a defect; [] is correct and good when none did
     - input: "svc deploy --target prod" # the candidate, verbatim and re-runnable
       expected: "denied"
@@ -356,7 +370,7 @@ lenient choice.
 
 **Probe rule**: only entries with `reproduced: true` may appear in `probes` — an unreproduced suspicion
 is not a finding and must not be reported. `boundary:` is always present; `probes_executed:` is required
-whenever `boundary: true`. If `boundary: true` and `probes_executed: 0`, `checks` must carry the `probe
+whenever `boundary: true`, and so is `probe_command:`. If `boundary: true` and `probes_executed: 0`, `checks` must carry the `probe
 mode executed no candidates` FAIL from Step 4.
 
 **Omitting a field is not a way to answer it.** A missing `boundary` is not `false` — it means the
