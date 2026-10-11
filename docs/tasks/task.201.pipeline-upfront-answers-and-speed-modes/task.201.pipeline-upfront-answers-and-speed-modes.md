@@ -8,7 +8,7 @@ category: feature
 status: ready-for-review
 priority: Medium
 created: 2026-10-09
-updated: 2026-10-10
+updated: 2026-10-11
 assignee:
 estimated_effort_hours: 24
 github_issue: 621
@@ -358,6 +358,7 @@ Post-merge only — recorded under Notes, Deferred Work.
 | Step 2 skipped on a current review | `review-report-freshness.test.mjs` blob cases (match, mismatch, legacy) |
 | ISO timestamp per step | template test asserting the `Completed (UTC)` column in all three variants |
 | Orchestrators no longer restate the questions | extended `orchestrator-directive-branch-literal.test.mjs` |
+| No consumer-specific names; all limits from `skills-config.yaml` | `pipeline-answers-generic.test.mjs` (names: the engines whole and task.201's sections, with a non-vacuity case) + `pipeline-answers-docs.test.mjs` 4a/4g (limits) — added after DoD gap 1 |
 
 ### Migration
 
@@ -513,6 +514,7 @@ hold as written.
 | 2026-10-10 |         | QA findings fixed — cycle 3, 3 findings (CR-1 merge writes the resolved waiver, tested against the doc's own jq; CR-2 column-0 key; CR-3 heredoc strip keeps continuation lines) | qa-fix |
 | 2026-10-10 |         | QA gate PASS (100/100) — 0 open findings, 1 advisory cleanup | qa-task |
 | 2026-10-10 |         | DoD incomplete — 1 gap identified (AC10 unpinned) | finalise |
+| 2026-10-11 |         | DoD gap fixed — AC10 pinned by `pipeline-answers-generic.test.mjs`; re-entering QA at 5a | develop |
 <!-- change-log-end -->
 
 ---
