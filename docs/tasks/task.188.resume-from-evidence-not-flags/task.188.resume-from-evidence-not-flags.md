@@ -455,6 +455,36 @@ None.
 - Four QA cycles: 3 + 4 + 3 findings fixed; cycle 4 found two advisory LOW items (recorded as future work).
 - Security is `reasoned` with `probes_executed: 0` — the boundary is prose no probe entry form reaches; finalise needs a DoD override.
 
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**QA Report**: `task.188.qa.4.resume-from-evidence-not-flags.md`
+**Gate File**: `task.188.gate.4.resume-from-evidence-not-flags.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 · Step 5c PR review: ✅ APPROVE
+
+### Missing Criteria:
+
+1. **Security Review:**
+   - [ ] The probe zero-guard: the Step 0.1 reconciliation and Step 3 merge-verdict blocks are a boundary (they refuse on PR state and repository state), and no probe-engine entry form reaches a fenced prose block, so `probes_executed` is 0 (`task.188.dod.1.security.run.json`: `entry-not-probeable`). Closing it takes a recorded human override — precedent task.125 / task.133 — citing the executed fixture evidence in `shared/resources/tests/merge-delete-branch-guard.test.mjs`, or task.181's `shell-argv:` engine form.
+
+All 11 success criteria pass, CI is green on `4935a1a3`, and docs and compliance pass. This is the only gap.
+
+### Next Steps:
+
+- [ ] **BLOCKING**: an operator records the security override (or defers acceptance to task.181)
+
+**Estimated Effort:** Small — an operator decision; the fix is document-only, so `/finalise` re-runs at Step 7 without re-entering QA
+
+**Gap Report Generated:** 2026-10-11
+
+**Detailed Verification Log:** See `task.188.dod.1.resume-from-evidence-not-flags.md` for complete verification evidence and timestamps.
+
+---
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -472,6 +502,7 @@ None.
 | 2026-10-11 |  | QA gate CONCERNS (90/100) — 3 findings (1 medium, 2 low); cycle 2's four closed | qa-task |
 | 2026-10-11 |  | QA findings fixed — CR3-1 (uncommitted roadmap edits halt), CR3-2 (reconciled merge runs Step 3's post-merge items), CR3-3 (failed write halts); reconstruction table synced; 2 new executed cases, 3 iterations | qa-fix |
 | 2026-10-11 |  | QA gate PASS (100/100) — cycle 3's three closed; 2 advisory LOW items to future work | qa-task |
+| 2026-10-11 |  | DoD incomplete — 1 gap identified (security probe zero-guard on a prose boundary; needs a recorded override) | finalise |
 <!-- change-log-end -->
 
 ---
