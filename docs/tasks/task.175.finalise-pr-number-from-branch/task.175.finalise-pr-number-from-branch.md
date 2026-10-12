@@ -324,19 +324,47 @@ None identified.
 ### Key Findings
 No critical issues identified. Two advisory code-review findings (CR-1 branch rung on a long-lived branch, CR-2 refusal wording) routed to future work. Security is `boundary: true` with `probes_executed: 0` — no probe entry form reaches the resolver, so finalise's zero-guard will need a recorded override.
 
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**QA Report**: `task.175.qa.1.finalise-pr-number-from-branch.md`
+**Gate File**: `task.175.gate.1.finalise-pr-number-from-branch.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+### Missing Criteria:
+
+1. **Security Review:**
+   - [ ] Probe zero-guard: no `security-probe.mjs` entry form reaches `shared/resources/resolve-pr-number.sh` (flag-parsed, `gh`-networked). The engine's 14 `shell:` runs measured the argument parser (exit 2 on every input), not the control — needs task.181's `shell-argv:` form or a recorded human override citing the executed fixture suite
+
+All eight success criteria, documentation, compliance (not applicable) and CI reading 1 (SUCCESS @ `545ca1bd14e6`) pass.
+
+### Next Steps:
+
+- [ ] **BLOCKING**: a human records a security override in a DoD run 2 (task.125 / task.133 / task.188 precedent), or task.181 lands first
+
+**Estimated Effort:** Small (record an override and re-run `/finalise`)
+
+**Gap Report Generated:** 2026-10-12
+
+**Detailed Verification Log:** See `task.175.dod.1.finalise-pr-number-from-branch.md` for complete verification evidence and timestamps.
+<!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                | Author      |
-| ---------- | ------- | ------------------------------------------ | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-02 | 1.0     | Initial draft — cut from observation #184  | create-task |
 | 2026-10-12 | 1.1     | Review passed (8/10) — rung 2 reuses `pr-read.sh`; Step 7.2's body-to-frontmatter `pr_number` write added to scope; unsourced `PR_NUMBER_ARG` dropped; anchors corrected | review-task |
 | 2026-10-12 |         | Status → ready-for-development | review-task |
 | 2026-10-12 |         | Implemented — 1 new script, 1 new test file (16 cases), 5 sources edited; 7 mutations proved red | develop |
 | 2026-10-12 |         | QA gate PASS (100/100) — 0 findings; 2 advisory code-review notes | qa-task |
-
-<!-- change-log-end -->
+| 2026-10-12 |  | DoD incomplete — 1 gap identified (security probe zero-guard) | finalise |
 
 ---
+<!-- change-log-end -->
 
 ## Progress Tracking
 

@@ -3,7 +3,7 @@
 **Task**: `task.175.finalise-pr-number-from-branch.md`
 **Run Number**: 1
 **Started**: 2026-10-12 06:06
-**Status**: In Progress
+**Status**: Halted — finalise DoD gaps
 
 ---
 
@@ -34,9 +34,9 @@ Give `/finalise` one authoritative PR-number resolver (caller → branch → loc
 | 1. create-branch           | ✅ Done    | Branch `feature/task.175.*` exists in git                             | `feature/task.175.finalise-pr-number-from-branch` created at `bfc3c8c9` from `develop`, pushed | —                    | 2026-10-12T06:06Z |
 | 2. review-task             | ✅ Done    | `task.175.review.{N}.{name}.md` exists (or skip logged)               | `task.175.review.1.finalise-pr-number-from-branch.md` — READY TO IMPLEMENT 8/10; Planned → Ready for Development | —                    | 2026-10-12T06:10Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan + surface map); 1 iteration; 4/4 phases; `ci:fast` green (5364 tests, 0 fail); 7 mutations red | —                    | 2026-10-12T06:18Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.175.qa.{N}.*.md`; `task.175.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.175.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #635: https://github.com/Gamaroff/agent-skills/pull/635 | —                    | 2026-10-12T06:19Z |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.175.qa.{N}.*.md`; `task.175.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 1 cycle: gate.1 PASS 100; 5c `/review-pr` APPROVE (pr-review.1, 0 findings) | —                    | 2026-10-12T06:25Z |
+| 7. finalise                | ⚠️ Needs Attention | `task.175.dod.{N}.*.md`; task `status: accepted`                      | DoD run 1 (`task.175.dod.1.*`): GAPS — security probe zero-guard only; AC 8/8, docs PASS, compliance N/A, CI reading 1 SUCCESS @ 545ca1bd | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
@@ -85,12 +85,36 @@ Give `/finalise` one authoritative PR-number resolver (caller → branch → loc
 - Mutation proofs (bash, `cp` snapshot, `cmp` restore — all restored): M1 body accepted unconfirmed → red; M2 rungs 2/4 swapped → red; M3 lock directory ignored → red; M4 body regex back in Step 3a → red; M5 AC prompt bullet restored → red; M6 Step 7.2 "add if only in body" restored → red; M7 `pr_read` drops `headRefName` → `pr-read.test.sh` red.
 - Gates: `npm run ci:fast` with `.agents/skills` moved aside → TEST_EXIT 0 (5364 tests, 5350 pass, 0 fail); `npm run lint:shell` clean; `npm run bundle:check` 0 problems; `npm run validate -- skills/finalise/` ✓. zsh is not installed on this host, so `SHELLS` ran bash only (CI also runs bash only).
 
+### Step 4 — create-pr
+
+- SCOPE_PATHS: docs/tasks/task.175.finalise-pr-number-from-branch, CHANGELOG.md, shared/resources, skills/{develop-batch,develop-bug,develop-story,develop-task,finalise,review-story,review-task}/references, skills/finalise. No out-of-scope untracked files; nothing held. Leak check: OK.
+- Report links checked (`doc-links.js`): 0 relative links, ok.
+- Commits: `58c34655` fix(finalise) — resolver, finalise, prompts, `pr-read.sh`, tests, bundles, CHANGELOG; `d79ed207` docs(task.175) — review, plan, task document, this report. Committed directly with scoped `git add` rather than through `/commit-changes` (same scoping and message conventions).
+- PR created: https://github.com/Gamaroff/agent-skills/pull/635 (base `develop`, `Closes #551`). Post-PR state: OPEN. Lock `pr_url` updated.
+- Tracker #551: in-review comment posted; GitHub board: in-review → stage-disabled.
+- Live check: the bundled resolver now answers `{"pr":635,"source":"branch"}` on this branch.
+
+### Steps 5–6 — QA loop
+
+- Board: QA-start re-assert → stage-disabled. Traceability mapper skipped: the Success Criteria section is a checklist, not a table (`HAS_SUCCESS_CRITERIA_TABLE=false`).
+- `/qa-task` cycle 1 (`code_review_blocking=true`): gate.1 PASS 100, `top_issues: []`. Code reviewer (Explore, 70 s): CR-1 medium/medium (branch rung on a long-lived branch), CR-2 low cleanup — advisory, routed to `recommendations.future`. Security `boundary: true`, `probes_executed: 0` (no probe entry form reaches the resolver) — finalise's zero-guard will need a recorded override. Gate + QA report committed `545ca1bd` and pushed.
+- 5c `/review-pr --effort medium --comment --no-code`: APPROVE, 0 conformance findings; `task.175.pr-review.1.finalise-pr-number-from-branch.md` staged for the acceptance commit; PR summary comment posted. `ready-for-merge` signalled.
+
+### Step 7 — finalise (run 1)
+
+- `/finalise` resolved the PR through its new Step 3a: `{"pr":635,"source":"branch"}` — the task's own document cites PR #488 first, and it was not used.
+- DoD agents: AC traceability PASS (8/8, each behaviour criterion with a per-PR test); docs PASS; compliance NOT_APPLICABLE; security FAIL on `probe mode executed no candidates` (medium).
+- The security agent could not run the engine (read-only), so `/finalise` ran its `probe_command` (`shell:` form): 14 executed, `verdict: absent`, 9 "reproduced", 5 "overblocked". Every case exited 2 on `unknown argument '<fixture-dir>'` (reproduced by hand), so the runs measured the argument parser, not the control — the task.125 "absent behind a full count" shape. Recorded in the DoD as 0 real candidates against the control; the record is kept at `task.175.dod.1.security.run.json` with that explanation.
+- CI reading 1: SUCCESS @ `545ca1bd14e6` over 5 checks (background poll).
+- Decision: GAPS — security zero-guard only. Step 8a fix-and-recheck does not apply (medium, no code change can close it). Gap report written to the task body, Change Log gaps row added, gaps PR comment posted.
+
 ---
 
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
 
+- Step 7 (finalise run 1): DoD GAPS — the security probe zero-guard. No `security-probe.mjs` entry form reaches `resolve-pr-number.sh` (flag-parsed, `gh`-networked); the `shell:` run measured the argument parser. Needs a recorded human override (task.125 / task.133 / task.188 precedent) or task.181's `shell-argv:` form. HALT.
 - Step 3: zsh is not installed on this host; the executed tests ran under bash only. CI runs bash only too, and the task's Testing Strategy was scoped to `SHELLS` at review.
 
 ---
@@ -99,14 +123,23 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-10-12
+**Gate Result**: PASS
+**Issues Found**: none (2 advisory code-review notes — CR-1 branch rung on a long-lived branch, CR-2 refusal wording — routed to `recommendations.future`)
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: APPROVE
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: — (halted at Step 7)
+**Final Status**: Halted — finalise DoD gaps (security probe zero-guard)
 **Branch**: feature/task.175.finalise-pr-number-from-branch
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/635
+**QA Iterations**: 1
+**DoD Summary**: docs/tasks/task.175.finalise-pr-number-from-branch/task.175.dod.1.finalise-pr-number-from-branch.md (GAPS)
+**Tracker debt**: none
