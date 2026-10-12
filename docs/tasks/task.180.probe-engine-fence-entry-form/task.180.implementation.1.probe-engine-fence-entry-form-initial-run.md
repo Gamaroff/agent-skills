@@ -387,7 +387,7 @@ The pipeline completed 8 qa-task/qa-fix cycles without a clean PASS. Cycle 8's f
 **Final gate status**: CONCERNS (90/100), gate 8 — Security PASS; the second consecutive gate with no HIGH
 **HIGH findings per cycle**: 1, 1, 1, 1, 1, 1, 0, 0
 **Remaining issues** (from gate 8, with the fix that answers them):
-- TASK-180-020, medium, `shared/resources/tests/security-probe.mjs`: the guard's integration test was vacuous. Fixed in `30769d36`, ungated.
+- TASK-180-020, medium, `shared/resources/tests/security-probe.test.mjs`: the guard's integration test was vacuous. Fixed in `30769d36`, ungated.
 - TASK-180-021, medium, `shared/resources/security-probe.mjs`: `emitBlock` dropped the `fence:` slot. Fixed in `30769d36`, ungated.
 
 **What was attempted per cycle**: cycles 1–7 as above; cycle 8 fixed a test that cycle 7 had made vacuous, and a record-rendering gap. Half-cycle considered and declined (`medium-not-falling`).
