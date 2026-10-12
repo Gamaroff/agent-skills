@@ -1,0 +1,68 @@
+schema: 2
+task: 'task.178.review-skills-cite-key-lookup'
+task_title: 'review-task and review-story cite the §0a key lookup'
+gate: FAIL
+status_reason: 'Cycle 3''s quote-aware splitter regressed a fixture-table shape: a prose apostrophe before a code span opens a "quote" that swallows the code span, so a prose-fallback restatement (the shape of the original review-task:134 site) is no longer caught. Reproduced.'
+reviewer: 'QA Engineer'
+head: 'c288e3428f2694130f21d4ad51163ce5e1fee625'
+updated: '2026-10-12T07:49:52Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: high
+    file: 'tests/key-lookup-single-statement.test.js'
+    finding: 'segments() treats a prose apostrophe as an opening shell quote, so the rest of the line — code-span backticks included — never splits; "fall back to the skill''s `grep -rl "github_issue: {N}" docs/`" now returns false (true at gate 3). The header''s fixture-table claim is false for that shape.'
+    suggested_action: 'Split on code-span backticks before the quote-aware split, fall back to a plain split for a chunk whose quotes do not balance, and add an apostrophe-before-code-span fixture.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 12
+  phases_verified: 3/3
+  ci: 'not read — CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged (scoped: CHANGELOG.md and the test file).'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Unchanged.'
+  maintainability:
+    status: CONCERNS
+    notes: 'CR-1 — the guard no longer holds a shape its own header claims.'
+
+recommendations:
+  immediate:
+    - action: 'CR-1: backtick-first split; plain split for an unbalanced chunk; apostrophe fixture.'
+      refs: ['tests/key-lookup-single-statement.test.js']
+  future:
+    - action: 'Advisory (reviewer CR-2, low/medium): docs/{placeholder} reads as a brace set — require a comma inside the braces.'
+      refs: ['tests/key-lookup-single-statement.test.js']
+    - action: 'Cleanups (reviewer CR-3/CR-4): header sentence should say "outside quotes"; CHANGELOG entry should lead with the scoped claim and rewrap.'
+      refs: ['tests/key-lookup-single-statement.test.js', 'CHANGELOG.md']
+    - action: 'BND-1 (standing deferral): probe the Jira-key task-only check via task.180.'
+      refs: ['skills/review-task/SKILL.md']
+
+bug_resolution:
+  previous_gate: 3
+  fixed: ['CR-1 (gate 3)', 'CR-2 (gate 3)']
+  fix_commit: 'c288e342'
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['CR-1 fixed']

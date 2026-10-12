@@ -34,11 +34,12 @@ All notable changes to this project will be documented in this file. Format foll
   artifacts such as `.request.` files, and HALTs on several matches instead of taking the first. A
   review that resolved a document only by prefix match now reports "no local document".
   `review-task`'s Jira-key branch also refuses a key that resolves to a non-task document.
-  `tests/key-lookup-single-statement.test.js` fails on any canonical source other than §0a that
-  greps the `docs` tree for a tracker-key value — a tripwire over the shapes in its fixture table
-  (grep-family commands, flag spellings, quoted alternation, prefixed and globbed `docs` paths;
-  files-without-match searches excluded), with its known unseen shapes listed in its header — and runs the Jira-key branch against a fixture under bash
-  and zsh. The Jira-key branch's three blocks run as one shell, and its check refuses unbound inputs.
+  `tests/key-lookup-single-statement.test.js` fails when a canonical source other than §0a matches
+  one of the lookup shapes in its fixture table — a grep-family command searching the `docs` tree for
+  a tracker-key value, across flag spellings, quoted alternation, prose code spans and prefixed or
+  globbed `docs` paths (files-without-match searches excluded). It is a tripwire, not a parser: its
+  header lists the shapes it does not see. It also runs the Jira-key branch against a fixture under
+  bash and zsh; the branch's three blocks run as one shell, and its check refuses unbound inputs.
 - **`develop-next` and `develop-batch` dispatch with `--defaults`** instead of restating Phase 0d's
   answers in a prose directive — the restatement that drifted in bug.18. `develop-batch` passes
   `--defaults --base <baseBranch> --target <baseBranch>` and keeps its HALT for an integration branch.

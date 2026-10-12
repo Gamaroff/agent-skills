@@ -301,25 +301,24 @@ accurate.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-12
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 80/100
+**Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.178.qa.3.review-skills-cite-key-lookup.md](./task.178.qa.3.review-skills-cite-key-lookup.md)
-- **Gate File**: [task.178.gate.3.review-skills-cite-key-lookup.yml](./task.178.gate.3.review-skills-cite-key-lookup.yml)
+- **Full Report**: [task.178.qa.4.review-skills-cite-key-lookup.md](./task.178.qa.4.review-skills-cite-key-lookup.md)
+- **Gate File**: [task.178.gate.4.review-skills-cite-key-lookup.yml](./task.178.gate.4.review-skills-cite-key-lookup.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 12 (new file)
 - **Phases Verified**: 3/3
-- **Critical Issues**: 0
+- **Critical Issues**: 1
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-- Gate 2 findings fixed (behaviour-keyed matcher).
-- CR-1, CR-2 (medium): the matcher misses quoted alternation and prefixed docs paths; its scope is unstated.
+- CR-1 (high): cycle 3's quote-aware split misses a prose restatement when an apostrophe precedes the code span.
 
 <!-- change-log-start -->
 
@@ -337,6 +336,8 @@ accurate.
 | 2026-10-12 |         | QA findings fixed — cycle 2, 2 findings (guard key replaced: grep over the docs tree for a key value, per command segment) | qa-fix |
 | 2026-10-12 |         | QA gate CONCERNS (90/100) — 2 findings (2 medium) | qa-task |
 | 2026-10-12 |         | QA findings fixed — cycle 3, 2 findings (quote-aware segments, prefixed/globbed docs paths; guard claim scoped to its fixture table) | qa-fix |
+| 2026-10-12 |         | QA gate FAIL (80/100) — 1 finding (1 high) | qa-task |
+| 2026-10-12 |         | QA findings fixed — cycle 4, 1 finding + 1 advisory + 2 cleanups (backtick-first segment split; brace sets need a comma; CHANGELOG and header wording) | qa-fix |
 
 <!-- change-log-end -->
 

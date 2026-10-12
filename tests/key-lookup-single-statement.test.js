@@ -16,9 +16,9 @@
  * 1. No canonical source searches the docs/ tree for a tracker-key VALUE outside the one statement
  *    of the rule — §0a's own lookup. The key is what the line DOES, not how its flags are spelled
  *    (QA cycle 2 replaced a flag-spelling key that kept missing spellings — obs #135, #174): within
- *    one command segment (split on pipes, `;`, `&&` and code-span backticks), a grep-family command
- *    (`grep`, `egrep`, `fgrep`, `git grep`, `rg`) + a key field followed by a value
- *    (`jira_key: X`, `github_issue: {N}`, `${KEY_FIELD}:…`) + the `docs` tree as a path argument,
+ *    one command segment (split on code-span backticks, then on pipes, `;` and `&&` outside quotes),
+ *    a grep-family command (`grep`, `egrep`, `fgrep`, `git grep`, `rg`) + a key field followed by a
+ *    value (`jira_key: X`, `github_issue: {N}`, `${KEY_FIELD}:…`) + the `docs` tree as a path argument,
  *    and NOT a files-WITHOUT-match search (`-L`, `--files-without-match`), which is a different rule
  *    (the sync-*-bug skills list unlinked documents that way) and is pinned below.
  *
@@ -47,48 +47,56 @@ const { spawnSync, execFileSync } = require("node:child_process");
 const ROOT = path.resolve(__dirname, "..");
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
 
-// One command segment of a line. Pipes, `;`, `&&`, `||` and markdown code-span backticks separate
-// segments, so a pipeline or a sentence naming two commands is read command by command — but only
-// OUTSIDE quotes: a `|` inside a quoted pattern is alternation (`"^(jira_key|github_issue): X"`),
-// not a pipe (QA cycle 3, CR-1). Single quotes take no escapes; inside double quotes `\` escapes.
-function segments(line) {
+// One command segment of a line. Markdown code-span backticks are split first, always: a prose
+// apostrophe (`skill's`) is not a shell quote, and reading it as one swallowed the code span after it
+// (QA cycle 4, CR-1). Within each chunk, pipes, `;`, `&&` and `||` separate commands — but only
+// OUTSIDE quotes, because a `|` inside a quoted pattern is alternation (`"^(jira_key|github_issue): X"`),
+// not a pipe (QA cycle 3). A chunk whose quotes do not balance is prose, not shell, and is split
+// plainly. Single quotes take no escapes; inside double quotes `\` escapes.
+const plainSplit = (chunk) => chunk.split(/\|\||&&|[|;]/);
+
+function quoteAwareSplit(chunk) {
   const out = [];
   let cur = "";
   let quote = null;
-  for (let i = 0; i < line.length; i++) {
-    const c = line[i];
+  for (let i = 0; i < chunk.length; i++) {
+    const c = chunk[i];
     if (quote) {
       cur += c;
-      if (quote === '"' && c === "\\" && i + 1 < line.length) cur += line[++i];
+      if (quote === '"' && c === "\\" && i + 1 < chunk.length)
+        cur += chunk[++i];
       else if (c === quote) quote = null;
       continue;
     }
     if (c === "'" || c === '"') {
       quote = c;
       cur += c;
-    } else if (c === "|" || c === ";" || c === "`") {
+    } else if (c === "|" || c === ";") {
       out.push(cur);
       cur = "";
-      if (c === "|" && line[i + 1] === "|") i++;
-    } else if (c === "&" && line[i + 1] === "&") {
+      if (c === "|" && chunk[i + 1] === "|") i++;
+    } else if (c === "&" && chunk[i + 1] === "&") {
       out.push(cur);
       cur = "";
       i++;
     } else cur += c;
   }
+  if (quote) return plainSplit(chunk); // unbalanced: prose
   out.push(cur);
   return out;
 }
+
+const segments = (line) => line.split("`").flatMap(quoteAwareSplit);
 const GREP_FAMILY = /(?:^|[\s$(])(?:(?:git\s+)?[ef]?grep|rg)(?=\s)/;
 // A key field followed by a VALUE — not a closing quote, not the end: `jira_key: X`,
 // `github_issue: {N}`, `${KEY_FIELD}:[[:space:]]*…`. A value-less `"^jira_key:"` inventories keys.
 const KEY_WITH_VALUE =
   /(?:\bjira_key|\bgithub_issue|\$\{?KEY_FIELD\}?)\)?:[ \t]*(?=[^\s'"`)\\]|\[)/;
 // The docs tree itself as a path argument — `docs`, `docs/`, `./docs/`, `$ROOT/docs`, a glob over it
-// (`docs/**/*.md`) or a brace set under it (`docs/{stories,tasks}/`) — but not one named file under it
-// (QA cycle 3, CR-2).
+// (`docs/**/*.md`) or a brace set under it (`docs/{stories,tasks}/`, a comma inside the braces) — but
+// not one named file under it, nor a `{placeholder}` standing for one (QA cycles 3 and 4).
 const DOCS_TREE =
-  /(?:^|[\s'"(=])(?:\.\/|\$\{?[A-Za-z_][A-Za-z0-9_]*\}?\/)?docs(?:\/(?:\*\*?(?:\/[^\s'")]*)?|\{[^}\s]*\}\/?)?)?(?=[\s'")]|$)/;
+  /(?:^|[\s'"(=])(?:\.\/|\$\{?[A-Za-z_][A-Za-z0-9_]*\}?\/)?docs(?:\/(?:\*\*?(?:\/[^\s'")]*)?|\{[^}\s]*,[^}\s]*\}\/?)?)?(?=[\s'")]|$)/;
 const FILES_WITHOUT =
   /(?:^|\s)(?:-[A-Za-z]*L[A-Za-z]*|--files-without-match)(?=\s|$)/;
 
@@ -207,6 +215,11 @@ test("the key matches the restatements it exists to catch", () => {
     'grep -rl "jira_key: X" "$ROOT/docs"',
     'grep -l "jira_key: X" docs/**/*.md',
     'grep -rl "github_issue: 5" docs/{stories,tasks}/',
+    // QA cycle 4, CR-1: a prose apostrophe before the code span.
+    'fall back to the skill\'s `grep -rl "github_issue: {N}" docs/`',
+    'If it doesn\'t resolve, run `grep -rl "jira_key: ${KEY}" docs/`',
+    // Two apostrophes balance as a "quote" across the code span: only the backtick-first split sees it.
+    "the skill's `grep -rl \"jira_key: X\" docs/` isn't needed",
     `DOC_MATCHES=$(grep -rlE "^\${KEY_FIELD}:[[:space:]]*['\\"]?\${KEY_VALUE}['\\"]?[[:space:]]*$" docs/ 2>/dev/null \\`,
   ]) {
     assert.ok(isKeyLookup(s), s);
@@ -219,6 +232,7 @@ test("the key matches the restatements it exists to catch", () => {
     'grep -rl "status: done" docs/ | xargs grep -h "^jira_key:"',
     "run `grep -rl TODO docs/` then read the `jira_key:` field",
     'grep -rl "^jira_key:" docs/ | wc -l', // an inventory: no key value
+    'grep "^jira_key: X" docs/{task-file}', // a placeholder for one file, not a brace set
   ]) {
     assert.ok(!isKeyLookup(s), `not a lookup: ${s}`);
   }
