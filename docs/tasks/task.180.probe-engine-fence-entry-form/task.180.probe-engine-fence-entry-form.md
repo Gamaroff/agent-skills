@@ -5,10 +5,10 @@ type: task
 description: "Add a `fence:<doc>#<heading>` entry form to shared/resources/security-probe.mjs that extracts the first bash block under a heading on every run, substitutes the case's input into a named placeholder, applies an optional per-case env and fixture files, and scores exit status as the verdict. A boundary shipped as a fenced block in a step doc is then probed by the engine instead of through a hand-written wrapper."
 tags: [security-probe, finalise, qa-task, qa-story, review-security, observation]
 category: infrastructure
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-12
 assignee:
 estimated_effort_hours: 8
 github_issue: 560
@@ -16,7 +16,9 @@ github_issue: 560
 
 # Technical Task: security-probe — a `fence:` entry form
 
-**Status:** Planned
+**Status:** Ready for Review
+
+**Review**: ✅ All review recommendations from `task.180.review.1.probe-engine-fence-entry-form.md` implemented 2026-10-12
 
 **GitHub Issue**: [#560](https://github.com/Gamaroff/agent-skills/issues/560)
 
@@ -67,7 +69,7 @@ This repository ships many of its boundaries as fenced bash blocks inside Markdo
 ```
 
 - `resolveEntry` accepts `fence:path#heading`. The path must be a `.md` file inside the repo root (same containment as the other forms), and the heading must be non-empty. It returns `{ ok: true, kind: "fence", entryPath, heading }`.
-- **Extraction on every run.** The engine reads the doc, finds the first line whose text equals the heading, and takes the first `bash` block from `extractBlocks` whose `line` falls after it and before the next heading of the same or a higher level. A missing heading or a missing block is a named `entry-not-probeable` decline, never an `absent` verdict.
+- **Extraction on every run.** The engine reads the doc, finds the line whose text equals the heading, and takes the first `bash` block from `extractBlocks` whose `line` falls after it and before the next heading of the same or a higher level. **Headings are read only from lines outside fences**, tracking fence state the way `extractBlocks` does: the step-3 doc alone has 10 heading-shaped `# comment` lines inside fences, and a raw line scan would read each as a level-1 heading that ends the section early or makes the heading falsely ambiguous (review I2). `extractBlocks` returns `bash` blocks only, so an `sh` block under the heading is the "no bash block" decline (review O2). A missing heading or a missing block is a named `entry-not-probeable` decline, never an `absent` verdict.
 - **Input.** `--slot <placeholder>` names the literal token in the block (for example `<fastGateCommand>`). Each case's `input` replaces every occurrence through a replacer function, never a replacement string (`$&` safety). If the token is absent from the block, the run is declined (a slot that substitutes nothing tests nothing).
 - **Per-case fixture.** A new optional case field `fixture: { env?: {k: v}, files?: {relpath: content} }`, added to `OPTIONAL_CASE_FIELDS`. Files are written into the case's work directory; a path that is absolute or escapes it is a declined case. `env` merges over `caseEnv` (`security-probe.mjs:1474`: `sandboxEnv()` plus a sandbox `HOME`, `TMPDIR` and `LC_ALL=C`), and never replaces `HOME` or `TMPDIR`.
 - **Verdict.** The block runs as a script under each shell `probeShells()` returns, with cwd set to the fixture. Exit 0 is `accepted`, any other exit is `rejected`, and a launch failure or timeout is `errored`. A case that carries `expected` is compared exactly as the shell arm does.
@@ -76,7 +78,8 @@ This repository ships many of its boundaries as fenced bash blocks inside Markdo
 ### Important Clarifications
 
 - **Why `--slot` and not a JSON `input`?** `input` stays a string, so corpus sinks still work unchanged, and the per-case env and files travel in the new `fixture` field. This was the shape task.167's 13 cases needed.
-- **Not a snippet runner.** `qa-execute-snippets` runs untrusted prose behind an allow-list. Here the caller names one block by heading, the **engine** chooses the command (`bash <script>`), and values cross as files and argv. `node` stays off `SAFE_COMMANDS` (`probe-boundary-rule.md` §2).
+- **Not a snippet runner.** `qa-execute-snippets` runs untrusted prose behind an allow-list. Here the caller names one block by heading, and the **engine** chooses the command (`bash <script>`). `node` stays off `SAFE_COMMANDS` (`probe-boundary-rule.md` §2).
+- **The slot is source substitution, not data.** A case's `input` is spliced into the block's text, which is what the document's reader does with the placeholder, so `fence:` probes the block as shipped. The `$&`-safe replacer protects the replacement string, not the shell. A block that quotes the slot in double quotes (`FAST_GATE_COMMAND="<fastGateCommand>"`) runs a `$(…)` in the input: task.167's `npm run x$(touch PWNED)` case still scores `rejected`, and it now creates `PWNED` **inside the case work directory**. Fixture files and the case's env are the only values that cross as data. A side effect stays in the per-case work directory, and the escape detector still fails a write outside it (review C1: executed, `PWNED` created).
 
 ---
 
@@ -114,32 +117,33 @@ None. The four existing entry forms, the case schema's required fields and the r
 **Risk**: Low
 **Files**: `shared/resources/tests/security-probe.test.mjs`
 
-- [ ] `resolveEntry`: `fence:doc.md#Heading` resolves to `kind: "fence"`; `fence:doc.md` (no heading), `fence:x.js#H` (not Markdown) and a path outside the root are refused as `bad-entry` / `outside-repo-root`
-- [ ] Extraction: a missing heading and a heading with no bash block under it each decline as `entry-not-probeable`, naming which
-- [ ] Verdict: an admitting block scores accepted and a refusing one rejected; a block that `exit 3`s with no `expected` scores rejected; a launch failure scores errored
-- [ ] Slot: `--slot` names a token absent from the block → declined; an input containing `$&` is substituted literally
-- [ ] Fixture: `env` reaches the block; `files` are written into the case directory; a file path that escapes it is declined
-- [ ] Fresh read: editing the block between two runs changes the verdict (the engine never caches the text)
+- [x] `resolveEntry`: `fence:doc.md#Heading` resolves to `kind: "fence"`; `fence:doc.md` (no heading), `fence:x.js#H` (not Markdown) and a path outside the root are refused as `bad-entry` / `outside-repo-root`
+- [x] Extraction: a missing heading and a heading with no bash block under it each decline as `entry-not-probeable`, naming which; a heading-shaped `# comment` inside a fenced block neither ends the section nor counts as a second match of the heading
+- [x] Verdict: an admitting block scores accepted and a refusing one rejected; a block that `exit 3`s with no `expected` scores rejected; a launch failure scores errored (held by the timeout arm — the engine writes the script itself, so bash failing to open it is unreachable in a test; `isLaunchFailure` keeps its unit tests)
+- [x] Slot: `--slot` names a token absent from the block → declined; an input containing `$&` is substituted literally; an input whose `$(…)` writes a file leaves that file inside the case work directory, never outside it
+- [x] Fixture: `env` reaches the block; `files` are written into the case directory; a file path that escapes it is declined
+- [x] Fresh read: editing the block between two runs changes the verdict (the engine never caches the text)
 
 ### Phase 2: The entry form
 
 **Risk**: Medium
 **Files**: `shared/resources/security-probe.mjs`, `shared/resources/security-input-corpus.mjs`
 
-- [ ] `FENCE_PREFIX = "fence:"` and the `resolveEntry` branch
-- [ ] `extractFencedBlock(doc, heading)`, reusing `extractBlocks` from `qa-execute-snippets.mjs`
-- [ ] `runFenceCase`: substitute the slot, write the script and fixture into the case work directory, run under `probeShells()`, score exit status, reuse `isLaunchFailure` and `compareExpected`
-- [ ] `--slot` in `main()`, required with `fence:` and refused with every other form; `fixture` added to `OPTIONAL_CASE_FIELDS` and validated
-- [ ] `npm run bundle`; `bundle:check` reports 0 problems
+- [x] `FENCE_PREFIX = "fence:"` and the `resolveEntry` branch
+- [x] `extractFencedBlock(doc, heading)`, reusing `extractBlocks` from `qa-execute-snippets.mjs`
+- [x] `runFenceCase`: substitute the slot, write the script and fixture into the case work directory, run under `probeShells()`, score exit status, reuse `isLaunchFailure` and `compareExpected`
+- [x] `--slot` in `main()`, required with `fence:` and refused with every other form; `fixture` added to `OPTIONAL_CASE_FIELDS` and validated
+- [x] `npm run bundle`; `bundle:check` reports 0 problems
 
 ### Phase 3: Routing and proof
 
 **Risk**: Low
 **Files**: the § 7 population, `shared/resources/tests/security-probe.test.mjs`, `CHANGELOG.md`
 
-- [ ] Each document that lists the entry forms names `fence:` (five forms), and the security prompt's Step 1b signal routes a fenced-block boundary to it
-- [ ] A committed test runs task.167's 13 cases through `fence:shared/resources/develop-pipeline-step-3-develop-loop.md#Precondition — the gate must resolve before the first iteration` with `--slot '<fastGateCommand>'`: verdict `engages`, executed 13 × the shells present, reproduced 0
-- [ ] CHANGELOG `[Unreleased]` › Added entry citing (task 180) and observation #261
+- [x] Each document that lists the entry forms names `fence:` (five forms), and the security prompt's Step 1b signal routes a fenced-block boundary to it
+- [x] Commit `shared/resources/tests/fixtures/fence-probe/t167-cases.json`, the 13 cases **reconstructed from task.167's DoD** (`task.167.dod.1.fast-gate-precondition-npm-loglevel.md:123`–`:128`: 7 hostile, 6 legitimate, the 4 silent-environment legitimate cases by name). The original `.claude/state/t167-probe-cases.json` is gitignored and absent from this checkout, and the committed run record carries totals only (review I1)
+- [x] A committed test runs task.167's 13 cases through `fence:shared/resources/develop-pipeline-step-3-develop-loop.md#Precondition — the gate must resolve before the first iteration` with `--slot '<fastGateCommand>'`: verdict `engages`, executed 13 × the shells present, reproduced 0
+- [x] CHANGELOG `[Unreleased]` › Added entry citing (task 180) and observation #261
 
 ---
 
@@ -215,25 +219,25 @@ Not applicable. Each case is one spawn per shell under the shared `spawnBudget`;
 
 ### Functional
 
-- [ ] `fence:<doc>#<heading>` with `--slot` probes a fenced bash block and scores exit 0 as accepted and non-zero as rejected (Phase 2; tests in Phase 1)
-- [ ] A missing heading or a missing bash block under it is a named `entry-not-probeable` decline, not a verdict
-- [ ] The optional `fixture` field delivers `env` and `files` to the case, and a file path outside the case directory is declined
-- [ ] task.167's 13 cases through `fence:` against the shipped step-3 doc give verdict `engages` with 0 reproduced, and the copy without the flag over-blocks the 4 silent-environment cases
-- [ ] The four existing entry forms' tests still pass unchanged
+- [x] `fence:<doc>#<heading>` with `--slot` probes a fenced bash block and scores exit 0 as accepted and non-zero as rejected (Phase 2; tests in Phase 1)
+- [x] A missing heading or a missing bash block under it is a named `entry-not-probeable` decline, not a verdict
+- [x] The optional `fixture` field delivers `env` and `files` to the case, and a file path outside the case directory is declined
+- [x] task.167's 13 cases through `fence:` against the shipped step-3 doc give verdict `engages` with 0 reproduced, and the copy without the flag over-blocks the 4 silent-environment cases
+- [x] The four existing entry forms' tests still pass unchanged
 
 ### Performance
 
-- [ ] No new `timeout: <number>` literal; spawns use the shared `spawnBudget` (`tests/test-harness-concurrency.test.js`)
+- [x] No new `timeout: <number>` literal; spawns use the shared `spawnBudget` (`tests/test-harness-concurrency.test.js`)
 
 ### Code Quality
 
-- [ ] Each mutation in § 8 is observed red, and the red output is quoted in the implementation report
-- [ ] `npm run ci:fast`, `bundle:check` (0 problems), `lint:shell` and `npm run validate -- skills/{qa-task,qa-story,review-security,finalise}/` are clean
+- [x] Each mutation in § 8 is observed red, and the red output is quoted in the implementation report
+- [x] `npm run ci:fast`, `bundle:check` (0 problems), `lint:shell` and `npm run validate -- skills/{qa-task,qa-story,review-security,finalise}/` are clean, and `npm run generate-catalog` leaves `docs/reference/skill-catalog.md` unchanged
 
 ### Migration
 
-- [ ] Every document in the § 7 routing population names `fence:`, re-measured with the same `git grep` command
-- [ ] CHANGELOG `[Unreleased]` cites (task 180)
+- [x] Every document in the § 7 routing population names `fence:`, re-measured with the same `git grep` command
+- [x] CHANGELOG `[Unreleased]` cites (task 180)
 
 ---
 
@@ -292,12 +296,25 @@ None.
 
 ---
 
+## Implementation Summary
+
+**Completed:** 2026-10-12 (develop-task run 1 — `task.180.implementation.1.probe-engine-fence-entry-form-initial-run.md`)
+
+**Approach.** `fence:` joins the shell family: `resolveEntry` accepts `fence:<doc.md>#<heading>` (split on the first `#`), `extractFencedBlock` reads headings outside fences and reuses `extractBlocks` for the block, and `runFenceCase` writes the substituted block as a script under the harness dir, builds a fresh case directory per shell from `fixture.files`, and runs `<shell> <script>` through `watchedSpawn` with `caseEnv` plus `fixture.env`. The verdict is the exit status, or `compareExpected` when a case carries `expected`. `--slot` mirrors `--argv`: required with `fence:`, refused with every other form, validated in both `main()` and `runProbeSpec`. `--fake-gh` and the trip-wire `gh` apply to `fence:` as to the shell forms.
+
+**Testing results.** 14 new `fence entry` tests in `security-probe.test.mjs`, including task.167's 13 cases (reconstructed in `shared/resources/tests/fixtures/fence-probe/t167-cases.json`) against the shipped block — `engages`, 0 reproduced, 0 escapes — and the flagless copy over-blocking the same 4 cases task.167's DoD names. A routing parity test in `probe-boundary-signals.test.mjs` holds the § 7 population. The four mutations (§ 8 plus review I2) each went red. `npm run ci:fast`: 5377 pass, 0 fail.
+
+**Deferred work.** None. Out-of-scope items remain as listed in § 4 (`shell-argv:`, obs #189; obs #257; obs #232).
+
 <!-- change-log-start -->
 ## Change Log
 
 | Date       | Version | Description                                | Author      |
 | ---------- | ------- | ------------------------------------------ | ----------- |
 | 2026-10-03 | 1.0     | Initial draft — cut from observation #261  | create-task |
+| 2026-10-12 | 1.1     | Review passed (8/10 after fixes) — slot restated as source substitution (C1); 13 task.167 cases reconstructed from its DoD (I1); headings read outside fences (I2); `bash`-only and catalog checks (O1, O2) | review-task |
+| 2026-10-12 |         | Status → ready-for-development | review-task |
+| 2026-10-12 |         | Implemented — fence: entry form, --slot, fixture field; 7 routing sites; 15 tests (14 engine + 1 routing parity) | develop |
 <!-- change-log-end -->
 
 ---
@@ -305,16 +322,16 @@ None.
 ## Progress Tracking
 
 ### Phase 1: Tests first (red)
-- [ ] `resolveEntry`, extraction, verdict, slot, fixture and fresh-read cases
+- [x] `resolveEntry`, extraction, verdict, slot, fixture and fresh-read cases
 
 ### Phase 2: The entry form
-- [ ] `fence:`, `--slot`, `fixture`, `runFenceCase`
-- [ ] Bundle regenerated; `bundle:check` clean
+- [x] `fence:`, `--slot`, `fixture`, `runFenceCase`
+- [x] Bundle regenerated; `bundle:check` clean
 
 ### Phase 3: Routing and proof
-- [ ] Routing population updated
-- [ ] task.167 cases through `fence:`
-- [ ] CHANGELOG entry
+- [x] Routing population updated
+- [x] task.167 cases through `fence:`
+- [x] CHANGELOG entry
 
 ---
 
