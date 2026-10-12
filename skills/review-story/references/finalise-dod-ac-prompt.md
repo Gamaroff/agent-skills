@@ -18,7 +18,7 @@ You are a read-only verification agent. Check AC traceability, PR review status,
 
 Read `<STORY_FILE>`. Extract:
 - Every acceptance criterion from `## Acceptance Criteria` (stories) or `## 9. Success Criteria` / `## Success Criteria` (tasks). Include both checked `- [x]` and unchecked `- [ ]` items.
-- The PR number from frontmatter (`pr_number:`) or body text (`PR #NNN`, `https://github.com/.../pull/NNN`, `https://bitbucket.org/.../pull-requests/NNN`).
+- The PR number is `<PR_NUMBER>`, resolved by the caller. Do not derive it from the document — a document cites other work's PRs (task 175). An empty `<PR_NUMBER>` means none was resolved: report `pr_status: NOT_FOUND`.
 - The story/task type from frontmatter `type:` field (e.g. `api`, `ui`, `data`, `auth`, `infrastructure`, `task`, `refactoring`).
 
 ### Step 2: Check PR status

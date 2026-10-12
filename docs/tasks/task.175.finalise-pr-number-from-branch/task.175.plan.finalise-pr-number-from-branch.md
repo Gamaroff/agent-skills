@@ -32,12 +32,14 @@ Rungs, first answer wins:
 | Rung | Source | Answers when |
 | --- | --- | --- |
 | `explicit` | `--pr N` | N is a positive integer |
-| `branch` | GitHub `gh pr view --json number,headRefName` (no argument: the current branch's PR); Bitbucket `pullrequests?q=source.branch.name="<branch>"` | a PR exists whose head is `git branch --show-current` |
+| `branch` | `pr_read` from the sibling `pr-read.sh`, no `--pr` (GitHub: the PR `gh` finds for the current branch; Bitbucket: the one open PR whose source branch is the current branch) | `pr_read` returns 0; `PR_READ_NUMBER` is the answer |
 | `lock` | `.claude/state/develop-pipeline.lock` `.pr_url` → trailing number | the lock's `task_or_story_directory`, canonicalised, equals the `--doc` directory |
 | `frontmatter` | `^pr_number:` in `--doc` | a positive integer |
-| `body` | first `PR #N` / `pull/N` in `--doc` | `gh pr view N --json headRefName` equals the current branch |
+| `body` | first `PR #N` / `pull/N` in `--doc` | the cited PR's head branch (GitHub `gh pr view N --json headRefName`; Bitbucket `GET …/pullrequests/N` `.source.branch.name`) equals the current branch |
 
-Canonicalise directories the way `advance-pipeline-lock.sh --restore` does (strip `./`, trailing `/`, then `cd … && pwd -P`). Source `resolve-platform.sh` as `source "$(dirname "$0")/resolve-platform.sh" || exit 1` for `$VCS`; on Bitbucket source `bitbucket-auth.sh` the same way, and treat a missing credential as "the branch rung did not answer", never as an error.
+Canonicalise directories the way `advance-pipeline-lock.sh --restore` does (strip `./`, trailing `/`, then `cd … && pwd -P`). Source the siblings from the script's own directory (`source "$(dirname "$0")/pr-read.sh" || exit 1`, likewise `resolve-platform.sh` for `$VCS` and, on Bitbucket, `bitbucket-auth.sh`); `jira-list-sprints.sh` sources a sibling the same way. A `pr_read` failure (exit 1 or 3) means "the branch rung did not answer", never an error of the resolver; log its `PR_READ_ERROR` to stderr. A missing Bitbucket credential likewise leaves rungs 2 and 5 unanswered.
+
+**`pr-read.sh` is reused, not restated.** It already owns the current-branch PR query on both forges, the HTTP-status check and the control-character-safe JSON parse (develop-* Step 8 uses it). A second copy of the Bitbucket source-branch query inside the resolver would be a second mechanism for the same job.
 
 ### Phase 2: finalise uses it
 
@@ -51,13 +53,15 @@ PR_NUMBER=$(grep '^pr_number:' {story-file} | awk '{print $(2)}' | grep -oE '[0-
 with:
 
 ```bash
-# The PR this run judges — from the caller, the branch or the lock before the document (task 175).
-PR_JSON=$(bash .agents/skills/finalise/references/resolve-pr-number.sh --doc {story-file} ${PR_NUMBER_ARG:+--pr "$PR_NUMBER_ARG"} --json)
+# The PR this run judges — from the branch or the lock before the document (task 175).
+PR_JSON=$(bash .agents/skills/finalise/references/resolve-pr-number.sh --doc {story-file} --json)
 PR_NUMBER=$(printf '%s' "$PR_JSON" | jq -r '.pr // empty')
 PR_SOURCE=$(printf '%s' "$PR_JSON" | jq -r '.source // "none"')
 ```
 
-and add one line telling the agent to record `PR: #{PR_NUMBER} (source: {PR_SOURCE})` in the running summary's Step 2 header. `PR_NUMBER_ARG` is the orchestrator's number when it passes one — name it as an input in the prose so the block does not read it unbound.
+and add one line telling the agent to record `PR: #{PR_NUMBER} (source: {PR_SOURCE})` in the running summary's Step 2 header. **No `--pr`:** finalise takes no PR argument and no orchestrator passes one, so the block names no input it would read unbound; rung 1 is for direct callers of the resolver and its tests.
+
+**Step 7.2** (§ "Update Frontmatter") — replace *"Ensure `pr_number` is present in frontmatter (add if only in body)"* with *"Write `pr_number: {PR_NUMBER}` from Step 3a's resolver; when it resolved none, write no `pr_number:` — never a number copied from the body."*
 
 `skills/finalise/SKILL.md` bug-mode `read-document` note: replace *"`PR_NUMBER` comes from Step 3a's existing derivation over the document (`pr_number:` in frontmatter, else `PR #NNN` / `pull/NNN` in the body), which reads a bug file exactly as it reads a task"* with *"`PR_NUMBER` comes from Step 3a's resolver, which reads a bug's branch exactly as it reads a task's"*.
 
@@ -71,11 +75,11 @@ and add one line telling the agent to record `PR: #{PR_NUMBER} (source: {PR_SOUR
 2. Branch PR 550 exists; document body cites `PR #505` → `branch`, 550.
 3. No branch PR; lock `pr_url …/pull/550` with a matching directory → `lock`; with another work item's directory → skips to the next rung.
 4. No branch PR, no lock; `pr_number: 550` → `frontmatter`.
-5. Body cites `PR #505`; stub answers PR 505's `headRefName` as another branch → exit 1, `reason: none`, stdout has no number.
-6. Body cites `PR #550`; stub answers the current branch → `body`, 550.
+5. Rungs 2–4 empty (the stub finds no PR for the branch, no lock, no `pr_number:`); body cites `PR #505`; stub answers PR 505's `headRefName` as another branch → exit 1, `reason: none`, stdout has no number.
+6. Rungs 2–4 empty; body cites `PR #550`; stub answers the current branch → `body`, 550.
 7. Usage: no `--doc`, `--pr abc` → exit 2.
 
-Presence pin (same file, or `tests/finalise-pr-number-resolution.test.js`): Step 3a contains `resolve-pr-number.sh` (non-vacuity floor), and none of `skills/finalise/SKILL.md`, `shared/resources/finalise-dod-ac-prompt.md`, `shared/resources/finalise-dod-fix-evidence-prompt.md` carries the derivation regex `PR #([0-9]+)|pull/([0-9]+)` or the prose *"PR number from frontmatter"*.
+Presence pin (same file, or `tests/finalise-pr-number-resolution.test.js`): Step 3a contains `resolve-pr-number.sh` (non-vacuity floor), and none of `skills/finalise/SKILL.md`, `shared/resources/finalise-dod-ac-prompt.md`, `shared/resources/finalise-dod-fix-evidence-prompt.md` carries the derivation regex `PR #([0-9]+)|pull/([0-9]+)`, the prose *"PR number from frontmatter"* or Step 7.2's *"add if only in body"*. No existing test pins any of these literals (`git grep -nF -e 'pull/([0-9]+)' -e 'PR number from frontmatter' -e 'add if only in body' -- '*.test.*' evals tests` → no hits, 2026-10-12).
 
 ### Phase 4: Proof and gates
 
@@ -85,13 +89,14 @@ Presence pin (same file, or `tests/finalise-pr-number-resolution.test.js`): Step
 | Rungs 2 and 4 swapped | case 2 red (a document with a stale `pr_number:`) — add that variant |
 | Rung 3 ignores the directory match | case 3's other-work-item variant red |
 | The body regex restored in Step 3a | presence pin red |
+| Step 7.2's "add if only in body" restored | presence pin red |
 | The AC prompt's "from frontmatter or body text" bullet restored | presence pin red |
 
 ## Key Patterns and References
 
 - Exit-code contract and header style: `shared/resources/qa-cycle.sh`, `shared/resources/verify-push-state.sh`.
 - Directory canonicalisation: `advance-pipeline-lock.sh --restore`.
-- Bitbucket source-branch query: `skills/qa-fix/SKILL.md` § PR Existence Check.
+- Current-branch PR on both forges: `shared/resources/pr-read.sh` (`pr_read`), reused for rung 2.
 - `newest-numbered.sh` shows how finalise sources a bundled helper from the repository root.
 
 ## Testing Approach
