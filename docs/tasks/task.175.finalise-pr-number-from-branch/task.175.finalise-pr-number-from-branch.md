@@ -5,10 +5,12 @@ type: task
 description: "Resolve PR_NUMBER from the branch first (`gh pr view --json number` for the current branch, or the pipeline lock's `pr_url`), then from frontmatter, and never from a free-text body match."
 tags: [finalise, observation]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-02
 updated: 2026-10-12
+completed_date: 2026-10-12
+pr_number: 635
 assignee:
 estimated_effort_hours: 8
 github_issue: 551
@@ -16,7 +18,7 @@ github_issue: 551
 
 # Technical Task: Resolve finalise's PR number from the branch, not the task body
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.175.review.1.finalise-pr-number-from-branch.md` implemented 2026-10-12
 
@@ -324,9 +326,9 @@ None identified.
 ### Key Findings
 No critical issues identified. Two advisory code-review findings (CR-1 branch rung on a long-lived branch, CR-2 refusal wording) routed to future work. Security is `boundary: true` with `probes_executed: 0` — no probe entry form reaches the resolver, so finalise's zero-guard will need a recorded override.
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 1 (historical, superseded by run 2 below)
 
-**Status:** IN PROGRESS
+**Status:** superseded — run 2 accepted the task with the security zero-guard closed by a recorded human override
 
 ### QA Gate Status
 
@@ -354,6 +356,31 @@ All eight success criteria, documentation, compliance (not applicable) and CI re
 <!-- change-log-start -->
 ## Change Log
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.175.qa.1.finalise-pr-number-from-branch.md`
+**Gate File**: `task.175.gate.1.finalise-pr-number-from-branch.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 8/8 met — the four behaviour criteria each held by `resolve-pr-number.test.mjs` / `pr-read.test.sh`, run per PR
+✅ **PR Review:** PR #635; Step 5c `/review-pr` APPROVE (0 findings); no host reviews required
+✅ **Tests:** 16 resolver cases + 3 pr-read cases; 7 mutations red; `ci:fast` 5364 tests, 0 failures
+✅ **Documentation:** CHANGELOG `[Unreleased]` › Fixed cites (task 175); finalise SKILL.md and both DoD prompts updated and bundled
+✅ **Security Review:** PASS by recorded human override — the probe zero-guard (no `security-probe.mjs` entry form reaches the flag-parsed, `gh`-networked resolver); checklist otherwise clean
+✅ **Compliance Review:** not applicable (internal tooling)
+✅ **CI:** reading 1 SUCCESS @ `bd06cc3d68c1` (5 checks)
+
+**Task marked as ACCEPTED on:** 2026-10-12
+
+**Detailed Verification Log:** See `task.175.dod.2.finalise-pr-number-from-branch.md` (run 2, with the override block) and `task.175.dod.1.finalise-pr-number-from-branch.md` (run 1) for complete verification evidence and timestamps.
+
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-10-02 | 1.0     | Initial draft — cut from observation #184  | create-task |
@@ -362,6 +389,7 @@ All eight success criteria, documentation, compliance (not applicable) and CI re
 | 2026-10-12 |         | Implemented — 1 new script, 1 new test file (16 cases), 5 sources edited; 7 mutations proved red | develop |
 | 2026-10-12 |         | QA gate PASS (100/100) — 0 findings; 2 advisory code-review notes | qa-task |
 | 2026-10-12 |  | DoD incomplete — 1 gap identified (security probe zero-guard) | finalise |
+| 2026-10-12 | 1.2 | DoD verified — accepted (PR #635); security zero-guard closed by a recorded human override | finalise |
 
 ---
 <!-- change-log-end -->
@@ -400,7 +428,7 @@ All eight success criteria, documentation, compliance (not applicable) and CI re
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 
