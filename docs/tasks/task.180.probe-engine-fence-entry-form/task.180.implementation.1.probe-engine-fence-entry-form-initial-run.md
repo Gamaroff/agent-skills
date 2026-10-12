@@ -36,7 +36,7 @@ Add the `fence:<doc>#<heading>` entry form (with `--slot` and an optional per-ca
 | 2. review-task             | ✅ Done    | `task.180.review.{N}.{name}.md` exists (or skip logged)               | review.1 — 8/10 after fixes, READY; Planned → Ready for Development | — | 2026-10-12T13:16Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan + map); 2 iterations of the fast gate — iter 1: 2 lint failures in new prose, fixed; iter 2: 5377 pass, 0 fail | — | 2026-10-12T13:46Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #637: https://github.com/Gamaroff/agent-skills/pull/637 | — | 2026-10-12T13:48Z |
-| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention — QA loop not converging (HIGH 1, 1, 1, 1, 1, 1; gate 6 FAIL; budget spent) | `task.180.qa.{N}.*.md`; `task.180.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention — QA loop not converging (loop limit at cycle 7; HIGH 1×6 then 0; gate 7 CONCERNS; last fix 9d30305c ungated) | `task.180.qa.{N}.*.md`; `task.180.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.180.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
@@ -130,6 +130,11 @@ Add the `fence:<doc>#<heading>` entry form (with `--slot` and an optional per-ca
 - QA Cycle 5 (resumed at 5b) — changes-requested: stage-disabled. Third strike fires on `security-probe.mjs` (gates 3–5); the struck mechanism is refusal scoring (gates 3–4). TASK-180-015/-016 are sandbox containment, a different mechanism, so they are fixed as usual (obs #98 rule).
 - qa-fix cycle 5: findings read inline (2 open; `pr-review-current` → none). Post-fix PR state inline (`gh pr view` → OPEN @ 243bc237). Counter 5 < `qa_max_cycles` 6 → QA cycle 6.
 - QA Cycle 6 — safety re-probe (clause 2), reviewer 290.3 s; gate FAIL 70. Convergence check (gates 4–6): HIGH 1, 1, 1 → trips; budget spent (cycle 6 of 6). 5b not run.
+- QA loop re-entry (cycle 6 escalation): 1 extra cycle granted (user: "go ahead"); `qa_max_cycles` = 7. Re-entry corrected 5a → 5b by hand (observation #17, fourth time).
+- QA Cycle 6 (resumed at 5b) — changes-requested: stage-disabled. Move on the containment mechanism (struck in substance: gates 5–6 both enumerate the checked text): **replace** — `ghFreePath` shadows every PATH directory holding `gh`, so the guarantee no longer depends on which text is checked.
+- qa-fix cycle 6: findings read inline (2 open). Post-fix PR state inline (OPEN @ cba2750b). Counter 6 < `qa_max_cycles` 7 → QA cycle 7.
+- QA Cycle 7 — safety re-probe (clause 2), reviewer 362.5 s; gate CONCERNS 90 (HIGH 0). Convergence check: HIGH_N 0 → no trip. Route classifier: continue (not-a-pass-gate; route 2 declined: high-findings-remain). → 5b. changes-requested: stage-disabled.
+- qa-fix cycle 7: findings read inline. Counter 7 = `qa_max_cycles` 7 → Loop limit. Route 2c (budgetSpent): continue (`medium-not-falling`, MEDIUM 1, 1, 1 over cycles 5–7) → escalation; cycle 7's Action overwritten to `Escalating — loop limit reached`.
 
 ---
 
@@ -138,6 +143,7 @@ Add the `fence:<doc>#<heading>` entry form (with `--slot` and an optional per-ca
 _Problems encountered and how they were resolved or escalated._
 - **QA cycle 3 gate heredoc was unquoted**: backticks in the finding text ran as command substitutions (only "command not found" — no side effects) and truncated one finding; repaired from the reviewer's text before commit.
 - **QA loop not converging (cycle 3)** — escalated; see QA Iteration History § QA Loop Not Converging.
+- **QA loop limit reached (cycle 7)** — HIGH fell to 0; the half-cycle declined (`medium-not-falling`); see QA Iteration History § QA Loop Limit Reached.
 - **QA loop not converging (cycle 6)** — escalated after a second 1-cycle grant; see QA Iteration History § QA Loop Not Converging (cycle 6).
 - **QA loop not converging (cycle 5)** — escalated after the 1-cycle grant; see QA Iteration History § QA Loop Not Converging (cycle 5).
 - **qa-fix cycle 4 fast gate attempt 1 red**: `bundle --check` found a stale bundled `probe-boundary-rule.md` (edited after `npm run bundle`). Rebundled; attempt 2 green.
@@ -297,6 +303,9 @@ are NOT accepted — they are handed over below. The QA budget (`qa_max_cycles` 
 **PR Review**: not reached — gate did not exit the loop
 **Loop exit**: n/a — this exit not taken
 **Action**: Escalating — loop not converging
+**Re-entry**: 1 extra cycle granted (`qa_max_cycles` 7), re-entered at 5b on gate 6
+**Fixes Applied**: move **replace** on the containment mechanism — `ghFreePath` shadows every PATH directory holding `gh` for each case (TASK-180-017); `expected.absent` checked before the never-ran branch (TASK-180-018). 3 mutations red. `ci:fast` attempt 1 green: 5409 tests, 5395 pass, 0 fail. PR comment and issue comment (`qa-fix-6`) posted.
+**Commit**: `cba2750b`
 
 ### QA Loop Not Converging (cycle 6) — 2026-10-12
 
@@ -322,14 +331,48 @@ over below. The QA budget (`qa_max_cycles` 6) is also spent.
 2. Fix TASK-180-018 in the same pass: check `expected.absent` before step 1 of `scoreFenceRun`.
 3. Then grant one more cycle (re-run /develop-task), or waive with the measured plausibility (0 shipped docs resolve `gh` to a path) and proceed to /finalise.
 
+### QA Cycle 7 — 2026-10-12
+**Gate Result**: CONCERNS
+**Issues Found**: 2. TASK-180-019 (MEDIUM): a default-path lookup (`command -p gh`, `env -u PATH gh`) in a fixture script skips the PATH guard where `gh` is `/usr/bin/gh`. CR-2 (LOW, advisory): a relative PATH entry is not resolved before the `gh` test. The cycle-6 fixes hold: TASK-180-017 and -018 fixed; bugs 10 and 11 closed. First gate with no HIGH.
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Escalating — loop limit reached
+**Fixes Applied**: TASK-180-019: the `gh` text check reads every case's `fixture.env` values and `fixture.files`; the default-path lookup is a stated limit. CR-2: `ghFreePath` resolves relative PATH entries against the case directory. 2 mutations red. `ci:fast` attempt 1 green: 5410 tests, 5396 pass, 0 fail. PR comment and issue comment (`qa-fix-7`) posted.
+**Commit**: `9d30305c`
+
+### QA Loop Limit Reached — 2026-10-12
+
+The pipeline completed 7 qa-task/qa-fix cycles (the base 5 plus grants of 2, 1 and 1, of which 2 cycles ran inside the first grant) without a clean PASS. Cycle 7's fix (`9d30305c`) has not been read by any gate: the gate-the-last-fix half-cycle declined (`medium-not-falling` — MEDIUM 1, 1, 1 over cycles 5–7).
+
+**Final gate status**: CONCERNS (90/100), gate 7 — the first gate with no HIGH
+**HIGH findings per cycle**: 1, 1, 1, 1, 1, 1, 0 — fell to 0 at cycle 7
+**Remaining issues** (from gate 7, with the fix that answers them):
+- TASK-180-019, medium, `shared/resources/security-probe.mjs`: default-path `gh` lookup from a fixture. Fixed in `9d30305c`, ungated.
+- CR-2, low (advisory), `shared/resources/security-probe.mjs`: relative PATH entries. Fixed in `9d30305c`, ungated.
+
+**What was attempted per cycle**:
+- Cycles 1–4: refusal scoring, closed at cycle 4.
+- Cycles 5–6: `gh` containment by text enumeration; replaced at cycle 6 by the structural `ghFreePath` guard (`cba2750b`).
+- Cycle 7: fixture text added to the fast-path check; default-path lookup stated; relative entries resolved (`9d30305c`).
+- Half-cycle: considered and declined (`medium-not-falling`).
+
+**Likely root cause**: the loop has converged on HIGH (6 × 1, then 0). What remains is a MEDIUM per cycle from each unscoped safety re-probe of the new surface. The scope is a probe that runs its input as script source; each re-probe finds a narrower containment edge (cycle 7's needs a host with `/usr/bin/gh`). The structural guard is in place, the remaining edges are stated limits, and the last fix is small and mutation-proven but not gated.
+
+**Recommended next steps**:
+1. Gate the last fix: re-run /develop-task and grant 1 cycle (Phase 0b, "Resume at 5a"). Gate 8 reads `9d30305c`; a PASS or a CONCERNS with no open entry hands to 5c (`/review-pr`) and then `/finalise`.
+2. Or accept gate 7 and run /finalise: its only open entry (TASK-180-019) is fixed and mutation-proven on the head, and the DoD reads the head.
+3. Follow-ups outside this task: the shell forms have the same PATH-lookup gap (pre-existing); `GIT_CEILING_DIRECTORIES` in `caseEnv`; observation #17 (the grant script's re-entry phase).
+
 ---
 
 ## Completion
 
 **Finished**: {populated at end}
-**Final Status**: Escalated — QA loop not converging at cycle 6 (after grants of 2, 1 and 1 cycles; budget spent)
+**Final Status**: Escalated — QA loop limit reached at cycle 7 (gate 7 CONCERNS, HIGH 0; last fix ungated)
 **Branch**: feature/task.180.probe-engine-fence-entry-form
 **PR**: https://github.com/Gamaroff/agent-skills/pull/637
-**QA Iterations**: 6 (5 fix cycles)
+**QA Iterations**: 7 (7 fix cycles)
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
