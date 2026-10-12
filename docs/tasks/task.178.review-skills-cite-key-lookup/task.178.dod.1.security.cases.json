@@ -1,0 +1,104 @@
+[
+  {
+    "id": "t178.legit.task-doc",
+    "sink": "filename",
+    "input": "docs/tasks/task.70.review-x/task.70.review-x.md",
+    "direction": "legitimate"
+  },
+  {
+    "id": "t178.legit.this-task",
+    "sink": "filename",
+    "input": "docs/tasks/task.178.review-skills-cite-key-lookup/task.178.review-skills-cite-key-lookup.md",
+    "direction": "legitimate"
+  },
+  {
+    "id": "t178.legit.bare-name",
+    "sink": "filename",
+    "input": "task.1.a.md",
+    "direction": "legitimate"
+  },
+  {
+    "id": "t178.legit.spaces",
+    "sink": "filename",
+    "input": "docs/a b/task.9.with space.md",
+    "direction": "legitimate"
+  },
+  {
+    "id": "t178.hostile.story",
+    "sink": "filename",
+    "input": "docs/prd/x/stories/story.1.2.foo/story.1.2.foo.md",
+    "direction": "hostile"
+  },
+  {
+    "id": "t178.hostile.bug",
+    "sink": "filename",
+    "input": "docs/bugs/bug.3.foo/bug.3.foo.md",
+    "direction": "hostile"
+  },
+  {
+    "id": "t178.hostile.epic",
+    "sink": "filename",
+    "input": "docs/epics/epic.4.x/epic.4.x.md",
+    "direction": "hostile"
+  },
+  {
+    "id": "t178.hostile.empty",
+    "sink": "filename",
+    "input": "",
+    "direction": "hostile"
+  },
+  {
+    "id": "t178.hostile.no-digit",
+    "sink": "filename",
+    "input": "docs/tasks/task.x.foo.md",
+    "direction": "hostile"
+  },
+  {
+    "id": "t178.hostile.tasks-prefix",
+    "sink": "filename",
+    "input": "docs/tasks/tasks.1.foo.md",
+    "direction": "hostile"
+  },
+  {
+    "id": "t178.hostile.task-dir-story-file",
+    "sink": "filename",
+    "input": "docs/tasks/task.1.foo/story.1.1.x.md",
+    "direction": "hostile"
+  },
+  {
+    "id": "t178.hostile.trailing-slash",
+    "sink": "filename",
+    "input": "docs/tasks/task.1.y.md/",
+    "direction": "hostile"
+  },
+  {
+    "id": "t178.hostile.command-substitution",
+    "sink": "filename",
+    "input": "docs/$(touch PWNED).md",
+    "direction": "hostile"
+  },
+  {
+    "id": "t178.hostile.newline-in-dir",
+    "sink": "filename",
+    "input": "docs/x\ntask.1.y.md",
+    "direction": "hostile"
+  },
+  {
+    "id": "t178.hostile.leading-space",
+    "sink": "filename",
+    "input": "docs/ task.1.x.md",
+    "direction": "hostile"
+  },
+  {
+    "id": "t178.hostile.uppercase",
+    "sink": "filename",
+    "input": "docs/TASK.1.x.md",
+    "direction": "hostile"
+  },
+  {
+    "id": "t178.hostile.dash-prefix",
+    "sink": "filename",
+    "input": "docs/-task.1.x.md",
+    "direction": "hostile"
+  }
+]

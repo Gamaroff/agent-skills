@@ -1,0 +1,19 @@
+{
+  "sink": null,
+  "entry": ".claude/state/t178-probe-wrapper.mjs#taskOnlyCheckAdmits",
+  "name": "review-task-jira-key-task-only-check",
+  "call_site": "skills/review-task/SKILL.md:124",
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 17,
+  "passed": 17,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": null,
+  "ran_at": "2026-10-12T11:10:02.786Z"
+}

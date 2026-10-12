@@ -5,10 +5,12 @@ type: task
 description: "Replace the three restated, unanchored jira_key / github_issue lookups in review-task and review-story with citations of the shared §0a Key → document lookup that task.176 corrected."
 tags: [review-task, review-story, input-resolution, follow-up]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-02
 updated: 2026-10-12
+completed_date: 2026-10-12
+pr_number: 636
 assignee:
 estimated_effort_hours: 8
 github_issue: 556
@@ -16,7 +18,7 @@ github_issue: 556
 
 # Technical Task: review-task and review-story cite the §0a key lookup
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.178.review.1.review-skills-cite-key-lookup.md` implemented 2026-10-12
 **GitHub Issue**: [#556](https://github.com/Gamaroff/agent-skills/issues/556)
 
@@ -321,12 +323,33 @@ accurate.
 - Gate 5 CR-1 fixed (`dcf86760`), mutation-proven.
 - One advisory low/medium matcher edge case (a quote glued between word characters); routed to future work.
 
-<!-- change-log-start -->
+## Definition of Done - PASSED ✅
 
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.178.qa.6.review-skills-cite-key-lookup.md`
+**Gate File**: `task.178.gate.6.review-skills-cite-key-lookup.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (6 QA cycles — 5 budgeted plus 1 granted after the loop-limit escalation)
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 6/6, each held by a test that runs per PR
+✅ **PR Review:** PR #636 — Step 5c conformance review APPROVE (no host review required); CI green on `a557658`
+✅ **Documentation:** CHANGELOG [Unreleased] entry (task 178); three sites cite §0a; step-0 document bundled into both skills
+✅ **Security Review:** PASS — the task-only check is a boundary, probed by /finalise through the engine (17 executed, 0 reproduced)
+⚠️ **Compliance Review:** NOT_APPLICABLE — internal refactor
+
+**Task marked as ACCEPTED on:** 2026-10-12
+
+**Detailed Verification Log:** See `task.178.dod.1.review-skills-cite-key-lookup.md` for complete verification evidence and timestamps.
+<!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                       | Author      |
-| ---------- | ------- | ------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-02 | 1.0     | Initial draft — task.176 Deferred Work item 5     | create-task |
 | 2026-10-12 | 1.1     | Review passed (8/10) — guard key widened to a quote- and flag-order-tolerant compound pattern with the `grep -rL` exclusion pinned; executed fixture test named for the Jira-key criterion; tracked shell added to the guard population | review-task |
 | 2026-10-12 |         | Status → ready-for-development | review-task |
@@ -342,7 +365,7 @@ accurate.
 | 2026-10-12 |         | QA gate CONCERNS (90/100) — 1 finding (1 medium) | qa-task |
 | 2026-10-12 |         | QA findings fixed — cycle 5, 1 finding (a word-internal apostrophe is literal, not a quote opener) | qa-fix |
 | 2026-10-12 |         | QA gate PASS (100/100) — 0 blocking findings (1 low advisory) — cycle 6, granted after escalation | qa-task |
-
+| 2026-10-12 | 1.2 | DoD passed — accepted (PR #636) | finalise |
 <!-- change-log-end -->
 
 ---
