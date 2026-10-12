@@ -36,7 +36,7 @@ Add the `fence:<doc>#<heading>` entry form (with `--slot` and an optional per-ca
 | 2. review-task             | ✅ Done    | `task.180.review.{N}.{name}.md` exists (or skip logged)               | review.1 — 8/10 after fixes, READY; Planned → Ready for Development | — | 2026-10-12T13:16Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan + map); 2 iterations of the fast gate — iter 1: 2 lint failures in new prose, fixed; iter 2: 5377 pass, 0 fail | — | 2026-10-12T13:46Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #637: https://github.com/Gamaroff/agent-skills/pull/637 | — | 2026-10-12T13:48Z |
-| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention — QA loop not converging (loop limit at cycle 7; HIGH 1×6 then 0; gate 7 CONCERNS; last fix 9d30305c ungated) | `task.180.qa.{N}.*.md`; `task.180.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention — QA loop not converging (loop limit at cycle 8; HIGH 1×6 then 0, 0; gate 8 CONCERNS; last fix 30769d36 ungated) | `task.180.qa.{N}.*.md`; `task.180.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.180.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
@@ -135,6 +135,9 @@ Add the `fence:<doc>#<heading>` entry form (with `--slot` and an optional per-ca
 - qa-fix cycle 6: findings read inline (2 open). Post-fix PR state inline (OPEN @ cba2750b). Counter 6 < `qa_max_cycles` 7 → QA cycle 7.
 - QA Cycle 7 — safety re-probe (clause 2), reviewer 362.5 s; gate CONCERNS 90 (HIGH 0). Convergence check: HIGH_N 0 → no trip. Route classifier: continue (not-a-pass-gate; route 2 declined: high-findings-remain). → 5b. changes-requested: stage-disabled.
 - qa-fix cycle 7: findings read inline. Counter 7 = `qa_max_cycles` 7 → Loop limit. Route 2c (budgetSpent): continue (`medium-not-falling`, MEDIUM 1, 1, 1 over cycles 5–7) → escalation; cycle 7's Action overwritten to `Escalating — loop limit reached`.
+- QA loop re-entry (loop limit, cycle 7): 1 extra cycle granted (user: "go ahead"); `qa_max_cycles` = 8; re-entered at 5a (correct for a loop-limit halt: cycle 7's fix was ungated).
+- QA Cycle 8 — scoped re-review (SAFETY_REPROBE false: gate 7 had no HIGH and was not FAIL), reviewer 363.1 s; gate CONCERNS 90. Route classifier: continue (not-a-pass-gate; route 2 declined: product-defect-signal). → 5b. changes-requested: stage-disabled.
+- qa-fix cycle 8: findings read inline. Counter 8 = `qa_max_cycles` 8 → Loop limit. Route 2c: continue (`medium-not-falling`, MEDIUM 1, 1, 2 over cycles 6–8) → escalation.
 
 ---
 
@@ -143,6 +146,7 @@ Add the `fence:<doc>#<heading>` entry form (with `--slot` and an optional per-ca
 _Problems encountered and how they were resolved or escalated._
 - **QA cycle 3 gate heredoc was unquoted**: backticks in the finding text ran as command substitutions (only "command not found" — no side effects) and truncated one finding; repaired from the reviewer's text before commit.
 - **QA loop not converging (cycle 3)** — escalated; see QA Iteration History § QA Loop Not Converging.
+- **QA loop limit reached (cycle 8)** — HIGH 0 for two gates; the half-cycle declined (`medium-not-falling`); see QA Iteration History § QA Loop Limit Reached (cycle 8).
 - **QA loop limit reached (cycle 7)** — HIGH fell to 0; the half-cycle declined (`medium-not-falling`); see QA Iteration History § QA Loop Limit Reached.
 - **QA loop not converging (cycle 6)** — escalated after a second 1-cycle grant; see QA Iteration History § QA Loop Not Converging (cycle 6).
 - **QA loop not converging (cycle 5)** — escalated after the 1-cycle grant; see QA Iteration History § QA Loop Not Converging (cycle 5).
@@ -365,14 +369,43 @@ The pipeline completed 7 qa-task/qa-fix cycles (the base 5 plus grants of 2, 1 a
 2. Or accept gate 7 and run /finalise: its only open entry (TASK-180-019) is fixed and mutation-proven on the head, and the DoD reads the head.
 3. Follow-ups outside this task: the shell forms have the same PATH-lookup gap (pre-existing); `GIT_CEILING_DIRECTORIES` in `caseEnv`; observation #17 (the grant script's re-entry phase).
 
+### QA Cycle 8 — 2026-10-12
+**Gate Result**: CONCERNS
+**Issues Found**: 5. TASK-180-020 (MEDIUM): the TASK-180-017 integration test passes on a pre-spawn decline and never reaches `ghFreePath`. TASK-180-021 (MEDIUM): `emitBlock` drops a `fence:` control's slot. 3 LOW cleanups (advisory). The cycle-7 fix holds: TASK-180-019 fixed; bug 12 closed. Second gate with no HIGH; Security PASS.
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Escalating — loop limit reached
+**Fixes Applied**: TASK-180-020: the guard's integration fixture builds the `gh` name at run time and the test asserts cases ran, so it reaches `ghFreePath`. TASK-180-021: `emitBlock` prints the `fence:` slot; the default name keeps a `#` heading and carries the slot. CR-3 comment corrected. 3 mutations red. `ci:fast` attempt 1 green: 5411 tests, 5397 pass, 0 fail. PR comment and issue comment (`qa-fix-8`) posted.
+**Commit**: `30769d36`
+
+### QA Loop Limit Reached (cycle 8) — 2026-10-12
+
+The pipeline completed 8 qa-task/qa-fix cycles without a clean PASS. Cycle 8's fix (`30769d36`) has not been read by a gate: the gate-the-last-fix half-cycle declined (`medium-not-falling` — MEDIUM 1, 1, 2 over cycles 6–8).
+
+**Final gate status**: CONCERNS (90/100), gate 8 — Security PASS; the second consecutive gate with no HIGH
+**HIGH findings per cycle**: 1, 1, 1, 1, 1, 1, 0, 0
+**Remaining issues** (from gate 8, with the fix that answers them):
+- TASK-180-020, medium, `shared/resources/tests/security-probe.mjs`: the guard's integration test was vacuous. Fixed in `30769d36`, ungated.
+- TASK-180-021, medium, `shared/resources/security-probe.mjs`: `emitBlock` dropped the `fence:` slot. Fixed in `30769d36`, ungated.
+
+**What was attempted per cycle**: cycles 1–7 as above; cycle 8 fixed a test that cycle 7 had made vacuous, and a record-rendering gap. Half-cycle considered and declined (`medium-not-falling`).
+
+**Likely root cause**: HIGH has been 0 for two gates and Security is PASS. Gate 8's findings are in a test and in record rendering, not in the guard. Each cycle's fix is small and mutation-proven, but each one gives the next review new code to read. The MEDIUM count is therefore flat by construction, not because fixes fail. Gate 8's first finding was itself caused by cycle 7's fix, which is the pattern the refute pass exists for.
+
+**Recommended next steps**:
+1. Accept gate 8 and run /finalise: both open entries are fixed and mutation-proven on the head, CI is gated there, and the DoD reads the head. The remaining LOW cleanups and the carried follow-ups go to Deferred Work.
+2. Or grant one more cycle to gate `30769d36` (re-run /develop-task); a PASS or a CONCERNS with no open entry hands to 5c and /finalise.
+
 ---
 
 ## Completion
 
 **Finished**: {populated at end}
-**Final Status**: Escalated — QA loop limit reached at cycle 7 (gate 7 CONCERNS, HIGH 0; last fix ungated)
+**Final Status**: Escalated — QA loop limit reached at cycle 8 (gate 8 CONCERNS, HIGH 0, Security PASS; last fix ungated)
 **Branch**: feature/task.180.probe-engine-fence-entry-form
 **PR**: https://github.com/Gamaroff/agent-skills/pull/637
-**QA Iterations**: 7 (7 fix cycles)
+**QA Iterations**: 8 (8 fix cycles)
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
