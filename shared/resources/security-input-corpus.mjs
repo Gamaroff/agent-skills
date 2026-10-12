@@ -64,7 +64,8 @@ export const CASE_FIELDS = Object.freeze([
  * must NOT create: it is how a command-substitution name is caught when the
  * substitution ran but the number still came out right.
  *
- * `fixture` is read only by the `fence:` entry form (task.180):
+ * `fixture` is read only by the `fence:` (task.180) and `shell-argv:` (task.181)
+ * entry forms — for `shell-argv:`, written before its `--fixture-setup` runs:
  *
  *   { env: { npm_config_loglevel: "silent" }, files: { ".npmrc": "loglevel=silent\n" } }
  *

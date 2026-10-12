@@ -79,7 +79,7 @@ Invoke as `/review-security [work-item] [--mode diff|full]`.
      epic-level scope is deliberately out of scope, having no stopping rule.
 3. **Identify the controls the work item claims.** Read its Success Criteria / Acceptance Criteria and
    its security-relevant prose. A control is anything whose job is to decide what gets through.
-4. **Write one probe spec per control** — `{ sink, entry }`, plus `argv` for a `cli:` entry and `slot` for a `fence:` entry — following
+4. **Write one probe spec per control** — `{ sink, entry }`, plus `argv` for a `cli:` or `shell-argv:` entry and `slot` for a `fence:` entry — following
    [`references/security-review-prompt.md`](references/security-review-prompt.md),
    which is passed to the reviewing agent verbatim. Sink selection and entry-point rules live there.
 5. **Run the engine.** `runProbeSpec` executes every corpus case for the sink in a sandboxed child and
@@ -154,10 +154,11 @@ clean result:
    file in scope to `unverifiable`.
 3. **A non-JS entry point is routed to the engine's `shell:` entry form** — or `shell-fn:` for a
    sourced library, `cli:` with an `--argv` template for a Node CLI whose decision sits behind
-   its flags, and `fence:` with `--slot` for a fenced bash block in a step doc — never recorded
-   `unverifiable` for being bash, for taking several flags or for being prose; only a
-   target no form reaches (stdin, a shell script with more than one positional, network) is
-   declined, with the reason named.
+   its flags, `shell-argv:` with an `--argv` template (and `--fixture-setup` when it needs a
+   repository) for a shell script that takes several arguments or flags, and `fence:` with
+   `--slot` for a fenced bash block in a step doc — never recorded `unverifiable` for being
+   bash, for taking several flags or for being prose; only a target no form reaches (stdin,
+   network) is declined, with the reason named.
 
 ## Out of scope in v1
 

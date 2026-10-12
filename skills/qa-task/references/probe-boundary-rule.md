@@ -161,8 +161,9 @@ Declining conditions, each reported with its reason:
 | `unknown-sink` | No corpus for that sink. `corpusFor` throws rather than returning `[]`, deliberately. |
 | `entry-not-probeable` | The module would not import, the export is absent, or it is not a function. An **absent** export is a module-private predicate: export it and re-run — never a reason for `boundary: false` (obs #156). For `fence:`: the heading is not in the doc, appears twice, or has no ```` ```bash ```` block under it. |
 | `case-errored` | One case timed out or its child never ran. |
-| `bad-args` | `--args-json` is not a JSON array, or was given with a `shell:` / `shell-fn:` / `cli:` / `fence:` entry, which cannot append an argument to a call. |
+| `bad-args` | `--args-json` is not a JSON array, or was given with a `shell:` / `shell-fn:` / `cli:` / `shell-argv:` / `fence:` entry, which cannot append an argument to a call. |
 | `bad-slot` | A `fence:` entry with no `--slot`, a `--slot` the block does not contain (a slot that substitutes nothing tests nothing), or a `--slot` given with any other form. |
+| `bad-fixture-setup` | A `--fixture-setup` given with any form but `shell-argv:`, or one outside the containment root, under `node_modules`, or not a readable regular file. |
 
 ### `boundary: internal` is a decision, not a verdict
 
@@ -231,7 +232,7 @@ takes it.
   missing file under a symlinked root stays inside it. The residual is a symlink
   that appears between the containment check and the readable-file check, a race
   nothing here defends against.
-- **The engine reaches five entry forms, and "not importable" is not a decline.**
+- **The engine reaches six entry forms, and "not importable" is not a decline.**
   `path#export` imports a JS module; `shell:path` runs a **shell script that
   takes one positional argument** — `bash <script> <fixture-dir>` per case, under
   bash and (when the host has it) zsh, with the script and directory passed as
@@ -390,8 +391,8 @@ takes it.
     `{input}` (a CLI whose own argument is a template, the engine itself
     included). Pass such a value as the case's input instead.
   - **A `--argv` shape error is an argument error, not a probe result:** exit 2,
-    `bad-argv`, nothing runs and no record is written (`--argv` without `cli:`,
-    `cli:` without `--argv`, zero or two `{input}`, an unknown or embedded
+    `bad-argv`, nothing runs and no record is written (`--argv` without `cli:`
+    or `shell-argv:`, `cli:` without `--argv`, zero or two `{input}`, an unknown or embedded
     slot). An entry outside the root, or one that is not a `.mjs` / `.js`
     regular file, is a named decline like every other form's. The record carries
     the template as `argv`, and **a `cli:` control's identity is its
@@ -416,6 +417,42 @@ takes it.
   (`process.execPath`) and the script is fixed by `--entry` and
   containment-checked before anything spawns, exactly as the JS form already
   runs a Node child. `node` stays off `SAFE_COMMANDS`.
+
+  **`shell-argv:path --argv '<JSON array>'` runs a bash script that takes
+  several arguments or flags** (task.181) — `verify-push-state.sh --base …
+  --scope …`, `grant-qa-cycles.sh <doc-dir> <k> [<report>]`,
+  `reenter-qa-after-finalise.sh <doc-dir> <report>` — which the one-positional
+  shell form cannot reach. It is `cli:`'s contract on a shell script: the same
+  template grammar (one `"{input}"` element, never split, never parsed by a
+  shell; `"{fixture}"` elements), the same verdict (exit 0 *accepted*, non-zero
+  *rejected*, `expected` compared when a case carries it), the same record
+  (`argv`, and a control keyed on its `--name`, else its argv skeleton). Per
+  case and per shell, **the shell is the caller and bash the interpreter** —
+  `<shell> -c 'bash "$@"' <shell> <script> ...argv` — as the one-positional
+  form does: the script's shebang fixes its interpreter, and a bash script interpreted by zsh
+  would fail on a bash construct and score as a refusal. A timeout or a launch
+  failure is *errored*. Two things `cli:` never needed:
+  - **`--fixture-setup <path>`** names a committed shell script, contained like
+    the entry, run as `bash <setup> <case-dir>` before each (case, shell) run, in
+    the same sandbox and env. It is how a case gets the scratch git repository
+    these scripts read — commits, a gate whose `head:` is an ancestor, a halt
+    snapshot. The sandbox `HOME` has no git identity, so the setup states one
+    (`git -c user.name=… -c user.email=…`). **A setup that fails is *errored*,
+    never *rejected*** — the engine could not build what the script needs.
+    `--fixture-setup` with any other form is exit 2, `bad-fixture-setup`; the
+    record carries it as `fixture_setup`.
+  - **A case's `fixture`** (`env`, `files`) is honoured exactly as `fence:`
+    honours it, and is written **before** the setup runs, so the setup may rely
+    on it.
+
+  It is a shell form for `gh`: a script — or a setup — that names `gh` with no
+  `--fake-gh` is declined `needs-fake-gh`, the trip-wire `gh` is first on `PATH`,
+  and `--fake-gh` is accepted. Like `cli:` it does not touch §2: the engine
+  chooses the interpreter (`bash`), and the script and the setup are fixed by
+  flags and containment-checked before anything spawns. The worked example is
+  the `shell-argv` fixture pair beside `security-probe.test.mjs` — a setup and
+  eight cases against `reenter-qa-after-finalise.sh`, `engages`, every case past
+  its usage line.
 
   **`fence:<doc.md>#<heading>` with `--slot <placeholder>` runs a fenced bash
   block in a step doc** (task.180) — the shape most of this repository's
@@ -467,8 +504,7 @@ takes it.
   the command, and the sandbox, the per-case directory and the escape sentinel
   all apply unchanged.
 - **What is still declined, and recorded as declined:** a script or CLI that
-  reads its input from stdin, a shell script that takes more than one positional,
-  anything that must open a socket; a live database sink; anything that needs
+  reads its input from stdin, anything that must open a socket; a live database sink; anything that needs
   the network (a CLI that consults `gh` included — `--fake-gh` is a shell-form
   flag). These are limits of the entry forms,
   not reasons to record `boundary: false` — the boundary exists whether or not
@@ -485,7 +521,8 @@ takes it.
   task.150 spent three QA cycles finding them one layer at a time (obs #209).
 
 The precondition — a pure-ish predicate, composer, single-argument script,
-argv-driven Node CLI or fenced bash block with one placeholder — is what the
+argv-driven Node CLI or shell script, or fenced bash block with one
+placeholder — is what the
 boundary rule selects for anyway. If it turns
 out that most real controls are reachable by none of the forms and the engine declines almost
 everything, **that is a finding to record here in this section**, not something
@@ -493,12 +530,13 @@ to paper over by loosening §2.
 
 ### 5.1 When the sink is declined and the reviewer probes it by hand
 
-A declined sink (a stdin-reading script or CLI, a multi-positional shell
-script, a networked control — what no entry form reaches) is not exempt from
-being tested; it is exempt from the *engine*. **Reach for this only after the
-entry forms have been tried** — a one-argument script is `shell:`'s job, a
-Node CLI driven by its argv is `cli:`'s and a fenced bash block in a step doc
-is `fence:`'s, and a by-hand probe of any of them is the self-report the engine
+A declined sink (a stdin-reading script or CLI, a networked control — what no
+entry form reaches) is not exempt from being tested; it is exempt from the
+*engine*. **Reach for this only after the entry forms have been tried** — a
+one-argument script is `shell:`'s job, a shell script taking several arguments
+or flags is `shell-argv:`'s (with `--fixture-setup` when it needs a
+repository), a Node CLI driven by its argv is `cli:`'s and a fenced bash block
+in a step doc is `fence:`'s, and a by-hand probe of any of them is the self-report the engine
 exists to remove. A `cli:` probe exercises **one arm**
 — the CLI's own argv; the other arms below (a wrapper, an env-var path) still
 need the by-hand rule when they reach the same sink. When the reviewer executes such

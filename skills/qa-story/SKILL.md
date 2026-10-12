@@ -1153,8 +1153,8 @@ JSON
    do not restate them here. **Runnable prose is in scope:** a fenced bash block in a `SKILL.md` or a
    `shared/resources/*.md` that clears, refuses or HALTs on repository state is a boundary under that
    Step 1b's repo-state signal, exactly as a script would be. When no engine form reaches it, record
-   `boundary: true` and the zero-guard finding naming the remedy (an extracted script, or task.181's
-   `shell-argv:`), never `boundary: false`. QA recorded `false` on task.173's 5c classify block for
+   `boundary: true` and the zero-guard finding naming the remedy (an extracted script the
+   `shell:` or `shell-argv:` form reaches), never `boundary: false`. QA recorded `false` on task.173's 5c classify block for
    seven cycles, and `/finalise` then raised the same boundary as a DoD gap (obs #298). When the rule fires, the probe engine is the harness — **run it**:
    `node references/security-probe.mjs --sink <sink> --entry '<path>#<export>' --repo-root "$(git rev-parse --show-toplevel)" --record <work-item-dir>/<stem>.qa.<N>.security.run.json --json`
    — or, for a **shell-script** boundary (one positional argument; a script whose header says it
@@ -1171,7 +1171,11 @@ JSON
    `--entry 'cli:<path>' --argv '["--flag","{input}"]' --cases-file <cases.json>` — the
    template's one `"{input}"` element is each case, exit status is the verdict, a crash is
    `errored`, and each guarded flag is its own control, named with `--name`; "it takes several flags" is never a reason
-   to record `boundary: false`. A **fenced bash block in a step doc** (a guard shipped as Markdown —
+   to record `boundary: false`. A **shell script that takes several arguments or flags** (task.170:
+   `reenter-qa-after-finalise.sh <doc-dir> <report>`) takes the shell-argv form:
+   `--entry 'shell-argv:<path>' --argv '["{input}","<second-argument>"]' --cases-file <cases.json>`,
+   plus `--fixture-setup <setup.sh>` when it reads a repository — the cli form's template and verdict,
+   bash as the interpreter, and a setup that fails is `errored`, never a refusal. A **fenced bash block in a step doc** (a guard shipped as Markdown —
    task.167's fast-gate precondition) takes the fence form:
    `--entry 'fence:<doc.md>#<heading>' --slot '<placeholder>' --cases-file <cases.json>` — the block
    under the heading runs with each case's input in place of the placeholder, each case's
