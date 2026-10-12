@@ -1,0 +1,22 @@
+{
+  "sink": "filename",
+  "entry": "fence:shared/resources/develop-pipeline-step-3-develop-loop.md#Precondition — the gate must resolve before the first iteration",
+  "name": "fast-gate precondition via fence:",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 13,
+  "passed": 13,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": [
+    "bash"
+  ],
+  "fake_gh": null,
+  "argv": null,
+  "args": null,
+  "slot": "<fastGateCommand>",
+  "ran_at": "2026-10-12T18:18:04.748Z"
+}

@@ -5,18 +5,20 @@ type: task
 description: "Add a `fence:<doc>#<heading>` entry form to shared/resources/security-probe.mjs that extracts the first bash block under a heading on every run, substitutes the case's input into a named placeholder, applies an optional per-case env and fixture files, and scores a hostile case against its stated refusal (`expected`) and a legitimate one by exit status. A boundary shipped as a fenced block in a step doc is then probed by the engine instead of through a hand-written wrapper."
 tags: [security-probe, finalise, qa-task, qa-story, review-security, observation]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-03
 updated: 2026-10-12
 assignee:
 estimated_effort_hours: 8
 github_issue: 560
+completed_date: 2026-10-12
+pr_number: 637
 ---
 
 # Technical Task: security-probe — a `fence:` entry form
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.180.review.1.probe-engine-fence-entry-form.md` implemented 2026-10-12
 
@@ -330,11 +332,36 @@ None.
 - MEDIUM (TASK-180-021): `emitBlock` drops a `fence:` control's slot.
 - HIGH findings per cycle: 1, 1, 1, 1, 1, 1, 0, 0.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.180.qa.8.probe-engine-fence-entry-form.md`
+**Gate File**: `task.180.gate.8.probe-engine-fence-entry-form.yml`
+**Gate Status**: ⚠️ CONCERNS — accepted by the user at the QA loop limit (8 cycles)
+**Quality Score**: 90/100
+**PR Review (Step 5c)**: `task.180.pr-review.1.probe-engine-fence-entry-form.md` — ⚠️ CONCERNS (0 high)
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 10/10 success criteria met; 8 behaviour criteria held by per-PR tests
+✅ **Tests & CI:** `ci:fast` 5411 tests, 0 fail; CI SUCCESS on `954e77b7` (5 checks)
+✅ **Documentation:** CHANGELOG cites task 180; every §7 routing document names `fence:`
+✅ **Security Review:** PASS — 26 probes executed, 0 reproduced (`task.180.dod.1.security.run.json`)
+⚠️ **Compliance Review:** NOT_APPLICABLE — internal developer tooling
+
+**Accepted residue (user decision):** the gate-8 entries TASK-180-020/-021 (bugs 13, 14) are fixed and mutation-proven in `30769d36`, which no QA gate has read; CI is green on a head that includes it.
+
+**Task marked as ACCEPTED on:** 2026-10-12
+
+**Detailed Verification Log:** See `task.180.dod.1.probe-engine-fence-entry-form.md` for complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                | Author      |
-| ---------- | ------- | ------------------------------------------ | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-03 | 1.0     | Initial draft — cut from observation #261  | create-task |
 | 2026-10-12 | 1.1     | Review passed (8/10 after fixes) — slot restated as source substitution (C1); 13 task.167 cases reconstructed from its DoD (I1); headings read outside fences (I2); `bash`-only and catalog checks (O1, O2) | review-task |
 | 2026-10-12 |         | Status → ready-for-development | review-task |
@@ -355,6 +382,7 @@ None.
 | 2026-10-12 |         | QA findings fixed — cycle 7, 2 findings (TASK-180-019 + CR-2): the gh text check reads fixtures; the default-path lookup is a stated limit; relative PATH entries resolved | qa-fix |
 | 2026-10-12 |         | QA gate CONCERNS (90/100) — cycle 8 scoped re-review, 5 findings: 2 medium, 3 low | qa-task |
 | 2026-10-12 |         | QA findings fixed — cycle 8, 2 findings (TASK-180-020..021) + 1 cleanup: the guard's integration test reaches ghFreePath; emitBlock renders the fence: slot | qa-fix |
+| 2026-10-12 | 1.2 | DoD passed — accepted (PR #637); gate 8 CONCERNS accepted by the user at the QA loop limit | finalise |
 <!-- change-log-end -->
 
 ---

@@ -4,7 +4,7 @@
 **Bug ID**: TASK-180-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 1, code review CR-2, verified against `controlKey`)
 **Date Found**: 2026-10-12
 
@@ -68,3 +68,4 @@ Record `slot` in the record entry, and key a fence: control on its `--name` when
 | 2026-10-12 | New          | qa-task    | QA cycle 1 |
 | 2026-10-12 | In Progress  | qa-fix     | Investigation started |
 | 2026-10-12 | Ready for QA | qa-fix     | Fix implemented, mutation-proven |
+| 2026-10-12 | Closed       | QA Engineer | Verified by qa.2 (TASK-180-002 FIXED; mutation F2 red) (closed at the PR review, PC trail finding) |

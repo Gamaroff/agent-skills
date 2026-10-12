@@ -4,7 +4,7 @@
 **Bug ID**: TASK-180-BUG-1
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 1, code review CR-1, reproduced)
 **Date Found**: 2026-10-12
 
@@ -77,3 +77,4 @@ Added `isShellParseFailure(child, scriptPath)` — keyed on the shell's message 
 | 2026-10-12 | New          | qa-task    | QA cycle 1 |
 | 2026-10-12 | In Progress  | qa-fix     | Investigation started |
 | 2026-10-12 | Ready for QA | qa-fix     | Fix implemented, mutation-proven |
+| 2026-10-12 | Closed       | QA Engineer | Verified by qa.2 (TASK-180-001 FIXED for parse errors); the wider class closed via TASK-180-005 → -009, verified by qa.4 (closed at the PR review, PC trail finding) |

@@ -4,7 +4,7 @@
 **Bug ID**: TASK-180-BUG-5
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 2 refute pass, code review CR-3 / TASK-180-006)
 **Date Found**: 2026-10-12
 
@@ -40,3 +40,4 @@ Compare `expected.absent` before scoring a diagnostic run `errored`; regression 
 | ---------- | ------------ | ---------- | ----- |
 | 2026-10-12 | New          | qa-task    | QA cycle 2 |
 | 2026-10-12 | Ready for QA | qa-fix     | Fixed in the scoreFenceRun rewrite, mutation-proven |
+| 2026-10-12 | Closed       | QA Engineer | Verified by qa.3 (TASK-180-006 FIXED; mutation G3 red) (closed at the PR review, PC trail finding) |

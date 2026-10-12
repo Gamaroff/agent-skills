@@ -4,7 +4,7 @@
 **Bug ID**: TASK-180-BUG-3
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 2 refute pass, code review CR-1 / TASK-180-004)
 **Date Found**: 2026-10-12
 
@@ -40,3 +40,4 @@ Decline when an `expected.absent` name equals a `fixture.files` key or that key'
 | ---------- | ------------ | ---------- | ----- |
 | 2026-10-12 | New          | qa-task    | QA cycle 2 |
 | 2026-10-12 | Ready for QA | qa-fix     | Fixed in the scoreFenceRun rewrite, mutation-proven |
+| 2026-10-12 | Closed       | QA Engineer | Verified by qa.3 (TASK-180-004 FIXED for exact names) and qa.4 (TASK-180-010 normalised collision FIXED) (closed at the PR review, PC trail finding) |

@@ -4,7 +4,7 @@
 **Bug ID**: TASK-180-BUG-4
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 2 refute pass, code review CR-2 / TASK-180-005)
 **Date Found**: 2026-10-12
 
@@ -40,3 +40,4 @@ Widen the classifier from parse errors to every shell diagnostic naming the scri
 | ---------- | ------------ | ---------- | ----- |
 | 2026-10-12 | New          | qa-task    | QA cycle 2 |
 | 2026-10-12 | Ready for QA | qa-fix     | Fixed in the scoreFenceRun rewrite, mutation-proven |
+| 2026-10-12 | Closed       | QA Engineer | Over-fixed at cycle 2 (TASK-180-009); the stderr classifier was replaced at cycle 3 and the replacement verified by qa.4 (closed at the PR review, PC trail finding) |
