@@ -104,6 +104,11 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The QA-loop escalation option "accept the gate and finalise" now runs Step 5c first (observation #21).**
+  An escalated loop never reaches 5c, so no PR review report exists, and on a host with no review
+  decision `/finalise` needs that report for its "PR approved" column. Option 2 of both HALT
+  messages in `develop-pipeline-step-5-6-qa-loop.md` now names `/review-pr --effort medium --comment
+  --no-code` before `/finalise`, with a note on why.
 - **`/finalise` judges its own pull request, not the first one its document cites (task 175).**
   Step 3a read `pr_number:` and otherwise the first `PR #N` / `pull/N` in the document body; inside a
   pipeline the frontmatter has no `pr_number:` yet, so three runs judged a PR their document merely
