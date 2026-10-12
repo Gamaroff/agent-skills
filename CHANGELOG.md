@@ -27,9 +27,10 @@ All notable changes to this project will be documented in this file. Format foll
 - **security-probe reaches a fenced bash block in a step doc (task 180, obs #261).** A fifth entry
   form, `--entry 'fence:<doc.md>#<heading>' --slot '<placeholder>'`, reads the doc on every run, takes
   the first ```` ```bash ```` block under the heading (headings are read outside fences), substitutes
-  each case's input for the placeholder and runs it under bash and zsh, scoring exit status as the
-  verdict — except that a run on which the shell reports an error in the substituted block (a parse
-  error, a fatal expansion) is `errored`, never a refusal. A new optional case field, `fixture: {env, files}`, supplies what else the block reads. The
+  each case's input for the placeholder and runs it under bash and zsh. A hostile case must state the
+  guard's refusal in `expected` and is declined without one, because an exit status cannot tell a
+  refusal from a shell that stopped on the input; a legitimate case is scored by exit status, and a
+  script that does not parse (`<shell> -n`) is `errored`. A new optional case field, `fixture: {env, files}`, supplies what else the block reads. The
   slot is source substitution, as for the document's reader: a `$(…)` input runs, inside the case's
   sandbox directory. A guard shipped as Markdown — task.159's and task.167's, each probed through a
   hand-written wrapper under `.claude/state/` — is now probed by the engine, and the record names an

@@ -433,19 +433,14 @@ takes it.
   sandbox, and a write anywhere else is an escape. A case's optional `fixture`
   supplies the rest of what the block reads — `env` (never `HOME`, `TMPDIR` or
   `LC_ALL`, which the sandbox owns) and `files` written into the case directory,
-  declined when a path leaves it. **The verdict is the exit status**, `cli:`'s
-  rule — 0 is `accepted`, non-zero `rejected` — and a case carrying `expected`
-  is compared as the shell arm compares it. **A run on which the shell reports an
-  error in the substituted block is `errored`, never `rejected`**: a quote or `$(`
-  that breaks the block's syntax, or a fatal expansion such as `${x:?}`, stops the
-  shell before the guard answers, and scored as a refusal it let an accept-all
-  block read `engages` (task.180 QA cycles 1–2). A side effect a case's
-  `expected.absent` names is still a reproduction when the shell stops after it,
-  and an `expected.absent` name the case's own fixture writes is declined. **The
-  residual:** an input that injects its own control flow (`"; exit 1; "`) *is* the
-  block's answer under source substitution and reads as a refusal by exit status —
-  a hostile case that must tell the guard's refusal from an injected exit carries
-  `expected` (the guard's own refusal output). The order these rules apply in is
+  declined when a path leaves it. **A hostile case must carry `expected`** — the
+  guard's own refusal (its exit, stdout or stderr) — and is declined without one:
+  under source substitution an exit status cannot tell a refusal from a shell that
+  stopped on the input (`${x:?}`, a word-split `cd`) or from an injected
+  `exit`, and reading the shell's stderr to tell them apart failed in three
+  consecutive QA cycles (task.180). A legitimate case without `expected` is scored
+  by exit status, `cli:`'s rule. A generated script that does not parse
+  (`<shell> -n`) is `errored`. The order these rules apply in is
   `scoreFenceRun`'s, stated once in the engine. The record names
   `fence:<doc>#<heading>`, which resolves in every checkout, and carries the `slot`;
   a `fence:` control is keyed on its `--name`, else its slot, so two slots probed on

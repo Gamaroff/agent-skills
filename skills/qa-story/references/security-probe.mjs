@@ -185,11 +185,14 @@
  * (never HOME, TMPDIR or LC_ALL — the sandbox owns them) and `files` written
  * into the case directory, refused when a path leaves it. The script runs as
  * `<shell> <script>` per shell, rc files off, with the shell arm's trip-wire
- * `gh` (or `--fake-gh`) first on PATH. THE VERDICT IS THE EXIT STATUS, the
- * cli: arm's rule: exit 0 is `accepted`, non-zero `rejected`; a case carrying
- * `expected` is compared as the shell arm compares it. A run on which the SHELL
- * reports an error in the substituted block is `errored` (shellDiagnostic), never a
- * refusal — the cli: arm's crash rule, for a shell; the order is scoreFenceRun's. A missing heading, an
+ * `gh` (or `--fake-gh`) first on PATH. A HOSTILE case must carry `expected` —
+ * the guard's own refusal, stated — and is declined without one: under source
+ * substitution an exit status cannot tell a refusal from a shell that stopped
+ * on the input or from an injected `exit`, and three QA cycles of stderr
+ * classification each let one of them read as a refusal (task.180). A
+ * legitimate case without `expected` is scored by exit status (0 accepted).
+ * A generated script that does not parse (`<shell> -n`) is `errored`. The
+ * order is scoreFenceRun's. A missing heading, an
  * ambiguous one, a heading with no bash block under it, or a slot the block
  * does not contain is a named decline, never a verdict. The record names
  * `fence:<doc>#<heading>`, which resolves in every checkout.
@@ -217,6 +220,7 @@ import {
   dirname,
   isAbsolute,
   join,
+  normalize,
   relative,
   resolve,
   sep,
@@ -2183,26 +2187,28 @@ export function fixtureProblem(fixture) {
 }
 
 /**
- * The first line on stderr in which the SHELL reports an error in the generated
- * script, or null (task.180 QA cycles 1–2, TASK-180-001 and -005). bash writes
- * `<script>: line N: …` (a syntax error, `unexpected EOF`, a fatal expansion
- * such as `${x:?}`, `command not found`, an unbound variable), zsh writes
- * `<script>:N: …`. Each means the shell stopped on the block rather than the
- * block's guard answering, so the run is "could not look". Keyed on the shell's
- * message about THIS script, never on the exit code alone — 1 and 2 are what a
- * guard exits with when it refuses — and a message about another file (a
- * nested `bash -c`) is the block answering. A run that exits 0 is the block's
- * answer whatever it printed.
+ * Whether the generated script PARSES under `shell`: `<shell> -n`, rc files off,
+ * which reads every command and executes none. Returns null when it parses, else
+ * a one-line reason (task.180 QA cycle 3, TASK-180-009 — the third strike on the
+ * stderr classifier this replaces). A parse failure is a property of the script
+ * text, so it is decided before and apart from the run: no message the block
+ * prints at run time can be mistaken for it, and no runtime error the block hits
+ * after its guard answered can be mistaken for "never answered".
  */
-export function shellDiagnostic(child, scriptPath) {
-  if (child.status === 0 || child.status === null) return null;
-  const subject = escapeRegExp(scriptPath);
-  const re = new RegExp(
-    `^(?:bash: |zsh: )?${subject}:(?: line)? ?\\d+: .*$`,
-    "m",
-  );
-  const m = re.exec(child.stderr ?? "");
-  return m ? m[0] : null;
+export function parseCheck(shell, scriptPath, { cwd, env, timeoutMs }) {
+  const r = spawnSync(shell, [...noRcFlags(shell), "-n", scriptPath], {
+    input: "",
+    cwd,
+    env,
+    encoding: "utf8",
+    timeout: timeoutMs,
+  });
+  if (r.status === 0) return null;
+  if (neverRan(r)) {
+    return `\`${shell} -n\` did not complete: ${r.error?.message ?? r.signal ?? "no exit status"}`;
+  }
+  const first = (r.stderr ?? "").trim().split("\n")[0] ?? "";
+  return `\`${shell} -n\` exit ${r.status}: ${first.slice(0, 160)}`;
 }
 
 /**
@@ -2214,19 +2220,21 @@ export function shellDiagnostic(child, scriptPath) {
  *   2. a path `expected.absent` names exists in the case directory → the side
  *      effect happened: compared, so a hostile case is reproduced — even when
  *      the shell then stopped (TASK-180-006)
- *   3. the shell reported an error in the substituted block → errored: the
- *      guard never answered (TASK-180-001, -005)
- *   4. `expected` → compared, mapped through direction
- *   5. otherwise exit 0 is accepted, any other exit rejected
- * An input that injects its own control flow (`"; exit 1; "`) is the block's
- * answer under source substitution and lands on 5 — a hostile case that must
- * tell the guard's refusal from an injected exit carries `expected`.
+ *   3. the generated script does not parse (`parseError`, from parseCheck) →
+ *      errored: the guard never ran (TASK-180-001)
+ *   4. `expected` → compared, mapped through direction. Every hostile case
+ *      reaches this step: runFenceCase declines one with no `expected`, so a
+ *      shell that stopped on the input (`${x:?}`, a word-split `cd`) or an
+ *      injected `exit` mismatches the stated refusal instead of passing for it
+ *      (TASK-180-005, -009)
+ *   5. otherwise (a legitimate case) exit 0 is accepted, any other exit rejected
+ * No step reads the shell's stderr to decide whether the guard answered.
  *
  * @returns {{outcome: string, detail: string|null}}
  */
 export function scoreFenceRun(
   child,
-  { c, shell, scriptPath, caseDir, timeoutMs },
+  { c, shell, scriptPath, caseDir, timeoutMs, parseError = null },
 ) {
   const compared = () => {
     const mismatches = compareExpected(c.expected, child, caseDir);
@@ -2257,11 +2265,10 @@ export function scoreFenceRun(
   }
   const absent = c.expected?.absent ?? [];
   if (absent.some((p) => existsSync(join(caseDir, p)))) return compared();
-  const diagnostic = shellDiagnostic(child, scriptPath);
-  if (diagnostic !== null) {
+  if (parseError !== null) {
     return {
       outcome: "errored",
-      detail: `the shell reported an error in the substituted block under ${shell} (exit ${child.status}) — the guard never answered: ${diagnostic.slice(0, 160)}`,
+      detail: `the substituted block does not parse under ${shell} — the guard never ran: ${parseError}`,
     };
   }
   if (c.expected !== undefined) return compared();
@@ -2333,6 +2340,12 @@ function runFenceCase(
       return;
     }
   }
+  if (!hasExpected && c.direction === "hostile") {
+    decline(
+      "hostile fence: case has no `expected` — state the guard's refusal (its exit, stdout or stderr); an exit status alone cannot tell a refusal from a shell that stopped on the input",
+    );
+    return;
+  }
   const problem = fixtureProblem(c.fixture);
   if (problem !== null) {
     decline(`case's ${problem}`);
@@ -2343,8 +2356,13 @@ function runFenceCase(
   // run, so every hostile case would score accepted and the verdict read
   // `absent` behind a full count — declined, as the shell and cli: arms decline
   // it (task.128 BUG-13; task.180 QA cycle 2, TASK-180-004).
+  // Compared on the NORMALISED first segment, case-folded: `./pwned` and
+  // `b/../pwned` write `pwned`, and on a case-insensitive filesystem so does
+  // `PWNED` (TASK-180-010). A path that leaves the case directory is refused
+  // below, per shell.
+  const firstSegment = (rel) => normalize(rel).split(sep)[0].toLowerCase();
   const collides = (c.expected?.absent ?? []).find((p) =>
-    files.some(([rel]) => rel === p || rel.split("/")[0] === p),
+    files.some(([rel]) => firstSegment(rel) === p.toLowerCase()),
   );
   if (collides !== undefined) {
     decline(
@@ -2396,6 +2414,18 @@ function runFenceCase(
     } else {
       env.PATH = `${join(harnessDir, "bin")}:${env.PATH}`;
     }
+    const parseError = parseCheck(shell, scriptPath, {
+      cwd: caseDir,
+      env,
+      timeoutMs,
+    });
+    // The sentinel skips the work dir, and the case directory sits inside it:
+    // a write beside the case directory (`../pwned`, the harness dir) is an
+    // escape only this snapshot sees (TASK-180-011). The trip-wire's own marker
+    // is the harness's write, reported as a gh call, not here.
+    const caseName = basename(caseDir);
+    const ownWrite = `${basename(harnessDir)}/${GH_TRIPPED}`;
+    const workBefore = snapshotTree(workDir, caseName);
     const child = watchedSpawn(
       shell,
       [...noRcFlags(shell), scriptPath],
@@ -2410,12 +2440,23 @@ function runFenceCase(
       },
     );
 
+    for (const [path, stamp] of snapshotTree(workDir, caseName)) {
+      if (path !== ownWrite && workBefore.get(path) !== stamp) {
+        escapes.push({
+          id: `${c.id}@${shell}`,
+          shell,
+          path: `${workDirName}/${path}`,
+        });
+      }
+    }
+
     const { outcome, detail } = scoreFenceRun(child, {
       c,
       shell,
       scriptPath,
       caseDir,
       timeoutMs,
+      parseError,
     });
     caseResults.push({
       id: c.id,

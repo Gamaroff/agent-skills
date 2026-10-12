@@ -253,10 +253,9 @@ node PROMPT_DIR/security-probe.mjs \
 # task.167's fast-gate precondition) takes the fence form: the engine reads the
 # doc on every run, takes the first ```bash block under the heading, replaces
 # every --slot token with each case's input (as SOURCE — a $(…) in it runs, in
-# the case's own directory), and runs it under bash and zsh. Exit status is the
-# verdict; a run on which the shell reports an error in the block is errored, not
-# refused, and a hostile case that must tell the guard's refusal from an injected
-# exit carries `expected`. What the block reads besides the slot — env, files such as a
+# the case's own directory), and runs it under bash and zsh. Every hostile case
+# carries `expected` — the guard's own refusal — or is declined; a legitimate
+# case is scored by exit status (order: scoreFenceRun). What the block reads besides the slot — env, files such as a
 # package.json — comes from each case's `fixture: {env, files}`. Name a cases
 # file; the record's entry resolves in every checkout.
 node PROMPT_DIR/security-probe.mjs \

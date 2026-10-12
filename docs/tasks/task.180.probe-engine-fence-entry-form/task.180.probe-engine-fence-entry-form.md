@@ -2,10 +2,10 @@
 id: task.180
 title: "[Task 180] security-probe: a fence: entry form for a fenced bash block in a step doc"
 type: task
-description: "Add a `fence:<doc>#<heading>` entry form to shared/resources/security-probe.mjs that extracts the first bash block under a heading on every run, substitutes the case's input into a named placeholder, applies an optional per-case env and fixture files, and scores exit status as the verdict. A boundary shipped as a fenced block in a step doc is then probed by the engine instead of through a hand-written wrapper."
+description: "Add a `fence:<doc>#<heading>` entry form to shared/resources/security-probe.mjs that extracts the first bash block under a heading on every run, substitutes the case's input into a named placeholder, applies an optional per-case env and fixture files, and scores a hostile case against its stated refusal (`expected`) and a legitimate one by exit status. A boundary shipped as a fenced block in a step doc is then probed by the engine instead of through a hand-written wrapper."
 tags: [security-probe, finalise, qa-task, qa-story, review-security, observation]
 category: infrastructure
-status: in-progress
+status: ready-for-review
 priority: Medium
 created: 2026-10-03
 updated: 2026-10-12
@@ -16,7 +16,7 @@ github_issue: 560
 
 # Technical Task: security-probe — a `fence:` entry form
 
-**Status:** In Progress
+**Status:** Ready for Review
 
 **Review**: ✅ All review recommendations from `task.180.review.1.probe-engine-fence-entry-form.md` implemented 2026-10-12
 
@@ -72,7 +72,7 @@ This repository ships many of its boundaries as fenced bash blocks inside Markdo
 - **Extraction on every run.** The engine reads the doc, finds the line whose text equals the heading, and takes the first `bash` block from `extractBlocks` whose `line` falls after it and before the next heading of the same or a higher level. **Headings are read only from lines outside fences**, tracking fence state the way `extractBlocks` does: the step-3 doc alone has 10 heading-shaped `# comment` lines inside fences, and a raw line scan would read each as a level-1 heading that ends the section early or makes the heading falsely ambiguous (review I2). `extractBlocks` returns `bash` blocks only, so an `sh` block under the heading is the "no bash block" decline (review O2). A missing heading or a missing block is a named `entry-not-probeable` decline, never an `absent` verdict.
 - **Input.** `--slot <placeholder>` names the literal token in the block (for example `<fastGateCommand>`). Each case's `input` replaces every occurrence through a replacer function, never a replacement string (`$&` safety). If the token is absent from the block, the run is declined (a slot that substitutes nothing tests nothing).
 - **Per-case fixture.** A new optional case field `fixture: { env?: {k: v}, files?: {relpath: content} }`, added to `OPTIONAL_CASE_FIELDS`. Files are written into the case's work directory; a path that is absolute or escapes it is a declined case. `env` merges over `caseEnv` (`security-probe.mjs:1474`: `sandboxEnv()` plus a sandbox `HOME`, `TMPDIR` and `LC_ALL=C`), and never replaces `HOME` or `TMPDIR`.
-- **Verdict.** The block runs as a script under each shell `probeShells()` returns, with cwd set to the fixture. Exit 0 is `accepted`, any other exit is `rejected`, and a launch failure, a timeout or a shell error reported in the substituted block is `errored` (added in QA cycles 1–2, TASK-180-001/-005; the order is `scoreFenceRun`'s). A case that carries `expected` is compared exactly as the shell arm does.
+- **Verdict.** The block runs as a script under each shell `probeShells()` returns, with cwd set to the fixture. A hostile case must carry `expected` — the guard's own refusal — and is declined without one; a legitimate case without `expected` scores exit 0 `accepted`, any other exit `rejected`. A case that carries `expected` is compared exactly as the shell arm does. A launch failure, a timeout or a substituted script that does not parse (`<shell> -n`) is `errored`. The order is `scoreFenceRun`'s (QA cycle 3 replaced cycles 1–2's stderr classification, TASK-180-009).
 - **Record.** The entry kind is `fence`. The record names `fence:<doc>#<heading>`, which resolves in every checkout.
 
 ### Important Clarifications
@@ -344,6 +344,7 @@ None.
 | 2026-10-12 |         | QA gate FAIL (60/100) — cycle 2 refute pass, 5 findings: 1 high, 2 medium, 2 low | qa-task |
 | 2026-10-12 |         | QA findings fixed — cycle 2, 5 findings (TASK-180-004..008): scoring replaced by one ordered scoreFenceRun; collision decline; slot on decline; CRLF | qa-fix |
 | 2026-10-12 |         | QA gate FAIL (70/100) — cycle 3 safety re-probe, 3 findings: 1 high, 1 medium, 1 low | qa-task |
+| 2026-10-12 |         | QA findings fixed — cycle 3, 3 findings (TASK-180-009..011): third strike — stderr classifier replaced by a `-n` parse check and a required `expected` on hostile cases; collision decline normalised; work-dir writes watched | qa-fix |
 <!-- change-log-end -->
 
 ---

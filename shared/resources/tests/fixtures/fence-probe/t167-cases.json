@@ -15,6 +15,10 @@
       "files": {
         "package.json": "{\n  \"name\": \"fixture\",\n  \"version\": \"1.0.0\",\n  \"scripts\": {\n    \"test\": \"true\"\n  }\n}\n"
       }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: develop.fastGateCommand runs 'ci:fast', which this project does not define.\n      Set develop.fastGateCommand in skills-config.yaml to this project's cheap CI-equivalent.\n"
     }
   },
   {
@@ -34,6 +38,10 @@
       "files": {
         "package.json": "{\n  \"name\": \"fixture\",\n  \"version\": \"1.0.0\",\n  \"scripts\": {\n    \"test\": \"true\"\n  }\n}\n"
       }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: develop.fastGateCommand runs 'ci:fast', which this project does not define.\n      Set develop.fastGateCommand in skills-config.yaml to this project's cheap CI-equivalent.\n"
     }
   },
   {
@@ -53,6 +61,10 @@
         "package.json": "{\n  \"name\": \"fixture\",\n  \"version\": \"1.0.0\",\n  \"scripts\": {\n    \"test\": \"true\"\n  }\n}\n",
         ".npmrc": "loglevel=silent\n"
       }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: develop.fastGateCommand runs 'ci:fast', which this project does not define.\n      Set develop.fastGateCommand in skills-config.yaml to this project's cheap CI-equivalent.\n"
     }
   },
   {
@@ -72,6 +84,10 @@
         "package.json": "{\n  \"name\": \"fixture\",\n  \"version\": \"1.0.0\",\n  \"scripts\": {\n    \"test\": \"true\"\n  }\n}\n",
         ".npmrc": "loglevel=error\n"
       }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: develop.fastGateCommand runs 'ci:fast', which this project does not define.\n      Set develop.fastGateCommand in skills-config.yaml to this project's cheap CI-equivalent.\n"
     }
   },
   {
@@ -90,6 +106,10 @@
       "files": {
         "package.json": "{\n  \"name\": \"fixture\",\n  \"version\": \"1.0.0\",\n  \"scripts\": {\n    \"ci:fast\": \"true\",\n    \"lint\": \"true\"\n  }\n}\n"
       }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: develop.fastGateCommand runs 'ci:fast-missing', which this project does not define.\n      Set develop.fastGateCommand in skills-config.yaml to this project's cheap CI-equivalent.\n"
     }
   },
   {
@@ -108,6 +128,10 @@
       "files": {
         "package.json": "{\n  \"name\": \"fixture\",\n  \"version\": \"1.0.0\",\n  \"scripts\": {\n    \"ci:fast\": \"true\",\n    \"lint\": \"true\"\n  }\n}\n"
       }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: develop.fastGateCommand runs 'ci', which this project does not define.\n      Set develop.fastGateCommand in skills-config.yaml to this project's cheap CI-equivalent.\n"
     }
   },
   {
@@ -126,6 +150,10 @@
       "files": {
         "package.json": "{\n  \"name\": \"fixture\",\n  \"version\": \"1.0.0\",\n  \"scripts\": {\n    \"ci:fast\": \"true\",\n    \"lint\": \"true\"\n  }\n}\n"
       }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: develop.fastGateCommand runs 'x', which this project does not define.\n      Set develop.fastGateCommand in skills-config.yaml to this project's cheap CI-equivalent.\n"
     }
   },
   {
