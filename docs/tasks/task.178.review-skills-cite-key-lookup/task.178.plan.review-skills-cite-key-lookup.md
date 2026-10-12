@@ -5,7 +5,7 @@ type: plan
 description: "Code-level guide for task 178: the three citation edits, the bundle, and the guard test."
 task-ref: task.178.review-skills-cite-key-lookup.md
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-12
 ---
 
 # Implementation Plan: review-task and review-story cite the §0a key lookup
@@ -45,17 +45,22 @@ Confirm the copy is the step-0 document alone, which is what the citation rule p
 
 - Population: every `skills/*/SKILL.md`, every `shared/resources/*.md`, and every hand-authored
   `skills/*/references/*.md` (drop files carrying the AUTO-GENERATED marker).
-- Fail on `/grep -rl "(jira_key|github_issue): /`. Allowlist exactly one entry — the §0a history note
-  ("The previous form of this lookup was a bare …") — matched by file and by that sentence, never by
-  line number.
+- Fail on a grep-family command searching the `docs` tree for a tracker-key value, read per command segment (QA cycle 2 replaced the flag-spelling key; the test's `isKeyLookup`)
+  (quote- and flag-order-tolerant; review 1, I1). Pin that it does not match the `grep -rL` sites in
+  `sync-github-bug` / `sync-jira-bug` — files *without* a key, a different rule. Population also takes
+  tracked shell under `shared/resources/` and `skills/*/scripts/`. Allowlist exactly one entry — §0a's own lookup
+  (`DOC_MATCHES=$(grep -rlE …`; the §0a history note no longer matches the cycle-2 key) — matched by
+  file and by that text, never by line number.
 - Non-vacuity: the §0a block in `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` must
   contain `^${KEY_FIELD}:[[:space:]]*['\"]?${KEY_VALUE}` — the rule must still exist for the citations
   to point at.
 - Mutation: paste the old line-99 grep back into review-task and confirm the test goes red.
+- Executed fixture (review 1, I2): extract the §0a block and review-task's Jira-key block, run them under
+  bash and zsh against a temp `docs/` holding a quoted key, a `.request.` sibling, a `RAPP-702` prefix
+  neighbour and a non-task document. Follow `skills/review-pr/tests/review-pr.test.js`'s §0a extraction.
 
-The key `grep -rl "jira_key: ` is unique to this rule: the population command in the task document
-returns only these sites. If a later grep finds a hit belonging to another rule, switch to a compound
-pattern (obs #135).
+The compound key is the obs #135 discriminator: the plain `-r` form also matches `grep -rL`, which
+belongs to another rule.
 
 ## Phase 3
 

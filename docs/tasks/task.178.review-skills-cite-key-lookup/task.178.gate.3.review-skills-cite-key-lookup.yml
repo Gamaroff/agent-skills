@@ -1,0 +1,77 @@
+schema: 2
+task: 'task.178.review-skills-cite-key-lookup'
+task_title: 'review-task and review-story cite the §0a key lookup'
+gate: CONCERNS
+status_reason: 'Gate 2 findings fixed (behaviour-keyed matcher). The scoped review found two more spellings the matcher misses (quoted alternation, prefixed docs paths) — the third consecutive cycle on one test-file mechanism; HIGH 0 for three gates.'
+reviewer: 'QA Engineer'
+head: '1e47097bd65ac7399830d1741b2d90d00b19e54a'
+updated: '2026-10-12T07:37:52Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'tests/key-lookup-single-statement.test.js'
+    finding: 'segments() splits on every |, including one inside a quoted grep pattern, so a lookup with alternation (grep -rlE "^(jira_key|github_issue): X" docs/, or "jira_key: X\|github_issue: X") is cut apart and not flagged.'
+    suggested_action: 'Split only on unquoted shell operators, and add both alternation spellings as must-match fixtures.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-2'
+    severity: medium
+    file: 'tests/key-lookup-single-statement.test.js'
+    finding: 'DOCS_TREE accepts only a bare docs or docs/ argument, so ./docs/, "$ROOT/docs", docs/**/*.md and docs/{stories,tasks}/ lookups are missed, and neither the test header nor the CHANGELOG states that scope.'
+    suggested_action: 'Accept a ./ or $VAR/ prefix and a glob or brace suffix on the docs path (a single named file stays excluded), with fixtures — or state the scope.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 12
+  phases_verified: 3/3
+  ci: 'not read — CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged since gate 2 (scoped review: CHANGELOG.md and the test file only).'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Unchanged since gate 2.'
+  maintainability:
+    status: CONCERNS
+    notes: 'CR-1, CR-2 — the guard claims more coverage than its matcher has.'
+
+recommendations:
+  immediate:
+    - action: 'CR-1, CR-2: quote-aware segment split; prefixed docs paths; state the guard''s scope where it is claimed.'
+      refs: ['tests/key-lookup-single-statement.test.js', 'CHANGELOG.md']
+  future:
+    - action: 'Advisory (reviewer CR-3, low/medium): escape-class values (\s) and \-continued lines are not seen.'
+      refs: ['tests/key-lookup-single-statement.test.js']
+    - action: 'Advisory (reviewer CR-4, low/medium): rg -L means --follow, not files-without-match.'
+      refs: ['tests/key-lookup-single-statement.test.js']
+    - action: 'BND-1 (standing deferral, gates 1–2): probe the Jira-key task-only check via task.180''s fence: entry form.'
+      refs: ['skills/review-task/SKILL.md']
+    - action: 'Pre-existing (gate 2 advisory): review-task Step 2 reads a bare INPUT no block binds.'
+      refs: ['skills/review-task/SKILL.md']
+
+bug_resolution:
+  previous_gate: 2
+  fixed: ['CR-1 (gate 2)', 'CR-3 (gate 2)']
+  fix_commit: '1e47097b'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1, CR-2 fixed or scoped']

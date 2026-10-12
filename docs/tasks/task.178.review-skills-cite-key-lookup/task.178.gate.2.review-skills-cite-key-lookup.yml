@@ -1,0 +1,81 @@
+schema: 2
+task: 'task.178.review-skills-cite-key-lookup'
+task_title: 'review-task and review-story cite the §0a key lookup'
+gate: CONCERNS
+status_reason: 'Cycle 1 fixes hold (one-shell contract and loud guards verified), but the refute pass shows the flag-token guard key still misses real restatements (CR-1, medium) and flags lines that are not lookups (CR-3, low).'
+reviewer: 'QA Engineer'
+head: 'abec1e35bd77e7a6e583cd5c9374b02054ec09c0'
+updated: '2026-10-12T07:23:36Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'tests/key-lookup-single-statement.test.js'
+    finding: 'isKeyLookup stops at the first token it cannot parse and keys on grep flag spelling, so grep --include="*.md" -rl, grep -m1 -rl, flags after the pattern, egrep -rl, --files-with-match, and a verbatim copy of §0a (which greps :) all pass the guard; the CHANGELOG claim "fails on a restated recursive key grep in any canonical source" is false.'
+    suggested_action: 'Stop keying on flag spelling: key on what the line does (a grep-family command searching docs/ for a tracker-key value, excluding files-without-match), or narrow the claim to the forms caught.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-3'
+    severity: low
+    file: 'tests/key-lookup-single-statement.test.js'
+    finding: 'isKeyLookup tests the key field against the whole line but the flags against any grep on it, so a pipeline (grep -rl "status: done" docs/ | xargs grep -h "^jira_key:"), prose naming an unrelated grep, and a key inventory with no value are flagged as lookups.'
+    suggested_action: 'Require the key field, a key value and the docs/ target in the same grep invocation (segment), and add those lines as negatives.'
+    suggested_owner: dev
+    status: open
+  - id: 'BND-1'
+    severity: low
+    file: 'skills/review-task/SKILL.md'
+    finding: 'boundary: true — the Jira-key task-only check has no security-probe entry form; probes_executed 0.'
+    suggested_action: 'Probe through task.180''s fence: entry form once it lands; /finalise records a zero-guard override citing task.180 until then.'
+    suggested_owner: dev
+    status: deferred
+    deferred_to: 'task.180'
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 12
+  phases_verified: 3/3
+  ci: 'not read — CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No new input surface; BND-1 deferred to task.180.'
+  performance:
+    status: PASS
+    notes: 'Unchanged from gate 1.'
+  reliability:
+    status: PASS
+    notes: 'CR-1 of gate 1 fixed: the check block HALTs on unbound inputs; the one-shell contract is stated and tested.'
+  maintainability:
+    status: CONCERNS
+    notes: 'CR-1 — a guard that misses real restatements gives false assurance.'
+
+recommendations:
+  immediate:
+    - action: 'CR-1: replace the flag-spelling key with a key on what the line does.'
+      refs: ['tests/key-lookup-single-statement.test.js']
+  future:
+    - action: 'Advisory (reviewer CR-2, medium/medium, pre-existing): review-task Step 2 reads a bare INPUT no block binds — identical on origin/develop:skills/review-task/SKILL.md:97; bind it from a placeholder in a follow-up.'
+      refs: ['skills/review-task/SKILL.md']
+    - action: 'BND-1: probe via task.180.'
+      refs: ['skills/review-task/SKILL.md']
+
+bug_resolution:
+  previous_gate: 1
+  fixed: ['CR-1 (gate 1)', 'CR-2 (gate 1)', 'CR-3 (gate 1 cleanup)']
+  fix_commit: 'abec1e35'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 fixed']
