@@ -4119,7 +4119,7 @@ test("fence entry: a substitution that breaks the block's syntax is errored, nev
     assert.equal(quote.length, probeShells().length);
     assert.ok(
       quote.every(
-        (c) => c.outcome === "errored" && /does not parse/.test(c.detail),
+        (c) => c.outcome === "errored" && /guard never answered/.test(c.detail),
       ),
       JSON.stringify(quote),
     );
@@ -4221,4 +4221,155 @@ test("fence entry: an empty --slot exits 2 with bad-slot and writes no record (T
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("fence entry: an expected.absent name the case's own fixture writes is declined, never scored (TASK-180-004)", () => {
+  const root = fenceRoot({
+    "doc.md": ["## G", "", "```bash", ': "<slot>"', "exit 0", "```", ""].join(
+      "\n",
+    ),
+  });
+  try {
+    for (const [files, absent] of [
+      [{ pwned: "" }, ["pwned"]],
+      [{ "dir/x": "" }, ["dir"]],
+    ]) {
+      const r = runProbeSpec({
+        entry: "fence:doc.md#G",
+        slot: "<slot>",
+        cases: [
+          fenceCase("f.collide", "hostile", "x", {
+            fixture: { files },
+            expected: { exit: 0, absent },
+          }),
+        ],
+        repoRoot: root,
+      });
+      assert.equal(r.cases.length, probeShells().length);
+      assert.ok(
+        r.cases.every(
+          (c) => c.outcome === "errored" && /fixture writes/.test(c.detail),
+        ),
+        JSON.stringify(r.cases),
+      );
+      assert.notEqual(r.verdict, "absent");
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: any shell error in the substituted block is errored; an injected exit is the block's answer, and expected tells it from a refusal (TASK-180-005)", () => {
+  const root = fenceRoot({
+    "doc.md": [
+      "## Accept all",
+      "",
+      "```bash",
+      'X="<slot>"',
+      "exit 0",
+      "```",
+      "",
+    ].join("\n"),
+  });
+  try {
+    const spec = (cases) =>
+      runProbeSpec({
+        entry: "fence:doc.md#Accept all",
+        slot: "<slot>",
+        cases: [...cases, fenceCase("f.ok", "legitimate", "ok")],
+        repoRoot: root,
+      });
+    const fatal = spec([
+      fenceCase("f.expansion", "hostile", "${x:?boom}"),
+      fenceCase("f.unset", "hostile", "${x?}"),
+    ]);
+    const hostile = fatal.cases.filter((c) => c.direction === "hostile");
+    assert.equal(hostile.length, 2 * probeShells().length);
+    assert.ok(
+      hostile.every(
+        (c) => c.outcome === "errored" && /guard never answered/.test(c.detail),
+      ),
+      JSON.stringify(hostile),
+    );
+    assert.notEqual(fatal.verdict, "engages");
+    // The residual, pinned: an injected exit is the block's answer under source
+    // substitution — by exit status alone it reads as a refusal ...
+    const injected = spec([fenceCase("f.inject", "hostile", '"; exit 1; "')]);
+    assert.ok(
+      injected.cases
+        .filter((c) => c.id === "f.inject")
+        .every((c) => c.outcome === "rejected"),
+    );
+    // ... and a hostile case that names the guard's own refusal in `expected`
+    // tells the two apart: no refusal printed, so the injection reproduces.
+    const told = spec([
+      fenceCase("f.inject", "hostile", '"; exit 1; "', {
+        expected: { stdout: "REFUSED\n" },
+      }),
+    ]);
+    assert.deepEqual(
+      told.reproduced,
+      probeShells().map((s) => `f.inject@${s}`),
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: a side effect expected.absent names is a reproduction even when the shell then stops (TASK-180-006)", () => {
+  const root = fenceRoot({
+    "doc.md": [
+      "## Two contexts",
+      "",
+      "```bash",
+      'echo "checking <slot>"',
+      "x='<slot>'",
+      "```",
+      "",
+    ].join("\n"),
+  });
+  try {
+    const r = runProbeSpec({
+      entry: "fence:doc.md#Two contexts",
+      slot: "<slot>",
+      cases: [
+        fenceCase("f.side", "hostile", "$(touch pwned)'", {
+          expected: { exit: 0, absent: ["pwned"] },
+        }),
+      ],
+      repoRoot: root,
+    });
+    assert.deepEqual(
+      r.reproduced,
+      probeShells().map((s) => `f.side@${s}`),
+      JSON.stringify(r.cases),
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: a declined fence: run keeps its slot, so its record key matches the corrected re-run (TASK-180-007)", () => {
+  const root = fenceRoot({ "doc.md": FENCE_DOC });
+  try {
+    const r = runProbeSpec({
+      entry: "fence:../elsewhere.md#Admit",
+      slot: "<slot>",
+      cases: ADMIT_CASES,
+      repoRoot: root,
+    });
+    assert.equal(r.reason, "outside-repo-root");
+    assert.equal(r.slot, "<slot>");
+    assert.equal(toRecordEntry(r).slot, "<slot>");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: a CRLF doc resolves its heading and yields an LF block (TASK-180-008)", () => {
+  const doc = FENCE_DOC.split("\n").join("\r\n");
+  const got = extractFencedBlock(doc, "Admit");
+  assert.equal(got.ok, true, got.detail);
+  assert.equal(got.code.includes("\r"), false);
+  assert.match(got.code, /GATE="<slot>"/);
 });

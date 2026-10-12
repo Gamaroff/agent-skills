@@ -72,7 +72,7 @@ This repository ships many of its boundaries as fenced bash blocks inside Markdo
 - **Extraction on every run.** The engine reads the doc, finds the line whose text equals the heading, and takes the first `bash` block from `extractBlocks` whose `line` falls after it and before the next heading of the same or a higher level. **Headings are read only from lines outside fences**, tracking fence state the way `extractBlocks` does: the step-3 doc alone has 10 heading-shaped `# comment` lines inside fences, and a raw line scan would read each as a level-1 heading that ends the section early or makes the heading falsely ambiguous (review I2). `extractBlocks` returns `bash` blocks only, so an `sh` block under the heading is the "no bash block" decline (review O2). A missing heading or a missing block is a named `entry-not-probeable` decline, never an `absent` verdict.
 - **Input.** `--slot <placeholder>` names the literal token in the block (for example `<fastGateCommand>`). Each case's `input` replaces every occurrence through a replacer function, never a replacement string (`$&` safety). If the token is absent from the block, the run is declined (a slot that substitutes nothing tests nothing).
 - **Per-case fixture.** A new optional case field `fixture: { env?: {k: v}, files?: {relpath: content} }`, added to `OPTIONAL_CASE_FIELDS`. Files are written into the case's work directory; a path that is absolute or escapes it is a declined case. `env` merges over `caseEnv` (`security-probe.mjs:1474`: `sandboxEnv()` plus a sandbox `HOME`, `TMPDIR` and `LC_ALL=C`), and never replaces `HOME` or `TMPDIR`.
-- **Verdict.** The block runs as a script under each shell `probeShells()` returns, with cwd set to the fixture. Exit 0 is `accepted`, any other exit is `rejected`, and a launch failure, a timeout or a parse failure of the substituted block is `errored` (the parse-failure clause added in QA cycle 1, TASK-180-001). A case that carries `expected` is compared exactly as the shell arm does.
+- **Verdict.** The block runs as a script under each shell `probeShells()` returns, with cwd set to the fixture. Exit 0 is `accepted`, any other exit is `rejected`, and a launch failure, a timeout or a shell error reported in the substituted block is `errored` (added in QA cycles 1–2, TASK-180-001/-005; the order is `scoreFenceRun`'s). A case that carries `expected` is compared exactly as the shell arm does.
 - **Record.** The entry kind is `fence`. The record names `fence:<doc>#<heading>`, which resolves in every checkout.
 
 ### Important Clarifications
@@ -311,24 +311,25 @@ None.
 **QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-12
-**Quality Score**: 70/100
+**Quality Score**: 60/100
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.180.qa.1.probe-engine-fence-entry-form.md](./task.180.qa.1.probe-engine-fence-entry-form.md)
-- **Gate File**: [task.180.gate.1.probe-engine-fence-entry-form.yml](./task.180.gate.1.probe-engine-fence-entry-form.yml)
+- **Full Report**: [task.180.qa.2.probe-engine-fence-entry-form.md](./task.180.qa.2.probe-engine-fence-entry-form.md)
+- **Gate File**: [task.180.gate.2.probe-engine-fence-entry-form.yml](./task.180.gate.2.probe-engine-fence-entry-form.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 194
+- **Tests Executed**: 5394
 - **Phases Verified**: 3/3
 - **Critical Issues**: 1
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- HIGH (TASK-180-001): a substitution that breaks the block's shell syntax is scored as a refusal, so an accept-all block can score `engages` — reproduced.
-- MEDIUM (TASK-180-002): a fence: control's record key ignores its slot and name; `slot` is not recorded.
-- LOW (TASK-180-003): `main()` accepts an empty `--slot`.
-- Engine probes: 26 executed, 0 reproduced (`task.180.qa.1.security.run.json`).
+- Cycle 1's three fixes hold (each mutation-proven).
+- HIGH (TASK-180-004): `expected.absent` naming a file the case's own fixture writes scores every hostile case accepted.
+- MEDIUM (TASK-180-005, -006): other shell diagnostics still read as refusals; the parse-failure branch masks a reproduced side effect.
+- LOW (TASK-180-007, -008): a declined run loses its slot; CRLF headings never match.
+- Engine probes: 26 executed, 0 reproduced (`task.180.qa.2.security.run.json`).
 
 <!-- change-log-start -->
 ## Change Log
@@ -341,6 +342,8 @@ None.
 | 2026-10-12 |         | Implemented — fence: entry form, --slot, fixture field; 7 routing sites; 15 tests (14 engine + 1 routing parity) | develop |
 | 2026-10-12 |         | QA gate FAIL (70/100) — 3 findings: 1 high, 1 medium, 1 low | qa-task |
 | 2026-10-12 |         | QA findings fixed — cycle 1, 3 findings (TASK-180-001 parse failure errored, -002 fence: control key, -003 empty --slot) + 2 cleanups | qa-fix |
+| 2026-10-12 |         | QA gate FAIL (60/100) — cycle 2 refute pass, 5 findings: 1 high, 2 medium, 2 low | qa-task |
+| 2026-10-12 |         | QA findings fixed — cycle 2, 5 findings (TASK-180-004..008): scoring replaced by one ordered scoreFenceRun; collision decline; slot on decline; CRLF | qa-fix |
 <!-- change-log-end -->
 
 ---

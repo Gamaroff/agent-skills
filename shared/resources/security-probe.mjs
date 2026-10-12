@@ -186,9 +186,9 @@
  * `<shell> <script>` per shell, rc files off, with the shell arm's trip-wire
  * `gh` (or `--fake-gh`) first on PATH. THE VERDICT IS THE EXIT STATUS, the
  * cli: arm's rule: exit 0 is `accepted`, non-zero `rejected`; a case carrying
- * `expected` is compared as the shell arm compares it. A block the input leaves
- * UNPARSEABLE is `errored` (isShellParseFailure), never a refusal — the cli:
- * arm's crash rule, for a shell. A missing heading, an
+ * `expected` is compared as the shell arm compares it. A run on which the SHELL
+ * reports an error in the substituted block is `errored` (shellDiagnostic), never a
+ * refusal — the cli: arm's crash rule, for a shell; the order is scoreFenceRun's. A missing heading, an
  * ambiguous one, a heading with no bash block under it, or a slot the block
  * does not contain is a named decline, never a verdict. The record names
  * `fence:<doc>#<heading>`, which resolves in every checkout.
@@ -1020,6 +1020,16 @@ export function runProbeSpec({
     if (typeof entry === "string" && entry.startsWith(CLI_PREFIX)) {
       const parsed = parseArgvTemplate(argv);
       if (parsed.ok) base.argv = parsed.template;
+    }
+    // Likewise a fence: probe carries its slot, which keys an unnamed fence:
+    // control (task.180 QA cycle 2, TASK-180-007).
+    if (
+      typeof entry === "string" &&
+      entry.startsWith(FENCE_PREFIX) &&
+      typeof slot === "string" &&
+      slot !== ""
+    ) {
+      base.slot = slot;
     }
     return decline(resolved.reason, resolved.detail);
   }
@@ -2065,7 +2075,10 @@ const ATX_HEADING = /^(#{1,6})[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/;
  */
 export function extractFencedBlock(docText, heading) {
   const want = String(heading).trim();
-  const lines = String(docText).split("\n");
+  // A CRLF checkout ends every heading in \r, which no heading matched
+  // (task.180 QA cycle 2, TASK-180-008): normalise before reading anything.
+  const text = String(docText).replace(/\r\n?/g, "\n");
+  const lines = text.split("\n");
   const headings = [];
   let open = null;
   for (let i = 0; i < lines.length; i++) {
@@ -2102,7 +2115,7 @@ export function extractFencedBlock(docText, heading) {
     (h) => h.line > match.line && h.level <= match.level,
   );
   const end = next ? next.line : Number.POSITIVE_INFINITY;
-  const block = extractBlocks(String(docText)).find(
+  const block = extractBlocks(text).find(
     (b) => b.line > match.line && b.line < end,
   );
   if (!block) {
@@ -2169,22 +2182,94 @@ export function fixtureProblem(fixture) {
 }
 
 /**
- * The shell could not PARSE the generated script (task.180 QA cycle 1,
- * TASK-180-001). Keyed on the shell's own message about the script — bash
- * `<script>: line N: syntax error …` / `unexpected EOF while looking for
- * matching …`, zsh `<script>:N: parse error …` / `unmatched …` — never on
- * the exit code alone: 1 and 2 are what a guard exits with when it refuses.
- * A syntax error the block's own commands report (a nested `bash -c`) names
- * another file and is the block answering, so it is scored as usual.
+ * The first line on stderr in which the SHELL reports an error in the generated
+ * script, or null (task.180 QA cycles 1–2, TASK-180-001 and -005). bash writes
+ * `<script>: line N: …` (a syntax error, `unexpected EOF`, a fatal expansion
+ * such as `${x:?}`, `command not found`, an unbound variable), zsh writes
+ * `<script>:N: …`. Each means the shell stopped on the block rather than the
+ * block's guard answering, so the run is "could not look". Keyed on the shell's
+ * message about THIS script, never on the exit code alone — 1 and 2 are what a
+ * guard exits with when it refuses — and a message about another file (a
+ * nested `bash -c`) is the block answering. A run that exits 0 is the block's
+ * answer whatever it printed.
  */
-export function isShellParseFailure(child, scriptPath) {
-  if (child.status === 0 || child.status === null) return false;
+export function shellDiagnostic(child, scriptPath) {
+  if (child.status === 0 || child.status === null) return null;
   const subject = escapeRegExp(scriptPath);
   const re = new RegExp(
-    `^(?:bash: |zsh: )?${subject}:(?: line)? ?\\d+: (?:syntax error|unexpected EOF|parse error|unmatched )`,
+    `^(?:bash: |zsh: )?${subject}:(?: line)? ?\\d+: .*$`,
     "m",
   );
-  return re.test(child.stderr ?? "");
+  const m = re.exec(child.stderr ?? "");
+  return m ? m[0] : null;
+}
+
+/**
+ * Score one fence: run — the ONE ordered decision (task.180 QA cycle 2: two
+ * cycles of HIGH findings were each a branch checked in the wrong order, so the
+ * order is stated here, once):
+ *   1. the child never answered (killed, timed out) or the shell could not open
+ *      the script → errored
+ *   2. a path `expected.absent` names exists in the case directory → the side
+ *      effect happened: compared, so a hostile case is reproduced — even when
+ *      the shell then stopped (TASK-180-006)
+ *   3. the shell reported an error in the substituted block → errored: the
+ *      guard never answered (TASK-180-001, -005)
+ *   4. `expected` → compared, mapped through direction
+ *   5. otherwise exit 0 is accepted, any other exit rejected
+ * An input that injects its own control flow (`"; exit 1; "`) is the block's
+ * answer under source substitution and lands on 5 — a hostile case that must
+ * tell the guard's refusal from an injected exit carries `expected`.
+ *
+ * @returns {{outcome: string, detail: string|null}}
+ */
+export function scoreFenceRun(
+  child,
+  { c, shell, scriptPath, caseDir, timeoutMs },
+) {
+  const compared = () => {
+    const mismatches = compareExpected(c.expected, child, caseDir);
+    const matched = mismatches.length === 0;
+    const good = c.direction === "hostile" ? "rejected" : "accepted";
+    const bad = c.direction === "hostile" ? "accepted" : "rejected";
+    return {
+      outcome: matched ? good : bad,
+      detail: matched ? null : mismatches.join("; "),
+    };
+  };
+  if (neverRan(child)) {
+    return {
+      outcome: "errored",
+      detail:
+        child.error?.code === "ETIMEDOUT"
+          ? `timed out after ${timeoutMs}ms`
+          : child.signal
+            ? `killed by ${child.signal}`
+            : `never ran: ${child.error?.message ?? "no exit status"}`,
+    };
+  }
+  if (isLaunchFailure(child, scriptPath)) {
+    return {
+      outcome: "errored",
+      detail: `${shell} could not open the script (exit ${child.status}): ${(child.stderr ?? "").trim().slice(0, 160)}`,
+    };
+  }
+  const absent = c.expected?.absent ?? [];
+  if (absent.some((p) => existsSync(join(caseDir, p)))) return compared();
+  const diagnostic = shellDiagnostic(child, scriptPath);
+  if (diagnostic !== null) {
+    return {
+      outcome: "errored",
+      detail: `the shell reported an error in the substituted block under ${shell} (exit ${child.status}) — the guard never answered: ${diagnostic.slice(0, 160)}`,
+    };
+  }
+  if (c.expected !== undefined) return compared();
+  return child.status === 0
+    ? { outcome: "accepted", detail: null }
+    : {
+        outcome: "rejected",
+        detail: `exit ${child.status}: ${((child.stderr ?? "").trim() || (child.stdout ?? "").trim()).split("\n")[0].slice(0, 160)}`,
+      };
 }
 
 /**
@@ -2253,6 +2338,19 @@ function runFenceCase(
     return;
   }
   const files = Object.entries(c.fixture?.files ?? {});
+  // An `expected.absent` name the case's own fixture writes mismatches on every
+  // run, so every hostile case would score accepted and the verdict read
+  // `absent` behind a full count — declined, as the shell and cli: arms decline
+  // it (task.128 BUG-13; task.180 QA cycle 2, TASK-180-004).
+  const collides = (c.expected?.absent ?? []).find((p) =>
+    files.some(([rel]) => rel === p || rel.split("/")[0] === p),
+  );
+  if (collides !== undefined) {
+    decline(
+      `case's \`expected.absent\` names "${collides}", which the case's own fixture writes`,
+    );
+    return;
+  }
   const script = block.replaceAll(slot, () => c.input);
 
   for (const shell of shells) {
@@ -2311,44 +2409,13 @@ function runFenceCase(
       },
     );
 
-    let outcome;
-    let detail = null;
-    if (neverRan(child)) {
-      outcome = "errored";
-      detail = child.signal
-        ? `timed out after ${timeoutMs}ms`
-        : `never ran: ${child.error?.message ?? "no exit status"}`;
-    } else if (isLaunchFailure(child, scriptPath)) {
-      outcome = "errored";
-      detail = `${shell} could not open the script (exit ${child.status}): ${(child.stderr ?? "").trim().slice(0, 160)}`;
-    } else if (isShellParseFailure(child, scriptPath)) {
-      // The substituted block did not PARSE — a quote, backtick or `$(` in the
-      // input broke its syntax — so the shell stopped before the guard answered.
-      // (Lines before the broken one may have run: bash executes as it reads.) Scored
-      // `rejected`, that read as the guard refusing, and an accept-all block with
-      // one such hostile case scored `engages` (task.180 QA cycle 1, TASK-180-001).
-      // "Could not look", never a refusal: the cli: arm's crash rule, for a shell.
-      outcome = "errored";
-      detail = `the substituted block does not parse under ${shell} (exit ${child.status}) — the guard never answered: ${(child.stderr ?? "").trim().split("\n")[0].slice(0, 160)}`;
-    } else if (hasExpected) {
-      const mismatches = compareExpected(c.expected, child, caseDir);
-      const matched = mismatches.length === 0;
-      outcome =
-        c.direction === "hostile"
-          ? matched
-            ? "rejected"
-            : "accepted"
-          : matched
-            ? "accepted"
-            : "rejected";
-      detail = matched ? null : mismatches.join("; ");
-    } else {
-      outcome = child.status === 0 ? "accepted" : "rejected";
-      detail =
-        child.status === 0
-          ? null
-          : `exit ${child.status}: ${((child.stderr ?? "").trim() || (child.stdout ?? "").trim()).split("\n")[0].slice(0, 160)}`;
-    }
+    const { outcome, detail } = scoreFenceRun(child, {
+      c,
+      shell,
+      scriptPath,
+      caseDir,
+      timeoutMs,
+    });
     caseResults.push({
       id: c.id,
       shell,

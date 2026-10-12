@@ -1152,8 +1152,8 @@ JSON
    task.167's fast-gate precondition) takes the fence form:
    `--entry 'fence:<doc.md>#<heading>' --slot '<placeholder>' --cases-file <cases.json>` — the block
    under the heading runs with each case's input in place of the placeholder, each case's
-   `fixture: {env, files}` supplies what else it reads, and exit status is the verdict (an input that
-   leaves the block unparseable is `errored`); "it is prose,
+   `fixture: {env, files}` supplies what else it reads, and exit status is the verdict (a run on which the
+   shell reports an error in the block is `errored`); "it is prose,
    not a script" is never a reason to record `boundary: false`.
    A predicate the engine cannot import because it is **not exported** — a module-private `const` —
    takes the same answer: export it (one word) and probe it. "It is not exported" is never a reason to
