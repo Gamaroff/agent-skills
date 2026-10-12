@@ -104,6 +104,13 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **A QA re-review now closes the bug reports it verified (observation #21).** The bug lifecycle
+  has QA move a fixed bug from Ready for QA to Closed or Reopened, and nothing did: task.180 ended with
+  five verified bug reports still at Ready for QA. `status-history.js` gains `--set-status`, which sets
+  the bug's status in frontmatter and its `**Status**` header line (keeping each one's style, skipping
+  fenced examples) and appends the Status History row in one write, refusing a report that carries
+  neither field. `qa-task` (Step 9b) and `qa-story` (Re-Review Context) call it for each bug whose
+  finding the cycle verified.
 - **The QA-loop escalation option "accept the gate and finalise" now runs Step 5c first (observation #21).**
   An escalated loop never reaches 5c, so no PR review report exists, and on a host with no review
   decision `/finalise` needs that report for its "PR approved" column. Option 2 of both HALT
