@@ -195,3 +195,133 @@ test("the CLI sets process.exitCode and never calls process.exit()", () => {
   assert.doesNotMatch(code, /process\.exit\(/);
   assert.match(code, /process\.exitCode = main\(process\.argv\)/);
 });
+
+// --set-status (observation #21): one call sets the bug's own status and records the row.
+function withContent(content, fn) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "status-history-set-"));
+  const file = path.join(dir, "task.9.bug.1.x.md");
+  fs.writeFileSync(file, content);
+  try {
+    fn(file);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+const ROW = [
+  "--date",
+  "2026-10-12",
+  "--changed-by",
+  "qa-task",
+  "--notes",
+  "Verified by qa.3",
+];
+
+test("--set-status closed sets frontmatter and the decorated header, and appends the row, in one write", () => {
+  withBug((file) => {
+    const r = run([
+      "--file",
+      file,
+      "--status",
+      "closed",
+      "--set-status",
+      ...ROW,
+      "--json",
+    ]);
+    assert.equal(r.status, 0, r.stderr);
+    const out = JSON.parse(r.stdout);
+    assert.equal(out.reason, "updated");
+    assert.deepEqual(out.statusFields, ["frontmatter", "header"]);
+    const doc = fs.readFileSync(file, "utf8");
+    assert.match(
+      doc,
+      /^status: closed # bug lifecycle/m,
+      "the inline comment is kept",
+    );
+    assert.match(doc, /^\*\*Status\*\*: ✅ Closed$/m);
+    assert.match(
+      doc,
+      /\| 2026-10-12 \| Closed \| qa-task \| Verified by qa\.3 \|/,
+    );
+  });
+});
+
+test("--set-status on a header-only report keeps the plain style, and reads **Status:** too", () => {
+  for (const [line, want] of [
+    ["**Status**: Ready for QA", "**Status**: Reopened"],
+    ["**Status:** Ready for QA", "**Status:** Reopened"],
+  ]) {
+    withContent(
+      `# Bug\n\n${line}\n**Severity**: MEDIUM\n\n## Status History\n\n| Date | Status | Changed By | Notes |\n| --- | --- | --- | --- |\n| 2026-10-12 | New | QA | x |\n`,
+      (file) => {
+        const r = run([
+          "--file",
+          file,
+          "--status",
+          "reopened",
+          "--set-status",
+          ...ROW,
+          "--json",
+        ]);
+        assert.equal(r.status, 0, r.stderr);
+        assert.deepEqual(JSON.parse(r.stdout).statusFields, ["header"]);
+        const doc = fs.readFileSync(file, "utf8");
+        assert.ok(doc.includes(`\n${want}\n`), doc);
+        assert.match(doc, /\| 2026-10-12 \| Reopened \| qa-task \|/);
+      },
+    );
+  }
+});
+
+test("--set-status leaves a fenced example alone, and refuses a report with no status field — writing nothing", () => {
+  const fenced =
+    "# Bug\n\n```markdown\n**Status**: 🆕 New\n```\n\n## Status History\n\n| Date | Status | Changed By | Notes |\n| --- | --- | --- | --- |\n";
+  withContent(fenced, (file) => {
+    const r = run([
+      "--file",
+      file,
+      "--status",
+      "closed",
+      "--set-status",
+      ...ROW,
+      "--json",
+    ]);
+    assert.equal(r.status, 1);
+    assert.equal(JSON.parse(r.stdout).reason, "no-status-field");
+    assert.equal(
+      fs.readFileSync(file, "utf8"),
+      fenced,
+      "nothing written: no row without a status",
+    );
+  });
+  withContent(`**Status**: New\n\n${fenced}`, (file) => {
+    run(["--file", file, "--status", "closed", "--set-status", ...ROW]);
+    const doc = fs.readFileSync(file, "utf8");
+    assert.ok(doc.startsWith("**Status**: Closed\n"), doc);
+    assert.ok(
+      doc.includes("```markdown\n**Status**: 🆕 New\n```"),
+      "the fenced example is untouched",
+    );
+  });
+});
+
+test("--set-status refuses a status outside the lifecycle (exit 2); without the flag the status fields are untouched", () => {
+  withBug((file) => {
+    const before = fs.readFileSync(file, "utf8");
+    const r = run([
+      "--file",
+      file,
+      "--status",
+      "Won't Fix",
+      "--set-status",
+      ...ROW,
+      "--json",
+    ]);
+    assert.equal(r.status, 2);
+    assert.equal(JSON.parse(r.stdout).reason, "usage");
+    assert.equal(fs.readFileSync(file, "utf8"), before);
+    run(["--file", file, "--status", "closed", ...ROW]);
+    const doc = fs.readFileSync(file, "utf8");
+    assert.match(doc, /^status: new /m);
+    assert.match(doc, /^\*\*Status\*\*: 🆕 New$/m);
+  });
+});

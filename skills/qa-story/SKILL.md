@@ -372,6 +372,29 @@ Re-review scope: unscoped — prior gate carries no head: (schema 1)
 Naming the scope is what makes a quiet cycle auditable. Without it, "we found nothing" and "we did
 not look" are the same sentence.
 
+### Close or reopen the bug reports this re-review verified
+
+Re-reviews only. For each co-located bug report still at **Ready for QA**, act on the row the
+Re-Review Context gives its finding: `✅ FIXED` → close it; `⚠️ PARTIAL` or `❌ NOT FIXED` →
+reopen it. One call per bug sets the status wherever the report carries it (frontmatter
+`status:`, the `**Status**` header line, or both) and appends the Status History row, in one
+write:
+
+```bash
+command node .agents/skills/qa-story/references/status-history.js --file "{bug-file}" --set-status \
+  --status "{closed or reopened}" --date "$(date -u +%Y-%m-%d)" --changed-by qa-story \
+  --notes "{Verified or Not fixed} by {this cycle's QA report filename}" --json
+```
+
+Read `reason`: `updated` is done. `no-status-field` (exit 1) means the report carries neither
+field, so nothing was written; name it in the QA report. `usage` (exit 2) means the call is wrong.
+Stage each bug report with the gate and QA report, so the cycle's commit carries it.
+
+The bug lifecycle has QA move a fixed bug from Ready for QA to Closed or Reopened, and until this
+step nothing did: task.180 ended with five bug reports at Ready for QA whose fixes later gates had
+verified, found only by the PR review (obs #21). A bug left at Ready for QA after the gate that
+verified it reads as open to every later reader.
+
 ### Example Re-Review Scenarios
 
 **Scenario 1: Clean PASS → Skip**

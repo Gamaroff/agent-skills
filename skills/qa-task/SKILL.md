@@ -1077,6 +1077,29 @@ For each HIGH or MEDIUM severity issue found:
 {How to fix}
 ```
 
+### Step 9b: Close or reopen the bug reports this re-review verified
+
+Re-reviews only. For each co-located bug report still at **Ready for QA**, act on the row the
+Re-Review Context gives its finding: `✅ FIXED` → close it; `⚠️ PARTIAL` or `❌ NOT FIXED` →
+reopen it. One call per bug sets the status wherever the report carries it (frontmatter
+`status:`, the `**Status**` header line, or both) and appends the Status History row, in one
+write:
+
+```bash
+command node .agents/skills/qa-task/references/status-history.js --file "{bug-file}" --set-status \
+  --status "{closed or reopened}" --date "$(date -u +%Y-%m-%d)" --changed-by qa-task \
+  --notes "{Verified or Not fixed} by {this cycle's QA report filename}" --json
+```
+
+Read `reason`: `updated` is done. `no-status-field` (exit 1) means the report carries neither
+field, so nothing was written; name it in the QA report. `usage` (exit 2) means the call is wrong.
+Stage each bug report with the gate and QA report, so the cycle's commit carries it.
+
+The bug lifecycle has QA move a fixed bug from Ready for QA to Closed or Reopened, and until this
+step nothing did: task.180 ended with five bug reports at Ready for QA whose fixes later gates had
+verified, found only by the PR review (obs #21). A bug left at Ready for QA after the gate that
+verified it reads as open to every later reader.
+
 ### Step 10: Create Quality Gate File
 
 > **Precondition — no dispatched review is outstanding.** Do not write a gate while a code review dispatched in this cycle has not returned its `code_review:` block. The gate is a verdict on all the evidence, and a review still running is evidence not yet in hand — a `PASS` written now can be contradicted minutes later by the reviewer it did not wait for (task.106, obs #56). If the diff-review step reports the review as outstanding, wait against its wall-clock budget or resolve it per `references/develop-pipeline-autonomous-defaults.md` §Subagents **before** this step; never write around it. **That is the only wait.** A pending, cancelled or unavailable CI run on the PR is **not** a precondition of this step: CI is gated once, on the final commit, at `/finalise`, and no QA cycle waits on CI before then. If the latest CI state is to hand, record it as `evidence.ci` (informational — for example `pending @ {sha}`); never hold the gate for it.
