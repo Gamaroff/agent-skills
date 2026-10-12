@@ -636,7 +636,9 @@ This convention ensures the cycle budget is respected across resumes.
      `not-converging` halt fired at 5a *before* 5b, so the grant writes `5b` and the latest gate's
      queue goes to `/qa-fix` first. Re-entering a not-converging halt at 5a reviews unchanged code,
      re-raises the same HIGH and trips the check again, spending the grant with no fix attempted
-     (task.140). The script reads `halt_reason` from the candidate before its restore drops it.
+     (task.140). The script reads `halt_reason` from the candidate before its restore drops it, and
+     reads its leading token: the HALT appends detail after a `:` or a space, and an exact compare
+     sent every real not-converging halt to `5a` (obs #17).
 
    The loop then runs with **`QA_MAX_CYCLES` = the lock's `qa_max_cycles`** (absent → 5). The
    budget is **relative to the reconstructed count, not to 5**: a grant of `k` must deliver `k`

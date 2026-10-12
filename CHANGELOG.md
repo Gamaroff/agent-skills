@@ -104,6 +104,13 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **A not-converging QA halt now resumes at 5b, as the grant intends (observation #17).**
+  `grant-qa-cycles.sh` chose the re-entry phase by comparing `halt_reason` to exactly
+  `not-converging`, but the HALT writes it with detail appended (`not-converging: QA loop HIGH 1,1,1 at
+  cycle 3 …`). Every real not-converging grant therefore re-entered at 5a, re-reviewing code whose
+  fix had not run and spending the granted cycle — four of four re-entries on task.180. The script
+  now reads the leading token (alone, or followed by `:` or a space); `grant-qa-cycles.test.sh` adds
+  detailed reasons in both directions.
 - **`/finalise` judges its own pull request, not the first one its document cites (task 175).**
   Step 3a read `pr_number:` and otherwise the first `PR #N` / `pull/N` in the document body; inside a
   pipeline the frontmatter has no `pr_number:` yet, so three runs judged a PR their document merely
