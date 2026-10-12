@@ -33,7 +33,8 @@ All notable changes to this project will be documented in this file. Format foll
   script that does not parse (`<shell> -n`) is `errored`. A new optional case field, `fixture: {env, files}`, supplies what else the block reads. The
   slot is source substitution, as for the document's reader: a `$(…)` input runs, inside the case's
   sandbox directory; a write to an absolute path outside the sandbox is not observed (a stated limit).
-  Without `--fake-gh`, a block or input that names `gh` is declined `needs-fake-gh` before it runs. A guard shipped as Markdown — task.159's and task.167's, each probed through a
+  Without `--fake-gh`, a block or input that names `gh` is declined `needs-fake-gh` before it runs,
+  and every `PATH` directory that holds `gh` is shadowed by a copy without it for each case. A guard shipped as Markdown — task.159's and task.167's, each probed through a
   hand-written wrapper under `.claude/state/` — is now probed by the engine, and the record names an
   entry that resolves in every checkout. Every document that routes a non-JS entry names the new form,
   held by a parity test.

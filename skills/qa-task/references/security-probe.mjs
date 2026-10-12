@@ -188,8 +188,9 @@
  * (never HOME, TMPDIR or LC_ALL — the sandbox owns them) and `files` written
  * into the case directory, refused when a path leaves it. The script runs as
  * `<shell> <script>` per shell, rc files off, with the shell arm's trip-wire
- * `gh` (or `--fake-gh`) first on PATH, and the shell forms' `gh` text check
- * over the block and the inputs. A HOSTILE case must carry `expected` — the
+ * `gh` (or `--fake-gh`) first on PATH, every PATH directory holding the host
+ * `gh` shadowed by a copy without it (ghFreePath), and the shell forms' `gh`
+ * text check over the block and the inputs. A HOSTILE case must carry `expected` — the
  * guard's own refusal OUTPUT, a non-empty stdout or stderr — and is declined
  * without one: under source
  * substitution an exit status cannot tell a refusal from a shell that stopped
@@ -217,6 +218,7 @@ import {
   renameSync,
   rmSync,
   statSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -2244,11 +2246,11 @@ export function parseCheck(shell, scriptPath, { cwd, env, timeoutMs }) {
  * Score one fence: run — the ONE ordered decision (task.180 QA cycle 2: two
  * cycles of HIGH findings were each a branch checked in the wrong order, so the
  * order is stated here, once):
- *   1. the child never answered (killed, timed out) or the shell could not open
- *      the script → errored
- *   2. a path `expected.absent` names exists in the case directory → the side
+ *   1. a path `expected.absent` names exists in the case directory → the side
  *      effect happened: compared, so a hostile case is reproduced — even when
- *      the shell then stopped (TASK-180-006)
+ *      the shell then stopped, was killed or timed out (TASK-180-006, -018)
+ *   2. the child never answered (killed, timed out) or the shell could not open
+ *      the script → errored
  *   3. the generated script does not parse (`parseError`, from parseCheck) →
  *      errored: the guard never ran (TASK-180-001)
  *   4. `expected` → compared, mapped through direction. Every hostile case
@@ -2276,6 +2278,10 @@ export function scoreFenceRun(
       detail: matched ? null : mismatches.join("; "),
     };
   };
+  // A side effect that happened is a reproduction whatever the shell then did —
+  // stopped, was killed, or timed out (TASK-180-006, -018).
+  const absent = c.expected?.absent ?? [];
+  if (absent.some((p) => existsSync(join(caseDir, p)))) return compared();
   if (neverRan(child)) {
     return {
       outcome: "errored",
@@ -2293,8 +2299,6 @@ export function scoreFenceRun(
       detail: `${shell} could not open the script (exit ${child.status}): ${(child.stderr ?? "").trim().slice(0, 160)}`,
     };
   }
-  const absent = c.expected?.absent ?? [];
-  if (absent.some((p) => existsSync(join(caseDir, p)))) return compared();
   if (parseError !== null) {
     return {
       outcome: "errored",
@@ -2341,6 +2345,45 @@ function workDirStamps(dir, skip) {
   };
   walk(dir, "");
   return out;
+}
+
+/**
+ * `path` with every absolute directory that holds an executable `gh` replaced by
+ * a copy of it WITHOUT `gh` — a directory of symlinks under `farmRoot`, one per
+ * entry, built once per directory and reused. A PATH lookup in the child
+ * (`gh`, `type -ap gh`, `command -v gh`) then finds only the trip-wire or the
+ * fixture prepended ahead of it, whatever the block, an input or a fixture
+ * says. Enumerating the text that will run could not do this: under fence:
+ * everything a case carries can run (TASK-180-015, -017). An absolute path to a
+ * real `gh`, and a PATH the block itself prepends, stay the stated limits. A
+ * directory that holds `gh` but cannot be listed is dropped rather than kept.
+ */
+export function ghFreePath(path, farmRoot) {
+  return (path ?? "")
+    .split(":")
+    .flatMap((dir) => {
+      if (!isAbsolute(dir)) return [dir];
+      try {
+        accessSync(join(dir, "gh"), fsConstants.X_OK);
+      } catch {
+        return [dir];
+      }
+      const farm = join(
+        farmRoot,
+        createHash("sha1").update(dir).digest("hex").slice(0, 16),
+      );
+      if (existsSync(farm)) return [farm];
+      try {
+        const names = readdirSync(dir).filter((n) => n !== "gh");
+        mkdirSync(farm, { recursive: true });
+        for (const n of names) symlinkSync(join(dir, n), join(farm, n));
+        return [farm];
+      } catch {
+        rmSync(farm, { recursive: true, force: true });
+        return [];
+      }
+    })
+    .join(":");
 }
 
 /**
@@ -2482,6 +2525,9 @@ function runFenceCase(
       TMPDIR: sandbox.TMPDIR,
       LC_ALL: sandbox.LC_ALL,
     };
+    // Every PATH directory holding the host `gh` is shadowed by one without it,
+    // fixture.env's PATH included, before the trip-wire or fixture goes first.
+    env.PATH = ghFreePath(env.PATH, join(harnessDir, "path"));
     if (fakeGhDir !== null) {
       env.PATH = `${fakeGhDir}:${env.PATH}`;
       env.FAKE_GH = "1";

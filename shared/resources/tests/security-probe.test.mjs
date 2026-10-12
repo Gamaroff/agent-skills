@@ -19,6 +19,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
+  chmodSync,
   cpSync,
   existsSync,
   mkdirSync,
@@ -51,6 +52,7 @@ import {
   isLaunchFailure,
   main,
   namesGh,
+  ghFreePath,
   parseArgvTemplate,
   probeShells,
   readRecord,
@@ -4627,6 +4629,122 @@ test("fence entry: a write to an absolute path outside the sandbox is NOT observ
   } finally {
     rmSync(root, { recursive: true, force: true });
     rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("ghFreePath: a PATH directory holding gh is replaced by a copy without it; others, and relative entries, are kept (TASK-180-017)", () => {
+  const base = realpathSync(mkdtempSync(join(tmpdir(), "ghfree-")));
+  try {
+    const withGh = join(base, "with");
+    const without = join(base, "without");
+    mkdirSync(withGh);
+    mkdirSync(without);
+    for (const [dir, name] of [
+      [withGh, "gh"],
+      [withGh, "tool"],
+      [without, "other"],
+    ]) {
+      writeFileSync(join(dir, name), "#!/bin/sh\n");
+      chmodSync(join(dir, name), 0o755);
+    }
+    const farmRoot = join(base, "farm");
+    const out = ghFreePath(`${withGh}:rel:${without}`, farmRoot).split(":");
+    assert.equal(out.length, 3);
+    assert.ok(out[0].startsWith(farmRoot), out[0]);
+    assert.deepEqual(readdirSync(out[0]), ["tool"]);
+    assert.equal(out[1], "rel");
+    assert.equal(out[2], without);
+    // Built once: a second call reuses the same copy.
+    assert.equal(ghFreePath(withGh, farmRoot), out[0]);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: no PATH lookup reaches a host gh, whatever runs it — a BASH_ENV fixture script included (TASK-180-017)", () => {
+  const root = fenceRoot({
+    "doc.md": [
+      "## Plain",
+      "",
+      "```bash",
+      "X='<slot>'",
+      'case "$X" in ok) ;; *) echo REFUSED; exit 1 ;; esac',
+      "```",
+      "",
+    ].join("\n"),
+  });
+  // A stand-in for the host's gh, first on the PATH the engine inherits. It
+  // writes a marker OUTSIDE the sandbox when it runs.
+  const host = realpathSync(mkdtempSync(join(tmpdir(), "probe-host-gh-")));
+  const marker = join(host, "host-gh-ran");
+  writeFileSync(join(host, "gh"), `#!/bin/sh\n: > "${marker}"\n`);
+  chmodSync(join(host, "gh"), 0o755);
+  const savedPath = process.env.PATH;
+  process.env.PATH = `${host}:${savedPath}`;
+  try {
+    const fixture = {
+      env: { BASH_ENV: "./init.sh" },
+      files: {
+        "init.sh":
+          'for g in $(type -ap gh); do "$g" --version >/dev/null 2>&1; done\n',
+      },
+    };
+    const r = runProbeSpec({
+      entry: "fence:doc.md#Plain",
+      slot: "<slot>",
+      cases: [
+        fenceCase("f.ok", "legitimate", "ok", { fixture }),
+        fenceCase("f.bad", "hostile", "bad", {
+          fixture,
+          expected: { exit: 1, stdout: "REFUSED\n" },
+        }),
+      ],
+      repoRoot: root,
+    });
+    assert.equal(existsSync(marker), false, "the host gh ran");
+    // The trip-wire answered instead, so the run is declined, not scored.
+    assert.equal(r.reason, "needs-fake-gh", JSON.stringify(r));
+  } finally {
+    process.env.PATH = savedPath;
+    rmSync(root, { recursive: true, force: true });
+    rmSync(host, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: a side effect followed by a kill is a reproduction, not errored (TASK-180-018)", () => {
+  const root = fenceRoot({
+    "doc.md": [
+      "## Case guard",
+      "",
+      "```bash",
+      "X='<slot>'",
+      'case "$X" in ok) ;; *) echo REFUSED; exit 1 ;; esac',
+      "```",
+      "",
+    ].join("\n"),
+  });
+  const refusal = { exit: 1, stdout: "REFUSED\n" };
+  try {
+    const r = runProbeSpec({
+      entry: "fence:doc.md#Case guard",
+      slot: "<slot>",
+      cases: [
+        fenceCase("f.ok", "legitimate", "ok"),
+        fenceCase("f.bad", "hostile", "bad", { expected: refusal }),
+        fenceCase("f.kill", "hostile", "'$(touch pwned; kill -9 $$)'", {
+          expected: { ...refusal, absent: ["pwned"] },
+        }),
+      ],
+      repoRoot: root,
+    });
+    assert.deepEqual(
+      r.reproduced,
+      probeShells().map((sh) => `f.kill@${sh}`),
+      JSON.stringify(r.cases),
+    );
+    assert.notEqual(r.verdict, "engages");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
 

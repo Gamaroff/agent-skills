@@ -5,7 +5,7 @@ type: task
 description: "Add a `fence:<doc>#<heading>` entry form to shared/resources/security-probe.mjs that extracts the first bash block under a heading on every run, substitutes the case's input into a named placeholder, applies an optional per-case env and fixture files, and scores a hostile case against its stated refusal (`expected`) and a legitimate one by exit status. A boundary shipped as a fenced block in a step doc is then probed by the engine instead of through a hand-written wrapper."
 tags: [security-probe, finalise, qa-task, qa-story, review-security, observation]
 category: infrastructure
-status: in-progress
+status: ready-for-review
 priority: Medium
 created: 2026-10-03
 updated: 2026-10-12
@@ -16,7 +16,7 @@ github_issue: 560
 
 # Technical Task: security-probe — a `fence:` entry form
 
-**Status:** In Progress
+**Status:** Ready for Review
 
 **Review**: ✅ All review recommendations from `task.180.review.1.probe-engine-fence-entry-form.md` implemented 2026-10-12
 
@@ -350,6 +350,7 @@ None.
 | 2026-10-12 |         | QA gate FAIL (70/100) — cycle 5 safety re-probe, 3 findings: 1 high, 1 medium, 1 low | qa-task |
 | 2026-10-12 |         | QA findings fixed — cycle 5, 2 findings (TASK-180-015..016): fence: runs the gh text check over the block and inputs; the outside-write limit is stated and pinned | qa-fix |
 | 2026-10-12 |         | QA gate FAIL (70/100) — cycle 6 safety re-probe, 2 findings: 1 high, 1 medium | qa-task |
+| 2026-10-12 |         | QA findings fixed — cycle 6, 2 findings (TASK-180-017..018): structural PATH guard (ghFreePath) replaces the text enumeration as the gh guarantee; expected.absent checked first | qa-fix |
 <!-- change-log-end -->
 
 ---
