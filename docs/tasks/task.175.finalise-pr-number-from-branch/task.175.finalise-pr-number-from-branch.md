@@ -303,6 +303,27 @@ None identified.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-12
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.175.qa.1.finalise-pr-number-from-branch.md](./task.175.qa.1.finalise-pr-number-from-branch.md)
+- **Gate File**: [task.175.gate.1.finalise-pr-number-from-branch.yml](./task.175.gate.1.finalise-pr-number-from-branch.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 19 (16 resolver cases, 3 pr-read cases) plus the full fast gate
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No critical issues identified. Two advisory code-review findings (CR-1 branch rung on a long-lived branch, CR-2 refusal wording) routed to future work. Security is `boundary: true` with `probes_executed: 0` — no probe entry form reaches the resolver, so finalise's zero-guard will need a recorded override.
+
 ## Change Log
 
 | Date       | Version | Description                                | Author      |
@@ -311,6 +332,7 @@ None identified.
 | 2026-10-12 | 1.1     | Review passed (8/10) — rung 2 reuses `pr-read.sh`; Step 7.2's body-to-frontmatter `pr_number` write added to scope; unsourced `PR_NUMBER_ARG` dropped; anchors corrected | review-task |
 | 2026-10-12 |         | Status → ready-for-development | review-task |
 | 2026-10-12 |         | Implemented — 1 new script, 1 new test file (16 cases), 5 sources edited; 7 mutations proved red | develop |
+| 2026-10-12 |         | QA gate PASS (100/100) — 0 findings; 2 advisory code-review notes | qa-task |
 
 <!-- change-log-end -->
 
