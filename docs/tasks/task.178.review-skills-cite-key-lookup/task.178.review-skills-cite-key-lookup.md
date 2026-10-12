@@ -301,24 +301,25 @@ accurate.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-12
-**Quality Score**: 80/100
-**Gate Decision**: FAIL
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.178.qa.4.review-skills-cite-key-lookup.md](./task.178.qa.4.review-skills-cite-key-lookup.md)
-- **Gate File**: [task.178.gate.4.review-skills-cite-key-lookup.yml](./task.178.gate.4.review-skills-cite-key-lookup.yml)
+- **Full Report**: [task.178.qa.5.review-skills-cite-key-lookup.md](./task.178.qa.5.review-skills-cite-key-lookup.md)
+- **Gate File**: [task.178.gate.5.review-skills-cite-key-lookup.yml](./task.178.gate.5.review-skills-cite-key-lookup.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 12 (new file)
 - **Phases Verified**: 3/3
-- **Critical Issues**: 1
+- **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-- CR-1 (high): cycle 3's quote-aware split misses a prose restatement when an apostrophe precedes the code span.
+- Gate 4 HIGH fixed.
+- CR-1 (medium): an unpaired apostrophe in a chunk breaks a quoted-alternation lookup.
 
 <!-- change-log-start -->
 
@@ -338,6 +339,8 @@ accurate.
 | 2026-10-12 |         | QA findings fixed — cycle 3, 2 findings (quote-aware segments, prefixed/globbed docs paths; guard claim scoped to its fixture table) | qa-fix |
 | 2026-10-12 |         | QA gate FAIL (80/100) — 1 finding (1 high) | qa-task |
 | 2026-10-12 |         | QA findings fixed — cycle 4, 1 finding + 1 advisory + 2 cleanups (backtick-first segment split; brace sets need a comma; CHANGELOG and header wording) | qa-fix |
+| 2026-10-12 |         | QA gate CONCERNS (90/100) — 1 finding (1 medium) | qa-task |
+| 2026-10-12 |         | QA findings fixed — cycle 5, 1 finding (a word-internal apostrophe is literal, not a quote opener) | qa-fix |
 
 <!-- change-log-end -->
 

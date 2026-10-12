@@ -27,10 +27,11 @@
  *    and three QA cycles chasing spellings showed it (QA cycle 3, Step 2.6: scope the claim). Known
  *    unseen shapes: a lookup that pipes `find docs …` into a grep; a pattern continued onto the next
  *    physical line with a trailing `\`; an escape-class value (`jira_key:\s*X`); `rg -L` (which is
- *    `--follow`, read here as files-without-match). Add a shape to the table when one is found in a
- *    canonical source.
- * 2. Non-vacuity: §0a still holds its anchored pattern, the population is non-trivial, and the
- *    allowlisted note still exists (a stale allowlist entry is red).
+ *    `--follow`, read here as files-without-match); quoted alternation in a chunk that also holds an
+ *    unpaired quote that is not a word-internal apostrophe (the chunk is split plainly). Add a
+ *    shape to the table when one is found in a canonical source.
+ * 2. Non-vacuity: §0a still holds its anchored pattern, the population is non-trivial, and the one
+ *    allowlisted line — §0a's own lookup — still matches the key (a stale entry is red).
  * 3. The three former sites cite §0a, and each skill ships the step-0 document.
  * 4. review-task's Jira-key branch — its two fenced blocks around the §0a block in the copy the skill
  *    ships, run as one script as the skill says — resolves a quoted key to its one task document, not
@@ -51,8 +52,9 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
 // apostrophe (`skill's`) is not a shell quote, and reading it as one swallowed the code span after it
 // (QA cycle 4, CR-1). Within each chunk, pipes, `;`, `&&` and `||` separate commands — but only
 // OUTSIDE quotes, because a `|` inside a quoted pattern is alternation (`"^(jira_key|github_issue): X"`),
-// not a pipe (QA cycle 3). A chunk whose quotes do not balance is prose, not shell, and is split
-// plainly. Single quotes take no escapes; inside double quotes `\` escapes.
+// not a pipe (QA cycle 3). A word-internal apostrophe is literal. A chunk whose quotes still do not
+// balance is prose, not shell, and is split plainly (pipes inside quotes included). Single quotes
+// take no escapes; inside double quotes `\` escapes.
 const plainSplit = (chunk) => chunk.split(/\|\||&&|[|;]/);
 
 function quoteAwareSplit(chunk) {
@@ -68,7 +70,14 @@ function quoteAwareSplit(chunk) {
       else if (c === quote) quote = null;
       continue;
     }
-    if (c === "'" || c === '"') {
+    // A word-internal apostrophe (`don't`, `skill's`) is prose, not a shell quote (QA cycle 5, CR-1).
+    if (
+      c === "'" &&
+      /\w/.test(chunk[i - 1] || "") &&
+      /\w/.test(chunk[i + 1] || "")
+    ) {
+      cur += c;
+    } else if (c === "'" || c === '"') {
       quote = c;
       cur += c;
     } else if (c === "|" || c === ";") {
@@ -220,6 +229,10 @@ test("the key matches the restatements it exists to catch", () => {
     'If it doesn\'t resolve, run `grep -rl "jira_key: ${KEY}" docs/`',
     // Two apostrophes balance as a "quote" across the code span: only the backtick-first split sees it.
     "the skill's `grep -rl \"jira_key: X\" docs/` isn't needed",
+    // QA cycle 5, CR-1: quoted alternation with a word-internal apostrophe in the same chunk.
+    'grep -rlE "^(jira_key|github_issue): X" docs/   # don\'t take the first',
+    'If it doesn\'t resolve, grep -rlE "^(jira_key|github_issue): X" docs/',
+    'grep -rl "jira_key: X\\|github_issue: X" docs/  # the skill\'s copy',
     `DOC_MATCHES=$(grep -rlE "^\${KEY_FIELD}:[[:space:]]*['\\"]?\${KEY_VALUE}['\\"]?[[:space:]]*$" docs/ 2>/dev/null \\`,
   ]) {
     assert.ok(isKeyLookup(s), s);
