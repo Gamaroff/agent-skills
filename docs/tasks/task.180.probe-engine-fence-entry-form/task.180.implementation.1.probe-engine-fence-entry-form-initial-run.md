@@ -3,7 +3,7 @@
 **Task**: `task.180.probe-engine-fence-entry-form.md`
 **Run Number**: 1
 **Started**: 2026-10-12 15:12
-**Status**: Escalated
+**Status**: Completed
 
 ---
 
@@ -36,9 +36,9 @@ Add the `fence:<doc>#<heading>` entry form (with `--slot` and an optional per-ca
 | 2. review-task             | ✅ Done    | `task.180.review.{N}.{name}.md` exists (or skip logged)               | review.1 — 8/10 after fixes, READY; Planned → Ready for Development | — | 2026-10-12T13:16Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan + map); 2 iterations of the fast gate — iter 1: 2 lint failures in new prose, fixed; iter 2: 5377 pass, 0 fail | — | 2026-10-12T13:46Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #637: https://github.com/Gamaroff/agent-skills/pull/637 | — | 2026-10-12T13:48Z |
-| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention — QA loop not converging (loop limit at cycle 8; HIGH 1×6 then 0, 0; gate 8 CONCERNS; last fix 30769d36 ungated) | `task.180.qa.{N}.*.md`; `task.180.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.180.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done — 8 cycles; gate 8 CONCERNS accepted by the user at the loop limit; 5c PR review CONCERNS | `task.180.qa.{N}.*.md`; `task.180.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    | 2026-10-12T18:33Z |
+| 7. finalise                | ✅ Done    | `task.180.dod.{N}.*.md`; task `status: accepted`                      | dod.1 ACCEPTED; acceptance commit b114cddb; CI reading 2 SUCCESS @ b114cddb; issue #560 closed; board Done (already) | — | 2026-10-12T18:33Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | report-only docs commit | — | 2026-10-12T18:33Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -138,6 +138,10 @@ Add the `fence:<doc>#<heading>` entry form (with `--slot` and an optional per-ca
 - QA loop re-entry (loop limit, cycle 7): 1 extra cycle granted (user: "go ahead"); `qa_max_cycles` = 8; re-entered at 5a (correct for a loop-limit halt: cycle 7's fix was ungated).
 - QA Cycle 8 — scoped re-review (SAFETY_REPROBE false: gate 7 had no HIGH and was not FAIL), reviewer 363.1 s; gate CONCERNS 90. Route classifier: continue (not-a-pass-gate; route 2 declined: product-defect-signal). → 5b. changes-requested: stage-disabled.
 - qa-fix cycle 8: findings read inline. Counter 8 = `qa_max_cycles` 8 → Loop limit. Route 2c: continue (`medium-not-falling`, MEDIUM 1, 1, 2 over cycles 6–8) → escalation.
+- Halt option 2 taken (user: "go ahead" on the recommendation, 2026-10-12): accept gate 8 (CONCERNS 90, HIGH 0, Security PASS) and proceed to /finalise. Both open entries (TASK-180-020, -021) are fixed and mutation-proven in `30769d36`, which no gate has read. Step 5c (`/review-pr`) was not run; the loop exited by user decision, not through its exit gate. Lock restored and advanced to step 7.
+- Step 5c run before /finalise (its DoD needs a `/review-pr` report: the PR has no GitHub review decision). `/review-pr --effort medium --comment --no-code` → **CONCERNS** (9 conformance findings, 0 high): `task.180.pr-review.1.probe-engine-fence-entry-form.md`; PR comment posted. Doc-only carries: bugs 1–5 closed citing their verifying QA reports (PC-2 … PC-6). PC-1/PC-7/PC-8 (cycle-8 fix ungated, bugs 13/14 open) are the user-accepted residue; PC-9 is written by /finalise.
+- /finalise: four DoD agents — AC PASS (10/10), Security PASS (probe run by /finalise after the read-only agent returned its command: 26 executed, 0 reproduced, `task.180.dod.1.security.run.json`), Compliance NOT_APPLICABLE, Docs PASS. Decision ACCEPTED, gate 8 CONCERNS accepted by the user. CI reading 1: SUCCESS @ 954e77b7fabb (5 checks). Acceptance commit `b114cddb` pushed (DoD, sprint review, registry ticked, 5c review carried).
+- CI reading 2: SUCCESS @ b114cddb7c29 over 5 checks after 60s. Canonical PR comment posted; issue #560: done comment posted, closed (CLOSED confirmed); board move `already` (Done). Task completed.
 
 ---
 
@@ -402,10 +406,12 @@ The pipeline completed 8 qa-task/qa-fix cycles without a clean PASS. Cycle 8's f
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: Escalated — QA loop limit reached at cycle 8 (gate 8 CONCERNS, HIGH 0, Security PASS; last fix ungated)
+**Finished**: 2026-10-12T18:33Z
+**Final Status**: Completed — accepted at gate 8 (CONCERNS 90, HIGH 0, Security PASS) by user decision at the QA loop limit
 **Branch**: feature/task.180.probe-engine-fence-entry-form
 **PR**: https://github.com/Gamaroff/agent-skills/pull/637
 **QA Iterations**: 8 (8 fix cycles)
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**DoD Summary**: `task.180.dod.1.probe-engine-fence-entry-form.md` — ✅ ACCEPTED
+**Tracker debt**: none
+
+**Completion Summary**: Implemented the `fence:<doc>#<heading>` entry form for `security-probe.mjs` — `--slot` source substitution, the per-case `fixture` field, one ordered scorer (`scoreFenceRun`), a required hostile-case refusal output, a structural `gh` guard (`ghFreePath`) with a text fast path, and a work-dir watch for writes, deletions and directories — and routed every non-JS entry-form document to it. Task.167's precondition is now probed by the engine (13 cases, engages, 0 reproduced). The QA loop ran 8 cycles under grants of 2, 1, 1 and 1: refusal scoring converged at cycle 4, sandbox containment at cycles 5–7, and the last two gates had no HIGH. The user accepted gate 8 (CONCERNS) at the loop limit; its two MEDIUM entries are fixed and mutation-proven in `30769d36` but no gate read them. Step 5c ran before /finalise (CONCERNS) and closed bugs 1–5. Notable decisions: the stderr classifier was replaced by a parse check and a stated refusal at cycle 3, the `gh` text enumeration was replaced by a PATH guard at cycle 6, and the grant script's re-entry phase was corrected by hand four times (observation #17).
