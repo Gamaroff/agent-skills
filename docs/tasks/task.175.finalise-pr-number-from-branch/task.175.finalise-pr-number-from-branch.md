@@ -5,10 +5,10 @@ type: task
 description: "Resolve PR_NUMBER from the branch first (`gh pr view --json number` for the current branch, or the pipeline lock's `pr_url`), then from frontmatter, and never from a free-text body match."
 tags: [finalise, observation]
 category: infrastructure
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-12
 assignee:
 estimated_effort_hours: 8
 github_issue: 551
@@ -16,7 +16,9 @@ github_issue: 551
 
 # Technical Task: Resolve finalise's PR number from the branch, not the task body
 
-**Status:** Planned
+**Status:** Ready for Review
+
+**Review**: ✅ All review recommendations from `task.175.review.1.finalise-pr-number-from-branch.md` implemented 2026-10-12
 
 **GitHub Issue**: [#551](https://github.com/Gamaroff/agent-skills/issues/551)
 
@@ -31,13 +33,13 @@ This task gives finalise one authoritative resolver: the PR whose head is the cu
 **Scope**:
 
 - A new resolver, `shared/resources/resolve-pr-number.sh`, with an executed test
-- `skills/finalise/SKILL.md` Step 3a, and the bug-mode note that cites it
+- `skills/finalise/SKILL.md` Step 3a, the bug-mode note that cites it, and Step 7.2's `pr_number:` write
 - `shared/resources/finalise-dod-ac-prompt.md` Step 1 and `shared/resources/finalise-dod-fix-evidence-prompt.md` Step 1, which re-derive the number from the body themselves
 
 **Key deliverables**:
 
 1. `resolve-pr-number.sh` returns the PR number and the source it came from, and refuses rather than guesses when no authoritative source exists.
-2. finalise Step 3a calls it; no derivation site in finalise reads a body `PR #N` unconfirmed.
+2. finalise Step 3a calls it; no derivation site in finalise reads a body `PR #N` unconfirmed, and Step 7.2 writes the resolved number, never one copied from the body.
 3. The two agent prompts take the number they are given (`<PR_NUMBER>`) and no longer derive it from the document.
 4. Tests fail when any of these is reverted.
 
@@ -67,39 +69,40 @@ This task gives finalise one authoritative resolver: the PR whose head is the cu
 
 ### Current Architecture
 
-Three places derive the PR number, each from the document:
+Four places derive the PR number, each from the document. The search that defines the list, from the repository root: `grep -nE "PR #|pull/|pr_number|PR number from|PR_NUMBER=" skills/finalise/SKILL.md shared/resources/finalise-dod-*-prompt.md`, keeping only the lines that take a number *from the document* (the remaining hits read `$PR_NUMBER` or are worked examples):
 
-- `skills/finalise/SKILL.md:448-449` (Step 3a, *`# PR number`*): `pr_number:` from frontmatter, else `grep -oE 'PR #([0-9]+)|pull/([0-9]+)' {story-file} | grep -oE '[0-9]+' | head -1`.
+- `skills/finalise/SKILL.md:462-463` (Step 3a, *`# PR number`*): `pr_number:` from frontmatter, else `grep -oE 'PR #([0-9]+)|pull/([0-9]+)' {story-file} | grep -oE '[0-9]+' | head -1`.
 - `shared/resources/finalise-dod-ac-prompt.md:20` (Step 1, *"The PR number from frontmatter (`pr_number:`) or body text"*): the AC agent re-derives the number from the document even though `<PR_NUMBER>` is substituted into its prompt.
 - `shared/resources/finalise-dod-fix-evidence-prompt.md:34` (Step 1, same wording): the bug-mode agent does the same.
+- `skills/finalise/SKILL.md:1141` (Step 7.2, *"Ensure `pr_number` is present in frontmatter (add if only in body)"*): the acceptance write copies a body number into frontmatter, where rung 4 below would then trust it on every later run.
 
-One prose citation depends on the Step 3a rule: `skills/finalise/SKILL.md:234` (bug mode `read-document`: *"`PR_NUMBER` comes from Step 3a's existing derivation over the document"*).
+One prose citation depends on the Step 3a rule: `skills/finalise/SKILL.md:243` (bug mode `read-document`: *"`PR_NUMBER` comes from Step 3a's existing derivation over the document"*).
 
 The authoritative sources already exist and nothing in finalise reads them:
 
-- The pipeline lock's `pr_url`, written at Step 4: `shared/resources/develop-pipeline-step-4-create-pr.md:246` (*`jq --arg url "{PR_URL}" '.pr_url = $url'`*).
+- The pipeline lock's `pr_url`, written at Step 4: `shared/resources/develop-pipeline-step-4-create-pr.md:266` (*`jq --arg url "{PR_URL}" '.pr_url = $url'`*).
 - The PR whose head is the current branch: `gh pr view --json number,headRefName` on GitHub (qa-task already resolves its PR this way — its PR existence check runs `gh pr view --json url,state,title,number` on the current branch); Bitbucket's `pullrequests?q=source.branch.name=…` query, which `qa-fix` and `review-pr` already use.
 
-No existing helper resolves a PR number: `git grep -n 'resolve-pr\|pr-number' -- shared/resources` returns one hit, `shared/resources/pr-conformance-prompt.md:127` (*`resolved_via: … pr-number …`*), which is review-pr's label for resolving the **work item** from a PR — the opposite direction. The resolver is a new mechanism, not a second one.
+**One existing helper already reads the current branch's PR, and the resolver reuses it rather than sitting beside it.** `shared/resources/pr-read.sh` (sourced, `pr_read [--pr N] [--branch B]`) sets `PR_READ_NUMBER` for the PR `gh` finds for the current branch on GitHub, and for the **one open** PR whose source branch is the current branch on Bitbucket; none or several is a named failure (`PR_READ_ERROR`), and it reads Bitbucket's HTTP status rather than trusting an empty body (develop-* Step 8 uses it). Rung 2 below **is** `pr_read` with no `--pr`, so the forge queries, the auth handling and the control-character-safe JSON parse stay in one place. The resolver adds what `pr_read` does not do: the rung order, the lock and document rungs, and the body confirmation. An earlier draft of this section said no helper resolved a PR number; its search (`git grep -n 'resolve-pr\|pr-number'`) could not see `pr-read.sh`, whose output is `PR_READ_NUMBER`. `pr-conformance-prompt.md:127`'s `resolved_via: … pr-number …` is review-pr's label for the opposite direction (work item from a PR) and is unrelated.
 
 ### Target Architecture
 
 `shared/resources/resolve-pr-number.sh --doc <work-item> [--pr <N>] [--json]` resolves in this order and stops at the first source that answers:
 
 1. `--pr <N>` — an explicit number from the caller (the orchestrator, which knows it from Step 4)
-2. the PR whose head is the current branch (GitHub: `gh pr view --json number,headRefName`; Bitbucket: the source-branch query)
+2. the PR whose head is the current branch: `pr_read` from `pr-read.sh`, with no `--pr` (GitHub: the PR `gh` finds for the current branch; Bitbucket: the one open PR from the current branch)
 3. the pipeline lock's `pr_url`, only when the lock's `task_or_story_directory` is the work item's directory
 4. frontmatter `pr_number:`
 5. a body `PR #N` / `pull/N` match, **only** when that PR's head branch is the current branch; an unconfirmed match is refused
 
 It prints the number (or `{"pr": N, "source": "<rung>"}` with `--json`) and exits 0, or exits 1 with `reason: none` and no number. It never prints a number it could not attribute to a rung. It exits 2 on a usage error. Platform comes from `resolve-platform.sh`, sourced as `source … || exit 1`.
 
-finalise Step 3a calls it; the two prompts' Step 1 read only `<PR_NUMBER>`. A resolver exit 1 leaves `PR_NUMBER` empty, which the agents already handle (*"If PR number not found: set pr_status = NOT_FOUND"*), and the DoD records it as unresolved rather than guessed.
+finalise Step 3a calls it **without `--pr`**: finalise takes no PR argument and no orchestrator passes one, so inside a pipeline rung 2 answers. Rung 1 serves direct callers of the resolver and its tests. The two prompts' Step 1 read only `<PR_NUMBER>`, and Step 7.2 writes `pr_number: <PR_NUMBER>` only when Step 3a resolved one — an unresolved run writes no `pr_number:`. A resolver exit 1 leaves `PR_NUMBER` empty, which the agents already handle (*"If PR number not found: set pr_status = NOT_FOUND"*), and the DoD records it as unresolved rather than guessed.
 
 ### Important Clarifications
 
 - **Writing `pr_number:` at Step 4** (create-pr), which observation #184 also suggests, is left out: rung 2 finds the PR from the branch at every point after Step 4, so the frontmatter write would only add a second copy of a value git already holds. Recorded as a possible follow-up, not done here.
-- **The body rung stays, confirmed.** A merged PR whose head branch was deleted has no rung 2 answer, and an after-the-fact audit may have only the body; confirmation against `gh pr view <N> --json headRefName` keeps that path without trusting it blind. A deleted head branch cannot be confirmed, so the body rung refuses there too, and the run says `none`.
+- **The body rung stays, confirmed, and it is narrow.** It answers only when rung 2 found no PR for the current branch but the cited PR's head branch *is* the current branch — on Bitbucket, a PR that is no longer open (`pr_read` reads open PRs only) on a branch that is still checked out. Confirmation reads the cited PR's head branch (GitHub `gh pr view <N> --json headRefName`; Bitbucket `.source.branch.name`), so the path is kept without trusting the body blind. A deleted head branch, or a citation of another work item's PR, cannot be confirmed: the body rung refuses and the run says `none`.
 
 ---
 
@@ -108,7 +111,8 @@ finalise Step 3a calls it; the two prompts' Step 1 read only `<PR_NUMBER>`. A re
 ### In Scope
 
 ✅ `shared/resources/resolve-pr-number.sh` (new) and its executed test
-✅ `skills/finalise/SKILL.md` Step 3a and the `read-document` bug-mode note
+✅ `shared/resources/pr-read.sh`: `pr_read` also reports the PR's head branch (`PR_READ_HEAD_BRANCH`), which rung 5 compares — so the per-number forge query stays in the one helper (added during development)
+✅ `skills/finalise/SKILL.md` Step 3a, the `read-document` bug-mode note and Step 7.2's `pr_number:` write
 ✅ `shared/resources/finalise-dod-ac-prompt.md` and `shared/resources/finalise-dod-fix-evidence-prompt.md` Step 1
 ✅ Bundled copies regenerated; CHANGELOG `[Unreleased]` entry citing (task 175)
 
@@ -136,10 +140,10 @@ None to any interface. One behaviour change: when no authoritative source names 
 
 **Files**: `shared/resources/resolve-pr-number.sh` (new)
 
-- [ ] `--doc` (required), `--pr`, `--json`; usage errors exit 2.
-- [ ] Rungs 1–5 in the stated order; rung 3 only when the lock's `task_or_story_directory` canonicalises to the work item's directory; rung 5 only on a `headRefName` match with the current branch.
-- [ ] Exit 0 with the number and its source; exit 1 with `reason: none` and no number.
-- [ ] GitHub and Bitbucket arms, platform from `resolve-platform.sh` (`source … || exit 1`).
+- [x] `--doc` (required), `--pr`, `--json`; usage errors exit 2.
+- [x] Rungs 1–5 in the stated order; rung 3 only when the lock's `task_or_story_directory` canonicalises to the work item's directory; rung 5 only on a `headRefName` match with the current branch.
+- [x] Exit 0 with the number and its source; exit 1 with `reason: none` and no number.
+- [x] Rung 2 is `pr_read` from the sibling `pr-read.sh` (sourced `|| exit 1`); rung 5's confirmation has GitHub and Bitbucket arms, platform from `resolve-platform.sh` (`source … || exit 1`).
 
 ### Phase 2: finalise uses it
 
@@ -147,9 +151,10 @@ None to any interface. One behaviour change: when no authoritative source names 
 
 **Files**: `skills/finalise/SKILL.md`, `shared/resources/finalise-dod-ac-prompt.md`, `shared/resources/finalise-dod-fix-evidence-prompt.md`
 
-- [ ] Step 3a: replace the two `PR_NUMBER=` lines with the resolver call; record the source in the running summary.
-- [ ] Bug-mode `read-document` note: cite the resolver, not "Step 3a's existing derivation over the document".
-- [ ] AC prompt and fix-evidence prompt Step 1: read the PR number only from `<PR_NUMBER>`; drop the frontmatter/body derivation.
+- [x] Step 3a: replace the two `PR_NUMBER=` lines with the resolver call; record the source in the running summary.
+- [x] Bug-mode `read-document` note: cite the resolver, not "Step 3a's existing derivation over the document".
+- [x] Step 7.2: replace "Ensure `pr_number` is present in frontmatter (add if only in body)" with a write of Step 3a's `PR_NUMBER`, skipped when it is empty.
+- [x] AC prompt and fix-evidence prompt Step 1: read the PR number only from `<PR_NUMBER>`; drop the frontmatter/body derivation.
 
 ### Phase 3: Tests
 
@@ -157,16 +162,16 @@ None to any interface. One behaviour change: when no authoritative source names 
 
 **Files**: `shared/resources/tests/resolve-pr-number.test.mjs` (new)
 
-- [ ] Executed against a fixture repo with a `gh` stub (`shared/resources/tests/lib/executed-prose.mjs` `fixtureRepo` / `ghStub`): each rung wins when the rungs above it are empty; a body citation of another PR is refused when its head branch differs; no source → exit 1 with no number.
-- [ ] A presence pin: no finalise derivation site (Step 3a, the two prompts) reads a body `PR #N` pattern; keyed on the derivation regex, with a non-vacuity floor that Step 3a calls the resolver.
+- [x] Executed against a fixture repo with a `gh` stub (`shared/resources/tests/lib/executed-prose.mjs` `fixtureRepo` / `ghStub`): each rung wins when the rungs above it are empty; a body citation of another PR is refused when its head branch differs (rungs 2–4 empty: the stub finds no PR for the branch, no lock, no `pr_number:`); no source → exit 1 with no number.
+- [x] A presence pin: no finalise derivation site (Step 3a, Step 7.2, the two prompts) reads a body `PR #N` pattern or copies a body number into frontmatter; keyed on the derivation regex and the "add if only in body" / "PR number from frontmatter" prose, with a non-vacuity floor that Step 3a calls the resolver.
 
 ### Phase 4: Proof and gates
 
 **Risk**: Low.
 
-- [ ] Mutation-prove under bash with `cp` snapshots and `cmp`-checked restore: drop rung 5's confirmation → red; swap rungs 2 and 4 → red; restore the body regex in Step 3a → red.
-- [ ] `npm run bundle`, `npm run ci:fast` with `.agents/skills` moved aside, `npm run bundle:check`, `npm run validate -- skills/finalise/`, `npm run lint:shell`.
-- [ ] CHANGELOG `[Unreleased]` entry citing (task 175).
+- [x] Mutation-prove under bash with `cp` snapshots and `cmp`-checked restore: drop rung 5's confirmation → red; swap rungs 2 and 4 → red; restore the body regex in Step 3a → red.
+- [x] `npm run bundle`, `npm run ci:fast` with `.agents/skills` moved aside, `npm run bundle:check`, `npm run validate -- skills/finalise/`, `npm run lint:shell`.
+- [x] CHANGELOG `[Unreleased]` entry citing (task 175).
 
 ---
 
@@ -175,13 +180,16 @@ None to any interface. One behaviour change: when no authoritative source names 
 ### Files to Modify (Core Implementation)
 
 1. ✅ `shared/resources/resolve-pr-number.sh` (new): the resolver
-2. ✅ `skills/finalise/SKILL.md`: Step 3a and the bug-mode note
+2. ✅ `skills/finalise/SKILL.md`: Step 3a, the bug-mode note and Step 7.2
 3. ✅ `shared/resources/finalise-dod-ac-prompt.md`: Step 1
 4. ✅ `shared/resources/finalise-dod-fix-evidence-prompt.md`: Step 1
 
+5. ✅ `shared/resources/pr-read.sh`: `PR_READ_HEAD_BRANCH` output (GitHub `headRefName`, Bitbucket `.source.branch.name`; best-effort, never fails the read)
+
 ### Files to Modify (Tests)
 
-5. ✅ `shared/resources/tests/resolve-pr-number.test.mjs` (new)
+6. ✅ `shared/resources/tests/resolve-pr-number.test.mjs` (new)
+7. ✅ `shared/resources/pr-read.test.sh`: three head-branch cases
 
 ### Files to Modify (Dependencies)
 
@@ -189,8 +197,8 @@ None.
 
 ### Files to Modify (Documentation)
 
-6. ✅ `CHANGELOG.md`: `[Unreleased]` entry
-7. ✅ Bundled copies under `skills/*/references/` (regenerated by `npm run bundle`, never edited by hand)
+8. ✅ `CHANGELOG.md`: `[Unreleased]` entry
+9. ✅ Bundled copies under `skills/*/references/` (regenerated by `npm run bundle`, never edited by hand)
 
 ### Files to Delete
 
@@ -204,7 +212,7 @@ None.
 
 - **Scope**: the resolver's rung order, the body-rung confirmation, the refusal
 - **Command**: `node --test shared/resources/tests/resolve-pr-number.test.mjs`
-- **Target**: each Phase 4 mutation goes red; baseline green under bash and zsh
+- **Target**: each Phase 4 mutation goes red; baseline green under every shell in `SHELLS` (bash in CI, which has no zsh; zsh where installed, verified locally)
 
 ### Integration Tests
 
@@ -228,7 +236,7 @@ Not applicable — one `gh` call per resolution, at most three.
 - [ ] `resolve-pr-number.sh` resolves through rungs 1–5 in order, and its executed test holds each rung (Phases 1, 3).
 - [ ] A body `PR #N` is used only when PR N's head branch is the current branch; an unconfirmed citation is refused — held by the test that cites another PR in the fixture document (Phases 1, 3).
 - [ ] With no source, the resolver exits 1 and prints no number (Phases 1, 3).
-- [ ] finalise Step 3a calls the resolver, and no finalise derivation site reads a body `PR #N` pattern — held by the presence pin (Phases 2, 3).
+- [ ] finalise Step 3a calls the resolver, Step 7.2 writes only the resolved number, and no finalise derivation site reads a body `PR #N` pattern — held by the presence pin (Phases 2, 3).
 
 ### Performance
 
@@ -300,6 +308,9 @@ None identified.
 | Date       | Version | Description                                | Author      |
 | ---------- | ------- | ------------------------------------------ | ----------- |
 | 2026-10-02 | 1.0     | Initial draft — cut from observation #184  | create-task |
+| 2026-10-12 | 1.1     | Review passed (8/10) — rung 2 reuses `pr-read.sh`; Step 7.2's body-to-frontmatter `pr_number` write added to scope; unsourced `PR_NUMBER_ARG` dropped; anchors corrected | review-task |
+| 2026-10-12 |         | Status → ready-for-development | review-task |
+| 2026-10-12 |         | Implemented — 1 new script, 1 new test file (16 cases), 5 sources edited; 7 mutations proved red | develop |
 
 <!-- change-log-end -->
 
@@ -309,26 +320,26 @@ None identified.
 
 ### Phase 1: The resolver
 
-- [ ] Rungs, refusal, platform arms
+- [x] Rungs, refusal, platform arms
 
 ### Phase 2: finalise uses it
 
-- [ ] Step 3a, bug-mode note, two prompts
+- [x] Step 3a, bug-mode note, two prompts
 
 ### Phase 3: Tests
 
-- [ ] Executed resolver test; presence pin
+- [x] Executed resolver test; presence pin
 
 ### Phase 4: Proof and gates
 
-- [ ] Mutation proofs; gates; CHANGELOG
+- [x] Mutation proofs; gates; CHANGELOG
 
 ---
 
 ## References
 
 - Observation #184 — finalise Step 3a PR_NUMBER falls back to the first 'PR #N' in the body — picks a cited PR, not the task's (recurrences: task.147, task.166)
-- `skills/finalise/SKILL.md` § Step 3a; `shared/resources/develop-pipeline-step-4-create-pr.md` § Post-PR Steps (the lock's `pr_url`)
+- `skills/finalise/SKILL.md` § Step 3a; `shared/resources/develop-pipeline-step-4-create-pr.md` § Post-PR Steps (the lock's `pr_url`); `shared/resources/pr-read.sh` (rung 2)
 
 ---
 
@@ -339,7 +350,7 @@ None identified.
 
 ---
 
-**Status:** Planned
+**Status:** Ready for Review
 
 **Next Steps**:
 
