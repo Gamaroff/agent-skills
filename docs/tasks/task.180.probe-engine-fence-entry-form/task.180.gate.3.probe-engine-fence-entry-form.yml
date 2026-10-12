@@ -1,0 +1,80 @@
+schema: 2
+task: 'task.180.probe-engine-fence-entry-form'
+task_title: 'security-probe: a fence: entry form for a fenced bash block in a step doc'
+gate: FAIL
+status_reason: 'Cycle 2''s fixes hold for the cases they named, but the cycle-3 safety re-probe reproduced a false engages through cycle 2''s own widening: shellDiagnostic now treats non-fatal shell errors that occur after a guard let a hostile input through (cd: too many arguments) as "the guard never answered". Third consecutive HIGH in the fence: scoring path.'
+reviewer: 'QA Engineer'
+head: 'fcbbe9d9c8e83931a93a5c4f51b5fac62c27105c'
+updated: '2026-10-12T14:35:38Z'
+
+top_issues:
+  - id: 'TASK-180-009'
+    severity: high
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'shellDiagnostic matches every "<script>: line N:" stderr line on a non-zero exit, including non-fatal errors bash reports after the guard has let the input through (cd: too many arguments, No such file or directory, command not found, [: too many arguments); scoreFenceRun checks it before expected, so a hostile case that got past the guard scores errored and drops out of the verdict. Reproduced by the reviewer: a guard that refuses absolute paths, then runs an unquoted cd on the input, with inputs "x y" and "nosuchdir" — both pass the guard, both score errored, verdict engages. Also format-keyed: bash "<script>: eval: line N:" and zsh "<script>:cd:N:" do not match. Code review CR-1 (high/high).'
+    suggested_action: 'Treat only diagnostics that stop the shell before any guard can answer (syntax error, unexpected EOF, parameter null or not set, unbound variable) as errored, or let a mismatched expected outrank any diagnostic; add the word-split cd case as a regression test.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-180-010'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'The expected.absent / fixture.files collision decline compares raw strings, so ./pwned or b/../pwned writes the absent file undetected and the hostile case scores accepted (a false reproduction); a case-only difference collides undetected on a case-insensitive filesystem. Code review CR-2 (medium/high), reproduced.'
+    suggested_action: 'Compare the first segment of the resolved, case-relative path for every fixture file; consider a case-folded comparison.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-180-011'
+    severity: low
+    file: 'shared/resources/probe-boundary-rule.md'
+    finding: 'The fence: docs say a write outside the case directory is an escape, but the case directory sits under the work dir, which the sentinel skips: an input writing ../pwned or into .probe-harness/ is not recorded. Code review CR-3 (low/high), reproduced.'
+    suggested_action: 'Snapshot the work dir minus the current case dir around each fence: spawn, or correct the docs.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 5399
+  phases_verified: 3/3
+  ci: 'not read this cycle (CI is gated at /finalise)'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 26
+    notes: 'task.180.qa.3.security.run.json: both controls engages, 0 reproduced. CONCERNS for TASK-180-009 (false engages path) and -010.'
+  performance:
+    status: PASS
+    notes: 'ci:fast 5385/0 at fcbbe9d9.'
+  reliability:
+    status: PASS
+    notes: 'Cycle 2 reliability findings (slot on decline, CRLF) fixed and mutation-proven.'
+  maintainability:
+    status: PASS
+    notes: 'Scoring order now stated once (scoreFenceRun).'
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 0
+  fix_date: '2026-10-12'
+  total_iterations: 2
+  verification_method: 'Regression tests + mutation proofs G1-G5 + ci:fast'
+
+recommendations:
+  immediate:
+    - action: 'Human decision on the fence: verdict model before another fix cycle: exit-status scoring of a source-substituted block has produced a HIGH in each of three cycles. Options: require expected on hostile fence: cases (a guard''s refusal stated, not inferred), or narrow errored to fatal parse/expansion diagnostics only.'
+      refs: ['shared/resources/security-probe.mjs']
+  future:
+    - action: 'CR-5 (cycle 2, pre-existing class): a command backgrounded past the spawn outlives the case — the shell family''s stated limit.'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []
