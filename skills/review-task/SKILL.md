@@ -104,10 +104,19 @@ fi
 **On the Jira-key branch**, run [§0a Key → document lookup](references/develop-pipeline-step-0-resolve-and-prepare.md#key--document-lookup)
 with the `KEY_FIELD` / `KEY_VALUE` bound above. It binds `LOCAL_PATH`, and it HALTs (exit 1) on a
 missing `docs/` and on several matching documents. Cited, not restated: one anchored, quote-tolerant
-lookup serves the develop pipelines, `/review-pr` and this skill. Then check its result is a task:
+lookup serves the develop pipelines, `/review-pr` and this skill. Then check its result is a task.
+
+**Run the three as one script, in one shell** — the block above, the §0a block, then the block
+below. Each reads what the one before it binds (`KEY_FIELD` / `KEY_VALUE`, then `LOCAL_PATH`), and a
+fresh shell between them loses it. The check refuses to run on an unbound `JIRA_KEY` or `LOCAL_PATH`
+rather than reading the empty value as "no document":
 
 ```bash
-# After §0a, on the Jira-key branch only. LOCAL_PATH is §0a's answer, JIRA_KEY the key bound above.
+# After §0a, on the Jira-key branch only, in the SAME shell as the bind block and §0a.
+# LOCAL_PATH is §0a's answer ("" when it found none), JIRA_KEY the key the bind block set.
+: "${JIRA_KEY:?run this check in the same shell as the bind block and §0a — JIRA_KEY is unbound}"
+[ "${LOCAL_PATH+set}" = set ] \
+  || { echo "HALT: LOCAL_PATH is unbound — run §0a's block in this shell first"; exit 1; }
 if [ -z "$LOCAL_PATH" ]; then
   echo "No local document found for Jira key ${JIRA_KEY}. Run /create-task first, or provide the file path directly."
   exit 1

@@ -1,0 +1,78 @@
+schema: 2
+task: 'task.178.review-skills-cite-key-lookup'
+task_title: 'review-task and review-story cite the §0a key lookup'
+gate: CONCERNS
+status_reason: 'Citations, bundle and guard are correct and mutation-proven, but review-task''s Jira-key branch is split across three fenced blocks that only work in one shell and never say so (CR-1, medium); the guard misses non-adjacent r/l flag spellings (CR-2, low).'
+reviewer: 'QA Engineer'
+head: 'b81c09506b5406ec590a9feb4927fd5dd0e62eac'
+updated: '2026-10-12T07:04:14Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'skills/review-task/SKILL.md'
+    finding: 'The Jira-key branch is three fenced blocks (bind, cited §0a, task-only check) that each read what another binds; run as separate shells, §0a fails on KEY_FIELD:? and the check reports "No local document found for Jira key ." even when the key resolves. The test joins all three into one script, so it cannot see this.'
+    suggested_action: 'State that the three blocks run as one shell (bind, §0a, check), make the check block fail loudly when JIRA_KEY or LOCAL_PATH is unbound, and add a test that runs the check block alone and asserts the loud failure.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-2'
+    severity: low
+    file: 'tests/key-lookup-single-statement.test.js'
+    finding: 'The guard key matches r and l only when adjacent in one flag cluster, so grep -ril, grep -rEl, grep -r -l and grep --recursive -l restate the lookup undetected; the header claims "in either order".'
+    suggested_action: 'Parse the grep flag tokens: a recursive flag (cluster with r/R, or --recursive) plus a lowercase-l cluster (or --files-with-matches), and add the four spellings to the restatement test.'
+    suggested_owner: dev
+    status: open
+  - id: 'BND-1'
+    severity: low
+    file: 'skills/review-task/SKILL.md'
+    finding: 'boundary: true — the Jira-key task-only check (a case allow-list over a repository-state path) has no security-probe entry form, so probes_executed is 0; the fixture test executes it, but by-hand runs do not count.'
+    suggested_action: 'Probe it with task.180''s fence: entry form once that lands; until then /finalise records a zero-guard override citing task.180.'
+    suggested_owner: dev
+    status: deferred
+    deferred_to: 'task.180'
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 10
+  phases_verified: 3/3
+  ci: 'not read — CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No new input surface: JIRA_KEY is validated by the unchanged ^[A-Z]+-[0-9]+$ check before it reaches §0a. The task-only check is a routing refusal (boundary: true, no engine form — BND-1, deferred to task.180).'
+  performance:
+    status: PASS
+    notes: 'One lookup replaces one lookup; the guard scans ~800 tracked files in ~50 ms.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1 — the cross-block binding fails silently-wrong when the blocks run as separate shells.'
+  maintainability:
+    status: PASS
+    notes: 'Three restatements replaced by citations; guard + fixture test keep it that way; bundle closure +1 per skill.'
+
+recommendations:
+  immediate:
+    - action: 'CR-1: make the Jira-key branch one-shell and loud on unbound inputs.'
+      refs: ['skills/review-task/SKILL.md', 'tests/key-lookup-single-statement.test.js']
+  future:
+    - action: 'CR-2: widen the guard key to non-adjacent r/l flag spellings.'
+      refs: ['tests/key-lookup-single-statement.test.js']
+    - action: 'CR-3 (cleanup): delete the mkdtemp fixtures after each test.'
+      refs: ['tests/key-lookup-single-statement.test.js']
+    - action: 'BND-1: probe the task-only check through task.180''s fence: entry form.'
+      refs: ['skills/review-task/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 fixed']

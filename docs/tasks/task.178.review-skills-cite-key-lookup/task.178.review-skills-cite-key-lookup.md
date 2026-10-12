@@ -92,16 +92,19 @@ document today (`ls … | grep -c develop-pipeline-step-0` → 0).
 - review-task's line-99 block keeps its task-only constraint (a `task.{N}` document) as a check on the
   lookup's result, never as a second grep.
 - A guard test fails on any recursive files-with-matches grep over the key in a canonical source
-  outside the allowlisted §0a history note. Its key is the compound, case-sensitive pattern
-  `grep +(-[A-Za-z]+ +)*-[A-Za-z]*(rl|lr)[A-Za-z]* +.*(jira_key|github_issue):` — tolerant of quote
-  style and flag order. Measured 2026-10-12 with
-  `git grep -n -E '<that pattern>' -- 'skills/*/SKILL.md' 'shared/resources/*.md' 'shared/resources/*.sh' 'skills/*/scripts/*'`
-  it returns 4 lines: the three sites and the §0a history note. It deliberately does **not** match
+  outside the allowlisted §0a history note. Its key is compound and read off the grep's own flag
+  tokens: a recursive flag (a short cluster holding `r`/`R`, or `--recursive`) and a files-with-matches
+  flag (a short cluster holding a lowercase `l`, or `--files-with-matches`), in any order and in one
+  cluster or several (`-rl`, `-ril`, `-rEl`, `-r -l`), over `jira_key:` / `github_issue:` in any quote
+  style (QA cycle 1, CR-2 widened it from an adjacent-`rl` regex). On the 2026-10-12 population
+  (`skills/*/SKILL.md`, `shared/resources/*.md|*.sh`, `skills/*/scripts/*`) it matched 4 lines before
+  this task: the three sites and the §0a history note. It deliberately does **not** match
   `sync-github-bug/SKILL.md:58` / `sync-jira-bug/SKILL.md:105`, which run `grep -rL` (files *without*
   a key — a different rule); the lowercase `l` is what separates them. It carries a non-vacuity floor:
   the §0a block must still match its own anchored pattern.
-- review-task's Jira-key branch stays a **fenced block** (the §0a binding plus the task-only check), so a
-  test can extract and execute it.
+- review-task's Jira-key branch stays in **fenced blocks** (the binding, then the task-only check, around
+  the cited §0a block), which the skill says to run as one script in one shell; the check refuses its
+  unbound inputs when run alone (QA cycle 1, CR-1). A test extracts and executes them.
 
 ### Important Clarifications
 
@@ -295,6 +298,29 @@ accurate.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-12
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.178.qa.1.review-skills-cite-key-lookup.md](./task.178.qa.1.review-skills-cite-key-lookup.md)
+- **Gate File**: [task.178.gate.1.review-skills-cite-key-lookup.yml](./task.178.gate.1.review-skills-cite-key-lookup.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 10 (new file) + 5374 (fast gate)
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+- CR-1 (medium): review-task's Jira-key branch works only when its three blocks run as one shell, and does not say so.
+- CR-2 (low): the guard key misses non-adjacent `r` / `l` flag spellings.
+- BND-1 (low, deferred to task.180): the task-only check is a boundary with no probe entry form yet.
+
 <!-- change-log-start -->
 
 ## Change Log
@@ -305,6 +331,8 @@ accurate.
 | 2026-10-12 | 1.1     | Review passed (8/10) — guard key widened to a quote- and flag-order-tolerant compound pattern with the `grep -rL` exclusion pinned; executed fixture test named for the Jira-key criterion; tracked shell added to the guard population | review-task |
 | 2026-10-12 |         | Status → ready-for-development | review-task |
 | 2026-10-12 |         | Implemented — 4 files changed, 1 test file (10 tests), 2 bundled copies | develop |
+| 2026-10-12 |         | QA gate CONCERNS (90/100) — 3 findings (1 medium, 2 low; 1 deferred) | qa-task |
+| 2026-10-12 |         | QA findings fixed — cycle 1, 2 findings + 1 cleanup (one-shell Jira-key branch, flag-token guard key, fixture cleanup) | qa-fix |
 
 <!-- change-log-end -->
 

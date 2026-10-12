@@ -45,7 +45,7 @@ Confirm the copy is the step-0 document alone, which is what the citation rule p
 
 - Population: every `skills/*/SKILL.md`, every `shared/resources/*.md`, and every hand-authored
   `skills/*/references/*.md` (drop files carrying the AUTO-GENERATED marker).
-- Fail on the compound key `/grep +(-[A-Za-z]+ +)*-[A-Za-z]*(rl|lr)[A-Za-z]* +.*(jira_key|github_issue):/`
+- Fail on the compound key — a recursive flag plus a lowercase-`l` files-with-matches flag, read off the grep's flag tokens (QA cycle 1, CR-2; the test's `isKeyLookup`)
   (quote- and flag-order-tolerant; review 1, I1). Pin that it does not match the `grep -rL` sites in
   `sync-github-bug` / `sync-jira-bug` — files *without* a key, a different rule. Population also takes
   tracked shell under `shared/resources/` and `skills/*/scripts/`. Allowlist exactly one entry — the §0a history note
