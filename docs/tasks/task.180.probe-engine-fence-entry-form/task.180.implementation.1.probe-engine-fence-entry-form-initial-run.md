@@ -36,7 +36,7 @@ Add the `fence:<doc>#<heading>` entry form (with `--slot` and an optional per-ca
 | 2. review-task             | ✅ Done    | `task.180.review.{N}.{name}.md` exists (or skip logged)               | review.1 — 8/10 after fixes, READY; Planned → Ready for Development | — | 2026-10-12T13:16Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan + map); 2 iterations of the fast gate — iter 1: 2 lint failures in new prose, fixed; iter 2: 5377 pass, 0 fail | — | 2026-10-12T13:46Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #637: https://github.com/Gamaroff/agent-skills/pull/637 | — | 2026-10-12T13:48Z |
-| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention — QA loop not converging (HIGH 1, 1, 1; gate 3 FAIL) | `task.180.qa.{N}.*.md`; `task.180.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention — QA loop not converging (HIGH 1, 1, 1, 1; gate 4 FAIL) | `task.180.qa.{N}.*.md`; `task.180.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.180.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
@@ -113,6 +113,13 @@ Add the `fence:<doc>#<heading>` entry form (with `--slot` and an optional per-ca
 - Pre-strike shape named at cycle 2: both HIGHs sit in runFenceCase's outcome scoring (a mechanism this branch created). Move taken early: **replace** the branch chain with one ordered scorer, rather than a third patch.
 - Post-fix PR state check done inline (`gh pr view` → OPEN @ bdbedcdf) rather than through the poller subagent.
 - QA Cycle 3 — safety re-probe (reviewer 252.5 s); gate FAIL 70. Convergence check (awk count over gates 1–3): HIGH 1, 1, 1 → trips at cycle 3. 5b not run.
+- QA loop re-entry: 2 extra cycles granted; 0 cycle(s) run outside the loop back-filled from disk (gates 1–3 on disk, 3 `### QA Cycle` entries). `qa_max_cycles` = 5.
+- Re-entry phase corrected 5a → 5b by hand (`set-qa-phase.sh 5b`): `grant-qa-cycles.sh` compares `halt_reason` to exactly `not-converging`. This snapshot's reason has detail appended, so the script printed `reenter_at=5a`. Gate 3's fix never ran, so the resume contract's re-entry point is 5b. Logged as observation #17.
+- QA Cycle 3 (resumed at 5b) — changes-requested: stage-disabled. Narrowing offer: false (high-findings-remain).
+- Third strike: `shared/resources/security-probe.mjs` carries a HIGH in gates 1, 2 and 3. Struck mechanism, read from TASK-180-001/-009 (and the gate-2 widening TASK-180-005): **classifying a non-zero fence exit as errored by pattern-matching shell stderr** (`isShellParseFailure` → `shellDiagnostic`, read by `scoreFenceRun`). Passed to `/qa-fix` as delete / replace / waive only.
+- qa-fix cycle 3: findings read inline. No ingester subagent: the gate has 3 findings, and `pr-review-current` → none. Gate 3's `recommendations.immediate` asked for a human decision on the verdict model. User chose **replace**: `<shell> -n` parse check plus a required `expected` on hostile `fence:` cases (AskUserQuestion, 2026-10-12).
+- qa-fix cycle 3 premise check: `bash -n` (GNU bash 5.3.15) executed nothing (`touch` not run). It exit 2 on `X="a"b"` and exit 0 on `${x:?boom}`. zsh is not installed on this host, so `zsh -f -n` is **unverified** locally.
+- qa-fix cycle 3: fast gate `ci:fast` with the `.agents/skills` symlink moved aside: 5402 tests, 5388 pass, 0 fail. `bundle:check` 0 problems. Five mutations each went red: decline removed, stderr rule re-added, parse check removed, raw collision compare, work-dir watch removed.
 
 ---
 
@@ -160,6 +167,9 @@ _Track each QA review/fix cycle._
 **PR Review**: not reached — gate did not exit the loop
 **Loop exit**: n/a — this exit not taken
 **Action**: Escalating — loop not converging
+**Re-entry**: 2 extra cycles granted (`qa_max_cycles` 5), re-entered at 5b on gate 3
+**Fixes Applied**: third strike, move **replace** (user's choice). The stderr classifier (`shellDiagnostic`) is deleted. `parseCheck` (`<shell> -n`) decides errored. A hostile `fence:` case with no `expected` is declined. Also -010 (normalised, case-folded collision) and -011 (work-dir writes are escapes). 5 mutations red. `ci:fast` 5402 tests, 5388 pass, 0 fail. Doc population 7: 6 updated, 1 unaffected. PR comment and issue comment (`qa-fix-3`) posted.
+**Commit**: `1a31af72`
 
 ### QA Loop Not Converging — 2026-10-12
 
@@ -187,14 +197,51 @@ they are handed over below.
 2. Then re-run /develop-task (Phase 0b offers "Resume at 5a with {k} more cycles"); fix TASK-180-010/011 in the same pass.
 3. The task.167 proof (13 cases, engages, the 4-case over-block discrimination) holds at every cycle and is unaffected by either option.
 
+
+### QA Cycle 4 — 2026-10-12
+**Gate Result**: FAIL
+**Issues Found**: 3. TASK-180-012 (HIGH): the required hostile `expected` accepts `{exit: 1}` alone, so `${x:?}` or an injected exit passes for a refusal and an accept-all block reads engages. TASK-180-013 (MEDIUM): the work-dir watch misses deletions (the gh trip-wire) and empty directories. TASK-180-014 (LOW): Success Criterion 1 is stale. CR-3 (no GIT_CEILING_DIRECTORIES) is pre-existing and goes to future.
+**HIGH findings**: 1
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Escalating — loop not converging
+
+### QA Loop Not Converging (cycle 4) — 2026-10-12
+
+The pipeline stopped after 4 qa-task/qa-fix cycles, the 4th run on a 2-cycle grant. The HIGH finding
+count failed to strictly decrease across two consecutive cycles, so the loop was no longer
+converging. The remaining findings are NOT accepted. They are handed over below. One granted cycle
+is unused.
+
+**Final gate status**: FAIL (70/100), gate 4
+**HIGH findings per cycle**: 1, 1, 1, 1 (flat from cycle 1 onward)
+**Remaining issues** (from gate 4):
+- TASK-180-012, high, `shared/resources/security-probe.mjs`: an exit-only `expected` on a hostile fence: case passes for a refusal (bug 6).
+- TASK-180-013, medium, `shared/resources/security-probe.mjs`: the work-dir watch misses deletions and empty directories (bug 7).
+- TASK-180-014, low, the task doc: Success Criterion 1 restates the old exit-status rule.
+
+**What was attempted per cycle**:
+- Cycle 1: parse failures scored errored; control key; empty --slot (`bdbedcdf`).
+- Cycle 2: one ordered scoreFenceRun; widened shellDiagnostic; collision decline; slot on decline; CRLF (`fcbbe9d9`).
+- Cycle 3, after the grant: third-strike replace, chosen by the user. The stderr classifier was deleted, a `<shell> -n` parse check added, and `expected` made required on hostile cases. Collision normalised; work-dir watch added (`1a31af72`).
+- Cycle 4: not fixed. The convergence check tripped.
+
+**Likely root cause**: each cycle's HIGH is a different hole, but all of them are the same question: what tells a guard that refused apart from a block that did not answer? Cycle 3 moved that judgement to the case author through `expected`. The engine accepts any `expected`, though, including one (`{exit: 1}`) that cannot make the distinction either. The fix the gate names is a one-rule tightening (a hostile `expected` must carry non-empty stdout or stderr). That is a refinement of the user-chosen model, not a fifth mechanism. It does make a silent guard (exit 1, no output) unprobeable by design.
+
+**Recommended next steps**:
+1. Apply TASK-180-012 as the gate states: decline a hostile fence: case whose `expected` has no non-empty stdout or stderr. Update ADMIT_CASES and the Admit fixture block to print a refusal. Then use the 1 remaining granted cycle (re-run /develop-task; Phase 0b offers "Resume at 5a with {k} more cycles").
+2. Fix TASK-180-013 in the same pass: compare the snapshots both ways and include directories.
+3. Reword Success Criterion 1 to cite `scoreFenceRun` (TASK-180-014). CR-3 (GIT_CEILING_DIRECTORIES) is a separate follow-up for every shell-family form.
+
 ---
 
 ## Completion
 
 **Finished**: {populated at end}
-**Final Status**: Escalated — QA loop not converging at cycle 3
+**Final Status**: Escalated — QA loop not converging at cycle 4 (after a 2-cycle grant)
 **Branch**: feature/task.180.probe-engine-fence-entry-form
 **PR**: https://github.com/Gamaroff/agent-skills/pull/637
-**QA Iterations**: 3 (2 fix cycles)
+**QA Iterations**: 4 (3 fix cycles)
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}

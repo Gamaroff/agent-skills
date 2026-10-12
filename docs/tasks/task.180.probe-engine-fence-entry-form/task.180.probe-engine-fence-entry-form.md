@@ -5,7 +5,7 @@ type: task
 description: "Add a `fence:<doc>#<heading>` entry form to shared/resources/security-probe.mjs that extracts the first bash block under a heading on every run, substitutes the case's input into a named placeholder, applies an optional per-case env and fixture files, and scores a hostile case against its stated refusal (`expected`) and a legitimate one by exit status. A boundary shipped as a fenced block in a step doc is then probed by the engine instead of through a hand-written wrapper."
 tags: [security-probe, finalise, qa-task, qa-story, review-security, observation]
 category: infrastructure
-status: ready-for-review
+status: in-progress
 priority: Medium
 created: 2026-10-03
 updated: 2026-10-12
@@ -16,7 +16,7 @@ github_issue: 560
 
 # Technical Task: security-probe — a `fence:` entry form
 
-**Status:** Ready for Review
+**Status:** In Progress
 
 **Review**: ✅ All review recommendations from `task.180.review.1.probe-engine-fence-entry-form.md` implemented 2026-10-12
 
@@ -315,20 +315,20 @@ None.
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.180.qa.3.probe-engine-fence-entry-form.md](./task.180.qa.3.probe-engine-fence-entry-form.md)
-- **Gate File**: [task.180.gate.3.probe-engine-fence-entry-form.yml](./task.180.gate.3.probe-engine-fence-entry-form.yml)
+- **Full Report**: [task.180.qa.4.probe-engine-fence-entry-form.md](./task.180.qa.4.probe-engine-fence-entry-form.md)
+- **Gate File**: [task.180.gate.4.probe-engine-fence-entry-form.yml](./task.180.gate.4.probe-engine-fence-entry-form.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5399
+- **Tests Executed**: 5402
 - **Phases Verified**: 3/3
 - **Critical Issues**: 1
 - **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-- HIGH (TASK-180-009): cycle 2's widened shell-diagnostic rule treats non-fatal errors after a guard as "the guard never answered" — a false `engages` on the unquoted word-split shape.
-- MEDIUM (TASK-180-010): the collision decline compares raw paths (`./pwned`).
-- LOW (TASK-180-011): writes beside the case directory are not observed, though documented as escapes.
-- HIGH findings per cycle: 1, 1, 1 — the QA loop's convergence check tripped; escalated for a design decision on the `fence:` verdict model.
+- HIGH (TASK-180-012): the hostile-case `expected` requirement accepts an exit code alone. A shell that stopped, or an injected `exit 1`, matches it, so an accept-all block reads `engages`.
+- MEDIUM (TASK-180-013): the work-dir watch misses deletions (the gh trip-wire) and empty directories.
+- LOW (TASK-180-014): Success Criterion 1 restates the old exit-status rule.
+- HIGH findings per cycle: 1, 1, 1, 1. The cycle-3 fixes themselves hold (4 mutations covered).
 
 <!-- change-log-start -->
 ## Change Log
@@ -345,6 +345,7 @@ None.
 | 2026-10-12 |         | QA findings fixed — cycle 2, 5 findings (TASK-180-004..008): scoring replaced by one ordered scoreFenceRun; collision decline; slot on decline; CRLF | qa-fix |
 | 2026-10-12 |         | QA gate FAIL (70/100) — cycle 3 safety re-probe, 3 findings: 1 high, 1 medium, 1 low | qa-task |
 | 2026-10-12 |         | QA findings fixed — cycle 3, 3 findings (TASK-180-009..011): third strike — stderr classifier replaced by a `-n` parse check and a required `expected` on hostile cases; collision decline normalised; work-dir writes watched | qa-fix |
+| 2026-10-12 |         | QA gate FAIL (70/100) — cycle 4 safety re-probe, 3 findings: 1 high, 1 medium, 1 low | qa-task |
 <!-- change-log-end -->
 
 ---
