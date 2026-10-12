@@ -4,7 +4,7 @@
 **Bug ID**: TASK-180-BUG-6
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 4 safety re-probe, code review CR-1 / TASK-180-012)
 **Date Found**: 2026-10-12
 
@@ -56,3 +56,4 @@ For a hostile `fence:` case, require a non-empty `stdout` or `stderr` in `expect
 | ---------- | ------ | ----------- | ----- |
 | 2026-10-12 | New          | QA Engineer | QA cycle 4 — reproduced on 1a31af72 |
 | 2026-10-12 | Ready for QA | qa-fix      | Hostile `expected` must state a non-empty stdout or stderr; mutation-proven |
+| 2026-10-12 | Closed       | QA Engineer | QA cycle 5 — verified on f21c0552; regression test and 2 QA mutations red |

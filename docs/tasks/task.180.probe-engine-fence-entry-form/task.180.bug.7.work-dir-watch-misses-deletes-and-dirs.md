@@ -4,7 +4,7 @@
 **Bug ID**: TASK-180-BUG-7
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 4 safety re-probe, code review CR-2 / TASK-180-013)
 **Date Found**: 2026-10-12
 
@@ -47,3 +47,4 @@ Compare the two snapshots both ways (a path present before and absent after is a
 | ---------- | ------ | ----------- | ----- |
 | 2026-10-12 | New          | QA Engineer | QA cycle 4 — reproduced on 1a31af72 |
 | 2026-10-12 | Ready for QA | qa-fix      | Watch compares both ways, directories included; mutation-proven |
+| 2026-10-12 | Closed       | QA Engineer | QA cycle 5 — verified on f21c0552; regression test and 2 QA mutations red |

@@ -36,7 +36,7 @@ Add the `fence:<doc>#<heading>` entry form (with `--slot` and an optional per-ca
 | 2. review-task             | ✅ Done    | `task.180.review.{N}.{name}.md` exists (or skip logged)               | review.1 — 8/10 after fixes, READY; Planned → Ready for Development | — | 2026-10-12T13:16Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan + map); 2 iterations of the fast gate — iter 1: 2 lint failures in new prose, fixed; iter 2: 5377 pass, 0 fail | — | 2026-10-12T13:46Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #637: https://github.com/Gamaroff/agent-skills/pull/637 | — | 2026-10-12T13:48Z |
-| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention — QA loop not converging (HIGH 1, 1, 1, 1; gate 4 FAIL) | `task.180.qa.{N}.*.md`; `task.180.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention — QA loop not converging (HIGH 1, 1, 1, 1, 1; gate 5 FAIL; budget spent) | `task.180.qa.{N}.*.md`; `task.180.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.180.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
@@ -120,6 +120,12 @@ Add the `fence:<doc>#<heading>` entry form (with `--slot` and an optional per-ca
 - qa-fix cycle 3: findings read inline. No ingester subagent: the gate has 3 findings, and `pr-review-current` → none. Gate 3's `recommendations.immediate` asked for a human decision on the verdict model. User chose **replace**: `<shell> -n` parse check plus a required `expected` on hostile `fence:` cases (AskUserQuestion, 2026-10-12).
 - qa-fix cycle 3 premise check: `bash -n` (GNU bash 5.3.15) executed nothing (`touch` not run). It exit 2 on `X="a"b"` and exit 0 on `${x:?boom}`. zsh is not installed on this host, so `zsh -f -n` is **unverified** locally.
 - qa-fix cycle 3: fast gate `ci:fast` with the `.agents/skills` symlink moved aside: 5402 tests, 5388 pass, 0 fail. `bundle:check` 0 problems. Five mutations each went red: decline removed, stderr rule re-added, parse check removed, raw collision compare, work-dir watch removed.
+- QA loop re-entry (cycle 4 escalation): 1 extra cycle granted (user's choice); 0 cycle(s) run outside the loop back-filled from disk (gates 1–4 on disk, 4 `### QA Cycle` entries). `qa_max_cycles` = 5 (unchanged — the script never lowers it).
+- Re-entry phase corrected 5a → 5b by hand again (`set-qa-phase.sh 5b`): same cause as at cycle 3 (observation #17 — `halt_reason` carries appended detail). Gate 4's fix never ran, so 5b fixes gate 4 and the granted cycle is QA cycle 5.
+- QA Cycle 4 (resumed at 5b) — changes-requested: stage-disabled. Narrowing offer: false (high-findings-remain).
+- Fourth strike on `shared/resources/security-probe.mjs` (gates 2, 3, 4). Struck mechanism: inferring a guard's refusal from a fence run's exit status. User's instruction for this cycle: **apply the gate's one-rule tightening** of the cycle-3 replace model — a hostile `fence:` case's `expected` must carry a non-empty stdout or stderr, else declined (TASK-180-012) — and fix TASK-180-013 and -014 in the same pass. Recorded as a refinement of the user-chosen model, not a fifth mechanism.
+- qa-fix cycle 4: findings read inline (3 findings; `pr-review-current` → none). Post-fix PR state check inline (`gh pr view` → OPEN @ f21c0552). Counter 4 < `qa_max_cycles` 5 → QA cycle 5, the granted cycle. Traceability mapper skipped: HAS_SUCCESS_CRITERIA_TABLE=false.
+- QA Cycle 5 — safety re-probe (clause 2: gate 4 HIGH on a boundary), reviewer 273.2 s; gate FAIL 70. CR-1 kept at the reviewer's HIGH although measured plausibility is 0 shipped docs: the author of the fixes does not re-rate the finding that decides the last cycle. Convergence check (gates 3–5): HIGH 1, 1, 1 → trips; budget also spent (cycle 5 of 5). 5b not run.
 
 ---
 
@@ -128,6 +134,8 @@ Add the `fence:<doc>#<heading>` entry form (with `--slot` and an optional per-ca
 _Problems encountered and how they were resolved or escalated._
 - **QA cycle 3 gate heredoc was unquoted**: backticks in the finding text ran as command substitutions (only "command not found" — no side effects) and truncated one finding; repaired from the reviewer's text before commit.
 - **QA loop not converging (cycle 3)** — escalated; see QA Iteration History § QA Loop Not Converging.
+- **QA loop not converging (cycle 5)** — escalated after the 1-cycle grant; see QA Iteration History § QA Loop Not Converging (cycle 5).
+- **qa-fix cycle 4 fast gate attempt 1 red**: `bundle --check` found a stale bundled `probe-boundary-rule.md` (edited after `npm run bundle`). Rebundled; attempt 2 green.
 
 - **Fast gate iter 1 — 2 failures (triaged real by an Explore subagent):** (1) `probes-executed-population` lint — the new `fence:` paragraph in `probe-boundary-rule.md` named a `probes_executed` count with no run record nearby; reworded to "probed zero times by the engine". (2) `bundle-comment-origin` lint — the new `routingBlocks()` JSDoc carried a comment-only `shared/resources/<file>.md` reference; reworded. A first draft of that JSDoc also wrote `skills/*/SKILL.md`, whose `*/` closed the comment (prettier caught it). Iter 2: 5377 pass, 0 fail.
 
@@ -206,6 +214,9 @@ they are handed over below.
 **PR Review**: not reached — gate did not exit the loop
 **Loop exit**: n/a — this exit not taken
 **Action**: Escalating — loop not converging
+**Re-entry**: 1 extra cycle granted (`qa_max_cycles` 5), re-entered at 5b on gate 4
+**Fixes Applied**: fourth strike, move **replace (refinement, user-chosen)**: a hostile `fence:` case whose `expected` has no non-blank stdout or stderr is declined by name, never scored (TASK-180-012). Work-dir watch lists directories and compares both ways (TASK-180-013). SC1 cites `scoreFenceRun` (TASK-180-014). 3 mutations red. `ci:fast` attempt 1 red (stale bundled `probe-boundary-rule.md`, edited after the bundle), attempt 2 green: 5404 tests, 5390 pass, 0 fail. Doc population 5 + CHANGELOG + task doc, all updated. PR comment and issue comment (`qa-fix-4`) posted.
+**Commit**: `f21c0552`
 
 ### QA Loop Not Converging (cycle 4) — 2026-10-12
 
@@ -234,14 +245,50 @@ is unused.
 2. Fix TASK-180-013 in the same pass: compare the snapshots both ways and include directories.
 3. Reword Success Criterion 1 to cite `scoreFenceRun` (TASK-180-014). CR-3 (GIT_CEILING_DIRECTORIES) is a separate follow-up for every shell-family form.
 
+
+### QA Cycle 5 — 2026-10-12
+**Gate Result**: FAIL
+**Issues Found**: 3. TASK-180-015 (HIGH): `fence:` skips the pre-spawn `gh` text check, so a block that resolves `gh` to a path runs the host binary and is scored. TASK-180-016 (MEDIUM): a substituted `$(…)` that writes to an absolute path outside the sandbox is unseen. CR-3 (LOW, advisory): a short slot rewrites guard code. The cycle-4 fixes hold: TASK-180-012, -013 and -014 fixed; bugs 6 and 7 closed; 4 QA mutations covered.
+**HIGH findings**: 1
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Escalating — loop not converging
+
+### QA Loop Not Converging (cycle 5) — 2026-10-12
+
+The pipeline stopped after 5 qa-task/qa-fix cycles: the HIGH finding count failed to strictly
+decrease across two consecutive cycles, so the loop was no longer converging. The remaining findings
+are NOT accepted — they are handed over below. The QA budget (`qa_max_cycles` 5) is also spent.
+
+**Final gate status**: FAIL (70/100), gate 5
+**HIGH findings per cycle**: 1, 1, 1, 1, 1 (flat from cycle 1 onward)
+**Remaining issues** (from gate 5):
+- TASK-180-015, high, `shared/resources/security-probe.mjs`: `fence:` skips the `namesGh` pre-spawn check; a path-resolved `gh` (`type -ap gh`) runs the host binary and the run is scored (bug 8). Measured plausibility: 0 shipped docs resolve `gh` to a path. Severity kept as the reviewer returned it.
+- TASK-180-016, medium, `shared/resources/security-probe.mjs`: an injected `$(…)` that writes outside the sandbox is unseen, contrary to probe-boundary-rule.md §5 (bug 9).
+
+**What was attempted per cycle**:
+- Cycle 1: parse failures scored errored; control key; empty --slot (`bdbedcdf`).
+- Cycle 2: one ordered scoreFenceRun; widened shellDiagnostic; collision decline; slot on decline; CRLF (`fcbbe9d9`).
+- Cycle 3: third-strike replace, chosen by the user: `<shell> -n` parse check, required hostile `expected`, normalised collision, work-dir watch (`1a31af72`).
+- Cycle 4: the user's one-rule tightening: a hostile `expected` must state a non-empty stdout or stderr; the watch compares both ways with directories; SC1 cites `scoreFenceRun` (`f21c0552`).
+- Cycle 5: not fixed. The convergence check tripped and the budget is spent.
+
+**Likely root cause**: the scoring mechanism has stopped producing findings. Cycles 1–4 circled how a refusal is scored, and that question closed at cycle 4: the cycle-4 fixes hold. Cycle 5's HIGH is a different mechanism in the same file: sandbox containment of what a source-substituted block can reach (the host `gh`, an absolute path). `fence:` runs its input as script source, which no other entry form does. So each safety re-probe of the whole surface finds the next containment gap the shell forms never had to close. The HIGH count stays flat because each cycle's re-probe finds a new gap, not because fixes are failing.
+
+**Recommended next steps**:
+1. Fix TASK-180-015 as the gate states: run `GH_COMMAND_WORD` / `GH_VARIABLE` over the extracted block text when `fakeGhDir` is null, and add a `type -ap gh` regression test. It is a small, contained change.
+2. Fix TASK-180-016 by stating the limit: an absolute-path write outside the sandbox is not observed under `fence:`. Put it in the engine header and probe-boundary-rule.md §5, in place of "a write anywhere else is an escape".
+3. Then grant one more cycle (re-run /develop-task; Phase 0b offers "Resume at 5a with {k} more cycles"). Or, if the containment limits are judged acceptable, waive TASK-180-015 with its measured plausibility (0 shipped docs) and proceed to /finalise.
+
 ---
 
 ## Completion
 
 **Finished**: {populated at end}
-**Final Status**: Escalated — QA loop not converging at cycle 4 (after a 2-cycle grant)
+**Final Status**: Escalated — QA loop not converging at cycle 5 (after grants of 2 and 1 cycles; budget spent)
 **Branch**: feature/task.180.probe-engine-fence-entry-form
 **PR**: https://github.com/Gamaroff/agent-skills/pull/637
-**QA Iterations**: 4 (3 fix cycles)
+**QA Iterations**: 5 (4 fix cycles)
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
