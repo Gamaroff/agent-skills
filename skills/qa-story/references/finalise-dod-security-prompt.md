@@ -255,7 +255,8 @@ node PROMPT_DIR/security-probe.mjs \
 # doc on every run, takes the first ```bash block under the heading, replaces
 # every --slot token with each case's input (as SOURCE — a $(…) in it runs, in
 # the case's own directory), and runs it under bash and zsh. Every hostile case
-# carries `expected` — the guard's own refusal — or is declined; a legitimate
+# carries `expected` with the guard's own refusal OUTPUT (a non-empty stdout or
+# stderr; an exit code alone is declined) — or is declined; a legitimate
 # case is scored by exit status (order: scoreFenceRun). What the block reads besides the slot — env, files such as a
 # package.json — comes from each case's `fixture: {env, files}`. Name a cases
 # file; the record's entry resolves in every checkout.

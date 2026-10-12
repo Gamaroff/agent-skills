@@ -2223,10 +2223,11 @@ export function parseCheck(shell, scriptPath, { cwd, env, timeoutMs }) {
  *   3. the generated script does not parse (`parseError`, from parseCheck) →
  *      errored: the guard never ran (TASK-180-001)
  *   4. `expected` → compared, mapped through direction. Every hostile case
- *      reaches this step: runFenceCase declines one with no `expected`, so a
- *      shell that stopped on the input (`${x:?}`, a word-split `cd`) or an
- *      injected `exit` mismatches the stated refusal instead of passing for it
- *      (TASK-180-005, -009)
+ *      reaches this step with a stated refusal OUTPUT: runFenceCase declines
+ *      one with no `expected`, or with one that is only an exit code or an
+ *      empty output (TASK-180-012), so a shell that stopped on the input
+ *      (`${x:?}`, a word-split `cd`) or an injected `exit` mismatches the
+ *      stated refusal instead of passing for it (TASK-180-005, -009)
  *   5. otherwise (a legitimate case) exit 0 is accepted, any other exit rejected
  * No step reads the shell's stderr to decide whether the guard answered.
  *
@@ -2278,6 +2279,39 @@ export function scoreFenceRun(
         outcome: "rejected",
         detail: `exit ${child.status}: ${((child.stderr ?? "").trim() || (child.stdout ?? "").trim()).split("\n")[0].slice(0, 160)}`,
       };
+}
+
+/** True when `expected` names a non-blank stdout or stderr — the only part of a refusal a stopped shell cannot also produce. */
+const statesRefusalOutput = (expected) =>
+  ["stdout", "stderr"].some(
+    (k) => typeof expected?.[k] === "string" && expected[k].trim() !== "",
+  );
+
+/**
+ * Every entry under `dir` except `skip`: files keyed by path with
+ * snapshotTree's stamp, directories keyed `path/` and stamped `dir` — a
+ * directory's mtime moves whenever anything is written inside it, so it is not
+ * a stamp. Directories are listed so an empty `mkdir` is seen (TASK-180-013).
+ */
+function workDirStamps(dir, skip) {
+  const out = snapshotTree(dir, skip);
+  const walk = (d, prefix) => {
+    let entries;
+    try {
+      entries = readdirSync(d, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      if (!e.isDirectory()) continue;
+      const rel = prefix ? `${prefix}/${e.name}` : e.name;
+      if (rel === skip) continue;
+      out.set(`${rel}/`, "dir");
+      walk(join(d, e.name), rel);
+    }
+  };
+  walk(dir, "");
+  return out;
 }
 
 /**
@@ -2342,7 +2376,18 @@ function runFenceCase(
   }
   if (!hasExpected && c.direction === "hostile") {
     decline(
-      "hostile fence: case has no `expected` — state the guard's refusal (its exit, stdout or stderr); an exit status alone cannot tell a refusal from a shell that stopped on the input",
+      "hostile fence: case has no `expected` — state the guard's refusal (its non-empty stdout or stderr); an exit status alone cannot tell a refusal from a shell that stopped on the input",
+    );
+    return;
+  }
+  // An exit code, or an empty output, is also what a shell that stopped on the
+  // input (`${x:?}`) or an injected `exit 1` produces, so an `expected` made only
+  // of those matches the very runs it was required to tell apart (TASK-180-012).
+  // A guard that refuses silently is therefore unprobeable here, by design: a
+  // decline says so, where a score would read a false `engages`.
+  if (c.direction === "hostile" && !statesRefusalOutput(c.expected)) {
+    decline(
+      "hostile fence: case's `expected` states no refusal output — an exit code or an empty stdout/stderr is also what a shell that stopped on the input, or an injected `exit`, produces; state the guard's non-empty stdout or stderr",
     );
     return;
   }
@@ -2421,11 +2466,12 @@ function runFenceCase(
     });
     // The sentinel skips the work dir, and the case directory sits inside it:
     // a write beside the case directory (`../pwned`, the harness dir) is an
-    // escape only this snapshot sees (TASK-180-011). The trip-wire's own marker
-    // is the harness's write, reported as a gh call, not here.
+    // escape only this snapshot sees (TASK-180-011), as is a deletion or an
+    // empty directory there (TASK-180-013). The trip-wire's own marker is the
+    // harness's write, reported as a gh call, not here.
     const caseName = basename(caseDir);
     const ownWrite = `${basename(harnessDir)}/${GH_TRIPPED}`;
-    const workBefore = snapshotTree(workDir, caseName);
+    const workBefore = workDirStamps(workDir, caseName);
     const child = watchedSpawn(
       shell,
       [...noRcFlags(shell), scriptPath],
@@ -2440,14 +2486,22 @@ function runFenceCase(
       },
     );
 
-    for (const [path, stamp] of snapshotTree(workDir, caseName)) {
-      if (path !== ownWrite && workBefore.get(path) !== stamp) {
-        escapes.push({
-          id: `${c.id}@${shell}`,
-          shell,
-          path: `${workDirName}/${path}`,
-        });
-      }
+    // Both ways: a path that appeared or changed, and a path that is gone — a
+    // deleted trip-wire stub lets later cases reach the host's real `gh`
+    // (TASK-180-013).
+    const workAfter = workDirStamps(workDir, caseName);
+    const changed = [...workAfter]
+      .filter(
+        ([path, stamp]) => path !== ownWrite && workBefore.get(path) !== stamp,
+      )
+      .map(([path]) => path);
+    const gone = [...workBefore.keys()].filter((path) => !workAfter.has(path));
+    for (const path of [...changed, ...gone]) {
+      escapes.push({
+        id: `${c.id}@${shell}`,
+        shell,
+        path: `${workDirName}/${path}`,
+      });
     }
 
     const { outcome, detail } = scoreFenceRun(child, {

@@ -429,15 +429,18 @@ takes it.
   cwd the case's own directory. **The slot is source substitution, not data:**
   the input becomes script text, exactly as it does for the document's reader,
   so a `$(…)` in it runs; its effects land in the case directory, inside the
-  sandbox, and a write anywhere else is an escape. A case's optional `fixture`
+  sandbox, and a write anywhere else is an escape — under the work dir that holds
+  the case directories, so is a deletion or a new directory. A case's optional `fixture`
   supplies the rest of what the block reads — `env` (never `HOME`, `TMPDIR` or
   `LC_ALL`, which the sandbox owns) and `files` written into the case directory,
   declined when a path leaves it. **A hostile case must carry `expected`** — the
-  guard's own refusal (its exit, stdout or stderr) — and is declined without one:
-  under source substitution an exit status cannot tell a refusal from a shell that
+  guard's own refusal **output**, a non-empty stdout or stderr — and is declined
+  without one, or with one that is only an exit code or an empty output: under
+  source substitution an exit status cannot tell a refusal from a shell that
   stopped on the input (`${x:?}`, a word-split `cd`) or from an injected
   `exit`, and reading the shell's stderr to tell them apart failed in three
-  consecutive QA cycles (task.180). A legitimate case without `expected` is scored
+  consecutive QA cycles (task.180). A guard that refuses silently is therefore
+  declined here, never scored. A legitimate case without `expected` is scored
   by exit status, `cli:`'s rule. A generated script that does not parse
   (`<shell> -n`) is `errored`. The order these rules apply in is
   `scoreFenceRun`'s, stated once in the engine. The record names

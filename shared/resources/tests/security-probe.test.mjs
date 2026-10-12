@@ -3524,13 +3524,14 @@ const FENCE_DOC = [
   "",
   "```bash",
   'GATE="<slot>"',
-  '[ "$GATE" = "ok" ] || exit 1',
+  '[ "$GATE" = "ok" ] || { echo REFUSED; exit 1; }',
   "```",
   "",
   "### Refuse everything",
   "",
   "```bash",
   ': "<slot>"',
+  "echo REFUSED",
   "exit 1",
   "```",
   "",
@@ -3556,11 +3557,14 @@ const fenceCase = (id, direction, input, extra = {}) => ({
   ...extra,
 });
 
-// A hostile fence: case states the guard's refusal (TASK-180-009): Admit's guard
-// refuses with exit 1 and prints nothing.
+// A hostile fence: case states the guard's refusal (TASK-180-009) as output a
+// stopped shell cannot also produce (TASK-180-012): Admit's guard prints
+// REFUSED and exits 1.
 const ADMIT_CASES = [
   fenceCase("f.ok", "legitimate", "ok"),
-  fenceCase("f.bad", "hostile", "bad", { expected: { exit: 1, stdout: "" } }),
+  fenceCase("f.bad", "hostile", "bad", {
+    expected: { exit: 1, stdout: "REFUSED\n" },
+  }),
 ];
 
 test("fence entry: resolveEntry returns kind fence with the heading, and refuses a malformed or escaping spec", () => {
@@ -3839,7 +3843,7 @@ test("fence entry: the slot is script source — a $(…) input runs, in the cas
       slot: "<slot>",
       cases: [
         fenceCase("f.sub", "hostile", "$(touch PWNED)", {
-          expected: { exit: 0, absent: ["PWNED"] },
+          expected: { exit: 0, stdout: "REFUSED\n", absent: ["PWNED"] },
         }),
       ],
       repoRoot: root,
@@ -3953,7 +3957,10 @@ test("fence entry: the block is read on every run — editing it between two run
     assert.equal(runProbeSpec(spec).verdict, "engages");
     writeFileSync(
       join(root, "doc.md"),
-      FENCE_DOC.replace('[ "$GATE" = "ok" ] || exit 1', "exit 0"),
+      FENCE_DOC.replace(
+        '[ "$GATE" = "ok" ] || { echo REFUSED; exit 1; }',
+        "exit 0",
+      ),
     );
     const after = runProbeSpec(spec);
     assert.notEqual(after.verdict, "engages");
@@ -4186,6 +4193,72 @@ test("fence entry: a hostile case with no `expected` is declined, never scored b
   }
 });
 
+test("fence entry: a hostile `expected` with no non-empty stdout or stderr is declined — an accept-all block never reads engages (TASK-180-012)", () => {
+  const root = fenceRoot({
+    "doc.md": [
+      "## Accept all",
+      "",
+      "```bash",
+      'X="<slot>"',
+      "exit 0",
+      "```",
+      "",
+    ].join("\n"),
+  });
+  try {
+    // The two inputs the finding names, each under the two exit-only shapes —
+    // and a whitespace-only output, which a bare `echo` also produces.
+    for (const expected of [
+      { exit: 1 },
+      { exit: 1, stdout: "" },
+      { exit: 1, stdout: "", stderr: "" },
+      { exit: 1, stderr: " \n" },
+      { exit: 1, absent: ["pwned"] },
+    ]) {
+      const r = runProbeSpec({
+        entry: "fence:doc.md#Accept all",
+        slot: "<slot>",
+        cases: [
+          fenceCase("f.expansion", "hostile", "${x:?boom}", { expected }),
+          fenceCase("f.inject", "hostile", '"; exit 1; "', { expected }),
+          fenceCase("f.ok", "legitimate", "ok"),
+        ],
+        repoRoot: root,
+      });
+      const hostile = r.cases.filter((c) => c.direction === "hostile");
+      assert.equal(hostile.length, 2 * probeShells().length);
+      assert.ok(
+        hostile.every(
+          (c) =>
+            c.outcome === "errored" &&
+            /states no refusal output/.test(c.detail),
+        ),
+        JSON.stringify({ expected, cases: r.cases }),
+      );
+      assert.notEqual(r.verdict, "engages", JSON.stringify(expected));
+    }
+    // The other direction: a non-empty refusal output is admitted and scored —
+    // the same accept-all block reproduces on both inputs.
+    const scored = runProbeSpec({
+      entry: "fence:doc.md#Accept all",
+      slot: "<slot>",
+      cases: [
+        fenceCase("f.expansion", "hostile", "${x:?boom}", {
+          expected: { exit: 1, stderr: "refused\n" },
+        }),
+        fenceCase("f.inject", "hostile", '"; exit 1; "', {
+          expected: { exit: 1, stdout: "refused\n" },
+        }),
+        fenceCase("f.ok", "legitimate", "ok"),
+      ],
+      repoRoot: root,
+    });
+    assert.equal(scored.verdict, "absent", JSON.stringify(scored.cases));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("fence entry: a runtime error AFTER the guard let the input through is the guard's failure, not errored — the word-split cd case reproduces (TASK-180-009)", () => {
   const root = fenceRoot({
     "doc.md": [
@@ -4324,7 +4397,7 @@ test("fence entry: an expected.absent name the case's own fixture writes is decl
         cases: [
           fenceCase("f.collide", "hostile", "x", {
             fixture: { files },
-            expected: { exit: 0, absent },
+            expected: { exit: 0, stdout: "REFUSED\n", absent },
           }),
         ],
         repoRoot: root,
@@ -4416,6 +4489,38 @@ test("fence entry: a write beside the case directory, under the work dir, is an 
   }
 });
 
+test("fence entry: a deletion or an empty directory under the work dir is an escape — the gh trip-wire stub cannot be removed unseen (TASK-180-013)", () => {
+  const root = fenceRoot({
+    "doc.md": ["## Echo", "", "```bash", ': "<slot>"', "```", ""].join("\n"),
+  });
+  try {
+    const r = runProbeSpec({
+      entry: "fence:doc.md#Echo",
+      slot: "<slot>",
+      cases: [
+        fenceCase(
+          "f.x",
+          "legitimate",
+          "$(rm -f ../.probe-harness/bin/gh; mkdir ../pwned-dir)",
+        ),
+      ],
+      repoRoot: root,
+    });
+    // The first shell deletes the stub; a later shell finds it already gone,
+    // so the deletion is that first shell's escape. The directory is each
+    // shell's own (mkdir fails on the second, which changes nothing).
+    const first = `f.x@${probeShells()[0]}`;
+    for (const path of ["work/.probe-harness/bin/gh", "work/pwned-dir/"]) {
+      assert.ok(
+        r.escapes.some((e) => e.id === first && e.path === path),
+        JSON.stringify(r.escapes),
+      );
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("fence entry: a side effect expected.absent names is a reproduction even when the shell then stops (TASK-180-006)", () => {
   const root = fenceRoot({
     "doc.md": [
@@ -4434,7 +4539,7 @@ test("fence entry: a side effect expected.absent names is a reproduction even wh
       slot: "<slot>",
       cases: [
         fenceCase("f.side", "hostile", "$(touch pwned)'", {
-          expected: { exit: 0, absent: ["pwned"] },
+          expected: { exit: 0, stdout: "REFUSED\n", absent: ["pwned"] },
         }),
       ],
       repoRoot: root,

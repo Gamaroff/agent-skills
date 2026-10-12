@@ -5,7 +5,7 @@ type: task
 description: "Add a `fence:<doc>#<heading>` entry form to shared/resources/security-probe.mjs that extracts the first bash block under a heading on every run, substitutes the case's input into a named placeholder, applies an optional per-case env and fixture files, and scores a hostile case against its stated refusal (`expected`) and a legitimate one by exit status. A boundary shipped as a fenced block in a step doc is then probed by the engine instead of through a hand-written wrapper."
 tags: [security-probe, finalise, qa-task, qa-story, review-security, observation]
 category: infrastructure
-status: in-progress
+status: ready-for-review
 priority: Medium
 created: 2026-10-03
 updated: 2026-10-12
@@ -16,7 +16,7 @@ github_issue: 560
 
 # Technical Task: security-probe — a `fence:` entry form
 
-**Status:** In Progress
+**Status:** Ready for Review
 
 **Review**: ✅ All review recommendations from `task.180.review.1.probe-engine-fence-entry-form.md` implemented 2026-10-12
 
@@ -219,7 +219,7 @@ Not applicable. Each case is one spawn per shell under the shared `spawnBudget`;
 
 ### Functional
 
-- [x] `fence:<doc>#<heading>` with `--slot` probes a fenced bash block and scores exit 0 as accepted and non-zero as rejected (Phase 2; tests in Phase 1)
+- [x] `fence:<doc>#<heading>` with `--slot` probes a fenced bash block, each run scored by the order `scoreFenceRun` in `shared/resources/security-probe.mjs` states (Phase 2; tests in Phase 1)
 - [x] A missing heading or a missing bash block under it is a named `entry-not-probeable` decline, not a verdict
 - [x] The optional `fixture` field delivers `env` and `files` to the case, and a file path outside the case directory is declined
 - [x] task.167's 13 cases through `fence:` against the shipped step-3 doc give verdict `engages` with 0 reproduced, and the copy without the flag over-blocks the 4 silent-environment cases
@@ -346,6 +346,7 @@ None.
 | 2026-10-12 |         | QA gate FAIL (70/100) — cycle 3 safety re-probe, 3 findings: 1 high, 1 medium, 1 low | qa-task |
 | 2026-10-12 |         | QA findings fixed — cycle 3, 3 findings (TASK-180-009..011): third strike — stderr classifier replaced by a `-n` parse check and a required `expected` on hostile cases; collision decline normalised; work-dir writes watched | qa-fix |
 | 2026-10-12 |         | QA gate FAIL (70/100) — cycle 4 safety re-probe, 3 findings: 1 high, 1 medium, 1 low | qa-task |
+| 2026-10-12 |         | QA findings fixed — cycle 4, 3 findings (TASK-180-012..014): a hostile `expected` must state a non-empty stdout or stderr; work-dir watch compares both ways with directories; Success Criterion 1 cites `scoreFenceRun` | qa-fix |
 <!-- change-log-end -->
 
 ---

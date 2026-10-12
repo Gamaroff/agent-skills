@@ -4,7 +4,7 @@
 **Bug ID**: TASK-180-BUG-7
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: New
+**Status**: Ready for QA
 **Found By**: QA Engineer (QA cycle 4 safety re-probe, code review CR-2 / TASK-180-013)
 **Date Found**: 2026-10-12
 
@@ -27,8 +27,23 @@ Both are recorded as escapes under `work/`.
 
 Compare the two snapshots both ways (a path present before and absent after is an escape). Include directory entries in the stamp map. Add a test that deletes the trip-wire from an input.
 
+## Developer Fix Cycle
+
+### Iteration 1
+
+**Date**: 2026-10-12 — qa-fix, QA cycle 4
+
+**Root cause**: The watch iterated only the after-snapshot, and `snapshotTree` records regular files only.
+
+**Fix**: `workDirStamps` adds every directory (keyed `path/`, stamped `dir`, since a directory's mtime moves with its contents) to `snapshotTree`'s file stamps, and `runFenceCase` compares both ways: a path that appeared or changed, and a path that is gone. `snapshotTree` itself (shared with `qa-execute-snippets.mjs`) is unchanged.
+
+**Files Modified**: `shared/resources/security-probe.mjs`, `shared/resources/tests/security-probe.test.mjs`, `shared/resources/probe-boundary-rule.md`.
+
+**Testing**: New test: input `$(rm -f ../.probe-harness/bin/gh; mkdir ../pwned-dir)` records `work/.probe-harness/bin/gh` and `work/pwned-dir/` as escapes. Mutations (deletions unseen; directories unseen) → each red.
+
 ## Status History
 
 | Date       | Status | Changed By  | Notes |
 | ---------- | ------ | ----------- | ----- |
-| 2026-10-12 | New    | QA Engineer | QA cycle 4 — reproduced on 1a31af72 |
+| 2026-10-12 | New          | QA Engineer | QA cycle 4 — reproduced on 1a31af72 |
+| 2026-10-12 | Ready for QA | qa-fix      | Watch compares both ways, directories included; mutation-proven |
