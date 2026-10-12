@@ -301,25 +301,25 @@ accurate.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-12
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.178.qa.5.review-skills-cite-key-lookup.md](./task.178.qa.5.review-skills-cite-key-lookup.md)
-- **Gate File**: [task.178.gate.5.review-skills-cite-key-lookup.yml](./task.178.gate.5.review-skills-cite-key-lookup.yml)
+- **Full Report**: [task.178.qa.6.review-skills-cite-key-lookup.md](./task.178.qa.6.review-skills-cite-key-lookup.md)
+- **Gate File**: [task.178.gate.6.review-skills-cite-key-lookup.yml](./task.178.gate.6.review-skills-cite-key-lookup.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 12 (new file)
+- **Tests Executed**: 12 (new file); fast gate 5377
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-- Gate 4 HIGH fixed.
-- CR-1 (medium): an unpaired apostrophe in a chunk breaks a quoted-alternation lookup.
+- Gate 5 CR-1 fixed (`dcf86760`), mutation-proven.
+- One advisory low/medium matcher edge case (a quote glued between word characters); routed to future work.
 
 <!-- change-log-start -->
 
@@ -341,6 +341,7 @@ accurate.
 | 2026-10-12 |         | QA findings fixed — cycle 4, 1 finding + 1 advisory + 2 cleanups (backtick-first segment split; brace sets need a comma; CHANGELOG and header wording) | qa-fix |
 | 2026-10-12 |         | QA gate CONCERNS (90/100) — 1 finding (1 medium) | qa-task |
 | 2026-10-12 |         | QA findings fixed — cycle 5, 1 finding (a word-internal apostrophe is literal, not a quote opener) | qa-fix |
+| 2026-10-12 |         | QA gate PASS (100/100) — 0 blocking findings (1 low advisory) — cycle 6, granted after escalation | qa-task |
 
 <!-- change-log-end -->
 
