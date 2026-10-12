@@ -3,7 +3,7 @@
 **Task**: `task.175.finalise-pr-number-from-branch.md`
 **Run Number**: 1
 **Started**: 2026-10-12 06:06
-**Status**: Halted — finalise DoD gaps
+**Status**: Complete
 
 ---
 
@@ -36,8 +36,8 @@ Give `/finalise` one authoritative PR-number resolver (caller → branch → loc
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan + surface map); 1 iteration; 4/4 phases; `ci:fast` green (5364 tests, 0 fail); 7 mutations red | —                    | 2026-10-12T06:18Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #635: https://github.com/Gamaroff/agent-skills/pull/635 | —                    | 2026-10-12T06:19Z |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.175.qa.{N}.*.md`; `task.175.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 1 cycle: gate.1 PASS 100; 5c `/review-pr` APPROVE (pr-review.1, 0 findings) | —                    | 2026-10-12T06:25Z |
-| 7. finalise                | ⚠️ Needs Attention | `task.175.dod.{N}.*.md`; task `status: accepted`                      | DoD run 1 (`task.175.dod.1.*`): GAPS — security probe zero-guard only; AC 8/8, docs PASS, compliance N/A, CI reading 1 SUCCESS @ 545ca1bd | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 7. finalise                | ✅ Done | `task.175.dod.{N}.*.md`; task `status: accepted`                      | DoD run 2 (`task.175.dod.2.*`): ACCEPTED — security zero-guard closed by a recorded human override; CI reading 1 SUCCESS @ bd06cc3d, reading 2 SUCCESS (tree-equivalent to bd06cc3d) @ 63877c97; #551 closed | —                    | 2026-10-12T06:44Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | Implementation report committed and pushed | —                    | 2026-10-12T06:44Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -108,6 +108,15 @@ Give `/finalise` one authoritative PR-number resolver (caller → branch → loc
 - CI reading 1: SUCCESS @ `545ca1bd14e6` over 5 checks (background poll).
 - Decision: GAPS — security zero-guard only. Step 8a fix-and-recheck does not apply (medium, no code change can close it). Gap report written to the task body, Change Log gaps row added, gaps PR comment posted.
 
+### Step 7 resume — finalise (run 2)
+
+- Operator decision ("Go ahead", 2026-10-12): close the security probe zero-guard with a recorded human override, following the task.125 / task.133 / task.188 precedent. develop-next run state `halted` cleared; lock restored from the halt snapshot at step 7 (`advance-pipeline-lock.sh --restore`).
+- Phase 0b: the run-1 fix is document-only (an override record), so the run resumes at 7, not 5a — `git diff 545ca1bd..bd06cc3d` touches only this task's directory.
+- DoD run 2 (`task.175.dod.2.finalise-pr-number-from-branch.md`): Steps 1–4 carried from run 1; security reads "FAIL (agent) → PASS by recorded human override", with an "Override recorded, not hidden" block (what, why, who, evidence: `resolve-pr-number.test.mjs` cases and mutations M1–M3, low-risk rationale, follow-up task.181 and obs #12). Final Status ✅ ACCEPTED.
+- CI reading 1: SUCCESS @ `bd06cc3d68c1` (5 checks).
+- Acceptance writes: `status: accepted`, `completed_date`, `pr_number: 635`; Change Log 1.2; run-1 gap report retitled historical; `## Definition of Done - PASSED ✅` added before the change log; sprint review summary; registry row ticked (`ticked`). Acceptance commit `63877c97` pushed; document, DoD and sprint review asserted tracked and on origin; CHANGELOG cites (task 175).
+- CI reading 2: SUCCESS (tree-equivalent to `bd06cc3d68c1`) @ `63877c97576d` over 5 checks (background poll, 30 s). Canonical PR summary comment posted. Tracker #551: Document link unchanged; `done` comment posted; closed (state CLOSED); board `done` → already.
+
 ---
 
 ## Issues Log
@@ -136,10 +145,10 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: — (halted at Step 7)
-**Final Status**: Halted — finalise DoD gaps (security probe zero-guard)
+**Finished**: 2026-10-12 06:44 UTC
+**Final Status**: Completed — accepted (security probe zero-guard closed by a recorded human override)
 **Branch**: feature/task.175.finalise-pr-number-from-branch
 **PR**: https://github.com/Gamaroff/agent-skills/pull/635
 **QA Iterations**: 1
-**DoD Summary**: docs/tasks/task.175.finalise-pr-number-from-branch/task.175.dod.1.finalise-pr-number-from-branch.md (GAPS)
+**DoD Summary**: docs/tasks/task.175.finalise-pr-number-from-branch/task.175.dod.2.finalise-pr-number-from-branch.md (ACCEPTED; run 1 `dod.1` GAPS, superseded)
 **Tracker debt**: none
