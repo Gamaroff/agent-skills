@@ -240,7 +240,7 @@ docs/tasks/task.90.swagger-cli-plugin-enablement/
 3. Parse YAML frontmatter to extract current status and metadata
 4. Extract acceptance criteria, PR references, and documentation notes from the body
 
-**Bug mode (`read-document`):** run — the document is a bug report, and it comes in two shapes: YAML frontmatter, or a `**Bug ID**:` / `**Status**:` header block with no frontmatter at all. Read it through `node references/bug-doc.js --file "$DOC_FILE"` (the same reader `ensure-bug-github-issue` and the syncs use) rather than by frontmatter grep; the JSON carries `mode`, `bug_id`, `github_issue` / `jira_key`, and `fields.status` / `fields.severity` / `fields.priority` (merged across both shapes). It carries **no** `pr_number`: `PR_NUMBER` comes from Step 3a's existing derivation over the document (`pr_number:` in frontmatter, else `PR #NNN` / `pull/NNN` in the body), which reads a bug file exactly as it reads a task. There are no acceptance criteria to extract — the bug's one "criterion" is its `**Expected Behavior**` line, which the fix-evidence agent reads.
+**Bug mode (`read-document`):** run — the document is a bug report, and it comes in two shapes: YAML frontmatter, or a `**Bug ID**:` / `**Status**:` header block with no frontmatter at all. Read it through `node references/bug-doc.js --file "$DOC_FILE"` (the same reader `ensure-bug-github-issue` and the syncs use) rather than by frontmatter grep; the JSON carries `mode`, `bug_id`, `github_issue` / `jira_key`, and `fields.status` / `fields.severity` / `fields.priority` (merged across both shapes). It carries **no** `pr_number`: `PR_NUMBER` comes from Step 3a's resolver, which reads a bug's branch exactly as it reads a task's. There are no acceptance criteria to extract — the bug's one "criterion" is its `**Expected Behavior**` line, which the fix-evidence agent reads.
 
 ### Step 2: Check for and Review QA Reports
 
@@ -458,9 +458,11 @@ superseded)`). If it is not, that is itself a finding: an unmarked stale PASS ba
 Collect these values before dispatching:
 
 ```bash
-# PR number
-PR_NUMBER=$(grep '^pr_number:' {story-file} | awk '{print $(2)}' | grep -oE '[0-9]+' | head -1)
-[ -z "$PR_NUMBER" ] && PR_NUMBER=$(grep -oE 'PR #([0-9]+)|pull/([0-9]+)' {story-file} | grep -oE '[0-9]+' | head -1)
+# The PR this run judges — from the branch or the pipeline lock before the document (task 175).
+# Exit 1 (no source names one) leaves PR_NUMBER empty; the agents report pr_status NOT_FOUND.
+PR_JSON=$(bash .agents/skills/finalise/references/resolve-pr-number.sh --doc {story-file} --json)
+PR_NUMBER=$(printf '%s' "$PR_JSON" | jq -r '.pr // empty')
+PR_SOURCE=$(printf '%s' "$PR_JSON" | jq -r '.source // "none"')
 
 # Story type
 STORY_TYPE=$(grep '^type:' {story-file} | awk '{print $(2)}' | tr -d '"')
@@ -471,6 +473,16 @@ DIFF_FILE=".claude/state/pr-diff-$(date +%s).diff"
 [ -n "$PR_NUMBER" ] && gh pr diff "$PR_NUMBER" > "$DIFF_FILE" 2>/dev/null \
   || git diff HEAD~1 HEAD > "$DIFF_FILE" 2>/dev/null || touch "$DIFF_FILE"
 ```
+
+**The PR number comes from `references/resolve-pr-number.sh`, never from the document body.** It
+reads, first answer wins: an explicit `--pr`, the PR whose head is the current branch (`pr-read.sh`),
+the pipeline lock's `pr_url` when the lock is for this document's directory, frontmatter
+`pr_number:`, and a body `PR #N` only when PR N's head branch is the current branch. A task document
+cites other work's PRs, and the old first-match-in-the-body rule judged one of them on three runs
+(task.146 → #472, task.147 → #207, task.166 → #505; obs #184). Step 3a passes no `--pr`: finalise
+takes no PR argument, and inside a pipeline the branch rung answers. Record
+`**PR:** #{PR_NUMBER} (source: {PR_SOURCE})` in the running summary's Step 2 block — or
+`**PR:** unresolved (no branch PR, lock, frontmatter or confirmed citation)` when `PR_NUMBER` is empty.
 
 #### Step 3b: Dispatch 4 Explore Subagents in Parallel
 
@@ -1138,7 +1150,7 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    - Change `status` to `accepted`
    - Update `updated` field to current date (YYYY-MM-DD)
    - Add `completed_date` field with current date
-   - Ensure `pr_number` is present in frontmatter (add if only in body)
+   - Write `pr_number: {PR_NUMBER}` from Step 3a's resolver; when it resolved none, write no `pr_number:` — never a number copied from the document body (task 175)
 
    **Example:**
 

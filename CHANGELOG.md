@@ -77,6 +77,17 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`/finalise` judges its own pull request, not the first one its document cites (task 175).**
+  Step 3a read `pr_number:` and otherwise the first `PR #N` / `pull/N` in the document body; inside a
+  pipeline the frontmatter has no `pr_number:` yet, so three runs judged a PR their document merely
+  cited (task.146 → #472, task.147 → #207, task.166 → #505; observation #184). A new resolver,
+  `shared/resources/resolve-pr-number.sh`, reads an explicit `--pr`, then the current branch's PR
+  (through `pr-read.sh`), then the pipeline lock's `pr_url` when the lock is for this document, then
+  frontmatter, and a body citation only when that PR's head branch is the current branch; with no
+  source it exits 1 and prints no number. The AC and fix-evidence agents now take the number they
+  are given, and Step 7.2 writes the resolved number instead of copying one from the body.
+  `pr_read` also reports the PR's head branch (`PR_READ_HEAD_BRANCH`).
+
 - **`develop-next` and `develop-batch` resume from evidence, not flags (task.188).** A merge is
   judged by the PR's state (`gh pr view --json state`), never by `gh pr merge`'s exit code, which also
   covers local follow-ups: a merge that landed before a network error no longer reads as failed, and a
