@@ -3,7 +3,7 @@
 **Task**: `task.178.review-skills-cite-key-lookup.md`
 **Run Number**: 1
 **Started**: 2026-10-12 08:52
-**Status**: Escalated
+**Status**: Completed
 
 ---
 
@@ -36,9 +36,9 @@ Replace the three restated, unanchored key → document lookups in review-task a
 | 2. review-task             | ✅ Done    | `task.178.review.{N}.{name}.md` exists (or skip logged)                | review.1 — 8/10 READY TO IMPLEMENT; Planned → Ready for Development | —                    | 2026-10-12T06:53Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration, inline; 3/3 phases; fast gate green | —                    | 2026-10-12T06:59Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #636: https://github.com/Gamaroff/agent-skills/pull/636 | —                    | 2026-10-12T07:00Z |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.178.qa.{N}.*.md`; `task.178.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.178.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.178.qa.{N}.*.md`; `task.178.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 6 cycles (5 + 1 granted); gate 6 PASS 100; 5c APPROVE | —                    | 2026-10-12T11:06Z |
+| 7. finalise                | ✅ Done | `task.178.dod.{N}.*.md`; task `status: accepted`                       | DoD 1 ACCEPTED; acceptance commit 8e65874e; CI reading 2 SUCCESS; #556 closed | —                    | 2026-10-12T11:23Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | final report commit + push | —                    | 2026-10-12T11:23Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -91,6 +91,14 @@ Replace the three restated, unanchored key → document lookups in review-task a
 - Commit attribution lines dropped from cycle 3 on, per an updated system instruction.
 - QA Cycle 4 — Convergence check: not tripped (HIGH sequence 0,0,0,1 — HIGH first appears at cycle 4; it has not stopped falling for two cycles). Third strike: no (one HIGH cycle). Route classifier: not consulted on a FAIL with a HIGH open (route 2/2b need HIGH 0). changes-requested: stage-disabled.
 - Priority P2 default block not run: the issue's priority label is set at creation (Medium); non-blocking.
+- QA loop re-entry: 1 extra cycle granted by the operator ("go ahead" on the HALT's recommended option); 0 cycles run outside the loop. `grant-qa-cycles.sh`: QA_CYCLE=5, qa_max_cycles=6, lock restored from the halt snapshot, re-enter at 5a. Resumed via `/develop-next` → `/develop-task --defaults` (Phase 0b auto-answer: resume at 5a with the grant). Purpose: gate `dcf86760`, cycle 5's ungated fix.
+- QA Cycle 6 — gate PASS (100); 5c `/review-pr --effort medium --comment --no-code` → APPROVE (conformance lens only; 1 low finding, PC-1, ref re-emitted once to the field-name form). ready-for-merge: stage-disabled. QA loop exits to Step 7.
+- DoD summary: docs/tasks/task.178.review-skills-cite-key-lookup/task.178.dod.1.review-skills-cite-key-lookup.md (DoD 1 ACCEPTED). The security agent's zero-guard FAIL (boundary: true, probes_executed: 0 — no engine form reaches a fenced block) was resolved by /finalise running the probe engine through a one-argument wrapper over the shipped task-only check (task.159 / task.167 pattern): 17 executed, 0 reproduced, verdict engages.
+- CI reading 1: SUCCESS @ a557658d6ef8 (5 checks); CI reading 2: SUCCESS @ 8e65874eb952 (5 checks, 60 s) — acceptance commit `8e65874e`.
+- DoD body posted to PR — comment URL: https://github.com/Gamaroff/agent-skills/pull/636#issuecomment-6123268394 (canonical summary: #issuecomment-6123257567).
+- Issue close: GitHub #556 CLOSED (confirmed); completion comment `done` posted; Document link already on develop.
+- Board transition: gh-stage `done` → already.
+- Task completed.
 
 ---
 
@@ -193,12 +201,25 @@ _Track each QA review/fix cycle._
 **Action**: Escalating — loop limit reached
 **Fixes Applied**: CR-1 — a word-internal apostrophe is literal; three fixtures; header states the unbalanced-chunk behaviour. Fast gate stopped by the host for low memory (not re-run); the test file passes 12/12, prettier clean.
 **Commit**: `dcf86760`
+
+### QA Cycle 6 — 2026-10-12
+**Gate Result**: PASS
+**Issues Found**: none blocking — gate 5 CR-1 fixed by `dcf86760` (mutation-proven). Advisory: 1 low/medium matcher edge case (a quote glued between word characters), routed to future work.
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: APPROVE — `task.178.pr-review.1.review-skills-cite-key-lookup.md` (1 low finding, PC-1: no `pr_number:` in the frontmatter — recorded, not fixed; `/finalise` writes it from its branch resolver). ready-for-merge: see Decisions Log.
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+**Carried to 6a**: docs/tasks/task.178.review-skills-cite-key-lookup/task.178.pr-review.1.review-skills-cite-key-lookup.md (PC-1 recorded, not fixed — no path)
+**Fast gate**: 5377 tests, 1 fail — `tests/bundle-missing-source.test.js` load-sensitive timing (23.9 s alone vs 20 s budget); pre-existing, identical on `origin/develop`, not touched by this branch.
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: Escalated
+**Finished**: 2026-10-12 13:23
+**Final Status**: Completed
 **Branch**: feature/task.178.review-skills-cite-key-lookup
 **PR**: https://github.com/Gamaroff/agent-skills/pull/636
-**QA Iterations**: 5 (loop limit)
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 6 (5 budgeted; escalated at the loop limit; 1 granted by the operator)
+**DoD Summary**: docs/tasks/task.178.review-skills-cite-key-lookup/task.178.dod.1.review-skills-cite-key-lookup.md
+**Tracker debt**: none
+
+**Completion Summary**: review-task's Jira-key branch and both review skills' issue fallbacks now cite the shared §0a Key → document lookup instead of restating an unanchored grep; review-task's branch runs its bind block, §0a and a task-only check as one script and HALTs loudly on unbound inputs. A new guard test, `tests/key-lookup-single-statement.test.js` (12 tests), catches a restated lookup within its stated fixture-table scope and executes the Jira-key branch under bash and zsh. The deliverable was clean from QA cycle 1; cycles 2–5 all landed on the guard's text matcher, and the loop escalated at its limit with cycle 5's fix ungated. The operator granted one cycle: gate 6 PASS 100, Step 5c APPROVE. At finalise the read-only security agent hit the zero-guard on the fenced-block boundary; /finalise ran the engine through a wrapper over the shipped block (17 executed, 0 reproduced). CI green on both readings. Notable: the pre-existing `bundle-missing-source.test.js` timing test is red on this host (also on develop) and green in CI.
