@@ -392,7 +392,7 @@ takes it.
     included). Pass such a value as the case's input instead.
   - **A `--argv` shape error is an argument error, not a probe result:** exit 2,
     `bad-argv`, nothing runs and no record is written (`--argv` without `cli:`
-    or `shell-argv:`, `cli:` without `--argv`, zero or two `{input}`, an unknown or embedded
+    or `shell-argv:`, `cli:` or `shell-argv:` without `--argv`, zero or two `{input}`, an unknown or embedded
     slot). An entry outside the root, or one that is not a `.mjs` / `.js`
     regular file, is a named decline like every other form's. The record carries
     the template as `argv`, and **a `cli:` control's identity is its
@@ -445,9 +445,11 @@ takes it.
     honours it, and is written **before** the setup runs, so the setup may rely
     on it.
 
-  It is a shell form for `gh`: a script — or a setup — that names `gh` with no
-  `--fake-gh` is declined `needs-fake-gh`, the trip-wire `gh` is first on `PATH`,
-  and `--fake-gh` is accepted. Like `cli:` it does not touch §2: the engine
+  It is a shell form for `gh`: a script, a setup, or a case fixture's `env`
+  values or `files` contents that name `gh` with no `--fake-gh` are declined
+  `needs-fake-gh` (the case input is argv data and is not read), every `PATH`
+  directory holding the host `gh` is shadowed (`ghFreePath`, as for `fence:`),
+  the trip-wire `gh` is first on `PATH`, and `--fake-gh` is accepted. Like `cli:` it does not touch §2: the engine
   chooses the interpreter (`bash`), and the script and the setup are fixed by
   flags and containment-checked before anything spawns. The worked example is
   the `shell-argv` fixture pair beside `security-probe.test.mjs` — a setup and

@@ -195,8 +195,10 @@
  * `bash <setup> <case-dir>` before each (case, shell) run, after the case's
  * fixture files are written: it builds the scratch repository these scripts
  * read. A setup that exits non-zero, times out or never starts makes that run
- * `errored`, never `rejected`. It is a shell form for `gh`: a script or setup
- * that names `gh` without `--fake-gh` is declined `needs-fake-gh`. The record
+ * `errored`, never `rejected`. It is a shell form for `gh`: a script, a setup,
+ * or a case fixture's env values or file contents that name `gh` without
+ * `--fake-gh` are declined `needs-fake-gh`, and every PATH directory holding the
+ * host `gh` is shadowed (ghFreePath), as for fence: (TASK-181-001). The record
  * carries the setup as `fixture_setup`.
  *
  * THE FENCE ENTRY FORM (task.180). Many of this repository's boundaries ship as
@@ -1149,7 +1151,7 @@ export function runProbeSpec({
     if (isShellForm || isCliForm || isFenceForm || isShellArgvForm) {
       return decline(
         "bad-args",
-        "--args-json applies to the JS entry form (path#export) only — the shell, cli: and fence: forms take their input from the case",
+        "--args-json applies to the JS entry form (path#export) only — the shell, cli:, shell-argv: and fence: forms take their input from the case",
       );
     }
     if (!Array.isArray(args)) {
@@ -1366,6 +1368,34 @@ export function runProbeSpec({
       return decline(
         "needs-fake-gh",
         `the block under "${resolved.heading}" in ${resolved.entryPath}, or a case's input or fixture, names \`gh\` — pass --fake-gh <dir> so the fixture answers instead of the real binary`,
+      );
+    }
+  }
+
+  // shell-argv: honours a case's fixture as fence: does, so the fixture strings
+  // get the same text check (TASK-181-001): `env` values and `files` contents can
+  // run (BASH_ENV, a sourced fixture script). The case's INPUT is not checked —
+  // it crosses as one argv element, data, never source. runShellArgvCase also
+  // shadows every PATH directory holding a gh (ghFreePath), which catches a
+  // lookup this text check cannot spell.
+  if (isShellArgvForm && fakeGhDir === null) {
+    const strings = (o) =>
+      o && typeof o === "object" && !Array.isArray(o)
+        ? Object.values(o).filter((v) => typeof v === "string")
+        : [];
+    const fixtureText = probeCases
+      .flatMap((c) => [
+        ...strings(c?.fixture?.env),
+        ...strings(c?.fixture?.files),
+      ])
+      .join("\n");
+    if (
+      fixtureText !== "" &&
+      namesGh(resolved.entryPath, realpathSafe(resolve(repoRoot)), fixtureText)
+    ) {
+      return decline(
+        "needs-fake-gh",
+        `a case's fixture (env or files) for ${resolved.entryPath} names \`gh\` — pass --fake-gh <dir> so the fixture answers instead of the real binary`,
       );
     }
   }
@@ -2376,6 +2406,10 @@ function runShellArgvCase(
       sandboxHome,
       sandboxTmp,
     });
+    // Every PATH directory holding the host `gh` is shadowed by a copy without
+    // it, fixture.env's PATH included, before the trip-wire or fake goes first —
+    // as runFenceCase does, because a case fixture can run (TASK-181-001).
+    env.PATH = ghFreePath(env.PATH, join(harnessDir, "path"), fixtureDir);
     if (fakeGhDir !== null) {
       env.PATH = `${fakeGhDir}:${env.PATH}`;
       env.FAKE_GH = "1";

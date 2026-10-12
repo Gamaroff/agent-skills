@@ -73,7 +73,7 @@ Line numbers measured on `develop` at `9af9b0f1` (after task.180's `fence:` form
 - **Run.** Per case and per shell from `probeShells()`, the shell is the **caller** and bash the interpreter, exactly as `shell:`: `<shell> -c 'bash "$@"' <shell> <path> ...argv`, with `{input}` replaced by the case's input as ONE argv element and each `{fixture}` by the case's fixture directory; cwd is the fixture directory; env is `caseEnv`; stdin is empty; the child goes through `watchedSpawn`. Never `<shell> <path>`: that would interpret a bash script under zsh, and a zsh parse failure would score as `rejected` — "could not look" read as "refused".
 - **Case fixture.** A case's optional `fixture` (`env`, `files`) is honoured exactly as `fence:` honours it — validated by `fixtureProblem`, `files` written into the case directory, `env` merged into `caseEnv` — and is written **before** the setup script runs, so the setup may rely on it. `security-input-corpus.mjs:67` and the `fixture` header text name `shell-argv:` beside `fence:`.
 - **Fixture setup.** `--fixture-setup <path>` names a committed shell script (contained in the repo root, a readable regular file, like the entry). Before each (case, shell) run it executes as `bash <setup> <fixture-dir>` in the same sandbox; a non-zero exit, a timeout or a launch failure makes that run `errored` ("could not look"), never `rejected`. This is how a case gets its scratch git repository. `--fixture-setup` with any other form is an argument error (exit 2, `bad-fixture-setup`), as `--slot` is outside `fence:`.
-- **`gh`.** `shell-argv:` is a shell form for `gh`: a script — or a setup script — that names `gh` with no `--fake-gh` is declined `needs-fake-gh`; the trip-wire `gh` is first on PATH; `--fake-gh` is accepted.
+- **`gh`.** `shell-argv:` is a shell form for `gh`: a script, a setup script, or a case fixture's `env` values or `files` contents that name `gh` with no `--fake-gh` are declined `needs-fake-gh`; every PATH directory holding the host `gh` is shadowed (`ghFreePath`), as for `fence:`; the trip-wire `gh` is first on PATH; `--fake-gh` is accepted (QA cycle 1, TASK-181-001).
 - **Verdict.** As `cli:`: exit 0 is `accepted`, non-zero `rejected`, a launch failure or timeout `errored`; a case with `expected` is compared exactly as `runShellCase` compares it.
 - **Record.** Entry kind `shell-argv`; the record carries the `argv` template and, when given, the setup path (`fixture_setup`). A control's key is its `--name`, else its argv skeleton, as for `cli:` (`controlKey`, `:2716`).
 
@@ -317,6 +317,27 @@ None.
 
 **Deferred work.** None. zsh is absent on the development host, so the zsh caller arm ran only through the structural test; CI's lanes decide whether it runs there.
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-12
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.181.qa.1.probe-engine-shell-argv-entry-form.md](./task.181.qa.1.probe-engine-shell-argv-entry-form.md)
+- **Gate File**: [task.181.gate.1.probe-engine-shell-argv-entry-form.yml](./task.181.gate.1.probe-engine-shell-argv-entry-form.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 5415 (ci:fast) + 19 probes
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+TASK-181-001 (MEDIUM, reproduced): a `shell-argv:` case fixture reaches the host `gh` — the arm lacks `fence:`'s fixture-string `namesGh` check and `ghFreePath`. Bug report: [task.181.bug.1.fixture-reaches-host-gh.md](./task.181.bug.1.fixture-reaches-host-gh.md).
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -328,6 +349,8 @@ None.
 | 2026-10-12 |         | Status → ready-for-development | review-task |
 | 2026-10-12 |         | Implemented — 1 engine + 6 routing docs + 2 proof fixtures + 3 test files, 15 new tests (13 shell-argv, 1 routing, 1 limits update) | develop |
 | 2026-10-12 |         | Status → ready-for-review | develop |
+| 2026-10-12 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-10-12 |         | QA findings fixed — cycle 1, 1 finding + 2 cleanups (fixture gh checks for shell-argv:) | qa-fix |
 
 <!-- change-log-end -->
 

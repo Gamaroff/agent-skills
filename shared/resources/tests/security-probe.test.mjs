@@ -5398,3 +5398,86 @@ test("shell-argv entry: the proof run — reenter-qa-after-finalise.sh is reache
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ── task.181 QA cycle 1 — TASK-181-001: a case fixture must not reach the host gh ──
+//
+// shell-argv: honours a case's fixture as fence: does, so it takes fence:'s two
+// gh hardenings over it: the pre-spawn text check over fixture env values and
+// file contents, and ghFreePath, which hides every PATH directory holding a gh.
+// A fake "host" gh is planted on the test process's PATH, so both rows hold on a
+// host with no real gh as well as one with it.
+
+/** Run fn with a directory holding an executable `gh` first on process PATH. */
+function withPlantedGh(fn) {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), "planted-gh-")));
+  writeFileSync(join(dir, "gh"), "#!/bin/sh\necho planted-gh\n");
+  chmodSync(join(dir, "gh"), 0o755);
+  const saved = process.env.PATH;
+  process.env.PATH = `${dir}:${saved ?? ""}`;
+  try {
+    return fn();
+  } finally {
+    process.env.PATH = saved;
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test("shell-argv entry: a case fixture that names gh is declined needs-fake-gh before anything spawns (TASK-181-001)", () => {
+  const root = saRoot({ "plain.sh": '#!/usr/bin/env bash\n[ -n "$1" ]\n' });
+  try {
+    const helper =
+      'for p in $(type -ap gh); do case $p in *probe-harness*) ;; *) "$p" > ghran.txt 2>&1; break;; esac; done\n';
+    for (const fixture of [
+      { env: { BASH_ENV: "./helper.sh" }, files: { "helper.sh": helper } },
+      { env: { PROBE_CMD: "gh auth status" } },
+    ]) {
+      const r = withPlantedGh(() =>
+        runProbeSpec({
+          entry: "shell-argv:plain.sh",
+          argv: ["{input}"],
+          cases: [
+            saCase("sa.fx", "hostile", "x", {
+              fixture,
+              expected: { exit: 0, absent: ["ghran.txt"] },
+            }),
+          ],
+          repoRoot: root,
+        }),
+      );
+      assert.equal(r.reason, "needs-fake-gh", JSON.stringify(r.cases));
+      assert.equal(r.executed, 0);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: a fixture that spells gh without naming it still finds no host gh on PATH (TASK-181-001, ghFreePath)", () => {
+  const root = saRoot({ "plain.sh": '#!/usr/bin/env bash\n[ -n "$1" ]\n' });
+  try {
+    // `${G}h` with G=g spells gh without the text "gh" — only the PATH
+    // shadowing can stop it.
+    const helper =
+      'for p in $(type -ap "${G}h"); do case $p in *probe-harness*) ;; *) "$p" > ghran.txt 2>&1; break;; esac; done\n';
+    const r = withPlantedGh(() =>
+      runProbeSpec({
+        entry: "shell-argv:plain.sh",
+        argv: ["{input}"],
+        cases: [
+          saCase("sa.fx", "hostile", "x", {
+            fixture: {
+              env: { BASH_ENV: "./helper.sh", G: "g" },
+              files: { "helper.sh": helper },
+            },
+            expected: { exit: 0, absent: ["ghran.txt"] },
+          }),
+        ],
+        repoRoot: root,
+      }),
+    );
+    assert.deepEqual(r.reproduced, [], JSON.stringify(r.cases));
+    assert.equal(r.executed, probeShells().length);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
