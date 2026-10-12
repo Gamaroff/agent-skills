@@ -45,12 +45,12 @@ Confirm the copy is the step-0 document alone, which is what the citation rule p
 
 - Population: every `skills/*/SKILL.md`, every `shared/resources/*.md`, and every hand-authored
   `skills/*/references/*.md` (drop files carrying the AUTO-GENERATED marker).
-- Fail on the compound key — a recursive flag plus a lowercase-`l` files-with-matches flag, read off the grep's flag tokens (QA cycle 1, CR-2; the test's `isKeyLookup`)
+- Fail on a grep-family command searching the `docs` tree for a tracker-key value, read per command segment (QA cycle 2 replaced the flag-spelling key; the test's `isKeyLookup`)
   (quote- and flag-order-tolerant; review 1, I1). Pin that it does not match the `grep -rL` sites in
   `sync-github-bug` / `sync-jira-bug` — files *without* a key, a different rule. Population also takes
-  tracked shell under `shared/resources/` and `skills/*/scripts/`. Allowlist exactly one entry — the §0a history note
-  ("The previous form of this lookup was a bare …") — matched by file and by that sentence, never by
-  line number.
+  tracked shell under `shared/resources/` and `skills/*/scripts/`. Allowlist exactly one entry — §0a's own lookup
+  (`DOC_MATCHES=$(grep -rlE …`; the §0a history note no longer matches the cycle-2 key) — matched by
+  file and by that text, never by line number.
 - Non-vacuity: the §0a block in `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` must
   contain `^${KEY_FIELD}:[[:space:]]*['\"]?${KEY_VALUE}` — the rule must still exist for the citations
   to point at.

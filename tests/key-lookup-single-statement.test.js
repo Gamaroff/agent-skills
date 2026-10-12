@@ -13,15 +13,15 @@
  *
  * WHAT IT CHECKS
  * --------------
- * 1. No canonical source runs a recursive files-with-matches grep over the key outside the one
- *    allowlisted §0a history note. The key is COMPOUND (obs #135), read off the grep's own flag
- *    tokens rather than one regex over the line: a recursive flag (a short cluster holding `r`/`R`,
- *    or `--recursive`) AND a files-with-matches flag (a short cluster holding a LOWERCASE `l`, or
- *    `--files-with-matches`) — in any order, in one cluster or several (`-rl`, `-lr`, `-ril`,
- *    `-rEl`, `-r -l`, `--recursive -l`) — over `jira_key:` / `github_issue:`, any quote style. The
- *    plain recursive form would also match `grep -rL 'jira_key:'` (files WITHOUT a key) in the
- *    sync-*-bug skills — a different rule — so the lowercase `l` is the discriminator, and it is
- *    pinned below rather than assumed.
+ * 1. No canonical source searches the docs/ tree for a tracker-key VALUE outside the one statement
+ *    of the rule — §0a's own lookup. The key is what the line DOES, not how its flags are spelled
+ *    (QA cycle 2 replaced a flag-spelling key that kept missing spellings — obs #135, #174): within
+ *    one command segment (split on pipes, `;`, `&&` and code-span backticks), a grep-family command
+ *    (`grep`, `egrep`, `fgrep`, `git grep`, `rg`) + a key field followed by a value
+ *    (`jira_key: X`, `github_issue: {N}`, `${KEY_FIELD}:…`) + the `docs` tree as a path argument,
+ *    and NOT a files-WITHOUT-match search (`-L`, `--files-without-match`), which is a different rule
+ *    (the sync-*-bug skills list unlinked documents that way) and is pinned below. Its scope is that
+ *    shape: a lookup that pipes `find docs …` into a grep is not seen.
  * 2. Non-vacuity: §0a still holds its anchored pattern, the population is non-trivial, and the
  *    allowlisted note still exists (a stale allowlist entry is red).
  * 3. The three former sites cite §0a, and each skill ships the step-0 document.
@@ -40,48 +40,43 @@ const { spawnSync, execFileSync } = require("node:child_process");
 const ROOT = path.resolve(__dirname, "..");
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
 
-const KEY_FIELD_RE = /\b(?:jira_key|github_issue):/;
+// One command segment of a line: pipes, `;`, `&&`, `||` and markdown code-span backticks separate
+// segments, so a pipeline or a sentence that names two commands is read command by command.
+const segments = (line) => line.split(/\|\||&&|[|;`]/);
+const GREP_FAMILY = /(?:^|[\s$(])(?:(?:git\s+)?[ef]?grep|rg)(?=\s)/;
+// A key field followed by a VALUE — not a closing quote, not the end: `jira_key: X`,
+// `github_issue: {N}`, `${KEY_FIELD}:[[:space:]]*…`. A value-less `"^jira_key:"` inventories keys.
+const KEY_WITH_VALUE =
+  /(?:\bjira_key|\bgithub_issue|\$\{?KEY_FIELD\}?):[ \t]*(?=[^\s'"`)\\]|\[)/;
+// The docs tree itself as a path argument (`docs`, `docs/`) — not a file under it.
+const DOCS_TREE = /(?:^|[\s'"(=])docs\/?(?=[\s'")]|$)/;
+const FILES_WITHOUT =
+  /(?:^|\s)(?:-[A-Za-z]*L[A-Za-z]*|--files-without-match)(?=\s|$)/;
 
-// The flag tokens of every `grep` invocation on a line: the run of `-x` / `--word` tokens that
-// follows the word `grep`, up to the first token that is not a flag (the pattern).
-function grepFlagSets(line) {
-  const sets = [];
-  const re = /(?:^|[^A-Za-z0-9_-])grep((?:\s+--?[A-Za-z][A-Za-z-]*)+)/g;
-  let m;
-  while ((m = re.exec(line)) !== null) sets.push(m[1].trim().split(/\s+/));
-  return sets;
-}
-const isRecursive = (t) =>
-  /^-[A-Za-z]*[rR][A-Za-z]*$/.test(t) ||
-  t === "--recursive" ||
-  t === "--dereference-recursive";
-const hasFlag = (flags, short, long) =>
-  flags.some(
-    (t) => t === long || (/^-[A-Za-z]+$/.test(t) && t.slice(1).includes(short)),
-  );
-
-// A recursive files-WITH-matches grep over a tracker key: the restated lookup.
+const lookupSegment = (seg) =>
+  GREP_FAMILY.test(seg) && KEY_WITH_VALUE.test(seg) && DOCS_TREE.test(seg);
+// A grep over the docs tree for a tracker-key value: the restated lookup.
 const isKeyLookup = (line) =>
-  KEY_FIELD_RE.test(line) &&
-  grepFlagSets(line).some(
-    (f) => f.some(isRecursive) && hasFlag(f, "l", "--files-with-matches"),
-  );
-// A recursive files-WITHOUT-match grep over a tracker key: a different rule (unlinked documents).
+  segments(line).some((seg) => lookupSegment(seg) && !FILES_WITHOUT.test(seg));
+// A files-WITHOUT-match grep over a key field: a different rule (unlinked documents).
 const isFilesWithoutKey = (line) =>
-  KEY_FIELD_RE.test(line) &&
-  grepFlagSets(line).some(
-    (f) => f.some(isRecursive) && hasFlag(f, "L", "--files-without-match"),
+  segments(line).some(
+    (seg) =>
+      GREP_FAMILY.test(seg) &&
+      /\b(?:jira_key|github_issue):/.test(seg) &&
+      FILES_WITHOUT.test(seg),
   );
 
 const STEP0_SOURCE =
   "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md";
-// The one allowlisted hit: §0a's own note describing the form it replaced. Matched by file and by
-// sentence, never by line number.
+// The one allowlisted hit: the rule's own statement, §0a's lookup. Matched by file and by text,
+// never by line number. Its liveness test below is also the guard's non-vacuity floor: a key that
+// stops matching the statement it protects is a key that matches nothing.
 const ALLOWLIST = [
   {
     file: STEP0_SOURCE,
-    sentence: "The previous form of this lookup was a bare",
-    why: "history — the §0a note naming the unanchored form task.176 replaced",
+    sentence: "DOC_MATCHES=$(grep -rlE",
+    why: "the one statement — §0a Key → document lookup",
   },
 ];
 
@@ -125,7 +120,7 @@ function hits(files, matches) {
 const allowlisted = (h) =>
   ALLOWLIST.some((a) => a.file === h.file && h.text.includes(a.sentence));
 
-test("no canonical source restates the key → document grep outside the §0a history note", () => {
+test("no canonical source restates the key → document lookup outside §0a's own statement", () => {
   const files = population();
   assert.ok(
     files.length >= 100,
@@ -155,22 +150,29 @@ test("the key matches the restatements it exists to catch", () => {
     'fall back to `grep -rl "github_issue: {N}" docs/`',
     "grep -rl 'jira_key: RAPP-1' docs/",
     'grep -lr "github_issue: 5" docs/',
-    'grep -rlE "^jira_key: X" docs/',
-    'grep -n -rl "jira_key: X" docs/',
-    // QA cycle 1, CR-2: r and l in one cluster but not adjacent, or in separate tokens.
     'grep -ril "jira_key: X" docs/',
-    'grep -rEl "^jira_key: X" docs/',
     'grep -r -l "github_issue: 5" docs/',
     'grep --recursive -l "jira_key: X" docs/',
-    'grep -R --files-with-matches "jira_key: X" docs/',
+    // QA cycle 2, CR-1: spellings a flag-token key missed.
+    'grep --include="*.md" -rl "jira_key: X" docs/',
+    'grep -m1 -rl "jira_key: X" docs/',
+    'grep "jira_key: X" -rl docs/',
+    'egrep -rl "jira_key: X" docs/',
+    'grep -r --files-with-match "jira_key: X" docs/',
+    'rg -l "github_issue: 5" docs/',
+    'git grep -l "jira_key: X" -- docs/',
+    `DOC_MATCHES=$(grep -rlE "^\${KEY_FIELD}:[[:space:]]*['\\"]?\${KEY_VALUE}['\\"]?[[:space:]]*$" docs/ 2>/dev/null \\`,
   ]) {
     assert.ok(isKeyLookup(s), s);
   }
   for (const s of [
     "grep -rL 'jira_key:' docs/", // files WITHOUT a key — another rule
     "TRACKER_ISSUE=$(grep '^jira_key:' {document-file})", // one file, not a lookup
-    'grep -l "jira_key: X" docs/x.md', // not recursive
-    "grep -rn 'jira_key: X' docs/", // not files-with-matches
+    'grep "^jira_key: X" docs/tasks/task.1.x/task.1.x.md', // a file under docs/, not the tree
+    // QA cycle 2, CR-3: lines that are not lookups.
+    'grep -rl "status: done" docs/ | xargs grep -h "^jira_key:"',
+    "run `grep -rl TODO docs/` then read the `jira_key:` field",
+    'grep -rl "^jira_key:" docs/ | wc -l', // an inventory: no key value
   ]) {
     assert.ok(!isKeyLookup(s), `not a lookup: ${s}`);
   }

@@ -91,14 +91,13 @@ document today (`ls … | grep -c develop-pipeline-step-0` → 0).
   bundler copies the step-0 document alone into each skill, not its closure (AGENTS.md "Cite or depend").
 - review-task's line-99 block keeps its task-only constraint (a `task.{N}` document) as a check on the
   lookup's result, never as a second grep.
-- A guard test fails on any recursive files-with-matches grep over the key in a canonical source
-  outside the allowlisted §0a history note. Its key is compound and read off the grep's own flag
-  tokens: a recursive flag (a short cluster holding `r`/`R`, or `--recursive`) and a files-with-matches
-  flag (a short cluster holding a lowercase `l`, or `--files-with-matches`), in any order and in one
-  cluster or several (`-rl`, `-ril`, `-rEl`, `-r -l`), over `jira_key:` / `github_issue:` in any quote
-  style (QA cycle 1, CR-2 widened it from an adjacent-`rl` regex). On the 2026-10-12 population
-  (`skills/*/SKILL.md`, `shared/resources/*.md|*.sh`, `skills/*/scripts/*`) it matched 4 lines before
-  this task: the three sites and the §0a history note. It deliberately does **not** match
+- A guard test fails on any canonical source other than §0a's own lookup that greps the `docs` tree
+  for a tracker-key value. Its key is what the line does, not how its flags are
+  spelled: within one command segment, a grep-family command (`grep`, `egrep`, `git grep`, `rg`), a
+  key field followed by a value (`jira_key: X`, `github_issue: {N}`, `${KEY_FIELD}:…`) and the
+  `docs` tree as a path argument (QA cycle 2 replaced two flag-spelling keys that each missed real
+  spellings). Before this task it matched the three sites; after it, only §0a's own lookup, which is
+  the allowlist's one entry. A lookup that pipes `find docs …` into a grep is outside its shape. It deliberately does **not** match
   `sync-github-bug/SKILL.md:58` / `sync-jira-bug/SKILL.md:105`, which run `grep -rL` (files *without*
   a key — a different rule); the lowercase `l` is what separates them. It carries a non-vacuity floor:
   the §0a block must still match its own anchored pattern.
@@ -162,7 +161,7 @@ match now reports "no local document". CHANGELOG says so.
 
 - [x] Fail on the compound key (§3 Target Architecture) in any canonical source — `skills/*/SKILL.md`,
       `shared/resources/*.md`, hand-authored `skills/*/references/*.md`, and tracked shell under
-      `shared/resources/` and `skills/*/scripts/` — except the allowlisted §0a history note; assert the
+      `shared/resources/` and `skills/*/scripts/` — except §0a's own lookup, the one allowlisted entry; assert the
       §0a block still holds its anchored pattern (non-vacuity). Assert the two `grep -rL` sites are not
       matched (the discriminator is pinned, not assumed).
 - [x] Executed fixture test, same file: extract the §0a fenced block and review-task's Jira-key fenced
@@ -239,8 +238,8 @@ None.
 
 ### Functional
 
-- [ ] No canonical source restates `grep -rl "jira_key: ` or `grep -rl "github_issue: ` outside the
-      allowlisted §0a history note (guard test).
+- [ ] No canonical source other than §0a's own lookup greps the `docs` tree for a tracker-key value
+      — the key `tests/key-lookup-single-statement.test.js` defines (guard test).
 - [ ] review-task's Jira-key branch resolves a quoted key to its one task document and not to a
       `.request.` sibling or a prefix neighbour (executed fixture test in
       `tests/key-lookup-single-statement.test.js`, bash and zsh — CI installs zsh).
@@ -307,19 +306,20 @@ accurate.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.178.qa.1.review-skills-cite-key-lookup.md](./task.178.qa.1.review-skills-cite-key-lookup.md)
-- **Gate File**: [task.178.gate.1.review-skills-cite-key-lookup.yml](./task.178.gate.1.review-skills-cite-key-lookup.yml)
+- **Full Report**: [task.178.qa.2.review-skills-cite-key-lookup.md](./task.178.qa.2.review-skills-cite-key-lookup.md)
+- **Gate File**: [task.178.gate.2.review-skills-cite-key-lookup.yml](./task.178.gate.2.review-skills-cite-key-lookup.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 10 (new file) + 5374 (fast gate)
+- **Tests Executed**: 12 (new file) + fast gate
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-- CR-1 (medium): review-task's Jira-key branch works only when its three blocks run as one shell, and does not say so.
-- CR-2 (low): the guard key misses non-adjacent `r` / `l` flag spellings.
-- BND-1 (low, deferred to task.180): the task-only check is a boundary with no probe entry form yet.
+- Gate 1 findings fixed (one-shell Jira-key branch, flag-token key, fixture cleanup).
+- CR-1 (medium): the guard keys on grep flag spelling and still misses real restatements.
+- CR-3 (low): the guard flags lines that are not lookups.
+- BND-1 deferred to task.180.
 
 <!-- change-log-start -->
 
@@ -333,6 +333,8 @@ accurate.
 | 2026-10-12 |         | Implemented — 4 files changed, 1 test file (10 tests), 2 bundled copies | develop |
 | 2026-10-12 |         | QA gate CONCERNS (90/100) — 3 findings (1 medium, 2 low; 1 deferred) | qa-task |
 | 2026-10-12 |         | QA findings fixed — cycle 1, 2 findings + 1 cleanup (one-shell Jira-key branch, flag-token guard key, fixture cleanup) | qa-fix |
+| 2026-10-12 |         | QA gate CONCERNS (90/100) — 3 findings (1 medium, 1 low, 1 deferred) | qa-task |
+| 2026-10-12 |         | QA findings fixed — cycle 2, 2 findings (guard key replaced: grep over the docs tree for a key value, per command segment) | qa-fix |
 
 <!-- change-log-end -->
 
