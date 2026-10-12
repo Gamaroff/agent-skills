@@ -3,7 +3,7 @@
 **Task**: `task.180.probe-engine-fence-entry-form.md`
 **Run Number**: 1
 **Started**: 2026-10-12 15:12
-**Status**: In Progress
+**Status**: Escalated
 
 ---
 
@@ -35,8 +35,8 @@ Add the `fence:<doc>#<heading>` entry form (with `--slot` and an optional per-ca
 | 1. create-branch           | ✅ Done    | Branch `feature/task.180.*` exists in git                             | Branch created at `9865b20a` | —                    | 2026-10-12T13:12Z |
 | 2. review-task             | ✅ Done    | `task.180.review.{N}.{name}.md` exists (or skip logged)               | review.1 — 8/10 after fixes, READY; Planned → Ready for Development | — | 2026-10-12T13:16Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan + map); 2 iterations of the fast gate — iter 1: 2 lint failures in new prose, fixed; iter 2: 5377 pass, 0 fail | — | 2026-10-12T13:46Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.180.qa.{N}.*.md`; `task.180.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #637: https://github.com/Gamaroff/agent-skills/pull/637 | — | 2026-10-12T13:48Z |
+| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention — QA loop not converging (HIGH 1, 1, 1; gate 3 FAIL) | `task.180.qa.{N}.*.md`; `task.180.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.180.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
@@ -95,11 +95,32 @@ Add the `fence:<doc>#<heading>` entry form (with `--slot` and an optional per-ca
 - Change Log: one develop row written by the inline path (`/develop` did not run).
 - Development completion comment posted to github issue 560.
 
+### Step 4 — Create PR
+
+- SCOPE_PATHS: docs/tasks/task.180.probe-engine-fence-entry-form, CHANGELOG.md, shared/resources, shared/resources/tests, skills/finalise/references, skills/qa-story/references, skills/qa-story, skills/qa-task/references, skills/qa-task, skills/review-security/references, skills/review-security. Pre-flight guard held nothing (every untracked path in scope). Report and review links checked (0 relative links each).
+- Base branch pre-supplied: develop — /create-pr prompt skipped. Committed via /commit-changes in two commits: `f802999e` feat(security-probe) and `a318b134` docs(task.180); the pre-commit hook re-bundled with every skill in sync. Leak check OK.
+- PR body composed from this implementation record rather than the diff-summariser subagent — the change was authored in this run, and the record is the more precise source.
+- PR created: https://github.com/Gamaroff/agent-skills/pull/637 (state OPEN). Issue #560: in-review comment posted. GitHub board: in-review → stage-disabled.
+- Lock pr_url written; develop-next run state prNumber = 637.
+
+### Steps 5–6 — QA loop
+
+- Traceability mapper skipped: HAS_SUCCESS_CRITERIA_TABLE=false (Success Criteria are checklists, derived inline). QA-start board re-assert: in-review → stage-disabled.
+- QA Cycle 1 — gate FAIL 70/100 (1 HIGH reproduced by QA, 1 MEDIUM, 1 LOW). Security: 26 engine probes, 0 reproduced, recorded in `task.180.qa.1.security.run.json`.
+- QA Cycle 1 — changes-requested: stage-disabled. Narrowing offer: false (below-cycle-floor).
+- qa-fix cycle 1: Step 1a findings ingester run inline — the gate was written in this session and no PR-review report exists (`pr-review-current` none); no independence lost on facts, only on reading.
+- QA Cycle 2 — refute pass + safety re-probe (clause 2 by judgement); reviewer 306.7 s. Gate FAIL 60. changes-requested: stage-disabled. Narrowing offer: false (HIGH not 0).
+- Pre-strike shape named at cycle 2: both HIGHs sit in runFenceCase's outcome scoring (a mechanism this branch created). Move taken early: **replace** the branch chain with one ordered scorer, rather than a third patch.
+- Post-fix PR state check done inline (`gh pr view` → OPEN @ bdbedcdf) rather than through the poller subagent.
+- QA Cycle 3 — safety re-probe (reviewer 252.5 s); gate FAIL 70. Convergence check (awk count over gates 1–3): HIGH 1, 1, 1 → trips at cycle 3. 5b not run.
+
 ---
 
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
+- **QA cycle 3 gate heredoc was unquoted**: backticks in the finding text ran as command substitutions (only "command not found" — no side effects) and truncated one finding; repaired from the reviewer's text before commit.
+- **QA loop not converging (cycle 3)** — escalated; see QA Iteration History § QA Loop Not Converging.
 
 - **Fast gate iter 1 — 2 failures (triaged real by an Explore subagent):** (1) `probes-executed-population` lint — the new `fence:` paragraph in `probe-boundary-rule.md` named a `probes_executed` count with no run record nearby; reworded to "probed zero times by the engine". (2) `bundle-comment-origin` lint — the new `routingBlocks()` JSDoc carried a comment-only `shared/resources/<file>.md` reference; reworded. A first draft of that JSDoc also wrote `skills/*/SKILL.md`, whose `*/` closed the comment (prettier caught it). Iter 2: 5377 pass, 0 fail.
 
@@ -109,14 +130,71 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-10-12
+**Gate Result**: FAIL
+**Issues Found**: 3 — TASK-180-001 (HIGH, reproduced: a substitution that breaks the block's shell syntax is scored as a refusal, so an accept-all block scores engages), TASK-180-002 (MEDIUM: fence: control key ignores slot and name; slot not recorded), TASK-180-003 (LOW: empty --slot passes main()). Advisory cleanups CR-4, CR-5.
+**HIGH findings**: 1
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 1 of 5)
+**Fixes Applied**: TASK-180-001 — isShellParseFailure scores an unparseable substituted block errored (stderr-first detail, CR-4); TASK-180-002 — record carries slot, fence: control keyed on --name else slot; TASK-180-003 — empty --slot exits 2; CR-5 length asserts. Each fix mutation-proven (F1–F4 red). Exit-rule clause restated at 5 fence: sites + CHANGELOG + task doc (Probe population 5, move: patch). Fast gate attempt 1 green (5380/0).
+**Commit**: `bdbedcdf`
+
+### QA Cycle 2 — 2026-10-12
+**Gate Result**: FAIL
+**Issues Found**: 5 — TASK-180-004 (HIGH: expected.absent can name a file the case's own fixture writes → every hostile case accepted), TASK-180-005 (MEDIUM: shell diagnostics other than a parse error read as a refusal), TASK-180-006 (MEDIUM: parse-failure branch masks a reproduced side effect), TASK-180-007 (LOW: declined run loses slot), TASK-180-008 (LOW: CRLF). CR-5 pre-existing → future; CR-7 → future.
+**HIGH findings**: 1
+**MEDIUM findings**: 2
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 2 of 5)
+**Fixes Applied**: structural move — runFenceCase's scoring replaced by one ordered scoreFenceRun (absent-first, shellDiagnostic widened to every shell error about the script); TASK-180-004 collision decline; -007 slot on decline; -008 CRLF; CR-7 signal wording. Mutations G1–G5 red. Fast gate attempt 1 green (5385/0). Doc population (phrase 'unparseable'): 5 fence sites + CHANGELOG + task doc updated, 9 unrelated hits unaffected.
+**Commit**: `fcbbe9d9`
+
+### QA Cycle 3 — 2026-10-12
+**Gate Result**: FAIL
+**Issues Found**: 3 — TASK-180-009 (HIGH: cycle 2's widened shellDiagnostic treats non-fatal errors after a guard as "the guard never answered" → false engages on the unquoted word-split shape), TASK-180-010 (MEDIUM: collision decline compares raw paths), TASK-180-011 (LOW: writes beside the case dir under the work dir are not observed).
+**HIGH findings**: 1
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Escalating — loop not converging
+
+### QA Loop Not Converging — 2026-10-12
+
+The pipeline stopped after 3 qa-task/qa-fix cycles: the HIGH finding
+count failed to strictly decrease across two consecutive cycles, so the
+loop was no longer converging. The remaining findings are NOT accepted —
+they are handed over below.
+
+**Final gate status**: FAIL (gate 3, 70/100)
+**HIGH findings per cycle**: 1, 1, 1 — flat from cycle 1 onward
+**Remaining issues** (from final gate file):
+- TASK-180-009 — high — `shared/resources/security-probe.mjs` — shellDiagnostic counts non-fatal shell errors that occur after a guard let a hostile input through as "the guard never answered", so a guard that word-splits an unquoted input scores engages.
+- TASK-180-010 — medium — `shared/resources/security-probe.mjs` — the expected.absent / fixture.files collision decline compares raw strings (`./pwned`, `b/../pwned`, case-only on case-insensitive filesystems).
+- TASK-180-011 — low — `shared/resources/probe-boundary-rule.md` — writes beside the case dir under the work dir are not observed, though the docs call them escapes.
+
+**What was attempted per cycle**:
+- Cycle 1: parse failures of the substituted block scored errored; fence: control keyed on --name else slot; empty --slot exits 2 (`bdbedcdf`).
+- Cycle 2: structural move — runFenceCase's scoring replaced by one ordered scoreFenceRun; shellDiagnostic widened to every shell error about the script; collision decline; slot on decline; CRLF (`fcbbe9d9`).
+- Cycle 3: not fixed — the convergence check tripped.
+
+**Likely root cause**: every HIGH sits in one design decision — inferring a guard's refusal from the exit status of a block whose slot is source-substituted. Each fix narrowed or widened the "could not look" class, and each move created the opposite error: cycle 1 left other fatal diagnostics as refusals, cycle 2's widening swallowed non-fatal errors after the guard. Exit status cannot tell "the guard refused" from "the input broke the block" without the case saying what a refusal looks like. The file the fixes kept circling is `shared/resources/security-probe.mjs`, mechanism `scoreFenceRun`/`shellDiagnostic`.
+
+**Recommended next steps**:
+1. Decide the fence: verdict model: (a) require `expected` on hostile fence: cases (the guard's own refusal output), declining a hostile case without one — the robust option; or (b) narrow `errored` to diagnostics that stop the shell before any line runs (syntax error, unexpected EOF, `${x:?}`/unbound) and let a mismatched `expected` outrank any diagnostic.
+2. Then re-run /develop-task (Phase 0b offers "Resume at 5a with {k} more cycles"); fix TASK-180-010/011 in the same pass.
+3. The task.167 proof (13 cases, engages, the 4-case over-block discrimination) holds at every cycle and is unaffected by either option.
+
 ---
 
 ## Completion
 
 **Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Final Status**: Escalated — QA loop not converging at cycle 3
 **Branch**: feature/task.180.probe-engine-fence-entry-form
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/637
+**QA Iterations**: 3 (2 fix cycles)
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
