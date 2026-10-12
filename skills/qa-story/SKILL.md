@@ -1148,7 +1148,14 @@ JSON
    `--entry 'cli:<path>' --argv '["--flag","{input}"]' --cases-file <cases.json>` — the
    template's one `"{input}"` element is each case, exit status is the verdict, a crash is
    `errored`, and each guarded flag is its own control, named with `--name`; "it takes several flags" is never a reason
-   to record `boundary: false`.
+   to record `boundary: false`. A **fenced bash block in a step doc** (a guard shipped as Markdown —
+   task.167's fast-gate precondition) takes the fence form:
+   `--entry 'fence:<doc.md>#<heading>' --slot '<placeholder>' --cases-file <cases.json>` — the block
+   under the heading runs with each case's input in place of the placeholder, each case's
+   `fixture: {env, files}` supplies what else it reads, and every hostile case carries `expected` with the
+   guard's own refusal output (a non-empty stdout or stderr) — or is declined (scoring order:
+   `scoreFenceRun`); "it is prose,
+   not a script" is never a reason to record `boundary: false`.
    A predicate the engine cannot import because it is **not exported** — a module-private `const` —
    takes the same answer: export it (one word) and probe it. "It is not exported" is never a reason to
    record `boundary: false`; the engine's `entry-not-probeable` detail names the remedy. On task.139

@@ -24,6 +24,20 @@ All notable changes to this project will be documented in this file. Format foll
 - **Per-step timestamps.** Implementation reports gain a `Completed (UTC)` column in Pipeline Progress,
   stamped once by the Step Transition Protocol, so step timing can be measured instead of reconstructed
   from commits.
+- **security-probe reaches a fenced bash block in a step doc (task 180, obs #261).** A fifth entry
+  form, `--entry 'fence:<doc.md>#<heading>' --slot '<placeholder>'`, reads the doc on every run, takes
+  the first ```` ```bash ```` block under the heading (headings are read outside fences), substitutes
+  each case's input for the placeholder and runs it under bash and zsh. A hostile case must state the
+  guard's refusal output (a non-empty stdout or stderr) in `expected` and is declined without one,
+  because an exit status cannot tell a refusal from a shell that stopped on the input; a legitimate case is scored by exit status, and a
+  script that does not parse (`<shell> -n`) is `errored`. A new optional case field, `fixture: {env, files}`, supplies what else the block reads. The
+  slot is source substitution, as for the document's reader: a `$(…)` input runs, inside the case's
+  sandbox directory; a write to an absolute path outside the sandbox is not observed (a stated limit).
+  Without `--fake-gh`, a block, input or fixture that names `gh` is declined `needs-fake-gh` before it runs,
+  and every `PATH` directory that holds `gh` is shadowed by a copy without it for each case. A guard shipped as Markdown — task.159's and task.167's, each probed through a
+  hand-written wrapper under `.claude/state/` — is now probed by the engine, and the record names an
+  entry that resolves in every checkout. Every document that routes a non-JS entry names the new form,
+  held by a parity test.
 
 ### Changed
 

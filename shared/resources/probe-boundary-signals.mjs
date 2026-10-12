@@ -55,7 +55,7 @@ export const BOUNDARY_SIGNALS = Object.freeze([
   Object.freeze({
     id: "self-declared-refusal",
     description:
-      'a script or function whose own header or doc comment says it *refuses*, *never guesses*, or *fails closed* — in any language; a bash script is a boundary by its own words, and "not importable" routes it to the engine\'s `shell:` entry form, never to `boundary: false`',
+      'a script or function whose own header or doc comment says it *refuses*, *never guesses*, or *fails closed* — in any language; a bash script is a boundary by its own words, and "not importable" routes it to the engine\'s `shell:` entry form — or, for a guard shipped as a fenced bash block in a step doc, to `fence:<doc.md>#<heading>` with `--slot` — never to `boundary: false`',
     scope: "doc",
     phrases: Object.freeze([
       /\brefuses?\b(?: rather than| instead of| to guess)/i,

@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "filename",
+      "entry": "fence:shared/resources/develop-pipeline-step-3-develop-loop.md#Precondition — the gate must resolve before the first iteration",
+      "name": "fast-gate precondition via fence:",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 13,
+      "passed": 13,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": [
+        "bash"
+      ],
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": "<fastGateCommand>",
+      "ran_at": "2026-10-12T16:56:18.733Z"
+    },
+    {
+      "sink": "path",
+      "entry": "shared/resources/security-probe.mjs#resolveEntry",
+      "name": "resolveEntry fence: branch",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 13,
+      "passed": 13,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": null,
+      "ran_at": "2026-10-12T16:56:21.815Z"
+    }
+  ],
+  "totals": {
+    "executed": 26,
+    "reproduced": 0
+  },
+  "updated_at": "2026-10-12T16:56:21.815Z"
+}

@@ -63,8 +63,16 @@ export const CASE_FIELDS = Object.freeze([
  * `absent` lists paths, relative to the fixture directory, that a correct run
  * must NOT create: it is how a command-substitution name is caught when the
  * substitution ran but the number still came out right.
+ *
+ * `fixture` is read only by the `fence:` entry form (task.180):
+ *
+ *   { env: { npm_config_loglevel: "silent" }, files: { ".npmrc": "loglevel=silent\n" } }
+ *
+ * `env` is merged into the case's environment (it may not set HOME, TMPDIR or
+ * LC_ALL, which the sandbox owns); `files` are written into the case's own
+ * directory, which is the block's cwd. No corpus case carries it.
  */
-export const OPTIONAL_CASE_FIELDS = Object.freeze(["expected"]);
+export const OPTIONAL_CASE_FIELDS = Object.freeze(["expected", "fixture"]);
 
 /**
  * Sinks whose cases materialise as a FIXTURE DIRECTORY rather than as a string.
