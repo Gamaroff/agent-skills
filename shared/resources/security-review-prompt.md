@@ -98,7 +98,7 @@ answer to a question nobody asked.
 `entry` is `path#exportName`, resolved from the repository root. It must be:
 
 - **A real, importable ES module export — or a shell script via the `shell:` entry form, a
-  sourced library via `shell-fn:`, or a Node CLI via `cli:`.** A bash script taking one positional argument is probed with
+  sourced library via `shell-fn:`, a Node CLI via `cli:`, or a fenced bash block via `fence:`.** A bash script taking one positional argument is probed with
   `--entry 'shell:<path>'` (and a materialised sink such as `filename`); a **sourced library** — a
   header that says *source it*, or functions with no top-level call (the signal is stated once in
   `probe-boundary-rule.md` §5) — with `--entry 'shell-fn:<path>#<function>' --cases-file
@@ -108,7 +108,12 @@ answer to a question nobody asked.
   behind its flags is probed with `--entry 'cli:<path>' --argv '["--flag","{input}"]'` — the
   template's one `"{input}"` element is the case, the exit status is the verdict (0 accepted,
   non-zero rejected; a case carrying `expected` is compared instead), a crash is `errored`, and each
-  guarded flag is its own control, named with `--name`. A script or CLI that reads stdin, a shell script that takes two
+  guarded flag is its own control, named with `--name`. A **fenced bash block in a step doc** — a
+  guard shipped as Markdown — is probed with `--entry 'fence:<doc.md>#<heading>' --slot
+  '<placeholder>' --cases-file <cases.json>`: the block under the heading runs as a script with each
+  case's input substituted for the placeholder (as source — a `$(…)` in it runs, inside the sandbox),
+  each case's `fixture: {env, files}` supplies what else it reads, and the exit status is the
+  verdict. "It is prose, not a script" is never a reason to report `unverifiable`. A script or CLI that reads stdin, a shell script that takes two
   positionals, or anything that needs the network is what remains declined — say which.
 - **Called with the case as its first argument** — for the JS form. The child runner calls
   `await fn(input, ...args)`, where `args` is the JSON array given with `--args-json` (empty without
@@ -162,7 +167,7 @@ A shell-script boundary takes the same row with `--entry 'shell:<path>'` in plac
 materialises each case as a fixture directory and runs the script against it under bash and zsh, so
 "it is not JS" is never the reason a control row reads `unverifiable`. A Node CLI takes it with
 `--entry 'cli:<path>' --argv '[…"{input}"…]'`, and "it takes several flags" is never that reason
-either.
+either. A fenced bash block takes it with `--entry 'fence:<doc.md>#<heading>' --slot '<placeholder>'`.
 
 And the machine block, once per report, which is what a gate consumes. **It is printed, not
 written.** Every probe passes `--repo-root "$(git rev-parse --show-toplevel)"` — the engine's
@@ -255,7 +260,8 @@ over-read a clean result.
    site's `file:line`, record the module path the engine actually resolved, and **downgrade to
    `unverifiable` any citation naming no file in scope**.
 3. **A non-JS entry point is routed to `--entry 'shell:<path>'`** — or, for a sourced library,
-   `--entry 'shell-fn:<path>#<function>'`, and for a Node CLI, `--entry 'cli:<path>' --argv …`
+   `--entry 'shell-fn:<path>#<function>'`, for a Node CLI, `--entry 'cli:<path>' --argv …`, and for
+   a fenced bash block in a step doc, `--entry 'fence:<doc.md>#<heading>' --slot '<placeholder>'`
    — not recorded `unverifiable`; only a target no entry form reaches (stdin, a shell script with
    more than one positional, network) is declined — and the decline names the reason. The `cli:`
    form's verdict is only as good as the CLI's exit status: one that exits 0 while refusing is

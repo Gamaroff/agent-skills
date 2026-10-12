@@ -1,0 +1,245 @@
+[
+  {
+    "id": "missing-default",
+    "sink": "filename",
+    "input": "npm run ci:fast",
+    "why": "the gate script is not defined, default config",
+    "correct": "the precondition HALTs (exit 1)",
+    "direction": "hostile",
+    "fixture": {
+      "env": {
+        "npm_config_logs_max": "0",
+        "npm_config_update_notifier": "false",
+        "NODE_DISABLE_COMPILE_CACHE": "1"
+      },
+      "files": {
+        "package.json": "{\n  \"name\": \"fixture\",\n  \"version\": \"1.0.0\",\n  \"scripts\": {\n    \"test\": \"true\"\n  }\n}\n"
+      }
+    }
+  },
+  {
+    "id": "missing-env-silent",
+    "sink": "filename",
+    "input": "npm run ci:fast",
+    "why": "script missing under npm_config_loglevel=silent — the flag must not admit a missing script",
+    "correct": "the precondition HALTs (exit 1)",
+    "direction": "hostile",
+    "fixture": {
+      "env": {
+        "npm_config_logs_max": "0",
+        "npm_config_update_notifier": "false",
+        "NODE_DISABLE_COMPILE_CACHE": "1",
+        "npm_config_loglevel": "silent"
+      },
+      "files": {
+        "package.json": "{\n  \"name\": \"fixture\",\n  \"version\": \"1.0.0\",\n  \"scripts\": {\n    \"test\": \"true\"\n  }\n}\n"
+      }
+    }
+  },
+  {
+    "id": "missing-npmrc-silent",
+    "sink": "filename",
+    "input": "npm run ci:fast",
+    "why": "script missing under a project .npmrc loglevel=silent",
+    "correct": "the precondition HALTs (exit 1)",
+    "direction": "hostile",
+    "fixture": {
+      "env": {
+        "npm_config_logs_max": "0",
+        "npm_config_update_notifier": "false",
+        "NODE_DISABLE_COMPILE_CACHE": "1"
+      },
+      "files": {
+        "package.json": "{\n  \"name\": \"fixture\",\n  \"version\": \"1.0.0\",\n  \"scripts\": {\n    \"test\": \"true\"\n  }\n}\n",
+        ".npmrc": "loglevel=silent\n"
+      }
+    }
+  },
+  {
+    "id": "missing-npmrc-error",
+    "sink": "filename",
+    "input": "npm run ci:fast",
+    "why": "script missing under a project .npmrc loglevel=error",
+    "correct": "the precondition HALTs (exit 1)",
+    "direction": "hostile",
+    "fixture": {
+      "env": {
+        "npm_config_logs_max": "0",
+        "npm_config_update_notifier": "false",
+        "NODE_DISABLE_COMPILE_CACHE": "1"
+      },
+      "files": {
+        "package.json": "{\n  \"name\": \"fixture\",\n  \"version\": \"1.0.0\",\n  \"scripts\": {\n    \"test\": \"true\"\n  }\n}\n",
+        ".npmrc": "loglevel=error\n"
+      }
+    }
+  },
+  {
+    "id": "suffix-of-defined",
+    "sink": "filename",
+    "input": "npm run ci:fast-missing",
+    "why": "a suffix of a defined script is not that script (anchored grep)",
+    "correct": "the precondition HALTs (exit 1)",
+    "direction": "hostile",
+    "fixture": {
+      "env": {
+        "npm_config_logs_max": "0",
+        "npm_config_update_notifier": "false",
+        "NODE_DISABLE_COMPILE_CACHE": "1"
+      },
+      "files": {
+        "package.json": "{\n  \"name\": \"fixture\",\n  \"version\": \"1.0.0\",\n  \"scripts\": {\n    \"ci:fast\": \"true\",\n    \"lint\": \"true\"\n  }\n}\n"
+      }
+    }
+  },
+  {
+    "id": "prefix-of-defined",
+    "sink": "filename",
+    "input": "npm run ci",
+    "why": "a prefix of a defined script is not that script (anchored grep)",
+    "correct": "the precondition HALTs (exit 1)",
+    "direction": "hostile",
+    "fixture": {
+      "env": {
+        "npm_config_logs_max": "0",
+        "npm_config_update_notifier": "false",
+        "NODE_DISABLE_COMPILE_CACHE": "1"
+      },
+      "files": {
+        "package.json": "{\n  \"name\": \"fixture\",\n  \"version\": \"1.0.0\",\n  \"scripts\": {\n    \"ci:fast\": \"true\",\n    \"lint\": \"true\"\n  }\n}\n"
+      }
+    }
+  },
+  {
+    "id": "command-substitution",
+    "sink": "filename",
+    "input": "npm run x$(touch PWNED)",
+    "why": "the slot is script source: the substitution runs, in the case directory, and the script it leaves (x) is undefined",
+    "correct": "the precondition HALTs (exit 1)",
+    "direction": "hostile",
+    "fixture": {
+      "env": {
+        "npm_config_logs_max": "0",
+        "npm_config_update_notifier": "false",
+        "NODE_DISABLE_COMPILE_CACHE": "1"
+      },
+      "files": {
+        "package.json": "{\n  \"name\": \"fixture\",\n  \"version\": \"1.0.0\",\n  \"scripts\": {\n    \"ci:fast\": \"true\",\n    \"lint\": \"true\"\n  }\n}\n"
+      }
+    }
+  },
+  {
+    "id": "defined-default",
+    "sink": "filename",
+    "input": "npm run ci:fast",
+    "why": "a defined gate script, default config",
+    "correct": "the precondition admits (exit 0)",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {
+        "npm_config_logs_max": "0",
+        "npm_config_update_notifier": "false",
+        "NODE_DISABLE_COMPILE_CACHE": "1"
+      },
+      "files": {
+        "package.json": "{\n  \"name\": \"fixture\",\n  \"version\": \"1.0.0\",\n  \"scripts\": {\n    \"ci:fast\": \"true\",\n    \"lint\": \"true\"\n  }\n}\n"
+      }
+    }
+  },
+  {
+    "id": "defined-env-silent",
+    "sink": "filename",
+    "input": "npm run ci:fast",
+    "why": "defined script under npm_config_loglevel=silent (obs #213)",
+    "correct": "the precondition admits (exit 0)",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {
+        "npm_config_logs_max": "0",
+        "npm_config_update_notifier": "false",
+        "NODE_DISABLE_COMPILE_CACHE": "1",
+        "npm_config_loglevel": "silent"
+      },
+      "files": {
+        "package.json": "{\n  \"name\": \"fixture\",\n  \"version\": \"1.0.0\",\n  \"scripts\": {\n    \"ci:fast\": \"true\",\n    \"lint\": \"true\"\n  }\n}\n"
+      }
+    }
+  },
+  {
+    "id": "defined-npmrc-silent",
+    "sink": "filename",
+    "input": "npm run ci:fast",
+    "why": "defined script under a project .npmrc loglevel=silent (obs #213)",
+    "correct": "the precondition admits (exit 0)",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {
+        "npm_config_logs_max": "0",
+        "npm_config_update_notifier": "false",
+        "NODE_DISABLE_COMPILE_CACHE": "1"
+      },
+      "files": {
+        "package.json": "{\n  \"name\": \"fixture\",\n  \"version\": \"1.0.0\",\n  \"scripts\": {\n    \"ci:fast\": \"true\",\n    \"lint\": \"true\"\n  }\n}\n",
+        ".npmrc": "loglevel=silent\n"
+      }
+    }
+  },
+  {
+    "id": "defined-env-and-npmrc-silent",
+    "sink": "filename",
+    "input": "npm run ci:fast",
+    "why": "defined script under both silent sources",
+    "correct": "the precondition admits (exit 0)",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {
+        "npm_config_logs_max": "0",
+        "npm_config_update_notifier": "false",
+        "NODE_DISABLE_COMPILE_CACHE": "1",
+        "npm_config_loglevel": "silent"
+      },
+      "files": {
+        "package.json": "{\n  \"name\": \"fixture\",\n  \"version\": \"1.0.0\",\n  \"scripts\": {\n    \"ci:fast\": \"true\",\n    \"lint\": \"true\"\n  }\n}\n",
+        ".npmrc": "loglevel=silent\n"
+      }
+    }
+  },
+  {
+    "id": "defined-npm-config-silent",
+    "sink": "filename",
+    "input": "npm run ci:fast",
+    "why": "defined script under npm_config_silent=true",
+    "correct": "the precondition admits (exit 0)",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {
+        "npm_config_logs_max": "0",
+        "npm_config_update_notifier": "false",
+        "NODE_DISABLE_COMPILE_CACHE": "1",
+        "npm_config_silent": "true"
+      },
+      "files": {
+        "package.json": "{\n  \"name\": \"fixture\",\n  \"version\": \"1.0.0\",\n  \"scripts\": {\n    \"ci:fast\": \"true\",\n    \"lint\": \"true\"\n  }\n}\n"
+      }
+    }
+  },
+  {
+    "id": "defined-compound-silent",
+    "sink": "filename",
+    "input": "npm run ci:fast && npm run lint",
+    "why": "a compound gate under a silent env — the first script is checked",
+    "correct": "the precondition admits (exit 0)",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {
+        "npm_config_logs_max": "0",
+        "npm_config_update_notifier": "false",
+        "NODE_DISABLE_COMPILE_CACHE": "1",
+        "npm_config_loglevel": "silent"
+      },
+      "files": {
+        "package.json": "{\n  \"name\": \"fixture\",\n  \"version\": \"1.0.0\",\n  \"scripts\": {\n    \"ci:fast\": \"true\",\n    \"lint\": \"true\"\n  }\n}\n"
+      }
+    }
+  }
+]

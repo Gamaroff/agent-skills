@@ -45,7 +45,7 @@ Signals — any **one** is sufficient:
 - a named allow-list or deny-list in any form (array, regex alternation, `switch`, set membership)
 - a function whose own tests are mostly of the shape "X is refused"
 - a work-item document whose Success Criteria contain *never*, *must not*, *fails closed*, or *refused*
-- a script or function whose own header or doc comment says it *refuses*, *never guesses*, or *fails closed* — in any language; a bash script is a boundary by its own words, and "not importable" routes it to the engine's `shell:` entry form — or, for a **sourced library** (a header that says *source it*, or functions with no top-level call), the `shell-fn:path#function` form with `--cases-file` and, when the body names `gh`, `--fake-gh` (Step 4; the signal that tells the two apart is stated once, in `probe-boundary-rule.md` §5); a **Node CLI** whose decision sits behind its flags routes to the `cli:path` form with an `--argv` template — never to `boundary: false`
+- a script or function whose own header or doc comment says it *refuses*, *never guesses*, or *fails closed* — in any language; a bash script is a boundary by its own words, and "not importable" routes it to the engine's `shell:` entry form — or, for a **sourced library** (a header that says *source it*, or functions with no top-level call), the `shell-fn:path#function` form with `--cases-file` and, when the body names `gh`, `--fake-gh` (Step 4; the signal that tells the two apart is stated once, in `probe-boundary-rule.md` §5); a **Node CLI** whose decision sits behind its flags routes to the `cli:path` form with an `--argv` template; a **fenced bash block in a step doc** (a precondition, refusal or guard shipped as Markdown) routes to the `fence:<doc.md>#<heading>` form with `--slot <placeholder>` — never to `boundary: false`
 
 The list is data as well as prose: `probe-boundary-signals.mjs` (beside `security-probe.mjs`) exports it, and `classifyBoundaryText` applies the text-shaped signals to a header or a criteria section. Five QA gates on task.121 read a bash script that says "refuses rather than guesses" and recorded no boundary, because every signal above the last one is JS-shaped; the last one is what a script's own words match.
 
@@ -249,6 +249,20 @@ node PROMPT_DIR/security-probe.mjs \
   --cases-file <path-to-cases.json> --name '<control name>' \
   --repo-root "$(git rev-parse --show-toplevel)" \
   --record <STORY_DIR>/<stem>.dod.<DOD_N>.security.run.json --json
+
+# A FENCED BASH BLOCK boundary (a guard shipped inside a Markdown step doc —
+# task.167's fast-gate precondition) takes the fence form: the engine reads the
+# doc on every run, takes the first ```bash block under the heading, replaces
+# every --slot token with each case's input (as SOURCE — a $(…) in it runs, in
+# the case's own directory), and runs it under bash and zsh. Exit status is the
+# verdict. What the block reads besides the slot — env, files such as a
+# package.json — comes from each case's `fixture: {env, files}`. Name a cases
+# file; the record's entry resolves in every checkout.
+node PROMPT_DIR/security-probe.mjs \
+  --sink filename --entry 'fence:<doc-path-from-repo-root>#<heading text>' \
+  --slot '<placeholder>' --cases-file <path-to-cases.json> --name '<control name>' \
+  --repo-root "$(git rev-parse --show-toplevel)" \
+  --record <STORY_DIR>/<stem>.dod.<DOD_N>.security.run.json --json
 ```
 
 **Building the `--args-json` value** for `lintReport`: it is `[{"sections": …}]`, where `sections` is
@@ -271,7 +285,10 @@ outcome this form exists to end. **Nor is "it is a sourced function"**: that is 
 form's case, and running `shell:` against a library instead is the task.125 outcome — `absent`
 behind a full count — that *that* form exists to end. **Nor is "it is a multi-flag CLI" or "the
 function takes three arguments"** when a Node CLI calls it: that is the `cli:` form's case, and
-recording it unverifiable is the task.141 outcome that form exists to end. **Nor is "it takes a
+recording it unverifiable is the task.141 outcome that form exists to end. **Nor is "it is prose,
+not a script"** for a guard shipped as a fenced bash block in a step doc: that is the `fence:`
+form's case, and the hand-written wrapper under `.claude/state/` it replaces is the task.159 and
+task.167 outcome it exists to end. **Nor is "it takes a
 second argument"** for a JS export whose extra argument is plain data: that is `--args-json`'s case,
 and recording it unverifiable is the task.124 outcome (`lintReport`, overruled by hand) it exists to
 end.

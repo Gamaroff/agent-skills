@@ -45,6 +45,9 @@ import {
   computeVerdict,
   defaultRepoRoot,
   expectedProblem,
+  extractFencedBlock,
+  FENCE_PREFIX,
+  fixtureProblem,
   isLaunchFailure,
   main,
   namesGh,
@@ -3503,5 +3506,575 @@ test("task.131: a lintReport mutant without the header-block check is caught by 
     assert.equal(r.verdict, "present-but-inert");
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ── The fence: entry form (task.180) ─────────────────────────────────────────
+//
+// `fence:<doc.md>#<heading>` + `--slot` runs the first ```bash block under a
+// heading as a script, per case, with the case's input substituted for the
+// slot's text. The docs are written into a temp ROOT per test and passed as
+// `repoRoot`, so containment is exercised for real and the shipped tree is
+// never edited.
+
+const FENCE_DOC = [
+  "# Fixture doc",
+  "",
+  "### Admit",
+  "",
+  "```bash",
+  'GATE="<slot>"',
+  '[ "$GATE" = "ok" ] || exit 1',
+  "```",
+  "",
+  "### Refuse everything",
+  "",
+  "```bash",
+  ': "<slot>"',
+  "exit 1",
+  "```",
+  "",
+].join("\n");
+
+/** A temp root holding `files` ({relpath: text}); returns the root. */
+function fenceRoot(files) {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "probe-fence-")));
+  for (const [rel, text] of Object.entries(files)) {
+    mkdirSync(dirname(join(root, rel)), { recursive: true });
+    writeFileSync(join(root, rel), text);
+  }
+  return root;
+}
+
+const fenceCase = (id, direction, input, extra = {}) => ({
+  id,
+  sink: "filename",
+  input,
+  why: "fence fixture",
+  correct: direction === "hostile" ? "refused" : "admitted",
+  direction,
+  ...extra,
+});
+
+const ADMIT_CASES = [
+  fenceCase("f.ok", "legitimate", "ok"),
+  fenceCase("f.bad", "hostile", "bad"),
+];
+
+test("fence entry: resolveEntry returns kind fence with the heading, and refuses a malformed or escaping spec", () => {
+  const root = fenceRoot({ "doc.md": FENCE_DOC });
+  try {
+    const r = resolveEntry("fence:doc.md#Admit", root);
+    assert.equal(r.ok, true);
+    assert.equal(r.kind, "fence");
+    assert.equal(r.heading, "Admit");
+    assert.equal(r.entryPath, join(root, "doc.md"));
+    assert.equal(FENCE_PREFIX, "fence:");
+    // The FIRST # splits: a heading may carry one, a path may not.
+    assert.equal(
+      resolveEntry("fence:doc.md#C# and F#", root).heading,
+      "C# and F#",
+    );
+    assert.equal(resolveEntry("fence:doc.md", root).reason, "bad-entry");
+    assert.equal(resolveEntry("fence:doc.md#   ", root).reason, "bad-entry");
+    assert.equal(resolveEntry("fence:#H", root).reason, "bad-entry");
+    assert.equal(resolveEntry("fence:x.js#H", root).reason, "bad-entry");
+    assert.equal(
+      resolveEntry("fence:../outside.md#H", root).reason,
+      "outside-repo-root",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: extraction takes the block under THIS heading, and a missing heading or block is a named decline", () => {
+  const root = fenceRoot({ "doc.md": FENCE_DOC });
+  try {
+    // Under "Admit" the block admits ok and refuses bad → engages. Were the
+    // heading ignored, the doc's first block would still be taken here — so the
+    // second heading's block is what pins it (below).
+    const admit = runProbeSpec({
+      entry: "fence:doc.md#Admit",
+      slot: "<slot>",
+      cases: ADMIT_CASES,
+      repoRoot: root,
+    });
+    assert.equal(admit.verdict, "engages", JSON.stringify(admit.cases));
+    assert.deepEqual(admit.escapes, []);
+
+    const refuse = runProbeSpec({
+      entry: "fence:doc.md#Refuse everything",
+      slot: "<slot>",
+      cases: ADMIT_CASES,
+      repoRoot: root,
+    });
+    // Its block is `exit 1`: the ok case is over-blocked, which only the
+    // SECOND heading's block does. Extraction that ignored the heading would
+    // run the first block and admit ok.
+    assert.deepEqual(
+      refuse.overblocked,
+      probeShells().map((s) => `f.ok@${s}`),
+      "the block under the second heading ran",
+    );
+
+    const missing = runProbeSpec({
+      entry: "fence:doc.md#Nope",
+      slot: "<slot>",
+      cases: ADMIT_CASES,
+      repoRoot: root,
+    });
+    assert.equal(missing.verdict, "unverifiable");
+    assert.equal(missing.reason, "entry-not-probeable");
+    assert.match(missing.declined[0].detail, /heading not found: "Nope"/);
+    assert.equal(missing.executed, 0);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: a heading with no bash block under it, or two identical headings, is a named decline", () => {
+  const doc = [
+    "## Prose only",
+    "",
+    "Words, and an sh block — not bash:",
+    "",
+    "```sh",
+    "exit 0",
+    "```",
+    "",
+    "## Twice",
+    "",
+    "```bash",
+    "exit 0",
+    "```",
+    "",
+    "## Twice",
+    "",
+  ].join("\n");
+  const root = fenceRoot({ "doc.md": doc });
+  try {
+    const prose = extractFencedBlock(doc, "Prose only");
+    assert.equal(prose.ok, false);
+    assert.match(prose.detail, /no bash block under heading "Prose only"/);
+    const twice = extractFencedBlock(doc, "Twice");
+    assert.equal(twice.ok, false);
+    assert.match(twice.detail, /ambiguous — it appears at lines 9 and 15/);
+    const r = runProbeSpec({
+      entry: "fence:doc.md#Prose only",
+      slot: "exit",
+      cases: ADMIT_CASES,
+      repoRoot: root,
+    });
+    assert.equal(r.reason, "entry-not-probeable");
+    assert.match(r.declined[0].detail, /no bash block/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: a heading-shaped # comment inside a fence neither ends the section nor matches the heading (review I2)", () => {
+  const doc = [
+    "## Setup",
+    "",
+    "```bash",
+    "# Gate",
+    "exit 0",
+    "```",
+    "",
+    "## Gate",
+    "",
+    "```yaml",
+    "# a yaml comment, heading-shaped",
+    "key: value",
+    "```",
+    "",
+    "```bash",
+    "# Bind the value first.",
+    'GATE="<slot>"',
+    '[ "$GATE" = "ok" ] || exit 1',
+    "```",
+    "",
+  ].join("\n");
+  const got = extractFencedBlock(doc, "Gate");
+  assert.equal(got.ok, true, got.detail);
+  assert.equal(
+    got.headingLine,
+    8,
+    "the real heading, not the comment at line 4",
+  );
+  assert.equal(got.line, 15, "the bash block after the yaml block's comment");
+  assert.match(got.code, /GATE="<slot>"/);
+});
+
+test("fence entry: exit status is the verdict — non-zero with no expected is rejected, a hang is errored", () => {
+  const root = fenceRoot({
+    "doc.md": [
+      "## Three",
+      "",
+      "```bash",
+      ': "<slot>"',
+      "exit 3",
+      "```",
+      "",
+      "## Hang",
+      "",
+      "```bash",
+      ': "<slot>"',
+      "sleep 5",
+      "```",
+      "",
+    ].join("\n"),
+  });
+  try {
+    const three = runProbeSpec({
+      entry: "fence:doc.md#Three",
+      slot: "<slot>",
+      cases: [fenceCase("f.x", "legitimate", "x")],
+      repoRoot: root,
+    });
+    assert.ok(
+      three.cases.every((c) => c.outcome === "rejected" && c.exit === 3),
+    );
+    const hang = runProbeSpec({
+      entry: "fence:doc.md#Hang",
+      slot: "<slot>",
+      cases: [fenceCase("f.x", "legitimate", "x")],
+      timeoutMs: 300,
+      repoRoot: root,
+    });
+    assert.ok(hang.cases.every((c) => c.outcome === "errored"));
+    assert.match(hang.cases[0].detail, /timed out/);
+    assert.equal(hang.reason, "entry-not-probeable");
+    assert.equal(hang.executed, 0);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: --slot is required with fence:, refused elsewhere, and must appear in the block", () => {
+  const root = fenceRoot({ "doc.md": FENCE_DOC });
+  try {
+    const none = runProbeSpec({
+      entry: "fence:doc.md#Admit",
+      cases: ADMIT_CASES,
+      repoRoot: root,
+    });
+    assert.equal(none.reason, "bad-slot");
+    const absent = runProbeSpec({
+      entry: "fence:doc.md#Admit",
+      slot: "<absent>",
+      cases: ADMIT_CASES,
+      repoRoot: root,
+    });
+    assert.equal(absent.reason, "bad-slot");
+    assert.match(absent.declined[0].detail, /does not appear in the block/);
+    const onShell = runProbeSpec({
+      entry: FIXED_SCRIPT,
+      slot: "<slot>",
+      sink: "filename",
+    });
+    assert.equal(onShell.reason, "bad-slot");
+    assert.match(onShell.declined[0].detail, /fence: entry form only/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: the slot replacement is a function — $& in the input is text", () => {
+  const root = fenceRoot({
+    "doc.md": ["## Echo", "", "```bash", "printf %s '<slot>'", "```", ""].join(
+      "\n",
+    ),
+  });
+  try {
+    const r = runProbeSpec({
+      entry: "fence:doc.md#Echo",
+      slot: "<slot>",
+      cases: [
+        fenceCase("f.amp", "legitimate", "a$&b", {
+          expected: { stdout: "a$&b", exit: 0 },
+        }),
+      ],
+      repoRoot: root,
+    });
+    assert.ok(
+      r.cases.every((c) => c.outcome === "accepted"),
+      JSON.stringify(r.cases),
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: the slot is script source — a $(…) input runs, in the case directory, never outside it (review C1)", () => {
+  const root = fenceRoot({
+    "doc.md": [
+      "## Assign",
+      "",
+      "```bash",
+      'X="<slot>"',
+      "exit 0",
+      "```",
+      "",
+      "## Home",
+      "",
+      "```bash",
+      ': "<slot>"',
+      ': > "$HOME/leak"',
+      "```",
+      "",
+    ].join("\n"),
+  });
+  try {
+    // `absent` looks in the case directory: the substitution ran there, so the
+    // hostile case mismatches (accepted) — and no escape is recorded.
+    const sub = runProbeSpec({
+      entry: "fence:doc.md#Assign",
+      slot: "<slot>",
+      cases: [
+        fenceCase("f.sub", "hostile", "$(touch PWNED)", {
+          expected: { exit: 0, absent: ["PWNED"] },
+        }),
+      ],
+      repoRoot: root,
+    });
+    assert.ok(
+      sub.cases.every(
+        (c) => c.outcome === "accepted" && /PWNED/.test(c.detail),
+      ),
+      JSON.stringify(sub.cases),
+    );
+    assert.deepEqual(sub.escapes, []);
+    assert.equal(existsSync(join(root, "PWNED")), false);
+    // HOME is the sandbox's, outside the work dir: a write there IS an escape.
+    const home = runProbeSpec({
+      entry: "fence:doc.md#Home",
+      slot: "<slot>",
+      cases: [fenceCase("f.home", "legitimate", "x")],
+      repoRoot: root,
+    });
+    assert.ok(
+      home.escapes.some((e) => e.path === "home/leak"),
+      JSON.stringify(home.escapes),
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: fixture env and files reach the block; a path that leaves the case directory is declined", () => {
+  const root = fenceRoot({
+    "doc.md": [
+      "## Env",
+      "",
+      "```bash",
+      ': "<slot>"',
+      '[ "$X" = 1 ]',
+      "```",
+      "",
+      "## Files",
+      "",
+      "```bash",
+      ': "<slot>"',
+      '[ "$(cat pkg/a.txt)" = hi ]',
+      "```",
+      "",
+    ].join("\n"),
+  });
+  try {
+    const env = runProbeSpec({
+      entry: "fence:doc.md#Env",
+      slot: "<slot>",
+      cases: [
+        fenceCase("f.env", "legitimate", "x", { fixture: { env: { X: "1" } } }),
+      ],
+      repoRoot: root,
+    });
+    assert.ok(
+      env.cases.every((c) => c.outcome === "accepted"),
+      JSON.stringify(env.cases),
+    );
+    const files = runProbeSpec({
+      entry: "fence:doc.md#Files",
+      slot: "<slot>",
+      cases: [
+        fenceCase("f.files", "legitimate", "x", {
+          fixture: { files: { "pkg/a.txt": "hi" } },
+        }),
+      ],
+      repoRoot: root,
+    });
+    assert.ok(
+      files.cases.every((c) => c.outcome === "accepted"),
+      JSON.stringify(files.cases),
+    );
+    const escape = runProbeSpec({
+      entry: "fence:doc.md#Files",
+      slot: "<slot>",
+      cases: [
+        fenceCase("f.esc", "legitimate", "x", {
+          fixture: { files: { "../escape": "x" } },
+        }),
+      ],
+      repoRoot: root,
+    });
+    assert.ok(escape.cases.every((c) => c.outcome === "errored"));
+    assert.match(escape.cases[0].detail, /leaves the case directory/);
+    assert.equal(escape.executed, 0);
+    // The sandbox owns HOME, TMPDIR and LC_ALL: a fixture may not set them.
+    assert.match(fixtureProblem({ env: { HOME: "/" } }), /sandbox owns it/);
+    assert.match(fixtureProblem({ files: { a: 1 } }), /must be a string/);
+    assert.match(fixtureProblem({ argv: [] }), /unknown keys: argv/);
+    assert.equal(fixtureProblem(undefined), null);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: the block is read on every run — editing it between two runs changes the verdict", () => {
+  const root = fenceRoot({ "doc.md": FENCE_DOC });
+  try {
+    const spec = {
+      entry: "fence:doc.md#Admit",
+      slot: "<slot>",
+      cases: ADMIT_CASES,
+      repoRoot: root,
+    };
+    assert.equal(runProbeSpec(spec).verdict, "engages");
+    writeFileSync(
+      join(root, "doc.md"),
+      FENCE_DOC.replace('[ "$GATE" = "ok" ] || exit 1', "exit 0"),
+    );
+    const after = runProbeSpec(spec);
+    assert.notEqual(after.verdict, "engages");
+    assert.deepEqual(
+      after.reproduced,
+      probeShells().map((s) => `f.bad@${s}`),
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: --slot missing with fence:, or given with another form, exits 2 with bad-slot", () => {
+  const cases = {
+    missing: ["--entry", "fence:doc.md#Admit"],
+    misplaced: ["--entry", FIXED_SCRIPT, "--slot", "<slot>"],
+  };
+  for (const [name, args] of Object.entries(cases)) {
+    const { rc, err } = runMain(["--sink", "filename", ...args]);
+    assert.equal(rc, 2, name);
+    assert.match(err, /^bad-slot: /, name);
+  }
+  const { rc, err } = runMain([
+    "--sink",
+    "filename",
+    "--entry",
+    "fence:doc.md#Admit",
+    "--slot",
+    "<slot>",
+    "--args-json",
+    "[]",
+  ]);
+  assert.equal(rc, 2);
+  assert.match(err, /^bad-args: /);
+});
+
+test("fence entry: every fence result path returns the JS form's key set", () => {
+  const root = fenceRoot({ "doc.md": FENCE_DOC });
+  try {
+    const expected = Object.keys(
+      runProbeSpec({ entry: entry("engaging-control"), cases: CASES }),
+    ).sort();
+    const paths = {
+      success: {
+        entry: "fence:doc.md#Admit",
+        slot: "<slot>",
+        cases: ADMIT_CASES,
+      },
+      "no slot": { entry: "fence:doc.md#Admit", cases: ADMIT_CASES },
+      "missing heading": {
+        entry: "fence:doc.md#Nope",
+        slot: "<slot>",
+        cases: ADMIT_CASES,
+      },
+      "all errored": {
+        entry: "fence:doc.md#Admit",
+        slot: "<slot>",
+        cases: [fenceCase("f.e", "legitimate", 7)],
+      },
+    };
+    for (const [name, spec] of Object.entries(paths)) {
+      const r = runProbeSpec({ ...spec, repoRoot: root });
+      assert.deepEqual(Object.keys(r).sort(), expected, `${name} key set`);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// task.167's 13 cases, reconstructed from its DoD (lines 123–128) — the original
+// cases file lived under the gitignored .claude/state/ and is not in the repo.
+// Run against the SHIPPED block: the probe its finalise ran through a
+// hand-written wrapper, now through the engine.
+const T167_CASES = JSON.parse(
+  readFileSync(
+    join(
+      REPO_ROOT,
+      "shared/resources/tests/fixtures/fence-probe/t167-cases.json",
+    ),
+    "utf8",
+  ),
+);
+const T167_HEADING =
+  "Precondition — the gate must resolve before the first iteration";
+const T167_DOC = "shared/resources/develop-pipeline-step-3-develop-loop.md";
+
+test("fence entry: task.167's 13 cases against the shipped fast-gate precondition — engages, 0 reproduced, no escape", () => {
+  assert.equal(T167_CASES.length, 13);
+  const r = runProbeSpec({
+    entry: `fence:${T167_DOC}#${T167_HEADING}`,
+    slot: "<fastGateCommand>",
+    sink: "filename",
+    cases: T167_CASES,
+  });
+  assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+  assert.equal(r.executed, 13 * probeShells().length);
+  assert.deepEqual(r.reproduced, []);
+  assert.deepEqual(r.overblocked, []);
+  assert.deepEqual(r.escapes, []);
+});
+
+test("fence entry: without --loglevel=notice the same cases over-block the 4 silent-environment legitimate cases", () => {
+  const text = readFileSync(join(REPO_ROOT, T167_DOC), "utf8");
+  const parts = text.split("npm run --loglevel=notice 2>/dev/null");
+  assert.equal(
+    parts.length,
+    2,
+    "the shipped block carries the flag exactly once",
+  );
+  const root = fenceRoot({ "doc.md": parts.join("npm run 2>/dev/null") });
+  try {
+    const r = runProbeSpec({
+      entry: `fence:doc.md#${T167_HEADING}`,
+      slot: "<fastGateCommand>",
+      sink: "filename",
+      cases: T167_CASES,
+      repoRoot: root,
+    });
+    const silent = [
+      "defined-env-silent",
+      "defined-npmrc-silent",
+      "defined-env-and-npmrc-silent",
+      "defined-compound-silent",
+    ];
+    assert.deepEqual(
+      [...r.overblocked].sort(),
+      silent.flatMap((id) => probeShells().map((s) => `${id}@${s}`)).sort(),
+    );
+    assert.deepEqual(r.reproduced, []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });

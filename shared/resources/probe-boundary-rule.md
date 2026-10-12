@@ -31,6 +31,17 @@ is no command to allow-list. Inputs cross to the child as **JSON on stdin** —
 never interpolated into a shell string, never placed on argv — so no
 caller-authored value is ever parsed as code.
 
+**One form is the stated exception, and it does not reopen the snippet path.**
+`fence:` (task.180, §5) runs a fenced bash block, and its slot puts the case's
+input into the block's **source** — because that is what the document's reader
+does with the placeholder, and a probe that substituted differently would test a
+different block. Three things keep it a probe and not a snippet: the caller names
+**one** block by heading in a containment-checked file, never "every fence"; the
+engine chooses the command (`<shell> <script>`); and the run is the probe
+engine's sandbox — per-case directory, sandbox `HOME`/`TMPDIR`, escape sentinel —
+invoked by a reviewer, never by the QA snippet path. `SAFE_COMMANDS` is untouched
+(§2).
+
 ## 2. The refusal: `node` must never join `SAFE_COMMANDS`
 
 **This is the shortcut, and it is refused.**
@@ -147,9 +158,10 @@ Declining conditions, each reported with its reason:
 | `bad-entry` | The entry spec is not `path#exportName`. |
 | `outside-repo-root` | The resolved path escapes the containment root. |
 | `unknown-sink` | No corpus for that sink. `corpusFor` throws rather than returning `[]`, deliberately. |
-| `entry-not-probeable` | The module would not import, the export is absent, or it is not a function. An **absent** export is a module-private predicate: export it and re-run — never a reason for `boundary: false` (obs #156). |
+| `entry-not-probeable` | The module would not import, the export is absent, or it is not a function. An **absent** export is a module-private predicate: export it and re-run — never a reason for `boundary: false` (obs #156). For `fence:`: the heading is not in the doc, appears twice, or has no ```` ```bash ```` block under it. |
 | `case-errored` | One case timed out or its child never ran. |
-| `bad-args` | `--args-json` is not a JSON array, or was given with a `shell:` / `shell-fn:` / `cli:` entry, which cannot append an argument to a call. |
+| `bad-args` | `--args-json` is not a JSON array, or was given with a `shell:` / `shell-fn:` / `cli:` / `fence:` entry, which cannot append an argument to a call. |
+| `bad-slot` | A `fence:` entry with no `--slot`, a `--slot` the block does not contain (a slot that substitutes nothing tests nothing), or a `--slot` given with any other form. |
 
 ### `boundary: internal` is a decision, not a verdict
 
@@ -218,7 +230,7 @@ takes it.
   missing file under a symlinked root stays inside it. The residual is a symlink
   that appears between the containment check and the readable-file check, a race
   nothing here defends against.
-- **The engine reaches four entry forms, and "not importable" is not a decline.**
+- **The engine reaches five entry forms, and "not importable" is not a decline.**
   `path#export` imports a JS module; `shell:path` runs a **shell script that
   takes one positional argument** — `bash <script> <fixture-dir>` per case, under
   bash and (when the host has it) zsh, with the script and directory passed as
@@ -403,6 +415,32 @@ takes it.
   (`process.execPath`) and the script is fixed by `--entry` and
   containment-checked before anything spawns, exactly as the JS form already
   runs a Node child. `node` stays off `SAFE_COMMANDS`.
+
+  **`fence:<doc.md>#<heading>` with `--slot <placeholder>` runs a fenced bash
+  block in a step doc** (task.180) — the shape most of this repository's
+  preconditions, refusals and guards ship in, which until this form were probed
+  zero times by the engine and closed with a hand-written wrapper under the gitignored
+  `.claude/state/` (task.159, task.167). The engine reads the doc **on every
+  run**, finds the heading among the lines **outside** fences (a bash
+  `# comment` is not a heading), and takes the first ```` ```bash ```` block
+  before the next heading of the same or a higher level. Every occurrence of the
+  slot's text is replaced by the case's input, and the result runs as a script —
+  `<shell> <script>` per case under bash and (when present) zsh, rc files off,
+  cwd the case's own directory. **The slot is source substitution, not data:**
+  the input becomes script text, exactly as it does for the document's reader,
+  so a `$(…)` in it runs; its effects land in the case directory, inside the
+  sandbox, and a write anywhere else is an escape. A case's optional `fixture`
+  supplies the rest of what the block reads — `env` (never `HOME`, `TMPDIR` or
+  `LC_ALL`, which the sandbox owns) and `files` written into the case directory,
+  declined when a path leaves it. **The verdict is the exit status**, `cli:`'s
+  rule — 0 is `accepted`, non-zero `rejected` — and a case carrying `expected`
+  is compared as the shell arm compares it. The record names
+  `fence:<doc>#<heading>`, which resolves in every checkout. **"It is prose, not
+  a script" is never a reason for `boundary: false`**: a guard shipped as a
+  fenced block is a boundary by what it does, and `fence:` reaches it. Like
+  `cli:` it does not touch §2: the caller names one block, the engine chooses
+  the command, and the sandbox, the per-case directory and the escape sentinel
+  all apply unchanged.
 - **What is still declined, and recorded as declined:** a script or CLI that
   reads its input from stdin, a shell script that takes more than one positional,
   anything that must open a socket; a live database sink; anything that needs
@@ -421,8 +459,9 @@ takes it.
   fixture cannot see a coercion upstream or a first-match resolve downstream;
   task.150 spent three QA cycles finding them one layer at a time (obs #209).
 
-The precondition — a pure-ish predicate, composer, single-argument script or
-argv-driven Node CLI — is what the boundary rule selects for anyway. If it turns
+The precondition — a pure-ish predicate, composer, single-argument script,
+argv-driven Node CLI or fenced bash block with one placeholder — is what the
+boundary rule selects for anyway. If it turns
 out that most real controls are reachable by none of the forms and the engine declines almost
 everything, **that is a finding to record here in this section**, not something
 to paper over by loosening §2.
@@ -432,9 +471,10 @@ to paper over by loosening §2.
 A declined sink (a stdin-reading script or CLI, a multi-positional shell
 script, a networked control — what no entry form reaches) is not exempt from
 being tested; it is exempt from the *engine*. **Reach for this only after the
-entry forms have been tried** — a one-argument script is `shell:`'s job and a
-Node CLI driven by its argv is `cli:`'s, and a by-hand probe of either is the
-self-report the engine exists to remove. A `cli:` probe exercises **one arm**
+entry forms have been tried** — a one-argument script is `shell:`'s job, a
+Node CLI driven by its argv is `cli:`'s and a fenced bash block in a step doc
+is `fence:`'s, and a by-hand probe of any of them is the self-report the engine
+exists to remove. A `cli:` probe exercises **one arm**
 — the CLI's own argv; the other arms below (a wrapper, an env-var path) still
 need the by-hand rule when they reach the same sink. When the reviewer executes such
 candidates itself, two rules apply that the engine would otherwise have enforced:
