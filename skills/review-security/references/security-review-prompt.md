@@ -114,7 +114,7 @@ answer to a question nobody asked.
   '<placeholder>' --cases-file <cases.json>`: the block under the heading runs as a script with each
   case's input substituted for the placeholder (as source — a `$(…)` in it runs, inside the sandbox),
   each case's `fixture: {env, files}` supplies what else it reads, and the exit status is the
-  verdict. "It is prose, not a script" is never a reason to report `unverifiable`. A script or CLI that reads stdin, a shell script that takes two
+  verdict (an input that leaves the block unparseable is `errored`, never a refusal). "It is prose, not a script" is never a reason to report `unverifiable`. A script or CLI that reads stdin, a shell script that takes two
   positionals, or anything that needs the network is what remains declined — say which.
 - **Called with the case as its first argument** — for the JS form. The child runner calls
   `await fn(input, ...args)`, where `args` is the JSON array given with `--args-json` (empty without

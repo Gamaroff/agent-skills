@@ -254,7 +254,7 @@ node PROMPT_DIR/security-probe.mjs \
 # doc on every run, takes the first ```bash block under the heading, replaces
 # every --slot token with each case's input (as SOURCE — a $(…) in it runs, in
 # the case's own directory), and runs it under bash and zsh. Exit status is the
-# verdict. What the block reads besides the slot — env, files such as a
+# verdict; an input that leaves the block unparseable is errored, not refused. What the block reads besides the slot — env, files such as a
 # package.json — comes from each case's `fixture: {env, files}`. Name a cases
 # file; the record's entry resolves in every checkout.
 node PROMPT_DIR/security-probe.mjs \

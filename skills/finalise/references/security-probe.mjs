@@ -187,7 +187,9 @@
  * `<shell> <script>` per shell, rc files off, with the shell arm's trip-wire
  * `gh` (or `--fake-gh`) first on PATH. THE VERDICT IS THE EXIT STATUS, the
  * cli: arm's rule: exit 0 is `accepted`, non-zero `rejected`; a case carrying
- * `expected` is compared as the shell arm compares it. A missing heading, an
+ * `expected` is compared as the shell arm compares it. A block the input leaves
+ * UNPARSEABLE is `errored` (isShellParseFailure), never a refusal — the cli:
+ * arm's crash rule, for a shell. A missing heading, an
  * ambiguous one, a heading with no bash block under it, or a slot the block
  * does not contain is a named decline, never a verdict. The record names
  * `fence:<doc>#<heading>`, which resolves in every checkout.
@@ -2168,6 +2170,25 @@ export function fixtureProblem(fixture) {
 }
 
 /**
+ * The shell could not PARSE the generated script (task.180 QA cycle 1,
+ * TASK-180-001). Keyed on the shell's own message about the script — bash
+ * `<script>: line N: syntax error …` / `unexpected EOF while looking for
+ * matching …`, zsh `<script>:N: parse error …` / `unmatched …` — never on
+ * the exit code alone: 1 and 2 are what a guard exits with when it refuses.
+ * A syntax error the block's own commands report (a nested `bash -c`) names
+ * another file and is the block answering, so it is scored as usual.
+ */
+export function isShellParseFailure(child, scriptPath) {
+  if (child.status === 0 || child.status === null) return false;
+  const subject = escapeRegExp(scriptPath);
+  const re = new RegExp(
+    `^(?:bash: |zsh: )?${subject}:(?: line)? ?\\d+: (?:syntax error|unexpected EOF|parse error|unmatched )`,
+    "m",
+  );
+  return re.test(child.stderr ?? "");
+}
+
+/**
  * Run one case against a fenced block, once per shell (task.180).
  *
  * Per shell: a fresh case directory under the work dir — the fixture's files,
@@ -2301,6 +2322,15 @@ function runFenceCase(
     } else if (isLaunchFailure(child, scriptPath)) {
       outcome = "errored";
       detail = `${shell} could not open the script (exit ${child.status}): ${(child.stderr ?? "").trim().slice(0, 160)}`;
+    } else if (isShellParseFailure(child, scriptPath)) {
+      // The substituted block did not PARSE — a quote, backtick or `$(` in the
+      // input broke its syntax — so the shell stopped before the guard answered.
+      // (Lines before the broken one may have run: bash executes as it reads.) Scored
+      // `rejected`, that read as the guard refusing, and an accept-all block with
+      // one such hostile case scored `engages` (task.180 QA cycle 1, TASK-180-001).
+      // "Could not look", never a refusal: the cli: arm's crash rule, for a shell.
+      outcome = "errored";
+      detail = `the substituted block does not parse under ${shell} (exit ${child.status}) — the guard never answered: ${(child.stderr ?? "").trim().split("\n")[0].slice(0, 160)}`;
     } else if (hasExpected) {
       const mismatches = compareExpected(c.expected, child, caseDir);
       const matched = mismatches.length === 0;
@@ -2318,7 +2348,7 @@ function runFenceCase(
       detail =
         child.status === 0
           ? null
-          : `exit ${child.status}: ${(child.stdout ?? "").trim().split("\n")[0].slice(0, 160)}`;
+          : `exit ${child.status}: ${((child.stderr ?? "").trim() || (child.stdout ?? "").trim()).split("\n")[0].slice(0, 160)}`;
     }
     caseResults.push({
       id: c.id,
@@ -2428,6 +2458,15 @@ export function cliControlKey(template) {
 // landed in a second entry (task.144 5c CR-1).
 const controlKey = (c) => {
   const base = `${c.sink ?? ""}\u0000${c.entry ?? ""}`;
+  // A fence: entry names a BLOCK, not how it was called: its --name, else its
+  // slot, is what tells two controls on one block apart. Keyed on sink + entry
+  // alone, a second slot or name silently replaced the first (task.180 QA
+  // cycle 1, TASK-180-002) — the cli: precedent, below.
+  if (typeof c.entry === "string" && c.entry.startsWith(FENCE_PREFIX)) {
+    const name = cliControlName(c);
+    if (name !== null) return `${base}\u0000name:${name}`;
+    return typeof c.slot === "string" ? `${base}\u0000slot:${c.slot}` : base;
+  }
   const isCli =
     Array.isArray(c.argv) ||
     (typeof c.entry === "string" && c.entry.startsWith(CLI_PREFIX));
@@ -2480,6 +2519,9 @@ export function toRecordEntry(result, { name, callSite } = {}) {
     argv: Array.isArray(result.argv) ? [...result.argv] : null,
     // The JS form's fixed extra arguments (task.131), or null.
     args: Array.isArray(result.args) ? [...result.args] : null,
+    // The fence: form's placeholder token (task.180), or null for every other
+    // form. Part of an unnamed fence: control's key — see controlKey.
+    slot: typeof result.slot === "string" ? result.slot : null,
     ran_at: new Date().toISOString(),
   };
 }
@@ -2930,7 +2972,7 @@ export function main(argv = process.argv.slice(2)) {
   // `--slot` is the fence: form's, as `--argv` is the cli: form's (task.180):
   // missing with fence: or given with any other form is an argument error.
   const isFenceEntry = opts.entry.startsWith(FENCE_PREFIX);
-  if (isFenceEntry && opts.slot === undefined) {
+  if (isFenceEntry && (opts.slot === undefined || opts.slot === "")) {
     process.stderr.write(
       "bad-slot: the fence: entry form needs --slot <placeholder> — the text in the block each case's input replaces\n",
     );

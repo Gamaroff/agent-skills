@@ -1,0 +1,106 @@
+[
+  {
+    "id": "fence.dotdot",
+    "sink": "path",
+    "input": "fence:../outside.md#H",
+    "why": "relative escape",
+    "correct": "refused: {ok:false}",
+    "direction": "hostile"
+  },
+  {
+    "id": "fence.abs",
+    "sink": "path",
+    "input": "fence:/etc/passwd.md#H",
+    "why": "absolute path outside the root",
+    "correct": "refused: {ok:false}",
+    "direction": "hostile"
+  },
+  {
+    "id": "fence.deep-dotdot",
+    "sink": "path",
+    "input": "fence:shared/resources/../../../etc/x.md#H",
+    "why": "escape after normalisation",
+    "correct": "refused: {ok:false}",
+    "direction": "hostile"
+  },
+  {
+    "id": "fence.node-modules",
+    "sink": "path",
+    "input": "fence:node_modules/x/README.md#H",
+    "why": "under node_modules",
+    "correct": "refused: {ok:false}",
+    "direction": "hostile"
+  },
+  {
+    "id": "fence.not-md",
+    "sink": "path",
+    "input": "fence:shared/resources/security-probe.mjs#H",
+    "why": "not a Markdown file",
+    "correct": "refused: {ok:false}",
+    "direction": "hostile"
+  },
+  {
+    "id": "fence.no-heading",
+    "sink": "path",
+    "input": "fence:shared/resources/probe-boundary-rule.md",
+    "why": "no #heading",
+    "correct": "refused: {ok:false}",
+    "direction": "hostile"
+  },
+  {
+    "id": "fence.blank-heading",
+    "sink": "path",
+    "input": "fence:shared/resources/probe-boundary-rule.md#   ",
+    "why": "blank heading",
+    "correct": "refused: {ok:false}",
+    "direction": "hostile"
+  },
+  {
+    "id": "fence.empty-path",
+    "sink": "path",
+    "input": "fence:#H",
+    "why": "empty path",
+    "correct": "refused: {ok:false}",
+    "direction": "hostile"
+  },
+  {
+    "id": "fence.nul",
+    "sink": "path",
+    "input": "fence:shared/resources/a.md\u0000#H",
+    "why": "NUL byte",
+    "correct": "refused: {ok:false}",
+    "direction": "hostile"
+  },
+  {
+    "id": "fence.root-md",
+    "sink": "path",
+    "input": "fence:.md#H",
+    "why": "a file named .md at the root is a contained Markdown path",
+    "correct": "accepted: kind fence",
+    "direction": "legitimate"
+  },
+  {
+    "id": "fence.step3",
+    "sink": "path",
+    "input": "fence:shared/resources/develop-pipeline-step-3-develop-loop.md#Precondition — the gate must resolve before the first iteration",
+    "why": "the shipped block",
+    "correct": "accepted: kind fence",
+    "direction": "legitimate"
+  },
+  {
+    "id": "fence.hash-in-heading",
+    "sink": "path",
+    "input": "fence:shared/resources/probe-boundary-rule.md#C# and F#",
+    "why": "heading carrying #",
+    "correct": "accepted: kind fence",
+    "direction": "legitimate"
+  },
+  {
+    "id": "fence.missing-file",
+    "sink": "path",
+    "input": "fence:docs/not-yet.md#H",
+    "why": "contained path that does not exist yet — readability is checked later",
+    "correct": "accepted: kind fence",
+    "direction": "legitimate"
+  }
+]

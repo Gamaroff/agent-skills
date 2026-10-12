@@ -1,0 +1,77 @@
+schema: 2
+task: 'task.180.probe-engine-fence-entry-form'
+task_title: 'security-probe: a fence: entry form for a fenced bash block in a step doc'
+gate: FAIL
+status_reason: 'All 3 phases implemented, every success criterion held by a named test, ci:fast green and 26 engine probes executed with 0 reproduced. One HIGH, reproduced: a substitution that breaks the block''s shell syntax exits 2 and is scored as a refusal, so an accept-all block scores engages — the false pass this engine exists to prevent. One MEDIUM: a fence: control''s record key ignores its slot and name.'
+reviewer: 'QA Engineer'
+head: 'a318b134bb2d94b4e1b172a60e2ccf95f18d0d36'
+updated: '2026-10-12T13:53:55Z'
+
+top_issues:
+  - id: 'TASK-180-001'
+    severity: high
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'runFenceCase scores every non-zero exit as rejected with no expected; a hostile input that breaks the block''s syntax once substituted (a quote inside X="<slot>") exits 2 before any guard runs and is read as a refusal. Reproduced: an accept-all block (X="<slot>"; exit 0) with hostile a"b scores engages. Code review CR-1 (medium/medium), re-rated high on the reproduction. Bug: task.180.bug.1.shell-syntax-error-scored-as-refusal.md'
+    suggested_action: 'Score a run errored when stderr shows a shell parse failure in the generated script (bash syntax error / unexpected EOF, zsh parse error); add a regression test that an accept-all block does not score engages, and mutation-prove it.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-180-002'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'controlKey keys every non-cli: control on sink + entry, so two fence: probes of one block with different --slot or --name share an entry file and the second silently replaces the first; toRecordEntry never records slot. Code review CR-2 (medium/medium), verified by reading controlKey. Bug: task.180.bug.2.fence-control-key-ignores-slot.md'
+    suggested_action: 'Record slot in the record entry and key a fence: control on its --name when given, else sink + entry + slot (the cli: precedent); test that two slots on one block keep two entries.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-180-003'
+    severity: low
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'main() accepts an empty --slot operand, so runProbeSpec declines it bad-slot and writes an unverifiable record entry, where an argument error should exit 2 and touch no record (code review CR-3).'
+    suggested_action: 'Reject an empty --slot in main() with exit 2, beside the missing-slot check.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 194
+  phases_verified: 3/3
+  ci: 'not read this cycle (CI is gated at /finalise)'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 26
+    notes: 'Two controls probed through the engine into task.180.qa.1.security.run.json, both engages, 0 reproduced: resolveEntry fence: branch (13 cases, path containment and shape) and the shipped fast-gate precondition via fence: (13 task.167 cases). CONCERNS for TASK-180-001: the engine can report engages for an absent guard.'
+  performance:
+    status: PASS
+    notes: 'No new timeout literal (tests/test-harness-concurrency.test.js green); each case is one spawn per shell under spawnBudget. npm-backed cases run about 0.5 s each.'
+  reliability:
+    status: PASS
+    notes: 'Missing, ambiguous and blockless headings, absent slots and escaping fixture paths are named declines; per-shell case directories keep one shell''s side effects out of the next.'
+  maintainability:
+    status: PASS
+    notes: 'Reuses extractBlocks, caseEnv, watchedSpawn, compareExpected and the record writer; routing held by a parity test over a shared routingBlocks() population.'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-180-001 (syntax error scored as refusal) with a regression test.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'Fix TASK-180-002 (fence: control key and record slot).'
+      refs: ['shared/resources/security-probe.mjs']
+  future:
+    - action: 'CR-4: quote stderr (falling back to stdout) in the rejection detail, as runCliCase does.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'CR-5: assert cases.length before every() in the fence tests, so an empty result cannot pass.'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

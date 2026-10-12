@@ -434,8 +434,13 @@ takes it.
   `LC_ALL`, which the sandbox owns) and `files` written into the case directory,
   declined when a path leaves it. **The verdict is the exit status**, `cli:`'s
   rule — 0 is `accepted`, non-zero `rejected` — and a case carrying `expected`
-  is compared as the shell arm compares it. The record names
-  `fence:<doc>#<heading>`, which resolves in every checkout. **"It is prose, not
+  is compared as the shell arm compares it. **A block the substitution leaves
+  unparseable is `errored`, never `rejected`**: a quote or `$(` in the input that
+  breaks the block's syntax stops the shell before the guard answers, and scored
+  as a refusal it let an accept-all block read `engages` (task.180 QA cycle 1). The record names
+  `fence:<doc>#<heading>`, which resolves in every checkout, and carries the `slot`;
+  a `fence:` control is keyed on its `--name`, else its slot, so two slots probed on
+  one block stay two controls. **"It is prose, not
   a script" is never a reason for `boundary: false`**: a guard shipped as a
   fenced block is a boundary by what it does, and `fence:` reaches it. Like
   `cli:` it does not touch §2: the caller names one block, the engine chooses
