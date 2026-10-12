@@ -5,7 +5,7 @@ type: task
 description: "Add a `fence:<doc>#<heading>` entry form to shared/resources/security-probe.mjs that extracts the first bash block under a heading on every run, substitutes the case's input into a named placeholder, applies an optional per-case env and fixture files, and scores a hostile case against its stated refusal (`expected`) and a legitimate one by exit status. A boundary shipped as a fenced block in a step doc is then probed by the engine instead of through a hand-written wrapper."
 tags: [security-probe, finalise, qa-task, qa-story, review-security, observation]
 category: infrastructure
-status: ready-for-review
+status: in-progress
 priority: Medium
 created: 2026-10-03
 updated: 2026-10-12
@@ -16,7 +16,7 @@ github_issue: 560
 
 # Technical Task: security-probe — a `fence:` entry form
 
-**Status:** Ready for Review
+**Status:** In Progress
 
 **Review**: ✅ All review recommendations from `task.180.review.1.probe-engine-fence-entry-form.md` implemented 2026-10-12
 
@@ -315,20 +315,20 @@ None.
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.180.qa.5.probe-engine-fence-entry-form.md](./task.180.qa.5.probe-engine-fence-entry-form.md)
-- **Gate File**: [task.180.gate.5.probe-engine-fence-entry-form.yml](./task.180.gate.5.probe-engine-fence-entry-form.yml)
+- **Full Report**: [task.180.qa.6.probe-engine-fence-entry-form.md](./task.180.qa.6.probe-engine-fence-entry-form.md)
+- **Gate File**: [task.180.gate.6.probe-engine-fence-entry-form.yml](./task.180.gate.6.probe-engine-fence-entry-form.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5404
+- **Tests Executed**: 5406
 - **Phases Verified**: 3/3
 - **Critical Issues**: 1
 - **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-- Fixed this cycle: TASK-180-012, -013 and -014 (bugs 6 and 7 closed; 4 QA mutations covered).
-- HIGH (TASK-180-015): `fence:` skips the pre-spawn `gh` text check, so a block that resolves `gh` to a path runs the host binary and is scored.
-- MEDIUM (TASK-180-016): a substituted `$(…)` that writes to an absolute path outside the sandbox is unseen.
-- HIGH findings per cycle: 1, 1, 1, 1, 1 — a different mechanism in `security-probe.mjs` each cycle.
+- Fixed this cycle: TASK-180-015 and -016 (bugs 8 and 9 closed; 2 QA mutations covered).
+- HIGH (TASK-180-017): the `gh` text check misses what a case fixture runs; a `BASH_ENV` fixture resolves the host `gh`.
+- MEDIUM (TASK-180-018): a kill after a side effect scores `errored`, hiding a reproduction.
+- HIGH findings per cycle: 1, 1, 1, 1, 1, 1.
 
 <!-- change-log-start -->
 ## Change Log
@@ -349,6 +349,7 @@ None.
 | 2026-10-12 |         | QA findings fixed — cycle 4, 3 findings (TASK-180-012..014): a hostile `expected` must state a non-empty stdout or stderr; work-dir watch compares both ways with directories; Success Criterion 1 cites `scoreFenceRun` | qa-fix |
 | 2026-10-12 |         | QA gate FAIL (70/100) — cycle 5 safety re-probe, 3 findings: 1 high, 1 medium, 1 low | qa-task |
 | 2026-10-12 |         | QA findings fixed — cycle 5, 2 findings (TASK-180-015..016): fence: runs the gh text check over the block and inputs; the outside-write limit is stated and pinned | qa-fix |
+| 2026-10-12 |         | QA gate FAIL (70/100) — cycle 6 safety re-probe, 2 findings: 1 high, 1 medium | qa-task |
 <!-- change-log-end -->
 
 ---

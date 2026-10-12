@@ -4,7 +4,7 @@
 **Bug ID**: TASK-180-BUG-9
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 5 safety re-probe, code review CR-2 / TASK-180-016)
 **Date Found**: 2026-10-12
 
@@ -48,3 +48,4 @@ State the absolute-path limit in the engine header and `probe-boundary-rule.md` 
 | ---------- | ------ | ----------- | ----- |
 | 2026-10-12 | New          | QA Engineer | QA cycle 5 — reproduced on f21c0552 |
 | 2026-10-12 | Ready for QA | qa-fix      | Limit stated and pinned by a test |
+| 2026-10-12 | Closed       | QA Engineer | QA cycle 6 — verified on 243bc237; regression test and QA mutations red |

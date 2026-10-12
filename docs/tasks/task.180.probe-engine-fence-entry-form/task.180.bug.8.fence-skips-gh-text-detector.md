@@ -4,7 +4,7 @@
 **Bug ID**: TASK-180-BUG-8
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 5 safety re-probe, code review CR-1 / TASK-180-015)
 **Date Found**: 2026-10-12
 
@@ -52,3 +52,4 @@ When `fakeGhDir` is null, run `GH_COMMAND_WORD` / `GH_VARIABLE` over the extract
 | ---------- | ------ | ----------- | ----- |
 | 2026-10-12 | New          | QA Engineer | QA cycle 5 — reproduced on f21c0552 |
 | 2026-10-12 | Ready for QA | qa-fix      | gh text check over the extracted block and inputs; mutation-proven |
+| 2026-10-12 | Closed       | QA Engineer | QA cycle 6 — verified on 243bc237; regression test and QA mutations red |

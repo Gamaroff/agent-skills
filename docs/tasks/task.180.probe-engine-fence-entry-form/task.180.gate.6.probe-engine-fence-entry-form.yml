@@ -1,0 +1,75 @@
+schema: 2
+task: 'task.180.probe-engine-fence-entry-form'
+task_title: 'security-probe: a fence: entry form for a fenced bash block in a step doc'
+gate: FAIL
+status_reason: 'The cycle-5 fixes hold: TASK-180-015 and -016 are closed, and 2 QA mutations are covered. The safety re-probe found the next gap of the same class: the gh text check reads the block and the inputs, but not what a case fixture runs (BASH_ENV, a sourced fixture file). A kill after a side effect also hides it. Sixth consecutive HIGH in security-probe.mjs, and the second from enumerating the text that gets checked.'
+reviewer: 'QA Engineer'
+head: '243bc237fbe58659b817899a26788fb9f1173abc'
+updated: '2026-10-12T16:27:21Z'
+
+top_issues:
+  - id: 'TASK-180-017'
+    severity: high
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'The fence: gh text check scans the extracted block and the case inputs only. A fixture file reached through fixture.env BASH_ENV, or through a block''s own source ./x.sh resolved in the case directory, runs type -ap gh and resolves the host binary, with no needs-fake-gh decline. Reproduced on 243bc237. Code review CR-1 (high/high). Bug: task.180.bug.10.gh-text-check-misses-fixture-content.md'
+    suggested_action: 'Replace the text enumeration with one structural guard: build each case PATH without any directory that holds a gh executable, so a lookup finds only the trip-wire (an absolute path stays the stated limit); or decline a fence: case that carries a fixture unless --fake-gh is given.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-180-018'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'scoreFenceRun scores a killed or timed-out child errored before it checks expected.absent, so $(touch pwned; kill -9 $$) left pwned and scored errored, and the run read engages. Reproduced on 243bc237. Code review CR-2 (medium/high). Bug: task.180.bug.11.killed-run-hides-side-effect.md'
+    suggested_action: 'Check expected.absent before the never-ran and launch-failure branches.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 5406
+  phases_verified: 3/3
+  ci: 'not read this cycle (CI is gated at /finalise)'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 26
+    notes: 'task.180.qa.6.security.run.json: both controls engage, 0 reproduced, 0 escapes. CONCERNS for TASK-180-017 (host gh reachable through a fixture) and -018 (a kill hides a side effect).'
+  performance:
+    status: PASS
+    notes: 'ci:fast 5406 tests, 5392 pass, 0 fail at 243bc237 (5b).'
+  reliability:
+    status: PASS
+    notes: 'The cycle-5 fixes hold: 2 QA mutations covered (the text argument ignored; the guard inverted).'
+  maintainability:
+    status: PASS
+    notes: 'The outside-write limit is stated in the engine header and probe-boundary-rule.md §5, and pinned by a test.'
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 2
+  fix_date: '2026-10-12'
+  total_iterations: 5
+  verification_method: 'Regression tests + QA mutation spot check (2 covered) + ci:fast'
+
+recommendations:
+  immediate:
+    - action: 'TASK-180-017: make the gh guard structural (a case PATH with no directory that holds gh) instead of adding more text to the check.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'TASK-180-018: check expected.absent before step 1 of scoreFenceRun.'
+      refs: ['shared/resources/security-probe.mjs']
+  future:
+    - action: 'Carried: CR-3 short-slot rewrite (gate 5); GIT_CEILING_DIRECTORIES in caseEnv; a deleted trip-wire stub lets later cases reach gh.'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []
