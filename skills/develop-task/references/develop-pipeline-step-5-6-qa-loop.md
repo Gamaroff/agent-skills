@@ -1942,7 +1942,8 @@ On a convergence stall the remaining findings are outstanding, not accepted — 
 because it was no longer reducing them, which is a reason to look at them, not past them.
 Options:
 1. Fix remaining issues manually, then re-run /qa-story
-2. Accept the current gate status and proceed manually with /finalise
+2. Accept the current gate status: run Step 5c first (/review-pr --effort medium --comment
+   --no-code), then /finalise — on a host with no review decision, finalise needs that report
 3. Update the story requirements if issues reflect unintended scope
 4. Re-run /develop-story to resume with more cycles — Phase 0b offers "Resume at 5a with {k}
    more cycles"; any /qa-story you run by hand in between is counted from its gate on disk
@@ -1964,8 +1965,16 @@ On a convergence stall the remaining findings are outstanding, not accepted — 
 because it was no longer reducing them, which is a reason to look at them, not past them.
 Options:
 1. Fix remaining issues manually, then re-run /qa-task
-2. Accept the current gate status and proceed manually with /finalise
+2. Accept the current gate status: run Step 5c first (/review-pr --effort medium --comment
+   --no-code), then /finalise — on a host with no review decision, finalise needs that report
 3. Update the task requirements if issues reflect unintended scope
 4. Re-run /develop-task to resume with more cycles — Phase 0b offers "Resume at 5a with {k}
    more cycles"; any /qa-task you run by hand in between is counted from its gate on disk
 ```
+
+> **Option 2 goes through 5c, not around it.** A loop that escalates never reaches Step 5c, so no
+> `*.pr-review.*.md` exists. `/finalise` satisfies its "PR approved" column with a GitHub review
+> decision or, when the host has none (a single-maintainer repository), with that report — reading
+> APPROVE or CONCERNS. Taking option 2 straight to `/finalise` there produces a DoD gap. The review
+> also reads the trail, and on task.180 it found five bug reports whose fixes later gates had
+> verified but that no step had closed (obs #21).

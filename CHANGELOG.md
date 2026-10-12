@@ -104,6 +104,11 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The QA-loop escalation option "accept the gate and finalise" now runs Step 5c first (observation #21).**
+  An escalated loop never reaches 5c, so no PR review report exists, and on a host with no review
+  decision `/finalise` needs that report for its "PR approved" column. Option 2 of both HALT
+  messages in `develop-pipeline-step-5-6-qa-loop.md` now names `/review-pr --effort medium --comment
+  --no-code` before `/finalise`, with a note on why.
 - **A not-converging QA halt now resumes at 5b, as the grant intends (observation #17).**
   `grant-qa-cycles.sh` chose the re-entry phase by comparing `halt_reason` to exactly
   `not-converging`, but the HALT writes it with detail appended (`not-converging: QA loop HIGH 1,1,1 at
