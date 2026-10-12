@@ -35,8 +35,9 @@ All notable changes to this project will be documented in this file. Format foll
   review that resolved a document only by prefix match now reports "no local document".
   `review-task`'s Jira-key branch also refuses a key that resolves to a non-task document.
   `tests/key-lookup-single-statement.test.js` fails on any canonical source other than §0a that
-  greps the `docs` tree for a tracker-key value (any grep-family command, any flag spelling;
-  files-without-match searches excluded), and runs the Jira-key branch against a fixture under bash
+  greps the `docs` tree for a tracker-key value — a tripwire over the shapes in its fixture table
+  (grep-family commands, flag spellings, quoted alternation, prefixed and globbed `docs` paths;
+  files-without-match searches excluded), with its known unseen shapes listed in its header — and runs the Jira-key branch against a fixture under bash
   and zsh. The Jira-key branch's three blocks run as one shell, and its check refuses unbound inputs.
 - **`develop-next` and `develop-batch` dispatch with `--defaults`** instead of restating Phase 0d's
   answers in a prose directive — the restatement that drifted in bug.18. `develop-batch` passes

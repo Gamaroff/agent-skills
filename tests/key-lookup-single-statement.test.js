@@ -20,8 +20,15 @@
  *    (`grep`, `egrep`, `fgrep`, `git grep`, `rg`) + a key field followed by a value
  *    (`jira_key: X`, `github_issue: {N}`, `${KEY_FIELD}:…`) + the `docs` tree as a path argument,
  *    and NOT a files-WITHOUT-match search (`-L`, `--files-without-match`), which is a different rule
- *    (the sync-*-bug skills list unlinked documents that way) and is pinned below. Its scope is that
- *    shape: a lookup that pipes `find docs …` into a grep is not seen.
+ *    (the sync-*-bug skills list unlinked documents that way) and is pinned below.
+ *
+ *    SCOPE — a tripwire, not a parser. It catches the shapes in the "matches the restatements" fixture
+ *    table and nothing is claimed beyond them; a lexical matcher cannot see every way to spell a grep,
+ *    and three QA cycles chasing spellings showed it (QA cycle 3, Step 2.6: scope the claim). Known
+ *    unseen shapes: a lookup that pipes `find docs …` into a grep; a pattern continued onto the next
+ *    physical line with a trailing `\`; an escape-class value (`jira_key:\s*X`); `rg -L` (which is
+ *    `--follow`, read here as files-without-match). Add a shape to the table when one is found in a
+ *    canonical source.
  * 2. Non-vacuity: §0a still holds its anchored pattern, the population is non-trivial, and the
  *    allowlisted note still exists (a stale allowlist entry is red).
  * 3. The three former sites cite §0a, and each skill ships the step-0 document.
@@ -40,16 +47,48 @@ const { spawnSync, execFileSync } = require("node:child_process");
 const ROOT = path.resolve(__dirname, "..");
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
 
-// One command segment of a line: pipes, `;`, `&&`, `||` and markdown code-span backticks separate
-// segments, so a pipeline or a sentence that names two commands is read command by command.
-const segments = (line) => line.split(/\|\||&&|[|;`]/);
+// One command segment of a line. Pipes, `;`, `&&`, `||` and markdown code-span backticks separate
+// segments, so a pipeline or a sentence naming two commands is read command by command — but only
+// OUTSIDE quotes: a `|` inside a quoted pattern is alternation (`"^(jira_key|github_issue): X"`),
+// not a pipe (QA cycle 3, CR-1). Single quotes take no escapes; inside double quotes `\` escapes.
+function segments(line) {
+  const out = [];
+  let cur = "";
+  let quote = null;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (quote) {
+      cur += c;
+      if (quote === '"' && c === "\\" && i + 1 < line.length) cur += line[++i];
+      else if (c === quote) quote = null;
+      continue;
+    }
+    if (c === "'" || c === '"') {
+      quote = c;
+      cur += c;
+    } else if (c === "|" || c === ";" || c === "`") {
+      out.push(cur);
+      cur = "";
+      if (c === "|" && line[i + 1] === "|") i++;
+    } else if (c === "&" && line[i + 1] === "&") {
+      out.push(cur);
+      cur = "";
+      i++;
+    } else cur += c;
+  }
+  out.push(cur);
+  return out;
+}
 const GREP_FAMILY = /(?:^|[\s$(])(?:(?:git\s+)?[ef]?grep|rg)(?=\s)/;
 // A key field followed by a VALUE — not a closing quote, not the end: `jira_key: X`,
 // `github_issue: {N}`, `${KEY_FIELD}:[[:space:]]*…`. A value-less `"^jira_key:"` inventories keys.
 const KEY_WITH_VALUE =
-  /(?:\bjira_key|\bgithub_issue|\$\{?KEY_FIELD\}?):[ \t]*(?=[^\s'"`)\\]|\[)/;
-// The docs tree itself as a path argument (`docs`, `docs/`) — not a file under it.
-const DOCS_TREE = /(?:^|[\s'"(=])docs\/?(?=[\s'")]|$)/;
+  /(?:\bjira_key|\bgithub_issue|\$\{?KEY_FIELD\}?)\)?:[ \t]*(?=[^\s'"`)\\]|\[)/;
+// The docs tree itself as a path argument — `docs`, `docs/`, `./docs/`, `$ROOT/docs`, a glob over it
+// (`docs/**/*.md`) or a brace set under it (`docs/{stories,tasks}/`) — but not one named file under it
+// (QA cycle 3, CR-2).
+const DOCS_TREE =
+  /(?:^|[\s'"(=])(?:\.\/|\$\{?[A-Za-z_][A-Za-z0-9_]*\}?\/)?docs(?:\/(?:\*\*?(?:\/[^\s'")]*)?|\{[^}\s]*\}\/?)?)?(?=[\s'")]|$)/;
 const FILES_WITHOUT =
   /(?:^|\s)(?:-[A-Za-z]*L[A-Za-z]*|--files-without-match)(?=\s|$)/;
 
@@ -161,6 +200,13 @@ test("the key matches the restatements it exists to catch", () => {
     'grep -r --files-with-match "jira_key: X" docs/',
     'rg -l "github_issue: 5" docs/',
     'git grep -l "jira_key: X" -- docs/',
+    // QA cycle 3, CR-1/CR-2: alternation inside a quoted pattern; prefixed and globbed docs paths.
+    'grep -rlE "^(jira_key|github_issue): X" docs/',
+    'grep -rl "jira_key: X\\|github_issue: X" docs/',
+    'grep -rl "jira_key: X" ./docs/',
+    'grep -rl "jira_key: X" "$ROOT/docs"',
+    'grep -l "jira_key: X" docs/**/*.md',
+    'grep -rl "github_issue: 5" docs/{stories,tasks}/',
     `DOC_MATCHES=$(grep -rlE "^\${KEY_FIELD}:[[:space:]]*['\\"]?\${KEY_VALUE}['\\"]?[[:space:]]*$" docs/ 2>/dev/null \\`,
   ]) {
     assert.ok(isKeyLookup(s), s);

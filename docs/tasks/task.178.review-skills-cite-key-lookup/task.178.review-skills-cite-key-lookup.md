@@ -97,7 +97,9 @@ document today (`ls … | grep -c develop-pipeline-step-0` → 0).
   key field followed by a value (`jira_key: X`, `github_issue: {N}`, `${KEY_FIELD}:…`) and the
   `docs` tree as a path argument (QA cycle 2 replaced two flag-spelling keys that each missed real
   spellings). Before this task it matched the three sites; after it, only §0a's own lookup, which is
-  the allowlist's one entry. A lookup that pipes `find docs …` into a grep is outside its shape. It deliberately does **not** match
+  the allowlist's one entry. It is a tripwire over the shapes in its fixture table, not a parser: its
+  header lists the shapes it does not see (QA cycle 3 scoped the claim rather than chase more
+  spellings). It deliberately does **not** match
   `sync-github-bug/SKILL.md:58` / `sync-jira-bug/SKILL.md:105`, which run `grep -rL` (files *without*
   a key — a different rule); the lowercase `l` is what separates them. It carries a non-vacuity floor:
   the §0a block must still match its own anchored pattern.
@@ -306,20 +308,18 @@ accurate.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.178.qa.2.review-skills-cite-key-lookup.md](./task.178.qa.2.review-skills-cite-key-lookup.md)
-- **Gate File**: [task.178.gate.2.review-skills-cite-key-lookup.yml](./task.178.gate.2.review-skills-cite-key-lookup.yml)
+- **Full Report**: [task.178.qa.3.review-skills-cite-key-lookup.md](./task.178.qa.3.review-skills-cite-key-lookup.md)
+- **Gate File**: [task.178.gate.3.review-skills-cite-key-lookup.yml](./task.178.gate.3.review-skills-cite-key-lookup.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 12 (new file) + fast gate
+- **Tests Executed**: 12 (new file)
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-- Gate 1 findings fixed (one-shell Jira-key branch, flag-token key, fixture cleanup).
-- CR-1 (medium): the guard keys on grep flag spelling and still misses real restatements.
-- CR-3 (low): the guard flags lines that are not lookups.
-- BND-1 deferred to task.180.
+- Gate 2 findings fixed (behaviour-keyed matcher).
+- CR-1, CR-2 (medium): the matcher misses quoted alternation and prefixed docs paths; its scope is unstated.
 
 <!-- change-log-start -->
 
@@ -335,6 +335,8 @@ accurate.
 | 2026-10-12 |         | QA findings fixed — cycle 1, 2 findings + 1 cleanup (one-shell Jira-key branch, flag-token guard key, fixture cleanup) | qa-fix |
 | 2026-10-12 |         | QA gate CONCERNS (90/100) — 3 findings (1 medium, 1 low, 1 deferred) | qa-task |
 | 2026-10-12 |         | QA findings fixed — cycle 2, 2 findings (guard key replaced: grep over the docs tree for a key value, per command segment) | qa-fix |
+| 2026-10-12 |         | QA gate CONCERNS (90/100) — 2 findings (2 medium) | qa-task |
+| 2026-10-12 |         | QA findings fixed — cycle 3, 2 findings (quote-aware segments, prefixed/globbed docs paths; guard claim scoped to its fixture table) | qa-fix |
 
 <!-- change-log-end -->
 
