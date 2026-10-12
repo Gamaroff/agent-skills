@@ -1243,8 +1243,9 @@ export function runProbeSpec({
   }
 
   // The trip-wire answers only a PATH-resolved `gh`: a block (or an input —
-  // the slot is source) that resolves it to a path (`type -ap gh`, an absolute
-  // path) ran the host binary and was scored. So fence: gets the text check the
+  // the slot is source) that resolves it to a path (`type -ap gh`) ran the host
+  // binary and was scored. This check catches a lookup spelled out in the text;
+  // an absolute path to `gh` it does not match, and that stays a stated limit. So fence: gets the text check the
   // shell forms get, over what will actually run (TASK-180-015).
   if (isFenceForm && fakeGhDir === null) {
     // Every string a case carries can run: its input (the slot is source), its
@@ -3074,12 +3075,7 @@ export function emitBlock(record, { mode = "diff" } = {}) {
     lines.push("  controls:");
     for (const c of record.controls) {
       lines.push(
-        `    - name: ${yamlStr(
-          c.name ??
-            `${c.sink}:${String(c.entry ?? "")
-              .split("#")
-              .pop()}`,
-        )}`,
+        `    - name: ${yamlStr(c.name ?? defaultControlName(c))}`,
         `      verdict: ${yamlStr(c.verdict)}`,
         `      severity: ${yamlStr(SEVERITY_BY_VERDICT[c.verdict])}`,
         `      call_site: ${yamlStr(c.call_site)}`,
@@ -3095,10 +3091,29 @@ export function emitBlock(record, { mode = "diff" } = {}) {
         ...(Array.isArray(c.argv)
           ? [`      argv: ${JSON.stringify(c.argv)}`]
           : []),
+        // The slot, for the same reason: two fence: controls on one block are
+        // two controls, keyed apart by their slot (TASK-180-002, -021).
+        ...(typeof c.slot === "string"
+          ? [`      slot: ${yamlStr(c.slot)}`]
+          : []),
       );
     }
   }
   return `${lines.join("\n")}\n`;
+}
+
+/**
+ * An unnamed control's display name: `<sink>:<the text after the FIRST #>` — a
+ * fence: heading may itself contain `#` (`C# and F#`) — plus the slot for a
+ * fence: control, so two slots on one block read as two (TASK-180-021).
+ */
+function defaultControlName(c) {
+  const entry = String(c.entry ?? "");
+  const hash = entry.indexOf("#");
+  const tail = hash < 0 ? entry : entry.slice(hash + 1);
+  return typeof c.slot === "string"
+    ? `${c.sink}:${tail} [${c.slot}]`
+    : `${c.sink}:${tail}`;
 }
 
 // ── CLI ──────────────────────────────────────────────────────────────────────

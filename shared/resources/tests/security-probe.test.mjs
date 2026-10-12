@@ -4692,8 +4692,10 @@ test("fence entry: no PATH lookup reaches a host gh, whatever runs it — a BASH
     const fixture = {
       env: { BASH_ENV: "./init.sh" },
       files: {
+        // The name is assembled at run time, so the pre-spawn text check cannot
+        // see it and the run reaches ghFreePath (TASK-180-020).
         "init.sh":
-          'for g in $(type -ap gh); do "$g" --version >/dev/null 2>&1; done\n',
+          'n=g; for g in $(type -ap "${n}h"); do "$g" --version >/dev/null 2>&1; done\n',
       },
     };
     const r = runProbeSpec({
@@ -4708,8 +4710,10 @@ test("fence entry: no PATH lookup reaches a host gh, whatever runs it — a BASH
       ],
       repoRoot: root,
     });
+    // Cases ran: a pre-spawn decline cannot satisfy this test.
+    assert.ok((r.cases ?? []).length > 0, JSON.stringify(r));
     assert.equal(existsSync(marker), false, "the host gh ran");
-    // The trip-wire answered instead, so the run is declined, not scored.
+    // The trip-wire answered at run time, so the run is declined, not scored.
     assert.equal(r.reason, "needs-fake-gh", JSON.stringify(r));
   } finally {
     process.env.PATH = savedPath;
@@ -4756,6 +4760,51 @@ test("fence entry: a fixture that names gh — a default-path lookup included �
       assert.equal(r.reason, "needs-fake-gh", JSON.stringify(fixture));
       assert.deepEqual(r.cases ?? [], [], JSON.stringify(r.cases));
     }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("emit-block: two unnamed fence: controls on one block render as two, and a heading with # keeps its name (TASK-180-021)", () => {
+  const root = fenceRoot({
+    "doc.md": [
+      "## C# and F#",
+      "",
+      "```bash",
+      'A="<a>"; B="<b>"',
+      '[ "$A" = ok ] && [ "$B" = ok ] || { echo REFUSED; exit 1; }',
+      "```",
+      "",
+    ].join("\n"),
+  });
+  const record = join(root, "run.json");
+  const cases = [
+    fenceCase("f.ok", "legitimate", "ok"),
+    fenceCase("f.bad", "hostile", "bad", {
+      expected: { exit: 1, stdout: "REFUSED\n" },
+    }),
+  ];
+  try {
+    for (const slot of ["<a>", "<b>"]) {
+      const r = runProbeSpec({
+        entry: "fence:doc.md#C# and F#",
+        slot,
+        cases,
+        repoRoot: root,
+      });
+      recordRun(record, r);
+    }
+    assert.equal(readRecord(record).controls.length, 2);
+    const { out } = runMain(["--emit-block", record]);
+    const names = [...out.matchAll(/- name: (.*)/g)].map((m) => m[1]);
+    assert.equal(names.length, 2, out);
+    assert.notEqual(names[0], names[1], out);
+    assert.ok(
+      names.every((n) => n.includes("C# and F#")),
+      out,
+    );
+    assert.match(out, /slot: "?<a>"?/);
+    assert.match(out, /slot: "?<b>"?/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

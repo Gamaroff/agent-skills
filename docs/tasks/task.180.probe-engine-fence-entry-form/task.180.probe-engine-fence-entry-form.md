@@ -315,20 +315,20 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.180.qa.7.probe-engine-fence-entry-form.md](./task.180.qa.7.probe-engine-fence-entry-form.md)
-- **Gate File**: [task.180.gate.7.probe-engine-fence-entry-form.yml](./task.180.gate.7.probe-engine-fence-entry-form.yml)
+- **Full Report**: [task.180.qa.8.probe-engine-fence-entry-form.md](./task.180.qa.8.probe-engine-fence-entry-form.md)
+- **Gate File**: [task.180.gate.8.probe-engine-fence-entry-form.yml](./task.180.gate.8.probe-engine-fence-entry-form.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5409
+- **Tests Executed**: 5410
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-- Fixed this cycle: TASK-180-017 and -018 (bugs 10 and 11 closed). First gate with no HIGH.
-- MEDIUM (TASK-180-019): a default-path lookup (`command -p gh`, `env -u PATH gh`) in a fixture script skips the PATH guard where `gh` is `/usr/bin/gh`.
-- LOW (advisory): a relative PATH entry is not resolved before the `gh` test.
-- HIGH findings per cycle: 1, 1, 1, 1, 1, 1, 0.
+- Fixed this cycle: TASK-180-019 (bug 12 closed). Second gate with no HIGH; Security PASS.
+- MEDIUM (TASK-180-020): the TASK-180-017 integration test no longer reaches `ghFreePath`.
+- MEDIUM (TASK-180-021): `emitBlock` drops a `fence:` control's slot.
+- HIGH findings per cycle: 1, 1, 1, 1, 1, 1, 0, 0.
 
 <!-- change-log-start -->
 ## Change Log
@@ -353,6 +353,8 @@ None.
 | 2026-10-12 |         | QA findings fixed — cycle 6, 2 findings (TASK-180-017..018): structural PATH guard (ghFreePath) replaces the text enumeration as the gh guarantee; expected.absent checked first | qa-fix |
 | 2026-10-12 |         | QA gate CONCERNS (90/100) — cycle 7 safety re-probe, 2 findings: 1 medium, 1 low | qa-task |
 | 2026-10-12 |         | QA findings fixed — cycle 7, 2 findings (TASK-180-019 + CR-2): the gh text check reads fixtures; the default-path lookup is a stated limit; relative PATH entries resolved | qa-fix |
+| 2026-10-12 |         | QA gate CONCERNS (90/100) — cycle 8 scoped re-review, 5 findings: 2 medium, 3 low | qa-task |
+| 2026-10-12 |         | QA findings fixed — cycle 8, 2 findings (TASK-180-020..021) + 1 cleanup: the guard's integration test reaches ghFreePath; emitBlock renders the fence: slot | qa-fix |
 <!-- change-log-end -->
 
 ---

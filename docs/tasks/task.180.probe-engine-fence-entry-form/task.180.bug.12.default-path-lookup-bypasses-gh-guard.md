@@ -4,7 +4,7 @@
 **Bug ID**: TASK-180-BUG-12
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 7 safety re-probe, code review CR-1 / TASK-180-019)
 **Date Found**: 2026-10-12
 
@@ -42,3 +42,4 @@ Add the fixture's `env` values and `files` contents to the `gh` text check, and 
 | ---------- | ------ | ----------- | ----- |
 | 2026-10-12 | New          | QA Engineer | QA cycle 7 — mechanism confirmed on cba2750b |
 | 2026-10-12 | Ready for QA | qa-fix      | Fixture text checked; limit stated; mutation-proven |
+| 2026-10-12 | Closed       | QA Engineer | QA cycle 8 — verified on 9d30305c; 2 QA mutations red |
