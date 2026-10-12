@@ -5,7 +5,7 @@ type: task
 description: "Add a `fence:<doc>#<heading>` entry form to shared/resources/security-probe.mjs that extracts the first bash block under a heading on every run, substitutes the case's input into a named placeholder, applies an optional per-case env and fixture files, and scores a hostile case against its stated refusal (`expected`) and a legitimate one by exit status. A boundary shipped as a fenced block in a step doc is then probed by the engine instead of through a hand-written wrapper."
 tags: [security-probe, finalise, qa-task, qa-story, review-security, observation]
 category: infrastructure
-status: in-progress
+status: ready-for-review
 priority: Medium
 created: 2026-10-03
 updated: 2026-10-12
@@ -16,7 +16,7 @@ github_issue: 560
 
 # Technical Task: security-probe — a `fence:` entry form
 
-**Status:** In Progress
+**Status:** Ready for Review
 
 **Review**: ✅ All review recommendations from `task.180.review.1.probe-engine-fence-entry-form.md` implemented 2026-10-12
 
@@ -79,7 +79,7 @@ This repository ships many of its boundaries as fenced bash blocks inside Markdo
 
 - **Why `--slot` and not a JSON `input`?** `input` stays a string, so corpus sinks still work unchanged, and the per-case env and files travel in the new `fixture` field. This was the shape task.167's 13 cases needed.
 - **Not a snippet runner.** `qa-execute-snippets` runs untrusted prose behind an allow-list. Here the caller names one block by heading, and the **engine** chooses the command (`bash <script>`). `node` stays off `SAFE_COMMANDS` (`probe-boundary-rule.md` §2).
-- **The slot is source substitution, not data.** A case's `input` is spliced into the block's text, which is what the document's reader does with the placeholder, so `fence:` probes the block as shipped. The `$&`-safe replacer protects the replacement string, not the shell. A block that quotes the slot in double quotes (`FAST_GATE_COMMAND="<fastGateCommand>"`) runs a `$(…)` in the input: task.167's `npm run x$(touch PWNED)` case still scores `rejected`, and it now creates `PWNED` **inside the case work directory**. Fixture files and the case's env are the only values that cross as data. A side effect stays in the per-case work directory, and the escape detector still fails a write outside it (review C1: executed, `PWNED` created).
+- **The slot is source substitution, not data.** A case's `input` is spliced into the block's text, which is what the document's reader does with the placeholder, so `fence:` probes the block as shipped. The `$&`-safe replacer protects the replacement string, not the shell. A block that quotes the slot in double quotes (`FAST_GATE_COMMAND="<fastGateCommand>"`) runs a `$(…)` in the input: task.167's `npm run x$(touch PWNED)` case still scores `rejected`, and it now creates `PWNED` **inside the case work directory**. Fixture files and the case's env are the only values that cross as data. A side effect stays in the per-case work directory, and the escape detector fails a write elsewhere in the sandbox (review C1: executed, `PWNED` created). A write to an absolute path outside the sandbox is not observed — a stated limit (TASK-180-016).
 
 ---
 
@@ -348,6 +348,7 @@ None.
 | 2026-10-12 |         | QA gate FAIL (70/100) — cycle 4 safety re-probe, 3 findings: 1 high, 1 medium, 1 low | qa-task |
 | 2026-10-12 |         | QA findings fixed — cycle 4, 3 findings (TASK-180-012..014): a hostile `expected` must state a non-empty stdout or stderr; work-dir watch compares both ways with directories; Success Criterion 1 cites `scoreFenceRun` | qa-fix |
 | 2026-10-12 |         | QA gate FAIL (70/100) — cycle 5 safety re-probe, 3 findings: 1 high, 1 medium, 1 low | qa-task |
+| 2026-10-12 |         | QA findings fixed — cycle 5, 2 findings (TASK-180-015..016): fence: runs the gh text check over the block and inputs; the outside-write limit is stated and pinned | qa-fix |
 <!-- change-log-end -->
 
 ---

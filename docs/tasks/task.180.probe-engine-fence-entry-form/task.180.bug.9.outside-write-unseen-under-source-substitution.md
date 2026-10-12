@@ -4,7 +4,7 @@
 **Bug ID**: TASK-180-BUG-9
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: New
+**Status**: Ready for QA
 **Found By**: QA Engineer (QA cycle 5 safety re-probe, code review CR-2 / TASK-180-016)
 **Date Found**: 2026-10-12
 
@@ -28,8 +28,23 @@ The write is recorded, or the documentation states the limit instead of claiming
 
 State the absolute-path limit in the engine header and `probe-boundary-rule.md` §5. Or let a `fence:` case name an outside path to check after the run (an absolute form of `expected.absent`).
 
+## Developer Fix Cycle
+
+### Iteration 1
+
+**Date**: 2026-10-12 — qa-fix, QA cycle 5
+
+**Root cause**: the engine watches the sandbox root, the work dir and the doc directory; nothing else is in reach without a filesystem-wide watch.
+
+**Fix**: the limit is stated instead of the overclaim — engine header, `probe-boundary-rule.md` §5, the task doc's clarification and `CHANGELOG.md` now say a write to an absolute path outside the sandbox is not observed. A test pins the limit, so closing it later forces the statements to change with it.
+
+**Files Modified**: `shared/resources/security-probe.mjs` (header), `shared/resources/tests/security-probe.test.mjs`, `shared/resources/probe-boundary-rule.md`, `CHANGELOG.md`, the task doc.
+
+**Testing**: New test: `'$(touch <abs>/pwned)'` creates the file and `escapes` stays empty — the stated limit, asserted.
+
 ## Status History
 
 | Date       | Status | Changed By  | Notes |
 | ---------- | ------ | ----------- | ----- |
-| 2026-10-12 | New    | QA Engineer | QA cycle 5 — reproduced on f21c0552 |
+| 2026-10-12 | New          | QA Engineer | QA cycle 5 — reproduced on f21c0552 |
+| 2026-10-12 | Ready for QA | qa-fix      | Limit stated and pinned by a test |

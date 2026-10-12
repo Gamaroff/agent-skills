@@ -430,8 +430,13 @@ takes it.
   cwd the case's own directory. **The slot is source substitution, not data:**
   the input becomes script text, exactly as it does for the document's reader,
   so a `$(…)` in it runs; its effects land in the case directory, inside the
-  sandbox, and a write anywhere else is an escape — under the work dir that holds
-  the case directories, so is a deletion or a new directory. A case's optional `fixture`
+  sandbox, and a write elsewhere in the sandbox is an escape — under the work dir
+  that holds the case directories, so is a deletion or a new directory. **A write
+  to an absolute path outside the sandbox is not observed** (an injected
+  `$(touch /abs/x)`): it is a stated limit, pinned by a test, and `expected.absent`
+  cannot name such a path. With no `--fake-gh`, the `gh` text check below runs over
+  the extracted block and every case's input (never the whole document), so a block
+  that resolves `gh` to a path is declined `needs-fake-gh` before anything runs. A case's optional `fixture`
   supplies the rest of what the block reads — `env` (never `HOME`, `TMPDIR` or
   `LC_ALL`, which the sandbox owns) and `files` written into the case directory,
   declined when a path leaves it. **A hostile case must carry `expected`** — the

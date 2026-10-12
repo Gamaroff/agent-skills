@@ -180,13 +180,18 @@
  * THE SLOT IS SOURCE SUBSTITUTION, NOT DATA: the input becomes script text, as
  * it does for the document's reader, so a `$(…)` in it runs — the probe models
  * the block as shipped. Its effects land in the case's own directory, which is
- * the block's cwd, inside the sandbox; a write anywhere else is an escape. A
+ * the block's cwd, inside the sandbox; a write elsewhere in the sandbox is an
+ * escape, and under the work dir so is a deletion or a new directory. A write
+ * to an absolute path OUTSIDE the sandbox (an injected `$(touch /x)`) is not
+ * observed — a stated limit (TASK-180-016). A
  * case's optional `fixture` supplies the rest of what the block reads: `env`
  * (never HOME, TMPDIR or LC_ALL — the sandbox owns them) and `files` written
  * into the case directory, refused when a path leaves it. The script runs as
  * `<shell> <script>` per shell, rc files off, with the shell arm's trip-wire
- * `gh` (or `--fake-gh`) first on PATH. A HOSTILE case must carry `expected` —
- * the guard's own refusal, stated — and is declined without one: under source
+ * `gh` (or `--fake-gh`) first on PATH, and the shell forms' `gh` text check
+ * over the block and the inputs. A HOSTILE case must carry `expected` — the
+ * guard's own refusal OUTPUT, a non-empty stdout or stderr — and is declined
+ * without one: under source
  * substitution an exit status cannot tell a refusal from a shell that stopped
  * on the input or from an injected `exit`, and three QA cycles of stderr
  * classification each let one of them read as a refusal (task.180). A
@@ -682,9 +687,11 @@ let harnessSeq = 0;
  * that sources `gh-labels.sh`, never a chain. A sourced path is tried against
  * the library's own directory, then the root (the repository's idiom,
  * `source references/gh-labels.sh`, is cwd-relative); a path holding a `$` is
- * not followable, and one outside the root is not ours to read.
+ * not followable, and one outside the root is not ours to read. `text`, when
+ * given, is read in place of the file — the fence: form passes its extracted
+ * block, whose sourced paths still resolve from the doc's directory.
  */
-export function namesGh(entryPath, root) {
+export function namesGh(entryPath, root, text = null) {
   const read = (p) => {
     try {
       return readFileSync(p, "utf8");
@@ -696,7 +703,7 @@ export function namesGh(entryPath, root) {
   // realpath'd, so a lexical root reached through a symlink would put every one
   // of them "outside" and read as "names no gh" (task.140 QA cycle 1, CR-6).
   root = realpathSafe(root);
-  const first = read(entryPath);
+  const first = text ?? read(entryPath);
   if (first === null) return false;
   const texts = [first];
   const seen = new Set([entryPath]);
@@ -1197,8 +1204,8 @@ export function runProbeSpec({
 
   // The fence: block is extracted HERE, on every run — never cached — and a doc
   // the engine cannot read a block from is a named decline, never a verdict.
-  // The pre-spawn `namesGh` text detector is not applied: it would read the
-  // whole document. The run-time trip-wire below is the guarantee for fence:.
+  // The pre-spawn `gh` text check runs below, over the extracted block and the
+  // case inputs (never the whole document), once the cases are known.
   let fenceBlock = null;
   if (isFenceForm) {
     let docText;
@@ -1229,6 +1236,28 @@ export function runProbeSpec({
       probeCases = corpusFor(sink);
     } catch (e) {
       return decline("unknown-sink", String(e && e.message));
+    }
+  }
+
+  // The trip-wire answers only a PATH-resolved `gh`: a block (or an input —
+  // the slot is source) that resolves it to a path (`type -ap gh`, an absolute
+  // path) ran the host binary and was scored. So fence: gets the text check the
+  // shell forms get, over what will actually run (TASK-180-015).
+  if (isFenceForm && fakeGhDir === null) {
+    const inputs = probeCases
+      .map((c) => (typeof c?.input === "string" ? c.input : ""))
+      .join("\n");
+    if (
+      namesGh(
+        resolved.entryPath,
+        realpathSafe(resolve(repoRoot)),
+        `${fenceBlock}\n${inputs}`,
+      )
+    ) {
+      return decline(
+        "needs-fake-gh",
+        `the block under "${resolved.heading}" in ${resolved.entryPath}, or a case's input, names \`gh\` — pass --fake-gh <dir> so the fixture answers instead of the real binary`,
+      );
     }
   }
 

@@ -4521,6 +4521,115 @@ test("fence entry: a deletion or an empty directory under the work dir is an esc
   }
 });
 
+test("fence entry: a block or an input that names gh is declined needs-fake-gh before anything runs — a path-resolved gh never reaches the host (TASK-180-015)", () => {
+  const root = fenceRoot({
+    "doc.md": [
+      "## Path gh",
+      "",
+      "```bash",
+      'X="<slot>"',
+      'real=$(type -ap gh | tail -1); "$real" --version > ran-gh',
+      '[ "$X" = ok ] || { echo REFUSED; exit 1; }',
+      "```",
+      "",
+      "## Plain",
+      "",
+      "```bash",
+      'X="<slot>"',
+      '[ "$X" = ok ] || { echo REFUSED; exit 1; }',
+      "```",
+      "",
+    ].join("\n"),
+  });
+  const cases = [
+    fenceCase("f.ok", "legitimate", "ok"),
+    fenceCase("f.bad", "hostile", "bad", {
+      expected: { exit: 1, stdout: "REFUSED\n" },
+    }),
+  ];
+  try {
+    const block = runProbeSpec({
+      entry: "fence:doc.md#Path gh",
+      slot: "<slot>",
+      cases,
+      repoRoot: root,
+    });
+    assert.equal(block.reason, "needs-fake-gh", JSON.stringify(block));
+    assert.equal(block.verdict, "unverifiable");
+    // Declined BEFORE any spawn — the run-time trip-wire also declines
+    // needs-fake-gh, but only after cases ran, and it never sees a path-resolved gh.
+    assert.deepEqual(block.cases ?? [], [], JSON.stringify(block.cases));
+    assert.match(block.declined[0].detail, /--fake-gh/);
+    // The slot is source: an input that names gh is the same exposure.
+    const input = runProbeSpec({
+      entry: "fence:doc.md#Plain",
+      slot: "<slot>",
+      cases: [
+        ...cases,
+        fenceCase("f.gh", "hostile", "$(gh --version)", {
+          expected: { exit: 1, stdout: "REFUSED\n" },
+        }),
+      ],
+      repoRoot: root,
+    });
+    assert.equal(input.reason, "needs-fake-gh", JSON.stringify(input));
+    assert.deepEqual(input.cases ?? [], [], JSON.stringify(input.cases));
+    // The other direction: a block and inputs that only CONTAIN the letters
+    // (a path ending in /gh, `ghost`) are probed and scored as usual.
+    const plain = runProbeSpec({
+      entry: "fence:doc.md#Plain",
+      slot: "<slot>",
+      cases: [
+        ...cases,
+        fenceCase("f.ghost", "hostile", "ghost/bin/gh", {
+          expected: { exit: 1, stdout: "REFUSED\n" },
+        }),
+      ],
+      repoRoot: root,
+    });
+    assert.equal(plain.verdict, "engages", JSON.stringify(plain.cases));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: a write to an absolute path outside the sandbox is NOT observed — the stated limit, pinned (TASK-180-016)", () => {
+  const root = fenceRoot({
+    "doc.md": [
+      "## Case guard",
+      "",
+      "```bash",
+      "X='<slot>'",
+      'case "$X" in ok) ;; *) echo REFUSED; exit 1 ;; esac',
+      "```",
+      "",
+    ].join("\n"),
+  });
+  const outside = realpathSync(mkdtempSync(join(tmpdir(), "probe-outside-")));
+  try {
+    const r = runProbeSpec({
+      entry: "fence:doc.md#Case guard",
+      slot: "<slot>",
+      cases: [
+        fenceCase("f.ok", "legitimate", "ok"),
+        fenceCase("f.out", "hostile", `'$(touch ${outside}/pwned)'`, {
+          expected: { exit: 1, stdout: "REFUSED\n" },
+        }),
+      ],
+      repoRoot: root,
+    });
+    // The injection ran, and the engine did not see it: probe-boundary-rule.md
+    // §5 and the engine header state this limit. If this row starts failing,
+    // the limit was closed — update both statements with it.
+    assert.ok(existsSync(join(outside, "pwned")));
+    assert.deepEqual(r.escapes, []);
+    assert.equal(r.verdict, "engages");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
 test("fence entry: a side effect expected.absent names is a reproduction even when the shell then stops (TASK-180-006)", () => {
   const root = fenceRoot({
     "doc.md": [
