@@ -186,7 +186,7 @@ LOCAL_PATH=$(echo "$DOC_URL" | sed 's|https://github\.com/[^/]*/[^/]*/blob/[^/]*
 ```
 
 - If `LOCAL_PATH` is non-empty and the file exists: use it as `story_file`, skip to Step 4.
-- If no Document link found (older issue without Document section): fall back to `grep -rl "github_issue: {N}" docs/` and find `story.{epic}.{story}.*.md` in the result (excluding `.qa.`, `.gate.`, `.bug.`, `.implementation.` files).
+- If no Document link found (older issue without Document section): fall back to [§0a Key → document lookup](references/develop-pipeline-step-0-resolve-and-prepare.md#key--document-lookup) with `KEY_FIELD=github_issue KEY_VALUE={N}`, and check the `LOCAL_PATH` it binds is a `story.{epic}.{story}.*.md` document. It already excludes artifacts and HALTs on several matches.
 - If still not found: HALT — inform user: "No local document found for issue #{N}. Run `/create-story` first, or provide the file path directly."
 
 **Step 4 — Continue with the resolved `story_file`.**

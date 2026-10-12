@@ -5,10 +5,10 @@ type: task
 description: "Replace the three restated, unanchored jira_key / github_issue lookups in review-task and review-story with citations of the shared §0a Key → document lookup that task.176 corrected."
 tags: [review-task, review-story, input-resolution, follow-up]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-12
 assignee:
 estimated_effort_hours: 8
 github_issue: 556
@@ -16,7 +16,8 @@ github_issue: 556
 
 # Technical Task: review-task and review-story cite the §0a key lookup
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.178.review.1.review-skills-cite-key-lookup.md` implemented 2026-10-12
 **GitHub Issue**: [#556](https://github.com/Gamaroff/agent-skills/issues/556)
 
 ---
@@ -90,9 +91,17 @@ document today (`ls … | grep -c develop-pipeline-step-0` → 0).
   bundler copies the step-0 document alone into each skill, not its closure (AGENTS.md "Cite or depend").
 - review-task's line-99 block keeps its task-only constraint (a `task.{N}` document) as a check on the
   lookup's result, never as a second grep.
-- A guard test fails on any `grep -rl "jira_key: ` / `"github_issue: ` in a canonical source outside the
-  allowlisted §0a history note. It carries a non-vacuity floor: the §0a block must still match its own
-  anchored pattern.
+- A guard test fails on any recursive files-with-matches grep over the key in a canonical source
+  outside the allowlisted §0a history note. Its key is the compound, case-sensitive pattern
+  `grep +(-[A-Za-z]+ +)*-[A-Za-z]*(rl|lr)[A-Za-z]* +.*(jira_key|github_issue):` — tolerant of quote
+  style and flag order. Measured 2026-10-12 with
+  `git grep -n -E '<that pattern>' -- 'skills/*/SKILL.md' 'shared/resources/*.md' 'shared/resources/*.sh' 'skills/*/scripts/*'`
+  it returns 4 lines: the three sites and the §0a history note. It deliberately does **not** match
+  `sync-github-bug/SKILL.md:58` / `sync-jira-bug/SKILL.md:105`, which run `grep -rL` (files *without*
+  a key — a different rule); the lowercase `l` is what separates them. It carries a non-vacuity floor:
+  the §0a block must still match its own anchored pattern.
+- review-task's Jira-key branch stays a **fenced block** (the §0a binding plus the task-only check), so a
+  test can extract and execute it.
 
 ### Important Clarifications
 
@@ -134,11 +143,11 @@ match now reports "no local document". CHANGELOG says so.
 
 **Files**: `skills/review-task/SKILL.md`, `skills/review-story/SKILL.md`
 
-- [ ] review-task Step 2's Jira-key branch runs the §0a lookup (cited) with `KEY_FIELD=jira_key`, then
+- [x] review-task Step 2's Jira-key branch runs the §0a lookup (cited) with `KEY_FIELD=jira_key`, then
       checks the result is a `task.{N}` document.
-- [ ] review-task:134 and review-story:189 fallbacks cite §0a with `KEY_FIELD=github_issue` (or
+- [x] review-task:134 and review-story:189 fallbacks cite §0a with `KEY_FIELD=github_issue` (or
       `jira_key`).
-- [ ] `npm run bundle` — the step-0 document is added to both skills' `references/`.
+- [x] `npm run bundle` — the step-0 document is added to both skills' `references/`.
 
 **Dependencies**: none.
 
@@ -148,9 +157,17 @@ match now reports "no local document". CHANGELOG says so.
 
 **Files**: `tests/key-lookup-single-statement.test.js` (new)
 
-- [ ] Fail on a `grep -rl "(jira_key|github_issue): ` in any canonical source except the allowlisted
-      §0a history note; assert the §0a block still holds its anchored pattern (non-vacuity).
-- [ ] Mutation check: re-insert one old grep and confirm the test goes red.
+- [x] Fail on the compound key (§3 Target Architecture) in any canonical source — `skills/*/SKILL.md`,
+      `shared/resources/*.md`, hand-authored `skills/*/references/*.md`, and tracked shell under
+      `shared/resources/` and `skills/*/scripts/` — except the allowlisted §0a history note; assert the
+      §0a block still holds its anchored pattern (non-vacuity). Assert the two `grep -rL` sites are not
+      matched (the discriminator is pinned, not assumed).
+- [x] Executed fixture test, same file: extract the §0a fenced block and review-task's Jira-key fenced
+      block, run them under bash and zsh (zsh skipped when absent, as the other suites do) against a
+      temp `docs/` fixture holding a task document with a quoted key (`jira_key: 'RAPP-70'`), a
+      `.request.` sibling carrying the same key, a prefix neighbour (`RAPP-702`), and a non-task document
+      for the task-only check. Pattern: `skills/review-pr/tests/review-pr.test.js` §0a extraction.
+- [x] Mutation check: re-insert one old grep (and a single-quoted variant) and confirm the test goes red.
 
 **Dependencies**: Phase 1.
 
@@ -158,7 +175,7 @@ match now reports "no local document". CHANGELOG says so.
 
 **Risk Level**: Low
 
-- [ ] `[Unreleased]` entry citing (task 178).
+- [x] `[Unreleased]` entry citing (task 178).
 
 **Dependencies**: Phase 2.
 
@@ -194,7 +211,9 @@ None.
 
 ### Unit Tests
 
-- The guard test (Phase 2), with its non-vacuity floor and an allowlist of exactly one entry.
+- The guard test (Phase 2), with its non-vacuity floor, an allowlist of exactly one entry, and a pinned
+  `grep -rL` exclusion.
+- The executed fixture test for review-task's Jira-key branch (Phase 2, same file).
 
 ### Integration Tests
 
@@ -220,7 +239,8 @@ None.
 - [ ] No canonical source restates `grep -rl "jira_key: ` or `grep -rl "github_issue: ` outside the
       allowlisted §0a history note (guard test).
 - [ ] review-task's Jira-key branch resolves a quoted key to its one task document and not to a
-      `.request.` sibling or a prefix neighbour (executed fixture test, bash and zsh).
+      `.request.` sibling or a prefix neighbour (executed fixture test in
+      `tests/key-lookup-single-statement.test.js`, bash and zsh — CI installs zsh).
 
 ### Performance
 
@@ -282,6 +302,9 @@ accurate.
 | Date       | Version | Description                                       | Author      |
 | ---------- | ------- | ------------------------------------------------- | ----------- |
 | 2026-10-02 | 1.0     | Initial draft — task.176 Deferred Work item 5     | create-task |
+| 2026-10-12 | 1.1     | Review passed (8/10) — guard key widened to a quote- and flag-order-tolerant compound pattern with the `grep -rL` exclusion pinned; executed fixture test named for the Jira-key criterion; tracked shell added to the guard population | review-task |
+| 2026-10-12 |         | Status → ready-for-development | review-task |
+| 2026-10-12 |         | Implemented — 4 files changed, 1 test file (10 tests), 2 bundled copies | develop |
 
 <!-- change-log-end -->
 
@@ -291,19 +314,19 @@ accurate.
 
 ### Phase 1: Cite §0a
 
-- [ ] review-task:99
-- [ ] review-task:134
-- [ ] review-story:189
-- [ ] Bundle
+- [x] review-task:99
+- [x] review-task:134
+- [x] review-story:189
+- [x] Bundle
 
 ### Phase 2: Guard test
 
-- [ ] Test
-- [ ] Mutation check
+- [x] Test
+- [x] Mutation check
 
 ### Phase 3: CHANGELOG
 
-- [ ] Entry
+- [x] Entry
 
 ---
 
