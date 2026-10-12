@@ -308,27 +308,27 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-12
-**Quality Score**: 70/100
-**Gate Decision**: FAIL
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.180.qa.6.probe-engine-fence-entry-form.md](./task.180.qa.6.probe-engine-fence-entry-form.md)
-- **Gate File**: [task.180.gate.6.probe-engine-fence-entry-form.yml](./task.180.gate.6.probe-engine-fence-entry-form.yml)
+- **Full Report**: [task.180.qa.7.probe-engine-fence-entry-form.md](./task.180.qa.7.probe-engine-fence-entry-form.md)
+- **Gate File**: [task.180.gate.7.probe-engine-fence-entry-form.yml](./task.180.gate.7.probe-engine-fence-entry-form.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5406
+- **Tests Executed**: 5409
 - **Phases Verified**: 3/3
-- **Critical Issues**: 1
+- **Critical Issues**: 0
 - **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-- Fixed this cycle: TASK-180-015 and -016 (bugs 8 and 9 closed; 2 QA mutations covered).
-- HIGH (TASK-180-017): the `gh` text check misses what a case fixture runs; a `BASH_ENV` fixture resolves the host `gh`.
-- MEDIUM (TASK-180-018): a kill after a side effect scores `errored`, hiding a reproduction.
-- HIGH findings per cycle: 1, 1, 1, 1, 1, 1.
+- Fixed this cycle: TASK-180-017 and -018 (bugs 10 and 11 closed). First gate with no HIGH.
+- MEDIUM (TASK-180-019): a default-path lookup (`command -p gh`, `env -u PATH gh`) in a fixture script skips the PATH guard where `gh` is `/usr/bin/gh`.
+- LOW (advisory): a relative PATH entry is not resolved before the `gh` test.
+- HIGH findings per cycle: 1, 1, 1, 1, 1, 1, 0.
 
 <!-- change-log-start -->
 ## Change Log
@@ -351,6 +351,8 @@ None.
 | 2026-10-12 |         | QA findings fixed — cycle 5, 2 findings (TASK-180-015..016): fence: runs the gh text check over the block and inputs; the outside-write limit is stated and pinned | qa-fix |
 | 2026-10-12 |         | QA gate FAIL (70/100) — cycle 6 safety re-probe, 2 findings: 1 high, 1 medium | qa-task |
 | 2026-10-12 |         | QA findings fixed — cycle 6, 2 findings (TASK-180-017..018): structural PATH guard (ghFreePath) replaces the text enumeration as the gh guarantee; expected.absent checked first | qa-fix |
+| 2026-10-12 |         | QA gate CONCERNS (90/100) — cycle 7 safety re-probe, 2 findings: 1 medium, 1 low | qa-task |
+| 2026-10-12 |         | QA findings fixed — cycle 7, 2 findings (TASK-180-019 + CR-2): the gh text check reads fixtures; the default-path lookup is a stated limit; relative PATH entries resolved | qa-fix |
 <!-- change-log-end -->
 
 ---

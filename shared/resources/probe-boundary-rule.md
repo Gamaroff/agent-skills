@@ -434,13 +434,16 @@ takes it.
   to an absolute path outside the sandbox is not observed** (an injected
   `$(touch /abs/x)`): it is a stated limit, pinned by a test, and `expected.absent`
   cannot name such a path. With no `--fake-gh`, the `gh` text check below runs over
-  the extracted block and every case's input (never the whole document), so a block
+  the extracted block and every case's input and fixture `env` / `files` (never the
+  whole document), so a block
   that resolves `gh` to a path is declined `needs-fake-gh` before anything runs. That
   check is the fast path; the guarantee is structural: for each case, every `PATH`
   directory that holds a `gh` is replaced by a copy without it (`ghFreePath`), so no
   `PATH` lookup — `type -ap gh`, `command -v gh`, from the block, an input or a
-  fixture script — reaches the host binary. An absolute path, and a `PATH` the block
-  itself prepends, remain the limits. A case's optional `fixture`
+  fixture script — reaches the host binary. An absolute path, a `PATH` the block
+  itself prepends, and a default-path lookup (`command -p gh`, `env -u PATH gh`,
+  which search `/bin:/usr/bin`) remain the limits; the text check catches the last
+  wherever it is written out in the block, an input or a fixture. A case's optional `fixture`
   supplies the rest of what the block reads — `env` (never `HOME`, `TMPDIR` or
   `LC_ALL`, which the sandbox owns) and `files` written into the case directory,
   declined when a path leaves it. **A hostile case must carry `expected`** — the

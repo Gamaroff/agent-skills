@@ -4,7 +4,7 @@
 **Bug ID**: TASK-180-BUG-11
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 6 safety re-probe, code review CR-2 / TASK-180-018)
 **Date Found**: 2026-10-12
 
@@ -46,3 +46,4 @@ Check `expected.absent` before the never-ran and launch-failure branches, so a s
 | ---------- | ------ | ----------- | ----- |
 | 2026-10-12 | New          | QA Engineer | QA cycle 6 — reproduced on 243bc237 |
 | 2026-10-12 | Ready for QA | qa-fix      | absent checked first; mutation-proven |
+| 2026-10-12 | Closed       | QA Engineer | QA cycle 7 — verified on cba2750b |

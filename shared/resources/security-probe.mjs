@@ -189,7 +189,8 @@
  * `<shell> <script>` per shell, rc files off, with the shell arm's trip-wire
  * `gh` (or `--fake-gh`) first on PATH, every PATH directory holding the host
  * `gh` shadowed by a copy without it (ghFreePath), and the shell forms' `gh`
- * text check over the block and the inputs. A HOSTILE case must carry `expected` — the
+ * text check over the block, the inputs and the fixtures. A default-path lookup
+ * (`command -p gh`) that no checked text spells out is a stated limit. A HOSTILE case must carry `expected` — the
  * guard's own refusal OUTPUT, a non-empty stdout or stderr — and is declined
  * without one: under source
  * substitution an exit status cannot tell a refusal from a shell that stopped
@@ -1245,8 +1246,20 @@ export function runProbeSpec({
   // path) ran the host binary and was scored. So fence: gets the text check the
   // shell forms get, over what will actually run (TASK-180-015).
   if (isFenceForm && fakeGhDir === null) {
+    // Every string a case carries can run: its input (the slot is source), its
+    // fixture's env values and its fixture's files (BASH_ENV, a sourced
+    // fixture script). Spellings that skip PATH — `command -p gh`, `env -u
+    // PATH gh` — are caught here or not at all (TASK-180-019).
+    const strings = (o) =>
+      o && typeof o === "object" && !Array.isArray(o)
+        ? Object.values(o).filter((v) => typeof v === "string")
+        : [];
     const inputs = probeCases
-      .map((c) => (typeof c?.input === "string" ? c.input : ""))
+      .flatMap((c) => [
+        ...(typeof c?.input === "string" ? [c.input] : []),
+        ...strings(c?.fixture?.env),
+        ...strings(c?.fixture?.files),
+      ])
       .join("\n");
     if (
       namesGh(
@@ -1257,7 +1270,7 @@ export function runProbeSpec({
     ) {
       return decline(
         "needs-fake-gh",
-        `the block under "${resolved.heading}" in ${resolved.entryPath}, or a case's input, names \`gh\` — pass --fake-gh <dir> so the fixture answers instead of the real binary`,
+        `the block under "${resolved.heading}" in ${resolved.entryPath}, or a case's input or fixture, names \`gh\` — pass --fake-gh <dir> so the fixture answers instead of the real binary`,
       );
     }
   }
@@ -2356,16 +2369,23 @@ function workDirStamps(dir, skip) {
  * everything a case carries can run (TASK-180-015, -017). An absolute path to a
  * real `gh`, and a PATH the block itself prepends, stay the stated limits. A
  * directory that holds `gh` but cannot be listed is dropped rather than kept.
+ * A relative entry is resolved against `cwd` (the case directory) for the test.
+ * A default-path lookup (`command -p gh`, `env -u PATH gh`) searches
+ * /bin:/usr/bin, not PATH: the text check is what catches it (TASK-180-019).
  */
-export function ghFreePath(path, farmRoot) {
+export function ghFreePath(path, farmRoot, cwd = null) {
   return (path ?? "")
     .split(":")
-    .flatMap((dir) => {
-      if (!isAbsolute(dir)) return [dir];
+    .flatMap((entry) => {
+      // A relative entry (`""` included) is searched from the child's cwd, so
+      // it is tested there: `../../…/.local/bin` from a fixture's PATH must not
+      // keep a host gh in reach. With no cwd it cannot be tested, and is kept.
+      if (!isAbsolute(entry) && cwd === null) return [entry];
+      const dir = isAbsolute(entry) ? entry : resolve(cwd, entry);
       try {
         accessSync(join(dir, "gh"), fsConstants.X_OK);
       } catch {
-        return [dir];
+        return [entry];
       }
       const farm = join(
         farmRoot,
@@ -2526,7 +2546,7 @@ function runFenceCase(
     };
     // Every PATH directory holding the host `gh` is shadowed by one without it,
     // fixture.env's PATH included, before the trip-wire or fixture goes first.
-    env.PATH = ghFreePath(env.PATH, join(harnessDir, "path"));
+    env.PATH = ghFreePath(env.PATH, join(harnessDir, "path"), caseDir);
     if (fakeGhDir !== null) {
       env.PATH = `${fakeGhDir}:${env.PATH}`;
       env.FAKE_GH = "1";

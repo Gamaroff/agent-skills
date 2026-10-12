@@ -4656,6 +4656,13 @@ test("ghFreePath: a PATH directory holding gh is replaced by a copy without it; 
     assert.equal(out[2], without);
     // Built once: a second call reuses the same copy.
     assert.equal(ghFreePath(withGh, farmRoot), out[0]);
+    // With a cwd, a relative entry is resolved there and shadowed like an
+    // absolute one: a fixture PATH of `../with` must not keep gh in reach (CR-2).
+    const cwd = join(base, "case");
+    mkdirSync(cwd);
+    const rel = ghFreePath("../with:../without", farmRoot, cwd).split(":");
+    assert.equal(rel[0], out[0]);
+    assert.equal(rel[1], "../without");
   } finally {
     rmSync(base, { recursive: true, force: true });
   }
@@ -4708,6 +4715,49 @@ test("fence entry: no PATH lookup reaches a host gh, whatever runs it — a BASH
     process.env.PATH = savedPath;
     rmSync(root, { recursive: true, force: true });
     rmSync(host, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: a fixture that names gh — a default-path lookup included — is declined before anything runs (TASK-180-019)", () => {
+  const root = fenceRoot({
+    "doc.md": [
+      "## Plain",
+      "",
+      "```bash",
+      "X='<slot>'",
+      'case "$X" in ok) ;; *) echo REFUSED; exit 1 ;; esac',
+      "```",
+      "",
+    ].join("\n"),
+  });
+  try {
+    for (const fixture of [
+      {
+        env: { BASH_ENV: "./init.sh" },
+        files: { "init.sh": "env -u PATH gh --version\n" },
+      },
+      {
+        env: { BASH_ENV: "./init.sh" },
+        files: { "init.sh": "command -p gh --version\n" },
+      },
+      { env: { PROMPT_COMMAND: "gh api user" } },
+    ]) {
+      const r = runProbeSpec({
+        entry: "fence:doc.md#Plain",
+        slot: "<slot>",
+        cases: [
+          fenceCase("f.ok", "legitimate", "ok", { fixture }),
+          fenceCase("f.bad", "hostile", "bad", {
+            expected: { exit: 1, stdout: "REFUSED\n" },
+          }),
+        ],
+        repoRoot: root,
+      });
+      assert.equal(r.reason, "needs-fake-gh", JSON.stringify(fixture));
+      assert.deepEqual(r.cases ?? [], [], JSON.stringify(r.cases));
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
 

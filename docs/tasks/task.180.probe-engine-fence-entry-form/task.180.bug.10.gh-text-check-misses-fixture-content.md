@@ -4,7 +4,7 @@
 **Bug ID**: TASK-180-BUG-10
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 6 safety re-probe, code review CR-1 / TASK-180-017)
 **Date Found**: 2026-10-12
 
@@ -48,3 +48,4 @@ Enumerating more text into the check repeats the cycle-5 shape. Prefer one struc
 | ---------- | ------ | ----------- | ----- |
 | 2026-10-12 | New          | QA Engineer | QA cycle 6 — reproduced on 243bc237 |
 | 2026-10-12 | Ready for QA | qa-fix      | Structural PATH guard; mutation-proven |
+| 2026-10-12 | Closed       | QA Engineer | QA cycle 7 — verified on cba2750b |
