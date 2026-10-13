@@ -272,26 +272,30 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-13
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.182.qa.3.reenter-qa-refusal-diagnostics-and-qa-reentry-population.md](./task.182.qa.3.reenter-qa-refusal-diagnostics-and-qa-reentry-population.md)
-- **Gate File**: [task.182.gate.3.reenter-qa-refusal-diagnostics-and-qa-reentry-population.yml](./task.182.gate.3.reenter-qa-refusal-diagnostics-and-qa-reentry-population.yml)
+- **Full Report**: [task.182.qa.4.reenter-qa-refusal-diagnostics-and-qa-reentry-population.md](./task.182.qa.4.reenter-qa-refusal-diagnostics-and-qa-reentry-population.md)
+- **Gate File**: [task.182.gate.4.reenter-qa-refusal-diagnostics-and-qa-reentry-population.yml](./task.182.gate.4.reenter-qa-refusal-diagnostics-and-qa-reentry-population.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: re-entry suite 61/61; parity tests 12/12; security probe 8 executed, 0 reproduced
+- **Tests Executed**: re-entry suite 61/61; parity tests 12/12; security probe 8 executed, 0 reproduced (gate 3 record; script unchanged)
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-- Every stated `qa_phase` value is now correct; [task.182.bug.1](./task.182.bug.1.hooks-doc-qa-phase-writer-claim.md) closed.
-- TASK-182-004 (MEDIUM): the contract still restates the grant's values while the pause row claims to be the one statement, and the guard misses it — [task.182.bug.2](./task.182.bug.2.consolidated-qa-phase-rule-restated.md).
-- Deferred: the "Resume at 5a" option label (pinned by eval fixtures).
+- Four QA cycles; [task.182.bug.1](./task.182.bug.1.hooks-doc-qa-phase-writer-claim.md) and [task.182.bug.2](./task.182.bug.2.consolidated-qa-phase-rule-restated.md) closed.
+- Diminishing-returns exit at cycle 4: TASK-182-005 (LOW, test machinery) carried to the gate's `recommendations.future` — see Deferred Work.
+
+## Deferred Work
+
+- **TASK-182-005** (LOW) — carried to gate 4 `recommendations.future` (route 2, cycle 4): the one-statement guard's `VALUE_CLAIM` and its `git grep` population are case-sensitive and narrowly worded, so a sentence-initial "The grant writes", a singular "re-entry writer", an unbackticked value or another verb passes it.
+- **Option label** (QA cycle 2 CR-6 / cycle 4 CR-1, advisory) — "Resume at 5a with {k} more cycles" names a phase a not-converging grant does not write. Pre-existing (task.123) and pinned by eval replay fixtures; a follow-up task.
 
 ## Change Log
 
@@ -309,6 +313,7 @@ None.
 | 2026-10-13 |  | QA findings fixed — TASK-182-003 by consolidating the qa_phase writer rule; advisory CR-2, CR-3, CR-4, CR-5, CR-7 fixed; CR-6 deferred; 2 iterations | qa-fix |
 | 2026-10-13 |  | QA gate CONCERNS (90/100) — 1 finding (medium) + 1 deferred | qa-task |
 | 2026-10-13 |  | QA findings fixed — TASK-182-004 by scoping the claim to the grant's value; guard population derived; 3 iterations | qa-fix |
+| 2026-10-13 |  | QA gate PASS (100/100) — 1 LOW carried by the diminishing-returns exit (route 2) | qa-task |
 
 <!-- change-log-end -->
 

@@ -4,7 +4,7 @@
 **Bug ID**: TASK-182-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 3, code review CR-1/CR-2 / TASK-182-004)
 **Date Found**: 2026-10-13
 
@@ -61,3 +61,4 @@ Contract cites the row and keeps only the rationale; `VALUE_CLAIM` matches "the 
 | 2026-10-13 | New | qa-task | Filed by task.182.qa.3 |
 | 2026-10-13 | In Progress | qa-fix | Investigation (QA cycle 3 fix) |
 | 2026-10-13 | Ready for QA | qa-fix | Claim scoped to the grant; contract cites the row; guard derived and widened |
+| 2026-10-13 | Closed | qa-task | Verified by task.182.qa.4 — contract cites the pause row; guard population derived |
