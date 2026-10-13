@@ -279,19 +279,19 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.182.qa.2.reenter-qa-refusal-diagnostics-and-qa-reentry-population.md](./task.182.qa.2.reenter-qa-refusal-diagnostics-and-qa-reentry-population.md)
-- **Gate File**: [task.182.gate.2.reenter-qa-refusal-diagnostics-and-qa-reentry-population.yml](./task.182.gate.2.reenter-qa-refusal-diagnostics-and-qa-reentry-population.yml)
+- **Full Report**: [task.182.qa.3.reenter-qa-refusal-diagnostics-and-qa-reentry-population.md](./task.182.qa.3.reenter-qa-refusal-diagnostics-and-qa-reentry-population.md)
+- **Gate File**: [task.182.gate.3.reenter-qa-refusal-diagnostics-and-qa-reentry-population.yml](./task.182.gate.3.reenter-qa-refusal-diagnostics-and-qa-reentry-population.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: re-entry suite 59/59; parity tests 12/12; security probe 8 executed, 0 reproduced
+- **Tests Executed**: re-entry suite 61/61; parity tests 12/12; security probe 8 executed, 0 reproduced
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-- Cycle 1 fixes hold (TASK-182-002 closed; mutation-proven).
-- TASK-182-003 (MEDIUM): the pause reference's lock schema still says both re-entry writers set `qa_phase` to `5a` — [task.182.bug.1](./task.182.bug.1.hooks-doc-qa-phase-writer-claim.md) reopened.
-- Advisory: no-gate ambiguity route, contract halt-7 bullet, live-lock 5b claim, wrong-repo cwd, option label, CHANGELOG count.
+- Every stated `qa_phase` value is now correct; [task.182.bug.1](./task.182.bug.1.hooks-doc-qa-phase-writer-claim.md) closed.
+- TASK-182-004 (MEDIUM): the contract still restates the grant's values while the pause row claims to be the one statement, and the guard misses it — [task.182.bug.2](./task.182.bug.2.consolidated-qa-phase-rule-restated.md).
+- Deferred: the "Resume at 5a" option label (pinned by eval fixtures).
 
 ## Change Log
 
@@ -307,6 +307,8 @@ None.
 | 2026-10-13 |  | QA findings fixed — TASK-182-001, TASK-182-002 + advisory CR-3, CR-4 and one probe sibling; 1 iteration | qa-fix |
 | 2026-10-13 |  | QA gate CONCERNS (90/100) — 1 finding (medium) + 6 advisory | qa-task |
 | 2026-10-13 |  | QA findings fixed — TASK-182-003 by consolidating the qa_phase writer rule; advisory CR-2, CR-3, CR-4, CR-5, CR-7 fixed; CR-6 deferred; 2 iterations | qa-fix |
+| 2026-10-13 |  | QA gate CONCERNS (90/100) — 1 finding (medium) + 1 deferred | qa-task |
+| 2026-10-13 |  | QA findings fixed — TASK-182-004 by scoping the claim to the grant's value; guard population derived; 3 iterations | qa-fix |
 
 <!-- change-log-end -->
 

@@ -4,7 +4,7 @@
 **Bug ID**: TASK-182-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 1, code review CR-1 / TASK-182-001)
 **Date Found**: 2026-10-13
 
@@ -90,3 +90,4 @@ Correct the sentence (`5b` after not-converging, else `5a`; reenter always `5a`)
 | 2026-10-13 | Reopened | qa-task | Not fixed — pause-doc lock schema still says both writers set 5a (task.182.qa.2, TASK-182-003) |
 | 2026-10-13 | In Progress | qa-fix | Iteration 2 — consolidating the qa_phase writer rule |
 | 2026-10-13 | Ready for QA | qa-fix | One statement in the pause lock schema; hooks doc and both SKILL.md cite it; parity test holds it |
+| 2026-10-13 | Closed | qa-task | Verified by task.182.qa.3 — no site states a wrong qa_phase value; the restatement that remains is bug.2 |

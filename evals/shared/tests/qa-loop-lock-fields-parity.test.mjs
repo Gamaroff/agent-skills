@@ -47,6 +47,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs, { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -208,36 +209,45 @@ test("qa_reentry: the writer and every reader and describer name it (task.182)",
     /not-converging[^\n]*\) REENTER=5b/,
     "grant-qa-cycles.sh no longer writes 5b after not-converging — re-check the pause reference's qa_phase row",
   );
-  // No other describer restates a value. Measured against every historic false statement: the
-  // develop pause row, both cycle-1 hooks sentences — and it matches none of today's citations.
+  // No other describer restates the grant's value. The population is DERIVED — every shared
+  // resource and SKILL.md that names the grant — not the hand-kept FILES map, which missed
+  // describers; the text is whitespace-collapsed so a claim that wraps is still one claim; and the
+  // match takes "the grant" as well as the script name, and needs a writes/sets verb before the value
+  // so a table keyed on the value the grant PRINTED is not a claim (task.182 QA cycle 3, TASK-182-004).
+  // Measured against every historic false statement on origin/develop, b7d7661e, 4eb35d36 and
+  // 93539f1b (the contract's "the grant writes `5a`" among them).
   const VALUE_CLAIM =
-    /(?:grant-qa-cycles\.sh`?|re-entry (?:scripts|writers))[^|\n]{0,200}?(?:`5[ab]`|`qa_phase: 5[ab]`)/;
-  const describers = Object.keys(FILES).filter(
-    (n) =>
-      ![
-        "pauseDoc",
-        "grantScript",
-        "reenterScript",
-        "setQaPhase",
-        "stopHook",
-        "lockHelper",
-        "setWaitingOn",
-      ].includes(n),
-  );
+    /(?:grant-qa-cycles\.sh`?|\bthe grant\b|re-entry (?:scripts|writers))[^|]{0,200}?(?<![-\w])(?:writes?|sets?)(?![-\w])(?: it to)?[^|]{0,60}?`(?:qa_phase: )?5[ab]`/;
+  const grantDescribers = execFileSync(
+    "git",
+    [
+      "grep",
+      "-l",
+      "-E",
+      "grant-qa-cycles|the grant",
+      "--",
+      ":(glob)shared/resources/*.md",
+      ":(glob)skills/*/SKILL.md",
+    ],
+    { cwd: ROOT, encoding: "utf8" },
+  )
+    .trim()
+    .split("\n")
+    .filter((p) => p && p !== FILES.pauseDoc);
   assert.ok(
-    describers.length >= 6,
-    "non-vacuity: the describer list is too short",
+    grantDescribers.length >= 5,
+    `non-vacuity: only ${grantDescribers.length} describers of the grant found`,
   );
-  for (const name of describers) {
+  for (const p of grantDescribers) {
     assert.doesNotMatch(
-      text[name],
+      read(p).replace(/\s+/g, " "),
       VALUE_CLAIM,
-      `${name} (${FILES[name]}) restates which qa_phase a re-entry writer writes — cite the pause reference's lock schema instead`,
+      `${p} restates which qa_phase the grant writes — cite the pause reference's lock schema instead`,
     );
   }
   assert.match(
     text.hooksDoc,
-    /which value each re-entry writes is stated once, in the `qa_phase` row of the lock schema in `develop-pipeline-pause\.md`/,
+    /the value the grant writes depends on the halt and is stated once, in the `qa_phase` row of the lock schema in `develop-pipeline-pause\.md`/,
     "the hooks doc must cite the pause reference for the qa_phase values",
   );
   // The SKILL.md grant sentence names no value (a "qa_phase: 5a atomically" there carried no

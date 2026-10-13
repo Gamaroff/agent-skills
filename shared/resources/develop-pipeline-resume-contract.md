@@ -630,10 +630,11 @@ This convention ensures the cycle budget is respected across resumes.
    - It **writes three fields atomically** — `extra_cycles_granted = k` (the record),
      `qa_max_cycles = base + k` (the budget) and `qa_phase`, the re-entry point — via `mktemp` +
      `mv`, removing its temp file on every failure, and prints the budget and `reenter_at` back from
-     the written lock. **The re-entry point depends on where the halt stopped** (obs #228): a
-     `loop-limit` halt ran its last 5b, so the grant writes `5a` and the next gate reads that fix; a
-     `not-converging` halt fired at 5a *before* 5b, so the grant writes `5b` and the latest gate's
-     queue goes to `/qa-fix` first. Re-entering a not-converging halt at 5a reviews unchanged code,
+     the written lock. **The re-entry point depends on where the halt stopped** (obs #228) — which
+     value for which halt is the `qa_phase` row of the lock schema in `develop-pipeline-pause.md`.
+     The reason: a `loop-limit` halt ran its last 5b, so the next gate must read that fix, and a
+     `not-converging` halt fired at 5a *before* 5b, so the latest gate's queue must go to `/qa-fix`
+     first. Re-entering a not-converging halt at 5a reviews unchanged code,
      re-raises the same HIGH and trips the check again, spending the grant with no fix attempted
      (task.140). The script reads `halt_reason` from the candidate before its restore drops it, and
      reads its leading token: the HALT appends detail after a `:` or a space, and an exact compare
