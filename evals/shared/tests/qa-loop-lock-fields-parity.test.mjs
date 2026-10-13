@@ -20,6 +20,16 @@
 //                         the Stop hook, DESCRIBED by the hooks doc and the pause
 //                         reference's lock schema.
 //
+// A fourth joined with task.170, and task.182 carried it to every reader:
+//
+//   qa_reentry            {from_step, reason, at, gate_head, report_entries} —
+//                         why a lock sits at step 5 after a Step 7 halt.
+//                         WRITTEN by reenter-qa-after-finalise.sh (the one
+//                         writer, which also writes qa_max_cycles and qa_phase),
+//                         READ by the resume contract and the detector prompt,
+//                         DESCRIBED by the pause reference, the hooks doc and
+//                         both develop-* SKILL.md.
+//
 // A field with two spellings is a field with no reader: the writer writes
 // `qa_phase`, the hook reads `qaPhase`, and the default arm fires on every
 // stop — silently, because an absent field IS a legal state. This test pins
@@ -57,6 +67,7 @@ const FILES = {
   changelog: "CHANGELOG.md",
   setWaitingOn: "shared/resources/set-waiting-on.sh",
   pauseDoc: "shared/resources/develop-pipeline-pause.md",
+  reenterScript: "shared/resources/reenter-qa-after-finalise.sh",
 };
 const text = Object.fromEntries(
   Object.entries(FILES).map(([k, p]) => [k, read(p)]),
@@ -87,6 +98,9 @@ const MISSPELLINGS = [
   /\bbudgetMinutes\b/,
   /(?<!-)\bbudget-minutes\b/, // `--budget-minutes` is the writer's flag, not a field spelling
   /\bwall_clock_minutes\b/,
+  // task.182: the qa_reentry field
+  /\bqaReentry\b/,
+  /\bqa_re_entry\b/,
 ];
 
 test("every participant spells `qa_phase` and `extra_cycles_granted` the same way", () => {
@@ -123,6 +137,51 @@ test("every participant spells `qa_phase` and `extra_cycles_granted` the same wa
       text[name],
       /\bextra_cycles_granted\b/,
       `${name} must name extra_cycles_granted`,
+    );
+  }
+});
+
+test("qa_reentry: the writer and every reader and describer name it (task.182)", () => {
+  const participants = [
+    "reenterScript",
+    "resumeContract",
+    "detectorPrompt",
+    "pauseDoc",
+    "hooksDoc",
+    "taskSkill",
+    "storySkill",
+  ];
+  assert.ok(
+    participants.length > 0,
+    "non-vacuity: the qa_reentry participant list is empty",
+  );
+  for (const name of participants) {
+    assert.match(
+      text[name],
+      /\bqa_reentry\b/,
+      `${name} (${FILES[name]}) must name qa_reentry`,
+    );
+  }
+  // The writer is the one place the field's shape is set; the detector prompt reports the
+  // sub-fields the resume contract's Second precedence reads, so it names each of them.
+  assert.match(
+    text.reenterScript,
+    /\.qa_reentry = \{from_step: 7, reason: "dod-gaps-code-fix", at: \$now, gate_head: \$head, report_entries: \$entries\}/,
+    "reenter-qa-after-finalise.sh must write qa_reentry with its five sub-fields",
+  );
+  for (const sub of ["from_step", "reason", "gate_head", "report_entries"]) {
+    assert.match(
+      text.detectorPrompt,
+      new RegExp(`qa_reentry[^\\n]*\\b${sub}\\b`),
+      `the detector prompt's qa_reentry line must report ${sub}`,
+    );
+  }
+  // qa_max_cycles has two writers, and the hooks doc names both — the description that said it is
+  // "written together at a resume after a loop-limit halt" was true of one of them (task.182, CR-2).
+  for (const writer of ["grant-qa-cycles.sh", "reenter-qa-after-finalise.sh"]) {
+    assert.ok(
+      text.hooksDoc.includes(writer),
+      `the hooks doc must name ${writer} as a writer of qa_max_cycles`,
     );
   }
 });

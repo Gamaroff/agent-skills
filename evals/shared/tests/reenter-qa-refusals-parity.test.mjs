@@ -165,7 +165,7 @@ test("the resume contract's 5c readings ignore a terminal verdict that predates 
 // task.170 QA cycle 4, CR-1/CR-2: each refusal's ROUTE is stated once, in the contract's list. The
 // halt-7 bullet once sent every refused re-entry to step 7 — uncommitted-fix included — while the
 // list, the script and SKILL.md said never.
-test("every refusal carries its route, and uncommitted-fix never routes to step 7", () => {
+test("every refusal carries its route, and uncommitted-fix / git-unreadable never route to step 7", () => {
   const text = read(CONTRACT);
   const list = text.match(
     /<!-- reenter-qa-refusals: start -->([\s\S]*?)<!-- reenter-qa-refusals: end -->/,
@@ -174,12 +174,16 @@ test("every refusal carries its route, and uncommitted-fix never routes to step 
   assert.ok(lines.length >= FLOOR, "refusal lines found");
   for (const l of lines)
     assert.match(l, /\*\*Route:\*\*/, `no route: ${l.slice(0, 60)}`);
-  const uncommitted = lines.find((l) => l.startsWith("- `uncommitted-fix`"));
-  assert.match(
-    uncommitted,
-    /\*\*never\*\* step 7/,
-    "uncommitted-fix must never route to step 7",
-  );
+  // task.182, CR-3: an unreadable tree is the other state /finalise must not run over.
+  for (const reason of ["uncommitted-fix", "git-unreadable"]) {
+    const line = lines.find((l) => l.startsWith(`- \`${reason}\``));
+    assert.ok(line, `${reason} must be in the contract's refusal list`);
+    assert.match(
+      line,
+      /\*\*never\*\* step 7/,
+      `${reason} must never route to step 7`,
+    );
+  }
   assert.doesNotMatch(
     text,
     /like a declined or otherwise refused re-entry, takes the next/,
