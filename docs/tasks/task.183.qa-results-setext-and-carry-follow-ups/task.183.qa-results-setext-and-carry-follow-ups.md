@@ -8,7 +8,7 @@ category: refactoring
 status: accepted
 priority: High
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-13
 assignee:
 estimated_effort_hours: 8
 github_issue: 569
@@ -97,8 +97,8 @@ QA cycle 5 review reproduced, not just plain text.
 - The QA writer stops deleting setext sections for every shape QA reproduced (CR5-1 closed, not
   narrowed). Observation #267 recorded how task.171 passed with this open.
 - Change logs keep their rows whatever their column order.
-- Carried Bug Reports and Deferred Work lists keep their `####` groups and stop carrying QA's own
-  stale text.
+- Carried Bug Reports and Deferred Work lists keep their `####` groups. (CR2-4 deferred: a stale QA
+  list after a carried block is carried once — a duplicate, never a deletion; task.184 § 4.)
 - The timing criterion records its conditions and is re-measured where it is relied on.
 
 ---
@@ -151,7 +151,8 @@ QA cycle 5 review reproduced, not just plain text.
 
 - `removesStructure` is the only structural guard. This task **narrows** its setext exemption and
   **extends** its log-table recognition; it adds no second guard.
-- `collectBlocks`' `stops` is the only block-boundary rule. This task **changes** two of its clauses.
+- `collectBlocks`' `stops` is the only block-boundary rule. This task **changes** one of its clauses
+  (the heading stop); a `QA_LABELS` clause was added and then removed (task.184 § 4).
 - `RE_QA_FIELD` is the only list of QA-owned lines. (A `QA_LABELS` list beside it was added and
   then removed in QA — see CR2-4 in `## Deferred Work`.)
 
@@ -228,8 +229,8 @@ CHANGELOG states all of these.
 - [x] A bold-label block stops at a heading of level 3 or shallower
 - [x] ~~`QA_LABELS` beside `RE_QA_FIELD`~~ — added, then removed at QA cycle 5 (it dropped grouped
       bug lists); CR2-4 deferred
-- [x] Tests: a `####` group under `**Bug Reports**` survives three writes; a bug list grouped under
-      any sub-label survives; a stale list is carried once, never doubled
+- [x] Tests: a `####` group under `**Bug Reports**` survives three writes; a bug list directly
+      under a sub-label survives; a stale list is carried once, never doubled
 
 ### Phase 5: survey pre-filter, timing and docs (Risk: Low)
 
@@ -238,7 +239,8 @@ CHANGELOG states all of these.
 
 - [x] The write survey skips documents that do not mention `QA Testing Results`
 - [x] Record the timing with `uptime` beside `time`, in the implementation report
-- [x] task.171's Deferred Work items marked resolved, with a link to this task
+- [x] task.171's Deferred Work items: three marked resolved, two deferred (CR-7, CR2-4), with a link
+      to this task
 - [x] CHANGELOG `[Unreleased]` cites `(task 183)` and names the new refusals and the two shapes now
       written
 - [x] `npm run bundle`, `npm run bundle:check`, `npm run ci:fast`, `npm run validate` for qa-task and
@@ -255,7 +257,7 @@ CHANGELOG states all of these.
 3. ✅ `tests/qa-results-corpus.test.js`: survey pre-filter
 4. ✅ `CHANGELOG.md`
 5. ✅ `docs/tasks/task.171.deferred-work-placement-and-qa-results-residuals/task.171.deferred-work-placement-and-qa-results-residuals.md`:
-   Deferred Work items marked resolved
+   Deferred Work items — three resolved, two deferred
 
 ### Generated (`npm run bundle`, never edited by hand)
 
@@ -307,7 +309,7 @@ None.
 - [ ] A misplaced section above a `| Version | Date | … |` log is refused, never relocated with row
       loss, and a section quoting a table without a `Date` column is still writable (Phase 3 test)
 - [ ] A `####` group under a bold `**Bug Reports**` label survives three writes, and a bug list
-      grouped under any sub-label is carried whole (Phase 4 tests; CR2-4 deferred)
+      grouped directly under a sub-label is carried whole (Phase 4 tests; CR2-4 deferred)
 
 ### Performance
 
@@ -327,8 +329,7 @@ None.
 
 ### Migration
 
-- [ ] CHANGELOG `[Unreleased]` cites `(task 183)` and names the new refusals and the newly written
-      shapes
+- [ ] CHANGELOG `[Unreleased]` cites `(task 183)` and names the new refusals and the deferrals
 - [ ] task.171's `## Deferred Work` items closed here link to this task
 
 ---
@@ -468,6 +469,7 @@ gates 2–4 `recommendations.future`. All four are gaps in `shared/resources/qa-
 | 2026-10-05 |         | QA gate FAIL (50/100) — 3 findings (2 high); loop not converging, escalated again | qa-task |
 | 2026-10-05 |         | QA gate PASS (100/100) — 0 findings (3 advisory lows) | qa-task |
 | 2026-10-05 | 1.2 | DoD passed — accepted (PR #571) | finalise |
+| 2026-10-13 |  | Note: the gate 4 FAIL row was written after the cycle 5 rows above it; rows are left in written order (append-only). Narrative corrected for CR2-4 deferral and the one stops clause changed — task.184 | develop |
 <!-- change-log-end -->
 
 ---
@@ -477,7 +479,7 @@ gates 2–4 `recommendations.future`. All four are gaps in `shared/resources/qa-
 - [x] Phase 1: setext leans toward refusal (CR5-1)
 - [x] Phase 2: two setext false refusals (CR-7) — deferred
 - [x] Phase 3: a log table is a table with a Date column (5c CR-1)
-- [x] Phase 4: bold-label boundaries (5c CR-2, CR2-4)
+- [x] Phase 4: bold-label boundaries (5c CR-2; CR2-4 deferred)
 - [x] Phase 5: survey pre-filter, timing and docs
 
 ---
