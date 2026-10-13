@@ -268,7 +268,7 @@ None.
 
 **Testing results.** `reenter-qa-after-finalise.test.sh`: 58 pass (53 before + 5: the three `no-gate` causes each relay `qa-cycle.sh`'s reason with the prefix rewritten and the refused line last; an unnumbered gate and two gates claiming one cycle refuse `no-gate`; a `git` stub failing only on `status` refuses `git-unreadable` with nothing written and nothing consumed). `qa-loop-lock-fields-parity.test.mjs`: new test pins `qa_reentry` in the writer and six readers (non-vacuity floor), the writer's five-field shape, the detector's four sub-fields and the hooks doc's two `qa_max_cycles` writers; `qaReentry` / `qa_re_entry` added to the misspellings. `reenter-qa-refusals-parity.test.mjs`: `git-unreadable` must route **never** to step 7, beside `uncommitted-fix`. Mutations — relay disabled (3 cause cases red), `|| refuse git-unreadable` neutralised (git-failure case red), detector `qa_reentry` line deleted (parity red). `npm run ci:fast` with the `.agents/skills` symlink moved aside: 5424 pass, 0 fail. `bundle:check` clean. ShellCheck `--severity=warning` clean on both `.sh`. No bash-3.2-rejected construct in the added lines (checked on the diff; no macOS host). Suite runtime 4.5 s at load 2.34 (information, not a bound).
 
-**Deferred work.** None. A macOS `/bin/bash` 3.2 run was not available (Linux host, `ubuntu-latest` CI).
+**Deferred work.** One item. QA cycle 2's CR-6: the Phase 0b option label "Resume at 5a with {k} more cycles" (both SKILL.md, `develop-pipeline-resume-contract.md:607`, `develop-pipeline-step-5-6-qa-loop.md:1947/1970`, `grant-qa-cycles.sh:6`) contradicts a not-converging grant that re-enters at `5b`. The label predates this task (task.123) and is pinned by the eval replay fixtures `evals/develop-{task,story}/step-isolation/12-qa-reentry-after-loop-limit-with-grant/` and by `qa-loop-lock-fields-parity.test.mjs`, so relabelling it is a change to recorded eval answers, out of this task's scope — a follow-up task. A macOS `/bin/bash` 3.2 run was not available (Linux host, `ubuntu-latest` CI).
 
 ## QA Testing Results
 
@@ -279,18 +279,19 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.182.qa.1.reenter-qa-refusal-diagnostics-and-qa-reentry-population.md](./task.182.qa.1.reenter-qa-refusal-diagnostics-and-qa-reentry-population.md)
-- **Gate File**: [task.182.gate.1.reenter-qa-refusal-diagnostics-and-qa-reentry-population.yml](./task.182.gate.1.reenter-qa-refusal-diagnostics-and-qa-reentry-population.yml)
+- **Full Report**: [task.182.qa.2.reenter-qa-refusal-diagnostics-and-qa-reentry-population.md](./task.182.qa.2.reenter-qa-refusal-diagnostics-and-qa-reentry-population.md)
+- **Gate File**: [task.182.gate.2.reenter-qa-refusal-diagnostics-and-qa-reentry-population.yml](./task.182.gate.2.reenter-qa-refusal-diagnostics-and-qa-reentry-population.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 7 suites/checks (re-entry suite 58/58; parity and probe tests 182/182; probe 8 executed)
+- **Tests Executed**: re-entry suite 59/59; parity tests 12/12; security probe 8 executed, 0 reproduced
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-- TASK-182-001 (MEDIUM): the hooks doc says both re-entry scripts set `qa_phase` to `5a`; `grant-qa-cycles.sh` writes `5b` after a not-converging halt — [task.182.bug.1](./task.182.bug.1.hooks-doc-qa-phase-writer-claim.md).
-- TASK-182-002 (LOW): the parity test's detector sub-field check is vacuous (mutation stays green).
+- Cycle 1 fixes hold (TASK-182-002 closed; mutation-proven).
+- TASK-182-003 (MEDIUM): the pause reference's lock schema still says both re-entry writers set `qa_phase` to `5a` — [task.182.bug.1](./task.182.bug.1.hooks-doc-qa-phase-writer-claim.md) reopened.
+- Advisory: no-gate ambiguity route, contract halt-7 bullet, live-lock 5b claim, wrong-repo cwd, option label, CHANGELOG count.
 
 ## Change Log
 
@@ -304,6 +305,8 @@ None.
 | 2026-10-13 |  | Implemented — 9 source files (+16 bundled copies), 7 new test cases; status → ready-for-review | develop |
 | 2026-10-13 |  | QA gate CONCERNS (90/100) — 2 findings (1 medium, 1 low) | qa-task |
 | 2026-10-13 |  | QA findings fixed — TASK-182-001, TASK-182-002 + advisory CR-3, CR-4 and one probe sibling; 1 iteration | qa-fix |
+| 2026-10-13 |  | QA gate CONCERNS (90/100) — 1 finding (medium) + 6 advisory | qa-task |
+| 2026-10-13 |  | QA findings fixed — TASK-182-003 by consolidating the qa_phase writer rule; advisory CR-2, CR-3, CR-4, CR-5, CR-7 fixed; CR-6 deferred; 2 iterations | qa-fix |
 
 <!-- change-log-end -->
 

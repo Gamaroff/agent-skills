@@ -1,0 +1,69 @@
+schema: 2
+task: 'task.182.reenter-qa-refusal-diagnostics-and-qa-reentry-population'
+task_title: 'reenter-qa refusal diagnostics and the qa_reentry reader population'
+gate: CONCERNS
+status_reason: 'Cycle 1 fixes hold (TASK-182-002 closed; mutation-proven), but the refute pass found the qa_phase writer claim still false in the pause reference (TASK-182-003, a missed site of TASK-182-001). Four lower-confidence findings and two cleanups are advisory.'
+reviewer: 'QA Engineer'
+head: '4eb35d367aa4e383a805823a508955cf700747e6'
+updated: '2026-10-13T06:44:53Z'
+
+top_issues:
+  - id: 'TASK-182-003'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-pause.md'
+    finding: 'The lock-schema qa_phase row still says both re-entry writers "set 5a"; grant-qa-cycles.sh writes 5b on a not-converging restore. Cycle 1 fixed the hooks doc and both SKILL.md but missed this site, and the parity test pins only those three. Code review CR-1; bug report task.182.bug.1 reopened.'
+    suggested_action: 'State the qa_phase writer rule once, in the pause reference lock schema, precisely (5b only when the grant restores from a not-converging halt snapshot; 5a otherwise, including a live lock); have the hooks doc and both SKILL.md cite it; pin it with a parity test that finds every describer of the writers.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 7
+  phases_verified: 3/3
+  ci: 'not read this cycle (gated at /finalise)'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 8
+    notes: 'task.182.qa.2.security.run.json: shell-argv: reenter-qa-after-finalise.sh, task.181 fixture — 8 executed (bash; zsh absent), 0 reproduced, 0 escapes.'
+  performance:
+    status: PASS
+    notes: 'No change since gate 1 to the gate-read path; ci:fast 5424/0 at 4eb35d36 content.'
+  reliability:
+    status: PASS
+    notes: 'git-unreadable still refuses before any write; CR-5 (wrong-repo cwd misreported as git-unreadable) is advisory — the refusal still fails closed.'
+  maintainability:
+    status: CONCERNS
+    notes: 'TASK-182-003. Advisory: CR-2 (no-gate ambiguity route can reach step 7), CR-3 (contract halt-7 bullet omits git-unreadable), CR-4 (5b claim wrong with a live lock), CR-6 ("Resume at 5a" label), CR-7 (CHANGELOG reader count).'
+
+recommendations:
+  immediate:
+    - action: 'TASK-182-003: one statement of the qa_phase writer rule, cited elsewhere, pinned'
+      refs: ['shared/resources/develop-pipeline-pause.md', 'shared/resources/develop-pipeline-hooks.md', 'skills/develop-task/SKILL.md', 'skills/develop-story/SKILL.md', 'evals/shared/tests/qa-loop-lock-fields-parity.test.mjs']
+  future:
+    - action: 'CR-2: route a no-gate ambiguity to "resolve the gate files, then run the script again", never step 7'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md']
+    - action: 'CR-3: name git-unreadable in the contract halt-7 bullet'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md']
+    - action: 'CR-4: 5b only on a not-converging restore; 5a with a live lock'
+      refs: ['shared/resources/develop-pipeline-hooks.md']
+    - action: 'CR-5: refuse a cwd outside <doc-dir>''s repository as a usage error before the git status read'
+      refs: ['shared/resources/reenter-qa-after-finalise.sh']
+    - action: 'CR-6: relabel "Resume at 5a with {k} more cycles" phase-neutrally'
+      refs: ['skills/develop-task/SKILL.md', 'skills/develop-story/SKILL.md', 'shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+    - action: 'CR-7: CHANGELOG — one writer, two readers, four describers'
+      refs: ['CHANGELOG.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-182-003 closed']

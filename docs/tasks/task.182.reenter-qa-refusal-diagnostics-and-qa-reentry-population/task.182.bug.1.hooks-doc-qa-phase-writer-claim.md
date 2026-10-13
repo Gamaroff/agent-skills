@@ -59,6 +59,27 @@ Correct the sentence (`5b` after not-converging, else `5a`; reenter always `5a`)
 1. `grep -n "writes \`5b\`" shared/resources/develop-pipeline-hooks.md`
 2. `command node --test evals/shared/tests/qa-loop-lock-fields-parity.test.mjs`
 
+### Iteration 2
+
+#### Re-Investigation (Reopened → In Progress)
+
+**Date**: 2026-10-13
+
+**QA Reopening Reason**: task.182.qa.2 (TASK-182-003) — the pause reference's lock schema (`develop-pipeline-pause.md:113`) still said both re-entry writers set `5a`; iteration 1 corrected three sites and missed this one. The refute pass also found iteration 1's own wording imprecise (CR-4): `grant-qa-cycles.sh` reads `halt_reason` only from a snapshot it restores, so with a live lock it writes `5a` whatever halted.
+
+**Revised Approach**: consolidate, not patch a fourth site (qa-fix Step 2.6, trigger (b) — a repeated subject). The pause reference's `qa_phase` row is now the one statement of which value each writer sets; the hooks doc and both SKILL.md cite it and state no value.
+
+#### Fix Implementation (In Progress → Ready for QA)
+
+**Date**: 2026-10-13
+
+**Fix Description**:
+- `develop-pipeline-pause.md` `qa_phase` row: `grant-qa-cycles.sh` writes `5b` when it restores from a not-converging halt snapshot and `5a` otherwise (a loop-limit halt, or a lock that already exists); `reenter-qa-after-finalise.sh` always writes `5a`.
+- `develop-pipeline-hooks.md` and both `skills/develop-{task,story}/SKILL.md`: cite that row; no value restated.
+- `qa-loop-lock-fields-parity.test.mjs`: pins the row, and fails any other describer that restates a writer's value (`VALUE_CLAIM`, measured against every historic false statement on `origin/develop`, `b7d7661e` and `4eb35d36`; non-vacuity floor of 6 describers).
+
+**Testing**: parity 12/12. Mutation-proven: the row's 5b clause flipped to 5a → red; a value restated in the hooks doc → red.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -66,3 +87,6 @@ Correct the sentence (`5b` after not-converging, else `5a`; reenter always `5a`)
 | 2026-10-13 | New | qa-task | Filed by task.182.qa.1 |
 | 2026-10-13 | In Progress | qa-fix | Investigation started (QA cycle 1 fix) |
 | 2026-10-13 | Ready for QA | qa-fix | Hooks doc and both SKILL.md corrected; parity pins added |
+| 2026-10-13 | Reopened | qa-task | Not fixed — pause-doc lock schema still says both writers set 5a (task.182.qa.2, TASK-182-003) |
+| 2026-10-13 | In Progress | qa-fix | Iteration 2 — consolidating the qa_phase writer rule |
+| 2026-10-13 | Ready for QA | qa-fix | One statement in the pause lock schema; hooks doc and both SKILL.md cite it; parity test holds it |

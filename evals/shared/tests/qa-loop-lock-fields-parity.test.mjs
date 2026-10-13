@@ -192,28 +192,63 @@ test("qa_reentry: the writer and every reader and describer name it (task.182)",
       `the hooks doc must name ${writer} as a writer of qa_max_cycles`,
     );
   }
-  // ...and states the qa_phase each re-entry writes. grant-qa-cycles.sh writes 5b after a
-  // not-converging halt; a sentence that said both scripts write 5a passed the writer check above
-  // (task.182 QA cycle 1, TASK-182-001).
+  // The qa_phase each re-entry writes is stated ONCE, in the pause reference's lock schema, and the
+  // other describers cite it. Cycles 1 and 2 of task.182 each found a site the previous fix missed
+  // (hooks doc, both SKILL.md, then the pause doc itself), so the rule is consolidated rather than
+  // patched again, and this test holds the one-statement shape (TASK-182-001, TASK-182-003).
   assert.match(
-    text.hooksDoc,
-    /`grant-qa-cycles\.sh` writes `5b` after a not-converging halt[^.]*`5a` otherwise/,
-    "the hooks doc must say grant-qa-cycles.sh writes qa_phase 5b after a not-converging halt",
+    text.pauseDoc,
+    /`grant-qa-cycles\.sh` \(task\.123\) writes `5b` when it restores the lock from a halt snapshot whose `halt_reason` is not-converging[^|]*`5a` otherwise — a loop-limit halt, or a lock that already exists[^|]*`reenter-qa-after-finalise\.sh` \(task\.170\) always writes `5a`/,
+    "the pause reference's qa_phase row must state which value each re-entry writer writes",
   );
-  // Both SKILL.md describe the same grant write; a "qa_phase: 5a atomically" there was the same
-  // false claim one step removed (task.182 QA cycle 1, the Step 3.5 population probe).
-  for (const name of ["taskSkill", "storySkill"]) {
-    assert.match(
-      text[name],
-      /`qa_phase` \(`5b` after a not-converging halt, else `5a`\) atomically/,
-      `${name} must say the grant writes qa_phase 5b after a not-converging halt`,
-    );
-  }
+  // The writer the statement describes: 5b only on a not-converging RESTORE (halt_reason is read
+  // from the snapshot it restores, never from a live lock).
   assert.match(
     text.grantScript,
     /not-converging[^\n]*\) REENTER=5b/,
-    "grant-qa-cycles.sh no longer writes 5b after not-converging — re-check the hooks doc sentence",
+    "grant-qa-cycles.sh no longer writes 5b after not-converging — re-check the pause reference's qa_phase row",
   );
+  // No other describer restates a value. Measured against every historic false statement: the
+  // develop pause row, both cycle-1 hooks sentences — and it matches none of today's citations.
+  const VALUE_CLAIM =
+    /(?:grant-qa-cycles\.sh`?|re-entry (?:scripts|writers))[^|\n]{0,200}?(?:`5[ab]`|`qa_phase: 5[ab]`)/;
+  const describers = Object.keys(FILES).filter(
+    (n) =>
+      ![
+        "pauseDoc",
+        "grantScript",
+        "reenterScript",
+        "setQaPhase",
+        "stopHook",
+        "lockHelper",
+        "setWaitingOn",
+      ].includes(n),
+  );
+  assert.ok(
+    describers.length >= 6,
+    "non-vacuity: the describer list is too short",
+  );
+  for (const name of describers) {
+    assert.doesNotMatch(
+      text[name],
+      VALUE_CLAIM,
+      `${name} (${FILES[name]}) restates which qa_phase a re-entry writer writes — cite the pause reference's lock schema instead`,
+    );
+  }
+  assert.match(
+    text.hooksDoc,
+    /which value each re-entry writes is stated once, in the `qa_phase` row of the lock schema in `develop-pipeline-pause\.md`/,
+    "the hooks doc must cite the pause reference for the qa_phase values",
+  );
+  // The SKILL.md grant sentence names no value (a "qa_phase: 5a atomically" there carried no
+  // writer name, so VALUE_CLAIM cannot see it) — it cites the lock schema.
+  for (const name of ["taskSkill", "storySkill"]) {
+    assert.match(
+      text[name],
+      /and `qa_phase` \(which value: the `qa_phase` row of the lock schema in `references\/develop-pipeline-pause\.md`\) atomically/,
+      `${name} must cite the lock schema for the qa_phase the grant writes`,
+    );
+  }
 });
 
 test("waiting_on: one writer, one reader, and every describer spells the field and its sub-fields the same way", () => {

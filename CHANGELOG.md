@@ -125,7 +125,7 @@ All notable changes to this project will be documented in this file. Format foll
   operator and never step 7. The `qa_reentry` lock field reaches the readers task.170 missed: the
   hooks doc states each loop field's writers (`qa_max_cycles` has two, `extra_cycles_granted` one),
   the resume detector reports a re-entry with its four sub-fields, and
-  `qa-loop-lock-fields-parity.test.mjs` pins `qa_reentry` in its writer and six readers.
+  `qa-loop-lock-fields-parity.test.mjs` pins `qa_reentry` in its writer, its two readers and its four describers, and the `qa_phase` writer rule is stated once, in the pause reference's lock schema, which the hooks doc and both SKILL.md cite.
 
 - **A QA re-review now closes the bug reports it verified (observation #21).** The bug lifecycle
   has QA move a fixed bug from Ready for QA to Closed or Reopened, and nothing did: task.180 ended with

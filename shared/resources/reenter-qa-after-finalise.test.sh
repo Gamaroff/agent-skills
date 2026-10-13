@@ -346,6 +346,18 @@ mkrepo usage
 (cd "$R" && bash "$SCRIPT" >/dev/null 2>&1); [ $? -eq 2 ] && pass "no <doc-dir> → exit 2" || fail "usage" "no doc-dir did not exit 2"
 (cd "$R" && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" "$DOC" >/dev/null 2>&1); [ $? -eq 2 ] && pass "no implementation report → exit 2 (report_entries has no source)" || fail "report required" "missing report did not exit 2"
 (cd "$R" && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" . "$DOC/report.md" >/dev/null 2>&1); [ $? -eq 2 ] && pass "<doc-dir> at the repository root → exit 2" || fail "root doc-dir" "did not exit 2"
+# A cwd that is not <doc-dir>'s repository root is a usage error, not git-unreadable: from another
+# repository `git status` exits 128 on the exclude pathspec (task.182 QA cycle 2, CR-5).
+OTHER="$T/other-repo"; mkdir -p "$OTHER"; git -C "$OTHER" init -q
+ERR=$(cd "$OTHER" && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" "$R/$DOC" "$R/$DOC/report.md" 2>&1 >/dev/null); RC=$?
+if [ "$RC" -eq 2 ] && printf '%s' "$ERR" | grep -q "run from the root of the repository" && ! printf '%s' "$ERR" | grep -q 'git-unreadable'; then
+  pass "a cwd in another repository → exit 2 (usage), never git-unreadable"
+else
+  fail "other-repo cwd" "rc=$RC err=$ERR"
+fi
+ERR=$(cd "$R/src" && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" "../$DOC" "../$DOC/report.md" 2>&1 >/dev/null); RC=$?
+[ "$RC" -eq 2 ] && printf '%s' "$ERR" | grep -q "run from the root of the repository" \
+  && pass "a cwd below the repository root → exit 2 (usage)" || fail "subdirectory cwd" "rc=$RC err=$ERR"
 [ -f "$S" ] && pass "usage errors consume nothing" || fail "usage consumed" "snapshot gone"
 mkdir -p "$R/docs/notes"
 (cd "$R" && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" docs/notes "$DOC/report.md" >/dev/null 2>&1); RC=$?
