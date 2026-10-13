@@ -1505,7 +1505,7 @@ command node -e '
   if (!["replaced", "relocated", "created"].includes(r.reason)) {
     console.error(`HALT qa-results: ${r.reason}${r.detail ? ` (${r.detail})` : ""} — ${file} not written.` +
       (r.reason === "multiple" ? " Keep the copy whose Gate File link names the highest gate, delete the others by hand, re-run." :
-       r.reason === "unbounded" ? " The existing section cannot be bounded: it opens a fence that never closes, or the text a replace would remove holds a change-log marker, an H1/H2 (setext included), a Change Log heading (a fenced `# comment` counts) or, under a change log, a dated log row. The detail names the line. Fix that section by hand, re-run." :
+       r.reason === "unbounded" ? " The existing section cannot be bounded: it opens a fence that never closes, or the text a replace would remove holds a change-log marker, an H1/H2 (setext included), a Change Log heading (a fenced `# comment` counts) or, under a change log, a dated log row; or a carried Bug Reports / Deferred Work list continues past a label and a paragraph (`carried-tail:`). The detail names the line. Fix that section by hand, re-run." :
        r.reason === "bad-section" ? " The rendered section was refused; the detail names the rule. Fix the render (one section, no own Bug Reports or Deferred Work block, no trailing HTML comment), re-run." :
        r.reason === "unplaceable" ? " The write would not read back as exactly one section (an unclosed fence near the insertion point?). Fix by hand, re-run." : ""));
     process.exit(1);
@@ -1521,7 +1521,9 @@ change-log block (else before `## Progress Tracking`, else at the end), moves on
 **inside** the change-log block out of it (`relocated`), and **refuses** a document that already
 carries more than one (`multiple`) — it never guesses which copy is current. It also refuses a
 section it cannot bound (`unbounded`: an unclosed fence, or removed text that carries a change-log
-marker, an H1/H2 or a Change Log heading — scanned ignoring fences, so a fenced `# comment` counts) and a write that would not read back as one
+marker, an H1/H2 or a Change Log heading — scanned ignoring fences, so a fenced `# comment` counts —
+or a carried Bug Reports / Deferred Work list that continues past a label and a paragraph,
+`carried-tail:`) and a write that would not read back as one
 section (`unplaceable`). On any refusal the step halts; a hand edit is not a fallback. A `### Bug Reports`
 list (`create-bug-report`) or `### Deferred Work` block (the pipeline's loop exit) already inside the
 section is carried through the replace; the rendered section must not include either — a render
