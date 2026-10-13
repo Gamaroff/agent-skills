@@ -5,10 +5,12 @@ type: task
 description: "Add a `shell-argv:<path>` entry form to shared/resources/security-probe.mjs, the shell sibling of `cli:`: the case's input crosses as one element of an `--argv` template, the script runs under bash and zsh, and an optional `--fixture-setup` script builds each case's scratch repository. A refusing shell script that takes several arguments or flags is then probed by the engine instead of being accepted as unverified."
 tags: [security-probe, finalise, qa-task, qa-story, review-security, observation]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-04
 updated: 2026-10-13
+completed_date: 2026-10-13
+pr_number: 641
 assignee:
 estimated_effort_hours: 8
 github_issue: 564
@@ -16,7 +18,7 @@ github_issue: 564
 
 # Technical Task: security-probe — a `shell-argv:` entry form
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.181.review.1.probe-engine-shell-argv-entry-form.md` implemented 2026-10-12
 
 **GitHub Issue**: [#564](https://github.com/Gamaroff/agent-skills/issues/564)
@@ -338,9 +340,9 @@ None.
 ### Key Findings
 QA re-entered after the finalise DoD gaps (dod.1); the three tests closing AC2 and AC6 hold their members and are mutation-proven. One LOW advisory finding routed to recommendations.future.
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 1 (historical, closed by dod.2)
 
-**Status:** IN PROGRESS
+**Status:** CLOSED — the three gaps below were closed by `918a52af` and verified by `task.181.dod.2`
 
 ### QA Gate Status
 
@@ -369,6 +371,29 @@ Security (19 probes, 0 reproduced), docs and CI reading 1 (SUCCESS, 5 checks @ `
 **Gap Report Generated:** 2026-10-13
 
 **Detailed Verification Log:** See `task.181.dod.1.probe-engine-shell-argv-entry-form.md` for complete verification evidence.
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.181.qa.4.probe-engine-shell-argv-entry-form.md`
+**Gate File**: `task.181.gate.4.probe-engine-shell-argv-entry-form.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** All 13 met — every member of the set criteria AC2 and AC6 held by its own per-PR test (the dod.1 gaps, closed by `918a52af`)
+✅ **Unit Tests:** `ci:fast` 5423 pass, 0 fail; CI green on 5 checks @ `a6f9b9c4`
+✅ **PR Review:** PR #641; Step 5c conformance review APPROVE (`task.181.pr-review.2`); no reviewers required
+✅ **Documentation:** CHANGELOG `[Unreleased]`, probe-boundary-rule.md (forms list, reasons table, §5.1), routing prompts and SKILL.md files
+✅ **Security Review:** ✅ PASS — 19 probes executed, 0 reproduced; both controls engage
+✅ **Compliance Review:** NOT_APPLICABLE — internal developer tooling
+
+**Detailed Verification Log:** See `task.181.dod.2.probe-engine-shell-argv-entry-form.md` for complete verification evidence and timestamps.
+
+**Task marked as ACCEPTED on:** 2026-10-13
 <!-- change-log-start -->
 ## Change Log
 
@@ -386,6 +411,7 @@ Security (19 probes, 0 reproduced), docs and CI reading 1 (SUCCESS, 5 checks @ `
 | 2026-10-13 |         | QA gate PASS (100/100) — 0 findings | qa-task |
 | 2026-10-13 |  | DoD incomplete — 3 gaps identified | finalise |
 | 2026-10-13 |  | QA gate PASS (100/100) — 0 findings (re-entry after DoD gaps) | qa-task |
+| 2026-10-13 | 1.2 | DoD passed — accepted (PR #641) | finalise |
 <!-- change-log-end -->
 
 ---
