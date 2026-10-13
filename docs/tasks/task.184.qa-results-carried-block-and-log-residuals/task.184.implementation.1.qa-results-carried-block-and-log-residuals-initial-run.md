@@ -35,9 +35,9 @@ Close three content-loss shapes in `shared/resources/qa-results.js` (5c CR-1 nes
 | 2. review-task             | ✅ Done    | `task.184.review.{N}.{name}.md` exists (or skip logged)                | READY TO IMPLEMENT 9/10; 0C/2I/2O, all applied; Planned → Ready for Development | —                    | 2026-10-13T07:54Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; 4/4 phases; ci:fast 5441/0 fail; 4 mutation proofs held | —                    | 2026-10-13T07:59Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #644: https://github.com/Gamaroff/agent-skills/pull/644 | —                    | 2026-10-13T08:01Z |
-| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.184.qa.{N}.*.md`; `task.184.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 4 cycles: CONCERNS 80 → CONCERNS 70 → CONCERNS 80 → PASS 100; 5c CONCERNS (PC-1 open for finalise) | —                    | 2026-10-13T09:23Z |
-| 7. finalise                | ❌ Failed  | `task.184.dod.{N}.*.md`; task `status: accepted`                       | DoD GAPS (`task.184.dod.1`): AC10 CHANGELOG placement (5c PC-1); AC5 no idle timing on the head | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.184.qa.{N}.*.md`; `task.184.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 5 cycles: CONCERNS 80 → CONCERNS 70 → CONCERNS 80 → PASS 100 → PASS 100 (re-entry after DoD gaps); 5c cycle 4 CONCERNS, cycle 5 APPROVE | —                    | 2026-10-13T09:23Z |
+| 7. finalise                | ✅ Done    | `task.184.dod.{N}.*.md`; task `status: accepted`                       | Run 1 GAPS (`dod.1`); run 2 ACCEPTED (`dod.2`), AC5 by operator override (CPU throttled); CI 2 SUCCESS (tree-eq) @ 54314104 | —                    | 2026-10-13T16:29Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Implementation report committed and pushed | —                    | 2026-10-13T16:29Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -119,6 +119,18 @@ Close three content-loss shapes in `shared/resources/qa-results.js` (5c CR-1 nes
 - Re-invoked by `/develop-next` with `--defaults` after the gaps were closed (`5ab4839a`, `3e7abe6f`). Resume detector not dispatched — state verified inline (`handoff-verify` 10/10 confirmed; snapshot `halt_step` 7; DoD 1 `❌ GAPS`); independence lost.
 - Phase 0b auto-answer (`--defaults`): "Re-enter QA at 5a" (Recommended). QA re-entry after finalise DoD gaps: `reenter-qa: re-entered QA at step 5 / qa_phase 5a — qa_max_cycles=6 (base 4), gate_head=9c5547befa7965bc5fb772e8dcdebde6ad78b025`. The one commit outside the task directory is the CHANGELOG move; the script counts it as moved code, so the handoff's planned resume at 7 does not apply.
 - Phase 0d: answers from the restored lock (`persisted`): base `develop`, target `develop`, mode `standard`, no skips. Nothing asked.
+- Untracked continuation file `task.184.handoff.1…md` set aside to the session scratchpad before Step 7, so the publish-boundary dirty check would not trip on it; restored after Step 8.
+
+### Step 7 — finalise (run 2) — 2026-10-13
+
+- `/finalise` invoked (not inlined). DoD summary: `task.184.dod.2.qa-results-carried-block-and-log-residuals.md`. PR #644 resolved from the branch.
+- Four DoD agents: AC PARTIAL 10/11 (AC5 `re-measure`); Security PASS (`boundary: internal`, reason holds); Compliance NOT_APPLICABLE; Docs PASS.
+- AC5 re-measured on head `17abc500`: 5.38–5.98 s at load 1.6–2.9. Cause found: host CPU pinned at 800 MHz on every core under load (`package_throttle_count` 177,490; a 3e8 loop 14.74 s); head and `5ab4839a` equal back to back (5.5–5.9 s); an Android emulator was stopped at the operator's instruction and ruled out. **Operator decision: accept AC5 by recorded override** — identical code ran 1.08–1.62 s (median 1.14 s) at 12:42Z before the throttling. Recorded in DoD run 2 Step 5.
+- CI reading 1: SUCCESS @ `17abc5003ce2` over 5 checks; CI reading 2: SUCCESS (tree-equivalent to 17abc5003ce2) @ `543141049c22` over 5 checks.
+- Acceptance commit `54314104` (DoD, sprint review, document, registry ticked; 5c review carried), pushed; 6b assertions passed; 6d CHANGELOG cites task 184.
+- Canonical PR summary posted (issuecomment-6150217504). DoD body posted to PR — comment URL: https://github.com/Gamaroff/agent-skills/pull/644#issuecomment-6150230372.
+- Tracker: Document link already on `develop`; `done` comment posted (pipeline re-post: `already`); GitHub Issue #572 — close: CLOSED ✅ (verified inline with `gh issue view`; poller not dispatched). GitHub Issue #572 — board: done → already. Journal empty — tracker debt none.
+- Task completed.
 
 ---
 
@@ -183,14 +195,28 @@ _Track each QA review/fix cycle._
 **Carried to 6a**: task.184.pr-review.1.qa-results-carried-block-and-log-residuals.md, task.184.qa-results-carried-block-and-log-residuals.md (PC-2, PC-3 fixed doc-only)
 **Not fixed at 5c**: PC-1 — `record` (CHANGELOG.md is outside `ci.docsOnly.patterns` = `docs/**`); the Migration criterion it affects is judged at `/finalise`.
 
+### QA Cycle 5 — 2026-10-13
+**Gate Result**: PASS (100/100)
+**Issues Found**: none — re-entry after the finalise DoD gaps; scope since gate 4 is `CHANGELOG.md` plus task documents (no reviewable code, Step 3b not run). `npm run ci:fast` exit 0.
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: APPROVE
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+**PR Review report**: `task.184.pr-review.2.qa-results-carried-block-and-log-residuals.md` — APPROVE: PC-1 (low) the QA Cycle 5 entry was uncommitted at the PR head; PC-2 (low) the DoD gaps section still lists the closed gaps.
+**Carried to 6a**: task.184.pr-review.2.qa-results-carried-block-and-log-residuals.md
+**Not fixed at 5c**: PC-1 — `record` (the implementation report is Step 8's; it is committed at Step 8). PC-2 — doc-only, not applied on APPROVE; `/finalise` replaces the gaps section.
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: Halted at Step 7 — finalise DoD gaps (2)
+**Finished**: 2026-10-13T16:29Z
+**Final Status**: Completed
 **Branch**: feature/task.184.qa-results-carried-block-and-log-residuals
 **PR**: https://github.com/Gamaroff/agent-skills/pull/644
-**QA Iterations**: 4 (gate 4 PASS 100; 5c CONCERNS)
-**DoD Summary**: `task.184.dod.1.qa-results-carried-block-and-log-residuals.md` — GAPS (2)
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 5 (gates: CONCERNS 80 → CONCERNS 70 → CONCERNS 80 → PASS 100 → PASS 100; 5c CONCERNS then APPROVE)
+**DoD Summary**: `task.184.dod.2.qa-results-carried-block-and-log-residuals.md` — ACCEPTED (run 1, `dod.1`, found 2 gaps)
+**Tracker debt**: none
+
+**Completion Summary.** Implemented three `qa-results.js` fixes: the engine keeps a nested Bug Reports tail, refuses a section under an ambiguous marker-less change log, and refuses a carried list cut by a label and a paragraph (`carried-tail:`). QA cycles 1–3 then closed a write-then-refuse class by applying one `sectionGuard()` to both the replaced and the written section, and recovered a CPU regression. The first `/finalise` stopped on two gaps: the CHANGELOG entry sat under a released heading, and there was no idle timing on the head. Both were fixed. Because the CHANGELOG move falls outside `docs/**`, the resume re-entered QA for a fifth cycle (PASS 100; 5c APPROVE). `/finalise` run 2 accepted the task. AC5 (suites under 2 s) was accepted by a recorded operator override: the host CPU was found pinned at 800 MHz, and byte-identical code had measured a median of 1.14 s before the throttling.
