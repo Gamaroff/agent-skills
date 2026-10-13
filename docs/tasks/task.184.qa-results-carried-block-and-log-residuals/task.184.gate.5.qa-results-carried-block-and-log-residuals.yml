@@ -1,0 +1,58 @@
+schema: 2
+task: 'task.184.qa-results-carried-block-and-log-residuals'
+task_title: 'qa-results carried-block and log residuals'
+gate: PASS
+status_reason: 'Re-entry after the finalise DoD gaps. The only change outside the task directory since gate 4 is the CHANGELOG entry moving to [Unreleased]; the suites were re-measured at idle (9 of 10 runs under 2 s, median 1.14 s). No open finding.'
+reviewer: 'QA Engineer'
+head: 'd369c211eaf4046d694bc916084faad7067b04b9'
+updated: '2026-10-13T14:35:06Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 110
+  phases_verified: 4/4
+  ci: 'not read — CI is gated at /finalise; local npm run ci:fast exit 0 (5,430 pass, 0 fail, 14 skipped)'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false for this cycle — the scoped change set (CHANGELOG.md and documents in the task directory) adds no code. The engine boundary record (internal) stands from gates 1–4, unchanged.'
+  performance:
+    status: PASS
+    notes: 'Idle re-measure on 5ab4839a (code identical to the gate-4 head): ten back-to-back runs once the 1-minute load fell below 2.0 — 1.62, 1.12, 1.16, 4.13, 1.11, 1.10, 1.08, 1.10, 1.21, 1.29 s; nine under 2 s, median 1.14 s. The 4.13 s run coincided with external load rising to 2.62 mid-run. Recorded with load beside each in the Implementation Summary.'
+  reliability:
+    status: PASS
+    notes: 'No code change since gate 4.'
+  maintainability:
+    status: PASS
+    notes: 'CHANGELOG entry now under [Unreleased] > Fixed; prettier clean.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Move the outermost-only / union comment back above carriedBlocks (cycle 4 CR-1).'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'Replace R8''s single-iteration loop with one direct write (cycle 4 CR-2).'
+      refs: ['shared/resources/tests/qa-results.test.mjs']
+    - action: 'Gate 2 CR-4: decide whether a fenced block after a stopping label is a tail.'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'Gate 1 CR-3: compute the "directly under a marker-less log" predicate once.'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'changelog-entry-drift.test.mjs passes with the (task 184) bullet under a released heading on the branch; it holds the placement only after merge. Decide whether it should read the branch too.'
+      refs: ['evals/shared/tests/changelog-entry-drift.test.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

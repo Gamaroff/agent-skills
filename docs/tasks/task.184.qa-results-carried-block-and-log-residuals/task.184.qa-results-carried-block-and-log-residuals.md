@@ -465,17 +465,17 @@ external load rose mid-run and the next six were 1.08–1.29 s.
 **Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.184.qa.4.qa-results-carried-block-and-log-residuals.md](./task.184.qa.4.qa-results-carried-block-and-log-residuals.md)
-- **Gate File**: [task.184.gate.4.qa-results-carried-block-and-log-residuals.yml](./task.184.gate.4.qa-results-carried-block-and-log-residuals.yml)
+- **Full Report**: [task.184.qa.5.qa-results-carried-block-and-log-residuals.md](./task.184.qa.5.qa-results-carried-block-and-log-residuals.md)
+- **Gate File**: [task.184.gate.5.qa-results-carried-block-and-log-residuals.yml](./task.184.gate.5.qa-results-carried-block-and-log-residuals.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 104 (engine, corpus, wiring)
+- **Tests Executed**: 110 (engine, corpus, wiring, CHANGELOG drift); `npm run ci:fast` exit 0
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-No open findings. Four QA cycles closed the write-then-refuse class (one section guard for the replaced and the written section), a cubic tail scan, and a performance regression. Two cosmetic cleanups are recorded as future work in gate 4.
+No open findings. Cycle 5 re-entered QA after the finalise DoD gaps: the CHANGELOG entry now sits under `[Unreleased]`, and the suites ran under 2 s in nine of ten idle runs (median 1.14 s). Gate 4's cosmetic cleanups remain future work.
 
 ## Definition of Done - Gaps Identified
 
@@ -527,6 +527,7 @@ No open findings. Four QA cycles closed the write-then-refuse class (one section
 | 2026-10-13 |  | QA findings fixed — cycle 3, 1 finding (PERF-1 medium) + 1 cleanup: blocks collected once per guard; R8 trimmed | qa-fix |
 | 2026-10-13 |  | QA gate PASS (100/100) — 0 findings (2 advisory cleanups) | qa-task |
 | 2026-10-13 |  | DoD incomplete — 2 gaps identified (CHANGELOG placement; idle timing) | finalise |
+| 2026-10-13 |  | QA gate PASS (100/100) — 0 findings; re-entry after DoD gaps | qa-task |
 <!-- change-log-end -->
 
 ---
