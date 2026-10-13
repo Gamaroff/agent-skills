@@ -60,6 +60,8 @@ import {
   recordRun,
   resolveEntry,
   runProbeSpec,
+  SHELL_ARGV_PREFIX,
+  shellArgvSpawnArgs,
   toRecordEntry,
 } from "../security-probe.mjs";
 import { corpusFor } from "../security-input-corpus.mjs";
@@ -2417,8 +2419,8 @@ test("cli entry: every malformed --argv / cli: combination exits 2 with bad-argv
     // (the parser also refuses a missing --argv) is still proved on its own.
     const NAMED = {
       "cli: without --argv": /needs --argv/,
-      "--argv on a JS entry": /cli: entry form only/,
-      "--argv on a shell: entry": /cli: entry form only/,
+      "--argv on a JS entry": /cli: and shell-argv: entry forms only/,
+      "--argv on a shell: entry": /cli: and shell-argv: entry forms only/,
       "two {input}": /got 2/,
       "an embedded slot": /embeds \{input\}/,
       "non-JSON": /not JSON/,
@@ -2462,7 +2464,10 @@ test("cli entry: runProbeSpec declines bad-argv for a library caller, and never 
     argv: ["{input}"],
   });
   assert.equal(onJs.reason, "bad-argv");
-  assert.match(onJs.declined[0].detail, /cli: entry form only/);
+  assert.match(
+    onJs.declined[0].detail,
+    /cli: and shell-argv: entry forms only/,
+  );
   const bad = runProbeSpec({
     sink: "url-authority",
     entry: CLI("refuser"),
@@ -4903,4 +4908,785 @@ test("fence entry: a CRLF doc resolves its heading and yields an LF block (TASK-
   assert.equal(got.ok, true, got.detail);
   assert.equal(got.code.includes("\r"), false);
   assert.match(got.code, /GATE="<slot>"/);
+});
+
+// ── The shell-argv: entry form (task.181) ─────────────────────────────────────
+//
+// `shell-argv:<path>` + `--argv` runs a bash script that takes several
+// arguments or flags, the case's input crossing as ONE element of the template,
+// exactly as `cli:` runs a Node CLI. Each shell from probeShells() is the
+// CALLER and bash the interpreter, as for `shell:`. An optional
+// `--fixture-setup` script builds each (case, shell) directory first; a setup
+// that fails is `errored`, never a verdict. The scripts are written into a temp
+// ROOT per test and passed as `repoRoot`, so containment is exercised for real.
+
+// Refuses (exit 1) unless $1 is a plain lower-case name and $2 a directory.
+// A split input moves $# off 2: exit 7, which no case expects, so it scores as
+// a reproduction. `${1,,}` is bash-only — under a zsh INTERPRETER it is a bad
+// substitution, so a zsh-interpreted run could never accept "alpha".
+const TWO_ARGS_SH = [
+  "#!/usr/bin/env bash",
+  "# Refuses rather than guesses: a name and a directory, nothing else.",
+  '[ "$#" -eq 2 ] || { echo "argc=$#" >&2; exit 7; }',
+  'lower="${1,,}"',
+  '[[ "$1" =~ ^[a-z]+$ ]] && [ "$lower" = "$1" ] || { echo "REFUSED name" >&2; exit 1; }',
+  '[ -d "$2" ] || { echo "REFUSED dir" >&2; exit 1; }',
+  "exit 0",
+  "",
+].join("\n");
+
+const SA_TEMPLATE = ["{input}", "{fixture}"];
+
+// No `sink`: a materialised sink would also write the input as a file name in
+// the case directory (cli:'s rule), which "../x" cannot be.
+const saCase = (id, direction, input, extra = {}) => ({
+  id,
+  input,
+  why: "shell-argv fixture",
+  correct: direction === "hostile" ? "refused" : "admitted",
+  direction,
+  ...extra,
+});
+
+const SA_CASES = [
+  saCase("sa.ok", "legitimate", "alpha"),
+  saCase("sa.space", "hostile", "a b", { expected: { exit: 1 } }),
+  saCase("sa.subst", "hostile", "$(touch PWNED)", {
+    expected: { exit: 1, absent: ["PWNED"] },
+  }),
+  saCase("sa.dash", "hostile", "-n", { expected: { exit: 1 } }),
+  saCase("sa.dotdot", "hostile", "../x", { expected: { exit: 1 } }),
+];
+
+/** A temp root with the two-args script plus `files`; returns the root. */
+function saRoot(files = {}) {
+  return fenceRoot({ "two-args.sh": TWO_ARGS_SH, ...files });
+}
+
+test("shell-argv entry: resolveEntry returns kind shell-argv with shell:'s containment, and refuses a hash or an escape", () => {
+  const root = saRoot();
+  try {
+    assert.equal(SHELL_ARGV_PREFIX, "shell-argv:");
+    const r = resolveEntry("shell-argv:two-args.sh", root);
+    assert.equal(r.ok, true);
+    assert.equal(r.kind, "shell-argv");
+    assert.equal(r.entryPath, join(root, "two-args.sh"));
+    assert.equal(
+      resolveEntry("shell-argv:../outside.sh", root).reason,
+      "outside-repo-root",
+    );
+    assert.equal(
+      resolveEntry("shell-argv:/etc/x.sh", root).reason,
+      "outside-repo-root",
+    );
+    assert.equal(
+      resolveEntry("shell-argv:two-args.sh#f", root).reason,
+      "bad-entry",
+    );
+    assert.equal(resolveEntry("shell-argv:", root).reason, "bad-entry");
+    // The three shell prefixes are disjoint: neither older form claims it.
+    assert.equal(resolveEntry("shell:two-args.sh", root).kind, "shell");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: every malformed flag combination exits 2 by name and writes no record", () => {
+  const root = saRoot({ "setup.sh": "exit 0\n" });
+  const dir = mkdtempSync(join(tmpdir(), "probe-sa-argv-"));
+  try {
+    const record = join(dir, "run.json");
+    const combos = {
+      "shell-argv: without --argv": [
+        ["--entry", "shell-argv:two-args.sh"],
+        /^bad-argv: .*needs --argv/,
+      ],
+      "--argv on a shell: entry": [
+        ["--entry", "shell:two-args.sh", "--argv", '["{input}"]'],
+        /^bad-argv: --argv applies to the cli: and shell-argv: entry forms only/,
+      ],
+      "--args-json with shell-argv:": [
+        [
+          "--entry",
+          "shell-argv:two-args.sh",
+          "--argv",
+          '["{input}"]',
+          "--args-json",
+          "[]",
+        ],
+        /^bad-args: /,
+      ],
+      "--fixture-setup on a cli: entry": [
+        [
+          "--entry",
+          "cli:x.mjs",
+          "--argv",
+          '["{input}"]',
+          "--fixture-setup",
+          "setup.sh",
+        ],
+        /^bad-fixture-setup: --fixture-setup applies to the shell-argv: entry form only/,
+      ],
+      "an embedded slot": [
+        ["--entry", "shell-argv:two-args.sh", "--argv", '["--n={input}"]'],
+        /^bad-argv: .*embeds \{input\}/,
+      ],
+    };
+    for (const [name, [args, re]] of Object.entries(combos)) {
+      const { rc, err } = runMain([
+        "--sink",
+        "filename",
+        "--repo-root",
+        root,
+        ...args,
+        "--record",
+        record,
+      ]);
+      assert.equal(rc, 2, `${name}: exit 2 (stderr: ${err})`);
+      assert.match(err, re, `${name}: names its rule`);
+      assert.equal(existsSync(record), false, `${name}: no record`);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: runProbeSpec declines bad-argv / bad-args for a library caller, and never runs a case", () => {
+  const root = saRoot();
+  try {
+    const noArgv = runProbeSpec({
+      entry: "shell-argv:two-args.sh",
+      cases: SA_CASES,
+      repoRoot: root,
+    });
+    assert.equal(noArgv.reason, "bad-argv");
+    assert.equal(noArgv.executed, 0);
+    const onShell = runProbeSpec({
+      sink: "filename",
+      entry: "shell:two-args.sh",
+      cases: SA_CASES,
+      argv: ["{input}"],
+      repoRoot: root,
+    });
+    assert.equal(onShell.reason, "bad-argv");
+    assert.match(
+      onShell.declined[0].detail,
+      /cli: and shell-argv: entry forms only/,
+    );
+    const withArgs = runProbeSpec({
+      entry: "shell-argv:two-args.sh",
+      cases: SA_CASES,
+      argv: SA_TEMPLATE,
+      args: [],
+      repoRoot: root,
+    });
+    assert.equal(withArgs.reason, "bad-args");
+    const setupOnShell = runProbeSpec({
+      sink: "filename",
+      entry: "shell:two-args.sh",
+      cases: SA_CASES,
+      fixtureSetup: "two-args.sh",
+      repoRoot: root,
+    });
+    assert.equal(setupOnShell.reason, "bad-fixture-setup");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: {input} reaches the script as ONE element under every shell, bash interprets, and exit status is the verdict", () => {
+  const root = saRoot();
+  try {
+    const r = runProbeSpec({
+      entry: "shell-argv:two-args.sh",
+      cases: SA_CASES,
+      argv: SA_TEMPLATE,
+      repoRoot: root,
+    });
+    assert.deepEqual(r.declined, [], JSON.stringify(r.declined));
+    assert.deepEqual(r.shells, probeShells());
+    assert.equal(r.executed, SA_CASES.length * probeShells().length);
+    // A split input would exit 7 and reproduce; a zsh-interpreted run would
+    // reject "alpha" on `${1,,}` and overblock it.
+    assert.deepEqual(r.reproduced, [], JSON.stringify(r.cases));
+    assert.deepEqual(r.overblocked, [], JSON.stringify(r.cases));
+    assert.equal(r.verdict, "engages");
+    assert.deepEqual(r.argv, SA_TEMPLATE);
+    for (const shell of probeShells()) {
+      const ok = r.cases.find((c) => c.id === "sa.ok" && c.shell === shell);
+      assert.equal(ok?.outcome, "accepted", `alpha accepted under ${shell}`);
+    }
+    assert.deepEqual(r.escapes, []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: every shell is the caller and bash the interpreter — held without zsh on the host", () => {
+  const args = ["a b", "/tmp/f"];
+  assert.deepEqual(shellArgvSpawnArgs("zsh", "/r/s.sh", args), [
+    "-f",
+    "-c",
+    'bash "$@"',
+    "zsh",
+    "/r/s.sh",
+    "a b",
+    "/tmp/f",
+  ]);
+  // The body really does run the script under bash with the elements intact:
+  // spawned here under bash as the caller, the script's own $BASH_VERSION and
+  // $# answer.
+  const root = fenceRoot({
+    "who.sh": 'printf "%s|%s|%s" "${BASH_VERSION:+bash}" "$#" "$1"\n',
+  });
+  try {
+    const r = spawnSync(
+      "bash",
+      shellArgvSpawnArgs("bash", join(root, "who.sh"), args),
+      { encoding: "utf8" },
+    );
+    assert.equal(r.stdout, "bash|2|a b");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: a split {input} is caught — the discriminator the one-element rule rests on", () => {
+  // The same script, called with the input spread over TWO elements by a
+  // template that names the fixture twice: $# is 3, the script exits 7, and a
+  // hostile case expecting exit 1 reproduces. Proves exit 7 is visible.
+  const root = saRoot();
+  try {
+    const r = runProbeSpec({
+      entry: "shell-argv:two-args.sh",
+      cases: [saCase("sa.space", "hostile", "a b", { expected: { exit: 1 } })],
+      argv: ["{input}", "{fixture}", "{fixture}"],
+      repoRoot: root,
+    });
+    assert.equal(r.reproduced.length, probeShells().length);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: --fixture-setup runs per (case, shell) before the script, after the case fixture is written", () => {
+  const needsReady = [
+    "#!/usr/bin/env bash",
+    '[ -f "$2/ready" ] || { echo "REFUSED unready" >&2; exit 1; }',
+    '[ "$1" = "alpha" ] || { echo "REFUSED" >&2; exit 1; }',
+    "",
+  ].join("\n");
+  // The setup reads the case's own fixture file (written first) and its env.
+  const setup = [
+    "#!/usr/bin/env bash",
+    'cd "$1" || exit 9',
+    "[ -f seed.txt ] || exit 4",
+    '[ "${PROBE_SEED_ENV:-}" = "yes" ] || exit 5',
+    "touch ready",
+    "",
+  ].join("\n");
+  const root = fenceRoot({ "needs-ready.sh": needsReady, "setup.sh": setup });
+  try {
+    const fixture = {
+      files: { "seed.txt": "x" },
+      env: { PROBE_SEED_ENV: "yes" },
+    };
+    const r = runProbeSpec({
+      entry: "shell-argv:needs-ready.sh",
+      cases: [
+        saCase("sa.ok", "legitimate", "alpha", { fixture }),
+        saCase("sa.bad", "hostile", "beta", { fixture, expected: { exit: 1 } }),
+      ],
+      argv: ["{input}", "{fixture}"],
+      fixtureSetup: "setup.sh",
+      repoRoot: root,
+    });
+    assert.deepEqual(r.declined, [], JSON.stringify(r.cases));
+    assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+    assert.equal(r.fixtureSetup, join(root, "setup.sh"));
+    assert.equal(toRecordEntry(r).fixture_setup, join(root, "setup.sh"));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: a failing setup is errored for every (case, shell), never rejected", () => {
+  const root = saRoot({ "setup-fails.sh": "exit 3\n" });
+  try {
+    const r = runProbeSpec({
+      entry: "shell-argv:two-args.sh",
+      cases: SA_CASES,
+      argv: SA_TEMPLATE,
+      fixtureSetup: "setup-fails.sh",
+      repoRoot: root,
+    });
+    assert.equal(r.executed, 0);
+    assert.equal(r.verdict, "unverifiable");
+    assert.equal(r.reason, "entry-not-probeable");
+    assert.equal(r.cases.length, SA_CASES.length * probeShells().length);
+    for (const c of r.cases) {
+      assert.equal(c.outcome, "errored", JSON.stringify(c));
+      assert.match(c.detail, /fixture setup exited 3/);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: a setup outside the root, missing, or with a malformed case fixture is declined, not scored", () => {
+  const root = saRoot();
+  try {
+    const outside = runProbeSpec({
+      entry: "shell-argv:two-args.sh",
+      cases: SA_CASES,
+      argv: SA_TEMPLATE,
+      fixtureSetup: "../setup.sh",
+      repoRoot: root,
+    });
+    assert.equal(outside.reason, "bad-fixture-setup");
+    assert.match(outside.declined[0].detail, /outside/);
+    const missing = runProbeSpec({
+      entry: "shell-argv:two-args.sh",
+      cases: SA_CASES,
+      argv: SA_TEMPLATE,
+      fixtureSetup: "nope.sh",
+      repoRoot: root,
+    });
+    assert.equal(missing.reason, "bad-fixture-setup");
+    const badFixture = runProbeSpec({
+      entry: "shell-argv:two-args.sh",
+      cases: [saCase("sa.ok", "legitimate", "alpha", { fixture: 3 })],
+      argv: SA_TEMPLATE,
+      repoRoot: root,
+    });
+    assert.equal(badFixture.executed, 0);
+    assert.match(badFixture.cases[0].detail, /fixture/);
+    const leaves = runProbeSpec({
+      entry: "shell-argv:two-args.sh",
+      cases: [
+        saCase("sa.ok", "legitimate", "alpha", {
+          fixture: { files: { "../out.txt": "x" } },
+        }),
+      ],
+      argv: SA_TEMPLATE,
+      repoRoot: root,
+    });
+    assert.equal(leaves.executed, 0);
+    assert.match(leaves.cases[0].detail, /leaves the case directory/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: a script or setup naming gh with no --fake-gh is declined needs-fake-gh", () => {
+  const root = saRoot({
+    "gh-script.sh": '#!/usr/bin/env bash\ngh issue view "$1"\n',
+    // Named on a branch that never runs: only the pre-spawn read of the SETUP
+    // can decline it — the run-time trip-wire never fires.
+    "gh-setup.sh": "#!/usr/bin/env bash\nif false; then gh auth status; fi\n",
+  });
+  try {
+    const script = runProbeSpec({
+      entry: "shell-argv:gh-script.sh",
+      cases: SA_CASES,
+      argv: ["{input}"],
+      repoRoot: root,
+    });
+    assert.equal(script.reason, "needs-fake-gh");
+    const setup = runProbeSpec({
+      entry: "shell-argv:two-args.sh",
+      cases: SA_CASES,
+      argv: SA_TEMPLATE,
+      fixtureSetup: "gh-setup.sh",
+      repoRoot: root,
+    });
+    assert.equal(setup.reason, "needs-fake-gh");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: a timeout is errored, and a write outside the fixture is an escape", () => {
+  const root = saRoot({
+    "slow.sh": "#!/usr/bin/env bash\nsleep 5\n",
+    "escapes.sh": '#!/usr/bin/env bash\ntouch "$HOME/pwned"\nexit 1\n',
+  });
+  try {
+    const slow = runProbeSpec({
+      entry: "shell-argv:slow.sh",
+      cases: [saCase("sa.ok", "legitimate", "alpha")],
+      argv: ["{input}"],
+      timeoutMs: 300,
+      repoRoot: root,
+    });
+    assert.equal(slow.executed, 0);
+    for (const c of slow.cases) assert.equal(c.outcome, "errored");
+    const esc = runProbeSpec({
+      entry: "shell-argv:escapes.sh",
+      cases: [saCase("sa.bad", "hostile", "x")],
+      argv: ["{input}"],
+      repoRoot: root,
+    });
+    assert.ok(esc.escapes.length > 0, JSON.stringify(esc));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: the record carries the argv template and setup, and two templates on one script are two controls", () => {
+  const root = saRoot();
+  const dir = mkdtempSync(join(tmpdir(), "probe-sa-rec-"));
+  try {
+    const record = join(dir, "run.json");
+    for (const argv of [SA_TEMPLATE, ["{input}", "{fixture}", "--x"]]) {
+      const r = runProbeSpec({
+        entry: "shell-argv:two-args.sh",
+        cases: SA_CASES,
+        argv,
+        repoRoot: root,
+      });
+      recordRun(record, r, {});
+    }
+    const controls = readRecord(record).controls;
+    assert.equal(controls.length, 2);
+    for (const c of controls) assert.ok(Array.isArray(c.argv));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: the proof run — reenter-qa-after-finalise.sh is reached by the engine, every case past its usage line (task.181)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "probe-sa-proof-"));
+  try {
+    const record = join(dir, "run.json");
+    const SA = "shared/resources/tests/fixtures/shell-argv";
+    const { rc, out, err } = runMain([
+      "--entry",
+      "shell-argv:shared/resources/reenter-qa-after-finalise.sh",
+      "--argv",
+      '["{input}","docs/tasks/task.42.example/report.md"]',
+      "--fixture-setup",
+      `${SA}/reenter-qa-setup.sh`,
+      "--cases-file",
+      `${SA}/reenter-qa-cases.json`,
+      "--record",
+      record,
+      "--json",
+    ]);
+    const r = JSON.parse(out);
+    const cases = JSON.parse(
+      readFileSync(join(REPO_ROOT, SA, "reenter-qa-cases.json"), "utf8"),
+    );
+    assert.equal(rc, 0, `stderr: ${err}\n${JSON.stringify(r.cases)}`);
+    assert.equal(r.verdict, "engages");
+    assert.deepEqual(r.declined, []);
+    assert.equal(r.executed, cases.length * probeShells().length);
+    // The usage line exits 2; every run here exits 0 (the re-entry) or 1 (a
+    // refusal of the script's own), so none stopped at argument parsing.
+    for (const c of r.cases) {
+      assert.ok(c.exit === 0 || c.exit === 1, JSON.stringify(c));
+    }
+    const totals = readRecord(record);
+    assert.ok(totals.totals.executed > 0);
+    assert.equal(
+      totals.controls[0].fixture_setup,
+      join(REPO_ROOT, SA, "reenter-qa-setup.sh"),
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ── task.181 QA cycle 1 — TASK-181-001: a case fixture must not reach the host gh ──
+//
+// shell-argv: honours a case's fixture as fence: does, so it takes fence:'s two
+// gh hardenings over it: the pre-spawn text check over fixture env values and
+// file contents, and ghFreePath, which hides every PATH directory holding a gh.
+// A fake "host" gh is planted on the test process's PATH, so both rows hold on a
+// host with no real gh as well as one with it.
+
+/** Run fn with a directory holding an executable `gh` first on process PATH. */
+function withPlantedGh(fn) {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), "planted-gh-")));
+  writeFileSync(join(dir, "gh"), "#!/bin/sh\necho planted-gh\n");
+  chmodSync(join(dir, "gh"), 0o755);
+  const saved = process.env.PATH;
+  process.env.PATH = `${dir}:${saved ?? ""}`;
+  try {
+    return fn();
+  } finally {
+    process.env.PATH = saved;
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test("shell-argv entry: a case fixture that names gh is declined needs-fake-gh before anything spawns (TASK-181-001)", () => {
+  const root = saRoot({ "plain.sh": '#!/usr/bin/env bash\n[ -n "$1" ]\n' });
+  try {
+    const helper =
+      'for p in $(type -ap gh); do case $p in *probe-harness*) ;; *) "$p" > ghran.txt 2>&1; break;; esac; done\n';
+    for (const fixture of [
+      { env: { BASH_ENV: "./helper.sh" }, files: { "helper.sh": helper } },
+      { env: { PROBE_CMD: "gh auth status" } },
+    ]) {
+      const r = withPlantedGh(() =>
+        runProbeSpec({
+          entry: "shell-argv:plain.sh",
+          argv: ["{input}"],
+          cases: [
+            saCase("sa.fx", "hostile", "x", {
+              fixture,
+              expected: { exit: 0, absent: ["ghran.txt"] },
+            }),
+          ],
+          repoRoot: root,
+        }),
+      );
+      assert.equal(r.reason, "needs-fake-gh", JSON.stringify(r.cases));
+      assert.equal(r.executed, 0);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: a fixture that spells gh without naming it still finds no host gh on PATH (TASK-181-001, ghFreePath)", () => {
+  const root = saRoot({ "plain.sh": '#!/usr/bin/env bash\n[ -n "$1" ]\n' });
+  try {
+    // `${G}h` with G=g spells gh without the text "gh" — only the PATH
+    // shadowing can stop it.
+    const helper =
+      'for p in $(type -ap "${G}h"); do case $p in *probe-harness*) ;; *) "$p" > ghran.txt 2>&1; break;; esac; done\n';
+    const r = withPlantedGh(() =>
+      runProbeSpec({
+        entry: "shell-argv:plain.sh",
+        argv: ["{input}"],
+        cases: [
+          saCase("sa.fx", "hostile", "x", {
+            fixture: {
+              env: { BASH_ENV: "./helper.sh", G: "g" },
+              files: { "helper.sh": helper },
+            },
+            expected: { exit: 0, absent: ["ghran.txt"] },
+          }),
+        ],
+        repoRoot: root,
+      }),
+    );
+    assert.deepEqual(r.reproduced, [], JSON.stringify(r.cases));
+    assert.equal(r.executed, probeShells().length);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// ── task.181 QA cycle 2 — TASK-181-002 / -003: escape accounting for shell-argv: ──
+//
+// The setup builds its case directory and nothing else: a write elsewhere errors
+// that run, named, and is never charged to the entry under probe (TASK-181-002).
+// The entry's runs are watched beside the case directory as fence:'s are — the
+// sentinel skips the work dir, so only the work-dir snapshot sees a write to a
+// sibling case or a deletion in the harness dir (TASK-181-003).
+
+test("shell-argv entry: a setup that writes outside its case directory errors the run and charges the entry nothing (TASK-181-002)", () => {
+  const root = saRoot({
+    "ok.sh": '#!/usr/bin/env bash\n[ "$1" = alpha ] || exit 1\n',
+    "setup-tmp.sh": "#!/usr/bin/env bash\nmktemp >/dev/null\n",
+    "setup-inside.sh":
+      '#!/usr/bin/env bash\nmktemp "$1/scratch.XXXXXX" >/dev/null\n',
+  });
+  try {
+    const cases = [
+      saCase("a.ok", "legitimate", "alpha"),
+      saCase("a.bad", "hostile", "beta"),
+    ];
+    const outside = runProbeSpec({
+      entry: "shell-argv:ok.sh",
+      argv: ["{input}"],
+      fixtureSetup: "setup-tmp.sh",
+      cases,
+      repoRoot: root,
+    });
+    assert.deepEqual(outside.escapes, [], JSON.stringify(outside.escapes));
+    assert.equal(outside.executed, 0);
+    for (const c of outside.cases) {
+      assert.equal(c.outcome, "errored");
+      assert.match(c.detail, /fixture setup wrote outside the case directory/);
+    }
+    const inside = runProbeSpec({
+      entry: "shell-argv:ok.sh",
+      argv: ["{input}"],
+      fixtureSetup: "setup-inside.sh",
+      cases,
+      repoRoot: root,
+    });
+    assert.deepEqual(inside.escapes, []);
+    assert.equal(inside.verdict, "engages", JSON.stringify(inside.cases));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: a write beside the case directory, or a deletion in the harness, is an escape (TASK-181-003)", () => {
+  const root = saRoot({
+    "writes.sh": '#!/usr/bin/env bash\ntouch "$1"\nexit 1\n',
+    "deletes.sh":
+      "#!/usr/bin/env bash\nrm -f ../.probe-harness/bin/gh\nexit 1\n",
+  });
+  try {
+    const up = runProbeSpec({
+      entry: "shell-argv:writes.sh",
+      argv: ["{input}"],
+      cases: [saCase("w.up", "hostile", "../pwned", { expected: { exit: 1 } })],
+      repoRoot: root,
+    });
+    assert.ok(
+      up.escapes.some((e) => e.path.endsWith("/pwned")),
+      JSON.stringify(up.escapes),
+    );
+    const del = runProbeSpec({
+      entry: "shell-argv:deletes.sh",
+      argv: ["{input}"],
+      cases: [saCase("w.del", "hostile", "x", { expected: { exit: 1 } })],
+      repoRoot: root,
+    });
+    assert.ok(
+      del.escapes.some((e) => e.path.endsWith(".probe-harness/bin/gh")),
+      JSON.stringify(del.escapes),
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: a setup that is killed reports why, not always a timeout (CR-4)", () => {
+  const root = saRoot({
+    "slow-setup.sh": "#!/usr/bin/env bash\nsleep 5\n",
+    "self-kill.sh": "#!/usr/bin/env bash\nkill -TERM $$\n",
+  });
+  try {
+    const slow = runProbeSpec({
+      entry: "shell-argv:two-args.sh",
+      argv: SA_TEMPLATE,
+      fixtureSetup: "slow-setup.sh",
+      cases: [saCase("sa.ok", "legitimate", "alpha")],
+      timeoutMs: 300,
+      repoRoot: root,
+    });
+    for (const c of slow.cases) assert.match(c.detail, /timed out after 300ms/);
+    const killed = runProbeSpec({
+      entry: "shell-argv:two-args.sh",
+      argv: SA_TEMPLATE,
+      fixtureSetup: "self-kill.sh",
+      cases: [saCase("sa.ok", "legitimate", "alpha")],
+      repoRoot: root,
+    });
+    for (const c of killed.cases) {
+      assert.equal(c.outcome, "errored");
+      assert.doesNotMatch(c.detail, /timed out/);
+      assert.match(c.detail, /SIGTERM/);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// ── task.181 /finalise DoD gaps — AC2 and AC6 members held by tests ──────────
+//
+// The DoD's quantifier rule (dod.1): every member of a set criterion needs its
+// own test. AC2 lists `shell-fn:` among the forms `--argv` is still refused for;
+// AC6 lists the run-time trip-wire and `--fake-gh` among the shell forms' `gh`
+// handling `shell-argv:` takes.
+
+test("shell-argv entry: --argv is still refused for a shell-fn: entry — CLI exit 2 and library decline (task.181 AC2)", () => {
+  const root = fenceRoot({ "lib.sh": "f() { printf '%s\\n' \"$1\"; }\n" });
+  const dir = mkdtempSync(join(tmpdir(), "probe-sa-fnargv-"));
+  try {
+    const record = join(dir, "run.json");
+    const { rc, err } = runMain([
+      "--sink",
+      "filename",
+      "--repo-root",
+      root,
+      "--entry",
+      "shell-fn:lib.sh#f",
+      "--argv",
+      '["{input}"]',
+      "--record",
+      record,
+    ]);
+    assert.equal(rc, 2, err);
+    assert.match(
+      err,
+      /^bad-argv: --argv applies to the cli: and shell-argv: entry forms only/,
+    );
+    assert.equal(existsSync(record), false);
+    const r = runProbeSpec({
+      sink: "filename",
+      entry: "shell-fn:lib.sh#f",
+      cases: SA_CASES,
+      argv: ["{input}"],
+      repoRoot: root,
+    });
+    assert.equal(r.reason, "bad-argv");
+    assert.equal(r.executed, 0);
+    assert.match(r.declined[0].detail, /cli: and shell-argv: entry forms only/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: a gh call the text check cannot see is caught by the run-time trip-wire and declined (task.181 AC6)", () => {
+  // `X=gh; "$X"` names no `gh` the pre-spawn detector reads, so only the
+  // trip-wire first on PATH can answer — and then nothing is scored.
+  const root = saRoot({
+    "calls-gh.sh":
+      '#!/usr/bin/env bash\nX=gh\n"$X" auth status >/dev/null 2>&1\n[ "$1" = alpha ]\n',
+  });
+  try {
+    const r = runProbeSpec({
+      entry: "shell-argv:calls-gh.sh",
+      cases: SA_CASES,
+      argv: ["{input}"],
+      repoRoot: root,
+    });
+    assert.equal(r.reason, "needs-fake-gh", JSON.stringify(r.declined));
+    assert.equal(r.executed, 0);
+    assert.match(r.declined[0].detail, /invoked .gh. at run time/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: --fake-gh is accepted and its gh answers the run (task.181 AC6)", () => {
+  // The script refuses unless the fake answered — so `alpha` accepted proves
+  // the fake was first on PATH, armed with FAKE_GH=1.
+  const root = saRoot({
+    "fake/gh":
+      '#!/bin/sh\n[ "$FAKE_GH" = 1 ] || { echo "FAKE_GH unset" >&2; exit 2; }\necho fake-gh-answered\n',
+    "asks-gh.sh":
+      '#!/usr/bin/env bash\nout=$(gh api x)\n[ "$out" = fake-gh-answered ] || exit 9\n[ "$1" = alpha ] || exit 1\n',
+  });
+  try {
+    chmodSync(join(root, "fake/gh"), 0o755);
+    const r = runProbeSpec({
+      entry: "shell-argv:asks-gh.sh",
+      cases: [
+        saCase("sa.ok", "legitimate", "alpha"),
+        saCase("sa.bad", "hostile", "beta", { expected: { exit: 1 } }),
+      ],
+      argv: ["{input}"],
+      fakeGh: "fake",
+      repoRoot: root,
+    });
+    assert.deepEqual(r.declined, [], JSON.stringify(r.cases));
+    assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+    assert.equal(r.fakeGh, join(root, "fake"));
+    assert.equal(toRecordEntry(r).fake_gh, join(root, "fake"));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

@@ -1,0 +1,13 @@
+[
+  {"id":"sa.dotdot","sink":"path","input":"shell-argv:../outside.sh","why":"relative escape","correct":"refused: {ok:false}","direction":"hostile"},
+  {"id":"sa.abs","sink":"path","input":"shell-argv:/etc/passwd","why":"absolute path outside the root","correct":"refused: {ok:false}","direction":"hostile"},
+  {"id":"sa.deep-dotdot","sink":"path","input":"shell-argv:shared/resources/../../../etc/x.sh","why":"escape after normalisation","correct":"refused: {ok:false}","direction":"hostile"},
+  {"id":"sa.root","sink":"path","input":"shell-argv:.","why":"the root itself is not an entry","correct":"refused: {ok:false}","direction":"hostile"},
+  {"id":"sa.node-modules","sink":"path","input":"shell-argv:node_modules/x.sh","why":"under node_modules","correct":"refused: {ok:false}","direction":"hostile"},
+  {"id":"sa.nul","sink":"path","input":"shell-argv:shared/resources/x.sh\u0000.sh","why":"a NUL byte in the path","correct":"refused: {ok:false}","direction":"hostile"},
+  {"id":"sa.hash","sink":"path","input":"shell-argv:shared/resources/grant-qa-cycles.sh#main","why":"an export name on a shell form","correct":"refused: {ok:false}","direction":"hostile"},
+  {"id":"sa.empty","sink":"path","input":"shell-argv:","why":"no path after the prefix","correct":"refused: {ok:false}","direction":"hostile"},
+  {"id":"sa.spaces","sink":"path","input":"shell-argv:   ","why":"a blank path","correct":"refused: {ok:false}","direction":"hostile"},
+  {"id":"sa.reenter","sink":"path","input":"shell-argv:shared/resources/reenter-qa-after-finalise.sh","why":"the proof target","correct":"accepted","direction":"legitimate"},
+  {"id":"sa.grant","sink":"path","input":"shell-argv:shared/resources/grant-qa-cycles.sh","why":"a multi-positional script","correct":"accepted","direction":"legitimate"}
+]

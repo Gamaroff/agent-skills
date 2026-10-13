@@ -1,0 +1,64 @@
+[
+  {
+    "id": "reenter.doc-dir",
+    "input": "docs/tasks/task.42.example",
+    "why": "the halted work item's own directory — the one input the re-entry exists for",
+    "correct": "accept",
+    "direction": "legitimate"
+  },
+  {
+    "id": "reenter.doc-dir-slash",
+    "input": "docs/tasks/task.42.example/",
+    "why": "the same directory with a trailing slash, which the script strips",
+    "correct": "accept",
+    "direction": "legitimate"
+  },
+  {
+    "id": "reenter.other-doc",
+    "input": "docs/tasks/task.99.other",
+    "why": "another work item's directory — the snapshot is not for it",
+    "correct": "reject",
+    "direction": "hostile",
+    "expected": { "exit": 1 }
+  },
+  {
+    "id": "reenter.traversal",
+    "input": "docs/tasks/task.42.example/../task.99.other",
+    "why": "a traversal that leaves the halted work item for another",
+    "correct": "reject",
+    "direction": "hostile",
+    "expected": { "exit": 1 }
+  },
+  {
+    "id": "reenter.parent",
+    "input": "docs",
+    "why": "a parent of the work item — its exclusion would hide the code movement",
+    "correct": "reject",
+    "direction": "hostile",
+    "expected": { "exit": 1 }
+  },
+  {
+    "id": "reenter.substitution",
+    "input": "docs/tasks/$(touch PWNED)",
+    "why": "a directory NAMED as a command substitution must stay a name",
+    "correct": "reject",
+    "direction": "hostile",
+    "expected": { "exit": 1, "absent": ["PWNED"] }
+  },
+  {
+    "id": "reenter.space",
+    "input": "docs/tasks/a b",
+    "why": "a directory name with a space must stay one argument",
+    "correct": "reject",
+    "direction": "hostile",
+    "expected": { "exit": 1 }
+  },
+  {
+    "id": "reenter.dash",
+    "input": "-n",
+    "why": "a flag-shaped directory name must not be read as an option",
+    "correct": "reject",
+    "direction": "hostile",
+    "expected": { "exit": 1 }
+  }
+]

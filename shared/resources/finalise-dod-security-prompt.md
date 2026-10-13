@@ -44,7 +44,7 @@ Signals — any **one** is sufficient:
 - a named allow-list or deny-list in any form (array, regex alternation, `switch`, set membership)
 - a function whose own tests are mostly of the shape "X is refused"
 - a work-item document whose Success Criteria contain *never*, *must not*, *fails closed*, or *refused*
-- a script or function whose own header or doc comment says it *refuses*, *never guesses*, or *fails closed* — in any language; a bash script is a boundary by its own words, and "not importable" routes it to the engine's `shell:` entry form — or, for a **sourced library** (a header that says *source it*, or functions with no top-level call), the `shell-fn:path#function` form with `--cases-file` and, when the body names `gh`, `--fake-gh` (Step 4; the signal that tells the two apart is stated once, in `probe-boundary-rule.md` §5); a **Node CLI** whose decision sits behind its flags routes to the `cli:path` form with an `--argv` template; a **fenced bash block in a step doc** (a precondition, refusal or guard shipped as Markdown) routes to the `fence:<doc.md>#<heading>` form with `--slot <placeholder>` — never to `boundary: false`
+- a script or function whose own header or doc comment says it *refuses*, *never guesses*, or *fails closed* — in any language; a bash script is a boundary by its own words, and "not importable" routes it to the engine's `shell:` entry form — or, for a **sourced library** (a header that says *source it*, or functions with no top-level call), the `shell-fn:path#function` form with `--cases-file` and, when the body names `gh`, `--fake-gh` (Step 4; the signal that tells the two apart is stated once, in `probe-boundary-rule.md` §5); a **Node CLI** whose decision sits behind its flags routes to the `cli:path` form with an `--argv` template; a **shell script that takes several arguments or flags** routes to the `shell-argv:path` form with an `--argv` template and, when it reads a repository, `--fixture-setup <setup.sh>`; a **fenced bash block in a step doc** (a precondition, refusal or guard shipped as Markdown) routes to the `fence:<doc.md>#<heading>` form with `--slot <placeholder>` — never to `boundary: false`
 
 The list is data as well as prose: `probe-boundary-signals.mjs` (beside `security-probe.mjs`) exports it, and `classifyBoundaryText` applies the text-shaped signals to a header or a criteria section. Five QA gates on task.121 read a bash script that says "refuses rather than guesses" and recorded no boundary, because every signal above the last one is JS-shaped; the last one is what a script's own words match.
 
@@ -54,9 +54,10 @@ security-adjacent they look. Probe mode must **not** fire on them.
 
 **A refusal whose input is repository state is a boundary** — a git hook, a guard driven by
 `git status`. Its input is the index, not an argument, and "takes no caller-supplied value" does not
-make it `false`. Once the engine's `shell-argv:` form exists (task.181), probe it there with a
-`--fixture-setup` that stages each case. Until then record `boundary: true`; the zero-guard will
-fire, and closing it takes a recorded override (obs #221).
+make it `false`. Probe it through the `shell-argv:` form (task.181): each case's `fixture.files`
+carries the state, a `--fixture-setup` stages it (a commit, a `git add`) before the run, and the
+template's one `{input}` element reaches a script that may ignore it. Record `boundary: true`; where
+no form reaches the guard, the zero-guard fires and closing it takes a recorded override (obs #221).
 
 **Test code is not exempt by location.** A test double whose refusal backs an assertion — a fake
 `gh` that refuses writes so an eval can assert "never posts" — is a boundary: the agent under test
@@ -249,6 +250,23 @@ node PROMPT_DIR/security-probe.mjs \
   --repo-root "$(git rev-parse --show-toplevel)" \
   --record <STORY_DIR>/<stem>.dod.<DOD_N>.security.run.json --json
 
+# A MULTI-ARGUMENT SHELL SCRIPT boundary (a bash script taking several
+# arguments or flags — task.170's `reenter-qa-after-finalise.sh <doc-dir>
+# <report>`) takes the shell-argv form: the cli form's --argv template and
+# verdict, with bash as the interpreter under every caller shell. When the
+# script reads a repository (commits, a gate, a halt snapshot), name a
+# committed --fixture-setup script: it runs as `bash <setup> <case-dir>` before
+# each (case, shell) run, and a setup that fails is errored, never a refusal.
+# A setup builds "$1" and nothing else: a write anywhere else errors the run.
+# A script, setup or case fixture that names `gh` needs --fake-gh. NAME each control.
+node PROMPT_DIR/security-probe.mjs \
+  --entry 'shell-argv:<path-from-repo-root>' \
+  --argv '["{input}","<second-argument>"]' \
+  --fixture-setup <setup-script-from-repo-root> \
+  --cases-file <path-to-cases.json> --name '<control name>' \
+  --repo-root "$(git rev-parse --show-toplevel)" \
+  --record <STORY_DIR>/<stem>.dod.<DOD_N>.security.run.json --json
+
 # A FENCED BASH BLOCK boundary (a guard shipped inside a Markdown step doc —
 # task.167's fast-gate precondition) takes the fence form: the engine reads the
 # doc on every run, takes the first ```bash block under the heading, replaces
@@ -277,8 +295,7 @@ both directions — and prints a JSON result whose `executed` is the count of ca
 actually ran, whose `reproduced[]` names the hostile cases that were accepted, and whose
 `overblocked[]` names the legitimate cases that were refused. The record it writes carries the same
 counts; **`probes_executed:` below is the record's `totals.executed`, copied, never composed.** An
-entry no form reaches (a script or CLI that reads stdin, a shell script that takes two positionals,
-anything networked) is `verdict: unverifiable` with `executed: 0` and
+entry no form reaches (a script or CLI that reads stdin, anything networked) is `verdict: unverifiable` with `executed: 0` and
 takes the zero-guard below — say why in `summary`, do not fall back to a hand-written harness,
 because a count from a harness is the self-report this step removed. **"It is a bash script" is not
 such a reason**: that is the `shell:` form's case, and recording it as unverifiable is the task.121
@@ -286,7 +303,10 @@ outcome this form exists to end. **Nor is "it is a sourced function"**: that is 
 form's case, and running `shell:` against a library instead is the task.125 outcome — `absent`
 behind a full count — that *that* form exists to end. **Nor is "it is a multi-flag CLI" or "the
 function takes three arguments"** when a Node CLI calls it: that is the `cli:` form's case, and
-recording it unverifiable is the task.141 outcome that form exists to end. **Nor is "it is prose,
+recording it unverifiable is the task.141 outcome that form exists to end. **Nor is "the script
+takes several arguments or flags"** for a shell script: that is the `shell-argv:` form's case, with
+`--fixture-setup` building the scratch repository it reads, and the by-hand probe it replaces is the
+task.147 and task.170 outcome it exists to end. **Nor is "it is prose,
 not a script"** for a guard shipped as a fenced bash block in a step doc: that is the `fence:`
 form's case, and the hand-written wrapper under `.claude/state/` it replaces is the task.159 and
 task.167 outcome it exists to end. **Nor is "it takes a

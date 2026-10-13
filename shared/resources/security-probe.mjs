@@ -8,6 +8,7 @@
  *   node <this-file> --sink <name> --entry shell:<path>     [options]
  *   node <this-file> --sink <name> --entry shell-fn:<path>#<function> [--fake-gh <dir>] [options]
  *   node <this-file> --sink <name> --entry cli:<path> --argv '<JSON array>' [options]
+ *   node <this-file> --sink <name> --entry shell-argv:<path> --argv '<JSON array>' [--fixture-setup <path>] [options]
  *   node <this-file> --sink <name> --entry 'fence:<doc.md>#<heading>' --slot '<token>' [options]
  *
  * Options:
@@ -24,6 +25,10 @@
  *                        or `cli:relative/path.mjs` — a NODE CLI run with the
  *                        `--argv` template, one probe per case. See "The cli
  *                        entry form".
+ *                        or `shell-argv:relative/path.sh` — a SHELL SCRIPT taking
+ *                        several arguments or flags, run with the `--argv`
+ *                        template under bash, called from bash and (when present)
+ *                        zsh. See "The shell-argv entry form".
  *                        or `fence:relative/doc.md#Heading` — the first ```bash
  *                        block under that heading of a MARKDOWN STEP DOC, read
  *                        on every run and run as a script per case under bash
@@ -31,10 +36,17 @@
  *   --slot <token>       the fence: form's placeholder — the literal text in the
  *                        block that each case's input replaces. Required with
  *                        fence:, refused (exit 2, `bad-slot`) with every other form
- *   --argv <json>        the cli: form's argv template — a JSON array of strings
- *                        with exactly one "{input}" element and optionally
- *                        "{fixture}" elements. Required with cli:, refused
- *                        (exit 2, `bad-argv`) with every other form
+ *   --argv <json>        the cli: and shell-argv: forms' argv template — a JSON
+ *                        array of strings with exactly one "{input}" element and
+ *                        optionally "{fixture}" elements. Required with cli: and
+ *                        shell-argv:, refused (exit 2, `bad-argv`) with every
+ *                        other form
+ *   --fixture-setup <path> the shell-argv: form's per-run setup — a committed
+ *                        shell script inside the repo root, run as
+ *                        `bash <path> <fixture-dir>` before each (case, shell)
+ *                        run. A non-zero exit makes that run `errored`, never a
+ *                        verdict. Refused (exit 2, `bad-fixture-setup`) with
+ *                        every other form; recorded as `fixture_setup`
  *   --args-json <json>   a JSON ARRAY of fixed extra arguments appended after the
  *                        case's input on every call — `fn(input, ...args)` — so a
  *                        `(text, opts)` validator is probeable (task.131). The JS
@@ -166,6 +178,30 @@
  * SKELETON (flags and positionals kept, flag values dropped — see controlKey),
  * so two different controls on one script
  * (`--env {input}`, `--clear-note {input}`) are two controls, not one.
+ *
+ * THE SHELL-ARGV ENTRY FORM (task.181). A boundary delivered as a SHELL SCRIPT
+ * TAKING SEVERAL ARGUMENTS OR FLAGS (`verify-push-state.sh --base … --scope …`,
+ * `reenter-qa-after-finalise.sh <doc-dir> <report>`) matched none of the forms —
+ * `shell:` passes exactly one positional — so every such change tripped the
+ * zero-guard and was probed by hand (task.147, task.170). `--entry
+ * shell-argv:<path> --argv '<JSON array>'` is the cli: contract on a bash script:
+ * the same template grammar, the same verdict (exit status, or `expected` when a
+ * case carries one), the same record key (`--name`, else the argv skeleton).
+ * Each shell from probeShells() is the CALLER and bash the INTERPRETER —
+ * `<shell> -c 'bash "$@"' <shell> <script> ...argv` — as for `shell:`. A case's
+ * `fixture` (`env`, `files`) is honoured as for fence:, and `--fixture-setup
+ * <path>` names a committed script, contained like the entry, run as
+ * `bash <setup> <case-dir>` before each (case, shell) run, after the case's
+ * fixture files are written: it builds the scratch repository these scripts
+ * read. A setup that exits non-zero, times out or never starts makes that run
+ * `errored`, never `rejected`; so does a setup that writes anywhere but the case
+ * directory — its writes are watched in their own list and never charged to the
+ * entry (TASK-181-002). Every run is watched beside the case directory as
+ * fence:'s is (caseWatchedSpawn, TASK-181-003). It is a shell form for `gh`: a script, a setup,
+ * or a case fixture's env values or file contents that name `gh` without
+ * `--fake-gh` are declined `needs-fake-gh`, and every PATH directory holding the
+ * host `gh` is shadowed (ghFreePath), as for fence: (TASK-181-001). The record
+ * carries the setup as `fixture_setup`.
  *
  * THE FENCE ENTRY FORM (task.180). Many of this repository's boundaries ship as
  * a fenced bash block inside a Markdown step doc — a precondition, a refusal, a
@@ -441,6 +477,9 @@ export function resolveEntry(entry, repoRoot = defaultRepoRoot()) {
   // The two prefixes are disjoint (`shell:` vs `shell-fn:` differ at byte 5),
   // so no guard against the other is needed (task.140, PR-review CR-3).
   const isShell = entry.startsWith(SHELL_PREFIX);
+  // `shell-argv:` is disjoint from both: it differs from `shell:` at byte 5 and
+  // from `shell-fn:` at byte 6, so no check order is load-bearing (task.181).
+  const isShellArgv = entry.startsWith(SHELL_ARGV_PREFIX);
   const isCli = entry.startsWith(CLI_PREFIX);
   // Disjoint from the other three: no prefix shares `fence:`'s first byte.
   const isFence = entry.startsWith(FENCE_PREFIX);
@@ -495,13 +534,14 @@ export function resolveEntry(entry, repoRoot = defaultRepoRoot()) {
         detail: `"${fnName}" is not a shell function name`,
       };
     }
-  } else if (isShell) {
-    rawPath = entry.slice(SHELL_PREFIX.length);
+  } else if (isShell || isShellArgv) {
+    const prefix = isShellArgv ? SHELL_ARGV_PREFIX : SHELL_PREFIX;
+    rawPath = entry.slice(prefix.length);
     if (rawPath.trim() === "" || rawPath.includes("#")) {
       return {
         ok: false,
         reason: "bad-entry",
-        detail: `entry must be "shell:path" with no export name, got "${entry}"`,
+        detail: `entry must be "${prefix}path" with no export name, got "${entry}"`,
       };
     }
   } else {
@@ -549,6 +589,7 @@ export function resolveEntry(entry, repoRoot = defaultRepoRoot()) {
   }
   if (isFence) return { ok: true, kind: "fence", entryPath, heading };
   if (isCli) return { ok: true, kind: "cli", entryPath };
+  if (isShellArgv) return { ok: true, kind: "shell-argv", entryPath };
   if (isShellFn) return { ok: true, kind: "shell-fn", entryPath, fnName };
   return isShell
     ? { ok: true, kind: "shell", entryPath }
@@ -557,6 +598,8 @@ export function resolveEntry(entry, repoRoot = defaultRepoRoot()) {
 
 /** The entry-spec prefix that selects the shell form. */
 export const SHELL_PREFIX = "shell:";
+/** The entry-spec prefix that selects the multi-argument shell form (task.181). */
+export const SHELL_ARGV_PREFIX = "shell-argv:";
 /** The entry-spec prefix that selects the sourced-function form (task.136). */
 export const SHELL_FN_PREFIX = "shell-fn:";
 /** The entry-spec prefix that selects the Node CLI form (task.144). */
@@ -962,6 +1005,7 @@ export function runProbeSpec({
   argv,
   args,
   slot,
+  fixtureSetup,
   timeoutMs,
   repoRoot = defaultRepoRoot(),
 } = {}) {
@@ -1011,6 +1055,9 @@ export function runProbeSpec({
     args: null,
     // The fence: form's placeholder token, or null (task.180).
     slot: null,
+    // The shell-argv: form's per-run setup script (its real path), or null
+    // (task.181). Stated so the record says what built each case directory.
+    fixtureSetup: null,
   };
 
   // `declined` is its own state and is NEVER folded into `executed: 0`. Both
@@ -1031,7 +1078,11 @@ export function runProbeSpec({
     // template it was given: the template is part of an unnamed control's key,
     // and without it the corrected re-run keyed differently and left this
     // `unverifiable` entry beside the real verdict (task.144 5c CR-1).
-    if (typeof entry === "string" && entry.startsWith(CLI_PREFIX)) {
+    // Likewise shell-argv:, which keys the same way (task.181).
+    if (
+      typeof entry === "string" &&
+      (entry.startsWith(CLI_PREFIX) || entry.startsWith(SHELL_ARGV_PREFIX))
+    ) {
       const parsed = parseArgvTemplate(argv);
       if (parsed.ok) base.argv = parsed.template;
     }
@@ -1050,6 +1101,10 @@ export function runProbeSpec({
   const isShellForm = resolved.kind === "shell" || resolved.kind === "shell-fn";
   const isCliForm = resolved.kind === "cli";
   const isFenceForm = resolved.kind === "fence";
+  // `shell-argv:` (task.181): a bash script called with the --argv template. It
+  // takes cli:'s argv contract and the shell forms' PATH handling (`gh`).
+  const isShellArgvForm = resolved.kind === "shell-argv";
+  const takesArgv = isCliForm || isShellArgvForm;
   // `slot` — validated here, the boundary a library caller crosses, exactly as
   // `argv` is for cli: (task.180).
   const slotGiven = slot !== undefined && slot !== null;
@@ -1072,11 +1127,11 @@ export function runProbeSpec({
   // guard. The same validator, so the two cannot disagree (task.144).
   let template = null;
   const argvGiven = argv !== undefined && argv !== null;
-  if (isCliForm) {
+  if (takesArgv) {
     if (!argvGiven) {
       return decline(
         "bad-argv",
-        'the cli: entry form needs --argv — a JSON array with one "{input}" element',
+        `the ${isCliForm ? "cli:" : "shell-argv:"} entry form needs --argv — a JSON array with one "{input}" element`,
       );
     }
     const parsed = parseArgvTemplate(argv);
@@ -1085,7 +1140,7 @@ export function runProbeSpec({
   } else if (argvGiven) {
     return decline(
       "bad-argv",
-      "--argv applies to the cli: entry form only — the other forms take their input from the case",
+      "--argv applies to the cli: and shell-argv: entry forms only — the other forms take their input from the case",
     );
   }
   base.argv = template;
@@ -1095,10 +1150,10 @@ export function runProbeSpec({
   // an argv element, so args there would be recorded without being used —
   // declined, not ignored, like --fake-gh on the JS form.
   if (args !== undefined && args !== null) {
-    if (isShellForm || isCliForm || isFenceForm) {
+    if (isShellForm || isCliForm || isFenceForm || isShellArgvForm) {
       return decline(
         "bad-args",
-        "--args-json applies to the JS entry form (path#export) only — the shell, cli: and fence: forms take their input from the case",
+        "--args-json applies to the JS entry form (path#export) only — the shell, cli:, shell-argv: and fence: forms take their input from the case",
       );
     }
     if (!Array.isArray(args)) {
@@ -1118,7 +1173,7 @@ export function runProbeSpec({
       `${resolved.entryPath} is not a ${CLI_EXTENSIONS.join(" / ")} script — the cli: form runs it with node`,
     );
   }
-  if (isShellForm || isCliForm || isFenceForm) {
+  if (isShellForm || isCliForm || isFenceForm || isShellArgvForm) {
     // The script must be a readable regular file BEFORE anything is compared.
     // Without this a missing path made every run exit 127, every case mismatch
     // `expected`, and the verdict read `absent` with executed = cases × shells —
@@ -1137,6 +1192,44 @@ export function runProbeSpec({
       );
     }
   }
+  // `fixtureSetup` (task.181) — the shell-argv: form's per-run setup script.
+  // Validated HERE, the boundary a library caller crosses, as `slot` and `argv`
+  // are; with the entry's own containment, because it is code the engine runs.
+  // Declined, not ignored, on any other form: a caller who passed it meant it.
+  let setupPath = null;
+  if (fixtureSetup !== undefined && fixtureSetup !== null) {
+    if (!isShellArgvForm) {
+      return decline(
+        "bad-fixture-setup",
+        "--fixture-setup applies to the shell-argv: entry form only",
+      );
+    }
+    if (typeof fixtureSetup !== "string" || fixtureSetup.trim() === "") {
+      return decline("bad-fixture-setup", "--fixture-setup must name a script");
+    }
+    const root = realpathSafe(resolve(repoRoot));
+    setupPath = realpathSafe(
+      isAbsolute(fixtureSetup)
+        ? resolve(fixtureSetup)
+        : resolve(root, fixtureSetup),
+    );
+    if (setupPath === root || !isWithin(root, setupPath)) {
+      return decline("bad-fixture-setup", `${setupPath} is outside ${root}`);
+    }
+    if (relative(root, setupPath).split(sep).includes("node_modules")) {
+      return decline("bad-fixture-setup", `${setupPath} is under node_modules`);
+    }
+    try {
+      if (!statSync(setupPath).isFile()) throw new Error("not a regular file");
+      accessSync(setupPath, fsConstants.R_OK);
+    } catch (e) {
+      return decline(
+        "bad-fixture-setup",
+        `setup script is not a readable regular file: ${e.message}`,
+      );
+    }
+  }
+  base.fixtureSetup = setupPath;
   // `--fake-gh` is validated BEFORE anything spawns, like the entry: a
   // directory with no `gh` in it would let the real one answer from further
   // down PATH, which is the exact outcome the flag exists to prevent, with
@@ -1149,12 +1242,12 @@ export function runProbeSpec({
     // reach must not be RECORDED as having answered — `fake_gh: <dir>` on a
     // JS-form record would claim a fixture where the real binary ran
     // (TASK-136-BUG-1). Declined, not ignored: a caller who passed it meant it.
-    if (!isShellForm && !isFenceForm) {
+    if (!isShellForm && !isFenceForm && !isShellArgvForm) {
       return decline(
         "bad-fake-gh",
         isCliForm
-          ? "--fake-gh applies to the shell entry forms only (shell:, shell-fn:, fence:) — a CLI that consults gh is a networked CLI, which the cli: form does not probe"
-          : "--fake-gh applies to the shell entry forms only (shell:, shell-fn:, fence:) — a JS export never consults PATH",
+          ? "--fake-gh applies to the shell entry forms only (shell:, shell-fn:, shell-argv:, fence:) — a CLI that consults gh is a networked CLI, which the cli: form does not probe"
+          : "--fake-gh applies to the shell entry forms only (shell:, shell-fn:, shell-argv:, fence:) — a JS export never consults PATH",
       );
     }
     if (typeof fakeGh !== "string" || fakeGh.trim() === "") {
@@ -1195,12 +1288,17 @@ export function runProbeSpec({
   // EVERY shell form, not only shell-fn: a `shell:` script that names `gh` ran
   // the host `gh` — host PATH, host keychain — and was scored (task.140,
   // c3-CR-2). The detector reads the entry and one level of what it sources.
-  if (isShellForm && fakeGhDir === null) {
-    if (namesGh(resolved.entryPath, realpathSafe(resolve(repoRoot)))) {
-      return decline(
-        "needs-fake-gh",
-        `${resolved.entryPath} names \`gh\` — pass --fake-gh <dir> so the fixture answers instead of the real binary`,
-      );
+  // `shell-argv:` is a shell form here too, and its setup script is code the
+  // run executes on the same PATH, so it is read as well (task.181).
+  if ((isShellForm || isShellArgvForm) && fakeGhDir === null) {
+    const root = realpathSafe(resolve(repoRoot));
+    for (const path of [resolved.entryPath, setupPath]) {
+      if (path !== null && namesGh(path, root)) {
+        return decline(
+          "needs-fake-gh",
+          `${path} names \`gh\` — pass --fake-gh <dir> so the fixture answers instead of the real binary`,
+        );
+      }
     }
   }
 
@@ -1276,6 +1374,34 @@ export function runProbeSpec({
     }
   }
 
+  // shell-argv: honours a case's fixture as fence: does, so the fixture strings
+  // get the same text check (TASK-181-001): `env` values and `files` contents can
+  // run (BASH_ENV, a sourced fixture script). The case's INPUT is not checked —
+  // it crosses as one argv element, data, never source. runShellArgvCase also
+  // shadows every PATH directory holding a gh (ghFreePath), which catches a
+  // lookup this text check cannot spell.
+  if (isShellArgvForm && fakeGhDir === null) {
+    const strings = (o) =>
+      o && typeof o === "object" && !Array.isArray(o)
+        ? Object.values(o).filter((v) => typeof v === "string")
+        : [];
+    const fixtureText = probeCases
+      .flatMap((c) => [
+        ...strings(c?.fixture?.env),
+        ...strings(c?.fixture?.files),
+      ])
+      .join("\n");
+    if (
+      fixtureText !== "" &&
+      namesGh(resolved.entryPath, realpathSafe(resolve(repoRoot)), fixtureText)
+    ) {
+      return decline(
+        "needs-fake-gh",
+        `a case's fixture (env or files) for ${resolved.entryPath} names \`gh\` — pass --fake-gh <dir> so the fixture answers instead of the real binary`,
+      );
+    }
+  }
+
   if (probeCases.length === 0) {
     // Zero cases yields `unverifiable`, never `engages` and never a pass.
     return { ...base, verdict: "unverifiable", reason: "no-cases-executed" };
@@ -1302,7 +1428,7 @@ export function runProbeSpec({
   // The harness's own files — source-completed markers and the trip-wire gh —
   // live under the WORK dir, which the escape sentinel deliberately skips.
   const harnessDir = join(workDir, ".probe-harness");
-  if (isShellForm || isFenceForm) {
+  if (isShellForm || isFenceForm || isShellArgvForm) {
     mkdirSync(join(harnessDir, "bin"), { recursive: true });
     if (fakeGhDir === null) {
       writeFileSync(
@@ -1316,7 +1442,8 @@ export function runProbeSpec({
 
   const caseResults = [];
   const escapes = [];
-  const shells = isShellForm || isFenceForm ? probeShells() : null;
+  const shells =
+    isShellForm || isFenceForm || isShellArgvForm ? probeShells() : null;
   try {
     for (const c of probeCases) {
       if (isFenceForm) {
@@ -1324,6 +1451,26 @@ export function runProbeSpec({
           block: fenceBlock,
           slot,
           docPath: resolved.entryPath,
+          fakeGhDir,
+          harnessDir,
+          shells,
+          sandboxRoot,
+          sandboxHome,
+          sandboxTmp,
+          workDir,
+          workDirName,
+          timeoutMs: perCaseTimeout,
+          caseResults,
+          escapes,
+        });
+        continue;
+      }
+      if (isShellArgvForm) {
+        runShellArgvCase(c, {
+          sink,
+          entryPath: resolved.entryPath,
+          template,
+          setupPath,
           fakeGhDir,
           harnessDir,
           shells,
@@ -1438,7 +1585,8 @@ export function runProbeSpec({
       });
     }
     ghTripped =
-      (isShellForm || isFenceForm) && existsSync(join(harnessDir, GH_TRIPPED));
+      (isShellForm || isFenceForm || isShellArgvForm) &&
+      existsSync(join(harnessDir, GH_TRIPPED));
   } finally {
     rmSync(sandboxRoot, { recursive: true, force: true });
   }
@@ -1533,6 +1681,7 @@ export function runProbeSpec({
     argv: template,
     args: base.args,
     slot: base.slot,
+    fixtureSetup: base.fixtureSetup,
   };
 }
 
@@ -2101,6 +2250,348 @@ function runCliCase(
   });
 }
 
+/**
+ * Write a case's `fixture.files` into its directory. Shared by the fence: and
+ * shell-argv: arms (task.181), so the two cannot drift on what a fixture file
+ * may name. THROWS on a path that leaves the directory; the caller turns that
+ * into an `errored` run.
+ */
+function writeFixtureFiles(caseDir, files) {
+  for (const [rel, content] of files) {
+    const target = resolve(caseDir, rel);
+    if (target === caseDir || !isWithin(caseDir, target)) {
+      throw new Error(
+        `\`fixture.files\` path "${rel}" leaves the case directory`,
+      );
+    }
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, content);
+  }
+}
+
+/**
+ * `caseEnv` with a case's `fixture.env` merged in. The case's env first, the
+ * sandbox's own keys last: fixtureProblem already refuses HOME/TMPDIR/LC_ALL,
+ * and the order holds even if it did not. Shared by the fence: and shell-argv:
+ * arms (task.181).
+ */
+function fixtureCaseEnv(fixture, { fixtureDir, sandboxHome, sandboxTmp }) {
+  const sandbox = caseEnv({ fixtureDir, sandboxHome, sandboxTmp });
+  return {
+    ...sandbox,
+    ...(fixture?.env ?? {}),
+    HOME: sandbox.HOME,
+    TMPDIR: sandbox.TMPDIR,
+    LC_ALL: sandbox.LC_ALL,
+  };
+}
+
+/**
+ * The env one per-case shell run gets: `fixtureCaseEnv`, then every PATH
+ * directory holding the host `gh` shadowed by a copy without it (fixture.env's
+ * PATH included), then the fake `gh` (armed) or the trip-wire first on PATH.
+ * ONE definition for the fence: and shell-argv: arms — the arms whose case
+ * fixture can run — so they cannot drift on it (TASK-181-001 was this
+ * isolation copied into one arm and not the other).
+ */
+function caseShellEnv(
+  fixture,
+  { caseDir, sandboxHome, sandboxTmp, harnessDir, fakeGhDir },
+) {
+  const env = fixtureCaseEnv(fixture, {
+    fixtureDir: caseDir,
+    sandboxHome,
+    sandboxTmp,
+  });
+  env.PATH = ghFreePath(env.PATH, join(harnessDir, "path"), caseDir);
+  if (fakeGhDir !== null) {
+    env.PATH = `${fakeGhDir}:${env.PATH}`;
+    env.FAKE_GH = "1";
+  } else {
+    env.PATH = `${join(harnessDir, "bin")}:${env.PATH}`;
+  }
+  return env;
+}
+
+/**
+ * `watchedSpawn` for a run whose cwd is a case directory inside the work dir,
+ * plus the work-dir snapshot that only such a run needs: the sandbox sentinel
+ * skips the work dir, so a write beside the case directory (`../pwned`, a
+ * sibling case, the harness dir) is an escape only this sees, as is a deletion
+ * or an empty directory there — a deleted trip-wire stub lets later cases reach
+ * the host's real `gh` (TASK-180-011, -013). The trip-wire's own marker is the
+ * harness's write, reported as a gh call, not here. ONE definition for the
+ * fence: and shell-argv: arms (TASK-181-003 was this snapshot missing from one).
+ */
+function caseWatchedSpawn(
+  command,
+  argv,
+  { cwd, env, timeoutMs },
+  {
+    sandboxRoot,
+    workDir,
+    workDirName,
+    harnessDir,
+    scriptDir,
+    escapes,
+    escapeId,
+    shell,
+  },
+) {
+  const caseName = basename(cwd);
+  const ownWrite = `${basename(harnessDir)}/${GH_TRIPPED}`;
+  const workBefore = workDirStamps(workDir, caseName);
+  const child = watchedSpawn(
+    command,
+    argv,
+    { cwd, env, timeoutMs },
+    { sandboxRoot, workDirName, scriptDir, escapes, escapeId, shell },
+  );
+  // Both ways: a path that appeared or changed, and a path that is gone.
+  const workAfter = workDirStamps(workDir, caseName);
+  const changed = [...workAfter]
+    .filter(
+      ([path, stamp]) => path !== ownWrite && workBefore.get(path) !== stamp,
+    )
+    .map(([path]) => path);
+  const gone = [...workBefore.keys()].filter((path) => !workAfter.has(path));
+  for (const path of [...changed, ...gone]) {
+    escapes.push({ id: escapeId, shell, path: `${workDirName}/${path}` });
+  }
+  return child;
+}
+
+/**
+ * Why a child produced no answer — `neverRan` says THAT it did not; this says
+ * which of three things happened, so "could not start" and "killed for another
+ * reason" never read as a timeout (task.181 QA cycle 2, CR-4).
+ */
+function neverRanDetail(child, timeoutMs) {
+  if (child.error?.code === "ETIMEDOUT")
+    return `timed out after ${timeoutMs}ms`;
+  if (child.signal) return `killed by ${child.signal}`;
+  return `never ran: ${child.error?.message ?? "no exit status"}`;
+}
+
+// ── The shell-argv entry form (task.181) ─────────────────────────────────────
+
+/**
+ * The argv one shell-argv: run spawns `shell` with: the shell is the CALLER,
+ * with its rc files off, of a fixed body that hands the script and its
+ * arguments to bash as "$@" — bash is always the interpreter. Exported so the
+ * rule is held on a host without zsh, where the zsh arm never runs.
+ */
+export function shellArgvSpawnArgs(shell, entryPath, args) {
+  return [...noRcFlags(shell), "-c", 'bash "$@"', shell, entryPath, ...args];
+}
+
+/**
+ * Run one case against a multi-argument shell script, once per shell.
+ *
+ * The cli: arm's contract on a bash script: the case's input is ONE element of
+ * the `--argv` template (`{fixture}` elements become the case directory), the
+ * exit status is the verdict (0 accepted, non-zero rejected), and a case's
+ * `expected`, when given, is compared as the shell arm compares it. Each shell
+ * from probeShells() is the CALLER and bash the INTERPRETER —
+ * `<shell> -c 'bash "$@"' <shell> <script> ...argv` — as for `shell:`: the
+ * script's shebang fixes its interpreter, and a bash script interpreted by zsh
+ * would fail on a bash construct and read as a refusal ("could not look" scored
+ * as "refused").
+ *
+ * Before each (case, shell) run: the case's own `fixture` (`files`, `env`) is
+ * written exactly as the fence: arm writes it, then the `--fixture-setup`
+ * script, when given, runs as `bash <setup> <case-dir>` under the same env and
+ * sentinels. A setup that exits non-zero, times out or never starts makes the
+ * run `errored` — the engine could not build what the script needs — never
+ * `rejected`.
+ */
+function runShellArgvCase(
+  c,
+  {
+    sink,
+    entryPath,
+    template,
+    setupPath = null,
+    fakeGhDir = null,
+    harnessDir,
+    shells,
+    sandboxRoot,
+    sandboxHome,
+    sandboxTmp,
+    workDir,
+    workDirName,
+    timeoutMs,
+    caseResults,
+    escapes,
+  },
+) {
+  const sinkFixture = MATERIALISED_SINKS[c.sink ?? sink] ?? null;
+  const errored = (shell, detail) =>
+    caseResults.push({
+      id: c.id,
+      shell,
+      direction: c.direction,
+      outcome: "errored",
+      detail,
+    });
+  const decline = (detail) => {
+    for (const shell of shells) errored(shell, detail);
+  };
+  if (typeof c.input !== "string") {
+    decline(
+      `case input is ${describeType(c.input)}, not a string — an argv element is a string`,
+    );
+    return;
+  }
+  const hasExpected = c.expected !== undefined;
+  if (hasExpected) {
+    // Declined, never scored — the BUG-8 / BUG-11 rule the shell arm applies.
+    const problem = expectedProblem(c.expected);
+    if (problem !== null) {
+      decline(`case's ${problem}`);
+      return;
+    }
+  }
+  const problem = fixtureProblem(c.fixture);
+  if (problem !== null) {
+    decline(`case's ${problem}`);
+    return;
+  }
+  const files = Object.entries(c.fixture?.files ?? {});
+  // An `expected.absent` name the run's own fixture creates mismatches on every
+  // run — declined, as every other arm declines it (task.128 BUG-13).
+  const firstSegment = (rel) => normalize(rel).split(sep)[0].toLowerCase();
+  const collides = (c.expected?.absent ?? []).find(
+    (p) =>
+      (sinkFixture !== null &&
+        (sinkFixture.controls.includes(p) || p === c.input)) ||
+      files.some(([rel]) => firstSegment(rel) === p.toLowerCase()),
+  );
+  if (collides !== undefined) {
+    decline(
+      `case's \`expected.absent\` names "${collides}", which the fixture itself creates`,
+    );
+    return;
+  }
+
+  for (const shell of shells) {
+    // One directory per (case, shell): a side effect from the bash run must not
+    // be read as one from the zsh run, and the setup builds each afresh.
+    let fixtureDir;
+    try {
+      fixtureDir = materialiseFixture(
+        workDir,
+        sinkFixture?.controls ?? [],
+        c.input,
+        { writeInput: sinkFixture !== null },
+      );
+      writeFixtureFiles(fixtureDir, files);
+    } catch (e) {
+      errored(shell, `fixture: ${e.message}`);
+      continue;
+    }
+    // The same isolation as fence: — one definition (caseShellEnv).
+    const env = caseShellEnv(c.fixture, {
+      caseDir: fixtureDir,
+      sandboxHome,
+      sandboxTmp,
+      harnessDir,
+      fakeGhDir,
+    });
+    const watch = {
+      sandboxRoot,
+      workDir,
+      workDirName,
+      harnessDir,
+      escapeId: `${c.id}@${shell}`,
+      shell,
+    };
+
+    if (setupPath !== null) {
+      // The setup builds its case directory and nothing else. Its writes are
+      // watched into their OWN list, never the entry's: a setup write charged
+      // to the entry read as the entry escaping (TASK-181-002). A write
+      // anywhere but the case directory — the sandbox HOME or TMPDIR, a
+      // sibling case, the harness — errors this run, named: it leaves the
+      // entry's escape baseline unknown. A setup that needs scratch space
+      // makes it inside "$1".
+      const setupWrites = [];
+      const setup = caseWatchedSpawn(
+        "bash",
+        [setupPath, fixtureDir],
+        { cwd: fixtureDir, env, timeoutMs },
+        { ...watch, scriptDir: dirname(setupPath), escapes: setupWrites },
+      );
+      if (neverRan(setup)) {
+        errored(shell, `fixture setup ${neverRanDetail(setup, timeoutMs)}`);
+        continue;
+      }
+      if (setupWrites.length > 0) {
+        const paths = [...new Set(setupWrites.map((e) => e.path))];
+        errored(
+          shell,
+          `fixture setup wrote outside the case directory: ${paths.slice(0, 5).join(", ")}${paths.length > 5 ? ` (+${paths.length - 5} more)` : ""} — a setup builds "$1" and nothing else`,
+        );
+        continue;
+      }
+      if (setup.status !== 0) {
+        errored(
+          shell,
+          `fixture setup exited ${setup.status}: ${(setup.stderr ?? "").trim().split("\n")[0].slice(0, 160)}`,
+        );
+        continue;
+      }
+    }
+
+    // Whole-element substitution only — parseArgvTemplate refused any element
+    // that merely CONTAINS a slot, so nothing here builds a string from input.
+    // ARGV, never a string: the shell's body is fixed and the script and its
+    // arguments arrive as "$@".
+    const args = template.map((a) =>
+      a === "{input}" ? c.input : a === "{fixture}" ? fixtureDir : a,
+    );
+    const child = caseWatchedSpawn(
+      shell,
+      shellArgvSpawnArgs(shell, entryPath, args),
+      { cwd: fixtureDir, env, timeoutMs },
+      { ...watch, scriptDir: dirname(entryPath), escapes },
+    );
+
+    let outcome;
+    let detail = null;
+    if (neverRan(child)) {
+      outcome = "errored";
+      detail = neverRanDetail(child, timeoutMs);
+    } else if (hasExpected) {
+      const mismatches = compareExpected(c.expected, child, fixtureDir);
+      const matched = mismatches.length === 0;
+      outcome =
+        c.direction === "hostile"
+          ? matched
+            ? "rejected"
+            : "accepted"
+          : matched
+            ? "accepted"
+            : "rejected";
+      detail = matched ? null : mismatches.join("; ");
+    } else {
+      outcome = child.status === 0 ? "accepted" : "rejected";
+      detail =
+        child.status === 0
+          ? null
+          : `exit ${child.status}: ${(child.stderr ?? "").trim().split("\n")[0].slice(0, 160)}`;
+    }
+    caseResults.push({
+      id: c.id,
+      shell,
+      direction: c.direction,
+      outcome,
+      detail,
+      exit: child.status,
+    });
+  }
+}
+
 // ── The fence entry form (task.180) ──────────────────────────────────────────
 
 /** An opening or closing fence — `extractBlocks`' own pattern, so the two agree. */
@@ -2512,16 +3003,7 @@ function runFenceCase(
   for (const shell of shells) {
     const caseDir = mkdtempSync(join(workDir, "fixture-"));
     try {
-      for (const [rel, content] of files) {
-        const target = resolve(caseDir, rel);
-        if (target === caseDir || !isWithin(caseDir, target)) {
-          throw new Error(
-            `\`fixture.files\` path "${rel}" leaves the case directory`,
-          );
-        }
-        mkdirSync(dirname(target), { recursive: true });
-        writeFileSync(target, content);
-      }
+      writeFixtureFiles(caseDir, files);
     } catch (e) {
       caseResults.push({
         id: c.id,
@@ -2535,69 +3017,36 @@ function runFenceCase(
     const scriptPath = join(harnessDir, `fence-${++harnessSeq}.sh`);
     writeFileSync(scriptPath, script);
 
-    // The case's env first, the sandbox's own keys last: fixtureProblem already
-    // refuses HOME/TMPDIR/LC_ALL, and the order holds even if it did not.
-    const sandbox = caseEnv({ fixtureDir: caseDir, sandboxHome, sandboxTmp });
-    const env = {
-      ...sandbox,
-      ...(c.fixture?.env ?? {}),
-      HOME: sandbox.HOME,
-      TMPDIR: sandbox.TMPDIR,
-      LC_ALL: sandbox.LC_ALL,
-    };
-    // Every PATH directory holding the host `gh` is shadowed by one without it,
-    // fixture.env's PATH included, before the trip-wire or fixture goes first.
-    env.PATH = ghFreePath(env.PATH, join(harnessDir, "path"), caseDir);
-    if (fakeGhDir !== null) {
-      env.PATH = `${fakeGhDir}:${env.PATH}`;
-      env.FAKE_GH = "1";
-    } else {
-      env.PATH = `${join(harnessDir, "bin")}:${env.PATH}`;
-    }
+    // The per-case isolation shared with shell-argv: (caseShellEnv).
+    const env = caseShellEnv(c.fixture, {
+      caseDir,
+      sandboxHome,
+      sandboxTmp,
+      harnessDir,
+      fakeGhDir,
+    });
     const parseError = parseCheck(shell, scriptPath, {
       cwd: caseDir,
       env,
       timeoutMs,
     });
-    // The sentinel skips the work dir, and the case directory sits inside it:
-    // a write beside the case directory (`../pwned`, the harness dir) is an
-    // escape only this snapshot sees (TASK-180-011), as is a deletion or an
-    // empty directory there (TASK-180-013). The trip-wire's own marker is the
-    // harness's write, reported as a gh call, not here.
-    const caseName = basename(caseDir);
-    const ownWrite = `${basename(harnessDir)}/${GH_TRIPPED}`;
-    const workBefore = workDirStamps(workDir, caseName);
-    const child = watchedSpawn(
+    // Watched beside the case directory too (TASK-180-011, -013) — the
+    // snapshot is caseWatchedSpawn's, shared with shell-argv:.
+    const child = caseWatchedSpawn(
       shell,
       [...noRcFlags(shell), scriptPath],
       { cwd: caseDir, env, timeoutMs },
       {
         sandboxRoot,
+        workDir,
         workDirName,
+        harnessDir,
         scriptDir: dirname(docPath),
         escapes,
         escapeId: `${c.id}@${shell}`,
         shell,
       },
     );
-
-    // Both ways: a path that appeared or changed, and a path that is gone — a
-    // deleted trip-wire stub lets later cases reach the host's real `gh`
-    // (TASK-180-013).
-    const workAfter = workDirStamps(workDir, caseName);
-    const changed = [...workAfter]
-      .filter(
-        ([path, stamp]) => path !== ownWrite && workBefore.get(path) !== stamp,
-      )
-      .map(([path]) => path);
-    const gone = [...workBefore.keys()].filter((path) => !workAfter.has(path));
-    for (const path of [...changed, ...gone]) {
-      escapes.push({
-        id: `${c.id}@${shell}`,
-        shell,
-        path: `${workDirName}/${path}`,
-      });
-    }
 
     const { outcome, detail } = scoreFenceRun(child, {
       c,
@@ -2726,7 +3175,9 @@ const controlKey = (c) => {
   }
   const isCli =
     Array.isArray(c.argv) ||
-    (typeof c.entry === "string" && c.entry.startsWith(CLI_PREFIX));
+    (typeof c.entry === "string" &&
+      (c.entry.startsWith(CLI_PREFIX) ||
+        c.entry.startsWith(SHELL_ARGV_PREFIX)));
   if (!isCli) return base;
   const name = cliControlName(c);
   if (name !== null) return `${base}\u0000name:${name}`;
@@ -2779,6 +3230,10 @@ export function toRecordEntry(result, { name, callSite } = {}) {
     // The fence: form's placeholder token (task.180), or null for every other
     // form. Part of an unnamed fence: control's key — see controlKey.
     slot: typeof result.slot === "string" ? result.slot : null,
+    // The shell-argv: form's setup script (task.181), or null for every other
+    // form — the record says what built each case directory.
+    fixture_setup:
+      typeof result.fixtureSetup === "string" ? result.fixtureSetup : null,
     ran_at: new Date().toISOString(),
   };
 }
@@ -3126,6 +3581,7 @@ const OPERAND_FLAGS = Object.freeze({
   "--argv": "argv",
   "--args-json": "argsJson",
   "--slot": "slot",
+  "--fixture-setup": "fixtureSetup",
   "--repo-root": "repoRoot",
   "--record": "record",
   "--name": "name",
@@ -3206,7 +3662,7 @@ export function main(argv = process.argv.slice(2)) {
   }
   if (!opts.entry) {
     process.stderr.write(
-      "--entry <path#exportName | shell:path | shell-fn:path#function | cli:path | fence:doc.md#heading> is required\n",
+      "--entry <path#exportName | shell:path | shell-fn:path#function | cli:path | shell-argv:path | fence:doc.md#heading> is required\n",
     );
     return 2;
   }
@@ -3220,19 +3676,29 @@ export function main(argv = process.argv.slice(2)) {
   // validator and declines `bad-argv` for a library caller; here the flag is
   // wrong, not the probe, and a wrong flag must not write a record entry.
   const isCliEntry = opts.entry.startsWith(CLI_PREFIX);
-  if (isCliEntry && opts.argv === undefined) {
+  const isShellArgvEntry = opts.entry.startsWith(SHELL_ARGV_PREFIX);
+  const takesArgv = isCliEntry || isShellArgvEntry;
+  if (takesArgv && opts.argv === undefined) {
     process.stderr.write(
-      'bad-argv: the cli: entry form needs --argv — a JSON array with one "{input}" element\n',
+      `bad-argv: the ${isCliEntry ? "cli:" : "shell-argv:"} entry form needs --argv — a JSON array with one "{input}" element\n`,
     );
     return 2;
   }
-  if (!isCliEntry && opts.argv !== undefined) {
+  if (!takesArgv && opts.argv !== undefined) {
     process.stderr.write(
-      "bad-argv: --argv applies to the cli: entry form only\n",
+      "bad-argv: --argv applies to the cli: and shell-argv: entry forms only\n",
     );
     return 2;
   }
-  if (isCliEntry) {
+  // `--fixture-setup` is the shell-argv: form's (task.181), as `--slot` is the
+  // fence: form's: given with any other form it is an argument error.
+  if (!isShellArgvEntry && opts.fixtureSetup !== undefined) {
+    process.stderr.write(
+      "bad-fixture-setup: --fixture-setup applies to the shell-argv: entry form only\n",
+    );
+    return 2;
+  }
+  if (takesArgv) {
     const parsed = parseArgvTemplate(opts.argv);
     if (!parsed.ok) {
       process.stderr.write(`bad-argv: ${parsed.detail}\n`);
@@ -3263,6 +3729,7 @@ export function main(argv = process.argv.slice(2)) {
     if (
       isCliEntry ||
       isFenceEntry ||
+      isShellArgvEntry ||
       opts.entry.startsWith(SHELL_PREFIX) ||
       opts.entry.startsWith(SHELL_FN_PREFIX)
     ) {
@@ -3310,6 +3777,7 @@ export function main(argv = process.argv.slice(2)) {
     argv: opts.argv,
     args: extraArgs,
     slot: opts.slot,
+    fixtureSetup: opts.fixtureSetup,
     timeoutMs: opts.timeoutMs,
     ...(opts.repoRoot ? { repoRoot: resolve(opts.repoRoot) } : {}),
   });

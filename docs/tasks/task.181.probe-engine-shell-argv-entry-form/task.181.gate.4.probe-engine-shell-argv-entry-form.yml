@@ -1,0 +1,52 @@
+schema: 2
+task: 'task.181.probe-engine-shell-argv-entry-form'
+task_title: 'security-probe: a shell-argv: entry form for a shell script that takes several arguments'
+gate: PASS
+status_reason: 'QA re-entered after the finalise DoD gaps (dod.1). The three tests that close AC2 and AC6 hold their members and are mutation-proven; ci:fast green. One LOW advisory finding on the AC2 test routed to recommendations.future.'
+reviewer: 'QA Engineer'
+head: '918a52afb43599275a8639d46efeb5f942983685'
+updated: '2026-10-13T05:16:59Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 3
+  phases_verified: 3/3
+  ci: 'not read this cycle (gated at /finalise)'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 19
+    notes: 'task.181.qa.4.security.run.json: both controls engage, 0 reproduced, 0 escapes.'
+  performance:
+    status: PASS
+    notes: 'ci:fast 5423 pass, 0 fail at 918a52af.'
+  reliability:
+    status: PASS
+    notes: 'Unchanged engine; three coverage tests added.'
+  maintainability:
+    status: PASS
+    notes: 'The DoD-gap tests sit in one labelled block beside the shell-argv: tests.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Cycle-4 CR-1 (LOW): the AC2 CLI test asserts the record snapshot is absent but not recordEntriesDir(record) — add that assertion, or fold the shell-fn: combination into the malformed-argv combos table'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+    - action: 'Carried from gate 3: setup gh call attributed to the entry in the run-level decline; all-setup-failed reads entry-not-probeable; fixture-string gh check written twice; timed-out child process tree; runCliCase work-dir snapshot (pre-existing); setup-keyed shell-argv: controls'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

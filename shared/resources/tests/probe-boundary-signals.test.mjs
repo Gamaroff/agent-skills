@@ -323,6 +323,17 @@ test("every site that routes a non-JS entry names the fence: form too (task.180)
   );
 });
 
+test("every site that routes a non-JS entry names the shell-argv: form too (task.181)", () => {
+  // Same population as the cli: and fence: tests: a site that routes a non-JS
+  // entry and omits shell-argv: leaves a bash script taking several arguments
+  // or flags with no engine route — the task.147 / task.170 by-hand probe.
+  assert.deepEqual(
+    blocksMissing("shell-argv:"),
+    [],
+    "these sites route a non-JS entry but never name shell-argv: — a multi-argument shell script has no route from them",
+  );
+});
+
 test("every block that states a cli: control's record identity names --name (task.144 QA cycle 4, CR-3)", () => {
   // The cli: record key changed three times in QA — whole template, guarded
   // flag, skeleton — and each time a site that described it was left stating

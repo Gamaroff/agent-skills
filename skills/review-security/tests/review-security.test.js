@@ -420,11 +420,11 @@ test("the skill states its own limits", () => {
   // script with more than one positional, the network — never "non-JS". With
   // task.144 a multi-flag Node CLI is reachable too (`cli:`), so it must not be
   // listed as declined, and the limit names every form a reader can route to.
-  assert.match(
-    SKILL,
-    /target no form reaches \(stdin, a shell script with more than one positional, network\)/,
-  );
-  for (const form of ["shell:", "shell-fn:", "cli:"]) {
+  // With task.181 a multi-argument shell script is reachable too
+  // (`shell-argv:`), so it leaves the declined list the same way.
+  assert.match(SKILL, /target no form reaches \(stdin,\s+network\)/);
+  assert.doesNotMatch(SKILL, /more than one positional/);
+  for (const form of ["shell:", "shell-fn:", "cli:", "shell-argv:"]) {
     assert.ok(
       SKILL.includes(`\`${form}\``),
       `the limits must name the ${form} form`,

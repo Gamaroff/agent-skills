@@ -1,0 +1,77 @@
+schema: 2
+task: 'task.181.probe-engine-shell-argv-entry-form'
+task_title: 'security-probe: a shell-argv: entry form for a shell script that takes several arguments'
+gate: CONCERNS
+status_reason: 'TASK-181-001 fixed and verified. The cycle-2 refute pass found two reproduced MEDIUM escape-accounting defects in the shell-argv: arm: setup writes are charged to the entry (TASK-181-002), and writes beside the case directory are unseen (TASK-181-003).'
+reviewer: 'QA Engineer'
+head: '86667d713216b28b676388a1dc22055dd4b77a6c'
+updated: '2026-10-13T04:24:39Z'
+
+top_issues:
+  - id: 'TASK-181-002'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'The --fixture-setup spawn shares the entry escapes array and escapeId, so a setup mktemp or home write is recorded as the entry escaping (reproduced: 2 escapes on a clean entry; main exits 1). Code review CR-1 (bug, high confidence).'
+    suggested_action: 'Track setup writes separately; a setup write outside the case directory makes that run errored, named, never an entry escape (bug report task.181.bug.2).'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-181-003'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'runShellArgvCase takes no workDirStamps snapshot, so a script writing "../pwned" from its case directory writes into the work dir unrecorded (reproduced: escapes []). Code review CR-2.'
+    suggested_action: 'Wrap the setup and script spawns in runFenceCase workDirStamps diff (bug report task.181.bug.3).'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 17
+  phases_verified: 3/3
+  ci: 'not read this cycle (gated at /finalise)'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 2
+  fix_date: '2026-10-12'
+  verified:
+    - 'task.181.bug.1 (TASK-181-001) closed — tests "a case fixture that names gh is declined" and "a fixture that spells gh without naming it" green; both mutation-proven in 86667d71'
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 19
+    notes: 'task.181.qa.2.security.run.json: both controls engage, 0 reproduced, 0 escapes. TASK-181-002 and -003 are escape-accounting defects in the harness arm itself (false escape; missed escape), open.'
+  performance:
+    status: PASS
+    notes: 'ci:fast 5417 pass, 0 fail at 86667d71 (qa-fix cycle 1).'
+  reliability:
+    status: PASS
+    notes: 'CR-3 (a timed-out setup leaves its process tree running) is LOW and shared by every arm through watchedSpawn — recommendations.future.'
+  maintainability:
+    status: PASS
+    notes: 'CR-4 (setup never-ran detail misreports) fixed with the cycle-2 fixes.'
+
+recommendations:
+  immediate:
+    - action: 'Close TASK-181-002 and TASK-181-003'
+      refs: ['shared/resources/security-probe.mjs']
+  future:
+    - action: 'CR-3: kill a timed-out child process tree (process group) for every arm that spawns through watchedSpawn'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'runCliCase has the same missing workDirStamps snapshot on develop (pre-existing) — a cli: write beside the case directory is unseen'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'Two unnamed shell-argv: controls with the same argv and different --fixture-setup share a controlKey; emitBlock does not print fixture_setup (carried from gate 1)'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-181-002 and TASK-181-003 closed']

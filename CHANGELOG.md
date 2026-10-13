@@ -24,6 +24,17 @@ All notable changes to this project will be documented in this file. Format foll
 - **Per-step timestamps.** Implementation reports gain a `Completed (UTC)` column in Pipeline Progress,
   stamped once by the Step Transition Protocol, so step timing can be measured instead of reconstructed
   from commits.
+- **security-probe reaches a shell script that takes several arguments or flags (task 181, obs
+  #189).** A sixth entry form, `--entry 'shell-argv:<path>' --argv '<JSON array>'`, runs a bash
+  script with `cli:`'s template, verdict and record key — the case's input crosses as one argv
+  element, exit status is the verdict — with every caller shell running the script under bash. An
+  optional `--fixture-setup <path>` names a committed script that builds each (case, shell)
+  directory first (the scratch git repository these scripts read); a setup that fails, or writes
+  anywhere but its case directory, is `errored`, never a refusal, and never charged to the entry. A case's `fixture` is honoured as for `fence:`, with `fence:`'s `gh` checks over it
+  (fixture text, `ghFreePath`), and the form takes the shell forms' `gh` handling. `--argv`'s refusal now names both forms that take it; `--fixture-setup` with any
+  other form is exit 2, `bad-fixture-setup`. Proved against `reenter-qa-after-finalise.sh`
+  (`shared/resources/tests/fixtures/shell-argv/`): `engages`, every case past its usage line. A
+  multi-positional shell script leaves §5.1's by-hand list.
 - **security-probe reaches a fenced bash block in a step doc (task 180, obs #261).** A fifth entry
   form, `--entry 'fence:<doc.md>#<heading>' --slot '<placeholder>'`, reads the doc on every run, takes
   the first ```` ```bash ```` block under the heading (headings are read outside fences), substitutes
