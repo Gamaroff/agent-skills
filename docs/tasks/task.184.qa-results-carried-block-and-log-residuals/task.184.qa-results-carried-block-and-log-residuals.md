@@ -418,8 +418,14 @@ in `shared/resources/qa-results.js` and adds one test, and no rule exempts a lin
   its `tail`. `upsertQaResults` refuses with `carried-tail:<line>`, reading `tail` from every
   collected block, not only the ones `carriedBlocks` keeps (review O2). A stopping label that opens a
   carried block of its own (`**Bug Reports**`, `**Deferred Work**`) records no tail: that block already
-  collects the list, and the engine writes two carried blocks side by side (QA cycle 1, CR-1; R7, R8). The detail is in the vocabulary
+  collects the list, and the engine writes two carried blocks side by side (QA cycle 1, CR-1; R7, R8).
+  More generally a tail inside a span a kept block carries is not a cut (the nested-block union, QA
+  cycle 2 CR-1), and the scan ends at the next carried label so it stays bounded (CR-3, R10). The detail is in the vocabulary
   comment and in both QA skills' Step 12 hint string and `unbounded` paragraph.
+- **QA cycles 1–2 (consolidation).** `sectionGuard()` is the one definition of "a section this engine
+  refuses to rewrite" (unclosed fence, structural line, uncarried tail). It runs on the section a write
+  replaces (`unbounded`) and on the section it writes (`unplaceable`), so the engine never writes a
+  document its next write refuses (QA cycle 2 CR-1, CR-2; R8 property over 343 shapes, R9).
 - **Phase 4.** R2's duplicate `assertCr51Refused()` dropped; R4 renamed; CHANGELOG task 183 entry
   narrowed and a `(task 184)` entry added; seven task.183 passages amended, with one Change Log note row.
 
@@ -438,21 +444,21 @@ M3 (R7) red. `bundle:check` 0 problems; `validate` qa-task, qa-story clean.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-13
-**Quality Score**: 80/100
+**Quality Score**: 70/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.184.qa.1.qa-results-carried-block-and-log-residuals.md](./task.184.qa.1.qa-results-carried-block-and-log-residuals.md)
-- **Gate File**: [task.184.gate.1.qa-results-carried-block-and-log-residuals.yml](./task.184.gate.1.qa-results-carried-block-and-log-residuals.yml)
+- **Full Report**: [task.184.qa.2.qa-results-carried-block-and-log-residuals.md](./task.184.qa.2.qa-results-carried-block-and-log-residuals.md)
+- **Gate File**: [task.184.gate.2.qa-results-carried-block-and-log-residuals.yml](./task.184.gate.2.qa-results-carried-block-and-log-residuals.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 101 (engine, corpus, wiring); 5441 in `ci:fast`
+- **Tests Executed**: 102 (engine, corpus, wiring)
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 (1 medium)
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 0 (2 medium, 1 low)
+- **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-CR-1 (medium): the `carried-tail:` rule refuses a document the engine itself writes — a bold Bug Reports block next to a bold Deferred Work block with a lead paragraph — so a later QA cycle halts on its own output. Bug: [task.184.bug.1.carried-tail-refuses-engines-own-write.md](./task.184.bug.1.carried-tail-refuses-engines-own-write.md). Two low cleanups (CR-2, CR-3) advisory.
+Cycle 2 refute pass: the engine can still write a document its next write refuses — via the Phase 1 union with the tail rule (CR-1, [bug 1](./task.184.bug.1.carried-tail-refuses-engines-own-write.md) reopened) and via `ambiguousAbove` with the render's own dated rows (CR-2, [bug 2](./task.184.bug.2.ambiguous-log-section-refuses-its-own-render.md)). The tail scan is cubic on a repeated label (CR-3, low).
 <!-- change-log-start -->
 ## Change Log
 
@@ -464,6 +470,8 @@ CR-1 (medium): the `carried-tail:` rule refuses a document the engine itself wri
 | 2026-10-13 |  | Implemented — 7 source files (+2 bundled copies), 3 new tests, 3 updated; 4 mutation proofs | develop |
 | 2026-10-13 |  | QA gate CONCERNS (80/100) — 1 finding (medium), 2 advisory cleanups | qa-task |
 | 2026-10-13 |  | QA findings fixed — cycle 1, 2 findings (CR-1 medium, CR-2 cleanup); R7 case + R8 property test | qa-fix |
+| 2026-10-13 |  | QA gate CONCERNS (70/100) — 3 findings (2 medium, 1 low) | qa-task |
+| 2026-10-13 |  | QA findings fixed — cycle 2, 3 findings (CR-1, CR-2 medium; CR-3 low): one section guard for input and written section; R8 widened, R9, R10 | qa-fix |
 <!-- change-log-end -->
 
 ---

@@ -109,9 +109,27 @@ block — a shape the engine itself produces — was read as a cut list.
 **Verification Steps for QA**: run `command node --test shared/resources/tests/qa-results.test.mjs`;
 re-run the reproduction above.
 
+### Iteration 2
+
+#### Re-Investigation (Reopened → In Progress)
+
+**Date**: 2026-10-13
+
+**QA Reopening Reason**: gate 2 CR-1 — the Phase 1 union carries a nested `#### Deferred Work` block whose list follows a bold label and a paragraph; the tail rule read that line as cut although the union carries it, so the engine still wrote a document its next write refused. Iteration 1 fixed the shape it was shown, not the class.
+
+**Revised Approach** (qa-fix Step 2.6 — consolidate): one `sectionGuard()` defines "a section this engine refuses to rewrite" and runs on the section a write replaces and on the section it writes (`checked()`), so a write the next write would refuse is refused up front as `unplaceable`. A tail inside a span a kept block carries is not a cut. The tail scan ends at the next carried label (gate 2 CR-3).
+
+#### Fix Implementation (In Progress → Ready for QA)
+
+**Files Modified**: `shared/resources/qa-results.js` (+ bundled copies); `shared/resources/tests/qa-results.test.mjs` (R8 family 216 → 343 shapes with the nested piece; R9; R10); `skills/qa-task/SKILL.md`, `skills/qa-story/SKILL.md` (`unplaceable` hint and paragraph).
+
+**Testing**: the gate 2 reproduction writes `replaced` ×3. Mutations: drop the coverage check → R8 red; drop the written-section guard → R9 red; drop the scan terminator → R10 red (26 s).
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
 | ---- | ------ | ---------- | ----- |
 | 2026-10-13 | Open | qa-task | Found in task.184.qa.1.qa-results-carried-block-and-log-residuals.md |
 | 2026-10-13 | Ready for QA | qa-fix | Fix implemented — QA cycle 1 fix (R7, R8) |
+| 2026-10-13 | Reopened | qa-task | Not fixed by task.184.qa.2.qa-results-carried-block-and-log-residuals.md — reproduction passes, class remains (gate 2 CR-1) |
+| 2026-10-13 | Ready for QA | qa-fix | Iteration 2 — sectionGuard on input and written section (QA cycle 2 fix) |

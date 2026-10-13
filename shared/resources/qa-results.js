@@ -39,6 +39,8 @@
 //   trailing-comment         the render ends in an HTML comment, which a read peels as a separator
 //   multiple:<n>             n sections found
 //   read-back:<n>            the write would read back as n sections, or an unbounded one
+//   (unplaceable also carries unclosed-fence / structural-line: / carried-tail: when the written
+//    section fails the guard the next write would apply — task.184 QA cycle 2)
 //
 // The last two reasons exist because an unclosed fence protects everything after it: every
 // later heading and marker becomes "example text", the span runs to EOF, and a
@@ -211,6 +213,7 @@ function collectBlocks(text, name) {
     let end = text.length;
     let offset = bodyAt;
     let tail = null;
+    let tailAt = -1;
     for (let i = 0; i < lines.length; i++) {
       if (!insideProtected(ranges, offset) && stops(i)) {
         end = offset;
@@ -223,7 +226,10 @@ function collectBlocks(text, name) {
         // a carried block of its own: that block collects the list after its lead
         // paragraph, so nothing is cut, and the engine's own write puts two carried blocks
         // side by side — refusing that shape refused the engine's previous write (task.184
-        // QA cycle 1, CR-1). The other block's own stop is checked when it is collected.
+        // QA cycle 1, CR-1). The other block's own stop is checked when it is collected, so
+        // the scan also ends at the next carried label: one scan per block ran to the end of
+        // the section and made a repeated label cubic (QA cycle 2, CR-3). The tail's offset
+        // is kept so the write can tell a cut line from one another block carries.
         const l = bare(i);
         if (
           !level &&
@@ -235,9 +241,15 @@ function collectBlocks(text, name) {
           for (let j = i + 1; j < lines.length; j++) {
             const t = bare(j);
             if (!insideProtected(ranges, at)) {
-              if (/^#{1,3}[ \t]/.test(t) || RE_QA_FIELD.test(t)) break;
+              if (
+                /^#{1,3}[ \t]/.test(t) ||
+                RE_QA_FIELD.test(t) ||
+                RE_CARRIED_LABEL.test(t)
+              )
+                break;
               if (RE_LIST_OR_ROW.test(t)) {
                 tail = t.trim().slice(0, 60);
+                tailAt = at;
                 break;
               }
             }
@@ -254,6 +266,7 @@ function collectBlocks(text, name) {
       start: m.index,
       labelLen: m[0].length,
       tail,
+      tailAt,
       whole,
       // A folded block keeps its heading's text as a bold line (CR-4); a bold-label
       // block's first line already is one.
@@ -770,6 +783,27 @@ function normaliseSection(section) {
   return { body };
 }
 
+// Why this engine would refuse to rewrite section `s` of `content` — a refusal detail — or
+// null. The one definition, applied to the section a write replaces and to the section it
+// writes (task.184 QA cycle 2: two definitions let the engine write what it then refused).
+function sectionGuard(content, s) {
+  if (s.unbounded) return "unclosed-fence";
+  const span = content.slice(s.start, s.end);
+  const line = removesStructure(span, { underLog: s.underLog });
+  if (line !== null) return `structural-line:${line}`;
+  // Every collected block, not only carriedBlocks' kept ones: a nested block is dropped there,
+  // so its tail would never be seen (task.184 review 1, O2). A tail inside a span a kept block
+  // carries is not cut — the nested-block union carries it whole (QA cycle 2, CR-1); a tail no
+  // kept block reaches is (gate 6 CR6-1). Span arithmetic over blocks already found.
+  const kept = carriedBlocks(span);
+  const carried = (at) =>
+    kept.some((k) => at >= k.start && at < k.start + k.whole.length);
+  const cut = CARRIED_SUBSECTIONS.flatMap((n) => collectBlocks(span, n)).find(
+    (b) => b.tail !== null && !carried(b.tailAt),
+  );
+  return cut ? `carried-tail:${cut.tail}` : null;
+}
+
 /**
  * Write the `## QA Testing Results` section: replace, relocate or create it.
  *
@@ -803,43 +837,26 @@ function upsertQaResults(content, section, { docType = "" } = {}) {
     };
   }
   for (const s of sections) {
-    if (s.unbounded) {
-      return { content, reason: "unbounded", detail: "unclosed-fence" };
-    }
-    const line = removesStructure(content.slice(s.start, s.end), {
-      underLog: s.underLog,
-    });
-    if (line !== null) {
-      return {
-        content,
-        reason: "unbounded",
-        detail: `structural-line:${line}`,
-      };
-    }
-    // Every collected block, not only carriedBlocks' kept ones: a nested block is dropped
-    // there (and Phase 1 of task 184 merges its span), so its tail would never be seen.
-    // Refusal only, so the wider read is the safe direction (task.184 review 1, O2).
-    const span = content.slice(s.start, s.end);
-    const cut = CARRIED_SUBSECTIONS.flatMap((n) => collectBlocks(span, n)).find(
-      (b) => b.tail !== null,
-    );
-    if (cut) {
-      return {
-        content,
-        reason: "unbounded",
-        detail: `carried-tail:${cut.tail}`,
-      };
-    }
+    const refusal = sectionGuard(content, s);
+    if (refusal) return { content, reason: "unbounded", detail: refusal };
   }
+  // The write is held to the same guard as the section it replaces: a document this engine
+  // writes is one its next write accepts. Two rules each correct alone — the nested-block union
+  // with the tail rule, and `ambiguousAbove` with a render's own dated rows — wrote a section the
+  // following write refused (task.184 QA cycles 1–2, CR-1, CR-2). Refused here, up front.
   const checked = (out, reason) => {
     const post = findQaResults(out).sections;
-    return post.length === 1 && !post[0].unbounded
-      ? { content: out, reason }
-      : {
-          content,
-          reason: "unplaceable",
-          detail: `read-back:${post.length}${post.some((p) => p.unbounded) ? " unbounded" : ""}`,
-        };
+    if (post.length !== 1 || post[0].unbounded) {
+      return {
+        content,
+        reason: "unplaceable",
+        detail: `read-back:${post.length}${post.some((p) => p.unbounded) ? " unbounded" : ""}`,
+      };
+    }
+    const refusal = sectionGuard(out, post[0]);
+    return refusal
+      ? { content, reason: "unplaceable", detail: refusal }
+      : { content: out, reason };
   };
 
   if (sections.length === 1 && !sections[0].insideChangeLog) {

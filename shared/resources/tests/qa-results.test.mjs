@@ -1341,10 +1341,12 @@ test("R7 gate 6 CR6-1: a carried list behind a label and a paragraph is refused"
   assert.equal(count(doc2, "Carried from cycle 3:"), 1);
 });
 
-test("R8 QA cycle 1 CR-1: a write the engine makes is never refused by its next write", () => {
+test("R8 QA cycles 1–2 CR-1: a write the engine makes is never refused by its next write", () => {
   // The property, not the repro (qa-fix Step 3.5): across a family of carried-block
   // shapes, a first write that succeeds is followed by writes that succeed, nothing a
-  // carried block held is lost, and a repeated write is byte-identical.
+  // carried block held is lost, and a repeated write is byte-identical. The last piece is
+  // QA cycle 2's counterexample: a `####` block nested under a bold block (the union)
+  // whose own list follows a bold label and a paragraph.
   const pieces = (i) => [
     `**Bug Reports**\n\n- [b${i}](./b${i}.md)`,
     `**Bug Reports**\n\nFound in cycle ${i}:\n\n- [p${i}](./p${i}.md)`,
@@ -1352,12 +1354,13 @@ test("R8 QA cycle 1 CR-1: a write the engine makes is never refused by its next 
     `**Deferred Work**\n\n- E${i} item`,
     `#### Bug Reports\n\n- [h${i}](./h${i}.md)`,
     `### Notes ${i}`,
+    `#### Deferred Work\n\n**From cycle ${i}**\n\nCarried forward:\n\n- F${i} item`,
   ];
   const ok = (r) => ["replaced", "relocated", "created"].includes(r.reason);
   let shapes = 0;
-  for (let a = 0; a < 6; a++)
-    for (let b = 0; b < 6; b++)
-      for (let c = 0; c < 6; c++) {
+  for (let a = 0; a < 7; a++)
+    for (let b = 0; b < 7; b++)
+      for (let c = 0; c < 7; c++) {
         const parts = [pieces(1)[a], pieces(2)[b], pieces(3)[c]];
         const doc = markerDoc(`${section(1)}\n\n${parts.join("\n\n")}\n\n`);
         const items = parts.join("\n").match(/^- .*$/gm) || [];
@@ -1384,7 +1387,42 @@ test("R8 QA cycle 1 CR-1: a write the engine makes is never refused by its next 
       }
   // Non-vacuity: the family must exercise the property, not skip past it.
   assert.ok(
-    shapes >= 200,
-    `only ${shapes} of 216 shapes wrote on the first write`,
+    shapes >= 300,
+    `only ${shapes} of 343 shapes wrote on the first write`,
   );
+});
+
+test("R9 QA cycle 2 CR-2: a render the next write would refuse is refused up front", () => {
+  // Under an ambiguous marker-less log (a Date-first table, then a Version-first one, above
+  // the section) the span is under the dated-row guard. A render carrying its own dated rows
+  // used to replace in place and be refused by the following write; it is refused now.
+  const mixed = `${FM}## Body\n\ntext\n\n## Change Log\n\n| Date | Version | Description | Author |\n| --- | --- | --- | --- |\n| 2026-01-01 | 1.0 | x | y |\n\n| Version | Date | Change |\n| --- | --- | --- |\n| 1.1 | 2026-01-02 | synced |\n\n${section(1)}\n`;
+  const dated = `${section(2)}\n\n| Cycle | Date | Gate |\n| --- | --- | --- |\n| 2 | 2026-10-02 | PASS |`;
+  const r = QR.upsertQaResults(mixed, dated, { docType: "task" });
+  assert.equal(r.reason, "unplaceable");
+  assert.equal(r.detail, "structural-line:| 2 | 2026-10-02 | PASS |");
+  assert.equal(r.content, mixed);
+  // A render without dated rows still replaces, and the result is writable again.
+  const plain = QR.upsertQaResults(mixed, section(2), { docType: "task" });
+  assert.equal(plain.reason, "replaced");
+  assert.equal(
+    QR.upsertQaResults(plain.content, section(3), { docType: "task" }).reason,
+    "replaced",
+  );
+});
+
+test("R10 QA cycle 2 CR-3: the tail scan stays bounded on a repeated label", () => {
+  // Each bold block that stops at a non-list label scanned to the end of the section:
+  // k = 400 took 4151 ms against 19 ms on the base engine. The scan now ends at the next
+  // carried label. The bound is loose (≈ 25× the measured time) so load does not flake it,
+  // and tight enough that the cubic scan cannot pass.
+  let body = "";
+  for (let i = 0; i < 600; i++)
+    body += `**Bug Reports**\n\n**Note ${i}**\n\ntext \`code${i}\` here\n\n`;
+  const doc = markerDoc(`${section(1)}\n\n${body}`);
+  const t0 = Date.now();
+  const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+  const ms = Date.now() - t0;
+  assert.equal(r.reason, "replaced");
+  assert.ok(ms < 4000, `upsert took ${ms} ms on 600 repeated labels`);
 });
