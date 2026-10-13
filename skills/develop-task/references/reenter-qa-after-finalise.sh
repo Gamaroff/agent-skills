@@ -19,7 +19,11 @@
 #        no-dod               no {stem}.dod.{N}.*.md beside the document — keyed on the work
 #                             item's stem, so a co-located bug's DoD is never read as its verdict
 #        dod-not-gaps         the newest DoD file's Final Status is not ❌ GAPS
-#        no-gate              qa-cycle.sh found no single current gate
+#        no-gate              qa-cycle.sh found no single current gate — its own reason line(s) are
+#                             relayed above the refusal (no gate file, an unnumbered gate, two gates
+#                             claiming one cycle), so the operator can tell an ambiguity from an absence
+#        git-unreadable       git status failed — the tree cannot be read, so the re-entry cannot be
+#                             judged; never read as a clean tree (that would route a fix to step 7)
 #        uncommitted-fix      a TRACKED change outside <doc-dir> is uncommitted: the re-entered
 #                             review reads committed history (qa-task Step 3b HALTs on it), so
 #                             commit the fix and re-run — never resume at 7 over it
@@ -69,8 +73,9 @@
 # The report is REQUIRED: report_entries is read from it, and without it the resume precedence would
 # have nothing to key on.
 #
-# Run from the repository root — the movement measure's pathspecs are relative to it, and a
-# <doc-dir> that IS the root is refused (its exclusion would hide every change).
+# Run from the repository root — the movement measure's pathspecs are relative to it, so a cwd that
+# is not the root of <doc-dir>'s repository is a usage error, and a <doc-dir> that IS the root is
+# refused (its exclusion would hide every change).
 # Exit: 0 re-entered; 1 refused or failed (the reason on stderr); 2 usage.
 # Paths honour PIPELINE_LOCK and PIPELINE_HALT_SNAPSHOT for tests; both pass through to --restore.
 
@@ -115,6 +120,14 @@ done
 # measure would read 0 for every change (the qa-task Phase 0 guard, task.135 QA cycle 3, CR3-2).
 PREFIX=$(git -C "$DOC_DIR" rev-parse --show-prefix 2>/dev/null) || { echo "reenter-qa: '$DOC_DIR' is not inside a git work tree" >&2; usage; }
 [ -n "$PREFIX" ] || { echo "reenter-qa: '$DOC_DIR' is the repository root — its own files cannot be told from the code" >&2; usage; }
+# The measure's pathspecs are relative to the cwd, so the cwd must be <doc-dir>'s repository root. From
+# another repository `git status` exits 128 on the exclude pathspec and would read as git-unreadable,
+# telling the operator to repair a healthy repository (task.182 QA cycle 2, CR-5) — a usage error.
+DOC_TOP=$(git -C "$DOC_DIR" rev-parse --show-toplevel 2>/dev/null)
+CWD_TOP=$(git rev-parse --show-toplevel 2>/dev/null) || CWD_TOP=""
+CWD_PREFIX=$(git rev-parse --show-prefix 2>/dev/null) || CWD_PREFIX="?"
+[ -n "$CWD_TOP" ] && [ "$CWD_TOP" = "$DOC_TOP" ] && [ -z "$CWD_PREFIX" ] \
+  || { echo "reenter-qa: run from the root of the repository that holds '$DOC_DIR' ($DOC_TOP), not '$PWD'" >&2; usage; }
 
 # ── 1. Refusals — every one before any write ─────────────────────────────────
 [ -f "$LOCK" ] && refuse lock-present "a live lock exists at '$LOCK'; this re-entry starts from a halt snapshot, and a live lock means the run is already resumed"
@@ -159,15 +172,28 @@ grep -q '^\*\*Final Status:\*\* ❌ GAPS' "$DOD" || refuse dod-not-gaps "the new
 # it names — a second gate key here would let this script and the loop disagree about the base
 # (task.170 QA cycle 2, CR-6; tests/qa-cycle.test.js forbids another gate derivation in a helper).
 # A co-located bug gate that makes the cycle ambiguous is refused by qa-cycle.sh, never guessed.
-GATE=$(bash "$QA_CYCLE_SH" "$DOC_DIR" --path gate 2>/dev/null) || GATE=""
-BASE=$(bash "$QA_CYCLE_SH" "$DOC_DIR" 2>/dev/null) || BASE=""
+# qa-cycle.sh names its cause on stderr — no gate file, gate files with no cycle number, or two files
+# claiming one cycle — and the last fails only under --path, so the reason comes from whichever call
+# failed. Both are captured and relayed as the no-snapshot refusal relays --restore --which (task.182,
+# CR-1); sort -u drops the duplicate when both calls fail for the same cause.
+GATE_ERR=$(mktemp) || exit 1
+GATE=$(bash "$QA_CYCLE_SH" "$DOC_DIR" --path gate 2>>"$GATE_ERR") || GATE=""
+BASE=$(bash "$QA_CYCLE_SH" "$DOC_DIR" 2>>"$GATE_ERR") || BASE=""
+GATE_WHY=$(sort -u "$GATE_ERR"); rm -f "$GATE_ERR"
 case "$BASE" in ''|*[!0-9]*) BASE="" ;; esac
-[ -n "$GATE" ] && [ -f "$GATE" ] && [ -n "$BASE" ] || refuse no-gate "qa-cycle.sh found no single current gate in '$DOC_DIR'"
+if ! { [ -n "$GATE" ] && [ -f "$GATE" ] && [ -n "$BASE" ]; }; then
+  [ -n "$GATE_WHY" ] && printf '%s\n' "$GATE_WHY" | sed 's/^⚠️  qa-cycle:/reenter-qa:/' >&2
+  refuse no-gate "qa-cycle.sh found no single current gate in '$DOC_DIR'"
+fi
 
 # ── 2. Movement, measured as committed history ───────────────────────────────
 # Uncommitted tracked work outside the work item is refused first, whatever else moved: the
 # re-entered review cannot read it (qa-task Step 3b HALTs on it), and /finalise must not run over it.
-DIRTY=$(git status --porcelain --untracked-files=no -- . ":(exclude)$DOC_DIR" ":(exclude).claude/state" 2>/dev/null)
+# A git status that fails is a refusal, never an empty answer: read as a clean tree, it would let the
+# measure below refuse no-code-moved, whose route is step 7 — the one outcome this script exists to
+# prevent (task.182, CR-3). git's own error reaches the operator.
+DIRTY=$(git status --porcelain --untracked-files=no -- . ":(exclude)$DOC_DIR" ":(exclude).claude/state") \
+  || refuse git-unreadable "git status failed in '$PWD' — the tree cannot be read, so a re-entry cannot be judged; repair the repository and run this script again (do NOT resume at step 7)"
 [ -z "$DIRTY" ] || refuse uncommitted-fix "uncommitted changes outside '$DOC_DIR' — commit the fix, then re-run this script (the re-entered review reads committed history; do NOT resume at step 7 over them): $(printf '%s' "$DIRTY" | tr '\n' ' ')"
 UNTRACKED=$(git ls-files --others --exclude-standard -- . ":(exclude)$DOC_DIR" ":(exclude).claude/state" 2>/dev/null)
 GATE_HEAD=$(grep -E '^head:' "$GATE" 2>/dev/null | head -1 | sed -E "s/^head:[[:space:]]*//; s/[[:space:]]+#.*$//; s/['\"]//g; s/[[:space:]]*$//")

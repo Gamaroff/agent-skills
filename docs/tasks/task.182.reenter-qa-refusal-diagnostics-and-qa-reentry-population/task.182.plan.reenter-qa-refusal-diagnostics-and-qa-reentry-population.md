@@ -45,6 +45,7 @@ Assert three things: exit 1 with `refused (git-unreadable)`; the lock is not low
 - Add `reenterScript: "shared/resources/reenter-qa-after-finalise.sh"` to `FILES` (line 46) if it is not already present.
 - Add a test that every reader names `qa_reentry`: `resumeContract`, `pauseDoc`, `hooksDoc`, `detectorPrompt`, `taskSkill`, `storySkill`, and the writer.
 - Add a non-vacuity floor: the reader list is not empty.
+- Assert the hooks doc names `reenter-qa-after-finalise.sh` (the second writer of `qa_max_cycles`).
 
 ### Phase 2: The script
 
@@ -81,12 +82,14 @@ Then:
 ### Phase 3: The reader population
 
 1. Re-run the population command in the task's §3. Classify every path into one of four kinds: writer, reader that must name `qa_reentry`, reader that need not (state why), or eval fixture.
-2. **`develop-pipeline-hooks.md:86`.** Replace "written together at a resume after a loop-limit halt" with wording that names both writers:
-   - `grant-qa-cycles.sh`: a resume after a loop-limit halt.
-   - `reenter-qa-after-finalise.sh`: a QA re-entry after a finalise DoD-gaps halt. It also writes `qa_reentry`, which the hook does not read.
+2. **`develop-pipeline-hooks.md:86`.** Replace "written together at a resume after a loop-limit halt" with each field's exact writers (review 1, I-1):
+   - `qa_max_cycles`: `grant-qa-cycles.sh` (a resume after a loop-limit halt, written with `extra_cycles_granted`) and `reenter-qa-after-finalise.sh` (a QA re-entry after a finalise DoD-gaps halt).
+   - `extra_cycles_granted`: `grant-qa-cycles.sh` only.
+   - `qa_phase`: `set-qa-phase.sh` inside the loop, and both re-entry scripts.
+   - `qa_reentry`: `reenter-qa-after-finalise.sh` only. The hook reads none of the last three; it reads `current_step` and `qa_phase`.
 3. **`pipeline-resume-detector-prompt.md`.** After line 117, add a line:
    - `qa_reentry` (object) records a 7 → 5 QA re-entry after a finalise DoD-gaps halt.
-   - Report it in `deltas_since_pause` as `{ "path": null, "concern": "qa_reentry: from_step {n}; gate_head {sha12}" }`, so the operator sees the run as a re-entry rather than a loop in progress.
+   - Report it in `deltas_since_pause` as `{ "path": null, "concern": "qa_reentry: from_step {n}; reason {reason}; gate_head {sha12}; report_entries {n}" }`, so the operator sees the run as a re-entry rather than a loop in progress.
 4. **CHANGELOG `[Unreleased]` › Fixed.** One entry citing task 182.
 
 ## Key Patterns and References
@@ -97,7 +100,7 @@ Then:
 
 ## Testing Approach
 
-- Run the suite under bash 5 and macOS `/bin/bash` 3.2. Run both parity tests. Run `npm run ci:fast` and `npm run bundle:check`.
+- Run the suite under bash 5; check the diff for bash-3.2-rejected constructs (no macOS host available). Run both parity tests. Run `npm run ci:fast` and `npm run bundle:check`.
 - Mutation proofs:
   - Drop the stderr pass-through: the three cause cases go red.
   - Drop `|| refuse git-unreadable`: the stub case goes red.

@@ -205,8 +205,8 @@ Step 7 halt, on what the fix changed** (task.170):
   change outside the work item is easy to miss by eye, and a missed one would re-run `/finalise`
   over an ungated head. **What follows a refusal is its route in the refusal list below** — the one
   statement of it: a declined offer, or a refusal routed to step 7 (`no-code-moved` among them),
-  takes the next bullet; `uncommitted-fix` is routed back to the operator and never to step 7
-  (task.170).
+  takes the next bullet; a refusal the list routes back to the operator — `uncommitted-fix`,
+  `git-unreadable`, `no-gate` — never reaches step 7 (task.170, task.182).
 - any other `halt_reason`, or a PreCompact `pause_reason`, or **any `develop-bug` snapshot** → run
   `advance-pipeline-lock.sh --restore {doc-directory}` **here**, before Phase 0b, on the
   re-invocation path exactly as the in-session continuation does (QA cycle 2, CR-2; the step-0
@@ -631,10 +631,11 @@ This convention ensures the cycle budget is respected across resumes.
    - It **writes three fields atomically** — `extra_cycles_granted = k` (the record),
      `qa_max_cycles = base + k` (the budget) and `qa_phase`, the re-entry point — via `mktemp` +
      `mv`, removing its temp file on every failure, and prints the budget and `reenter_at` back from
-     the written lock. **The re-entry point depends on where the halt stopped** (obs #228): a
-     `loop-limit` halt ran its last 5b, so the grant writes `5a` and the next gate reads that fix; a
-     `not-converging` halt fired at 5a *before* 5b, so the grant writes `5b` and the latest gate's
-     queue goes to `/qa-fix` first. Re-entering a not-converging halt at 5a reviews unchanged code,
+     the written lock. **The re-entry point depends on where the halt stopped** (obs #228) — which
+     value for which halt is the `qa_phase` row of the lock schema in `develop-pipeline-pause.md`.
+     The reason: a `loop-limit` halt ran its last 5b, so the next gate must read that fix, and a
+     `not-converging` halt fired at 5a *before* 5b, so the latest gate's queue must go to `/qa-fix`
+     first. Re-entering a not-converging halt at 5a reviews unchanged code,
      re-raises the same HIGH and trips the check again, spending the grant with no fix attempted
      (task.140). The script reads `halt_reason` from the candidate before its restore drops it, and
      reads its leading token: the HALT appends detail after a `:` or a space, and an exact compare
@@ -700,7 +701,8 @@ and both SKILL.md Phase 0b paragraphs cite it.
 - `not-a-finalise-halt` — the snapshot's `halt_step` is not 7 (compared as text: the HALT snippet writes it with `jq --arg`). **Route:** the next bullet (an ordinary restore).
 - `no-dod` — no `{stem}.dod.{N}.*.md` beside the document, keyed on the work item's own stem — read from the DoD files whose stem the directory name continues, never from a bug's — so a co-located bug's DoD is never read as its verdict. **Route:** the next bullet.
 - `dod-not-gaps` — the newest DoD file does not read `**Final Status:** ❌ GAPS`. **Route:** the next bullet.
-- `no-gate` — `qa-cycle.sh` found no single current gate. **Route:** the next bullet; resolve the gate files first if the refusal names an ambiguity.
+- `no-gate` — `qa-cycle.sh` found no single current gate. Its own reason is relayed above the refusal as a `reenter-qa:` line — no gate file, gate files with no cycle number, or two files claiming one cycle (task.182). **Route:** back to the operator — resolve the gate files the relayed line names and run the script again; **never** step 7, which would accept a head no gate has read (a step-7 halt had a gate, so a missing or ambiguous one is a state to repair, not a document-only fix).
+- `git-unreadable` — `git status` exited non-zero, so the movement measure cannot run; git's own error is printed with it (task.182). **Route:** back to the operator — repair the repository and run the script again; **never** step 7, which an unread tree would otherwise reach through `no-code-moved`.
 - `uncommitted-fix` — a **tracked** change outside the work item's directory is uncommitted. **Route:** back to the operator — commit the fix and run the script again; **never** step 7, which would accept a head no review has read.
 - `no-code-moved` — no commit outside the work item's directory since the gate's `head:`: a document-only fix. **Route:** the next bullet — `/finalise` re-runs at 7. Untracked files outside the directory are named in this refusal, never a reason of their own: after Step 4 restores the files it held aside, nothing can tell one of those from a new fix file, so the operator who can decides — commit any that belong to the fix and run the script again.
 <!-- reenter-qa-refusals: end -->

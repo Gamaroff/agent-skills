@@ -165,7 +165,7 @@ test("the resume contract's 5c readings ignore a terminal verdict that predates 
 // task.170 QA cycle 4, CR-1/CR-2: each refusal's ROUTE is stated once, in the contract's list. The
 // halt-7 bullet once sent every refused re-entry to step 7 — uncommitted-fix included — while the
 // list, the script and SKILL.md said never.
-test("every refusal carries its route, and uncommitted-fix never routes to step 7", () => {
+test("every refusal carries its route, and every never-step-7 refusal is named wherever the set is summarised", () => {
   const text = read(CONTRACT);
   const list = text.match(
     /<!-- reenter-qa-refusals: start -->([\s\S]*?)<!-- reenter-qa-refusals: end -->/,
@@ -174,22 +174,60 @@ test("every refusal carries its route, and uncommitted-fix never routes to step 
   assert.ok(lines.length >= FLOOR, "refusal lines found");
   for (const l of lines)
     assert.match(l, /\*\*Route:\*\*/, `no route: ${l.slice(0, 60)}`);
-  const uncommitted = lines.find((l) => l.startsWith("- `uncommitted-fix`"));
-  assert.match(
-    uncommitted,
-    /\*\*never\*\* step 7/,
-    "uncommitted-fix must never route to step 7",
-  );
+  // The never-step-7 set is DERIVED from the list, so a reason added to it reaches every summary
+  // below without a hand-kept copy here (task.182 QA cycle 2, CR-2/CR-3 — the halt-7 bullet kept
+  // naming one reason after a second, then a third, joined the set).
+  const neverSeven = lines
+    .filter((l) => /\*\*never\*\* step 7/.test(l))
+    .map((l) => l.match(/^- `([a-z-]+)`/)[1]);
+  // Keyed on each reason's OWN list line, so a "never step 7" elsewhere cannot satisfy it.
+  for (const reason of ["uncommitted-fix", "git-unreadable", "no-gate"]) {
+    const line = lines.find((l) => l.startsWith(`- \`${reason}\``));
+    assert.ok(line, `${reason} must be in the contract's refusal list`);
+    // The route is the text after this line's own **Route:** marker — the cell that carries it.
+    const route = line.split("**Route:**")[1] ?? "";
+    assert.ok(
+      route.trim().startsWith("back to the operator"),
+      `${reason}'s route must start "back to the operator" (got: ${route.trim().slice(0, 60)})`,
+    );
+    assert.match(
+      route,
+      /\*\*never\*\* step 7/,
+      `${reason}'s route must say **never** step 7`,
+    );
+  }
   assert.doesNotMatch(
     text,
     /like a declined or otherwise refused re-entry, takes the next/,
     "the halt-7 bullet must not route every refusal to step 7",
   );
+  const halt7 = text.match(
+    /a refusal the list routes back to the operator — ([^]*?) — never reaches step 7/,
+  );
+  assert.ok(
+    halt7,
+    "the halt-7 bullet must summarise the refusals that never reach step 7",
+  );
+  for (const reason of neverSeven) {
+    assert.ok(
+      halt7[1].includes(`\`${reason}\``),
+      `the halt-7 bullet must name ${reason} among the refusals that never reach step 7`,
+    );
+  }
   for (const skill of ["develop-task", "develop-story"]) {
+    const body = read(`skills/${skill}/SKILL.md`);
     assert.match(
-      read(`skills/${skill}/SKILL.md`),
+      body,
       /refusal list — follow it/,
       `${skill} must cite the contract's routes`,
     );
+    const example = body.match(/\(([^()]*) never resumes at 7\)/);
+    assert.ok(example, `${skill} must carry the never-resumes-at-7 example`);
+    for (const reason of neverSeven) {
+      assert.ok(
+        example[1].includes(`\`${reason}\``),
+        `${skill} must name ${reason} as never resuming at 7`,
+      );
+    }
   }
 });

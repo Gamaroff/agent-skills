@@ -115,6 +115,20 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **A refused QA re-entry says why, and an unreadable tree is no longer a clean one (task 182).**
+  `reenter-qa-after-finalise.sh`'s `no-gate` refusal discarded `qa-cycle.sh`'s stderr, so a missing
+  gate, an unnumbered gate and two gates claiming one cycle all printed one message, and the
+  contract's "resolve the gate files first if the refusal names an ambiguity" could never fire. Both
+  `qa-cycle.sh` calls' reason lines are now relayed above the refusal as `reenter-qa:` lines, and
+  `no-gate` now routes back to the operator, never to step 7. Run from anywhere but `<doc-dir>`'s
+  repository root, the script is now a usage error (exit 2) instead of a misleading refusal. A
+  failing `git status` read as an empty, clean tree and could route a code fix to `/finalise` at
+  step 7 through `no-code-moved`; it now refuses `git-unreadable`, whose route is back to the
+  operator and never step 7. The `qa_reentry` lock field reaches the readers task.170 missed: the
+  hooks doc states each loop field's writers (`qa_max_cycles` has two, `extra_cycles_granted` one),
+  the resume detector reports a re-entry with its four sub-fields, and
+  `qa-loop-lock-fields-parity.test.mjs` pins `qa_reentry` in its writer, its two readers and its four describers, and the `qa_phase` writer rule is stated once, in the pause reference's lock schema, which the hooks doc and both SKILL.md cite.
+
 - **A QA re-review now closes the bug reports it verified (observation #21).** The bug lifecycle
   has QA move a fixed bug from Ready for QA to Closed or Reopened, and nothing did: task.180 ended with
   five verified bug reports still at Ready for QA. `status-history.js` gains `--set-status`, which sets
