@@ -5,10 +5,10 @@ type: task
 description: "Follow-up to task.183. Close three content-loss shapes in `shared/resources/qa-results.js` that predate task.183 (all identical on origin/develop): keep a nested Bug Reports block that runs past its outer block, refuse a section under a marker-less log whose table above is not Date-first, and refuse a carried bold block whose list continues past a label and a paragraph. Also correct task.183's stale wording, CHANGELOG over-claim and a duplicate test assertion."
 tags: [qa-task, qa-story, engine, follow-up]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-13
 assignee:
 estimated_effort_hours: 16
 github_issue: 572
@@ -16,7 +16,9 @@ github_issue: 572
 
 # Technical Task: qa-results carried-block and log residuals
 
-**Status:** Planned
+**Status:** Ready for Review
+
+**Review**: ✅ All review recommendations from `task.184.review.1.qa-results-carried-block-and-log-residuals.md` implemented 2026-10-13
 
 **GitHub Issue**: [#572](https://github.com/Gamaroff/agent-skills/issues/572)
 
@@ -153,8 +155,10 @@ existing `unbounded` reason and the `detail` vocabulary.
 
 - ✅ The three engine fixes above, each with one test and a recorded mutation proof
 - ✅ R3's CR3-2 assertion: `relocated` → refused (`unbounded`, `structural-line:`), row kept
-- ✅ The `carried-tail:` detail added to the vocabulary comment and to the `unbounded` hint text in
-  the qa-task and qa-story Step 12 writer blocks
+- ✅ The `carried-tail:` detail added to the vocabulary comment, to the `unbounded` hint text in
+  the qa-task and qa-story Step 12 writer blocks, and to the prose paragraph in each skill that lists
+  what `unbounded` refuses (sites: `grep -n unbounded skills/qa-task/SKILL.md skills/qa-story/SKILL.md`
+  — the hint string and that paragraph in each file)
 - ✅ Comment at `qa-results.js:307-314` made accurate
 - ✅ Test hygiene: drop R2's duplicate `assertCr51Refused()` call (`qa-results.test.mjs:1157`); rename
   R4 so it claims lists *directly* under a sub-label
@@ -208,27 +212,27 @@ behaviour changes, both toward refusal:
 
 **Risk:** Low · **Files:** `shared/resources/qa-results.js` (`carriedBlocks`), `shared/resources/tests/qa-results.test.mjs`
 
-- [ ] In `carriedBlocks`, when a block starts inside the kept outer block and ends past it, extend the
+- [x] In `carriedBlocks`, when a block starts inside the kept outer block and ends past it, extend the
       outer block's `whole` and `body` to that end
-- [ ] Test R5: the CR-1 shape keeps `[a]` and `[b]` exactly once across `replaceThrice`, and
+- [x] Test R5: the CR-1 shape keeps `[a]` and `[b]` exactly once across `replaceThrice`, and
       `**Bug Reports**` appears once
-- [ ] Mutation-prove R5 (revert to the plain `continue`)
+- [x] Mutation-prove R5 (revert to the plain `continue`)
 
 ### Phase 2: refuse a section under an ambiguous marker-less log — 5c CR-2
 
 **Risk:** Medium (changes a tested outcome) · **Files:** `qa-results.js` (`findQaResults`), test file
 **Depends on:** none
 
-- [ ] Compute `ambiguousAbove`: marker-less log, section directly under it, and the last Date-column
+- [x] Compute `ambiguousAbove`: marker-less log, section directly under it, and the last Date-column
       table between the log heading and the section is not Date-first
-- [ ] When `ambiguousAbove`, skip the cut and include it in `underLog`
-- [ ] Test R6: both CR-2 variants (2- and 4-column quoted table) return `unbounded` with a
+- [x] When `ambiguousAbove`, skip the cut and include it in `underLog`
+- [x] Test R6: both CR-2 variants (2- and 4-column quoted table) return `unbounded` with a
       `structural-line:` detail naming the quoted row, document unchanged
-- [ ] Update R3's CR3-2 case: `unbounded`, `structural-line:| 2026-09-25 | 1.0 | log-row | y |`,
+- [x] Update R3's CR3-2 case: `unbounded`, `structural-line:| 2026-09-25 | 1.0 | log-row | y |`,
       document unchanged
-- [ ] Confirm G1 (REL-004) still `replaced`
-- [ ] Rewrite the comment at `:307-314` to state the marker-less rule
-- [ ] Mutation-prove R6 (drop `ambiguousAbove` from the cut condition, then from `underLog`)
+- [x] Confirm G1 (REL-004) still `replaced`
+- [x] Rewrite the comment at `:307-314` to state the marker-less rule
+- [x] Mutation-prove R6 (drop `ambiguousAbove` from the cut condition, then from `underLog`)
 
 ### Phase 3: refuse a carried list behind a label and a paragraph — gate 6 CR6-1
 
@@ -236,28 +240,30 @@ behaviour changes, both toward refusal:
 test file, `skills/qa-task/SKILL.md`, `skills/qa-story/SKILL.md` · **Depends on:** Phase 1 (the same
 carried-block path)
 
-- [ ] When a bold-label block stops at a bold label that does not introduce a list, look ahead to the
+- [x] When a bold-label block stops at a bold label that does not introduce a list, look ahead to the
       next `#{1,3}` heading, QA field line or end of text; record the first list item or table row
-- [ ] `upsertQaResults` refuses with `reason: "unbounded"`, `detail: "carried-tail:<line>"`, writing
+- [x] `upsertQaResults` refuses with `reason: "unbounded"`, `detail: "carried-tail:<line>"`, writing
       nothing
-- [ ] Add `carried-tail:<line>` to the detail vocabulary comment
-- [ ] Add the cause to the `unbounded` hint string in the Step 12 writer block of
-      `skills/qa-task/SKILL.md` and `skills/qa-story/SKILL.md`
-- [ ] Test R7: the CR6-1 shape refuses with `carried-tail:- [b](./b.md)`, document unchanged; R4's
+- [x] Add `carried-tail:<line>` to the detail vocabulary comment
+- [x] Add the cause to the `unbounded` hint string in the Step 12 writer block of
+      `skills/qa-task/SKILL.md` and `skills/qa-story/SKILL.md`, and to the prose paragraph below each
+      block that lists what `unbounded` refuses (search: `grep -n unbounded skills/qa-task/SKILL.md
+      skills/qa-story/SKILL.md`; four hits, two per file)
+- [x] Test R7: the CR6-1 shape refuses with `carried-tail:- [b](./b.md)`, document unchanged; R4's
       stale-list case (`**Recommendations**:` directly over a list) is still carried once
-- [ ] Mutation-prove R7 (remove the look-ahead)
+- [x] Mutation-prove R7 (remove the look-ahead)
 
 ### Phase 4: wording, hygiene, CHANGELOG
 
 **Risk:** Low · **Depends on:** Phases 1–3
 
-- [ ] Drop R2's duplicate `assertCr51Refused()` call (`qa-results.test.mjs:1157`)
-- [ ] Rename R4: "keeps its #### groups and every bug list directly under a sub-label"
-- [ ] Amend the seven task.183 passages listed in § 4, and append one task.183 Change Log row
+- [x] Drop R2's duplicate `assertCr51Refused()` call (`qa-results.test.mjs:1157`)
+- [x] Rename R4: "keeps its #### groups and every bug list directly under a sub-label"
+- [x] Amend the seven task.183 passages listed in § 4, and append one task.183 Change Log row
       noting that the gate 4 row was written after the cycle 5 rows
-- [ ] CHANGELOG: narrow task 183's entry to "directly under a sub-label"; add a `(task 184)` Fixed
+- [x] CHANGELOG: narrow task 183's entry to "directly under a sub-label"; add a `(task 184)` Fixed
       entry naming the two new refusals and the kept nested tail
-- [ ] `npm run bundle`; `npm run bundle:check`; `npm run validate -- skills/qa-task/` and
+- [x] `npm run bundle`; `npm run bundle:check`; `npm run validate -- skills/qa-task/` and
       `skills/qa-story/`
 
 ---
@@ -269,8 +275,8 @@ carried-block path)
 1. ✅ `shared/resources/qa-results.js` — Phases 1–3, comments
 2. ✅ `skills/qa-task/references/qa-results.js` — bundled copy (generated)
 3. ✅ `skills/qa-story/references/qa-results.js` — bundled copy (generated)
-4. ✅ `skills/qa-task/SKILL.md` — Step 12 `unbounded` hint (Phase 3)
-5. ✅ `skills/qa-story/SKILL.md` — Step 12 `unbounded` hint (Phase 3)
+4. ✅ `skills/qa-task/SKILL.md` — Step 12 `unbounded` hint and the `unbounded` prose paragraph (Phase 3)
+5. ✅ `skills/qa-story/SKILL.md` — Step 12 `unbounded` hint and the `unbounded` prose paragraph (Phase 3)
 
 **Tests**
 
@@ -314,33 +320,34 @@ re-run each alone before reading a failure as real.
 
 ### Functional
 
-- [ ] CR-1: the nested shape keeps `[a]` and `[b]` exactly once across three writes, `replaced` each
+- [x] CR-1: the nested shape keeps `[a]` and `[b]` exactly once across three writes, `replaced` each
       time (Phase 1, R5)
-- [ ] CR-2: both variants return `reason: "unbounded"` with `detail` `structural-line:` naming the
+- [x] CR-2: both variants return `reason: "unbounded"` with `detail` `structural-line:` naming the
       quoted row, document byte-identical (Phase 2, R6)
-- [ ] CR3-2 shape: `reason: "unbounded"`, `detail` `structural-line:| 2026-09-25 | 1.0 | log-row | y |`,
+- [x] CR3-2 shape: `reason: "unbounded"`, `detail` `structural-line:| 2026-09-25 | 1.0 | log-row | y |`,
       document byte-identical; G1 (REL-004) still `replaced` (Phase 2, R3)
-- [ ] CR6-1: returns `reason: "unbounded"` with `detail` `carried-tail:- [b](./b.md)`, document
+- [x] CR6-1: returns `reason: "unbounded"` with `detail` `carried-tail:- [b](./b.md)`, document
       byte-identical; R4's directly-under-a-label cases unchanged (Phase 3, R7)
 
 ### Performance
 
-- [ ] Engine, wiring and corpus suites under 2 s, with `uptime` load recorded beside the figure in
+- [x] Engine, wiring and corpus suites under 2 s, with `uptime` load recorded beside the figure in
       the implementation report, re-measured at finalise
-- [ ] No network access (`qa-results.js` requires only `./change-log.js`)
+- [x] No network access — documentation criterion: `shared/resources/qa-results.js` contains exactly
+      one `require(`, of `./change-log.js` (`grep -c 'require(' shared/resources/qa-results.js` → `1`)
 
 ### Code Quality
 
-- [ ] Corpus write survey 0 / 0 / 0 on the tracked tree
-- [ ] R5, R6, R7 each mutation-proved, each result recorded
-- [ ] `npm run ci:fast`, `npm run bundle:check`, `npm run validate -- skills/qa-task/` and
+- [x] Corpus write survey 0 / 0 / 0 on the tracked tree
+- [x] R5, R6, R7 each mutation-proved, each result recorded
+- [x] `npm run ci:fast`, `npm run bundle:check`, `npm run validate -- skills/qa-task/` and
       `skills/qa-story/` clean
 
 ### Migration
 
-- [ ] CHANGELOG `[Unreleased]` cites `(task 184)` and names the two new refusals and the kept tail;
+- [x] CHANGELOG `[Unreleased]` cites `(task 184)` and names the two new refusals and the kept tail;
       task 183's entry says "directly under a sub-label"
-- [ ] The seven task.183 passages in § 4 amended, with one task.183 Change Log row
+- [x] The seven task.183 passages in § 4 amended, with one task.183 Change Log row
 
 ---
 
@@ -391,22 +398,57 @@ never by exempting lines from the structural guard.
 
 ---
 
+## Implementation Summary
+
+**Completed:** 2026-10-13 · **Branch:** `feature/task.184.qa-results-carried-block-and-log-residuals`
+
+**Approach.** Implemented inline from the plan by `/develop-task` Step 3; each phase changes one rule
+in `shared/resources/qa-results.js` and adds one test, and no rule exempts a line from a refusal.
+
+- **Phase 1 (5c CR-1, keep).** `collectBlocks` records each block's `labelLen`; `carriedBlocks` extends
+  a kept outer block to the end of a nested block that runs past it, instead of dropping the tail.
+- **Phase 2 (5c CR-2, refuse).** `findQaResults` computes `ambiguousAbove` — a section directly under a
+  marker-less log whose last `Date`-column table above it is not Date-first. It skips the cut and puts
+  the span under the dated-row guard. The CR3-2 `| Reviewer | Date |` shape now refuses (R3 updated).
+  R6 also holds a third shape the plan did not list: a Date-first log table **followed by** a
+  Version-first table above the section. There `underTablelessLog` is false, so only `ambiguousAbove`
+  refuses it; the case was added because mutation M2b survived without it.
+- **Phase 3 (gate 6 CR6-1, refuse).** A bold-label block that stops at a bold label not introducing a
+  list looks ahead to the next `#{1,3}` heading or QA field; the first list item or table row there is
+  its `tail`. `upsertQaResults` refuses with `carried-tail:<line>`, reading `tail` from every
+  collected block, not only the ones `carriedBlocks` keeps (review O2). The detail is in the vocabulary
+  comment and in both QA skills' Step 12 hint string and `unbounded` paragraph.
+- **Phase 4.** R2's duplicate `assertCr51Refused()` dropped; R4 renamed; CHANGELOG task 183 entry
+  narrowed and a `(task 184)` entry added; seven task.183 passages amended, with one Change Log note row.
+
+**Testing results.** Engine suite 88/88 (R5, R6, R7 new; R3 updated). Engine + corpus + wiring:
+101/101 in 1.08 s (`time -p`, load 0.55; `/usr/bin/time` is not installed on the host, so bash's
+`time` keyword was used). Corpus write survey 0 / 0 / 0. Mutation proofs (snapshot, one split/join
+edit, suite, restore + `cmp`): M1 (R5) red; M2a (R3, R6) red; M2b (R6) red after the mixed-log case;
+M3 (R7) red. `bundle:check` 0 problems; `validate` qa-task, qa-story clean.
+
+**Deferred Work.** None new. task.183's CR-7, CR2-3, CR4-4 and CR2-4 remain deferred there.
+
+---
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                       | Author      |
-| ---------- | ------- | ------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-05 | 1.0     | Initial draft — follow-up to task.183 gate 6 and Step 5c review | create-task |
+| 2026-10-13 | 1.1     | Review passed (9/10) — added the `unbounded` prose paragraph in each QA skill to Phase 3; restated "no network access" as a documentation criterion | review-task |
+| 2026-10-13 |         | Status → ready-for-development | review-task |
+| 2026-10-13 |  | Implemented — 7 source files (+2 bundled copies), 3 new tests, 3 updated; 4 mutation proofs | develop |
 <!-- change-log-end -->
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 1: keep a nested block's tail (5c CR-1)
-- [ ] Phase 2: refuse under an ambiguous marker-less log (5c CR-2)
-- [ ] Phase 3: refuse a carried list behind a label and a paragraph (gate 6 CR6-1)
-- [ ] Phase 4: wording, hygiene, CHANGELOG
+- [x] Phase 1: keep a nested block's tail (5c CR-1)
+- [x] Phase 2: refuse under an ambiguous marker-less log (5c CR-2)
+- [x] Phase 3: refuse a carried list behind a label and a paragraph (gate 6 CR6-1)
+- [x] Phase 4: wording, hygiene, CHANGELOG
 
 ---
 

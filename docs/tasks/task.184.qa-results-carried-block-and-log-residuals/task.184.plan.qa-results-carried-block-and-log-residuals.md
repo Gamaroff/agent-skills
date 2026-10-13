@@ -139,8 +139,10 @@ for (let j = i + 1; j < lines.length; j++) {
 ```
 
 Skip lines inside protected ranges the same way the stop loop does. Store `tail` on the block.
-In `upsertQaResults`, beside the `removesStructure` check, refuse when any
-`carriedBlocks(content.slice(s.start, s.end))` block carries a `tail`:
+In `upsertQaResults`, beside the `removesStructure` check, refuse when any block collected from
+`content.slice(s.start, s.end)` carries a `tail` — read it from every `collectBlocks` result, not only
+`carriedBlocks`' kept ones: `carriedBlocks` drops a nested block (and Phase 1 merges its span), so its
+`tail` would never be seen (task.184 review 1, O2). Refusal only, so the wider read is the safe direction:
 
 ```js
 return { content, reason: "unbounded", detail: `carried-tail:${tail}` };
@@ -149,9 +151,11 @@ return { content, reason: "unbounded", detail: `carried-tail:${tail}` };
 Add to the vocabulary comment (`:29-38`):
 `//   carried-tail:<line>      a carried block's list continues past a label and a paragraph`.
 
-In `skills/qa-task/SKILL.md` (`:1395`) and `skills/qa-story/SKILL.md` (`:1905`), extend the
+In `skills/qa-task/SKILL.md` (`:1508`) and `skills/qa-story/SKILL.md` (`:2018`, both at `c94450f9`), extend the
 `unbounded` hint: "…or a carried Bug Reports / Deferred Work list continues past a label and a
-paragraph (`carried-tail:`)…". Keep the two strings identical.
+paragraph (`carried-tail:`)…". Keep the two strings identical. Extend the prose paragraph below each
+block that lists what `unbounded` refuses (qa-task `:1523`, qa-story `:2033`) the same way. Search
+that defines the sites: `grep -n unbounded skills/qa-task/SKILL.md skills/qa-story/SKILL.md`.
 
 **Test R7:**
 
