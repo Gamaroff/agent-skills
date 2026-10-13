@@ -445,6 +445,13 @@ refactor, and was compared only relatively at QA (equal to the cycle-0 head unde
 edit, suite, restore + `cmp`): M1 (R5) red; M2a (R3, R6) red; M2b (R6) red after the mixed-log case;
 M3 (R7) red. `bundle:check` 0 problems; `validate` qa-task, qa-story clean.
 
+**Finalise re-measure (DoD gap 2).** On `5ab4839a` (code identical to `8aedf89b`), after waiting for
+the 1-minute load average to fall below 2.0, engine + corpus + wiring 104/104 in ten back-to-back
+runs (bash `time -p`, 1-minute `uptime` load beside each): 1.62 s (1.89), 1.12 s (1.60), 1.16 s
+(1.60), 4.13 s (1.60 → 2.62 during the run), 1.11 s (2.41), 1.10 s (2.21), 1.08 s (2.04), 1.10 s
+(1.87), 1.21 s (1.87), 1.29 s (1.80). Nine of ten under 2 s, median 1.14 s; the one outlier ran while
+external load rose mid-run and the next six were 1.08–1.29 s.
+
 **Deferred Work.** None new. task.183's CR-7, CR2-3, CR4-4 and CR2-4 remain deferred there.
 
 ---
