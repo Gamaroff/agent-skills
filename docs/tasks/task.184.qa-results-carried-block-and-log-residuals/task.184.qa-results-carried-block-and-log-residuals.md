@@ -191,8 +191,8 @@ task.183 passages to amend (line numbers at `9ca5f9d9`):
 
 ## 5. Breaking Changes
 
-None to any public contract: `upsertQaResults` keeps its signature and its reason set. Two
-behaviour changes, both toward refusal:
+None to any public contract: `upsertQaResults` keeps its signature and its reason set. Three
+behaviour changes, all toward refusal (the third added in the QA loop):
 
 1. **A marker-less log with a non-Date-first Date table above the section** (CR-2 and the CR3-2
    shape) now refuses (`unbounded`, `structural-line:<row>`) where it relocated. Migration: the Step
@@ -200,7 +200,14 @@ behaviour changes, both toward refusal:
    Date-first, then re-run. 0 tracked documents have this shape today.
 2. **A carried bold block whose list continues past a label and a paragraph** (CR6-1) now refuses
    (`unbounded`, `carried-tail:<line>`) where it lost the list. Migration: the HALT names the line;
-   put the list directly under its label, or move it out of the QA section, then re-run.
+   put the list directly under its label, or move it out of the QA section, then re-run. A label that
+   opens a carried block of its own, or a list another carried block already spans, is not a tail:
+   that block carries the list, and nothing is refused.
+3. **A write whose written section the next write would refuse** (QA cycles 1–2) is now refused up
+   front (`unplaceable`, with the guard's detail — `structural-line:` or `carried-tail:`) where it
+   wrote the section and the following write halted. Example: a render carrying its own dated rows
+   (`| Cycle | Date | Gate |`) under the ambiguous log of change 1. Migration: as for change 1 or 2,
+   per the detail.
 
 ---
 
@@ -429,9 +436,12 @@ in `shared/resources/qa-results.js` and adds one test, and no rule exempts a lin
 - **Phase 4.** R2's duplicate `assertCr51Refused()` dropped; R4 renamed; CHANGELOG task 183 entry
   narrowed and a `(task 184)` entry added; seven task.183 passages amended, with one Change Log note row.
 
-**Testing results.** Engine suite 88/88 (R5, R6, R7 new; R3 updated). Engine + corpus + wiring:
-101/101 in 1.08 s (`time -p`, load 0.55; `/usr/bin/time` is not installed on the host, so bash's
-`time` keyword was used). Corpus write survey 0 / 0 / 0. Mutation proofs (snapshot, one split/join
+**Testing results.** At develop (before QA): engine suite 88/88 (R5, R6, R7 new; R3 updated);
+engine + corpus + wiring 101/101 in 1.08 s (`time -p`, load 0.55; `/usr/bin/time` is not installed on
+the host, so bash's `time` keyword was used). After QA cycles 1–3: engine 91/91 (R8–R10 added,
+R7 extended), engine + corpus + wiring 104/104; the 1.08 s figure predates R8–R10 and the cycle-3
+refactor, and was compared only relatively at QA (equal to the cycle-0 head under identical load) —
+`/finalise` re-measures it at idle. Corpus write survey 0 / 0 / 0. Mutation proofs (snapshot, one split/join
 edit, suite, restore + `cmp`): M1 (R5) red; M2a (R3, R6) red; M2b (R6) red after the mixed-log case;
 M3 (R7) red. `bundle:check` 0 problems; `validate` qa-task, qa-story clean.
 
@@ -459,6 +469,40 @@ M3 (R7) red. `bundle:check` 0 problems; `validate` qa-task, qa-story clean.
 
 ### Key Findings
 No open findings. Four QA cycles closed the write-then-refuse class (one section guard for the replaced and the written section), a cubic tail scan, and a performance regression. Two cosmetic cleanups are recorded as future work in gate 4.
+
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS (document status unchanged: ready-for-review)
+
+### QA Gate Status
+
+**QA Report**: `task.184.qa.4.qa-results-carried-block-and-log-residuals.md`
+**Gate File**: `task.184.gate.4.qa-results-carried-block-and-log-residuals.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+### Missing Criteria:
+
+1. **Acceptance Criteria / Documentation:**
+   - [ ] CHANGELOG `[Unreleased]` cites `(task 184)` — the entry is at `CHANGELOG.md:919`, under the released `## [v0.53.0]` heading; move it to `## [Unreleased]` → `### Fixed` (Step 5c PC-1)
+
+2. **Performance (measured criterion):**
+   - [ ] Suites under 2 s with `uptime` beside `time`, re-measured at finalise — the head has no idle measurement; at load 3–4 (external processes) the suites take ~5.8 s, equal to the cycle-0 head under the same load. Re-measure at idle and record it, or re-scope the criterion to a bound relative to the base
+
+### Next Steps:
+
+- [ ] Move the `(task 184)` CHANGELOG entry to `[Unreleased]`
+- [ ] Re-measure the suites at idle on the head (or re-scope the criterion)
+- [ ] Re-run `/finalise` — both fixes are document-only, so no QA re-entry is needed
+
+**Estimated Effort:** Small (< 30 minutes, plus an idle window for the timing)
+
+**Gap Report Generated:** 2026-10-13
+**QA Gate Reference**: See `task.184.gate.4.qa-results-carried-block-and-log-residuals.yml`
+
+**Detailed Verification Log:** See `task.184.dod.1.qa-results-carried-block-and-log-residuals.md` for complete verification evidence and timestamps.
+
+---
 <!-- change-log-start -->
 ## Change Log
 
@@ -475,6 +519,7 @@ No open findings. Four QA cycles closed the write-then-refuse class (one section
 | 2026-10-13 |  | QA gate CONCERNS (80/100) — 1 finding (medium, PERF-1); bugs 1–2 closed | qa-task |
 | 2026-10-13 |  | QA findings fixed — cycle 3, 1 finding (PERF-1 medium) + 1 cleanup: blocks collected once per guard; R8 trimmed | qa-fix |
 | 2026-10-13 |  | QA gate PASS (100/100) — 0 findings (2 advisory cleanups) | qa-task |
+| 2026-10-13 |  | DoD incomplete — 2 gaps identified (CHANGELOG placement; idle timing) | finalise |
 <!-- change-log-end -->
 
 ---
