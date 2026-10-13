@@ -326,17 +326,17 @@ None.
 **Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.181.qa.3.probe-engine-shell-argv-entry-form.md](./task.181.qa.3.probe-engine-shell-argv-entry-form.md)
-- **Gate File**: [task.181.gate.3.probe-engine-shell-argv-entry-form.yml](./task.181.gate.3.probe-engine-shell-argv-entry-form.yml)
+- **Full Report**: [task.181.qa.4.probe-engine-shell-argv-entry-form.md](./task.181.qa.4.probe-engine-shell-argv-entry-form.md)
+- **Gate File**: [task.181.gate.4.probe-engine-shell-argv-entry-form.yml](./task.181.gate.4.probe-engine-shell-argv-entry-form.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5420 (ci:fast) + 19 probes
+- **Tests Executed**: 5423 (ci:fast) + 19 probes
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-TASK-181-001..003 fixed and verified across QA cycles 1–3; the per-case isolation is one definition shared by fence: and shell-argv:. Three LOW advisory findings routed to the gate's recommendations.future.
+QA re-entered after the finalise DoD gaps (dod.1); the three tests closing AC2 and AC6 hold their members and are mutation-proven. One LOW advisory finding routed to recommendations.future.
 
 ## Definition of Done - Gaps Identified
 
@@ -369,7 +369,6 @@ Security (19 probes, 0 reproduced), docs and CI reading 1 (SUCCESS, 5 checks @ `
 **Gap Report Generated:** 2026-10-13
 
 **Detailed Verification Log:** See `task.181.dod.1.probe-engine-shell-argv-entry-form.md` for complete verification evidence.
-
 <!-- change-log-start -->
 ## Change Log
 
@@ -386,6 +385,7 @@ Security (19 probes, 0 reproduced), docs and CI reading 1 (SUCCESS, 5 checks @ `
 | 2026-10-13 |         | QA findings fixed — cycle 2, 2 findings + 1 cleanup (shared per-case isolation for fence: and shell-argv:) | qa-fix |
 | 2026-10-13 |         | QA gate PASS (100/100) — 0 findings | qa-task |
 | 2026-10-13 |  | DoD incomplete — 3 gaps identified | finalise |
+| 2026-10-13 |  | QA gate PASS (100/100) — 0 findings (re-entry after DoD gaps) | qa-task |
 <!-- change-log-end -->
 
 ---
