@@ -35,9 +35,9 @@ Add a `shell-argv:<path>` entry form (with `--argv` and `--fixture-setup`) to `s
 | 2. review-task             | ✅ Done    | `task.181.review.{N}.{name}.md` exists (or skip logged)                | review.1 — 8/10 READY; 1C/6I/5O applied; Planned → Ready for Development | —                    | 2026-10-12T20:52Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan + surface map); 2 gate iterations; ci:fast 5415/0 | —                    | 2026-10-12T21:07Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #641: https://github.com/Gamaroff/agent-skills/pull/641 | —                    | 2026-10-12T21:09Z |
-| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.181.qa.{N}.*.md`; `task.181.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 3 cycles: CONCERNS 90 → CONCERNS 90 → PASS 100; 5c APPROVE (pr-review.1) | —                    | 2026-10-13T04:42Z |
-| 7. finalise                | ❌ Failed  | `task.181.dod.{N}.*.md`; task `status: accepted`                       | DoD GAPS — 3 missing tests (AC2 shell-fn: --argv refusal; AC6 run-time trip-wire, --fake-gh accepted); dod.1 | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.181.qa.{N}.*.md`; `task.181.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 4 cycles: CONCERNS 90 → CONCERNS 90 → PASS 100 → PASS 100 (re-entry after dod.1); 5c APPROVE (pr-review.1, pr-review.2) | —                    | 2026-10-13T04:42Z |
+| 7. finalise                | ✅ Done    | `task.181.dod.{N}.*.md`; task `status: accepted`                       | dod.1 GAPS (3 missing tests) → closed by 918a52af; dod.2 ACCEPTED — 13/13 AC, security 19 probes 0 reproduced; acceptance commit 36008464 | —                    | 2026-10-13T05:36Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Implementation report final commit | —                    | 2026-10-13T05:27Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -113,13 +113,30 @@ Add a `shell-argv:<path>` entry form (with `--argv` and `--fixture-setup`) to `s
 - Decision: GAPS — AC2 (`shell-fn:` member of the `--argv` refusal set has no test), AC6 (run-time trip-wire decline and `--fake-gh` accepted for shell-argv: have no test). Step 8a fix-and-recheck not taken: missing coverage, no `severity` on the AC findings (not low by rule), not a finding reproduced by execution.
 - Gaps path: Change Log row (no version bump), gap report section in the task body before the change-log block, gaps PR comment posted. Status left at ready-for-review.
 
+### Resume — 2026-10-13 (operator: "Go ahead")
+
+- Operator approved closing the DoD gaps. develop-next run-state halt cleared (halted: false).
+- Fix: three tests in `shared/resources/tests/security-probe.test.mjs` (AC2 shell-fn: --argv refusal; AC6 run-time trip-wire decline; AC6 --fake-gh accepted for shell-argv:). Mutations M12–M15 (CLI and library admit shell-fn: argv; trip-wire unread for shell-argv:; --fake-gh refused for shell-argv:) each turned one named test red. Commit `918a52af`, pushed.
+- QA re-entry after finalise DoD gaps: reenter-qa: re-entered QA at step 5 / qa_phase 5a — qa_max_cycles=5 (base 3), gate_head=5210dbd66fd2. Next gate is cycle 4.
+
+### Step 7 — finalise (dod.2) — 2026-10-13
+
+- QA cycle 4 (re-entry): gate.4 PASS 100; 5c pr-review.2 APPROVE (conformance lens, no findings; PR summary comment updated).
+- Four DoD agents dispatched in one message at 05:19:57Z. Compliance NOT_APPLICABLE (10.2 s); docs PASS (28.0 s); security — agent read-only again: probes_executed 0 + probe_command; /finalise ran both controls (cases → task.181.dod.2.security.cases.json, record task.181.dod.2.security.run.json): 19 executed, both engage, 0 reproduced → zero-guard FAIL dropped, SEC PASS (54.4 s agent); AC PASS 13/13 (114.3 s) — every member of AC2 and AC6 mapped to its own test.
+- PR review decision null (no reviews required) — satisfied by task.181.pr-review.2 (5c APPROVE).
+- CI reading 1: SUCCESS @ a6f9b9c4a92b (5 checks).
+- Decision: ACCEPTED. Frontmatter status accepted, completed_date, pr_number 641; Change Log 1.2 "DoD passed — accepted (PR #641)"; registry-tick: ticked; dod.1 gap section retitled historical; DoD PASSED section; sprint-review-summary.md.
+- 6a acceptance commit 36008464 ("docs(task.181): accept — DoD, sprint review; registry ticked; 5c review carried") pushed; 6b assertions ok; 6d CHANGELOG cites (task 181).
+- CI reading 1: SUCCESS @ a6f9b9c4a92b; CI reading 2: SUCCESS (tree-equivalent to 918a52afb435) @ 360084646189 over 5 checks after 30s.
+- Publish: canonical PR summary comment posted (issuecomment-6138909826); tracker done comment posted; issue #564 CLOSED (verified); gh-stage done: already.
+
 ---
 
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
 
-- **Step 7 /finalise: DoD gaps (3)** — AC2: no test holds `--argv` refused for a `shell-fn:` entry; AC6: no test holds the run-time trip-wire decline for a `shell-argv:` run, nor `--fake-gh` accepted for `shell-argv:`. Fix is test code → the resume offers "Re-enter QA at 5a". Pipeline HALTed at Step 7.
+- **Step 7 /finalise: DoD gaps (3)** — AC2: no test holds `--argv` refused for a `shell-fn:` entry; AC6: no test holds the run-time trip-wire decline for a `shell-argv:` run, nor `--fake-gh` accepted for `shell-argv:`. Fix is test code → the resume offers "Re-enter QA at 5a". Pipeline HALTed at Step 7. **Resolved** 2026-10-13: operator approved; three tests added (918a52af), QA cycle 4 PASS, dod.2 ACCEPTED.
 
 - **Step 3 gate iteration 1 failed (1/5429)** — `skills/review-security/tests/review-security.test.js:416` pinned the decline text this task removes. Missed by the Step 2 removed-literal sweep, which searched only the `bad-argv` message. Fixed and mutation-proven; recorded in the task's Files Summary.
 
@@ -160,14 +177,23 @@ _Track each QA review/fix cycle._
 **Loop exit**: n/a — this exit not taken
 **Action**: Proceeding to 5c (PR conformance review)
 
+### QA Cycle 4 — 2026-10-13 (re-entry after DoD gaps)
+**Gate Result**: PASS (100/100)
+**Issues Found**: none in the gate — dod.1's three gaps closed by mutation-proven tests (918a52af); 1 LOW advisory code-review finding to recommendations.future
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: APPROVE (pr-review.2)
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: Escalated — /finalise DoD gaps (3 missing tests); resume re-enters QA at 5a
+**Finished**: 2026-10-13T05:27Z
+**Final Status**: Completed — accepted at dod.2 after the dod.1 gaps were closed (QA re-entry, cycle 4)
 **Branch**: feature/task.181.probe-engine-shell-argv-entry-form
 **PR**: https://github.com/Gamaroff/agent-skills/pull/641
-**QA Iterations**: 3 (CONCERNS 90 → CONCERNS 90 → PASS 100; 5c APPROVE)
-**DoD Summary**: docs/tasks/task.181.probe-engine-shell-argv-entry-form/task.181.dod.1.probe-engine-shell-argv-entry-form.md (❌ GAPS)
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 4 (CONCERNS 90 → CONCERNS 90 → PASS 100 → PASS 100; 5c APPROVE ×2)
+**DoD Summary**: docs/tasks/task.181.probe-engine-shell-argv-entry-form/task.181.dod.2.probe-engine-shell-argv-entry-form.md (✅ ACCEPTED; dod.1 ❌ GAPS, closed)
+**Tracker debt**: none
