@@ -119,7 +119,9 @@ All notable changes to this project will be documented in this file. Format foll
   `reenter-qa-after-finalise.sh`'s `no-gate` refusal discarded `qa-cycle.sh`'s stderr, so a missing
   gate, an unnumbered gate and two gates claiming one cycle all printed one message, and the
   contract's "resolve the gate files first if the refusal names an ambiguity" could never fire. Both
-  `qa-cycle.sh` calls' reason lines are now relayed above the refusal as `reenter-qa:` lines. A
+  `qa-cycle.sh` calls' reason lines are now relayed above the refusal as `reenter-qa:` lines, and
+  `no-gate` now routes back to the operator, never to step 7. Run from anywhere but `<doc-dir>`'s
+  repository root, the script is now a usage error (exit 2) instead of a misleading refusal. A
   failing `git status` read as an empty, clean tree and could route a code fix to `/finalise` at
   step 7 through `no-code-moved`; it now refuses `git-unreadable`, whose route is back to the
   operator and never step 7. The `qa_reentry` lock field reaches the readers task.170 missed: the
