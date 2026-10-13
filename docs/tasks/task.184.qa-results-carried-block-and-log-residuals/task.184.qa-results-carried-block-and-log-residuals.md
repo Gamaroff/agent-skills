@@ -441,24 +441,24 @@ M3 (R7) red. `bundle:check` 0 problems; `validate` qa-task, qa-story clean.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-13
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.184.qa.3.qa-results-carried-block-and-log-residuals.md](./task.184.qa.3.qa-results-carried-block-and-log-residuals.md)
-- **Gate File**: [task.184.gate.3.qa-results-carried-block-and-log-residuals.yml](./task.184.gate.3.qa-results-carried-block-and-log-residuals.yml)
+- **Full Report**: [task.184.qa.4.qa-results-carried-block-and-log-residuals.md](./task.184.qa.4.qa-results-carried-block-and-log-residuals.md)
+- **Gate File**: [task.184.gate.4.qa-results-carried-block-and-log-residuals.yml](./task.184.gate.4.qa-results-carried-block-and-log-residuals.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 104 (engine, corpus, wiring)
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 (1 medium)
-- **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: PASS, Maintainability: PASS
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-The write-then-refuse class is closed — `sectionGuard()` runs on the replaced and the written section, a 450k-document fuzz is clean, and [bug 1](./task.184.bug.1.carried-tail-refuses-engines-own-write.md) and [bug 2](./task.184.bug.2.ambiguous-log-section-refuses-its-own-render.md) are closed. PERF-1 (medium): the 2 s suite criterion is at risk (CPU +68% over the cycle-0 head).
+No open findings. Four QA cycles closed the write-then-refuse class (one section guard for the replaced and the written section), a cubic tail scan, and a performance regression. Two cosmetic cleanups are recorded as future work in gate 4.
 <!-- change-log-start -->
 ## Change Log
 
@@ -474,6 +474,7 @@ The write-then-refuse class is closed — `sectionGuard()` runs on the replaced 
 | 2026-10-13 |  | QA findings fixed — cycle 2, 3 findings (CR-1, CR-2 medium; CR-3 low): one section guard for input and written section; R8 widened, R9, R10 | qa-fix |
 | 2026-10-13 |  | QA gate CONCERNS (80/100) — 1 finding (medium, PERF-1); bugs 1–2 closed | qa-task |
 | 2026-10-13 |  | QA findings fixed — cycle 3, 1 finding (PERF-1 medium) + 1 cleanup: blocks collected once per guard; R8 trimmed | qa-fix |
+| 2026-10-13 |  | QA gate PASS (100/100) — 0 findings (2 advisory cleanups) | qa-task |
 <!-- change-log-end -->
 
 ---
