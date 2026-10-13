@@ -438,7 +438,14 @@ takes it.
     these scripts read — commits, a gate whose `head:` is an ancestor, a halt
     snapshot. The sandbox `HOME` has no git identity, so the setup states one
     (`git -c user.name=… -c user.email=…`). **A setup that fails is *errored*,
-    never *rejected*** — the engine could not build what the script needs.
+    never *rejected*** — the engine could not build what the script needs. **A
+    setup builds `"$1"` and nothing else:** its writes are watched in their own
+    list, never charged to the entry, and a write anywhere else — the sandbox
+    `HOME` or `TMPDIR`, a sibling case, the harness — also errors that run,
+    named, because it leaves the entry's escape baseline unknown. A setup that
+    needs scratch space makes it inside `"$1"`. The entry's own runs are watched
+    beside the case directory as `fence:`'s are, so a write to a sibling case or
+    a deletion in the harness is an escape.
     `--fixture-setup` with any other form is exit 2, `bad-fixture-setup`; the
     record carries it as `fixture_setup`.
   - **A case's `fixture`** (`env`, `files`) is honoured exactly as `fence:`

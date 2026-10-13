@@ -29,8 +29,8 @@ All notable changes to this project will be documented in this file. Format foll
   script with `cli:`'s template, verdict and record key — the case's input crosses as one argv
   element, exit status is the verdict — with every caller shell running the script under bash. An
   optional `--fixture-setup <path>` names a committed script that builds each (case, shell)
-  directory first (the scratch git repository these scripts read); a setup that fails is `errored`,
-  never a refusal. A case's `fixture` is honoured as for `fence:`, with `fence:`'s `gh` checks over it
+  directory first (the scratch git repository these scripts read); a setup that fails, or writes
+  anywhere but its case directory, is `errored`, never a refusal, and never charged to the entry. A case's `fixture` is honoured as for `fence:`, with `fence:`'s `gh` checks over it
   (fixture text, `ghFreePath`), and the form takes the shell forms' `gh` handling. `--argv`'s refusal now names both forms that take it; `--fixture-setup` with any
   other form is exit 2, `bad-fixture-setup`. Proved against `reenter-qa-after-finalise.sh`
   (`shared/resources/tests/fixtures/shell-argv/`): `engages`, every case past its usage line. A

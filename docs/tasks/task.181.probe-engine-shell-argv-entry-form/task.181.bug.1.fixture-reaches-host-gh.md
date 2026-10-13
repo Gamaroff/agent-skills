@@ -4,7 +4,7 @@
 **Bug ID**: TASK-181-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 1, code review CR-1 / TASK-181-001)
 **Date Found**: 2026-10-12
 
@@ -52,3 +52,4 @@ Extend the `fence:` arm's fixture-string `namesGh` check to `shell-argv:` (its e
 | ---- | ------ | ---------- | ----- |
 | 2026-10-12 | New | qa-task | Found in QA cycle 1 (CR-1, reproduced) |
 | 2026-10-12 | Ready for QA | qa-fix | Fix iteration 1 |
+| 2026-10-13 | Closed | qa-task | Verified by task.181.qa.2.probe-engine-shell-argv-entry-form.md |

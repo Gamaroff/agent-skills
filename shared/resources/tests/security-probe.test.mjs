@@ -5481,3 +5481,114 @@ test("shell-argv entry: a fixture that spells gh without naming it still finds n
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+// ── task.181 QA cycle 2 — TASK-181-002 / -003: escape accounting for shell-argv: ──
+//
+// The setup builds its case directory and nothing else: a write elsewhere errors
+// that run, named, and is never charged to the entry under probe (TASK-181-002).
+// The entry's runs are watched beside the case directory as fence:'s are — the
+// sentinel skips the work dir, so only the work-dir snapshot sees a write to a
+// sibling case or a deletion in the harness dir (TASK-181-003).
+
+test("shell-argv entry: a setup that writes outside its case directory errors the run and charges the entry nothing (TASK-181-002)", () => {
+  const root = saRoot({
+    "ok.sh": '#!/usr/bin/env bash\n[ "$1" = alpha ] || exit 1\n',
+    "setup-tmp.sh": "#!/usr/bin/env bash\nmktemp >/dev/null\n",
+    "setup-inside.sh":
+      '#!/usr/bin/env bash\nmktemp "$1/scratch.XXXXXX" >/dev/null\n',
+  });
+  try {
+    const cases = [
+      saCase("a.ok", "legitimate", "alpha"),
+      saCase("a.bad", "hostile", "beta"),
+    ];
+    const outside = runProbeSpec({
+      entry: "shell-argv:ok.sh",
+      argv: ["{input}"],
+      fixtureSetup: "setup-tmp.sh",
+      cases,
+      repoRoot: root,
+    });
+    assert.deepEqual(outside.escapes, [], JSON.stringify(outside.escapes));
+    assert.equal(outside.executed, 0);
+    for (const c of outside.cases) {
+      assert.equal(c.outcome, "errored");
+      assert.match(c.detail, /fixture setup wrote outside the case directory/);
+    }
+    const inside = runProbeSpec({
+      entry: "shell-argv:ok.sh",
+      argv: ["{input}"],
+      fixtureSetup: "setup-inside.sh",
+      cases,
+      repoRoot: root,
+    });
+    assert.deepEqual(inside.escapes, []);
+    assert.equal(inside.verdict, "engages", JSON.stringify(inside.cases));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: a write beside the case directory, or a deletion in the harness, is an escape (TASK-181-003)", () => {
+  const root = saRoot({
+    "writes.sh": '#!/usr/bin/env bash\ntouch "$1"\nexit 1\n',
+    "deletes.sh":
+      "#!/usr/bin/env bash\nrm -f ../.probe-harness/bin/gh\nexit 1\n",
+  });
+  try {
+    const up = runProbeSpec({
+      entry: "shell-argv:writes.sh",
+      argv: ["{input}"],
+      cases: [saCase("w.up", "hostile", "../pwned", { expected: { exit: 1 } })],
+      repoRoot: root,
+    });
+    assert.ok(
+      up.escapes.some((e) => e.path.endsWith("/pwned")),
+      JSON.stringify(up.escapes),
+    );
+    const del = runProbeSpec({
+      entry: "shell-argv:deletes.sh",
+      argv: ["{input}"],
+      cases: [saCase("w.del", "hostile", "x", { expected: { exit: 1 } })],
+      repoRoot: root,
+    });
+    assert.ok(
+      del.escapes.some((e) => e.path.endsWith(".probe-harness/bin/gh")),
+      JSON.stringify(del.escapes),
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: a setup that is killed reports why, not always a timeout (CR-4)", () => {
+  const root = saRoot({
+    "slow-setup.sh": "#!/usr/bin/env bash\nsleep 5\n",
+    "self-kill.sh": "#!/usr/bin/env bash\nkill -TERM $$\n",
+  });
+  try {
+    const slow = runProbeSpec({
+      entry: "shell-argv:two-args.sh",
+      argv: SA_TEMPLATE,
+      fixtureSetup: "slow-setup.sh",
+      cases: [saCase("sa.ok", "legitimate", "alpha")],
+      timeoutMs: 300,
+      repoRoot: root,
+    });
+    for (const c of slow.cases) assert.match(c.detail, /timed out after 300ms/);
+    const killed = runProbeSpec({
+      entry: "shell-argv:two-args.sh",
+      argv: SA_TEMPLATE,
+      fixtureSetup: "self-kill.sh",
+      cases: [saCase("sa.ok", "legitimate", "alpha")],
+      repoRoot: root,
+    });
+    for (const c of killed.cases) {
+      assert.equal(c.outcome, "errored");
+      assert.doesNotMatch(c.detail, /timed out/);
+      assert.match(c.detail, /SIGTERM/);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

@@ -257,6 +257,7 @@ node PROMPT_DIR/security-probe.mjs \
 # script reads a repository (commits, a gate, a halt snapshot), name a
 # committed --fixture-setup script: it runs as `bash <setup> <case-dir>` before
 # each (case, shell) run, and a setup that fails is errored, never a refusal.
+# A setup builds "$1" and nothing else: a write anywhere else errors the run.
 # A script, setup or case fixture that names `gh` needs --fake-gh. NAME each control.
 node PROMPT_DIR/security-probe.mjs \
   --entry 'shell-argv:<path-from-repo-root>' \

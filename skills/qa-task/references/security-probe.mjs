@@ -195,7 +195,10 @@
  * `bash <setup> <case-dir>` before each (case, shell) run, after the case's
  * fixture files are written: it builds the scratch repository these scripts
  * read. A setup that exits non-zero, times out or never starts makes that run
- * `errored`, never `rejected`. It is a shell form for `gh`: a script, a setup,
+ * `errored`, never `rejected`; so does a setup that writes anywhere but the case
+ * directory — its writes are watched in their own list and never charged to the
+ * entry (TASK-181-002). Every run is watched beside the case directory as
+ * fence:'s is (caseWatchedSpawn, TASK-181-003). It is a shell form for `gh`: a script, a setup,
  * or a case fixture's env values or file contents that name `gh` without
  * `--fake-gh` are declined `needs-fake-gh`, and every PATH directory holding the
  * host `gh` is shadowed (ghFreePath), as for fence: (TASK-181-001). The record
@@ -2284,6 +2287,93 @@ function fixtureCaseEnv(fixture, { fixtureDir, sandboxHome, sandboxTmp }) {
   };
 }
 
+/**
+ * The env one per-case shell run gets: `fixtureCaseEnv`, then every PATH
+ * directory holding the host `gh` shadowed by a copy without it (fixture.env's
+ * PATH included), then the fake `gh` (armed) or the trip-wire first on PATH.
+ * ONE definition for the fence: and shell-argv: arms — the arms whose case
+ * fixture can run — so they cannot drift on it (TASK-181-001 was this
+ * isolation copied into one arm and not the other).
+ */
+function caseShellEnv(
+  fixture,
+  { caseDir, sandboxHome, sandboxTmp, harnessDir, fakeGhDir },
+) {
+  const env = fixtureCaseEnv(fixture, {
+    fixtureDir: caseDir,
+    sandboxHome,
+    sandboxTmp,
+  });
+  env.PATH = ghFreePath(env.PATH, join(harnessDir, "path"), caseDir);
+  if (fakeGhDir !== null) {
+    env.PATH = `${fakeGhDir}:${env.PATH}`;
+    env.FAKE_GH = "1";
+  } else {
+    env.PATH = `${join(harnessDir, "bin")}:${env.PATH}`;
+  }
+  return env;
+}
+
+/**
+ * `watchedSpawn` for a run whose cwd is a case directory inside the work dir,
+ * plus the work-dir snapshot that only such a run needs: the sandbox sentinel
+ * skips the work dir, so a write beside the case directory (`../pwned`, a
+ * sibling case, the harness dir) is an escape only this sees, as is a deletion
+ * or an empty directory there — a deleted trip-wire stub lets later cases reach
+ * the host's real `gh` (TASK-180-011, -013). The trip-wire's own marker is the
+ * harness's write, reported as a gh call, not here. ONE definition for the
+ * fence: and shell-argv: arms (TASK-181-003 was this snapshot missing from one).
+ */
+function caseWatchedSpawn(
+  command,
+  argv,
+  { cwd, env, timeoutMs },
+  {
+    sandboxRoot,
+    workDir,
+    workDirName,
+    harnessDir,
+    scriptDir,
+    escapes,
+    escapeId,
+    shell,
+  },
+) {
+  const caseName = basename(cwd);
+  const ownWrite = `${basename(harnessDir)}/${GH_TRIPPED}`;
+  const workBefore = workDirStamps(workDir, caseName);
+  const child = watchedSpawn(
+    command,
+    argv,
+    { cwd, env, timeoutMs },
+    { sandboxRoot, workDirName, scriptDir, escapes, escapeId, shell },
+  );
+  // Both ways: a path that appeared or changed, and a path that is gone.
+  const workAfter = workDirStamps(workDir, caseName);
+  const changed = [...workAfter]
+    .filter(
+      ([path, stamp]) => path !== ownWrite && workBefore.get(path) !== stamp,
+    )
+    .map(([path]) => path);
+  const gone = [...workBefore.keys()].filter((path) => !workAfter.has(path));
+  for (const path of [...changed, ...gone]) {
+    escapes.push({ id: escapeId, shell, path: `${workDirName}/${path}` });
+  }
+  return child;
+}
+
+/**
+ * Why a child produced no answer — `neverRan` says THAT it did not; this says
+ * which of three things happened, so "could not start" and "killed for another
+ * reason" never read as a timeout (task.181 QA cycle 2, CR-4).
+ */
+function neverRanDetail(child, timeoutMs) {
+  if (child.error?.code === "ETIMEDOUT")
+    return `timed out after ${timeoutMs}ms`;
+  if (child.signal) return `killed by ${child.signal}`;
+  return `never ran: ${child.error?.message ?? "no exit status"}`;
+}
+
 // ── The shell-argv entry form (task.181) ─────────────────────────────────────
 
 /**
@@ -2401,42 +2491,47 @@ function runShellArgvCase(
       errored(shell, `fixture: ${e.message}`);
       continue;
     }
-    const env = fixtureCaseEnv(c.fixture, {
-      fixtureDir,
+    // The same isolation as fence: — one definition (caseShellEnv).
+    const env = caseShellEnv(c.fixture, {
+      caseDir: fixtureDir,
       sandboxHome,
       sandboxTmp,
+      harnessDir,
+      fakeGhDir,
     });
-    // Every PATH directory holding the host `gh` is shadowed by a copy without
-    // it, fixture.env's PATH included, before the trip-wire or fake goes first —
-    // as runFenceCase does, because a case fixture can run (TASK-181-001).
-    env.PATH = ghFreePath(env.PATH, join(harnessDir, "path"), fixtureDir);
-    if (fakeGhDir !== null) {
-      env.PATH = `${fakeGhDir}:${env.PATH}`;
-      env.FAKE_GH = "1";
-    } else {
-      env.PATH = `${join(harnessDir, "bin")}:${env.PATH}`;
-    }
     const watch = {
       sandboxRoot,
+      workDir,
       workDirName,
-      escapes,
+      harnessDir,
       escapeId: `${c.id}@${shell}`,
       shell,
     };
 
     if (setupPath !== null) {
-      const setup = watchedSpawn(
+      // The setup builds its case directory and nothing else. Its writes are
+      // watched into their OWN list, never the entry's: a setup write charged
+      // to the entry read as the entry escaping (TASK-181-002). A write
+      // anywhere but the case directory — the sandbox HOME or TMPDIR, a
+      // sibling case, the harness — errors this run, named: it leaves the
+      // entry's escape baseline unknown. A setup that needs scratch space
+      // makes it inside "$1".
+      const setupWrites = [];
+      const setup = caseWatchedSpawn(
         "bash",
         [setupPath, fixtureDir],
         { cwd: fixtureDir, env, timeoutMs },
-        { ...watch, scriptDir: dirname(setupPath) },
+        { ...watch, scriptDir: dirname(setupPath), escapes: setupWrites },
       );
       if (neverRan(setup)) {
+        errored(shell, `fixture setup ${neverRanDetail(setup, timeoutMs)}`);
+        continue;
+      }
+      if (setupWrites.length > 0) {
+        const paths = [...new Set(setupWrites.map((e) => e.path))];
         errored(
           shell,
-          setup.signal
-            ? `fixture setup timed out after ${timeoutMs}ms`
-            : "fixture setup never ran",
+          `fixture setup wrote outside the case directory: ${paths.slice(0, 5).join(", ")}${paths.length > 5 ? ` (+${paths.length - 5} more)` : ""} — a setup builds "$1" and nothing else`,
         );
         continue;
       }
@@ -2456,20 +2551,18 @@ function runShellArgvCase(
     const args = template.map((a) =>
       a === "{input}" ? c.input : a === "{fixture}" ? fixtureDir : a,
     );
-    const child = watchedSpawn(
+    const child = caseWatchedSpawn(
       shell,
       shellArgvSpawnArgs(shell, entryPath, args),
       { cwd: fixtureDir, env, timeoutMs },
-      { ...watch, scriptDir: dirname(entryPath) },
+      { ...watch, scriptDir: dirname(entryPath), escapes },
     );
 
     let outcome;
     let detail = null;
     if (neverRan(child)) {
       outcome = "errored";
-      detail = child.signal
-        ? `timed out after ${timeoutMs}ms`
-        : `never ran: ${child.error?.message ?? "no exit status"}`;
+      detail = neverRanDetail(child, timeoutMs);
     } else if (hasExpected) {
       const mismatches = compareExpected(c.expected, child, fixtureDir);
       const matched = mismatches.length === 0;
@@ -2925,64 +3018,36 @@ function runFenceCase(
     const scriptPath = join(harnessDir, `fence-${++harnessSeq}.sh`);
     writeFileSync(scriptPath, script);
 
-    const env = fixtureCaseEnv(c.fixture, {
-      fixtureDir: caseDir,
+    // The per-case isolation shared with shell-argv: (caseShellEnv).
+    const env = caseShellEnv(c.fixture, {
+      caseDir,
       sandboxHome,
       sandboxTmp,
+      harnessDir,
+      fakeGhDir,
     });
-    // Every PATH directory holding the host `gh` is shadowed by one without it,
-    // fixture.env's PATH included, before the trip-wire or fixture goes first.
-    env.PATH = ghFreePath(env.PATH, join(harnessDir, "path"), caseDir);
-    if (fakeGhDir !== null) {
-      env.PATH = `${fakeGhDir}:${env.PATH}`;
-      env.FAKE_GH = "1";
-    } else {
-      env.PATH = `${join(harnessDir, "bin")}:${env.PATH}`;
-    }
     const parseError = parseCheck(shell, scriptPath, {
       cwd: caseDir,
       env,
       timeoutMs,
     });
-    // The sentinel skips the work dir, and the case directory sits inside it:
-    // a write beside the case directory (`../pwned`, the harness dir) is an
-    // escape only this snapshot sees (TASK-180-011), as is a deletion or an
-    // empty directory there (TASK-180-013). The trip-wire's own marker is the
-    // harness's write, reported as a gh call, not here.
-    const caseName = basename(caseDir);
-    const ownWrite = `${basename(harnessDir)}/${GH_TRIPPED}`;
-    const workBefore = workDirStamps(workDir, caseName);
-    const child = watchedSpawn(
+    // Watched beside the case directory too (TASK-180-011, -013) — the
+    // snapshot is caseWatchedSpawn's, shared with shell-argv:.
+    const child = caseWatchedSpawn(
       shell,
       [...noRcFlags(shell), scriptPath],
       { cwd: caseDir, env, timeoutMs },
       {
         sandboxRoot,
+        workDir,
         workDirName,
+        harnessDir,
         scriptDir: dirname(docPath),
         escapes,
         escapeId: `${c.id}@${shell}`,
         shell,
       },
     );
-
-    // Both ways: a path that appeared or changed, and a path that is gone — a
-    // deleted trip-wire stub lets later cases reach the host's real `gh`
-    // (TASK-180-013).
-    const workAfter = workDirStamps(workDir, caseName);
-    const changed = [...workAfter]
-      .filter(
-        ([path, stamp]) => path !== ownWrite && workBefore.get(path) !== stamp,
-      )
-      .map(([path]) => path);
-    const gone = [...workBefore.keys()].filter((path) => !workAfter.has(path));
-    for (const path of [...changed, ...gone]) {
-      escapes.push({
-        id: `${c.id}@${shell}`,
-        shell,
-        path: `${workDirName}/${path}`,
-      });
-    }
 
     const { outcome, detail } = scoreFenceRun(child, {
       c,
