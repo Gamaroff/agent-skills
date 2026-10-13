@@ -338,12 +338,43 @@ None.
 ### Key Findings
 TASK-181-001..003 fixed and verified across QA cycles 1–3; the per-case isolation is one definition shared by fence: and shell-argv:. Three LOW advisory findings routed to the gate's recommendations.future.
 
-## Change Log
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**QA Report**: `task.181.qa.3.probe-engine-shell-argv-entry-form.md`
+**Gate File**: `task.181.gate.3.probe-engine-shell-argv-entry-form.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR review (Step 5c)**: APPROVE (`task.181.pr-review.1.probe-engine-shell-argv-entry-form.md`)
+
+### Missing Criteria:
+
+1. **Acceptance Criteria (quantifier rule — each member of a set needs its own test):**
+   - [ ] AC2: a test that `--argv` with a `shell-fn:` entry is refused `bad-argv` (CLI exit 2 and library decline)
+   - [ ] AC6: a test that a `shell-argv:` run whose script calls `gh` in a spelling the text check misses is declined `needs-fake-gh` by the run-time trip-wire
+   - [ ] AC6: a test that `--fake-gh` is accepted for `shell-argv:` and its `gh` answers the run
+
+Security (19 probes, 0 reproduced), docs and CI reading 1 (SUCCESS, 5 checks @ `2fc64403`) pass; compliance is not applicable.
+
+### Next Steps:
+
+- [ ] Add the three tests to `shared/resources/tests/security-probe.test.mjs`, each mutation-proven
+- [ ] The fix is test code: re-enter QA at 5a, then re-run `/finalise`
+
+**Estimated Effort:** Small (three tests, no engine change expected)
+
+**Gap Report Generated:** 2026-10-13
+
+**Detailed Verification Log:** See `task.181.dod.1.probe-engine-shell-argv-entry-form.md` for complete verification evidence.
 
 <!-- change-log-start -->
+## Change Log
 
-| Date       | Version | Description                                                        | Author      |
-| ---------- | ------- | ------------------------------------------------------------------ | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-04 | 1.0     | Initial draft — cut from observation #189 and task.170's DoD gap 2 | create-task |
 | 2026-10-12 | 1.1     | Review 8/10 after fixes — zsh arm corrected to caller-only (bash interprets); form-dispatch site table added; `gh`, case `fixture` and `--fixture-setup` scoping decided; pinned-text tests listed; proof run held by a test; anchors re-measured after task.180 | review-task |
 | 2026-10-12 |         | Status → ready-for-development | review-task |
@@ -354,7 +385,7 @@ TASK-181-001..003 fixed and verified across QA cycles 1–3; the per-case isolat
 | 2026-10-13 |         | QA gate CONCERNS (90/100) — 2 findings | qa-task |
 | 2026-10-13 |         | QA findings fixed — cycle 2, 2 findings + 1 cleanup (shared per-case isolation for fence: and shell-argv:) | qa-fix |
 | 2026-10-13 |         | QA gate PASS (100/100) — 0 findings | qa-task |
-
+| 2026-10-13 |  | DoD incomplete — 3 gaps identified | finalise |
 <!-- change-log-end -->
 
 ---
