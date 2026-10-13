@@ -5592,3 +5592,101 @@ test("shell-argv entry: a setup that is killed reports why, not always a timeout
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+// ── task.181 /finalise DoD gaps — AC2 and AC6 members held by tests ──────────
+//
+// The DoD's quantifier rule (dod.1): every member of a set criterion needs its
+// own test. AC2 lists `shell-fn:` among the forms `--argv` is still refused for;
+// AC6 lists the run-time trip-wire and `--fake-gh` among the shell forms' `gh`
+// handling `shell-argv:` takes.
+
+test("shell-argv entry: --argv is still refused for a shell-fn: entry — CLI exit 2 and library decline (task.181 AC2)", () => {
+  const root = fenceRoot({ "lib.sh": "f() { printf '%s\\n' \"$1\"; }\n" });
+  const dir = mkdtempSync(join(tmpdir(), "probe-sa-fnargv-"));
+  try {
+    const record = join(dir, "run.json");
+    const { rc, err } = runMain([
+      "--sink",
+      "filename",
+      "--repo-root",
+      root,
+      "--entry",
+      "shell-fn:lib.sh#f",
+      "--argv",
+      '["{input}"]',
+      "--record",
+      record,
+    ]);
+    assert.equal(rc, 2, err);
+    assert.match(
+      err,
+      /^bad-argv: --argv applies to the cli: and shell-argv: entry forms only/,
+    );
+    assert.equal(existsSync(record), false);
+    const r = runProbeSpec({
+      sink: "filename",
+      entry: "shell-fn:lib.sh#f",
+      cases: SA_CASES,
+      argv: ["{input}"],
+      repoRoot: root,
+    });
+    assert.equal(r.reason, "bad-argv");
+    assert.equal(r.executed, 0);
+    assert.match(r.declined[0].detail, /cli: and shell-argv: entry forms only/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: a gh call the text check cannot see is caught by the run-time trip-wire and declined (task.181 AC6)", () => {
+  // `X=gh; "$X"` names no `gh` the pre-spawn detector reads, so only the
+  // trip-wire first on PATH can answer — and then nothing is scored.
+  const root = saRoot({
+    "calls-gh.sh":
+      '#!/usr/bin/env bash\nX=gh\n"$X" auth status >/dev/null 2>&1\n[ "$1" = alpha ]\n',
+  });
+  try {
+    const r = runProbeSpec({
+      entry: "shell-argv:calls-gh.sh",
+      cases: SA_CASES,
+      argv: ["{input}"],
+      repoRoot: root,
+    });
+    assert.equal(r.reason, "needs-fake-gh", JSON.stringify(r.declined));
+    assert.equal(r.executed, 0);
+    assert.match(r.declined[0].detail, /invoked .gh. at run time/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: --fake-gh is accepted and its gh answers the run (task.181 AC6)", () => {
+  // The script refuses unless the fake answered — so `alpha` accepted proves
+  // the fake was first on PATH, armed with FAKE_GH=1.
+  const root = saRoot({
+    "fake/gh":
+      '#!/bin/sh\n[ "$FAKE_GH" = 1 ] || { echo "FAKE_GH unset" >&2; exit 2; }\necho fake-gh-answered\n',
+    "asks-gh.sh":
+      '#!/usr/bin/env bash\nout=$(gh api x)\n[ "$out" = fake-gh-answered ] || exit 9\n[ "$1" = alpha ] || exit 1\n',
+  });
+  try {
+    chmodSync(join(root, "fake/gh"), 0o755);
+    const r = runProbeSpec({
+      entry: "shell-argv:asks-gh.sh",
+      cases: [
+        saCase("sa.ok", "legitimate", "alpha"),
+        saCase("sa.bad", "hostile", "beta", { expected: { exit: 1 } }),
+      ],
+      argv: ["{input}"],
+      fakeGh: "fake",
+      repoRoot: root,
+    });
+    assert.deepEqual(r.declined, [], JSON.stringify(r.cases));
+    assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+    assert.equal(r.fakeGh, join(root, "fake"));
+    assert.equal(toRecordEntry(r).fake_gh, join(root, "fake"));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
