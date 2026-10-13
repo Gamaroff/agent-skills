@@ -416,7 +416,9 @@ in `shared/resources/qa-results.js` and adds one test, and no rule exempts a lin
 - **Phase 3 (gate 6 CR6-1, refuse).** A bold-label block that stops at a bold label not introducing a
   list looks ahead to the next `#{1,3}` heading or QA field; the first list item or table row there is
   its `tail`. `upsertQaResults` refuses with `carried-tail:<line>`, reading `tail` from every
-  collected block, not only the ones `carriedBlocks` keeps (review O2). The detail is in the vocabulary
+  collected block, not only the ones `carriedBlocks` keeps (review O2). A stopping label that opens a
+  carried block of its own (`**Bug Reports**`, `**Deferred Work**`) records no tail: that block already
+  collects the list, and the engine writes two carried blocks side by side (QA cycle 1, CR-1; R7, R8). The detail is in the vocabulary
   comment and in both QA skills' Step 12 hint string and `unbounded` paragraph.
 - **Phase 4.** R2's duplicate `assertCr51Refused()` dropped; R4 renamed; CHANGELOG task 183 entry
   narrowed and a `(task 184)` entry added; seven task.183 passages amended, with one Change Log note row.
@@ -430,6 +432,27 @@ M3 (R7) red. `bundle:check` 0 problems; `validate` qa-task, qa-story clean.
 **Deferred Work.** None new. task.183's CR-7, CR2-3, CR4-4 and CR2-4 remain deferred there.
 
 ---
+
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-13
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.184.qa.1.qa-results-carried-block-and-log-residuals.md](./task.184.qa.1.qa-results-carried-block-and-log-residuals.md)
+- **Gate File**: [task.184.gate.1.qa-results-carried-block-and-log-residuals.yml](./task.184.gate.1.qa-results-carried-block-and-log-residuals.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 101 (engine, corpus, wiring); 5441 in `ci:fast`
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0 (1 medium)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+CR-1 (medium): the `carried-tail:` rule refuses a document the engine itself writes — a bold Bug Reports block next to a bold Deferred Work block with a lead paragraph — so a later QA cycle halts on its own output. Bug: [task.184.bug.1.carried-tail-refuses-engines-own-write.md](./task.184.bug.1.carried-tail-refuses-engines-own-write.md). Two low cleanups (CR-2, CR-3) advisory.
 <!-- change-log-start -->
 ## Change Log
 
@@ -439,6 +462,8 @@ M3 (R7) red. `bundle:check` 0 problems; `validate` qa-task, qa-story clean.
 | 2026-10-13 | 1.1     | Review passed (9/10) — added the `unbounded` prose paragraph in each QA skill to Phase 3; restated "no network access" as a documentation criterion | review-task |
 | 2026-10-13 |         | Status → ready-for-development | review-task |
 | 2026-10-13 |  | Implemented — 7 source files (+2 bundled copies), 3 new tests, 3 updated; 4 mutation proofs | develop |
+| 2026-10-13 |  | QA gate CONCERNS (80/100) — 1 finding (medium), 2 advisory cleanups | qa-task |
+| 2026-10-13 |  | QA findings fixed — cycle 1, 2 findings (CR-1 medium, CR-2 cleanup); R7 case + R8 property test | qa-fix |
 <!-- change-log-end -->
 
 ---

@@ -167,6 +167,15 @@ const CARRIED_PATTERN = {
   "Bug Reports": "Bug Reports?",
   "Deferred Work": "Deferred Work",
 };
+// A bold label that opens a carried block of its own, under any carried name.
+const RE_CARRIED_LABEL = new RegExp(
+  `^\\*\\*(?:${Object.values(CARRIED_PATTERN).join("|")})\\*\\*:?[ \\t]*$`,
+  "i",
+);
+// A line that opens a list item or a table row — what a carried list is made of. One
+// definition for the stop rule (introducesList) and the tail rule (task.184 QA cycle 1,
+// CR-2: the two copies could drift apart on what counts as a list).
+const RE_LIST_OR_ROW = /^[ \t]*(?:[-*+][ \t]|\d+[.)][ \t]|\|)/;
 
 function collectBlocks(text, name) {
   const ranges = protectedRanges(text);
@@ -186,10 +195,7 @@ function collectBlocks(text, name) {
     const introducesList = (i) => {
       let j = i + 1;
       while (j < lines.length && /^[ \t]*$/.test(bare(j))) j++;
-      return (
-        j < lines.length &&
-        /^[ \t]*(?:[-*+][ \t]|\d+[.)][ \t]|\|)/.test(bare(j))
-      );
+      return j < lines.length && RE_LIST_OR_ROW.test(bare(j));
     };
     const stops = (i) => {
       const l = bare(i);
@@ -213,15 +219,24 @@ function collectBlocks(text, name) {
         // field, the block's content may continue there (gate 6 CR6-1: `**Critical
         // Issues**` / paragraph / `- [b]`). Record it so the write is refused rather than
         // guessing which lines are the block's (task 184; operator decision 2026-10-05).
-        // This only ADDS a refusal; it exempts nothing.
+        // This only ADDS a refusal; it exempts nothing. Not when the stopping label opens
+        // a carried block of its own: that block collects the list after its lead
+        // paragraph, so nothing is cut, and the engine's own write puts two carried blocks
+        // side by side — refusing that shape refused the engine's previous write (task.184
+        // QA cycle 1, CR-1). The other block's own stop is checked when it is collected.
         const l = bare(i);
-        if (!level && RE_BOLD_LABEL.test(l) && !RE_QA_FIELD.test(l)) {
+        if (
+          !level &&
+          RE_BOLD_LABEL.test(l) &&
+          !RE_QA_FIELD.test(l) &&
+          !RE_CARRIED_LABEL.test(l)
+        ) {
           let at = offset + lines[i].length + 1;
           for (let j = i + 1; j < lines.length; j++) {
             const t = bare(j);
             if (!insideProtected(ranges, at)) {
               if (/^#{1,3}[ \t]/.test(t) || RE_QA_FIELD.test(t)) break;
-              if (/^[ \t]*(?:[-*+][ \t]|\d+[.)][ \t]|\|)/.test(t)) {
+              if (RE_LIST_OR_ROW.test(t)) {
                 tail = t.trim().slice(0, 60);
                 break;
               }

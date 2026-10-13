@@ -1324,4 +1324,67 @@ test("R7 gate 6 CR6-1: a carried list behind a label and a paragraph is refused"
   const out = replaceThrice(markerDoc(`${section(1)}\n\n${direct}\n\n`));
   assert.equal(count(out, "- stale"), 1);
   assert.equal(count(out, "(./a.md)"), 1);
+  // A stopping label that opens a carried block of its own is not a tail: that block
+  // collects the list after its lead paragraph. The engine writes two carried blocks side
+  // by side, so refusing this shape refused the engine's own previous write (QA cycle 1,
+  // CR-1: replaced, then carried-tail:- CR-1 thing on every later write).
+  const adjacent =
+    "**Bug Reports**\n\n- [a](./a.md)\n\n### Notes\n\n**Deferred Work**\n\nCarried from cycle 3:\n\n- CR-1 thing";
+  let doc2 = markerDoc(`${section(1)}\n\n${adjacent}\n\n`);
+  for (let n = 2; n <= 4; n++) {
+    const r2 = QR.upsertQaResults(doc2, section(n), { docType: "task" });
+    assert.equal(r2.reason, "replaced", `write ${n}: ${r2.detail || ""}`);
+    doc2 = r2.content;
+  }
+  assert.equal(count(doc2, "(./a.md)"), 1);
+  assert.equal(count(doc2, "- CR-1 thing"), 1);
+  assert.equal(count(doc2, "Carried from cycle 3:"), 1);
+});
+
+test("R8 QA cycle 1 CR-1: a write the engine makes is never refused by its next write", () => {
+  // The property, not the repro (qa-fix Step 3.5): across a family of carried-block
+  // shapes, a first write that succeeds is followed by writes that succeed, nothing a
+  // carried block held is lost, and a repeated write is byte-identical.
+  const pieces = (i) => [
+    `**Bug Reports**\n\n- [b${i}](./b${i}.md)`,
+    `**Bug Reports**\n\nFound in cycle ${i}:\n\n- [p${i}](./p${i}.md)`,
+    `**Deferred Work**\n\nCarried from cycle ${i}:\n\n- D${i} item`,
+    `**Deferred Work**\n\n- E${i} item`,
+    `#### Bug Reports\n\n- [h${i}](./h${i}.md)`,
+    `### Notes ${i}`,
+  ];
+  const ok = (r) => ["replaced", "relocated", "created"].includes(r.reason);
+  let shapes = 0;
+  for (let a = 0; a < 6; a++)
+    for (let b = 0; b < 6; b++)
+      for (let c = 0; c < 6; c++) {
+        const parts = [pieces(1)[a], pieces(2)[b], pieces(3)[c]];
+        const doc = markerDoc(`${section(1)}\n\n${parts.join("\n\n")}\n\n`);
+        const items = parts.join("\n").match(/^- .*$/gm) || [];
+        let cur = doc;
+        const first = QR.upsertQaResults(cur, section(2), { docType: "task" });
+        if (!ok(first)) continue;
+        shapes++;
+        cur = first.content;
+        for (let n = 3; n <= 4; n++) {
+          const r = QR.upsertQaResults(cur, section(n), { docType: "task" });
+          assert.ok(
+            ok(r),
+            `${JSON.stringify(parts)} write ${n}: ${r.reason} ${r.detail || ""}`,
+          );
+          cur = r.content;
+        }
+        for (const it of items)
+          assert.ok(count(cur, it) >= 1, `${JSON.stringify(parts)} lost ${it}`);
+        assert.equal(
+          QR.upsertQaResults(cur, section(4), { docType: "task" }).content,
+          cur,
+          `${JSON.stringify(parts)} not idempotent`,
+        );
+      }
+  // Non-vacuity: the family must exercise the property, not skip past it.
+  assert.ok(
+    shapes >= 200,
+    `only ${shapes} of 216 shapes wrote on the first write`,
+  );
 });

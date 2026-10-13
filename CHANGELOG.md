@@ -924,7 +924,7 @@ All notable changes to this project will be documented in this file. Format foll
   `structural-line:`), never relocated with quoted rows left in the log — this includes the
   `| Reviewer | Date |` shape task 183 relocated. And a carried bold block whose list continues past
   a label and a paragraph is now **refused** with a new `carried-tail:<line>` detail, where the list
-  was deleted. Migration for either refusal: the Step 12 HALT names the line; move the section above
+  was deleted — unless that label opens a carried block of its own, which already carries the list. Migration for either refusal: the Step 12 HALT names the line; move the section above
   `## Change Log` (or make the log Date-first), or put the list directly under its label, then re-run.
 
 - **`qa-results.js` no longer deletes a setext section headed by paragraph text, and keeps
