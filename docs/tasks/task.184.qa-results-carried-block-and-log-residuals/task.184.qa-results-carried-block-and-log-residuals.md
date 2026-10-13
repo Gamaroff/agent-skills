@@ -5,10 +5,12 @@ type: task
 description: "Follow-up to task.183. Close three content-loss shapes in `shared/resources/qa-results.js` that predate task.183 (all identical on origin/develop): keep a nested Bug Reports block that runs past its outer block, refuse a section under a marker-less log whose table above is not Date-first, and refuse a carried bold block whose list continues past a label and a paragraph. Also correct task.183's stale wording, CHANGELOG over-claim and a duplicate test assertion."
 tags: [qa-task, qa-story, engine, follow-up]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-05
 updated: 2026-10-13
+completed_date: 2026-10-13
+pr_number: 644
 assignee:
 estimated_effort_hours: 16
 github_issue: 572
@@ -16,7 +18,7 @@ github_issue: 572
 
 # Technical Task: qa-results carried-block and log residuals
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.184.review.1.qa-results-carried-block-and-log-residuals.md` implemented 2026-10-13
 
@@ -477,7 +479,9 @@ external load rose mid-run and the next six were 1.08–1.29 s.
 ### Key Findings
 No open findings. Cycle 5 re-entered QA after the finalise DoD gaps: the CHANGELOG entry now sits under `[Unreleased]`, and the suites ran under 2 s in nine of ten idle runs (median 1.14 s). Gate 4's cosmetic cleanups remain future work.
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 1 (historical, superseded)
+
+> Superseded by DoD run 2 (`task.184.dod.2.qa-results-carried-block-and-log-residuals.md`): both gaps below were closed and the task was accepted.
 
 **Status:** IN PROGRESS (document status unchanged: ready-for-review)
 
@@ -510,6 +514,31 @@ No open findings. Cycle 5 re-entered QA after the finalise DoD gaps: the CHANGEL
 **Detailed Verification Log:** See `task.184.dod.1.qa-results-carried-block-and-log-residuals.md` for complete verification evidence and timestamps.
 
 ---
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.184.qa.5.qa-results-carried-block-and-log-residuals.md`
+**Gate File**: `task.184.gate.5.qa-results-carried-block-and-log-residuals.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 10 of 11 criteria met by per-PR tests or committed evidence; AC5 (suites under 2 s) accepted by a recorded operator override — the host CPU was throttled to 800 MHz at finalise, and byte-identical code measured 1.08–1.62 s (median 1.14 s) before the throttling
+✅ **Unit Tests:** R3–R10 in `shared/resources/tests/qa-results.test.mjs`; corpus write survey 0 / 0 / 0; `npm run ci:fast` green
+✅ **PR Review:** PR #644 — Step 5c `task.184.pr-review.2` APPROVE; CI green on `17abc500` (5 checks)
+✅ **Documentation:** CHANGELOG `[Unreleased]` → Fixed cites task 184; both QA skills document `carried-tail:`
+✅ **Security Review:** PASS — no secrets, no shell or eval; `boundary: internal` (reason recorded)
+✅ **Compliance Review:** Not applicable — internal engine, no personal, payment, UI or health data
+
+**Task marked as ACCEPTED on:** 2026-10-13
+
+**Detailed Verification Log:** See `task.184.dod.2.qa-results-carried-block-and-log-residuals.md` for complete verification evidence, including the AC5 override.
+
+---
 <!-- change-log-start -->
 ## Change Log
 
@@ -528,6 +557,7 @@ No open findings. Cycle 5 re-entered QA after the finalise DoD gaps: the CHANGEL
 | 2026-10-13 |  | QA gate PASS (100/100) — 0 findings (2 advisory cleanups) | qa-task |
 | 2026-10-13 |  | DoD incomplete — 2 gaps identified (CHANGELOG placement; idle timing) | finalise |
 | 2026-10-13 |  | QA gate PASS (100/100) — 0 findings; re-entry after DoD gaps | qa-task |
+| 2026-10-13 | 1.2 | DoD passed — accepted (PR #644); AC5 by operator override (host CPU throttled) | finalise |
 <!-- change-log-end -->
 
 ---
