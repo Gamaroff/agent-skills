@@ -1,0 +1,69 @@
+schema: 2
+task: 'task.184.qa-results-carried-block-and-log-residuals'
+task_title: 'qa-results carried-block and log residuals'
+gate: CONCERNS
+status_reason: 'Cycle 2''s consolidation closed the write-then-refuse class: a 450k-document fuzz found no write followed by a refusal, no non-idempotent rewrite and no lost line, and bugs 1–2 are verified closed. One open finding: the 2 s performance criterion is at risk — suite CPU time is +68% over the cycle-0 head, mostly R8 and a guard that collects blocks twice.'
+reviewer: 'QA Engineer'
+head: '3dbc70163ad4892321c6223dd25814fda1592641'
+updated: '2026-10-13T08:59:18Z'
+
+top_issues:
+  - id: 'PERF-1'
+    severity: medium
+    file: 'shared/resources/qa-results.js'
+    finding: 'Success criterion "engine, wiring and corpus suites under 2 s" is at risk. Measured back to back at load 14 (external processes): af294361 real 6.92 s / user 10.57 s, 3dbc7016 real 11.32 s / user 17.83 s (+68% CPU); scaled from af294361''s idle 1.08 s that is about 1.8 s. R8 alone took 2.9 s under load. sectionGuard runs collectBlocks for both carried names twice per call (inside carriedBlocks and again for the tails) and now runs on the replaced and the written section; on label-dense input that is 4–6x base (500 nested Bug Reports labels: 2.8 s vs 0.5 s).'
+    suggested_action: 'Collect the blocks once per guard and derive the kept spans from that array (carriedBlocks accepting collected blocks); trim R8''s per-shape writes to what the property needs; re-measure at idle load with uptime beside time.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 104
+  phases_verified: 4/4
+  ci: 'not read — CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-10-13'
+  total_iterations: 2
+  verification_method: 'R7–R10, mutation spot checks M5–M7 (covered), reviewer fuzz of 450k documents'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: internal — shared/resources/qa-results.js#upsertQaResults judges a work-item document and a section this pipeline renders; markdown-structure models the implementation report and the disqualified-entries table lists only report-lint.js#lintReport. Unchanged from gates 1–2.'
+  performance:
+    status: CONCERNS
+    notes: 'PERF-1: suite CPU +68% over the cycle-0 head; the 2 s criterion is at risk (about 1.8 s estimated at idle). Label-dense input 4–6x base.'
+  reliability:
+    status: PASS
+    notes: 'Write-then-refuse class closed by construction (sectionGuard on the replaced and the written section); fuzz clean.'
+  maintainability:
+    status: PASS
+    notes: 'CR-2 (advisory): the header says unplaceable can carry unclosed-fence, but checked() reports read-back:1 unbounded first.'
+
+recommendations:
+  immediate:
+    - action: 'PERF-1: collect blocks once per guard; trim R8; re-measure the suites at idle.'
+      refs: ['shared/resources/qa-results.js', 'shared/resources/tests/qa-results.test.mjs']
+  future:
+    - action: 'CR-2: correct the unplaceable note in the detail vocabulary.'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'Gate 2 CR-4: decide whether a fenced block after a stopping label is a tail.'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'Gate 1 CR-3: compute the "directly under a marker-less log" predicate once.'
+      refs: ['shared/resources/qa-results.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['PERF-1: suites re-measured under 2 s']

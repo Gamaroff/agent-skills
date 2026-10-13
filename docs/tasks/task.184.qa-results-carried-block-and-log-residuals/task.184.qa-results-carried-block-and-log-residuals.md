@@ -444,21 +444,21 @@ M3 (R7) red. `bundle:check` 0 problems; `validate` qa-task, qa-story clean.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-13
-**Quality Score**: 70/100
+**Quality Score**: 80/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.184.qa.2.qa-results-carried-block-and-log-residuals.md](./task.184.qa.2.qa-results-carried-block-and-log-residuals.md)
-- **Gate File**: [task.184.gate.2.qa-results-carried-block-and-log-residuals.yml](./task.184.gate.2.qa-results-carried-block-and-log-residuals.yml)
+- **Full Report**: [task.184.qa.3.qa-results-carried-block-and-log-residuals.md](./task.184.qa.3.qa-results-carried-block-and-log-residuals.md)
+- **Gate File**: [task.184.gate.3.qa-results-carried-block-and-log-residuals.yml](./task.184.gate.3.qa-results-carried-block-and-log-residuals.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 102 (engine, corpus, wiring)
+- **Tests Executed**: 104 (engine, corpus, wiring)
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 (2 medium, 1 low)
-- **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 0 (1 medium)
+- **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Cycle 2 refute pass: the engine can still write a document its next write refuses — via the Phase 1 union with the tail rule (CR-1, [bug 1](./task.184.bug.1.carried-tail-refuses-engines-own-write.md) reopened) and via `ambiguousAbove` with the render's own dated rows (CR-2, [bug 2](./task.184.bug.2.ambiguous-log-section-refuses-its-own-render.md)). The tail scan is cubic on a repeated label (CR-3, low).
+The write-then-refuse class is closed — `sectionGuard()` runs on the replaced and the written section, a 450k-document fuzz is clean, and [bug 1](./task.184.bug.1.carried-tail-refuses-engines-own-write.md) and [bug 2](./task.184.bug.2.ambiguous-log-section-refuses-its-own-render.md) are closed. PERF-1 (medium): the 2 s suite criterion is at risk (CPU +68% over the cycle-0 head).
 <!-- change-log-start -->
 ## Change Log
 
@@ -472,6 +472,8 @@ Cycle 2 refute pass: the engine can still write a document its next write refuse
 | 2026-10-13 |  | QA findings fixed — cycle 1, 2 findings (CR-1 medium, CR-2 cleanup); R7 case + R8 property test | qa-fix |
 | 2026-10-13 |  | QA gate CONCERNS (70/100) — 3 findings (2 medium, 1 low) | qa-task |
 | 2026-10-13 |  | QA findings fixed — cycle 2, 3 findings (CR-1, CR-2 medium; CR-3 low): one section guard for input and written section; R8 widened, R9, R10 | qa-fix |
+| 2026-10-13 |  | QA gate CONCERNS (80/100) — 1 finding (medium, PERF-1); bugs 1–2 closed | qa-task |
+| 2026-10-13 |  | QA findings fixed — cycle 3, 1 finding (PERF-1 medium) + 1 cleanup: blocks collected once per guard; R8 trimmed | qa-fix |
 <!-- change-log-end -->
 
 ---

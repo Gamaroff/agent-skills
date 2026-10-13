@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa
+status: closed
 severity: medium
 priority: P2
 created: 2026-10-13
@@ -12,7 +12,7 @@ created: 2026-10-13
 **Bug ID**: TASK-184-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (qa-task cycle 1, Step 3b diff review CR-1)
 **Date Found**: 2026-10-13
 
@@ -133,3 +133,4 @@ re-run the reproduction above.
 | 2026-10-13 | Ready for QA | qa-fix | Fix implemented — QA cycle 1 fix (R7, R8) |
 | 2026-10-13 | Reopened | qa-task | Not fixed by task.184.qa.2.qa-results-carried-block-and-log-residuals.md — reproduction passes, class remains (gate 2 CR-1) |
 | 2026-10-13 | Ready for QA | qa-fix | Iteration 2 — sectionGuard on input and written section (QA cycle 2 fix) |
+| 2026-10-13 | Closed | qa-task | Verified by task.184.qa.3.qa-results-carried-block-and-log-residuals.md |

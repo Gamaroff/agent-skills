@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa
+status: closed
 severity: medium
 priority: P2
 created: 2026-10-13
@@ -12,7 +12,7 @@ created: 2026-10-13
 **Bug ID**: TASK-184-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (qa-task cycle 2, refute pass CR-2)
 **Date Found**: 2026-10-13
 
@@ -72,3 +72,4 @@ writing, and refuse the write that would fail the next one.
 | ---- | ------ | ---------- | ----- |
 | 2026-10-13 | Open | qa-task | Found in task.184.qa.2.qa-results-carried-block-and-log-residuals.md |
 | 2026-10-13 | Ready for QA | qa-fix | Fix implemented — QA cycle 2 fix (R9) |
+| 2026-10-13 | Closed | qa-task | Verified by task.184.qa.3.qa-results-carried-block-and-log-residuals.md |

@@ -39,8 +39,9 @@
 //   trailing-comment         the render ends in an HTML comment, which a read peels as a separator
 //   multiple:<n>             n sections found
 //   read-back:<n>            the write would read back as n sections, or an unbounded one
-//   (unplaceable also carries unclosed-fence / structural-line: / carried-tail: when the written
-//    section fails the guard the next write would apply — task.184 QA cycle 2)
+//   (unplaceable also carries structural-line: / carried-tail: when the written section fails
+//    the guard the next write would apply — task.184 QA cycle 2; an unbounded written section
+//    reports as read-back:<n> unbounded)
 //
 // The last two reasons exist because an unclosed fence protects everything after it: every
 // later heading and marker becomes "example text", the span runs to EOF, and a
@@ -286,12 +287,18 @@ function collectBlocks(text, name) {
 // block — a bold label inside a `####` block that ends at a later `####` — extends the
 // outer block to its own end, or its tail would be carried by no block and deleted (task
 // 184, 5c CR-1). A union of two spans already found: nothing is inferred.
-function carriedBlocks(text) {
-  const all = CARRIED_SUBSECTIONS.flatMap((n) => collectBlocks(text, n)).sort(
-    (a, b) => a.start - b.start,
-  );
+// Every carried block in `text`, under every carried name, in no particular order.
+function collectAll(text) {
+  return CARRIED_SUBSECTIONS.flatMap((n) => collectBlocks(text, n));
+}
+
+// `all` may be passed in when the caller already collected it — sectionGuard does, so the
+// blocks are collected once per guard, not twice (task.184 QA cycle 3, PERF-1). Kept blocks
+// are copies: the union below must not rewrite a block the caller still reads.
+function carriedBlocks(text, all = collectAll(text)) {
+  const sorted = [...all].sort((a, b) => a.start - b.start);
   const kept = [];
-  for (const b of all) {
+  for (const b of sorted) {
     const outer = kept[kept.length - 1];
     if (outer && b.start < outer.start + outer.whole.length) {
       const end = b.start + b.whole.length;
@@ -303,7 +310,7 @@ function carriedBlocks(text) {
       }
       continue;
     }
-    kept.push(b);
+    kept.push({ ...b });
   }
   return kept;
 }
@@ -795,12 +802,11 @@ function sectionGuard(content, s) {
   // so its tail would never be seen (task.184 review 1, O2). A tail inside a span a kept block
   // carries is not cut — the nested-block union carries it whole (QA cycle 2, CR-1); a tail no
   // kept block reaches is (gate 6 CR6-1). Span arithmetic over blocks already found.
-  const kept = carriedBlocks(span);
+  const all = collectAll(span);
+  const kept = carriedBlocks(span, all);
   const carried = (at) =>
     kept.some((k) => at >= k.start && at < k.start + k.whole.length);
-  const cut = CARRIED_SUBSECTIONS.flatMap((n) => collectBlocks(span, n)).find(
-    (b) => b.tail !== null && !carried(b.tailAt),
-  );
+  const cut = all.find((b) => b.tail !== null && !carried(b.tailAt));
   return cut ? `carried-tail:${cut.tail}` : null;
 }
 

@@ -1369,7 +1369,9 @@ test("R8 QA cycles 1–2 CR-1: a write the engine makes is never refused by its 
         if (!ok(first)) continue;
         shapes++;
         cur = first.content;
-        for (let n = 3; n <= 4; n++) {
+        // One more write is the property ("the next write accepts it"); a third adds cost,
+        // not coverage (task.184 QA cycle 3, PERF-1).
+        for (let n = 3; n <= 3; n++) {
           const r = QR.upsertQaResults(cur, section(n), { docType: "task" });
           assert.ok(
             ok(r),
@@ -1380,7 +1382,7 @@ test("R8 QA cycles 1–2 CR-1: a write the engine makes is never refused by its 
         for (const it of items)
           assert.ok(count(cur, it) >= 1, `${JSON.stringify(parts)} lost ${it}`);
         assert.equal(
-          QR.upsertQaResults(cur, section(4), { docType: "task" }).content,
+          QR.upsertQaResults(cur, section(3), { docType: "task" }).content,
           cur,
           `${JSON.stringify(parts)} not idempotent`,
         );
