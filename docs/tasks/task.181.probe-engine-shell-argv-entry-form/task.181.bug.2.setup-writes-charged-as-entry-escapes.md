@@ -4,7 +4,7 @@
 **Bug ID**: TASK-181-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 2, code review CR-1 / TASK-181-002)
 **Date Found**: 2026-10-13
 
@@ -48,3 +48,4 @@ Track the setup's writes separately from the entry's. A setup is meant to build 
 | ---- | ------ | ---------- | ----- |
 | 2026-10-13 | New | qa-task | Found in QA cycle 2 (refute pass) |
 | 2026-10-13 | Ready for QA | qa-fix | Fix iteration 1 |
+| 2026-10-13 | Closed | qa-task | Verified by task.181.qa.3.probe-engine-shell-argv-entry-form.md |

@@ -319,24 +319,24 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-13
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.181.qa.2.probe-engine-shell-argv-entry-form.md](./task.181.qa.2.probe-engine-shell-argv-entry-form.md)
-- **Gate File**: [task.181.gate.2.probe-engine-shell-argv-entry-form.yml](./task.181.gate.2.probe-engine-shell-argv-entry-form.yml)
+- **Full Report**: [task.181.qa.3.probe-engine-shell-argv-entry-form.md](./task.181.qa.3.probe-engine-shell-argv-entry-form.md)
+- **Gate File**: [task.181.gate.3.probe-engine-shell-argv-entry-form.yml](./task.181.gate.3.probe-engine-shell-argv-entry-form.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5417 (ci:fast) + 19 probes
+- **Tests Executed**: 5420 (ci:fast) + 19 probes
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-TASK-181-001 fixed and verified. Cycle-2 refute pass: TASK-181-002 (setup writes charged to the entry as escapes) and TASK-181-003 (writes beside the case directory unseen), both MEDIUM and reproduced. Bug reports: [bug.2](./task.181.bug.2.setup-writes-charged-as-entry-escapes.md), [bug.3](./task.181.bug.3.workdir-writes-unseen.md).
+TASK-181-001..003 fixed and verified across QA cycles 1–3; the per-case isolation is one definition shared by fence: and shell-argv:. Three LOW advisory findings routed to the gate's recommendations.future.
 
 ## Change Log
 
@@ -353,6 +353,7 @@ TASK-181-001 fixed and verified. Cycle-2 refute pass: TASK-181-002 (setup writes
 | 2026-10-12 |         | QA findings fixed — cycle 1, 1 finding + 2 cleanups (fixture gh checks for shell-argv:) | qa-fix |
 | 2026-10-13 |         | QA gate CONCERNS (90/100) — 2 findings | qa-task |
 | 2026-10-13 |         | QA findings fixed — cycle 2, 2 findings + 1 cleanup (shared per-case isolation for fence: and shell-argv:) | qa-fix |
+| 2026-10-13 |         | QA gate PASS (100/100) — 0 findings | qa-task |
 
 <!-- change-log-end -->
 
