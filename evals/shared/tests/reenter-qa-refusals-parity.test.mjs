@@ -190,10 +190,19 @@ test("every refusal carries its route, and uncommitted-fix / git-unreadable neve
     "the halt-7 bullet must not route every refusal to step 7",
   );
   for (const skill of ["develop-task", "develop-story"]) {
+    const body = read(`skills/${skill}/SKILL.md`);
     assert.match(
-      read(`skills/${skill}/SKILL.md`),
+      body,
       /refusal list — follow it/,
       `${skill} must cite the contract's routes`,
     );
+    // The SKILL.md example names every never-step-7 reason, not the first one (task.182 QA cycle 1, CR-3).
+    for (const reason of ["uncommitted-fix", "git-unreadable"]) {
+      assert.match(
+        body,
+        new RegExp(`\`${reason}\`[^)]*never resumes at 7`),
+        `${skill} must name ${reason} as never resuming at 7`,
+      );
+    }
   }
 });

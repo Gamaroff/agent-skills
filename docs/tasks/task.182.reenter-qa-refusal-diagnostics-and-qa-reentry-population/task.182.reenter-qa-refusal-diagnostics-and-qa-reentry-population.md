@@ -270,6 +270,28 @@ None.
 
 **Deferred work.** None. A macOS `/bin/bash` 3.2 run was not available (Linux host, `ubuntu-latest` CI).
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-13
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.182.qa.1.reenter-qa-refusal-diagnostics-and-qa-reentry-population.md](./task.182.qa.1.reenter-qa-refusal-diagnostics-and-qa-reentry-population.md)
+- **Gate File**: [task.182.gate.1.reenter-qa-refusal-diagnostics-and-qa-reentry-population.yml](./task.182.gate.1.reenter-qa-refusal-diagnostics-and-qa-reentry-population.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 7 suites/checks (re-entry suite 58/58; parity and probe tests 182/182; probe 8 executed)
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+- TASK-182-001 (MEDIUM): the hooks doc says both re-entry scripts set `qa_phase` to `5a`; `grant-qa-cycles.sh` writes `5b` after a not-converging halt — [task.182.bug.1](./task.182.bug.1.hooks-doc-qa-phase-writer-claim.md).
+- TASK-182-002 (LOW): the parity test's detector sub-field check is vacuous (mutation stays green).
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -280,6 +302,8 @@ None.
 | 2026-10-13 | 1.1 | Review passed (8/10) — hooks-doc writer list corrected per field, performance criteria restated (accept path gains mktemp/sort/rm), macOS run descoped, detector shape aligned, contract anchor fixed | review-task |
 | 2026-10-13 |  | Status → ready-for-development | review-task |
 | 2026-10-13 |  | Implemented — 9 source files (+16 bundled copies), 7 new test cases; status → ready-for-review | develop |
+| 2026-10-13 |  | QA gate CONCERNS (90/100) — 2 findings (1 medium, 1 low) | qa-task |
+| 2026-10-13 |  | QA findings fixed — TASK-182-001, TASK-182-002 + advisory CR-3, CR-4 and one probe sibling; 1 iteration | qa-fix |
 
 <!-- change-log-end -->
 

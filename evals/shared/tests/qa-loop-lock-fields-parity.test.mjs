@@ -169,11 +169,19 @@ test("qa_reentry: the writer and every reader and describer name it (task.182)",
     /\.qa_reentry = \{from_step: 7, reason: "dod-gaps-code-fix", at: \$now, gate_head: \$head, report_entries: \$entries\}/,
     "reenter-qa-after-finalise.sh must write qa_reentry with its five sub-fields",
   );
+  // Read the sub-fields out of the CONCERN TEMPLATE the detector files, not the whole line: the
+  // line opens with the field's type annotation, which names every sub-field, so a line-wide match
+  // passed with the template stripped bare (task.182 QA cycle 1, TASK-182-002).
+  const concern = text.detectorPrompt.match(/"concern": "(qa_reentry:[^"]*)"/);
+  assert.ok(
+    concern,
+    'the detector prompt must file qa_reentry as { "concern": "qa_reentry: …" }',
+  );
   for (const sub of ["from_step", "reason", "gate_head", "report_entries"]) {
     assert.match(
-      text.detectorPrompt,
-      new RegExp(`qa_reentry[^\\n]*\\b${sub}\\b`),
-      `the detector prompt's qa_reentry line must report ${sub}`,
+      concern[1],
+      new RegExp(`\\b${sub}\\b`),
+      `the detector prompt's qa_reentry concern must report ${sub}`,
     );
   }
   // qa_max_cycles has two writers, and the hooks doc names both — the description that said it is
@@ -184,6 +192,28 @@ test("qa_reentry: the writer and every reader and describer name it (task.182)",
       `the hooks doc must name ${writer} as a writer of qa_max_cycles`,
     );
   }
+  // ...and states the qa_phase each re-entry writes. grant-qa-cycles.sh writes 5b after a
+  // not-converging halt; a sentence that said both scripts write 5a passed the writer check above
+  // (task.182 QA cycle 1, TASK-182-001).
+  assert.match(
+    text.hooksDoc,
+    /`grant-qa-cycles\.sh` writes `5b` after a not-converging halt[^.]*`5a` otherwise/,
+    "the hooks doc must say grant-qa-cycles.sh writes qa_phase 5b after a not-converging halt",
+  );
+  // Both SKILL.md describe the same grant write; a "qa_phase: 5a atomically" there was the same
+  // false claim one step removed (task.182 QA cycle 1, the Step 3.5 population probe).
+  for (const name of ["taskSkill", "storySkill"]) {
+    assert.match(
+      text[name],
+      /`qa_phase` \(`5b` after a not-converging halt, else `5a`\) atomically/,
+      `${name} must say the grant writes qa_phase 5b after a not-converging halt`,
+    );
+  }
+  assert.match(
+    text.grantScript,
+    /not-converging[^\n]*\) REENTER=5b/,
+    "grant-qa-cycles.sh no longer writes 5b after not-converging — re-check the hooks doc sentence",
+  );
 });
 
 test("waiting_on: one writer, one reader, and every describer spells the field and its sub-fields the same way", () => {

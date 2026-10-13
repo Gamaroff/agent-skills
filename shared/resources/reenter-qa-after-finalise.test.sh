@@ -135,6 +135,12 @@ exec "$REAL_GIT" "\$@"
 EOF
 chmod +x "$GSTUB/git"
 PATH="$GSTUB:$PATH" expect_refusal "git status fails" git-unreadable
+# git's own error reaches the operator — the read no longer sends it to /dev/null (task.182 QA cycle 1, CR-4).
+ERR=$(PATH="$GSTUB:$PATH" run 2>&1 >/dev/null)
+case "$ERR" in
+  *"simulated index failure"*"refused (git-unreadable)"*) pass "git status fails → git's own error is printed above the refusal" ;;
+  *) fail "git status fails — git's error" "the stub's error is not printed above the refusal: $ERR" ;;
+esac
 
 mkrepo docs-only
 echo "re-scoped criterion" >> "$R/$DOC/task.42.example.md"; git -C "$R" commit -qam "doc fix"
