@@ -1,0 +1,60 @@
+schema: 2
+task: 'task.184.qa-results-carried-block-and-log-residuals'
+task_title: 'qa-results carried-block and log residuals'
+gate: CONCERNS
+status_reason: 'All three planned shapes behave as specified and every new test is mutation-proved, but the new carried-tail rule refuses a document the engine itself writes (a bold Bug Reports block next to a bold Deferred Work block with a lead paragraph) — a QA loop would halt on its own output (CR-1, medium/high).'
+reviewer: 'QA Engineer'
+head: 'af294361d5900815bb1e8e39f3b557979112c886'
+updated: '2026-10-13T08:08:07Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/qa-results.js'
+    finding: 'collectBlocks records a carried-tail when a bold Bug Reports block stops at a second carried label (Deferred Work / Bug Reports) whose list follows a lead paragraph. mergeCarried writes that shape, so cycle 2 is replaced and cycles 3+ refuse with carried-tail:- CR-1 thing; base writes all three. Nothing is lost, but QA Step 12 halts on its own output. Bug: task.184.bug.1.carried-tail-refuses-engines-own-write.md'
+    suggested_action: 'Record no tail when the stopping label opens its own carried block; run the tail check on the output inside checked() so the engine cannot write a document its next write refuses; add an R7 three-write case for Bug Reports + Deferred Work with a lead paragraph.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 101
+  phases_verified: 4/4
+  ci: 'not read — CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: internal — shared/resources/qa-results.js#upsertQaResults judges a work-item document and a section this pipeline renders; the only document sink, markdown-structure, models the implementation report, and the disqualified-entries table lists only report-lint.js#lintReport. Same decision as task.183 gates 1–6. No new input surface; all changes add refusals or union spans.'
+  performance:
+    status: PASS
+    notes: 'Engine + corpus + wiring 101/101 in 1.08 s (bash time -p, load 0.55; /usr/bin/time not installed). The tail look-ahead is linear in the lines after a stop.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1: the engine can write a document its own next write refuses. Refusal is the safe direction (no content lost), but it halts the QA loop.'
+  maintainability:
+    status: PASS
+    notes: 'Each rule commented with its task and finding id. Two low cleanups (CR-2 duplicated list regex, CR-3 repeated under-log predicate) are advisory.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1 (carried-tail on an adjacent carried block) and add the three-write test.'
+      refs: ['shared/resources/qa-results.js', 'shared/resources/tests/qa-results.test.mjs']
+  future:
+    - action: 'CR-2: hoist the list-item/table-row regex to one constant shared by introducesList and the tail scan.'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'CR-3: compute the "directly under a marker-less log" predicate once for underTablelessLog and ambiguousAbove.'
+      refs: ['shared/resources/qa-results.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 fixed']

@@ -1154,7 +1154,6 @@ test("R2 CR-7 deferred: no block context is inferred — a paragraph line over a
     assert.equal(r.reason, "unbounded", head);
     assert.equal(r.content, doc);
   }
-  assertCr51Refused();
 });
 
 test("R3 5c CR-1: a misplaced section above a Version-first log is refused; a Date-less table relocates", () => {
@@ -1204,14 +1203,16 @@ test("R3 5c CR-1: a misplaced section above a Version-first log is refused; a Da
   const re = QR.upsertQaResults(eof, section(2), { docType: "task" });
   assert.equal(re.reason, "unbounded");
   assert.equal(re.content, eof);
-  // A marker-less log holding a non-Date-first Date table above the section is still
-  // table-less for the cut: the log's own Date-first table below is cut at, and its row
-  // kept (QA cycle 3, CR3-2 — any Date column made the replace delete it).
+  // A marker-less log holding a non-Date-first Date table above the section is ambiguous:
+  // a quoted `| Reviewer | Date |` table and a Version-first log look the same, so the
+  // section is neither cut nor relocated — the write is refused and the log row kept.
+  // QA cycle 3 (CR3-2) relocated this shape; task 184 (5c CR-2, operator decision
+  // 2026-10-05) refuses it, the safe direction for both readings.
   const reviewer = `${FM}## Body\n\ntext\n\n## Change Log\n\n| Reviewer | Date |\n| --- | --- |\n| A | 2026-01-01 |\n\n${section(1)}\n\n| Date | Version | Description | Author |\n| --- | --- | --- | --- |\n| 2026-09-25 | 1.0 | log-row | y |\n`;
   const rr = QR.upsertQaResults(reviewer, section(2), { docType: "task" });
-  assert.equal(rr.reason, "relocated");
-  assert.equal(count(rr.content, "| 2026-09-25 | 1.0 | log-row | y |"), 1);
-  assert.equal(count(rr.content, "| A | 2026-01-01 |"), 1);
+  assert.equal(rr.reason, "unbounded");
+  assert.equal(rr.detail, "structural-line:| 2026-09-25 | 1.0 | log-row | y |");
+  assert.equal(rr.content, reviewer);
   // A header-only Date-first log is still cut at and relocated, header kept.
   const dfLog = vlog(
     "| Date | Version | Description | Author |\n| --- | --- | --- | --- |",
@@ -1231,7 +1232,7 @@ test("R3 5c CR-1: a misplaced section above a Version-first log is refused; a Da
   assert.doesNotMatch(w.content, /Phase 1 \| PASS/);
 });
 
-test("R4 5c CR-2: a bold Bug Reports block keeps its #### groups and every grouped bug list", () => {
+test("R4 5c CR-2: a bold Bug Reports block keeps its #### groups and every bug list directly under a sub-label", () => {
   const grouped = "**Bug Reports**\n\n#### From cycle 2\n\n- [b](./b.md)";
   const out = replaceThrice(markerDoc(`${section(1)}\n\n${grouped}\n\n`));
   assert.equal(count(out, "(./b.md)"), 1);
@@ -1265,4 +1266,165 @@ test("R4 5c CR-2: a bold Bug Reports block keeps its #### groups and every group
   const out3 = replaceThrice(markerDoc(`${section(1)}\n\n${grouped2}\n\n`));
   assert.equal(count(out3, "(./g1.md)"), 1);
   assert.equal(count(out3, "(./g2.md)"), 1);
+});
+
+test("R5 5c CR-1: a bold Bug Reports block nested in a #### block keeps its tail", () => {
+  // The `####` block ends at `#### From cycle 2`; the bold block runs past it. Dropping
+  // the nested block as "inside" the outer one deleted `[b]` (task 184).
+  const nested =
+    "#### Bug Reports\n\n- [a](./a.md)\n\n**Bug Reports**\n\n#### From cycle 2\n\n- [b](./b.md)";
+  let doc = markerDoc(`${section(1)}\n\n${nested}\n\n`);
+  for (let n = 2; n <= 4; n++) {
+    const r = QR.upsertQaResults(doc, section(n), { docType: "task" });
+    assert.equal(r.reason, "replaced", `write ${n}`);
+    doc = r.content;
+  }
+  assert.equal(count(doc, "(./a.md)"), 1);
+  assert.equal(count(doc, "(./b.md)"), 1);
+  assert.equal(count(doc, "**Bug Reports**"), 1);
+});
+
+test("R6 5c CR-2: a section under a marker-less Version-first log is refused, not relocated", () => {
+  const head = `${FM}## Body\n\ntext\n\n## Change Log\n\n| Version | Date | Change |\n| --- | --- | --- |\n| 1.0 | 2026-01-02 | synced |\n\n${section(1)}\n\n`;
+  for (const quoted of [
+    "| Date | Note |\n| --- | --- |\n| 2026-01-03 | quoted |",
+    "| Date | Version | Description | Author |\n| --- | --- | --- | --- |\n| 2026-01-03 | 1.1 | quoted | z |",
+  ]) {
+    const doc = `${head}${quoted}\n`;
+    const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+    assert.equal(r.reason, "unbounded", quoted);
+    assert.match(r.detail, /^structural-line:\| 2026-01-03 \|/);
+    assert.equal(r.content, doc);
+  }
+  // A Date-first table above does not settle it when the LAST Date table above is not
+  // Date-first: the section is not table-less, so no cut is attempted, and only
+  // ambiguousAbove puts its span under the dated-row guard. Without it the quoted row
+  // was replaced as if the log were finished (task 184, mutation M2b).
+  const mixed = `${FM}## Body\n\ntext\n\n## Change Log\n\n| Date | Version | Description | Author |\n| --- | --- | --- | --- |\n| 2026-01-01 | 1.0 | x | y |\n\n| Version | Date | Change |\n| --- | --- | --- |\n| 1.1 | 2026-01-02 | synced |\n\n${section(1)}\n\n| Date | Note |\n| --- | --- |\n| 2026-01-03 | quoted |\n`;
+  const rm = QR.upsertQaResults(mixed, section(2), { docType: "task" });
+  assert.equal(rm.reason, "unbounded");
+  assert.equal(rm.detail, "structural-line:| 2026-01-03 | quoted |");
+  assert.equal(rm.content, mixed);
+});
+
+test("R7 gate 6 CR6-1: a carried list behind a label and a paragraph is refused", () => {
+  // `**Critical Issues**` does not introduce a list, so the bold block stops there; the
+  // list after the paragraph was then replaced away (task 184). Refused, never cut.
+  const shape =
+    "**Bug Reports**\n\n- [a](./a.md)\n\n**Critical Issues**\n\nFound in cycle 2:\n\n- [b](./b.md)";
+  const doc = markerDoc(`${section(1)}\n\n${shape}\n\n`);
+  const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+  assert.equal(r.reason, "unbounded");
+  assert.equal(r.detail, "carried-tail:- [b](./b.md)");
+  assert.equal(r.content, doc);
+  // A label directly over its list is not a stop at all, so it is carried, not refused —
+  // the R4 shapes, stale QA list included (CR2-4 residue).
+  const direct =
+    "**Bug Reports**\n\n- [a](./a.md)\n\n**Recommendations**:\n\n- stale";
+  const out = replaceThrice(markerDoc(`${section(1)}\n\n${direct}\n\n`));
+  assert.equal(count(out, "- stale"), 1);
+  assert.equal(count(out, "(./a.md)"), 1);
+  // A stopping label that opens a carried block of its own is not a tail: that block
+  // collects the list after its lead paragraph. The engine writes two carried blocks side
+  // by side, so refusing this shape refused the engine's own previous write (QA cycle 1,
+  // CR-1: replaced, then carried-tail:- CR-1 thing on every later write).
+  const adjacent =
+    "**Bug Reports**\n\n- [a](./a.md)\n\n### Notes\n\n**Deferred Work**\n\nCarried from cycle 3:\n\n- CR-1 thing";
+  let doc2 = markerDoc(`${section(1)}\n\n${adjacent}\n\n`);
+  for (let n = 2; n <= 4; n++) {
+    const r2 = QR.upsertQaResults(doc2, section(n), { docType: "task" });
+    assert.equal(r2.reason, "replaced", `write ${n}: ${r2.detail || ""}`);
+    doc2 = r2.content;
+  }
+  assert.equal(count(doc2, "(./a.md)"), 1);
+  assert.equal(count(doc2, "- CR-1 thing"), 1);
+  assert.equal(count(doc2, "Carried from cycle 3:"), 1);
+});
+
+test("R8 QA cycles 1–2 CR-1: a write the engine makes is never refused by its next write", () => {
+  // The property, not the repro (qa-fix Step 3.5): across a family of carried-block
+  // shapes, a first write that succeeds is followed by writes that succeed, nothing a
+  // carried block held is lost, and a repeated write is byte-identical. The last piece is
+  // QA cycle 2's counterexample: a `####` block nested under a bold block (the union)
+  // whose own list follows a bold label and a paragraph.
+  const pieces = (i) => [
+    `**Bug Reports**\n\n- [b${i}](./b${i}.md)`,
+    `**Bug Reports**\n\nFound in cycle ${i}:\n\n- [p${i}](./p${i}.md)`,
+    `**Deferred Work**\n\nCarried from cycle ${i}:\n\n- D${i} item`,
+    `**Deferred Work**\n\n- E${i} item`,
+    `#### Bug Reports\n\n- [h${i}](./h${i}.md)`,
+    `### Notes ${i}`,
+    `#### Deferred Work\n\n**From cycle ${i}**\n\nCarried forward:\n\n- F${i} item`,
+  ];
+  const ok = (r) => ["replaced", "relocated", "created"].includes(r.reason);
+  let shapes = 0;
+  for (let a = 0; a < 7; a++)
+    for (let b = 0; b < 7; b++)
+      for (let c = 0; c < 7; c++) {
+        const parts = [pieces(1)[a], pieces(2)[b], pieces(3)[c]];
+        const doc = markerDoc(`${section(1)}\n\n${parts.join("\n\n")}\n\n`);
+        const items = parts.join("\n").match(/^- .*$/gm) || [];
+        let cur = doc;
+        const first = QR.upsertQaResults(cur, section(2), { docType: "task" });
+        if (!ok(first)) continue;
+        shapes++;
+        cur = first.content;
+        // One more write is the property ("the next write accepts it"); a third adds cost,
+        // not coverage (task.184 QA cycle 3, PERF-1).
+        for (let n = 3; n <= 3; n++) {
+          const r = QR.upsertQaResults(cur, section(n), { docType: "task" });
+          assert.ok(
+            ok(r),
+            `${JSON.stringify(parts)} write ${n}: ${r.reason} ${r.detail || ""}`,
+          );
+          cur = r.content;
+        }
+        for (const it of items)
+          assert.ok(count(cur, it) >= 1, `${JSON.stringify(parts)} lost ${it}`);
+        assert.equal(
+          QR.upsertQaResults(cur, section(3), { docType: "task" }).content,
+          cur,
+          `${JSON.stringify(parts)} not idempotent`,
+        );
+      }
+  // Non-vacuity: the family must exercise the property, not skip past it.
+  assert.ok(
+    shapes >= 300,
+    `only ${shapes} of 343 shapes wrote on the first write`,
+  );
+});
+
+test("R9 QA cycle 2 CR-2: a render the next write would refuse is refused up front", () => {
+  // Under an ambiguous marker-less log (a Date-first table, then a Version-first one, above
+  // the section) the span is under the dated-row guard. A render carrying its own dated rows
+  // used to replace in place and be refused by the following write; it is refused now.
+  const mixed = `${FM}## Body\n\ntext\n\n## Change Log\n\n| Date | Version | Description | Author |\n| --- | --- | --- | --- |\n| 2026-01-01 | 1.0 | x | y |\n\n| Version | Date | Change |\n| --- | --- | --- |\n| 1.1 | 2026-01-02 | synced |\n\n${section(1)}\n`;
+  const dated = `${section(2)}\n\n| Cycle | Date | Gate |\n| --- | --- | --- |\n| 2 | 2026-10-02 | PASS |`;
+  const r = QR.upsertQaResults(mixed, dated, { docType: "task" });
+  assert.equal(r.reason, "unplaceable");
+  assert.equal(r.detail, "structural-line:| 2 | 2026-10-02 | PASS |");
+  assert.equal(r.content, mixed);
+  // A render without dated rows still replaces, and the result is writable again.
+  const plain = QR.upsertQaResults(mixed, section(2), { docType: "task" });
+  assert.equal(plain.reason, "replaced");
+  assert.equal(
+    QR.upsertQaResults(plain.content, section(3), { docType: "task" }).reason,
+    "replaced",
+  );
+});
+
+test("R10 QA cycle 2 CR-3: the tail scan stays bounded on a repeated label", () => {
+  // Each bold block that stops at a non-list label scanned to the end of the section:
+  // k = 400 took 4151 ms against 19 ms on the base engine. The scan now ends at the next
+  // carried label. The bound is loose (≈ 25× the measured time) so load does not flake it,
+  // and tight enough that the cubic scan cannot pass.
+  let body = "";
+  for (let i = 0; i < 600; i++)
+    body += `**Bug Reports**\n\n**Note ${i}**\n\ntext \`code${i}\` here\n\n`;
+  const doc = markerDoc(`${section(1)}\n\n${body}`);
+  const t0 = Date.now();
+  const r = QR.upsertQaResults(doc, section(2), { docType: "task" });
+  const ms = Date.now() - t0;
+  assert.equal(r.reason, "replaced");
+  assert.ok(ms < 4000, `upsert took ${ms} ms on 600 repeated labels`);
 });

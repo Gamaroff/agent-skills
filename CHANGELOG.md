@@ -115,6 +115,19 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`qa-results.js` keeps a nested Bug Reports tail and refuses two shapes it used to lose
+  (task 184).** Three content-loss shapes that predate task 183, each identical on the base branch:
+  a bold `**Bug Reports**` block nested in a `#### Bug Reports` block that runs past it now **keeps**
+  its tail (it was carried by no block and deleted). A section directly under a marker-less change log
+  whose last `Date` table above the section is not Date-first is now **refused** (`unbounded`,
+  `structural-line:`), never relocated with quoted rows left in the log — this includes the
+  `| Reviewer | Date |` shape task 183 relocated. And a carried bold block whose list continues past
+  a label and a paragraph is now **refused** with a new `carried-tail:<line>` detail, where the list
+  was deleted — unless another carried block already carries the list. The engine also holds the
+  section it writes to the guard it applies to the section it replaces, so it never writes a document
+  its next write would refuse: such a write is refused up front (`unplaceable`, with the guard's
+  detail). Migration for any of these refusals: the Step 12 HALT names the line; move the section above
+  `## Change Log` (or make the log Date-first), or put the list directly under its label, then re-run.
 - **A refused QA re-entry says why, and an unreadable tree is no longer a clean one (task 182).**
   `reenter-qa-after-finalise.sh`'s `no-gate` refusal discarded `qa-cycle.sh`'s stderr, so a missing
   gate, an unnumbered gate and two gates claiming one cycle all printed one message, and the
@@ -928,7 +941,7 @@ All notable changes to this project will be documented in this file. Format foll
   Before, a relocate deleted that log's rows. The two task.171 CR-7 false refusals (a `---` after a
   list continuation line or an HTML comment's closing line) stay refused: inferring their context
   line by line deleted real sections in QA, so CR-7 is deferred. A bold `**Bug Reports**` / `**Deferred Work**` block now keeps its `####` groups and
-  every bug list grouped under a sub-label; a stale QA list after it is still carried (a duplicate,
+  every bug list grouped directly under a sub-label; a stale QA list after it is still carried (a duplicate,
   never a deletion — CR2-4 deferred). The corpus write survey now skips documents that never name the section.
 
 - **The QA loop's Deferred Work record has one home, and `qa-results.js` closes task.155's residuals
