@@ -219,8 +219,8 @@
 ## Verification Complete
 
 **Final Status:** ✅ ACCEPTED
-**Completion Time:** 2026-10-13T07:40Z
-**Total Duration:** ~25 minutes
+**Completion Time:** 2026-10-13T07:20Z
+**Total Duration:** ~5 minutes (07:15Z–07:20Z)
 **CI reading 1:** SUCCESS @ `a7229c97` (the acceptance decision — Step 6)
 **CI reading 2:** taken on the acceptance commit after this file is committed and pushed; recorded on the PR canonical summary comment and in the implementation report (Step 7 publish boundary)
 
