@@ -114,6 +114,12 @@ Close three content-loss shapes in `shared/resources/qa-results.js` (5c CR-1 nes
 - QA Cycle 2 — changes-requested: stage-disabled. qa-fix cycle 2 committed `3dbc7016` with gate 2, QA report 2, bugs 1–2; pushed once; PR #644 OPEN. Comments: PR posted, tracker `qa-fix-2` posted.
 - QA Cycle 1 — changes-requested: stage-disabled. qa-fix cycle 1 committed `e574d353` with gate 1, QA report 1, bug 1; pushed once. PR #644 OPEN after push (checked inline, poller not dispatched). qa-fix PR comment posted; tracker `qa-fix-1` posted.
 
+### Resume after Step 7 DoD gaps — 2026-10-13
+
+- Re-invoked by `/develop-next` with `--defaults` after the gaps were closed (`5ab4839a`, `3e7abe6f`). Resume detector not dispatched — state verified inline (`handoff-verify` 10/10 confirmed; snapshot `halt_step` 7; DoD 1 `❌ GAPS`); independence lost.
+- Phase 0b auto-answer (`--defaults`): "Re-enter QA at 5a" (Recommended). QA re-entry after finalise DoD gaps: `reenter-qa: re-entered QA at step 5 / qa_phase 5a — qa_max_cycles=6 (base 4), gate_head=9c5547befa7965bc5fb772e8dcdebde6ad78b025`. The one commit outside the task directory is the CHANGELOG move; the script counts it as moved code, so the handoff's planned resume at 7 does not apply.
+- Phase 0d: answers from the restored lock (`persisted`): base `develop`, target `develop`, mode `standard`, no skips. Nothing asked.
+
 ---
 
 ## Issues Log
