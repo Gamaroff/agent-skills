@@ -239,12 +239,12 @@ Full categorised index below.
 | `ensure-task-github-issue` | Internal sub-routine called from create-task and review-task. Given a task markdown file path, ensures the task has a corresponding GitHub issue. Creates the issue if… |
 | `ensure-task-jira-issue` | Internal sub-routine called from create-task and review-task. Given a task markdown file path, ensures the task has a corresponding Jira issue. Creates it if missing… |
 | `loop-supervisor` | Run an unattended sequential loop where every iteration gets a fresh Claude process and a fresh context, and each outcome is classified from filesystem post-conditions… |
-| `qa-next` | UAT loop orchestrator: selects the next untested user function from the owner's UAT registry (scripts/uat-status.mjs --next) — one row per thing a person does with… |
+| `qa-next` | UAT loop orchestrator: picks the next untested user function from the owner's UAT registry (scripts/uat-status.mjs --next), resolves it to checklist items (authoring any that are… |
 | `review-bug` | Bug report review with two modes. Interactive mode (default): asks batched clarifying questions to resolve missing reproduction detail, wrong severity/priority, and linkage gaps — use… |
 | `review-code` | Standalone adversarial diff code review of the working tree or a pull request — surfaces correctness bugs (logic, null/async/race, API misuse, broken invariants) and reuse/simplification/efficiency… |
 | `review-pr` | Reviews a pull request as a claim — does this change deliver what its story or task promised, and is the evidence behind it real?… |
 | `scaffold-tracker-workflow` | Read a project's live tracker board (Jira or GitHub Projects v2) and scaffold the `tracker-workflow.yaml` status ladder from it — the board's columns in order,… |
-| `sync-github-bug` | Sync a local bug report markdown file to GitHub Issues — creates the bug issue if it has no github_issue, updates it if github_issue is… |
+| `sync-github-bug` | Sync a local bug report markdown file to GitHub Issues — creates the issue if it has no github_issue, updates it if it has one.… |
 | `sync-github-epic` | Sync a local epic markdown file to GitHub Issues — creates the epic issue if it has no github_issue, updates it if github_issue is already… |
 | `sync-github-story` | Sync a local story markdown file to GitHub Issues — creates the story issue if it has no github_issue, updates it if github_issue is already… |
 | `sync-github-task` | Sync a local technical task markdown file to GitHub Issues — creates the task issue if it has no github_issue, updates it if github_issue is… |
