@@ -174,7 +174,7 @@ Phase detail: [`task.208.plan.worktree-root-config.md`](task.208.plan.worktree-r
 
 ## 9. Success Criteria
 
-- [ ] No shipped skill, script or runbook creates a worktree outside the repository
+- [ ] No shipped skill, script or runbook creates a persistent worktree outside the repository (scratch worktrees under the system temp dir, created and removed in the same step by the QA skills, are out of scope — owner decision, 2026-10-14)
 - [ ] `developBatch.worktreeRoot` is documented in `docs/reference/configuration.md` and `develop-batch` SKILL.md, default `.worktrees`
 - [ ] The selector refuses a root that leaves the repository
 - [ ] `develop-batch`'s stale check matches the paths the selector emits, enforced by a test
@@ -255,6 +255,7 @@ Five QA cycles; every medium finding fixed and verified. Low advisory items are 
 | 2026-10-14 |  | QA findings fixed — QA-208-7 (Step 0.3a prints the normalised root), 1 iteration | qa-fix |
 | 2026-10-14 |  | QA gate PASS (100/100) — cycle 5: no medium or high findings | qa-task |
 | 2026-10-14 |  | DoD incomplete — 4 gaps identified | finalise |
+| 2026-10-14 |  | Success criterion 1 scoped to persistent worktrees; QA scratch worktrees under the temp dir are out of scope (owner decision) | owner |
 <!-- change-log-end -->
 
 ---
