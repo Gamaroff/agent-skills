@@ -2018,14 +2018,28 @@ _agent_linked() {
 # (TASK-209-BUG-2), so main() calls this first.
 _check_link_agents() {
   [[ -n "$LINK_AGENTS" ]] || return 0
-  local -a want
-  IFS=',' read -r -a want <<<"$LINK_AGENTS"
   local id rec ids=""
   for rec in "${AGENT_TABLE[@]}"; do ids+="${ids:+, }$(_agent_field "$rec" 0)"; done
-  for id in "${want[@]}"; do
+  while IFS= read -r id; do
+    [[ -n "$(_agent_index "$id")" ]] || { err "--link-agents: unknown agent '$id'. Known: $ids"; return 1; }
+  done < <(_link_agents_ids)
+  return 0
+}
+
+# The ids in --link-agents, one per line: split on commas AND newlines, spaces
+# and carriage returns dropped, "none" and empties skipped. The one parse both
+# callers use. `IFS=',' read -a` alone stops at the first newline, so an id
+# after one was never checked and the run exited 0 (finalise run 1).
+_link_agents_ids() {
+  local v="${LINK_AGENTS//$'\r'/}"
+  v="${v//$'\n'/,}"
+  local -a raw
+  local id
+  IFS=',' read -r -a raw <<<"$v"
+  for id in "${raw[@]}"; do
     id="${id// /}"
     [[ -z "$id" || "$id" == none ]] && continue
-    [[ -n "$(_agent_index "$id")" ]] || { err "--link-agents: unknown agent '$id'. Known: $ids"; return 1; }
+    echo "$id"
   done
   return 0
 }
@@ -2049,12 +2063,9 @@ link_agents() {
   if [[ -n "$LINK_AGENTS" ]]; then
     # --link-agents a,b: no prompt. main() already refused an unknown id
     # (_check_link_agents) before any step ran, so every id here resolves.
-    local -a want; IFS=',' read -r -a want <<<"$LINK_AGENTS"
-    for id in "${want[@]}"; do
-      id="${id// /}"
-      [[ -z "$id" || "$id" == none ]] && continue
+    while IFS= read -r id; do
       chosen+=("$(_agent_index "$id")")
-    done
+    done < <(_link_agents_ids)
   else
     local defaults=""
     for i in "${!AGENT_TABLE[@]}"; do

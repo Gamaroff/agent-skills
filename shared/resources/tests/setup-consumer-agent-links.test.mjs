@@ -361,6 +361,30 @@ test("a run whose summary says Setup failed exits 1; one that warns exits 0", ()
   assert.match(fine.stdout, /reached/);
 });
 
+test("--link-agents reads ids across newlines: a typo after one is refused, good ids are linked", () => {
+  // Finalise run 1: `IFS=, read -a` stops at the first newline, so
+  // "claude<newline>claud" never checked "claud" and the run exited 0.
+  const bad = consumer();
+  const good = consumer();
+  try {
+    const r = run(bad, ["--link-agents", "claude\nclaud"]);
+    assert.notEqual(r.code, 0, "an id after a newline is checked");
+    assert.match(strip(r.out), /unknown agent 'claud'/);
+    assert.equal(linkOf(bad, "CLAUDE.md"), null);
+    const ok = run(good, ["--link-agents", "claude\r\ngemini"]);
+    assert.equal(ok.code, 0, ok.out);
+    assert.equal(linkOf(good, "CLAUDE.md"), "AGENTS.md");
+    assert.equal(
+      linkOf(good, "GEMINI.md"),
+      "AGENTS.md",
+      "an id after a newline is linked",
+    );
+  } finally {
+    rmSync(bad, { recursive: true, force: true });
+    rmSync(good, { recursive: true, force: true });
+  }
+});
+
 test("an existing unanchored rule is respected, not duplicated", () => {
   const dir = consumer({ seed: { ".gitignore": "CLAUDE.md\n" } });
   try {
@@ -400,6 +424,14 @@ test("with no terminal and no --link-agents, the list is skipped and nothing is 
     const code = await new Promise((res) => child.on("close", res));
     assert.equal(code, 0, out);
     assert.match(strip(out), /No terminal to show the list on — skipped/);
+    // The no-terminal guard is what keeps the list from touching /dev/tty at
+    // all: without it the run still skips, but prints a stream of
+    // "/dev/tty: No such device" errors on the way.
+    assert.doesNotMatch(
+      out,
+      /\/dev\/tty/,
+      "no /dev/tty errors without a terminal",
+    );
     assert.equal(linkOf(dir, "CLAUDE.md"), null);
   } finally {
     rmSync(dir, { recursive: true, force: true });
