@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Major'
 priority: 'Medium'
 created: '2026-10-14'
@@ -11,7 +11,7 @@ description: 'registry-tick reports no-row when parseRegistry rejected the row a
 
 **Bug ID**: bug.19
 **Related**: none — cross-cutting (`registry-tick` · `finalise` Step 7.4 · `develop-next` `parseRegistry`)
-**Status**: 🔍 Ready for QA
+**Status**: ✅ Closed
 **Priority**: Medium
 **Severity**: Major
 **Created**: 2026-10-14
@@ -261,9 +261,14 @@ DoD run 1 recorded four gaps:
 | 2026-10-14 | Ready for QA | finalise | DoD incomplete — 4 gap(s) — bug.19.dod.1.registry-tick-malformed-row-reported-as-no-row.md |
 | 2026-10-14 | Ready for QA | — | Iteration 2 — DoD run 1 gaps 1–3 fixed; review pending |
 | 2026-10-14 | Ready for QA | finalise | DoD verified — bug.19.dod.2.registry-tick-malformed-row-reported-as-no-row.md |
+| 2026-10-14 | Closed | develop-bug | Fix verified and accepted |
 
 ---
 
 ## Resolution Summary
 
-[Will be completed when bug is closed]
+**Final Status**: Closed — Fixed
+**Total Iterations**: 2
+**Time to Resolution**: same day (filed and closed 2026-10-14)
+**Final Fix Details**: `registry-tick` threw away the parser's `malformed` list and reported every rejected row as `no-row`. It now answers `row-malformed` with the parser's reason and line. `parseRegistry` accepts a plain-text title with the path in a `Document`/`Doc`/`Path`/`File` column, so the tick and `develop-next`'s frontier see those registries. The path must name a work item inside the repository (`resolveDocCell`); title links follow the same rule, whatever spelling the registry path was given in. Fixed in PR #651 and PR #652.
+**Lessons Learned**: (1) A caller that collapses a parser's rejection into "not found" hides the parser's diagnosis. Read `malformed` wherever `rows` is read. (2) Widening what a parser accepts makes new input reachable by every writer and reader that trusts it. Here that was `--annotate`'s notes cell and the selector's file open, and both needed a guard (obs #36). (3) A path boundary has to be exported as a verdict, or the probe engine cannot score it: DoD run 1 caught the absolute-path gap only by hand.
