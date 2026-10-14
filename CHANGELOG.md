@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **The setup wizard links your agents (task.209).** `setup-consumer.sh` shows a checkbox list of ten
+  agents (↑/↓, space, enter) and makes the local links each ticked one needs to `AGENTS.md` and
+  `.agents/skills/`, gitignored with anchored rules. Six of the ten need nothing and say so. It never
+  replaces or deletes an existing file. `--link-agents claude,gemini` picks without the list, and
+  `--links-only` runs just this step in a new clone or worktree. getting-started §1a now lists what
+  each agent needs.
+
 ### Changed
 
 - **Getting started now says how to link an agent to the skills (docs).** A consumer commits only
