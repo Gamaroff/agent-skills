@@ -462,6 +462,36 @@ test("template: the scaffold asset is a valid, lint-clean starter roadmap", () =
   assert.equal(r.item.id, "1.1");
 });
 
+test("template: the Change Log header is the one the change-log engine writes", async () => {
+  const tmpl = readFileSync(
+    path.join(
+      REPO_ROOT,
+      "skills",
+      "develop-next",
+      "assets",
+      "project-completion-roadmap.template.md",
+    ),
+    "utf-8",
+  );
+  // The engine is the source of the canonical header, so read it from the block
+  // it builds rather than restating the string here.
+  const { createRequire } = await import("node:module");
+  const { buildChangeLogBlock } = createRequire(import.meta.url)(
+    path.join(REPO_ROOT, "shared", "resources", "change-log.js"),
+  );
+  const canonical = buildChangeLogBlock([])
+    .split("\n")
+    .find((l) => l.startsWith("| Date"));
+  const section = tmpl.slice(tmpl.indexOf("## Change Log"));
+  const header = section.split("\n").find((l) => l.startsWith("|"));
+  const cells = (l) =>
+    l
+      .split("|")
+      .map((c) => c.trim())
+      .filter(Boolean);
+  assert.deepEqual(cells(header), cells(canonical));
+});
+
 // ── 11: `T`-prefixed standalone-task ids ─────────────────────────────────────
 
 test("11: a T-row parses as an item id, not an id-less annotation", () => {

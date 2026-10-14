@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+
+- **The roadmap template's Change Log header matches the canonical one (docs).**
+  `project-completion-roadmap.template.md` said `| Date | Version | Change | Author |`. Every other
+  Change Log, and the `change-log.js` engine, uses `Description` for the third column. Nothing
+  parsed the old name: the engine reads rows by position and accepts either header, so roadmaps
+  already scaffolded keep working. A test now ties the template's header to the one the engine
+  writes.
+
 ## [v0.56.0] - 2026-10-14
 
 ### Added
