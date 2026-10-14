@@ -197,5 +197,6 @@ An unknown `--link-agents` id exits 0 ([TASK-209-BUG-1](./task.209.bug.1.unknown
 |------|---------|-------------|--------|
 | 2026-10-14 | 1.0 | Task created and implemented | Claude |
 | 2026-10-14 |  | QA gate CONCERNS (90/100) — 1 medium, 1 low finding (retroactive QA of PR #659) | qa-task |
+| 2026-10-14 |  | QA findings fixed — QA-209-1 (unknown id exits 0), CR-2 (comment placement), 1 iteration | qa-fix |
 <!-- change-log-end -->
 

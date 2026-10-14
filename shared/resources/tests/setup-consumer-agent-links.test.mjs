@@ -245,6 +245,12 @@ test("an unknown agent id writes nothing and names the known ids", () => {
   const dir = consumer();
   try {
     const r = run(dir, ["--link-agents", "claude,claud"]);
+    assert.notEqual(r.code, 0, "a typo must fail the run, not read as success");
+    assert.doesNotMatch(
+      strip(r.out),
+      /Restart your agents/,
+      "a failed run must not say it worked",
+    );
     assert.match(strip(r.out), /unknown agent 'claud'\. Known: claude, codex/);
     assert.equal(
       linkOf(dir, "CLAUDE.md"),

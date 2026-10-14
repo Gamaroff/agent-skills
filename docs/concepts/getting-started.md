@@ -314,7 +314,8 @@ bash setup-consumer.sh --links-only                    # just the list (new clon
 bash setup-consumer.sh --links-only --link-agents claude,gemini   # no list (scripts, no terminal)
 ```
 
-Without a terminal the list is skipped; use `--link-agents`. By hand, the links are:
+Without a terminal the list is skipped; use `--link-agents`. An unknown agent name stops the run with an
+error and links nothing. By hand, the links are:
 
 | Id | Agent | Instruction file | Skills directory |
 | --- | --- | --- | --- |

@@ -1925,9 +1925,6 @@ install_hooks() {
   fi
 }
 
-# ── summary ──────────────────────────────────────────────────────────────────
-
-# Coloured status badge for the status table
 # ── agent links ──────────────────────────────────────────────────────────────
 # A consumer repo commits one instruction file (AGENTS.md) and one skills
 # directory (.agents/skills/). Each user links the agents they run to those,
@@ -2028,7 +2025,9 @@ link_agents() {
         local ids=""; for rec in "${AGENT_TABLE[@]}"; do ids+="${ids:+, }$(_agent_field "$rec" 0)"; done
         err "--link-agents: unknown agent '$id'. Known: $ids"
         record_step "Agent links" "fail" "unknown agent: $id"
-        return 0
+        # Non-zero, like every other failed step: --link-agents is the flag
+        # for scripts, and a script must not read a typo as success.
+        return 1
       fi
       chosen+=("$found")
     done
@@ -2093,6 +2092,9 @@ link_agents() {
   info "Links are per clone. In a new clone or worktree, run: setup-consumer.sh --links-only"
 }
 
+# ── summary ──────────────────────────────────────────────────────────────────
+
+# Coloured status badge for the status table
 _status_badge() {
   case "$1" in
     ok)      echo -e "${GREEN}ok${NC}     " ;;
@@ -2141,7 +2143,11 @@ print_summary() {
 
   if [[ "$LINKS_ONLY" == true ]]; then
     echo -e "${BOLD}Next steps:${NC}"
-    echo "  Restart your agents in this directory so they pick up the links."
+    if $WIZARD_HAS_FAIL; then
+      echo "  Fix the error above and re-run with --links-only."
+    else
+      echo "  Restart your agents in this directory so they pick up the links."
+    fi
     echo ""
     [[ "$DRY_RUN" == true ]] && warn "Dry-run mode — no files were written." && echo ""
     return 0

@@ -4,7 +4,7 @@
 **Bug ID**: TASK-209-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: New
+**Status**: ✅ Ready for QA
 **Found By**: QA Engineer (PR review CR-1, reproduced by the probe)
 **Date Found**: 2026-10-14
 
@@ -44,8 +44,52 @@ Exit non-zero when the links-only run recorded a failure (the full wizard's `_on
 failed step into a failed run only when the exit code is non-zero), and assert the exit code in the
 unknown-id test.
 
+## Developer Fix Cycle
+
+### Iteration 1
+
+#### Investigation (New → In Progress)
+
+**Date**: 2026-10-14
+
+**Root Cause**: the unknown-id branch recorded a `fail` step and returned 0, unlike every other
+failed step in the wizard, which returns or exits non-zero. The test checked the message, never the
+exit code.
+
+#### Fix Implementation (In Progress → Ready for QA)
+
+**Date**: 2026-10-14
+
+**Fix Description**:
+
+- `link_agents` returns 1 after recording the failure. Under `set -e` the run stops, and `_on_exit`
+  prints the summary and exits 1, the same path a failed skills install takes.
+- The links-only summary no longer says "Restart your agents" after a failure; it says to fix the
+  error and re-run.
+- getting-started §1a says an unknown name stops the run and links nothing.
+- PR review CR-2: the summary header and `_status_badge` comment are back above the function.
+
+**Files Modified**:
+
+- `scripts/setup-consumer.sh`
+- `shared/resources/tests/setup-consumer-agent-links.test.mjs`
+- `docs/concepts/getting-started.md`
+
+**Testing**:
+
+- `an unknown agent id writes nothing and names the known ids` now asserts a non-zero exit and that
+  the output does not say the run worked. Reverting either change turns it red.
+- All `setup-consumer-*` suites: 167 pass. shellcheck clean.
+
+**Verification Steps for QA**:
+
+1. `setup-consumer.sh --links-only --link-agents claude,claud` in a scratch repo: exit 1, nothing linked.
+2. Re-run the probe in `task.209.qa.1.security.cases.json`: the five hostile ids now exit non-zero.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
 | :--- | :--- | :--- | :--- |
 | 2026-10-14 | New | QA Engineer | Found by PR review CR-1; reproduced by the shell-argv probe |
+| 2026-10-14 | In Progress | qa-fix | Root cause: the unknown-id branch returned 0 |
+| 2026-10-14 | Ready for QA | qa-fix | Returns 1; failed links-only run no longer says it worked |
