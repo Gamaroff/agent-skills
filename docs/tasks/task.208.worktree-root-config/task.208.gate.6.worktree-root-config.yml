@@ -1,0 +1,49 @@
+schema: 2
+task: 'task.208.worktree-root-config'
+task_title: "Worktrees live inside the repo under a configurable root"
+gate: PASS
+status_reason: 'Re-QA of the finalise run-1 gap fixes: AC1 and AC6 now held per PR by tests/worktree-root-coverage.test.js; develop-next --batch docs updated. Two review rounds on the new sibling-path guard found patterns it got wrong; resolved by scoping it (qa-fix Step 2.6). The final scoping commit was mutation-proved but not independently reviewed.'
+reviewer: 'QA Engineer'
+head: 'ab31952f73d5e3059f66b9b70321a6115cca7d22'
+updated: '2026-10-14T17:15:12Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 5502
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 21
+    notes: 'DoD probe record task.208.dod.1.security.run.json (21 executed, 4 low, none exploitable); selector code unchanged since.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Unchanged code; new guards fail on every removed form.'
+  maintainability:
+    status: PASS
+    notes: 'Every prose claim the DoD named is now held by a per-PR test.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Discover repo-wide find/grep commands in all shipped skills and require a .worktrees exclusion or an allow-list entry (re-QA CR-2).'
+      refs: ['tests/worktree-root-coverage.test.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

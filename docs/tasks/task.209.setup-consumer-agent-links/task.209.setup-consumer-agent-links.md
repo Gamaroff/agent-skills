@@ -179,17 +179,18 @@ the previous state.
 **Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.209.qa.7.setup-consumer-agent-links.md](./task.209.qa.7.setup-consumer-agent-links.md)
-- **Gate File**: [task.209.gate.7.setup-consumer-agent-links.yml](./task.209.gate.7.setup-consumer-agent-links.yml)
+- **Full Report**: [task.209.qa.8.setup-consumer-agent-links.md](./task.209.qa.8.setup-consumer-agent-links.md)
+- **Gate File**: [task.209.gate.8.setup-consumer-agent-links.yml](./task.209.gate.8.setup-consumer-agent-links.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5497 (5479 pass; 4 worktree-only failures, obs #39)
+- **Tests Executed**: 5502 (5484 pass; 4 worktree-only failures, obs #39)
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Seven QA cycles (two past the 5-cycle budget, owner informed); six bugs found and closed, one by the owner's real-terminal check. macOS check deferred to task.210.
+The finalise run-1 gaps are closed: ids are read across newlines, and every guard has a mutation-proven test.
+
 ## Definition of Done - Gaps Identified
 
 **Status:** IN PROGRESS
@@ -223,5 +224,7 @@ Seven QA cycles (two past the 5-cycle budget, owner informed); six bugs found an
 | 2026-10-14 |  | QA findings fixed — scope the claim: TERM/QUIT trap and EXIT restore removed; Ctrl-C test requires SIGINT, 1 iteration | qa-fix |
 | 2026-10-14 |  | QA gate PASS (100/100) — cycle 7: no findings | qa-task |
 | 2026-10-14 |  | DoD incomplete — 3 gaps identified | finalise |
+| 2026-10-14 |  | QA findings fixed — finalise run-1 gaps | qa-fix |
+| 2026-10-14 |  | QA gate PASS (100/100) — cycle 8: re-QA of the DoD gap fixes | qa-task |
 <!-- change-log-end -->
 

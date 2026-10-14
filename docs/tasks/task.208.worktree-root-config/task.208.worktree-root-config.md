@@ -215,17 +215,18 @@ Phase detail: [`task.208.plan.worktree-root-config.md`](task.208.plan.worktree-r
 **Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.208.qa.5.worktree-root-config.md](./task.208.qa.5.worktree-root-config.md)
-- **Gate File**: [task.208.gate.5.worktree-root-config.yml](./task.208.gate.5.worktree-root-config.yml)
+- **Full Report**: [task.208.qa.6.worktree-root-config.md](./task.208.qa.6.worktree-root-config.md)
+- **Gate File**: [task.208.gate.6.worktree-root-config.yml](./task.208.gate.6.worktree-root-config.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5495 at cycle 4 (5477 pass; 4 worktree-only failures, obs #39); 38 protocol tests at cycle 5
+- **Tests Executed**: 5502 (5484 pass; 4 worktree-only failures, obs #39)
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Five QA cycles; every medium finding fixed and verified. Low advisory items are in the gate's recommendations.
+The finalise run-1 gaps (AC1, AC6, develop-next docs) are closed and held per PR by tests/worktree-root-coverage.test.js.
+
 ## Definition of Done - Gaps Identified
 
 **Status:** IN PROGRESS
@@ -256,6 +257,8 @@ Five QA cycles; every medium finding fixed and verified. Low advisory items are 
 | 2026-10-14 |  | QA gate PASS (100/100) — cycle 5: no medium or high findings | qa-task |
 | 2026-10-14 |  | DoD incomplete — 4 gaps identified | finalise |
 | 2026-10-14 |  | Success criterion 1 scoped to persistent worktrees; QA scratch worktrees under the temp dir are out of scope (owner decision) | owner |
+| 2026-10-14 |  | QA findings fixed — finalise run-1 gaps | qa-fix |
+| 2026-10-14 |  | QA gate PASS (100/100) — cycle 6: re-QA of the DoD gap fixes | qa-task |
 <!-- change-log-end -->
 
 ---
