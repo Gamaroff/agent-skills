@@ -5,7 +5,7 @@ type: task
 description: "Move every worktree the skills create from a sibling of the checkout to <repo>/.worktrees/<name>, behind a new developBatch.worktreeRoot key, and keep the generated worktrees out of the searches and copies the skills control."
 tags: [worktrees, develop-batch, develop-next, select-next, create-parallel-stories, configuration, gitignore]
 category: infrastructure
-status: in-progress
+status: ready-for-review
 priority: Medium
 created: 2026-10-14
 updated: 2026-10-14
@@ -15,7 +15,7 @@ estimated_effort_hours: 4
 
 # Technical Task: Worktrees live inside the repo under a configurable root
 
-**Status:** In Progress
+**Status:** Ready for Review
 
 ---
 
@@ -206,14 +206,33 @@ Phase detail: [`task.208.plan.worktree-root-config.md`](task.208.plan.worktree-r
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-14
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.208.qa.1.worktree-root-config.md](./task.208.qa.1.worktree-root-config.md)
+- **Gate File**: [task.208.gate.1.worktree-root-config.yml](./task.208.gate.1.worktree-root-config.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 5485 (5467 pass; 4 worktree-only failures, obs #39)
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0 (1 medium, 1 low)
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+A symlinked worktree root still puts worktrees outside the repository ([TASK-208-BUG-1](./task.208.bug.1.symlinked-worktree-root-escapes-repo.md)). Everything else verified by execution.
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
-
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-14 | 1.0     | Initial draft | create-task |
-
+| 2026-10-14 |  | QA gate CONCERNS (90/100) — 1 medium, 1 low finding (retroactive QA of PR #657) | qa-task |
 <!-- change-log-end -->
 
 ---

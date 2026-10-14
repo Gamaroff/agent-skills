@@ -1,0 +1,21 @@
+{
+  "sink": "path",
+  "entry": "skills/develop-next/scripts/select-next.mjs#normaliseWorktreeRoot",
+  "name": null,
+  "call_site": null,
+  "verdict": "present-but-inert",
+  "reason": "a-hostile-case-passed-a-control-that-rejects-others",
+  "executed": 11,
+  "passed": 8,
+  "reproduced": 3,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-10-14T15:01:25.667Z"
+}
