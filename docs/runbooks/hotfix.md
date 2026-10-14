@@ -52,8 +52,9 @@ flowchart TD
     E -->|READY TO FIX| F[Reproduce, fix<br/>+ regression test]
     E -->|DUPLICATE / STALE / NEEDS DETAIL| H[HALT]
     F --> G[create-pr --base main<br/>verify loop, finalise]
-    G --> I[Merge to main]
-    I --> J[Human: tag vX.Y.Z<br/>release.sh --patch]
+    G --> P[Human: release.sh --prepare --patch<br/>on the hotfix branch]
+    P --> I[Merge to main]
+    I --> J[Human: tag vX.Y.Z<br/>release.sh --tag]
     J --> K[Merge-back main → develop<br/>recorded in the Issues Log]
 ```
 
@@ -98,17 +99,20 @@ A general bug is anchored to the registry and has no parent to link.
 The pipeline ends with the bug closed and the PR open against `main`. Two actions remain, and both are
 yours:
 
-1. **Merge the PR into `main`**, then **cut the tag**. Tagging is a release action, not a pipeline step:
-   from `main` with a clean tree, `bash scripts/release.sh --patch` runs the checks, moves
-   `[Unreleased]` in `CHANGELOG.md`, commits `chore(release): vX.Y.Z`, creates the annotated tag and
-   pushes — and pushing a `v*.*.*` tag is what triggers the release workflow.
-2. **Merge back to `develop`.** `release.sh` does this at the end of every fresh release (`git merge
+1. **Prepare, merge, then cut the tag.** Tagging is a release action, not a pipeline step. On the
+   hotfix branch, with a clean tree, `bash scripts/release.sh --prepare --patch` moves `[Unreleased]`
+   in `CHANGELOG.md` to `[vX.Y.Z]`, commits `chore(release): vX.Y.Z` and pushes — the PR the pipeline
+   opened now carries it. **Merge the PR into `main`**, then from `main` with a clean tree
+   `bash scripts/release.sh --tag` runs the checks, creates the annotated tag and pushes it alone —
+   and pushing a `v*.*.*` tag is what triggers the release workflow. Nothing is committed to `main`
+   directly; its branch rule admits a change only by pull request.
+2. **Merge back to `develop`.** `release.sh --tag` does this at the end of every fresh release (`git merge
 main` into `develop`, then push); if you passed `--no-sync-develop`, or tagged by hand, do it yourself —
    `git checkout develop && git pull --rebase && git merge main && git push`. Then close the Issues-Log
    item the pipeline wrote at Step 4.
 
-The order is deliberate: the tag marks the `main` that shipped, and the merge-back carries the
-`chore(release)` commit into `develop` along with the fix.
+The order is deliberate: the tag marks the `main` that shipped, and the merge-back carries the fix and
+its `chore(release)` commit into `develop`.
 
 ## Pitfalls
 

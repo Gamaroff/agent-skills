@@ -465,6 +465,13 @@ test("release.sh gates on the clean-checkout runner first, stops when it fails, 
     git(fx.repo, "checkout", "--quiet", "-B", "main");
     git(fx.wrapper, "init", "--quiet", "--bare", origin);
     git(fx.repo, "remote", "add", "origin", origin);
+    // --tag reads the version from CHANGELOG before its gate: main as a merged release-prep PR leaves it.
+    fs.writeFileSync(
+      path.join(fx.repo, "CHANGELOG.md"),
+      "# Changelog\n\n## [Unreleased]\n\n## [v0.0.2] - 2026-10-14\n\n- fixture\n",
+    );
+    git(fx.repo, "add", "CHANGELOG.md");
+    git(fx.repo, "commit", "--quiet", "-m", "chore(release): v0.0.2");
     git(fx.repo, "push", "--quiet", "origin", "main");
     const bin = path.join(fx.wrapper, "bin");
     fs.mkdirSync(bin);
@@ -496,7 +503,7 @@ test("release.sh gates on the clean-checkout runner first, stops when it fails, 
       `#!/bin/sh\nif [ -n "$GH_RED" ]; then echo '${runs("failure")}'; else echo '${runs("success")}'; fi\n`,
       { mode: 0o755 },
     );
-    const release = (extra, flags = ["--patch"]) => {
+    const release = (extra, flags = ["--tag"]) => {
       fs.rmSync(log, { force: true });
       const env = {
         ...process.env,
@@ -551,10 +558,7 @@ test("release.sh gates on the clean-checkout runner first, stops when it fails, 
 
     // Uncertified (--skip-ci-check over a red CI): nothing enforced the file budgets, so the
     // gate keeps the normal ones — TEST_FILE_BUDGET_MS is not set for it.
-    const uncertified = release({ GH_RED: "1" }, [
-      "--patch",
-      "--skip-ci-check",
-    ]);
+    const uncertified = release({ GH_RED: "1" }, ["--tag", "--skip-ci-check"]);
     assert.deepEqual(
       uncertified.calls,
       ["run test:clean-checkout|<unset>|<unset>"],
