@@ -392,7 +392,12 @@ test("Step 4 registry arm: calls registry-tick.js --annotate, never writes Statu
     "already pushes unconditionally before marking ticked",
   );
   // QA-11: every exit-0 reason the engine can emit is named.
-  for (const r of ["`not-accepted`", "`not-a-task`", "`engine-unavailable`"]) {
+  for (const r of [
+    "`not-accepted`",
+    "`not-a-task`",
+    "`engine-unavailable`",
+    "`row-malformed`",
+  ]) {
     assert.ok(arm.includes(r), `exit-0 reason unnamed: ${r}`);
   }
   assert.match(

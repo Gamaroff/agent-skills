@@ -626,7 +626,7 @@ and, when the run created a tracker issue, the `Issue` cell — and never a seco
      git push origin <baseBranch>
      ```
      Then log `already` and mark `ticked: true`.
-   - every other exit-0 reason — `no-row`, `no-registry`, `no-cell`, `not-accepted`, `not-a-task`,
+   - every other exit-0 reason — `no-row`, `row-malformed`, `no-registry`, `no-cell`, `not-accepted`, `not-a-task`,
      `engine-unavailable` — log it verbatim, make no commit, mark `ticked: true`. The drift test is
      the backstop, and a missing or unannotatable index line never blocks a merge that has already
      happened. (Exit 2 is a usage error in this step's own invocation — fix the call, do not mark

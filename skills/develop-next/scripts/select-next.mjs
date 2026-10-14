@@ -928,7 +928,43 @@ const COLUMN_ALIASES = {
   "depends-on": "deps",
   depends_on: "deps",
   "blocked by": "deps",
+  document: "doc",
+  doc: "doc",
+  path: "doc",
+  file: "doc",
 };
+
+// The header names that map to the document-path column, exported so
+// `registry-tick.js --annotate` can refuse to write a note into that cell. A
+// second list there would drift from this one in the worst direction — the
+// parser reading a path the annotate write has just appended prose to.
+export const DOC_COLUMN_NAMES = Object.freeze(
+  Object.keys(COLUMN_ALIASES).filter((k) => COLUMN_ALIASES[k] === "doc"),
+);
+
+/**
+ * The work-item path in a registry's document-path column (bug 19).
+ *
+ * Some registries keep the title as plain text and put the document path in a
+ * column of its own (`| … | Document |`), usually as a code span. A Markdown
+ * link there resolves against the registry file, as a link does anywhere. A
+ * code span or bare path is read from the REPO ROOT — that is how a path is
+ * written in prose, and how the registries that use this shape write it — unless
+ * it opens with `./` or `../`, which says "relative to here".
+ *
+ * @returns {string|null} a repo-root-relative posix path, or null
+ */
+function docCellPath(cell, dir) {
+  const linked = [...cell.matchAll(MD_LINK_RE)]
+    .map((m) => m[1])
+    .find(isWorkItemHref);
+  if (linked) return path.posix.normalize(path.posix.join(dir, linked));
+  const raw = cell.replace(/^`+|`+$/g, "").trim();
+  if (/\s/.test(raw) || !isWorkItemHref(raw)) return null;
+  return path.posix.normalize(
+    /^\.\.?\//.test(raw) ? path.posix.join(dir, raw) : raw,
+  );
+}
 
 // Documented positions, used when a registry has no recognisable header.
 //   bug:  | # | Title | Status | Severity | Priority | Created | Area |
@@ -1137,14 +1173,21 @@ export function parseRegistry(text, kind, registryPath) {
       [...titleCell.matchAll(MD_LINK_RE)]
         .map((m) => m[1])
         .find(isWorkItemHref) || null;
+    // The title's link wins; the document-path column is read only when the
+    // title carries none, so a registry that has both cannot disagree with
+    // itself about which file a row names.
+    const docPath =
+      href || c.doc === undefined ? null : docCellPath(cells[c.doc] || "", dir);
 
     const base = { kind, n, line: i + 1, raw: t };
 
-    if (cells.length < 5 || !href || !status) {
+    if (cells.length < 5 || !(href || docPath) || !status) {
       malformed.push({
         ...base,
-        reason: !href
-          ? "malformed row — no [title](story|task|bug.….md) link"
+        reason: !(href || docPath)
+          ? c.doc === undefined
+            ? "malformed row — no [title](story|task|bug.….md) link"
+            : "malformed row — no [title](story|task|bug.….md) link and no work-item path in the document column"
           : !status
             ? "malformed row — empty status cell"
             : `malformed row — ${cells.length} cells, expected at least 5`,
@@ -1155,7 +1198,7 @@ export function parseRegistry(text, kind, registryPath) {
     rows.push({
       ...base,
       title: titleCell.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").trim(),
-      path: path.posix.normalize(path.posix.join(dir, href)),
+      path: docPath || path.posix.normalize(path.posix.join(dir, href)),
       registryStatus: status,
       severity:
         kind === "bug" && c.severity !== undefined

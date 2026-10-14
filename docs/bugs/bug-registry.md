@@ -1,8 +1,8 @@
 # Bug Registry
 
 **Purpose:** Central tracking for all general (cross-cutting) bug numbers in this repo.
-**Last Updated:** 2026-10-10
-**Next Available Bug Number:** **19**
+**Last Updated:** 2026-10-14
+**Next Available Bug Number:** **20**
 
 ## How to use
 
@@ -45,6 +45,7 @@
 | 16 | [The `main` guard is a silent no-op when the script is reached through a symlink](bug.16.main-guard-silent-noop-under-symlink/bug.16.main-guard-silent-noop-under-symlink.md) | closed | Major | Medium | 2026-09-23 | CLI entry points (6 files, 5 skills) |
 | 17 | [Under zsh, `choose_candidate()` accepts a candidate directory with an embedded NUL](bug.17.zsh-nul-truncates-candidate-directory/bug.17.zsh-nul-truncates-candidate-directory.md) | closed | Minor | Low | 2026-09-30 | pipeline lock (`advance-pipeline-lock.sh`) |
 | 18 | [`develop-next` and `develop-batch` hardcode the Phase 0d base branch, overriding `epic-integration`](bug.18.autonomous-runs-hardcode-base-branch/bug.18.autonomous-runs-hardcode-base-branch.md) | closed | Major | High | 2026-10-09 | autonomous orchestrators (`develop-next`, `develop-batch`) |
+| 19 | [`registry-tick` reports `no-row` when `parseRegistry` rejects every row of a plain-title registry](bug.19.registry-tick-malformed-row-reported-as-no-row/bug.19.registry-tick-malformed-row-reported-as-no-row.md) | ready-for-qa | Major | Medium | 2026-10-14 | registry tick + parser (`registry-tick`, `select-next`) |
 
 ---
 

@@ -70,6 +70,10 @@
  *                      phantom dependency, since the notes cell is parsed for `task.N` references
  *   no-registry        the registry file does not exist in this project
  *   no-row             the registry has no row for this task id
+ *   row-malformed      the registry HAS a row for this task id, but the shared
+ *                      parser rejected its shape; `parserReason` and `line` say
+ *                      why and where. Never reported as `no-row` (bug 19): that
+ *                      sends the operator looking for a row that is there.
  *   ambiguous-row      (tick) the row's status cell could not be identified unambiguously
  *   engine-unavailable the shared registry parser could not be located
  * Exit 2: usage error (including `--annotate` without `--pr`).
@@ -307,12 +311,29 @@ async function main() {
   }
 
   const { pathToFileURL } = require("url");
-  const { parseRegistry } = await import(pathToFileURL(selector).href);
+  const { parseRegistry, DOC_COLUMN_NAMES } = await import(
+    pathToFileURL(selector).href
+  );
 
   const registryText = fs.readFileSync(registryRel, "utf8");
-  const { rows } = parseRegistry(registryText, "task", registryRel);
+  const { rows, malformed } = parseRegistry(registryText, "task", registryRel);
   const row = rows.find((r) => r.n === taskId);
   if (!row) {
+    // The parser keeps what it rejected. A row it refused is not a missing
+    // row, and saying so points the operator at the wrong fix (bug 19: five
+    // finalise runs in one consumer answered `no-row` for rows that existed).
+    const rejected = (malformed || []).find((m) => m.n === taskId);
+    if (rejected) {
+      return emit(opts, {
+        reason: "row-malformed",
+        message: `registry ${registryRel} line ${rejected.line} is task ${taskId}'s row, but the parser rejected it: ${rejected.reason}`,
+        taskId,
+        line: rejected.line,
+        parserReason: rejected.reason,
+        ticked: false,
+        exitCode: 0,
+      });
+    }
     return emit(opts, {
       reason: "no-row",
       message: `registry ${registryRel} has no row for task ${taskId}`,
@@ -340,7 +361,13 @@ async function main() {
         exitCode: 0,
       });
     }
-    return annotate(opts, { registryRel, registryText, row, taskId });
+    return annotate(opts, {
+      registryRel,
+      registryText,
+      row,
+      taskId,
+      docColumnNames: DOC_COLUMN_NAMES || [],
+    });
   }
 
   if (row.registryStatus === "accepted") {
@@ -532,7 +559,10 @@ function findHeader(parts, rowLine) {
  * because the selector reads the registry to SELECT and has no use for an
  * Issue column; adding one there would be a selector change the task rules out.
  */
-function annotate(opts, { registryRel, registryText, row, taskId }) {
+function annotate(
+  opts,
+  { registryRel, registryText, row, taskId, docColumnNames },
+) {
   const parts = registryText.split(/(\r?\n)/);
   const idx = (row.line - 1) * 2;
   const original = parts[idx];
@@ -554,7 +584,10 @@ function annotate(opts, { registryRel, registryText, row, taskId }) {
     !header ||
     last < 1 ||
     headerLast !== last ||
-    DATA_COLUMN_NAMES.has(lastName)
+    DATA_COLUMN_NAMES.has(lastName) ||
+    // The document-path column is the parser's, and it names it: a note
+    // appended there would be read back as part of the path (bug 19).
+    docColumnNames.includes(lastName)
   ) {
     return emit(opts, {
       reason: "no-cell",
