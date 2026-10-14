@@ -24,7 +24,7 @@ Before cutting a repo release:
 > composite and the three workflows run the same set, so a lane added to one and not the other
 > fails `npm test` (task 111).
 
-> **The CI boxes below are enforced by `release.sh`, not only read by you.** Step 2 of the script (labelled 1b in `release.sh`'s own header, which keeps its original numbering)
+> **The CI boxes below are enforced by `release.sh`, not only read by you.** Step 2 of `--tag`
 > reads CI's recorded verdict for the commit being released (`scripts/release-ci-verdict.mjs`) and
 > refuses unless it is green: `Test` and `ShellCheck` must have a green run for the SHA, and
 > `Validate Skills` and `Docs link check` — path-filtered, so often absent — must not be red when
@@ -76,7 +76,7 @@ Before cutting a repo release:
 >   | grep -oE '(task|bug)\.[0-9]+' | sort -u
 > ```
 
-> Skill catalog (`npm run generate-catalog`) and bundled references (`npm run bundle`) are checked and auto-committed by `release.sh` — no manual pre-check needed. `release.sh` does **not** run `format:check`, `eval:all` or `shellcheck` locally; those are CI's job, which is why the boxes above are about CI being green and not about a local run — and it now reads CI's verdict for them before tagging (step 2 below).
+> Skill catalog (`npm run generate-catalog`) and bundled references (`npm run bundle`) are regenerated and committed on `develop` by `release.sh --prepare`, and checked again on `main` by `--tag` — no manual pre-check needed. `release.sh` does **not** run `format:check`, `eval:all` or `shellcheck` locally; those are CI's job, which is why the boxes above are about CI being green and not about a local run — and `--tag` reads CI's verdict for them before tagging (step 2 below).
 
 ## Branch flow
 
@@ -97,16 +97,16 @@ git pull --rebase
 git push
 ```
 
-Then advance `main` with a release-prep PR:
+Then prepare the release on `develop`. `--prepare` makes the release commit there and opens the
+release-prep PR that carries it to `main`:
 
 ```bash
-# From develop, open a release-prep PR. Replace vX.Y.Z with the version
-# you plan to cut — run `bash scripts/release.sh --dry-run --<bump>` from
-# a local main checkout and look for the line:
-#   ✓ Next version: vX.Y.Z  (minor bump)
-gh pr create --base main --head develop \
-  --title "Release prep — vX.Y.Z" \
-  --body "Promoting develop to main for next release."
+# Preview first — prints the next version:  ✓ Next version: vX.Y.Z  (minor bump)
+bash scripts/release.sh --dry-run --prepare --minor
+
+bash scripts/release.sh --prepare --minor
+#   → commits chore(release): vX.Y.Z on develop, pushes it, and opens
+#     "Release prep — vX.Y.Z" into main (or reuses the one already open)
 
 # Merge the PR via the GitHub UI (or `gh pr merge` — see Merge-type
 # aesthetics below for which flag to use). Then locally:
@@ -114,7 +114,19 @@ git checkout main
 git pull --rebase
 ```
 
-`main` is now at the tip you'll release from. Run `release.sh` (see [Cutting a release](#cutting-a-release)), then sync develop forward (see [Sync develop with main after release](#sync-develop-with-main-after-release)).
+`main` is now at the tip you'll release from, and that tip already carries the `[vX.Y.Z]` CHANGELOG
+section. Run `release.sh --tag` (see [Cutting a release](#cutting-a-release)); it tags that tip and
+syncs develop forward.
+
+> **The release commit is made on `develop`, not on `main` — since 2026-10-14.** Until then
+> `release.sh --minor` ran on `main`, committed `chore(release): vX.Y.Z` there and pushed it, along
+> with any catalog or bundle refresh. `main`'s one required check runs on `pull_request` only, so
+> every one of those pushes was refused and went through on an admin bypass — v0.57.0 printed
+> `Bypassed rule violations for refs/heads/main` — the very dependence on `enforce_admins: false`
+> that removing the direct fast-forward (below) was meant to end. Now the commit travels inside the
+> PR and `--tag` pushes only a tag, which the branch rule does not cover. The tag also lands on the
+> exact commit CI certified, rather than on a commit made after it. `tests/release-ci-gate.test.js`
+> runs the script against an origin whose `pre-receive` hook refuses every push to `main`.
 
 > **There used to be a "Direct fast-forward" option here, for a "solo maintainer, no branch
 > protection on `main`" — and it was removed on 2026-09-22 because that parenthetical had stopped
@@ -152,47 +164,60 @@ Pushing a `v*.*.*` tag triggers `.github/workflows/release.yml`, which:
 
 Consumers install from the tagged tarball. `setup-consumer.sh` resolves the latest release tag via the GitHub API at install time.
 
-Use `scripts/release.sh` — it runs all checks, bumps the version, updates CHANGELOG, commits, tags, and pushes in one command:
+Use `scripts/release.sh`, in two halves — neither one commits to `main`:
 
 ```bash
-# From main, with a clean working tree:
-bash scripts/release.sh --patch   # bug fixes, docs, catalog regen
-bash scripts/release.sh --minor   # new skills, new shared resources
-bash scripts/release.sh --major   # breaking changes
+# 1. On develop (or a hotfix/* or release/* branch), with a clean working tree:
+bash scripts/release.sh --prepare --patch   # bug fixes, docs, catalog regen
+bash scripts/release.sh --prepare --minor   # new skills, new shared resources
+bash scripts/release.sh --prepare --major   # breaking changes
 
-# Preview without writing anything:
-bash scripts/release.sh --dry-run --minor
+# 2. Merge the release-prep PR into main. Then on main, with a clean working tree:
+bash scripts/release.sh --tag
+
+# Preview either half without writing anything:
+bash scripts/release.sh --dry-run --prepare --minor
+bash scripts/release.sh --dry-run --tag
 
 # Skip the automatic develop sync:
-bash scripts/release.sh --patch --no-sync-develop
+bash scripts/release.sh --tag --no-sync-develop
 
-# Release without CI's verdict — only when GitHub is unreachable and you have
+# Tag without CI's verdict — only when GitHub is unreachable and you have
 # confirmed CI is green on the release commit another way:
-bash scripts/release.sh --patch --skip-ci-check
+bash scripts/release.sh --tag --skip-ci-check
 ```
 
-The script:
-1. Confirms you're on `main` with a clean, up-to-date working tree
+A bare `--patch`/`--minor`/`--major` (the interface before 2026-10-14) refuses and prints these two
+steps.
+
+`--prepare`:
+1. Confirms you're on `develop`, `hotfix/*` or `release/*` — the branches the Branch Policy admits a PR into `main` from — with a clean working tree in sync with origin
+2. **Warns on any branch carrying commits not on `develop`**, naming each with its commit count and last-commit date — finished work that was never merged is invisible to every other check here and to CI, because neither looks at an unmerged branch. Advisory: a parked branch is legitimate, and a stuck release is worse than a noted omission
+3. Calculates `vX.Y.Z` from the latest git tag + bump type (no tags yet → starts at `v0.0.0`); refuses when `CHANGELOG.md` already has that section, or `[Unreleased]` is empty
+4. Runs `npm run generate-catalog` and `npm run bundle` — commits any stale catalog or bundled-reference files
+5. Moves `## [Unreleased]` → `## [vX.Y.Z] - YYYY-MM-DD` in `CHANGELOG.md`, leaves a fresh `[Unreleased]` above it, and commits `chore(release): vX.Y.Z`
+6. Pushes the branch and opens `Release prep — vX.Y.Z` into `main` — or reuses the PR already open from the branch (a hotfix's own PR, say), which now carries the release commit
+
+`--tag`:
+1. Confirms you're on `main` with a clean working tree in sync with `origin/main`
 2. **Reads CI's verdict for `HEAD`** (`gh run list --commit`, via `scripts/release-ci-verdict.mjs`) and refuses unless it is green — naming the workflow, the run URL and `--skip-ci-check`. It runs before the multi-minute local test, so a red, pending or unreadable CI refuses in seconds. Requires an authenticated `gh`; a missing or failing `gh` is *unverifiable* and refuses. `--dry-run` prints the verdict and ends its summary with *Would have REFUSED* when a real run would. `--skip-ci-check` proceeds with a warning that the release is unverified against CI. `--retry` skips this step — it re-tags an existing release and keeps its own guard
-3. **Warns on any branch carrying commits not on `develop`**, naming each with its commit count and last-commit date — finished work that was never merged is invisible to every other check here and to CI, because neither looks at an unmerged branch. Advisory: a parked branch is legitimate, and a stuck release is worse than a noted omission
-4. Runs `npm run test:clean-checkout` (`npm test` in a clean clone of `HEAD`), `npm run validate:all`, `npm run generate-catalog`, and `npm run bundle` — auto-commits any stale catalog or bundled-reference files. A red local test prints the load-sensitive re-run rule above before exiting
-5. Calculates `vX.Y.Z` from the latest git tag + bump type (no tags yet → starts at `v0.0.0`)
-6. Moves `## [Unreleased]` → `## [vX.Y.Z] - YYYY-MM-DD` in `CHANGELOG.md` and leaves a fresh `[Unreleased]` above it
-7. Commits `chore(release): vX.Y.Z`, creates an annotated tag, and pushes both to origin
-8. Syncs `develop` with `main` (`git checkout develop && git pull --rebase && git merge main && git push && git checkout main`) — skip with `--no-sync-develop`
+3. **Reads the version from `CHANGELOG.md`** — the newest `## [vX.Y.Z]` section, which `--prepare` wrote. Refuses, before the local test, when there is none, when it is not newer than the latest tag, when it is already tagged, or when `[Unreleased]` on `main` has entries (they landed on `develop` after `--prepare` and would ship in this tag unlisted)
+4. Runs `npm run test:clean-checkout` (`npm test` in a clean clone of `HEAD`) and `npm run validate:all`, then **checks** — never regenerates — the catalog and bundled references (`check:generated`, `bundle:check`). A stale one refuses: fix it on `develop` and promote again, because regenerating it here would need a commit on `main`. A red local test prints the load-sensitive re-run rule above before exiting
+5. Creates an annotated tag at `HEAD` and pushes **the tag alone** — never `main`
+6. Syncs `develop` with `main` (`git checkout develop && git pull --rebase && git merge main && git push origin develop && git checkout main`) — skip with `--no-sync-develop`
 
 The GitHub Actions workflow then handles release creation. No manual `gh release create` needed.
 
 ## Sync `develop` with `main` after release
 
-`release.sh` adds a `chore(release): vX.Y.Z` commit and an annotated tag on `main`, then pushes both. **Develop is now behind `main`** by the chore(release) commit (and, for the PR-based path, also by the PR merge commit — whichever artefact `--merge`, `--rebase`, or `--squash` produced). This is true regardless of which branch-flow variant you used to advance `main`.
+`release.sh --tag` pushes only an annotated tag, but **develop is still behind `main`** by the release-prep PR's merge commit — whichever artefact `--merge`, `--rebase`, or `--squash` produced. The `chore(release)` commit itself is already on `develop`, where `--prepare` made it.
 
-`release.sh` handles this automatically at the end of every fresh release — it checks out `develop`, rebases, merges `main`, pushes, and returns to `main`. Pass `--no-sync-develop` to skip and run it manually:
+`release.sh --tag` handles this automatically at the end of every fresh release — it checks out `develop`, rebases, merges `main`, pushes, and returns to `main`. Pass `--no-sync-develop` to skip and run it manually:
 
 ```bash
 git checkout develop
 git pull --rebase        # in case anything new landed on develop while you were running the release
-git merge main           # brings main's commits, including the chore(release) commit, into develop
+git merge main           # brings main's commits — the PR merge commit, a hotfix — into develop
 git push
 ```
 
@@ -252,14 +277,14 @@ gh workflow run release.yml -f tag=v0.1.0 -R Gamaroff/agent-skills
 
 Or use the GitHub UI: Actions → Release → "Run workflow" → enter the tag.
 
-**B. You had to land a fix on `main`** (e.g. a workflow tweak). Delete the tag and re-push it at the new HEAD:
+**B. You had to land a fix on `main`** (e.g. a workflow tweak — through a PR, like everything else into `main`). Delete the tag and re-push it at the new HEAD:
 
 ```bash
 bash scripts/release.sh --retry           # retry latest tag
 bash scripts/release.sh --retry v0.1.0    # retry a specific tag
 ```
 
-`--retry` skips CHANGELOG and version-bump, refuses to run if a Release is already published for that tag, then deletes + re-pushes the tag — triggering the workflow afresh.
+`--retry` skips CHANGELOG and version-bump, refuses to run if a Release is already published for that tag, then deletes + re-pushes the tag — the tag alone, as `--tag` does — triggering the workflow afresh.
 
 ## Catalog regeneration
 

@@ -1,6 +1,6 @@
 # Release & Install
 
-> **Maintainers:** cut a release from `main`.  
+> **Maintainers:** prepare a release on `develop`, tag it on `main`.  
 > **Consumers:** install skills into your project via the setup wizard.
 
 ---
@@ -12,39 +12,38 @@
 ```bash
 npm run test:clean-checkout   # the suite in a clean clone of HEAD — what release.sh gates on
 npm run validate:all
-npm run generate-catalog   # commit any diff
+npm run generate-catalog   # --prepare also regenerates and commits this
 ```
 
 Ensure `CHANGELOG.md` has entries under `## [Unreleased]`.
 
-### 2. Advance `main`
+### 2. Prepare on `develop` and promote
 
-Promote through a release-prep PR. This is the only supported path: `main`'s required check runs on
-`pull_request` only, so a direct push is refused (the old "direct fast-forward" option was removed on
-2026-09-22 — [why](../contributing/releases.md)).
+`main` only moves by pull request: its required check runs on `pull_request` only, so a direct push
+is refused — and that includes the release commit, which is why it is made on `develop`
+([why](../contributing/releases.md#branch-flow)).
 
 ```bash
-# Preview the next version first
-bash scripts/release.sh --dry-run --minor
-
-gh pr create --base main --head develop \
-  --title "Release prep — vX.Y.Z" \
-  --body "Promoting develop to main for next release."
-# Merge via GitHub UI, then:
+git checkout develop && git pull --rebase
+bash scripts/release.sh --dry-run --prepare --minor   # preview the next version
+bash scripts/release.sh --prepare --minor
+#   → commits chore(release): vX.Y.Z on develop (CHANGELOG, catalog, bundle), pushes,
+#     and opens "Release prep — vX.Y.Z" into main
+# Merge the PR via GitHub UI, then:
 git checkout main && git pull --rebase
 ```
 
-### 3. Run the release script
+### 3. Tag `main`
 
 ```bash
-bash scripts/release.sh --patch   # bug fixes, docs, catalog regen
-bash scripts/release.sh --minor   # new skills, new shared resources
-bash scripts/release.sh --major   # breaking changes
+bash scripts/release.sh --tag
 ```
 
-The script: bumps version, updates CHANGELOG, commits `chore(release): vX.Y.Z`, creates an annotated tag, pushes. GitHub Actions then creates the release and attaches the source tarball automatically.
+The script reads the version from the `[vX.Y.Z]` section the PR brought in, checks CI's verdict and
+runs the local gate, then creates an annotated tag on `main`'s tip and pushes the tag alone. GitHub
+Actions then creates the release and attaches the source tarball automatically.
 
-**Bump type guide:**
+**Bump type guide** (passed to `--prepare`):
 
 | Bump      | When                                                                    |
 | --------- | ----------------------------------------------------------------------- |
@@ -53,6 +52,8 @@ The script: bumps version, updates CHANGELOG, commits `chore(release): vX.Y.Z`, 
 | `--major` | Skill renamed, frontmatter required fields changed, config key removed  |
 
 ### 4. Sync `develop` forward
+
+`--tag` does this itself unless you pass `--no-sync-develop`:
 
 ```bash
 git checkout develop && git pull --rebase
@@ -79,7 +80,7 @@ Full decision guide: [`../contributing/releases.md#recovering-from-a-failed-rele
 Run in your project root:
 
 ```bash
-bash <(curl -fsSL https://github.com/Gamaroff/agent-skills/raw/main/scripts/setup-consumer.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh)
 ```
 
 The wizard sets up:
@@ -145,7 +146,7 @@ Full key reference: [`../reference/configuration.md`](../reference/configuration
 ### Update skills only (skip wizard)
 
 ```bash
-bash <(curl -fsSL https://github.com/Gamaroff/agent-skills/raw/main/scripts/setup-consumer.sh) --update
+bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh) --update
 ```
 
 `--update` short-circuits before the wizard runs, so the profile is read from `skills-config.yaml`
@@ -155,7 +156,7 @@ keeps every skill you have — it does not silently prune to a default.
 ### Pin a specific version
 
 ```bash
-SKILLS_VERSION=v1.2.0 bash <(curl -fsSL https://github.com/Gamaroff/agent-skills/raw/main/scripts/setup-consumer.sh)
+SKILLS_VERSION=v1.2.0 bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh)
 ```
 
 ### After install

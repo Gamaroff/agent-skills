@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.57.1] - 2026-10-14
+
+### Changed
+
+- **A release no longer commits to `main` (maintainers).** `scripts/release.sh` now runs in two
+  halves. `--prepare --patch|--minor|--major` runs on `develop` (or a `hotfix/*` or `release/*`
+  branch). It moves `[Unreleased]` to `[vX.Y.Z]`, refreshes the catalog and bundled references,
+  commits `chore(release): vX.Y.Z`, pushes, and opens the `Release prep — vX.Y.Z` PR into `main`.
+  After that PR merges, `--tag` on `main` reads the version from `CHANGELOG.md`, runs the same CI
+  and local checks as before, and pushes the tag alone. It used to commit on `main` and push there.
+  `main`'s required check runs on pull requests only, so each of those pushes went through on an
+  admin bypass, and v0.57.0 printed `Bypassed rule violations for refs/heads/main`. `--tag` also
+  refuses a stale catalog or bundle instead of committing a fix to `main`. A bare `--minor` now
+  refuses and prints the two steps. The release test runs against an origin that refuses every
+  push to `main`.
+
 ## [v0.57.0] - 2026-10-14
 
 ### Added
