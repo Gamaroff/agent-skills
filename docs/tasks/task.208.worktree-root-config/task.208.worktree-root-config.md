@@ -215,17 +215,17 @@ Phase detail: [`task.208.plan.worktree-root-config.md`](task.208.plan.worktree-r
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.208.qa.2.worktree-root-config.md](./task.208.qa.2.worktree-root-config.md)
-- **Gate File**: [task.208.gate.2.worktree-root-config.yml](./task.208.gate.2.worktree-root-config.yml)
+- **Full Report**: [task.208.qa.3.worktree-root-config.md](./task.208.qa.3.worktree-root-config.md)
+- **Gate File**: [task.208.gate.3.worktree-root-config.yml](./task.208.gate.3.worktree-root-config.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5487 (5469 pass; 4 worktree-only failures, obs #39)
+- **Tests Executed**: 5494 (5476 pass; 4 worktree-only failures, obs #39)
 - **Phases Verified**: 5/5
-- **Critical Issues**: 0 (2 medium, 1 low)
-- **NFR Status**: Security: CONCERNS, Performance: CONCERNS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 0 (1 medium)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-Cycle-1 fixes verified. The refute pass found develop-batch Step 0.3a writes the exclude line before the root is validated and misreads git exit 128 ([TASK-208-BUG-2](./task.208.bug.2.exclude-written-before-root-validated.md)).
+Cycle-2 fixes verified. One medium in the fix prose: the `$ROOT` instruction in Step 0.3a ([TASK-208-BUG-3](./task.208.bug.3.root-variable-used-outside-its-block.md)).
 <!-- change-log-start -->
 ## Change Log
 
@@ -236,6 +236,7 @@ Cycle-1 fixes verified. The refute pass found develop-batch Step 0.3a writes the
 | 2026-10-14 |  | QA findings fixed — QA-208-1 (symlinked root), QA-208-2 (control characters), 1 iteration | qa-fix |
 | 2026-10-14 |  | QA gate CONCERNS (90/100) — cycle 2 refute pass: 2 medium, 1 low; cycle-1 fixes verified | qa-task |
 | 2026-10-14 |  | QA findings fixed — QA-208-3, -4 (Step 0.3a validates first, reads git exit status), QA-208-5 (linear gitdir parse), 1 iteration | qa-fix |
+| 2026-10-14 |  | QA gate CONCERNS (90/100) — cycle 3: 1 medium; cycle-2 fixes verified | qa-task |
 <!-- change-log-end -->
 
 ---

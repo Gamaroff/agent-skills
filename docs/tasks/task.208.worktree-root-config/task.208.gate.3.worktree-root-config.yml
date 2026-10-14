@@ -1,0 +1,61 @@
+schema: 2
+task: 'task.208.worktree-root-config'
+task_title: 'Worktrees live inside the repo under a configurable root'
+gate: CONCERNS
+status_reason: 'Cycle-2 fixes verified (Step 0.3a validates first, reads git exit status; linear gitdir parse). One medium in the fix prose: the instruction to use $ROOT in later steps cannot work (TASK-208-BUG-3).'
+reviewer: 'QA Engineer'
+head: '8d6627f3866f61c7b4882d0167bc9a350d8b5fd0'
+updated: '2026-10-14T15:42:57Z'
+
+top_issues:
+  - id: 'QA-208-6'
+    severity: medium
+    file: 'skills/develop-batch/SKILL.md'
+    finding: 'Step 0.3a says to use $ROOT everywhere below, but $ROOT exists only inside its block and later steps use <worktreeRoot> (TASK-208-BUG-3).'
+    suggested_action: 'State that the printed value is the <worktreeRoot> substituted in every later step.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 5494
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 11
+    notes: 'Probe record task.208.qa.2.security.run.json (11 executed); the root is now validated before any write. Shell metacharacters in a configured root are expanded by the placeholder substitution before --check-root sees them (advisory, low).'
+  performance:
+    status: PASS
+    notes: 'gitdir parse linear; timing test at 160k.'
+  reliability:
+    status: PASS
+    notes: 'check-ignore exit status read three ways; Step 0.3a executed by tests.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Step 0.3a instruction about $ROOT cannot be followed (QA-208-6).'
+
+recommendations:
+  immediate:
+    - action: 'Fix the $ROOT instruction in Step 0.3a (TASK-208-BUG-3).'
+      refs: ['skills/develop-batch/SKILL.md']
+  future:
+    - action: 'Pass the configured root to --check-root without shell interpolation (cycle-3 CR-2).'
+      refs: ['skills/develop-batch/SKILL.md']
+    - action: 'Make the timing-test comment match what it asserts (cycle-3 CR-3).'
+      refs: ['shared/resources/tests/qa-execute-snippets.test.mjs']
+    - action: 'Cycle-2 advisory items: tracked-directory root, resume re-check, stale-check by basename, CLI test cwd, commondir classification.'
+      refs: ['skills/develop-batch/SKILL.md', 'skills/develop-next/scripts/select-next.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-208-BUG-3 fixed']

@@ -179,17 +179,17 @@ the previous state.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.209.qa.2.setup-consumer-agent-links.md](./task.209.qa.2.setup-consumer-agent-links.md)
-- **Gate File**: [task.209.gate.2.setup-consumer-agent-links.yml](./task.209.gate.2.setup-consumer-agent-links.yml)
+- **Full Report**: [task.209.qa.3.setup-consumer-agent-links.md](./task.209.qa.3.setup-consumer-agent-links.md)
+- **Gate File**: [task.209.gate.3.setup-consumer-agent-links.yml](./task.209.gate.3.setup-consumer-agent-links.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5487 (5469 pass; 4 worktree-only failures, obs #39)
+- **Tests Executed**: 5494 (5476 pass; 4 worktree-only failures, obs #39)
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 (2 medium)
+- **Critical Issues**: 0 (1 medium)
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Exit status fixed; the refute pass found a typo stops the full wizard midway ([TASK-209-BUG-2](./task.209.bug.2.typo-stops-the-full-wizard-midway.md)) and a failed link is reported as made ([TASK-209-BUG-3](./task.209.bug.3.failed-link-reported-as-linked.md)).
+Cycle-2 fixes verified. A failed link is still recorded as a warning ([TASK-209-BUG-4](./task.209.bug.4.failed-link-recorded-as-warning.md)).
 <!-- change-log-start -->
 ## Change Log
 
@@ -200,5 +200,6 @@ Exit status fixed; the refute pass found a typo stops the full wizard midway ([T
 | 2026-10-14 |  | QA findings fixed — QA-209-1 (unknown id exits 0), CR-2 (comment placement), 1 iteration | qa-fix |
 | 2026-10-14 |  | QA gate CONCERNS (90/100) — cycle 2 refute pass: 2 medium; cycle-1 fix verified | qa-task |
 | 2026-10-14 |  | QA findings fixed — QA-209-2 (ids checked before any step), QA-209-3 (failed link reported), 1 iteration | qa-fix |
+| 2026-10-14 |  | QA gate CONCERNS (90/100) — cycle 3: 1 medium; cycle-2 fixes verified | qa-task |
 <!-- change-log-end -->
 

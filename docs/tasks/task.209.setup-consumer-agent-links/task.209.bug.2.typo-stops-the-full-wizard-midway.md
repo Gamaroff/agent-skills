@@ -4,7 +4,7 @@
 **Bug ID**: TASK-209-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle 2 refute pass)
 **Date Found**: 2026-10-14
 
@@ -62,3 +62,4 @@ Validate `--link-agents` against `AGENT_TABLE` in flag parsing and exit 1 there.
 | 2026-10-14 | New | QA Engineer | Cycle 2 refute pass, CR-1 — introduced by the cycle-1 fix |
 | 2026-10-14 | In Progress | qa-fix | Root cause found |
 | 2026-10-14 | Ready for QA | qa-fix | Unknown ids are checked before any step runs |
+| 2026-10-14 | Closed | qa-task | Verified by task.209.qa.3.setup-consumer-agent-links.md |

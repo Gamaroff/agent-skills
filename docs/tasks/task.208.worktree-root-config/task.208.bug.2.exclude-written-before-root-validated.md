@@ -4,7 +4,7 @@
 **Bug ID**: TASK-208-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle 2 refute pass)
 **Date Found**: 2026-10-14
 
@@ -81,3 +81,4 @@ runs first and writes a file, trusted the raw config value. Its `||` collapsed g
 | 2026-10-14 | New | QA Engineer | Cycle 2 refute pass, CR-1 and CR-2 |
 | 2026-10-14 | In Progress | qa-fix | Root cause: validation ran after the step that writes |
 | 2026-10-14 | Ready for QA | qa-fix | --check-root first; check-ignore exit status read three ways |
+| 2026-10-14 | Closed | qa-task | Verified by task.208.qa.3.worktree-root-config.md |
