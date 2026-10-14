@@ -4,7 +4,7 @@
 **Bug ID**: TASK-208-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (security probe, path sink)
 **Date Found**: 2026-10-14
 
@@ -106,3 +106,4 @@ looked at the filesystem.
 | 2026-10-14 | New | QA Engineer | Found by the path-sink probe of normaliseWorktreeRoot; reproduced with git |
 | 2026-10-14 | In Progress | qa-fix | Root cause: the only containment check was lexical |
 | 2026-10-14 | Ready for QA | qa-fix | Real-path check in the selector CLI; control characters refused |
+| 2026-10-14 | Closed | qa-task | Verified by task.208.qa.2.worktree-root-config.md |

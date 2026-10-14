@@ -215,17 +215,17 @@ Phase detail: [`task.208.plan.worktree-root-config.md`](task.208.plan.worktree-r
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.208.qa.1.worktree-root-config.md](./task.208.qa.1.worktree-root-config.md)
-- **Gate File**: [task.208.gate.1.worktree-root-config.yml](./task.208.gate.1.worktree-root-config.yml)
+- **Full Report**: [task.208.qa.2.worktree-root-config.md](./task.208.qa.2.worktree-root-config.md)
+- **Gate File**: [task.208.gate.2.worktree-root-config.yml](./task.208.gate.2.worktree-root-config.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5485 (5467 pass; 4 worktree-only failures, obs #39)
+- **Tests Executed**: 5487 (5469 pass; 4 worktree-only failures, obs #39)
 - **Phases Verified**: 5/5
-- **Critical Issues**: 0 (1 medium, 1 low)
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **Critical Issues**: 0 (2 medium, 1 low)
+- **NFR Status**: Security: CONCERNS, Performance: CONCERNS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-A symlinked worktree root still puts worktrees outside the repository ([TASK-208-BUG-1](./task.208.bug.1.symlinked-worktree-root-escapes-repo.md)). Everything else verified by execution.
+Cycle-1 fixes verified. The refute pass found develop-batch Step 0.3a writes the exclude line before the root is validated and misreads git exit 128 ([TASK-208-BUG-2](./task.208.bug.2.exclude-written-before-root-validated.md)).
 <!-- change-log-start -->
 ## Change Log
 
@@ -234,6 +234,7 @@ A symlinked worktree root still puts worktrees outside the repository ([TASK-208
 | 2026-10-14 | 1.0     | Initial draft | create-task |
 | 2026-10-14 |  | QA gate CONCERNS (90/100) — 1 medium, 1 low finding (retroactive QA of PR #657) | qa-task |
 | 2026-10-14 |  | QA findings fixed — QA-208-1 (symlinked root), QA-208-2 (control characters), 1 iteration | qa-fix |
+| 2026-10-14 |  | QA gate CONCERNS (90/100) — cycle 2 refute pass: 2 medium, 1 low; cycle-1 fixes verified | qa-task |
 <!-- change-log-end -->
 
 ---

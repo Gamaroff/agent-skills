@@ -1,0 +1,114 @@
+[
+ {
+  "id": "agent-ids.known",
+  "sink": "shell-exec",
+  "input": "claude",
+  "why": "A known id links Claude Code.",
+  "correct": "Accept.",
+  "direction": "legitimate",
+  "fixture": {
+   "files": {
+    "AGENTS.md": "# x\n",
+    ".agents/skills/demo/SKILL.md": "---\nname: demo\n---\n"
+   }
+  }
+ },
+ {
+  "id": "agent-ids.two-known",
+  "sink": "shell-exec",
+  "input": "claude,gemini",
+  "why": "Several known ids, comma-separated.",
+  "correct": "Accept.",
+  "direction": "legitimate",
+  "fixture": {
+   "files": {
+    "AGENTS.md": "# x\n",
+    ".agents/skills/demo/SKILL.md": "---\nname: demo\n---\n"
+   }
+  }
+ },
+ {
+  "id": "agent-ids.none",
+  "sink": "shell-exec",
+  "input": "none",
+  "why": "The documented way to pick no agents.",
+  "correct": "Accept and link nothing.",
+  "direction": "legitimate",
+  "fixture": {
+   "files": {
+    "AGENTS.md": "# x\n",
+    ".agents/skills/demo/SKILL.md": "---\nname: demo\n---\n"
+   }
+  }
+ },
+ {
+  "id": "agent-ids.typo",
+  "sink": "shell-exec",
+  "input": "claud",
+  "why": "A typo must not half-apply the list or read as success to a script.",
+  "correct": "Refuse with a non-zero exit.",
+  "direction": "hostile",
+  "fixture": {
+   "files": {
+    "AGENTS.md": "# x\n",
+    ".agents/skills/demo/SKILL.md": "---\nname: demo\n---\n"
+   }
+  }
+ },
+ {
+  "id": "agent-ids.typo-after-known",
+  "sink": "shell-exec",
+  "input": "claude,claud",
+  "why": "One bad id among good ones.",
+  "correct": "Refuse the whole list, non-zero exit, nothing linked.",
+  "direction": "hostile",
+  "fixture": {
+   "files": {
+    "AGENTS.md": "# x\n",
+    ".agents/skills/demo/SKILL.md": "---\nname: demo\n---\n"
+   }
+  }
+ },
+ {
+  "id": "agent-ids.subst",
+  "sink": "shell-exec",
+  "input": "$(touch pwned)",
+  "why": "Command substitution in an id must never execute.",
+  "correct": "Refuse; never evaluate.",
+  "direction": "hostile",
+  "fixture": {
+   "files": {
+    "AGENTS.md": "# x\n",
+    ".agents/skills/demo/SKILL.md": "---\nname: demo\n---\n"
+   }
+  }
+ },
+ {
+  "id": "agent-ids.semicolon",
+  "sink": "shell-exec",
+  "input": "claude;touch pwned",
+  "why": "A separator in an id must never execute.",
+  "correct": "Refuse; never evaluate.",
+  "direction": "hostile",
+  "fixture": {
+   "files": {
+    "AGENTS.md": "# x\n",
+    ".agents/skills/demo/SKILL.md": "---\nname: demo\n---\n"
+   }
+  }
+ },
+ {
+  "id": "agent-ids.traversal",
+  "sink": "shell-exec",
+  "input": "../../etc",
+  "why": "A path-shaped id.",
+  "correct": "Refuse.",
+  "direction": "hostile",
+  "fixture": {
+   "files": {
+    "AGENTS.md": "# x\n",
+    ".agents/skills/demo/SKILL.md": "---\nname: demo\n---\n"
+   }
+  }
+ }
+]

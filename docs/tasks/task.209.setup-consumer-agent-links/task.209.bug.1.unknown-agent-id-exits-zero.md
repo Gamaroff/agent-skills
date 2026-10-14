@@ -4,7 +4,7 @@
 **Bug ID**: TASK-209-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (PR review CR-1, reproduced by the probe)
 **Date Found**: 2026-10-14
 
@@ -93,3 +93,4 @@ exit code.
 | 2026-10-14 | New | QA Engineer | Found by PR review CR-1; reproduced by the shell-argv probe |
 | 2026-10-14 | In Progress | qa-fix | Root cause: the unknown-id branch returned 0 |
 | 2026-10-14 | Ready for QA | qa-fix | Returns 1; failed links-only run no longer says it worked |
+| 2026-10-14 | Closed | qa-task | Verified by task.209.qa.2.setup-consumer-agent-links.md |

@@ -1,0 +1,68 @@
+schema: 2
+task: 'task.209.setup-consumer-agent-links'
+task_title: "setup-consumer.sh links each user's agents to AGENTS.md and .agents/skills"
+gate: CONCERNS
+status_reason: 'TASK-209-BUG-1 verified fixed (all hostile ids now exit non-zero). The cycle-2 refute pass found the fix stops the full wizard after steps 1-8 have written (TASK-209-BUG-2), and a failed mkdir/ln is reported as linked (TASK-209-BUG-3).'
+reviewer: 'QA Engineer'
+head: '1746fa09e61ed3a180bf9f1a5610b12f7c7b1028'
+updated: '2026-10-14T15:31:51Z'
+
+top_issues:
+  - id: 'QA-209-2'
+    severity: medium
+    file: 'scripts/setup-consumer.sh'
+    finding: 'An unknown --link-agents id now stops the full wizard at step 8b, after steps 1-8 have written and before the hooks, with success-style advice (TASK-209-BUG-2; introduced by the cycle-1 fix).'
+    suggested_action: 'Validate --link-agents ids when the flags are parsed, before any step writes.'
+    suggested_owner: dev
+  - id: 'QA-209-3'
+    severity: medium
+    file: 'scripts/setup-consumer.sh'
+    finding: 'mkdir/ln failures inside status=$(...) are ignored, so a link that was not made is reported as linked and gitignored (TASK-209-BUG-3).'
+    suggested_action: 'Check mkdir -p and ln -s explicitly and report a failed status.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 5487
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 3]
+  ci: 'not run on the catch-up branch yet'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 8
+    notes: 'shell-argv probe re-run: 8 executed, 0 reproduced. Every hostile id exits non-zero; none executes anything.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'Full wizard stops midway on a typo (QA-209-2); failed link reported as made (QA-209-3).'
+  maintainability:
+    status: PASS
+    notes: 'Unchanged.'
+
+recommendations:
+  immediate:
+    - action: 'Validate --link-agents at parse time; check mkdir/ln (TASK-209-BUG-2, TASK-209-BUG-3).'
+      refs: ['scripts/setup-consumer.sh']
+  future:
+    - action: 'Compare link targets by resolved path, not raw readlink text (refute CR-3).'
+      refs: ['scripts/setup-consumer.sh']
+    - action: 'Report a terminal lost mid-list differently from no terminal (refute CR-4).'
+      refs: ['scripts/setup-consumer.sh']
+    - action: 'The owner tries --links-only in a real terminal on Linux and macOS (criterion 6).'
+      refs: ['docs/tasks/task.209.setup-consumer-agent-links/task.209.setup-consumer-agent-links.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-209-BUG-2 and TASK-209-BUG-3 fixed', 'real-terminal check on Linux and macOS']

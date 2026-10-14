@@ -179,17 +179,17 @@ the previous state.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.209.qa.1.setup-consumer-agent-links.md](./task.209.qa.1.setup-consumer-agent-links.md)
-- **Gate File**: [task.209.gate.1.setup-consumer-agent-links.yml](./task.209.gate.1.setup-consumer-agent-links.yml)
+- **Full Report**: [task.209.qa.2.setup-consumer-agent-links.md](./task.209.qa.2.setup-consumer-agent-links.md)
+- **Gate File**: [task.209.gate.2.setup-consumer-agent-links.yml](./task.209.gate.2.setup-consumer-agent-links.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5485 (5467 pass; 4 worktree-only failures, obs #39)
+- **Tests Executed**: 5487 (5469 pass; 4 worktree-only failures, obs #39)
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 (1 medium, 1 low)
+- **Critical Issues**: 0 (2 medium)
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-An unknown `--link-agents` id exits 0 ([TASK-209-BUG-1](./task.209.bug.1.unknown-agent-id-exits-zero.md)). The real-terminal check on Linux and macOS (criterion 6) is still the owner's to do.
+Exit status fixed; the refute pass found a typo stops the full wizard midway ([TASK-209-BUG-2](./task.209.bug.2.typo-stops-the-full-wizard-midway.md)) and a failed link is reported as made ([TASK-209-BUG-3](./task.209.bug.3.failed-link-reported-as-linked.md)).
 <!-- change-log-start -->
 ## Change Log
 
@@ -198,5 +198,6 @@ An unknown `--link-agents` id exits 0 ([TASK-209-BUG-1](./task.209.bug.1.unknown
 | 2026-10-14 | 1.0 | Task created and implemented | Claude |
 | 2026-10-14 |  | QA gate CONCERNS (90/100) — 1 medium, 1 low finding (retroactive QA of PR #659) | qa-task |
 | 2026-10-14 |  | QA findings fixed — QA-209-1 (unknown id exits 0), CR-2 (comment placement), 1 iteration | qa-fix |
+| 2026-10-14 |  | QA gate CONCERNS (90/100) — cycle 2 refute pass: 2 medium; cycle-1 fix verified | qa-task |
 <!-- change-log-end -->
 
