@@ -90,7 +90,10 @@ append_line() {
   local path="$1"; local line="$2"
   if [[ "$DRY_RUN" == true ]]; then
     echo -e "${YELLOW}[dry-run]${NC} would append to $path: $line"
-  elif ! grep -qF "$line" "$path" 2>/dev/null; then
+  elif ! grep -qxF -- "$line" "$path" 2>/dev/null; then
+    # Whole-line match (-x). A substring match read "!.env.example" as a
+    # ".env" rule already present, so .env was never added: the most common
+    # .gitignore shape left the credentials file unignored, silently.
     # Terminate an unterminated last line first. Without this, appending
     # ".secrets/" to a .gitignore ending in "dist/" (no newline) yields
     # "dist/.secrets/" — a rule that ignores neither path, silently.

@@ -43,6 +43,8 @@ const {
   BUG_ELIGIBLE_STATUSES,
   TASK_LIFECYCLE_STATUSES,
   BUG_LIFECYCLE_STATUSES,
+  normaliseWorktreeRoot,
+  DEFAULT_WORKTREE_ROOT,
 } = await import(pathToFileURL(SCRIPT).href);
 
 function fixture(name) {
@@ -462,6 +464,36 @@ test("template: the scaffold asset is a valid, lint-clean starter roadmap", () =
   assert.equal(r.item.id, "1.1");
 });
 
+test("template: the Change Log header is the one the change-log engine writes", async () => {
+  const tmpl = readFileSync(
+    path.join(
+      REPO_ROOT,
+      "skills",
+      "develop-next",
+      "assets",
+      "project-completion-roadmap.template.md",
+    ),
+    "utf-8",
+  );
+  // The engine is the source of the canonical header, so read it from the block
+  // it builds rather than restating the string here.
+  const { createRequire } = await import("node:module");
+  const { buildChangeLogBlock } = createRequire(import.meta.url)(
+    path.join(REPO_ROOT, "shared", "resources", "change-log.js"),
+  );
+  const canonical = buildChangeLogBlock([])
+    .split("\n")
+    .find((l) => l.startsWith("| Date"));
+  const section = tmpl.slice(tmpl.indexOf("## Change Log"));
+  const header = section.split("\n").find((l) => l.startsWith("|"));
+  const cells = (l) =>
+    l
+      .split("|")
+      .map((c) => c.trim())
+      .filter(Boolean);
+  assert.deepEqual(cells(header), cells(canonical));
+});
+
 // ── 11: `T`-prefixed standalone-task ids ─────────────────────────────────────
 
 test("11: a T-row parses as an item id, not an id-less annotation", () => {
@@ -807,6 +839,83 @@ test("13: CLI --batch --require-touches defers un-annotated rows", () => {
   );
   assert.ok(
     r.excluded.some((e) => e.id === "9.2" && /requireTouches/.test(e.reason)),
+  );
+});
+
+// ── 13b: worktrees live inside the repository ────────────────────────────────
+//
+// The batch used to emit `../tc-wt-<slug>` — a sibling of the checkout, with a
+// prefix left over from the project the selector was extracted from — while
+// develop-batch's stale check looked for `../wt-*`, so the two never matched.
+// Worktrees now live under a repo-relative root (developBatch.worktreeRoot).
+
+test("13b: --batch worktrees default to .worktrees/batch-<slug>, inside the repo", () => {
+  const b = selectBatch(parseRoadmap(BATCH_ROADMAP));
+  assert.equal(DEFAULT_WORKTREE_ROOT, ".worktrees");
+  const w = b.worktrees.find((x) => x.id === "8.1");
+  assert.equal(w.dir, ".worktrees/batch-8-1");
+  assert.equal(
+    w.shell,
+    "git worktree add .worktrees/batch-8-1 -b story/8-1 develop",
+  );
+  for (const x of b.worktrees) {
+    assert.ok(
+      !x.dir.startsWith(".."),
+      `${x.id} worktree escapes the repo: ${x.dir}`,
+    );
+  }
+});
+
+test("13b: selectBatch honours opts.worktreeRoot", () => {
+  const b = selectBatch(parseRoadmap(BATCH_ROADMAP), {
+    worktreeRoot: "tmp/wt",
+  });
+  assert.ok(b.worktrees.length > 0, "fixture batches at least one row");
+  for (const x of b.worktrees) assert.match(x.dir, /^tmp\/wt\/batch-/);
+});
+
+test("13b: normaliseWorktreeRoot accepts repo-relative roots and refuses escapes", () => {
+  assert.equal(normaliseWorktreeRoot(".worktrees"), ".worktrees");
+  assert.equal(normaliseWorktreeRoot(".worktrees/"), ".worktrees");
+  assert.equal(normaliseWorktreeRoot("./build//wt"), "build/wt");
+  for (const bad of [
+    "../wt",
+    "a/../../b",
+    "/abs/wt",
+    "C:\\wt",
+    "",
+    ".",
+    "  ",
+    undefined,
+  ]) {
+    assert.equal(
+      normaliseWorktreeRoot(bad),
+      null,
+      `${JSON.stringify(bad)} must be refused`,
+    );
+  }
+});
+
+test("13b: CLI --worktree-root sets the root; an escaping root exits 1", () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "roadmap-"));
+  const file = path.join(dir, "roadmap.md");
+  writeFileSync(file, BATCH_ROADMAP);
+  const out = execFileSync(
+    process.execPath,
+    [SCRIPT, "--batch", "--worktree-root", "wt-root/", "--roadmap", file],
+    { encoding: "utf-8" },
+  );
+  const r = JSON.parse(out);
+  assert.ok(r.worktrees.length > 0);
+  for (const x of r.worktrees) assert.match(x.dir, /^wt-root\/batch-/);
+  assert.throws(
+    () =>
+      execFileSync(
+        process.execPath,
+        [SCRIPT, "--batch", "--worktree-root", "../outside", "--roadmap", file],
+        { encoding: "utf-8", stdio: "pipe" },
+      ),
+    (e) => e.status === 1 && /inside the repository/.test(String(e.stderr)),
   );
 });
 

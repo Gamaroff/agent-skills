@@ -18,6 +18,7 @@
  *   select-next.mjs [--roadmap <path>]                      # selection (default)
  *   select-next.mjs --batch [--roadmap <path>]              # parallel worktree batch
  *   select-next.mjs --batch --require-touches [...]         # defer un-annotated rows
+ *   select-next.mjs --batch --worktree-root <dir> [...]     # worktree parent (default .worktrees)
  *   select-next.mjs --lint [--roadmap <path>]               # format lint + registry frontier
  *   select-next.mjs [--bug-registry <p>] [--task-registry <p>]  # override registry paths
  *
@@ -35,6 +36,29 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const DEFAULT_ROADMAP = "docs/development/project-completion-roadmap.md";
+
+// Parent directory of the batch worktrees, relative to the repository root.
+// Worktrees live INSIDE the repo (gitignored), never beside it: a sibling
+// directory is invisible to the repo's own .gitignore and lands in whatever
+// folder happens to hold the clone. Config key: developBatch.worktreeRoot.
+export const DEFAULT_WORKTREE_ROOT = ".worktrees";
+
+/**
+ * Normalise a worktree root, or return null when it would leave the repo.
+ * Accepts a repo-relative path; refuses an absolute one or any `..` segment,
+ * because "inside the repository" is the whole contract.
+ * @param {string} root
+ * @returns {string|null}
+ */
+export function normaliseWorktreeRoot(root) {
+  if (typeof root !== "string") return null;
+  const trimmed = root.trim().replace(/\/+$/, "");
+  if (!trimmed || trimmed === ".") return null;
+  if (path.isAbsolute(trimmed) || /^[A-Za-z]:/.test(trimmed)) return null;
+  const segs = trimmed.split(/[\\/]+/).filter((x) => x && x !== ".");
+  if (!segs.length || segs.includes("..")) return null;
+  return segs.join("/");
+}
 
 // ── Registry fallback frontier ────────────────────────────────────────────────
 //
@@ -1569,7 +1593,10 @@ function hardConflict(a, b) {
   return null;
 }
 
-function worktreeFor(row) {
+/** Name prefix that marks a worktree as batch-owned (Step 0's stale check). */
+export const BATCH_WORKTREE_PREFIX = "batch-";
+
+export function worktreeFor(row, root = DEFAULT_WORKTREE_ROOT) {
   const slug = row.id.toLowerCase().replace(/[^a-z0-9]+/g, "-");
   const kind =
     row.command === "/develop-task"
@@ -1578,7 +1605,7 @@ function worktreeFor(row) {
         ? "bug"
         : "story";
   const branch = `${kind}/${slug}`;
-  const dir = `../tc-wt-${slug}`;
+  const dir = `${root}/${BATCH_WORKTREE_PREFIX}${slug}`;
   return {
     id: row.id,
     dir,
@@ -1668,11 +1695,15 @@ export function storyBranchModel(storyPath, read) {
  * keeps this function pure for callers that read nothing from disk.
  *
  * @param {object} model
- * @param {{requireTouches?: boolean, branchModelOf?: (row: object) => ({resolved: boolean, model?: string|null, reason?: string})}} [opts]
+ * `opts.worktreeRoot` is the repo-relative parent of the emitted worktrees
+ * (default `.worktrees`); pass it through normaliseWorktreeRoot first.
+ *
+ * @param {{requireTouches?: boolean, worktreeRoot?: string, branchModelOf?: (row: object) => ({resolved: boolean, model?: string|null, reason?: string})}} [opts]
  * @returns {{status:"batch"|"halt", ...}}
  */
 export function selectBatch(model, opts = {}) {
   const requireTouches = opts.requireTouches === true;
+  const worktreeRoot = opts.worktreeRoot ?? DEFAULT_WORKTREE_ROOT;
   const branchModelOf =
     typeof opts.branchModelOf === "function" ? opts.branchModelOf : null;
   const lint = { errors: model.errors, warnings: model.warnings };
@@ -1796,7 +1827,7 @@ export function selectBatch(model, opts = {}) {
       excluded,
       softOverlaps,
       unannotated,
-      worktrees: batch.map(worktreeFor),
+      worktrees: batch.map((r) => worktreeFor(r, worktreeRoot)),
       lint,
     };
   }
@@ -1828,6 +1859,7 @@ function parseArgs(argv) {
     lint: false,
     batch: false,
     requireTouches: false,
+    worktreeRoot: DEFAULT_WORKTREE_ROOT,
   };
   for (let i = 0; i < argv.length; i++) {
     switch (argv[i]) {
@@ -1849,6 +1881,18 @@ function parseArgs(argv) {
       case "--require-touches":
         args.requireTouches = true;
         break;
+      case "--worktree-root": {
+        const root = normaliseWorktreeRoot(argv[++i]);
+        if (root === null) {
+          process.stderr.write(
+            `select-next: --worktree-root must be a path inside the repository (relative, no ".."), got ${JSON.stringify(argv[i] ?? "")}\n`,
+          );
+          process.exitCode = 1;
+          return null;
+        }
+        args.worktreeRoot = root;
+        break;
+      }
       default:
         process.stderr.write(`select-next: unknown argument ${argv[i]}\n`);
         // `process.exitCode` + `return`, never `process.exit()`: stdio is
@@ -1948,6 +1992,7 @@ function main() {
         roadmap: args.roadmap,
         ...selectBatch(model, {
           requireTouches: args.requireTouches,
+          worktreeRoot: args.worktreeRoot,
           // Paths in the roadmap are repository-relative, like --roadmap's.
           branchModelOf: (row) =>
             storyBranchModel(

@@ -246,29 +246,41 @@ For each parallel story, generate Git worktree commands:
 
 ```bash
 # For Story 1-1
-git worktree add ../worktrees/story-1-1 -b feature/story-1-1-1
+git worktree add .worktrees/story-1-1 -b feature/story-1-1-1
 
 # For Story 1-2
-git worktree add ../worktrees/story-1-2 -b feature/story-1-1-2
+git worktree add .worktrees/story-1-2 -b feature/story-1-1-2
 
 # For Story 1-3
-git worktree add ../worktrees/story-1-3 -b feature/story-1-1-3
+git worktree add .worktrees/story-1-3 -b feature/story-1-1-3
 ```
+
+Worktrees live **inside** the repository, under the worktree root: `developBatch.worktreeRoot`
+in `skills-config.yaml`, default `.worktrees` ([configuration reference](../../docs/reference/configuration.md)).
+Never create them beside the checkout. Before the first `git worktree add`, make sure the root is
+gitignored, or the main tree shows it as untracked and every search and lint finds a duplicate
+checkout:
+
+```bash
+git check-ignore -q .worktrees/ || echo '/.worktrees/' >> .gitignore   # then commit .gitignore
+```
+
+Substitute the configured root for `.worktrees` everywhere below.
 
 **Worktree Structure**:
 
 ```
-{project}/               # Main repository
+{project}/                    # Main repository
 ├─ .git/
+├─ .gitignore                 # lists /.worktrees/
 ├─ apps/
-└─ libs/
-
-../worktrees/
-├─ story-1-1/                 # Isolated worktree for story 1-1
-│  ├─ apps/
-│  └─ libs/
-├─ story-1-2/                 # Isolated worktree for story 1-2
-└─ story-1-3/                 # Isolated worktree for story 1-3
+├─ libs/
+└─ .worktrees/
+   ├─ story-1-1/              # Isolated worktree for story 1-1
+   │  ├─ apps/
+   │  └─ libs/
+   ├─ story-1-2/              # Isolated worktree for story 1-2
+   └─ story-1-3/              # Isolated worktree for story 1-3
 ```
 
 #### 3.2 Worktree Workflow Instructions
@@ -279,10 +291,10 @@ For each parallel story, document:
 
 ```bash
 # Create worktree
-git worktree add ../worktrees/story-1-1 -b feature/story-1-1-1
+git worktree add .worktrees/story-1-1 -b feature/story-1-1-1
 
 # Navigate to worktree
-cd ../worktrees/story-1-1
+cd .worktrees/story-1-1
 
 # Install dependencies (if needed)
 npm install
@@ -295,7 +307,7 @@ npx nx serve {app-name}
 
 ```bash
 # Work in isolated worktree
-cd ../worktrees/story-1-1
+cd .worktrees/story-1-1
 
 # Make changes only to specified modules
 # (see File Boundaries section)
@@ -318,8 +330,8 @@ npx nx test {app-name}
 gh pr create --title "Story 1-1: Login UI"
 
 # After PR merged, clean up worktree
-cd ../../{project}
-git worktree remove ../worktrees/story-1-1
+cd ../..
+git worktree remove .worktrees/story-1-1
 ```
 
 ---
@@ -354,13 +366,13 @@ Add these sections to Dev Notes:
 ### Worktree Setup
 
 **Branch Name**: feature/story-1-1-1
-**Worktree Path**: ../worktrees/story-1-1
+**Worktree Path**: .worktrees/story-1-1
 
 **Setup Command**:
 
 ```bash
-git worktree add ../worktrees/story-1-1 -b feature/story-1-1-1
-cd ../worktrees/story-1-1
+git worktree add .worktrees/story-1-1 -b feature/story-1-1-1
+cd .worktrees/story-1-1
 npm install
 ```
 ````
@@ -368,8 +380,8 @@ npm install
 **Cleanup Command** (after merge):
 
 ```bash
-cd ../../{project}
-git worktree remove ../worktrees/story-1-1
+cd ../..
+git worktree remove .worktrees/story-1-1
 ```
 
 ````
@@ -437,8 +449,8 @@ For each parallel story, add to Dev Notes:
 **1. Setup Worktree**:
 
 ```bash
-git worktree add ../worktrees/story-1-1 -b feature/story-1-1-1
-cd ../worktrees/story-1-1
+git worktree add .worktrees/story-1-1 -b feature/story-1-1-1
+cd .worktrees/story-1-1
 ```
 ````
 
@@ -469,8 +481,8 @@ gh pr create --title "Story 1-1: Login UI" \
 **5. Cleanup** (after PR merged):
 
 ```bash
-cd ../../{project}
-git worktree remove ../worktrees/story-1-1
+cd ../..
+git worktree remove .worktrees/story-1-1
 git branch -d feature/story-1-1-1
 ```
 
@@ -643,9 +655,9 @@ Generate comprehensive summary:
 ### Git Worktree Branches Established
 
 ```bash
-../worktrees/story-1-1  → feature/story-1-1-1
-../worktrees/story-1-2  → feature/story-1-1-2
-../worktrees/story-1-3  → feature/story-1-1-3
+.worktrees/story-1-1  → feature/story-1-1-1
+.worktrees/story-1-2  → feature/story-1-1-2
+.worktrees/story-1-3  → feature/story-1-1-3
 ```
 ````
 
@@ -754,7 +766,7 @@ git worktree list
 git worktree prune
 
 # Try creating again
-git worktree add ../worktrees/story-1-1 -b feature/story-1-1-1
+git worktree add .worktrees/story-1-1 -b feature/story-1-1-1
 ````
 
 ### Sequential Story Can't Start

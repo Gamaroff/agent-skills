@@ -83,10 +83,10 @@ auth-service.spec.ts
 
 \`\`\`bash
 # Find all __tests__/ directories
-find . -type d -name "__tests__"
+find . -path ./.worktrees -prune -o -type d -name "__tests__" -print
 
 # Find all test files in __tests__/
-find . -path "*/__tests__/*" -name "*.test.ts" -o -name "*.spec.ts"
+find . -path ./.worktrees -prune -o -path "*/__tests__/*" \( -name "*.test.ts" -o -name "*.spec.ts" \) -print
 \`\`\`
 
 ### Step 2: Move Tests to Co-Location

@@ -54,7 +54,7 @@ function item(id, over = {}) {
     id,
     command: "/develop-story",
     commandArg: `path/${id}.md`,
-    dir: `../wt-${id}`,
+    dir: `.worktrees/batch-${id}`,
     branch: `story/${id}`,
     worktreeCreated: false,
     dispatched: false,
