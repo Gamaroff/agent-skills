@@ -4,7 +4,7 @@
 **Bug ID**: TASK-209-BUG-6
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Reopened
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle 5 review of the TASK-209-BUG-5 fix)
 **Date Found**: 2026-10-14
 
@@ -51,3 +51,4 @@ QUIT and Ctrl-Z during the list are a known limitation, recorded in the gate.
 | 2026-10-14 | Ready for QA | qa-fix | Restore asserted on enter and Ctrl-C; TERM/QUIT and EXIT restore |
 | 2026-10-14 | Reopened | qa-task | Partly fixed per task.209.qa.6.setup-consumer-agent-links.md — the TERM/QUIT trap re-raised INT, and the new test passed without the change |
 | 2026-10-14 | Ready for QA | qa-fix | Scoped back to the tested INT restore; Ctrl-C test requires a SIGINT death |
+| 2026-10-14 | Closed | qa-task | Verified by task.209.qa.7.setup-consumer-agent-links.md |

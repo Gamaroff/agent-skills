@@ -172,24 +172,24 @@ the previous state.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-14
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.209.qa.6.setup-consumer-agent-links.md](./task.209.qa.6.setup-consumer-agent-links.md)
-- **Gate File**: [task.209.gate.6.setup-consumer-agent-links.yml](./task.209.gate.6.setup-consumer-agent-links.yml)
+- **Full Report**: [task.209.qa.7.setup-consumer-agent-links.md](./task.209.qa.7.setup-consumer-agent-links.md)
+- **Gate File**: [task.209.gate.7.setup-consumer-agent-links.yml](./task.209.gate.7.setup-consumer-agent-links.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 172 setup-consumer tests
+- **Tests Executed**: 5497 (5479 pass; 4 worktree-only failures, obs #39)
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 (2 medium)
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-The cycle-5 fix's TERM/QUIT trap re-raised SIGINT and its Ctrl-C test could not fail ([TASK-209-BUG-6](./task.209.bug.6.autowrap-restore-untested.md), reopened); scoped back to the tested INT restore.
+Seven QA cycles (two past the 5-cycle budget, owner informed); six bugs found and closed, one by the owner's real-terminal check. macOS check deferred to task.210.
 <!-- change-log-start -->
 ## Change Log
 
@@ -209,5 +209,6 @@ The cycle-5 fix's TERM/QUIT trap re-raised SIGINT and its Ctrl-C test could not 
 | 2026-10-14 |  | QA findings fixed — QA-209-5 (autowrap restore tested; TERM/QUIT/EXIT restore), 1 iteration | qa-fix |
 | 2026-10-14 |  | QA gate CONCERNS (80/100) — cycle 6 (past the 5-cycle budget): 2 medium in the cycle-5 fix | qa-task |
 | 2026-10-14 |  | QA findings fixed — scope the claim: TERM/QUIT trap and EXIT restore removed; Ctrl-C test requires SIGINT, 1 iteration | qa-fix |
+| 2026-10-14 |  | QA gate PASS (100/100) — cycle 7: no findings | qa-task |
 <!-- change-log-end -->
 
