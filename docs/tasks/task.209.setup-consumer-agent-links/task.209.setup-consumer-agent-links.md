@@ -175,21 +175,21 @@ the previous state.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-14
-**Quality Score**: 90/100
+**Quality Score**: 80/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.209.qa.5.setup-consumer-agent-links.md](./task.209.qa.5.setup-consumer-agent-links.md)
-- **Gate File**: [task.209.gate.5.setup-consumer-agent-links.yml](./task.209.gate.5.setup-consumer-agent-links.yml)
+- **Full Report**: [task.209.qa.6.setup-consumer-agent-links.md](./task.209.qa.6.setup-consumer-agent-links.md)
+- **Gate File**: [task.209.gate.6.setup-consumer-agent-links.yml](./task.209.gate.6.setup-consumer-agent-links.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 172 setup-consumer tests
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 (1 medium)
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 0 (2 medium)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
 
 ### Key Findings
-The owner-found narrow-terminal bug is fixed and re-verified on Linux. The autowrap restore was untested ([TASK-209-BUG-6](./task.209.bug.6.autowrap-restore-untested.md)); macOS deferred to task.210.
+The cycle-5 fix's TERM/QUIT trap re-raised SIGINT and its Ctrl-C test could not fail ([TASK-209-BUG-6](./task.209.bug.6.autowrap-restore-untested.md), reopened); scoped back to the tested INT restore.
 <!-- change-log-start -->
 ## Change Log
 
@@ -207,5 +207,7 @@ The owner-found narrow-terminal bug is fixed and re-verified on Linux. The autow
 | 2026-10-14 |  | QA gate CONCERNS (90/100) — cycle 5: owner-found BUG-5 verified; 1 medium (BUG-6) | qa-task |
 | 2026-10-14 |  | Criterion 6: Linux verified by the owner; macOS deferred to task.210 (owner decision) | owner |
 | 2026-10-14 |  | QA findings fixed — QA-209-5 (autowrap restore tested; TERM/QUIT/EXIT restore), 1 iteration | qa-fix |
+| 2026-10-14 |  | QA gate CONCERNS (80/100) — cycle 6 (past the 5-cycle budget): 2 medium in the cycle-5 fix | qa-task |
+| 2026-10-14 |  | QA findings fixed — scope the claim: TERM/QUIT trap and EXIT restore removed; Ctrl-C test requires SIGINT, 1 iteration | qa-fix |
 <!-- change-log-end -->
 

@@ -539,7 +539,11 @@ test("Ctrl-C in the list leaves autowrap on and links nothing", () => {
     try {
       out = drive(dir, "\\x1b[B| |\\x03");
     } catch (e) {
-      out = String(e.stdout); // Ctrl-C ends the run non-zero
+      // Ctrl-C must be what ended the run: the driver exits 254 for a child
+      // killed by SIGINT (sys.exit(-2)). Anything else, a crash or a
+      // timeout included, is a real failure.
+      if (e.status !== 254) throw e;
+      out = String(e.stdout);
     }
     assert.match(strip(out), /Which agents do you use\?/);
     assert.equal(finalAutowrap(out), "on", "autowrap is back on after Ctrl-C");
