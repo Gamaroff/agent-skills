@@ -19,7 +19,8 @@ All notable changes to this project will be documented in this file. Format foll
   `developBatch.worktreeRoot` key (default `.worktrees`) sets where worktrees go. `select-next.mjs
   --batch` takes it as `--worktree-root` and emits `<root>/batch-<slug>`. It used to emit
   `../tc-wt-<slug>`, beside the checkout, with a prefix left over from another project. The selector
-  refuses a root with `..` or an absolute path. `develop-batch` now checks the root is gitignored
+  refuses a root with `..`, an absolute path, a control character, or a symlink that leads outside
+  the repository. `develop-batch` now checks the root is gitignored
   before it creates a worktree (falling back to `.git/info/exclude` and saying so), and its stale
   check looks for `<root>/batch-*`. It used to look for `../wt-*`, which nothing ever created, so
   the check could never fire. `create-parallel-stories` and the parallel-story runbooks use

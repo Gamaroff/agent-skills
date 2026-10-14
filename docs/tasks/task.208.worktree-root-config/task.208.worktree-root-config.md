@@ -233,6 +233,7 @@ A symlinked worktree root still puts worktrees outside the repository ([TASK-208
 |------|---------|-------------|--------|
 | 2026-10-14 | 1.0     | Initial draft | create-task |
 | 2026-10-14 |  | QA gate CONCERNS (90/100) — 1 medium, 1 low finding (retroactive QA of PR #657) | qa-task |
+| 2026-10-14 |  | QA findings fixed — QA-208-1 (symlinked root), QA-208-2 (control characters), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

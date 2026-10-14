@@ -66,8 +66,8 @@ resource at `maxParallel` capacity, and the dispatch directive renders exactly a
 worktree (a fresh `git worktree add` carries none, which silently changes how a
 runner behaves). `worktreeRoot` is the repo-relative directory that holds the batch
 worktrees: each one is `<worktreeRoot>/batch-<slug>`, **inside** the repository and
-gitignored, never a sibling of the checkout. The selector refuses an absolute root or one with
-a `..` segment. `maxResumeAttempts` bounds re-dispatch of an externally-interrupted item;
+gitignored, never a sibling of the checkout. The selector refuses an absolute root, one with
+a `..` segment or a control character, and one that a symlink takes outside the repository. `maxResumeAttempts` bounds re-dispatch of an externally-interrupted item;
 `maxRebatches` bounds Step 5.5.
 
 `requireTouches` (default off, non-breaking) hardens the write-footprint

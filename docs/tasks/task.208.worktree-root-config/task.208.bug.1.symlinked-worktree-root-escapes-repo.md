@@ -4,7 +4,7 @@
 **Bug ID**: TASK-208-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: New
+**Status**: ✅ Ready for QA
 **Found By**: QA Engineer (security probe, path sink)
 **Date Found**: 2026-10-14
 
@@ -51,8 +51,58 @@ created: `develop-batch` Step 0.3a, before the first `git worktree add` — reso
 `realpath "<worktreeRoot>"` once it exists and refuse it unless it is inside
 `git rev-parse --show-toplevel`. The selector's CLI may also check it when the directory exists.
 
+## Developer Fix Cycle
+
+### Iteration 1
+
+#### Investigation (New → In Progress)
+
+**Date**: 2026-10-14
+
+**Root Cause**: `normaliseWorktreeRoot` is lexical by design: the selector is otherwise pure, and a
+string check cannot see a symlink. Nothing else between the config value and `git worktree add`
+looked at the filesystem.
+
+#### Fix Implementation (In Progress → Ready for QA)
+
+**Date**: 2026-10-14
+
+**Fix Description**:
+
+- New exported `worktreeRootEscapes(root, repoDir)` resolves the deepest existing part of the root
+  through `realpath`, appends the rest, and refuses a result outside the repository, the repository
+  itself, or a dangling link.
+- The CLI runs it whenever `--batch` is set, for the default `.worktrees` as well as a flag value,
+  and exits 1 with "resolves outside the repository". `develop-batch` passes its root through the
+  selector at Step 1, so it is covered without a second check.
+- `normaliseWorktreeRoot` now also refuses any control character (QA-208-2).
+- `configuration.md`, the develop-batch SKILL and the CHANGELOG entry say so.
+
+**Files Modified**:
+
+- `skills/develop-next/scripts/select-next.mjs`
+- `evals/develop-next/unit/select-next.test.mjs`
+- `skills/develop-batch/SKILL.md`, `docs/reference/configuration.md`, `CHANGELOG.md`
+
+**Testing**:
+
+- `13b: worktreeRootEscapes follows symlinks out of the repo, and only out` — link out, missing root
+  under a parent link out, dangling link, link to the repo itself: refused. Real directory, root not
+  yet created, link to a directory inside, a `..foo` name: accepted.
+- `13b: CLI --batch refuses a root that is a symlink out of the repo` — the default root as the link.
+- Mutation-proved: removing the CLI check, the control-character refusal, or the dangling-link
+  refusal, making the check always false or always true, and loosening the `..` comparison each turn
+  a test red.
+
+**Verification Steps for QA**:
+
+1. In a scratch repo, `ln -s /tmp/x .worktrees`, then `select-next.mjs --batch --roadmap <file>`: exit 1.
+2. Remove the link: the same command succeeds.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
 | :--- | :--- | :--- | :--- |
 | 2026-10-14 | New | QA Engineer | Found by the path-sink probe of normaliseWorktreeRoot; reproduced with git |
+| 2026-10-14 | In Progress | qa-fix | Root cause: the only containment check was lexical |
+| 2026-10-14 | Ready for QA | qa-fix | Real-path check in the selector CLI; control characters refused |

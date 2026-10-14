@@ -45,19 +45,68 @@ export const DEFAULT_WORKTREE_ROOT = ".worktrees";
 
 /**
  * Normalise a worktree root, or return null when it would leave the repo.
- * Accepts a repo-relative path; refuses an absolute one or any `..` segment,
- * because "inside the repository" is the whole contract.
+ * Accepts a repo-relative path; refuses an absolute one, any `..` segment and
+ * any control character, because "inside the repository" is the whole
+ * contract and a NUL or newline is not part of any path git will take.
+ * Lexical only: a symlink is invisible here, so the CLI also runs
+ * worktreeRootEscapes() against the real filesystem.
  * @param {string} root
  * @returns {string|null}
  */
 export function normaliseWorktreeRoot(root) {
   if (typeof root !== "string") return null;
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f\u007f]/.test(root)) return null;
   const trimmed = root.trim().replace(/\/+$/, "");
   if (!trimmed || trimmed === ".") return null;
   if (path.isAbsolute(trimmed) || /^[A-Za-z]:/.test(trimmed)) return null;
   const segs = trimmed.split(/[\\/]+/).filter((x) => x && x !== ".");
   if (!segs.length || segs.includes("..")) return null;
   return segs.join("/");
+}
+
+/**
+ * Does a (normalised) worktree root leave `repoDir` once symlinks are
+ * followed? `.wt -> /tmp/x` is a clean relative path, and `git worktree add
+ * .wt/batch-x` then lands in /tmp/x (TASK-208-BUG-1). The root itself usually
+ * does not exist yet, but any parent of it can be a link, so the deepest part
+ * of the path that exists is resolved and the rest appended. A dangling link
+ * cannot be resolved and is refused. The repository directory itself is not a
+ * subdirectory, so a root that resolves to it is refused too.
+ * @param {string} root  repo-relative, from normaliseWorktreeRoot
+ * @param {string} repoDir
+ * @returns {boolean} true when the root must be refused
+ */
+export function worktreeRootEscapes(root, repoDir) {
+  const exists = (p) => {
+    try {
+      fs.lstatSync(p);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  let probe = path.resolve(repoDir, root);
+  const rest = [];
+  while (!exists(probe)) {
+    const up = path.dirname(probe);
+    if (up === probe) break;
+    rest.unshift(path.basename(probe));
+    probe = up;
+  }
+  let real;
+  try {
+    real = path.join(fs.realpathSync(probe), ...rest);
+  } catch {
+    return true;
+  }
+  const rel = path.relative(fs.realpathSync(repoDir), real);
+  return (
+    rel === "" ||
+    rel === ".." ||
+    rel.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(rel)
+  );
 }
 
 // ── Registry fallback frontier ────────────────────────────────────────────────
@@ -1885,7 +1934,7 @@ function parseArgs(argv) {
         const root = normaliseWorktreeRoot(argv[++i]);
         if (root === null) {
           process.stderr.write(
-            `select-next: --worktree-root must be a path inside the repository (relative, no ".."), got ${JSON.stringify(argv[i] ?? "")}\n`,
+            `select-next: --worktree-root must be a path inside the repository (relative, no "..", no control characters), got ${JSON.stringify(argv[i] ?? "")}\n`,
           );
           process.exitCode = 1;
           return null;
@@ -1902,6 +1951,16 @@ function parseArgs(argv) {
         process.exitCode = 1;
         return null;
     }
+  }
+  // The lexical check cannot see a symlink; this one follows them. Checked for
+  // the default root as well as a flag, since `.worktrees` itself can be a
+  // link. Paths are repository-relative, so the repository is the cwd.
+  if (args.batch && worktreeRootEscapes(args.worktreeRoot, process.cwd())) {
+    process.stderr.write(
+      `select-next: worktree root ${JSON.stringify(args.worktreeRoot)} resolves outside the repository (a symlink?) — worktrees must live inside it\n`,
+    );
+    process.exitCode = 1;
+    return null;
   }
   return args;
 }
