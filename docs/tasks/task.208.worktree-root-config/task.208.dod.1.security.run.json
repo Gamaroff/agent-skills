@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "path",
+      "entry": "cli:skills/develop-next/scripts/select-next.mjs",
+      "name": "select-next --check-root",
+      "call_site": null,
+      "verdict": "present-but-inert",
+      "reason": "a-hostile-case-passed-a-control-that-rejects-others",
+      "executed": 10,
+      "passed": 8,
+      "reproduced": 2,
+      "overblocked": 0,
+      "declined": 1,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": [
+        "--check-root",
+        "{input}"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-10-14T17:02:32.211Z"
+    },
+    {
+      "sink": "path",
+      "entry": "skills/develop-next/scripts/select-next.mjs#normaliseWorktreeRoot",
+      "name": null,
+      "call_site": null,
+      "verdict": "present-but-inert",
+      "reason": "a-hostile-case-passed-a-control-that-rejects-others",
+      "executed": 11,
+      "passed": 9,
+      "reproduced": 2,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-10-14T17:02:27.264Z"
+    }
+  ],
+  "totals": {
+    "executed": 21,
+    "reproduced": 4
+  },
+  "updated_at": "2026-10-14T17:02:32.211Z"
+}

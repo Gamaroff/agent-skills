@@ -1,0 +1,49 @@
+schema: 2
+task: 'task.209.setup-consumer-agent-links'
+task_title: "setup-consumer.sh links each user's agents to AGENTS.md and .agents/skills"
+gate: PASS
+status_reason: 'Re-QA of the finalise run-1 gap fixes: --link-agents ids read across newlines through one parse whose exit status is kept; empty list safe under bash 3.2; the no-terminal guard and wrap-around/pre-tick each turn a test red when removed.'
+reviewer: 'QA Engineer'
+head: 'ab31952f73d5e3059f66b9b70321a6115cca7d22'
+updated: '2026-10-14T17:15:12Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 5502
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 9
+    notes: 'DoD probe record task.209.dod.1.security.run.json reproduced the newline case; fixed and covered by the newline test.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Newline typo refused; parse failure stops the run.'
+  maintainability:
+    status: PASS
+    notes: 'Every prose claim the DoD named is now held by a per-PR test.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Exercise the bash 3.2 empty-list guard on macOS (task.210).'
+      refs: ['docs/tasks/task.210.macos-check-of-agent-checkbox-list/task.210.macos-check-of-agent-checkbox-list.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

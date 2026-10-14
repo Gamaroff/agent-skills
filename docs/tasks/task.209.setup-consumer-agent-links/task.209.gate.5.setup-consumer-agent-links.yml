@@ -1,0 +1,59 @@
+schema: 2
+task: 'task.209.setup-consumer-agent-links'
+task_title: "setup-consumer.sh links each user's agents to AGENTS.md and .agents/skills"
+gate: CONCERNS
+status_reason: 'TASK-209-BUG-5 (owner found: frames stacked in a narrow terminal) verified fixed, and the owner re-ran it on Linux. One medium: nothing tested that autowrap is restored after the list (TASK-209-BUG-6).'
+reviewer: 'QA Engineer'
+head: '3ea9658161b48f65e3f405bd3d91f37ec1bbc013'
+updated: '2026-10-14T16:54:22Z'
+
+top_issues:
+  - id: 'QA-209-5'
+    severity: medium
+    file: 'shared/resources/tests/setup-consumer-agent-links.test.mjs'
+    finding: 'No test checks that autowrap is turned back on after the list; removing the restore keeps the suite green (TASK-209-BUG-6).'
+    suggested_action: 'Assert the final autowrap state after enter and after Ctrl-C.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 172
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 8
+    notes: 'Probe record task.209.qa.2.security.run.json; the id path is unchanged.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'Terminal restore untested; TERM/QUIT did not restore (QA-209-5).'
+  maintainability:
+    status: PASS
+    notes: 'Narrow-terminal behaviour now tested through a minimal emulator.'
+
+recommendations:
+  immediate:
+    - action: 'Test the autowrap restore on enter and Ctrl-C (TASK-209-BUG-6).'
+      refs: ['shared/resources/tests/setup-consumer-agent-links.test.mjs']
+  future:
+    - action: 'Ctrl-Z while the list is drawn returns to the shell with the list terminal state (cycle-5 CR-2, residual after the TERM/QUIT/EXIT fix).'
+      refs: ['scripts/setup-consumer.sh']
+    - action: 'macOS real-terminal check — task.210.'
+      refs: ['docs/tasks/task.210.macos-check-of-agent-checkbox-list/task.210.macos-check-of-agent-checkbox-list.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-209-BUG-6 fixed']

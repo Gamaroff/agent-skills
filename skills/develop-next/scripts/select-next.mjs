@@ -18,6 +18,8 @@
  *   select-next.mjs [--roadmap <path>]                      # selection (default)
  *   select-next.mjs --batch [--roadmap <path>]              # parallel worktree batch
  *   select-next.mjs --batch --require-touches [...]         # defer un-annotated rows
+ *   select-next.mjs --batch --worktree-root <dir> [...]     # worktree parent (default .worktrees)
+ *   select-next.mjs --check-root <dir>                      # print the normalised root, or exit 1
  *   select-next.mjs --lint [--roadmap <path>]               # format lint + registry frontier
  *   select-next.mjs [--bug-registry <p>] [--task-registry <p>]  # override registry paths
  *
@@ -35,6 +37,78 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const DEFAULT_ROADMAP = "docs/development/project-completion-roadmap.md";
+
+// Parent directory of the batch worktrees, relative to the repository root.
+// Worktrees live INSIDE the repo (gitignored), never beside it: a sibling
+// directory is invisible to the repo's own .gitignore and lands in whatever
+// folder happens to hold the clone. Config key: developBatch.worktreeRoot.
+export const DEFAULT_WORKTREE_ROOT = ".worktrees";
+
+/**
+ * Normalise a worktree root, or return null when it would leave the repo.
+ * Accepts a repo-relative path; refuses an absolute one, any `..` segment and
+ * any control character, because "inside the repository" is the whole
+ * contract and a NUL or newline is not part of any path git will take.
+ * Lexical only: a symlink is invisible here, so the CLI also runs
+ * worktreeRootEscapes() against the real filesystem.
+ * @param {string} root
+ * @returns {string|null}
+ */
+export function normaliseWorktreeRoot(root) {
+  if (typeof root !== "string") return null;
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f\u007f]/.test(root)) return null;
+  const trimmed = root.trim().replace(/\/+$/, "");
+  if (!trimmed || trimmed === ".") return null;
+  if (path.isAbsolute(trimmed) || /^[A-Za-z]:/.test(trimmed)) return null;
+  const segs = trimmed.split(/[\\/]+/).filter((x) => x && x !== ".");
+  if (!segs.length || segs.includes("..")) return null;
+  return segs.join("/");
+}
+
+/**
+ * Does a (normalised) worktree root leave `repoDir` once symlinks are
+ * followed? `.wt -> /tmp/x` is a clean relative path, and `git worktree add
+ * .wt/batch-x` then lands in /tmp/x (TASK-208-BUG-1). The root itself usually
+ * does not exist yet, but any parent of it can be a link, so the deepest part
+ * of the path that exists is resolved and the rest appended. A dangling link
+ * cannot be resolved and is refused. The repository directory itself is not a
+ * subdirectory, so a root that resolves to it is refused too.
+ * @param {string} root  repo-relative, from normaliseWorktreeRoot
+ * @param {string} repoDir
+ * @returns {boolean} true when the root must be refused
+ */
+export function worktreeRootEscapes(root, repoDir) {
+  const exists = (p) => {
+    try {
+      fs.lstatSync(p);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  let probe = path.resolve(repoDir, root);
+  const rest = [];
+  while (!exists(probe)) {
+    const up = path.dirname(probe);
+    if (up === probe) break;
+    rest.unshift(path.basename(probe));
+    probe = up;
+  }
+  let real;
+  try {
+    real = path.join(fs.realpathSync(probe), ...rest);
+  } catch {
+    return true;
+  }
+  const rel = path.relative(fs.realpathSync(repoDir), real);
+  return (
+    rel === "" ||
+    rel === ".." ||
+    rel.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(rel)
+  );
+}
 
 // ── Registry fallback frontier ────────────────────────────────────────────────
 //
@@ -1569,7 +1643,10 @@ function hardConflict(a, b) {
   return null;
 }
 
-function worktreeFor(row) {
+/** Name prefix that marks a worktree as batch-owned (Step 0's stale check). */
+export const BATCH_WORKTREE_PREFIX = "batch-";
+
+export function worktreeFor(row, root = DEFAULT_WORKTREE_ROOT) {
   const slug = row.id.toLowerCase().replace(/[^a-z0-9]+/g, "-");
   const kind =
     row.command === "/develop-task"
@@ -1578,7 +1655,7 @@ function worktreeFor(row) {
         ? "bug"
         : "story";
   const branch = `${kind}/${slug}`;
-  const dir = `../tc-wt-${slug}`;
+  const dir = `${root}/${BATCH_WORKTREE_PREFIX}${slug}`;
   return {
     id: row.id,
     dir,
@@ -1668,11 +1745,15 @@ export function storyBranchModel(storyPath, read) {
  * keeps this function pure for callers that read nothing from disk.
  *
  * @param {object} model
- * @param {{requireTouches?: boolean, branchModelOf?: (row: object) => ({resolved: boolean, model?: string|null, reason?: string})}} [opts]
+ * `opts.worktreeRoot` is the repo-relative parent of the emitted worktrees
+ * (default `.worktrees`); pass it through normaliseWorktreeRoot first.
+ *
+ * @param {{requireTouches?: boolean, worktreeRoot?: string, branchModelOf?: (row: object) => ({resolved: boolean, model?: string|null, reason?: string})}} [opts]
  * @returns {{status:"batch"|"halt", ...}}
  */
 export function selectBatch(model, opts = {}) {
   const requireTouches = opts.requireTouches === true;
+  const worktreeRoot = opts.worktreeRoot ?? DEFAULT_WORKTREE_ROOT;
   const branchModelOf =
     typeof opts.branchModelOf === "function" ? opts.branchModelOf : null;
   const lint = { errors: model.errors, warnings: model.warnings };
@@ -1796,7 +1877,7 @@ export function selectBatch(model, opts = {}) {
       excluded,
       softOverlaps,
       unannotated,
-      worktrees: batch.map(worktreeFor),
+      worktrees: batch.map((r) => worktreeFor(r, worktreeRoot)),
       lint,
     };
   }
@@ -1828,6 +1909,7 @@ function parseArgs(argv) {
     lint: false,
     batch: false,
     requireTouches: false,
+    worktreeRoot: DEFAULT_WORKTREE_ROOT,
   };
   for (let i = 0; i < argv.length; i++) {
     switch (argv[i]) {
@@ -1849,6 +1931,24 @@ function parseArgs(argv) {
       case "--require-touches":
         args.requireTouches = true;
         break;
+      case "--check-root":
+        // Validate a root and print it normalised, without reading a roadmap:
+        // develop-batch runs this BEFORE it writes the root into
+        // .git/info/exclude, so a refused root leaves nothing behind.
+        args.checkRoot = argv[++i] ?? "";
+        break;
+      case "--worktree-root": {
+        const root = normaliseWorktreeRoot(argv[++i]);
+        if (root === null) {
+          process.stderr.write(
+            `select-next: --worktree-root must be a path inside the repository (relative, no "..", no control characters), got ${JSON.stringify(argv[i] ?? "")}\n`,
+          );
+          process.exitCode = 1;
+          return null;
+        }
+        args.worktreeRoot = root;
+        break;
+      }
       default:
         process.stderr.write(`select-next: unknown argument ${argv[i]}\n`);
         // `process.exitCode` + `return`, never `process.exit()`: stdio is
@@ -1859,6 +1959,16 @@ function parseArgs(argv) {
         return null;
     }
   }
+  // The lexical check cannot see a symlink; this one follows them. Checked for
+  // the default root as well as a flag, since `.worktrees` itself can be a
+  // link. Paths are repository-relative, so the repository is the cwd.
+  if (args.batch && worktreeRootEscapes(args.worktreeRoot, process.cwd())) {
+    process.stderr.write(
+      `select-next: worktree root ${JSON.stringify(args.worktreeRoot)} resolves outside the repository (a symlink?) — worktrees must live inside it\n`,
+    );
+    process.exitCode = 1;
+    return null;
+  }
   return args;
 }
 
@@ -1866,6 +1976,18 @@ function main() {
   const args = parseArgs(process.argv.slice(2));
   // parseArgs returns null when it has already reported a bad argument.
   if (args === null) return;
+  if (args.checkRoot !== undefined) {
+    const root = normaliseWorktreeRoot(args.checkRoot);
+    if (root === null || worktreeRootEscapes(root, process.cwd())) {
+      process.stderr.write(
+        `select-next: worktree root ${JSON.stringify(args.checkRoot)} refused — it must be a path inside the repository (relative, no "..", no control characters, no symlink leading out)\n`,
+      );
+      process.exitCode = 1;
+      return;
+    }
+    process.stdout.write(root + "\n");
+    return;
+  }
   let text;
   try {
     text = fs.readFileSync(args.roadmap, "utf-8");
@@ -1948,6 +2070,7 @@ function main() {
         roadmap: args.roadmap,
         ...selectBatch(model, {
           requireTouches: args.requireTouches,
+          worktreeRoot: args.worktreeRoot,
           // Paths in the roadmap are repository-relative, like --roadmap's.
           branchModelOf: (row) =>
             storyBranchModel(

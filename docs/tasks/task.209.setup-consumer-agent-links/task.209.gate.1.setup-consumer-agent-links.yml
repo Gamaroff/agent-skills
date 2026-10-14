@@ -1,0 +1,60 @@
+schema: 2
+task: 'task.209.setup-consumer-agent-links'
+task_title: "setup-consumer.sh links each user's agents to AGENTS.md and .agents/skills"
+gate: CONCERNS
+status_reason: 'The list and the links work and every guard but one is mutation-proved; an unknown --link-agents id exits 0 (TASK-209-BUG-1), and the real-terminal / macOS check has not been done.'
+reviewer: 'QA Engineer'
+head: '72d4d597fd3bfe425e45374e9b2cc7210ae75059'
+updated: '2026-10-14T15:14:23Z'
+
+top_issues:
+  - id: 'QA-209-1'
+    severity: medium
+    file: 'scripts/setup-consumer.sh'
+    finding: 'An unknown --link-agents id records a fail step and prints Setup failed, but the script exits 0, so a calling script reads a typo as success (TASK-209-BUG-1).'
+    suggested_action: 'Exit non-zero from the links-only path when a step failed, and assert the exit code in the unknown-id test.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 5485
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+  ci: 'success @ 391c193e (PR #659 merge head: test, validate, shellcheck, link-check)'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 8
+    notes: 'shell-argv probe of --link-agents: 8 executed. No id executes anything or links anything; the 5 reproductions are the exit-status defect, scored under reliability.'
+  performance:
+    status: PASS
+    notes: 'One step, a handful of lstat calls.'
+  reliability:
+    status: CONCERNS
+    notes: 'Unknown id exits 0 (TASK-209-BUG-1). Ctrl-C restores the terminal (trap). Not run on macOS bash 3.2.'
+  maintainability:
+    status: PASS
+    notes: 'One AGENT_TABLE, tied to the getting-started table by a test.'
+
+recommendations:
+  immediate:
+    - action: 'Exit non-zero on an unknown --link-agents id (TASK-209-BUG-1).'
+      refs: ['scripts/setup-consumer.sh', 'shared/resources/tests/setup-consumer-agent-links.test.mjs']
+  future:
+    - action: 'Move the agent-links block above the summary header, so _status_badge keeps its comment (PR review CR-2).'
+      refs: ['scripts/setup-consumer.sh']
+    - action: 'The owner tries --links-only in a real terminal on Linux and macOS (success criterion 6).'
+      refs: ['docs/tasks/task.209.setup-consumer-agent-links/task.209.setup-consumer-agent-links.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-209-BUG-1 fixed', 'real-terminal check on Linux and macOS']

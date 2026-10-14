@@ -1,0 +1,55 @@
+schema: 2
+task: 'task.209.setup-consumer-agent-links'
+task_title: "setup-consumer.sh links each user's agents to AGENTS.md and .agents/skills"
+gate: PASS
+status_reason: 'QA-209-4 verified: a link that cannot be made fails the step and the run exits 1. The reviewer confirmed the exit path prints one summary and does not change --dry-run or --update on success. Two low advisory items remain.'
+reviewer: 'QA Engineer'
+head: 'c0db062aa3fc7271fb0ac40a8a9a8c5f72b442b0'
+updated: '2026-10-14T15:49:01Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 5495
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 8
+    notes: 'Probe record task.209.qa.2.security.run.json: 8 executed, 0 reproduced; ids are now checked before any step.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Unknown id refused before any write; failed link fails the run; a failed run exits 1.'
+  maintainability:
+    status: PASS
+    notes: 'One id lookup; one AGENT_TABLE tied to the docs table by a test.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Guard link_agents against an empty _agent_index result, so a caller that skips main() cannot link agent 0 (cycle-4 CR-1).'
+      refs: ['scripts/setup-consumer.sh']
+    - action: 'Reword the _exit_on_fail test comment, or add an end-to-end --update run (cycle-4 CR-2).'
+      refs: ['shared/resources/tests/setup-consumer-agent-links.test.mjs']
+    - action: 'Compare link targets by resolved path; report a terminal lost mid-list; remove a folder mkdir made when ln fails (cycle 2-3 advisories).'
+      refs: ['scripts/setup-consumer.sh']
+    - action: 'The owner tries --links-only in a real terminal on Linux and macOS (criterion 6).'
+      refs: ['docs/tasks/task.209.setup-consumer-agent-links/task.209.setup-consumer-agent-links.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions: ['real-terminal check on Linux and macOS (criterion 6)']

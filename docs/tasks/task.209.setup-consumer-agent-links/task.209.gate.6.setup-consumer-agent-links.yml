@@ -1,0 +1,63 @@
+schema: 2
+task: 'task.209.setup-consumer-agent-links'
+task_title: "setup-consumer.sh links each user's agents to AGENTS.md and .agents/skills"
+gate: CONCERNS
+status_reason: 'The cycle-5 fix added a TERM/QUIT trap that re-raised SIGINT, and a Ctrl-C test that passed without the change (TASK-209-BUG-6 reopened). Cycle 6 is past the 5-cycle budget; the owner has been told.'
+reviewer: 'QA Engineer'
+head: '69cf27330f143ac8f5d6b96876f1e57b1d4644cd'
+updated: '2026-10-14T16:57:59Z'
+
+top_issues:
+  - id: 'QA-209-6'
+    severity: medium
+    file: 'scripts/setup-consumer.sh'
+    finding: 'The list trap re-raises SIGINT for TERM and QUIT, so the caller sees the wrong signal.'
+    suggested_action: 'Re-raise the received signal, or drop the TERM/QUIT trap.'
+    suggested_owner: dev
+  - id: 'QA-209-7'
+    severity: medium
+    file: 'shared/resources/tests/setup-consumer-agent-links.test.mjs'
+    finding: 'The new Ctrl-C test passes on the code before the change, and accepts any failure as the Ctrl-C exit.'
+    suggested_action: 'Test what the fix changes, and require the run to have died from SIGINT.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 172
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 8
+    notes: 'Probe record task.209.qa.2.security.run.json; id path unchanged.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'Wrong signal re-raised for TERM/QUIT (QA-209-6).'
+  maintainability:
+    status: CONCERNS
+    notes: 'A test that cannot fail without the change it claims to hold (QA-209-7).'
+
+recommendations:
+  immediate:
+    - action: 'Scope the terminal-restore claim to what is tested (TASK-209-BUG-6, iteration 2).'
+      refs: ['scripts/setup-consumer.sh', 'shared/resources/tests/setup-consumer-agent-links.test.mjs']
+  future:
+    - action: 'Restore the terminal on TERM, QUIT and Ctrl-Z during the list, re-raising the signal received, with a test per signal.'
+      refs: ['scripts/setup-consumer.sh']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-209-BUG-6 fixed']

@@ -43,6 +43,9 @@ const {
   BUG_ELIGIBLE_STATUSES,
   TASK_LIFECYCLE_STATUSES,
   BUG_LIFECYCLE_STATUSES,
+  normaliseWorktreeRoot,
+  worktreeRootEscapes,
+  DEFAULT_WORKTREE_ROOT,
 } = await import(pathToFileURL(SCRIPT).href);
 
 function fixture(name) {
@@ -462,6 +465,36 @@ test("template: the scaffold asset is a valid, lint-clean starter roadmap", () =
   assert.equal(r.item.id, "1.1");
 });
 
+test("template: the Change Log header is the one the change-log engine writes", async () => {
+  const tmpl = readFileSync(
+    path.join(
+      REPO_ROOT,
+      "skills",
+      "develop-next",
+      "assets",
+      "project-completion-roadmap.template.md",
+    ),
+    "utf-8",
+  );
+  // The engine is the source of the canonical header, so read it from the block
+  // it builds rather than restating the string here.
+  const { createRequire } = await import("node:module");
+  const { buildChangeLogBlock } = createRequire(import.meta.url)(
+    path.join(REPO_ROOT, "shared", "resources", "change-log.js"),
+  );
+  const canonical = buildChangeLogBlock([])
+    .split("\n")
+    .find((l) => l.startsWith("| Date"));
+  const section = tmpl.slice(tmpl.indexOf("## Change Log"));
+  const header = section.split("\n").find((l) => l.startsWith("|"));
+  const cells = (l) =>
+    l
+      .split("|")
+      .map((c) => c.trim())
+      .filter(Boolean);
+  assert.deepEqual(cells(header), cells(canonical));
+});
+
 // ── 11: `T`-prefixed standalone-task ids ─────────────────────────────────────
 
 test("11: a T-row parses as an item id, not an id-less annotation", () => {
@@ -808,6 +841,194 @@ test("13: CLI --batch --require-touches defers un-annotated rows", () => {
   assert.ok(
     r.excluded.some((e) => e.id === "9.2" && /requireTouches/.test(e.reason)),
   );
+});
+
+// ── 13b: worktrees live inside the repository ────────────────────────────────
+//
+// The batch used to emit `../tc-wt-<slug>` — a sibling of the checkout, with a
+// prefix left over from the project the selector was extracted from — while
+// develop-batch's stale check looked for `../wt-*`, so the two never matched.
+// Worktrees now live under a repo-relative root (developBatch.worktreeRoot).
+
+test("13b: --batch worktrees default to .worktrees/batch-<slug>, inside the repo", () => {
+  const b = selectBatch(parseRoadmap(BATCH_ROADMAP));
+  assert.equal(DEFAULT_WORKTREE_ROOT, ".worktrees");
+  const w = b.worktrees.find((x) => x.id === "8.1");
+  assert.equal(w.dir, ".worktrees/batch-8-1");
+  assert.equal(
+    w.shell,
+    "git worktree add .worktrees/batch-8-1 -b story/8-1 develop",
+  );
+  for (const x of b.worktrees) {
+    assert.ok(
+      !x.dir.startsWith(".."),
+      `${x.id} worktree escapes the repo: ${x.dir}`,
+    );
+  }
+});
+
+test("13b: selectBatch honours opts.worktreeRoot", () => {
+  const b = selectBatch(parseRoadmap(BATCH_ROADMAP), {
+    worktreeRoot: "tmp/wt",
+  });
+  assert.ok(b.worktrees.length > 0, "fixture batches at least one row");
+  for (const x of b.worktrees) assert.match(x.dir, /^tmp\/wt\/batch-/);
+});
+
+test("13b: normaliseWorktreeRoot accepts repo-relative roots and refuses escapes", () => {
+  assert.equal(normaliseWorktreeRoot(".worktrees"), ".worktrees");
+  assert.equal(normaliseWorktreeRoot(".worktrees/"), ".worktrees");
+  assert.equal(normaliseWorktreeRoot("./build//wt"), "build/wt");
+  for (const bad of [
+    "../wt",
+    "a/../../b",
+    "/abs/wt",
+    "C:\\wt",
+    "",
+    ".",
+    "  ",
+    undefined,
+    "wt\u0000x",
+    "wt\nx",
+    "wt\tx",
+  ]) {
+    assert.equal(
+      normaliseWorktreeRoot(bad),
+      null,
+      `${JSON.stringify(bad)} must be refused`,
+    );
+  }
+});
+
+test("13b: CLI --worktree-root sets the root; an escaping root exits 1", () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "roadmap-"));
+  const file = path.join(dir, "roadmap.md");
+  writeFileSync(file, BATCH_ROADMAP);
+  const out = execFileSync(
+    process.execPath,
+    [SCRIPT, "--batch", "--worktree-root", "wt-root/", "--roadmap", file],
+    { encoding: "utf-8" },
+  );
+  const r = JSON.parse(out);
+  assert.ok(r.worktrees.length > 0);
+  for (const x of r.worktrees) assert.match(x.dir, /^wt-root\/batch-/);
+  assert.throws(
+    () =>
+      execFileSync(
+        process.execPath,
+        [SCRIPT, "--batch", "--worktree-root", "../outside", "--roadmap", file],
+        { encoding: "utf-8", stdio: "pipe" },
+      ),
+    (e) => e.status === 1 && /inside the repository/.test(String(e.stderr)),
+  );
+});
+
+// TASK-208-BUG-1: the lexical check cannot see a symlink. Both directions:
+// a link that leaves the repo is refused; a real or linked root that stays
+// inside is accepted.
+test("13b: worktreeRootEscapes follows symlinks out of the repo, and only out", () => {
+  const base = mkdtempSync(path.join(os.tmpdir(), "wt-escape-"));
+  const repo = path.join(base, "repo");
+  const outside = path.join(base, "outside");
+  mkdirSync(repo);
+  mkdirSync(outside);
+  mkdirSync(path.join(repo, "real-wt"));
+  mkdirSync(path.join(repo, ".worktrees"));
+  symlinkSync(outside, path.join(repo, ".wt"));
+  symlinkSync(outside, path.join(repo, "build"));
+  symlinkSync(path.join(repo, "real-wt"), path.join(repo, "inside-link"));
+  symlinkSync(path.join(base, "gone"), path.join(repo, "dangling"));
+  symlinkSync(repo, path.join(repo, "self"));
+  const escapes = (r) => worktreeRootEscapes(r, repo);
+  // Leaves the repository → refused.
+  assert.equal(escapes(".wt"), true, "a root that is a link out");
+  assert.equal(
+    escapes("build/wt"),
+    true,
+    "a missing root under a parent link out",
+  );
+  assert.equal(escapes("dangling"), true, "a dangling link cannot be resolved");
+  assert.equal(
+    escapes("self"),
+    true,
+    "a root that resolves to the repo itself",
+  );
+  // Stays inside → accepted.
+  assert.equal(escapes(".worktrees"), false, "an existing real directory");
+  assert.equal(escapes("not-yet/created"), false, "a root not created yet");
+  assert.equal(
+    escapes("inside-link"),
+    false,
+    "a link to a directory inside the repo",
+  );
+  assert.equal(
+    escapes("..foo"),
+    false,
+    "a name that only starts with two dots",
+  );
+});
+
+test("13b: CLI --batch refuses a root that is a symlink out of the repo", () => {
+  const base = mkdtempSync(path.join(os.tmpdir(), "wt-escape-cli-"));
+  const repo = path.join(base, "repo");
+  mkdirSync(repo);
+  mkdirSync(path.join(base, "outside"));
+  writeFileSync(path.join(repo, "roadmap.md"), BATCH_ROADMAP);
+  symlinkSync(path.join(base, "outside"), path.join(repo, ".worktrees"));
+  // The default root, not a flag: `.worktrees` itself can be the link.
+  assert.throws(
+    () =>
+      execFileSync(
+        process.execPath,
+        [SCRIPT, "--batch", "--roadmap", "roadmap.md"],
+        {
+          cwd: repo,
+          encoding: "utf-8",
+          stdio: "pipe",
+        },
+      ),
+    (e) =>
+      e.status === 1 &&
+      /resolves outside the repository/.test(String(e.stderr)),
+  );
+  // Without --batch no worktree is emitted, so the root is not checked.
+  execFileSync(process.execPath, [SCRIPT, "--roadmap", "roadmap.md"], {
+    cwd: repo,
+    encoding: "utf-8",
+    stdio: "pipe",
+  });
+});
+
+test("13b: --check-root prints the normalised root, or refuses with exit 1", () => {
+  const base = mkdtempSync(path.join(os.tmpdir(), "wt-check-root-"));
+  const repo = path.join(base, "repo");
+  mkdirSync(repo);
+  mkdirSync(path.join(base, "outside"));
+  symlinkSync(path.join(base, "outside"), path.join(repo, ".wt"));
+  const run = (root) => {
+    try {
+      const out = execFileSync(
+        process.execPath,
+        [SCRIPT, "--check-root", root],
+        {
+          cwd: repo,
+          encoding: "utf-8",
+          stdio: "pipe",
+        },
+      );
+      return { code: 0, out };
+    } catch (e) {
+      return { code: e.status, out: String(e.stdout), err: String(e.stderr) };
+    }
+  };
+  assert.deepEqual(run("./.worktrees/"), { code: 0, out: ".worktrees\n" });
+  assert.deepEqual(run("build//wt"), { code: 0, out: "build/wt\n" });
+  for (const bad of ["../outside", "/abs", "wt\nx", ".wt", ""]) {
+    const r = run(bad);
+    assert.equal(r.code, 1, `${JSON.stringify(bad)} must be refused`);
+    assert.equal(r.out, "", "a refused root prints nothing on stdout");
+    assert.match(r.err, /refused/);
+  }
 });
 
 // ── 14: /develop-bug rows are first-class runnable work ──────────────────────

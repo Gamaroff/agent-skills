@@ -1,0 +1,54 @@
+schema: 2
+task: 'task.209.setup-consumer-agent-links'
+task_title: "setup-consumer.sh links each user's agents to AGENTS.md and .agents/skills"
+gate: PASS
+status_reason: 'TASK-209-BUG-6 verified: the terminal-restore claim is scoped to what is tested; the Ctrl-C test requires a SIGINT death and fails without the INT restore. No findings this cycle. Cycles 6-7 ran past the 5-cycle budget with the owner informed.'
+reviewer: 'QA Engineer'
+head: '6eec696e89656a4c23fbb971df441adac624a956'
+updated: '2026-10-14T17:00:40Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 5497
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+  owner_check: 'Linux real terminal, 2026-10-14: works after TASK-209-BUG-5; macOS deferred to task.210'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 8
+    notes: 'Probe record task.209.qa.2.security.run.json: 8 executed, 0 reproduced.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Unknown id refused before any write; failed link fails the run; list redraws in place at any width; autowrap restored on enter and Ctrl-C.'
+  maintainability:
+    status: PASS
+    notes: 'Each terminal-state claim has a test that fails without it.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Restore the terminal on TERM, QUIT and Ctrl-Z during the list, re-raising the signal received, with a test per signal.'
+      refs: ['scripts/setup-consumer.sh']
+    - action: 'macOS real-terminal check — task.210.'
+      refs: ['docs/tasks/task.210.macos-check-of-agent-checkbox-list/task.210.macos-check-of-agent-checkbox-list.md']
+    - action: 'Advisory items from gates 2-4: link identity by resolved path, terminal lost mid-list, mkdir cleanup, empty _agent_index guard, _exit_on_fail test scope.'
+      refs: ['scripts/setup-consumer.sh']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
