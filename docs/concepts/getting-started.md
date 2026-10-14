@@ -112,6 +112,9 @@ bash /path/to/agent-skills/scripts/setup-consumer.sh
 # Preview every action without writing anything:
 bash /path/to/agent-skills/scripts/setup-consumer.sh --dry-run
 
+# Link your agents only (a new clone or worktree):
+bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh) --links-only
+
 # Update skills to the latest release (skips the full wizard):
 bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh) --update
 ```
@@ -131,6 +134,7 @@ The full wizard runs all 10 steps. The `--update` flag runs only steps 1 and 8 �
 | 6    | Creates `docs/development/epic-registry.md` and `docs/tasks/task-registry.md` if absent                                            | Idempotent                                           |
 | 7    | Scaffolds `docs/prd/`, `docs/architecture/concepts/` (3 required stubs), `docs/tasks/`                                             | Idempotent                                           |
 | 8    | Downloads the latest release from GitHub and extracts skills into `.agents/skills/`, applying **your install profile** (see below) and **skipping the tracker-specific skills your platform can never fire** (see below)                                                | Yes                                                  |
+| 8b   | Shows a checkbox list of agents and makes the local links each one needs to `AGENTS.md` and `.agents/skills/`, gitignored. See [1a](#1a-link-your-agent-to-agentsmd-and-agentsskills) | Yes (tick nothing, or no terminal) |
 | 9    | Patches `.claude/settings.json` directly with the three pipeline hooks (inline jq — no dependency on skills being installed first) | Yes                                                  |
 
 #### Skill profiles — choosing how much of the library to install
@@ -295,26 +299,53 @@ Restart your agent (e.g. Claude Code) in the project dir after install so it pic
 ### 1a. Link your agent to `AGENTS.md` and `.agents/skills`
 
 A consumer repo commits **one** instruction file, `AGENTS.md`, and **one** skills directory,
-`.agents/skills/`. Most agents look elsewhere (Claude Code reads `CLAUDE.md` and `.claude/skills/`), so
-each user creates local symlinks for the agents they use, once per clone and once per worktree. The links
-are never committed: some installers refuse symlinks in a tree, CI must not depend on them, and each user
-runs different agents.
+`.agents/skills/`. Most agents read both already. The few that look elsewhere get local symlinks,
+made by each user for the agents they run, once per clone and once per worktree. The links are never
+committed: some installers refuse symlinks in a tree, CI must not depend on them, and each user runs
+different agents.
 
-| Agent | Instruction file | Skills directory |
-| --- | --- | --- |
-| Claude Code | `ln -s AGENTS.md CLAUDE.md` | `mkdir -p .claude && ln -s ../.agents/skills .claude/skills` |
-| Any other agent | link its instruction file to `AGENTS.md` (skip if it reads `AGENTS.md` already) | link its skills dir to `../.agents/skills` (skip if it reads `.agents/skills/` already) |
+**The wizard makes them for you.** It shows a checkbox list of the agents below (↑/↓ move, space
+ticks, enter confirms) and links the ones you tick. Agents you have already linked start ticked. It
+never replaces or deletes anything: an existing `CLAUDE.md`, or a link aimed elsewhere, is reported
+and left alone.
 
-Gitignore every link you create, so it can never be committed:
+```bash
+bash setup-consumer.sh --links-only                    # just the list (new clone or worktree)
+bash setup-consumer.sh --links-only --link-agents claude,gemini   # no list (scripts, no terminal)
+```
+
+Without a terminal the list is skipped; use `--link-agents`. By hand, the links are:
+
+| Id | Agent | Instruction file | Skills directory |
+| --- | --- | --- | --- |
+| `claude` | Claude Code | `ln -s AGENTS.md CLAUDE.md` (needed before v2.1.277, harmless after) | `mkdir -p .claude && ln -s ../.agents/skills .claude/skills` |
+| `codex` | OpenAI Codex | reads `AGENTS.md` | reads `.agents/skills/` |
+| `copilot` | GitHub Copilot | reads `AGENTS.md` | reads `.agents/skills/` |
+| `cursor` | Cursor | reads `AGENTS.md` | reads `.agents/skills/` |
+| `gemini` | Gemini CLI | `ln -s AGENTS.md GEMINI.md` | reads `.agents/skills/` |
+| `windsurf` | Windsurf (Devin Desktop) | reads `AGENTS.md` | reads `.agents/skills/` |
+| `cline` | Cline | reads `AGENTS.md` | `mkdir -p .cline && ln -s ../.agents/skills .cline/skills` |
+| `kiro` | Kiro | reads `AGENTS.md` | `mkdir -p .kiro && ln -s ../.agents/skills .kiro/skills` |
+| `opencode` | OpenCode | reads `AGENTS.md` | reads `.agents/skills/` |
+| `amp` | Amp | reads `AGENTS.md` | reads `.agents/skills/` |
+
+Each agent's own docs, checked 2026-10-14, are the source for this table; the links are listed in
+[task 209](../tasks/task.209.setup-consumer-agent-links/task.209.setup-consumer-agent-links.md#3-technical-background).
+Agents change these paths, so if yours stops finding the skills, check its docs first.
+
+Gitignore every link you create, anchored to the root so a committed sub-folder `CLAUDE.md` stays
+tracked, and without a trailing slash, because git sees a symlink as a file:
 
 ```gitignore
 # Agent links: each user creates their own
-CLAUDE.md
-.claude/skills
+/CLAUDE.md
+/.claude/skills
 ```
 
-If a repo already commits `CLAUDE.md` or `.claude/skills` as a symlink or a copy, replace it: keep the
-content in `AGENTS.md`, `git rm --cached` the old path, add it to `.gitignore`, and recreate it as a local link.
+**Claude Code reads `AGENTS.md` only when there is no `CLAUDE.md`.** A real `CLAUDE.md`, or a
+`CLAUDE.local.md`, makes it ignore `AGENTS.md`. If a repo already commits `CLAUDE.md` or `.claude/skills`
+as a symlink or a copy, replace it: keep the content in `AGENTS.md`, `git rm --cached` the old path,
+delete it, and re-run `--links-only`.
 
 ### 1b. Install pipeline hooks (one-time per project)
 
