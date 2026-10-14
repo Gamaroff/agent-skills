@@ -235,7 +235,20 @@ DoD run 1 recorded four gaps:
 
 #### QA Verification (Ready for QA → Closed/Reopened)
 
-[Pending — `/finalise --bug` DoD run 2]
+**Date**: 2026-10-14
+**QA Engineer**: `/finalise --bug` DoD run 2, plus `/review-pr` on #652 (`bug.19.pr-review.1.…md`). The same session wrote the fix; the review's two lenses and the four DoD agents ran as separate read-only subagents
+
+**Verification Result**: ✅ Fixed
+
+**Notes**: verified at PR #652 head `2187e98f`:
+
+- DoD run 1's four gaps are closed. The CHANGELOG cites `(bug 19)`. The document column refuses an absolute path. `resolveDocCell` is exported and probed. #652 has a PR review.
+- The PR review's findings are all fixed in `2187e98f`: CR-2 (absolute registry path), CR-1 (title-link escape, pre-existing), PC-1 (#643 reopened) and PC-2 (Decision wording).
+- Mutation proofs for the review fixes: making `registryDir` return an absolute directory unchanged turns the CR-2 test red. Disabling title-link containment turns the CR-1 test red. Both were restored.
+- Security probe, recorded at `bug.19.dod.2.security.run.json`: 18 executed, 0 reproduced (`engages`).
+- `npm test` with the `.agents/skills` symlink moved aside: 5446 pass, 0 fail.
+
+**Decision**: Closed
 
 ---
 
@@ -247,6 +260,7 @@ DoD run 1 recorded four gaps:
 | 2026-10-14 | Ready for QA | —    | Fix implemented; bundle pending         |
 | 2026-10-14 | Ready for QA | finalise | DoD incomplete — 4 gap(s) — bug.19.dod.1.registry-tick-malformed-row-reported-as-no-row.md |
 | 2026-10-14 | Ready for QA | — | Iteration 2 — DoD run 1 gaps 1–3 fixed; review pending |
+| 2026-10-14 | Ready for QA | finalise | DoD verified — bug.19.dod.2.registry-tick-malformed-row-reported-as-no-row.md |
 
 ---
 
