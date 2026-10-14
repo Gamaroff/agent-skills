@@ -11,7 +11,8 @@
  *   --file <path>        markdown file to analyse (required)
  *   --bind NAME=VALUE    bind a caller-supplied variable; repeatable
  *   --copy <dir>         seed the temp working directory from this directory
- *                        (its CONTENTS land at the temp root)
+ *                        (its CONTENTS land at the temp root; linked git
+ *                        worktrees nested inside it are not copied)
  *   --copy-as SRC:DEST   copy SRC to DEST inside the temp working directory;
  *                        repeatable. DEST must be relative, stay inside it, not
  *                        pass through a symlink, and not exist yet (it seeds a
@@ -1597,6 +1598,36 @@ export function isWithin(parent, child) {
 }
 
 /**
+ * True when `dir` is the root of a linked git worktree: its `.git` is a FILE
+ * whose `gitdir:` points into a `worktrees/` admin directory. Worktrees live
+ * inside the repository (`.worktrees/<name>` by default), so `--copy .` would
+ * otherwise copy, and then snapshot, one full checkout per worktree. A
+ * submodule's `.git` file points into `modules/` and is kept.
+ */
+export function isLinkedWorktree(dir) {
+  let text;
+  try {
+    const gitPath = join(dir, ".git");
+    if (!lstatSync(gitPath).isFile()) return false;
+    text = readFileSync(gitPath, "utf8");
+  } catch {
+    return false;
+  }
+  const m = /^gitdir:\s*(.+?)\s*$/m.exec(text);
+  return !!m && /[\\/]worktrees[\\/][^\\/]+$/.test(m[1]);
+}
+
+/**
+ * A cpSync filter that skips linked worktrees nested below `root`. The root
+ * itself is always copied, even when it is a worktree: QA commonly runs inside
+ * one, and refusing the directory it was asked to copy would be wrong.
+ */
+function skipNestedWorktrees(root) {
+  const top = resolve(root);
+  return (src) => resolve(src) === top || !isLinkedWorktree(src);
+}
+
+/**
  * Throw when any path component between `root` (exclusive) and `target`
  * (inclusive) exists and is a symlink. Components that do not exist yet end the
  * walk: nothing below a missing directory can be a link. `lstat`, never `stat`,
@@ -1663,7 +1694,11 @@ export function executeFile(filePath, opts = {}) {
 
   try {
     mkdirSync(tmp, { recursive: true });
-    if (copyFrom) cpSync(copyFrom, tmp, { recursive: true });
+    if (copyFrom)
+      cpSync(copyFrom, tmp, {
+        recursive: true,
+        filter: skipNestedWorktrees(copyFrom),
+      });
     // obs #143 — `--copy` places a directory's CONTENTS at the temp root, so a
     // block that addresses a path (`find docs/tasks …`) found nothing whatever was
     // copied. `--copy-as` seeds at the path the block addresses. The destination is
@@ -1720,7 +1755,10 @@ export function executeFile(filePath, opts = {}) {
           `--copy-as SRC contains the sandbox itself — copying it would copy into its own output: ${src}`,
         );
       mkdirSync(dirname(target), { recursive: true });
-      cpSync(src, target, { recursive: true });
+      cpSync(src, target, {
+        recursive: true,
+        filter: skipNestedWorktrees(src),
+      });
     }
     for (const block of blocks) {
       const { klass, reason } = classifyBlock(block.code, bindings);

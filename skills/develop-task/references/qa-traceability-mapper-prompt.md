@@ -106,7 +106,7 @@ For each AC, extract 2–4 distinctive keywords:
 For each AC, run:
 
 ```bash
-grep -rl "{keyword1}\|{keyword2}" . \
+grep -rl "{keyword1}\|{keyword2}" . --exclude-dir=.worktrees --exclude-dir=node_modules \
   --include="*.spec.ts" --include="*.spec.tsx" \
   --include="*.test.ts" --include="*.test.tsx" \
   --include="*.spec.js" --include="*.test.js" \
@@ -124,7 +124,7 @@ If grep yields more than 5 files for a keyword: narrow with a second keyword; if
 For each AC, run:
 
 ```bash
-grep -rl "{keyword1}\|{keyword2}" . \
+grep -rl "{keyword1}\|{keyword2}" . --exclude-dir=.worktrees --exclude-dir=node_modules \
   --include="*.ts" --include="*.tsx" --include="*.js" --include="*.py" \
   --exclude="*.spec.*" --exclude="*.test.*" \
   2>/dev/null | head -5

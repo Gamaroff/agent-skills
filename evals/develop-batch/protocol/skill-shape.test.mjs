@@ -10,6 +10,7 @@
  *   - the per-item merge gate is develop-next's gate (head-SHA + configured gate/strategy)
  *   - development fans out in parallel but merges run serially (rebase-per-item)
  *   - worktrees are removed with `git worktree remove`, never `rm -rf`
+ *   - worktrees live inside the repo under developBatch.worktreeRoot, never beside it
  *   - a missing roadmap reuses develop-next's scaffold-then-STOP; never fabricated
  *   - no consumer-project facts baked into a library skill
  *
@@ -24,7 +25,7 @@ import assert from "node:assert/strict";
 import { readFile, access } from "node:fs/promises";
 import { constants } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
@@ -126,6 +127,32 @@ test("SKILL.md: worktrees are removed with git worktree remove, never rm -rf", (
   assert.match(flat, /never `rm -rf`/);
 });
 
+test("worktrees live inside the repo: the selector's paths and Step 0's stale check agree", async () => {
+  const { BATCH_WORKTREE_PREFIX, DEFAULT_WORKTREE_ROOT } = await import(
+    pathToFileURL(SELECTOR_PATH).href
+  );
+  // The selector is told the configured root, and the stale check looks for the
+  // prefix the selector actually emits. These two drifted once (`../tc-wt-` emitted,
+  // `../wt-*` checked), which made the stale check unable to find anything.
+  assert.match(
+    flat,
+    /select-next\.mjs --batch [^`]*--worktree-root <worktreeRoot>/,
+  );
+  assert.ok(
+    flat.includes(`<worktreeRoot>/${BATCH_WORKTREE_PREFIX}*`),
+    `Step 0 stale check must look for <worktreeRoot>/${BATCH_WORKTREE_PREFIX}*`,
+  );
+  assert.ok(
+    skill.includes(`| \`${DEFAULT_WORKTREE_ROOT}\``),
+    "SKILL.md config table states the selector's default root",
+  );
+  // The root is ignored before any worktree is created, or the next run's
+  // dirty check halts on the batch's own worktrees.
+  assert.match(flat, /git check-ignore -q "<worktreeRoot>\/"/);
+  // No worktree path in the skill points outside the repository.
+  assert.doesNotMatch(skill, /\.\.\/(?:tc-)?wt-|\.\.\/worktrees\//);
+});
+
 test("SKILL.md: a halted item does not sink the batch; its worktree is left for inspection", () => {
   assert.match(flat, /halted/);
   assert.match(
@@ -161,10 +188,14 @@ test("no consumer-project facts leak into the library skill", async () => {
     path.join(SKILL_DIR, "references", "execution-resources.md"),
     "utf-8",
   );
+  // The selector emits the worktree paths this skill runs, so it is held to the
+  // same rule: the `tc-wt` prefix lived there long after it left this SKILL.md.
+  const selector = await readFile(SELECTOR_PATH, "utf-8");
   for (const [name, content] of [
     ["SKILL.md", skill],
     ["README.md", readme],
     ["references/execution-resources.md", reference],
+    ["develop-next/scripts/select-next.mjs", selector],
   ]) {
     for (const re of banned) {
       assert.doesNotMatch(
@@ -191,6 +222,7 @@ test("config keys documented in SKILL.md and configuration reference", async () 
     "developBatch.requireTouches",
     "developBatch.resources",
     "developBatch.worktreeSeedPaths",
+    "developBatch.worktreeRoot",
     "developBatch.maxResumeAttempts",
     "developBatch.maxRebatches",
   ]) {
@@ -199,6 +231,7 @@ test("config keys documented in SKILL.md and configuration reference", async () 
   for (const key of [
     "developBatch.maxParallel",
     "developBatch.requireTouches",
+    "developBatch.worktreeRoot",
   ]) {
     assert.ok(configDoc.includes(key), `configuration.md missing ${key}`);
   }

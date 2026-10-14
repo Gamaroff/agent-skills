@@ -21,6 +21,9 @@ CLAUDE.md
 .agents/state/
 .agents/skills
 
+# Git worktrees live inside the repo, never beside it (developBatch.worktreeRoot)
+/.worktrees/
+
 # Subagent summary artifacts — runtime-local, see shared/resources/subagent-summary-artifact.md
 .summaries/
 
