@@ -5,7 +5,7 @@ type: task
 description: "A checkbox list in the setup wizard makes the local, gitignored links each picked agent needs to the one committed instruction file and skills directory, with a --link-agents flag and a --links-only mode for new clones and worktrees."
 tags: [setup-consumer, onboarding, agents-md, symlinks, gitignore]
 category: infrastructure
-status: in-progress
+status: ready-for-review
 priority: Medium
 created: 2026-10-14
 updated: 2026-10-14
@@ -15,7 +15,7 @@ estimated_effort_hours: 4
 
 # Technical Task: setup-consumer.sh links each user's agents to AGENTS.md and .agents/skills
 
-**Status:** In Progress
+**Status:** Ready for Review
 
 ---
 
@@ -170,10 +170,32 @@ the previous state.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-14
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.209.qa.1.setup-consumer-agent-links.md](./task.209.qa.1.setup-consumer-agent-links.md)
+- **Gate File**: [task.209.gate.1.setup-consumer-agent-links.yml](./task.209.gate.1.setup-consumer-agent-links.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 5485 (5467 pass; 4 worktree-only failures, obs #39)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0 (1 medium, 1 low)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+An unknown `--link-agents` id exits 0 ([TASK-209-BUG-1](./task.209.bug.1.unknown-agent-id-exits-zero.md)). The real-terminal check on Linux and macOS (criterion 6) is still the owner's to do.
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
 | Date | Version | Description | Author |
-| --- | --- | --- | --- |
+|------|---------|-------------|--------|
 | 2026-10-14 | 1.0 | Task created and implemented | Claude |
+| 2026-10-14 |  | QA gate CONCERNS (90/100) — 1 medium, 1 low finding (retroactive QA of PR #659) | qa-task |
 <!-- change-log-end -->
+
