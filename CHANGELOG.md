@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.57.0] - 2026-10-14
+
 ### Added
 
 - **The setup wizard links your agents (task.209).** `setup-consumer.sh` shows a checkbox list of ten
