@@ -5,17 +5,19 @@ type: task
 description: "A checkbox list in the setup wizard makes the local, gitignored links each picked agent needs to the one committed instruction file and skills directory, with a --link-agents flag and a --links-only mode for new clones and worktrees."
 tags: [setup-consumer, onboarding, agents-md, symlinks, gitignore]
 category: infrastructure
-status: in-progress
+status: accepted
 priority: Medium
 created: 2026-10-14
 updated: 2026-10-14
+completed_date: 2026-10-14
+pr_number: 660
 assignee:
 estimated_effort_hours: 4
 ---
 
 # Technical Task: setup-consumer.sh links each user's agents to AGENTS.md and .agents/skills
 
-**Status:** In Progress
+**Status:** Accepted
 
 ---
 
@@ -148,7 +150,7 @@ See [`task.209.plan.setup-consumer-agent-links.md`](task.209.plan.setup-consumer
 - [x] Works without a terminal via `--link-agents`; skips cleanly without either
 - [x] `--links-only` covers a new clone or worktree in one command
 - [x] Tests pass and each guard is mutation-proved
-- [ ] Tried by the user in a real terminal (Linux and macOS)
+- [x] Tried by the user in a real terminal on Linux (owner, 2026-10-14 — found and fixed TASK-209-BUG-5); macOS deferred by the owner to [task.210](../task.210.macos-check-of-agent-checkbox-list/task.210.macos-check-of-agent-checkbox-list.md)
 
 ---
 
@@ -170,10 +172,79 @@ the previous state.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-14
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.209.qa.8.setup-consumer-agent-links.md](./task.209.qa.8.setup-consumer-agent-links.md)
+- **Gate File**: [task.209.gate.8.setup-consumer-agent-links.yml](./task.209.gate.8.setup-consumer-agent-links.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 5502 (5484 pass; 4 worktree-only failures, obs #39)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+The finalise run-1 gaps are closed: ids are read across newlines, and every guard has a mutation-proven test.
+
+## Definition of Done - Gaps Identified — run 1 (historical, superseded)
+
+**Status:** superseded by run 2 below
+
+- [ ] **Security**: an id after a newline in `--link-agents` is never checked and the run exits 0
+- [ ] **SC5**: record the wrap-around and pre-tick mutation proofs; make the no-terminal guard observable (clean stderr) so its mutation goes red
+- [ ] **SC5**: PR #660 CI green on the fix head
+
+**Estimated Effort:** Small (1-2 hours)
+
+**Gap Report Generated:** 2026-10-14
+**Detailed Verification Log:** See `task.209.dod.1.setup-consumer-agent-links.md`.
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.209.qa.8.setup-consumer-agent-links.md` · **Gate File**: `task.209.gate.8.setup-consumer-agent-links.yml` · **Gate Status**: ✅ PASS · **Quality Score**: 100/100
+
+✅ **Success Criteria:** SC1–SC6 all pass. Every guard has a committed mutation record (qa.1, qa.3, qa.8); SC6 is the owner's Linux real-terminal run (macOS deferred to task.210); tests pass in CI.
+✅ **PR Review:** `task.209.pr-review.1.setup-consumer-agent-links.md`; acceptance PR #660 (implementation #659)
+✅ **Security Review:** PASS — 9 probes (`task.209.dod.2.security.run.json`), 0 reproduced; the run-1 newline case is refused.
+✅ **Compliance Review:** not applicable
+✅ **Documentation:** PASS — CHANGELOG Added entry; getting-started §1a, step 8b and usage (section carried from dod.1; docs unchanged since).
+
+**Task marked as ACCEPTED on:** 2026-10-14
+
+**Detailed Verification Log:** See `task.209.dod.2.setup-consumer-agent-links.md`.
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
 | Date | Version | Description | Author |
-| --- | --- | --- | --- |
+|------|---------|-------------|--------|
 | 2026-10-14 | 1.0 | Task created and implemented | Claude |
+| 2026-10-14 |  | QA gate CONCERNS (90/100) — 1 medium, 1 low finding (retroactive QA of PR #659) | qa-task |
+| 2026-10-14 |  | QA findings fixed — QA-209-1 (unknown id exits 0), CR-2 (comment placement), 1 iteration | qa-fix |
+| 2026-10-14 |  | QA gate CONCERNS (90/100) — cycle 2 refute pass: 2 medium; cycle-1 fix verified | qa-task |
+| 2026-10-14 |  | QA findings fixed — QA-209-2 (ids checked before any step), QA-209-3 (failed link reported), 1 iteration | qa-fix |
+| 2026-10-14 |  | QA gate CONCERNS (90/100) — cycle 3: 1 medium; cycle-2 fixes verified | qa-task |
+| 2026-10-14 |  | QA findings fixed — QA-209-4 (a failed link fails the step and the run), 1 iteration | qa-fix |
+| 2026-10-14 |  | QA gate PASS (100/100) — cycle 4: no medium or high findings | qa-task |
+| 2026-10-14 |  | Owner real-terminal check found stacked frames in a narrow terminal (TASK-209-BUG-5); fixed, 1 iteration | qa-fix |
+| 2026-10-14 |  | QA gate CONCERNS (90/100) — cycle 5: owner-found BUG-5 verified; 1 medium (BUG-6) | qa-task |
+| 2026-10-14 |  | Criterion 6: Linux verified by the owner; macOS deferred to task.210 (owner decision) | owner |
+| 2026-10-14 |  | QA findings fixed — QA-209-5 (autowrap restore tested; TERM/QUIT/EXIT restore), 1 iteration | qa-fix |
+| 2026-10-14 |  | QA gate CONCERNS (80/100) — cycle 6 (past the 5-cycle budget): 2 medium in the cycle-5 fix | qa-task |
+| 2026-10-14 |  | QA findings fixed — scope the claim: TERM/QUIT trap and EXIT restore removed; Ctrl-C test requires SIGINT, 1 iteration | qa-fix |
+| 2026-10-14 |  | QA gate PASS (100/100) — cycle 7: no findings | qa-task |
+| 2026-10-14 |  | DoD incomplete — 3 gaps identified | finalise |
+| 2026-10-14 |  | QA findings fixed — finalise run-1 gaps | qa-fix |
+| 2026-10-14 |  | QA gate PASS (100/100) — cycle 8: re-QA of the DoD gap fixes | qa-task |
+| 2026-10-14 | 1.1 | DoD passed — accepted (PR #660) | finalise |
 <!-- change-log-end -->
+

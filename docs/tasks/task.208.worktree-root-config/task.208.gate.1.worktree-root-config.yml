@@ -1,0 +1,68 @@
+schema: 2
+task: 'task.208.worktree-root-config'
+task_title: 'Worktrees live inside the repo under a configurable root'
+gate: CONCERNS
+status_reason: 'The change works and every test guard is mutation-proved, but a symlinked worktree root still puts worktrees outside the repository (TASK-208-BUG-1), which success criterion 3 rules out.'
+reviewer: 'QA Engineer'
+head: '391c193efdca8953c9e914486270b0919c72cd3c'
+updated: '2026-10-14T15:09:51Z'
+
+top_issues:
+  - id: 'QA-208-1'
+    severity: medium
+    file: 'skills/develop-next/scripts/select-next.mjs'
+    finding: 'normaliseWorktreeRoot checks containment lexically, so a root that is a symlink to a directory outside the repo is accepted and git worktree add creates the worktree there (TASK-208-BUG-1).'
+    suggested_action: 'Refuse a root whose realpath is outside the repository top level, in develop-batch Step 0.3a before the first git worktree add.'
+    suggested_owner: dev
+  - id: 'QA-208-2'
+    severity: low
+    file: 'skills/develop-next/scripts/select-next.mjs'
+    finding: 'A root containing a NUL or other control character is accepted (probe case path.null-byte).'
+    suggested_action: 'Return null for any root containing a character below 0x20.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 5485
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [1]
+  ci: 'success @ 65bb2b0f (PR #657 merge head: test, validate, shellcheck, link-check)'
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 11
+    notes: 'Path-sink probe of normaliseWorktreeRoot: 11 executed, 3 hostile accepted. Symlink escape is real (reproduced with git); NUL is low; percent-encoded traversal is inert because nothing decodes the root.'
+  performance:
+    status: PASS
+    notes: 'No hot path changed; the copy filter adds one lstat per directory entry.'
+  reliability:
+    status: PASS
+    notes: 'Refused roots exit 1 without process.exit; develop-batch ignores the root before creating worktrees.'
+  maintainability:
+    status: PASS
+    notes: 'Prefix and default root exported once and tied to the SKILL by a test.'
+
+recommendations:
+  immediate:
+    - action: 'Refuse a symlinked root that resolves outside the repository (TASK-208-BUG-1).'
+      refs: ['skills/develop-batch/SKILL.md', 'skills/develop-next/scripts/select-next.mjs']
+  future:
+    - action: 'Document --worktree-root and the gitignore requirement on the standalone develop-next --batch path (PR review CR-1).'
+      refs: ['skills/develop-next/SKILL.md']
+    - action: 'Return to the repo root by variable, not cd ../.., in create-parallel-stories cleanup (PR review CR-2).'
+      refs: ['skills/create-parallel-stories/SKILL.md']
+    - action: 'Fix the observation-log resolver tests that fail inside a linked worktree (obs #39).'
+      refs: ['shared/resources/tests/observation-log.test.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-208-BUG-1 fixed']

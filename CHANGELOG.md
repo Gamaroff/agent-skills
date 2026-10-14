@@ -11,7 +11,8 @@ All notable changes to this project will be documented in this file. Format foll
   `.agents/skills/`, gitignored with anchored rules. Six of the ten need nothing and say so. It never
   replaces or deletes an existing file. `--link-agents claude,gemini` picks without the list, and
   `--links-only` runs just this step in a new clone or worktree. getting-started §1a now lists what
-  each agent needs.
+  each agent needs. An unknown agent name is refused before any step runs, and a run whose summary
+  reports a failed step now exits 1 (it used to exit 0 after, for example, invalid hook JSON).
 
 ### Changed
 
@@ -19,7 +20,8 @@ All notable changes to this project will be documented in this file. Format foll
   `developBatch.worktreeRoot` key (default `.worktrees`) sets where worktrees go. `select-next.mjs
   --batch` takes it as `--worktree-root` and emits `<root>/batch-<slug>`. It used to emit
   `../tc-wt-<slug>`, beside the checkout, with a prefix left over from another project. The selector
-  refuses a root with `..` or an absolute path. `develop-batch` now checks the root is gitignored
+  refuses a root with `..`, an absolute path, a control character, or a symlink that leads outside
+  the repository. `develop-batch` now checks the root is gitignored
   before it creates a worktree (falling back to `.git/info/exclude` and saying so), and its stale
   check looks for `<root>/batch-*`. It used to look for `../wt-*`, which nothing ever created, so
   the check could never fire. `create-parallel-stories` and the parallel-story runbooks use

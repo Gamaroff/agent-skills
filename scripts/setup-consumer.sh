@@ -179,7 +179,7 @@ _checklist_has_tty() { { : </dev/tty >/dev/tty; } 2>/dev/null; }
 
 _checklist_restore() {
   [[ -n "${_CL_STTY:-}" ]] && stty "$_CL_STTY" </dev/tty 2>/dev/null
-  printf '\033[?25h' >/dev/tty 2>/dev/null
+  printf '\033[?25h\033[?7h' >/dev/tty 2>/dev/null
   _CL_STTY=""
 }
 
@@ -201,7 +201,11 @@ checklist() {
   # the wizard.
   trap '_checklist_restore; trap - INT; kill -INT $$' INT
   stty -echo </dev/tty
-  printf '\033[?25l' >/dev/tty
+  # Cursor hidden, and autowrap OFF while the list is drawn: the redraw moves
+  # up exactly one row per item, so a line wider than the terminal must be
+  # clipped at the edge, never wrapped onto a second row. A wrapped line made
+  # every redraw land too high and stack frames on top of each other.
+  printf '\033[?25l\033[?7l' >/dev/tty
 
   {
     echo -e "${BOLD}${title}${NC}"
@@ -1925,9 +1929,6 @@ install_hooks() {
   fi
 }
 
-# ── summary ──────────────────────────────────────────────────────────────────
-
-# Coloured status badge for the status table
 # ── agent links ──────────────────────────────────────────────────────────────
 # A consumer repo commits one instruction file (AGENTS.md) and one skills
 # directory (.agents/skills/). Each user links the agents they run to those,
@@ -1957,7 +1958,7 @@ _agent_field() { local IFS='|'; local -a f; read -r -a f <<<"$1"; echo "${f[$2]:
 # Make one link. Never replaces or deletes anything: an existing file, folder
 # or differently-aimed link is reported and left alone, because it may hold the
 # only copy of someone's instructions (§ 1a says how to migrate one by hand).
-# Prints one status word for the caller: linked, already, kept, missing.
+# Prints one status word for the caller: linked, already, kept, missing, failed.
 _make_agent_link() {
   local link="$1" target="$2"
   # Resolve the target by text, not through the filesystem: the link's folder
@@ -1981,9 +1982,14 @@ _make_agent_link() {
     echo -e "${YELLOW}[dry-run]${NC} would link: $link → $target" >&2
     echo linked
   else
-    mkdir -p "$(dirname "$link")"
-    ln -s "$target" "$link"
-    echo linked
+    # Checked explicitly: this runs inside `status=$(...)`, where bash turns
+    # set -e off, so a failed mkdir or ln would otherwise print "linked".
+    if mkdir -p "$(dirname "$link")" && ln -s "$target" "$link"; then
+      echo linked
+    else
+      warn "$link could not be created — see the error above" >&2
+      echo failed
+    fi
   fi
 }
 
@@ -2007,6 +2013,54 @@ _agent_linked() {
   done
 }
 
+# Refuse an unknown --link-agents id before any step writes. Found at step 8b,
+# a typo stopped the full wizard after steps 1-8 had already written
+# (TASK-209-BUG-2), so main() calls this first.
+_check_link_agents() {
+  [[ -n "$LINK_AGENTS" ]] || return 0
+  local id rec ids="" want
+  for rec in "${AGENT_TABLE[@]}"; do ids+="${ids:+, }$(_agent_field "$rec" 0)"; done
+  # A command substitution, not `< <(...)`: its exit status is kept, so a
+  # parse that fails stops here instead of reading as "no ids".
+  want=$(_link_agents_ids) || return 1
+  while IFS= read -r id; do
+    [[ -z "$id" ]] && continue
+    [[ -n "$(_agent_index "$id")" ]] || { err "--link-agents: unknown agent '$id'. Known: $ids"; return 1; }
+  done <<<"$want"
+  return 0
+}
+
+# The ids in --link-agents, one per line: split on commas AND newlines, spaces
+# and carriage returns dropped, "none" and empties skipped. The one parse both
+# callers use. `IFS=',' read -a` alone stops at the first newline, so an id
+# after one was never checked and the run exited 0 (finalise run 1).
+_link_agents_ids() {
+  local v="${LINK_AGENTS//$'\r'/}"
+  v="${v//$'\n'/,}"
+  local -a raw
+  local id
+  IFS=',' read -r -a raw <<<"$v"
+  # bash 3.2 (macOS) treats "${raw[@]}" of an empty array as unbound under
+  # set -u, which a value of only separators (e.g. $'\r') produces.
+  (( ${#raw[@]} )) || return 0
+  for id in "${raw[@]}"; do
+    id="${id// /}"
+    [[ -z "$id" || "$id" == none ]] && continue
+    echo "$id"
+  done
+  return 0
+}
+
+# The AGENT_TABLE index of an agent id, or nothing. The one lookup both
+# _check_link_agents and link_agents use.
+_agent_index() {
+  local i
+  for i in "${!AGENT_TABLE[@]}"; do
+    [[ "$(_agent_field "${AGENT_TABLE[i]}" 0)" == "$1" ]] && { echo "$i"; return 0; }
+  done
+  return 0
+}
+
 link_agents() {
   heading "Agent links"
 
@@ -2014,24 +2068,14 @@ link_agents() {
   local rec i id
 
   if [[ -n "$LINK_AGENTS" ]]; then
-    # --link-agents a,b: no prompt. An unknown id is a typo, and guessing what
-    # was meant would link the wrong agent, so it stops the step.
-    local -a want; IFS=',' read -r -a want <<<"$LINK_AGENTS"
-    for id in "${want[@]}"; do
-      id="${id// /}"
-      [[ -z "$id" || "$id" == none ]] && continue
-      local found=""
-      for i in "${!AGENT_TABLE[@]}"; do
-        [[ "$(_agent_field "${AGENT_TABLE[i]}" 0)" == "$id" ]] && found=$i
-      done
-      if [[ -z "$found" ]]; then
-        local ids=""; for rec in "${AGENT_TABLE[@]}"; do ids+="${ids:+, }$(_agent_field "$rec" 0)"; done
-        err "--link-agents: unknown agent '$id'. Known: $ids"
-        record_step "Agent links" "fail" "unknown agent: $id"
-        return 0
-      fi
-      chosen+=("$found")
-    done
+    # --link-agents a,b: no prompt. main() already refused an unknown id
+    # (_check_link_agents) before any step ran, so every id here resolves.
+    local want
+    want=$(_link_agents_ids) || return 1
+    while IFS= read -r id; do
+      [[ -z "$id" ]] && continue
+      chosen+=("$(_agent_index "$id")")
+    done <<<"$want"
   else
     local defaults=""
     for i in "${!AGENT_TABLE[@]}"; do
@@ -2042,12 +2086,13 @@ link_agents() {
         local pair; for pair in $links; do paths+="${paths:+, }${pair%%>*}"; done
         labels+=("$(printf '%-26s links %s' "$label" "$paths")")
       else
-        labels+=("$(printf '%-26s nothing to link: reads AGENTS.md and .agents/skills' "$label")")
+        labels+=("$(printf '%-26s nothing to link' "$label")")
       fi
       _agent_linked "$rec" && defaults+="${defaults:+ }$i"
     done
     echo "  Each agent you tick gets local links to AGENTS.md and .agents/skills,"
-    echo "  added to .gitignore. Nothing is ever replaced or deleted."
+    echo "  added to .gitignore. Nothing is ever replaced or deleted. Agents marked"
+    echo "  \"nothing to link\" already read AGENTS.md and .agents/skills themselves."
     echo ""
     if ! CHECKLIST_DEFAULT="$defaults" checklist "Which agents do you use?" "${labels[@]}"; then
       info "No terminal to show the list on — skipped. Use --link-agents claude,gemini,…"
@@ -2063,7 +2108,7 @@ link_agents() {
     return 0
   fi
 
-  local done_names="" problems=0
+  local done_names="" problems=0 failed=0
   for i in "${chosen[@]}"; do
     rec="${AGENT_TABLE[i]}"
     local name links pair status
@@ -2078,13 +2123,20 @@ link_agents() {
       case "$status" in
         linked)  ok "$name: ${pair%%>*} → ${pair#*>}"; _ignore_agent_link "${pair%%>*}" ;;
         already) ok "$name: ${pair%%>*} already linked"; _ignore_agent_link "${pair%%>*}" ;;
+        failed)  failed=$(( failed + 1 )) ;;
         *)       problems=$(( problems + 1 )) ;;
       esac
     done
     done_names+="${done_names:+, }$name"
   done
 
-  if (( problems > 0 )); then
+  # Kept and missing links are deliberate non-actions: a warning. A link that
+  # could not be made is an error: the step fails, and the run exits 1 at the
+  # end (main), after the remaining steps have run.
+  if (( failed > 0 )); then
+    record_step "Agent links" "fail" "$done_names; $failed link(s) could not be made"
+    record_warning "Agent links: $failed link(s) could not be created — see the errors above"
+  elif (( problems > 0 )); then
     record_step "Agent links" "warn" "$done_names; $problems link(s) left alone"
     record_warning "Agent links: $problems link(s) not made — see the messages above and getting-started § 1a"
   else
@@ -2093,6 +2145,9 @@ link_agents() {
   info "Links are per clone. In a new clone or worktree, run: setup-consumer.sh --links-only"
 }
 
+# ── summary ──────────────────────────────────────────────────────────────────
+
+# Coloured status badge for the status table
 _status_badge() {
   case "$1" in
     ok)      echo -e "${GREEN}ok${NC}     " ;;
@@ -2141,7 +2196,11 @@ print_summary() {
 
   if [[ "$LINKS_ONLY" == true ]]; then
     echo -e "${BOLD}Next steps:${NC}"
-    echo "  Restart your agents in this directory so they pick up the links."
+    if $WIZARD_HAS_FAIL; then
+      echo "  Fix the error above and re-run with --links-only."
+    else
+      echo "  Restart your agents in this directory so they pick up the links."
+    fi
     echo ""
     [[ "$DRY_RUN" == true ]] && warn "Dry-run mode — no files were written." && echo ""
     return 0
@@ -2195,9 +2254,20 @@ _on_exit() {
   exit $rc
 }
 
+# A run whose summary says "Setup failed" exits 1. Steps that record a fail
+# and carry on (so later steps still run) would otherwise end the run with 0,
+# which a calling script reads as success.
+_exit_on_fail() {
+  if $WIZARD_HAS_FAIL; then exit 1; fi
+  return 0
+}
+
 # ── main ─────────────────────────────────────────────────────────────────────
 main() {
   trap '_on_exit' EXIT
+  # Before anything is written: nothing has been recorded yet, so _on_exit
+  # exits without a summary and the project is untouched.
+  _check_link_agents || exit 1
 
   echo ""
   if [[ "$LINKS_ONLY" == true ]]; then
@@ -2213,6 +2283,7 @@ main() {
   if [[ "$LINKS_ONLY" == true ]]; then
     link_agents
     print_summary
+    _exit_on_fail
     return
   fi
 
@@ -2223,6 +2294,7 @@ main() {
     # --update never prompts; it links only when asked to by flag.
     [[ -n "$LINK_AGENTS" ]] && link_agents
     print_summary
+    _exit_on_fail
     return
   fi
 
@@ -2241,6 +2313,7 @@ main() {
   link_agents
   install_hooks
   print_summary
+  _exit_on_fail
 }
 
 # Sourcing with SETUP_CONSUMER_NO_MAIN=1 loads the function definitions without

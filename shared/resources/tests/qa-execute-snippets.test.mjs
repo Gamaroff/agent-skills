@@ -2534,6 +2534,32 @@ function repoWithNestedWorktree() {
   return root;
 }
 
+// QA-208-5: the .git file was parsed with a regex quadratic in whitespace
+// (40k spaces: 19 s). Linear now: 160k spaces must read in well under a
+// second (the old regex takes minutes), and a malformed file is still read
+// correctly. The slow shape is a
+// run of spaces INSIDE the value, before a last character.
+test("QA-18b: isLinkedWorktree reads a whitespace-heavy .git file in linear time", () => {
+  const dir = mkdtempSync(join(tmpdir(), "gitfile-ws-"));
+  const time = (n) => {
+    writeFileSync(join(dir, ".git"), "gitdir: x" + " ".repeat(n) + "y");
+    const t0 = process.hrtime.bigint();
+    const r = isLinkedWorktree(dir);
+    return { r, ms: Number(process.hrtime.bigint() - t0) / 1e6 };
+  };
+  const small = time(40_000);
+  const big = time(160_000);
+  assert.equal(small.r, false);
+  assert.equal(big.r, false);
+  assert.ok(big.ms < 500, `160k spaces took ${big.ms} ms`);
+  writeFileSync(join(dir, ".git"), "gitdir:   /r/.git/worktrees/wt1   \n");
+  assert.equal(
+    isLinkedWorktree(dir),
+    true,
+    "padding around a real gitdir still reads",
+  );
+});
+
 test("QA-18b: isLinkedWorktree tells a linked worktree from a submodule and a plain dir", () => {
   const root = repoWithNestedWorktree();
   assert.equal(isLinkedWorktree(join(root, ".worktrees", "wt1")), true);
