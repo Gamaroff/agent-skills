@@ -290,7 +290,31 @@ Each skill is self-contained — shared resources are pre-bundled into `referenc
 
 **Re-running the install is idempotent** — overwrite the existing `.agents/skills/` directory to update to a newer release.
 
-Restart your agent (e.g. Claude Code) in the project dir after install so it picks up `.agents/skills/`.
+Restart your agent (e.g. Claude Code) in the project dir after install so it picks up the skills through the links in [1a](#1a-link-your-agent-to-agentsmd-and-agentsskills).
+
+### 1a. Link your agent to `AGENTS.md` and `.agents/skills`
+
+A consumer repo commits **one** instruction file, `AGENTS.md`, and **one** skills directory,
+`.agents/skills/`. Most agents look elsewhere (Claude Code reads `CLAUDE.md` and `.claude/skills/`), so
+each user creates local symlinks for the agents they use, once per clone and once per worktree. The links
+are never committed: some installers refuse symlinks in a tree, CI must not depend on them, and each user
+runs different agents.
+
+| Agent | Instruction file | Skills directory |
+| --- | --- | --- |
+| Claude Code | `ln -s AGENTS.md CLAUDE.md` | `mkdir -p .claude && ln -s ../.agents/skills .claude/skills` |
+| Any other agent | link its instruction file to `AGENTS.md` (skip if it reads `AGENTS.md` already) | link its skills dir to `../.agents/skills` (skip if it reads `.agents/skills/` already) |
+
+Gitignore every link you create, so it can never be committed:
+
+```gitignore
+# Agent links: each user creates their own
+CLAUDE.md
+.claude/skills
+```
+
+If a repo already commits `CLAUDE.md` or `.claude/skills` as a symlink or a copy, replace it: keep the
+content in `AGENTS.md`, `git rm --cached` the old path, add it to `.gitignore`, and recreate it as a local link.
 
 ### 1b. Install pipeline hooks (one-time per project)
 

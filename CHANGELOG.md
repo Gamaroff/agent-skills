@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Changed
+
+- **Getting started now says how to link an agent to the skills (docs).** A consumer commits only
+  `AGENTS.md` and `.agents/skills/`; each user creates gitignored links such as `CLAUDE.md -> AGENTS.md`
+  and `.claude/skills -> ../.agents/skills`. The guide used to say Claude Code picks up `.agents/skills/`
+  on its own, which it does not.
+
 ### Fixed
 
 - **The roadmap template's Change Log header matches the canonical one (docs).**
@@ -12,6 +19,10 @@ All notable changes to this project will be documented in this file. Format foll
   parsed the old name: the engine reads rows by position and accepts either header, so roadmaps
   already scaffolded keep working. A test now ties the template's header to the one the engine
   writes.
+
+- **`setup-consumer.sh` could leave `.env` unignored.** The `.gitignore` helper checked for an
+  existing rule by substring, so a `.gitignore` holding `!.env.example` (or `.env.local`) read as
+  already ignoring `.env`, and the rule was never added. It now matches whole lines.
 
 ## [v0.56.0] - 2026-10-14
 
