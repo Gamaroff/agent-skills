@@ -183,7 +183,19 @@ collapsed the parser's rejection into "no row".
 
 #### QA Verification (Ready for QA → Closed/Reopened)
 
-[Pending]
+**Date**: 2026-10-14
+**QA Engineer**: agent session (`/finalise --bug`) — the same session that wrote the fix; no independent reviewer
+
+**Verification Result**: ✅ Fixed
+
+**Notes**: verified on `develop` at `97e56a7a` (the merge of PR #651), not on the branch:
+
+- The reproduction snippet now returns task 7 in `rows` with `path: docs/tasks/task.7.x/task.7.x.md` and an empty `malformed`.
+- End to end, through the merged `shared/resources/registry-tick.js`, on a sandbox registry in the consumer's exact shape (plain title, `Icon`/`Tracker` columns, backticked path in `Document`) with an accepted task 147: `reason: ticked`, `ready-for-review → accepted`, only the Status cell changed, path cell untouched.
+- Suites on the merge commit: `select-next.test.mjs` 155/155, `registry-tick.test.mjs` 40/40, `skill-shape.test.mjs` 34/34; `bundle_skill.py --check` 0 problems. PR #651 CI: all five checks SUCCESS (`test` 2m59s).
+- Mutation on the merge commit: disabling the `row-malformed` branch turns the `row-malformed` test red (0 pass, 1 fail); restored.
+
+**Decision**: Closed
 
 ---
 
@@ -193,6 +205,7 @@ collapsed the parser's rejection into "no row".
 | ---------- | ------ | ---------- | --------------------------------------- |
 | 2026-10-14 | New    | —          | Bug created from GitHub #643            |
 | 2026-10-14 | Ready for QA | —    | Fix implemented; bundle pending         |
+| 2026-10-14 | Ready for QA | finalise | DoD incomplete — 4 gap(s) — bug.19.dod.1.registry-tick-malformed-row-reported-as-no-row.md |
 
 ---
 
