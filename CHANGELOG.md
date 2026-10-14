@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.57.1] - 2026-10-14
+
 ### Changed
 
 - **A release no longer commits to `main` (maintainers).** `scripts/release.sh` now runs in two
