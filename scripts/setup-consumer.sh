@@ -2018,11 +2018,15 @@ _agent_linked() {
 # (TASK-209-BUG-2), so main() calls this first.
 _check_link_agents() {
   [[ -n "$LINK_AGENTS" ]] || return 0
-  local id rec ids=""
+  local id rec ids="" want
   for rec in "${AGENT_TABLE[@]}"; do ids+="${ids:+, }$(_agent_field "$rec" 0)"; done
+  # A command substitution, not `< <(...)`: its exit status is kept, so a
+  # parse that fails stops here instead of reading as "no ids".
+  want=$(_link_agents_ids) || return 1
   while IFS= read -r id; do
+    [[ -z "$id" ]] && continue
     [[ -n "$(_agent_index "$id")" ]] || { err "--link-agents: unknown agent '$id'. Known: $ids"; return 1; }
-  done < <(_link_agents_ids)
+  done <<<"$want"
   return 0
 }
 
@@ -2036,6 +2040,9 @@ _link_agents_ids() {
   local -a raw
   local id
   IFS=',' read -r -a raw <<<"$v"
+  # bash 3.2 (macOS) treats "${raw[@]}" of an empty array as unbound under
+  # set -u, which a value of only separators (e.g. $'\r') produces.
+  (( ${#raw[@]} )) || return 0
   for id in "${raw[@]}"; do
     id="${id// /}"
     [[ -z "$id" || "$id" == none ]] && continue
@@ -2063,9 +2070,12 @@ link_agents() {
   if [[ -n "$LINK_AGENTS" ]]; then
     # --link-agents a,b: no prompt. main() already refused an unknown id
     # (_check_link_agents) before any step ran, so every id here resolves.
+    local want
+    want=$(_link_agents_ids) || return 1
     while IFS= read -r id; do
+      [[ -z "$id" ]] && continue
       chosen+=("$(_agent_index "$id")")
-    done < <(_link_agents_ids)
+    done <<<"$want"
   else
     local defaults=""
     for i in "${!AGENT_TABLE[@]}"; do

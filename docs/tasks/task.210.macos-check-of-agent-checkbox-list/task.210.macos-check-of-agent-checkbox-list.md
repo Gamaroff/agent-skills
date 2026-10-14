@@ -86,6 +86,7 @@ None — a verification task. Any fix found goes through the pipeline with its o
 - [ ] Each key: ↑/↓ (and wrap), k/j, space, a, enter
 - [ ] Ctrl-C mid-list: the prompt comes back with echo on, cursor visible, autowrap on (type a long line)
 - [ ] Without `--dry-run` in a scratch repo: the ticked links are made and gitignored
+- [ ] `--link-agents $'\r'` under bash 3.2: "No agents chosen", no unbound-variable error (the empty-list guard bash 5 on CI cannot exercise)
 
 ### Phase 3: Record and fix (Low–Medium risk)
 
