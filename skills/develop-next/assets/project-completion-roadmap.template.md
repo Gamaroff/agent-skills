@@ -56,6 +56,6 @@ milestones are done you may archive them out to a `roadmap-history.md`.
 
 ## Change Log
 
-| Date | Version | Change | Author |
+| Date | Version | Description | Author |
 |---|---|---|---|
 | <YYYY-MM-DD> | 1.0 | Initial roadmap | <author> |
