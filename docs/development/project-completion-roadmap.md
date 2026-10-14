@@ -20,7 +20,7 @@ finished work. Rules:
 §"Registry fallback frontier".
 
 Add a phase only to express *sequencing* the registries cannot: a deliberate order, a dependency
-chain, a human gate. No phase is open: Phase 10 (T188) closed and was archived 2026-10-11, so `/develop-next` selects from the registries.
+chain, a human gate. **Phase 11 is open** (T202–T207, opened 2026-10-14) — an ordered chain ahead of the registry fallback.
 
 > ⚠️ **A phase costs upkeep that a registry row does not, and the cost is not obvious.** Roadmap rows
 > are matched on the **checkbox alone** — they do **not** consult the target document's frontmatter.
@@ -66,6 +66,25 @@ Read only by `--batch`. Two rows conflict when they share a tag that **either** 
 | `mutation-proving` | `shared/resources/mutation-proving.md`                                  |
 | `docs-pipeline`    | `docs/runbooks/*`, `docs/concepts/*`, `docs/reference/pipeline-artifacts.md`, `docs/operations/workflows.md`, `skills/develop-*/README.md` |
 | `pipeline-lock`    | `shared/resources/advance-pipeline-lock.sh`, `advance-pipeline-lock.test.sh`  |
+
+---
+
+## PHASE 11 — hierarchical document numbering (opened 2026-10-14)
+
+An **override**: without it the registry fallback selects T189, then 190–200, before T202, because
+the fallback takes the lowest-numbered task. The chain renames PRDs, epics and stories to
+`prd.P` → `epic.P.E` → `story.P.E.S` (design: [`.agents/plans/hierarchical-doc-numbering.md`](../../.agents/plans/hierarchical-doc-numbering.md)).
+**T205 is ordered ahead of T204** on purpose: T203 retires the global epic registry that
+`/create-epic` reads until T205 lands, so T205 runs straight after T203 to close that window. T204
+and T205 hard-conflict on `templates` and `review-skills`, so `--batch` never pairs them. **Tick each
+row `[x]` the moment its task is accepted** — a phase row is matched on its checkbox, not the document.
+
+- [ ] **T202** Doc-id engine and PRD registry · deps: none · touches: selection~, test-harness~ · /develop-task docs/tasks/task.202.doc-id-engine-and-prd-registry/task.202.doc-id-engine-and-prd-registry.md
+- [ ] **T203** Migrate documents to hierarchical numbering · deps: T202 · touches: test-harness~ · /develop-task docs/tasks/task.203.migrate-doc-numbering/task.203.migrate-doc-numbering.md
+- [ ] **T205** PRD-scoped epic numbering · deps: T203 · touches: templates!, review-skills!, bundles!, setup-consumer~ · /develop-task docs/tasks/task.205.prd-scoped-epic-numbering/task.205.prd-scoped-epic-numbering.md
+- [ ] **T204** Numbered PRDs in the PRD skills · deps: T203 · touches: templates!, review-skills!, bundles! · /develop-task docs/tasks/task.204.numbered-prds-in-prd-skills/task.204.numbered-prds-in-prd-skills.md
+- [ ] **T206** Hierarchical story ids in the pipeline · deps: T202, T203, T205 · touches: pipeline-steps!, selection!, bundles!, finalise~, templates~ · /develop-task docs/tasks/task.206.hierarchical-story-ids-in-pipeline/task.206.hierarchical-story-ids-in-pipeline.md
+- [ ] **T207** Doc numbering enforcement and sweep · deps: T204, T205, T206 · touches: test-harness!, docs-pipeline!, bundles!, review-skills~, templates~ · /develop-task docs/tasks/task.207.doc-numbering-enforcement-and-sweep/task.207.doc-numbering-enforcement-and-sweep.md
 
 ---
 
@@ -184,3 +203,4 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-10-11 | **Phase 10 opened** — T188 (resume from evidence, not flags) ahead of the registry fallback's T175. Obs #9 showed that a `/develop-next` run whose pipeline HALTed loops on Step 3's "not accepted" HALT even after the halt is cleared; T188 v1.1 carries the fix. A one-row override; archive it when T188 is accepted. |
 | 2026-10-11 | **T188 accepted + merged — PR #634 merged** (`46223ec0`). develop-next and develop-batch resume from evidence, not flags: the GitHub merge arm reads the PR's state after `gh pr merge` (obs #197), develop-next's run state records a pipeline HALT and Step 0.1 surfaces it before routing (obs #286, #9), and a reconcile block advances `merged` / `ticked` from the PR and the roadmap row — origin, then the local base — halting on anything it cannot read (obs #180). QA ran 4 cycles (80 → 40 → 90 → 100); 5c APPROVE. DoD run 1 stopped on the security probe zero-guard (fenced-prose boundary, no probe entry form); the operator recorded an override on the executed fixture evidence and run 2 accepted 11/11. Merge gate `npm run ci` green (5334 tests). Issue #587 closed. Phase 10 is fully ticked — archive it at the next housekeeping |
 | 2026-10-11 | **Phase 10 archived** to `roadmap-history.md`. Its one row, T188, moved verbatim with its `touches:` tags and acceptance annotation, so a `deps:` naming it still resolves there. No phase is open: `/develop-next` selects from the registries (next: T175). |
+| 2026-10-14 | **Phase 11 opened** — T202 → T203 → T205 → T204 → T206 → T207 (issues #645–#650), the hierarchical document numbering chain, ahead of the registry fallback's T189. T205 precedes T204 so the window in which `/create-epic` reads the epic registry T203 retires closes immediately. Archive the phase when T207 is accepted. |
