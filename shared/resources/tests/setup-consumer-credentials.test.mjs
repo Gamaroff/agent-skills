@@ -153,6 +153,18 @@ test("re-running does not duplicate the gitignore rules", () => {
   assert.equal(gi.match(/^\.env$/gm).length, 1, ".env must appear once");
 });
 
+test("a rule that merely contains .env or .secrets/ does not count as present", () => {
+  // `!.env.example` is the commonest .gitignore line there is. A substring
+  // check reads it as a `.env` rule and skips the append, leaving the
+  // credentials file unignored with no warning anywhere.
+  const gi = runWizard({
+    seed: { ".gitignore": "!.env.example\n.env.local\n.secrets/old/\n" },
+  }).read(".gitignore");
+  assert.match(gi, /^\.env$/m, ".env must be added as its own rule");
+  assert.match(gi, /^\.secrets\/$/m, ".secrets/ must be added as its own rule");
+  assert.match(gi, /^!\.env\.example$/m, "pre-existing rules must survive");
+});
+
 test("the tracked .env.example is not swallowed by the .secrets/ rule", () => {
   // It stays at the repo root precisely so the rule that protects the real
   // credential file cannot hide the example describing it.
