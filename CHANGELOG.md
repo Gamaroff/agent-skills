@@ -13,6 +13,13 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The roadmap template's Change Log header matches the canonical one (docs).**
+  `project-completion-roadmap.template.md` said `| Date | Version | Change | Author |`. Every other
+  Change Log, and the `change-log.js` engine, uses `Description` for the third column. Nothing
+  parsed the old name: the engine reads rows by position and accepts either header, so roadmaps
+  already scaffolded keep working. A test now ties the template's header to the one the engine
+  writes.
+
 - **`setup-consumer.sh` could leave `.env` unignored.** The `.gitignore` helper checked for an
   existing rule by substring, so a `.gitignore` holding `!.env.example` (or `.env.local`) read as
   already ignoring `.env`, and the rule was never added. It now matches whole lines.
