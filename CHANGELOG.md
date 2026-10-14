@@ -6,12 +6,30 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **Worktrees live inside the repo, under a configurable root (task.208).** A new
+  `developBatch.worktreeRoot` key (default `.worktrees`) sets where worktrees go. `select-next.mjs
+  --batch` takes it as `--worktree-root` and emits `<root>/batch-<slug>`. It used to emit
+  `../tc-wt-<slug>`, beside the checkout, with a prefix left over from another project. The selector
+  refuses a root with `..` or an absolute path. `develop-batch` now checks the root is gitignored
+  before it creates a worktree (falling back to `.git/info/exclude` and saying so), and its stale
+  check looks for `<root>/batch-*`. It used to look for `../wt-*`, which nothing ever created, so
+  the check could never fire. `create-parallel-stories` and the parallel-story runbooks use
+  `.worktrees/<name>`. **Upgrading:** add `/.worktrees/` to your `.gitignore`, and to any test
+  runner or linter that does not read it.
+
 - **Getting started now says how to link an agent to the skills (docs).** A consumer commits only
   `AGENTS.md` and `.agents/skills/`; each user creates gitignored links such as `CLAUDE.md -> AGENTS.md`
   and `.claude/skills -> ../.agents/skills`. The guide used to say Claude Code picks up `.agents/skills/`
   on its own, which it does not.
 
 ### Fixed
+
+- **Root-wide searches and copies skip nested worktrees (task.208).** `qa-execute-snippets --copy`
+  and `--copy-as` no longer copy linked worktrees found inside the source directory. Submodules
+  and the copy root itself are still copied. The repo-wide `grep -r` and `find .` commands in
+  `qa-traceability-mapper-prompt`, `test-co-location-enforcer` and `railway-postgres-crud` exclude
+  `.worktrees/`. `test-co-location-enforcer`'s `__tests__` file search also had an unparenthesised
+  `-o` that matched every `*.spec.ts` in the tree; it is now grouped.
 
 - **The roadmap template's Change Log header matches the canonical one (docs).**
   `project-completion-roadmap.template.md` said `| Date | Version | Change | Author |`. Every other

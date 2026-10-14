@@ -46,6 +46,7 @@ const {
   executeFile,
   extractBlocks,
   extractTableCellCommands,
+  isLinkedWorktree,
   isWithin,
   runBlock,
   sandboxEnv,
@@ -2515,6 +2516,76 @@ test("QA-18: --copy-as seeds a directory at the path the block addresses; --copy
   assert.ok(
     contents.findings.some((f) => f.kind === "execution-failure"),
     "--copy places the directory's CONTENTS at the root, so docs/tasks is absent",
+  );
+});
+
+// Worktrees live inside the repository (`.worktrees/<name>`), so `--copy .`
+// would copy one full checkout per worktree into the sandbox, and then snapshot it.
+function repoWithNestedWorktree() {
+  const root = tmp();
+  writeFileSync(join(root, "keep.txt"), "kept\n");
+  mkdirSync(join(root, ".worktrees", "wt1"), { recursive: true });
+  writeFileSync(
+    join(root, ".worktrees", "wt1", ".git"),
+    "gitdir: /repo/.git/worktrees/wt1\n",
+  );
+  writeFileSync(join(root, ".worktrees", "wt1", "dup.txt"), "duplicate\n");
+  mkdirSync(join(root, "sub"));
+  writeFileSync(join(root, "sub", ".git"), "gitdir: ../.git/modules/sub\n");
+  return root;
+}
+
+test("QA-18b: isLinkedWorktree tells a linked worktree from a submodule and a plain dir", () => {
+  const root = repoWithNestedWorktree();
+  assert.equal(isLinkedWorktree(join(root, ".worktrees", "wt1")), true);
+  assert.equal(
+    isLinkedWorktree(join(root, "sub")),
+    false,
+    "a submodule is kept",
+  );
+  assert.equal(isLinkedWorktree(root), false, "no .git at all");
+  assert.equal(isLinkedWorktree(join(root, "missing")), false);
+});
+
+test("QA-18b: --copy and --copy-as skip a nested linked worktree but keep the rest", () => {
+  const root = repoWithNestedWorktree();
+  const kept = join(tmp(), "SKILL.md");
+  writeFileSync(kept, bash("ls keep.txt sub/.git"));
+  const dup = join(tmp(), "SKILL.md");
+  writeFileSync(dup, bash("ls .worktrees/wt1/dup.txt"));
+
+  assert.deepEqual(
+    executeFile(kept, { allowZsh: false, copyFrom: root }).findings,
+    [],
+    "ordinary files and a submodule are still copied",
+  );
+  assert.ok(
+    executeFile(dup, { allowZsh: false, copyFrom: root }).findings.some(
+      (f) => f.kind === "execution-failure",
+    ),
+    "--copy must not carry the nested worktree",
+  );
+  const dupAs = join(tmp(), "SKILL.md");
+  writeFileSync(dupAs, bash("ls seed/.worktrees/wt1/dup.txt"));
+  assert.ok(
+    executeFile(dupAs, {
+      allowZsh: false,
+      copyAs: [{ src: root, dest: "seed" }],
+    }).findings.some((f) => f.kind === "execution-failure"),
+    "--copy-as must not carry the nested worktree either",
+  );
+});
+
+test("QA-18b: a --copy root that is itself a worktree is still copied", () => {
+  const root = repoWithNestedWorktree();
+  const file = join(tmp(), "SKILL.md");
+  writeFileSync(file, bash("ls dup.txt"));
+  assert.deepEqual(
+    executeFile(file, {
+      allowZsh: false,
+      copyFrom: join(root, ".worktrees", "wt1"),
+    }).findings,
+    [],
   );
 });
 

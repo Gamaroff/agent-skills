@@ -26,16 +26,17 @@ created: 2026-05-13
 If you haven't used `git worktree` before, read this first (branch (a) depends on it):
 
 ```bash
-# Add a worktree at a sibling path, pointing at an existing branch
-git worktree add ../agent-skills-feat-x feature/feat-x
+# Add a worktree inside the repo, under the gitignored .worktrees/ directory,
+# pointing at an existing branch. Never put one beside the repo.
+git worktree add .worktrees/feat-x feature/feat-x
 
 # Now you have two checkouts of the same repo with two branches.
 # Each checkout has its own working tree — changes in one don't bleed into the other.
-cd ../agent-skills-feat-x
+cd .worktrees/feat-x
 # Run /develop-story here independently
 
-# When the branch is merged, clean up:
-git worktree remove ../agent-skills-feat-x
+# When the branch is merged, clean up (from the main checkout):
+git worktree remove .worktrees/feat-x
 ```
 
 Worktrees share the same `.git` directory — so commits, fetches, and pushes are visible across all of them immediately.
@@ -54,8 +55,8 @@ Worktrees share the same `.git` directory — so commits, fetches, and pushes ar
 - [ ] Invoke `/create-parallel-stories <epic-path>` to generate the coordination matrix and worktree setup commands.
 - [ ] Set up two worktrees — one per story branch:
   ```bash
-  git worktree add ../agent-skills-story-A feature/story.{E}.{S1}.{name}
-  git worktree add ../agent-skills-story-B feature/story.{E}.{S2}.{name}
+  git worktree add .worktrees/story-A feature/story.{E}.{S1}.{name}
+  git worktree add .worktrees/story-B feature/story.{E}.{S2}.{name}
   ```
 - [ ] Open two terminal sessions (or agent sessions). In each, `cd` to the matching worktree and run `/develop-story <story-path>`.
 - [ ] Both pipelines run independently — commits in one worktree do not affect the other.

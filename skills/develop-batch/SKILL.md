@@ -52,6 +52,7 @@ batch runs never diverge), plus one batch-only key. Every key has a default:
 | `developBatch.requireTouches`    | `false`                                          | Step 1            |
 | `developBatch.resources`         | *(unset — one implicit resource)*                | Step 2            |
 | `developBatch.worktreeSeedPaths` | `[]`                                             | Step 2            |
+| `developBatch.worktreeRoot`      | `.worktrees`                                     | Steps 0, 1, 2, 4  |
 | `developBatch.maxResumeAttempts` | `2`                                              | Steps 0, 2        |
 | `developBatch.maxRebatches`      | `3`                                              | Step 5.5          |
 
@@ -63,7 +64,10 @@ capacity, test command and optional capacity probe — see
 resource at `maxParallel` capacity, and the dispatch directive renders exactly as before.
 `worktreeSeedPaths` lists gitignored files to copy from the main tree into each fresh
 worktree (a fresh `git worktree add` carries none, which silently changes how a
-runner behaves). `maxResumeAttempts` bounds re-dispatch of an externally-interrupted item;
+runner behaves). `worktreeRoot` is the repo-relative directory that holds the batch
+worktrees: each one is `<worktreeRoot>/batch-<slug>`, **inside** the repository and
+gitignored, never a sibling of the checkout. The selector refuses an absolute root or one with
+a `..` segment. `maxResumeAttempts` bounds re-dispatch of an externally-interrupted item;
 `maxRebatches` bounds Step 5.5.
 
 `requireTouches` (default off, non-breaking) hardens the write-footprint
@@ -95,7 +99,7 @@ project's own `CLAUDE.md`/`AGENTS.md` when running these (e.g. a required prefix
       "source": "roadmap",
       "command": "/develop-task",
       "commandArg": "<path>",
-      "dir": "../wt-t40",
+      "dir": ".worktrees/batch-t40",
       "branch": "task/t40",
       "resource": "box",
       "testCommand": "ssh build-box make test",
@@ -175,7 +179,21 @@ independently via its own Phase 0b machinery.
    Create no worktrees, write no state file, dispatch nothing. Stop.
 3. `git status --porcelain` on the main tree — if it is dirty: **HALT**, list the dirty
    paths. Never stash or discard.
-4. `git worktree list` — if any `../wt-*` (or otherwise batch-owned) worktrees from a
+3a. **The worktree root must be ignored.** Worktrees live inside the repository, so an
+   unignored `<worktreeRoot>/` shows up as untracked in the main tree. The next run's dirty
+   check (step 3) would then HALT, and every search or lint that walks the tree would find
+   whole duplicate checkouts. Check, and if the root is not ignored, ignore it locally:
+
+   ```bash
+   git check-ignore -q "<worktreeRoot>/" ||
+     printf '/%s/\n' "<worktreeRoot>" >> "$(git rev-parse --git-common-dir)/info/exclude"
+   ```
+
+   `info/exclude` is local and never committed, so this changes nothing another clone sees.
+   When you had to write it, say so in the run report and recommend adding `<worktreeRoot>/` to
+   the project's `.gitignore`, and to any test-runner or linter ignore list that does not read
+   `.gitignore` (for example Jest's `testPathIgnorePatterns` or a `tsconfig` `exclude`).
+4. `git worktree list` — if any `<worktreeRoot>/batch-*` (or otherwise batch-owned) worktrees from a
    previous run are dangling with no matching run-state, **HALT** and report them for the
    operator to `git worktree remove`; never `rm -rf` a worktree directory.
 5. `git checkout <baseBranch> && git pull --ff-only origin <baseBranch>` — on non-ff or
@@ -186,7 +204,8 @@ independently via its own Phase 0b machinery.
 Run the deterministic selector — **never eyeball the roadmap**:
 
 ```bash
-node <skillsDir>/develop-next/scripts/select-next.mjs --batch --roadmap <roadmapPath>
+node <skillsDir>/develop-next/scripts/select-next.mjs --batch --roadmap <roadmapPath> \
+  --worktree-root <worktreeRoot>
 # append --require-touches when developBatch.requireTouches is true
 ```
 

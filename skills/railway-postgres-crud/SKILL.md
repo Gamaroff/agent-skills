@@ -88,7 +88,7 @@ railway variable list -e staging -s <database-service> --json \
 Read the Prisma schema to learn what tables exist, their columns, lookup
 fields, and cascade behaviour. To find the schema:
 ```bash
-find . -name "schema.prisma" -not -path "*/node_modules/*" -not -path "*/generated/*"
+find . -name "schema.prisma" -not -path "*/node_modules/*" -not -path "*/generated/*" -not -path "./.worktrees/*"
 ```
 
 **If the project does not use Prisma**, query `information_schema` directly
@@ -396,7 +396,7 @@ in production. To find what is system data:
 
 1. Locate the seed files (typically alongside the Prisma schema):
    ```bash
-   find . -name "seed*.ts" -path "*/prisma/*" -not -path "*/node_modules/*"
+   find . -name "seed*.ts" -path "*/prisma/*" -not -path "*/node_modules/*" -not -path "./.worktrees/*"
    ```
 2. System seeds use `upsert` with `update: {}` — this makes them idempotent
    and re-runnable. The tables they write to are system tables.
