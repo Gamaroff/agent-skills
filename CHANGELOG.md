@@ -11,6 +11,12 @@ All notable changes to this project will be documented in this file. Format foll
   and `.claude/skills -> ../.agents/skills`. The guide used to say Claude Code picks up `.agents/skills/`
   on its own, which it does not.
 
+### Fixed
+
+- **`setup-consumer.sh` could leave `.env` unignored.** The `.gitignore` helper checked for an
+  existing rule by substring, so a `.gitignore` holding `!.env.example` (or `.env.local`) read as
+  already ignoring `.env`, and the rule was never added. It now matches whole lines.
+
 ## [v0.56.0] - 2026-10-14
 
 ### Added
