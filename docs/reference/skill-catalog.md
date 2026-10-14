@@ -248,7 +248,7 @@ Full categorised index below.
 | `sync-github-epic` | Sync a local epic markdown file to GitHub Issues — creates the epic issue if it has no github_issue, updates it if github_issue is already… |
 | `sync-github-story` | Sync a local story markdown file to GitHub Issues — creates the story issue if it has no github_issue, updates it if github_issue is already… |
 | `sync-github-task` | Sync a local technical task markdown file to GitHub Issues — creates the task issue if it has no github_issue, updates it if github_issue is… |
-| `sync-jira-bug` | Sync a local bug report markdown file to Jira — creates the bug if it has no jira_key, updates it if jira_key is already set.… |
+| `sync-jira-bug` | Sync a local bug report markdown file to Jira — creates the bug if it has no jira_key, updates it if it has one. Handles… |
 | `tech-debt-audit` | Thorough, user-invoked tech debt and architecture audit of the current codebase. Produces TECH_DEBT_AUDIT.md with file-cited findings, severity, effort estimates, and a required "looks bad but… |
 | `test-it` | Universal autonomous test investigator, environment orchestrator, QA checklist executor, test author, and testing stack architecture documenter. |
 | `tracker-reconcile` | Re-read a committed tracker handover days later and reconcile it with the live board — tick what is already satisfied, flag what someone moved elsewhere… |
