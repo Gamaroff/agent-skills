@@ -233,7 +233,7 @@ All notable changes to this project will be documented in this file. Format foll
   `Document`/`Doc`/`Path`/`File` column when the title carries no link, so the tick and
   `develop-next`'s registry frontier both see those rows. A path there must name a work item inside
   the repository: an absolute path, a backslash, a control character or a path outside the repo
-  root makes the row malformed. A row the parser still rejects now answers `row-malformed`, with
+  root makes the row malformed. A title link that leaves the repository is now malformed too. A row the parser still rejects now answers `row-malformed`, with
   the parser's reason and line, and `--annotate` never writes a note into the document column.
 
 - **`set-qa-phase.sh` and `set-waiting-on.sh` stop when a paused run on this branch has no lock.**

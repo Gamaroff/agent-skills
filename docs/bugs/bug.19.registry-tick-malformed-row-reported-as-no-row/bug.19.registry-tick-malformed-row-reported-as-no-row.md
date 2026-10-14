@@ -195,7 +195,7 @@ collapsed the parser's rejection into "no row".
 - Suites on the merge commit: `select-next.test.mjs` 155/155, `registry-tick.test.mjs` 40/40, `skill-shape.test.mjs` 34/34; `bundle_skill.py --check` 0 problems. PR #651 CI: all five checks SUCCESS (`test` 2m59s).
 - Mutation on the merge commit: disabling the `row-malformed` branch turns the `row-malformed` test red (0 pass, 1 fail); restored.
 
-**Decision**: Closed — superseded the same day: `/finalise --bug` DoD run 1 (`bug.19.dod.1.…md`) found 4 gaps, so the bug stays Ready for QA. See Iteration 2.
+**Decision**: Reopened — `/finalise --bug` DoD run 1 (`bug.19.dod.1.…md`) found 4 gaps, so the bug stays Ready for QA. See Iteration 2.
 
 ### Iteration 2
 
@@ -219,12 +219,12 @@ DoD run 1 recorded four gaps:
 
 - `docCellPath` becomes the exported `resolveDocCell(cell, registryPath)`, which returns `{ok: true, path}` or `{ok: false, reason}`. It refuses an absolute path (leading `/` or a drive letter), a backslash, a control character, a non-work-item path, and any path that normalises outside the repo root, in both the code-span and link forms. `parseRegistry` calls it, and a refusal is a malformed row reading `document column refused: <reason>`.
 - `CHANGELOG.md` `[Unreleased]` → `### Fixed` gains the `(bug 19)` entry. `roadmap-selection.md` states the containment rule.
-- Gap 4 is handled outside this file: `/review-pr` on this iteration's PR.
+- Gap 4: `/review-pr` on PR #652 (`bug.19.pr-review.1.…md`) returned ⚠️ CONCERNS with two medium findings, both fixed here. **CR-2:** an absolute `--task-registry` path made every joined path absolute, so the `../` containment check never fired. `registryDir` now re-expresses an absolute registry path from the working directory, the base `readStatus` opens paths from. **CR-1** (pre-existing; the same input on `97e56a7a~1` gives the same result): a title link could still resolve outside the repo. It now meets the same rule and becomes a malformed row (`title link … resolves outside the repository`). PC-2 is fixed by the Decision wording above. PC-1 (#643 closed while the bug is open) is fixed by reopening #643; DoD run 2 closes it.
 
 **Files Modified**:
 
 - `skills/develop-next/scripts/select-next.mjs`, `skills/develop-next/references/roadmap-selection.md`, `CHANGELOG.md`
-- `evals/develop-next/unit/select-next.test.mjs` (3 tests)
+- `evals/develop-next/unit/select-next.test.mjs` (5 tests)
 - `bug.19.dod.2.security.cases.json` (beside this file): 18 probe cases, 11 hostile and 7 legitimate
 
 **Testing**:

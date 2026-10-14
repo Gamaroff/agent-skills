@@ -989,7 +989,7 @@ export function resolveDocCell(cell, registryPath) {
   const resolved = path.posix.normalize(
     linked || /^\.\.?\//.test(raw) ? path.posix.join(dir, raw) : raw,
   );
-  if (resolved === ".." || resolved.startsWith("../")) {
+  if (outsideRepo(resolved)) {
     return {
       ok: false,
       reason: `${JSON.stringify(raw)} resolves outside the repository`,
@@ -1000,11 +1000,22 @@ export function resolveDocCell(cell, registryPath) {
 
 /** The registry's directory, posix, repo-root-relative — what hrefs resolve against. */
 function registryDir(registryPath) {
-  return path.posix.dirname(
+  const dir = path.posix.dirname(
     String(registryPath || "")
       .split(path.sep)
       .join("/"),
   );
+  if (!path.posix.isAbsolute(dir)) return dir;
+  // An absolute registry path (`--task-registry "$PWD/…"`) is re-expressed from
+  // the working directory, the base `readStatus` opens a row's path from. Left
+  // absolute, every path joined to it is absolute too, never starts with `../`,
+  // and `outsideRepo` passes a cell that leaves the repo (bug 19 PR review, CR-2).
+  return path.relative(process.cwd(), dir).split(path.sep).join("/") || ".";
+}
+
+/** A repo-root-relative path that normalises above the root. */
+function outsideRepo(p) {
+  return p === ".." || p.startsWith("../");
 }
 
 // Documented positions, used when a registry has no recognisable header.
@@ -1218,8 +1229,22 @@ export function parseRegistry(text, kind, registryPath) {
         ? null
         : resolveDocCell(cells[c.doc] || "", registryPath);
     const docPath = docVerdict && docVerdict.ok ? docVerdict.path : null;
+    const titlePath = href
+      ? path.posix.normalize(path.posix.join(dir, href))
+      : null;
 
     const base = { kind, n, line: i + 1, raw: t };
+
+    // The title link meets the same containment rule as the document column:
+    // the selector opens whatever a row names (bug 19 PR review, CR-1 — this
+    // escape predates the document column).
+    if (titlePath && outsideRepo(titlePath)) {
+      malformed.push({
+        ...base,
+        reason: `malformed row — title link ${JSON.stringify(href)} resolves outside the repository`,
+      });
+      continue;
+    }
 
     if (cells.length < 5 || !(href || docPath) || !status) {
       malformed.push({
@@ -1240,7 +1265,7 @@ export function parseRegistry(text, kind, registryPath) {
     rows.push({
       ...base,
       title: titleCell.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").trim(),
-      path: docPath || path.posix.normalize(path.posix.join(dir, href)),
+      path: docPath || titlePath,
       registryStatus: status,
       severity:
         kind === "bug" && c.severity !== undefined

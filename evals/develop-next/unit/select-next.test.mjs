@@ -3257,3 +3257,47 @@ test("bug.19: a refused document cell is a malformed row that names the refusal"
     /^malformed row — document column refused: absolute path/,
   );
 });
+
+// ── bug.19 PR review (#652): containment does not depend on how the registry
+//    path is spelled, and the title link meets the same rule ─────────────────
+
+test("bug.19 CR-2: an absolute registry path cannot switch containment off", () => {
+  const abs = path.join(process.cwd(), REG_TASK_PATH);
+  for (const cell of [
+    "`../../../etc/task.1.x.md`",
+    "[d](../../../etc/task.1.x.md)",
+  ]) {
+    const v = resolveDocCell(cell, abs);
+    assert.equal(
+      v.ok,
+      false,
+      `${cell} must be refused with an absolute registry path`,
+    );
+    assert.match(v.reason, /outside the repository/);
+  }
+  // …and a legitimate cell still resolves, to the same repo-relative path.
+  assert.deepEqual(resolveDocCell("`./task.9.x/task.9.x.md`", abs), {
+    ok: true,
+    path: "docs/tasks/task.9.x/task.9.x.md",
+  });
+});
+
+test("bug.19 CR-1: a title link that resolves outside the repository is a malformed row", () => {
+  const p = parseRegistry(
+    taskRegistry([
+      "| 12 | [T12](../../../../etc/task.12.x.md) | planned | infra | High | 2026-10-14 | — | — |",
+      taskRow(13, "inside", "planned"),
+    ]),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.deepEqual(
+    p.rows.map((r) => r.n),
+    [13],
+  );
+  assert.equal(p.malformed[0].n, 12);
+  assert.match(
+    p.malformed[0].reason,
+    /^malformed row — title link .* resolves outside the repository$/,
+  );
+});
