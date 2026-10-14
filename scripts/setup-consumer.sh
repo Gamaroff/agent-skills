@@ -1978,9 +1978,14 @@ _make_agent_link() {
     echo -e "${YELLOW}[dry-run]${NC} would link: $link → $target" >&2
     echo linked
   else
-    mkdir -p "$(dirname "$link")"
-    ln -s "$target" "$link"
-    echo linked
+    # Checked explicitly: this runs inside `status=$(...)`, where bash turns
+    # set -e off, so a failed mkdir or ln would otherwise print "linked".
+    if mkdir -p "$(dirname "$link")" && ln -s "$target" "$link"; then
+      echo linked
+    else
+      warn "$link could not be created — see the error above" >&2
+      echo failed
+    fi
   fi
 }
 
@@ -2002,6 +2007,27 @@ _agent_linked() {
   for pair in $links; do
     [[ -L "${pair%%>*}" && "$(readlink "${pair%%>*}")" == "${pair#*>}" ]] || return 1
   done
+}
+
+# Refuse an unknown --link-agents id before any step writes. Found at step 8b,
+# a typo stopped the full wizard after steps 1-8 had already written
+# (TASK-209-BUG-2), so main() calls this first.
+_check_link_agents() {
+  [[ -n "$LINK_AGENTS" ]] || return 0
+  local -a want
+  IFS=',' read -r -a want <<<"$LINK_AGENTS"
+  local id rec found ids=""
+  for rec in "${AGENT_TABLE[@]}"; do ids+="${ids:+, }$(_agent_field "$rec" 0)"; done
+  for id in "${want[@]}"; do
+    id="${id// /}"
+    [[ -z "$id" || "$id" == none ]] && continue
+    found=false
+    for rec in "${AGENT_TABLE[@]}"; do
+      [[ "$(_agent_field "$rec" 0)" == "$id" ]] && found=true
+    done
+    $found || { err "--link-agents: unknown agent '$id'. Known: $ids"; return 1; }
+  done
+  return 0
 }
 
 link_agents() {
@@ -2204,6 +2230,9 @@ _on_exit() {
 # ── main ─────────────────────────────────────────────────────────────────────
 main() {
   trap '_on_exit' EXIT
+  # Before anything is written: nothing has been recorded yet, so _on_exit
+  # exits without a summary and the project is untouched.
+  _check_link_agents || exit 1
 
   echo ""
   if [[ "$LINKS_ONLY" == true ]]; then

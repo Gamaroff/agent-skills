@@ -262,6 +262,77 @@ test("an unknown agent id writes nothing and names the known ids", () => {
   }
 });
 
+test("an unknown id stops the FULL wizard before any step writes", () => {
+  // TASK-209-BUG-2: found at step 8b, the typo used to stop the wizard after
+  // steps 1-8 had already written config, registries and skills.
+  const dir = consumer();
+  try {
+    const before = execFileSync(
+      "git",
+      ["status", "--porcelain", "--untracked-files=all"],
+      {
+        cwd: dir,
+        encoding: "utf-8",
+      },
+    );
+    const r = spawnSync("bash", [WIZARD, "--link-agents", "claude,claud"], {
+      cwd: dir,
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    assert.notEqual(r.status, 0);
+    assert.match(strip(r.stderr), /unknown agent 'claud'/);
+    assert.doesNotMatch(
+      strip(r.stdout),
+      /Prerequisites|Setup complete|Setup failed/,
+      "no step ran",
+    );
+    const after = execFileSync(
+      "git",
+      ["status", "--porcelain", "--untracked-files=all"],
+      {
+        cwd: dir,
+        encoding: "utf-8",
+      },
+    );
+    assert.equal(after, before, "the project is untouched");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a link that cannot be made is reported as failed, never as linked", () => {
+  // TASK-209-BUG-3: inside status=$(...) set -e is off, so a failed ln printed
+  // "linked", the run said ok and the missing link was gitignored.
+  const dir = consumer({
+    seed: { ".claude": "a regular file, not a folder\n" },
+  });
+  try {
+    const r = run(dir, ["--link-agents", "claude"]);
+    const out = strip(r.out);
+    assert.match(out, /\.claude\/skills could not be created/);
+    assert.doesNotMatch(out, /\.claude\/skills → \.\.\/\.agents\/skills/);
+    assert.match(out, /Agent links\s+warn/);
+    assert.equal(
+      readFileSync(path.join(dir, ".claude"), "utf-8"),
+      "a regular file, not a folder\n",
+      ".claude is left as it was",
+    );
+    assert.doesNotMatch(
+      gitignore(dir),
+      /^\/\.claude\/skills$/m,
+      "a link not made is not ignored",
+    );
+    assert.equal(
+      linkOf(dir, "CLAUDE.md"),
+      "AGENTS.md",
+      "the other link is still made",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("an existing unanchored rule is respected, not duplicated", () => {
   const dir = consumer({ seed: { ".gitignore": "CLAUDE.md\n" } });
   try {

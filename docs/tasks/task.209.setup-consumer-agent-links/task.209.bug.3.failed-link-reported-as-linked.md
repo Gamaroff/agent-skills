@@ -4,7 +4,7 @@
 **Bug ID**: TASK-209-BUG-3
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: New
+**Status**: ✅ Ready for QA
 **Found By**: QA Engineer (cycle 2 refute pass)
 **Date Found**: 2026-10-14
 
@@ -36,8 +36,35 @@ It reports the link as made, exits 0 and writes an ignore line for a link that d
 
 Check `mkdir -p` and `ln -s` explicitly and echo a `failed` status.
 
+## Developer Fix Cycle
+
+### Iteration 1
+
+#### Investigation (New → In Progress)
+
+**Date**: 2026-10-14
+
+**Root Cause**: `_make_agent_link` runs inside `status=$(...)`, where bash disables set -e, so a failed mkdir/ln fell through to `echo linked`.
+
+#### Fix Implementation (In Progress → Ready for QA)
+
+**Date**: 2026-10-14
+
+**Fix Description**:
+
+- `mkdir -p … && ln -s …` is checked; on failure it warns "could not be created" and returns
+  `failed`, which the caller counts as a problem and does not gitignore.
+
+**Files Modified**: `scripts/setup-consumer.sh`, `shared/resources/tests/setup-consumer-agent-links.test.mjs`
+
+**Testing**: `a link that cannot be made is reported as failed, never as linked`: `.claude` as a regular file;
+  the run warns, writes no `/.claude/skills` rule, leaves `.claude` untouched and still links
+  `CLAUDE.md`. Ignoring the `ln` status turns it red.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
 | :--- | :--- | :--- | :--- |
 | 2026-10-14 | New | QA Engineer | Cycle 2 refute pass, CR-2; reproduced |
+| 2026-10-14 | In Progress | qa-fix | Root cause found |
+| 2026-10-14 | Ready for QA | qa-fix | mkdir and ln checked explicitly |
