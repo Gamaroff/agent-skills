@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+
+- **`setup-consumer.sh` could leave `.env` unignored.** The `.gitignore` helper checked for an
+  existing rule by substring, so a `.gitignore` holding `!.env.example` (or `.env.local`) read as
+  already ignoring `.env`, and the rule was never added. It now matches whole lines.
+
 ## [v0.56.0] - 2026-10-14
 
 ### Added
