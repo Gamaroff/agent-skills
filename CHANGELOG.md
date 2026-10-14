@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Changed
+
+- **Getting started now says how to link an agent to the skills (docs).** A consumer commits only
+  `AGENTS.md` and `.agents/skills/`; each user creates gitignored links such as `CLAUDE.md -> AGENTS.md`
+  and `.claude/skills -> ../.agents/skills`. The guide used to say Claude Code picks up `.agents/skills/`
+  on its own, which it does not.
+
 ## [v0.56.0] - 2026-10-14
 
 ### Added
