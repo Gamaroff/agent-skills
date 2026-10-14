@@ -5,17 +5,19 @@ type: task
 description: "A checkbox list in the setup wizard makes the local, gitignored links each picked agent needs to the one committed instruction file and skills directory, with a --link-agents flag and a --links-only mode for new clones and worktrees."
 tags: [setup-consumer, onboarding, agents-md, symlinks, gitignore]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-14
 updated: 2026-10-14
+completed_date: 2026-10-14
+pr_number: 660
 assignee:
 estimated_effort_hours: 4
 ---
 
 # Technical Task: setup-consumer.sh links each user's agents to AGENTS.md and .agents/skills
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 ---
 
@@ -191,9 +193,9 @@ the previous state.
 ### Key Findings
 The finalise run-1 gaps are closed: ids are read across newlines, and every guard has a mutation-proven test.
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 1 (historical, superseded)
 
-**Status:** IN PROGRESS
+**Status:** superseded by run 2 below
 
 - [ ] **Security**: an id after a newline in `--link-agents` is never checked and the run exits 0
 - [ ] **SC5**: record the wrap-around and pre-tick mutation proofs; make the no-terminal guard observable (clean stderr) so its mutation goes red
@@ -203,6 +205,23 @@ The finalise run-1 gaps are closed: ids are read across newlines, and every guar
 
 **Gap Report Generated:** 2026-10-14
 **Detailed Verification Log:** See `task.209.dod.1.setup-consumer-agent-links.md`.
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.209.qa.8.setup-consumer-agent-links.md` · **Gate File**: `task.209.gate.8.setup-consumer-agent-links.yml` · **Gate Status**: ✅ PASS · **Quality Score**: 100/100
+
+✅ **Success Criteria:** SC1–SC6 all pass. Every guard has a committed mutation record (qa.1, qa.3, qa.8); SC6 is the owner's Linux real-terminal run (macOS deferred to task.210); tests pass in CI.
+✅ **PR Review:** `task.209.pr-review.1.setup-consumer-agent-links.md`; acceptance PR #660 (implementation #659)
+✅ **Security Review:** PASS — 9 probes (`task.209.dod.2.security.run.json`), 0 reproduced; the run-1 newline case is refused.
+✅ **Compliance Review:** not applicable
+✅ **Documentation:** PASS — CHANGELOG Added entry; getting-started §1a, step 8b and usage (section carried from dod.1; docs unchanged since).
+
+**Task marked as ACCEPTED on:** 2026-10-14
+
+**Detailed Verification Log:** See `task.209.dod.2.setup-consumer-agent-links.md`.
 <!-- change-log-start -->
 ## Change Log
 
@@ -226,5 +245,6 @@ The finalise run-1 gaps are closed: ids are read across newlines, and every guar
 | 2026-10-14 |  | DoD incomplete — 3 gaps identified | finalise |
 | 2026-10-14 |  | QA findings fixed — finalise run-1 gaps | qa-fix |
 | 2026-10-14 |  | QA gate PASS (100/100) — cycle 8: re-QA of the DoD gap fixes | qa-task |
+| 2026-10-14 | 1.1 | DoD passed — accepted (PR #660) | finalise |
 <!-- change-log-end -->
 

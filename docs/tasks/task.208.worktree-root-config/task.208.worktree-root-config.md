@@ -5,17 +5,19 @@ type: task
 description: "Move every worktree the skills create from a sibling of the checkout to <repo>/.worktrees/<name>, behind a new developBatch.worktreeRoot key, and keep the generated worktrees out of the searches and copies the skills control."
 tags: [worktrees, develop-batch, develop-next, select-next, create-parallel-stories, configuration, gitignore]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-14
 updated: 2026-10-14
+completed_date: 2026-10-14
+pr_number: 660
 assignee:
 estimated_effort_hours: 4
 ---
 
 # Technical Task: Worktrees live inside the repo under a configurable root
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 ---
 
@@ -227,9 +229,9 @@ Phase detail: [`task.208.plan.worktree-root-config.md`](task.208.plan.worktree-r
 ### Key Findings
 The finalise run-1 gaps (AC1, AC6, develop-next docs) are closed and held per PR by tests/worktree-root-coverage.test.js.
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 1 (historical, superseded)
 
-**Status:** IN PROGRESS
+**Status:** superseded by run 2 below
 
 - [ ] **AC1**: reword to persistent worktrees (owner decision, 2026-10-14) and add a per-PR guard that no shipped skill or runbook names a sibling worktree path
 - [ ] **AC6**: a per-PR test that runs the grep/find exclusions in the three skills against a fixture with a nested `.worktrees/`, and one that `.gitignore` ignores `.worktrees/`
@@ -240,6 +242,23 @@ The finalise run-1 gaps (AC1, AC6, develop-next docs) are closed and held per PR
 
 **Gap Report Generated:** 2026-10-14
 **Detailed Verification Log:** See `task.208.dod.1.worktree-root-config.md`.
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.208.qa.6.worktree-root-config.md` · **Gate File**: `task.208.gate.6.worktree-root-config.yml` · **Gate Status**: ✅ PASS · **Quality Score**: 100/100
+
+✅ **Success Criteria:** AC1–AC7 all pass. AC1 (persistent worktrees, owner-scoped) and AC6 are held by `tests/worktree-root-coverage.test.js`; AC3 by the select-next 13b tests including real symlinks; AC5 by Step 0.3a executed in `skill-shape.test.mjs`; AC7 by CI.
+✅ **PR Review:** `task.208.pr-review.1.worktree-root-config.md`; acceptance PR #660 (implementation #657)
+✅ **Security Review:** PASS — 21 probes (`task.208.dod.1.security.run.json`), 4 low and not exploitable; selector code unchanged since run 1 (section carried from dod.1).
+✅ **Compliance Review:** not applicable
+✅ **Documentation:** PASS — CHANGELOG Changed + Fixed; develop-batch, create-parallel-stories, develop-next `--batch`, both runbooks, `.gitignore` and the configuration reference.
+
+**Task marked as ACCEPTED on:** 2026-10-14
+
+**Detailed Verification Log:** See `task.208.dod.2.worktree-root-config.md`.
 <!-- change-log-start -->
 ## Change Log
 
@@ -259,6 +278,7 @@ The finalise run-1 gaps (AC1, AC6, develop-next docs) are closed and held per PR
 | 2026-10-14 |  | Success criterion 1 scoped to persistent worktrees; QA scratch worktrees under the temp dir are out of scope (owner decision) | owner |
 | 2026-10-14 |  | QA findings fixed — finalise run-1 gaps | qa-fix |
 | 2026-10-14 |  | QA gate PASS (100/100) — cycle 6: re-QA of the DoD gap fixes | qa-task |
+| 2026-10-14 | 1.1 | DoD passed — accepted (PR #660) | finalise |
 <!-- change-log-end -->
 
 ---
