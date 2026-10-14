@@ -30,16 +30,20 @@ const read = (rel) => fs.readFileSync(path.join(REPO, rel), "utf-8");
 
 // ── AC1: no shipped skill or runbook puts a worktree beside the repository ────
 
-// A worktree path beside the repository, in every form task 208 removed:
-// `../worktrees/x`, `../tc-wt-x`, `../wt-x`; any `git worktree add|move|remove`
-// with a `../` argument, wherever it sits (`add -b x ../y`, `add "../y"`); and
-// `cd ../<name>` into a sibling, but not `cd ../..` back to the repository root.
+// A worktree path beside the repository: the literal prefixes task 208 removed
+// (`../worktrees/x`, `../tc-wt-x`, `../wt-x`), and any `git worktree
+// add|move|remove` (also `git -C dir worktree …`) with a `../` argument,
+// `../../` included. Deliberately not `cd ../<name>`: a sibling worktree
+// cannot exist without the `worktree add` line that creates it, and a `cd`
+// pattern that tells `cd ../..` (back to the repo root) from `cd ../sibling`
+// across inline-code, quoted and chained forms took three review rounds and
+// still leaked. This errs toward flagging: a line that both adds a worktree
+// inside the repo and cds `../..` is flagged, and a human reads it.
 const SIBLING = new RegExp(
   [
     /\.\.\/(?:worktrees\/|tc-wt-|wt-)/.source,
-    /\bgit worktree (?:add|move|remove)\b[^\n]*?(?:^|[\s"'=])\.\.\/(?!\.\.)/
+    /\bgit(?:\s+-C\s+\S+)?\s+worktree\s+(?:add|move|remove)\b[^\n]*?[\s"'=]\.\.\//
       .source,
-    /\bcd\s+["']?\.\.\/(?!\.\.(?:\/|\s|$))[^\s"']+/.source,
   ].join("|"),
 );
 
@@ -78,16 +82,20 @@ test("the sibling-path pattern matches what it must and nothing it must not", ()
     "git worktree add -b feature/x ../x",
     "git worktree add --detach ../x",
     'git worktree add "../x"',
+    "git worktree add ../../x",
+    "git  worktree add ../x",
+    "git -C repo worktree add ../x",
     "git worktree remove ../agent-skills-feat-x",
     "git worktree move a ../b",
-    "cd ../repo-story-1.2",
   ]) {
     assert.match(hit, SIBLING, hit);
   }
   for (const miss of [
     ".worktrees/batch-t40",
     "cd ../..",
-    "cd ../../",
+    "`cd ../..`",
+    'cd "../.."',
+    "(cd ../..)",
     "cd ../.. && git worktree list",
     "git worktree add .worktrees/x",
     "git worktree remove .worktrees/batch-x",
