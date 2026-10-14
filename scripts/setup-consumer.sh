@@ -1954,7 +1954,7 @@ _agent_field() { local IFS='|'; local -a f; read -r -a f <<<"$1"; echo "${f[$2]:
 # Make one link. Never replaces or deletes anything: an existing file, folder
 # or differently-aimed link is reported and left alone, because it may hold the
 # only copy of someone's instructions (§ 1a says how to migrate one by hand).
-# Prints one status word for the caller: linked, already, kept, missing.
+# Prints one status word for the caller: linked, already, kept, missing, failed.
 _make_agent_link() {
   local link="$1" target="$2"
   # Resolve the target by text, not through the filesystem: the link's folder
@@ -2016,16 +2016,22 @@ _check_link_agents() {
   [[ -n "$LINK_AGENTS" ]] || return 0
   local -a want
   IFS=',' read -r -a want <<<"$LINK_AGENTS"
-  local id rec found ids=""
+  local id rec ids=""
   for rec in "${AGENT_TABLE[@]}"; do ids+="${ids:+, }$(_agent_field "$rec" 0)"; done
   for id in "${want[@]}"; do
     id="${id// /}"
     [[ -z "$id" || "$id" == none ]] && continue
-    found=false
-    for rec in "${AGENT_TABLE[@]}"; do
-      [[ "$(_agent_field "$rec" 0)" == "$id" ]] && found=true
-    done
-    $found || { err "--link-agents: unknown agent '$id'. Known: $ids"; return 1; }
+    [[ -n "$(_agent_index "$id")" ]] || { err "--link-agents: unknown agent '$id'. Known: $ids"; return 1; }
+  done
+  return 0
+}
+
+# The AGENT_TABLE index of an agent id, or nothing. The one lookup both
+# _check_link_agents and link_agents use.
+_agent_index() {
+  local i
+  for i in "${!AGENT_TABLE[@]}"; do
+    [[ "$(_agent_field "${AGENT_TABLE[i]}" 0)" == "$1" ]] && { echo "$i"; return 0; }
   done
   return 0
 }
@@ -2037,25 +2043,13 @@ link_agents() {
   local rec i id
 
   if [[ -n "$LINK_AGENTS" ]]; then
-    # --link-agents a,b: no prompt. An unknown id is a typo, and guessing what
-    # was meant would link the wrong agent, so it stops the step.
+    # --link-agents a,b: no prompt. main() already refused an unknown id
+    # (_check_link_agents) before any step ran, so every id here resolves.
     local -a want; IFS=',' read -r -a want <<<"$LINK_AGENTS"
     for id in "${want[@]}"; do
       id="${id// /}"
       [[ -z "$id" || "$id" == none ]] && continue
-      local found=""
-      for i in "${!AGENT_TABLE[@]}"; do
-        [[ "$(_agent_field "${AGENT_TABLE[i]}" 0)" == "$id" ]] && found=$i
-      done
-      if [[ -z "$found" ]]; then
-        local ids=""; for rec in "${AGENT_TABLE[@]}"; do ids+="${ids:+, }$(_agent_field "$rec" 0)"; done
-        err "--link-agents: unknown agent '$id'. Known: $ids"
-        record_step "Agent links" "fail" "unknown agent: $id"
-        # Non-zero, like every other failed step: --link-agents is the flag
-        # for scripts, and a script must not read a typo as success.
-        return 1
-      fi
-      chosen+=("$found")
+      chosen+=("$(_agent_index "$id")")
     done
   else
     local defaults=""
@@ -2088,7 +2082,7 @@ link_agents() {
     return 0
   fi
 
-  local done_names="" problems=0
+  local done_names="" problems=0 failed=0
   for i in "${chosen[@]}"; do
     rec="${AGENT_TABLE[i]}"
     local name links pair status
@@ -2103,13 +2097,20 @@ link_agents() {
       case "$status" in
         linked)  ok "$name: ${pair%%>*} → ${pair#*>}"; _ignore_agent_link "${pair%%>*}" ;;
         already) ok "$name: ${pair%%>*} already linked"; _ignore_agent_link "${pair%%>*}" ;;
+        failed)  failed=$(( failed + 1 )) ;;
         *)       problems=$(( problems + 1 )) ;;
       esac
     done
     done_names+="${done_names:+, }$name"
   done
 
-  if (( problems > 0 )); then
+  # Kept and missing links are deliberate non-actions: a warning. A link that
+  # could not be made is an error: the step fails, and the run exits 1 at the
+  # end (main), after the remaining steps have run.
+  if (( failed > 0 )); then
+    record_step "Agent links" "fail" "$done_names; $failed link(s) could not be made"
+    record_warning "Agent links: $failed link(s) could not be created — see the errors above"
+  elif (( problems > 0 )); then
     record_step "Agent links" "warn" "$done_names; $problems link(s) left alone"
     record_warning "Agent links: $problems link(s) not made — see the messages above and getting-started § 1a"
   else
@@ -2227,6 +2228,14 @@ _on_exit() {
   exit $rc
 }
 
+# A run whose summary says "Setup failed" exits 1. Steps that record a fail
+# and carry on (so later steps still run) would otherwise end the run with 0,
+# which a calling script reads as success.
+_exit_on_fail() {
+  if $WIZARD_HAS_FAIL; then exit 1; fi
+  return 0
+}
+
 # ── main ─────────────────────────────────────────────────────────────────────
 main() {
   trap '_on_exit' EXIT
@@ -2248,6 +2257,7 @@ main() {
   if [[ "$LINKS_ONLY" == true ]]; then
     link_agents
     print_summary
+    _exit_on_fail
     return
   fi
 
@@ -2258,6 +2268,7 @@ main() {
     # --update never prompts; it links only when asked to by flag.
     [[ -n "$LINK_AGENTS" ]] && link_agents
     print_summary
+    _exit_on_fail
     return
   fi
 
@@ -2276,6 +2287,7 @@ main() {
   link_agents
   install_hooks
   print_summary
+  _exit_on_fail
 }
 
 # Sourcing with SETUP_CONSUMER_NO_MAIN=1 loads the function definitions without

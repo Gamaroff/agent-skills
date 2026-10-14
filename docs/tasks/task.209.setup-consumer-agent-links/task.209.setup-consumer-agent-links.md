@@ -201,5 +201,6 @@ Cycle-2 fixes verified. A failed link is still recorded as a warning ([TASK-209-
 | 2026-10-14 |  | QA gate CONCERNS (90/100) — cycle 2 refute pass: 2 medium; cycle-1 fix verified | qa-task |
 | 2026-10-14 |  | QA findings fixed — QA-209-2 (ids checked before any step), QA-209-3 (failed link reported), 1 iteration | qa-fix |
 | 2026-10-14 |  | QA gate CONCERNS (90/100) — cycle 3: 1 medium; cycle-2 fixes verified | qa-task |
+| 2026-10-14 |  | QA findings fixed — QA-209-4 (a failed link fails the step and the run), 1 iteration | qa-fix |
 <!-- change-log-end -->
 

@@ -312,7 +312,12 @@ test("a link that cannot be made is reported as failed, never as linked", () => 
     const out = strip(r.out);
     assert.match(out, /\.claude\/skills could not be created/);
     assert.doesNotMatch(out, /\.claude\/skills → \.\.\/\.agents\/skills/);
-    assert.match(out, /Agent links\s+warn/);
+    // TASK-209-BUG-4: a link that could not be made fails the step and the
+    // run, unlike a link deliberately left alone, which only warns.
+    assert.match(out, /Agent links\s+fail/);
+    assert.notEqual(r.code, 0, "a failed link fails the run");
+    assert.match(out, /Fix the error above/);
+    assert.doesNotMatch(out, /Restart your agents/);
     assert.equal(
       readFileSync(path.join(dir, ".claude"), "utf-8"),
       "a regular file, not a folder\n",
@@ -331,6 +336,29 @@ test("a link that cannot be made is reported as failed, never as linked", () => 
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("a run whose summary says Setup failed exits 1; one that warns exits 0", () => {
+  // _exit_on_fail runs at the end of every main() path: a step that records a
+  // fail and carries on must not leave the run at exit 0.
+  const run = (hasFail) =>
+    spawnSync(
+      "bash",
+      [
+        "-c",
+        `source '${WIZARD}'; WIZARD_HAS_FAIL=${hasFail}; _exit_on_fail; echo reached`,
+      ],
+      {
+        env: { ...process.env, SETUP_CONSUMER_NO_MAIN: "1" },
+        encoding: "utf-8",
+      },
+    );
+  const failed = run("true");
+  assert.equal(failed.status, 1);
+  assert.doesNotMatch(failed.stdout, /reached/);
+  const fine = run("false");
+  assert.equal(fine.status, 0);
+  assert.match(fine.stdout, /reached/);
 });
 
 test("an existing unanchored rule is respected, not duplicated", () => {

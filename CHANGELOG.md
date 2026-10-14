@@ -11,7 +11,8 @@ All notable changes to this project will be documented in this file. Format foll
   `.agents/skills/`, gitignored with anchored rules. Six of the ten need nothing and say so. It never
   replaces or deletes an existing file. `--link-agents claude,gemini` picks without the list, and
   `--links-only` runs just this step in a new clone or worktree. getting-started §1a now lists what
-  each agent needs.
+  each agent needs. An unknown agent name is refused before any step runs, and a run whose summary
+  reports a failed step now exits 1 (it used to exit 0 after, for example, invalid hook JSON).
 
 ### Changed
 

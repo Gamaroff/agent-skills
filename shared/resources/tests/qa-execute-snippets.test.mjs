@@ -2535,8 +2535,9 @@ function repoWithNestedWorktree() {
 }
 
 // QA-208-5: the .git file was parsed with a regex quadratic in whitespace
-// (40k spaces: 19 s). Linear now: doubling the input must not quadruple the
-// time, and a malformed file is still read correctly. The slow shape is a
+// (40k spaces: 19 s). Linear now: 160k spaces must read in well under a
+// second (the old regex takes minutes), and a malformed file is still read
+// correctly. The slow shape is a
 // run of spaces INSIDE the value, before a last character.
 test("QA-18b: isLinkedWorktree reads a whitespace-heavy .git file in linear time", () => {
   const dir = mkdtempSync(join(tmpdir(), "gitfile-ws-"));

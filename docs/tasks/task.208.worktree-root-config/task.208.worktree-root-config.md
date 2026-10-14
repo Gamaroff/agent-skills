@@ -237,6 +237,7 @@ Cycle-2 fixes verified. One medium in the fix prose: the `$ROOT` instruction in 
 | 2026-10-14 |  | QA gate CONCERNS (90/100) — cycle 2 refute pass: 2 medium, 1 low; cycle-1 fixes verified | qa-task |
 | 2026-10-14 |  | QA findings fixed — QA-208-3, -4 (Step 0.3a validates first, reads git exit status), QA-208-5 (linear gitdir parse), 1 iteration | qa-fix |
 | 2026-10-14 |  | QA gate CONCERNS (90/100) — cycle 3: 1 medium; cycle-2 fixes verified | qa-task |
+| 2026-10-14 |  | QA findings fixed — QA-208-6 (Step 0.3a root binding wording), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

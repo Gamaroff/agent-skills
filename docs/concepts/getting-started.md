@@ -315,7 +315,7 @@ bash setup-consumer.sh --links-only --link-agents claude,gemini   # no list (scr
 ```
 
 Without a terminal the list is skipped; use `--link-agents`. An unknown agent name stops the run with an
-error and links nothing. By hand, the links are:
+error before anything is written, and a link that cannot be created fails the run. By hand, the links are:
 
 | Id | Agent | Instruction file | Skills directory |
 | --- | --- | --- | --- |
