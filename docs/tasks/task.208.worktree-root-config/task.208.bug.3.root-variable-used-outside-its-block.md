@@ -4,7 +4,7 @@
 **Bug ID**: TASK-208-BUG-3
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle 3)
 **Date Found**: 2026-10-14
 
@@ -57,3 +57,4 @@ removing the echo turns it red.
 | 2026-10-14 | Reopened | qa-task | Not fixed by task.208.qa.4.worktree-root-config.md — the block prints nothing, so 'the value this block printed' does not exist |
 | 2026-10-14 | In Progress | qa-fix | Iteration 2 |
 | 2026-10-14 | Ready for QA | qa-fix | Block prints the normalised root; test asserts it |
+| 2026-10-14 | Closed | qa-task | Verified by task.208.qa.5.worktree-root-config.md |

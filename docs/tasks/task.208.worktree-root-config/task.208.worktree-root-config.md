@@ -208,24 +208,24 @@ Phase detail: [`task.208.plan.worktree-root-config.md`](task.208.plan.worktree-r
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-14
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.208.qa.4.worktree-root-config.md](./task.208.qa.4.worktree-root-config.md)
-- **Gate File**: [task.208.gate.4.worktree-root-config.yml](./task.208.gate.4.worktree-root-config.yml)
+- **Full Report**: [task.208.qa.5.worktree-root-config.md](./task.208.qa.5.worktree-root-config.md)
+- **Gate File**: [task.208.gate.5.worktree-root-config.yml](./task.208.gate.5.worktree-root-config.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5495 (5477 pass; 4 worktree-only failures, obs #39)
+- **Tests Executed**: 5495 at cycle 4 (5477 pass; 4 worktree-only failures, obs #39); 38 protocol tests at cycle 5
 - **Phases Verified**: 5/5
-- **Critical Issues**: 0 (1 medium)
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Step 0.3a points later steps at a value it does not print ([TASK-208-BUG-3](./task.208.bug.3.root-variable-used-outside-its-block.md), reopened).
+Five QA cycles; every medium finding fixed and verified. Low advisory items are in the gate's recommendations.
 <!-- change-log-start -->
 ## Change Log
 
@@ -240,6 +240,7 @@ Step 0.3a points later steps at a value it does not print ([TASK-208-BUG-3](./ta
 | 2026-10-14 |  | QA findings fixed — QA-208-6 (Step 0.3a root binding wording), 1 iteration | qa-fix |
 | 2026-10-14 |  | QA gate CONCERNS (90/100) — cycle 4: 1 medium (TASK-208-BUG-3 reopened) | qa-task |
 | 2026-10-14 |  | QA findings fixed — QA-208-7 (Step 0.3a prints the normalised root), 1 iteration | qa-fix |
+| 2026-10-14 |  | QA gate PASS (100/100) — cycle 5: no medium or high findings | qa-task |
 <!-- change-log-end -->
 
 ---

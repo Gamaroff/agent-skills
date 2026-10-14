@@ -1,0 +1,53 @@
+schema: 2
+task: 'task.208.worktree-root-config'
+task_title: 'Worktrees live inside the repo under a configurable root'
+gate: PASS
+status_reason: 'QA-208-7 verified: Step 0.3a prints the normalised root, the prose binds later steps to it, and the executed-block test asserts it. No medium or high findings; two low cleanups recorded.'
+reviewer: 'QA Engineer'
+head: 'fabe14f821fd84f2938129c7c5a5a3d0c29fcc51'
+updated: '2026-10-14T16:50:08Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 5495
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 11
+    notes: 'Probe record task.208.qa.2.security.run.json; root validated before any write; symlink escapes refused by the real-path check (committed tests with real links).'
+  performance:
+    status: PASS
+    notes: 'gitdir parse linear.'
+  reliability:
+    status: PASS
+    notes: 'check-ignore exit status read three ways; Step 0.3a executed by tests.'
+  maintainability:
+    status: PASS
+    notes: 'Root validated once (select-next), Step 0.3a binding explicit.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Say that the --dry-run path skips Step 0.3a and passes the raw root, which the selector normalises (cycle-5 CR-1).'
+      refs: ['skills/develop-batch/SKILL.md']
+    - action: 'Assert the worktreeRoot line on the already-ignored path too (cycle-5 CR-2).'
+      refs: ['evals/develop-batch/protocol/skill-shape.test.mjs']
+    - action: 'Advisory items from gates 2 and 3: tracked-directory root, resume re-check, stale check by basename, CLI test cwd, commondir classification, shell metacharacters in the root.'
+      refs: ['skills/develop-batch/SKILL.md', 'skills/develop-next/scripts/select-next.mjs', 'shared/resources/qa-execute-snippets.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
