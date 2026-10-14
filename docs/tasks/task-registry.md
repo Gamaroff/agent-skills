@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-10-14
-**Next Available Task Number:** **210**
+**Next Available Task Number:** **211**
 
 ## How to use
 
@@ -251,6 +251,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 207 | [Doc numbering enforcement and sweep](task.207.doc-numbering-enforcement-and-sweep/task.207.doc-numbering-enforcement-and-sweep.md) | planned | testing | Medium | 2026-10-13 | [#650](https://github.com/Gamaroff/agent-skills/issues/650) | task.204, task.205, task.206 — corpus test, no-hand-rolled-id-regex chokepoint test, prose sweep of the old flat patterns |
 | 208 | [Worktrees live inside the repo under a configurable root](task.208.worktree-root-config/task.208.worktree-root-config.md) | in-progress | infrastructure | Medium | 2026-10-14 | — | — developBatch.worktreeRoot (default .worktrees); select-next --worktree-root, develop-batch ignore + stale checks, create-parallel-stories and runbooks move worktrees into the repo; nested worktrees skipped by qa-execute-snippets --copy and root-wide searches |
 | 209 | [setup-consumer.sh links each user's agents to AGENTS.md and .agents/skills](task.209.setup-consumer-agent-links/task.209.setup-consumer-agent-links.md) | in-progress | infrastructure | Medium | 2026-10-14 | — | — checkbox list of ten agents in the wizard, --link-agents, --links-only; anchored gitignore lines; never replaces an existing file |
+| 210 | [macOS check of the setup-consumer agent checkbox list](task.210.macos-check-of-agent-checkbox-list/task.210.macos-check-of-agent-checkbox-list.md) | planned | testing | Low | 2026-10-14 | — | task.209 — real-terminal run under macOS bash 3.2 from zsh, normal and narrow widths; deferred from task.209 criterion 6
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 

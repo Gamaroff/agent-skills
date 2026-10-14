@@ -408,6 +408,14 @@ test("with no terminal and no --link-agents, the list is skipped and nothing is 
 
 // Drive the real list through a pseudo-terminal. Python's pty module is the
 // portable way to get one (Linux and macOS); keys are sent one at a time.
+// The last autowrap switch (CSI ?7 h|l) in the output: "on", "off" or "never".
+// The list turns autowrap off while it draws and must leave it on.
+function finalAutowrap(bytes) {
+  const all = [...bytes.matchAll(/\x1b\[\?7([hl])/g)];
+  if (!all.length) return "never";
+  return all.at(-1)[1] === "h" ? "on" : "off";
+}
+
 function drive(dir, keys, cols = 200) {
   const py = `
 import os, pty, sys, time, select, fcntl, termios, struct
@@ -415,8 +423,8 @@ keys = [k.encode('latin1').decode('unicode_escape').encode('latin1') for k in sy
 pid, fd = pty.fork()
 if pid == 0:
     os.execvp('bash', ['bash', sys.argv[1], '--links-only'])
-# The terminal's width, as a real window has one: a list line wider than this
-# wraps unless the list turns autowrap off.
+# A window size, for realism only: a pty never wraps, so the width that
+# decides the narrow-terminal test is the one passed to screen().
 fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack('HHHH', 40, int(sys.argv[3]), 0, 0))
 out = b''
 def drain(t):
@@ -518,6 +526,24 @@ test("the list redraws in place in a terminal narrower than its lines", () => {
       /❯/,
       "the cursor sits on the fourth item after three downs",
     );
+    assert.equal(finalAutowrap(out), "on", "autowrap is back on after enter");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("Ctrl-C in the list leaves autowrap on and links nothing", () => {
+  const dir = consumer();
+  try {
+    let out;
+    try {
+      out = drive(dir, "\\x1b[B| |\\x03");
+    } catch (e) {
+      out = String(e.stdout); // Ctrl-C ends the run non-zero
+    }
+    assert.match(strip(out), /Which agents do you use\?/);
+    assert.equal(finalAutowrap(out), "on", "autowrap is back on after Ctrl-C");
+    assert.equal(linkOf(dir, "CLAUDE.md"), null);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

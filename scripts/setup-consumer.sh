@@ -199,7 +199,7 @@ checklist() {
   # Movement uses `x=$(( … ))`, never `(( x = … ))`: the latter returns 1
   # when the result is 0, and under `set -e` wrapping past the end would end
   # the wizard.
-  trap '_checklist_restore; trap - INT; kill -INT $$' INT
+  trap '_checklist_restore; trap - INT TERM QUIT; kill -INT $$' INT TERM QUIT
   stty -echo </dev/tty
   # Cursor hidden, and autowrap OFF while the list is drawn: the redraw moves
   # up exactly one row per item, so a line wider than the terminal must be
@@ -223,7 +223,7 @@ checklist() {
       printf '\r\033[2K  %b%b %s\n' "$ptr" "$box" "${labels[i]}" >/dev/tty
     done
 
-    IFS= read -rsn1 key </dev/tty || { _checklist_restore; trap - INT; return 1; }
+    IFS= read -rsn1 key </dev/tty || { _checklist_restore; trap - INT TERM QUIT; return 1; }
     case "$key" in
       $'\033')
         IFS= read -rsn2 rest </dev/tty || rest=""
@@ -243,7 +243,7 @@ checklist() {
   done
 
   _checklist_restore
-  trap - INT
+  trap - INT TERM QUIT
   for (( i = 0; i < n; i++ )); do
     (( ticked[i] )) && CHECKLIST_RESULT+="${CHECKLIST_RESULT:+ }$i"
   done
@@ -2222,6 +2222,9 @@ print_summary() {
 _on_exit() {
   local rc=$?
   trap - EXIT
+  # The list changes the terminal (echo, cursor, autowrap); whatever ends the
+  # run while it is drawn must not leave those changes behind.
+  [[ -n "${_CL_STTY:-}" ]] && _checklist_restore
   [[ "$SUMMARY_PRINTED" == true ]] && exit $rc
   # Skip summary if nothing of substance ran (e.g. --help, prereq fail before recording)
   [[ ${#WIZARD_STEPS[@]} -eq 0 ]] && exit $rc

@@ -4,7 +4,7 @@
 **Bug ID**: TASK-209-BUG-5
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: Owner (success criterion 6, real-terminal check on Linux)
 **Date Found**: 2026-10-14
 
@@ -47,3 +47,4 @@ case) and 50: clean.
 | :--- | :--- | :--- | :--- |
 | 2026-10-14 | New | Owner | Screenshot of stacked frames from the first real-terminal run |
 | 2026-10-14 | Ready for QA | qa-fix | Autowrap off while drawing; shorter labels; narrow-terminal test |
+| 2026-10-14 | Closed | qa-task | Verified by task.209.qa.5.setup-consumer-agent-links.md; owner re-ran on Linux: works |

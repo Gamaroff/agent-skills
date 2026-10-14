@@ -148,7 +148,7 @@ See [`task.209.plan.setup-consumer-agent-links.md`](task.209.plan.setup-consumer
 - [x] Works without a terminal via `--link-agents`; skips cleanly without either
 - [x] `--links-only` covers a new clone or worktree in one command
 - [x] Tests pass and each guard is mutation-proved
-- [ ] Tried by the user in a real terminal (Linux and macOS)
+- [x] Tried by the user in a real terminal on Linux (owner, 2026-10-14 — found and fixed TASK-209-BUG-5); macOS deferred by the owner to [task.210](../task.210.macos-check-of-agent-checkbox-list/task.210.macos-check-of-agent-checkbox-list.md)
 
 ---
 
@@ -172,24 +172,24 @@ the previous state.
 
 ## QA Testing Results
 
-**QA Status**: PASS
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-14
-**Quality Score**: 100/100
-**Gate Decision**: PASS
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.209.qa.4.setup-consumer-agent-links.md](./task.209.qa.4.setup-consumer-agent-links.md)
-- **Gate File**: [task.209.gate.4.setup-consumer-agent-links.yml](./task.209.gate.4.setup-consumer-agent-links.yml)
+- **Full Report**: [task.209.qa.5.setup-consumer-agent-links.md](./task.209.qa.5.setup-consumer-agent-links.md)
+- **Gate File**: [task.209.gate.5.setup-consumer-agent-links.yml](./task.209.gate.5.setup-consumer-agent-links.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5495 (5477 pass; 4 worktree-only failures, obs #39)
+- **Tests Executed**: 172 setup-consumer tests
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **Critical Issues**: 0 (1 medium)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-All findings fixed and verified. Two low advisory items recorded. Criterion 6 (real-terminal check on Linux and macOS) is the owner's to do.
+The owner-found narrow-terminal bug is fixed and re-verified on Linux. The autowrap restore was untested ([TASK-209-BUG-6](./task.209.bug.6.autowrap-restore-untested.md)); macOS deferred to task.210.
 <!-- change-log-start -->
 ## Change Log
 
@@ -204,5 +204,8 @@ All findings fixed and verified. Two low advisory items recorded. Criterion 6 (r
 | 2026-10-14 |  | QA findings fixed — QA-209-4 (a failed link fails the step and the run), 1 iteration | qa-fix |
 | 2026-10-14 |  | QA gate PASS (100/100) — cycle 4: no medium or high findings | qa-task |
 | 2026-10-14 |  | Owner real-terminal check found stacked frames in a narrow terminal (TASK-209-BUG-5); fixed, 1 iteration | qa-fix |
+| 2026-10-14 |  | QA gate CONCERNS (90/100) — cycle 5: owner-found BUG-5 verified; 1 medium (BUG-6) | qa-task |
+| 2026-10-14 |  | Criterion 6: Linux verified by the owner; macOS deferred to task.210 (owner decision) | owner |
+| 2026-10-14 |  | QA findings fixed — QA-209-5 (autowrap restore tested; TERM/QUIT/EXIT restore), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
