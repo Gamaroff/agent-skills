@@ -612,7 +612,7 @@ merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
      when dirty (a crash between the write and its commit leaves the row edited; the resume path
      skips the dirty-tree check), then `git push origin <baseBranch>` once, regardless (a crash
      between commit and push leaves the record local-only; the push is idempotent), then
-     `ticked: true`; every other exit-0 reason (`no-row`,
+     `ticked: true`; every other exit-0 reason (`no-row`, `row-malformed`,
      `no-registry`, `no-cell`, `not-accepted`, `not-a-task`, `engine-unavailable`) → log, no commit.
    - **`source: bug-registry`** — the bug registry has no Issue or notes cell and
      `develop-bug` already closed the row: log `bug-registry: nothing to write`, no commit.

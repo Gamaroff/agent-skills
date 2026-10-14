@@ -1250,6 +1250,7 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    | `not-accepted` | The document's status is not `accepted` | Investigate — step 2 above should have set it |
    | `no-registry` | This project keeps no task registry | Nothing |
    | `no-row` | The registry has no row for this task | **Log it.** CI's drift check will fail on this |
+   | `row-malformed` | The registry has a row for this task, but the parser rejected its shape — `parserReason` and `line` say why and where | **Log it and tick by hand.** Fix the row's shape so the next tick works |
    | `ambiguous-row` | The Status column could not be identified | **Log it and tick by hand** |
    | `engine-unavailable` | The registry parser could not be located | **Log it and tick by hand** |
 
@@ -2328,7 +2329,7 @@ EOF
 
 - [ ] Running summary file finalized — `## Verification Complete` appended with `**Final Status:** ✅ ACCEPTED`, and that is the file's only status line (the header carries none)
 - [ ] Story frontmatter updated: `status: accepted`, `updated`, `completed_date`, `pr_number`
-- [ ] Task only: registry row ticked — `registry-tick.js` reported `ticked` / `already` / `no-registry` (a `no-row`, `ambiguous-row` or `engine-unavailable` needs a manual tick before merge, or CI's drift check fails)
+- [ ] Task only: registry row ticked — `registry-tick.js` reported `ticked` / `already` / `no-registry` (a `no-row`, `row-malformed`, `ambiguous-row` or `engine-unavailable` needs a manual tick before merge, or CI's drift check fails)
 - [ ] DoD PASSED section added to story document body
 - [ ] Running summary referenced in DoD section
 - [ ] Sprint Review summary file created at `{story-directory}/sprint-review-summary.md`

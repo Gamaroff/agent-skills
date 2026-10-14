@@ -33,6 +33,7 @@ const {
   selectBatch,
   parseTouches,
   parseRegistry,
+  DOC_COLUMN_NAMES,
   parseFrontmatterStatus,
   storyBranchModel,
   registryFrontier,
@@ -3056,4 +3057,123 @@ test("bug.18 CLI: --batch excludes an epic-integration story found on disk", () 
   );
   assert.equal(r.excluded[0].id, "9.1");
   assert.match(r.excluded[0].reason, /^epic-integration:/);
+});
+
+// ── bug.19: a plain-title registry with a document-path column parses ────────
+
+// The consumer shape from GitHub #643: plain-text title, the path in a column
+// of its own, and columns the parser does not know (`Icon`, `Tracker`).
+function docColumnRegistry(rows) {
+  return [
+    "| # | Title | Category | Priority | Icon | Status | Tracker | Document |",
+    "|---|---|---|---|---|---|---|---|",
+    ...rows,
+    "",
+  ].join("\n");
+}
+const docColumnRow = (n, status, docCell) =>
+  `| ${n} | Plain title ${n} | infrastructure | High | ⚠️ | ${status} | X-${n} | ${docCell} |`;
+
+test("bug.19: a code-span path in a Document column is read from the repo root", () => {
+  const p = parseRegistry(
+    docColumnRegistry([
+      docColumnRow(7, "ready-for-review", "`docs/tasks/task.7.x/task.7.x.md`"),
+    ]),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.deepEqual(p.malformed, []);
+  assert.equal(p.rows.length, 1);
+  assert.equal(p.rows[0].n, 7);
+  assert.equal(p.rows[0].title, "Plain title 7");
+  assert.equal(p.rows[0].path, "docs/tasks/task.7.x/task.7.x.md");
+  assert.equal(p.rows[0].registryStatus, "ready-for-review");
+  assert.equal(p.rows[0].priority, "High");
+});
+
+test("bug.19: a link or a ./-relative path in the Document column resolves against the registry", () => {
+  const p = parseRegistry(
+    docColumnRegistry([
+      docColumnRow(8, "planned", "[doc](task.8.x/task.8.x.md)"),
+      docColumnRow(9, "planned", "`./task.9.x/task.9.x.md`"),
+    ]),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.deepEqual(
+    p.rows.map((r) => r.path),
+    ["docs/tasks/task.8.x/task.8.x.md", "docs/tasks/task.9.x/task.9.x.md"],
+  );
+});
+
+test("bug.19: the title's link wins over the Document column", () => {
+  const p = parseRegistry(
+    [
+      "| # | Title | Status | Priority | Document |",
+      "|---|---|---|---|---|",
+      "| 4 | [T4](task.4.link/task.4.link.md) | planned | High | `docs/tasks/task.4.other/task.4.other.md` |",
+      "",
+    ].join("\n"),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.equal(p.rows[0].path, "docs/tasks/task.4.link/task.4.link.md");
+});
+
+test("bug.19: a Document cell that names no work item is still a malformed row, and says which column it read", () => {
+  const p = parseRegistry(
+    docColumnRegistry([
+      docColumnRow(5, "planned", "`docs/notes/readme.md`"),
+      docColumnRow(6, "planned", "—"),
+    ]),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.deepEqual(p.rows, []);
+  assert.deepEqual(
+    p.malformed.map((m) => m.n),
+    [5, 6],
+  );
+  for (const m of p.malformed) {
+    assert.match(m.reason, /no work-item path in the document column/);
+  }
+});
+
+test("bug.19: a registry with no document column keeps the original malformed reason", () => {
+  const p = parseRegistry(
+    taskRegistry([
+      "| 2 | No link at all | ready-for-development | infra | High | 2026-08-29 | — | — |",
+    ]),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.equal(
+    p.malformed[0].reason,
+    "malformed row — no [title](story|task|bug.….md) link",
+  );
+});
+
+test("bug.19: the registry frontier selects a row from a Document-column registry", () => {
+  const { opts } = registryOpts({
+    tasks: docColumnRegistry([
+      docColumnRow(
+        7,
+        "ready-for-development",
+        "`docs/tasks/task.7.x/task.7.x.md`",
+      ),
+    ]),
+    docs: { "docs/tasks/task.7.x/task.7.x.md": "ready-for-development" },
+  });
+  const sel = registryFrontier(opts.registries);
+  assert.equal(sel.selected?.id, "T7");
+});
+
+test("bug.19: DOC_COLUMN_NAMES lists the header names the parser maps to the document column", () => {
+  assert.deepEqual([...DOC_COLUMN_NAMES].sort(), [
+    "doc",
+    "document",
+    "file",
+    "path",
+  ]);
+  assert.ok(Object.isFrozen(DOC_COLUMN_NAMES));
 });
