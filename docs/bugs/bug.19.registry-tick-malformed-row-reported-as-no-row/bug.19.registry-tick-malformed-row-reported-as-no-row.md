@@ -195,7 +195,47 @@ collapsed the parser's rejection into "no row".
 - Suites on the merge commit: `select-next.test.mjs` 155/155, `registry-tick.test.mjs` 40/40, `skill-shape.test.mjs` 34/34; `bundle_skill.py --check` 0 problems. PR #651 CI: all five checks SUCCESS (`test` 2m59s).
 - Mutation on the merge commit: disabling the `row-malformed` branch turns the `row-malformed` test red (0 pass, 1 fail); restored.
 
-**Decision**: Closed
+**Decision**: Closed — superseded the same day: `/finalise --bug` DoD run 1 (`bug.19.dod.1.…md`) found 4 gaps, so the bug stays Ready for QA. See Iteration 2.
+
+### Iteration 2
+
+#### Investigation (Reopened by DoD run 1)
+
+**Date**: 2026-10-14
+**Developer**: agent session
+
+DoD run 1 recorded four gaps:
+
+1. `CHANGELOG.md` `[Unreleased]` had no `(bug 19)` entry.
+2. The document column accepted an absolute path. `/etc/task.1.x.md` resolved to `/etc/task.1.x.md`, where a title link with the same href is joined under the registry directory. Confirmed in memory against `97e56a7a`. A `../` escape out of the repo was also possible; title links allow that too, and they are not changed here.
+3. Security probe zero-guard: no engine form could score `parseRegistry`, which returns `{rows, malformed}`, and `docCellPath` was not exported.
+4. PR #651 had no review.
+
+#### Fix Implementation (Reopened → Ready for QA)
+
+**Date**: 2026-10-14
+
+**Fix Description**:
+
+- `docCellPath` becomes the exported `resolveDocCell(cell, registryPath)`, which returns `{ok: true, path}` or `{ok: false, reason}`. It refuses an absolute path (leading `/` or a drive letter), a backslash, a control character, a non-work-item path, and any path that normalises outside the repo root, in both the code-span and link forms. `parseRegistry` calls it, and a refusal is a malformed row reading `document column refused: <reason>`.
+- `CHANGELOG.md` `[Unreleased]` → `### Fixed` gains the `(bug 19)` entry. `roadmap-selection.md` states the containment rule.
+- Gap 4 is handled outside this file: `/review-pr` on this iteration's PR.
+
+**Files Modified**:
+
+- `skills/develop-next/scripts/select-next.mjs`, `skills/develop-next/references/roadmap-selection.md`, `CHANGELOG.md`
+- `evals/develop-next/unit/select-next.test.mjs` (3 tests)
+- `bug.19.dod.2.security.cases.json` (beside this file): 18 probe cases, 11 hostile and 7 legitimate
+
+**Testing**:
+
+- Unit: `resolveDocCell` refuses 10 cell shapes, each with its reason; it resolves 6 legitimate spellings; a refused cell becomes a malformed row naming the refusal. `select-next.test.mjs` and `registry-tick.test.mjs`: 198/198.
+- Mutation proofs, each restored after. Removing the absolute check turns 2 tests red. Removing the outside-repo check turns 1 red. Removing the control-character/backslash check turns 1 red.
+- Security probe: `security-probe.mjs --cases-file bug.19.dod.2.security.cases.json --entry skills/develop-next/scripts/select-next.mjs#resolveDocCell --args-json '["docs/tasks/task-registry.md"]'` gave `engages`: 18 executed, 0 reproduced, 0 over-blocked. With the absolute check removed it gave `present-but-inert`, reproducing `absolute-code-span`, `absolute-link` and `drive-letter`. Two cases were wrong as first written and the probe exposed both: `../outside/…` and `../../task.1.x.md` resolve inside the repo from `docs/tasks/`. They were corrected, not the code.
+
+#### QA Verification (Ready for QA → Closed/Reopened)
+
+[Pending — `/finalise --bug` DoD run 2]
 
 ---
 
@@ -206,6 +246,7 @@ collapsed the parser's rejection into "no row".
 | 2026-10-14 | New    | —          | Bug created from GitHub #643            |
 | 2026-10-14 | Ready for QA | —    | Fix implemented; bundle pending         |
 | 2026-10-14 | Ready for QA | finalise | DoD incomplete — 4 gap(s) — bug.19.dod.1.registry-tick-malformed-row-reported-as-no-row.md |
+| 2026-10-14 | Ready for QA | — | Iteration 2 — DoD run 1 gaps 1–3 fixed; review pending |
 
 ---
 

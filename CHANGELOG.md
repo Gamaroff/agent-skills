@@ -226,6 +226,16 @@ All notable changes to this project will be documented in this file. Format foll
   worktree is cut from and rebased onto the base branch, and names any story whose epic it cannot
   find in `lint.warnings`. `/develop-next` runs the excluded stories instead.
 
+- **`registry-tick` no longer reports a rejected row as missing, and a registry can keep its document
+  path in its own column (bug 19).** A task registry with a plain-text title and the path in a
+  `Document` column had every row rejected by the shared parser, and `registry-tick` reported
+  each as `no-row`, so `/finalise` never ticked it. `parseRegistry` now reads a
+  `Document`/`Doc`/`Path`/`File` column when the title carries no link, so the tick and
+  `develop-next`'s registry frontier both see those rows. A path there must name a work item inside
+  the repository: an absolute path, a backslash, a control character or a path outside the repo
+  root makes the row malformed. A row the parser still rejects now answers `row-malformed`, with
+  the parser's reason and line, and `--annotate` never writes a note into the document column.
+
 - **`set-qa-phase.sh` and `set-waiting-on.sh` stop when a paused run on this branch has no lock.**
   After a compaction, the summary carried the pre-pause lock state, the session never ran `--restore`,
   and both helpers no-oped silently until Step 7 (task.185). They now exit 1 naming

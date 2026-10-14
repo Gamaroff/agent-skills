@@ -952,17 +952,58 @@ export const DOC_COLUMN_NAMES = Object.freeze(
  * written in prose, and how the registries that use this shape write it — unless
  * it opens with `./` or `../`, which says "relative to here".
  *
- * @returns {string|null} a repo-root-relative posix path, or null
+ * **The result must name a file inside the repository, or the cell is refused.**
+ * The selector reads the frontmatter of whatever path a row names, so this is a
+ * path boundary. An absolute path (`/etc/task.1.x.md`, `C:/…`), a backslash, a
+ * control character, or a path that normalises to outside the repo root
+ * (`../…`) is a refusal, never a resolution. A title link cannot name an
+ * absolute path because it is joined under the registry directory; without this
+ * check the document column was the laxer of the two (bug 19, DoD run 1).
+ *
+ * Exported, and shaped as a verdict, so the security probe engine can score it:
+ * `{ ok: false }` is a refusal to that engine.
+ *
+ * @param {string} cell raw document-column cell text
+ * @param {string} registryPath repo-root-relative registry path
+ * @returns {{ok: true, path: string} | {ok: false, reason: string}}
  */
-function docCellPath(cell, dir) {
-  const linked = [...cell.matchAll(MD_LINK_RE)]
+export function resolveDocCell(cell, registryPath) {
+  const dir = registryDir(registryPath);
+  const text = String(cell ?? "");
+  const linked = [...text.matchAll(MD_LINK_RE)]
     .map((m) => m[1])
     .find(isWorkItemHref);
-  if (linked) return path.posix.normalize(path.posix.join(dir, linked));
-  const raw = cell.replace(/^`+|`+$/g, "").trim();
-  if (/\s/.test(raw) || !isWorkItemHref(raw)) return null;
-  return path.posix.normalize(
-    /^\.\.?\//.test(raw) ? path.posix.join(dir, raw) : raw,
+  const raw = linked || text.replace(/^`+|`+$/g, "").trim();
+  // Refused before any path arithmetic, because each makes "where does this
+  // point" depend on more than the string: a NUL truncates at the syscall, a
+  // backslash is a separator on one platform and a character on another.
+  if (/[\u0000-\u001f\u007f\\]/.test(raw)) {
+    return { ok: false, reason: "control character or backslash in path" };
+  }
+  if (/^\//.test(raw) || /^[a-z]:/i.test(raw)) {
+    return { ok: false, reason: `absolute path ${JSON.stringify(raw)}` };
+  }
+  if (!linked && (/\s/.test(raw) || !isWorkItemHref(raw))) {
+    return { ok: false, reason: "no work-item path" };
+  }
+  const resolved = path.posix.normalize(
+    linked || /^\.\.?\//.test(raw) ? path.posix.join(dir, raw) : raw,
+  );
+  if (resolved === ".." || resolved.startsWith("../")) {
+    return {
+      ok: false,
+      reason: `${JSON.stringify(raw)} resolves outside the repository`,
+    };
+  }
+  return { ok: true, path: resolved };
+}
+
+/** The registry's directory, posix, repo-root-relative — what hrefs resolve against. */
+function registryDir(registryPath) {
+  return path.posix.dirname(
+    String(registryPath || "")
+      .split(path.sep)
+      .join("/"),
   );
 }
 
@@ -1077,11 +1118,7 @@ export function parseRegistry(text, kind, registryPath) {
   if (typeof text !== "string" || !text.trim())
     return { rows, malformed, warnings };
 
-  const dir = path.posix.dirname(
-    String(registryPath || "")
-      .split(path.sep)
-      .join("/"),
-  );
+  const dir = registryDir(registryPath);
   const defaults = DEFAULT_COLUMNS[kind] || DEFAULT_COLUMNS.task;
   const lines = text.split(/\r?\n/);
   let fenced = false;
@@ -1176,8 +1213,11 @@ export function parseRegistry(text, kind, registryPath) {
     // The title's link wins; the document-path column is read only when the
     // title carries none, so a registry that has both cannot disagree with
     // itself about which file a row names.
-    const docPath =
-      href || c.doc === undefined ? null : docCellPath(cells[c.doc] || "", dir);
+    const docVerdict =
+      href || c.doc === undefined
+        ? null
+        : resolveDocCell(cells[c.doc] || "", registryPath);
+    const docPath = docVerdict && docVerdict.ok ? docVerdict.path : null;
 
     const base = { kind, n, line: i + 1, raw: t };
 
@@ -1187,7 +1227,9 @@ export function parseRegistry(text, kind, registryPath) {
         reason: !(href || docPath)
           ? c.doc === undefined
             ? "malformed row — no [title](story|task|bug.….md) link"
-            : "malformed row — no [title](story|task|bug.….md) link and no work-item path in the document column"
+            : docVerdict.reason === "no work-item path"
+              ? "malformed row — no [title](story|task|bug.….md) link and no work-item path in the document column"
+              : `malformed row — document column refused: ${docVerdict.reason}`
           : !status
             ? "malformed row — empty status cell"
             : `malformed row — ${cells.length} cells, expected at least 5`,
