@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.56.0] - 2026-10-14
+
 ### Added
 
 - **Develop pipelines take their answers and their speed up front (task.201).** `/develop-story`,
