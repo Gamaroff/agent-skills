@@ -999,6 +999,38 @@ test("13b: CLI --batch refuses a root that is a symlink out of the repo", () => 
   });
 });
 
+test("13b: --check-root prints the normalised root, or refuses with exit 1", () => {
+  const base = mkdtempSync(path.join(os.tmpdir(), "wt-check-root-"));
+  const repo = path.join(base, "repo");
+  mkdirSync(repo);
+  mkdirSync(path.join(base, "outside"));
+  symlinkSync(path.join(base, "outside"), path.join(repo, ".wt"));
+  const run = (root) => {
+    try {
+      const out = execFileSync(
+        process.execPath,
+        [SCRIPT, "--check-root", root],
+        {
+          cwd: repo,
+          encoding: "utf-8",
+          stdio: "pipe",
+        },
+      );
+      return { code: 0, out };
+    } catch (e) {
+      return { code: e.status, out: String(e.stdout), err: String(e.stderr) };
+    }
+  };
+  assert.deepEqual(run("./.worktrees/"), { code: 0, out: ".worktrees\n" });
+  assert.deepEqual(run("build//wt"), { code: 0, out: "build/wt\n" });
+  for (const bad of ["../outside", "/abs", "wt\nx", ".wt", ""]) {
+    const r = run(bad);
+    assert.equal(r.code, 1, `${JSON.stringify(bad)} must be refused`);
+    assert.equal(r.out, "", "a refused root prints nothing on stdout");
+    assert.match(r.err, /refused/);
+  }
+});
+
 // ── 14: /develop-bug rows are first-class runnable work ──────────────────────
 //
 // Before this, the selector reached `/develop-story` and `/develop-task` rows

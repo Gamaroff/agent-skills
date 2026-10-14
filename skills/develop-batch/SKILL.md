@@ -182,14 +182,26 @@ independently via its own Phase 0b machinery.
 3a. **The worktree root must be ignored.** Worktrees live inside the repository, so an
    unignored `<worktreeRoot>/` shows up as untracked in the main tree. The next run's dirty
    check (step 3) would then HALT, and every search or lint that walks the tree would find
-   whole duplicate checkouts. Check, and if the root is not ignored, ignore it locally:
+   whole duplicate checkouts. Validate the root **first** — this step writes a file, and Step 1's
+   selector call is too late to stop it — then check, and if the root is not ignored, ignore it
+   locally:
 
    ```bash
-   git check-ignore -q "<worktreeRoot>/" ||
-     printf '/%s/\n' "<worktreeRoot>" >> "$(git rev-parse --git-common-dir)/info/exclude"
+   # The selector prints the normalised root, or refuses (exit 1, reason on stderr): an absolute
+   # path, a `..`, a control character, or a symlink that leads outside the repository.
+   ROOT=$(node <skillsDir>/develop-next/scripts/select-next.mjs --check-root "<worktreeRoot>") \
+     || { echo "HALT: worktreeRoot refused (see the selector's message above)"; exit 1; }
+   # 0 = ignored, 1 = not ignored. Anything else means git could not answer, and must not be
+   # read as "not ignored" — that wrote a junk pattern and reported the root as handled.
+   git check-ignore -q "$ROOT/"; rc=$?
+   case "$rc" in
+     0) ;;
+     1) printf '/%s/\n' "$ROOT" >> "$(git rev-parse --git-common-dir)/info/exclude" ;;
+     *) echo "HALT: git check-ignore could not evaluate $ROOT/ (exit $rc)"; exit 1 ;;
+   esac
    ```
 
-   `info/exclude` is local and never committed, so this changes nothing another clone sees.
+   Use the printed `$ROOT`, not the raw config value, everywhere below. `info/exclude` is local and never committed, so this changes nothing another clone sees.
    When you had to write it, say so in the run report and recommend adding `<worktreeRoot>/` to
    the project's `.gitignore`, and to any test-runner or linter ignore list that does not read
    `.gitignore` (for example Jest's `testPathIgnorePatterns` or a `tsconfig` `exclude`).

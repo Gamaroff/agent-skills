@@ -1613,8 +1613,14 @@ export function isLinkedWorktree(dir) {
   } catch {
     return false;
   }
-  const m = /^gitdir:\s*(.+?)\s*$/m.exec(text);
-  return !!m && /[\\/]worktrees[\\/][^\\/]+$/.test(m[1]);
+  // git writes one line, `gitdir: <path>`. Read it with indexOf and trim,
+  // never a backtracking regex: `^gitdir:\s*(.+?)\s*$` was quadratic in the
+  // whitespace of a malformed file, and this runs on every nested .git file.
+  const nl = text.indexOf("\n");
+  const line = (nl === -1 ? text : text.slice(0, nl)).trim();
+  if (!line.startsWith("gitdir:")) return false;
+  const target = line.slice("gitdir:".length).trim();
+  return /[\\/]worktrees[\\/][^\\/]+$/.test(target);
 }
 
 /**

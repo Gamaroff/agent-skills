@@ -19,6 +19,7 @@
  *   select-next.mjs --batch [--roadmap <path>]              # parallel worktree batch
  *   select-next.mjs --batch --require-touches [...]         # defer un-annotated rows
  *   select-next.mjs --batch --worktree-root <dir> [...]     # worktree parent (default .worktrees)
+ *   select-next.mjs --check-root <dir>                      # print the normalised root, or exit 1
  *   select-next.mjs --lint [--roadmap <path>]               # format lint + registry frontier
  *   select-next.mjs [--bug-registry <p>] [--task-registry <p>]  # override registry paths
  *
@@ -1930,6 +1931,12 @@ function parseArgs(argv) {
       case "--require-touches":
         args.requireTouches = true;
         break;
+      case "--check-root":
+        // Validate a root and print it normalised, without reading a roadmap:
+        // develop-batch runs this BEFORE it writes the root into
+        // .git/info/exclude, so a refused root leaves nothing behind.
+        args.checkRoot = argv[++i] ?? "";
+        break;
       case "--worktree-root": {
         const root = normaliseWorktreeRoot(argv[++i]);
         if (root === null) {
@@ -1969,6 +1976,18 @@ function main() {
   const args = parseArgs(process.argv.slice(2));
   // parseArgs returns null when it has already reported a bad argument.
   if (args === null) return;
+  if (args.checkRoot !== undefined) {
+    const root = normaliseWorktreeRoot(args.checkRoot);
+    if (root === null || worktreeRootEscapes(root, process.cwd())) {
+      process.stderr.write(
+        `select-next: worktree root ${JSON.stringify(args.checkRoot)} refused — it must be a path inside the repository (relative, no "..", no control characters, no symlink leading out)\n`,
+      );
+      process.exitCode = 1;
+      return;
+    }
+    process.stdout.write(root + "\n");
+    return;
+  }
   let text;
   try {
     text = fs.readFileSync(args.roadmap, "utf-8");
