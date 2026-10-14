@@ -42,6 +42,15 @@ jobs:
       - name: Install PyYAML
         run: pip install pyyaml
 
+      # The same tools test.yml installs, for the same suite. tests/ci-tool-skips.test.js fails
+      # under CI when a tool a suite probes for is missing, so a release job that runs `npm test`
+      # without them is red where test.yml is green. v0.56.0's first run failed here: test.yml had
+      # gained zsh and this job had not. Keep the two lists equal.
+      - name: Install awk variants and zsh
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gawk mawk zsh
+
       - name: Install npm deps
         run: npm ci || npm install
 
