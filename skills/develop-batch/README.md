@@ -31,6 +31,12 @@ these tags via a `touches:` annotation; the vocabulary (the conflict-footprint r
 project-specific and lives in the roadmap's Legend. An **un-annotated row is treated as
 `+own`** (no shared resource) — optimistic, so annotate new rows as you add them.
 
+A third rule sits beside the two axes: **a story whose epic declares
+`branch_model: epic-integration` is never batched.** A batch worktree is cut from, and
+rebased onto, the base branch, which would land the story outside its epic's integration
+branch. The selector puts it in `excluded[]` with an `epic-integration:` reason, and you run
+it with `/develop-next` instead (bug.18).
+
 ## One-time setup (before the first unattended run)
 
 1. **Linked-worktree-safe `create-branch`** — this skill runs pipelines inside worktrees

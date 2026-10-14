@@ -34,6 +34,20 @@ Hooks noop outside pipeline runs — zero overhead when no `.claude/state/develo
 
 ---
 
+## Invocation Flags — Answer Up Front
+
+`/develop-bug <path> [--defaults] [--branch-model bugfix|hotfix] [--base <branch>] [--target <branch>]`
+
+- `--defaults` takes §0d's **(Recommended)** option for every question nothing else answers.
+- `--branch-model` answers Q1; `--base` / `--target` must match it, or the question is asked with the
+  conflict stated.
+- `--mode` and `--skip` are refused here with the reason: this pipeline has its own lite rule and no QA
+  gate to record a waiver in.
+
+Resolution order: `references/develop-bug-step-0-resolve-bug.md` §0d.
+
+---
+
 ## Phase 0: Resolve & Prepare
 
 See [`references/develop-bug-step-0-resolve-bug.md`](references/develop-bug-step-0-resolve-bug.md) for the full resolve-and-prepare protocol: bug-file resolution across the three modes (0a), pipeline lock state check (0b), upfront context reading — severity/priority/status/related/reproduction, plus lite-mode detection (0c), upfront prompts via AskUserQuestion (0d — **Q1 branch model** bugfix-vs-hotfix, **Q2 base branch**, **Q3 PR target**, each with an auto-derived recommended option), implementation report creation (0e), and pre-flight summary (0f).
@@ -130,7 +144,7 @@ When a step dispatches subagents, persist their summaries per [`references/subag
 Every step ends with the same four actions, executed _in order, with no text output between them_:
 
 1. **Bash tool call** advancing the lock to the next step: `bash .agents/skills/develop-bug/references/advance-pipeline-lock.sh {N+1}`. **This must be the first call** — it anchors the orchestrator into "still working" mode and signals the `Stop` hook that the pipeline advanced. After Step 8, issue `--complete` instead of a number (a numeric advance with no lock is an error): Step 8's Completion Checklist already ran `--complete` as its last action, so this one is a no-op — the helper exits 0 when there is no lock (task 161). Idempotent — a sub-skill normally self-advances the lock, so this re-advance noops.
-2. **Edit the implementation report** Pipeline Progress row for the just-completed step (`✅ Done`), then **read it back**. **After Step 8 this edit is a no-op:** Step 8 set its own row to `✅ Done` before its commit (step-8 doc § Final Implementation Report Update), and the Completion Checklist's check 5 has already required a clean tree, so any change here would be uncommitted dirt. Confirm the row is finished by check 4's own test (its Status cell starts with `✅`, or reads `⏭️ Skipped`) and change nothing (task 160). A row that fails that test after Step 8 is a **HALT, not an edit**: the Completion Checklist should have refused it, so something wrote the report after the checklist ran. The read-back is lint call site (1) of the four the report-lint contract names, and it is a tool call, not prose:
+2. **Edit the implementation report** Pipeline Progress row for the just-completed step (`✅ Done`) — and, when its `Completed (UTC)` cell is empty, write `date -u +%Y-%m-%dT%H:%MZ` into it; a resumed step keeps the time it first finished, so never overwrite a filled cell (task.201) — then **read it back**. **After Step 8 this edit is a no-op:** Step 8 set its own row to `✅ Done` before its commit (step-8 doc § Final Implementation Report Update), and the Completion Checklist's check 5 has already required a clean tree, so any change here would be uncommitted dirt. Confirm the row is finished by check 4's own test (its Status cell starts with `✅`, or reads `⏭️ Skipped`) and change nothing (task 160). A row that fails that test after Step 8 is a **HALT, not an edit**: the Completion Checklist should have refused it, so something wrote the report after the checklist ran. The read-back is lint call site (1) of the four the report-lint contract names, and it is a tool call, not prose:
 
    ```bash
    command node .agents/skills/develop-bug/references/report-lint.js --file "{implementation-report-path}" --json; rc=$?
@@ -192,7 +206,7 @@ Follow the generic mechanics in [`references/develop-pipeline-step-1-create-bran
 
 - **work item** = the bug file; **work-item dir** = the bug directory; **id** = the bug prefix (`story.{e}.{s}.bug.{n}` / `task.{id}.bug.{n}` / `bug.{N}`).
 - **Branch base and type** come from Phase 0d:
-  - **Bugfix** (default) → invoke `/create-branch` with the bug file; select `develop` as the base when asked (Q2 answer).
+  - **Bugfix** (default) → invoke `/create-branch` with the bug file; select `develop` as the base when asked (Q2 answer). The branch is `bugfix/{bug file stem}` (create-branch's **Bugfix** row, e.g. `bugfix/task.110.bug.1.whitelist-admits-mutating-shapes`): never a shortened or re-separated form.
   - **Hotfix** (Q1 = production hotfix) → invoke `/create-branch --hotfix v{X.Y.Z}` (branch off `main`). The version is the Q-derived next patch; if unknown, ask once during Step 1.
 - **Ensure a tracker issue** (runs *before* the lock is written, so the lock records a real issue rather than an empty field it then contradicts). Branch on `TRACKER`:
   - `TRACKER=jira` → invoke `ensure-bug-jira-issue` with `BUG_FILE_PATH={bug file}`. On return `BUG_JIRA_KEY` is a key or empty.

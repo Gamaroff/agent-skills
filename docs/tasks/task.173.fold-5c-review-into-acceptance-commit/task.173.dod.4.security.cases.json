@@ -1,0 +1,314 @@
+[
+  {
+    "id": "nul-md-suffix",
+    "direction": "hostile",
+    "input": "src/a.js\u0000.md",
+    "why": "git cuts the argv at NUL and sees src/a.js (DoD run 3)"
+  },
+  {
+    "id": "nul-docs-js",
+    "direction": "hostile",
+    "input": "docs/safe.txt\u0000.js",
+    "why": "NUL inside a docs path"
+  },
+  {
+    "id": "newline",
+    "direction": "hostile",
+    "input": "docs/a\n.md",
+    "why": "a newline splits a line-oriented consumer"
+  },
+  {
+    "id": "tab",
+    "direction": "hostile",
+    "input": "docs/a\t.md",
+    "why": "tab: control character"
+  },
+  {
+    "id": "cr",
+    "direction": "hostile",
+    "input": "docs/a\r.md",
+    "why": "carriage return"
+  },
+  {
+    "id": "esc",
+    "direction": "hostile",
+    "input": "docs/a\u001b.md",
+    "why": "escape"
+  },
+  {
+    "id": "del",
+    "direction": "hostile",
+    "input": "docs/a.md",
+    "why": "DEL"
+  },
+  {
+    "id": "code-js",
+    "direction": "hostile",
+    "input": "src/a.js",
+    "why": "code is never documentation"
+  },
+  {
+    "id": "code-sh",
+    "direction": "hostile",
+    "input": "shared/resources/x.sh",
+    "why": "code"
+  },
+  {
+    "id": "dot-dot",
+    "direction": "hostile",
+    "input": "docs/../src/a.js",
+    "why": "traversal segment"
+  },
+  {
+    "id": "dot-dot-lead",
+    "direction": "hostile",
+    "input": "../docs/a.md",
+    "why": "leading traversal"
+  },
+  {
+    "id": "dot-seg",
+    "direction": "hostile",
+    "input": "docs/./a.md",
+    "why": "dot segment"
+  },
+  {
+    "id": "empty-seg",
+    "direction": "hostile",
+    "input": "docs//a.md",
+    "why": "empty segment"
+  },
+  {
+    "id": "trailing-slash",
+    "direction": "hostile",
+    "input": "docs/a.md/",
+    "why": "empty final segment"
+  },
+  {
+    "id": "absolute",
+    "direction": "hostile",
+    "input": "/docs/a.md",
+    "why": "leading slash normalised by the matcher"
+  },
+  {
+    "id": "dot-slash",
+    "direction": "hostile",
+    "input": "./docs/a.md",
+    "why": "./ prefix"
+  },
+  {
+    "id": "backslash",
+    "direction": "hostile",
+    "input": "docs\\evil.js",
+    "why": "backslash normalised into docs/"
+  },
+  {
+    "id": "lead-space",
+    "direction": "hostile",
+    "input": " docs/x.js",
+    "why": "leading space"
+  },
+  {
+    "id": "trail-space",
+    "direction": "hostile",
+    "input": "docs/x.js ",
+    "why": "trailing space"
+  },
+  {
+    "id": "config",
+    "direction": "hostile",
+    "input": "skills-config.yaml",
+    "why": "the rule config is never docs"
+  },
+  {
+    "id": "config-nested",
+    "direction": "hostile",
+    "input": "docs/skills-config.yaml",
+    "why": "config basename anywhere"
+  },
+  {
+    "id": "gitlink",
+    "direction": "hostile",
+    "input": ":gitlink:docs/vendor",
+    "why": "a submodule pointer"
+  },
+  {
+    "id": "empty",
+    "direction": "hostile",
+    "input": "",
+    "why": "empty string"
+  },
+  {
+    "id": "docs-md",
+    "direction": "legitimate",
+    "input": "docs/a.md",
+    "why": "a doc"
+  },
+  {
+    "id": "docs-nested",
+    "direction": "legitimate",
+    "input": "docs/tasks/task.1.x/task.1.x.md",
+    "why": "a work-item doc"
+  },
+  {
+    "id": "docs-hidden",
+    "direction": "legitimate",
+    "input": "docs/.hidden.md",
+    "why": "dotfile, not a dot segment"
+  },
+  {
+    "id": "docs-dots",
+    "direction": "legitimate",
+    "input": "docs/a..b.md",
+    "why": "two dots inside a name"
+  },
+  {
+    "id": "docs-unicode",
+    "direction": "legitimate",
+    "input": "docs/café.md",
+    "why": "printable non-ASCII"
+  },
+  {
+    "id": "dod4-nul-trailing",
+    "direction": "hostile",
+    "input": "docs/a.md\u0000",
+    "why": "NUL at the end: git cuts the argv to docs/a.md, a different file than the predicate judged"
+  },
+  {
+    "id": "dod4-nul-leading",
+    "direction": "hostile",
+    "input": "\u0000docs/a.md",
+    "why": "NUL at the start: git sees an empty argument"
+  },
+  {
+    "id": "dod4-vt",
+    "direction": "hostile",
+    "input": "docs/a\u000b.md",
+    "why": "vertical tab: C0 control"
+  },
+  {
+    "id": "dod4-ff",
+    "direction": "hostile",
+    "input": "docs/a\f.md",
+    "why": "form feed: C0 control"
+  },
+  {
+    "id": "dod4-us-boundary",
+    "direction": "hostile",
+    "input": "docs/a\u001f.md",
+    "why": "U+001F: top of the C0 range, boundary of the refusal class"
+  },
+  {
+    "id": "dod4-nbsp-lead",
+    "direction": "hostile",
+    "input": " docs/x.js",
+    "why": "NBSP: String.trim strips it, so a normalising check would read docs/x.js"
+  },
+  {
+    "id": "dod4-bom-lead",
+    "direction": "hostile",
+    "input": "﻿docs/x.js",
+    "why": "BOM: String.trim strips it"
+  },
+  {
+    "id": "dod4-ls-trail",
+    "direction": "hostile",
+    "input": "docs/x.js ",
+    "why": "U+2028: String.trim strips it and the ** matcher treats it as a line terminator"
+  },
+  {
+    "id": "dod4-case-dir",
+    "direction": "hostile",
+    "input": "DOCS/evil.js",
+    "why": "case variant of the docs root: not docs/** on a case-sensitive matcher, and git on a case-insensitive FS may resolve it to docs/"
+  },
+  {
+    "id": "dod4-bare-dir",
+    "direction": "hostile",
+    "input": "docs",
+    "why": "the docs directory itself: a pathspec naming every file under it"
+  },
+  {
+    "id": "dod4-dir-slash",
+    "direction": "hostile",
+    "input": "docs/",
+    "why": "directory with trailing slash"
+  },
+  {
+    "id": "dod4-bidi-spoof",
+    "direction": "hostile",
+    "input": "src/a‮dm.js",
+    "why": "RLO: displays as a markdown name, is a .js file"
+  },
+  {
+    "id": "dod4-dotgit-hook",
+    "direction": "hostile",
+    "input": "docs/.git/hooks/pre-commit",
+    "why": "a .git segment is never documentation: git refuses to track it, and a write there is a hook that executes"
+  },
+  {
+    "id": "dod4-dotgit-case",
+    "direction": "hostile",
+    "input": "docs/.GIT/config",
+    "why": ".git segment, case variant (core.protectNTFS / HFS fold it)"
+  },
+  {
+    "id": "dod4-dotgit-hfs",
+    "direction": "hostile",
+    "input": "docs/.git‌/config",
+    "why": ".git with an HFS-ignorable ZWNJ (CVE-2014-9390 shape)"
+  },
+  {
+    "id": "dod4-dotdot-trailing",
+    "direction": "hostile",
+    "input": "docs/a.md/..",
+    "why": "trailing traversal segment"
+  },
+  {
+    "id": "dod4-config-case-ok",
+    "direction": "hostile",
+    "input": "docs/sub/skills-config.yaml",
+    "why": "the rule config at depth"
+  },
+  {
+    "id": "dod4-docs-space",
+    "direction": "legitimate",
+    "input": "docs/a b.md",
+    "why": "a space inside a doc name"
+  },
+  {
+    "id": "dod4-docs-dash",
+    "direction": "legitimate",
+    "input": "docs/-n.md",
+    "why": "a doc name that begins with a dash"
+  },
+  {
+    "id": "dod4-docs-double-ext",
+    "direction": "legitimate",
+    "input": "docs/a.md.md",
+    "why": "doubled extension"
+  },
+  {
+    "id": "dod4-docs-deep",
+    "direction": "legitimate",
+    "input": "docs/x/y/z/deep.md",
+    "why": "deep nesting"
+  },
+  {
+    "id": "dod4-docs-cjk",
+    "direction": "legitimate",
+    "input": "docs/日本語.md",
+    "why": "printable CJK"
+  },
+  {
+    "id": "dod4-docs-long",
+    "direction": "legitimate",
+    "input": "docs/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.md",
+    "why": "a long but valid path (under PATH_MAX)"
+  },
+  {
+    "id": "dod4-docs-dotfile-dir",
+    "direction": "legitimate",
+    "input": "docs/.github-notes/a.md",
+    "why": "a dot-directory that is not .git"
+  }
+]

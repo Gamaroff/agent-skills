@@ -49,8 +49,12 @@ find {task-directory} -maxdepth 1 -name "task.{id}.review.*.md" 2>/dev/null | se
 | `In Progress`           | Yes                    | **Skip** — review already completed; log and proceed                               |
 | `In Progress`           | No                     | Run `/review-task` — task may have been marked In Progress without a proper review |
 
-**"Current" is defined, not judged.** A report is current when it is not older than the task
-document's last content change. Compute it with the engine — never eyeball the two dates:
+**"Current" is defined, not judged.** A report that records `reviewed_blob:` (every review written
+since task.201) is current exactly when that hash equals `git hash-object` of the task document now —
+the review's own fixes and status edit are already inside the hash, so only a later change makes it
+stale, a same-day one included. A report without the field (written before task.201) is current when
+it is not older than the task document's last content change, as before. Compute it with the engine —
+never eyeball the hashes or the dates:
 
 ```bash
 node -e '
@@ -60,9 +64,10 @@ node -e '
   const r = classifyReviewReport({
     taskContent:   fs.readFileSync(process.argv[1], "utf8"),
     reportContent: process.argv[2] ? fs.readFileSync(process.argv[2], "utf8") : null,
+    taskBlob:      process.argv[3] || null,
   });
   console.log(JSON.stringify({ ...r, message: describeVerdict(r, { reportPath: process.argv[2] }) }));
-' "{task-file}" "{resolved-report-file-or-empty}"
+' "{task-file}" "{resolved-report-file-or-empty}" "$(git hash-object "{task-file}")"
 ```
 
 > Two things about that snippet. **`argv[1]` is the first *argument* only because this is `node -e`** —
@@ -139,6 +144,22 @@ decide differently in CI than on a developer's machine.
 > decision stays visible here rather than hiding inside it.
 
 ---
+
+## When `--skip review` Is in Force
+
+§0d's answer resolution may have accepted `--skip review` — only when the consumer's
+`develop.skippable` lists it (task.201). Ask the lock whether its `answers.skips` holds `review`
+(`jq -r '(.answers.skips // []) | index("review") != null' .claude/state/develop-pipeline.lock`). When
+it prints `true`, the table above is **not** consulted and no review skill runs:
+
+- Log in the Decisions Log: "review-task skipped — `--skip review` ({answer_sources.skips}); waiver: {waiver.reason}, approved by {waiver.approved_by}".
+- Update Pipeline Progress: ⏭️ Skipped — `--skip review` (waived).
+- Post the skip notice below with `--slot outcome="skipped by request"`.
+- **The QA gate will read `WAIVED`**, never `PASS` — Steps 5–6 write it through `pipeline-answers.js gate`
+  (see the QA loop's §"Recording a waived step"). A skipped review is a recorded decision, not a pass.
+
+The automatic reuse in the table is a different thing and writes no waiver: a current review **was**
+done, so its verdict is earned.
 
 ## If Skipping
 

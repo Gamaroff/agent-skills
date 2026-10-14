@@ -20,6 +20,16 @@
 //                         the Stop hook, DESCRIBED by the hooks doc and the pause
 //                         reference's lock schema.
 //
+// A fourth joined with task.170, and task.182 carried it to every reader:
+//
+//   qa_reentry            {from_step, reason, at, gate_head, report_entries} —
+//                         why a lock sits at step 5 after a Step 7 halt.
+//                         WRITTEN by reenter-qa-after-finalise.sh (the one
+//                         writer, which also writes qa_max_cycles and qa_phase),
+//                         READ by the resume contract and the detector prompt,
+//                         DESCRIBED by the pause reference, the hooks doc and
+//                         both develop-* SKILL.md.
+//
 // A field with two spellings is a field with no reader: the writer writes
 // `qa_phase`, the hook reads `qaPhase`, and the default arm fires on every
 // stop — silently, because an absent field IS a legal state. This test pins
@@ -37,6 +47,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs, { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -57,6 +68,7 @@ const FILES = {
   changelog: "CHANGELOG.md",
   setWaitingOn: "shared/resources/set-waiting-on.sh",
   pauseDoc: "shared/resources/develop-pipeline-pause.md",
+  reenterScript: "shared/resources/reenter-qa-after-finalise.sh",
 };
 const text = Object.fromEntries(
   Object.entries(FILES).map(([k, p]) => [k, read(p)]),
@@ -87,6 +99,9 @@ const MISSPELLINGS = [
   /\bbudgetMinutes\b/,
   /(?<!-)\bbudget-minutes\b/, // `--budget-minutes` is the writer's flag, not a field spelling
   /\bwall_clock_minutes\b/,
+  // task.182: the qa_reentry field
+  /\bqaReentry\b/,
+  /\bqa_re_entry\b/,
 ];
 
 test("every participant spells `qa_phase` and `extra_cycles_granted` the same way", () => {
@@ -123,6 +138,125 @@ test("every participant spells `qa_phase` and `extra_cycles_granted` the same wa
       text[name],
       /\bextra_cycles_granted\b/,
       `${name} must name extra_cycles_granted`,
+    );
+  }
+});
+
+test("qa_reentry: the writer and every reader and describer name it (task.182)", () => {
+  const participants = [
+    "reenterScript",
+    "resumeContract",
+    "detectorPrompt",
+    "pauseDoc",
+    "hooksDoc",
+    "taskSkill",
+    "storySkill",
+  ];
+  assert.ok(
+    participants.length > 0,
+    "non-vacuity: the qa_reentry participant list is empty",
+  );
+  for (const name of participants) {
+    assert.match(
+      text[name],
+      /\bqa_reentry\b/,
+      `${name} (${FILES[name]}) must name qa_reentry`,
+    );
+  }
+  // The writer is the one place the field's shape is set; the detector prompt reports the
+  // sub-fields the resume contract's Second precedence reads, so it names each of them.
+  assert.match(
+    text.reenterScript,
+    /\.qa_reentry = \{from_step: 7, reason: "dod-gaps-code-fix", at: \$now, gate_head: \$head, report_entries: \$entries\}/,
+    "reenter-qa-after-finalise.sh must write qa_reentry with its five sub-fields",
+  );
+  // Read the sub-fields out of the CONCERN TEMPLATE the detector files, not the whole line: the
+  // line opens with the field's type annotation, which names every sub-field, so a line-wide match
+  // passed with the template stripped bare (task.182 QA cycle 1, TASK-182-002).
+  const concern = text.detectorPrompt.match(/"concern": "(qa_reentry:[^"]*)"/);
+  assert.ok(
+    concern,
+    'the detector prompt must file qa_reentry as { "concern": "qa_reentry: …" }',
+  );
+  for (const sub of ["from_step", "reason", "gate_head", "report_entries"]) {
+    assert.match(
+      concern[1],
+      new RegExp(`\\b${sub}\\b`),
+      `the detector prompt's qa_reentry concern must report ${sub}`,
+    );
+  }
+  // qa_max_cycles has two writers, and the hooks doc names both — the description that said it is
+  // "written together at a resume after a loop-limit halt" was true of one of them (task.182, CR-2).
+  for (const writer of ["grant-qa-cycles.sh", "reenter-qa-after-finalise.sh"]) {
+    assert.ok(
+      text.hooksDoc.includes(writer),
+      `the hooks doc must name ${writer} as a writer of qa_max_cycles`,
+    );
+  }
+  // The qa_phase each re-entry writes is stated ONCE, in the pause reference's lock schema, and the
+  // other describers cite it. Cycles 1 and 2 of task.182 each found a site the previous fix missed
+  // (hooks doc, both SKILL.md, then the pause doc itself), so the rule is consolidated rather than
+  // patched again, and this test holds the one-statement shape (TASK-182-001, TASK-182-003).
+  assert.match(
+    text.pauseDoc,
+    /`grant-qa-cycles\.sh` \(task\.123\) writes `5b` when it restores the lock from a halt snapshot whose `halt_reason` is not-converging[^|]*`5a` otherwise — a loop-limit halt, or a lock that already exists[^|]*`reenter-qa-after-finalise\.sh` \(task\.170\) always writes `5a`/,
+    "the pause reference's qa_phase row must state which value each re-entry writer writes",
+  );
+  // The writer the statement describes: 5b only on a not-converging RESTORE (halt_reason is read
+  // from the snapshot it restores, never from a live lock).
+  assert.match(
+    text.grantScript,
+    /not-converging[^\n]*\) REENTER=5b/,
+    "grant-qa-cycles.sh no longer writes 5b after not-converging — re-check the pause reference's qa_phase row",
+  );
+  // No other describer restates the grant's value. The population is DERIVED — every shared
+  // resource and SKILL.md that names the grant — not the hand-kept FILES map, which missed
+  // describers; the text is whitespace-collapsed so a claim that wraps is still one claim; and the
+  // match takes "the grant" as well as the script name, and needs a writes/sets verb before the value
+  // so a table keyed on the value the grant PRINTED is not a claim (task.182 QA cycle 3, TASK-182-004).
+  // Measured against every historic false statement on origin/develop, b7d7661e, 4eb35d36 and
+  // 93539f1b (the contract's "the grant writes `5a`" among them).
+  const VALUE_CLAIM =
+    /(?:grant-qa-cycles\.sh`?|\bthe grant\b|re-entry (?:scripts|writers))[^|]{0,200}?(?<![-\w])(?:writes?|sets?)(?![-\w])(?: it to)?[^|]{0,60}?`(?:qa_phase: )?5[ab]`/;
+  const grantDescribers = execFileSync(
+    "git",
+    [
+      "grep",
+      "-l",
+      "-E",
+      "grant-qa-cycles|the grant",
+      "--",
+      ":(glob)shared/resources/*.md",
+      ":(glob)skills/*/SKILL.md",
+    ],
+    { cwd: ROOT, encoding: "utf8" },
+  )
+    .trim()
+    .split("\n")
+    .filter((p) => p && p !== FILES.pauseDoc);
+  assert.ok(
+    grantDescribers.length >= 5,
+    `non-vacuity: only ${grantDescribers.length} describers of the grant found`,
+  );
+  for (const p of grantDescribers) {
+    assert.doesNotMatch(
+      read(p).replace(/\s+/g, " "),
+      VALUE_CLAIM,
+      `${p} restates which qa_phase the grant writes — cite the pause reference's lock schema instead`,
+    );
+  }
+  assert.match(
+    text.hooksDoc,
+    /the value the grant writes depends on the halt and is stated once, in the `qa_phase` row of the lock schema in `develop-pipeline-pause\.md`/,
+    "the hooks doc must cite the pause reference for the qa_phase values",
+  );
+  // The SKILL.md grant sentence names no value (a "qa_phase: 5a atomically" there carried no
+  // writer name, so VALUE_CLAIM cannot see it) — it cites the lock schema.
+  for (const name of ["taskSkill", "storySkill"]) {
+    assert.match(
+      text[name],
+      /and `qa_phase` \(which value: the `qa_phase` row of the lock schema in `references\/develop-pipeline-pause\.md`\) atomically/,
+      `${name} must cite the lock schema for the qa_phase the grant writes`,
     );
   }
 });
@@ -414,8 +548,8 @@ test("QA_MAX_CYCLES is the lock's qa_max_cycles — reconstructed count plus the
   // restoring the lock from the halt snapshot when the HALT removed it (C2-CR-1).
   assert.match(
     text.grantScript,
-    /'\.extra_cycles_granted = \$k \| \.qa_max_cycles = \(\$c \+ \$k\) \| \.qa_phase = "5a"'/,
-    "grant-qa-cycles.sh must write qa_max_cycles as the reconstructed count plus the grant, and qa_phase 5a, in one write (C3-CR-3)",
+    /'\.extra_cycles_granted = \$k \| \.qa_max_cycles = \(\$c \+ \$k\) \| \.qa_phase = \$p'/,
+    "grant-qa-cycles.sh must write qa_max_cycles as the reconstructed count plus the grant, and the re-entry qa_phase, in one write (C3-CR-3, obs #228)",
   );
   // task.124: the restore moved into advance-pipeline-lock.sh --restore, the ONE restore path.
   // The field stripping lives there; the grant script must call it and must not carry its own.

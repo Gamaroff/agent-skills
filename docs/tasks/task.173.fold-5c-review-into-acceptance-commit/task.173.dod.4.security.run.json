@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "path",
+      "entry": "skills/develop-story/references/ci-tree-equivalence.js#isDocsPath",
+      "name": "isDocsPath-5c-classify-repo-patterns",
+      "call_site": "shared/resources/develop-pipeline-step-5-6-qa-loop.md:1502",
+      "verdict": "present-but-inert",
+      "reason": "a-hostile-case-passed-a-control-that-rejects-others",
+      "executed": 52,
+      "passed": 49,
+      "reproduced": 3,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": [
+        [
+          "docs/**"
+        ]
+      ],
+      "ran_at": "2026-10-08T18:59:10.755Z"
+    },
+    {
+      "sink": "path",
+      "entry": "skills/develop-task/references/ci-tree-equivalence.js#isDocsPath",
+      "name": "isDocsPath-5c-classify-default-patterns",
+      "call_site": "shared/resources/develop-pipeline-step-5-6-qa-loop.md:1502",
+      "verdict": "present-but-inert",
+      "reason": "a-hostile-case-passed-a-control-that-rejects-others",
+      "executed": 52,
+      "passed": 49,
+      "reproduced": 3,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": [
+        [
+          "**/*.md",
+          "docs/**"
+        ]
+      ],
+      "ran_at": "2026-10-08T18:59:05.911Z"
+    }
+  ],
+  "totals": {
+    "executed": 104,
+    "reproduced": 6
+  },
+  "updated_at": "2026-10-08T18:59:10.755Z"
+}

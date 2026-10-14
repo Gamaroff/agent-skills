@@ -19,7 +19,7 @@ Before invoking `/commit-changes`, update the implementation report one final ti
 - Set **Finished** timestamp
 - Set **Final Status** to `Completed`
 - Fill in **QA Iterations** count
-- Ensure the Pipeline Progress table shows ✅ for all steps, **including Step 8's own row**, written `✅ Done` — the value the orchestrator's Step Transition Protocol writes after the step returns, so that later edit changes nothing. Nothing in the report is edited after `/commit-changes`: check 5 of the Completion Checklist requires a clean tree, and check 4 requires every row finished. A late edit either fails check 5 or is left out of the commit, and 14 of the 123 committed completed reports carried Step 8's own row at `⏳ Pending` that way (task 160)
+- Ensure the Pipeline Progress table shows ✅ for all steps, **including Step 8's own row**, written `✅ Done` — the value the orchestrator's Step Transition Protocol writes after the step returns, so that later edit changes nothing. Fill Step 8's own `Completed (UTC)` cell here too (`date -u +%Y-%m-%dT%H:%MZ`, only when empty), for the same reason (task.201). Nothing in the report is edited after `/commit-changes`: check 5 of the Completion Checklist requires a clean tree, and check 4 requires every row finished. A late edit either fails check 5 or is left out of the commit, and 14 of the 123 committed completed reports carried Step 8's own row at `⏳ Pending` that way (task 160)
 - Write a **Completion Summary** paragraph:
   - develop-story: what was **built**, QA iterations taken, notable decisions
   - develop-task: what was **implemented**, QA iterations taken, notable decisions
@@ -283,6 +283,9 @@ VERIFY_EXIT=$?
 # Every check passed: Step 4's records have done their job. A record left behind would be read as
 # current by the next run in this checkout (task.147 QA-2, CR-7).
 rm -f .claude/state/step4-scope-paths.txt .claude/state/step4-held-paths.txt .claude/state/step4-hold-dir.txt
+# The 5c carry records too: 6a has committed the set, and a list left behind must not be read by a
+# later run's resume probe (task.173 QA-3, CR-1).
+rm -f .claude/state/5c-carry-eligible.txt .claude/state/5c-carry-classified.txt
 
 # Checks 2–5 passed: end the run. `--complete` is the lock's one terminal remover — `/commit-changes`
 # left the lock in place at step 8 (task 161). It runs HERE, after every check, never earlier: a

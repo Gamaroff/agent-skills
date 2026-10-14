@@ -1,0 +1,60 @@
+schema: 2
+task: 'task.178.review-skills-cite-key-lookup'
+task_title: 'review-task and review-story cite the §0a key lookup'
+gate: PASS
+status_reason: 'Gate 5 CR-1 fixed by dcf86760 and mutation-proven. The one new reviewer finding is low/medium (advisory, not promoted); HIGH 0, MEDIUM 0.'
+reviewer: 'QA Engineer'
+head: 'a85246e125927dfd00e5bc6718b7482818fdc87a'
+updated: '2026-10-12T11:02:19Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 12
+  phases_verified: 3/3
+  ci: 'not read — CI is gated at /finalise'
+  fast_gate: '5377 tests, 5362 pass, 1 fail — tests/bundle-missing-source.test.js load-sensitive timing (23.9 s alone vs 20 s budget); pre-existing, identical on origin/develop (cycles 1–3), file untouched by this branch'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged (scoped: the test file only). BND-1 stays deferred to task.180.'
+  performance:
+    status: PASS
+    notes: 'Unchanged; the guard test runs in ~5 s including the fixture shells.'
+  reliability:
+    status: PASS
+    notes: 'Unchanged.'
+  maintainability:
+    status: PASS
+    notes: 'Gate 5 CR-1 fixed; the residual low finding is a named, out-of-table shape.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Reviewer CR-1 (low/medium): the word-internal-apostrophe rule reads a real quote glued between word characters (grep -rlE -e'jira_key: X|github_issue: X' docs/) as literal, so that line is now missed. No canonical source uses the shape; name it among the header's known unseen shapes, or read the apostrophe as literal only when the quote reading is unbalanced."
+      refs: ['tests/key-lookup-single-statement.test.js']
+    - action: 'BND-1 (standing deferral): probe the Jira-key task-only check via task.180.'
+      refs: ['skills/review-task/SKILL.md']
+    - action: 'Pre-existing: tests/bundle-missing-source.test.js exceeds its 20 s budget on this host even when run alone; widen the budget or make it relative.'
+      refs: ['tests/bundle-missing-source.test.js']
+
+bug_resolution:
+  previous_gate: 5
+  fixed: ['CR-1 (gate 5)']
+  fix_commit: 'dcf86760'
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

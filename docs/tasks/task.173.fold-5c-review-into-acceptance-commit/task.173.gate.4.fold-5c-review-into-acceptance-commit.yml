@@ -1,0 +1,83 @@
+schema: 2
+task: 'task.173.fold-5c-review-into-acceptance-commit'
+task_title: 'Fold the 5c review and its doc-only fixes into the acceptance commit'
+gate: CONCERNS
+status_reason: 'Cycle 4 (scoped to cycle-3 fixes): no HIGH. One MEDIUM with high confidence — the 8a overlap recovery hint restores the rejected fix along with the 5c edit. Two LOW bugs and one test cleanup adopted.'
+reviewer: 'QA Engineer'
+head: '967f62d3648fc95ee2ca7756bff8abe73d5752e1'
+updated: '2026-10-08T04:47:30Z'
+
+top_issues:
+  - id: 'CR4-1'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: '8a overlap hint "save its content first and restore it after": 8a staged the fix before committing, so the saved content is the 5c edit plus the rejected fix, and restoring it brings the fix back; the 5c-only version is in no index, tree or commit.'
+    suggested_action: 'Scope the claim: restore the path from CI_HEAD_1, re-apply the 5c doc-only fix from the review report finding, and re-run the 5c stage block; say the 5c-only content cannot be recovered from the tree.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR4-2'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'The classify re-run guard ignores the header, so a stale list from another pass with a dirty path HALTs with "run the stage block" — the wrong remedy. Adopted.'
+    suggested_action: 'Apply the guard only when line 1 names this PR_REVIEW; otherwise replace the stale list and say so.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR4-3'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'git restore --staged before the could-not-run HALT is unchecked; on failure the message says "unstaged" while the unchecked fix stays staged. Adopted.'
+    suggested_action: 'Check the restore and HALT naming the path as still staged when it fails.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR4-4'
+    severity: low
+    file: 'shared/resources/tests/acceptance-commit-carries-5c.test.mjs'
+    finding: 'The review-unstaged probe shape HALTs on the unstaged review itself, so it cannot fail on the staged-review check it claims to cover. Cleanup, reviewer confidence high; adopted.'
+    suggested_action: 'Assert per shape that the HALT lists the carried doc fix path.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 5548
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'No new untrusted-input surface. boundary: false (see QA report 1).'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Cycle-3 reliability fixes verified; CR4-1 is a recovery-hint prose defect, CR4-3 a degraded-error message.'
+  maintainability:
+    status: CONCERNS
+    notes: 'CR4-1 recovery prose; CR4-4 a test that cannot fail on its defect.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR4-1..CR4-4 in qa-fix cycle 4.'
+      refs: ['skills/finalise/SKILL.md', 'shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'shared/resources/tests/acceptance-commit-carries-5c.test.mjs']
+  future: []
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR4-1 fixed']
+
+bug_resolution:
+  bugs_fixed: 7
+  bugs_remaining: 0
+  fix_date: '2026-10-08'
+  total_iterations: 3
+  verification_method: 'Scoped review of cycle-3 fixes; CR3-1..CR3-7 closed'

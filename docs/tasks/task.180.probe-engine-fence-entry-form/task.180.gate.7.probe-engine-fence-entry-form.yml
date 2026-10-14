@@ -1,0 +1,68 @@
+schema: 2
+task: 'task.180.probe-engine-fence-entry-form'
+task_title: 'security-probe: a fence: entry form for a fenced bash block in a step doc'
+gate: CONCERNS
+status_reason: 'The cycle-6 fixes hold: TASK-180-017 and -018 are closed. First gate with no HIGH. The safety re-probe found one MEDIUM: a default-path lookup (command -p gh, env -u PATH gh) in a fixture script skips the PATH guard on a host whose gh is /usr/bin/gh, and the docs claim no lookup reaches the host gh. One LOW advisory: a relative PATH entry is not resolved before the gh test.'
+reviewer: 'QA Engineer'
+head: 'cba2750b6d7c94299c9de73bbab43194360ec995'
+updated: '2026-10-12T17:03:12Z'
+
+top_issues:
+  - id: 'TASK-180-019'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'ghFreePath rewrites $PATH only. command -p gh and env -u PATH gh in a fixture script (the BASH_ENV channel the text check does not read) look gh up in /bin:/usr/bin and reach the host binary on hosts where it lives there; the docs claim no lookup reaches the host gh. Mechanism confirmed on cba2750b (command -p -v ls → /bin/ls under PATH=/nonexistent); this host has no /usr/bin/gh. Code review CR-1 (medium/high, platform-variance). Bug: task.180.bug.12.default-path-lookup-bypasses-gh-guard.md'
+    suggested_action: 'Add fixture env values and files contents to the gh text check, and state the default-path lookup as a limit beside the absolute path.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 5409
+  phases_verified: 3/3
+  ci: 'not read this cycle (CI is gated at /finalise)'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 26
+    notes: 'task.180.qa.7.security.run.json: both controls engage, 0 reproduced, 0 escapes. CONCERNS for TASK-180-019 (default-path lookup from a fixture).'
+  performance:
+    status: PASS
+    notes: 'ci:fast 5409 tests, 5395 pass, 0 fail at cba2750b (5b). ghFreePath builds one symlink copy per PATH directory that holds gh, once per run.'
+  reliability:
+    status: PASS
+    notes: 'The cycle-6 fixes hold (regression tests green; QA mutation results in the QA report).'
+  maintainability:
+    status: PASS
+    notes: 'The gh guarantee is structural (ghFreePath) with the text check as a fast path; both are described once in probe-boundary-rule.md §5.'
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 1
+  fix_date: '2026-10-12'
+  total_iterations: 6
+  verification_method: 'Regression tests + QA mutation spot check + ci:fast'
+
+recommendations:
+  immediate:
+    - action: 'TASK-180-019: add fixture env values and files to the gh text check; state the default-path lookup as a limit.'
+      refs: ['shared/resources/security-probe.mjs', 'shared/resources/probe-boundary-rule.md']
+  future:
+    - action: 'CR-2 (low/medium, advisory): resolve a relative PATH entry against the case directory before the gh test in ghFreePath.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'Carried: CR-3 short-slot rewrite; GIT_CEILING_DIRECTORIES in caseEnv; a deleted trip-wire stub lets later cases reach gh.'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-180-019 fixed or its limit stated']

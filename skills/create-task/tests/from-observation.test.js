@@ -144,7 +144,7 @@ test("seed: a single short entry gives a title with the skill prefix removed", (
       taskId: 150,
     },
   );
-  assert.equal(seed.title, "[Task 150] a short name");
+  assert.equal(seed.title, "a short name");
   assert.equal(seed.titleReason, null);
   assert.equal(
     seed.changeLogDescription,
@@ -165,12 +165,51 @@ test("seed: an over-bound source title gives `title: null` (obs #128's own 144-c
   const atBound = lib.seedFromObservations([entry(1, { title: bare })], {
     taskId: 150,
   });
-  assert.equal(atBound.title.length, CARD_TITLE_MAX);
+  assert.equal(`[Task 150] ${atBound.title}`.length, CARD_TITLE_MAX);
   const overBound = lib.seedFromObservations(
     [entry(1, { title: `${bare}x` })],
     { taskId: 150 },
   );
   assert.equal(overBound.titleReason, "over-bound");
+});
+
+test("seed: an Improvement that opens with a numbered list seeds its first sentence, not the marker (obs #291)", () => {
+  const seed = lib.seedFromObservations(
+    [
+      entry(290, {
+        improvement:
+          "1. In code-review-prompt.md, state that file_line is the head line.\n2. Add a check.",
+      }),
+    ],
+    { taskId: 194 },
+  );
+  assert.equal(
+    seed.description,
+    "In code-review-prompt.md, state that file_line is the head line.",
+  );
+  assert.equal(seed.descriptionReason, null);
+  const bullet = lib.seedFromObservations(
+    [
+      entry(291, {
+        improvement:
+          "- Skip a leading list marker before matching the sentence.",
+      }),
+    ],
+    { taskId: 194 },
+  );
+  assert.equal(
+    bullet.description,
+    "Skip a leading list marker before matching the sentence.",
+  );
+});
+
+test("seed: a description under the minimum is refused, not written (obs #291)", () => {
+  const seed = lib.seedFromObservations(
+    [entry(5, { improvement: "Fix it." })],
+    { taskId: 150 },
+  );
+  assert.equal(seed.description, null);
+  assert.equal(seed.descriptionReason, "too-short");
 });
 
 test("seed: two or more entries never name the task themselves", () => {

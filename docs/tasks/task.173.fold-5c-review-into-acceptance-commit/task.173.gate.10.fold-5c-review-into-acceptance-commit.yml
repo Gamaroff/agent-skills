@@ -1,0 +1,62 @@
+schema: 2
+task: 'task.173.fold-5c-review-into-acceptance-commit'
+task_title: 'Fold the 5c review and its doc-only fixes into the acceptance commit'
+gate: PASS
+status_reason: 'Cycle 10 (scoped to the cycle-9 fix 96026663): CR9-2 and CR9-4 closed. The reviewer ran the new tests against the pre-fix docs and both went red. Three new findings, all low and none high-confidence, so all are advisory. No open entries.'
+reviewer: 'QA Engineer'
+head: 'dbef58434a68e044f012f52cbe66aa872955ece2'
+updated: '2026-10-08T18:52:32Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 5561
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 28
+    notes: 'isDocsPath probed via the engine (task.173.qa.10.security.run.json, cases file task.173.qa.10.security.cases.json): engages, 0 reproduced. The 5c classify, stage and probe arms (fenced Markdown) are pinned by the committed suite under bash and zsh.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'CR9-2 closed: a spaced carried doc is set aside on resume.'
+  maintainability:
+    status: PASS
+    notes: 'Unchanged.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR10-1 (low/medium, advisory): CARRY_EXPECT matches by pathspec containment, so a directory entry in the eligible list (only possible by hand-editing it now) would set aside every staged file under it; admit an entry only when ls-files names exactly that path.'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md']
+    - action: 'CR10-2 (low/low, advisory): the review-report arm of the resume probe still matches a C-quoted porcelain path against a raw glob; a work-item directory that porcelain quotes would HALT the resume.'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md']
+    - action: 'CR10-3 (cleanup): CI (ubuntu-latest) installs no zsh (test.yml installs gawk and mawk only), so every zsh-only pin in acceptance-commit-carries-5c, the CR9-4 pin included, runs only locally. Install zsh in test.yml.'
+      refs: ['.github/workflows/test.yml', 'shared/resources/tests/acceptance-commit-carries-5c.test.mjs']
+    - action: 'CR9-1, CR9-3, CR8-2, CR7-1, CR6-2 (advisory, carried).'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-10-08'
+  total_iterations: 9
+  verification_method: 'Scoped review of 96026663; the new tests were run against the pre-fix docs (CR9-2 red in both shells, CR9-4 red under zsh) and pass at HEAD'

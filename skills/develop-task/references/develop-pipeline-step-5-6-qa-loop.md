@@ -218,7 +218,7 @@ Log the bypass reason in the Decisions Log (`Traceability mapper skipped: {reaso
 
 **Invoke `/qa-story`**
 
-Invoke the `/qa-story` skill with the story file path. If `PIPELINE_MODE=lite`, prefix the invocation with explicit context: "Use **direct tools only** for this review — skip parallel agents regardless of the adaptive strategy decision. This story is running in lite mode."
+Invoke the `/qa-story` skill with the story file path. If the run's mode is `lite` or `fast`, or `--skip qa-depth` is in force (the lock's `answers.mode` / `answers.skips`, resolved in §0d), prefix the invocation with explicit context: "Use **direct tools only** for this review — skip parallel agents regardless of the adaptive strategy decision. This story is running in lite mode." When the lock carries a `waiver`, also prefix the waiver directive from the lite-mode contract (§"Directive Passed to the QA Skill").
 
 **Code-review-and-fix loop (pipeline default).** Always pass the run-level override `code_review_blocking=true`. This makes the diff code review qa-story already runs (Phase 1.6) gate the build on high-confidence correctness bugs, which then flow into this loop's qa-fix step (5b) and get fixed and re-reviewed each cycle. A story opts **out** with `code_review_blocking: false` in its frontmatter (escape hatch) — the override never overrides an explicit `false`. See the **Opt-in to blocking** resolution matrix in `references/code-review-prompt.md`.
 
@@ -266,7 +266,7 @@ Skip this pre-step when `PIPELINE_MODE=lite` OR `HAS_SUCCESS_CRITERIA_TABLE=fals
 
 **Invoke `/qa-task`**
 
-Invoke the `/qa-task` skill with the task file path. If `PIPELINE_MODE=lite`, prefix the invocation with explicit context: "Use **direct tools only** for this review — skip parallel agents regardless of the adaptive strategy decision. This task is running in lite mode."
+Invoke the `/qa-task` skill with the task file path. If the run's mode is `lite` or `fast`, or `--skip qa-depth` is in force (the lock's `answers.mode` / `answers.skips`, resolved in §0d), prefix the invocation with explicit context: "Use **direct tools only** for this review — skip parallel agents regardless of the adaptive strategy decision. This task is running in lite mode." When the lock carries a `waiver`, also prefix the waiver directive from the lite-mode contract (§"Directive Passed to the QA Skill").
 
 **Code-review-and-fix loop (pipeline default).** Always pass the run-level override `code_review_blocking=true`. This makes the diff code review qa-task already runs (Step 3b) gate the build on high-confidence correctness bugs, which then flow into this loop's qa-fix step (5b) and get fixed and re-reviewed each cycle. A task opts **out** with `code_review_blocking: false` in its frontmatter (escape hatch) — the override never overrides an explicit `false`. See the **Opt-in to blocking** resolution matrix in `references/code-review-prompt.md`.
 
@@ -307,6 +307,42 @@ Three rules make this loop's history readable rather than a churn log:
 
 A QA cycle that finds nothing still writes its verdict row: the verdict is the event being
 recorded, not the findings.
+
+### Recording a waived step (shared)
+
+Runs after the QA skill writes its gate and **before** the outcome branching below reads it — and only
+when the lock carries a `waiver` (a step was removed by `--skip`, task.201). **The QA skill writes the
+gate; this step only checks it** — dev-side steps never modify a gate file. The waiver directive the QA
+skill was given (lite-mode contract, §"Directive Passed to the QA Skill") tells it to record `WAIVED`
+for a review that would otherwise read `PASS` or `CONCERNS`. The engine's rule is a fixed point, so the
+recorded gate is correct exactly when the engine, given it, returns it unchanged:
+
+```bash
+LOCK=.claude/state/develop-pipeline.lock
+if [ "$(jq -r '.waiver.active // false' "$LOCK")" = "true" ]; then
+  GATE_FILE="{the latest gate file, per Finding the Latest Gate File}"
+  RECORDED=$(sed -nE 's/^gate:[[:space:]]*"?([A-Z]+)"?.*/\1/p' "$GATE_FILE" | head -1)
+  EXPECTED=$(command node .agents/skills/{develop-story|develop-task}/references/pipeline-answers.js gate \
+    --earned "$RECORDED" --skips "$(jq -r '.answers.skips | join(",")' "$LOCK")" \
+    --waiver-reason "$(jq -r '.waiver.reason' "$LOCK")" \
+    --approved-by "$(jq -r '.waiver.approved_by' "$LOCK")" --json | jq -r '.gate')
+  if [ "$EXPECTED" != "$RECORDED" ]; then
+    echo "WAIVER NOT RECORDED: gate reads $RECORDED, a skipped step requires $EXPECTED"
+  elif [ "$RECORDED" = "WAIVED" ] && ! grep -qE '^[[:space:]]+approved_by:[[:space:]]*"?[^"[:space:]]' "$GATE_FILE"; then
+    echo "WAIVER NOT RECORDED: gate reads WAIVED with no waiver.approved_by"
+  else
+    echo "waiver recorded: $RECORDED"
+  fi
+fi
+```
+
+- `waiver recorded` → continue to the outcome branching; the `WAIVED` arm routes it to 5c like any
+  accepted waiver, and a `FAIL` takes the `FAIL` arm — **a waiver never masks a failure**.
+- `WAIVER NOT RECORDED` → the QA skill wrote a verdict a skipped step cannot earn. Re-invoke it once,
+  same cycle, with the waiver directive restated first. If the second gate still fails the check,
+  **HALT**: a skipped step must never reach 5c reading `PASS`.
+
+Log `Gate {N}: {RECORDED} — waiver {recorded / re-invoked / HALT}` in the Decisions Log.
 
 ### Outcome branching (shared)
 
@@ -1352,7 +1388,7 @@ done
 # standard mode
 /review-pr --effort medium --comment --no-code
 
-# lite mode — degrades the review, never skips it
+# lite or fast mode, or --skip review-pr-depth — degrades the review, never skips it
 /review-pr --effort low --comment --no-code
 ```
 
@@ -1365,7 +1401,8 @@ done
 
 - **Target**: the open PR for this branch — pass nothing and `/review-pr` resolves it from the
   current branch.
-- **`--effort`**: `medium` in standard mode, `low` in lite mode. Lite **degrades** the review; it
+- **`--effort`**: `medium` in standard mode, `low` in lite mode — and in fast mode, or with
+  `--skip review-pr-depth` in force (the lock's `answers`). Lite **degrades** the review; it
   never skips it. See [`references/develop-pipeline-lite-mode.md`](develop-pipeline-lite-mode.md).
 - **`--no-code`**: always, in both modes. `/qa-story` and `/qa-task` already ran the code reviewer
   over this diff in 5a, with `code_review_blocking=true`, so 5c runs the **conformance lens only**
@@ -1390,8 +1427,8 @@ gate.
 | Verdict | Action |
 | --- | --- |
 | 🚨 **REQUEST CHANGES** | Return to **5b** and run `/qa-fix` with the review's findings (see the invocation below). **Do not increment the counter here** — 5b's step 7 increments it on exit, exactly as on any other cycle. A review-driven fix is a cycle like any other, and it is counted in the same one place. |
-| ⚠️ **CONCERNS** | Record the findings in the QA Cycle entry and the implementation report. **Do not block.** Signal `ready-for-merge`, exit the loop, proceed to Step 7. |
-| ✅ **APPROVE** | Signal `ready-for-merge`, exit the loop, proceed to Step 7. |
+| ⚠️ **CONCERNS** | Record the findings in the QA Cycle entry and the implementation report. **Do not block.** Signal `ready-for-merge`, carry the review into the acceptance commit (below; doc-only findings may be fixed there), exit the loop, proceed to Step 7. |
+| ✅ **APPROVE** | Signal `ready-for-merge`, carry the review into the acceptance commit (below), exit the loop, proceed to Step 7. |
 | ❌ **Review failed** — `/review-pr` HALTed, could not resolve a PR, or errored | **Not a verdict, and not an exit.** Log it in the Issues Log, record `review failed` on the cycle's `**PR Review**` row, the gate and QA report are already committed by path 1 — do not commit again — and **HALT** naming the PR and the failure. Do **not** fall through to Step 7: 5c is the only exit, so a run that skips it silently finalises without the check this step exists to add. |
 
 > **Why the failure arm is spelled out.** A gate that reaches 5c from 5a (§5c routes 1, 2, 2b and 3) does so without entering 5b, so
@@ -1399,6 +1436,195 @@ gate.
 > is first discovered *by* `/review-pr`, and `/review-pr` HALTs with text addressed to a human. Without
 > this row the orchestrator has no arm for that state, and the likeliest improvisation is the one
 > outcome that must never happen: proceeding to `/finalise` with no review.
+
+#### Carry the review into the acceptance commit (APPROVE / CONCERNS)
+
+**Nothing is committed or pushed between this verdict and `/finalise` 6a.** 6a commits the whole
+index, so what is staged here rides the acceptance commit, and the run pushes one commit fewer than a
+separate "5c review" commit would (task.173). Staged, not committed: a local commit would move
+`HEAD` past the pushed head, and `/finalise` records CI reading 1 against `HEAD`. On the path to
+acceptance, the commits that can run before 6a are path-limited for the same reason: `/finalise` 8a
+commits only its `touched` paths, and the PreCompact pause commit only the report. **A HALT in that
+window is the exception.** The Step 7 DoD-gaps halt, a terminal-HALT report commit, and `/qa-fix` after
+a re-entry at 5a all commit through `/commit-changes`. Each of them carries the staged set and pushes
+it. That is the behaviour before this change: the set is review evidence, and nothing is lost.
+
+**A finding is doc-only when the path in its `ref` matches `ci.docsOnly.patterns`** — task.172's
+set, read through its own reader (`readConfig` + `isDocsPath` in `ci-tree-equivalence.js`), so
+there is one definition of "documentation" and its default lives in the configuration reference, not
+here. **It may be fixed here only when the path names exactly one tracked file, read literally, that is
+clean against `HEAD` and is neither an implementation report nor this review report.** Git reads a
+path argument as a pathspec, so a `ref` such as `:!*.md`, a glob or a directory would otherwise
+name many files at once (task.173 QA-8). The implementation report is uncommitted
+by design at 5c (Step 8 owns it), and a fix that later fails a check is undone with
+`git checkout HEAD`. That command is safe only on a file that held no other work. A `ref` with no
+path (an `AC-n` id), a path outside the patterns, and a path that fails the second test are
+**recorded and not fixed**, exactly as before. A code change after the last QA cycle is what the loop
+exists to prevent. Classify on `CONCERNS` before touching anything.
+
+**The eligible list is one record with one writer** (task.173 QA-3, consolidated):
+
+| `.claude/state/5c-carry-eligible.txt` | |
+| --- | --- |
+| Shape | line 1 `# review: <the work item's PR review report>`; then one cleared path per line |
+| Writer | the classify block below, once per 5c pass, before any edit |
+| Readers | the stage block below; the resume contract's working-tree probe, **only** when line 1 names a review report inside the resuming work item's directory and that report is itself staged |
+| Deleter | Step 8, beside Step 4's records, once every check has passed |
+
+A list from another work item or an earlier pass is therefore never read as current: its header names
+another report, or a report that is no longer staged.
+
+
+```bash
+# INPUT, bound in THIS block: the PR review report this 5c pass wrote.
+PR_REVIEW="{work-item-dir}/{prefix}.pr-review.{n}.{name}.md"
+case "$PR_REVIEW" in *'{'*) printf '%s\n' "HALT: substitute PR_REVIEW before running this block"; exit 1 ;; esac
+[ -f "$PR_REVIEW" ] || { printf '%s\n' "HALT: $PR_REVIEW not found — /review-pr writes it before the verdict"; exit 1; }
+mkdir -p .claude/state
+CLASSIFIED=.claude/state/5c-carry-classified.txt
+ELIGIBLE=.claude/state/5c-carry-eligible.txt   # the paths the stage block below may touch
+# Every line that carries a ref or a path is printed with printf '%s', never echo: zsh's echo interprets
+# backslash escapes, so a ref holding \n printed a fake classify line (task.173 QA-9, CR9-4).
+# Classify runs ONCE per 5c pass, before any edit. Re-run after the edits, it would rebuild the list
+# from a tree where every fixed path is now dirty and drop them all (task.173 QA-2, CR-5).
+# A listed path that is dirty against HEAD changed after a 5c pass cleared it, whatever the header
+# says: a re-run /review-pr writes a new {n}, so "another pass" and "this pass" can share one record.
+# Refuse in both arms; only the remedy differs. A list is replaced only when every path it names is
+# clean (task.173 QA-5, CR-1). The list names what was cleared, not what was edited, so the stale arm
+# never calls the change a 5c edit and never offers to undo it (task.173 QA-6, CR-1).
+if [ -s "$ELIGIBLE" ]; then
+  ELIG_HEAD=$(head -1 "$ELIGIBLE")
+  while IFS= read -r q; do
+    case "$q" in '# '*) continue ;; esac
+    git --literal-pathspecs diff --quiet HEAD -- "$q" 2>/dev/null && continue
+    if [ "$ELIG_HEAD" = "# review: $PR_REVIEW" ]; then
+      printf '%s\n' "HALT: $q already carries a 5c edit — run the stage block, do not re-classify"
+    else
+      printf '%s\n' "HALT: $q changed after the 5c pass for ${ELIG_HEAD#\# review: } cleared it — inspect git diff HEAD -- $q; if it is that pass's fix, carry it with that pass's stage block, otherwise it is not a 5c edit: commit it or set it aside yourself; then re-classify"
+    fi
+    exit 1
+  done < "$ELIGIBLE"
+  [ "$ELIG_HEAD" = "# review: $PR_REVIEW" ] \
+    || printf '%s\n' "replacing a stale eligible list ($ELIG_HEAD) — every path it names is clean"
+fi
+printf '# review: %s\n' "$PR_REVIEW" > "$ELIGIBLE"
+# One line per finding in the report's Machine-Readable Findings block. The engine exits 1 when it
+# cannot read the block, or when an entry yields no line: "nothing to classify" and "could not
+# parse" must not look alike (task.173 QA-1, CR-2). An empty `findings: []` is a clean zero.
+command node -e '
+  const fs = require("fs");
+  const { readConfig, isDocsPath } = require("./.agents/skills/{develop-story|develop-task}/references/ci-tree-equivalence.js");
+  const patterns = readConfig(process.cwd()).patterns;
+  const text = fs.readFileSync(process.argv[1], "utf8");
+  const fence = String.fromCharCode(96).repeat(3);   // no literal fence inside a fenced block
+  const sections = text.split("## Machine-Readable Findings");
+  if (sections.length < 2) { console.error("no ## Machine-Readable Findings section"); process.exit(1); }
+  const fenced = sections[1].split(fence + "yaml");
+  if (fenced.length < 2) { console.error("no yaml fence under ## Machine-Readable Findings"); process.exit(1); }
+  // The block ends at a fence on a line of its own (CommonMark), never at the first triple
+  // backtick anywhere: one inside a quoted finding would cut the block short (task.173 QA-2, CR-6).
+  const body = fenced[1];
+  // Three or more backticks, optional trailing blanks and CR: a CRLF report and a longer closing
+  // fence are both valid CommonMark closes (task.173 QA-3, CR-5).
+  const close = body.search(new RegExp("\n[ \t]*" + fence + "\x60*[ \t]*\r?(\n|$)"));
+  if (close < 0) { console.error("the yaml fence under ## Machine-Readable Findings never closes"); process.exit(1); }
+  const lines = body.slice(0, close).split("\n");
+  const entries = lines.filter((l) => /^\s*-\s+\S/.test(l)).length;
+  let id = null, printed = 0;
+  for (const line of lines) {
+    const m = line.match(/^\s*-\s+id:\s*(\S+)/);
+    if (m) { id = m[1]; continue; }
+    const r = line.match(/^\s+ref:\s*(.+?)\s*$/);
+    if (r && id) {
+      const p = r[1].replace(/^["\x27]|["\x27]$/g, "").replace(/:\d+(-\d+)?$/, "");
+      console.log(isDocsPath(p, patterns) ? `doc-only ${id} ${p}` : `record ${id} ${r[1]}`);
+      printed++; id = null;
+    }
+  }
+  if (printed !== entries) { console.error(`${entries} finding entries, ${printed} classified — an entry has no id: first or no ref:`); process.exit(1); }
+' "$PR_REVIEW" > "$CLASSIFIED" || { printf '%s\n' "HALT: cannot classify $PR_REVIEW — the findings are neither fixed nor recorded"; exit 1; }
+# Second test, in the shell where git is: tracked, clean against HEAD, not Step 8's report, not the review.
+# Git reads a path argument as a PATHSPEC, isDocsPath reads it as a FILE NAME, and the two disagree:
+# `:!*.md` passes the predicate under the default patterns and names every non-markdown file to git
+# (task.173 QA-8, CR8-1). So every git call in this block and the stage block is literal, and a ref
+# clears only when it names exactly one tracked file — no glob, directory or magic can widen it.
+while IFS=' ' read -r VERDICT ID REST; do
+  if [ "$VERDICT" != "doc-only" ]; then printf '%s\n' "$VERDICT $ID $REST"; continue; fi
+  case "$REST" in *.implementation.*) printf '%s\n' "record $ID $REST (the implementation report is Step 8's)"; continue ;; esac
+  [ "$REST" != "$PR_REVIEW" ] || { printf '%s\n' "record $ID $REST (the review report itself)"; continue; }
+  if [ "$(git -c core.quotePath=false --literal-pathspecs ls-files -- "$REST" 2>/dev/null)" = "$REST" ] \
+     && git --literal-pathspecs diff --quiet HEAD -- "$REST"; then
+    printf '%s\n' "doc-only $ID $REST"; printf '%s\n' "$REST" >> "$ELIGIBLE"
+  else
+    printf '%s\n' "record $ID $REST (untracked, or holds uncommitted work — not fixed at 5c)"
+  fi
+done < "$CLASSIFIED"
+```
+
+Apply the `doc-only` findings — and only those — then run the block below. It stages the review
+report (`/review-pr` already staged it; staging again is a no-op) and each changed path the classifier
+cleared, once it passes `doc-links.js`. A cleared path that fails the link check is restored to
+`HEAD`, which undoes only the 5c edit because the path was clean when cleared; its finding is
+recorded, not fixed. A path the classifier did **not** clear is a HALT and is left untouched: this
+block never discards work it cannot prove is its own. On `APPROVE`, or a `CONCERNS` with nothing
+doc-only, leave `CARRY_FIXED` empty: the block then only asserts the report is staged.
+
+```bash
+# INPUTS, bound in THIS block: the report, and every path the doc-only fixes changed (repo-relative).
+PR_REVIEW="{work-item-dir}/{prefix}.pr-review.{n}.{name}.md"
+# Quoted on purpose: unquoted, zsh drops the braces and the placeholder guard below cannot see it.
+CARRY_FIXED=("{each path the doc-only fixes changed, quoted — write CARRY_FIXED=() when none}")
+case "$PR_REVIEW ${CARRY_FIXED[*]}" in *'{'*) printf '%s\n' "HALT: substitute PR_REVIEW and CARRY_FIXED before running this block"; exit 1 ;; esac
+ELIGIBLE=.claude/state/5c-carry-eligible.txt   # written by the classify block above
+# The checker must be runnable before anything is staged or restored: an unsubstituted skill name
+# or a missing node would otherwise read as "dead link" and undo a valid fix (task.173 QA-2, CR-2).
+# Quoted: unquoted, the placeholder's | splits the line into a pipeline (task.173 QA-3, CR-6).
+DOC_LINKS=".agents/skills/{develop-story|develop-task}/references/doc-links.js"
+case "$DOC_LINKS" in *'{'*) printf '%s\n' "HALT: substitute the skill name in DOC_LINKS"; exit 1 ;; esac
+[ -f "$DOC_LINKS" ] || { printf '%s\n' "HALT: $DOC_LINKS not found"; exit 1; }
+command -v node >/dev/null 2>&1 || { printf '%s\n' "HALT: node is not on PATH — the link check cannot run"; exit 1; }
+HEAD_BEFORE=$(git rev-parse HEAD)
+git --literal-pathspecs add -- "$PR_REVIEW" || { printf '%s\n' "HALT: cannot stage $PR_REVIEW"; exit 1; }
+CARRIED=("$PR_REVIEW")
+HANDLED=""   # one outcome per path: a path listed twice is handled once (task.173 QA-2, CR-4)
+for p in "${CARRY_FIXED[@]}"; do
+  printf '%s' "$HANDLED" | grep -qxF -- "$p" && continue
+  HANDLED="$HANDLED$p"$'\n'
+  grep -qxF -- "$p" "$ELIGIBLE" 2>/dev/null \
+    || { printf '%s\n' "HALT: $p was not cleared by the classify block — left untouched; undo that edit by hand"; exit 1; }
+  git --literal-pathspecs add -- "$p" || { printf '%s\n' "HALT: cannot stage $p"; exit 1; }
+  # doc-links.js: 0 = links resolve, 1 = a dead link (the only exit that undoes the fix), anything
+  # else = the check could not run — HALT, staged as it is, rather than discard a fix over a tool error.
+  LINKS_RC=0
+  case "$p" in
+    *.md) command node "$DOC_LINKS" --file "$p"; LINKS_RC=$? ;;
+  esac
+  if [ "$LINKS_RC" -eq 0 ]; then
+    CARRIED+=("$p")
+  elif [ "$LINKS_RC" -ne 1 ]; then
+    # Unstaged, edit kept: staged, a resume would carry a fix whose check never ran (QA-3, CR-2).
+    git --literal-pathspecs restore --staged -- "$p" \
+      || { printf '%s\n' "HALT: doc-links.js exited $LINKS_RC on $p, and $p is STILL STAGED — unstage it by hand"; exit 1; }
+    printf '%s\n' "HALT: doc-links.js exited $LINKS_RC on $p — the check did not run; the edit is kept, unstaged"; exit 1
+  else
+    printf '%s\n' "NOT CARRIED: $p — a dead link; the 5c edit is undone, finding recorded"
+    git --literal-pathspecs checkout HEAD -- "$p" || { printf '%s\n' "HALT: cannot restore $p"; exit 1; }
+  fi
+done
+# This block commits nothing and pushes nothing. If HEAD moved, something here did.
+[ "$(git rev-parse HEAD)" = "$HEAD_BEFORE" ] || { printf '%s\n' "HALT: HEAD moved during the 5c carry — nothing may commit before 6a"; exit 1; }
+printf '%s\n' "Carried to 6a: ${CARRIED[*]}"
+```
+
+Write the block's last line onto the cycle's QA Cycle entry as `**Carried to 6a**: {paths}`, and
+record every `NOT CARRIED` and `record` line there as a finding not fixed. The implementation
+report itself is still Step 8's. A PreCompact pause after this block commits the report alone and
+leaves the set staged. The resume contract's working-tree probe sets the set aside (staged, nothing
+unstaged on top, and either the work item's review report or a path in the eligible list above)
+instead of halting on it. A resume into Step 7 then finds the set still staged and 6a carries it,
+because the index is durable across processes. **A crash is different:** the implementation report
+still holds this cycle's uncommitted entries, the probe HALTs on it as class (c), and the 5c set stays
+staged for whoever resolves the HALT.
 
 The 5-cycle budget is **shared**, not additional. A run whose review returns REQUEST CHANGES
 therefore consumes a cycle it would not have consumed before, and can reach Loop Escalation on a
@@ -1560,8 +1786,11 @@ The route fires — `gate-the-last-fix` — only when **all** of:
    and ended on a HIGH-0 gate (task.130 `0,1,0,1,0`; task.125 `1,1,0,1,0` — obs #139). Both were
    granted a cycle by hand and read clean. A blocker on the last gate still escalates with its
    evidence — that fix is not owed a half-cycle.
-3. `MEDIUM_N < MEDIUM_{N-1} < MEDIUM_{N-2}` — strictly falling across the last three gates. Flat, or
-   fell-then-plateaued, is not evidence that one more gate would clear.
+3. `MEDIUM_N < MEDIUM_{N-1} < MEDIUM_{N-2}` — strictly falling across the last three gates — **or
+   `MEDIUM_N == 0`**. Flat, or fell-then-plateaued, above 0 is not evidence that one more gate would
+   clear. At 0 there is no room left to fall: the last gate raised only LOW entries, and a fix that
+   answers only LOW is the fix one more gate is most likely to clear. task.173's PASS-100 gate
+   (MEDIUM `0, 0, 0`) escalated a two-line LOW fix no gate had read (obs #300).
 
 **On `gate-the-last-fix`:**
 
@@ -1713,7 +1942,8 @@ On a convergence stall the remaining findings are outstanding, not accepted — 
 because it was no longer reducing them, which is a reason to look at them, not past them.
 Options:
 1. Fix remaining issues manually, then re-run /qa-story
-2. Accept the current gate status and proceed manually with /finalise
+2. Accept the current gate status: run Step 5c first (/review-pr --effort medium --comment
+   --no-code), then /finalise — on a host with no review decision, finalise needs that report
 3. Update the story requirements if issues reflect unintended scope
 4. Re-run /develop-story to resume with more cycles — Phase 0b offers "Resume at 5a with {k}
    more cycles"; any /qa-story you run by hand in between is counted from its gate on disk
@@ -1735,8 +1965,16 @@ On a convergence stall the remaining findings are outstanding, not accepted — 
 because it was no longer reducing them, which is a reason to look at them, not past them.
 Options:
 1. Fix remaining issues manually, then re-run /qa-task
-2. Accept the current gate status and proceed manually with /finalise
+2. Accept the current gate status: run Step 5c first (/review-pr --effort medium --comment
+   --no-code), then /finalise — on a host with no review decision, finalise needs that report
 3. Update the task requirements if issues reflect unintended scope
 4. Re-run /develop-task to resume with more cycles — Phase 0b offers "Resume at 5a with {k}
    more cycles"; any /qa-task you run by hand in between is counted from its gate on disk
 ```
+
+> **Option 2 goes through 5c, not around it.** A loop that escalates never reaches Step 5c, so no
+> `*.pr-review.*.md` exists. `/finalise` satisfies its "PR approved" column with a GitHub review
+> decision or, when the host has none (a single-maintainer repository), with that report — reading
+> APPROVE or CONCERNS. Taking option 2 straight to `/finalise` there produces a DoD gap. The review
+> also reads the trail, and on task.180 it found five bug reports whose fixes later gates had
+> verified but that no step had closed (obs #21).

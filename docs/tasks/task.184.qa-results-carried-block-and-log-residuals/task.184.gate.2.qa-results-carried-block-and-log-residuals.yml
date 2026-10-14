@@ -1,0 +1,72 @@
+schema: 2
+task: 'task.184.qa-results-carried-block-and-log-residuals'
+task_title: 'qa-results carried-block and log residuals'
+gate: CONCERNS
+status_reason: 'Cycle 2 refute pass: cycle 1 fixed its reproduction but not the class. Two more shapes write and are then refused by the next write (CR-1 via the Phase 1 union plus the tail rule, CR-2 via ambiguousAbove and the render''s own dated rows), and the tail scan is cubic on a repeated label (CR-3). Nothing is deleted; QA Step 12 would halt on its own output.'
+reviewer: 'QA Engineer'
+head: 'e574d353f89f424e0fa1dfe9325bfd16e1d57d7a'
+updated: '2026-10-13T08:24:13Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/qa-results.js'
+    finding: 'Write-then-refuse via the Phase 1 union: **Bug Reports** / - [b] / ### Cycle 2 Notes / #### Deferred Work / **From cycle 2** / paragraph / - CR-9 item writes replaced, mergeCarried puts the bold block directly above the #### block, and every later write refuses carried-tail:- CR-9 item although the union already carries that line. Base replaces all three. R8''s "never refused by its next write" claim is false (the reviewer''s fuzz: 89 shapes). Bug: task.184.bug.1 (reopened).'
+    suggested_action: 'Skip a tail that lies inside a span carriedBlocks keeps; and make the engine refuse up front any write its next write would refuse, by running the same section guards on the written section in checked().'
+    suggested_owner: dev
+  - id: 'CR-2'
+    severity: medium
+    file: 'shared/resources/qa-results.js'
+    finding: 'Write-then-refuse via ambiguousAbove: a marker-less log with a Date-first table and then a | Version | Date | table, section directly below; write 2 renders | Cycle | Date | Gate | and returns replaced, write 3 refuses structural-line:| 2 | 2026-10-02 | PASS |. Base replaces both. Bug: task.184.bug.2.'
+    suggested_action: 'Check the written section with the same guards (underLog included) before writing, so the write is refused up front instead of on the following write.'
+    suggested_owner: dev
+  - id: 'CR-3'
+    severity: low
+    file: 'shared/resources/qa-results.js'
+    finding: 'The tail scan runs to the end of the section for every bold block that stops at a non-list label, calling insideProtected per line: k repeats of **Bug Reports** / **Note i** / text with inline code take 60 / 501 / 4151 ms at k = 100 / 200 / 400 (base 5 / 8 / 19 ms).'
+    suggested_action: 'End the tail scan at the next carried-label line (that block is checked on its own) and avoid per-line insideProtected over all ranges, so the scan stays linear.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 102
+  phases_verified: 4/4
+  ci: 'not read — CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: internal — shared/resources/qa-results.js#upsertQaResults judges a work-item document and a section this pipeline renders; markdown-structure models the implementation report and the disqualified-entries table lists only report-lint.js#lintReport. Unchanged from gate 1.'
+  performance:
+    status: CONCERNS
+    notes: 'CR-3: cubic tail scan on a repeated non-list label (4151 ms at k=400 vs 19 ms on base). The planned suites still run in about 1 s.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1, CR-2: the engine can write a document its own next write refuses. No content lost.'
+  maintainability:
+    status: PASS
+    notes: 'CR-4 (advisory): fenced lines after a stopping label are skipped by the tail scan, as the stop loop skips them; record it as an accepted trade or refuse on a fence.'
+
+recommendations:
+  immediate:
+    - action: 'One definition of "a section this engine refuses to rewrite", applied to the input section and to the written section, so no write leaves a document its next write refuses (CR-1, CR-2). Skip a tail the kept spans already carry (CR-1). Bound the tail scan (CR-3).'
+      refs: ['shared/resources/qa-results.js', 'shared/resources/tests/qa-results.test.mjs']
+  future:
+    - action: 'CR-4: decide whether a fenced block after a stopping label is a tail (refuse) and record the choice in the tail-rule comment.'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'Gate 1 CR-3: compute the "directly under a marker-less log" predicate once for underTablelessLog and ambiguousAbove.'
+      refs: ['shared/resources/qa-results.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1, CR-2 fixed', 'CR-3 bounded']

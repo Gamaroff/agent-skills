@@ -79,7 +79,7 @@ Invoke as `/review-security [work-item] [--mode diff|full]`.
      epic-level scope is deliberately out of scope, having no stopping rule.
 3. **Identify the controls the work item claims.** Read its Success Criteria / Acceptance Criteria and
    its security-relevant prose. A control is anything whose job is to decide what gets through.
-4. **Write one probe spec per control** — `{ sink, entry }`, plus `argv` for a `cli:` entry — following
+4. **Write one probe spec per control** — `{ sink, entry }`, plus `argv` for a `cli:` or `shell-argv:` entry and `slot` for a `fence:` entry — following
    [`references/security-review-prompt.md`](references/security-review-prompt.md),
    which is passed to the reviewing agent verbatim. Sink selection and entry-point rules live there.
 5. **Run the engine.** `runProbeSpec` executes every corpus case for the sink in a sandboxed child and
@@ -119,7 +119,7 @@ than good intentions:
 
 | Guarantee | Held by |
 | --- | --- |
-| The agent cannot write a verdict | `computeVerdict` in the engine; the agent supplies only `{sink, entry}` (and `argv`, for `cli:`) |
+| The agent cannot write a verdict | `computeVerdict` in the engine; the agent supplies only `{sink, entry}` (and `argv`, for `cli:`; `slot`, for `fence:`) |
 | Zero executed probes never reads as a pass | `runProbeSpec` returns `unverifiable` on `no-cases-executed` |
 | `evidence: measured` implies `probes_executed > 0` | both values come from the engine's run record via `--emit-block`; `evidenceOf()` computes `measured` only from a positive `totals.executed`, and the contract test runs the engine, emits the block, then deletes the record and asserts it reads `reasoned` |
 | The block's keys match the QA gate's, so a cycle lifts rather than translates | `evals/shared/tests/qa-re-review-scope-parity.test.mjs`; values defined once in [`references/qa-gate-security-evidence.md`](references/qa-gate-security-evidence.md) |
@@ -153,10 +153,12 @@ clean result:
    `file:line`, recording the module path the engine resolved, and downgrading any citation naming no
    file in scope to `unverifiable`.
 3. **A non-JS entry point is routed to the engine's `shell:` entry form** — or `shell-fn:` for a
-   sourced library, and `cli:` with an `--argv` template for a Node CLI whose decision sits behind
-   its flags — never recorded `unverifiable` for being bash or for taking several flags; only a
-   target no form reaches (stdin, a shell script with more than one positional, network) is
-   declined, with the reason named.
+   sourced library, `cli:` with an `--argv` template for a Node CLI whose decision sits behind
+   its flags, `shell-argv:` with an `--argv` template (and `--fixture-setup` when it needs a
+   repository) for a shell script that takes several arguments or flags, and `fence:` with
+   `--slot` for a fenced bash block in a step doc — never recorded `unverifiable` for being
+   bash, for taking several flags or for being prose; only a target no form reaches (stdin,
+   network) is declined, with the reason named.
 
 ## Out of scope in v1
 

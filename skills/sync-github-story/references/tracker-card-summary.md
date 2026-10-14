@@ -107,6 +107,12 @@ spec with an alias array rather than three specs: it keeps bug mode out of the c
   keys to set is instruction for the repo, not information for a card reader.
 - **Stakeholder Sign-off.** Explicitly excluded — see `create-story` and
   `create-task`.
+- **A literal control-character escape.** GitHub rewrites the text `\u0000` in
+  an issue or PR body to `\^@` and `\u001f` to `\^_`, server-side, whatever
+  the payload held (bug.17, 2026-09-30). A bug about control characters quotes
+  exactly these. Name the character in words instead: `NUL (U+0000)`,
+  `U+001F`. Nothing reads a body back after writing it, so the corruption is
+  otherwise found only by chance (obs #233).
 
 ## Implementation
 

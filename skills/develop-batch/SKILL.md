@@ -28,7 +28,7 @@ not consider — **write-conflict** between concurrent items — is decided here
 - User says "action the next batch", "develop the parallel frontier", "fan out the next
   worktrees and merge them".
 - `--dry-run`: report which rows the batch would contain, the soft overlaps accepted, the
-  rows held back by hard conflicts, and the worktree commands — then stop. **Read-only** —
+  rows held back by hard conflicts or an `epic-integration` epic, and the worktree commands — then stop. **Read-only** —
   no worktrees, no checkout/pull, no state file, no pipeline actions.
 
 For a single item (no worktrees), or to stop at every phase boundary, use `/develop-next`
@@ -136,7 +136,30 @@ independently via its own Phase 0b machinery.
    gate. If plan mode is active, STOP and say so — do not dispatch. (This is observed, not
    hypothetical: it killed 4 of 5 running pipelines in a live batch.)
 1. **Run-state check.** If `.claude/state/develop-batch.state.json` exists, a prior batch
-   did not finish — do **not** select a new batch. **Resume**: skip items already
+   did not finish — do **not** select a new batch. **Reconcile first, then route** (obs #180):
+   a crash between an item's merge and its flag write leaves `merged: false` on a PR that
+   merged, and routing on that flag would merge it again. For each non-terminal item (not
+   `ticked`, not `halted`) with a `prNumber` and `merged: false`, read the PR's state —
+   `MERGED` → set `merged: true`. Reconciliation only advances a flag, never clears one; a
+   query that fails leaves the item as recorded. The rule is `develop-next` Step 0.1's;
+   `ticked` is not reconciled here (a Future Improvement in task.188).
+
+   ```bash
+   # Step 0.1 reconciliation (develop-batch): merged ← the PR's state, per non-terminal item.
+   STATE_FILE=.claude/state/develop-batch.state.json
+   for PR_NUMBER in $(jq -r '.items[]
+       | select((.ticked // false) != true and (.halted // false) != true
+                and (.merged // false) != true and .prNumber != null)
+       | .prNumber' "$STATE_FILE"); do
+     if [ "$(gh pr view "$PR_NUMBER" --json state -q .state)" = "MERGED" ]; then
+       jq --argjson n "$PR_NUMBER" '(.items[] | select(.prNumber == $n) | .merged) = true' \
+         "$STATE_FILE" > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"
+       echo "reconciled: PR #$PR_NUMBER is MERGED — merged: true"
+     fi
+   done
+   ```
+
+   **Resume**: skip items already
    `ticked`; for each non-terminal item, resume from its recorded flags exactly as the
    per-item lane below would (`merged: true, ticked: false` → tick it; `dispatched: true,
    pipelineDone: false` → treat as **interrupted** and re-admit it via Step 2's planner —
@@ -189,7 +212,15 @@ Selection rules, the two batching axes, and marker vocabulary:
   `--dry-run`: print them and **stop here**. Otherwise write the run-state file with every
   `batch[]` item (a 1-item batch is fine — it degrades to a single worktree). Surface
   `softOverlaps[]` explicitly: these are the `~` tags whose second merger will rebase, and
-  `excluded[]`: ready rows held back by a hard `!` conflict, deferred to the next batch.
+  `excluded[]`: ready rows held back by a hard `!` conflict, deferred to the next batch,
+  and stories whose epic declares `branch_model: epic-integration` (reason starting
+  `epic-integration:`). A batch never runs those: its worktree is cut from, and rebased
+  onto, `<baseBranch>`, which would land the story outside its epic's integration branch
+  (bug.18). Tell the operator to run each one with `/develop-next`, whose Phase 0d bases it
+  on the integration branch.
+  A story whose epic the selector could not find stays in the batch, and `lint.warnings`
+  names it (`<id>: could not resolve its epic …`). Report that line: the dispatched
+  pipeline's integration-branch HALT is then the only check left for that item.
   Also surface `unannotated[]` (and the matching `lint.warnings` line): rows batched with
   no `touches:` field, whose write-disjointness is **assumed, not verified**. Two or more
   together is a co-scheduling risk — report it in both `--dry-run` and live runs, and advise
@@ -202,8 +233,9 @@ Selection rules, the two batching axes, and marker vocabulary:
   annotation, so write-disjointness cannot be established for them — see
   [`roadmap-selection.md`](../develop-next/references/roadmap-selection.md) §"Registry
   fallback frontier"), so an empty batch does **not** mean the registries are empty.
-  **STOP**: report `excluded[]` + `skippedPhases[]` so the operator sees why, tell them to
-  run `/develop-next` for the registry frontier (or author a phase with `touches:` tags if
+  **STOP**: report `excluded[]` + `skippedPhases[]` so the operator sees why — an
+  `epic-integration:` exclusion can empty a batch on its own — tell them to
+  run `/develop-next` for those and for the registry frontier (or author a phase with `touches:` tags if
   the items should run in parallel), send a push notification.
 - **`halt`** (no parseable roadmap content, exit 1) → **HALT**: surface `lint.errors`
   verbatim. The selector is deliberately tolerant; a halt means the file could not be
@@ -244,7 +276,10 @@ and `inflight[r] ≤` a probe's effective capacity when one is configured. In-fl
    ```
 
    Mark `worktreeCreated: true`. This is an isolated checkout on its own scratch branch off
-   the base — the pipeline cuts its own `feature/…` branch inside it. Then **seed it**: copy
+   the base — the pipeline cuts its own `feature/…` branch inside it. Cutting every worktree
+   from `<baseBranch>` is correct only because the selector keeps `epic-integration`
+   stories out of `batch[]` (bug.18): for every item that reaches this step, Phase 0d
+   recommends the base branch. Then **seed it**: copy
    every `developBatch.worktreeSeedPaths` entry from the main tree into `<dir>`. A fresh
    worktree carries no gitignored files, and a missing runner config typically degrades
    *silently* rather than failing.
@@ -271,7 +306,8 @@ and `inflight[r] ≤` a probe's effective capacity when one is configured. In-fl
    than its root one, carries the credentials a test run needs.
 
 2. **Dispatch one agent per admitted worktree.** Run the item's named command
-   (`worktrees[].run`, e.g. `/develop-task <path>`; `/develop-story` and `/develop-bug` dispatch identically) **with its working directory set to
+   (`worktrees[].run`, e.g. `/develop-task <path>`; `/develop-story` and `/develop-bug` dispatch identically)
+   **followed by `--defaults --base <baseBranch> --target <baseBranch>`**, **with its working directory set to
    `<dir>`**, prepending the directive below. Mark `dispatched: true`.
 
    **Dispatch in the background** so individual completions can be observed. This is what
@@ -284,9 +320,12 @@ and `inflight[r] ≤` a probe's effective capacity when one is configured. In-fl
    > **AUTONOMOUS RUN (develop-batch):** You are running this pipeline inside the git
    > worktree at `<dir>` — set your working directory to `<dir>` for all git and file
    > operations; do not touch the main working tree or any sibling worktree.
-   > For the Phase 0d Upfront Setup questions, take the auto-derived recommended option
-   > for every question without prompting (Q1 = base branch, `<baseBranch>`; Q2 = base
-   > branch, `<baseBranch>`). For the Phase 0b resume prompt, take the option Phase 0b
+   > The command carries `--defaults --base <baseBranch> --target <baseBranch>`, so the
+   > Phase 0d Upfront Setup questions resolve without prompting: this worktree was cut from
+   > `<baseBranch>`, and the batch admits no `epic-integration` story. If Phase 0d still asks
+   > — its epic pre-check found an integration branch, so the given base conflicts — HALT
+   > and report it rather than choosing: the item does not belong in a batch. For the
+   > Phase 0b resume prompt, take the option Phase 0b
    > marks **(Recommended)** — after a finalise DoD-gaps halt that is "Re-enter QA at
    > 5a"; only when no option is marked, choose "Resume from last completed step".
    > Record every auto-answer in the Decisions Log. Run the pipeline to
@@ -373,7 +412,9 @@ with `pipelineDone: true` and not `halted`, in `batch[]` order, reusing `develop
 merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
 
 1. **Rebase on the current tip** (for the 2nd and later merges): in the item's worktree,
-   `git fetch origin && git rebase origin/<baseBranch>` onto its `feature/…` branch. This
+   `git fetch origin && git rebase origin/<baseBranch>` onto its `feature/…` branch (every
+   batch item is based on `<baseBranch>`; `epic-integration` stories never enter a batch,
+   so this never replays an integration branch's commits — bug.18). This
    trivially resolves the `softOverlaps[]` (a new Prisma model, an appended `imports:[]`
    line, another registry row) against whatever earlier items in this batch already landed.
    A non-trivial rebase conflict → mark the item `halted`, report it, and continue with the
@@ -399,6 +440,9 @@ merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
      An entry is open when its `status:` is absent or reads `open` — **except** under `gate: WAIVED`
      with `waiver.active: true`, where the listed entries are the waived findings (qa-gate keeps them
      with no `status:`) and count as waived, not open. Same clause as `develop-next` Step 3.
+     A `/develop-bug` item never reads `accepted` and has no gate file: it is gated by the bug
+     rows in `develop-next` Step 3 instead (`status: closed`, DoD `✅ ACCEPTED`, verify verdict
+     `PASS`). They apply here unchanged and are not copied, so the two cannot drift.
    - **Head-SHA check:** `gh pr view <PR#> --json headRefOid,state` must match
      `git rev-parse HEAD` on the item's local PR branch after the rebase (never gate one
      commit and merge another).
@@ -488,12 +532,23 @@ merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
    # Bind the head branch before the merge; an empty binding is a halt, never a delete of "".
    HEAD_BRANCH=$(gh pr view <PR#> --json headRefName -q .headRefName)
    [ -n "$HEAD_BRANCH" ] || { echo "cannot bind the PR head branch"; exit 1; }
-   if [ -z "$(git status --porcelain)" ]; then
+   DIRTY=$(git status --porcelain)
+   if [ -z "$DIRTY" ]; then
      gh pr merge <PR#> --<mergeStrategy> --delete-branch
+     MERGE_EXIT=$?
    else
      # A dirty main checkout: --delete-branch's local switch would abort and skip the remote
      # delete (obs #142). Merge without it, then delete the remote branch directly.
-     gh pr merge <PR#> --<mergeStrategy> || exit 1
+     gh pr merge <PR#> --<mergeStrategy>
+     MERGE_EXIT=$?
+   fi
+   # The PR's state is the verdict, not the exit code (develop-next Step 3, obs #197).
+   PR_STATE=$(gh pr view <PR#> --json state -q .state)
+   [ "$PR_STATE" = "MERGED" ] \
+     || { echo "PR <PR#> is '${PR_STATE}' after gh pr merge (exit $MERGE_EXIT)"; exit 1; }
+   [ "$MERGE_EXIT" -eq 0 ] \
+     || echo "⚠️  PR <PR#> merged, but gh pr merge exited $MERGE_EXIT — a local follow-up failed"
+   if [ -n "$DIRTY" ] || [ "$MERGE_EXIT" -ne 0 ]; then
      # The merge has happened; a failed delete (already auto-deleted) is a warning, never the
      # block's status, or a merged item reads as halted (task.147 QA-1, CR-5).
      git push origin --delete "$HEAD_BRANCH" \
@@ -501,9 +556,12 @@ merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
    fi
    ```
 
-   On merge failure (conflict, protection): mark the item `halted`, report, continue. Mark
-   `merged: true`. Story/task PRs target `<baseBranch>` directly — no epic integration
-   branch.
+   The merge is judged by the PR's state, never by `gh pr merge`'s exit status — the rule is
+   stated once, in `develop-next` Step 3, beside its Bitbucket parsing note. On merge failure
+   (the PR is not `MERGED`: a conflict, protection): mark the item `halted`, report, continue.
+   Mark `merged: true`. Every batch PR targets `<baseBranch>` directly: the selector keeps
+   `epic-integration` stories, whose PRs target their epic's integration branch, out of a
+   batch (bug.18).
 4. **Signal the `pr-merged` stage for _this_ item**, after its merge succeeds and before its
    tick. Read the issue key from **this item's** document frontmatter — never from a
    batch-level variable:
@@ -554,7 +612,7 @@ merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
      when dirty (a crash between the write and its commit leaves the row edited; the resume path
      skips the dirty-tree check), then `git push origin <baseBranch>` once, regardless (a crash
      between commit and push leaves the record local-only; the push is idempotent), then
-     `ticked: true`; every other exit-0 reason (`no-row`,
+     `ticked: true`; every other exit-0 reason (`no-row`, `row-malformed`,
      `no-registry`, `no-cell`, `not-accepted`, `not-a-task`, `engine-unavailable`) → log, no commit.
    - **`source: bug-registry`** — the bug registry has no Issue or notes cell and
      `develop-bug` already closed the row: log `bug-registry: nothing to write`, no commit.

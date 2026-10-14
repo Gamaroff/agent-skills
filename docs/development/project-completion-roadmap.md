@@ -5,7 +5,7 @@ How to use this document: work top to bottom. Only `[ ]` rows are candidates; `[
 [`roadmap-history.md`](./roadmap-history.md), so a `deps:` entry naming no current row means
 _already shipped_, not an error. Resolve any such reference there.
 
-**Phases 1 through 8 are complete and archived** to
+**Phases 1 through 10 are complete and archived** to
 [`roadmap-history.md`](./roadmap-history.md) — resolve any `deps:` naming a row you cannot find here
 against that file. The rows under "Deferred / human-gated" remain invisible to selection.
 
@@ -20,8 +20,7 @@ finished work. Rules:
 §"Registry fallback frontier".
 
 Add a phase only to express *sequencing* the registries cannot: a deliberate order, a dependency
-chain, a human gate. **No phase is open**: Phase 8 (T186) closed 2026-10-06, and selection now falls
-through to the registries.
+chain, a human gate. **Phase 11 is open** (T202–T207, opened 2026-10-14) — an ordered chain ahead of the registry fallback.
 
 > ⚠️ **A phase costs upkeep that a registry row does not, and the cost is not obvious.** Roadmap rows
 > are matched on the **checkbox alone** — they do **not** consult the target document's frontmatter.
@@ -70,6 +69,23 @@ Read only by `--batch`. Two rows conflict when they share a tag that **either** 
 
 ---
 
+## PHASE 11 — hierarchical document numbering (opened 2026-10-14)
+
+An **override**: without it the registry fallback selects T189, then 190–200, before T202, because
+the fallback takes the lowest-numbered task. The chain renames PRDs, epics and stories to
+`prd.P` → `epic.P.E` → `story.P.E.S` (design: [`.agents/plans/hierarchical-doc-numbering.md`](../../.agents/plans/hierarchical-doc-numbering.md)).
+**T205 is ordered ahead of T204** on purpose: T203 retires the global epic registry that
+`/create-epic` reads until T205 lands, so T205 runs straight after T203 to close that window. T204
+and T205 hard-conflict on `templates` and `review-skills`, so `--batch` never pairs them. **Tick each
+row `[x]` the moment its task is accepted** — a phase row is matched on its checkbox, not the document.
+
+- [ ] **T202** Doc-id engine and PRD registry · deps: none · touches: selection~, test-harness~ · /develop-task docs/tasks/task.202.doc-id-engine-and-prd-registry/task.202.doc-id-engine-and-prd-registry.md
+- [ ] **T203** Migrate documents to hierarchical numbering · deps: T202 · touches: test-harness~ · /develop-task docs/tasks/task.203.migrate-doc-numbering/task.203.migrate-doc-numbering.md
+- [ ] **T205** PRD-scoped epic numbering · deps: T203 · touches: templates!, review-skills!, bundles!, setup-consumer~ · /develop-task docs/tasks/task.205.prd-scoped-epic-numbering/task.205.prd-scoped-epic-numbering.md
+- [ ] **T204** Numbered PRDs in the PRD skills · deps: T203 · touches: templates!, review-skills!, bundles! · /develop-task docs/tasks/task.204.numbered-prds-in-prd-skills/task.204.numbered-prds-in-prd-skills.md
+- [ ] **T206** Hierarchical story ids in the pipeline · deps: T202, T203, T205 · touches: pipeline-steps!, selection!, bundles!, finalise~, templates~ · /develop-task docs/tasks/task.206.hierarchical-story-ids-in-pipeline/task.206.hierarchical-story-ids-in-pipeline.md
+- [ ] **T207** Doc numbering enforcement and sweep · deps: T204, T205, T206 · touches: test-harness!, docs-pipeline!, bundles!, review-skills~, templates~ · /develop-task docs/tasks/task.207.doc-numbering-enforcement-and-sweep/task.207.doc-numbering-enforcement-and-sweep.md
+
 ---
 
 ## Deferred / human-gated
@@ -83,7 +99,7 @@ Rows here are invisible to selection. Move a row up into a phase when it becomes
 
 ## Housekeeping
 
-- [x] Archive accepted rows to `roadmap-history.md` at each phase close — Phase 5 archived 2026-09-12; Phases 6, 7 and 8 archived 2026-10-06
+- [x] Archive accepted rows to `roadmap-history.md` at each phase close — Phase 5 archived 2026-09-12; Phases 6, 7 and 8 archived 2026-10-06; Phases 9 and 10 archived 2026-10-11
 - [ ] If a phase is ever re-opened: tick its rows `[x]` as each item is accepted — an unticked row for an accepted item is still selected and stalls the loop
 
 **Registry-selected items need no row here.** When selection falls through to the registries (the
@@ -180,3 +196,11 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-10-06 | **Phases 6 and 7 archived** to `roadmap-history.md`. Both were fully ticked: Phase 6 (task.141 follow-ups, T143–T146) and Phase 7 (the 2026-09-24 observation review, T147–T154 and T158). 13 rows moved verbatim with their `touches:` tags and acceptance annotations, so a `deps:` naming any of them still resolves there. Phase 8 (T186) is now the only open phase. |
 | 2026-10-06 | **T186 accepted + merged — PR #576 merged** (`f1adccad`). Eval harness hardening and the task.185 leftovers, in four independent phases. (1) The runner and `repeat.mjs` share one assertion table (`assertion-dispatch.mjs`, `driver-name.mjs`): a never-settling setup is could-not-run, an unknown assertion `fn` is a usage error before any run, and a scenario with no assertion its driver runs is refused; the opt-in exit codes move to 73/74/75. (2) The fake `gh` gains a `refusal` field and closes the version, `-R` and `pick()` gaps. (3) `pr-inline-comment.js` sends `-X GET`. (4) `next_numbered` replaces counting at six skill sites. QA ran 3 cycles: CR-1 and CR-3 were fixed, then C2-CR-1, a regression from the first `jq` fix that skipped replay runs, was fixed; the loop left by the Diminishing-returns exit. 5c CONCERNS. **Two `/finalise` runs:** run 1 found AC6's zsh arm had no CI lane; the operator recorded a scope note (zsh verified locally, the task.185/176 precedent), and run 2 accepted (30 probes, 0 reproduced). Merge gate `npm run ci` green. Issue #575 closed. Phase 8 is fully ticked — archive it at the next housekeeping |
 | 2026-10-06 | **Phase 8 archived** to `roadmap-history.md`. Its one row, T186, moved verbatim with its `touches:` tags and acceptance annotation, so a `deps:` naming it still resolves there. No phase is open: `/develop-next` selects from the registries (next: T173). |
+| 2026-10-09 | **Phase 9 opened** with two rows, B18 then T201, as an override ahead of the registry fallback, which would select B18 first but then every lower-numbered task (175, 180, 181, 184, 188–200) before T201. Reason: T201 Phase 2 replaces the orchestrator directive bug.18 corrects, and its registry row already declares `bug.18` as a dependency. Both documents were filed the same day (issues #620, #621). |
+| 2026-10-10 | **B18 closed — PR #625 merged** (`748eb85e`). Both autonomous-orchestrator directives stated Phase 0d's per-item branch answers as constants, overriding the integration branch Phase 0d recommends for an `epic-integration` story. `develop-next` now takes the Recommended option and names no branch. `develop-batch` names `<baseBranch>`, its worktree's base, only beside a HALT for an integration branch: the review (CR-1/CR-2) showed that blind deferral would HALT every item on a non-`develop` base, because Phase 0d's own option reads `develop`. `select-next.mjs --batch` excludes `epic-integration` stories with a logged reason, and names an epic it cannot find in `lint.warnings` (CR-3). A per-orchestrator guard (`orchestrator-directive-branch-literal.test.mjs`) is red on both pre-fix SKILL.md files, and 6 selector cases were added. One verify cycle, 3 non-blocking review findings applied; `/finalise --bug` accepted; `npm run ci` green. Observations #2 (Step 3's verify-green table has no bug row) and #3 (finalise's CI-reading-2 floor counts duplicated rollup entries) logged. **T201 is next.** |
+| 2026-10-11 | **T201 accepted + merged — PR #632 merged** (`b5a266ff`). The develop pipelines take their Phase 0d answers and their speed up front. One engine, `pipeline-answers.js`, resolves each answer flag → policy → recommendation → ask, asking only on a conflict it states; `develop-next` and `develop-batch` pass `--defaults` instead of restating the question set (the bug.18 class). `--mode standard\|lite\|fast` and `--skip` are bounded by `develop.defaultMode` / `develop.skippable` (empty by default), and a skip makes the gate `WAIVED` with reason and approver, never `PASS`; the floor steps cannot be skipped. Step 2 reuses a review whose `reviewed_blob:` matches the document; implementation reports carry a UTC timestamp per step. QA ran 8 cycles in three passes: DoD runs 1 and 2 each found gaps only in AC10 (consumer names, limits from config), closed by test changes that re-entered QA at 5a; run 3 accepted 12/12 (72 probes, 0 reproduced). 5c APPROVE (pr-review.3). Merge gate `npm run ci` green (5305 tests). Issue #621 closed. Phase 9 is fully ticked — archive it at the next housekeeping |
+| 2026-10-11 | **Phase 9 archived** to `roadmap-history.md`. Both rows (B18, T201) moved verbatim with their `touches:` tags and acceptance annotations, so a `deps:` naming either still resolves there. |
+| 2026-10-11 | **Phase 10 opened** — T188 (resume from evidence, not flags) ahead of the registry fallback's T175. Obs #9 showed that a `/develop-next` run whose pipeline HALTed loops on Step 3's "not accepted" HALT even after the halt is cleared; T188 v1.1 carries the fix. A one-row override; archive it when T188 is accepted. |
+| 2026-10-11 | **T188 accepted + merged — PR #634 merged** (`46223ec0`). develop-next and develop-batch resume from evidence, not flags: the GitHub merge arm reads the PR's state after `gh pr merge` (obs #197), develop-next's run state records a pipeline HALT and Step 0.1 surfaces it before routing (obs #286, #9), and a reconcile block advances `merged` / `ticked` from the PR and the roadmap row — origin, then the local base — halting on anything it cannot read (obs #180). QA ran 4 cycles (80 → 40 → 90 → 100); 5c APPROVE. DoD run 1 stopped on the security probe zero-guard (fenced-prose boundary, no probe entry form); the operator recorded an override on the executed fixture evidence and run 2 accepted 11/11. Merge gate `npm run ci` green (5334 tests). Issue #587 closed. Phase 10 is fully ticked — archive it at the next housekeeping |
+| 2026-10-11 | **Phase 10 archived** to `roadmap-history.md`. Its one row, T188, moved verbatim with its `touches:` tags and acceptance annotation, so a `deps:` naming it still resolves there. No phase is open: `/develop-next` selects from the registries (next: T175). |
+| 2026-10-14 | **Phase 11 opened** — T202 → T203 → T205 → T204 → T206 → T207 (issues #645–#650), the hierarchical document numbering chain, ahead of the registry fallback's T189. T205 precedes T204 so the window in which `/create-epic` reads the epic registry T203 retires closes immediately. Archive the phase when T207 is accepted. |

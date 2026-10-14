@@ -63,7 +63,7 @@
     "bundle": "python3 skills/create-skill/scripts/bundle_skill.py --all",
     "bundle:check": "python3 skills/create-skill/scripts/bundle_skill.py --check",
     "bundle:skill": "python3 skills/create-skill/scripts/bundle_skill.py",
-    "prepare": "git config core.hooksPath .githooks"
+    "prepare": "git config core.hooksPath .githooks && bash scripts/link-skills.sh"
   },
   "devDependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.138",

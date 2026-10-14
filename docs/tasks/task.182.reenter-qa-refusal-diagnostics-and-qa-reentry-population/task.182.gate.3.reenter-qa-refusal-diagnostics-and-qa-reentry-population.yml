@@ -1,0 +1,59 @@
+schema: 2
+task: 'task.182.reenter-qa-refusal-diagnostics-and-qa-reentry-population'
+task_title: 'reenter-qa refusal diagnostics and the qa_reentry reader population'
+gate: CONCERNS
+status_reason: 'TASK-182-003 is fixed — no site states a wrong qa_phase value — but the consolidation claims more than it holds: the resume contract still restates the grant''s values, and the guard that should catch a restatement keys on one spelling over a hand-kept file list (TASK-182-004).'
+reviewer: 'QA Engineer'
+head: '93539f1bf5a7a8abf2b34dd8eaa40ef67a659927'
+updated: '2026-10-13T06:59:08Z'
+
+top_issues:
+  - id: 'TASK-182-004'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: 'The pause row says it is "the one statement" of the qa_phase values and the parity test says no other describer restates one, but the contract''s grant paragraph (:634-635) says "the grant writes `5a`" / "the grant writes `5b`". VALUE_CLAIM misses it (it needs the literal script name on one line), and its describer list is the hand-kept FILES map (it omits develop-pipeline-step-7-finalise.md). Code review CR-1, CR-2; bug report task.182.bug.2.'
+    suggested_action: 'Make the contract paragraph cite the pause row and keep only the why; match "the grant" and whitespace-collapsed text in VALUE_CLAIM; derive the describer population by grepping shared/resources/*.md and skills/*/SKILL.md for grant-qa-cycles; scope the pause row''s claim to the grant''s halt-dependent value (reenter-qa-after-finalise.sh''s constant 5a may be restated at its call sites).'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 7
+  phases_verified: 3/3
+  ci: 'not read this cycle (gated at /finalise)'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 8
+    notes: 'task.182.qa.3.security.run.json: shell-argv: reenter-qa-after-finalise.sh at 93539f1b — 8 executed (bash; zsh absent), 0 reproduced, 0 escapes; every case exit 0 or 1, so the new cwd guard refuses none of the proof run''s cases.'
+  performance:
+    status: PASS
+    notes: 'The cwd guard adds three git rev-parse calls before the refusals; suite 61/61.'
+  reliability:
+    status: PASS
+    notes: 'The cwd guard refuses a wrong-repo or subdirectory cwd as usage (exit 2) before any write; reviewer checked symlinked toplevels and worktrees.'
+  maintainability:
+    status: CONCERNS
+    notes: 'TASK-182-004. CR-3 (the "Resume at 5a" option label) is the cycle-2 CR-6 deferral, pre-existing and pinned by eval fixtures.'
+
+recommendations:
+  immediate:
+    - action: 'TASK-182-004: the contract cites the pause row; VALUE_CLAIM catches "the grant" across lines; describer population derived by grep'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/develop-pipeline-pause.md', 'evals/shared/tests/qa-loop-lock-fields-parity.test.mjs']
+  future:
+    - action: 'CR-3 (= cycle-2 CR-6): relabel "Resume at 5a with {k} more cycles" phase-neutrally — a follow-up task (eval fixtures pin the label)'
+      refs: ['skills/develop-task/SKILL.md', 'skills/develop-story/SKILL.md', 'shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'evals/develop-task/step-isolation/12-qa-reentry-after-loop-limit-with-grant/answers.jsonl']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-182-004 closed']

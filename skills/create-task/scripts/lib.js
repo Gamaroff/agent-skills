@@ -277,10 +277,17 @@ function frontmatterId(raw) {
   return null;
 }
 
+// A seeded description shorter than this is refused, not written: "1." passes
+// "non-empty" and is worse than no value (obs #291).
+const DESCRIPTION_MIN = 20;
+
 function firstSentence(text) {
   const flat = String(text || "")
     .replace(/\s+/g, " ")
-    .trim();
+    .trim()
+    // An Improvement section that opens with a list starts with its marker;
+    // the marker's own dot is not the end of a sentence (obs #291).
+    .replace(/^(?:\d+[.)]|[-*+])\s+/, "");
   const m = /^(.+?[.!?])(?=\s|$)/.exec(flat);
   return m ? m[1] : flat;
 }
@@ -294,7 +301,8 @@ function firstSentence(text) {
  * @param {{taskId: number|string}} opts
  * @returns {{
  *   ids: number[], title: string|null, titleReason: string|null,
- *   description: string, tags: string[], references: string[],
+ *   description: string|null, descriptionReason: string|null,
+ *   tags: string[], references: string[],
  *   changeLogDescription: string, park: string[][]
  * }}
  *
@@ -381,15 +389,23 @@ function seedFromObservations(entries, { taskId } = {}) {
         break;
       }
     }
+    // The title is the bare name every task document carries. The bound is
+    // checked on the card form, because that is the string the tracker holds;
+    // ensure-task-github-issue adds the prefix (obs #291).
     const candidate = `[Task ${taskId}] ${bare}`;
-    if (candidate.length <= CARD_TITLE_MAX) title = candidate;
+    if (candidate.length <= CARD_TITLE_MAX) title = bare;
     else titleReason = "over-bound";
   }
 
-  const description = rows
+  let description = rows
     .map((r) => firstSentence(r.sections.improvement))
     .filter(Boolean)
     .join(" ");
+  let descriptionReason = null;
+  if (description.length < DESCRIPTION_MIN) {
+    description = null;
+    descriptionReason = "too-short";
+  }
   const references = rows.map((r) => `Observation #${r.id} — ${r.title}`);
   const list = ids.map((i) => `#${i}`).join(", ");
   const changeLogDescription = `Initial draft — cut from observation${ids.length > 1 ? "s" : ""} ${list}`;
@@ -415,6 +431,7 @@ function seedFromObservations(entries, { taskId } = {}) {
     title,
     titleReason,
     description,
+    descriptionReason,
     tags,
     references,
     changeLogDescription,

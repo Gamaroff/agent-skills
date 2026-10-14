@@ -512,6 +512,14 @@ const WRITER_SITES = [
     "### Step 7 — Write the review report",
     "review-pr",
   ],
+  // The develop pipelines' implementation report, before its first commit at
+  // Step 4 (obs #198). One step doc serves all three orchestrators, so the
+  // skill segment is the {a|b|c} invocation spelling.
+  [
+    "shared/resources/develop-pipeline-step-4-create-pr.md",
+    "## Check the Report's Links",
+    "{develop-story|develop-task|develop-bug}",
+  ],
 ];
 
 /** The section under `heading`, to the next heading of the same or a higher
@@ -542,7 +550,7 @@ function section(text, heading) {
   return lines.slice(start, end).join("\n");
 }
 
-test("writer sites: qa-task Step 11, qa-story Output 1 and review-pr Step 7 each stage the report and run doc-links.js on it (task.152, obs #155)", () => {
+test("writer sites: qa-task Step 11, qa-story Output 1, review-pr Step 7 and develop Step 4 each stage the report and run doc-links.js on it (task.152, obs #155, #198)", () => {
   let found = 0;
   for (const [file, heading, skill] of WRITER_SITES) {
     const body = section(
@@ -554,7 +562,7 @@ test("writer sites: qa-task Step 11, qa-story Output 1 and review-pr Step 7 each
     assert.match(
       body,
       new RegExp(
-        `node \\.agents/skills/${skill}/references/doc-links\\.js --file`,
+        `node \\.agents/skills/${skill.replace(/[{}|]/g, "\\$&")}/references/doc-links\\.js --file`,
       ),
       `${file} § ${heading} does not run references/doc-links.js --file on the report it writes`,
     );
@@ -579,14 +587,16 @@ test("writer sites: qa-task Step 11, qa-story Output 1 and review-pr Step 7 each
         `${file} § ${heading} stages the gate before it is written — git add fails and stages nothing`,
       );
     }
-    assert.ok(
-      fs.existsSync(
-        path.join(REPO_ROOT, "skills", skill, "references", "doc-links.js"),
-      ),
-      `skills/${skill}/references/doc-links.js is not bundled — run npm run bundle`,
-    );
+    for (const one of skill.replace(/[{}]/g, "").split("|")) {
+      assert.ok(
+        fs.existsSync(
+          path.join(REPO_ROOT, "skills", one, "references", "doc-links.js"),
+        ),
+        `skills/${one}/references/doc-links.js is not bundled — run npm run bundle`,
+      );
+    }
   }
-  assert.equal(found, 3, "all three writer sections were found");
+  assert.equal(found, WRITER_SITES.length, "every writer section was found");
 });
 
 test("state (task.149, obs #164): a broken link says whether the target is untracked on disk or missing, and the red markers are unchanged", () => {

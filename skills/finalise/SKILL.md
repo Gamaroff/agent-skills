@@ -240,7 +240,7 @@ docs/tasks/task.90.swagger-cli-plugin-enablement/
 3. Parse YAML frontmatter to extract current status and metadata
 4. Extract acceptance criteria, PR references, and documentation notes from the body
 
-**Bug mode (`read-document`):** run — the document is a bug report, and it comes in two shapes: YAML frontmatter, or a `**Bug ID**:` / `**Status**:` header block with no frontmatter at all. Read it through `node references/bug-doc.js --file "$DOC_FILE"` (the same reader `ensure-bug-github-issue` and the syncs use) rather than by frontmatter grep; the JSON carries `mode`, `bug_id`, `github_issue` / `jira_key`, and `fields.status` / `fields.severity` / `fields.priority` (merged across both shapes). It carries **no** `pr_number`: `PR_NUMBER` comes from Step 3a's existing derivation over the document (`pr_number:` in frontmatter, else `PR #NNN` / `pull/NNN` in the body), which reads a bug file exactly as it reads a task. There are no acceptance criteria to extract — the bug's one "criterion" is its `**Expected Behavior**` line, which the fix-evidence agent reads.
+**Bug mode (`read-document`):** run — the document is a bug report, and it comes in two shapes: YAML frontmatter, or a `**Bug ID**:` / `**Status**:` header block with no frontmatter at all. Read it through `node references/bug-doc.js --file "$DOC_FILE"` (the same reader `ensure-bug-github-issue` and the syncs use) rather than by frontmatter grep; the JSON carries `mode`, `bug_id`, `github_issue` / `jira_key`, and `fields.status` / `fields.severity` / `fields.priority` (merged across both shapes). It carries **no** `pr_number`: `PR_NUMBER` comes from Step 3a's resolver, which reads a bug's branch exactly as it reads a task's. There are no acceptance criteria to extract — the bug's one "criterion" is its `**Expected Behavior**` line, which the fix-evidence agent reads.
 
 ### Step 2: Check for and Review QA Reports
 
@@ -344,6 +344,11 @@ superseded)`). If it is not, that is itself a finding: an unmarked stale PASS ba
      - Check `waiver.active` and understand why issues were waived
      - Verify waiver is appropriate and documented
      - Consider waived issues in acceptance decision
+     - **Show the waiver in the DoD file**, beside the gate status, as one line —
+       `**Waiver**: {waiver.reason} — approved by {waiver.approved_by}`. A pipeline step skipped with
+       `--skip` (task.201) reaches the DoD only through this line, so a reader of the DoD or its PR
+       comment sees the skip rather than a gate that merely reads `WAIVED`. A waiver with no
+       `approved_by` is not documented: list it as a DoD gap.
 
 6. **Document QA Report Findings:**
    - If QA reports exist, reference them in the final DoD verification section
@@ -453,9 +458,11 @@ superseded)`). If it is not, that is itself a finding: an unmarked stale PASS ba
 Collect these values before dispatching:
 
 ```bash
-# PR number
-PR_NUMBER=$(grep '^pr_number:' {story-file} | awk '{print $(2)}' | grep -oE '[0-9]+' | head -1)
-[ -z "$PR_NUMBER" ] && PR_NUMBER=$(grep -oE 'PR #([0-9]+)|pull/([0-9]+)' {story-file} | grep -oE '[0-9]+' | head -1)
+# The PR this run judges — from the branch or the pipeline lock before the document (task 175).
+# Exit 1 (no source names one) leaves PR_NUMBER empty; the agents report pr_status NOT_FOUND.
+PR_JSON=$(bash .agents/skills/finalise/references/resolve-pr-number.sh --doc {story-file} --json)
+PR_NUMBER=$(printf '%s' "$PR_JSON" | jq -r '.pr // empty')
+PR_SOURCE=$(printf '%s' "$PR_JSON" | jq -r '.source // "none"')
 
 # Story type
 STORY_TYPE=$(grep '^type:' {story-file} | awk '{print $(2)}' | tr -d '"')
@@ -467,6 +474,16 @@ DIFF_FILE=".claude/state/pr-diff-$(date +%s).diff"
   || git diff HEAD~1 HEAD > "$DIFF_FILE" 2>/dev/null || touch "$DIFF_FILE"
 ```
 
+**The PR number comes from `references/resolve-pr-number.sh`, never from the document body.** It
+reads, first answer wins: an explicit `--pr`, the PR whose head is the current branch (`pr-read.sh`),
+the pipeline lock's `pr_url` when the lock is for this document's directory, frontmatter
+`pr_number:`, and a body `PR #N` only when PR N's head branch is the current branch. A task document
+cites other work's PRs, and the old first-match-in-the-body rule judged one of them on three runs
+(task.146 → #472, task.147 → #207, task.166 → #505; obs #184). Step 3a passes no `--pr`: finalise
+takes no PR argument, and inside a pipeline the branch rung answers. Record
+`**PR:** #{PR_NUMBER} (source: {PR_SOURCE})` in the running summary's Step 2 block — or
+`**PR:** unresolved (no branch PR, lock, frontmatter or confirmed citation)` when `PR_NUMBER` is empty.
+
 #### Step 3b: Dispatch 4 Explore Subagents in Parallel
 
 **CRITICAL**: Send all 4 Agent tool calls in a **single message**. Do not send them sequentially.
@@ -476,7 +493,7 @@ Read each prompt file to get the template, substitute the placeholder values, th
 | Agent                | Prompt file                                    | Key substitutions                                            |
 | -------------------- | ---------------------------------------------- | ------------------------------------------------------------ |
 | 1. AC traceability   | `references/finalise-dod-ac-prompt.md`         | `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>`, `<DIFF_FILE>` |
-| 2. Security review   | `references/finalise-dod-security-prompt.md`   | `<STORY_FILE>`, `<STORY_TYPE>`                               |
+| 2. Security review   | `references/finalise-dod-security-prompt.md`   | `<STORY_FILE>`, `<STORY_TYPE>`, `<DOD_N>` (Step 0's `$DOD_N`) |
 | 3. Compliance review | `references/finalise-dod-compliance-prompt.md` | `<STORY_FILE>`                                               |
 | 4. Docs & changelog  | `references/finalise-dod-docs-prompt.md`       | `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>`                |
 
@@ -485,6 +502,39 @@ Each agent returns YAML. Capture: `AC_RESULT`, `SECURITY_RESULT`, `COMPLIANCE_RE
 **Bug mode (`ac-agent`):** skip — a bug report has no acceptance criteria, so agent 1's prompt has nothing to trace. Its slot is taken by the fix-evidence agent below; still four agents, still one message.
 
 **Bug mode (`fix-evidence`):** run — dispatch `references/finalise-dod-fix-evidence-prompt.md` as agent 1 with `<BUG_FILE>`, `<PR_NUMBER>`, `<DIFF_FILE>` and `<IMPL_REPORT>` (the newest implementation report beside the bug in **either** shape the pipeline has written — `{bug-prefix}.implementation.*.md` or `{bug-prefix}.{name}.implementation.*.md`, the two prefixes `references/bug-doc.js` accepts (TASK-125-BUG-13) — or empty). It checks the five things a bug fix must show — the expected behaviour is implemented, a regression test asserts it *and runs per PR*, the test is recorded red without the fix, a new guard states its scope, bundled copies match their source — and returns `fix_evidence:` YAML in the same PASS/FAIL-with-citation contract as `ac_traceability:`. Capture it **as `AC_RESULT`** so Steps 3c–6 read one variable: `AC_OVERALL` is `fix_evidence.overall`, and the Step 6 column "All Acceptance Criteria Met?" reads "all fix-evidence checks PASS". `STORY_TYPE` is `bug` for the other three agents, which need no bug variant.
+
+> **The security agent's evidence lands in the work-item directory before Step 3d.** The run record
+> (`{stem}.dod.{N}.security.run.json` and its `.d/`) and any cases file
+> (`{stem}.dod.{N}.security.cases.json`), both numbered by this run's `$DOD_N` (obs #302), must be under the work-item directory, because the 6a
+> acceptance commit carries them. A read-only agent may report that it wrote them elsewhere. Copy
+> them in from the paths it returns, and treat a `--cases-file` it ran but did not save as
+> `probes_executed` that cannot be re-run: re-dispatch once, asking for the file (obs #299).
+
+> **When the record is still absent, `/finalise` runs the probe itself (obs #10).** A read-only
+> agent may refuse to create the engine's sandbox or its record. It then returns `probes_executed: 0`,
+> the `probe mode executed no candidates` FAIL and its `probe_command`. That FAIL describes the agent's
+> tool class, not the boundary. On task.201 it would have reached Step 6 as a security FAIL on a
+> boundary that held (72 executed, 0 reproduced). Before Step 3c, when `boundary: true` and this run's
+> `${STEM}.dod.${DOD_N}.security.run.json` is in neither the work-item directory nor a path the agent
+> returned:
+>
+> 1. **Cases.** If `probe_command` passes `--cases-file` and that file is absent, write the agent's
+>    `probe_cases` to it, under the work-item directory. With neither, re-dispatch once, asking for them.
+> 2. **Run.** First check that the command's `--record` is this run's record path in the work-item
+>    directory. Correct a command that records anywhere else; do not run it as given. Then run it from
+>    the repository root.
+> 3. **Replace, from the record.** Set `probes_executed` to its `totals.executed`. Rebuild `probes[]`
+>    from the engine's `cases[]`, keeping each whose outcome differs from its direction, with its input
+>    verbatim. When the count is non-zero, drop the agent's `probe mode executed no candidates` check.
+>    Recompute `overall` from what remains: FAIL if any check or general check FAILs or any probe
+>    reproduced, otherwise PASS. A rebuilt probe carries **no `severity`**, so Step 8a reads it as not-low and halts.
+>    Re-dispatch the agent with the record path if you want it graded.
+> 4. **Say so.** Add `- Probe run by /finalise — the security agent could not execute it` under the
+>    security section's Probe Results.
+>
+> A zero from this run still takes the zero-guard: then the engine declined the entry, which is the
+> guard's real case. With no `probe_command` either, the zero-guard stands and the section is
+> re-dispatched once.
 
 > **`SECURITY_RESULT` carries a `boundary:` flag and, when it is true, `probes_executed:` and `probes[]`.**
 > `boundary: true` means the security agent's Step 1b identified a **boundary deliverable** — a predicate,
@@ -813,7 +863,11 @@ CI_ROLLUP=$(gh pr view "$PR_NUMBER" --json statusCheckRollup \
 # How many checks that reading was green over. Reading 2's poll uses it as a floor: a fresh push
 # registers its fast lanes first, and a rollup that is SUCCESS across three checks while the slow
 # lanes have not yet appeared is not a decision (obs #87). Record it beside CI_ROLLUP.
-CI_CHECKS_1=$(gh pr view "$PR_NUMBER" --json statusCheckRollup -q '.statusCheckRollup | length' 2>/dev/null || echo 0)
+# DISTINCT checks (a CheckRun's name, a StatusContext's context), never rollup entries: one check
+# can be listed twice, and a floor counted in entries could never be met by a head that listed it
+# once — the poll then ran out its whole MAX_WAIT on a green head (obs #3, PR #625). The poll's
+# checks() below uses the same query, so the floor and the reading count one unit.
+CI_CHECKS_1=$(gh pr view "$PR_NUMBER" --json statusCheckRollup -q '[.statusCheckRollup[] | (.name // .context // "")] | unique | length' 2>/dev/null || echo 0)
 ```
 
 #### Bitbucket (`PLATFORM=bitbucket`)
@@ -1096,7 +1150,7 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    - Change `status` to `accepted`
    - Update `updated` field to current date (YYYY-MM-DD)
    - Add `completed_date` field with current date
-   - Ensure `pr_number` is present in frontmatter (add if only in body)
+   - Write `pr_number: {PR_NUMBER}` from Step 3a's resolver; when it resolved none, write no `pr_number:` — never a number copied from the document body (task 175)
 
    **Example:**
 
@@ -1196,6 +1250,7 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    | `not-accepted` | The document's status is not `accepted` | Investigate — step 2 above should have set it |
    | `no-registry` | This project keeps no task registry | Nothing |
    | `no-row` | The registry has no row for this task | **Log it.** CI's drift check will fail on this |
+   | `row-malformed` | The registry has a row for this task, but the parser rejected its shape — `parserReason` and `line` say why and where | **Log it and tick by hand.** Fix the row's shape so the next tick works |
    | `ambiguous-row` | The Status column could not be identified | **Log it and tick by hand** |
    | `engine-unavailable` | The registry parser could not be located | **Log it and tick by hand** |
 
@@ -1324,6 +1379,10 @@ standalone.
    # prose beside this block, so the block HALTed verbatim on every bug run (TASK-125-BUG-16).
    # The implementation report is NOT staged here — the orchestrator's Step 8 owns its final
    # commit, and staging it would split its history.
+   # The commit below carries the FULL INDEX, not only these paths: in a develop pipeline, 5c
+   # stages the PR review report and any doc-only CONCERNS fixes and commits nothing, so they ride
+   # this commit (task.173; develop-pipeline-step-5-6-qa-loop.md § "Carry the review into the
+   # acceptance commit"). The message says so when it happens — CARRY_SUFFIX below.
    # The DoD path is resolved FIRST, zsh-safe and by number, and checked — a bare glob inside
    # the array assignment aborted the whole script under zsh before the HALT below could
    # print (cycle-8 CR-5; ordering: TASK-125-BUG-21).
@@ -1361,13 +1420,23 @@ standalone.
    # The suffix is keyed on the registry being STAGED, not on the file existing — a story run in
    # a repo that keeps a task registry would otherwise claim a tick it did not make.
    REG_SUFFIX=$(git diff --cached --quiet -- docs/tasks/task-registry.md 2>/dev/null || echo '; registry ticked')
+   # Anything staged beyond the acceptance artefacts and the registry is 5c's carried set (or, in a
+   # standalone run, whatever the operator staged by hand — the suffix then says so truthfully).
+   # git spells the artefacts' names on both sides: a pathspec diff over ADD_PATHS normalises an
+   # absolute, `./`-prefixed or doubled-slash path to the name the full list prints, where a string
+   # comparison read every artefact as carried (task.173 QA-1, CR-4).
+   EXPECTED=$(git -c core.quotePath=false diff --cached --name-only -- "${ADD_PATHS[@]}" docs/tasks/task-registry.md)
+   CARRIED=$(git -c core.quotePath=false diff --cached --name-only \
+     | grep -vxF -f <(printf '%s\n' "$EXPECTED") || true)
+   CARRY_SUFFIX=""
+   [ -n "$CARRIED" ] && CARRY_SUFFIX='; 5c review carried'
    # Idempotent on re-run: when the artefacts are already committed there is nothing staged, and
    # `git commit` would exit 1 for "nothing to commit" — indistinguishable from a hook rejection.
    # Skip the COMMIT in that case (never the push, and never `--allow-empty`).
    if git diff --cached --quiet; then
      echo "acceptance artefacts already committed — skipping commit, pushing"
    else
-     git commit -m "${COMMIT_MSG}${REG_SUFFIX}"
+     git commit -m "${COMMIT_MSG}${REG_SUFFIX}${CARRY_SUFFIX}"
      COMMIT_EXIT=$?
      [ "$COMMIT_EXIT" -eq 0 ] || { echo "HALT: acceptance commit rejected (exit $COMMIT_EXIT) — see output above"; exit 1; }
    fi
@@ -1482,6 +1551,7 @@ standalone.
 #!/usr/bin/env bash
 # usage: finalise-ci-poll.sh <PR_NUMBER> <EXPECTED_HEAD> <MAX_WAIT_SECONDS> <RESULT_FILE> [EXPECTED_CHECKS] [ENGINE]
 # Writes ONE line to RESULT_FILE when it concludes: "<STATE> <HEAD> <CHECKS> <WAITED>s TREE_EQ=<sha12 or empty>".
+# <STATE> is the rollup token, or UNDECIDED when MAX_WAIT ran out on a SUCCESS that never qualified.
 # ENGINE is the path of ci-tree-equivalence.js; absent means the docs-only rule is off for this poll.
 PR_NUMBER=${1}; EXPECTED_HEAD=${2}; MAX_WAIT=${3}; RESULT=${4}; EXPECTED_CHECKS=${5:-0}; ENGINE=${6:-}
 TREE_EQ=""; TE_LATCHED=0
@@ -1496,8 +1566,9 @@ rollup() { : ...the Step 6 rollup query for this platform, verbatim — copy it,
 sampled_head() { gh pr view "$PR_NUMBER" --json headRefOid -q .headRefOid 2>/dev/null || echo unknown; }
 # How many checks the rollup is green OVER. A push registers its fast lanes first; a rollup
 # sampled in that window is SUCCESS across three checks while the slow lanes have not yet
-# appeared (obs #87). Bitbucket: the pipeline count for the head commit.
-checks() { gh pr view "$PR_NUMBER" --json statusCheckRollup -q '.statusCheckRollup | length' 2>/dev/null || echo 0; }
+# appeared (obs #87). Distinct checks, the same query as CI_CHECKS_1 (obs #3).
+# Bitbucket: the pipeline count for the head commit.
+checks() { gh pr view "$PR_NUMBER" --json statusCheckRollup -q '[.statusCheckRollup[] | (.name // .context // "")] | unique | length' 2>/dev/null || echo 0; }
 WAITED=0; PREV_CHECKS=-1
 STATE=$(rollup); CHECKS=$(checks)
 # A terminal state is accepted only when ALL of:
@@ -1539,10 +1610,19 @@ decided() {
     *) return 1 ;;
   esac
 }
+DECIDED=0
 while [ "$WAITED" -lt "$MAX_WAIT" ]; do
-  decided && break
+  decided && { DECIDED=1; break; }
   sleep 30; WAITED=$((WAITED + 30)); PREV_CHECKS=$CHECKS; STATE=$(rollup); CHECKS=$(checks)
 done
+# MAX_WAIT ran out. The last sample was taken after the loop's last decided(), so judge it once.
+# Only a SUCCESS is re-judged: decided() on a PENDING/NONE head asks the engine, and FAILURE is
+# terminal for the reader anyway. A SUCCESS that still fails the floor or the stable-count rule is
+# NOT a green reading: printed as sampled, the reader accepted a rollup that stayed partial for the
+# whole wait, which is the case the floor exists to refuse (obs #4). UNDECIDED makes the reader HALT.
+if [ "$DECIDED" -eq 0 ] && [ "$STATE" = SUCCESS ]; then
+  decided || STATE=UNDECIDED
+fi
 printf '%s %s %s %ss TREE_EQ=%s\n' "$STATE" "$(sampled_head)" "$CHECKS" "$WAITED" "$TREE_EQ" > "$RESULT"
 POLLEOF
    # CI_CHECKS_1 is the check count reading 1 was green over (Step 6 records it beside CI_ROLLUP).
@@ -1593,6 +1673,7 @@ POLLEOF
    | `SUCCESS`                                  | Proceed to action 7. Record `CI reading 2: SUCCESS @ {CI_HEAD_2}` — or, when `CI_TREE_EQ_2` is set, `CI reading 2: SUCCESS (tree-equivalent to {CI_TREE_EQ_2}) @ {CI_HEAD_2}`, never plain `SUCCESS`: the acceptance commit's own CI did not finish and the docs-only rule satisfied the reading |
    | `FAILURE`                                  | **HALT `ci-not-green-on-acceptance-head`.** The acceptance commit is pushed and `status: accepted` is on the branch — do **not** revert it; report the failing job(s) and stop before any side-effect. The human decides whether the red is the docs commit or the code |
    | `PENDING` / `NONE` / `CANCELLED` / `UNKNOWN` past `MAX_WAIT` | **HALT `ci-not-green-on-acceptance-head`** with the last sampled state. Waiting past the bound is a judgement for a human; assuming green is not a judgement at all |
+   | `UNDECIDED`                                | **HALT `ci-not-green-on-acceptance-head`.** `MAX_WAIT` ran out on a rollup that read `SUCCESS` without meeting the check floor (`CI_CHECKS_2` below reading 1's count) or without its count settling. Report both counts: a partial rollup is not a green reading, however long it was waited on (obs #4) |
 
    > **The poll is a background job by construction, not by advice.** `gh pr checks --watch` is
    > forbidden for the same reason (see `develop-next` Step 3): a wait that lives inside one tool
@@ -2248,7 +2329,7 @@ EOF
 
 - [ ] Running summary file finalized — `## Verification Complete` appended with `**Final Status:** ✅ ACCEPTED`, and that is the file's only status line (the header carries none)
 - [ ] Story frontmatter updated: `status: accepted`, `updated`, `completed_date`, `pr_number`
-- [ ] Task only: registry row ticked — `registry-tick.js` reported `ticked` / `already` / `no-registry` (a `no-row`, `ambiguous-row` or `engine-unavailable` needs a manual tick before merge, or CI's drift check fails)
+- [ ] Task only: registry row ticked — `registry-tick.js` reported `ticked` / `already` / `no-registry` (a `no-row`, `row-malformed`, `ambiguous-row` or `engine-unavailable` needs a manual tick before merge, or CI's drift check fails)
 - [ ] DoD PASSED section added to story document body
 - [ ] Running summary referenced in DoD section
 - [ ] Sprint Review summary file created at `{story-directory}/sprint-review-summary.md`
@@ -2652,7 +2733,29 @@ line `Fix-and-recheck refused: {ids}` in the gap report's Blocking Issues Summar
   it to be non-empty, to name the test, and to carry a red marker (`not ok` / `✖` / `ℹ fail N`);
   a flipped boolean with no recorded run halts on `mutation-proved`. **Exit 0 is the licence for
   the commit; exit 1 is Step 8.**
-- `git commit` — one commit, message `fix(<stem>): finalise DoD <section> — <finding, one line>`.
+- Commit — one commit, message `fix(<stem>): finalise DoD <section> — <finding, one line>`,
+  **path-limited to `touched`**. 5c may have staged the PR review report and doc-only fixes for 6a to
+  carry into the acceptance commit (task.173). A bare `git commit` sweeps them into this fix
+  commit, and the `--git-base` run below then refuses it for a file the record did not name — on
+  healthy work. `--` commits the named paths and leaves the rest of the index staged for 6a:
+
+  ```bash
+  STEM="{story.{epic}.{story} | task.{id} — the work item's filename stem}"
+  MSG_TAIL="{section} — {the finding, one line}"
+  case "$STEM$MSG_TAIL" in *'{'*) echo "HALT: STEM and MSG_TAIL must be substituted in this block"; exit 1 ;; esac
+  # The commit's paths are the record's `touched`, read in THIS block — zsh-safe, no bare glob.
+  TOUCHED=()
+  while IFS= read -r p; do [ -n "$p" ] && TOUCHED+=("$p"); done \
+    < <(command node -e 'for (const p of JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).touched || []) console.log(p)' .claude/state/finalise-fix-finding.json)
+  [ "${#TOUCHED[@]}" -gt 0 ] || { echo "HALT: the finding record names no touched paths"; exit 1; }
+  # Add first: `git commit -- <path>` refuses a path git does not yet know (a new test file).
+  git add -- "${TOUCHED[@]}"
+  ADD_EXIT=$?
+  [ "$ADD_EXIT" -eq 0 ] || { echo "HALT: git add of the touched paths failed (exit $ADD_EXIT)"; exit 1; }
+  git commit -m "fix(${STEM}): finalise DoD ${MSG_TAIL}" -- "${TOUCHED[@]}"
+  COMMIT_EXIT=$?
+  [ "$COMMIT_EXIT" -eq 0 ] || { echo "HALT: 8a fix commit rejected (exit $COMMIT_EXIT) — see output above"; exit 1; }
+  ```
 
 **2b. Re-run the evaluator on the record, then push.** The second run licensed the *commit* on a
 forecast (`"commits": 1` typed before any commit existed; `touched` as the paths the fix *would*
@@ -2666,7 +2769,14 @@ node references/finalise-fix-and-recheck.mjs \
 `--git-base` derives `commits` from `git rev-list --count <base>..HEAD` and `touched` from
 `git diff --name-only <base>..HEAD` and **refuses** a record that disagrees with either — two
 commits, a file the record did not name, a ref git cannot answer. Exit 0 → `git push origin HEAD`;
-exit 1 → Step 8, with the commit left local (it is one `git reset --hard "$CI_HEAD_1"` away). The
+exit 1 → Step 8, with the commit left local. To drop it, run `git reset --soft "$CI_HEAD_1"` and then
+`git restore --source="$CI_HEAD_1" --staged --worktree -- <touched>`. Never use `--hard`: it would also
+destroy the 5c review report and any doc-only fixes staged for 6a to carry, which no commit holds
+(task.173 QA-2, CR-3). One exception: a `touched` path that is also a 5c-carried doc fix (listed in
+`.claude/state/5c-carry-eligible.txt`). The fix commit took the 5c edit with it, so the 5c-only content
+survives nowhere: not in the index, not in the tree, not in any commit. Restore the path from
+`CI_HEAD_1`, re-apply the doc-only fix from its finding in the PR review report, and re-run the 5c
+stage block for that path (task.173 QA-4, CR-1). The
 run before the commit cannot do this check, and that is why there are three runs, not two.
 
 **3. Retake CI reading 1 on the fix head.** The decision reading from Step 6 was taken on a commit

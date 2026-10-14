@@ -112,7 +112,9 @@ Before this existed, the ascending-number tie-break hid the gap whenever a depen
 
 ### Columns
 
-When the table has a header, columns are read **by name** (`#`/`No`/`Id`, `Title`/`Name`, `Status`, `Severity`, `Priority`, `Deps`/`Depends on`/`Blocked by`), falling back to the documented positions only when no header is recognisable. A consumer who orders their registry differently is read correctly rather than silently mis-ranked; a header that names no `Status` or `Priority` column falls back to the documented position and says so in `--lint` warnings.
+When the table has a header, columns are read **by name** (`#`/`No`/`Id`, `Title`/`Name`, `Status`, `Severity`, `Priority`, `Deps`/`Depends on`/`Blocked by`, `Document`/`Doc`/`Path`/`File`), falling back to the documented positions only when no header is recognisable. A consumer who orders their registry differently is read correctly rather than silently mis-ranked; a header that names no `Status` or `Priority` column falls back to the documented position and says so in `--lint` warnings.
+
+**The document path comes from the title's link, or from a document column** (bug 19). A registry may keep the title as plain text and put the path in a column of its own — `` | 147 | Plain title | … | `docs/tasks/task.147.x/task.147.x.md` | ``. That column is read only when the title carries no work-item link, so a registry with both cannot disagree with itself. A Markdown link there resolves against the registry file, as links do everywhere; a code span or bare path is read from the repo root, unless it opens with `./` or `../`. The result must name a work item **inside the repository**: an absolute path, a backslash, a control character, or a path that normalises outside the repo root makes the row malformed (`document column refused: …`), because the selector opens whatever a row names. A title link meets the same root rule (`title link … resolves outside the repository`). An absolute registry path is re-expressed from the working directory first, so how the registry was named cannot switch the rule off.
 
 Column mapping is scoped to **one table**: it is resolved from that table's header and discarded when the table ends, so a `## Notes` key/value table or a second registry section is parsed on its own terms rather than as more registry rows.
 
@@ -120,7 +122,7 @@ A row whose id cell is not a number is a **malformed row**, not a header — the
 
 ### Tolerance
 
-A consumer repo may have neither registry. An absent, empty, header-only or table-less registry yields zero rows and **never throws** — it degrades to today's behaviour. A single malformed row (no `[title](path.md)` link, an empty status cell, too few columns) is recorded and stepped over; it never suppresses the well-formed rows around it. A pipe table inside a fenced code block is an example, not the registry.
+A consumer repo may have neither registry. An absent, empty, header-only or table-less registry yields zero rows and **never throws** — it degrades to today's behaviour. A single malformed row (no `[title](path.md)` link and no document-column path, an empty status cell, too few columns) is recorded and stepped over; it never suppresses the well-formed rows around it. A pipe table inside a fenced code block is an example, not the registry.
 
 ### Visibility — out of the frontier, never invisible
 
@@ -158,6 +160,7 @@ Two axes must both hold for a row to enter the batch:
 Behaviour:
 
 - **Greedy pack in document order**, so the batch always leads with the row selection would have picked. A ready row that hard-conflicts with an already-picked one is moved to `excluded[]` with the clashing tag and rival id.
+- **No `epic-integration` story is batched.** A `/develop-story` row whose epic declares `branch_model: epic-integration` is moved to `excluded[]` with a reason starting `epic-integration:`. A batch worktree is cut from, and rebased onto, `develop`, so such a story would land outside its epic's integration branch and the rebase would replay the epic's earlier commits (bug.18); `/develop-next` runs it instead, through Phase 0d's integration-branch recommendation. The epic is found the way Phase 0d finds it — the story's `epic_source:`, else the enclosing directory named by its `epic:` stem — and an epic that cannot be found leaves the row in the batch, as Phase 0d leaves `EPIC_BRANCH` unset, with a `lint.warnings` line naming it so the guess is visible. Only the default key and value (`branch_model: epic-integration`) are read; a `branching.epicIntegration` override in `skills-config.yaml` is not.
 - **Phase discipline, relaxed for planning.** The batch is drawn from the first phase with a non-empty ready frontier. Unlike selection (which STOPs at `phase-blocked`), batch *advances past* an earlier phase whose ready set is empty — only blocked/gated rows remain — recording it in `skippedPhases[]`. This surfaces the real doable frontier (e.g. Phase-2 work while a Phase-1 legal gate is pending) without touching the autonomous loop's stricter stop.
 - **Output**: `batch[]` (ids + touches), `excluded[]`, `softOverlaps[]`, `skippedPhases[]`, and `worktrees[]` (`git worktree add … -b <kind>/<slug> develop` commands, `<kind>` ∈ `story`/`task`/`bug`). The base is always `develop`, so a `/develop-bug` row batches as a **bugfix**; a production hotfix (off `main`) is not expressible in a batch and must be run through `/develop-bug` directly. Exit 0 unless the roadmap HALTs.
 

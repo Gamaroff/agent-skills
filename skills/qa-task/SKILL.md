@@ -30,6 +30,14 @@ When invoked from the `/develop-task` orchestrator, the call may be prefixed wit
 
 If invoked outside the pipeline (no lite directive), the normal Adaptive Review Strategy applies.
 
+**Waiver directive (task.201).** When a pipeline step was skipped with `--skip`, the `/develop-task`
+orchestrator also prefixes a waiver directive naming the skip and its approver. Decide the gate as
+usual; if the decision would be `PASS` or `CONCERNS`, write `gate: WAIVED` with the `waiver:` block
+(`active: true`, the directive's `reason`, its `approved_by`) and keep `top_issues[]` as found. A `FAIL`
+stays `FAIL`. The orchestrator checks the gate afterwards and re-invokes this skill if a skipped step's
+gate reads `PASS`. Directive text: `references/develop-pipeline-lite-mode.md` §"Directive Passed to the
+QA Skill".
+
 ## Pipeline Skill args (Pipeline Contract)
 
 When invoked from the `/develop-task` orchestrator, the Skill `args` field may carry `key=value` tokens:
@@ -652,7 +660,12 @@ JSON
    function whose purpose is to accept or reject (a classifier, validator, parser, sanitiser, or
    any predicate whose `false` prevents an action). The signals and the
    explicit negative case are stated once, in Step 1b of `references/finalise-dod-security-prompt.md`;
-   do not restate them here. When the rule fires, the probe engine is the harness — **run it**:
+   do not restate them here. **Runnable prose is in scope:** a fenced bash block in a `SKILL.md` or a
+   `shared/resources/*.md` that clears, refuses or HALTs on repository state is a boundary under that
+   Step 1b's repo-state signal, exactly as a script would be. When no engine form reaches it, record
+   `boundary: true` and the zero-guard finding naming the remedy (an extracted script the
+   `shell:` or `shell-argv:` form reaches), never `boundary: false`. QA recorded `false` on task.173's 5c classify block for
+   seven cycles, and `/finalise` then raised the same boundary as a DoD gap (obs #298). When the rule fires, the probe engine is the harness — **run it**:
    `node references/security-probe.mjs --sink <sink> --entry '<path>#<export>' --repo-root "$(git rev-parse --show-toplevel)" --record <work-item-dir>/<stem>.qa.<N>.security.run.json --json`
    — or, for a **shell-script** boundary (one positional argument; a script whose header says it
    refuses / never guesses / fails closed is one by its own words), the shell entry form with the
@@ -668,7 +681,18 @@ JSON
    `--entry 'cli:<path>' --argv '["--flag","{input}"]' --cases-file <cases.json>` — the
    template's one `"{input}"` element is each case, exit status is the verdict, a crash is
    `errored`, and each guarded flag is its own control, named with `--name`; "it takes several flags" is never a reason
-   to record `boundary: false`.
+   to record `boundary: false`. A **shell script that takes several arguments or flags** (task.170:
+   `reenter-qa-after-finalise.sh <doc-dir> <report>`) takes the shell-argv form:
+   `--entry 'shell-argv:<path>' --argv '["{input}","<second-argument>"]' --cases-file <cases.json>`,
+   plus `--fixture-setup <setup.sh>` when it reads a repository — the cli form's template and verdict,
+   bash as the interpreter, and a setup that fails is `errored`, never a refusal. A **fenced bash block in a step doc** (a guard shipped as Markdown —
+   task.167's fast-gate precondition) takes the fence form:
+   `--entry 'fence:<doc.md>#<heading>' --slot '<placeholder>' --cases-file <cases.json>` — the block
+   under the heading runs with each case's input in place of the placeholder, each case's
+   `fixture: {env, files}` supplies what else it reads, and every hostile case carries `expected` with the
+   guard's own refusal output (a non-empty stdout or stderr) — or is declined (scoring order:
+   `scoreFenceRun`); "it is prose,
+   not a script" is never a reason to record `boundary: false`.
    A predicate the engine cannot import because it is **not exported** — a module-private `const` —
    takes the same answer: export it (one word) and probe it. "It is not exported" is never a reason to
    record `boundary: false`; the engine's `entry-not-probeable` detail names the remedy. On task.139
@@ -1056,6 +1080,29 @@ For each HIGH or MEDIUM severity issue found:
 ## Recommendation
 {How to fix}
 ```
+
+### Step 9b: Close or reopen the bug reports this re-review verified
+
+Re-reviews only. For each co-located bug report still at **Ready for QA**, act on the row the
+Re-Review Context gives its finding: `✅ FIXED` → close it; `⚠️ PARTIAL` or `❌ NOT FIXED` →
+reopen it. One call per bug sets the status wherever the report carries it (frontmatter
+`status:`, the `**Status**` header line, or both) and appends the Status History row, in one
+write:
+
+```bash
+command node .agents/skills/qa-task/references/status-history.js --file "{bug-file}" --set-status \
+  --status "{closed or reopened}" --date "$(date -u +%Y-%m-%d)" --changed-by qa-task \
+  --notes "{Verified or Not fixed} by {this cycle's QA report filename}" --json
+```
+
+Read `reason`: `updated` is done. `no-status-field` (exit 1) means the report carries neither
+field, so nothing was written; name it in the QA report. `usage` (exit 2) means the call is wrong.
+Stage each bug report with the gate and QA report, so the cycle's commit carries it.
+
+The bug lifecycle has QA move a fixed bug from Ready for QA to Closed or Reopened, and until this
+step nothing did: task.180 ended with five bug reports at Ready for QA whose fixes later gates had
+verified, found only by the PR review (obs #21). A bug left at Ready for QA after the gate that
+verified it reads as open to every later reader.
 
 ### Step 10: Create Quality Gate File
 
@@ -1458,9 +1505,9 @@ command node -e '
   if (!["replaced", "relocated", "created"].includes(r.reason)) {
     console.error(`HALT qa-results: ${r.reason}${r.detail ? ` (${r.detail})` : ""} — ${file} not written.` +
       (r.reason === "multiple" ? " Keep the copy whose Gate File link names the highest gate, delete the others by hand, re-run." :
-       r.reason === "unbounded" ? " The existing section cannot be bounded: it opens a fence that never closes, or the text a replace would remove holds a change-log marker, an H1/H2 (setext included), a Change Log heading (a fenced `# comment` counts) or, under a change log, a dated log row. The detail names the line. Fix that section by hand, re-run." :
+       r.reason === "unbounded" ? " The existing section cannot be bounded: it opens a fence that never closes, or the text a replace would remove holds a change-log marker, an H1/H2 (setext included), a Change Log heading (a fenced `# comment` counts) or, under a change log, a dated log row; or a carried Bug Reports / Deferred Work list continues past a label and a paragraph (`carried-tail:`). The detail names the line. Fix that section by hand, re-run." :
        r.reason === "bad-section" ? " The rendered section was refused; the detail names the rule. Fix the render (one section, no own Bug Reports or Deferred Work block, no trailing HTML comment), re-run." :
-       r.reason === "unplaceable" ? " The write would not read back as exactly one section (an unclosed fence near the insertion point?). Fix by hand, re-run." : ""));
+       r.reason === "unplaceable" ? " The write would not read back as exactly one section (an unclosed fence near the insertion point?), or the written section would be refused by the next write (the detail names the line: a dated row under a change log, or a carried list cut by a label and a paragraph). Fix by hand, re-run." : ""));
     process.exit(1);
   }
   fs.writeFileSync(file, r.content);
@@ -1474,8 +1521,10 @@ change-log block (else before `## Progress Tracking`, else at the end), moves on
 **inside** the change-log block out of it (`relocated`), and **refuses** a document that already
 carries more than one (`multiple`) — it never guesses which copy is current. It also refuses a
 section it cannot bound (`unbounded`: an unclosed fence, or removed text that carries a change-log
-marker, an H1/H2 or a Change Log heading — scanned ignoring fences, so a fenced `# comment` counts) and a write that would not read back as one
-section (`unplaceable`). On any refusal the step halts; a hand edit is not a fallback. A `### Bug Reports`
+marker, an H1/H2 or a Change Log heading — scanned ignoring fences, so a fenced `# comment` counts —
+or a carried Bug Reports / Deferred Work list that continues past a label and a paragraph,
+`carried-tail:`) and a write that would not read back as one
+section, or whose written section the next write would refuse (`unplaceable`). On any refusal the step halts; a hand edit is not a fallback. A `### Bug Reports`
 list (`create-bug-report`) or `### Deferred Work` block (the pipeline's loop exit) already inside the
 section is carried through the replace; the rendered section must not include either — a render
 that does is refused as `bad-section`. Write the section **before** the Change Log row below,

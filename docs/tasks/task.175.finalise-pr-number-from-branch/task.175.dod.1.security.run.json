@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "filename",
+      "entry": "shell:shared/resources/resolve-pr-number.sh",
+      "name": null,
+      "call_site": null,
+      "verdict": "absent",
+      "reason": "no-hostile-case-was-rejected",
+      "executed": 14,
+      "passed": 0,
+      "reproduced": 9,
+      "overblocked": 5,
+      "declined": 0,
+      "escaped": 0,
+      "shells": [
+        "bash"
+      ],
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "ran_at": "2026-10-12T06:27:32.969Z"
+    }
+  ],
+  "totals": {
+    "executed": 14,
+    "reproduced": 9
+  },
+  "updated_at": "2026-10-12T06:27:32.969Z"
+}

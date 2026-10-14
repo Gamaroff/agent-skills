@@ -1,0 +1,104 @@
+schema: 2
+task: 'task.173.fold-5c-review-into-acceptance-commit'
+task_title: 'Fold the 5c review and its doc-only fixes into the acceptance commit'
+gate: CONCERNS
+status_reason: 'Cycle 3 (scoped to cycle-2 fixes): no HIGH, no high-confidence bug. QA adopts all seven findings after reading: a stale eligible list can make the resume probe keep real dirt, a doc-links HALT leaves an unchecked fix staged, an unquoted pipe in the placeholder guard, plus prose and coverage residue.'
+reviewer: 'QA Engineer'
+head: 'aba301e5008d822cac43842b768ee3c1a5c8d581'
+updated: '2026-10-08T04:24:56Z'
+
+top_issues:
+  - id: 'CR3-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: 'The probe trusts .claude/state/5c-carry-eligible.txt on every resume; nothing deletes it and it names no work item, so a stale list from an earlier run keeps a staged doc path as carried instead of class (c). Adopted by QA from reviewer medium/medium.'
+    suggested_action: 'Bind the list to the work item (first line = its review report) and use it only when that report is in WI_DIR and staged; delete it in Step 8 cleanup.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR3-2'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'The doc-links "could not run" HALT leaves the fix staged; the resume probe then sets it aside as carried and 6a commits a fix whose link check never ran. Adopted by QA from reviewer medium/low.'
+    suggested_action: 'Unstage the path (keeping the edit) before that HALT.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR3-3'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'Prose claims a crash after the stage block resumes cleanly; after a crash the uncommitted implementation report is (c) and the probe HALTs. Only the pause path is clean. Adopted.'
+    suggested_action: 'Limit the claim to the PreCompact pause; state the crash behaviour.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR3-4'
+    severity: low
+    file: 'skills/finalise/SKILL.md'
+    finding: '8a recovery hint: when a touched path is also a carried doc fix, the path-limited restore from CI_HEAD_1 destroys the 5c edit. Adopted.'
+    suggested_action: 'State the overlap exception in the hint.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR3-5'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'Closing-fence match rejects CRLF and a 4+-backtick close, so a valid report HALTs as "never closes". Adopted.'
+    suggested_action: 'Accept an optional CR and a run of three or more backticks.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR3-6'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'Unsubstituted, the [ -f .agents/skills/{develop-story|develop-task}/... ] guard is split by the unquoted | into a pipeline and HALTs only via a parse error (exit 127). Cleanup, reviewer confidence high; adopted.'
+    suggested_action: 'Bind DOC_LINKS to a quoted variable, guard it with the *{* case check, then test -f "".'
+    suggested_owner: dev
+    status: open
+  - id: 'CR3-7'
+    severity: low
+    file: 'shared/resources/tests/acceptance-commit-carries-5c.test.mjs'
+    finding: 'The probe test never runs the overlay-arm CARRY_LINES subtraction, nor a carried path with an unstaged change on top (AM/MM). Adopted.'
+    suggested_action: 'Add an overlay + carried-set case and an MM case that must HALT.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 5540
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'No new untrusted-input surface. boundary: false (see QA report).'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR3-1 stale-list trust on resume; CR3-2 unchecked fix left staged on a HALT.'
+  maintainability:
+    status: PASS
+    notes: 'Blocks executed by the committed test under bash and zsh.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR3-1..CR3-7 in qa-fix cycle 3.'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'skills/finalise/SKILL.md']
+  future: []
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR3-1, CR3-2 fixed']
+
+bug_resolution:
+  bugs_fixed: 6
+  bugs_remaining: 0
+  fix_date: '2026-10-08'
+  total_iterations: 2
+  verification_method: 'Scoped review of cycle-2 fixes; CR2-1..CR2-6 closed'

@@ -18,6 +18,9 @@
 #   PR_READ_HEAD    the head commit. Bitbucket returns 12 characters in some responses — compare
 #                   by PREFIX against `git rev-parse HEAD`, never by equality
 #   PR_READ_BASE    the branch the PR merges into
+#   PR_READ_HEAD_BRANCH  the PR's source (head) branch name. Best-effort: empty when the forge's
+#                   answer omits it, and its absence alone never fails the read. finalise's PR
+#                   resolver compares it with the current branch to confirm a cited PR (task 175)
 #   PR_READ_ERROR   on failure, which read failed and why — print it, do not paraphrase it
 #
 # Return status:
@@ -55,7 +58,7 @@ PR_READ_BB_API="${PR_READ_BB_API:-https://api.bitbucket.org/2.0}"
 
 # shellcheck disable=SC2034  # PR_READ_* are the output contract, set here and read by the sourcing caller (see header)
 pr_read() {
-  PR_READ_VCS="" PR_READ_NUMBER="" PR_READ_HEAD="" PR_READ_BASE="" PR_READ_ERROR=""
+  PR_READ_VCS="" PR_READ_NUMBER="" PR_READ_HEAD="" PR_READ_BASE="" PR_READ_HEAD_BRANCH="" PR_READ_ERROR=""
   local pr="" remote="origin" branch=""
   while [ $# -gt 0 ]; do
     case "$1" in
@@ -77,11 +80,11 @@ pr_read() {
     command -v gh >/dev/null 2>&1 || { PR_READ_ERROR="gh not on PATH"; return 3; }
     local line
     # shellcheck disable=SC2086  # $pr is empty or one number; unquoted so empty means "this branch"
-    line=$(gh pr view $pr --json number,headRefOid,baseRefName \
-             --jq '"\(.number) \(.headRefOid) \(.baseRefName)"' 2>/dev/null)
-    read -r PR_READ_NUMBER PR_READ_HEAD PR_READ_BASE <<<"$line"
+    line=$(gh pr view $pr --json number,headRefOid,baseRefName,headRefName \
+             --jq '"\(.number) \(.headRefOid) \(.baseRefName) \(.headRefName)"' 2>/dev/null)
+    read -r PR_READ_NUMBER PR_READ_HEAD PR_READ_BASE PR_READ_HEAD_BRANCH <<<"$line"
     if [ -z "$PR_READ_HEAD" ] || [ -z "$PR_READ_BASE" ]; then
-      PR_READ_NUMBER="" PR_READ_HEAD="" PR_READ_BASE=""
+      PR_READ_NUMBER="" PR_READ_HEAD="" PR_READ_BASE="" PR_READ_HEAD_BRANCH=""
       PR_READ_ERROR="gh pr view ${pr:-(current branch)} returned no PR"
       return 1
     fi
@@ -146,21 +149,22 @@ if "values" in d:
     if len(v) != 1:
         print("COUNT %d" % len(v)); sys.exit(0)
     d = v[0]
-print("OK %s %s %s" % (d["id"], d["source"]["commit"]["hash"], d["destination"]["branch"]["name"]))
+print("OK %s %s %s %s" % (d["id"], d["source"]["commit"]["hash"], d["destination"]["branch"]["name"],
+                         (d["source"].get("branch") or {}).get("name", "")))
 PY
 )
   rm -f "$body"
   local tag
-  read -r tag PR_READ_NUMBER PR_READ_HEAD PR_READ_BASE <<<"$parsed"
+  read -r tag PR_READ_NUMBER PR_READ_HEAD PR_READ_BASE PR_READ_HEAD_BRANCH <<<"$parsed"
   case "$tag" in
     OK) [ -n "$PR_READ_BASE" ] && return 0 ;;
     COUNT)
       # COUNT's one field landed in PR_READ_NUMBER.
       PR_READ_ERROR="found ${PR_READ_NUMBER} open PRs for branch '${branch}' on Bitbucket — expected exactly one"
-      PR_READ_NUMBER="" PR_READ_HEAD="" PR_READ_BASE=""
+      PR_READ_NUMBER="" PR_READ_HEAD="" PR_READ_BASE="" PR_READ_HEAD_BRANCH=""
       return 1 ;;
   esac
-  PR_READ_NUMBER="" PR_READ_HEAD="" PR_READ_BASE=""
+  PR_READ_NUMBER="" PR_READ_HEAD="" PR_READ_BASE="" PR_READ_HEAD_BRANCH=""
   PR_READ_ERROR="could not parse ${what} (HTTP 200, unexpected body)"
   return 1
 }

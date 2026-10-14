@@ -1,0 +1,82 @@
+schema: 2
+task: 'task.180.probe-engine-fence-entry-form'
+task_title: 'security-probe: a fence: entry form for a fenced bash block in a step doc'
+gate: FAIL
+status_reason: 'Cycle 3 replaced the stderr classifier as the third-strike move and its own fixes hold (4 mutations covered). The safety re-probe reproduced a false engages one level down: the required expected accepts an exit code alone, which a shell that stopped or an injected exit also produces. Fourth consecutive HIGH in the fence: scoring path.'
+reviewer: 'QA Engineer'
+head: '1a31af72b8274fe6f197ad8d142f3e6d2125d2b4'
+updated: '2026-10-12T15:20:18Z'
+
+top_issues:
+  - id: 'TASK-180-012'
+    severity: high
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'The hostile-case expected requirement (runFenceCase) accepts an exit-only expected such as {exit: 1} or {exit: 1, stdout: ""}. A shell that stopped on the input (${x:?boom}) or an injected "; exit 1; " matches it and scores rejected, so an accept-all block reads engages. Reproduced on 1a31af72. Code review CR-1 (high/high). Bug: task.180.bug.6.exit-only-expected-passes-for-refusal.md'
+    suggested_action: 'For a hostile fence: case, require a non-empty stdout or stderr in expected, decline exit-only and empty-output cases by name, and add regression tests for both inputs.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-180-013'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'The cycle-3 work-dir watch reports only paths present after the run. A deletion (rm ../.probe-harness/bin/gh removes the gh trip-wire) and an empty directory (mkdir ../pwned) are not recorded as escapes. Reproduced on 1a31af72. Code review CR-2 (medium/medium), confirmed by QA. Bug: task.180.bug.7.work-dir-watch-misses-deletes-and-dirs.md'
+    suggested_action: 'Compare the two snapshots both ways and include directory entries; add a test that deletes the trip-wire stub.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-180-014'
+    severity: low
+    file: 'docs/tasks/task.180.probe-engine-fence-entry-form/task.180.probe-engine-fence-entry-form.md'
+    finding: 'Success Criterion 1 still says fence: scores exit 0 as accepted and non-zero as rejected; since cycle 3 that holds for legitimate cases only.'
+    suggested_action: 'Reword the criterion to cite the shipped rule (scoreFenceRun; hostile cases carry expected) rather than restate it.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 5402
+  phases_verified: 3/3
+  ci: 'not read this cycle (CI is gated at /finalise)'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 26
+    notes: 'task.180.qa.4.security.run.json: both controls engages, 0 reproduced (shipped precondition with the 13 task.167 cases; resolveEntry with the QA cases file). CONCERNS for TASK-180-012 (false engages on an exit-only expected) and -013.'
+  performance:
+    status: PASS
+    notes: 'ci:fast 5402 tests, 5388 pass, 0 fail at 1a31af72. parseCheck adds one -n spawn per case per shell, under spawnBudget.'
+  reliability:
+    status: PASS
+    notes: 'The cycle-3 fixes hold: 4 mutations covered.'
+  maintainability:
+    status: PASS
+    notes: 'The scoring order is stated once (scoreFenceRun). Six docs cite it rather than restating it.'
+
+bug_resolution:
+  bugs_fixed: 0
+  bugs_remaining: 2
+  fix_date: '2026-10-12'
+  total_iterations: 3
+  verification_method: 'Regression tests + QA mutation spot check (4 covered) + ci:fast'
+
+recommendations:
+  immediate:
+    - action: 'TASK-180-012: require a non-empty stdout or stderr in a hostile fence: case''s expected. A silent guard becomes declined (unverifiable) instead of falsely engages.'
+      refs: ['shared/resources/security-probe.mjs']
+  future:
+    - action: 'CR-3 (pre-existing class; caseEnv sets no GIT_CEILING_DIRECTORIES on develop for the shell arm either): git inside a case can discover a repository above a TMPDIR that sits inside a work tree. Set GIT_CEILING_DIRECTORIES in caseEnv for every shell-family form.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'CR-5 (cycle 2, pre-existing class): a command backgrounded past the spawn outlives the case.'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

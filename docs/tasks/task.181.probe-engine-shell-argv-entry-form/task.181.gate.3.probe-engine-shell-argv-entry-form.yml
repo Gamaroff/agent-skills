@@ -1,0 +1,69 @@
+schema: 2
+task: 'task.181.probe-engine-shell-argv-entry-form'
+task_title: 'security-probe: a shell-argv: entry form for a shell script that takes several arguments'
+gate: PASS
+status_reason: 'TASK-181-002 and -003 fixed and verified; the per-case isolation is now one definition shared by fence: and shell-argv:. The scoped cycle-3 review raised only LOW attribution/wording findings, routed to recommendations.future.'
+reviewer: 'QA Engineer'
+head: '5210dbd66fd248b268cb3595b1b2f97cf6e9105a'
+updated: '2026-10-13T04:39:05Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 20
+  phases_verified: 3/3
+  ci: 'not read this cycle (gated at /finalise)'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 0
+  fix_date: '2026-10-13'
+  total_iterations: 2
+  verified:
+    - 'task.181.bug.2 (TASK-181-002) closed — test "a setup that writes outside its case directory errors the run…" green; mutation proven in 5210dbd6'
+    - 'task.181.bug.3 (TASK-181-003) closed — test "a write beside the case directory, or a deletion in the harness, is an escape" green; mutation reds fence: too'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 19
+    notes: 'task.181.qa.3.security.run.json: resolveEntry shell-argv: branch (11) and reenter-qa via shell-argv: (8) engage, 0 reproduced, 0 escapes. TASK-181-001..003 closed.'
+  performance:
+    status: PASS
+    notes: 'ci:fast 5420 pass, 0 fail at 5210dbd6.'
+  reliability:
+    status: PASS
+    notes: 'Setup failures, kills and stray writes are errored with a named cause; CR-3 of gate 2 (setup process tree) is future, shared by every arm.'
+  maintainability:
+    status: PASS
+    notes: 'caseShellEnv / caseWatchedSpawn define per-case isolation once for both arms.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Cycle-3 CR-1 (LOW): a setup that calls gh in a spelling namesGh misses trips the shared trip-wire, and the end-of-run needs-fake-gh decline names the entry rather than the setup — check the marker after the setup spawn and error that run naming the setup'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'Cycle-3 CR-2 (LOW): a run whose setup fails on every case reads reason entry-not-probeable with the entry as the declined id; the per-case detail names the setup, but a fixture-setup-failed reason would say it at the top level'
+      refs: ['shared/resources/security-probe.mjs', 'shared/resources/probe-boundary-rule.md']
+    - action: 'Cycle-3 CR-3 (cleanup): the fixture-string gh check is written twice (fence: and shell-argv: pre-spawn checks) — one fixtureStrings(cases) helper'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'Gate-2 CR-3: kill a timed-out child process tree for every arm that spawns through watchedSpawn'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'runCliCase has no work-dir snapshot on develop (pre-existing) — it could call caseWatchedSpawn'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'Two unnamed shell-argv: controls with the same argv and different --fixture-setup share a controlKey; emitBlock does not print fixture_setup'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

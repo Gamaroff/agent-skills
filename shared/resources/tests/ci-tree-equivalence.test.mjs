@@ -2031,15 +2031,22 @@ function pollScript() {
   return pollMatch[1].replace(stub, 'rollup() { cat "$FAKE_ROLLUP_FILE"; }');
 }
 
-/** A bin dir with a fake gh (PR head, check count, ancestor checks) and a no-op sleep. */
+/**
+ * A bin dir with a fake gh (PR head, check count, ancestor checks) and a no-op sleep.
+ * The check count answers 3 — unless FAKE_ROLLUP_JSON names a rollup, in which case the poll's own
+ * \`-q\` query is run on it with jq, so the query itself is under test (obs #3).
+ */
 function pollBin(head, green) {
   const bin = mkdtempSync(join(tmpdir(), "ci-tree-eq-poll-"));
   writeFileSync(
     join(bin, "gh"),
     `#!/bin/sh
+q=""; prev=""
+for a in "$@"; do [ "$prev" = "-q" ] && q="$a"; prev="$a"; done
 case "$*" in
   *headRefOid*) echo "${head}" ;;
-  *"statusCheckRollup | length"*) echo 3 ;;
+  *statusCheckRollup*)
+    if [ -n "$FAKE_ROLLUP_JSON" ]; then jq -r "$q" "$FAKE_ROLLUP_JSON"; else echo 3; fi ;;
   *"commits/${green}/check-runs"*) echo '{"status":"completed","conclusion":"success","completed_at":"2020-01-01T00:00:00Z"}' ;;
   *) : ;;
 esac
@@ -2073,6 +2080,8 @@ function runPoll({
   rollup = "PENDING",
   maxWait = 120,
   withEngine = true,
+  expectedChecks = "3",
+  rollupJson = null,
 }) {
   const bin = pollBin(head, green);
   const work = mkdtempSync(join(tmpdir(), "ci-tree-eq-work-"));
@@ -2095,7 +2104,7 @@ function runPoll({
           head,
           String(maxWait),
           result,
-          "3",
+          expectedChecks,
           ...(withEngine ? [shim] : []),
         ],
         {
@@ -2105,6 +2114,7 @@ function runPoll({
             PATH: `${bin}:${process.env.PATH}`,
             VCS: "github",
             FAKE_ROLLUP_FILE: rollupFile,
+            ...(rollupJson ? { FAKE_ROLLUP_JSON: rollupJson } : {}),
           },
           encoding: "utf8",
           timeout: CLI_BUDGET.timeoutMs,
@@ -2182,6 +2192,170 @@ test("6c poll: without an ENGINE argument the rule is off and the poll waits exa
     assert.equal(r.calls, 0);
   } finally {
     cleanup(dir);
+  }
+});
+
+// ── obs #3: the check-count floor counts distinct checks, on both sides ───────
+//
+// Reading 1 records how many checks it was green over, and the 6c poll will not accept SUCCESS on
+// fewer (obs #87). Both counted rollup ENTRIES, and one check can be listed twice: PR #625's
+// reading 1 had 6 entries for 5 checks, its acceptance head 5, so the floor of 6 could never be met
+// and the poll ran out its whole MAX_WAIT on a green head.
+
+const COUNT_QUERY_RE = /statusCheckRollup -q '([^']*)'/;
+function countQuery(re, what) {
+  const m = re.exec(finalise);
+  assert.ok(m, `${what} not found in skills/finalise/SKILL.md`);
+  const q = COUNT_QUERY_RE.exec(m[0]);
+  assert.ok(q, `${what} carries no statusCheckRollup -q query`);
+  return q[1];
+}
+const READING_1_QUERY = () =>
+  countQuery(
+    /^CI_CHECKS_1=\$\(gh pr view[^\n]*$/m,
+    "the Step 6 CI_CHECKS_1 line",
+  );
+const POLL_QUERY = () =>
+  countQuery(/^checks\(\) \{ gh pr view[^\n]*$/m, "the 6c poll's checks()");
+
+/** A rollup with the given check names: CheckRuns by `name`, plus StatusContexts by `context`. */
+function rollupFile(names, contexts = []) {
+  const work = mkdtempSync(join(tmpdir(), "ci-tree-eq-rollup-"));
+  const file = join(work, "rollup.json");
+  writeFileSync(
+    file,
+    JSON.stringify({
+      statusCheckRollup: [
+        ...names.map((name) => ({
+          __typename: "CheckRun",
+          name,
+          status: "COMPLETED",
+          conclusion: "SUCCESS",
+        })),
+        ...contexts.map((context) => ({
+          __typename: "StatusContext",
+          context,
+          state: "SUCCESS",
+        })),
+      ],
+    }),
+  );
+  return { work, file };
+}
+function jqCount(query, file) {
+  const r = spawnSync("jq", ["-r", query, file], { encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+  return r.stdout.trim();
+}
+const PR625_READING_1 = [
+  "test",
+  "PR into main comes from an allowed branch",
+  "PR into main comes from an allowed branch",
+  "link-check",
+  "shellcheck",
+  "validate",
+];
+const PR625_HEAD = [
+  "PR into main comes from an allowed branch",
+  "link-check",
+  "shellcheck",
+  "test",
+  "validate",
+];
+
+test("obs #3: reading 1's floor and the poll's checks() are one query, and it counts distinct checks", () => {
+  assert.equal(
+    POLL_QUERY(),
+    READING_1_QUERY(),
+    "the floor and the reading must count the same unit",
+  );
+  const { work, file } = rollupFile(PR625_READING_1, [
+    "ci/legacy",
+    "ci/legacy",
+  ]);
+  try {
+    // 6 CheckRun entries for 5 checks, plus one StatusContext listed twice: 6 distinct checks.
+    assert.equal(jqCount(READING_1_QUERY(), file), "6");
+    // Mutation: the entry count this replaced reads 8 on the same rollup.
+    assert.equal(jqCount(".statusCheckRollup | length", file), "8");
+  } finally {
+    cleanup(work);
+  }
+});
+
+test("obs #3: a check listed twice in reading 1 does not hold the poll to MAX_WAIT on a green head", () => {
+  const { dir, green } = greenThenDocs(1);
+  const r1 = rollupFile(PR625_READING_1);
+  const head2 = rollupFile(PR625_HEAD);
+  try {
+    const head = git(dir, "rev-parse", "HEAD");
+    const expectedChecks = jqCount(READING_1_QUERY(), r1.file);
+    assert.equal(expectedChecks, "5");
+    const r = runPoll({
+      dir,
+      head,
+      green,
+      rollup: "SUCCESS",
+      maxWait: 120,
+      expectedChecks,
+      rollupJson: head2.file,
+    });
+    assert.equal(r.line, `SUCCESS ${head} 5 30s TREE_EQ=`, r.stderr);
+  } finally {
+    cleanup(dir);
+    cleanup(r1.work);
+    cleanup(head2.work);
+  }
+});
+
+// ── obs #4: a timeout never publishes a SUCCESS that did not qualify ────────
+
+test("obs #4: MAX_WAIT on a SUCCESS still below the floor writes UNDECIDED, not SUCCESS", () => {
+  const { dir, green } = greenThenDocs(1);
+  const partial = rollupFile(["shellcheck", "link-check", "validate"]);
+  try {
+    const head = git(dir, "rev-parse", "HEAD");
+    const r = runPoll({
+      dir,
+      head,
+      green,
+      rollup: "SUCCESS",
+      maxWait: 90,
+      expectedChecks: "5",
+      rollupJson: partial.file,
+    });
+    assert.equal(r.line, `UNDECIDED ${head} 3 90s TREE_EQ=`, r.stderr);
+    assert.match(
+      finalise,
+      /\| `UNDECIDED` +\| \*\*HALT `ci-not-green-on-acceptance-head`\.\*\*/,
+      "the 6c reader table must HALT on UNDECIDED",
+    );
+  } finally {
+    cleanup(dir);
+    cleanup(partial.work);
+  }
+});
+
+test("obs #4: the sample taken as MAX_WAIT runs out is still judged, so a qualifying one is SUCCESS", () => {
+  const { dir, green } = greenThenDocs(1);
+  const full = rollupFile(PR625_HEAD);
+  try {
+    const head = git(dir, "rev-parse", "HEAD");
+    // maxWait 30: the loop's only decided() runs at WAITED=0 (never decides); the 30 s sample is
+    // taken after it, and only the post-loop judgement can accept it.
+    const r = runPoll({
+      dir,
+      head,
+      green,
+      rollup: "SUCCESS",
+      maxWait: 30,
+      expectedChecks: "5",
+      rollupJson: full.file,
+    });
+    assert.equal(r.line, `SUCCESS ${head} 5 30s TREE_EQ=`, r.stderr);
+  } finally {
+    cleanup(dir);
+    cleanup(full.work);
   }
 });
 
@@ -2983,6 +3157,52 @@ test("SEC-3: checkCommand is not run over uncommitted code; uncommitted document
   } finally {
     rmSync(marker, { force: true });
     cleanup(docs.dir);
+  }
+});
+
+test("SEC-5: a path containing a control character is never documentation (task.173 DoD run 3)", () => {
+  const globs = ["docs/**", "**/*.md"];
+  for (const bad of [
+    "src/a.js\u0000.md",
+    "docs/safe.txt\u0000.js",
+    "docs/a\n.md",
+    "docs/a\t.md",
+    "docs/a\r.md",
+    "docs/a\u001b.md",
+    "docs/a\u007f.md",
+  ]) {
+    assert.equal(eng.isDocsPath(bad, globs), false, JSON.stringify(bad));
+  }
+  // Printable non-ASCII is not a control character: still documentation.
+  assert.equal(eng.isDocsPath("docs/caf\u00e9.md", globs), true);
+});
+
+test("SEC-6: a path through any spelling of .git is never documentation", () => {
+  const globs = ["docs/**", "**/*.md"];
+  for (const bad of [
+    "docs/.git/hooks/pre-commit",
+    "docs/.git/config",
+    "docs/.GIT/config",
+    "docs/.Git/x.md",
+    "docs/.git\u200c/config", // HFS+ ignorable (ZWNJ)
+    "docs/.g\u200bit/x.md", // HFS+ ignorable (ZWSP) inside the name
+    "docs/.git\ufeff/x.md", // BOM
+    "docs/.git./config", // NTFS trailing dot
+    "docs/GIT~1/config", // NTFS short name
+    ".git/x.md",
+    "a/.git/b/c.md",
+  ]) {
+    assert.equal(eng.isDocsPath(bad, globs), false, JSON.stringify(bad));
+  }
+  // Names that merely start with .git are ordinary files and stay documentation.
+  for (const ok of [
+    "docs/.github/x.md",
+    "docs/.gitignore.md",
+    "docs/.gitkeep",
+    "docs/git/x.md",
+    "docs/a.git.md",
+  ]) {
+    assert.equal(eng.isDocsPath(ok, globs), true, JSON.stringify(ok));
   }
 });
 

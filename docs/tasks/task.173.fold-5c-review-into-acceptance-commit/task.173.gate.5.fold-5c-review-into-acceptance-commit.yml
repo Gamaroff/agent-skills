@@ -1,0 +1,62 @@
+schema: 2
+task: 'task.173.fold-5c-review-into-acceptance-commit'
+task_title: 'Fold the 5c review and its doc-only fixes into the acceptance commit'
+gate: CONCERNS
+status_reason: 'Cycle 5 (scoped to cycle-4 fixes): no HIGH; one MEDIUM — the cycle-4 stale-list arm replaces a list without checking its paths, so a re-run review (new pr-review number) or a ./-spelled PR_REVIEW makes this pass own list look stale and drops its record.'
+reviewer: 'QA Engineer'
+head: '4cfd1d4ffc8291bb8a3656e4ea3cd7277eb6b1ea'
+updated: '2026-10-08T05:11:59Z'
+
+top_issues:
+  - id: 'CR5-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'Classify stale arm overwrites the eligible list without checking it; the header cannot tell another pass from this pass once the review path changes, so this pass edits drop out of the record and the stage block then HALTs telling the agent to undo valid fixes. Adopted by QA from reviewer medium/medium; severity kept.'
+    suggested_action: 'Keep the dirty-path check in both arms; on a header mismatch HALT naming the dirty listed path as an uncarried edit from that review; replace a stale list only when every listed path is clean; update the stale-list test.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 5550
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'No new untrusted-input surface. boundary: false (see QA report 1).'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR5-1: a legitimate review re-run can drop the pass record.'
+  maintainability:
+    status: PASS
+    notes: 'Unchanged.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR5-1 in qa-fix cycle 5.'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'shared/resources/tests/acceptance-commit-carries-5c.test.mjs']
+  future: []
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR5-1 fixed']
+
+bug_resolution:
+  bugs_fixed: 4
+  bugs_remaining: 0
+  fix_date: '2026-10-08'
+  total_iterations: 4
+  verification_method: 'Scoped review of cycle-4 fixes; CR4-1, CR4-3, CR4-4 closed; CR4-2 fix regressed (CR5-1)'

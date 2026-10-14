@@ -405,7 +405,10 @@ Parse latest gate YAML for:
 When `PR_REVIEW` (selected in Step 1a) is a path, read that report's `## Machine-Readable Findings`
 block — `id`, `severity`, `ref`, `finding`, `suggested_action` — and treat a `high` finding as a
 HIGH gate `top_issue`. On the `REQUEST CHANGES` path it is the only carrier of the work; the gate is
-clean. Read no other PR review report.
+clean. Read no other PR review report. **Skip an entry marked `provenance: pre-existing`.** `/review-pr`
+found it identical on the PR base and left it out of its verdict, so it is a follow-up for the base,
+not work for this branch, exactly as `/qa-task` routes the same finding to `recommendations.future`
+(obs #271).
 
 Read assessment markdowns and extract:
 
@@ -723,6 +726,12 @@ comm -23 \
   <(git grep --full-name -l -F -i -e '<subject phrase>' -- ':(top,glob)skills/*/SKILL.md' ':(top,glob)skills/*/references/*.md' ':(top,glob)shared/resources/*.md' | sort) \
   <(git grep --full-name -l -e '^<!-- AUTO-GENERATED — DO NOT EDIT' -- ':(top,glob)skills/*/references/*.md' | sort)
 ```
+
+**When the fix changes a behaviour, the phrase is the old behaviour's observable, not the text
+the fix edits.** Search for the verdict, message, exit code or field value that stops being true:
+for a check that used to print `no-such-file`, search `no-such-file`, not the line you rewrote. Run
+one population per changed observable, and record each phrase in the `Probe:` block. A probe whose
+phrase is the edited text finds only the sites already being edited (obs #293).
 
 **A population of 0 means the probe did not run, not that nothing restates the subject.** The
 edited file restates it by definition, so a working run finds at least one file. An empty result

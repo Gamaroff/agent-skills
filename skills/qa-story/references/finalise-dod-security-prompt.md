@@ -1,12 +1,12 @@
 ---
 name: finalise-dod-security-prompt
-description: Explore subagent prompt for the /finalise DoD security review — a story-type-aware grep checklist, plus a probe mode that executes candidate inputs against a boundary deliverable instead of inspecting it. Substitute <STORY_FILE> and <STORY_TYPE> before dispatching.
+description: Explore subagent prompt for the /finalise DoD security review — a story-type-aware grep checklist, plus a probe mode that executes candidate inputs against a boundary deliverable instead of inspecting it. Substitute <STORY_FILE>, <STORY_TYPE> and <DOD_N> before dispatching.
 ---
 <!-- AUTO-GENERATED — DO NOT EDIT. Source: shared/resources/finalise-dod-security-prompt.md. Regenerate via `npm run bundle`. -->
 
 # Security Review — Explore Subagent Prompt
 
-**Usage**: Dispatch as an Explore subagent from `/finalise` Steps 3–5 parallel dispatch. Substitute `<STORY_FILE>` and `<STORY_TYPE>` before sending. Story type values: `api` | `ui` | `data` | `auth` | `infrastructure` | `task` | `refactoring`.
+**Usage**: Dispatch as an Explore subagent from `/finalise` Steps 3–5 parallel dispatch. Substitute `<STORY_FILE>`, `<STORY_TYPE>` and `<DOD_N>` (the number of the DoD run dispatching you) before sending. Story type values: `api` | `ui` | `data` | `auth` | `infrastructure` | `task` | `refactoring`.
 
 ---
 
@@ -45,7 +45,7 @@ Signals — any **one** is sufficient:
 - a named allow-list or deny-list in any form (array, regex alternation, `switch`, set membership)
 - a function whose own tests are mostly of the shape "X is refused"
 - a work-item document whose Success Criteria contain *never*, *must not*, *fails closed*, or *refused*
-- a script or function whose own header or doc comment says it *refuses*, *never guesses*, or *fails closed* — in any language; a bash script is a boundary by its own words, and "not importable" routes it to the engine's `shell:` entry form — or, for a **sourced library** (a header that says *source it*, or functions with no top-level call), the `shell-fn:path#function` form with `--cases-file` and, when the body names `gh`, `--fake-gh` (Step 4; the signal that tells the two apart is stated once, in `probe-boundary-rule.md` §5); a **Node CLI** whose decision sits behind its flags routes to the `cli:path` form with an `--argv` template — never to `boundary: false`
+- a script or function whose own header or doc comment says it *refuses*, *never guesses*, or *fails closed* — in any language; a bash script is a boundary by its own words, and "not importable" routes it to the engine's `shell:` entry form — or, for a **sourced library** (a header that says *source it*, or functions with no top-level call), the `shell-fn:path#function` form with `--cases-file` and, when the body names `gh`, `--fake-gh` (Step 4; the signal that tells the two apart is stated once, in `probe-boundary-rule.md` §5); a **Node CLI** whose decision sits behind its flags routes to the `cli:path` form with an `--argv` template; a **shell script that takes several arguments or flags** routes to the `shell-argv:path` form with an `--argv` template and, when it reads a repository, `--fixture-setup <setup.sh>`; a **fenced bash block in a step doc** (a precondition, refusal or guard shipped as Markdown) routes to the `fence:<doc.md>#<heading>` form with `--slot <placeholder>` — never to `boundary: false`
 
 The list is data as well as prose: `probe-boundary-signals.mjs` (beside `security-probe.mjs`) exports it, and `classifyBoundaryText` applies the text-shaped signals to a header or a criteria section. Five QA gates on task.121 read a bash script that says "refuses rather than guesses" and recorded no boundary, because every signal above the last one is JS-shaped; the last one is what a script's own words match.
 
@@ -55,9 +55,10 @@ security-adjacent they look. Probe mode must **not** fire on them.
 
 **A refusal whose input is repository state is a boundary** — a git hook, a guard driven by
 `git status`. Its input is the index, not an argument, and "takes no caller-supplied value" does not
-make it `false`. Once the engine's `shell-argv:` form exists (task.181), probe it there with a
-`--fixture-setup` that stages each case. Until then record `boundary: true`; the zero-guard will
-fire, and closing it takes a recorded override (obs #221).
+make it `false`. Probe it through the `shell-argv:` form (task.181): each case's `fixture.files`
+carries the state, a `--fixture-setup` stages it (a commit, a `git add`) before the run, and the
+template's one `{input}` element reaches a script that may ignore it. Record `boundary: true`; where
+no form reaches the guard, the zero-guard fires and closing it takes a recorded override (obs #221).
 
 **Test code is not exempt by location.** A test double whose refusal backs an assertion — a fake
 `gh` that refuses writes so an eval can assert "never posts" — is a boundary: the agent under test
@@ -164,10 +165,29 @@ each re-derive a candidate set from prose test different things and reach differ
 that imports the corpus tests what is known to get past the control. If you find an input the corpus
 does not have, add it there — every later probe then gets it for free.
 
+**A cases file is written to disk, beside the record, before the run.** When the corpus does not fit
+the control and you pass `--cases-file`, write it to `<STORY_DIR>/<stem>.dod.<DOD_N>.security.cases.json`,
+beside this run's record. Pass that path, never process substitution and never a temp file,
+and name it in `summary`. If you cannot write into `<STORY_DIR>`, write both the cases file and the
+record to `$TMPDIR` and return their paths, and the orchestrator copies them in. If you cannot write
+any file at all, return the cases verbatim as `probe_cases:` and the orchestrator writes them to that
+path before it runs the probe (step 3). A verdict whose inputs
+were never saved cannot be re-run. On task.173, two DoD runs gave opposite verdicts on unchanged code,
+and the earlier run's inputs no longer existed (obs #299). The record carries `<DOD_N>` for the same
+reason: a fixed record path is overwritten by the next DoD run, and the earlier DoD file's probe count
+then cites a record that no longer holds it (obs #302).
+
 **3. Execute them.** Run the probe engine, `references/security-probe.mjs`, against the entry
 point with the sink you chose, and **run it** with `--record` so the count of what executed is
 written by the engine and not by you. Do not reason abstractly about what the code would return —
 reasoning about it is precisely what the checklist already does, and what it gets wrong.
+
+**Return the command whether or not you ran it.** `probe_command:` is the exact engine invocation
+below, with this run's `--record` path. `/finalise` runs that command itself when this run's record is
+not in the work-item directory after you return, and takes the count and the probes from the record
+it writes. If your tool class will not let you run the engine (it creates a sandbox and writes the
+record), do not compose a count. Return `probes_executed: 0`, the `probe mode executed no candidates`
+FAIL and `probe_command:`. The orchestrator's run replaces all three (obs #10).
 
 ```bash
 # The engine ships BESIDE this prompt file (in this repository: shared/resources;
@@ -179,7 +199,7 @@ reasoning about it is precisely what the checklist already does, and what it get
 node PROMPT_DIR/security-probe.mjs \
   --sink <sink> --entry '<path-from-repo-root>#<exportName>' \
   --repo-root "$(git rev-parse --show-toplevel)" \
-  --record <STORY_DIR>/<stem>.dod.security.run.json --json
+  --record <STORY_DIR>/<stem>.dod.<DOD_N>.security.run.json --json
 
 # A JS export that takes a CONFIGURATION ARGUMENT after its input — `(text, opts)`,
 # like report-lint.js#lintReport — takes --args-json: a JSON array of fixed
@@ -189,7 +209,7 @@ node PROMPT_DIR/security-probe.mjs \
   --sink markdown-structure --entry '<path-from-repo-root>/report-lint.js#lintReport' \
   --args-json '<[{"sections": <the loadTemplate() result>}], as JSON>' \
   --repo-root "$(git rev-parse --show-toplevel)" \
-  --record <STORY_DIR>/<stem>.dod.security.run.json --json
+  --record <STORY_DIR>/<stem>.dod.<DOD_N>.security.run.json --json
 
 # A SHELL SCRIPT boundary (one positional argument) takes the shell entry form —
 # same flags, same record, same count. The sink must be a materialised one
@@ -198,7 +218,7 @@ node PROMPT_DIR/security-probe.mjs \
 node PROMPT_DIR/security-probe.mjs \
   --sink filename --entry 'shell:<path-from-repo-root>' \
   --repo-root "$(git rev-parse --show-toplevel)" \
-  --record <STORY_DIR>/<stem>.dod.security.run.json --json
+  --record <STORY_DIR>/<stem>.dod.<DOD_N>.security.run.json --json
 
 # A SOURCED LIBRARY boundary (header says "source it", or functions with no
 # top-level call — probe-boundary-rule.md §5 has the signal) takes the shell-fn
@@ -213,7 +233,7 @@ node PROMPT_DIR/security-probe.mjs \
   --sink filename --entry 'shell-fn:<path-from-repo-root>#<function>' \
   --cases-file <path-to-cases.json> --fake-gh <dir-holding-an-executable-gh> \
   --repo-root "$(git rev-parse --show-toplevel)" \
-  --record <STORY_DIR>/<stem>.dod.security.run.json --json
+  --record <STORY_DIR>/<stem>.dod.<DOD_N>.security.run.json --json
 
 # A NODE CLI boundary (a .mjs/.js script whose decision sits behind its flags —
 # task.141's `uat-status.mjs --env`) takes the cli form: node runs the script
@@ -229,7 +249,40 @@ node PROMPT_DIR/security-probe.mjs \
   --argv '["--flag-before","value","--guarded-flag","{input}"]' \
   --cases-file <path-to-cases.json> --name '<control name>' \
   --repo-root "$(git rev-parse --show-toplevel)" \
-  --record <STORY_DIR>/<stem>.dod.security.run.json --json
+  --record <STORY_DIR>/<stem>.dod.<DOD_N>.security.run.json --json
+
+# A MULTI-ARGUMENT SHELL SCRIPT boundary (a bash script taking several
+# arguments or flags — task.170's `reenter-qa-after-finalise.sh <doc-dir>
+# <report>`) takes the shell-argv form: the cli form's --argv template and
+# verdict, with bash as the interpreter under every caller shell. When the
+# script reads a repository (commits, a gate, a halt snapshot), name a
+# committed --fixture-setup script: it runs as `bash <setup> <case-dir>` before
+# each (case, shell) run, and a setup that fails is errored, never a refusal.
+# A setup builds "$1" and nothing else: a write anywhere else errors the run.
+# A script, setup or case fixture that names `gh` needs --fake-gh. NAME each control.
+node PROMPT_DIR/security-probe.mjs \
+  --entry 'shell-argv:<path-from-repo-root>' \
+  --argv '["{input}","<second-argument>"]' \
+  --fixture-setup <setup-script-from-repo-root> \
+  --cases-file <path-to-cases.json> --name '<control name>' \
+  --repo-root "$(git rev-parse --show-toplevel)" \
+  --record <STORY_DIR>/<stem>.dod.<DOD_N>.security.run.json --json
+
+# A FENCED BASH BLOCK boundary (a guard shipped inside a Markdown step doc —
+# task.167's fast-gate precondition) takes the fence form: the engine reads the
+# doc on every run, takes the first ```bash block under the heading, replaces
+# every --slot token with each case's input (as SOURCE — a $(…) in it runs, in
+# the case's own directory), and runs it under bash and zsh. Every hostile case
+# carries `expected` with the guard's own refusal OUTPUT (a non-empty stdout or
+# stderr; an exit code alone is declined) — or is declined; a legitimate
+# case is scored by exit status (order: scoreFenceRun). What the block reads besides the slot — env, files such as a
+# package.json — comes from each case's `fixture: {env, files}`. Name a cases
+# file; the record's entry resolves in every checkout.
+node PROMPT_DIR/security-probe.mjs \
+  --sink filename --entry 'fence:<doc-path-from-repo-root>#<heading text>' \
+  --slot '<placeholder>' --cases-file <path-to-cases.json> --name '<control name>' \
+  --repo-root "$(git rev-parse --show-toplevel)" \
+  --record <STORY_DIR>/<stem>.dod.<DOD_N>.security.run.json --json
 ```
 
 **Building the `--args-json` value** for `lintReport`: it is `[{"sections": …}]`, where `sections` is
@@ -243,8 +296,7 @@ both directions — and prints a JSON result whose `executed` is the count of ca
 actually ran, whose `reproduced[]` names the hostile cases that were accepted, and whose
 `overblocked[]` names the legitimate cases that were refused. The record it writes carries the same
 counts; **`probes_executed:` below is the record's `totals.executed`, copied, never composed.** An
-entry no form reaches (a script or CLI that reads stdin, a shell script that takes two positionals,
-anything networked) is `verdict: unverifiable` with `executed: 0` and
+entry no form reaches (a script or CLI that reads stdin, anything networked) is `verdict: unverifiable` with `executed: 0` and
 takes the zero-guard below — say why in `summary`, do not fall back to a hand-written harness,
 because a count from a harness is the self-report this step removed. **"It is a bash script" is not
 such a reason**: that is the `shell:` form's case, and recording it as unverifiable is the task.121
@@ -252,7 +304,13 @@ outcome this form exists to end. **Nor is "it is a sourced function"**: that is 
 form's case, and running `shell:` against a library instead is the task.125 outcome — `absent`
 behind a full count — that *that* form exists to end. **Nor is "it is a multi-flag CLI" or "the
 function takes three arguments"** when a Node CLI calls it: that is the `cli:` form's case, and
-recording it unverifiable is the task.141 outcome that form exists to end. **Nor is "it takes a
+recording it unverifiable is the task.141 outcome that form exists to end. **Nor is "the script
+takes several arguments or flags"** for a shell script: that is the `shell-argv:` form's case, with
+`--fixture-setup` building the scratch repository it reads, and the by-hand probe it replaces is the
+task.147 and task.170 outcome it exists to end. **Nor is "it is prose,
+not a script"** for a guard shipped as a fenced bash block in a step doc: that is the `fence:`
+form's case, and the hand-written wrapper under `.claude/state/` it replaces is the task.159 and
+task.167 outcome it exists to end. **Nor is "it takes a
 second argument"** for a JS export whose extra argument is plain data: that is `--args-json`'s case,
 and recording it unverifiable is the task.124 outcome (`lintReport`, overruled by hand) it exists to
 end.
@@ -323,6 +381,11 @@ security_review:
   probes_executed: 0 # REQUIRED when boundary is true. Every candidate actually run, including
     # the legitimate inputs of step 5 and every candidate that behaved correctly —
     # totals.executed from the engine's run record (--record), never composed by hand.
+  probe_command: "node <PROMPT_DIR>/security-probe.mjs --sink <sink> --entry '<entry>' --repo-root <root> --record <STORY_DIR>/<stem>.dod.<DOD_N>.security.run.json --json"
+    # REQUIRED when boundary is true, whether or not you ran it. /finalise runs it when the
+    # record is absent from the work-item directory (Step 4, step 3).
+  probe_cases: [] # ONLY when probe_command passes --cases-file and you could not write that
+    # file: the cases JSON array, verbatim. /finalise writes it to that path before running.
   probes: # only candidates that REPRODUCED a defect; [] is correct and good when none did
     - input: "svc deploy --target prod" # the candidate, verbatim and re-runnable
       expected: "denied"
@@ -346,7 +409,7 @@ lenient choice.
 
 **Probe rule**: only entries with `reproduced: true` may appear in `probes` — an unreproduced suspicion
 is not a finding and must not be reported. `boundary:` is always present; `probes_executed:` is required
-whenever `boundary: true`. If `boundary: true` and `probes_executed: 0`, `checks` must carry the `probe
+whenever `boundary: true`, and so is `probe_command:`. If `boundary: true` and `probes_executed: 0`, `checks` must carry the `probe
 mode executed no candidates` FAIL from Step 4.
 
 **Omitting a field is not a way to answer it.** A missing `boundary` is not `false` — it means the

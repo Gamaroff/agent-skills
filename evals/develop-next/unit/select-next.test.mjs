@@ -12,7 +12,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { writeFileSync, mkdtempSync, symlinkSync } from "node:fs";
+import { writeFileSync, mkdtempSync, mkdirSync, symlinkSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -33,7 +33,10 @@ const {
   selectBatch,
   parseTouches,
   parseRegistry,
+  DOC_COLUMN_NAMES,
+  resolveDocCell,
   parseFrontmatterStatus,
+  storyBranchModel,
   registryFrontier,
   parseDepCell,
   TASK_ELIGIBLE_STATUSES,
@@ -2881,5 +2884,420 @@ test("B8: the code lifecycles match docs/standards/bug-documents.md", () => {
     `the documented bug lifecycle and BUG_LIFECYCLE_STATUSES disagree.\n` +
       `  doc:  ${parsed.sort().join(", ")}\n` +
       `  code: ${[...BUG_LIFECYCLE_STATUSES].sort().join(", ")}`,
+  );
+});
+
+// ── bug.18: an epic-integration story never enters a parallel batch ──────────
+//
+// Phase 0d recommends the epic's integration branch for a story whose epic declares
+// `branch_model: epic-integration`. A batch worktree is cut from, and rebased onto,
+// the base branch, so such a story would land on the base branch early and the
+// rebase would replay the epic's earlier commits. The batch excludes it with a
+// logged reason and leaves it to `/develop-next` or an interactive run.
+
+const EPIC_BATCH_ROADMAP = [
+  "# PHASE 1 — MVP",
+  "## Epic 8",
+  "- [ ] **8.1** Ordinary story · deps: — · touches: +own · /develop-story docs/p/e8/story.8.1.a/story.8.1.a.md",
+  "- [ ] **8.2** Integration story · deps: — · touches: +own · /develop-story docs/p/e9/story.9.1.b/story.9.1.b.md",
+  "- [ ] **T5** A task · deps: — · touches: +own · /develop-task docs/tasks/task.5.x/task.5.x.md",
+  "",
+].join("\n");
+
+test("bug.18: --batch excludes a story whose epic declares epic-integration, with a reason", () => {
+  const asked = [];
+  const b = selectBatch(parseRoadmap(EPIC_BATCH_ROADMAP), {
+    branchModelOf: (row) => {
+      asked.push(row.id);
+      return {
+        resolved: true,
+        model: row.id === "8.2" ? "epic-integration" : null,
+      };
+    },
+  });
+  assert.deepEqual(
+    b.batch.map((r) => r.id),
+    ["8.1", "T5"],
+  );
+  assert.equal(b.excluded.length, 1);
+  assert.equal(b.excluded[0].id, "8.2");
+  assert.match(b.excluded[0].reason, /^epic-integration:/);
+  assert.match(b.excluded[0].reason, /\/develop-next/);
+  assert.ok(
+    !b.worktrees.some((w) => w.id === "8.2"),
+    "no worktree is planned for the excluded story",
+  );
+  assert.deepEqual(asked, ["8.1", "8.2"], "only /develop-story rows are asked");
+  assert.match(b.detail, /1 held back/);
+});
+
+test("bug.18: a develop-direct or undeclared epic keeps the story in the batch, silently", () => {
+  for (const model of [null, "develop-direct"]) {
+    const b = selectBatch(parseRoadmap(EPIC_BATCH_ROADMAP), {
+      branchModelOf: () => ({ resolved: true, model }),
+    });
+    assert.deepEqual(
+      b.batch.map((r) => r.id),
+      ["8.1", "8.2", "T5"],
+      `branch model ${JSON.stringify(model)} must not exclude`,
+    );
+    assert.deepEqual(b.lint.warnings, [], "a resolved epic is not a warning");
+  }
+});
+
+test("bug.18: an unresolved epic keeps the story in the batch but names it in lint.warnings", () => {
+  const b = selectBatch(parseRoadmap(EPIC_BATCH_ROADMAP), {
+    branchModelOf: (row) =>
+      row.id === "8.2"
+        ? { resolved: false, reason: "epic document not found" }
+        : { resolved: true, model: null },
+  });
+  assert.deepEqual(
+    b.batch.map((r) => r.id),
+    ["8.1", "8.2", "T5"],
+  );
+  assert.equal(b.lint.warnings.length, 1);
+  assert.match(
+    b.lint.warnings[0],
+    /^8\.2: could not resolve its epic \(epic document not found\).*\/develop-next/,
+  );
+});
+
+test("bug.18: with no branchModelOf, selectBatch behaves as before (pure default)", () => {
+  const b = selectBatch(parseRoadmap(EPIC_BATCH_ROADMAP));
+  assert.deepEqual(
+    b.batch.map((r) => r.id),
+    ["8.1", "8.2", "T5"],
+  );
+});
+
+test("bug.18: storyBranchModel reads the epic from epic_source, then the enclosing epic directory", () => {
+  const files = {
+    "/r/docs/p/epics/epic.9.int/epic.9.int.md":
+      "---\ntype: epic\nbranch_model: epic-integration # opt-in\n---\n",
+    "/r/docs/p/epics/epic.9.int/stories/story.9.1.b/story.9.1.b.md":
+      "---\ntype: story\nepic: epic.9.int\n---\n",
+    "/r/docs/p/epics/epic.8.dd/epic.8.dd.md": "---\ntype: epic\n---\n",
+    "/r/docs/p/epics/epic.8.dd/stories/story.8.1.a/story.8.1.a.md":
+      "---\ntype: story\nepic: epic.8.dd\n---\n",
+    "/r/elsewhere/story.9.2.c.md":
+      "---\ntype: story\nepic: epic.9.int\nepic_source: '../docs/p/epics/epic.9.int/epic.9.int.md'\n---\n",
+    "/r/elsewhere/story.9.3.d.md": "---\ntype: story\nepic: epic.9.int\n---\n",
+  };
+  const read = (p) => (p in files ? files[p] : null);
+  assert.deepEqual(
+    storyBranchModel(
+      "/r/docs/p/epics/epic.9.int/stories/story.9.1.b/story.9.1.b.md",
+      read,
+    ),
+    { resolved: true, model: "epic-integration" },
+    "enclosing epic directory named by `epic:`",
+  );
+  assert.deepEqual(
+    storyBranchModel("/r/elsewhere/story.9.2.c.md", read),
+    { resolved: true, model: "epic-integration" },
+    "epic_source, relative to the story file",
+  );
+  assert.deepEqual(
+    storyBranchModel(
+      "/r/docs/p/epics/epic.8.dd/stories/story.8.1.a/story.8.1.a.md",
+      read,
+    ),
+    { resolved: true, model: null },
+    "an epic that declares nothing",
+  );
+  assert.deepEqual(
+    storyBranchModel("/r/elsewhere/story.9.3.d.md", read),
+    { resolved: false, reason: "epic document not found" },
+    "an epic that cannot be found is unresolved, never guessed",
+  );
+  assert.deepEqual(storyBranchModel("/r/missing.md", read), {
+    resolved: false,
+    reason: "story unreadable",
+  });
+});
+
+test("bug.18 CLI: --batch excludes an epic-integration story found on disk", () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "select-next-epic-int-"));
+  const put = (rel, body) => {
+    const p = path.join(root, rel);
+    mkdirSync(path.dirname(p), { recursive: true });
+    writeFileSync(p, body);
+  };
+  put(
+    "docs/p/epics/epic.9.int/epic.9.int.md",
+    "---\ntype: epic\nbranch_model: epic-integration\n---\n",
+  );
+  put(
+    "docs/p/epics/epic.9.int/stories/story.9.1.b/story.9.1.b.md",
+    "---\ntype: story\nepic: epic.9.int\n---\n",
+  );
+  put("docs/p/epics/epic.8.dd/epic.8.dd.md", "---\ntype: epic\n---\n");
+  put(
+    "docs/p/epics/epic.8.dd/stories/story.8.1.a/story.8.1.a.md",
+    "---\ntype: story\nepic: epic.8.dd\n---\n",
+  );
+  put(
+    "roadmap.md",
+    [
+      "# PHASE 1 — MVP",
+      "- [ ] **8.1** Ordinary · deps: — · touches: +own · /develop-story docs/p/epics/epic.8.dd/stories/story.8.1.a/story.8.1.a.md",
+      "- [ ] **9.1** Integration · deps: — · touches: +own · /develop-story docs/p/epics/epic.9.int/stories/story.9.1.b/story.9.1.b.md",
+      "",
+    ].join("\n"),
+  );
+  const out = execFileSync(
+    process.execPath,
+    [SCRIPT, "--batch", "--roadmap", "roadmap.md"],
+    { encoding: "utf-8", cwd: root },
+  );
+  const r = JSON.parse(out);
+  assert.deepEqual(
+    r.batch.map((x) => x.id),
+    ["8.1"],
+  );
+  assert.equal(r.excluded[0].id, "9.1");
+  assert.match(r.excluded[0].reason, /^epic-integration:/);
+});
+
+// ── bug.19: a plain-title registry with a document-path column parses ────────
+
+// The consumer shape from GitHub #643: plain-text title, the path in a column
+// of its own, and columns the parser does not know (`Icon`, `Tracker`).
+function docColumnRegistry(rows) {
+  return [
+    "| # | Title | Category | Priority | Icon | Status | Tracker | Document |",
+    "|---|---|---|---|---|---|---|---|",
+    ...rows,
+    "",
+  ].join("\n");
+}
+const docColumnRow = (n, status, docCell) =>
+  `| ${n} | Plain title ${n} | infrastructure | High | ⚠️ | ${status} | X-${n} | ${docCell} |`;
+
+test("bug.19: a code-span path in a Document column is read from the repo root", () => {
+  const p = parseRegistry(
+    docColumnRegistry([
+      docColumnRow(7, "ready-for-review", "`docs/tasks/task.7.x/task.7.x.md`"),
+    ]),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.deepEqual(p.malformed, []);
+  assert.equal(p.rows.length, 1);
+  assert.equal(p.rows[0].n, 7);
+  assert.equal(p.rows[0].title, "Plain title 7");
+  assert.equal(p.rows[0].path, "docs/tasks/task.7.x/task.7.x.md");
+  assert.equal(p.rows[0].registryStatus, "ready-for-review");
+  assert.equal(p.rows[0].priority, "High");
+});
+
+test("bug.19: a link or a ./-relative path in the Document column resolves against the registry", () => {
+  const p = parseRegistry(
+    docColumnRegistry([
+      docColumnRow(8, "planned", "[doc](task.8.x/task.8.x.md)"),
+      docColumnRow(9, "planned", "`./task.9.x/task.9.x.md`"),
+    ]),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.deepEqual(
+    p.rows.map((r) => r.path),
+    ["docs/tasks/task.8.x/task.8.x.md", "docs/tasks/task.9.x/task.9.x.md"],
+  );
+});
+
+test("bug.19: the title's link wins over the Document column", () => {
+  const p = parseRegistry(
+    [
+      "| # | Title | Status | Priority | Document |",
+      "|---|---|---|---|---|",
+      "| 4 | [T4](task.4.link/task.4.link.md) | planned | High | `docs/tasks/task.4.other/task.4.other.md` |",
+      "",
+    ].join("\n"),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.equal(p.rows[0].path, "docs/tasks/task.4.link/task.4.link.md");
+});
+
+test("bug.19: a Document cell that names no work item is still a malformed row, and says which column it read", () => {
+  const p = parseRegistry(
+    docColumnRegistry([
+      docColumnRow(5, "planned", "`docs/notes/readme.md`"),
+      docColumnRow(6, "planned", "—"),
+    ]),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.deepEqual(p.rows, []);
+  assert.deepEqual(
+    p.malformed.map((m) => m.n),
+    [5, 6],
+  );
+  for (const m of p.malformed) {
+    assert.match(m.reason, /no work-item path in the document column/);
+  }
+});
+
+test("bug.19: a registry with no document column keeps the original malformed reason", () => {
+  const p = parseRegistry(
+    taskRegistry([
+      "| 2 | No link at all | ready-for-development | infra | High | 2026-08-29 | — | — |",
+    ]),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.equal(
+    p.malformed[0].reason,
+    "malformed row — no [title](story|task|bug.….md) link",
+  );
+});
+
+test("bug.19: the registry frontier selects a row from a Document-column registry", () => {
+  const { opts } = registryOpts({
+    tasks: docColumnRegistry([
+      docColumnRow(
+        7,
+        "ready-for-development",
+        "`docs/tasks/task.7.x/task.7.x.md`",
+      ),
+    ]),
+    docs: { "docs/tasks/task.7.x/task.7.x.md": "ready-for-development" },
+  });
+  const sel = registryFrontier(opts.registries);
+  assert.equal(sel.selected?.id, "T7");
+});
+
+test("bug.19: DOC_COLUMN_NAMES lists the header names the parser maps to the document column", () => {
+  assert.deepEqual([...DOC_COLUMN_NAMES].sort(), [
+    "doc",
+    "document",
+    "file",
+    "path",
+  ]);
+  assert.ok(Object.isFrozen(DOC_COLUMN_NAMES));
+});
+
+// ── bug.19 DoD run 1: the document column names a file inside the repo ──────
+
+// Each refusal is a path the selector would otherwise open. A title link cannot
+// name an absolute path (it is joined under the registry directory); the
+// document column must be no laxer than that.
+const DOC_CELL_REFUSED = [
+  ["absolute", "`/etc/task.1.x.md`", /absolute path/],
+  ["absolute link", "[d](/etc/task.1.x.md)", /absolute path/],
+  [
+    "drive letter",
+    "`C:/repo/docs/tasks/task.1.x/task.1.x.md`",
+    /absolute path/,
+  ],
+  ["backslash", "`docs\\tasks\\task.1.x\\task.1.x.md`", /backslash/],
+  ["NUL", "`docs/tasks/task.1.x/task.1.x.md\u0000.png`", /control character/],
+  [
+    "root escape, ../-relative",
+    "`../../../etc/task.1.x.md`",
+    /outside the repository/,
+  ],
+  [
+    "root escape, inner ..",
+    "`docs/../../etc/task.1.x.md`",
+    /outside the repository/,
+  ],
+  [
+    "root escape, link",
+    "[d](../../../etc/task.1.x.md)",
+    /outside the repository/,
+  ],
+  ["not a work item", "`docs/notes/readme.md`", /no work-item path/],
+  ["empty", "", /no work-item path/],
+];
+
+test("bug.19: resolveDocCell refuses a path outside the repo, an absolute path and an ambiguous one", () => {
+  for (const [label, cell, reason] of DOC_CELL_REFUSED) {
+    const v = resolveDocCell(cell, REG_TASK_PATH);
+    assert.equal(
+      v.ok,
+      false,
+      `${label}: ${JSON.stringify(cell)} must be refused`,
+    );
+    assert.match(v.reason, reason, label);
+  }
+});
+
+test("bug.19: resolveDocCell resolves the legitimate spellings to a repo-root-relative path", () => {
+  for (const [cell, want] of [
+    ["`docs/tasks/task.7.x/task.7.x.md`", "docs/tasks/task.7.x/task.7.x.md"],
+    ["docs/tasks/task.7.x/task.7.x.md", "docs/tasks/task.7.x/task.7.x.md"],
+    ["`./task.9.x/task.9.x.md`", "docs/tasks/task.9.x/task.9.x.md"],
+    ["`../bugs/bug.3.x/bug.3.x.md`", "docs/bugs/bug.3.x/bug.3.x.md"],
+    ["[doc](task.8.x/task.8.x.md)", "docs/tasks/task.8.x/task.8.x.md"],
+    [
+      "`docs/tasks/archive..2026/task.6.x.md`",
+      "docs/tasks/archive..2026/task.6.x.md",
+    ],
+  ]) {
+    assert.deepEqual(
+      resolveDocCell(cell, REG_TASK_PATH),
+      { ok: true, path: want },
+      cell,
+    );
+  }
+});
+
+test("bug.19: a refused document cell is a malformed row that names the refusal", () => {
+  const p = parseRegistry(
+    docColumnRegistry([docColumnRow(11, "planned", "`/etc/task.11.x.md`")]),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.deepEqual(p.rows, []);
+  assert.match(
+    p.malformed[0].reason,
+    /^malformed row — document column refused: absolute path/,
+  );
+});
+
+// ── bug.19 PR review (#652): containment does not depend on how the registry
+//    path is spelled, and the title link meets the same rule ─────────────────
+
+test("bug.19 CR-2: an absolute registry path cannot switch containment off", () => {
+  const abs = path.join(process.cwd(), REG_TASK_PATH);
+  for (const cell of [
+    "`../../../etc/task.1.x.md`",
+    "[d](../../../etc/task.1.x.md)",
+  ]) {
+    const v = resolveDocCell(cell, abs);
+    assert.equal(
+      v.ok,
+      false,
+      `${cell} must be refused with an absolute registry path`,
+    );
+    assert.match(v.reason, /outside the repository/);
+  }
+  // …and a legitimate cell still resolves, to the same repo-relative path.
+  assert.deepEqual(resolveDocCell("`./task.9.x/task.9.x.md`", abs), {
+    ok: true,
+    path: "docs/tasks/task.9.x/task.9.x.md",
+  });
+});
+
+test("bug.19 CR-1: a title link that resolves outside the repository is a malformed row", () => {
+  const p = parseRegistry(
+    taskRegistry([
+      "| 12 | [T12](../../../../etc/task.12.x.md) | planned | infra | High | 2026-10-14 | — | — |",
+      taskRow(13, "inside", "planned"),
+    ]),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.deepEqual(
+    p.rows.map((r) => r.n),
+    [13],
+  );
+  assert.equal(p.malformed[0].n, 12);
+  assert.match(
+    p.malformed[0].reason,
+    /^malformed row — title link .* resolves outside the repository$/,
   );
 });

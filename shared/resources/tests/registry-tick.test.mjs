@@ -1100,3 +1100,113 @@ test("annotate: `--annotate` without `--pr` is a usage error (exit 2), and `--pr
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ── bug.19: a row the parser rejected is not a missing row ───────────────────
+
+/**
+ * A sandbox whose registry is written verbatim, for registry shapes other than
+ * the documented one. Same selector symlink as `sandbox()`.
+ */
+function rawSandbox(lines) {
+  const { dir, registry } = sandbox([]);
+  writeFileSync(registry, [...lines, ""].join("\n"));
+  return { dir, registry };
+}
+
+// The consumer shape from GitHub #643: plain title, path in its own column.
+const DOC_COLUMN_HEADER = [
+  "| # | Title | Category | Priority | Icon | Status | Tracker | Document |",
+  "|---|---|---|---|---|---|---|---|",
+];
+const docColumnRow = (n, slug, status) =>
+  `| ${n} | Plain title ${n} | infrastructure | High | ⚠️ | ${status} | X-${n} | \`docs/tasks/task.${n}.${slug}/task.${n}.${slug}.md\` |`;
+
+test("bug.19: a plain-title registry with a Document column ticks — never `no-row`", () => {
+  const { dir, registry } = rawSandbox([
+    ...DOC_COLUMN_HEADER,
+    docColumnRow(47, "me", "ready-for-review"),
+  ]);
+  try {
+    const f = writeDoc(dir, 47, "me", { status: "accepted" });
+    const res = run(dir, ["--file", path.relative(dir, f)]);
+    assert.equal(res.reason, "ticked");
+    const line = readFileSync(registry, "utf8")
+      .split("\n")
+      .find((l) => l.startsWith("| 47 |"));
+    assert.equal(
+      line,
+      docColumnRow(47, "me", "accepted").replace(
+        "| accepted |",
+        "| accepted         |",
+      ),
+      "only the Status cell changes, width preserved; the path cell is untouched",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("bug.19: a row the parser rejects reports `row-malformed` with the parser's reason and line", () => {
+  // Plain title and no document column: the parser has nowhere to find a path.
+  const { dir, registry } = rawSandbox([
+    "| # | Title | Status | Category | Priority | Created | Issue | Depends on |",
+    "|---|---|---|---|---|---|---|---|",
+    "| 48 | Plain title | ready-for-review | infrastructure | High | 2026-01-01 | — | — |",
+  ]);
+  try {
+    const f = writeDoc(dir, 48, "plain", { status: "accepted" });
+    const before = readFileSync(registry, "utf8");
+    for (const extra of [[], ["--annotate", "--pr", "12"]]) {
+      const res = run(dir, ["--file", path.relative(dir, f), ...extra]);
+      assert.equal(
+        res.reason,
+        "row-malformed",
+        `mode ${extra.join(" ") || "tick"}`,
+      );
+      assert.equal(res.exitCode, 0);
+      assert.equal(res.line, 3);
+      assert.match(res.parserReason, /no \[title\]\(story\|task\|bug/);
+      assert.match(res.message, /line 3 is task 48's row/);
+    }
+    assert.equal(readFileSync(registry, "utf8"), before, "nothing written");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("bug.19: a genuinely absent row is still `no-row` when other rows are malformed", () => {
+  const { dir } = rawSandbox([
+    "| # | Title | Status | Category | Priority | Created | Issue | Depends on |",
+    "|---|---|---|---|---|---|---|---|",
+    "| 48 | Plain title | ready-for-review | infrastructure | High | 2026-01-01 | — | — |",
+  ]);
+  try {
+    const f = writeDoc(dir, 49, "absent", { status: "accepted" });
+    assert.equal(run(dir, ["--file", path.relative(dir, f)]).reason, "no-row");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("bug.19: annotate never writes a note into the Document column", () => {
+  const { dir, registry } = rawSandbox([
+    ...DOC_COLUMN_HEADER,
+    docColumnRow(50, "doc", "accepted"),
+  ]);
+  try {
+    const f = writeDoc(dir, 50, "doc", { status: "accepted" });
+    const before = readFileSync(registry, "utf8");
+    const res = run(dir, [
+      "--annotate",
+      "--file",
+      path.relative(dir, f),
+      "--pr",
+      "12",
+    ]);
+    assert.equal(res.reason, "no-cell");
+    assert.equal(res.lastColumn, "document");
+    assert.equal(readFileSync(registry, "utf8"), before);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

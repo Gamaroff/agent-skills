@@ -866,15 +866,30 @@ function buildRationale(model, row, phase, skipped, phaseNotes) {
  * @returns {string|null} lowercase-kebab status, or null
  */
 export function parseFrontmatterStatus(text) {
+  const v = frontmatterScalar(text, "status");
+  return v ? v.toLowerCase() : null;
+}
+
+/**
+ * Read one top-level scalar out of a document's YAML frontmatter — same
+ * deliberately minimal reading as `parseFrontmatterStatus`: trailing comment
+ * and surrounding quotes stripped, case preserved. Null when absent.
+ *
+ * @param {string} text
+ * @param {string} key
+ * @returns {string|null}
+ */
+function frontmatterScalar(text, key) {
   if (typeof text !== "string") return null;
   const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
   if (!m) return null;
-  const line = m[1].split(/\r?\n/).find((l) => /^status\s*:/.test(l));
+  const keyRe = new RegExp(`^${key}\\s*:`);
+  const line = m[1].split(/\r?\n/).find((l) => keyRe.test(l));
   if (!line) return null;
-  let v = line.replace(/^status\s*:/, "").trim();
+  let v = line.replace(keyRe, "").trim();
   v = v.replace(/\s+#.*$/, "").trim(); // strip a trailing comment
   v = v.replace(/^['"]|['"]$/g, "").trim();
-  return v ? v.toLowerCase() : null;
+  return v || null;
 }
 
 /** A markdown table separator row (`| --- | :--: |`). */
@@ -913,7 +928,95 @@ const COLUMN_ALIASES = {
   "depends-on": "deps",
   depends_on: "deps",
   "blocked by": "deps",
+  document: "doc",
+  doc: "doc",
+  path: "doc",
+  file: "doc",
 };
+
+// The header names that map to the document-path column, exported so
+// `registry-tick.js --annotate` can refuse to write a note into that cell. A
+// second list there would drift from this one in the worst direction — the
+// parser reading a path the annotate write has just appended prose to.
+export const DOC_COLUMN_NAMES = Object.freeze(
+  Object.keys(COLUMN_ALIASES).filter((k) => COLUMN_ALIASES[k] === "doc"),
+);
+
+/**
+ * The work-item path in a registry's document-path column (bug 19).
+ *
+ * Some registries keep the title as plain text and put the document path in a
+ * column of its own (`| … | Document |`), usually as a code span. A Markdown
+ * link there resolves against the registry file, as a link does anywhere. A
+ * code span or bare path is read from the REPO ROOT — that is how a path is
+ * written in prose, and how the registries that use this shape write it — unless
+ * it opens with `./` or `../`, which says "relative to here".
+ *
+ * **The result must name a file inside the repository, or the cell is refused.**
+ * The selector reads the frontmatter of whatever path a row names, so this is a
+ * path boundary. An absolute path (`/etc/task.1.x.md`, `C:/…`), a backslash, a
+ * control character, or a path that normalises to outside the repo root
+ * (`../…`) is a refusal, never a resolution. A title link cannot name an
+ * absolute path because it is joined under the registry directory; without this
+ * check the document column was the laxer of the two (bug 19, DoD run 1).
+ *
+ * Exported, and shaped as a verdict, so the security probe engine can score it:
+ * `{ ok: false }` is a refusal to that engine.
+ *
+ * @param {string} cell raw document-column cell text
+ * @param {string} registryPath repo-root-relative registry path
+ * @returns {{ok: true, path: string} | {ok: false, reason: string}}
+ */
+export function resolveDocCell(cell, registryPath) {
+  const dir = registryDir(registryPath);
+  const text = String(cell ?? "");
+  const linked = [...text.matchAll(MD_LINK_RE)]
+    .map((m) => m[1])
+    .find(isWorkItemHref);
+  const raw = linked || text.replace(/^`+|`+$/g, "").trim();
+  // Refused before any path arithmetic, because each makes "where does this
+  // point" depend on more than the string: a NUL truncates at the syscall, a
+  // backslash is a separator on one platform and a character on another.
+  if (/[\u0000-\u001f\u007f\\]/.test(raw)) {
+    return { ok: false, reason: "control character or backslash in path" };
+  }
+  if (/^\//.test(raw) || /^[a-z]:/i.test(raw)) {
+    return { ok: false, reason: `absolute path ${JSON.stringify(raw)}` };
+  }
+  if (!linked && (/\s/.test(raw) || !isWorkItemHref(raw))) {
+    return { ok: false, reason: "no work-item path" };
+  }
+  const resolved = path.posix.normalize(
+    linked || /^\.\.?\//.test(raw) ? path.posix.join(dir, raw) : raw,
+  );
+  if (outsideRepo(resolved)) {
+    return {
+      ok: false,
+      reason: `${JSON.stringify(raw)} resolves outside the repository`,
+    };
+  }
+  return { ok: true, path: resolved };
+}
+
+/** The registry's directory, posix, repo-root-relative — what hrefs resolve against. */
+function registryDir(registryPath) {
+  const dir = path.posix.dirname(
+    String(registryPath || "")
+      .split(path.sep)
+      .join("/"),
+  );
+  if (!path.posix.isAbsolute(dir)) return dir;
+  // An absolute registry path (`--task-registry "$PWD/…"`) is re-expressed from
+  // the working directory, the base `readStatus` opens a row's path from. Left
+  // absolute, every path joined to it is absolute too, never starts with `../`,
+  // and `outsideRepo` passes a cell that leaves the repo (bug 19 PR review, CR-2).
+  return path.relative(process.cwd(), dir).split(path.sep).join("/") || ".";
+}
+
+/** A repo-root-relative path that normalises above the root. */
+function outsideRepo(p) {
+  return p === ".." || p.startsWith("../");
+}
 
 // Documented positions, used when a registry has no recognisable header.
 //   bug:  | # | Title | Status | Severity | Priority | Created | Area |
@@ -1026,11 +1129,7 @@ export function parseRegistry(text, kind, registryPath) {
   if (typeof text !== "string" || !text.trim())
     return { rows, malformed, warnings };
 
-  const dir = path.posix.dirname(
-    String(registryPath || "")
-      .split(path.sep)
-      .join("/"),
-  );
+  const dir = registryDir(registryPath);
   const defaults = DEFAULT_COLUMNS[kind] || DEFAULT_COLUMNS.task;
   const lines = text.split(/\r?\n/);
   let fenced = false;
@@ -1122,14 +1221,40 @@ export function parseRegistry(text, kind, registryPath) {
       [...titleCell.matchAll(MD_LINK_RE)]
         .map((m) => m[1])
         .find(isWorkItemHref) || null;
+    // The title's link wins; the document-path column is read only when the
+    // title carries none, so a registry that has both cannot disagree with
+    // itself about which file a row names.
+    const docVerdict =
+      href || c.doc === undefined
+        ? null
+        : resolveDocCell(cells[c.doc] || "", registryPath);
+    const docPath = docVerdict && docVerdict.ok ? docVerdict.path : null;
+    const titlePath = href
+      ? path.posix.normalize(path.posix.join(dir, href))
+      : null;
 
     const base = { kind, n, line: i + 1, raw: t };
 
-    if (cells.length < 5 || !href || !status) {
+    // The title link meets the same containment rule as the document column:
+    // the selector opens whatever a row names (bug 19 PR review, CR-1 — this
+    // escape predates the document column).
+    if (titlePath && outsideRepo(titlePath)) {
       malformed.push({
         ...base,
-        reason: !href
-          ? "malformed row — no [title](story|task|bug.….md) link"
+        reason: `malformed row — title link ${JSON.stringify(href)} resolves outside the repository`,
+      });
+      continue;
+    }
+
+    if (cells.length < 5 || !(href || docPath) || !status) {
+      malformed.push({
+        ...base,
+        reason: !(href || docPath)
+          ? c.doc === undefined
+            ? "malformed row — no [title](story|task|bug.….md) link"
+            : docVerdict.reason === "no work-item path"
+              ? "malformed row — no [title](story|task|bug.….md) link and no work-item path in the document column"
+              : `malformed row — document column refused: ${docVerdict.reason}`
           : !status
             ? "malformed row — empty status cell"
             : `malformed row — ${cells.length} cells, expected at least 5`,
@@ -1140,7 +1265,7 @@ export function parseRegistry(text, kind, registryPath) {
     rows.push({
       ...base,
       title: titleCell.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").trim(),
-      path: path.posix.normalize(path.posix.join(dir, href)),
+      path: docPath || titlePath,
       registryStatus: status,
       severity:
         kind === "bug" && c.severity !== undefined
@@ -1464,6 +1589,60 @@ function worktreeFor(row) {
   };
 }
 
+/** The epic branch model a parallel batch cannot honour (bug.18). */
+const EPIC_INTEGRATION = "epic-integration";
+
+/**
+ * The `branch_model:` a story's parent epic declares. Returns
+ * `{ resolved: true, model }` once the epic is found — `model` lowercased, or
+ * null when the epic declares none — and `{ resolved: false, reason }` when the
+ * story or its epic cannot be read. The two are kept apart because the right
+ * response differs: an epic that declares nothing is develop-direct, while one
+ * that could not be found might be an integration epic nobody looked at.
+ *
+ * The epic is found from the story's `epic_source:` (relative to the story file,
+ * then to the working directory), else from `epic:` — the epic's directory stem —
+ * by walking up to the enclosing directory of that name, where the standard
+ * layout nests every story (docs/standards/story-documents.md).
+ *
+ * @param {string} storyPath  absolute path of the story document
+ * @param {(p: string) => string|null} read  file reader; null when unreadable
+ * @returns {{resolved: true, model: string|null} | {resolved: false, reason: string}}
+ */
+export function storyBranchModel(storyPath, read) {
+  const story = read(storyPath);
+  if (!story) return { resolved: false, reason: "story unreadable" };
+  const candidates = [];
+  const source = frontmatterScalar(story, "epic_source");
+  if (source)
+    candidates.push(
+      path.resolve(path.dirname(storyPath), source),
+      path.resolve(source),
+    );
+  const stem = frontmatterScalar(story, "epic");
+  if (stem)
+    for (let dir = path.dirname(storyPath); ; dir = path.dirname(dir)) {
+      if (path.basename(dir) === stem) {
+        candidates.push(path.join(dir, `${stem}.md`));
+        break;
+      }
+      if (path.dirname(dir) === dir) break;
+    }
+  for (const p of candidates) {
+    const epic = read(p);
+    if (!epic) continue;
+    const model = frontmatterScalar(epic, "branch_model");
+    return { resolved: true, model: model ? model.toLowerCase() : null };
+  }
+  return {
+    resolved: false,
+    reason:
+      source || stem
+        ? "epic document not found"
+        : "story names no epic_source: or epic:",
+  };
+}
+
 /**
  * Greedily pack a maximal conflict-free batch from the earliest actionable phase.
  * Document order is the tie-breaker, so the batch always leads with the row
@@ -1477,12 +1656,25 @@ function worktreeFor(row) {
  * row is kept, the rest deferred to `excluded` (belt-and-suspenders for teams that
  * want conflicts impossible by construction). Default is warn-only (non-breaking).
  *
+ * `opts.branchModelOf(row)` returns what `storyBranchModel` returns for a
+ * `/develop-story` row's document. A story whose epic declares `epic-integration`
+ * is excluded: a batch worktree is cut from, and rebased onto, the base branch,
+ * which would land the story on the base branch early and replay the epic's
+ * earlier commits on rebase (bug.18). It is left to `/develop-next` or an
+ * interactive run, whose Phase 0d bases it on the integration branch. A story
+ * whose epic cannot be resolved stays in the batch, as Phase 0d leaves
+ * `EPIC_BRANCH` unset for it, but is named in `lint.warnings` so the guess is
+ * visible. Without the callback no row is excluded for its branch model, which
+ * keeps this function pure for callers that read nothing from disk.
+ *
  * @param {object} model
- * @param {{requireTouches?: boolean}} [opts]
+ * @param {{requireTouches?: boolean, branchModelOf?: (row: object) => ({resolved: boolean, model?: string|null, reason?: string})}} [opts]
  * @returns {{status:"batch"|"halt", ...}}
  */
 export function selectBatch(model, opts = {}) {
   const requireTouches = opts.requireTouches === true;
+  const branchModelOf =
+    typeof opts.branchModelOf === "function" ? opts.branchModelOf : null;
   const lint = { errors: model.errors, warnings: model.warnings };
   if (model.errors.length)
     return { status: "halt", haltReason: model.errors[0], batch: [], lint };
@@ -1508,6 +1700,27 @@ export function selectBatch(model, opts = {}) {
     const batch = [];
     const excluded = [];
     for (const row of ready) {
+      const branch =
+        branchModelOf && row.command === "/develop-story"
+          ? branchModelOf(row)
+          : null;
+      if (branch && !branch.resolved)
+        model.warnings.push(
+          `${row.id}: could not resolve its epic (${branch.reason}) — batched as ` +
+            `develop-direct; if its epic declares branch_model: epic-integration, ` +
+            `run it with /develop-next instead`,
+        );
+      if (branch && branch.resolved && branch.model === EPIC_INTEGRATION) {
+        excluded.push({
+          id: row.id,
+          line: row.line,
+          reason:
+            "epic-integration: its epic cuts stories from an integration branch, " +
+            "which a batch worktree (cut from and rebased onto the base branch) " +
+            "cannot honour — run it with /develop-next or interactively",
+        });
+        continue;
+      }
       let clash = null;
       for (const picked of batch) {
         const tag = hardConflict(row, picked);
@@ -1569,7 +1782,7 @@ export function selectBatch(model, opts = {}) {
     return {
       status: "batch",
       phase: phase.name,
-      detail: `${batch.length} row(s) can develop in parallel; ${excluded.length} held back by hard conflicts`,
+      detail: `${batch.length} row(s) can develop in parallel; ${excluded.length} held back (hard conflicts or epic-integration)`,
       skippedPhases,
       batch: batch.map((r) => ({
         id: r.id,
@@ -1733,7 +1946,15 @@ function main() {
         // `touches:` data, so write-disjointness cannot be established for them
         // and they must never enter a parallel batch.
         roadmap: args.roadmap,
-        ...selectBatch(model, { requireTouches: args.requireTouches }),
+        ...selectBatch(model, {
+          requireTouches: args.requireTouches,
+          // Paths in the roadmap are repository-relative, like --roadmap's.
+          branchModelOf: (row) =>
+            storyBranchModel(
+              path.resolve(row.commandArg),
+              (p) => readOrEmpty(p) || null,
+            ),
+        }),
       }
     : { roadmap: args.roadmap, ...selectNext(model, { loadRegistries }) };
   process.stdout.write(JSON.stringify(result, null, 2) + "\n");

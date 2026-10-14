@@ -1738,3 +1738,126 @@ test("template: fixed section order, half-life labels, and the traps section is 
     "the template's own placeholder rows parse",
   );
 });
+
+// ---------------------------------------------------------------------------
+// obs #1 — `{observation-workspace}`: a probe that names the observation log
+// must run on any machine, not only the one whose absolute path it spelled out
+// ---------------------------------------------------------------------------
+
+const WS = "/home/someone/.claude/projects/-home-someone-repo";
+const wsOk = () => ({ ok: true, value: WS });
+
+test("obs #1: {observation-workspace} is substituted per token before the whitelist judges the line", () => {
+  const cat = mod.isAllowed(
+    "cat {observation-workspace}/skill-observations/last-review-date.txt",
+    undefined,
+    { resolveWorkspace: wsOk },
+  );
+  assert.equal(cat.ok, true, cat.detail);
+  assert.deepEqual(cat.argv, [
+    "cat",
+    `${WS}/skill-observations/last-review-date.txt`,
+  ]);
+  const queue = mod.isAllowed(
+    `command node skills/observe-work/${REFS}/observation-log.js queue --workspace {observation-workspace} --json`,
+    undefined,
+    { resolveWorkspace: wsOk },
+  );
+  assert.equal(queue.ok, true, queue.detail);
+  assert.ok(queue.argv.includes(WS), "the resolved path is one argv element");
+});
+
+test("obs #1: an unresolvable or unsupplied workspace refuses the line, naming why", () => {
+  const cmd =
+    "cat {observation-workspace}/skill-observations/last-review-date.txt";
+  const refused = mod.isAllowed(cmd, undefined, {
+    resolveWorkspace: () => ({
+      ok: false,
+      detail:
+        "observation workspace refused: path is inside a temporary directory",
+    }),
+  });
+  assert.equal(refused.ok, false);
+  assert.match(
+    refused.detail,
+    /^\{observation-workspace\} not resolvable: observation workspace refused/,
+  );
+  const none = mod.isAllowed(cmd);
+  assert.equal(none.ok, false, "no resolver supplied fails closed");
+  assert.match(none.detail, /not resolvable: no resolver supplied/);
+});
+
+test("obs #1: the resolved path is held to the same rules as a written one", () => {
+  // A value carrying a shell expansion is refused exactly as if it had been written.
+  const dollar = mod.isAllowed("cat {observation-workspace}/x", undefined, {
+    resolveWorkspace: () => ({ ok: true, value: "/home/$USER/ws" }),
+  });
+  assert.equal(dollar.ok, false);
+  assert.match(dollar.detail, /shell expansion/);
+  // A binary whose spec refuses an absolute positional still refuses it after substitution.
+  const written = mod.isAllowed(`git log ${WS}`);
+  const substituted = mod.isAllowed(
+    "git log {observation-workspace}",
+    undefined,
+    {
+      resolveWorkspace: wsOk,
+    },
+  );
+  assert.equal(substituted.ok, written.ok);
+  assert.equal(substituted.detail, written.detail);
+});
+
+test("obs #1: verify() resolves the workspace once per run, and never when no probe names it", async () => {
+  const doc =
+    TABLE_HEADER +
+    "| Review | `cat {observation-workspace}/skill-observations/last-review-date.txt` | **2026-10-10** |\n" +
+    `| Queue | \`command node skills/observe-work/${REFS}/observation-log.js queue --workspace {observation-workspace} --json\` | **total** |\n` +
+    "| Status | `git status` | **clean** |\n";
+  let asked = 0;
+  const runner = stubRunner({
+    [`cat ${WS}/skill-observations/last-review-date.txt`]: {
+      stdout: "2026-10-10\n",
+    },
+    [`node skills/observe-work/${REFS}/observation-log.js queue --workspace ${WS} --json`]:
+      {
+        stdout: '{"total": 4}',
+      },
+    "git status": { stdout: "nothing to commit, working tree clean" },
+  });
+  const r = await mod.verify(mod.parseHandoff(doc), {
+    runner,
+    resolveWorkspace: () => (asked++, { ok: true, value: WS }),
+  });
+  assert.equal(asked, 1, "resolved once for two probes");
+  assert.deepEqual(r.counts, { confirmed: 3, stale: 0, unverifiable: 0 });
+
+  asked = 0;
+  const plain = TABLE_HEADER + "| Status | `git status` | **clean** |\n";
+  await mod.verify(mod.parseHandoff(plain), {
+    runner,
+    resolveWorkspace: () => (asked++, { ok: true, value: WS }),
+  });
+  assert.equal(asked, 0, "no probe names it, so the resolver never runs");
+});
+
+test("obs #1: resolveObservationWorkspace runs the bundled resolver and reports a refusal verbatim", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "handoff-ws-"));
+  try {
+    const durable = mod.resolveObservationWorkspace(dir, {
+      env: { ...process.env, OBS_WORKSPACE: WS },
+    });
+    assert.deepEqual(durable, { ok: true, value: WS });
+    const ephemeral = mod.resolveObservationWorkspace(dir, {
+      env: { ...process.env, OBS_WORKSPACE: path.join(dir, "ws") },
+    });
+    assert.equal(ephemeral.ok, false);
+    assert.match(ephemeral.detail, /refused/);
+    const missing = mod.resolveObservationWorkspace(dir, {
+      resolver: path.join(dir, "no-such-resolver.sh"),
+    });
+    assert.equal(missing.ok, false);
+    assert.match(missing.detail, /resolver not found/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

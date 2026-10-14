@@ -224,6 +224,83 @@ function normaliseStatus(status) {
 }
 
 // ---------------------------------------------------------------------------
+// The bug's own status — frontmatter and header, set together (observation #21)
+// ---------------------------------------------------------------------------
+// A bug report carries its status in up to two places: frontmatter `status:`
+// (the lowercase lifecycle token) and a `**Status**: …` header line in the body
+// (Title Case, often decorated: `🆕 New`, `✅ Closed`). Until this existed every
+// writer flipped them by hand, and a QA cycle that verified a fix closed nothing:
+// task.180 ended with five bug reports at "Ready for QA" whose fixes later gates
+// had verified. This writes whichever of the two the file has, in one edit,
+// and leaves a fenced example of a header alone.
+const DECORATED = Object.freeze({
+  new: "🆕 New",
+  "in-progress": "🔄 In Progress",
+  "ready-for-qa": "✅ Ready for QA",
+  closed: "✅ Closed",
+  reopened: "⚠️ Reopened",
+});
+const RE_FM_STATUS = /^(status:[ \t]*)([^#\n]*?)([ \t]+#[^\n]*)?$/m;
+const RE_HEADER_STATUS = /^(\*\*Status(?:\*\*:|:\*\*)[ \t]*)(.*)$/gm;
+
+/**
+ * Set a bug report's status in frontmatter and/or its `**Status**` header line.
+ *
+ * @param {string} content  the bug report
+ * @param {string} token    a lifecycle token: new | in-progress | ready-for-qa | closed | reopened
+ * @returns {{content: string, fields: string[]}}  fields names what was written
+ *          (`frontmatter`, `header`); empty when the file carries neither
+ */
+function setBugStatus(content, token) {
+  const key = String(token == null ? "" : token)
+    .trim()
+    .toLowerCase();
+  if (!Object.prototype.hasOwnProperty.call(LIFECYCLE_TITLE, key))
+    throw new Error(`not a bug lifecycle status: ${token}`);
+  const fields = [];
+  let out = content;
+  // Frontmatter: only inside the leading --- block; an inline comment is kept.
+  if (out.startsWith("---")) {
+    const close = out.indexOf("\n---", 3);
+    if (close !== -1) {
+      const fm = out.slice(0, close);
+      if (RE_FM_STATUS.test(fm)) {
+        const next = fm.replace(
+          RE_FM_STATUS,
+          (_, lead, _v, comment) => `${lead}${key}${comment || ""}`,
+        );
+        out = next + out.slice(close);
+        fields.push("frontmatter");
+      }
+    }
+  }
+  // Header: the first `**Status**:` line outside a fence. The value keeps its
+  // style — decorated when it was decorated, plain Title Case when it was plain.
+  const fences = CL.fencedRanges(out);
+  const inFence = (i) => fences.some(([start, end]) => i >= start && i < end);
+  RE_HEADER_STATUS.lastIndex = 0;
+  for (const m of out.matchAll(RE_HEADER_STATUS)) {
+    if (inFence(m.index)) continue;
+    const old = m[2];
+    const decorated = old.trim() !== "" && old.trim() !== stripLead(old);
+    const value = decorated ? DECORATED[key] : LIFECYCLE_TITLE[key];
+    out =
+      out.slice(0, m.index) + m[1] + value + out.slice(m.index + m[0].length);
+    fields.push("header");
+    break;
+  }
+  return { content: out, fields };
+}
+
+// Leading emoji or symbol decoration, as bug-doc.js strips it (not required here:
+// this module requires only change-log.js).
+function stripLead(value) {
+  return String(value)
+    .replace(/^[\s\u200d\ufe0f\u2190-\u2bff\p{Extended_Pictographic}]+/u, "")
+    .trim();
+}
+
+// ---------------------------------------------------------------------------
 // CLI — for the prose-only skills (the GitHub sync path) that cannot require()
 // ---------------------------------------------------------------------------
 // The shared `reason` contract of its sibling engines (doc-links.js,
@@ -234,7 +311,7 @@ function normaliseStatus(status) {
 // a missing `--file`, an unknown flag, a value flag with no operand, or a file
 // that cannot be read. Usage errors were exit 1 until task.152.
 const USAGE =
-  "Usage: status-history.js --file <bug.md> --date <YYYY-MM-DD> --status <s> --changed-by <who> --notes <text> [--json]";
+  "Usage: status-history.js --file <bug.md> --date <YYYY-MM-DD> --status <s> --changed-by <who> --notes <text> [--set-status] [--json]";
 
 function usage(json, error) {
   process.stderr.write(`${error}\n${USAGE}\n`);
@@ -248,6 +325,9 @@ function usage(json, error) {
 function main(argv) {
   const args = argv.slice(2);
   const json = args.includes("--json");
+  // --set-status: also set the bug's own status (frontmatter and header) to --status, in the
+  // same write as the row. Opt-in: every existing caller records a row WITHOUT a transition.
+  const setStatus = args.includes("--set-status");
   const opts = { file: "", date: "", status: "", changedBy: "", notes: "" };
   const map = {
     "--file": "file",
@@ -258,7 +338,7 @@ function main(argv) {
   };
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
-    if (a === "--json") continue;
+    if (a === "--json" || a === "--set-status") continue;
     const key = map[a];
     if (key) {
       const v = args[++i];
@@ -276,12 +356,47 @@ function main(argv) {
     return usage(json, `cannot read ${opts.file}: ${e.code || e.message}`);
   }
   const status = normaliseStatus(opts.status);
-  const after = upsertStatusHistory(before, { ...opts, status });
+  let base = before;
+  let fields;
+  if (setStatus) {
+    const token = String(opts.status).trim().toLowerCase().replace(/\s+/g, "-");
+    if (!Object.prototype.hasOwnProperty.call(LIFECYCLE_TITLE, token))
+      return usage(
+        json,
+        `--set-status needs a lifecycle --status (new, in-progress, ready-for-qa, closed, reopened), got '${opts.status}'`,
+      );
+    const set = setBugStatus(before, token);
+    fields = set.fields;
+    if (fields.length === 0) {
+      // Refused, nothing written: a row saying "Closed" beside a status that still reads
+      // otherwise is the disagreement this flag exists to prevent.
+      const error = `${opts.file} carries no frontmatter status: and no **Status** header line`;
+      process.stderr.write(`${error}\n`);
+      if (json)
+        process.stdout.write(
+          JSON.stringify({
+            reason: "no-status-field",
+            exitCode: 1,
+            file: opts.file,
+            error,
+          }) + "\n",
+        );
+      return 1;
+    }
+    base = set.content;
+  }
+  const after = upsertStatusHistory(base, { ...opts, status });
   if (after !== before) fs.writeFileSync(opts.file, after, "utf-8");
   const reason = after === before ? "unchanged" : "updated";
   process.stdout.write(
     json
-      ? JSON.stringify({ reason, exitCode: 0, file: opts.file, status }) + "\n"
+      ? JSON.stringify({
+          reason,
+          exitCode: 0,
+          file: opts.file,
+          status,
+          ...(fields ? { statusFields: fields } : {}),
+        }) + "\n"
       : `${reason}\n`,
   );
   return 0;
@@ -306,6 +421,7 @@ if (require.main === module) {
     ANCHOR,
     isEntryRow,
     fmtEntry,
+    setBugStatus,
     buildStatusHistoryBlock,
     findStatusHistory,
     extractEntries,

@@ -99,6 +99,49 @@ expect_refusal "newest DoD file accepted (dod.2 outranks dod.1's GAPS)" dod-not-
 mkrepo nogate; codefix; rm -f "$R/$DOC"/*.gate.*
 expect_refusal "no gate" no-gate
 
+# expect_gate_cause NAME FRAGMENT — the no-gate refusal relays qa-cycle.sh's own reason for its
+# cause, rewritten to the reenter-qa: prefix and printed above the refused line (task.182, CR-1).
+# FRAGMENT is a stable piece of qa-cycle.sh's message; none of them occurs in the refused line.
+expect_gate_cause() {
+  local name="$1" frag="$2" err
+  err=$(run 2>&1 >/dev/null)
+  if ! printf '%s\n' "$err" | grep '^reenter-qa: ' | grep -qF "$frag"; then
+    fail "$name" "qa-cycle.sh's reason ('$frag') not relayed as a reenter-qa: line: $err"; return
+  fi
+  if printf '%s\n' "$err" | grep -q 'qa-cycle:'; then fail "$name" "the qa-cycle: prefix was not rewritten: $err"; return; fi
+  if ! printf '%s\n' "$err" | tail -1 | grep -q 'refused (no-gate)'; then fail "$name" "the refused line is not last: $err"; return; fi
+  pass "$name → the refusal names qa-cycle.sh's reason ('$frag')"
+}
+expect_gate_cause "no gate" "no gate file in"
+
+mkrepo unnumbered-gate; codefix; rm -f "$R/$DOC"/*.gate.*; : > "$R/$DOC/task.42.gate.example.yml"
+expect_refusal "an unnumbered gate file only" no-gate
+expect_gate_cause "an unnumbered gate file only" "carry no cycle number"
+
+mkrepo two-gates; codefix; cp "$R/$DOC/task.42.gate.2.example.yml" "$R/$DOC/task.42.gate.2.dup.yml"
+expect_refusal "two gate files claim one cycle" no-gate
+expect_gate_cause "two gate files claim one cycle" "claim cycle 2"
+
+# ── A git status that fails is a refusal, never a clean tree (task.182, CR-3) ─
+# A git that fails only on `status` and passes every other call through to the real one, so the
+# checks before the movement measure behave as on a healthy repository.
+mkrepo gitfail; codefix
+GSTUB="$T/gitstub"; mkdir -p "$GSTUB"
+REAL_GIT=$(command -v git)
+cat > "$GSTUB/git" <<EOF
+#!/usr/bin/env bash
+for a in "\$@"; do [ "\$a" = status ] && { echo "fatal: simulated index failure" >&2; exit 128; }; done
+exec "$REAL_GIT" "\$@"
+EOF
+chmod +x "$GSTUB/git"
+PATH="$GSTUB:$PATH" expect_refusal "git status fails" git-unreadable
+# git's own error reaches the operator — the read no longer sends it to /dev/null (task.182 QA cycle 1, CR-4).
+ERR=$(PATH="$GSTUB:$PATH" run 2>&1 >/dev/null)
+case "$ERR" in
+  *"simulated index failure"*"refused (git-unreadable)"*) pass "git status fails → git's own error is printed above the refusal" ;;
+  *) fail "git status fails — git's error" "the stub's error is not printed above the refusal: $ERR" ;;
+esac
+
 mkrepo docs-only
 echo "re-scoped criterion" >> "$R/$DOC/task.42.example.md"; git -C "$R" commit -qam "doc fix"
 echo "uncommitted doc edit" >> "$R/$DOC/task.42.example.md"
@@ -303,6 +346,18 @@ mkrepo usage
 (cd "$R" && bash "$SCRIPT" >/dev/null 2>&1); [ $? -eq 2 ] && pass "no <doc-dir> → exit 2" || fail "usage" "no doc-dir did not exit 2"
 (cd "$R" && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" "$DOC" >/dev/null 2>&1); [ $? -eq 2 ] && pass "no implementation report → exit 2 (report_entries has no source)" || fail "report required" "missing report did not exit 2"
 (cd "$R" && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" . "$DOC/report.md" >/dev/null 2>&1); [ $? -eq 2 ] && pass "<doc-dir> at the repository root → exit 2" || fail "root doc-dir" "did not exit 2"
+# A cwd that is not <doc-dir>'s repository root is a usage error, not git-unreadable: from another
+# repository `git status` exits 128 on the exclude pathspec (task.182 QA cycle 2, CR-5).
+OTHER="$T/other-repo"; mkdir -p "$OTHER"; git -C "$OTHER" init -q
+ERR=$(cd "$OTHER" && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" "$R/$DOC" "$R/$DOC/report.md" 2>&1 >/dev/null); RC=$?
+if [ "$RC" -eq 2 ] && printf '%s' "$ERR" | grep -q "run from the root of the repository" && ! printf '%s' "$ERR" | grep -q 'git-unreadable'; then
+  pass "a cwd in another repository → exit 2 (usage), never git-unreadable"
+else
+  fail "other-repo cwd" "rc=$RC err=$ERR"
+fi
+ERR=$(cd "$R/src" && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" "../$DOC" "../$DOC/report.md" 2>&1 >/dev/null); RC=$?
+[ "$RC" -eq 2 ] && printf '%s' "$ERR" | grep -q "run from the root of the repository" \
+  && pass "a cwd below the repository root → exit 2 (usage)" || fail "subdirectory cwd" "rc=$RC err=$ERR"
 [ -f "$S" ] && pass "usage errors consume nothing" || fail "usage consumed" "snapshot gone"
 mkdir -p "$R/docs/notes"
 (cd "$R" && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" docs/notes "$DOC/report.md" >/dev/null 2>&1); RC=$?

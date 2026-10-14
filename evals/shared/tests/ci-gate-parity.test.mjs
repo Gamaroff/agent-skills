@@ -132,7 +132,7 @@ const SETUP_STEPS = [
   "Set up Node",
   "Set up Python",
   "Install PyYAML",
-  "Install awk variants",
+  "Install awk variants and zsh",
   "Install dependencies",
   "Install ShellCheck (pinned)",
 ];

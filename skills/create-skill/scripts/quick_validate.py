@@ -5,6 +5,7 @@
 Quick validation script for skills - minimal version
 """
 
+import functools
 import sys
 import os
 import re
@@ -104,7 +105,14 @@ def parse_shared_refs(content):
     One pass over the text: the name class excludes whitespace, so no match spans
     a newline, and counting newlines between matches gives the line (a per-line
     loop cost 1.9 s of a 7.2 s `bundle --check`, task 154). Empty names are
-    dropped. Pure."""
+    dropped. Pure, so it is cached on the text: `bundle --check` reaches the same
+    shared source once per skill that bundles it, and re-parsing it each time was
+    5 s of a 22 s run. Each caller gets a fresh list."""
+    return list(_parse_shared_refs_cached(content))
+
+
+@functools.lru_cache(maxsize=None)
+def _parse_shared_refs_cached(content):
     spans = cite_comment_spans(content)
     out = []
     line, pos = 1, 0
@@ -114,7 +122,7 @@ def parse_shared_refs(content):
         name, has_fragment = split_fragment(m.group(1))
         if name:
             out.append((line, name, ref_kind(name, has_fragment, in_spans(m.start(), spans))))
-    return out
+    return tuple(out)
 
 
 def collect_shared_refs(content):

@@ -136,6 +136,26 @@ fi
 
 ---
 
+## Check the Report's Links
+
+The implementation report's first commit is this step's, and nothing checks its links before it. A
+fast gate run earlier passes whatever the report contains, because the doc-links corpus guard walks
+`git ls-files` and the report is still untracked. So the push is the first link check: task.152's
+report quoted a link shape inline, and PR #495 went red on `link-check` and cost a QA cycle
+(obs #198). `qa-task`, `qa-story` and `review-pr` check each report they write the same way. The
+engine resolves against the index, so stage first:
+
+```bash
+git add "{implementation-report-path}"
+node .agents/skills/{develop-story|develop-task|develop-bug}/references/doc-links.js --file "{implementation-report-path}"
+```
+
+Exit 1 → fix the quotation (put it in a fence, or break the `[..](..)` shape so it no longer reads
+as a link) and re-run until it exits 0. Exit 2 is a usage error: fix the call. `git add` only
+stages, and the commit below carries the report anyway.
+
+---
+
 ## Invoke /create-pr
 
 Invoke the `/create-pr` skill passing `--base {Q2_answer}`, one `--scope` flag per line of `.claude/state/step4-scope-paths.txt` (the `SCOPE_PATHS` the Build Staging Scope block derived), and conditionally `--issue`. Branch on tracker platform for the `--issue` flag:

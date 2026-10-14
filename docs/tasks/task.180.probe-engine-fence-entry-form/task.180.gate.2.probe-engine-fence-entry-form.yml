@@ -1,0 +1,96 @@
+schema: 2
+task: 'task.180.probe-engine-fence-entry-form'
+task_title: 'security-probe: a fence: entry form for a fenced bash block in a step doc'
+gate: FAIL
+status_reason: 'Cycle 1''s three fixes hold (each mutation-proven, regression tests green). The cycle-2 refute pass, run as a safety re-probe, reproduced four more defects in the fence: verdict path: a case whose expected.absent names a file its own fixture writes scores every hostile case accepted (HIGH); shell diagnostics other than parse errors still read as refusals, and the parse-failure branch masks a reproduced side effect (MEDIUM x2); a declined run loses its slot (LOW).'
+reviewer: 'QA Engineer'
+head: 'bdbedcdf0e711492dddb93c2f7a4c9af11630fa2'
+updated: '2026-10-12T14:16:01Z'
+
+top_issues:
+  - id: 'TASK-180-004'
+    severity: high
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'runFenceCase has no collision guard between expected.absent and fixture.files: a case whose absent list names a file its own fixture writes mismatches on every run, so every hostile case scores accepted and the verdict reads absent with a full count. runShellCase and runCliCase decline this shape (task.128 BUG-13). Code review CR-1 (high/high), reproduced by the reviewer.'
+    suggested_action: 'Decline the case when an expected.absent name equals a fixture.files key or its first path segment; add a regression test.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-180-005'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'isShellParseFailure covers syntax errors only: an input that makes the shell stop with another diagnostic about the script (fatal expansion ${x:?boom}, parameter not set, command not found) is still scored rejected, so an accept-all block with such a hostile case scores engages. An injected exit ("; exit 1; ") is the residual no classifier can see. Code review CR-2 (medium/high), reproduced.'
+    suggested_action: 'Score any shell diagnostic about the generated script errored, and state the injected-control-flow residual where the rule is documented, pointing hostile cases at expected.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-180-006'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'The parse-failure branch runs before expected is compared: when one line runs the injection and a later line fails to parse, a side effect in the case directory (expected.absent hit) is recorded as errored, and the sentinel does not watch the work dir. Code review CR-3 (medium/high), reproduced.'
+    suggested_action: 'Compare expected.absent before scoring a diagnostic run errored; a side effect seen is a reproduction.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-180-007'
+    severity: low
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'A fence: run that resolveEntry declines carries slot null (base.slot is set after resolveEntry), so its record key lacks the slot and the corrected re-run leaves a stale unverifiable entry — the task.144 5c CR-1 shape. Code review CR-4 (low/high), reproduced.'
+    suggested_action: 'In the resolveEntry decline branch, copy a non-empty string slot onto base for a fence: entry, as the cli: argv template is.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-180-008'
+    severity: low
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'platform-variance: extractFencedBlock splits on \n only, so on a CRLF checkout every heading carries \r and no fence: entry resolves. Code review CR-6 (low/medium).'
+    suggested_action: 'Normalise CRLF to LF before reading headings and blocks; test with a CRLF doc.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 5394
+  phases_verified: 3/3
+  ci: 'not read this cycle (CI is gated at /finalise)'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 26
+    notes: 'task.180.qa.2.security.run.json: resolveEntry fence: branch (13) and the shipped fast-gate precondition via fence: (13), both engages, 0 reproduced. CONCERNS for TASK-180-004..006: the fence: verdict path can still mis-score a case.'
+  performance:
+    status: PASS
+    notes: 'No new timeout literal; ci:fast 5380/0.'
+  reliability:
+    status: CONCERNS
+    notes: 'TASK-180-007 (stale record entry on a declined run) and TASK-180-008 (CRLF checkout).'
+  maintainability:
+    status: PASS
+    notes: 'Cycle 1 fixes are local and each is mutation-proven.'
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-10-12'
+  total_iterations: 1
+  verification_method: 'Regression tests + mutation proofs (F1-F4) + ci:fast'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-180-004..006 in one pass over the runFenceCase scoring order: collision decline, diagnostic -> errored, absent before errored.'
+      refs: ['shared/resources/security-probe.mjs']
+  future:
+    - action: 'CR-5 (pre-existing class): a command backgrounded past the spawn outlives the case and the after-snapshot — the shell family''s stated limit (probe-boundary-rule.md §5). Identical for shell: on develop. Follow-up: run each case in its own process group and kill the group before the after-snapshot.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'CR-7: report a signal as the signal, and "timed out" only on ETIMEDOUT.'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

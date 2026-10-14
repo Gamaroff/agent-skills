@@ -1642,3 +1642,37 @@ test("§9b a --body-file edit takes the same piped-stderr path", () => {
   assert.equal(r.reason, "performed");
   assert.deepEqual(editStdio, ["pipe", "pipe", "pipe"]);
 });
+
+// ── Control-character escapes (obs #303) ────────────────────────────────────
+
+test("a literal \\u0000 in an issue body is sent as U+0000 — GitHub would store it as \\^@", () => {
+  const dir = withRepo({
+    "body.md": "Reproduce with a path holding \\u0000 and \\u001f.\n",
+  });
+  const gh = stubGh();
+  const r = cli.run({
+    argv: [
+      "node",
+      "tracker-issue.js",
+      "--kind",
+      "create",
+      "--title",
+      "t",
+      "--body-file",
+      join(dir, "body.md"),
+      "--repo",
+      "acme/repo",
+    ],
+    repoRoot: dir,
+    env: {},
+    execImpl: gh.execImpl,
+  });
+  assert.equal(r.reason, "performed");
+  const sent = gh.calls.find(
+    (c) => c.argv[0] === "issue" && c.argv[1] === "create",
+  );
+  assert.equal(
+    sent.input,
+    "Reproduce with a path holding U+0000 and U+001F.\n",
+  );
+});

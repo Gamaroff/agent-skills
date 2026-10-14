@@ -1,0 +1,76 @@
+schema: 2
+task: 'task.173.fold-5c-review-into-acceptance-commit'
+task_title: 'Fold the 5c review and its doc-only fixes into the acceptance commit'
+gate: PASS
+status_reason: 'Cycle 9 (unscoped safety re-probe; clause 1 from gate 8''s security FAIL): CR8-1 closed, with every pathspec, glob, directory and case variant recorded and only exact tracked paths cleared; the NUL fix holds. Two LOW findings were promoted (bug, high confidence): the resume probe misspells spaced paths, and zsh echo can fake a classify line. No HIGH, no MEDIUM.'
+reviewer: 'QA Engineer'
+head: 'c2d063bad32c2b3e4e78fce3aba18718018ff67c'
+updated: '2026-10-08T18:03:21Z'
+
+top_issues:
+  - id: 'CR9-2'
+    severity: low
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: 'The classifier lists a cleared path raw (ls-files with core.quotePath=false), but the resume probe reads p from git status --porcelain with the default quotePath, which C-quotes a path with a space or non-ASCII character. A legitimately carried docs/my notes.md never matches the eligible list, so a resume after a pause HALTs as class (c). Promoted (bug, low/high).'
+    suggested_action: 'Read status as git -c core.quotePath=false status --porcelain -z --no-renames (or unquote p the same way) so the classifier, the stage block and the probe spell a path the same way; add a spaced-path test.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR9-4'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'The classify loop prints the untrusted ref with echo, and zsh''s echo interprets backslash escapes: a ref containing \n prints a fake second line such as "doc-only CR-10 src/evil.js", and \c truncates the line. The orchestrator reproduced this (bash literal, zsh split). The stage block still HALTs on an uncleared path, but only after the edit. Promoted (bug, low/high).'
+    suggested_action: 'Print untrusted values with printf ''%s'' in the classify loop and in the HALT messages that echo a path.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 5557
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 28
+    notes: 'isDocsPath probed via the engine (task.173.qa.9.security.run.json, cases file task.173.qa.9.security.cases.json): engages, 0 reproduced. The CR8-1 pathspec class sits in the fenced classify block, which the engine cannot reach; the reviewer verified it against the real index under bash and zsh, and the committed suite pins it. CR9-4 is LOW (output spoofing that the stage block still contains).'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'CR9-2 (LOW): a resume after a pause HALTs on a spaced carried path, which fails loud.'
+  maintainability:
+    status: PASS
+    notes: 'Unchanged.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR9-1 (medium/medium, advisory): the classify block reads ci.docsOnly.patterns from the working-tree skills-config.yaml; read it at HEAD (readConfigAtCommit) or HALT when the config is dirty.'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+    - action: 'CR9-3 (low/medium, advisory): the clean test ignores the index; also require git diff --cached --quiet HEAD for the path.'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+    - action: 'CR8-2 (medium/low, advisory): record mode-120000 (symlink) paths.'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+    - action: 'CR7-1, CR6-2 (advisory).'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions: ['CR9-2 and CR9-4 (LOW) addressed or accepted']
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: '2026-10-08'
+  total_iterations: 8
+  verification_method: 'Unscoped safety re-probe; CR8-1 (task.173.bug.3) closed, verified against the real index under bash and zsh and mutation-proved in the committed suite'

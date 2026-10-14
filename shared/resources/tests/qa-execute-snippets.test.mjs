@@ -877,19 +877,23 @@ test(
 );
 
 test(
-  "exit status alone cannot catch the defect — both shells exit non-zero",
+  "a pass/fail exit check cannot catch the defect — both shells exit non-zero; only stdout differs",
   { skip: !zshAvailable() },
   () => {
-    // This is why stdout is the load-bearing comparison. If the implementation ever
-    // regressed to comparing only exit codes, the defect would look clean.
+    // This is why stdout is the load-bearing comparison. Both shells FAIL, so a check that
+    // asks only "did it succeed?" sees no disagreement. The exact codes are platform noise
+    // and must not be relied on in either direction: zsh's nomatch exits 1 everywhere, while
+    // bash runs `ls` on the literal glob, and `ls` exits 1 on BSD (macOS) but 2 on GNU (Linux).
+    // An earlier version asserted the codes were EQUAL — true only on macOS, and red the first
+    // time CI ran the zsh variant on Linux.
     const cwd = trailFixture();
     const { runs } = runBlock(PRE_FIX, { shells: ["bash", "zsh"], cwd });
     assert.notEqual(runs.bash.status, 0);
     assert.notEqual(runs.zsh.status, 0);
-    assert.equal(
-      runs.bash.status,
-      runs.zsh.status,
-      "the exit codes AGREE — only stdout differs",
+    assert.notEqual(
+      runs.bash.stdout,
+      runs.zsh.stdout,
+      "the outputs DIFFER — that, not the exit status, is the defect",
     );
     rmSync(cwd, { recursive: true, force: true });
   },

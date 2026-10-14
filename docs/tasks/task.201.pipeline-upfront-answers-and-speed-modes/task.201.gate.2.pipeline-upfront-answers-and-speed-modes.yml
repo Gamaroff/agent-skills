@@ -1,0 +1,86 @@
+schema: 2
+task: 'task.201.pipeline-upfront-answers-and-speed-modes'
+task_title: 'Pipeline up-front answers and speed modes'
+gate: CONCERNS
+status_reason: 'Cycle 1 fixes verified (QA-1/QA-2/QA-3/CR-4 closed, mutation-proven). The refute pass found that a resume rebuilds the waiver from the resuming invoker, that §0d pastes the raw arguments inside a double-quoted shell string, and smaller gaps in the stamp writer and the resume skip comparison.'
+reviewer: 'QA Engineer'
+head: 'e5db996f7629f0c33c3960c9c1c45e3f97314b7e'
+updated: '2026-10-10T19:46:25Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/pipeline-answers.js'
+    finding: 'On resume the waiver is rebuilt from the resuming invoker; an unset user.name yields approved_by null with no refusal, and Step 1''s merge overwrites the lock''s original approver.'
+    suggested_action: 'Keep the lock''s own waiver on resume (read it with the answers) and never overwrite an existing waiver.'
+    suggested_owner: dev
+  - id: 'CR-2'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-0-resolve-and-prepare.md'
+    finding: 'The skill''s arguments are pasted verbatim inside a double-quoted --args "…"; a quoted value (--skip "review, qa-depth") breaks the quoting and $ or backticks would be expanded by the shell.'
+    suggested_action: 'Pass the arguments without shell interpolation — a single-quoted heredoc read by the CLI from stdin.'
+    suggested_owner: dev
+  - id: 'CR-4'
+    severity: low
+    file: 'shared/resources/record-reviewed-blob.js'
+    finding: 'The writer''s frontmatter strip is narrower than the reader''s splitFrontmatter (quoted or spaced keys; a non-YAML --- block), so some stamped reports read ambiguous.'
+    suggested_action: 'Locate frontmatter and its reviewed_blob key with the reader''s own splitFrontmatter.'
+    suggested_owner: dev
+  - id: 'CR-5'
+    severity: low
+    file: 'shared/resources/record-reviewed-blob.js'
+    finding: 'A stamp line that also opens an HTML comment is deleted whole, exposing the commented lines below as prose.'
+    suggested_action: 'Re-run the prose view after removal and refuse (or keep the rest of the line) when any other line''s view changed.'
+    suggested_owner: dev
+  - id: 'CR-6'
+    severity: low
+    file: 'shared/resources/pipeline-answers.js'
+    finding: 'The resume skip comparison uses length plus one-way inclusion, so duplicates make different sets compare equal.'
+    suggested_action: 'Compare de-duplicated sets both ways.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 5274
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [2, 3, 4]
+  ci: 'not read this cycle'
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 35
+    notes: 'isRefName probed 35/35 (task.201.qa.2.security.run.json). Shell interpolation of raw arguments in §0d (CR-2); a recommendation is not ref-checked (CR-3, advisory).'
+  performance:
+    status: PASS
+    notes: 'No hot path.'
+  reliability:
+    status: CONCERNS
+    notes: 'Resume waiver approver (CR-1); stamp writer edge cases (CR-4, CR-5).'
+  maintainability:
+    status: PASS
+    notes: 'One stamp matcher shared by reader and writer; test 2c guards bindings.'
+
+bug_resolution:
+  previous_gate: 1
+  closed: ['QA-1', 'QA-2', 'QA-3', 'CR-4 (gate 1)']
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1, CR-2, CR-4, CR-5, CR-6; also take the advisory CR-3 (ref-check the recommendation), CR-7 (persisted skips under the current allow-list), CR-8 (strict --detector) and CR-9 (test 2c population and order).'
+      refs: ['shared/resources/pipeline-answers.js', 'shared/resources/record-reviewed-blob.js', 'shared/resources/develop-pipeline-step-0-resolve-and-prepare.md']
+  future:
+    - action: 'Pre-existing: skills/develop-bug/references/develop-bug-step-0-resolve-bug.md:39 block exits 1 on base and head alike.'
+      refs: ['skills/develop-bug/references/develop-bug-step-0-resolve-bug.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 and CR-2 fixed']

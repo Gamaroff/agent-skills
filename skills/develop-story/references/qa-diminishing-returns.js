@@ -666,18 +666,24 @@ function classifyLoopRoute(input) {
     const m1 = mediumCounts[cycle - 2];
     const m2 = mediumCounts[cycle - 3];
     const seq = [m2, m1, mN];
-    if (!(mN < m1 && m1 < m2)) {
+    // A strictly falling test needs room to fall. A last gate that raised no
+    // MEDIUM (HIGH is already 0 above) left only LOW entries for the last fix,
+    // which is the fix one more gate is most likely to clear. Requiring
+    // 0 < m1 < m2 there escalated task.173's PASS-100 gate (MEDIUM 0, 0, 0)
+    // and task.143's (1, 1, 0) — obs #300.
+    const atFloor = mN === 0;
+    if (!atFloor && !(mN < m1 && m1 < m2)) {
       return route(
         ROUTES.CONTINUE,
         "medium-not-falling",
-        `MEDIUM reads ${seq.join(", ")} over cycles ${cycle - 2}–${cycle} — route 2c needs it strictly falling, which is the evidence that one more gate would clear`,
+        `MEDIUM reads ${seq.join(", ")} over cycles ${cycle - 2}–${cycle} — route 2c needs it strictly falling, or 0 on the last gate, which is the evidence that one more gate would clear`,
         { mediumSequence: seq },
       );
     }
     return route(
       ROUTES.GATE_THE_LAST_FIX,
       "gate-the-last-fix",
-      `the ${cycle}-cycle budget is spent with HIGH 0 on cycle ${cycle}'s gate and MEDIUM falling ${seq.join(" → ")}; cycle ${cycle}'s fix has landed and no gate has read it, so one ordinary 5a (review + gate, no 5b) runs on that head before any escalation entry is written`,
+      `the ${cycle}-cycle budget is spent with HIGH 0 on cycle ${cycle}'s gate and MEDIUM ${atFloor ? `at 0 on that gate (${seq.join(" → ")})` : `falling ${seq.join(" → ")}`}; cycle ${cycle}'s fix has landed and no gate has read it, so one ordinary 5a (review + gate, no 5b) runs on that head before any escalation entry is written`,
       { mediumSequence: seq },
     );
   }

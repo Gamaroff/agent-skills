@@ -666,6 +666,24 @@ Carrying `file_line` through for code findings would re-create, one layer down, 
 parse-by-position problem the structured block exists to remove: a consumer would again have to test
 which key is present before it could read a location.
 
+**Check every conformance `ref` against its grammar before Step 7 writes it.** The grammar is
+`pr-conformance-prompt.md`'s: one criterion id, artifact path, frontmatter field or `path:line`. A
+`ref` holding prose, spaces between two paths, or a second location is a lens contract violation, not
+a location. Send the lens one follow-up asking it to re-emit that finding with a conforming `ref`
+(split into one finding per file when it names several). If it still does not conform, keep the
+finding, and record its `ref` verbatim with `anchor_check: no-such-file`. A downstream classifier that
+reads `ref` as a path must never be handed prose (obs #297).
+
+**Provenance before the verdict — is a reproduced finding new to this PR?** For every
+`category: bug` finding the code lens reproduced, run the same input against the PR **base**
+(`git show "origin/${BASE_BRANCH}:${file}"` into a scratch copy). When the output is identical on
+base and no fixture corpus carries the shape, the finding is **`pre-existing`**. Keep its severity and
+confidence as returned, mark it `pre-existing` in the rendered finding and add
+`provenance: pre-existing` to its machine-readable entry, and **leave it out of the verdict table
+below**. It is reported, never hidden, but a PR is not asked to change for a defect it did not
+introduce. This is the same rule as `qa-task` Step 3b item 5b. Without it, the PR verdict counted
+defects that `develop` already had, while QA had already set them aside (obs #271).
+
 **Deterministic verdict — advisory only:**
 
 | Condition | Verdict |

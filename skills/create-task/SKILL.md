@@ -206,7 +206,8 @@ could forget: 9 entries had been parked by hand, each by whichever session remem
    is set by the resolver, so source it again in the same shell as this read, or every path loses its
    directory) and pass
    `{ frontmatter: <the scan entry>, body: <the file's text> }` to `seedFromObservations` in
-   `scripts/lib.js`. It returns `ids`, `title` (or `null` with `titleReason`), `description`, `tags`,
+   `scripts/lib.js`. It returns `ids`, `title` (the bare name, or `null` with `titleReason`),
+   `description` (or `null` with `descriptionReason: too-short`), `tags`,
    `references`, `changeLogDescription` and the `park` vectors. It throws on a non-`open` entry, and on
    an entry whose identity is uncertain. Identity is the scan entry's `file` prefix, which is what
    `set-status --id` resolves, and the frontmatter id must agree with it.
@@ -214,7 +215,9 @@ could forget: 9 entries had been parked by hand, each by whichever session remem
    seed Motivation, **and every current-state name they carry is grepped before it is written**
    (§ 3.5, obs #127). An observation is a memory of a run, not a read of the code.
 4. **Ask only what is still open.** Ask for the title only when `title` is `null`: `over-bound`
-   (observation titles run long, and a title is a name, obs #128) or `multiple-entries`. Also ask the
+   (observation titles run long, and a title is a name, obs #128) or `multiple-entries`. Ask for
+   the description only when `description` is `null` (`too-short`: an Improvement whose first
+   sentence is a fragment, obs #291). Also ask the
    tracker-sync question at 4.5, which stays opt-in. Take the rest as defaults and **report** each one
    in the completion message: priority `Medium`, the template's category, and effort from the rubric
    (§ 4.4). § 3.5 still runs in full. Its Critical items are about the document, not the author, and a

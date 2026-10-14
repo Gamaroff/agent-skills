@@ -186,7 +186,7 @@ LOCAL_PATH=$(echo "$DOC_URL" | sed 's|https://github\.com/[^/]*/[^/]*/blob/[^/]*
 ```
 
 - If `LOCAL_PATH` is non-empty and the file exists: use it as `story_file`, skip to Step 4.
-- If no Document link found (older issue without Document section): fall back to `grep -rl "github_issue: {N}" docs/` and find `story.{epic}.{story}.*.md` in the result (excluding `.qa.`, `.gate.`, `.bug.`, `.implementation.` files).
+- If no Document link found (older issue without Document section): fall back to [§0a Key → document lookup](references/develop-pipeline-step-0-resolve-and-prepare.md#key--document-lookup) with `KEY_FIELD=github_issue KEY_VALUE={N}`, and check the `LOCAL_PATH` it binds is a `story.{epic}.{story}.*.md` document. It already excludes artifacts and HALTs on several matches.
 - If still not found: HALT — inform user: "No local document found for issue #{N}. Run `/create-story` first, or provide the file path directly."
 
 **Step 4 — Continue with the resolved `story_file`.**
@@ -1120,6 +1120,14 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
       Step 7 ×4; all three one-argv `rm` HALT sites were in orchestrator `SKILL.md` files, none in
       the step docs
     - Flag as **Important** when the list and the search disagree, or the search is missing
+17. **Field names a plan consumes from another skill** (obs #296):
+    - Trigger: the plan parses or consumes another skill's output — a YAML block, a JSON record, a
+      report section, a gate field
+    - Require the document to name the producing skill and the exact field names, and check each
+      against the producer's documented schema (its prompt template, its output contract, or a real
+      artefact it wrote)
+    - Flag as **Important** a field the producer does not emit. A plan that reads a field nobody
+      writes passes every review and fails only at runtime, as a silently empty value
 
 **Common Hallucination Patterns to Detect**:
 
@@ -2444,6 +2452,28 @@ Change Log Updated: Review entry added
 ↓
 User Can Now: Run `/develop` to begin implementation
 ```
+
+### Step 10a: Record the Reviewed Revision
+
+**Purpose**: stamp the review report with the exact revision of the document it reviewed, so a
+develop pipeline's Step 2 can reuse this review instead of running it again (task.201).
+
+**When to Execute**: always, when a review report file was written — after every edit this review
+makes to the document (fixes, Change Log rows, status), because the hash must include them. Skip it
+only when no report file exists (action plan only).
+
+```bash
+command node .agents/skills/review-story/references/record-reviewed-blob.js \
+  --doc "{story-file-path}" --report "{review report path}" --json
+```
+
+> Engine source: `references/record-reviewed-blob.js` (bundled into each skill as `references/record-reviewed-blob.js`).
+
+It writes `**reviewed_blob:** <git hash-object of the document>` under the report's `**Reviewed:**`
+line, and reads it back. Read `reason`: `written` needs nothing; any other value (`no-doc`,
+`no-report`, `git-failed`, `unreadable-after-write`) is logged and the review continues — the cost of
+a missing stamp is one re-review, never a halt. **Edit the document after this step and the stamp is
+stale by design**: Step 2 then reviews it again.
 
 ---
 

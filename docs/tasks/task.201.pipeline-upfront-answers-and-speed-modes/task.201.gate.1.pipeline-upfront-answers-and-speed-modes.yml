@@ -1,0 +1,78 @@
+schema: 2
+task: 'task.201.pipeline-upfront-answers-and-speed-modes'
+task_title: 'Pipeline up-front answers and speed modes'
+gate: FAIL
+status_reason: 'The §0d answer-resolution block cannot run as written: it reads PIPELINE_MODE and EPIC_BRANCH that no line of the block binds, so the :? guard aborts every story/task run and the epic-integration conflict is never checked. Resume does not reuse a persisted mode or skips, and branch flag values reach git unvalidated.'
+reviewer: 'QA Engineer'
+head: 'f2fef9cf59e087a988c3478e980e4613623328b3'
+updated: '2026-10-10T19:33:41Z'
+
+top_issues:
+  - id: 'QA-1'
+    severity: high
+    file: 'shared/resources/develop-pipeline-step-0-resolve-and-prepare.md'
+    finding: 'The §0d resolve block reads ${PIPELINE_MODE:?} and ${EPIC_BRANCH:-} with no writer in the block (each fenced block is its own shell): the :? aborts every story/task Phase 0d run before the resolver, and EPIC_BRANCH is always empty, so conflictFor never sees an epic-integration story and develop-batch''s integration-branch HALT cannot fire. The INPUTS entries added to tests/unbound-default-reads.test.js hide the reads instead of fixing them (confirms CR-1, CR-2).'
+    suggested_action: 'Pass both as {placeholders} the agent substitutes from 0a-parallel and the epic pre-check, drop the two INPUTS entries, and add a docs-test assertion that the resolve block reads no unbound variable.'
+    suggested_owner: dev
+  - id: 'QA-2'
+    severity: medium
+    file: 'shared/resources/pipeline-answers.js'
+    finding: 'Only the question keys are read from the persisted answers; mode and skips are re-resolved on resume from the new flags or policy, while Steps 2/5/5c read the lock''s old values (Step 1, the only writer, is skipped on resume), so a changed --mode/--skip on resume is silently ignored and 0f shows a value the run does not use (confirms CR-3).'
+    suggested_action: 'Read persisted mode/skips (source persisted) and treat a disagreeing resume flag as a refused flag with the reason, so the run keeps one setting and says so.'
+    suggested_owner: dev
+  - id: 'QA-3'
+    severity: medium
+    file: 'shared/resources/pipeline-answers.js'
+    finding: 'A --base/--target/--branch-model value is accepted as any non-empty string, so --base=-f (or a value with whitespace or shell metacharacters) is recorded as the answer and later interpolated into git commands; the module exports no predicate, so the boundary could not be probed (probes_executed 0).'
+    suggested_action: 'Add an exported isRefName predicate (git check-ref-format rules, plus no leading dash and no shell metacharacters), refuse an invalid flag value as a stated conflict, and probe it.'
+    suggested_owner: dev
+  - id: 'CR-4'
+    severity: low
+    file: 'shared/resources/record-reviewed-blob.js'
+    finding: 'The writer removes only the **reviewed_blob:** form while the reader accepts bare, list-item and frontmatter forms, so re-stamping over one of those leaves two hashes and the report reads report-blob-ambiguous.'
+    suggested_action: 'Remove old stamps with the reader''s own matcher (export it from review-report-freshness.js), frontmatter key included.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 50
+
+evidence:
+  tests_reviewed: 5263
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [2, 3]
+  ci: 'not read this cycle'
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Branch flag values unvalidated (QA-3); no exported predicate to probe.'
+  performance:
+    status: PASS
+    notes: 'Pure engines; no hot path.'
+  reliability:
+    status: CONCERNS
+    notes: 'Resume ignores a changed mode/skips (QA-2); §0d block aborts (QA-1).'
+  maintainability:
+    status: CONCERNS
+    notes: 'Two definitions of the reviewed_blob line shape (CR-4).'
+
+recommendations:
+  immediate:
+    - action: 'Fix QA-1, QA-2, QA-3, CR-4.'
+      refs: ['shared/resources/develop-pipeline-step-0-resolve-and-prepare.md', 'shared/resources/pipeline-answers.js', 'shared/resources/record-reviewed-blob.js']
+  future:
+    - action: 'Pre-existing: skills/develop-bug/references/develop-bug-step-0-resolve-bug.md:39 block exits 1 under qa-execute-snippets on base and head alike — follow-up outside task.201.'
+      refs: ['skills/develop-bug/references/develop-bug-step-0-resolve-bug.md']
+    - action: 'CR-5 cleanup: find the stamp anchor on the blanked-prose view so a fenced **Reviewed:** line is never chosen.'
+      refs: ['shared/resources/record-reviewed-blob.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

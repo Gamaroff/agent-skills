@@ -307,6 +307,12 @@ Closes #{GITHUB_ISSUE}
 
 If no issue number is available, do NOT add the Related Issues section.
 
+**Never put a literal control-character escape in the body.** GitHub rewrites the text `\u0000` to
+`\^@` and `\u001f` to `\^_` on save, whatever the payload held, so a PR fixing a control-character
+bug misquotes its own subject. Name the character in words: `NUL (U+0000)`, `U+001F` (obs #233).
+Step 6 also runs the body through `github-body-text.js`, which writes any escape that slipped through
+as `U+00XX` (obs #303).
+
 ### Step 6: Create the Pull Request
 
 Branch on `PLATFORM`:
@@ -314,10 +320,16 @@ Branch on `PLATFORM`:
 **GitHub:**
 
 ```bash
+# A file, not --body: the body carries backticks and $(…), and the file is what
+# github-body-text.js rewrites (GitHub stores a literal \u0000-\u001f as caret notation).
+PR_BODY_FILE=$(mktemp)
+printf '%s\n' "$PR_BODY" > "$PR_BODY_FILE"
+command node .agents/skills/create-pr/references/github-body-text.js --file "$PR_BODY_FILE" || exit 1
 PR_URL=$(gh pr create \
   --base "$BASE_BRANCH" \
   --title "$PR_TITLE" \
-  --body "$PR_BODY")
+  --body-file "$PR_BODY_FILE")
+rm -f "$PR_BODY_FILE"
 PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
 rm -f "$DIFF_FILE"
 ```

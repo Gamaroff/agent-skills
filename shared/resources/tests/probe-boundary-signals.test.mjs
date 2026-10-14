@@ -226,18 +226,18 @@ test("every site that names the JS entry form also names the shell entry form", 
   );
 });
 
-test("every site that routes a non-JS entry names the cli: form too (task.144 CR-1)", () => {
-  // The contract test above keys on sites that spell the JS `--entry` form, and
-  // review-security's SKILL.md routes non-JS entries in prose without ever
-  // spelling it — so when task.144 added `cli:`, that site kept saying `shell:`
-  // was the only route and "two positionals" the decline, and nothing noticed.
-  // This population is keyed on the ROUTING statement itself (the same
-  // predicate the BUG-10 test counts), so a site that routes non-JS entries
-  // cannot omit the form a multi-flag Node CLI takes. It is checked PER BLOCK —
-  // a paragraph or a list item — not per file: a file-level check passes a
-  // stale routing sentence as long as `cli:` appears anywhere else in the same
-  // file, which is every one of these files once any of them is correct (QA
-  // cycle 2, CR-4).
+/**
+ * Every prose block (a paragraph or a list item) in the shared Markdown resources
+ * and every skill's SKILL.md that ROUTES a non-JS entry — names `shell:` and says the
+ * target is non-JS / bash. Shared by the per-form routing tests below (cli:,
+ * task.144; fence:, task.180) so the population and its block rule are one
+ * definition. A fenced block is skipped whole: a routing rule is prose, and a
+ * command inside a fence is an example of one form, not a statement of the
+ * routes. Checked PER BLOCK, not per file — a file-level check passes a stale
+ * routing sentence as long as the form appears anywhere else in the same file
+ * (task.144 QA cycle 2, CR-4).
+ */
+function routingBlocks() {
   const files = [];
   for (const f of readdirSync(join(REPO_ROOT, "shared/resources"))) {
     if (f.endsWith(".md")) files.push(`shared/resources/${f}`);
@@ -245,11 +245,8 @@ test("every site that routes a non-JS entry names the cli: form too (task.144 CR
   for (const d of readdirSync(join(REPO_ROOT, "skills"))) {
     files.push(`skills/${d}/SKILL.md`);
   }
-  const routesNonJs = (t) =>
-    /shell:/.test(t) && /non-JS|not JS|bash script/i.test(t);
-  // A block ends at a blank line or where the next list item begins. A
-  // fenced block is skipped whole: a routing rule is prose, and a command
-  // inside a fence is an example of one form, not a statement of the routes.
+  const routesNonJs = (b) =>
+    /shell:/.test(b) && /non-JS|not JS|bash script/i.test(b);
   const blocksOf = (text) => {
     const blocks = [];
     let cur = [];
@@ -271,8 +268,7 @@ test("every site that routes a non-JS entry names the cli: form too (task.144 CR
     flush();
     return blocks;
   };
-  const missing = [];
-  let sites = 0;
+  const out = [];
   for (const rel of files) {
     let text;
     try {
@@ -281,20 +277,60 @@ test("every site that routes a non-JS entry names the cli: form too (task.144 CR
       continue;
     }
     for (const [i, block] of blocksOf(text).entries()) {
-      if (!routesNonJs(block)) continue;
-      sites += 1;
-      if (!/cli:/.test(block))
-        missing.push(`${rel} (block ${i + 1}: ${block.slice(0, 80)}…)`);
+      if (routesNonJs(block)) out.push({ rel, i, block });
     }
   }
+  return out;
+}
+
+/** The routing blocks that never name `form`, as readable site labels. */
+function blocksMissing(form) {
+  return routingBlocks()
+    .filter(({ block }) => !block.includes(form))
+    .map(
+      ({ rel, i, block }) => `${rel} (block ${i + 1}: ${block.slice(0, 80)}…)`,
+    );
+}
+
+test("every site that routes a non-JS entry names the cli: form too (task.144 CR-1)", () => {
+  // The contract test above keys on sites that spell the JS `--entry` form, and
+  // review-security's SKILL.md routes non-JS entries in prose without ever
+  // spelling it — so when task.144 added `cli:`, that site kept saying `shell:`
+  // was the only route and "two positionals" the decline, and nothing noticed.
+  // This population is keyed on the ROUTING statement itself (the same
+  // predicate the BUG-10 test counts), so a site that routes non-JS entries
+  // cannot omit the form a multi-flag Node CLI takes.
   assert.deepEqual(
-    missing,
+    blocksMissing("cli:"),
     [],
     "these sites route a non-JS entry but never name cli: — a multi-flag Node CLI has no route from them",
   );
+  const sites = routingBlocks().length;
   assert.ok(
     sites >= 5,
     `only ${sites} routing block(s) found — the predicate no longer matches`,
+  );
+});
+
+test("every site that routes a non-JS entry names the fence: form too (task.180)", () => {
+  // Same population as the cli: test: a site that routes a non-JS entry and
+  // omits fence: leaves a guard shipped as a fenced bash block in a step doc
+  // with no engine route — the task.159 / task.167 hand-written wrapper.
+  assert.deepEqual(
+    blocksMissing("fence:"),
+    [],
+    "these sites route a non-JS entry but never name fence: — a fenced-block guard has no route from them",
+  );
+});
+
+test("every site that routes a non-JS entry names the shell-argv: form too (task.181)", () => {
+  // Same population as the cli: and fence: tests: a site that routes a non-JS
+  // entry and omits shell-argv: leaves a bash script taking several arguments
+  // or flags with no engine route — the task.147 / task.170 by-hand probe.
+  assert.deepEqual(
+    blocksMissing("shell-argv:"),
+    [],
+    "these sites route a non-JS entry but never name shell-argv: — a multi-argument shell script has no route from them",
   );
 });
 

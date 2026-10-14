@@ -520,6 +520,73 @@ test("the zero-executed guard keys on the execution count, not on an empty probe
   );
 });
 
+/**
+ * obs #10: /finalise dispatches this agent as a read-only Explore subagent, and on task.201 it
+ * refused to create the engine's sandbox and record, so a boundary that held (72 executed, 0
+ * reproduced) came back as a zero-guard FAIL. The agent now always returns the command, and the
+ * orchestrator — which can write — runs it when the record is absent. Both halves are asserted:
+ * a prompt that returns a command nobody runs, or a skill that runs a command no prompt returns,
+ * is the same stuck FAIL.
+ */
+test("the probe run falls to /finalise when the agent cannot execute it (obs #10)", () => {
+  const yaml = yamlBlock();
+  for (const field of ["probe_command:", "probe_cases:"]) {
+    assert.ok(
+      yaml.includes(field),
+      `${PROMPT}: the returned YAML block no longer carries "${field}" — a read-only agent ` +
+        `has no other way to hand the probe run to /finalise`,
+    );
+  }
+  assert.ok(
+    has(source(), "Return the command whether or not you ran it."),
+    `${PROMPT}: the instruction to return probe_command even when the agent could not run it is gone`,
+  );
+  assert.ok(
+    has(
+      source(),
+      "`probes_executed:` is required whenever `boundary: true`, and so is `probe_command:`",
+    ),
+    `${PROMPT}: the probe rule no longer requires probe_command on a boundary`,
+  );
+
+  const s = flat(skill());
+  const at = s.indexOf("`/finalise` runs the probe itself");
+  assert.ok(
+    at >= 0,
+    "skills/finalise/SKILL.md: the orchestrator-run probe step is gone — a read-only agent's " +
+      "zero-guard FAIL then reaches Step 6 as a security FAIL",
+  );
+  const block = s.slice(at, at + 2500);
+  for (const [needle, why] of [
+    ["probe_command", "the step must run the command the agent returned"],
+    [
+      "probe_cases",
+      "the step must write the cases a read-only agent could not",
+    ],
+    [
+      "totals.executed",
+      "the count must come from the record, never be composed",
+    ],
+    [
+      "Before Step 3c",
+      "the replacement must land before aggregation reads SECURITY_RESULT",
+    ],
+    [
+      "no `severity`",
+      "a rebuilt probe must not be graded low by the orchestrator",
+    ],
+    [
+      "still takes the zero-guard",
+      "a zero from the orchestrator's own run is still a finding",
+    ],
+  ]) {
+    assert.ok(
+      block.includes(needle),
+      `skills/finalise/SKILL.md: the orchestrator-run probe step no longer says "${needle}" — ${why}`,
+    );
+  }
+});
+
 // --- The consumer ---------------------------------------------------------------------------
 
 test("skills/finalise/SKILL.md renders probe results in the Security section", () => {

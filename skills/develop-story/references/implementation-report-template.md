@@ -65,17 +65,19 @@ Created as `story.{epic}.{story}.implementation.{N}.{descriptive-name}.md` in th
 
 ## Pipeline Progress
 
-| Step                        | Status     | Required Artifacts                                                                           | Notes | Subagent summary ref |
-| --------------------------- | ---------- | -------------------------------------------------------------------------------------------- | ----- | -------------------- |
-| 1. create-story-branch      | ⏳ Pending | Branch `feature/story.{epic}.{story}.*` exists in git                                        |       | —                    |
-| 2. review-story             | ⏳ Pending | `story.{epic}.{story}.review.{N}.{name}.md` exists (or skip logged)                          |       | —                    |
-| 3. develop                  | ⏳ Pending | Story status == `Ready for Review`                                                           |       | —                    |
-| 4. create-pr                | ⏳ Pending | PR URL targets `develop` (or chosen base); issue/tracker comment posted                      |       | —                    |
-| 5–6. qa-story / qa-fix loop | ⏳ Pending | `story.{epic}.{story}.qa.{N}.*.md`; `story.{epic}.{story}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
-| 7. finalise                 | ⏳ Pending | `story.{epic}.{story}.dod.{N}.*.md`; story `status: accepted`                                |       | —                    |
-| 8. commit-changes           | ⏳ Pending | All artifacts committed and pushed                                                           |       | —                    |
+| Step                        | Status     | Required Artifacts                                                                           | Notes | Subagent summary ref | Completed (UTC) |
+| --------------------------- | ---------- | -------------------------------------------------------------------------------------------- | ----- | -------------------- | --------------- |
+| 1. create-story-branch      | ⏳ Pending | Branch `feature/story.{epic}.{story}.*` exists in git                                        |       | —                    |                 |
+| 2. review-story             | ⏳ Pending | `story.{epic}.{story}.review.{N}.{name}.md` exists (or skip logged)                          |       | —                    |                 |
+| 3. develop                  | ⏳ Pending | Story status == `Ready for Review`                                                           |       | —                    |                 |
+| 4. create-pr                | ⏳ Pending | PR URL targets `develop` (or chosen base); issue/tracker comment posted                      |       | —                    |                 |
+| 5–6. qa-story / qa-fix loop | ⏳ Pending | `story.{epic}.{story}.qa.{N}.*.md`; `story.{epic}.{story}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
+| 7. finalise                 | ⏳ Pending | `story.{epic}.{story}.dod.{N}.*.md`; story `status: accepted`                                |       | —                    |                 |
+| 8. commit-changes           | ⏳ Pending | All artifacts committed and pushed                                                           |       | —                    |                 |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
+>
+> `Completed (UTC)` is the moment the step's row went `✅` — `date -u +%Y-%m-%dT%H:%MZ` — written once by the Step Transition Protocol and never overwritten on resume (task.201). Leave it empty for a step that has not finished.
 
 ---
 
@@ -161,17 +163,19 @@ Created as `task.{id}.implementation.{N}.{descriptive-name}.md` in the task dire
 
 ## Pipeline Progress
 
-| Step                       | Status     | Required Artifacts                                                     | Notes | Subagent summary ref |
-| -------------------------- | ---------- | ---------------------------------------------------------------------- | ----- | -------------------- |
-| 1. create-branch           | ⏳ Pending | Branch `feature/task.{id}.*` exists in git                             |       | —                    |
-| 2. review-task             | ⏳ Pending | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               |       | —                    |
-| 3. develop                 | ⏳ Pending | Task status == `Ready for Review`                                      |       | —                    |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| Step                       | Status     | Required Artifacts                                                     | Notes | Subagent summary ref | Completed (UTC) |
+| -------------------------- | ---------- | ---------------------------------------------------------------------- | ----- | -------------------- | --------------- |
+| 1. create-branch           | ⏳ Pending | Branch `feature/task.{id}.*` exists in git                             |       | —                    |                 |
+| 2. review-task             | ⏳ Pending | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               |       | —                    |                 |
+| 3. develop                 | ⏳ Pending | Task status == `Ready for Review`                                      |       | —                    |                 |
+| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
+| 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
+| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
+>
+> `Completed (UTC)` is the moment the step's row went `✅` — `date -u +%Y-%m-%dT%H:%MZ` — written once by the Step Transition Protocol and never overwritten on resume (task.201). Leave it empty for a step that has not finished.
 
 ---
 
@@ -249,15 +253,15 @@ started: '{YYYY-MM-DDTHH:MM:SSZ}'
 
 ## Pipeline Progress
 
-| Step | Skill | Status | Notes | Subagent summary ref |
-|------|-------|--------|-------|----------------------|
-| 1 | create-branch | ⏳ Pending | | |
-| 2 | review-bug | ⏳ Pending | | |
-| 3 | investigate-fix | ⏳ Pending | | |
-| 4 | create-pr | ⏳ Pending | | |
-| 5–6 | verify-fix loop | ⏳ Pending | | |
-| 7 | finalise-close | ⏳ Pending | | |
-| 8 | commit-changes | ⏳ Pending | | |
+| Step | Skill | Status | Notes | Subagent summary ref | Completed (UTC) |
+|------|-------|--------|-------|----------------------|-----------------|
+| 1 | create-branch | ⏳ Pending | | | |
+| 2 | review-bug | ⏳ Pending | | | |
+| 3 | investigate-fix | ⏳ Pending | | | |
+| 4 | create-pr | ⏳ Pending | | | |
+| 5–6 | verify-fix loop | ⏳ Pending | | | |
+| 7 | finalise-close | ⏳ Pending | | | |
+| 8 | commit-changes | ⏳ Pending | | | |
 
 ## Decisions Log
 

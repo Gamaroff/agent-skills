@@ -221,6 +221,13 @@ contract: `qa-cycle.sh` is called this way from every block that needs the cycle
 `newest-numbered.sh` — the one definition of "the newest artefact of a numbered series", hoisted
 out of three inline copies in `finalise` (obs #146, task.138) — is sourced the same way.
 
+**A sourced library must not name a variable after a zsh special parameter.** A file that is
+sourced rather than run executes in the caller's shell, and that shell is zsh on every macOS host.
+There, `path`, `status`, `argv`, `fpath`, `cdpath`, `manpath`, `module_path`, `pipestatus`,
+`options`, `commands` and `functions` are special. Assigning `path=…` rewrites `$PATH`, and every
+later command in the caller is "not found". Use prefixed names (`f_path`, `rc`), and test the library
+by sourcing it under zsh, not only by running it under bash (obs #295).
+
 **Why a shared function has to be a file.** Every fenced block runs as its own shell; a function
 defined in one block does not exist in the next, so a helper written inline is copied into every
 block that needs it and the copies drift. `finalise` carried `newest_numbered` three times.

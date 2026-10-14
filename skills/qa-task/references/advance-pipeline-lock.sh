@@ -96,6 +96,14 @@
 #     the same selection function, not a re-derivation — grant-qa-cycles.sh reads its
 #     never-lower guard from this path, so the guard and the restore cannot disagree about
 #     which candidate is live (task.130; task.124 QA cycle 1, CR-5).
+#   • --paused-here: read-only. With no lock, print the halt snapshot or orphaned claim whose
+#     `branch` is the current branch (the snapshot first), and nothing when there is none; with a lock,
+#     print nothing. Always exit 0. It answers "was a pipeline on THIS branch paused or halted?",
+#     which set-qa-phase.sh and set-waiting-on.sh ask before treating a missing lock as a
+#     standalone run: after a compaction the summary carried the pre-pause lock state, the
+#     session never ran --restore, and both helpers no-oped silently until Step 7 (obs #275).
+#     Keyed on the branch because a snapshot persists by design after a terminal HALT: a
+#     snapshot for another branch is a finished run, not this one.
 #
 # Exit codes: 0 on every safe path listed above; 1 on argument error, a numeric advance
 # with no lock, a --restore with nothing usable, a non-object lock, or a jq failure.
@@ -112,6 +120,7 @@ Usage:
   $0 <next_step_number>     # 1..8
   $0 --complete             # remove lock (Step 8's Completion Checklist passed)
   $0 --skill <skill-name>   # advance based on returning sub-skill name
+  $0 --paused-here          # print a halt snapshot / claim for the current branch, if any
   $0 --restore [--which] [--accept-legacy] <doc-dir>
                             # rebuild the lock from the halt snapshot / orphaned claim
                             #   --which: print the candidate --restore would consume; no writes
@@ -122,6 +131,21 @@ USAGE
 }
 
 [ $# -ge 1 ] || usage
+
+if [ "$1" = "--paused-here" ]; then
+  [ $# -eq 1 ] || usage
+  [ -f "$LOCK" ] && exit 0
+  command -v jq >/dev/null 2>&1 || exit 0
+  HERE=$(git branch --show-current 2>/dev/null)
+  [ -n "$HERE" ] || exit 0
+  # `find`, not a glob, for the same zsh nomatch reason as choose_candidate below.
+  { [ -f "$SNAPSHOT" ] && printf '%s\n' "$SNAPSHOT"
+    find "$(dirname "$LOCK")" -maxdepth 1 -name "$(basename "$LOCK").pausing.*" -type f 2>/dev/null; } |
+    while IFS= read -r c; do
+      [ "$(jq -r 'if type == "object" then (.branch // "") else "" end' "$c" 2>/dev/null)" = "$HERE" ] && printf '%s\n' "$c"
+    done | head -1
+  exit 0
+fi
 
 # The no-lock behaviour is decided PER MODE below, not here. A single `|| exit 0`
 # ahead of the parse was the silent no-op that made every numeric advance and the

@@ -205,8 +205,8 @@ Step 7 halt, on what the fix changed** (task.170):
   change outside the work item is easy to miss by eye, and a missed one would re-run `/finalise`
   over an ungated head. **What follows a refusal is its route in the refusal list below** — the one
   statement of it: a declined offer, or a refusal routed to step 7 (`no-code-moved` among them),
-  takes the next bullet; `uncommitted-fix` is routed back to the operator and never to step 7
-  (task.170).
+  takes the next bullet; a refusal the list routes back to the operator — `uncommitted-fix`,
+  `git-unreadable`, `no-gate` — never reaches step 7 (task.170, task.182).
 - any other `halt_reason`, or a PreCompact `pause_reason`, or **any `develop-bug` snapshot** → run
   `advance-pipeline-lock.sh --restore {doc-directory}` **here**, before Phase 0b, on the
   re-invocation path exactly as the in-session continuation does (QA cycle 2, CR-2; the step-0
@@ -229,6 +229,21 @@ Pass `recommended_step` to Phase 0b. Phase 0b only verifies artifacts for steps 
 
 ---
 
+### Persisted up-front answers (task.201)
+
+Step 1 writes §0d's resolved answers into the lock (`answers`, `answer_sources`, `waiver`), and §0d's
+answer resolution reads them back through `--persisted-file`, so a resume asks nothing they settle.
+The states the rule holds in, each pinned by a test:
+
+| State | What §0d does | Test |
+| --- | --- | --- |
+| Live lock carrying `answers` | Reuses them (source `persisted`); asks nothing they settle | `pipeline-answers.test.mjs` 7a |
+| Lock rebuilt by `--restore` from a halt snapshot or an orphaned claim | Same — `--restore` deletes only the halt/pause fields and `waiting_on`, so `answers` survives | `advance-pipeline-lock.test.sh` scenario 13 |
+| Legacy lock or snapshot with no `answers` (written before task.201) | Today's rule: questions already in the Decisions Log are not re-asked | `pipeline-answers.test.mjs` 7b |
+| No lock and no snapshot (re-invocation over an existing report) | As the legacy row | `pipeline-answers.test.mjs` 9b |
+| Re-invocation flags that disagree with the persisted answers | A conflict: asked, with both values stated — never silently overwritten either way | `pipeline-answers.test.mjs` 7c |
+| A persisted answer the epic now contradicts | Asked, with the conflict stated | `pipeline-answers.test.mjs` 7d |
+
 ## Phase 0b — Resume Artifact Verification (CRITICAL)
 
 ### Working-tree probe — before any artifact is trusted (task.124, obs #85)
@@ -246,12 +261,59 @@ bundled copy the run had produced. So the probe runs **first**, and it **classif
 | **(b) bundle drift** | every entry is under `skills/*/references/` — bundled copies out of date with their sources | `npm run bundle -- --check \|\| npm run bundle`, then continue |
 | **(c) anything else** | an entry the probe cannot classify — real uncommitted work, an untracked file the base does not have, a mix; and an **unbindable base** (no PR, no report row, no `**Branch model:**` line), which makes the whole tree (c) | **HALT**: print the entries and stop. A resume that guesses here is the task.116 overlay again |
 
+**Set aside before classifying: the 5c carried set** (task.173). It is the work item's PR review
+report and the doc-only fixes 5c staged for `/finalise` 6a to carry. A path-limited pause commit
+leaves them staged on purpose. An entry staged `A` or `M` with nothing unstaged on top, that is either
+the work item's `*.pr-review.*.md` or a path listed in `.claude/state/5c-carry-eligible.txt`, is
+printed, then kept out of (a), (b) and (c). The list counts only when its header line names this
+work item's review report and that report is staged. (a) must never discard it, and (c) must not HALT on what
+a resume into Step 7 is meant to carry.
+
 ```bash
 # `--no-renames`: a staged rename would otherwise print as one `R  old -> new` entry whose
 # "path" is the whole arrow expression — a pathspec that matches nothing, is quiet under `git
 # diff`, and is "discarded" without effect (task.124 QA cycle 2, CR-4). Split, it is a `D` and
 # an `A`, each a real path; the `A` is not in the base and so is class (c).
 DIRTY=$(git status --porcelain --no-renames)
+# The 5c carried set (task.173) is resumable state, not dirt: the PR review report and the doc-only
+# fixes 5c staged for /finalise 6a to carry, with nothing unstaged on top. The path-limited pause
+# commit leaves it staged, so set it aside BEFORE classifying — (a) must never discard it and (c)
+# must not HALT on it. An entry qualifies only with index column A or M, a clean worktree column,
+# and a path that is the work item's own PR review report or one the 5c classify block cleared.
+WI_DIR=$(dirname "{implementation-report-path}")
+# The eligible list counts only when its header names this work item's review report and that
+# report is itself staged; a list left by another work item or an earlier pass is ignored (task.173 QA-3).
+ELIGIBLE=""
+ELIG_HEAD=$(head -1 .claude/state/5c-carry-eligible.txt 2>/dev/null)
+case "$ELIG_HEAD" in
+  "# review: $WI_DIR"/*.pr-review.*.md)
+    [ -n "$(git --literal-pathspecs diff --cached --name-only -- "${ELIG_HEAD#\# review: }")" ] && ELIGIBLE=.claude/state/5c-carry-eligible.txt ;;
+esac
+# How git spells each listed path in $DIRTY: ask git, with the same flags, rather than compare a raw
+# list entry against a status line — porcelain C-quotes a path with a space or non-ASCII byte, and
+# the list holds it raw, so a carried `docs/my notes.md` never matched (task.173 QA-9, CR9-2).
+CARRY_EXPECT=""
+if [ -n "$ELIGIBLE" ]; then
+  while IFS= read -r e; do
+    case "$e" in '# '*|'') continue ;; esac
+    CARRY_EXPECT="$CARRY_EXPECT$(git --literal-pathspecs status --porcelain --no-renames -- "$e")"$'\n'
+  done < "$ELIGIBLE"
+fi
+CARRY_LINES=""; REST_LINES=""
+while IFS= read -r line; do
+  [ -n "$line" ] || continue
+  st=${line:0:2}; p=${line:3}
+  case "$st" in
+    "A "|"M ")
+      case "$p" in "$WI_DIR"/*.pr-review.*.md) CARRY_LINES="$CARRY_LINES$line"$'\n'; continue ;; esac
+      if [ -n "$ELIGIBLE" ] && printf '%s' "$CARRY_EXPECT" | grep -qxF -- "$line"; then
+        CARRY_LINES="$CARRY_LINES$line"$'\n'; continue
+      fi ;;
+  esac
+  REST_LINES="$REST_LINES$line"$'\n'
+done <<< "$DIRTY"
+[ -z "$CARRY_LINES" ] || { echo "5c carried set kept staged for 6a:"; printf '%s' "$CARRY_LINES"; }
+DIRTY=$(printf '%s' "$REST_LINES")
 if [ -n "$DIRTY" ]; then
   # The base is RECORDED STATE, never a bare shell variable with a `develop` default: nothing in
   # any pipeline binds BASE_BRANCH, so `${BASE_BRANCH:-develop}` probed every hotfix off `main`
@@ -314,7 +376,8 @@ if [ -n "$DIRTY" ]; then
     # satisfied vacuously by the very entry a bad pathspec never addressed (QA cycle 2, CR-4).
     # A discard that succeeded and left anything behind is the failure the probe exists to
     # stop, so it is a HALT, not a warning.
-    LEFT=$(git status --porcelain --no-renames)
+    # Minus the carried set, which was set aside above and is still staged by design.
+    LEFT=$(git status --porcelain --no-renames | grep -vxF -f <(printf '%s' "$CARRY_LINES") || true)
     if [ -n "$LEFT" ]; then
       echo "HALT: overlay discard left entries behind — classify by hand before resuming:"; printf '%s\n' "$LEFT"; exit 1
     fi
@@ -566,10 +629,17 @@ This convention ensures the cycle budget is respected across resumes.
      `{doc-directory}` — because a stale snapshot persists by design.
    - It **never lowers** a `qa_max_cycles` the lock already carries.
    - It **writes three fields atomically** — `extra_cycles_granted = k` (the record),
-     `qa_max_cycles = base + k` (the budget) and `qa_phase = 5a` (an accepted grant *is* a 5a
-     re-entry; a Stop between the grant and a separate `set-qa-phase.sh` call would otherwise name
-     `/qa-fix`) — via `mktemp` + `mv`, removing its temp file on every failure, and prints the
-     budget back from the written lock.
+     `qa_max_cycles = base + k` (the budget) and `qa_phase`, the re-entry point — via `mktemp` +
+     `mv`, removing its temp file on every failure, and prints the budget and `reenter_at` back from
+     the written lock. **The re-entry point depends on where the halt stopped** (obs #228) — which
+     value for which halt is the `qa_phase` row of the lock schema in `develop-pipeline-pause.md`.
+     The reason: a `loop-limit` halt ran its last 5b, so the next gate must read that fix, and a
+     `not-converging` halt fired at 5a *before* 5b, so the latest gate's queue must go to `/qa-fix`
+     first. Re-entering a not-converging halt at 5a reviews unchanged code,
+     re-raises the same HIGH and trips the check again, spending the grant with no fix attempted
+     (task.140). The script reads `halt_reason` from the candidate before its restore drops it, and
+     reads its leading token: the HALT appends detail after a `:` or a space, and an exact compare
+     sent every real not-converging halt to `5a` (obs #17).
 
    The loop then runs with **`QA_MAX_CYCLES` = the lock's `qa_max_cycles`** (absent → 5). The
    budget is **relative to the reconstructed count, not to 5**: a grant of `k` must deliver `k`
@@ -585,9 +655,10 @@ This convention ensures the cycle budget is respected across resumes.
    `evals/shared/tests/qa-loop-lock-fields-parity.test.mjs` fails when any file disagrees. **Do not
    reuse `MAX_ITER`**: that is the Step 3 develop-loop bound (below), a different budget over a
    different loop.
-4. **Re-enter at 5a as cycle `NEXT_CYCLE`.** The grant already wrote `qa_phase: 5a` and restored
-   the lock; 5a's own first action (`set-qa-phase.sh 5a`) then runs as on any cycle and is a noop
-   here. **A declined grant, or a grant the script refused (exit 1 — surface its stderr line to the
+4. **Re-enter at the phase the grant printed (`reenter_at`).** `5a` → as cycle `NEXT_CYCLE`; 5a's
+   own first action (`set-qa-phase.sh 5a`) then runs as on any cycle and is a noop here. `5b` → run
+   5b on the latest gate as cycle `QA_CYCLE` (the cycle the halt interrupted), then 5a as
+   `NEXT_CYCLE`. **A declined grant, or a grant the script refused (exit 1 — surface its stderr line to the
    user), does not re-enter the loop at all**: no lock is restored, no cycle runs, and the run
    returns to the halt message's own three options. That is the one statement of the declined path;
    the step-5-6 HALT messages and both SKILL.md Phase 0b blocks point here rather than restating it
@@ -630,7 +701,8 @@ and both SKILL.md Phase 0b paragraphs cite it.
 - `not-a-finalise-halt` — the snapshot's `halt_step` is not 7 (compared as text: the HALT snippet writes it with `jq --arg`). **Route:** the next bullet (an ordinary restore).
 - `no-dod` — no `{stem}.dod.{N}.*.md` beside the document, keyed on the work item's own stem — read from the DoD files whose stem the directory name continues, never from a bug's — so a co-located bug's DoD is never read as its verdict. **Route:** the next bullet.
 - `dod-not-gaps` — the newest DoD file does not read `**Final Status:** ❌ GAPS`. **Route:** the next bullet.
-- `no-gate` — `qa-cycle.sh` found no single current gate. **Route:** the next bullet; resolve the gate files first if the refusal names an ambiguity.
+- `no-gate` — `qa-cycle.sh` found no single current gate. Its own reason is relayed above the refusal as a `reenter-qa:` line — no gate file, gate files with no cycle number, or two files claiming one cycle (task.182). **Route:** back to the operator — resolve the gate files the relayed line names and run the script again; **never** step 7, which would accept a head no gate has read (a step-7 halt had a gate, so a missing or ambiguous one is a state to repair, not a document-only fix).
+- `git-unreadable` — `git status` exited non-zero, so the movement measure cannot run; git's own error is printed with it (task.182). **Route:** back to the operator — repair the repository and run the script again; **never** step 7, which an unread tree would otherwise reach through `no-code-moved`.
 - `uncommitted-fix` — a **tracked** change outside the work item's directory is uncommitted. **Route:** back to the operator — commit the fix and run the script again; **never** step 7, which would accept a head no review has read.
 - `no-code-moved` — no commit outside the work item's directory since the gate's `head:`: a document-only fix. **Route:** the next bullet — `/finalise` re-runs at 7. Untracked files outside the directory are named in this refusal, never a reason of their own: after Step 4 restores the files it held aside, nothing can tell one of those from a new fix file, so the operator who can decides — commit any that belong to the fix and run the script again.
 <!-- reenter-qa-refusals: end -->

@@ -175,6 +175,30 @@ EOF
 
 The lock file is read by `.agents/skills/develop-task/scripts/on-precompact.sh` if compaction fires.
 
+### Persist the resolved answers (shared)
+
+Write §0d's answers into the lock the moment it exists, so a resume reuses them instead of asking
+again (task.201). They live in the **lock**, not in an orchestrator's run state, because the lock is
+what this pipeline's resume reads:
+
+```bash
+if [ -f .claude/state/pipeline-answers.json ]; then
+  jq --slurpfile a .claude/state/pipeline-answers.json \
+     '. + {answers: $a[0].answers, answer_sources: $a[0].sources, waiver: $a[0].waiver}' \
+     .claude/state/develop-pipeline.lock > .claude/state/develop-pipeline.lock.tmp \
+    && mv .claude/state/develop-pipeline.lock.tmp .claude/state/develop-pipeline.lock \
+    && rm -f .claude/state/pipeline-answers.json
+fi
+```
+
+`advance-pipeline-lock.sh` rewrites the lock with `jq` and `--restore` deletes only the halt/pause
+fields and `waiting_on`, so `answers` survives every advance, pause and restore. The `waiver` written
+is always the one §0d resolved: on a resume the resolver already carries the lock's waiver and its
+approver forward, and when a resume withdraws a skip (the allow-list no longer lists it, or no one can
+approve it) the resolved waiver is `null` — keeping the old one would demand a `WAIVED` gate for a
+step that ran (gate 3, CR-1). A lock written before
+task.201 has no `answers`; §0d then asks as it always did.
+
 ### Shared note
 
 From Step 2 onward, the per-step banner directive updates `current_step`. Step 4 also writes `pr_url` after the PR is created.
