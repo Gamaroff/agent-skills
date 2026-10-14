@@ -203,5 +203,6 @@ All findings fixed and verified. Two low advisory items recorded. Criterion 6 (r
 | 2026-10-14 |  | QA gate CONCERNS (90/100) — cycle 3: 1 medium; cycle-2 fixes verified | qa-task |
 | 2026-10-14 |  | QA findings fixed — QA-209-4 (a failed link fails the step and the run), 1 iteration | qa-fix |
 | 2026-10-14 |  | QA gate PASS (100/100) — cycle 4: no medium or high findings | qa-task |
+| 2026-10-14 |  | Owner real-terminal check found stacked frames in a narrow terminal (TASK-209-BUG-5); fixed, 1 iteration | qa-fix |
 <!-- change-log-end -->
 

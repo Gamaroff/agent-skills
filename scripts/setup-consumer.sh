@@ -179,7 +179,7 @@ _checklist_has_tty() { { : </dev/tty >/dev/tty; } 2>/dev/null; }
 
 _checklist_restore() {
   [[ -n "${_CL_STTY:-}" ]] && stty "$_CL_STTY" </dev/tty 2>/dev/null
-  printf '\033[?25h' >/dev/tty 2>/dev/null
+  printf '\033[?25h\033[?7h' >/dev/tty 2>/dev/null
   _CL_STTY=""
 }
 
@@ -201,7 +201,11 @@ checklist() {
   # the wizard.
   trap '_checklist_restore; trap - INT; kill -INT $$' INT
   stty -echo </dev/tty
-  printf '\033[?25l' >/dev/tty
+  # Cursor hidden, and autowrap OFF while the list is drawn: the redraw moves
+  # up exactly one row per item, so a line wider than the terminal must be
+  # clipped at the edge, never wrapped onto a second row. A wrapped line made
+  # every redraw land too high and stack frames on top of each other.
+  printf '\033[?25l\033[?7l' >/dev/tty
 
   {
     echo -e "${BOLD}${title}${NC}"
@@ -2061,12 +2065,13 @@ link_agents() {
         local pair; for pair in $links; do paths+="${paths:+, }${pair%%>*}"; done
         labels+=("$(printf '%-26s links %s' "$label" "$paths")")
       else
-        labels+=("$(printf '%-26s nothing to link: reads AGENTS.md and .agents/skills' "$label")")
+        labels+=("$(printf '%-26s nothing to link' "$label")")
       fi
       _agent_linked "$rec" && defaults+="${defaults:+ }$i"
     done
     echo "  Each agent you tick gets local links to AGENTS.md and .agents/skills,"
-    echo "  added to .gitignore. Nothing is ever replaced or deleted."
+    echo "  added to .gitignore. Nothing is ever replaced or deleted. Agents marked"
+    echo "  \"nothing to link\" already read AGENTS.md and .agents/skills themselves."
     echo ""
     if ! CHECKLIST_DEFAULT="$defaults" checklist "Which agents do you use?" "${labels[@]}"; then
       info "No terminal to show the list on — skipped. Use --link-agents claude,gemini,…"

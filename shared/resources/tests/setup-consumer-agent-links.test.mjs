@@ -408,13 +408,16 @@ test("with no terminal and no --link-agents, the list is skipped and nothing is 
 
 // Drive the real list through a pseudo-terminal. Python's pty module is the
 // portable way to get one (Linux and macOS); keys are sent one at a time.
-function drive(dir, keys) {
+function drive(dir, keys, cols = 200) {
   const py = `
-import os, pty, sys, time, select
+import os, pty, sys, time, select, fcntl, termios, struct
 keys = [k.encode('latin1').decode('unicode_escape').encode('latin1') for k in sys.argv[2].split('|')]
 pid, fd = pty.fork()
 if pid == 0:
     os.execvp('bash', ['bash', sys.argv[1], '--links-only'])
+# The terminal's width, as a real window has one: a list line wider than this
+# wraps unless the list turns autowrap off.
+fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack('HHHH', 40, int(sys.argv[3]), 0, 0))
 out = b''
 def drain(t):
     global out
@@ -432,12 +435,93 @@ _, st = os.waitpid(pid, 0)
 sys.stdout.write(out.decode('utf8', 'replace'))
 sys.exit(os.waitstatus_to_exitcode(st))
 `;
-  return execFileSync("python3", ["-c", py, WIZARD, keys], {
+  return execFileSync("python3", ["-c", py, WIZARD, keys, String(cols)], {
     cwd: dir,
     encoding: "utf-8",
     timeout: PTY_BUDGET.timeoutMs,
   });
 }
+
+// A minimal terminal: printable text, CR, LF, cursor up (CSI n A), erase line
+// (CSI 2K) and autowrap on/off (CSI ?7 l/h), at a fixed width. Enough to see
+// the screen the list leaves behind, which the raw byte stream does not show.
+function screen(bytes, cols) {
+  const rows = [];
+  const row = (r) => (rows[r] ??= Array(cols).fill(" "));
+  let r = 0;
+  let c = 0;
+  let wrap = true;
+  let pending = false;
+  for (let i = 0; i < bytes.length; i++) {
+    const ch = bytes[i];
+    if (ch === "\x1b") {
+      const m = /^\x1b\[(\??)([\d;]*)([A-Za-z])/.exec(bytes.slice(i));
+      if (m) {
+        const n = parseInt(m[2] || "1", 10);
+        if (m[3] === "A") ((r = Math.max(0, r - n)), (pending = false));
+        else if (m[3] === "K") rows[r] = Array(cols).fill(" ");
+        else if (m[1] === "?" && n === 7) wrap = m[3] === "h";
+        i += m[0].length - 1;
+      }
+      continue;
+    }
+    if (ch === "\r") ((c = 0), (pending = false));
+    else if (ch === "\n") (r++, (pending = false));
+    else {
+      if (pending && wrap) (r++, (c = 0), (pending = false));
+      row(r)[c] = ch;
+      if (c === cols - 1) pending = true;
+      else c++;
+    }
+  }
+  // Array.from, not map: map skips the holes rows never written leave.
+  return Array.from(rows, (x) => (x ?? []).join("").trimEnd());
+}
+
+test("the list redraws in place in a terminal narrower than its lines", () => {
+  // Owner's check, 2026-10-14: at ~84 columns the longest lines wrapped onto a
+  // second row, each redraw moved up one row per item and landed too high, and
+  // frames stacked on top of each other (TASK-209-BUG-5).
+  const dir = consumer();
+  try {
+    const cols = 40; // narrower than every list line
+    const out = drive(dir, "\\x1b[B|\\x1b[B|\\x1b[B|\\r", cols);
+    const rows = screen(out, cols);
+    const top = rows.findIndex((x) => x.startsWith("Which agents do you use?"));
+    assert.ok(top > -1, "the list was drawn");
+    const list = rows.slice(top + 2, top + 12);
+    const names = [
+      "Claude Code",
+      "OpenAI Codex",
+      "GitHub Copilot",
+      "Cursor",
+      "Gemini CLI",
+      "Windsurf",
+      "Cline",
+      "Kiro",
+      "OpenCode",
+      "Amp",
+    ];
+    names.forEach((name, i) => {
+      assert.ok(
+        list[i].includes(name),
+        `row ${i} should show ${name}, got ${JSON.stringify(list[i])}`,
+      );
+      assert.equal(
+        (list[i].match(/\[[ x]\]/g) || []).length,
+        1,
+        `one item per row: ${JSON.stringify(list[i])}`,
+      );
+    });
+    assert.match(
+      list[3],
+      /❯/,
+      "the cursor sits on the fourth item after three downs",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 test("the list: space ticks, arrows move and wrap, enter confirms", () => {
   const dir = consumer();
