@@ -36,6 +36,17 @@ SKILL itself).
 **Files Modified**: `skills/develop-batch/SKILL.md`; the timing-test comment in
 `shared/resources/tests/qa-execute-snippets.test.mjs` (cycle-3 CR-3).
 
+### Iteration 2
+
+**Date**: 2026-10-14
+
+**QA Reopening Reason**: the iteration-1 sentence pointed later steps at "the value this block
+printed", but the block captured the root into `$ROOT` and printed nothing on success.
+
+**Fix**: the block now ends with `echo "worktreeRoot: $ROOT"`, and the prose names that line as the
+value later steps substitute. The executed-block test asserts `worktreeRoot: .worktrees` on stdout;
+removing the echo turns it red.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -44,3 +55,5 @@ SKILL itself).
 | 2026-10-14 | In Progress | qa-fix | Root cause found |
 | 2026-10-14 | Ready for QA | qa-fix | Doc fix: later steps substitute the printed root |
 | 2026-10-14 | Reopened | qa-task | Not fixed by task.208.qa.4.worktree-root-config.md — the block prints nothing, so 'the value this block printed' does not exist |
+| 2026-10-14 | In Progress | qa-fix | Iteration 2 |
+| 2026-10-14 | Ready for QA | qa-fix | Block prints the normalised root; test asserts it |

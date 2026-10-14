@@ -239,6 +239,7 @@ Step 0.3a points later steps at a value it does not print ([TASK-208-BUG-3](./ta
 | 2026-10-14 |  | QA gate CONCERNS (90/100) — cycle 3: 1 medium; cycle-2 fixes verified | qa-task |
 | 2026-10-14 |  | QA findings fixed — QA-208-6 (Step 0.3a root binding wording), 1 iteration | qa-fix |
 | 2026-10-14 |  | QA gate CONCERNS (90/100) — cycle 4: 1 medium (TASK-208-BUG-3 reopened) | qa-task |
+| 2026-10-14 |  | QA findings fixed — QA-208-7 (Step 0.3a prints the normalised root), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

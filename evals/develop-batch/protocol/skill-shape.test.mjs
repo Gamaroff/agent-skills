@@ -504,6 +504,8 @@ test("Step 0.3a: an unignored root is excluded once, by its normalised name", ()
   const { repo, exclude } = scratchRepo();
   const r = runStep03a(repo, "./.worktrees/");
   assert.equal(r.status, 0, r.stdout + r.stderr);
+  // Later steps substitute this printed value (TASK-208-BUG-3).
+  assert.match(r.stdout, /^worktreeRoot: \.worktrees$/m);
   assert.match(excludeText(exclude), /^\/\.worktrees\/$/m);
   const again = runStep03a(repo, ".worktrees");
   assert.equal(again.status, 0);

@@ -199,11 +199,12 @@ independently via its own Phase 0b machinery.
      1) printf '/%s/\n' "$ROOT" >> "$(git rev-parse --git-common-dir)/info/exclude" ;;
      *) echo "HALT: git check-ignore could not evaluate $ROOT/ (exit $rc)"; exit 1 ;;
    esac
+   echo "worktreeRoot: $ROOT"
    ```
 
-   From here on, every `<worktreeRoot>` in this skill means the value this block **printed** (the
-   normalised root), not the raw config value: substitute it into each later step yourself, since
-   `$ROOT` exists only inside this block. `info/exclude` is local and never committed, so this
+   The block ends by printing `worktreeRoot: <normalised root>`. From here on, every
+   `<worktreeRoot>` in this skill means that printed value, not the raw config value: substitute it
+   into each later step yourself, since `$ROOT` exists only inside this block. `info/exclude` is local and never committed, so this
    changes nothing another clone sees.
    When you had to write it, say so in the run report and recommend adding `<worktreeRoot>/` to
    the project's `.gitignore`, and to any test-runner or linter ignore list that does not read
