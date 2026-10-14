@@ -172,24 +172,24 @@ the previous state.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-14
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.209.qa.3.setup-consumer-agent-links.md](./task.209.qa.3.setup-consumer-agent-links.md)
-- **Gate File**: [task.209.gate.3.setup-consumer-agent-links.yml](./task.209.gate.3.setup-consumer-agent-links.yml)
+- **Full Report**: [task.209.qa.4.setup-consumer-agent-links.md](./task.209.qa.4.setup-consumer-agent-links.md)
+- **Gate File**: [task.209.gate.4.setup-consumer-agent-links.yml](./task.209.gate.4.setup-consumer-agent-links.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5494 (5476 pass; 4 worktree-only failures, obs #39)
+- **Tests Executed**: 5495 (5477 pass; 4 worktree-only failures, obs #39)
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 (1 medium)
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Cycle-2 fixes verified. A failed link is still recorded as a warning ([TASK-209-BUG-4](./task.209.bug.4.failed-link-recorded-as-warning.md)).
+All findings fixed and verified. Two low advisory items recorded. Criterion 6 (real-terminal check on Linux and macOS) is the owner's to do.
 <!-- change-log-start -->
 ## Change Log
 
@@ -202,5 +202,6 @@ Cycle-2 fixes verified. A failed link is still recorded as a warning ([TASK-209-
 | 2026-10-14 |  | QA findings fixed — QA-209-2 (ids checked before any step), QA-209-3 (failed link reported), 1 iteration | qa-fix |
 | 2026-10-14 |  | QA gate CONCERNS (90/100) — cycle 3: 1 medium; cycle-2 fixes verified | qa-task |
 | 2026-10-14 |  | QA findings fixed — QA-209-4 (a failed link fails the step and the run), 1 iteration | qa-fix |
+| 2026-10-14 |  | QA gate PASS (100/100) — cycle 4: no medium or high findings | qa-task |
 <!-- change-log-end -->
 

@@ -1,0 +1,57 @@
+schema: 2
+task: 'task.208.worktree-root-config'
+task_title: 'Worktrees live inside the repo under a configurable root'
+gate: CONCERNS
+status_reason: 'The cycle-3 wording fix points later steps at "the value this block printed", but the Step 0.3a block prints nothing on success (TASK-208-BUG-3 reopened).'
+reviewer: 'QA Engineer'
+head: 'c0db062aa3fc7271fb0ac40a8a9a8c5f72b442b0'
+updated: '2026-10-14T15:49:01Z'
+
+top_issues:
+  - id: 'QA-208-7'
+    severity: medium
+    file: 'skills/develop-batch/SKILL.md'
+    finding: 'Step 0.3a captures the normalised root into $ROOT and prints nothing, so the instruction to substitute "the value this block printed" cannot be followed (TASK-208-BUG-3, reopened).'
+    suggested_action: 'Have the block print a labelled line (worktreeRoot: $ROOT) and point the prose at it; assert it in the executed-block test.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 5495
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 11
+    notes: 'Probe record task.208.qa.2.security.run.json (11 executed); no code change since.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Unchanged.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Step 0.3a instruction refers to output the block does not produce (QA-208-7).'
+
+recommendations:
+  immediate:
+    - action: 'Print the normalised root from Step 0.3a and test it (TASK-208-BUG-3).'
+      refs: ['skills/develop-batch/SKILL.md', 'evals/develop-batch/protocol/skill-shape.test.mjs']
+  future:
+    - action: 'Earlier advisory items stand (gate 2 and gate 3 recommendations.future).'
+      refs: ['skills/develop-batch/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-208-BUG-3 fixed']

@@ -4,7 +4,7 @@
 **Bug ID**: TASK-209-BUG-4
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle 3)
 **Date Found**: 2026-10-14
 
@@ -49,3 +49,4 @@ the end of the full wizard is not exercised by a test (the full wizard is intera
 | 2026-10-14 | New | QA Engineer | Cycle 3 scoped review — introduced by the cycle-2 fix |
 | 2026-10-14 | In Progress | qa-fix | Root cause found |
 | 2026-10-14 | Ready for QA | qa-fix | Failed link fails the step; any recorded fail exits 1 |
+| 2026-10-14 | Closed | qa-task | Verified by task.209.qa.4.setup-consumer-agent-links.md |
