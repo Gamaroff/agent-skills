@@ -226,6 +226,19 @@ Phase detail: [`task.208.plan.worktree-root-config.md`](task.208.plan.worktree-r
 
 ### Key Findings
 Five QA cycles; every medium finding fixed and verified. Low advisory items are in the gate's recommendations.
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+- [ ] **AC1**: reword to persistent worktrees (owner decision, 2026-10-14) and add a per-PR guard that no shipped skill or runbook names a sibling worktree path
+- [ ] **AC6**: a per-PR test that runs the grep/find exclusions in the three skills against a fixture with a nested `.worktrees/`, and one that `.gitignore` ignores `.worktrees/`
+- [ ] **Docs**: `develop-next --batch` names `--worktree-root` and the gitignore requirement
+- [ ] **AC7**: PR #660 CI green on the fix head
+
+**Estimated Effort:** Small (1-2 hours)
+
+**Gap Report Generated:** 2026-10-14
+**Detailed Verification Log:** See `task.208.dod.1.worktree-root-config.md`.
 <!-- change-log-start -->
 ## Change Log
 
@@ -241,6 +254,7 @@ Five QA cycles; every medium finding fixed and verified. Low advisory items are 
 | 2026-10-14 |  | QA gate CONCERNS (90/100) — cycle 4: 1 medium (TASK-208-BUG-3 reopened) | qa-task |
 | 2026-10-14 |  | QA findings fixed — QA-208-7 (Step 0.3a prints the normalised root), 1 iteration | qa-fix |
 | 2026-10-14 |  | QA gate PASS (100/100) — cycle 5: no medium or high findings | qa-task |
+| 2026-10-14 |  | DoD incomplete — 4 gaps identified | finalise |
 <!-- change-log-end -->
 
 ---

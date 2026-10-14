@@ -190,6 +190,18 @@ the previous state.
 
 ### Key Findings
 Seven QA cycles (two past the 5-cycle budget, owner informed); six bugs found and closed, one by the owner's real-terminal check. macOS check deferred to task.210.
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+- [ ] **Security**: an id after a newline in `--link-agents` is never checked and the run exits 0
+- [ ] **SC5**: record the wrap-around and pre-tick mutation proofs; make the no-terminal guard observable (clean stderr) so its mutation goes red
+- [ ] **SC5**: PR #660 CI green on the fix head
+
+**Estimated Effort:** Small (1-2 hours)
+
+**Gap Report Generated:** 2026-10-14
+**Detailed Verification Log:** See `task.209.dod.1.setup-consumer-agent-links.md`.
 <!-- change-log-start -->
 ## Change Log
 
@@ -210,5 +222,6 @@ Seven QA cycles (two past the 5-cycle budget, owner informed); six bugs found an
 | 2026-10-14 |  | QA gate CONCERNS (80/100) — cycle 6 (past the 5-cycle budget): 2 medium in the cycle-5 fix | qa-task |
 | 2026-10-14 |  | QA findings fixed — scope the claim: TERM/QUIT trap and EXIT restore removed; Ctrl-C test requires SIGINT, 1 iteration | qa-fix |
 | 2026-10-14 |  | QA gate PASS (100/100) — cycle 7: no findings | qa-task |
+| 2026-10-14 |  | DoD incomplete — 3 gaps identified | finalise |
 <!-- change-log-end -->
 
