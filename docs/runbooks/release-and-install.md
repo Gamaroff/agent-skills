@@ -80,7 +80,7 @@ Full decision guide: [`../contributing/releases.md#recovering-from-a-failed-rele
 Run in your project root:
 
 ```bash
-bash <(curl -fsSL https://github.com/Gamaroff/agent-skills/raw/main/scripts/setup-consumer.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh)
 ```
 
 The wizard sets up:
@@ -146,7 +146,7 @@ Full key reference: [`../reference/configuration.md`](../reference/configuration
 ### Update skills only (skip wizard)
 
 ```bash
-bash <(curl -fsSL https://github.com/Gamaroff/agent-skills/raw/main/scripts/setup-consumer.sh) --update
+bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh) --update
 ```
 
 `--update` short-circuits before the wizard runs, so the profile is read from `skills-config.yaml`
@@ -156,7 +156,7 @@ keeps every skill you have — it does not silently prune to a default.
 ### Pin a specific version
 
 ```bash
-SKILLS_VERSION=v1.2.0 bash <(curl -fsSL https://github.com/Gamaroff/agent-skills/raw/main/scripts/setup-consumer.sh)
+SKILLS_VERSION=v1.2.0 bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh)
 ```
 
 ### After install
