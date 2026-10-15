@@ -1,0 +1,48 @@
+schema: 2
+task: 'task.202.doc-id-engine-and-prd-registry'
+task_title: 'Doc-id engine and PRD registry'
+gate: PASS
+status_reason: 'QA re-entry after the finalise DoD gaps: the only change since gate 6 is the CHANGELOG [Unreleased] entry for task 202. Its claims were checked against the engine and the selector; no reviewable code changed. Security probe engages.'
+reviewer: 'QA Engineer'
+head: '55bee3e321330ce4632b4e9d0a70284d6c7d2fd8'
+updated: '2026-10-15T05:34:34Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 59
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+  ci: 'not read — CI is gated at /finalise'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 30
+    notes: 'security-probe.mjs on doc-id.js#parse: engages (re-run on this head).'
+  performance:
+    status: PASS
+    notes: 'check --corpus over docs/prd 0.027 s on head 55bee3e3 (uptime load 0.03, 0.26, 0.70).'
+  reliability:
+    status: PASS
+    notes: 'No code change since gate 6.'
+  maintainability:
+    status: PASS
+    notes: 'CHANGELOG entry matches the delivered behaviour.'
+
+recommendations:
+  immediate: []
+  future: []
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

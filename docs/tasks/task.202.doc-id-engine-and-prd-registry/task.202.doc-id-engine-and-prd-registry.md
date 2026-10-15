@@ -423,17 +423,17 @@ that write one.
 **Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.202.qa.6.doc-id-engine-and-prd-registry.md](./task.202.qa.6.doc-id-engine-and-prd-registry.md)
-- **Gate File**: [task.202.gate.6.doc-id-engine-and-prd-registry.yml](./task.202.gate.6.doc-id-engine-and-prd-registry.yml)
+- **Full Report**: [task.202.qa.7.doc-id-engine-and-prd-registry.md](./task.202.qa.7.doc-id-engine-and-prd-registry.md)
+- **Gate File**: [task.202.gate.7.doc-id-engine-and-prd-registry.yml](./task.202.gate.7.doc-id-engine-and-prd-registry.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 59 (55 doc-id + 4 select-next), inside a 5569-test green suite
+- **Tests Executed**: 59 (55 doc-id + 4 select-next)
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-No critical issues identified. Six QA cycles closed 24 gate findings and 13 advisory ones, each with a mutation-proven test.
+No critical issues identified. QA re-entry after the finalise DoD gaps; the only change since gate 6 is the CHANGELOG entry.
 
 ## Definition of Done - Gaps Identified
 
@@ -486,6 +486,7 @@ No critical issues identified. Six QA cycles closed 24 gate findings and 13 advi
 | 2026-10-15 |  | QA findings fixed — cycle 5, 1 gate finding, 3 test cases | qa-fix |
 | 2026-10-15 |  | QA gate PASS (100/100) — no findings | qa-task |
 | 2026-10-15 |  | DoD incomplete — 2 gaps identified | finalise |
+| 2026-10-15 |  | QA gate PASS (100/100) — no findings (re-entry after DoD gaps) | qa-task |
 
 <!-- change-log-end -->
 
