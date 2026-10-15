@@ -22,8 +22,9 @@ docs/prd/
                 └── stories/                # child stories
 ```
 
-`E` is the highest epic number under PRD `P` plus 1 (`doc-id.js next epic --prd-dir …`); a deleted
-number is never reused. No registry allocates it.
+`E` is the highest epic number under PRD `P` plus 1 (`doc-id.js next epic --prd-dir …`). A gap left
+by a deleted epic is never refilled, but no registry or counter allocates `E`, so deleting the
+highest-numbered epic frees its number again.
 
 > **Interim (2026-10-15, task 202).** Skills adopt this scheme in tasks 204–206. Until then, `create-*` still writes the legacy shape (`epic.{N}.{name}`, numbered by the global epic registry) and `doc-id.js parseLegacy` reads it.
 

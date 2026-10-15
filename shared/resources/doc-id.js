@@ -81,6 +81,11 @@ const LEGACY_ID_RE = Object.freeze({
 
 const EXT_RE = /\.(?:md|ya?ml|json|sh)$/;
 
+// A number segment is a JS number only while it is a safe integer: past
+// Number.MAX_SAFE_INTEGER, Number() rounds, and the parsed value would no longer
+// name the file it came from (QA cycle 1, PROBE-1).
+const isSafeNum = (v) => v === undefined || Number.isSafeInteger(Number(v));
+
 /** Basename without directory or a known extension. */
 function stemOf(name) {
   return path.basename(String(name)).replace(EXT_RE, "");
@@ -119,6 +124,7 @@ function parseRemainder(rest, slugOk) {
     head !== "plan" &&
     segs.length === 3 &&
     NUM_RE.test(segs[1]) &&
+    isSafeNum(segs[1]) &&
     slugOk(segs[2])
   ) {
     return {
@@ -161,6 +167,8 @@ function parse(name) {
   const m = ID_RE[kind].exec(stem);
   if (!m) return fail("bad-number");
   const g = m.groups;
+  if (![g.prd, g.epic, g.story, g.n].every(isSafeNum))
+    return fail("bad-number");
   const slugOk = (s) =>
     (HIERARCHICAL.includes(kind) ? SLUG_RE : LOOSE_SLUG_RE).test(s);
   const r = parseRemainder(stem.slice(m[0].length), slugOk);
@@ -197,6 +205,7 @@ function parseLegacy(name) {
   const m = LEGACY_ID_RE[kind].exec(stem);
   if (!m) return fail("bad-number");
   const g = m.groups || {};
+  if (![g.epic, g.story].every(isSafeNum)) return fail("bad-number");
   const r = parseRemainder(stem.slice(m[0].length), (s) =>
     LOOSE_SLUG_RE.test(s),
   );
@@ -241,6 +250,25 @@ function format(parts) {
     throw new TypeError(
       `format: parts do not form a valid name (${back.reason}): ${out}`,
     );
+  // The output must parse back to exactly these parts — a missing or zero seq,
+  // or a dotted slug, can still produce a name that parses as something else
+  // (QA cycle 1, CR-3).
+  const want = {
+    prd: p.prd ?? null,
+    epic: p.epic ?? null,
+    story: p.story ?? null,
+    sub: p.sub || null,
+    n: p.n ?? null,
+    artifact: p.artifact || null,
+    seq: p.artifact && p.artifact !== "plan" ? p.seq : null,
+    slug: p.slug,
+  };
+  const drift = Object.keys(want).filter((k) => back[k] !== want[k]);
+  if (!back.canonical || drift.length) {
+    throw new TypeError(
+      `format: ${out} does not round-trip (${drift.join(", ") || "non-canonical"})`,
+    );
+  }
   return out;
 }
 
@@ -275,26 +303,50 @@ const PRD_COUNTER_RE = /\*\*Next Available PRD Number:?\*\*:?\s*\*\*(\d+)\*\*/;
  * the number column plus the counter is all allocation and `check` need.
  */
 function registryNumbers(text) {
+  // Only rows of the table whose header names the `PRD #` column, outside fenced
+  // blocks — a sample row in an example block is not a registration, which is
+  // how the selector's parseRegistry reads the same file (QA cycle 1, CR-6).
   const nums = [];
+  let fence = null;
+  let inTable = false;
   for (const line of String(text || "").split("\n")) {
-    const m = /^\|\s*(\d+)\s*\|/.exec(line);
-    if (m) nums.push(Number(m[1]));
+    const f = /^\s*(`{3,}|~{3,})/.exec(line);
+    if (f) {
+      if (!fence) fence = f[1][0];
+      else if (f[1][0] === fence) fence = null;
+      continue;
+    }
+    if (fence) continue;
+    if (!/^\s*\|/.test(line)) {
+      inTable = false;
+      continue;
+    }
+    if (/^\s*\|\s*prd\s*#\s*\|/i.test(line)) {
+      inTable = true;
+      continue;
+    }
+    const m = /^\s*\|\s*(\d+)\s*\|/.exec(line);
+    if (inTable && m) nums.push(Number(m[1]));
   }
   return nums;
 }
 
 /**
- * Allocate the next number, highest + 1. A deleted number is never handed out
- * again — the rule of the task, bug and epic registries, and deliberately NOT the
- * gap-filling rule of create-story's nextStoryId.
+ * Allocate the next number.
  *
- *   prd          — the registry's **Next Available PRD Number** is authoritative;
+ *   prd          — the registry's **Next Available PRD Number** is authoritative and
+ *                  never moves backwards, so a deleted PRD's number is never reused;
  *                  `entries` (PRD directory names) only guard against a stale counter.
- *   epic / story — the highest number among `entries` (directory basenames that
- *                  parse as documents of that kind) + 1; 1 when there are none.
+ *   epic / story — highest + 1 over `entries` (directory basenames that parse as
+ *                  documents of that kind); 1 when there are none. A gap left by a
+ *                  deleted epic or story is never refilled — deliberately NOT the
+ *                  gap-filling rule of create-story's nextStoryId. These numbers have
+ *                  no counter, so deleting the HIGHEST-numbered one does free its
+ *                  number again (QA cycle 1, CR-1).
  *
  * @returns {object} `{ ok: true, reason: "ok", next }` or `{ ok: false, reason }`
- *   with reason `registry-missing` / `registry-behind` / `unknown-kind`.
+ *   with reason `registry-missing` / `registry-invalid` / `registry-behind` /
+ *   `unknown-kind`.
  */
 function next(kind, entries, registryText) {
   const docs = (entries || [])
@@ -303,6 +355,8 @@ function next(kind, entries, registryText) {
   if (kind === "prd") {
     const m = PRD_COUNTER_RE.exec(String(registryText || ""));
     if (!m) return fail("registry-missing");
+    // The counter is an id: a positive integer, no leading zeros (QA cycle 1, CR-7).
+    if (!NUM_RE.test(m[1]) || !isSafeNum(m[1])) return fail("registry-invalid");
     const counter = Number(m[1]);
     const used = docs.map((p) => p.prd).concat(registryNumbers(registryText));
     if (used.some((n) => n >= counter)) return fail("registry-behind");
@@ -367,7 +421,12 @@ function frontmatterField(src, key) {
   if (!block) return "";
   const m = new RegExp(`^${key}:[ \\t]*(.*?)[ \\t]*$`, "m").exec(block[1]);
   if (!m) return "";
-  return m[1].replace(/^(['"])(.*)\1$/, "$2").trim();
+  const v = m[1];
+  // A quoted value keeps everything between its quotes; an unquoted one loses a
+  // YAML trailing comment (` # …`) — `prd_number: 1 # first` is 1 (QA cycle 1, CR-9).
+  const q = /^(['"])(.*)\1(?:\s+#.*)?$/.exec(v);
+  if (q) return q[2].trim();
+  return v.replace(/\s+#.*$/, "").trim();
 }
 
 function finding(reason, file, detail) {
@@ -406,6 +465,11 @@ function check(docPath, ctx = {}) {
         ? `an artifact (${p.artifact}), not a document`
         : `a ${p.kind} document is not checked here`;
     return [finding("bad-shape", docPath, `${base}: ${why}`)];
+  }
+  // A path that names no file is one finding, not a frontmatter defect plus a
+  // registry one (QA cycle 1, CR-8).
+  if (!io.exists(docPath)) {
+    return [finding("bad-shape", docPath, `${base}: not found`)];
   }
   const stem = stemOf(base);
   const dir = path.dirname(docPath);
@@ -504,10 +568,10 @@ function check(docPath, ctx = {}) {
 
 /** True when a basename names an artifact even though it does not parse (legacy). */
 function looksLikeArtifact(base) {
-  return stemOf(base)
-    .split(".")
-    .slice(1)
-    .some((s) => ARTIFACTS.includes(s));
+  // A keyword with nothing after it is a slug, as in parse(): `epic.1.qa.md` is a
+  // malformed document to report, not an artifact to skip (QA cycle 1, CR-10).
+  const segs = stemOf(base).split(".").slice(1);
+  return segs.some((s, i) => ARTIFACTS.includes(s) && i < segs.length - 1);
 }
 
 /**
@@ -515,8 +579,11 @@ function looksLikeArtifact(base) {
  * starts with one of those kind words, artifacts excepted. `prd-registry.md` and
  * shard files carry no kind prefix and are never considered. Adds one
  * `duplicate-id` per id held by more than one document.
- * @returns {object} `{ reason: "ok" | "findings" | "empty" | "root-missing",
- *   findings, documents }`
+ * A directory that cannot be read is never read as an empty one: the run answers
+ * `unreadable` and names it, so a misconfigured root cannot pass as `empty`
+ * (QA cycle 1, CR-4).
+ * @returns {object} `{ reason: "ok" | "findings" | "empty" | "root-missing" |
+ *   "unreadable", findings, documents, unreadable }`
  */
 function checkCorpus(prdRoot, ctx = {}) {
   const io = ctx.io || REAL_FS;
@@ -528,8 +595,14 @@ function checkCorpus(prdRoot, ctx = {}) {
     });
   }
   const docs = [];
+  const unreadable = [];
   const walk = (dir) => {
-    for (const ent of io.readDir(dir) || []) {
+    const ents = io.readDir(dir);
+    if (ents === null) {
+      unreadable.push(dir);
+      return;
+    }
+    for (const ent of ents) {
       const full = path.join(dir, ent.name);
       if (ent.dir) {
         walk(full);
@@ -545,8 +618,21 @@ function checkCorpus(prdRoot, ctx = {}) {
   };
   walk(prdRoot);
   docs.sort();
+  if (unreadable.length) {
+    return Object.freeze({
+      reason: "unreadable",
+      findings: [],
+      documents: docs.length,
+      unreadable,
+    });
+  }
   if (docs.length === 0)
-    return Object.freeze({ reason: "empty", findings: [], documents: 0 });
+    return Object.freeze({
+      reason: "empty",
+      findings: [],
+      documents: 0,
+      unreadable,
+    });
 
   const findings = [];
   const byId = new Map();
@@ -570,6 +656,7 @@ function checkCorpus(prdRoot, ctx = {}) {
     reason: findings.length ? "findings" : "ok",
     findings,
     documents: docs.length,
+    unreadable,
   });
 }
 
@@ -668,6 +755,10 @@ function runCli(argv, { cwd = process.cwd(), io = REAL_FS } = {}) {
   );
   if (unknown.length) return usage(`unknown flag ${unknown[0]}`);
   const [cmd, arg] = positional;
+  // Every path the CLI is handed resolves against `cwd`, not process.cwd(), so a
+  // caller's cwd means the same thing for skills-config.yaml and for the paths it
+  // names (QA cycle 1, CR-5).
+  const at = (p) => path.resolve(cwd, p);
   const done = (exitCode, body) => ({
     exitCode,
     payload: { ...body, exitCode },
@@ -681,15 +772,16 @@ function runCli(argv, { cwd = process.cwd(), io = REAL_FS } = {}) {
 
   if (cmd === "next") {
     if (arg === "prd") {
-      const root = resolvePrdRoot(argv, cwd);
+      const root = at(resolvePrdRoot(argv, cwd));
       const reg = io.readFile(path.join(root, "prd-registry.md"));
       const r = next("prd", allDirs(root, io), reg);
       return done(r.ok ? 0 : 1, { ...r, prdRoot: root });
     }
     if (arg === "epic" || arg === "story") {
       const flag = arg === "epic" ? "--prd-dir" : "--epic-dir";
-      const dir = argValue(argv, flag);
-      if (!dir) return usage(`next ${arg} needs ${flag} <dir>`);
+      const given = argValue(argv, flag);
+      if (!given) return usage(`next ${arg} needs ${flag} <dir>`);
+      const dir = at(given);
       const parent = parse(path.basename(dir));
       const parentKind = arg === "epic" ? "prd" : "epic";
       if (!parent.ok || parent.kind !== parentKind || parent.artifact) {
@@ -697,6 +789,16 @@ function runCli(argv, { cwd = process.cwd(), io = REAL_FS } = {}) {
           ok: false,
           reason: "bad-shape",
           detail: `${dir} is not a ${parentKind} directory`,
+        });
+      }
+      // A mistyped parent must not allocate a number: the directory and its own
+      // document must both exist (QA cycle 1, CR-2).
+      const parentDocPath = path.join(dir, `${path.basename(dir)}.md`);
+      if (io.readDir(dir) === null || !io.exists(parentDocPath)) {
+        return done(1, {
+          ok: false,
+          reason: "parent-missing",
+          detail: `no ${parentKind} document at ${parentDocPath}`,
         });
       }
       const children = childDirs(
@@ -721,7 +823,7 @@ function runCli(argv, { cwd = process.cwd(), io = REAL_FS } = {}) {
   }
 
   if (cmd === "check") {
-    const prdRoot = resolvePrdRoot(argv, cwd);
+    const prdRoot = at(resolvePrdRoot(argv, cwd));
     if (argv.includes("--corpus")) {
       const r = checkCorpus(prdRoot, { io });
       const code = r.reason === "ok" || r.reason === "empty" ? 0 : 1;
@@ -730,10 +832,11 @@ function runCli(argv, { cwd = process.cwd(), io = REAL_FS } = {}) {
         prdRoot,
         documents: r.documents,
         findings: r.findings,
+        unreadable: r.unreadable,
       });
     }
     if (!arg) return usage("check needs <path> or --corpus");
-    const findings = check(arg, { io, prdRoot });
+    const findings = check(at(arg), { io, prdRoot });
     return done(findings.length ? 1 : 0, {
       reason: findings.length ? "findings" : "ok",
       findings,

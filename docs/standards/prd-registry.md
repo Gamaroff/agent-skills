@@ -49,14 +49,17 @@ Before creating a new PRD:
 
 1. Read **Next Available PRD Number** — that is your `P`. Allocate it with
    `node shared/resources/doc-id.js next prd --json`, which reads the counter and refuses
-   (`registry-behind`) when a PRD already on disk or in the table holds a number at or above it.
+   (`registry-behind`) when a PRD already on disk or in the table holds a number at or above it,
+   and (`registry-invalid`) when the counter is not a positive integer without leading zeros.
 2. Create `${PRD_ROOT}/{domain}/prd.{P}.{slug}/prd.{P}.{slug}.md` with frontmatter `prd_number: P`.
 3. Append a row and increment **Next Available PRD Number**.
 4. Commit the registry update **in the same commit** as the new PRD — atomic.
 
 Numbers inside a PRD need no registry: `E` is the highest epic number under that PRD plus 1, and `S`
 is the highest story number under that epic plus 1 (`doc-id.js next epic --prd-dir …` /
-`next story --epic-dir …`). A deleted number is never handed out again.
+`next story --epic-dir …`). A gap left by a deleted epic or story is never refilled. These numbers
+have no counter, so deleting the highest-numbered epic or story frees its number again; only `P`,
+which the registry's counter allocates, is never reused.
 
 **Merge conflicts.** Two branches that each allocate a PRD conflict on the counter line and on
 adjacent rows. Keep both rows and set the counter above both. Two branches that each take `next epic`
@@ -68,7 +71,8 @@ for the same PRD do not conflict textually; `doc-id.js check --corpus` reports t
 `node shared/resources/doc-id.js check --corpus --json` walks `${PRD_ROOT}` and reports, per
 document, `bad-shape`, `dir-stem-mismatch`, `frontmatter-mismatch`, `parent-missing`,
 `parent-number-mismatch`, `unregistered`, `duplicate-id` and `registry-missing`. Exit 0 is `ok` or
-`empty`, 1 is findings, 2 is a usage error.
+`empty`; 1 is findings, an `unreadable` directory or a missing root (`root-missing`); 2 is a usage
+error. A directory that cannot be read is never reported as an empty tree.
 
 ## See also
 

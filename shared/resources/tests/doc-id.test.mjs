@@ -567,3 +567,184 @@ test("CLI: a large check --corpus payload arrives whole through a pipe", () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ---------------------------------------------------------------------------
+// QA cycle 1 findings (gate 1) — one regression test each
+// ---------------------------------------------------------------------------
+
+test("PROBE-1: a number past MAX_SAFE_INTEGER is bad-number, never a lossy id", () => {
+  for (const name of [
+    "prd.99999999999999999999.x",
+    "epic.1.99999999999999999999.x",
+    "story.1.2.99999999999999999999.x",
+    "task.99999999999999999999.x",
+  ]) {
+    const p = d.parse(name);
+    assert.equal(p.ok, false, name);
+    assert.equal(p.reason, "bad-number", name);
+  }
+  assert.equal(
+    d.parseLegacy("epic.99999999999999999999.x").reason,
+    "bad-number",
+  );
+  const art = d.parse("story.1.2.3.qa.99999999999999999999.x");
+  assert.notEqual(art.seq, 1e20, "an unsafe seq is never parsed as a number");
+  // the boundary itself still parses
+  assert.equal(d.parse(`prd.${Number.MAX_SAFE_INTEGER}.x`).ok, true);
+});
+
+test("CR-1: a gap is never refilled, and deleting the HIGHEST number frees it (documented)", () => {
+  assert.equal(
+    d.nextNumber("epic", ["epic.1.1.a", "epic.1.3.c"]),
+    4,
+    "middle gap 2 is not refilled",
+  );
+  // epic.1.3 deleted: no counter exists for epics, so 3 is free again — the docs say so
+  assert.equal(d.nextNumber("epic", ["epic.1.1.a", "epic.1.2.b"]), 3);
+});
+
+test("CR-3: format refuses parts that do not round-trip", () => {
+  const base = { kind: "story", prd: 1, epic: 2, story: 3 };
+  assert.throws(
+    () => d.format({ ...base, artifact: "qa", slug: "x" }),
+    TypeError,
+    "missing seq",
+  );
+  assert.throws(
+    () => d.format({ ...base, artifact: "gate", seq: 0, slug: "x" }),
+    TypeError,
+    "seq 0",
+  );
+  assert.throws(
+    () => d.format({ ...base, slug: "x.qa" }),
+    TypeError,
+    "dotted slug",
+  );
+  assert.throws(
+    () => d.format({ ...base, sub: "a", slug: "x" }),
+    TypeError,
+    "lowercase sub",
+  );
+  assert.equal(
+    d.format({ ...base, artifact: "qa", seq: 2, slug: "x" }),
+    "story.1.2.3.qa.2.x",
+  );
+});
+
+test("CR-6: the registry reader counts only PRD # table rows outside fences", () => {
+  const reg = [
+    "**Next Available PRD Number:** **3**",
+    "",
+    "```markdown",
+    "| PRD # | Title |",
+    "|---|---|",
+    "| 7 | [Example](x) |",
+    "```",
+    "",
+    "| # | Something else |",
+    "|---|---|",
+    "| 9 | other table |",
+    "",
+    "| PRD # | Title | Folder | Status | Created |",
+    "|---|---|---|---|---|",
+    "| 1 | [A](a) | web | draft | 2026-10-15 |",
+    "| 2 | [B](b) | web | draft | 2026-10-15 |",
+  ].join("\n");
+  assert.deepEqual(d.registryNumbers(reg), [1, 2]);
+  assert.equal(
+    d.nextNumber("prd", [], reg),
+    3,
+    "fenced 7 and other-table 9 do not read as registry-behind",
+  );
+});
+
+test("CR-7: a PRD counter that is not a positive integer is registry-invalid", () => {
+  for (const n of ["0", "02", "99999999999999999999"]) {
+    const r = d.next("prd", [], `**Next Available PRD Number:** **${n}**`);
+    assert.equal(r.reason, "registry-invalid", n);
+  }
+});
+
+test("CR-8: check on a missing file is one bad-shape 'not found'", () => {
+  const io = { readFile: () => null, exists: () => false, readDir: () => [] };
+  const r = d.check("r/web/prd.1.h/prd.1.h.md", { io, prdRoot: "r" });
+  assert.deepEqual(
+    r.map((f) => f.reason),
+    ["bad-shape"],
+  );
+  assert.match(r[0].detail, /not found/);
+});
+
+test("CR-9: an unquoted value loses its trailing YAML comment; a quoted one keeps its #", () => {
+  const src =
+    "---\nprd_number: 1 # first\ntitle: \"a # b\"\nepic: 'epic.1.2.x' # parent\n---\n";
+  assert.equal(d.frontmatterField(src, "prd_number"), "1");
+  assert.equal(d.frontmatterField(src, "title"), "a # b");
+  assert.equal(d.frontmatterField(src, "epic"), "epic.1.2.x");
+});
+
+test("CR-4: an unreadable directory is 'unreadable', never 'empty'", () => {
+  const io = {
+    exists: () => true,
+    readFile: () => null,
+    readDir: (p) => (p === "r" ? [{ name: "web", dir: true }] : null),
+  };
+  const r = d.checkCorpus("r", { io });
+  assert.equal(r.reason, "unreadable");
+  assert.deepEqual(r.unreadable, ["r/web"]);
+  const cli = json(["check", "--corpus", "--prd-root", "package.json"]);
+  assert.equal(cli.code, 1, "a file given as the root is not an empty tree");
+  assert.equal(cli.body.reason, "unreadable");
+});
+
+test("CR-10: an unparsed name ending in an artifact word is reported, not skipped", () => {
+  const files = { "r/epic.1.qa/epic.1.qa.md": "---\n---\n" };
+  const io = {
+    exists: (p) => p === "r" || p in files,
+    readFile: (p) => files[p] ?? null,
+    readDir: (p) =>
+      p === "r"
+        ? [{ name: "epic.1.qa", dir: true }]
+        : p === "r/epic.1.qa"
+          ? [{ name: "epic.1.qa.md", dir: false }]
+          : [],
+  };
+  const r = d.checkCorpus("r", { io });
+  assert.deepEqual(
+    r.findings.map((f) => f.reason),
+    ["bad-shape"],
+  );
+});
+
+test("CR-2: next epic/story refuse a parent that does not exist", () => {
+  const epic = json([
+    "next",
+    "epic",
+    "--prd-dir",
+    join(root("valid"), "web/prd.9.typo"),
+  ]);
+  assert.deepEqual([epic.code, epic.body.reason], [1, "parent-missing"]);
+  const story = json([
+    "next",
+    "story",
+    "--epic-dir",
+    join(root("valid"), "web/prd.1.home/epics/epic.1.7.nope"),
+  ]);
+  assert.deepEqual([story.code, story.body.reason], [1, "parent-missing"]);
+});
+
+test("CR-5: runCli resolves every path against its cwd option", () => {
+  const r = d.runCli(["check", "--corpus", "--prd-root", "docs/prd"], {
+    cwd: join(FIXTURES, "valid"),
+  });
+  assert.equal(r.payload.reason, "ok");
+  assert.equal(
+    r.payload.documents,
+    3,
+    "the fixture's tree, not the repository's",
+  );
+  const one = d.runCli(["check", "docs/prd/web/prd.1.home/prd.1.home.md"], {
+    cwd: join(FIXTURES, "valid"),
+  });
+  assert.equal(one.payload.reason, "ok");
+});

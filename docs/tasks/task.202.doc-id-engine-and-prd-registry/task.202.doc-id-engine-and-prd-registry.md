@@ -413,6 +413,28 @@ that write one.
 <!--
   Canonical spec: references/document-change-log.md
 -->
+
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-15
+**Quality Score**: 60/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.202.qa.1.doc-id-engine-and-prd-registry.md](./task.202.qa.1.doc-id-engine-and-prd-registry.md)
+- **Gate File**: [task.202.gate.1.doc-id-engine-and-prd-registry.yml](./task.202.gate.1.doc-id-engine-and-prd-registry.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 32 (28 doc-id + 4 select-next), inside a 5542-test green suite
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+Four medium defects in `doc-id.js`: a number past `Number.MAX_SAFE_INTEGER` parses as valid (security probe), a tail-deleted number is reused despite the never-reuse claim, `format()` accepts non-canonical parts, and `next epic/story` allocate under a missing parent. Four low and three advisory findings in the QA report.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -422,6 +444,8 @@ that write one.
 | 2026-10-15 | 1.1 | Review passed (8/10): added non-canonical artifact classification + agreement test, `coding-standards.md` § Registries to scope, load-recorded timing criterion | review-task |
 | 2026-10-15 |  | Status → ready-for-development | review-task |
 | 2026-10-15 |  | Implemented — 33 files (doc-id.js + CLI, 20 fixtures, select-next prd kind, 8 standards), 32 tests | develop |
+| 2026-10-15 |  | QA gate CONCERNS (60/100) — 8 findings (4 medium, 4 low) | qa-task |
+| 2026-10-15 |  | QA findings fixed — cycle 1, 8 gate findings + 3 advisory, 11 tests | qa-fix |
 
 <!-- change-log-end -->
 

@@ -1,0 +1,21 @@
+{
+  "sink": "filename",
+  "entry": "shared/resources/doc-id.js#parse",
+  "name": null,
+  "call_site": null,
+  "verdict": "present-but-inert",
+  "reason": "a-hostile-case-passed-a-control-that-rejects-others",
+  "executed": 27,
+  "passed": 26,
+  "reproduced": 1,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-10-15T03:53:39.227Z"
+}
