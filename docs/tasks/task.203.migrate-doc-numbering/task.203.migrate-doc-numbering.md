@@ -684,10 +684,40 @@ the second-run no-op guarantee no longer describes the tree.
 - There are no open findings.
 - Reliability is CONCERNS because of two advisory edge cases: the revert of untracked moved-and-rewritten files, and the directories a part-way failure leaves behind. Neither can occur in this repository.
 
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**QA Report**: `task.203.qa.3.migrate-doc-numbering.md`
+**Gate File**: `task.203.gate.3.migrate-doc-numbering.yml`
+**Gate Status**: ⚠️ CONCERNS (empty queue; non-blocking)
+**Quality Score**: 90/100
+
+### Missing Criteria:
+
+1. **CI:**
+   - [ ] Clear `link-check` on the head. It is red on 10 dead relative links in 4 migrated files (`story.1.1.1.plan…`, `story.1.1.2.plan…`, `story.1.2.1.sprint-review-summary.md`, `story.1.4.4.plan…`). Every one was already dead at its old path on `develop`; the job checks these files only because the migration renamed them, and AC15 keeps dead links byte-identical. Either repair the links (documentation-only) or record a human waiver.
+
+2. **Documentation:**
+   - [ ] Add a `(task 203)` entry under `CHANGELOG.md` `[Unreleased]`: the new `migrate-doc-numbering.mjs` CLI, the PRD registry, and the retired global epic registry.
+
+### Next Steps:
+
+Both fixes touch only documentation, so `/finalise` re-runs directly with no QA re-entry.
+
+**Estimated Effort:** Small
+
+**Gap Report Generated:** 2026-10-15
+**QA Gate Reference**: See `task.203.gate.3.migrate-doc-numbering.yml`
+
+**Detailed Verification Log:** See `task.203.dod.1.migrate-doc-numbering.md` for the complete verification evidence.
+<!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-13 | 1.0     | Initial draft | create-task |
 | 2026-10-15 | 1.1     | Review (8/10 after fixes) — `validate` artifact vocabulary gap (C1); PRD-registry bootstrap and `registry-missing` blocker; literal-pass exclusions; stale-standards fix; reuse `resolvePrdRoot`/`frontmatterField`; location decides parent PRD; tests named for three criteria | review-task |
 | 2026-10-15 |         | Status → ready-for-development | review-task |
@@ -697,8 +727,10 @@ the second-run no-op guarantee no longer describes the tree.
 | 2026-10-15 |  | QA gate FAIL (60/100) — 1 HIGH, 2 MEDIUM (bug 2 reopened; bugs 5, 6) | qa-task |
 | 2026-10-15 |  | QA findings fixed — bug 2 (revert scoped to a touch record, dirty-path widened), bug 5 (id-collision), bug 6 (apply wrapped), plus CR-4–CR-7; 7 tests added, 2 iterations | qa-fix |
 | 2026-10-15 |  | QA gate CONCERNS (90/100) — 0 open findings; 2 advisory reliability edge cases | qa-task |
+| 2026-10-15 |  | DoD incomplete — 2 gaps identified (CI link-check, CHANGELOG) | finalise |
 
 ---
+<!-- change-log-end -->
 
 ## Progress Tracking
 
