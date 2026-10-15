@@ -1191,3 +1191,52 @@ test("stripIdPrefix: dash separators and sub-story ids (QA cycle 1, CR-6)", () =
   );
   assert.equal(d.stripIdPrefix("epic", "Foo — bar"), "Foo — bar");
 });
+
+test("stripIdPrefix: a hyphen needs whitespace before it; a story id may be followed by a space (QA cycle 2, CR-8)", () => {
+  assert.equal(
+    d.stripIdPrefix("epic", "Epic 10-Year Plan"),
+    "Epic 10-Year Plan",
+  );
+  assert.equal(d.stripIdPrefix("epic", "Epic 3 - Foo"), "Foo");
+  assert.equal(d.stripIdPrefix("epic", "Epic 3 Foo"), "Epic 3 Foo");
+  assert.equal(d.stripIdPrefix("story", "Story 1.2.3 Foo"), "Foo");
+  assert.equal(
+    d.stripIdPrefix("story", "Story 1.2.10-Year"),
+    "Story 1.2.10-Year",
+  );
+  assert.equal(
+    d.stripIdPrefix("story", "Storyboard 1 Foo"),
+    "Storyboard 1 Foo",
+  );
+});
+
+test("epicMeta: id, bare title, milestone and issue from the document itself", () => {
+  const dir = mkdtempSync(join(tmpdir(), "epic-meta-"));
+  try {
+    const f = join(dir, "epic.1.3.foo.md");
+    writeFileSync(f, "---\ntitle: 'Epic 3: Checkout'\ngithub_issue: 75\n---\n");
+    const m = d.epicMeta(f);
+    assert.equal(m.ok, true);
+    assert.equal(m.id, "1.3");
+    assert.equal(m.title, "Checkout");
+    assert.equal(m.milestone, "Epic 1.3 — Checkout");
+    assert.equal(m.githubIssue, 75);
+    const untitled = join(dir, "epic.1.4.bar.md");
+    writeFileSync(untitled, "---\nepic_number: 4\n---\n");
+    assert.equal(d.epicMeta(untitled).reason, "no-title");
+    assert.equal(d.epicMeta(join(dir, "epic.3.legacy.md")).reason, "bad-shape");
+    assert.equal(
+      d.epicMeta(join(dir, "epic.1.5.missing.md")).reason,
+      "unreadable",
+    );
+    const cli = spawnSync(
+      process.execPath,
+      [join(__dirname, "..", "doc-id.js"), "epic-meta", f, "--json"],
+      { encoding: "utf8" },
+    );
+    assert.equal(cli.status, 0, cli.stderr);
+    assert.equal(JSON.parse(cli.stdout).milestone, "Epic 1.3 — Checkout");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

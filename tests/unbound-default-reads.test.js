@@ -44,12 +44,12 @@ const INPUTS = new Map([
   // task.205: the Discover Parent PRD and Input Resolution blocks each run as their own shell, so
   // their inputs are bound by the agent from the steps before them; each `${NAME:?}` is the guard.
   [
-    "skills/create-epic/SKILL.md#PRD_ROOT",
-    "input of the Discover Parent PRD block (references/resolve-paths.sh); the `:?` is the loud-failure guard",
-  ],
-  [
     "skills/create-epic/SKILL.md#DOMAIN",
     "input of the Discover Parent PRD block (the epic's domain directory); the `:?` is the loud-failure guard",
+  ],
+  [
+    "skills/ensure-task-github-issue/SKILL.md#TASK_FILE_PATH",
+    "input of the task milestone block (the sub-routine's argument); the `:?` is the loud-failure guard",
   ],
   [
     "skills/ensure-epic-github-issue/SKILL.md#EPIC_FILE_PATH",

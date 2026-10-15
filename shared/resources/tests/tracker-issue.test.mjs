@@ -1804,3 +1804,60 @@ test("§11 --rename-from on any kind but milestone is a usage error (exit 2)", (
   ]);
   assert.equal(r.exitCode, 2);
 });
+
+test("§11 --rename-from: a failed milestone lookup is unverifiable and creates nothing (QA cycle 2, CR-4)", () => {
+  const dir = withRepo();
+  const calls = [];
+  const execImpl = (bin, argv) => {
+    calls.push({ bin, argv });
+    const joined = argv.join(" ");
+    if (argv[0] === "auth") return "";
+    if (argv[0] === "repo") return "acme/repo";
+    if (
+      argv[0] === "api" &&
+      joined.includes("/milestones") &&
+      !joined.includes("--method")
+    )
+      throw new Error("gh: HTTP 502");
+    throw new Error(`unexpected gh call: ${joined}`);
+  };
+  const r = renameRun(dir, execImpl);
+  assert.equal(r.reason, "unverifiable");
+  assert.equal(r.performed, false);
+  assert.ok(
+    !calls.some((c) => /--method (PATCH|POST)/.test(c.argv.join(" "))),
+    "a failed lookup must not create or rename",
+  );
+});
+
+test("§11 without --rename-from, a failed lookup still falls through to create (unchanged)", () => {
+  const dir = withRepo();
+  const execImpl = (bin, argv) => {
+    const joined = argv.join(" ");
+    if (argv[0] === "auth") return "";
+    if (argv[0] === "repo") return "acme/repo";
+    if (argv[0] === "api" && joined.includes("--method POST"))
+      return JSON.stringify({ number: 12 });
+    if (argv[0] === "api" && joined.includes("/milestones"))
+      throw new Error("gh: HTTP 502");
+    throw new Error(`unexpected gh call: ${joined}`);
+  };
+  const r = cli.run({
+    argv: [
+      "node",
+      "tracker-issue.js",
+      "--kind",
+      "milestone",
+      "--title",
+      "Epic 1.3 — Foo",
+      "--repo",
+      "acme/repo",
+      "--json",
+    ],
+    repoRoot: dir,
+    env: {},
+    execImpl,
+  });
+  assert.equal(r.reason, "performed");
+  assert.equal(r.milestone, "12");
+});

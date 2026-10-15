@@ -36,21 +36,15 @@ This is an **internal sub-routine** called by `create-story` and `review-story`.
 
 ```bash
 # ensure-epic-github-issue — epic id and bare title (task 205)
-# INPUTS: EPIC_FILE_PATH — the epic document. The title is read from its own frontmatter here, in
-# this block: a value bound in another block does not exist in this shell.
+# INPUTS: EPIC_FILE_PATH — the epic document. Id, title and milestone come from
+# `doc-id.js epic-meta`, which reads that document: the one definition of the milestone key.
 DOC_ID=.agents/skills/ensure-epic-github-issue/references/doc-id.js
 : "${EPIC_FILE_PATH:?bind EPIC_FILE_PATH to the epic document}"
-[ -f "$EPIC_FILE_PATH" ] || { echo "❌ ${EPIC_FILE_PATH} is not a file"; exit 1; }
-EPIC_STEM=$(basename "$EPIC_FILE_PATH" .md)
-EPIC_ID=$(command node "$DOC_ID" parse "$EPIC_STEM" --json | jq -r 'select(.kind == "epic" and .artifact == null) | "\(.prd).\(.epic)"')
-[ -n "$EPIC_ID" ] || { echo "❌ ${EPIC_STEM} is not an epic.{P}.{E} file — run /review-epic"; exit 1; }
-EPIC_TITLE=$(command node -e '
-  const d = require(process.argv[1]);
-  const src = require("fs").readFileSync(process.argv[2], "utf8");
-  console.log(d.stripIdPrefix("epic", d.frontmatterField(src, "title")));
-' "$PWD/$DOC_ID" "$EPIC_FILE_PATH")
-[ -n "$EPIC_TITLE" ] || { echo "❌ ${EPIC_FILE_PATH} has no frontmatter title"; exit 1; }
-MILESTONE_TITLE="Epic ${EPIC_ID} — ${EPIC_TITLE}"
+META=$(command node "$DOC_ID" epic-meta "$EPIC_FILE_PATH" --json) \
+  || { echo "❌ $(printf '%s' "$META" | jq -r '.detail // .reason // "doc-id epic-meta failed"') — run /review-epic"; exit 1; }
+EPIC_ID=$(printf '%s' "$META" | jq -r '.id')
+EPIC_TITLE=$(printf '%s' "$META" | jq -r '.title')
+MILESTONE_TITLE=$(printf '%s' "$META" | jq -r '.milestone')
 ```
 
 4. Set `EPIC_RELATIVE_PATH` = the path relative to the repo root.

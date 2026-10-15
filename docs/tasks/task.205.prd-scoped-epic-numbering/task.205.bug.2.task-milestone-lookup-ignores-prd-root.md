@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Minor'
 priority: 'Medium'
 created: '2026-10-15'
@@ -12,7 +12,7 @@ description: 'The task milestone lookup never resolves PRD_ROOT, so a configured
 
 **Bug ID**: TASK-205-BUG-2
 **Related**: [task.205.prd-scoped-epic-numbering.md](./task.205.prd-scoped-epic-numbering.md) (QA finding CR-4, gate 1)
-**Status**: Ready for QA
+**Status**: Closed
 **Priority**: Medium
 **Severity**: Minor
 **Created**: 2026-10-15
@@ -64,3 +64,4 @@ Source `references/resolve-paths.sh` (already bundled in the skill) inside the b
 |------|--------|------------|-------|
 | 2026-10-15 | New | qa-task | Found by QA cycle 1 diff review (CR-4) |
 | 2026-10-15 | Ready for QA | qa-fix | Fixed in QA cycle 1 fix pass |
+| 2026-10-15 | Closed | qa-task | Verified by task.205.qa.2.prd-scoped-epic-numbering.md |

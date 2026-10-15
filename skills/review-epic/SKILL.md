@@ -79,9 +79,10 @@ every epic of PRD 3 and `1.3` cannot claim `1.30`:
 
 ```bash
 # review-epic — resolve the input to DOC_FILE (task 205)
-# INPUTS: INPUT (the skill argument); PRD_ROOT (references/resolve-paths.sh — default docs/prd).
+# INPUTS: INPUT (the skill argument). PRD_ROOT is resolved HERE from skills-config.yaml (default
+# docs/prd), never defaulted in place (QA cycle 2, CR-5).
 DOC_ID=.agents/skills/review-epic/references/doc-id.js
-PRD_ROOT=${PRD_ROOT:-docs/prd}
+source .agents/skills/review-epic/references/resolve-paths.sh || exit 1
 : "${INPUT:?bind INPUT to the skill argument}"
 epic_files() {
   find "$PRD_ROOT" -type f -name 'epic.*.md' 2>/dev/null | while IFS= read -r f; do

@@ -176,9 +176,20 @@ function fixture(files, skills) {
     const ref = path.join(dir, ".agents", "skills", s, "references");
     fs.mkdirSync(ref, { recursive: true });
     fs.copyFileSync(DOC_ID_SRC, path.join(ref, "doc-id.js"));
+    // The path resolver and the config reader it sources: blocks resolve PRD_ROOT themselves.
+    for (const f of ["resolve-paths.sh", "read-config.sh"]) {
+      fs.copyFileSync(
+        path.join(ROOT, "shared", "resources", f),
+        path.join(ref, f),
+      );
+    }
   }
   return dir;
 }
+
+/** A block with its `{placeholder}` replaced — how the agent runs a block that names one. */
+const substitute = (block, map) =>
+  Object.entries(map).reduce((b, [k, v]) => b.split(k).join(v), block);
 
 function runBlock(block, cwd, env, tail = "") {
   const r = spawnSync("bash", ["-c", `${block}\n${tail}`], {
@@ -248,7 +259,7 @@ test("create-epic block: no PRD halts naming /create-prd; one PRD allocates P an
     "create-epic",
     "# create-epic — Discover Parent PRD and allocate the epic id",
   );
-  const env = { PRD_ROOT: "docs/prd", DOMAIN: "d" };
+  const env = { DOMAIN: "d" };
 
   const empty = fixture({ "docs/prd/d/notes.md": "x\n" }, ["create-epic"]);
   try {
@@ -313,25 +324,139 @@ test("create-epic block: no PRD halts naming /create-prd; one PRD allocates P an
   }
 });
 
-test("ensure-epic-github-issue / sync-github-epic id blocks: [Epic P.E] title and milestone, title read in-block", () => {
+test("review-epic block: a configured PRD root is honoured, an env PRD_ROOT is not (QA cycle 2, CR-5)", () => {
+  const block = blockBy(
+    "review-epic",
+    "# review-epic — resolve the input to DOC_FILE",
+  );
+  const dir = fixture(
+    {
+      "skills-config.yaml": "prd:\n  prdShardedLocation: specs/prd\n",
+      "specs/prd/d/prd.1.x/epics/epic.1.3.foo/epic.1.3.foo.md": epicFile(
+        1,
+        3,
+        "foo",
+      ),
+    },
+    ["review-epic"],
+  );
+  try {
+    const r = runBlock(block, dir, { INPUT: "1.3", PRD_ROOT: "docs/prd" });
+    assert.equal(r.code, 0, r.out);
+    assert.match(
+      r.out,
+      /DOC_FILE=specs\/prd\/d\/prd\.1\.x\/epics\/epic\.1\.3\.foo\/epic\.1\.3\.foo\.md/,
+    );
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("create-epic id-check block: checks the substituted epic file, blocking (QA cycle 2, CR-6)", () => {
+  const block = blockBy("create-epic", "# INPUT: {epic file}");
+  const ok = "docs/prd/d/prd.1.x/epics/epic.1.2.a/epic.1.2.a.md";
+  const bad = "docs/prd/d/prd.1.x/epics/epic.1.3.b/epic.1.3.b.md";
+  const dir = fixture(
+    {
+      "docs/prd/d/prd.1.x/prd.1.x.md": prdFile(1),
+      [ok]: epicFile(1, 2, "a"),
+      [bad]: epicFile(1, 9, "b"),
+    },
+    ["create-epic"],
+  );
+  try {
+    const good = runBlock(substitute(block, { "{epic file}": ok }), dir, {});
+    assert.equal(good.code, 0, good.out);
+    const wrong = runBlock(substitute(block, { "{epic file}": bad }), dir, {});
+    assert.equal(wrong.code, 1, wrong.out);
+    assert.match(wrong.out, /doc-id check failed/);
+    const missing = runBlock(
+      substitute(block, { "{epic file}": "nope.md" }),
+      dir,
+      {},
+    );
+    assert.equal(missing.code, 1, missing.out);
+    assert.match(missing.out, /is not a file/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("create-epics-from-shards blocks: E0 from next epic; Step 7 checks the batch and refuses an empty one (CR-7)", () => {
+  const step4 = blockBy(
+    "create-epics-from-shards",
+    "# INPUT: {PRD dir} — substitute the PRD directory found in Step 1",
+  );
+  const step7 = blockBy(
+    "create-epics-from-shards",
+    "# INPUT: {PRD dir} — the same PRD directory as Step 4",
+  );
+  const prdDir = "docs/prd/chat/prd.2.chat";
+  const dir = fixture(
+    {
+      [`${prdDir}/prd.2.chat.md`]: prdFile(2),
+      [`${prdDir}/epics/epic.2.1.core/epic.2.1.core.md`]: epicFile(
+        2,
+        1,
+        "core",
+      ),
+    },
+    ["create-epics-from-shards"],
+  );
+  const empty = fixture(
+    { [`${prdDir}/prd.2.chat.md`]: prdFile(2), [`${prdDir}/epics/.keep`]: "" },
+    ["create-epics-from-shards"],
+  );
+  try {
+    const e0 = runBlock(substitute(step4, { "{PRD dir}": prdDir }), dir, {});
+    assert.equal(e0.code, 0, e0.out);
+    assert.match(e0.out, /E0=2/);
+    const notDir = runBlock(
+      substitute(step4, { "{PRD dir}": "nope" }),
+      dir,
+      {},
+    );
+    assert.equal(notDir.code, 1, notDir.out);
+
+    const checked = runBlock(
+      substitute(step7, { "{PRD dir}": prdDir }),
+      dir,
+      {},
+    );
+    assert.equal(checked.code, 0, checked.out);
+    assert.match(checked.out, /1 epic\(s\) ok/);
+    const none = runBlock(
+      substitute(step7, { "{PRD dir}": prdDir }),
+      empty,
+      {},
+    );
+    assert.equal(none.code, 1, none.out);
+    assert.match(none.out, /the batch wrote nothing/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(empty, { recursive: true, force: true });
+  }
+});
+
+test("ensure-epic-github-issue / sync-github-epic id blocks: [Epic P.E] title and milestone from epic-meta", () => {
   const EPIC = "docs/prd/d/prd.1.x/epics/epic.1.3.foo/epic.1.3.foo.md";
   const fm = (title) =>
-    `---\nprd_number: 1\nepic_number: 3\n${title === null ? "" : `title: "${title}"\n`}---\n`;
+    `---\nprd_number: 1\nepic_number: 3\n${title === null ? "" : `title: ${title}\n`}---\n`;
   for (const skill of ["ensure-epic-github-issue", "sync-github-epic"]) {
     const block = blockBy(skill, `# ${skill} — epic id and bare title`);
     for (const title of [
-      "Epic 3: Foo",
-      "[Epic 1.3] Foo",
+      '"Epic 3: Foo"',
+      '"[Epic 1.3] Foo"',
       "Foo",
-      "Epic 1.3 — Foo",
+      "'Epic 1.3 — Foo'",
     ]) {
       const dir = fixture({ [EPIC]: fm(title) }, [skill]);
       try {
-        // No TITLE from outside: the block reads it from the file (QA cycle 1, CR-2/CR-3).
+        // Nothing but the file path from outside: the block reads the rest from the document.
         const r = runBlock(
           block,
           dir,
-          { EPIC_FILE_PATH: EPIC, TITLE: "" },
+          { EPIC_FILE_PATH: EPIC, TITLE: "", EPIC_ID: "9.9" },
           'printf "ID=%s|MS=%s\\n" "$EPIC_ID" "$MILESTONE_TITLE"',
         );
         assert.equal(r.code, 0, r.out);
@@ -349,10 +474,10 @@ test("ensure-epic-github-issue / sync-github-epic id blocks: [Epic P.E] title an
       const r = runBlock(block, untitled, { EPIC_FILE_PATH: EPIC });
       assert.equal(r.code, 1, r.out);
       assert.match(r.out, /has no frontmatter title/);
-      const missing = runBlock(block, untitled, {
+      const legacy = runBlock(block, untitled, {
         EPIC_FILE_PATH: "x/epic.3.foo.md",
       });
-      assert.equal(missing.code, 1, missing.out);
+      assert.equal(legacy.code, 1, legacy.out);
       const unbound = runBlock(block, untitled, { EPIC_FILE_PATH: "" });
       assert.notEqual(unbound.code, 0, unbound.out);
     } finally {
@@ -361,29 +486,43 @@ test("ensure-epic-github-issue / sync-github-epic id blocks: [Epic P.E] title an
   }
 });
 
-test("sync-github-epic milestone block: renames only the epic's own milestone (CR-1)", () => {
+test("sync-github-epic milestone block: derives its inputs from the epic file and renames only the epic's own milestone (CR-1, CR-3, CR-9)", () => {
   const block = blockBy(
     "sync-github-epic",
     "# sync-github-epic — resolve the epic's milestone",
   );
-  const dir = fixture({}, []);
+  const issue = `205${process.pid}`;
+  const EPIC = "docs/prd/d/prd.1.x/epics/epic.1.3.foo/epic.1.3.foo.md";
+  const dir = fixture(
+    {
+      [EPIC]: `---\nprd_number: 1\nepic_number: 3\ntitle: "Foo"\ngithub_issue: ${issue}\n---\n`,
+    },
+    ["sync-github-epic"],
+  );
   const stub = path.join(dir, "bin");
   fs.mkdirSync(stub);
-  // A `node` stand-in that records its argv, one per line.
+  // A `node` stand-in for the tracker-issue call only; doc-id runs under the real node.
   fs.writeFileSync(
     path.join(stub, "node"),
     `#!/usr/bin/env bash\nprintf '%s\\n' "$@" > "${path.join(dir, "argv.txt")}"\n`,
     { mode: 0o755 },
   );
-  const issue = `205${process.pid}`;
   const issueJson = path.join(os.tmpdir(), `issue-${issue}.json`);
+  // `command node` (doc-id) must reach the real node; the bare `node` (tracker-issue) the stub.
+  const realNode = path.dirname(process.execPath);
+  const blockWithStub = block.replace(
+    /^node references\/tracker-issue\.js/m,
+    `"${path.join(stub, "node")}" references/tracker-issue.js`,
+  );
+  assert.notEqual(
+    blockWithStub,
+    block,
+    "the tracker-issue call line was not found",
+  );
   const env = {
     ...process.env,
-    ISSUE_NUM: issue,
-    EPIC_ID: "1.3",
-    EPIC_TITLE: "Foo",
-    MILESTONE_TITLE: "Epic 1.3 — Foo",
-    PATH: `${stub}:${process.env.PATH}`,
+    EPIC_FILE_PATH: EPIC,
+    PATH: `${realNode}:${process.env.PATH}`,
   };
   const renameFrom = (current) => {
     fs.writeFileSync(
@@ -391,12 +530,12 @@ test("sync-github-epic milestone block: renames only the epic's own milestone (C
       JSON.stringify({ milestone: current ? { title: current } : null }),
     );
     fs.rmSync(path.join(dir, "argv.txt"), { force: true });
-    const r = spawnSync("bash", ["-c", block], {
+    const r = spawnSync("bash", ["-c", blockWithStub], {
       cwd: dir,
       encoding: "utf8",
       env,
     });
-    assert.equal(r.status, 0, r.stderr);
+    assert.equal(r.status, 0, r.stderr + r.stdout);
     const argv = fs
       .readFileSync(path.join(dir, "argv.txt"), "utf8")
       .split("\n");
@@ -406,24 +545,26 @@ test("sync-github-epic milestone block: renames only the epic's own milestone (C
       : null;
   };
   try {
-    // The epic's own milestone — id moved (any old number) or retitled — is renamed in place.
+    // The epic's own milestone — retitled, or under a legacy one-number id — is renamed in place.
     assert.equal(renameFrom("Epic 3 — Foo"), "Epic 3 — Foo");
     assert.equal(renameFrom("Epic 163 — Foo"), "Epic 163 — Foo");
     assert.equal(renameFrom("Epic 1.3 — Old title"), "Epic 1.3 — Old title");
-    // Anything else is never renamed: a sprint, another epic's, a shared one.
+    // Anything else is never renamed: a sprint, another epic's, a shared one — and another
+    // dotted epic whose title happens to match (CR-9).
     assert.equal(renameFrom("Sprint 12"), null);
     assert.equal(renameFrom("Epic 9 — Other"), null);
     assert.equal(renameFrom("Epic 1.30 — Bar"), null);
+    assert.equal(renameFrom("Epic 2.1 — Foo"), null);
     assert.equal(renameFrom("Release — Foo"), null);
     assert.equal(renameFrom("Epic 9x — Foo"), null);
     // Already right, or no milestone: nothing to rename.
     assert.equal(renameFrom("Epic 1.3 — Foo"), null);
     assert.equal(renameFrom(null), null);
-    // An unbound input fails loudly instead of skipping the rename (CR-5).
-    const r = spawnSync("bash", ["-c", block], {
+    // No file bound fails loudly instead of skipping the rename.
+    const r = spawnSync("bash", ["-c", blockWithStub], {
       cwd: dir,
       encoding: "utf8",
-      env: { ...env, ISSUE_NUM: "" },
+      env: { ...env, EPIC_FILE_PATH: "" },
     });
     assert.notEqual(r.status, 0);
   } finally {
@@ -432,23 +573,14 @@ test("sync-github-epic milestone block: renames only the epic's own milestone (C
   }
 });
 
-/** Bundle the path resolver (and the config reader it sources) where a skill block expects it. */
-function withResolvePaths(dir, skill) {
-  const ref = path.join(dir, ".agents", "skills", skill, "references");
-  fs.mkdirSync(ref, { recursive: true });
-  for (const f of ["resolve-paths.sh", "read-config.sh"]) {
-    fs.copyFileSync(
-      path.join(ROOT, "shared", "resources", f),
-      path.join(ref, f),
-    );
-  }
-}
-
-test("ensure-task-github-issue block: a task's epic: resolves through doc-id, not a registry", () => {
+test("ensure-task-github-issue block: reads the task's own epic:, through doc-id and epic-meta (CR-1, CR-2, CR-4)", () => {
   const block = blockBy(
     "ensure-task-github-issue",
     "# ensure-task-github-issue — task milestone from its epic",
   );
+  const task = (epic) =>
+    `---\ntype: task\n${epic === null ? "" : `epic: ${epic}\n`}---\n# T\n`;
+  const ms = 'printf "MS=%s\\n" "$MILESTONE_TITLE"';
   const dir = fixture(
     {
       "docs/prd/d/prd.1.x/epics/epic.1.3.foo/epic.1.3.foo.md": epicFile(
@@ -463,19 +595,44 @@ test("ensure-task-github-issue block: a task's epic: resolves through doc-id, no
         "bar",
         "Bar",
       ),
+      "docs/prd/d/prd.1.x/epics/epic.1.4.q/epic.1.4.q.md":
+        "---\nprd_number: 1\nepic_number: 4\ntitle: 'Checkout: v2'\n---\n",
+      "t/pe.md": task("1.3"),
+      "t/stem.md": task("epic.1.3.foo"),
+      "t/quoted.md": task("1.4"),
+      "t/none.md": task("9.9"),
+      "t/standalone.md": task(null),
     },
     ["ensure-task-github-issue"],
   );
-  withResolvePaths(dir, "ensure-task-github-issue");
-  const ms = 'printf "MS=%s\\n" "$MILESTONE_TITLE"';
   try {
-    for (const ref of ["1.3", "epic.1.3.foo"]) {
-      const r = runBlock(block, dir, { EPIC_REF: ref }, ms);
+    for (const f of ["t/pe.md", "t/stem.md"]) {
+      // A misleading EPIC_REF in the environment must not decide: the block reads the task file.
+      const r = runBlock(
+        block,
+        dir,
+        { TASK_FILE_PATH: f, EPIC_REF: "9.9" },
+        ms,
+      );
       assert.equal(r.code, 0, r.out);
-      assert.match(r.out, /MS=Epic 1\.3 — Foo/, ref);
+      assert.match(r.out, /MS=Epic 1\.3 — Foo/, f);
     }
-    const none = runBlock(block, dir, { EPIC_REF: "9.9" }, ms);
-    assert.match(none.out, /MS=Technical Tasks \(standalone\)/);
+    // One parser for the milestone key: a single-quoted title matches the epic's own key (CR-2).
+    const q = runBlock(block, dir, { TASK_FILE_PATH: "t/quoted.md" }, ms);
+    assert.match(q.out, /MS=Epic 1\.4 — Checkout: v2\n/);
+    assert.match(
+      runBlock(block, dir, { TASK_FILE_PATH: "t/none.md" }, ms).out,
+      /MS=Technical Tasks \(standalone\)/,
+    );
+    const alone = runBlock(
+      block,
+      dir,
+      { TASK_FILE_PATH: "t/standalone.md" },
+      ms,
+    );
+    assert.match(alone.out, /MS=Technical Tasks \(standalone\)/);
+    assert.doesNotMatch(alone.out, /does not resolve/);
+    assert.notEqual(runBlock(block, dir, { TASK_FILE_PATH: "" }, ms).code, 0);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -495,16 +652,15 @@ test("ensure-task-github-issue block: a configured PRD root is honoured (CR-4)",
         "foo",
         "Foo",
       ),
+      "t.md": "---\nepic: 1.3\n---\n",
     },
     ["ensure-task-github-issue"],
   );
-  withResolvePaths(dir, "ensure-task-github-issue");
   try {
-    // PRD_ROOT from the environment must not decide: the block resolves it from the config.
     const r = runBlock(
       block,
       dir,
-      { EPIC_REF: "1.3", PRD_ROOT: "docs/prd" },
+      { TASK_FILE_PATH: "t.md", PRD_ROOT: "docs/prd" },
       'printf "MS=%s\\n" "$MILESTONE_TITLE"',
     );
     assert.equal(r.code, 0, r.out);

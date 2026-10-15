@@ -1023,6 +1023,16 @@ function perform({
         existing = hit ? String(hit.number) : "";
         renameSource = !hit && old ? String(old.number) : "";
       } catch (_) {
+        // With --rename-from, "could not look" must not read as "the old title is
+        // absent": creating here would move only this issue onto a new milestone,
+        // and every later run would answer `already` and never rename the old one —
+        // the split the flag exists to prevent (task 205, QA cycle 2, CR-4).
+        if (args.renameFrom) {
+          output.warn(
+            "⚠️  Could not list milestones — not renaming or creating. Re-run when gh can read the repository.",
+          );
+          return emit({ performed: false, reason: "unverifiable" }, skipCode);
+        }
         existing = "";
         renameSource = "";
       }

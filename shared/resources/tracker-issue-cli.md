@@ -64,7 +64,7 @@ issue still on the old one:
 | no | yes | `PATCH /repos/{repo}/milestones/{n}` with the new title — one write, same number | `performed` (plus `renamedFrom`) |
 | no | no | create, as without the flag | `performed` |
 
-The flag is refused (exit 2) on any other kind. Under a deferring mode the record carries both titles
+The flag is refused (exit 2) on any other kind. **A failed milestone listing is `unverifiable` under `--rename-from`**, never a create: "could not look" must not read as "the old title is absent", or the run would create the new milestone, every later run would answer `already`, and the old milestone and its issues would be stranded. Under a deferring mode the record carries both titles
 (`desired.title`, `desired.rename_from`) and its manual steps say to rename, never to create a second.
 
 `--kind create` prints the **number**, not the URL. Every call site used to follow

@@ -266,10 +266,13 @@ One `next epic` call gives the first free `E` in this PRD; the batch takes conse
 it. Run it once, before writing any epic file:
 
 ```bash
-PRD_DIR="${PRD_ROOT}/{domain}/prd.{P}.{feature}"   # from Step 1
-E0=$(command node .agents/skills/create-epics-from-shards/references/doc-id.js next epic --prd-dir "$PRD_DIR" --json | jq -r '.next') \
-  || { echo "❌ doc-id next epic failed for ${PRD_DIR}"; exit 1; }
-# Epics of this batch: E0, E0+1, … E0+n-1
+# INPUT: {PRD dir} — substitute the PRD directory found in Step 1 (prd.{P}.{feature}/).
+PRD_DIR="{PRD dir}"
+[ -d "$PRD_DIR" ] || { echo "❌ ${PRD_DIR} is not a directory — substitute the PRD directory from Step 1"; exit 1; }
+NEXT=$(command node .agents/skills/create-epics-from-shards/references/doc-id.js next epic --prd-dir "$PRD_DIR" --json) \
+  || { echo "❌ doc-id next epic failed for ${PRD_DIR}: $(printf '%s' "$NEXT" | jq -r '.detail // .reason')"; exit 1; }
+E0=$(printf '%s' "$NEXT" | jq -r '.next')
+echo "E0=${E0}"   # epics of this batch: E0, E0+1, … E0+n-1
 ```
 
 **Example:** PRD 2 already has epics `epic.2.1` and `epic.2.2`; `next epic` answers `3`; creating
@@ -378,11 +381,20 @@ from the epic roadmap `epics/index.md` created in Step 5; keep both.
 printed verbatim:
 
 ```bash
+# INPUT: {PRD dir} — the same PRD directory as Step 4. PRD_ROOT is resolved here (QA cycle 2, CR-7).
+PRD_DIR="{PRD dir}"
+[ -d "$PRD_DIR/epics" ] || { echo "❌ ${PRD_DIR}/epics does not exist — substitute the PRD directory from Step 1"; exit 1; }
+source .agents/skills/create-epics-from-shards/references/resolve-paths.sh || exit 1
+CHECKED=0
 for f in "$PRD_DIR"/epics/epic.*/epic.*.md; do
+  [ -f "$f" ] || continue
   case "${f##*/}" in "$(basename "$(dirname "$f")").md") ;; *) continue ;; esac
   command node .agents/skills/create-epics-from-shards/references/doc-id.js check "$f" --prd-root "${PRD_ROOT}" --json >/dev/null \
     || { echo "❌ doc-id check failed: $f"; exit 1; }
+  CHECKED=$((CHECKED + 1))
 done
+[ "$CHECKED" -gt 0 ] || { echo "❌ no epic files under ${PRD_DIR}/epics — the batch wrote nothing"; exit 1; }
+echo "doc-id check: ${CHECKED} epic(s) ok"
 ```
 
 **Epic Quality Checklist:**

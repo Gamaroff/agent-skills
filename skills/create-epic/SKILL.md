@@ -102,10 +102,11 @@ with `references/doc-id.js`:
 
 ```bash
 # create-epic — Discover Parent PRD and allocate the epic id (task 205)
-# INPUTS: PRD_ROOT (references/resolve-paths.sh), DOMAIN (the epic's domain directory under it), and —
-# only when the domain holds several PRDs — PRD_DIR, the one the user chose (exit 3 below asks).
+# INPUTS: DOMAIN (the epic's domain directory under the PRD root), and — only when the domain holds
+# several PRDs — PRD_DIR, the one the user chose (exit 3 below asks). PRD_ROOT is resolved HERE.
 DOC_ID=.agents/skills/create-epic/references/doc-id.js
-: "${PRD_ROOT:?source references/resolve-paths.sh first}" "${DOMAIN:?bind DOMAIN to the domain directory of the epic}"
+source .agents/skills/create-epic/references/resolve-paths.sh || exit 1
+: "${DOMAIN:?bind DOMAIN to the domain directory of the epic}"
 if [ -z "${PRD_DIR:-}" ]; then
   CANDIDATES=""
   for d in "${PRD_ROOT}/${DOMAIN}"/prd.*/; do
@@ -410,11 +411,11 @@ After generating the epic file, check its id first — **blocking**, because thi
 name, so a disagreement is this skill's defect, not the author's:
 
 ```bash
-# INPUTS, re-bound in this block from the Discover Parent PRD block's output line (each fenced
-# block is its own shell): PRD_ROOT, PRD_DIR, P, E — and {name}, the epic's slug, substituted.
-: "${PRD_ROOT:?bind PRD_ROOT (references/resolve-paths.sh)}" "${PRD_DIR:?bind PRD_DIR from Discover Parent PRD}"
-: "${P:?bind P from Discover Parent PRD}" "${E:?bind E from Discover Parent PRD}"
-EPIC_FILE="${PRD_DIR}/epics/epic.${P}.${E}.{name}/epic.${P}.${E}.{name}.md"
+# INPUT: {epic file} — substitute the path of the epic file this run just wrote. Nothing else is read
+# from another block: PRD_ROOT is resolved here (QA cycle 2, CR-6).
+EPIC_FILE="{epic file}"
+source .agents/skills/create-epic/references/resolve-paths.sh || exit 1
+[ -f "$EPIC_FILE" ] || { echo "❌ ${EPIC_FILE} is not a file — substitute the epic file this run wrote"; exit 1; }
 command node .agents/skills/create-epic/references/doc-id.js check "$EPIC_FILE" --prd-root "${PRD_ROOT}" --json \
   || { echo "❌ doc-id check failed on ${EPIC_FILE} — fix the name or frontmatter before continuing"; exit 1; }
 ```

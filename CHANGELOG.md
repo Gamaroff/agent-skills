@@ -49,7 +49,9 @@ All notable changes to this project will be documented in this file. Format foll
      helper, `doc-id.js` `epicSummary`. When the frontmatter numbers are missing, the summary is the
      bare title; it never guesses an id from the title. `sync-github-epic` renames the epic's
      own milestone in place through the new `tracker-issue.js --kind milestone --rename-from`, so
-     stories already on it stay grouped; a sprint or other shared milestone is never renamed. No manual step: an epic converges on its next sync.
+     stories already on it stay grouped; a sprint or other shared milestone is never renamed, and a
+     failed milestone lookup renames and creates nothing. The milestone key has one definition,
+     `doc-id.js epic-meta`, which the epic sub-routines and the task milestone lookup all call. No manual step: an epic converges on its next sync.
   4. **`epic-registry-manager` is removed.** Delete `.agents/skills/epic-registry-manager/` in each
      consumer, because the installer does not prune. `create-epic` covers what it did.
      `setup-consumer.sh` no longer creates `docs/development/epic-registry.md`. A task's `epic:`

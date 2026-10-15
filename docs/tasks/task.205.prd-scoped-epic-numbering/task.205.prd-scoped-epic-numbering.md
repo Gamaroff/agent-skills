@@ -578,23 +578,23 @@ Not applicable — no hot path changes; the generator's walk gains one directory
 **QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-15
-**Quality Score**: 70/100
+**Quality Score**: 60/100
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.205.qa.1.prd-scoped-epic-numbering.md](./task.205.qa.1.prd-scoped-epic-numbering.md)
-- **Gate File**: [task.205.gate.1.prd-scoped-epic-numbering.yml](./task.205.gate.1.prd-scoped-epic-numbering.yml)
+- **Full Report**: [task.205.qa.2.prd-scoped-epic-numbering.md](./task.205.qa.2.prd-scoped-epic-numbering.md)
+- **Gate File**: [task.205.gate.2.prd-scoped-epic-numbering.yml](./task.205.gate.2.prd-scoped-epic-numbering.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5677 (5663 pass, 0 fail, 14 skipped)
+- **Tests Executed**: 5680 (5666 pass, 0 fail)
 - **Phases Verified**: 7/7
 - **Critical Issues**: 1
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
 
 ### Key Findings
-- HIGH: `sync-github-epic` renames whatever milestone the epic issue is on, a shared one included ([TASK-205-BUG-1](./task.205.bug.1.milestone-rename-hijacks-shared-milestone.md)).
-- MEDIUM: the task milestone lookup ignores a configured PRD root ([TASK-205-BUG-2](./task.205.bug.2.task-milestone-lookup-ignores-prd-root.md)).
-- LOW: `stripIdPrefix("story", …)` no longer strips dash and sub-story title forms.
+- Cycle 1's gating findings are fixed ([TASK-205-BUG-1](./task.205.bug.1.milestone-rename-hijacks-shared-milestone.md), [TASK-205-BUG-2](./task.205.bug.2.task-milestone-lookup-ignores-prd-root.md) closed).
+- HIGH: the task milestone block reads an unbound `$EPIC_REF` ([TASK-205-BUG-3](./task.205.bug.3.task-milestone-block-reads-unbound-epic-ref.md)).
+- MEDIUM: [BUG-4](./task.205.bug.4.task-milestone-title-parsed-by-a-second-parser.md), [BUG-5](./task.205.bug.5.rename-block-inputs-never-bound.md), [BUG-6](./task.205.bug.6.rename-from-creates-on-lookup-failure.md), [BUG-7](./task.205.bug.7.review-epic-resolver-ignores-prd-root.md).
 
 ## Change Log
 
@@ -606,6 +606,8 @@ Not applicable — no hot path changes; the generator's walk gains one directory
 | 2026-10-15 |  | Implemented — 44 files changed vs develop (bundled copies excluded), `epic-registry-manager` removed; new or changed tests in 7 suites (doc-id helpers, generator, both Jira scripts, `--rename-from`, migration pointer, retirement guard with 5 executed skill blocks) | develop |
 | 2026-10-15 |  | QA gate FAIL (70/100) — 3 gating findings (1 high, 1 medium, 1 low) | qa-task |
 | 2026-10-15 |  | QA findings fixed — cycle 1, 7 findings (3 gating + 4 advisory), 4 mutation-proven | qa-fix |
+| 2026-10-15 |  | QA gate FAIL (60/100) — refute pass, 7 gating findings (1 high, 4 medium, 2 low); bugs 1–2 closed | qa-task |
+| 2026-10-15 |  | QA findings fixed — cycle 2, 9 findings; every new block derives its inputs from its own document via `doc-id.js epic-meta`; 7 mutation-proven | qa-fix |
 
 ---
 

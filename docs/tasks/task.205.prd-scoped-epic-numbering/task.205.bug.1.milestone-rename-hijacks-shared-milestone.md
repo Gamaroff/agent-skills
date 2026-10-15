@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Major'
 priority: 'High'
 created: '2026-10-15'
@@ -12,7 +12,7 @@ description: 'sync-github-epic renames whatever milestone the epic issue is on, 
 
 **Bug ID**: TASK-205-BUG-1
 **Related**: [task.205.prd-scoped-epic-numbering.md](./task.205.prd-scoped-epic-numbering.md) (QA finding CR-1, gate 1)
-**Status**: Ready for QA
+**Status**: Closed
 **Priority**: High
 **Severity**: Major
 **Created**: 2026-10-15
@@ -72,3 +72,4 @@ Pass `--rename-from` only when the current title is this epic's own milestone: i
 |------|--------|------------|-------|
 | 2026-10-15 | New | qa-task | Found by QA cycle 1 diff review (CR-1) |
 | 2026-10-15 | Ready for QA | qa-fix | Fixed in QA cycle 1 fix pass |
+| 2026-10-15 | Closed | qa-task | Verified by task.205.qa.2.prd-scoped-epic-numbering.md |

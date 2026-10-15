@@ -60,28 +60,38 @@ Determine `MILESTONE_TITLE` in this order:
 
    ```bash
    # ensure-task-github-issue — task milestone from its epic (task 205)
-   # INPUTS: EPIC_REF — the task's `epic:` frontmatter value. PRD_ROOT is resolved HERE from
-   # skills-config.yaml (default docs/prd), never assumed (QA cycle 1, CR-4).
+   # INPUTS: TASK_FILE_PATH — the task document (this sub-routine's argument). Its `epic:` value and
+   # the PRD root are read HERE, never taken from another block (QA cycles 1–2, CR-4, CR-1).
    DOC_ID=.agents/skills/ensure-task-github-issue/references/doc-id.js
+   : "${TASK_FILE_PATH:?bind TASK_FILE_PATH to the task document}"
+   [ -f "$TASK_FILE_PATH" ] || { echo "❌ ${TASK_FILE_PATH} is not a file"; exit 1; }
    source .agents/skills/ensure-task-github-issue/references/resolve-paths.sh || exit 1
-   WANT=$(case "$EPIC_REF" in
-     epic.*) command node "$DOC_ID" parse "$EPIC_REF" --json | jq -r 'select(.kind == "epic") | "\(.prd).\(.epic)"' ;;
-     *) printf '%s' "$EPIC_REF" ;;
-   esac)
-   EPIC_FILES=$(find "$PRD_ROOT" -type f -name 'epic.*.md' 2>/dev/null | while IFS= read -r f; do
-       b=${f##*/}; d=${f%/*}; d=${d##*/}
-       [ "$b" = "$d.md" ] || continue
-       [ "$(command node "$DOC_ID" parse "${b%.md}" --json | jq -r 'select(.kind == "epic" and .artifact == null) | "\(.prd).\(.epic)"')" = "$WANT" ] \
-         && printf '%s\n' "$f"
-     done)
-   if [ -n "$WANT" ] && [ "$(printf '%s' "$EPIC_FILES" | grep -c .)" = 1 ]; then
-     EPIC_RAW_TITLE=$(sed -n 's/^title:[[:space:]]*//p' "$EPIC_FILES" | head -1 | sed -e 's/^"//' -e 's/"$//')
-     EPIC_TITLE=$(command node -e 'console.log(require(process.argv[1]).stripIdPrefix("epic", process.argv[2]))' "$PWD/$DOC_ID" "$EPIC_RAW_TITLE")
-     MILESTONE_TITLE="Epic ${WANT} — ${EPIC_TITLE}"
-   else
-     echo "⚠️  epic: '${EPIC_REF}' does not resolve to exactly one epic — using the standalone milestone"
-     MILESTONE_TITLE="Technical Tasks (standalone)"
+   EPIC_REF=$(command node -e '
+     const d = require(process.argv[1]);
+     console.log(d.frontmatterField(require("fs").readFileSync(process.argv[2], "utf8"), "epic"));
+   ' "$PWD/$DOC_ID" "$TASK_FILE_PATH")
+   MILESTONE_TITLE="Technical Tasks (standalone)"
+   if [ -n "$EPIC_REF" ]; then
+     WANT=$(case "$EPIC_REF" in
+       epic.*) command node "$DOC_ID" parse "$EPIC_REF" --json | jq -r 'select(.kind == "epic") | "\(.prd).\(.epic)"' ;;
+       *) printf '%s' "$EPIC_REF" ;;
+     esac)
+     EPIC_FILES=$(find "$PRD_ROOT" -type f -name 'epic.*.md' 2>/dev/null | while IFS= read -r f; do
+         b=${f##*/}; d=${f%/*}; d=${d##*/}
+         [ "$b" = "$d.md" ] || continue
+         [ "$(command node "$DOC_ID" parse "${b%.md}" --json | jq -r 'select(.kind == "epic" and .artifact == null) | "\(.prd).\(.epic)"')" = "$WANT" ] \
+           && printf '%s\n' "$f"
+       done)
+     # The milestone key comes from `doc-id.js epic-meta` — the same command the epic's own
+     # sub-routines use, so the task's milestone is the epic's milestone (QA cycle 2, CR-2).
+     if [ -n "$WANT" ] && [ "$(printf '%s' "$EPIC_FILES" | grep -c .)" = 1 ] \
+        && META=$(command node "$DOC_ID" epic-meta "$EPIC_FILES" --json); then
+       MILESTONE_TITLE=$(printf '%s' "$META" | jq -r '.milestone')
+     else
+       echo "⚠️  epic: '${EPIC_REF}' does not resolve to exactly one titled epic — using the standalone milestone"
+     fi
    fi
+   echo "MILESTONE_TITLE=${MILESTONE_TITLE}"
    ```
 3. Else → default to `"Technical Tasks (standalone)"`.
 

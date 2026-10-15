@@ -86,21 +86,15 @@ converge and prevents a double prefix like `[Epic 1.3] Epic 3: …`. Run from th
 
 ```bash
 # sync-github-epic — epic id and bare title (task 205)
-# INPUTS: EPIC_FILE_PATH — the epic document. The title is read from its own frontmatter here, in
-# this block: a value bound in another block does not exist in this shell.
+# INPUTS: EPIC_FILE_PATH — the epic document. Id, title and milestone come from
+# `doc-id.js epic-meta`, which reads that document: the one definition of the milestone key.
 DOC_ID=.agents/skills/sync-github-epic/references/doc-id.js
 : "${EPIC_FILE_PATH:?bind EPIC_FILE_PATH to the epic document}"
-[ -f "$EPIC_FILE_PATH" ] || { echo "❌ ${EPIC_FILE_PATH} is not a file"; exit 1; }
-EPIC_STEM=$(basename "$EPIC_FILE_PATH" .md)
-EPIC_ID=$(command node "$DOC_ID" parse "$EPIC_STEM" --json | jq -r 'select(.kind == "epic" and .artifact == null) | "\(.prd).\(.epic)"')
-[ -n "$EPIC_ID" ] || { echo "❌ ${EPIC_STEM} is not an epic.{P}.{E} file — run /review-epic"; exit 1; }
-EPIC_TITLE=$(command node -e '
-  const d = require(process.argv[1]);
-  const src = require("fs").readFileSync(process.argv[2], "utf8");
-  console.log(d.stripIdPrefix("epic", d.frontmatterField(src, "title")));
-' "$PWD/$DOC_ID" "$EPIC_FILE_PATH")
-[ -n "$EPIC_TITLE" ] || { echo "❌ ${EPIC_FILE_PATH} has no frontmatter title"; exit 1; }
-MILESTONE_TITLE="Epic ${EPIC_ID} — ${EPIC_TITLE}"
+META=$(command node "$DOC_ID" epic-meta "$EPIC_FILE_PATH" --json) \
+  || { echo "❌ $(printf '%s' "$META" | jq -r '.detail // .reason // "doc-id epic-meta failed"') — run /review-epic"; exit 1; }
+EPIC_ID=$(printf '%s' "$META" | jq -r '.id')
+EPIC_TITLE=$(printf '%s' "$META" | jq -r '.title')
+MILESTONE_TITLE=$(printf '%s' "$META" | jq -r '.milestone')
 ```
 
 Set `EPIC_RELATIVE_PATH` = the epic file path relative to the repo root.
@@ -188,24 +182,32 @@ resolves or creates the epic's milestone as usual and the edit below moves only 
 
 ```bash
 # sync-github-epic — resolve the epic's milestone, renaming in place (task 205)
-# INPUTS, re-bound in this block (each fenced block is its own shell): ISSUE_NUM (frontmatter
-# github_issue), and EPIC_ID, EPIC_TITLE and MILESTONE_TITLE from Step 3's id block.
-: "${ISSUE_NUM:?bind ISSUE_NUM to the epic issue number}" "${EPIC_ID:?bind EPIC_ID from the Step 3 id block}"
-: "${EPIC_TITLE:?bind EPIC_TITLE from the Step 3 id block}" "${MILESTONE_TITLE:?bind MILESTONE_TITLE from the Step 3 id block}"
+# INPUTS: EPIC_FILE_PATH — the epic document. Everything else is derived HERE from it (each fenced
+# block is its own shell, so nothing bound in Step 3 exists in this one; QA cycle 2, CR-3).
+DOC_ID=.agents/skills/sync-github-epic/references/doc-id.js
+: "${EPIC_FILE_PATH:?bind EPIC_FILE_PATH to the epic document}"
+META=$(command node "$DOC_ID" epic-meta "$EPIC_FILE_PATH" --json) \
+  || { echo "❌ $(printf '%s' "$META" | jq -r '.detail // .reason // "doc-id epic-meta failed"')"; exit 1; }
+ISSUE_NUM=$(printf '%s' "$META" | jq -r '.githubIssue // empty')
+EPIC_ID=$(printf '%s' "$META" | jq -r '.id')
+EPIC_TITLE=$(printf '%s' "$META" | jq -r '.title')
+MILESTONE_TITLE=$(printf '%s' "$META" | jq -r '.milestone')
+[ -n "$ISSUE_NUM" ] || { echo "❌ ${EPIC_FILE_PATH} has no github_issue — this is the update path"; exit 1; }
 ISSUE_JSON="/tmp/issue-${ISSUE_NUM}.json"
 [ -s "$ISSUE_JSON" ] || { echo "❌ ${ISSUE_JSON} is missing — run the issue view above first"; exit 1; }
 CURRENT_MILESTONE=$(jq -r '.milestone.title // empty' "$ISSUE_JSON")
 RENAME_ARGS=()
 if [ -n "$CURRENT_MILESTONE" ] && [ "$CURRENT_MILESTONE" != "$MILESTONE_TITLE" ]; then
-  # Rename only the epic's OWN milestone: its id with any title, or any id with its title.
-  # A sprint or shared milestone is left alone (QA cycle 1, CR-1).
+  # Rename only the epic's OWN milestone: its id with any title (retitled), or its title under a
+  # legacy one-number id (the id move task 205 introduces). A sprint, a shared milestone, or
+  # another dotted epic's milestone with the same title is left alone (QA cycles 1–2, CR-1, CR-9).
   OWN_ID_PREFIX="Epic ${EPIC_ID} — "
   OWN_TITLE_SUFFIX=" — ${EPIC_TITLE}"
   case "$CURRENT_MILESTONE" in
     "$OWN_ID_PREFIX"*) RENAME_ARGS=(--rename-from "$CURRENT_MILESTONE") ;;
     Epic\ [0-9]*"$OWN_TITLE_SUFFIX")
       OLD_ID=${CURRENT_MILESTONE#Epic }; OLD_ID=${OLD_ID%"$OWN_TITLE_SUFFIX"}
-      case "$OLD_ID" in *[!0-9.]*|'') ;; *) RENAME_ARGS=(--rename-from "$CURRENT_MILESTONE") ;; esac ;;
+      case "$OLD_ID" in *[!0-9]*|'') ;; *) RENAME_ARGS=(--rename-from "$CURRENT_MILESTONE") ;; esac ;;
   esac
 fi
 node references/tracker-issue.js \
@@ -215,6 +217,13 @@ node references/tracker-issue.js \
 Then run the edit:
 
 ```bash
+# The epic's id, title and milestone, derived in THIS block from the epic document (QA cycle 2, CR-3).
+: "${EPIC_FILE_PATH:?bind EPIC_FILE_PATH to the epic document}"
+META=$(command node .agents/skills/sync-github-epic/references/doc-id.js epic-meta "$EPIC_FILE_PATH" --json) || exit 1
+ISSUE_NUM=$(printf '%s' "$META" | jq -r '.githubIssue // empty')
+EPIC_ID=$(printf '%s' "$META" | jq -r '.id')
+EPIC_TITLE=$(printf '%s' "$META" | jq -r '.title')
+MILESTONE_TITLE=$(printf '%s' "$META" | jq -r '.milestone')
 mkdir -p .claude/state
 printf '%s' "$NEW_BODY" > .claude/state/issue-body.md
 
