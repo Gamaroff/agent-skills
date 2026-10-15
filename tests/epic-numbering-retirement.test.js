@@ -26,6 +26,7 @@
  * Run: node --test tests/epic-numbering-retirement.test.js
  */
 const test = require("node:test");
+const { before } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("fs");
 const os = require("os");
@@ -144,20 +145,31 @@ test("review-epic: Critical numbering check via doc-id check, no sentinel exempt
 
 // ── 2. Executed skill blocks ───────────────────────────────────────────────
 
+// The repository's one fence reader — the one the security probe, QA's snippet runner and a
+// renderer agree with. A regex that ignores fence nesting found the Step 7 block while a stray
+// four-backtick fence hid it from every engine (QA cycle 6, TASK-205-BUG-14). ESM, so loaded once.
+let extractBlocks;
+before(async () => {
+  ({ extractBlocks } =
+    await import("../shared/resources/qa-execute-snippets.mjs"));
+});
+
+/** Every ```bash block of a document, as the fence reader sees it, with the list indent removed. */
+function bashBlocks(md) {
+  return extractBlocks(md).map(({ code }) => {
+    const lines = code.split("\n");
+    const indent = Math.min(
+      ...lines.filter((l) => l.trim()).map((l) => l.match(/^[ \t]*/)[0].length),
+    );
+    return lines.map((l) => l.slice(indent)).join("\n");
+  });
+}
+
 /** The one ```bash block whose first line starts with `marker`. Exactly one, or the test fails. */
 function blockBy(skill, marker) {
-  const md = skillText(skill);
-  const blocks = [];
-  const re = /^([ \t]*)```bash\n([\s\S]*?)^\1```/gm;
-  let m;
-  while ((m = re.exec(md))) {
-    const indent = m[1];
-    const body = m[2]
-      .split("\n")
-      .map((l) => (l.startsWith(indent) ? l.slice(indent.length) : l))
-      .join("\n");
-    if (body.trimStart().startsWith(marker)) blocks.push(body);
-  }
+  const blocks = bashBlocks(skillText(skill)).filter((body) =>
+    body.trimStart().startsWith(marker),
+  );
   assert.equal(
     blocks.length,
     1,
@@ -770,14 +782,9 @@ test("ensure-epic-github-issue milestone and create blocks derive id/title/miles
     path.join(ref, "gh-labels.sh"),
     'gh_labels_filter() { printf "%s\\n" "$1"; }\n',
   );
-  const md = skillText("ensure-epic-github-issue");
-  const blocks = [];
-  const re = /^```bash\n([\s\S]*?)^```/gm;
-  let m;
-  while ((m = re.exec(md))) {
-    if (m[1].includes("tracker-issue.js") && m[1].includes("epic-meta"))
-      blocks.push(m[1]);
-  }
+  const blocks = bashBlocks(skillText("ensure-epic-github-issue")).filter(
+    (b) => b.includes("tracker-issue.js") && b.includes("epic-meta"),
+  );
   assert.equal(
     blocks.length,
     2,
@@ -830,17 +837,11 @@ test("no epic-skill block mixes repository-root and skill-relative helper paths"
   let rootBlocks = 0;
   const mixed = [];
   for (const s of skills) {
-    const md = skillText(s);
-    const re = /^([ \t]*)```bash\n([\s\S]*?)^\1```/gm;
-    let m;
-    while ((m = re.exec(md))) {
-      if (!m[2].includes(".agents/skills/")) continue;
+    for (const { line, code } of extractBlocks(skillText(s))) {
+      if (!code.includes(".agents/skills/")) continue;
       rootBlocks++;
-      const bare = m[2].match(/(^|[\s"'(=])references\/[\w.-]+/gm);
-      if (bare)
-        mixed.push(
-          `${s}:${md.slice(0, m.index).split("\n").length} ${bare.join(" ").trim()}`,
-        );
+      const bare = code.match(/(^|[\s"'(=])references\/[\w.-]+/gm);
+      if (bare) mixed.push(`${s}:${line} ${bare.join(" ").trim()}`);
     }
   }
   assert.ok(

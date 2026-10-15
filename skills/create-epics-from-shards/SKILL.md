@@ -331,7 +331,6 @@ graph TD
     B --> D[Epic 4]
     C --> D
 ```
-````
 
 ## Development Timeline
 

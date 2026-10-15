@@ -1,0 +1,21 @@
+{
+  "sink": "filename",
+  "entry": "fence:skills/create-epics-from-shards/SKILL.md#Step 7: Quality Validation",
+  "name": "shards-step7-batch-check",
+  "call_site": null,
+  "verdict": "unverifiable",
+  "reason": "entry-not-probeable",
+  "executed": 0,
+  "passed": 0,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 1,
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": null,
+  "slot": "{PRD dir}\"\nE0=\"{E0}\"; COUNT=\"{count}",
+  "fixture_setup": null,
+  "ran_at": "2026-10-15T12:48:46.835Z"
+}
