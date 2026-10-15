@@ -364,10 +364,14 @@ NUMBERING=$(command node -e '
   }
   say(findings);
 ' "$PWD/$DOC_ID" "$PRD_ROOT" "$PRD_FILE")
-case $? in
-  0) echo "✅ numbering ok under $(dirname "$PRD_FILE")" ;;
-  1) printf '%s' "$NUMBERING" | jq -r '.findings[] | "[Critical] numbering \(.reason): \(.path) — \(.detail)"' ;;
-  *) echo "❌ numbering check could not run: $(printf '%s' "$NUMBERING" | jq -r '.reason')"; exit 1 ;;
+NUMBERING_RC=$?
+# The verdict is the exit code AND the reason it printed, together: a node process that crashed
+# (a missing doc-id.js) also exits 1, with no JSON at all, and must never read as "no findings".
+NUMBERING_REASON=$(printf '%s' "$NUMBERING" | jq -r '.reason // empty' 2>/dev/null)
+case "${NUMBERING_RC}:${NUMBERING_REASON}" in
+  0:ok)       echo "✅ numbering ok under $(dirname "$PRD_FILE")" ;;
+  1:findings) printf '%s' "$NUMBERING" | jq -r '.findings[] | "[Critical] numbering \(.reason): \(.path) — \(.detail)"' ;;
+  *) echo "❌ numbering check could not run (exit ${NUMBERING_RC}${NUMBERING_REASON:+, ${NUMBERING_REASON}}) — this is not a clean PRD"; exit 1 ;;
 esac
 ```
 
@@ -391,6 +395,14 @@ source .agents/skills/review-prd/references/resolve-paths.sh || exit 1
 NAME_ARGS=()
 [ -n "${MIG_NAME:-}" ] && NAME_ARGS=(--name "$MIG_NAME")
 MIG=$(command node "$MIGRATE" --check --json --root "$PRD_ROOT" "${NAME_ARGS[@]}")
+MIG_RC=$?
+MIG_REASON=$(printf '%s' "$MIG" | jq -r '.reason // empty' 2>/dev/null)
+# Only these answers are a plan. A usage error (no git repository, a missing PRD root) or a crash
+# carries no blockers list, and an absent list must not read as "no blockers".
+case "${MIG_RC}:${MIG_REASON}" in
+  0:already|1:needs-migration|1:post-check-failed) ;;
+  *) echo "❌ migration plan could not run (exit ${MIG_RC}${MIG_REASON:+, ${MIG_REASON}}): $(printf '%s' "$MIG" | jq -r '.error // empty' 2>/dev/null)"; exit 1 ;;
+esac
 printf '%s' "$MIG" | jq -r '"migration: \(.reason)",
   (.blockers[]? | "  ✖ blocker \(.code): \(.path) — \(.detail)"),
   (.mapping[]? | "  \(.kind) \(.oldId) → \(.newId)   \(.old) → \(.new)")'

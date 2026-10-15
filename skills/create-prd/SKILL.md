@@ -352,6 +352,15 @@ ALLOC=$(command node -e '
       detail: `domain ${JSON.stringify(domain)} is not lowercase kebab-case starting with a letter` }));
     process.exit(1);
   }
+  // An existing domain directory must really be under the root: a symlink out of it passes the
+  // text check above and would carry the PRD with it.
+  const domDir = path.join(root, domain);
+  if (fs.existsSync(domDir) && fs.existsSync(root)
+      && !fs.realpathSync(domDir).startsWith(fs.realpathSync(root) + path.sep)) {
+    console.log(JSON.stringify({ ok: false, reason: "bad-domain",
+      detail: `${domDir} resolves outside ${root}` }));
+    process.exit(1);
+  }
   let r = d.runCli(["next", "prd", "--prd-root", root, "--json"]).payload;
   if (r.reason === "registry-missing") {
     // No registry: number 1 is free only when no numbered PRD exists anywhere under the root.
@@ -406,28 +415,51 @@ For Resume, Start fresh, Extend and Revise — the found PRD keeps its `P`:
 
 ```bash
 # create-prd — keep the found PRD's number (task 204)
-# INPUT: FOUND_PRD, the PRD file continuation detection found.
+# INPUT: FOUND_PRD, the PRD file continuation detection found. PRD_ROOT is resolved HERE.
 DOC_ID=.agents/skills/create-prd/references/doc-id.js
+source .agents/skills/create-prd/references/resolve-paths.sh || exit 1
 : "${FOUND_PRD:?bind FOUND_PRD to the PRD file continuation detection found}"
 KEEP=$(command node -e '
   const d = require(process.argv[1]);
   const fs = require("fs");
   const path = require("path");
-  const file = process.argv[2];
+  const [root, file] = process.argv.slice(2);
   const p = d.parse(path.basename(file));
+  // The same layout the register block requires: {domain}/prd.{P}.{feature}/prd.{P}.{feature}.md
+  // under the PRD root, so a kept file can never be one outside it.
+  const parts = path.relative(path.resolve(root), path.resolve(file)).split(path.sep);
+  let folderOk = false;
+  try { d.format({ kind: "prd", prd: 1, slug: parts[0] }); folderOk = true; } catch {}
   let r;
   if (!p.ok || p.kind !== "prd" || p.artifact) {
     r = { ok: false, reason: "unnumbered", detail: `${file} predates numbered PRDs` };
+  } else if (parts.length !== 3 || !folderOk || parts[1] !== path.basename(file, ".md")) {
+    r = { ok: false, reason: "off-layout", detail: `${file} is not at ${root}/{domain}/prd.{P}.{feature}/` };
   } else {
-    const fm = d.frontmatterField(fs.readFileSync(file, "utf8"), "prd_number");
-    r = fm && fm !== String(p.prd)
-      ? { ok: false, reason: "frontmatter-mismatch", detail: `prd_number: ${fm}, file name says ${p.prd}` }
-      : { ok: true, reason: "ok", next: p.prd };
+    let text = null;
+    try { text = fs.readFileSync(file, "utf8"); } catch (e) {
+      r = { ok: false, reason: "unreadable", detail: `${file} cannot be read (${e.code || e.message})` };
+    }
+    if (text !== null) {
+      const fm = d.frontmatterField(text, "prd_number");
+      r = fm && fm !== String(p.prd)
+        ? { ok: false, reason: "frontmatter-mismatch", detail: `prd_number: ${fm}, file name says ${p.prd}` }
+        : { ok: true, reason: "ok", next: p.prd };
+    }
   }
   console.log(JSON.stringify(r));
   process.exitCode = r.ok ? 0 : 1;
-' "$PWD/$DOC_ID" "$FOUND_PRD") \
-  || { echo "❌ $(printf '%s' "$KEEP" | jq -r '.detail') — run /review-prd, which reports it and offers the numbering migration"; exit 1; }
+' "$PWD/$DOC_ID" "$PRD_ROOT" "$FOUND_PRD")
+KEEP_RC=$?
+KEEP_REASON=$(printf '%s' "$KEEP" | jq -r '.reason // empty' 2>/dev/null)
+case "${KEEP_RC}:${KEEP_REASON}" in
+  0:ok) ;;
+  1:unnumbered|1:off-layout|1:frontmatter-mismatch)
+    echo "❌ $(printf '%s' "$KEEP" | jq -r '.detail') — run /review-prd, which reports it and offers the numbering migration"; exit 1 ;;
+  1:unreadable)
+    echo "❌ $(printf '%s' "$KEEP" | jq -r '.detail') — check the FOUND_PRD binding"; exit 1 ;;
+  *) echo "❌ the keep-number check could not run (exit ${KEEP_RC}) — check the bundled ${DOC_ID}"; exit 1 ;;
+esac
 P=$(printf '%s' "$KEEP" | jq -r '.next')
 PRD_FILE="$FOUND_PRD"
 echo "P=${P} PRD_FILE=${PRD_FILE} (kept)"
@@ -488,6 +520,10 @@ command node -e '
   if (!p.ok || p.kind !== "prd" || p.artifact || parts.length !== 3 || !folderOk
       || dir !== path.basename(file, ".md")) {
     console.log(`❌ registry row not written: ${file} is not a numbered PRD document at ${root}/{domain}/prd.{P}.{feature}/`);
+    process.exit(1);
+  }
+  if (!fs.realpathSync(file).startsWith(fs.realpathSync(root) + path.sep)) {
+    console.log(`❌ registry row not written: ${file} resolves outside ${root}`);
     process.exit(1);
   }
   const n = p.prd;

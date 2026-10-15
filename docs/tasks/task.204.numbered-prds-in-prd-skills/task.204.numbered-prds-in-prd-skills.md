@@ -527,22 +527,22 @@ that this document's own example (an unnumbered PRD) never shows.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-15
-**Quality Score**: 60/100
+**Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.204.qa.2.numbered-prds-in-prd-skills.md](./task.204.qa.2.numbered-prds-in-prd-skills.md)
-- **Gate File**: [task.204.gate.2.numbered-prds-in-prd-skills.yml](./task.204.gate.2.numbered-prds-in-prd-skills.yml)
+- **Full Report**: [task.204.qa.3.numbered-prds-in-prd-skills.md](./task.204.qa.3.numbered-prds-in-prd-skills.md)
+- **Gate File**: [task.204.gate.3.numbered-prds-in-prd-skills.yml](./task.204.gate.3.numbered-prds-in-prd-skills.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 21 (new, each mutation-proven) + full suite 5697 pass / 0 fail
+- **Tests Executed**: 29 (new, each mutation-proven) + full suite 5705 pass / 0 fail
 - **Phases Verified**: 5/5
-- **Critical Issues**: 0 high, 4 medium
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 0 high, 1 medium
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- Gate 1's four findings are fixed and verified.
-- Cycle 2 refute pass: a PRD file that does not own its directory absorbs other PRDs' findings (CR-1) and is never checked itself (CR-2); a full-stem input does not resolve (CR-3); `DOMAIN` is unvalidated and can escape `${PRD_ROOT}` (CR-5).
+- Gate 2's four findings are fixed and verified; the DOMAIN boundary is closed (24 probes engage).
+- CR-1: a crashed numbering checker reports no findings and exits 0.
 
 <!-- change-log-start -->
 ## Change Log
@@ -557,6 +557,8 @@ that this document's own example (an unnumbered PRD) never shows.
 | 2026-10-15 |         | QA findings fixed — cycle 1, 4 findings (CR-1, CR-2, QA-1, QA-2) + 2 advisory (CR-3, CR-4); 21 test rows, each mutation-proven | qa-fix |
 | 2026-10-15 |         | QA gate CONCERNS (60/100) — 4 findings | qa-task |
 | 2026-10-15 |         | QA findings fixed — cycle 2, 4 findings (CR-1, CR-2, CR-3, CR-5) + 3 advisory (CR-6, CR-7, CR-8); CR-4 deferred; 29 test rows | qa-fix |
+| 2026-10-15 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-10-15 |         | QA findings fixed — cycle 3, 1 finding (CR-1) + 4 advisory (CR-2..CR-5); 33 test rows | qa-fix |
 <!-- change-log-end -->
 
 ---

@@ -21,6 +21,7 @@ import {
   mkdirSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
@@ -708,4 +709,88 @@ test("gate-2 CR-8: the register block refuses a bad folder and a PRD nested one 
     assert.match(r.out, /not a numbered PRD document at/, file);
   }
   assert.doesNotMatch(readFileSync(path.join(root, REG), "utf8"), /^\| 3 /m);
+});
+
+// ── QA cycle 3 (gate 3) ────────────────────────────────────────────────────
+
+/** A consumer root whose review-prd or create-prd install has no doc-id.js. */
+function brokenRoot(skill, files = {}) {
+  const root = makeConsumerRoot(REPO, "prd-204-broken-");
+  rmSync(path.join(root, ".agents", "skills"));
+  const ref = path.join(root, ".agents", "skills", skill, "references");
+  mkdirSync(ref, { recursive: true });
+  for (const f of ["resolve-paths.sh", "read-config.sh"]) {
+    copyFileSync(
+      path.join(REPO, "skills", skill, "references", f),
+      path.join(ref, f),
+    );
+  }
+  for (const [rel, content] of Object.entries(files)) {
+    mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
+    writeFileSync(path.join(root, rel), content);
+  }
+  return root;
+}
+
+test("gate-3 CR-1: a numbering checker that cannot run says so and fails, never 'no findings'", () => {
+  const root = brokenRoot("review-prd", { [prdPath(1, "a")]: prdDoc(1, "a") });
+  const r = run(NUMBERING(), root, { PRD_FILE: prdPath(1, "a") });
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /numbering check could not run/);
+  assert.doesNotMatch(r.out, /numbering ok/);
+});
+
+test("gate-3 CR-3: a migration plan that cannot run says so, never 'no blockers'", () => {
+  // No git repository: migrate-doc-numbering.mjs answers usage, with no blockers list.
+  const root = tree({ [REG]: registry(1), "docs/prd.md": "# mono\n" });
+  const r = run(MIG_PLAN(), root);
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /migration plan could not run \(exit 2, usage\)/);
+  assert.doesNotMatch(r.out, /^migration: /m);
+});
+
+test("gate-3 CR-2/CR-4: the keep block refuses an off-layout PRD and tells an unreadable one apart", () => {
+  const root = tree({
+    [REG]: registry(5, [[4, "x", "x"]]),
+    "docs/prd/x/prd.4.x.md": prdDoc(4, "x"),
+    "elsewhere/prd.4.x/prd.4.x.md": prdDoc(4, "x"),
+  });
+  for (const file of [
+    "docs/prd/x/prd.4.x.md",
+    "elsewhere/prd.4.x/prd.4.x.md",
+  ]) {
+    const k = run(KEEP(), root, { FOUND_PRD: file }, 'echo "GOT P=$P"');
+    assert.equal(k.code, 1, `${file}: ${k.out}`);
+    assert.match(k.out, /is not at docs\/prd\/\{domain\}/, file);
+    assert.doesNotMatch(k.out, /GOT P=/);
+  }
+  const missing = run(KEEP(), root, { FOUND_PRD: prdPath(4, "x") });
+  assert.equal(missing.code, 1, missing.out);
+  assert.match(missing.out, /cannot be read .*check the FOUND_PRD binding/);
+  assert.doesNotMatch(missing.out, /review-prd/);
+});
+
+test("gate-3 CR-5: a domain directory that symlinks out of the root is refused, at allocate and at register", () => {
+  const root = tree({ [REG]: registry(1), "outside/.keep": "" });
+  symlinkSync(path.join(root, "outside"), path.join(root, "docs/prd/shop"));
+  const a = run(
+    ALLOCATE(),
+    root,
+    { DOMAIN: "shop", FEATURE: "shop" },
+    'echo "GOT P=$P"',
+  );
+  assert.equal(a.code, 1, a.out);
+  assert.match(a.out, /bad-domain .*resolves outside/);
+  assert.doesNotMatch(a.out, /GOT P=/);
+  mkdirSync(path.join(root, "outside/prd.1.shop"), { recursive: true });
+  writeFileSync(
+    path.join(root, "outside/prd.1.shop/prd.1.shop.md"),
+    prdDoc(1, "shop"),
+  );
+  const w = run(REGISTER(), root, {
+    PRD_FILE: prdPath(1, "shop"),
+    TITLE: "Shop",
+  });
+  assert.equal(w.code, 1, w.out);
+  assert.match(w.out, /resolves outside docs\/prd/);
 });
