@@ -353,7 +353,10 @@ test("review-epic block: a configured PRD root is honoured, an env PRD_ROOT is n
 });
 
 test("create-epic id-check block: checks the substituted epic file, blocking (QA cycle 2, CR-6)", () => {
-  const block = blockBy("create-epic", "# INPUT: {epic file}");
+  const block = blockBy(
+    "create-epic",
+    "# INPUT: {epic file} — substitute the path of the epic file this run just wrote. Nothing",
+  );
   const ok = "docs/prd/d/prd.1.x/epics/epic.1.2.a/epic.1.2.a.md";
   const bad = "docs/prd/d/prd.1.x/epics/epic.1.3.b/epic.1.3.b.md";
   const dir = fixture(
@@ -389,7 +392,7 @@ test("create-epics-from-shards blocks: E0 from next epic; Step 7 checks the batc
   );
   const step7 = blockBy(
     "create-epics-from-shards",
-    "# INPUT: {PRD dir} — the same PRD directory as Step 4",
+    "# INPUTS: {PRD dir} — the same PRD directory as Step 4",
   );
   const prdDir = "docs/prd/chat/prd.2.chat";
   const dir = fixture(
@@ -419,19 +422,29 @@ test("create-epics-from-shards blocks: E0 from next epic; Step 7 checks the batc
     assert.equal(notDir.code, 1, notDir.out);
 
     const checked = runBlock(
-      substitute(step7, { "{PRD dir}": prdDir }),
+      substitute(step7, { "{PRD dir}": prdDir, "{E0}": "1", "{count}": "1" }),
       dir,
       {},
     );
     assert.equal(checked.code, 0, checked.out);
     assert.match(checked.out, /1 epic\(s\) ok/);
     const none = runBlock(
-      substitute(step7, { "{PRD dir}": prdDir }),
+      substitute(step7, { "{PRD dir}": prdDir, "{E0}": "1", "{count}": "1" }),
       empty,
       {},
     );
     assert.equal(none.code, 1, none.out);
-    assert.match(none.out, /the batch wrote nothing/);
+    assert.match(none.out, /epic\.2\.1 is missing/);
+    // A batch that claims more epics than it wrote fails even when the PRD already has some (CR-3).
+    const short = runBlock(
+      substitute(step7, { "{PRD dir}": prdDir, "{E0}": "1", "{count}": "2" }),
+      dir,
+      {},
+    );
+    assert.equal(short.code, 1, short.out);
+    assert.match(short.out, /epic\.2\.2 is missing/);
+    const unsub = runBlock(step7, dir, {});
+    assert.equal(unsub.code, 1, unsub.out);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
     fs.rmSync(empty, { recursive: true, force: true });
@@ -507,11 +520,12 @@ test("sync-github-epic milestone block: derives its inputs from the epic file an
     `#!/usr/bin/env bash\nprintf '%s\\n' "$@" > "${path.join(dir, "argv.txt")}"\n`,
     { mode: 0o755 },
   );
-  const issueJson = path.join(os.tmpdir(), `issue-${issue}.json`);
+  // The literal path the block reads — not os.tmpdir(), which is not /tmp on every host (QA cycle 3, CR-4).
+  const issueJson = `/tmp/issue-${issue}.json`;
   // `command node` (doc-id) must reach the real node; the bare `node` (tracker-issue) the stub.
   const realNode = path.dirname(process.execPath);
   const blockWithStub = block.replace(
-    /^node references\/tracker-issue\.js/m,
+    /^command node \.agents\/skills\/sync-github-epic\/references\/tracker-issue\.js/m,
     `"${path.join(stub, "node")}" references/tracker-issue.js`,
   );
   assert.notEqual(
@@ -665,6 +679,85 @@ test("ensure-task-github-issue block: a configured PRD root is honoured (CR-4)",
     );
     assert.equal(r.code, 0, r.out);
     assert.match(r.out, /MS=Epic 1\.3 — Foo/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("create-epic card preflight block reads no value from another block (QA cycle 3, CR-1)", () => {
+  const block = blockBy(
+    "create-epic",
+    "# INPUT: {epic file} — substitute the path of the epic file this run just wrote (QA cycle 3",
+  );
+  assert.match(block, /card-preflight\.js --file "\{epic file\}"/);
+  assert.doesNotMatch(
+    block,
+    /\$\{?[A-Z_]/,
+    "the preflight block must read no shell variable",
+  );
+});
+
+test("ensure-epic-github-issue milestone and create blocks derive id/title/milestone in-block (QA cycle 3, CR-2)", () => {
+  const EPIC = "docs/prd/d/prd.1.x/epics/epic.1.3.foo/epic.1.3.foo.md";
+  const dir = fixture(
+    {
+      [EPIC]: '---\nprd_number: 1\nepic_number: 3\ntitle: "Epic 3: Foo"\n---\n',
+    },
+    ["ensure-epic-github-issue"],
+  );
+  const tracker = path.join(dir, "tracker");
+  fs.writeFileSync(
+    tracker,
+    `#!/usr/bin/env bash\nprintf '%s\\n' "$@" > "${path.join(dir, "argv.txt")}"\n`,
+    {
+      mode: 0o755,
+    },
+  );
+  // How the blocks run here: the tracker CLI is a recording stub, the label helper a pass-through.
+  const asRun = (b) =>
+    b
+      .replace(/^node references\/tracker-issue\.js/m, `"${tracker}"`)
+      .replace(/\$\(node references\/tracker-issue\.js/, `$("${tracker}"`)
+      .replace(
+        "source references/gh-labels.sh || exit 1",
+        `gh_labels_filter() { printf '%s\\n' "$1"; }`,
+      );
+  const md = skillText("ensure-epic-github-issue");
+  const blocks = [];
+  const re = /^```bash\n([\s\S]*?)^```/gm;
+  let m;
+  while ((m = re.exec(md))) {
+    if (m[1].includes("tracker-issue.js") && m[1].includes("epic-meta"))
+      blocks.push(m[1]);
+  }
+  assert.equal(
+    blocks.length,
+    2,
+    "the milestone block and the create block each bind via epic-meta",
+  );
+  try {
+    for (const b of blocks) {
+      fs.rmSync(path.join(dir, "argv.txt"), { force: true });
+      // Empty values "from another block" must not be what the block uses.
+      const r = runBlock(asRun(b), dir, {
+        EPIC_FILE_PATH: EPIC,
+        EPIC_ID: "",
+        EPIC_TITLE: "",
+        MILESTONE_TITLE: "",
+      });
+      assert.equal(r.code, 0, r.out);
+      const argv = fs
+        .readFileSync(path.join(dir, "argv.txt"), "utf8")
+        .split("\n");
+      const kind = argv[argv.indexOf("--kind") + 1];
+      if (kind === "create") {
+        assert.equal(argv[argv.indexOf("--title") + 1], "[Epic 1.3] Foo");
+        assert.equal(argv[argv.indexOf("--milestone") + 1], "Epic 1.3 — Foo");
+      } else {
+        assert.equal(kind, "milestone");
+        assert.equal(argv[argv.indexOf("--title") + 1], "Epic 1.3 — Foo");
+      }
+    }
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

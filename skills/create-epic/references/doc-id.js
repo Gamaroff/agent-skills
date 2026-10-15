@@ -420,12 +420,6 @@ const asPositiveInt = (v) => {
 };
 
 /**
- * The canonical tracker summary of an epic: `[Epic P.E] {title}`. The frontmatter
- * pair `{ prd, epic }` wins over any id already in the title; when either number is
- * missing the result is the bare title — never a guessed id (review-epic is the
- * gate for a missing number). Idempotent.
- */
-/**
  * The tracker identity of one epic document, read from the document itself: its
  * `P.E` id from the filename, its bare title from frontmatter `title`, the GitHub
  * milestone title `Epic P.E — {title}`, and `github_issue`. The ONE definition of
@@ -471,6 +465,12 @@ function epicMeta(docPath, { io = REAL_FS } = {}) {
   };
 }
 
+/**
+ * The canonical tracker summary of an epic: `[Epic P.E] {title}`. The frontmatter
+ * pair `{ prd, epic }` wins over any id already in the title; when either number is
+ * missing the result is the bare title — never a guessed id (review-epic is the
+ * gate for a missing number). Idempotent.
+ */
 function epicSummary(summary, { prd, epic } = {}) {
   const bare = stripIdPrefix("epic", summary);
   const P = asPositiveInt(prd);

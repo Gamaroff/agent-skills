@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Major'
 priority: 'High'
 created: '2026-10-15'
@@ -12,7 +12,7 @@ description: 'The task milestone block reads an unbound $EPIC_REF'
 
 **Bug ID**: TASK-205-BUG-3
 **Related**: [task.205.prd-scoped-epic-numbering.md](./task.205.prd-scoped-epic-numbering.md) (QA finding CR-1, gate 2)
-**Status**: Ready for QA
+**Status**: Closed
 **Priority**: High
 **Severity**: Major
 **Created**: 2026-10-15
@@ -50,3 +50,4 @@ Read `epic:` from the task file's own frontmatter inside the block; guard the ta
 |------|--------|------------|-------|
 | 2026-10-15 | New | qa-task | Found by QA cycle 2 refute pass (CR-1) |
 | 2026-10-15 | Ready for QA | qa-fix | Fixed in QA cycle 2 fix pass |
+| 2026-10-15 | Closed | qa-task | Verified by task.205.qa.3.prd-scoped-epic-numbering.md |

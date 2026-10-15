@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Minor'
 priority: 'Medium'
 created: '2026-10-15'
@@ -12,7 +12,7 @@ description: 'The task milestone block parses the epic title with its own sed'
 
 **Bug ID**: TASK-205-BUG-4
 **Related**: [task.205.prd-scoped-epic-numbering.md](./task.205.prd-scoped-epic-numbering.md) (QA finding CR-2, gate 2)
-**Status**: Ready for QA
+**Status**: Closed
 **Priority**: Medium
 **Severity**: Minor
 **Created**: 2026-10-15
@@ -50,3 +50,4 @@ Use `frontmatterField` so all three sites share one parser.
 |------|--------|------------|-------|
 | 2026-10-15 | New | qa-task | Found by QA cycle 2 refute pass (CR-2) |
 | 2026-10-15 | Ready for QA | qa-fix | Fixed in QA cycle 2 fix pass |
+| 2026-10-15 | Closed | qa-task | Verified by task.205.qa.3.prd-scoped-epic-numbering.md |

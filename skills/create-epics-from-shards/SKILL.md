@@ -381,8 +381,11 @@ from the epic roadmap `epics/index.md` created in Step 5; keep both.
 printed verbatim:
 
 ```bash
-# INPUT: {PRD dir} — the same PRD directory as Step 4. PRD_ROOT is resolved here (QA cycle 2, CR-7).
+# INPUTS: {PRD dir} — the same PRD directory as Step 4; {E0} and {count} — this batch's first epic
+# number (Step 4's E0) and how many epics it wrote. PRD_ROOT is resolved here (QA cycle 2, CR-7).
 PRD_DIR="{PRD dir}"
+E0="{E0}"; COUNT="{count}"
+case "$E0$COUNT" in *[!0-9]*|'') echo "❌ substitute {E0} and {count} with this batch's numbers"; exit 1 ;; esac
 [ -d "$PRD_DIR/epics" ] || { echo "❌ ${PRD_DIR}/epics does not exist — substitute the PRD directory from Step 1"; exit 1; }
 source .agents/skills/create-epics-from-shards/references/resolve-paths.sh || exit 1
 CHECKED=0
@@ -393,8 +396,16 @@ for f in "$PRD_DIR"/epics/epic.*/epic.*.md; do
     || { echo "❌ doc-id check failed: $f"; exit 1; }
   CHECKED=$((CHECKED + 1))
 done
-[ "$CHECKED" -gt 0 ] || { echo "❌ no epic files under ${PRD_DIR}/epics — the batch wrote nothing"; exit 1; }
-echo "doc-id check: ${CHECKED} epic(s) ok"
+# Every epic of THIS batch must be present: a floor of "any epic" passes a batch that wrote nothing
+# whenever the PRD already had epics (QA cycle 3, CR-3).
+P=$(basename "$PRD_DIR" | cut -d. -f2)
+E=$E0
+while [ "$E" -lt $((E0 + COUNT)) ]; do
+  ls "$PRD_DIR/epics/epic.$P.$E."*/epic.$P.$E.*.md >/dev/null 2>&1 \
+    || { echo "❌ epic.$P.$E is missing — the batch did not write it"; exit 1; }
+  E=$((E + 1))
+done
+echo "doc-id check: ${CHECKED} epic(s) ok; batch epic.$P.$E0 … epic.$P.$((E0 + COUNT - 1)) present"
 ```
 
 **Epic Quality Checklist:**

@@ -383,7 +383,8 @@ On failure it logs a warning and returns empty — never halts.
 Run the tracker-card preflight on the document just written, **before** reporting completion:
 
 ```bash
-node references/card-preflight.js --file "${PRD_DIR}/epics/epic.${P}.${E}.[name]/epic.${P}.${E}.[name].md"
+# INPUT: {epic file} — substitute the path of the epic file this run just wrote (QA cycle 3, CR-1).
+node references/card-preflight.js --file "{epic file}"
 ```
 
 Offline — no auth, no network, no writes. It reports whether this document will publish a complete

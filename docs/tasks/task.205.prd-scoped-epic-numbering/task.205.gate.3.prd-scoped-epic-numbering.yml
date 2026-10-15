@@ -1,0 +1,74 @@
+schema: 2
+task: 'task.205.prd-scoped-epic-numbering'
+task_title: 'PRD-scoped epic numbering'
+gate: CONCERNS
+status_reason: 'Cycle 2''s seven gating findings are fixed (bugs 3–7 closed). Two MEDIUM remain, both the same class — a skill block reading values another block bound: the create-epic card preflight (reviewer HIGH, re-rated MEDIUM on a measured loud exit 2 on an advisory step) and ensure-epic-github-issue''s milestone/create blocks. Suite green: 5673 pass, 0 fail.'
+reviewer: 'QA Engineer'
+head: '67d5dd326c98164d814e3775a14b49e00bff5077'
+updated: '2026-10-15T11:11:34Z'
+
+top_issues:
+  - id: 'TASK-205-QA3-CR1'
+    severity: medium
+    original_severity: high
+    file: 'skills/create-epic/SKILL.md'
+    finding: 'The card preflight block reads PRD_DIR, P and E bound in another block; run alone it exits 2 (no such file). Re-rated from HIGH: measured loud failure on an advisory step, identical shape on base (TASK-205-BUG-8).'
+    suggested_action: 'Use the {epic file} placeholder the id-check block uses.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-205-QA3-CR2'
+    severity: medium
+    file: 'skills/ensure-epic-github-issue/SKILL.md'
+    finding: 'The milestone and create blocks read EPIC_ID / EPIC_TITLE / MILESTONE_TITLE bound only in Step E1, so in their own shell the issue is created as "[Epic ] " on an empty milestone (TASK-205-BUG-9).'
+    suggested_action: 'Re-derive them with doc-id.js epic-meta in each block.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 5687
+  phases_verified: '7/7'
+  ci: 'not read at this cycle (gated at /finalise)'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5, 6]
+    phases_with_issues: [3, 5]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 10
+    notes: 'review-epic Input Resolution re-probed (fence form, 10 cases, verdict engages).'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'Two blocks still read values bound in other blocks; the sync-github-epic milestone call path and its test fixture path are advisory concerns (CR-4, CR-5).'
+  maintainability:
+    status: PASS
+    notes: 'One milestone-key definition (epic-meta); blocks bind their own inputs except the two named.'
+
+recommendations:
+  immediate:
+    - action: 'Bind the create-epic preflight to {epic file} (CR-1) and derive ensure-epic block values via epic-meta (CR-2); enumerate every block this task added for cross-block reads.'
+      refs: ['skills/create-epic/SKILL.md', 'skills/ensure-epic-github-issue/SKILL.md']
+  future:
+    - action: 'Advisory, medium confidence but reproduced: the rename test writes under os.tmpdir() while the block reads /tmp (CR-4, fails under TMPDIR=/var/tmp); tracker-issue path in the rename block (CR-5); shards Step 7 floor counts pre-existing epics (CR-3); epicSummary docblock placement (CR-6).'
+      refs: ['tests/epic-numbering-retirement.test.js', 'skills/sync-github-epic/SKILL.md', 'skills/create-epics-from-shards/SKILL.md', 'shared/resources/doc-id.js']
+
+bug_resolution:
+  bugs_fixed: 7
+  bugs_remaining: 2
+  fix_date: '2026-10-15'
+  total_iterations: 2
+  verification_method: 'Executed skill blocks (guard test) + mutation proofs'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-205-BUG-8', 'TASK-205-BUG-9']

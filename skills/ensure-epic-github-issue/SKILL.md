@@ -86,6 +86,12 @@ fi
 Auto-create the milestone if it doesn't exist yet:
 
 ```bash
+# The epic's id, title and milestone, derived in THIS block from the epic document (QA cycle 3, CR-2).
+: "${EPIC_FILE_PATH:?bind EPIC_FILE_PATH to the epic document}"
+META=$(command node .agents/skills/ensure-epic-github-issue/references/doc-id.js epic-meta "$EPIC_FILE_PATH" --json) || exit 1
+EPIC_ID=$(printf '%s' "$META" | jq -r '.id')
+EPIC_TITLE=$(printf '%s' "$META" | jq -r '.title')
+MILESTONE_TITLE=$(printf '%s' "$META" | jq -r '.milestone')
 node references/tracker-issue.js \
   --kind milestone --title "${MILESTONE_TITLE}" --quiet 2>/dev/null || true
 ```
@@ -116,6 +122,12 @@ file is also what carries the body into the deferred record's `command.stdin`.
 > needs.
 
 ```bash
+# The epic's id, title and milestone, derived in THIS block from the epic document (QA cycle 3, CR-2).
+: "${EPIC_FILE_PATH:?bind EPIC_FILE_PATH to the epic document}"
+META=$(command node .agents/skills/ensure-epic-github-issue/references/doc-id.js epic-meta "$EPIC_FILE_PATH" --json) || exit 1
+EPIC_ID=$(printf '%s' "$META" | jq -r '.id')
+EPIC_TITLE=$(printf '%s' "$META" | jq -r '.title')
+MILESTONE_TITLE=$(printf '%s' "$META" | jq -r '.milestone')
 mkdir -p .claude/state
 cat > .claude/state/issue-body.md <<EOF
 ## Summary

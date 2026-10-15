@@ -210,8 +210,11 @@ if [ -n "$CURRENT_MILESTONE" ] && [ "$CURRENT_MILESTONE" != "$MILESTONE_TITLE" ]
       case "$OLD_ID" in *[!0-9]*|'') ;; *) RENAME_ARGS=(--rename-from "$CURRENT_MILESTONE") ;; esac ;;
   esac
 fi
-node references/tracker-issue.js \
-  --kind milestone --title "${MILESTONE_TITLE}" "${RENAME_ARGS[@]}" --quiet 2>/dev/null || true
+# Resolved from the repository root like doc-id above, and its failure is reported, not discarded:
+# a rename that silently did not happen is the split this block exists to prevent (QA cycle 3, CR-5).
+command node .agents/skills/sync-github-epic/references/tracker-issue.js \
+  --kind milestone --title "${MILESTONE_TITLE}" "${RENAME_ARGS[@]}" --quiet \
+  || echo "⚠️  milestone resolve/rename for ${MILESTONE_TITLE} did not complete — see the tracker-issue output above"
 ```
 
 Then run the edit:

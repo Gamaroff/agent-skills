@@ -575,26 +575,25 @@ Not applicable — no hot path changes; the generator's walk gains one directory
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-15
-**Quality Score**: 60/100
-**Gate Decision**: FAIL
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.205.qa.2.prd-scoped-epic-numbering.md](./task.205.qa.2.prd-scoped-epic-numbering.md)
-- **Gate File**: [task.205.gate.2.prd-scoped-epic-numbering.yml](./task.205.gate.2.prd-scoped-epic-numbering.yml)
+- **Full Report**: [task.205.qa.3.prd-scoped-epic-numbering.md](./task.205.qa.3.prd-scoped-epic-numbering.md)
+- **Gate File**: [task.205.gate.3.prd-scoped-epic-numbering.yml](./task.205.gate.3.prd-scoped-epic-numbering.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5680 (5666 pass, 0 fail)
+- **Tests Executed**: 5687 (5673 pass, 0 fail)
 - **Phases Verified**: 7/7
-- **Critical Issues**: 1
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- Cycle 1's gating findings are fixed ([TASK-205-BUG-1](./task.205.bug.1.milestone-rename-hijacks-shared-milestone.md), [TASK-205-BUG-2](./task.205.bug.2.task-milestone-lookup-ignores-prd-root.md) closed).
-- HIGH: the task milestone block reads an unbound `$EPIC_REF` ([TASK-205-BUG-3](./task.205.bug.3.task-milestone-block-reads-unbound-epic-ref.md)).
-- MEDIUM: [BUG-4](./task.205.bug.4.task-milestone-title-parsed-by-a-second-parser.md), [BUG-5](./task.205.bug.5.rename-block-inputs-never-bound.md), [BUG-6](./task.205.bug.6.rename-from-creates-on-lookup-failure.md), [BUG-7](./task.205.bug.7.review-epic-resolver-ignores-prd-root.md).
+- Cycle 2's fixes verified; bugs 3–7 closed.
+- MEDIUM: [BUG-8](./task.205.bug.8.create-epic-preflight-reads-another-blocks-inputs.md) (re-rated from HIGH on a measurement — see the QA report) and [BUG-9](./task.205.bug.9.ensure-epic-create-blocks-read-step-e1-values.md): blocks reading values another block bound.
 
 ## Change Log
 
@@ -608,6 +607,8 @@ Not applicable — no hot path changes; the generator's walk gains one directory
 | 2026-10-15 |  | QA findings fixed — cycle 1, 7 findings (3 gating + 4 advisory), 4 mutation-proven | qa-fix |
 | 2026-10-15 |  | QA gate FAIL (60/100) — refute pass, 7 gating findings (1 high, 4 medium, 2 low); bugs 1–2 closed | qa-task |
 | 2026-10-15 |  | QA findings fixed — cycle 2, 9 findings; every new block derives its inputs from its own document via `doc-id.js epic-meta`; 7 mutation-proven | qa-fix |
+| 2026-10-15 |  | QA gate CONCERNS (80/100) — 2 medium findings (one re-rated from high on a measurement); bugs 3–7 closed | qa-task |
+| 2026-10-15 |  | QA findings fixed — cycle 3, 6 findings (2 gating + 3 advisory + 1 cleanup); population of cross-block reads enumerated; 4 mutation-proven | qa-fix |
 
 ---
 
