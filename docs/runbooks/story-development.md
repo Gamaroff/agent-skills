@@ -73,7 +73,7 @@ flowchart TD
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Invoke**    | `"create a PRD for X"` · `/create-prd`                                                                                                                                                                                                                             |
 | **Inputs**    | Product context, goals, constraints. Skill is interactive — it elicits section-by-section.                                                                                                                                                                         |
-| **Outputs**   | `docs/prd/{domain}/{feature}/prd.md` (or path per `skills-config.yaml`). YAML frontmatter with `status: draft`.                                                                                                                                                    |
+| **Outputs**   | `docs/prd/{domain}/prd.{P}.{feature}/prd.{P}.{feature}.md` (root per `skills-config.yaml`), with `{P}` allocated from `docs/prd/prd-registry.md` and a registry row added. YAML frontmatter with `status: draft` and `prd_number: {P}`.                                                                                                                                                    |
 | **Pitfalls**  | Don't skip the interactive elicitation — `create-doc` enforces it. Frontmatter `status:` is lowercase kebab-case; body `Status:` is Title Case (see [`../../shared/resources/document-status-lifecycle.md`](../../shared/resources/document-status-lifecycle.md)). |
 | **Calls**     | `create-doc`, `brownfield-prd-template` (or `prd-template` for greenfield), `pm-checklist`, optionally `mermaid-architect` for embedded diagrams.                                                                                                                  |
 | **Reference** | [`../../skills/create-prd/SKILL.md`](../../skills/create-prd/SKILL.md)                                                                                                                                                                                             |
@@ -86,7 +86,7 @@ flowchart TD
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Invoke**       | `"review the PRD at <path>"` · `/review-prd <path>`                                                                                                                   |
 | **What it does** | Verifies claims against the actual codebase, checks requirements traceability, detects staleness, asks clarifying questions.                                          |
-| **Outputs**      | Co-located review report `prd.review.{YYYY-MM-DD}.md`, or an inline action plan if minor. Update frontmatter `status: ready-for-development` once review is resolved. |
+| **Outputs**      | Co-located review report `prd.{P}.{feature}.review.{n}.{name}.md`, or an inline action plan if minor. Numbering defects are Critical, with the migration offered when its plan has no blockers. Update frontmatter `status: ready-for-development` once review is resolved. |
 | **Pitfalls**     | The review _will_ find inaccuracies — budget time to revise. Don't write epics until `status: ready-for-development`.                                                 |
 | **Reference**    | [`../../skills/review-prd/SKILL.md`](../../skills/review-prd/SKILL.md)                                                                                                |
 
@@ -95,7 +95,7 @@ flowchart TD
 If the PRD exceeds ~5 epics or ~30 stories, shard it by level-2 sections to keep epic creation manageable.
 
 ```
-/shard-prd docs/prd/{domain}/{feature}/prd.md
+/shard-prd docs/prd/{domain}/prd.{P}.{feature}/prd.{P}.{feature}.md
 ```
 
 Produces one file per section under the same directory. See [`../../skills/shard-prd/SKILL.md`](../../skills/shard-prd/SKILL.md).

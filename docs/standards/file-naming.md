@@ -20,7 +20,7 @@ Canonical filename patterns used across the library. Skills enforce these patter
 `P` is the PRD number, `E` counts epics within that PRD and `S` counts stories within that epic. A
 sub-story carries a capital-letter suffix on `S`: `story.1.2.3A.core-ui.md`.
 
-> **Interim (2026-10-15, task 202).** Skills adopt this scheme in tasks 204–206. Until then, `create-*` still writes the legacy shape (`prd.{name}`, `epic.{number}.{name}`, `story.{epic}.{story}.{name}`) and `doc-id.js parseLegacy` reads it.
+> **Interim (2026-10-15, tasks 202, 204 and 205).** `create-prd` writes `prd.{P}.{name}` (task 204) and the epic skills write `epic.{P}.{E}.{name}` (task 205). Until task 206, `create-story` still writes the legacy `story.{epic}.{story}.{name}`, and `doc-id.js parseLegacy` reads every legacy shape.
 
 | Artifact | Pattern | Example |
 |---|---|---|

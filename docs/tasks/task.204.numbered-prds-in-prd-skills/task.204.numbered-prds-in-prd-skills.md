@@ -5,10 +5,12 @@ type: task
 description: "Make create-prd allocate a registry-backed PRD number and write prd.{P}.{feature} in both modes, move the templates, greenfield wrapper and shard-prd onto the numbered path, and make review-prd raise Critical findings for any unnumbered or mismatched PRD, epic or story under it, with an offer to run the migration."
 tags: [create-prd, review-prd, new-product-prd, shard-prd, prd-template, brownfield-prd-template, doc-numbering, prd-registry]
 category: feature
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-13
 updated: 2026-10-15
+completed_date: 2026-10-15
+pr_number: 675
 assignee:
 estimated_effort_hours: 16
 github_issue: 647
@@ -16,7 +18,7 @@ github_issue: 647
 
 # Technical Task: Numbered PRDs in the PRD skills
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.204.review.1.numbered-prds-in-prd-skills.md` implemented 2026-10-15
 
@@ -244,8 +246,10 @@ review-prd
 
 - ❌ `doc-id.js`, the registry format and the standards rows. These are task.202.
 - ❌ The migration script and migrating this repo. These are task.203.
-  - **Deviation, recorded at acceptance (PR review 1, PC-5):** two edits to
-    `shared/resources/migrate-doc-numbering.mjs` shipped here. The `TEST_FILE_EXCEPTIONS` literal is
+  - **Deviation, recorded at acceptance (PR review 1, PC-5; PR review 2, PC-4):** three edits to
+    `shared/resources/migrate-doc-numbering.mjs` shipped here. The third (QA cycle 9) exports
+    `inRewriteScope` and moves the literal pass onto it, so the run and review-prd's migration guard
+    share one rewrite-scope rule. The `TEST_FILE_EXCEPTIONS` literal is
     built from segments, so bundling review-prd stops pulling 45 extra files. The token pass skips
     undotted stems (`prd`, `index`), because migrating `docs/prd.md` through review-prd rewrote
     `type: prd` in every other PRD (gate 7 CR-1). The remaining engine defects go to task.211
@@ -448,7 +452,7 @@ that this document's own example (an unnumbered PRD) never shows.
 - [ ] `review-prd` reports each of the four numbering classes as **Critical**, with the engine's `reason` (rows 5 and 10).
 - [ ] `review-prd` offers the migration only when `--check` reports no blockers, applies it only on a yes, and re-checks afterwards (rows 6, 6b).
 - [ ] `review-prd` writes `prd.{P}.{feature}.review.{n}.{name}.md` and never resolves a review report as the PRD (row 7).
-- [ ] `git grep -n "docs/prd\.md" -- ':!docs/tasks' ':!docs/bugs' ':!**/references/**' ':!.agents/plans' ':!shared/resources/tests' ':!evals/shared/tests/prd-skill-numbering.test.mjs'` returns only the legacy-detection lines in `shard-prd` and `review-prd` (its migration guard included). (The exclusions are the plan of record, task.203's monolith fixtures and this task's own test fixtures, which name the legacy path on purpose.)
+- [ ] `git grep -n "docs/prd\.md" -- ':!docs/tasks' ':!docs/bugs' ':!**/references/**' ':!.agents/plans' ':!shared/resources/tests' ':!evals/shared/tests/prd-skill-numbering.test.mjs' ':!CHANGELOG.md'` returns only the legacy-detection lines in `shard-prd` and `review-prd` (its migration guard included). (The exclusions are the plan of record, task.203's monolith fixtures and this task's own test fixtures and the CHANGELOG entry, which name the legacy path on purpose.)
 
 ### Performance
 
@@ -461,11 +465,12 @@ that this document's own example (an unnumbered PRD) never shows.
 - [ ] `npm run bundle:check` is clean, with no `UNREACHED` copies.
 - [ ] `npm run validate -- skills/<skill>/` passes for every touched skill. `npm run generate-catalog` produces no diff after a commit.
 - [ ] Every assertion in the new test is mutation-proven (Testing Strategy).
-  - **Narrowed at acceptance (DoD 1, CQ4):** the evidence is per cycle, not per row. The 21 rows
-    present after QA cycle 1 were proven together (gate 2, QA-2: 21/21, counts recorded). Every row a
-    later QA fix cycle added or changed is proven with the mutation and the row that went red named in
-    that cycle's **Fixes Applied** entry in the implementation report. No member-by-member map of all
-    40 rows exists.
+  - **Narrowed at acceptance (DoD 1, CQ4; corrected at DoD 2):** the evidence is a count per cycle,
+    not a per-row map. Each QA fix cycle's **Fixes Applied** entry in the implementation report records
+    how many mutations it ran and that each turned a row red as predicted — cycle 1: 16 (21/21 rows,
+    re-confirmed by gate 2's QA-2), then 11, 6, 2, 5, 4, 5, 8, 4 and 2 for cycles 2–10. Most entries
+    give the count only; they do not name each mutation and the row it turned red, and no
+    member-by-member map of the 41 rows exists.
 
 ### Migration
 
@@ -561,9 +566,9 @@ that this document's own example (an unnumbered PRD) never shows.
 - Gate 9's findings are fixed and verified.
 - The migration guard's reference test misses C-quoted paths (CR-1) and scans long runs quadratically (CR-2).
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 1 (historical, superseded by run 2)
 
-**Status:** IN PROGRESS
+**Status:** SUPERSEDED — every gap below was closed; see the run 2 section that follows
 
 ### QA Gate Status
 
@@ -597,11 +602,39 @@ that this document's own example (an unnumbered PRD) never shows.
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.204.qa.10.numbered-prds-in-prd-skills.md`
+**Gate File**: `task.204.gate.10.numbered-prds-in-prd-skills.yml`
+**Gate Status**: ⚠️ CONCERNS (80/100) — both findings fixed in `bcacdfea`, accepted without a gate via Step 5c (PR review 2, CONCERNS, 0 high)
+
+All Definition of Done criteria have been verified (run 2):
+
+✅ **Acceptance Criteria:** 16/16 (CQ4 and the `docs/prd.md` grep criterion as amended at acceptance)
+✅ **Tests:** `evals/shared/tests/prd-skill-numbering.test.mjs`, 41 rows; CI `test` SUCCESS @ `ec926081`
+✅ **PR Review:** PR #675 — `task.204.pr-review.2.numbered-prds-in-prd-skills.md` (single-maintainer host)
+✅ **Documentation:** CHANGELOG entry; reference docs and standards notes match what shipped
+✅ **Security Review:** 24 probes executed, 0 reproduced; no secrets, no shell spawns
+⚠️ **Compliance Review:** not applicable
+
+**Follow-ups:** task.211 (#676) — migration-engine fixes that lift review-prd's migration guard;
+a shared PRD-path containment predicate in `doc-id.js` and recovery for a PRD written without its
+registry row (recorded in gates 2–10).
+
+**Task marked as ACCEPTED on:** 2026-10-15
+
+**Detailed Verification Log:** See `task.204.dod.2.numbered-prds-in-prd-skills.md` for complete verification evidence.
+
+---
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-13 | 1.0     | Initial draft (from plan T3) | create-task |
 | 2026-10-15 | 1.1     | Review passed (8/10) after fixes — `next prd` does not bootstrap and no CLI writes a row (row write via `appendPrdRow`); report name follows file-naming.md:84 full stem; migration payload `blockers[]`/`--name`; retirement-guard ALLOW entries; grep exclusions; test rows 1b, 6b, 8–11 | review-task |
 | 2026-10-15 |         | Status → ready-for-development | review-task |
@@ -628,6 +661,8 @@ that this document's own example (an unnumbered PRD) never shows.
 | 2026-10-15 |         | QA findings fixed — cycle 9, 4 findings (CR-1 outside-links counts real references only, CR-2 reference-doc epic/story paths, CR-4, CR-5) + CR-3 advisory deferred; 41 test rows | qa-fix |
 | 2026-10-15 |         | QA gate CONCERNS (80/100) — 2 findings | qa-task |
 | 2026-10-15 |         | QA findings fixed — cycle 10, 2 findings (CR-1 quoted paths, CR-2 quadratic scan): outside-links is a fail-closed mention check, no parser; 41 test rows | qa-fix |
+| 2026-10-15 |         | PR review 2 (Step 5c, conformance) CONCERNS — 4 findings; grep criterion excludes CHANGELOG, third engine edit recorded | review-pr |
+| 2026-10-15 | 1.2 | DoD passed — accepted (PR #675) | finalise |
 <!-- change-log-end -->
 
 ---
