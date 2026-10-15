@@ -11,7 +11,7 @@ Filename grammar lives in [File naming](../standards/file-naming.md); this page 
 Everything the pipeline produces is **co-located with the work item** — there is no central `docs/qa/` or `docs/reports/` directory.
 
 ```
-docs/prd/{domain}/{feature}/epics/epic.{N}.{name}/stories/story.{E}.{S}.{name}/
+docs/prd/{domain}/prd.{P}.{feature}/epics/epic.{P}.{E}.{name}/stories/story.{E}.{S}.{name}/
 ├── story.{E}.{S}.{name}.md                     # you wrote this
 ├── story.{E}.{S}.plan.{name}.md                # you (or /plan) wrote this
 ├── story.{E}.{S}.review.{n}.{name}.md          # ← Step 2

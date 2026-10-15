@@ -83,12 +83,12 @@ When prompted, answer **No** to sharding (single-epic PRD needs no split).
 
 > `/create-epic docs/prd/footer-link/prd.{P}.footer-link/prd.{P}.footer-link.md`
 
-The skill assigns the next epic number from `docs/development/epic-registry.md` and writes:
+The skill allocates the epic's number `{E}` within PRD `{P}` and writes:
 
 ```
-docs/prd/footer-link/epics/
-└── epic.{N}.footer-link/
-    └── epic.{N}.footer-link.md
+docs/prd/footer-link/prd.{P}.footer-link/epics/
+└── epic.{P}.{E}.footer-link/
+    └── epic.{P}.{E}.footer-link.md
 ```
 
 When prompted for tracker, choose **Skip — docs only** to avoid creating a practice issue in your tracker. That is *no tracker for this run*. A standing restriction (`access.tracker: manual` / `command`) is a different choice — [Restricted tracker access](./restricted-access.md).
@@ -97,15 +97,15 @@ When prompted for tracker, choose **Skip — docs only** to avoid creating a pra
 
 ## 4. Create the story (≤ 3 min)
 
-> `/create-story docs/prd/footer-link/epics/epic.{N}.footer-link/epic.{N}.footer-link.md`
+> `/create-story docs/prd/footer-link/prd.{P}.footer-link/epics/epic.{P}.{E}.footer-link/epic.{P}.{E}.footer-link.md`
 
 The skill writes the first story under the epic:
 
 ```
-docs/prd/footer-link/epics/epic.{N}.footer-link/stories/
-└── story.{N}.1.add-footer-link/
-    ├── story.{N}.1.add-footer-link.md
-    └── story.{N}.1.plan.add-footer-link.md
+docs/prd/footer-link/prd.{P}.footer-link/epics/epic.{P}.{E}.footer-link/stories/
+└── story.{E}.1.add-footer-link/
+    ├── story.{E}.1.add-footer-link.md
+    └── story.{E}.1.plan.add-footer-link.md
 ```
 
 No additional prompts beyond confirming the story title.
@@ -115,7 +115,7 @@ No additional prompts beyond confirming the story title.
 ## 5. Develop the story (≤ 45 min)
 
 ```text
-/develop-story docs/prd/footer-link/epics/epic.{N}.footer-link/stories/story.{N}.1.add-footer-link/
+/develop-story docs/prd/footer-link/prd.{P}.footer-link/epics/epic.{P}.{E}.footer-link/stories/story.{E}.1.add-footer-link/
 ```
 
 Phase 0 of `/develop-story` asks two questions. Recommended answers for a practice run:
@@ -125,7 +125,7 @@ Phase 0 of `/develop-story` asks two questions. Recommended answers for a practi
 | Q1 — Feature branch base | `develop` (or `main` if your repo has no `develop` branch) |
 | Q2 — PR target           | `develop` (same as Q1)                                     |
 
-Both prompts also offer an epic integration branch (`epic/{N}.footer-link`) as a trailing, unrecommended option. Ignore it for a practice run — it exists for epics whose stories must land as one unit, and it adds a manual promotion step at the end. Lite mode is auto-detected for a story this small; it is not a prompt.
+Both prompts also offer an epic integration branch (`epic/{P}.{E}.footer-link`) as a trailing, unrecommended option. Ignore it for a practice run — it exists for epics whose stories must land as one unit, and it adds a manual promotion step at the end. Lite mode is auto-detected for a story this small; it is not a prompt.
 
 > **What is lite mode?** A shorter pipeline mode that trades QA depth for speed on low-risk stories (single-file changes, docs edits, trivial refactors). It skips the parallel QA agents and the traceability matrix step, but **still runs every Step 7 side-effect** — PR comment, tracker update, board move, DoD post — so the audit trail is unchanged. See [`develop-pipeline-lite-mode.md`](../../shared/resources/develop-pipeline-lite-mode.md) for trigger conditions and exact behaviour. Pick `No` for anything with cross-file impact, security implications, or unclear acceptance criteria.
 
@@ -140,7 +140,7 @@ If QA loops more than once it is working as intended; a one-line README change s
 ## 6. Review your artifacts (≤ 2 min)
 
 ```bash
-ls docs/prd/footer-link/epics/epic.{N}.footer-link/stories/story.{N}.1.add-footer-link/
+ls docs/prd/footer-link/prd.{P}.footer-link/epics/epic.{P}.{E}.footer-link/stories/story.{E}.1.add-footer-link/
 ```
 
 You should have all 10 artifact types:
@@ -148,15 +148,15 @@ You should have all 10 artifact types:
 | #   | Artifact                                          | What it is                                                                 |
 | --- | ------------------------------------------------- | -------------------------------------------------------------------------- |
 | 1   | `prd.{P}.footer-link.md`                          | Practice PRD                                                               |
-| 2   | `epic.{N}.footer-link.md`                         | Parent epic                                                                |
-| 3   | `story.{N}.1.add-footer-link.md`                  | Story spec                                                                 |
-| 4   | `story.{N}.1.plan.add-footer-link.md`             | Co-located implementation plan                                             |
-| 5   | `story.{N}.1.review.1.add-footer-link.md`         | Story review report                                                        |
-| 6   | `story.{N}.1.implementation.1.add-footer-link.md` | What was built + pipeline log                                              |
+| 2   | `epic.{P}.{E}.footer-link.md`                         | Parent epic                                                                |
+| 3   | `story.{E}.1.add-footer-link.md`                  | Story spec                                                                 |
+| 4   | `story.{E}.1.plan.add-footer-link.md`             | Co-located implementation plan                                             |
+| 5   | `story.{E}.1.review.1.add-footer-link.md`         | Story review report                                                        |
+| 6   | `story.{E}.1.implementation.1.add-footer-link.md` | What was built + pipeline log                                              |
 | 7   | PR URL                                            | Pull Request opened by `/develop-story` (GitHub or Bitbucket per your VCS) |
-| 8   | `story.{N}.1.qa.1.add-footer-link.md`             | QA findings + traceability matrix                                          |
-| 9   | `story.{N}.1.gate.1.add-footer-link.yml`          | PASS / CONCERNS / FAIL gate                                                |
-| 10  | `story.{N}.1.dod.1.add-footer-link.md`            | Definition-of-Done checklist + sprint review summary                       |
+| 8   | `story.{E}.1.qa.1.add-footer-link.md`             | QA findings + traceability matrix                                          |
+| 9   | `story.{E}.1.gate.1.add-footer-link.yml`          | PASS / CONCERNS / FAIL gate                                                |
+| 10  | `story.{E}.1.dod.1.add-footer-link.md`            | Definition-of-Done checklist + sprint review summary                       |
 
 For annotated worked examples of the upstream artifacts, see [`examples/prd-example/`](../../examples/prd-example/) (the PRD that drove this onboarding effort) and [`examples/epic-examples/`](../../examples/epic-examples/) (its four epics). For a deliberate FAIL → PASS walkthrough, see [Day 3 — Messy Path](../runbooks/first-week/day-3-messy-path.md).
 
@@ -178,7 +178,7 @@ Close the practice PR on your VCS host (GitHub/Bitbucket) and close any practice
 
 ```bash
 git checkout develop
-git branch -D feature/story.{N}.1.add-footer-link
+git branch -D feature/story.{E}.1.add-footer-link
 ```
 
 Revert or drop the PRD/epic/story commits from your branch. Mark registry rows `CANCELLED` — do NOT delete them.

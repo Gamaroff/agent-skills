@@ -112,7 +112,7 @@ Produces one file per section under the same directory. See [`../../skills/shard
 | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Invoke**    | `"create an epic for <scope> from <prd-path>"` · `/create-epic`                                                                                                                           |
 | **Inputs**    | PRD path; the section/sections this epic covers.                                                                                                                                          |
-| **Outputs**   | `docs/prd/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md` plus a stories/ subdir (empty at first). `{N}` is the next number from the **epic registry**.                      |
+| **Outputs**   | `docs/prd/{domain}/prd.{P}.{feature}/epics/epic.{P}.{E}.{name}/epic.{P}.{E}.{name}.md` plus a stories/ subdir (empty at first). `{E}` is allocated within PRD `{P}`.                      |
 | **Pitfalls**  | Never invent an epic number — `epic-registry-manager` assigns it and updates `docs/development/epic-registry.md`. Commit the registry update **in the same commit** as the new epic file. |
 | **Calls**     | `epic-registry-manager`, `documentation-standards-validator`, optionally `mermaid-architect`.                                                                                             |
 | **Reference** | [`../../skills/create-epic/SKILL.md`](../../skills/create-epic/SKILL.md)                                                                                                                  |
@@ -141,7 +141,7 @@ Epic GitHub/Jira issues are created automatically downstream by `develop-story` 
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Invoke**       | `"create the next story for epic <N>"` · `/create-story <epic-path>`                                                                                                               |
 | **What it does** | 10-step process that identifies the next logical story, extracts technical context from architecture docs and the codebase, and writes a story with anti-hallucination safeguards. |
-| **Outputs**      | `docs/prd/.../epics/epic.{N}.{name}/stories/story.{E}.{S}.{name}/story.{E}.{S}.{name}.md`. Story directory is created with the same stem as the file.                              |
+| **Outputs**      | `docs/prd/.../prd.{P}.{feature}/epics/epic.{P}.{E}.{name}/stories/story.{E}.{S}.{name}/story.{E}.{S}.{name}.md`. Story directory is created with the same stem as the file.                              |
 | **Pitfalls**     | Don't hand-edit story numbering — the skill computes the next `{S}` from existing siblings. Story acceptance criteria must be testable; vague criteria block `review-story`.       |
 | **Calls**        | `documentation-standards-validator`, optionally `mermaid-architect`.                                                                                                               |
 | **Reference**    | [`../../skills/create-story/SKILL.md`](../../skills/create-story/SKILL.md)                                                                                                         |

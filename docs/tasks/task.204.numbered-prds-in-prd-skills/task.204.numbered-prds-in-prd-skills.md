@@ -544,22 +544,22 @@ that this document's own example (an unnumbered PRD) never shows.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-15
-**Quality Score**: 50/100
+**Quality Score**: 80/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.204.qa.8.numbered-prds-in-prd-skills.md](./task.204.qa.8.numbered-prds-in-prd-skills.md)
-- **Gate File**: [task.204.gate.8.numbered-prds-in-prd-skills.yml](./task.204.gate.8.numbered-prds-in-prd-skills.yml)
+- **Full Report**: [task.204.qa.9.numbered-prds-in-prd-skills.md](./task.204.qa.9.numbered-prds-in-prd-skills.md)
+- **Gate File**: [task.204.gate.9.numbered-prds-in-prd-skills.yml](./task.204.gate.9.numbered-prds-in-prd-skills.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 39 (new, each mutation-proven) + full suite 5715 pass / 0 fail
+- **Tests Executed**: 40 (new) + full suite 5716 pass / 0 fail
 - **Phases Verified**: 5/5
-- **Critical Issues**: 0 high, 5 medium (+1 advisory low)
+- **Critical Issues**: 0 high, 2 medium, 2 low (+1 advisory)
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
 
 ### Key Findings
-- Gate 7's findings are fixed and verified.
-- The migration review-prd offers has five reproduced defects: a failed apply hides its undo command; frontmatter-less legacy PRDs and two unnamed PRDs can never migrate; a migrated root-level PRD is refused by create-prd; outside links to a moved monolith go dead. Two are task-203 engine defects present on develop.
+- The DoD 1 gaps are fixed (CI's stdout-drain guard green).
+- The migration guard's outside-links check matches any mention of the PRD's basename (CR-1); the reference docs still give pre-numbering epic and story paths (CR-2).
 
 ## Definition of Done - Gaps Identified
 
@@ -624,6 +624,8 @@ that this document's own example (an unnumbered PRD) never shows.
 | 2026-10-15 |         | QA findings fixed — cycle 8, 5 findings: review-prd apply shows findings and undo (CR-1), several --name pairs (CR-3); migration guard refuses no-frontmatter, no-domain and outside-links shapes (CR-2, CR-4, CR-5 — engine fixes to a follow-up task); 40 test rows | qa-fix |
 | 2026-10-15 |         | PR review 1 (Step 5c, conformance) CONCERNS — 5 findings; Scope deviation, Migration criterion narrowing and grep exclusion recorded; engine follow-up filed as task.211 (#676) | review-pr |
 | 2026-10-15 |         | DoD incomplete — 4 gaps identified | finalise |
+| 2026-10-15 |         | QA gate CONCERNS (80/100) — 4 findings (re-entry after DoD 1) | qa-task |
+| 2026-10-15 |         | QA findings fixed — cycle 9, 4 findings (CR-1 outside-links counts real references only, CR-2 reference-doc epic/story paths, CR-4, CR-5) + CR-3 advisory deferred; 41 test rows | qa-fix |
 <!-- change-log-end -->
 
 ---

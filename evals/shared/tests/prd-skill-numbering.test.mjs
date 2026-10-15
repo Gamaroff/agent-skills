@@ -990,7 +990,7 @@ test("gate-8: the migration guard refuses what the migration cannot carry, names
   gitInit(linked);
   assert.match(
     run(MIG_PLAN(), linked, env).out,
-    /✖ blocker outside-links: docs\/prd\.md — named by 1 file\(s\) outside docs\/prd .*README\.md/,
+    /✖ blocker outside-links: docs\/prd\.md — referenced by 1 file\(s\) outside docs\/prd .*README\.md/,
   );
   assert.equal(run(MIG_APPLY(), linked, env).code, 1);
   assert.equal(status(linked), "", "nothing moved; README untouched");
@@ -1030,10 +1030,14 @@ test("gate-8: the migration guard refuses what the migration cannot carry, names
   );
   writeFileSync(
     path.join(skillDir, "references/migrate-doc-numbering.mjs"),
-    `const a = process.argv;
-if (a.includes("--check")) { console.log(JSON.stringify({ reason: "needs-migration", blockers: [], mapping: [] })); process.exit(1); }
-console.log(JSON.stringify({ reason: "post-check-failed", findings: [{ reason: "frontmatter-mismatch", path: "docs/prd/x.md", detail: "prd_number (missing) ≠ 2" }], revert: "git restore --staged --worktree docs/prd" }));
-process.exit(1);
+    `export const inRewriteScope = () => true;
+// The guard imports this module for inRewriteScope; only a direct run answers.
+const a = process.argv;
+if (a[1] && a[1].endsWith("migrate-doc-numbering.mjs")) {
+  if (a.includes("--check")) console.log(JSON.stringify({ reason: "needs-migration", blockers: [], mapping: [] }));
+  else console.log(JSON.stringify({ reason: "post-check-failed", findings: [{ reason: "frontmatter-mismatch", path: "docs/prd/x.md", detail: "prd_number (missing) ≠ 2" }], revert: "git restore --staged --worktree docs/prd" }));
+  process.exitCode = 1;
+}
 `,
   );
   const failed = run(MIG_APPLY(), stub);
@@ -1044,6 +1048,106 @@ process.exit(1);
     /✖ frontmatter-mismatch: docs\/prd\/x\.md — prd_number \(missing\) ≠ 2/,
   );
   assert.match(failed.out, /undo: git restore --staged --worktree docs\/prd/);
+});
+
+test("gate-9: outside-links counts real references only — not vendored prose, not a basename mention — and a guard usage error is shown", () => {
+  const guard = (root, mapping) =>
+    spawnSync(
+      process.execPath,
+      [
+        ".agents/skills/review-prd/scripts/migration-guard.mjs",
+        "--root",
+        "docs/prd",
+      ],
+      { cwd: root, encoding: "utf8", input: JSON.stringify({ mapping }) },
+    );
+  const mono = [
+    {
+      kind: "prd",
+      old: "docs/prd.md",
+      new: "docs/prd/mono/prd.2.mono/prd.2.mono.md",
+    },
+  ];
+  // CR-1: committed vendored skills that mention docs/prd.md, and prose naming the basename, do
+  // not block — nothing there would go dead.
+  const quiet = tree({
+    [REG]: registry(2),
+    "docs/prd.md": "---\ntype: prd\n---\n# Mono\n",
+    ".agents/vendored/review-prd/SKILL.md":
+      "A root-level `docs/prd.md` is legacy.\n",
+    "docs/notes.md": "The old prd.md layout is described elsewhere.\n",
+  });
+  gitInit(quiet);
+  const q = guard(quiet, mono);
+  assert.equal(q.status, 0, q.stdout + q.stderr);
+  assert.equal(JSON.parse(q.stdout).reason, "ok");
+  // The other direction: a README path and a relative link from docs/ both block.
+  const linked = tree({
+    [REG]: registry(2),
+    "docs/prd.md": "---\ntype: prd\n---\n# Mono\n",
+    "README.md": "See [the PRD](docs/prd.md).\n",
+    "docs/architecture.md": "See [the PRD](prd.md).\n",
+  });
+  gitInit(linked);
+  const l = guard(linked, mono);
+  assert.equal(l.status, 1, l.stdout);
+  const b = JSON.parse(l.stdout).blockers.find(
+    (x) => x.code === "outside-links",
+  );
+  assert.match(b.detail, /referenced by 2 file\(s\)/);
+  assert.match(b.detail, /README\.md/);
+  assert.match(b.detail, /docs\/architecture\.md/);
+  // CR-5: a name carrying regex metacharacters still matches its own references.
+  const plus = tree({
+    [REG]: registry(2),
+    "docs/prd+v2.md": "---\ntype: prd\n---\n# Mono\n",
+    "README.md": "[x](docs/prd+v2.md)\n",
+  });
+  gitInit(plus);
+  const pl = guard(plus, [
+    {
+      kind: "prd",
+      old: "docs/prd+v2.md",
+      new: "docs/prd/mono/prd.2.mono/prd.2.mono.md",
+    },
+  ]);
+  assert.equal(pl.status, 1, pl.stdout);
+  assert.match(pl.stdout, /outside-links/);
+  // CR-4: a guard usage error reaches the user through the apply block.
+  const stub = tree({
+    [REG]: registry(1),
+    [prdPath(1, "shop")]: prdDoc(1, "shop"),
+  });
+  rmSync(path.join(stub, ".agents/skills"), { recursive: true, force: true });
+  const skillDir = path.join(stub, ".agents/skills/review-prd");
+  mkdirSync(path.join(skillDir, "references"), { recursive: true });
+  mkdirSync(path.join(skillDir, "scripts"), { recursive: true });
+  for (const f of [
+    "resolve-paths.sh",
+    "migrate-doc-numbering.mjs",
+    "doc-id.js",
+  ])
+    writeFileSync(
+      path.join(skillDir, "references", f),
+      readFileSync(path.join(REPO, "skills/review-prd/references", f)),
+    );
+  writeFileSync(
+    path.join(skillDir, "scripts/migration-guard.mjs"),
+    readFileSync(
+      path.join(REPO, "skills/review-prd/scripts/migration-guard.mjs"),
+    ),
+  );
+  // An engine whose --check answers without a plan: the guard refuses with a usage error.
+  writeFileSync(
+    path.join(skillDir, "references/migrate-doc-numbering.mjs"),
+    `export const inRewriteScope = () => true;
+if (process.argv.includes("--check")) { process.stdout.write('{"reason":"usage","error":"no git"}\\n'); process.exitCode = 2; }
+`,
+  );
+  const failed = run(MIG_APPLY(), stub);
+  assert.equal(failed.code, 1, failed.out);
+  assert.match(failed.out, /guard refused it/);
+  assert.match(failed.out, /the plan carries no mapping/);
 });
 
 test("gate-5 CR-4: shard-prd explodes only a numbered PRD that owns its directory under the root", () => {

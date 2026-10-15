@@ -144,6 +144,19 @@ function isTestFixture(rel) {
 const isExampleCopy = (rel) => rel.startsWith("examples/");
 const isBundledCopy = (rel) => /^skills\/[^/]+\/references\//.test(rel);
 
+/**
+ * Whether the literal pass may rewrite `rel`: not history, a test fixture, a bundled copy or a
+ * dependency. Exported so review-prd's migration guard judges the same files the run rewrites.
+ */
+export function inRewriteScope(rel) {
+  return (
+    !isHistory(rel) &&
+    !isTestFixture(rel) &&
+    !isBundledCopy(rel) &&
+    !rel.startsWith("node_modules/")
+  );
+}
+
 /** Classify a basename under either scheme, through doc-id only. */
 function classify(base) {
   const p = docId.parse(base);
@@ -1017,11 +1030,7 @@ export function planEdits(planned, disc, io) {
     const inTree = isUnder(file, root);
     const isMd = file.endsWith(".md");
     const litOk =
-      LITERAL_EXTS.includes(P.extname(file)) &&
-      !isHistory(file) &&
-      !isTestFixture(file) &&
-      !isBundledCopy(file) &&
-      !file.startsWith("node_modules/");
+      LITERAL_EXTS.includes(P.extname(file)) && inRewriteScope(file);
     // Cheap prefilters: a file outside the tree can only point into it by naming
     // the root's last segment, and can only hold a literal by naming the root.
     const rootSeg = `${P.basename(root)}/`;

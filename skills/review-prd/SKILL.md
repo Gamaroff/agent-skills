@@ -587,7 +587,7 @@ GUARDED=$(command node "$MIGRATE" --check --json --root "$PRD_ROOT" "${NAME_ARGS
 case "$?:$(printf '%s' "$GUARDED" | jq -r '.reason // empty' 2>/dev/null)" in
   0:ok) ;;
   *) echo "❌ migration not applied — the plan's guard refused it:"
-     printf '%s' "$GUARDED" | jq -r '.blockers[]? | "  ✖ \(.code): \(.path) — \(.detail)", (.error // empty)' 2>/dev/null
+     printf '%s' "$GUARDED" | jq -r '(.blockers[]? | "  ✖ \(.code): \(.path) — \(.detail)"), (.error // empty)' 2>/dev/null
      exit 1 ;;
 esac
 MIG=$(command node "$MIGRATE" --apply --json --root "$PRD_ROOT" "${NAME_ARGS[@]}")
