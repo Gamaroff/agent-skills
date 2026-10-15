@@ -212,6 +212,28 @@ The pipeline completed 8 qa-task/qa-fix cycles (5 + 2 + 1 granted) without a cle
 
 The CI fix is a code change, so it re-enters QA at 5a before /finalise re-runs (`reenter-qa-after-finalise.sh`).
 
+**Gap fixes (`a8810b54`):** `migration-guard.mjs` returns through `main()` and sets `process.exitCode` (stdout-drain guard green; mutation-proven: the `63c1e06b` version reds it); CHANGELOG `[Unreleased]` entry; numbered PRD paths in `docs/concepts/quickstart-story.md` and `docs/reference/configuration.md`; CQ4 narrowed to the per-cycle mutation evidence (maintainer's choice). Fast gate run with every new file staged: `ci:fast` 5716/0 (symlink parked). A first run went red on a comment that named the test by its `shared/resources/` path — a bundling instruction in a skill file — and was fixed before the commit.
+
+QA re-entry after finalise DoD gaps: `reenter-qa-after-finalise.sh` — 2 code commits since gate 8's head; step 5 / qa_phase 5a, qa_max_cycles=10.
+
+### QA Loop Limit Reached — 2026-10-15 (after the finalise re-entry)
+
+The pipeline completed cycles 9–10 (re-entry after DoD 1) without a clean gate.
+
+**Final gate status**: CONCERNS (80/100), gate 10 — its two findings are fixed in `bcacdfea`, which no gate has read
+**HIGH findings per cycle**: 0, 0, 0, 0, 0, 0, 1, 0, 0, 0
+**MEDIUM findings per cycle**: 4, 4, 1, 1, 3, 1, 1, 5, 2, 2
+**Remaining issues**: none open on `bcacdfea` by the fix record; advisory CR-3/CR-4 superseded by the mention check; CR-5 (runbook epic-registry prose) → task.207 sweep.
+
+**What was attempted per cycle**:
+- Cycle 9: DoD gaps fixed (`a8810b54`); gate 9 CONCERNS 80 — outside-links over-matched vendored prose; reference-doc subtree paths; fixed in `8c1b6d4e`
+- Cycle 10: gate 10 CONCERNS 80 — the new reference parser missed quoted names and scanned quadratically; replaced by a fail-closed mention check in `bcacdfea`
+- Gate-the-last-fix half-cycle (route 2c) considered and declined: `medium-not-falling` — MEDIUM reads 5, 2, 2 over cycles 8–10.
+
+**Likely root cause**: the migration guard is a stopgap whose reference test was rewritten twice; the scope-the-claim move in cycle 10 removes the parser rather than patching it.
+
+**Decision**: accepted via Step 5c then `/finalise`, the route the maintainer chose at the same decision point after cycle 8 and approved for this re-entry ("fix → QA → /finalise").
+
 ---
 
 ## QA Iteration History
@@ -305,6 +327,29 @@ _Track each QA review/fix cycle._
 **Action**: Escalating — loop limit reached
 **Fixes Applied**: Scope decided by the user (qa-fix Step 2a, two options offered): "fix blocks, guard engine"; CR-4 layout: "migration asks for a domain" (follow-up). CR-1: the apply block prints the engine's findings and its revert command on a non-zero exit. CR-3: MIG_NAME takes one `<path>=<slug>` per line, each its own --name, in plan and apply; the unplaced-prd instruction says so. CR-2/CR-4/CR-5: new skill-local `skills/review-prd/scripts/migration-guard.mjs` (one definition, called by both blocks) reads the plan and refuses `no-frontmatter` (no closed block), `no-domain` (a PRD that would land directly under the root) and `outside-links` (a source outside the root named by files outside it); the apply block re-plans and runs the guard before moving anything. Engine fixes for CR-2, CR-5 and the domain prompt for CR-4 go to a follow-up task. Probe: `MIG_NAME` / `unplaced-prd` / `revert command` — population 1 (review-prd SKILL.md, updated); task doc Step 2 line is the historical plan, unaffected. Test rows +1 (40); 8 mutations, each red in the gate-8 row (one row holds all eight assertions — recorded). ci:fast 5716/0 (symlink parked), bundle:check clean, validate and quick_validate pass.
 **Commit**: `63c1e06b` (pushed; PR #675 OPEN) — no gate has read this fix
+
+### QA Cycle 9 — 2026-10-15
+**Origin**: re-entry after finalise DoD 1 gaps (`reenter-qa-after-finalise.sh`)
+**Gate Result**: CONCERNS (80/100)
+**Issues Found**: DoD 1 gaps fixed and verified; CR-1 medium outside-links matches any basename mention (vendored skills block every docs/prd.md migration); CR-2 medium pre-numbering epic/story paths in reference docs; CR-4, CR-5 low; CR-3 advisory (MIG_NAME unbound in blocks)
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 9 of 10)
+**Fixes Applied**: CR-1/CR-5 outside-links: fixed-string search; a file counts only when it refers to the PRD (repo-relative path anywhere, relative path as a link target) and sits in the engine's rewrite scope (`inRewriteScope`, newly exported and used by the engine's literal pass — one definition). CR-4 jq precedence. CR-2 PRD-subtree paths in configuration.md, quickstart-story.md, pipeline-artifacts.md and the story-development runbook (epic `prd.{P}.{feature}/epics/epic.{P}.{E}`; story names stay `story.{E}.{S}` — task.206). CR-3 advisory deferred. Test rows +1 (41); gate-8 stub made import-safe (the guard now imports the engine). 4 mutations, each red. ci:fast 5717/0 with all files staged (symlink parked); engine suite 44/44.
+**Commit**: `8c1b6d4e` (pushed; PR #675 OPEN)
+
+### QA Cycle 10 — 2026-10-15
+**Gate Result**: CONCERNS (80/100)
+**Issues Found**: gate 9's findings fixed and verified; CR-1 medium C-quoted git grep paths read as no reference; CR-2 medium quadratic token scan; CR-3, CR-4, CR-5 advisory
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Escalating — loop limit reached
+**Fixes Applied**: Step 2.6 repeat subject (outside-links reference test, gates 9–10) — move: scope the claim. The reference parser is removed; any mention of the PRD's basename in a file inside the engine's rewrite scope blocks the offer (fail closed until task.211), found with `git grep -l -z -F` (CR-1 quoted names; CR-2 no regex scan). Test row updated (41 rows; 2 mutations, each red). ci:fast 5717/0 with every file staged; a timing assertion was dropped rather than marked LOAD-SENSITIVE, since no scan remains to time.
+**Commit**: `bcacdfea` (pushed; PR #675 OPEN) — no gate has read this fix
 
 ---
 
