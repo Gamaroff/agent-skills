@@ -50,7 +50,9 @@ Before creating a new PRD:
 1. Read **Next Available PRD Number** — that is your `P`. Allocate it with
    `node shared/resources/doc-id.js next prd --json`, which reads the counter and refuses
    (`registry-behind`) when a PRD already on disk or in the table holds a number at or above it,
-   and (`registry-invalid`) when the counter is not a positive integer without leading zeros.
+   and (`registry-invalid`) when the registry has no counter line, or one that is not a positive
+   integer without leading zeros. Rows are read by the same rules as the selector's `parseRegistry`
+   (a test pins the two readers to the same answer).
 2. Create `${PRD_ROOT}/{domain}/prd.{P}.{slug}/prd.{P}.{slug}.md` with frontmatter `prd_number: P`.
 3. Append a row and increment **Next Available PRD Number**.
 4. Commit the registry update **in the same commit** as the new PRD — atomic.
@@ -70,7 +72,8 @@ for the same PRD do not conflict textually; `doc-id.js check --corpus` reports t
 
 `node shared/resources/doc-id.js check --corpus --json` walks `${PRD_ROOT}` and reports, per
 document, `bad-shape`, `dir-stem-mismatch`, `frontmatter-mismatch`, `parent-missing`,
-`parent-number-mismatch`, `unregistered`, `duplicate-id` and `registry-missing`. Exit 0 is `ok` or
+`parent-number-mismatch`, `unregistered`, `duplicate-id`, `registry-missing` and `unreadable` (a
+document or registry that exists and cannot be read). Exit 0 is `ok` or
 `empty`; 1 is findings, an `unreadable` directory or a missing root (`root-missing`); 2 is a usage
 error. A directory that cannot be read is never reported as an empty tree.
 

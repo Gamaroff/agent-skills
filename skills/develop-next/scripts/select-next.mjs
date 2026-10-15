@@ -1179,7 +1179,7 @@ function mapHeader(cells) {
 }
 
 /**
- * Parse a bug or task registry's markdown table.
+ * Parse a bug, task or PRD registry's markdown table.
  *
  * Tolerance is the whole point (SC7). A consumer repo may have neither
  * registry; a hand-edited row may be malformed. Neither may suppress the rows
@@ -1203,7 +1203,8 @@ function mapHeader(cells) {
  * outcome this design forbids.
  *
  * @param {string} text  registry markdown ("" or null for an absent registry)
- * @param {"bug"|"task"} kind
+ * @param {"bug"|"task"|"prd"} kind  `prd` reads the PRD registry (docs/standards/prd-registry.md);
+ *   doc-id.js reads the same rows by the same rules, pinned by a parity test
  * @param {string} registryPath  repo-root-relative path, used to resolve hrefs
  * @returns {{rows: object[], malformed: object[], warnings: string[]}}
  */

@@ -423,17 +423,17 @@ that write one.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.202.qa.1.doc-id-engine-and-prd-registry.md](./task.202.qa.1.doc-id-engine-and-prd-registry.md)
-- **Gate File**: [task.202.gate.1.doc-id-engine-and-prd-registry.yml](./task.202.gate.1.doc-id-engine-and-prd-registry.yml)
+- **Full Report**: [task.202.qa.2.doc-id-engine-and-prd-registry.md](./task.202.qa.2.doc-id-engine-and-prd-registry.md)
+- **Gate File**: [task.202.gate.2.doc-id-engine-and-prd-registry.yml](./task.202.gate.2.doc-id-engine-and-prd-registry.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 32 (28 doc-id + 4 select-next), inside a 5542-test green suite
+- **Tests Executed**: 43 (39 doc-id + 4 select-next), inside a 5553-test green suite
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Four medium defects in `doc-id.js`: a number past `Number.MAX_SAFE_INTEGER` parses as valid (security probe), a tail-deleted number is reused despite the never-reuse claim, `format()` accepts non-canonical parts, and `next epic/story` allocate under a missing parent. Four low and three advisory findings in the QA report.
+Cycle-1 findings all fixed and mutation-proven; the security probe engages. Cycle 2 found four medium defects in `doc-id.js`: sprint-review-summary artifacts read as documents, the allocator reads an unreadable directory as empty, the PRD registry reader disagrees with the selector, and `format()` rejects string-number parts.
 
 <!-- change-log-start -->
 ## Change Log
@@ -446,6 +446,8 @@ Four medium defects in `doc-id.js`: a number past `Number.MAX_SAFE_INTEGER` pars
 | 2026-10-15 |  | Implemented — 33 files (doc-id.js + CLI, 20 fixtures, select-next prd kind, 8 standards), 32 tests | develop |
 | 2026-10-15 |  | QA gate CONCERNS (60/100) — 8 findings (4 medium, 4 low) | qa-task |
 | 2026-10-15 |  | QA findings fixed — cycle 1, 8 gate findings + 3 advisory, 11 tests | qa-fix |
+| 2026-10-15 |  | QA gate CONCERNS (60/100) — 8 findings (4 medium, 4 low) | qa-task |
+| 2026-10-15 |  | QA findings fixed — cycle 2, 8 gate findings + 4 advisory, registry reader consolidated with the selector (parity test), 10 tests | qa-fix |
 
 <!-- change-log-end -->
 

@@ -110,24 +110,63 @@ function fail(reason) {
 function parseRemainder(rest, slugOk) {
   if (rest === "") return { reason: "bad-slug" };
   const segs = rest.slice(1).split(".");
+  const none = { docSlug: null };
   if (segs.length === 1) {
+    // `sprint-review-summary` is a fixed-name artifact: it carries no seq and no
+    // slug, so its one segment is the artifact, not a document's slug (QA cycle 2,
+    // QA-1). Every other lone segment is the slug, even an artifact word.
+    if (segs[0] === "sprint-review-summary") {
+      return {
+        ...none,
+        artifact: segs[0],
+        seq: null,
+        slug: null,
+        canonical: true,
+      };
+    }
     return slugOk(segs[0])
-      ? { artifact: null, seq: null, slug: segs[0], canonical: true }
+      ? { ...none, artifact: null, seq: null, slug: segs[0], canonical: true }
       : { reason: "bad-slug" };
   }
   const [head] = segs;
   if (head === "plan" && segs.length === 2 && slugOk(segs[1])) {
-    return { artifact: "plan", seq: null, slug: segs[1], canonical: true };
+    return {
+      ...none,
+      artifact: "plan",
+      seq: null,
+      slug: segs[1],
+      canonical: true,
+    };
+  }
+  const isSeq = (v) => NUM_RE.test(v) && isSafeNum(v);
+  // The full-stem form `{docSlug}.{artifact}.{seq}.{slug}` — a PRD or general-bug
+  // review report carries its document's slug before the keyword (file-naming.md;
+  // QA cycle 2, CR-7).
+  if (
+    segs.length === 4 &&
+    slugOk(segs[0]) &&
+    ARTIFACTS.includes(segs[1]) &&
+    !["plan", "sprint-review-summary"].includes(segs[1]) &&
+    isSeq(segs[2]) &&
+    slugOk(segs[3])
+  ) {
+    return {
+      artifact: segs[1],
+      seq: Number(segs[2]),
+      slug: segs[3],
+      docSlug: segs[0],
+      canonical: true,
+    };
   }
   if (
     ARTIFACTS.includes(head) &&
-    head !== "plan" &&
+    !["plan", "sprint-review-summary"].includes(head) &&
     segs.length === 3 &&
-    NUM_RE.test(segs[1]) &&
-    isSafeNum(segs[1]) &&
+    isSeq(segs[1]) &&
     slugOk(segs[2])
   ) {
     return {
+      ...none,
       artifact: head,
       seq: Number(segs[1]),
       slug: segs[2],
@@ -136,7 +175,13 @@ function parseRemainder(rest, slugOk) {
   }
   const keyword = segs.find((s) => ARTIFACTS.includes(s));
   if (keyword)
-    return { artifact: keyword, seq: null, slug: null, canonical: false };
+    return {
+      ...none,
+      artifact: keyword,
+      seq: null,
+      slug: null,
+      canonical: false,
+    };
   return { reason: "bad-artifact" };
 }
 
@@ -185,6 +230,7 @@ function parse(name) {
     artifact: r.artifact,
     seq: r.seq,
     slug: r.slug,
+    docSlug: r.docSlug,
     canonical: r.canonical,
     id: buildId(kind, g),
   });
@@ -220,6 +266,7 @@ function parseLegacy(name) {
     artifact: r.artifact,
     seq: r.seq,
     slug: r.slug,
+    docSlug: r.docSlug,
     canonical: r.canonical,
   });
 }
@@ -244,6 +291,9 @@ function format(parts) {
   let out;
   if (!p.artifact) out = `${id}.${p.slug}`;
   else if (p.artifact === "plan") out = `${id}.plan.${p.slug}`;
+  else if (p.artifact === "sprint-review-summary") out = `${id}.${p.artifact}`;
+  else if (p.docSlug)
+    out = `${id}.${p.docSlug}.${p.artifact}.${p.seq}.${p.slug}`;
   else out = `${id}.${p.artifact}.${p.seq}.${p.slug}`;
   const back = parse(out);
   if (!back.ok)
@@ -253,15 +303,26 @@ function format(parts) {
   // The output must parse back to exactly these parts — a missing or zero seq,
   // or a dotted slug, can still produce a name that parses as something else
   // (QA cycle 1, CR-3).
+  // Numeric parts are compared as numbers: `prd: "1"` builds `prd.1…` and is the
+  // same part as `prd: 1` (QA cycle 2, CR-3). A non-numeric string stays itself
+  // and drifts, as it should.
+  const num = (v) =>
+    v === undefined || v === null
+      ? null
+      : typeof v === "string" && NUM_RE.test(v)
+        ? Number(v)
+        : v;
+  const fixed = p.artifact === "sprint-review-summary";
   const want = {
-    prd: p.prd ?? null,
-    epic: p.epic ?? null,
-    story: p.story ?? null,
+    prd: num(p.prd),
+    epic: num(p.epic),
+    story: num(p.story),
     sub: p.sub || null,
-    n: p.n ?? null,
+    n: num(p.n),
     artifact: p.artifact || null,
-    seq: p.artifact && p.artifact !== "plan" ? p.seq : null,
-    slug: p.slug,
+    seq: p.artifact && p.artifact !== "plan" && !fixed ? num(p.seq) : null,
+    slug: fixed ? null : p.slug,
+    docSlug: p.docSlug || null,
   };
   const drift = Object.keys(want).filter((k) => back[k] !== want[k]);
   if (!back.canonical || drift.length) {
@@ -295,40 +356,82 @@ function matchesEpic(name, P, E) {
 }
 
 // `**Next Available PRD Number:** **N**` — the bold-in-bold form task-registry.md uses.
-const PRD_COUNTER_RE = /\*\*Next Available PRD Number:?\*\*:?\s*\*\*(\d+)\*\*/;
+const PRD_COUNTER_RE =
+  /\*\*Next Available PRD Number:?\*\*:?\s*\*\*([^*]*)\*\*/;
+
+// The selector's id-column aliases (select-next.mjs COLUMN_ALIASES → "n" / "title").
+const N_ALIASES = Object.freeze(["#", "prd #", "no", "num", "number", "id"]);
+const TITLE_ALIASES = Object.freeze(["title", "name"]);
 
 /**
- * The PRD numbers a registry's table rows carry. A minimal reader by design: this
- * module is CommonJS and the selector's parseRegistry (select-next.mjs) is ESM, and
- * the number column plus the counter is all allocation and `check` need.
+ * Read a PRD registry the way the selector's `parseRegistry(text, "prd", …)` reads
+ * it, for the two facts doc-id needs: the registered numbers and the counter.
+ *
+ * The rules are the selector's, ported because this module is CommonJS and the
+ * selector is ESM (QA cycle 2, CR-2 — the earlier reader kept its own rules and
+ * disagreed). doc-id.test.mjs runs both readers over one input set and fails on any
+ * difference, so a change to either side is a red test, not a silent split:
+ *   - a fence line (``` or ~~~) toggles fenced state, whatever its length — the
+ *     selector's rule, kept for parity (CR-8);
+ *   - a non-table line ends the table and forgets its header;
+ *   - a header row (the line above a separator) maps the id column when it names
+ *     both an id alias and a title alias; a headless table reads column 0;
+ *   - a row is a registration when its id cell is all digits — malformed or not,
+ *     the row's other cells are the selector's to judge.
+ * The counter is the first counter line outside a fence (CR-4).
+ * @returns {{ numbers: number[], counter: string|null }}
  */
-function registryNumbers(text) {
-  // Only rows of the table whose header names the `PRD #` column, outside fenced
-  // blocks — a sample row in an example block is not a registration, which is
-  // how the selector's parseRegistry reads the same file (QA cycle 1, CR-6).
-  const nums = [];
-  let fence = null;
-  let inTable = false;
-  for (const line of String(text || "").split("\n")) {
-    const f = /^\s*(`{3,}|~{3,})/.exec(line);
-    if (f) {
-      if (!fence) fence = f[1][0];
-      else if (f[1][0] === fence) fence = null;
+function scanRegistry(text) {
+  const numbers = [];
+  let counter = null;
+  let fenced = false;
+  let nCol = null;
+  let pending = null;
+  for (const line of String(text || "").split(/\r?\n/)) {
+    if (/^\s*(```|~~~)/.test(line)) {
+      fenced = !fenced;
+      pending = null;
       continue;
     }
-    if (fence) continue;
-    if (!/^\s*\|/.test(line)) {
-      inTable = false;
+    if (fenced) continue;
+    if (counter === null) {
+      const c = PRD_COUNTER_RE.exec(line);
+      if (c) counter = c[1].trim();
+    }
+    const t = line.trim();
+    if (!t.startsWith("|")) {
+      pending = null;
+      nCol = null;
       continue;
     }
-    if (/^\s*\|\s*prd\s*#\s*\|/i.test(line)) {
-      inTable = true;
+    if (/^\|[\s:|-]*\|?\s*$/.test(t)) {
+      if (pending) {
+        const low = pending.map((c) => c.toLowerCase());
+        const n = low.findIndex((c) => N_ALIASES.includes(c));
+        const ti = low.findIndex((c) => TITLE_ALIASES.includes(c));
+        if (n >= 0 && ti >= 0) nCol = n;
+      }
+      pending = null;
       continue;
     }
-    const m = /^\s*\|\s*(\d+)\s*\|/.exec(line);
-    if (inTable && m) nums.push(Number(m[1]));
+    const cells = t
+      .replace(/^\|/, "")
+      .replace(/\|\s*$/, "")
+      .split("|")
+      .map((c) => c.trim());
+    const id = cells[nCol === null ? 0 : nCol] || "";
+    if (!/^\d+$/.test(id)) {
+      if (nCol === null) pending = cells;
+      continue;
+    }
+    numbers.push(Number(id));
   }
-  return nums;
+  return { numbers, counter };
+}
+
+/** The PRD numbers a registry registers — scanRegistry(text).numbers. */
+function registryNumbers(text) {
+  return scanRegistry(text).numbers;
 }
 
 /**
@@ -353,12 +456,20 @@ function next(kind, entries, registryText) {
     .map((e) => parse(e))
     .filter((p) => p.ok && p.kind === kind && !p.artifact);
   if (kind === "prd") {
-    const m = PRD_COUNTER_RE.exec(String(registryText || ""));
-    if (!m) return fail("registry-missing");
-    // The counter is an id: a positive integer, no leading zeros (QA cycle 1, CR-7).
-    if (!NUM_RE.test(m[1]) || !isSafeNum(m[1])) return fail("registry-invalid");
-    const counter = Number(m[1]);
-    const used = docs.map((p) => p.prd).concat(registryNumbers(registryText));
+    // No text is a missing registry; text with no usable counter is an invalid one
+    // (QA cycle 2, CR-10). The counter is an id: a positive integer, no leading
+    // zeros, a safe integer (QA cycle 1, CR-7).
+    if (registryText === null || registryText === undefined)
+      return fail("registry-missing");
+    const scan = scanRegistry(registryText);
+    if (
+      scan.counter === null ||
+      !NUM_RE.test(scan.counter) ||
+      !isSafeNum(scan.counter)
+    )
+      return fail("registry-invalid");
+    const counter = Number(scan.counter);
+    const used = docs.map((p) => p.prd).concat(scan.numbers);
     if (used.some((n) => n >= counter)) return fail("registry-behind");
     return Object.freeze({ ok: true, reason: "ok", next: counter });
   }
@@ -392,6 +503,7 @@ const CHECK_REASONS = Object.freeze([
   "unregistered",
   "duplicate-id",
   "registry-missing",
+  "unreadable",
 ]);
 
 const REAL_FS = Object.freeze({
@@ -417,16 +529,42 @@ const REAL_FS = Object.freeze({
 
 /** A frontmatter scalar, read from the leading `---` block only (quotes stripped). */
 function frontmatterField(src, key) {
-  const block = /^---\r?\n([\s\S]*?)\r?\n---/.exec(String(src || ""));
-  if (!block) return "";
-  const m = new RegExp(`^${key}:[ \\t]*(.*?)[ \\t]*$`, "m").exec(block[1]);
-  if (!m) return "";
-  const v = m[1];
-  // A quoted value keeps everything between its quotes; an unquoted one loses a
-  // YAML trailing comment (` # …`) — `prd_number: 1 # first` is 1 (QA cycle 1, CR-9).
-  const q = /^(['"])(.*)\1(?:\s+#.*)?$/.exec(v);
-  if (q) return q[2].trim();
-  return v.replace(/\s+#.*$/, "").trim();
+  // Line by line, with no backtracking regex: a long whitespace run in a crafted
+  // line must not make this quadratic (QA cycle 2, CR-6).
+  const lines = String(src || "").split(/\r?\n/);
+  if (lines[0] !== "---") return "";
+  for (let i = 1; i < lines.length && lines[i] !== "---"; i++) {
+    const line = lines[i];
+    if (!line.startsWith(`${key}:`)) continue;
+    const v = line.slice(key.length + 1).trim();
+    // A quoted scalar ends at its own closing quote — a comment after it may hold
+    // the same quote character (QA cycle 2, CR-5). '' is YAML's escaped '.
+    if (v[0] === '"') {
+      const end = v.indexOf('"', 1);
+      return end > 0 ? v.slice(1, end).trim() : v;
+    }
+    if (v[0] === "'") {
+      let j = 1;
+      let out = "";
+      while (j < v.length) {
+        if (v[j] === "'" && v[j + 1] === "'") {
+          out += "'";
+          j += 2;
+        } else if (v[j] === "'") {
+          return out.trim();
+        } else out += v[j++];
+      }
+      return v;
+    }
+    // An unquoted value loses a YAML trailing comment: `#` after whitespace
+    // (QA cycle 1, CR-9) — found by a linear scan.
+    for (let j = 1; j < v.length; j++) {
+      if (v[j] === "#" && (v[j - 1] === " " || v[j - 1] === "\t"))
+        return v.slice(0, j).trim();
+    }
+    return v;
+  }
+  return "";
 }
 
 function finding(reason, file, detail) {
@@ -486,7 +624,11 @@ function check(docPath, ctx = {}) {
   // Frontmatter numbers must equal the filename's.
   const src = io.readFile(docPath);
   if (src === null) {
-    out.push(finding("frontmatter-mismatch", docPath, "document unreadable"));
+    // It exists (checked above) and cannot be read: its own reason, never a
+    // frontmatter defect (QA cycle 2, CR-9).
+    out.push(
+      finding("unreadable", docPath, "document exists but cannot be read"),
+    );
   } else {
     const want = { prd_number: p.prd };
     if (p.kind === "epic") want.epic_number = p.epic;
@@ -556,7 +698,15 @@ function check(docPath, ctx = {}) {
     const regPath = path.join(prdRoot, "prd-registry.md");
     const reg = io.readFile(regPath);
     if (reg === null)
-      out.push(finding("registry-missing", docPath, `${regPath} not found`));
+      out.push(
+        io.exists(regPath)
+          ? finding(
+              "unreadable",
+              docPath,
+              `${regPath} exists but cannot be read`,
+            )
+          : finding("registry-missing", docPath, `${regPath} not found`),
+      );
     else if (!registryNumbers(reg).includes(p.prd)) {
       out.push(
         finding("unregistered", docPath, `no row ${p.prd} in ${regPath}`),
@@ -571,7 +721,11 @@ function looksLikeArtifact(base) {
   // A keyword with nothing after it is a slug, as in parse(): `epic.1.qa.md` is a
   // malformed document to report, not an artifact to skip (QA cycle 1, CR-10).
   const segs = stemOf(base).split(".").slice(1);
-  return segs.some((s, i) => ARTIFACTS.includes(s) && i < segs.length - 1);
+  return segs.some(
+    (s, i) =>
+      s === "sprint-review-summary" ||
+      (ARTIFACTS.includes(s) && i < segs.length - 1),
+  );
 }
 
 /**
@@ -715,22 +869,34 @@ const USAGE = `Usage:
   doc-id check --corpus [--prd-root R] [--json]
 `;
 
-/** Directory names one level down, or [] when the directory is absent. */
+/**
+ * Directory names one level down: `[]` when the directory does not exist, `null`
+ * when it exists and cannot be read — the allocator must not read "could not look"
+ * as "nothing there" (QA cycle 2, CR-1).
+ */
 function childDirs(dir, io) {
-  return (io.readDir(dir) || []).filter((e) => e.dir).map((e) => e.name);
+  const ents = io.readDir(dir);
+  if (ents === null) return io.exists(dir) ? null : [];
+  return ents.filter((e) => e.dir).map((e) => e.name);
 }
 
-/** Every directory name under `root`, any depth. */
+/** Every directory name under `root`, any depth, plus the ones it could not read. */
 function allDirs(root, io) {
-  const out = [];
+  const names = [];
+  const unreadable = [];
   const walk = (d) => {
-    for (const name of childDirs(d, io)) {
-      out.push(name);
+    const kids = childDirs(d, io);
+    if (kids === null) {
+      unreadable.push(d);
+      return;
+    }
+    for (const name of kids) {
+      names.push(name);
       walk(path.join(d, name));
     }
   };
   walk(root);
-  return out;
+  return { names, unreadable };
 }
 
 /**
@@ -774,7 +940,16 @@ function runCli(argv, { cwd = process.cwd(), io = REAL_FS } = {}) {
     if (arg === "prd") {
       const root = at(resolvePrdRoot(argv, cwd));
       const reg = io.readFile(path.join(root, "prd-registry.md"));
-      const r = next("prd", allDirs(root, io), reg);
+      const dirs = allDirs(root, io);
+      if (dirs.unreadable.length) {
+        return done(1, {
+          ok: false,
+          reason: "unreadable",
+          detail: `cannot read ${dirs.unreadable.join(", ")}`,
+          prdRoot: root,
+        });
+      }
+      const r = next("prd", dirs.names, reg);
       return done(r.ok ? 0 : 1, { ...r, prdRoot: root });
     }
     if (arg === "epic" || arg === "story") {
@@ -794,6 +969,13 @@ function runCli(argv, { cwd = process.cwd(), io = REAL_FS } = {}) {
       // A mistyped parent must not allocate a number: the directory and its own
       // document must both exist (QA cycle 1, CR-2).
       const parentDocPath = path.join(dir, `${path.basename(dir)}.md`);
+      if (io.readDir(dir) === null && io.exists(dir)) {
+        return done(1, {
+          ok: false,
+          reason: "unreadable",
+          detail: `cannot read ${dir}`,
+        });
+      }
       if (io.readDir(dir) === null || !io.exists(parentDocPath)) {
         return done(1, {
           ok: false,
@@ -801,10 +983,16 @@ function runCli(argv, { cwd = process.cwd(), io = REAL_FS } = {}) {
           detail: `no ${parentKind} document at ${parentDocPath}`,
         });
       }
-      const children = childDirs(
-        path.join(dir, arg === "epic" ? "epics" : "stories"),
-        io,
-      ).filter((n) => {
+      const container = path.join(dir, arg === "epic" ? "epics" : "stories");
+      const listed = childDirs(container, io);
+      if (listed === null) {
+        return done(1, {
+          ok: false,
+          reason: "unreadable",
+          detail: `cannot read ${container}`,
+        });
+      }
+      const children = listed.filter((n) => {
         const c = parse(n);
         return (
           c.ok &&

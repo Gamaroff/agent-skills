@@ -25,7 +25,7 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { spawnBudget } from "../spawn-budget.mjs";
+import { loadSensitive, spawnBudget } from "../spawn-budget.mjs";
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -193,10 +193,11 @@ test("format/parse round-trip over a generated name set", () => {
   const shapes = [
     { artifact: null, seq: null },
     { artifact: "plan", seq: null },
-    ...d.ARTIFACTS.filter((a) => a !== "plan").map((a) => ({
-      artifact: a,
-      seq: 2,
-    })),
+    ...d.ARTIFACTS.filter(
+      (a) => a !== "plan" && a !== "sprint-review-summary",
+    ).map((a) => ({ artifact: a, seq: 2 })),
+    { artifact: "sprint-review-summary", seq: null },
+    { artifact: "review", seq: 3, docSlug: "doc-name" },
   ];
   let n = 0;
   for (const id of ids) {
@@ -211,7 +212,7 @@ test("format/parse round-trip over a generated name set", () => {
   }
   assert.equal(
     n,
-    ids.length * (d.ARTIFACTS.length + 1),
+    ids.length * (d.ARTIFACTS.length + 2),
     "non-vacuity: every kind × shape",
   );
 });
@@ -297,7 +298,11 @@ test("nextNumber prd: the registry counter is authoritative, guarded against a s
     d.next("prd", [], reg(2, "| 2 | [A](x) |\n")).reason,
     "registry-behind",
   );
-  assert.equal(d.next("prd", [], "no counter here").reason, "registry-missing");
+  assert.equal(
+    d.next("prd", [], "no counter here").reason,
+    "registry-invalid",
+    "text with no counter is an invalid registry, not a missing one",
+  );
   assert.equal(d.next("prd", [], null).reason, "registry-missing");
   assert.throws(
     () => d.nextNumber("prd", [], null),
@@ -397,6 +402,14 @@ test("check covers every reason it declares", () => {
   const seeded = new Set([
     ...d.checkCorpus(root("defects")).findings.map((f) => f.reason),
     ...d.checkCorpus(root("noregistry")).findings.map((f) => f.reason),
+    // `unreadable` needs a filesystem that refuses a read, which no fixture tree
+    // can be: seeded through an injected io.
+    ...d
+      .check("r/web/prd.1.h/prd.1.h.md", {
+        io: { exists: () => true, readFile: () => null, readDir: () => [] },
+        prdRoot: "r",
+      })
+      .map((f) => f.reason),
   ]);
   assert.deepEqual([...seeded].sort(), [...d.CHECK_REASONS].sort());
 });
@@ -631,7 +644,7 @@ test("CR-3: format refuses parts that do not round-trip", () => {
   );
 });
 
-test("CR-6: the registry reader counts only PRD # table rows outside fences", () => {
+test("CR-6: the registry reader skips fenced rows", () => {
   const reg = [
     "**Next Available PRD Number:** **3**",
     "",
@@ -640,10 +653,6 @@ test("CR-6: the registry reader counts only PRD # table rows outside fences", ()
     "|---|---|",
     "| 7 | [Example](x) |",
     "```",
-    "",
-    "| # | Something else |",
-    "|---|---|",
-    "| 9 | other table |",
     "",
     "| PRD # | Title | Folder | Status | Created |",
     "|---|---|---|---|---|",
@@ -654,7 +663,7 @@ test("CR-6: the registry reader counts only PRD # table rows outside fences", ()
   assert.equal(
     d.nextNumber("prd", [], reg),
     3,
-    "fenced 7 and other-table 9 do not read as registry-behind",
+    "the fenced 7 does not read as registry-behind",
   );
 });
 
@@ -747,4 +756,213 @@ test("CR-5: runCli resolves every path against its cwd option", () => {
     cwd: join(FIXTURES, "valid"),
   });
   assert.equal(one.payload.reason, "ok");
+});
+
+// ---------------------------------------------------------------------------
+// QA cycle 2 findings (gate 2) — one regression test each
+// ---------------------------------------------------------------------------
+
+test("QA-1: sprint-review-summary is a fixed-name artifact, never a document", () => {
+  const p = d.parse("story.1.2.3.sprint-review-summary.md");
+  assert.deepEqual(
+    [p.ok, p.artifact, p.seq, p.slug, p.canonical],
+    [true, "sprint-review-summary", null, null, true],
+  );
+  assert.equal(
+    d.format({
+      kind: "story",
+      prd: 1,
+      epic: 2,
+      story: 3,
+      artifact: "sprint-review-summary",
+    }),
+    "story.1.2.3.sprint-review-summary",
+  );
+  assert.equal(
+    WORK_ITEM_ARTIFACT_RE.test("story.1.2.3.sprint-review-summary.md"),
+    true,
+  );
+  // the legacy files in today's docs/prd are skipped by the corpus walk, as before CR-10
+  const files = { "r/story.1.1.x/story.1.1.sprint-review-summary.md": "" };
+  const io = {
+    exists: (q) => q === "r" || q in files,
+    readFile: (q) => files[q] ?? null,
+    readDir: (q) =>
+      q === "r"
+        ? [{ name: "story.1.1.x", dir: true }]
+        : q === "r/story.1.1.x"
+          ? [{ name: "story.1.1.sprint-review-summary.md", dir: false }]
+          : [],
+  };
+  assert.equal(d.checkCorpus("r", { io }).reason, "empty");
+});
+
+test("CR-1: next refuses to allocate over a directory it cannot read", () => {
+  const prdDir = "/r/web/prd.1.h";
+  const io = {
+    exists: () => true,
+    readFile: () => null,
+    readDir: (q) => (q === prdDir ? [{ name: "epics", dir: true }] : null),
+  };
+  const epic = d.runCli(["next", "epic", "--prd-dir", prdDir], {
+    cwd: "/",
+    io,
+  });
+  assert.deepEqual([epic.exitCode, epic.payload.reason], [1, "unreadable"]);
+  const prd = d.runCli(["next", "prd", "--prd-root", "/r"], {
+    cwd: "/",
+    io: {
+      exists: () => true,
+      readFile: () => "**Next Available PRD Number:** **2**",
+      readDir: () => null,
+    },
+  });
+  assert.deepEqual([prd.exitCode, prd.payload.reason], [1, "unreadable"]);
+});
+
+test("CR-2: doc-id and the selector read the same PRD registry rows (parity)", async () => {
+  const { parseRegistry } = await import(
+    pathToFileURL(join(repoRoot, "skills/develop-next/scripts/select-next.mjs"))
+      .href
+  );
+  const row = (n) =>
+    `| ${n} | [P${n}](web/prd.${n}.p/prd.${n}.p.md) | web | draft | 2026-10-15 |`;
+  const inputs = {
+    documented: [
+      "| PRD # | Title | Folder | Status | Created |",
+      "|---|---|---|---|---|",
+      row(1),
+      row(2),
+    ],
+    headless: [row(1), row(2)],
+    "hash-header": [
+      "| # | Title | Folder | Status | Created |",
+      "|---|---|---|---|---|",
+      row(1),
+    ],
+    "blank-line-between-rows": [
+      "| PRD # | Title | Folder | Status | Created |",
+      "|---|---|---|---|---|",
+      row(1),
+      "",
+      row(2),
+    ],
+    "fenced-example": [
+      "```",
+      row(9),
+      "```",
+      "| PRD # | Title | Folder | Status | Created |",
+      "|---|---|---|---|---|",
+      row(1),
+    ],
+    "four-backtick-fence": ["````", "```", row(7), "```", "````", row(1)],
+    "malformed-row": [
+      "| PRD # | Title | Folder | Status | Created |",
+      "|---|---|---|---|---|",
+      "| 3 | no link | web | draft | 2026-10-15 |",
+    ],
+    "id-not-first": [
+      "| Title | PRD # | Folder | Status | Created |",
+      "|---|---|---|---|---|",
+      "| [P4](web/prd.4.p/prd.4.p.md) | 4 | web | draft | 2026-10-15 |",
+    ],
+  };
+  for (const [name, lines] of Object.entries(inputs)) {
+    const text = lines.join("\n");
+    const sel = parseRegistry(text, "prd", "docs/prd/prd-registry.md");
+    const selNums = [...sel.rows, ...sel.malformed]
+      .map((r) => r.n)
+      .filter((n) => n !== null)
+      .sort((a, b) => a - b);
+    const ours = [...d.registryNumbers(text)].sort((a, b) => a - b);
+    assert.deepEqual(ours, selNums, name);
+  }
+});
+
+test("CR-3: format accepts string-number parts that build the same name", () => {
+  assert.equal(
+    d.format({ kind: "epic", prd: "1", epic: "2", slug: "x" }),
+    "epic.1.2.x",
+  );
+  assert.equal(
+    d.format({
+      kind: "story",
+      prd: "1",
+      epic: "2",
+      story: "3",
+      artifact: "qa",
+      seq: "4",
+      slug: "x",
+    }),
+    "story.1.2.3.qa.4.x",
+  );
+  assert.throws(
+    () => d.format({ kind: "epic", prd: "01", epic: 2, slug: "x" }),
+    TypeError,
+  );
+});
+
+test("CR-4: the counter is read outside fences", () => {
+  const reg = [
+    "```",
+    "**Next Available PRD Number:** **99**",
+    "```",
+    "**Next Available PRD Number:** **4**",
+    "| PRD # | Title |",
+    "|---|---|",
+    "| 3 | [C](c) |",
+  ].join("\n");
+  assert.equal(d.nextNumber("prd", [], reg), 4);
+});
+
+test("CR-5: a quoted value ends at its own closing quote", () => {
+  const src = "---\nprd_number: \"1\" # a \"b\"\ntitle: 'it''s' # c 'd'\n---\n";
+  assert.equal(d.frontmatterField(src, "prd_number"), "1");
+  assert.equal(d.frontmatterField(src, "title"), "it's");
+});
+
+test("CR-6: frontmatterField is linear on a long whitespace run", () => {
+  const src = (n) => `---\nprd_number: 1${" ".repeat(n)}x\n---\n`;
+  const t0 = process.hrtime.bigint();
+  d.frontmatterField(src(200000), "prd_number");
+  const ms = Number(process.hrtime.bigint() - t0) / 1e6;
+  assert.ok(
+    ms < 200,
+    loadSensitive(
+      `200k-space line took ${ms} ms — quadratic backtracking has returned`,
+    ),
+  );
+});
+
+test("CR-7: the full-stem review report is canonical and round-trips", () => {
+  const p = d.parse("prd.1.onboarding.review.1.pm-check.md");
+  assert.deepEqual(
+    [p.ok, p.artifact, p.seq, p.slug, p.docSlug, p.canonical],
+    [true, "review", 1, "pm-check", "onboarding", true],
+  );
+  assert.equal(d.format(p), "prd.1.onboarding.review.1.pm-check");
+});
+
+test("CR-9: an unreadable document or registry is 'unreadable', not a defect it does not have", () => {
+  const io = {
+    exists: () => true,
+    readFile: () => null,
+    readDir: () => [],
+  };
+  const r = d.check("r/web/prd.1.h/prd.1.h.md", { io, prdRoot: "r" });
+  assert.deepEqual(
+    r.map((f) => f.reason),
+    ["unreadable", "unreadable"],
+  );
+});
+
+test("CR-10: a registry with text but no usable counter is registry-invalid", () => {
+  for (const c of [
+    "**Next Available PRD Number:** **two**",
+    "**Next Available PRD Number:** **2.0**",
+    "| PRD # | Title |",
+  ]) {
+    assert.equal(d.next("prd", [], c).reason, "registry-invalid", c);
+  }
+  assert.equal(d.next("prd", [], null).reason, "registry-missing");
 });
