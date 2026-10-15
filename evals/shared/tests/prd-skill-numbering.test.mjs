@@ -858,16 +858,43 @@ test("gate-5: every block that reads or writes a PRD path refuses a symlink out 
     path.join(root, prdPath(1, "shop")),
   );
   const n = run(NUMBERING(), root, { PRD_FILE: prdPath(1, "shop") });
-  assert.match(
-    n.out,
-    /\[Critical\] numbering bad-shape: .*resolves outside docs\/prd through a symlink/,
-  );
+  assert.equal(n.code, 1, n.out);
+  assert.match(n.out, /resolves outside docs\/prd through a symlink/);
   assert.doesNotMatch(n.out, /numbering ok/);
   // CR-3: the keep block names the real remedy, not a migration.
   const k = run(KEEP(), root, { FOUND_PRD: prdPath(1, "shop") });
   assert.equal(k.code, 1, k.out);
   assert.match(k.out, /no migration can fix this/);
   assert.doesNotMatch(k.out, /offers the numbering migration/);
+});
+
+test("gate-6 CR-1: a PRD that resolves outside the root stops the review, and no report path is given through the link", () => {
+  const root = tree({
+    [REG]: registry(3, [[2, "evil", "evil"]]),
+    "outside/prd.2.evil/prd.2.evil.md": prdDoc(2, "evil"),
+    "docs/prd.md": "# legacy monolith\n",
+  });
+  mkdirSync(path.join(root, "docs/prd/evil"), { recursive: true });
+  symlinkSync(
+    path.join(root, "outside/prd.2.evil"),
+    path.join(root, "docs/prd/evil/prd.2.evil"),
+  );
+  const file = "docs/prd/evil/prd.2.evil/prd.2.evil.md";
+  // The numbering block stops the review rather than reporting and carrying on.
+  const n = run(NUMBERING(), root, { PRD_FILE: file }, 'echo "AFTER-BLOCK"');
+  assert.equal(n.code, 1, n.out);
+  assert.match(n.out, /review stopped: a symlink leads out of docs\/prd/);
+  assert.match(n.out, /no migration can fix this/);
+  assert.doesNotMatch(n.out, /AFTER-BLOCK|numbering ok|\[Critical\]/);
+  // The report-number block refuses the linked directory: no REPORT path through it.
+  const r = run(REPORT_N(), root, { PRD_FILE: file });
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /resolves outside docs\/prd/);
+  assert.doesNotMatch(r.out, /REPORT=/);
+  // The other direction: a legacy PRD above the root still gets its report beside it.
+  const legacy = run(REPORT_N(), root, { PRD_FILE: "docs/prd.md" });
+  assert.equal(legacy.code, 0, legacy.out);
+  assert.match(legacy.out, /REPORT=docs\/prd\.review\.1\.\{name\}\.md/);
 });
 
 test("gate-5 CR-4: shard-prd explodes only a numbered PRD that owns its directory under the root", () => {
@@ -898,6 +925,30 @@ test("gate-5 CR-4: shard-prd explodes only a numbered PRD that owns its director
   const unbound = run(SHARD(), root, { PATH: PATHX, PRD_FILE: "" });
   assert.notEqual(unbound.code, 0, unbound.out);
   assert.match(unbound.out, /bind PRD_FILE/);
+  // gate-6 CR-2: a numbered PRD reached through a symlink out of the root gets its own remedy.
+  mkdirSync(path.join(root, "outside/prd.4.evil"), { recursive: true });
+  writeFileSync(
+    path.join(root, "outside/prd.4.evil/prd.4.evil.md"),
+    prdDoc(4, "evil"),
+  );
+  mkdirSync(path.join(root, "docs/prd/evil"), { recursive: true });
+  symlinkSync(
+    path.join(root, "outside/prd.4.evil"),
+    path.join(root, "docs/prd/evil/prd.4.evil"),
+  );
+  const linked = run(SHARD(), root, {
+    PATH: PATHX,
+    PRD_FILE: "docs/prd/evil/prd.4.evil/prd.4.evil.md",
+  });
+  assert.equal(linked.code, 1, linked.out);
+  assert.match(linked.out, /resolves outside docs\/prd through a symlink/);
+  assert.match(linked.out, /no migration can fix this/);
+  assert.doesNotMatch(linked.out, /offers the numbering migration/);
+  assert.equal(
+    existsSync(path.join(root, ".md-tree-calls")),
+    false,
+    "nothing exploded through the link",
+  );
   const ok = run(SHARD(), root, { PATH: PATHX, PRD_FILE: prdPath(3, "shop") });
   assert.equal(ok.code, 0, ok.out);
   assert.equal(

@@ -340,10 +340,14 @@ NUMBERING=$(command node -e '
     say([{ reason: "bad-shape", path: abs, detail: `outside ${root} — a PRD written before numbered PRDs` }]);
   }
   // Text inside the root is not enough: a file (or a directory above it) that is a symlink out of
-  // the root would carry every read and write of this review with it.
+  // the root would carry every read and write of this review with it. That is not a finding to
+  // report and carry on from — the report and every fix would be written through the link — so the
+  // review stops here (exit 3).
   const fs = require("fs");
   if (fs.existsSync(abs) && !fs.realpathSync(abs).startsWith(fs.realpathSync(rootAbs) + path.sep)) {
-    say([{ reason: "bad-shape", path: abs, detail: `resolves outside ${root} through a symlink — replace the link with the real file` }]);
+    console.log(JSON.stringify({ reason: "outside-root", findings: [{ reason: "bad-shape", path: abs,
+      detail: `resolves outside ${root} through a symlink` }] }));
+    process.exit(3);
   }
   // The file itself, always — the corpus walk below skips any name without a prd/epic/story prefix.
   const own = d.check(abs, { prdRoot: rootAbs });
@@ -377,12 +381,17 @@ NUMBERING_REASON=$(printf '%s' "$NUMBERING" | jq -r '.reason // empty' 2>/dev/nu
 case "${NUMBERING_RC}:${NUMBERING_REASON}" in
   0:ok)       echo "✅ numbering ok under $(dirname "$PRD_FILE")" ;;
   1:findings) printf '%s' "$NUMBERING" | jq -r '.findings[] | "[Critical] numbering \(.reason): \(.path) — \(.detail)"' ;;
+  3:outside-root)
+    printf '%s' "$NUMBERING" | jq -r '.findings[] | "❌ \(.path) \(.detail)"'
+    echo "❌ review stopped: a symlink leads out of ${PRD_ROOT}, and the report and fixes would be written through it — replace the link with the real directory under the root (no migration can fix this), then re-run /review-prd"; exit 1 ;;
   *) echo "❌ numbering check could not run (exit ${NUMBERING_RC}${NUMBERING_REASON:+, ${NUMBERING_REASON}}) — this is not a clean PRD"; exit 1 ;;
 esac
 ```
 
 Report each line as a **Critical** issue carrying the engine's `reason` — there is no advisory tier,
-because a wrong number propagates into every epic and story id below it. The four classes:
+because a wrong number propagates into every epic and story id below it. A PRD that resolves outside
+`${PRD_ROOT}` through a symlink is not reported and carried on from: the block stops the review, because
+the report and every fix would be written through the link. The four classes:
 
 | Class | Engine `reason` |
 | :-- | :-- |
@@ -816,15 +825,26 @@ read through `doc-id.js`, which owns the artifact grammar:
 
 ```bash
 # review-prd — next review report number (task 204)
-# INPUT: PRD_FILE from Input Resolution.
+# INPUT: PRD_FILE from Input Resolution. PRD_ROOT is resolved HERE.
 DOC_ID=.agents/skills/review-prd/references/doc-id.js
+source .agents/skills/review-prd/references/resolve-paths.sh || exit 1
 : "${PRD_FILE:?bind PRD_FILE to the resolved PRD}"
 REVIEW_N=$(command node -e '
   const d = require(process.argv[1]);
   const fs = require("fs");
   const path = require("path");
-  const file = process.argv[2];
+  const [root, file] = process.argv.slice(2);
   const stem = path.basename(file, ".md");
+  // The report is written beside the PRD, so the directory must be where its text says: inside the
+  // PRD root for a PRD under it, inside the working tree for a legacy PRD above it — never through
+  // a symlink that leads out of either.
+  const dirAbs = path.dirname(path.resolve(file));
+  const textIn = (p, base) => p === base || p.startsWith(base + path.sep);
+  const base = textIn(dirAbs, path.resolve(root)) ? root : ".";
+  if (!fs.existsSync(dirAbs) || !textIn(fs.realpathSync(dirAbs), fs.realpathSync(base))) {
+    console.error(`❌ ${path.dirname(file)} resolves outside ${base === "." ? "the working tree" : root} — no report is written through a symlink; replace the link with the real directory`);
+    process.exit(1);
+  }
   const own = (n) => (d.parse(n).ok ? d.parse(n) : d.parseLegacy(n));
   const me = own(path.basename(file));
   let high = 0;
@@ -834,7 +854,7 @@ REVIEW_N=$(command node -e '
     if (a.ok && a.kind === "prd" && a.artifact === "review" && a.prd === me.prd && a.seq > high) high = a.seq;
   }
   console.log(high + 1);
-' "$PWD/$DOC_ID" "$PRD_FILE") || exit 1
+' "$PWD/$DOC_ID" "$PRD_ROOT" "$PRD_FILE") || exit 1
 PRD_STEM=$(basename "$PRD_FILE" .md)
 echo "REPORT=$(dirname "$PRD_FILE")/${PRD_STEM}.review.${REVIEW_N}.{name}.md"
 ```

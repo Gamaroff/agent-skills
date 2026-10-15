@@ -56,6 +56,9 @@ which moves it to ${PRD_ROOT}/{domain}/prd.{P}.{feature}/. Then shard the number
 Never explode such a file into `${PRD_ROOT}` itself: shards written flat there belong to no PRD, and
 no epic can be numbered from them.
 
+**Refuse a numbered PRD reached through a symlink out of `${PRD_ROOT}`** too: the shards would be
+written through the link. No migration fixes this — replace the link with the real directory.
+
 ## Execution Approach
 
 ### Method 1: Automatic (Preferred)
@@ -120,8 +123,12 @@ command node -e '
   const dir = path.basename(path.dirname(path.resolve(file)));
   const inside = fs.existsSync(file)
     && fs.realpathSync(file).startsWith(fs.realpathSync(root) + path.sep);
-  if (!p.ok || p.kind !== "prd" || p.artifact || dir !== path.basename(file, ".md") || !inside) {
+  if (!p.ok || p.kind !== "prd" || p.artifact || dir !== path.basename(file, ".md")) {
     console.log(`❌ ${file} is not a numbered PRD in its own directory under ${root} — run /review-prd on it, which reports it and offers the numbering migration`);
+    process.exit(1);
+  }
+  if (!inside) {
+    console.log(`❌ ${file} is missing or resolves outside ${root} through a symlink — replace the link with the real directory under the root (no migration can fix this)`);
     process.exit(1);
   }
 ' "$PWD/$DOC_ID" "$PRD_ROOT" "$PRD_FILE" || exit 1
