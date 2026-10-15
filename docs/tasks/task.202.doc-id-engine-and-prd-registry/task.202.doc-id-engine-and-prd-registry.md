@@ -5,7 +5,7 @@ type: task
 description: "Ship one shared parser, formatter, allocator and checker for hierarchical document ids (prd.P, epic.P.E, story.P.E.S), plus the PRD registry and the standards that define them, with no existing call site migrated yet."
 tags: [doc-numbering, prd, epic, story, registry, shared-resources]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-13
 updated: 2026-10-15
@@ -13,11 +13,13 @@ assignee:
 estimated_effort_hours: 16
 risk_level: medium
 github_issue: 645
+completed_date: 2026-10-15
+pr_number: 667
 ---
 
 # Technical Task: Doc-id engine and PRD registry
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.202.review.1.doc-id-engine-and-prd-registry.md` implemented 2026-10-15
 
@@ -126,9 +128,11 @@ Existing mechanisms this task sits beside. This answers the "second mechanism" c
   - Until 206 lands there are two copies of the artifact list. That is deliberate: the primitive → migration seam. A unit test pins the two lists as equal, so they cannot drift in the interim.
 - **`nextStoryId` / `scanExistingStoryIds` / `STORY_FILENAME_RE`** (`skills/create-story/scripts/lib.js`).
   They **stay in place**. `doc-id next story` will replace them when task 206 wires create-story. It
-  allocates **highest + 1**, which differs from the gap-filling `nextStoryId` on purpose: a deleted
-  story's number is not handed out again, which matches the "never reused" rule of the task, bug and
-  epic registries.
+  allocates **highest + 1**, which differs from the gap-filling `nextStoryId` on purpose: a gap left
+  by a deleted story is never refilled. Story and epic numbers have no counter, so deleting the
+  highest-numbered one frees its number again; only `P`, which the PRD registry's counter allocates,
+  is never reused. (Narrowed in QA cycle 1, CR-1 — the original wording claimed never-reuse for every
+  deleted number.)
 - **`prdRootFromConfig`** (`shared/resources/generate-prd-epic-index.mjs`) resolves `PRD_ROOT` in
   this order: `--prd-root`, then skills-config `prd.prdShardedLocation`, then `docs/prd`. `doc-id.js`
   uses the **same order**. It is a sibling of that function, not shared with it: the generator is an
@@ -435,9 +439,9 @@ that write one.
 ### Key Findings
 No critical issues identified. QA re-entry after the finalise DoD gaps; the only change since gate 6 is the CHANGELOG entry.
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 1 (historical, superseded)
 
-**Status:** IN PROGRESS
+**Status:** SUPERSEDED — both gaps closed; accepted by /finalise run 2 (below)
 
 ### QA Gate Status
 
@@ -464,6 +468,31 @@ No critical issues identified. QA re-entry after the finalise DoD gaps; the only
 **Gap Report Generated:** 2026-10-15
 
 **Detailed Verification Log:** See `task.202.dod.1.doc-id-engine-and-prd-registry.md` for complete verification evidence.
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.202.qa.7.doc-id-engine-and-prd-registry.md`
+**Gate File**: `task.202.gate.7.doc-id-engine-and-prd-registry.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (7 QA cycles)
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 13 of 13 met. AC6's timing is recorded on code identical to the head (0.037 s on PR head 54e79076), a recorded deviation
+✅ **Tests:** `shared/resources/tests/doc-id.test.mjs` and `evals/develop-next/unit/select-next.test.mjs`, run per PR by `npm test`; CI green on 54e79076
+✅ **PR Review:** PR #667; Step 5c `/review-pr` APPROVE twice (`pr-review.1`, `pr-review.2`)
+✅ **Documentation:** CHANGELOG `[Unreleased]` entry; new `docs/standards/prd-registry.md`; five standards and `coding-standards.md` with dated interim notes
+✅ **Security Review:** ✅ PASS — the probe on `doc-id.js#parse` engages (30 cases, 0 reproduced); read-only engine, no shell, no network
+⚠️ **Compliance Review:** NOT_APPLICABLE — internal tooling
+
+**Scope note (PC-1):** §3's never-reuse wording was narrowed at acceptance. A gap is never refilled, but deleting the highest-numbered epic or story frees its number again; only `P` is never reused.
+
+**Task marked as ACCEPTED on:** 2026-10-15
+
+**Detailed Verification Log:** See `task.202.dod.2.doc-id-engine-and-prd-registry.md` for complete verification evidence (run 1: `task.202.dod.1.doc-id-engine-and-prd-registry.md`).
 
 <!-- change-log-start -->
 ## Change Log
@@ -487,7 +516,7 @@ No critical issues identified. QA re-entry after the finalise DoD gaps; the only
 | 2026-10-15 |  | QA gate PASS (100/100) — no findings | qa-task |
 | 2026-10-15 |  | DoD incomplete — 2 gaps identified | finalise |
 | 2026-10-15 |  | QA gate PASS (100/100) — no findings (re-entry after DoD gaps) | qa-task |
-
+| 2026-10-15 | 1.2 | DoD passed — accepted (PR #667); §3 never-reuse wording narrowed (PC-1) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
@@ -524,4 +553,4 @@ QA artifacts will land in this directory: `task.202.qa.{n}.doc-id-engine-and-prd
 `task.202.gate.{n}.doc-id-engine-and-prd-registry.yml`, and `task.202.bug.{n}.{name}.md` if bugs are
 found.
 
-**Status:** Ready for Review
+**Status:** Accepted
