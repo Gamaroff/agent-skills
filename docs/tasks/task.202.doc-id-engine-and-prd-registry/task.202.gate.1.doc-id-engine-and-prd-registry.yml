@@ -1,0 +1,108 @@
+schema: 2
+task: 'task.202.doc-id-engine-and-prd-registry'
+task_title: 'Doc-id engine and PRD registry'
+gate: CONCERNS
+status_reason: 'All phases delivered and the suite is green, but the diff review and the security probe found four medium correctness defects in doc-id.js (precision loss on huge numbers, tail-deleted numbers reused despite the never-reuse claim, format() not enforcing canonical parts, next epic/story allocating under a missing parent) plus four low ones. No HIGH findings.'
+reviewer: 'QA Engineer'
+head: 'c58dde4198e42ea8c47df2ada4defe27598638bb'
+updated: '2026-10-15T03:57:29Z'
+
+top_issues:
+  - id: 'PROBE-1'
+    severity: medium
+    file: 'shared/resources/doc-id.js'
+    finding: 'parse accepts a number past Number.MAX_SAFE_INTEGER: parse("prd.99999999999999999999.x") is ok with prd 100000000000000000000, id prd.99999999999999999999, and format() returns prd.100000000000000000000.x — the parsed number no longer names the file and the round-trip breaks (security probe, case docid.huge-number, the one hostile case accepted of 21).'
+    suggested_action: 'Reject a number whose Number() is not a safe integer (reason bad-number), in parse, parseLegacy and the PRD counter; add the probe case as a unit test.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/doc-id.js'
+    finding: 'next("epic"|"story") is highest+1 over the directories that exist now, so deleting the highest-numbered epic or story hands its number out again; the docstring and the standards (prd-registry.md, epic-documents.md, file-naming.md) claim a deleted number is never reused, and the test only covers a middle gap.'
+    suggested_action: 'Reword the docstring and standards to say gaps are never refilled (or persist a high-water mark), and add a tail-deletion test either way.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-2'
+    severity: medium
+    file: 'shared/resources/doc-id.js'
+    finding: 'next epic --prd-dir / next story --epic-dir exit 0 with id epic.9.1 for a parent directory that does not exist (a mistyped path whose basename parses), so a wrong path silently allocates a possibly colliding number.'
+    suggested_action: 'Require the parent directory (and its document) to exist; otherwise exit 1 with a distinct reason (parent-missing).'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-3'
+    severity: medium
+    file: 'shared/resources/doc-id.js'
+    finding: 'format() only checks that its output parses, so non-canonical parts pass: an artifact with no seq gives "story.1.2.3.qa.undefined.x", seq 0 gives "…gate.0.x", and slug "x.qa" gives "story.1.2.3.x.qa", none throwing.'
+    suggested_action: 'Throw unless parse(out) is canonical and its kind, numbers, sub, artifact, seq and slug equal the input parts.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-5'
+    severity: low
+    file: 'shared/resources/doc-id.js'
+    finding: 'runCli resolves only skills-config.yaml against its cwd option; the prd root, --prd-dir/--epic-dir and the check path resolve against process.cwd().'
+    suggested_action: 'path.resolve(cwd, …) each path before handing it to io.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-6'
+    severity: low
+    file: 'shared/resources/doc-id.js'
+    finding: 'registryNumbers counts numeric-first rows anywhere in the file, fenced examples and other tables included, while parseRegistry skips fenced tables — the two readers can disagree about what the registry holds.'
+    suggested_action: 'Skip fenced blocks and read only the table whose header names the PRD # column.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-7'
+    severity: low
+    file: 'shared/resources/doc-id.js'
+    finding: 'next prd returns ok for a counter of 0 or a zero-padded counter, an id parse() rejects.'
+    suggested_action: 'Fail with a distinct reason (registry-invalid) when the counter is not a positive integer without leading zeros.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-8'
+    severity: low
+    file: 'shared/resources/doc-id.js'
+    finding: 'check <path> on a missing file reports frontmatter-mismatch (and registry-missing for a PRD) — the same reason as a real frontmatter defect.'
+    suggested_action: 'Check existence first and return one finding with a clear detail (bad-shape, "not found").'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 32
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1, 2]
+  ci: 'not read — CI is gated at /finalise'
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 27
+    notes: 'security-probe.mjs on doc-id.js#parse with a doc-id cases file (21 hostile, 6 legitimate): present-but-inert — 20 hostile rejected, docid.huge-number accepted (PROBE-1); all 6 legitimate accepted. No shell, network or filesystem writes in the engine.'
+  performance:
+    status: PASS
+    notes: 'check --corpus over docs/prd: real 0.029s on head c58dde41 (uptime load 0.62, 1.44, 1.30); bound is < 1 s. No new runtime dependency.'
+  reliability:
+    status: CONCERNS
+    notes: 'Missing-parent and unreadable-root paths answer like an empty tree (CR-2, CR-4 advisory); missing file reads as frontmatter-mismatch (CR-8).'
+  maintainability:
+    status: PASS
+    notes: 'One engine, documented reasons, 28 focused tests with fixtures; every check branch mutation-proven.'
+
+recommendations:
+  immediate:
+    - action: 'Fix PROBE-1, CR-1, CR-2, CR-3 (medium) and the low CR-5..CR-8 in the qa-fix cycle.'
+      refs: ['shared/resources/doc-id.js', 'shared/resources/tests/doc-id.test.mjs']
+  future:
+    - action: 'Advisory CR-4 (root-unreadable reason), CR-9 (trailing YAML comment in frontmatter), CR-10 (unparsed artifact-word names skipped by the corpus walk).'
+      refs: ['shared/resources/doc-id.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['Medium findings fixed and re-reviewed']

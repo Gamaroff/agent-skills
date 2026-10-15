@@ -375,6 +375,16 @@ function isWorkItemHref(href) {
 }
 
 /**
+ * The PRD registry's row link (task 202). Deliberately NOT folded into
+ * isWorkItemHref: the roadmap reader shares that predicate, and a roadmap line
+ * linking a PRD is a reference, not a frontier item. Only parseRegistry with
+ * kind "prd" consults this one.
+ */
+function isPrdHref(href) {
+  return /(?:^|\/)prd\.[^/]*\.md$/i.test(href);
+}
+
+/**
  * Parse roadmap markdown into a structural model.
  * @param {string} text
  * @returns {object} model: { phases, rows, flows, epicSections, byId, errors, warnings }
@@ -987,6 +997,7 @@ function tableCells(line) {
 // demanding one spelling.
 const COLUMN_ALIASES = {
   "#": "n",
+  "prd #": "n",
   no: "n",
   num: "n",
   number: "n",
@@ -1041,12 +1052,10 @@ export const DOC_COLUMN_NAMES = Object.freeze(
  * @param {string} registryPath repo-root-relative registry path
  * @returns {{ok: true, path: string} | {ok: false, reason: string}}
  */
-export function resolveDocCell(cell, registryPath) {
+export function resolveDocCell(cell, registryPath, isHref = isWorkItemHref) {
   const dir = registryDir(registryPath);
   const text = String(cell ?? "");
-  const linked = [...text.matchAll(MD_LINK_RE)]
-    .map((m) => m[1])
-    .find(isWorkItemHref);
+  const linked = [...text.matchAll(MD_LINK_RE)].map((m) => m[1]).find(isHref);
   const raw = linked || text.replace(/^`+|`+$/g, "").trim();
   // Refused before any path arithmetic, because each makes "where does this
   // point" depend on more than the string: a NUL truncates at the syscall, a
@@ -1057,7 +1066,7 @@ export function resolveDocCell(cell, registryPath) {
   if (/^\//.test(raw) || /^[a-z]:/i.test(raw)) {
     return { ok: false, reason: `absolute path ${JSON.stringify(raw)}` };
   }
-  if (!linked && (/\s/.test(raw) || !isWorkItemHref(raw))) {
+  if (!linked && (/\s/.test(raw) || !isHref(raw))) {
     return { ok: false, reason: "no work-item path" };
   }
   const resolved = path.posix.normalize(
@@ -1095,9 +1104,11 @@ function outsideRepo(p) {
 // Documented positions, used when a registry has no recognisable header.
 //   bug:  | # | Title | Status | Severity | Priority | Created | Area |
 //   task: | # | Title | Status | Category | Priority | Created | Issue | Deps |
+//   prd:  | PRD # | Title | Folder | Status | Created |   (docs/standards/prd-registry.md)
 const DEFAULT_COLUMNS = {
   bug: { n: 0, title: 1, status: 2, severity: 3, priority: 4 },
   task: { n: 0, title: 1, status: 2, priority: 4, deps: 7 },
+  prd: { n: 0, title: 1, status: 3 },
 };
 
 // A dependency reference inside a registry `Depends on` cell: `task.83`, `T83`,
@@ -1168,7 +1179,7 @@ function mapHeader(cells) {
 }
 
 /**
- * Parse a bug or task registry's markdown table.
+ * Parse a bug, task or PRD registry's markdown table.
  *
  * Tolerance is the whole point (SC7). A consumer repo may have neither
  * registry; a hand-edited row may be malformed. Neither may suppress the rows
@@ -1192,7 +1203,8 @@ function mapHeader(cells) {
  * outcome this design forbids.
  *
  * @param {string} text  registry markdown ("" or null for an absent registry)
- * @param {"bug"|"task"} kind
+ * @param {"bug"|"task"|"prd"} kind  `prd` reads the PRD registry (docs/standards/prd-registry.md);
+ *   doc-id.js reads the same rows by the same rules, pinned by a parity test
  * @param {string} registryPath  repo-root-relative path, used to resolve hrefs
  * @returns {{rows: object[], malformed: object[], warnings: string[]}}
  */
@@ -1205,6 +1217,9 @@ export function parseRegistry(text, kind, registryPath) {
 
   const dir = registryDir(registryPath);
   const defaults = DEFAULT_COLUMNS[kind] || DEFAULT_COLUMNS.task;
+  // A PRD row links a prd.… document; every other registry links a work item.
+  const isRowHref = kind === "prd" ? isPrdHref : isWorkItemHref;
+  const linkKinds = kind === "prd" ? "prd" : "story|task|bug";
   const lines = text.split(/\r?\n/);
   let fenced = false;
   let cols = null; // resolved from the header, once seen
@@ -1292,16 +1307,15 @@ export function parseRegistry(text, kind, registryPath) {
     const titleCell = cells[c.title] || "";
     const status = (cells[c.status] || "").toLowerCase() || null;
     const href =
-      [...titleCell.matchAll(MD_LINK_RE)]
-        .map((m) => m[1])
-        .find(isWorkItemHref) || null;
+      [...titleCell.matchAll(MD_LINK_RE)].map((m) => m[1]).find(isRowHref) ||
+      null;
     // The title's link wins; the document-path column is read only when the
     // title carries none, so a registry that has both cannot disagree with
     // itself about which file a row names.
     const docVerdict =
       href || c.doc === undefined
         ? null
-        : resolveDocCell(cells[c.doc] || "", registryPath);
+        : resolveDocCell(cells[c.doc] || "", registryPath, isRowHref);
     const docPath = docVerdict && docVerdict.ok ? docVerdict.path : null;
     const titlePath = href
       ? path.posix.normalize(path.posix.join(dir, href))
@@ -1325,9 +1339,9 @@ export function parseRegistry(text, kind, registryPath) {
         ...base,
         reason: !(href || docPath)
           ? c.doc === undefined
-            ? "malformed row — no [title](story|task|bug.….md) link"
+            ? `malformed row — no [title](${linkKinds}.….md) link`
             : docVerdict.reason === "no work-item path"
-              ? "malformed row — no [title](story|task|bug.….md) link and no work-item path in the document column"
+              ? `malformed row — no [title](${linkKinds}.….md) link and no work-item path in the document column`
               : `malformed row — document column refused: ${docVerdict.reason}`
           : !status
             ? "malformed row — empty status cell"

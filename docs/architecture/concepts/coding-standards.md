@@ -60,7 +60,8 @@ Implementation plans **must** live in-repo, co-located with the work or under `.
 ## Registries
 
 - **Task numbers** are globally unique. Read `docs/tasks/task-registry.md` → "Next Available Task Number" before creating a task. Append a row, increment counter, commit atomically.
-- **Epic numbers** are globally unique. Source of truth: `docs/development/epic-registry.md`.
+- **PRD numbers** are globally unique and never reused. Source of truth: `${PRD_ROOT}/prd-registry.md` → "Next Available PRD Number" ([standard](../../standards/prd-registry.md)). Epic and story ids are hierarchical — `epic.{P}.{E}`, `story.{P}.{E}.{S}` — with `E` unique within its PRD and `S` within its epic; parse and allocate them with `shared/resources/doc-id.js`, never a hand-written regex.
+- **Epic numbers** are globally unique. Source of truth: `docs/development/epic-registry.md`. *Interim (2026-10-15, task 202): this governs the existing `epic.{number}` epics until task 203 migrates them to per-PRD numbering; skills adopt the new scheme in tasks 204–206.*
 
 ## Validation before commit
 

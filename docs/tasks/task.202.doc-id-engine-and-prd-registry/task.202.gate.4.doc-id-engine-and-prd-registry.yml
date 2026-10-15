@@ -1,0 +1,64 @@
+schema: 2
+task: 'task.202.doc-id-engine-and-prd-registry'
+task_title: 'Doc-id engine and PRD registry'
+gate: CONCERNS
+status_reason: 'Cycle 3 holds on the tracked tree (parse/parseLegacy unchanged on 5808 files except the 4 intended fixture results; frontmatterField unchanged on 568 documents and agrees with PyYAML on 567). One medium regression: the letter-initial docSlug guard sits in the shared path, so parse() refuses digit-first bug/task full-stem review reports. No HIGH findings.'
+reviewer: 'QA Engineer'
+head: '1254d3089e6246eba2c5cc699b9fc455115d5560'
+updated: '2026-10-15T04:32:49Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/doc-id.js'
+    finding: 'The SLUG_RE docSlug guard is in the shared parseRemainder, so parse("bug.20.404-on-refresh.review.1.fix-readiness.md") is now canonical:false with seq, slug and docSlug null, and format() of those parts throws — a loose task/bug slug may start with a digit.'
+    suggested_action: 'Apply the letter-initial docSlug guard on the parseLegacy path only; parse() keeps the kind slug rule. Add a digit-first general-bug full-stem round-trip test.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 57
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1]
+  ci: 'not read — CI is gated at /finalise'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 30
+    notes: 'security-probe.mjs on doc-id.js#parse: engages.'
+  performance:
+    status: PASS
+    notes: 'check --corpus 0.030 s on head 1254d308 (uptime load 1.40, 1.82, 1.76).'
+  reliability:
+    status: PASS
+    notes: 'next epic/story correct for absent, unreadable and present-without-document parents (reviewer probes).'
+  maintainability:
+    status: PASS
+    notes: 'One advisory test-name precision issue (CR-2).'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1.'
+      refs: ['shared/resources/doc-id.js']
+  future:
+    - action: 'Advisory CR-2: parseLegacy still returns a non-canonical legacy artifact for a new-scheme name; refuse a digit-first remainder or rename the test.'
+      refs: ['shared/resources/doc-id.js', 'shared/resources/tests/doc-id.test.mjs']
+
+bug_resolution:
+  previous_gate: 'task.202.gate.3.doc-id-engine-and-prd-registry.yml'
+  fixed: ['CR-1', 'CR-3', 'advisory CR-2', 'advisory CR-4', 'advisory CR-5']
+  fix_commit: '1254d308'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 fixed and re-reviewed']
