@@ -83,6 +83,30 @@ description: 'The `post-check-failed` revert command does not undo the run, and 
 
 **Verification Steps for QA**: Run `command node --test shared/resources/tests/migrate-doc-numbering.test.mjs`, then re-run the reproduction above.
 
+
+### Iteration 2
+
+#### Re-Investigation (Reopened → In Progress)
+
+**Date**: 2026-10-15
+**Developer**: qa-fix (develop-task pipeline, QA cycle 2)
+
+**QA Reopening Reason**: gate 2, CR-1. The iteration-1 hint restored the whole PRD root and every touched outside file, while `verify()` refused only dirty move sources, so running it could erase uncommitted work the run never touched.
+
+**Revised Approach** (Step 2.6 — a repeat subject, so the move is **consolidate**, not another patch): one exported `touchRecord(planned, edits, writes, io, tracked)` — moves, in-place rewrites, created files — is now the single record that the dirty check, `apply()` and the revert all read.
+
+#### Fix Implementation (In Progress → Ready for QA)
+
+**Date**: 2026-10-15
+
+**Fix Description**:
+- `dirty-path` now covers every tracked path the run would change, not only a move source.
+- `revertHint(touch, progress?)` lists exactly the moved, edited and written paths (never a directory). It runs from the repository top level (`cd "$(git rev-parse --show-toplevel)"`, which also closes CR-7).
+- The nothing-to-move branch prints no command.
+
+**Files Modified**: `shared/resources/migrate-doc-numbering.mjs`, `shared/resources/tests/migrate-doc-numbering.test.mjs`, `task.203.migrate-doc-numbering.md` (§ 10 Rollback, blocker table), `task.203.plan.migrate-doc-numbering.md`
+
+**Testing**: The new test `cycle 2 CR-1: a dirty file the run would rewrite in place blocks` passes. So does `cycle 2 CR-1/CR-7: the revert touches only the run's own paths, keeps unrelated dirty work, and runs from a subdirectory`, a real git repository with an uncommitted edit under the root that survives the revert. Mutation-proven three ways: in-place dirty check off, root re-added to the restore, top-level `cd` removed. The suite passes 44/44.
 ---
 
 ## Status History
@@ -92,6 +116,9 @@ description: 'The `post-check-failed` revert command does not undo the run, and 
 | 2026-10-15 | New    | qa-task    | Bug created |
 | 2026-10-15 | In Progress | qa-fix | Investigation started |
 | 2026-10-15 | Ready for QA | qa-fix | Fix implemented (QA cycle 1) |
+| 2026-10-15 | Reopened | qa-task | Not fixed by task.203.qa.2.migrate-doc-numbering.md — the hint restores the whole root, erasing uncommitted work the run never touched (cycle 2 CR-1) |
+| 2026-10-15 | In Progress | qa-fix | Re-investigation (cycle 2) |
+| 2026-10-15 | Ready for QA | qa-fix | Fix implemented (QA cycle 2) |
 
 ---
 

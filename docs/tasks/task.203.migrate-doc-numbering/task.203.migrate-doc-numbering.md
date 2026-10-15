@@ -253,10 +253,11 @@ docs/prd/
 | `unplaced-prd` | An L3 monolith or index PRD has no feature slug. It needs `--name <path>=<slug>` |
 | `in-flight` | A story's status is not terminal (`accepted` or `cancelled`), so a live branch and run state still name it. `--allow-in-flight` overrides this |
 | `target-exists` | A destination path is already occupied |
-| `dirty-path` | A path to be moved has uncommitted changes |
+| `dirty-path` | A path the run would change — a move source, a file it edits in place, a registry it rewrites — has uncommitted changes (QA cycle 2, CR-1) |
 | `link-would-break` | A link that resolves today would be dead after the move |
 | `registry-behind` | The PRD registry counter is lower than the highest PRD number on disk (from task.202 `nextNumber`). It is never overridden |
 | `registry-missing` | There is no PRD registry, but a numbered PRD already exists on disk. Rows are never invented. With no numbered PRD, the registry is bootstrapped instead (§ 3, Plan) |
+| `id-collision` | Two documents would carry one id after the move — a legacy story landing on the number an already-numbered story holds under the same epic. Raised by the dry run (QA cycle 2, CR-2) |
 | `registry-unwritable` | `appendPrdRow` would refuse a row: an unrecognised table header, a duplicate number, or a malformed cell. Raised by the dry run and by `--check`, never first at `--apply` (QA cycle 1, CR-3). `registry-invalid` and `bad-slug` are passed through from `doc-id.js` the same way |
 
 ### Important Clarifications
@@ -597,7 +598,7 @@ None. Old directories become empty and are removed by the move. Nothing is delet
    - **Impact**: A mixed tree.
    - **Mitigation**: All verification happens before the first write. Moves come before rewrites,
      and the engine is idempotent over a mixed tree (Phase 1), so re-running finishes the job.
-   - **Rollback**: run the `revert` command the run prints on the uncommitted state: `git restore --source=HEAD --staged --worktree -- <root> <each edited path outside it>`, plus an exact `rm -f` of any file the run created. Untracked files the run moved are named for moving back by hand; nothing is cleaned. (A whole-tree `git checkout -- .` does not undo the staged `git mv` renames, and `git clean` deletes untracked work — QA cycle 1, CR-2.)
+   - **Rollback**: on the uncommitted state, run the `revert` command the run prints. It lists exactly the paths the run moved, edited or wrote — never a directory — and runs `git restore --source=HEAD --staged --worktree` on those paths, plus an exact `rm -f` of any file the run created, from the repository top level. Untracked files the run moved are named for moving back by hand, and nothing is cleaned. The run refuses (`dirty-path`) when any path it would change has uncommitted edits, so the revert can never erase work it did not write. A whole-tree `git checkout -- .` does not undo the staged `git mv` renames, and `git clean` deletes untracked work (QA cycles 1–2, CR-2 / CR-1). A move or write that fails part-way returns `post-check-failed` with the revert for what was actually done.
 
 ### Medium Risk Areas
 
@@ -665,25 +666,24 @@ the second-run no-op guarantee no longer describes the tree.
 **QA Status**: FAIL
 **QA Engineer**: QA Engineer (qa-task, develop-task pipeline)
 **Testing Date**: 2026-10-15
-**Quality Score**: 50/100
+**Quality Score**: 60/100
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.203.qa.1.migrate-doc-numbering.md](./task.203.qa.1.migrate-doc-numbering.md)
-- **Gate File**: [task.203.gate.1.migrate-doc-numbering.yml](./task.203.gate.1.migrate-doc-numbering.yml)
+- **Full Report**: [task.203.qa.2.migrate-doc-numbering.md](./task.203.qa.2.migrate-doc-numbering.md)
+- **Gate File**: [task.203.gate.2.migrate-doc-numbering.yml](./task.203.gate.2.migrate-doc-numbering.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 33 (engine) + `ci:fast` 5637 + `eval:all`
+- **Tests Executed**: 95 (engine + doc-id), `ci:fast` 5642, plus a probe with 11 cases
 - **Phases Verified**: 5/5 (2 with concerns)
-- **Critical Issues**: 1 HIGH, 3 MEDIUM
+- **Critical Issues**: 1 HIGH, 2 MEDIUM
 - **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- The repository migration is verified clean: 146 renames, 17 stories and 17 gates on the new ids, corpus ok (22 documents), and a second `--apply` answers `already`.
-- Bug 1 (HIGH): a named L3 monolith is planned but never moved.
-- Bug 2: the revert hint does not revert.
-- Bug 3: a registry refusal throws only on `--apply`.
-- Bug 4: the refusing boundary is unprobed, and an empty `--root` is accepted.
+- Bugs 1, 3 and 4 are verified fixed and closed.
+- Bug 2 is reopened (HIGH): the revert hint restores the whole root and can erase uncommitted work.
+- Bug 5: a story-number collision passes the dry run.
+- Bug 6: an `apply()` failure strands the tree with no revert hint.
 
 ## Change Log
 
@@ -695,6 +695,8 @@ the second-run no-op guarantee no longer describes the tree.
 | 2026-10-15 |  | Implemented — engine + 33 tests (2 test files, 2 shared sources, 1 bundled copy); repository migrated: 146 files moved, 112 links re-pointed, corpus ok (22 documents) | develop |
 | 2026-10-15 |  | QA gate FAIL (50/100) — 1 HIGH, 3 MEDIUM (bugs 1–4) | qa-task |
 | 2026-10-15 |  | QA findings fixed — bugs 1–4 (CR-1, CR-2, CR-3, QA-1) and CR-4; 5 tests added, 1 iteration | qa-fix |
+| 2026-10-15 |  | QA gate FAIL (60/100) — 1 HIGH, 2 MEDIUM (bug 2 reopened; bugs 5, 6) | qa-task |
+| 2026-10-15 |  | QA findings fixed — bug 2 (revert scoped to a touch record, dirty-path widened), bug 5 (id-collision), bug 6 (apply wrapped), plus CR-4–CR-7; 7 tests added, 2 iterations | qa-fix |
 
 ---
 

@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Major'
 priority: 'High'
 created: '2026-10-15'
@@ -12,7 +12,7 @@ description: 'A named L3 monolith is planned but never moved; the run answers `a
 
 **Bug ID**: TASK-203-BUG-1
 **Related**: [task.203.migrate-doc-numbering.md](./task.203.migrate-doc-numbering.md) (QA finding CR-1, gate 1)
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Priority**: High
 **Severity**: Major
 **Created**: 2026-10-15
@@ -92,6 +92,7 @@ description: 'A named L3 monolith is planned but never moved; the run answers `a
 | 2026-10-15 | New    | qa-task    | Bug created |
 | 2026-10-15 | In Progress | qa-fix | Investigation started |
 | 2026-10-15 | Ready for QA | qa-fix | Fix implemented (QA cycle 1) |
+| 2026-10-15 | Closed | qa-task | Verified by task.203.qa.2.migrate-doc-numbering.md |
 
 ---
 

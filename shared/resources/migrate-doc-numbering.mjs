@@ -46,8 +46,10 @@
  *     usage             2  a bad flag, --apply with --check, no git repository, or
  *                          a PRD root that does not exist
  *
- * Blocker codes: prd-less-epic, unplaced-prd, in-flight, target-exists, dirty-path,
- * link-would-break, registry-behind, registry-missing — plus two that doc-id.js can
+ * Blocker codes: prd-less-epic, unplaced-prd, in-flight, target-exists, dirty-path
+ * (any tracked path the run would change, not only a move source), id-collision (two
+ * documents that would carry one id), link-would-break, registry-behind,
+ * registry-missing — plus two that doc-id.js can
  * answer and this module passes through rather than guessing past: registry-invalid
  * (a registry with no usable counter), registry-unwritable (appendPrdRow refused a
  * row: no PRD table header it recognises, a duplicate, a malformed cell) and bad-slug
@@ -78,6 +80,7 @@ export const BLOCKER_CODES = Object.freeze([
   "registry-missing",
   "registry-invalid",
   "registry-unwritable",
+  "id-collision",
   "bad-slug",
 ]);
 
@@ -199,10 +202,20 @@ export function realIo(repoRoot) {
       trackedCache = r.stdout.split("\0").filter(Boolean);
       return trackedCache;
     },
-    /** Tracked paths under `dir` with uncommitted changes (untracked files excluded). */
-    dirty(dir) {
+    /** Of `paths`, the tracked ones with uncommitted changes (untracked excluded). */
+    dirty(paths) {
+      const list = Array.isArray(paths) ? paths : [paths];
+      if (!list.length) return new Set();
       const r = git(
-        ["status", "--porcelain=v1", "-z", "--untracked-files=no", "--", dir],
+        [
+          "--literal-pathspecs",
+          "status",
+          "--porcelain=v1",
+          "-z",
+          "--untracked-files=no",
+          "--",
+          ...list,
+        ],
         repoRoot,
       );
       if (r.status !== 0) throw new Error(`git status failed: ${r.stderr}`);
@@ -550,6 +563,28 @@ export function plan(disc, registryText, io) {
       newShort: docId.parse(newStem).id,
       newDir: P.join(ep.newDir, "stories", newStem),
     });
+  }
+
+  // Two documents that would carry one id. A story keeps its number under its new
+  // parent, so a legacy story can land on the id an already-numbered one holds
+  // (task.203 QA cycle 2, CR-2). Checked over every planned epic and story, and
+  // raised only when at least one of the pair is renamed — a pre-existing
+  // duplicate between unmoved documents is checkCorpus's to report.
+  const byId = new Map();
+  for (const x of [...epicPlans, ...storyPlans]) {
+    const id = docId.parse(x.newStem).id;
+    if (!byId.has(id)) byId.set(id, []);
+    byId.get(id).push(x);
+  }
+  for (const [id, list] of byId) {
+    if (list.length < 2 || list.every((x) => x.dir === x.newDir)) continue;
+    blockers.push(
+      blocker(
+        "id-collision",
+        list[1].doc || list[1].dir,
+        `${id} would be held by ${list.map((x) => x.dir).join(" and ")}`,
+      ),
+    );
   }
 
   // Directory map (old → new) and the basename rule of each document directory.
@@ -960,7 +995,9 @@ export function planEdits(planned, disc, io) {
   }
 
   const prefix = `${root}/`;
-  const candidates = new Set(disc.files);
+  // Every file the run moves is a candidate, the L3 monolith beside the root
+  // included even when it is untracked (task.203 QA cycle 2, CR-6).
+  const candidates = new Set([...disc.files, ...planned.fileMap.keys()]);
   for (const f of tracked)
     if (LITERAL_EXTS.includes(P.extname(f))) candidates.add(f);
   for (const file of candidates) {
@@ -1124,15 +1161,19 @@ export function verify(planned, disc, io, opts = {}) {
         ),
       );
   }
-  if (planned.fileMap.size) {
-    const dirty = io.dirty(planned.root);
-    for (const from of planned.fileMap.keys()) {
-      if (dirty.has(from))
+  // Every pre-existing path the run will change — a move source, a file edited in
+  // place, a registry it rewrites — must be clean, or the revert would erase the
+  // uncommitted change with the run's (task.203 QA cycle 2, CR-1).
+  const dirtyPaths = opts.dirtyPaths || [...planned.fileMap.keys()];
+  if (dirtyPaths.length) {
+    const dirty = io.dirty(dirtyPaths);
+    for (const p of dirtyPaths) {
+      if (dirty.has(p))
         blockers.push(
           blocker(
             "dirty-path",
-            from,
-            "uncommitted changes — commit or stash first",
+            p,
+            "uncommitted changes the run would rewrite — commit or stash first",
           ),
         );
     }
@@ -1217,6 +1258,9 @@ export function epicRegistryPointer(oldText, planned, { rel, repoPath }) {
  */
 export function apply(planned, disc, editsOut, io, extra = {}) {
   const tracked = extra.tracked || new Set(io.tracked());
+  // What has been done so far — read by the caller's revert when a step throws
+  // part-way (task.203 QA cycle 2, CR-3).
+  const progress = extra.progress || { moved: new Set(), written: new Set() };
   const newDirs = new Set(
     [...planned.fileMap.values()].map((p) => P.dirname(p)),
   );
@@ -1224,17 +1268,31 @@ export function apply(planned, disc, editsOut, io, extra = {}) {
   let moved = 0;
   for (const [from, to] of planned.fileMap) {
     io.move(from, to, { tracked: tracked.has(from) });
+    progress.moved.add(from);
     moved++;
   }
-  const oldDirs = [...new Set(disc.dirs)].sort((a, b) => b.length - a.length);
-  for (const d of oldDirs) if (d !== planned.root) io.rmdirIfEmpty(d);
+  // Only the directories this run's moves emptied — never any other empty
+  // directory under the root (task.203 QA cycle 2, CR-4).
+  const emptied = new Set();
+  for (const from of planned.fileMap.keys()) {
+    let d = P.dirname(from);
+    while (d !== planned.root && isUnder(d, planned.root)) {
+      emptied.add(d);
+      d = P.dirname(d);
+    }
+  }
+  for (const d of [...emptied].sort((a, b) => b.length - a.length))
+    io.rmdirIfEmpty(d);
   let written = 0;
   for (const [file, text] of editsOut) {
-    io.writeFile(planned.mapPath(file), text);
+    const target = planned.mapPath(file);
+    io.writeFile(target, text);
+    progress.written.add(target);
     written++;
   }
   for (const [file, text] of extra.writes || []) {
     io.writeFile(file, text);
+    progress.written.add(file);
     written++;
   }
   return { moved, written };
@@ -1262,33 +1320,44 @@ export function checkPrdRoot(rootArg, base) {
   if (typeof rootArg !== "string" || rootArg === "" || typeof base !== "string")
     return null;
   if (rootArg.includes("\0") || rootArg.includes("%")) return null;
-  const abs = path.resolve(base, rootArg);
-  const rel = path.relative(base, abs);
-  if (rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel))
-    return null;
   let realBase;
   try {
     realBase = fs.realpathSync(base);
   } catch {
     return null;
   }
+  // Containment is judged on real paths: the nearest existing ancestor is
+  // realpath'd and the not-yet-existing tail re-appended. A symlink out of the
+  // repository is refused, and a root named through a symlinked path to the
+  // repository is accepted (task.203 QA cycle 2, CR-5).
+  const abs = path.resolve(base, rootArg);
   let probe = abs;
-  while (!fs.existsSync(probe) && probe !== path.dirname(probe))
-    probe = path.dirname(probe);
+  const tail = [];
+  while (!fs.existsSync(probe)) {
+    const parent = path.dirname(probe);
+    if (parent === probe) return null;
+    tail.unshift(path.basename(probe));
+    probe = parent;
+  }
   let real;
   try {
     real = fs.realpathSync(probe);
   } catch {
     return null;
   }
-  const realRel = path.relative(realBase, real);
+  const rel = path.relative(realBase, path.join(real, ...tail));
+  // The repository root itself, anything outside it, and git or dependency
+  // internals are never a PRD root (CR-4).
   if (
-    realRel === ".." ||
-    realRel.startsWith(`..${path.sep}`) ||
-    path.isAbsolute(realRel)
+    rel === "" ||
+    rel === ".." ||
+    rel.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(rel)
   )
     return null;
-  return rel === "" ? "." : rel.split(path.sep).join("/");
+  const segs = rel.split(path.sep);
+  if (segs.some((x) => x === ".git" || x === "node_modules")) return null;
+  return segs.join("/");
 }
 
 /**
@@ -1337,27 +1406,74 @@ export function planRegistry(planned, registryText, edits, io, registryPath) {
 }
 
 /**
- * The command that undoes an --apply which has not been committed: restore every
- * tracked path the run touched from HEAD (no-overlay, so a staged rename
- * destination is removed and its source returns), and name the untracked files the
- * run moved by plain rename — they are not in HEAD, so they are moved back by hand,
- * never cleaned. Untracked work is left alone (task.203 QA cycle 1, CR-2).
+ * The run's one record of what it changes. The dirty check, the apply and the
+ * revert all read it, so what is refused, what is written and what is undone
+ * cannot disagree (task.203 QA cycle 2, CR-1 — consolidated rather than patched).
+ *   moves   — { from, to, tracked } per file move
+ *   inPlace — pre-existing paths rewritten where they are (an edited file that does
+ *             not move, a registry rewritten)
+ *   created — paths the run writes that did not exist before (the PRD registry on a
+ *             bootstrap)
  */
-export function revertHint(root, touched, untrackedMoves, created = []) {
+export function touchRecord(planned, edits, writes, io, tracked) {
+  const moves = [...planned.fileMap].map(([from, to]) => ({
+    from,
+    to,
+    tracked: tracked.has(from),
+  }));
+  const inPlace = [];
+  const created = [];
+  for (const f of edits.keys()) if (!planned.fileMap.has(f)) inPlace.push(f);
+  for (const [f] of writes) {
+    if (inPlace.includes(f)) continue;
+    if (io.exists(f)) inPlace.push(f);
+    else created.push(f);
+  }
+  return { moves, inPlace, created, tracked };
+}
+
+/**
+ * The command that undoes an uncommitted --apply — exactly the paths the touch
+ * record names, never a directory. With `progress`, only what was actually done.
+ * Tracked paths are restored from HEAD (no-overlay, so a staged rename destination
+ * is removed and its source returns); created files are removed by exact name;
+ * untracked files moved by plain rename are named for moving back by hand. It runs
+ * from the repository top level, so it works from any directory (CR-7).
+ */
+export function revertHint(touch, progress = null) {
   const q = (t) => `'${t.replace(/'/g, "'\\''")}'`;
-  const paths = [
-    ...new Set([root, ...touched.filter((t) => !isUnder(t, root))]),
-  ]
-    .filter((t) => !created.includes(t))
-    .sort()
-    .map(q);
-  let cmd = `git restore --source=HEAD --staged --worktree -- ${paths.join(" ")}`;
-  // A file the run created is untracked, so restore cannot see it: name it exactly.
-  if (created.length)
-    cmd += ` && rm -f -- ${[...created].sort().map(q).join(" ")}`;
-  if (!untrackedMoves.length) return cmd;
-  const back = untrackedMoves.map(([from, to]) => `${to} → ${from}`).join("; ");
-  return `${cmd}; then move these untracked files back by hand: ${back}`;
+  const didMove = (m) => !progress || progress.moved.has(m.from);
+  const didWrite = (f) => !progress || progress.written.has(f);
+  const restore = new Set();
+  const back = [];
+  const byHand = [];
+  for (const m of touch.moves) {
+    if (!didMove(m)) continue;
+    if (m.tracked) {
+      restore.add(m.from);
+      restore.add(m.to);
+    } else back.push(`${m.to} → ${m.from}`);
+  }
+  for (const f of touch.inPlace) {
+    if (!didWrite(f)) continue;
+    if (touch.tracked.has(f)) restore.add(f);
+    else byHand.push(f);
+  }
+  const remove = touch.created.filter(didWrite);
+  const parts = [];
+  if (restore.size)
+    parts.push(
+      `git restore --source=HEAD --staged --worktree -- ${[...restore].sort().map(q).join(" ")}`,
+    );
+  if (remove.length) parts.push(`rm -f -- ${remove.sort().map(q).join(" ")}`);
+  let cmd = parts.length
+    ? `cd "$(git rev-parse --show-toplevel)" && ${parts.join(" && ")}`
+    : "nothing to revert";
+  if (back.length)
+    cmd += `; then move these untracked files back by hand: ${back.join("; ")}`;
+  if (byHand.length)
+    cmd += `; untracked files the run rewrote, to check by hand: ${byHand.join(", ")}`;
+  return cmd;
 }
 
 // ---------------------------------------------------------------------------
@@ -1442,7 +1558,7 @@ export function run(argv, ctx = {}) {
       return {
         reason: "usage",
         exitCode: 2,
-        error: `PRD root ${JSON.stringify(named)} is outside the repository or not a plain path`,
+        error: `PRD root ${JSON.stringify(named)} is refused: it must be a plain directory path inside the repository, not the repository root itself, .git or node_modules`,
       };
   } else {
     root = P.normalize(named).replace(/\/$/, "");
@@ -1496,7 +1612,10 @@ export function run(argv, ctx = {}) {
       exitCode: 1,
       corpus: corpus.summary,
       findings: corpus.findings,
-      revert: `nothing left to move, but the corpus is not clean — a crashed --apply? \`git status\` shows what changed; ${revertHint(root, io.exists(EPIC_REGISTRY) ? [EPIC_REGISTRY] : [], [])} restores the tracked files under the root (and the epic registry, when there is one) from HEAD (re-check any other file \`git status\` lists; untracked files are left alone)`,
+      // No command: with nothing left to move this run touched nothing, and a
+      // whole-root restore would erase work it never wrote (task.203 QA cycle 2, CR-1).
+      revert:
+        "nothing left to move, but the corpus is not clean. If an earlier --apply stopped part-way, run the revert command it printed; otherwise fix the findings above. `git status` shows what is uncommitted.",
     };
   }
 
@@ -1508,28 +1627,8 @@ export function run(argv, ctx = {}) {
     io,
     registryPath,
   );
-  const blockers = [
-    ...verify(planned, disc, io, { allowInFlight: args.allowInFlight }),
-    ...e.blockers,
-    ...registry.blockers,
-  ];
-  const report = {
-    ...base,
-    blockers,
-    links: {
-      live: e.links.live,
-      dead: e.links.dead,
-      rewritten: e.links.rewritten,
-      wouldHeal: e.links.wouldHeal,
-    },
-    edits: e.edits.size,
-  };
-  if (args.check) return { ...report, reason: "needs-migration", exitCode: 1 };
-  if (blockers.length) return { ...report, reason: "blocked", exitCode: 1 };
-  if (!args.apply) return { ...report, reason: "dry-run", exitCode: 0 };
-
-  // Registries — validated above; written once, after the edits, and removed from
-  // the edit map so the same file is never written twice.
+  // Registries — written once, after the edits, and removed from the edit map so
+  // the same file is never written twice.
   const writes = [];
   if (registry.changed) {
     e.edits.delete(registryPath);
@@ -1549,15 +1648,48 @@ export function run(argv, ctx = {}) {
       ]);
     }
   }
-  // The untracked files the run will move by plain rename — read once, before the
-  // moves, for the revert hint (a per-file read would re-list the index each time).
   const tracked = new Set(io.tracked());
-  const untrackedMoves = [...planned.fileMap].filter(
-    ([from]) => !tracked.has(from),
-  );
-  // Files this run creates (the PRD registry on a bootstrap): listed for the revert.
-  const created = writes.map(([f]) => f).filter((f) => !io.exists(f));
-  const done = apply(planned, disc, e.edits, io, { writes, tracked });
+  const touch = touchRecord(planned, e.edits, writes, io, tracked);
+  const blockers = [
+    ...verify(planned, disc, io, {
+      allowInFlight: args.allowInFlight,
+      dirtyPaths: [...touch.moves.map((m) => m.from), ...touch.inPlace],
+    }),
+    ...e.blockers,
+    ...registry.blockers,
+  ];
+  const report = {
+    ...base,
+    blockers,
+    links: {
+      live: e.links.live,
+      dead: e.links.dead,
+      rewritten: e.links.rewritten,
+      wouldHeal: e.links.wouldHeal,
+    },
+    edits: e.edits.size,
+  };
+  if (args.check) return { ...report, reason: "needs-migration", exitCode: 1 };
+  if (blockers.length) return { ...report, reason: "blocked", exitCode: 1 };
+  if (!args.apply) return { ...report, reason: "dry-run", exitCode: 0 };
+
+  const progress = { moved: new Set(), written: new Set() };
+  let done;
+  try {
+    done = apply(planned, disc, e.edits, io, { writes, tracked, progress });
+  } catch (err) {
+    // A move or write failed part-way: report what was done and how to undo it,
+    // never a bare exception (task.203 QA cycle 2, CR-3).
+    return {
+      ...report,
+      reason: "post-check-failed",
+      exitCode: 1,
+      error: `--apply stopped part-way: ${err.message}`,
+      moved: progress.moved.size,
+      written: progress.written.size,
+      revert: revertHint(touch, progress),
+    };
+  }
   const corpus = postCheck(root, io, repoRoot);
   if (!corpus.clean)
     return {
@@ -1567,12 +1699,7 @@ export function run(argv, ctx = {}) {
       exitCode: 1,
       corpus: corpus.summary,
       findings: corpus.findings,
-      revert: revertHint(
-        root,
-        [...e.edits.keys(), ...writes.map(([f]) => f)],
-        untrackedMoves,
-        created,
-      ),
+      revert: revertHint(touch),
     };
   return {
     ...report,
@@ -1581,12 +1708,7 @@ export function run(argv, ctx = {}) {
     exitCode: 0,
     corpus: corpus.summary,
     // Nothing is committed by the run: this is how to undo it before you commit.
-    revert: revertHint(
-      root,
-      [...e.edits.keys(), ...writes.map(([f]) => f)],
-      untrackedMoves,
-      created,
-    ),
+    revert: revertHint(touch),
   };
 }
 

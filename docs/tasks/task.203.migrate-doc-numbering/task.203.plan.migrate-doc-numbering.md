@@ -158,7 +158,8 @@ paths go first, so a directory prefix never replaces part of a longer file path.
 | `unplaced-prd` | An L3 shape with no `--name` |
 | `in-flight` | A story main doc's `status` is not in `{accepted, cancelled}` and `--allow-in-flight` is absent |
 | `target-exists` | Any new path exists and is not the same file |
-| `dirty-path` | `git status --porcelain -- <old>` is non-empty for any path to be moved |
+| `dirty-path` | A tracked path the run would change — a move source, a file edited in place, a registry rewritten — has uncommitted changes (`git status --porcelain --untracked-files=no -- <paths>`; QA cycle 2, CR-1) |
+| `id-collision` | Two planned documents would carry one id (QA cycle 2, CR-2) |
 | `link-would-break` | See above |
 | `registry-behind` | `next("prd", …)` answers `registry-behind` |
 | `registry-missing` | No `${PRD_ROOT}/prd-registry.md`, but a numbered PRD is already on disk. With no numbered PRD, the registry is bootstrapped instead |

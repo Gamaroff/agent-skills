@@ -39,9 +39,16 @@ const { extractRelativeLinks } = require(
 // An in-memory io: files are { path: text }; directories are implied.
 // ---------------------------------------------------------------------------
 
-function memIo(files, { tracked, dirty = [] } = {}) {
+function memIo(files, { tracked, dirty = [], failMoveAt = 0 } = {}) {
   const fs = new Map(Object.entries(files));
-  const calls = { readDir: [], tracked: 0, moves: [], writes: [] };
+  const calls = {
+    readDir: [],
+    tracked: 0,
+    moves: [],
+    writes: [],
+    rmdirs: [],
+    dirtyAsked: [],
+  };
   const isDir = (p) => {
     const pre = `${p}/`;
     for (const k of fs.keys()) if (k.startsWith(pre)) return true;
@@ -68,14 +75,22 @@ function memIo(files, { tracked, dirty = [] } = {}) {
       calls.tracked++;
       return tracked || [...fs.keys()];
     },
-    dirty: () => new Set(dirty),
+    dirty(paths) {
+      calls.dirtyAsked.push(...paths);
+      return new Set(dirty);
+    },
     mkdirp() {},
     move(from, to, opts) {
+      if (failMoveAt && calls.moves.length + 1 === failMoveAt)
+        throw new Error("git mv refused");
       calls.moves.push({ from, to, tracked: opts.tracked });
       fs.set(to, fs.get(from));
       fs.delete(from);
     },
-    rmdirIfEmpty: (p) => !isDir(p),
+    rmdirIfEmpty(p) {
+      calls.rmdirs.push(p);
+      return !isDir(p);
+    },
     writeFile(p, t) {
       calls.writes.push(p);
       fs.set(p, t);
@@ -657,12 +672,10 @@ test("nothing left to move but a dirty corpus is post-check-failed, never alread
   };
   const r = m.run(["--root", R], { io: memIo(files) });
   assert.deepEqual([r.reason, r.exitCode], ["post-check-failed", 1]);
-  assert.match(r.revert, /git restore --source=HEAD --staged --worktree -- /);
-  assert.doesNotMatch(
-    r.revert,
-    /git (checkout|clean)/,
-    "never a whole-tree checkout or clean",
-  );
+  // Nothing left to move means this run touched nothing: no command, never a
+  // whole-root restore that would erase work it did not write (cycle 2, CR-1).
+  assert.doesNotMatch(r.revert, /git (restore|checkout|clean)/);
+  assert.match(r.revert, /git status/);
 });
 
 test("usage: --apply with --check, an unknown flag, a missing root, a bad --name", () => {
@@ -920,7 +933,27 @@ test("QA-1: checkPrdRoot refuses an empty, escaping, encoded, NUL or symlinked r
       "docs/prd",
       "an absolute path inside the base",
     );
-    assert.equal(m.checkPrdRoot(".", base), ".");
+    for (const internal of [
+      ".",
+      ".git",
+      ".git/x",
+      "node_modules",
+      "a/node_modules/b",
+    ])
+      assert.equal(
+        m.checkPrdRoot(internal, base),
+        null,
+        `${internal} is never a PRD root (cycle 2, CR-4)`,
+      );
+    // A root named through a symlinked path to the base is the same root (cycle 2, CR-5).
+    const link = `${base}-link`;
+    execFileSync("ln", ["-s", base, link]);
+    try {
+      assert.equal(m.checkPrdRoot(join(link, "docs/prd"), base), "docs/prd");
+      assert.equal(m.checkPrdRoot("docs/prd", link), "docs/prd");
+    } finally {
+      rmSync(link, { force: true });
+    }
   } finally {
     rmSync(base, { recursive: true, force: true });
   }
@@ -958,4 +991,149 @@ test("CR-2: the printed revert undoes an uncommitted --apply exactly, in a real 
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// ---------------------------------------------------------------------------
+// QA cycle 2 (gate 2): CR-1, CR-2, CR-3, CR-4, CR-6, CR-7
+// ---------------------------------------------------------------------------
+
+test("cycle 2 CR-1: a dirty file the run would rewrite in place blocks, not only a dirty move source", () => {
+  const io = memIo(l2Tree(), { dirty: ["README.md"] });
+  const r = m.run(["--apply", "--root", R], { io });
+  assert.equal(r.reason, "blocked");
+  assert.deepEqual(
+    r.blockers.map((b) => `${b.code} ${b.path}`),
+    ["dirty-path README.md"],
+  );
+  assert.ok(
+    io.calls.dirtyAsked.includes("README.md"),
+    "the in-place edit target was checked",
+  );
+  assert.equal(
+    io.calls.moves.length + io.calls.writes.length,
+    0,
+    "nothing written",
+  );
+});
+
+test("cycle 2 CR-1/CR-7: the revert touches only the run's own paths, keeps unrelated dirty work, and runs from a subdirectory", () => {
+  const PAD =
+    Array.from({ length: 40 }, (_, i) => `# unchanged line ${i}`).join("\n") +
+    "\n";
+  const tree = Object.fromEntries(
+    Object.entries(l2Tree({ [`${R}/onb/notes.md`]: "notes\n" })).map(
+      ([k, v]) => [k, v + PAD],
+    ),
+  );
+  const { dir, g } = gitRepo(tree);
+  try {
+    // Uncommitted work under the root that the run neither moves nor rewrites.
+    writeFileSync(join(dir, R, "onb/notes.md"), "someone's uncommitted edit\n");
+    const r = m.run(["--apply", "--json", "--root", R], { cwd: dir });
+    assert.equal(
+      r.reason,
+      "ok",
+      JSON.stringify(r.findings || r.blockers || r.error),
+    );
+    assert.doesNotMatch(
+      r.revert,
+      /-- '?docs\/prd'?( |$)/,
+      "never the whole root",
+    );
+    execFileSync("bash", ["-c", r.revert], { cwd: join(dir, "docs") });
+    assert.equal(
+      g("status", "--porcelain").trim(),
+      `M ${R}/onb/notes.md`,
+      "only the unrelated edit is left",
+    );
+    assert.equal(
+      readFileSync(join(dir, R, "onb/notes.md"), "utf8"),
+      "someone's uncommitted edit\n",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("cycle 2 CR-2: two stories that would carry one id block the dry run", () => {
+  const E = `${R}/d/prd.f/epics/epic.1.e`;
+  const io = memIo({
+    [`${R}/d/prd.f/prd.f.md`]: "---\nname: prd.f\n---\n",
+    [`${E}/epic.1.e.md`]: "---\nepic_number: 1\n---\n",
+    [`${E}/stories/story.1.1.a/story.1.1.a.md`]:
+      "---\nid: story.1.1.a\nstatus: accepted\nepic: 1\n---\n",
+    [`${E}/stories/story.1.1.1.b/story.1.1.1.b.md`]:
+      "---\nid: story.1.1.1.b\nstatus: accepted\nepic: epic.1.1.e\n---\n",
+  });
+  for (const argv of [
+    ["--root", R],
+    ["--apply", "--root", R],
+  ]) {
+    const r = m.run(argv, { io });
+    assert.equal(r.reason, "blocked", argv.join(" "));
+    assert.ok(
+      r.blockers.some(
+        (b) => b.code === "id-collision" && /story\.1\.1\.1/.test(b.detail),
+      ),
+    );
+  }
+  assert.equal(io.calls.moves.length, 0);
+});
+
+test("cycle 2 CR-3: a move that fails part-way returns post-check-failed with a revert for what was done", () => {
+  const io = memIo(l2Tree(), { failMoveAt: 3 });
+  const r = m.run(["--apply", "--root", R], { io });
+  assert.deepEqual([r.reason, r.exitCode], ["post-check-failed", 1]);
+  assert.match(r.error, /stopped part-way: git mv refused/);
+  assert.equal(r.moved, 2);
+  const [first, second] = io.calls.moves;
+  for (const p of [first.from, first.to, second.from, second.to])
+    assert.ok(r.revert.includes(`'${p}'`), p);
+  const fresh = memIo(l2Tree());
+  const third = [
+    ...m.plan(m.discover(R, fresh), null, fresh).fileMap.keys(),
+  ][2];
+  assert.ok(
+    !r.revert.includes(`'${third}'`),
+    "a file never moved is not in the revert",
+  );
+});
+
+test("cycle 2 CR-4: apply only asks to remove ancestors of moved files, never another directory", () => {
+  const io = memIo(l2Tree({ [`${R}/other/empty-later/keep.md`]: "x" }));
+  assert.equal(m.run(["--apply", "--root", R], { io }).reason, "ok");
+  const movedFrom = io.calls.moves.map((x) => x.from);
+  assert.ok(io.calls.rmdirs.length > 0);
+  for (const d of io.calls.rmdirs) {
+    assert.ok(
+      movedFrom.some((f) => f.startsWith(`${d}/`)),
+      `${d} is an ancestor of a moved file`,
+    );
+    assert.notEqual(d, R, "never the root");
+  }
+  assert.ok(
+    !io.calls.rmdirs.some((d) => d.startsWith(`${R}/other`)),
+    "an unrelated directory is never touched",
+  );
+});
+
+test("cycle 2 CR-6: an untracked monolith still gets its frontmatter edit", () => {
+  const io = memIo(
+    {
+      "docs/prd.md": "---\ntitle: Mono\nstatus: draft\n---\n# PRD\n",
+      [`${R}/.keep`]: "",
+    },
+    { tracked: [`${R}/.keep`] },
+  );
+  const r = m.run(["--apply", "--root", R, "--name", "docs/prd.md=mono"], {
+    io,
+  });
+  assert.equal(r.reason, "ok", JSON.stringify(r.findings || r.blockers));
+  assert.equal(
+    docId.frontmatterField(
+      io.files.get(`${R}/mono/prd.1.mono/prd.1.mono.md`),
+      "prd_number",
+    ),
+    "1",
+  );
 });
