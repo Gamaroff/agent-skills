@@ -47,8 +47,12 @@ ci: # the docs-only rule at the pipeline's CI waits — schema: docs/reference/c
     # SKILL.md and shared/resources/*.md are executable prose in THIS repository, and tests read
     # docs/ (card-preflight-corpus scans docs/tasks/), so the consumer default (**/*.md) is too
     # wide here. Block list on purpose: the YAML subset reads an inline [..] as a string.
+    # CHANGELOG.md is prose no skill executes; the one test that reads it (changelog-entry-drift)
+    # runs in checkCommand's npm test. Listed so a CHANGELOG-only DoD fix resumes at /finalise
+    # instead of re-entering QA (reenter-qa-after-finalise.sh, observation #44).
     patterns:
       - "docs/**"
+      - "CHANGELOG.md"
     # ci:fast does not run the eval tier, which holds task-registry-drift (a docs-only edit to a
     # task document can fail it). Measured 2026-10-01: eval:all takes about 5 s.
     checkCommand: "npm run ci:fast && npm run eval:all"

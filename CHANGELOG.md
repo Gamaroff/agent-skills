@@ -17,6 +17,18 @@ All notable changes to this project will be documented in this file. Format foll
   standards now describe the scheme, each with a dated interim note. No skill uses it yet; tasks
   203–207 migrate the callers.
 
+### Fixed
+
+- **A documentation-only DoD fix no longer re-enters QA.** After `/finalise` halts on Definition of
+  Done gaps, `reenter-qa-after-finalise.sh` counted every commit outside the work item's directory
+  as a code change. A CHANGELOG entry or a standards page therefore cost a full QA cycle and a
+  second PR review before `/finalise` could re-run (observation #44, task 202's run). The script
+  now classifies the changed paths with `ci.docsOnly.patterns` through `ci-tree-equivalence.js`,
+  the definition the docs-only CI rule and the 5c carry rule already use. It reads the configuration
+  at `HEAD`, and documentation alone resumes at Step 7. A classifier that cannot run, a malformed
+  configuration and `enabled: false` all count every path as code. This repository's patterns now
+  include `CHANGELOG.md`.
+
 ## [v0.57.1] - 2026-10-14
 
 ### Changed

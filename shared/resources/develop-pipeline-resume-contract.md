@@ -703,12 +703,17 @@ and both SKILL.md Phase 0b paragraphs cite it.
 - `no-gate` — `qa-cycle.sh` found no single current gate. Its own reason is relayed above the refusal as a `reenter-qa:` line — no gate file, gate files with no cycle number, or two files claiming one cycle (task.182). **Route:** back to the operator — resolve the gate files the relayed line names and run the script again; **never** step 7, which would accept a head no gate has read (a step-7 halt had a gate, so a missing or ambiguous one is a state to repair, not a document-only fix).
 - `git-unreadable` — `git status` exited non-zero, so the movement measure cannot run; git's own error is printed with it (task.182). **Route:** back to the operator — repair the repository and run the script again; **never** step 7, which an unread tree would otherwise reach through `no-code-moved`.
 - `uncommitted-fix` — a **tracked** change outside the work item's directory is uncommitted. **Route:** back to the operator — commit the fix and run the script again; **never** step 7, which would accept a head no review has read.
-- `no-code-moved` — no commit outside the work item's directory since the gate's `head:`: a document-only fix. **Route:** the next bullet — `/finalise` re-runs at 7. Untracked files outside the directory are named in this refusal, never a reason of their own: after Step 4 restores the files it held aside, nothing can tell one of those from a new fix file, so the operator who can decides — commit any that belong to the fix and run the script again.
+- `no-code-moved` — no commit outside the work item's directory since the gate's `head:`, or every path those commits changed is documentation under `ci.docsOnly.patterns` (a CHANGELOG entry, a standards page — observation #44): a document-only fix. **Route:** the next bullet — `/finalise` re-runs at 7. Untracked files outside the directory are named in this refusal, never a reason of their own: after Step 4 restores the files it held aside, nothing can tell one of those from a new fix file, so the operator who can decides — commit any that belong to the fix and run the script again.
 <!-- reenter-qa-refusals: end -->
 
 **Movement is measured as committed history**, because that is what the re-entered review reads
 (`qa-task` Step 3b scopes from commits and HALTs on an uncommitted tracked change): commits since the
-gate's `head:` outside the directory. Uncommitted tracked work is refused (`uncommitted-fix`); untracked
+gate's `head:` outside the directory. When there are such commits, the paths they changed are classified
+against `ci.docsOnly.patterns` through `ci-tree-equivalence.js` — the one definition of documentation,
+the same reader the 5c carry rule uses — with the configuration read at `HEAD`, renames split, and
+`skills-config.yaml` and submodule pointers never documentation; documentation alone is not movement.
+A classifier that cannot run, a malformed configuration and `enabled: false` all count every path as
+code. Uncommitted tracked work is refused (`uncommitted-fix`); untracked
 files are named on every outcome and never counted (above). `.claude/state`, the pipeline's own
 scratch, is never counted; a `head:` that is absent, not
 40-hex, not a commit or not an ancestor of `HEAD` counts as moved. It fails toward one extra QA
