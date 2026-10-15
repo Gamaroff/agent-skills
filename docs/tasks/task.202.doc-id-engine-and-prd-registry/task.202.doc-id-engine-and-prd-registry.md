@@ -416,24 +416,24 @@ that write one.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-15
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.202.qa.5.doc-id-engine-and-prd-registry.md](./task.202.qa.5.doc-id-engine-and-prd-registry.md)
-- **Gate File**: [task.202.gate.5.doc-id-engine-and-prd-registry.yml](./task.202.gate.5.doc-id-engine-and-prd-registry.yml)
+- **Full Report**: [task.202.qa.6.doc-id-engine-and-prd-registry.md](./task.202.qa.6.doc-id-engine-and-prd-registry.md)
+- **Gate File**: [task.202.gate.6.doc-id-engine-and-prd-registry.yml](./task.202.gate.6.doc-id-engine-and-prd-registry.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 59 (55 doc-id + 4 select-next)
+- **Tests Executed**: 59 (55 doc-id + 4 select-next), inside a 5569-test green suite
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-One medium: the parseLegacy digit-first guard misses the sub-story suffix (`story.1.2.3A.*`).
+No critical issues identified. Six QA cycles closed 24 gate findings and 13 advisory ones, each with a mutation-proven test.
 
 <!-- change-log-start -->
 ## Change Log
@@ -454,6 +454,7 @@ One medium: the parseLegacy digit-first guard misses the sub-story suffix (`stor
 | 2026-10-15 |  | QA findings fixed — cycle 4, 1 gate finding + 1 advisory, 2 tests | qa-fix |
 | 2026-10-15 |  | QA gate CONCERNS (90/100) — 1 finding (1 medium) | qa-task |
 | 2026-10-15 |  | QA findings fixed — cycle 5, 1 gate finding, 3 test cases | qa-fix |
+| 2026-10-15 |  | QA gate PASS (100/100) — no findings | qa-task |
 
 <!-- change-log-end -->
 

@@ -1,0 +1,57 @@
+schema: 2
+task: 'task.202.doc-id-engine-and-prd-registry'
+task_title: 'Doc-id engine and PRD registry'
+gate: PASS
+status_reason: 'Cycle 5 fix verified: parseLegacy refuses new-scheme sub-story names, with 0 other differences over 4712 tracked filename segments, and every legacy docs/prd shape still reads. No findings. Security probe engages; full suite green.'
+reviewer: 'QA Engineer'
+head: '8103737b960dc578a6bcda1d869576b522534d39'
+updated: '2026-10-15T05:21:46Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 59
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+  ci: 'not read — CI is gated at /finalise'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 30
+    notes: 'security-probe.mjs on doc-id.js#parse (23 hostile, 7 legitimate): engages.'
+  performance:
+    status: PASS
+    notes: 'check --corpus over docs/prd 0.032 s on head 8103737b (uptime load 1.72, 1.40, 1.34); bound < 1 s.'
+  reliability:
+    status: PASS
+    notes: 'Fail-closed answers for absent, unreadable and malformed inputs, each test-pinned.'
+  maintainability:
+    status: PASS
+    notes: 'Registry reader pinned to the selector by a parity test; every fix carries a mutation-proven test.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Task 203: validate is not in the artifact vocabulary, so 7 legacy story.*.validate.<date>.md files in docs/prd do not parse (pre-existing).'
+      refs: ['shared/resources/doc-id.js', 'shared/resources/finalise-fix-and-recheck.mjs']
+    - action: 'Task 203: decide legacy-vs-new from the missing prd_number frontmatter (the task rule) rather than from parseLegacy name heuristics.'
+      refs: ['shared/resources/doc-id.js']
+
+bug_resolution:
+  previous_gate: 'task.202.gate.5.doc-id-engine-and-prd-registry.yml'
+  fixed: ['CR-1']
+  fix_commit: '0399f61f'
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
