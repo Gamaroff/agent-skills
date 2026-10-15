@@ -5,10 +5,10 @@ type: task
 description: "Ship one shared parser, formatter, allocator and checker for hierarchical document ids (prd.P, epic.P.E, story.P.E.S), plus the PRD registry and the standards that define them, with no existing call site migrated yet."
 tags: [doc-numbering, prd, epic, story, registry, shared-resources]
 category: infrastructure
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-15
 assignee:
 estimated_effort_hours: 16
 risk_level: medium
@@ -17,7 +17,9 @@ github_issue: 645
 
 # Technical Task: Doc-id engine and PRD registry
 
-**Status:** Planned
+**Status:** Ready for Review
+
+**Review**: ✅ All review recommendations from `task.202.review.1.doc-id-engine-and-prd-registry.md` implemented 2026-10-15
 
 **GitHub Issue**: [#645](https://github.com/Gamaroff/agent-skills/issues/645)
 
@@ -158,6 +160,18 @@ Existing mechanisms this task sits beside. This answers the "second mechanism" c
   - It is checked against today's tree with `find docs evals skills \( -name 'story.*' -o -name 'epic.*' \) | grep -E '/(story\.[0-9]+\.[0-9]+|epic\.[0-9]+)\.[0-9]'`, which returns nothing.
 - A sub-story is a letter suffix on S: `story.1.2.3A.slug` (`create-branch/SKILL.md`: "creating `story.309.2.3A`").
 - Task and bug grammar is unchanged.
+- **Artifacts are recognised the way `WORK_ITEM_ARTIFACT_RE` recognises them**: an artifact keyword as a
+  whole dot-segment anywhere after the id. The canonical form `.{artifact}.{seq}.{slug}` (and
+  `.plan.{slug}`) fills `seq` and `slug`. The tree also holds non-canonical artifacts that `parse` must
+  still classify as artifacts, never as documents and never as `bad-shape`: a dated review
+  (`task.12.review.2026-05-06.md`), a slug before the keyword
+  (`task.11.review-task-tracker-dedup.review.2026-05-06.md`) and a seq-less DoD sidecar
+  (`task.133.dod.security.by-hand-probe.md`, `task.125.dod.security.run.json`). For these `parse` returns
+  the artifact with `seq: null` and `canonical: false`; the round-trip property covers canonical names
+  only. Found with `ls docs/tasks/*/ | grep -E '\.(review|qa|dod|gate|handover|handoff|risk|test-design|pr-review)\.' | grep -vE '\.(review|qa|dod|gate|handover|handoff|risk|test-design|pr-review)\.[0-9]+\.'`.
+- A single-segment remainder is always the document's slug, even when it equals an artifact word:
+  `story.1.2.3.plan.md` is the story whose slug is `plan` (an artifact needs at least one segment after
+  its keyword).
 
 **`check` reasons:** `ok`, `bad-shape`, `dir-stem-mismatch`, `frontmatter-mismatch`, `parent-missing`,
 `parent-number-mismatch`, `unregistered`, `duplicate-id`, `registry-missing`.
@@ -209,6 +223,7 @@ Title cell links to the PRD document. Its standard is `docs/standards/prd-regist
 - ✅ A `prd` kind in `parseRegistry`, with a `kind`-scoped href check, in `skills/develop-next/scripts/select-next.mjs`
 - ✅ `docs/standards/prd-registry.md` (new)
 - ✅ Updates to `docs/standards/file-naming.md`, `prd-documents.md`, `epic-documents.md`, `story-documents.md` and `epic-registry.md` (the last one marked as superseded by 203)
+- ✅ `docs/architecture/concepts/coding-standards.md` § Registries — add the PRD registry and the dated interim note beside "Epic numbers are globally unique". It is a `devLoadAlwaysFiles` entry, loaded into every pipeline run, so leaving it would contradict the standards this task rewrites
 - ✅ Tests that fix `doc-id.js`'s artifact list as equal to `WORK_ITEM_ARTIFACT_RE`
 
 ### Out of Scope
@@ -243,28 +258,30 @@ that write one.
 
 **Risk:** Medium (grammar errors propagate to every later task). **Files:** `shared/resources/doc-id.js`, `shared/resources/tests/doc-id.test.mjs`. **Dependencies:** none.
 
-- [ ] Define the id grammar for prd, epic, story (with sub-story suffix), task and bug, plus the co-located artifact forms
-- [ ] Implement `parse`, `parseLegacy` and `format`, with a round-trip property test over a generated name set
-- [ ] Implement `matchesEpic(name, P, E)`, including a test that `epic.1.*` does not claim `epic.1.2.x`'s sibling `epic.12.1.x`
-- [ ] Implement `nextNumber` as highest + 1, with a test proving a deleted number is not reused (the contrast with `nextStoryId`)
+- [x] Define the id grammar for prd, epic, story (with sub-story suffix), task and bug, plus the co-located artifact forms
+- [x] Implement `parse`, `parseLegacy` and `format`, with a round-trip property test over a generated name set
+- [x] Classify non-canonical artifacts (dated, slug-before-keyword, seq-less) as artifacts with `seq: null, canonical: false`, with a test over the tracked `docs/tasks/` and `docs/bugs/` filenames asserting `parse`'s document-vs-artifact verdict agrees with `isWorkItemDocument` for every `task.*` / `bug.*` name
+- [x] Implement `matchesEpic(name, P, E)`, including a test that `epic.1.*` does not claim `epic.1.2.x`'s sibling `epic.12.1.x`
+- [x] Implement `nextNumber` as highest + 1, with a test proving a deleted number is not reused (the contrast with `nextStoryId`)
 
 ### Phase 2: Checks and CLI
 
 **Risk:** Medium. **Files:** `shared/resources/doc-id.js` and its test. **Dependencies:** Phase 1.
 
-- [ ] `check(path)`: shape, dir = stem, frontmatter numbers = filename numbers, parent exists with the same P/E, registry row present
-- [ ] `checkCorpus(prdRoot)`: walk `${PRD_ROOT}` (excluding `prd-registry.md` and shard files that carry no kind prefix), report `duplicate-id`, return `empty` for a tree with no documents
-- [ ] `resolvePrdRoot`, using the same order as `generate-prd-epic-index.mjs` `prdRootFromConfig`
-- [ ] CLI with `--json`, `reason` and exit codes 0, 1 and 2, all covered by spawned-process tests that read stdout through a pipe
+- [x] `check(path)`: shape, dir = stem, frontmatter numbers = filename numbers, parent exists with the same P/E, registry row present
+- [x] `checkCorpus(prdRoot)`: walk `${PRD_ROOT}` (excluding `prd-registry.md` and shard files that carry no kind prefix), report `duplicate-id`, return `empty` for a tree with no documents
+- [x] `resolvePrdRoot`, using the same order as `generate-prd-epic-index.mjs` `prdRootFromConfig`
+- [x] CLI with `--json`, `reason` and exit codes 0, 1 and 2, all covered by spawned-process tests that read stdout through a pipe
 
 ### Phase 3: Registry parser and standards
 
 **Risk:** Low. **Files:** `skills/develop-next/scripts/select-next.mjs`, `docs/standards/*.md`. **Dependencies:** Phase 1.
 
-- [ ] Add `prd` to `DEFAULT_COLUMNS` and `"prd #"` to `COLUMN_ALIASES`, and accept a `prd.` href only when `kind === "prd"`
-- [ ] Write `docs/standards/prd-registry.md`, modelled on `docs/standards/task-registry.md`
-- [ ] Rewrite the patterns in `file-naming.md`, `prd-documents.md`, `epic-documents.md` and `story-documents.md`, and add the interim note to each
-- [ ] Mark `docs/standards/epic-registry.md` as superseded by per-PRD numbering, effective with task 203
+- [x] Add `prd` to `DEFAULT_COLUMNS` and `"prd #"` to `COLUMN_ALIASES`, and accept a `prd.` href only when `kind === "prd"`
+- [x] Write `docs/standards/prd-registry.md`, modelled on `docs/standards/task-registry.md`
+- [x] Rewrite the patterns in `file-naming.md`, `prd-documents.md`, `epic-documents.md` and `story-documents.md`, and add the interim note to each
+- [x] Mark `docs/standards/epic-registry.md` as superseded by per-PRD numbering, effective with task 203
+- [x] Update `docs/architecture/concepts/coding-standards.md` § Registries: add the PRD registry bullet (`${PRD_ROOT}/prd-registry.md`, Next Available PRD Number) and the dated interim note on the epic bullet
 
 ## 7. Files Summary
 
@@ -290,6 +307,7 @@ that write one.
 9. ✅ `docs/standards/story-documents.md`
 10. ✅ `docs/standards/epic-registry.md`
 11. ✅ `docs/standards/README.md` — list `prd-registry.md`
+12. ✅ `docs/architecture/concepts/coding-standards.md` — § Registries: PRD registry bullet and the interim note
 
 ## 8. Testing Strategy
 
@@ -308,6 +326,7 @@ that write one.
 ### Contract Tests
 
 - **Artifact vocabulary:** `doc-id.js`'s list is equal to `WORK_ITEM_ARTIFACT_RE` from `finalise-fix-and-recheck.mjs`. This holds them in step until task 206 makes one re-export the other.
+- **Classification agreement:** for every tracked `task.*` / `bug.*` filename under `docs/tasks/` and `docs/bugs/`, `parse` calls it an artifact exactly when `isWorkItemDocument` rejects it as one. Control cases: `task.12.review.2026-05-06.md` (artifact, non-canonical) and `task.202.doc-id-engine-and-prd-registry.md` (document).
 
 ### Performance Tests
 
@@ -329,7 +348,7 @@ that write one.
 
 ### Performance
 
-- [ ] `check --corpus` over this repo's `docs/prd` tree finishes in under 1 s (measured with `time`, recorded in the implementation report)
+- [ ] `check --corpus` over this repo's `docs/prd` tree finishes in under 1 s (measured with `time` on the PR's head commit, with `uptime` recorded beside it, both in the implementation report)
 - [ ] No new runtime dependency is added to `package.json`
 
 ### Code Quality
@@ -340,7 +359,7 @@ that write one.
 
 ### Migration
 
-- [ ] The four changed standards carry the dated interim note
+- [ ] The four changed standards, and `coding-standards.md` § Registries, carry the dated interim note
 - [ ] `docs/standards/prd-registry.md` defines the registry location, columns, counter and the never-reuse rule
 - [ ] `epic-registry.md` names task 203 as the point where it is retired
 
@@ -400,19 +419,22 @@ that write one.
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-10-13 | 1.0 | Initial draft, from `.agents/plans/hierarchical-doc-numbering.md` (T1) | create-task |
+| 2026-10-15 | 1.1 | Review passed (8/10): added non-canonical artifact classification + agreement test, `coding-standards.md` § Registries to scope, load-recorded timing criterion | review-task |
+| 2026-10-15 |  | Status → ready-for-development | review-task |
+| 2026-10-15 |  | Implemented — 33 files (doc-id.js + CLI, 20 fixtures, select-next prd kind, 8 standards), 32 tests | develop |
 
 <!-- change-log-end -->
 
 ## Progress Tracking
 
 ### Phase 1: Grammar and pure functions
-- [ ] Complete
+- [x] Complete
 
 ### Phase 2: Checks and CLI
-- [ ] Complete
+- [x] Complete
 
 ### Phase 3: Registry parser and standards
-- [ ] Complete
+- [x] Complete
 
 ---
 
@@ -437,4 +459,4 @@ QA artifacts will land in this directory: `task.202.qa.{n}.doc-id-engine-and-prd
 `task.202.gate.{n}.doc-id-engine-and-prd-registry.yml`, and `task.202.bug.{n}.{name}.md` if bugs are
 found.
 
-**Status:** Planned
+**Status:** Ready for Review

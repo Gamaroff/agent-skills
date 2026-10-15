@@ -54,6 +54,9 @@ const ID_RE = {
    - `.{artifact}.{seq}.{slug}`, an artifact
    - `.plan.{slug}`, the plan, which has no seq
    - `sprint-review-summary`, which is unprefixed and handled by the caller
+   - any other remainder holding an `ARTIFACTS` keyword as a whole dot-segment (dated review,
+     slug before the keyword, seq-less DoD sidecar): an artifact with `seq: null`, `canonical: false`.
+     A single-segment remainder is always the document slug, even when it equals an artifact word.
 4. Return a frozen object, or `{ ok: false, reason }` where `reason` is one of `unknown-kind`,
    `bad-number`, `bad-slug` or `bad-artifact`.
 
