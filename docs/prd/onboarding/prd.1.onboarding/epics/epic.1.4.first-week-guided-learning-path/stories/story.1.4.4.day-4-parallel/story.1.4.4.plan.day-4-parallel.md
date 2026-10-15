@@ -38,7 +38,7 @@ Remove a worktree when done: `git worktree remove ../agent-skills-feat-x`.
 
 ## Branch (a) — Parallel stories (~3 hours)
 
-- [ ] Read [`docs/runbooks/create-parallel-stories.md`](../create-parallel-stories.md). The Epic 3.2 callout at the top tells you whether this is the right fit.
+- [ ] Read [`docs/runbooks/create-parallel-stories.md`](../../../../../../../runbooks/create-parallel-stories.md). The Epic 3.2 callout at the top tells you whether this is the right fit.
 - [ ] Invoke `/create-parallel-stories` to scope 2 stories that can run in parallel.
 - [ ] Open 2 git worktrees, one per story branch.
 - [ ] Run `/develop-story` in each.
@@ -46,7 +46,7 @@ Remove a worktree when done: `git worktree remove ../agent-skills-feat-x`.
 
 ## Branch (b) — Change management (~2 hours)
 
-- [ ] Read [`docs/runbooks/change-management.md`](../change-management.md).
+- [ ] Read [`docs/runbooks/change-management.md`](../../../../../../../runbooks/change-management.md).
 - [ ] Identify a pivot worth documenting (real or simulated — e.g., "Day 5 PRD scope grew unexpectedly").
 - [ ] Invoke `/correct-course` (or the `change-management` skill directly).
 - [ ] Follow the `change-checklist` 6-section structure.
@@ -62,7 +62,7 @@ Remove a worktree when done: `git worktree remove ../agent-skills-feat-x`.
 - Branch (a): how git worktrees + multiple develop-story chains coexist.
 - Branch (b): how to recover from a scope/plan change without abandoning the pipeline.
 
-## Next: [First-week index](../first-week.md) (Story 4.5 output — closes the loop)
+## Next: [First-week index](../../../../../../../runbooks/first-week.md) (Story 4.5 output — closes the loop)
 ```
 
 ≈ 60 lines.

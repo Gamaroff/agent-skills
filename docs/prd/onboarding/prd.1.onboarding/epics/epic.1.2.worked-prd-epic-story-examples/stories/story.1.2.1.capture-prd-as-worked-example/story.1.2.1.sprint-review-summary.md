@@ -94,7 +94,7 @@ Established the first worked PRD example in this repo by copying the onboarding 
 
 ### Documentation Links
 
-- [examples/prd-example/README.md](../../../../../../../../../examples/prd-example/README.md)
+- [examples/prd-example/README.md](../../../../../../../../examples/prd-example/README.md)
 - [QA Report](./story.1.2.1.qa.1.capture-prd-as-worked-example.md)
 
 ---

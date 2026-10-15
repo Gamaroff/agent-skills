@@ -120,9 +120,9 @@ Same pattern as Story 1.1 Task 8.
 
 ## Key Patterns and References
 
-- [`docs/concepts/quickstart-task.md`](../../../../../concepts/quickstart-task.md) (Story 1.1 output) — section structure to mirror.
-- [`docs/runbooks/story-development.md`](../../../../../runbooks/story-development.md) — link out for depth; do NOT duplicate.
-- [`docs/standards/document-status-lifecycle.md`](../../../../../standards/document-status-lifecycle.md) — frontmatter + body status pairing.
+- [`docs/concepts/quickstart-task.md`](../../../../../../../concepts/quickstart-task.md) (Story 1.1 output) — section structure to mirror.
+- [`docs/runbooks/story-development.md`](../../../../../../../runbooks/story-development.md) — link out for depth; do NOT duplicate.
+- [`shared/resources/document-status-lifecycle.md`](../../../../../../../../shared/resources/document-status-lifecycle.md) — frontmatter + body status pairing.
 - Commits `df0b690`, `ce297a6` — pipeline regression history; quickstart treats chain as black box.
 
 ## Testing Approach

@@ -194,9 +194,9 @@ Add Change Log entry:
 
 ## Key Patterns and References
 
-- **Status lifecycle:** [`docs/standards/document-status-lifecycle.md`](../../../../../standards/document-status-lifecycle.md). Frontmatter `status:` is `lowercase-kebab-case`; body `**Status:**` is Title Case. Always update both in the same edit.
-- **File naming:** [`docs/standards/file-naming.md`](../../../../../standards/file-naming.md). Single-word slug (`quickstart-task`) is acceptable; dots reserved for structural separators (none needed at this depth).
-- **Task registry rules:** [`docs/standards/task-registry.md`](../../../../../standards/task-registry.md). Numbers are globally unique and never recycled — the cleanup section MUST honour this.
+- **Status lifecycle:** [`shared/resources/document-status-lifecycle.md`](../../../../../../../../shared/resources/document-status-lifecycle.md). Frontmatter `status:` is `lowercase-kebab-case`; body `**Status:**` is Title Case. Always update both in the same edit.
+- **File naming:** [`docs/standards/file-naming.md`](../../../../../../../standards/file-naming.md). Single-word slug (`quickstart-task`) is acceptable; dots reserved for structural separators (none needed at this depth).
+- **Task registry rules:** [`docs/standards/task-registry.md`](../../../../../../../standards/task-registry.md). Numbers are globally unique and never recycled — the cleanup section MUST honour this.
 - **Example anchor task:** `examples/README.md` features `task.6.create-epic-jira-tracker-path` as the canonical full-lifecycle artifact set. The quickstart's "Review your artifacts" section can mirror that table's structure.
 - **CI hook:** Commit `f6810df` added a markdown link check workflow for `docs/`. Make sure all internal links in the new doc resolve before opening the PR.
 

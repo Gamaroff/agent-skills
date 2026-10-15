@@ -17,6 +17,26 @@ All notable changes to this project will be documented in this file. Format foll
   standards now describe the scheme, each with a dated interim note. No skill uses it yet; tasks
   203–207 migrate the callers.
 
+- **A one-shot migration to hierarchical document numbering, run on this repository (task 203).**
+  The new `shared/resources/migrate-doc-numbering.mjs` renames an existing PRD, its epics and its
+  stories to `prd.{P}`, `epic.{P}.{E}` and `story.{P}.{E}.{S}`. It rewrites their frontmatter, gate
+  `story:` fields and every relative link into the moved tree, and appends the PRD to the PRD
+  registry. It is a dry run by default. `--apply` writes nothing until every blocker has passed:
+  an epic with no PRD, an in-flight story, a target that already exists, a dirty path, a link that
+  would break, a missing or stale registry, or two documents mapping to one new id. `--check`
+  exits 1 while a migration is pending and 0 once it is done. A run that fails part-way returns
+  `post-check-failed` with a revert command that names only the paths it touched. This repository's
+  onboarding PRD is now `docs/prd/onboarding/prd.1.onboarding/`, with epics `1.1`–`1.4` and
+  stories `story.1.E.S`. `doc-id.js` recognises the `validate` artifact kind.
+
+### Changed
+
+- **The global epic registry is retired (task 203).** `docs/development/epic-registry.md` is now a
+  pointer to `docs/prd/prd-registry.md`, and it keeps the old epic numbers as a historical mapping
+  (`1`–`4` → `1.1`–`1.4`). Epic numbers now count within their PRD. Skills that still read the old
+  registry are migrated by tasks 204–207. Ten relative links in four onboarding story artifacts
+  were already dead before the move; they now point at their real targets.
+
 ### Fixed
 
 - **A documentation-only DoD fix no longer re-enters QA.** After `/finalise` halts on Definition of
