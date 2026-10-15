@@ -3,7 +3,7 @@
 **Task**: `task.204.numbered-prds-in-prd-skills.md`
 **Run Number**: 1
 **Started**: 2026-10-15 16:55
-**Status**: In Progress
+**Status**: Escalated
 
 ---
 
@@ -34,7 +34,7 @@ Make the PRD skills allocate, write and check a registry-backed PRD number, and 
 | 1. create-branch           | ✅ Done    | Branch `feature/task.204.*` exists in git                             | Branch created at `8074dad0`; pushed | —                    | 2026-10-15T14:53Z |
 | 2. review-task             | ✅ Done    | `task.204.review.{N}.{name}.md` exists (or skip logged)               | READY TO IMPLEMENT 8/10; 1 Critical + 7 Important fixed in the task doc; Planned → Ready for Development | —                    | 2026-10-15T14:58Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; 27/27 phases; ci:fast green (5692/0) | docs/tasks/task.204.numbered-prds-in-prd-skills/.summaries/step-3-loop-audit-1.json | 2026-10-15T15:19Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #675: https://github.com/Gamaroff/agent-skills/pull/675 | —                    | 2026-10-15T15:24Z |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.204.qa.{N}.*.md`; `task.204.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.204.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
@@ -87,11 +87,61 @@ Make the PRD skills allocate, write and check a registry-backed PRD number, and 
 - Loop audit run inline (deterministic checkbox count + `git log`), not via an Explore subagent: status ready-for-review, 27/27.
 - Development completion comment posted to github issue 647.
 
+### Step 5–6 — QA loop — 2026-10-15
+
+- QA cycle 1 (5a): qa-task, code_review_blocking=true; traceability mapper skipped (Success Criteria are a checkbox list, not a table). Diff reviewer (Explore, 142 s): 4 findings, 2 high-confidence promoted (CR-1, CR-2). Probe engine `fence:` form on the allocation slug guard: 11 executed, engages. `eval:all` exit 0, `bundle:check` clean. Gate 1 CONCERNS 60/100.
+- QA Cycle 1 — changes-requested: stage-disabled.
+- QA cycle 1 (5b): qa-fix — see QA Iteration History.
+- QA cycle 2 (5a): refute pass over the whole branch at 703dd536 (Explore, 165 s): 7 bugs + 1 cleanup, 4 promoted (CR-1, CR-2, CR-3, CR-5; all reproduced). Probe re-run 11/engages. Gate 2 CONCERNS 60/100. qa-task steps run by the orchestrator from the already-loaded skill text this cycle, not a fresh `/qa-task` invocation.
+- QA Cycle 2 — changes-requested: stage-disabled. Narrowing residue: not signalled (medium-files-differ).
+- QA cycle 3 (5a): SAFETY_REPROBE=true by judgement (gate 2 security CONCERNS on a path escape; clause 1 false) → unscoped re-probe (Explore, 123 s): 5 bugs, 1 promoted (CR-1, reproduced). Probe: new domain control (13 cases) + slug control (11), 24 executed, both engage. Gate 3 CONCERNS 90/100.
+- QA Cycle 3 — changes-requested: stage-disabled.
+- QA cycle 4 (5a): scoped to the 3 files changed since gate 3 (SAFETY_REPROBE false: gate 3 security PASS). Explore reviewer 75 s: 2 bugs + 1 cleanup, 1 promoted (CR-1, reproduced). Probe 24/engages. Gate 4 CONCERNS 90/100. Route: continue (not-a-pass-gate).
+- QA Cycle 4 — changes-requested: not signalled (stage-disabled, unchanged).
+- QA cycle 5 (5a): SAFETY_REPROBE=true by judgement (gate 4 security CONCERNS on containment) → unscoped re-probe, 115 s: 4 findings, 3 promoted (all reproduced; two re-rated high → medium with the measurement recorded in the gate). Gate 5 CONCERNS 70/100. Route: continue. Budget: cycle 5 of 5.
+
+### Step 4 — create-pr — 2026-10-15
+
+- SCOPE_PATHS: docs/tasks/task.204.numbered-prds-in-prd-skills, shared/resources, 15 skill dirs, tests, evals/shared/tests (the last added explicitly: the new test file sits in a directory with no tracked change). Pre-flight guard: nothing out of scope to hold.
+- Commits: f1c061a4 fix(migrate-doc-numbering), 76513756 feat(create-prd), 1e5f30b6 feat(review-prd), 28aea8c9 refactor(prd-skills), 5f1ad2e0 test(prd-skills), 18e1d685 docs(task.204). Leak check: every file inside SCOPE_PATHS.
+- PR created: https://github.com/Gamaroff/agent-skills/pull/675 (base develop, Closes #647). Issue comment `posted`. GitHub board: in-review → stage-disabled. Post-PR state: OPEN (checked inline with `gh pr view`).
+
 ---
 
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
+- Session crash mid-5b (2026-10-15 ~17:50): the fast gate had moved the gitignored `.agents/skills` symlink into the session scratch dir, which did not survive; the symlink was missing on resume. Restored with `ln -s ../skills .agents/skills`; the gate was re-run (green) with the symlink parked under `.claude/state/` instead, so a crash cannot lose it.
+
+- Step 4 commit series rebuilt once before push: the repo's pre-commit hook refuses a commit while any generated `references/` copy is untracked, so the first two scoped commits failed and their staged files rode into the third. Reset (unpushed) and re-committed in order with `BUNDLE_PRECOMMIT_WARN=1` on the intermediate commits only; the copies land in the commits that reach them.
+
+
+### QA Loop Limit Reached — 2026-10-15
+
+The pipeline completed 5 qa-task/qa-fix cycles without a clean PASS.
+
+**Final gate status**: CONCERNS (70/100), gate 5 — its three findings are fixed in `88f8ba81`, which no gate has read
+**HIGH findings per cycle**: 0, 0, 0, 0, 0 — no blocker at any cycle (gate 5 re-rated two reviewer-high findings to medium on a measured plausibility check)
+**MEDIUM findings per cycle**: 4, 4, 1, 1, 3
+**Remaining issues** (from gate 5, all fixed in `88f8ba81`, ungated):
+- CR-1 medium — the registry write followed a symlink — `skills/create-prd/SKILL.md`
+- CR-2 medium — review-prd compared paths as text — `skills/review-prd/SKILL.md`
+- CR-3 medium — the keep outside-root refusal pointed at an impossible remedy — `skills/create-prd/SKILL.md`
+
+**What was attempted per cycle**:
+- Cycle 1: review-prd directory input and monolith findings; +5 test rows; all rows mutation-proven (`703dd536`)
+- Cycle 2: numbering scope consolidated into one ownership rule; full-stem input; DOMAIN guard (`eb14a639`)
+- Cycle 3: checker failures are not clean results; keep-path layout; realpath at allocate/register (`96604439`)
+- Cycle 4: realpath at keep; post-check-failed arm (`5ad0b163`)
+- Cycle 5: containment at every block that reads or writes a PRD path; shard-prd guarded (`88f8ba81`)
+- Gate-the-last-fix half-cycle (route 2c) considered and declined: `medium-not-falling` — MEDIUM reads 1, 1, 3 over cycles 3–5.
+
+**Likely root cause**: one rule — "a PRD path stays inside `${PRD_ROOT}`" — is enforced separately in every fenced block that touches a path, because blocks cannot share code. Gates 2–5 each found one more site (DOMAIN, symlinked domain at allocate/register, at keep, then the registry write and review-prd). Cycle 5 closed every site the re-probe enumerated, but the defect class is the duplication itself: the durable fix is one layout-and-containment predicate in `doc-id.js` that every block calls — an engine change outside this task's stated scope.
+
+**Recommended next steps**:
+1. Grant 2 more cycles (`/develop-task` → "Resume at 5a with 2 more cycles"): cycle 6 gates `88f8ba81`, the fix no gate has read; all three gate-5 findings are already fixed there.
+2. Open a follow-up task: one PRD-path containment predicate in `doc-id.js` (`isPrdDocumentPath(root, file)` returning a reason), called by every create-prd / review-prd / shard-prd block — recorded in gates 4 and 5.
+3. Also outstanding as recorded follow-ups: recovery for a PRD written without its registry row (gate-2 CR-4).
 
 ---
 
@@ -99,14 +149,69 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-10-15
+**Gate Result**: CONCERNS (60/100)
+**Issues Found**: 4 medium — CR-1 directory input does not resolve; CR-2 a root-level docs/prd.md absorbs other PRDs' findings; QA-1 no test for the migration-blocker / monolith paths; QA-2 7 of 16 rows mutation-proven
+**HIGH findings**: 0
+**MEDIUM findings**: 4
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 1 of 5)
+**Fixes Applied**: CR-1 directory input resolves to `{dir}/{dir}.md`; CR-2 a PRD outside `${PRD_ROOT}` reports only its own finding; CR-3 (advisory) resolver failure exits 2 with its own message; CR-4 (advisory) register block reads P from PRD_FILE's name. Test rows +5 (21 total), every row mutation-proven (16 new mutations, each red as predicted). Step 3.5 probe: "No PRD found matching" → review-prd/SKILL.md only (updated); "INPUTS: P, DOMAIN" → 0 (removed text). Gate 1 findings ingested inline (this run wrote the gate; ingester subagent not dispatched — independence loss recorded). Observation #54 logged (Step 4b does not syntax-check refused blocks — three blocks broke on an apostrophe this session).
+**Commit**: `703dd536` (pushed; PR #675 OPEN after push — checked inline with `gh pr view`)
+
+### QA Cycle 2 — 2026-10-15
+**Gate Result**: CONCERNS (60/100)
+**Issues Found**: gate 1's four fixed and verified; 4 new medium — CR-1 a PRD file that does not own its directory absorbs others' findings; CR-2 the PRD file itself is never checked; CR-3 full-stem input does not resolve; CR-5 DOMAIN unvalidated (path escapes ${PRD_ROOT})
+**HIGH findings**: 0
+**MEDIUM findings**: 4
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 2 of 5)
+**Fixes Applied**: CR-1/CR-2 — numbering scope consolidated into one ownership rule (Step 2.6 repeat-subject trigger: gate-2 CR-1 re-hit gate-1 CR-2's filter; move: consolidate — the file's own `doc-id check` findings always, plus its directory's corpus findings only when it owns that directory); CR-3 full-stem input; CR-5 DOMAIN validated by the doc-id slug rule (`bad-domain`); advisory CR-6 duplicate-id from either side, CR-7 duplicate-row advice names the move, CR-8 register block takes folder/href from PRD_FILE and refuses an off-layout file; CR-4 (abandoned-create recovery) deferred to gate recommendations. Test rows +8 (29 total); 11 mutations, each red as predicted after two rows were added for the two that first survived (own check dropped; layout unchecked). Probe phrases "registry moved since Step 1.5", "bad-domain", "does not own its directory" → one file each, updated. Narrowing offer: not signalled (medium-files-differ).
+**Commit**: `eb14a639` (pushed; PR #675 OPEN)
+
+### QA Cycle 3 — 2026-10-15
+**Gate Result**: CONCERNS (90/100)
+**Issues Found**: gate 2's four fixed and verified; 1 new medium — CR-1 a crashed numbering checker reports no findings and exits 0; 4 advisory (CR-2 keep-block layout, CR-3 migration plan errors, CR-4 unreadable FOUND_PRD, CR-5 symlinked domain)
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 3 of 5)
+**Fixes Applied**: CR-1 numbering verdict is exit code + parsed reason together (a crash → "could not run", exit 1); advisory CR-2 keep block applies the register layout rule (off-layout refused), CR-3 migration plan refuses a usage/crash answer, CR-4 unreadable FOUND_PRD reported as such, CR-5 realpath check on an existing domain directory (allocate) and on the file (register). Gate-2 CR-4 (abandoned-create recovery) still deferred. Test rows +4 (33); 6 mutations, each red as predicted. Probe: each changed message in one file (updated); "resolves outside" also matches develop-next/references/roadmap-selection.md — unrelated subject, unaffected. Route classifier at cycle 3: continue (not-a-pass-gate; route 2 declined: product-defect-signal; qa.testArtifactGlobs not configured).
+**Commit**: `96604439` (pushed; PR #675 OPEN)
+
+### QA Cycle 4 — 2026-10-15
+**Gate Result**: CONCERNS (90/100)
+**Issues Found**: gate 3's finding + 4 advisories fixed and verified; 1 new medium — CR-1 the keep block lacks the realpath containment cycle 3 gave allocate and register (enumeration miss); 2 advisory (CR-2 post-check-failed, CR-3 predicate in three blocks)
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 4 of 5)
+**Fixes Applied**: CR-1 keep block gets the realpath containment (the symlink row now runs allocate, register and keep — one row holds the population of three blocks; move: patch + population row, because the reviewer's consolidation, a shared predicate in doc-id.js, is an engine change this task leaves to task.202's owner — recorded in gate 4's future recommendations); advisory CR-2 `post-check-failed` has its own arm (nothing to apply, findings printed). Test rows +1 (34) and the symlink row extended; 2 mutations, each red as predicted.
+**Commit**: `5ad0b163` (pushed; PR #675 OPEN)
+
+### QA Cycle 5 — 2026-10-15
+**Gate Result**: CONCERNS (70/100)
+**Issues Found**: gate 4's finding fixed and verified; 3 new medium — CR-1 the registry write follows a symlink; CR-2 review-prd's numbering check compares paths as text; CR-3 the keep outside-root refusal points at an impossible remedy (CR-1, CR-2 re-rated high → medium: `find docs/prd -type l` → 0, no PRD-skill writer creates a symlink); 1 advisory (CR-4 shard-prd block unguarded)
+**HIGH findings**: 0
+**MEDIUM findings**: 3
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Escalating — loop limit reached
+**Fixes Applied**: Step 2.6 repeat subject (gates 2–5 each found one more site of one containment rule); move: consolidate within this task's scope — the rule now holds at every block that reads or writes a PRD path (registry write refuses a symlink; review-prd numbering checks realpath; keep has its own outside-root message; shard-prd block guarded: bound, numbered, own directory, realpath inside the root, doc-id.js now bundled), and one population row holds register, numbering and keep together. The single shared predicate in doc-id.js stays a recorded follow-up (engine change). Test rows +2 (36); 5 mutations, each red as predicted.
+**Commit**: `88f8ba81` (pushed; PR #675 OPEN) — no gate has read this fix
+
 ---
 
 ## Completion
 
 **Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Final Status**: Escalated — QA loop limit reached (5 cycles; gate 5 CONCERNS 70/100, its findings fixed in `88f8ba81` and ungated)
 **Branch**: feature/task.204.numbered-prds-in-prd-skills
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/675
+**QA Iterations**: 5 (loop limit)
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
