@@ -663,27 +663,26 @@ the second-run no-op guarantee no longer describes the tree.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer (qa-task, develop-task pipeline)
 **Testing Date**: 2026-10-15
-**Quality Score**: 60/100
-**Gate Decision**: FAIL
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.203.qa.2.migrate-doc-numbering.md](./task.203.qa.2.migrate-doc-numbering.md)
-- **Gate File**: [task.203.gate.2.migrate-doc-numbering.yml](./task.203.gate.2.migrate-doc-numbering.yml)
+- **Full Report**: [task.203.qa.3.migrate-doc-numbering.md](./task.203.qa.3.migrate-doc-numbering.md)
+- **Gate File**: [task.203.gate.3.migrate-doc-numbering.yml](./task.203.gate.3.migrate-doc-numbering.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 95 (engine + doc-id), `ci:fast` 5642, plus a probe with 11 cases
-- **Phases Verified**: 5/5 (2 with concerns)
-- **Critical Issues**: 1 HIGH, 2 MEDIUM
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Tests Executed**: 44 engine tests, `ci:fast` 5648, plus a probe with 11 cases
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- Bugs 1, 3 and 4 are verified fixed and closed.
-- Bug 2 is reopened (HIGH): the revert hint restores the whole root and can erase uncommitted work.
-- Bug 5: a story-number collision passes the dry run.
-- Bug 6: an `apply()` failure strands the tree with no revert hint.
+- All six bugs are closed.
+- There are no open findings.
+- Reliability is CONCERNS because of two advisory edge cases: the revert of untracked moved-and-rewritten files, and the directories a part-way failure leaves behind. Neither can occur in this repository.
 
 ## Change Log
 
@@ -697,6 +696,7 @@ the second-run no-op guarantee no longer describes the tree.
 | 2026-10-15 |  | QA findings fixed — bugs 1–4 (CR-1, CR-2, CR-3, QA-1) and CR-4; 5 tests added, 1 iteration | qa-fix |
 | 2026-10-15 |  | QA gate FAIL (60/100) — 1 HIGH, 2 MEDIUM (bug 2 reopened; bugs 5, 6) | qa-task |
 | 2026-10-15 |  | QA findings fixed — bug 2 (revert scoped to a touch record, dirty-path widened), bug 5 (id-collision), bug 6 (apply wrapped), plus CR-4–CR-7; 7 tests added, 2 iterations | qa-fix |
+| 2026-10-15 |  | QA gate CONCERNS (90/100) — 0 open findings; 2 advisory reliability edge cases | qa-task |
 
 ---
 

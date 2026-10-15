@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Major'
 priority: 'Medium'
 created: '2026-10-15'
@@ -12,7 +12,7 @@ description: 'Two stories that map to one new id pass the dry run and fail only 
 
 **Bug ID**: TASK-203-BUG-5
 **Related**: [task.203.migrate-doc-numbering.md](./task.203.migrate-doc-numbering.md) (QA finding CR-2 (cycle 2), gate 2)
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Priority**: Medium
 **Severity**: Major
 **Created**: 2026-10-15
@@ -90,6 +90,7 @@ description: 'Two stories that map to one new id pass the dry run and fail only 
 | 2026-10-15 | New    | qa-task    | Bug created |
 | 2026-10-15 | In Progress | qa-fix | Investigation started |
 | 2026-10-15 | Ready for QA | qa-fix | Fix implemented (QA cycle 2) |
+| 2026-10-15 | Closed | qa-task | Verified by task.203.qa.3.migrate-doc-numbering.md |
 
 ---
 

@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Major'
 priority: 'Medium'
 created: '2026-10-15'
@@ -12,7 +12,7 @@ description: 'The `post-check-failed` revert command does not undo the run, and 
 
 **Bug ID**: TASK-203-BUG-2
 **Related**: [task.203.migrate-doc-numbering.md](./task.203.migrate-doc-numbering.md) (QA finding CR-2, gate 1)
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Priority**: Medium
 **Severity**: Major
 **Created**: 2026-10-15
@@ -119,6 +119,7 @@ description: 'The `post-check-failed` revert command does not undo the run, and 
 | 2026-10-15 | Reopened | qa-task | Not fixed by task.203.qa.2.migrate-doc-numbering.md — the hint restores the whole root, erasing uncommitted work the run never touched (cycle 2 CR-1) |
 | 2026-10-15 | In Progress | qa-fix | Re-investigation (cycle 2) |
 | 2026-10-15 | Ready for QA | qa-fix | Fix implemented (QA cycle 2) |
+| 2026-10-15 | Closed | qa-task | Verified by task.203.qa.3.migrate-doc-numbering.md |
 
 ---
 
