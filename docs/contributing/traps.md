@@ -87,6 +87,19 @@ The `test` script is 10 `&&`-joined segments — nine explicit `bash …` invoca
 `node --test` call with an explicit list of per-skill globs. **A new `skills/*/tests/` directory runs
 nowhere until someone adds its glob.** This has already silently orphaned 232 tests once.
 
+### A shell test suite must source `undefined-command-guard.sh`
+
+A call to an undefined command in a `*.test.sh` (a helper used above its definition, a typo) prints
+"command not found", returns 127, and no assertion reads it. The case is skipped and the suite stays
+green. Six cases in `reenter-qa-after-finalise.test.sh` never ran this way. Wiring the guard into
+every suite then found a seventh, in `tracker-access.test.sh`, that had been unasserted since
+task.56: it called `pass`/`fail` in a suite that names them `ok`/`bad`. Source
+`shared/resources/undefined-command-guard.sh` before the first case and call
+`undefined_commands_check || FAIL=$((FAIL + 1))` before the summary. A skill's own suite sources its
+bundled copy, `$SKILL/references/undefined-command-guard.sh`. `tests/shell-suite-guard.test.js`
+fails on a tracked `*.test.sh` that skips either line or is missing from `npm test`. The hook needs
+bash 4+, so under macOS `/bin/bash` 3.2 the guard is off.
+
 ### The `.gitignore` negation block must stay at the END of the file
 
 The last three lines re-include `evals/**/replay/`. Those fixtures deliberately contain paths matched

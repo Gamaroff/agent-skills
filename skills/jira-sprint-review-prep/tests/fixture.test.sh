@@ -11,6 +11,9 @@ SKILL=$(cd "$HERE/.." && pwd)
 FIXTURE="$HERE/fixtures/sprint-data.json"
 
 fail=0
+# Bundled from the shared helper by `npm run bundle`; it fails the suite on a call to an undefined command.
+# shellcheck source=../references/undefined-command-guard.sh
+. "$SKILL/references/undefined-command-guard.sh"
 assert_contains() {
   local label=$1 needle=$2 hay=$3
   if ! grep -qF -- "$needle" <<<"$hay"; then
@@ -65,6 +68,7 @@ assert_contains "notes.dod.102.warn"    "**[PROJ-102]** Migrate legacy tax calcu
 # Open items must NOT be in release notes
 assert_not_contains "notes.open.103.absent" "PROJ-103" "$NOTES"
 
+undefined_commands_check || fail=$((fail + 1))
 if [ "$fail" -gt 0 ]; then
   echo "❌ $fail assertion(s) failed" >&2
   exit 1

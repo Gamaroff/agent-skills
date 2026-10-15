@@ -15,6 +15,9 @@ TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
 fail=0
+# Bundled from the shared helper by `npm run bundle`; it fails the suite on a call to an undefined command.
+# shellcheck source=../references/undefined-command-guard.sh
+. "$SKILL/references/undefined-command-guard.sh"
 assert_contains() {
   local label=$1 needle=$2 hay=$3
   if ! grep -qF -- "$needle" <<<"$hay"; then
@@ -207,6 +210,7 @@ assert_contains "adf.deep" "Nested ADF deep leaf" "$(pluck PROJ-203 description)
 assert_contains "roster.names"      "Ada Lovelace" "$(jq -r '[.assignees[].displayName] | join(",")' <<<"$CLASSIFIED")"
 assert_contains "roster.unassigned" "1"            "$(jq -r '.unassignedCount' <<<"$CLASSIFIED")"
 
+undefined_commands_check || fail=$((fail + 1))
 if [ "$fail" -gt 0 ]; then
   echo "❌ $fail assertion(s) failed" >&2
   exit 1
