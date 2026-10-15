@@ -4,6 +4,12 @@
 
 **Location:** `/docs/development/epic-registry.md` (inside the consuming project).
 
+> **Superseded by per-PRD numbering (2026-10-15, task 202).** Under the hierarchical scheme an epic is
+> `epic.{P}.{E}`: `P` comes from the [PRD registry](./prd-registry.md) and `E` counts epics within that
+> PRD, so no global epic registry allocates it. This registry still governs the existing
+> `epic.{number}` epics until **task 203** migrates them and retires it. Do not add rows for an epic
+> created under the new scheme.
+
 The epic registry tracks every epic in a project. Epic numbers are **globally unique** across the project and never reused.
 
 ## Purpose
@@ -25,3 +31,4 @@ The epic registry tracks every epic in a project. Epic numbers are **globally un
 - [`epic-registry-manager` SKILL.md](../../skills/epic-registry-manager/SKILL.md)
 - [Epic documents](./epic-documents.md) — frontmatter schema for epic files
 - [File naming](./file-naming.md)
+- [PRD registry](./prd-registry.md) — the registry that replaces this one
