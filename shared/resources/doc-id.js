@@ -107,7 +107,7 @@ function fail(reason) {
  *   a slug before the keyword, a seq-less DoD sidecar: a non-canonical artifact,
  *   classified the way WORK_ITEM_ARTIFACT_RE classifies it.
  */
-function parseRemainder(rest, slugOk) {
+function parseRemainder(rest, slugOk, docSlugOk = slugOk) {
   if (rest === "") return { reason: "bad-slug" };
   const segs = rest.slice(1).split(".");
   const none = { docSlug: null };
@@ -144,11 +144,7 @@ function parseRemainder(rest, slugOk) {
   // QA cycle 2, CR-7).
   if (
     segs.length === 4 &&
-    // The document slug must begin with a letter whatever the caller's slug rule:
-    // under parseLegacy's loose rule a digit-first docSlug would read a new-scheme
-    // artifact (`epic.1.1.review.1.x`) as a legacy one (QA cycle 3, CR-1).
-    SLUG_RE.test(segs[0]) &&
-    slugOk(segs[0]) &&
+    docSlugOk(segs[0]) &&
     ARTIFACTS.includes(segs[1]) &&
     !["plan", "sprint-review-summary"].includes(segs[1]) &&
     isSeq(segs[2]) &&
@@ -256,8 +252,17 @@ function parseLegacy(name) {
   if (!m) return fail("bad-number");
   const g = m.groups || {};
   if (![g.epic, g.story].every(isSafeNum)) return fail("bad-number");
-  const r = parseRemainder(stem.slice(m[0].length), (s) =>
-    LOOSE_SLUG_RE.test(s),
+  const rest = stem.slice(m[0].length);
+  // A digit-first remainder is the new scheme's next number (`epic.1.1.…`), not a
+  // legacy slug: refused, so the migrator never claims a new-scheme file (QA cycle
+  // 4, CR-2). For the same reason a full-stem document slug must begin with a
+  // letter here — and only here: parse() keeps the kind's own slug rule, under
+  // which a task or bug slug may start with a digit (QA cycle 4, CR-1).
+  if (/^\.\d+(?:\.|$)/.test(rest)) return fail("bad-number");
+  const r = parseRemainder(
+    rest,
+    (s) => LOOSE_SLUG_RE.test(s),
+    (s) => SLUG_RE.test(s),
   );
   if (r.reason) return fail(r.reason);
   return Object.freeze({

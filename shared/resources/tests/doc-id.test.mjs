@@ -1030,3 +1030,33 @@ test("CR-4 (cycle 3): format refuses a slug or seq on a fixed-name artifact", ()
   assert.throws(() => d.format({ ...base, seq: 4 }), TypeError);
   assert.equal(d.format(base), "story.1.2.3.sprint-review-summary");
 });
+
+// ---------------------------------------------------------------------------
+// QA cycle 4 findings (gate 4)
+// ---------------------------------------------------------------------------
+
+test("CR-1 (cycle 4): parse keeps the kind's slug rule for a full-stem document slug", () => {
+  const p = d.parse("bug.20.404-on-refresh.review.1.fix-readiness.md");
+  assert.deepEqual(
+    [p.ok, p.canonical, p.docSlug, p.artifact, p.seq, p.slug],
+    [true, true, "404-on-refresh", "review", 1, "fix-readiness"],
+  );
+  assert.equal(d.format(p), "bug.20.404-on-refresh.review.1.fix-readiness");
+});
+
+test("CR-2 (cycle 4): parseLegacy refuses a new-scheme name outright", () => {
+  for (const name of [
+    "epic.1.1.review.1.hero.md",
+    "story.1.1.1.qa.1.anim.md",
+    "epic.1.1.hero.md",
+  ]) {
+    const p = d.parseLegacy(name);
+    assert.equal(p.ok, false, name);
+    assert.equal(p.reason, "bad-number", name);
+  }
+  assert.equal(
+    d.parseLegacy("story.1.1.qa.1.first-task.md").ok,
+    true,
+    "a legacy artifact still reads",
+  );
+});

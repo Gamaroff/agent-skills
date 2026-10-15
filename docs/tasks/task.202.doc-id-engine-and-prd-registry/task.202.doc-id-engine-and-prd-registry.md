@@ -423,17 +423,17 @@ that write one.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.202.qa.3.doc-id-engine-and-prd-registry.md](./task.202.qa.3.doc-id-engine-and-prd-registry.md)
-- **Gate File**: [task.202.gate.3.doc-id-engine-and-prd-registry.yml](./task.202.gate.3.doc-id-engine-and-prd-registry.yml)
+- **Full Report**: [task.202.qa.4.doc-id-engine-and-prd-registry.md](./task.202.qa.4.doc-id-engine-and-prd-registry.md)
+- **Gate File**: [task.202.gate.4.doc-id-engine-and-prd-registry.yml](./task.202.gate.4.doc-id-engine-and-prd-registry.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 53 (49 doc-id + 4 select-next)
+- **Tests Executed**: 57 (53 doc-id + 4 select-next)
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Every cycle-2 fix holds. One medium remains: `parseLegacy` accepts new-scheme full-stem artifacts as legacy ones. One low (`next prd` reports an unreadable registry as missing).
+One medium regression from cycle 3: the docSlug guard blocks digit-first bug/task full-stem review reports in `parse()`.
 
 <!-- change-log-start -->
 ## Change Log
@@ -450,6 +450,8 @@ Every cycle-2 fix holds. One medium remains: `parseLegacy` accepts new-scheme fu
 | 2026-10-15 |  | QA findings fixed — cycle 2, 8 gate findings + 4 advisory, registry reader consolidated with the selector (parity test), 10 tests | qa-fix |
 | 2026-10-15 |  | QA gate CONCERNS (90/100) — 2 findings (1 medium, 1 low) | qa-task |
 | 2026-10-15 |  | QA findings fixed — cycle 3, 2 gate findings + 3 advisory, 4 tests | qa-fix |
+| 2026-10-15 |  | QA gate CONCERNS (90/100) — 1 finding (1 medium) | qa-task |
+| 2026-10-15 |  | QA findings fixed — cycle 4, 1 gate finding + 1 advisory, 2 tests | qa-fix |
 
 <!-- change-log-end -->
 
