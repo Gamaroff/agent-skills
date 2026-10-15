@@ -7,6 +7,11 @@ name: Docs link check
 # previous gaurav-nelson action diffed against a single `base-branch` (default
 # `master`), which doesn't fit this repo's gitflow (PRs target develop, sometimes
 # main), so we compute the changed set against the actual base ourselves.
+#
+# examples/** is checked too, except the frozen PRD and epic snapshot copies
+# (examples/prd-example/prd.*.md, examples/epic-examples/epic.*.md). Their bodies are kept
+# exactly as captured on 2026-05-12, with links relative to their original docs/prd location,
+# so they are never edited to make a link resolve. The READMEs around them are live and checked.
 
 on:
   pull_request:
@@ -15,6 +20,7 @@ on:
       - 'README.md'
       - 'AGENTS.md'
       - 'CONTRIBUTING.md'
+      - 'examples/**/*.md'
       - '.github/markdown-link-check.json'
       - '.github/workflows/docs-link-check.yml'
   push:
@@ -24,6 +30,7 @@ on:
       - 'README.md'
       - 'AGENTS.md'
       - 'CONTRIBUTING.md'
+      - 'examples/**/*.md'
 
 jobs:
   link-check:
@@ -53,9 +60,10 @@ jobs:
           fi
           echo "Diff range: $RANGE"
           git diff --name-only --diff-filter=ACMR "$RANGE" -- \
-            'docs' 'README.md' 'AGENTS.md' 'CONTRIBUTING.md' \
+            'docs' 'examples' 'README.md' 'AGENTS.md' 'CONTRIBUTING.md' \
             | grep -E '\.md$' \
-            | grep -v '^docs/templates/' > changed.txt || true
+            | grep -v '^docs/templates/' \
+            | grep -vE '^examples/(prd-example/prd|epic-examples/epic)\.[^/]*\.md$' > changed.txt || true
           echo "Changed markdown files:"
           cat changed.txt || true
 
