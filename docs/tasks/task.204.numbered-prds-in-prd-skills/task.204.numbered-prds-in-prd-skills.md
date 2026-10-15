@@ -244,6 +244,12 @@ review-prd
 
 - ❌ `doc-id.js`, the registry format and the standards rows. These are task.202.
 - ❌ The migration script and migrating this repo. These are task.203.
+  - **Deviation, recorded at acceptance (PR review 1, PC-5):** two edits to
+    `shared/resources/migrate-doc-numbering.mjs` shipped here. The `TEST_FILE_EXCEPTIONS` literal is
+    built from segments, so bundling review-prd stops pulling 45 extra files. The token pass skips
+    undotted stems (`prd`, `index`), because migrating `docs/prd.md` through review-prd rewrote
+    `type: prd` in every other PRD (gate 7 CR-1). The remaining engine defects go to task.211
+    (GitHub #676).
 - ❌ Epic-side skills (`create-epic`, `create-epics-from-shards`, `review-epic`,
   `generate-prd-epic-index.mjs`). These are task.205. Independent of this task.
 - ❌ Story and pipeline id parsing. This is task.206.
@@ -442,7 +448,7 @@ that this document's own example (an unnumbered PRD) never shows.
 - [ ] `review-prd` reports each of the four numbering classes as **Critical**, with the engine's `reason` (rows 5 and 10).
 - [ ] `review-prd` offers the migration only when `--check` reports no blockers, applies it only on a yes, and re-checks afterwards (rows 6, 6b).
 - [ ] `review-prd` writes `prd.{P}.{feature}.review.{n}.{name}.md` and never resolves a review report as the PRD (row 7).
-- [ ] `git grep -n "docs/prd\.md" -- ':!docs/tasks' ':!docs/bugs' ':!**/references/**' ':!.agents/plans' ':!shared/resources/tests'` returns only the legacy-detection lines in `shard-prd` and `review-prd`. (The exclusions are the plan of record and task.203's monolith fixtures, which name the legacy path on purpose.)
+- [ ] `git grep -n "docs/prd\.md" -- ':!docs/tasks' ':!docs/bugs' ':!**/references/**' ':!.agents/plans' ':!shared/resources/tests' ':!evals/shared/tests/prd-skill-numbering.test.mjs'` returns only the legacy-detection lines in `shard-prd` and `review-prd` (its migration guard included). (The exclusions are the plan of record, task.203's monolith fixtures and this task's own test fixtures, which name the legacy path on purpose.)
 
 ### Performance
 
@@ -460,6 +466,12 @@ that this document's own example (an unnumbered PRD) never shows.
 
 - [ ] `docs/standards/file-naming.md:84`'s PRD review row (task.202) and the review-prd report name agree: `prd.{P}.{name}.review.{n}.{name}.md`.
 - [ ] A consumer holding `docs/prd.md` gets a Critical finding plus a migration offer from `review-prd`, and a refusal from `shard-prd`. Neither skill silently reads it.
+  - **Narrowed at acceptance (PR review 1, PC-1):** the Critical finding and the `shard-prd` refusal
+    hold for every `docs/prd.md`. The migration **offer** is withheld, with a Critical blocker naming
+    the hand fix, when `review-prd/scripts/migration-guard.mjs` refuses the shape: no closed
+    frontmatter block (`no-frontmatter`), a PRD that would land outside a domain directory
+    (`no-domain`), or a monolith that files outside the PRD root name (`outside-links`). The guard
+    is lifted shape by shape by task.211 (GitHub #676).
 
 ---
 
@@ -569,6 +581,7 @@ that this document's own example (an unnumbered PRD) never shows.
 | 2026-10-15 |         | QA findings fixed — cycle 7, 2 findings (CR-1 migration token pass, CR-2 shard directory) + 1 advisory (CR-3); 39 test rows | qa-fix |
 | 2026-10-15 |         | QA gate CONCERNS (50/100) — 5 findings | qa-task |
 | 2026-10-15 |         | QA findings fixed — cycle 8, 5 findings: review-prd apply shows findings and undo (CR-1), several --name pairs (CR-3); migration guard refuses no-frontmatter, no-domain and outside-links shapes (CR-2, CR-4, CR-5 — engine fixes to a follow-up task); 40 test rows | qa-fix |
+| 2026-10-15 |         | PR review 1 (Step 5c, conformance) CONCERNS — 5 findings; Scope deviation, Migration criterion narrowing and grep exclusion recorded; engine follow-up filed as task.211 (#676) | review-pr |
 <!-- change-log-end -->
 
 ---
