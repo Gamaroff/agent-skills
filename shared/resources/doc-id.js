@@ -258,7 +258,8 @@ function parseLegacy(name) {
   // 4, CR-2). For the same reason a full-stem document slug must begin with a
   // letter here — and only here: parse() keeps the kind's own slug rule, under
   // which a task or bug slug may start with a digit (QA cycle 4, CR-1).
-  if (/^\.\d+(?:\.|$)/.test(rest)) return fail("bad-number");
+  // …with or without a sub-story suffix (`story.1.2.3A.…`; QA cycle 5, CR-1).
+  if (/^\.\d+[A-Z]?(?:\.|$)/.test(rest)) return fail("bad-number");
   const r = parseRemainder(
     rest,
     (s) => LOOSE_SLUG_RE.test(s),

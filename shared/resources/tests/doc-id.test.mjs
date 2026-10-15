@@ -1049,6 +1049,10 @@ test("CR-2 (cycle 4): parseLegacy refuses a new-scheme name outright", () => {
     "epic.1.1.review.1.hero.md",
     "story.1.1.1.qa.1.anim.md",
     "epic.1.1.hero.md",
+    // QA cycle 5, CR-1: the sub-story suffix
+    "story.1.2.3A.qa.1.anim.md",
+    "story.1.2.3A.dod.md",
+    "story.1.2.3A.review.2026-01-01.md",
   ]) {
     const p = d.parseLegacy(name);
     assert.equal(p.ok, false, name);
