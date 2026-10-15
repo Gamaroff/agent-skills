@@ -400,7 +400,12 @@ MIG_REASON=$(printf '%s' "$MIG" | jq -r '.reason // empty' 2>/dev/null)
 # Only these answers are a plan. A usage error (no git repository, a missing PRD root) or a crash
 # carries no blockers list, and an absent list must not read as "no blockers".
 case "${MIG_RC}:${MIG_REASON}" in
-  0:already|1:needs-migration|1:post-check-failed) ;;
+  0:already|1:needs-migration) ;;
+  1:post-check-failed)
+    # Nothing is left to move, but the corpus is not clean: there is no plan to apply.
+    echo "migration: post-check-failed — nothing to migrate; the numbering findings above need a hand fix"
+    printf '%s' "$MIG" | jq -r '.findings[]? | "  ✖ \(.reason): \(.path) — \(.detail)"'
+    exit 0 ;;
   *) echo "❌ migration plan could not run (exit ${MIG_RC}${MIG_REASON:+, ${MIG_REASON}}): $(printf '%s' "$MIG" | jq -r '.error // empty' 2>/dev/null)"; exit 1 ;;
 esac
 printf '%s' "$MIG" | jq -r '"migration: \(.reason)",
@@ -416,7 +421,8 @@ the `reason` alone:
   slug, bind `MIG_NAME` to `<path>=<slug>`, and run the plan again.
 - **Any other blocker** (`dirty-path`, `in-flight`, `target-exists`, …) → report it as Critical with its
   detail and offer no apply. The blocker names what to fix first.
-- **`already`** → nothing to migrate; the findings above need a hand fix.
+- **`already`** or **`post-check-failed`** → nothing to migrate; the numbering findings need a hand
+  fix, and no apply is offered.
 
 **Optional pm-checklist integration**: If `run_pm_checklist` is true, invoke the pm-checklist skill here and incorporate its 9-category findings into this step. Otherwise, perform the lighter structural check above.
 

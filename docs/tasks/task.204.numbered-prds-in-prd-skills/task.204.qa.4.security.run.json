@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": null,
+      "entry": "fence:skills/create-prd/SKILL.md#Allocate a new PRD number",
+      "name": "create-prd-allocate-slug",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 11,
+      "passed": 11,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": [
+        "bash"
+      ],
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": "\"$FEATURE\"",
+      "fixture_setup": null,
+      "ran_at": "2026-10-15T16:14:33.552Z"
+    },
+    {
+      "sink": null,
+      "entry": "fence:skills/create-prd/SKILL.md#Allocate a new PRD number",
+      "name": "create-prd-allocate-domain",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 13,
+      "passed": 13,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": [
+        "bash"
+      ],
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": "\"$DOMAIN\"",
+      "fixture_setup": null,
+      "ran_at": "2026-10-15T16:14:35.382Z"
+    }
+  ],
+  "totals": {
+    "executed": 24,
+    "reproduced": 0
+  },
+  "updated_at": "2026-10-15T16:14:35.382Z"
+}

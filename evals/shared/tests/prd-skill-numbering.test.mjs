@@ -793,4 +793,29 @@ test("gate-3 CR-5: a domain directory that symlinks out of the root is refused, 
   });
   assert.equal(w.code, 1, w.out);
   assert.match(w.out, /resolves outside docs\/prd/);
+  // gate-4 CR-1: the third block that accepts a PRD path holds the same line.
+  const k = run(
+    KEEP(),
+    root,
+    { FOUND_PRD: prdPath(1, "shop") },
+    'echo "GOT P=$P"',
+  );
+  assert.equal(k.code, 1, k.out);
+  assert.match(k.out, /resolves outside docs\/prd/);
+  assert.doesNotMatch(k.out, /GOT P=/);
+});
+
+test("gate-4 CR-2: a post-check-failed migration answer offers nothing to apply and names the findings", () => {
+  // Fully numbered, so nothing moves, but the corpus is not clean (prd_number disagrees).
+  const root = tree({
+    [REG]: registry(2, [[1, "a", "a"]]),
+    [prdPath(1, "a")]: "---\nname: prd.1.a\nprd_number: 7\ntype: prd\n---\n",
+  });
+  writeFileSync(path.join(root, ".gitignore"), ".agents/\n");
+  gitInit(root);
+  const r = run(MIG_PLAN(), root);
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /post-check-failed — nothing to migrate/);
+  assert.match(r.out, /✖ frontmatter-mismatch: .*prd\.1\.a\.md/);
+  assert.doesNotMatch(r.out, /^migration: needs-migration/m);
 });

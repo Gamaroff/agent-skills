@@ -435,6 +435,11 @@ KEEP=$(command node -e '
     r = { ok: false, reason: "unnumbered", detail: `${file} predates numbered PRDs` };
   } else if (parts.length !== 3 || !folderOk || parts[1] !== path.basename(file, ".md")) {
     r = { ok: false, reason: "off-layout", detail: `${file} is not at ${root}/{domain}/prd.{P}.{feature}/` };
+  } else if (fs.existsSync(file)
+      && !fs.realpathSync(file).startsWith(fs.realpathSync(root) + path.sep)) {
+    // The same realpath containment the allocate and register blocks apply: a domain directory
+    // that symlinks out of the root must not carry a kept PRD with it.
+    r = { ok: false, reason: "off-layout", detail: `${file} resolves outside ${root}` };
   } else {
     let text = null;
     try { text = fs.readFileSync(file, "utf8"); } catch (e) {
