@@ -19,11 +19,13 @@ import {
   copyFileSync,
   existsSync,
   mkdirSync,
+  mkdtempSync,
   readFileSync,
   rmSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnBudget } from "../../../shared/resources/spawn-budget.mjs";
@@ -897,6 +899,55 @@ test("gate-6 CR-1: a PRD that resolves outside the root stops the review, and no
   assert.match(legacy.out, /REPORT=docs\/prd\.review\.1\.\{name\}\.md/);
 });
 
+test("gate-7 CR-1: migrating a root-level docs/prd.md leaves every other PRD's text alone", () => {
+  const shop = `${prdDoc(1, "shop")}\nThe prd says hi; the \`prd\` type stays; a bare prd.md mention is prose.\n`;
+  const root = tree({
+    [REG]: registry(2, [[1, "shop", "shop"]]),
+    [prdPath(1, "shop")]: shop,
+    "docs/prd.md": "---\ntype: prd\n---\n# Legacy\n",
+  });
+  writeFileSync(path.join(root, ".gitignore"), ".agents/\n");
+  gitInit(root);
+  const env = { MIG_NAME: "docs/prd.md=legacy" };
+  const plan = run(MIG_PLAN(), root, env);
+  assert.match(plan.out, /migration: needs-migration/);
+  const a = run(MIG_APPLY(), root, env);
+  assert.equal(a.code, 0, a.out);
+  assert.match(a.out, /migration: ok/);
+  assert.ok(
+    existsSync(path.join(root, prdPath(2, "legacy"))),
+    "the monolith moved to its numbered place",
+  );
+  assert.equal(
+    readFileSync(path.join(root, prdPath(1, "shop")), "utf8"),
+    shop,
+    "another PRD's type: prd and prose are untouched",
+  );
+});
+
+test("gate-7 CR-3: a legacy PRD above the root that links out of the working tree stops the review", () => {
+  const outside = mkdtempSync(path.join(os.tmpdir(), "prd-204-outside-"));
+  writeFileSync(path.join(outside, "victim.md"), "# not ours\n");
+  const root = tree({ [REG]: registry(1) });
+  symlinkSync(path.join(outside, "victim.md"), path.join(root, "docs/prd.md"));
+  const n = run(
+    NUMBERING(),
+    root,
+    { PRD_FILE: "docs/prd.md" },
+    'echo "AFTER-BLOCK"',
+  );
+  assert.equal(n.code, 1, n.out);
+  assert.match(n.out, /resolves outside the working tree through a symlink/);
+  assert.match(n.out, /review stopped/);
+  assert.doesNotMatch(n.out, /AFTER-BLOCK|\[Critical\]/);
+  rmSync(outside, { recursive: true, force: true });
+  // The other direction: a real legacy docs/prd.md is reported, not stopped.
+  const plain = tree({ [REG]: registry(1), "docs/prd.md": "# legacy\n" });
+  const p = run(NUMBERING(), plain, { PRD_FILE: "docs/prd.md" });
+  assert.equal(p.code, 0, p.out);
+  assert.match(p.out, /\[Critical\] numbering bad-shape: .*outside docs\/prd/);
+});
+
 test("gate-5 CR-4: shard-prd explodes only a numbered PRD that owns its directory under the root", () => {
   const root = tree({
     [prdPath(3, "shop")]: prdDoc(3, "shop"),
@@ -948,6 +999,29 @@ test("gate-5 CR-4: shard-prd explodes only a numbered PRD that owns its director
     existsSync(path.join(root, ".md-tree-calls")),
     false,
     "nothing exploded through the link",
+  );
+  // gate-7 CR-2: a linked directory holding a link back to a real PRD inside the root passes a
+  // file-only check; the directory md-tree writes into is checked too.
+  mkdirSync(path.join(root, "outside/prd.3.shop"), { recursive: true });
+  symlinkSync(
+    path.join(root, prdPath(3, "shop")),
+    path.join(root, "outside/prd.3.shop/prd.3.shop.md"),
+  );
+  mkdirSync(path.join(root, "docs/prd/mall"), { recursive: true });
+  symlinkSync(
+    path.join(root, "outside/prd.3.shop"),
+    path.join(root, "docs/prd/mall/prd.3.shop"),
+  );
+  const backLinked = run(SHARD(), root, {
+    PATH: PATHX,
+    PRD_FILE: "docs/prd/mall/prd.3.shop/prd.3.shop.md",
+  });
+  assert.equal(backLinked.code, 1, backLinked.out);
+  assert.match(backLinked.out, /resolves outside docs\/prd through a symlink/);
+  assert.equal(
+    existsSync(path.join(root, ".md-tree-calls")),
+    false,
+    "nothing exploded into the linked directory",
   );
   const ok = run(SHARD(), root, { PATH: PATHX, PRD_FILE: prdPath(3, "shop") });
   assert.equal(ok.code, 0, ok.out);

@@ -524,25 +524,26 @@ that this document's own example (an unnumbered PRD) never shows.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-15
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 70/100
+**Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.204.qa.6.numbered-prds-in-prd-skills.md](./task.204.qa.6.numbered-prds-in-prd-skills.md)
-- **Gate File**: [task.204.gate.6.numbered-prds-in-prd-skills.yml](./task.204.gate.6.numbered-prds-in-prd-skills.yml)
+- **Full Report**: [task.204.qa.7.numbered-prds-in-prd-skills.md](./task.204.qa.7.numbered-prds-in-prd-skills.md)
+- **Gate File**: [task.204.gate.7.numbered-prds-in-prd-skills.yml](./task.204.gate.7.numbered-prds-in-prd-skills.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 36 (new, each mutation-proven) + full suite 5712 pass / 0 fail
+- **Tests Executed**: 37 (new, each mutation-proven) + full suite 5713 pass / 0 fail
 - **Phases Verified**: 5/5
-- **Critical Issues**: 0 high, 1 medium
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **Critical Issues**: 1 high, 1 medium (+1 advisory medium)
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: FAIL, Maintainability: PASS
 
 ### Key Findings
-- Gate 5's three findings are fixed and verified.
-- review-prd reports a PRD that resolves outside the root but does not stop, and its report-number block has no containment (CR-1).
+- Gate 6's finding is fixed and verified.
+- Migrating a root-level docs/prd.md rewrites the bare word prd across the PRD tree, type: prd in every other PRD included, and reports ok (CR-1, high).
+- shard-prd checks the PRD file's realpath, not the directory it explodes into (CR-2).
 
 <!-- change-log-start -->
 ## Change Log
@@ -565,6 +566,8 @@ that this document's own example (an unnumbered PRD) never shows.
 | 2026-10-15 |         | QA findings fixed — cycle 5, 3 findings (CR-1..CR-3) + 1 advisory (CR-4); shard-prd block guarded; 36 test rows | qa-fix |
 | 2026-10-15 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-10-15 |         | QA findings fixed — cycle 6, 1 finding (CR-1) + 1 advisory (CR-2); review-prd stops on a PRD outside the root; 37 test rows | qa-fix |
+| 2026-10-15 |         | QA gate FAIL (70/100) — 2 findings | qa-task |
+| 2026-10-15 |         | QA findings fixed — cycle 7, 2 findings (CR-1 migration token pass, CR-2 shard directory) + 1 advisory (CR-3); 39 test rows | qa-fix |
 <!-- change-log-end -->
 
 ---

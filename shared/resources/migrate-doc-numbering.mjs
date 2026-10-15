@@ -914,10 +914,16 @@ export function planEdits(planned, disc, io) {
   const links = { live: 0, dead: 0, rewritten: 0, wouldHeal: [] };
   const root = planned.root;
 
-  // Old stems and basenames inside the tree (the token pass).
+  // Old stems and basenames inside the tree (the token pass). Only a dotted stem
+  // (`prd.onboarding`, `epic.3.auth`) is distinctive enough to rewrite as a whole word:
+  // the monolith's stem is the bare word `prd` and a root index's is `index`, and as
+  // tokens they rewrote `type: prd` in every other PRD and every `prd` in prose
+  // (task.204 QA cycle 7, CR-1). Their paths still move through the literal pass.
+  const distinctive = (stem) => stem.includes(".");
   const tokenKeys = new Set();
   for (const p of planned.prds)
-    if (p.oldStem !== p.newStem) tokenKeys.add(p.oldStem);
+    if (p.oldStem !== p.newStem && distinctive(p.oldStem))
+      tokenKeys.add(p.oldStem);
   for (const e of planned.epics)
     if (e.oldStem !== e.newStem) tokenKeys.add(e.oldStem);
   for (const s of planned.stories)
@@ -926,7 +932,7 @@ export function planEdits(planned, disc, io) {
   for (const [from, to] of planned.fileMap) {
     const a = P.basename(from);
     const b = P.basename(to);
-    if (a !== b) baseMap.set(a, b);
+    if (a !== b && distinctive(stemOf(a))) baseMap.set(a, b);
   }
   for (const k of baseMap.keys()) tokenKeys.add(k);
   const stemMap = new Map();

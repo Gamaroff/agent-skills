@@ -335,19 +335,24 @@ NUMBERING=$(command node -e '
     console.log(JSON.stringify({ reason: findings.length ? "findings" : "ok", findings }));
     process.exit(findings.length ? 1 : 0);
   };
-  // A PRD outside the PRD root (a root-level docs/prd.md) has one finding: that it is there.
-  if (!abs.startsWith(rootAbs + path.sep)) {
-    say([{ reason: "bad-shape", path: abs, detail: `outside ${root} — a PRD written before numbered PRDs` }]);
-  }
-  // Text inside the root is not enough: a file (or a directory above it) that is a symlink out of
-  // the root would carry every read and write of this review with it. That is not a finding to
-  // report and carry on from — the report and every fix would be written through the link — so the
-  // review stops here (exit 3).
+  // Text is not enough: a file, or its directory, that is a symlink out of where its path says it is
+  // (the PRD root for a PRD under it, the working tree for a legacy PRD above it) would carry every
+  // read and write of this review with it. That is not a finding to report and carry on from — the
+  // report and every fix would be written through the link — so the review stops here (exit 3).
+  // Checked first, so a legacy PRD above the root is held to it too.
   const fs = require("fs");
-  if (fs.existsSync(abs) && !fs.realpathSync(abs).startsWith(fs.realpathSync(rootAbs) + path.sep)) {
+  const textIn = (p, b) => p === b || p.startsWith(b + path.sep);
+  const underRoot = abs.startsWith(rootAbs + path.sep);
+  const base = underRoot ? rootAbs : path.resolve(".");
+  if (fs.existsSync(abs) && !(textIn(fs.realpathSync(abs), fs.realpathSync(base))
+      && textIn(fs.realpathSync(dirAbs), fs.realpathSync(base)))) {
     console.log(JSON.stringify({ reason: "outside-root", findings: [{ reason: "bad-shape", path: abs,
-      detail: `resolves outside ${root} through a symlink` }] }));
+      detail: `resolves outside ${underRoot ? root : "the working tree"} through a symlink` }] }));
     process.exit(3);
+  }
+  // A PRD outside the PRD root (a root-level docs/prd.md) has one finding: that it is there.
+  if (!underRoot) {
+    say([{ reason: "bad-shape", path: abs, detail: `outside ${root} — a PRD written before numbered PRDs` }]);
   }
   // The file itself, always — the corpus walk below skips any name without a prd/epic/story prefix.
   const own = d.check(abs, { prdRoot: rootAbs });
@@ -383,7 +388,7 @@ case "${NUMBERING_RC}:${NUMBERING_REASON}" in
   1:findings) printf '%s' "$NUMBERING" | jq -r '.findings[] | "[Critical] numbering \(.reason): \(.path) — \(.detail)"' ;;
   3:outside-root)
     printf '%s' "$NUMBERING" | jq -r '.findings[] | "❌ \(.path) \(.detail)"'
-    echo "❌ review stopped: a symlink leads out of ${PRD_ROOT}, and the report and fixes would be written through it — replace the link with the real directory under the root (no migration can fix this), then re-run /review-prd"; exit 1 ;;
+    echo "❌ review stopped: a symlink leads out of ${PRD_ROOT} (or, for a PRD above it, the working tree), and the report and fixes would be written through it — replace the link with the real directory under the root (no migration can fix this), then re-run /review-prd"; exit 1 ;;
   *) echo "❌ numbering check could not run (exit ${NUMBERING_RC}${NUMBERING_REASON:+, ${NUMBERING_REASON}}) — this is not a clean PRD"; exit 1 ;;
 esac
 ```

@@ -121,8 +121,10 @@ command node -e '
   const [root, file] = process.argv.slice(2);
   const p = d.parse(path.basename(file));
   const dir = path.basename(path.dirname(path.resolve(file)));
-  const inside = fs.existsSync(file)
-    && fs.realpathSync(file).startsWith(fs.realpathSync(root) + path.sep);
+  // Both the file and the directory md-tree writes into: a linked directory holding a link back to a
+  // real PRD passes a file-only check while its shards land outside the root.
+  const within = (p) => fs.realpathSync(p).startsWith(fs.realpathSync(root) + path.sep);
+  const inside = fs.existsSync(file) && within(file) && within(path.dirname(file));
   if (!p.ok || p.kind !== "prd" || p.artifact || dir !== path.basename(file, ".md")) {
     console.log(`❌ ${file} is not a numbered PRD in its own directory under ${root} — run /review-prd on it, which reports it and offers the numbering migration`);
     process.exit(1);
