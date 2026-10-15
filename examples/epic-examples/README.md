@@ -12,6 +12,12 @@ created: 2026-05-12
 Four real epic docs produced by `/create-epic` from the same PRD on 2026-05-11.
 Each is frozen at capture time (see `source_sha` in frontmatter).
 
+> **Names predate hierarchical numbering.** These copies keep their captured filenames and text.
+> Task 203 (2026-10-15) later renumbered the live tree: `epic.1` … `epic.4` are now `epic.1.1` …
+> `epic.1.4` under [`prd.1.onboarding`](../../docs/prd/onboarding/prd.1.onboarding/prd.1.onboarding.md),
+> and a story `story.E.S` is now `story.1.E.S`. The "Story list" links below point at the live,
+> renumbered folders.
+
 Parent PRD: [`examples/prd-example/prd.onboarding.md`](../prd-example/prd.onboarding.md).
 
 ## Epic Index

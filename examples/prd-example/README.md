@@ -1,11 +1,18 @@
 # Worked PRD Example: agent-skills Onboarding & Tutorials
 
-**Source:** [`docs/prd/onboarding/prd.onboarding.md`](../../docs/prd/onboarding/prd.1.onboarding/prd.1.onboarding.md)
+**Source:** [`docs/prd/onboarding/prd.1.onboarding/prd.1.onboarding.md`](../../docs/prd/onboarding/prd.1.onboarding/prd.1.onboarding.md)
 **Skill version:** `create-prd` 0.1.0 — see `skills/create-prd/package.json`
-**Captured:** 2026-05-12 by Story 2.1 (`develop-story` pipeline)
+**Captured:** 2026-05-12 by Story 1.2.1 (`develop-story` pipeline; numbered Story 2.1 at the time)
 **Source SHA:** `ea106b1521706dc2c710e93996c0554c80a4c528`
 
 ---
+
+> **Frozen snapshot — names predate hierarchical numbering.** This copy was captured on
+> 2026-05-12 and is kept as captured. Task 203 (2026-10-15) later renumbered the live tree: this
+> PRD is now [`prd.1.onboarding`](../../docs/prd/onboarding/prd.1.onboarding/prd.1.onboarding.md),
+> its epics are `epic.1.1`–`epic.1.4` and its stories `story.1.E.S`. The copy keeps its captured
+> filename and text, so its "Epic 2" / "Story 2.1" references are the numbers of that time
+> (Epic 2 is now 1.2, Story 2.1 is now 1.2.1).
 
 This directory contains a faithful copy of the onboarding PRD that bootstrapped this whole dogfood run. The copy is identical to the source except for three provenance frontmatter fields (`captured_skill_version`, `captured_date`, `source_sha`). If they diverge beyond that, the source PRD has evolved since capture — check `source_sha` to see how far.
 
@@ -31,7 +38,7 @@ This document narrates the PRD: what was easy, what required iteration, and what
 
 **Epic sequencing required spelling out the dependency graph.** The first draft listed the four epics as parallel. They are not — Epic 2 runs last (consumes pipeline artifacts from Epics 1, 3, 4), and Epic 4 Day-3 specifically needs an Epic-2 messy-path artifact. The Mermaid dependency graph in §5.2 was added after the pm-checklist flagged "Epic 4 depends on Epic 2 but the sequencing text says 'fully parallel'."
 
-**The frontmatter field-set for captured artifacts went through two revisions.** The original AC3 specified only `captured_skill_version`. The review (see `story.2.1.review.1.capture-prd-as-worked-example.md`) found three separate inconsistencies: AC3, Task 3, Manual Testing §AC3, and the Edge cases section each described a different field set. The canonical answer after user clarification: four fields — `captured_skill_version`, `captured_date`, `source_sha`, `created`. Task 0 was also added to establish where `captured_skill_version` comes from (a `package.json` on each skill that previously did not exist for `create-prd`).
+**The frontmatter field-set for captured artifacts went through two revisions.** The original AC3 specified only `captured_skill_version`. The review (see `story.1.2.1.review.1.capture-prd-as-worked-example.md`) found three separate inconsistencies: AC3, Task 3, Manual Testing §AC3, and the Edge cases section each described a different field set. The canonical answer after user clarification: four fields — `captured_skill_version`, `captured_date`, `source_sha`, `created`. Task 0 was also added to establish where `captured_skill_version` comes from (a `package.json` on each skill that previously did not exist for `create-prd`).
 
 ---
 
@@ -49,12 +56,12 @@ This document narrates the PRD: what was easy, what required iteration, and what
 
 Start at §1.4 (Goals) — it names the two gaps being solved (onboarding + credibility) in one paragraph. Then §5.2 (Epic structure) to understand the sequencing rationale. The rest of the sections fill in detail.
 
-The canonical source PRD at `docs/prd/onboarding/prd.onboarding.md` is the live document — it may have been updated after this copy was captured. Check `source_sha` (`ea106b1521706dc2c710e93996c0554c80a4c528`) against `git log -- docs/prd/onboarding/prd.onboarding.md` to see if there are newer commits.
+The canonical source PRD at `docs/prd/onboarding/prd.1.onboarding/prd.1.onboarding.md` is the live document — it may have been updated after this copy was captured. Check `source_sha` (`ea106b1521706dc2c710e93996c0554c80a4c528`) against `git log --follow -- docs/prd/onboarding/prd.1.onboarding/prd.1.onboarding.md` to see if there are newer commits.
 
 ---
 
 ## Related examples
 
 - Task pipeline (existing): [`docs/tasks/task.6.create-epic-jira-tracker-path/`](../../docs/tasks/task.6.create-epic-jira-tracker-path/)
-- Epic examples (Story 2.2): `examples/epic-examples/` *(pending)*
-- Messy-path story (Story 2.3): `examples/story-messy-path/` *(pending)*
+- Epic examples (Story 1.2.2): [`examples/epic-examples/`](../epic-examples/)
+- Messy-path story (Story 1.2.3): [`story.1.2.3.capture-story-messy-path/`](../../docs/prd/onboarding/prd.1.onboarding/epics/epic.1.2.worked-prd-epic-story-examples/stories/story.1.2.3.capture-story-messy-path/) (not copied into `examples/`; descoped during its run)
