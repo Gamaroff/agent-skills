@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **One engine for hierarchical document ids, and a PRD registry (task 202).** The new
+  `shared/resources/doc-id.js` parses, formats, allocates and checks `prd.{P}`, `epic.{P}.{E}` and
+  `story.{P}.{E}.{S}` names: `P` comes from a new PRD registry, `E` counts epics within a PRD, and
+  `S` counts stories within an epic. Its CLI (`parse`, `next`, `check`, `check --corpus`) follows the
+  `--json` `reason` and exit-code contract of the other engines, and refuses a directory it cannot
+  read rather than reporting it empty. `select-next.mjs` now reads a PRD registry (`kind: "prd"`)
+  by the same rules as its bug and task registries, and a roadmap line linking a PRD is still not a
+  work item. New standard: `docs/standards/prd-registry.md`. The file-naming, PRD, epic and story
+  standards now describe the scheme, each with a dated interim note. No skill uses it yet; tasks
+  203–207 migrate the callers.
+
 ## [v0.57.1] - 2026-10-14
 
 ### Changed
