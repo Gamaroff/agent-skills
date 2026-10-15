@@ -3522,3 +3522,63 @@ test("bug.19 CR-1: a title link that resolves outside the repository is a malfor
     /^malformed row — title link .* resolves outside the repository$/,
   );
 });
+
+// --- task.202: the PRD registry kind ---------------------------------------
+// The row measured in task.202 §2, which parsed into `malformed` before the
+// `prd` kind existed. Its href is accepted ONLY for kind "prd": the roadmap
+// reader shares isWorkItemHref, and a roadmap line linking a PRD is a reference.
+const PRD_REGISTRY = [
+  "| PRD # | Title | Folder | Status | Created |",
+  "|---|---|---|---|---|",
+  "| 1 | [Onboarding](onboarding/prd.1.onboarding/prd.1.onboarding.md) | onboarding | accepted | 2026-10-13 |",
+  "",
+].join("\n");
+
+test("task.202: a prd registry row parses into rows, not malformed", () => {
+  const r = parseRegistry(PRD_REGISTRY, "prd", "docs/prd/prd-registry.md");
+  assert.deepEqual(r.malformed, []);
+  assert.equal(r.rows.length, 1);
+  assert.equal(r.rows[0].kind, "prd");
+  assert.equal(r.rows[0].n, 1);
+  assert.equal(r.rows[0].registryStatus, "accepted");
+  assert.equal(
+    r.rows[0].path,
+    "docs/prd/onboarding/prd.1.onboarding/prd.1.onboarding.md",
+  );
+});
+
+test("task.202: a prd registry with no header still reads its documented columns", () => {
+  const headless = PRD_REGISTRY.split("\n").slice(2).join("\n");
+  const r = parseRegistry(headless, "prd", "docs/prd/prd-registry.md");
+  assert.equal(r.rows.length, 1);
+  assert.equal(r.rows[0].registryStatus, "accepted");
+});
+
+test("task.202: the prd href is scoped to kind prd — a task registry still refuses it", () => {
+  const r = parseRegistry(PRD_REGISTRY, "task", "docs/tasks/task-registry.md");
+  assert.equal(r.rows.length, 0);
+  assert.match(r.malformed[0].reason, /story\|task\|bug/);
+  const p = parseRegistry(
+    "| 1 | [X](task.1.x/task.1.x.md) | x | draft | 2026-10-13 |\n",
+    "prd",
+    "docs/prd/prd-registry.md",
+  );
+  assert.equal(p.rows.length, 0, "a prd registry does not accept a task link");
+  assert.match(p.malformed[0].reason, /\[title\]\(prd\./);
+});
+
+test("task.202: a roadmap line linking a PRD is still not a work item", () => {
+  const r = selectNext(
+    parseRoadmap(
+      [
+        "# PHASE 1",
+        "## Epic 4",
+        "- [ ] **4.1** Home PRD — [prd](docs/prd/web/prd.1.home/prd.1.home.md) · deps: — · `/develop-story`",
+        "",
+      ].join("\n"),
+    ),
+  );
+  assert.equal(r.status, "stop");
+  assert.equal(r.stopReason, "manual-checkpoint");
+  assert.equal(r.item.commandArg, null, "the PRD link is not a work-item path");
+});
