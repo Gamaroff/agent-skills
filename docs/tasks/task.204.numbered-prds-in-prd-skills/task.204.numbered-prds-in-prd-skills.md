@@ -548,18 +548,18 @@ that this document's own example (an unnumbered PRD) never shows.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.204.qa.9.numbered-prds-in-prd-skills.md](./task.204.qa.9.numbered-prds-in-prd-skills.md)
-- **Gate File**: [task.204.gate.9.numbered-prds-in-prd-skills.yml](./task.204.gate.9.numbered-prds-in-prd-skills.yml)
+- **Full Report**: [task.204.qa.10.numbered-prds-in-prd-skills.md](./task.204.qa.10.numbered-prds-in-prd-skills.md)
+- **Gate File**: [task.204.gate.10.numbered-prds-in-prd-skills.yml](./task.204.gate.10.numbered-prds-in-prd-skills.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 40 (new) + full suite 5716 pass / 0 fail
+- **Tests Executed**: 41 (new) + full suite 5717 pass / 0 fail
 - **Phases Verified**: 5/5
-- **Critical Issues**: 0 high, 2 medium, 2 low (+1 advisory)
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+- **Critical Issues**: 0 high, 2 medium (+3 advisory)
+- **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- The DoD 1 gaps are fixed (CI's stdout-drain guard green).
-- The migration guard's outside-links check matches any mention of the PRD's basename (CR-1); the reference docs still give pre-numbering epic and story paths (CR-2).
+- Gate 9's findings are fixed and verified.
+- The migration guard's reference test misses C-quoted paths (CR-1) and scans long runs quadratically (CR-2).
 
 ## Definition of Done - Gaps Identified
 
@@ -626,6 +626,8 @@ that this document's own example (an unnumbered PRD) never shows.
 | 2026-10-15 |         | DoD incomplete — 4 gaps identified | finalise |
 | 2026-10-15 |         | QA gate CONCERNS (80/100) — 4 findings (re-entry after DoD 1) | qa-task |
 | 2026-10-15 |         | QA findings fixed — cycle 9, 4 findings (CR-1 outside-links counts real references only, CR-2 reference-doc epic/story paths, CR-4, CR-5) + CR-3 advisory deferred; 41 test rows | qa-fix |
+| 2026-10-15 |         | QA gate CONCERNS (80/100) — 2 findings | qa-task |
+| 2026-10-15 |         | QA findings fixed — cycle 10, 2 findings (CR-1 quoted paths, CR-2 quadratic scan): outside-links is a fail-closed mention check, no parser; 41 test rows | qa-fix |
 <!-- change-log-end -->
 
 ---

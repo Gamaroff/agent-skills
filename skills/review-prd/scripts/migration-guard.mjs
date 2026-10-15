@@ -78,18 +78,19 @@ function main() {
       });
     }
     // outside-links — only a source outside the root can be named by files the engine never reads.
-    // A file counts when it REFERS to this PRD — its repo-relative path, or a relative path from
-    // the file's own directory that resolves to it — and sits where the run would rewrite it
-    // (inRewriteScope, the engine's own rule: not history, a fixture, a bundled or vendored copy).
-    // A bare mention of the basename in prose is not a reference: matched as one, the vendored
-    // skills' own text refused every docs/prd.md migration (task.204 QA cycle 9, CR-1). The search
-    // is a fixed string, so a name carrying regex metacharacters still matches itself (CR-5).
+    // Fail closed, by design a stopgap until task.211 makes the engine re-point these: any file
+    // that MENTIONS the PRD's basename and sits where the run rewrites (inRewriteScope, the
+    // engine's own rule — not history, a fixture, a bundled or vendored copy) blocks the offer.
+    // No reference parser: two cycles of one (QA cycles 9–10) each found a way it read a real
+    // reference as none, or ran in quadratic time. The search is a fixed string; -z keeps a name
+    // with non-ASCII characters or quotes unquoted, so every listed file is the real path.
     if (!inRoot(m.old)) {
       const target = path.normalize(m.old);
-      const base = path.basename(target);
-      const g = spawnSync("git", ["grep", "-l", "-F", "-e", base, "--", "."], {
-        encoding: "utf8",
-      });
+      const g = spawnSync(
+        "git",
+        ["grep", "-l", "-z", "-F", "-e", path.basename(target), "--", "."],
+        { encoding: "utf8" },
+      );
       if (g.status !== 0 && g.status !== 1) {
         blockers.push({
           code: "outside-links",
@@ -97,35 +98,15 @@ function main() {
           detail: "could not search for references to it (git grep failed)",
         });
       } else {
-        const escaped = base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        // A repo-relative path counts anywhere; a path relative to the file counts only as a link
-        // target (`](…)`, `<…>`, `]: …`), where a reader's tool will follow it.
-        const token = new RegExp(
-          `(\\]\\(|<|\\]:[ \\t]*)?([A-Za-z0-9_./+-]*${escaped})`,
-          "g",
-        );
-        const refers = (file) => {
-          const text = existsSync(file) ? readFileSync(file, "utf8") : "";
-          for (const [, link, t] of text.matchAll(token)) {
-            if (path.normalize(t.replace(/^\.\//, "")) === target) return true;
-            if (
-              link &&
-              path.normalize(path.join(path.dirname(file), t)) === target
-            )
-              return true;
-          }
-          return false;
-        };
         const files = g.stdout
-          .split("\n")
+          .split("\0")
           .filter(Boolean)
-          .filter((f) => f !== target && !inRoot(f) && inRewriteScope(f))
-          .filter(refers);
+          .filter((f) => f !== target && !inRoot(f) && inRewriteScope(f));
         if (files.length) {
           blockers.push({
             code: "outside-links",
             path: m.old,
-            detail: `referenced by ${files.length} file(s) outside ${root} that the migration would not re-point (${files.slice(0, 5).join(", ")}${files.length > 5 ? ", …" : ""}) — move it by hand and update them`,
+            detail: `mentioned by ${files.length} file(s) outside ${root} that the migration would not re-point (${files.slice(0, 5).join(", ")}${files.length > 5 ? ", …" : ""}) — update or remove each mention, or move the PRD by hand`,
           });
         }
       }

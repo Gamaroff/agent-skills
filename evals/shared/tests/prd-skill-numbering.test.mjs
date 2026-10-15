@@ -990,7 +990,7 @@ test("gate-8: the migration guard refuses what the migration cannot carry, names
   gitInit(linked);
   assert.match(
     run(MIG_PLAN(), linked, env).out,
-    /✖ blocker outside-links: docs\/prd\.md — referenced by 1 file\(s\) outside docs\/prd .*README\.md/,
+    /✖ blocker outside-links: docs\/prd\.md — mentioned by 1 file\(s\) outside docs\/prd .*README\.md/,
   );
   assert.equal(run(MIG_APPLY(), linked, env).code, 1);
   assert.equal(status(linked), "", "nothing moved; README untouched");
@@ -1050,7 +1050,7 @@ if (a[1] && a[1].endsWith("migrate-doc-numbering.mjs")) {
   assert.match(failed.out, /undo: git restore --staged --worktree docs\/prd/);
 });
 
-test("gate-9: outside-links counts real references only — not vendored prose, not a basename mention — and a guard usage error is shown", () => {
+test("gate-9/10: outside-links blocks on a mention in the rewrite scope — not in vendored copies or history — fails closed, and a guard usage error is shown", () => {
   const guard = (root, mapping) =>
     spawnSync(
       process.execPath,
@@ -1075,7 +1075,7 @@ test("gate-9: outside-links counts real references only — not vendored prose, 
     "docs/prd.md": "---\ntype: prd\n---\n# Mono\n",
     ".agents/vendored/review-prd/SKILL.md":
       "A root-level `docs/prd.md` is legacy.\n",
-    "docs/notes.md": "The old prd.md layout is described elsewhere.\n",
+    "docs/tasks/task.1.x/task.1.x.md": "History mentions docs/prd.md.\n",
   });
   gitInit(quiet);
   const q = guard(quiet, mono);
@@ -1094,9 +1094,22 @@ test("gate-9: outside-links counts real references only — not vendored prose, 
   const b = JSON.parse(l.stdout).blockers.find(
     (x) => x.code === "outside-links",
   );
-  assert.match(b.detail, /referenced by 2 file\(s\)/);
+  assert.match(b.detail, /mentioned by 2 file\(s\)/);
   assert.match(b.detail, /README\.md/);
   assert.match(b.detail, /docs\/architecture\.md/);
+  // gate-10: fail closed — a prose mention outside history blocks; a non-ASCII file name is read
+  // as itself (git grep -z); a long run is no special case (there is no regex scan).
+  const prose = tree({
+    [REG]: registry(2),
+    "docs/prd.md": "---\ntype: prd\n---\n# Mono\n",
+    "docs/été.md": "The old prd.md layout.\n",
+    "docs/img.md": `The old prd.md layout. ${"A".repeat(200000)}\n`,
+  });
+  gitInit(prose);
+  const pr = guard(prose, mono);
+  assert.equal(pr.status, 1, pr.stdout);
+  assert.match(pr.stdout, /mentioned by 2 file\(s\)/);
+  assert.match(pr.stdout, /docs\/été\.md/);
   // CR-5: a name carrying regex metacharacters still matches its own references.
   const plus = tree({
     [REG]: registry(2),

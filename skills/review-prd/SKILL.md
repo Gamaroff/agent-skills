@@ -452,9 +452,9 @@ the `reason` alone:
   ask the user for its slug, add a `<path>=<slug>` line to `MIG_NAME` — one line per such PRD, keeping
   the ones already there — and run the plan again.
 - **`no-frontmatter`**, **`no-domain`**, **`outside-links`** — the migration guard's refusals: a PRD
-  the migration cannot number, would place outside a domain directory, or would leave linked from
-  outside the PRD root by a dead link. Report each as Critical with its detail; the detail names the
-  hand fix.
+  the migration cannot number, would place outside a domain directory, or that files outside the PRD
+  root mention (history and vendored copies aside) — the migration would not re-point them. Report
+  each as Critical with its detail; the detail names the hand fix.
 - **Any other blocker** (`dirty-path`, `in-flight`, `target-exists`, …) → report it as Critical with its
   detail and offer no apply. The blocker names what to fix first.
 - **`already`** or **`post-check-failed`** → nothing to migrate; the numbering findings need a hand

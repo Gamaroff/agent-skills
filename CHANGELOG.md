@@ -41,7 +41,7 @@ All notable changes to this project will be documented in this file. Format foll
   migration when its plan has no blockers, and writes its report as
   `prd.{P}.{feature}.review.{n}.{name}.md`. A new `review-prd/scripts/migration-guard.mjs` withholds
   that offer for three shapes the migration cannot yet carry — no frontmatter, a PRD with no domain,
-  and a `docs/prd.md` that files outside the PRD root link to — until task 211 lands. `shard-prd`
+  and a `docs/prd.md` that files outside the PRD root mention — until task 211 lands. `shard-prd`
   explodes a numbered PRD in place and refuses a legacy one. Every PRD-path block refuses a path that
   resolves outside `${PRD_ROOT}` through a symlink. The migration's token pass no longer rewrites the
   bare words `prd` and `index`, which turned `type: prd` in every other PRD into `type: prd.{P}.{slug}`.
