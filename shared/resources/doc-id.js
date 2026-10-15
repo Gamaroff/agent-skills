@@ -144,6 +144,10 @@ function parseRemainder(rest, slugOk) {
   // QA cycle 2, CR-7).
   if (
     segs.length === 4 &&
+    // The document slug must begin with a letter whatever the caller's slug rule:
+    // under parseLegacy's loose rule a digit-first docSlug would read a new-scheme
+    // artifact (`epic.1.1.review.1.x`) as a legacy one (QA cycle 3, CR-1).
+    SLUG_RE.test(segs[0]) &&
     slugOk(segs[0]) &&
     ARTIFACTS.includes(segs[1]) &&
     !["plan", "sprint-review-summary"].includes(segs[1]) &&
@@ -320,8 +324,10 @@ function format(parts) {
     sub: p.sub || null,
     n: num(p.n),
     artifact: p.artifact || null,
-    seq: p.artifact && p.artifact !== "plan" && !fixed ? num(p.seq) : null,
-    slug: fixed ? null : p.slug,
+    seq: p.artifact && p.artifact !== "plan" ? num(p.seq) : null,
+    // A fixed-name artifact takes no slug: one passed is drift, never dropped
+    // silently (QA cycle 3, CR-4).
+    slug: fixed ? (p.slug ?? null) : p.slug,
     docSlug: p.docSlug || null,
   };
   const drift = Object.keys(want).filter((k) => back[k] !== want[k]);
@@ -532,8 +538,14 @@ function frontmatterField(src, key) {
   // Line by line, with no backtracking regex: a long whitespace run in a crafted
   // line must not make this quadratic (QA cycle 2, CR-6).
   const lines = String(src || "").split(/\r?\n/);
-  if (lines[0] !== "---") return "";
-  for (let i = 1; i < lines.length && lines[i] !== "---"; i++) {
+  const isFence = (l) => /^---[ \t]*$/.test(l);
+  if (!isFence(lines[0])) return "";
+  // Only a CLOSED block is frontmatter: find the closing fence first, then read
+  // the lines between — an unclosed block, or one closed by `---   `, must not let
+  // a body line answer for a field (QA cycle 3, CR-2).
+  const close = lines.findIndex((l, i) => i > 0 && isFence(l));
+  if (close < 0) return "";
+  for (let i = 1; i < close; i++) {
     const line = lines[i];
     if (!line.startsWith(`${key}:`)) continue;
     const v = line.slice(key.length + 1).trim();
@@ -939,7 +951,18 @@ function runCli(argv, { cwd = process.cwd(), io = REAL_FS } = {}) {
   if (cmd === "next") {
     if (arg === "prd") {
       const root = at(resolvePrdRoot(argv, cwd));
-      const reg = io.readFile(path.join(root, "prd-registry.md"));
+      const regPath = path.join(root, "prd-registry.md");
+      const reg = io.readFile(regPath);
+      // A registry that exists and cannot be read is `unreadable`, as in check();
+      // `registry-missing` stays for an absent file (QA cycle 3, CR-3).
+      if (reg === null && io.exists(regPath)) {
+        return done(1, {
+          ok: false,
+          reason: "unreadable",
+          detail: `${regPath} exists but cannot be read`,
+          prdRoot: root,
+        });
+      }
       const dirs = allDirs(root, io);
       if (dirs.unreadable.length) {
         return done(1, {
@@ -969,14 +992,16 @@ function runCli(argv, { cwd = process.cwd(), io = REAL_FS } = {}) {
       // A mistyped parent must not allocate a number: the directory and its own
       // document must both exist (QA cycle 1, CR-2).
       const parentDocPath = path.join(dir, `${path.basename(dir)}.md`);
-      if (io.readDir(dir) === null && io.exists(dir)) {
+      // One read of the parent directory: null = unreadable, [] = absent (CR-5).
+      const parentListing = childDirs(dir, io);
+      if (parentListing === null) {
         return done(1, {
           ok: false,
           reason: "unreadable",
           detail: `cannot read ${dir}`,
         });
       }
-      if (io.readDir(dir) === null || !io.exists(parentDocPath)) {
+      if (!io.exists(dir) || !io.exists(parentDocPath)) {
         return done(1, {
           ok: false,
           reason: "parent-missing",

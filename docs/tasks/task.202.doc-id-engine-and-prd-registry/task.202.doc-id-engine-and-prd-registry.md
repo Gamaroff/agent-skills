@@ -419,21 +419,21 @@ that write one.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-15
-**Quality Score**: 60/100
+**Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.202.qa.2.doc-id-engine-and-prd-registry.md](./task.202.qa.2.doc-id-engine-and-prd-registry.md)
-- **Gate File**: [task.202.gate.2.doc-id-engine-and-prd-registry.yml](./task.202.gate.2.doc-id-engine-and-prd-registry.yml)
+- **Full Report**: [task.202.qa.3.doc-id-engine-and-prd-registry.md](./task.202.qa.3.doc-id-engine-and-prd-registry.md)
+- **Gate File**: [task.202.gate.3.doc-id-engine-and-prd-registry.yml](./task.202.gate.3.doc-id-engine-and-prd-registry.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 43 (39 doc-id + 4 select-next), inside a 5553-test green suite
+- **Tests Executed**: 53 (49 doc-id + 4 select-next)
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Cycle-1 findings all fixed and mutation-proven; the security probe engages. Cycle 2 found four medium defects in `doc-id.js`: sprint-review-summary artifacts read as documents, the allocator reads an unreadable directory as empty, the PRD registry reader disagrees with the selector, and `format()` rejects string-number parts.
+Every cycle-2 fix holds. One medium remains: `parseLegacy` accepts new-scheme full-stem artifacts as legacy ones. One low (`next prd` reports an unreadable registry as missing).
 
 <!-- change-log-start -->
 ## Change Log
@@ -448,6 +448,8 @@ Cycle-1 findings all fixed and mutation-proven; the security probe engages. Cycl
 | 2026-10-15 |  | QA findings fixed — cycle 1, 8 gate findings + 3 advisory, 11 tests | qa-fix |
 | 2026-10-15 |  | QA gate CONCERNS (60/100) — 8 findings (4 medium, 4 low) | qa-task |
 | 2026-10-15 |  | QA findings fixed — cycle 2, 8 gate findings + 4 advisory, registry reader consolidated with the selector (parity test), 10 tests | qa-fix |
+| 2026-10-15 |  | QA gate CONCERNS (90/100) — 2 findings (1 medium, 1 low) | qa-task |
+| 2026-10-15 |  | QA findings fixed — cycle 3, 2 gate findings + 3 advisory, 4 tests | qa-fix |
 
 <!-- change-log-end -->
 

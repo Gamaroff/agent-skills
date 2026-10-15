@@ -1,0 +1,71 @@
+schema: 2
+task: 'task.202.doc-id-engine-and-prd-registry'
+task_title: 'Doc-id engine and PRD registry'
+gate: CONCERNS
+status_reason: 'Every cycle-2 fix holds (the scanRegistry port agrees with parseRegistry on 15 further inputs); the security probe engages. One medium defect remains: the new full-stem branch lets parseLegacy accept new-scheme artifacts as legacy ones. One low. No HIGH findings.'
+reviewer: 'QA Engineer'
+head: '5e8228324fe2fe47f8816f75be46092fe4338950'
+updated: '2026-10-15T04:25:48Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/doc-id.js'
+    finding: 'The 4-segment full-stem branch uses the caller slug rule, so parseLegacy (loose, digits allowed) reads new-scheme artifacts as canonical legacy ones with docSlug "1": parseLegacy("epic.1.1.review.1.hero.md") and parseLegacy("story.1.1.1.qa.1.anim.md") were canonical:false and are now canonical:true.'
+    suggested_action: 'Require a letter-initial docSlug (SLUG_RE) in the 4-segment branch whatever the caller slug rule; add parseLegacy cases for the new-scheme fixture artifacts.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-3'
+    severity: low
+    file: 'shared/resources/doc-id.js'
+    finding: 'next prd reports a prd-registry.md that exists but cannot be read as registry-missing, unlike check(), which splits unreadable from missing.'
+    suggested_action: 'When readFile returns null and the registry exists, answer unreadable.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 53
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1]
+  ci: 'not read — CI is gated at /finalise'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 30
+    notes: 'security-probe.mjs on doc-id.js#parse (23 hostile, 7 legitimate): engages.'
+  performance:
+    status: PASS
+    notes: 'frontmatterField is linear (CR-6 test: 200k-space line under 200 ms, marked load-sensitive); check --corpus 29 documents as before.'
+  reliability:
+    status: PASS
+    notes: 'Unreadable directories and documents answer unreadable; one residual registry path (CR-3, low).'
+  maintainability:
+    status: PASS
+    notes: 'Registry reader pinned to the selector by a parity test.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1 (medium) and CR-3 (low).'
+      refs: ['shared/resources/doc-id.js']
+  future:
+    - action: 'Advisory CR-2 (frontmatterField closing fence must allow trailing spaces and require a close), CR-4 (format silently drops slug/seq on sprint-review-summary), CR-5 (parent directory read twice).'
+      refs: ['shared/resources/doc-id.js']
+
+bug_resolution:
+  previous_gate: 'task.202.gate.2.doc-id-engine-and-prd-registry.yml'
+  fixed: ['QA-1', 'CR-1', 'CR-2', 'CR-3', 'CR-4', 'CR-5', 'CR-6', 'CR-8', 'advisory CR-7', 'advisory CR-9', 'advisory CR-10', 'advisory CR-11']
+  fix_commit: '5e822832'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 fixed and re-reviewed']

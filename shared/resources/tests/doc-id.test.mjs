@@ -196,13 +196,13 @@ test("format/parse round-trip over a generated name set", () => {
     ...d.ARTIFACTS.filter(
       (a) => a !== "plan" && a !== "sprint-review-summary",
     ).map((a) => ({ artifact: a, seq: 2 })),
-    { artifact: "sprint-review-summary", seq: null },
+    { artifact: "sprint-review-summary", seq: null, slug: null },
     { artifact: "review", seq: 3, docSlug: "doc-name" },
   ];
   let n = 0;
   for (const id of ids) {
     for (const shape of shapes) {
-      const name = d.format({ ...id, ...shape, slug: "some-slug" });
+      const name = d.format({ ...id, slug: "some-slug", ...shape });
       const p = d.parse(name);
       assert.equal(p.ok, true, name);
       assert.equal(d.format(p), name, `format(parse(${name}))`);
@@ -965,4 +965,68 @@ test("CR-10: a registry with text but no usable counter is registry-invalid", ()
     assert.equal(d.next("prd", [], c).reason, "registry-invalid", c);
   }
   assert.equal(d.next("prd", [], null).reason, "registry-missing");
+});
+
+// ---------------------------------------------------------------------------
+// QA cycle 3 findings (gate 3)
+// ---------------------------------------------------------------------------
+
+test("CR-1 (cycle 3): parseLegacy does not read a new-scheme artifact as a legacy one", () => {
+  for (const name of [
+    "epic.1.1.review.1.hero.md",
+    "story.1.1.1.qa.1.anim.md",
+  ]) {
+    const p = d.parseLegacy(name);
+    assert.notEqual(
+      p.canonical,
+      true,
+      `${name} is not a canonical legacy artifact`,
+    );
+    assert.equal(p.docSlug ?? null, null, name);
+  }
+  const legacy = d.parseLegacy("bug.7.login-timeout.review.1.fix-readiness.md");
+  assert.equal(legacy.ok, false, "bug has no legacy shape — sanity");
+  const full = d.parseLegacy("prd.onboarding.review.1.pm-check.md");
+  assert.equal(full.artifact, "review");
+});
+
+test("CR-3 (cycle 3): next prd reports an unreadable registry as unreadable", () => {
+  const io = { exists: () => true, readFile: () => null, readDir: () => [] };
+  const r = d.runCli(["next", "prd", "--prd-root", "/r"], { cwd: "/", io });
+  assert.deepEqual([r.exitCode, r.payload.reason], [1, "unreadable"]);
+  const absent = d.runCli(["next", "prd", "--prd-root", "/r"], {
+    cwd: "/",
+    io: { exists: (q) => q === "/r", readFile: () => null, readDir: () => [] },
+  });
+  assert.equal(absent.payload.reason, "registry-missing");
+});
+
+test("CR-2 (cycle 3): only a closed frontmatter block answers; a spaced closing fence closes it", () => {
+  assert.equal(
+    d.frontmatterField("---\ntitle: a\n---   \nprd_number: 9\n", "prd_number"),
+    "",
+  );
+  assert.equal(
+    d.frontmatterField("---\ntitle: a\nprd_number: 9\n", "prd_number"),
+    "",
+    "unclosed",
+  );
+  assert.equal(
+    d.frontmatterField("---\r\nprd_number: 3\r\n---\r\n", "prd_number"),
+    "3",
+    "CRLF",
+  );
+});
+
+test("CR-4 (cycle 3): format refuses a slug or seq on a fixed-name artifact", () => {
+  const base = {
+    kind: "story",
+    prd: 1,
+    epic: 2,
+    story: 3,
+    artifact: "sprint-review-summary",
+  };
+  assert.throws(() => d.format({ ...base, slug: "x" }), TypeError);
+  assert.throws(() => d.format({ ...base, seq: 4 }), TypeError);
+  assert.equal(d.format(base), "story.1.2.3.sprint-review-summary");
 });
