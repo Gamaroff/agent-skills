@@ -33,7 +33,7 @@ First pipeline run for task 202: ship `shared/resources/doc-id.js` (hierarchical
 | -------------------------- | ---------- | ---------------------------------------------------------------------- | ----- | -------------------- | --------------- |
 | 1. create-branch           | ✅ Done | Branch `feature/task.202.*` exists in git                             | Branch created at `3b8d4026` | —                    | 2026-10-15T03:34Z |
 | 2. review-task             | ✅ Done | `task.202.review.{N}.{name}.md` exists (or skip logged)               | READY TO IMPLEMENT 8/10; 3 Important fixed; Planned → Ready for Development | —                    | 2026-10-15T03:38Z |
-| 3. develop                 | ⏳ Pending | Task status == `Ready for Review`                                      |       | —                    |                 |
+| 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline (plan file + surface map); 1 iteration; audit 14/14, ready-for-review @ b0ec491a; ci:fast 5542 pass | —                    | 2026-10-15T03:51Z |
 | 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.202.qa.{N}.*.md`; `task.202.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.202.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
@@ -76,6 +76,9 @@ First pipeline run for task 202: ship `shared/resources/doc-id.js` (hierarchical
 - PRD registry rows are read in doc-id.js by a minimal number-column reader, not parseRegistry: doc-id.js is CommonJS and the selector is ESM
 - Mutation proof (each `check` branch removed in turn, `node --test shared/resources/tests/doc-id.test.mjs`): bad-shape → 3 red; dir-stem-mismatch → 2; frontmatter-mismatch → 3; parent-missing → 3; parent-number-mismatch → first mutation survived (it removed only the P half by operator precedence — `false && a || b`), which exposed that the P half had no test; test added, full-branch mutation → 3 red; unregistered → 2; registry-missing → 2; duplicate-id → 2
 - Timing (pre-commit, base 3b8d4026): `time node shared/resources/doc-id.js check --corpus --json` over docs/prd → real 0.031s, `uptime` load average 1.25, 1.24, 1.08; 29 documents, 29 `bad-shape` (the unmigrated legacy tree — expected until task 203). Re-measure on the PR head before finalise
+- Fast gate (`npm run ci:fast`, `.agents/skills` symlink moved aside): TEST_EXIT=0, 5542 tests, 0 failures. Also `npm run bundle:check` (0 problems) and `npm run check:generated` (clean)
+- Loop audit iter 1: status ready-for-review, 14/14 phase items, last commit b0ec491a → exit loop
+- Development completion comment posted to github issue 645
 
 ---
 
