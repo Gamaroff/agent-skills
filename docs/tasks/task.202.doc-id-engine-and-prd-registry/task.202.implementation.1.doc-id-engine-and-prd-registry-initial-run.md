@@ -3,7 +3,7 @@
 **Task**: `task.202.doc-id-engine-and-prd-registry.md`
 **Run Number**: 1
 **Started**: 2026-10-15 05:34
-**Status**: Escalated
+**Status**: In Progress
 
 ---
 
@@ -35,7 +35,7 @@ First pipeline run for task 202: ship `shared/resources/doc-id.js` (hierarchical
 | 2. review-task             | ✅ Done | `task.202.review.{N}.{name}.md` exists (or skip logged)               | READY TO IMPLEMENT 8/10; 3 Important fixed; Planned → Ready for Development | —                    | 2026-10-15T03:38Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline (plan file + surface map); 1 iteration; audit 14/14, ready-for-review @ b0ec491a; ci:fast 5542 pass | —                    | 2026-10-15T03:51Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #667: https://github.com/Gamaroff/agent-skills/pull/667 | —                    | 2026-10-15T03:52Z |
-| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.202.qa.{N}.*.md`; `task.202.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.202.qa.{N}.*.md`; `task.202.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 6 cycles (5 + 2 granted, 1 used); gate.6 PASS 100; 5c APPROVE (pr-review.1) | —                    | 2026-10-15T05:24Z |
 | 7. finalise                | ⏳ Pending | `task.202.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
@@ -96,12 +96,18 @@ First pipeline run for task 202: ship `shared/resources/doc-id.js` (hierarchical
 - QA Cycle 3 — changes-requested: stage-disabled. Post-fix: PR + tracker comments (qa-fix-3: posted)
 - QA cycle 4: scoped (2 files since gate 3) → CONCERNS 90/100; the reviewer checked the whole tracked tree (5808 files parse/parseLegacy old vs new; 568 frontmatter blocks vs PyYAML); probe engages (30); route continue (not-a-pass-gate); HIGH 0×4. Note for task 203: 7 legacy `story.*.validate.<date>.md` files in docs/prd do not parse — `validate` is not in the artifact vocabulary (pre-existing, unchanged by this task)
 - QA Cycle 4 — changes-requested: stage-disabled. Post-fix comments: qa-fix-4 posted
+- Resume after QA loop limit (operator approved 'go ahead' with the recommended grant): develop-next run state halted → false; PR #667 OPEN, nothing to reconcile. Phase 0b: QA loop re-entry: 2 extra cycles granted; 0 cycle(s) run outside the loop back-filled from disk (grant-qa-cycles.sh: QA_CYCLE=5, qa_max_cycles=7, lock restored from the halt snapshot, reenter at 5a)
+- QA cycle 6 (granted): scoped review, 0 findings → PASS 100/100; probe engages (30). Gate committed and pushed (a3ef6bca) before 5c
+- Step 5c: /review-pr --effort medium --comment --no-code → APPROVE (PC-1, PC-2 low); report staged for the acceptance commit; PR summary comment posted; ready-for-merge signalled
+- Step 7: /finalise → GAPS (DoD file task.202.dod.1…; gaps PR comment posted). The gaps comment's lead was given count=2 (the two gaps) rather than the block's checkbox count, which also counted the 3 Next Steps boxes
 
 ---
 
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
+
+- Step 7 /finalise — DoD gaps (2), both documentation-only: (1) AC6 — the `check --corpus` timing was recorded on 8103737b, not on the PR head a3ef6bca, and the implementation report carries only the base-commit figure; (2) Docs — `CHANGELOG.md [Unreleased]` has no `(task 202)` entry (the changelog-entry-drift test would fail CI after merge). AC, security (30 probes, 0 reproduced), compliance (N/A) otherwise pass; CI SUCCESS on a3ef6bca. Fix-and-recheck (8a) not applicable: two sections failed. Resume at Step 7 after the doc-only fix (no QA re-entry)
 
 ### QA Loop Limit Reached — 2026-10-15
 
@@ -190,6 +196,15 @@ _Track each QA review/fix cycle._
 **Action**: Escalating — loop limit reached
 **Fixes Applied**: CR-1 (guard widened to /^\.\d+[A-Z]?(?:\.|$)/); 3 refusal cases, mutation-proven. Fast gate: ci:fast 5569 tests, 0 failures
 **Commit**: `0399f61f` (pushed; no gate has read it)
+
+### QA Cycle 6 — 2026-10-15
+**Gate Result**: PASS
+**Issues Found**: none
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: APPROVE — task.202.pr-review.1.doc-id-engine-and-prd-registry.md (2 low conformance findings: PC-1 §3 never-reuse wording, PC-2 Completion block)
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
 
 ---
 

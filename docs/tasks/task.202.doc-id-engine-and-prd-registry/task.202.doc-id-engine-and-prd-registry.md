@@ -435,6 +435,36 @@ that write one.
 ### Key Findings
 No critical issues identified. Six QA cycles closed 24 gate findings and 13 advisory ones, each with a mutation-proven test.
 
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**QA Report**: `task.202.qa.6.doc-id-engine-and-prd-registry.md`
+**Gate File**: `task.202.gate.6.doc-id-engine-and-prd-registry.yml`
+**Gate Status**: ✅ PASS (100/100)
+
+### Missing Criteria:
+
+1. **Acceptance Criteria:**
+   - [ ] AC6: record `time` + `uptime` for `check --corpus` on the PR head in the implementation report (the recorded 0.032 s was taken on 8103737b, not the head)
+
+2. **Documentation:**
+   - [ ] Add a `(task 202)` entry under `CHANGELOG.md [Unreleased]`
+
+### Next Steps:
+
+- [ ] Record the head measurement in the implementation report
+- [ ] Add the CHANGELOG entry
+- [ ] Re-run /finalise (document-only fix — resumes at Step 7)
+
+**Estimated Effort:** Small (under 15 minutes)
+
+**Gap Report Generated:** 2026-10-15
+
+**Detailed Verification Log:** See `task.202.dod.1.doc-id-engine-and-prd-registry.md` for complete verification evidence.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -455,6 +485,7 @@ No critical issues identified. Six QA cycles closed 24 gate findings and 13 advi
 | 2026-10-15 |  | QA gate CONCERNS (90/100) — 1 finding (1 medium) | qa-task |
 | 2026-10-15 |  | QA findings fixed — cycle 5, 1 gate finding, 3 test cases | qa-fix |
 | 2026-10-15 |  | QA gate PASS (100/100) — no findings | qa-task |
+| 2026-10-15 |  | DoD incomplete — 2 gaps identified | finalise |
 
 <!-- change-log-end -->
 
