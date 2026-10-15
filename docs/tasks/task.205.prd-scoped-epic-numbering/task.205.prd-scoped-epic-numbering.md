@@ -575,25 +575,26 @@ Not applicable — no hot path changes; the generator's walk gains one directory
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-15
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.205.qa.6.prd-scoped-epic-numbering.md](./task.205.qa.6.prd-scoped-epic-numbering.md)
-- **Gate File**: [task.205.gate.6.prd-scoped-epic-numbering.yml](./task.205.gate.6.prd-scoped-epic-numbering.yml)
+- **Full Report**: [task.205.qa.7.prd-scoped-epic-numbering.md](./task.205.qa.7.prd-scoped-epic-numbering.md)
+- **Gate File**: [task.205.gate.7.prd-scoped-epic-numbering.yml](./task.205.gate.7.prd-scoped-epic-numbering.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 5690 (5676 pass, 0 fail)
 - **Phases Verified**: 7/7
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-- Cycle 5's fixes verified and mutation-proven; bugs 12–13 closed.
-- MEDIUM: [BUG-14](./task.205.bug.14.shards-stray-fence-hides-step-7-guard.md) — a stray fence (pre-existing on develop) hides Steps 6–7 of create-epics-from-shards from every engine, so the Step 7 guard's probe record is empty. With the fence removed the guard engages 8/8.
+- Cycle 6's fix verified and mutation-proven; [BUG-14](./task.205.bug.14.shards-stray-fence-hides-step-7-guard.md) closed — all 14 bugs closed.
+- The Step 7 batch guard is probed against the committed doc: engages, 8/8.
+- One low cleanup (test hook style); advisories carried in the gate's `recommendations.future`.
 
 ## Change Log
 
@@ -615,6 +616,7 @@ Not applicable — no hot path changes; the generator's walk gains one directory
 | 2026-10-15 |  | QA findings fixed — cycle 5, 2 gating findings + 1 advisory (batch presence shape; id-check reason printed; create-epic preflight path root); 2 mutation-proven | qa-fix |
 | 2026-10-15 |  | QA gate CONCERNS (80/100) — 0 high; 1 medium gating (stray fence hides the Step 7 guard from every engine); bugs 12–13 closed | qa-task |
 | 2026-10-15 |  | QA findings fixed — cycle 6, 1 gating finding (stray fence removed; the retirement test reads blocks through the shared fence reader); 1 mutation-proven | qa-fix |
+| 2026-10-15 |  | QA gate PASS (100/100) — 0 gating findings, 1 low cleanup; bug 14 closed | qa-task |
 
 ---
 

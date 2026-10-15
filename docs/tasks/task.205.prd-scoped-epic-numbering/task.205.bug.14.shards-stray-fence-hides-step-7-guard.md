@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Medium'
 priority: 'Medium'
 created: '2026-10-15'
@@ -12,7 +12,7 @@ description: 'A stray four-backtick fence turns Steps 6–7 of create-epics-from
 
 **Bug ID**: TASK-205-BUG-14
 **Related**: [task.205.prd-scoped-epic-numbering.md](./task.205.prd-scoped-epic-numbering.md) (QA cycle 6, gate 6, QA6-1)
-**Status**: Ready for QA
+**Status**: Closed
 **Priority**: Medium
 **Severity**: Medium
 **Created**: 2026-10-15
@@ -90,3 +90,4 @@ block count equals the raw `bash` fence count.
 |------|--------|------------|-------|
 | 2026-10-15 | New | qa-task | Found by QA cycle 6 (boundary probe declined `entry-not-probeable`) |
 | 2026-10-15 | Ready for QA | qa-fix | Fixed in QA cycle 6 fix pass |
+| 2026-10-15 | Closed | qa-task | Verified by task.205.qa.7.prd-scoped-epic-numbering.md |
