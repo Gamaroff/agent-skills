@@ -349,8 +349,15 @@ Things worth knowing:
   at those sites on upgrade. Set `ci.docsOnly.enabled: false` to restore the full wait.
 - **Executable markdown is not documentation.** In a repository where `SKILL.md` files or `docs/` are
   read by tests, narrow `patterns`, or set `checkCommand`, or both. This repository sets
-  `patterns: ["docs/**"]` and `checkCommand: "npm run ci:fast && npm run eval:all"` (`eval:all` is the
-  tier `ci:fast` does not run, and it holds the task-registry drift test a docs-only edit can fail).
+  `patterns: ["docs/**", "CHANGELOG.md"]` and `checkCommand: "npm run ci:fast && npm run eval:all"`
+  (`eval:all` is the tier `ci:fast` does not run, and it holds the task-registry drift test a docs-only
+  edit can fail).
+- **The same patterns decide two routing questions besides CI.** The Step 5c carry rule fixes a
+  review finding in the acceptance commit only when its path matches them, and
+  `reenter-qa-after-finalise.sh` treats a `/finalise` DoD-gap fix as document-only — resume at Step 7,
+  no new QA cycle — when every path it changed outside the work item matches them (observation #44).
+  The re-entry reads the configuration at `HEAD` and counts every path as code when the rule is
+  disabled or cannot run, so widening the patterns also lets more fixes skip a QA cycle.
 - **`checkCommand` cannot reproduce everything.** A workflow triggered only by docs paths (a link
   checker, for instance) never ran on a green ancestor that touched none of them, and a local command
   rarely reproduces external-URL reachability. That residual is accepted; `enabled: false` is the
