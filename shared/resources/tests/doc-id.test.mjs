@@ -174,6 +174,69 @@ test("parse: non-canonical artifacts in today's tree are artifacts, never docume
   }
 });
 
+test("validate report is a non-canonical artifact — review-story's standalone validate output (task 203, review C1)", () => {
+  // review-story writes `.validate.{date}.md`; seven sit under docs/prd. Outside the
+  // vocabulary, checkCorpus walked each as a document and reported bad-shape.
+  for (const name of [
+    "story.1.1.1.validate.2026-05-12.md", // short-id form
+    "story.1.3.1.before-you-start-anchor-runbooks.validate.2026-05-13.md", // full-stem form
+  ]) {
+    const p = d.parse(name);
+    assert.equal(p.ok, true, name);
+    assert.equal(p.artifact, "validate", name);
+    assert.equal(p.canonical, false, name);
+    assert.ok(WORK_ITEM_ARTIFACT_RE.test(name), `${name}: finalise agrees`);
+  }
+  // The legacy name is an artifact too, so the migration reads it as one.
+  const legacy = d.parseLegacy("story.1.1.validate.2026-05-12.md");
+  assert.equal(legacy.ok, true);
+  assert.equal(legacy.artifact, "validate");
+  // And checkCorpus never walks one as a document.
+  const io = {
+    exists: () => true,
+    readFile: () => null,
+    readDir: (p) =>
+      p === "R"
+        ? [{ name: "story.1.1.1.validate.2026-05-12.md", dir: false }]
+        : [],
+  };
+  assert.equal(d.checkCorpus("R", { io }).reason, "empty");
+});
+
+test("appendPrdRow: bootstraps an empty registry, appends, moves the counter forward only, refuses a duplicate (task 203)", () => {
+  const row = (n) => ({
+    n,
+    title: `PRD ${n}`,
+    href: `d/prd.${n}.x/prd.${n}.x.md`,
+    folder: "d",
+    status: "draft",
+    created: "2026-10-15",
+  });
+  const one = d.appendPrdRow(null, row(1));
+  assert.equal(d.frontmatterField(one, "type"), "registry");
+  assert.deepEqual(d.registryNumbers(one), [1]);
+  assert.equal(d.next("prd", [], one).next, 2);
+  // A row numbered past the counter carries the counter past it.
+  const five = d.appendPrdRow(one, row(5));
+  assert.deepEqual(d.registryNumbers(five), [1, 5]);
+  assert.equal(d.next("prd", [], five).next, 6);
+  // A lower row never moves the counter backwards.
+  const three = d.appendPrdRow(five, row(3));
+  assert.equal(d.next("prd", [], three).next, 6);
+  assert.throws(
+    () => d.appendPrdRow(three, row(5)),
+    (e) => e.reason === "duplicate-row",
+  );
+  assert.throws(
+    () => d.appendPrdRow("# PRD Registry\n", row(1)),
+    (e) => e.reason === "registry-invalid",
+  );
+  assert.throws(
+    () => d.appendPrdRow(null, { ...row(1), title: "a | b" }),
+    (e) => e.reason === "bad-row",
+  );
+});
+
 test("parse: a single-segment remainder is always the slug, even an artifact word", () => {
   const p = d.parse("story.1.2.3.plan.md");
   assert.equal(p.ok, true);

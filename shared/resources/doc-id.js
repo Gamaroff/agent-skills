@@ -57,6 +57,7 @@ const ARTIFACTS = Object.freeze([
   "pr-review",
   "risk",
   "test-design",
+  "validate",
   "sprint-review-summary",
 ]);
 
@@ -500,6 +501,82 @@ function nextNumber(kind, entries, registryText) {
     throw e;
   }
   return r.next;
+}
+
+// The empty registry, in the shape docs/standards/prd-registry.md § Format defines.
+const PRD_REGISTRY_HEADER = "| PRD # | Title | Folder | Status | Created |";
+const EMPTY_PRD_REGISTRY = [
+  "---",
+  "type: registry",
+  "---",
+  "",
+  "# PRD Registry",
+  "",
+  "**Next Available PRD Number:** **1**",
+  "",
+  PRD_REGISTRY_HEADER,
+  "|---|---|---|---|---|",
+  "",
+].join("\n");
+
+/**
+ * The PRD registry's one row writer (task 203). Appends `row` and moves the counter
+ * to at least `row.n + 1` — it never moves backwards. With `registryText` null or
+ * undefined it starts from the empty registry (counter 1): the bootstrap.
+ *
+ * `row` is `{ n, title, href, folder, status, created }`; `href` is relative to the
+ * registry (`{domain}/prd.{P}.{slug}/prd.{P}.{slug}.md`). Pure: returns the new
+ * text. Throws an Error carrying `.reason` — `registry-invalid` (no usable
+ * counter), `duplicate-row` (`n` already registered), `no-table` (no PRD table to
+ * append to), `bad-row` (a malformed `row`).
+ */
+function appendPrdRow(registryText, row) {
+  const r = row || {};
+  const bad = (reason, msg) => {
+    const e = new Error(`appendPrdRow: ${msg}`);
+    e.reason = reason;
+    return e;
+  };
+  if (!isPositiveInt(r.n)) throw bad("bad-row", "n must be a positive integer");
+  for (const k of ["title", "href", "folder", "status", "created"]) {
+    if (typeof r[k] !== "string" || r[k] === "" || /[|\r\n]/.test(r[k]))
+      throw bad(
+        "bad-row",
+        `${k} must be a non-empty string with no | or newline`,
+      );
+  }
+  const text =
+    registryText === null || registryText === undefined
+      ? EMPTY_PRD_REGISTRY
+      : String(registryText);
+  const scan = scanRegistry(text);
+  if (scan.counter === null || !NUM_RE.test(scan.counter))
+    throw bad("registry-invalid", "no usable Next Available PRD Number");
+  if (scan.numbers.includes(r.n))
+    throw bad("duplicate-row", `PRD ${r.n} is already registered`);
+  const counter = Math.max(Number(scan.counter), r.n + 1);
+  const lines = text.split("\n");
+  const head = lines.findIndex(
+    (l) => l.trim().replace(/\s+/g, " ") === PRD_REGISTRY_HEADER,
+  );
+  if (head < 0) throw bad("no-table", "no PRD table header to append to");
+  let end = head + 1; // the separator row
+  while (end + 1 < lines.length && lines[end + 1].trim().startsWith("|")) end++;
+  const cell = `| ${r.n} | [${r.title}](${r.href}) | ${r.folder} | ${r.status} | ${r.created} |`;
+  lines.splice(end + 1, 0, cell);
+  // The counter line: the first one outside a fence, as scanRegistry reads it.
+  let fenced = false;
+  for (let i = 0; i < lines.length; i++) {
+    if (/^\s*(```|~~~)/.test(lines[i])) {
+      fenced = !fenced;
+      continue;
+    }
+    if (!fenced && PRD_COUNTER_RE.test(lines[i])) {
+      lines[i] = lines[i].split(`**${scan.counter}**`).join(`**${counter}**`);
+      break;
+    }
+  }
+  return lines.join("\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -1099,6 +1176,7 @@ module.exports = {
   matchesEpic,
   next,
   nextNumber,
+  appendPrdRow,
   check,
   checkCorpus,
   resolvePrdRoot,
