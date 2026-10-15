@@ -522,6 +522,28 @@ that this document's own example (an unnumbered PRD) never shows.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-15
+**Quality Score**: 60/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.204.qa.1.numbered-prds-in-prd-skills.md](./task.204.qa.1.numbered-prds-in-prd-skills.md)
+- **Gate File**: [task.204.gate.1.numbered-prds-in-prd-skills.yml](./task.204.gate.1.numbered-prds-in-prd-skills.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 16 (new) + full suite 5692 pass / 0 fail; eval:all exit 0
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0 high, 4 medium
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+- CR-1: review-prd does not resolve a directory input. CR-2: a root-level `docs/prd.md` absorbs every other PRD's numbering findings.
+- QA-1: no test runs the migration plan with a blocker or the monolith path. QA-2: 7 of 16 rows mutation-proven.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -531,6 +553,8 @@ that this document's own example (an unnumbered PRD) never shows.
 | 2026-10-15 | 1.1     | Review passed (8/10) after fixes — `next prd` does not bootstrap and no CLI writes a row (row write via `appendPrdRow`); report name follows file-naming.md:84 full stem; migration payload `blockers[]`/`--name`; retirement-guard ALLOW entries; grep exclusions; test rows 1b, 6b, 8–11 | review-task |
 | 2026-10-15 |         | Status → ready-for-development | review-task |
 | 2026-10-15 |         | Implemented — 25 files, 16 tests (`prd-skill-numbering.test.mjs`) | develop |
+| 2026-10-15 |         | QA gate CONCERNS (60/100) — 4 findings | qa-task |
+| 2026-10-15 |         | QA findings fixed — cycle 1, 4 findings (CR-1, CR-2, QA-1, QA-2) + 2 advisory (CR-3, CR-4); 21 test rows, each mutation-proven | qa-fix |
 <!-- change-log-end -->
 
 ---

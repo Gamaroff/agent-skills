@@ -16,9 +16,11 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
   chmodSync,
+  copyFileSync,
   existsSync,
   mkdirSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
@@ -147,7 +149,6 @@ test("row 1: an empty PRD root allocates 1, and the row block creates the regist
   mkdirSync(path.join(root, "docs/prd/shop/prd.1.shop"), { recursive: true });
   writeFileSync(path.join(root, prdPath(1, "shop")), prdDoc(1, "shop"));
   const w = run(REGISTER(), root, {
-    P: "1",
     DOMAIN: "shop",
     PRD_FILE: prdPath(1, "shop"),
     TITLE: "Shop PRD",
@@ -456,4 +457,112 @@ test("a legacy PRD still resolves by its slug, so review-prd can report it", () 
   const r = run(RESOLVE(), root, { PRD_INPUT: "onboarding" });
   assert.equal(r.code, 0, r.out);
   assert.match(r.out, /PRD_FILE=.*\/prd\.onboarding\/prd\.onboarding\.md$/m);
+});
+
+// ── QA cycle 1 (gate 1) ────────────────────────────────────────────────────
+
+test("register: the number comes from PRD_FILE's own name, and a non-numbered file is refused", () => {
+  const root = tree({ [REG]: registry(5, [[4, "x", "x"]]) });
+  mkdirSync(path.join(root, "docs/prd/y/prd.5.y"), { recursive: true });
+  writeFileSync(path.join(root, prdPath(5, "y")), prdDoc(5, "y"));
+  const ok = run(REGISTER(), root, {
+    DOMAIN: "y",
+    PRD_FILE: prdPath(5, "y"),
+    TITLE: "Y",
+    P: "99",
+  });
+  assert.equal(ok.code, 0, ok.out);
+  const reg = readFileSync(path.join(root, REG), "utf8");
+  assert.match(reg, /^\| 5 \| \[Y\]/m, "row 5, from the file name");
+  assert.doesNotMatch(
+    reg,
+    /^\| 99 /m,
+    "a stray P in the environment is never used",
+  );
+
+  writeFileSync(path.join(root, "docs/prd/y/prd.y.md"), "# legacy\n");
+  const bad = run(REGISTER(), root, {
+    DOMAIN: "y",
+    PRD_FILE: "docs/prd/y/prd.y.md",
+    TITLE: "Y",
+  });
+  assert.equal(bad.code, 1, bad.out);
+  assert.match(bad.out, /not a numbered PRD document/);
+});
+
+test("CR-1: a PRD directory resolves to its own document, with or without the trailing slash", () => {
+  const root = tree({
+    [REG]: registry(4, [[3, "shop", "shop"]]),
+    [prdPath(3, "shop")]: prdDoc(3, "shop"),
+    "docs/prd/shop/prd.3.shop/prd.3.shop.review.1.x.md": "# review\n",
+    "docs/prd/empty/prd.9.empty/notes.md": "# not the document\n",
+  });
+  for (const input of [
+    "docs/prd/shop/prd.3.shop/",
+    "docs/prd/shop/prd.3.shop",
+  ]) {
+    const r = run(RESOLVE(), root, { PRD_INPUT: input });
+    assert.equal(r.code, 0, `${input}: ${r.out}`);
+    assert.match(
+      r.out,
+      /^PRD_FILE=docs\/prd\/shop\/prd\.3\.shop\/prd\.3\.shop\.md$/m,
+    );
+  }
+  const none = run(RESOLVE(), root, {
+    PRD_INPUT: "docs/prd/empty/prd.9.empty/",
+  });
+  assert.equal(none.code, 1, none.out);
+  assert.match(none.out, /No PRD found/);
+});
+
+test("CR-3: a resolver that cannot run says so, never 'No PRD found'", () => {
+  // A consumer root whose review-prd install lacks doc-id.js.
+  const root = makeConsumerRoot(REPO, "prd-204-broken-");
+  rmSync(path.join(root, ".agents", "skills"));
+  const ref = path.join(root, ".agents", "skills", "review-prd", "references");
+  mkdirSync(ref, { recursive: true });
+  for (const f of ["resolve-paths.sh", "read-config.sh"]) {
+    copyFileSync(
+      path.join(REPO, "skills", "review-prd", "references", f),
+      path.join(ref, f),
+    );
+  }
+  mkdirSync(path.join(root, "docs", "prd"), { recursive: true });
+  const r = run(RESOLVE(), root, { PRD_INPUT: "1" });
+  assert.equal(r.code, 2, r.out);
+  assert.match(r.out, /resolver could not run/);
+  assert.doesNotMatch(r.out, /No PRD found/);
+});
+
+/** A consumer holding a monolithic docs/prd.md, beside a numbered PRD with a defect of its own. */
+const MONOLITH_TREE = {
+  [REG]: registry(2, [[1, "a", "a"]]),
+  [prdPath(1, "a")]: "---\nname: prd.1.a\nprd_number: 7\ntype: prd\n---\n",
+  "docs/prd.md": "---\ntitle: Mono\nstatus: draft\ntype: prd\n---\n# PRD\n",
+};
+
+test("CR-2: a root-level docs/prd.md reports exactly its own finding, not another PRD's", () => {
+  const root = tree(MONOLITH_TREE);
+  const r = run(NUMBERING(), root, { PRD_FILE: "docs/prd.md" });
+  const lines = r.out.split("\n").filter((l) => l.startsWith("[Critical]"));
+  assert.equal(lines.length, 1, r.out);
+  assert.match(lines[0], /bad-shape: .*\/docs\/prd\.md — outside docs\/prd/);
+  assert.doesNotMatch(r.out, /prd\.1\.a/);
+});
+
+test("QA-1: the migration plan surfaces a monolith's blocker, and MIG_NAME clears it", () => {
+  const root = tree({
+    [REG]: registry(1),
+    "docs/prd.md": MONOLITH_TREE["docs/prd.md"],
+  });
+  writeFileSync(path.join(root, ".gitignore"), ".agents/\n");
+  gitInit(root);
+  const blocked = run(MIG_PLAN(), root);
+  assert.match(blocked.out, /✖ blocker unplaced-prd: docs\/prd\.md/);
+  const named = run(MIG_PLAN(), root, { MIG_NAME: "docs/prd.md=mono" });
+  assert.doesNotMatch(named.out, /blocker/);
+  assert.match(
+    named.out,
+    /prd prd → 1 .*docs\/prd\.md → docs\/prd\/mono\/prd\.1\.mono\/prd\.1\.mono\.md/,
+  );
 });

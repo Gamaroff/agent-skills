@@ -455,10 +455,11 @@ one — write its registry row as soon as the file first exists, in the same ste
 
 ```bash
 # create-prd — write the PRD registry row (task 204)
-# INPUTS: P, DOMAIN and PRD_FILE from Step 1.5, and TITLE, the PRD's title (no | and no newline).
+# INPUTS: DOMAIN and PRD_FILE from Step 1.5, and TITLE, the PRD's title (no | and no newline).
+# The number is read from PRD_FILE's own name, never carried from Step 1.5's shell.
 DOC_ID=.agents/skills/create-prd/references/doc-id.js
 source .agents/skills/create-prd/references/resolve-paths.sh || exit 1
-: "${P:?bind P}" "${DOMAIN:?bind DOMAIN}" "${PRD_FILE:?bind PRD_FILE}" "${TITLE:?bind TITLE to the PRD title}"
+: "${DOMAIN:?bind DOMAIN}" "${PRD_FILE:?bind PRD_FILE}" "${TITLE:?bind TITLE to the PRD title}"
 [ -f "$PRD_FILE" ] || { echo "❌ ${PRD_FILE} does not exist yet — write the PRD first"; exit 1; }
 REG="${PRD_ROOT}/prd-registry.md"
 # appendPrdRow is the engine's one row writer: it starts from the empty registry when there is none,
@@ -466,17 +467,23 @@ REG="${PRD_ROOT}/prd-registry.md"
 command node -e '
   const d = require(process.argv[1]);
   const fs = require("fs");
-  const [reg, n, title, href, folder, created] = process.argv.slice(2);
+  const [reg, file, title, href, folder, created] = process.argv.slice(2);
+  const p = d.parse(require("path").basename(file));
+  if (!p.ok || p.kind !== "prd" || p.artifact) {
+    console.log(`❌ registry row not written: ${file} is not a numbered PRD document`);
+    process.exit(1);
+  }
+  const n = p.prd;
   const text = fs.existsSync(reg) ? fs.readFileSync(reg, "utf8") : null;
   try {
-    const out = d.appendPrdRow(text, { n: Number(n), title, href, folder, status: "draft", created });
+    const out = d.appendPrdRow(text, { n, title, href, folder, status: "draft", created });
     fs.writeFileSync(reg, out);
     console.log(`registered PRD ${n} in ${reg}${text === null ? " (registry created)" : ""}`);
   } catch (e) {
     console.log(`❌ registry row not written (${e.reason || "error"}): ${e.message}`);
     process.exitCode = 1;
   }
-' "$PWD/$DOC_ID" "$REG" "$P" "$TITLE" "${PRD_FILE#"${PRD_ROOT}"/}" "$DOMAIN" "$(date +%Y-%m-%d)" || exit 1
+' "$PWD/$DOC_ID" "$REG" "$PRD_FILE" "$TITLE" "${PRD_FILE#"${PRD_ROOT}"/}" "$DOMAIN" "$(date +%Y-%m-%d)" || exit 1
 ```
 
 A refusal is a **HALT** with the reason printed: `duplicate-row` means `P` is already registered (the

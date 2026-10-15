@@ -1,0 +1,84 @@
+schema: 2
+task: 'task.204.numbered-prds-in-prd-skills'
+task_title: 'Numbered PRDs in the PRD skills'
+gate: CONCERNS
+status_reason: 'All phases delivered and the fast gate is green, but two reproduced review-prd defects (directory input does not resolve; a root-level docs/prd.md drags every other PRD''s findings into its report) and two evidence gaps (the migration-blocker and monolith paths have no test; 7 of 16 test rows are mutation-proven against a criterion that says every one) keep this short of PASS.'
+reviewer: 'QA Engineer'
+head: '18e1d685af37032a59685b068b12c7e471a4c265'
+updated: '2026-10-15T15:29:20Z'
+
+top_issues:
+  - id: CR-1
+    severity: medium
+    file: 'skills/review-prd/SKILL.md'
+    finding: 'Input Resolution promises that a directory path resolves to its {dir}/{dir}.md, but a numbered directory input (docs/prd/shop/prd.3.shop/) becomes the input prd.3.shop, which parses as neither a number nor a matching slug, so the block reports "No PRD found" (reproduced).'
+    suggested_action: 'When PRD_INPUT is an existing directory, return {dir}/{basename}.md if that file exists; add a test row for directory input.'
+    suggested_owner: dev
+    status: open
+  - id: CR-2
+    severity: medium
+    file: 'skills/review-prd/SKILL.md'
+    finding: 'For a PRD outside ${PRD_ROOT} (the root-level docs/prd.md the block handles), the prefix filter uses docs/ as the PRD directory, so every finding of every other PRD under docs/prd is reported as this PRD''s Critical issue (reproduced: 3 findings for a monolith that owns 1).'
+    suggested_action: 'When the PRD file is outside ${PRD_ROOT}, report only its own bad-shape finding and skip the corpus filter; add a test row for the monolith.'
+    suggested_owner: dev
+    status: open
+  - id: QA-1
+    severity: medium
+    file: 'evals/shared/tests/prd-skill-numbering.test.mjs'
+    finding: 'Two success criteria are held by prose only: "offers the migration only when --check reports no blockers" (no row runs the plan block against a tree with a blocker), and the Migration criterion for a consumer holding docs/prd.md (no row runs the numbering or plan block on a monolith, which is how CR-2 went unseen).'
+    suggested_action: 'Add rows: the plan block surfaces a blocker (unplaced-prd for docs/prd.md without MIG_NAME) and clears it with MIG_NAME=docs/prd.md=<slug>; the numbering block reports exactly one finding for the monolith.'
+    suggested_owner: dev
+    status: open
+  - id: QA-2
+    severity: medium
+    file: 'evals/shared/tests/prd-skill-numbering.test.mjs'
+    finding: 'The Code Quality criterion says every assertion in the new test is mutation-proven; the implementation report records 7 proofs over 16 rows (rows 2, 3, 6, 6b, 8, 10, 11, the bad-slug row, the clean-PRD row and the legacy-resolve row have none).'
+    suggested_action: 'Mutation-prove each remaining row (revert the behaviour it names, confirm it goes red, restore) and record one line per proof, or narrow the criterion with a recorded reason for any row that cannot be proven.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 16
+  phases_verified: 5/5
+  ci: 'not read this cycle'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4]
+    phases_with_issues: [3, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 11
+    notes: 'Boundary: create-prd allocation refuses any feature slug doc-id.js cannot format (traversal, slash, upper case, digit-first, empty, space, dot, leading dash, control character); probed with the fence: form, 11 cases, verdict engages (task.204.qa.1.security.run.json). The registry write goes through appendPrdRow, which refuses | and newline in a cell.'
+  performance:
+    status: PASS
+    notes: 'Row 11 measures three node processes for allocate + register + check; review-prd numbering is one check --corpus.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-3 (advisory, medium confidence): the resolve block ignores the node exit status, so a resolver that cannot run reads as "No PRD found".'
+  maintainability:
+    status: PASS
+    notes: 'CR-4 (advisory, medium confidence): P and PRD_FILE are read by blocks that do not bind them; declared inputs would make the contract explicit.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1 and CR-2 in review-prd and add the directory-input and monolith rows (QA-1).'
+      refs: ['skills/review-prd/SKILL.md', 'evals/shared/tests/prd-skill-numbering.test.mjs']
+    - action: 'Complete and record the mutation proofs (QA-2).'
+      refs: ['evals/shared/tests/prd-skill-numbering.test.mjs']
+  future:
+    - action: 'CR-3: check the resolver node exit status and report "could not run" separately from "no PRD found".'
+      refs: ['skills/review-prd/SKILL.md']
+    - action: 'CR-4: declare P / PRD_FILE as block inputs (INPUTS map) or re-derive P from PRD_FILE in the register block.'
+      refs: ['skills/create-prd/SKILL.md', 'tests/unbound-default-reads.test.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1, CR-2, QA-1 and QA-2 closed']

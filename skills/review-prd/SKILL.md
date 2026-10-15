@@ -123,6 +123,14 @@ MATCHES=$(command node -e '
     if (fs.existsSync(raw)) console.log(raw);
     process.exit(0);
   }
+  // A directory is resolved to its own document, {dir}/{dir}.md, and to nothing else.
+  let isDir = false;
+  try { isDir = fs.statSync(raw).isDirectory(); } catch {}
+  if (isDir) {
+    const own = path.join(raw, `${path.basename(path.resolve(raw))}.md`);
+    if (fs.existsSync(own)) console.log(own);
+    process.exit(0);
+  }
   const input = path.basename(raw.replace(/\/+$/, ""));
   // A bare number, or prd.{N} with no slug, selects by number.
   const asId = d.parse(`${input.startsWith("prd.") ? input : `prd.${input}`}.x`);
@@ -147,7 +155,8 @@ MATCHES=$(command node -e '
   };
   walk(root);
   out.sort().forEach((f) => console.log(f));
-' "$PWD/$DOC_ID" "$PRD_ROOT" "$PRD_INPUT")
+' "$PWD/$DOC_ID" "$PRD_ROOT" "$PRD_INPUT") \
+  || { echo "❌ The PRD resolver could not run (is ${DOC_ID} installed?) — this is not a missing PRD."; exit 2; }
 COUNT=$(printf '%s' "$MATCHES" | grep -c .)
 case "$COUNT" in
   0) echo "❌ No PRD found matching '${PRD_INPUT}'."; exit 1 ;;
@@ -157,7 +166,8 @@ case "$COUNT" in
 esac
 ```
 
-Exit 1 → Step 4 below. Exit 3 → ask the user which PRD with `AskUserQuestion`, bind `PRD_INPUT` to
+Exit 1 → Step 4 below. Exit 2 → the resolver itself failed: report that, never "no PRD found".
+Exit 3 → ask the user which PRD with `AskUserQuestion`, bind `PRD_INPUT` to
 that path, and run the block again. A root-level `docs/prd.md` resolves only when given as a path;
 Step 2 reports it as a PRD that predates numbering.
 
@@ -313,11 +323,15 @@ NUMBERING=$(command node -e '
   const path = require("path");
   const [root, file] = process.argv.slice(2);
   const dir = path.resolve(path.dirname(file)) + path.sep;
-  const findings = [];
+  // A PRD outside the PRD root (a root-level docs/prd.md) owns no directory under it: its one
+  // finding is that it is there. Its directory is a parent of the root, so a prefix filter would
+  // claim the findings of every other PRD as its own.
   if (!(dir + "x").startsWith(path.resolve(root) + path.sep)) {
-    findings.push({ reason: "bad-shape", path: path.resolve(file),
-      detail: `outside ${root} — a PRD written before numbered PRDs` });
+    console.log(JSON.stringify({ reason: "findings", findings: [{ reason: "bad-shape",
+      path: path.resolve(file), detail: `outside ${root} — a PRD written before numbered PRDs` }] }));
+    process.exit(1);
   }
+  const findings = [];
   const r = d.runCli(["check", "--corpus", "--prd-root", root, "--json"]).payload;
   if (!["ok", "findings", "empty", "root-missing"].includes(r.reason)) {
     console.log(JSON.stringify({ reason: r.reason, findings, unreadable: r.unreadable || [] }));
