@@ -99,6 +99,11 @@ Make the PRD skills allocate, write and check a registry-backed PRD number, and 
 - QA cycle 4 (5a): scoped to the 3 files changed since gate 3 (SAFETY_REPROBE false: gate 3 security PASS). Explore reviewer 75 s: 2 bugs + 1 cleanup, 1 promoted (CR-1, reproduced). Probe 24/engages. Gate 4 CONCERNS 90/100. Route: continue (not-a-pass-gate).
 - QA Cycle 4 — changes-requested: not signalled (stage-disabled, unchanged).
 - QA cycle 5 (5a): SAFETY_REPROBE=true by judgement (gate 4 security CONCERNS on containment) → unscoped re-probe, 115 s: 4 findings, 3 promoted (all reproduced; two re-rated high → medium with the measurement recorded in the gate). Gate 5 CONCERNS 70/100. Route: continue. Budget: cycle 5 of 5.
+- QA loop re-entry: 2 extra cycles granted (user approved "Resume at 5a with 2 more cycles"); 0 cycle(s) run outside the loop back-filled from disk. `grant-qa-cycles.sh`: lock restored from the halt snapshot, QA_CYCLE=5, qa_max_cycles=7, reenter_at=5a.
+- QA cycle 6 (5a): fresh `/qa-task` invocation; SAFETY_REPROBE=true by judgement (gate 5 security CONCERNS on containment) → unscoped re-probe (Explore, 265 s): 2 bugs, 1 promoted (CR-1, reproduced). Probe 24/engages. ci:fast 5712/0 (symlink parked). Gate 6 CONCERNS 90/100. Route: continue (not-a-pass-gate). PR comment posted; issue comment `posted`.
+- QA Cycle 6 — changes-requested: stage-disabled.
+- QA cycle 6 (5b): qa-fix — see QA Iteration History; fix commit 84b065af; PR comment posted, issue comment `posted`.
+- QA cycle 7 (5a): qa-task steps run by the orchestrator from the skill text loaded for cycle 6. SAFETY_REPROBE=true by judgement → unscoped re-probe (Explore, 238 s): 3 bugs, 2 promoted (CR-1 HIGH reproduced by QA, provenance: engine identical on develop, call path new here → in scope; CR-2). Probe 24/engages. Gate 7 FAIL 70/100; task status → in-progress. Convergence: HIGH 0,0,0,0,0,0,1 — no trip (first-time HIGH). Route: continue. PR comment posted; issue comment `posted`. Note: the CR-1 engine fix was started in the working tree before gate 7 was written; gate 7's head is 84b065af, the commit the reviewer read.
 
 ### Step 4 — create-pr — 2026-10-15
 
@@ -142,6 +147,30 @@ The pipeline completed 5 qa-task/qa-fix cycles without a clean PASS.
 1. Grant 2 more cycles (`/develop-task` → "Resume at 5a with 2 more cycles"): cycle 6 gates `88f8ba81`, the fix no gate has read; all three gate-5 findings are already fixed there.
 2. Open a follow-up task: one PRD-path containment predicate in `doc-id.js` (`isPrdDocumentPath(root, file)` returning a reason), called by every create-prd / review-prd / shard-prd block — recorded in gates 4 and 5.
 3. Also outstanding as recorded follow-ups: recovery for a PRD written without its registry row (gate-2 CR-4).
+
+### QA Loop Limit Reached — 2026-10-15 (after re-entry)
+
+The pipeline completed 7 qa-task/qa-fix cycles (5 + 2 granted on re-entry) without a clean PASS.
+
+**Final gate status**: FAIL (70/100), gate 7 — its findings are fixed in `e8d205a3`, which no gate has read
+**HIGH findings per cycle**: 0, 0, 0, 0, 0, 0, 1 — the first HIGH appeared at cycle 7, outside the containment class
+**MEDIUM findings per cycle**: 4, 4, 1, 1, 3, 1, 1
+**Remaining issues** (from gate 7, all fixed in `e8d205a3`, ungated):
+- CR-1 high — migrating a root-level docs/prd.md rewrote the bare word `prd` across the PRD tree, `type: prd` in other PRDs included, and reported ok — `shared/resources/migrate-doc-numbering.mjs` (defect present in develop's task-203 engine; this branch adds the review-prd call path)
+- CR-2 medium — shard-prd checked the file's realpath, not the directory md-tree writes into — `skills/shard-prd/SKILL.md`
+- CR-3 medium, advisory — review-prd's realpath stop ran after the text-outside early exit — `skills/review-prd/SKILL.md`
+
+**What was attempted per cycle** (cycles 1–5: see the entry above):
+- Cycle 6: gate 6 CONCERNS 90 (1 medium); review-prd stops on a PRD resolving outside the root; report-number block contained; shard-prd outside-root message (`84b065af`)
+- Cycle 7: gate 7 FAIL 70 (1 high, 1 medium); migration token pass skips undotted stems; shard directory contained; review-prd realpath stop before the text-outside exit (`e8d205a3`)
+- Gate-the-last-fix half-cycle (route 2c) considered and declined: `high-on-last-gate` — HIGH is 1 on cycle 7's gate.
+
+**Likely root cause**: two separate things. (1) The containment rule is still restated per fenced block — cycles 6 and 7 each found one more site (review-prd report directory, shard-prd target directory, legacy PRD above the root); the durable fix is still one predicate in `doc-id.js`. (2) Cycle 7's HIGH is not that class: the safety re-probe exercised the migration path end to end for the first time and found a corruption bug in the task-203 engine that this task newly exposes. It is fixed and regression-tested, but no gate has read the fix.
+
+**Recommended next steps**:
+1. Grant 1–2 more cycles (`/develop-task` → "Resume at 5a with {k} more cycles"): cycle 8 gates `e8d205a3`, where all gate-7 findings are fixed.
+2. Or accept after a manual check of `e8d205a3`: run Step 5c (`/review-pr --effort medium --comment --no-code`), then `/finalise`.
+3. Follow-up tasks either way: the shared containment predicate in `doc-id.js`; recovery for a PRD written without its registry row (gate-2 CR-4).
 
 ---
 
@@ -204,14 +233,36 @@ _Track each QA review/fix cycle._
 **Fixes Applied**: Step 2.6 repeat subject (gates 2–5 each found one more site of one containment rule); move: consolidate within this task's scope — the rule now holds at every block that reads or writes a PRD path (registry write refuses a symlink; review-prd numbering checks realpath; keep has its own outside-root message; shard-prd block guarded: bound, numbered, own directory, realpath inside the root, doc-id.js now bundled), and one population row holds register, numbering and keep together. The single shared predicate in doc-id.js stays a recorded follow-up (engine change). Test rows +2 (36); 5 mutations, each red as predicted.
 **Commit**: `88f8ba81` (pushed; PR #675 OPEN) — no gate has read this fix
 
+### QA Cycle 6 — 2026-10-15
+**Gate Result**: CONCERNS (90/100)
+**Issues Found**: gate 5's three findings fixed and verified; 1 new medium — CR-1 review-prd reports a PRD resolving outside the root but does not stop, and the report-number block has no containment; 1 low advisory (CR-2 shard-prd shared refusal message)
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 6 of 7)
+**Fixes Applied**: Findings taken inline from gate 6 (two findings, already in context from 5a; ingester not dispatched — recorded as a deviation). CR-1: review-prd's numbering block exits 3 `outside-root` on a PRD that resolves outside the root and its case arm stops the review with the replace-the-link remedy; the next-report-number block resolves PRD_ROOT and refuses a report directory whose realpath leaves the PRD root (or the working tree, for a legacy PRD above the root). Advisory CR-2: shard-prd's outside-root refusal has its own message, and its prose names the refusal. Step 2.6 repeat subject (containment rule, sixth site): move — patch; the consolidating move (one predicate in doc-id.js) stays the recorded follow-up, an engine change outside this task. Probe: `through a symlink` / `resolves outside` / `next review report number` over executed docs — review-prd, shard-prd updated; create-prd unaffected (its own arms already distinct); probe-boundary-rule.md, qa-runnable-prose-detection.md, develop-next roadmap-selection.md unaffected (other subjects). Population 7. Test rows +1 (37) and the gate-5 and shard rows extended; 4 mutations (numbering does not stop; report-number containment off; legacy base forced to root; shard outside arm off), each red as predicted. ci:fast 5713/0 (symlink parked), bundle:check clean, validate rc 0.
+**Commit**: `84b065af` (pushed; PR #675 OPEN)
+
+### QA Cycle 7 — 2026-10-15
+**Gate Result**: FAIL (70/100)
+**Issues Found**: gate 6's finding fixed and verified; 1 HIGH — CR-1 migrating a root-level docs/prd.md rewrites the bare word `prd` across the PRD tree, `type: prd` in other PRDs included, and reports ok (reproduced by QA; same in develop's engine, call path added by this branch); 1 medium — CR-2 shard-prd checks the file's realpath, not the target directory; 1 advisory medium (CR-3)
+**HIGH findings**: 1
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Escalating — loop limit reached
+**Fixes Applied**: Run from the qa-fix skill text loaded for cycle 6 (findings inline from gate 7). CR-1: the migration engine's token pass keeps undotted stems (`prd`, `index`) and their basenames out — their paths still move through the literal pass (shared/resources/migrate-doc-numbering.mjs + bundled review-prd copy); regression row migrates docs/prd.md beside a numbered PRD and asserts that PRD's bytes unchanged. CR-2: shard-prd checks the realpath of the directory md-tree writes into as well as the file. Advisory CR-3: review-prd's realpath stop now runs before the text-outside early exit, against the working tree for a legacy PRD above the root. Step 2.6: CR-2/CR-3 repeat subject (containment) — move: patch, consolidation stays the doc-id.js follow-up; CR-1 is a new subject. Probe: `token pass` / `whole old stems` / `old stem` over executed docs — population 0 (the token pass is stated only in the engine's own comment, updated). Test rows +2 (39); 5 mutations, each red (M2 basename filter red only after the fixture gained a bare `prd.md` mention — recorded). ci:fast 5715/0 (symlink parked), engine suite 44/44, bundle:check clean, validate rc 0.
+**Commit**: `e8d205a3` (pushed; PR #675 OPEN) — no gate has read this fix
+
 ---
 
 ## Completion
 
 **Finished**: {populated at end}
-**Final Status**: Escalated — QA loop limit reached (5 cycles; gate 5 CONCERNS 70/100, its findings fixed in `88f8ba81` and ungated)
+**Final Status**: Escalated — QA loop limit reached (7 cycles after a 2-cycle grant; gate 7 FAIL 70/100, its findings fixed in `e8d205a3` and ungated)
 **Branch**: feature/task.204.numbered-prds-in-prd-skills
 **PR**: https://github.com/Gamaroff/agent-skills/pull/675
-**QA Iterations**: 5 (loop limit)
+**QA Iterations**: 7 (loop limit after re-entry)
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
