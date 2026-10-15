@@ -16,6 +16,8 @@
 
 PASS=0
 FAIL=0
+# shellcheck source=undefined-command-guard.sh
+. "$(dirname "$0")/undefined-command-guard.sh"
 SCRIPT="$(cd "$(dirname "$0")" && pwd)/bitbucket-auth.sh"
 STDERR_FILE=$(mktemp)
 trap 'rm -f "$STDERR_FILE"' EXIT
@@ -163,5 +165,6 @@ run_case BITBUCKET_ACCESS_TOKEN=bb-access-tok
 assert_eq "success: nothing written to stderr" "$(cat "$STDERR_FILE")" ""
 
 echo
+undefined_commands_check || FAIL=$((FAIL + 1))
 echo "  $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] || exit 1

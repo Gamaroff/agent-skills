@@ -17,6 +17,8 @@
 
 PASS=0
 FAIL=0
+# shellcheck source=undefined-command-guard.sh
+. "$(dirname "$0")/undefined-command-guard.sh"
 SCRIPT="$(cd "$(dirname "$0")" && pwd)/set-qa-phase.sh"
 
 pass() { echo "  PASS  $1"; PASS=$((PASS + 1)); }
@@ -161,5 +163,6 @@ OUT=$(fx_run 2>&1); RC=$?
 rm -f "$FX_LOCK.pausing.4242"
 
 echo ""
+undefined_commands_check || FAIL=$((FAIL + 1))
 echo "  set-qa-phase.test.sh: $PASS passed, $FAIL failed."
 [ "$FAIL" -eq 0 ]

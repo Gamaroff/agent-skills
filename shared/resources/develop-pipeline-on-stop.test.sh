@@ -39,6 +39,8 @@
 
 PASS=0
 FAIL=0
+# shellcheck source=undefined-command-guard.sh
+. "$(dirname "$0")/undefined-command-guard.sh"
 HOOK="$(cd "$(dirname "$0")" && pwd)/develop-pipeline-on-stop.sh"
 BASH_BIN="$(command -v bash)"
 
@@ -401,5 +403,6 @@ done
 
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo ""
+undefined_commands_check || FAIL=$((FAIL + 1))
 echo "  develop-pipeline-on-stop.test.sh: $PASS passed, $FAIL failed."
 [ "$FAIL" -eq 0 ]

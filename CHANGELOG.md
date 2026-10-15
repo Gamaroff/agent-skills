@@ -28,6 +28,14 @@ All notable changes to this project will be documented in this file. Format foll
   at `HEAD`, and documentation alone resumes at Step 7. A classifier that cannot run, a malformed
   configuration and `enabled: false` all count every path as code. This repository's patterns now
   include `CHANGELOG.md`.
+- **A shell test suite fails when it calls an undefined command.** Previously such a call printed
+  "command not found" and was skipped, and the suite stayed green. The new
+  `shared/resources/undefined-command-guard.sh` records each miss through bash's
+  `command_not_found_handle`, and every `*.test.sh` now sources it and fails on a miss.
+  `tests/shell-suite-guard.test.js` keeps every tracked suite wired and registered in `npm test`.
+  Wiring it in found an assertion in `tracker-access.test.sh` that had never run since task.56: it
+  called helpers that suite never defined. It is fixed, and it fails when the stale banner wording
+  returns.
 
 ## [v0.57.1] - 2026-10-14
 
