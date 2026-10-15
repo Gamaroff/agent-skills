@@ -527,22 +527,22 @@ that this document's own example (an unnumbered PRD) never shows.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-15
-**Quality Score**: 90/100
+**Quality Score**: 70/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.204.qa.4.numbered-prds-in-prd-skills.md](./task.204.qa.4.numbered-prds-in-prd-skills.md)
-- **Gate File**: [task.204.gate.4.numbered-prds-in-prd-skills.yml](./task.204.gate.4.numbered-prds-in-prd-skills.yml)
+- **Full Report**: [task.204.qa.5.numbered-prds-in-prd-skills.md](./task.204.qa.5.numbered-prds-in-prd-skills.md)
+- **Gate File**: [task.204.gate.5.numbered-prds-in-prd-skills.yml](./task.204.gate.5.numbered-prds-in-prd-skills.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 33 (new, each mutation-proven) + full suite 5709 pass / 0 fail
+- **Tests Executed**: 34 (new, each mutation-proven) + full suite 5710 pass / 0 fail
 - **Phases Verified**: 5/5
-- **Critical Issues**: 0 high, 1 medium
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **Critical Issues**: 0 high (2 re-rated from high on a measured plausibility check), 3 medium
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- Gate 3's finding and four advisories are fixed and verified.
-- CR-1: the keep block lacks the realpath containment cycle 3 gave allocate and register.
+- Gate 4's finding is fixed and verified.
+- The containment rule is missing at three more sites: the registry write follows a symlink (CR-1), review-prd compares paths as text (CR-2), and the keep refusal points at an impossible remedy (CR-3).
 
 <!-- change-log-start -->
 ## Change Log
@@ -561,6 +561,8 @@ that this document's own example (an unnumbered PRD) never shows.
 | 2026-10-15 |         | QA findings fixed — cycle 3, 1 finding (CR-1) + 4 advisory (CR-2..CR-5); 33 test rows | qa-fix |
 | 2026-10-15 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-10-15 |         | QA findings fixed — cycle 4, 1 finding (CR-1) + 1 advisory (CR-2); 34 test rows | qa-fix |
+| 2026-10-15 |         | QA gate CONCERNS (70/100) — 3 findings | qa-task |
+| 2026-10-15 |         | QA findings fixed — cycle 5, 3 findings (CR-1..CR-3) + 1 advisory (CR-4); shard-prd block guarded; 36 test rows | qa-fix |
 <!-- change-log-end -->
 
 ---

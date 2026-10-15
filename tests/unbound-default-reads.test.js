@@ -64,6 +64,10 @@ const INPUTS = new Map([
     "input of the resolve block (the skill's argument: a number, id, slug or path); the `:?` is the loud-failure guard",
   ],
   [
+    "skills/shard-prd/SKILL.md#PRD_FILE",
+    "input of the shard block (the numbered PRD to explode); the `:?` is the loud-failure guard",
+  ],
+  [
     "skills/review-prd/SKILL.md#MIG_NAME",
     "optional input of the migration blocks — empty unless the plan blocked on unplaced-prd and the user named the slug",
   ],

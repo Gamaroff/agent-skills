@@ -339,6 +339,12 @@ NUMBERING=$(command node -e '
   if (!abs.startsWith(rootAbs + path.sep)) {
     say([{ reason: "bad-shape", path: abs, detail: `outside ${root} — a PRD written before numbered PRDs` }]);
   }
+  // Text inside the root is not enough: a file (or a directory above it) that is a symlink out of
+  // the root would carry every read and write of this review with it.
+  const fs = require("fs");
+  if (fs.existsSync(abs) && !fs.realpathSync(abs).startsWith(fs.realpathSync(rootAbs) + path.sep)) {
+    say([{ reason: "bad-shape", path: abs, detail: `resolves outside ${root} through a symlink — replace the link with the real file` }]);
+  }
   // The file itself, always — the corpus walk below skips any name without a prd/epic/story prefix.
   const own = d.check(abs, { prdRoot: rootAbs });
   // The subtree belongs to this PRD only when the PRD owns its directory (prd.P.x/prd.P.x.md). A file

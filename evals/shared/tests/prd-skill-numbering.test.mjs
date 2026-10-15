@@ -819,3 +819,89 @@ test("gate-4 CR-2: a post-check-failed migration answer offers nothing to apply 
   assert.match(r.out, /✖ frontmatter-mismatch: .*prd\.1\.a\.md/);
   assert.doesNotMatch(r.out, /^migration: needs-migration/m);
 });
+
+// ── QA cycle 5 (gate 5) ────────────────────────────────────────────────────
+
+const SHARD = () =>
+  blockBy("shard-prd", "# shard-prd — explode a numbered PRD in place");
+
+test("gate-5: every block that reads or writes a PRD path refuses a symlink out of the root", () => {
+  // CR-1: a registry that is a symlink (live or dangling) is never written through.
+  for (const live of [true, false]) {
+    const root = tree({
+      [prdPath(1, "shop")]: prdDoc(1, "shop"),
+      "outside/.keep": "",
+    });
+    if (live) writeFileSync(path.join(root, "outside/reg.md"), registry(1));
+    symlinkSync(path.join(root, "outside/reg.md"), path.join(root, REG));
+    const r = run(REGISTER(), root, {
+      PRD_FILE: prdPath(1, "shop"),
+      TITLE: "Shop",
+    });
+    assert.equal(r.code, 1, `live=${live}: ${r.out}`);
+    assert.match(r.out, /is a symlink/);
+    const target = path.join(root, "outside/reg.md");
+    assert.equal(
+      existsSync(target) && readFileSync(target, "utf8").includes("[Shop]"),
+      false,
+      "nothing written outside",
+    );
+  }
+  // CR-2: review-prd reports a PRD file that is a symlink out of the root.
+  const root = tree({
+    [REG]: registry(2, [[1, "shop", "shop"]]),
+    "outside/real.md": prdDoc(1, "shop"),
+  });
+  mkdirSync(path.join(root, "docs/prd/shop/prd.1.shop"), { recursive: true });
+  symlinkSync(
+    path.join(root, "outside/real.md"),
+    path.join(root, prdPath(1, "shop")),
+  );
+  const n = run(NUMBERING(), root, { PRD_FILE: prdPath(1, "shop") });
+  assert.match(
+    n.out,
+    /\[Critical\] numbering bad-shape: .*resolves outside docs\/prd through a symlink/,
+  );
+  assert.doesNotMatch(n.out, /numbering ok/);
+  // CR-3: the keep block names the real remedy, not a migration.
+  const k = run(KEEP(), root, { FOUND_PRD: prdPath(1, "shop") });
+  assert.equal(k.code, 1, k.out);
+  assert.match(k.out, /no migration can fix this/);
+  assert.doesNotMatch(k.out, /offers the numbering migration/);
+});
+
+test("gate-5 CR-4: shard-prd explodes only a numbered PRD that owns its directory under the root", () => {
+  const root = tree({
+    [prdPath(3, "shop")]: prdDoc(3, "shop"),
+    "docs/prd.md": "# legacy monolith\n",
+    "docs/prd/x/prd.x/prd.x.md": "# legacy\n",
+  });
+  // md-tree, stubbed: it records the arguments it was called with.
+  const shimDir = path.join(root, ".shim");
+  mkdirSync(shimDir);
+  writeFileSync(
+    path.join(shimDir, "md-tree"),
+    `#!/bin/sh\necho "md-tree $*" >> "${root}/.md-tree-calls"\n`,
+  );
+  chmodSync(path.join(shimDir, "md-tree"), 0o755);
+  const PATHX = `${shimDir}:${path.dirname(process.execPath)}:${process.env.PATH}`;
+  for (const file of ["docs/prd.md", "docs/prd/x/prd.x/prd.x.md"]) {
+    const r = run(SHARD(), root, { PATH: PATHX, PRD_FILE: file });
+    assert.equal(r.code, 1, `${file}: ${r.out}`);
+    assert.match(r.out, /is not a numbered PRD in its own directory/, file);
+  }
+  assert.equal(
+    existsSync(path.join(root, ".md-tree-calls")),
+    false,
+    "nothing exploded",
+  );
+  const unbound = run(SHARD(), root, { PATH: PATHX, PRD_FILE: "" });
+  assert.notEqual(unbound.code, 0, unbound.out);
+  assert.match(unbound.out, /bind PRD_FILE/);
+  const ok = run(SHARD(), root, { PATH: PATHX, PRD_FILE: prdPath(3, "shop") });
+  assert.equal(ok.code, 0, ok.out);
+  assert.equal(
+    readFileSync(path.join(root, ".md-tree-calls"), "utf8").trim(),
+    `md-tree explode ${prdPath(3, "shop")} docs/prd/shop/prd.3.shop`,
+  );
+});

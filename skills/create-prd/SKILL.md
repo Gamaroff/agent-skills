@@ -439,7 +439,7 @@ KEEP=$(command node -e '
       && !fs.realpathSync(file).startsWith(fs.realpathSync(root) + path.sep)) {
     // The same realpath containment the allocate and register blocks apply: a domain directory
     // that symlinks out of the root must not carry a kept PRD with it.
-    r = { ok: false, reason: "off-layout", detail: `${file} resolves outside ${root}` };
+    r = { ok: false, reason: "outside-root", detail: `${file} resolves outside ${root}` };
   } else {
     let text = null;
     try { text = fs.readFileSync(file, "utf8"); } catch (e) {
@@ -461,6 +461,8 @@ case "${KEEP_RC}:${KEEP_REASON}" in
   0:ok) ;;
   1:unnumbered|1:off-layout|1:frontmatter-mismatch)
     echo "❌ $(printf '%s' "$KEEP" | jq -r '.detail') — run /review-prd, which reports it and offers the numbering migration"; exit 1 ;;
+  1:outside-root)
+    echo "❌ $(printf '%s' "$KEEP" | jq -r '.detail') — a symlink leads out of ${PRD_ROOT}; replace it with the real directory under the root (no migration can fix this)"; exit 1 ;;
   1:unreadable)
     echo "❌ $(printf '%s' "$KEEP" | jq -r '.detail') — check the FOUND_PRD binding"; exit 1 ;;
   *) echo "❌ the keep-number check could not run (exit ${KEEP_RC}) — check the bundled ${DOC_ID}"; exit 1 ;;
@@ -533,6 +535,14 @@ command node -e '
   }
   const n = p.prd;
   const href = parts.join("/");
+  // The registry is written as well as read: a symlink, live or dangling, would carry the write
+  // outside the root, so the registry must be a plain file (or absent).
+  let isLink = false;
+  try { isLink = fs.lstatSync(reg).isSymbolicLink(); } catch {}
+  if (isLink) {
+    console.log(`❌ registry row not written: ${reg} is a symlink — the registry must be a plain file under ${root}`);
+    process.exit(1);
+  }
   const text = fs.existsSync(reg) ? fs.readFileSync(reg, "utf8") : null;
   try {
     const out = d.appendPrdRow(text, { n, title, href, folder, status: "draft", created });

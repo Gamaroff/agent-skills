@@ -100,13 +100,37 @@ npm install -g @kayvan/markdown-tree-parser
 
 **Usage:**
 
-First source `references/resolve-paths.sh` to populate `${PRD_ROOT}` and `${ARCH_ROOT}` (defaults: `docs/prd`, `docs/architecture`).
+For a PRD, run this block from the repository root. It refuses anything that is not a numbered PRD
+owning its directory under `${PRD_ROOT}` — the refusal described in
+[§ Which PRD, and Where Its Shards Go](#which-prd-and-where-its-shards-go) — and only then explodes it
+in place:
 
 ```bash
-# For a PRD — explode it in place, into its own directory.
-# PRD_FILE is the numbered PRD, e.g. docs/prd/shop/prd.3.shop/prd.3.shop.md
+# shard-prd — explode a numbered PRD in place (task 204)
+# INPUT: PRD_FILE, the numbered PRD (e.g. docs/prd/shop/prd.3.shop/prd.3.shop.md). PRD_ROOT is resolved HERE.
+DOC_ID=.agents/skills/shard-prd/references/doc-id.js
+source .agents/skills/shard-prd/references/resolve-paths.sh || exit 1
+: "${PRD_FILE:?bind PRD_FILE to the numbered PRD}"
+command node -e '
+  const d = require(process.argv[1]);
+  const fs = require("fs");
+  const path = require("path");
+  const [root, file] = process.argv.slice(2);
+  const p = d.parse(path.basename(file));
+  const dir = path.basename(path.dirname(path.resolve(file)));
+  const inside = fs.existsSync(file)
+    && fs.realpathSync(file).startsWith(fs.realpathSync(root) + path.sep);
+  if (!p.ok || p.kind !== "prd" || p.artifact || dir !== path.basename(file, ".md") || !inside) {
+    console.log(`❌ ${file} is not a numbered PRD in its own directory under ${root} — run /review-prd on it, which reports it and offers the numbering migration`);
+    process.exit(1);
+  }
+' "$PWD/$DOC_ID" "$PRD_ROOT" "$PRD_FILE" || exit 1
 md-tree explode "$PRD_FILE" "$(dirname "$PRD_FILE")"
+```
 
+The other uses, for reference:
+
+```bash
 # For Architecture
 md-tree explode docs/architecture.md "$ARCH_ROOT"
 
