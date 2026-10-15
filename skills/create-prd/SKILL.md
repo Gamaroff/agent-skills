@@ -342,7 +342,16 @@ ALLOC=$(command node -e '
   const d = require(process.argv[1]);
   const fs = require("fs");
   const path = require("path");
-  const [root, slug] = process.argv.slice(2);
+  const [root, slug, domain] = process.argv.slice(2);
+  // The domain is a path segment under the PRD root: the slug grammar doc-id.js applies to a
+  // feature (lowercase kebab-case from a letter) is the rule for it too, so a value such as
+  // ../.. or a/b can never place a PRD outside the root.
+  try { d.format({ kind: "prd", prd: 1, slug: domain }); }
+  catch {
+    console.log(JSON.stringify({ ok: false, reason: "bad-domain",
+      detail: `domain ${JSON.stringify(domain)} is not lowercase kebab-case starting with a letter` }));
+    process.exit(1);
+  }
   let r = d.runCli(["next", "prd", "--prd-root", root, "--json"]).payload;
   if (r.reason === "registry-missing") {
     // No registry: number 1 is free only when no numbered PRD exists anywhere under the root.
@@ -369,7 +378,7 @@ ALLOC=$(command node -e '
   }
   console.log(JSON.stringify(r));
   process.exitCode = r.ok ? 0 : 1;
-' "$PWD/$DOC_ID" "$PRD_ROOT" "$FEATURE") \
+' "$PWD/$DOC_ID" "$PRD_ROOT" "$FEATURE" "$DOMAIN") \
   || { echo "❌ PRD number not allocated: $(printf '%s' "$ALLOC" | jq -r '.reason + " — " + (.detail // "")')"; exit 1; }
 P=$(printf '%s' "$ALLOC" | jq -r '.next')
 PRD_STEM=$(printf '%s' "$ALLOC" | jq -r '.stem')
@@ -386,6 +395,7 @@ echo "P=${P} PRD_FILE=${PRD_FILE} ($(printf '%s' "$ALLOC" | jq -r '.reason'))"
 | `registry-missing` | No registry, but numbered PRDs exist | **HALT** — the registry was lost; `/review-prd` reports it. Never restart at 1 over existing numbers |
 | `registry-invalid`, `registry-behind`, `unreadable` | The engine refused the registry | **HALT** with the engine's reason verbatim |
 | `bad-slug` | `{feature}` cannot form a PRD name | Ask for a slug that starts with a letter, then re-run |
+| `bad-domain` | `{domain}` is not a lowercase kebab-case segment (a `..`, a `/`, upper case) | Ask for a domain that is, then re-run — the PRD must land under `${PRD_ROOT}` |
 
 A number is allocated, not reserved: nothing is written here, so a run abandoned now leaves no trace.
 The registry row is written in Step 2, beside the file.
@@ -455,11 +465,12 @@ one — write its registry row as soon as the file first exists, in the same ste
 
 ```bash
 # create-prd — write the PRD registry row (task 204)
-# INPUTS: DOMAIN and PRD_FILE from Step 1.5, and TITLE, the PRD's title (no | and no newline).
-# The number is read from PRD_FILE's own name, never carried from Step 1.5's shell.
+# INPUTS: PRD_FILE from Step 1.5, and TITLE, the title of the PRD (no | and no newline).
+# Number, folder and href are all read from PRD_FILE itself — nothing is carried from another shell,
+# and a file that is not at ${PRD_ROOT}/{domain}/prd.{P}.{feature}/prd.{P}.{feature}.md is refused.
 DOC_ID=.agents/skills/create-prd/references/doc-id.js
 source .agents/skills/create-prd/references/resolve-paths.sh || exit 1
-: "${DOMAIN:?bind DOMAIN}" "${PRD_FILE:?bind PRD_FILE}" "${TITLE:?bind TITLE to the PRD title}"
+: "${PRD_FILE:?bind PRD_FILE}" "${TITLE:?bind TITLE to the PRD title}"
 [ -f "$PRD_FILE" ] || { echo "❌ ${PRD_FILE} does not exist yet — write the PRD first"; exit 1; }
 REG="${PRD_ROOT}/prd-registry.md"
 # appendPrdRow is the engine's one row writer: it starts from the empty registry when there is none,
@@ -467,13 +478,20 @@ REG="${PRD_ROOT}/prd-registry.md"
 command node -e '
   const d = require(process.argv[1]);
   const fs = require("fs");
-  const [reg, file, title, href, folder, created] = process.argv.slice(2);
-  const p = d.parse(require("path").basename(file));
-  if (!p.ok || p.kind !== "prd" || p.artifact) {
-    console.log(`❌ registry row not written: ${file} is not a numbered PRD document`);
+  const path = require("path");
+  const [reg, root, file, title, created] = process.argv.slice(2);
+  const p = d.parse(path.basename(file));
+  const parts = path.relative(path.resolve(root), path.resolve(file)).split(path.sep);
+  const [folder, dir] = parts;
+  let folderOk = false;
+  try { d.format({ kind: "prd", prd: 1, slug: folder }); folderOk = true; } catch {}
+  if (!p.ok || p.kind !== "prd" || p.artifact || parts.length !== 3 || !folderOk
+      || dir !== path.basename(file, ".md")) {
+    console.log(`❌ registry row not written: ${file} is not a numbered PRD document at ${root}/{domain}/prd.{P}.{feature}/`);
     process.exit(1);
   }
   const n = p.prd;
+  const href = parts.join("/");
   const text = fs.existsSync(reg) ? fs.readFileSync(reg, "utf8") : null;
   try {
     const out = d.appendPrdRow(text, { n, title, href, folder, status: "draft", created });
@@ -483,11 +501,14 @@ command node -e '
     console.log(`❌ registry row not written (${e.reason || "error"}): ${e.message}`);
     process.exitCode = 1;
   }
-' "$PWD/$DOC_ID" "$REG" "$PRD_FILE" "$TITLE" "${PRD_FILE#"${PRD_ROOT}"/}" "$DOMAIN" "$(date +%Y-%m-%d)" || exit 1
+' "$PWD/$DOC_ID" "$REG" "$PRD_ROOT" "$PRD_FILE" "$TITLE" "$(date +%Y-%m-%d)" || exit 1
 ```
 
 A refusal is a **HALT** with the reason printed: `duplicate-row` means `P` is already registered (the
-registry moved since Step 1.5 — re-allocate), `bad-row` means the title carries a `|` or a newline,
+registry moved since Step 1.5 — another run took `P`). Re-run Step 1.5 for a new number, **move the
+file you already wrote** to the new `PRD_FILE` (directory and file name both change) and set its
+`name:` and `prd_number:` to match, then run this block again; the old `prd.{P}.{feature}/` directory
+must not be left behind, or it is a second PRD claiming `P`. `bad-row` means the title carries a `|` or a newline,
 `registry-invalid` / `no-table` mean the registry is malformed. The PRD file and this row are
 committed together, by the user — see Step 4.
 

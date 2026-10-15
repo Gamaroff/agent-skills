@@ -531,18 +531,18 @@ that this document's own example (an unnumbered PRD) never shows.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.204.qa.1.numbered-prds-in-prd-skills.md](./task.204.qa.1.numbered-prds-in-prd-skills.md)
-- **Gate File**: [task.204.gate.1.numbered-prds-in-prd-skills.yml](./task.204.gate.1.numbered-prds-in-prd-skills.yml)
+- **Full Report**: [task.204.qa.2.numbered-prds-in-prd-skills.md](./task.204.qa.2.numbered-prds-in-prd-skills.md)
+- **Gate File**: [task.204.gate.2.numbered-prds-in-prd-skills.yml](./task.204.gate.2.numbered-prds-in-prd-skills.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 16 (new) + full suite 5692 pass / 0 fail; eval:all exit 0
+- **Tests Executed**: 21 (new, each mutation-proven) + full suite 5697 pass / 0 fail
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0 high, 4 medium
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- CR-1: review-prd does not resolve a directory input. CR-2: a root-level `docs/prd.md` absorbs every other PRD's numbering findings.
-- QA-1: no test runs the migration plan with a blocker or the monolith path. QA-2: 7 of 16 rows mutation-proven.
+- Gate 1's four findings are fixed and verified.
+- Cycle 2 refute pass: a PRD file that does not own its directory absorbs other PRDs' findings (CR-1) and is never checked itself (CR-2); a full-stem input does not resolve (CR-3); `DOMAIN` is unvalidated and can escape `${PRD_ROOT}` (CR-5).
 
 <!-- change-log-start -->
 ## Change Log
@@ -555,6 +555,8 @@ that this document's own example (an unnumbered PRD) never shows.
 | 2026-10-15 |         | Implemented — 25 files, 16 tests (`prd-skill-numbering.test.mjs`) | develop |
 | 2026-10-15 |         | QA gate CONCERNS (60/100) — 4 findings | qa-task |
 | 2026-10-15 |         | QA findings fixed — cycle 1, 4 findings (CR-1, CR-2, QA-1, QA-2) + 2 advisory (CR-3, CR-4); 21 test rows, each mutation-proven | qa-fix |
+| 2026-10-15 |         | QA gate CONCERNS (60/100) — 4 findings | qa-task |
+| 2026-10-15 |         | QA findings fixed — cycle 2, 4 findings (CR-1, CR-2, CR-3, CR-5) + 3 advisory (CR-6, CR-7, CR-8); CR-4 deferred; 29 test rows | qa-fix |
 <!-- change-log-end -->
 
 ---

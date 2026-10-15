@@ -566,3 +566,146 @@ test("QA-1: the migration plan surfaces a monolith's blocker, and MIG_NAME clear
     /prd prd → 1 .*docs\/prd\.md → docs\/prd\/mono\/prd\.1\.mono\/prd\.1\.mono\.md/,
   );
 });
+
+// ── QA cycle 2 (gate 2) ────────────────────────────────────────────────────
+
+test("gate-2 CR-1/CR-2: a PRD file that does not own its directory reports only its own finding", () => {
+  const root = tree({
+    [REG]: registry(4, [[3, "shop", "shop"]]),
+    [prdPath(3, "shop")]:
+      "---\nname: prd.3.shop\nprd_number: 9\ntype: prd\n---\n",
+    "docs/prd/x/prd.x/prd.x.md": "# legacy\n",
+    "docs/prd/index.md": "# legacy index\n",
+    "docs/prd/flat/prd.flat.md": "# flat legacy\n",
+    "docs/prd/flat/prd.2.other/prd.2.other.md": prdDoc(2, "other"),
+  });
+  for (const [file, name] of [
+    ["docs/prd/index.md", "index.md"],
+    ["docs/prd/flat/prd.flat.md", "prd.flat.md"],
+  ]) {
+    const r = run(NUMBERING(), root, { PRD_FILE: file });
+    const lines = r.out.split("\n").filter((l) => l.startsWith("[Critical]"));
+    assert.equal(lines.length, 1, `${file}: ${r.out}`);
+    assert.ok(lines[0].includes(name), `${file}: ${lines[0]}`);
+    assert.doesNotMatch(r.out, /prd\.3\.shop|prd\.x\.md|prd\.2\.other/, file);
+  }
+});
+
+test("gate-2 CR-2: the PRD file's own findings are reported with its subtree's", () => {
+  const root = tree({
+    [REG]: registry(3, [[1, "a", "a"]]),
+    [prdPath(1, "a")]: prdDoc(1, "a"),
+    // A numbered PRD that is not in the registry: unregistered is the file's own finding.
+    [prdPath(2, "b")]: prdDoc(2, "b"),
+    "docs/prd/b/prd.2.b/epics/epic.2.1.e/epic.2.1.e.md":
+      "---\nprd_number: 2\nepic_number: 1\n---\n",
+  });
+  const r = run(NUMBERING(), root, { PRD_FILE: prdPath(2, "b") });
+  assert.match(r.out, /\[Critical\] numbering unregistered: .*prd\.2\.b\.md/);
+  assert.equal((r.out.match(/unregistered/g) || []).length, 1, "deduplicated");
+});
+
+test("gate-2 CR-6: a duplicated PRD id is reported from either side", () => {
+  const root = tree({
+    [REG]: registry(2, [[1, "x", "a"]]),
+    "docs/prd/a/prd.1.x/prd.1.x.md": prdDoc(1, "x"),
+    "docs/prd/b/prd.1.x/prd.1.x.md": prdDoc(1, "x"),
+  });
+  for (const file of [
+    "docs/prd/a/prd.1.x/prd.1.x.md",
+    "docs/prd/b/prd.1.x/prd.1.x.md",
+  ]) {
+    const r = run(NUMBERING(), root, { PRD_FILE: file });
+    assert.match(r.out, /\[Critical\] numbering duplicate-id/, file);
+  }
+});
+
+test("gate-2 CR-3: a full stem resolves to exactly that PRD; a wrong slug resolves to nothing", () => {
+  const root = tree({
+    [REG]: registry(13, [
+      [3, "shop", "shop"],
+      [12, "shop-two", "shop"],
+    ]),
+    [prdPath(3, "shop")]: prdDoc(3, "shop"),
+    "docs/prd/shop/prd.12.shop-two/prd.12.shop-two.md": prdDoc(12, "shop-two"),
+    "docs/prd/x/prd.onboarding/prd.onboarding.md": "# legacy\n",
+  });
+  const hit = run(RESOLVE(), root, { PRD_INPUT: "prd.3.shop" });
+  assert.equal(hit.code, 0, hit.out);
+  assert.match(
+    hit.out,
+    /^PRD_FILE=docs\/prd\/shop\/prd\.3\.shop\/prd\.3\.shop\.md$/m,
+  );
+  const legacy = run(RESOLVE(), root, { PRD_INPUT: "prd.onboarding" });
+  assert.match(legacy.out, /^PRD_FILE=.*\/prd\.onboarding\.md$/m);
+  const miss = run(RESOLVE(), root, { PRD_INPUT: "prd.3.other" });
+  assert.equal(miss.code, 1, miss.out);
+});
+
+test("gate-2 CR-5: a domain that is not a kebab-case segment is refused, and nothing is allocated", () => {
+  for (const domain of ["../..", "a/b", "Shop", "3d", " ", "."]) {
+    const root = tree({ [REG]: registry(1) });
+    const r = run(
+      ALLOCATE(),
+      root,
+      { DOMAIN: domain, FEATURE: "shop" },
+      'echo "GOT P=$P"',
+    );
+    assert.equal(r.code, 1, `${JSON.stringify(domain)}: ${r.out}`);
+    assert.match(r.out, /bad-domain/, JSON.stringify(domain));
+    assert.doesNotMatch(r.out, /GOT P=/);
+  }
+});
+
+test("gate-2 CR-8: the register block takes folder and href from PRD_FILE and refuses a file off the layout", () => {
+  const root = tree({ [REG]: registry(2) });
+  mkdirSync(path.join(root, "docs/prd/shop/prd.2.shop"), { recursive: true });
+  writeFileSync(path.join(root, prdPath(2, "shop")), prdDoc(2, "shop"));
+  const ok = run(REGISTER(), root, {
+    PRD_FILE: prdPath(2, "shop"),
+    TITLE: "Shop",
+    DOMAIN: "wrong",
+  });
+  assert.equal(ok.code, 0, ok.out);
+  assert.match(
+    readFileSync(path.join(root, REG), "utf8"),
+    /^\| 2 \| \[Shop\]\(shop\/prd\.2\.shop\/prd\.2\.shop\.md\) \| shop \|/m,
+  );
+  mkdirSync(path.join(root, "docs/prd/prd.3.flat"), { recursive: true });
+  writeFileSync(
+    path.join(root, "docs/prd/prd.3.flat/prd.3.flat.md"),
+    prdDoc(3, "flat"),
+  );
+  const off = run(REGISTER(), root, {
+    PRD_FILE: "docs/prd/prd.3.flat/prd.3.flat.md",
+    TITLE: "Flat",
+  });
+  assert.equal(off.code, 1, off.out);
+  assert.match(off.out, /not a numbered PRD document at/);
+});
+
+test("gate-2 CR-2: a file the corpus walk skips is still checked, never reported as numbering ok", () => {
+  // notes/notes.md owns its directory but carries no prd. prefix, so checkCorpus never visits it.
+  const root = tree({
+    [REG]: registry(1),
+    "docs/prd/x/notes/notes.md": "# not a PRD\n",
+  });
+  const r = run(NUMBERING(), root, { PRD_FILE: "docs/prd/x/notes/notes.md" });
+  assert.match(r.out, /\[Critical\] numbering bad-shape: .*notes\.md/);
+  assert.doesNotMatch(r.out, /numbering ok/);
+});
+
+test("gate-2 CR-8: the register block refuses a bad folder and a PRD nested one level too deep", () => {
+  const root = tree({ [REG]: registry(4) });
+  for (const file of [
+    "docs/prd/Bad_Folder/prd.3.x/prd.3.x.md",
+    "docs/prd/a/prd.3.x/prd.3.x/prd.3.x.md",
+  ]) {
+    mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+    writeFileSync(path.join(root, file), prdDoc(3, "x"));
+    const r = run(REGISTER(), root, { PRD_FILE: file, TITLE: "X" });
+    assert.equal(r.code, 1, `${file}: ${r.out}`);
+    assert.match(r.out, /not a numbered PRD document at/, file);
+  }
+  assert.doesNotMatch(readFileSync(path.join(root, REG), "utf8"), /^\| 3 /m);
+});

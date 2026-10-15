@@ -132,6 +132,9 @@ MATCHES=$(command node -e '
     process.exit(0);
   }
   const input = path.basename(raw.replace(/\/+$/, ""));
+  // A full stem (prd.3.shop, or a legacy prd.shop) selects the PRD whose directory is that stem.
+  const stem = d.parse(input).ok ? d.parse(input) : d.parseLegacy(input);
+  const wantStem = stem.ok && stem.kind === "prd" && !stem.artifact ? input : null;
   // A bare number, or prd.{N} with no slug, selects by number.
   const asId = d.parse(`${input.startsWith("prd.") ? input : `prd.${input}`}.x`);
   const wantN = asId.ok && asId.kind === "prd" && !asId.artifact && asId.slug === "x" ? asId.prd : null;
@@ -149,7 +152,9 @@ MATCHES=$(command node -e '
       const p = d.parse(e.name);
       const doc = p.ok ? p : d.parseLegacy(e.name);
       if (!doc.ok || doc.kind !== "prd" || doc.artifact) continue;
-      const hit = wantN !== null ? p.ok && p.prd === wantN : doc.slug.includes(wantSlug);
+      const hit = wantStem !== null ? stem === wantStem
+        : wantN !== null ? p.ok && p.prd === wantN
+        : doc.slug.includes(wantSlug);
       if (hit) out.push(full);
     }
   };
@@ -322,25 +327,42 @@ NUMBERING=$(command node -e '
   const d = require(process.argv[1]);
   const path = require("path");
   const [root, file] = process.argv.slice(2);
-  const dir = path.resolve(path.dirname(file)) + path.sep;
-  // A PRD outside the PRD root (a root-level docs/prd.md) owns no directory under it: its one
-  // finding is that it is there. Its directory is a parent of the root, so a prefix filter would
-  // claim the findings of every other PRD as its own.
-  if (!(dir + "x").startsWith(path.resolve(root) + path.sep)) {
-    console.log(JSON.stringify({ reason: "findings", findings: [{ reason: "bad-shape",
-      path: path.resolve(file), detail: `outside ${root} — a PRD written before numbered PRDs` }] }));
-    process.exit(1);
-  }
-  const findings = [];
-  const r = d.runCli(["check", "--corpus", "--prd-root", root, "--json"]).payload;
-  if (!["ok", "findings", "empty", "root-missing"].includes(r.reason)) {
-    console.log(JSON.stringify({ reason: r.reason, findings, unreadable: r.unreadable || [] }));
-    process.exitCode = 2;
-  } else {
-    for (const f of r.findings || []) if (f.path.startsWith(dir)) findings.push(f);
+  const abs = path.resolve(file);
+  const rootAbs = path.resolve(root);
+  const dirAbs = path.dirname(abs);
+  const stem = path.basename(abs, ".md");
+  const say = (findings) => {
     console.log(JSON.stringify({ reason: findings.length ? "findings" : "ok", findings }));
-    process.exitCode = findings.length ? 1 : 0;
+    process.exit(findings.length ? 1 : 0);
+  };
+  // A PRD outside the PRD root (a root-level docs/prd.md) has one finding: that it is there.
+  if (!abs.startsWith(rootAbs + path.sep)) {
+    say([{ reason: "bad-shape", path: abs, detail: `outside ${root} — a PRD written before numbered PRDs` }]);
   }
+  // The file itself, always — the corpus walk below skips any name without a prd/epic/story prefix.
+  const own = d.check(abs, { prdRoot: rootAbs });
+  // The subtree belongs to this PRD only when the PRD owns its directory (prd.P.x/prd.P.x.md). A file
+  // that does not (index.md beside other PRDs, a flat domain/prd.x.md) owns no subtree, and a folder
+  // filter on its parent would claim the findings of every PRD beside it.
+  if (path.basename(dirAbs) !== stem || dirAbs === rootAbs) {
+    say(own.length ? own : [{ reason: "bad-shape", path: abs,
+      detail: `does not own its directory (${path.basename(dirAbs)}/) — not a numbered PRD document` }]);
+  }
+  const r = d.runCli(["check", "--corpus", "--prd-root", root, "--json"]).payload;
+  if (!["ok", "findings", "empty"].includes(r.reason)) {
+    console.log(JSON.stringify({ reason: r.reason, findings: own, unreadable: r.unreadable || [] }));
+    process.exit(2);
+  }
+  const under = dirAbs + path.sep;
+  const seen = new Set();
+  const findings = [];
+  for (const f of [...own, ...(r.findings || [])]) {
+    // A duplicate-id finding is attached to one path but names all of them in its detail.
+    const mine = f.path.startsWith(under) || (f.reason === "duplicate-id" && f.detail.includes(under));
+    const key = `${f.reason}|${f.path}|${f.detail}`;
+    if (mine && !seen.has(key)) { seen.add(key); findings.push(f); }
+  }
+  say(findings);
 ' "$PWD/$DOC_ID" "$PRD_ROOT" "$PRD_FILE")
 case $? in
   0) echo "✅ numbering ok under $(dirname "$PRD_FILE")" ;;
