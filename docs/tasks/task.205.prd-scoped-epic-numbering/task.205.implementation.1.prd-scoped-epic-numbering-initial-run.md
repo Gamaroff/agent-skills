@@ -3,7 +3,7 @@
 **Task**: `task.205.prd-scoped-epic-numbering.md`
 **Run Number**: 1
 **Started**: 2026-10-15 12:01
-**Status**: Escalated
+**Status**: Completed
 
 ---
 
@@ -35,9 +35,9 @@ Move every epic skill to PRD-scoped `epic.{P}.{E}` numbering, make a parent PRD 
 | 2. review-task             | ✅ Done    | `task.205.review.{N}.{name}.md` exists (or skip logged)               | `task.205.review.1.prd-scoped-epic-numbering.md` — READY TO IMPLEMENT 8/10; 7 Important + 1 Optional fixes applied; Planned → Ready for Development | —                    | 2026-10-15T10:05Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan + surface map); 30/30 phases; ci:fast 5663/0; 10 mutation proofs; develop-complete comment posted | —                    | 2026-10-15T10:27Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #674: https://github.com/Gamaroff/agent-skills/pull/674 (commit `91c077e7`) | —                    | 2026-10-15T10:28Z |
-| 5–6. qa-task / qa-fix loop | ⚠️ Escalated | `task.205.qa.{N}.*.md`; `task.205.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.205.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.205.qa.{N}.*.md`; `task.205.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 7 cycles (2 granted re-entries); gate 7 PASS 100; PR review CONCERNS (`task.205.pr-review.1`) | — | 2026-10-15T14:09Z |
+| 7. finalise                | ✅ Done    | `task.205.dod.{N}.*.md`; task `status: accepted`                      | DoD ACCEPTED; acceptance commit `0b437e47`; CI reading 2 SUCCESS (tree-equivalent); #648 closed | — | 2026-10-15T14:32Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Implementation report committed and pushed | — | 2026-10-15T14:33Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -108,6 +108,26 @@ Move every epic skill to PRD-scoped `epic.{P}.{E}` numbering, make a parent PRD 
 - Narrowing residue — every MEDIUM on gates 5 and 6 names skills/create-epics-from-shards/SKILL.md (TASK-205-QA5-CR1, TASK-205-QA6-1); HIGH 0 on both. This is an OFFER to qa-fix Step 2.6, not a route and not an escalation.
 - QA Cycle 6 fix: findings ingester not dispatched — the findings were in hand from 5a (independence loss, as cycles 1–5). Step 2.6 move: consolidate. Commit `6b33e298`, pushed; post-fix PR state OPEN (inline `gh pr view`).
 - Loop limit (6/6): route 2c `continue (medium-not-falling)` — MEDIUM reads 1, 1, 1 over cycles 4–6 → escalate.
+
+### QA Loop Re-entry 2 — 2026-10-15
+
+- QA loop re-entry: 1 extra cycle granted (operator approved "Resume at 5a with 1 more cycle"); 0 cycle(s) run outside the loop back-filled from disk (gates 1–6, 6 `### QA Cycle` entries).
+- `grant-qa-cycles.sh`: lock restored from the halt snapshot; QA_CYCLE=6, extra_cycles_granted=1, qa_max_cycles=7, reenter_at=5a. Cycle 7 gates `6b33e298` (BUG-14).
+- QA Cycle 7 — gate PASS (100/100), head `632d1752`. Diff reviewer 112831 ms, 1 low cleanup. Route 1 (PASS, no open entry) → 5c.
+- Step 5c — `/review-pr --effort medium --comment --no-code`: CONCERNS (PC-1 medium scope, PC-2 low scope); report `task.205.pr-review.1.prd-scoped-epic-numbering.md`; PR comment posted. Conformance lens 76847 ms. Carry classify: PC-1 record (not a docs path), PC-2 doc-only but its fix is this note — nothing edited; review report staged for 6a. ready-for-merge: stage-disabled.
+
+### Step 7 — finalise — 2026-10-15
+
+- DoD summary: `task.205.dod.1.prd-scoped-epic-numbering.md` — ✅ ACCEPTED. AC 17/17 (AC9 re-measured on `82762a2b`: 0.172–0.179 s against a 1 s bound; AC11 resolved by the CI re-run), Security PASS (3 fenced controls, 34 executed, 0 reproduced; record `task.205.dod.1.security.run.json`), Compliance N/A, Docs PASS.
+- CI reading 1: SUCCESS @ 82762a2b17f5 (5 checks). The `test` job attempt 1 failed 1/6142 (`resolve-pr-number.test.mjs` "explicit: --pr wins": ENOENT copying a shared `/tmp/executed-prose-*/origin.git` fixture template — a fixture race outside this diff; `82762a2b` differs from the green `632d1752` only under `docs/`). Re-ran the failed job; attempt 2 SUCCESS.
+- CI reading 2: SUCCESS (tree-equivalent to 82762a2b17f5) @ 0b437e47f588, over 5 checks, after 30 s.
+- Acceptance commit `0b437e47` (`docs(task.205): accept — DoD, sprint review; registry ticked; 5c review carried`), pushed; 6b assertions passed; registry-tick: ticked. CHANGELOG cites task 205.
+- PR canonical summary comment posted. DoD body posted to PR — comment URL: https://github.com/Gamaroff/agent-skills/pull/674#issuecomment-6194586481
+- Tracker #648: Document link already on a durable branch (unchanged); done comment posted; issue close confirmed CLOSED; board transition: already (Done).
+- Accept gap: tracker-actions journal empty → no tracker debt.
+- DoD security cases: the DoD's own cases file (1.6 MB, fixture copies embedded per case) is committed. The two re-used QA cases files (0.8–1.0 MB each) are kept outside the tree in `.claude/state/`.
+- A DoD section was first inserted between `<!-- change-log-start -->` and `## Change Log`; it was moved above the marker before commit (append-only check ok).
+- Task completed.
 
 ---
 
@@ -241,14 +261,29 @@ _Track each QA review/fix cycle._
 **Fixes Applied**: QA6-1 / BUG-14 — deleted the early closing fence in the Step 5 index template; the retirement test now reads every bash block through `qa-execute-snippets.mjs` `extractBlocks` (Step 2.6 move: consolidate — the test's nesting-blind regex and the engines' fence reader disagreed). Fence probe against the fixed doc: engages 8/8 (not recorded — QA's artifact). Fast gate attempt 1 red — `bundle-missing-source.test.js` load-sensitive budget (20.6 s / 20 s; 7/7 green alone); attempt 2 green (5690/5676/0). Mutation-proven: stray fence restored → Step 7 test red. Step 3.5 probe: population 1 (`create-epics-from-shards/SKILL.md`, updated); all 9 epic skills' fence-reader block counts equal their raw fence counts. Advisory CR-1/CR-2 left (no gate left to read a change to the presence loop).
 **Commit**: `6b33e298`
 
+### QA Cycle 7 — 2026-10-15
+**Gate Result**: PASS
+**Issues Found**: cycle 6 fix verified (BUG-14 closed; all 14 bugs closed); Step 7 guard probed against the committed doc, engages 8/8 (`probes_executed: 8`); 1 low cleanup (test hook style)
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: CONCERNS — `task.205.pr-review.1.prd-scoped-epic-numbering.md` (conformance lens only, `--no-code`; 2 scope findings, anchors verified)
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+**Carried to 6a**: docs/tasks/task.205.prd-scoped-epic-numbering/task.205.pr-review.1.prd-scoped-epic-numbering.md
+**Findings recorded, not fixed**: PC-1 (medium) — `skills/documentation-standards-validator/SKILL.md` is edited outside §7 and half-converted to `epic.{P}.{E}` (its examples mix the two schemes). It is not a docs path, so 5c does not fix it; it goes to the task.207 prose sweep. PC-2 (low) — the onboarding PRD gained a generated epics-index block: it was produced by `generate-prd-epic-index.mjs`'s new domain-level discovery and is kept (no edit at 5c), and is noted here as the review asks.
+
 ---
 
 ## Completion
 
-**Finished**: 2026-10-15T13:22Z
-**Final Status**: Escalated — QA loop limit reached (after a 1-cycle re-entry)
+**Finished**: 2026-10-15T14:33Z
+**Final Status**: Completed
 **Branch**: feature/task.205.prd-scoped-epic-numbering
 **PR**: https://github.com/Gamaroff/agent-skills/pull/674
-**QA Iterations**: 6 (5 + 1 granted; half-cycle declined twice: medium-not-falling)
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 7 (5 budgeted + 2 granted re-entries; final gate 7 PASS 100/100; Step 5c PR review CONCERNS)
+**DoD Summary**: `task.205.dod.1.prd-scoped-epic-numbering.md` — ✅ ACCEPTED
+**Tracker debt**: none
+
+### Completion Summary
+
+Implemented PRD-scoped epic numbering. Every epic skill now names `epic.{P}.{E}` through `doc-id.js` (`next epic`, `epic-meta`), a parent PRD is mandatory, tracker titles read `Epic P.E`, existing GitHub milestones are renamed in place (`tracker-issue --rename-from`, fail-closed), and the global epic registry and `epic-registry-manager` are retired. The QA loop took 7 cycles. Each cycle found the next layer of one defect class: executable skill blocks that read correctly as prose but fail when run as their own shell (unbound inputs, cross-block reads, mixed path roots, guards narrower than what they guard). The loop escalated twice at its budget with one MEDIUM left, and the operator granted one cycle each time. Cycle 6 found that a stray fence, present on develop since May, hid the Step 7 guard from every engine. The fix also moved the retirement test onto the shared fence reader. Gate 7 read PASS 100. Step 5c returned CONCERNS with two scope findings: `documentation-standards-validator/SKILL.md` is half-converted (left for task.207), and the onboarding PRD gained a generated index block. `/finalise` accepted the task (17/17 AC, 34 security probes, 0 reproduced). CI reading 1 needed one re-run of a fixture-race flake outside the diff, and reading 2 was SUCCESS by tree-equivalence. Issue #648 is closed.
