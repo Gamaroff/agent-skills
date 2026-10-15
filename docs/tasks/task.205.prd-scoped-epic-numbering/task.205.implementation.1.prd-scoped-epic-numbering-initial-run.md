@@ -97,6 +97,18 @@ Move every epic skill to PRD-scoped `epic.{P}.{E}` numbering, make a parent PRD 
 - QA Cycle 1 — changes-requested: stage-disabled. Findings ingester not dispatched: the findings were in hand from 5a (independence loss — the same session reviewed and fixed).
 - Post-fix PR state: OPEN (inline `gh pr view`).
 
+### QA Loop Re-entry — 2026-10-15
+
+- QA loop re-entry: 1 extra cycle granted (operator chose "Resume at 5a with 1 more cycle"); 0 cycle(s) run outside the loop back-filled from disk (gates 1–5 on disk, 5 `### QA Cycle` entries).
+- `grant-qa-cycles.sh`: QA_CYCLE=5, extra_cycles_granted=1, qa_max_cycles=6, reenter_at=5a. The lock had survived the escalation HALT (no halt snapshot), so no restore was needed.
+- Cycle 6 gates `575addd8` (bugs 12–13). Traceability mapper not dispatched — consistent with cycles 1–5 (no `.summaries/` matrix); qa-task uses its internal mapping.
+- QA Cycle 6 — gate CONCERNS (80/100), head `a6897af1`. Diff reviewer 158683 ms, 2 low advisories (none promoted). Fence probe of the Step 7 guard declined `entry-not-probeable` (stray fence, BUG-14); scratch run with the fence removed engaged 8/8. Suite 5690/5676/0.
+- QA Cycle 6 — Convergence check: HIGH `1,1,0,2,0,0`, HIGH_6 = 0 → no trip. Route classifier: `continue (not-a-pass-gate)`; route 2 declined `product-defect-signal`.
+- QA Cycle 6 — changes-requested: stage-disabled. Third strike: no HIGH on gate 6 → not applicable.
+- Narrowing residue — every MEDIUM on gates 5 and 6 names skills/create-epics-from-shards/SKILL.md (TASK-205-QA5-CR1, TASK-205-QA6-1); HIGH 0 on both. This is an OFFER to qa-fix Step 2.6, not a route and not an escalation.
+- QA Cycle 6 fix: findings ingester not dispatched — the findings were in hand from 5a (independence loss, as cycles 1–5). Step 2.6 move: consolidate. Commit `6b33e298`, pushed; post-fix PR state OPEN (inline `gh pr view`).
+- Loop limit (6/6): route 2c `continue (medium-not-falling)` — MEDIUM reads 1, 1, 1 over cycles 4–6 → escalate.
+
 ---
 
 ## Issues Log
@@ -132,6 +144,30 @@ Advisory and pre-existing items not fixed (gate 4/5 `recommendations.future`): l
 1. Run one `/qa-task` on `575addd8` to gate the cycle-5 fix (bugs 12–13). If it reads PASS or CONCERNS with no open entry, take option 2 below.
 2. Then run Step 5c (`/review-pr --effort medium --comment --no-code`) and `/finalise`; `/develop-task` resume offers "Resume at 5a with {k} more cycles".
 3. File a follow-up task for the pre-existing issue-body block reads and the per-skill (not per-block) path-root rule in the GitHub epic skills.
+
+### QA Loop Limit Reached — 2026-10-15 (after a 1-cycle re-entry)
+
+The pipeline completed 6 qa-task/qa-fix cycles (5 + 1 granted) without a clean PASS.
+
+**Final gate status**: CONCERNS (gate 6, 80/100, head `a6897af1`). Its one gating finding is fixed in `6b33e298`, but no gate has read that fix.
+**HIGH findings per cycle**: 1, 1, 0, 2, 0, 0 — 0 on the last two gates
+**MEDIUM findings per cycle**: 1, 4, 2, 1, 1, 1
+**Remaining issues** (from gate 6 — fixed in `6b33e298`, ungated):
+- MEDIUM — a stray fence hid Steps 6–7 of create-epics-from-shards, so no engine could reach the Step 7 guard (TASK-205-BUG-14) — `skills/create-epics-from-shards/SKILL.md`
+
+Advisory, not fixed: CR-1, where under zsh `nomatch` a missing `epic.P.E` aborts the presence loop without its message (it still fails closed), and CR-2, where a duplicate P.E still reads "is missing". The carried gate 4/5 `recommendations.future` items are unchanged.
+
+**What was attempted per cycle**:
+- Cycles 1–5: see the first escalation entry above.
+- Cycle 6 (granted): verified cycle 5's fixes (bugs 12–13 closed, both mutation-proven). Found BUG-14 when the boundary probe declined `entry-not-probeable`. Fixed in `6b33e298` by deleting the fence. The test now uses the shared fence reader, so it can no longer pass on a block the engines cannot see.
+- Gate-the-last-fix half-cycle: **declined** — `medium-not-falling` (MEDIUM reads 1, 1, 1 over cycles 4–6).
+
+**Likely root cause**: the loop is converging, but each gate finds exactly one MEDIUM, so the MEDIUM count stays flat and route 2c never fires. BUG-14 is a different kind of defect from cycles 1–5: a pre-existing document-structure fault, found by the probe rather than the reviewer. Like cycle 5's finding, it is a one-site fix in one file. No HIGH has been raised for two gates.
+
+**Recommended next steps**:
+1. Grant one more cycle (`/develop-task` resume → "Resume at 5a with 1 more cycle") to gate `6b33e298`. If it reads PASS, or CONCERNS with no open entry, it hands to 5c and finalise.
+2. Or accept gate 6: run Step 5c (`/review-pr --effort medium --comment --no-code`), then `/finalise`. Finalise's security probe of the Step 7 guard should now engage, because the fence is fixed.
+3. File the follow-up named in the first entry, plus a repository-wide guard that every SKILL.md fence closes where it opens.
 
 ---
 
@@ -194,14 +230,25 @@ _Track each QA review/fix cycle._
 **Fixes Applied**: BUG-12 — presence loop requires exactly one `epic.P.E.{slug}/epic.P.E.{slug}.md` (the shape the id check reads); BUG-13 — id-check output printed on failure; CR-2 advisory — create-epic card-preflight from the repository root. Fast gate green first attempt (5676/0). Mutation-proven: CR-1, CR-4.
 **Commit**: `575addd8`
 
+### QA Cycle 6 — 2026-10-15
+**Gate Result**: CONCERNS
+**Issues Found**: cycle 5 fixes verified (bugs 12–13 closed, both mutation-proven). New: QA6-1 MEDIUM — a stray four-backtick fence at create-epics-from-shards SKILL.md:334 (pre-existing on develop) hides Steps 6–7, so the fence probe cannot reach the Step 7 guard this task added (probes_executed 0; BUG-14); advisory CR-1 (zsh nomatch message), cleanup CR-2 (duplicate-P.E message)
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Escalating — loop limit reached
+**Fixes Applied**: QA6-1 / BUG-14 — deleted the early closing fence in the Step 5 index template; the retirement test now reads every bash block through `qa-execute-snippets.mjs` `extractBlocks` (Step 2.6 move: consolidate — the test's nesting-blind regex and the engines' fence reader disagreed). Fence probe against the fixed doc: engages 8/8 (not recorded — QA's artifact). Fast gate attempt 1 red — `bundle-missing-source.test.js` load-sensitive budget (20.6 s / 20 s; 7/7 green alone); attempt 2 green (5690/5676/0). Mutation-proven: stray fence restored → Step 7 test red. Step 3.5 probe: population 1 (`create-epics-from-shards/SKILL.md`, updated); all 9 epic skills' fence-reader block counts equal their raw fence counts. Advisory CR-1/CR-2 left (no gate left to read a change to the presence loop).
+**Commit**: `6b33e298`
+
 ---
 
 ## Completion
 
-**Finished**: 2026-10-15T12:11Z
-**Final Status**: Escalated — QA loop limit reached
+**Finished**: 2026-10-15T13:22Z
+**Final Status**: Escalated — QA loop limit reached (after a 1-cycle re-entry)
 **Branch**: feature/task.205.prd-scoped-epic-numbering
 **PR**: https://github.com/Gamaroff/agent-skills/pull/674
-**QA Iterations**: 5 (half-cycle declined: medium-not-falling)
+**QA Iterations**: 6 (5 + 1 granted; half-cycle declined twice: medium-not-falling)
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
