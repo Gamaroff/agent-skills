@@ -22,6 +22,18 @@ fail() { echo "  FAIL  $1"; echo "        $2"; FAIL=$((FAIL + 1)); }
 
 T=$(mktemp -d)
 trap 'rm -rf "$T"' EXIT
+# A call to an undefined command — a helper used above its definition, a typo — prints "command not
+# found" and returns 127, which no assertion reads: the case is silently skipped and the suite still
+# reports 0 failed (observed while adding the observation #44 cases). bash runs this hook in a
+# subshell, so it records the miss in a file and the summary below counts it as a failure. It covers
+# this shell only; a script under test does not inherit the function. The hook needs bash 4+: under
+# macOS /bin/bash 3.2 it is never called, so the guard is off there (CI runs bash 5).
+UNDEFINED="$T/undefined-commands"
+command_not_found_handle() {
+  printf '%s\n' "$1" >> "$UNDEFINED"
+  echo "  FAIL  undefined command: $1" >&2
+  return 127
+}
 DOC=docs/tasks/task.42.example
 
 # mkrepo NAME [GATE_HEAD_MODE] — a repo with one code commit, a gate whose head is that commit,
@@ -431,5 +443,9 @@ else
 fi
 
 echo ""
+if [ -s "$UNDEFINED" ]; then
+  MISSES=$(wc -l < "$UNDEFINED" | tr -d ' ')
+  fail "every command this suite calls is defined" "$MISSES call(s) to an undefined command: $(sort -u "$UNDEFINED" | tr '\n' ' ')"
+fi
 echo "Results: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
