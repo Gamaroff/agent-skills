@@ -94,8 +94,12 @@ const HISTORY_PREFIXES = Object.freeze([
 const HISTORY_FILES = Object.freeze(["CHANGELOG.md"]);
 // A test file holds fixtures, which move with the parser change in task 206 — except
 // this one, whose KNOWN_ARTIFACT_* keys are live repo paths the ratchet looks up.
+// Spelled as segments: a shared-resources path literal inside a shared script is a bundling
+// instruction, and this one is a repo path the run compares against, not a dependency —
+// as a literal it vendored the test and its whole closure into every skill that bundles
+// this script (task 204).
 const TEST_FILE_EXCEPTIONS = Object.freeze([
-  "shared/resources/tests/doc-links.test.mjs",
+  ["shared", "resources", "tests", "doc-links.test.mjs"].join("/"),
 ]);
 const LITERAL_EXTS = Object.freeze([
   ".md",
