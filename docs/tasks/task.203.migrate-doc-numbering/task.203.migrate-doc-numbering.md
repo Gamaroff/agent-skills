@@ -670,19 +670,19 @@ the second-run no-op guarantee no longer describes the tree.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.203.qa.3.migrate-doc-numbering.md](./task.203.qa.3.migrate-doc-numbering.md)
-- **Gate File**: [task.203.gate.3.migrate-doc-numbering.yml](./task.203.gate.3.migrate-doc-numbering.yml)
+- **Full Report**: [task.203.qa.4.migrate-doc-numbering.md](./task.203.qa.4.migrate-doc-numbering.md)
+- **Gate File**: [task.203.gate.4.migrate-doc-numbering.yml](./task.203.gate.4.migrate-doc-numbering.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 44 engine tests, `ci:fast` 5648, plus a probe with 11 cases
+- **Tests Executed**: `doc-links` 24/24; `ci:fast` 5551 pass on the scratch worktree (3 environmental file failures that pass 83/83 in the main tree)
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- All six bugs are closed.
-- There are no open findings.
-- Reliability is CONCERNS because of two advisory edge cases: the revert of untracked moved-and-rewritten files, and the directories a part-way failure leaves behind. Neither can occur in this repository.
+- Cycle 4 re-entered QA after the finalise DoD gaps. Both gaps are fixed: 10 pre-existing dead links were repointed, and the CHANGELOG has a task 203 entry.
+- One low cleanup is advisory: the CHANGELOG blocker list names 8 of the 12 blocker codes.
+- Reliability CONCERNS is carried from gate 3, because the engine is unchanged.
 
 ## Definition of Done - Gaps Identified
 
@@ -728,6 +728,7 @@ Both fixes touch only documentation, so `/finalise` re-runs directly with no QA 
 | 2026-10-15 |  | QA findings fixed — bug 2 (revert scoped to a touch record, dirty-path widened), bug 5 (id-collision), bug 6 (apply wrapped), plus CR-4–CR-7; 7 tests added, 2 iterations | qa-fix |
 | 2026-10-15 |  | QA gate CONCERNS (90/100) — 0 open findings; 2 advisory reliability edge cases | qa-task |
 | 2026-10-15 |  | DoD incomplete — 2 gaps identified (CI link-check, CHANGELOG) | finalise |
+| 2026-10-15 |  | QA gate CONCERNS (90/100) — 0 open findings; 1 low cleanup (cycle 4, after finalise re-entry) | qa-task |
 
 ---
 <!-- change-log-end -->
