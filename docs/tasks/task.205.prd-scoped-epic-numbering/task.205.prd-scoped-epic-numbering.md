@@ -356,7 +356,7 @@ run `npm run bundle` at the end of every phase that touches a shared source.
 **Files**: `shared/resources/tracker-issue.js` (+ test), `skills/ensure-epic-github-issue/SKILL.md`, `skills/sync-github-epic/SKILL.md`, `skills/ensure-task-github-issue/SKILL.md`, `skills/sync-github-task/SKILL.md`, `skills/review-task/SKILL.md`, `skills/create-task/SKILL.md`.
 - [x] `tracker-issue.js --kind milestone --title <new> --rename-from <old>`: rename when `<old>` exists and `<new>` does not; `already` when `<new>` exists; deferred under a deferring access mode like every other kind
 - [x] `ensure-epic-github-issue` / `sync-github-epic`: `EPIC_ID` from `doc-id parse` (`P.E`); title `[Epic P.E]`; milestone `Epic P.E — {title}`; sentinel branches removed
-- [x] `sync-github-epic` update path: when the issue's current milestone differs from the target title, rename it with `--rename-from`, never create-and-move
+- [x] `sync-github-epic` update path: when the issue's current milestone is the epic's own (`Epic {P.E} — …`, or `Epic {any id} — {title}`) and differs from the target title, rename it with `--rename-from`, never create-and-move; any other milestone is never renamed (QA cycle 1, CR-1)
 - [x] Task milestone lookup step 2: resolve the task's `epic:` value (`P.E` or an epic directory stem) through `doc-id` to the epic file and use `Epic P.E — {epic title}`; no registry read. Restatements in `sync-github-task`, `review-task`, `create-task` point at the one step
 
 ### Phase 6: Retire the registry and the skill; close-out (Low)
@@ -468,7 +468,7 @@ blocks are written as fenced `bash` blocks that `tests/epic-numbering-retirement
 
 - `review-epic` input resolution: `1.3` → exactly one file; `3` → non-zero exit and the `P.E` hint; a name → the name search.
 - `create-epic` Discover Parent PRD: a domain with no PRD → non-zero exit with the `/create-prd` message; a domain with `prd.1.x/` → `P=1` and `E` from `next epic --prd-dir`.
-- `sync-github-epic` update path: the block passes `--rename-from "<current milestone title>"` to `tracker-issue.js --kind milestone` (asserted on the extracted block's text, since running it needs `gh`; the rename behaviour itself is held by `tracker-issue.test.mjs`).
+- `sync-github-epic` update path: the block passes `--rename-from "<current milestone title>"` to `tracker-issue.js --kind milestone` only for the epic's own milestone — run with a recording `node` stand-in on `PATH` over own, foreign and shared milestones (the rename itself is held by `tracker-issue.test.mjs`).
 
 ### Mutation proof
 
@@ -573,6 +573,29 @@ Not applicable — no hot path changes; the generator's walk gains one directory
 
 ---
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-15
+**Quality Score**: 70/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.205.qa.1.prd-scoped-epic-numbering.md](./task.205.qa.1.prd-scoped-epic-numbering.md)
+- **Gate File**: [task.205.gate.1.prd-scoped-epic-numbering.yml](./task.205.gate.1.prd-scoped-epic-numbering.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 5677 (5663 pass, 0 fail, 14 skipped)
+- **Phases Verified**: 7/7
+- **Critical Issues**: 1
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+- HIGH: `sync-github-epic` renames whatever milestone the epic issue is on, a shared one included ([TASK-205-BUG-1](./task.205.bug.1.milestone-rename-hijacks-shared-milestone.md)).
+- MEDIUM: the task milestone lookup ignores a configured PRD root ([TASK-205-BUG-2](./task.205.bug.2.task-milestone-lookup-ignores-prd-root.md)).
+- LOW: `stripIdPrefix("story", …)` no longer strips dash and sub-story title forms.
+
 ## Change Log
 
 | Date | Version | Description | Author |
@@ -581,6 +604,8 @@ Not applicable — no hot path changes; the generator's walk gains one directory
 | 2026-10-15 | 1.1 | Review passed (8/10) — allocator flag corrected to `--prd-dir`; ESM-safe `doc-id.cjs` vendoring; interim notices, tests to update, guard allowlist and executable-block tests added | review-task |
 | 2026-10-15 |  | Status → ready-for-development | review-task |
 | 2026-10-15 |  | Implemented — 44 files changed vs develop (bundled copies excluded), `epic-registry-manager` removed; new or changed tests in 7 suites (doc-id helpers, generator, both Jira scripts, `--rename-from`, migration pointer, retirement guard with 5 executed skill blocks) | develop |
+| 2026-10-15 |  | QA gate FAIL (70/100) — 3 gating findings (1 high, 1 medium, 1 low) | qa-task |
+| 2026-10-15 |  | QA findings fixed — cycle 1, 7 findings (3 gating + 4 advisory), 4 mutation-proven | qa-fix |
 
 ---
 

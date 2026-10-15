@@ -904,6 +904,21 @@ test("labelForChildStory — an already-prefixed title is not repeated", () => {
   );
 });
 
+test("labelForChildStory — a dash-separated or sub-story prefix is not repeated (QA cycle 1, CR-6)", () => {
+  const epicFile = makeEpicDir({
+    "story.1.2.1.alpha": {
+      "story.1.2.1.alpha.md": "# Story 1.2.1 — Alpha thing",
+    },
+    "story.1.2.3A.beta": {
+      "story.1.2.3A.beta.md": "# [Story 1.2.3A] Beta thing",
+    },
+  });
+  assert.deepEqual(
+    lib.findChildStories(epicFile).map((s) => s.label),
+    ["Story 1.2.1 — Alpha thing", "Story 1.2.3A — Beta thing"],
+  );
+});
+
 test("labelForChildStory — an untitled card still gets a numbered label", () => {
   const epicFile = makeEpicDir({
     "story.1.2.1.alpha": { "story.1.2.1.alpha.md": "no heading here" },

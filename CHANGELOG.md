@@ -48,8 +48,8 @@ All notable changes to this project will be documented in this file. Format foll
      and the milestone becomes `Epic 1.3 — Foo`. Both Jira scripts build the summary with one shared
      helper, `doc-id.js` `epicSummary`. When the frontmatter numbers are missing, the summary is the
      bare title; it never guesses an id from the title. `sync-github-epic` renames the epic's
-     current milestone in place through the new `tracker-issue.js --kind milestone --rename-from`,
-     so stories already on it stay grouped. No manual step: an epic converges on its next sync.
+     own milestone in place through the new `tracker-issue.js --kind milestone --rename-from`, so
+     stories already on it stay grouped; a sprint or other shared milestone is never renamed. No manual step: an epic converges on its next sync.
   4. **`epic-registry-manager` is removed.** Delete `.agents/skills/epic-registry-manager/` in each
      consumer, because the installer does not prune. `create-epic` covers what it did.
      `setup-consumer.sh` no longer creates `docs/development/epic-registry.md`. A task's `epic:`

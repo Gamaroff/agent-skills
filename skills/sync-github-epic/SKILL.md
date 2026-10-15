@@ -86,12 +86,20 @@ converge and prevents a double prefix like `[Epic 1.3] Epic 3: …`. Run from th
 
 ```bash
 # sync-github-epic — epic id and bare title (task 205)
-# INPUTS: EPIC_FILE_PATH; TITLE — the frontmatter `title` value.
+# INPUTS: EPIC_FILE_PATH — the epic document. The title is read from its own frontmatter here, in
+# this block: a value bound in another block does not exist in this shell.
 DOC_ID=.agents/skills/sync-github-epic/references/doc-id.js
+: "${EPIC_FILE_PATH:?bind EPIC_FILE_PATH to the epic document}"
+[ -f "$EPIC_FILE_PATH" ] || { echo "❌ ${EPIC_FILE_PATH} is not a file"; exit 1; }
 EPIC_STEM=$(basename "$EPIC_FILE_PATH" .md)
 EPIC_ID=$(command node "$DOC_ID" parse "$EPIC_STEM" --json | jq -r 'select(.kind == "epic" and .artifact == null) | "\(.prd).\(.epic)"')
 [ -n "$EPIC_ID" ] || { echo "❌ ${EPIC_STEM} is not an epic.{P}.{E} file — run /review-epic"; exit 1; }
-EPIC_TITLE=$(command node -e 'console.log(require(process.argv[1]).stripIdPrefix("epic", process.argv[2]))' "$PWD/$DOC_ID" "$TITLE")
+EPIC_TITLE=$(command node -e '
+  const d = require(process.argv[1]);
+  const src = require("fs").readFileSync(process.argv[2], "utf8");
+  console.log(d.stripIdPrefix("epic", d.frontmatterField(src, "title")));
+' "$PWD/$DOC_ID" "$EPIC_FILE_PATH")
+[ -n "$EPIC_TITLE" ] || { echo "❌ ${EPIC_FILE_PATH} has no frontmatter title"; exit 1; }
 MILESTONE_TITLE="Epic ${EPIC_ID} — ${EPIC_TITLE}"
 ```
 
@@ -167,20 +175,38 @@ gh issue view ${ISSUE_NUM} --json state,title,labels,body,milestone > /tmp/issue
 
 Diff `title`, `body`, `labels`, `milestone` against current GitHub state. The body is rebuilt to the **same shape** `ensure-epic-github-issue` emits on create — Summary, Metadata (`Status`, `Priority`), and a `## Document` link block (using `DOC_URL` above, plus the `📋 [Parent PRD](…)` line from `${PRD_LINE}` when `prd_source` resolves) — so create→update is diff-stable. That shape and its caps are specified once, in [`references/tracker-card-summary.md`](./references/tracker-card-summary.md); follow it there rather than restating it here. Re-syncing from a feature branch refreshes the link to that branch (it changes the body, so the diff is non-empty and the edit runs). At acceptance, `finalise` re-points the link to the durable integration branch so the closed issue doesn't link to a deleted feature branch.
 
-If anything changed, first resolve the milestone the edit attaches. **It is renamed in place, never
-created beside the old one**: when the issue's current milestone title differs from
-`MILESTONE_TITLE` (the epic was retitled, or its id moved from `Epic 3` to `Epic 1.3`), creating the
-new title would move only this issue onto it and strand every story still grouped on the old one.
-`--rename-from` renames the old milestone when the new title does not exist yet, so its issues move
-with it:
+If anything changed, first resolve the milestone the edit attaches. **The epic's own milestone is
+renamed in place, never created beside the old one**: when the epic was retitled, or its id moved
+from `Epic 3` to `Epic 1.3`, creating the new title would move only this issue onto it and strand
+every story still grouped on the old one. `--rename-from` renames the old milestone when the new
+title does not exist yet, so its issues move with it.
+
+**Only the epic's own milestone is renamed.** A current milestone counts as the epic's own when it
+is `Epic {EPIC_ID} — …` (the epic was retitled) or `Epic {any id} — {EPIC_TITLE}` (its id moved).
+Any other milestone — a sprint, a release, one shared with other work — is never renamed: the block
+resolves or creates the epic's milestone as usual and the edit below moves only this issue onto it.
 
 ```bash
 # sync-github-epic — resolve the epic's milestone, renaming in place (task 205)
-# INPUTS: ISSUE_NUM and MILESTONE_TITLE (Step 3); the issue JSON written by the view above.
-CURRENT_MILESTONE=$(jq -r '.milestone.title // empty' "/tmp/issue-${ISSUE_NUM}.json")
+# INPUTS, re-bound in this block (each fenced block is its own shell): ISSUE_NUM (frontmatter
+# github_issue), and EPIC_ID, EPIC_TITLE and MILESTONE_TITLE from Step 3's id block.
+: "${ISSUE_NUM:?bind ISSUE_NUM to the epic issue number}" "${EPIC_ID:?bind EPIC_ID from the Step 3 id block}"
+: "${EPIC_TITLE:?bind EPIC_TITLE from the Step 3 id block}" "${MILESTONE_TITLE:?bind MILESTONE_TITLE from the Step 3 id block}"
+ISSUE_JSON="/tmp/issue-${ISSUE_NUM}.json"
+[ -s "$ISSUE_JSON" ] || { echo "❌ ${ISSUE_JSON} is missing — run the issue view above first"; exit 1; }
+CURRENT_MILESTONE=$(jq -r '.milestone.title // empty' "$ISSUE_JSON")
 RENAME_ARGS=()
 if [ -n "$CURRENT_MILESTONE" ] && [ "$CURRENT_MILESTONE" != "$MILESTONE_TITLE" ]; then
-  RENAME_ARGS=(--rename-from "$CURRENT_MILESTONE")
+  # Rename only the epic's OWN milestone: its id with any title, or any id with its title.
+  # A sprint or shared milestone is left alone (QA cycle 1, CR-1).
+  OWN_ID_PREFIX="Epic ${EPIC_ID} — "
+  OWN_TITLE_SUFFIX=" — ${EPIC_TITLE}"
+  case "$CURRENT_MILESTONE" in
+    "$OWN_ID_PREFIX"*) RENAME_ARGS=(--rename-from "$CURRENT_MILESTONE") ;;
+    Epic\ [0-9]*"$OWN_TITLE_SUFFIX")
+      OLD_ID=${CURRENT_MILESTONE#Epic }; OLD_ID=${OLD_ID%"$OWN_TITLE_SUFFIX"}
+      case "$OLD_ID" in *[!0-9.]*|'') ;; *) RENAME_ARGS=(--rename-from "$CURRENT_MILESTONE") ;; esac ;;
+  esac
 fi
 node references/tracker-issue.js \
   --kind milestone --title "${MILESTONE_TITLE}" "${RENAME_ARGS[@]}" --quiet 2>/dev/null || true

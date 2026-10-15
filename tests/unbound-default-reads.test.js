@@ -52,6 +52,14 @@ const INPUTS = new Map([
     "input of the Discover Parent PRD block (the epic's domain directory); the `:?` is the loud-failure guard",
   ],
   [
+    "skills/ensure-epic-github-issue/SKILL.md#EPIC_FILE_PATH",
+    "input of the epic id block (the sub-routine's argument); the `:?` is the loud-failure guard",
+  ],
+  [
+    "skills/sync-github-epic/SKILL.md#EPIC_FILE_PATH",
+    "input of the epic id block (the skill's argument); the `:?` is the loud-failure guard",
+  ],
+  [
     "skills/review-epic/SKILL.md#INPUT",
     "input of the Input Resolution block (the skill argument); the `:?` is the loud-failure guard",
   ],

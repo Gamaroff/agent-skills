@@ -1175,3 +1175,19 @@ test("epicSummary: [Epic P.E], frontmatter pair wins, idempotent, never guesses"
   assert.equal(d.epicSummary("Foo", { prd: 0, epic: 3 }), "Foo");
   assert.equal(d.epicSummary("Foo"), "Foo");
 });
+
+test("stripIdPrefix: dash separators and sub-story ids (QA cycle 1, CR-6)", () => {
+  assert.equal(d.stripIdPrefix("story", "Story 1.2.1 — Tap"), "Tap");
+  assert.equal(d.stripIdPrefix("story", "Story 1.2.1 – Tap"), "Tap");
+  assert.equal(d.stripIdPrefix("story", "Story 1.2.1 - Tap"), "Tap");
+  assert.equal(d.stripIdPrefix("story", "[Story 1.2.3A] Tap"), "Tap");
+  assert.equal(d.stripIdPrefix("story", "[Story 1.2.1] — Tap"), "Tap");
+  assert.equal(d.stripIdPrefix("epic", "Epic 1.3 — Foo"), "Foo");
+  // Not an id prefix: left alone.
+  assert.equal(d.stripIdPrefix("epic", "Epic 3 Foo"), "Epic 3 Foo");
+  assert.equal(
+    d.stripIdPrefix("epic", "Epic-driven design"),
+    "Epic-driven design",
+  );
+  assert.equal(d.stripIdPrefix("epic", "Foo — bar"), "Foo — bar");
+});

@@ -373,10 +373,13 @@ const TITLE_WORD = Object.freeze({ epic: "Epic", story: "Story" });
 
 /**
  * Drop a leading id prefix from a tracker title: `[Epic 3] `, `[Epic 1.3] `,
- * `Epic 3: ` or `Epic 1.3: ` (case-insensitive; `Story` for a story). The legacy
- * one-number form is accepted on input so an old title converges on the next
- * sync. This is the ONE title-prefix rule: the epic-index generator and both Jira
- * epic scripts call it rather than carrying a regex of their own (task 205).
+ * `Epic 3: `, `Epic 1.3 — ` (case-insensitive; `Story` for a story, whose id may
+ * carry a sub-story letter: `[Story 1.2.3A] `). The separator after an unbracketed
+ * id is a colon, an en or em dash, or a hyphen; a bracketed id may be followed by
+ * one too. The legacy one-number form is accepted on input so an old title
+ * converges on the next sync. This is the ONE title-prefix rule: the epic-index
+ * generator and both Jira epic scripts call it rather than carrying a regex of
+ * their own (task 205).
  */
 function stripIdPrefix(kind, title) {
   const word = TITLE_WORD[kind];
@@ -385,10 +388,14 @@ function stripIdPrefix(kind, title) {
       `stripIdPrefix(kind, title): kind must be one of ${Object.keys(TITLE_WORD).join(", ")}`,
     );
   }
-  const id = String.raw`\d+(?:\.\d+)*`;
+  const id = String.raw`\d+(?:\.\d+)*[A-Z]?`;
+  const sep = String.raw`[:\u2013\u2014-]`;
   return String(title ?? "")
-    .replace(new RegExp(String.raw`^\s*\[${word}\s+${id}\]\s*`, "i"), "")
-    .replace(new RegExp(String.raw`^\s*${word}\s+${id}\s*:\s*`, "i"), "")
+    .replace(
+      new RegExp(String.raw`^\s*\[${word}\s+${id}\]\s*(?:${sep}\s*)?`, "i"),
+      "",
+    )
+    .replace(new RegExp(String.raw`^\s*${word}\s+${id}\s*${sep}\s*`, "i"), "")
     .trim();
 }
 

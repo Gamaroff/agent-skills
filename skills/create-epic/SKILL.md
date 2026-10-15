@@ -410,7 +410,11 @@ After generating the epic file, check its id first — **blocking**, because thi
 name, so a disagreement is this skill's defect, not the author's:
 
 ```bash
-EPIC_FILE="${PRD_DIR}/epics/epic.${P}.${E}.[name]/epic.${P}.${E}.[name].md"
+# INPUTS, re-bound in this block from the Discover Parent PRD block's output line (each fenced
+# block is its own shell): PRD_ROOT, PRD_DIR, P, E — and {name}, the epic's slug, substituted.
+: "${PRD_ROOT:?bind PRD_ROOT (references/resolve-paths.sh)}" "${PRD_DIR:?bind PRD_DIR from Discover Parent PRD}"
+: "${P:?bind P from Discover Parent PRD}" "${E:?bind E from Discover Parent PRD}"
+EPIC_FILE="${PRD_DIR}/epics/epic.${P}.${E}.{name}/epic.${P}.${E}.{name}.md"
 command node .agents/skills/create-epic/references/doc-id.js check "$EPIC_FILE" --prd-root "${PRD_ROOT}" --json \
   || { echo "❌ doc-id check failed on ${EPIC_FILE} — fix the name or frontmatter before continuing"; exit 1; }
 ```

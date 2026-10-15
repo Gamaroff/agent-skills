@@ -313,20 +313,25 @@ test("create-epic block: no PRD halts naming /create-prd; one PRD allocates P an
   }
 });
 
-test("ensure-epic-github-issue / sync-github-epic id blocks: [Epic P.E] title and milestone", () => {
+test("ensure-epic-github-issue / sync-github-epic id blocks: [Epic P.E] title and milestone, title read in-block", () => {
+  const EPIC = "docs/prd/d/prd.1.x/epics/epic.1.3.foo/epic.1.3.foo.md";
+  const fm = (title) =>
+    `---\nprd_number: 1\nepic_number: 3\n${title === null ? "" : `title: "${title}"\n`}---\n`;
   for (const skill of ["ensure-epic-github-issue", "sync-github-epic"]) {
     const block = blockBy(skill, `# ${skill} — epic id and bare title`);
-    const dir = fixture({}, [skill]);
-    try {
-      for (const title of ["Epic 3: Foo", "[Epic 1.3] Foo", "Foo"]) {
+    for (const title of [
+      "Epic 3: Foo",
+      "[Epic 1.3] Foo",
+      "Foo",
+      "Epic 1.3 — Foo",
+    ]) {
+      const dir = fixture({ [EPIC]: fm(title) }, [skill]);
+      try {
+        // No TITLE from outside: the block reads it from the file (QA cycle 1, CR-2/CR-3).
         const r = runBlock(
           block,
           dir,
-          {
-            EPIC_FILE_PATH:
-              "docs/prd/d/prd.1.x/epics/epic.1.3.foo/epic.1.3.foo.md",
-            TITLE: title,
-          },
+          { EPIC_FILE_PATH: EPIC, TITLE: "" },
           'printf "ID=%s|MS=%s\\n" "$EPIC_ID" "$MILESTONE_TITLE"',
         );
         assert.equal(r.code, 0, r.out);
@@ -335,19 +340,28 @@ test("ensure-epic-github-issue / sync-github-epic id blocks: [Epic P.E] title an
           /ID=1\.3\|MS=Epic 1\.3 — Foo/,
           `${skill} / ${title}`,
         );
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
       }
-      const bad = runBlock(block, dir, {
+    }
+    const untitled = fixture({ [EPIC]: fm(null) }, [skill]);
+    try {
+      const r = runBlock(block, untitled, { EPIC_FILE_PATH: EPIC });
+      assert.equal(r.code, 1, r.out);
+      assert.match(r.out, /has no frontmatter title/);
+      const missing = runBlock(block, untitled, {
         EPIC_FILE_PATH: "x/epic.3.foo.md",
-        TITLE: "Foo",
       });
-      assert.equal(bad.code, 1, bad.out);
+      assert.equal(missing.code, 1, missing.out);
+      const unbound = runBlock(block, untitled, { EPIC_FILE_PATH: "" });
+      assert.notEqual(unbound.code, 0, unbound.out);
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(untitled, { recursive: true, force: true });
     }
   }
 });
 
-test("sync-github-epic milestone block: a changed title renames in place with --rename-from", () => {
+test("sync-github-epic milestone block: renames only the epic's own milestone (CR-1)", () => {
   const block = blockBy(
     "sync-github-epic",
     "# sync-github-epic — resolve the epic's milestone",
@@ -363,47 +377,72 @@ test("sync-github-epic milestone block: a changed title renames in place with --
   );
   const issue = `205${process.pid}`;
   const issueJson = path.join(os.tmpdir(), `issue-${issue}.json`);
-  const argvOf = () =>
-    fs.readFileSync(path.join(dir, "argv.txt"), "utf8").split("\n");
-  try {
+  const env = {
+    ...process.env,
+    ISSUE_NUM: issue,
+    EPIC_ID: "1.3",
+    EPIC_TITLE: "Foo",
+    MILESTONE_TITLE: "Epic 1.3 — Foo",
+    PATH: `${stub}:${process.env.PATH}`,
+  };
+  const renameFrom = (current) => {
     fs.writeFileSync(
       issueJson,
-      JSON.stringify({ milestone: { title: "Epic 3 — Foo" } }),
+      JSON.stringify({ milestone: current ? { title: current } : null }),
     );
-    const env = {
-      ISSUE_NUM: issue,
-      MILESTONE_TITLE: "Epic 1.3 — Foo",
-      PATH: `${stub}:${process.env.PATH}`,
-    };
-    let r = spawnSync("bash", ["-c", block], {
+    fs.rmSync(path.join(dir, "argv.txt"), { force: true });
+    const r = spawnSync("bash", ["-c", block], {
       cwd: dir,
       encoding: "utf8",
-      env: { ...process.env, ...env },
+      env,
     });
     assert.equal(r.status, 0, r.stderr);
-    let argv = argvOf();
-    assert.ok(argv.includes("--rename-from"), argv.join(" "));
-    assert.equal(argv[argv.indexOf("--rename-from") + 1], "Epic 3 — Foo");
+    const argv = fs
+      .readFileSync(path.join(dir, "argv.txt"), "utf8")
+      .split("\n");
     assert.equal(argv[argv.indexOf("--title") + 1], "Epic 1.3 — Foo");
-
-    // Same title → no rename asked for.
-    fs.writeFileSync(
-      issueJson,
-      JSON.stringify({ milestone: { title: "Epic 1.3 — Foo" } }),
-    );
-    r = spawnSync("bash", ["-c", block], {
+    return argv.includes("--rename-from")
+      ? argv[argv.indexOf("--rename-from") + 1]
+      : null;
+  };
+  try {
+    // The epic's own milestone — id moved (any old number) or retitled — is renamed in place.
+    assert.equal(renameFrom("Epic 3 — Foo"), "Epic 3 — Foo");
+    assert.equal(renameFrom("Epic 163 — Foo"), "Epic 163 — Foo");
+    assert.equal(renameFrom("Epic 1.3 — Old title"), "Epic 1.3 — Old title");
+    // Anything else is never renamed: a sprint, another epic's, a shared one.
+    assert.equal(renameFrom("Sprint 12"), null);
+    assert.equal(renameFrom("Epic 9 — Other"), null);
+    assert.equal(renameFrom("Epic 1.30 — Bar"), null);
+    assert.equal(renameFrom("Release — Foo"), null);
+    assert.equal(renameFrom("Epic 9x — Foo"), null);
+    // Already right, or no milestone: nothing to rename.
+    assert.equal(renameFrom("Epic 1.3 — Foo"), null);
+    assert.equal(renameFrom(null), null);
+    // An unbound input fails loudly instead of skipping the rename (CR-5).
+    const r = spawnSync("bash", ["-c", block], {
       cwd: dir,
       encoding: "utf8",
-      env: { ...process.env, ...env },
+      env: { ...env, ISSUE_NUM: "" },
     });
-    assert.equal(r.status, 0, r.stderr);
-    argv = argvOf();
-    assert.ok(!argv.includes("--rename-from"), argv.join(" "));
+    assert.notEqual(r.status, 0);
   } finally {
     fs.rmSync(issueJson, { force: true });
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+/** Bundle the path resolver (and the config reader it sources) where a skill block expects it. */
+function withResolvePaths(dir, skill) {
+  const ref = path.join(dir, ".agents", "skills", skill, "references");
+  fs.mkdirSync(ref, { recursive: true });
+  for (const f of ["resolve-paths.sh", "read-config.sh"]) {
+    fs.copyFileSync(
+      path.join(ROOT, "shared", "resources", f),
+      path.join(ref, f),
+    );
+  }
+}
 
 test("ensure-task-github-issue block: a task's epic: resolves through doc-id, not a registry", () => {
   const block = blockBy(
@@ -427,24 +466,49 @@ test("ensure-task-github-issue block: a task's epic: resolves through doc-id, no
     },
     ["ensure-task-github-issue"],
   );
+  withResolvePaths(dir, "ensure-task-github-issue");
+  const ms = 'printf "MS=%s\\n" "$MILESTONE_TITLE"';
   try {
     for (const ref of ["1.3", "epic.1.3.foo"]) {
-      const r = runBlock(
-        block,
-        dir,
-        { EPIC_REF: ref },
-        'printf "MS=%s\\n" "$MILESTONE_TITLE"',
-      );
+      const r = runBlock(block, dir, { EPIC_REF: ref }, ms);
       assert.equal(r.code, 0, r.out);
       assert.match(r.out, /MS=Epic 1\.3 — Foo/, ref);
     }
-    const none = runBlock(
+    const none = runBlock(block, dir, { EPIC_REF: "9.9" }, ms);
+    assert.match(none.out, /MS=Technical Tasks \(standalone\)/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("ensure-task-github-issue block: a configured PRD root is honoured (CR-4)", () => {
+  const block = blockBy(
+    "ensure-task-github-issue",
+    "# ensure-task-github-issue — task milestone from its epic",
+  );
+  const dir = fixture(
+    {
+      "skills-config.yaml": "prd:\n  prdShardedLocation: specs/prd\n",
+      "specs/prd/d/prd.1.x/epics/epic.1.3.foo/epic.1.3.foo.md": epicFile(
+        1,
+        3,
+        "foo",
+        "Foo",
+      ),
+    },
+    ["ensure-task-github-issue"],
+  );
+  withResolvePaths(dir, "ensure-task-github-issue");
+  try {
+    // PRD_ROOT from the environment must not decide: the block resolves it from the config.
+    const r = runBlock(
       block,
       dir,
-      { EPIC_REF: "9.9" },
+      { EPIC_REF: "1.3", PRD_ROOT: "docs/prd" },
       'printf "MS=%s\\n" "$MILESTONE_TITLE"',
     );
-    assert.match(none.out, /MS=Technical Tasks \(standalone\)/);
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, /MS=Epic 1\.3 — Foo/);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

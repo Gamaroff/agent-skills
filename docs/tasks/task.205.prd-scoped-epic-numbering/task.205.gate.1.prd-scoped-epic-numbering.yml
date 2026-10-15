@@ -1,0 +1,77 @@
+schema: 2
+task: 'task.205.prd-scoped-epic-numbering'
+task_title: 'PRD-scoped epic numbering'
+gate: FAIL
+status_reason: 'One high-confidence HIGH bug (sync-github-epic renames any milestone the epic issue is on, a shared one included), plus a MEDIUM (task milestone lookup ignores a configured PRD root) and a LOW (story-title prefix strip regressed for dash and sub-story forms). Suite green: 5663 pass, 0 fail.'
+reviewer: 'QA Engineer'
+head: '91c077e70f6b2fd58bdbdc2911c71b5be8be45c8'
+updated: '2026-10-15T10:34:52Z'
+
+top_issues:
+  - id: 'TASK-205-QA1-CR1'
+    severity: high
+    file: 'skills/sync-github-epic/SKILL.md'
+    finding: 'The update path passes any differing current milestone as --rename-from, so an epic issue on a shared milestone renames it in place for every issue on it (TASK-205-BUG-1).'
+    suggested_action: 'Pass --rename-from only when the current title is this epic''s own milestone (Epic <E> — or Epic <P.E> — ); otherwise resolve or create.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-205-QA1-CR4'
+    severity: medium
+    file: 'skills/ensure-task-github-issue/SKILL.md'
+    finding: 'The Step T3 block defaults PRD_ROOT to docs/prd and never sources resolve-paths.sh, so a configured PRD root is ignored and the task falls back to the standalone milestone (TASK-205-BUG-2).'
+    suggested_action: 'Source references/resolve-paths.sh inside the block.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-205-QA1-CR6'
+    severity: low
+    file: 'shared/resources/doc-id.js'
+    finding: 'stripIdPrefix("story", …) no longer strips "Story 1.2.1 — Tap" or "[Story 1.2.3A] Tap", which the base regex in findChildStories''s label did, so the id renders twice.'
+    suggested_action: 'Accept a sub-story letter and dash/em-dash separators in the id pattern.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 5677
+  phases_verified: '7/7'
+  ci: 'not read at this cycle (gated at /finalise)'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5, 6]
+    phases_with_issues: [2, 5]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 10
+    notes: 'review-epic input resolution probed with the fence form (10 cases, verdict engages). No secrets or new network paths; --rename-from replaces a create call.'
+  performance:
+    status: PASS
+    notes: 'generate-prd-epic-index.mjs --check: real 0.039 s (load 2.67), bound < 1 s.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1: a rename on the wrong milestone is not reversible by the pipeline; CR-4 silently degrades to the standalone milestone.'
+  maintainability:
+    status: PASS
+    notes: 'One title-prefix rule in doc-id.js; registry and skill removed; guard test with executed skill blocks.'
+
+recommendations:
+  immediate:
+    - action: 'Restrict --rename-from to the epic''s own old milestone (CR-1).'
+      refs: ['skills/sync-github-epic/SKILL.md']
+    - action: 'Source resolve-paths.sh in the task milestone block (CR-4).'
+      refs: ['skills/ensure-task-github-issue/SKILL.md']
+    - action: 'Widen stripIdPrefix for story titles (CR-6).'
+      refs: ['shared/resources/doc-id.js']
+  future:
+    - action: 'Advisory (medium confidence): bind TITLE / ISSUE_NUM inside the GitHub epic blocks or guard them with ${NAME:?} (CR-2, CR-3, CR-5); name the unbound input in the create-epic id-check block (CR-7).'
+      refs: ['skills/sync-github-epic/SKILL.md', 'skills/ensure-epic-github-issue/SKILL.md', 'skills/create-epic/SKILL.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

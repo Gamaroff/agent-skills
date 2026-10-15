@@ -60,9 +60,10 @@ Determine `MILESTONE_TITLE` in this order:
 
    ```bash
    # ensure-task-github-issue — task milestone from its epic (task 205)
-   # INPUTS: EPIC_REF — the task's `epic:` frontmatter value; PRD_ROOT (references/resolve-paths.sh, default docs/prd).
+   # INPUTS: EPIC_REF — the task's `epic:` frontmatter value. PRD_ROOT is resolved HERE from
+   # skills-config.yaml (default docs/prd), never assumed (QA cycle 1, CR-4).
    DOC_ID=.agents/skills/ensure-task-github-issue/references/doc-id.js
-   PRD_ROOT=${PRD_ROOT:-docs/prd}
+   source .agents/skills/ensure-task-github-issue/references/resolve-paths.sh || exit 1
    WANT=$(case "$EPIC_REF" in
      epic.*) command node "$DOC_ID" parse "$EPIC_REF" --json | jq -r 'select(.kind == "epic") | "\(.prd).\(.epic)"' ;;
      *) printf '%s' "$EPIC_REF" ;;
