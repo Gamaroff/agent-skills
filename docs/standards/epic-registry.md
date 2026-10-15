@@ -6,9 +6,10 @@
 
 > **Superseded by per-PRD numbering (2026-10-15, task 202).** Under the hierarchical scheme an epic is
 > `epic.{P}.{E}`: `P` comes from the [PRD registry](./prd-registry.md) and `E` counts epics within that
-> PRD, so no global epic registry allocates it. This registry still governs the existing
-> `epic.{number}` epics until **task 203** migrates them and retires it. Do not add rows for an epic
-> created under the new scheme.
+> PRD, so no global epic registry allocates it. **Retired (task 203).** `migrate-doc-numbering.mjs`
+> renames the `epic.{number}` epics and turns this file into a pointer that keeps the old rows as a
+> historical old → new mapping. It allocates nothing. `create-epic` and `epic-registry-manager` are
+> rewired in task 205; do not run them against a retired registry before then.
 
 The epic registry tracks every epic in a project. Epic numbers are **globally unique** across the project and never reused.
 

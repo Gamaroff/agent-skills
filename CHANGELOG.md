@@ -2706,7 +2706,7 @@ All notable changes to this project will be documented in this file. Format foll
   link check is path-filtered to `docs/**` and never saw them.
 
 - **The onboarding PRD and its shipped example linked to `~/.claude/plans/…`**
-  ([`docs/prd/onboarding/prd.onboarding.md`](docs/prd/onboarding/prd.onboarding.md),
+  ([`docs/prd/onboarding/prd.onboarding.md`](docs/prd/onboarding/prd.1.onboarding/prd.1.onboarding.md),
   [`examples/prd-example/prd.onboarding.md`](examples/prd-example/prd.onboarding.md)) — a live link to an
   agent scratch file, in the example that teaches the plan-location rule forbidding it. Replaced with
   a note that the pre-flight plan is not retained.

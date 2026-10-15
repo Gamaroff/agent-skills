@@ -403,20 +403,20 @@ test("corpus: every work-item document's relative links resolve and every fence 
 // file → target (links) and by file (fences) — not by line, which an unrelated
 // edit above moves. Delete an entry with its fix; the ratchet only tightens.
 const KNOWN_ARTIFACT_LINKS = new Set([
-  "docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entry-point/stories/story.1.1.first-task-in-10-minutes/story.1.1.plan.first-task-in-10-minutes.md → ../../../../../standards/document-status-lifecycle.md",
-  "docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entry-point/stories/story.1.1.first-task-in-10-minutes/story.1.1.plan.first-task-in-10-minutes.md → ../../../../../standards/file-naming.md",
-  "docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entry-point/stories/story.1.1.first-task-in-10-minutes/story.1.1.plan.first-task-in-10-minutes.md → ../../../../../standards/task-registry.md",
-  "docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entry-point/stories/story.1.2.first-story-in-60-minutes/story.1.2.plan.first-story-in-60-minutes.md → ../../../../../concepts/quickstart-task.md",
-  "docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entry-point/stories/story.1.2.first-story-in-60-minutes/story.1.2.plan.first-story-in-60-minutes.md → ../../../../../runbooks/story-development.md",
-  "docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entry-point/stories/story.1.2.first-story-in-60-minutes/story.1.2.plan.first-story-in-60-minutes.md → ../../../../../standards/document-status-lifecycle.md",
-  "docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/stories/story.2.1.capture-prd-as-worked-example/story.2.1.sprint-review-summary.md → ../../../../../../../../../examples/prd-example/README.md",
-  "docs/prd/onboarding/epics/epic.4.first-week-guided-learning-path/stories/story.4.4.day-4-parallel/story.4.4.plan.day-4-parallel.md → ../change-management.md",
-  "docs/prd/onboarding/epics/epic.4.first-week-guided-learning-path/stories/story.4.4.day-4-parallel/story.4.4.plan.day-4-parallel.md → ../create-parallel-stories.md",
-  "docs/prd/onboarding/epics/epic.4.first-week-guided-learning-path/stories/story.4.4.day-4-parallel/story.4.4.plan.day-4-parallel.md → ../first-week.md",
+  "docs/prd/onboarding/prd.1.onboarding/epics/epic.1.1.quickstart-and-decision-tree-entry-point/stories/story.1.1.1.first-task-in-10-minutes/story.1.1.1.plan.first-task-in-10-minutes.md → ../../../../../standards/document-status-lifecycle.md",
+  "docs/prd/onboarding/prd.1.onboarding/epics/epic.1.1.quickstart-and-decision-tree-entry-point/stories/story.1.1.1.first-task-in-10-minutes/story.1.1.1.plan.first-task-in-10-minutes.md → ../../../../../standards/file-naming.md",
+  "docs/prd/onboarding/prd.1.onboarding/epics/epic.1.1.quickstart-and-decision-tree-entry-point/stories/story.1.1.1.first-task-in-10-minutes/story.1.1.1.plan.first-task-in-10-minutes.md → ../../../../../standards/task-registry.md",
+  "docs/prd/onboarding/prd.1.onboarding/epics/epic.1.1.quickstart-and-decision-tree-entry-point/stories/story.1.1.2.first-story-in-60-minutes/story.1.1.2.plan.first-story-in-60-minutes.md → ../../../../../concepts/quickstart-task.md",
+  "docs/prd/onboarding/prd.1.onboarding/epics/epic.1.1.quickstart-and-decision-tree-entry-point/stories/story.1.1.2.first-story-in-60-minutes/story.1.1.2.plan.first-story-in-60-minutes.md → ../../../../../runbooks/story-development.md",
+  "docs/prd/onboarding/prd.1.onboarding/epics/epic.1.1.quickstart-and-decision-tree-entry-point/stories/story.1.1.2.first-story-in-60-minutes/story.1.1.2.plan.first-story-in-60-minutes.md → ../../../../../standards/document-status-lifecycle.md",
+  "docs/prd/onboarding/prd.1.onboarding/epics/epic.1.2.worked-prd-epic-story-examples/stories/story.1.2.1.capture-prd-as-worked-example/story.1.2.1.sprint-review-summary.md → ../../../../../../../../../examples/prd-example/README.md",
+  "docs/prd/onboarding/prd.1.onboarding/epics/epic.1.4.first-week-guided-learning-path/stories/story.1.4.4.day-4-parallel/story.1.4.4.plan.day-4-parallel.md → ../change-management.md",
+  "docs/prd/onboarding/prd.1.onboarding/epics/epic.1.4.first-week-guided-learning-path/stories/story.1.4.4.day-4-parallel/story.1.4.4.plan.day-4-parallel.md → ../create-parallel-stories.md",
+  "docs/prd/onboarding/prd.1.onboarding/epics/epic.1.4.first-week-guided-learning-path/stories/story.1.4.4.day-4-parallel/story.1.4.4.plan.day-4-parallel.md → ../first-week.md",
   "docs/tasks/task.35.okf-conformance-document-skills/task.35.plan.okf-conformance-document-skills.md → ../../shared/resources/open-knowledge-format.md",
 ]);
 const KNOWN_ARTIFACT_FENCES = new Set([
-  "docs/prd/onboarding/epics/epic.4.first-week-guided-learning-path/stories/story.4.4.day-4-parallel/story.4.4.plan.day-4-parallel.md",
+  "docs/prd/onboarding/prd.1.onboarding/epics/epic.1.4.first-week-guided-learning-path/stories/story.1.4.4.day-4-parallel/story.1.4.4.plan.day-4-parallel.md",
   "docs/tasks/task.81.review-security-skill/task.81.bug.1.malformed-nested-fences-in-prompt.md",
 ]);
 
