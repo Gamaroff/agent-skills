@@ -5,11 +5,13 @@ type: task
 description: "Ship a dry-run-by-default migration script that renames PRDs, epics and stories to the hierarchical prd.P / epic.P.E / story.P.E.S scheme, rewrites their frontmatter and links, builds the PRD registry and retires the global epic registry — then run it on this repository's onboarding PRD."
 tags: [doc-numbering, prd, epic, story, migration, prd-registry, epic-registry]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: high
 created: 2026-10-13
 updated: 2026-10-15
+completed_date: 2026-10-15
+pr_number: 671
 assignee:
 estimated_effort_hours: 16
 github_issue: 646
@@ -17,7 +19,7 @@ github_issue: 646
 
 # Technical Task: Migrate documents to hierarchical numbering
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.203.review.1.migrate-doc-numbering.md` implemented 2026-10-15
 
@@ -684,9 +686,9 @@ the second-run no-op guarantee no longer describes the tree.
 - One low cleanup is advisory: the CHANGELOG blocker list names 8 of the 12 blocker codes.
 - Reliability CONCERNS is carried from gate 3, because the engine is unchanged.
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 1 (historical, superseded by run 2)
 
-**Status:** IN PROGRESS
+**Status:** IN PROGRESS at run 1. Both gaps were closed in `acccb861`; see the PASSED section below.
 
 ### QA Gate Status
 
@@ -716,6 +718,32 @@ Both fixes touch only documentation, so `/finalise` re-runs directly with no QA 
 <!-- change-log-start -->
 ## Change Log
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.203.qa.4.migrate-doc-numbering.md`
+**Gate File**: `task.203.gate.4.migrate-doc-numbering.yml`
+**Gate Status**: ⚠️ CONCERNS (empty queue; the reservation is the advisory reliability edge cases, non-blocking)
+**Quality Score**: 90/100
+**PR Review**: `task.203.pr-review.2.migrate-doc-numbering.md`, ✅ APPROVE
+
+All Definition of Done criteria have been verified (run 2):
+
+✅ **Success Criteria:** 18/18 pass. Sixteen are held by per-PR tests, AC9 is measured (0.501 s against a 5 s bound) and AC18 is documentation.
+✅ **Tests & PR:** PR #671. Every check is green on `e36429f8`: test, validate, link-check, shellcheck and branch policy.
+✅ **Documentation:** a CHANGELOG `(task 203)` entry; the standards are corrected; the epic registry is retired to a pointer; the PRD registry is created.
+✅ **Security Review:** PASS. `checkPrdRoot` was probed with 11 cases, and none reproduced.
+⚠️ **Compliance Review:** not applicable (an internal docs migration).
+
+**Run 1** found 2 gaps: CI `link-check` red on 10 pre-existing dead links, and no CHANGELOG entry. Both were fixed in `acccb861` and re-gated at QA cycle 4.
+
+**Task marked as ACCEPTED on:** 2026-10-15
+
+**Detailed Verification Log:** See `task.203.dod.2.migrate-doc-numbering.md` (run 2) and `task.203.dod.1.migrate-doc-numbering.md` (run 1, gaps).
+
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-10-13 | 1.0     | Initial draft | create-task |
@@ -729,6 +757,7 @@ Both fixes touch only documentation, so `/finalise` re-runs directly with no QA 
 | 2026-10-15 |  | QA gate CONCERNS (90/100) — 0 open findings; 2 advisory reliability edge cases | qa-task |
 | 2026-10-15 |  | DoD incomplete — 2 gaps identified (CI link-check, CHANGELOG) | finalise |
 | 2026-10-15 |  | QA gate CONCERNS (90/100) — 0 open findings; 1 low cleanup (cycle 4, after finalise re-entry) | qa-task |
+| 2026-10-15 | 1.2 | DoD passed — accepted (PR #671) | finalise |
 
 ---
 <!-- change-log-end -->
