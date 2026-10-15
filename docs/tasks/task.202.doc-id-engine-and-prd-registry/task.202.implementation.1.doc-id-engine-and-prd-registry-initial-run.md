@@ -3,7 +3,7 @@
 **Task**: `task.202.doc-id-engine-and-prd-registry.md`
 **Run Number**: 1
 **Started**: 2026-10-15 05:34
-**Status**: In Progress
+**Status**: Escalated
 
 ---
 
@@ -34,8 +34,8 @@ First pipeline run for task 202: ship `shared/resources/doc-id.js` (hierarchical
 | 1. create-branch           | ✅ Done | Branch `feature/task.202.*` exists in git                             | Branch created at `3b8d4026` | —                    | 2026-10-15T03:34Z |
 | 2. review-task             | ✅ Done | `task.202.review.{N}.{name}.md` exists (or skip logged)               | READY TO IMPLEMENT 8/10; 3 Important fixed; Planned → Ready for Development | —                    | 2026-10-15T03:38Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline (plan file + surface map); 1 iteration; audit 14/14, ready-for-review @ b0ec491a; ci:fast 5542 pass | —                    | 2026-10-15T03:51Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.202.qa.{N}.*.md`; `task.202.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
+| 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #667: https://github.com/Gamaroff/agent-skills/pull/667 | —                    | 2026-10-15T03:52Z |
+| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.202.qa.{N}.*.md`; `task.202.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.202.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
@@ -79,6 +79,23 @@ First pipeline run for task 202: ship `shared/resources/doc-id.js` (hierarchical
 - Fast gate (`npm run ci:fast`, `.agents/skills` symlink moved aside): TEST_EXIT=0, 5542 tests, 0 failures. Also `npm run bundle:check` (0 problems) and `npm run check:generated` (clean)
 - Loop audit iter 1: status ready-for-review, 14/14 phase items, last commit b0ec491a → exit loop
 - Development completion comment posted to github issue 645
+- Step 4 scope: work-item dir + 24 changed-code paths (`.claude/state/step4-scope-paths.txt`); everything except the report update was already committed in Step 3, so the Step 4 commit carried the report only — no leak possible
+- PR body written inline from the committed diff (the author had the full change set in context) rather than via the pr-body-summariser subagent
+- PR #667: https://github.com/Gamaroff/agent-skills/pull/667 (base develop, Closes #645). Tracker comment (in-review): posted
+- GitHub board: in-review → stage-disabled (no `pipeline.in-review` mapping)
+- Post-PR state check (inline `gh pr view`, not the poller subagent): PR #667 state = OPEN, head c58dde41. errors = 0
+- QA start: board re-assert in-review → stage-disabled. Traceability mapper skipped: no Success Criteria table (criteria are checkbox lists), Phase 0 run inline
+- QA cycle 1: /qa-task (code_review_blocking=true) → CONCERNS 60/100; security probe on doc-id.js#parse measured (27 executed, present-but-inert on docid.huge-number); PR comment + tracker comment (qa-gate-1: posted)
+- QA Cycle 1 — changes-requested: stage-disabled. qa-fix ran inline on the findings summary 5a had just produced (same session wrote the gate), not via the findings-ingester subagent
+- CR-1 decision (autonomous; two options offered): reword the claim rather than persist a high-water mark — a counter per PRD/epic would add frontmatter state outside this task's scope. The task document's own §3 sentence ("a deleted story's number is not handed out again") overstates the same way; it is the requirement text, which qa-fix may not edit, so it is noted here for /finalise
+- QA Cycle 1 post-fix: PR comment + tracker comment (qa-fix-1: posted); PR #667 state OPEN
+- QA cycle 2: refute pass over the whole branch → CONCERNS 60/100; security probe engages (30 executed; case docid.unsafe-seq re-specified hostile → legitimate — it classifies as a non-canonical artifact with seq null, the documented grammar). QA-1 found by QA, not the reviewer: check --corpus documents 29 → 34 after cycle-1 CR-10
+- QA Cycle 2 — changes-requested: stage-disabled. Narrowing residue — every MEDIUM on gates 1 and 2 names shared/resources/doc-id.js; HIGH 0 on both. Move: consolidate (registry reader → selector parity; frontmatter reader replaced)
+- CR-8 resolved by parity rather than CommonMark fence lengths: both readers must give one answer; a fence-length fix belongs to the selector as a follow-up
+- QA cycle 3: scoped to the 5 files changed since gate 2's head → CONCERNS 90/100; probe engages (30); route classifier: continue (not-a-pass-gate); convergence check not tripped (HIGH 0, 0, 0). Narrowing residue offered again (gates 2 and 3); move: patch — distinct edge cases in readers already consolidated
+- QA Cycle 3 — changes-requested: stage-disabled. Post-fix: PR + tracker comments (qa-fix-3: posted)
+- QA cycle 4: scoped (2 files since gate 3) → CONCERNS 90/100; the reviewer checked the whole tracked tree (5808 files parse/parseLegacy old vs new; 568 frontmatter blocks vs PyYAML); probe engages (30); route continue (not-a-pass-gate); HIGH 0×4. Note for task 203: 7 legacy `story.*.validate.<date>.md` files in docs/prd do not parse — `validate` is not in the artifact vocabulary (pre-existing, unchanged by this task)
+- QA Cycle 4 — changes-requested: stage-disabled. Post-fix comments: qa-fix-4 posted
 
 ---
 
@@ -86,20 +103,102 @@ First pipeline run for task 202: ship `shared/resources/doc-id.js` (hierarchical
 
 _Problems encountered and how they were resolved or escalated._
 
+### QA Loop Limit Reached — 2026-10-15
+
+The pipeline completed 5 qa-task/qa-fix cycles without a clean PASS.
+
+**Final gate status**: CONCERNS (90/100), gate 5 — read head 5fbf970b; cycle 5's fix 0399f61f has not been gated
+**HIGH findings per cycle**: 0, 0, 0, 0, 0 — no blocker at any cycle
+**MEDIUM findings per cycle**: 4, 4, 1, 1, 1 — fell, then flat at 1 from cycle 3
+**Remaining issues** (from final gate file):
+- CR-1 — parseLegacy accepted new-scheme sub-story artifacts (`story.1.2.3A.*`) as legacy — medium — `shared/resources/doc-id.js`. **Fixed in 0399f61f** (mutation-proven, fast gate green) but not re-reviewed: the budget ended on the fix
+
+**What was attempted per cycle**:
+- Cycle 1: 8 gate findings + 3 advisory (safe integers, round-trip format, fail-closed CLI paths, registry fence/table rows, counter validity, trailing YAML comments) — e096933d
+- Cycle 2: 8 gate findings + 4 advisory; structural move on the narrowing-residue offer: registry reader consolidated with the selector's parseRegistry rules (parity test), frontmatter reader replaced with a linear line reader — 5e822832 (fast gate red twice on one test, committed unpushed per the 2-attempt bound)
+- Cycle 3: parseLegacy full-stem guard, closed-frontmatter rule, unreadable registry in next prd — 1254d308
+- Cycle 4: the cycle-3 guard moved from the shared path to parseLegacy only; parseLegacy refuses a digit-first remainder — 5fbf970b
+- Cycle 5: the digit-first refusal widened to the sub-story suffix — 0399f61f
+- Route 2c (gate-the-last-fix half-cycle) considered and declined: `medium-not-falling` (MEDIUM 1, 1, 1 over cycles 3–5)
+
+**Likely root cause**: not a stall in the deliverable. Each gate from cycle 2 on found one or two edge cases in a hand-written grammar (`doc-id.js`'s legacy/new-scheme boundary and its two readers), several of them introduced by the previous cycle's fix — the narrowing-residue shape on one file at HIGH 0. The single remaining finding is already fixed on the head; the loop budget ended one gate before it could be read. The legacy/new-scheme boundary is inherently ambiguous by name alone (the task says task 203 decides "legacy" from frontmatter), which is why parseLegacy kept attracting edge cases.
+
+**Recommended next steps**:
+1. Grant one more QA cycle (re-run `/develop-task` — Phase 0b offers "Resume at 5a with {k} more cycles", recommended k = 2) so a gate reads 0399f61f; the expected outcome is a clean gate, then 5c and finalise
+2. Or accept the current state via option 2 of the HALT message: `/review-pr --effort medium --comment --no-code`, then `/finalise`
+3. For task 203: decide whether parseLegacy should exist as a name parser at all, or whether "legacy" is decided only by the missing `prd_number` frontmatter (the task's own rule) — the latter removes the boundary every late finding sat on
+
+- QA cycle 2 fast gate: attempt 1's log was deleted before it was read (orchestrator slip — the protocol retains a red log); the failing test was identified on attempt 2 as `tests/load-sensitive-marker.test.js` direction C and fixed. Committed without pushing per the 2-attempt bound; the next cycle's push carries it
+
 ---
 
 ## QA Iteration History
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-10-15
+**Gate Result**: CONCERNS
+**Issues Found**: 8 open — PROBE-1 (huge number parses with precision loss), CR-1 (tail-deleted number reused), CR-2 (next under a missing parent), CR-3 (format accepts non-canonical parts) medium; CR-5–CR-8 low. Advisory: CR-4, CR-9, CR-10
+**HIGH findings**: 0
+**MEDIUM findings**: 4
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 1 of 5)
+**Fixes Applied**: all 8 gate findings (PROBE-1, CR-1–3, CR-5–8) plus advisory CR-4, CR-9, CR-10; 11 regression tests, each mutation-proven (revert → its own test red); CR-1 resolved by correcting the never-reuse claim in epic-documents.md and prd-registry.md (gaps never refilled; a tail-deleted epic/story number is freed — no counter). Fast gate: ci:fast 5553 tests, 0 failures
+**Commit**: `e096933d`
+
+### QA Cycle 2 — 2026-10-15
+**Gate Result**: CONCERNS
+**Issues Found**: 8 open — QA-1 (sprint-review-summary read as a document — regression from cycle-1 CR-10), CR-1 (allocator reads an unreadable directory as empty), CR-2 (registry reader disagrees with the selector), CR-3 (format rejects string-number parts) medium; CR-4, CR-5, CR-6, CR-8 low. Advisory: CR-7, CR-9, CR-10, CR-11
+**HIGH findings**: 0
+**MEDIUM findings**: 4
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 2 of 5)
+**Fixes Applied**: all 8 gate findings plus advisory CR-7, CR-9, CR-10, CR-11; registry reader consolidated with the selector's parseRegistry rules (parity test, 8 inputs); frontmatter reader replaced with a linear line reader; 10 tests, 9 fixes mutation-proven (CR-6 timing test not mutated — not-run). Fast gate: attempt 1 red on 1 test (log deleted before reading — not identified), attempt 2 red on 1 test (`tests/load-sensitive-marker.test.js` direction C: the new timing test lacked the loadSensitive marker); fixed, targeted re-run green; committed without pushing per the 2-attempt bound
+**Commit**: `5e822832` (not pushed)
+
+### QA Cycle 3 — 2026-10-15
+**Gate Result**: CONCERNS
+**Issues Found**: 2 open — CR-1 (parseLegacy reads new-scheme full-stem artifacts as legacy) medium; CR-3 (next prd: unreadable registry reported as missing) low. Advisory: CR-2, CR-4, CR-5
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 3 of 5)
+**Fixes Applied**: CR-1, CR-3 plus advisory CR-2, CR-4, CR-5; 4 tests, each mutation-proven. Fast gate: ci:fast 5567 tests, 0 failures (attempt 1)
+**Commit**: `1254d308` (pushed, carrying 5e822832)
+
+### QA Cycle 4 — 2026-10-15
+**Gate Result**: CONCERNS
+**Issues Found**: 1 open — CR-1 (cycle 3's docSlug guard in the shared path blocks digit-first bug/task full-stem reviews in parse()) medium. Advisory: CR-2
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 4 of 5)
+**Fixes Applied**: CR-1 (guard moved to the parseLegacy path) and advisory CR-2 (parseLegacy refuses a digit-first remainder); 2 tests, each mutation-proven. Fast gate: ci:fast 5569 tests, 0 failures
+**Commit**: `5fbf970b`
+
+### QA Cycle 5 — 2026-10-15
+**Gate Result**: CONCERNS
+**Issues Found**: 1 open — CR-1 (parseLegacy digit-first guard misses the sub-story suffix, story.1.2.3A.*) medium
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: Loop route: continue (medium-not-falling) — MEDIUM reads 1, 1, 1 over cycles 3–5 — route 2c needs it strictly falling, or 0 on the last gate, which is the evidence that one more gate would clear.
+**Action**: Escalating — loop limit reached
+**Fixes Applied**: CR-1 (guard widened to /^\.\d+[A-Z]?(?:\.|$)/); 3 refusal cases, mutation-proven. Fast gate: ci:fast 5569 tests, 0 failures
+**Commit**: `0399f61f` (pushed; no gate has read it)
+
 ---
 
 ## Completion
 
 **Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Final Status**: Escalated — QA loop limit reached (5 cycles, final gate CONCERNS 90/100, HIGH 0 throughout)
 **Branch**: feature/task.202.doc-id-engine-and-prd-registry
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/667
+**QA Iterations**: 5
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
