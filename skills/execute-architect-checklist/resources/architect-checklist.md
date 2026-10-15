@@ -7,7 +7,7 @@ This checklist serves as a comprehensive framework for the Architect to validate
 Before proceeding with this checklist, ensure you have access to:
 
 1. architecture.md - The primary architecture document (check docs/architecture.md)
-2. prd.md - Product Requirements Document for requirements alignment (check docs/prd.md)
+2. The PRD - Product Requirements Document for requirements alignment (check the PRD under ${PRD_ROOT}/**/prd.{P}.*/prd.{P}.*.md — ask which when several exist)
 3. frontend-architecture.md or fe-architecture.md - If this is a UI project (check docs/frontend-architecture.md)
 4. Any system diagrams referenced in the architecture
 5. API documentation if available

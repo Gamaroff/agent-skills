@@ -64,7 +64,7 @@ The wrapper performs no orchestration of its own; it exists only to ensure green
 
 ## Output
 
-- PRD written to `docs/prd.md` (greenfield default)
+- PRD written to `${PRD_ROOT}/{product}/prd.{P}.{product}/prd.{P}.{product}.md`, with `P` allocated by `create-prd` from the PRD registry, and its registry row
 - Checklist results embedded in PRD
 - UX Expert and Architect handoff prompts generated
 
@@ -95,5 +95,5 @@ User: "Create a PRD for a new mobile banking app"
 → Sections processed interactively with 1-9 elicitation stops
 → pm-checklist validates
 → UX Expert + Architect handoff prompts generated
-→ Returns completed PRD at docs/prd.md
+→ Returns completed PRD at ${PRD_ROOT}/{product}/prd.{P}.{product}/prd.{P}.{product}.md
 ```

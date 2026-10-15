@@ -168,13 +168,16 @@ template:
   version: 2.0
   output:
     format: markdown
-    filename: docs/prd.md
+    filename: "{{prd_root}}/{{domain}}/prd.{{prd_number}}.{{feature}}/prd.{{prd_number}}.{{feature}}.md"
     title: '{{project_name}} Brownfield Enhancement PRD'
 
 workflow:
   mode: interactive
   elicitation: advanced-elicitation
 ```
+
+`{{prd_number}}` in the output path is allocated by `/create-prd` from the PRD registry — never
+invented. If it is unfilled when this template runs, stop and run `/create-prd`, which allocates it.
 
 ## Key Design Principles
 

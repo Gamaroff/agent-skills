@@ -242,8 +242,8 @@ Document sharded successfully:
 ## Common Sharding Scenarios
 
 ### PRD Sharding
-**Source**: `docs/prd.md` (monolithic file at repo root)
-**Destination**: `${PRD_ROOT}/` (default `docs/prd/`)
+**Source**: the numbered PRD, `${PRD_ROOT}/{domain}/prd.{P}.{feature}/prd.{P}.{feature}.md`
+**Destination**: the PRD's own directory — shard in place with `shard-prd`, which refuses a PRD that predates numbering
 **Typical sections**: Overview, Goals, Tech Stack, Architecture, etc.
 
 ### Architecture Sharding
