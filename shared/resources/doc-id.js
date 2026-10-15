@@ -1,0 +1,786 @@
+#!/usr/bin/env node
+"use strict";
+
+/**
+ * doc-id.js — the one definition of a document id under the hierarchical scheme
+ * (task 202). Pure library plus a thin CLI.
+ *
+ *   prd.{P}.{slug}            P — the PRD number, global, from the PRD registry
+ *   epic.{P}.{E}.{slug}       E — counts epics WITHIN that PRD
+ *   story.{P}.{E}.{S}.{slug}  S — counts stories within that epic; `3A` is a sub-story
+ *   task.{N}.{slug}           unchanged
+ *   bug.{N}.{slug}            unchanged
+ *
+ * Numbers are positive integers with no leading zeros. A prd / epic / story slug is
+ * lowercase kebab-case BEGINNING WITH A LETTER — that is what keeps `story.1.2.3.x`
+ * unambiguous: the fourth segment can never be a number. Task and bug slugs keep
+ * today's looser grammar.
+ *
+ * Nothing calls this module yet: tasks 203–207 migrate the callers. Until task 206,
+ * `finalise-fix-and-recheck.mjs` keeps its own artifact regex, and a contract test
+ * pins the two vocabularies equal.
+ *
+ * CLI (exit codes: 0 = ok / empty, 1 = a guard tripped, 2 = usage error — the
+ * contract of tracker-comment.js and its peers):
+ *
+ *   node doc-id.js parse <name> [--json]
+ *   node doc-id.js next prd   [--prd-root R] [--json]
+ *   node doc-id.js next epic  --prd-dir  <dir> [--json]
+ *   node doc-id.js next story --epic-dir <dir> [--json]
+ *   node doc-id.js check <path> [--prd-root R] [--json]
+ *   node doc-id.js check --corpus [--prd-root R] [--json]
+ */
+
+const fs = require("fs");
+const path = require("path");
+
+const NUM = "[1-9][0-9]*";
+const NUM_RE = new RegExp(`^${NUM}$`);
+const SLUG_RE = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/; // prd / epic / story
+const LOOSE_SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/; // task / bug: today's grammar
+
+const KINDS = Object.freeze(["prd", "epic", "story", "task", "bug"]);
+const HIERARCHICAL = Object.freeze(["prd", "epic", "story"]);
+
+// The ONE artifact vocabulary. Until task 206 makes finalise-fix-and-recheck.mjs
+// re-export it, doc-id.test.mjs pins it equal to that file's WORK_ITEM_ARTIFACT_RE.
+const ARTIFACTS = Object.freeze([
+  "qa",
+  "gate",
+  "bug",
+  "implementation",
+  "review",
+  "dod",
+  "plan",
+  "handover",
+  "handoff",
+  "pr-review",
+  "risk",
+  "test-design",
+  "sprint-review-summary",
+]);
+
+const ID_RE = Object.freeze({
+  prd: new RegExp(`^prd\\.(?<prd>${NUM})(?=\\.|$)`),
+  epic: new RegExp(`^epic\\.(?<prd>${NUM})\\.(?<epic>${NUM})(?=\\.|$)`),
+  story: new RegExp(
+    `^story\\.(?<prd>${NUM})\\.(?<epic>${NUM})\\.(?<story>${NUM})(?<sub>[A-Z])?(?=\\.|$)`,
+  ),
+  task: new RegExp(`^task\\.(?<n>${NUM})(?=\\.|$)`),
+  bug: new RegExp(`^bug\\.(?<n>${NUM})(?=\\.|$)`),
+});
+
+// The legacy shapes task 203 migrates from. Read by parseLegacy() only.
+const LEGACY_ID_RE = Object.freeze({
+  prd: /^prd(?=\.)/,
+  epic: new RegExp(`^epic\\.(?<epic>${NUM})(?=\\.|$)`),
+  story: new RegExp(
+    `^story\\.(?<epic>${NUM})\\.(?<story>${NUM})(?<sub>[A-Z])?(?=\\.|$)`,
+  ),
+});
+
+const EXT_RE = /\.(?:md|ya?ml|json|sh)$/;
+
+/** Basename without directory or a known extension. */
+function stemOf(name) {
+  return path.basename(String(name)).replace(EXT_RE, "");
+}
+
+function fail(reason) {
+  return Object.freeze({ ok: false, reason });
+}
+
+/**
+ * Classify what follows the id. Returns `{ artifact, seq, slug, canonical }` or a
+ * failure reason. `slugOk` is the kind's slug rule.
+ *
+ *   .{slug}                     the document (a single segment is ALWAYS the slug,
+ *                               even when it spells an artifact word)
+ *   .{artifact}.{seq}.{slug}    a canonical artifact
+ *   .plan.{slug}                the plan, which has no seq
+ *   anything else holding an artifact word as a whole segment — a dated review,
+ *   a slug before the keyword, a seq-less DoD sidecar: a non-canonical artifact,
+ *   classified the way WORK_ITEM_ARTIFACT_RE classifies it.
+ */
+function parseRemainder(rest, slugOk) {
+  if (rest === "") return { reason: "bad-slug" };
+  const segs = rest.slice(1).split(".");
+  if (segs.length === 1) {
+    return slugOk(segs[0])
+      ? { artifact: null, seq: null, slug: segs[0], canonical: true }
+      : { reason: "bad-slug" };
+  }
+  const [head] = segs;
+  if (head === "plan" && segs.length === 2 && slugOk(segs[1])) {
+    return { artifact: "plan", seq: null, slug: segs[1], canonical: true };
+  }
+  if (
+    ARTIFACTS.includes(head) &&
+    head !== "plan" &&
+    segs.length === 3 &&
+    NUM_RE.test(segs[1]) &&
+    slugOk(segs[2])
+  ) {
+    return {
+      artifact: head,
+      seq: Number(segs[1]),
+      slug: segs[2],
+      canonical: true,
+    };
+  }
+  const keyword = segs.find((s) => ARTIFACTS.includes(s));
+  if (keyword)
+    return { artifact: keyword, seq: null, slug: null, canonical: false };
+  return { reason: "bad-artifact" };
+}
+
+function buildId(kind, g) {
+  switch (kind) {
+    case "prd":
+      return `prd.${g.prd}`;
+    case "epic":
+      return `epic.${g.prd}.${g.epic}`;
+    case "story":
+      return `story.${g.prd}.${g.epic}.${g.story}${g.sub || ""}`;
+    default:
+      return `${kind}.${g.n}`;
+  }
+}
+
+/**
+ * Parse a basename or stem under the hierarchical scheme.
+ * @returns {object} frozen `{ ok: true, kind, prd, epic, story, sub, n, artifact,
+ *   seq, slug, canonical, id }`, or `{ ok: false, reason }` with reason one of
+ *   `unknown-kind`, `bad-number`, `bad-slug`, `bad-artifact`.
+ */
+function parse(name) {
+  if (typeof name !== "string" || name === "") return fail("unknown-kind");
+  const stem = stemOf(name);
+  const kind = stem.split(".")[0];
+  if (!KINDS.includes(kind)) return fail("unknown-kind");
+  const m = ID_RE[kind].exec(stem);
+  if (!m) return fail("bad-number");
+  const g = m.groups;
+  const slugOk = (s) =>
+    (HIERARCHICAL.includes(kind) ? SLUG_RE : LOOSE_SLUG_RE).test(s);
+  const r = parseRemainder(stem.slice(m[0].length), slugOk);
+  if (r.reason) return fail(r.reason);
+  const toNum = (v) => (v === undefined ? null : Number(v));
+  return Object.freeze({
+    ok: true,
+    kind,
+    prd: toNum(g.prd),
+    epic: toNum(g.epic),
+    story: toNum(g.story),
+    sub: g.sub || null,
+    n: toNum(g.n),
+    artifact: r.artifact,
+    seq: r.seq,
+    slug: r.slug,
+    canonical: r.canonical,
+    id: buildId(kind, g),
+  });
+}
+
+/**
+ * Read the LEGACY shapes only — `prd.{slug}`, `epic.{E}.{slug}` and
+ * `story.{E}.{S}{sub?}.{slug}` — for task 203's migration. No pipeline reader may
+ * call this: once the tree is migrated, the legacy shapes are malformed.
+ * @returns {object} frozen `{ ok: true, legacy: true, kind, epic, story, sub,
+ *   artifact, seq, slug, canonical }`, or `{ ok: false, reason }`.
+ */
+function parseLegacy(name) {
+  if (typeof name !== "string" || name === "") return fail("unknown-kind");
+  const stem = stemOf(name);
+  const kind = stem.split(".")[0];
+  if (!LEGACY_ID_RE[kind]) return fail("unknown-kind");
+  const m = LEGACY_ID_RE[kind].exec(stem);
+  if (!m) return fail("bad-number");
+  const g = m.groups || {};
+  const r = parseRemainder(stem.slice(m[0].length), (s) =>
+    LOOSE_SLUG_RE.test(s),
+  );
+  if (r.reason) return fail(r.reason);
+  return Object.freeze({
+    ok: true,
+    legacy: true,
+    kind,
+    epic: g.epic === undefined ? null : Number(g.epic),
+    story: g.story === undefined ? null : Number(g.story),
+    sub: g.sub || null,
+    artifact: r.artifact,
+    seq: r.seq,
+    slug: r.slug,
+    canonical: r.canonical,
+  });
+}
+
+/**
+ * The inverse of parse() for canonical names: returns the stem (no extension).
+ * Throws on parts that cannot form a canonical name.
+ */
+function format(parts) {
+  const p = parts || {};
+  if (!KINDS.includes(p.kind))
+    throw new TypeError(`format: unknown kind ${p.kind}`);
+  if (p.canonical === false)
+    throw new TypeError("format: a non-canonical artifact has no format");
+  const id = buildId(p.kind, {
+    prd: p.prd,
+    epic: p.epic,
+    story: p.story,
+    sub: p.sub,
+    n: p.n,
+  });
+  let out;
+  if (!p.artifact) out = `${id}.${p.slug}`;
+  else if (p.artifact === "plan") out = `${id}.plan.${p.slug}`;
+  else out = `${id}.${p.artifact}.${p.seq}.${p.slug}`;
+  const back = parse(out);
+  if (!back.ok)
+    throw new TypeError(
+      `format: parts do not form a valid name (${back.reason}): ${out}`,
+    );
+  return out;
+}
+
+const isPositiveInt = (v) => Number.isInteger(v) && v > 0;
+
+/**
+ * True for the epic `epic.P.E.*` and every story or artifact beneath it. P is
+ * REQUIRED: a caller cannot ask by E alone, which is what makes `epic.1.*` unable
+ * to claim `epic.12.1.*` or `epic.1.21.*`.
+ */
+function matchesEpic(name, P, E) {
+  if (!isPositiveInt(P) || !isPositiveInt(E)) {
+    throw new TypeError(
+      "matchesEpic(name, P, E): P and E must both be positive integers",
+    );
+  }
+  const p = parse(name);
+  return (
+    p.ok &&
+    (p.kind === "epic" || p.kind === "story") &&
+    p.prd === P &&
+    p.epic === E
+  );
+}
+
+// `**Next Available PRD Number:** **N**` — the bold-in-bold form task-registry.md uses.
+const PRD_COUNTER_RE = /\*\*Next Available PRD Number:?\*\*:?\s*\*\*(\d+)\*\*/;
+
+/**
+ * The PRD numbers a registry's table rows carry. A minimal reader by design: this
+ * module is CommonJS and the selector's parseRegistry (select-next.mjs) is ESM, and
+ * the number column plus the counter is all allocation and `check` need.
+ */
+function registryNumbers(text) {
+  const nums = [];
+  for (const line of String(text || "").split("\n")) {
+    const m = /^\|\s*(\d+)\s*\|/.exec(line);
+    if (m) nums.push(Number(m[1]));
+  }
+  return nums;
+}
+
+/**
+ * Allocate the next number, highest + 1. A deleted number is never handed out
+ * again — the rule of the task, bug and epic registries, and deliberately NOT the
+ * gap-filling rule of create-story's nextStoryId.
+ *
+ *   prd          — the registry's **Next Available PRD Number** is authoritative;
+ *                  `entries` (PRD directory names) only guard against a stale counter.
+ *   epic / story — the highest number among `entries` (directory basenames that
+ *                  parse as documents of that kind) + 1; 1 when there are none.
+ *
+ * @returns {object} `{ ok: true, reason: "ok", next }` or `{ ok: false, reason }`
+ *   with reason `registry-missing` / `registry-behind` / `unknown-kind`.
+ */
+function next(kind, entries, registryText) {
+  const docs = (entries || [])
+    .map((e) => parse(e))
+    .filter((p) => p.ok && p.kind === kind && !p.artifact);
+  if (kind === "prd") {
+    const m = PRD_COUNTER_RE.exec(String(registryText || ""));
+    if (!m) return fail("registry-missing");
+    const counter = Number(m[1]);
+    const used = docs.map((p) => p.prd).concat(registryNumbers(registryText));
+    if (used.some((n) => n >= counter)) return fail("registry-behind");
+    return Object.freeze({ ok: true, reason: "ok", next: counter });
+  }
+  if (kind !== "epic" && kind !== "story") return fail("unknown-kind");
+  const key = kind === "epic" ? "epic" : "story";
+  const highest = docs.reduce((max, p) => Math.max(max, p[key]), 0);
+  return Object.freeze({ ok: true, reason: "ok", next: highest + 1 });
+}
+
+/** next() for callers that want a number; throws an Error carrying `.reason`. */
+function nextNumber(kind, entries, registryText) {
+  const r = next(kind, entries, registryText);
+  if (!r.ok) {
+    const e = new Error(`nextNumber(${kind}): ${r.reason}`);
+    e.reason = r.reason;
+    throw e;
+  }
+  return r.next;
+}
+
+// ---------------------------------------------------------------------------
+// check / checkCorpus
+// ---------------------------------------------------------------------------
+
+const CHECK_REASONS = Object.freeze([
+  "bad-shape",
+  "dir-stem-mismatch",
+  "frontmatter-mismatch",
+  "parent-missing",
+  "parent-number-mismatch",
+  "unregistered",
+  "duplicate-id",
+  "registry-missing",
+]);
+
+const REAL_FS = Object.freeze({
+  readFile: (p) => {
+    try {
+      return fs.readFileSync(p, "utf8");
+    } catch {
+      return null;
+    }
+  },
+  exists: (p) => fs.existsSync(p),
+  readDir: (p) => {
+    try {
+      return fs.readdirSync(p, { withFileTypes: true }).map((d) => ({
+        name: d.name,
+        dir: d.isDirectory(),
+      }));
+    } catch {
+      return null;
+    }
+  },
+});
+
+/** A frontmatter scalar, read from the leading `---` block only (quotes stripped). */
+function frontmatterField(src, key) {
+  const block = /^---\r?\n([\s\S]*?)\r?\n---/.exec(String(src || ""));
+  if (!block) return "";
+  const m = new RegExp(`^${key}:[ \\t]*(.*?)[ \\t]*$`, "m").exec(block[1]);
+  if (!m) return "";
+  return m[1].replace(/^(['"])(.*)\1$/, "$2").trim();
+}
+
+function finding(reason, file, detail) {
+  return Object.freeze({ reason, path: file, detail });
+}
+
+/** The document of a directory, `{dir}/{dir}.md`, and its parse. */
+function parentDoc(dir, io) {
+  const name = path.basename(dir);
+  const doc = path.join(dir, `${name}.md`);
+  return { name, doc, parsed: parse(name), exists: io.exists(doc) };
+}
+
+/**
+ * Check one prd / epic / story document against the scheme. Filesystem access is
+ * injected (`ctx.io = { readFile, exists, readDir }`) so the unit tests stay pure.
+ * Collects every finding rather than stopping at the first — except `bad-shape`,
+ * after which there are no numbers to check anything else against.
+ * @returns {object[]} findings `{ reason, path, detail }`; empty means ok.
+ */
+function check(docPath, ctx = {}) {
+  const io = ctx.io || REAL_FS;
+  const prdRoot = ctx.prdRoot || "docs/prd";
+  const out = [];
+  const base = path.basename(docPath);
+  const p = parse(base);
+  if (
+    !p.ok ||
+    p.artifact ||
+    !HIERARCHICAL.includes(p.kind) ||
+    !base.endsWith(".md")
+  ) {
+    const why = !p.ok
+      ? p.reason
+      : p.artifact
+        ? `an artifact (${p.artifact}), not a document`
+        : `a ${p.kind} document is not checked here`;
+    return [finding("bad-shape", docPath, `${base}: ${why}`)];
+  }
+  const stem = stemOf(base);
+  const dir = path.dirname(docPath);
+  if (path.basename(dir) !== stem) {
+    out.push(
+      finding(
+        "dir-stem-mismatch",
+        docPath,
+        `directory ${path.basename(dir)} ≠ ${stem}`,
+      ),
+    );
+  }
+
+  // Frontmatter numbers must equal the filename's.
+  const src = io.readFile(docPath);
+  if (src === null) {
+    out.push(finding("frontmatter-mismatch", docPath, "document unreadable"));
+  } else {
+    const want = { prd_number: p.prd };
+    if (p.kind === "epic") want.epic_number = p.epic;
+    for (const [key, val] of Object.entries(want)) {
+      const got = frontmatterField(src, key);
+      if (got !== String(val)) {
+        out.push(
+          finding(
+            "frontmatter-mismatch",
+            docPath,
+            `${key}: ${got || "(missing)"} ≠ ${val}`,
+          ),
+        );
+      }
+    }
+    if (p.kind === "story") {
+      const epicRef = frontmatterField(src, "epic");
+      const e = parse(epicRef);
+      if (
+        !e.ok ||
+        e.kind !== "epic" ||
+        e.artifact ||
+        e.prd !== p.prd ||
+        e.epic !== p.epic
+      ) {
+        out.push(
+          finding(
+            "frontmatter-mismatch",
+            docPath,
+            `epic: ${epicRef || "(missing)"} is not epic.${p.prd}.${p.epic}.{slug}`,
+          ),
+        );
+      }
+    }
+  }
+
+  // The parent: an epic's PRD and a story's epic are two directories up
+  // (…/prd.P.x/epics/epic.P.E.y/, …/epic.P.E.y/stories/story.P.E.S.z/).
+  if (p.kind !== "prd") {
+    const parentKind = p.kind === "epic" ? "prd" : "epic";
+    const parent = parentDoc(path.dirname(path.dirname(dir)), io);
+    const pp = parent.parsed;
+    if (!pp.ok || pp.kind !== parentKind || pp.artifact || !parent.exists) {
+      out.push(
+        finding(
+          "parent-missing",
+          docPath,
+          `no ${parentKind} document at ${parent.doc}`,
+        ),
+      );
+    } else if (
+      pp.prd !== p.prd ||
+      (parentKind === "epic" && pp.epic !== p.epic)
+    ) {
+      out.push(
+        finding(
+          "parent-number-mismatch",
+          docPath,
+          `${p.id} sits under ${pp.id}`,
+        ),
+      );
+    }
+  }
+
+  // A PRD needs its registry row.
+  if (p.kind === "prd") {
+    const regPath = path.join(prdRoot, "prd-registry.md");
+    const reg = io.readFile(regPath);
+    if (reg === null)
+      out.push(finding("registry-missing", docPath, `${regPath} not found`));
+    else if (!registryNumbers(reg).includes(p.prd)) {
+      out.push(
+        finding("unregistered", docPath, `no row ${p.prd} in ${regPath}`),
+      );
+    }
+  }
+  return out;
+}
+
+/** True when a basename names an artifact even though it does not parse (legacy). */
+function looksLikeArtifact(base) {
+  return stemOf(base)
+    .split(".")
+    .slice(1)
+    .some((s) => ARTIFACTS.includes(s));
+}
+
+/**
+ * Walk `prdRoot` and check every prd / epic / story DOCUMENT — any `.md` whose name
+ * starts with one of those kind words, artifacts excepted. `prd-registry.md` and
+ * shard files carry no kind prefix and are never considered. Adds one
+ * `duplicate-id` per id held by more than one document.
+ * @returns {object} `{ reason: "ok" | "findings" | "empty" | "root-missing",
+ *   findings, documents }`
+ */
+function checkCorpus(prdRoot, ctx = {}) {
+  const io = ctx.io || REAL_FS;
+  if (!io.exists(prdRoot)) {
+    return Object.freeze({
+      reason: "root-missing",
+      findings: [],
+      documents: 0,
+    });
+  }
+  const docs = [];
+  const walk = (dir) => {
+    for (const ent of io.readDir(dir) || []) {
+      const full = path.join(dir, ent.name);
+      if (ent.dir) {
+        walk(full);
+        continue;
+      }
+      if (!ent.name.endsWith(".md")) continue;
+      const kind = ent.name.split(".")[0];
+      if (!HIERARCHICAL.includes(kind)) continue;
+      const p = parse(ent.name);
+      if (p.ok ? p.artifact : looksLikeArtifact(ent.name)) continue;
+      docs.push(full);
+    }
+  };
+  walk(prdRoot);
+  docs.sort();
+  if (docs.length === 0)
+    return Object.freeze({ reason: "empty", findings: [], documents: 0 });
+
+  const findings = [];
+  const byId = new Map();
+  for (const doc of docs) {
+    findings.push(...check(doc, { io, prdRoot }));
+    const p = parse(path.basename(doc));
+    if (p.ok && !p.artifact) byId.set(p.id, [...(byId.get(p.id) || []), doc]);
+  }
+  for (const [id, paths] of byId) {
+    if (paths.length > 1) {
+      findings.push(
+        finding(
+          "duplicate-id",
+          paths[1],
+          `${id} is held by ${paths.join(", ")}`,
+        ),
+      );
+    }
+  }
+  return Object.freeze({
+    reason: findings.length ? "findings" : "ok",
+    findings,
+    documents: docs.length,
+  });
+}
+
+/** Read a `--flag <value>` / `--flag=value` argument; "" when absent. */
+function argValue(argv, flag) {
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === flag) {
+      const v = argv[i + 1];
+      return v && !v.startsWith("--") ? v : "";
+    }
+    if (argv[i].startsWith(`${flag}=`)) return argv[i].slice(flag.length + 1);
+  }
+  return "";
+}
+
+/**
+ * PRD_ROOT, in the order generate-prd-epic-index.mjs's prdRootFromConfig uses:
+ * `--prd-root`, then skills-config.yaml `prd.prdShardedLocation`, then `docs/prd`.
+ * A sibling of that function, not shared with it: the generator runs its CLI at
+ * import. Task 205 switches the generator to this resolver.
+ */
+function resolvePrdRoot(argv = [], cwd = process.cwd()) {
+  const flag = argValue(argv, "--prd-root");
+  if (flag) return flag;
+  let text = "";
+  try {
+    text = fs.readFileSync(path.join(cwd, "skills-config.yaml"), "utf8");
+  } catch {
+    return "docs/prd";
+  }
+  let inBlock = false;
+  for (const line of text.split("\n")) {
+    if (/^prd:\s*(#.*)?$/.test(line)) {
+      inBlock = true;
+      continue;
+    }
+    if (inBlock && /^\S/.test(line)) inBlock = false;
+    if (inBlock) {
+      const m = line.match(/^\s+prdShardedLocation:\s*(.+?)\s*$/);
+      if (m) return m[1].replace(/^['"]|['"]$/g, "").trim() || "docs/prd";
+    }
+  }
+  return "docs/prd";
+}
+
+// ---------------------------------------------------------------------------
+// CLI
+// ---------------------------------------------------------------------------
+
+const USAGE = `Usage:
+  doc-id parse <name> [--json]
+  doc-id next prd   [--prd-root R] [--json]
+  doc-id next epic  --prd-dir <dir> [--json]
+  doc-id next story --epic-dir <dir> [--json]
+  doc-id check <path> [--prd-root R] [--json]
+  doc-id check --corpus [--prd-root R] [--json]
+`;
+
+/** Directory names one level down, or [] when the directory is absent. */
+function childDirs(dir, io) {
+  return (io.readDir(dir) || []).filter((e) => e.dir).map((e) => e.name);
+}
+
+/** Every directory name under `root`, any depth. */
+function allDirs(root, io) {
+  const out = [];
+  const walk = (d) => {
+    for (const name of childDirs(d, io)) {
+      out.push(name);
+      walk(path.join(d, name));
+    }
+  };
+  walk(root);
+  return out;
+}
+
+/**
+ * Run the CLI over `argv` (no node / script entries). Pure apart from `io`:
+ * returns `{ exitCode, payload }` and writes nothing.
+ */
+function runCli(argv, { cwd = process.cwd(), io = REAL_FS } = {}) {
+  const usage = (error) => ({
+    exitCode: 2,
+    payload: { reason: "usage", exitCode: 2, error },
+  });
+  const flagsWithValue = ["--prd-root", "--prd-dir", "--epic-dir"];
+  const positional = [];
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (flagsWithValue.includes(a)) i++;
+    else if (!a.startsWith("--")) positional.push(a);
+  }
+  const known = ["--json", "--corpus", ...flagsWithValue];
+  const unknown = argv.filter(
+    (a) => a.startsWith("--") && !known.includes(a.split("=")[0]),
+  );
+  if (unknown.length) return usage(`unknown flag ${unknown[0]}`);
+  const [cmd, arg] = positional;
+  const done = (exitCode, body) => ({
+    exitCode,
+    payload: { ...body, exitCode },
+  });
+
+  if (cmd === "parse") {
+    if (!arg) return usage("parse needs a <name>");
+    const p = parse(arg);
+    return done(p.ok ? 0 : 1, { ...p, reason: p.ok ? "ok" : p.reason });
+  }
+
+  if (cmd === "next") {
+    if (arg === "prd") {
+      const root = resolvePrdRoot(argv, cwd);
+      const reg = io.readFile(path.join(root, "prd-registry.md"));
+      const r = next("prd", allDirs(root, io), reg);
+      return done(r.ok ? 0 : 1, { ...r, prdRoot: root });
+    }
+    if (arg === "epic" || arg === "story") {
+      const flag = arg === "epic" ? "--prd-dir" : "--epic-dir";
+      const dir = argValue(argv, flag);
+      if (!dir) return usage(`next ${arg} needs ${flag} <dir>`);
+      const parent = parse(path.basename(dir));
+      const parentKind = arg === "epic" ? "prd" : "epic";
+      if (!parent.ok || parent.kind !== parentKind || parent.artifact) {
+        return done(1, {
+          ok: false,
+          reason: "bad-shape",
+          detail: `${dir} is not a ${parentKind} directory`,
+        });
+      }
+      const children = childDirs(
+        path.join(dir, arg === "epic" ? "epics" : "stories"),
+        io,
+      ).filter((n) => {
+        const c = parse(n);
+        return (
+          c.ok &&
+          c.prd === parent.prd &&
+          (arg === "epic" || c.epic === parent.epic)
+        );
+      });
+      const r = next(arg, children, null);
+      const id =
+        arg === "epic"
+          ? `epic.${parent.prd}.${r.next}`
+          : `story.${parent.prd}.${parent.epic}.${r.next}`;
+      return done(0, { ...r, id });
+    }
+    return usage("next needs prd | epic | story");
+  }
+
+  if (cmd === "check") {
+    const prdRoot = resolvePrdRoot(argv, cwd);
+    if (argv.includes("--corpus")) {
+      const r = checkCorpus(prdRoot, { io });
+      const code = r.reason === "ok" || r.reason === "empty" ? 0 : 1;
+      return done(code, {
+        reason: r.reason,
+        prdRoot,
+        documents: r.documents,
+        findings: r.findings,
+      });
+    }
+    if (!arg) return usage("check needs <path> or --corpus");
+    const findings = check(arg, { io, prdRoot });
+    return done(findings.length ? 1 : 0, {
+      reason: findings.length ? "findings" : "ok",
+      findings,
+    });
+  }
+
+  return usage(cmd ? `unknown command ${cmd}` : "no command");
+}
+
+function render(payload) {
+  if (payload.reason === "usage") return `doc-id: ${payload.error}\n${USAGE}`;
+  if (payload.findings) {
+    const lines = payload.findings.map(
+      (f) => `  ✖ ${f.reason}  ${f.path} — ${f.detail}`,
+    );
+    return [`doc-id: ${payload.reason}`, ...lines].join("\n") + "\n";
+  }
+  if (payload.next !== undefined) return `${payload.next}\n`;
+  if (payload.id && payload.ok) return `${payload.id} (${payload.kind})\n`;
+  return `doc-id: ${payload.reason}\n`;
+}
+
+if (require.main === module) {
+  const argv = process.argv.slice(2);
+  const { exitCode, payload } = runCli(argv);
+  const json = argv.includes("--json");
+  // Set exitCode and let the process end on its own: process.exit() after an
+  // async stdout write truncates a large payload on a pipe (the select-next defect).
+  const text = json ? JSON.stringify(payload, null, 2) + "\n" : render(payload);
+  (exitCode === 2 && !json ? process.stderr : process.stdout).write(text);
+  process.exitCode = exitCode;
+}
+
+module.exports = {
+  ARTIFACTS,
+  CHECK_REASONS,
+  KINDS,
+  parse,
+  parseLegacy,
+  format,
+  matchesEpic,
+  next,
+  nextNumber,
+  check,
+  checkCorpus,
+  resolvePrdRoot,
+  registryNumbers,
+  frontmatterField,
+  runCli,
+};
