@@ -46,14 +46,6 @@ const LITERALS = [
 
 // file → why it may still carry a literal. Each must still carry one.
 const ALLOW = new Map([
-  [
-    "skills/create-prd/SKILL.md",
-    "task.204 — PRD skills move to per-PRD numbering",
-  ],
-  [
-    "skills/review-prd/SKILL.md",
-    "task.204 — PRD skills move to per-PRD numbering",
-  ],
   ["shared/resources/open-knowledge-format.md", "task.207 — prose sweep"],
   [
     "shared/resources/migrate-doc-numbering.mjs",

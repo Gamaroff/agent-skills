@@ -1,0 +1,459 @@
+/**
+ * Numbered PRDs in the PRD skills (task 204).
+ *
+ * Every row slices a LIVE fenced block out of skills/create-prd/SKILL.md or
+ * skills/review-prd/SKILL.md, by the marker on its first line, and runs it under bash
+ * in a consumer-shaped root (makeConsumerRoot: `.agents/skills -> <repo>/skills`), so
+ * the test follows the text as shipped and the bundled `references/doc-id.js` copies
+ * it reaches. It asserts what the block does — the number, the exit code, the file it
+ * writes — never that a string exists.
+ *
+ * Rows are numbered as in the task document's Testing Strategy (§ 8).
+ */
+
+import { test, before } from "node:test";
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { spawnBudget } from "../../../shared/resources/spawn-budget.mjs";
+import { makeConsumerRoot } from "../lib/consumer-root.mjs";
+
+const REPO = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  "..",
+);
+const { timeoutMs: SPAWN_TIMEOUT_MS } = spawnBudget("prd-skill-numbering");
+
+// The repository's one fence reader (the QA snippet runner's), so a block is found the
+// way every other engine finds it. ESM, loaded once.
+let extractBlocks;
+before(async () => {
+  ({ extractBlocks } =
+    await import("../../../shared/resources/qa-execute-snippets.mjs"));
+});
+
+const skillText = (skill) =>
+  readFileSync(path.join(REPO, "skills", skill, "SKILL.md"), "utf8");
+
+/** The one ```bash block of `skill` whose first line starts with `marker`. */
+function blockBy(skill, marker) {
+  const blocks = extractBlocks(skillText(skill))
+    .map(({ code }) => code)
+    .filter((body) => body.trimStart().startsWith(marker));
+  assert.equal(blocks.length, 1, `${skill}: one block marked "${marker}"`);
+  return blocks[0];
+}
+
+const ALLOCATE = () =>
+  blockBy("create-prd", "# create-prd — allocate a new PRD number");
+const KEEP = () =>
+  blockBy("create-prd", "# create-prd — keep the found PRD's number");
+const REGISTER = () =>
+  blockBy("create-prd", "# create-prd — write the PRD registry row");
+const CHECK = () =>
+  blockBy("create-prd", "# create-prd — numbering check, blocking");
+const RESOLVE = () => blockBy("review-prd", "# review-prd — resolve the PRD");
+const NUMBERING = () => blockBy("review-prd", "# review-prd — numbering check");
+const MIG_PLAN = () =>
+  blockBy("review-prd", "# review-prd — numbering migration plan, read-only");
+const MIG_APPLY = () =>
+  blockBy("review-prd", "# review-prd — apply the numbering migration");
+const REPORT_N = () =>
+  blockBy("review-prd", "# review-prd — next review report number");
+
+/** A fresh consumer root holding `files` (repo-relative path → content). */
+function tree(files = {}) {
+  const root = makeConsumerRoot(REPO, "prd-204-");
+  for (const [rel, content] of Object.entries(files)) {
+    mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
+    writeFileSync(path.join(root, rel), content);
+  }
+  return root;
+}
+
+/** Run `script` under bash in `cwd` with `env`; `tail` runs after it in the same shell. */
+function run(script, cwd, env = {}, tail = "") {
+  const r = spawnSync(
+    "bash",
+    ["--noprofile", "--norc", "-c", `${script}\n${tail}`],
+    {
+      cwd,
+      encoding: "utf8",
+      timeout: SPAWN_TIMEOUT_MS,
+      env: {
+        ...process.env,
+        PATH: `${path.dirname(process.execPath)}:${process.env.PATH}`,
+        ...env,
+      },
+    },
+  );
+  return { code: r.status, out: `${r.stdout}${r.stderr}` };
+}
+
+const registry = (next, rows = []) =>
+  [
+    "---",
+    "type: registry",
+    "---",
+    "",
+    "# PRD Registry",
+    "",
+    `**Next Available PRD Number:** **${next}**`,
+    "",
+    "| PRD # | Title | Folder | Status | Created |",
+    "|---|---|---|---|---|",
+    ...rows.map(
+      ([n, slug, domain]) =>
+        `| ${n} | [${slug}](${domain}/prd.${n}.${slug}/prd.${n}.${slug}.md) | ${domain} | draft | 2026-10-15 |`,
+    ),
+    "",
+  ].join("\n");
+
+const prdDoc = (n, slug) =>
+  `---\nname: prd.${n}.${slug}\nprd_number: ${n}\ntype: prd\n---\n# PRD ${slug}\n`;
+const prdPath = (n, slug, domain = slug) =>
+  `docs/prd/${domain}/prd.${n}.${slug}/prd.${n}.${slug}.md`;
+const REG = "docs/prd/prd-registry.md";
+
+// ── create-prd ─────────────────────────────────────────────────────────────
+
+test("row 1: an empty PRD root allocates 1, and the row block creates the registry with row 1 and counter 2", () => {
+  const root = tree({ "docs/prd/.keep": "" });
+  const env = { DOMAIN: "shop", FEATURE: "shop" };
+  const a = run(ALLOCATE(), root, env, 'echo "GOT P=$P FILE=$PRD_FILE"');
+  assert.equal(a.code, 0, a.out);
+  assert.match(
+    a.out,
+    /GOT P=1 FILE=docs\/prd\/shop\/prd\.1\.shop\/prd\.1\.shop\.md/,
+  );
+  assert.match(a.out, /\(bootstrap\)/);
+  assert.equal(
+    existsSync(path.join(root, REG)),
+    false,
+    "allocation writes nothing",
+  );
+
+  // The PRD is written (create-doc's job), then registered.
+  mkdirSync(path.join(root, "docs/prd/shop/prd.1.shop"), { recursive: true });
+  writeFileSync(path.join(root, prdPath(1, "shop")), prdDoc(1, "shop"));
+  const w = run(REGISTER(), root, {
+    P: "1",
+    DOMAIN: "shop",
+    PRD_FILE: prdPath(1, "shop"),
+    TITLE: "Shop PRD",
+  });
+  assert.equal(w.code, 0, w.out);
+  const reg = readFileSync(path.join(root, REG), "utf8");
+  assert.match(reg, /\*\*Next Available PRD Number:\*\* \*\*2\*\*/);
+  assert.match(
+    reg,
+    /^\| 1 \| \[Shop PRD\]\(shop\/prd\.1\.shop\/prd\.1\.shop\.md\) \| shop \| draft \| \d{4}-\d{2}-\d{2} \|$/m,
+  );
+});
+
+test("row 1b: no registry but a numbered PRD on disk — the allocation halts and writes nothing", () => {
+  const root = tree({ [prdPath(2, "x")]: prdDoc(2, "x") });
+  const a = run(
+    ALLOCATE(),
+    root,
+    { DOMAIN: "shop", FEATURE: "shop" },
+    'echo "GOT P=$P"',
+  );
+  assert.equal(a.code, 1, a.out);
+  assert.match(a.out, /registry-missing/);
+  assert.doesNotMatch(a.out, /GOT P=/);
+  assert.equal(existsSync(path.join(root, REG)), false);
+});
+
+test("row 2: the registry's counter is the number — next = 3 allocates 3, not a directory count", () => {
+  const root = tree({
+    [REG]: registry(3, [
+      [1, "a", "a"],
+      [2, "b", "b"],
+    ]),
+    [prdPath(1, "a")]: prdDoc(1, "a"),
+    [prdPath(2, "b")]: prdDoc(2, "b"),
+  });
+  const a = run(
+    ALLOCATE(),
+    root,
+    { DOMAIN: "c", FEATURE: "c" },
+    'echo "GOT P=$P"',
+  );
+  assert.equal(a.code, 0, a.out);
+  assert.match(a.out, /GOT P=3\b/);
+});
+
+test("allocation refuses a feature slug no PRD name can carry", () => {
+  const root = tree({ [REG]: registry(1) });
+  const a = run(
+    ALLOCATE(),
+    root,
+    { DOMAIN: "x", FEATURE: "3d-shop" },
+    'echo "GOT P=$P"',
+  );
+  assert.equal(a.code, 1, a.out);
+  assert.match(a.out, /bad-slug/);
+});
+
+test("row 3: a numbered, registered PRD passes the blocking check", () => {
+  const root = tree({
+    [REG]: registry(2, [[1, "shop", "shop"]]),
+    [prdPath(1, "shop")]: prdDoc(1, "shop"),
+  });
+  const c = run(CHECK(), root, { PRD_FILE: prdPath(1, "shop") });
+  assert.equal(c.code, 0, c.out);
+  assert.match(c.out, /numbering ok/);
+});
+
+test("row 4: the same PRD without prd_number fails the check and the HALT branch fires", () => {
+  const root = tree({
+    [REG]: registry(2, [[1, "shop", "shop"]]),
+    [prdPath(1, "shop")]: "---\nname: prd.1.shop\ntype: prd\n---\n# PRD\n",
+  });
+  const c = run(
+    CHECK(),
+    root,
+    { PRD_FILE: prdPath(1, "shop") },
+    'echo "AFTER-HALT"',
+  );
+  assert.equal(c.code, 1, c.out);
+  assert.match(c.out, /HALT/);
+  assert.match(c.out, /frontmatter-mismatch/);
+  assert.doesNotMatch(c.out, /AFTER-HALT/, "the block must stop the run");
+});
+
+test("row 8: continuation keeps the found PRD's number and leaves the registry byte-identical", () => {
+  const reg = registry(5, [[4, "x", "x"]]);
+  const root = tree({ [REG]: reg, [prdPath(4, "x")]: prdDoc(4, "x") });
+  const k = run(
+    KEEP(),
+    root,
+    { FOUND_PRD: prdPath(4, "x") },
+    'echo "GOT P=$P"',
+  );
+  assert.equal(k.code, 0, k.out);
+  assert.match(k.out, /GOT P=4\b/);
+  assert.equal(readFileSync(path.join(root, REG), "utf8"), reg);
+});
+
+test("row 9: continuation on a legacy unnumbered PRD halts and points at /review-prd", () => {
+  const root = tree({
+    [REG]: registry(1),
+    "docs/prd/x/prd.x/prd.x.md": "---\ntype: prd\n---\n# PRD\n",
+  });
+  const k = run(
+    KEEP(),
+    root,
+    { FOUND_PRD: "docs/prd/x/prd.x/prd.x.md" },
+    'echo "GOT P=$P"',
+  );
+  assert.equal(k.code, 1, k.out);
+  assert.match(k.out, /review-prd/);
+  assert.doesNotMatch(k.out, /GOT P=/);
+});
+
+test("row 11: allocation, the registry row and the check are exactly three node processes", () => {
+  const root = tree({ [REG]: registry(1) });
+  // A `node` shim first on PATH counts every process the blocks start, then runs the real one.
+  const shimDir = path.join(root, ".shim");
+  mkdirSync(shimDir);
+  const log = path.join(root, ".node-calls");
+  writeFileSync(
+    path.join(shimDir, "node"),
+    `#!/bin/sh\necho x >> "${log}"\nexec "${process.execPath}" "$@"\n`,
+  );
+  chmodSync(path.join(shimDir, "node"), 0o755);
+  const env = {
+    PATH: `${shimDir}:${path.dirname(process.execPath)}:${process.env.PATH}`,
+    DOMAIN: "shop",
+    FEATURE: "shop",
+    TITLE: "Shop",
+  };
+  const write = `mkdir -p "$PRD_DIR" && printf -- '---\\nname: prd.1.shop\\nprd_number: 1\\ntype: prd\\n---\\n' > "$PRD_FILE"`;
+  const r = run([ALLOCATE(), write, REGISTER(), CHECK()].join("\n"), root, env);
+  assert.equal(r.code, 0, r.out);
+  const calls = readFileSync(log, "utf8").trim().split("\n").length;
+  assert.equal(calls, 3, `node processes: ${calls}`);
+});
+
+// ── review-prd ─────────────────────────────────────────────────────────────
+
+/** A legacy PRD with a legacy epic, plus — the control — a numbered PRD whose epic carries another P. */
+const LEGACY_TREE = {
+  [REG]: registry(3, [[2, "chat", "chat"]]),
+  "docs/prd/onboarding/prd.onboarding/prd.onboarding.md":
+    "---\ntitle: Onboarding\nstatus: draft\ntype: prd\n---\n# PRD\n",
+  "docs/prd/onboarding/prd.onboarding/epics/epic.4.tour/epic.4.tour.md":
+    "---\nepic_number: 4\ntitle: Tour\nstatus: draft\n---\n# Epic\n",
+  [prdPath(2, "chat")]: prdDoc(2, "chat"),
+  "docs/prd/chat/prd.2.chat/epics/epic.3.1.feed/epic.3.1.feed.md":
+    "---\nprd_number: 3\nepic_number: 1\ntitle: Feed\n---\n# Epic\n",
+};
+
+function gitInit(root) {
+  for (const args of [
+    ["init", "-q"],
+    ["add", "-A"],
+    ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "fixture"],
+  ]) {
+    const r = spawnSync("git", args, { cwd: root, encoding: "utf8" });
+    assert.equal(r.status, 0, r.stderr);
+  }
+}
+
+test("row 5: a legacy PRD and its epic are each a Critical finding; a numbered PRD's wrong-P epic is too", () => {
+  const root = tree(LEGACY_TREE);
+  const legacy = run(NUMBERING(), root, {
+    PRD_FILE: "docs/prd/onboarding/prd.onboarding/prd.onboarding.md",
+  });
+  assert.equal(legacy.code, 0, legacy.out); // findings are reported, not a crash
+  assert.match(
+    legacy.out,
+    /\[Critical\] numbering bad-shape: .*prd\.onboarding\.md/,
+  );
+  assert.match(
+    legacy.out,
+    /\[Critical\] numbering bad-shape: .*epic\.4\.tour\.md/,
+  );
+  assert.doesNotMatch(
+    legacy.out,
+    /chat/,
+    "findings stay inside this PRD's directory",
+  );
+
+  const control = run(NUMBERING(), root, { PRD_FILE: prdPath(2, "chat") });
+  assert.match(
+    control.out,
+    /\[Critical\] numbering parent-number-mismatch: .*epic\.3\.1\.feed\.md/,
+  );
+  assert.doesNotMatch(control.out, /onboarding/);
+});
+
+test("row 10: a deleted registry and a wrong prd_number are each a Critical finding", () => {
+  const root = tree({
+    [prdPath(1, "a")]: prdDoc(1, "a"),
+    [prdPath(2, "b")]: "---\nname: prd.2.b\nprd_number: 7\ntype: prd\n---\n",
+  });
+  const missing = run(NUMBERING(), root, { PRD_FILE: prdPath(1, "a") });
+  assert.match(
+    missing.out,
+    /\[Critical\] numbering registry-missing: .*prd\.1\.a\.md/,
+  );
+  const wrong = run(NUMBERING(), root, { PRD_FILE: prdPath(2, "b") });
+  assert.match(
+    wrong.out,
+    /\[Critical\] numbering frontmatter-mismatch: .*prd_number: 7 ≠ 2/,
+  );
+});
+
+test("a clean numbered PRD has no numbering findings", () => {
+  const root = tree({
+    [REG]: registry(2, [[1, "a", "a"]]),
+    [prdPath(1, "a")]: prdDoc(1, "a"),
+  });
+  const r = run(NUMBERING(), root, { PRD_FILE: prdPath(1, "a") });
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /numbering ok/);
+  assert.doesNotMatch(r.out, /Critical/);
+});
+
+test("row 6: the migration plan lists the renames and writes nothing", () => {
+  const root = tree({
+    [REG]: registry(1),
+    "docs/prd/onboarding/prd.onboarding/prd.onboarding.md":
+      LEGACY_TREE["docs/prd/onboarding/prd.onboarding/prd.onboarding.md"],
+    "docs/prd/onboarding/prd.onboarding/epics/epic.4.tour/epic.4.tour.md":
+      LEGACY_TREE[
+        "docs/prd/onboarding/prd.onboarding/epics/epic.4.tour/epic.4.tour.md"
+      ],
+  });
+  gitInit(root);
+  const r = run(MIG_PLAN(), root);
+  assert.match(r.out, /migration: needs-migration/);
+  assert.match(r.out, /prd prd\.onboarding → 1 .*prd\.1\.onboarding\.md/);
+  assert.match(r.out, /epic 4 → 1\.1 /);
+  assert.doesNotMatch(r.out, /blocker/);
+  const st = spawnSync("git", ["status", "--porcelain"], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  assert.equal(
+    st.stdout.replace(/^\?\? \.agents\/\n/m, ""),
+    "",
+    "the plan writes nothing",
+  );
+});
+
+test("row 6b: apply moves the PRD, and the numbering check on its new path is clean", () => {
+  const root = tree({
+    [REG]: registry(1),
+    "docs/prd/onboarding/prd.onboarding/prd.onboarding.md":
+      LEGACY_TREE["docs/prd/onboarding/prd.onboarding/prd.onboarding.md"],
+    "docs/prd/onboarding/prd.onboarding/epics/epic.4.tour/epic.4.tour.md":
+      LEGACY_TREE[
+        "docs/prd/onboarding/prd.onboarding/epics/epic.4.tour/epic.4.tour.md"
+      ],
+  });
+  writeFileSync(path.join(root, ".gitignore"), ".agents/\n");
+  gitInit(root);
+  const a = run(MIG_APPLY(), root);
+  assert.equal(a.code, 0, a.out);
+  assert.match(a.out, /migration: ok/);
+  const resolved = run(RESOLVE(), root, { PRD_INPUT: "1" });
+  assert.equal(resolved.code, 0, resolved.out);
+  const file = resolved.out.match(/PRD_FILE=(\S+)/)[1];
+  assert.equal(
+    file,
+    "docs/prd/onboarding/prd.1.onboarding/prd.1.onboarding.md",
+  );
+  const c = run(NUMBERING(), root, { PRD_FILE: file });
+  assert.equal(c.code, 0, c.out);
+  assert.match(c.out, /numbering ok/);
+});
+
+test("row 7: resolving 1 picks prd.1's document — not prd.12, not a review report — and the next report is 4 (highest + 1, not count + 1)", () => {
+  const root = tree({
+    [REG]: registry(13, [
+      [1, "x", "x"],
+      [12, "other", "other"],
+    ]),
+    [prdPath(1, "x")]: prdDoc(1, "x"),
+    "docs/prd/x/prd.1.x/prd.1.x.review.1.y.md": "# review\n",
+    "docs/prd/x/prd.1.x/prd.1.x.review.3.y.md": "# review\n",
+    [prdPath(12, "other")]: prdDoc(12, "other"),
+  });
+  for (const input of ["1", "prd.1"]) {
+    const r = run(RESOLVE(), root, { PRD_INPUT: input });
+    assert.equal(r.code, 0, `${input}: ${r.out}`);
+    assert.match(r.out, /PRD_FILE=docs\/prd\/x\/prd\.1\.x\/prd\.1\.x\.md$/m);
+  }
+  const bySlug = run(RESOLVE(), root, { PRD_INPUT: "other" });
+  assert.match(bySlug.out, /PRD_FILE=.*prd\.12\.other\.md$/m);
+  const n = run(REPORT_N(), root, { PRD_FILE: prdPath(1, "x") });
+  assert.equal(n.code, 0, n.out);
+  assert.match(
+    n.out,
+    /REPORT=docs\/prd\/x\/prd\.1\.x\/prd\.1\.x\.review\.4\.\{name\}\.md/,
+  );
+});
+
+test("a legacy PRD still resolves by its slug, so review-prd can report it", () => {
+  const root = tree({
+    "docs/prd/onboarding/prd.onboarding/prd.onboarding.md": "# PRD\n",
+    "docs/prd/onboarding/prd.onboarding/prd.onboarding.review.1.x.md": "# r\n",
+  });
+  const r = run(RESOLVE(), root, { PRD_INPUT: "onboarding" });
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /PRD_FILE=.*\/prd\.onboarding\/prd\.onboarding\.md$/m);
+});

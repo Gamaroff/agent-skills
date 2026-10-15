@@ -41,6 +41,32 @@ const REPO_ROOT = path.resolve(__dirname, "..");
 
 // Declared inputs — `file#NAME`: why the document may read it unbound.
 const INPUTS = new Map([
+  // task.204: create-prd's Step 1.5 / registry-row blocks and review-prd's resolution and migration
+  // blocks each run as their own shell; their inputs are bound by the agent from the step before.
+  [
+    "skills/create-prd/SKILL.md#DOMAIN",
+    "input of the allocate / register blocks (the PRD's domain directory); the `:?` is the loud-failure guard",
+  ],
+  [
+    "skills/create-prd/SKILL.md#FEATURE",
+    "input of the allocate block (the feature slug); the `:?` is the loud-failure guard",
+  ],
+  [
+    "skills/create-prd/SKILL.md#FOUND_PRD",
+    "input of the keep-the-number block (the PRD continuation detection found); the `:?` is the loud-failure guard",
+  ],
+  [
+    "skills/create-prd/SKILL.md#TITLE",
+    "input of the register block (the PRD title); the `:?` is the loud-failure guard",
+  ],
+  [
+    "skills/review-prd/SKILL.md#PRD_INPUT",
+    "input of the resolve block (the skill's argument: a number, id, slug or path); the `:?` is the loud-failure guard",
+  ],
+  [
+    "skills/review-prd/SKILL.md#MIG_NAME",
+    "optional input of the migration blocks — empty unless the plan blocked on unplaced-prd and the user named the slug",
+  ],
   // task.205: the Discover Parent PRD and Input Resolution blocks each run as their own shell, so
   // their inputs are bound by the agent from the steps before them; each `${NAME:?}` is the guard.
   [
