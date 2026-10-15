@@ -49,8 +49,11 @@
  * Blocker codes: prd-less-epic, unplaced-prd, in-flight, target-exists, dirty-path,
  * link-would-break, registry-behind, registry-missing — plus two that doc-id.js can
  * answer and this module passes through rather than guessing past: registry-invalid
- * (a registry with no usable counter) and bad-slug (a legacy slug that no hierarchical
- * name can carry, such as one starting with a digit).
+ * (a registry with no usable counter), registry-unwritable (appendPrdRow refused a
+ * row: no PRD table header it recognises, a duplicate, a malformed cell) and bad-slug
+ * (a legacy slug that no hierarchical name can carry, such as one starting with a
+ * digit). Every one of them is raised by the dry run and by --check, before --apply
+ * writes anything.
  */
 import { createRequire } from "node:module";
 import fs from "node:fs";
@@ -74,6 +77,7 @@ export const BLOCKER_CODES = Object.freeze([
   "registry-behind",
   "registry-missing",
   "registry-invalid",
+  "registry-unwritable",
   "bad-slug",
 ]);
 
@@ -596,9 +600,7 @@ export function plan(disc, registryText, io) {
       if (f === p.doc || base.startsWith(`${p.oldStem}.`))
         explicit.set(f, P.join(p.newDir, renameBase(base, p.rule)));
     }
-    if (p.shape === "L3" && p.doc !== P.join(root, "index.md"))
-      explicit.set(p.doc, P.join(p.newDir, `${p.newStem}.md`));
-    else if (p.shape === "L3")
+    if (p.shape === "L3")
       explicit.set(p.doc, P.join(p.newDir, `${p.newStem}.md`));
   }
 
@@ -618,8 +620,11 @@ export function plan(disc, registryText, io) {
     return out;
   };
 
+  // Every discovered file, plus every explicit move — the L3 monolith sits beside
+  // the root, outside the walk, and reaches the map only through `explicit`
+  // (task.203 QA cycle 1, CR-1).
   const fileMap = new Map();
-  for (const f of disc.files) {
+  for (const f of new Set([...disc.files, ...explicit.keys()])) {
     const to = mapPath(f);
     if (to !== f) fileMap.set(f, to);
   }
@@ -977,7 +982,16 @@ export function planEdits(planned, disc, io) {
     }
     const text = io.readFile(file);
     if (text === null) continue;
-    if (!inTree && !text.includes(rootSeg) && !text.includes(prefix)) continue;
+    // A file with a frontmatter or gate edit is never skipped: the L3 monolith sits
+    // outside the root and need not name it (task.203 QA cycle 1, CR-1).
+    if (
+      !inTree &&
+      !docFields.has(file) &&
+      !gateEdits.has(file) &&
+      !text.includes(rootSeg) &&
+      !text.includes(prefix)
+    )
+      continue;
     let out = text;
 
     if (docFields.has(file)) out = editFrontmatter(out, docFields.get(file));
@@ -1202,7 +1216,7 @@ export function epicRegistryPointer(oldText, planned, { rel, repoPath }) {
  * registries. Returns { moved, written }.
  */
 export function apply(planned, disc, editsOut, io, extra = {}) {
-  const tracked = new Set(io.tracked());
+  const tracked = extra.tracked || new Set(io.tracked());
   const newDirs = new Set(
     [...planned.fileMap.values()].map((p) => P.dirname(p)),
   );
@@ -1227,6 +1241,126 @@ export function apply(planned, disc, editsOut, io, extra = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// The PRD root — the one input the caller names
+// ---------------------------------------------------------------------------
+
+/**
+ * The PRD root as a repo-relative POSIX path, or null when it is refused. Pure over
+ * the filesystem it reads (realpath only; nothing is written).
+ *
+ * Refused: an empty or non-string value, a NUL, a percent escape (a root is a
+ * directory name, never a URL), any path whose `..` segments leave `base`, an
+ * absolute path outside `base`, and a path that is lexically inside `base` but
+ * resolves outside it through a symlink — the nearest existing ancestor is
+ * realpath'd and re-checked, so a root that does not exist yet is still judged.
+ * Existence is NOT checked here: a missing root is the caller's separate `usage`.
+ * @param {string} rootArg the value the caller gave (`--root`, or the config key)
+ * @param {string} base    the repository root (absolute)
+ * @returns {string|null}
+ */
+export function checkPrdRoot(rootArg, base) {
+  if (typeof rootArg !== "string" || rootArg === "" || typeof base !== "string")
+    return null;
+  if (rootArg.includes("\0") || rootArg.includes("%")) return null;
+  const abs = path.resolve(base, rootArg);
+  const rel = path.relative(base, abs);
+  if (rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel))
+    return null;
+  let realBase;
+  try {
+    realBase = fs.realpathSync(base);
+  } catch {
+    return null;
+  }
+  let probe = abs;
+  while (!fs.existsSync(probe) && probe !== path.dirname(probe))
+    probe = path.dirname(probe);
+  let real;
+  try {
+    real = fs.realpathSync(probe);
+  } catch {
+    return null;
+  }
+  const realRel = path.relative(realBase, real);
+  if (
+    realRel === ".." ||
+    realRel.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(realRel)
+  )
+    return null;
+  return rel === "" ? "." : rel.split(path.sep).join("/");
+}
+
+/**
+ * The PRD registry text this run would write, and every reason it could not.
+ * Built before any write — in the dry run and under --check too — so a registry
+ * refusal is a blocker, never a crash after the moves (task.203 QA cycle 1, CR-3).
+ * Starts from planEdits' rewrite of the registry when there is one, so a link the
+ * link pass re-pointed in an in-tree registry is not overwritten (CR-4).
+ */
+export function planRegistry(planned, registryText, edits, io, registryPath) {
+  const blockers = [];
+  const start = edits.has(registryPath)
+    ? edits.get(registryPath)
+    : registryText;
+  let reg = start;
+  const clean = (v) => String(v).replace(/[|\r\n]+/g, "-");
+  for (const p of planned.prds.filter((x) => x.legacy)) {
+    const src = io.readFile(p.doc) || "";
+    const field = (k) => docId.frontmatterField(src, k);
+    try {
+      reg = docId.appendPrdRow(reg, {
+        n: p.n,
+        title: clean(field("title") || p.slug),
+        href: P.relative(planned.root, planned.mapPath(p.doc)),
+        folder: clean(p.domain),
+        status: clean(field("status") || "draft"),
+        created: clean(
+          field("created") || new Date().toISOString().slice(0, 10),
+        ),
+      });
+    } catch (e) {
+      blockers.push(
+        blocker(
+          "registry-unwritable",
+          registryPath,
+          `appendPrdRow refused PRD ${p.n} (${e.reason || "error"}): ${e.message}`,
+        ),
+      );
+    }
+  }
+  return {
+    text: reg,
+    changed: reg !== start || edits.has(registryPath),
+    blockers,
+  };
+}
+
+/**
+ * The command that undoes an --apply which has not been committed: restore every
+ * tracked path the run touched from HEAD (no-overlay, so a staged rename
+ * destination is removed and its source returns), and name the untracked files the
+ * run moved by plain rename — they are not in HEAD, so they are moved back by hand,
+ * never cleaned. Untracked work is left alone (task.203 QA cycle 1, CR-2).
+ */
+export function revertHint(root, touched, untrackedMoves, created = []) {
+  const q = (t) => `'${t.replace(/'/g, "'\\''")}'`;
+  const paths = [
+    ...new Set([root, ...touched.filter((t) => !isUnder(t, root))]),
+  ]
+    .filter((t) => !created.includes(t))
+    .sort()
+    .map(q);
+  let cmd = `git restore --source=HEAD --staged --worktree -- ${paths.join(" ")}`;
+  // A file the run created is untracked, so restore cannot see it: name it exactly.
+  if (created.length)
+    cmd += ` && rm -f -- ${[...created].sort().map(q).join(" ")}`;
+  if (!untrackedMoves.length) return cmd;
+  const back = untrackedMoves.map(([from, to]) => `${to} → ${from}`).join("; ");
+  return `${cmd}; then move these untracked files back by hand: ${back}`;
+}
+
+// ---------------------------------------------------------------------------
 // The run — flags → payload
 // ---------------------------------------------------------------------------
 
@@ -1247,7 +1381,7 @@ function parseArgs(argv) {
     const x = argv[i];
     const val = () => {
       const v = argv[++i];
-      if (v === undefined || v.startsWith("--"))
+      if (v === undefined || v === "" || v.startsWith("--"))
         throw new Error(`${x} needs a value`);
       return v;
     };
@@ -1257,9 +1391,11 @@ function parseArgs(argv) {
     else if (x === "--allow-in-flight") a.allowInFlight = true;
     else if (x === "--help" || x === "-h") a.help = true;
     else if (x === "--root" || x === "--prd-root") a.root = val();
-    else if (x.startsWith("--root=") || x.startsWith("--prd-root="))
+    else if (x.startsWith("--root=") || x.startsWith("--prd-root=")) {
       a.root = x.slice(x.indexOf("=") + 1);
-    else if (x === "--name") {
+      if (a.root === "")
+        throw new Error(`${x.slice(0, x.indexOf("="))} needs a value`);
+    } else if (x === "--name") {
       const v = val();
       const eq = v.lastIndexOf("=");
       if (eq <= 0 || eq === v.length - 1)
@@ -1298,11 +1434,26 @@ export function run(argv, ctx = {}) {
     io = realIo(repoRoot);
   }
   const rootArg = args.root ? ["--prd-root", args.root] : [];
-  let root = P.normalize(docId.resolvePrdRoot(rootArg, repoRoot || "."));
-  if (repoRoot && path.isAbsolute(root))
-    root = P.normalize(path.relative(repoRoot, root));
-  root = root.replace(/\/$/, "");
-  if (root.startsWith("..") || !io.exists(root) || io.readDir(root) === null)
+  const named = docId.resolvePrdRoot(rootArg, repoRoot || ".");
+  let root;
+  if (repoRoot) {
+    root = checkPrdRoot(named, repoRoot);
+    if (root === null)
+      return {
+        reason: "usage",
+        exitCode: 2,
+        error: `PRD root ${JSON.stringify(named)} is outside the repository or not a plain path`,
+      };
+  } else {
+    root = P.normalize(named).replace(/\/$/, "");
+    if (root === ".." || root.startsWith("../"))
+      return {
+        reason: "usage",
+        exitCode: 2,
+        error: `PRD root ${root} is outside the tree`,
+      };
+  }
+  if (!io.exists(root) || io.readDir(root) === null)
     return {
       reason: "usage",
       exitCode: 2,
@@ -1345,17 +1496,22 @@ export function run(argv, ctx = {}) {
       exitCode: 1,
       corpus: corpus.summary,
       findings: corpus.findings,
-      revert:
-        "nothing left to move, but the corpus is not clean — a crashed --apply? `git checkout -- . && git clean -fd " +
-        root +
-        "` restores the last commit",
+      revert: `nothing left to move, but the corpus is not clean — a crashed --apply? \`git status\` shows what changed; ${revertHint(root, io.exists(EPIC_REGISTRY) ? [EPIC_REGISTRY] : [], [])} restores the tracked files under the root (and the epic registry, when there is one) from HEAD (re-check any other file \`git status\` lists; untracked files are left alone)`,
     };
   }
 
   const e = planEdits(planned, disc, io);
+  const registry = planRegistry(
+    planned,
+    registryText,
+    e.edits,
+    io,
+    registryPath,
+  );
   const blockers = [
     ...verify(planned, disc, io, { allowInFlight: args.allowInFlight }),
     ...e.blockers,
+    ...registry.blockers,
   ];
   const report = {
     ...base,
@@ -1372,23 +1528,13 @@ export function run(argv, ctx = {}) {
   if (blockers.length) return { ...report, reason: "blocked", exitCode: 1 };
   if (!args.apply) return { ...report, reason: "dry-run", exitCode: 0 };
 
-  // Registries.
+  // Registries — validated above; written once, after the edits, and removed from
+  // the edit map so the same file is never written twice.
   const writes = [];
-  let reg = registryText;
-  for (const p of planned.prds.filter((x) => x.legacy)) {
-    const src = io.readFile(p.doc) || "";
-    const field = (k) => docId.frontmatterField(src, k);
-    const newDoc = planned.mapPath(p.doc);
-    reg = docId.appendPrdRow(reg, {
-      n: p.n,
-      title: (field("title") || p.slug).replace(/[|\r\n]+/g, "-"),
-      href: P.relative(root, newDoc),
-      folder: p.domain,
-      status: (field("status") || "draft").replace(/[|\r\n]+/g, "-"),
-      created: field("created") || new Date().toISOString().slice(0, 10),
-    });
+  if (registry.changed) {
+    e.edits.delete(registryPath);
+    writes.push([registryPath, registry.text]);
   }
-  if (reg !== registryText) writes.push([registryPath, reg]);
   if (
     planned.epics.some((x) => x.dir !== x.newDir) &&
     io.exists(EPIC_REGISTRY)
@@ -1396,13 +1542,22 @@ export function run(argv, ctx = {}) {
     const old = io.readFile(EPIC_REGISTRY) || "";
     if (docId.frontmatterField(old, "status") !== "retired") {
       const rel = P.relative(P.dirname(EPIC_REGISTRY), registryPath);
+      e.edits.delete(EPIC_REGISTRY);
       writes.push([
         EPIC_REGISTRY,
         epicRegistryPointer(old, planned, { rel, repoPath: registryPath }),
       ]);
     }
   }
-  const done = apply(planned, disc, e.edits, io, { writes });
+  // The untracked files the run will move by plain rename — read once, before the
+  // moves, for the revert hint (a per-file read would re-list the index each time).
+  const tracked = new Set(io.tracked());
+  const untrackedMoves = [...planned.fileMap].filter(
+    ([from]) => !tracked.has(from),
+  );
+  // Files this run creates (the PRD registry on a bootstrap): listed for the revert.
+  const created = writes.map(([f]) => f).filter((f) => !io.exists(f));
+  const done = apply(planned, disc, e.edits, io, { writes, tracked });
   const corpus = postCheck(root, io, repoRoot);
   if (!corpus.clean)
     return {
@@ -1412,7 +1567,12 @@ export function run(argv, ctx = {}) {
       exitCode: 1,
       corpus: corpus.summary,
       findings: corpus.findings,
-      revert: `git checkout -- . && git clean -fd ${root} — nothing is committed by the run`,
+      revert: revertHint(
+        root,
+        [...e.edits.keys(), ...writes.map(([f]) => f)],
+        untrackedMoves,
+        created,
+      ),
     };
   return {
     ...report,
@@ -1420,6 +1580,13 @@ export function run(argv, ctx = {}) {
     reason: "ok",
     exitCode: 0,
     corpus: corpus.summary,
+    // Nothing is committed by the run: this is how to undo it before you commit.
+    revert: revertHint(
+      root,
+      [...e.edits.keys(), ...writes.map(([f]) => f)],
+      untrackedMoves,
+      created,
+    ),
   };
 }
 

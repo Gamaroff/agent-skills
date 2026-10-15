@@ -657,7 +657,12 @@ test("nothing left to move but a dirty corpus is post-check-failed, never alread
   };
   const r = m.run(["--root", R], { io: memIo(files) });
   assert.deepEqual([r.reason, r.exitCode], ["post-check-failed", 1]);
-  assert.match(r.revert, /git checkout/);
+  assert.match(r.revert, /git restore --source=HEAD --staged --worktree -- /);
+  assert.doesNotMatch(
+    r.revert,
+    /git (checkout|clean)/,
+    "never a whole-tree checkout or clean",
+  );
 });
 
 test("usage: --apply with --check, an unknown flag, a missing root, a bad --name", () => {
@@ -667,6 +672,9 @@ test("usage: --apply with --check, an unknown flag, a missing root, a bad --name
     ["--frobnicate"],
     ["--root", "nope"],
     ["--name", "x"],
+    ["--root", ""],
+    ["--root="],
+    ["--root", "../outside"],
   ]) {
     const r = m.run(argv, { io });
     assert.deepEqual([r.reason, r.exitCode], ["usage", 2], argv.join(" "));
@@ -800,6 +808,152 @@ test("fixture --apply in a temp git repo: renames recorded as R, live links reso
     assert.equal(
       m.run(["--check", "--root", R], { cwd: dir }).reason,
       "already",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// QA cycle 1 (gate 1): CR-1, CR-2, CR-3, CR-4, QA-1
+// ---------------------------------------------------------------------------
+
+test("CR-1: a named L3 monolith beside the root is moved, not reported as already", () => {
+  const io = memIo({
+    "docs/prd.md": "---\ntitle: Mono\nstatus: draft\n---\n# PRD\n",
+    [`${R}/.keep`]: "",
+  });
+  const r = m.run(["--apply", "--root", R, "--name", "docs/prd.md=mono"], {
+    io,
+  });
+  assert.equal(r.reason, "ok", JSON.stringify(r.findings || r.blockers));
+  assert.equal(r.counts.files, 1);
+  assert.equal(
+    io.files.has("docs/prd.md"),
+    false,
+    "the monolith left its old path",
+  );
+  const moved = io.files.get(`${R}/mono/prd.1.mono/prd.1.mono.md`);
+  assert.ok(moved, "the monolith is at its new path");
+  assert.equal(docId.frontmatterField(moved, "prd_number"), "1");
+  assert.deepEqual(
+    docId.registryNumbers(io.files.get(`${R}/prd-registry.md`)),
+    [1],
+  );
+});
+
+test("CR-3: a registry appendPrdRow would refuse blocks the dry run and --apply, before any write", () => {
+  const reg =
+    "---\ntype: registry\n---\n\n# PRD Registry\n\n**Next Available PRD Number:** **1**\n\n| # | Name | Folder | Status | Created |\n|---|---|---|---|---|\n";
+  for (const argv of [
+    ["--root", R],
+    ["--apply", "--root", R],
+  ]) {
+    const io = memIo(l2Tree({ [`${R}/prd-registry.md`]: reg }));
+    const r = m.run(argv, { io });
+    assert.equal(r.reason, "blocked", argv.join(" "));
+    assert.deepEqual(
+      r.blockers.map((b) => b.code),
+      ["registry-unwritable"],
+    );
+    assert.equal(
+      io.calls.moves.length + io.calls.writes.length,
+      0,
+      "nothing written",
+    );
+  }
+});
+
+test("CR-4: the registry row is layered on the link pass's rewrite of an in-tree registry", () => {
+  const reg =
+    docId.appendPrdRow(null, {
+      n: 2,
+      title: "Z",
+      href: "z/prd.2.z/prd.2.z.md",
+      folder: "z",
+      status: "draft",
+      created: "2026-01-01",
+    }) + "\nSee [the old onboarding PRD](onb/prd.onb.md).\n";
+  const io = memIo(
+    l2Tree({
+      [`${R}/prd-registry.md`]: reg,
+      [`${R}/z/prd.2.z/prd.2.z.md`]: "---\nname: prd.2.z\nprd_number: 2\n---\n",
+    }),
+  );
+  const r = m.run(["--apply", "--root", R], { io });
+  assert.equal(r.reason, "ok", JSON.stringify(r.findings || r.blockers));
+  const out = io.files.get(`${R}/prd-registry.md`);
+  assert.match(
+    out,
+    /\[the old onboarding PRD\]\(onb\/prd\.3\.onb\/prd\.3\.onb\.md\)/,
+    "the link pass's rewrite survives",
+  );
+  assert.deepEqual(
+    docId.registryNumbers(out),
+    [2, 3],
+    "and the new row is appended",
+  );
+});
+
+test("QA-1: checkPrdRoot refuses an empty, escaping, encoded, NUL or symlinked root and accepts plain ones", () => {
+  const base = mkdtempSync(join(tmpdir(), "prd-root-"));
+  try {
+    mkdirSync(join(base, "uploads"));
+    execFileSync("ln", ["-s", "/etc", join(base, "uploads", "link-to-etc")]);
+    for (const bad of [
+      "",
+      "..",
+      "../x",
+      "/etc",
+      "a/../../x",
+      "..%2f..%2fetc",
+      "a\0b",
+      "uploads/link-to-etc/passwd",
+      "uploads/link-to-etc",
+    ])
+      assert.equal(m.checkPrdRoot(bad, base), null, JSON.stringify(bad));
+    assert.equal(m.checkPrdRoot("docs/prd", base), "docs/prd");
+    assert.equal(m.checkPrdRoot("docs/prd/", base), "docs/prd");
+    assert.equal(m.checkPrdRoot("./docs/prd", base), "docs/prd");
+    assert.equal(
+      m.checkPrdRoot(join(base, "docs/prd"), base),
+      "docs/prd",
+      "an absolute path inside the base",
+    );
+    assert.equal(m.checkPrdRoot(".", base), ".");
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("CR-2: the printed revert undoes an uncommitted --apply exactly, in a real git repository", () => {
+  const PAD =
+    Array.from({ length: 40 }, (_, i) => `# unchanged line ${i}`).join("\n") +
+    "\n";
+  const tree = Object.fromEntries(
+    Object.entries(l2Tree()).map(([k, v]) => [k, v + PAD]),
+  );
+  const { dir, g } = gitRepo(tree);
+  try {
+    writeFileSync(
+      join(dir, "unrelated.txt"),
+      "someone else's untracked work\n",
+    );
+    const r = m.run(["--apply", "--json", "--root", R], { cwd: dir });
+    assert.equal(
+      r.reason,
+      "ok",
+      JSON.stringify(r.findings || r.blockers || r.error),
+    );
+    assert.ok(
+      g("status", "--porcelain").trim().length > 0,
+      "the apply changed the tree",
+    );
+    execFileSync("bash", ["-c", r.revert], { cwd: dir });
+    assert.equal(
+      g("status", "--porcelain").trim(),
+      "?? unrelated.txt",
+      "back to HEAD, untracked work untouched",
     );
   } finally {
     rmSync(dir, { recursive: true, force: true });
