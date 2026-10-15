@@ -36,8 +36,8 @@ Ship `migrate-doc-numbering.mjs` (dry-run by default, `--apply`, `--check`) and 
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline (plan + surface map); 1 iteration; loop audit ready-for-review 22/22 at `aa427c4e`; ci:fast + eval:all green | — | 2026-10-15T07:46Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #671: https://github.com/Gamaroff/agent-skills/pull/671 | — | 2026-10-15T07:47Z |
 | 5–6. qa-task / qa-fix loop | ✅ Done | `task.203.qa.{N}.*.md`; `task.203.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 3 cycles; gate 3 CONCERNS 90 (empty queue); 5c `task.203.pr-review.1` APPROVE | — | 2026-10-15T08:43Z |
-| 7. finalise                | ❌ Gaps | `task.203.dod.{N}.*.md`; task `status: accepted`                      | `task.203.dod.1.migrate-doc-numbering.md`: NOT ACCEPTED, 2 gaps (CI `link-check` red; no CHANGELOG entry). HALT | — |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 7. finalise                | ✅ Done | `task.203.dod.{N}.*.md`; task `status: accepted`                      | Run 1 (`dod.1`): 2 gaps → HALT, fixed in `acccb861`, QA cycle 4. Run 2 (`dod.2`): ACCEPTED; acceptance commit `b2d10c4a`; issue #646 closed | — | 2026-10-15T09:09Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | Final report commit | —                    | 2026-10-15T09:09Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -89,6 +89,18 @@ Ship `migrate-doc-numbering.mjs` (dry-run by default, `--apply`, `--check`) and 
   - **CI reading 1:** FAILURE @ `70ff65cf82008a38653e9be62cdd6ab89198293b`, over 5 checks. `link-check` FAILURE; `test`, `validate`, `shellcheck` and the branch policy SUCCESS.
   - **Step 8a:** not applicable. Two sections fail, and the red link-check files are neither the work item's own document nor co-located artifacts.
   - **Result:** Step 8. Gap report in the task doc, gaps Change Log row, PR gaps comment.
+- - Resume after the Step 7 halt:
+  - **Lock and snapshot.** The lock was restored with `--restore`, which consumed the halt snapshot before the fix existed. I re-created the snapshot with the HALT's own recipe so that `reenter-qa-after-finalise.sh` could run (it refuses `lock-present`).
+  - **Re-entry.** The script reported 1 commit outside the task directory that is not documentation (`doc-links.test.mjs`), and re-entered at 5a with `qa_max_cycles=5` (base 3).
+- QA cycle 4 (5a):
+  - **Review.** The scoped reviewer was dispatched at 08:48Z and returned in 52 s (`duration_ms` 52022). It found 1 low cleanup; the anchor is `ok`.
+  - **Fast gate.** `ci:fast` ran in a scratch worktree with no `.agents/skills` symlink: 5551/5554 pass. The 3 file failures are environmental (the observation-log fixture refuses a `/tmp` scratch base), and those files pass 83/83 in the main tree.
+  - **Gate 4.** CONCERNS 90 with an empty queue, so route 3 → 5c.
+- - Step 7 (finalise run 2):
+  - **DoD agents:** 4 dispatched at 08:58Z. AC PASS 18/18. Security PASS (the agent ran the probe itself this time: `task.203.dod.2.security.run.json`, 11 executed, 0 reproduced). Compliance N/A. Docs PASS.
+  - **CI reading 1:** SUCCESS @ `e36429f871e9f98f25ff25af05bb56b6263e6373`, over 5 checks. **CI reading 2:** SUCCESS (tree-equivalent to `acccb8619fee`) @ `b2d10c4a4f74`, over 5 checks after 30 s.
+  - **Acceptance commit:** `b2d10c4a` (DoD 2, sprint review, registry ticked, 5c `pr-review.2` carried). The run-1 gap section in the task doc is marked historical.
+  - **Tracker:** canonical PR summary posted. Issue #646 got a `done` comment and is closed (state verified `CLOSED`). The board `done` stage reported `already`; the document link needed no re-point.
 - - Always-load files resolved: 3 files — docs/architecture/concepts/coding-standards.md, docs/architecture/concepts/tech-stack.md, docs/architecture/concepts/source-tree.md
 
 ---
@@ -192,14 +204,38 @@ sys	0m0.067s
 reason: dry-run, counts: {prds:1, epics:4, stories:17, files:146}, mapping 22, edits 156, blockers 0
 ```
 
+### QA Cycle 4 — 2026-10-15
+**Trigger**: re-entry after the `/finalise` DoD-gaps halt. `reenter-qa-after-finalise.sh` routed it to 5a because the fix touched `shared/resources/tests/doc-links.test.mjs`.
+**Gate Result**: CONCERNS
+**Issues Found**:
+- None open. Both DoD gaps are fixed in `acccb861`: 10 pre-existing dead links were repointed and 10 healed ratchet entries deleted, and the CHANGELOG has a task 203 entry.
+- Advisory: CR-1 (low cleanup). The CHANGELOG blocker list names 8 of the 12 `BLOCKER_CODES`.
+- Reliability CONCERNS is carried from gate 3, because the engine is unchanged.
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: ✅ APPROVE — `task.203.pr-review.2.migrate-doc-numbering.md` (conformance lens only; dispatched 08:54Z, returned in 105 s). PC-1 (low): the task doc says "eight blocker codes", but the engine ships twelve. PC-2 (low): the task doc does not mention the post-run repair of the dead links. Both are recorded and not fixed: on an APPROVE the carry is the report only.
+**Loop exit**: 5c APPROVE → Step 7
+**Action**: Proceeding to 5c (PR conformance review)
+**Carried to 6a**: docs/tasks/task.203.migrate-doc-numbering/task.203.pr-review.2.migrate-doc-numbering.md
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: Halted at Step 7 — finalise DoD gaps (2), awaiting a decision on the pre-existing dead links
+**Finished**: 2026-10-15T09:09Z
+**Final Status**: Completed
 **Branch**: feature/task.203.migrate-doc-numbering
 **PR**: https://github.com/Gamaroff/agent-skills/pull/671
-**QA Iterations**: 3
-**DoD Summary**: `task.203.dod.1.migrate-doc-numbering.md` (gaps)
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 4
+**DoD Summary**: `task.203.dod.2.migrate-doc-numbering.md` (ACCEPTED); run 1 `task.203.dod.1.migrate-doc-numbering.md` (gaps)
+**Tracker debt**: none
+
+**Completion Summary**: Implemented `shared/resources/migrate-doc-numbering.mjs`, a dry-run-by-default migration to hierarchical `prd.P` / `epic.P.E` / `story.P.E.S` ids, plus the `validate` artifact kind and `appendPrdRow` in `doc-id.js`. The migration was run on this repository's onboarding PRD (146 files, 22 ids), and the global epic registry was retired to a pointer.
+
+Four QA cycles:
+1. Cycle 1 found an unmoved L3 monolith, a revert hint that did not revert, a registry write that threw only on apply, and an unprobed boundary.
+2. Cycle 2 found that the revert restored the whole root, a story id collision, and an unwrapped apply.
+3. Cycle 3 was clean.
+4. Cycle 4 re-gated the doc-only fix from finalise run 1.
+
+`/finalise` run 1 stopped on CI `link-check`: 10 links in renamed artifacts were already dead before the migration, and a CHANGELOG entry was missing. Both were fixed and the task was accepted on run 2. Every fix in all four cycles is mutation-proven.
