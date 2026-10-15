@@ -22,6 +22,22 @@ stepsCompleted:
 
 # agent-skills Brownfield Enhancement PRD — Onboarding & Tutorials
 
+<!-- epics-index-start -->
+
+## Epics
+
+_Auto-generated index — regenerate with `node scripts/generate-prd-epic-index.mjs`._
+
+| #   | Epic | Status |
+| --- | ---- | ------ |
+| 1.1 | [Quickstart & Decision-Tree Entry Point](epics/epic.1.1.quickstart-and-decision-tree-entry-point/epic.1.1.quickstart-and-decision-tree-entry-point.md) | ✅ Accepted |
+| 1.2 | [Worked PRD / Epic / Story Examples](epics/epic.1.2.worked-prd-epic-story-examples/epic.1.2.worked-prd-epic-story-examples.md) | ✅ Accepted |
+| 1.3 | [Runbook Tutorial Wrappers](epics/epic.1.3.runbook-tutorial-wrappers/epic.1.3.runbook-tutorial-wrappers.md) | ✅ Accepted |
+| 1.4 | [First-Week Guided Learning Path](epics/epic.1.4.first-week-guided-learning-path/epic.1.4.first-week-guided-learning-path.md) | ✅ Accepted |
+
+<!-- epics-index-end -->
+
+
 ## 1. Intro Project Analysis and Context
 
 ### 1.1 Existing Project Overview

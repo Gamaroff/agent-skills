@@ -196,7 +196,8 @@ Each epic has its own subdirectory containing:
 
 ```yaml
 ---
-epic_number: N
+prd_number: P
+epic_number: E
 title: "[Epic Name]"
 type: epic
 description: "[One-sentence summary of what this epic delivers]"
@@ -207,7 +208,7 @@ priority: "Critical | High | Medium | Low"
 estimated_stories: N
 created: YYYY-MM-DD
 target_completion: YYYY-MM-DD
-prd_source: "{{PRD_SOURCE_PATH}}" # repo-relative PRD path, or "brownfield-enhancement"
+prd_source: "{{PRD_SOURCE_PATH}}" # repo-relative path to the parent PRD (required)
 ---
 ```
 
@@ -275,28 +276,22 @@ docs/prd/{domain}/{feature}/epics/epic.[N].[name]/stories/
 
 ### Epic Files
 
-**Format**: `epic.[number].[descriptive-name].md`
+**Format**: `epic.{P}.{E}.[descriptive-name].md`
 
-**CRITICAL - Global Epic Numbering**:
+**Epic numbering is PRD-scoped**:
 
-- Epic numbers are **globally unique** across the entire your project
-- Numbers are assigned system-wide, NOT per-feature
-- Check `/docs/development/epic-registry.md` for next available number
-- Update registry when creating new epics
-- See [Epic Registry standard](../../../docs/standards/epic-registry.md)
-
-**Numbering Rules**:
-
-- Whole numbers for major epics: `epic.163.`, `epic.164.`, `epic.165.`
-- Decimal numbers for intermediate epics: `epic.163.5.`, `epic.164.5.`
-- Starting from epic 163, all numbers are globally unique
-- Legacy epics (1-162) contain duplicates from feature-scoped numbering (technical debt)
+- `P` is the parent PRD's number (global — see the [PRD registry standard](../../../docs/standards/prd-registry.md));
+  `E` counts epics **within that PRD**. `E` alone is not unique: every lookup keys on `(P, E)`.
+- Every epic has a parent PRD; there is no PRD-less epic.
+- `create-epic` allocates `E` with `doc-id.js next epic --prd-dir <PRD dir>` — never by hand. The
+  global epic registry is retired.
+- No decimal "intermediate" epics: `epic.1.3.5.x` would read as a malformed id.
 
 **Examples**:
 
-- `epic.163.core-foundation.md` (first new epic using registry)
-- `epic.163.5.settings-integration.md` (intermediate epic)
-- `epic.164.auto-compact-system.md` (next sequential epic)
+- `epic.1.1.core-foundation.md` (PRD 1's first epic)
+- `epic.1.2.settings-integration.md` (PRD 1's second epic)
+- `epic.2.1.auto-compact-system.md` (PRD 2's first epic)
 
 ### Epic Roadmaps
 

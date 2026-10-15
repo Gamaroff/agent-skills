@@ -29,6 +29,7 @@
  *   node doc-id.js next story --epic-dir <dir> [--json]
  *   node doc-id.js check <path> [--prd-root R] [--json]
  *   node doc-id.js check --corpus [--prd-root R] [--json]
+ *   node doc-id.js epic-meta <epic file> [--json]
  */
 
 const fs = require("fs");
@@ -366,6 +367,114 @@ function matchesEpic(name, P, E) {
     p.prd === P &&
     p.epic === E
   );
+}
+
+// The words a tracker title prefixes an id with, per kind (task 205).
+const TITLE_WORD = Object.freeze({ epic: "Epic", story: "Story" });
+
+/**
+ * Drop a leading id prefix from a tracker title: `[Epic 3] `, `[Epic 1.3] `,
+ * `Epic 3: `, `Epic 1.3 — ` (case-insensitive; `Story` for a story, whose id may
+ * carry a sub-story letter: `[Story 1.2.3A] `). After an unbracketed id the
+ * separator is a colon, an en or em dash, or a hyphen WITH whitespace before it —
+ * `Epic 10-Year Plan` is a title, not an id. A story id may also be followed by
+ * whitespace alone (`Story 1.2.3 Foo`), as the story-label rule did before this
+ * one replaced it; an epic id may not, so `Epic 3 Foo` is left alone. A bracketed
+ * id may be followed by a separator too. The legacy one-number form is accepted
+ * on input so an old title converges on the next sync. This is the ONE
+ * title-prefix rule: the epic-index generator and both Jira epic scripts call it
+ * rather than carrying a regex of their own (task 205).
+ */
+function stripIdPrefix(kind, title) {
+  const word = TITLE_WORD[kind];
+  if (!word) {
+    throw new TypeError(
+      `stripIdPrefix(kind, title): kind must be one of ${Object.keys(TITLE_WORD).join(", ")}`,
+    );
+  }
+  const id = String.raw`\d+(?:\.\d+)*[A-Z]?`;
+  const sep = String.raw`(?:\s*[:\u2013\u2014]|\s+-)`;
+  const bare = kind === "story" ? String.raw`(?:${sep}|\s)` : sep;
+  return String(title ?? "")
+    .replace(
+      new RegExp(String.raw`^\s*\[${word}\s+${id}\]\s*(?:${sep}\s*)?`, "i"),
+      "",
+    )
+    .replace(new RegExp(String.raw`^\s*${word}\s+${id}${bare}\s*`, "i"), "")
+    .trim();
+}
+
+/** "1.3" for an epic, "1.3.2" for a story: a parsed id's numeric segments, dot-joined. */
+function idLabel(p) {
+  return [p && p.prd, p && p.epic, p && p.story]
+    .filter((n) => n != null)
+    .join(".");
+}
+
+// A frontmatter number arrives as a number or a string; anything else is absent.
+const asPositiveInt = (v) => {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return isPositiveInt(n) && String(v).trim() === String(n) ? n : null;
+};
+
+/**
+ * The tracker identity of one epic document, read from the document itself: its
+ * `P.E` id from the filename, its bare title from frontmatter `title`, the GitHub
+ * milestone title `Epic P.E — {title}`, and `github_issue`. The ONE definition of
+ * the milestone key — the GitHub epic sub-routines and the task milestone lookup
+ * all call this, so no skill block builds the key with a parser of its own, and no
+ * block reads it from a variable another block set (task 205, QA cycle 2).
+ * @returns {{ok: true, id, prd, epic, title, milestone, githubIssue} | {ok: false, reason, detail}}
+ */
+function epicMeta(docPath, { io = REAL_FS } = {}) {
+  const stem = path.basename(String(docPath || ""), ".md");
+  const p = parse(stem);
+  if (!p.ok || p.kind !== "epic" || p.artifact) {
+    return {
+      ok: false,
+      reason: "bad-shape",
+      detail: `${stem} is not an epic.{P}.{E}.{slug} document`,
+    };
+  }
+  const src = io.readFile(docPath);
+  if (src === null)
+    return {
+      ok: false,
+      reason: "unreadable",
+      detail: `cannot read ${docPath}`,
+    };
+  const title = stripIdPrefix("epic", frontmatterField(src, "title"));
+  if (!title)
+    return {
+      ok: false,
+      reason: "no-title",
+      detail: `${docPath} has no frontmatter title`,
+    };
+  const id = idLabel(p);
+  const issue = frontmatterField(src, "github_issue");
+  return {
+    ok: true,
+    id,
+    prd: p.prd,
+    epic: p.epic,
+    title,
+    milestone: `Epic ${id} — ${title}`,
+    githubIssue: /^[1-9][0-9]*$/.test(issue) ? Number(issue) : null,
+  };
+}
+
+/**
+ * The canonical tracker summary of an epic: `[Epic P.E] {title}`. The frontmatter
+ * pair `{ prd, epic }` wins over any id already in the title; when either number is
+ * missing the result is the bare title — never a guessed id (review-epic is the
+ * gate for a missing number). Idempotent.
+ */
+function epicSummary(summary, { prd, epic } = {}) {
+  const bare = stripIdPrefix("epic", summary);
+  const P = asPositiveInt(prd);
+  const E = asPositiveInt(epic);
+  return P && E ? `[Epic ${P}.${E}] ${bare}` : bare;
 }
 
 // `**Next Available PRD Number:** **N**` — the bold-in-bold form task-registry.md uses.
@@ -962,6 +1071,7 @@ const USAGE = `Usage:
   doc-id next story --epic-dir <dir> [--json]
   doc-id check <path> [--prd-root R] [--json]
   doc-id check --corpus [--prd-root R] [--json]
+  doc-id epic-meta <epic file> [--json]
 `;
 
 /**
@@ -1118,6 +1228,12 @@ function runCli(argv, { cwd = process.cwd(), io = REAL_FS } = {}) {
     return usage("next needs prd | epic | story");
   }
 
+  if (cmd === "epic-meta") {
+    if (!arg) return usage("epic-meta needs <epic file>");
+    const m = epicMeta(at(arg), { io });
+    return done(m.ok ? 0 : 1, { ...m, reason: m.ok ? "ok" : m.reason });
+  }
+
   if (cmd === "check") {
     const prdRoot = at(resolvePrdRoot(argv, cwd));
     if (argv.includes("--corpus")) {
@@ -1174,6 +1290,10 @@ module.exports = {
   parseLegacy,
   format,
   matchesEpic,
+  stripIdPrefix,
+  idLabel,
+  epicSummary,
+  epicMeta,
   next,
   nextNumber,
   appendPrdRow,

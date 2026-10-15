@@ -1,6 +1,6 @@
 ---
 name: documentation-standards-validator
-description: Validate documentation follows naming conventions with DOTS not underscores, YAML frontmatter requirements, and structural standards. Use when creating PRDs, epics, or stories, validating documentation structure, reviewing doc PRs, or auditing documentation consistency. Enforces epic.163.name.md format and status indicators.
+description: Validate documentation follows naming conventions with DOTS not underscores, YAML frontmatter requirements, and structural standards. Use when creating PRDs, epics, or stories, validating documentation structure, reviewing doc PRs, or auditing documentation consistency. Enforces epic.1.3.name.md (PRD-scoped) format and status indicators.
 ---
 
 # Documentation Standards Validator
@@ -47,13 +47,13 @@ When creating or reviewing a story/epic/task, apply these checks to the affected
 
 \`\`\`
 ✅ CORRECT
-epic.163.module-security.md
+epic.1.3.module-security.md
 story.163.1.encryption-service.md
 task.38.authservice-di-failure.md
 
 ❌ INCORRECT
-epic_163_account_security.md // Underscores
-epic-163-module-security.md // Hyphens instead of dots
+epic_1_3_account_security.md // Underscores
+epic-1-3-module-security.md // Hyphens instead of dots
 Epic.163.AccountSecurity.md // Capitalization
 \`\`\`
 
@@ -62,7 +62,7 @@ Epic.163.AccountSecurity.md // Capitalization
 **Pattern**: \`epic.NUMBER.descriptive-name.md\`
 
 \`\`\`
-epic.163.module-security.md
+epic.1.3.module-security.md
 epic.164.transaction-batching.md
 epic.165.chat-encryption.md
 \`\`\`
@@ -80,7 +80,7 @@ epic.165.chat-encryption.md
 **Rule**: The plan file (if present) must be co-located in the story's subdirectory.
 
 ```
-📁 epic.163.module-security/
+📁 epic.1.3.module-security/
   📁 stories/
     📁 story.163.1.encryption-service/
       📄 story.163.1.encryption-service.md

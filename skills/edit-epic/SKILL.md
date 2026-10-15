@@ -41,7 +41,6 @@ Natural language triggers:
 - `create-epic` - Create new epic documents
 - `create-epics-from-shards` - Generate epics from PRD sections
 - `edit-story` - Edit story documents (use this for story files)
-- `epic-registry-manager` - Manage global epic numbering
 
 ---
 
@@ -59,7 +58,7 @@ You can invoke this skill with either:
 When given a directory path:
 
 1. List all files in the directory
-2. Find the epic file by pattern: `epic.[number].[name].md`
+2. Find the epic file by pattern: `epic.{P}.{E}.{name}.md`
 3. Exclude files containing: `.qa.`, `.gate.`, or `.bug.`
 4. If no epic file found, HALT and ask user for the correct path
 5. If multiple epic files found, use the one matching the directory name
@@ -77,7 +76,7 @@ When given a file path:
    >
    > To edit story files, use the `edit-story` skill instead:
    > `/edit-story {filepath}`"
-3. Verify filename matches epic pattern: `epic.[number].[name].md`
+3. Verify filename matches epic pattern: `epic.{P}.{E}.{name}.md`
 4. If pattern doesn't match, warn user and ask for confirmation
 
 **Example:**
@@ -116,7 +115,7 @@ Rejects: story.178.1.search-by-handle.md (if provided)
 
 3. **Confirm with user**:
    > "Found epic file: {filepath}
-   > Epic Number: {number}
+   > Epic Id: {P}.{E}
    > Epic Name: {name}
    > Ready to proceed with editing?"
 
@@ -175,10 +174,10 @@ Store the classification result — it governs Step 4 and Step 5 behaviour.
 
 **B. File Naming Convention**
 
-- Filename follows pattern: `epic.[number].[name].md`
+- Filename follows pattern: `epic.{P}.{E}.{name}.md`
 - Uses DOTS for number separator (not underscores)
 - Uses hyphens for word separation in descriptive name (not underscores)
-- Example valid: `epic.163.module-security.md`
+- Example valid: `epic.1.3.module-security.md`
 - Example invalid: `epic_163_account_security.md`
 
 **C. Required Sections Presence**
@@ -401,7 +400,7 @@ Request user approval:
    >   {list of affected story files}
    >   {endif}
    > - Consider running validation on the epic
-   > - Update epic registry if epic number or name changed"
+   > - If the epic number or name changed, rename its directory and file to match and re-run `doc-id.js check` on it"
 
 **If post-edit validation fails:**
 
@@ -465,19 +464,19 @@ Request user approval:
 
 **Valid Patterns:**
 
-- `epic.163.module-security.md` ✓
+- `epic.1.3.module-security.md` ✓
 - `epic.246.feature-and-interface.md` ✓
 - `epic.178.feature-ui.md` ✓
 
 **Invalid Patterns:**
 
 - `epic_163_account_security.md` ✗ (underscores instead of dots)
-- `epic.163_module-security.md` ✗ (mixed separators)
+- `epic.1.3_module-security.md` ✗ (mixed separators)
 - `epic-163.module-security.md` ✗ (hyphen for number separator)
 
 **Rule from Documentation:**
 
-> Use DOTS for numbers: `epic.163.name.md` not `epic_163_name.md`
+> Use DOTS for numbers: `epic.1.3.name.md` not `epic_1_3_name.md`
 > Use hyphens for word separation in descriptive names: `module-security` not `account_security`
 >
 > Source: `.claude/documentation.md` lines 99-100
@@ -565,11 +564,6 @@ Request user approval:
 - Use `edit-story` for story files
 - Never mix - each skill validates file type
 
-**epic-registry-manager**:
-
-- If epic number changes, update registry using this skill
-- `edit-epic` will remind user to update registry
-
 **create-story**:
 
 - Epic edits may require new stories
@@ -639,7 +633,7 @@ Agent:
 
 ## Notes
 
-- **Epic numbers are globally unique** - Check `/docs/development/epic-registry.md` if changing epic number
+- **Epic numbers count within their PRD** (`epic.{P}.{E}`). Renumber inside a PRD with `doc-id.js next epic --prd-dir <PRD dir>` for a free `E`. Moving an epic to another PRD changes `P` for it and every story under it: refuse to do that here, and use task.203's `migrate-doc-numbering.mjs` (dry-run, then apply) — never a hand rename
 - **Story files live in `stories/` subdirectory** - Per documentation structure requirements
 - **YAML frontmatter is critical** - Many systems depend on valid frontmatter
 - **Cascade analysis is unique to this skill** - Story edits don't need cascade checks

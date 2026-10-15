@@ -11,7 +11,7 @@ type: internal
 This is an **internal sub-routine** called by `create-story` and `review-story`. Do not invoke directly.
 
 **Inputs (set by the calling skill before invoking):**
-- `EPIC_FILE_PATH` — repo-relative path to the epic markdown file (e.g. `${PRD_ROOT}/service-domain/account/epics/epic.163.module-security/epic.163.module-security.md`; `${PRD_ROOT}` defaults to `docs/prd`)
+- `EPIC_FILE_PATH` — repo-relative path to the epic markdown file (e.g. `${PRD_ROOT}/service-domain/prd.1.account/epics/epic.1.3.module-security/epic.1.3.module-security.md`; `${PRD_ROOT}` defaults to `docs/prd`)
 
 **Output (set by this sub-routine, available to the calling skill):**
 - `EPIC_ISSUE_NUM` — the GitHub issue number for the epic (integer string), or empty string on failure
@@ -28,10 +28,26 @@ This is an **internal sub-routine** called by `create-story` and `review-story`.
    - `title` — epic title
    - `status` — epic status
    - `priority` — epic priority (use `—` if absent)
-   - `prd_source` — repo-relative path to the parent PRD (may be absent, or the literal `brownfield-enhancement` for standalone epics)
-3. Parse the epic number from the filename: pattern `epic.{N}.` → `EPIC_N`.
-4. Strip any leading `Epic {N}: ` prefix (or an already-bracketed `[Epic {N}] ` prefix) from `title` to get the bare title for display: `EPIC_TITLE`. (Stripping both forms prevents a double prefix like `[Epic 1] Epic 1: …`.)
-5. Set `EPIC_RELATIVE_PATH` = the path relative to the repo root.
+   - `prd_source` — repo-relative path to the parent PRD (every epic has one)
+3. Read the epic id `P.E` from the filename with `references/doc-id.js` → `EPIC_ID`, and strip any
+   leading id prefix — `[Epic 3] `, `[Epic 1.3] `, `Epic 3: ` or `Epic 1.3: ` — from `title` to get the
+   bare display title `EPIC_TITLE`. Both forms are stripped so a legacy title converges, and the wrap
+   below adds `[Epic P.E] ` once (no `[Epic 1.3] Epic 3: …` double prefix). Run from the repository root:
+
+```bash
+# ensure-epic-github-issue — epic id and bare title (task 205)
+# INPUTS: EPIC_FILE_PATH — the epic document. Id, title and milestone come from
+# `doc-id.js epic-meta`, which reads that document: the one definition of the milestone key.
+DOC_ID=.agents/skills/ensure-epic-github-issue/references/doc-id.js
+: "${EPIC_FILE_PATH:?bind EPIC_FILE_PATH to the epic document}"
+META=$(command node "$DOC_ID" epic-meta "$EPIC_FILE_PATH" --json) \
+  || { echo "❌ $(printf '%s' "$META" | jq -r '.detail // .reason // "doc-id epic-meta failed"') — run /review-epic"; exit 1; }
+EPIC_ID=$(printf '%s' "$META" | jq -r '.id')
+EPIC_TITLE=$(printf '%s' "$META" | jq -r '.title')
+MILESTONE_TITLE=$(printf '%s' "$META" | jq -r '.milestone')
+```
+
+4. Set `EPIC_RELATIVE_PATH` = the path relative to the repo root.
 
 ### Step E2: Check if Epic Issue Already Exists
 
@@ -50,7 +66,6 @@ Read `project.yml` from the repo root:
 REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
 OWNER=$(grep '^ *owner:' project.yml | head -1 | awk '{print $(2)}')
 PROJECT_NUM=$(grep 'project_board_number:' project.yml | awk '{print $(2)}')
-MILESTONE_TITLE="Epic ${EPIC_N} — ${EPIC_TITLE}"
 # Prefer the current branch's remote-tracking branch (strip the remote prefix),
 # so the link points at the branch where the work lives. Fall back to the repo's
 # default branch when there is no upstream / HEAD is detached, then to `develop`.
@@ -58,11 +73,11 @@ DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name
 DOC_BRANCH=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null | sed 's|^[^/]*/||')
 DOC_URL="https://github.com/$REPO/blob/${DOC_BRANCH:-$DEFAULT_BRANCH}/${EPIC_RELATIVE_PATH}"
 
-# Resolve the parent PRD link the same way (skip the placeholder/standalone sentinel).
-# PRD_LINE is empty for standalone epics, so the Document section simply omits the line.
+# Resolve the parent PRD link the same way. Every epic has a parent PRD; PRD_LINE stays
+# empty only when prd_source is missing, which /review-epic flags as Critical.
 PRD_RELATIVE_PATH="${prd_source from frontmatter}"
 PRD_LINE=""
-if [ -n "$PRD_RELATIVE_PATH" ] && [ "$PRD_RELATIVE_PATH" != "brownfield-enhancement" ]; then
+if [ -n "$PRD_RELATIVE_PATH" ]; then
   PRD_URL="https://github.com/$REPO/blob/${DOC_BRANCH:-$DEFAULT_BRANCH}/${PRD_RELATIVE_PATH}"
   PRD_LINE=$'\n'"📋 [Parent PRD](${PRD_URL})"
 fi
@@ -71,8 +86,17 @@ fi
 Auto-create the milestone if it doesn't exist yet:
 
 ```bash
-node references/tracker-issue.js \
-  --kind milestone --title "${MILESTONE_TITLE}" --quiet 2>/dev/null || true
+# The epic's id, title and milestone, derived in THIS block from the epic document (QA cycle 3, CR-2).
+: "${EPIC_FILE_PATH:?bind EPIC_FILE_PATH to the epic document}"
+META=$(command node .agents/skills/ensure-epic-github-issue/references/doc-id.js epic-meta "$EPIC_FILE_PATH" --json) || exit 1
+EPIC_ID=$(printf '%s' "$META" | jq -r '.id')
+EPIC_TITLE=$(printf '%s' "$META" | jq -r '.title')
+MILESTONE_TITLE=$(printf '%s' "$META" | jq -r '.milestone')
+# Every helper resolves from the repository root, like doc-id above (QA cycle 4, CR-1); a failed
+# resolve is reported, not discarded.
+command node .agents/skills/ensure-epic-github-issue/references/tracker-issue.js \
+  --kind milestone --title "${MILESTONE_TITLE}" --quiet \
+  || echo "⚠️  milestone resolve for ${MILESTONE_TITLE} did not complete — see the tracker-issue output above"
 ```
 
 The CLI is resolve-or-create: an existing title is reused and reported as
@@ -101,6 +125,12 @@ file is also what carries the body into the deferred record's `command.stdin`.
 > needs.
 
 ```bash
+# The epic's id, title and milestone, derived in THIS block from the epic document (QA cycle 3, CR-2).
+: "${EPIC_FILE_PATH:?bind EPIC_FILE_PATH to the epic document}"
+META=$(command node .agents/skills/ensure-epic-github-issue/references/doc-id.js epic-meta "$EPIC_FILE_PATH" --json) || exit 1
+EPIC_ID=$(printf '%s' "$META" | jq -r '.id')
+EPIC_TITLE=$(printf '%s' "$META" | jq -r '.title')
+MILESTONE_TITLE=$(printf '%s' "$META" | jq -r '.milestone')
 mkdir -p .claude/state
 cat > .claude/state/issue-body.md <<EOF
 ## Summary
@@ -122,14 +152,14 @@ EOF
 
 # Even a FIXED label reaches gh through the helper: a repository without an
 # `epic` label fails the whole create otherwise (task.125, TASK-125-BUG-11).
-source references/gh-labels.sh || exit 1
+source .agents/skills/ensure-epic-github-issue/references/gh-labels.sh || exit 1
 LABEL_ARGS=()
 while IFS= read -r l; do [ -n "$l" ] && LABEL_ARGS+=(--label "$l"); done \
   < <(gh_labels_filter "epic")
 
-EPIC_ISSUE_NUM=$(node references/tracker-issue.js \
+EPIC_ISSUE_NUM=$(node .agents/skills/ensure-epic-github-issue/references/tracker-issue.js \
   --kind create \
-  --title "[Epic ${EPIC_N}] ${EPIC_TITLE}" \
+  --title "[Epic ${EPIC_ID}] ${EPIC_TITLE}" \
   --body-file .claude/state/issue-body.md \
   "${LABEL_ARGS[@]}" \
   --milestone "${MILESTONE_TITLE}")

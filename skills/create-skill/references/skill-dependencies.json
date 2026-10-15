@@ -20,7 +20,6 @@
   "create-bug-report": [],
   "create-doc": [],
   "create-epic": [
-    "epic-registry-manager",
     "mermaid-architect"
   ],
   "create-epics-from-shards": [],
@@ -123,7 +122,6 @@
   "ensure-task-jira-issue": [
     "sync-jira-task"
   ],
-  "epic-registry-manager": [],
   "error-handling-enforcer": [],
   "execute-architect-checklist": [],
   "execute-checklist": [],

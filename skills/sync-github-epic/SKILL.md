@@ -1,6 +1,6 @@
 ---
 name: sync-github-epic
-description: Sync a local epic markdown file to GitHub Issues — creates the epic issue if it has no github_issue, updates it if github_issue is already set. Top-level work item (no parent); the epic's milestone (`Epic {N} — {title}`) carries the relationship to its stories/tasks. Adds the issue to the project board and mirrors the priority label onto the board's Priority field. Closes/reopens the issue based on frontmatter status. Writes a Change Log row on issue creation and on status transition only (not on body updates). GitHub-only sibling of sync-jira-epic. Use when the user says "create this epic in GitHub", "sync epic to GitHub", "push epic changes to GitHub", or "publish epic to GitHub".
+description: Sync a local epic markdown file to GitHub Issues — creates the epic issue if it has no github_issue, updates it if github_issue is already set. Top-level work item (no parent); the epic's milestone (`Epic {P.E} — {title}`) carries the relationship to its stories/tasks. Adds the issue to the project board and mirrors the priority label onto the board's Priority field. Closes/reopens the issue based on frontmatter status. Writes a Change Log row on issue creation and on status transition only (not on body updates). GitHub-only sibling of sync-jira-epic. Use when the user says "create this epic in GitHub", "sync epic to GitHub", "push epic changes to GitHub", or "publish epic to GitHub".
 ---
 
 # sync-github-epic
@@ -77,15 +77,29 @@ source references/resolve-platform.sh || exit 1
 
 ### 3. Read Epic Frontmatter and Parse Identity
 
-Extract from frontmatter: `title`, `status`, `priority`, `github_issue` (if present), `labels`, `prd_source` (repo-relative parent PRD path, may be absent or the literal `brownfield-enhancement`).
+Extract from frontmatter: `title`, `status`, `priority`, `github_issue` (if present), `labels`, `prd_source` (repo-relative parent PRD path — every epic has one).
 
-Parse the epic number from the filename: `epic.{N}.` → `EPIC_N`.
+Read the epic id `P.E` from the filename with `references/doc-id.js` → `EPIC_ID`, and strip any leading
+id prefix — `[Epic 3] `, `[Epic 1.3] `, `Epic 3: ` or `Epic 1.3: ` — from `title` to get the bare display
+title `EPIC_TITLE`. The wrap below adds `[Epic P.E] ` once; stripping both forms makes a legacy title
+converge and prevents a double prefix like `[Epic 1.3] Epic 3: …`. Run from the repository root:
 
-Strip any leading `Epic {N}: ` prefix (or an already-bracketed `[Epic {N}] ` prefix) from `title` to get the bare display title: `EPIC_TITLE`. The wrap below adds `[Epic {N}] ` once; stripping both forms prevents a double prefix like `[Epic 1] Epic 1: …`.
+```bash
+# sync-github-epic — epic id and bare title (task 205)
+# INPUTS: EPIC_FILE_PATH — the epic document. Id, title and milestone come from
+# `doc-id.js epic-meta`, which reads that document: the one definition of the milestone key.
+DOC_ID=.agents/skills/sync-github-epic/references/doc-id.js
+: "${EPIC_FILE_PATH:?bind EPIC_FILE_PATH to the epic document}"
+META=$(command node "$DOC_ID" epic-meta "$EPIC_FILE_PATH" --json) \
+  || { echo "❌ $(printf '%s' "$META" | jq -r '.detail // .reason // "doc-id epic-meta failed"') — run /review-epic"; exit 1; }
+EPIC_ID=$(printf '%s' "$META" | jq -r '.id')
+EPIC_TITLE=$(printf '%s' "$META" | jq -r '.title')
+MILESTONE_TITLE=$(printf '%s' "$META" | jq -r '.milestone')
+```
 
 Set `EPIC_RELATIVE_PATH` = the epic file path relative to the repo root.
 
-The milestone title is always `Epic {EPIC_N} — {EPIC_TITLE}` (em dash), matching `ensure-epic-github-issue`.
+The milestone title is always `Epic {EPIC_ID} — {EPIC_TITLE}` (em dash), matching `ensure-epic-github-issue`.
 
 ### 4. Branch: Create vs Update
 
@@ -95,8 +109,8 @@ Invoke the `ensure-epic-github-issue` sub-routine with `EPIC_FILE_PATH={resolved
 
 - checks for an existing `github_issue` (idempotent no-op if already set),
 - reads `project.yml`,
-- auto-creates the milestone `Epic {N} — {title}` if absent,
-- creates the issue (`[Epic {N}] {title}`, label `epic`, milestone attached),
+- auto-creates the milestone `Epic {P.E} — {title}` if absent,
+- creates the issue (`[Epic {P.E}] {title}`, label `epic`, milestone attached),
 - adds it to the Project board,
 - writes `github_issue: {N}` into the epic frontmatter.
 
@@ -138,12 +152,12 @@ DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name
 DOC_BRANCH=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null | sed 's|^[^/]*/||')
 DOC_URL="https://github.com/$REPO/blob/${DOC_BRANCH:-$DEFAULT_BRANCH}/${EPIC_RELATIVE_PATH}"
 
-# Resolve the parent PRD link the same way (skip the standalone sentinel).
-# PRD_LINE is empty for standalone epics, so the rebuilt Document block omits the line —
-# matching the create-path shape so create→update stays diff-stable.
+# Resolve the parent PRD link the same way as the create path, so create→update stays
+# diff-stable. Every epic has a parent PRD; PRD_LINE stays empty only when prd_source is
+# missing, which /review-epic flags as Critical.
 PRD_RELATIVE_PATH="${prd_source from frontmatter}"
 PRD_LINE=""
-if [ -n "$PRD_RELATIVE_PATH" ] && [ "$PRD_RELATIVE_PATH" != "brownfield-enhancement" ]; then
+if [ -n "$PRD_RELATIVE_PATH" ]; then
   PRD_URL="https://github.com/$REPO/blob/${DOC_BRANCH:-$DEFAULT_BRANCH}/${PRD_RELATIVE_PATH}"
   PRD_LINE=$'\n'"📋 [Parent PRD](${PRD_URL})"
 fi
@@ -155,15 +169,70 @@ gh issue view ${ISSUE_NUM} --json state,title,labels,body,milestone > /tmp/issue
 
 Diff `title`, `body`, `labels`, `milestone` against current GitHub state. The body is rebuilt to the **same shape** `ensure-epic-github-issue` emits on create — Summary, Metadata (`Status`, `Priority`), and a `## Document` link block (using `DOC_URL` above, plus the `📋 [Parent PRD](…)` line from `${PRD_LINE}` when `prd_source` resolves) — so create→update is diff-stable. That shape and its caps are specified once, in [`references/tracker-card-summary.md`](./references/tracker-card-summary.md); follow it there rather than restating it here. Re-syncing from a feature branch refreshes the link to that branch (it changes the body, so the diff is non-empty and the edit runs). At acceptance, `finalise` re-points the link to the durable integration branch so the closed issue doesn't link to a deleted feature branch.
 
-If anything changed, run:
+If anything changed, first resolve the milestone the edit attaches. **The epic's own milestone is
+renamed in place, never created beside the old one**: when the epic was retitled, or its id moved
+from `Epic 3` to `Epic 1.3`, creating the new title would move only this issue onto it and strand
+every story still grouped on the old one. `--rename-from` renames the old milestone when the new
+title does not exist yet, so its issues move with it.
+
+**Only the epic's own milestone is renamed.** A current milestone counts as the epic's own when it
+is `Epic {EPIC_ID} — …` (the epic was retitled) or `Epic {any id} — {EPIC_TITLE}` (its id moved).
+Any other milestone — a sprint, a release, one shared with other work — is never renamed: the block
+resolves or creates the epic's milestone as usual and the edit below moves only this issue onto it.
 
 ```bash
+# sync-github-epic — resolve the epic's milestone, renaming in place (task 205)
+# INPUTS: EPIC_FILE_PATH — the epic document. Everything else is derived HERE from it (each fenced
+# block is its own shell, so nothing bound in Step 3 exists in this one; QA cycle 2, CR-3).
+DOC_ID=.agents/skills/sync-github-epic/references/doc-id.js
+: "${EPIC_FILE_PATH:?bind EPIC_FILE_PATH to the epic document}"
+META=$(command node "$DOC_ID" epic-meta "$EPIC_FILE_PATH" --json) \
+  || { echo "❌ $(printf '%s' "$META" | jq -r '.detail // .reason // "doc-id epic-meta failed"')"; exit 1; }
+ISSUE_NUM=$(printf '%s' "$META" | jq -r '.githubIssue // empty')
+EPIC_ID=$(printf '%s' "$META" | jq -r '.id')
+EPIC_TITLE=$(printf '%s' "$META" | jq -r '.title')
+MILESTONE_TITLE=$(printf '%s' "$META" | jq -r '.milestone')
+[ -n "$ISSUE_NUM" ] || { echo "❌ ${EPIC_FILE_PATH} has no github_issue — this is the update path"; exit 1; }
+ISSUE_JSON="/tmp/issue-${ISSUE_NUM}.json"
+[ -s "$ISSUE_JSON" ] || { echo "❌ ${ISSUE_JSON} is missing — run the issue view above first"; exit 1; }
+CURRENT_MILESTONE=$(jq -r '.milestone.title // empty' "$ISSUE_JSON")
+RENAME_ARGS=()
+if [ -n "$CURRENT_MILESTONE" ] && [ "$CURRENT_MILESTONE" != "$MILESTONE_TITLE" ]; then
+  # Rename only the epic's OWN milestone: its id with any title (retitled), or its title under a
+  # legacy one-number id (the id move task 205 introduces). A sprint, a shared milestone, or
+  # another dotted epic's milestone with the same title is left alone (QA cycles 1–2, CR-1, CR-9).
+  OWN_ID_PREFIX="Epic ${EPIC_ID} — "
+  OWN_TITLE_SUFFIX=" — ${EPIC_TITLE}"
+  case "$CURRENT_MILESTONE" in
+    "$OWN_ID_PREFIX"*) RENAME_ARGS=(--rename-from "$CURRENT_MILESTONE") ;;
+    Epic\ [0-9]*"$OWN_TITLE_SUFFIX")
+      OLD_ID=${CURRENT_MILESTONE#Epic }; OLD_ID=${OLD_ID%"$OWN_TITLE_SUFFIX"}
+      case "$OLD_ID" in *[!0-9]*|'') ;; *) RENAME_ARGS=(--rename-from "$CURRENT_MILESTONE") ;; esac ;;
+  esac
+fi
+# Resolved from the repository root like doc-id above, and its failure is reported, not discarded:
+# a rename that silently did not happen is the split this block exists to prevent (QA cycle 3, CR-5).
+command node .agents/skills/sync-github-epic/references/tracker-issue.js \
+  --kind milestone --title "${MILESTONE_TITLE}" "${RENAME_ARGS[@]}" --quiet \
+  || echo "⚠️  milestone resolve/rename for ${MILESTONE_TITLE} did not complete — see the tracker-issue output above"
+```
+
+Then run the edit:
+
+```bash
+# The epic's id, title and milestone, derived in THIS block from the epic document (QA cycle 2, CR-3).
+: "${EPIC_FILE_PATH:?bind EPIC_FILE_PATH to the epic document}"
+META=$(command node .agents/skills/sync-github-epic/references/doc-id.js epic-meta "$EPIC_FILE_PATH" --json) || exit 1
+ISSUE_NUM=$(printf '%s' "$META" | jq -r '.githubIssue // empty')
+EPIC_ID=$(printf '%s' "$META" | jq -r '.id')
+EPIC_TITLE=$(printf '%s' "$META" | jq -r '.title')
+MILESTONE_TITLE=$(printf '%s' "$META" | jq -r '.milestone')
 mkdir -p .claude/state
 printf '%s' "$NEW_BODY" > .claude/state/issue-body.md
 
 # A label the repository does not define fails the WHOLE edit; the shared
 # helper drops it with a warning instead (task.125, TASK-125-BUG-3).
-source references/gh-labels.sh || exit 1
+source .agents/skills/sync-github-epic/references/gh-labels.sh || exit 1
 LABEL_ARGS=()
 while IFS= read -r l; do [ -n "$l" ] && LABEL_ARGS+=(--add-label "$l"); done \
   < <(gh_labels_filter "priority:${priority}")
@@ -178,19 +247,12 @@ OLD_PRIORITY=$(gh issue view "${ISSUE_NUM}" --json labels -q '.labels[].name' 2>
 REMOVE_ARGS=()
 [ -n "$OLD_PRIORITY" ] && [ -n "$NEW_PRIORITY" ] && REMOVE_ARGS=(--remove-label "$OLD_PRIORITY")
 
-node references/tracker-issue.js --kind edit --issue ${ISSUE_NUM} \
-  --title "[Epic ${EPIC_N}] ${EPIC_TITLE}" \
+node .agents/skills/sync-github-epic/references/tracker-issue.js --kind edit --issue ${ISSUE_NUM} \
+  --title "[Epic ${EPIC_ID}] ${EPIC_TITLE}" \
   --body-file .claude/state/issue-body.md \
   --milestone "${MILESTONE_TITLE}" \
   "${LABEL_ARGS[@]}" \
   "${REMOVE_ARGS[@]}"
-```
-
-The milestone is auto-created first if it does not yet exist (e.g. the epic title changed):
-
-```bash
-node references/tracker-issue.js \
-  --kind milestone --title "${MILESTONE_TITLE}" --quiet 2>/dev/null || true
 ```
 
 If the priority label changed, also re-mirror the board's Priority field:

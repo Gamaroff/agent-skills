@@ -328,7 +328,6 @@ for (const skill of [
   "shard-doc",
   "shard-prd",
   "enforce-standards",
-  "epic-registry-manager",
 ]) {
   test(`change-log — ${skill} instructs writing a row and links the spec`, () => {
     const { content } = loadSkill(skill);
@@ -475,18 +474,18 @@ test("change-log — create-task and review-task ship byte-identical task templa
   );
 });
 
-test("change-log — all three epic-template copies are byte-identical", () => {
-  // All three had drifted from each other before this lock: the
+test("change-log — the epic-template copies are byte-identical", () => {
+  // The copies had drifted from each other before this lock: the
   // documentation-standards-validator copy by 9 lines (3 absent frontmatter fields +
-  // 6 stale reference links) and the epic-registry-manager copy by 18 (a wholly
-  // different frontmatter schema + the same stale links). Equal line counts hid the
-  // second one, which is why this asserts bytes and not length.
+  // 6 stale reference links) and the since-retired epic-registry-manager copy by 18
+  // (a wholly different frontmatter schema + the same stale links). Equal line counts
+  // hid the second one, which is why this asserts bytes and not length. One copy is
+  // left now that epic-registry-manager is gone (task 205).
   const canonical = fs.readFileSync(
     path.join(REPO_ROOT, "docs/templates/epic-template.md"),
     "utf-8",
   );
   for (const p of [
-    "skills/epic-registry-manager/references/epic-template.md",
     "skills/documentation-standards-validator/references/epic-template.md",
   ]) {
     assert.equal(

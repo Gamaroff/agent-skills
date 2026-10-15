@@ -141,7 +141,7 @@ Flow:
 3. Resolve `prd_source` to a Bitbucket URL via the multi-variant lookup; fall back to `prd_bitbucket_url` frontmatter if present.
 4. If `jira_key` absent: search for an issue carrying the file's `synced-from-*` label. If found, switch to update.
 5. Detect create vs update; on update fetch current state and run concurrent-edit guard.
-6. Diff `summary`, body hash, meta hash, priority, labels.
+6. Normalise the summary to `[Epic P.E] {title}` from frontmatter `prd_number` + `epic_number` with `epicSummary` from `references/doc-id.js` (the one rule, shared with `jira-epic-creator`; a missing pair leaves the bare title), then diff `summary`, body hash, meta hash, priority, labels.
 7. Build a Jira ADF description: Summary → Metadata → Stories Breakdown overview table → Source links.
 8. Resolve cached `Epic` issue type id (or fetch + cache).
 9. **Create** (POST, with Epic-Name-field auto-retry on 400) or **Update** (atomic PUT with `returnIssue=true`).

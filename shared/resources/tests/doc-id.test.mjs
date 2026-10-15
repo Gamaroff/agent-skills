@@ -1127,3 +1127,116 @@ test("CR-2 (cycle 4): parseLegacy refuses a new-scheme name outright", () => {
     "a legacy artifact still reads",
   );
 });
+
+// ── Title-prefix helpers (task 205) ──────────────────────────────────────────
+// stripIdPrefix / idLabel / epicSummary are the ONE title-prefix rule the
+// epic-index generator and both Jira epic scripts call.
+
+test("stripIdPrefix drops both bracket and colon forms, legacy and P.E", () => {
+  for (const t of [
+    "[Epic 3] Foo",
+    "[Epic 1.3] Foo",
+    "Epic 3: Foo",
+    "Epic 1.3: Foo",
+    "  [epic 1.3]   Foo",
+    "EPIC 12.4 : Foo",
+  ]) {
+    assert.equal(d.stripIdPrefix("epic", t), "Foo", t);
+  }
+  assert.equal(d.stripIdPrefix("story", "[Story 1.3.2] Bar"), "Bar");
+  assert.equal(d.stripIdPrefix("story", "Story 2.1: Bar"), "Bar");
+  // Only a LEADING prefix is an id; one inside the title is text.
+  assert.equal(d.stripIdPrefix("epic", "Foo [Epic 3]"), "Foo [Epic 3]");
+  // The other kind's word is not stripped.
+  assert.equal(d.stripIdPrefix("epic", "[Story 1.2] Foo"), "[Story 1.2] Foo");
+  assert.throws(() => d.stripIdPrefix("task", "x"), TypeError);
+});
+
+test("idLabel dot-joins a parsed id's numeric segments", () => {
+  assert.equal(d.idLabel(d.parse("epic.1.3.foo")), "1.3");
+  assert.equal(d.idLabel(d.parse("story.1.3.2.foo")), "1.3.2");
+  assert.equal(d.idLabel(d.parse("prd.4.foo")), "4");
+});
+
+test("epicSummary: [Epic P.E], frontmatter pair wins, idempotent, never guesses", () => {
+  const pair = { prd: 1, epic: 3 };
+  assert.equal(d.epicSummary("[Epic 3] Foo", pair), "[Epic 1.3] Foo");
+  assert.equal(d.epicSummary("Epic 1.3: Foo", pair), "[Epic 1.3] Foo");
+  assert.equal(d.epicSummary("[Epic 1.3] Foo", pair), "[Epic 1.3] Foo");
+  assert.equal(d.epicSummary("Foo", pair), "[Epic 1.3] Foo");
+  // A stale id in the title loses to the frontmatter pair.
+  assert.equal(d.epicSummary("[Epic 9.9] Foo", pair), "[Epic 1.3] Foo");
+  // Frontmatter numbers often arrive as strings.
+  assert.equal(d.epicSummary("Foo", { prd: "1", epic: "3" }), "[Epic 1.3] Foo");
+  // A missing or malformed pair yields the BARE title — never an id taken from the title.
+  assert.equal(d.epicSummary("Epic 7: Foo", {}), "Foo");
+  assert.equal(d.epicSummary("[Epic 7] Foo", { prd: 1 }), "Foo");
+  assert.equal(d.epicSummary("Foo", { prd: 1, epic: "x" }), "Foo");
+  assert.equal(d.epicSummary("Foo", { prd: 0, epic: 3 }), "Foo");
+  assert.equal(d.epicSummary("Foo"), "Foo");
+});
+
+test("stripIdPrefix: dash separators and sub-story ids (QA cycle 1, CR-6)", () => {
+  assert.equal(d.stripIdPrefix("story", "Story 1.2.1 — Tap"), "Tap");
+  assert.equal(d.stripIdPrefix("story", "Story 1.2.1 – Tap"), "Tap");
+  assert.equal(d.stripIdPrefix("story", "Story 1.2.1 - Tap"), "Tap");
+  assert.equal(d.stripIdPrefix("story", "[Story 1.2.3A] Tap"), "Tap");
+  assert.equal(d.stripIdPrefix("story", "[Story 1.2.1] — Tap"), "Tap");
+  assert.equal(d.stripIdPrefix("epic", "Epic 1.3 — Foo"), "Foo");
+  // Not an id prefix: left alone.
+  assert.equal(d.stripIdPrefix("epic", "Epic 3 Foo"), "Epic 3 Foo");
+  assert.equal(
+    d.stripIdPrefix("epic", "Epic-driven design"),
+    "Epic-driven design",
+  );
+  assert.equal(d.stripIdPrefix("epic", "Foo — bar"), "Foo — bar");
+});
+
+test("stripIdPrefix: a hyphen needs whitespace before it; a story id may be followed by a space (QA cycle 2, CR-8)", () => {
+  assert.equal(
+    d.stripIdPrefix("epic", "Epic 10-Year Plan"),
+    "Epic 10-Year Plan",
+  );
+  assert.equal(d.stripIdPrefix("epic", "Epic 3 - Foo"), "Foo");
+  assert.equal(d.stripIdPrefix("epic", "Epic 3 Foo"), "Epic 3 Foo");
+  assert.equal(d.stripIdPrefix("story", "Story 1.2.3 Foo"), "Foo");
+  assert.equal(
+    d.stripIdPrefix("story", "Story 1.2.10-Year"),
+    "Story 1.2.10-Year",
+  );
+  assert.equal(
+    d.stripIdPrefix("story", "Storyboard 1 Foo"),
+    "Storyboard 1 Foo",
+  );
+});
+
+test("epicMeta: id, bare title, milestone and issue from the document itself", () => {
+  const dir = mkdtempSync(join(tmpdir(), "epic-meta-"));
+  try {
+    const f = join(dir, "epic.1.3.foo.md");
+    writeFileSync(f, "---\ntitle: 'Epic 3: Checkout'\ngithub_issue: 75\n---\n");
+    const m = d.epicMeta(f);
+    assert.equal(m.ok, true);
+    assert.equal(m.id, "1.3");
+    assert.equal(m.title, "Checkout");
+    assert.equal(m.milestone, "Epic 1.3 — Checkout");
+    assert.equal(m.githubIssue, 75);
+    const untitled = join(dir, "epic.1.4.bar.md");
+    writeFileSync(untitled, "---\nepic_number: 4\n---\n");
+    assert.equal(d.epicMeta(untitled).reason, "no-title");
+    assert.equal(d.epicMeta(join(dir, "epic.3.legacy.md")).reason, "bad-shape");
+    assert.equal(
+      d.epicMeta(join(dir, "epic.1.5.missing.md")).reason,
+      "unreadable",
+    );
+    const cli = spawnSync(
+      process.execPath,
+      [join(__dirname, "..", "doc-id.js"), "epic-meta", f, "--json"],
+      { encoding: "utf8" },
+    );
+    assert.equal(cli.status, 0, cli.stderr);
+    assert.equal(JSON.parse(cli.stdout).milestone, "Epic 1.3 — Checkout");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

@@ -41,6 +41,28 @@ const REPO_ROOT = path.resolve(__dirname, "..");
 
 // Declared inputs — `file#NAME`: why the document may read it unbound.
 const INPUTS = new Map([
+  // task.205: the Discover Parent PRD and Input Resolution blocks each run as their own shell, so
+  // their inputs are bound by the agent from the steps before them; each `${NAME:?}` is the guard.
+  [
+    "skills/create-epic/SKILL.md#DOMAIN",
+    "input of the Discover Parent PRD block (the epic's domain directory); the `:?` is the loud-failure guard",
+  ],
+  [
+    "skills/ensure-task-github-issue/SKILL.md#TASK_FILE_PATH",
+    "input of the task milestone block (the sub-routine's argument); the `:?` is the loud-failure guard",
+  ],
+  [
+    "skills/ensure-epic-github-issue/SKILL.md#EPIC_FILE_PATH",
+    "input of the epic id block (the sub-routine's argument); the `:?` is the loud-failure guard",
+  ],
+  [
+    "skills/sync-github-epic/SKILL.md#EPIC_FILE_PATH",
+    "input of the epic id block (the skill's argument); the `:?` is the loud-failure guard",
+  ],
+  [
+    "skills/review-epic/SKILL.md#INPUT",
+    "input of the Input Resolution block (the skill argument); the `:?` is the loud-failure guard",
+  ],
   [
     "skills/create-issue/SKILL.md#JIRA_PROJECT_KEY",
     "environment knob (Jira project), documented in the skill's env table",

@@ -713,6 +713,8 @@ test("epicRegistryPointer keeps the old table as a historical mapping and names 
     /\| 1 \| 1\.1 \| epic\.1\.1\.alpha \| gh#73 \| Alpha \| ✅ Accepted \|/,
   );
   assert.match(text, /task\.205/);
+  // task.205 landed: the pointer no longer tells anyone to hold off /create-epic.
+  assert.doesNotMatch(text, /do not run `\/create-epic`/);
   assert.match(
     text,
     /\[`docs\/prd\/prd-registry\.md`\]\(\.\.\/prd\/prd-registry\.md\)/,

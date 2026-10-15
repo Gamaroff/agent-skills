@@ -11,7 +11,7 @@ One-way sync of a local technical task markdown file to GitHub Issues. Auto-dete
 
 | `github_issue` present? | Action |
 |---|---|
-| Absent / null | **Pre-flight dedup search by title**, then **Create** (no parent linkage; milestone resolved from frontmatter / epic-registry / standalone default) if no match. Writes `github_issue` back to file. |
+| Absent / null | **Pre-flight dedup search by title**, then **Create** (no parent linkage; milestone resolved from frontmatter / epic lookup (see `ensure-task-github-issue` Step T3) / standalone default) if no match. Writes `github_issue` back to file. |
 | Present | **Update** existing GitHub issue (title, body, labels, milestone), reconcile open/closed state with frontmatter `status`. A Change Log row is written only if the status transitioned. |
 
 **Difference from `sync-github-story`:** tasks are **standalone** — no parent epic issue lookup, no sub-issue linking. Milestone is the only relationship to a higher-level work item, mirroring `sync-jira-task`'s "no jira_epic" stance.
@@ -76,7 +76,7 @@ Strip any leading `Task {N}: ` prefix (or an already-bracketed `[Task {N}] ` pre
 Invoke the `ensure-task-github-issue` sub-routine with `TASK_FILE_PATH={resolved task file path}`. The sub-routine:
 
 - runs a dedup-by-title search and adopts any single match,
-- resolves the milestone (frontmatter `milestone:` → epic-registry lookup → `"Technical Tasks (standalone)"`),
+- resolves the milestone (frontmatter `milestone:` → epic lookup, see `ensure-task-github-issue` Step T3 → `"Technical Tasks (standalone)"`),
 - creates the issue if no match,
 - adds it to the Project board, mirrors the Priority field,
 - writes `github_issue: {N}` into the task frontmatter,
@@ -247,7 +247,7 @@ The full URL is reconstructable from `project.yml` (`owner` + `repo`) and the is
 | `gh auth status` fails | Abort with instruction to run `gh auth login` |
 | `project.yml` missing or malformed | Abort with diagnostic |
 | Issue referenced by `github_issue` no longer exists | Abort update; user must reconcile manually |
-| Milestone lookup fails (e.g. `epic:` field set but no matching epic-registry row) | Falls through to `"Technical Tasks (standalone)"` and logs a warning |
+| Milestone lookup fails (e.g. `epic:` field set but resolves to no epic, or to several) | Falls through to `"Technical Tasks (standalone)"` and logs a warning |
 | Project board add fails | Warn and continue |
 | Priority field mirror fails | Warn and continue |
 

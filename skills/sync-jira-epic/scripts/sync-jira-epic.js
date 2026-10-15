@@ -20,6 +20,7 @@ const fs = require("fs");
 const path = require("path");
 const lib = require("../references/jira-sync.js");
 const CL = require("../references/change-log.js");
+const docId = require("../references/doc-id.js");
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -302,25 +303,42 @@ function hashMeta(frontmatter) {
 // card is the file named after its own directory — that convention is what
 // distinguishes it, rather than a blocklist of artifact types that would rot
 // as new artifact kinds appear.
+//
+// Ids are read with doc-id.js (task 205): a child is a `story.{P}.{E}.{S}` whose
+// (P, E) equals the epic directory's own, so a stray story of another epic that
+// landed under this one is not linked.
 function findChildStories(filePath) {
   const storiesDir = path.join(path.dirname(filePath), "stories");
   if (!fs.existsSync(storiesDir)) return [];
+  const epic = docId.parse(path.basename(path.dirname(filePath)));
+  if (!epic.ok || epic.kind !== "epic") return [];
   return (
     fs
       .readdirSync(storiesDir)
       .map((d) => ({ dir: d, card: path.join(storiesDir, d, `${d}.md`) }))
       .filter((s) => fs.existsSync(s.card))
-      .map((s) => ({ ...s, num: s.dir.match(/^story\.(\d+)\.(\d+)\./i) }))
-      .filter((s) => s.num)
-      // Lexicographic sort puts story.2.10 before story.2.2 — order numerically.
+      .map((s) => ({ ...s, id: docId.parse(s.dir) }))
+      .filter(
+        (s) =>
+          s.id.ok &&
+          s.id.kind === "story" &&
+          !s.id.artifact &&
+          s.id.prd === epic.prd &&
+          s.id.epic === epic.epic,
+      )
+      // Lexicographic sort puts story.1.2.10 before story.1.2.2 — order numerically;
+      // a sub-story (3A) sorts after its parent (3).
       .sort(
         (a, b) =>
-          Number(a.num[1]) - Number(b.num[1]) ||
-          Number(a.num[2]) - Number(b.num[2]),
+          a.id.story - b.id.story ||
+          String(a.id.sub || "").localeCompare(String(b.id.sub || "")),
       )
       .map((s) => ({
         file: s.card,
-        label: labelForChildStory(s.card, `${s.num[1]}.${s.num[2]}`),
+        label: labelForChildStory(
+          s.card,
+          docId.idLabel(s.id) + (s.id.sub || ""),
+        ),
       }))
   );
 }
@@ -336,7 +354,7 @@ function labelForChildStory(file, num) {
     /* unreadable child — fall back to the number alone */
   }
   // Titles are commonly already prefixed "[Story 2.4] ..." — don't repeat it.
-  if (title) title = title.replace(/^\[?story\s*[\d.]+\]?[\s:—-]*/i, "").trim();
+  if (title) title = docId.stripIdPrefix("story", title);
   return title ? `Story ${num} — ${title}` : `Story ${num}`;
 }
 
@@ -348,26 +366,12 @@ function syncLabelFor(filePath) {
   return SYNC_LABEL_PREFIX + dir.replace(/\s+/g, "-");
 }
 
-// Normalise the summary to the canonical "[Epic N] {title}" bracket form
-// (parity with the story/task skills and the GitHub siblings). The `title`
-// frontmatter usually embeds an "Epic N:" prefix, so strip whatever prefix it
-// carries (bracket or colon) and re-wrap in brackets. `epicNumber` (from
-// frontmatter) takes precedence over any id the title carried; the title's id
-// is only a fallback. Idempotent: an already-correct "[Epic N] …" summary with
-// a matching id is returned unchanged.
-function normaliseEpicSummary(summary, epicNumber) {
-  const bracket = summary.match(/^\s*\[Epic\s+(\d+)\]\s*(.*)$/i);
-  const colon = summary.match(/^\s*Epic\s+(\d+)\s*:\s*(.*)$/i);
-  let epicId = epicNumber != null ? String(epicNumber) : null;
-  if (bracket) {
-    epicId = epicId || bracket[1];
-    summary = bracket[2].trim();
-  } else if (colon) {
-    epicId = epicId || colon[1];
-    summary = colon[2].trim();
-  }
-  return epicId != null ? `[Epic ${epicId}] ${summary}` : summary;
-}
+// Normalise the summary to the canonical "[Epic P.E] {title}" bracket form
+// (parity with the story/task skills and the GitHub siblings). The ONE rule is
+// doc-id.js `epicSummary` (task 205), shared with jira-create-epic.js: the
+// frontmatter pair { prd, epic } wins over any id the title carried, and a missing
+// pair yields the bare title — never an id guessed from the title.
+const normaliseEpicSummary = docId.epicSummary;
 
 // ---------------------------------------------------------------------------
 // Field collection
@@ -830,8 +834,11 @@ async function run({
     );
     return { exitCode: 1 };
   }
-  // Normalise to the canonical "[Epic N] {title}" bracket form (see helper).
-  summary = normaliseEpicSummary(summary, frontmatter.epic_number);
+  // Normalise to the canonical "[Epic P.E] {title}" bracket form (see helper).
+  summary = normaliseEpicSummary(summary, {
+    prd: frontmatter.prd_number,
+    epic: frontmatter.epic_number,
+  });
 
   const http = lib.makeHttp({
     fetchImpl: fetchImpl || (typeof fetch !== "undefined" ? fetch : null),
