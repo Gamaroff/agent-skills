@@ -7,13 +7,13 @@ priority: "Medium"
 estimated_stories: 5
 created: 2026-05-11
 target_completion: 2026-06-29
-prd_source: "docs/prd/onboarding/prd.onboarding.md"
+prd_source: "docs/prd/onboarding/prd.1.onboarding/prd.1.onboarding.md"
 github_issue: 76
 github_url: "https://github.com/Gamaroff/agent-skills/issues/76"
 captured_skill_version: create-epic v0.1.0
 captured_date: 2026-05-12
 source_sha: a93f7220ec413235c7d091a8f6c6a4e050b3d46a
-source_path: docs/prd/onboarding/epics/epic.4.first-week-guided-learning-path/epic.4.first-week-guided-learning-path.md
+source_path: docs/prd/onboarding/prd.1.onboarding/epics/epic.1.4.first-week-guided-learning-path/epic.1.4.first-week-guided-learning-path.md
 ---
 
 # Epic 4: First-Week Guided Learning Path — Brownfield Enhancement

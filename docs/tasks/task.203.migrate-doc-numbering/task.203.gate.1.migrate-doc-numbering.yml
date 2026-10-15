@@ -1,0 +1,84 @@
+schema: 2
+task: 'task.203.migrate-doc-numbering'
+task_title: 'Migrate documents to hierarchical numbering'
+gate: FAIL
+status_reason: 'One high-confidence HIGH bug (a named L3 monolith is planned but never moved, so the run answers already) and three MEDIUM findings. The revert hint does not revert, appendPrdRow throws only on --apply, and the refusing boundary is unprobed. The repository migration itself is verified clean.'
+reviewer: 'QA Engineer (qa-task, develop-task pipeline)'
+head: '7ac5e4456b68922e4441e2f4ce9b6b88b25c1d32'
+updated: '2026-10-15T07:51:53Z'
+
+top_issues:
+  - id: CR-1
+    severity: high
+    file: 'shared/resources/migrate-doc-numbering.mjs'
+    finding: 'discover() adds an L3 monolith to prds but not to disc.files, so plan() builds no fileMap entry and run() answers already (reproduced in memory with --name docs/prd.md=mono).'
+    suggested_action: 'Build fileMap from disc.files plus every explicit-map key (or add the monolith to disc.files), and add a test that a named monolith actually moves.'
+    suggested_owner: dev
+    bug_ref: 'task.203.bug.1.named-l3-monolith-never-moves.md'
+    status: open
+  - id: CR-2
+    severity: medium
+    file: 'shared/resources/migrate-doc-numbering.mjs'
+    finding: 'The post-check-failed revert hint (git checkout -- . && git clean -fd <root>) leaves the staged git mv renames in place, discards unrelated edits, and deletes untracked files the run moved.'
+    suggested_action: 'Recommend a revert from HEAD scoped to the paths the run touched, say untracked moved files must be moved back by hand, and correct the task Rollback Plan text the same way.'
+    suggested_owner: dev
+    bug_ref: 'task.203.bug.2.revert-hint-does-not-revert.md'
+    status: open
+  - id: CR-3
+    severity: medium
+    file: 'shared/resources/migrate-doc-numbering.mjs'
+    finding: 'appendPrdRow is called only on --apply, outside any try, so no-table / bad-row / duplicate-row crash after a clean dry run, with the tree half-written (reproduced: alias header | # | Name |).'
+    suggested_action: 'Build the registry text during plan/verify and turn any thrown reason into a blocker so dry-run and --check report it before the first write.'
+    suggested_owner: dev
+    bug_ref: 'task.203.bug.3.registry-write-throws-only-on-apply.md'
+    status: open
+  - id: QA-1
+    severity: medium
+    file: 'shared/resources/migrate-doc-numbering.mjs'
+    finding: 'The engine is a refusing boundary (its header says it stops rather than guessing, and --root refuses a root outside the repository), but the decision sits inside run() behind git rev-parse, so no probe form reaches it (probes_executed 0); a hand probe shows --root "" silently taking the configured default.'
+    suggested_action: 'Extract the --root resolution into an exported predicate, probe it with security-probe.mjs --sink path, and refuse an empty --root as usage.'
+    suggested_owner: dev
+    bug_ref: 'task.203.bug.4.boundary-not-probed.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 50
+
+evidence:
+  tests_reviewed: 33
+  phases_verified: 5/5
+  ci: 'not read this cycle (CI is gated at /finalise)'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4]
+    phases_with_issues: [1, 3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Boundary true but unprobed (QA-1). git is spawned with argument arrays and -- separators, and ls-files / status read NUL-delimited, so no shell or filename injection was found by reading. An empty --root is accepted.'
+  performance:
+    status: PASS
+    notes: 'Dry run 2.248 s at load 9.25 (migration pending, at 61baa8dc); 1.251 s at load 30.65 on head 7ac5e445. Both are under the 5 s bound. One move per file is asserted by a test.'
+  reliability:
+    status: CONCERNS
+    notes: 'The revert hint is wrong (CR-2), and a registry refusal crashes mid-apply (CR-3). A second --apply on the migrated tree answers already, and corpus ok.'
+  maintainability:
+    status: PASS
+    notes: '33 tests; every blocker and the idempotence rule are mutation-proven (9/9 re-run by QA). Two advisory cleanups (CR-6, CR-7).'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1, CR-2, CR-3 and QA-1 (bugs 1–4).'
+      refs: ['shared/resources/migrate-doc-numbering.mjs']
+  future:
+    - action: 'CR-4: start the registry text from the planEdits output so in-tree rewrites are not overwritten; CR-5: appendPrdRow header search should skip fences; CR-6/CR-7 cleanups.'
+      refs: ['shared/resources/migrate-doc-numbering.mjs', 'shared/resources/doc-id.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

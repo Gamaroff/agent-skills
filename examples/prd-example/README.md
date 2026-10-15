@@ -1,6 +1,6 @@
 # Worked PRD Example: agent-skills Onboarding & Tutorials
 
-**Source:** [`docs/prd/onboarding/prd.onboarding.md`](../../docs/prd/onboarding/prd.onboarding.md)
+**Source:** [`docs/prd/onboarding/prd.onboarding.md`](../../docs/prd/onboarding/prd.1.onboarding/prd.1.onboarding.md)
 **Skill version:** `create-prd` 0.1.0 — see `skills/create-prd/package.json`
 **Captured:** 2026-05-12 by Story 2.1 (`develop-story` pipeline)
 **Source SHA:** `ea106b1521706dc2c710e93996c0554c80a4c528`

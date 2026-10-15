@@ -348,7 +348,7 @@ Friction events recorded during this PRD's dogfood run (Epics 1–3).
 1. Open a fresh Claude Code session.
 2. Run `/develop-story <story-file-path>` and choose **Resume**.
 
-_Provenance: `docs/prd/onboarding/epics/epic.3.runbook-tutorial-wrappers/stories/story.3.1.before-you-start-anchor-runbooks/story.3.1.implementation.1.before-you-start-anchor-runbooks-initial-run.md`_
+_Provenance: `docs/prd/onboarding/prd.1.onboarding/epics/epic.1.3.runbook-tutorial-wrappers/stories/story.1.3.1.before-you-start-anchor-runbooks/story.1.3.1.implementation.1.before-you-start-anchor-runbooks-initial-run.md`_
 
 ### Phase 0 base-branch prompt shows no `develop` option
 
@@ -358,7 +358,7 @@ _Provenance: `docs/prd/onboarding/epics/epic.3.runbook-tutorial-wrappers/stories
 1. `git checkout -b develop main && git push -u origin develop`
 2. Re-invoke `/develop-story <path>` — `develop` will appear.
 
-_Provenance: `docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entry-point/stories/story.1.1.first-task-in-10-minutes/story.1.1.implementation.1.first-task-in-10-minutes-initial-run.md`_
+_Provenance: `docs/prd/onboarding/prd.1.onboarding/epics/epic.1.1.quickstart-and-decision-tree-entry-point/stories/story.1.1.1.first-task-in-10-minutes/story.1.1.1.implementation.1.first-task-in-10-minutes-initial-run.md`_
 
 ### "Lock file exists" blocks a fresh pipeline run
 
@@ -368,7 +368,7 @@ _Provenance: `docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entr
 1. `rm .claude/state/develop-pipeline.lock`
 2. Re-run `/develop-story <path>`.
 
-_Provenance: `docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entry-point/stories/story.1.2.first-story-in-60-minutes/story.1.2.implementation.1.first-story-in-60-minutes-initial-run.md`_
+_Provenance: `docs/prd/onboarding/prd.1.onboarding/epics/epic.1.1.quickstart-and-decision-tree-entry-point/stories/story.1.1.2.first-story-in-60-minutes/story.1.1.2.implementation.1.first-story-in-60-minutes-initial-run.md`_
 
 ### Step 4 marked ✅ Done but PR URL is empty
 
@@ -378,7 +378,7 @@ _Provenance: `docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entr
 1. Re-run `/develop-story <path>` and choose **Resume**.
 2. Pipeline re-enters Step 4 and creates the PR.
 
-_Provenance: `docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/stories/story.2.3.capture-story-messy-path/story.2.3.implementation.1.capture-story-messy-path.md`_
+_Provenance: `docs/prd/onboarding/prd.1.onboarding/epics/epic.1.2.worked-prd-epic-story-examples/stories/story.1.2.3.capture-story-messy-path/story.1.2.3.implementation.1.capture-story-messy-path.md`_
 
 ### `/finalise` flags "CHANGELOG.md not updated"
 
@@ -388,4 +388,4 @@ _Provenance: `docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/st
 1. Add an entry to `CHANGELOG.md` under the current version heading.
 2. Re-invoke `/finalise` — it detects the entry and clears the gap.
 
-_Provenance: `docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entry-point/stories/story.1.5.readme-start-here-callout/story.1.5.implementation.1.readme-start-here-callout-initial-run.md`_
+_Provenance: `docs/prd/onboarding/prd.1.onboarding/epics/epic.1.1.quickstart-and-decision-tree-entry-point/stories/story.1.1.5.readme-start-here-callout/story.1.1.5.implementation.1.readme-start-here-callout-initial-run.md`_

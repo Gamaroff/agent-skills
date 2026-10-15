@@ -89,7 +89,7 @@ implementation report also accept the full-stem form older runs wrote. No PR rev
 |---|---|---|
 | Sprint Change Proposal | `change.{n}.{name}.md` | `change.1.auth-pivot.md` |
 
-PRD numbers (`P`) are **globally unique and never reused** — see [`prd-registry.md`](./prd-registry.md). An epic number `E` is unique **within its PRD**, and a story number `S` within its epic; each is the highest in use plus 1, never a reused gap. The global epic registry ([`epic-registry.md`](./epic-registry.md)) governs the legacy `epic.{number}` shape until task 203 retires it. Task numbers are **globally unique and never reused** — see `AGENTS.md` § "Task Registry". General bug numbers are **globally unique and never reused** — see [`bug-registry.md`](./bug-registry.md) and `AGENTS.md` § "Bug Registry".
+PRD numbers (`P`) are **globally unique and never reused** — see [`prd-registry.md`](./prd-registry.md). An epic number `E` is unique **within its PRD**, and a story number `S` within its epic; each is the highest in use plus 1, never a reused gap. The global epic registry ([`epic-registry.md`](./epic-registry.md)) is retired (task 203): it allocates nothing, and survives only as a historical old → new mapping. Task numbers are **globally unique and never reused** — see `AGENTS.md` § "Task Registry". General bug numbers are **globally unique and never reused** — see [`bug-registry.md`](./bug-registry.md) and `AGENTS.md` § "Bug Registry".
 
 ## See also
 
