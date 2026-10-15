@@ -3,7 +3,7 @@
 **Task**: `task.202.doc-id-engine-and-prd-registry.md`
 **Run Number**: 1
 **Started**: 2026-10-15 05:34
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -35,9 +35,9 @@ First pipeline run for task 202: ship `shared/resources/doc-id.js` (hierarchical
 | 2. review-task             | ✅ Done | `task.202.review.{N}.{name}.md` exists (or skip logged)               | READY TO IMPLEMENT 8/10; 3 Important fixed; Planned → Ready for Development | —                    | 2026-10-15T03:38Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline (plan file + surface map); 1 iteration; audit 14/14, ready-for-review @ b0ec491a; ci:fast 5542 pass | —                    | 2026-10-15T03:51Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #667: https://github.com/Gamaroff/agent-skills/pull/667 | —                    | 2026-10-15T03:52Z |
-| 5–6. qa-task / qa-fix loop | ✅ Done | `task.202.qa.{N}.*.md`; `task.202.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 6 cycles (5 + 2 granted, 1 used); gate.6 PASS 100; 5c APPROVE (pr-review.1) | —                    | 2026-10-15T05:24Z |
-| 7. finalise                | ⏳ Pending | `task.202.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.202.qa.{N}.*.md`; `task.202.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 7 cycles (5 + 2 granted, then a re-entry after finalise run 1's DoD gaps); gate.7 PASS 100; 5c APPROVE (pr-review.1, pr-review.2) | —                    | 2026-10-15T05:24Z |
+| 7. finalise                | ✅ Done | `task.202.dod.{N}.*.md`; task `status: accepted`                      | Run 1 GAPS (dod.1, 2 doc gaps); run 2 ACCEPTED (dod.2) @ af738c21; CI SUCCESS on both readings; issue #645 closed | —                    | 2026-10-15T05:46Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | Implementation report committed | —                    | 2026-10-15T05:46Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -100,6 +100,10 @@ First pipeline run for task 202: ship `shared/resources/doc-id.js` (hierarchical
 - QA cycle 6 (granted): scoped review, 0 findings → PASS 100/100; probe engages (30). Gate committed and pushed (a3ef6bca) before 5c
 - Step 5c: /review-pr --effort medium --comment --no-code → APPROVE (PC-1, PC-2 low); report staged for the acceptance commit; PR summary comment posted; ready-for-merge signalled
 - Step 7: /finalise → GAPS (DoD file task.202.dod.1…; gaps PR comment posted). The gaps comment's lead was given count=2 (the two gaps) rather than the block's checkbox count, which also counted the 3 Next Steps boxes
+- DoD gap fixes (documentation only, operator 'Go ahead'): CHANGELOG [Unreleased] entry for task 202 (commit 55bee3e3, pushed). AC6 measurement on the PR head: `time node shared/resources/doc-id.js check --corpus --json` on HEAD 55bee3e321330ce4632b4e9d0a70284d6c7d2fd8 (clean tree but this report, which Step 8 commits) → real 0.027s; `uptime` load average 0.03, 0.26, 0.70; bound < 1 s — PASS
+- QA re-entry after finalise DoD gaps: reenter-qa: 1 commit(s) outside the work-item directory since gate 6's head 8103737b (CHANGELOG.md, 55bee3e3) → re-entered QA at step 5 / qa_phase 5a, qa_max_cycles=8 (base 6). The script counts any path outside the work-item directory, a docs-only CHANGELOG commit included; followed as decided
+- QA cycle 7 (re-entry): CHANGELOG-only diff, claims verified by execution → PASS 100; 5c /review-pr → APPROVE (pr-review.2); PC-1 §3 wording fixed and staged with the review for the acceptance commit
+- Step 7 /finalise run 2 → ACCEPTED (dod.2). AC 13/13; AC6 accepted on head-identical code with a recorded deviation: `time node shared/resources/doc-id.js check --corpus --json` on PR head 54e7907641 → real 0.037s, `uptime` load 0.88, 0.41, 0.61 (doc-id.js and docs/prd byte-identical to the acceptance head af738c21). Docs PASS, security PASS (30 probes, 0 reproduced), compliance N/A. CI reading 1 SUCCESS @ 54e79076, reading 2 SUCCESS @ af738c21. Registry ticked; canonical PR comment posted; #645 done comment posted, closed; board `done` already. Slip: dod.2 was written in one pass after the agents returned rather than created at Step 0
 
 ---
 
@@ -206,14 +210,23 @@ _Track each QA review/fix cycle._
 **Loop exit**: n/a — this exit not taken
 **Action**: Proceeding to 5c (PR conformance review)
 
+### QA Cycle 7 — 2026-10-15
+**Gate Result**: PASS
+**Issues Found**: none (re-entry after the finalise DoD gaps; CHANGELOG.md only)
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: APPROVE — task.202.pr-review.2.doc-id-engine-and-prd-registry.md (PC-1 fixed as a doc-only carry in task §3; PC-2 at Step 8)
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: Escalated — QA loop limit reached (5 cycles, final gate CONCERNS 90/100, HIGH 0 throughout)
+**Finished**: 2026-10-15
+**Final Status**: Completed — accepted (gate.7 PASS 100/100; operator granted 2 extra QA cycles after the 5-cycle limit escalation)
 **Branch**: feature/task.202.doc-id-engine-and-prd-registry
 **PR**: https://github.com/Gamaroff/agent-skills/pull/667
-**QA Iterations**: 5
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 7
+**DoD Summary**: `task.202.dod.2.doc-id-engine-and-prd-registry.md` (run 1 gaps: `task.202.dod.1.doc-id-engine-and-prd-registry.md`)
+**Tracker debt**: none
