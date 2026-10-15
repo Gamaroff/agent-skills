@@ -35,8 +35,8 @@ Make the PRD skills allocate, write and check a registry-backed PRD number, and 
 | 2. review-task             | ✅ Done    | `task.204.review.{N}.{name}.md` exists (or skip logged)               | READY TO IMPLEMENT 8/10; 1 Critical + 7 Important fixed in the task doc; Planned → Ready for Development | —                    | 2026-10-15T14:58Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; 27/27 phases; ci:fast green (5692/0) | docs/tasks/task.204.numbered-prds-in-prd-skills/.summaries/step-3-loop-audit-1.json | 2026-10-15T15:19Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #675: https://github.com/Gamaroff/agent-skills/pull/675 | —                    | 2026-10-15T15:24Z |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.204.qa.{N}.*.md`; `task.204.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.204.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.204.qa.{N}.*.md`; `task.204.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 8 cycles (5 + 2 + 1 granted); escalated at the loop limit; accepted by the maintainer via Step 5c — PR review 1 CONCERNS | —                    | 2026-10-15T21:10Z |
+| 7. finalise                | ❌ Failed  | `task.204.dod.{N}.*.md`; task `status: accepted`                      | DoD 1: GAPS — CI red (stdout-drain guard on migration-guard.mjs), CHANGELOG + 2 reference docs, CQ4 mutation map | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
@@ -105,6 +105,7 @@ Make the PRD skills allocate, write and check a registry-backed PRD number, and 
 - QA cycle 6 (5b): qa-fix — see QA Iteration History; fix commit 84b065af; PR comment posted, issue comment `posted`.
 - QA cycle 7 (5a): qa-task steps run by the orchestrator from the skill text loaded for cycle 6. SAFETY_REPROBE=true by judgement → unscoped re-probe (Explore, 238 s): 3 bugs, 2 promoted (CR-1 HIGH reproduced by QA, provenance: engine identical on develop, call path new here → in scope; CR-2). Probe 24/engages. Gate 7 FAIL 70/100; task status → in-progress. Convergence: HIGH 0,0,0,0,0,0,1 — no trip (first-time HIGH). Route: continue. PR comment posted; issue comment `posted`. Note: the CR-1 engine fix was started in the working tree before gate 7 was written; gate 7's head is 84b065af, the commit the reviewer read.
 - QA loop re-entry: 1 extra cycle granted (user approved "Resume at 5a with 1 more cycle"); 0 cycle(s) run outside the loop back-filled from disk. `grant-qa-cycles.sh`: lock restored, QA_CYCLE=7, qa_max_cycles=8, reenter_at=5a.
+- Acceptance after escalation (2026-10-15): the maintainer chose option 2 of the escalation — accept the current gate via Step 5c, then `/finalise` — over another grant. Basis: gate 8 raised no HIGH; its five mediums are fixed (CR-1, CR-3) or guarded by `review-prd/scripts/migration-guard.mjs` (CR-2, CR-4, CR-5) in `63c1e06b`, verified by the gate-8 test row (40/40, 8 mutations each red) and `ci:fast` 5716/0, but read by no gate. Step 5c `/review-pr --effort medium --comment --no-code` returned CONCERNS (task.204.pr-review.1.numbered-prds-in-prd-skills.md, 0 high, 3 medium, 2 low); PR comment posted. PC-1, PC-2, PC-5 fixed in the task document; PC-3 is this entry; PC-4: the engine follow-up is task.211 (GitHub #676), written in a develop worktree (`.worktrees/task.211`) and not yet committed, so it does not ride into PR #675.
 - QA cycle 8 (5b): user chose scope (fix blocks, guard engine) and CR-4 direction (migration asks for a domain); fix 63c1e06b; changes-requested stage-disabled; PR comment posted, issue comment `posted`.
 - QA cycle 8 (5a): SAFETY_REPROBE=true by judgement; unscoped re-probe directed to exercise the migration path end to end (Explore, 340 s): 6 bugs, 5 promoted (all reproduced; CR-2 and CR-5 verified by QA on this branch and develop's engine — engine defects, in scope as this task wires the path). Probe 24/engages. Gate 8 CONCERNS 50/100. Route: continue. PR comment posted; issue comment `posted`.
 
@@ -200,6 +201,17 @@ The pipeline completed 8 qa-task/qa-fix cycles (5 + 2 + 1 granted) without a cle
 2. Open the follow-up task the maintainer chose: fix the migration engine (frontmatter creation, outside-link prefilter, domain prompt for a domain-less PRD), then lift the matching guard refusals.
 3. Separate follow-up: the shared PRD-path containment predicate in `doc-id.js` (gates 4–8), and recovery for a PRD written without its registry row (gate-2 CR-4).
 
+### Finalise DoD Gaps — 2026-10-15
+
+`/finalise` (DoD 1, `task.204.dod.1.numbered-prds-in-prd-skills.md`) returned GAPS. Security PASS (probe run by /finalise: 24 executed, 0 reproduced); compliance not applicable.
+
+- **CI red (code):** `skills/review-prd/scripts/migration-guard.mjs:25` exits straight after `console.log`; `shared/resources/tests/stdout-drain-on-exit.test.mjs` ("no NEW file adopts exit-after-write") fails. CI `test` failed on `63c1e06b`, `687560bb`, `a61f3e28`. Cycle 8's local "ci:fast 5716/0" was run while the new file was still untracked, and the guard reads tracked files only — the local green did not cover it.
+- **CHANGELOG.md:** no task 204 entry under `[Unreleased]`.
+- **Reference docs:** `docs/concepts/quickstart-story.md:72-75, 83, 149` and `docs/reference/configuration.md:20` show the old unnumbered PRD paths.
+- **CQ4:** "every assertion mutation-proven" has per-cycle counts, not a member-by-member map of the 40 rows.
+
+The CI fix is a code change, so it re-enters QA at 5a before /finalise re-runs (`reenter-qa-after-finalise.sh`).
+
 ---
 
 ## QA Iteration History
@@ -288,7 +300,7 @@ _Track each QA review/fix cycle._
 **Issues Found**: gate 7's findings fixed and verified; 5 new medium on the migration path review-prd offers — CR-1 apply failure hides findings and revert; CR-2 frontmatter-less legacy PRD can never migrate (engine, on develop too); CR-3 one --name only; CR-4 create-prd refuses the migrated root placement; CR-5 outside links to a moved monolith go dead (engine, on develop too); 1 advisory low (CR-6 PRD root outside the working tree)
 **HIGH findings**: 0
 **MEDIUM findings**: 5
-**PR Review**: not reached — gate did not exit the loop
+**PR Review**: CONCERNS (task.204.pr-review.1, run after escalation on the maintainer's accept decision)
 **Loop exit**: n/a — this exit not taken
 **Action**: Escalating — loop limit reached
 **Fixes Applied**: Scope decided by the user (qa-fix Step 2a, two options offered): "fix blocks, guard engine"; CR-4 layout: "migration asks for a domain" (follow-up). CR-1: the apply block prints the engine's findings and its revert command on a non-zero exit. CR-3: MIG_NAME takes one `<path>=<slug>` per line, each its own --name, in plan and apply; the unplaced-prd instruction says so. CR-2/CR-4/CR-5: new skill-local `skills/review-prd/scripts/migration-guard.mjs` (one definition, called by both blocks) reads the plan and refuses `no-frontmatter` (no closed block), `no-domain` (a PRD that would land directly under the root) and `outside-links` (a source outside the root named by files outside it); the apply block re-plans and runs the guard before moving anything. Engine fixes for CR-2, CR-5 and the domain prompt for CR-4 go to a follow-up task. Probe: `MIG_NAME` / `unplaced-prd` / `revert command` — population 1 (review-prd SKILL.md, updated); task doc Step 2 line is the historical plan, unaffected. Test rows +1 (40); 8 mutations, each red in the gate-8 row (one row holds all eight assertions — recorded). ci:fast 5716/0 (symlink parked), bundle:check clean, validate and quick_validate pass.
@@ -303,5 +315,5 @@ _Track each QA review/fix cycle._
 **Branch**: feature/task.204.numbered-prds-in-prd-skills
 **PR**: https://github.com/Gamaroff/agent-skills/pull/675
 **QA Iterations**: 8 (loop limit after two re-entries)
-**DoD Summary**: {populated after Step 7}
+**DoD Summary**: task.204.dod.1.numbered-prds-in-prd-skills.md — GAPS
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}

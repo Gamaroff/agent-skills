@@ -556,6 +556,42 @@ that this document's own example (an unnumbered PRD) never shows.
 - Gate 7's findings are fixed and verified.
 - The migration review-prd offers has five reproduced defects: a failed apply hides its undo command; frontmatter-less legacy PRDs and two unnamed PRDs can never migrate; a migrated root-level PRD is refused by create-prd; outside links to a moved monolith go dead. Two are task-203 engine defects present on develop.
 
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**QA Report**: `task.204.qa.8.numbered-prds-in-prd-skills.md`
+**Gate File**: `task.204.gate.8.numbered-prds-in-prd-skills.yml`
+**Gate Status**: ⚠️ CONCERNS — **Quality Score**: 50/100 (accepted for finalise via Step 5c, PR review 1 CONCERNS)
+
+### Missing Criteria:
+
+1. **Code Quality (CQ1) — CI is red:**
+   - [ ] `skills/review-prd/scripts/migration-guard.mjs:25` calls `process.exit` straight after `console.log`, which `shared/resources/tests/stdout-drain-on-exit.test.mjs` forbids in a new file. CI `test` failed on `63c1e06b`, `687560bb` and `a61f3e28`.
+
+2. **Code Quality (CQ4) — mutation evidence:**
+   - [ ] "Every assertion in the new test is mutation-proven" has per-cycle counts, not a member-by-member map of the 40 rows.
+
+3. **Documentation:**
+   - [ ] CHANGELOG.md `[Unreleased]` has no task 204 entry.
+   - [ ] `docs/concepts/quickstart-story.md` (lines 72–75, 83, 149) and `docs/reference/configuration.md` (line 20) show the old unnumbered PRD paths.
+
+### Next Steps:
+
+- [ ] **BLOCKING**: set `process.exitCode` and return in `migration-guard.mjs`; the code change re-enters QA at 5a
+- [ ] Add the CHANGELOG entry; update the two reference docs
+- [ ] Map each test row to a recorded mutation, or narrow CQ4
+- [ ] Re-run /finalise
+
+**Estimated Effort:** Small–Medium (1–2 hours)
+
+**Gap Report Generated:** 2026-10-15
+**Detailed Verification Log:** See `task.204.dod.1.numbered-prds-in-prd-skills.md` for complete verification evidence.
+
+---
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -582,6 +618,7 @@ that this document's own example (an unnumbered PRD) never shows.
 | 2026-10-15 |         | QA gate CONCERNS (50/100) — 5 findings | qa-task |
 | 2026-10-15 |         | QA findings fixed — cycle 8, 5 findings: review-prd apply shows findings and undo (CR-1), several --name pairs (CR-3); migration guard refuses no-frontmatter, no-domain and outside-links shapes (CR-2, CR-4, CR-5 — engine fixes to a follow-up task); 40 test rows | qa-fix |
 | 2026-10-15 |         | PR review 1 (Step 5c, conformance) CONCERNS — 5 findings; Scope deviation, Migration criterion narrowing and grep exclusion recorded; engine follow-up filed as task.211 (#676) | review-pr |
+| 2026-10-15 |         | DoD incomplete — 4 gaps identified | finalise |
 <!-- change-log-end -->
 
 ---
