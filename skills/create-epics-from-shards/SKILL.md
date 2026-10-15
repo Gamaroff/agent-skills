@@ -395,8 +395,8 @@ CHECKED=0
 for f in "$PRD_DIR"/epics/epic.*/epic.*.md; do
   [ -f "$f" ] || continue
   case "${f##*/}" in "$(basename "$(dirname "$f")").md") ;; *) continue ;; esac
-  command node .agents/skills/create-epics-from-shards/references/doc-id.js check "$f" --prd-root "${PRD_ROOT}" --json >/dev/null \
-    || { echo "❌ doc-id check failed: $f"; exit 1; }
+  OUT=$(command node .agents/skills/create-epics-from-shards/references/doc-id.js check "$f" --prd-root "${PRD_ROOT}" --json) \
+    || { echo "❌ doc-id check failed: $f"; printf '%s\n' "$OUT"; exit 1; }
   CHECKED=$((CHECKED + 1))
 done
 # Every epic of THIS batch must be present: a floor of "any epic" passes a batch that wrote nothing
@@ -405,8 +405,15 @@ P=$(command node .agents/skills/create-epics-from-shards/references/doc-id.js pa
 [ -n "$P" ] || { echo "❌ $(basename "$PRD_DIR") is not a prd.{P}.{feature} directory"; exit 1; }
 E=$E0
 while [ "$E" -lt $((E0 + COUNT)) ]; do
-  ls "$PRD_DIR/epics/epic.$P.$E."*/epic.$P.$E.*.md >/dev/null 2>&1 \
-    || { echo "❌ epic.$P.$E is missing — the batch did not write it"; exit 1; }
+  # Exactly one epic.P.E.{slug}/epic.P.E.{slug}.md — the only shape the loop above checks, so a
+  # misnamed batch file cannot pass unchecked (QA cycle 5, CR-1).
+  FOUND=0
+  for d in "$PRD_DIR/epics/epic.$P.$E."*/; do
+    d=${d%/}
+    [ -f "$d/${d##*/}.md" ] && FOUND=$((FOUND + 1))
+  done
+  [ "$FOUND" -eq 1 ] \
+    || { echo "❌ epic.$P.$E is missing — the batch did not write one epic.$P.$E.{slug}/epic.$P.$E.{slug}.md (found $FOUND)"; exit 1; }
   E=$((E + 1))
 done
 echo "doc-id check: ${CHECKED} epic(s) ok; batch epic.$P.$E0 … epic.$P.$((E0 + COUNT - 1)) present"

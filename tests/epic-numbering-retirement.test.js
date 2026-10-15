@@ -187,6 +187,11 @@ function fixture(files, skills) {
   return dir;
 }
 
+function write(dir, rel, content) {
+  fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
+  fs.writeFileSync(path.join(dir, rel), content);
+}
+
 /** A block with its `{placeholder}` replaced — how the agent runs a block that names one. */
 const substitute = (block, map) =>
   Object.entries(map).reduce((b, [k, v]) => b.split(k).join(v), block);
@@ -460,6 +465,34 @@ test("create-epics-from-shards blocks: E0 from next epic; Step 7 checks the batc
     }
     const unsub = runBlock(step7, dir, {});
     assert.equal(unsub.code, 1, unsub.out);
+
+    // A batch epic named apart from its directory is one the id check never read (QA cycle 5, CR-1).
+    write(
+      dir,
+      `${prdDir}/epics/epic.2.2.foo/epic.2.2.bar.md`,
+      epicFile(2, 2, "bar"),
+    );
+    const misnamed = runBlock(
+      substitute(step7, { "{PRD dir}": prdDir, "{E0}": "2", "{count}": "1" }),
+      dir,
+      {},
+    );
+    assert.equal(misnamed.code, 1, misnamed.out);
+    assert.match(misnamed.out, /epic\.2\.2 is missing/);
+    // A failing check prints its findings, not only the path (QA cycle 5, CR-4).
+    write(
+      dir,
+      `${prdDir}/epics/epic.2.3.baz/epic.2.3.baz.md`,
+      epicFile(2, 4, "baz"),
+    );
+    const failing = runBlock(
+      substitute(step7, { "{PRD dir}": prdDir, "{E0}": "3", "{count}": "1" }),
+      dir,
+      {},
+    );
+    assert.equal(failing.code, 1, failing.out);
+    assert.match(failing.out, /doc-id check failed/);
+    assert.match(failing.out, /"reason"/);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
     fs.rmSync(empty, { recursive: true, force: true });

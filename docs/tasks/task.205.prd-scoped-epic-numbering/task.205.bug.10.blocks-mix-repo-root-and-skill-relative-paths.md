@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Major'
 priority: 'High'
 created: '2026-10-15'
@@ -12,7 +12,7 @@ description: 'Blocks call helpers from two different working directories'
 
 **Bug ID**: TASK-205-BUG-10
 **Related**: [task.205.prd-scoped-epic-numbering.md](./task.205.prd-scoped-epic-numbering.md) (QA finding CR-1, CR-2, gate 4)
-**Status**: Ready for QA
+**Status**: Closed
 **Priority**: High
 **Severity**: Major
 **Created**: 2026-10-15
@@ -50,3 +50,4 @@ Resolve every helper in a block from the repository root; assert that no block t
 |------|--------|------------|-------|
 | 2026-10-15 | New | qa-task | Found by QA cycle 4 (CR-1, CR-2) |
 | 2026-10-15 | Ready for QA | qa-fix | Fixed in QA cycle 4 fix pass |
+| 2026-10-15 | Closed | qa-task | Verified by task.205.qa.5.prd-scoped-epic-numbering.md |

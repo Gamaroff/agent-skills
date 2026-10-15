@@ -387,7 +387,7 @@ Run the tracker-card preflight on the document just written, **before** reportin
 
 ```bash
 # INPUT: {epic file} — substitute the path of the epic file this run just wrote (QA cycle 3, CR-1).
-node references/card-preflight.js --file "{epic file}"
+command node .agents/skills/create-epic/references/card-preflight.js --file "{epic file}"
 ```
 
 Offline — no auth, no network, no writes. It reports whether this document will publish a complete

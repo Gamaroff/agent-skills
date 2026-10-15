@@ -575,26 +575,26 @@ Not applicable — no hot path changes; the generator's walk gains one directory
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-15
-**Quality Score**: 50/100
-**Gate Decision**: FAIL
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.205.qa.4.prd-scoped-epic-numbering.md](./task.205.qa.4.prd-scoped-epic-numbering.md)
-- **Gate File**: [task.205.gate.4.prd-scoped-epic-numbering.yml](./task.205.gate.4.prd-scoped-epic-numbering.yml)
+- **Full Report**: [task.205.qa.5.prd-scoped-epic-numbering.md](./task.205.qa.5.prd-scoped-epic-numbering.md)
+- **Gate File**: [task.205.gate.5.prd-scoped-epic-numbering.yml](./task.205.gate.5.prd-scoped-epic-numbering.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5689 (5675 pass, 0 fail)
+- **Tests Executed**: 5690 (5676 pass, 0 fail)
 - **Phases Verified**: 7/7
-- **Critical Issues**: 2
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- Cycle 3's fixes verified; bugs 8–9 closed.
-- HIGH: [BUG-10](./task.205.bug.10.blocks-mix-repo-root-and-skill-relative-paths.md) — blocks call helpers from two working directories.
-- MEDIUM: [BUG-11](./task.205.bug.11.shards-batch-guard-joins-its-two-inputs.md) — the batch guard validates its inputs joined.
+- Cycle 4's fixes verified; bugs 10–11 closed.
+- MEDIUM: [BUG-12](./task.205.bug.12.shards-presence-check-accepts-a-misnamed-batch-epic.md) — presence check accepts an unchecked batch epic.
+- LOW: [BUG-13](./task.205.bug.13.shards-id-check-discards-its-reason.md) — id check discards its reason.
 
 ## Change Log
 
@@ -612,6 +612,8 @@ Not applicable — no hot path changes; the generator's walk gains one directory
 | 2026-10-15 |  | QA findings fixed — cycle 3, 6 findings (2 gating + 3 advisory + 1 cleanup); population of cross-block reads enumerated; 4 mutation-proven | qa-fix |
 | 2026-10-15 |  | QA gate FAIL (50/100) — 3 gating findings (2 high, one root; 1 medium); bugs 8–9 closed | qa-task |
 | 2026-10-15 |  | QA findings fixed — cycle 4, 4 findings (one path root per block, enforced by a test; batch guard; one frontmatter parser); 4 mutation-proven | qa-fix |
+| 2026-10-15 |  | QA gate CONCERNS (80/100) — 0 high; 1 medium, 1 low gating; bugs 10–11 closed | qa-task |
+| 2026-10-15 |  | QA findings fixed — cycle 5, 2 gating findings + 1 advisory (batch presence shape; id-check reason printed; create-epic preflight path root); 2 mutation-proven | qa-fix |
 
 ---
 

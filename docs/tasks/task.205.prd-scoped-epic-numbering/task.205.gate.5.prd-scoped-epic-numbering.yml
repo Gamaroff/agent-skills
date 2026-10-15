@@ -1,0 +1,79 @@
+schema: 2
+task: 'task.205.prd-scoped-epic-numbering'
+task_title: 'PRD-scoped epic numbering'
+gate: CONCERNS
+status_reason: 'Cycle 4''s fixes hold (bugs 10–11 closed; one path root per block, enforced by a test). No HIGH. One MEDIUM: the shards batch presence check accepts an epic file the id check skipped (misnamed file). One LOW: the id check discards its reason. Two medium-confidence advisories (a pre-existing bare helper path in create-epic; later blocks of two skills still use bare references/ paths). Suite green: 5676 pass, 0 fail.'
+reviewer: 'QA Engineer'
+head: '941446e8b8874129e0093a247b0d01eb1c54cb93'
+updated: '2026-10-15T11:55:31Z'
+
+top_issues:
+  - id: 'TASK-205-QA5-CR1'
+    severity: medium
+    file: 'skills/create-epics-from-shards/SKILL.md'
+    finding: 'The presence check matches epic.P.E.*/epic.P.E.*.md while the id check runs only on a file named after its directory, so a misnamed batch epic passes unchecked at exit 0 (TASK-205-BUG-12).'
+    suggested_action: 'Require exactly one epic.P.E.{slug}/epic.P.E.{slug}.md per batch epic.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-205-QA5-CR4'
+    severity: low
+    file: 'skills/create-epics-from-shards/SKILL.md'
+    finding: 'The id check''s JSON (its reason) goes to /dev/null, so the HALT does not print the reason the prose promises (TASK-205-BUG-13).'
+    suggested_action: 'Print the check output on failure.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 5690
+  phases_verified: '7/7'
+  ci: 'not read at this cycle (gated at /finalise)'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5, 6]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 10
+    notes: 'review-epic Input Resolution re-probed (fence form, 10 cases, verdict engages).'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'A batch presence check that can accept an unchecked file.'
+  maintainability:
+    status: PASS
+    notes: 'One path root per block, enforced.'
+
+recommendations:
+  immediate:
+    - action: 'Require exactly one epic.P.E.{slug}/epic.P.E.{slug}.md per batch epic; print the id-check reason on failure (CR-1, CR-4).'
+      refs: ['skills/create-epics-from-shards/SKILL.md']
+  future:
+    - action: 'Advisory, medium confidence: create-epic card-preflight line calls a bare references/ helper with a repository-relative argument (path form pre-existing on develop) (CR-2).'
+      refs: ['skills/create-epic/SKILL.md']
+    - action: 'Advisory, medium confidence: later blocks of sync-github-epic and ensure-epic-github-issue still use bare references/ paths (pre-existing); one root per skill rather than per block (CR-3).'
+      refs: ['skills/sync-github-epic/SKILL.md', 'skills/ensure-epic-github-issue/SKILL.md']
+    - action: 'Pre-existing (identical on develop): issue-body blocks read DOC_URL / NEW_BODY / … bound elsewhere (gate 4 CR-3/CR-4).'
+      refs: ['skills/ensure-epic-github-issue/SKILL.md', 'skills/sync-github-epic/SKILL.md']
+    - action: 'Cleanup: two blocks bind epic-meta values they never use (CR-5).'
+      refs: ['skills/ensure-epic-github-issue/SKILL.md', 'skills/sync-github-epic/SKILL.md']
+
+bug_resolution:
+  bugs_fixed: 11
+  bugs_remaining: 2
+  fix_date: '2026-10-15'
+  total_iterations: 4
+  verification_method: 'Executed skill blocks (guard test) + mutation proofs'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['bugs 12–13']
