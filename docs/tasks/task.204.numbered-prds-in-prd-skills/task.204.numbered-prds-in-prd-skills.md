@@ -461,6 +461,11 @@ that this document's own example (an unnumbered PRD) never shows.
 - [ ] `npm run bundle:check` is clean, with no `UNREACHED` copies.
 - [ ] `npm run validate -- skills/<skill>/` passes for every touched skill. `npm run generate-catalog` produces no diff after a commit.
 - [ ] Every assertion in the new test is mutation-proven (Testing Strategy).
+  - **Narrowed at acceptance (DoD 1, CQ4):** the evidence is per cycle, not per row. The 21 rows
+    present after QA cycle 1 were proven together (gate 2, QA-2: 21/21, counts recorded). Every row a
+    later QA fix cycle added or changed is proven with the mutation and the row that went red named in
+    that cycle's **Fixes Applied** entry in the implementation report. No member-by-member map of all
+    40 rows exists.
 
 ### Migration
 

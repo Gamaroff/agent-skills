@@ -17,7 +17,7 @@ Skills resolve these via [`shared/resources/resolve-paths.sh`](../../shared/reso
 
 **The nested structure under each root is fixed**:
 
-- **PRD discovery.** PRDs live directly under `${PRD_ROOT}` (e.g. `${PRD_ROOT}/onboarding/prd.onboarding.md`).
+- **PRD discovery.** Each PRD owns its directory under a domain: `${PRD_ROOT}/{domain}/prd.{P}.{feature}/prd.{P}.{feature}.md` (e.g. `${PRD_ROOT}/onboarding/prd.1.onboarding/prd.1.onboarding.md`), where `{P}` is its number in `${PRD_ROOT}/prd-registry.md`.
 - **Epic location.** Epics live at `${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md`.
 - **Story layout.** Stories nest inside their parent epic at `${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.{name}/stories/story.{E}.{S}.{name}/`. Flat layouts are **not supported** — `create-story` will refuse to write outside the epic directory.
 - **Architecture docs.** Coding standards / tech stack / source tree live at `${ARCH_ROOT}/concepts/{coding-standards,tech-stack,source-tree}.md`.

@@ -67,11 +67,12 @@ Tell the agent:
 
 > `/create-prd` Add a footer link to `docs/runbooks/README.md` pointing at `CONTRIBUTING.md`. Single-epic brownfield enhancement. Title: "footer-link".
 
-The skill creates:
+The skill allocates the PRD's number `{P}` from `docs/prd/prd-registry.md`, adds its row there, and creates:
 
 ```
 docs/prd/footer-link/
-└── prd.footer-link.md
+└── prd.{P}.footer-link/
+    └── prd.{P}.footer-link.md
 ```
 
 When prompted, answer **No** to sharding (single-epic PRD needs no split).
@@ -80,7 +81,7 @@ When prompted, answer **No** to sharding (single-epic PRD needs no split).
 
 ## 3. Create the epic (≤ 3 min)
 
-> `/create-epic docs/prd/footer-link/prd.footer-link.md`
+> `/create-epic docs/prd/footer-link/prd.{P}.footer-link/prd.{P}.footer-link.md`
 
 The skill assigns the next epic number from `docs/development/epic-registry.md` and writes:
 
@@ -146,7 +147,7 @@ You should have all 10 artifact types:
 
 | #   | Artifact                                          | What it is                                                                 |
 | --- | ------------------------------------------------- | -------------------------------------------------------------------------- |
-| 1   | `prd.footer-link.md`                              | Practice PRD                                                               |
+| 1   | `prd.{P}.footer-link.md`                          | Practice PRD                                                               |
 | 2   | `epic.{N}.footer-link.md`                         | Parent epic                                                                |
 | 3   | `story.{N}.1.add-footer-link.md`                  | Story spec                                                                 |
 | 4   | `story.{N}.1.plan.add-footer-link.md`             | Co-located implementation plan                                             |

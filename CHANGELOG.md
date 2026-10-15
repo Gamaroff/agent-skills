@@ -31,6 +31,21 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **The PRD skills write, check and migrate numbered PRDs (task 204). Breaking.** `create-prd`
+  allocates the PRD's number `P` from `${PRD_ROOT}/prd-registry.md` (bootstrapping it on first use),
+  writes `${PRD_ROOT}/{domain}/prd.{P}.{feature}/prd.{P}.{feature}.md` with `prd_number: P`, adds the
+  registry row, and stops on any `doc-id.js check` result other than `ok`. Re-running it on an
+  existing PRD keeps its number. The greenfield path no longer writes `docs/prd.md`.
+  `review-prd` reports a missing registry, an unnumbered PRD, a directory/stem/frontmatter mismatch
+  and an unnumbered or wrongly-parented epic or story as **Critical**, offers the task-203
+  migration when its plan has no blockers, and writes its report as
+  `prd.{P}.{feature}.review.{n}.{name}.md`. A new `review-prd/scripts/migration-guard.mjs` withholds
+  that offer for three shapes the migration cannot yet carry — no frontmatter, a PRD with no domain,
+  and a `docs/prd.md` that files outside the PRD root link to — until task 211 lands. `shard-prd`
+  explodes a numbered PRD in place and refuses a legacy one. Every PRD-path block refuses a path that
+  resolves outside `${PRD_ROOT}` through a symlink. The migration's token pass no longer rewrites the
+  bare words `prd` and `index`, which turned `type: prd` in every other PRD into `type: prd.{P}.{slug}`.
+
 - **Epics are numbered within their PRD, and every epic needs a PRD (task 205). Breaking.** Every
   epic skill now names a new epic `epic.{P}.{E}.{name}`: `P` is the parent PRD's number and `E` is
   allocated by `doc-id.js next epic --prd-dir <PRD dir>`. The PRD's "Epic 2" and the file

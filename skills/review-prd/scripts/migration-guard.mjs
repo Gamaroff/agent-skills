@@ -20,94 +20,103 @@ import { readFileSync, existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 
-const out = (o, code) => {
-  console.log(JSON.stringify(o));
-  process.exit(code);
-};
+// Every exit goes through main()'s return, so stdout drains before the process ends: the
+// result is written once below and the status set with process.exitCode, never process.exit
+// straight after a write (the stdout-drain-on-exit test).
+const out = (o, code) => ({ o, code });
 
-const argv = process.argv.slice(2);
-const i = argv.indexOf("--root");
-const root = i >= 0 ? argv[i + 1] : "";
-if (!root || argv.length !== 2)
-  out(
-    {
-      reason: "usage",
-      error: "usage: migration-guard.mjs --root <PRD_ROOT> < plan.json",
-    },
-    2,
-  );
-
-let plan;
-try {
-  plan = JSON.parse(readFileSync(0, "utf8"));
-} catch {
-  out({ reason: "usage", error: "stdin is not the migration plan's JSON" }, 2);
-}
-if (!Array.isArray(plan.mapping))
-  out({ reason: "usage", error: "the plan carries no mapping[]" }, 2);
-
-const rootAbs = path.resolve(root);
-const inRoot = (p) => path.resolve(p).startsWith(rootAbs + path.sep);
-const blockers = [];
-
-for (const m of plan.mapping) {
-  if (m.kind !== "prd") continue;
-  // no-frontmatter — the engine edits prd_number into an existing block and never creates one.
-  const text = existsSync(m.old) ? readFileSync(m.old, "utf8") : "";
-  // An opening fence with no closing one is no block either.
-  if (!/^---[ \t]*\r?\n(?:.*\r?\n)*?---[ \t]*(?:\r?\n|$)/.test(text)) {
-    blockers.push({
-      code: "no-frontmatter",
-      path: m.old,
-      detail:
-        "has no closed frontmatter block, so the migration cannot write its number — add one (---, type: prd, ---) and plan again",
-    });
-  }
-  // no-domain — create-prd's layout is {domain}/prd.{P}.{feature}/prd.{P}.{feature}.md.
-  const rel = path.relative(rootAbs, path.resolve(m.new)).split(path.sep);
-  if (rel.length !== 3) {
-    blockers.push({
-      code: "no-domain",
-      path: m.old,
-      detail: `would land at ${m.new}, outside a domain directory — move it to ${root}/{domain}/prd.{slug}.md by hand (git mv) and plan again`,
-    });
-  }
-  // outside-links — only a source outside the root can be named by files the engine never reads.
-  if (!inRoot(m.old)) {
-    const base = path.basename(m.old).replace(/[.]/g, "\\.");
-    const g = spawnSync(
-      "git",
-      [
-        "grep",
-        "-l",
-        "-E",
-        `(^|[^A-Za-z0-9_.-])${base}([^A-Za-z0-9_-]|$)`,
-        "--",
-        ".",
-        `:(exclude)${root}`,
-        `:(exclude)${m.old}`,
-      ],
-      { encoding: "utf8" },
+function main() {
+  const argv = process.argv.slice(2);
+  const i = argv.indexOf("--root");
+  const root = i >= 0 ? argv[i + 1] : "";
+  if (!root || argv.length !== 2)
+    return out(
+      {
+        reason: "usage",
+        error: "usage: migration-guard.mjs --root <PRD_ROOT> < plan.json",
+      },
+      2,
     );
-    if (g.status !== 0 && g.status !== 1) {
+
+  let plan;
+  try {
+    plan = JSON.parse(readFileSync(0, "utf8"));
+  } catch {
+    return out(
+      { reason: "usage", error: "stdin is not the migration plan's JSON" },
+      2,
+    );
+  }
+  if (!Array.isArray(plan.mapping))
+    return out({ reason: "usage", error: "the plan carries no mapping[]" }, 2);
+
+  const rootAbs = path.resolve(root);
+  const inRoot = (p) => path.resolve(p).startsWith(rootAbs + path.sep);
+  const blockers = [];
+
+  for (const m of plan.mapping) {
+    if (m.kind !== "prd") continue;
+    // no-frontmatter — the engine edits prd_number into an existing block and never creates one.
+    const text = existsSync(m.old) ? readFileSync(m.old, "utf8") : "";
+    // An opening fence with no closing one is no block either.
+    if (!/^---[ \t]*\r?\n(?:.*\r?\n)*?---[ \t]*(?:\r?\n|$)/.test(text)) {
       blockers.push({
-        code: "outside-links",
+        code: "no-frontmatter",
         path: m.old,
-        detail: "could not search for references to it (git grep failed)",
+        detail:
+          "has no closed frontmatter block, so the migration cannot write its number — add one (---, type: prd, ---) and plan again",
       });
-    } else {
-      const files = g.stdout.split("\n").filter(Boolean);
-      if (files.length) {
+    }
+    // no-domain — create-prd's layout is {domain}/prd.{P}.{feature}/prd.{P}.{feature}.md.
+    const rel = path.relative(rootAbs, path.resolve(m.new)).split(path.sep);
+    if (rel.length !== 3) {
+      blockers.push({
+        code: "no-domain",
+        path: m.old,
+        detail: `would land at ${m.new}, outside a domain directory — move it to ${root}/{domain}/prd.{slug}.md by hand (git mv) and plan again`,
+      });
+    }
+    // outside-links — only a source outside the root can be named by files the engine never reads.
+    if (!inRoot(m.old)) {
+      const base = path.basename(m.old).replace(/[.]/g, "\\.");
+      const g = spawnSync(
+        "git",
+        [
+          "grep",
+          "-l",
+          "-E",
+          `(^|[^A-Za-z0-9_.-])${base}([^A-Za-z0-9_-]|$)`,
+          "--",
+          ".",
+          `:(exclude)${root}`,
+          `:(exclude)${m.old}`,
+        ],
+        { encoding: "utf8" },
+      );
+      if (g.status !== 0 && g.status !== 1) {
         blockers.push({
           code: "outside-links",
           path: m.old,
-          detail: `named by ${files.length} file(s) outside ${root} that the migration would not re-point (${files.slice(0, 5).join(", ")}${files.length > 5 ? ", …" : ""}) — move it by hand and update them`,
+          detail: "could not search for references to it (git grep failed)",
         });
+      } else {
+        const files = g.stdout.split("\n").filter(Boolean);
+        if (files.length) {
+          blockers.push({
+            code: "outside-links",
+            path: m.old,
+            detail: `named by ${files.length} file(s) outside ${root} that the migration would not re-point (${files.slice(0, 5).join(", ")}${files.length > 5 ? ", …" : ""}) — move it by hand and update them`,
+          });
+        }
       }
     }
   }
+  return out(
+    { reason: blockers.length ? "blocked" : "ok", blockers },
+    blockers.length ? 1 : 0,
+  );
 }
-out(
-  { reason: blockers.length ? "blocked" : "ok", blockers },
-  blockers.length ? 1 : 0,
-);
+
+const { o, code } = main();
+process.stdout.write(`${JSON.stringify(o)}\n`);
+process.exitCode = code;
