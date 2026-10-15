@@ -1,0 +1,113 @@
+#!/usr/bin/env node
+/**
+ * review-prd — migration guard (task 204, QA cycle 8).
+ *
+ * Reads the numbering migration's plan (`migrate-doc-numbering.mjs --check --json`) on stdin and
+ * refuses the shapes the migration cannot carry through safely yet. Each refusal is a blocker with
+ * the same shape as the engine's own, so review-prd reports it and offers no apply:
+ *
+ *   no-frontmatter   a PRD to be moved has no frontmatter block, so the number cannot be written
+ *                    into it and the apply would fail its own post-check after moving files
+ *   no-domain        the PRD would land directly under the PRD root, a layout create-prd refuses
+ *   outside-links    files outside the PRD root name a PRD file that sits outside it (a root-level
+ *                    docs/prd.md); the migration does not re-point them, so they would go dead
+ *
+ * Usage:  migration-guard.mjs --root <PRD_ROOT>  < plan.json
+ * Prints JSON {reason: "ok" | "blocked" | "usage", blockers: [...]}; exit 0 ok, 1 blocked, 2 usage.
+ * Run from the repository root. Reads files; writes nothing.
+ */
+import { readFileSync, existsSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import path from "node:path";
+
+const out = (o, code) => {
+  console.log(JSON.stringify(o));
+  process.exit(code);
+};
+
+const argv = process.argv.slice(2);
+const i = argv.indexOf("--root");
+const root = i >= 0 ? argv[i + 1] : "";
+if (!root || argv.length !== 2)
+  out(
+    {
+      reason: "usage",
+      error: "usage: migration-guard.mjs --root <PRD_ROOT> < plan.json",
+    },
+    2,
+  );
+
+let plan;
+try {
+  plan = JSON.parse(readFileSync(0, "utf8"));
+} catch {
+  out({ reason: "usage", error: "stdin is not the migration plan's JSON" }, 2);
+}
+if (!Array.isArray(plan.mapping))
+  out({ reason: "usage", error: "the plan carries no mapping[]" }, 2);
+
+const rootAbs = path.resolve(root);
+const inRoot = (p) => path.resolve(p).startsWith(rootAbs + path.sep);
+const blockers = [];
+
+for (const m of plan.mapping) {
+  if (m.kind !== "prd") continue;
+  // no-frontmatter — the engine edits prd_number into an existing block and never creates one.
+  const text = existsSync(m.old) ? readFileSync(m.old, "utf8") : "";
+  // An opening fence with no closing one is no block either.
+  if (!/^---[ \t]*\r?\n(?:.*\r?\n)*?---[ \t]*(?:\r?\n|$)/.test(text)) {
+    blockers.push({
+      code: "no-frontmatter",
+      path: m.old,
+      detail:
+        "has no closed frontmatter block, so the migration cannot write its number — add one (---, type: prd, ---) and plan again",
+    });
+  }
+  // no-domain — create-prd's layout is {domain}/prd.{P}.{feature}/prd.{P}.{feature}.md.
+  const rel = path.relative(rootAbs, path.resolve(m.new)).split(path.sep);
+  if (rel.length !== 3) {
+    blockers.push({
+      code: "no-domain",
+      path: m.old,
+      detail: `would land at ${m.new}, outside a domain directory — move it to ${root}/{domain}/prd.{slug}.md by hand (git mv) and plan again`,
+    });
+  }
+  // outside-links — only a source outside the root can be named by files the engine never reads.
+  if (!inRoot(m.old)) {
+    const base = path.basename(m.old).replace(/[.]/g, "\\.");
+    const g = spawnSync(
+      "git",
+      [
+        "grep",
+        "-l",
+        "-E",
+        `(^|[^A-Za-z0-9_.-])${base}([^A-Za-z0-9_-]|$)`,
+        "--",
+        ".",
+        `:(exclude)${root}`,
+        `:(exclude)${m.old}`,
+      ],
+      { encoding: "utf8" },
+    );
+    if (g.status !== 0 && g.status !== 1) {
+      blockers.push({
+        code: "outside-links",
+        path: m.old,
+        detail: "could not search for references to it (git grep failed)",
+      });
+    } else {
+      const files = g.stdout.split("\n").filter(Boolean);
+      if (files.length) {
+        blockers.push({
+          code: "outside-links",
+          path: m.old,
+          detail: `named by ${files.length} file(s) outside ${root} that the migration would not re-point (${files.slice(0, 5).join(", ")}${files.length > 5 ? ", …" : ""}) — move it by hand and update them`,
+        });
+      }
+    }
+  }
+}
+out(
+  { reason: blockers.length ? "blocked" : "ok", blockers },
+  blockers.length ? 1 : 0,
+);

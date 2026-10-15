@@ -524,26 +524,25 @@ that this document's own example (an unnumbered PRD) never shows.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-15
-**Quality Score**: 70/100
-**Gate Decision**: FAIL
+**Quality Score**: 50/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.204.qa.7.numbered-prds-in-prd-skills.md](./task.204.qa.7.numbered-prds-in-prd-skills.md)
-- **Gate File**: [task.204.gate.7.numbered-prds-in-prd-skills.yml](./task.204.gate.7.numbered-prds-in-prd-skills.yml)
+- **Full Report**: [task.204.qa.8.numbered-prds-in-prd-skills.md](./task.204.qa.8.numbered-prds-in-prd-skills.md)
+- **Gate File**: [task.204.gate.8.numbered-prds-in-prd-skills.yml](./task.204.gate.8.numbered-prds-in-prd-skills.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 37 (new, each mutation-proven) + full suite 5713 pass / 0 fail
+- **Tests Executed**: 39 (new, each mutation-proven) + full suite 5715 pass / 0 fail
 - **Phases Verified**: 5/5
-- **Critical Issues**: 1 high, 1 medium (+1 advisory medium)
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: FAIL, Maintainability: PASS
+- **Critical Issues**: 0 high, 5 medium (+1 advisory low)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
 
 ### Key Findings
-- Gate 6's finding is fixed and verified.
-- Migrating a root-level docs/prd.md rewrites the bare word prd across the PRD tree, type: prd in every other PRD included, and reports ok (CR-1, high).
-- shard-prd checks the PRD file's realpath, not the directory it explodes into (CR-2).
+- Gate 7's findings are fixed and verified.
+- The migration review-prd offers has five reproduced defects: a failed apply hides its undo command; frontmatter-less legacy PRDs and two unnamed PRDs can never migrate; a migrated root-level PRD is refused by create-prd; outside links to a moved monolith go dead. Two are task-203 engine defects present on develop.
 
 <!-- change-log-start -->
 ## Change Log
@@ -568,6 +567,8 @@ that this document's own example (an unnumbered PRD) never shows.
 | 2026-10-15 |         | QA findings fixed — cycle 6, 1 finding (CR-1) + 1 advisory (CR-2); review-prd stops on a PRD outside the root; 37 test rows | qa-fix |
 | 2026-10-15 |         | QA gate FAIL (70/100) — 2 findings | qa-task |
 | 2026-10-15 |         | QA findings fixed — cycle 7, 2 findings (CR-1 migration token pass, CR-2 shard directory) + 1 advisory (CR-3); 39 test rows | qa-fix |
+| 2026-10-15 |         | QA gate CONCERNS (50/100) — 5 findings | qa-task |
+| 2026-10-15 |         | QA findings fixed — cycle 8, 5 findings: review-prd apply shows findings and undo (CR-1), several --name pairs (CR-3); migration guard refuses no-frontmatter, no-domain and outside-links shapes (CR-2, CR-4, CR-5 — engine fixes to a follow-up task); 40 test rows | qa-fix |
 <!-- change-log-end -->
 
 ---
