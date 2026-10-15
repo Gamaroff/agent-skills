@@ -92,8 +92,11 @@ META=$(command node .agents/skills/ensure-epic-github-issue/references/doc-id.js
 EPIC_ID=$(printf '%s' "$META" | jq -r '.id')
 EPIC_TITLE=$(printf '%s' "$META" | jq -r '.title')
 MILESTONE_TITLE=$(printf '%s' "$META" | jq -r '.milestone')
-node references/tracker-issue.js \
-  --kind milestone --title "${MILESTONE_TITLE}" --quiet 2>/dev/null || true
+# Every helper resolves from the repository root, like doc-id above (QA cycle 4, CR-1); a failed
+# resolve is reported, not discarded.
+command node .agents/skills/ensure-epic-github-issue/references/tracker-issue.js \
+  --kind milestone --title "${MILESTONE_TITLE}" --quiet \
+  || echo "⚠️  milestone resolve for ${MILESTONE_TITLE} did not complete — see the tracker-issue output above"
 ```
 
 The CLI is resolve-or-create: an existing title is reused and reported as
@@ -149,12 +152,12 @@ EOF
 
 # Even a FIXED label reaches gh through the helper: a repository without an
 # `epic` label fails the whole create otherwise (task.125, TASK-125-BUG-11).
-source references/gh-labels.sh || exit 1
+source .agents/skills/ensure-epic-github-issue/references/gh-labels.sh || exit 1
 LABEL_ARGS=()
 while IFS= read -r l; do [ -n "$l" ] && LABEL_ARGS+=(--label "$l"); done \
   < <(gh_labels_filter "epic")
 
-EPIC_ISSUE_NUM=$(node references/tracker-issue.js \
+EPIC_ISSUE_NUM=$(node .agents/skills/ensure-epic-github-issue/references/tracker-issue.js \
   --kind create \
   --title "[Epic ${EPIC_ID}] ${EPIC_TITLE}" \
   --body-file .claude/state/issue-body.md \

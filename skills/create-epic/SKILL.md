@@ -132,7 +132,10 @@ PRD_SOURCE_PATH="${PRD_DIR}/${PRD_STEM}.md"
 P=$(command node "$DOC_ID" parse "$PRD_STEM" --json | jq -r '.prd // empty')
 [ -n "$P" ] || { echo "❌ ${PRD_DIR} is not a prd.{P}.{feature} directory"; exit 1; }
 # The PRD's own prd_number, when it carries one, must agree with its directory.
-FM_P=$(sed -n 's/^prd_number:[[:space:]]*//p' "$PRD_SOURCE_PATH" | head -1 | tr -d "\"' ")
+FM_P=$(command node -e '
+  const d = require(process.argv[1]);
+  console.log(d.frontmatterField(require("fs").readFileSync(process.argv[2], "utf8"), "prd_number"));
+' "$PWD/$DOC_ID" "$PRD_SOURCE_PATH")
 [ -z "$FM_P" ] || [ "$FM_P" = "$P" ] \
   || { echo "❌ ${PRD_SOURCE_PATH} says prd_number: ${FM_P}, its directory says ${P} — fix the PRD first"; exit 1; }
 NEXT=$(command node "$DOC_ID" next epic --prd-dir "$PRD_DIR" --json) \

@@ -575,25 +575,26 @@ Not applicable — no hot path changes; the generator's walk gains one directory
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-15
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 50/100
+**Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.205.qa.3.prd-scoped-epic-numbering.md](./task.205.qa.3.prd-scoped-epic-numbering.md)
-- **Gate File**: [task.205.gate.3.prd-scoped-epic-numbering.yml](./task.205.gate.3.prd-scoped-epic-numbering.yml)
+- **Full Report**: [task.205.qa.4.prd-scoped-epic-numbering.md](./task.205.qa.4.prd-scoped-epic-numbering.md)
+- **Gate File**: [task.205.gate.4.prd-scoped-epic-numbering.yml](./task.205.gate.4.prd-scoped-epic-numbering.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5687 (5673 pass, 0 fail)
+- **Tests Executed**: 5689 (5675 pass, 0 fail)
 - **Phases Verified**: 7/7
-- **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 2
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
 
 ### Key Findings
-- Cycle 2's fixes verified; bugs 3–7 closed.
-- MEDIUM: [BUG-8](./task.205.bug.8.create-epic-preflight-reads-another-blocks-inputs.md) (re-rated from HIGH on a measurement — see the QA report) and [BUG-9](./task.205.bug.9.ensure-epic-create-blocks-read-step-e1-values.md): blocks reading values another block bound.
+- Cycle 3's fixes verified; bugs 8–9 closed.
+- HIGH: [BUG-10](./task.205.bug.10.blocks-mix-repo-root-and-skill-relative-paths.md) — blocks call helpers from two working directories.
+- MEDIUM: [BUG-11](./task.205.bug.11.shards-batch-guard-joins-its-two-inputs.md) — the batch guard validates its inputs joined.
 
 ## Change Log
 
@@ -609,6 +610,8 @@ Not applicable — no hot path changes; the generator's walk gains one directory
 | 2026-10-15 |  | QA findings fixed — cycle 2, 9 findings; every new block derives its inputs from its own document via `doc-id.js epic-meta`; 7 mutation-proven | qa-fix |
 | 2026-10-15 |  | QA gate CONCERNS (80/100) — 2 medium findings (one re-rated from high on a measurement); bugs 3–7 closed | qa-task |
 | 2026-10-15 |  | QA findings fixed — cycle 3, 6 findings (2 gating + 3 advisory + 1 cleanup); population of cross-block reads enumerated; 4 mutation-proven | qa-fix |
+| 2026-10-15 |  | QA gate FAIL (50/100) — 3 gating findings (2 high, one root; 1 medium); bugs 8–9 closed | qa-task |
+| 2026-10-15 |  | QA findings fixed — cycle 4, 4 findings (one path root per block, enforced by a test; batch guard; one frontmatter parser); 4 mutation-proven | qa-fix |
 
 ---
 

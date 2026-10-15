@@ -385,7 +385,10 @@ printed verbatim:
 # number (Step 4's E0) and how many epics it wrote. PRD_ROOT is resolved here (QA cycle 2, CR-7).
 PRD_DIR="{PRD dir}"
 E0="{E0}"; COUNT="{count}"
-case "$E0$COUNT" in *[!0-9]*|'') echo "❌ substitute {E0} and {count} with this batch's numbers"; exit 1 ;; esac
+# Each input on its own: joined, one substituted value would cover a missing other (QA cycle 4, CR-5).
+for v in "$E0" "$COUNT"; do
+  case "$v" in ''|*[!0-9]*|0*) echo "❌ substitute {E0} and {count} with this batch's numbers (positive integers)"; exit 1 ;; esac
+done
 [ -d "$PRD_DIR/epics" ] || { echo "❌ ${PRD_DIR}/epics does not exist — substitute the PRD directory from Step 1"; exit 1; }
 source .agents/skills/create-epics-from-shards/references/resolve-paths.sh || exit 1
 CHECKED=0
@@ -398,7 +401,8 @@ for f in "$PRD_DIR"/epics/epic.*/epic.*.md; do
 done
 # Every epic of THIS batch must be present: a floor of "any epic" passes a batch that wrote nothing
 # whenever the PRD already had epics (QA cycle 3, CR-3).
-P=$(basename "$PRD_DIR" | cut -d. -f2)
+P=$(command node .agents/skills/create-epics-from-shards/references/doc-id.js parse "$(basename "$PRD_DIR")" --json | jq -r 'select(.kind == "prd") | .prd')
+[ -n "$P" ] || { echo "❌ $(basename "$PRD_DIR") is not a prd.{P}.{feature} directory"; exit 1; }
 E=$E0
 while [ "$E" -lt $((E0 + COUNT)) ]; do
   ls "$PRD_DIR/epics/epic.$P.$E."*/epic.$P.$E.*.md >/dev/null 2>&1 \

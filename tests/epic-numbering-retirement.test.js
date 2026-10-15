@@ -319,6 +319,13 @@ test("create-epic block: no PRD halts naming /create-prd; one PRD allocates P an
     const r = runBlock(block, drift, env);
     assert.equal(r.code, 1, r.out);
     assert.match(r.out, /prd_number: 4, its directory says 1/);
+    // One frontmatter parser: a trailing comment is not part of the value (QA cycle 4, CR-6).
+    fs.writeFileSync(
+      path.join(drift, "docs/prd/d/prd.1.x/prd.1.x.md"),
+      "---\nprd_number: 1 # the onboarding PRD\ntype: prd\n---\n",
+    );
+    const commented = runBlock(block, drift, env);
+    assert.equal(commented.code, 0, commented.out);
   } finally {
     fs.rmSync(drift, { recursive: true, force: true });
   }
@@ -443,6 +450,14 @@ test("create-epics-from-shards blocks: E0 from next epic; Step 7 checks the batc
     );
     assert.equal(short.code, 1, short.out);
     assert.match(short.out, /epic\.2\.2 is missing/);
+    for (const partial of [
+      { "{PRD dir}": prdDir, "{E0}": "1" },
+      { "{PRD dir}": prdDir, "{count}": "1" },
+      { "{PRD dir}": prdDir, "{E0}": "1", "{count}": "0" },
+    ]) {
+      const r = runBlock(substitute(step7, partial), dir, {});
+      assert.equal(r.code, 1, `${JSON.stringify(partial)}: ${r.out}`);
+    }
     const unsub = runBlock(step7, dir, {});
     assert.equal(unsub.code, 1, unsub.out);
   } finally {
@@ -697,7 +712,7 @@ test("create-epic card preflight block reads no value from another block (QA cyc
   );
 });
 
-test("ensure-epic-github-issue milestone and create blocks derive id/title/milestone in-block (QA cycle 3, CR-2)", () => {
+test("ensure-epic-github-issue milestone and create blocks derive id/title/milestone in-block, from one root (QA cycles 3–4)", () => {
   const EPIC = "docs/prd/d/prd.1.x/epics/epic.1.3.foo/epic.1.3.foo.md";
   const dir = fixture(
     {
@@ -705,23 +720,23 @@ test("ensure-epic-github-issue milestone and create blocks derive id/title/miles
     },
     ["ensure-epic-github-issue"],
   );
-  const tracker = path.join(dir, "tracker");
-  fs.writeFileSync(
-    tracker,
-    `#!/usr/bin/env bash\nprintf '%s\\n' "$@" > "${path.join(dir, "argv.txt")}"\n`,
-    {
-      mode: 0o755,
-    },
+  // The blocks run with their OWN paths: a recording tracker-issue.js and a pass-through label
+  // helper sit where the blocks look for them (repository root), and nothing is rewritten.
+  const ref = path.join(
+    dir,
+    ".agents",
+    "skills",
+    "ensure-epic-github-issue",
+    "references",
   );
-  // How the blocks run here: the tracker CLI is a recording stub, the label helper a pass-through.
-  const asRun = (b) =>
-    b
-      .replace(/^node references\/tracker-issue\.js/m, `"${tracker}"`)
-      .replace(/\$\(node references\/tracker-issue\.js/, `$("${tracker}"`)
-      .replace(
-        "source references/gh-labels.sh || exit 1",
-        `gh_labels_filter() { printf '%s\\n' "$1"; }`,
-      );
+  fs.writeFileSync(
+    path.join(ref, "tracker-issue.js"),
+    `require("fs").writeFileSync(${JSON.stringify(path.join(dir, "argv.txt"))}, process.argv.slice(2).join("\\n"));\n`,
+  );
+  fs.writeFileSync(
+    path.join(ref, "gh-labels.sh"),
+    'gh_labels_filter() { printf "%s\\n" "$1"; }\n',
+  );
   const md = skillText("ensure-epic-github-issue");
   const blocks = [];
   const re = /^```bash\n([\s\S]*?)^```/gm;
@@ -739,7 +754,7 @@ test("ensure-epic-github-issue milestone and create blocks derive id/title/miles
     for (const b of blocks) {
       fs.rmSync(path.join(dir, "argv.txt"), { force: true });
       // Empty values "from another block" must not be what the block uses.
-      const r = runBlock(asRun(b), dir, {
+      const r = runBlock(b, dir, {
         EPIC_FILE_PATH: EPIC,
         EPIC_ID: "",
         EPIC_TITLE: "",
@@ -761,4 +776,47 @@ test("ensure-epic-github-issue milestone and create blocks derive id/title/miles
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// ── One path root per block (QA cycle 4, CR-1/CR-2) ────────────────────────
+// A block that calls a helper from the repository root (`.agents/skills/<skill>/references/…`) and
+// another relative to the skill directory (`references/…`) fails one half from either cwd. Every
+// block in the epic skills that uses the repository-root form must use it for every helper.
+test("no epic-skill block mixes repository-root and skill-relative helper paths", () => {
+  const skills = [
+    "create-epic",
+    "create-epics-from-shards",
+    "review-epic",
+    "edit-epic",
+    "ensure-epic-github-issue",
+    "sync-github-epic",
+    "ensure-task-github-issue",
+    "sync-jira-epic",
+    "jira-epic-creator",
+  ];
+  let rootBlocks = 0;
+  const mixed = [];
+  for (const s of skills) {
+    const md = skillText(s);
+    const re = /^([ \t]*)```bash\n([\s\S]*?)^\1```/gm;
+    let m;
+    while ((m = re.exec(md))) {
+      if (!m[2].includes(".agents/skills/")) continue;
+      rootBlocks++;
+      const bare = m[2].match(/(^|[\s"'(=])references\/[\w.-]+/gm);
+      if (bare)
+        mixed.push(
+          `${s}:${md.slice(0, m.index).split("\n").length} ${bare.join(" ").trim()}`,
+        );
+    }
+  }
+  assert.ok(
+    rootBlocks >= 10,
+    `only ${rootBlocks} repository-root blocks scanned — the scan matched less than it should`,
+  );
+  assert.deepEqual(
+    mixed,
+    [],
+    `blocks mixing the two path roots:\n${mixed.join("\n")}`,
+  );
 });

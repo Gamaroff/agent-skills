@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Minor'
 priority: 'Medium'
 created: '2026-10-15'
@@ -12,7 +12,7 @@ description: 'The create-epic card preflight block reads PRD_DIR, P and E from a
 
 **Bug ID**: TASK-205-BUG-8
 **Related**: [task.205.prd-scoped-epic-numbering.md](./task.205.prd-scoped-epic-numbering.md) (QA finding CR-1, gate 3)
-**Status**: Ready for QA
+**Status**: Closed
 **Priority**: Medium
 **Severity**: Minor
 **Created**: 2026-10-15
@@ -50,3 +50,4 @@ Use the `{epic file}` placeholder the id-check block uses.
 |------|--------|------------|-------|
 | 2026-10-15 | New | qa-task | Found by QA cycle 3 (CR-1) |
 | 2026-10-15 | Ready for QA | qa-fix | Fixed in QA cycle 3 fix pass |
+| 2026-10-15 | Closed | qa-task | Verified by task.205.qa.4.prd-scoped-epic-numbering.md |

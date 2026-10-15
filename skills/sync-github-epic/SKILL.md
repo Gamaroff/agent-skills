@@ -232,7 +232,7 @@ printf '%s' "$NEW_BODY" > .claude/state/issue-body.md
 
 # A label the repository does not define fails the WHOLE edit; the shared
 # helper drops it with a warning instead (task.125, TASK-125-BUG-3).
-source references/gh-labels.sh || exit 1
+source .agents/skills/sync-github-epic/references/gh-labels.sh || exit 1
 LABEL_ARGS=()
 while IFS= read -r l; do [ -n "$l" ] && LABEL_ARGS+=(--add-label "$l"); done \
   < <(gh_labels_filter "priority:${priority}")
@@ -247,7 +247,7 @@ OLD_PRIORITY=$(gh issue view "${ISSUE_NUM}" --json labels -q '.labels[].name' 2>
 REMOVE_ARGS=()
 [ -n "$OLD_PRIORITY" ] && [ -n "$NEW_PRIORITY" ] && REMOVE_ARGS=(--remove-label "$OLD_PRIORITY")
 
-node references/tracker-issue.js --kind edit --issue ${ISSUE_NUM} \
+node .agents/skills/sync-github-epic/references/tracker-issue.js --kind edit --issue ${ISSUE_NUM} \
   --title "[Epic ${EPIC_ID}] ${EPIC_TITLE}" \
   --body-file .claude/state/issue-body.md \
   --milestone "${MILESTONE_TITLE}" \
