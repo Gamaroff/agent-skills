@@ -5,18 +5,20 @@ type: task
 description: "Number every epic within its parent PRD as epic.{P}.{E}, make a parent PRD mandatory, and retire the global epic registry and the epic-registry-manager skill, across the epic authoring, review, index and tracker-sync skills."
 tags: [create-epic, create-epics-from-shards, review-epic, edit-epic, epic-registry-manager, generate-prd-epic-index, sync-jira-epic, jira-epic-creator, ensure-epic-github-issue, sync-github-epic, doc-numbering]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-13
 updated: 2026-10-15
 assignee:
 estimated_effort_hours: 16
 github_issue: 648
+completed_date: 2026-10-15
+pr_number: 674
 ---
 
 # Technical Task: PRD-scoped epic numbering
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.205.review.1.prd-scoped-epic-numbering.md` implemented 2026-10-15
 
@@ -596,6 +598,32 @@ Not applicable — no hot path changes; the generator's walk gains one directory
 - The Step 7 batch guard is probed against the committed doc: engages, 8/8.
 - One low cleanup (test hook style); advisories carried in the gate's `recommendations.future`.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.205.qa.7.prd-scoped-epic-numbering.md`
+**Gate File**: `task.205.gate.7.prd-scoped-epic-numbering.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (7 QA cycles; bugs 1–14 closed)
+**PR review (Step 5c)**: ⚠️ CONCERNS, non-blocking — `task.205.pr-review.1.prd-scoped-epic-numbering.md`
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 17/17 met, each with code and per-PR test evidence (AC9 re-measured on the PR head at 0.18 s against a 1 s bound)
+✅ **Tests & CI:** CI SUCCESS on `82762a2b` over 5 checks; local fast gate 5690 tests, 0 failures
+✅ **PR Review:** the host requires no reviews; the Step 5c conformance review reads CONCERNS, with two scope findings recorded
+✅ **Documentation:** CHANGELOG breaking entry, retired registry standard, updated skill files, regenerated catalog, README count
+✅ **Security Review:** ✅ PASS. Three fenced guards probed, 34 candidates executed, 0 reproduced
+⚠️ **Compliance Review:** not applicable (internal tooling refactor)
+
+**Task marked as ACCEPTED on:** 2026-10-15
+
+**Detailed Verification Log:** See `task.205.dod.1.prd-scoped-epic-numbering.md` for the complete verification evidence and timestamps.
+
+<!-- change-log-start -->
 ## Change Log
 
 | Date | Version | Description | Author |
@@ -617,8 +645,10 @@ Not applicable — no hot path changes; the generator's walk gains one directory
 | 2026-10-15 |  | QA gate CONCERNS (80/100) — 0 high; 1 medium gating (stray fence hides the Step 7 guard from every engine); bugs 12–13 closed | qa-task |
 | 2026-10-15 |  | QA findings fixed — cycle 6, 1 gating finding (stray fence removed; the retirement test reads blocks through the shared fence reader); 1 mutation-proven | qa-fix |
 | 2026-10-15 |  | QA gate PASS (100/100) — 0 gating findings, 1 low cleanup; bug 14 closed | qa-task |
+| 2026-10-15 | 1.2 | DoD passed — accepted (PR #674) | finalise |
 
 ---
+<!-- change-log-end -->
 
 ## Progress Tracking
 
