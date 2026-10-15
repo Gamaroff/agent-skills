@@ -3,7 +3,7 @@
 **Task**: `task.204.numbered-prds-in-prd-skills.md`
 **Run Number**: 1
 **Started**: 2026-10-15 16:55
-**Status**: Escalated
+**Status**: Completed
 
 ---
 
@@ -36,8 +36,8 @@ Make the PRD skills allocate, write and check a registry-backed PRD number, and 
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; 27/27 phases; ci:fast green (5692/0) | docs/tasks/task.204.numbered-prds-in-prd-skills/.summaries/step-3-loop-audit-1.json | 2026-10-15T15:19Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #675: https://github.com/Gamaroff/agent-skills/pull/675 | —                    | 2026-10-15T15:24Z |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.204.qa.{N}.*.md`; `task.204.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 8 cycles (5 + 2 + 1 granted); escalated at the loop limit; accepted by the maintainer via Step 5c — PR review 1 CONCERNS | —                    | 2026-10-15T21:10Z |
-| 7. finalise                | ❌ Failed  | `task.204.dod.{N}.*.md`; task `status: accepted`                      | DoD 1: GAPS — CI red (stdout-drain guard on migration-guard.mjs), CHANGELOG + 2 reference docs, CQ4 mutation map | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 7. finalise                | ✅ Done | `task.204.dod.{N}.*.md`; task `status: accepted`                      | DoD 1 GAPS (CI red, CHANGELOG, docs, CQ4) → fixed, QA re-entered (cycles 9–10) → DoD 2 ACCEPTED; CI reading 2 SUCCESS @ bb4c2af1; issue #647 closed | —                    | 2026-10-15T22:41Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | Implementation report committed and pushed | —                    | 2026-10-15T22:41Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -234,6 +234,12 @@ The pipeline completed cycles 9–10 (re-entry after DoD 1) without a clean gate
 
 **Decision**: accepted via Step 5c then `/finalise`, the route the maintainer chose at the same decision point after cycle 8 and approved for this re-entry ("fix → QA → /finalise").
 
+### Finalise DoD 2 — 2026-10-15
+
+- CI reading 1: SUCCESS @ `ec926081`; CI reading 2: SUCCESS @ `bb4c2af1` (5 checks, 240 s, background poll).
+- AC 15/16 on dispatch; CQ4's DoD 1 narrowing overclaimed named mutations — reworded to the per-cycle counts that exist, each read back from **Fixes Applied** (16, 11, 6, 2, 5, 4, 5, 8, 4, 2). Docs FAIL on dispatch (three runbook rows describing the old create-prd / review-prd / shard-prd output) — fixed in-run as a document-only change with three stale interim notes, docs section re-dispatched → PASS. Security PASS: probe record rebuilt by /finalise after the agent wrote two mis-slotted controls into it (24 executed, 0 reproduced). Compliance not applicable.
+- Acceptance commit `bb4c2af1` carried DoD 2, the sprint review, the registry tick, PR review 2 and the in-run doc fixes. Canonical PR comment posted; issue #647 commented (`posted`) and closed; board `done` → `already`; the issue's Document link already pointed at develop.
+
 ---
 
 ## QA Iteration History
@@ -345,7 +351,7 @@ _Track each QA review/fix cycle._
 **Issues Found**: gate 9's findings fixed and verified; CR-1 medium C-quoted git grep paths read as no reference; CR-2 medium quadratic token scan; CR-3, CR-4, CR-5 advisory
 **HIGH findings**: 0
 **MEDIUM findings**: 2
-**PR Review**: not reached — gate did not exit the loop
+**PR Review**: CONCERNS (task.204.pr-review.2, run after escalation on the maintainer's accept decision); `bcacdfea` is accepted without a gate
 **Loop exit**: n/a — this exit not taken
 **Action**: Escalating — loop limit reached
 **Fixes Applied**: Step 2.6 repeat subject (outside-links reference test, gates 9–10) — move: scope the claim. The reference parser is removed; any mention of the PRD's basename in a file inside the engine's rewrite scope blocks the offer (fail closed until task.211), found with `git grep -l -z -F` (CR-1 quoted names; CR-2 no regex scan). Test row updated (41 rows; 2 mutations, each red). ci:fast 5717/0 with every file staged; a timing assertion was dropped rather than marked LOAD-SENSITIVE, since no scan remains to time.
@@ -355,10 +361,12 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: Escalated — QA loop limit reached (8 cycles after two grants; gate 8 CONCERNS 50/100, its findings fixed or guarded in `63c1e06b` and ungated)
+**Finished**: 2026-10-15T22:41Z
+**Final Status**: Completed — accepted at DoD 2 after the QA loop escalated (10 cycles); gate 10 CONCERNS 80/100 with both findings fixed in `bcacdfea` and accepted via Step 5c (PR review 2 CONCERNS)
 **Branch**: feature/task.204.numbered-prds-in-prd-skills
 **PR**: https://github.com/Gamaroff/agent-skills/pull/675
-**QA Iterations**: 8 (loop limit after two re-entries)
-**DoD Summary**: task.204.dod.1.numbered-prds-in-prd-skills.md — GAPS
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 10 (loop limit after three re-entries)
+**DoD Summary**: task.204.dod.2.numbered-prds-in-prd-skills.md — ACCEPTED (DoD 1: GAPS, superseded)
+**Tracker debt**: none — issue #647 closed, board Done (`already`)
+
+**Completion Summary**: Implemented registry-numbered PRDs across the PRD skills — `create-prd` allocates and registers `prd.{P}.{feature}` and blocks on `doc-id check`; `review-prd` reports numbering defects as Critical, numbers its own reports, and offers the task-203 migration behind a guard that withholds it for shapes the engine cannot carry yet (task.211, #676); `shard-prd` explodes numbered PRDs in place. Ten QA cycles (three budget grants, one re-entry after DoD 1), two Step 5c conformance reviews, two DoD runs. Notable decisions: PRD-path containment enforced per block (a shared `doc-id.js` predicate is a recorded follow-up); three scope-deviating edits to the task-203 migration engine, each recorded; the outside-links guard narrowed to a fail-closed mention check; CQ4 narrowed to per-cycle mutation counts. The DoD files' start and completion times, first typed rather than measured, were corrected from git commit times at Step 8.

@@ -1,7 +1,7 @@
 # Definition of Done Verification
 
 **Story/Task:** task.204.numbered-prds-in-prd-skills
-**Verification Started:** 2026-10-15 21:15 UTC
+**Verification Started:** 2026-10-15, after `a61f3e28` (committed 21:24 UTC) — the start was not recorded at the time
 
 ---
 
@@ -133,7 +133,7 @@ maintainer via Step 5c — PR review 1 (`task.204.pr-review.1.numbered-prds-in-p
 
 **Final Status:** ❌ GAPS IDENTIFIED - NOT ACCEPTED
 
-**Completion Time:** 2026-10-15 21:40 UTC
+**Completion Time:** 2026-10-15 21:29 UTC (the gaps commit `17d135ef`)
 **CI reading 1:** FAILURE @ `a61f3e28` (the acceptance decision — Step 6)
 
 **Blocking Issues Summary:** see Step 5 — one code defect (CI red), two documentation gaps, one evidence gap.

@@ -1,7 +1,7 @@
 # Definition of Done Verification
 
 **Story/Task:** task.204.numbered-prds-in-prd-skills
-**Verification Started:** 2026-10-15 22:45 UTC
+**Verification Started:** 2026-10-15 22:2x UTC (after `ec926081`, committed 22:25 UTC — the start was not recorded at the time)
 
 ---
 
@@ -109,7 +109,7 @@ its four document findings fixed before this run.
 ## Verification Complete
 
 **Final Status:** ✅ ACCEPTED
-**Completion Time:** 2026-10-15 23:15 UTC
+**Completion Time:** 2026-10-15 22:35 UTC (the acceptance commit `bb4c2af1`)
 **CI reading 1:** SUCCESS @ `ec926081` (the acceptance decision — Step 6)
 **CI reading 2:** taken on the acceptance commit after this file is committed and pushed; recorded on the PR canonical summary comment and in the implementation report (Step 7 publish boundary)
 
