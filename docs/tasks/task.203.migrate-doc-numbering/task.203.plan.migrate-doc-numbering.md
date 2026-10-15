@@ -34,7 +34,18 @@ command node -e 'import("./shared/resources/doc-id.js").then(m=>console.log(Obje
   amend the calls below if they differ.
 - task.202 plans no registry **row writer**. Add `appendPrdRow(registryText, row)` to `doc-id.js`
   in this task, beside `nextNumber`, so the registry format has one owner. Do not write a second
-  writer here.
+  writer here. With `registryText` null it renders the empty registry first (frontmatter
+  `type: registry`, `# PRD Registry`, `**Next Available PRD Number:** **1**`, the header row from
+  `docs/standards/prd-registry.md`). That is the bootstrap.
+- Confirmed at review (`e28a1cce`): the merged exports also include `next` (the non-throwing
+  form), `resolvePrdRoot`, `registryNumbers` and `frontmatterField`. Use `resolvePrdRoot` for
+  `--root`/`PRD_ROOT` and `frontmatterField` for every frontmatter read.
+- **Add `validate` to the artifact vocabulary** (review C1). `review-story` writes
+  `.validate.{date}.md` (`skills/review-story/SKILL.md:147`), and seven exist under `docs/prd`.
+  Without the change, `checkCorpus` reports each one, once renamed, as a `bad-shape` document.
+  Edit both `ARTIFACTS` (`doc-id.js:47`) and `WORK_ITEM_ARTIFACT_RE`
+  (`finalise-fix-and-recheck.mjs:76`) in one commit, because `doc-id.test.mjs:318` pins them
+  equal. Then run `npm run bundle` to refresh the bundled `finalise` copy.
 
 ### Phase 1: Discover and plan
 
@@ -43,7 +54,8 @@ command node -e 'import("./shared/resources/doc-id.js").then(m=>console.log(Obje
 ```js
 // shared/resources/migrate-doc-numbering.mjs
 import { createRequire } from "node:module";
-const { parse, parseLegacy, format, nextNumber, checkCorpus } = createRequire(import.meta.url)("./doc-id.js");
+const { parse, parseLegacy, format, nextNumber, checkCorpus, resolvePrdRoot, frontmatterField } =
+  createRequire(import.meta.url)("./doc-id.js");
 
 export function discover(root, { readDir, readFile }) { /* returns { prds, epics, stories, files } */ }
 export function plan(discovery, registry, opts) { /* returns { renames: Map<old,new>, edits: Edit[], mapping: Row[] } */ }
@@ -66,7 +78,9 @@ change-log engine is tested the same way.
 | legacy | `parse` fails and `parseLegacy(stem).legacy === true` | migrate |
 
 - **Epics** are the directories `epics/epic.*` under a PRD's directory. For L2, `epics/` is a
-  sibling of the PRD file.
+  sibling of the PRD file. **Location decides the parent.** An `epics/` directory that no PRD
+  document owns makes each of its epics `prd-less-epic`, whatever `prd_source` says. This is the
+  shape `create-epic` writes for a `brownfield-enhancement` epic.
 - **Stories** are the directories `stories/story.*` under each epic.
 - **Artifacts** are every file inside a story or epic directory.
 
@@ -84,6 +98,8 @@ change-log engine is tested the same way.
    - A basename that starts with the old full stem (`story.3.1.before-you-start-anchor-runbooks.validate…`)
      gets the new full stem.
    - Anything else (`sprint-review-summary.md`) keeps its basename.
+   - The rename is a prefix substitution. It never depends on `parseLegacy` accepting the whole
+     name, so a non-canonical artifact still moves.
 5. **New PRD location.**
    - L1: `{root}/{domain}/prd.P.{f}/prd.P.{f}.md`.
    - L2: a new directory is inserted, `{root}/{domain}/prd.P.{f}/`, which holds both the file and
@@ -128,7 +144,9 @@ newHref  = relative(dir(newFile), newTarget)
   which is reported but is not a blocker).
 
 **Path literals.** Outside the history set (`docs/tasks/**`, `docs/bugs/**`, `.agents/**`,
-`CHANGELOG.md`), find every exact occurrence of each old repo-relative path from the rename map in
+`CHANGELOG.md`), the frozen-copy bodies under `examples/**` (only their frontmatter `prd_source:`
+and `source_path:` are rewritten) and test fixtures (`*.test.*`, `tests/**`, `evals/**`, except
+`shared/resources/tests/doc-links.test.mjs`, which is named explicitly), find every exact occurrence of each old repo-relative path from the rename map in
 tracked text files (`*.md`, `*.yml`, `*.mjs`, `*.js`) and replace it with the new path. Longest
 paths go first, so a directory prefix never replaces part of a longer file path.
 
@@ -142,6 +160,8 @@ paths go first, so a directory prefix never replaces part of a longer file path.
 | `target-exists` | Any new path exists and is not the same file |
 | `dirty-path` | `git status --porcelain -- <old>` is non-empty for any path to be moved |
 | `link-would-break` | See above |
+| `registry-behind` | `next("prd", …)` answers `registry-behind` |
+| `registry-missing` | No `${PRD_ROOT}/prd-registry.md`, but a numbered PRD is already on disk. With no numbered PRD, the registry is bootstrapped instead |
 
 ### Phase 3: Apply and the CLI
 
