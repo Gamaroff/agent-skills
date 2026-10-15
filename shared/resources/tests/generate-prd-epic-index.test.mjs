@@ -21,6 +21,7 @@ import os from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { copyFileSync } from "node:fs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = join(__dirname, "..", "generate-prd-epic-index.mjs");
@@ -39,7 +40,8 @@ function tmp() {
 
 /**
  * Build a PRD dir: <root>/<prd>/<prd>.md + epics/<dir>/<dir>.md per epic.
- * Each epic: { dir, title, number?, status?, reviewTitle? }.
+ * `prd` is `prd.{P}.{slug}`; each epic writes `prd_number: P` (or `prdNumber`).
+ * Each epic: { dir, title, number?, status?, reviewTitle?, prdNumber? }.
  * `reviewTitle` writes a *.review.*.md sibling that must NOT appear in the index.
  */
 function makePrd(root, prd, epics) {
@@ -53,6 +55,8 @@ function makePrd(root, prd, epics) {
     const epicDir = join(prdDir, "epics", e.dir);
     mkdirSync(epicDir, { recursive: true });
     let fm = `---\ntitle: "${e.title}"\n`;
+    const P = e.prdNumber ?? prd.match(/^prd\.(\d+)\./)?.[1];
+    if (P !== undefined) fm += `prd_number: ${P}\n`;
     if (e.number !== undefined) fm += `epic_number: ${e.number}\n`;
     if (e.status) fm += `status: ${e.status}\n`;
     fm += `---\n\n# ${e.title}\n`;
@@ -76,15 +80,15 @@ const readPrd = (prdDir, prd) =>
 test("idempotency — second run makes no change", () => {
   const root = tmp();
   try {
-    makePrd(root, "prd.alpha", [
+    makePrd(root, "prd.1.alpha", [
       {
-        dir: "epic.1.foo",
+        dir: "epic.1.1.foo",
         title: "[Epic 1] Foo",
         number: 1,
         status: "planned",
       },
       {
-        dir: "epic.2.bar",
+        dir: "epic.1.2.bar",
         title: "[Epic 2] Bar",
         number: 2,
         status: "in-progress",
@@ -92,11 +96,11 @@ test("idempotency — second run makes no change", () => {
     ]);
     const first = run(root, ["--prd-root", root]);
     assert.equal(first.status, 0, first.stderr);
-    const after1 = readPrd(join(root, "prd.alpha"), "prd.alpha");
+    const after1 = readPrd(join(root, "prd.1.alpha"), "prd.1.alpha");
 
     const second = run(root, ["--prd-root", root]);
     assert.equal(second.status, 0, second.stderr);
-    const after2 = readPrd(join(root, "prd.alpha"), "prd.alpha");
+    const after2 = readPrd(join(root, "prd.1.alpha"), "prd.1.alpha");
 
     assert.equal(after2, after1, "second run must be byte-identical");
     assert.match(second.stdout, /Done: 0 PRD\(s\) updated\./);
@@ -111,23 +115,23 @@ test("idempotency — second run makes no change", () => {
 test("output shape — markers, table header, sort, relative links", () => {
   const root = tmp();
   try {
-    makePrd(root, "prd.alpha", [
+    makePrd(root, "prd.1.alpha", [
       {
-        dir: "epic.10.ten",
+        dir: "epic.1.10.ten",
         title: "[Epic 10] Ten",
         number: 10,
         status: "planned",
       },
       {
-        dir: "epic.2.two",
+        dir: "epic.1.2.two",
         title: "[Epic 2] Two",
         number: 2,
         status: "accepted",
       },
-      { dir: "epic.1.one", title: "[Epic 1] One", number: 1 },
+      { dir: "epic.1.1.one", title: "[Epic 1] One", number: 1 },
     ]);
     assert.equal(run(root, ["--prd-root", root]).status, 0);
-    const out = readPrd(join(root, "prd.alpha"), "prd.alpha");
+    const out = readPrd(join(root, "prd.1.alpha"), "prd.1.alpha");
 
     assert.match(out, /<!-- epics-index-start -->/);
     assert.match(out, /<!-- epics-index-end -->/);
@@ -142,11 +146,11 @@ test("output shape — markers, table header, sort, relative links", () => {
     // Relative link shape: [Title](epics/<dir>/<dir>.md)
     assert.match(
       out,
-      /\| 1 \| \[One\]\(epics\/epic\.1\.one\/epic\.1\.one\.md\) \| — \|/,
+      /\| 1\.1 \| \[One\]\(epics\/epic\.1\.1\.one\/epic\.1\.1\.one\.md\) \| — \|/,
     );
     assert.match(
       out,
-      /\| 2 \| \[Two\]\(epics\/epic\.2\.two\/epic\.2\.two\.md\) \| accepted \|/,
+      /\| 1\.2 \| \[Two\]\(epics\/epic\.1\.2\.two\/epic\.1\.2\.two\.md\) \| accepted \|/,
     );
 
     // Numeric (not lexical) sort: 1 then 2 then 10.
@@ -158,7 +162,7 @@ test("output shape — markers, table header, sort, relative links", () => {
 
     // Block sits after the H1.
     assert.ok(
-      out.indexOf("# prd.alpha PRD") <
+      out.indexOf("# prd.1.alpha PRD") <
         out.indexOf("<!-- epics-index-start -->"),
     );
   } finally {
@@ -172,19 +176,19 @@ test("output shape — markers, table header, sort, relative links", () => {
 test("excludes *.review.*.md siblings", () => {
   const root = tmp();
   try {
-    makePrd(root, "prd.alpha", [
+    makePrd(root, "prd.1.alpha", [
       {
-        dir: "epic.1.foo",
+        dir: "epic.1.1.foo",
         title: "[Epic 1] Foo",
         number: 1,
         reviewTitle: "SHOULD NOT APPEAR",
       },
     ]);
     assert.equal(run(root, ["--prd-root", root]).status, 0);
-    const out = readPrd(join(root, "prd.alpha"), "prd.alpha");
+    const out = readPrd(join(root, "prd.1.alpha"), "prd.1.alpha");
     assert.doesNotMatch(out, /SHOULD NOT APPEAR/);
-    assert.doesNotMatch(out, /\| 999 \|/);
-    assert.match(out, /\| 1 \| \[Foo\]/);
+    assert.doesNotMatch(out, /999/);
+    assert.match(out, /\| 1\.1 \| \[Foo\]/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -196,9 +200,9 @@ test("excludes *.review.*.md siblings", () => {
 test("--check exits 0 when up to date, non-zero on drift", () => {
   const root = tmp();
   try {
-    const prdDir = makePrd(root, "prd.alpha", [
+    const prdDir = makePrd(root, "prd.1.alpha", [
       {
-        dir: "epic.1.foo",
+        dir: "epic.1.1.foo",
         title: "[Epic 1] Foo",
         number: 1,
         status: "planned",
@@ -212,7 +216,7 @@ test("--check exits 0 when up to date, non-zero on drift", () => {
     assert.match(clean.stdout, /All epics indexes up to date\./);
 
     // Mutate an epic's status → index is now stale.
-    const epicFile = join(prdDir, "epics", "epic.1.foo", "epic.1.foo.md");
+    const epicFile = join(prdDir, "epics", "epic.1.1.foo", "epic.1.1.foo.md");
     writeFileSync(
       epicFile,
       readFileSync(epicFile, "utf8").replace(
@@ -234,16 +238,16 @@ test("--check exits 0 when up to date, non-zero on drift", () => {
 test("--strict fails on missing epic_number; lenient skips it", () => {
   const root = tmp();
   try {
-    makePrd(root, "prd.alpha", [
-      { dir: "epic.1.ok", title: "[Epic 1] Ok", number: 1 },
-      { dir: "epic.2.bad", title: "[Epic 2] Bad" /* no number */ },
+    makePrd(root, "prd.1.alpha", [
+      { dir: "epic.1.1.ok", title: "[Epic 1] Ok", number: 1 },
+      { dir: "epic.1.2.bad", title: "[Epic 2] Bad" /* no number */ },
     ]);
 
     // Lenient: skips the bad epic, exits 0, still writes the good one.
     const lenient = run(root, ["--prd-root", root]);
     assert.equal(lenient.status, 0);
-    assert.match(lenient.stderr, /epic\.2\.bad.*no epic_number/s);
-    const out = readPrd(join(root, "prd.alpha"), "prd.alpha");
+    assert.match(lenient.stderr, /epic\.1\.2\.bad.*disagrees/s);
+    const out = readPrd(join(root, "prd.1.alpha"), "prd.1.alpha");
     assert.match(out, /\[Ok\]/);
     assert.doesNotMatch(out, /\[Bad\]/);
 
@@ -263,8 +267,8 @@ test("resolves PRD root from skills-config.yaml when no --prd-root", () => {
   const root = tmp();
   try {
     // PRD tree under <root>/prds; config points there.
-    makePrd(join(root, "prds"), "prd.alpha", [
-      { dir: "epic.1.foo", title: "[Epic 1] Foo", number: 1 },
+    makePrd(join(root, "prds"), "prd.1.alpha", [
+      { dir: "epic.1.1.foo", title: "[Epic 1] Foo", number: 1 },
     ]);
     writeFileSync(
       join(root, "skills-config.yaml"),
@@ -272,7 +276,7 @@ test("resolves PRD root from skills-config.yaml when no --prd-root", () => {
     );
     const res = run(root, []); // no --prd-root: must read config
     assert.equal(res.status, 0, res.stderr);
-    const out = readPrd(join(root, "prds", "prd.alpha"), "prd.alpha");
+    const out = readPrd(join(root, "prds", "prd.1.alpha"), "prd.1.alpha");
     assert.match(out, /<!-- epics-index-start -->/);
     assert.match(out, /\[Foo\]/);
   } finally {
@@ -283,8 +287,8 @@ test("resolves PRD root from skills-config.yaml when no --prd-root", () => {
 test("--prd-root overrides config", () => {
   const root = tmp();
   try {
-    makePrd(join(root, "custom"), "prd.beta", [
-      { dir: "epic.1.foo", title: "[Epic 1] Foo", number: 1 },
+    makePrd(join(root, "custom"), "prd.1.beta", [
+      { dir: "epic.1.1.foo", title: "[Epic 1] Foo", number: 1 },
     ]);
     // Config points elsewhere; the CLI flag must win.
     writeFileSync(
@@ -294,7 +298,7 @@ test("--prd-root overrides config", () => {
     const res = run(root, ["--prd-root", join(root, "custom")]);
     assert.equal(res.status, 0, res.stderr);
     assert.match(
-      readPrd(join(root, "custom", "prd.beta"), "prd.beta"),
+      readPrd(join(root, "custom", "prd.1.beta"), "prd.1.beta"),
       /\[Foo\]/,
     );
   } finally {
@@ -330,21 +334,21 @@ test("missing PRD root is a graceful no-op (exit 0)", () => {
 test("frontmatter — a single-quoted title undoubles YAML's escaped apostrophe", () => {
   const root = tmp();
   try {
-    const prdDir = join(root, "prd.quoted");
-    mkdirSync(join(prdDir, "epics", "epic.1.wallet"), { recursive: true });
+    const prdDir = join(root, "prd.1.quoted");
+    mkdirSync(join(prdDir, "epics", "epic.1.1.wallet"), { recursive: true });
     writeFileSync(
-      join(prdDir, "prd.quoted.md"),
+      join(prdDir, "prd.1.quoted.md"),
       `---\ntype: prd\n---\n\n# Quoted PRD\n\nBody.\n`,
     );
     writeFileSync(
-      join(prdDir, "epics", "epic.1.wallet", "epic.1.wallet.md"),
-      `---\ntitle: '[Epic 1] Anna''s wallet'\nepic_number: 1\nstatus: planned\n---\n\n# [Epic 1] Anna's wallet\n`,
+      join(prdDir, "epics", "epic.1.1.wallet", "epic.1.1.wallet.md"),
+      `---\ntitle: '[Epic 1] Anna''s wallet'\nprd_number: 1\nepic_number: 1\nstatus: planned\n---\n\n# [Epic 1] Anna's wallet\n`,
     );
 
     const res = run(root, ["--prd-root", root]);
     assert.equal(res.status, 0, res.stderr);
 
-    const out = readPrd(prdDir, "prd.quoted");
+    const out = readPrd(prdDir, "prd.1.quoted");
     assert.match(out, /Anna's wallet/, "renders one apostrophe");
     assert.doesNotMatch(out, /Anna''s wallet/, "never leaks YAML's doubling");
     assert.doesNotMatch(
@@ -363,20 +367,20 @@ test("frontmatter — a single-quoted title undoubles YAML's escaped apostrophe"
 test("frontmatter — an unquoted title keeping a trailing quote is left intact", () => {
   const root = tmp();
   try {
-    const prdDir = join(root, "prd.trailing");
-    mkdirSync(join(prdDir, "epics", "epic.2.shout"), { recursive: true });
+    const prdDir = join(root, "prd.1.trailing");
+    mkdirSync(join(prdDir, "epics", "epic.1.2.shout"), { recursive: true });
     writeFileSync(
-      join(prdDir, "prd.trailing.md"),
+      join(prdDir, "prd.1.trailing.md"),
       `---\ntype: prd\n---\n\n# Trailing PRD\n\nBody.\n`,
     );
     writeFileSync(
-      join(prdDir, "epics", "epic.2.shout", "epic.2.shout.md"),
-      `---\ntitle: Say it "loud"\nepic_number: 2\nstatus: planned\n---\n\n# Say it "loud"\n`,
+      join(prdDir, "epics", "epic.1.2.shout", "epic.1.2.shout.md"),
+      `---\ntitle: Say it "loud"\nprd_number: 1\nepic_number: 2\nstatus: planned\n---\n\n# Say it "loud"\n`,
     );
 
     const res = run(root, ["--prd-root", root]);
     assert.equal(res.status, 0, res.stderr);
-    assert.match(readPrd(prdDir, "prd.trailing"), /Say it "loud"/);
+    assert.match(readPrd(prdDir, "prd.1.trailing"), /Say it "loud"/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -403,9 +407,9 @@ test("frontmatter — an unquoted title keeping a trailing quote is left intact"
 test("epic title containing $& is inserted literally, not expanded", () => {
   const root = tmp();
   try {
-    const prdDir = makePrd(root, "prd.dollar", [
+    const prdDir = makePrd(root, "prd.1.dollar", [
       {
-        dir: "epic.38.tilemap",
+        dir: "epic.1.38.tilemap",
         title: "[Epic 38] Tilemap $& Ruleset",
         number: 38,
         status: "planned",
@@ -416,11 +420,11 @@ test("epic title containing $& is inserted literally, not expanded", () => {
     assert.equal(run(root, ["--prd-root", root]).status, 0);
     assert.equal(run(root, ["--prd-root", root]).status, 0);
 
-    const out = readPrd(prdDir, "prd.dollar");
+    const out = readPrd(prdDir, "prd.1.dollar");
 
     assert.match(
       out,
-      /\| 38 \| \[Tilemap \$& Ruleset\]\(epics\/epic\.38\.tilemap\/epic\.38\.tilemap\.md\) \| planned \|/,
+      /\| 1\.38 \| \[Tilemap \$& Ruleset\]\(epics\/epic\.1\.38\.tilemap\/epic\.1\.38\.tilemap\.md\) \| planned \|/,
       "the title must appear verbatim in its table cell",
     );
     // The block must appear exactly once — `$&` re-inserting the match would
@@ -449,20 +453,173 @@ test("epic title containing $& is inserted literally, not expanded", () => {
 test("epic titles containing $`, $' and $$ survive regeneration", () => {
   const root = tmp();
   try {
-    const prdDir = makePrd(root, "prd.dollars", [
-      { dir: "epic.1.before", title: "[Epic 1] Cost $` each", number: 1 },
-      { dir: "epic.2.after", title: "[Epic 2] Cost $' each", number: 2 },
-      { dir: "epic.3.literal", title: "[Epic 3] Cost $$ each", number: 3 },
+    const prdDir = makePrd(root, "prd.1.dollars", [
+      { dir: "epic.1.1.before", title: "[Epic 1] Cost $` each", number: 1 },
+      { dir: "epic.1.2.after", title: "[Epic 2] Cost $' each", number: 2 },
+      { dir: "epic.1.3.literal", title: "[Epic 3] Cost $$ each", number: 3 },
     ]);
 
     assert.equal(run(root, ["--prd-root", root]).status, 0);
     assert.equal(run(root, ["--prd-root", root]).status, 0);
 
-    const out = readPrd(prdDir, "prd.dollars");
-    assert.match(out, /\| 1 \| \[Cost \$` each\]/);
-    assert.match(out, /\| 2 \| \[Cost \$' each\]/);
-    assert.match(out, /\| 3 \| \[Cost \$\$ each\]/);
+    const out = readPrd(prdDir, "prd.1.dollars");
+    assert.match(out, /\| 1\.1 \| \[Cost \$` each\]/);
+    assert.match(out, /\| 1\.2 \| \[Cost \$' each\]/);
+    assert.match(out, /\| 1\.3 \| \[Cost \$\$ each\]/);
     assert.equal(out.split("<!-- epics-index-start -->").length - 1, 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// ===========================================================================
+// PRD-scoped epic numbering (task 205)
+// ===========================================================================
+
+test("task 205: a domain-level PRD and a root-level PRD are both indexed", () => {
+  const root = tmp();
+  try {
+    const nested = makePrd(join(root, "onboarding"), "prd.1.onboarding", [
+      { dir: "epic.1.1.alpha", title: "[Epic 1] Alpha", number: 1 },
+    ]);
+    const flat = makePrd(root, "prd.2.flat", [
+      { dir: "epic.2.1.beta", title: "[Epic 2.1] Beta", number: 1 },
+    ]);
+    const res = run(root, ["--prd-root", root]);
+    assert.equal(res.status, 0, res.stderr);
+    assert.match(readPrd(nested, "prd.1.onboarding"), /\| 1\.1 \| \[Alpha\]/);
+    assert.match(readPrd(flat, "prd.2.flat"), /\| 2\.1 \| \[Beta\]/);
+    assert.match(res.stdout, /Done: 2 PRD\(s\) updated\./);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("task 205: a directory that does not parse as a PRD is never indexed", () => {
+  const root = tmp();
+  try {
+    // A domain directory holding a stray non-PRD directory with a same-named file.
+    const stray = join(root, "onboarding", "notes");
+    mkdirSync(join(stray, "epics", "epic.1.1.x"), { recursive: true });
+    writeFileSync(join(stray, "notes.md"), "# Notes\n");
+    writeFileSync(
+      join(stray, "epics", "epic.1.1.x", "epic.1.1.x.md"),
+      "---\ntitle: X\nprd_number: 1\nepic_number: 1\n---\n",
+    );
+    const res = run(root, ["--prd-root", root]);
+    assert.equal(res.status, 0, res.stderr);
+    assert.doesNotMatch(
+      readFileSync(join(stray, "notes.md"), "utf8"),
+      /epics-index/,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("task 205: two PRDs each with E=1 are indexed independently", () => {
+  const root = tmp();
+  try {
+    const a = makePrd(join(root, "d"), "prd.1.a", [
+      { dir: "epic.1.1.one", title: "One", number: 1 },
+    ]);
+    const b = makePrd(join(root, "d"), "prd.2.b", [
+      { dir: "epic.2.1.uno", title: "Uno", number: 1 },
+    ]);
+    assert.equal(run(root, ["--prd-root", root]).status, 0);
+    const outA = readPrd(a, "prd.1.a");
+    const outB = readPrd(b, "prd.2.b");
+    assert.match(outA, /\| 1\.1 \| \[One\]/);
+    assert.doesNotMatch(outA, /Uno/);
+    assert.match(outB, /\| 2\.1 \| \[Uno\]/);
+    assert.doesNotMatch(outB, /\[One\]/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("task 205: 1.2 sorts before 1.10, and both title-prefix forms strip", () => {
+  const root = tmp();
+  try {
+    const prdDir = makePrd(root, "prd.1.x", [
+      { dir: "epic.1.10.ten", title: "[Epic 1.10] Ten", number: 10 },
+      { dir: "epic.1.2.two", title: "Epic 2: Two", number: 2 },
+    ]);
+    assert.equal(run(root, ["--prd-root", root]).status, 0);
+    const out = readPrd(prdDir, "prd.1.x");
+    assert.ok(
+      out.indexOf("| 1.2 | [Two]") < out.indexOf("| 1.10 | [Ten]"),
+      out,
+    );
+    assert.doesNotMatch(out, /\[Epic /);
+    assert.doesNotMatch(out, /Epic 2:/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("task 205: an epic whose numbers disagree with its directory is skipped and named; --strict fails", () => {
+  const root = tmp();
+  try {
+    makePrd(root, "prd.1.x", [
+      { dir: "epic.1.1.ok", title: "Ok", number: 1 },
+      { dir: "epic.1.2.wrong-epic", title: "WrongEpic", number: 3 },
+      { dir: "epic.1.4.wrong-prd", title: "WrongPrd", number: 4, prdNumber: 2 },
+      {
+        dir: "epic.2.5.other-parent",
+        title: "OtherParent",
+        number: 5,
+        prdNumber: 2,
+      },
+      { dir: "epic.9.legacy", title: "Legacy", number: 9 },
+    ]);
+    const lenient = run(root, ["--prd-root", root]);
+    assert.equal(lenient.status, 0, lenient.stderr);
+    assert.match(
+      lenient.stderr,
+      /epic\.1\.2\.wrong-epic.*disagrees with directory 1\.2/,
+    );
+    assert.match(
+      lenient.stderr,
+      /epic\.1\.4\.wrong-prd.*disagrees with directory 1\.4/,
+    );
+    assert.match(lenient.stderr, /epic\.2\.5\.other-parent.*parent is PRD 1/);
+    assert.match(lenient.stderr, /epic\.9\.legacy.*not epic\.\{P\}\.\{E\}/);
+    const out = readPrd(join(root, "prd.1.x"), "prd.1.x");
+    assert.match(out, /\[Ok\]/);
+    for (const t of ["WrongEpic", "WrongPrd", "OtherParent", "Legacy"]) {
+      assert.doesNotMatch(out, new RegExp(t));
+    }
+    const strict = run(root, ["--prd-root", root, "--strict"]);
+    assert.notEqual(strict.status, 0);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// setup-consumer.sh vendors the generator to a consumer's scripts/ with doc-id as
+// `doc-id.cjs`: in a `"type": "module"` consumer a vendored `doc-id.js` would be
+// parsed as ESM and fail on `require`. This runs the vendored pair there.
+test("task 205: the vendored pair (generator + doc-id.cjs) runs in an ESM consumer", () => {
+  const root = tmp();
+  try {
+    mkdirSync(join(root, "scripts"));
+    writeFileSync(join(root, "package.json"), '{ "type": "module" }\n');
+    copyFileSync(SCRIPT, join(root, "scripts", "generate-prd-epic-index.mjs"));
+    copyFileSync(
+      join(__dirname, "..", "doc-id.js"),
+      join(root, "scripts", "doc-id.cjs"),
+    );
+    const prdDir = makePrd(join(root, "docs", "prd", "d"), "prd.1.x", [
+      { dir: "epic.1.1.one", title: "One", number: 1 },
+    ]);
+    const res = spawnSync(
+      process.execPath,
+      [join(root, "scripts", "generate-prd-epic-index.mjs")],
+      { cwd: root, encoding: "utf8" },
+    );
+    assert.equal(res.status, 0, res.stderr);
+    assert.match(readPrd(prdDir, "prd.1.x"), /\| 1\.1 \| \[One\]/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

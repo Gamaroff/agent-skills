@@ -1,6 +1,6 @@
 ---
 name: ensure-task-github-issue
-description: Internal sub-routine called from create-task and review-task. Given a task markdown file path, ensures the task has a corresponding GitHub issue. Creates the issue if missing, adds it to the project board, sets the board Priority field, and writes github_issue to the task frontmatter. Tasks are standalone (NOT linked to a parent epic issue) — milestone is resolved from frontmatter or epic-registry, defaulting to "Technical Tasks (standalone)". Returns TASK_ISSUE_NUM (integer or empty on failure). GitHub-only sibling of sync-jira-task. Callers branch on TRACKER (set by references/resolve-platform.sh) to pick the right sub-routine.
+description: Internal sub-routine called from create-task and review-task. Given a task markdown file path, ensures the task has a corresponding GitHub issue. Creates the issue if missing, adds it to the project board, sets the board Priority field, and writes github_issue to the task frontmatter. Tasks are standalone (NOT linked to a parent epic issue) — milestone is resolved from frontmatter or the task's epic (via doc-id.js), defaulting to "Technical Tasks (standalone)". Returns TASK_ISSUE_NUM (integer or empty on failure). GitHub-only sibling of sync-jira-task. Callers branch on TRACKER (set by references/resolve-platform.sh) to pick the right sub-routine.
 type: internal
 ---
 
@@ -52,7 +52,36 @@ If `github_issue` is absent, null, or empty:
 Determine `MILESTONE_TITLE` in this order:
 
 1. If `milestone` frontmatter field is set → use it verbatim.
-2. Else if `epic` frontmatter field is set → look up `Epic {N}` in `docs/development/epic-registry.md` and use `"Epic {N} — {Epic Title}"`.
+2. Else if `epic` frontmatter field is set → resolve it to the epic file with `references/doc-id.js` and
+   use `"Epic {P}.{E} — {epic title}"` — the exact title `ensure-epic-github-issue` gives the epic's own
+   milestone. The value is the epic's id `P.E` (e.g. `1.3`) or its directory stem
+   (`epic.1.3.checkout`); there is no epic registry to look it up in. If it does not resolve to exactly
+   one epic, log a warning and fall through to 3:
+
+   ```bash
+   # ensure-task-github-issue — task milestone from its epic (task 205)
+   # INPUTS: EPIC_REF — the task's `epic:` frontmatter value; PRD_ROOT (references/resolve-paths.sh, default docs/prd).
+   DOC_ID=.agents/skills/ensure-task-github-issue/references/doc-id.js
+   PRD_ROOT=${PRD_ROOT:-docs/prd}
+   WANT=$(case "$EPIC_REF" in
+     epic.*) command node "$DOC_ID" parse "$EPIC_REF" --json | jq -r 'select(.kind == "epic") | "\(.prd).\(.epic)"' ;;
+     *) printf '%s' "$EPIC_REF" ;;
+   esac)
+   EPIC_FILES=$(find "$PRD_ROOT" -type f -name 'epic.*.md' 2>/dev/null | while IFS= read -r f; do
+       b=${f##*/}; d=${f%/*}; d=${d##*/}
+       [ "$b" = "$d.md" ] || continue
+       [ "$(command node "$DOC_ID" parse "${b%.md}" --json | jq -r 'select(.kind == "epic" and .artifact == null) | "\(.prd).\(.epic)"')" = "$WANT" ] \
+         && printf '%s\n' "$f"
+     done)
+   if [ -n "$WANT" ] && [ "$(printf '%s' "$EPIC_FILES" | grep -c .)" = 1 ]; then
+     EPIC_RAW_TITLE=$(sed -n 's/^title:[[:space:]]*//p' "$EPIC_FILES" | head -1 | sed -e 's/^"//' -e 's/"$//')
+     EPIC_TITLE=$(command node -e 'console.log(require(process.argv[1]).stripIdPrefix("epic", process.argv[2]))' "$PWD/$DOC_ID" "$EPIC_RAW_TITLE")
+     MILESTONE_TITLE="Epic ${WANT} — ${EPIC_TITLE}"
+   else
+     echo "⚠️  epic: '${EPIC_REF}' does not resolve to exactly one epic — using the standalone milestone"
+     MILESTONE_TITLE="Technical Tasks (standalone)"
+   fi
+   ```
 3. Else → default to `"Technical Tasks (standalone)"`.
 
 If the chosen milestone does not yet exist on the repo, auto-create it (idempotent):

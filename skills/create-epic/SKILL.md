@@ -1,7 +1,7 @@
 ---
 name: create-epic
 description: Create single epic for medium-sized brownfield enhancements (1-3 stories). Use when enhancement follows existing patterns, has minimal architectural changes, and manageable integration complexity.
-invokes: [epic-registry-manager, mermaid-architect]
+invokes: [mermaid-architect]
 ---
 
 # Brownfield Epic Creation
@@ -30,11 +30,11 @@ Activate when user needs:
 
 ## ⚠️ Documentation-Only Scope — Do NOT Implement
 
-This skill produces **the epic document and registry update only**. It MUST NOT begin implementing the stories the epic describes, nor scaffold any source code.
+This skill produces **the epic document only** (plus the parent PRD's regenerated epics index). It MUST NOT begin implementing the stories the epic describes, nor scaffold any source code.
 
 **Forbidden during this skill** (regardless of how compelling it seems):
 
-- ❌ Editing, creating, or deleting any source file outside the epic's directory (and the registry/sprint-status side effects below)
+- ❌ Editing, creating, or deleting any source file outside the epic's directory (and the epics-index side effect below)
 - ❌ Creating story files (that is `create-story`'s job, invoked separately)
 - ❌ Running migrations, codegen, build, lint-fix, or refactor commands
 - ❌ Creating branches, committing, or pushing code changes
@@ -43,8 +43,8 @@ This skill produces **the epic document and registry update only**. It MUST NOT 
 
 **Allowed writes** (the only filesystem changes this skill may make):
 
-- ✅ The epic file `${PRD_ROOT}/[domain]/[feature]/epics/epic.[N].[name]/epic.[N].[name].md`
-- ✅ `/docs/development/epic-registry.md` (number reservation per the global numbering rule)
+- ✅ The epic file `${PRD_ROOT}/{domain}/prd.{P}.{feature}/epics/epic.{P}.{E}.{name}/epic.{P}.{E}.{name}.md`
+- ✅ The parent PRD's `<!-- epics-index -->` block, regenerated (see *Update the Parent PRD's Epic Index*)
 - ✅ Tracker issue creation (GitHub/Jira issue for the epic itself) — **only after explicit opt-in** via the prompt in the *Offer Tracker Sync* step; never created unprompted
 
 **If the user asks to "create the epic and start the first story"**: create the epic doc, then STOP and explicitly hand off — tell user to invoke `/create-story` as a separate step. Do not chain.
@@ -67,48 +67,85 @@ This skill produces **the epic document and registry update only**. It MUST NOT 
 
 **Epic Numbering (CRITICAL):**
 
-- Check `/docs/development/epic-registry.md` for next available epic number
-- Epic numbers are globally unique across entire system
-- Reserve your number before creating epic file
+- Every epic is numbered **within its parent PRD**: `epic.{P}.{E}`, where `P` is the PRD's number and
+  `E` counts epics in that PRD (`epic.1.1`, `epic.1.2`, `epic.2.1`). The PRD's "Epic 2" is the file
+  `epic.{P}.2` — one number everywhere.
+- A parent PRD is **mandatory**. There is no PRD-less epic: with no PRD there is no `P`.
+- `E` is allocated by `doc-id.js next epic` in *Discover Parent PRD* below — never picked by hand,
+  and never from a registry (the global epic registry is retired).
 
 ## File Naming Convention
 
-**Format**: `epic.[number].[descriptive-name].md`
+**Format**: `epic.{P}.{E}.{descriptive-name}.md`
 
-**CRITICAL - Global Epic Numbering**:
+**Examples** (PRD 1, its first and second epic):
 
-1. Check `/docs/development/epic-registry.md` for next available number
-2. Add your epic to registry table
-3. Increment "Next Available Epic Number" counter
-4. Use that number in your epic filename
-5. Commit registry + epic file together
+- `epic.1.1.feature-notifications.md`
+- `epic.1.2.payment-integration.md`
 
-**Examples** (using globally unique numbers):
-
-- `epic.163.feature-notifications.md` (next available from registry)
-- `epic.164.payment-integration.md` (incremented)
-- `epic.163.5.settings-enhancement.md` (use decimals for intermediate epics)
-
-**Location**: `${PRD_ROOT}/[domain]/[feature]/epics/epic.[number].[descriptive-name]/` (Directory name must exactly match file name). Resolve `${PRD_ROOT}` from `skills-config.yaml` via `references/resolve-paths.sh` (default: `docs/prd`).
+**Location**: `${PRD_ROOT}/{domain}/prd.{P}.{feature}/epics/epic.{P}.{E}.{descriptive-name}/` (Directory name must exactly match file name). Resolve `${PRD_ROOT}` from `skills-config.yaml` via `references/resolve-paths.sh` (default: `docs/prd`).
 
 **Naming Rules**:
 
 - Use DOTS (.) for structural separators
-- Use hyphens (-) within descriptive names
-- ✅ Correct: `epic.163.auto-hide`
-- ❌ Wrong: `epic-163-auto-hide` or `epic.1.auto-hide` (number already used)
+- Use hyphens (-) within descriptive names; the name begins with a letter
+- ✅ Correct: `epic.1.3.auto-hide`
+- ❌ Wrong: `epic-1-3-auto-hide`, `epic.3.auto-hide` (no PRD number), `epic.1.3.5.x` (no decimal epics)
 
 ## Discover Parent PRD
 
-Before writing the epic file, resolve the parent PRD so the epic carries a real, navigable reference back to its source spec (stakeholders open the epic and click straight through to the PRD). Resolve `${PRD_ROOT}` from `references/resolve-paths.sh` first (default `docs/prd`).
+Before writing the epic file, resolve the parent PRD — it gives the epic both its number and a real, navigable reference back to its source spec (stakeholders open the epic and click straight through to the PRD). Resolve `${PRD_ROOT}` from `references/resolve-paths.sh` first (default `docs/prd`).
 
-Derive `PRD_SOURCE_PATH` in this order:
+Run this block from the repository root. It finds the PRD — a `prd.{P}.{feature}/` directory holding
+its own `prd.{P}.{feature}.md` under `${PRD_ROOT}/{domain}/` — reads `P` from it, and allocates `E`
+with `references/doc-id.js`:
 
-1. **Canonical location** — check `${PRD_ROOT}/[domain]/[feature]/prd.[feature].md`. If it exists, set `PRD_SOURCE_PATH` to that repo-relative path.
-2. **Glob fallback** — if the canonical name doesn't match, search the feature directory for any PRD: `find ${PRD_ROOT}/[domain]/[feature] -maxdepth 1 -name 'prd.*.md'`. If exactly one matches, use it. If several match, ask the user which is the parent via `AskUserQuestion`.
-3. **No PRD** — if none is found, this is a standalone brownfield enhancement: set `PRD_SOURCE_PATH` to the literal string `brownfield-enhancement`.
+```bash
+# create-epic — Discover Parent PRD and allocate the epic id (task 205)
+# INPUTS: PRD_ROOT (references/resolve-paths.sh), DOMAIN (the epic's domain directory under it), and —
+# only when the domain holds several PRDs — PRD_DIR, the one the user chose (exit 3 below asks).
+DOC_ID=.agents/skills/create-epic/references/doc-id.js
+: "${PRD_ROOT:?source references/resolve-paths.sh first}" "${DOMAIN:?bind DOMAIN to the domain directory of the epic}"
+if [ -z "${PRD_DIR:-}" ]; then
+  CANDIDATES=""
+  for d in "${PRD_ROOT}/${DOMAIN}"/prd.*/; do
+    [ -d "$d" ] || continue
+    d=${d%/}; b=${d##*/}
+    [ -f "$d/$b.md" ] || continue
+    [ -n "$(command node "$DOC_ID" parse "$b" --json | jq -r 'select(.kind == "prd" and .artifact == null) | .prd')" ] || continue
+    CANDIDATES="${CANDIDATES}${d}
+"
+  done
+  COUNT=$(printf '%s' "$CANDIDATES" | grep -c .)
+  case "$COUNT" in
+    0) echo "❌ No parent PRD found under ${PRD_ROOT}/${DOMAIN}/. Every epic is numbered within a PRD (epic.{P}.{E}). Run /create-prd first, then re-run /create-epic."
+       exit 1 ;;
+    1) PRD_DIR=$(printf '%s' "$CANDIDATES" | head -1) ;;
+    *) echo "ASK: ${COUNT} PRDs under ${PRD_ROOT}/${DOMAIN}/ — ask the user which is the parent, bind PRD_DIR to it, and re-run:"
+       printf '%s' "$CANDIDATES"
+       exit 3 ;;
+  esac
+fi
+PRD_STEM=${PRD_DIR##*/}
+PRD_SOURCE_PATH="${PRD_DIR}/${PRD_STEM}.md"
+P=$(command node "$DOC_ID" parse "$PRD_STEM" --json | jq -r '.prd // empty')
+[ -n "$P" ] || { echo "❌ ${PRD_DIR} is not a prd.{P}.{feature} directory"; exit 1; }
+# The PRD's own prd_number, when it carries one, must agree with its directory.
+FM_P=$(sed -n 's/^prd_number:[[:space:]]*//p' "$PRD_SOURCE_PATH" | head -1 | tr -d "\"' ")
+[ -z "$FM_P" ] || [ "$FM_P" = "$P" ] \
+  || { echo "❌ ${PRD_SOURCE_PATH} says prd_number: ${FM_P}, its directory says ${P} — fix the PRD first"; exit 1; }
+NEXT=$(command node "$DOC_ID" next epic --prd-dir "$PRD_DIR" --json) \
+  || { echo "❌ doc-id next epic: $(printf '%s' "$NEXT" | jq -r '.detail // .reason')"; exit 1; }
+E=$(printf '%s' "$NEXT" | jq -r '.next')
+echo "PRD_SOURCE_PATH=${PRD_SOURCE_PATH} P=${P} E=${E}"
+```
 
-Use `PRD_SOURCE_PATH` to populate the `prd_source:` frontmatter field. Never leave `prd_source` as the `[source-document].md` placeholder — it must be a real path or `brownfield-enhancement`.
+- **Exit 1** — no parent PRD (or a malformed one): **HALT** with the message. Do not invent a PRD,
+  and do not write the epic. A small enhancement needs a PRD first; `/create-prd` makes one.
+- **Exit 3** — several PRDs in the domain: ask the user which is the parent via `AskUserQuestion`,
+  bind `PRD_DIR` to that directory, and run the block again.
+- **Exit 0** — the epic is `epic.{P}.{E}.{name}` in `${PRD_DIR}/epics/`. Use `PRD_SOURCE_PATH` for the
+  `prd_source:` frontmatter field — a real repo-relative path, never a placeholder.
 
 Then build `PRD_URL` — a full web URL for the body link that works in any markdown renderer (GitHub, Bitbucket, VS Code preview):
 
@@ -142,13 +179,12 @@ else
 fi
 ```
 
-When `PRD_SOURCE_PATH` is `brownfield-enhancement`, skip URL resolution and omit the **Source PRD** body line entirely.
-
 ## Epic Structure
 
 ```markdown
 ---
-epic_number: N
+prd_number: P
+epic_number: E
 title: "[Enhancement Name]"
 type: epic
 description: "[One-sentence summary of what this epic delivers]"
@@ -159,10 +195,10 @@ priority: "Critical | High | Medium | Low"
 estimated_stories: N
 created: YYYY-MM-DD
 target_completion: YYYY-MM-DD
-prd_source: "{{PRD_SOURCE_PATH}}"   # repo-relative PRD path from Discover Parent PRD, or "brownfield-enhancement"
+prd_source: "{{PRD_SOURCE_PATH}}"   # repo-relative path to the parent PRD (required) — from Discover Parent PRD
 ---
 
-# [Epic N] {{Enhancement Name}} - Brownfield Enhancement
+# [Epic P.E] {{Enhancement Name}} - Brownfield Enhancement
 
 ## Epic Goal
 
@@ -171,7 +207,7 @@ prd_source: "{{PRD_SOURCE_PATH}}"   # repo-relative PRD path from Discover Paren
 ## Epic Description
 
 **Source PRD**: [View document]({{PRD_URL}})
-<!-- PRD_URL is a full https:// URL resolved in Discover Parent PRD. Omit this line entirely when prd_source is "brownfield-enhancement". -->
+<!-- PRD_URL is a full https:// URL resolved in Discover Parent PRD. Every epic has a parent PRD, so this line is always present. -->
 
 **Existing System Context:**
 
@@ -197,11 +233,11 @@ prd_source: "{{PRD_SOURCE_PATH}}"   # repo-relative PRD path from Discover Paren
 
 | Story | Status         | Priority | Description                     |
 | ----- | -------------- | -------- | ------------------------------- |
-| [N].1 | ❌ Not Started | High     | {{Title and brief description}} |
-| [N].2 | ❌ Not Started | Medium   | {{Title and brief description}} |
-| [N].3 | ❌ Not Started | Low      | {{Title and brief description}} |
+| P.E.1 | ❌ Not Started | High     | {{Title and brief description}} |
+| P.E.2 | ❌ Not Started | Medium   | {{Title and brief description}} |
+| P.E.3 | ❌ Not Started | Low      | {{Title and brief description}} |
 
-### Story [N].1: {{story_title}}
+### Story P.E.1: {{story_title}}
 
 As a {{user_type}},
 I want {{capability}},
@@ -214,7 +250,7 @@ So that {{value_benefit}}.
 **Then** {{expected_outcome}}
 **And** {{additional_criteria}}
 
-_(Repeat structure for Stories [N].2 and [N].3)_
+_(Repeat structure for Stories P.E.2 and P.E.3)_
 
 **Status Indicators**:
 
@@ -256,9 +292,9 @@ _(Repeat structure for Stories [N].2 and [N].3)_
 
 **Story Completion**:
 
-- Story [N].1: ❌ Not Started
-- Story [N].2: ❌ Not Started
-- Story [N].3: ❌ Not Started
+- Story P.E.1: ❌ Not Started
+- Story P.E.2: ❌ Not Started
+- Story P.E.3: ❌ Not Started
 
 **Update Progress**: Calculate as (completed stories / total stories) × 100
 
@@ -289,7 +325,7 @@ After drafting the Stories Breakdown, decide whether a Mermaid Value Stream diag
 
 ## Offer Tracker Sync (opt-in)
 
-After the epic file is fully written and the registry updated, ask the user whether to sync it to an issue tracker. This step **never creates a remote issue without explicit confirmation in this run**. Skip automatically (no prompt) if the epic frontmatter already contains a `github_issue` or `jira_key` — log `"ℹ️  tracker issue already linked — skipping"` and continue (idempotent — no duplicate creation on re-runs).
+After the epic file is fully written, ask the user whether to sync it to an issue tracker. This step **never creates a remote issue without explicit confirmation in this run**. Skip automatically (no prompt) if the epic frontmatter already contains a `github_issue` or `jira_key` — log `"ℹ️  tracker issue already linked — skipping"` and continue (idempotent — no duplicate creation on re-runs).
 
 **Step A — detect** the configured platform using the canonical resolver (see `references/platform-detection.md`):
 
@@ -346,7 +382,7 @@ On failure it logs a warning and returns empty — never halts.
 Run the tracker-card preflight on the document just written, **before** reporting completion:
 
 ```bash
-node references/card-preflight.js --file "${PRD_ROOT}/[domain]/[feature]/epics/epic.[N].[name]/epic.[N].[name].md"
+node references/card-preflight.js --file "${PRD_DIR}/epics/epic.${P}.${E}.[name]/epic.${P}.${E}.[name].md"
 ```
 
 Offline — no auth, no network, no writes. It reports whether this document will publish a complete
@@ -370,23 +406,32 @@ check passing a document the sync then publishes thin. Full contract:
 
 ## Post-Creation Validation
 
-After generating the epic file, invoke `documentation-standards-validator` to confirm:
+After generating the epic file, check its id first — **blocking**, because this skill chose the
+name, so a disagreement is this skill's defect, not the author's:
 
-- Filename uses dots as separators (`epic.NUMBER.descriptive-name.md`)
-- All required YAML frontmatter fields are present (epic_number, title, `type: epic`, domain, status, priority, estimated_stories, created, target_completion; `description` recommended, `tags` optional — see [OKF conformance](references/open-knowledge-format.md))
+```bash
+EPIC_FILE="${PRD_DIR}/epics/epic.${P}.${E}.[name]/epic.${P}.${E}.[name].md"
+command node .agents/skills/create-epic/references/doc-id.js check "$EPIC_FILE" --prd-root "${PRD_ROOT}" --json \
+  || { echo "❌ doc-id check failed on ${EPIC_FILE} — fix the name or frontmatter before continuing"; exit 1; }
+```
+
+Any `reason` other than `ok` (directory and stem disagree, `prd_number` / `epic_number` disagree
+with the filename, a duplicate `(P, E)`) is a **HALT** — print it verbatim. Then invoke
+`documentation-standards-validator` to confirm:
+
+- Filename uses dots as separators (`epic.{P}.{E}.descriptive-name.md`)
+- All required YAML frontmatter fields are present (prd_number, epic_number, title, `type: epic`, domain, status, priority, estimated_stories, created, target_completion; `description` recommended, `tags` optional — see [OKF conformance](references/open-knowledge-format.md))
 - Status indicator uses the standard icon (✅ 🔄 ⚠️ ❌ 📋)
-- File placed in correct location (`${PRD_ROOT}/[domain]/[feature]/epics/epic.NUMBER.descriptive-name/`)
+- File placed in correct location (`${PRD_ROOT}/{domain}/prd.{P}.{feature}/epics/epic.{P}.{E}.descriptive-name/`)
 - `## Change Log` is present with exactly one row (`| {today} | 1.0 | Initial draft | create-epic |`)
   whose Date is today — canonical format: `references/document-change-log.md`. Epics have no
   frontmatter `updated:` field, so there is nothing to reconcile it against.
 
 ## Regenerate the PRD Epic Index
 
-After the epic file is written **and** the epic-registry update is committed, refresh the
-parent PRD's linked epic index so PRD→epic links stay complete and statuses current.
-
-Skip this when `PRD_SOURCE_PATH` is `brownfield-enhancement` (there is no parent PRD to update).
-Otherwise, with `${PRD_ROOT}` already resolved (see [Discover Parent PRD](#discover-parent-prd)):
+After the epic file is written and its id check passes, refresh the parent PRD's linked epic index
+so PRD→epic links stay complete and statuses current. Every epic has a parent PRD, so this step
+always runs. With `${PRD_ROOT}` already resolved (see [Discover Parent PRD](#discover-parent-prd)):
 
 ```bash
 node scripts/generate-prd-epic-index.mjs --prd-root "${PRD_ROOT}" \
@@ -395,10 +440,10 @@ node scripts/generate-prd-epic-index.mjs --prd-root "${PRD_ROOT}" \
 
 The generator prefers the consumer's vendored `scripts/` copy and falls back to this skill's
 bundled `references/generate-prd-epic-index.mjs`. It is idempotent — only PRD files whose index
-actually changed are rewritten. The new epic **must** carry `epic_number` in its frontmatter
-(the Epic Structure template already requires it); the generator silently skips any epic that
-lacks it, so a missing `epic_number` means the epic will not appear in the index. Pass `--strict`
-to turn that into a hard error when you want to fail loudly.
+actually changed are rewritten. The index lists the epic as `P.E`, and only when its directory
+parses as `epic.{P}.{E}.{slug}` under PRD `P` and its `prd_number` / `epic_number` agree; any other
+epic is skipped and named on stderr. The id check above already guarantees that. Pass `--strict`
+to turn a skip into a hard error when you want to fail loudly.
 
 Stage the changed `prd.*.md` alongside the epic file in the **same** commit so the downstream
 `docs:epic-index:check` never sees drift.
@@ -433,6 +478,5 @@ Stage the changed `prd.*.md` alongside the epic file in the **same** commit so t
 ## Related Skills
 
 - `documentation-standards-validator` - Validates epic file naming, YAML frontmatter fields, and status indicator usage after creation
-- `epic-registry-manager` - Manages global epic numbering and registry updates
 - `create-story` - Creates individual stories within the epic
 - `mermaid-architect` - Generates Value Stream flowchart of the epic's stories when sequencing or parallelism warrants a diagram

@@ -31,6 +31,39 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **Epics are numbered within their PRD, and every epic needs a PRD (task 205). Breaking.** Every
+  epic skill now names a new epic `epic.{P}.{E}.{name}`: `P` is the parent PRD's number and `E` is
+  allocated by `doc-id.js next epic --prd-dir <PRD dir>`. The PRD's "Epic 2" and the file
+  `epic.{P}.2` are now the same thing. Six changes reach a consumer:
+  1. **Epic filename and frontmatter.** `epic.163.x` becomes `epic.1.2.x`, with `prd_number: 1` and
+     `epic_number: 2`. `create-epic` and `create-epics-from-shards` run `doc-id.js check` on what they
+     write and stop on any reason other than `ok`. `create-epics-from-shards` now writes one directory
+     per epic. To migrate existing epics, run task.203's `migrate-doc-numbering.mjs`: dry run first,
+     then `--apply`.
+  2. **A parent PRD is mandatory.** `create-epic` stops with `No parent PRD found … Run /create-prd
+     first` instead of writing `prd_source: "brownfield-enhancement"`. The sentinel is gone from every
+     skill. The migration reports a sentinel epic as a blocker. Give it a PRD with `/create-prd`, then
+     re-run the migration.
+  3. **Tracker identity is `[Epic P.E]`.** Jira summaries and GitHub titles become `[Epic 1.3] Foo`,
+     and the milestone becomes `Epic 1.3 — Foo`. Both Jira scripts build the summary with one shared
+     helper, `doc-id.js` `epicSummary`. When the frontmatter numbers are missing, the summary is the
+     bare title; it never guesses an id from the title. `sync-github-epic` renames the epic's
+     current milestone in place through the new `tracker-issue.js --kind milestone --rename-from`,
+     so stories already on it stay grouped. No manual step: an epic converges on its next sync.
+  4. **`epic-registry-manager` is removed.** Delete `.agents/skills/epic-registry-manager/` in each
+     consumer, because the installer does not prune. `create-epic` covers what it did.
+     `setup-consumer.sh` no longer creates `docs/development/epic-registry.md`. A task's `epic:`
+     milestone lookup now resolves the epic through `doc-id.js` instead of the registry.
+  5. **`review-epic` refuses a bare number.** Use `/review-epic 1.3`, a path or a name. `/review-epic 3`
+     is refused because `3` is ambiguous across PRDs. A new Critical check runs `doc-id.js check` on
+     the epic, and the review now compares the epic against every epic on disk instead of a registry.
+  6. **The PRD epic-index column reads `P.E`.** `generate-prd-epic-index.mjs` now also finds PRDs
+     under a domain directory (`docs/prd/{domain}/prd.{P}.{feature}/`), sorts by `E`, and skips and
+     names any epic whose numbers disagree with its directory. It loads `doc-id`, which
+     `setup-consumer.sh` vendors beside it as `scripts/doc-id.cjs`, so a `"type": "module"` consumer
+     can load it. Run `setup-consumer.sh --update`, then `node scripts/generate-prd-epic-index.mjs`
+     once.
+
 - **The global epic registry is retired (task 203).** `docs/development/epic-registry.md` is now a
   pointer to `docs/prd/prd-registry.md`, and it keeps the old epic numbers as a historical mapping
   (`1`–`4` → `1.1`–`1.4`). Epic numbers now count within their PRD. Skills that still read the old

@@ -80,8 +80,10 @@ The epic file must follow the standard format with YAML frontmatter:
 
 ```yaml
 ---
-title: "[Epic N] Epic Name"
-prd_source: "source-document.md"
+title: "[Epic P.E] Epic Name"
+prd_number: 1
+epic_number: 3
+prd_source: "docs/prd/{domain}/prd.1.{feature}/prd.1.{feature}.md"
 epic_type: "feature_enhancement"
 priority: "high"
 estimated_sprints: 2
@@ -92,7 +94,7 @@ status: "NOT_STARTED"
 
 The script extracts:
 
-- **Summary** from `title` frontmatter or first heading
+- **Summary** from `title` frontmatter or first heading, normalised to `[Epic P.E] {title}` from `prd_number` + `epic_number` by `epicSummary` in `references/doc-id.js` — the same rule `sync-jira-epic` uses. A missing number leaves the bare title, never an id guessed from it
 - **Description** from Epic Goal and Epic Description sections
 - **Priority** from `priority` frontmatter (automatically capitalized for Jira: "high" → "High")
 - **Stories table** from Stories Breakdown section

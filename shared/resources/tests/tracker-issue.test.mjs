@@ -1676,3 +1676,131 @@ test("a literal \\u0000 in an issue body is sent as U+0000 — GitHub would stor
     "Reproduce with a path holding U+0000 and U+001F.\n",
   );
 });
+
+// ── §11 --rename-from: rename a milestone in place (task 205) ───────────────
+// An epic's milestone title changes from `Epic 3 — Foo` to `Epic 1.3 — Foo`.
+// Resolve-or-create alone would create the new title and move only the epic's
+// issue onto it, splitting the board from every story still on the old one.
+
+/** A `gh` stub over an explicit milestone list, logging every call. */
+function milestoneGh(list) {
+  const calls = [];
+  const execImpl = (bin, argv) => {
+    calls.push({ bin, argv });
+    const joined = argv.join(" ");
+    if (argv[0] === "auth") return "";
+    if (argv[0] === "repo") return "acme/repo";
+    if (argv[0] === "api" && joined.includes("--method PATCH")) return "{}";
+    if (argv[0] === "api" && joined.includes("--method POST"))
+      return JSON.stringify({ number: 99 });
+    if (argv[0] === "api" && joined.includes("/milestones"))
+      return list.map((m) => JSON.stringify(m)).join("\n");
+    throw new Error(`unexpected gh call: ${joined}`);
+  };
+  const writes = () =>
+    calls.filter((c) => /--method (PATCH|POST)/.test(c.argv.join(" ")));
+  return { execImpl, calls, writes };
+}
+
+const renameRun = (dir, execImpl, extra = []) =>
+  cli.run({
+    argv: [
+      "node",
+      "tracker-issue.js",
+      "--kind",
+      "milestone",
+      "--title",
+      "Epic 1.3 — Foo",
+      "--rename-from",
+      "Epic 3 — Foo",
+      "--repo",
+      "acme/repo",
+      "--json",
+      ...extra,
+    ],
+    repoRoot: dir,
+    env: {},
+    execImpl,
+  });
+
+test("§11 --rename-from: old exists, new absent → one PATCH renames it, nothing created", () => {
+  const dir = withRepo();
+  const gh = milestoneGh([
+    { number: 4, title: "Epic 2 — Bar" },
+    { number: 7, title: "Epic 3 — Foo" },
+  ]);
+  const r = renameRun(dir, gh.execImpl);
+  assert.equal(r.exitCode, 0);
+  assert.equal(r.reason, "performed");
+  assert.equal(r.milestone, "7", "the renamed milestone keeps its number");
+  assert.equal(r.renamedFrom, "Epic 3 — Foo");
+  const writes = gh.writes();
+  assert.equal(writes.length, 1, "exactly one write — no extra network call");
+  const w = writes[0].argv.join(" ");
+  assert.match(w, /--method PATCH \/repos\/acme\/repo\/milestones\/7/);
+  assert.match(w, /title=Epic 1\.3 — Foo/);
+  assert.ok(!w.includes("POST"), "a rename never creates a second milestone");
+});
+
+test("§11 --rename-from: new title already exists → already, no write", () => {
+  const dir = withRepo();
+  const gh = milestoneGh([
+    { number: 7, title: "Epic 3 — Foo" },
+    { number: 8, title: "Epic 1.3 — Foo" },
+  ]);
+  const r = renameRun(dir, gh.execImpl);
+  assert.equal(r.reason, "already");
+  assert.equal(r.milestone, "8");
+  assert.equal(gh.writes().length, 0);
+});
+
+test("§11 --rename-from: neither exists → created, as without the flag", () => {
+  const dir = withRepo();
+  const gh = milestoneGh([{ number: 4, title: "Epic 2 — Bar" }]);
+  const r = renameRun(dir, gh.execImpl);
+  assert.equal(r.reason, "performed");
+  assert.equal(r.milestone, "99");
+  assert.equal(r.renamedFrom, undefined);
+  const writes = gh.writes();
+  assert.equal(writes.length, 1);
+  assert.match(writes[0].argv.join(" "), /--method POST/);
+});
+
+test("§11 --rename-from under a deferring mode records both titles and calls nothing", () => {
+  const dir = withRepo();
+  const r = run(
+    dir,
+    [
+      "--kind",
+      "milestone",
+      "--title",
+      "Epic 1.3 — Foo",
+      "--rename-from",
+      "Epic 3 — Foo",
+      "--repo",
+      "acme/repo",
+    ],
+    { ACCESS_TRACKER: "manual" },
+  );
+  assert.equal(r.reason, "deferred");
+  const rec = readJournal(dir)[0];
+  assert.equal(rec.desired.title, "Epic 1.3 — Foo");
+  assert.equal(rec.desired.rename_from, "Epic 3 — Foo");
+  assert.match(rec.intent, /Rename GitHub milestone "Epic 3 — Foo"/);
+  assert.match(rec.manual.ui, /do NOT create a second milestone/);
+});
+
+test("§11 --rename-from on any kind but milestone is a usage error (exit 2)", () => {
+  const dir = withRepo();
+  const r = run(dir, [
+    "--kind",
+    "edit",
+    "--issue",
+    "5",
+    "--title",
+    "T",
+    "--rename-from",
+    "Old",
+  ]);
+  assert.equal(r.exitCode, 2);
+});

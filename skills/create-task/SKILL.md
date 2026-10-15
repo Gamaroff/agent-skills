@@ -663,7 +663,7 @@ On return, `TASK_JIRA_KEY` is set (e.g. `PROJ-15`) or empty (on failure).
 
 Invoke the `ensure-task-github-issue` sub-routine with `TASK_FILE_PATH={path to the task file just created}`. The sub-routine handles:
 
-- milestone resolution (frontmatter `milestone:` → epic-registry lookup via the task's `epic:` field → `"Technical Tasks (standalone)"` default), auto-creating the milestone if needed
+- milestone resolution (frontmatter `milestone:` → epic lookup via the task's `epic:` field, see `ensure-task-github-issue` Step T3 → `"Technical Tasks (standalone)"` default), auto-creating the milestone if needed
 - creating the issue with title `[Task {id}] {title}`, body assembled from Overview / Key Deliverables / Success Criteria / Metadata / Document sections, and labels `task` + `priority:{priority}`
 - adding the issue to the GitHub Project board
 - mirroring the priority label onto the board's Priority single-select field

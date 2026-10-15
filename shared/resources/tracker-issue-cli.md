@@ -53,6 +53,20 @@ node references/tracker-issue.js --kind <kind> [flags] [--json] [--quiet] [--dry
 record's `command.stdin` — which is what keeps two different bodies on the same
 issue two records instead of one.
 
+**`--kind milestone --rename-from <old title>` renames in place** (task 205). It is for a milestone
+whose *title* changes — an epic's `Epic 3 — Foo` becoming `Epic 1.3 — Foo` — where resolve-or-create
+would create the new title and move only the caller's issue onto it, splitting the board from every
+issue still on the old one:
+
+| `--title` exists | `--rename-from` exists | Action | `reason` |
+| --- | --- | --- | --- |
+| yes | — | none | `already` |
+| no | yes | `PATCH /repos/{repo}/milestones/{n}` with the new title — one write, same number | `performed` (plus `renamedFrom`) |
+| no | no | create, as without the flag | `performed` |
+
+The flag is refused (exit 2) on any other kind. Under a deferring mode the record carries both titles
+(`desired.title`, `desired.rename_from`) and its manual steps say to rename, never to create a second.
+
 `--kind create` prints the **number**, not the URL. Every call site used to follow
 its create with `grep -oE '[0-9]+$'`; the CLI does it once so six prose blocks
 do not each carry their own copy.

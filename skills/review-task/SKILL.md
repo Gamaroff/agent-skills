@@ -695,7 +695,7 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
          3. **Zero matches** → fall through to create block below
          4. **Multiple matches** → log `"⚠️ Dedup: {count} matches found for \"[Task {id}]\": #{n1}, #{n2}, … — proceeding to create"` and fall through to create block below
        Invoke the `ensure-task-github-issue` sub-routine with `TASK_FILE_PATH={resolved task file path}`. The sub-routine handles:
-       - resolving the milestone (frontmatter `milestone:` → epic-registry lookup → `"Technical Tasks (standalone)"` default)
+       - resolving the milestone (frontmatter `milestone:` → epic lookup, see `ensure-task-github-issue` Step T3 → `"Technical Tasks (standalone)"` default)
        - creating the issue (title `[Task {id}] {title}`, `task` + `priority:{priority}` labels)
        - adding it to the GitHub Project board
        - mirroring the priority label onto the board's Priority single-select field

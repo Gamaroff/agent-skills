@@ -368,6 +368,57 @@ function matchesEpic(name, P, E) {
   );
 }
 
+// The words a tracker title prefixes an id with, per kind (task 205).
+const TITLE_WORD = Object.freeze({ epic: "Epic", story: "Story" });
+
+/**
+ * Drop a leading id prefix from a tracker title: `[Epic 3] `, `[Epic 1.3] `,
+ * `Epic 3: ` or `Epic 1.3: ` (case-insensitive; `Story` for a story). The legacy
+ * one-number form is accepted on input so an old title converges on the next
+ * sync. This is the ONE title-prefix rule: the epic-index generator and both Jira
+ * epic scripts call it rather than carrying a regex of their own (task 205).
+ */
+function stripIdPrefix(kind, title) {
+  const word = TITLE_WORD[kind];
+  if (!word) {
+    throw new TypeError(
+      `stripIdPrefix(kind, title): kind must be one of ${Object.keys(TITLE_WORD).join(", ")}`,
+    );
+  }
+  const id = String.raw`\d+(?:\.\d+)*`;
+  return String(title ?? "")
+    .replace(new RegExp(String.raw`^\s*\[${word}\s+${id}\]\s*`, "i"), "")
+    .replace(new RegExp(String.raw`^\s*${word}\s+${id}\s*:\s*`, "i"), "")
+    .trim();
+}
+
+/** "1.3" for an epic, "1.3.2" for a story: a parsed id's numeric segments, dot-joined. */
+function idLabel(p) {
+  return [p && p.prd, p && p.epic, p && p.story]
+    .filter((n) => n != null)
+    .join(".");
+}
+
+// A frontmatter number arrives as a number or a string; anything else is absent.
+const asPositiveInt = (v) => {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return isPositiveInt(n) && String(v).trim() === String(n) ? n : null;
+};
+
+/**
+ * The canonical tracker summary of an epic: `[Epic P.E] {title}`. The frontmatter
+ * pair `{ prd, epic }` wins over any id already in the title; when either number is
+ * missing the result is the bare title — never a guessed id (review-epic is the
+ * gate for a missing number). Idempotent.
+ */
+function epicSummary(summary, { prd, epic } = {}) {
+  const bare = stripIdPrefix("epic", summary);
+  const P = asPositiveInt(prd);
+  const E = asPositiveInt(epic);
+  return P && E ? `[Epic ${P}.${E}] ${bare}` : bare;
+}
+
 // `**Next Available PRD Number:** **N**` — the bold-in-bold form task-registry.md uses.
 const PRD_COUNTER_RE =
   /\*\*Next Available PRD Number:?\*\*:?\s*\*\*([^*]*)\*\*/;
@@ -1174,6 +1225,9 @@ module.exports = {
   parseLegacy,
   format,
   matchesEpic,
+  stripIdPrefix,
+  idLabel,
+  epicSummary,
   next,
   nextNumber,
   appendPrdRow,

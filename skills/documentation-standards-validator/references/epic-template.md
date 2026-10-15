@@ -1,20 +1,13 @@
 <!--
-╔═══════════════════════════════════════════════════════════════╗
-║ ⚠️  CRITICAL: Check Epic Registry BEFORE Creating This Epic  ║
-║                                                                ║
-║ 1. Open: /docs/development/epic-registry.md                  ║
-║ 2. Use "Next Available Epic Number" for YOUR epic number     ║
-║ 3. Update registry table with your epic details              ║
-║ 4. Increment "Next Available Epic Number" counter            ║
-║ 5. Commit registry + epic file together                      ║
-║                                                                ║
-║ Epic numbers are GLOBALLY UNIQUE across entire system        ║
-╚═══════════════════════════════════════════════════════════════╝
+Numbered within its parent PRD: epic.{P}.{E}.{name}, where P is the PRD's number and E counts
+epics in that PRD. `create-epic` allocates E via `doc-id.js next epic`; never pick one by hand.
+Every epic has a parent PRD — `prd_source` is a required repo-relative path.
 -->
 
 ---
 
-epic_number: N
+prd_number: P
+epic_number: E
 title: "[Epic Name]"
 type: epic
 description: "[One-sentence summary of what this epic delivers]"
@@ -25,11 +18,11 @@ priority: "Critical | High | Medium | Low"
 estimated_stories: N
 created: YYYY-MM-DD
 target_completion: YYYY-MM-DD
-prd_source: "{{PRD_SOURCE_PATH}}" # repo-relative PRD path, or "brownfield-enhancement"
+prd_source: "{{PRD_SOURCE_PATH}}" # repo-relative path to the parent PRD (required)
 
 ---
 
-# [Epic N] Epic Name
+# [Epic P.E] Epic Name
 
 **Status**: [Emoji] [Detailed Status Description]
 **Last Updated**: YYYY-MM-DD
@@ -48,7 +41,7 @@ prd_source: "{{PRD_SOURCE_PATH}}" # repo-relative PRD path, or "brownfield-enhan
 ### Source PRD Section
 
 **Source PRD**: [View document]({{PRD_URL}})
-<!-- Full https:// URL built from prd_source + git remote at epic creation time. Omit this line when prd_source is "brownfield-enhancement". -->
+<!-- Full https:// URL built from prd_source + git remote at epic creation time. Every epic has a parent PRD, so this line is always present. -->
 **Related Specs**: [[Specification Name]](../[spec-name].md)
 
 ### System Integration
@@ -63,9 +56,9 @@ This epic integrates with:
 
 Before starting this epic, the following must exist:
 
-- [x] [Prerequisite 1] - ✅ Complete (Epic [N])
-- [x] [Prerequisite 2] - ✅ Complete (Epic [N])
-- [ ] [Prerequisite 3] - ❌ Blocking (needs Epic [N])
+- [x] [Prerequisite 1] - ✅ Complete (Epic [P.E])
+- [x] [Prerequisite 2] - ✅ Complete (Epic [P.E])
+- [ ] [Prerequisite 3] - ❌ Blocking (needs Epic [P.E])
 
 **Current State**:
 
@@ -372,7 +365,7 @@ Re-render
 
 ### Depends On (Blockers)
 
-- [ ] **Epic [N]**: [Epic Name]
+- [ ] **Epic [P.E]**: [Epic Name]
   - **Reason**: [Why this is a dependency]
   - **Status**: [Status]
   - **Impact if not complete**: [Impact description]
@@ -522,7 +515,7 @@ Re-render
 
 ## Definition of Done
 
-Epic [N] is complete when all criteria below are met:
+Epic [P.E] is complete when all criteria below are met:
 
 ### Story Completion
 
@@ -670,7 +663,7 @@ Epic [N] is complete when all criteria below are met:
 ### Project Resources
 
 - [Project completion roadmap]({REPO_ROOT}/docs/development/project-completion-roadmap.md) - Ordered backlog `develop-next` selects from
-- [Epic registry]({REPO_ROOT}/docs/development/epic-registry.md) - Global epic numbering
+- [PRD registry]({REPO_ROOT}/docs/standards/prd-registry.md) - Global PRD numbering; epics are numbered within their PRD
 - [Task registry]({REPO_ROOT}/docs/tasks/task-registry.md) - Global task numbering
 
 ---
