@@ -42,14 +42,19 @@
 
 const fs = require("fs");
 const path = require("path");
+// The one definition of a document id (task 202). A story bug's parent is read
+// through it, so a sub-story (`story.1.2.3A`) and the hierarchical story id parse
+// by the same rule every other reader uses (task 206).
+const docId = require("./doc-id.js");
 
 // ---------------------------------------------------------------------------
 // Filename grammar
 // ---------------------------------------------------------------------------
-// The id capture is lazy up to the literal `.bug.`, so a three-part story id
-// (`story.8.5.3.bug.2.…`) parses as id `8.5.3` rather than swallowing the bug
-// number. Anchored at both ends: a partial match here picks the wrong parent.
-const RE_STORY_BUG = /^story\.([\d.]+?)\.bug\.(\d+)\.(.+)\.md$/i;
+// A story bug is read by doc-id: `story.{P}.{E}.{S}{sub?}.bug.{n}.{slug}.md`, so
+// `story.8.5.3.bug.2.…` is P=8 E=5 S=3 and `story.1.2.3A.bug.1.…` belongs to the
+// sub-story 1.2.3A. A name doc-id cannot read (a legacy `story.{E}.{S}`) is not a
+// story bug: a wrong parent link is worse than none. The task id capture below is
+// lazy up to the literal `.bug.`; anchored at both ends.
 const RE_TASK_BUG = /^task\.([\d.]+?)\.bug\.(\d+)\.(.+)\.md$/i;
 const RE_GENERAL_BUG = /^bug\.(\d+)\.(.+)\.md$/i;
 
@@ -103,14 +108,22 @@ function resolveBugMode(filePath, frontmatter = {}, body = "") {
   const warnings = [];
   let out = null;
 
-  let m = filename.match(RE_STORY_BUG);
-  if (m) {
+  let m;
+  const storyBug = /\.md$/i.test(filename) ? docId.parse(filename) : null;
+  if (
+    storyBug &&
+    storyBug.ok &&
+    storyBug.kind === "story" &&
+    storyBug.artifact === "bug" &&
+    storyBug.seq !== null
+  ) {
+    const parentId = storyBug.id.slice("story.".length); // "1.2.3A"
     out = {
       mode: "story",
-      bugId: `story.${m[1]}.bug.${m[2]}`,
+      bugId: `${storyBug.id}.bug.${storyBug.seq}`,
       parentKind: "story",
-      parentId: m[1],
-      bugNumber: Number(m[2]),
+      parentId,
+      bugNumber: storyBug.seq,
     };
   }
   if (!out && (m = filename.match(RE_TASK_BUG))) {
@@ -170,9 +183,14 @@ function resolveBugMode(filePath, frontmatter = {}, body = "") {
         );
       continue;
     }
-    const kindMatch = c.match(/\b(story|task)\b[^\d]*([\d.]+)/);
+    // Free text ("story 1.2.3A", lowercased above): a sub-story letter is read
+    // too, so a correct claim about a sub-story is not reported as a mismatch.
+    const kindMatch = c.match(/\b(story|task)\b[^\d]*([\d.]*\d[a-z]?)/);
     if (!kindMatch) continue;
-    if (kindMatch[1] !== out.parentKind || kindMatch[2] !== out.parentId) {
+    if (
+      kindMatch[1] !== out.parentKind ||
+      kindMatch[2] !== String(out.parentId).toLowerCase()
+    ) {
       warnings.push(
         `Document says "${claim}" but the path makes this a ${out.mode} bug of ` +
           `${out.parentKind} ${out.parentId}. Path wins.`,
@@ -629,7 +647,6 @@ if (require.main === module) {
   process.exitCode = main(process.argv);
 } else {
   module.exports = {
-    RE_STORY_BUG,
     RE_TASK_BUG,
     RE_GENERAL_BUG,
     ARTIFACT_INFIXES,
