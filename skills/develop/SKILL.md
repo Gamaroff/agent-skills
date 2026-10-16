@@ -12,7 +12,7 @@ invokes: [qa-planning]
 
 Use this skill when:
 
-- Implementing user stories from `{epic-directory}/stories/` (co-located inside epic dirs, e.g. `${PRD_ROOT}/<domain>/<feature>/epics/epic.{P}.{E}.<name>/stories/`)
+- Implementing user stories from `{epic-directory}/stories/` (co-located inside epic dirs, e.g. `${PRD_ROOT}/<domain>/prd.<P>.<feature>/epics/epic.{P}.{E}.<name>/stories/`)
 - Executing technical tasks from `docs/tasks/`
 - Starting new feature development
 - Need guidance on development workflow
@@ -37,7 +37,7 @@ You can invoke this skill with:
    - If detected: Invoke epic handling workflow (see Epic File Handling section)
 
 2. **Story File Detection** - Matches pattern: `story.{P}.{E}.{S}.{name}.md`
-   - Location: co-located within epic directories (`${PRD_ROOT}/<domain>/<feature>/epics/epic.{P}.{E}.<name>/stories/`) or as provided by the caller
+   - Location: co-located within epic directories (`${PRD_ROOT}/<domain>/prd.<P>.<feature>/epics/epic.{P}.{E}.<name>/stories/`) or as provided by the caller
    - Exclude files containing: `.qa.`, `.gate.`, or `.bug.`
 
 3. **Task File Detection** - Matches pattern: `task.{id}.{name}.md`
@@ -258,7 +258,7 @@ This document has "draft" status and may not be ready for development.
 
 Document: story.1.178.8.example-feature.md
 Status: draft
-Location: ${PRD_ROOT}/<domain>/<feature>/epics/epic.178.<name>/stories/story.1.178.8.example-feature/
+Location: ${PRD_ROOT}/<domain>/prd.<P>.<feature>/epics/epic.178.<name>/stories/story.1.178.8.example-feature/
 
 System Prompt: [Displays AskUserQuestion with 3 options]
 
@@ -547,7 +547,7 @@ This skill works best with the following conventions in your project (adapt as n
 ### 1. Develop Story Workflow
 
 **File Pattern**: `story.{P}.{E}.{S}.{name}.md`
-**Location**: co-located inside the epic dir: `{epic-directory}/stories/story.{P}.{E}.{S}.{name}/story.{P}.{E}.{S}.{name}.md` (epic-directory = `${PRD_ROOT}/<domain>/<feature>/epics/epic.{P}.{E}.<name>/`). Never a global `docs/stories/`.
+**Location**: co-located inside the epic dir: `{epic-directory}/stories/story.{P}.{E}.{S}.{name}/story.{P}.{E}.{S}.{name}.md` (epic-directory = `${PRD_ROOT}/<domain>/prd.<P>.<feature>/epics/epic.{P}.{E}.<name>/`). Never a global `docs/stories/`.
 
 **Starting Development**:
 
@@ -846,7 +846,7 @@ Teach what and why you did in detail, as if training a junior engineer.
 
 **Key Paths**:
 
-- Stories: `${PRD_ROOT}/<domain>/<feature>/epics/epic.{P}.{E}.<name>/stories/` (co-located within epics)
+- Stories: `${PRD_ROOT}/<domain>/prd.<P>.<feature>/epics/epic.{P}.{E}.<name>/stories/` (co-located within epics)
 - Tasks: `docs/tasks/`
 - QA Artifacts: gate files and QA reports are **co-located** with their story/task (e.g. `{story-dir}/story.{P}.{E}.{S}.gate.{n}.{name}.yml`); `docs/qa/` is reserved for cross-cutting assessments only
 - PRD: `${PRD_ROOT}/` (sharded; default `docs/prd/`, configurable)
@@ -860,7 +860,7 @@ Teach what and why you did in detail, as if training a junior engineer.
 Each story has its own subdirectory containing all related files:
 
 ```
-${PRD_ROOT}/<domain>/<feature>/epics/epic.{P}.{E}.<name>/stories/
+${PRD_ROOT}/<domain>/prd.<P>.<feature>/epics/epic.{P}.{E}.<name>/stories/
 └── story.{P}.{E}.{S}.{story-name}/
     ├── story.{P}.{E}.{S}.{story-name}.md           # Story file (source of truth)
     ├── story.{P}.{E}.{S}.qa.{number}.{descriptive-name}.md  # QA report (created by QA)

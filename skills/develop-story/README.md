@@ -11,7 +11,7 @@ This document is structured for two audiences:
 
 ## Technical Summary
 
-`develop-story` is a thin **orchestrator** for product stories within an epic. Almost all real logic lives in `develop-pipeline-*.md` files under `shared/resources/`, loaded on demand per step (progressive disclosure). It coordinates 8 sub-skills sequentially and maintains a co-located **implementation report** as the durable source of truth for state and audit trail. Stories live under `docs/prd/<domain>/<feature>/epics/epic.{P}.{E}.<name>/stories/story.{P}.{E}.{S}.<name>/`.
+`develop-story` is a thin **orchestrator** for product stories within an epic. Almost all real logic lives in `develop-pipeline-*.md` files under `shared/resources/`, loaded on demand per step (progressive disclosure). It coordinates 8 sub-skills sequentially and maintains a co-located **implementation report** as the durable source of truth for state and audit trail. Stories live under `docs/prd/<domain>/prd.<P>.<feature>/epics/epic.{P}.{E}.<name>/stories/story.{P}.{E}.{S}.<name>/`.
 
 Story branches are cut from **`develop`** and PR back to `develop` — short-lived feature branches, standard Gitflow. By default an epic has no branch of its own. An epic can opt in with `branch_model: epic-integration` in its frontmatter: its stories are then cut from and PR into that epic's integration branch (`epic/{P}.{E}.{slug}`, or the `integration_branch:` it names), which Step 1 creates on demand.
 

@@ -468,7 +468,7 @@ sprint-review-summary.md
 writes it beside every accepted work item with the item's key. `.request.` is there because a `{kind}.{N}.request.{n}.*.md` carries the same `jira_key` as its work
 item, so without it a key lookup returns two files and the work item is ambiguous.
 
-Story documents are **not** in `docs/stories/`. They nest under `${PRD_ROOT}/{domain}/{feature}/epics/epic.{P}.{E}.{name}/stories/story.{P}.{E}.{S}.{name}/`. Glob across `docs/`; never assume one root.
+Story documents are **not** in `docs/stories/`. They nest under `${PRD_ROOT}/{domain}/prd.{P}.{feature}/epics/epic.{P}.{E}.{name}/stories/story.{P}.{E}.{S}.{name}/`. Glob across `docs/`; never assume one root.
 
 ### Step 3 — Collect the paper trail
 

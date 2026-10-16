@@ -201,7 +201,7 @@ Related to: story.1.180.3.quick-re-search
 
 - **From PR**: #{pr_number} (if applicable)
 - **Story/Task**: story.1.180.3.quick-re-search
-- **Local Doc**: `${PRD_ROOT}/<domain>/<feature>/epics/epic.180.<name>/stories/story.1.180.3.quick-re-search/story.1.180.3.issue.1.debounce-timing.md`
+- **Local Doc**: `${PRD_ROOT}/<domain>/prd.<P>.<feature>/epics/epic.1.180.<name>/stories/story.1.180.3.quick-re-search/story.1.180.3.issue.1.debounce-timing.md`
 
 ## Acceptance Criteria
 

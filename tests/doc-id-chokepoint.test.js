@@ -520,7 +520,15 @@ const PRD_PLACEHOLDER =
   /^(?:P|p|PRD|prd|prdNum|prd_num|prd_number|prd-number|prd-num)$/;
 // The one restatement with no kind word in front: a bare two-level `{epic}.{story}` id.
 // `(?<![\w.])` alone: any `{epic}` after a dot is already a later segment of a longer id.
-const BARE_TWO_LEVEL = /(?<![\w.])\{epic\}\.\{story\}/;
+// Braced, bracketed or angled — `{epic}.{story}`, `[epic].[story]`, `<epic>.<story>` — the
+// bracket form survived in qa-story because this matched braces only (QA cycle 5, CR-2).
+const BARE_TWO_LEVEL =
+  /(?<![\w.\]>}])(?:\{epic\}\.\{story\}|\[epic\]\.\[story\]|<epic>\.<story>)/i;
+// A PRD-tree path whose feature directory is not the PRD's own `prd.{P}.{feature}`: the
+// epic and story names in it can be right while the directory above them is the flat
+// layout (QA cycle 5, CR-1 — ~20 lines in 12 files).
+const FLAT_LAYOUT =
+  /(?<!prd\.[{[<][A-Za-z_]+[}\]>]\.)[{[<]feature[}\]>]\/epics\//;
 const TITLE_HEAD =
   /(?:EPIC-|\bEpic |\[Epic |\bStory |\[Story )(?:\{\{?([^{}.]+)\}|\[([^\[\].]+)\]|<([^<>.]+)>)/g;
 const FLAT_NUMBER =
@@ -535,17 +543,41 @@ const FLAT_NUMBER =
 const RELATIVE_TITLES = new Map([
   [
     "skills/prd-template/SKILL.md",
-    "PRD Section 6 headings — epics and stories numbered within the PRD",
+    {
+      why: "PRD Section 6 headings — epics and stories numbered within the PRD",
+      lines: [
+        "[Epic {{epic_number}}] {{epic_title}}",
+        "[Story {{epic_number}}.{{story_number}}] {{story_title}}",
+      ],
+    },
   ],
   [
     "skills/prd-template/resources/prd-tmpl.yaml",
-    "PRD template headings — relative by its own EPIC NUMBERING note",
+    {
+      why: "PRD template headings — relative by its own EPIC NUMBERING note",
+      lines: [
+        'title: "[Epic {{epic_number}}] {{epic_title}}"',
+        'title: "[Story {{epic_number}}.{{story_number}}] {{story_title}}"',
+      ],
+    },
   ],
   [
     "skills/create-prd/SKILL.md",
-    "the PRD's own Change Log row names the epic by its number within the PRD",
+    {
+      why: "the PRD's own Change Log row names the epic by its number within the PRD",
+      lines: ["| {today} |  | Epic {N} appended | create-prd |"],
+    },
   ],
 ]);
+
+/**
+ * Exempt from the title check only on an anchored line, never the whole file: a file-wide
+ * exemption let a new flat title anywhere else in a 1000-line skill pass (QA cycle 5, CR-3).
+ */
+function titleExempt(f, line) {
+  const e = RELATIVE_TITLES.get(f);
+  return !!e && e.lines.some((anchor) => line.includes(anchor));
+}
 
 /** The old-scheme placeholder heads on one line, or [] when it states none. */
 function oldPlaceholders(line, { titles = true } = {}) {
@@ -559,6 +591,7 @@ function oldPlaceholders(line, { titles = true } = {}) {
     if (FLAT_NUMBER.test(name.trim())) out.push(m[0]);
   }
   if (BARE_TWO_LEVEL.test(line)) out.push("{epic}.{story}");
+  if (FLAT_LAYOUT.test(line)) out.push("{feature}/epics/");
   return out;
 }
 
@@ -618,7 +651,7 @@ test("§5 no canonical prose states an old-scheme placeholder", () => {
       continue;
     }
     text.split("\n").forEach((line, i) => {
-      const heads = oldPlaceholders(line, { titles: !RELATIVE_TITLES.has(f) });
+      const heads = oldPlaceholders(line, { titles: !titleExempt(f, line) });
       if (heads.length)
         bad.push(
           `${f}:${i + 1}: [${heads.join(", ")}] ${line.trim().slice(0, 110)}`,
@@ -637,25 +670,26 @@ test("§5 no canonical prose states an old-scheme placeholder", () => {
   );
 });
 
-test("§5 every relative-title exemption still names a file with a relative title head", () => {
-  for (const [f, why] of RELATIVE_TITLES) {
+test("§5 every relative-title anchor still exists, states a reason and is a relative title head", () => {
+  for (const [f, { why, lines }] of RELATIVE_TITLES) {
     assert.ok(
       fs.existsSync(path.join(ROOT, f)),
       `${f} is exempt but does not exist`,
     );
     assert.ok(why.length >= 20, `${f}: the reason is too short to check`);
-    const text = fs.readFileSync(path.join(ROOT, f), "utf8");
-    const still = text
-      .split("\n")
-      .some(
-        (l) =>
-          oldPlaceholders(l).length >
-          oldPlaceholders(l, { titles: false }).length,
+    const text = fs.readFileSync(path.join(ROOT, f), "utf8").split("\n");
+    for (const anchor of lines) {
+      const line = text.find((l) => l.includes(anchor));
+      assert.ok(
+        line,
+        `${f}: anchor no longer present — drop it from RELATIVE_TITLES: ${anchor}`,
       );
-    assert.ok(
-      still,
-      `${f} has no relative title head left — drop it from RELATIVE_TITLES (${why})`,
-    );
+      assert.ok(
+        oldPlaceholders(line).length >
+          oldPlaceholders(line, { titles: false }).length,
+        `${f}: anchored line has no relative title head — the exemption is stale: ${anchor}`,
+      );
+    }
   }
 });
 
@@ -682,6 +716,10 @@ test("§5 the placeholder check refuses every flat spelling and spares the new o
     "Story [epic].[story]",
     "[Story {{epic_number}}.{{story_number}}]",
     "Epic {epicNum}",
+    "**Story**: [epic].[story] - [Story Title]",
+    "<epic>.<story>.gate.yml",
+    "${PRD_ROOT}/{domain}/{feature}/epics/epic.{P}.{E}.{name}/",
+    "docs/prd/[domain]/[feature]/epics/",
   ])
     assert.ok(oldPlaceholders(hit).length > 0, `expected a hit: ${hit}`);
   for (const miss of [
@@ -701,6 +739,9 @@ test("§5 the placeholder check refuses every flat spelling and spares the new o
     "Story [prev] links back",
     "pass the epic <path>",
     "Epic {any id} is accepted",
+    "${PRD_ROOT}/{domain}/prd.{P}.{feature}/epics/epic.{P}.{E}.{name}/",
+    "docs/prd/[domain]/prd.[P].[feature]/epics/",
+    "`{prd}.{epic}.{story}`",
   ])
     assert.deepEqual(oldPlaceholders(miss), [], `expected no hit: ${miss}`);
 });

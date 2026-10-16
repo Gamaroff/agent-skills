@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa
+status: closed
 severity: Critical
 priority: High
 created: 2026-10-16
@@ -14,7 +14,7 @@ description: "qa-findings-ingester-prompt globs were renamed to <P>.<E>.<S> but 
 **Bug ID**: TASK-207-BUG-6
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 3, finding CR-1)
 **Date Found**: 2026-10-16
 **Location**: `shared/resources/qa-findings-ingester-prompt.md:16`
@@ -84,3 +84,4 @@ Rename the substitution lists to `<P>`, `<E>`, `<S>` in both places (bundled cop
 | 2026-10-16 | Reopened | qa-task | Partial — <S> source ambiguous for a sub-story (parse returns story and sub separately) (task.207.qa.4 CR-3) |
 | 2026-10-16 | In Progress | qa-fix | Fix cycle 4 started |
 | 2026-10-16 | Ready for QA | qa-fix | Fixed in QA fix cycle 4 |
+| 2026-10-16 | Closed | qa-task | Verified by task.207.qa.5.doc-numbering-enforcement-and-sweep.md |

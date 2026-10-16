@@ -209,7 +209,7 @@ Authoritative copy: `references/epic-template.md` (byte-identical to `docs/templ
 **File Locations**:
 
 ```
-docs/prd/{domain}/{feature}/epics/
+docs/prd/{domain}/prd.{P}.{feature}/epics/
 ├── epic.[P].[E].[name]/
 │   ├── epic.[P].[E].[name].md       ← Epic file here
 │   ├── EPIC-[P].[E]-ROADMAP.md      ← Roadmap here (optional)
@@ -231,7 +231,7 @@ docs/prd/{domain}/{feature}/epics/
 **File Locations**:
 
 ```
-docs/prd/{domain}/{feature}/epics/epic.[P].[E].[name]/stories/
+docs/prd/{domain}/prd.{P}.{feature}/epics/epic.[P].[E].[name]/stories/
 ├── story.[P].[E].1.[name].md
 ├── story.[P].[E].1.[name].completion.md
 ├── story.[P].[E].2.[name].md
@@ -474,7 +474,7 @@ See full story: [Story 164-1](./stories/story.164.1.[name].md)
 ### Organization Principles
 
 1. **Co-location**: Stories MUST be co-located with their epics
-   - ✅ Correct: `docs/prd/[domain]/[feature]/epics/epic.[P].[E].[name]/stories/`
+   - ✅ Correct: `docs/prd/[domain]/prd.[P].[feature]/epics/epic.[P].[E].[name]/stories/`
    - ❌ Wrong: `docs/prd/[domain]/[feature]/stories/` (old flat structure)
    - ❌ Wrong: `docs/stories/[domain]/[feature]/` (completely separated)
 

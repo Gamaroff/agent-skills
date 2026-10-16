@@ -103,6 +103,20 @@ Rewrite the glob and template to `epic.{P}.{E}`; sweep the other `epic.[N]` / `{
 
 **Testing**: `tests/doc-id-chokepoint.test.js` 13/13. The new stale-entry test fired on its first run (brownfield entry) — evidence it reads the files.
 
+### Iteration 5
+
+#### Fix Implementation (In Progress → Ready for QA)
+
+**Date**: 2026-10-16
+
+**Root Cause**: The guard checked placeholder names, not the directory above them: `{domain}/{feature}/epics/` paths named correct epic and story ids under a flat layout, and the two-level id check matched braces only.
+
+**Fix Description**: 13 files rewritten to `{domain}/prd.{P}.{feature}/epics/` (and the bracket and angle spellings), plus create-issue's flat `epic.180.<name>`; qa-story's `[epic].[story]` id. §5 gains `FLAT_LAYOUT` (a `{feature}/epics/` not preceded by `prd.{P}.`) and widens `BARE_TWO_LEVEL` to bracket and angle forms. `RELATIVE_TITLES` is anchored to exact lines (CR5-3), and its stale test now requires each anchor to exist and be a relative title head. The ingester contract test binds only a line's head names (CR5-5), with a must-fail fixture. A dated audit plan touched by the bulk rewrite was restored unedited.
+
+**Files Modified**: 13 prose files, tests/doc-id-chokepoint.test.js, tests/ingester-prompt-placeholders.test.js
+
+**Testing**: 17/17. Mutations: restore a flat layout path, the bracket id, or a flat title outside an anchor → §5 red; boundNames reading the whole line → its fixture red.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -119,3 +133,6 @@ Rewrite the glob and template to `epic.{P}.{E}`; sweep the other `epic.[N]` / `{
 | 2026-10-16 | Reopened | qa-task | Not fixed — YAML templates and config comments outside §5's *.md population (task.207.qa.4 CR-1) |
 | 2026-10-16 | In Progress | qa-fix | Fix cycle 4 started |
 | 2026-10-16 | Ready for QA | qa-fix | Fixed in QA fix cycle 4 |
+| 2026-10-16 | Reopened | qa-task | Partial — {domain}/{feature}/epics layout and [epic].[story] bracket form remain (task.207.qa.5 CR-1, CR-2) |
+| 2026-10-16 | In Progress | qa-fix | Fix cycle 5 started |
+| 2026-10-16 | Ready for QA | qa-fix | Fixed in QA fix cycle 5 |

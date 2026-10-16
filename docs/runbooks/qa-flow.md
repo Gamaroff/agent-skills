@@ -168,7 +168,7 @@ formal PR review, no code edits. The orchestrator acts on the verdict. Lite mode
 **All QA artifacts are co-located with the story or task they belong to.** There is no central `docs/qa/` directory.
 
 ```
-docs/prd/[domain]/[feature]/epics/epic.{P}.{E}.{name}/stories/story.{P}.{E}.{S}.{name}/
+docs/prd/[domain]/prd.[P].[feature]/epics/epic.{P}.{E}.{name}/stories/story.{P}.{E}.{S}.{name}/
 ├── story.{P}.{E}.{S}.{name}.md                       # the story
 ├── story.{P}.{E}.{S}.qa.{N}.{name}.md                # QA narrative + NFR + traceability
 ├── story.{P}.{E}.{S}.dod.{N}.{name}.md               # Definition of Done

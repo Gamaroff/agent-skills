@@ -1576,7 +1576,7 @@ stories/
 # QA Report: Story [P].[E].[S] - [Story Title]
 
 **Epic**: [Epic Name]
-**Story**: [epic].[story] - [Story Title]
+**Story**: [P].[E].[S] - [Story Title]
 **QA Engineer**: QA Engineer
 **Testing Completed**: [Date]
 **Status**: PASS/CONCERNS/FAIL
@@ -3305,7 +3305,7 @@ This traceability feeds into quality gates:
 
 **Resolve paths first.** Source `references/resolve-paths.sh` to populate `${PRD_ROOT}` (default `docs/prd`) — the PRD root is configurable. The nested structure under it (and QA artifact co-location) is fixed (see [docs/reference/configuration.md](../../docs/reference/configuration.md#configurable-roots-and-fixed-conventions)):
 
-- Stories: nested at `${PRD_ROOT}/{domain}/{feature}/epics/epic.{P}.{E}.{name}/stories/story.{P}.{E}.{S}.{name}/`
+- Stories: nested at `${PRD_ROOT}/{domain}/prd.{P}.{feature}/epics/epic.{P}.{E}.{name}/stories/story.{P}.{E}.{S}.{name}/`
 - QA artifacts (review report, NFR, traceability, gate, DoD): co-located with the story file. No `qa.qaLocation` key.
 
 ### File Naming Conventions (Updated 2025-12-09)

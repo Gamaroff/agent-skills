@@ -558,7 +558,7 @@ If flagged: recommend splitting into sub-epics and suggest how to divide the sco
 
 **Option A — Co-located Report**:
 
-Save to: `${PRD_ROOT}/[domain]/[feature]/epics/epic.[P].[E].[name]/epic.[P].[E].review.[n].[name].md`
+Save to: `${PRD_ROOT}/[domain]/prd.[P].[feature]/epics/epic.[P].[E].[name]/epic.[P].[E].review.[n].[name].md`
 
 - `[P]` is the PRD number and `[E]` the epic number within it; `[name]` is the parent epic file's own name slug (the hyphenated portion after `epic.[P].[E].` in the epic filename) — NOT a free-form summary of the review focus.
 - `[n]` is a sequence number for multiple reviews of the same epic, computed below — never counted by eye (mirrors the QA `qa.{n}` and story `review.{n}` patterns). Use DOTS as structural separators and hyphens within the name slug.

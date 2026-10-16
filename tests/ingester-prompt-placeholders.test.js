@@ -48,14 +48,25 @@ function section(text, heading) {
 const placeholders = (text) =>
   new Set([...text.matchAll(/<([A-Za-z_]+)>/g)].map((m) => m[1]));
 
+/**
+ * The names a binding line BINDS: the backticked `<X>` before its first `(` or `:`, plus any
+ * `OR \`<X>\`` alternative. A placeholder that only appears in the line's explanation
+ * (`<S>` = `.story` + `.sub`) is not bound by it (QA cycle 5, CR-5).
+ */
+function boundNames(line) {
+  const names = new Set();
+  const head = line.split(/[(:]/)[0];
+  for (const m of head.matchAll(/`<([A-Za-z_]+)>`/g)) names.add(m[1]);
+  for (const m of line.matchAll(/\bOR `<([A-Za-z_]+)>`/g)) names.add(m[1]);
+  return names;
+}
+
 /** The `<X>` names on the substitution-list lines (`- \`<X>\`…: …`) of a block of text. */
 function bindingList(text) {
   const names = new Set();
   for (const line of text.split("\n")) {
     if (!/^\s*- `<[A-Za-z_]+>`/.test(line)) continue;
-    // Every backticked placeholder on the line: a binding line may explain its own
-    // values (`<S>` = `.story` + `.sub`), so cutting at the first colon dropped `<id>`.
-    for (const m of line.matchAll(/`<([A-Za-z_]+)>`/g)) names.add(m[1]);
+    for (const n of boundNames(line)) names.add(n);
   }
   return names;
 }
@@ -104,4 +115,10 @@ test("every discovery placeholder is in /qa-fix Step 1a's binding list", () => {
     [],
     `unbound in qa-fix Step 1a: ${missing.map((n) => `<${n}>`).join(", ")}`,
   );
+});
+
+test("a placeholder named only in a binding line's explanation is not bound", () => {
+  const line =
+    "- `<epic>`, `<story>` (story mode — `<S>` = `.story` followed by `.sub`) OR `<id>` (task mode): from context";
+  assert.deepEqual([...boundNames(line)].sort(), ["epic", "id", "story"]);
 });

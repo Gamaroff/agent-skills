@@ -539,21 +539,21 @@ unaffected and listed as such.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-16
-**Quality Score**: 80/100
+**Quality Score**: 70/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.207.qa.4.doc-numbering-enforcement-and-sweep.md](./task.207.qa.4.doc-numbering-enforcement-and-sweep.md)
-- **Gate File**: [task.207.gate.4.doc-numbering-enforcement-and-sweep.yml](./task.207.gate.4.doc-numbering-enforcement-and-sweep.yml)
+- **Full Report**: [task.207.qa.5.doc-numbering-enforcement-and-sweep.md](./task.207.qa.5.doc-numbering-enforcement-and-sweep.md)
+- **Gate File**: [task.207.gate.5.doc-numbering-enforcement-and-sweep.yml](./task.207.gate.5.doc-numbering-enforcement-and-sweep.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 22
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-Cycle 4: no HIGH. BUG-3 reopened (PRD YAML templates and config comments still flat; §5 scans Markdown only). BUG-6 reopened (the ingester binding lists do not say a sub-story's <S> is parse .story followed by .sub).
+Cycle 5: no HIGH; BUG-6 closed. BUG-3 reopened (layout paths drop the prd.{P}. directory), plus two guard-precision gaps (bracket two-level ids; file-wide title exemption).
 
 ## Change Log
 
@@ -573,6 +573,8 @@ Cycle 4: no HIGH. BUG-3 reopened (PRD YAML templates and config comments still f
 | 2026-10-16 |         | QA findings fixed — BUG-6 (ingester placeholder contract + test), BUG-3 title spellings, CR3-5; 1 iteration | qa-fix |
 | 2026-10-16 |         | QA gate CONCERNS (80/100) — 2 medium, 2 low; BUG-3, BUG-6 reopened (task.207.qa.4) | qa-task |
 | 2026-10-16 |         | QA findings fixed — BUG-3 (YAML population; PRD-relative titles restored and exempted by name), BUG-6 (<S> = .story+.sub), CR4-4, CR4-5; 1 iteration | qa-fix |
+| 2026-10-16 |         | QA gate CONCERNS (70/100) — 3 medium, 1 low; BUG-3 reopened (task.207.qa.5) | qa-task |
+| 2026-10-16 |         | QA findings fixed — BUG-3 layout paths (13 files) + FLAT_LAYOUT key, CR5-2, CR5-3 (anchored exemptions), CR5-5; 1 iteration | qa-fix |
 
 <!-- change-log-end -->
 
