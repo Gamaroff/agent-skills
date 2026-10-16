@@ -543,17 +543,17 @@ unaffected and listed as such.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.207.qa.6.doc-numbering-enforcement-and-sweep.md](./task.207.qa.6.doc-numbering-enforcement-and-sweep.md)
-- **Gate File**: [task.207.gate.6.doc-numbering-enforcement-and-sweep.yml](./task.207.gate.6.doc-numbering-enforcement-and-sweep.yml)
+- **Full Report**: [task.207.qa.7.doc-numbering-enforcement-and-sweep.md](./task.207.qa.7.doc-numbering-enforcement-and-sweep.md)
+- **Gate File**: [task.207.gate.7.doc-numbering-enforcement-and-sweep.yml](./task.207.gate.7.doc-numbering-enforcement-and-sweep.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 17
+- **Tests Executed**: 18
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-Half-cycle gate on the last fix: no HIGH, CI green. Layout residue remains in tree diagrams and concrete example paths (~23 lines, 14 files).
+Cycle 7: no HIGH; layout and trees clean. Three mixed-id examples, a FLAT_LITERAL name-start gap, and the guide's story layout vs its new links remain.
 
 ## Change Log
 
@@ -577,6 +577,7 @@ Half-cycle gate on the last fix: no HIGH, CI green. Layout residue remains in tr
 | 2026-10-16 |         | QA findings fixed — BUG-3 layout paths (13 files) + FLAT_LAYOUT key, CR5-2, CR5-3 (anchored exemptions), CR5-5; 1 iteration | qa-fix |
 | 2026-10-16 |         | QA gate CONCERNS (70/100), gate-the-last-fix half-cycle — 4 medium, 1 low; BUG-3 reopened (task.207.qa.6) | qa-task |
 | 2026-10-16 |         | QA findings fixed (user-approved cycle 6) — enumerated layout/literal/tree sweep, 15 prose files; §5 parent, literal and tree checks | qa-fix |
+| 2026-10-16 |         | QA gate CONCERNS (70/100) — 3 medium, 1 low; BUG-3 still open (task.207.qa.7) | qa-task |
 
 <!-- change-log-end -->
 

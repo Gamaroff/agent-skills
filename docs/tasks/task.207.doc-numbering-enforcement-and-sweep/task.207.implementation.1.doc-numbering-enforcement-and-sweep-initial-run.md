@@ -155,6 +155,13 @@ Add the corpus and chokepoint CI guards for hierarchical doc numbering and sweep
 
 ---
 
+### Steps 5–6 — user-approved cycles 6 fix and 7 — 2026-10-16
+
+- Fix cycle 6 (`b20f6e72`): population listed first (`/epics/` parents, literal flat ids, tree `epics/` nodes), 15 prose files, §5 `flatParent` / `FLAT_LITERAL` / `flatTreeEpics`; four mutations red; my own enumeration grep excluded `/`-preceded ids and the widened check found four more. Fast gate exit 0. qa-fix-6 comments posted.
+- Gate 7 CONCERNS 70 (reviewer 19:02:58Z, `duration_ms` 144249). I first closed BUG-3, then reopened it: CR7-1..3 are residues of its class.
+
+---
+
 ## Issues Log
 
 ### QA Loop Limit Reached — 2026-10-16
@@ -248,6 +255,16 @@ _Track each QA review/fix cycle._
 **PR Review**: not reached — gate did not exit the loop
 **Loop exit**: n/a — this exit not taken
 **Action**: Escalating — loop limit reached
+
+### QA Cycle 7 — 2026-10-16
+**Half-cycle**: none — a further fix cycle approved by the user after the escalation
+**Gate Result**: CONCERNS
+**Issues Found**: 3 MEDIUM — BUG-3 (mixed-id examples CR7-1..3), CR7-4 (FLAT_LITERAL name start), CR7-5 (guide story layout vs cycle-6 links); 1 LOW (CR7-8)
+**HIGH findings**: 0
+**MEDIUM findings**: 3
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Paused — awaiting the user's decision
 
 ---
 
