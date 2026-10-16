@@ -5,7 +5,7 @@ type: task
 description: "Give uat-status.mjs a way to close a Findings-table row that has no bug: a `resolved <date> by \`<evidence>\`` marker in its Filed as cell, written by a new --resolve-finding command, verified against a real commit or a later run file, and counted as closed by --findings."
 tags: [qa-next, uat, findings, uat-status, follow-up]
 category: feature
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-16
 updated: 2026-10-16
@@ -13,11 +13,13 @@ assignee:
 estimated_effort_hours: 5
 depends_on: []
 github_issue: 679
+completed_date: 2026-10-16
+pr_number: 680
 ---
 
 # Technical Task: qa-next: a note finding can be resolved, with evidence
 
-**Status:** Ready for Review
+**Status:** Accepted
 **GitHub Issue**: [#679](https://github.com/Gamaroff/agent-skills/issues/679)
 **Review**: ✅ All review recommendations from `task.212.review.1.qa-next-resolvable-note-findings.md` implemented 2026-10-16
 
@@ -360,11 +362,34 @@ None.
 ### Key Findings
 No open findings. Every fix from QA cycles 1–3 is held by a test that fails when the fix is removed. Four low-severity improvements are recorded as future work.
 
-## Change Log
-<!-- change-log-start -->
+## Definition of Done - PASSED ✅
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.212.qa.4.qa-next-resolvable-note-findings.md`
+**Gate File**: `task.212.gate.4.qa-next-resolvable-note-findings.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (4 QA cycles)
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 12/12 met, each asserted by a per-PR test in `evals/qa-next/unit/uat-status.test.mjs`
+✅ **Tests:** 85 qa-next unit tests; `npm run ci:fast` 5773/0 with `.agents/skills` moved aside; CI green on PR #680
+✅ **PR Review:** PR #680 — Step 5c `/review-pr` ✅ APPROVE (`task.212.pr-review.1.qa-next-resolvable-note-findings.md`)
+✅ **Documentation:** CHANGELOG [Unreleased], qa-next SKILL.md, README and run template
+✅ **Security Review:** ✅ PASS — `--resolve-finding --by` probed: 27 executed, 0 reproduced (verdict `engages`)
+✅ **Compliance Review:** NOT_APPLICABLE — local developer CLI, no PII, payments, UI or health data
+
+**Task marked as ACCEPTED on:** 2026-10-16
+
+**Detailed Verification Log:** See `task.212.dod.1.qa-next-resolvable-note-findings.md` for complete verification evidence and timestamps.
+<!-- change-log-start -->
+## Change Log
+
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-16 | 1.0     | Initial draft | create-task |
 | 2026-10-16 | 1.1     | Review passed (8/10) — added `bad-evidence`, run-evidence membership, `resolution` key only on marked rows, `<run>` argument form, evidence-only idempotency, SKILL.md Step 5 commit scope; linked #679 | review-task |
 | 2026-10-16 |         | Status → ready-for-development | review-task |
@@ -376,6 +401,7 @@ No open findings. Every fix from QA cycles 1–3 is held by a test that fails wh
 | 2026-10-16 |         | QA gate FAIL (80/100) — 1 finding; status → in-progress | qa-task |
 | 2026-10-16 |         | QA findings fixed — cycle 3, 1 finding (CR1: --changed-runs owns the run-file listing; Step 5 calls it); status → ready-for-review | qa-fix |
 | 2026-10-16 |         | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-10-16 | 1.2 | DoD passed — accepted (PR #680) | finalise |
 <!-- change-log-end -->
 
 ---
