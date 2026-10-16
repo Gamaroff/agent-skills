@@ -547,9 +547,12 @@ test("Step 3b.1: a run killed mid-write leaves no result — never a partial or 
   write(
     work,
     "killed-runner.mjs",
-    'process.stdout.write(\'{"reason": "ran", "probes_exec\'); process.exit(137);\n',
+    // Deliberate on both paths (CR5-3): imported for the budget it exports a bound; run as the CLI it
+    // prints half a JSON object and dies the way a killed process does.
+    'export const ENGINE_TIMEOUT_MS = 60000;\nif (process.argv[1] && process.argv[1].endsWith(\'killed-runner.mjs\')) { process.stdout.write(\'{"reason": "ran", "probes_exec\'); process.exit(137); }\n',
   );
   write(work, ".claude/state/probe-plan.json", "[]");
+  write(work, WAIT_STUB, 'echo "$*" >> .wait.log\n');
   write(
     work,
     ".claude/state/probe-plan-result.json",
@@ -719,4 +722,33 @@ test("a repeated falsy inline case is still refused as a duplicate (CR4-5)", asy
   });
   assert.deepEqual(out.runs, []);
   assert.match(out.refusals[0].reason, /plan-entry-cases-duplicate-id/);
+});
+
+// --- task.189 QA cycle 5 regressions -------------------------------------------------------------
+
+test("a runner that fails to load still removes the stale result and reports no result (CR5-1)", () => {
+  const work = probeRepo([]);
+  write(
+    work,
+    ".claude/state/probe-plan-result.json",
+    JSON.stringify({ reason: "ran", probes_executed: 99 }),
+  );
+  const block = bind(blockBy(readDoc(FINALISE), "security-probe-plan.mjs"), {
+    ".agents/skills/finalise/references/security-probe-plan.mjs":
+      "no-such-runner.mjs",
+    ".agents/skills/finalise/references/set-waiting-on.sh": WAIT_STUB,
+    "{story.{P}.{E}.{S} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}":
+      "task.9",
+    "{Step 0's DOD_N}": "2",
+    "{document-directory}": "docs/tasks/task.9.x",
+  });
+  const r = run("bash", block, { cwd: work });
+  assert.match(r.stdout, /the runner did not load — the wait is not marked/);
+  assert.match(r.stdout, /probe-plan exit=/);
+  assert.match(r.stdout, /probe-plan: no result — the run did not complete/);
+  assert.equal(
+    fs.existsSync(path.join(work, ".claude/state/probe-plan-result.json")),
+    false,
+    "the stale result survived",
+  );
 });

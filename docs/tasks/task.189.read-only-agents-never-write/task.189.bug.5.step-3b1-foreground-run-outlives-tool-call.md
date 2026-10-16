@@ -73,6 +73,23 @@ Run the Step 3b.1 block backgrounded (`run_in_background`, marked with `set-wait
 
 **Testing**: `read-only-agent-writes.test.mjs` 20/20 — the block's wait call is logged by a stub and asserted (budget = ceil(2 × 20) + 5 = 45 for two entries, then `--clear`); no result is reported missing without jq; falsy duplicate refused. Six mutation proofs (F1–F6), each red.
 
+### Iteration 3
+
+#### Re-Investigation (Reopened → In Progress)
+
+**Date**: 2026-10-16
+**Developer**: qa-fix (develop-task Step 5b, cycle 5)
+
+**QA Reopening Reason**: iteration 2's `${BUDGET:?}` abort ran before the stale result was removed (CR5-1).
+
+**Revised Approach**: the stale result is removed first, before anything can stop the block; a budget that is not a positive integer prints a warning and skips the mark instead of aborting, so the run still reports `no result`. Same cycle: the killed-runner test's stand-in exports a bound and writes the wait stub (CR5-3); Step 8a.4 names "Step 3b.1 item 2" (CR5-4).
+
+#### Fix Implementation
+
+**Files Modified**: `skills/finalise/SKILL.md`, `shared/resources/tests/read-only-agent-writes.test.mjs`, `evals/shared/tests/finalise-dod-prompt-contract.test.mjs`
+
+**Testing**: new case — a runner that fails to load, with a stale result present: stale removed, warning, exit line and `no result` printed. Mutation proofs G1–G3, each red.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -81,3 +98,5 @@ Run the Step 3b.1 block backgrounded (`run_in_background`, marked with `set-wait
 | 2026-10-16 | Ready for QA | qa-fix | Fixed in QA cycle 3 |
 | 2026-10-16 | Reopened | qa-task | Partial — backgrounding landed, but the wait has no budget (CR4-1) and Step 8a.4's re-run of the same block is not backgrounded (CR4-2); task.189.qa.4 |
 | 2026-10-16 | Ready for QA | qa-fix | Fixed in QA cycle 4 (iteration 2) |
+| 2026-10-16 | Reopened | qa-task | Iteration 2's ${BUDGET:?} abort runs before the stale result is removed (CR5-1); task.189.qa.5 |
+| 2026-10-16 | Ready for QA | qa-fix | Fixed in QA cycle 5 (iteration 3) |

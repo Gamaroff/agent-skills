@@ -592,7 +592,7 @@ test("the agent plans the probe and /finalise always runs it (obs #10, task.189)
   );
   assert.ok(
     s.includes(
-      "Step 3b.1's block, re-run backgrounded exactly as item 2 runs it",
+      "Step 3b.1's block, re-run backgrounded exactly as Step 3b.1 item 2 runs it",
     ),
     "skills/finalise/SKILL.md: Step 8a.4 no longer re-runs the saved probe plan",
   );

@@ -536,6 +536,10 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
    DOC_DIR="{document-directory}"
    RESULT=.claude/state/probe-plan-result.json
    RUNNER=.agents/skills/finalise/references/security-probe-plan.mjs
+   # A result exists only when a run completed: the stale one goes FIRST — before anything below can
+   # stop the block — and the new one is moved into place only once it parses, so a run killed
+   # mid-write leaves NO result, never a partial or an earlier one (task.189 CR5-1).
+   rm -f "$RESULT" "$RESULT.tmp"
    # The wait, marked HERE so no caller can run the block without it. Budget: the runner's own bound per
    # entry (ENGINE_TIMEOUT_MS) times the plan's entries, plus 5 minutes. The plan path goes first: the
    # runner's entry guard reads argv[1], and must not take this import for a CLI run.
@@ -545,12 +549,14 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
        let n = 1;
        try { n = Math.max(1, JSON.parse(fs.readFileSync(process.argv[1], "utf8")).length); } catch {}
        console.log(Math.ceil((n * m.ENGINE_TIMEOUT_MS) / 60000) + 5);
-     });' .claude/state/probe-plan.json "$RUNNER")
-   bash .agents/skills/finalise/references/set-waiting-on.sh "step-7 probe plan" --kind task \
-     --budget-minutes "${BUDGET:?the runner did not load — check the bundled path}"
-   # A result exists only when a run completed: the stale one goes first, and the new one is moved into
-   # place only once it parses — a run killed mid-write leaves NO result, never a partial one.
-   rm -f "$RESULT" "$RESULT.tmp"
+     });' .claude/state/probe-plan.json "$RUNNER" 2>/dev/null)
+   # A budget that is not a positive integer means the runner did not load: say so and carry on — the
+   # run below fails the same way and reports "no result"; aborting here would print nothing at all.
+   case "$BUDGET" in
+     ''|*[!0-9]*) echo "⚠️  probe plan: the runner did not load — the wait is not marked" ;;
+     *) bash .agents/skills/finalise/references/set-waiting-on.sh "step-7 probe plan" --kind task \
+          --budget-minutes "$BUDGET" ;;
+   esac
    command node "$RUNNER" \
      --plan .claude/state/probe-plan.json \
      --record "$DOC_DIR/$STEM.dod.$DOD_N.security.run.json" \
@@ -2873,7 +2879,7 @@ wait — until it is `SUCCESS`. Record it in the running summary as
 `CI reading 1 (fix head): {CI_ROLLUP} @ {CI_HEAD_1}`. `FAILURE` → Step 8.
 
 **4. Re-run ONLY the failed section's reproduction.** Not the four agents. For security, that is
-Step 3b.1's block, re-run backgrounded exactly as item 2 runs it (the block marks its own wait) on
+Step 3b.1's block, re-run backgrounded exactly as Step 3b.1 item 2 runs it (the block marks its own wait) on
 the plan it saved at `.claude/state/probe-plan.json` and into this run's
 record, so the record's `totals.executed` is refreshed from the fixed tree — the security agent
 returns a plan and records no command (task.189); for a checklist FAIL it is the check's own

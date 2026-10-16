@@ -447,17 +447,17 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.189.qa.4.read-only-agents-never-write.md](./task.189.qa.4.read-only-agents-never-write.md)
-- **Gate File**: [task.189.gate.4.read-only-agents-never-write.yml](./task.189.gate.4.read-only-agents-never-write.yml)
+- **Full Report**: [task.189.qa.5.read-only-agents-never-write.md](./task.189.qa.5.read-only-agents-never-write.md)
+- **Gate File**: [task.189.gate.5.read-only-agents-never-write.yml](./task.189.gate.5.read-only-agents-never-write.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 67
+- **Tests Executed**: 70
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Cycle-3 fixes hold. One medium: Step 3b.1's background wait has no budget (CR4-1); bug.5 reopened because Step 8a.4 re-runs the same block without the background rule.
+Cycle-4 fixes hold. One medium: the Step 3b.1 block's budget abort runs before the stale result is removed (CR5-1); bug.5 reopened.
 
 <!-- change-log-start -->
 ## Change Log
@@ -476,6 +476,8 @@ Cycle-3 fixes hold. One medium: Step 3b.1's background wait has no budget (CR4-1
 | 2026-10-16 |  | QA findings fixed — cycle 3, 3 gate findings (QA3-1, CR3-2, CR3-3) | qa-fix |
 | 2026-10-16 |  | QA gate CONCERNS (90/100) — 1 medium finding; bug.5 reopened | qa-task |
 | 2026-10-16 |  | QA findings fixed — cycle 4, 1 gate finding (CR4-1) + 4 advisory (CR4-2..CR4-5), run rule consolidated into the Step 3b.1 block | qa-fix |
+| 2026-10-16 |  | QA gate CONCERNS (90/100) — 1 medium finding; bug.5 reopened | qa-task |
+| 2026-10-16 |  | QA findings fixed — cycle 5, 1 gate finding (CR5-1) + 2 advisory (CR5-3, CR5-4) | qa-fix |
 <!-- change-log-end -->
 
 ---
