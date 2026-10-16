@@ -89,6 +89,20 @@ Rewrite the glob and template to `epic.{P}.{E}`; sweep the other `epic.[N]` / `{
 
 **Testing**: `tests/doc-id-chokepoint.test.js` 12/12. Mutation: restore `Epic {N} — {title}` in sync-github-epic → §5 red.
 
+### Iteration 4
+
+#### Fix Implementation (In Progress → Ready for QA)
+
+**Date**: 2026-10-16
+
+**Root Cause**: §5's population stopped at `*.md`; the PRD YAML templates, `skills-config.yaml` and two `core-config-reference.yaml` comments render titles and paths too. And cycle 3's title-form rewrite of prd-template Section 6 and create-prd's PRD Change Log row was itself wrong: inside a PRD, epic and story numbers are relative by documented design (create-prd § Epic Numbering; both PRD templates' EPIC NUMBERING notes).
+
+**Fix Description**: §5's population is `*.md`, `*.yaml`, `*.yml`. Rewritten: `skills-config.yaml` layout comment, both `core-config-reference.yaml` comments, `qa-gate-template.yaml` location and story format. Reverted the cycle-3 PRD-internal rewrites; new `RELATIVE_TITLES` exempts the title check (filename heads still checked) in prd-template SKILL.md, prd-tmpl.yaml and create-prd SKILL.md, each with its reason and a stale-entry test — which immediately dropped the brownfield template (literal `[Epic 1]` only). CR4-4 (story-template parent link) and CR4-5 (qa-story example id) fixed.
+
+**Files Modified**: tests/doc-id-chokepoint.test.js, skills-config.yaml, skills/{develop,qa-fix}/resources/core-config-reference.yaml, skills/qa-fix/resources/qa-gate-template.yaml, skills/prd-template/SKILL.md, skills/create-prd/SKILL.md, skills/documentation-standards-validator/references/story-template.md, skills/qa-story/SKILL.md
+
+**Testing**: `tests/doc-id-chokepoint.test.js` 13/13. The new stale-entry test fired on its first run (brownfield entry) — evidence it reads the files.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -102,3 +116,6 @@ Rewrite the glob and template to `epic.{P}.{E}`; sweep the other `epic.[N]` / `{
 | 2026-10-16 | Reopened | qa-task | Not fixed — §5 misses uppercase and title spellings (task.207.qa.3 CR-2) |
 | 2026-10-16 | In Progress | qa-fix | Fix cycle 3 started |
 | 2026-10-16 | Ready for QA | qa-fix | Fixed in QA fix cycle 3 |
+| 2026-10-16 | Reopened | qa-task | Not fixed — YAML templates and config comments outside §5's *.md population (task.207.qa.4 CR-1) |
+| 2026-10-16 | In Progress | qa-fix | Fix cycle 4 started |
+| 2026-10-16 | Ready for QA | qa-fix | Fixed in QA fix cycle 4 |

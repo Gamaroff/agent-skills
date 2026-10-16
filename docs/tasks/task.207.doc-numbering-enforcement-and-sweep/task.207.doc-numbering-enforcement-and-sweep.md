@@ -536,24 +536,24 @@ unaffected and listed as such.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-16
-**Quality Score**: 60/100
-**Gate Decision**: FAIL
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.207.qa.3.doc-numbering-enforcement-and-sweep.md](./task.207.qa.3.doc-numbering-enforcement-and-sweep.md)
-- **Gate File**: [task.207.gate.3.doc-numbering-enforcement-and-sweep.yml](./task.207.gate.3.doc-numbering-enforcement-and-sweep.yml)
+- **Full Report**: [task.207.qa.4.doc-numbering-enforcement-and-sweep.md](./task.207.qa.4.doc-numbering-enforcement-and-sweep.md)
+- **Gate File**: [task.207.gate.4.doc-numbering-enforcement-and-sweep.yml](./task.207.gate.4.doc-numbering-enforcement-and-sweep.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 19
+- **Tests Executed**: 22
 - **Phases Verified**: 5/5
-- **Critical Issues**: 1
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: CONCERNS
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
 
 ### Key Findings
-Cycle 3: BUG-2 and BUG-5 closed. BUG-6 (HIGH): the ingester prompt's story globs were renamed to <P>.<E>.<S> but its callers still bind <epic>/<story>. BUG-3 reopened: §5 misses uppercase and title spellings.
+Cycle 4: no HIGH. BUG-3 reopened (PRD YAML templates and config comments still flat; §5 scans Markdown only). BUG-6 reopened (the ingester binding lists do not say a sub-story's <S> is parse .story followed by .sub).
 
 ## Change Log
 
@@ -571,6 +571,8 @@ Cycle 3: BUG-2 and BUG-5 closed. BUG-6 (HIGH): the ingester prompt's story globs
 | 2026-10-16 |         | QA findings fixed — BUG-2, BUG-3 by structural moves (shared JS tokenizer; §5 allow-list), BUG-5, CR2-6; 1 iteration | qa-fix |
 | 2026-10-16 |         | QA gate FAIL (60/100) — 1 high, 1 medium, 2 low; BUG-3 reopened, BUG-6 new (task.207.qa.3) | qa-task |
 | 2026-10-16 |         | QA findings fixed — BUG-6 (ingester placeholder contract + test), BUG-3 title spellings, CR3-5; 1 iteration | qa-fix |
+| 2026-10-16 |         | QA gate CONCERNS (80/100) — 2 medium, 2 low; BUG-3, BUG-6 reopened (task.207.qa.4) | qa-task |
+| 2026-10-16 |         | QA findings fixed — BUG-3 (YAML population; PRD-relative titles restored and exempted by name), BUG-6 (<S> = .story+.sub), CR4-4, CR4-5; 1 iteration | qa-fix |
 
 <!-- change-log-end -->
 

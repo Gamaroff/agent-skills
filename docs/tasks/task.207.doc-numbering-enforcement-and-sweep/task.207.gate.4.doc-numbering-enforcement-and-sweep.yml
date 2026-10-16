@@ -1,0 +1,86 @@
+schema: 2
+task: 'task.207.doc-numbering-enforcement-and-sweep'
+task_title: 'Doc numbering enforcement and sweep'
+gate: CONCERNS
+status_reason: 'No HIGH. Two MEDIUM: the YAML templates and config comments still render flat epic/story titles and paths (outside §5, which scans Markdown only), and the ingester binding lists do not say that a sub-story <S> is parse .story followed by .sub.'
+reviewer: 'QA Engineer'
+head: '763f1d8c956b573bd8a2626a6ccb5db0e4acb9df'
+updated: '2026-10-16T17:50:08Z'
+
+top_issues:
+  - id: 'TASK-207-BUG-3'
+    severity: medium
+    file: 'skills/prd-template/resources/prd-tmpl.yaml'
+    finding: 'Reopened (CR-1): prd-tmpl.yaml:153,175 and brownfield-prd-tmpl.yaml:249,269 render [Epic N] / [Story E.S] titles; skills-config.yaml:9 and two core-config-reference.yaml:22 comments state epic.{N}/story.{E}.{S}; §5 scans *.md only.'
+    suggested_action: 'Rewrite them to the P.E / P.E.S form and add tracked *.yaml/*.yml to the §5 prose population.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-207-BUG-6'
+    severity: medium
+    file: 'skills/qa-fix/SKILL.md'
+    finding: 'Reopened (CR-3): both binding lists say <S> comes from doc-id parse and carries a sub-story letter, but parse returns story and sub as separate fields; taking .story alone builds story.1.2.3.* for story.1.2.3A and the globs match nothing.'
+    suggested_action: 'State <S> = .story followed by .sub when non-null (or bind the whole .id stem).'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-207-CR4-4'
+    severity: low
+    file: 'skills/documentation-standards-validator/references/story-template.md'
+    finding: 'Line 600 keeps [[Epic N] Name](../epics/epic-[n]-[name].md); a bare N is outside TITLE_HEAD.'
+    suggested_action: 'Rewrite the link.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-207-CR4-5'
+    severity: low
+    file: 'skills/qa-story/SKILL.md'
+    finding: 'Line 102 pairs the three-level pattern with the flat example story.336.1.'
+    suggested_action: 'Use story.1.336.1.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 22
+  phases_verified: 5/5
+  ci: 'fast gate exit 0 on 763f1d8c (.agents/skills moved aside); PR checks not read'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4]
+    phases_with_issues: [3]
+
+bug_resolution:
+  bugs_fixed: 0
+  bugs_reopened: 2
+  verification_method: 'scoped review of the 19 files cycle 3 changed (both test files green, 15/15)'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'No boundary changed since gate 1; relatedDocInfo run record (task.207.qa.1.security.run.json, totals.executed 26) stands.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'BUG-6: sub-story ingestion would match nothing if <S> is taken from .story alone.'
+  maintainability:
+    status: CONCERNS
+    notes: 'BUG-3: YAML/config population outside §5.'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-207-BUG-3 and BUG-6.'
+      refs: ['skills/prd-template/resources/prd-tmpl.yaml', 'skills/qa-fix/SKILL.md', 'tests/doc-id-chokepoint.test.js']
+  future:
+    - action: 'create-epic says a frontmatter milestone: value overrides the milestone, but doc-id epicMeta never reads it (CR-2 — identical on origin/develop, pre-existing).'
+      refs: ['skills/create-epic/SKILL.md', 'shared/resources/doc-id.js']
+    - action: 'Earlier future items: review-pipeline-step-0a cross-block reads, doc-id.parse hardening, create-parallel-stories scheme, §5 dropped-level check (CR3-4).'
+      refs: ['shared/resources/review-pipeline-step-0a-branch-setup.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-207-BUG-3 and BUG-6 fixed']

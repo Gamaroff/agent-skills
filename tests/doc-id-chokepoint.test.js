@@ -526,14 +526,35 @@ const TITLE_HEAD =
 const FLAT_NUMBER =
   /^(?:[NnEe]|[Nn]\s*[+-]\s*\d+|epic|Epic|epicNum|epic_num|epic_number|story|storyNum)$/;
 
+// file → why its TITLE heads may name a relative epic or story number. Inside a PRD the epic
+// and story headings are relative by design — "Epic 1" in a PRD IS epic.{P}.1 (create-prd §
+// "Epic Numbering", and the note in both PRD templates) — so `[Epic {{epic_number}}]` there is
+// correct, and a cycle-3 fix that rewrote it was itself the defect (task.207 QA cycle 4).
+// Filename heads in these files are still checked. An entry whose file no longer carries a
+// relative title head FAILS (§5 stale-entry test).
+const RELATIVE_TITLES = new Map([
+  [
+    "skills/prd-template/SKILL.md",
+    "PRD Section 6 headings — epics and stories numbered within the PRD",
+  ],
+  [
+    "skills/prd-template/resources/prd-tmpl.yaml",
+    "PRD template headings — relative by its own EPIC NUMBERING note",
+  ],
+  [
+    "skills/create-prd/SKILL.md",
+    "the PRD's own Change Log row names the epic by its number within the PRD",
+  ],
+]);
+
 /** The old-scheme placeholder heads on one line, or [] when it states none. */
-function oldPlaceholders(line) {
+function oldPlaceholders(line, { titles = true } = {}) {
   const out = [];
   for (const m of line.matchAll(PLACEHOLDER_HEAD)) {
     const name = m[1] ?? m[2] ?? m[3];
     if (!PRD_PLACEHOLDER.test(name.trim())) out.push(m[0]);
   }
-  for (const m of line.matchAll(TITLE_HEAD)) {
+  for (const m of titles ? line.matchAll(TITLE_HEAD) : []) {
     const name = m[1] ?? m[2] ?? m[3];
     if (FLAT_NUMBER.test(name.trim())) out.push(m[0]);
   }
@@ -569,7 +590,10 @@ const HISTORICAL = new Map([
   ],
 ]);
 
-const PROSE = gitFiles("*.md").filter(
+// Markdown AND the YAML templates and configs that render titles and paths: the PRD templates
+// and config comments kept the flat scheme because the population stopped at *.md (task.207 QA
+// cycle 4, CR-1).
+const PROSE = gitFiles("*.md", "*.yaml", "*.yml").filter(
   (f) =>
     ![...HISTORICAL.keys()].some((h) => f.startsWith(h)) &&
     !f.startsWith("evals/") &&
@@ -594,7 +618,7 @@ test("§5 no canonical prose states an old-scheme placeholder", () => {
       continue;
     }
     text.split("\n").forEach((line, i) => {
-      const heads = oldPlaceholders(line);
+      const heads = oldPlaceholders(line, { titles: !RELATIVE_TITLES.has(f) });
       if (heads.length)
         bad.push(
           `${f}:${i + 1}: [${heads.join(", ")}] ${line.trim().slice(0, 110)}`,
@@ -611,6 +635,28 @@ test("§5 no canonical prose states an old-scheme placeholder", () => {
     "old-scheme placeholder — write story.{P}.{E}.{S} / epic.{P}.{E} (or [P].[E]):\n" +
       bad.join("\n"),
   );
+});
+
+test("§5 every relative-title exemption still names a file with a relative title head", () => {
+  for (const [f, why] of RELATIVE_TITLES) {
+    assert.ok(
+      fs.existsSync(path.join(ROOT, f)),
+      `${f} is exempt but does not exist`,
+    );
+    assert.ok(why.length >= 20, `${f}: the reason is too short to check`);
+    const text = fs.readFileSync(path.join(ROOT, f), "utf8");
+    const still = text
+      .split("\n")
+      .some(
+        (l) =>
+          oldPlaceholders(l).length >
+          oldPlaceholders(l, { titles: false }).length,
+      );
+    assert.ok(
+      still,
+      `${f} has no relative title head left — drop it from RELATIVE_TITLES (${why})`,
+    );
+  }
 });
 
 test("§5 the placeholder check refuses every flat spelling and spares the new ones", () => {

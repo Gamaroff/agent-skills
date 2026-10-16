@@ -373,7 +373,7 @@ Load the prompt from `references/qa-findings-ingester-prompt.md`. Substitute pla
 - `<dir>`: substitute with absolute path to the story or task directory
 - `<mode>`: substitute with `story` or `task`
 - `<pr_review>`: substitute with `PR_REVIEW` — the selected report path, or `none`
-- `<P>`, `<E>`, `<S>` (story mode — the story id's PRD, epic and story numbers from `doc-id.js parse`; a sub-story's `<S>` carries its letter, e.g. `3A`) OR `<id>` (task mode): substitute with the relevant IDs from context
+- `<P>`, `<E>`, `<S>` (story mode — from `doc-id.js parse`: `<P>` = `.prd`, `<E>` = `.epic`, `<S>` = `.story` followed by `.sub` when `.sub` is not null — `story.1.2.3A` gives `<S>` = `3A`, never `3`) OR `<id>` (task mode): substitute with the relevant IDs from context
 
 Dispatch: `Agent(subagent_type="Explore", prompt=<loaded-prompt-with-substitutions>)`
 

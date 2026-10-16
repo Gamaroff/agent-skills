@@ -22,6 +22,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("fs");
 const path = require("path");
+const { sectionOf } = require("./lib/markdown-section");
 
 const ROOT = path.join(__dirname, "..");
 const PROMPT = fs.readFileSync(
@@ -33,11 +34,15 @@ const QA_FIX = fs.readFileSync(
   "utf8",
 );
 
+/**
+ * The section under an exact heading line, to the next heading of the same or a higher
+ * level, fences respected — the shared `sectionOf` (cycle 4, CR-6: a hand-rolled search
+ * ran to the next H2, and a `# comment` inside a bash fence would end a fence-blind one).
+ */
 function section(text, heading) {
-  const start = text.indexOf(heading);
-  assert.ok(start !== -1, `heading not found: ${heading}`);
-  const next = text.indexOf("\n## ", start + heading.length);
-  return text.slice(start, next === -1 ? undefined : next);
+  const lines = sectionOf(text, heading);
+  assert.ok(lines, `heading not found: ${heading}`);
+  return lines.join("\n");
 }
 
 const placeholders = (text) =>
@@ -48,17 +53,32 @@ function bindingList(text) {
   const names = new Set();
   for (const line of text.split("\n")) {
     if (!/^\s*- `<[A-Za-z_]+>`/.test(line)) continue;
-    const head = line.split(":")[0];
-    for (const m of head.matchAll(/`<([A-Za-z_]+)>`/g)) names.add(m[1]);
+    // Every backticked placeholder on the line: a binding line may explain its own
+    // values (`<S>` = `.story` + `.sub`), so cutting at the first colon dropped `<id>`.
+    for (const m of line.matchAll(/`<([A-Za-z_]+)>`/g)) names.add(m[1]);
   }
   return names;
 }
 
-const USED = placeholders(section(PROMPT, "## Artifact Discovery"));
+// The discovery section lives INSIDE the dispatch prompt's own fence (the prompt is one
+// fenced block), so its headings are the prompt's text: slice to the prompt's next `## `.
+function promptSection(text, heading) {
+  const start = text.indexOf(`\n${heading}\n`);
+  assert.ok(start !== -1, `heading not found: ${heading}`);
+  const next = text.indexOf("\n## ", start + heading.length + 1);
+  return text.slice(start, next === -1 ? undefined : next);
+}
+
+const USED = placeholders(promptSection(PROMPT, "## Artifact Discovery"));
 const PROMPT_BINDS = bindingList(
-  section(PROMPT, "## Usage in `/qa-fix` Step 1a"),
+  promptSection(PROMPT, "## Usage in `/qa-fix` Step 1a"),
 );
-const QA_FIX_BINDS = bindingList(section(QA_FIX, "#### Step 1a"));
+const QA_FIX_BINDS = bindingList(
+  section(
+    QA_FIX,
+    "#### Step 1a: Dispatch Findings Ingester Subagent (Primary Path)",
+  ),
+);
 
 test("the discovery section uses a plausible set of placeholders", () => {
   for (const name of ["dir", "P", "E", "S", "id"])

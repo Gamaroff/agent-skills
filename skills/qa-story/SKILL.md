@@ -99,7 +99,7 @@ When given a directory path:
 4. If multiple story files found, use the one matching the directory name
 5. If no story file found, HALT and ask user for the correct path
 
-When given only a story ID (e.g., `story.336.1`) with no path, locate the story directory using the nested pattern: `${PRD_ROOT}/**/epics/*/stories/story.{P}.{E}.{S}.*`
+When given only a story ID (e.g., `story.1.336.1`) with no path, locate the story directory using the nested pattern: `${PRD_ROOT}/**/epics/*/stories/story.{P}.{E}.{S}.*`
 
 **QA Artifacts Creation:**
 

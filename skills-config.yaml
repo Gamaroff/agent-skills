@@ -6,7 +6,7 @@
 #
 # PRD and architecture roots are configurable. The *nested* structure under
 # each root is fixed:
-#   ${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.{name}/stories/story.{E}.{S}.{name}/
+#   ${PRD_ROOT}/{domain}/prd.{P}.{feature}/epics/epic.{P}.{E}.{name}/stories/story.{P}.{E}.{S}.{name}/
 #   ${ARCH_ROOT}/concepts/{coding-standards,tech-stack,source-tree}.md
 
 prd:

@@ -597,7 +597,7 @@ const data = jsonString ? JSON.parse(jsonString) : defaults;
 
 ### Epic Documentation
 
-- [[Epic N] Name](../epics/epic-[n]-[name].md) - Parent epic
+- [[Epic [P].[E]] Name](../../epic.[P].[E].[name].md) - Parent epic
 - [Epic [P].[E] Roadmap](../epics/EPIC-[P].[E]-ROADMAP.md) - Weekly plan
 
 ### Related Stories

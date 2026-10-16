@@ -60,6 +60,20 @@ Rename the substitution lists to `<P>`, `<E>`, `<S>` in both places (bundled cop
 
 **Testing**: `tests/ingester-prompt-placeholders.test.js` 3/3. Mutation: restore `<epic>`, `<story>` in qa-fix Step 1a → the binding-list test red.
 
+### Iteration 2
+
+#### Fix Implementation (In Progress → Ready for QA)
+
+**Date**: 2026-10-16
+
+**Root Cause**: The binding lists said a sub-story's `<S>` 'carries its letter' as if parse's story number did; `doc-id.js parse story.1.2.3A.x.md` returns `story: 3` and `sub: "A"` apart.
+
+**Fix Description**: Both lists now map each placeholder to its parse field: `<P>` = `.prd`, `<E>` = `.epic`, `<S>` = `.story` followed by `.sub` when non-null (`3A`, never `3`). The contract test now reads every backticked placeholder on a binding line, and finds Step 1a by its exact heading with the fence-aware `sectionOf` (CR-6).
+
+**Files Modified**: shared/resources/qa-findings-ingester-prompt.md, skills/qa-fix/SKILL.md, tests/ingester-prompt-placeholders.test.js (+ bundled copies)
+
+**Testing**: `tests/ingester-prompt-placeholders.test.js` 3/3. Mutation: qa-fix Step 1a back to `<epic>`, `<story>` → red.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -67,3 +81,6 @@ Rename the substitution lists to `<P>`, `<E>`, `<S>` in both places (bundled cop
 | 2026-10-16 | New | qa-task | Raised by task.207.qa.3 |
 | 2026-10-16 | In Progress | qa-fix | Fix cycle 3 started |
 | 2026-10-16 | Ready for QA | qa-fix | Fixed in QA fix cycle 3 |
+| 2026-10-16 | Reopened | qa-task | Partial — <S> source ambiguous for a sub-story (parse returns story and sub separately) (task.207.qa.4 CR-3) |
+| 2026-10-16 | In Progress | qa-fix | Fix cycle 4 started |
+| 2026-10-16 | Ready for QA | qa-fix | Fixed in QA fix cycle 4 |
