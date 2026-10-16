@@ -3,7 +3,7 @@
 **Task**: `task.207.doc-numbering-enforcement-and-sweep.md`
 **Run Number**: 1
 **Started**: 2026-10-16 16:40
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -35,9 +35,9 @@ Add the corpus and chokepoint CI guards for hierarchical doc numbering and sweep
 | 2. review-task             | ✅ Done | `task.207.review.{N}.{name}.md` exists (or skip logged)               | review.1: READY TO IMPLEMENT 8/10 (1C/7I/3O, all C+I applied); Planned → Ready for Development | —                    | 2026-10-16T16:44Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | inline (plan + measured surface map); loop audit iter 1: ready-for-review 23/23 @ `a6479024`; `npm run ci` exit 0 (2nd run — 1st failed on 9 tests pinning old literals, fixed) | —                    | 2026-10-16T17:05Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #682: https://github.com/Gamaroff/agent-skills/pull/682 | —                    | 2026-10-16T17:06Z |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.207.qa.{N}.*.md`; `task.207.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.207.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.207.qa.{N}.*.md`; `task.207.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 8 cycles: 5 budgeted → loop-limit escalation → user-extended 6–8; gate 8 PASS 90 (Cosmetic-residue exit); 5c APPROVE (pr-review.1) | —                    | 2026-10-16T20:04Z |
+| 7. finalise                | ✅ Done | `task.207.dod.{N}.*.md`; task `status: accepted`                      | dod.1 ACCEPTED; 8a fix `05322e4f` (relatedDocInfo basename guard); acceptance `56f1b075`; CI 1 SUCCESS @ 05322e4fce56, CI 2 SUCCESS @ 56f1b07555db; #650 closed | —                    | 2026-10-16T20:04Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | implementation report only (acceptance artefacts committed by /finalise 6a) | —                    | 2026-10-16T20:04Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -169,6 +169,29 @@ Add the corpus and chokepoint CI guards for hierarchical doc numbering and sweep
 
 ---
 
+### Step 5c — PR conformance review — 2026-10-16
+
+- `/review-pr --effort medium --comment --no-code`: ✅ APPROVE. One LOW (PC-1: the Section 7 population count was not in the PR description) — fixed during the review: the PR body now carries base `fc69695a` → head `26d2f36c` counts (placeholders 19/11/20 → 0/0/1, literal ids 25/4/3 → 3/1/0) with the reason for every remaining hit.
+- Diff scope: the default `*/references/*` exclusion would have dropped 7 hand-authored references this PR changed; only the 149 AUTO-GENERATED copies were excluded.
+- `ready-for-merge`: stage-disabled. Review report staged for the acceptance commit.
+
+---
+
+### Step 7 — < 2 s bound re-measured on the PR head — 2026-10-16
+
+`uptime` → load average 0.88, 1.41, 1.36. `time command node --test tests/doc-id-chokepoint.test.js evals/shared/tests/doc-numbering-corpus.test.mjs` on `26d2f36c` → 19/19 pass, real 1.262s, user 1.388s. Three further runs: 1231, 1259, 1280 ms. Within the < 2 s bound.
+
+---
+
+### Step 7 — finalise — 2026-10-16
+
+- DoD agents: AC 11/12 (AC5 a recording gap — the < 2 s head measurement is now in dod.1 and this report); security FAIL — `relatedDocInfo` accepted `../`, a newline, NUL and `$(…)` (probe run by /finalise: 12 executed, 4 reproduced; `develop` rejected the first two); compliance NOT_APPLICABLE; docs PASS.
+- Step 8a fix-and-recheck: plain-basename guard + test, commit `05322e4f`; evaluator exit 0 three times; mutation proof redone after a first revert broke the function and the evaluator still accepted it (observation #61); probe re-run 12 executed, 0 reproduced; fast gate exit 0.
+- CI reading 1: SUCCESS @ `26d2f36c65ff` (decision), retaken SUCCESS @ `05322e4fce56` over 5 checks after the fix. CI reading 2: SUCCESS @ `56f1b07555db` over 5 checks (180 s).
+- Acceptance commit `56f1b075` (DoD, sprint review, registry ticked, 5c review + probe record carried). Canonical PR comment and DoD-body PR comment posted; #650 commented, closed (CLOSED confirmed); board `done`: already.
+
+---
+
 ## Issues Log
 
 ### QA Loop Limit Reached — 2026-10-16
@@ -278,7 +301,7 @@ _Track each QA review/fix cycle._
 **Issues Found**: 3 LOW (CR8-1..3), carried to recommendations.future
 **HIGH findings**: 0
 **MEDIUM findings**: 0
-**PR Review**: pending — 5c not yet run
+**PR Review**: ✅ APPROVE — task.207.pr-review.1.doc-numbering-enforcement-and-sweep.md (1 LOW, PC-1, resolved in the PR description)
 **Loop exit**: Cosmetic-residue exit taken — PASS gate at cycle 8 with HIGH 0 for cycles 7 and 8; all 3 open findings are LOW and are carried to the gate's recommendations.future by id (TASK-207-CR8-1, TASK-207-CR8-2, TASK-207-CR8-3). This is a CLEAN exit, not a stall: nothing is blocked and nothing is being accepted over; a full qa-fix cycle for cosmetic findings is what this route exists to avoid.
 **Action**: Proceeding to 5c (PR conformance review)
 
@@ -286,10 +309,14 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-10-16T20:04Z
+**Final Status**: Completed
 **Branch**: `feature/task.207.doc-numbering-enforcement-and-sweep`
 **PR**: https://github.com/Gamaroff/agent-skills/pull/682
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 8 (5 budgeted, escalated on the loop limit; 3 further cycles approved by the user)
+**DoD Summary**: `task.207.dod.1.doc-numbering-enforcement-and-sweep.md` — ACCEPTED
+**Tracker debt**: none
+
+### Completion Summary
+
+Implemented the two guards that hold hierarchical document numbering — `doc-numbering-corpus.test.mjs` over the PRD corpus and `doc-id-chokepoint.test.js` over code and prose — moved the remaining id parsers onto `doc-id.js`, fixed review-epic's step-0a `awk` split, and swept the retired flat scheme out of ~70 skills, shared resources and docs. QA took 8 cycles: each early gate found another spelling of the old scheme, because the sweep population was enumerated by remembered spellings rather than listed first (observation #60); the user extended the loop after the budgeted 5, cycle 6 listed the population before fixing it, and gate 8 passed. /finalise found and fixed one boundary regression (`relatedDocInfo` accepting non-basenames) under Step 8a.
