@@ -26,6 +26,8 @@
 //                                             close a `note` finding on evidence: appends
 //                                             ` — resolved <date> by \`<evidence>\`` to its Filed as
 //                                             cell, the one edit ever made to a written run file
+//   node uat-status.mjs --changed-runs                tracked run files that differ from HEAD (the
+//                                             earlier runs --resolve-finding edited), one per line
 //
 // The /qa-next run state file (default .claude/state/qa-next.state.json under --root; --state <path>
 // overrides) — the single-flight lock and resume record. Its fields and who writes each: STATE_FIELDS.
@@ -122,6 +124,7 @@ const OPTIONS = new Set([
   "--findings",
   "--all",
   "--resolve-finding",
+  "--changed-runs",
   "--by",
   "--date",
   "--state-init",
@@ -1046,6 +1049,38 @@ function cmdResolveFinding(opts) {
   );
 }
 
+// --changed-runs — the tracked run files under <registry dir>/runs that differ from HEAD, one path
+// per line, relative to --root (the directory /qa-next stages from). These are the earlier runs a
+// --resolve-finding edited: the run file this run wrote is untracked, so it is not listed. The
+// registry directory comes from --registry like every other command, never from a second default
+// in the caller (QA cycle 3, CR1: a shell default ignored qaNext.registryPath). Read-only.
+function cmdChangedRuns(opts) {
+  let out;
+  try {
+    out = execFileSync(
+      "git",
+      [
+        "-C",
+        opts.root,
+        "-c",
+        "core.quotePath=false",
+        "diff",
+        "--name-only",
+        "--relative",
+        "HEAD",
+        "--",
+        join(opts.registryDir, "runs"),
+      ],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+    );
+  } catch (e) {
+    die(
+      `--changed-runs needs a git work tree with a commit at ${opts.root}: ${String(e.stderr || e.message).trim()}`,
+    );
+  }
+  process.stdout.write(out);
+}
+
 export function nextItem({ sections }) {
   for (const sec of sections) {
     const r = sec.rows.find((row) => stateKey(row.state) === "untested");
@@ -1818,6 +1853,7 @@ function dispatch(opts) {
     return cmdCell(opts, "--automated", "Automated by");
   if (opts.has("--accept")) return cmdAccept(opts);
   if (opts.has("--resolve-finding")) return cmdResolveFinding(opts);
+  if (opts.has("--changed-runs")) return cmdChangedRuns(opts);
   if (opts.has("--findings")) return cmdFindings(opts);
   return cmdScoreboard(opts);
 }

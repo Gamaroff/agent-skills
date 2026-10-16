@@ -208,13 +208,10 @@ Only if `qaNext.commit` is true. Stage **only** the run file, any earlier run fi
 qa(uat): <id> <pass|fail|blocked> — <Function>
 ```
 
-**The earlier run files to stage are read from the tree, never remembered.** A run that crashed after `phase recorded` resumes here with no record of which run files Step 4.3 edited; the edit itself is the record. The tracked run files git reports changed are exactly those, and the new run file this run wrote is untracked, so it is not in the list:
+**The earlier run files to stage are read from the tree, never remembered.** A run that crashed after `phase recorded` resumes here with no record of which run files Step 4.3 edited; the edit itself is the record. The tool lists the tracked run files that differ from `HEAD` — exactly those, since the new run file this run wrote is untracked — under the registry it is pointed at, so pass `--registry` as for every other call when `qaNext.registryPath` is not the default:
 
 ```bash
-# Earlier run files this run resolved a finding in — tracked files under runs/ that differ from HEAD.
-# REGISTRY_DIR is the registry's directory (default docs/qa).
-REGISTRY_DIR="${REGISTRY_DIR:-docs/qa}"
-git diff --name-only HEAD -- "$REGISTRY_DIR/runs"
+node .agents/skills/qa-next/scripts/uat-status.mjs --changed-runs
 ```
 
 Stage each path it prints with the rest.

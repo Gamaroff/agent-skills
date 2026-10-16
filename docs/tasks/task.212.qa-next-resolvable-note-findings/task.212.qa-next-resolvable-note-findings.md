@@ -125,6 +125,9 @@ nobody has dealt with". A resolved note leaves the count only on evidence a read
     A re-run on a later day must not be refused for the date it defaulted to. This holds only while
     the existing marker verifies; a marker that no longer holds is **replaced** by newly verified
     evidence, so the only writer can repair what it wrote (QA cycle 1, CR-1).
+- **Stage.** `--changed-runs` prints the tracked run files under `<registry dir>/runs` that differ
+  from `HEAD` — the earlier runs `--resolve-finding` edited — for `SKILL.md` Step 5 to stage. The
+  registry directory comes from `--registry`, like every other command (QA cycles 2–3, CR1).
 - **Report.** `--findings` counts valid resolutions as closed. `--findings --all` renders the row's
   label as `[note — resolved <date> by <evidence>]`. `--json` carries `resolution`.
 
@@ -338,26 +341,24 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-16
 **Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.212.qa.2.qa-next-resolvable-note-findings.md](./task.212.qa.2.qa-next-resolvable-note-findings.md)
-- **Gate File**: [task.212.gate.2.qa-next-resolvable-note-findings.yml](./task.212.gate.2.qa-next-resolvable-note-findings.yml)
+- **Full Report**: [task.212.qa.3.qa-next-resolvable-note-findings.md](./task.212.qa.3.qa-next-resolvable-note-findings.md)
+- **Gate File**: [task.212.gate.3.qa-next-resolvable-note-findings.yml](./task.212.gate.3.qa-next-resolvable-note-findings.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 79 (qa-next unit) + 14 security probes
+- **Tests Executed**: 82 (qa-next unit) + 17 security probes
 - **Phases Verified**: 3/3
-- **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 1
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: PASS
 
 ### Key Findings
-- **Cycle 1**: all three findings are fixed, each with a test that fails when the fix is reverted.
-- **Open, MEDIUM**: T212-QA2-CR1. A resumed run has no record of which earlier run files it edited.
-- **Open, LOW**: T212-QA2-CR2 (the writer does not read back the row it wrote) and T212-QA2-CR7 (a run file with an impossible date counts as later).
+T212-QA3-CR1 (HIGH) is open. The Step 5 staging block was added in cycle 2, and it hardcodes the default registry directory. Any project with a different `qaNext.registryPath` therefore never stages the run files that `--resolve-finding` edited. The cycle-2 fixes for CR2 and CR7 hold.
 
 ## Change Log
 <!-- change-log-start -->
@@ -372,6 +373,8 @@ None.
 | 2026-10-16 |         | QA findings fixed — cycle 1, 3 findings (CR-1 stale-marker repair, CR-2 later-by-name, CR-3 duplicate numbers) + 2 low | qa-fix |
 | 2026-10-16 |         | QA gate CONCERNS (80/100) — 3 findings | qa-task |
 | 2026-10-16 |         | QA findings fixed — cycle 2, 3 findings (CR1 Step 5 stages edited runs from the tree, CR2 writer read-back, CR7 real-date run names) + 4 advisory | qa-fix |
+| 2026-10-16 |         | QA gate FAIL (80/100) — 1 finding; status → in-progress | qa-task |
+| 2026-10-16 |         | QA findings fixed — cycle 3, 1 finding (CR1: --changed-runs owns the run-file listing; Step 5 calls it); status → ready-for-review | qa-fix |
 <!-- change-log-end -->
 
 ---

@@ -12,8 +12,9 @@ All notable changes to this project will be documented in this file. Format foll
   `Filed as` cell — the only edit ever made to a written run file — where the evidence is a commit
   sha or a later run file. `--findings` counts a validly resolved note as closed; `--check` reports
   every marker whose evidence does not hold (`commit-not-found`, `not-a-git-repo`, `run-not-found`,
-  `run-is-self`, `run-not-later`, `on-a-bug-link`, `bad-date`, `bad-evidence`). Run files without
-  markers read exactly as before.
+  `run-is-self`, `run-not-later`, `on-a-bug-link`, `bad-date`, `bad-evidence`). `--changed-runs`
+  lists the earlier run files a resolution edited, so `/qa-next` Step 5 stages them even on a
+  resumed run. Run files without markers read exactly as before.
 
 - **One engine for hierarchical document ids, and a PRD registry (task 202).** The new
   `shared/resources/doc-id.js` parses, formats, allocates and checks `prd.{P}`, `epic.{P}.{E}` and

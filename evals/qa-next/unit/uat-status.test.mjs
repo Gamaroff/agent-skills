@@ -3617,7 +3617,7 @@ test("CLI: replacing a stale marker drops every trailing marker and its dash, wh
   rmSync(root, { recursive: true, force: true });
 });
 
-test("SKILL.md Step 5's staging block lists exactly the tracked run files a run edited — executed, not read (task 212, QA cycle 2 CR1)", () => {
+test("SKILL.md Step 5's staging block lists exactly the tracked run files a run edited — executed, not read (task 212, QA cycles 2–3 CR1)", () => {
   const skill = readFileSync(
     path.resolve(__dirname, "../../../skills/qa-next/SKILL.md"),
     "utf8",
@@ -3629,8 +3629,10 @@ test("SKILL.md Step 5's staging block lists exactly the tracked run files a run 
   const blocks = [...step5.matchAll(/```bash\n([\s\S]*?)```/g)].map(
     (m) => m[1],
   );
-  const block = blocks.find((b) => b.includes("git diff --name-only HEAD"));
+  const block = blocks.find((b) => b.includes("--changed-runs"));
   assert.ok(block, "Step 5 carries the tree-derived staging block");
+  // The registry directory is the tool's to resolve; a shell default ignored qaNext.registryPath (QA cycle 3).
+  assert.doesNotMatch(step5, /REGISTRY_DIR/);
   const { root } = gitCorpus();
   const git = (...a) =>
     execFileSync(
@@ -3666,10 +3668,91 @@ test("SKILL.md Step 5's staging block lists exactly the tracked run files a run 
       "| note — resolved 2026-10-16 by `runs/A.5/2026-10-16-lan.md` |",
     ),
   );
-  const out = execFileSync("bash", ["-c", block], {
-    cwd: root,
-    encoding: "utf8",
-  });
+  const out = execFileSync(
+    "bash",
+    [
+      "-c",
+      block.replace(".agents/skills/qa-next/scripts/uat-status.mjs", TOOL),
+    ],
+    { cwd: root, encoding: "utf8" },
+  );
   assert.equal(out, "docs/qa/runs/A.4/2026-10-15-lan.md\n");
+  rmSync(root, { recursive: true, force: true });
+});
+
+test("CLI: --changed-runs lists the edited run files under the registry it is given, not under docs/qa (task 212, QA cycle 3 CR1)", () => {
+  const { root } = gitCorpus();
+  const git = (...a) =>
+    execFileSync(
+      "git",
+      [
+        "-c",
+        "user.email=qa@example.invalid",
+        "-c",
+        "user.name=qa",
+        "-c",
+        "commit.gpgsign=false",
+        ...a,
+      ],
+      { cwd: root, encoding: "utf8" },
+    );
+  const REGISTRY = "quality/uat/uat-registry.md";
+  const put = (rel, text) => {
+    const p = path.join(root, rel);
+    mkdirSync(path.dirname(p), { recursive: true });
+    writeFileSync(p, text);
+  };
+  put(
+    "quality/uat/runs/A.1/2026-10-15-lan.md",
+    findingsFile(["| 1 | /a | x | Minor | note |"]),
+  );
+  put(
+    "docs/qa/runs/A.1/2026-10-15-lan.md",
+    findingsFile(["| 1 | /a | x | Minor | note |"]),
+  );
+  git("add", "-A");
+  git("commit", "-q", "-m", "runs");
+  put(
+    "quality/uat/runs/A.1/2026-10-16-lan.md",
+    findingsFile(["| 1 | /b | y | Minor | note |"]),
+  );
+  assert.equal(
+    run(
+      root,
+      "--registry",
+      REGISTRY,
+      "--resolve-finding",
+      "runs/A.1/2026-10-15-lan.md",
+      "1",
+      "--by",
+      "runs/A.1/2026-10-16-lan.md",
+    ).code,
+    0,
+  );
+  // A stray edit under the default directory is not this registry's and is not listed.
+  put("docs/qa/runs/A.1/2026-10-15-lan.md", "edited\n");
+  const r = run(root, "--registry", REGISTRY, "--changed-runs");
+  assert.equal(r.code, 0, r.out);
+  assert.equal(r.out, "quality/uat/runs/A.1/2026-10-15-lan.md\n");
+  rmSync(root, { recursive: true, force: true });
+});
+
+test("CLI: --changed-runs outside a git work tree is a refusal, not an empty list (task 212)", () => {
+  const root = corpus();
+  const env = { ...process.env, GIT_CEILING_DIRECTORIES: path.dirname(root) };
+  let code = 0;
+  let out = "";
+  try {
+    out = execFileSync("node", [TOOL, "--root", root, "--changed-runs"], {
+      encoding: "utf8",
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  } catch (e) {
+    code = e.status;
+    out = `${e.stdout ?? ""}${e.stderr ?? ""}`;
+  }
+  assert.equal(code, 2, out);
+  assert.match(out, /--changed-runs needs a git work tree/);
   rmSync(root, { recursive: true, force: true });
 });
