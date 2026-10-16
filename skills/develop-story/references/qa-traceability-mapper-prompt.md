@@ -23,7 +23,7 @@ Read-only pre-QA mapping pass. Runs in an Explore subagent so grep output and fi
 ```markdown
 # QA Traceability Matrix
 
-**Story** (or **Task**): story.{epic}.{story}.{name}.md / task.{id}.{name}.md
+**Story** (or **Task**): story.{P}.{E}.{S}.{name}.md / task.{id}.{name}.md
 **Generated**: {YYYY-MM-DD}
 
 | Criterion | Spec files | Src files | Coverage | Uncertainty |

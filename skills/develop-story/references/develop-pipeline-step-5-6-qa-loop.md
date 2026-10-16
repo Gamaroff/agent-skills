@@ -157,7 +157,7 @@ fi
 An empty `QA_CYCLE` (and so an empty `LATEST_GATE`) means no QA run has written a gate yet.
 
 > The helper reads every `*.gate.*.yml` in the directory. The story form this replaced was keyed on
-> the story's own stem (`story.{epic}.{story}.gate.*`); no co-located bug writes a gate today, and a
+> the story's own stem (`story.{P}.{E}.{S}.gate.*`); no co-located bug writes a gate today, and a
 > stem filter for the helper is a recorded follow-up (task.149 gate 8 CR-2).
 
 **Note (tasks only)**: The legacy path `docs/qa/gates/tasks/` is deprecated. qa-task v2.0 co-locates gate files in the task directory alongside the task document.
@@ -1101,7 +1101,7 @@ working tree, where a branch switch loses it and no reader of the PR ever sees i
    Committing here rather than at the Step 7 transition is load-bearing twice over: 5c reads the
    artifact trail **off the branch**, so an uncommitted gate is invisible to the very review that
    audits it; and if 5c returns `REQUEST CHANGES`, the Step 7 transition never happens on this
-   cycle. Message: `docs(story.{epic}.{story}): QA cycle {N} gate + report` (or `docs(task.{id}): …`).
+   cycle. Message: `docs(story.{P}.{E}.{S}): QA cycle {N} gate + report` (or `docs(task.{id}): …`).
 
    > **This is the one path on which a cycle commits twice, and the push budget is what matters.**
    > A `REQUEST CHANGES` verdict re-enters 5b *inside the same cycle N*, and 5b then makes its own
@@ -1188,7 +1188,7 @@ After fixes are applied:
 
    **Bound this retry at 2 attempts.** After a second red gate in the same cycle, stop retrying:
    **commit the attempt without pushing** — `fix(task.{id}): qa-fix cycle {N} — fast gate red, not
-   pushed` (or `fix(story.{epic}.{story}): …`), carrying this cycle's gate and QA report as step
+   pushed` (or `fix(story.{P}.{E}.{S}): …`), carrying this cycle's gate and QA report as step
    0-stage staged them, with the implementation report still excluded per step 1 — record the
    failing output in the QA Iteration History, and let the cycle end so the next QA review writes a
    gate. Skip step 3's push: the next push — the next cycle's, or the one before its 5c — carries
@@ -1218,13 +1218,13 @@ After fixes are applied:
    git reset HEAD -- '**/task.*.implementation.*.md' 2>/dev/null || true
    ```
 
-   Then invoke `/commit-changes` with an explicit `exclude` directive in the prompt: pass `exclude=story.{epic}.{story}.implementation.*.md` (or `task.{id}.implementation.*.md`). The skill respects the directive and will not re-stage the report.
+   Then invoke `/commit-changes` with an explicit `exclude` directive in the prompt: pass `exclude=story.{P}.{E}.{S}.implementation.*.md` (or `task.{id}.implementation.*.md`). The skill respects the directive and will not re-stage the report.
 
    Conventional Commits message:
 
    #### develop-story
 
-   `fix(story.{epic}.{story}): qa-fix cycle {N} — {brief summary of fixes}`
+   `fix(story.{P}.{E}.{S}): qa-fix cycle {N} — {brief summary of fixes}`
 
    #### develop-task
 
@@ -1914,7 +1914,7 @@ and QA report get committed** in 5b):
 
 #### develop-story escalation commit
 
-Suggested commit message: `docs(story.{epic}.{story}): implementation report — qa loop escalation`
+Suggested commit message: `docs(story.{P}.{E}.{S}): implementation report — qa loop escalation`
 
 #### develop-task escalation commit
 

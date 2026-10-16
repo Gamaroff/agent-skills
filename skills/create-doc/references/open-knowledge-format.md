@@ -62,7 +62,7 @@ Existing `docs/` documents are **not** retrofitted — adoption is going-forward
 
 These OKF features are deliberately **not** adopted, because existing repo conventions already serve their purpose:
 
-- **Reserved `index.md` / `log.md` per directory** — the global registries (`docs/tasks/task-registry.md`, `docs/development/epic-registry.md`) and the inline Change-Log tables already serve discovery and history.
+- **Reserved `index.md` / `log.md` per directory** — the global registries (`docs/tasks/task-registry.md`, `${PRD_ROOT}/prd-registry.md`) and the inline Change-Log tables already serve discovery and history.
 - **Bundle-relative `/...` cross-links** — the repo uses relative links and frontmatter references; the bundler (`npm run bundle`) rewrites `shared/resources/*` paths into each skill.
 - **`okf_version` in a root `index.md`** — the conformance version is declared here (`okf_version: "0.1"`) instead of in a per-bundle root index.
 

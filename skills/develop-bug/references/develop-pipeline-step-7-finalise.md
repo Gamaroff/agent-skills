@@ -60,7 +60,7 @@ Log each gap with specific detail in Issues Log. Invoke the `/commit-changes` sk
 
 #### develop-story
 
-Suggested commit message: `docs(story.{epic}.{story}): implementation report — finalise gaps identified`
+Suggested commit message: `docs(story.{P}.{E}.{S}): implementation report — finalise gaps identified`
 
 #### develop-task
 
@@ -555,7 +555,7 @@ Locate the DoD summary file created by finalise:
 #### develop-story
 
 ```bash
-find {story-directory} -maxdepth 1 -name "story.{epic}.{story}.dod.*.md" 2>/dev/null | sed -E 's/^(.*\.dod\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-
+find {story-directory} -maxdepth 1 -name "story.{P}.{E}.{S}.dod.*.md" 2>/dev/null | sed -E 's/^(.*\.dod\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-
 ```
 
 #### develop-task
