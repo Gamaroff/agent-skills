@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Major'
 priority: 'Medium'
 created: '2026-10-16'
@@ -12,7 +12,7 @@ description: 'bug-doc rejects a story bug whose slug starts with a digit'
 
 **Bug ID**: TASK-206-BUG-3
 **Related**: [task.206.hierarchical-story-ids-in-pipeline.md](./task.206.hierarchical-story-ids-in-pipeline.md) (QA finding CR-4, gate 1)
-**Status**: Ready for QA
+**Status**: Closed
 **Priority**: Medium
 **Severity**: Major
 **Created**: 2026-10-16
@@ -64,3 +64,4 @@ Take the parent id from doc-id but read the `.bug.{n}.{slug}` remainder with the
 | 2026-10-16 | New | qa-task | Filed from QA cycle 1 (CR-4) |
 | 2026-10-16 | In Progress | qa-fix | Investigation (QA cycle 1 fix) |
 | 2026-10-16 | Ready for QA | qa-fix | Fixed — see Developer Fix Cycle, iteration 1 |
+| 2026-10-16 | Closed | qa-task | Verified by task.206.qa.2.hierarchical-story-ids-in-pipeline.md |

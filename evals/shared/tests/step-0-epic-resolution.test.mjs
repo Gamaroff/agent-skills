@@ -10,6 +10,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { execFileSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 import {
@@ -158,6 +159,29 @@ for (const shell of SHELLS) {
     assert.doesNotMatch(r.stdout, /epic\.2\.2\.search/);
   });
 
+  test(`${shell}: Step 0 still resolves the epic when find meets an unreadable directory under docs/ — pipefail fails only on the filter (task.206 QA cycle 2, CR2-6)`, () => {
+    const cwd = consumer({
+      ...TWO_PRDS,
+      [STORY_REL]: story("epic.1.2.payments"),
+    });
+    const locked = path.join(cwd, "docs/prd/locked");
+    fs.mkdirSync(locked, { recursive: true });
+    fs.chmodSync(locked, 0o000);
+    try {
+      const r = run(shell, bind(RESOLVE, { "{story-file}": STORY_REL }), {
+        cwd,
+      });
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+      assert.match(
+        r.stdout,
+        /epic 1\.2: docs\/prd\/web\/prd\.1\.app\/epics\/epic\.1\.2\.payments\/epic\.1\.2\.payments\.md$/m,
+      );
+    } finally {
+      fs.chmodSync(locked, 0o755);
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
   test(`${shell}: Step 0 HALTs on two epic documents claiming (P, E), listing both — never head -1`, () => {
     const r = resolve(shell, {
       ...TWO_PRDS,
@@ -203,14 +227,31 @@ for (const shell of SHELLS) {
         ids.stdout,
         /^story story\.1\.2\.3 — PRD 1, epic 2, story 3$/m,
       );
-      const skip = (branch) =>
-        run(
+      // 0a.3 ALONE — its own shell, as an agent runs it, on a REAL checked-out branch: it must
+      // derive STORY_STEM (QA cycle 1, CR-8) and read the branch itself (QA cycle 2, CR2-1).
+      // Only DOC_FILE, the documented input, is bound — never CURRENT_BRANCH.
+      const g = (...a) =>
+        execFileSync("git", ["-C", cwd, ...a], { stdio: "ignore" });
+      g("init", "-q", "-b", "develop");
+      g(
+        "-c",
+        "user.email=t@t",
+        "-c",
+        "user.name=t",
+        "commit",
+        "-q",
+        "--allow-empty",
+        "-m",
+        "init",
+      );
+      const skip = (branch) => {
+        g("checkout", "-q", "-B", branch);
+        return run(
           shell,
-          // 0a.3 ALONE — its own shell, as an agent runs it: it must derive STORY_STEM itself
-          // (task.206 QA cycle 1, CR-8). Only its inputs are bound.
-          `DOC_FILE=${STORY_REL}\nCURRENT_BRANCH='${branch}'\nAUTO_SKIPPED=false\n${REVIEW_SKIP}\necho "AUTO_SKIPPED=$AUTO_SKIPPED"`,
+          `DOC_FILE=${STORY_REL}\nAUTO_SKIPPED=false\n${REVIEW_SKIP}\necho "AUTO_SKIPPED=$AUTO_SKIPPED"`,
           { cwd },
         ).stdout;
+      };
       assert.match(skip("feature/story.1.2.3.charge"), /AUTO_SKIPPED=true/);
       for (const other of [
         "feature/story.1.2.30.charge", // a story whose number extends this one's
@@ -386,7 +427,15 @@ for (const shell of SHELLS) {
         /^ID=1\.2\.3 M=Epic 1\.2 — Payments$/m,
         create.stderr,
       );
-      // A document that is not a story stops the block before any tracker call.
+      // A document that is not a story stops each block before any tracker call — the dedup
+      // block before it searches (QA cycle 2, QA2-2) as well as the edit block.
+      const badDedup = run(
+        shell,
+        `STORY_FILE_PATH=${EPIC_DIR}/epic.1.2.payments.md\n${upTo(ENSURE_DEDUP, "DEDUP=")}\necho REACHED`,
+        { cwd },
+      );
+      assert.equal(badDedup.status, 1);
+      assert.doesNotMatch(badDedup.stdout, /REACHED/);
       const bad = run(
         shell,
         `STORY_FILE_PATH=${EPIC_DIR}/epic.1.2.payments.md\n${upTo(SYNC_5B, "mkdir -p .claude/state")}\necho REACHED`,

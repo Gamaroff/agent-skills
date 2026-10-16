@@ -2894,7 +2894,7 @@ test("storyIds collects P.E.S and sub-story tokens whole, so a Stories cell neve
   ]);
 });
 
-test("CLI: --check and --coverage COUNT an unreadable story and an old-shape surface key in their own output, not only on stderr (task.206 QA cycle 1, CR-9)", () => {
+test("CLI: --check FAILS on, and --coverage COUNTS, an unreadable story and an old-shape surface key in their own output, not only on stderr (task.206 QA cycle 1, CR-9)", () => {
   const root = corpus();
   run(root, "--init");
   const legacy = path.join(
@@ -2913,13 +2913,18 @@ test("CLI: --check and --coverage COUNT an unreadable story and an old-shape sur
   const check = run(root, "--check");
   assert.match(
     check.out,
-    /\[warn \] .*story\.9\.1\.s\.md: not a story id doc-id can read/,
+    /\[ERROR\] .*story\.9\.1\.s\.md: not a story id doc-id can read/,
   );
   assert.match(
     check.out,
-    /\[warn \] .*epicSurface key "5" is not an epic id P\.E/,
+    /\[ERROR\] .*epicSurface key "5" is not an epic id P\.E/,
   );
-  assert.match(check.out, /uat-check: \d+ error\(s\), [1-9]\d* warning\(s\)/);
+  assert.match(check.out, /uat-check: [2-9]\d* error\(s\)/);
+  assert.equal(
+    check.code,
+    1,
+    "an unreadable story fails --check, which qa-next gates on (QA cycle 2, CR2-4)",
+  );
   const cov = JSON.parse(run(root, "--coverage", "--json").out);
   assert.equal(cov.warnings.length, 2, JSON.stringify(cov.warnings));
   const text = run(root, "--coverage").out;

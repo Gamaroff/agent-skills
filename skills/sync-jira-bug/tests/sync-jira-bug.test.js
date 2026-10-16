@@ -78,6 +78,11 @@ test("a sub-story bug resolves to its sub-story parent, and a legacy two-number 
     bug.resolveBugMode("/x/story.1.2.3.x.bug.1.y.md").mode,
     "unknown",
   );
+  // A prefix doc-id reads as a story ARTIFACT (the plan) is not a story id either (QA cycle 2, QA2-1).
+  assert.equal(
+    bug.resolveBugMode("/x/story.1.2.3.plan.bug.1.y.md").mode,
+    "unknown",
+  );
   // A legacy name: doc-id cannot read it, so no parent is invented for it.
   const legacy = bug.resolveBugMode("/x/story.7.4.bug.4.tap-target.md");
   assert.equal(legacy.mode, "unknown");

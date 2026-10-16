@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Major'
 priority: 'Medium'
 created: '2026-10-16'
@@ -12,7 +12,7 @@ description: 'create-story's uniqueness check throws ENOENT for an epic's first 
 
 **Bug ID**: TASK-206-BUG-4
 **Related**: [task.206.hierarchical-story-ids-in-pipeline.md](./task.206.hierarchical-story-ids-in-pipeline.md) (QA finding CR-5, gate 1)
-**Status**: Ready for QA
+**Status**: Closed
 **Priority**: Medium
 **Severity**: Major
 **Created**: 2026-10-16
@@ -64,3 +64,4 @@ Pass an empty list when the directory is missing (existsSync), so only a real co
 | 2026-10-16 | New | qa-task | Filed from QA cycle 1 (CR-5) |
 | 2026-10-16 | In Progress | qa-fix | Investigation (QA cycle 1 fix) |
 | 2026-10-16 | Ready for QA | qa-fix | Fixed — see Developer Fix Cycle, iteration 1 |
+| 2026-10-16 | Closed | qa-task | Verified by task.206.qa.2.hierarchical-story-ids-in-pipeline.md |

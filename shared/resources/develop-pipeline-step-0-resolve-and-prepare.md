@@ -64,7 +64,9 @@ EPIC_REF_JSON=$(command node "$DOC_ID" parse "$EPIC_REF" --json) \
 EPIC_SLUG=$(printf '%s' "$EPIC_REF_JSON" | jq -r '.slug')
 
 # The epic document of (P, E): matchesEpic over every epic.*.md under docs/, artifacts excluded.
-EPIC_FILES=$(find docs -type f -name 'epic.*.md' 2>/dev/null | command node -e '
+# find's own non-zero exit (an unreadable subdirectory) must not trip pipefail: only the node filter's
+# failure is a "could not list" (task.206 QA cycle 2, CR2-6).
+EPIC_FILES=$({ find docs -type f -name 'epic.*.md' 2>/dev/null || true; } | command node -e '
   const d = require(process.argv[1]);
   const [P, E] = [Number(process.argv[2]), Number(process.argv[3])];
   for (const f of require("fs").readFileSync(0, "utf8").split("\n").filter(Boolean)) {

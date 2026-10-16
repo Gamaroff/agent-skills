@@ -103,7 +103,7 @@ REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
 OWNER=$(grep '^ *owner:' project.yml | head -1 | awk '{print $(2)}')
 PROJECT_NUM=$(grep 'project_board_number:' project.yml | awk '{print $(2)}')
 PROJECT_NAME=$(grep 'project_board_name:' project.yml | sed -E 's/.*: *"?([^"]+)"?/\1/')
-# MILESTONE_TITLE comes from Step S1's block (`doc-id.js epic-meta`) — `Epic P.E — {title}`, or empty.
+# Each block that reads MILESTONE_TITLE derives it itself (`doc-id.js epic-meta`) — `Epic P.E — {title}`, or empty.
 # Prefer the current branch's remote-tracking branch (strip the remote prefix),
 # so the link points at the branch where the work lives. Fall back to the repo's
 # default branch when there is no upstream / HEAD is detached, then to `develop`.

@@ -5,7 +5,7 @@ type: task
 description: "Move every story-side reader and writer of story and epic identifiers (create-story, the Step 0 and 0a shell snippets, create-branch, session-handoff, qa-next, the tracker story syncs, select-next and the finalise artifact regex) off its own regex and onto the task.202 doc-id engine, so the pipeline runs end to end on story.{P}.{E}.{S} documents and feature/story.{P}.{E}.{S} / epic/{P}.{E} branches."
 tags: [doc-id, numbering, create-story, develop-story, create-branch, session-handoff, qa-next, develop-next, migration]
 category: refactoring
-status: ready-for-review
+status: in-progress
 priority: Medium
 created: 2026-10-13
 updated: 2026-10-16
@@ -16,7 +16,7 @@ github_issue: 649
 
 # Technical Task: Hierarchical story ids in the pipeline
 
-**Status:** Ready for Review
+**Status:** In Progress
 
 **Review**: ✅ All review recommendations from `task.206.review.1.hierarchical-story-ids-in-pipeline.md` implemented 2026-10-16
 
@@ -566,6 +566,12 @@ every new executable block is mutation-proved (implementation report, Decisions 
   `develop/SKILL.md`, `qa-fix/SKILL.md`, `qa-story/SKILL.md`, `review-bug/SKILL.md` (population:
   `git grep -l -F 'story.{epic}.{story}.bug'` over skills and shared resources, generated copies
   excluded) — task.207's placeholder sweep. `bug-doc.js`, the one code reader, is fixed.
+- **Cross-block reads in neighbouring blocks (QA cycle 2).** The task, bug and epic 0a.3 variants
+  read `TASK_ID` / `BUG_PREFIX` / `EPIC_NUM` and `CURRENT_BRANCH` from 0a.1 / 0a.2 (unchanged since
+  before this task; only the review-story stanza is in scope). The ensure-story create block and the
+  sync-github-story Step 5b block still read `STORY_TITLE`, `DOC_URL`, `STORY_RELATIVE_PATH`,
+  `NEW_BODY` and `ISSUE_NUM` without binding them — pre-existing on the base (no block anywhere sets
+  `STORY_TITLE`; QA cycle 2 CR2-2 / CR2-3). A follow-up should make those blocks self-binding.
 - The remaining `story.{epic}.{story}` placeholders in `develop-story/SKILL.md`, the Step 1 lock
   template, `qa-story`, `qa-fix`, `develop` and other prose are task.207's sweep, as § 4 states.
 - Post-merge consumer smoke test (§ 8, Consumer tests): `/create-prd` → `/create-epic` → `/create-story`
@@ -573,24 +579,24 @@ every new executable block is mutation-proved (implementation report, Decisions 
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-16
-**Quality Score**: 60/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 80/100
+**Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.206.qa.1.hierarchical-story-ids-in-pipeline.md](./task.206.qa.1.hierarchical-story-ids-in-pipeline.md)
-- **Gate File**: [task.206.gate.1.hierarchical-story-ids-in-pipeline.yml](./task.206.gate.1.hierarchical-story-ids-in-pipeline.yml)
+- **Full Report**: [task.206.qa.2.hierarchical-story-ids-in-pipeline.md](./task.206.qa.2.hierarchical-story-ids-in-pipeline.md)
+- **Gate File**: [task.206.gate.2.hierarchical-story-ids-in-pipeline.yml](./task.206.gate.2.hierarchical-story-ids-in-pipeline.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5752
+- **Tests Executed**: 5755
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0
+- **Critical Issues**: 1
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Four medium high-confidence bugs gate the cycle (CR-1, CR-2, CR-4, CR-5) plus one low (CR-8): three executable blocks read a value only another block binds, bug-doc rejects a digit-led story-bug slug, and create-story's uniqueness check throws for an epic's first story. Bug reports task.206.bug.1–4.
+Refute pass: cycle 1's five fixes hold (bugs 1–4 closed), but Step 0a.3 still reads CURRENT_BRANCH that only 0a.1 binds (high — bug.5). Two mutation test gaps (low).
 
 ## Change Log
 
@@ -604,6 +610,8 @@ Four medium high-confidence bugs gate the cycle (CR-1, CR-2, CR-4, CR-5) plus on
 | 2026-10-16 |  | Implemented — 141 non-generated files (11 code sites, 9 executable blocks, 9 migrated + 3 hand-renamed fixture trees), 1 new suite + 15 updated test files; ci:fast 5752/0 | develop |
 | 2026-10-16 |  | QA gate CONCERNS (60/100) — 4 medium + 1 low gated findings, 7 advisory | qa-task |
 | 2026-10-16 |  | QA findings fixed — 5 gated (CR-1, CR-2/3, CR-4, CR-5, CR-8) + 5 advisory (CR-6 writers, CR-7, CR-9, CR-10, CR-11/12), 1 iteration | qa-fix |
+| 2026-10-16 |  | QA gate FAIL (80/100) — 1 high (0a.3 CURRENT_BRANCH), 2 low test gaps; bugs 1–4 closed | qa-task |
+| 2026-10-16 |  | QA findings fixed — CR2-1 (0a.3 binds CURRENT_BRANCH), QA2-1/QA2-2 test gaps, advisory CR2-4..7, 1 iteration | qa-fix |
 
 <!-- change-log-end -->
 

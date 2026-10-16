@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Major'
 priority: 'Medium'
 created: '2026-10-16'
@@ -12,7 +12,7 @@ description: 'sync-github-story's edit block reads STORY_ID that only Step 3's b
 
 **Bug ID**: TASK-206-BUG-1
 **Related**: [task.206.hierarchical-story-ids-in-pipeline.md](./task.206.hierarchical-story-ids-in-pipeline.md) (QA finding CR-1, gate 1)
-**Status**: Ready for QA
+**Status**: Closed
 **Priority**: Medium
 **Severity**: Major
 **Created**: 2026-10-16
@@ -64,3 +64,4 @@ Re-derive STORY_ID with `doc-id.js parse` inside the Step 5b block (refuse an em
 | 2026-10-16 | New | qa-task | Filed from QA cycle 1 (CR-1) |
 | 2026-10-16 | In Progress | qa-fix | Investigation (QA cycle 1 fix) |
 | 2026-10-16 | Ready for QA | qa-fix | Fixed — see Developer Fix Cycle, iteration 1 |
+| 2026-10-16 | Closed | qa-task | Verified by task.206.qa.2.hierarchical-story-ids-in-pipeline.md |

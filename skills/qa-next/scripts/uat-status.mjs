@@ -154,8 +154,9 @@ export function loadSurfaces(opts) {
   cfg.excludedPrds ??= [];
   cfg.defaultSurface ??= cfg.surfaces.at(-1).letter;
   cfg.uatSpecPattern ??= "^apps/portal/e2e/(smoke|uat)/";
-  // Reported by the command that reads them: --check and --coverage count them in
-  // their output, every other command prints them to stderr (loadStories).
+  // Reported by the command that reads them: --check fails on them and --coverage
+  // counts them; commands that read stories print them to stderr (loadStories);
+  // --init, --run-path, --set and --accept read no story and do not report them.
   cfg.warnings = surfaceKeyWarnings(cfg, opts.surfaces);
   return cfg;
 }
@@ -754,7 +755,10 @@ function cmdCheck(opts) {
     cfg,
     exists,
   );
-  warns.unshift(...scan.warnings);
+  // An unreadable story or a legacy surface key makes coverage a claim about the
+  // wrong set of stories, and qa-next gates on this exit code: an ERROR, so the
+  // registry is never tested on top of a scan that could not read it (CR2-4).
+  errors.unshift(...scan.warnings);
   errors.push(...checkFindings(loadFindings(opts)));
   for (const w of warns) console.log(`[warn ] ${w}`);
   for (const e of errors) console.log(`[ERROR] ${e}`);

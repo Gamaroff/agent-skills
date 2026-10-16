@@ -129,6 +129,9 @@ If `CURRENT_BRANCH` already matches the doc's expected feature-branch pattern, s
 STORY_STEM=$(command node "$PWD/.agents/skills/review-story/references/doc-id.js" parse "$(basename "$DOC_FILE")" --json \
   | jq -r 'select(.kind == "story") | .id')
 [ -n "$STORY_STEM" ] || { echo "❌ $(basename "$DOC_FILE") is not a story id doc-id can read"; exit 1; }
+# CURRENT_BRANCH too — 0a.1's block is another shell; unbound, the case below never matches and the
+# auto-skip silently never fires (task.206 QA cycle 2, CR2-1). Empty on a detached HEAD: no skip.
+CURRENT_BRANCH=$(git branch --show-current)
 case "$CURRENT_BRANCH" in
   "feature/${STORY_STEM}."*)
     BRANCH_NAME="$CURRENT_BRANCH"; AUTO_SKIPPED=true ;;
