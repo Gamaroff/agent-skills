@@ -35,9 +35,9 @@ Make every pipeline step that dispatches a read-only Explore subagent the only w
 | 2. review-task             | ✅ Done    | `task.189.review.{N}.{name}.md` exists (or skip logged)               | `task.189.review.1.read-only-agents-never-write.md` — READY TO IMPLEMENT 9/10 after 7 Important fixes; Planned → Ready for Development | — (pre-pass B/C inline in review) | 2026-10-16T20:32Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan + surface map); 1 iteration; audit ready-for-review 17/17; ci:fast 5797/0 | `.summaries/step-3-loop-audit-1.json` | 2026-10-16T21:09Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #683: https://github.com/Gamaroff/agent-skills/pull/683 | — | 2026-10-16T21:12Z |
-| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.189.qa.{N}.*.md`; `task.189.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 6 cycles (5 + 1 granted), HIGH 0 throughout; loop limit — half-cycle declined (medium-not-falling); escalated | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.189.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.189.qa.{N}.*.md`; `task.189.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 6 cycles (5 + 1 granted), HIGH 0 throughout; loop limit — half-cycle declined (medium-not-falling); escalated, then accepted by the operator; 5c by hand → CONCERNS (`task.189.pr-review.1.read-only-agents-never-write.md`) | —                    | 2026-10-16T23:13Z |
+| 7. finalise                | ✅ Done | `task.189.dod.{N}.*.md`; task `status: accepted`                      | `task.189.dod.1.read-only-agents-never-write.md` — ACCEPTED with conditions; acceptance commit `72f95ddd` | — (4 DoD agents inline) | 2026-10-16T23:13Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | this report's final commit | —                    | 2026-10-16T23:13Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -103,6 +103,20 @@ Make every pipeline step that dispatches a read-only Explore subagent the only w
 - Operator chose "Resume at 5a with 1 more cycles" (passed as the `/develop-task` argument; AskUserQuestion not called — the answer was given up front).
 - QA loop re-entry: 1 extra cycles granted; 0 cycle(s) run outside the loop back-filled from disk (highest gate 5, 5 `### QA Cycle` entries). `grant-qa-cycles.sh`: lock restored from the halt snapshot; `qa_max_cycles=6`, `reenter_at=5a`.
 - Traceability matrix reused from cycle 1 (`.summaries/qa-traceability-matrix.md`), as cycles 2–5 did; mapper not re-dispatched.
+
+### Accept Current State — 2026-10-17
+
+- After the second loop-limit escalation the operator chose the halt message's option 2 ("go ahead"): accept the current gate status, run Step 5c by hand, then `/finalise`. The loop did not reach 5c through a route; this is the authorised exit, not a skipped one.
+- Step 5c run by hand: `/review-pr 683 --effort medium --comment --no-code` → ⚠️ CONCERNS (`task.189.pr-review.1.read-only-agents-never-write.md`; PC-1, PC-2 medium trail; PC-3, PC-4 low). PR comment posted.
+- Residue accepted: CR6-1's fix (`2117b908`) is mutation-proven but no gate has read it; bug.6 stays Ready for QA for `/finalise` to judge (PC-2).
+
+### Step 7 — finalise (by hand, option 2) — 2026-10-17
+
+- `/finalise` run standalone after the operator's accept: 4 DoD agents — AC ✅ PASS (9/9, every test per PR), Security ✅ PASS (boundary: true; Step 3b.1 ran the agent's 2-control plan: 30 executed, 0 reproduced, record `task.189.dod.1.security.run.json`), Compliance N/A, Docs ✅ PASS.
+- Decision: ACCEPTED with conditions — gate 6 CONCERNS judged non-blocking (one test-machinery entry, fixed and mutation-proven); bug.6 carried at Ready for QA; CR6-2 and CR3-4 advisory.
+- CI reading 1: SUCCESS @ c94e47eba9b7 (5 checks); CI reading 2: SUCCESS (tree-equivalent to c94e47eba9b7) @ 72f95dddf373 — the acceptance commit is docs-only.
+- Task: `status: accepted`, Change Log 1.2, § 9 Functional criteria ticked (5c PC-4), `updated: 2026-10-17` (PC-3). Registry row ticked. Sprint review summary written.
+- PR canonical summary posted. GitHub #588: Document link already on develop; `done` comment posted; issue CLOSED (verified); board `done` → already.
 
 ---
 
@@ -250,10 +264,10 @@ The pipeline completed 6 qa-task/qa-fix cycles (5 + 1 granted) without a clean P
 
 ## Completion
 
-**Finished**: 2026-10-17 (HALT — QA loop limit, after a 1-cycle grant)
-**Final Status**: Escalated
+**Finished**: 2026-10-17 (accepted after the QA loop limit — operator chose option 2)
+**Final Status**: Accepted (with conditions — see Step 7 above)
 **Branch**: feature/task.189.read-only-agents-never-write
 **PR**: https://github.com/Gamaroff/agent-skills/pull/683
 **QA Iterations**: 6 (loop limit, 5 + 1 granted)
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**DoD Summary**: `task.189.dod.1.read-only-agents-never-write.md`
+**Tracker debt**: none
