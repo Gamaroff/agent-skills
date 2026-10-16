@@ -1236,24 +1236,24 @@ function makeStoryDir(files) {
     os = require("os"),
     path = require("path");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "related-docs-"));
-  const storyDir = path.join(dir, "story.2.4.demo");
+  const storyDir = path.join(dir, "story.1.2.4.demo");
   fs.mkdirSync(storyDir);
   files.forEach((f) => fs.writeFileSync(path.join(storyDir, f), "x"));
-  return path.join(storyDir, "story.2.4.demo.md");
+  return path.join(storyDir, "story.1.2.4.demo.md");
 }
 
 test("findRelatedDocs — links durable artifacts and skips point-in-time ones", () => {
   const path = require("path");
   const card = makeStoryDir([
-    "story.2.4.demo.md",
-    "story.2.4.plan.demo.md",
-    "story.2.4.review.1.demo.md",
-    "story.2.4.qa.1.demo.md",
-    "story.2.4.implementation.1.demo.md",
-    "story.2.4.dod.1.demo.md",
-    "story.2.4.validate.2026-05-13.md", // dated run — excluded
+    "story.1.2.4.demo.md",
+    "story.1.2.4.plan.demo.md",
+    "story.1.2.4.review.1.demo.md",
+    "story.1.2.4.qa.1.demo.md",
+    "story.1.2.4.implementation.1.demo.md",
+    "story.1.2.4.dod.1.demo.md",
+    "story.1.2.4.validate.2026-05-13.md", // dated run — excluded
     "sprint-review-summary.md", // point-in-time — excluded
-    "story.2.4.gate.1.demo.yml", // not markdown — excluded
+    "story.1.2.4.gate.1.demo.yml", // not markdown — excluded
   ]);
   const found = lib.findRelatedDocs(card);
   assert.deepEqual(
@@ -1267,15 +1267,17 @@ test("findRelatedDocs — links durable artifacts and skips point-in-time ones",
     ],
   );
   // the card itself is never listed as its own related doc
-  assert.ok(!found.some((d) => path.basename(d.file) === "story.2.4.demo.md"));
+  assert.ok(
+    !found.some((d) => path.basename(d.file) === "story.1.2.4.demo.md"),
+  );
 });
 
 test("findRelatedDocs — qualifies repeated artifact types with their instance number", () => {
   const card = makeStoryDir([
-    "story.2.4.demo.md",
-    "story.2.4.review.1.demo.md",
-    "story.2.4.review.2.demo.md",
-    "story.2.4.qa.1.demo.md",
+    "story.1.2.4.demo.md",
+    "story.1.2.4.review.1.demo.md",
+    "story.1.2.4.review.2.demo.md",
+    "story.1.2.4.qa.1.demo.md",
   ]);
   const labels = lib.findRelatedDocs(card).map((d) => d.label);
   assert.deepEqual(labels, [
@@ -1287,17 +1289,30 @@ test("findRelatedDocs — qualifies repeated artifact types with their instance 
 
 test("findRelatedDocs — a story folder with no companions yields no links", () => {
   assert.deepEqual(
-    lib.findRelatedDocs(makeStoryDir(["story.2.4.demo.md"])),
+    lib.findRelatedDocs(makeStoryDir(["story.1.2.4.demo.md"])),
     [],
   );
 });
 
 test("relatedDocInfo — unknown artifact types are not linked", () => {
-  assert.equal(lib.relatedDocInfo("story.2.4.validate.2026-05-13.md"), null);
+  assert.equal(lib.relatedDocInfo("story.1.2.4.validate.2026-05-13.md"), null);
   assert.equal(lib.relatedDocInfo("sprint-review-summary.md"), null);
   assert.equal(
-    lib.relatedDocInfo("story.2.4.plan.demo.md").label,
+    lib.relatedDocInfo("story.1.2.4.plan.demo.md").label,
     "Implementation plan",
+  );
+});
+
+test("relatedDocInfo — reads the artifact through doc-id, sub-stories included (task 207)", () => {
+  // The private `[\d.]+?` story-id regex this replaced could not read a sub-story.
+  assert.deepEqual(
+    { ...lib.relatedDocInfo("story.1.2.4A.review.2.demo.md") },
+    { label: "Story review", instance: "2", order: 1 },
+  );
+  assert.equal(
+    lib.relatedDocInfo("story.1.2.4.demo.md"),
+    null,
+    "the story itself is not an artifact",
   );
 });
 

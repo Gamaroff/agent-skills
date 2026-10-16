@@ -156,7 +156,7 @@ const SITES = {
   finalise: {
     subs: {
       "{document-directory}": "$DIR",
-      "{story.{epic}.{story} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}":
+      "{story.{P}.{E}.{S} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}":
         "task.9",
     },
     vars: { DOD_N: ["task.9.dod.1.x.md", "task.9.dod.3.x.md"] },

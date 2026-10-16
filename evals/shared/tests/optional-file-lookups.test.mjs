@@ -83,6 +83,9 @@ const P = (dir) => ({
   "{id}": "7",
   "{epic}": "2",
   "{story}": "3",
+  "{P}": "1",
+  "{E}": "2",
+  "{S}": "3",
   "{story-stem}": "story.1.2.3",
   "{story-or-task-prefix}": "task.7",
   // The step docs address a bundled helper through the pipeline placeholder;
@@ -149,7 +152,7 @@ const ROWS = [
     expect: "",
     kind: "gate",
     ext: "yml",
-    stem: "story.2.3",
+    stem: "story.1.2.3",
   },
   {
     file: "skills/qa-story/SKILL.md",
@@ -158,7 +161,7 @@ const ROWS = [
     env: "STORY_DIR",
     varName: "LATEST_QA_NUM",
     expect: "",
-    numberOnly: { kind: "qa", ext: "md", stem: "story.2.3" },
+    numberOnly: { kind: "qa", ext: "md", stem: "story.1.2.3" },
   },
   {
     file: "skills/qa-story/SKILL.md",
@@ -180,7 +183,7 @@ const ROWS = [
     expect: "",
     kind: "gate",
     ext: "yml",
-    stem: "story.2.3",
+    stem: "story.1.2.3",
   },
   // step-7-finalise
   {
@@ -223,12 +226,11 @@ const ROWS = [
   },
   {
     file: "shared/resources/develop-pipeline-step-7-finalise.md",
-    needle:
-      'find {story-directory} -maxdepth 1 -name "story.{epic}.{story}.dod',
+    needle: 'find {story-directory} -maxdepth 1 -name "story.{P}.{E}.{S}.dod',
     stdout: "",
     kind: "dod",
     ext: "md",
-    stem: "story.2.3",
+    stem: "story.1.2.3",
   },
   {
     file: "shared/resources/develop-pipeline-step-7-finalise.md",
@@ -242,11 +244,11 @@ const ROWS = [
   {
     file: "shared/resources/develop-pipeline-step-2-review.md",
     needle:
-      'find {story-directory} -maxdepth 1 -name "story.{epic}.{story}.review',
+      'find {story-directory} -maxdepth 1 -name "story.{P}.{E}.{S}.review',
     stdout: "",
     kind: "review",
     ext: "md",
-    stem: "story.2.3",
+    stem: "story.1.2.3",
   },
   {
     file: "shared/resources/develop-pipeline-step-2-review.md",
@@ -271,8 +273,7 @@ const ROWS = [
   // step-3
   {
     file: "shared/resources/develop-pipeline-step-3-develop-loop.md",
-    needle:
-      'find {story-directory} -maxdepth 1 -name "story.{epic}.{story}.plan',
+    needle: 'find {story-directory} -maxdepth 1 -name "story.{P}.{E}.{S}.plan',
     stdout: "",
   },
   {
@@ -333,11 +334,11 @@ const ROWS = [
   {
     file: "skills/develop-story/SKILL.md",
     needle:
-      'find {story-directory} -maxdepth 1 -name "story.{epic}.{story}.implementation',
+      'find {story-directory} -maxdepth 1 -name "story.{P}.{E}.{S}.implementation',
     stdout: "",
     kind: "implementation",
     ext: "md",
-    stem: "story.2.3",
+    stem: "story.1.2.3",
   },
   {
     file: "skills/develop-task/SKILL.md",

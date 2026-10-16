@@ -176,8 +176,8 @@ Store choice as `output_mode` for Step 9.
 
 **Actions**: Execute the full protocol in `references/review-pipeline-step-0a-branch-setup.md`. Apply the **review-epic** variant throughout:
 
-- 0a.2 extract `EPIC_NUM`, `EPIC_SLUG`, `EPIC_BRANCH` from the epic filename (`epic.{N}.{slug}.md`).
-- 0a.3 auto-skip when on `feature/epic.${EPIC_NUM}.*`.
+- 0a.2 read `PRD_NUM`, `EPIC_NUM`, `EPIC_SLUG` and `EPIC_BRANCH` from the epic filename (`epic.{P}.{E}.{slug}.md`) through `doc-id.js`, never a positional split.
+- 0a.3 auto-skip when on `feature/epic.${PRD_NUM}.${EPIC_NUM}.*`.
 - 0a.4 prompt: single question — "Create epic branch `${EPIC_BRANCH}` from `${BASE_DEFAULT}`?" (Recommended Yes / "Other (specify branch)" / "Abort review").
 - 0a.5–0a.8 stash (`git stash create` + `store`) → ensure epic branch exists (guarded local create + push) → pop stash. No `/create-branch` invocation (the epic branch is created inline).
 
@@ -562,7 +562,7 @@ Save to: `${PRD_ROOT}/[domain]/[feature]/epics/epic.[N].[name]/epic.[N].review.[
 
 - `[N]` is the epic number; `[name]` is the parent epic file's own name slug (the hyphenated portion after `epic.[N].` in the epic filename) — NOT a free-form summary of the review focus.
 - `[n]` is a sequence number for multiple reviews of the same epic, computed below — never counted by eye (mirrors the QA `qa.{n}` and story `review.{n}` patterns). Use DOTS as structural separators and hyphens within the name slug.
-- Example: epic file `epic.1.mastra-runtime-foundation.md` → review file `epic.1.review.1.mastra-runtime-foundation.md`.
+- Example: epic file `epic.1.1.mastra-runtime-foundation.md` → review file `epic.1.1.review.1.mastra-runtime-foundation.md`.
 
 Compute `[n]`, from the repository root:
 

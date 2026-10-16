@@ -22,9 +22,12 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { copyFileSync } from "node:fs";
+import { createRequire } from "node:module";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = join(__dirname, "..", "generate-prd-epic-index.mjs");
+// The PRD number of a fixture name is doc-id's, not a private regex (task 207).
+const docId = createRequire(import.meta.url)("../doc-id.js");
 
 /** Spawn the generator (using the current node binary — avoids PATH/nvm surprises). */
 function run(cwd, args = []) {
@@ -55,7 +58,9 @@ function makePrd(root, prd, epics) {
     const epicDir = join(prdDir, "epics", e.dir);
     mkdirSync(epicDir, { recursive: true });
     let fm = `---\ntitle: "${e.title}"\n`;
-    const P = e.prdNumber ?? prd.match(/^prd\.(\d+)\./)?.[1];
+    const own = docId.parse(prd);
+    const P =
+      e.prdNumber ?? (own.ok && own.kind === "prd" ? own.prd : undefined);
     if (P !== undefined) fm += `prd_number: ${P}\n`;
     if (e.number !== undefined) fm += `epic_number: ${e.number}\n`;
     if (e.status) fm += `status: ${e.status}\n`;

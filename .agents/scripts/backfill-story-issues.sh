@@ -34,10 +34,14 @@ for STORY_FILE in "$@"; do
 
   TITLE=$(fm title "$STORY_FILE")
   PRIORITY=$(fm priority "$STORY_FILE")
-  ID=$(fm id "$STORY_FILE")
-  # Parse E.S from id (story.E.S.slug)
-  STORY_E=$(echo "$ID" | awk -F. '{print $2}')
-  STORY_S=$(echo "$ID" | awk -F. '{print $3}')
+  # P.E.S through doc-id, never a positional split: in story.P.E.S the second
+  # field is the PRD (task 207).
+  ID_JSON=$(command node "$(git rev-parse --show-toplevel)/shared/resources/doc-id.js" \
+    parse "$(basename "$STORY_FILE")" --json) \
+    || { echo "skip (not a story id doc-id can read): $STORY_FILE"; continue; }
+  STORY_P=$(printf '%s' "$ID_JSON" | jq -r '.prd')
+  STORY_E=$(printf '%s' "$ID_JSON" | jq -r '.epic')
+  STORY_S=$(printf '%s' "$ID_JSON" | jq -r '.story')
 
   # Resolve parent epic file + GH issue
   STORY_DIR=$(dirname "$STORY_FILE")
@@ -45,12 +49,12 @@ for STORY_FILE in "$@"; do
   EPIC_FILE="${EPIC_DIR}/$(basename "$EPIC_DIR").md"
   EPIC_GH=$(fm github_issue "$EPIC_FILE")
   EPIC_TITLE_RAW=$(fm title "$EPIC_FILE")
-  EPIC_TITLE_BARE=$(echo "$EPIC_TITLE_RAW" | sed -E "s/^Epic [0-9]+:? *//")
-  MILESTONE="Epic ${STORY_E} — ${EPIC_TITLE_BARE}"
+  EPIC_TITLE_BARE=$(echo "$EPIC_TITLE_RAW" | sed -E "s/^Epic [0-9]+(\.[0-9]+)*:? *//")
+  MILESTONE="Epic ${STORY_P}.${STORY_E} — ${EPIC_TITLE_BARE}"
 
   # Bare title (strip "Story E.S: " prefix)
   STORY_TITLE_BARE=$(echo "$TITLE" | sed -E "s/^Story [0-9]+\.[0-9]+:? *//")
-  ISSUE_TITLE="[Story ${STORY_E}.${STORY_S}] ${STORY_TITLE_BARE}"
+  ISSUE_TITLE="[Story ${STORY_P}.${STORY_E}.${STORY_S}] ${STORY_TITLE_BARE}"
 
   REL_PATH=$(git -C "$(git rev-parse --show-toplevel)" ls-files --full-name "$STORY_FILE" 2>/dev/null || echo "$STORY_FILE")
   DOC_URL="https://github.com/${REPO}/blob/develop/${REL_PATH}"
