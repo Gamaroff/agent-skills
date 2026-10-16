@@ -35,7 +35,7 @@ Make every pipeline step that dispatches a read-only Explore subagent the only w
 | 2. review-task             | ✅ Done    | `task.189.review.{N}.{name}.md` exists (or skip logged)               | `task.189.review.1.read-only-agents-never-write.md` — READY TO IMPLEMENT 9/10 after 7 Important fixes; Planned → Ready for Development | — (pre-pass B/C inline in review) | 2026-10-16T20:32Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan + surface map); 1 iteration; audit ready-for-review 17/17; ci:fast 5797/0 | `.summaries/step-3-loop-audit-1.json` | 2026-10-16T21:09Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #683: https://github.com/Gamaroff/agent-skills/pull/683 | — | 2026-10-16T21:12Z |
-| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.189.qa.{N}.*.md`; `task.189.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 5 cycles, HIGH 0 throughout; loop limit — half-cycle declined (medium-not-falling); escalated | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.189.qa.{N}.*.md`; `task.189.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 6 cycles (5 + 1 granted), HIGH 0 throughout; loop limit — half-cycle declined (medium-not-falling); escalated | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.189.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
@@ -97,6 +97,12 @@ Make every pipeline step that dispatches a read-only Explore subagent the only w
 ### Step 3 — notes continued
 
 - Mutation proofs (each file backed up, mutated, test run, restored): M1 mapper prompt "Write the matrix file" restored → guard fail 2; M2 inline dispatch write restored → fail 2; M3 code-review caller-runs marker removed → fail 1; M4 docs agent told to run `npm run generate-catalog` → fail 1; M5 runner counts an exit-2 entry as a run → read-only-agent-writes fail 1; M6 runner composes the count instead of reading the record → fail 3; M7 matrix block discards a returned matrix → fail 1.
+
+### QA Loop Re-entry — 2026-10-17
+
+- Operator chose "Resume at 5a with 1 more cycles" (passed as the `/develop-task` argument; AskUserQuestion not called — the answer was given up front).
+- QA loop re-entry: 1 extra cycles granted; 0 cycle(s) run outside the loop back-filled from disk (highest gate 5, 5 `### QA Cycle` entries). `grant-qa-cycles.sh`: lock restored from the halt snapshot; `qa_max_cycles=6`, `reenter_at=5a`.
+- Traceability matrix reused from cycle 1 (`.summaries/qa-traceability-matrix.md`), as cycles 2–5 did; mapper not re-dispatched.
 
 ---
 
@@ -199,14 +205,55 @@ The pipeline completed 5 qa-task/qa-fix cycles without a clean PASS.
 2. Or accept the current state: run Step 5c (`/review-pr --effort medium --comment --no-code`), then `/finalise`.
 3. Consider extracting Step 3b.1's shell (the run, the wait, the atomic result) into a tested script; the remaining edges were all in prose-embedded shell.
 
+### QA Cycle 6 — 2026-10-17
+**Gate Result**: CONCERNS
+**Issues Found**: CR6-1 the CR5-1 fix's `2>/dev/null` makes the cycle-4 argv-order stderr assertion vacuous (medium, test file; bug.6); advisory CR6-2 (medium/medium) and CR6-3..CR6-5; CR5-1 fixed and mutation-proven, bug.5 closed
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Escalating — loop limit reached
+
+- Granted cycle (re-entry, 1 of 1). Route classifier: continue (not-a-pass-gate; route 2 declined: product-defect-signal — maintainability NFR reads CONCERNS). Narrowing residue: not signalled (medium-files-differ). Third strike: n/a (no HIGH).
+- QA Cycle 6 — changes-requested: stage-disabled.
+- `ci:fast` during 5a: 5811 pass, 1 fail — `tests/bundle-missing-source.test.js` over its timing budget (53 s vs 20 s) while this cycle's probes and mutations ran beside it; 7/7 alone in 3 s.
+- 5b (qa-fix cycle 6): CR6-1 fixed — the CR4-1 test redirects the budget import's stderr to a file and requires it empty; CR6-3, CR6-4, CR6-5 fixed; CR6-2 left advisory. Fast gate attempt 1 red (prettier on the test file), attempt 2 5811/0. Mutation proofs: import-as-CLI with a correct budget → new test red, HEAD test green; wait marked on a failed load → CR5-1 test red; budget path skipped → killed-runner test red. Ingester not dispatched — the gate was written in this session.
+
+**Fixes Applied**: CR6-1 (bug.6), CR6-3, CR6-4, CR6-5
+**Commit**: `2117b908`
+
+- Gate-the-last-fix half-cycle (route 2c): declined by `classifyLoopRoute` — `medium-not-falling` ("MEDIUM reads 1, 1, 1 over cycles 4–6").
+
+### QA Loop Limit Reached — 2026-10-17 (after the 1-cycle grant)
+
+The pipeline completed 6 qa-task/qa-fix cycles (5 + 1 granted) without a clean PASS.
+
+**Final gate status**: CONCERNS (gate 6, 90/100) — its one finding (CR6-1, test machinery) was fixed in cycle 6's 5b (`2117b908`); no gate has read that fix.
+**HIGH findings per cycle**: 0, 0, 0, 0, 0, 0 — no blocker at any cycle
+**MEDIUM findings per cycle**: 3, 1, 1, 1, 1, 1 — flat at 1 from cycle 2 onward
+**Remaining issues** (from final gate file):
+- CR6-1 — medium — `shared/resources/tests/read-only-agent-writes.test.mjs` — the argv-order stderr guard was vacuous. **Fixed in `2117b908` (ungated), mutation-proven.**
+- Advisory, not gate entries: CR6-2 (medium/medium, `skills/finalise/SKILL.md` — a loaded runner without a numeric `ENGINE_TIMEOUT_MS` is reported as not loaded; unreachable with the shipped runner); CR5-2 (low/low, the wait is marked by the background process); CR3-4 (engine scope, SIGKILL skips sandbox cleanup).
+
+**What was attempted per cycle**:
+- Cycles 1–5: as in the first escalation above.
+- Cycle 6 (granted): CR5-1 verified fixed (bug.5 closed). New: CR6-1, a test made vacuous by cycle 5's own fix — fixed, plus CR6-3..CR6-5. Route 2c declined (`medium-not-falling`); route 2 declined at 5a (`product-defect-signal`: maintainability NFR read CONCERNS).
+
+**Likely root cause**: unchanged — every MEDIUM since cycle 3 sits in the operational shell around Step 3b.1 (the backgrounded run, its wait, its result) or the tests that execute it; each fix there moved the next edge into view. Cycle 6's MEDIUM was test machinery only, and the deliverable's core has been stable since cycle 2 (28 probes executed, 0 reproduced, every cycle).
+
+**Recommended next steps**:
+1. Accept the current state: run Step 5c (`/review-pr --effort medium --comment --no-code`), then `/finalise`. Cycle 6's residue is a test-only fix, mutation-proven.
+2. Or grant one more gate: re-run `/develop-task` and choose "Resume at 5a with 1 more cycles".
+3. Follow-up task: extract Step 3b.1's shell (run, wait, atomic result) into a tested script, and settle CR6-2 there.
+
 ---
 
 ## Completion
 
-**Finished**: 2026-10-17 (HALT — QA loop limit)
+**Finished**: 2026-10-17 (HALT — QA loop limit, after a 1-cycle grant)
 **Final Status**: Escalated
 **Branch**: feature/task.189.read-only-agents-never-write
 **PR**: https://github.com/Gamaroff/agent-skills/pull/683
-**QA Iterations**: 5 (loop limit)
+**QA Iterations**: 6 (loop limit, 5 + 1 granted)
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
