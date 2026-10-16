@@ -88,7 +88,7 @@ Populate it, then adjust these per-mode fields:
 | Field / heading                     | Story bug                                            | Task bug                                       | General bug                                       |
 | ----------------------------------- | --------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------- |
 | `Bug ID`                            | `story.{prd}.{epic}.{story}.bug.{n}.{name}`               | `task.{id}.bug.{n}.{name}`                     | `bug.{N}.{name}`                                  |
-| `Related` line / frontmatter        | `[Story {Epic}-{N}: {Title}](./story.{e}.{s}.{name}.md)` | `[Task {id}: {Title}](./task.{id}.{name}.md)` | `None — cross-cutting bug (no single owner)`      |
+| `Related` line / frontmatter        | `[Story {Epic}-{N}: {Title}](./story.{P}.{E}.{S}.{name}.md)` | `[Task {id}: {Title}](./task.{id}.{name}.md)` | `None — cross-cutting bug (no single owner)`      |
 | `## {Criteria Violation Heading}`   | `## Acceptance Criteria Violation`                  | `## Success Criteria Violation`                | `## Scope & Impact`                               |
 
 Everything else in the template (Description, Reproduction, Evidence, Developer Fix Cycle, Status

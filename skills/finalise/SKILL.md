@@ -70,7 +70,7 @@ if [ -z "$DOC_KIND" ]; then
     # and a kind this prose never defines is not a kind (TASK-125-BUG-5).
     *)       DOC_KIND=task ;;
   esac
-  # A bug report's filename is `bug.{N}.{name}.md`, `story.{e}.{s}.bug.{N}.{name}.md` or
+  # A bug report's filename is `bug.{N}.{name}.md`, `story.{P}.{E}.{S}.bug.{N}.{name}.md` or
   # `task.{id}.bug.{N}.{name}.md` — the `.bug.{N}.` segment is what a story/task file never has.
   if printf '%s' "$(basename "$DOC_FILE")" | grep -qE '(^|\.)bug\.[0-9]+\.'; then
     echo "hint: $(basename "$DOC_FILE") is a bug report — run \`/finalise --bug $DOC_FILE\` for the fix-evidence DoD; continuing in $DOC_KIND mode as invoked"
@@ -143,7 +143,7 @@ Use `TaskCreate` to register every sub-step you will execute. This prevents skip
 | Update frontmatter              | Change status, updated, completed_date fields (accepted path only)                                |
 | Generate Sprint Review summary  | Create sprint-review-summary.md from template (accepted path only)                                |
 | Post PR comment                 | Post acceptance or gap comment to GitHub PR                                                       |
-| Update running summary          | Finalize story.{epic}.{story}.dod.{num}.{name}.md with outcome                                    |
+| Update running summary          | Finalize story.{P}.{E}.{S}.dod.{num}.{name}.md with outcome                                    |
 | Communicate to user             | Output final result block to user                                                                 |
 
 Create all tasks upfront, then work through them in order. Do NOT skip any task.
@@ -156,17 +156,17 @@ Before starting any verification, also create a co-located running summary file 
 
 1. **Determine story/task directory:**
    - Extract directory path from the story/task file path provided
-   - Example: `${PRD_ROOT}/.../story.311.1.example-system/`
+   - Example: `${PRD_ROOT}/.../story.1.311.1.example-system/`
 
 2. **Create running summary file:**
-   - File name format (stories): `story.{epic}.{story}.dod.{num}.{story-name}.md` — `{num}` is computed below, never counted by eye
+   - File name format (stories): `story.{P}.{E}.{S}.dod.{num}.{story-name}.md` — `{num}` is computed below, never counted by eye
    - File name format (tasks): `task.{id}.dod.{num}.{task-name}.md`
-   - File name format (bugs): `{bug-prefix}.dod.{num}.{bug-name}.md` — the prefix is the bug id `bug-doc.js` reports (`bug.13`, `story.7.4.bug.4`, `task.67.bug.3`)
-   - Full path: `{story-directory}/story.{epic}.{story}.dod.{num}.{story-name}.md`
+   - File name format (bugs): `{bug-prefix}.dod.{num}.{bug-name}.md` — the prefix is the bug id `bug-doc.js` reports (`bug.13`, `story.1.7.4.bug.4`, `task.67.bug.3`)
+   - Full path: `{story-directory}/story.{P}.{E}.{S}.dod.{num}.{story-name}.md`
    - Compute `{num}`, from the repository root:
 
      ```bash
-     STEM="{story.{epic}.{story} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}"   # the work item's filename stem
+     STEM="{story.{P}.{E}.{S} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}"   # the work item's filename stem
      source .agents/skills/finalise/references/newest-numbered.sh || exit 1
      DOD_N=$(next_numbered "{document-directory}" dod -name "${STEM}.dod.*.md") || exit 1
      ```
@@ -206,9 +206,9 @@ Before starting any verification, also create a co-located running summary file 
 
 **Example:**
 
-If verifying `${PRD_ROOT}/.../story.311.1.example-system/story.311.1.example-system.md`, create:
+If verifying `${PRD_ROOT}/.../story.1.311.1.example-system/story.1.311.1.example-system.md`, create:
 
-`${PRD_ROOT}/.../story.311.1.example-system/story.311.1.dod.1.example-system.md`
+`${PRD_ROOT}/.../story.1.311.1.example-system/story.1.311.1.dod.1.example-system.md`
 
 ### Step 1: Locate and Read the Story/Task Document
 
@@ -217,13 +217,13 @@ Accept the story/task document path in one of these formats:
 **Full path to markdown file:**
 
 ```
-${PRD_ROOT}/ui-domain/module-name/epics/epic.311.example-integration/stories/story.311.1.example-system/story.311.1.example-system.md
+${PRD_ROOT}/ui-domain/module-name/epics/epic.1.311.example-integration/stories/story.1.311.1.example-system/story.1.311.1.example-system.md
 ```
 
 **Directory path (skill will find the .md file):**
 
 ```
-${PRD_ROOT}/ui-domain/module-name/epics/epic.311.example-integration/stories/story.311.1.example-system/
+${PRD_ROOT}/ui-domain/module-name/epics/epic.1.311.example-integration/stories/story.1.311.1.example-system/
 ```
 
 **Task path examples:**
@@ -255,7 +255,7 @@ Before proceeding with manual DoD verification, check if QA reports and gate fil
 
    **Bug mode (`qa-reports`):** run — but **scope both globs to the bug's own stem**:
    `{story-directory}/${STEM}.qa.*.md` and `{story-directory}/${STEM}.gate.*.yml`, where `STEM` is
-   the bug prefix `bug-doc.js` reports (`bug.13`, `story.7.4.bug.4`, `task.67.bug.3`). A story or
+   the bug prefix `bug-doc.js` reports (`bug.13`, `story.1.7.4.bug.4`, `task.67.bug.3`). A story or
    task bug lives in its **parent's** directory, and the directory-wide globs above return the
    parent's `task.67.qa.1` / `task.67.gate.2` — another work item's QA record, not the bug's
    (TASK-125-BUG-9). Expect **none**: the develop-bug verify loop writes no gate, so `qa-cycle.sh`
@@ -1331,7 +1331,7 @@ If all DoD criteria are met, finalize the running summary, update the story/task
 
 5. **Reference Running Summary in DoD Section:**
    - Add a reference to the detailed running summary file
-   - Example: "**Detailed Verification Log:** See `story.311.1.dod.1.example-system.md` for complete verification evidence and timestamps."
+   - Example: "**Detailed Verification Log:** See `story.1.311.1.dod.1.example-system.md` for complete verification evidence and timestamps."
 
    **Bug mode (`body-dod-section`):** skip — items 4 and 5 both. A bug report has no
    `## Definition of Done` section; its closing record is `## Resolution Summary`, which develop-bug
@@ -1366,9 +1366,9 @@ standalone.
 
    ```bash
    BRANCH=$(git rev-parse --abbrev-ref HEAD)
-   STEM="{story.{epic}.{story} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}"   # the work item's filename stem
+   STEM="{story.{P}.{E}.{S} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}"   # the work item's filename stem
    DOC_KIND="{story | task | bug — the kind the Document-kind block resolved}"   # re-bound here: no block inherits another's variables (TASK-121-BUG-2)
-   # Empty OR left as a placeholder: `{story.{epic}…}` is non-empty and passed the first
+   # Empty OR left as a placeholder: `{story.{P}…}` is non-empty and passed the first
    # version of this guard, after which the DoD glob matched nothing at exit 0 (cycle-6 CR-3).
    case "$STEM$DOC_KIND" in *'{'*) echo "HALT: STEM and DOC_KIND must be bound in this block — both are substituted inputs, not values carried over from an earlier block (empty or an unsubstituted placeholder found)"; exit 1 ;; esac
    [ -n "$STEM" ] && [ -n "$DOC_KIND" ] || { echo "HALT: STEM and DOC_KIND must be bound in this block — one of them is empty"; exit 1; }
@@ -1448,7 +1448,7 @@ standalone.
    ```
 
    **Bug mode (`acceptance-commit`):** run — the block itself branches on `DOC_KIND` (bound in
-   the block): `STEM` is the bug prefix (`bug.13`, `story.7.4.bug.4`, `task.67.bug.3`), the
+   the block): `STEM` is the bug prefix (`bug.13`, `story.1.7.4.bug.4`, `task.67.bug.3`), the
    `git add` names **the bug report** (it carries the Status History row from 7.3) and **the DoD
    file** only — no `sprint-review-summary.md` — and the commit message is
    `docs(${STEM}): DoD verified — finalise --bug`. The registry check is a no-op because the tick
@@ -1465,7 +1465,7 @@ standalone.
 
    ```bash
    BRANCH=$(git rev-parse --abbrev-ref HEAD)
-   STEM="{story.{epic}.{story} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}"
+   STEM="{story.{P}.{E}.{S} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}"
    DOC_KIND="{story | task | bug — the kind the Document-kind block resolved}"
    case "$STEM$DOC_KIND" in *'{'*) echo "HALT: STEM and DOC_KIND must be bound in this block — substituted inputs, not values carried over from 6a (empty or an unsubstituted placeholder found)"; exit 1 ;; esac
    [ -n "$STEM" ] && [ -n "$DOC_KIND" ] || { echo "HALT: STEM and DOC_KIND must be bound in this block — one of them is empty"; exit 1; }
@@ -1768,7 +1768,7 @@ POLLEOF
    # matched nothing, and published a canonical comment with an empty DoD path and empty
    # gate at exit 0 (TASK-125-BUG-15). Empty is a HALT; so is a placeholder left verbatim
    # (cycle-6 CR-3).
-   STEM="{story.{epic}.{story} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}"
+   STEM="{story.{P}.{E}.{S} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}"
    DOC_KIND="{story | task | bug — the kind the Document-kind block resolved}"
    case "$STEM$DOC_KIND" in *'{'*) echo "HALT: STEM and DOC_KIND must be bound in this block — substituted inputs, not values carried over from an earlier block (an unsubstituted placeholder found)"; exit 1 ;; esac
    [ -n "$STEM" ] && [ -n "$DOC_KIND" ] || { echo "HALT: STEM and DOC_KIND must be bound in this block — one of them is empty"; exit 1; }
@@ -2186,7 +2186,7 @@ EOF
    ```bash
    CUR_BODY=$(gh issue view {github_issue} --json body -q '.body')
    # Escape regex metacharacters in the path, then rewrite blob/<any-branch>/<path> → blob/$DURABLE_BRANCH/<path>.
-   # The branch segment uses [^) ]+ (not [^/]+) so multi-segment branch names like feature/story.5.1.foo match.
+   # The branch segment uses [^) ]+ (not [^/]+) so multi-segment branch names like feature/story.1.5.1.foo match.
    DOC_REL_RE=$(printf '%s' "$DOC_REL" | sed 's/[.[\*^$/]/\\&/g')
    NEW_BODY=$(printf '%s' "$CUR_BODY" | sed -E "s#blob/[^) ]+/(${DOC_REL_RE})#blob/${DURABLE_BRANCH}/\1#g")
    if [ "$NEW_BODY" != "$CUR_BODY" ]; then
@@ -2473,8 +2473,8 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
 
    ### QA Gate Status
 
-   **QA Report**: `story.311.2.qa.1.initial-review.md`
-   **Gate File**: `story.311.2.gate.1.initial-review.yml`
+   **QA Report**: `story.1.311.2.qa.1.initial-review.md`
+   **Gate File**: `story.1.311.2.gate.1.initial-review.yml`
    **Gate Status**: ❌ FAIL
    **Quality Score**: 45/100 (NEEDS IMPROVEMENT)
 
@@ -2516,9 +2516,9 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
    **Estimated Effort:** Large (6-8 hours) - includes 3 blocking security issues
 
    **Gap Report Generated:** 2025-02-01
-   **QA Gate Reference**: See `story.311.2.gate.1.initial-review.yml` for full details
+   **QA Gate Reference**: See `story.1.311.2.gate.1.initial-review.yml` for full details
 
-   **Detailed Verification Log:** See `story.311.2.dod.1.transaction-event-history.md` for complete verification evidence and timestamps.
+   **Detailed Verification Log:** See `story.1.311.2.dod.1.transaction-event-history.md` for complete verification evidence and timestamps.
    ```
 
 5. **Add PR Comment (if PR exists):**
@@ -2740,7 +2740,7 @@ line `Fix-and-recheck refused: {ids}` in the gap report's Blocking Issues Summar
   healthy work. `--` commits the named paths and leaves the rest of the index staged for 6a:
 
   ```bash
-  STEM="{story.{epic}.{story} | task.{id} — the work item's filename stem}"
+  STEM="{story.{P}.{E}.{S} | task.{id} — the work item's filename stem}"
   MSG_TAIL="{section} — {the finding, one line}"
   case "$STEM$MSG_TAIL" in *'{'*) echo "HALT: STEM and MSG_TAIL must be substituted in this block"; exit 1 ;; esac
   # The commit's paths are the record's `touched`, read in THIS block — zsh-safe, no bare glob.
@@ -2836,14 +2836,14 @@ provable gap under a rule; it is not a develop loop.
 **User Request:**
 
 ```
-Mark story.311.1.example-system as complete
+Mark story.1.311.1.example-system as complete
 ```
 
 **Skill Actions:**
 
-1. Read story document from `${PRD_ROOT}/.../story.311.1.example-system.md`
-2. Check for QA reports - found `story.311.1.qa.1.initial-review.md` ✅
-3. Review QA gate file - `story.311.1.gate.1.initial-review.yml` shows PASS ✅
+1. Read story document from `${PRD_ROOT}/.../story.1.311.1.example-system.md`
+2. Check for QA reports - found `story.1.311.1.qa.1.initial-review.md` ✅
+3. Review QA gate file - `story.1.311.1.gate.1.initial-review.yml` shows PASS ✅
 4. Verify all acceptance criteria are checked (cross-reference with QA report) ✅
 5. Find PR #789, verify it's approved ✅
 6. Check documentation is updated ✅
@@ -2858,7 +2858,7 @@ Mark story.311.1.example-system as complete
 ```
 ✅ Story Accepted - Ready for Sprint Review
 
-**Story:** story.311.1.example-system
+**Story:** story.1.311.1.example-system
 **Status:** ACCEPTED
 **Acceptance Date:** 2025-02-01
 
@@ -2875,8 +2875,8 @@ All Definition of Done criteria verified:
 - ✅ Maintainability review passed (QA verified)
 
 **QA Reports:**
-- QA Report: ${PRD_ROOT}/.../story.311.1.../story.311.1.qa.1.initial-review.md
-- Gate File: ${PRD_ROOT}/.../story.311.1.../story.311.1.gate.1.initial-review.yml
+- QA Report: ${PRD_ROOT}/.../story.311.1.../story.1.311.1.qa.1.initial-review.md
+- Gate File: ${PRD_ROOT}/.../story.311.1.../story.1.311.1.gate.1.initial-review.yml
 
 **Artifacts Generated:**
 - Updated: ${PRD_ROOT}/.../story.311.1.../story.311.1...md
@@ -2942,15 +2942,15 @@ Check if task.90.swagger-cli-plugin-enablement is ready for acceptance
 **User Request:**
 
 ```
-Verify DoD for ${PRD_ROOT}/ui-domain/module-name/epics/epic.311.example-integration/stories/story.311.2.example-notifications/
+Verify DoD for ${PRD_ROOT}/ui-domain/module-name/epics/epic.1.311.example-integration/stories/story.1.311.2.example-notifications/
 ```
 
 **Skill Actions:**
 
-1. Use Glob to find `.md` file in directory: `${PRD_ROOT}/.../story.311.2.example-notifications/*.md`
-2. Found: `story.311.2.example-notifications.md`
-3. Check for QA reports: `${PRD_ROOT}/.../story.311.2.example-notifications/*.qa.*.md`
-4. Check for gate files: `${PRD_ROOT}/.../story.311.2.example-notifications/*.gate.*.yml`
+1. Use Glob to find `.md` file in directory: `${PRD_ROOT}/.../story.1.311.2.example-notifications/*.md`
+2. Found: `story.1.311.2.example-notifications.md`
+3. Check for QA reports: `${PRD_ROOT}/.../story.1.311.2.example-notifications/*.qa.*.md`
+4. Check for gate files: `${PRD_ROOT}/.../story.1.311.2.example-notifications/*.gate.*.yml`
 5. Proceed with DoD verification workflow (Steps 3-8)...
 
 ## Resources

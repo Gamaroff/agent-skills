@@ -74,7 +74,7 @@ Epic 1: User Authentication
    - `architecture.architectureShardedLocation` — resolved into `${ARCH_ROOT}` (default `docs/architecture`)
 
    Nested structure under each root is fixed (see docs/reference/configuration.md):
-   - Epics: `${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md`
+   - Epics: `${PRD_ROOT}/{domain}/{feature}/epics/epic.{P}.{E}.{name}/epic.{P}.{E}.{name}.md`
    - Stories: nested at `{epic-dir}/stories/`
    - QA artifacts: co-located with the story.
 

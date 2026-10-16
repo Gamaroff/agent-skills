@@ -2845,7 +2845,7 @@ architecture:
 Both roots are configurable; nested structure is fixed (see [docs/reference/configuration.md](../../docs/reference/configuration.md#configurable-roots-and-fixed-conventions)):
 
 - PRDs live under `${PRD_ROOT}/`
-- Epics: `${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md`
+- Epics: `${PRD_ROOT}/{domain}/{feature}/epics/epic.{P}.{E}.{name}/epic.{P}.{E}.{name}.md`
 - Stories: nested at `{epic-dir}/stories/`
 
 **Note**: If `skills-config.yaml` is missing, the skill will use sensible defaults based on your project organization.

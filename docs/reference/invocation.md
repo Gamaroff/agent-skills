@@ -42,27 +42,27 @@ Many skills accept a story directory or specific file. Particularly useful for d
 
 Given a story directory, these skills auto-discover:
 
-- **Story file:** `story.{epic}.{story}.{name}.md`
-- **QA reports:** `story.{epic}.{story}.qa.{number}.*.md`
-- **Gate files:** `story.{epic}.{story}.gate.{number}.*.yml`
-- **Bug reports:** `story.{epic}.{story}.bug.{n}.{name}.md`
+- **Story file:** `story.{P}.{E}.{S}.{name}.md`
+- **QA reports:** `story.{P}.{E}.{S}.qa.{number}.*.md`
+- **Gate files:** `story.{P}.{E}.{S}.gate.{number}.*.yml`
+- **Bug reports:** `story.{P}.{E}.{S}.bug.{n}.{name}.md`
 
 ### Examples
 
 ```bash
 # Implement from a story directory
-/develop docs/prd/domain-name/module-name/example-area/epics/epic.178.feature-ui/stories/story.178.8.example-feature/
+/develop docs/prd/domain-name/module-name/example-area/epics/epic.1.178.feature-ui/stories/story.1.178.8.example-feature/
 
 # Review implementation
-/qa-story docs/prd/.../stories/story.178.8.example-feature/
+/qa-story docs/prd/.../stories/story.1.178.8.example-feature/
 
 # Apply QA findings
-/qa-fix docs/prd/.../stories/story.178.8.example-feature/
+/qa-fix docs/prd/.../stories/story.1.178.8.example-feature/
 
 # Specific files also work
-/develop docs/prd/.../story.178.8.example-feature.md
-/qa-story docs/prd/.../story.178.8.example-feature.md
-/qa-fix docs/prd/.../story.178.8.qa.1.initial-review.md
+/develop docs/prd/.../story.1.178.8.example-feature.md
+/qa-story docs/prd/.../story.1.178.8.example-feature.md
+/qa-fix docs/prd/.../story.1.178.8.qa.1.initial-review.md
 ```
 
 ### Supported Skills
@@ -82,7 +82,7 @@ Prefer the orchestrators — they run the full lifecycle automatically.
 ### `develop-story` — Automated Story Lifecycle
 
 ```bash
-/develop-story docs/prd/.../story.178.8.example-feature.md
+/develop-story docs/prd/.../story.1.178.8.example-feature.md
 "Develop and QA this story end to end"
 ```
 
@@ -144,8 +144,8 @@ Outputs: architecture docs, technology stack with versions, data models, API spe
 Slash form:
 
 ```bash
-/qa-story docs/prd/.../stories/story.178.8.example-feature/
-/qa-story story.178.8.example-feature.md
+/qa-story docs/prd/.../stories/story.1.178.8.example-feature/
+/qa-story story.1.178.8.example-feature.md
 ```
 
 Process: risk assessment → requirements traceability → code quality review → test architecture → NFR validation → active refactoring (when safe) → standards compliance.
@@ -160,7 +160,7 @@ Outputs:
 
 ```
 "Create branch for story 178.8"
-/create-branch story.178.8.example-feature.md
+/create-branch story.1.178.8.example-feature.md
 /create-branch --hotfix v1.2.1
 /create-branch --release v1.3.0
 ```
@@ -206,7 +206,7 @@ Modes: interactive (section-by-section, user confirms) or YOLO (one pass, compre
 
 Use when: 1-3 stories, follows existing patterns, low risk, minimal architectural changes.
 
-File naming: `epic.[number].[descriptive-name].md`. Check `/docs/development/epic-registry.md` for unique numbers.
+File naming: `epic.{P}.{E}.{descriptive-name}.md` — `P` is the parent PRD's number, `E` is counted within that PRD by `create-epic`.
 
 ## Configuration
 
@@ -236,8 +236,8 @@ Platform detection (tracker and VCS) resolves from `skills-config.yaml` → env 
 
 ### Story & Epic Management
 
-- Always check epic registry — epic numbers are globally unique
-- Follow numbering: `epic.163.feature-name`
+- Let `create-epic` number the epic — `E` counts within its PRD
+- Follow numbering: `epic.1.163.feature-name`
 - Validate before implementing — run checklists early
 - Review previous stories — learn from past implementations
 

@@ -48,7 +48,7 @@ flowchart TD
 Skip the PRD when the enhancement fits inside a single epic.
 
 ```
-1. /create-epic                 → epic-registry-manager assigns N
+1. /create-epic                 → allocates E within PRD P (epic.{P}.{E})
 2. /review-epic                 → catches scope overlap with existing epics
 3. → Story Development Runbook  (Phase C onwards)
 ```

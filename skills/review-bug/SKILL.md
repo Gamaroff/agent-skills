@@ -37,7 +37,7 @@ Non-interactive GO/NO-GO gate with a 1–10 fix-readiness score. Use when you ne
 
    | Mode | Pattern | Location |
    |------|---------|----------|
-   | story | `story.{epic}.{story}.bug.{n}.{name}.md` | co-located with the story |
+   | story | `story.{P}.{E}.{S}.bug.{n}.{name}.md` | co-located with the story |
    | task | `task.{id}.bug.{n}.{name}.md` | `docs/tasks/task.{id}.{name}/` |
    | general | `bug.{N}.{name}.md` | `docs/bugs/bug.{N}.{name}/` |
 

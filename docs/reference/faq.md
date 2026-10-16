@@ -40,13 +40,13 @@ If you genuinely need to skip Step 7, bypass `develop-*` entirely.
 
 By default the model is one level deep: each story branch is cut from `develop` and its PR targets `develop`, so every accepted story ships on its own. An epic has no branch of its own.
 
-Opt in to an epic integration branch when the epic's stories are not shippable one at a time — for example, they share infrastructure that only makes sense once all of them land. Set `branch_model: epic-integration` in the epic's frontmatter (optionally `integration_branch:` to name it; otherwise `epic/{n}.{slug}`). `/develop-story` then recommends that branch as both base and PR target, creates it on demand, and the epic ships with one `epic/…` → `develop` PR. The keys are configurable under `branching.epicIntegration.*` in [configuration.md](configuration.md).
+Opt in to an epic integration branch when the epic's stories are not shippable one at a time — for example, they share infrastructure that only makes sense once all of them land. Set `branch_model: epic-integration` in the epic's frontmatter (optionally `integration_branch:` to name it; otherwise `epic/{P}.{E}.{slug}`). `/develop-story` then recommends that branch as both base and PR target, creates it on demand, and the epic ships with one `epic/…` → `develop` PR. The keys are configurable under `branching.epicIntegration.*` in [configuration.md](configuration.md).
 
 Tasks don't have this option because tasks are standalone — no parent that collects siblings.
 
-### Why epic numbers globally unique, not unique-per-PRD?
+### Why are epic numbers counted within their PRD?
 
-Because branch names, commit messages, PR titles, and tracker references all carry the number out of context. `epic.178.feature-ui` should be unambiguous in `git log` even if you've forgotten which PRD it came from.
+Because a flat global number said nothing about where an epic belongs, and needed a registry every author had to update in step. An epic id is `epic.{P}.{E}`: the PRD number `P` is globally unique (from the [PRD registry](../standards/prd-registry.md)), and `E` counts within that PRD, so `epic.1.178.feature-ui` stays unambiguous in `git log` and names its PRD. A story is `story.{P}.{E}.{S}` the same way. See [File naming](../standards/file-naming.md).
 
 ## Skill design
 
@@ -72,7 +72,7 @@ To make them self-contained at installation time. The packager bundles shared re
 
 ### Why nested story directories instead of a flat list?
 
-Because the artifacts (plan, review, implementation, QA, DoD, gate) all belong to one story and should be findable together. A flat list of `story.{E}.{S}.{name}.md` becomes an unsearchable mess as soon as you have 50 stories with 5–7 artifacts each.
+Because the artifacts (plan, review, implementation, QA, DoD, gate) all belong to one story and should be findable together. A flat list of `story.{P}.{E}.{S}.{name}.md` becomes an unsearchable mess as soon as you have 50 stories with 5–7 artifacts each.
 
 Nested layout under `${PRD_ROOT}` is a [fixed convention](./configuration.md#configurable-roots-and-fixed-conventions) — there is no flat-layout mode. Only the PRD root itself is configurable.
 

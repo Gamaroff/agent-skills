@@ -37,7 +37,7 @@ The JSON carries everything this sub-routine needs:
 | Key | Use |
 | --- | --- |
 | `mode` | `story` \| `task` \| `general` — drives the parent relationship |
-| `bug_id` | `story.7.4.bug.4` \| `task.67.bug.3` \| `bug.12` — the title prefix |
+| `bug_id` | `story.1.7.4.bug.4` \| `task.67.bug.3` \| `bug.12` — the title prefix |
 | `parent_doc` | the parent story/task document, or the bug registry |
 | `parent_github_issue` | the parent's issue number, when it has one |
 | `has_frontmatter` | whether Step B7 must prepend a block first |
@@ -72,7 +72,7 @@ DEDUP=$(gh issue list --search "in:title \"[${BUG_ID}]\"" --state all \
   --json number,url,state,title 2>/dev/null)
 ```
 
-The search term is the **bug id**, which is unique across the repo — `[story.7.4.bug.4]`, not `[Bug 4]`. A bare bug number repeats in every story and would adopt the wrong issue.
+The search term is the **bug id**, which is unique across the repo — `[story.1.7.4.bug.4]`, not `[Bug 4]`. A bare bug number repeats in every story and would adopt the wrong issue.
 
 - **Search failure** → log `⚠️ GitHub dedup search failed — proceeding to create` and continue to Step B5.
 - **Exactly one match** → adopt it: set `BUG_ISSUE_NUM=$N`; if state is `CLOSED` log `⚠️ Linked existing CLOSED bug issue #${N} — verify intent before continuing.`; skip to Step B6.

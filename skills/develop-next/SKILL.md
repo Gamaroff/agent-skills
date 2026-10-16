@@ -544,7 +544,7 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
    > - Step 4 still ticks the roadmap on `<baseBranch>` as each story merges — correct, the roadmap tracks
    >   stories, not branches.
    > - The epic's work accumulates on the integration branch and **stays there**. Raise and merge the final
-   >   `epic/{n}.{name}` → `<baseBranch>` PR **by hand** once every story is in.
+   >   `epic/{P}.{E}.{name}` → `<baseBranch>` PR **by hand** once every story is in.
    > - Do not read "all this epic's rows are ticked" as "the epic has landed on `<baseBranch>`". It has not.
 
 ## Step 4 — Record the acceptance

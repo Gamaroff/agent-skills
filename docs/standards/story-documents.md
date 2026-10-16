@@ -36,7 +36,7 @@ sub-story carries a capital-letter suffix on `S` (`story.1.2.3A.core-ui`).
 docs/prd/auth/prd.1.login-flow/epics/epic.1.2.feature-ui/stories/story.1.2.1.login-form/story.1.2.1.login-form.md
 ```
 
-> **Interim (2026-10-15, task 202).** Skills adopt this scheme in tasks 204–206. Until then, `create-*` still writes the legacy shape (`story.{E}.{S}.{name}`, `epic: epic.{N}.{name}`) and `doc-id.js parseLegacy` reads it. Branch names below follow the story stem and move with it in task 206.
+> **Adopted (2026-10-16, tasks 202–207).** Every skill writes and reads this scheme through `doc-id.js` (tasks 204–206), and two CI tests hold it (task 207): `doc-numbering-corpus.test.mjs` fails on any unnumbered, mismatched, unregistered or duplicate document under the PRD root, and `doc-id-chokepoint.test.js` fails on an id parsed anywhere but `doc-id.js`. A legacy flat-numbered tree is migrated with `migrate-doc-numbering.mjs`; `doc-id.js parseLegacy` reads the old shapes only for that migration.
 
 Nested story layout under `${PRD_ROOT}` is a [fixed convention](../reference/configuration.md#configurable-roots-and-fixed-conventions) — flat layouts are not supported. The PRD root itself is configurable (default `docs/prd`).
 
@@ -135,21 +135,21 @@ These files are generated automatically by skills during the pipeline. Do not cr
 
 | Model | Story branch | Created from | PR targets | Reaches `develop` |
 |---|---|---|---|---|
-| **Develop-direct** (default) | `feature/story.{E}.{S}.{name}` | `develop` | `develop` | per story, continuously |
-| **Epic integration** (opt-in) | `feature/story.{E}.{S}.{name}` | `epic/{N}.{slug}` | `epic/{N}.{slug}` | once, when the epic branch is merged by hand |
+| **Develop-direct** (default) | `feature/story.{P}.{E}.{S}.{name}` | `develop` | `develop` | per story, continuously |
+| **Epic integration** (opt-in) | `feature/story.{P}.{E}.{S}.{name}` | `epic/{P}.{E}.{slug}` | `epic/{P}.{E}.{slug}` | once, when the epic branch is merged by hand |
 
 Which one is *recommended* in the prompt comes from the parent epic's frontmatter — but the other option is always selectable:
 
 ```yaml
-branch_model: epic-integration      # ⇒ epic/{N}.{slug} leads, "develop" still offered
+branch_model: epic-integration      # ⇒ epic/{P}.{E}.{slug} leads, "develop" still offered
 integration_branch: "epic/178.feature-ui"   # optional — used verbatim when present
 ```
 
 Absent, or `branch_model: develop-direct` ⇒ `develop` leads and the integration branch is offered last, unrecommended. Set `branching.epicIntegration.offerWhenUndeclared: false` in `skills-config.yaml` to drop that trailing option entirely.
 
-Choose epic integration only when the epic's stories are meaningless apart — a workspace foundation, a migration, a compliance boundary — where a partial landing on `develop` is worse than no landing. Long-lived integration branches drift, defer integration, and end in a big-bang merge; `develop` is the default for a reason. Nothing automates the final `epic/{N}.{slug}` → `develop` promotion: raise that PR by hand.
+Choose epic integration only when the epic's stories are meaningless apart — a workspace foundation, a migration, a compliance boundary — where a partial landing on `develop` is worse than no landing. Long-lived integration branches drift, defer integration, and end in a big-bang merge; `develop` is the default for a reason. Nothing automates the final `epic/{P}.{E}.{slug}` → `develop` promotion: raise that PR by hand.
 
-> `epic/{N}.{name}` (integration branch) is **not** `feature/epic.{N}.{name}` (an ordinary short-lived branch for editing the epic *document*, which `/review-epic` creates). Do not substitute one for the other.
+> `epic/{P}.{E}.{name}` (integration branch) is **not** `feature/epic.{P}.{E}.{name}` (an ordinary short-lived branch for editing the epic *document*, which `/review-epic` creates). Do not substitute one for the other.
 
 **Q1 and Q2 must agree.** Basing a story on `epic/178.feature-ui` and then targeting `develop` produces a PR whose diff includes every earlier story in the epic.
 

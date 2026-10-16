@@ -228,7 +228,7 @@ When creating, the script first runs:
 
 ```
 POST /rest/api/3/search/jql
-Body: { "jql": "project = \"RB\" AND labels = \"synced-from-story.1.2.slug\"", "fields": ["summary","updated"], "maxResults": 5 }
+Body: { "jql": "project = \"RB\" AND labels = \"synced-from-story.1.1.2.slug\"", "fields": ["summary","updated"], "maxResults": 5 }
 ```
 
 > **Note**: this is the modern POST `/search/jql` endpoint. Atlassian deprecated the legacy GET `/rest/api/3/search` form on 1 May 2025 (returns `410 Gone` on migrated Jira Cloud tenants).

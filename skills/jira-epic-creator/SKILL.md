@@ -18,7 +18,7 @@ Activate when user needs to:
 
 - "Create this epic in Jira"
 - "Sync epic to Jira"
-- "Publish epic.1.aml-risk-dashboard to Jira"
+- "Publish epic.1.1.aml-risk-dashboard to Jira"
 - "Use the script to create epic on Jira"
 
 ## Prerequisites

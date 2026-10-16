@@ -20,7 +20,7 @@ Canonical filename patterns used across the library. Skills enforce these patter
 `P` is the PRD number, `E` counts epics within that PRD and `S` counts stories within that epic. A
 sub-story carries a capital-letter suffix on `S`: `story.1.2.3A.core-ui.md`.
 
-> **Interim (2026-10-15, tasks 202, 204 and 205).** `create-prd` writes `prd.{P}.{name}` (task 204) and the epic skills write `epic.{P}.{E}.{name}` (task 205). Until task 206, `create-story` still writes the legacy `story.{epic}.{story}.{name}`, and `doc-id.js parseLegacy` reads every legacy shape.
+> **Adopted (2026-10-16, tasks 202–207).** Every skill writes and reads this scheme through `doc-id.js` (tasks 204–206), and two CI tests hold it (task 207): `doc-numbering-corpus.test.mjs` fails on any unnumbered, mismatched, unregistered or duplicate document under the PRD root, and `doc-id-chokepoint.test.js` fails on an id parsed anywhere but `doc-id.js`. A legacy flat-numbered tree is migrated with `migrate-doc-numbering.mjs`; `doc-id.js parseLegacy` reads the old shapes only for that migration.
 
 | Artifact | Pattern | Example |
 |---|---|---|

@@ -132,8 +132,7 @@ Done or repeat fix cycle
 ## Epic workflow
 
 ```
-1. epic-registry-manager → assign unique epic number, validate filename, update registry
-2. create-epic           → epic document with stories breakdown
+1. create-epic           → epic.{P}.{E} document with stories breakdown — E allocated within the PRD by doc-id.js
 3. review-epic           → validate quality, detect scope overlap
 4. create-story          → derive stories from the epic
 ```

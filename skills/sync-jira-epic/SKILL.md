@@ -230,7 +230,7 @@ When creating, the script first runs:
 
 ```
 POST /rest/api/3/search/jql
-{ "jql": "project = \"RB\" AND labels = \"synced-from-epic.1.foundation\"",
+{ "jql": "project = \"RB\" AND labels = \"synced-from-epic.1.1.foundation\"",
   "fields": ["summary", "updated"], "maxResults": 2 }
 ```
 

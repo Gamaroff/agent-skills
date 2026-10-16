@@ -487,7 +487,7 @@ Gate files are co-located alongside their story or task — not under `docs/qa/g
 
 ```yaml
 schema: 2
-story: "{epic}.{story}"
+story: "{prd}.{epic}.{story}"
 gate: PASS|CONCERNS|FAIL|WAIVED
 status_reason: "{1-2 sentence explanation}"
 reviewer: "QA Engineer"
@@ -501,7 +501,7 @@ waiver: { active: false }
 
 ```yaml
 schema: 2
-story: "{epic}.{story}"
+story: "{prd}.{epic}.{story}"
 story_title: "{story title}"
 gate: PASS|CONCERNS|FAIL|WAIVED
 status_reason: "{1-2 sentence explanation}"

@@ -19,21 +19,21 @@ Use this skill when you need to:
 Natural language triggers:
 
 - "Edit epic 178 to change priority to high"
-- "Update epic.246.feature-and-interface.md to add new story"
+- "Update epic.1.246.feature-and-interface.md to add new story"
 - "Modify epic 163 success criteria"
 
 **Slash Command Usage:**
 
 ```bash
 # Using epic directory (auto-discovers epic file)
-/edit-epic ${PRD_ROOT}/domain-name/module-name/example-area/epics/epic.178.feature-ui/
+/edit-epic ${PRD_ROOT}/domain-name/module-name/example-area/epics/epic.1.178.feature-ui/
 
 # Using specific epic file
-/edit-epic ${PRD_ROOT}/domain-name/module-name/example-area/epics/epic.178.feature-ui/epic.178.feature-ui.md
+/edit-epic ${PRD_ROOT}/domain-name/module-name/example-area/epics/epic.1.178.feature-ui/epic.1.178.feature-ui.md
 
 # Natural language
 "Edit epic 178 to update dependencies"
-"Use @edit-epic for epic.246.feature-and-interface.md"
+"Use @edit-epic for epic.1.246.feature-and-interface.md"
 ```
 
 **Related Skills**:
@@ -50,8 +50,8 @@ Natural language triggers:
 
 You can invoke this skill with either:
 
-- **A specific epic file**: `epic.178.feature-ui.md`
-- **An epic directory**: `epics/epic.178.feature-ui/`
+- **A specific epic file**: `epic.1.178.feature-ui.md`
+- **An epic directory**: `epics/epic.1.178.feature-ui/`
 
 **File Discovery Logic:**
 
@@ -82,9 +82,9 @@ When given a file path:
 **Example:**
 
 ```
-Input: ${PRD_ROOT}/.../epics/epic.178.feature-ui/
-Discovers: epic.178.feature-ui.md
-Rejects: story.178.1.search-by-handle.md (if provided)
+Input: ${PRD_ROOT}/.../epics/epic.1.178.feature-ui/
+Discovers: epic.1.178.feature-ui.md
+Rejects: story.1.178.1.search-by-handle.md (if provided)
 ```
 
 ---
@@ -260,7 +260,7 @@ If validation fails, present findings to user:
 
    1. [CONFLICT TYPE]
       Epic Change: {description of proposed change}
-      Affected Story: story.{epic}.{story}.{name}.md
+      Affected Story: story.{P}.{E}.{S}.{name}.md
       Issue: {description of conflict}
       Recommendation: {suggested resolution}
 
@@ -465,8 +465,8 @@ Request user approval:
 **Valid Patterns:**
 
 - `epic.1.3.module-security.md` ✓
-- `epic.246.feature-and-interface.md` ✓
-- `epic.178.feature-ui.md` ✓
+- `epic.1.246.feature-and-interface.md` ✓
+- `epic.1.178.feature-ui.md` ✓
 
 **Invalid Patterns:**
 
@@ -576,10 +576,10 @@ Request user approval:
 **Low-risk path (metadata/priority change — no blocking gate):**
 
 ```
-User: /edit-epic epic.178.feature-ui/ "Update priority to high"
+User: /edit-epic epic.1.178.feature-ui/ "Update priority to high"
 
 Agent:
-1. Discovers: epic.178.feature-ui.md ✓
+1. Discovers: epic.1.178.feature-ui.md ✓
 2. Loads epic and parses structure
 2b. Classifies change: priority → LOW RISK
 3. Validates: Pre-edit checks pass ✓
@@ -597,10 +597,10 @@ Agent:
 **High-risk path (structural change — full gate):**
 
 ```
-User: /edit-epic epic.178.feature-ui/ "Remove story 3 and add dependency on epic-163"
+User: /edit-epic epic.1.178.feature-ui/ "Remove story 3 and add dependency on epic-163"
 
 Agent:
-1. Discovers: epic.178.feature-ui.md ✓
+1. Discovers: epic.1.178.feature-ui.md ✓
 2. Loads epic and parses structure
 2b. Classifies change: Stories Breakdown + dependency → STRUCTURAL (highest risk)
 3. Validates: Pre-edit checks pass ✓

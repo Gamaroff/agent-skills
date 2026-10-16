@@ -450,7 +450,7 @@ Run the **docs guard** (Step 1a) before the cascade. `DOCS=absent` skips rungs 1
 > item. Both fail quietly, which is the worst shape for a resolver whose job is to be right about
 > *which document this is*. Rung 2 gets its anchoring from §0a, below.
 
-Rung 1 handles `task.{N}.*`, `story.{E}.{S}.*`, `epic.{N}.*` and `bug.{N}.*`. Rungs 4–5 reuse the cascade already documented in [`references/develop-pipeline-step-0-resolve-and-prepare.md`](references/develop-pipeline-step-0-resolve-and-prepare.md) § 0a — do not reinvent it. Rungs 2 and 4 **are** [§0a Key → document lookup](references/develop-pipeline-step-0-resolve-and-prepare.md#key--document-lookup) — rung 2 with `KEY_FIELD=pr_number`, rung 4 with the key or number the PR body names: anchored, quote-tolerant, the work-item rule applied, and a HALT on several matches. Rung 2 was a bare `grep` before task.177, so a review of PR 290 anchored on `bug.3.dod.1…md`, the one file carrying `pr_number: 290` — a DoD summary, not the bug.
+Rung 1 handles `task.{N}.*`, `story.{P}.{E}.{S}.*`, `epic.{P}.{E}.*` and `bug.{N}.*`. Rungs 4–5 reuse the cascade already documented in [`references/develop-pipeline-step-0-resolve-and-prepare.md`](references/develop-pipeline-step-0-resolve-and-prepare.md) § 0a — do not reinvent it. Rungs 2 and 4 **are** [§0a Key → document lookup](references/develop-pipeline-step-0-resolve-and-prepare.md#key--document-lookup) — rung 2 with `KEY_FIELD=pr_number`, rung 4 with the key or number the PR body names: anchored, quote-tolerant, the work-item rule applied, and a HALT on several matches. Rung 2 was a bare `grep` before task.177, so a review of PR 290 anchored on `bug.3.dod.1…md`, the one file carrying `pr_number: 290` — a DoD summary, not the bug.
 
 **Rung 4 must match both shapes.** A Bitbucket PR description carries `PROJ-123`, never `#{N}`; matching only the GitHub shape makes this rung dead on exactly the Bitbucket + Jira combination the skill exists to support.
 
@@ -468,7 +468,7 @@ sprint-review-summary.md
 writes it beside every accepted work item with the item's key. `.request.` is there because a `{kind}.{N}.request.{n}.*.md` carries the same `jira_key` as its work
 item, so without it a key lookup returns two files and the work item is ambiguous.
 
-Story documents are **not** in `docs/stories/`. They nest under `${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.{name}/stories/story.{E}.{S}.{name}/`. Glob across `docs/`; never assume one root.
+Story documents are **not** in `docs/stories/`. They nest under `${PRD_ROOT}/{domain}/{feature}/epics/epic.{P}.{E}.{name}/stories/story.{P}.{E}.{S}.{name}/`. Glob across `docs/`; never assume one root.
 
 ### Step 3 — Collect the paper trail
 
@@ -708,7 +708,7 @@ Co-located with the work item, using the `.pr-review.{n}.` artifact kind:
 
 ```
 docs/tasks/task.65.registry-aware-selection/task.65.pr-review.1.registry-aware-selection.md
-{story-dir}/story.2.1.pr-review.1.capture-prd-as-worked-example.md
+{story-dir}/story.1.2.1.pr-review.1.capture-prd-as-worked-example.md
 ```
 
 `{n}` is computed, never counted by eye — run, from the repository root:

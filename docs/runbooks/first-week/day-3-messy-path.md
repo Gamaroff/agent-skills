@@ -47,7 +47,7 @@ Most of `/develop-story`'s value is in the iteration loop. If your first 5 stori
 - [ ] `/develop-story` — let the pipeline run through to `qa-gate`
 - [ ] Observe the FAIL gate artifact in your story directory
 
-**Expected artifact:** `story.{epic}.{story}.gate.1.*.yml` with `decision: FAIL` (or `CONCERNS` flagging line-count overage)
+**Expected artifact:** `story.{P}.{E}.{S}.gate.1.*.yml` with `decision: FAIL` (or `CONCERNS` flagging line-count overage)
 
 ---
 
@@ -58,7 +58,7 @@ Most of `/develop-story`'s value is in the iteration loop. If your first 5 stori
 - [ ] Re-run `qa-gate` (or let the `/develop-story` `qa-fix` loop handle it automatically)
 - [ ] Observe the PASS gate artifact
 
-**Expected artifact:** `story.{epic}.{story}.gate.2.*.yml` with `decision: PASS`
+**Expected artifact:** `story.{P}.{E}.{S}.gate.2.*.yml` with `decision: PASS`
 
 ---
 

@@ -211,7 +211,7 @@ Extract a meaningful title from the branch name or commits:
 **From branch name:**
 
 ```
-feature/story.180.3.quick-re-search-functionality
+feature/story.1.180.3.quick-re-search-functionality
  → feat(story.180.3): quick re-search functionality
 ```
 
@@ -473,7 +473,7 @@ Provide the user with the PR URL and summary:
 
    Title: feat(story.180.3): quick re-search functionality
    URL: https://github.com/org/repo/pull/123
-   Base: develop ← feature/story.180.3.quick-re-search-functionality
+   Base: develop ← feature/story.1.180.3.quick-re-search-functionality
    Issue: #42 commented (or "not linked" if GITHUB_ISSUE unset)
 
 Next steps:
@@ -737,7 +737,7 @@ Output:
 
      Title: feat(story.180.3): quick re-search functionality
      URL: https://github.com/your-org/your-repo/pull/456
-     Base: develop ← feature/story.180.3.quick-re-search-functionality
+     Base: develop ← feature/story.1.180.3.quick-re-search-functionality
 ```
 
 ### Draft Hotfix PR

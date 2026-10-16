@@ -48,21 +48,21 @@ Issue documents follow the same pattern as bug reports, using `issue` instead of
 ### Story Issues
 
 ```
-story.{epic}.{story}.issue.{n}.{descriptive-name}.md
+story.{P}.{E}.{S}.issue.{n}.{descriptive-name}.md
 ```
 
 **Examples**:
 
-- `story.179.5.issue.1.privacy-settings-mobile-ui.md`
-- `story.180.3.issue.2.search-debounce-timing.md`
+- `story.1.179.5.issue.1.privacy-settings-mobile-ui.md`
+- `story.1.180.3.issue.2.search-debounce-timing.md`
 
 **Location**: Co-located in the story directory:
 
 ```
-${PRD_ROOT}/.../stories/story.180.3.quick-re-search/
-├── story.180.3.quick-re-search.md
-├── story.180.3.issue.1.debounce-timing.md    ← New issue
-└── story.180.3.bug.1.search-crash.md         ← Existing bug (from QA)
+${PRD_ROOT}/.../stories/story.1.180.3.quick-re-search/
+├── story.1.180.3.quick-re-search.md
+├── story.1.180.3.issue.1.debounce-timing.md    ← New issue
+└── story.1.180.3.bug.1.search-crash.md         ← Existing bug (from QA)
 ```
 
 ### Task Issues
@@ -92,17 +92,17 @@ docs/tasks/task.4.nx-monorepo-structure-audit/
 Parse the input to determine:
 
 1. **Source type**: Story or Task
-2. **Source ID**: `{epic}.{story}` or `{task-id}`
+2. **Source ID**: `{prd}.{epic}.{story}` or `{task-id}`
 3. **Source directory**: Where to create the issue file
 
 **Input Examples**:
 
 ```bash
 # Story directory
-/create-issue ${PRD_ROOT}/.../stories/story.180.3.quick-re-search/
+/create-issue ${PRD_ROOT}/.../stories/story.1.180.3.quick-re-search/
 
 # Story file
-/create-issue story.180.3.quick-re-search.md "Title" "Description"
+/create-issue story.1.180.3.quick-re-search.md "Title" "Description"
 
 # Task directory
 /create-issue docs/tasks/task.4.nx-monorepo-structure-audit/
@@ -117,7 +117,7 @@ Search the source directory for existing issue files:
 
 ```bash
 # For stories
-ls story.{epic}.{story}.issue.*.md
+ls story.{P}.{E}.{S}.issue.*.md
 
 # For tasks
 ls task.{id}.issue.*.md
@@ -191,7 +191,7 @@ body_file=$(mktemp)
 cat > "$body_file" <<'EOF'
 ## Context
 
-Related to: story.180.3.quick-re-search
+Related to: story.1.180.3.quick-re-search
 
 ## Description
 
@@ -200,8 +200,8 @@ Related to: story.180.3.quick-re-search
 ## Source
 
 - **From PR**: #{pr_number} (if applicable)
-- **Story/Task**: story.180.3.quick-re-search
-- **Local Doc**: `${PRD_ROOT}/<domain>/<feature>/epics/epic.180.<name>/stories/story.180.3.quick-re-search/story.180.3.issue.1.debounce-timing.md`
+- **Story/Task**: story.1.180.3.quick-re-search
+- **Local Doc**: `${PRD_ROOT}/<domain>/<feature>/epics/epic.180.<name>/stories/story.1.180.3.quick-re-search/story.1.180.3.issue.1.debounce-timing.md`
 
 ## Acceptance Criteria
 
@@ -384,9 +384,9 @@ Create the issue file in the source directory. Use the appropriate tracker refer
 ```markdown
 # Issue: {Title}
 
-**Issue ID**: story.{epic}.{story}.issue.{n}
+**Issue ID**: story.{P}.{E}.{S}.issue.{n}
 **Tracker Issue**: {PROJ-123 (https://yourorg.atlassian.net/browse/PROJ-123) | #45 (https://github.com/...) | #45 (https://bitbucket.org/...)}
-**Related Story**: [Story {epic}.{story}: {title}](./story.{epic}.{story}.{name}.md)
+**Related Story**: [Story {prd}.{epic}.{story}: {title}](./story.{P}.{E}.{S}.{name}.md)
 **Status**: 🆕 Open
 **Type**: {bug | enhancement | task}
 **Priority**: {high | medium | low}
@@ -420,7 +420,7 @@ Create the issue file in the source directory. Use the appropriate tracker refer
 
 Once work begins:
 
-- **Branch**: `feature/story.{epic}.{story}.issue.{n}.{name}` or `fix/...`
+- **Branch**: `feature/story.{P}.{E}.{S}.issue.{n}.{name}` or `fix/...`
 - **Created**: {date}
 - **PR**: #{pr_number}
 
@@ -454,7 +454,7 @@ Add a link to the issue in the source story/task's issues section.
 
 | ID      | Title                                                       | Status  | Priority | Tracker                |
 | ------- | ----------------------------------------------------------- | ------- | -------- | ---------------------- |
-| issue.1 | [Debounce timing](./story.180.3.issue.1.debounce-timing.md) | 🆕 Open | Medium   | [PROJ-45](https://...) |
+| issue.1 | [Debounce timing](./story.1.180.3.issue.1.debounce-timing.md) | 🆕 Open | Medium   | [PROJ-45](https://...) |
 ```
 
 **For Tasks** - Add or update `### Issues` section:
@@ -475,11 +475,11 @@ For **Jira**:
    Jira Issue: PROJ-45
    URL: https://yourorg.atlassian.net/browse/PROJ-45
 
-   Local Document: story.180.3.issue.1.debounce-timing.md
-   Location: ${PRD_ROOT}/.../stories/story.180.3.quick-re-search/
+   Local Document: story.1.180.3.issue.1.debounce-timing.md
+   Location: ${PRD_ROOT}/.../stories/story.1.180.3.quick-re-search/
 
 Next Steps:
-   1. Start work: /create-branch story.180.3.issue.1.debounce-timing.md
+   1. Start work: /create-branch story.1.180.3.issue.1.debounce-timing.md
    2. Implement the fix
    3. Commit: /commit-changes
    4. Create PR: /create-pr
@@ -511,10 +511,10 @@ The issue document integrates seamlessly with the Gitflow skills:
 
 ```bash
 # 1. Create the issue (this skill)
-/create-issue story.180.3.md "Add loading spinner" "User reported slow feedback"
+/create-issue story.1.180.3.md "Add loading spinner" "User reported slow feedback"
 
 # 2. Start work on the issue
-/create-branch story.180.3.issue.1.loading-spinner.md
+/create-branch story.1.180.3.issue.1.loading-spinner.md
 
 # 3. Implement, then commit
 /commit-changes
@@ -541,7 +541,7 @@ Apply GitHub labels based on context:
 
 | Type        | Labels                                             |
 | ----------- | -------------------------------------------------- |
-| Story Issue | `story.{epic}`, `{type}`                           |
+| Story Issue | `story.{P}.{E}`, `{type}`                         |
 | Task Issue  | `technical`, `{type}`                              |
 | From PR     | `from-pr-review`                                   |
 | Priority    | `priority:high`, `priority:medium`, `priority:low` |
@@ -650,7 +650,7 @@ Options:
 
 ```
 Input:
-/create-issue story.180.3.quick-re-search.md \
+/create-issue story.1.180.3.quick-re-search.md \
   --title "Search debounce should be 300ms not 500ms" \
   --type enhancement \
   --from-pr 123
@@ -659,10 +659,10 @@ Output:
 ✅ Issue Created!
 
    GitHub Issue: #47
-   Local Document: story.180.3.issue.1.search-debounce-timing.md
+   Local Document: story.1.180.3.issue.1.search-debounce-timing.md
 
 Next Steps:
-   /create-branch story.180.3.issue.1.search-debounce-timing.md
+   /create-branch story.1.180.3.issue.1.search-debounce-timing.md
 ```
 
 ### Tech Debt Discovery
