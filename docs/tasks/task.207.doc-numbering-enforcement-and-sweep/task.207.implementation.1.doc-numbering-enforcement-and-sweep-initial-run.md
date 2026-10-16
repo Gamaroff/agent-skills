@@ -3,7 +3,7 @@
 **Task**: `task.207.doc-numbering-enforcement-and-sweep.md`
 **Run Number**: 1
 **Started**: 2026-10-16 16:40
-**Status**: Escalated
+**Status**: In Progress
 
 ---
 
@@ -162,6 +162,13 @@ Add the corpus and chokepoint CI guards for hierarchical doc numbering and sweep
 
 ---
 
+### Steps 5–6 — user-approved fix cycle 7 and gate 8 — 2026-10-16
+
+- Fix cycle 7 (`4be7d8d3`): mixed-id examples (finalise ×4, develop, qa-gate ×2, qa-story); `FLAT_NAME` widened, level placeholders and a lone capital spared; four mutations red; CR7-5 and CR7-8 moved to Deferred Work. Fast gate exit 0. qa-fix-7 comments posted.
+- Gate 8 PASS 90 (reviewer 19:23:21Z, `duration_ms` 126106). Cosmetic-residue exit: CR8-1..3 carried. BUG-3 closed. Report status returns to In Progress for 5c.
+
+---
+
 ## Issues Log
 
 ### QA Loop Limit Reached — 2026-10-16
@@ -264,7 +271,16 @@ _Track each QA review/fix cycle._
 **MEDIUM findings**: 3
 **PR Review**: not reached — gate did not exit the loop
 **Loop exit**: n/a — this exit not taken
-**Action**: Paused — awaiting the user's decision
+**Action**: Running qa-fix (cycle 7, user-approved)
+
+### QA Cycle 8 — 2026-10-16
+**Gate Result**: PASS
+**Issues Found**: 3 LOW (CR8-1..3), carried to recommendations.future
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: pending — 5c not yet run
+**Loop exit**: Cosmetic-residue exit taken — PASS gate at cycle 8 with HIGH 0 for cycles 7 and 8; all 3 open findings are LOW and are carried to the gate's recommendations.future by id (TASK-207-CR8-1, TASK-207-CR8-2, TASK-207-CR8-3). This is a CLEAN exit, not a stall: nothing is blocked and nothing is being accepted over; a full qa-fix cycle for cosmetic findings is what this route exists to avoid.
+**Action**: Proceeding to 5c (PR conformance review)
 
 ---
 

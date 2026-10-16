@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa
+status: closed
 severity: Major
 priority: Medium
 created: 2026-10-16
@@ -14,7 +14,7 @@ description: "review-epic report numbering glob still uses the flat epic number"
 **Bug ID**: TASK-207-BUG-3
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 1, finding CR-3)
 **Date Found**: 2026-10-16
 **Location**: `skills/review-epic/SKILL.md:571`
@@ -171,3 +171,4 @@ Rewrite the glob and template to `epic.{P}.{E}`; sweep the other `epic.[N]` / `{
 | 2026-10-16 | Reopened | qa-task | Correction: closed in error — CR7-1..3 are residues of this same class (task.207.qa.7) |
 | 2026-10-16 | In Progress | qa-fix | Fix cycle 7 started (user-approved) |
 | 2026-10-16 | Ready for QA | qa-fix | Fixed in QA fix cycle 7 |
+| 2026-10-16 | Closed | qa-task | Verified by task.207.qa.8.doc-numbering-enforcement-and-sweep.md |

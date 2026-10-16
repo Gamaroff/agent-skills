@@ -536,24 +536,24 @@ unaffected and listed as such.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-16
-**Quality Score**: 70/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 90/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.207.qa.7.doc-numbering-enforcement-and-sweep.md](./task.207.qa.7.doc-numbering-enforcement-and-sweep.md)
-- **Gate File**: [task.207.gate.7.doc-numbering-enforcement-and-sweep.yml](./task.207.gate.7.doc-numbering-enforcement-and-sweep.yml)
+- **Full Report**: [task.207.qa.8.doc-numbering-enforcement-and-sweep.md](./task.207.qa.8.doc-numbering-enforcement-and-sweep.md)
+- **Gate File**: [task.207.gate.8.doc-numbering-enforcement-and-sweep.yml](./task.207.gate.8.doc-numbering-enforcement-and-sweep.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 18
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Cycle 7: no HIGH; layout and trees clean. Three mixed-id examples, a FLAT_LITERAL name-start gap, and the guide's story layout vs its new links remain.
+PASS at cycle 8; three LOW cleanups carried to recommendations.future (route 2b) and to Deferred Work.
 
 ## Change Log
 
@@ -579,6 +579,7 @@ Cycle 7: no HIGH; layout and trees clean. Three mixed-id examples, a FLAT_LITERA
 | 2026-10-16 |         | QA findings fixed (user-approved cycle 6) — enumerated layout/literal/tree sweep, 15 prose files; §5 parent, literal and tree checks | qa-fix |
 | 2026-10-16 |         | QA gate CONCERNS (70/100) — 3 medium, 1 low; BUG-3 still open (task.207.qa.7) | qa-task |
 | 2026-10-16 |         | QA findings fixed (user-approved cycle 7) — mixed-id examples, FLAT_LITERAL name start; guide story layout and ASCII trees moved to Deferred Work | qa-fix |
+| 2026-10-16 |         | QA gate PASS (90/100) — 3 LOW carried to future (route 2b); BUG-3 closed (task.207.qa.8) | qa-task |
 
 <!-- change-log-end -->
 
@@ -668,6 +669,9 @@ review-epic `awk` (§1, §3, §4); an id regex in a title-only allowlisted file 
   layout change, not numbering — owner: a follow-up task, together with the next three items.
 - **§5's tree check reads box-drawing trees only** (CR7-8): an ASCII tree (`+--`, `|`) or an
   `epics/ ← note` annotation is not checked. None exists in the repository today.
+- **Cosmetic LOWs carried at gate 8 (route 2b)**: `TASK-207-CR8-1` (`FLAT_NAME` should spare level
+  placeholders rather than require a name keyword), `TASK-207-CR8-2` (four flat-intent glob examples:
+  `edit-epic:609`, `create-pr:294,435`, `anti-patterns.md:87`), `TASK-207-CR8-3` (rewrap one comment).
 - **Pre-existing items QA routed to `recommendations.future`**: `create-epic`'s milestone override
   clause; `review-pipeline-step-0a` cross-block reads; `doc-id.parse` hardening (`../`, newline, NUL);
   `story-template.md`'s `../epics/` links; `qa-gate-template.yaml` naming; backfill reuse of
