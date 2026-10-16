@@ -1535,7 +1535,7 @@ You are **AUTHORIZED** to update the following sections in story/task files:
 
 **QA Report Location and Naming:**
 
-- **Stories**: `story.[epic].[story].qa.[number].[descriptive-name].md`
+- **Stories**: `story.[P].[E].[S].qa.[number].[descriptive-name].md`
 - **Tasks**: `task.[number].qa.[number].[descriptive-name].md`
 - **MUST co-locate with the story/task file in the same directory**
 
@@ -1766,8 +1766,8 @@ Re-enumerated {the boundary's inputs, named} and tested each against the current
 
 ---
 
-**QA Report Reference**: `story.[epic].[story].qa.[number].[descriptive-name].md` (co-located)
-**Gate File**: `story.[epic].[story].gate.[number].[descriptive-name].yml` (co-located)
+**QA Report Reference**: `story.[P].[E].[S].qa.[number].[descriptive-name].md` (co-located)
+**Gate File**: `story.[P].[E].[S].gate.[number].[descriptive-name].yml` (co-located)
 
 ````
 
@@ -1807,7 +1807,7 @@ gate once it is written.
 **CRITICAL: Gate files MUST be co-located with story/task files (Updated 2025-12-09)**
 
 **Gate File Location and Naming:**
-- **Stories**: `story.[epic].[story].gate.[number].[descriptive-name].yml`
+- **Stories**: `story.[P].[E].[S].gate.[number].[descriptive-name].yml`
 - **Tasks**: `task.[number].gate.[number].[descriptive-name].yml`
 - **MUST co-locate with the story/task file in the same directory**
 - Examples:
@@ -1958,8 +1958,8 @@ For each issue in `top_issues`, include a `suggested_owner`:
 
 After review:
 
-1. Create QA report file: `story.[epic].[story].qa.[number].[descriptive-name].md` (co-located with story file)
-2. Create quality gate file: `story.[epic].[story].gate.[number].[descriptive-name].yml` (co-located with story file — the directory `qa-cycle.sh` searches; a gate written elsewhere is one no later step finds, obs #194)
+1. Create QA report file: `story.[P].[E].[S].qa.[number].[descriptive-name].md` (co-located with story file)
+2. Create quality gate file: `story.[P].[E].[S].gate.[number].[descriptive-name].yml` (co-located with story file — the directory `qa-cycle.sh` searches; a gate written elsewhere is one no later step finds, obs #194)
 3. **Update Story/Task File with QA Results**:
 
    **Replace the whole `## QA Testing Results` section from the gate just written — never patch
@@ -1984,8 +1984,8 @@ After review:
 
    ### QA Report
 
-   - **Full Report**: [story.[epic].[story].qa.[number].[descriptive-name].md](./story.[epic].[story].qa.[number].[descriptive-name].md)
-   - **Gate File**: [story.[epic].[story].gate.[number].[descriptive-name].yml](./story.[epic].[story].gate.[number].[descriptive-name].yml)
+   - **Full Report**: [story.[P].[E].[S].qa.[number].[descriptive-name].md](./story.[P].[E].[S].qa.[number].[descriptive-name].md)
+   - **Gate File**: [story.[P].[E].[S].gate.[number].[descriptive-name].yml](./story.[P].[E].[S].gate.[number].[descriptive-name].yml)
 
    ### Test Coverage Summary
 
@@ -2194,8 +2194,8 @@ cat > "$BODY_FILE" <<'EOF'
 
 ### 📋 QA Artifacts
 
-- **QA Report**: [story.[epic].[story].qa.[number].[descriptive-name].md](path/to/report.md)
-- **Gate File**: [story.[epic].[story].gate.[number].[descriptive-name].yml](path/to/gate.yml)
+- **QA Report**: [story.[P].[E].[S].qa.[number].[descriptive-name].md](path/to/report.md)
+- **Gate File**: [story.[P].[E].[S].gate.[number].[descriptive-name].yml](path/to/gate.yml)
 
 ### ✅ Summary
 
@@ -2461,7 +2461,7 @@ When issues are found during story review, create bug reports following the docu
 
 **Unhappy Path (Issues Found)**:
 
-1. QA creates QA report: `story.[epic].[story].qa.[number].[descriptive-name].md`
+1. QA creates QA report: `story.[P].[E].[S].qa.[number].[descriptive-name].md`
 2. QA creates bug report files for each HIGH/MEDIUM severity issue
 3. QA updates story status to "Reopened"
 4. Iterative fix cycle begins (detailed below)
@@ -2494,7 +2494,7 @@ Review all issues found and categorize by severity:
 
 Use sequential numbering within each story:
 
-**Format**: `story.[epic].[story].bug.[bug-number].[descriptive-name].md`
+**Format**: `story.[P].[E].[S].bug.[bug-number].[descriptive-name].md`
 
 **Examples**:
 
@@ -2517,8 +2517,8 @@ Use sequential numbering within each story:
 **Required Bug Report Sections**:
 
 ```markdown
-**Bug ID**: story.[epic].[story].bug.[bug-number].[description]
-**Related Story**: [[Story [Epic].N] [Story Name]](./story.[epic].[story].[name].md)
+**Bug ID**: story.[P].[E].[S].bug.[bug-number].[description]
+**Related Story**: [[Story [P].[E].N] [Story Name]](./story.[P].[E].[S].[name].md)
 **Status**: 🆕 New
 **Priority**: Critical | High | Medium | Low
 **Severity**: Blocker | Major | Minor | Trivial
@@ -3312,7 +3312,7 @@ This traceability feeds into quality gates:
 
 **QA Reports**:
 
-- Stories: `story.[epic].[story].qa.[number].[descriptive-name].md` (co-located with story)
+- Stories: `story.[P].[E].[S].qa.[number].[descriptive-name].md` (co-located with story)
 - Tasks: `task.[number].qa.[number].[descriptive-name].md` (co-located with task)
 
 **Gate Files** — the `[number]` after `gate.` is the QA cycle, and it is **load-bearing**: it is the
@@ -3321,7 +3321,7 @@ from the gate filename. A gate written without it cannot be keyed to a cycle, an
 rather than guesses (task.121). Every writer (`qa-gate`, `qa-story`, `qa-task`) produces the numbered
 form; the un-numbered form this section once documented is not valid.
 
-- Stories: `story.[epic].[story].gate.[number].[descriptive-name].yml` (co-located with story)
+- Stories: `story.[P].[E].[S].gate.[number].[descriptive-name].yml` (co-located with story)
 - Tasks: `task.[number].gate.[number].[descriptive-name].yml` (co-located with task)
 
 **NFR Assessments**: `{qa.qaLocation}/assessments/{prd}.{epic}.{story}-nfr-{YYYYMMDD}.md` (legacy, deprecated)

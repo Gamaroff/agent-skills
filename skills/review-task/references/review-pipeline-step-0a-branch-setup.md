@@ -170,8 +170,16 @@ esac
 #### review-epic
 
 ```bash
+# 0a.3 review-epic — every value re-derived HERE: 0a.1's and 0a.2's blocks are other shells, and an
+# unbound PRD_NUM/EPIC_NUM collapsed the pattern to `feature/epic..*` so the skip never fired (task.207
+# QA cycle 1, CR-1). DOC_FILE is the epic document. Empty on a detached HEAD: no skip.
+EPIC_ID_JSON=$(command node "$PWD/.agents/skills/review-epic/references/doc-id.js" parse "$(basename "$DOC_FILE")" --json) \
+  || { echo "❌ $(basename "$DOC_FILE") is not an epic id doc-id can read"; exit 1; }
+PRD_NUM=$(printf '%s' "$EPIC_ID_JSON" | jq -r '.prd')
+EPIC_NUM=$(printf '%s' "$EPIC_ID_JSON" | jq -r '.epic')
+CURRENT_BRANCH=$(git branch --show-current)
 case "$CURRENT_BRANCH" in
-  feature/epic.${PRD_NUM}.${EPIC_NUM}.*) BRANCH_NAME="$CURRENT_BRANCH"; AUTO_SKIPPED=true ;;
+  "feature/epic.${PRD_NUM}.${EPIC_NUM}."*) BRANCH_NAME="$CURRENT_BRANCH"; AUTO_SKIPPED=true ;;
 esac
 ```
 

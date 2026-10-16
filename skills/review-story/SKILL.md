@@ -552,7 +552,7 @@ Actions:
    - Bug Reports
 
 2. **File Naming Convention**:
-   - MUST follow: `story.[epic].[story].[descriptive-name].md`
+   - MUST follow: `story.[P].[E].[S].[descriptive-name].md`
    - Use DOTS (.) for structural separators
    - Use hyphens (-) within descriptive names
    - Examples:

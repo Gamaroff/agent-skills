@@ -14,6 +14,14 @@ PRIO_SCRIPT="$(git rev-parse --show-toplevel)/skills/ensure-story-github-issue/r
 
 fm() { awk -v key="$1" 'BEGIN{p=0} /^---$/{p++; next} p==1 && $1==key":" {sub(/^[^:]*: */,""); gsub(/^["'\'']|["'\'']$/,""); print; exit}' "$2"; }
 
+# The title-prefix rule is doc-id.js's (`[Story 1.2.3] `, `Story 1.2.3: `, `Epic 1.2 — `), never a
+# private sed: a sed here stripped only `Story E.S` and left `.3:` on a hierarchical title (task.207
+# QA cycle 1, CR-4/CR-5).
+strip_id_prefix() {
+  command node -e 'process.stdout.write(require(process.argv[1]).stripIdPrefix(process.argv[2], process.argv[3]))' \
+    "$(git rev-parse --show-toplevel)/shared/resources/doc-id.js" "$1" "$2"
+}
+
 extract_section() {
   # $1 = heading name, $2 = file. Prints lines from "## $1" up to next "## " (exclusive).
   awk -v h="## $1" '
@@ -49,11 +57,11 @@ for STORY_FILE in "$@"; do
   EPIC_FILE="${EPIC_DIR}/$(basename "$EPIC_DIR").md"
   EPIC_GH=$(fm github_issue "$EPIC_FILE")
   EPIC_TITLE_RAW=$(fm title "$EPIC_FILE")
-  EPIC_TITLE_BARE=$(echo "$EPIC_TITLE_RAW" | sed -E "s/^Epic [0-9]+(\.[0-9]+)*:? *//")
+  EPIC_TITLE_BARE=$(strip_id_prefix epic "$EPIC_TITLE_RAW")
   MILESTONE="Epic ${STORY_P}.${STORY_E} — ${EPIC_TITLE_BARE}"
 
   # Bare title (strip "Story E.S: " prefix)
-  STORY_TITLE_BARE=$(echo "$TITLE" | sed -E "s/^Story [0-9]+\.[0-9]+:? *//")
+  STORY_TITLE_BARE=$(strip_id_prefix story "$TITLE")
   ISSUE_TITLE="[Story ${STORY_P}.${STORY_E}.${STORY_S}] ${STORY_TITLE_BARE}"
 
   REL_PATH=$(git -C "$(git rev-parse --show-toplevel)" ls-files --full-name "$STORY_FILE" 2>/dev/null || echo "$STORY_FILE")

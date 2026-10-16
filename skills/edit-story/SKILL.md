@@ -60,7 +60,7 @@ You can invoke this skill with either:
 When given a directory path:
 
 1. List all files in the directory
-2. Find the story file by pattern: `story.[epic].[story].[name].md`
+2. Find the story file by pattern: `story.[P].[E].[S].[name].md`
 3. Exclude files containing: `.qa.`, `.gate.`, or `.bug.`
 4. If multiple story files found, use the one matching the directory name
 5. If no story file found, HALT and ask user for the correct path
@@ -74,11 +74,11 @@ When given a file path:
    > "Error: This is an epic file, not a story file.
    >
    > File: {filename}
-   > Pattern detected: epic.[number].[name].md
+   > Pattern detected: epic.[P].[E].[name].md
    >
    > To edit epic files, use the `edit-epic` skill instead:
    > `/edit-epic {filepath}`"
-3. Verify filename matches story pattern: `story.[epic].[story].[name].md`
+3. Verify filename matches story pattern: `story.[P].[E].[S].[name].md`
 4. If pattern doesn't match, warn user and ask for confirmation
 
 **Example:**
@@ -154,8 +154,8 @@ Rejects: epic.1.323.pin-advanced-security.md (if provided)
 
 **A. File Naming Convention & Location**
 
-- Filename follows pattern: `story.[epic].[story].[name].md`
-- File must be placed inside a subdirectory with the exact same name: `story.[epic].[story].[name]/story.[epic].[story].[name].md`
+- Filename follows pattern: `story.[P].[E].[S].[name].md`
+- File must be placed inside a subdirectory with the exact same name: `story.[P].[E].[S].[name]/story.[P].[E].[S].[name].md`
 - Uses DOTS for number separators (not underscores)
 - Uses hyphens for word separation in descriptive name (not underscores)
 - Example valid: `story.1.163.1.seed-phrase-validator/story.1.163.1.seed-phrase-validator.md`

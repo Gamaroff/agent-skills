@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": null,
+      "entry": "skills/sync-jira-story/scripts/sync-jira-story.js#relatedDocInfo",
+      "name": "relatedDocInfo",
+      "call_site": null,
+      "verdict": "present-but-inert",
+      "reason": "a-hostile-case-passed-a-control-that-rejects-others",
+      "executed": 12,
+      "passed": 8,
+      "reproduced": 4,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-10-16T17:08:16.560Z"
+    },
+    {
+      "sink": "filename",
+      "entry": "skills/sync-jira-story/scripts/sync-jira-story.js#relatedDocInfo",
+      "name": null,
+      "call_site": null,
+      "verdict": "unverifiable",
+      "reason": "rejects-every-input",
+      "executed": 14,
+      "passed": 9,
+      "reproduced": 0,
+      "overblocked": 5,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-10-16T17:07:53.070Z"
+    }
+  ],
+  "totals": {
+    "executed": 26,
+    "reproduced": 4
+  },
+  "updated_at": "2026-10-16T17:08:16.560Z"
+}

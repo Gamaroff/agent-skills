@@ -534,6 +534,27 @@ unaffected and listed as such.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-16
+**Quality Score**: 60/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.207.qa.1.doc-numbering-enforcement-and-sweep.md](./task.207.qa.1.doc-numbering-enforcement-and-sweep.md)
+- **Gate File**: [task.207.gate.1.doc-numbering-enforcement-and-sweep.yml](./task.207.gate.1.doc-numbering-enforcement-and-sweep.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 14
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+
+### Key Findings
+Four MEDIUM findings: TASK-207-BUG-1 (review-epic 0a.3 reads variables bound in another block), BUG-2 (chokepoint comment stripper drops lines), BUG-3 (review-epic numbering glob still flat), BUG-4 (title shape misses literal-space parsers). Three LOW.
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -544,6 +565,8 @@ unaffected and listed as such.
 | 2026-10-16 | 1.1     | Review (8/10) — corpus-test API corrected to `checkCorpus(prdRoot)` / `documents` floor; site list re-measured after task.206; review-epic `awk` defect brought into scope with an executed test; retirement allowlist entry, comment-safe chokepoint key and measured < 2 s bound added | review-task |
 | 2026-10-16 |         | Status → ready-for-development | review-task |
 | 2026-10-16 |         | Implemented — 2 new tests (14 cases), 2 parsers moved onto doc-id.js, review-epic awk defect fixed, ~60 docs swept; status → ready-for-review | develop |
+| 2026-10-16 |         | QA gate CONCERNS (60/100) — 4 medium, 3 low findings (task.207.qa.1) | qa-task |
+| 2026-10-16 |         | QA findings fixed — BUG-1..4, CR-5, CR-6; §5 placeholder guard added; 1 iteration | qa-fix |
 
 <!-- change-log-end -->
 

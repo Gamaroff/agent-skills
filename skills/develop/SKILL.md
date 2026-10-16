@@ -998,8 +998,8 @@ Reference: See CLAUDE.md "Testing & Quality Standards" for complete testing patt
 
 **File Naming**:
 
-- Epics: `epic.[number].[name].md`
-- Stories: `story.[epic].[story].[name].md`
+- Epics: `epic.[P].[E].[name].md`
+- Stories: `story.[P].[E].[S].[name].md`
 - Use dots (.) for structural separators, hyphens (-) within descriptive names
 
 Reference: See CLAUDE.md "Documentation Standards" and `docs/templates/README.md`

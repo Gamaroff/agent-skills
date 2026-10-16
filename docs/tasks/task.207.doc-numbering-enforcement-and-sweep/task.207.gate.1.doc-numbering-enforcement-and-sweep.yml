@@ -1,0 +1,96 @@
+schema: 2
+task: 'task.207.doc-numbering-enforcement-and-sweep'
+task_title: 'Doc numbering enforcement and sweep'
+gate: CONCERNS
+status_reason: 'Both guards and the sweep work and full CI is green, but four MEDIUM defects hold: the review-epic auto-skip reads variables bound in another block, the chokepoint comment stripper silently drops lines, the review-epic report glob still uses the flat number, and the title shape misses literal-space parsers.'
+reviewer: 'QA Engineer'
+head: '9b36097f21cc671724a6dcd52111bd2aee855b04'
+updated: '2026-10-16T17:13:23Z'
+
+top_issues:
+  - id: 'TASK-207-BUG-1'
+    severity: medium
+    file: 'shared/resources/review-pipeline-step-0a-branch-setup.md'
+    finding: 'review-epic 0a.3 reads PRD_NUM, EPIC_NUM and CURRENT_BRANCH bound only in other blocks, so the auto-skip pattern collapses to feature/epic..* and never fires; the §4 test joins the blocks and cannot see it (CR-1).'
+    suggested_action: 'Re-derive the ids and CURRENT_BRANCH inside the 0a.3 block, as review-story does; run each block in its own shell in §4.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-207-BUG-2'
+    severity: medium
+    file: 'tests/doc-id-chokepoint.test.js'
+    finding: 'stripCodeComment searches for /* before handling a // line comment, so a // comment quoting a glob opens a phantom block comment and silently drops following lines from the scan (CR-2).'
+    suggested_action: 'Handle // line comments first, or reuse a quote-aware stripper; add a MUST_HIT row for the shape.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-207-BUG-3'
+    severity: medium
+    file: 'skills/review-epic/SKILL.md'
+    finding: 'The Step 9 numbering glob epic.{epic-number}.review.*.md and the save template epic.[N] still name one number, so REVIEW_N is always 1 for an epic.P.E report; other epic.[N] / README residues remain outside the §7 grep (CR-3, reviewer confidence medium, verified by QA).'
+    suggested_action: 'Rewrite to epic.{P}.{E}; sweep the residues; add a residual-placeholder population test.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-207-BUG-4'
+    severity: medium
+    file: 'tests/doc-id-chokepoint.test.js'
+    finding: 'The title shape matches only an escaped \s, so parsers written with a literal space (backfill-story-issues.sh:52 and :56) escape the guard (CR-4, reviewer confidence medium, verified by QA).'
+    suggested_action: 'Widen the title shape to a literal space or [[:space:]]; route or allowlist the backfill parsers; add a MUST_HIT row.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-207-CR-5'
+    severity: low
+    file: '.agents/scripts/backfill-story-issues.sh'
+    finding: 'The story-title strip still removes only Story E.S, so a Story 1.2.3 title becomes [Story 1.2.3] .3: X, and the bracket form is never stripped.'
+    suggested_action: 'Strip both Story N(.N)*: and [Story N(.N)*] prefixes.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-207-CR-6'
+    severity: low
+    file: 'docs/concepts/quickstart-story.md'
+    finding: 'Option B still tells the reader to mark registry rows CANCELLED, contradicting the rewritten option A.'
+    suggested_action: 'Reword to the new numbering model.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 14
+  phases_verified: 5/5
+  ci: 'npm run ci exit 0 on the tree of a6479024 (.agents/skills moved aside); PR checks not read'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 26
+    notes: 'relatedDocInfo probed twice (run record totals.executed 26): the generic filename corpus (14, unverifiable — its legitimate names are gate .yml files this predicate must reject) and its own grammar (12 cases, 3 legitimate, 9 hostile): 4 hostile names accepted (../ prefix, newline, $(id), NUL), inherited from doc-id.parse, which this PR does not change; readdirSync never yields / or NUL. LOW, routed to recommendations.future.'
+  performance:
+    status: PASS
+    notes: 'Both new tests: real 0m0.360s at load 1.02 (bound < 2 s).'
+  reliability:
+    status: CONCERNS
+    notes: 'TASK-207-BUG-1: the review-epic auto-skip fix does not hold when the blocks run as written.'
+  maintainability:
+    status: CONCERNS
+    notes: 'TASK-207-BUG-2 and BUG-4 leave the chokepoint guard blind to two shapes; BUG-3 is a sweep residue.'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-207-BUG-1..4.'
+      refs: ['shared/resources/review-pipeline-step-0a-branch-setup.md', 'tests/doc-id-chokepoint.test.js', 'skills/review-epic/SKILL.md']
+  future:
+    - action: 'doc-id.parse accepts a basename with a leading ../, a newline, NUL or shell metacharacters in the slug; harden its slug grammar (pre-existing — doc-id.js is unchanged here).'
+      refs: ['shared/resources/doc-id.js']
+    - action: 'create-parallel-stories keeps its {epic}.1-{n} scheme, which doc-id rejects (task Deferred Work).'
+      refs: ['skills/create-parallel-stories/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-207-BUG-1..4 fixed']

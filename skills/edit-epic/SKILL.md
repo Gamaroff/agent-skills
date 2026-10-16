@@ -72,7 +72,7 @@ When given a file path:
    > "Error: This is a story file, not an epic file.
    >
    > File: {filename}
-   > Pattern detected: story.[epic].[story].[name].md
+   > Pattern detected: story.[P].[E].[S].[name].md
    >
    > To edit story files, use the `edit-story` skill instead:
    > `/edit-story {filepath}`"
@@ -218,7 +218,7 @@ If validation fails, present findings to user:
 
 1. **Discover child stories** (all analysis modes except skip):
    - Check if `stories/` subdirectory exists in epic directory
-   - List all `story.[epic].[story].[name].md` files
+   - List all `story.[P].[E].[S].[name].md` files
    - Load only the story files needed for the active analysis mode
 
 2. **Analysis sub-steps (run only the sub-steps required by classification):**

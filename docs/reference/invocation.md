@@ -152,8 +152,8 @@ Process: risk assessment → requirements traceability → code quality review �
 
 Outputs:
 
-- `story.[epic].[story].qa.[number].[name].md`
-- `story.[epic].[story].gate.[number].[name].yml`
+- `story.[P].[E].[S].qa.[number].[name].md`
+- `story.[P].[E].[S].gate.[number].[name].yml`
 - Bug reports if issues found
 
 ### `create-branch` — Branch Creation

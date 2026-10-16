@@ -47,15 +47,15 @@ docs/prd/[domain]/[feature]/
         ├── index.md                          # Epic roadmap and overview
         ├── EPIC-CREATION-SUMMARY.md          # Epic overview
         │
-        ├── epic.[N].[name]/                  # Epic subdirectory
-        │   ├── epic.[N].[name].md            # Epic file
+        ├── epic.[P].[E].[name]/                  # Epic subdirectory
+        │   ├── epic.[P].[E].[name].md            # Epic file
         │   ├── EPIC-[N]-ROADMAP.md           # Week-by-week plan (optional)
         │   └── stories/                      # Stories for this epic
-        │       ├── story.[N].1.[name].md
-        │       ├── story.[N].1.[name].completion.md    # Completion doc
-        │       ├── story.[N].2.[name].md
-        │       ├── story.[N].2.[name].worklet-fix.md   # Technical addendum
-        │       └── EPIC-[N]-STORIES-INDEX.md           # Large epic index (optional)
+        │       ├── story.[P].[E].1.[name].md
+        │       ├── story.[P].[E].1.[name].completion.md    # Completion doc
+        │       ├── story.[P].[E].2.[name].md
+        │       ├── story.[P].[E].2.[name].worklet-fix.md   # Technical addendum
+        │       └── EPIC-[P].[E]-STORIES-INDEX.md           # Large epic index (optional)
         │
         ├── epic.[N+1].[name]/                # Next epic subdirectory
         │   ├── epic.[N+1].[name].md
@@ -183,10 +183,9 @@ docs/prd/
 
 Each epic has its own subdirectory containing:
 
-1. **epic.[N].[name]/** - Epic subdirectory
-   - **epic.[N].[name].md** - Epic file with YAML frontmatter
+1. **epic.[P].[E].[name]/** - Epic subdirectory
+   - **epic.[P].[E].[name].md** - Epic file with YAML frontmatter
    - **EPIC-[N]-ROADMAP.md** - Week-by-week execution plan (optional for complex epics)
-   - **epic.[N].5.[name].md** - Intermediate epic (optional, if needed)
    - **stories/** - Subdirectory for all stories in this epic
 
 2. **index.md** - Epic roadmap and overview (at `epics/` level)
@@ -220,38 +219,38 @@ Authoritative copy: `references/epic-template.md` (byte-identical to `docs/templ
 
 ```
 docs/prd/{domain}/{feature}/epics/
-├── epic.[N].[name]/
-│   ├── epic.[N].[name].md       ← Epic file here
+├── epic.[P].[E].[name]/
+│   ├── epic.[P].[E].[name].md       ← Epic file here
 │   ├── EPIC-[N]-ROADMAP.md      ← Roadmap here (optional)
 │   └── stories/                 ← Stories here
-│       └── story.[N].1.[name].md
+│       └── story.[P].[E].1.[name].md
 ```
 
 ### Level 5: Story Documentation (Detailed Tasks)
 
 **Purpose**: Provide implementation details for individual work items
 
-**Story Files** (in `epic.[N].[name]/stories/` subdirectory):
+**Story Files** (in `epic.[P].[E].[name]/stories/` subdirectory):
 
-1. **story.[epic].[n].[name].md** - Individual stories
-2. **story.[epic].[n].[name].completion.md** - Completion documentation
-3. **story.[epic].[n].[name].[type].md** - Technical addendums (e.g., .worklet-fix.md, .cleanup.md)
-4. **EPIC-[N]-STORIES-INDEX.md** - Index for large epics (optional, UPPERCASE)
+1. **story.[P].[E].[S].[name].md** - Individual stories
+2. **story.[P].[E].[S].[name].completion.md** - Completion documentation
+3. **story.[P].[E].[S].[name].[type].md** - Technical addendums (e.g., .worklet-fix.md, .cleanup.md)
+4. **EPIC-[P].[E]-STORIES-INDEX.md** - Index for large epics (optional, UPPERCASE)
 
 **File Locations**:
 
 ```
-docs/prd/{domain}/{feature}/epics/epic.[N].[name]/stories/
-├── story.[N].1.[name].md
-├── story.[N].1.[name].completion.md
-├── story.[N].2.[name].md
-├── story.[N].2.[name].worklet-fix.md
-└── EPIC-[N]-STORIES-INDEX.md (optional)
+docs/prd/{domain}/{feature}/epics/epic.[P].[E].[name]/stories/
+├── story.[P].[E].1.[name].md
+├── story.[P].[E].1.[name].completion.md
+├── story.[P].[E].2.[name].md
+├── story.[P].[E].2.[name].worklet-fix.md
+└── EPIC-[P].[E]-STORIES-INDEX.md (optional)
 ```
 
 **Coordination Files**:
 
-- **epic.[n].coordination.md** - Can be placed in epic subdirectory if needed for coordination
+- **epic.[P].[E].coordination.md** - Can be placed in epic subdirectory if needed for coordination
 
 ---
 
@@ -304,7 +303,7 @@ docs/prd/{domain}/{feature}/epics/epic.[N].[name]/stories/
 
 ### Story Files
 
-**Format**: `story.[epic].[story].[descriptive-name].md`
+**Format**: `story.[P].[E].[S].[descriptive-name].md`
 
 **Epic Numbering Patterns**:
 
@@ -325,12 +324,12 @@ docs/prd/{domain}/{feature}/epics/epic.[N].[name]/stories/
 
 **Completion Files**: Documents story implementation results
 
-- Format: `story.[epic].[story].[name].completion.md`
+- Format: `story.[P].[E].[S].[name].completion.md`
 - Example: `story.1.1.1.core-architecture.completion.md`
 
 **Technical Addendums**: Supplementary technical documentation
 
-- Format: `story.[epic].[story].[name].[type].md`
+- Format: `story.[P].[E].[S].[name].[type].md`
 - Examples:
   - `story.2.2.reverse-morphing.worklet-fix.md`
   - `story.2.2.reverse-morphing.cleanup.md`
@@ -341,7 +340,7 @@ docs/prd/{domain}/{feature}/epics/epic.[N].[name]/stories/
 **Guide Files**: `CROSS-REFERENCE-GUIDE.md`
 **Quick Start**: `DEVELOPER-QUICK-START.md`
 **Phases**: `implementation-phases.md`
-**Indexes**: `EPIC-[N]-STORIES-INDEX.md`
+**Indexes**: `EPIC-[P].[E]-STORIES-INDEX.md`
 **Meta Documentation**: `CONSISTENCY-CHECK-SUMMARY.md`, `DOCUMENTATION-STANDARDS-UPDATE.md`
 
 ---
@@ -383,9 +382,9 @@ docs/prd/{domain}/{feature}/epics/epic.[N].[name]/stories/
 
 **Create**:
 
-- [ ] `epics/epic.[N].[name]/stories/story.[epic].1.[name].md` - Individual stories
-- [ ] `epics/epic.[N].[name]/stories/story.[epic].2.[name].md` - More stories
-- [ ] `epics/epic.[N].[name]/stories/EPIC-[N]-STORIES-INDEX.md` - Index if >10 stories (optional)
+- [ ] `epics/epic.[P].[E].[name]/stories/story.[P].[E].1.[name].md` - Individual stories
+- [ ] `epics/epic.[P].[E].[name]/stories/story.[P].[E].2.[name].md` - More stories
+- [ ] `epics/epic.[P].[E].[name]/stories/EPIC-[P].[E]-STORIES-INDEX.md` - Index if >10 stories (optional)
 
 **Why**: Provide implementation details
 
@@ -424,9 +423,9 @@ Technical Implementation + UI/UX Specs
     ↓
 Implementation Phases
     ↓
-Epic Breakdown (epics/epic.[N].[name]/epic.[N].[name].md)
+Epic Breakdown (epics/epic.[P].[E].[name]/epic.[P].[E].[name].md)
     ↓
-Story Details (epics/epic.[N].[name]/stories/story.[N].1.[name].md)
+Story Details (epics/epic.[P].[E].[name]/stories/story.[P].[E].1.[name].md)
     ↓
 Developer Quick Start (code examples)
 ```
@@ -484,7 +483,7 @@ See full story: [Story 164-1](./stories/story.164.1.[name].md)
 ### Organization Principles
 
 1. **Co-location**: Stories MUST be co-located with their epics
-   - ✅ Correct: `docs/prd/[domain]/[feature]/epics/epic.[N].[name]/stories/`
+   - ✅ Correct: `docs/prd/[domain]/[feature]/epics/epic.[P].[E].[name]/stories/`
    - ❌ Wrong: `docs/prd/[domain]/[feature]/stories/` (old flat structure)
    - ❌ Wrong: `docs/stories/[domain]/[feature]/` (completely separated)
 
@@ -553,7 +552,7 @@ Is this epic particularly complex (>2 weeks, >5 stories)?
     └─ No → Epic document is sufficient
 
 Is this a new story?
-    ├─ Yes → Create epics/epic.[N].[name]/stories/story.[epic].[story].[name].md
+    ├─ Yes → Create epics/epic.[P].[E].[name]/stories/story.[P].[E].[S].[name].md
     └─ No → Update existing story
 
 Do developers need quick onboarding?
@@ -667,7 +666,7 @@ docs/prd/ui-domain/example-component/
 - [ ] Create `stories/` subdirectory
 - [ ] Write stories for Epic 1
 - [ ] Write stories for Epic 2+
-- [ ] Create EPIC-[N]-STORIES-INDEX.md for large epics
+- [ ] Create EPIC-[P].[E]-STORIES-INDEX.md for large epics
 - [ ] Create EPIC-[N]-ROADMAP.md for complex epics
 
 ### Development Phase
@@ -680,7 +679,7 @@ docs/prd/ui-domain/example-component/
 ### Maintenance Phase
 
 - [ ] Update story statuses
-- [ ] Create story.[epic].[story].[name].completion.md
+- [ ] Create story.[P].[E].[S].[name].completion.md
 - [ ] Update epic completion percentages
 - [ ] Run consistency checks
 - [ ] Archive completed documentation

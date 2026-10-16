@@ -181,7 +181,7 @@ git checkout develop
 git branch -D feature/story.{P}.{E}.1.add-footer-link
 ```
 
-Revert or drop the PRD/epic/story commits from your branch. Mark registry rows `CANCELLED` — do NOT delete them.
+Revert or drop the PRD/epic/story commits from your branch. If the practice run added a row to `docs/prd/prd-registry.md`, mark it `cancelled` — never delete it: a PRD number is never reused. Epic and story numbers need nothing: they are counted from the documents on disk.
 
 If a practice GitHub milestone or Jira sprint/version was created: delete it once all linked issues are closed.
 

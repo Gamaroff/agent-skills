@@ -15,7 +15,7 @@ Accept any of: an absolute/relative bug file path, a bug directory, or a bare bu
 
 | Mode | Filename pattern | Location | `related` |
 |------|------------------|----------|-----------|
-| **story** | `story.{epic}.{story}.bug.{n}.{name}.md` | co-located with the story file | link to parent story |
+| **story** | `story.{P}.{E}.{S}.bug.{n}.{name}.md` | co-located with the story file | link to parent story |
 | **task** | `task.{id}.bug.{n}.{name}.md` | `docs/tasks/task.{id}.{name}/` | link to parent task |
 | **general** | `bug.{N}.{name}.md` | `docs/bugs/bug.{N}.{name}/` | `None — cross-cutting` |
 

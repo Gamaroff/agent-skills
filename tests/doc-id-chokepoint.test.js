@@ -63,7 +63,12 @@ const CODE_SHAPES = [
   ["id-built", new RegExp(`new RegExp\\(.*${KIND}${ESC_DOT}`)],
   [
     "title",
-    new RegExp(String.raw`(?:Epic|Story)\\{1,2}s[+*]?[^\n]{0,4}?` + DIGIT),
+    // An escaped \s in a regex, or a literal space / [[:space:]] in a sed or grep pattern: a
+    // parser written either way is the same parser (task.207 QA cycle 1, CR-4).
+    new RegExp(
+      String.raw`(?:Epic|Story)(?:\\{1,2}s|\[\[:space:\]\]| )[+*]?[^\n]{0,4}?` +
+        DIGIT,
+    ),
   ],
 ];
 const SHELL_SHAPES = [
@@ -88,6 +93,11 @@ function stripCodeComment(line, lang, state) {
       state.block = false;
       line = line.slice(end + 2);
     }
+    // A `//` comment is removed BEFORE a block comment is looked for: a line comment that
+    // quotes a glob (`// shared/resources/*.md`) otherwise opened a phantom block comment
+    // that swallowed every following line (task.207 QA cycle 1, CR-2).
+    if (/^\s*\/\//.test(line)) return "";
+    line = line.replace(/\s\/\/\s.*$/, "");
     const open = line.indexOf("/*");
     if (open !== -1 && !/['"`]/.test(line.slice(0, open))) {
       const close = line.indexOf("*/", open + 2);
@@ -97,8 +107,7 @@ function stripCodeComment(line, lang, state) {
       }
       line = line.slice(0, open) + line.slice(close + 2);
     }
-    if (/^\s*\/\//.test(line)) return "";
-    return line.replace(/\s\/\/\s.*$/, "");
+    return line;
   }
   // shell / python
   if (/^\s*#/.test(line)) return "";
@@ -322,6 +331,12 @@ const MUST_HIT = [
     "shell",
     "EPIC_SLUG=$(echo \"$EPIC_BASENAME\" | sed 's/epic\\.[0-9]*\\.//')",
   ],
+  // A title parser written with a literal space, as a sed or grep pattern is (CR-4).
+  ["shell", 'BARE=$(echo "$TITLE" | sed -E "s/^Story [0-9]+\\.[0-9]+:? *//")'],
+  ["code", "const m = t.match(/^Epic [0-9]+:/);"],
+  // An id regex on the line after a `//` comment that quotes a glob — the comment
+  // must not open a block comment that hides it (CR-2).
+  ["code", "// Top-level shared/resources/*.md\nconst R = /story\\.(\\d+)/;"],
 ];
 const MUST_MISS = [
   ["shell", "TASK_ID=$(echo \"$TASK_BASENAME\" | awk -F. '{print $2}')"], // a task id — another rule
@@ -403,7 +418,12 @@ function reviewEpicBlock(n) {
   return blocks[n][1];
 }
 
-function runReviewEpic(docFile, branch) {
+/**
+ * Run ONE review-epic block as its own shell — the way an agent runs a fenced block —
+ * with only `DOC_FILE` bound, in a fresh git checkout on `branch`. Joining the blocks
+ * into one script hid a 0a.3 that read 0a.2's variables (task.207 QA cycle 1, CR-1).
+ */
+function runReviewEpicBlock(n, docFile, branch) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "review-epic-block-"));
   try {
     const skillRefs = path.join(
@@ -415,12 +435,14 @@ function runReviewEpic(docFile, branch) {
     );
     fs.mkdirSync(skillRefs, { recursive: true });
     fs.copyFileSync(path.join(ROOT, DOC_ID), path.join(skillRefs, "doc-id.js"));
+    const git = (...a) =>
+      spawnSync("git", a, { cwd: dir, encoding: "utf8" }).status;
+    assert.equal(git("init", "-q", "-b", branch), 0, "git init failed");
     const script =
-      `set -e\nDOC_FILE=${JSON.stringify(docFile)}\nCURRENT_BRANCH=${JSON.stringify(branch)}\nAUTO_SKIPPED=false\n` +
-      reviewEpicBlock(0) +
-      `\necho "PRD_NUM=$PRD_NUM"\necho "EPIC_NUM=$EPIC_NUM"\necho "EPIC_SLUG=$EPIC_SLUG"\necho "EPIC_BRANCH=$EPIC_BRANCH"\n` +
-      reviewEpicBlock(1) +
-      `\necho "AUTO_SKIPPED=$AUTO_SKIPPED"\n`;
+      `set -e\nDOC_FILE=${JSON.stringify(docFile)}\n` +
+      reviewEpicBlock(n) +
+      `\necho "PRD_NUM=$PRD_NUM"\necho "EPIC_NUM=$EPIC_NUM"\necho "EPIC_SLUG=\${EPIC_SLUG:-}"\n` +
+      `echo "EPIC_BRANCH=\${EPIC_BRANCH:-}"\necho "AUTO_SKIPPED=\${AUTO_SKIPPED:-false}"\n`;
     const r = spawnSync("bash", ["-c", script], { cwd: dir, encoding: "utf8" });
     return { status: r.status, out: r.stdout, err: r.stderr };
   } finally {
@@ -428,31 +450,168 @@ function runReviewEpic(docFile, branch) {
   }
 }
 
-test("§4 the review-epic block reads P and E through doc-id.js", () => {
-  const doc =
-    "docs/prd/x/prd.1.x/epics/epic.1.42.payments/epic.1.42.payments.md";
-  const r = runReviewEpic(doc, "feature/epic.1.7.other");
+const EPIC_DOC =
+  "docs/prd/x/prd.1.x/epics/epic.1.42.payments/epic.1.42.payments.md";
+
+test("§4 the review-epic 0a.2 block reads P and E through doc-id.js", () => {
+  const r = runReviewEpicBlock(0, EPIC_DOC, "develop");
   assert.equal(r.status, 0, r.err);
   assert.match(r.out, /^PRD_NUM=1$/m);
   assert.match(r.out, /^EPIC_NUM=42$/m);
   assert.match(r.out, /^EPIC_SLUG=payments$/m);
   assert.match(r.out, /^EPIC_BRANCH=feature\/epic\.1\.42\.payments$/m);
-  assert.match(
-    r.out,
-    /^AUTO_SKIPPED=false$/m,
-    "another epic of the same PRD must not auto-skip",
-  );
-  const own = runReviewEpic(doc, "feature/epic.1.42.payments");
+});
+
+test("§4 the review-epic 0a.3 block, run alone, skips on its own epic's branch only", () => {
+  const own = runReviewEpicBlock(1, EPIC_DOC, "feature/epic.1.42.payments");
+  assert.equal(own.status, 0, own.err);
   assert.match(
     own.out,
     /^AUTO_SKIPPED=true$/m,
     "the epic's own branch must auto-skip",
   );
+  for (const other of [
+    "feature/epic.1.7.other",
+    "feature/epic.2.42.payments",
+  ]) {
+    const r = runReviewEpicBlock(1, EPIC_DOC, other);
+    assert.equal(r.status, 0, r.err);
+    assert.match(
+      r.out,
+      /^AUTO_SKIPPED=false$/m,
+      `${other} is another epic and must not auto-skip`,
+    );
+  }
 });
 
-test("§4 the review-epic block refuses a name doc-id cannot read", () => {
-  const r = runReviewEpic("docs/prd/x/epic.42.payments.md", "develop");
-  assert.notEqual(r.status, 0, `a flat epic name must HALT, got:\n${r.out}`);
+test("§4 the review-epic blocks refuse a name doc-id cannot read", () => {
+  for (const n of [0, 1]) {
+    const r = runReviewEpicBlock(
+      n,
+      "docs/prd/x/epic.42.payments.md",
+      "develop",
+    );
+    assert.notEqual(
+      r.status,
+      0,
+      `block ${n}: a flat epic name must HALT, got:\n${r.out}`,
+    );
+  }
+});
+
+// ── §5 No prose teaches the flat scheme (task.207 QA cycle 1, CR-3) ─────────
+//
+// The sweep's population was one grep over the placeholder spellings its author
+// remembered. QA found the ones it missed — `epic.[N]`, `epic.{epic-number}`,
+// `story.[epic].[story]`, `story.[N].[M]` — in READMEs, templates and hand-authored
+// references the grep never searched; one of them was an executable glob that
+// numbered every epic review `review.1`. This is that population as a test.
+//
+// (a) KEY: an old-scheme placeholder — a kind word, a dot, and ONE bracketed or
+//     braced epic/story number that is not `{P}`/`[P]`. The new scheme always
+//     leads with P, so `story.{P}.{E}.{S}` and `{prd}.{epic}.{story}` never match.
+// (b) MISSES, accepted and named: a literal flat id (`story.4.2.x`) — those are
+//     negative examples as often as mistakes, and the corpus test catches a flat
+//     DOCUMENT; and a placeholder with a novel spelling outside the key.
+// (c) POPULATION: every tracked Markdown file under skills/ (generated references
+//     dropped by their AUTO-GENERATED marker), shared/resources/, docs/ and the
+//     root, minus the historical records below.
+
+const OLD_PLACEHOLDER = new RegExp(
+  [
+    String.raw`story\.\{(?:epic|E|e|epic_num|epic-number)\}`,
+    String.raw`story\.\[(?:epic|E|N|e|n)\]`,
+    String.raw`epic\.\{(?:N|n|number|epic|epic-number|epic_number|epic_num)\}`,
+    String.raw`epic\.\[(?:N|n|number|epic)\]`,
+    String.raw`epic/\{(?:N|n|number)\}`,
+    String.raw`(?<!\{prd\}\.)(?<!\{P\}\.)(?<![\w.])\{epic\}\.\{story\}`,
+  ].join("|"),
+);
+
+// path prefix → why it may keep the old spelling. Records, not guidance.
+const HISTORICAL = new Map([
+  ["docs/tasks/", "task records — describe what was true when written"],
+  ["docs/bugs/", "bug records — describe what was true when written"],
+  ["docs/prd/", "the PRD corpus — held by doc-numbering-corpus.test.mjs"],
+  [
+    "docs/reference/develop-story-pipeline-audit.2026-08-20.md",
+    "a dated audit that quotes the pipeline as it stood on that date",
+  ],
+  [
+    "examples/prd-example/",
+    "a frozen 2026-05-12 snapshot; examples/README.md states it keeps its original names",
+  ],
+  [
+    "examples/epic-examples/",
+    "a frozen 2026-05-12 snapshot; examples/README.md states it keeps its original names",
+  ],
+  [
+    "CHANGELOG.md",
+    "release history — quotes the old scheme to describe its retirement",
+  ],
+]);
+
+const PROSE = gitFiles("*.md").filter(
+  (f) =>
+    ![...HISTORICAL.keys()].some((h) => f.startsWith(h)) &&
+    !f.startsWith("evals/") &&
+    !f.startsWith(".agents/") &&
+    !f.startsWith("tests/"),
+);
+
+test("§5 no canonical prose states an old-scheme placeholder", () => {
+  assert.ok(
+    PROSE.length >= 300,
+    `prose population is only ${PROSE.length} files`,
+  );
+  const bad = [];
+  let generated = 0;
+  for (const f of PROSE) {
+    const text = fs.readFileSync(path.join(ROOT, f), "utf8");
+    if (
+      /^skills\/[^/]+\/references\//.test(f) &&
+      /^<!-- AUTO-GENERATED/m.test(text)
+    ) {
+      generated++;
+      continue;
+    }
+    text.split("\n").forEach((line, i) => {
+      if (OLD_PLACEHOLDER.test(line))
+        bad.push(`${f}:${i + 1}: ${line.trim().slice(0, 120)}`);
+    });
+  }
+  assert.ok(
+    generated >= 100,
+    `only ${generated} generated references recognised — the marker test is broken`,
+  );
+  assert.deepEqual(
+    bad,
+    [],
+    "old-scheme placeholder — write story.{P}.{E}.{S} / epic.{P}.{E} (or [P].[E]):\n" +
+      bad.join("\n"),
+  );
+});
+
+test("§5 the placeholder key hits every retired spelling and spares the new ones", () => {
+  for (const hit of [
+    "story.{epic}.{story}.qa.1.x.md",
+    "story.[epic].[story].gate.[number].yml",
+    "story.[N].[M].plan.x.md",
+    "epic.{epic-number}.review.*.md",
+    "epic.[N].[name]/",
+    "epic/{n}.{slug}",
+    "Source ID: `{epic}.{story}`",
+  ])
+    assert.ok(OLD_PLACEHOLDER.test(hit), `expected a hit: ${hit}`);
+  for (const miss of [
+    "story.{P}.{E}.{S}.qa.1.x.md",
+    "story.[P].[E].[S].gate.[number].yml",
+    "epic.{P}.{E}.review.*.md",
+    "epic/{P}.{E}.{slug}",
+    "story_id: '{prd}.{epic}.{story}'",
+    "`story.4.2.checkout.md` — a literal negative example",
+  ])
+    assert.ok(!OLD_PLACEHOLDER.test(miss), `expected no hit: ${miss}`);
 });
 
 module.exports = { scanCode, scanMarkdown, CODE_SHAPES, SHELL_SHAPES };

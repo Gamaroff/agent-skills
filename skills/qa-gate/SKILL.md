@@ -51,7 +51,7 @@ Gates are **advisory** - teams choose their quality bar, but gates provide trans
 
 ### Naming Convention
 
-**Format**: `story.[epic].[story].gate.[number].[descriptive-name].yml`
+**Format**: `story.[P].[E].[S].gate.[number].[descriptive-name].yml`
 
 **Examples**:
 
@@ -377,7 +377,7 @@ quality_weights:
 
 ### File Creation Steps
 
-1. **Create gate file** at: `{qa.qaLocation}/gates/[prd-path]/story.[epic].[story].gate.[number].[descriptive-name].yml`
+1. **Create gate file** at: `{qa.qaLocation}/gates/[prd-path]/story.[P].[E].[S].gate.[number].[descriptive-name].yml`
 2. **Keep status_reason** to 1-2 sentences maximum
 3. **Use severity values exactly**: `low`, `medium`, or `high` (no variations)
 4. **Mirror PRD structure**: Gate file directory matches story file location

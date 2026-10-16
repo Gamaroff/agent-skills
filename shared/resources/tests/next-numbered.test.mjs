@@ -146,8 +146,8 @@ const SITES = {
     },
   },
   "review-epic": {
-    subs: { "{epic-directory}": "$DIR", "{epic-number}": "5" },
-    vars: { REVIEW_N: ["epic.5.review.1.x.md", "epic.5.review.3.x.md"] },
+    subs: { "{epic-directory}": "$DIR", "{P}": "1", "{E}": "5" },
+    vars: { REVIEW_N: ["epic.1.5.review.1.x.md", "epic.1.5.review.3.x.md"] },
   },
   "review-task": {
     subs: { "{task-directory}": "$DIR", "task.{n}": "task.9" },

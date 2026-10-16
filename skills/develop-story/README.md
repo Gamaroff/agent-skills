@@ -11,15 +11,15 @@ This document is structured for two audiences:
 
 ## Technical Summary
 
-`develop-story` is a thin **orchestrator** for product stories within an epic. Almost all real logic lives in `develop-pipeline-*.md` files under `shared/resources/`, loaded on demand per step (progressive disclosure). It coordinates 8 sub-skills sequentially and maintains a co-located **implementation report** as the durable source of truth for state and audit trail. Stories live under `docs/prd/<domain>/<feature>/epics/epic.{N}.<name>/stories/story.{epic}.{story}.<name>/`.
+`develop-story` is a thin **orchestrator** for product stories within an epic. Almost all real logic lives in `develop-pipeline-*.md` files under `shared/resources/`, loaded on demand per step (progressive disclosure). It coordinates 8 sub-skills sequentially and maintains a co-located **implementation report** as the durable source of truth for state and audit trail. Stories live under `docs/prd/<domain>/<feature>/epics/epic.{P}.{E}.<name>/stories/story.{P}.{E}.{S}.<name>/`.
 
-Story branches are cut from **`develop`** and PR back to `develop` — short-lived feature branches, standard Gitflow. By default an epic has no branch of its own. An epic can opt in with `branch_model: epic-integration` in its frontmatter: its stories are then cut from and PR into that epic's integration branch (`epic/{n}.{slug}`, or the `integration_branch:` it names), which Step 1 creates on demand.
+Story branches are cut from **`develop`** and PR back to `develop` — short-lived feature branches, standard Gitflow. By default an epic has no branch of its own. An epic can opt in with `branch_model: epic-integration` in its frontmatter: its stories are then cut from and PR into that epic's integration branch (`epic/{P}.{E}.{slug}`, or the `integration_branch:` it names), which Step 1 creates on demand.
 
 ### External touchpoints
 
 | Surface                  | Operations                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Filesystem**           | story file (read/append `[x]`), epic file, implementation report (`story.{epic}.{story}.implementation.{N}.*.md`), review report, plan file, gate file (`.yml`), QA report, DoD summary, lock file `.claude/state/develop-pipeline.lock`, subagent summaries `<story-dir>/.summaries/step-*.json`, traceability matrix `<story-dir>/.summaries/qa-traceability-matrix.md`, test-output logs `.claude/state/test-output-{ITER}-*.log` |
+| **Filesystem**           | story file (read/append `[x]`), epic file, implementation report (`story.{P}.{E}.{S}.implementation.{N}.*.md`), review report, plan file, gate file (`.yml`), QA report, DoD summary, lock file `.claude/state/develop-pipeline.lock`, subagent summaries `<story-dir>/.summaries/step-*.json`, traceability matrix `<story-dir>/.summaries/qa-traceability-matrix.md`, test-output logs `.claude/state/test-output-{ITER}-*.log` |
 | **Git**                  | story branch create (from `develop`, or the opted-in epic integration branch), stash/pop, commits via `/commit-changes` only, `git push origin HEAD` after every QA cycle + final, mtime + `git log -1` audits                                                                                                                                                                                                                                                                |
 | **GitHub**               | `gh issue comment/close/view`, `gh pr view/comment`, board moves via `gh-stage.js --stage <moment>` (columns resolved from `tracker-workflow.yaml`; Priority auto-set inline), PR creation via `/create-pr` targeting `develop`                                                                                                                                                                                                                                                   |
 | **Jira**                 | `tracker-comment.js`, status moves via `jira-stage.js --stage <moment>` (columns resolved from `tracker-workflow.yaml`). Atlassian MCP (`getTransitionsForJiraIssue`, `transitionJiraIssue`, `getJiraIssue`) is the **fallback only**, used when the CLI reports `no-credentials`                                                                                                                                                                                                                                                                                                        |
@@ -165,7 +165,7 @@ sequenceDiagram
 
     note over H,A3: Single-message dispatch (par block)<br/>Skip resolver if input was inline-resolved
     par
-        H->>+A1: Find story file matching story.{epic}.{story}.*.md<br/>under docs/, exclude .qa/.gate/.bug/.implementation
+        H->>+A1: Find story file matching story.{P}.{E}.{S}.*.md<br/>under docs/, exclude .qa/.gate/.bug/.implementation
         A1->>FS: glob + filter
         FS-->>A1: candidate paths
         A1-->>-H: { absolute_file_path, story_directory, story_id }
@@ -219,7 +219,7 @@ sequenceDiagram
     H->>FS: append "Pre-develop surface map: N files"<br/>to Decisions Log
     H->>Sum: write step-3-pre-develop-map.json
 
-    H->>FS: ls story.{epic}.{story}.plan.*.md
+    H->>FS: ls story.{P}.{E}.{S}.plan.*.md
     alt plan file exists
         H->>FS: read plan file content<br/>(plan freshness check on resume)
     else no plan
@@ -288,7 +288,7 @@ sequenceDiagram
     participant GH as GitHub / Jira
     participant Sum as .summaries/
 
-    H->>FS: find latest gate file<br/>ls story.{epic}.{story}.gate.*.yml | sort -t. -k5 -n | tail -1
+    H->>FS: find latest gate file<br/>ls story.{P}.{E}.{S}.gate.*.yml | sort -t. -k5 -n | tail -1
     H->>H: cycle = (count of "### QA Cycle" entries) + 1<br/>(0 entries → 1; 2 entries → 3; etc.)
 
     loop cycle ≤ 5
@@ -304,15 +304,15 @@ sequenceDiagram
             note right of H: skip mapper (lite trades QA depth for speed)
             H->>+Q: /qa-story {story-file}<br/>prefix: "Use direct tools only — lite mode"
         end
-        Q->>FS: write story.{epic}.{story}.qa.{cycle}.*.md<br/>+ story.{epic}.{story}.gate.{cycle}.*.yml
+        Q->>FS: write story.{P}.{E}.{S}.qa.{cycle}.*.md<br/>+ story.{P}.{E}.{S}.gate.{cycle}.*.yml
         Q-->>-H: gate result
 
         H->>FS: read gate file
         alt gate == PASS / WAIVED
-            H->>+CC: /commit-changes<br/>"docs(story.{epic}.{story}): QA cycle {N} gate + report"
+            H->>+CC: /commit-changes<br/>"docs(story.{P}.{E}.{S}): QA cycle {N} gate + report"
             CC-->>-H: committed + pushed (cycle's one push)
             H->>+PR: /review-pr --effort {medium|low} --comment --no-code<br/>Step 5c — the loop's exit gate
-            PR->>FS: write story.{epic}.{story}.pr-review.{n}.*.md
+            PR->>FS: write story.{P}.{E}.{S}.pr-review.{n}.*.md
             PR-->>-H: verdict
             alt verdict == REQUEST CHANGES
                 note right of H: back to 5b — same 5-cycle budget,<br/>counter incremented by 5b step 7
@@ -332,7 +332,7 @@ sequenceDiagram
             alt no changes
                 H->>H: HALT — qa-fix unable to address issues
             else changes present
-                H->>+CC: /commit-changes<br/>"fix(story.{epic}.{story}): qa-fix cycle {N} — {summary}"
+                H->>+CC: /commit-changes<br/>"fix(story.{P}.{E}.{S}): qa-fix cycle {N} — {summary}"
                 CC->>FS: stage + commit
                 CC-->>-H: commit hash
                 H->>GH: git push origin HEAD
@@ -356,7 +356,7 @@ sequenceDiagram
 
     alt cycle > 5 without clearing 5c
         H->>FS: write escalation entry<br/>(per-cycle summaries, root cause, next steps)
-        H->>+CC: docs(story.{epic}.{story}): implementation report — qa loop escalation
+        H->>+CC: docs(story.{P}.{E}.{S}): implementation report — qa loop escalation
         CC-->>-H: hash
         H->>GH: git push origin HEAD
         H->>H: HALT — QA loop limit reached
@@ -455,19 +455,19 @@ Every file the harness creates or mutates, with its lifecycle. Anchor for "did t
 | --------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | Pipeline lock               | `.claude/state/develop-pipeline.lock`               | Step 1 (end of)                                                          | Steps 2–8 banners (`current_step`), Step 4 (`pr_url`), PreCompact hook (rm), Step 8 (rm), terminal HALT (snapshot then rm) | absent at Step 8 success or HALT                | `cat ... \| jq` — read by resume detector                                                                     |
 | Halt snapshot               | `.claude/state/develop-pipeline.last-halt.json`     | terminal HALT (snapshot of lock + `halted_at`/`halt_reason`/`halt_step`) | overwritten on subsequent terminal HALT; deleted by user choosing "Start fresh" on resume                                  | persists until next resume choice               | resume detector reads when active lock absent (`source: "halt_snapshot"`)                                     |
-| Implementation report       | `story.{epic}.{story}.implementation.{N}.{name}.md` | Phase 0e                                                                 | every step (Pipeline Progress, Decisions Log, Issues Log, QA Iteration History, Subagent summary ref)                      | committed in Step 8                             | read for resume + last ✅ step                                                                                |
-| Story branch                | `feature/story.{epic}.{story}.*`                    | Step 1 via `/create-branch` (from `develop` or the epic integration branch)                             | dev commits, qa-fix commits, final commit                                                                                  | pushed in Step 8                                | `git branch --list`                                                                                           |
-| Review report               | `story.{epic}.{story}.review.{YYYY-MM-DD}.md`       | Step 2 via `/review-story`                                               | —                                                                                                                          | committed in Step 8                             | optional (only if review ran)                                                                                 |
-| Plan file                   | `story.{epic}.{story}.plan.*.md`                    | upstream (created by `/plan` or manual)                                  | —                                                                                                                          | unchanged by pipeline                           | mtime check vs story file (Plan Freshness)                                                                    |
+| Implementation report       | `story.{P}.{E}.{S}.implementation.{N}.{name}.md` | Phase 0e                                                                 | every step (Pipeline Progress, Decisions Log, Issues Log, QA Iteration History, Subagent summary ref)                      | committed in Step 8                             | read for resume + last ✅ step                                                                                |
+| Story branch                | `feature/story.{P}.{E}.{S}.*`                    | Step 1 via `/create-branch` (from `develop` or the epic integration branch)                             | dev commits, qa-fix commits, final commit                                                                                  | pushed in Step 8                                | `git branch --list`                                                                                           |
+| Review report               | `story.{P}.{E}.{S}.review.{YYYY-MM-DD}.md`       | Step 2 via `/review-story`                                               | —                                                                                                                          | committed in Step 8                             | optional (only if review ran)                                                                                 |
+| Plan file                   | `story.{P}.{E}.{S}.plan.*.md`                    | upstream (created by `/plan` or manual)                                  | —                                                                                                                          | unchanged by pipeline                           | mtime check vs story file (Plan Freshness)                                                                    |
 | Pre-develop summary         | `.summaries/step-3-pre-develop-map.json`            | Step 3 pre-develop                                                       | —                                                                                                                          | retained on disk (gitignored)                   | replayed instead of re-dispatching subagent                                                                   |
 | Test-output log             | `.claude/state/test-output-{ITER}-*.log`            | `/develop` inside Step 3                                                 | triage subagent reads                                                                                                      | `rm -f` on `TEST_EXIT==0`; retained on failure  | none (transient)                                                                                              |
 | Test-triage summary         | `.summaries/step-3-test-triage-{ITER}.json`         | Step 3, on test failure                                                  | —                                                                                                                          | retained on disk                                | replayed                                                                                                      |
 | QA traceability matrix      | `.summaries/qa-traceability-matrix.md`              | Step 5 pre-step (standard mode only)                                     | overwritten on each cycle                                                                                                  | retained on disk                                | regenerated per cycle                                                                                         |
 | Traceability mapper summary | `.summaries/step-5-traceability-mapper.json`        | Step 5 pre-step                                                          | —                                                                                                                          | retained on disk                                | replayed                                                                                                      |
-| QA report                   | `story.{epic}.{story}.qa.{N}.{name}.md`             | Step 5 via `/qa-story`                                                   | —                                                                                                                          | committed in Step 8                             | resume requires both qa.N.md AND gate.N.yml AND PR comment for cycle N to be ✅                               |
-| Gate file                   | `story.{epic}.{story}.gate.{N}.{name}.yml`          | Step 5 via `/qa-story`                                                   | only QA skills (read-only to dev)                                                                                          | committed in Step 8                             | latest gate sorted by `-t. -k5 -n`                                                                            |
+| QA report                   | `story.{P}.{E}.{S}.qa.{N}.{name}.md`             | Step 5 via `/qa-story`                                                   | —                                                                                                                          | committed in Step 8                             | resume requires both qa.N.md AND gate.N.yml AND PR comment for cycle N to be ✅                               |
+| Gate file                   | `story.{P}.{E}.{S}.gate.{N}.{name}.yml`          | Step 5 via `/qa-story`                                                   | only QA skills (read-only to dev)                                                                                          | committed in Step 8                             | latest gate sorted by `-t. -k5 -n`                                                                            |
 | Post-fix tracker summary    | `.summaries/step-5-post-fix-tracker-{N}.json`       | Step 5b after every qa-fix push (one file per cycle N)                   | —                                                                                                                          | retained on disk (per cycle, never overwritten) | replayed                                                                                                      |
-| DoD summary                 | `story.{epic}.{story}.dod.{N}.{name}.md`            | Step 7 via `/finalise`                                                   | —                                                                                                                          | committed in Step 8                             | required for ✅; `grep -iE '^status:\s*accepted'` on story file + `gh pr view --comments \| grep -i accepted` |
+| DoD summary                 | `story.{P}.{E}.{S}.dod.{N}.{name}.md`            | Step 7 via `/finalise`                                                   | —                                                                                                                          | committed in Step 8                             | required for ✅; `grep -iE '^status:\s*accepted'` on story file + `gh pr view --comments \| grep -i accepted` |
 | PR                          | github.com/.../pull/{N}, base = `develop`           | Step 4 via `/create-pr --base develop`                                   | qa-fix pushes, finalise comment                                                                                            | merged to `develop`                             | `gh pr view --json state`                                                                                     |
 
 `.summaries/` is gitignored — these are runtime-local artifacts. Resume tolerates absence (in-flight pipelines started before the convention existed).

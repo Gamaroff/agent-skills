@@ -45,7 +45,7 @@ The following Jira environment variables must be available (will prompt if missi
 2. **Execute the script** with the epic file path:
 
 ```bash
-node .agents/skills/jira-epic-creator/scripts/jira-create-epic.js --file "$PRD_ROOT/[domain]/[feature]/epics/epic.[N].[name]/epic.[N].[name].md"
+node .agents/skills/jira-epic-creator/scripts/jira-create-epic.js --file "$PRD_ROOT/[domain]/[feature]/epics/epic.[P].[E].[name]/epic.[P].[E].[name].md"
 ```
 
 ### Environment Variable Check

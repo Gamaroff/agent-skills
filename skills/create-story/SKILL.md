@@ -654,13 +654,13 @@ Create detailed, sequential list of technical tasks based on:
 
 After collecting tasks/subtasks and dev notes, generate a co-located implementation plan file.
 
-**File**: `story.[N].[M].plan.[descriptive-name].md` — same directory as the story document.
+**File**: `story.[P].[E].[S].plan.[descriptive-name].md` — same directory as the story document.
 
 **CRITICAL — co-location is mandatory. The plan file MUST be written into the story's directory (alongside the story doc, nested under the parent epic directory).**
 
 - ❌ NEVER write the plan to `~/.claude/plans/`, `~/.agents/plans/`, `/tmp/`, the repo root, or any other shared/agent-scratch location.
 - ❌ NEVER leave a plan in `~/.claude/plans/` (Claude Code plan-mode default) and link to it from the story — it is outside the repo, invisible to teammates, and not version-controlled.
-- ✅ If a source/upstream plan already exists at `~/.claude/plans/<name>.md` (e.g., from Claude Code plan mode or a prior brainstorm), **relocate its content** into the co-located `story.[N].[M].plan.[descriptive-name].md` file. Do not just reference the original path.
+- ✅ If a source/upstream plan already exists at `~/.claude/plans/<name>.md` (e.g., from Claude Code plan mode or a prior brainstorm), **relocate its content** into the co-located `story.[P].[E].[S].plan.[descriptive-name].md` file. Do not just reference the original path.
 - ✅ Use a relative path (filename only) when cross-referencing from the story doc — both files live in the same directory.
 
 **Purpose**: The plan file contains implementation-level detail that the story document deliberately omits: code snippets, exact file changes, function signatures, and line-by-line guidance. The story doc describes *what* to build; the plan describes *how*.
@@ -669,15 +669,15 @@ After collecting tasks/subtasks and dev notes, generate a co-located implementat
 
 ```markdown
 ---
-id: story.[N].[M].plan
+id: story.[P].[E].[S].plan
 title: "Implementation Plan: [story title]"
 type: plan
-story-ref: story.[N].[M].[descriptive-name].md
+story-ref: story.[P].[E].[S].[descriptive-name].md
 ---
 
 # Implementation Plan: [story title]
 
-> Requirements and acceptance criteria: [story.[N].[M].[descriptive-name].md](story.[N].[M].[descriptive-name].md)
+> Requirements and acceptance criteria: [story.[P].[E].[S].[descriptive-name].md](story.[P].[E].[S].[descriptive-name].md)
 
 ## Overview
 
@@ -714,7 +714,7 @@ story-ref: story.[N].[M].[descriptive-name].md
 **Cross-reference in story doc**: After generating the plan file, add a cross-reference line at the top of the Tasks / Subtasks section:
 
 ```markdown
-> Detailed implementation guide: [story.[N].[M].plan.[descriptive-name].md](story.[N].[M].plan.[descriptive-name].md)
+> Detailed implementation guide: [story.[P].[E].[S].plan.[descriptive-name].md](story.[P].[E].[S].plan.[descriptive-name].md)
 ```
 
 ### 5.4.5 Visual Diagram (conditional, via `mermaid-architect`)
