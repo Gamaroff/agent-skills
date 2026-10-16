@@ -256,8 +256,11 @@ test("every shipped security-probe invocation that names an --entry passes --rep
     }
   }
   // relationship-assertion-lint: allow — a walk-sanity floor on the invocation count, not a row mapping
+  // 3 since task.189: the DoD security prompt's seven engine invocations became a probe PLAN, which
+  // /finalise runs through security-probe-plan.mjs; the remaining sites are review-security and the
+  // qa-story / qa-task probe steps.
   assert.ok(
-    total >= 4,
+    total >= 3,
     `only ${total} engine invocations found — the reassembly or the walk is broken`,
   );
   assert.deepEqual(

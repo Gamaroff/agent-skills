@@ -186,7 +186,7 @@ Read the gate file to determine the gate result.
 
 **Pre-step: Dispatch traceability mapper (standard mode only)**
 
-Before invoking `/qa-story`, dispatch the QA traceability mapper as an Explore subagent (see `shared/resources/qa-traceability-mapper-prompt.md` for the full execution protocol). Mark the wait beside the dispatch — `bash .agents/skills/develop-story/references/set-waiting-on.sh "step-5 traceability mapper"` — and `… --clear` once its confirmation is read (task.124):
+Before invoking `/qa-story`, dispatch the QA traceability mapper as an Explore subagent (see `shared/resources/qa-traceability-mapper-prompt.md` for the full execution protocol). Mark the wait beside the dispatch — `bash .agents/skills/develop-story/references/set-waiting-on.sh "step-5 traceability mapper"` — and `… --clear` once its reply is read (task.124):
 
 ```
 Agent(subagent_type="Explore", prompt="Run the QA traceability mapper (shared/resources/qa-traceability-mapper-prompt.md).
@@ -194,18 +194,50 @@ Inputs:
   STORY_FILE={story-file}
   STORY_DIR={story-directory}
 
-Follow the Execution Protocol exactly. Write the matrix file and return a one-line confirmation.")
+Follow the Execution Protocol exactly. Return the matrix between the markers; do not create or modify any file.")
 ```
 
 `{story-file}` and `{story-directory}` are the story file path and story directory path resolved in Phase 0a.
 
 After the subagent completes:
 
-1. Confirm `{story-directory}/.summaries/qa-traceability-matrix.md` was written.
+1. Save its reply **verbatim** to `.claude/state/mapper-reply.md` (Write tool — the reply is text in
+   your context, not a shell variable), then run the block below with `{doc-directory}` =
+   `{story-directory}`. The mapper is read-only: it **returns** the matrix and this step writes it
+   (task.189, obs #191 — on every run that told it to write, it refused and returned the table inline).
 2. Write the summary JSON artifact to `{story-directory}/.summaries/step-5-traceability-mapper.json` (schema: `shared/resources/subagent-summary-artifact.md`).
 3. Update the Pipeline Progress `Subagent summary ref` column for Step 5–6 with the JSON path.
 
-If the subagent fails or the matrix file is absent: log warning in Issues Log and proceed without the matrix (qa-story falls back to internal mapping).
+If the subagent fails, or the block above prints a `⚠️` line (no well-formed marked block in its reply): log warning in Issues Log and proceed without the matrix (qa-story falls back to internal mapping).
+
+##### Write the matrix from the mapper's reply
+
+```bash
+# Step 5 — write the traceability matrix the mapper RETURNED (task.189, obs #191).
+# INPUTS, substituted into THIS block: {doc-directory} — the story or task directory. The reply is
+# read from .claude/state/mapper-reply.md, which the orchestrator wrote verbatim with its Write tool.
+REPLY_FILE=.claude/state/mapper-reply.md
+MATRIX="{doc-directory}/.summaries/qa-traceability-matrix.md"
+START='^<!-- matrix-start -->[[:space:]]*$'
+END='^<!-- matrix-end -->[[:space:]]*$'
+# Exactly one of each marker, start before end — anything else is "no matrix", never a guess.
+if [ -f "$REPLY_FILE" ] \
+   && [ "$(grep -cE "$START" "$REPLY_FILE")" = 1 ] && [ "$(grep -cE "$END" "$REPLY_FILE")" = 1 ] \
+   && [ "$(grep -nE "$START" "$REPLY_FILE" | cut -d: -f1)" -lt "$(grep -nE "$END" "$REPLY_FILE" | cut -d: -f1)" ]; then
+  # Extracted beside the reply, not into the doc directory: the directory is created only once a
+  # non-empty matrix exists, so a refused reply leaves nothing behind (task.189 QA-2).
+  awk -v s="$START" -v e="$END" '$0 ~ e { f = 0 } f { print } $0 ~ s { f = 1 }' "$REPLY_FILE" > "$REPLY_FILE.matrix" \
+    && [ -s "$REPLY_FILE.matrix" ] && mkdir -p "$(dirname "$MATRIX")" && mv "$REPLY_FILE.matrix" "$MATRIX" \
+    && echo "matrix: written to $MATRIX" \
+    || { rm -f "$REPLY_FILE.matrix"; echo "⚠️ mapper returned an empty matrix — proceeding without it"; }
+else
+  echo "⚠️ mapper returned no matrix — proceeding without it"
+fi
+rm -f "$REPLY_FILE"
+```
+
+The text between the markers is written byte for byte. A reply that carries the marked matrix is
+**never discarded**: the warning fires only when the reply has no well-formed marked block.
 
 Skip this pre-step when any of:
 
@@ -242,7 +274,7 @@ Conditions to dispatch the mapper for tasks (all must be true):
 1. `PIPELINE_MODE = standard` (lite mode skips the mapper)
 2. `HAS_SUCCESS_CRITERIA_TABLE = true` (set by Phase 0a Agent 3 — the lite-mode/always-load detector)
 
-If both are true, dispatch the mapper as an Explore subagent — same prompt as develop-story, but pass the **task** file/directory as the values for `STORY_FILE`/`STORY_DIR` (the mapper accepts both doc types — see `qa-traceability-mapper-prompt.md` "Doc type" note). Mark the wait beside the dispatch — `bash .agents/skills/develop-task/references/set-waiting-on.sh "step-5 traceability mapper"` — and `… --clear` once its confirmation is read (task.124):
+If both are true, dispatch the mapper as an Explore subagent — same prompt as develop-story, but pass the **task** file/directory as the values for `STORY_FILE`/`STORY_DIR` (the mapper accepts both doc types — see `qa-traceability-mapper-prompt.md` "Doc type" note). Mark the wait beside the dispatch — `bash .agents/skills/develop-task/references/set-waiting-on.sh "step-5 traceability mapper"` — and `… --clear` once its reply is read (task.124):
 
 ```
 Agent(subagent_type="Explore", prompt="Run the QA traceability mapper (shared/resources/qa-traceability-mapper-prompt.md).
@@ -250,16 +282,17 @@ Inputs:
   STORY_FILE={task-file}
   STORY_DIR={task-directory}
 
-Follow the Execution Protocol exactly. Write the matrix file and return a one-line confirmation.")
+Follow the Execution Protocol exactly. Return the matrix between the markers; do not create or modify any file.")
 ```
 
 After the subagent completes:
 
-1. Confirm `{task-directory}/.summaries/qa-traceability-matrix.md` was written.
+1. Save its reply verbatim to `.claude/state/mapper-reply.md` and run the develop-story block
+   **Write the matrix from the mapper's reply** above with `{doc-directory}` = `{task-directory}`.
 2. Write the summary JSON artifact to `{task-directory}/.summaries/step-5-traceability-mapper.json` (schema: `shared/resources/subagent-summary-artifact.md`).
 3. Update the Pipeline Progress `Subagent summary ref` column for Step 5–6 with the JSON path.
 
-If the subagent fails or the matrix file is absent: log warning in Issues Log and proceed without the matrix (qa-task falls back to its internal mapping).
+If the subagent fails, or that block prints a `⚠️` line (no well-formed marked block in its reply): log warning in Issues Log and proceed without the matrix (qa-task falls back to its internal mapping).
 
 Skip this pre-step when `PIPELINE_MODE=lite` OR `HAS_SUCCESS_CRITERIA_TABLE=false`. Tasks with no Success Criteria table (e.g. pure infra cleanup) gain nothing from the mapper.
 

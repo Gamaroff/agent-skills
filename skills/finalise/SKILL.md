@@ -495,7 +495,7 @@ Read each prompt file to get the template, substitute the placeholder values, th
 | 1. AC traceability   | `references/finalise-dod-ac-prompt.md`         | `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>`, `<DIFF_FILE>` |
 | 2. Security review   | `references/finalise-dod-security-prompt.md`   | `<STORY_FILE>`, `<STORY_TYPE>`, `<DOD_N>` (Step 0's `$DOD_N`) |
 | 3. Compliance review | `references/finalise-dod-compliance-prompt.md` | `<STORY_FILE>`                                               |
-| 4. Docs & changelog  | `references/finalise-dod-docs-prompt.md`       | `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>`                |
+| 4. Docs & changelog  | `references/finalise-dod-docs-prompt.md`       | `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>`, `<DIFF_FILE>` |
 
 Each agent returns YAML. Capture: `AC_RESULT`, `SECURITY_RESULT`, `COMPLIANCE_RESULT`, `DOCS_RESULT`.
 
@@ -503,51 +503,145 @@ Each agent returns YAML. Capture: `AC_RESULT`, `SECURITY_RESULT`, `COMPLIANCE_RE
 
 **Bug mode (`fix-evidence`):** run — dispatch `references/finalise-dod-fix-evidence-prompt.md` as agent 1 with `<BUG_FILE>`, `<PR_NUMBER>`, `<DIFF_FILE>` and `<IMPL_REPORT>` (the newest implementation report beside the bug in **either** shape the pipeline has written — `{bug-prefix}.implementation.*.md` or `{bug-prefix}.{name}.implementation.*.md`, the two prefixes `references/bug-doc.js` accepts (TASK-125-BUG-13) — or empty). It checks the five things a bug fix must show — the expected behaviour is implemented, a regression test asserts it *and runs per PR*, the test is recorded red without the fix, a new guard states its scope, bundled copies match their source — and returns `fix_evidence:` YAML in the same PASS/FAIL-with-citation contract as `ac_traceability:`. Capture it **as `AC_RESULT`** so Steps 3c–6 read one variable: `AC_OVERALL` is `fix_evidence.overall`, and the Step 6 column "All Acceptance Criteria Met?" reads "all fix-evidence checks PASS". `STORY_TYPE` is `bug` for the other three agents, which need no bug variant.
 
-> **The security agent's evidence lands in the work-item directory before Step 3d.** The run record
-> (`{stem}.dod.{N}.security.run.json` and its `.d/`) and any cases file
-> (`{stem}.dod.{N}.security.cases.json`), both numbered by this run's `$DOD_N` (obs #302), must be under the work-item directory, because the 6a
-> acceptance commit carries them. A read-only agent may report that it wrote them elsewhere. Copy
-> them in from the paths it returns, and treat a `--cases-file` it ran but did not save as
-> `probes_executed` that cannot be re-run: re-dispatch once, asking for the file (obs #299).
+#### Step 3b.1: Run the security probe plan
 
-> **When the record is still absent, `/finalise` runs the probe itself (obs #10).** A read-only
-> agent may refuse to create the engine's sandbox or its record. It then returns `probes_executed: 0`,
-> the `probe mode executed no candidates` FAIL and its `probe_command`. That FAIL describes the agent's
-> tool class, not the boundary. On task.201 it would have reached Step 6 as a security FAIL on a
-> boundary that held (72 executed, 0 reproduced). Before Step 3c, when `boundary: true` and this run's
-> `${STEM}.dod.${DOD_N}.security.run.json` is in neither the work-item directory nor a path the agent
-> returned:
->
-> 1. **Cases.** If `probe_command` passes `--cases-file` and that file is absent, write the agent's
->    `probe_cases` to it, under the work-item directory. With neither, re-dispatch once, asking for them.
-> 2. **Run.** First check that the command's `--record` is this run's record path in the work-item
->    directory. Correct a command that records anywhere else; do not run it as given. Then run it from
->    the repository root.
-> 3. **Replace, from the record.** Set `probes_executed` to its `totals.executed`. Rebuild `probes[]`
->    from the engine's `cases[]`, keeping each whose outcome differs from its direction, with its input
->    verbatim. When the count is non-zero, drop the agent's `probe mode executed no candidates` check.
->    Recompute `overall` from what remains: FAIL if any check or general check FAILs or any probe
->    reproduced, otherwise PASS. A rebuilt probe carries **no `severity`**, so Step 8a reads it as not-low and halts.
->    Re-dispatch the agent with the record path if you want it graded.
-> 4. **Say so.** Add `- Probe run by /finalise — the security agent could not execute it` under the
->    security section's Probe Results.
->
-> A zero from this run still takes the zero-guard: then the engine declined the entry, which is the
-> guard's real case. With no `probe_command` either, the zero-guard stands and the section is
-> re-dispatched once.
+**When the security agent returns `boundary: true`, `/finalise` runs its probe plan — the agent
+never does.** It is a read-only Explore subagent: it decides *what* to probe and returns
+`probe_plan[]`, one entry per control, each the engine's arguments as an array plus any cases it
+needs. Running the engine builds a sandbox and writes a run record, which a read-only agent refuses;
+on task.158 that refusal came back as a `probe mode executed no candidates` FAIL on a boundary the
+dispatch had simply never probed, and on task.201 a boundary that held (72 executed, 0 reproduced)
+nearly reached Step 6 as a security FAIL (obs #10, #218). This step replaces the old "run it only when
+the record is absent" fallback: the run is now unconditional, and it happens here, **Before Step 3c**,
+so aggregation reads the filled result.
 
-> **`SECURITY_RESULT` carries a `boundary:` flag and, when it is true, `probes_executed:` and `probes[]`.**
+Skip it when `boundary` is `false` or `internal`. Otherwise:
+
+1. **Write the plan.** Save `SECURITY_RESULT.probe_plan` as a JSON array to
+   `.claude/state/probe-plan.json` (Write tool — it is YAML in your context, not a shell variable).
+   An absent or empty plan under `boundary: true` is written as `[]`; it is not skipped.
+2. **Run it — backgrounded**, one call from the repository root (`run_in_background`), and read the
+   `probe-plan exit=` line when the notification arrives. Each entry may run for minutes, and a
+   foreground call is stopped at the host's tool timeout (120–600 s), which would leave no result
+   (task.189 QA3-1). **The block marks and clears its own wait** (`set-waiting-on.sh "step-7 probe plan"
+   --kind task --budget-minutes …`), with a budget computed from the plan
+   and the runner's per-run bound — so every caller of this block, Step 8a.4's re-run included, gets
+   the same rule by running it (QA cycle 4, CR4-1, CR4-2):
+
+   ```bash
+   # Step 3b.1 — run the security agent's probe plan (task.189). INPUTS, substituted into THIS block:
+   # {document-directory} — the work item's directory; STEM and DOD_N exactly as Step 0 bound them.
+   STEM="{story.{P}.{E}.{S} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}"
+   DOD_N="{Step 0's DOD_N}"
+   DOC_DIR="{document-directory}"
+   RESULT=.claude/state/probe-plan-result.json
+   RUNNER=.agents/skills/finalise/references/security-probe-plan.mjs
+   # A result exists only when a run completed: the stale one goes FIRST — before anything below can
+   # stop the block — and the new one is moved into place only once it parses, so a run killed
+   # mid-write leaves NO result, never a partial or an earlier one (task.189 CR5-1).
+   rm -f "$RESULT" "$RESULT.tmp"
+   # The wait, marked HERE so no caller can run the block without it. Budget: the runner's own bound per
+   # entry (ENGINE_TIMEOUT_MS) times the plan's entries, plus 5 minutes. The plan path goes first: the
+   # runner's entry guard reads argv[1], and must not take this import for a CLI run.
+   BUDGET=$(command node -e '
+     const fs = require("fs"), path = require("path");
+     import(path.resolve(process.argv[2])).then((m) => {
+       let n = 1;
+       try { n = Math.max(1, JSON.parse(fs.readFileSync(process.argv[1], "utf8")).length); } catch {}
+       console.log(Math.ceil((n * m.ENGINE_TIMEOUT_MS) / 60000) + 5);
+     });' .claude/state/probe-plan.json "$RUNNER" 2>/dev/null)
+   # A budget that is not a positive integer means the runner did not load: say so and carry on — the
+   # run below fails the same way and reports "no result"; aborting here would print nothing at all.
+   # The pattern is set-waiting-on.sh's own, so the two checks accept the same values (task.189 CR6-5).
+   case "$BUDGET" in
+     ''|*[!0-9]*|0*) echo "⚠️  probe plan: the runner did not load — the wait is not marked" ;;
+     *) bash .agents/skills/finalise/references/set-waiting-on.sh "step-7 probe plan" --kind task \
+          --budget-minutes "$BUDGET" ;;
+   esac
+   command node "$RUNNER" \
+     --plan .claude/state/probe-plan.json \
+     --record "$DOC_DIR/$STEM.dod.$DOD_N.security.run.json" \
+     --cases-base "$DOC_DIR/$STEM.dod.$DOD_N.security.cases" \
+     --repo-root "$(git rev-parse --show-toplevel)" \
+     --json > "$RESULT.tmp"
+   rc=$?
+   # Parsed with node, which the run above already needed — not jq, whose absence would read as a run
+   # that did not complete (CR4-3).
+   command node -e 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))' "$RESULT.tmp" 2>/dev/null \
+     && mv "$RESULT.tmp" "$RESULT"
+   rm -f "$RESULT.tmp"
+   bash .agents/skills/finalise/references/set-waiting-on.sh --clear
+   echo "probe-plan exit=$rc"
+   if [ -f "$RESULT" ]; then
+     # The summary is a convenience: without jq the result is printed whole, never reported missing.
+     jq -c '{reason, probes_executed, reproduced: (.probes | length), escapes: (.escapes | length), refusals}' "$RESULT" 2>/dev/null \
+       || cat "$RESULT"
+   else
+     echo "probe-plan: no result — the run did not complete"
+   fi
+   ```
+
+   The runner (`references/security-probe-plan.mjs`) builds each entry's argument list as an array —
+   an entry such as `fence:<doc>#<heading text>` or an `--argv` template carries spaces inside one
+   argument, which an unquoted shell expansion would split. It writes inline cases beside the record
+   (`…security.cases.json`, or `…security.cases.<i>.json` for entry *i* of several), records every
+   entry into the **one** run record (the engine folds each control into it), and refuses an entry
+   whose arguments carry `--record`, `--repo-root`, `--cases-file`, `--json`, `--emit-block` or
+   `--timeout`, which it owns, refuses an entry whose inline `cases` repeat an id (each probe's `key`
+   must be unique), and kills an engine run that outlives its overall bound (a refusal, never an
+   execution). Exit 1 (`bad-plan`) means the JSON you wrote is not an array: fix the file, re-run.
+   **`probe-plan: no result` is not an empty plan** — the run did not complete (killed, or its output
+   did not parse): re-run the step; never fill `SECURITY_RESULT` from an absent result.
+   `reason: record-unreadable` means entries ran but their record cannot be folded (`error` says
+   why): add a `probe record unreadable — {error}` FAIL check with no `severity`, and never read the
+   0 it reports as nothing executed.
+3. **Fill the result from the record.** Set `SECURITY_RESULT.probes_executed` to the output's
+   `probes_executed` — the record's `totals.executed`, copied, never composed. Set `probes[]` to
+   the output's `probes`: each is a hostile case the control accepted or a legitimate case it
+   refused, with its input verbatim. A probe built here carries **no `severity`**, so Step 8a reads
+   it as not-low and halts. **When `probes[]` is non-empty, grade it:** re-dispatch the security
+   agent once with `.claude/state/probe-plan-result.json` and the record path, asking only for a
+   `severity` per probe `key` (a read — it runs nothing). Merge each returned severity onto the probe
+   with that `key`, never by `id`: `id` is the corpus case id, which every control on the same sink
+   shares, so an `id` match can put one control's grade on another's probe (task.189 CR2-1). A probe
+   it does not grade stays without, and halts. Without this step every reproduced probe would
+   halt, and the low-severity fix-and-recheck path Step 8a offers would never open.
+4. **An escape is a finding, whatever the verdict.** Each `escapes[]` entry is a case the engine saw
+   write outside its sandbox — the engine exits 1 on one even when the control engages. Add a
+   `probe escaped its sandbox: {entry} ({id} → {path})` FAIL check per entry, with no `severity`.
+5. **Refusals are not executions.** Each `refusals[]` entry is a control the plan named that was
+   never probed — the engine refused its arguments (exit 2, the reason is its first stderr line) or
+   the runner refused the entry. It adds nothing to `probes_executed`. Re-dispatch the security agent
+   once with the refusal reasons, asking for the corrected **whole** plan — the refused entries fixed,
+   every other entry unchanged — and re-run this step on it. A re-run's result replaces the first, so a
+   plan of only the corrected entries would drop the first run's probes and escapes while the shared
+   record still counts them (task.189 CR2-2). Still refused:
+   add a `checks[]` entry `probe plan entry refused: {entry} — {reason}` with `status: FAIL` and
+   no `severity`.
+6. **The zero-guard still applies — now to this run.** `boundary: true` with `probes_executed: 0`
+   (an empty plan, every entry refused or declined) adds the `probe mode executed no candidates`
+   FAIL check; a zero from this run **still takes the zero-guard**, because then the engine declined
+   the entry, which is the guard's real case. Recompute `overall`: FAIL if any check or general
+   check FAILs or any probe reproduced, otherwise PASS.
+7. **Say so.** Add `- Probe run by /finalise from the security agent's plan — {N} control(s), record
+   `{record path}`` under the security section's Probe Results.
+
+The record and every cases file are under the work-item directory, numbered by this run's `$DOD_N`
+(obs #299, #302), so the 6a acceptance commit carries them and a later DoD run cannot overwrite them.
+
+> **`SECURITY_RESULT` carries a `boundary:` flag and, when it is true, `probes_executed:` and `probes[]`** —
+> filled by Step 3b.1 from the run record, not by the agent.
 > `boundary: true` means the security agent's Step 1b identified a **boundary deliverable** — a predicate,
-> validator, classifier or allow/deny-list — and it then generated candidate inputs, **executed** them
-> against the shipped code, and reported only those that reproduced. `boundary: false` means the rule did
+> validator, classifier or allow/deny-list — and planned the probe; Step 3b.1 **executed** the candidate
+> inputs against the shipped code and kept only those that reproduced. `boundary: false` means the rule did
 > not fire, which is the common and expected case. `boundary: internal` means the rule fired on a
 > validator of the pipeline's own artefact that no corpus sink models — a recorded decision with an
 > `internal_reason`, rendered as an explicit skip, never as the zero-guard FAIL and never as `false`.
 >
 > **Read `probes` together with `probes_executed`, never alone.** No reproduced probe with a high
 > `probes_executed` is the *good* outcome — the boundary was probed and held. No reproduced probe with
-> `probes_executed: 0` **or absent** is a **finding**, not a pass: the agent emits a `probe mode
-> executed no candidates` FAIL in `checks`, rendered like any other failed check. Branching on list
+> `probes_executed: 0` **or absent** is a **finding**, not a pass: Step 3b.1 adds a `probe mode
+> executed no candidates` FAIL to `checks`, rendered like any other failed check. Branching on list
 > emptiness alone would report the best outcome and the worst one identically.
 >
 > **Four absences are four different things, and none of them is `false`.** A missing `boundary`
@@ -2785,9 +2879,11 @@ Step 6 rollup query **through the background poll** the CI gate already uses —
 wait — until it is `SUCCESS`. Record it in the running summary as
 `CI reading 1 (fix head): {CI_ROLLUP} @ {CI_HEAD_1}`. `FAILURE` → Step 8.
 
-**4. Re-run ONLY the failed section's reproduction.** Not the four agents. For security, that is the
-engine command the agent recorded (`security-probe.mjs … --record …`), re-run so the record's
-`totals.executed` is refreshed from the fixed tree; for a checklist FAIL it is the check's own
+**4. Re-run ONLY the failed section's reproduction.** Not the four agents. For security, that is
+Step 3b.1's block, re-run backgrounded exactly as Step 3b.1 item 2 runs it (the block marks its own wait) on
+the plan it saved at `.claude/state/probe-plan.json` and into this run's
+record, so the record's `totals.executed` is refreshed from the fixed tree — the security agent
+returns a plan and records no command (task.189); for a checklist FAIL it is the check's own
 citation re-read. The section is PASS when the reproduction no longer reproduces **and** the record
 shows the count. The other three sections were evaluated against a tree the fix did not change — the
 `touched` paths are inside the Files Summary, which is what `inside-files-summary` guarantees — and

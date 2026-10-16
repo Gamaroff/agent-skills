@@ -120,10 +120,15 @@ test("probe mode instructs execution, not abstract reasoning", () => {
     `${PROMPT}: the "do not reason abstractly" instruction is gone. This is THE instruction — ` +
       `without it the agent inspects the boundary again and the prompt is a grep checklist with extra steps`,
   );
-  assert.match(
-    source(),
-    /\*\*3\. Execute them\.\*\*/,
-    `${PROMPT}: the "Execute them" step has been removed or renamed`,
+  // task.189: the agent PLANS the execution and /finalise performs it — execution still happens,
+  // only the executor moved. Losing step 3 would leave a boundary with no plan and no run.
+  assert.ok(
+    has(source(), "**3. Plan the run — `/finalise` executes it.**"),
+    `${PROMPT}: the "Plan the run" step has been removed or renamed`,
+  );
+  assert.ok(
+    has(source(), "The plan is how the boundary gets executed."),
+    `${PROMPT}: step 3 no longer says the plan is what gets the boundary executed`,
   );
 });
 
@@ -407,11 +412,11 @@ test("probe mode reports only what reproduced, and counts everything it ran", ()
     `${PROMPT}: the reproduced-only rule is gone — unreproduced suspicions would enter the gate`,
   );
   assert.ok(
-    has(source(), "A candidate you did not run is not a finding"),
+    has(source(), "A candidate that did not run is not a finding"),
     `${PROMPT}: the "did not run is not a finding" rule has been softened`,
   );
   assert.ok(
-    has(source(), "Report the total in **`probes_executed:`**"),
+    has(source(), "The total is **`probes_executed:`**"),
     `${PROMPT}: the execution count is no longer required. Without it a filtered \`probes\` list ` +
       `is the only signal, and "probed and held" is indistinguishable from "probed nothing".`,
   );
@@ -419,11 +424,13 @@ test("probe mode reports only what reproduced, and counts everything it ran", ()
 
 // --- The read-only contract -----------------------------------------------------------------
 
-test("the read-only contract survives, redefined as does-not-mutate rather than does-not-run", () => {
+test("the read-only contract survives, redefined as writes-nothing rather than does-not-execute", () => {
+  // task.189: the agent writes nothing at all — /finalise runs the engine from its plan — but the
+  // boundary is still executed. Restoring a bare "read-only agent" is what foreclosed execution.
   assert.ok(
     has(
       source(),
-      "Read-only means you do not mutate. It does not mean you do not run.",
+      "Read-only means you write nothing. It does not mean the boundary goes unexecuted.",
     ),
     `${PROMPT}: the read-only redefinition is gone. Restoring a bare "read-only agent" is what ` +
       `foreclosed execution and let the fourteen routes through`,
@@ -431,7 +438,7 @@ test("the read-only contract survives, redefined as does-not-mutate rather than 
   for (const clause of [
     "modify, stage, or commit any file tracked by the repository",
     "open a network connection",
-    "write anywhere outside a temporary directory",
+    "create or modify any file, in the repository or in a temporary directory",
   ]) {
     assert.ok(
       has(source(), clause),
@@ -521,47 +528,85 @@ test("the zero-executed guard keys on the execution count, not on an empty probe
 });
 
 /**
- * obs #10: /finalise dispatches this agent as a read-only Explore subagent, and on task.201 it
- * refused to create the engine's sandbox and record, so a boundary that held (72 executed, 0
- * reproduced) came back as a zero-guard FAIL. The agent now always returns the command, and the
- * orchestrator — which can write — runs it when the record is absent. Both halves are asserted:
- * a prompt that returns a command nobody runs, or a skill that runs a command no prompt returns,
+ * obs #10 → task.189 (obs #218): /finalise dispatches this agent as a read-only Explore subagent,
+ * which refuses to create the engine's sandbox and record — on task.201 a boundary that held (72
+ * executed, 0 reproduced) came back as a zero-guard FAIL. obs #10 had the agent return the command
+ * and /finalise run it when the record was absent; task.189 makes the split total: the agent RETURNS
+ * a probe plan and never runs the engine, and /finalise Step 3b.1 ALWAYS runs it. Both halves are
+ * asserted: a prompt that returns a plan nobody runs, or a skill that runs a plan no prompt returns,
  * is the same stuck FAIL.
  */
-test("the probe run falls to /finalise when the agent cannot execute it (obs #10)", () => {
+test("the agent plans the probe and /finalise always runs it (obs #10, task.189)", () => {
   const yaml = yamlBlock();
-  for (const field of ["probe_command:", "probe_cases:"]) {
+  assert.ok(
+    yaml.includes("probe_plan:") &&
+      yaml.includes("argv:") &&
+      yaml.includes("cases:"),
+    `${PROMPT}: the returned YAML block no longer carries probe_plan / argv / cases — a read-only ` +
+      `agent has no other way to hand the probe run to /finalise`,
+  );
+  for (const gone of ["probe_command:", "probe_cases:"]) {
     assert.ok(
-      yaml.includes(field),
-      `${PROMPT}: the returned YAML block no longer carries "${field}" — a read-only agent ` +
-        `has no other way to hand the probe run to /finalise`,
+      !source().includes(gone),
+      `${PROMPT}: "${gone}" is back — the agent must not run the engine or name its record`,
     );
   }
+  // The use shape, in both spellings the runner refuses — and its own controls, so a regex that stops
+  // seeing one spelling goes red here rather than passing the prompt vacuously (task.189 CR4-4).
+  const RECORD_USE = /--record(?:\s+|=)["'<$\w./]/;
+  for (const use of [
+    "--record <STORY_DIR>/x.run.json",
+    "--record=<STORY_DIR>/x.run.json",
+  ]) {
+    assert.ok(RECORD_USE.test(use), `the --record matcher misses: ${use}`);
+  }
   assert.ok(
-    has(source(), "Return the command whether or not you ran it."),
-    `${PROMPT}: the instruction to return probe_command even when the agent could not run it is gone`,
+    !RECORD_USE.test("`--record`, `--repo-root`"),
+    "the --record matcher fires on the flag's name alone",
+  );
+  // `--record` may be NAMED (the prompt lists it among the flags the runner owns — task.189 CR3-3);
+  // it may never be USED with a path, which is the agent running the engine into a record.
+  assert.ok(
+    !RECORD_USE.test(source()),
+    `${PROMPT}: "--record <path>" is back — the agent must not run the engine or name its record`,
   );
   assert.ok(
-    has(
-      source(),
-      "`probes_executed:` is required whenever `boundary: true`, and so is `probe_command:`",
-    ),
-    `${PROMPT}: the probe rule no longer requires probe_command on a boundary`,
+    has(source(), "`probe_plan:` is required whenever `boundary: true`"),
+    `${PROMPT}: the probe rule no longer requires a plan on a boundary`,
   );
 
   const s = flat(skill());
-  const at = s.indexOf("`/finalise` runs the probe itself");
+  const at = s.indexOf("#### Step 3b.1: Run the security probe plan");
   assert.ok(
     at >= 0,
-    "skills/finalise/SKILL.md: the orchestrator-run probe step is gone — a read-only agent's " +
-      "zero-guard FAIL then reaches Step 6 as a security FAIL",
+    "skills/finalise/SKILL.md: Step 3b.1 is gone — a read-only agent's plan then runs nowhere",
   );
-  const block = s.slice(at, at + 2500);
+  assert.ok(
+    !s.includes("`/finalise` runs the probe itself"),
+    "skills/finalise/SKILL.md: the obs #10 conditional fallback is back beside Step 3b.1 — two mechanisms for one run",
+  );
+  // Step 8a.4's re-run is the plan's re-run: the agent records no command (task.189 CR-1).
+  assert.ok(
+    !s.includes("engine command the agent recorded"),
+    "skills/finalise/SKILL.md: Step 8a re-runs a command the security agent no longer records",
+  );
+  assert.ok(
+    s.includes(
+      "Step 3b.1's block, re-run backgrounded exactly as Step 3b.1 item 2 runs it",
+    ),
+    "skills/finalise/SKILL.md: Step 8a.4 no longer re-runs the saved probe plan",
+  );
+  // The whole of Step 3b.1 — to the next heading, not a fixed window it can outgrow.
+  const block = s.slice(at, s.indexOf("#### Step 3c", at));
   for (const [needle, why] of [
-    ["probe_command", "the step must run the command the agent returned"],
+    ["probe_plan", "the step must run the plan the agent returned"],
     [
-      "probe_cases",
-      "the step must write the cases a read-only agent could not",
+      "security-probe-plan.mjs",
+      "the step must run the plan through the runner, not by hand",
+    ],
+    [
+      "--repo-root",
+      "the engine's containment root must be the consumer's tree",
     ],
     [
       "totals.executed",
@@ -569,20 +614,41 @@ test("the probe run falls to /finalise when the agent cannot execute it (obs #10
     ],
     [
       "Before Step 3c",
-      "the replacement must land before aggregation reads SECURITY_RESULT",
+      "the run must land before aggregation reads SECURITY_RESULT",
     ],
     [
       "no `severity`",
       "a rebuilt probe must not be graded low by the orchestrator",
     ],
     [
+      "a `severity` per probe `key`",
+      "a reproduced probe must be graded by its unique key, or Step 8a's low path never opens or opens on the wrong probe (task.189 CR2-1)",
+    ],
+    [
       "still takes the zero-guard",
       "a zero from the orchestrator's own run is still a finding",
+    ],
+    [
+      "Refusals are not executions",
+      "an entry the engine refused must not be counted",
+    ],
+    [
+      "probe escaped its sandbox",
+      "an engine escape must reach the DoD as a FAIL, whatever the verdict (task.189 CR-2)",
+    ],
+    [
+      "record-unreadable",
+      "an unfoldable record must not read as zero executed (task.189 CR-4)",
+    ],
+
+    [
+      "corrected **whole** plan",
+      "a corrected-plan re-run must carry every entry, or it drops the first run's probes (task.189 CR2-2)",
     ],
   ]) {
     assert.ok(
       block.includes(needle),
-      `skills/finalise/SKILL.md: the orchestrator-run probe step no longer says "${needle}" — ${why}`,
+      `skills/finalise/SKILL.md: Step 3b.1 no longer says "${needle}" — ${why}`,
     );
   }
 });

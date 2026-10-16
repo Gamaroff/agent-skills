@@ -1,0 +1,82 @@
+schema: 2
+task: 'task.189.read-only-agents-never-write'
+task_title: 'Read-only agents never write'
+gate: CONCERNS
+status_reason: 'All five success criteria hold and 90/90 targeted tests pass, but the diff review found two medium correctness bugs (Step 8a still re-runs a command the agent no longer records; the runner drops engine escapes) and the new owned-flag refusal cannot be probed by the engine.'
+reviewer: 'QA Engineer'
+head: '16f8ed4f8fe7418f3000bbe38da580ce000b7d29'
+updated: '2026-10-16T21:17:32Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'Step 8a.4 (fix-and-recheck) re-runs "the engine command the agent recorded"; under the new contract the agent records no command, so the step names a command that does not exist. Bug: task.189.bug.1.'
+    suggested_action: 'Point Step 8a.4 at security-probe-plan.mjs on the saved .claude/state/probe-plan.json with this run record.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-2'
+    severity: medium
+    file: 'shared/resources/security-probe-plan.mjs'
+    finding: 'The runner drops the engine escapes[] (a probe that wrote outside its sandbox), and Step 3b.1 reads no escape field, so an escape reaches the DoD as a clean run. Bug: task.189.bug.2.'
+    suggested_action: 'Carry escapes into runs[] and a top-level field; Step 3b.1 adds a FAIL check when non-empty; pin with a fixture test.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-1'
+    severity: medium
+    file: 'shared/resources/security-probe-plan.mjs'
+    finding: 'ownedFlagIn returns the offending flag (truthy) for a refused entry and null for an allowed one, so the probe engine reads every refusal as acceptance; the owned-flag boundary has no engine probe and finalise would hit the zero-guard on it. Bug: task.189.bug.3.'
+    suggested_action: 'Export an accept-shaped predicate (argv when allowed, null when refused) and add each owned flag and its --flag=value form as fixture cases.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-2'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'The matrix write block runs mkdir -p before the non-empty check, so an empty marked block prints the warning and writes no matrix but leaves an empty .summaries directory (engine fence probe: t189.matrix.empty-block reproduced, 1 of 6 hostile).'
+    suggested_action: 'Write the temp file outside the doc directory (or create the directory only after the non-empty check).'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 90
+  phases_verified: '4/4'
+  ci: 'not read this cycle'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 8
+    notes: 'Fence-form probe of the Step 5 matrix block: 8 executed, 1 reproduced (empty-block side effect, low). Runner owned-flag boundary not probeable (QA-1); runner drops engine escapes (CR-2).'
+  performance:
+    status: PASS
+    notes: 'No path runs more often; Step 3b.1 replaces a conditional run with an unconditional one of the same engine.'
+  reliability:
+    status: CONCERNS
+    notes: 'Step 8a fix-and-recheck names a command that no longer exists (CR-1).'
+  maintainability:
+    status: PASS
+    notes: 'One runner, one guard test with a population re-measured from the tree; contract tests updated.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1, CR-2, QA-1 (task.189.bug.1-3).'
+      refs: ['skills/finalise/SKILL.md', 'shared/resources/security-probe-plan.mjs']
+  future:
+    - action: 'CR-3 (low/medium, advisory): the guard FORBIDS word list includes bare "no", which lets "If there is no X file, write it to Y" pass.'
+      refs: ['tests/explore-prompts-no-write.test.js']
+    - action: 'CR-4/CR-5 cleanups: read the record through readRecord(); assert probes_executed against an independent sum.'
+      refs: ['shared/resources/security-probe-plan.mjs', 'shared/resources/tests/read-only-agent-writes.test.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1, CR-2, QA-1 fixed']

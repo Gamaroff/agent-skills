@@ -1,0 +1,74 @@
+schema: 2
+task: 'task.189.read-only-agents-never-write'
+task_title: 'Read-only agents never write'
+gate: CONCERNS
+status_reason: 'Cycle-3 fixes hold (atomic result, duplicate ids, owned-flag listing check; boundaries engage, 28 executed, 0 reproduced). The backgrounding fix is partial: its wait has no budget, and Step 8a.4 re-runs the same block without the background rule.'
+reviewer: 'QA Engineer'
+head: '95248a845b624faa32c0be4a8b79364c4db7fb66'
+updated: '2026-10-16T21:54:53Z'
+
+top_issues:
+  - id: 'CR4-1'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'Step 3b.1 item 2 marks the background wait with no --budget-minutes, so it gets the 10-minute default while the runner allows each plan entry 20 minutes; the Stop hook reads a normal long run as a stall. Bug: task.189.bug.5 (reopened).'
+    suggested_action: 'Mark the wait with a budget derived from the plan (entries x the runner bound), ideally inside the block so every caller of the block gets it.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 67
+  phases_verified: '4/4'
+  ci: 'not read this cycle'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 28
+    notes: 'planArgvAllowed 20 cases engages; matrix block 8 cases engages (record task.189.qa.4.security.run.json).'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR4-1; advisory CR4-2 (Step 8a.4 re-run not backgrounded) and CR4-3 (jq missing reads as "did not complete").'
+  maintainability:
+    status: PASS
+    notes: 'OWNED_FLAGS listing consolidated and tested.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR4-1 (task.189.bug.5 reopened). Consolidate how Step 3b.1''s block is run into the block itself, so Step 8a.4 (CR4-2) inherits it.'
+      refs: ['skills/finalise/SKILL.md']
+  future:
+    - action: 'CR4-2 (medium/medium): Step 8a.4 re-runs the block with no background rule.'
+      refs: ['skills/finalise/SKILL.md']
+    - action: 'CR4-3 (low): validate the result with node, not jq, or distinguish a missing jq.'
+      refs: ['skills/finalise/SKILL.md']
+    - action: 'CR4-4 (low): the contract regex misses --record=<path>.'
+      refs: ['evals/shared/tests/finalise-dod-prompt-contract.test.mjs']
+    - action: 'CR4-5 (cleanup): duplicate-id check hides a repeated falsy case.'
+      refs: ['shared/resources/security-probe-plan.mjs']
+    - action: 'CR3-4 (carried, engine scope): SIGKILL on timeout skips the engine sandbox cleanup.'
+      refs: ['shared/resources/security-probe.mjs']
+
+bug_resolution:
+  bugs_fixed: 0
+  bugs_remaining: 1
+  fix_date: '2026-10-16'
+  total_iterations: 3
+  verification_method: 'Committed tests + engine probes'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR4-1 fixed']

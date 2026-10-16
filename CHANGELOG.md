@@ -146,6 +146,32 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **Read-only Explore subagents are never asked to write (task 189, observations #191, #218).** Two
+  pipeline steps dispatched a read-only Explore agent and then told it to write a file; it refused
+  every time, and each run finished only because the orchestrator noticed and did the write by hand
+  (seven recurrences). The dispatching step is now the only writer:
+  - **The QA traceability mapper returns its matrix** between `<!-- matrix-start -->` /
+    `<!-- matrix-end -->` markers. The Steps 5–6 doc saves the reply and a fenced block writes the
+    marked text, byte for byte, to `.summaries/qa-traceability-matrix.md`. The fallback warns only
+    when the reply has no well-formed marked block — a matrix the mapper returned is never discarded.
+  - **The finalise DoD security agent returns a probe plan, and `/finalise` always runs it.** The
+    agent returns `probe_plan[]` (the engine's arguments as an array, plus inline `cases`); the new
+    `/finalise` Step 3b.1 runs it through `security-probe-plan.mjs` into the one
+    `<stem>.dod.<DOD_N>.security.run.json` record and fills `probes_executed` (the record's
+    `totals.executed`) and `probes[]` from it. An entry the engine refuses is recorded with its
+    reason and never counted; an argument holding a space reaches the engine as one argument. This
+    replaces the obs #10 fallback that ran the agent's command only when the record was absent.
+    **Breaking for a custom dispatcher of `finalise-dod-security-prompt.md`:** the agent's YAML no
+    longer carries `probes_executed`, `probe_command` or `probe_cases`; run Step 3b.1's block after
+    the agent returns. `/finalise` users need do nothing.
+  - **The DoD docs agent runs no generator.** It judges a stale skill catalog from the PR diff (a
+    `SKILL.md` frontmatter change with no `docs/reference/skill-catalog.md` change), and now receives
+    `<DIFF_FILE>` to do it.
+  - **`tests/explore-prompts-no-write.test.js`** re-measures every Explore-dispatched prompt — named on
+    a dispatch line, self-declared, or inline in an `Agent(subagent_type="Explore", prompt="…")` call —
+    and fails on a write instruction outside a `<!-- caller-runs -->` region. `code-review-prompt.md`'s
+    caller-side diff scoping is marked that way.
+
 - **`uat-status.mjs` reads no longer write the surfaces template.** With no `uat-surfaces.json`,
   `--check`, `--coverage`, `--next`, `--item` and the scoreboard each copied the template into the
   tree before exiting 2, so a read left an untracked `docs/qa/` behind (observation #57). Only
