@@ -5,18 +5,20 @@ type: task
 description: "No pipeline prompt asks a read-only Explore subagent to write: the QA traceability mapper returns its matrix and the orchestrator writes it; the finalise DoD security agent returns a probe plan and the orchestrator runs the engine with --record; the DoD docs agent runs no generator; and a guard test keeps every Explore-dispatched prompt free of write instructions."
 tags: [develop-task, develop-story, finalise, observation, subagents, explore]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-07
-updated: 2026-10-16
+updated: 2026-10-17
 assignee:
 estimated_effort_hours: 16
 github_issue: 588
+completed_date: 2026-10-17
+pr_number: 683
 ---
 
 # Technical Task: Read-only agents never write
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.189.review.1.read-only-agents-never-write.md` implemented 2026-10-16
 **GitHub Issue**: [#588](https://github.com/Gamaroff/agent-skills/issues/588)
 
@@ -362,15 +364,15 @@ Not applicable: no change to how often the engine or the agents run.
 
 ### Functional
 
-- [ ] The mapper prompt contains no write instruction, and both dispatch sites say to return the
+- [x] The mapper prompt contains no write instruction, and both dispatch sites say to return the
   matrix — held by `tests/explore-prompts-no-write.test.js` (Phase 4).
-- [ ] The lifted extract-and-write block writes the marked matrix byte-for-byte and warns without
+- [x] The lifted extract-and-write block writes the marked matrix byte-for-byte and warns without
   writing when no markers are present — held by its fixture test (Phase 1).
-- [ ] The DoD security prompt contains no `--record` and no cases-file write, and returns
+- [x] The DoD security prompt contains no `--record` and no cases-file write, and returns
   `probe_plan[]` — held by the guard test (Phase 4) and the rewritten obs #10 contract test (Phase 2).
-- [ ] The lifted Step 3b.1 block sets `probes_executed` from the records' `totals.executed`, and
+- [x] The lifted Step 3b.1 block sets `probes_executed` from the records' `totals.executed`, and
   records an engine refusal without counting it — held by its fixture test (Phase 2).
-- [ ] The DoD docs prompt instructs no generator run — held by the guard test (Phase 4).
+- [x] The DoD docs prompt instructs no generator run — held by the guard test (Phase 4).
 
 ### Performance
 
@@ -459,6 +461,32 @@ None.
 ### Key Findings
 CR5-1 fixed and mutation-proven; bug.5 closed. One medium in test machinery: the fix's `2>/dev/null` makes the cycle-4 argv-order stderr assertion vacuous (CR6-1, bug.6).
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.189.qa.6.read-only-agents-never-write.md`
+**Gate File**: `task.189.gate.6.read-only-agents-never-write.yml`
+**Gate Status**: ⚠️ CONCERNS — judged non-blocking (one test-machinery entry, CR6-1, fixed in `2117b908` and mutation-proven; HIGH 0 across 6 cycles)
+**Quality Score**: 90/100
+**Step 5c**: `task.189.pr-review.1.read-only-agents-never-write.md` — ⚠️ CONCERNS
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 9/9 success criteria met, each held by a test that runs per PR
+✅ **PR Review:** PR #683 — single-maintainer repo; Step 5c review CONCERNS (accept-eligible); CI SUCCESS on `c94e47eb`
+✅ **Documentation:** CHANGELOG `[Unreleased]` entry; finalise Step 3b.1 and the shared prompts updated
+✅ **Security Review:** PASS, measured — 30 probes executed across 2 controls, 0 reproduced
+⚠️ **Compliance Review:** not applicable (internal pipeline refactor)
+
+**Conditions:** CR6-1's fix was verified by mutation proof, not by a QA gate; `task.189.bug.6` stays at Ready for QA as an accepted open item; CR6-2 and CR3-4 are advisory follow-ups.
+
+**Task marked as ACCEPTED on:** 2026-10-17
+
+**Detailed Verification Log:** See `task.189.dod.1.read-only-agents-never-write.md` for the complete verification evidence.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -480,6 +508,7 @@ CR5-1 fixed and mutation-proven; bug.5 closed. One medium in test machinery: the
 | 2026-10-16 |  | QA findings fixed — cycle 5, 1 gate finding (CR5-1) + 2 advisory (CR5-3, CR5-4) | qa-fix |
 | 2026-10-16 |  | QA gate CONCERNS (90/100) — 1 medium finding (test machinery); bug.5 closed, bug.6 opened | qa-task |
 | 2026-10-16 |  | QA findings fixed — cycle 6, 1 gate finding (CR6-1) + 3 advisory (CR6-3..CR6-5); CR6-2 left advisory | qa-fix |
+| 2026-10-17 | 1.2 | DoD verified — accepted (PR #683); gate 6 CONCERNS accepted with conditions | finalise |
 <!-- change-log-end -->
 
 ---
