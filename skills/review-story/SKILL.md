@@ -669,8 +669,8 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 
 - Pattern Match Search (Primary): Query by string prefix "[Story {prd}.{epic}.{story}] {title}".
 - Structural Label Search (Fallback - Execute if primary match returns zero results):
-  - For Jira: Execute Atlassian MCP searchJiraIssuesUsingJql with jql: `project = {JIRA_PROJECT_KEY} AND labels = "story-${PRD_NUM}.${EPIC_NUM}.${STORY_NUM}"`.
-  - For GitHub: Run `gh issue list --search "label:story-${PRD_NUM}.${EPIC_NUM}.${STORY_NUM}" --state all --json number,url,state,title`.
+  - For Jira: Execute Atlassian MCP searchJiraIssuesUsingJql with jql: `project = {JIRA_PROJECT_KEY} AND labels = "story-${STORY_STEM#story.}"`.
+  - For GitHub: Run `gh issue list --search "label:story-${STORY_STEM#story.}" --state all --json number,url,state,title`.
 - Handling Drift: If a single match is found via the fallback label search but the title has drifted from the local filename/title, link the existing tracker issue, write back the keys to frontmatter, and log a warning: "⚠️ Title drift detected between local file and existing tracker issue. Issue linked via structural label." Also insert/repair the body cross-reference link so the next review pass does not flag it as missing.
 
   **Jira path:**
@@ -694,7 +694,7 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
         - `jql`: `summary ~ "[Story {prd}.{epic}.{story}] {title}" AND project={JIRA_PROJECT_KEY}` (no status filter — all states)
         - Verify story title pattern against what `/create-story` Step 5.2a / `sync-jira-story` actually emits; align if the format differs
         - On search failure (outage / rate-limit): log `"⚠️ Jira dedup search failed — proceeding to create"` and fall through to steps 1–4 below (preserves current behaviour)
-        - **Fallback Structural Label Search**: If primary title match returns zero results, execute fallback search with jql: `project = {JIRA_PROJECT_KEY} AND labels = "story-${PRD_NUM}.${EPIC_NUM}.${STORY_NUM}"` (see Tracker Dedup Fallback Search Addendum for details).
+        - **Fallback Structural Label Search**: If primary title match returns zero results, execute fallback search with jql: `project = {JIRA_PROJECT_KEY} AND labels = "story-${STORY_STEM#story.}"` (see Tracker Dedup Fallback Search Addendum for details).
       - **Exactly one match** → link existing, skip steps 1–4 entirely (including `ensure-epic-jira-issue`):
         - Extract `jira_key` and build `jira_url = ${JIRA_URL}/browse/${jira_key}`
         - Write `jira_key: {jira_key}` and `jira_url: {jira_url}` into frontmatter (sed-based insert before closing `---`, same pattern as `create-task`)
@@ -744,7 +744,7 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
          ```
          Verify story title pattern against what `/create-story` Step 5.2a actually emits; align if the format differs.
          On failure: log `"⚠️ GitHub dedup search failed — proceeding to create"` and fall through to steps 1–4 below
-         - **Fallback Structural Label Search**: If primary title match returns zero results, run: `gh issue list --search "label:story-${PRD_NUM}.${EPIC_NUM}.${STORY_NUM}" --state all --json number,url,state,title` (see Tracker Dedup Fallback Search Addendum for details).
+         - **Fallback Structural Label Search**: If primary title match returns zero results, run: `gh issue list --search "label:story-${STORY_STEM#story.}" --state all --json number,url,state,title` (see Tracker Dedup Fallback Search Addendum for details).
       2. **Exactly one match** → link existing, skip steps 1–4 entirely (including `ensure-epic-github-issue`):
          - Extract `N` (issue number) and `url` from the result
          - Write `github_issue: {N}` into frontmatter (sed-based insert before closing `---`, same pattern as `create-task`)

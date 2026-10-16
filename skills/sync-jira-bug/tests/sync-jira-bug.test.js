@@ -63,6 +63,21 @@ test("a sub-story bug resolves to its sub-story parent, and a legacy two-number 
     [],
     "a correct claim about a sub-story is not a mismatch",
   );
+  // The bug's own slug keeps the loose bug-slug rule: a digit-led slug resolves
+  // (task.206 QA cycle 1, CR-4 — doc-id's letter-first rule is for story documents).
+  const digit = bug.resolveBugMode("/x/story.1.2.3.bug.1.500-error.md");
+  assert.equal(digit.mode, "story");
+  assert.equal(digit.parentId, "1.2.3");
+  assert.equal(digit.bugId, "story.1.2.3.bug.1");
+  // The story id must be exactly a story id: a leading zero or a slug segment before `.bug.` is not.
+  assert.equal(
+    bug.resolveBugMode("/x/story.01.2.3.bug.1.x.md").mode,
+    "unknown",
+  );
+  assert.equal(
+    bug.resolveBugMode("/x/story.1.2.3.x.bug.1.y.md").mode,
+    "unknown",
+  );
   // A legacy name: doc-id cannot read it, so no parent is invented for it.
   const legacy = bug.resolveBugMode("/x/story.7.4.bug.4.tap-target.md");
   assert.equal(legacy.mode, "unknown");

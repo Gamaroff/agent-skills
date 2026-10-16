@@ -381,7 +381,7 @@ test("CLI: coverage names accepted stories no function covers, honouring storyNa
   );
   assert.match(
     out,
-    /^coverage: 2 accepted stories covered by no function · 1 n\/a · 0 referenced but not accepted · 0 unknown$/m,
+    /^coverage: 2 accepted stories covered by no function · 1 n\/a · 0 referenced but not accepted · 0 unknown · 0 warning\(s\)$/m,
   );
   addRows(root, "D", D_ROWS);
   ({ code, out } = run(root, "--coverage", "--json"));
@@ -2892,4 +2892,37 @@ test("storyIds collects P.E.S and sub-story tokens whole, so a Stories cell neve
     "1.2.3A",
     "1.10.1",
   ]);
+});
+
+test("CLI: --check and --coverage COUNT an unreadable story and an old-shape surface key in their own output, not only on stderr (task.206 QA cycle 1, CR-9)", () => {
+  const root = corpus();
+  run(root, "--init");
+  const legacy = path.join(
+    root,
+    "docs/prd/prd.live/epics/epic.9.e/stories/story.9.1.s",
+  );
+  mkdirSync(legacy, { recursive: true });
+  writeFileSync(
+    path.join(legacy, "story.9.1.s.md"),
+    "---\ntitle: legacy\nstatus: accepted\n---\n",
+  );
+  const surfaces = path.join(root, "docs/qa/uat-surfaces.json");
+  const cfg = JSON.parse(readFileSync(surfaces, "utf8"));
+  cfg.epicSurface["5"] = "D";
+  writeFileSync(surfaces, JSON.stringify(cfg));
+  const check = run(root, "--check");
+  assert.match(
+    check.out,
+    /\[warn \] .*story\.9\.1\.s\.md: not a story id doc-id can read/,
+  );
+  assert.match(
+    check.out,
+    /\[warn \] .*epicSurface key "5" is not an epic id P\.E/,
+  );
+  assert.match(check.out, /uat-check: \d+ error\(s\), [1-9]\d* warning\(s\)/);
+  const cov = JSON.parse(run(root, "--coverage", "--json").out);
+  assert.equal(cov.warnings.length, 2, JSON.stringify(cov.warnings));
+  const text = run(root, "--coverage").out;
+  assert.match(text, /· 2 warning\(s\)$/m);
+  rmSync(root, { recursive: true, force: true });
 });

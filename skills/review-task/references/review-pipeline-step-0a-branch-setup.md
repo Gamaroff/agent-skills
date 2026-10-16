@@ -124,6 +124,11 @@ If `CURRENT_BRANCH` already matches the doc's expected feature-branch pattern, s
 
 ```bash
 # The full story stem plus a dot: story.1.2.3 never matches feature/story.1.2.30.* or story.1.2.4.*.
+# STORY_STEM is derived HERE — 0a.2's block is another shell, and an unbound stem matches only
+# `feature/.*`, so the auto-skip would silently never fire (task.206 QA cycle 1, CR-8).
+STORY_STEM=$(command node "$PWD/.agents/skills/review-story/references/doc-id.js" parse "$(basename "$DOC_FILE")" --json \
+  | jq -r 'select(.kind == "story") | .id')
+[ -n "$STORY_STEM" ] || { echo "❌ $(basename "$DOC_FILE") is not a story id doc-id can read"; exit 1; }
 case "$CURRENT_BRANCH" in
   "feature/${STORY_STEM}."*)
     BRANCH_NAME="$CURRENT_BRANCH"; AUTO_SKIPPED=true ;;

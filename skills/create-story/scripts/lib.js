@@ -109,7 +109,9 @@ function scanExistingStoryIds(entries, prdNum, epicNum) {
   const ids = new Set();
   for (const e of storiesOfEpic(entries, prdNum, epicNum)) {
     const p = docId.parse(e);
-    if (p.kind === "story") ids.add(p.story);
+    // Documents only — the population doc-id's allocator counts, so nextStoryId and
+    // assertUniqueStoryId cannot disagree about which numbers are in use (task.206 QA cycle 1, CR-12).
+    if (p.kind === "story" && p.artifact === null) ids.add(p.story);
   }
   return ids;
 }

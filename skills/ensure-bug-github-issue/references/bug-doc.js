@@ -50,6 +50,28 @@ const docId = require("./doc-id.js");
 // ---------------------------------------------------------------------------
 // Filename grammar
 // ---------------------------------------------------------------------------
+/**
+ * `story.{P}.{E}.{S}{sub?}.bug.{n}.{slug}.md` → `{ storyId, bugNumber }`, or null.
+ * The STORY ID is doc-id's: everything before the first `.bug.` must parse as a
+ * story document id and nothing else (`story.1.2.3A`). The `.bug.{n}.{slug}`
+ * remainder keeps the looser bug-slug rule task and general bugs use, so a slug
+ * that starts with a digit (`500-error`) still resolves — doc-id's story slug
+ * rule (letter first) governs story DOCUMENT names, not a bug's (task.206
+ * QA cycle 1, CR-4).
+ */
+function storyBugParts(filename) {
+  if (!filename.startsWith("story.")) return null;
+  const at = filename.indexOf(".bug.");
+  if (at < 0) return null;
+  const prefix = filename.slice(0, at);
+  const id = docId.parse(`${prefix}.x`);
+  if (!id.ok || id.kind !== "story" || id.artifact !== null || id.id !== prefix)
+    return null;
+  const rest = /^(\d+)\.(.+)\.md$/i.exec(filename.slice(at + ".bug.".length));
+  if (!rest) return null;
+  return { storyId: prefix, bugNumber: Number(rest[1]) };
+}
+
 // A story bug is read by doc-id: `story.{P}.{E}.{S}{sub?}.bug.{n}.{slug}.md`, so
 // `story.8.5.3.bug.2.…` is P=8 E=5 S=3 and `story.1.2.3A.bug.1.…` belongs to the
 // sub-story 1.2.3A. A name doc-id cannot read (a legacy `story.{E}.{S}`) is not a
@@ -109,21 +131,14 @@ function resolveBugMode(filePath, frontmatter = {}, body = "") {
   let out = null;
 
   let m;
-  const storyBug = /\.md$/i.test(filename) ? docId.parse(filename) : null;
-  if (
-    storyBug &&
-    storyBug.ok &&
-    storyBug.kind === "story" &&
-    storyBug.artifact === "bug" &&
-    storyBug.seq !== null
-  ) {
-    const parentId = storyBug.id.slice("story.".length); // "1.2.3A"
+  const storyBug = storyBugParts(filename);
+  if (storyBug) {
     out = {
       mode: "story",
-      bugId: `${storyBug.id}.bug.${storyBug.seq}`,
+      bugId: `${storyBug.storyId}.bug.${storyBug.bugNumber}`,
       parentKind: "story",
-      parentId,
-      bugNumber: storyBug.seq,
+      parentId: storyBug.storyId.slice("story.".length), // "1.2.3A"
+      bugNumber: storyBug.bugNumber,
     };
   }
   if (!out && (m = filename.match(RE_TASK_BUG))) {
@@ -154,7 +169,8 @@ function resolveBugMode(filePath, frontmatter = {}, body = "") {
       bugNumber: null,
       warnings: [
         `Filename "${filename}" matches no bug naming pattern ` +
-          `(story.{e}.{s}.bug.{n}.{name}.md, task.{id}.bug.{n}.{name}.md, bug.{N}.{name}.md).`,
+          `(story.{P}.{E}.{S}.bug.{n}.{name}.md, task.{id}.bug.{n}.{name}.md, bug.{N}.{name}.md; ` +
+          `a legacy story.{E}.{S} name is migrated first with migrate-doc-numbering).`,
       ],
     };
   }

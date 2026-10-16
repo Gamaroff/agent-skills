@@ -166,6 +166,12 @@ gh issue view ${ISSUE_NUM} --json state,title,labels,body > /tmp/issue-${ISSUE_N
 Diff `title`, `body`, `labels` against current GitHub state. The body is rebuilt to the **same shape** `ensure-story-github-issue` emits on create, including the `## Document` link block (using `DOC_URL` above), so re-syncing from a feature branch refreshes the link to that branch. At acceptance, `finalise` re-points the link to the durable integration branch so the closed issue doesn't link to a deleted feature branch. If anything changed, run:
 
 ```bash
+# sync-github-story Step 5b — the story id is derived HERE, in this block: Step 3's block is
+# another shell, and an unbound STORY_ID retitles the live issue "[Story ] …" (task.206 QA cycle 1, CR-1).
+: "${STORY_FILE_PATH:?bind STORY_FILE_PATH to the story document}"
+STORY_ID=$(command node .agents/skills/sync-github-story/references/doc-id.js parse "$(basename "$STORY_FILE_PATH")" --json \
+  | jq -r 'select(.kind == "story" and .artifact == null) | .id | sub("^story\\."; "")')
+[ -n "$STORY_ID" ] || { echo "❌ $(basename "$STORY_FILE_PATH") is not a story id doc-id can read — not editing the issue title"; exit 1; }
 mkdir -p .claude/state
 printf '%s' "$NEW_BODY" > .claude/state/issue-body.md
 

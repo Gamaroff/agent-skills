@@ -154,8 +154,9 @@ export function loadSurfaces(opts) {
   cfg.excludedPrds ??= [];
   cfg.defaultSurface ??= cfg.surfaces.at(-1).letter;
   cfg.uatSpecPattern ??= "^apps/portal/e2e/(smoke|uat)/";
+  // Reported by the command that reads them: --check and --coverage count them in
+  // their output, every other command prints them to stderr (loadStories).
   cfg.warnings = surfaceKeyWarnings(cfg, opts.surfaces);
-  for (const w of cfg.warnings) console.error(`uat-status: warning: ${w}`);
   return cfg;
 }
 
@@ -267,8 +268,17 @@ export function scanStories(opts, cfg) {
 
 export function loadStories(opts, cfg) {
   const { stories, warnings } = scanStories(opts, cfg);
-  for (const w of warnings) console.error(`uat-status: warning: ${w}`);
+  for (const w of [...(cfg.warnings ?? []), ...warnings])
+    console.error(`uat-status: warning: ${w}`);
   return stories;
+}
+
+// The warnings a reader of --check / --coverage must see in the result itself, not
+// only on stderr: "every story is covered" and "the stories could not be read"
+// must not print the same summary (task.206 QA cycle 1, CR-9).
+function storyScan(opts, cfg) {
+  const { stories, warnings } = scanStories(opts, cfg);
+  return { stories, warnings: [...(cfg.warnings ?? []), ...warnings] };
 }
 
 // ---------- registry parse / render ----------
@@ -508,8 +518,13 @@ export function checkCoverage({ sections }, stories, cfg) {
 
 function cmdCoverage(opts) {
   const cfg = requireSurfaces(opts);
-  const c = checkCoverage(readRegistry(opts), loadStories(opts, cfg), cfg);
+  const scan = storyScan(opts, cfg);
+  const c = {
+    ...checkCoverage(readRegistry(opts), scan.stories, cfg),
+    warnings: scan.warnings,
+  };
   if (opts.has("--json")) return console.log(JSON.stringify(c, null, 2));
+  for (const w of c.warnings) console.log(`warning    ${w}`);
   for (const s of c.unmapped)
     console.log(
       `unmapped   ${s.id}  ${s.title}  → surface ${s.suggestedSurface}`,
@@ -518,7 +533,7 @@ function cmdCoverage(opts) {
     console.log(`not-accepted ${s.id}  ${s.title}  (${s.status})`);
   for (const id of c.unknown) console.log(`unknown    ${id}  (no story file)`);
   console.log(
-    `coverage: ${c.unmapped.length} accepted stories covered by no function · ${c.na.length} n/a · ${c.notAccepted.length} referenced but not accepted · ${c.unknown.length} unknown`,
+    `coverage: ${c.unmapped.length} accepted stories covered by no function · ${c.na.length} n/a · ${c.notAccepted.length} referenced but not accepted · ${c.unknown.length} unknown · ${c.warnings.length} warning(s)`,
   );
 }
 
@@ -732,12 +747,14 @@ export function checkFindings(findings) {
 function cmdCheck(opts) {
   const cfg = requireSurfaces(opts);
   const exists = (rel) => existsSync(join(opts.root, repoPathOf(opts, rel)));
+  const scan = storyScan(opts, cfg);
   const { errors, warns } = checkRegistry(
     readRegistry(opts),
-    loadStories(opts, cfg),
+    scan.stories,
     cfg,
     exists,
   );
+  warns.unshift(...scan.warnings);
   errors.push(...checkFindings(loadFindings(opts)));
   for (const w of warns) console.log(`[warn ] ${w}`);
   for (const e of errors) console.log(`[ERROR] ${e}`);

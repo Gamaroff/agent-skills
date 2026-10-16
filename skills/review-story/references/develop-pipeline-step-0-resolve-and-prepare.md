@@ -40,6 +40,9 @@ E alone. Zero matches or two or more is a HALT, never `head -1` (task 206).
 
 ```bash
 # Story ids and epic resolution (task 206). INPUT: {story-file}, the resolved story document.
+# pipefail: the epic listing below pipes find | node | sort, and a crashed node filter must reach the
+# "could not list" HALT, not read as zero epics (task.206 QA cycle 1, CR-10).
+set -o pipefail
 DOC_ID="$PWD/.agents/skills/develop-story/references/doc-id.js"
 STORY_FILE="{story-file}"
 STORY_ID_JSON=$(command node "$DOC_ID" parse "$(basename "$STORY_FILE")" --json) \

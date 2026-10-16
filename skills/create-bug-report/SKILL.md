@@ -27,7 +27,7 @@ Use this skill when:
 
 | Mode             | When to use                                                                                      | Location                                              | Filename                             | Numbering                                    |
 | ---------------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------- | ------------------------------------ | -------------------------------------------- |
-| **Story bug**    | Bug found during user-facing feature (story) testing                                             | Co-located with the story file                       | `story.{epic}.{story}.bug.{n}.{name}.md` | Per-story (scan story dir, max + 1)          |
+| **Story bug**    | Bug found during user-facing feature (story) testing                                             | Co-located with the story file                       | `story.{prd}.{epic}.{story}.bug.{n}.{name}.md` | Per-story (scan story dir, max + 1)          |
 | **Task bug**     | Bug found during technical-task QA (refactoring, infrastructure, technical debt)                 | `docs/tasks/task.{id}.{name}/`                        | `task.{id}.bug.{n}.{name}.md`        | Per-task (scan task dir, max + 1)            |
 | **General bug**  | Cross-cutting / sweep bug with **no single story or task owner** (lint, security, deps, drift)   | `docs/bugs/bug.{N}.{name}/` (own self-named subdir)   | `bug.{N}.{name}.md`                  | **Global** (via `docs/bugs/bug-registry.md`) |
 
@@ -65,7 +65,7 @@ required:
   - reproduction_steps: List of steps to reproduce
 
 conditionally_required:
-  - story_id: '{epic}.{story}' # Story Bug mode only, e.g. "8.5.3"
+  - story_id: '{prd}.{epic}.{story}' # Story Bug mode only — doc-id's P.E.S, e.g. "1.8.5" (task.206)
   - task_id: '{id}'            # Task Bug mode only, e.g. "44"
 
 optional:
@@ -87,7 +87,7 @@ Populate it, then adjust these per-mode fields:
 
 | Field / heading                     | Story bug                                            | Task bug                                       | General bug                                       |
 | ----------------------------------- | --------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------- |
-| `Bug ID`                            | `story.{epic}.{story}.bug.{n}.{name}`               | `task.{id}.bug.{n}.{name}`                     | `bug.{N}.{name}`                                  |
+| `Bug ID`                            | `story.{prd}.{epic}.{story}.bug.{n}.{name}`               | `task.{id}.bug.{n}.{name}`                     | `bug.{N}.{name}`                                  |
 | `Related` line / frontmatter        | `[Story {Epic}-{N}: {Title}](./story.{e}.{s}.{name}.md)` | `[Task {id}: {Title}](./task.{id}.{name}.md)` | `None — cross-cutting bug (no single owner)`      |
 | `## {Criteria Violation Heading}`   | `## Acceptance Criteria Violation`                  | `## Success Criteria Violation`                | `## Scope & Impact`                               |
 
@@ -105,16 +105,16 @@ template sets `type: bug`.
 
 **Find Story File**:
 
-- Pattern: `story.{epic}.{story}.*.md`
+- Pattern: `story.{prd}.{epic}.{story}.*.md`
 - Example: `story.8.5.3.cache-first-cleanup-testing.md`
 
 **Extract Story Information**: story title, epic reference, story location (directory path).
 
-**HALT if story not found**: "Story {epic}.{story} not found. Please provide correct story ID."
+**HALT if story not found**: "Story {prd}.{epic}.{story} not found. Please provide correct story ID (P.E.S)."
 
 ### Step 2: Determine Next Bug Number
 
-1. Search the story directory for `story.{epic}.{story}.bug.*.md`.
+1. Search the story directory for `story.{prd}.{epic}.{story}.bug.*.md`.
 2. Highest existing number + 1 (no bugs → 1).
 3. Assign the number.
 
@@ -122,7 +122,7 @@ template sets `type: bug`.
 
 ### Step 3: Generate Filename
 
-`story.{epic}.{story}.bug.{bug-number}.{descriptive-name}.md` — `{descriptive-name}` = 2–4 words
+`story.{prd}.{epic}.{story}.bug.{bug-number}.{descriptive-name}.md` — `{descriptive-name}` = 2–4 words
 from the bug description, lowercase with hyphens, no special characters (per `docs/standards/file-naming.md`).
 
 Examples: `story.8.5.3.bug.1.cache-cleanup-memory-leak.md`, `story.2.1.1.bug.1.validation-error-handling.md`.
@@ -142,7 +142,7 @@ If a `## Bug Reports` section doesn't exist, add it after the "QA Report" sectio
 
 ### Open Bugs
 
-- [Bug {epic}.{story}.{n}: {Description}](story.{epic}.{story}.bug.{n}.{name}.md) - 🆕 New - Priority: {Priority}
+- [Bug {prd}.{epic}.{story}.{n}: {Description}](story.{prd}.{epic}.{story}.bug.{n}.{name}.md) - 🆕 New - Priority: {Priority}
 
 ### In QA Verification
 
@@ -157,7 +157,7 @@ If bugs already exist, add the new bug to the appropriate subsection based on st
 
 ### Step 6: Link in QA Report (if applicable)
 
-If a QA report exists (`story.{epic}.{story}.qa.*.md`), reference the bug report:
+If a QA report exists (`story.{prd}.{epic}.{story}.qa.*.md`), reference the bug report:
 
 ```markdown
 ## Issues Found
@@ -166,7 +166,7 @@ If a QA report exists (`story.{epic}.{story}.qa.*.md`), reference the bug report
 
 #### Issue 1: {Bug Description}
 
-**Bug Report**: [Bug {epic}.{story}.{n}](story.{epic}.{story}.bug.{n}.{name}.md)
+**Bug Report**: [Bug {prd}.{epic}.{story}.{n}](story.{prd}.{epic}.{story}.bug.{n}.{name}.md)
 
 {Issue details from QA report}
 ```
@@ -532,7 +532,7 @@ registry, with no parent coupling.
 6. **Initial Status**: always start with "New".
 7. **Severity-Driven**: HIGH/MEDIUM → create bug report; LOW → QA report only.
 8. **Naming Convention** (per `docs/standards/file-naming.md`):
-   - Story bugs: `story.{epic}.{story}.bug.{n}.{name}.md`
+   - Story bugs: `story.{prd}.{epic}.{story}.bug.{n}.{name}.md`
    - Task bugs: `task.{id}.bug.{n}.{name}.md`
    - General bugs: `bug.{N}.{name}.md` in `docs/bugs/bug.{N}.{name}/`
 
@@ -547,7 +547,7 @@ registry, with no parent coupling.
 - Bug reports track iterative fix cycles in the same file.
 - Bug status flow: New → In Progress → Ready for QA → Closed (or Reopened) — distinct from the document status lifecycle.
 
-**Story Bugs**: `story.{epic}.{story}.bug.{number}.{name}.md`, co-located with the story; per-story numbering.
+**Story Bugs**: `story.{prd}.{epic}.{story}.bug.{number}.{name}.md`, co-located with the story; per-story numbering.
 
 **Technical Task Bugs**: `task.{id}.bug.{number}.{name}.md`, co-located in the task subdirectory; per-task numbering. Quality gates are co-located in the task subdirectory (`task.{id}.gate.{number}.{name}.yml`).
 

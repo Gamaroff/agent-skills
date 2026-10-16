@@ -338,9 +338,30 @@ Recommend following Project Structure Guide for consistency.
 ### 5.1 Create Story File and Directory
 
 1. Determine story path name: `story.{prdNum}.{epicNum}.{storyNum}.{story-title-short}` — the three numbers
-   from Step 1.1's block. Before creating anything, confirm the id is free with
-   `command node -e 'require("./.agents/skills/create-story/scripts/lib.js").assertUniqueStoryId(Number(process.argv[1]), Number(process.argv[2]), Number(process.argv[3]), require("fs").readdirSync(process.argv[4]))' "$PRD_NUM" "$EPIC_NUM" "$STORY_NUM" "{epic-directory}/stories"`
-   — it throws `HALT: story.P.E.S already exists` on a collision (a story created since Step 1.1 ran).
+   from Step 1.1's block. Before creating anything, confirm the id is free — a story created since
+   Step 1.1 ran would collide. One block, with its inputs substituted, so it binds everything it reads:
+
+   ```bash
+   # create-story Step 5.1 — refuse an id another story already holds (task.206 QA cycle 1, CR-5).
+   # INPUTS, substituted into THIS block: {epic-file} (the epic document), {story-num} (Step 1.1's S).
+   EPIC_FILE="{epic-file}"
+   STORIES_DIR="$(dirname "$EPIC_FILE")/stories"
+   command node -e '
+     const fs = require("fs");
+     const lib = require("./.agents/skills/create-story/scripts/lib.js");
+     const d = require("./.agents/skills/create-story/references/doc-id.js");
+     const [epicFile, storiesDir, s] = process.argv.slice(1);
+     const e = d.parse(require("path").basename(epicFile));
+     if (!e.ok || e.kind !== "epic") { console.error(`HALT: ${epicFile} is not an epic document`); process.exit(1); }
+     // An epic with no stories/ directory yet is an epic with no stories: the first story is free.
+     const entries = fs.existsSync(storiesDir) ? fs.readdirSync(storiesDir) : [];
+     try { lib.assertUniqueStoryId(e.prd, e.epic, Number(s), entries); }
+     catch (err) { console.error(err.message); process.exit(1); }
+     console.log(`story.${e.prd}.${e.epic}.${s} is free`);
+   ' "$EPIC_FILE" "$STORIES_DIR" "{story-num}"
+   ```
+
+   It prints `HALT: story.P.E.S already exists` and exits 1 on a collision.
 2. Derive the output root from the epic file path provided (or identified in Step 1): `{epic-directory}/stories/`
 3. Create directory: `{epic-directory}/stories/{story-path-name}/`
 4. Create file inside directory: `{epic-directory}/stories/{story-path-name}/{story-path-name}.md`

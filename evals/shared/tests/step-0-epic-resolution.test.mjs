@@ -54,6 +54,34 @@ const SYNC_S3 = blockBy(
   SYNC_STORY,
   "# sync-github-story Step 3 — the story id through doc-id",
 );
+const SYNC_5B = blockBy(
+  SYNC_STORY,
+  "# sync-github-story Step 5b — the story id is derived HERE",
+);
+const ENSURE_DEDUP = blockBy(
+  ENSURE_STORY,
+  "# The story id, derived HERE — Step S1's block is another shell",
+);
+const ENSURE_MILESTONE = blockBy(
+  ENSURE_STORY,
+  "# No milestone when no epic document of this story's (P, E) is readable",
+);
+const ENSURE_CREATE = blockBy(
+  ENSURE_STORY,
+  "STORY_ISSUE_NUM=$(node references/tracker-issue.js",
+);
+const UNIQUE = blockBy(
+  CREATE_STORY,
+  "# create-story Step 5.1 — refuse an id another story already holds",
+);
+
+// The prefix of a shipped block up to (not including) its first side effect: what a block binds for
+// itself is decided before it calls gh / the tracker CLI, so the prefix is the part under test.
+const upTo = (block, marker) => {
+  const at = block.indexOf(marker);
+  assert.ok(at > 0, `marker ${JSON.stringify(marker)} not in the block`);
+  return block.slice(0, at);
+};
 
 const DOC_ID = path.join(ROOT, "shared", "resources", "doc-id.js");
 
@@ -178,7 +206,9 @@ for (const shell of SHELLS) {
       const skip = (branch) =>
         run(
           shell,
-          `DOC_FILE=${STORY_REL}\n${REVIEW_IDS}\nCURRENT_BRANCH='${branch}'\nAUTO_SKIPPED=false\n${REVIEW_SKIP}\necho "AUTO_SKIPPED=$AUTO_SKIPPED"`,
+          // 0a.3 ALONE — its own shell, as an agent runs it: it must derive STORY_STEM itself
+          // (task.206 QA cycle 1, CR-8). Only its inputs are bound.
+          `DOC_FILE=${STORY_REL}\nCURRENT_BRANCH='${branch}'\nAUTO_SKIPPED=false\n${REVIEW_SKIP}\necho "AUTO_SKIPPED=$AUTO_SKIPPED"`,
           { cwd },
         ).stdout;
       assert.match(skip("feature/story.1.2.3.charge"), /AUTO_SKIPPED=true/);
@@ -321,5 +351,86 @@ test("ensure-story dedups by title ONLY when github_issue is absent — a migrat
     /If `github_issue` is a positive integer in the frontmatter/,
   );
   assert.match(s2Body, /\*\*Return immediately\*\*/);
-  assert.match(ENSURE_STORY.slice(s3, s3 + 400), /\[Story \$\{STORY_ID\}\]/);
+  assert.match(ENSURE_STORY.slice(s3, s3 + 1500), /\[Story \$\{STORY_ID\}\]/);
 });
+
+for (const shell of SHELLS) {
+  test(`${shell}: every tracker block that reads STORY_ID / MILESTONE_TITLE binds it ITSELF — run alone, with only STORY_FILE_PATH, each derives the right value (task.206 QA cycle 1, CR-1/CR-2/CR-3)`, () => {
+    const EPIC_DIR = `${PRD1}/epic.1.2.payments`;
+    const cwd = consumer({
+      [`${EPIC_DIR}/epic.1.2.payments.md`]:
+        "---\ntitle: Payments\nprd_number: 1\nepic_number: 2\n---\n# Payments\n",
+      [STORY_REL]: story("epic.1.2.payments"),
+    });
+    try {
+      const alone = (prefix, echo) =>
+        run(shell, `STORY_FILE_PATH=${STORY_REL}\n${prefix}\n${echo}`, { cwd });
+      const sync = alone(
+        upTo(SYNC_5B, "mkdir -p .claude/state"),
+        'echo "ID=$STORY_ID"',
+      );
+      assert.match(sync.stdout, /^ID=1\.2\.3$/m, sync.stderr);
+      const dedup = alone(upTo(ENSURE_DEDUP, "DEDUP="), 'echo "ID=$STORY_ID"');
+      assert.match(dedup.stdout, /^ID=1\.2\.3$/m, dedup.stderr);
+      const ms = alone(
+        upTo(ENSURE_MILESTONE, "[ -z"),
+        'echo "M=$MILESTONE_TITLE"',
+      );
+      assert.match(ms.stdout, /^M=Epic 1\.2 — Payments$/m, ms.stderr);
+      const create = alone(
+        upTo(ENSURE_CREATE, "mkdir -p .claude/state"),
+        'echo "ID=$STORY_ID M=$MILESTONE_TITLE"',
+      );
+      assert.match(
+        create.stdout,
+        /^ID=1\.2\.3 M=Epic 1\.2 — Payments$/m,
+        create.stderr,
+      );
+      // A document that is not a story stops the block before any tracker call.
+      const bad = run(
+        shell,
+        `STORY_FILE_PATH=${EPIC_DIR}/epic.1.2.payments.md\n${upTo(SYNC_5B, "mkdir -p .claude/state")}\necho REACHED`,
+        { cwd },
+      );
+      assert.equal(bad.status, 1);
+      assert.doesNotMatch(bad.stdout, /REACHED/);
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  test(`${shell}: create-story Step 5.1 passes an epic's FIRST story (no stories/ yet) and HALTs on a taken (P, E, S) (task.206 QA cycle 1, CR-5)`, () => {
+    const EPIC = `${PRD1}/epic.1.2.payments/epic.1.2.payments.md`;
+    const cwd = consumer({ [EPIC]: "# epic\n" });
+    try {
+      const scripts = path.join(cwd, ".agents/skills/create-story/scripts");
+      fs.mkdirSync(scripts, { recursive: true });
+      fs.copyFileSync(
+        path.join(ROOT, "skills/create-story/scripts/lib.js"),
+        path.join(scripts, "lib.js"),
+      );
+      // lib.js's own bundled closure, exactly as an install ships it.
+      fs.cpSync(
+        path.join(ROOT, "skills/create-story/references"),
+        path.join(cwd, ".agents/skills/create-story/references"),
+        { recursive: true },
+      );
+      const unique = (n) =>
+        run(shell, bind(UNIQUE, { "{epic-file}": EPIC, "{story-num}": n }), {
+          cwd,
+        });
+      const first = unique("1");
+      assert.equal(first.status, 0, first.stdout + first.stderr);
+      assert.match(first.stdout, /story\.1\.2\.1 is free/);
+      const taken = `${PRD1}/epic.1.2.payments/stories/story.1.2.1.a/story.1.2.1.a.md`;
+      fs.mkdirSync(path.join(cwd, path.dirname(taken)), { recursive: true });
+      fs.writeFileSync(path.join(cwd, taken), "x\n");
+      const clash = unique("1");
+      assert.equal(clash.status, 1);
+      assert.match(clash.stderr, /HALT: story\.1\.2\.1 already exists/);
+      assert.equal(unique("2").status, 0);
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+}

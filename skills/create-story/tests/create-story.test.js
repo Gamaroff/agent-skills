@@ -95,7 +95,7 @@ test("scanExistingStoryIds — scoped to the epic (P, E), never E alone or a pre
       "story.2.2.7.baz.md", // epic 2 of ANOTHER PRD — ignored
       "story.1.20.9.qux.md", // epic 1.20 — the old `^story\\.2\\.` prefix shape would read it
       "story.1.2.30.quux.md", // story 30 of epic 1.2 — counted
-      "story.1.2.5.qa.1.x.md", // an artifact still names story 5 of epic 1.2
+      "story.1.2.5.qa.1.x.md", // an artifact alone does not hold a number — doc-id's allocator counts documents (CR-12)
       "README.md",
     ],
     1,
@@ -103,7 +103,7 @@ test("scanExistingStoryIds — scoped to the epic (P, E), never E alone or a pre
   );
   assert.deepEqual(
     [...ids].sort((a, b) => a - b),
-    [1, 2, 5, 30],
+    [1, 2, 30],
   );
 });
 

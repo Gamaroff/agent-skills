@@ -560,10 +560,37 @@ every new executable block is mutation-proved (implementation report, Decisions 
 - **`review-pipeline-step-0a-branch-setup.md` review-epic stanza (task.205's) is still positional**:
   `awk -F. '{print $2}'` reads P as `EPIC_NUM`, so its auto-skip `feature/epic.${EPIC_NUM}.*` matches every
   epic branch of PRD P. Out of scope here (§ 3 assigns it to task.205); recorded for task.207's sweep.
+- **Story-bug name readers (QA cycle 1, CR-6).** `create-bug-report` (the writer) and
+  `docs/standards/bug-documents.md` now name `story.{P}.{E}.{S}.bug`; six readers still restate the
+  old shape in prose — `develop-bug/SKILL.md`, `develop-bug/references/develop-bug-step-0-resolve-bug.md`,
+  `develop/SKILL.md`, `qa-fix/SKILL.md`, `qa-story/SKILL.md`, `review-bug/SKILL.md` (population:
+  `git grep -l -F 'story.{epic}.{story}.bug'` over skills and shared resources, generated copies
+  excluded) — task.207's placeholder sweep. `bug-doc.js`, the one code reader, is fixed.
 - The remaining `story.{epic}.{story}` placeholders in `develop-story/SKILL.md`, the Step 1 lock
   template, `qa-story`, `qa-fix`, `develop` and other prose are task.207's sweep, as § 4 states.
 - Post-merge consumer smoke test (§ 8, Consumer tests): `/create-prd` → `/create-epic` → `/create-story`
   → `/develop-story` to Step 4 in a scratch consumer — needs a live run, not a per-PR test.
+
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-16
+**Quality Score**: 60/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.206.qa.1.hierarchical-story-ids-in-pipeline.md](./task.206.qa.1.hierarchical-story-ids-in-pipeline.md)
+- **Gate File**: [task.206.gate.1.hierarchical-story-ids-in-pipeline.yml](./task.206.gate.1.hierarchical-story-ids-in-pipeline.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 5752
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+Four medium high-confidence bugs gate the cycle (CR-1, CR-2, CR-4, CR-5) plus one low (CR-8): three executable blocks read a value only another block binds, bug-doc rejects a digit-led story-bug slug, and create-story's uniqueness check throws for an epic's first story. Bug reports task.206.bug.1–4.
 
 ## Change Log
 
@@ -575,6 +602,8 @@ every new executable block is mutation-proved (implementation report, Decisions 
 | 2026-10-16 | 1.1 | Review passed (8/10) — shipped doc-id API named; regex criterion scoped; develop-next fixtures, create-story 01-happy and create-branch config added; measured-criterion commands; author decisions resolved | review-task |
 | 2026-10-16 |  | Status → ready-for-development | review-task |
 | 2026-10-16 |  | Implemented — 141 non-generated files (11 code sites, 9 executable blocks, 9 migrated + 3 hand-renamed fixture trees), 1 new suite + 15 updated test files; ci:fast 5752/0 | develop |
+| 2026-10-16 |  | QA gate CONCERNS (60/100) — 4 medium + 1 low gated findings, 7 advisory | qa-task |
+| 2026-10-16 |  | QA findings fixed — 5 gated (CR-1, CR-2/3, CR-4, CR-5, CR-8) + 5 advisory (CR-6 writers, CR-7, CR-9, CR-10, CR-11/12), 1 iteration | qa-fix |
 
 <!-- change-log-end -->
 

@@ -74,6 +74,11 @@ If `github_issue` is absent, null, or empty:
 Before creating, search for an issue with a matching title:
 
 ```bash
+# The story id, derived HERE — Step S1's block is another shell (task.206 QA cycle 1, CR-3).
+: "${STORY_FILE_PATH:?bind STORY_FILE_PATH to the story document}"
+STORY_ID=$(command node .agents/skills/ensure-story-github-issue/references/doc-id.js parse "$(basename "$STORY_FILE_PATH")" --json \
+  | jq -r 'select(.kind == "story" and .artifact == null) | .id | sub("^story\\."; "")')
+[ -n "$STORY_ID" ] || { echo "❌ $(basename "$STORY_FILE_PATH") is not a story id doc-id can read — not searching"; exit 1; }
 DEDUP=$(gh issue list --search "in:title \"[Story ${STORY_ID}]\"" --state all \
   --json number,url,state,title 2>/dev/null)
 ```
@@ -110,7 +115,18 @@ DOC_URL="https://github.com/$REPO/blob/${DOC_BRANCH:-$DEFAULT_BRANCH}/${STORY_RE
 Auto-create the milestone if it doesn't exist yet:
 
 ```bash
-# No milestone when Step S1 found no epic for this story's (P, E) — never an empty-titled one.
+# The story id and its epic's milestone, derived HERE — Step S1's block is another shell, and an
+# unbound MILESTONE_TITLE reads exactly like the deliberate "no epic" branch (task.206 QA cycle 1, CR-2).
+: "${STORY_FILE_PATH:?bind STORY_FILE_PATH to the story document}"
+DOC_ID=.agents/skills/ensure-story-github-issue/references/doc-id.js
+STORY_JSON=$(command node "$DOC_ID" parse "$(basename "$STORY_FILE_PATH")" --json \
+  | jq -c 'select(.kind == "story" and .artifact == null)')
+[ -n "$STORY_JSON" ] || { echo "❌ $(basename "$STORY_FILE_PATH") is not a story id doc-id can read"; exit 1; }
+STORY_ID=$(printf '%s' "$STORY_JSON" | jq -r '.id | sub("^story\\."; "")')
+EPIC_DIR=$(dirname "$(dirname "$(dirname "$STORY_FILE_PATH")")")
+MILESTONE_TITLE=$(command node "$DOC_ID" epic-meta "${EPIC_DIR}/$(basename "$EPIC_DIR").md" --json 2>/dev/null \
+  | jq -r --arg e "$(printf '%s' "$STORY_JSON" | jq -r '"\(.prd).\(.epic)"')" 'select(.id == $e) | .milestone // empty')
+# No milestone when no epic document of this story's (P, E) is readable — never an empty-titled one.
 [ -z "${MILESTONE_TITLE}" ] || node references/tracker-issue.js \
   --kind milestone --title "${MILESTONE_TITLE}" --quiet 2>/dev/null || true
 ```
@@ -142,6 +158,17 @@ The file is also what carries the body into the deferred record's `command.stdin
 > needs.
 
 ```bash
+# The story id and its epic's milestone, derived HERE — Step S1's block is another shell, and an
+# unbound MILESTONE_TITLE reads exactly like the deliberate "no epic" branch (task.206 QA cycle 1, CR-2).
+: "${STORY_FILE_PATH:?bind STORY_FILE_PATH to the story document}"
+DOC_ID=.agents/skills/ensure-story-github-issue/references/doc-id.js
+STORY_JSON=$(command node "$DOC_ID" parse "$(basename "$STORY_FILE_PATH")" --json \
+  | jq -c 'select(.kind == "story" and .artifact == null)')
+[ -n "$STORY_JSON" ] || { echo "❌ $(basename "$STORY_FILE_PATH") is not a story id doc-id can read"; exit 1; }
+STORY_ID=$(printf '%s' "$STORY_JSON" | jq -r '.id | sub("^story\\."; "")')
+EPIC_DIR=$(dirname "$(dirname "$(dirname "$STORY_FILE_PATH")")")
+MILESTONE_TITLE=$(command node "$DOC_ID" epic-meta "${EPIC_DIR}/$(basename "$EPIC_DIR").md" --json 2>/dev/null \
+  | jq -r --arg e "$(printf '%s' "$STORY_JSON" | jq -r '"\(.prd).\(.epic)"')" 'select(.id == $e) | .milestone // empty')
 mkdir -p .claude/state
 cat > .claude/state/issue-body.md <<EOF
 ## Summary
