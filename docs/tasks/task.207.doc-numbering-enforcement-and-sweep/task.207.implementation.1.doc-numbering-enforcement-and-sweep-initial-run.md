@@ -3,7 +3,7 @@
 **Task**: `task.207.doc-numbering-enforcement-and-sweep.md`
 **Run Number**: 1
 **Started**: 2026-10-16 16:40
-**Status**: In Progress
+**Status**: Escalated
 
 ---
 
@@ -34,7 +34,7 @@ Add the corpus and chokepoint CI guards for hierarchical doc numbering and sweep
 | 1. create-branch           | ✅ Done | Branch `feature/task.207.*` exists in git                             | Branch created at `fc69695a`; pushed with upstream | —                    | 2026-10-16T16:39Z |
 | 2. review-task             | ✅ Done | `task.207.review.{N}.{name}.md` exists (or skip logged)               | review.1: READY TO IMPLEMENT 8/10 (1C/7I/3O, all C+I applied); Planned → Ready for Development | —                    | 2026-10-16T16:44Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | inline (plan + measured surface map); loop audit iter 1: ready-for-review 23/23 @ `a6479024`; `npm run ci` exit 0 (2nd run — 1st failed on 9 tests pinning old literals, fixed) | —                    | 2026-10-16T17:05Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
+| 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #682: https://github.com/Gamaroff/agent-skills/pull/682 | —                    | 2026-10-16T17:06Z |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.207.qa.{N}.*.md`; `task.207.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.207.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
@@ -97,7 +97,92 @@ Add the corpus and chokepoint CI guards for hierarchical doc numbering and sweep
 
 ---
 
+### Step 4 — create-pr — 2026-10-16
+
+- Staging scope: 97 paths derived; only the work-item dir held uncommitted changes (the report), so `/create-pr` ran with `--scope docs/tasks/task.207.doc-numbering-enforcement-and-sweep` alone. Pre-flight guard: nothing out of scope untracked — nothing held.
+- Report links checked after staging: 0 relative links.
+- Report first commit `9b36097f`; branch pushed.
+- PR body written from the task's own record rather than the diff summariser (a 244-file diff, ~60% generated bundle output) — the summariser was not dispatched.
+- PR created: https://github.com/Gamaroff/agent-skills/pull/682 (base `develop`, `Closes #650`). Post-PR state: OPEN, head `9b36097f` (checked with `gh pr view`, no poller subagent).
+- Tracker: in-review comment → posted; GitHub board: in-review → stage-disabled.
+- Lock `pr_url` written; develop-next run state `prNumber: 682`.
+
+---
+
+### Steps 5–6 — QA cycle 1 — 2026-10-16
+
+- QA-start board re-assert: in-review → stage-disabled. Traceability mapper skipped — the task's Success Criteria are checkbox lists, not a table (HAS_SUCCESS_CRITERIA_TABLE=false, derived inline).
+- 5a `/qa-task` (`code_review_blocking=true`): gate.1 CONCERNS 60/100 — 4 MEDIUM (BUG-1..4), 3 LOW. Reviewer (Explore) dispatched 17:07:07Z, `duration_ms` 273649. Diff reviewed excludes generated `skills/*/references/**`. Two medium-confidence findings (CR-3, CR-4) promoted after QA verified them. Probe: `relatedDocInfo`, run record `totals.executed` 26, 4 hostile accepted (inherited from `doc-id.parse`, LOW, routed to future). Step 4b: 7 execution failures, all the harness temp copy lacking `.agents/skills`, identical on base.
+- QA Cycle 1 — changes-requested: stage-disabled.
+- 5b `/qa-fix` inline — findings ingester not dispatched: the gate was written in this session and its findings were in hand (independence loss recorded). Fixes: BUG-1 (0a.3 re-derives; §4 per-block), BUG-2 (comment order), BUG-3 (glob + 15-file residue sweep + new §5 prose guard), BUG-4 (title shape + backfill via `stripIdPrefix`), CR-5, CR-6. Mutation proofs: 4, all covered (one void `sed` attempt redone with an asserted edit).
+- Fast gate cycle 1: attempt 1 exit 1 (`develop-bug.test.js` pinned `story.{epic}.{story}.bug.{n}`), updated; attempt 2 exit 0.
+- Commit `c5432aa8` (fix + gate.1 + qa.1 + bug.1–4 + probe record), one push. PR and tracker qa-fix-1 comments posted.
+
+---
+
+### Steps 5–6 — QA cycle 2 — 2026-10-16
+
+- 5a refute pass (whole diff, reviewer dispatched 17:25:12Z, `duration_ms` 137936): gate.2 FAIL 60. BUG-1, BUG-4 closed via `status-history.js`; BUG-2, BUG-3 reopened; BUG-5 new. CR-4/CR-5 (cross-block reads in review-pipeline-step-0a) identical on `origin/develop` → pre-existing, routed to `recommendations.future`. Security `reasoned` (no boundary changed).
+- QA Cycle 2 — changes-requested: stage-disabled (signalled after 5b, not before it — order slip, no board effect).
+- 5b `/qa-fix` inline (findings in hand). Step 2.6 trigger (b), repeat subject on BUG-2 and BUG-3 → **consolidate** both: shared JS tokenizer lifted into `tests/lib/strip-js-comments.js`; §5 rewritten as an allow-list (first placeholder must name the PRD). The allow-list surfaced 30 lines in 15 files, rewritten; `create-parallel-stories` exempt by name. BUG-5/CR2-6 fixed (dev-only evidence: one-off script with no harness). Mutation proofs: 4, all covered.
+- Fast gate cycle 2: exit 0. Commit `26e783e4`, one push. PR and tracker qa-fix-2 comments posted.
+
+---
+
+### Steps 5–6 — QA cycle 3 — 2026-10-16
+
+- 5a scoped re-review (17 files since gate 2's head; reviewer dispatched 17:36:19Z, `duration_ms` 185015): gate.3 FAIL 60. Convergence check: HIGH `0, 1, 1` — not tripped (`HIGH_{N-2} = 0`). Third strike: none.
+- QA Cycle 3 — changes-requested: stage-disabled (signalled before 5b).
+- 5b inline: BUG-6 fixed + new contract test `tests/ingester-prompt-placeholders.test.js`; BUG-3 title-form extension (32 lines, 16 files); CR3-5; CR-7/CR-8 cleanups; CR3-4 deferred with reason. Mutation proofs: 2, covered.
+- Fast gate cycle 3: exit 0. Commit `763f1d8c`, one push. qa-fix-3 comments posted.
+
+---
+
+### Steps 5–6 — QA cycle 4 — 2026-10-16
+
+- 5a scoped (19 files since gate 3's head; reviewer 17:46:29Z, `duration_ms` 156229): gate.4 CONCERNS 80. Convergence: HIGH `1, 1, 0` — no trip. Route classifier: Diminishing-returns needs two HIGH-0 gates (one); Cosmetic-residue is PASS-only → 5b.
+- QA Cycle 4 — changes-requested: stage-disabled.
+- 5b inline: BUG-3 consolidate (population → `*.md`, `*.yaml`, `*.yml`); **self-correction** — cycle 3's rewrite of PRD-internal headings contradicted the documented relative numbering inside a PRD; reverted, and `RELATIVE_TITLES` exempts those files' title check by name, with a stale-entry test that fired on its first run. BUG-6 wording; contract test hardened (CR-6). CR-7 (backfill epic-meta) and CR-2 (pre-existing milestone override) stay future items.
+- Fast gate cycle 4: exit 0. Commit `563b4c0b`, one push. qa-fix-4 comments posted.
+
+---
+
+### Steps 5–6 — QA cycle 5 — 2026-10-16
+
+- 5a scoped (12 files since gate 4's head; reviewer 17:56:19Z, `duration_ms` 115491): gate.5 CONCERNS 70. Convergence: HIGH `1, 0, 0` — no trip.
+- 5b inline: BUG-3 (13 files to `{domain}/prd.{P}.{feature}/epics/`; §5 `FLAT_LAYOUT`, bracket/angle `BARE_TWO_LEVEL`), CR5-2, CR5-3 (anchored exemptions), CR5-5. A bulk rewrite touched the dated `.agents/plans/doc-drift-audit-2026-10-07.md`; restored unedited before commit. Four mutations each red. Fast gate exit 0. Commit `1f8de5cd`, one push; qa-fix-5 comments posted.
+- Loop-limit route (`classifyLoopRoute`, `budgetSpent: true`): `continue`, reason `medium-not-falling` — MEDIUM 1, 2, 3 over cycles 3–5.
+
+---
+
 ## Issues Log
+
+### QA Loop Limit Reached — 2026-10-16
+
+The pipeline completed 5 qa-task/qa-fix cycles without a clean PASS.
+
+**Final gate status**: CONCERNS (70) — gate.5 judged `563b4c0b`; cycle 5's fix (`1f8de5cd`) is ungated.
+**HIGH findings per cycle**: 0, 1, 1, 0, 0 — zero on the last two gates
+**Remaining issues** (from gate.5, all addressed by `1f8de5cd` but not re-gated):
+- TASK-207-BUG-3 — medium — `skills/qa-story/SKILL.md` — layout paths without `prd.{P}.`
+- TASK-207-CR5-2 — medium — `skills/qa-story/SKILL.md` — bracket two-level id
+- TASK-207-CR5-3 — medium — `tests/doc-id-chokepoint.test.js` — file-wide title exemption
+- TASK-207-CR5-5 — low — `tests/ingester-prompt-placeholders.test.js` — explanatory mentions counted as bound
+
+**What was attempted per cycle**:
+- Cycle 1: review-epic 0a blocks, chokepoint blind spots, placeholder residues (BUG-1..4)
+- Cycle 2: shared JS comment tokenizer; §5 rewritten as an allow-list; sub-story backfill titles
+- Cycle 3: ingester placeholder contract (BUG-6) with its own test; title-form placeholders
+- Cycle 4: §5 extended to YAML; reverted cycle 3's wrong rewrite of PRD-internal relative titles; `<S>` = `.story` + `.sub`
+- Cycle 5: `prd.{P}.` layout paths, bracket two-level ids, anchored exemptions, head-only binding names
+- Route 2c considered and declined: `medium-not-falling` (MEDIUM 1, 2, 3 over cycles 3–5).
+
+**Likely root cause**: The prose sweep's population was never enumerated up front: each gate found the next spelling of the retired scheme (angle placeholders, title forms, YAML, then the directory layout), and each fix widened §5 by one more shape. MEDIUM rose because every cycle's widening exposed a further residue, not because fixes regressed (apart from cycle 3's PRD-title rewrite, reverted in cycle 4). No HIGH remains, and the guard now checks ids, titles, two-level forms and the layout directory.
+
+**Recommended next steps**:
+1. Run one more `/qa-task` by hand on `1f8de5cd` (or resume `/develop-task` with more cycles): the last fix is ungated, and HIGH has been 0 for two gates.
+2. If it reads clean, 5c `/review-pr --effort medium --comment --no-code`, then `/finalise`.
+3. Carry the gate's `recommendations.future` items (create-parallel-stories scheme, create-epic milestone override, step-0a cross-block reads, `doc-id.parse` hardening, story-template `../epics/` links, qa-gate-template naming) into follow-up tasks.
 
 _Problems encountered and how they were resolved or escalated._
 
@@ -107,6 +192,51 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-10-16
+**Gate Result**: CONCERNS
+**Issues Found**: 4 MEDIUM — TASK-207-BUG-1 (review-epic 0a.3 reads variables bound in another block), BUG-2 (chokepoint phantom block comment), BUG-3 (review-epic numbering glob still flat), BUG-4 (title shape misses literal-space parsers); 3 LOW (CR-5, CR-6, QA-1)
+**HIGH findings**: 0
+**MEDIUM findings**: 4
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 1 of 5)
+
+### QA Cycle 2 — 2026-10-16
+**Gate Result**: FAIL
+**Issues Found**: 1 HIGH — BUG-3 reopened (§5 placeholder guard missed angle-bracket and `{N}.{M}` spellings in 9 files); 2 MEDIUM — BUG-2 reopened (`/*` in a regex literal), BUG-5 (backfill title drops the sub-story letter); 1 LOW (CR2-6). BUG-1, BUG-4 closed. 2 pre-existing findings routed to future.
+**HIGH findings**: 1
+**MEDIUM findings**: 2
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 2 of 5)
+
+### QA Cycle 3 — 2026-10-16
+**Gate Result**: FAIL
+**Issues Found**: 1 HIGH — BUG-6 (ingester globs renamed without their binding lists); 1 MEDIUM — BUG-3 reopened (title-form spellings); 2 LOW (CR3-4 deferred, CR3-5). BUG-2, BUG-5 closed.
+**HIGH findings**: 1
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 3 of 5)
+
+### QA Cycle 4 — 2026-10-16
+**Gate Result**: CONCERNS
+**Issues Found**: 2 MEDIUM — BUG-3 reopened (YAML templates/config outside §5), BUG-6 reopened (sub-story `<S>` source); 2 LOW (CR4-4, CR4-5). 1 pre-existing finding (create-epic milestone override) to future.
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 4 of 5)
+
+### QA Cycle 5 — 2026-10-16
+**Gate Result**: CONCERNS
+**Issues Found**: 3 MEDIUM — BUG-3 reopened (layout paths drop `prd.{P}.`), CR5-2 (bracket two-level id), CR5-3 (file-wide title exemption); 1 LOW (CR5-5). BUG-6 closed.
+**HIGH findings**: 0
+**MEDIUM findings**: 3
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: Loop route: continue (medium-not-falling) — gate-the-last-fix half-cycle declined
+**Action**: Escalating — loop limit reached
+
 ---
 
 ## Completion
@@ -114,7 +244,7 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: `feature/task.207.doc-numbering-enforcement-and-sweep`
-**PR**: {populated after Step 4}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/682
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
