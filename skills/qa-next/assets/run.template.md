@@ -46,7 +46,7 @@ updated: {{date}}
 
 ## Findings
 
-Everything seen that is **not** an item's own result: a rough edge on a function that passed, a defect on another surface, a fault in the environment or in this harness. One row each; `_None._` when there were none — the section is never omitted. **Where** is a route, element or endpoint; **What was observed** is the observation, not a diagnosis; **Severity** is `Blocker` / `Major` / `Minor` / `Trivial`; **Filed as** is the bug link (relative to this file), or `note` when a stranger could not reproduce it from this row alone. `uat-status.mjs --findings` lists the open ones across every run.
+Everything seen that is **not** an item's own result: a rough edge on a function that passed, a defect on another surface, a fault in the environment or in this harness. One row each; `_None._` when there were none — the section is never omitted. **Where** is a route, element or endpoint; **What was observed** is the observation, not a diagnosis; **Severity** is `Blocker` / `Major` / `Minor` / `Trivial`; **Filed as** is the bug link (relative to this file), or `note` when a stranger could not reproduce it from this row alone. A `note` closes only on evidence: `uat-status.mjs --resolve-finding <run> <n> --by <evidence>` — its only writer — appends `— resolved YYYY-MM-DD by `<evidence>`` to the cell, where the evidence is a commit sha or the path of a **later** run file (as `--findings` prints it), backticked and never a link, and `--check` re-verifies it every time. A row that links a bug is closed by its bug, never by a marker. `uat-status.mjs --findings` lists the open ones across every run.
 
 | # | Where | What was observed | Severity | Filed as |
 | :--- | :--- | :--- | :--- | :--- |

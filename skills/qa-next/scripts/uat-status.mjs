@@ -22,6 +22,12 @@
 //   node uat-status.mjs --automated <id> "<specs>"     fill the Automated-by cell
 //   node uat-status.mjs --accept <id> [--note "..."] [--force]   🟡 pass → ✅ accepted — the owner's command
 //   node uat-status.mjs --findings [--all] [--json]    open findings across every run file
+//   node uat-status.mjs --resolve-finding <run> <n> --by <sha | later run> [--date YYYY-MM-DD]
+//                                             close a `note` finding on evidence: appends
+//                                             ` — resolved <date> by \`<evidence>\`` to its Filed as
+//                                             cell, the one edit ever made to a written run file
+//   node uat-status.mjs --changed-runs                tracked run files that differ from HEAD (the
+//                                             earlier runs --resolve-finding edited), one per line
 //
 // The /qa-next run state file (default .claude/state/qa-next.state.json under --root; --state <path>
 // overrides) — the single-flight lock and resume record. Its fields and who writes each: STATE_FIELDS.
@@ -53,6 +59,7 @@ import {
 import { join, relative, dirname, resolve, basename } from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
 
 // The one definition of a document id (task 202). A story file is read through
 // it: ids are `P.E.S`, and an epic is `P.E` — E restarts in every PRD, so E alone
@@ -116,6 +123,10 @@ const OPTIONS = new Set([
   "--accept",
   "--findings",
   "--all",
+  "--resolve-finding",
+  "--changed-runs",
+  "--by",
+  "--date",
   "--state-init",
   "--state-get",
   "--state-set",
@@ -667,27 +678,127 @@ export const BUG_LINK_RULE =
 const FINDING_ROW = /^\|\s*(\d+)\s*\|(.*)\|(.*)\|(.*)\|(.*)\|\s*$/;
 const BUG_CLOSED = /^(closed|done|fixed|resolved)$/i;
 
-export function parseFindings(text) {
-  const lines = text.split("\n");
+// A note is closed by a marker at the end of its Filed as cell: ` — resolved YYYY-MM-DD by \`<evidence>\``
+// (task 212). The evidence is BACKTICKED, never a link: parseFindings reads the cell's first markdown
+// link as the bug, so a linked run file would turn the note into a "bug" with a non-bug status.
+const RESOLUTION_MARK = /\bresolved (\d{4}-\d{2}-\d{2}) by `([^`]+)`\s*$/;
+const COMMIT_EVIDENCE = /^[0-9a-f]{7,40}$/;
+
+// The Findings table's rows as [line index, FINDING_ROW match] — the one locator both the reader
+// (parseFindings) and the writer (--resolve-finding) use, so they cannot disagree on which line is
+// finding n.
+function findingRows(lines) {
   const start = lines.findIndex((l) => /^## Findings\s*$/.test(l));
   if (start < 0) return [];
   const out = [];
-  for (const line of lines.slice(start + 1)) {
-    if (/^## /.test(line)) break;
-    const m = line.match(FINDING_ROW);
-    if (!m) continue;
-    const [, n, where, what, severity, filed] = m;
-    const link = filed.match(/\[[^\]]*\]\(([^)]+)\)/);
-    out.push({
-      n: Number(n),
-      where: where.trim(),
-      what: what.trim(),
-      severity: severity.trim(),
-      filedAs: filed.trim(),
-      bug: link ? link[1] : null,
-    });
+  for (let i = start + 1; i < lines.length; i++) {
+    if (/^## /.test(lines[i])) break;
+    const m = lines[i].match(FINDING_ROW);
+    if (m) out.push([i, m]);
   }
   return out;
+}
+
+function rowFinding([, n, where, what, severity, filed]) {
+  const link = filed.match(/\[[^\]]*\]\(([^)]+)\)/);
+  const mark = filed.match(RESOLUTION_MARK);
+  return {
+    n: Number(n),
+    where: where.trim(),
+    what: what.trim(),
+    severity: severity.trim(),
+    filedAs: filed.trim(),
+    bug: link ? link[1] : null,
+    // Only a marked row carries the key: an unmarked row, and every --findings --json payload built
+    // from one, stays byte-identical to what it was before resolutions existed.
+    ...(mark ? { resolution: { date: mark[1], evidence: mark[2] } } : {}),
+  };
+}
+
+export function parseFindings(text) {
+  return findingRows(text.split("\n")).map(([, m]) => rowFinding(m));
+}
+
+// A run file is runs/<id>/<date>-<env>.md, or <date>-<env>-NN.md for the NNth run of that day.
+const RUN_NAME = /^(\d{4}-\d{2}-\d{2})-(.+?)(?:-(\d{2}))?\.md$/;
+const runName = (p) => {
+  const m = basename(p).match(RUN_NAME);
+  // A name whose date is not a real day carries no date at all: 2026-13-45 is never later.
+  return m && isRealDate(m[1])
+    ? { dir: dirname(p), date: m[1], env: m[2], seq: Number(m[3] ?? 1) }
+    : null;
+};
+
+// Is `evidence` a run made after `run`? Decided from the two names, never from listRunFiles'
+// order: that sorts same-day runs of different functions or environments by name, which says
+// nothing about which came first. A later date is later; on the same day only a higher sequence
+// of the same function and environment is; a name that carries no date is never later.
+export function isLaterRun(evidence, run) {
+  const e = runName(evidence);
+  const r = runName(run);
+  if (!e || !r) return false;
+  if (e.date !== r.date) return e.date > r.date;
+  return e.dir === r.dir && e.env === r.env && e.seq > r.seq;
+}
+
+const isRealDate = (d) => {
+  const t = Date.parse(`${d}T00:00:00Z`);
+  return Number.isFinite(t) && new Date(t).toISOString().slice(0, 10) === d;
+};
+
+// Why a finding's resolution does not hold, or null when it does. Pure: the run list and the commit
+// lookup are injected, so --check, --findings and the writer all apply this one rule. `runs` is
+// listRunFiles' order; `commitState(sha)` answers "commit" | "absent" | "no-repo".
+export function verifyResolution(f, { runs, commitState }) {
+  const { date, evidence } = f.resolution;
+  if (f.bug) return "on-a-bug-link";
+  if (!isRealDate(date)) return "bad-date";
+  if (evidence.endsWith(".md")) {
+    if (evidence === f.run) return "run-is-self";
+    if (!runs.includes(evidence)) return "run-not-found";
+    return isLaterRun(evidence, f.run) ? null : "run-not-later";
+  }
+  if (COMMIT_EVIDENCE.test(evidence)) {
+    const state = commitState(evidence);
+    if (state === "commit") return null;
+    return state === "no-repo" ? "not-a-git-repo" : "commit-not-found";
+  }
+  return "bad-evidence";
+}
+
+// Lazy: git is spawned only when a commit marker is actually verified, so a corpus with no markers
+// runs no process at all. A missing git binary reads as no repository — never as an accepted commit.
+function gitCommitState(root) {
+  let inRepo;
+  const seen = new Map();
+  const git = (args) =>
+    execFileSync("git", ["-C", root, ...args], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      // A partial clone would fetch a missing object over the network; a hung git must not hang
+      // --check. Either way the answer is "not verified here", never an accepted commit.
+      env: { ...process.env, GIT_NO_LAZY_FETCH: "1" },
+      timeout: 10_000,
+    });
+  return (sha) => {
+    if (inRepo === undefined) {
+      try {
+        inRepo = git(["rev-parse", "--is-inside-work-tree"]).trim() === "true";
+      } catch {
+        inRepo = false;
+      }
+    }
+    if (!inRepo) return "no-repo";
+    if (!seen.has(sha)) {
+      try {
+        git(["cat-file", "-e", `${sha}^{commit}`]);
+        seen.set(sha, "commit");
+      } catch {
+        seen.set(sha, "absent");
+      }
+    }
+    return seen.get(sha);
+  };
 }
 
 // A basename with no sequence is run 1 of its day, so compare it as "-01". Without this,
@@ -720,11 +831,14 @@ export function listRunFiles(runsDir) {
 
 // Every finding in every run file, oldest run first. `bug` is relative to the run file; `bugStatus`
 // is the bug's frontmatter status, `missing` when the link does not resolve, null for a note.
+// A marked finding's `resolution` gains `valid`, and `reason` when it does not hold.
 function loadFindings(opts) {
   const runsDir = join(opts.root, opts.registryDir, "runs");
   if (!existsSync(runsDir)) return [];
+  const runs = listRunFiles(runsDir);
+  const commitState = gitCommitState(opts.root);
   const out = [];
-  for (const run of listRunFiles(runsDir)) {
+  for (const run of runs) {
     const runPath = join(opts.root, opts.registryDir, run);
     for (const f of parseFindings(readFileSync(runPath, "utf8"))) {
       let bugStatus = null;
@@ -734,22 +848,42 @@ function loadFindings(opts) {
           ? (frontmatter(readFileSync(p, "utf8")).status ?? "")
           : "missing";
       }
-      out.push({ ...f, run, bugStatus });
+      const row = { ...f, run, bugStatus };
+      if (f.resolution) {
+        const reason = verifyResolution(row, { runs, commitState });
+        row.resolution = {
+          ...f.resolution,
+          valid: !reason,
+          ...(reason ? { reason } : {}),
+        };
+      }
+      out.push(row);
     }
   }
   return out;
 }
 
+// Pure. A note closes only on a resolution that held; a bug-linked row is governed by its bug's
+// status alone, whatever a marker on it says (--check reports that marker as on-a-bug-link).
 export function isOpenFinding(f) {
-  return f.bugStatus === null || !BUG_CLOSED.test(f.bugStatus);
+  return !f.bug ? !f.resolution?.valid : !BUG_CLOSED.test(f.bugStatus ?? "");
 }
 
 // Pure: a finding whose bug link does not resolve is an error — the row claims a record that
-// does not exist, which is the one thing the Findings table must never do.
+// does not exist, which is the one thing the Findings table must never do. So is a resolution
+// whose evidence does not hold: a marker that cannot be verified is a red --check, never a
+// silently closed row.
 export function checkFindings(findings) {
-  return findings
-    .filter((f) => f.bugStatus === "missing")
-    .map((f) => `${f.run} finding ${f.n}: bug file not found: ${f.bug}`);
+  return findings.flatMap((f) => [
+    ...(f.bugStatus === "missing"
+      ? [`${f.run} finding ${f.n}: bug file not found: ${f.bug}`]
+      : []),
+    ...(f.resolution && !f.resolution.valid
+      ? [
+          `${f.run} finding ${f.n}: resolution does not hold (${f.resolution.reason}): ${f.resolution.evidence}`,
+        ]
+      : []),
+  ]);
 }
 
 function cmdCheck(opts) {
@@ -782,10 +916,15 @@ function cmdFindings(opts) {
   let run = null;
   for (const f of shown) {
     if (f.run !== run) console.log((run = f.run));
+    const res = f.resolution;
     const filed =
-      f.bugStatus === null
-        ? "note"
-        : `${basename(f.bug).replace(/\.md$/, "")} (${f.bugStatus})`;
+      f.bugStatus !== null
+        ? `${basename(f.bug).replace(/\.md$/, "")} (${f.bugStatus})`
+        : !res
+          ? "note"
+          : res.valid
+            ? `note — resolved ${res.date} by ${res.evidence}`
+            : `note — resolution does not hold: ${res.reason}`;
     console.log(
       `  ${String(f.n).padStart(2)}  ${f.severity.padEnd(7)}  ${f.where} — ${f.what}  [${filed}]`,
     );
@@ -795,6 +934,151 @@ function cmdFindings(opts) {
   console.log(
     `findings: ${open.length} open (${unfiled} unfiled, ${open.length - unfiled} in open bugs) · ${all.length - open.length} closed${opts.has("--all") ? "" : " — --all to include them"}`,
   );
+}
+
+// --resolve-finding <run> <n> --by <evidence> [--date YYYY-MM-DD] — the only writer of the
+// resolution marker, and the one edit ever made to a run file after it is written. It appends the
+// marker to that row's Filed as cell and changes no other byte; every refusal writes nothing.
+function cmdResolveFinding(opts) {
+  const at = opts.args.indexOf("--resolve-finding");
+  const [runRel, nArg] = opts.args.slice(at + 1, at + 3);
+  const by = opts.val("--by");
+  const date = opts.val("--date") ?? today();
+  if (!runRel || runRel.startsWith("--") || !/^\d+$/.test(nArg ?? ""))
+    die(
+      "usage: --resolve-finding <run> <n> --by <evidence> [--date YYYY-MM-DD] — <run> as --findings prints it",
+    );
+  if (!by || by.startsWith("--"))
+    die("--resolve-finding needs --by <commit sha | later run file>");
+  const runsDir = join(opts.root, opts.registryDir, "runs");
+  const runs = existsSync(runsDir) ? listRunFiles(runsDir) : [];
+  // Exit 4, like --item: "you named a record that is not there" is not "you called me wrongly".
+  if (!runs.includes(runRel)) {
+    console.error(`uat-status: ${runRel}: no run file under runs/`);
+    process.exitCode = 4;
+    return;
+  }
+  const runPath = join(opts.root, opts.registryDir, runRel);
+  const lines = readFileSync(runPath, "utf8").split("\n");
+  const hits = findingRows(lines).filter(
+    ([, m]) => Number(m[1]) === Number(nArg),
+  );
+  if (!hits.length) {
+    console.error(`uat-status: ${runRel}: no finding ${nArg}`);
+    process.exitCode = 4;
+    return;
+  }
+  // Two rows numbered n are two findings the writer cannot tell apart; editing the first would
+  // leave the second unreachable, so the number is refused until the table is renumbered.
+  if (hits.length > 1)
+    die(
+      `${runRel} has ${hits.length} findings numbered ${nArg} — renumber them before resolving one`,
+    );
+  const [[idx, m]] = hits;
+  const f = { ...rowFinding(m), run: runRel };
+  if (f.bug)
+    die(
+      `${runRel} finding ${f.n} links a bug (${f.bug}) — its state is the bug's; close the bug instead`,
+    );
+  const commitState = gitCommitState(opts.root);
+  // An existing marker is judged by the rule --check applies, not by its presence. One that holds
+  // settles the row: the same evidence again is a no-op whatever --date says (the first date
+  // stands), and other evidence is refused. One that no longer holds — its run deleted, its date
+  // malformed, its sha gone — is REPLACED below by evidence that does, so the only writer can also
+  // repair what it wrote; reporting success over it would leave the row open and --check red.
+  const stale = f.resolution
+    ? verifyResolution(f, { runs, commitState })
+    : null;
+  if (f.resolution && !stale) {
+    if (f.resolution.evidence === by)
+      return console.log(
+        `already resolved: ${runRel} finding ${f.n} — ${f.filedAs}`,
+      );
+    die(
+      `${runRel} finding ${f.n} is already resolved by \`${f.resolution.evidence}\` — a resolved finding is not re-resolved`,
+    );
+  }
+  const reason = verifyResolution(
+    { ...f, resolution: { date, evidence: by } },
+    { runs, commitState },
+  );
+  if (reason)
+    die(`${runRel} finding ${f.n}: resolution refused (${reason}): ${by}`);
+  // Rewrite the last cell only, keeping its padding. Everything from the closing `|` on — a CRLF
+  // file's `\r` included — is carried over untouched.
+  const body = lines[idx];
+  const end = body.lastIndexOf("|");
+  const from = body.lastIndexOf("|", end - 1) + 1;
+  const cell = body.slice(from, end);
+  // A marker that no longer holds is dropped before the new one is appended — every trailing
+  // marker, with whatever dash separated it. Cut at RESOLUTION_MARK's own match index rather than
+  // with a second unanchored pattern, which was super-linear on a whitespace run (QA cycle 2).
+  let content = cell.trim();
+  for (let m; stale && (m = content.match(RESOLUTION_MARK));)
+    content = content
+      .slice(0, m.index)
+      .trimEnd()
+      .replace(/[—–-]$/, "")
+      .trimEnd();
+  const mark = `resolved ${date} by \`${by}\``;
+  const lead = cell.match(/^\s*/)[0];
+  // The trailing padding is the CELL's, not what follows `content`: a replaced marker makes
+  // `content` shorter than the cell's text, and slicing by its length would keep the old marker.
+  // An all-blank cell is all `lead`; counting it again as trail would double its padding.
+  const trail = lead.length < cell.length ? cell.match(/\s*$/)[0] : "";
+  lines[idx] =
+    `${body.slice(0, from)}${lead}${content ? `${content} — ${mark}` : mark}${trail}${body.slice(end)}`;
+  // Read the row back through the reader before writing it. Evidence that verified can still
+  // break the table (a run file named with a pipe or a backtick): a marker the reader would not
+  // see closes nothing, and a split cell corrupts the row, so either is refused with nothing written.
+  const back = lines[idx].match(FINDING_ROW);
+  const got = back && rowFinding(back);
+  if (
+    !got ||
+    got.n !== f.n ||
+    got.bug !== null ||
+    got.resolution?.date !== date ||
+    got.resolution?.evidence !== by
+  )
+    die(
+      `${runRel} finding ${f.n}: the marker for \`${by}\` would not read back from the table — refused, nothing written`,
+    );
+  writeFileSync(runPath, lines.join("\n"));
+  console.log(
+    `${stale ? `replaced a resolution that did not hold (${stale}): ` : "resolved: "}${runRel} finding ${f.n} — ${content ? `${content} — ` : ""}${mark}`,
+  );
+}
+
+// --changed-runs — the tracked run files under <registry dir>/runs that differ from HEAD, one path
+// per line, relative to --root (the directory /qa-next stages from). These are the earlier runs a
+// --resolve-finding edited: the run file this run wrote is untracked, so it is not listed. The
+// registry directory comes from --registry like every other command, never from a second default
+// in the caller (QA cycle 3, CR1: a shell default ignored qaNext.registryPath). Read-only.
+function cmdChangedRuns(opts) {
+  let out;
+  try {
+    out = execFileSync(
+      "git",
+      [
+        "-C",
+        opts.root,
+        "-c",
+        "core.quotePath=false",
+        "diff",
+        "--name-only",
+        "--relative",
+        "HEAD",
+        "--",
+        join(opts.registryDir, "runs"),
+      ],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+    );
+  } catch (e) {
+    die(
+      `--changed-runs needs a git work tree with a commit at ${opts.root}: ${String(e.stderr || e.message).trim()}`,
+    );
+  }
+  process.stdout.write(out);
 }
 
 export function nextItem({ sections }) {
@@ -1568,6 +1852,8 @@ function dispatch(opts) {
   if (opts.has("--automated"))
     return cmdCell(opts, "--automated", "Automated by");
   if (opts.has("--accept")) return cmdAccept(opts);
+  if (opts.has("--resolve-finding")) return cmdResolveFinding(opts);
+  if (opts.has("--changed-runs")) return cmdChangedRuns(opts);
   if (opts.has("--findings")) return cmdFindings(opts);
   return cmdScoreboard(opts);
 }

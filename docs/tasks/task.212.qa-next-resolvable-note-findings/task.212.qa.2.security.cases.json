@@ -1,0 +1,114 @@
+[
+  {
+    "id": "resolve-by.self",
+    "sink": "path",
+    "input": "runs/A.1/2026-10-15-lan.md",
+    "why": "A run cannot resolve its own finding.",
+    "correct": "Refuse run-is-self.",
+    "direction": "hostile"
+  },
+  {
+    "id": "resolve-by.traversal",
+    "sink": "path",
+    "input": "../../README.md",
+    "why": "A path outside runs/ is not a run file even when it exists.",
+    "correct": "Refuse run-not-found.",
+    "direction": "hostile"
+  },
+  {
+    "id": "resolve-by.non-canonical",
+    "sink": "path",
+    "input": "runs/A.1/../A.1/2026-10-16-lan.md",
+    "why": "A non-canonical spelling of a later run would let an unverified path through string checks.",
+    "correct": "Refuse — only listRunFiles spellings count.",
+    "direction": "hostile"
+  },
+  {
+    "id": "resolve-by.absolute",
+    "sink": "path",
+    "input": "/etc/passwd.md",
+    "why": "An absolute path ending .md must not be read as evidence.",
+    "correct": "Refuse run-not-found.",
+    "direction": "hostile"
+  },
+  {
+    "id": "resolve-by.missing-run",
+    "sink": "path",
+    "input": "runs/A.1/2026-10-20-lan.md",
+    "why": "A run that does not exist is no evidence.",
+    "correct": "Refuse run-not-found.",
+    "direction": "hostile"
+  },
+  {
+    "id": "resolve-by.sha-no-repo",
+    "sink": "path",
+    "input": "deadbeef",
+    "why": "The fixture is not a git work tree, so a sha cannot be verified.",
+    "correct": "Refuse not-a-git-repo.",
+    "direction": "hostile"
+  },
+  {
+    "id": "resolve-by.option-like",
+    "sink": "path",
+    "input": "--help",
+    "why": "An option-shaped value must not be taken as evidence or as a flag.",
+    "correct": "Refuse.",
+    "direction": "hostile"
+  },
+  {
+    "id": "resolve-by.backtick",
+    "sink": "path",
+    "input": "runs/A.1/2026-10-16-lan.md`",
+    "why": "A backtick would break the marker grammar on write.",
+    "correct": "Refuse.",
+    "direction": "hostile"
+  },
+  {
+    "id": "resolve-by.pipe",
+    "sink": "path",
+    "input": "a|b.md",
+    "why": "A pipe would split the table cell on write.",
+    "correct": "Refuse.",
+    "direction": "hostile"
+  },
+  {
+    "id": "resolve-by.newline",
+    "sink": "path",
+    "input": "runs/A.1/2026-10-16-lan.md\n| 9 | x | y | z | note |",
+    "why": "A newline would inject a table row on write.",
+    "correct": "Refuse.",
+    "direction": "hostile"
+  },
+  {
+    "id": "resolve-by.prose",
+    "sink": "path",
+    "input": "PR #12",
+    "why": "Free text is not verifiable evidence.",
+    "correct": "Refuse bad-evidence.",
+    "direction": "hostile"
+  },
+  {
+    "id": "resolve-by.undated-run",
+    "sink": "path",
+    "input": "runs/zz.md",
+    "why": "A file under runs/ with no date in its name is not a run that came later (cycle 1 CR-2).",
+    "correct": "Refuse run-not-later.",
+    "direction": "hostile"
+  },
+  {
+    "id": "resolve-by.same-day-other-function",
+    "sink": "path",
+    "input": "runs/A.2/2026-10-15-lan-02.md",
+    "why": "A same-day run of another function cannot be ordered after this one (cycle 1 CR-2).",
+    "correct": "Refuse run-not-later.",
+    "direction": "hostile"
+  },
+  {
+    "id": "resolve-by.later-run",
+    "sink": "path",
+    "input": "runs/A.1/2026-10-16-lan.md",
+    "why": "A later run file is the documented evidence form.",
+    "correct": "Accept it.",
+    "direction": "legitimate"
+  }
+]
