@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa
+status: reopened
 severity: Major
 priority: Medium
 created: 2026-10-16
@@ -14,7 +14,7 @@ description: "review-epic report numbering glob still uses the flat epic number"
 **Bug ID**: TASK-207-BUG-3
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Reopened
 **Found By**: QA Engineer (QA cycle 1, finding CR-3)
 **Date Found**: 2026-10-16
 **Location**: `skills/review-epic/SKILL.md:571`
@@ -136,3 +136,4 @@ Rewrite the glob and template to `epic.{P}.{E}`; sweep the other `epic.[N]` / `{
 | 2026-10-16 | Reopened | qa-task | Partial — {domain}/{feature}/epics layout and [epic].[story] bracket form remain (task.207.qa.5 CR-1, CR-2) |
 | 2026-10-16 | In Progress | qa-fix | Fix cycle 5 started |
 | 2026-10-16 | Ready for QA | qa-fix | Fixed in QA fix cycle 5 |
+| 2026-10-16 | Reopened | qa-task | Partial — tree diagrams and concrete example paths keep a flat feature directory (task.207.qa.6) |

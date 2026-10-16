@@ -159,15 +159,16 @@ Add the corpus and chokepoint CI guards for hierarchical doc numbering and sweep
 
 ### QA Loop Limit Reached — 2026-10-16
 
-The pipeline completed 5 qa-task/qa-fix cycles without a clean PASS.
+The pipeline completed 5 qa-task/qa-fix cycles without a clean PASS, plus the gate-the-last-fix half-cycle (cycle 6), granted by the user, whose gate has open entries.
 
-**Final gate status**: CONCERNS (70) — gate.5 judged `563b4c0b`; cycle 5's fix (`1f8de5cd`) is ungated.
-**HIGH findings per cycle**: 0, 1, 1, 0, 0 — zero on the last two gates
-**Remaining issues** (from gate.5, all addressed by `1f8de5cd` but not re-gated):
-- TASK-207-BUG-3 — medium — `skills/qa-story/SKILL.md` — layout paths without `prd.{P}.`
-- TASK-207-CR5-2 — medium — `skills/qa-story/SKILL.md` — bracket two-level id
-- TASK-207-CR5-3 — medium — `tests/doc-id-chokepoint.test.js` — file-wide title exemption
-- TASK-207-CR5-5 — low — `tests/ingester-prompt-placeholders.test.js` — explanatory mentions counted as bound
+**Final gate status**: CONCERNS (70) — gate.6 judged `1f8de5cd`; PR checks green on `aac45de6`.
+**HIGH findings per cycle**: 0, 1, 1, 0, 0, 0 — zero on the last three gates
+**Remaining issues** (from gate.6):
+- TASK-207-BUG-3 — medium — `skills/documentation-standards-validator/references/prd-structure-guide.md` — tree diagrams root `epics/` under a flat `[feature]/`
+- TASK-207-CR6-4 — medium — `skills/develop/SKILL.md` — ~23 example paths in 14 files with no `prd.*` parent above `/epics/epic.`
+- TASK-207-CR6-3 — medium — `prd-structure-guide.md` — numbering bullets in the old meanings
+- TASK-207-CR6-5 — medium — `skills/develop/SKILL.md` — `epic.178.<name>` holds `story.1.178.8`
+- TASK-207-CR6-6 — low — `skills/develop/SKILL.md` — examples disagree with their own ids
 
 **What was attempted per cycle**:
 - Cycle 1: review-epic 0a blocks, chokepoint blind spots, placeholder residues (BUG-1..4)
@@ -176,13 +177,14 @@ The pipeline completed 5 qa-task/qa-fix cycles without a clean PASS.
 - Cycle 4: §5 extended to YAML; reverted cycle 3's wrong rewrite of PRD-internal relative titles; `<S>` = `.story` + `.sub`
 - Cycle 5: `prd.{P}.` layout paths, bracket two-level ids, anchored exemptions, head-only binding names
 - Route 2c considered and declined: `medium-not-falling` (MEDIUM 1, 2, 3 over cycles 3–5).
+- Cycle 6 (half-cycle, user-granted): gate only, no fix — the gate found the layout residue in trees and concrete examples.
 
 **Likely root cause**: The prose sweep's population was never enumerated up front: each gate found the next spelling of the retired scheme (angle placeholders, title forms, YAML, then the directory layout), and each fix widened §5 by one more shape. MEDIUM rose because every cycle's widening exposed a further residue, not because fixes regressed (apart from cycle 3's PRD-title rewrite, reverted in cycle 4). No HIGH remains, and the guard now checks ids, titles, two-level forms and the layout directory.
 
 **Recommended next steps**:
-1. Run one more `/qa-task` by hand on `1f8de5cd` (or resume `/develop-task` with more cycles): the last fix is ungated, and HIGH has been 0 for two gates.
-2. If it reads clean, 5c `/review-pr --effort medium --comment --no-code`, then `/finalise`.
-3. Carry the gate's `recommendations.future` items (create-parallel-stories scheme, create-epic milestone override, step-0a cross-block reads, `doc-id.parse` hardening, story-template `../epics/` links, qa-gate-template naming) into follow-up tasks.
+1. One enumerated sweep as its own commit: list every `/epics/epic.` path and tree diagram first (`git grep -nE '/epics/epic\.'` minus `prd\.[^/]*/epics/epic\.`), rewrite them, then widen `FLAT_LAYOUT` to the parent-directory rule (with CR6-8's hyphen and digit P forms).
+2. Then one `/qa-task`; on a clean gate, 5c `/review-pr --effort medium --comment --no-code` and `/finalise`.
+3. Carry gate 6's `recommendations.future` into follow-up tasks.
 
 _Problems encountered and how they were resolved or escalated._
 
@@ -235,6 +237,16 @@ _Track each QA review/fix cycle._
 **MEDIUM findings**: 3
 **PR Review**: not reached — gate did not exit the loop
 **Loop exit**: Loop route: continue (medium-not-falling) — gate-the-last-fix half-cycle declined
+**Action**: Escalating — loop limit reached
+
+### QA Cycle 6 — 2026-10-16
+**Half-cycle**: gate-the-last-fix — granted by the user after the engine declined it (`medium-not-falling`)
+**Gate Result**: CONCERNS
+**Issues Found**: 4 MEDIUM — BUG-3 reopened (tree diagrams), CR6-4 (~23 example paths with no `prd.*` parent), CR6-3, CR6-5; 1 LOW (CR6-6)
+**HIGH findings**: 0
+**MEDIUM findings**: 4
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
 **Action**: Escalating — loop limit reached
 
 ---
