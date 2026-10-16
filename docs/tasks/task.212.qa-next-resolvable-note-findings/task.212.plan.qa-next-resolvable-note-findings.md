@@ -19,8 +19,9 @@ All code is in `skills/qa-next/scripts/uat-status.mjs`. Line numbers are as of `
 ### Phase 1: Parse, verify, count
 
 - **`parseFindings` (`:670`).** After computing `link`, match the `filed` cell against
-  `/\bresolved (\d{4}-\d{2}-\d{2}) by `([^`]+)`\s*$/`. Set
-  `resolution = m ? { date: m[1], evidence: m[2] } : null`. Validate the date with a round trip
+  `/\bresolved (\d{4}-\d{2}-\d{2}) by `([^`]+)`\s*$/`. When it
+  matches, add `resolution: { date: m[1], evidence: m[2] }` to the row; when it does not, add **no**
+  `resolution` key, so unmarked rows (and `--findings --json`) are byte-identical to today. Validate the date with a round trip
   through `Date` (`bad-date` otherwise). Keep `bug` exactly as today: the evidence is backticked, so
   the link regex never sees it.
 - **`loadFindings` (`:723`).** For each finding with a `resolution`:
@@ -40,7 +41,7 @@ All code is in `skills/qa-next/scripts/uat-status.mjs`. Line numbers are as of `
 - **`checkFindings` (`:749`).** Append
   `${f.run} finding ${f.n}: resolution does not hold (${f.resolution.reason}): ${f.resolution.evidence}`
   for every `resolution && !resolution.valid`.
-- **`--findings` rendering.** Where the label is built (near `:689`), a note with a valid resolution
+- **`--findings` rendering.** Where the label is built (`cmdFindings`, near `:786`), a note with a valid resolution
   renders `note — resolved <date> by <evidence>`. The summary line's `closed` count already derives
   from `isOpenFinding`.
 
@@ -55,13 +56,15 @@ All code is in `skills/qa-next/scripts/uat-status.mjs`. Line numbers are as of `
    the arguments) and run the **same verification** as `loadFindings`. Factor that verification into
    one function both call. Refuse on any reason (exit 2, printing it).
 4. If the cell already carries a resolution:
-   - same evidence and date → print "already resolved" and exit 0;
-   - otherwise exit 2 ("a resolved finding is not re-resolved").
+   - same evidence → print "already resolved" and exit 0, whatever the date (the first date stands);
+   - different evidence → exit 2 ("a resolved finding is not re-resolved").
 5. Replace the line with the same text, the last cell's trimmed content extended by
    `` — resolved ${date} by `${by}` ``. Keep the cell's original spacing before the closing `|`.
 6. Write the file and print the new cell.
 
-Add the command to the CLI dispatch near `:117`, and its usage line to the header block at `:24`.
+Add `--resolve-finding`, `--by` and `--date` to the `OPTIONS` allow-list (`:95`; an unlisted flag is
+refused by the unknown-option guard in `dispatch`), the command to `dispatch`, and its usage line to the
+header block at `:24`. Preserve a `\r` line ending on the edited row if the file has one.
 
 ### Phase 3: Docs
 
@@ -70,6 +73,7 @@ Add the command to the CLI dispatch near `:117`, and its usage line to the heade
 - **`SKILL.md`**:
   - Step 4.3 gets one sentence: when this run shows an earlier note's subject is gone, resolve it
     with `--resolve-finding <earlier run> <n> --by <this run>`.
+  - Step 5 stages every earlier run file this run resolved a finding in, beside the run file itself.
   - § "Never" gets the exception, stated narrowly.
   - § "Running as a loop" says notes now close.
 - **`README.md` (`:86`).** Say what counts as closed for a note.

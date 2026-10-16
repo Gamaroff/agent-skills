@@ -5,18 +5,21 @@ type: task
 description: "Give uat-status.mjs a way to close a Findings-table row that has no bug: a `resolved <date> by \`<evidence>\`` marker in its Filed as cell, written by a new --resolve-finding command, verified against a real commit or a later run file, and counted as closed by --findings."
 tags: [qa-next, uat, findings, uat-status, follow-up]
 category: feature
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-10-16
 updated: 2026-10-16
 assignee:
 estimated_effort_hours: 5
 depends_on: []
+github_issue: 679
 ---
 
 # Technical Task: qa-next: a note finding can be resolved, with evidence
 
-**Status:** Planned
+**Status:** Ready for Review
+**GitHub Issue**: [#679](https://github.com/Gamaroff/agent-skills/issues/679)
+**Review**: ✅ All review recommendations from `task.212.review.1.qa-next-resolvable-note-findings.md` implemented 2026-10-16
 
 ---
 
@@ -87,12 +90,16 @@ nobody has dealt with". A resolved note leaves the count only on evidence a read
   bug, so a linked run file would turn the note into a "bug" with a non-bug status. Two evidence kinds:
   - a commit: `[0-9a-f]{7,40}`, verified with `git -C <root> cat-file -e <sha>^{commit}`;
   - a run file: a path ending `.md`, relative to the registry directory (the form `--findings` and
-    `priorRuns` already print), which must exist, must not be the finding's own run file, and must
+    `priorRuns` already print), which must be one of the paths `listRunFiles` returns (so it lies under `runs/`;
+    anything else is `run-not-found`), must not be the finding's own run file, and must
     sort **after** it in `listRunFiles` order. A run cannot be resolved by an earlier run.
-- **Parse.** `parseFindings` gains `resolution: { date, evidence } | null`, read from the cell's text.
+- **Parse.** `parseFindings` adds `resolution: { date, evidence }`, read from the cell's text, **only to a
+  row that carries a marker**. A row without one gets no `resolution` key at all, so every existing
+  `parseFindings` result, `--findings --json` payload and `deepEqual` test is unchanged byte for byte.
 - **Verify.** `loadFindings` adds `resolution.valid` and, when invalid, `resolution.reason`. The
   reason is one of `commit-not-found`, `not-a-git-repo`, `run-not-found`, `run-is-self`,
-  `run-not-later`, `on-a-bug-link` or `bad-date`. All I/O stays in `loadFindings`.
+  `run-not-later`, `on-a-bug-link`, `bad-date` or `bad-evidence` (evidence that is neither a
+  commit-shaped hex string nor a path ending `.md`). All I/O stays in `loadFindings`.
 - **Count.** `isOpenFinding` stays pure:
   `f.bug === null ? !(f.resolution?.valid) : !BUG_CLOSED.test(f.bugStatus ?? "")`.
   A resolution on a row that links a bug is ignored for state: the bug's status governs.
@@ -100,7 +107,9 @@ nobody has dealt with". A resolved note leaves the count only on evidence a read
   the finding number and the reason. A marker that cannot be verified is a red `--check`, never a
   silently closed row.
 - **Write.** `--resolve-finding <run> <n> --by <evidence> [--date YYYY-MM-DD]` (date defaults to
-  today, UTC):
+  today, UTC). `<run>` is the registry-relative path exactly as `--findings` prints it
+  (`runs/A.5/2026-10-16-lan.md`). The three new flags join the `OPTIONS` allow-list, or the
+  unknown-option guard refuses them:
   - It appends the marker to that one row's `Filed as` cell and changes no other byte of the file.
   - It refuses, writing nothing, when:
     - the run or the finding does not exist (exit 4);
@@ -108,7 +117,8 @@ nobody has dealt with". A resolved note leaves the count only on evidence a read
     - the evidence fails the same verification `loadFindings` applies (exit 2, with the reason);
     - the row is already resolved by different evidence (exit 2; a resolved finding is not
       re-resolved).
-  - The same resolution twice is a no-op, exit 0.
+  - The same **evidence** twice is a no-op, exit 0, whatever `--date` says: the first date stands.
+    A re-run on a later day must not be refused for the date it defaulted to.
 - **Report.** `--findings` counts valid resolutions as closed. `--findings --all` renders the row's
   label as `[note — resolved <date> by <evidence>]`. `--json` carries `resolution`.
 
@@ -124,8 +134,10 @@ nobody has dealt with". A resolved note leaves the count only on evidence a read
 - Docs that define the cell:
   - `skills/qa-next/assets/run.template.md` § Findings, the **Filed as** definition;
   - `skills/qa-next/SKILL.md` Step 4.3 (a later run that finds an earlier note's subject gone resolves
-    it, with itself as evidence), § "What this skill never does" (the one narrow exception to
-    "Overwrite a previous run file"), and § "Running as a loop";
+    it, with itself as evidence), Step 5 (the commit stages **only** named paths, so it must also
+    stage every earlier run file this run resolved a finding in, or the edit is left uncommitted),
+    § "What this skill never does" (the one narrow exception to "Overwrite a previous run file"), and
+    § "Running as a loop";
   - `skills/qa-next/README.md` § findings (`:86`).
 - A CHANGELOG entry naming the grammar and the command.
 
@@ -172,7 +184,7 @@ See [task.212.plan.qa-next-resolvable-note-findings.md](task.212.plan.qa-next-re
 1. `skills/qa-next/scripts/uat-status.mjs`: Phases 1–2.
 2. `evals/qa-next/unit/uat-status.test.mjs`: every criterion in § 9 has a row here.
 3. `skills/qa-next/assets/run.template.md`: the **Filed as** definition.
-4. `skills/qa-next/SKILL.md`: Step 4.3, § "What this skill never does", § "Running as a loop".
+4. `skills/qa-next/SKILL.md`: Step 4.3, Step 5, § "What this skill never does", § "Running as a loop".
 5. `skills/qa-next/README.md`: § findings.
 6. `CHANGELOG.md`: an `[Unreleased]` entry.
 
@@ -198,34 +210,36 @@ See [task.212.plan.qa-next-resolvable-note-findings.md](task.212.plan.qa-next-re
 
 ### Functional
 
-- [ ] A note whose `Filed as` ends `— resolved 2026-10-16 by \`<sha>\`` naming an existing commit is
+- [x] A note whose `Filed as` ends `— resolved 2026-10-16 by \`<sha>\`` naming an existing commit is
       counted as closed by `--findings`, and shown by `--findings --all` as resolved.
-- [ ] The same marker naming a sha that is not a commit keeps the row open, and `--check` exits
+- [x] The same marker naming a sha that is not a commit keeps the row open, and `--check` exits
       non-zero naming the run, the finding number and `commit-not-found`.
-- [ ] A marker naming a later run file closes the row. One naming the row's own run (`run-is-self`),
+- [x] A marker naming a later run file closes the row. One naming the row's own run (`run-is-self`),
       an earlier run (`run-not-later`) or a missing file (`run-not-found`) keeps it open, and
-      `--check` names the reason.
-- [ ] A marker on a row that links a bug changes nothing about its state (the bug's status
+      `--check` names the reason. Evidence that is neither a sha nor a `.md` path is `bad-evidence`.
+- [x] A marker on a row that links a bug changes nothing about its state (the bug's status
       governs), and `--check` reports `on-a-bug-link`.
-- [ ] `--resolve-finding <run> <n> --by <evidence>`:
+- [x] `--resolve-finding <run> <n> --by <evidence>`:
   - writes the marker into that row's `Filed as` cell, and every other byte of the run file is unchanged;
-  - running it again with the same arguments exits 0 and changes nothing;
+  - running it again with the same evidence exits 0 and changes nothing, with or without a different
+    `--date`;
   - each refusal in § 3 Target exits with its stated code and leaves the file byte-identical.
-- [ ] A run file with no markers yields the same `--findings`, `--findings --json` and `--check`
+- [x] A run file with no markers yields the same `--findings`, `--findings --json` and `--check`
       output as before this task, asserted over the existing fixture.
 
 ### Code Quality
 
-- [ ] `isOpenFinding` performs no I/O. A test calls it on plain objects.
-- [ ] `npm test` and `npm run ci:fast` pass with `.agents/skills` moved aside.
-- [ ] Every criterion above is asserted by a test in `evals/qa-next/unit/uat-status.test.mjs` that
+- [x] `isOpenFinding` performs no I/O. A test calls it on plain objects.
+- [x] `npm test` and `npm run ci:fast` pass with `.agents/skills` moved aside.
+- [x] Every criterion above is asserted by a test in `evals/qa-next/unit/uat-status.test.mjs` that
       runs per PR.
 
 ### Documentation
 
-- [ ] `run.template.md`, `SKILL.md` and `README.md` define the marker grammar identically and name
+- [x] `run.template.md`, `SKILL.md` and `README.md` define the marker grammar identically and name
       `--resolve-finding` as its only writer.
-- [ ] SKILL.md § "What this skill never does" states the one exception to "Overwrite a previous run
+- [x] SKILL.md Step 5 stages the earlier run files a run resolved findings in.
+- [x] SKILL.md § "What this skill never does" states the one exception to "Overwrite a previous run
       file": `--resolve-finding` appends to a single `Filed as` cell.
 
 ---
@@ -251,21 +265,88 @@ See [task.212.plan.qa-next-resolvable-note-findings.md](task.212.plan.qa-next-re
 
 ---
 
+## Implementation Record
+
+**Completion Date:** 2026-10-16 (develop-task Step 3, run 1 — inline; see the implementation report)
+
+### Implementation Summary
+
+`skills/qa-next/scripts/uat-status.mjs`:
+
+| Piece | Now |
+|---|---|
+| `findingRows` / `rowFinding` | one row locator shared by the reader and the writer; `parseFindings` maps over it. A marked row carries `resolution: { date, evidence }`; an unmarked row carries no `resolution` key |
+| `verifyResolution` (exported, pure) | returns the reason a resolution does not hold, or `null`. `runs` and `commitState` are injected; reasons: `on-a-bug-link`, `bad-date`, `run-is-self`, `run-not-found`, `run-not-later`, `commit-not-found`, `not-a-git-repo`, `bad-evidence` |
+| `gitCommitState` | lazy `git -C <root>` lookup (`rev-parse --is-inside-work-tree`, then `cat-file -e <sha>^{commit}`), cached per sha. It spawns nothing for a corpus with no commit markers. A missing git binary counts as "no repository" |
+| `loadFindings` | adds `resolution.valid` and, when the resolution is invalid, `resolution.reason` |
+| `isOpenFinding` | pure: a note is open unless its resolution is valid; a bug-linked row follows its bug's status |
+| `checkFindings` | adds one error per resolution that does not hold, naming the run, the finding number, the reason and the evidence |
+| `cmdFindings` | renders `[note — resolved <date> by <evidence>]` for a valid resolution and `[note — resolution does not hold: <reason>]` for an invalid one |
+| `cmdResolveFinding` (`--resolve-finding`) | rewrites only the last cell of the row, keeping its padding and anything after the closing pipe, including a CRLF `\r`. It exits 4 when the run or the finding does not exist. It exits 2 on a bug link, a different-evidence re-resolution, any verification reason, or a missing `--by`. The same evidence again exits 0 with no write |
+| `OPTIONS`, `dispatch`, header usage | `--resolve-finding`, `--by` and `--date` added |
+
+The docs are `run.template.md` (the **Filed as** definition), `SKILL.md` (Step 4.3 converse, Step 5 staging, the § "never does" exception, § "Running as a loop"), `README.md` § Findings, and a `CHANGELOG.md` `[Unreleased]` entry.
+
+### Approach
+
+Implemented inline from the plan, corrected by review.1, so `/develop` was not invoked. Every rule was mutation-proved by reverting it and running the task-212 tests:
+
+| Mutation | Tests that fail |
+|---|---|
+| old `isOpenFinding` | 3 |
+| `checkFindings` ignores resolutions | 3 |
+| `resolution: null` on every row | 2 |
+| idempotency also requires the same date | 1 |
+| an earlier run accepted as evidence | 3 |
+| no repository counted as a commit | 1 |
+| a marker on a bug-link row accepted | 2 |
+
+One mutation survived: dropping the CRLF handling. The `\r` sits after the closing `|`, and the slice keeps it anyway, so the code was redundant. It was removed, and the CRLF test still holds the behaviour.
+
+### Deviations from the plan
+
+1. **The `--findings` label for an invalid resolution** reads `note — resolution does not hold: <reason>`. The plan only covered the valid label. The new label shows the owner which marker is broken without needing `--check`.
+2. **`verifyResolution` is exported**, with `runs` and `commitState` injected. Tests can then reach every reason without git or a file tree.
+
+### Testing Results
+
+- `evals/qa-next/unit/uat-status.test.mjs` has 9 new tests, all passing:
+  - parser shapes;
+  - every `verifyResolution` reason;
+  - `isOpenFinding` and `checkFindings` on plain objects;
+  - a CLI corpus in a real git repository, covering valid and invalid markers, `--findings`, `--all`, `--json` and `--check`;
+  - `not-a-git-repo` outside a work tree;
+  - the writer's single-cell write, idempotency and each of its 10 refusals, each confirmed byte-identical;
+  - CRLF;
+  - no-marker output identical to before;
+  - the doc-agreement test.
+- The 68 pre-existing tests are unchanged and pass.
+- `npm run ci:fast` (`format:check` + `npm test`) ran with `.agents/skills` moved aside: 5766 tests, 0 failures, exit 0.
+
+### Deferred Work
+
+None.
+
+---
+
 ## Change Log
 <!-- change-log-start -->
 
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-10-16 | 1.0     | Initial draft | create-task |
+| 2026-10-16 | 1.1     | Review passed (8/10) — added `bad-evidence`, run-evidence membership, `resolution` key only on marked rows, `<run>` argument form, evidence-only idempotency, SKILL.md Step 5 commit scope; linked #679 | review-task |
+| 2026-10-16 |         | Status → ready-for-development | review-task |
+| 2026-10-16 |         | Implemented — 4 code/doc files + CHANGELOG, 9 tests (mutation-proved); status → ready-for-review | develop |
 <!-- change-log-end -->
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 1: Parse, verify, count
-- [ ] Phase 2: The writer
-- [ ] Phase 3: Docs
+- [x] Phase 1: Parse, verify, count
+- [x] Phase 2: The writer
+- [x] Phase 3: Docs
 
 ---
 
