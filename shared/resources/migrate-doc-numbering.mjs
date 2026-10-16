@@ -94,8 +94,12 @@ const HISTORY_PREFIXES = Object.freeze([
 const HISTORY_FILES = Object.freeze(["CHANGELOG.md"]);
 // A test file holds fixtures, which move with the parser change in task 206 — except
 // this one, whose KNOWN_ARTIFACT_* keys are live repo paths the ratchet looks up.
+// Spelled as segments: a shared-resources path literal inside a shared script is a bundling
+// instruction, and this one is a repo path the run compares against, not a dependency —
+// as a literal it vendored the test and its whole closure into every skill that bundles
+// this script (task 204).
 const TEST_FILE_EXCEPTIONS = Object.freeze([
-  "shared/resources/tests/doc-links.test.mjs",
+  ["shared", "resources", "tests", "doc-links.test.mjs"].join("/"),
 ]);
 const LITERAL_EXTS = Object.freeze([
   ".md",
@@ -138,6 +142,19 @@ function isTestFixture(rel) {
 
 const isExampleCopy = (rel) => rel.startsWith("examples/");
 const isBundledCopy = (rel) => /^skills\/[^/]+\/references\//.test(rel);
+
+/**
+ * Whether the literal pass may rewrite `rel`: not history, a test fixture, a bundled copy or a
+ * dependency. Exported so review-prd's migration guard judges the same files the run rewrites.
+ */
+export function inRewriteScope(rel) {
+  return (
+    !isHistory(rel) &&
+    !isTestFixture(rel) &&
+    !isBundledCopy(rel) &&
+    !rel.startsWith("node_modules/")
+  );
+}
 
 /** Classify a basename under either scheme, through doc-id only. */
 function classify(base) {
@@ -910,10 +927,16 @@ export function planEdits(planned, disc, io) {
   const links = { live: 0, dead: 0, rewritten: 0, wouldHeal: [] };
   const root = planned.root;
 
-  // Old stems and basenames inside the tree (the token pass).
+  // Old stems and basenames inside the tree (the token pass). Only a dotted stem
+  // (`prd.onboarding`, `epic.3.auth`) is distinctive enough to rewrite as a whole word:
+  // the monolith's stem is the bare word `prd` and a root index's is `index`, and as
+  // tokens they rewrote `type: prd` in every other PRD and every `prd` in prose
+  // (task.204 QA cycle 7, CR-1). Their paths still move through the literal pass.
+  const distinctive = (stem) => stem.includes(".");
   const tokenKeys = new Set();
   for (const p of planned.prds)
-    if (p.oldStem !== p.newStem) tokenKeys.add(p.oldStem);
+    if (p.oldStem !== p.newStem && distinctive(p.oldStem))
+      tokenKeys.add(p.oldStem);
   for (const e of planned.epics)
     if (e.oldStem !== e.newStem) tokenKeys.add(e.oldStem);
   for (const s of planned.stories)
@@ -922,7 +945,7 @@ export function planEdits(planned, disc, io) {
   for (const [from, to] of planned.fileMap) {
     const a = P.basename(from);
     const b = P.basename(to);
-    if (a !== b) baseMap.set(a, b);
+    if (a !== b && distinctive(stemOf(a))) baseMap.set(a, b);
   }
   for (const k of baseMap.keys()) tokenKeys.add(k);
   const stemMap = new Map();
@@ -1006,11 +1029,7 @@ export function planEdits(planned, disc, io) {
     const inTree = isUnder(file, root);
     const isMd = file.endsWith(".md");
     const litOk =
-      LITERAL_EXTS.includes(P.extname(file)) &&
-      !isHistory(file) &&
-      !isTestFixture(file) &&
-      !isBundledCopy(file) &&
-      !file.startsWith("node_modules/");
+      LITERAL_EXTS.includes(P.extname(file)) && inRewriteScope(file);
     // Cheap prefilters: a file outside the tree can only point into it by naming
     // the root's last segment, and can only hold a literal by naming the root.
     const rootSeg = `${P.basename(root)}/`;

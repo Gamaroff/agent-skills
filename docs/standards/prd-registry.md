@@ -11,9 +11,9 @@ unique and never reused**, even after cancellation. It is the first number of ev
 PRD: `prd.{P}.{slug}`, `epic.{P}.{E}.{slug}` and `story.{P}.{E}.{S}.{slug}` (see
 [File naming](./file-naming.md)).
 
-> **Interim (2026-10-15, task 202).** The registry's shape and the engine that reads it ship now;
-> skills adopt the scheme in tasks 204–206. Until then `create-prd` does not allocate a number, and
-> task 203 creates this repository's own registry as part of its migration.
+> **Interim (2026-10-15, tasks 202 and 204).** `create-prd` allocates a number from this registry,
+> bootstrapping it on first use, and writes the PRD's row (task 204). Task 203 created this
+> repository's own registry as part of its migration. Story ids adopt the scheme in task 206.
 
 ## Format
 

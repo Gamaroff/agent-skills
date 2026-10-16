@@ -19,6 +19,13 @@ re-derives a rule they own.
 **The CLI spellings below are the plan's** (`next prd`, `check <path>`, `--check`). Phase 0
 replaces them with what task.202 and task.203 actually shipped before anything is written.
 
+> **Review 1 (2026-10-15) supersedes three details below; the task document wins where they differ.**
+> `doc-id next prd` does not bootstrap a missing registry and no CLI writes a row — the row is written
+> through `appendPrdRow` (task § *Dependencies consumed*, Phase 1). The review report name is the full
+> stem `prd.{P}.{feature}.review.{n}.{name}.md` (`file-naming.md:84`), not `prd.{P}.review.…`. The
+> migration offer reads `blockers[]` and passes `--name` for a monolith. See
+> `task.204.review.1.numbered-prds-in-prd-skills.md`.
+
 ## Phase-by-Phase Implementation Guide
 
 ### Phase 0: Gate
