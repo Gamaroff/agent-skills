@@ -5,7 +5,7 @@ type: task
 description: "Move every story-side reader and writer of story and epic identifiers (create-story, the Step 0 and 0a shell snippets, create-branch, session-handoff, qa-next, the tracker story syncs, select-next and the finalise artifact regex) off its own regex and onto the task.202 doc-id engine, so the pipeline runs end to end on story.{P}.{E}.{S} documents and feature/story.{P}.{E}.{S} / epic/{P}.{E} branches."
 tags: [doc-id, numbering, create-story, develop-story, create-branch, session-handoff, qa-next, develop-next, migration]
 category: refactoring
-status: in-progress
+status: ready-for-review
 priority: Medium
 created: 2026-10-13
 updated: 2026-10-16
@@ -16,7 +16,7 @@ github_issue: 649
 
 # Technical Task: Hierarchical story ids in the pipeline
 
-**Status:** In Progress
+**Status:** Ready for Review
 
 **Review**: ✅ All review recommendations from `task.206.review.1.hierarchical-story-ids-in-pipeline.md` implemented 2026-10-16
 
@@ -579,24 +579,24 @@ every new executable block is mutation-proved (implementation report, Decisions 
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-16
-**Quality Score**: 80/100
-**Gate Decision**: FAIL
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.206.qa.2.hierarchical-story-ids-in-pipeline.md](./task.206.qa.2.hierarchical-story-ids-in-pipeline.md)
-- **Gate File**: [task.206.gate.2.hierarchical-story-ids-in-pipeline.yml](./task.206.gate.2.hierarchical-story-ids-in-pipeline.yml)
+- **Full Report**: [task.206.qa.3.hierarchical-story-ids-in-pipeline.md](./task.206.qa.3.hierarchical-story-ids-in-pipeline.md)
+- **Gate File**: [task.206.gate.3.hierarchical-story-ids-in-pipeline.yml](./task.206.gate.3.hierarchical-story-ids-in-pipeline.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5755
+- **Tests Executed**: 5756
 - **Phases Verified**: 4/4
-- **Critical Issues**: 1
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Refute pass: cycle 1's five fixes hold (bugs 1–4 closed), but Step 0a.3 still reads CURRENT_BRANCH that only 0a.1 binds (high — bug.5). Two mutation test gaps (low).
+Cycle 2's fixes are verified: bug.5 is closed, and test gaps QA2-1 and QA2-2 are closed, each proven by mutation. There is no high-confidence finding. Three low bugs (CR-1 to CR-3) and two cleanups are advisory and routed to follow-up.
 
 ## Change Log
 
@@ -612,6 +612,7 @@ Refute pass: cycle 1's five fixes hold (bugs 1–4 closed), but Step 0a.3 still 
 | 2026-10-16 |  | QA findings fixed — 5 gated (CR-1, CR-2/3, CR-4, CR-5, CR-8) + 5 advisory (CR-6 writers, CR-7, CR-9, CR-10, CR-11/12), 1 iteration | qa-fix |
 | 2026-10-16 |  | QA gate FAIL (80/100) — 1 high (0a.3 CURRENT_BRANCH), 2 low test gaps; bugs 1–4 closed | qa-task |
 | 2026-10-16 |  | QA findings fixed — CR2-1 (0a.3 binds CURRENT_BRANCH), QA2-1/QA2-2 test gaps, advisory CR2-4..7, 1 iteration | qa-fix |
+| 2026-10-16 |  | QA gate PASS (100/100) — 0 gated; bug.5 closed; 3 low + 2 cleanups advisory | qa-task |
 
 <!-- change-log-end -->
 

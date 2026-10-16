@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Major'
 priority: 'High'
 created: '2026-10-16'
@@ -12,7 +12,7 @@ description: 'Step 0a.3 auto-skip still reads CURRENT_BRANCH, which only 0a.1 bi
 
 **Bug ID**: TASK-206-BUG-5
 **Related**: [task.206.hierarchical-story-ids-in-pipeline.md](./task.206.hierarchical-story-ids-in-pipeline.md) (QA finding CR-1, gate 2)
-**Status**: Ready for QA
+**Status**: Closed
 **Priority**: High
 **Severity**: Major
 **Created**: 2026-10-16
@@ -65,3 +65,4 @@ Bind `CURRENT_BRANCH=$(git branch --show-current)` inside the 0a.3 block(s); cha
 | 2026-10-16 | New | qa-task | Filed from QA cycle 2 (CR-1) |
 | 2026-10-16 | In Progress | qa-fix | Investigation (QA cycle 2 fix) |
 | 2026-10-16 | Ready for QA | qa-fix | Fixed — see Developer Fix Cycle, iteration 1 |
+| 2026-10-16 | Closed | qa-task | Verified by task.206.qa.3.hierarchical-story-ids-in-pipeline.md |
