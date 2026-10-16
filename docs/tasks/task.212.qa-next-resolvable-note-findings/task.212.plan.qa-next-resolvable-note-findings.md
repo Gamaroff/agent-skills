@@ -33,7 +33,8 @@ All code is in `skills/qa-next/scripts/uat-status.mjs`. Line numbers are as of `
   - Evidence ending `.md` is a run file. Compare it to `run` (the same registry-relative form):
     - equal → `run-is-self`;
     - not in `listRunFiles(runsDir)` → `run-not-found`;
-    - index ≤ the finding's run index → `run-not-later`.
+    - not later by name → `run-not-later` (`isLaterRun`: a later date, or the same day's higher
+      sequence of the same function and environment; QA cycle 1, CR-2 replaced the index rule).
   - Anything else is `bad-evidence`. Set `valid = !reason`.
 - **`isOpenFinding` (`:743`).**
   `return f.bug === null ? !(f.resolution && f.resolution.valid) : !BUG_CLOSED.test(f.bugStatus ?? "");`
@@ -55,9 +56,11 @@ All code is in `skills/qa-next/scripts/uat-status.mjs`. Line numbers are as of `
 3. Build the would-be finding object (`parseFindings` on that single row, plus a `resolution` from
    the arguments) and run the **same verification** as `loadFindings`. Factor that verification into
    one function both call. Refuse on any reason (exit 2, printing it).
-4. If the cell already carries a resolution:
-   - same evidence → print "already resolved" and exit 0, whatever the date (the first date stands);
-   - different evidence → exit 2 ("a resolved finding is not re-resolved").
+4. If the cell already carries a resolution, verify it first (QA cycle 1, CR-1):
+   - it holds, same evidence → print "already resolved" and exit 0, whatever the date;
+   - it holds, different evidence → exit 2 ("a resolved finding is not re-resolved");
+   - it does not hold → replace it with the new evidence once that verifies.
+   Two rows numbered n → exit 2 before any of this (CR-3).
 5. Replace the line with the same text, the last cell's trimmed content extended by
    `` — resolved ${date} by `${by}` ``. Keep the cell's original spacing before the closing `|`.
 6. Write the file and print the new cell.

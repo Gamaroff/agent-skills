@@ -680,6 +680,8 @@ const BUG_CLOSED = /^(closed|done|fixed|resolved)$/i;
 // link as the bug, so a linked run file would turn the note into a "bug" with a non-bug status.
 const RESOLUTION_MARK = /\bresolved (\d{4}-\d{2}-\d{2}) by `([^`]+)`\s*$/;
 const COMMIT_EVIDENCE = /^[0-9a-f]{7,40}$/;
+// The marker as the writer appends it, separator included — what a replacement removes.
+const OLD_MARK = new RegExp(`(?:\\s*—)?\\s*${RESOLUTION_MARK.source}`);
 
 // The Findings table's rows as [line index, FINDING_ROW match] — the one locator both the reader
 // (parseFindings) and the writer (--resolve-finding) use, so they cannot disagree on which line is
@@ -716,6 +718,27 @@ export function parseFindings(text) {
   return findingRows(text.split("\n")).map(([, m]) => rowFinding(m));
 }
 
+// A run file is runs/<id>/<date>-<env>.md, or <date>-<env>-NN.md for the NNth run of that day.
+const RUN_NAME = /^(\d{4}-\d{2}-\d{2})-(.+?)(?:-(\d{2}))?\.md$/;
+const runName = (p) => {
+  const m = basename(p).match(RUN_NAME);
+  return m
+    ? { dir: dirname(p), date: m[1], env: m[2], seq: Number(m[3] ?? 1) }
+    : null;
+};
+
+// Is `evidence` a run made after `run`? Decided from the two names, never from listRunFiles'
+// order: that sorts same-day runs of different functions or environments by name, which says
+// nothing about which came first. A later date is later; on the same day only a higher sequence
+// of the same function and environment is; a name that carries no date is never later.
+export function isLaterRun(evidence, run) {
+  const e = runName(evidence);
+  const r = runName(run);
+  if (!e || !r) return false;
+  if (e.date !== r.date) return e.date > r.date;
+  return e.dir === r.dir && e.env === r.env && e.seq > r.seq;
+}
+
 const isRealDate = (d) => {
   const t = Date.parse(`${d}T00:00:00Z`);
   return Number.isFinite(t) && new Date(t).toISOString().slice(0, 10) === d;
@@ -730,9 +753,8 @@ export function verifyResolution(f, { runs, commitState }) {
   if (!isRealDate(date)) return "bad-date";
   if (evidence.endsWith(".md")) {
     if (evidence === f.run) return "run-is-self";
-    const at = runs.indexOf(evidence);
-    if (at < 0) return "run-not-found";
-    return at > runs.indexOf(f.run) ? null : "run-not-later";
+    if (!runs.includes(evidence)) return "run-not-found";
+    return isLaterRun(evidence, f.run) ? null : "run-not-later";
   }
   if (COMMIT_EVIDENCE.test(evidence)) {
     const state = commitState(evidence);
@@ -932,21 +954,36 @@ function cmdResolveFinding(opts) {
   }
   const runPath = join(opts.root, opts.registryDir, runRel);
   const lines = readFileSync(runPath, "utf8").split("\n");
-  const hit = findingRows(lines).find(([, m]) => Number(m[1]) === Number(nArg));
-  if (!hit) {
+  const hits = findingRows(lines).filter(
+    ([, m]) => Number(m[1]) === Number(nArg),
+  );
+  if (!hits.length) {
     console.error(`uat-status: ${runRel}: no finding ${nArg}`);
     process.exitCode = 4;
     return;
   }
-  const [idx, m] = hit;
+  // Two rows numbered n are two findings the writer cannot tell apart; editing the first would
+  // leave the second unreachable, so the number is refused until the table is renumbered.
+  if (hits.length > 1)
+    die(
+      `${runRel} has ${hits.length} findings numbered ${nArg} — renumber them before resolving one`,
+    );
+  const [[idx, m]] = hits;
   const f = { ...rowFinding(m), run: runRel };
   if (f.bug)
     die(
       `${runRel} finding ${f.n} links a bug (${f.bug}) — its state is the bug's; close the bug instead`,
     );
-  // The same evidence again is a no-op whatever --date says: the first date stands, so a re-run on
-  // a later day (when --date defaulted to a new today) is not refused for a date nobody chose.
-  if (f.resolution) {
+  const commitState = gitCommitState(opts.root);
+  // An existing marker is judged by the rule --check applies, not by its presence. One that holds
+  // settles the row: the same evidence again is a no-op whatever --date says (the first date
+  // stands), and other evidence is refused. One that no longer holds — its run deleted, its date
+  // malformed, its sha gone — is REPLACED below by evidence that does, so the only writer can also
+  // repair what it wrote; reporting success over it would leave the row open and --check red.
+  const stale = f.resolution
+    ? verifyResolution(f, { runs, commitState })
+    : null;
+  if (f.resolution && !stale) {
     if (f.resolution.evidence === by)
       return console.log(
         `already resolved: ${runRel} finding ${f.n} — ${f.filedAs}`,
@@ -957,7 +994,7 @@ function cmdResolveFinding(opts) {
   }
   const reason = verifyResolution(
     { ...f, resolution: { date, evidence: by } },
-    { runs, commitState: gitCommitState(opts.root) },
+    { runs, commitState },
   );
   if (reason)
     die(`${runRel} finding ${f.n}: resolution refused (${reason}): ${by}`);
@@ -967,15 +1004,21 @@ function cmdResolveFinding(opts) {
   const end = body.lastIndexOf("|");
   const from = body.lastIndexOf("|", end - 1) + 1;
   const cell = body.slice(from, end);
-  const content = cell.trim();
+  // A marker that no longer holds is dropped before the new one is appended.
+  const content = (
+    stale ? cell.trim().replace(OLD_MARK, "") : cell.trim()
+  ).trim();
   const mark = `resolved ${date} by \`${by}\``;
   const lead = cell.match(/^\s*/)[0];
-  const trail = cell.slice(lead.length + content.length);
+  // The trailing padding is the CELL's, not what follows `content`: a replaced marker makes
+  // `content` shorter than the cell's text, and slicing by its length would keep the old marker.
+  // An all-blank cell is all `lead`; counting it again as trail would double its padding.
+  const trail = lead.length < cell.length ? cell.match(/\s*$/)[0] : "";
   lines[idx] =
     `${body.slice(0, from)}${lead}${content ? `${content} — ${mark}` : mark}${trail}${body.slice(end)}`;
   writeFileSync(runPath, lines.join("\n"));
   console.log(
-    `resolved: ${runRel} finding ${f.n} — ${content ? `${content} — ` : ""}${mark}`,
+    `${stale ? `replaced a resolution that did not hold (${stale}): ` : "resolved: "}${runRel} finding ${f.n} — ${content ? `${content} — ` : ""}${mark}`,
   );
 }
 

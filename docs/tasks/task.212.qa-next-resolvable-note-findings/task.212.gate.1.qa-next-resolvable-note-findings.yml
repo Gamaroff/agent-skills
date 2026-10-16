@@ -1,0 +1,76 @@
+schema: 2
+task: 'task.212.qa-next-resolvable-note-findings'
+task_title: 'qa-next: a note finding can be resolved, with evidence'
+gate: CONCERNS
+status_reason: 'Parse, verify, count, check and the writer work as specified, and the --by boundary engages (12 probes). Three reproduced MEDIUM defects remain: an invalid marker cannot be repaired, "later" is not chronological across directories or for undated files, and duplicate finding numbers make the writer edit the wrong row.'
+reviewer: 'QA Engineer'
+head: '525c9bb31e56d7da6e24723aba06bc80a5574f5c'
+updated: '2026-10-16T14:38:14Z'
+
+top_issues:
+  - id: 'T212-QA1-CR1'
+    severity: medium
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: 'cmdResolveFinding treats any existing marker as settled: the same evidence answers "already resolved" exit 0 and new evidence is refused, even when the existing marker no longer holds (deleted run, absent sha). The row stays open, --check stays red, and the only remedy is a hand edit the docs forbid. Reproduced: resolve by runs/zz.md, delete it, re-run → "already resolved", rc 0.'
+    suggested_action: 'Verify the existing marker first. Same evidence + still valid → no-op exit 0; existing marker invalid → replace it with newly verified evidence (or refuse non-zero naming the reason) — never report success over a marker that does not hold. Add tests for both.'
+    suggested_owner: dev
+    status: open
+  - id: 'T212-QA1-CR2'
+    severity: medium
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: 'verifyResolution reads "later" as listRunFiles index, which sorts by basename-with-sequence then path. Same-day runs in different function directories or envs are ordered arbitrarily (A.4/…-lan-02 counts as later than A.5/…-lan), and a run-dir file with no date prefix is accepted by name order (reproduced: runs/zz.md accepted as evidence for runs/A.4/2026-10-15-lan.md, rc 0). The README sentence about same-day cross-directory order is wrong when sequence numbers differ.'
+    suggested_action: 'Decide "later" from the run file name: a strictly later date prefix, or the same date AND same directory AND same env with a higher sequence; anything else (undated name, same-day other directory/env) is run-not-later. Correct the README sentence; add tests for each case.'
+    suggested_owner: dev
+    status: open
+  - id: 'T212-QA1-CR3'
+    severity: medium
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: 'When a run file has two Findings rows with the same number, --resolve-finding always edits the first; the second can never be targeted and the duplicate is never reported (reproduced: resolving n=1 again answers "already resolved by" the first row''s evidence).'
+    suggested_action: 'Refuse non-zero, writing nothing, when more than one row carries finding n, naming the count. Add a test.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 77
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 12
+    notes: 'cli: probe of uat-status --resolve-finding --by (sink path, 11 hostile + 1 legitimate): verdict engages, 0 escapes. execFileSync with an argument array; commit evidence is hex-only so no option injection into git.'
+  performance:
+    status: PASS
+    notes: 'git is spawned lazily, only for commit markers, and cached per sha; a corpus without markers spawns nothing.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1: a marker that stops holding cannot be repaired through the only writer.'
+  maintainability:
+    status: PASS
+    notes: 'One row locator shared by reader and writer; verifyResolution pure with injected I/O; 9 tests, mutation-proven.'
+
+recommendations:
+  immediate:
+    - action: 'Fix T212-QA1-CR1, CR2, CR3 with tests.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs', 'evals/qa-next/unit/uat-status.test.mjs']
+  future:
+    - action: 'CR-4 (low): verification is object existence, not reachability — a rebased-away sha keeps verifying until gc. Reword README/task risk text, or check reachability.'
+      refs: ['skills/qa-next/README.md']
+    - action: 'CR-5 (low): the not-a-git-repo test depends on os.tmpdir() lying outside any git work tree; pin it with GIT_CEILING_DIRECTORIES.'
+      refs: ['evals/qa-next/unit/uat-status.test.mjs']
+    - action: 'checkFindings could report duplicate finding numbers in a run file (pre-existing data shape; would newly fail consumer --check, so not done here).'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['Fix the three MEDIUM findings']

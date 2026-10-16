@@ -3061,6 +3061,10 @@ test("verifyResolution names every reason; it is pure over injected runs and com
     "runs/A.4/2026-10-15-lan.md",
     "runs/A.5/2026-10-16-lan.md",
     "runs/A.5/2026-10-16-lan-02.md",
+    "runs/A.4/2026-10-16-lan-02.md",
+    "runs/A.5/2026-10-16-staging.md",
+    "runs/A.4/2026-10-17-lan.md",
+    "runs/zz.md",
   ];
   const lookup = (states) => (sha) => states[sha] ?? "absent";
   const env = { runs, commitState: lookup({ "96d7948e": "commit" }) };
@@ -3091,6 +3095,28 @@ test("verifyResolution names every reason; it is pure over injected runs and com
   assert.equal(at(runs[1]), "run-is-self");
   assert.equal(at(runs[0]), "run-not-later");
   assert.equal(at("runs/A.5/2026-10-17-lan.md"), "run-not-found");
+  // "Later" is read from the run names, not listRunFiles' order (QA cycle 1, CR-2): same-day runs
+  // of another function or environment cannot be ordered, and an undated file is not a run.
+  assert.equal(
+    at("runs/A.4/2026-10-16-lan-02.md"),
+    "run-not-later",
+    "same day, other function",
+  );
+  assert.equal(
+    at("runs/A.5/2026-10-16-staging.md"),
+    "run-not-later",
+    "same day, other environment",
+  );
+  assert.equal(
+    at("runs/A.4/2026-10-17-lan.md"),
+    null,
+    "a later date resolves across functions",
+  );
+  assert.equal(
+    at("runs/zz.md"),
+    "run-not-later",
+    "a file with no date in its name is never later",
+  );
   assert.equal(
     at("../../README.md"),
     "run-not-found",
@@ -3240,9 +3266,23 @@ test("CLI: a commit marker outside a git work tree is not-a-git-repo — open, n
   writeRun(root, "runs/A.1/2026-10-16-lan.md", [
     "| 1 | /a | x | Minor | note — resolved 2026-10-16 by `96d7948e` |",
   ]);
-  assert.equal(JSON.parse(run(root, "--findings", "--json").out).length, 1);
+  // GIT_CEILING_DIRECTORIES stops git's upward search at the corpus, so the case holds wherever
+  // os.tmpdir() lives — including inside some other repository (QA cycle 1, CR-5).
+  const env = { ...process.env, GIT_CEILING_DIRECTORIES: path.dirname(root) };
+  const cli = (...args) => {
+    try {
+      return execFileSync("node", [TOOL, "--root", root, ...args], {
+        encoding: "utf8",
+        env,
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+    } catch (e) {
+      return `${e.stdout ?? ""}${e.stderr ?? ""}`;
+    }
+  };
+  assert.equal(JSON.parse(cli("--findings", "--json")).length, 1);
   assert.match(
-    run(root, "--check").out,
+    cli("--check"),
     /runs\/A\.1\/2026-10-16-lan\.md finding 1: resolution does not hold \(not-a-git-repo\): 96d7948e/,
   );
   rmSync(root, { recursive: true, force: true });
@@ -3446,4 +3486,75 @@ test("the run template, SKILL.md and README define the resolution marker identic
     /resolv/i,
     "Step 5 stages the earlier run files a run resolved findings in",
   );
+});
+
+test("CLI: --resolve-finding replaces a marker that no longer holds, and reports success only over one that does (task 212, QA cycle 1 CR-1)", () => {
+  const { root, sha } = gitCorpus();
+  run(root, "--init");
+  const r1 = "runs/A.5/2026-10-16-lan.md";
+  const p1 = writeRun(root, r1, ["| 1 | /a | wording | Minor | note |"]);
+  const r2 = "runs/A.5/2026-10-16-lan-02.md";
+  const p2 = writeRun(root, r2, ["| 1 | /b | x | Minor | note |"]);
+  assert.equal(
+    run(root, "--resolve-finding", r1, "1", "--by", r2, "--date", "2026-10-16")
+      .code,
+    0,
+  );
+  rmSync(p2);
+  // The marker no longer holds: the same evidence is NOT "already resolved".
+  const same = run(root, "--resolve-finding", r1, "1", "--by", r2);
+  assert.equal(same.code, 2, same.out);
+  assert.match(same.out, /run-not-found/);
+  assert.doesNotMatch(same.out, /already resolved/);
+  assert.match(
+    run(root, "--check").out,
+    /resolution does not hold \(run-not-found\)/,
+  );
+  // New, valid evidence replaces it — one marker, not two.
+  const fixed = run(
+    root,
+    "--resolve-finding",
+    r1,
+    "1",
+    "--by",
+    sha,
+    "--date",
+    "2026-10-17",
+  );
+  assert.equal(fixed.code, 0, fixed.out);
+  assert.match(
+    fixed.out,
+    /replaced a resolution that did not hold \(run-not-found\)/,
+  );
+  const row = readFileSync(p1, "utf8")
+    .split("\n")
+    .find((l) => l.startsWith("| 1 |"));
+  assert.equal(
+    row,
+    `| 1 | /a | wording | Minor | note — resolved 2026-10-17 by \`${sha}\` |`,
+  );
+  assert.equal(run(root, "--check").code, 0);
+  // Once it holds again, other evidence is refused and the same evidence is a no-op.
+  assert.equal(run(root, "--resolve-finding", r1, "1", "--by", r2).code, 2);
+  assert.match(
+    run(root, "--resolve-finding", r1, "1", "--by", sha).out,
+    /already resolved/,
+  );
+  rmSync(root, { recursive: true, force: true });
+});
+
+test("CLI: --resolve-finding refuses a finding number two rows share, writing nothing (task 212, QA cycle 1 CR-3)", () => {
+  const { root, sha } = gitCorpus();
+  run(root, "--init");
+  const r1 = "runs/A.5/2026-10-16-lan.md";
+  const p1 = writeRun(root, r1, [
+    "| 1 | /a | first | Minor | note |",
+    "| 1 | /b | second | Minor | note |",
+  ]);
+  const before = readFileSync(p1, "utf8");
+  const r = run(root, "--resolve-finding", r1, "1", "--by", sha);
+  assert.equal(r.code, 2, r.out);
+  assert.match(r.out, /2 findings numbered 1/);
+  assert.equal(readFileSync(p1, "utf8"), before);
+  rmSync(root, { recursive: true, force: true });
 });

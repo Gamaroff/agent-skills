@@ -92,7 +92,10 @@ nobody has dealt with". A resolved note leaves the count only on evidence a read
   - a run file: a path ending `.md`, relative to the registry directory (the form `--findings` and
     `priorRuns` already print), which must be one of the paths `listRunFiles` returns (so it lies under `runs/`;
     anything else is `run-not-found`), must not be the finding's own run file, and must
-    sort **after** it in `listRunFiles` order. A run cannot be resolved by an earlier run.
+    be **later** by name: a later date, or the same day's higher sequence of the same function and
+    environment. A same-day run of another function or environment, or an undated file, is not
+    later (QA cycle 1, CR-2 — `listRunFiles` order sorts those arbitrarily). A run cannot be
+    resolved by an earlier run.
 - **Parse.** `parseFindings` adds `resolution: { date, evidence }`, read from the cell's text, **only to a
   row that carries a marker**. A row without one gets no `resolution` key at all, so every existing
   `parseFindings` result, `--findings --json` payload and `deepEqual` test is unchanged byte for byte.
@@ -115,10 +118,13 @@ nobody has dealt with". A resolved note leaves the count only on evidence a read
     - the run or the finding does not exist (exit 4);
     - the row links a bug (exit 2; close the bug instead);
     - the evidence fails the same verification `loadFindings` applies (exit 2, with the reason);
-    - the row is already resolved by different evidence (exit 2; a resolved finding is not
-      re-resolved).
+    - two rows in the table carry finding n (exit 2; renumber them first — QA cycle 1, CR-3);
+    - the row is already resolved by different evidence **that still holds** (exit 2; a resolved
+      finding is not re-resolved).
   - The same **evidence** twice is a no-op, exit 0, whatever `--date` says: the first date stands.
-    A re-run on a later day must not be refused for the date it defaulted to.
+    A re-run on a later day must not be refused for the date it defaulted to. This holds only while
+    the existing marker verifies; a marker that no longer holds is **replaced** by newly verified
+    evidence, so the only writer can repair what it wrote (QA cycle 1, CR-1).
 - **Report.** `--findings` counts valid resolutions as closed. `--findings --all` renders the row's
   label as `[note — resolved <date> by <evidence>]`. `--json` carries `resolution`.
 
@@ -249,8 +255,9 @@ See [task.212.plan.qa-next-resolvable-note-findings.md](task.212.plan.qa-next-re
 - **Medium: the writer edits a committed record.** Mitigation: one cell only, located by
   `FINDING_ROW`, with a byte-equality assertion over the rest of the file in tests.
 - **Medium: a resolution that claims more than its evidence shows.** Mitigation: evidence is
-  verified on every `--check`, not only when written, so a rebased-away sha or a deleted run file
-  reopens the row loudly.
+  verified on every `--check`, not only when written, so a deleted run file reopens the row
+  loudly. A sha is checked for existence, not reachability: a rebased-away commit keeps verifying
+  until git collects it (QA cycle 1, CR-4 — documented, not changed).
 - **Low: git unavailable.** A commit-evidence marker outside a git work tree is
   `not-a-git-repo`: the row stays open and `--check` reports it. It is never accepted unverified.
 
@@ -329,6 +336,30 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-16
+**Quality Score**: 70/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.212.qa.1.qa-next-resolvable-note-findings.md](./task.212.qa.1.qa-next-resolvable-note-findings.md)
+- **Gate File**: [task.212.gate.1.qa-next-resolvable-note-findings.yml](./task.212.gate.1.qa-next-resolvable-note-findings.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 77 (qa-next unit) + 12 security probes
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+Three MEDIUM findings are open:
+- **T212-QA1-CR1**: an invalid marker cannot be repaired.
+- **T212-QA1-CR2**: "later" is not chronological across directories, and undated files are accepted as runs.
+- **T212-QA1-CR3**: a duplicate finding number sends the writer to the wrong row.
+
 ## Change Log
 <!-- change-log-start -->
 
@@ -338,6 +369,8 @@ None.
 | 2026-10-16 | 1.1     | Review passed (8/10) — added `bad-evidence`, run-evidence membership, `resolution` key only on marked rows, `<run>` argument form, evidence-only idempotency, SKILL.md Step 5 commit scope; linked #679 | review-task |
 | 2026-10-16 |         | Status → ready-for-development | review-task |
 | 2026-10-16 |         | Implemented — 4 code/doc files + CHANGELOG, 9 tests (mutation-proved); status → ready-for-review | develop |
+| 2026-10-16 |         | QA gate CONCERNS (70/100) — 3 findings | qa-task |
+| 2026-10-16 |         | QA findings fixed — cycle 1, 3 findings (CR-1 stale-marker repair, CR-2 later-by-name, CR-3 duplicate numbers) + 2 low | qa-fix |
 <!-- change-log-end -->
 
 ---
