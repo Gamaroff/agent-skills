@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa
+status: closed
 severity: Major
 priority: Medium
 created: 2026-10-16
@@ -14,7 +14,7 @@ description: "Chokepoint title shape misses parsers written with a literal space
 **Bug ID**: TASK-207-BUG-4
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 1, finding CR-4)
 **Date Found**: 2026-10-16
 **Location**: `tests/doc-id-chokepoint.test.js:66`
@@ -66,3 +66,4 @@ Widen the title shape to accept a literal space or `[[:space:]]`; route or allow
 | 2026-10-16 | New | qa-task | Raised by task.207.qa.1 |
 | 2026-10-16 | In Progress | qa-fix | Fix cycle 1 started |
 | 2026-10-16 | Ready for QA | qa-fix | Fixed in QA fix cycle 1 |
+| 2026-10-16 | Closed | qa-task | Verified by task.207.qa.2.doc-numbering-enforcement-and-sweep.md |

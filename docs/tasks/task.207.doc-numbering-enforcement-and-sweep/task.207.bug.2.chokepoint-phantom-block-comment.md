@@ -59,6 +59,22 @@ Strip a `//` line comment before searching for `/*` (or lift the quote-aware str
 
 **Testing**: `command node --test tests/doc-id-chokepoint.test.js` 12/12. Mutation: restore the old order → §1 and §3 red.
 
+### Iteration 2
+
+#### Re-Investigation (Reopened → In Progress)
+
+**Date**: 2026-10-16
+
+**QA Reopening Reason**: A `/*` inside a regex literal was still read as a block comment: the cycle-1 fix reordered a line-based stripper, which cannot tell a regex from a comment.
+
+#### Fix Implementation (In Progress → Ready for QA)
+
+**Fix Description**: Structural move (consolidate, Step 2.6): the quote-, template- and regex-aware tokenizer from `tests/test-harness-concurrency.test.js` is lifted into `tests/lib/strip-js-comments.js` (keeping line breaks inside block comments) and both tests import it; the chokepoint test's own JS stripping is deleted. MUST_HIT row: an id regex on the line after a regex literal containing `/*`.
+
+**Files Modified**: tests/lib/strip-js-comments.js (new), tests/doc-id-chokepoint.test.js, tests/test-harness-concurrency.test.js
+
+**Testing**: `command node --test tests/doc-id-chokepoint.test.js` 12/12. Mutation: stop stripping JS comments → §1 and §3 red; HEAD's stripper plus the new row → §3 red.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -66,3 +82,6 @@ Strip a `//` line comment before searching for `/*` (or lift the quote-aware str
 | 2026-10-16 | New | qa-task | Raised by task.207.qa.1 |
 | 2026-10-16 | In Progress | qa-fix | Fix cycle 1 started |
 | 2026-10-16 | Ready for QA | qa-fix | Fixed in QA fix cycle 1 |
+| 2026-10-16 | Reopened | qa-task | Not fixed — same mechanism survives (task.207.qa.2 CR-2) |
+| 2026-10-16 | In Progress | qa-fix | Fix cycle 2 started |
+| 2026-10-16 | Ready for QA | qa-fix | Fixed in QA fix cycle 2 |

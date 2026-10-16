@@ -14,10 +14,10 @@ parse them, and return a compact risk-sorted Findings Summary. Do not modify any
 Discover artifacts using the following globs under <dir>:
 
 Story mode (mode=<mode> where <mode>=story):
-  Gate:       story.<epic>.<story>.gate.*.yml       (all matches — use highest number)
-  QA Report:  story.<epic>.<story>.qa.*.md          (all matches — use highest number)
+  Gate:       story.<P>.<E>.<S>.gate.*.yml       (all matches — use highest number)
+  QA Report:  story.<P>.<E>.<S>.qa.*.md          (all matches — use highest number)
   PR Review:  <pr_review>                           (one path, or `none` — do NOT glob)
-  Bug Reports: story.<epic>.<story>.bug.*.md        (all matches)
+  Bug Reports: story.<P>.<E>.<S>.bug.*.md        (all matches)
 
 Task mode (mode=<mode> where <mode>=task):
   Gate:       task.<id>.gate.*.yml                  (all matches — use highest number)

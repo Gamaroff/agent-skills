@@ -63,10 +63,10 @@ Gates are **advisory** - teams choose their quality bar, but gates provide trans
 Gate files are **co-located** in the same directory as the story they belong to. Never use a central `docs/qa/gates/` path.
 
 ```
-${PRD_ROOT}/<domain>/<feature>/epics/epic.<N>.<name>/stories/story.<N>.<M>.<slug>/
-├── story.<N>.<M>.<slug>.md
-├── story.<N>.<M>.qa.1.<name>.md      # QA report
-└── story.<N>.<M>.gate.1.<name>.yml   # Gate file (co-located)
+${PRD_ROOT}/<domain>/prd.<P>.<feature>/epics/epic.<P>.<E>.<name>/stories/story.<P>.<E>.<S>.<slug>/
+├── story.<P>.<E>.<S>.<slug>.md
+├── story.<P>.<E>.<S>.qa.1.<name>.md      # QA report
+└── story.<P>.<E>.<S>.gate.1.<name>.yml   # Gate file (co-located)
 ```
 
 **Example**: If story is at `${PRD_ROOT}/domain-name/module-name/epics/epic.1.<name>/stories/story.1.1.5.<slug>/story.1.1.5.<slug>.md`, gate goes to `${PRD_ROOT}/domain-name/module-name/epics/epic.1.<name>/stories/story.1.1.5.<slug>/story.1.1.5.gate.1.feature-cache.yml`

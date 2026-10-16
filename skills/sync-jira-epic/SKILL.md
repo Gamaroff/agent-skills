@@ -54,7 +54,7 @@ Source `references/resolve-paths.sh` to populate `${PRD_ROOT}` (default `docs/pr
 ### Required Files
 
 - An epic markdown file at:
-  `${PRD_ROOT}/<domain>/<feature>/epics/epic.<N>.<name>/epic.<N>.<name>.md`
+  `${PRD_ROOT}/<domain>/prd.<P>.<feature>/epics/epic.<P>.<E>.<name>/epic.<P>.<E>.<name>.md`
 - Optionally: `prd_source` pointing to the parent PRD file for Bitbucket link generation.
 
 ### Required Environment Variables
@@ -108,7 +108,7 @@ due_date: '2026-05-15'
 ### 1. Identify the Epic File
 
 ```
-${PRD_ROOT}/<domain>/<feature>/epics/epic.<N>.<slug>/epic.<N>.<slug>.md
+${PRD_ROOT}/<domain>/prd.<P>.<feature>/epics/epic.<P>.<E>.<slug>/epic.<P>.<E>.<slug>.md
 ```
 
 To find epics that have **not yet been synced** (no `jira_key`):

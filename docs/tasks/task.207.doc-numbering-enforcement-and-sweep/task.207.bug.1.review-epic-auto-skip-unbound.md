@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa
+status: closed
 severity: Major
 priority: Medium
 created: 2026-10-16
@@ -14,7 +14,7 @@ description: "review-epic 0a.3 auto-skip reads variables bound in another block"
 **Bug ID**: TASK-207-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 1, finding CR-1)
 **Date Found**: 2026-10-16
 **Location**: `shared/resources/review-pipeline-step-0a-branch-setup.md:173`
@@ -66,3 +66,4 @@ Re-derive `PRD_NUM`/`EPIC_NUM` from `DOC_FILE` through `doc-id.js` and `CURRENT_
 | 2026-10-16 | New | qa-task | Raised by task.207.qa.1 |
 | 2026-10-16 | In Progress | qa-fix | Fix cycle 1 started |
 | 2026-10-16 | Ready for QA | qa-fix | Fixed in QA fix cycle 1 |
+| 2026-10-16 | Closed | qa-task | Verified by task.207.qa.2.doc-numbering-enforcement-and-sweep.md |

@@ -45,6 +45,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
+const { stripComments } = require("./lib/strip-js-comments");
 
 const PKG_PATH = path.join(__dirname, "..", "package.json");
 const SCRIPTS = JSON.parse(fs.readFileSync(PKG_PATH, "utf8")).scripts;
@@ -199,136 +200,9 @@ const BUDGET_MODULE = path.join(
  *
  * It tracks the five states that matter — line comment, block comment, string (all three quotes),
  * regex literal (character classes included, so `/` inside `[...]` does not end it) — and uses the
- * standard preceding-token heuristic to tell a regex literal from a division.
+ * standard preceding-token heuristic to tell a regex literal from a division. It lives in
+ * tests/lib/strip-js-comments.js, shared with the doc-id chokepoint test (task.207).
  */
-function stripComments(src) {
-  const REGEX_OK_AFTER =
-    /[(,=:[!&|?{};+\-*%~^<>]$|\b(?:return|typeof|instanceof|in|of|new|delete|void|throw|case|do|else|yield|await)$/;
-  let out = "";
-  let i = 0;
-  const n = src.length;
-  // Trailing significant output, for the regex-vs-division heuristic. A window rather than a scan
-  // of `out`: trimming the whole accumulated string on every `/` is quadratic (measured 3.9s on a
-  // 1.2MB input, 245ms at 500KB) and the longest keyword here is 10 characters.
-  let tail = "";
-  const emit = (text) => {
-    out += text;
-    tail = (tail + text).slice(-16);
-  };
-  const regexAllowed = () => {
-    const before = tail.replace(/\s+$/, "");
-    return before === "" || REGEX_OK_AFTER.test(before);
-  };
-
-  // Template-literal state. A template's closing backtick ALWAYS returns to code, because a
-  // template can only be opened from code — either at the top level or inside a `${}`. What needs
-  // a stack is the `${}` substitution: its contents are CODE, and the matching `}` must return to
-  // the enclosing template. Without this, a nested template's opening backtick closed the outer
-  // one and its contents were scanned as code, so a URL, a glob or a `//` inside it started a
-  // comment and deleted the rest of the line — to EOF for a `/*`.
-  let inTemplate = false;
-  const substitutions = []; // saved brace depth, one entry per open `${`
-  let braceDepth = 0;
-
-  while (i < n) {
-    const c = src[i];
-    const d = src[i + 1];
-
-    if (inTemplate) {
-      if (c === "\\") {
-        emit(c + (src[i + 1] ?? ""));
-        i += 2;
-        continue;
-      }
-      if (c === "`") {
-        emit(c);
-        i++;
-        inTemplate = false;
-        continue;
-      }
-      if (c === "$" && d === "{") {
-        emit("${");
-        i += 2;
-        substitutions.push(braceDepth);
-        braceDepth = 0;
-        inTemplate = false;
-        continue;
-      }
-      emit(c);
-      i++;
-      continue;
-    }
-
-    // ---- code ----
-    if (c === "/" && d === "/") {
-      // `\r` terminates a line comment in JS too; stopping only at `\n` ran a CRLF-free comment on.
-      while (i < n && src[i] !== "\n" && src[i] !== "\r") i++;
-      continue;
-    }
-    if (c === "/" && d === "*") {
-      i += 2;
-      while (i < n && !(src[i] === "*" && src[i + 1] === "/")) i++;
-      i += 2;
-      continue;
-    }
-    if (c === '"' || c === "'") {
-      emit(c);
-      i++;
-      while (i < n) {
-        if (src[i] === "\\") {
-          emit(src[i] + (src[i + 1] ?? ""));
-          i += 2;
-          continue;
-        }
-        emit(src[i]);
-        if (src[i] === c) {
-          i++;
-          break;
-        }
-        i++;
-      }
-      continue;
-    }
-    if (c === "`") {
-      emit(c);
-      i++;
-      inTemplate = true;
-      continue;
-    }
-    if (c === "}" && braceDepth === 0 && substitutions.length > 0) {
-      emit(c);
-      i++;
-      braceDepth = substitutions.pop();
-      inTemplate = true;
-      continue;
-    }
-    if (c === "{") braceDepth++;
-    else if (c === "}") braceDepth--;
-    if (c === "/" && regexAllowed()) {
-      emit(c);
-      i++;
-      let inClass = false;
-      while (i < n) {
-        const ch = src[i];
-        if (ch === "\\") {
-          emit(ch + (src[i + 1] ?? ""));
-          i += 2;
-          continue;
-        }
-        if (ch === "\n") break; // unterminated — not a regex after all; stop rather than run on
-        emit(ch);
-        i++;
-        if (ch === "[") inClass = true;
-        else if (ch === "]") inClass = false;
-        else if (ch === "/" && !inClass) break;
-      }
-      continue;
-    }
-    emit(c);
-    i++;
-  }
-  return out;
-}
 
 /** Source with comments removed, so prose about a historical value is not read as code. */
 function code(file) {

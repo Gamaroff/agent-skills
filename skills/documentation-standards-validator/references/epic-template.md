@@ -657,8 +657,8 @@ Epic [P.E] is complete when all criteria below are met:
 
 ### Related Epics
 
-- [Epic [N-1]: [Name]](../epic.[n-1].[name]/epic.[n-1].[name].md) - Previous epic
-- [Epic [N+1]: [Name]](../epic.[n+1].[name]/epic.[n+1].[name].md) - Next epic
+- [Epic [P].[E-1]: [Name]](../epic.[P].[E-1].[name]/epic.[P].[E-1].[name].md) - Previous epic
+- [Epic [P].[E+1]: [Name]](../epic.[P].[E+1].[name]/epic.[P].[E+1].[name].md) - Next epic
 
 ### Project Resources
 

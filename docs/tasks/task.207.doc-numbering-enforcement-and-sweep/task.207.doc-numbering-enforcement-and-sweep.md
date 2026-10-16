@@ -536,24 +536,24 @@ unaffected and listed as such.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-16
 **Quality Score**: 60/100
-**Gate Decision**: CONCERNS
+**Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.207.qa.1.doc-numbering-enforcement-and-sweep.md](./task.207.qa.1.doc-numbering-enforcement-and-sweep.md)
-- **Gate File**: [task.207.gate.1.doc-numbering-enforcement-and-sweep.yml](./task.207.gate.1.doc-numbering-enforcement-and-sweep.yml)
+- **Full Report**: [task.207.qa.2.doc-numbering-enforcement-and-sweep.md](./task.207.qa.2.doc-numbering-enforcement-and-sweep.md)
+- **Gate File**: [task.207.gate.2.doc-numbering-enforcement-and-sweep.yml](./task.207.gate.2.doc-numbering-enforcement-and-sweep.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 14
+- **Tests Executed**: 19
 - **Phases Verified**: 5/5
-- **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+- **Critical Issues**: 1
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: FAIL
 
 ### Key Findings
-Four MEDIUM findings: TASK-207-BUG-1 (review-epic 0a.3 reads variables bound in another block), BUG-2 (chokepoint comment stripper drops lines), BUG-3 (review-epic numbering glob still flat), BUG-4 (title shape misses literal-space parsers). Three LOW.
+Cycle 2 refute pass: BUG-1 and BUG-4 fixed and closed. BUG-3 reopened at HIGH (the §5 prose guard misses angle-bracket and story.{N}.{M} placeholders still used in nine files), BUG-2 reopened (a /* inside a regex literal still opens a phantom block comment), BUG-5 new (backfill title drops the sub-story letter).
 
 ## Change Log
 
@@ -567,6 +567,8 @@ Four MEDIUM findings: TASK-207-BUG-1 (review-epic 0a.3 reads variables bound in 
 | 2026-10-16 |         | Implemented — 2 new tests (14 cases), 2 parsers moved onto doc-id.js, review-epic awk defect fixed, ~60 docs swept; status → ready-for-review | develop |
 | 2026-10-16 |         | QA gate CONCERNS (60/100) — 4 medium, 3 low findings (task.207.qa.1) | qa-task |
 | 2026-10-16 |         | QA findings fixed — BUG-1..4, CR-5, CR-6; §5 placeholder guard added; 1 iteration | qa-fix |
+| 2026-10-16 |         | QA gate FAIL (60/100) — 1 high, 2 medium, 1 low; BUG-2, BUG-3 reopened (task.207.qa.2) | qa-task |
+| 2026-10-16 |         | QA findings fixed — BUG-2, BUG-3 by structural moves (shared JS tokenizer; §5 allow-list), BUG-5, CR2-6; 1 iteration | qa-fix |
 
 <!-- change-log-end -->
 

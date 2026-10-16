@@ -848,7 +848,7 @@ Teach what and why you did in detail, as if training a junior engineer.
 
 - Stories: `${PRD_ROOT}/<domain>/<feature>/epics/epic.{P}.{E}.<name>/stories/` (co-located within epics)
 - Tasks: `docs/tasks/`
-- QA Artifacts: gate files and QA reports are **co-located** with their story/task (e.g. `{story-dir}/story.{N}.{M}.gate.{n}.{name}.yml`); `docs/qa/` is reserved for cross-cutting assessments only
+- QA Artifacts: gate files and QA reports are **co-located** with their story/task (e.g. `{story-dir}/story.{P}.{E}.{S}.gate.{n}.{name}.yml`); `docs/qa/` is reserved for cross-cutting assessments only
 - PRD: `${PRD_ROOT}/` (sharded; default `docs/prd/`, configurable)
 - Architecture: `${ARCH_ROOT}/` (sharded; default `docs/architecture/`, configurable)
 - Debug Log: `.ai/debug-log.md`

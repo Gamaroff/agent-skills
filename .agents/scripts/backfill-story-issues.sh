@@ -47,9 +47,15 @@ for STORY_FILE in "$@"; do
   ID_JSON=$(command node "$(git rev-parse --show-toplevel)/shared/resources/doc-id.js" \
     parse "$(basename "$STORY_FILE")" --json) \
     || { echo "skip (not a story id doc-id can read): $STORY_FILE"; continue; }
+  # A story DOCUMENT only: an epic, or a story's artifact (story.1.2.3.bug.1.x.md), parses
+  # too and must not become a story issue (task.207 QA cycle 2, CR-6).
+  [ "$(printf '%s' "$ID_JSON" | jq -r '"\(.kind) \(.artifact)"')" = "story null" ] \
+    || { echo "skip (not a story document): $STORY_FILE"; continue; }
   STORY_P=$(printf '%s' "$ID_JSON" | jq -r '.prd')
   STORY_E=$(printf '%s' "$ID_JSON" | jq -r '.epic')
-  STORY_S=$(printf '%s' "$ID_JSON" | jq -r '.story')
+  # The label is doc-id's id minus `story.`, so a sub-story keeps its letter
+  # (story.1.2.3A → 1.2.3A) and never collides with its parent (task.207 QA cycle 2, CR-3).
+  STORY_LABEL=$(printf '%s' "$ID_JSON" | jq -r '.id | sub("^story\\."; "")')
 
   # Resolve parent epic file + GH issue
   STORY_DIR=$(dirname "$STORY_FILE")
@@ -62,7 +68,7 @@ for STORY_FILE in "$@"; do
 
   # Bare title (strip "Story E.S: " prefix)
   STORY_TITLE_BARE=$(strip_id_prefix story "$TITLE")
-  ISSUE_TITLE="[Story ${STORY_P}.${STORY_E}.${STORY_S}] ${STORY_TITLE_BARE}"
+  ISSUE_TITLE="[Story ${STORY_LABEL}] ${STORY_TITLE_BARE}"
 
   REL_PATH=$(git -C "$(git rev-parse --show-toplevel)" ls-files --full-name "$STORY_FILE" 2>/dev/null || echo "$STORY_FILE")
   DOC_URL="https://github.com/${REPO}/blob/develop/${REL_PATH}"

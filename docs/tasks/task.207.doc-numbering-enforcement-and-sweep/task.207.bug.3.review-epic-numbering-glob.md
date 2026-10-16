@@ -59,6 +59,22 @@ Rewrite the glob and template to `epic.{P}.{E}`; sweep the other `epic.[N]` / `{
 
 **Testing**: `command node --test tests/doc-id-chokepoint.test.js` 12/12. Mutation: restore `epic.{epic-number}` → §5 red.
 
+### Iteration 2
+
+#### Re-Investigation (Reopened → In Progress)
+
+**Date**: 2026-10-16
+
+**QA Reopening Reason**: §5 was a deny-list of remembered spellings and missed `<epic>`, `<N>`, `{N}.{M}`, `{epicNum}`, `[N+1]`, `[n-1]` and more.
+
+#### Fix Implementation (In Progress → Ready for QA)
+
+**Fix Description**: Structural move (consolidate — allow-list, Step 2.6, obs #276): §5 now requires the FIRST placeholder after `story.` / `epic.` / `epic/` to name the PRD (`P`, `prd`, `prdNum`, …) and refuses everything else. It surfaced 30 more lines in 15 files; all rewritten (qa-findings-ingester-prompt, develop, qa-gate, shard-doc, sync-github-*, sync-jira-*, README, epic templates, prd-structure-guide — decimal-epic block removed, day-4 runbook), with the PRD directory added to the sync/shard paths. `create-parallel-stories` is exempt by name as deferred work.
+
+**Files Modified**: tests/doc-id-chokepoint.test.js and 15 prose files (+ bundled copies)
+
+**Testing**: `command node --test tests/doc-id-chokepoint.test.js` 12/12. Mutation: allow-list accepts any head → §5 control red; restore `story.<epic>.<story>` in the ingester prompt → §5 red.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -66,3 +82,6 @@ Rewrite the glob and template to `epic.{P}.{E}`; sweep the other `epic.[N]` / `{
 | 2026-10-16 | New | qa-task | Raised by task.207.qa.1 |
 | 2026-10-16 | In Progress | qa-fix | Fix cycle 1 started |
 | 2026-10-16 | Ready for QA | qa-fix | Fixed in QA fix cycle 1 |
+| 2026-10-16 | Reopened | qa-task | Not fixed — same mechanism survives (task.207.qa.2 CR-1) |
+| 2026-10-16 | In Progress | qa-fix | Fix cycle 2 started |
+| 2026-10-16 | Ready for QA | qa-fix | Fixed in QA fix cycle 2 |

@@ -57,20 +57,11 @@ docs/prd/[domain]/[feature]/
         │       ├── story.[P].[E].2.[name].worklet-fix.md   # Technical addendum
         │       └── EPIC-[P].[E]-STORIES-INDEX.md           # Large epic index (optional)
         │
-        ├── epic.[N+1].[name]/                # Next epic subdirectory
-        │   ├── epic.[N+1].[name].md
-        │   └── stories/
-        │       ├── story.[N+1].1.[name].md
-        │       └── story.[N+1].2.[name].md
-        │
-        └── epic.[N+2].[name-with-intermediate]/ # Epic with intermediate version
-            ├── epic.[N+2].[name].md
-            ├── epic.[N+2].5.[name].md        # Intermediate epic (optional)
-            ├── EPIC-[N+2].5-ROADMAP.md       # Intermediate epic roadmap
+        └── epic.[P].[E+1].[name]/            # Next epic subdirectory (E counts within the PRD)
+            ├── epic.[P].[E+1].[name].md
             └── stories/
-                ├── story.[N+2].1.[name].md
-                ├── story.[N+2].5.1.[name].md # Story for intermediate epic
-                └── story.[N+2].2.[name].md
+                ├── story.[P].[E+1].1.[name].md
+                └── story.[P].[E+1].2.[name].md
 ```
 
 ### Domain Categories

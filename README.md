@@ -8,7 +8,7 @@ A library of **AI coding agent skills** — modular, self-contained packages tha
 
 Skills live in `.agents/skills/` inside any project. Compatible agents (Claude Code and others) pick them up automatically at startup — no config needed. Skills activate by context match or explicit invocation.
 
-**Example.** Type `/create-story` in an agent session → the `create-story` skill activates → the agent walks you through 10 questions → a fully-formed `story.{N}.{name}.md` lands in your repo with frontmatter, acceptance criteria, technical context, and links to its parent epic. Type `/develop-story <path>` next and the agent runs the full review → branch → implement → PR → QA loop.
+**Example.** Type `/create-story` in an agent session → the `create-story` skill activates → the agent walks you through 10 questions → a fully-formed `story.{P}.{E}.{S}.{name}.md` lands in your repo with frontmatter, acceptance criteria, technical context, and links to its parent epic. Type `/develop-story <path>` next and the agent runs the full review → branch → implement → PR → QA loop.
 
 See [docs/concepts/overview.md](./docs/concepts/overview.md) for the model, or jump straight into the Learning Path below.
 

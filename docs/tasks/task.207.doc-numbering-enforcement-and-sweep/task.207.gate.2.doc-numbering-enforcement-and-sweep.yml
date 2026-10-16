@@ -1,0 +1,89 @@
+schema: 2
+task: 'task.207.doc-numbering-enforcement-and-sweep'
+task_title: 'Doc numbering enforcement and sweep'
+gate: FAIL
+status_reason: 'The refute pass found the §5 guard blind to angle-bracket and story.{N}.{M} placeholders, which nine canonical files still state (one an executed subagent glob); the comment stripper still opens a phantom block comment on a /* inside a regex literal; and the backfill title drops the sub-story letter.'
+reviewer: 'QA Engineer'
+head: 'c5432aa81b45a7419db99a2a249b4a6862a89f1b'
+updated: '2026-10-16T17:29:05Z'
+
+top_issues:
+  - id: 'TASK-207-BUG-3'
+    severity: high
+    file: 'tests/doc-id-chokepoint.test.js'
+    finding: 'Reopened (CR-1): OLD_PLACEHOLDER has no angle-bracket form and no story.{N}.{M}, so §5 passes while qa-findings-ingester-prompt.md (an executed subagent glob story.<epic>.<story>.gate.*.yml), develop/SKILL.md, qa-gate, shard-doc, sync-github-*, sync-jira-* and README still teach the flat scheme.'
+    suggested_action: 'Add the <…> and unprefixed {N}/{M} spellings to the key and its control rows; rewrite every newly reported site.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-207-BUG-2'
+    severity: medium
+    file: 'tests/doc-id-chokepoint.test.js'
+    finding: 'Reopened (CR-2): a /* inside a regex literal (skills/session-handoff/scripts/handoff-verify.mjs:489) still opens a phantom block comment and hides the following lines from §1.'
+    suggested_action: 'Open a block comment only where /* starts a token (line start, after whitespace or ;) outside a string or regex; add a MUST_HIT row for the shape.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-207-BUG-5'
+    severity: medium
+    file: '.agents/scripts/backfill-story-issues.sh'
+    finding: 'The issue title drops doc-id .sub, so sub-story 1.2.3A is titled [Story 1.2.3] and collides with its parent (CR-3).'
+    suggested_action: 'Build the label from .id minus story.; skip anything not a story document (CR-6).'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-207-CR2-6'
+    severity: low
+    file: '.agents/scripts/backfill-story-issues.sh'
+    finding: 'Only a parse failure is checked; an epic document or a story artifact is processed as a story.'
+    suggested_action: 'Skip unless kind is story and artifact is null.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 19
+  phases_verified: 5/5
+  ci: 'fast gate exit 0 on c5432aa8 (.agents/skills moved aside); PR checks not read'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4]
+    phases_with_issues: [2, 3]
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_reopened: 2
+  bugs_new: 1
+  verification_method: 'tests/doc-id-chokepoint.test.js 12/12 plus the four cycle-1 mutation proofs; refute review of the whole diff'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'No boundary changed since gate 1: relatedDocInfo is unchanged and its cycle-1 run record (task.207.qa.1.security.run.json, totals.executed 26) stands. The review-epic blocks delegate refusal to doc-id.parse, executed by §4.'
+  performance:
+    status: PASS
+    notes: 'Chokepoint + corpus tests unchanged in cost (§5 adds one pass over ~700 Markdown files, in the 0.36 s budget measured at develop; re-measured at finalise).'
+  reliability:
+    status: CONCERNS
+    notes: 'BUG-5: backfill titles collide for sub-stories.'
+  maintainability:
+    status: FAIL
+    notes: 'BUG-3 reopened: the prose guard the cycle-1 fix added passes over nine files that still teach the flat scheme; BUG-2 reopened.'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-207-BUG-3 (reopened), BUG-2 (reopened), BUG-5.'
+      refs: ['tests/doc-id-chokepoint.test.js', '.agents/scripts/backfill-story-issues.sh']
+  future:
+    - action: 'review-pipeline-step-0a-branch-setup.md: 0a.6 reads EPIC_BRANCH and BASE_DEFAULT, and the review-task/review-bug 0a.3 blocks read TASK_ID/BUG_PREFIX/CURRENT_BRANCH, all bound in earlier blocks; and no 0a.3 variant echoes AUTO_SKIPPED for the prose that branches on it (CR-4, CR-5 — identical on origin/develop, pre-existing; a cross-block-read audit of this doc).'
+      refs: ['shared/resources/review-pipeline-step-0a-branch-setup.md']
+    - action: 'doc-id.parse accepts a basename with a leading ../, a newline, NUL or shell metacharacters in the slug (gate 1, QA-1).'
+      refs: ['shared/resources/doc-id.js']
+    - action: 'create-parallel-stories keeps its {epic}.1-{n} scheme (task Deferred Work).'
+      refs: ['skills/create-parallel-stories/SKILL.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['TASK-207-BUG-2, BUG-3, BUG-5 fixed']

@@ -47,6 +47,7 @@ const os = require("os");
 const path = require("path");
 const { execFileSync, spawnSync } = require("child_process");
 const { FENCE_OPEN, fenceStep } = require("./lib/markdown-section");
+const { stripComments } = require("./lib/strip-js-comments");
 
 const ROOT = path.join(__dirname, "..");
 const DOC_ID = "shared/resources/doc-id.js";
@@ -85,30 +86,13 @@ const SHELL_SUBJECT = new RegExp(
   `${SHELL_VAR}|\\b[A-Z_]*(?:STORY|EPIC|PRD)[A-Z_]*=`,
 );
 
-function stripCodeComment(line, lang, state) {
-  if (lang === "js") {
-    if (state.block) {
-      const end = line.indexOf("*/");
-      if (end === -1) return "";
-      state.block = false;
-      line = line.slice(end + 2);
-    }
-    // A `//` comment is removed BEFORE a block comment is looked for: a line comment that
-    // quotes a glob (`// shared/resources/*.md`) otherwise opened a phantom block comment
-    // that swallowed every following line (task.207 QA cycle 1, CR-2).
-    if (/^\s*\/\//.test(line)) return "";
-    line = line.replace(/\s\/\/\s.*$/, "");
-    const open = line.indexOf("/*");
-    if (open !== -1 && !/['"`]/.test(line.slice(0, open))) {
-      const close = line.indexOf("*/", open + 2);
-      if (close === -1) {
-        state.block = true;
-        return line.slice(0, open);
-      }
-      line = line.slice(0, open) + line.slice(close + 2);
-    }
-    return line;
-  }
+/**
+ * Strip a shell or Python comment from one line. JavaScript is not stripped here: a
+ * line-based stripper cannot tell a `/*` inside a regex literal from a comment, and
+ * opened a phantom block comment that hid hundreds of lines (task.207 QA cycles 1–2,
+ * CR-2). JS source goes through the tokenizer in tests/lib/strip-js-comments.js instead.
+ */
+function stripCodeComment(line) {
   // shell / python
   if (/^\s*#/.test(line)) return "";
   return line.replace(/\s#\s.*$/, "");
@@ -132,10 +116,11 @@ const langOf = (f) =>
 /** Hits in one code file: `[{ line, shapes, text }]`. */
 function scanCode(rel, text) {
   const lang = langOf(rel);
-  const state = { block: false };
   const out = [];
+  // JS: one tokenizer pass over the whole file (line breaks kept, so numbering holds).
+  const lines = lang === "js" ? stripComments(text).split("\n") : null;
   text.split("\n").forEach((raw, i) => {
-    const line = stripCodeComment(raw, lang, state);
+    const line = lang === "js" ? (lines[i] ?? "") : stripCodeComment(raw);
     if (!line.trim()) return;
     const shapes = lang === "sh" ? matchShellLine(line) : matchCodeLine(line);
     if (shapes.length) out.push({ line: i + 1, shapes, text: raw.trim() });
@@ -163,7 +148,7 @@ function scanMarkdown(text) {
       return;
     }
     if (open === null || !shell) return;
-    const line = stripCodeComment(raw, "sh", {});
+    const line = stripCodeComment(raw);
     if (!line.trim()) return;
     const shapes = matchShellLine(line);
     if (shapes.length) out.push({ line: i + 1, shapes, text: raw.trim() });
@@ -334,6 +319,9 @@ const MUST_HIT = [
   // A title parser written with a literal space, as a sed or grep pattern is (CR-4).
   ["shell", 'BARE=$(echo "$TITLE" | sed -E "s/^Story [0-9]+\\.[0-9]+:? *//")'],
   ["code", "const m = t.match(/^Epic [0-9]+:/);"],
+  // An id regex on the line after a regex LITERAL that contains `/*` — a line-based
+  // stripper read that as a block comment and hid every line to the next `*/` (CR-2).
+  ["code", "const P = /^[a-z._\\/*-]*$/;\nconst R = /story\\.(\\d+)/;"],
   // An id regex on the line after a `//` comment that quotes a glob — the comment
   // must not open a block comment that hides it (CR-2).
   ["code", "// Top-level shared/resources/*.md\nconst R = /story\\.(\\d+)/;"],
@@ -517,18 +505,32 @@ test("§4 the review-epic blocks refuse a name doc-id cannot read", () => {
 //     dropped by their AUTO-GENERATED marker), shared/resources/, docs/ and the
 //     root, minus the historical records below.
 
-const OLD_PLACEHOLDER = new RegExp(
-  [
-    String.raw`story\.\{(?:epic|E|e|epic_num|epic-number)\}`,
-    String.raw`story\.\[(?:epic|E|N|e|n)\]`,
-    String.raw`epic\.\{(?:N|n|number|epic|epic-number|epic_number|epic_num)\}`,
-    String.raw`epic\.\[(?:N|n|number|epic)\]`,
-    String.raw`epic/\{(?:N|n|number)\}`,
-    String.raw`(?<!\{prd\}\.)(?<!\{P\}\.)(?<![\w.])\{epic\}\.\{story\}`,
-  ].join("|"),
-);
+// An ALLOW-list, not a list of retired spellings (task.207 QA cycle 2, CR-1): a deny-list
+// of `story.{epic}`-style spellings missed `story.<N>.<M>`, `epic.<N>`, `story.{N}.{M}`,
+// `story.[N+1]` and more, because every author spells a placeholder their own way. The new
+// scheme has one invariant that every spelling shares — the FIRST placeholder after
+// `story.` or `epic.` names the PRD — so the check asks for that and refuses the rest.
+const PLACEHOLDER_HEAD =
+  /\b(?:story\.|epic[./])(?:\{([^{}.]+)\}|\[([^\[\].]+)\]|<([^<>.]+)>)/g;
+const PRD_PLACEHOLDER =
+  /^(?:P|p|PRD|prd|prdNum|prd_num|prd_number|prd-number|prd-num)$/;
+// The one restatement with no kind word in front: a bare two-level `{epic}.{story}` id.
+const BARE_TWO_LEVEL =
+  /(?<!\{prd\}\.)(?<!\{P\}\.)(?<![\w.])\{epic\}\.\{story\}/;
 
-// path prefix → why it may keep the old spelling. Records, not guidance.
+/** The old-scheme placeholder heads on one line, or [] when it states none. */
+function oldPlaceholders(line) {
+  const out = [];
+  for (const m of line.matchAll(PLACEHOLDER_HEAD)) {
+    const name = m[1] ?? m[2] ?? m[3];
+    if (!PRD_PLACEHOLDER.test(name.trim())) out.push(m[0]);
+  }
+  if (BARE_TWO_LEVEL.test(line)) out.push("{epic}.{story}");
+  return out;
+}
+
+// path prefix → why it may keep the old spelling: records, frozen snapshots, and the one
+// skill whose own numbering scheme is deferred work (it must name its follow-up).
 const HISTORICAL = new Map([
   ["docs/tasks/", "task records — describe what was true when written"],
   ["docs/bugs/", "bug records — describe what was true when written"],
@@ -544,6 +546,10 @@ const HISTORICAL = new Map([
   [
     "examples/epic-examples/",
     "a frozen 2026-05-12 snapshot; examples/README.md states it keeps its original names",
+  ],
+  [
+    "skills/create-parallel-stories/SKILL.md",
+    "deferred work (task.207): its own {epic}.1-{n} parallel-story scheme, which doc-id rejects; a follow-up task moves it to sub-stories",
   ],
   [
     "CHANGELOG.md",
@@ -576,8 +582,11 @@ test("§5 no canonical prose states an old-scheme placeholder", () => {
       continue;
     }
     text.split("\n").forEach((line, i) => {
-      if (OLD_PLACEHOLDER.test(line))
-        bad.push(`${f}:${i + 1}: ${line.trim().slice(0, 120)}`);
+      const heads = oldPlaceholders(line);
+      if (heads.length)
+        bad.push(
+          `${f}:${i + 1}: [${heads.join(", ")}] ${line.trim().slice(0, 110)}`,
+        );
     });
   }
   assert.ok(
@@ -592,26 +601,38 @@ test("§5 no canonical prose states an old-scheme placeholder", () => {
   );
 });
 
-test("§5 the placeholder key hits every retired spelling and spares the new ones", () => {
+test("§5 the placeholder check refuses every flat spelling and spares the new ones", () => {
+  // Every row is a spelling found in this repository's prose (cycles 1–2), not a
+  // synthetic string: the allow-list is proved against the forms authors actually write.
   for (const hit of [
     "story.{epic}.{story}.qa.1.x.md",
     "story.[epic].[story].gate.[number].yml",
     "story.[N].[M].plan.x.md",
+    "story.<epic>.<story>.gate.*.yml",
+    "epic.<N>.<name>/stories/story.<N>.<M>.<slug>/",
+    "story.{N}.{M}.gate.{n}.yml",
+    "story.{epicNum}.{storyNum}",
+    "story.[N+1].[name].md",
+    "epic.[n-1].[name]",
     "epic.{epic-number}.review.*.md",
     "epic.[N].[name]/",
     "epic/{n}.{slug}",
     "Source ID: `{epic}.{story}`",
   ])
-    assert.ok(OLD_PLACEHOLDER.test(hit), `expected a hit: ${hit}`);
+    assert.ok(oldPlaceholders(hit).length > 0, `expected a hit: ${hit}`);
   for (const miss of [
     "story.{P}.{E}.{S}.qa.1.x.md",
     "story.[P].[E].[S].gate.[number].yml",
+    "story.<prd>.<epic>.<story>",
+    "story.{prdNum}.{epicNum}.{storyNum}",
+    "story.{prd}.{epic}.{story}.bug.{n}",
+    "epic.{p}.{n}.{slug}",
     "epic.{P}.{E}.review.*.md",
     "epic/{P}.{E}.{slug}",
     "story_id: '{prd}.{epic}.{story}'",
     "`story.4.2.checkout.md` — a literal negative example",
   ])
-    assert.ok(!OLD_PLACEHOLDER.test(miss), `expected no hit: ${miss}`);
+    assert.deepEqual(oldPlaceholders(miss), [], `expected no hit: ${miss}`);
 });
 
 module.exports = { scanCode, scanMarkdown, CODE_SHAPES, SHELL_SHAPES };
