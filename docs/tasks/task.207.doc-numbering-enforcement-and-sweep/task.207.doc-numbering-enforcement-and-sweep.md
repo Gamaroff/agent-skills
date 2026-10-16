@@ -576,6 +576,7 @@ Half-cycle gate on the last fix: no HIGH, CI green. Layout residue remains in tr
 | 2026-10-16 |         | QA gate CONCERNS (70/100) — 3 medium, 1 low; BUG-3 reopened (task.207.qa.5) | qa-task |
 | 2026-10-16 |         | QA findings fixed — BUG-3 layout paths (13 files) + FLAT_LAYOUT key, CR5-2, CR5-3 (anchored exemptions), CR5-5; 1 iteration | qa-fix |
 | 2026-10-16 |         | QA gate CONCERNS (70/100), gate-the-last-fix half-cycle — 4 medium, 1 low; BUG-3 reopened (task.207.qa.6) | qa-task |
+| 2026-10-16 |         | QA findings fixed (user-approved cycle 6) — enumerated layout/literal/tree sweep, 15 prose files; §5 parent, literal and tree checks | qa-fix |
 
 <!-- change-log-end -->
 

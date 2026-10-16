@@ -51,7 +51,7 @@ Given a story directory, these skills auto-discover:
 
 ```bash
 # Implement from a story directory
-/develop docs/prd/domain-name/module-name/example-area/epics/epic.1.178.feature-ui/stories/story.1.178.8.example-feature/
+/develop docs/prd/domain-name/prd.1.example-area/epics/epic.1.178.feature-ui/stories/story.1.178.8.example-feature/
 
 # Review implementation
 /qa-story docs/prd/.../stories/story.1.178.8.example-feature/

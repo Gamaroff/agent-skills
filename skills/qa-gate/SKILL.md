@@ -69,7 +69,7 @@ ${PRD_ROOT}/<domain>/prd.<P>.<feature>/epics/epic.<P>.<E>.<name>/stories/story.<
 └── story.<P>.<E>.<S>.gate.1.<name>.yml   # Gate file (co-located)
 ```
 
-**Example**: If story is at `${PRD_ROOT}/domain-name/module-name/epics/epic.1.<name>/stories/story.1.1.5.<slug>/story.1.1.5.<slug>.md`, gate goes to `${PRD_ROOT}/domain-name/module-name/epics/epic.1.<name>/stories/story.1.1.5.<slug>/story.1.1.5.gate.1.feature-cache.yml`
+**Example**: If story is at `${PRD_ROOT}/domain-name/prd.1.module-name/epics/epic.1.<name>/stories/story.1.1.5.<slug>/story.1.1.5.<slug>.md`, gate goes to `${PRD_ROOT}/domain-name/prd.1.module-name/epics/epic.1.<name>/stories/story.1.1.5.<slug>/story.1.1.5.gate.1.feature-cache.yml`
 
 For tasks: gate is co-located in the task directory at `docs/tasks/task.<id>.<name>/task.<id>.gate.<N>.<name>.yml`.
 

@@ -217,13 +217,13 @@ Accept the story/task document path in one of these formats:
 **Full path to markdown file:**
 
 ```
-${PRD_ROOT}/ui-domain/module-name/epics/epic.1.311.example-integration/stories/story.1.311.1.example-system/story.1.311.1.example-system.md
+${PRD_ROOT}/ui-domain/prd.1.module-name/epics/epic.1.311.example-integration/stories/story.1.311.1.example-system/story.1.311.1.example-system.md
 ```
 
 **Directory path (skill will find the .md file):**
 
 ```
-${PRD_ROOT}/ui-domain/module-name/epics/epic.1.311.example-integration/stories/story.1.311.1.example-system/
+${PRD_ROOT}/ui-domain/prd.1.module-name/epics/epic.1.311.example-integration/stories/story.1.311.1.example-system/
 ```
 
 **Task path examples:**
@@ -2942,7 +2942,7 @@ Check if task.90.swagger-cli-plugin-enablement is ready for acceptance
 **User Request:**
 
 ```
-Verify DoD for ${PRD_ROOT}/ui-domain/module-name/epics/epic.1.311.example-integration/stories/story.1.311.2.example-notifications/
+Verify DoD for ${PRD_ROOT}/ui-domain/prd.1.module-name/epics/epic.1.311.example-integration/stories/story.1.311.2.example-notifications/
 ```
 
 **Skill Actions:**

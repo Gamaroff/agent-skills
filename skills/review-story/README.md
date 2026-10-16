@@ -14,16 +14,16 @@
 
 ```bash
 # Basic usage - review a story document
-/review-story story.310.5.socketio-real-time-delivery.md
+/review-story story.1.310.5.socketio-real-time-delivery.md
 
 # With specific focus areas
-/review-story story.2.3.auto-hide.md --focus testing,api-specs
+/review-story story.1.2.3.auto-hide.md --focus testing,api-specs
 
 # Quick review (15-30 min)
-/review-story story.4.1.user-auth.md --depth quick
+/review-story story.1.4.1.user-auth.md --depth quick
 
 # Thorough review (60-90+ min)
-/review-story story.1.5.critical-feature.md --depth thorough
+/review-story story.1.1.5.critical-feature.md --depth thorough
 ```
 
 ## Interactive Review Process

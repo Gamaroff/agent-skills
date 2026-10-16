@@ -528,7 +528,31 @@ const BARE_TWO_LEVEL =
 // epic and story names in it can be right while the directory above them is the flat
 // layout (QA cycle 5, CR-1 — ~20 lines in 12 files).
 const FLAT_LAYOUT =
-  /(?<!prd\.[{[<][A-Za-z_]+[}\]>]\.)[{[<]feature[}\]>]\/epics\//;
+  /(?<!prd\.(?:\d+|[{[<][A-Za-z_-]+[}\]>])\.)[{[<]feature[}\]>]\/epics\//;
+// The parent-directory rule (QA cycle 6, CR6-4): any `…/<dir>/epics/` whose `<dir>` is a
+// literal name must be the PRD's own `prd.*` directory. FLAT_LAYOUT knew one placeholder
+// spelling, so concrete examples (`ui-domain/module-name/epics/`) passed after their ids
+// were rewritten. A wildcard, `..`-free variable or `...` parent states no layout.
+function flatParent(line) {
+  for (const m of line.matchAll(/\/([^/\s`'"()]+)\/epics\//g)) {
+    const dir = m[1];
+    if (
+      /^prd\./.test(dir) ||
+      /^\*{1,2}$/.test(dir) ||
+      dir === "..." ||
+      dir.includes("$")
+    )
+      continue;
+    return true;
+  }
+  return false;
+}
+// A literal flat id — `epic.164.core-foundation`, `story.2.1.visibility` — in an example.
+// The placeholder checks above never see a literal (QA cycle 6: nine in one guide). A line
+// that shows the flat form AS the wrong one is spared by NEGATIVE_EXAMPLE.
+const FLAT_LITERAL =
+  /(?<![\w.-])(?:epic\.\d+\.[a-z[]|story\.\d+\.\d+[A-Z]?\.[a-z[])/;
+const NEGATIVE_EXAMPLE = /❌|\bWrong\b|\bNOT `|no PRD number/;
 const TITLE_HEAD =
   /(?:EPIC-|\bEpic |\[Epic |\bStory |\[Story )(?:\{\{?([^{}.]+)\}|\[([^\[\].]+)\]|<([^<>.]+)>)/g;
 const FLAT_NUMBER =
@@ -580,7 +604,7 @@ function titleExempt(f, line) {
 }
 
 /** The old-scheme placeholder heads on one line, or [] when it states none. */
-function oldPlaceholders(line, { titles = true } = {}) {
+function oldPlaceholders(line, { titles = true, literals = true } = {}) {
   const out = [];
   for (const m of line.matchAll(PLACEHOLDER_HEAD)) {
     const name = m[1] ?? m[2] ?? m[3];
@@ -592,7 +616,45 @@ function oldPlaceholders(line, { titles = true } = {}) {
   }
   if (BARE_TWO_LEVEL.test(line)) out.push("{epic}.{story}");
   if (FLAT_LAYOUT.test(line)) out.push("{feature}/epics/");
+  if (flatParent(line)) out.push("<dir>/epics/");
+  if (literals && FLAT_LITERAL.test(line) && !NEGATIVE_EXAMPLE.test(line))
+    out.push("flat literal id");
   return out;
+}
+
+// file → why its literal ids are data, not examples to copy.
+const LITERAL_DATA = new Map([
+  [
+    "shared/resources/security-input-corpus.md",
+    "parser input rows — the story id in a gate or report name is not what the row tests",
+  ],
+]);
+
+/**
+ * Tree diagrams (QA cycle 6, CR6-1): an `epics/` node whose nearest DIRECTORY ancestor
+ * is not `prd.*`. Line-based checks cannot see it: the parent is on another line.
+ * Returns the 1-based line numbers of offending `epics/` nodes.
+ */
+function flatTreeEpics(lines) {
+  const node = (l) => {
+    const m = l.match(/^([\s│├└─]*)(\S.*?)\s*(?:#.*)?$/);
+    return m ? { col: m[1].length, name: m[2] } : null;
+  };
+  const bad = [];
+  lines.forEach((l, i) => {
+    if (!/^[\s│├└─]*epics\/\s*(?:#.*)?$/.test(l)) return;
+    let col = node(l).col;
+    for (let j = i - 1; j >= 0; j--) {
+      const n = node(lines[j]);
+      if (!n || n.col >= col || /^[\s│]*$/.test(lines[j])) continue;
+      col = n.col;
+      if (!n.name.endsWith("/")) continue; // a label, not a directory
+      const dir = n.name.replace(/\/$/, "").split("/").pop();
+      if (!/^prd\./.test(dir)) bad.push(i + 1);
+      return;
+    }
+  });
+  return bad;
 }
 
 // path prefix → why it may keep the old spelling: records, frozen snapshots, and the one
@@ -650,8 +712,13 @@ test("§5 no canonical prose states an old-scheme placeholder", () => {
       generated++;
       continue;
     }
+    for (const n of flatTreeEpics(text.split("\n")))
+      bad.push(`${f}:${n}: [tree epics/ under a non-prd directory]`);
     text.split("\n").forEach((line, i) => {
-      const heads = oldPlaceholders(line, { titles: !titleExempt(f, line) });
+      const heads = oldPlaceholders(line, {
+        titles: !titleExempt(f, line),
+        literals: !LITERAL_DATA.has(f),
+      });
       if (heads.length)
         bad.push(
           `${f}:${i + 1}: [${heads.join(", ")}] ${line.trim().slice(0, 110)}`,
@@ -732,7 +799,7 @@ test("§5 the placeholder check refuses every flat spelling and spares the new o
     "epic.{P}.{E}.review.*.md",
     "epic/{P}.{E}.{slug}",
     "story_id: '{prd}.{epic}.{story}'",
-    "`story.4.2.checkout.md` — a literal negative example",
+    "- ❌ Wrong: `story.4.2.checkout.md` — a literal negative example",
     "EPIC-[P].[E]-STORIES-INDEX.md",
     "milestone (`Epic {P.E} — {title}`)",
     "[Story [P].[E].1]",
@@ -747,3 +814,42 @@ test("§5 the placeholder check refuses every flat spelling and spares the new o
 });
 
 module.exports = { scanCode, scanMarkdown, CODE_SHAPES, SHELL_SHAPES };
+
+test("§5 the parent, literal and tree checks catch the cycle-6 spellings and spare the new ones", () => {
+  for (const hit of [
+    "Location: ${PRD_ROOT}/ui-domain/module-name/epics/epic.1.178.x/",
+    "docs/prd/app/core/epics/epic.178/stories/",
+    "See [Epic 164](./epics/epic.164.core-foundation/epic.164.core-foundation.md)",
+    "- `story.2.1.visibility-mode-config.md`",
+    "- [ ] Write epic.1.[name].md",
+  ])
+    assert.ok(oldPlaceholders(hit).length > 0, `missed: ${hit}`);
+  for (const miss of [
+    "${PRD_ROOT}/ui-domain/prd.1.module-name/epics/epic.1.178.x/",
+    "${PRD_ROOT}/{domain}/prd.{prd-number}.{feature}/epics/",
+    "docs/prd/x/prd.1.{feature}/epics/",
+    '"$PRD_ROOT"/*/prd.*/epics/epic.*/epic.*.md',
+    "Glob: `${PRD_ROOT}/**/epics/*/stories/**/story.*.md`",
+    "`${PRD_DIR}/epics/`",
+    "- `story.1.2.3A` - a sub-story",
+    "- ❌ Wrong: `epic.3.auto-hide` (no PRD number)",
+  ])
+    assert.deepEqual(oldPlaceholders(miss), [], `false hit: ${miss}`);
+  assert.deepEqual(
+    flatTreeEpics([
+      "docs/",
+      "└── prd/",
+      "    └── [feature]/",
+      "        └── epics/",
+    ]),
+    [4],
+  );
+  assert.deepEqual(
+    flatTreeEpics([
+      "docs/prd/[domain]/prd.[P].[feature]/",
+      "└── Epic docs (Nested)",
+      "    └── epics/",
+    ]),
+    [],
+  );
+});

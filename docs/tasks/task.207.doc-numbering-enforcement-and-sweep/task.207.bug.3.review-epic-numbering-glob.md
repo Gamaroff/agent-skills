@@ -1,6 +1,6 @@
 ---
 type: bug
-status: reopened
+status: ready-for-qa
 severity: Major
 priority: Medium
 created: 2026-10-16
@@ -14,7 +14,7 @@ description: "review-epic report numbering glob still uses the flat epic number"
 **Bug ID**: TASK-207-BUG-3
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Reopened
+**Status**: Ready for QA
 **Found By**: QA Engineer (QA cycle 1, finding CR-3)
 **Date Found**: 2026-10-16
 **Location**: `skills/review-epic/SKILL.md:571`
@@ -117,6 +117,20 @@ Rewrite the glob and template to `epic.{P}.{E}`; sweep the other `epic.[N]` / `{
 
 **Testing**: 17/17. Mutations: restore a flat layout path, the bracket id, or a flat title outside an anchor → §5 red; boundNames reading the whole line → its fixture red.
 
+### Iteration 6
+
+#### Fix Implementation (In Progress → Ready for QA)
+
+**Date**: 2026-10-16
+
+**Root Cause**: Every earlier pass enumerated by spelling and never listed the population first. The guard matched placeholders only, never a literal id or a concrete folder name, and only within one line, so it could not see a tree diagram. My own enumeration grep repeated the gap: it excluded `/` before an id, and the widened check then found four more links.
+
+**Fix Description**: Listed the population first (`git grep '/epics/'` minus `prd.*` parents; literal `epic.N.x` / `story.N.N.x`; tree `epics/` nodes), then fixed every hit: 15 prose files (plus 7 bundled copies), including a rewritten real-world example tree in `prd-structure-guide.md` and a `troubleshooting.md` glob that was one level short and matched nothing (it now matches the 4 epic files in this repository). §5 gains `flatParent` (a literal parent of `epics/` must be `prd.*`), `FLAT_LITERAL` (`NEGATIVE_EXAMPLE` lines and `LITERAL_DATA` corpus rows spared, each with a reason) and `flatTreeEpics` (nearest directory ancestor of a tree `epics/` node). `FLAT_LAYOUT`'s lookbehind accepts hyphenated and digit P (CR6-8).
+
+**Files Modified**: tests/doc-id-chokepoint.test.js and 15 prose files (prd-structure-guide.md, finalise, qa-story, develop, edit-epic, qa-gate, ensure-*-jira-issue, create-issue, review-story README, story-status-schema, roadmap-selection, subagent-summary-artifact, invocation, troubleshooting)
+
+**Testing**: 18/18. Mutations: a concrete flat parent, a flat tree node, a literal flat id and a literal glob parent each turn §5 red.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -137,3 +151,5 @@ Rewrite the glob and template to `epic.{P}.{E}`; sweep the other `epic.[N]` / `{
 | 2026-10-16 | In Progress | qa-fix | Fix cycle 5 started |
 | 2026-10-16 | Ready for QA | qa-fix | Fixed in QA fix cycle 5 |
 | 2026-10-16 | Reopened | qa-task | Partial — tree diagrams and concrete example paths keep a flat feature directory (task.207.qa.6) |
+| 2026-10-16 | In Progress | qa-fix | Fix cycle 6 started (user-approved) |
+| 2026-10-16 | Ready for QA | qa-fix | Fixed in QA fix cycle 6 |

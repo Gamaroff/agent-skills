@@ -26,10 +26,10 @@ Natural language triggers:
 
 ```bash
 # Using epic directory (auto-discovers epic file)
-/edit-epic ${PRD_ROOT}/domain-name/module-name/example-area/epics/epic.1.178.feature-ui/
+/edit-epic ${PRD_ROOT}/domain-name/prd.1.example-area/epics/epic.1.178.feature-ui/
 
 # Using specific epic file
-/edit-epic ${PRD_ROOT}/domain-name/module-name/example-area/epics/epic.1.178.feature-ui/epic.1.178.feature-ui.md
+/edit-epic ${PRD_ROOT}/domain-name/prd.1.example-area/epics/epic.1.178.feature-ui/epic.1.178.feature-ui.md
 
 # Natural language
 "Edit epic 178 to update dependencies"

@@ -22,7 +22,7 @@
 ### Complete Structure Template
 
 ```
-docs/prd/[domain]/[feature]/
+docs/prd/[domain]/prd.[P].[feature]/
 ├── Core PRD Documents (Required)
 │   ├── executive-summary.md
 │   ├── goals-and-objectives.md
@@ -289,25 +289,24 @@ docs/prd/{domain}/prd.{P}.{feature}/epics/epic.[P].[E].[name]/stories/
 
 **Examples**:
 
-- `EPIC-1.5-ROADMAP.md`
-- `EPIC-3-ROADMAP.md`
+- `EPIC-1.2-ROADMAP.md`
+- `EPIC-2.3-ROADMAP.md`
 
 ### Story Files
 
 **Format**: `story.[P].[E].[S].[descriptive-name].md`
 
-**Epic Numbering Patterns**:
+**Numbering** (`P` from the PRD registry, `E` within the PRD, `S` within the epic):
 
-- `story.1.1.1` - Epic 1, Sub-epic 1, Story 1
-- `story.1.5.1` - Epic 1.5, Story 1
-- `story.2.1` - Epic 2, Story 1
-- `story.2.1.1` - Epic 2, Sub-epic 1, Story 1
+- `story.1.1.1` - PRD 1, Epic 1, Story 1
+- `story.1.2.3` - PRD 1, Epic 2, Story 3
+- `story.1.2.3A` - a sub-story of `story.1.2.3`
 
 **Examples**:
 
 - `story.1.1.1.core-architecture.md`
-- `story.1.5.1.settings-screen.md`
-- `story.2.1.visibility-mode-config.md`
+- `story.1.2.1.settings-screen.md`
+- `story.2.1.4.visibility-mode-config.md`
 
 ### Completion and Addendum Files
 
@@ -322,8 +321,8 @@ docs/prd/{domain}/prd.{P}.{feature}/epics/epic.[P].[E].[name]/stories/
 
 - Format: `story.[P].[E].[S].[name].[type].md`
 - Examples:
-  - `story.2.2.reverse-morphing.worklet-fix.md`
-  - `story.2.2.reverse-morphing.cleanup.md`
+  - `story.1.2.2.reverse-morphing.worklet-fix.md`
+  - `story.1.2.2.reverse-morphing.cleanup.md`
 
 ### Special Files (UPPERCASE)
 
@@ -363,8 +362,8 @@ docs/prd/{domain}/prd.{P}.{feature}/epics/epic.[P].[E].[name]/stories/
 **Create**:
 
 - [ ] `epics/index.md` - Epic roadmap
-- [ ] `epics/epic.1.[name].md` - First epic
-- [ ] `epics/epic.2.[name].md` - Subsequent epics
+- [ ] `epics/epic.[P].1.[name]/epic.[P].1.[name].md` - First epic
+- [ ] `epics/epic.[P].2.[name]/epic.[P].2.[name].md` - Subsequent epics
 - [ ] `implementation-phases.md` - Overall timeline
 
 **Why**: Break work into manageable chunks
@@ -426,13 +425,13 @@ Developer Quick Start (code examples)
 **From PRD to Epic**:
 
 ```markdown
-See [Epic 164: Core Foundation](./epics/epic.164.core-foundation/epic.164.core-foundation.md)
+See [Epic 4: Core Foundation](./epics/epic.1.4.core-foundation/epic.1.4.core-foundation.md)
 ```
 
 **From Epic to Story** (epic file linking to its stories):
 
 ```markdown
-See [[Story 164.1] Core Architecture](./stories/story.164.1.core-architecture.md)
+See [[Story 1.4.1] Core Architecture](./stories/story.1.4.1.core-architecture/story.1.4.1.core-architecture.md)
 ```
 
 **From Story to PRD**:
@@ -444,7 +443,7 @@ See [[Story 164.1] Core Architecture](./stories/story.164.1.core-architecture.md
 **From Story to Epic** (story linking to its parent epic):
 
 ```markdown
-**Epic**: [Epic 164: Core Foundation](../epic.164.core-foundation.md)
+**Epic**: [Epic 1.4: Core Foundation](../../epic.1.4.core-foundation.md)
 ```
 
 ### Bidirectional Links
@@ -454,17 +453,17 @@ Always provide navigation in both directions:
 **Epic → Stories** (from epic file):
 
 ```markdown
-### [Story 164.1] [Story Name]
+### [Story 1.4.1] [Story Name]
 
 [Story details...]
 
-See full story: [Story 164-1](./stories/story.164.1.[name].md)
+See full story: [Story 1.4.1](./stories/story.1.4.1.[name]/story.1.4.1.[name].md)
 ```
 
 **Story → Epic** (from story file):
 
 ```markdown
-**Epic**: [Epic 164: Core Foundation](../epic.164.core-foundation.md)
+**Epic**: [Epic 1.4: Core Foundation](../../epic.1.4.core-foundation.md)
 ```
 
 ---
@@ -535,7 +534,7 @@ Is this a specialized aspect (animation, API, security)?
     └─ No → Add to existing technical-implementation.md
 
 Is this a new epic?
-    ├─ Yes → Create epics/epic-[n]-[name].md
+    ├─ Yes → Create epics/epic.[P].[E].[name]/epic.[P].[E].[name].md
     └─ No → Update existing epic
 
 Is this epic particularly complex (>2 weeks, >5 stories)?
@@ -580,7 +579,8 @@ Do we need progress tracking?
 **Real-world reference from this project**:
 
 ```
-docs/prd/ui-domain/example-component/
+docs/prd/ui-domain/prd.3.bottom-action-bar/
+├── prd.3.bottom-action-bar.md                  # The PRD (P = 3)
 ├── Core PRD
 │   ├── executive-summary.md                    # 3 pages
 │   ├── goals-and-objectives.md                 # 4 pages
@@ -597,28 +597,23 @@ docs/prd/ui-domain/example-component/
 │   ├── DEVELOPER-QUICK-START.md
 │   └── implementation-phases.md
 │
-├── Epics (5 epics)
-│   └── epics/
-│       ├── index.md
-│       ├── epic.1.core-foundation.md           # 80% complete
-│       ├── epic.1.5.settings-integration.md    # Critical blocker
-│       ├── EPIC-1.5-ROADMAP.md                 # Week-by-week plan
-│       ├── epic.2.auto-compact-system.md
-│       ├── epic.3.advanced-features.md
-│       ├── epic.4.accessibility-polish.md
-│       └── EPIC-CREATION-SUMMARY.md
-│
-└── Stories (20+ stories)
-    └── stories/
-        ├── story.1.1.1.core-architecture.md
-        ├── story.1.1.2.button-selection.md
-        ├── 1.5-1.story.settings-screen.md
-        ├── 1.5-2.story.async-storage.md
-        ├── 2-1.story.visibility-mode.md
-        ├── EPIC-2-STORIES-INDEX.md
-        ├── STORY-1-1-COMPLETION.md
-        ├── epic.1.coordination.md
-        └── CONSISTENCY-CHECK-SUMMARY.md
+└── epics/                                      # 5 epics, 20+ stories
+    ├── index.md
+    ├── EPIC-CREATION-SUMMARY.md
+    ├── epic.3.1.core-foundation/               # 80% complete
+    │   ├── epic.3.1.core-foundation.md
+    │   └── stories/
+    │       ├── story.3.1.1.core-architecture/
+    │       └── story.3.1.2.button-selection/
+    ├── epic.3.2.settings-integration/          # Critical blocker
+    │   ├── epic.3.2.settings-integration.md
+    │   ├── EPIC-3.2-ROADMAP.md                 # Week-by-week plan
+    │   └── stories/
+    │       ├── story.3.2.1.settings-screen/
+    │       └── story.3.2.2.async-storage/
+    ├── epic.3.3.auto-compact-system/
+    ├── epic.3.4.advanced-features/
+    └── epic.3.5.accessibility-polish/
 ```
 
 **Key Insights**:
@@ -635,7 +630,7 @@ docs/prd/ui-domain/example-component/
 
 ### Requirements Phase
 
-- [ ] Create feature directory: `docs/prd/[domain]/[feature]/`
+- [ ] Allocate `P` in `docs/prd/prd-registry.md`, then create `docs/prd/[domain]/prd.[P].[feature]/`
 - [ ] Write executive-summary.md
 - [ ] Write goals-and-objectives.md
 - [ ] Write product-requirements.md
@@ -647,7 +642,7 @@ docs/prd/ui-domain/example-component/
 
 - [ ] Create `epics/` subdirectory
 - [ ] Write epics/index.md
-- [ ] Write epic.1.[name].md
+- [ ] Write epics/epic.[P].1.[name]/epic.[P].1.[name].md
 - [ ] Write additional epics
 - [ ] Create implementation-phases.md
 - [ ] Define epic dependencies

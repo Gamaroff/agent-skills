@@ -1564,7 +1564,7 @@ stories/
 
 **Examples:**
 
-- Story directory: `docs/prd/domain-name/module-name/example-area/epics/epic.1.178.feature-ui/stories/story.1.178.8.example-feature/`
+- Story directory: `docs/prd/domain-name/prd.1.example-area/epics/epic.1.178.feature-ui/stories/story.1.178.8.example-feature/`
 - Story file: `story.1.178.8.example-feature.md`
 - QA report: `story.1.178.8.qa.1.example-feature.md`
 - Gate file: `story.1.178.8.gate.1.example-feature.yml`
@@ -1811,7 +1811,7 @@ gate once it is written.
 - **Tasks**: `task.[number].gate.[number].[descriptive-name].yml`
 - **MUST co-locate with the story/task file in the same directory**
 - Examples:
-  - Story: `docs/prd/domain-name/module-name/epics/epic.1.<name>/stories/story.1.1.5.<slug>/story.1.1.5.gate.1.feature-implementation.yml`
+  - Story: `docs/prd/domain-name/prd.1.module-name/epics/epic.1.<name>/stories/story.1.1.5.<slug>/story.1.1.5.gate.1.feature-implementation.yml`
   - Task: `docs/tasks/task.44.transactions-account-backend-integration/task.44.gate.1.transactions-account-backend-integration.yml`
 
 **Legacy Note**: Old pattern of storing gates in `docs/qa/gates/[prd-path]/` is deprecated. All new gate files must be co-located.
@@ -2518,7 +2518,7 @@ Use sequential numbering within each story:
 
 ```markdown
 **Bug ID**: story.[P].[E].[S].bug.[bug-number].[description]
-**Related Story**: [[Story [P].[E].N] [Story Name]](./story.[P].[E].[S].[name].md)
+**Related Story**: [[Story [P].[E].[S]] [Story Name]](./story.[P].[E].[S].[name].md)
 **Status**: 🆕 New
 **Priority**: Critical | High | Medium | Low
 **Severity**: Blocker | Major | Minor | Trivial
@@ -3337,7 +3337,7 @@ form; the un-numbered form this section once documented is not valid.
 docs/
 ├── prd/
 │   └── [domain]/
-│       └── [feature]/
+│       └── prd.1.feature-name/
 │           └── epics/
 │               └── epic.1.1.epic-name/
 │                   └── stories/

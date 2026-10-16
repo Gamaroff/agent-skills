@@ -98,8 +98,8 @@ echo "PRD_ROOT=$PRD_ROOT ARCH_ROOT=$ARCH_ROOT"
 
 # Does it exist?
 ls "$PRD_ROOT"                              # base PRD directory
-ls "$PRD_ROOT"/*/epics/epic.*.md            # epic files
-ls "$PRD_ROOT"/*/epics/*/stories            # nested story directories
+ls "$PRD_ROOT"/*/prd.*/epics/epic.*/epic.*.md            # epic files
+ls "$PRD_ROOT"/*/prd.*/epics/*/stories            # nested story directories
 ```
 
 If the root is wrong, set `prd.prdShardedLocation` in `skills-config.yaml` to the right path. If the *nested* layout is non-standard (e.g. you have a global `docs/stories/` folder), move files onto the convention — skills won't adapt to custom nested layouts.

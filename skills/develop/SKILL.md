@@ -114,7 +114,7 @@ When an epic file is provided as input:
 ```
 User Input: /develop epic.1.178.feature-management.md
 
-System Detection: Epic file detected (matches pattern epic.178.*)
+System Detection: Epic file detected (matches pattern epic.1.178.*)
 
 System Warning:
 ⚠️  EPIC FILE DETECTED
@@ -122,7 +122,7 @@ Epic files cannot be developed directly. You must create individual
 stories or tasks from this epic first.
 
 Epic: epic.1.178.feature-management.md
-Location: ${PRD_ROOT}/ui-domain/module-name/epics/epic.1.178.feature-management/epic.1.178.feature-management.md
+Location: ${PRD_ROOT}/ui-domain/prd.1.module-name/epics/epic.1.178.feature-management/epic.1.178.feature-management.md
 
 System Prompt: [Displays AskUserQuestion with 3 options]
 
@@ -258,7 +258,7 @@ This document has "draft" status and may not be ready for development.
 
 Document: story.1.178.8.example-feature.md
 Status: draft
-Location: ${PRD_ROOT}/<domain>/prd.<P>.<feature>/epics/epic.178.<name>/stories/story.1.178.8.example-feature/
+Location: ${PRD_ROOT}/<domain>/prd.1.<feature>/epics/epic.1.178.<name>/stories/story.1.178.8.example-feature/
 
 System Prompt: [Displays AskUserQuestion with 3 options]
 
