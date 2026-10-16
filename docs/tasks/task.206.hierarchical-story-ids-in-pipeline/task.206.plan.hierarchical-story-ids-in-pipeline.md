@@ -17,7 +17,7 @@ script and update the tests. The rule throughout: **a site that needs an id impo
 doc-id. It never restates the grammar.**
 
 The function names below are those the plan gives task.202 (`parse`, `format`,
-`matchesEpic(stem, P, E)`, `next story --epic <dir>`). Before Phase 1, confirm them against the
+`matchesEpic(name, P, E)`, `next story --epic-dir <dir>`). Before Phase 1, confirm them against the
 merged `doc-id.js` (*plan is intent, code is evidence*). Where a name differs, use the shipped one.
 
 ## Phase-by-Phase Implementation Guide
@@ -26,10 +26,11 @@ merged `doc-id.js` (*plan is intent, code is evidence*). Where a name differs, u
 
 **`shared/resources/finalise-fix-and-recheck.mjs`**
 
-- `WORK_ITEM_DOC_RE` (line ~69): build it from doc-id's exported kind regexes instead of the
-  literal alternation.
+- `WORK_ITEM_DOC_RE` (line ~69): doc-id exports no regex (review.1, I1). Replace the regex with an
+  exported predicate, `isWorkItemDoc(relPath)`, that keeps the `docs/` path shape and decides the
+  basename with `docId.parse` (`ok`, `artifact === null`, kind in task/story/epic/bug).
 - The stem match inside `isCoLocatedArtifact` (line ~122): replace it with
-  `parse(basename).stem`, compared with a trailing `.`. That way `story.1.2.3.` never admits
+  `parse(basename).id`, compared with a trailing `.`. That way `story.1.2.3.` never admits
   `story.1.2.30.` or `story.1.2.4.`. Keep the null-byte and LF/CR guards and the `..` guard as they
   are.
 
@@ -38,17 +39,17 @@ merged `doc-id.js` (*plan is intent, code is evidence*). Where a name differs, u
 .match(/^(task\.\d+|story\.\d+\.\d+|epic\.\d+|bug\.\d+)\./);
 // after
 const id = docId.parse(path.basename(documentPath));
-if (!id) return false;            // unparseable document → nothing is co-located
-const prefix = `${id.stem}.`;     // e.g. "story.1.2.3."
+if (!id.ok) return false;         // unparseable document → nothing is co-located
+const prefix = `${id.id}.`;       // e.g. "story.1.2.3."  (parse returns {ok:false} on failure, never null)
 ```
 
 **`shared/resources/tests/doc-links.test.mjs:331`**
 
-- Delete `WORK_ITEM_RE` and import the exported regex or predicate.
+- Delete `WORK_ITEM_RE` and import the `isWorkItemDoc` predicate exported above.
 
 **`shared/resources/bug-doc.js`**
 
-- Replace `RE_STORY_BUG` with doc-id's story-id source plus `\.bug\.(\d+)\.(.+)\.md$`.
+- Replace `RE_STORY_BUG` with a `docId.parse` call: a story bug is `kind === "story" && artifact === "bug"`, its parent is `id`, its number `seq`.
 - Update the line ~49 comment: `story.8.5.3.bug.2` now reads P=8, E=5, S=3, and `story.1.2.3A.bug.1`
   is a sub-story.
 
@@ -66,12 +67,13 @@ const prefix = `${id.stem}.`;     // e.g. "story.1.2.3."
 
 **`skills/session-handoff/scripts/continuation.mjs`**
 
-- `STORY_BRANCH`: `^feature\/(story\.<doc-id story id>)\.([a-z0-9][a-z0-9-]*)$`. Take the id
-  source from doc-id, and pull out `prd`, `epic`, `story` and `sub` with `parse`.
-- In the handoff path builder, use `prefix = id.stem` (for example `story.1.2.3`), so the file is
+- `STORY_BRANCH`: strip `feature/` and pass the rest to `parse` (doc-id exports no regex — review.1,
+  I1). Accept it when `kind === "story"` and `artifact === null`; `prd`, `epic`, `story`, `sub` and
+  `slug` come from the result.
+- In the handoff path builder, use `prefix = id.id` (for example `story.1.2.3`), so the file is
   `${prefix}.handoff.${k}.${slug}.md`. `nextIndex` already escapes the prefix and requires
   `\.handoff\.`, so `story.1.2.3` cannot read `story.1.2.30.handoff.*`. Add a test for exactly that.
-- `findStoryDir(root, id)`: compare `parse(name)?.stem === id.stem` instead of the `want` prefix.
+- `findStoryDir(root, id)`: compare `parse(name).id === id.id` (with `ok` true) instead of the `want` prefix.
 
 **`skills/qa-next/scripts/uat-status.mjs`**
 
@@ -85,7 +87,7 @@ const prefix = `${id.stem}.`;     // e.g. "story.1.2.3."
 
 **`skills/develop-next/scripts/select-next.mjs`**
 
-- Heading match: `/\bEpic\s+(\d+\.\d+)\b/i`, where the `P.E` source comes from doc-id. Key
+- Heading match: `/\bEpic\s+(\d+\.\d+)\b/i` (a roadmap heading, not a document name, so `parse` does not apply). Key
   `epicSections` and `flows` by the `"P.E"` string.
 - Legacy heading detection: `/\bEpic\s+(\d+)\b(?!\.\d)/`. Push a model **error**:
   `roadmap heading "Epic N" predates hierarchical numbering — run migrate-doc-numbering`.
@@ -104,14 +106,15 @@ Replace the Explore-subagent instruction ("extract `{epic_number}` and `{story_n
 STORY_ID_JSON=$(command node .agents/skills/develop-story/references/doc-id.js parse "$(basename "$STORY_FILE")" --json) || exit 1
 PRD_NUM=$(printf '%s' "$STORY_ID_JSON" | command node -e 'process.stdin.on("data",d=>console.log(JSON.parse(d).prd))')
 # …EPIC_NUM, STORY_NUM likewise; EPIC_REF from frontmatter as today
-EPIC_FILE_LIST=$(command node .agents/skills/develop-story/references/doc-id.js find-epic --prd "$PRD_NUM" --epic "$EPIC_NUM" --root docs --json)
+# doc-id ships no epic-lookup subcommand (review.1, I1): list candidate epic documents and keep those
+# matchesEpic(name, PRD_NUM, EPIC_NUM) accepts — e.g. a `command node -e` over `git ls-files docs`.
 # 0 matches → HALT "epic.${PRD_NUM}.${EPIC_NUM}.* not found"; ≥2 → HALT listing them
 ```
 
 Notes on this block:
 
-- Use whatever lookup subcommand task.202 ships. If it ships none, use `matchesEpic` over a `git
-  ls-files docs` listing. Either way, **no `head -1`**.
+- task.202 ships no lookup subcommand, so use `matchesEpic` over a `git ls-files docs` listing.
+  **No `head -1`**.
 - Cross-check that the story's `epic:` stem parses to the same `(P, E)`. A mismatch is a HALT.
 - Integration-branch table: change the default to `epic/{p}.{n}.{slug}`. A `branchPattern` without
   `{p}` is a HALT that names the key.
@@ -135,7 +138,7 @@ task.205 owns review-epic)
   - `epic: epic.{prdNum}.{epicNum}.{epic-name}`
   - the "Epic {epicNum} Complete … Begin Epic {epicNum + 1}" step becomes "the next epic in PRD
     {prdNum}", which is read from the PRD's epics-index block (task.205), not from arithmetic
-  - story number from `doc-id next story --epic <dir>`
+  - story number from `doc-id next story --epic-dir <dir>`
 - `skills/create-story/resources/story-template.yaml` and `skills/review-story/resources/story-template.yaml`:
   - `filename: "{{epic_directory}}/stories/story.{{prd_num}}.{{epic_num}}.{{story_num}}.{{story_title_short}}/…"`
   - `title: "[Story {{prd_num}}.{{epic_num}}.{{story_num}}] …"`
@@ -165,8 +168,12 @@ task.205 owns review-epic)
    "already tolerant" site (`select-next` `ID_RE`, `storyBranchModel`, `sync-jira-story`
    `normaliseStorySummary("[Story 1.2.3] x")`, `reenter-qa-after-finalise.sh` with
    `story.1.2.3.dod.1.x.md`, `pipeline-answers.js` `epic/1.2.x`).
-5. `npm run bundle`, then `npm test`, `npm run eval:all`, `npm run bundle:check`,
-   `npm run lint:shell`.
+5. `develop-next` roadmap fixtures (task Files Summary 17a): rewrite every legacy `Epic N` heading and
+   `deps: Epic N` to `Epic 1.N` by hand, plus the roadmap template and `roadmap-selection.md`.
+6. `evals/create-story/scenarios/01-happy/replay/docs/stories/story.178.8.example-feature.md` has no
+   PRD or epic tree; rename it by hand and record why.
+7. `npm run bundle`, `npm run generate-catalog`, then `npm test`, `npm run eval:all`,
+   `npm run bundle:check`, `npm run lint:shell`.
 
 ## Key Patterns and References
 

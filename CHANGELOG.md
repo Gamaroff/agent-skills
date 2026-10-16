@@ -31,6 +31,35 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **The story pipeline reads hierarchical story ids (task 206). Breaking.** Every story-side reader
+  and writer of a story or epic id now goes through `doc-id.js` instead of its own pattern:
+  `finalise-fix-and-recheck.mjs` (8a's co-location rule and the doc-links corpus guards),
+  `bug-doc.js`, `create-story` (its validators and allocator), the Step 0 and Step 0a story blocks,
+  `create-branch`, `ensure-story-github-issue`, `sync-github-story`, `session-handoff`'s
+  continuation, `qa-next`'s UAT selector and `develop-next`'s roadmap selector. A story is
+  `story.{P}.{E}.{S}` (`3A` is a sub-story) and an epic is found by **(P, E)**: E restarts at 1 in
+  every PRD, so Step 0 now HALTs on zero or two-plus epic documents for the pair instead of taking
+  `head -1`, and `story.1.2.3` no longer admits `story.1.2.30`'s artifacts at 8a. `create-story`
+  allocates S with `doc-id next story --epic-dir` (highest + 1; `nextStoryId` delegates to the same
+  rule). Four changes reach a consumer, and **the order is: migrate first, then upgrade the skills**
+  — run task.203's `migrate-doc-numbering.mjs` on your tree (dry run, then `--apply`), then install
+  this release; finish any in-flight story branch on the old skills or rename it with `git branch -m`:
+  1. **Story and branch names.** `story.{E}.{S}` → `story.{P}.{E}.{S}`, and
+     `feature/story.{E}.{S}.slug` → `feature/story.{P}.{E}.{S}.slug`. A legacy story name is refused
+     with a message naming the migration; new tracker issues are titled `[Story P.E.S]` with the
+     milestone `Epic P.E — {title}`. Existing issues are not renamed; dedup by title runs only for a
+     story with no `github_issue`.
+  2. **`branching.epicIntegration.branchPattern`.** The default is now `epic/{p}.{n}.{slug}`, and a
+     configured pattern without `{p}` is refused (`/create-branch` Step 2b.4 HALTs naming the key).
+     Add `{p}` to a configured pattern. A declared `integration_branch:` is still used verbatim.
+  3. **`qa-next` surfaces file.** `epicSurface` keys are epic ids `"P.E"` (`"5"` → `"1.5"`), and
+     `storySurface` / `storyNa` keys are story ids `P.E.S`. A key in the old shape is reported by
+     `uat-status.mjs`, and a `story.*.md` it cannot read is reported rather than skipped.
+  4. **Roadmap epic headings.** `## Epic 8` → `## Epic 1.8`, and `deps: Epic 8` → `deps: Epic 1.8`.
+     A leftover bare `Epic N` is a selector **error** naming the migration (inside a Deferred,
+     Housekeeping or Change Log section it is history and is ignored). The roadmap template now
+     shows the new heading.
+
 - **The PRD skills write, check and migrate numbered PRDs (task 204). Breaking.** `create-prd`
   allocates the PRD's number `P` from `${PRD_ROOT}/prd-registry.md` (bootstrapping it on first use),
   writes `${PRD_ROOT}/{domain}/prd.{P}.{feature}/prd.{P}.{feature}.md` with `prd_number: P`, adds the
