@@ -22,8 +22,9 @@
  *
  *   feature/task.N.slug       + docs/tasks/task.N.slug/ exists
  *                             → docs/tasks/task.N.slug/task.N.handoff.{k}.slug.md
- *   feature/story.E.S.slug    + a story.E.S.*.md found under the PRD root
- *                             → <that dir>/story.E.S.handoff.{k}.slug.md
+ *   feature/story.P.E.S.slug  + a .md whose doc-id story id is story.P.E.S, found
+ *                               under the PRD root (`3A` sub-stories included)
+ *                             → <that dir>/story.P.E.S.handoff.{k}.slug.md
  *   anything else             → .agents/handoffs/{YYYY-MM-DD}-{slug}.md,
  *                               suffixed -2, -3, … when taken
  *
@@ -60,7 +61,14 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
+
+// The one definition of a document id (task 202). A story branch and a story
+// directory are read through it — never a local `story.{E}.{S}` pattern, which
+// read P where it meant E once ids grew a segment (task 206).
+const require = createRequire(import.meta.url);
+const docId = require("../references/doc-id.js");
 
 export const VERIFIER = "handoff-verify.mjs";
 export const FALLBACK_DIR = ".agents/handoffs";
@@ -68,7 +76,18 @@ export const TASKS_DIR = "docs/tasks";
 export const DEFAULT_PRD_ROOT = "docs/prd";
 
 const TASK_BRANCH = /^feature\/task\.(\d+)\.([a-z0-9][a-z0-9-]*)$/;
-const STORY_BRANCH = /^feature\/story\.(\d+)\.(\d+)\.([a-z0-9][a-z0-9-]*)$/;
+
+/**
+ * `feature/story.{P}.{E}.{S}{sub?}.{slug}` → `{ id: "story.P.E.S", slug }`, or
+ * null. The branch's remainder is a story name, so doc-id reads it.
+ */
+export function storyOfBranch(branch) {
+  if (typeof branch !== "string" || !branch.startsWith("feature/")) return null;
+  const p = docId.parse(branch.slice("feature/".length));
+  return p.ok && p.kind === "story" && p.artifact === null && p.slug
+    ? { id: p.id, slug: p.slug }
+    : null;
+}
 
 // ---------------------------------------------------------------------------
 // Pure helpers
@@ -138,7 +157,8 @@ export function buildResumePrompt({ path: file, verifier }) {
 /**
  * Resolve the continuation path, the verifier and the resume prompt.
  * Every filesystem read is injected: `exists(abs)`, `list(absDir)` (readdir,
- * `[]` on ENOENT) and `findStory(epic, story)` (absolute dir, or null).
+ * `[]` on ENOENT) and `findStory(storyId)` (absolute dir, or null; the id is
+ * doc-id's, e.g. `story.1.2.3`).
  */
 export function resolveContinuation({
   repoRoot,
@@ -155,7 +175,7 @@ export function resolveContinuation({
   let workItem = null;
 
   const task = TASK_BRANCH.exec(branch ?? "");
-  const story = task ? null : STORY_BRANCH.exec(branch ?? "");
+  const story = task ? null : storyOfBranch(branch);
   if (task) {
     const [, n, s] = task;
     const dir = path.join(repoRoot, TASKS_DIR, `task.${n}.${s}`);
@@ -172,17 +192,14 @@ export function resolveContinuation({
       };
     }
   } else if (story) {
-    const [, e, st, s] = story;
-    const dir = findStory ? findStory(e, st) : null;
+    const { id, slug: s } = story;
+    const dir = findStory ? findStory(id) : null;
     if (dir && isInside(repoRoot, dir)) {
-      const k = nextIndex(list(dir), `story.${e}.${st}`);
-      rel = emitPath(
-        repoRoot,
-        path.join(dir, `story.${e}.${st}.handoff.${k}.${s}.md`),
-      );
+      const k = nextIndex(list(dir), id);
+      rel = emitPath(repoRoot, path.join(dir, `${id}.handoff.${k}.${s}.md`));
       workItem = {
         kind: "story",
-        id: `story.${e}.${st}`,
+        id,
         dir: emitPath(repoRoot, dir),
       };
     }
@@ -282,10 +299,17 @@ function git(args, cwd) {
   }
 }
 
-/** Walk `root` for the first `story.E.S.*.md`; return its directory or null. */
+/**
+ * Walk `root` for the first `.md` whose doc-id story id is `id` (the document or
+ * one of its artifacts); return its directory or null. An id match, not a name
+ * prefix: `story.1.2.3` never resolves to `story.1.2.30` or `story.1.2.3A`.
+ */
 function makeFindStory(root) {
-  return (e, s) => {
-    const want = `story.${e}.${s}.`;
+  return (id) => {
+    const isStory = (name) => {
+      const p = docId.parse(name);
+      return p.ok && p.kind === "story" && p.id === id;
+    };
     const stack = [root];
     while (stack.length) {
       const dir = stack.pop();
@@ -300,7 +324,7 @@ function makeFindStory(root) {
           if (ent.name !== "node_modules" && !ent.name.startsWith(".")) {
             stack.push(path.join(dir, ent.name));
           }
-        } else if (ent.name.startsWith(want) && ent.name.endsWith(".md")) {
+        } else if (ent.name.endsWith(".md") && isStory(ent.name)) {
           return dir;
         }
       }

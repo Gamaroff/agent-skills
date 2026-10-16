@@ -34,7 +34,12 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
+
+// The one definition of a document id (task 202). An epic reference in a roadmap
+// — a heading or a `deps: Epic …` — is validated through it (task 206).
+const docId = createRequire(import.meta.url)("../references/doc-id.js");
 
 export const DEFAULT_ROADMAP = "docs/development/project-completion-roadmap.md";
 
@@ -329,6 +334,23 @@ export function parseTouches(rest) {
   return out;
 }
 
+/**
+ * The epic a heading or a dep segment names: `Epic P.E` → `{ id: "P.E" }`; any
+ * other `Epic <number>` → `{ error }`; no `Epic <number>` at all → null. The
+ * number is checked by doc-id's epic grammar (positive, no leading zero).
+ */
+export function epicRef(text) {
+  const m = String(text).match(/\bEpic\s+(\d+(?:\.\d+)*)(?![\w.])/i);
+  if (!m) return null;
+  const p = docId.parse(`epic.${m[1]}.x`);
+  if (p.ok && p.kind === "epic") return { id: `${p.prd}.${p.epic}` };
+  return {
+    error: /^\d+$/.test(m[1])
+      ? `"Epic ${m[1]}" predates hierarchical numbering — an epic is "Epic P.E" (E restarts in every PRD); run migrate-doc-numbering and rewrite the roadmap`
+      : `"Epic ${m[1]}" is not an epic id P.E`,
+  };
+}
+
 function idTokens(text) {
   return [...text.matchAll(ID_TOKEN_RE)].map((m) => m[1]);
 }
@@ -394,8 +416,8 @@ export function parseRoadmap(text) {
   const model = {
     phases: [], // { index, name, line }
     rows: [], // see row shape below
-    flows: {}, // epicNum -> [ [ids…], … ] (→-separated segments; ‖ within)
-    epicSections: {}, // epicNum -> { name, depth, rowIds: [] }
+    flows: {}, // "P.E" -> [ [ids…], … ] (→-separated segments; ‖ within)
+    epicSections: {}, // "P.E" -> { name, depth, rowIds: [] }
     // Checkbox rows seen but dropped for sitting in an excluded section. Kept so
     // "this file has no rows at all" can be told apart from "every row is archived
     // or deferred" — the first is the wrong file, the second is a finished roadmap.
@@ -406,7 +428,7 @@ export function parseRoadmap(text) {
 
   let phaseIdx = null;
   let excluded = null; // { depth } when inside an excluded section
-  let epic = null; // { num, depth } when inside an Epic section
+  let epic = null; // { num: "P.E", depth } when inside an Epic section
   const sawPhaseHeading = () => model.phases.length > 0;
 
   lines.forEach((line, i) => {
@@ -432,11 +454,16 @@ export function parseRoadmap(text) {
         excluded = { depth };
         return;
       }
-      const em = title.match(/\bEpic\s+(\d+)\b/i);
-      if (em) {
-        epic = { num: em[1], depth };
+      const ref = epicRef(title);
+      if (ref && ref.id) {
+        epic = { num: ref.id, depth };
         if (!model.epicSections[epic.num])
           model.epicSections[epic.num] = { name: title, depth, rowIds: [] };
+      } else if (ref && !excluded) {
+        // A legacy `Epic N` (or any non-P.E) heading is an ERROR, never a section
+        // keyed on E alone: E restarts at 1 in every PRD, so `Epic 2` names an
+        // epic in each of them and would silently mis-key (task 206).
+        model.errors.push(`line ${ln}: ${ref.error}`);
       }
       return;
     }
@@ -490,6 +517,11 @@ export function parseRoadmap(text) {
         // marker while still rejecting "-foo".
         if (!s || /^(?:none|n\/a|[—–-])(?![\w-])/i.test(s)) continue;
         const shipped = /shipped/i.test(s);
+        const eref = epicRef(s);
+        if (eref && !eref.id) {
+          model.errors.push(`line ${ln}: ${id} deps: ${eref.error}`);
+          continue;
+        }
         const ids = idTokens(s);
         if (!ids.length) {
           if (!shipped)
@@ -659,7 +691,7 @@ function depSatisfied(model, dep) {
   if (dep.shipped) return true;
   const done = idDone(model, dep.id);
   if (done !== null) return done;
-  const epicOutstanding = epicActionable(model, dep.id); // "deps: Epic 8"
+  const epicOutstanding = epicActionable(model, dep.id); // "deps: Epic 1.8"
   if (epicOutstanding !== null) return !epicOutstanding;
   return true; // archived out of the backlog → shipped
 }

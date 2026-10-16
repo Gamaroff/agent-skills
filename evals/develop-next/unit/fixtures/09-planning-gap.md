@@ -6,6 +6,6 @@
 
 ## PHASE 2 execution
 
-### Epic 11 — onboarding
+### Epic 1.11 — onboarding
 
 - [ ] **11.1** Signup flow · deps: none · /develop-story docs/s/story.11.1.md
