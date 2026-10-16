@@ -341,24 +341,24 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-16
-**Quality Score**: 80/100
-**Gate Decision**: FAIL
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.212.qa.3.qa-next-resolvable-note-findings.md](./task.212.qa.3.qa-next-resolvable-note-findings.md)
-- **Gate File**: [task.212.gate.3.qa-next-resolvable-note-findings.yml](./task.212.gate.3.qa-next-resolvable-note-findings.yml)
+- **Full Report**: [task.212.qa.4.qa-next-resolvable-note-findings.md](./task.212.qa.4.qa-next-resolvable-note-findings.md)
+- **Gate File**: [task.212.gate.4.qa-next-resolvable-note-findings.yml](./task.212.gate.4.qa-next-resolvable-note-findings.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 82 (qa-next unit) + 17 security probes
+- **Tests Executed**: 85 (qa-next unit) + 17 security probes
 - **Phases Verified**: 3/3
-- **Critical Issues**: 1
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: PASS
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-T212-QA3-CR1 (HIGH) is open. The Step 5 staging block was added in cycle 2, and it hardcodes the default registry directory. Any project with a different `qaNext.registryPath` therefore never stages the run files that `--resolve-finding` edited. The cycle-2 fixes for CR2 and CR7 hold.
+No open findings. Every fix from QA cycles 1–3 is held by a test that fails when the fix is removed. Four low-severity improvements are recorded as future work.
 
 ## Change Log
 <!-- change-log-start -->
@@ -375,6 +375,7 @@ T212-QA3-CR1 (HIGH) is open. The Step 5 staging block was added in cycle 2, and 
 | 2026-10-16 |         | QA findings fixed — cycle 2, 3 findings (CR1 Step 5 stages edited runs from the tree, CR2 writer read-back, CR7 real-date run names) + 4 advisory | qa-fix |
 | 2026-10-16 |         | QA gate FAIL (80/100) — 1 finding; status → in-progress | qa-task |
 | 2026-10-16 |         | QA findings fixed — cycle 3, 1 finding (CR1: --changed-runs owns the run-file listing; Step 5 calls it); status → ready-for-review | qa-fix |
+| 2026-10-16 |         | QA gate PASS (100/100) — 0 findings | qa-task |
 <!-- change-log-end -->
 
 ---
