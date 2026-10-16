@@ -578,6 +578,7 @@ Cycle 7: no HIGH; layout and trees clean. Three mixed-id examples, a FLAT_LITERA
 | 2026-10-16 |         | QA gate CONCERNS (70/100), gate-the-last-fix half-cycle — 4 medium, 1 low; BUG-3 reopened (task.207.qa.6) | qa-task |
 | 2026-10-16 |         | QA findings fixed (user-approved cycle 6) — enumerated layout/literal/tree sweep, 15 prose files; §5 parent, literal and tree checks | qa-fix |
 | 2026-10-16 |         | QA gate CONCERNS (70/100) — 3 medium, 1 low; BUG-3 still open (task.207.qa.7) | qa-task |
+| 2026-10-16 |         | QA findings fixed (user-approved cycle 7) — mixed-id examples, FLAT_LITERAL name start; guide story layout and ASCII trees moved to Deferred Work | qa-fix |
 
 <!-- change-log-end -->
 
@@ -660,6 +661,17 @@ review-epic `awk` (§1, §3, §4); an id regex in a title-only allowlisted file 
   that `doc-id.js` rejects (`story.1.2.1-1` → `bad-number`). Moving it to sub-stories
   (`story.{P}.{E}.{S}A`) is a design change to that skill, not a prose rewrite — owner: a follow-up
   task.
+- **`prd-structure-guide.md` draws story files loose in `stories/`** (QA cycle 7, CR7-5). Its
+  template trees (`:54-64`, `:217`, `:235-238`) and checklists predate this task and disagree with
+  `docs/standards/story-documents.md`, which gives each story its own `story.{P}.{E}.{S}.{name}/`
+  directory; the link examples rewritten here already assume that directory. Redrawing the guide is a
+  layout change, not numbering — owner: a follow-up task, together with the next three items.
+- **§5's tree check reads box-drawing trees only** (CR7-8): an ASCII tree (`+--`, `|`) or an
+  `epics/ ← note` annotation is not checked. None exists in the repository today.
+- **Pre-existing items QA routed to `recommendations.future`**: `create-epic`'s milestone override
+  clause; `review-pipeline-step-0a` cross-block reads; `doc-id.parse` hardening (`../`, newline, NUL);
+  `story-template.md`'s `../epics/` links; `qa-gate-template.yaml` naming; backfill reuse of
+  `doc-id.js epic-meta`.
 
 ## Notes
 

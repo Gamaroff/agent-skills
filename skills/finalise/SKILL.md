@@ -2875,12 +2875,12 @@ All Definition of Done criteria verified:
 - ✅ Maintainability review passed (QA verified)
 
 **QA Reports:**
-- QA Report: ${PRD_ROOT}/.../story.311.1.../story.1.311.1.qa.1.initial-review.md
-- Gate File: ${PRD_ROOT}/.../story.311.1.../story.1.311.1.gate.1.initial-review.yml
+- QA Report: ${PRD_ROOT}/.../story.1.311.1.../story.1.311.1.qa.1.initial-review.md
+- Gate File: ${PRD_ROOT}/.../story.1.311.1.../story.1.311.1.gate.1.initial-review.yml
 
 **Artifacts Generated:**
-- Updated: ${PRD_ROOT}/.../story.311.1.../story.311.1...md
-- Created: ${PRD_ROOT}/.../story.311.1.../sprint-review-summary.md
+- Updated: ${PRD_ROOT}/.../story.1.311.1.../story.1.311.1...md
+- Created: ${PRD_ROOT}/.../story.1.311.1.../sprint-review-summary.md
 - PR Comment: https://github.com/org/repo/pull/789#comment-xyz
 ```
 

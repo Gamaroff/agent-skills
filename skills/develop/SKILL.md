@@ -129,7 +129,7 @@ System Prompt: [Displays AskUserQuestion with 3 options]
 User Selection: "Create Story"
 
 System Action: Invokes /create-story skill
-→ Proceeds to create story.178.1.{name}.md
+→ Proceeds to create story.1.178.1.{name}.md
 → Story ready for development via /develop
 ```
 

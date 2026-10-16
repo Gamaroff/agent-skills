@@ -1811,7 +1811,7 @@ gate once it is written.
 - **Tasks**: `task.[number].gate.[number].[descriptive-name].yml`
 - **MUST co-locate with the story/task file in the same directory**
 - Examples:
-  - Story: `docs/prd/domain-name/prd.1.module-name/epics/epic.1.<name>/stories/story.1.1.5.<slug>/story.1.1.5.gate.1.feature-implementation.yml`
+  - Story: `docs/prd/domain-name/prd.1.module-name/epics/epic.1.1.<name>/stories/story.1.1.5.<slug>/story.1.1.5.gate.1.feature-implementation.yml`
   - Task: `docs/tasks/task.44.transactions-account-backend-integration/task.44.gate.1.transactions-account-backend-integration.yml`
 
 **Legacy Note**: Old pattern of storing gates in `docs/qa/gates/[prd-path]/` is deprecated. All new gate files must be co-located.

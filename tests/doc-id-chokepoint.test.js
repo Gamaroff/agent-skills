@@ -550,8 +550,15 @@ function flatParent(line) {
 // A literal flat id — `epic.164.core-foundation`, `story.2.1.visibility` — in an example.
 // The placeholder checks above never see a literal (QA cycle 6: nine in one guide). A line
 // that shows the flat form AS the wrong one is spared by NEGATIVE_EXAMPLE.
-const FLAT_LITERAL =
-  /(?<![\w.-])(?:epic\.\d+\.[a-z[]|story\.\d+\.\d+[A-Z]?\.[a-z[])/;
+// The NAME after the literal number(s) is a lowercase letter, two letters (a lone capital is a level, `epic.1.E`), an elided `...`, or a placeholder that
+// names a NAME (`{name}`, `<slug>`, `[feature-name]`); a LEVEL placeholder (`[E]`, `{S}`) is a
+// hierarchical id, not a flat one. A lowercase-only start missed `story.311.1...`,
+// `story.178.1.{name}` and `epic.1.<name>` above `story.1.1.5` (QA cycle 7, CR7-4).
+const FLAT_NAME =
+  "(?:[a-z]|[A-Z][A-Za-z]|\\.\\.|[[{<][^\\]}>]*(?:name|slug|title|desc|feature)[^\\]}>]*[\\]}>])";
+const FLAT_LITERAL = new RegExp(
+  `(?<![\\w.-])(?:epic\\.\\d+\\.${FLAT_NAME}|story\\.\\d+\\.\\d+[A-Z]?\\.${FLAT_NAME})`,
+);
 const NEGATIVE_EXAMPLE = /❌|\bWrong\b|\bNOT `|no PRD number/;
 const TITLE_HEAD =
   /(?:EPIC-|\bEpic |\[Epic |\bStory |\[Story )(?:\{\{?([^{}.]+)\}|\[([^\[\].]+)\]|<([^<>.]+)>)/g;
@@ -822,6 +829,9 @@ test("§5 the parent, literal and tree checks catch the cycle-6 spellings and sp
     "See [Epic 164](./epics/epic.164.core-foundation/epic.164.core-foundation.md)",
     "- `story.2.1.visibility-mode-config.md`",
     "- [ ] Write epic.1.[name].md",
+    "- QA Report: ${PRD_ROOT}/.../story.311.1.../story.1.311.1.qa.1.x.md",
+    "→ Proceeds to create story.178.1.{name}.md",
+    "`${PRD_ROOT}/d/prd.1.m/epics/epic.1.<name>/stories/story.1.1.5.<slug>/`",
   ])
     assert.ok(oldPlaceholders(hit).length > 0, `missed: ${hit}`);
   for (const miss of [
@@ -832,6 +842,9 @@ test("§5 the parent, literal and tree checks catch the cycle-6 spellings and sp
     "Glob: `${PRD_ROOT}/**/epics/*/stories/**/story.*.md`",
     "`${PRD_DIR}/epics/`",
     "- `story.1.2.3A` - a sub-story",
+    "tree to `prd.1.onboarding`, `epic.1.E` and `story.1.E.S`",
+    "- [ ] `epics/epic.1.[E].[name]/` and `story.1.2.[S].x`",
+    "`story.1.1.5.<slug>/story.1.1.5.gate.1.x.yml`",
     "- ❌ Wrong: `epic.3.auto-hide` (no PRD number)",
   ])
     assert.deepEqual(oldPlaceholders(miss), [], `false hit: ${miss}`);

@@ -1,6 +1,6 @@
 ---
 type: bug
-status: reopened
+status: ready-for-qa
 severity: Major
 priority: Medium
 created: 2026-10-16
@@ -14,7 +14,7 @@ description: "review-epic report numbering glob still uses the flat epic number"
 **Bug ID**: TASK-207-BUG-3
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Reopened
+**Status**: Ready for QA
 **Found By**: QA Engineer (QA cycle 1, finding CR-3)
 **Date Found**: 2026-10-16
 **Location**: `skills/review-epic/SKILL.md:571`
@@ -131,6 +131,20 @@ Rewrite the glob and template to `epic.{P}.{E}`; sweep the other `epic.[N]` / `{
 
 **Testing**: 18/18. Mutations: a concrete flat parent, a flat tree node, a literal flat id and a literal glob parent each turn §5 red.
 
+### Iteration 7
+
+#### Fix Implementation (In Progress → Ready for QA)
+
+**Date**: 2026-10-16
+
+**Root Cause**: `FLAT_LITERAL` required a lowercase name start, so a flat literal before `...`, `{name}` or `<name>` passed: `story.311.1...` beside rewritten filenames, `story.178.1.{name}.md`, and `epic.1.<name>` holding `story.1.1.5`.
+
+**Fix Description**: Each site now carries its example's full id (finalise ×4, develop, qa-gate ×2, qa-story). `FLAT_NAME` accepts a lowercase letter, two letters, `...`, or a name-like placeholder, and spares a lone capital (`epic.1.E`) and level placeholders (`[E]`, `{S}`). The guide's story-layout redraw (CR7-5) and ASCII trees (CR7-8) are in the task's Deferred Work.
+
+**Files Modified**: tests/doc-id-chokepoint.test.js, skills/finalise/SKILL.md, skills/develop/SKILL.md, skills/qa-gate/SKILL.md, skills/qa-story/SKILL.md
+
+**Testing**: 18/18. Mutations: each of the three sites reverted, and `FLAT_NAME` narrowed back to `[a-z]`, turn §5 red.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -155,3 +169,5 @@ Rewrite the glob and template to `epic.{P}.{E}`; sweep the other `epic.[N]` / `{
 | 2026-10-16 | Ready for QA | qa-fix | Fixed in QA fix cycle 6 |
 | 2026-10-16 | Closed | qa-task | Verified by task.207.qa.7 — layout population and tree diagrams swept; remaining items tracked as CR7-* |
 | 2026-10-16 | Reopened | qa-task | Correction: closed in error — CR7-1..3 are residues of this same class (task.207.qa.7) |
+| 2026-10-16 | In Progress | qa-fix | Fix cycle 7 started (user-approved) |
+| 2026-10-16 | Ready for QA | qa-fix | Fixed in QA fix cycle 7 |
