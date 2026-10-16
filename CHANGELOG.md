@@ -6,6 +6,24 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **Two CI guards hold hierarchical document numbering, and the docs stop teaching the old scheme
+  (task 207).** `evals/shared/tests/doc-numbering-corpus.test.mjs` runs `doc-id.js`'s `checkCorpus`
+  over the PRD root and fails on any unnumbered, mismatched, unregistered or duplicate PRD, epic or
+  story — with a 22-document non-vacuity floor and three mutation cases. `tests/doc-id-chokepoint.test.js`
+  fails on a PRD/epic/story id regex, a string-built id regex, a `[Epic N]`-style title regex or a
+  positional `awk -F.` / `cut -d.` split on a STORY/EPIC/PRD variable anywhere but `doc-id.js` — in
+  tracked code and in the bash fences of `SKILL.md` and `shared/resources/*.md` — with a per-shape
+  allowlist, a stale-entry check and a positive control. Fixed with it: `review-epic`'s branch setup
+  read the PRD number as the epic number (`awk -F.` on `epic.P.E.slug`), so its auto-skip matched
+  every epic of the PRD; it now reads both through `doc-id.js`. `sync-jira-story` reads related
+  artifacts through `doc-id.js` and so now links a sub-story's artifacts. The prose sweep rewrote
+  every `story.{epic}.{story}`, `epic.{N}`, `epic/{N}` and flat example id in `SKILL.md`,
+  `shared/resources/*.md` and `docs/`, replaced AGENTS.md § Epic Registry with § PRD Registry, and
+  removed the docs that still sent readers to the retired epic registry and `epic-registry-manager`.
+  **Consumer upgrade:** a project still on flat numbering migrates once with
+  `node .agents/skills/review-prd/references/migrate-doc-numbering.mjs --check`, then `--apply`
+  (`[--apply | --check] [--json] [--root <dir>] [--name <path>=<slug>]... [--allow-in-flight]`).
+
 - **A `/qa-next` note finding can be resolved, with evidence (task 212).** A `note` row in a run
   file's Findings table used to stay open forever. `uat-status.mjs --resolve-finding <run> <n> --by
   <evidence> [--date YYYY-MM-DD]` now appends ` — resolved YYYY-MM-DD by \`<evidence>\`` to its

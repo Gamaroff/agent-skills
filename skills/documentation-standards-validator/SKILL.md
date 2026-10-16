@@ -48,7 +48,7 @@ When creating or reviewing a story/epic/task, apply these checks to the affected
 \`\`\`
 ✅ CORRECT
 epic.1.3.module-security.md
-story.163.1.encryption-service.md
+story.1.163.1.encryption-service.md
 task.38.authservice-di-failure.md
 
 ❌ INCORRECT
@@ -63,8 +63,8 @@ Epic.163.AccountSecurity.md // Capitalization
 
 \`\`\`
 epic.1.3.module-security.md
-epic.164.transaction-batching.md
-epic.165.chat-encryption.md
+epic.1.164.transaction-batching.md
+epic.1.165.chat-encryption.md
 \`\`\`
 
 ### Story Filename and Directory Format
@@ -82,10 +82,10 @@ epic.165.chat-encryption.md
 ```
 📁 epic.1.3.module-security/
   📁 stories/
-    📁 story.163.1.encryption-service/
-      📄 story.163.1.encryption-service.md
-    📁 story.163.2.biometric-auth/
-      📄 story.163.2.biometric-auth.md
+    📁 story.1.163.1.encryption-service/
+      📄 story.1.163.1.encryption-service.md
+    📁 story.1.163.2.biometric-auth/
+      📄 story.1.163.2.biometric-auth.md
 ```
 
 ## YAML Frontmatter Requirements
@@ -117,7 +117,7 @@ target_completion: 2026-01-15
 
 ## \`\`\`yaml
 
-epic: epic.163.module-security
+epic: epic.1.163.module-security
 epic_number: 163
 story_number: 1
 title: Implement Mnemonic Encryption Service
@@ -183,7 +183,7 @@ These icons are for body prose only and are never a frontmatter `status:` value 
 - [ ] Hyphens only within names
 - [ ] Correct pattern (epic.N.name.md or story.E.S.name.md)
 - [ ] .md extension
-- [ ] Stories are placed in self-named subdirectories (e.g., `story.1.1.name/story.1.1.name.md`)
+- [ ] Stories are placed in self-named subdirectories (e.g., `story.1.1.1.name/story.1.1.1.name.md`)
 - [ ] Correct pattern for plan files (story.E.S.plan.name.md) if present
 
 ### YAML Frontmatter

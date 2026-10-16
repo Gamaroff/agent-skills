@@ -352,7 +352,7 @@ Log in Decisions Log: "Jira {TRACKER_ISSUE} — PR comment posted; status: {land
 
 #### develop-story
 
-Log in Issues Log. Invoke the `/commit-changes` skill to commit the report (suggested message: `docs(story.{epic}.{story}): implementation report — create-pr failure`), push, then HALT.
+Log in Issues Log. Invoke the `/commit-changes` skill to commit the report (suggested message: `docs(story.{P}.{E}.{S}): implementation report — create-pr failure`), push, then HALT.
 
 #### develop-task
 

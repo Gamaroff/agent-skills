@@ -120,7 +120,7 @@ Before starting this epic, the following must exist:
 
 ## Stories Breakdown
 
-### [Story [Epic].1] [Story Name]
+### [Story [P].[E].1] [Story Name]
 
 **Status**: ❌ Not Started | 🔄 In Progress | ✅ Complete | ⚠️ Blocked
 **Priority**: Critical | High | Medium | Low
@@ -159,7 +159,7 @@ path/to/file3.spec.ts - [Purpose]
 
 ---
 
-### [Story [Epic].2] [Story Name]
+### [Story [P].[E].2] [Story Name]
 
 **Status**: ❌ Not Started | 🔄 In Progress | ✅ Complete | ⚠️ Blocked
 **Priority**: Critical | High | Medium | Low
@@ -195,7 +195,7 @@ path/to/file2.ts - [Purpose]
 
 ---
 
-### [Story [Epic].3] [Story Name]
+### [Story [P].[E].3] [Story Name]
 
 **Status**: ❌ Not Started | 🔄 In Progress | ✅ Complete | ⚠️ Blocked
 **Priority**: Critical | High | Medium | Low
@@ -222,7 +222,7 @@ path/to/file2.ts - [Purpose]
 
 ---
 
-### [Story [Epic].N] [Additional Stories...]
+### [Story [P].[E].N] [Additional Stories...]
 
 [Continue pattern for all stories in epic]
 
@@ -377,25 +377,25 @@ Re-render
 
 ### Blocks (What this epic enables)
 
-- [ ] **Epic [N+1]**: [Epic Name]
-  - **Reason**: [Why Epic [N+1] depends on this]
+- [ ] **Epic [P].[E+1]**: [Epic Name]
+  - **Reason**: [Why Epic [P].[E+1] depends on this]
   - **Specific requirement**: [What specifically is needed]
 
-- [ ] **Epic [N+2]**: [Epic Name]
-  - **Reason**: [Why Epic [N+2] depends on this]
+- [ ] **Epic [P].[E+2]**: [Epic Name]
+  - **Reason**: [Why Epic [P].[E+2] depends on this]
   - **Specific requirement**: [What specifically is needed]
 
 ### Parallel Work Opportunities
 
 **Can be developed in parallel**:
 
-- [Story [Epic].1] and [Story [Epic].3] (no dependencies)
-- [Story [Epic].2] can start after [Story [Epic].1] completes
+- [Story [P].[E].1] and [Story [P].[E].3] (no dependencies)
+- [Story [P].[E].2] can start after [Story [P].[E].1] completes
 
 **Must be sequential**:
 
-- [Story [Epic].4] requires [Story [Epic].2] completion
-- [Story [Epic].5] requires all previous stories
+- [Story [P].[E].4] requires [Story [P].[E].2] completion
+- [Story [P].[E].5] requires all previous stories
 
 ---
 
@@ -407,7 +407,7 @@ Re-render
 
 - **Probability**: High | Medium | Low
 - **Impact**: High | Medium | Low
-- **Affected Stories**: [Story [Epic].1], [Story [Epic].2]
+- **Affected Stories**: [Story [P].[E].1], [Story [P].[E].2]
 - **Mitigation Strategy**: [Detailed strategy]
 - **Contingency Plan**: [Backup plan]
 - **Owner**: [Person responsible]
@@ -417,7 +417,7 @@ Re-render
 
 - **Probability**: High | Medium | Low
 - **Impact**: High | Medium | Low
-- **Affected Stories**: [Story [Epic].3]
+- **Affected Stories**: [Story [P].[E].3]
 - **Mitigation Strategy**: [Detailed strategy]
 - **Contingency Plan**: [Backup plan]
 - **Owner**: [Person responsible]
@@ -581,9 +581,9 @@ Epic [P.E] is complete when all criteria below are met:
 
 ### Development Phase
 
-- **Sprint 1**: [Story [Epic].1], [Story [Epic].2]
-- **Sprint 2**: [Story [Epic].3], [Story [Epic].4]
-- **Sprint 3**: [Story [Epic].5], testing
+- **Sprint 1**: [Story [P].[E].1], [Story [P].[E].2]
+- **Sprint 2**: [Story [P].[E].3], [Story [P].[E].4]
+- **Sprint 3**: [Story [P].[E].5], testing
 - **Total**: [X] sprints ([X] weeks)
 
 ### Testing & Polish Phase
@@ -639,14 +639,14 @@ Epic [P.E] is complete when all criteria below are met:
 
 ### Story Documentation
 
-- [[Story [Epic].1] Name](./stories/story.[epic].1.[name].md)
-- [[Story [Epic].2] Name](./stories/story.[epic].2.[name].md)
-- [[Story [Epic].3] Name](./stories/story.[epic].3.[name].md)
+- [[Story [P].[E].1] Name](./stories/story.[P].[E].1.[name].md)
+- [[Story [P].[E].2] Name](./stories/story.[P].[E].2.[name].md)
+- [[Story [P].[E].3] Name](./stories/story.[P].[E].3.[name].md)
 - [Additional stories...]
 
 ### Epic Roadmap
 
-- [Epic [N] Roadmap](./EPIC-[N]-ROADMAP.md) - Week-by-week execution plan
+- [Epic [P].[E] Roadmap](./EPIC-[P].[E]-ROADMAP.md) - Week-by-week execution plan
 
 ### Related Documentation
 
@@ -657,8 +657,8 @@ Epic [P.E] is complete when all criteria below are met:
 
 ### Related Epics
 
-- [Epic [N-1]: [Name]](../epic.[n-1].[name]/epic.[n-1].[name].md) - Previous epic
-- [Epic [N+1]: [Name]](../epic.[n+1].[name]/epic.[n+1].[name].md) - Next epic
+- [Epic [P].[E-1]: [Name]](../epic.[P].[E-1].[name]/epic.[P].[E-1].[name].md) - Previous epic
+- [Epic [P].[E+1]: [Name]](../epic.[P].[E+1].[name]/epic.[P].[E+1].[name].md) - Next epic
 
 ### Project Resources
 

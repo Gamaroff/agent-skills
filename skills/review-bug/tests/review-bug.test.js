@@ -92,7 +92,7 @@ test("review-bug explicitly never mutates the bug lifecycle status", () => {
 // Handles all three bug modes
 // ---------------------------------------------------------------------------
 test("resolves all three bug modes", () => {
-  assert.match(SKILL, /story\.\{epic\}\.\{story\}\.bug/);
+  assert.match(SKILL, /story\.\{P\}\.\{E\}\.\{S\}\.bug/);
   assert.match(SKILL, /task\.\{id\}\.bug/);
   assert.match(SKILL, /bug\.\{N\}\.\{name\}/);
 });

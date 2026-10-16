@@ -37,7 +37,7 @@ One-way sync of a local bug report to GitHub Issues. Auto-detects create vs upda
 A bug report in one of the three documented layouts:
 
 ```
-docs/prd/<...>/story.{e}.{s}.bug.{n}.{name}.md          # story bug
+docs/prd/<...>/story.{P}.{E}.{S}.bug.{n}.{name}.md          # story bug
 docs/tasks/task.{id}.{name}/task.{id}.bug.{n}.{name}.md # task bug
 docs/bugs/bug.{N}.{name}/bug.{N}.{name}.md              # general bug
 ```
@@ -192,7 +192,7 @@ A `reopened` bug reopening a closed issue is the expected direction of travel he
 
 ### 6. Report to User
 
-- ✅ Bug mode and id (e.g. `story bug — story.7.4.bug.4`)
+- ✅ Bug mode and id (e.g. `story bug — story.1.7.4.bug.4`)
 - ✅ GitHub issue number and URL
 - ✅ Parent document, and parent issue if the sub-issue link landed
 - ✅ Added to project board + Priority field mirrored

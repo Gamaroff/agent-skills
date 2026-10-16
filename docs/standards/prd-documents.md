@@ -20,7 +20,7 @@ docs/prd/
             └── epic.{P}.{E}.{name}/ # see epic-documents.md
 ```
 
-> **Interim (2026-10-15, tasks 202 and 204).** `create-prd`, `review-prd` and `shard-prd` write and check this scheme (task 204), and epics follow it (task 205). Story ids adopt it in task 206; until then, a legacy PRD (`prd.{feature}`, no `prd_number`) is still read by `doc-id.js parseLegacy`, and `review-prd` reports it as Critical and offers the migration.
+> **Adopted (2026-10-16, tasks 202–207).** `create-prd`, `review-prd` and `shard-prd` write and check this scheme (task 204), and epics and stories follow it (tasks 205, 206). A legacy PRD (`prd.{feature}`, no `prd_number`) is reported by `review-prd` as Critical and migrated with `migrate-doc-numbering.mjs`.
 
 When sharded, the body splits across files in `prd.{P}.{feature}/` per level-2 section. The pipeline locates epics at `${PRD_ROOT}/{domain}/prd.{P}.{feature}/epics/epic.{P}.{E}.{name}/epic.{P}.{E}.{name}.md`, where `${PRD_ROOT}` is configurable (default `docs/prd`) — see [Configurable roots and fixed conventions](../reference/configuration.md#configurable-roots-and-fixed-conventions).
 

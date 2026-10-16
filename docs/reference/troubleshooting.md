@@ -98,8 +98,8 @@ echo "PRD_ROOT=$PRD_ROOT ARCH_ROOT=$ARCH_ROOT"
 
 # Does it exist?
 ls "$PRD_ROOT"                              # base PRD directory
-ls "$PRD_ROOT"/*/epics/epic.*.md            # epic files
-ls "$PRD_ROOT"/*/epics/*/stories            # nested story directories
+ls "$PRD_ROOT"/*/prd.*/epics/epic.*/epic.*.md            # epic files
+ls "$PRD_ROOT"/*/prd.*/epics/*/stories            # nested story directories
 ```
 
 If the root is wrong, set `prd.prdShardedLocation` in `skills-config.yaml` to the right path. If the *nested* layout is non-standard (e.g. you have a global `docs/stories/` folder), move files onto the convention — skills won't adapt to custom nested layouts.
@@ -110,7 +110,7 @@ If the root is wrong, set `prd.prdShardedLocation` in `skills-config.yaml` to th
 
 **Cause:** Hard gate — every story must declare its parent epic for branch targeting.
 
-**Fix:** Add `epic: epic.{N}.{name}` to the story frontmatter, matching the parent epic directory stem exactly. Re-run.
+**Fix:** Add `epic: epic.{P}.{E}.{name}` to the story frontmatter, matching the parent epic directory stem exactly. Re-run.
 
 See [Story documents](../standards/story-documents.md#frontmatter-schema).
 
@@ -120,25 +120,25 @@ See [Story documents](../standards/story-documents.md#frontmatter-schema).
 
 **Cause:** You accepted the default at the Phase 0 Q1 prompt without checking that the project's integration branch is `develop` (not `main`), or Q1 and Q2 disagreed — basing on an epic integration branch and then targeting `develop` yields a PR containing every earlier story in the epic.
 
-**Fix:** rebase onto the base you meant, where `{CORRECT_BASE}` is `develop` or the epic integration branch (`epic/{N}.{slug}`):
+**Fix:** rebase onto the base you meant, where `{CORRECT_BASE}` is `develop` or the epic integration branch (`epic/{P}.{E}.{slug}`):
 
 ```bash
-git checkout feature/story.{E}.{S}.{name}
+git checkout feature/story.{P}.{E}.{S}.{name}
 git rebase --onto {CORRECT_BASE} <wrong-base>
 git push --force-with-lease
 ```
 
 If the PR is already open, update its base via `gh pr edit --base {CORRECT_BASE}`. Q1 and Q2 must name the same branch.
 
-## Epic / task registry collision
+## PRD / epic / task number collision
 
-**Symptom:** `create-epic` or `create-task` fails because the assigned number already exists.
+**Symptom:** `create-prd` or `create-task` fails because the assigned number already exists, or CI fails `doc-numbering-corpus.test.mjs` with `duplicate-id`.
 
-**Cause:** Another author created an artifact with the same number, or you used a stale registry snapshot.
+**Cause:** Another author created an artifact with the same number — a stale registry snapshot (PRD, task), or two branches that each took the next epic number within the same PRD.
 
-**Fix:** Pull the latest registry. The skill re-reads **Next Available** and assigns the next free number. If you've already committed locally with a colliding number, rename your epic/task directory and file to the new number before pushing.
+**Fix:** Pull the latest `develop`. A registry skill re-reads **Next Available** and assigns the next free number; `create-epic` recounts the epics on disk. If you've already committed locally with a colliding number, rename the directory and file to the new number before pushing.
 
-See [Epic registry](../standards/epic-registry.md), [Task registry](../standards/task-registry.md).
+See [PRD registry](../standards/prd-registry.md), [Task registry](../standards/task-registry.md).
 
 ## Gate file conflicts
 
@@ -149,7 +149,7 @@ See [Epic registry](../standards/epic-registry.md), [Task registry](../standards
 **Fix:** Do not hand-merge gate files. Discard your local gate file and re-run `qa-story` / `qa-task` to regenerate it. **Dev skills must never modify gate files** — they're owned by QA skills.
 
 ```bash
-git checkout --theirs path/to/story.{E}.{S}.gate.{N}.{name}.yml
+git checkout --theirs path/to/story.{P}.{E}.{S}.gate.{N}.{name}.yml
 /qa-story <story-path>
 ```
 

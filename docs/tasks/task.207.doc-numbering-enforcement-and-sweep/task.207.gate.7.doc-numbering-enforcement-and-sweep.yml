@@ -1,0 +1,75 @@
+schema: 2
+task: 'task.207.doc-numbering-enforcement-and-sweep'
+task_title: 'Doc numbering enforcement and sweep'
+gate: CONCERNS
+status_reason: 'User-approved cycle 7 on b20f6e72. No HIGH. Three example ids keep a flat segment beside a rewritten one, which FLAT_LITERAL misses (it needs a lowercase name start); and the cycle-6 guide links assume per-story directories that the guide trees (pre-existing) do not draw.'
+reviewer: 'QA Engineer'
+head: 'b20f6e72ff4eb812200b429e3c846b3ff5e87466'
+updated: '2026-10-16T19:06:11Z'
+
+top_issues:
+  - id: 'TASK-207-BUG-3'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'Reopened (CR7-1..3) — lines 2878-2883: directory story.311.1... beside story.1.311.1 filenames; develop/SKILL.md:132 story.178.1.{name}.md; qa-gate:72 and qa-story:1814 epic.1.<name> holding story.1.1.5 (CR7-1..3).'
+    suggested_action: 'Rewrite each to the full id of its own example.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-207-CR7-4'
+    severity: medium
+    file: 'tests/doc-id-chokepoint.test.js'
+    finding: 'FLAT_LITERAL fires only on a [a-z[ name start, so flat literals before "{", "<", "." or an uppercase letter pass (that is how CR7-1..3 passed); its "[" branch also flags epic.1.[E].[name].'
+    suggested_action: 'Widen the name start; spare level placeholders; add CR7-1..3 as hit fixtures and epic.1.[E].[name] as a miss.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-207-CR7-5'
+    severity: medium
+    file: 'skills/documentation-standards-validator/references/prd-structure-guide.md'
+    finding: 'Cycle 6 wrote Story→Epic links for a per-story directory (../../epic...md) while the Story→PRD link at :440 and the template trees (:54-64, :217, :235-238, pre-existing) put story files directly in stories/ — the guide contradicts itself and docs/standards/story-documents.md.'
+    suggested_action: 'Redraw the trees with one story.[P].[E].[S].[name]/ directory per story, then align :440 (../../../../) and the checklists at :375-377, :395, :545.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-207-CR7-8'
+    severity: low
+    file: 'tests/doc-id-chokepoint.test.js'
+    finding: 'flatTreeEpics ignores ASCII trees (+--, |) and ← annotations; no such node exists today.'
+    suggested_action: 'Widen the prefix class; add an ASCII fixture.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 18
+  phases_verified: 5/5
+  ci: 'fast gate exit 0 on b20f6e72 (.agents/skills moved aside)'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4]
+    phases_with_issues: [2, 3]
+
+bug_resolution:
+  bugs_fixed: 0
+  bugs_reopened: 1
+  verification_method: 'scoped review of the 16 files cycle 6 changed; reviewer ran the new checks over the prose population'
+
+nfr_validation:
+  security: { status: PASS, evidence: reasoned, notes: 'No boundary changed since gate 1.' }
+  performance: { status: PASS, notes: 'Unchanged.' }
+  reliability: { status: PASS, notes: 'troubleshooting globs now match.' }
+  maintainability: { status: CONCERNS, notes: 'Mixed-id examples; guide story layout.' }
+
+recommendations:
+  immediate:
+    - action: 'Fix CR7-1..5 and CR7-7 (roadmap checklist path); widen FLAT_LITERAL.'
+      refs: ['tests/doc-id-chokepoint.test.js', 'skills/documentation-standards-validator/references/prd-structure-guide.md']
+  future:
+    - action: 'Carried from gate 6.'
+      refs: ['skills/create-epic/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR7-1..5 fixed or accepted']

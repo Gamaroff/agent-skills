@@ -61,7 +61,7 @@ Implementation plans **must** live in-repo, co-located with the work or under `.
 
 - **Task numbers** are globally unique. Read `docs/tasks/task-registry.md` → "Next Available Task Number" before creating a task. Append a row, increment counter, commit atomically.
 - **PRD numbers** are globally unique and never reused. Source of truth: `${PRD_ROOT}/prd-registry.md` → "Next Available PRD Number" ([standard](../../standards/prd-registry.md)). Epic and story ids are hierarchical — `epic.{P}.{E}`, `story.{P}.{E}.{S}` — with `E` unique within its PRD and `S` within its epic; parse and allocate them with `shared/resources/doc-id.js`, never a hand-written regex.
-- **Epic numbers** count within their PRD (`epic.{P}.{E}`); PRD numbers come from `docs/prd/prd-registry.md`. `docs/development/epic-registry.md` is retired (task 203) and keeps only a historical old → new mapping. The epic skills allocate with `doc-id.js` (task 205); PRD and story skills adopt the scheme in tasks 204 and 206.
+- **Epic numbers** count within their PRD (`epic.{P}.{E}`); PRD numbers come from `docs/prd/prd-registry.md`. `docs/development/epic-registry.md` is retired (task 203) and keeps only a historical old → new mapping. Every PRD, epic and story skill allocates and parses with `doc-id.js` (tasks 204–206); `tests/doc-id-chokepoint.test.js` and `evals/shared/tests/doc-numbering-corpus.test.mjs` hold it (task 207).
 
 ## Validation before commit
 

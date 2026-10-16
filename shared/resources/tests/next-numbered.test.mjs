@@ -146,8 +146,8 @@ const SITES = {
     },
   },
   "review-epic": {
-    subs: { "{epic-directory}": "$DIR", "{epic-number}": "5" },
-    vars: { REVIEW_N: ["epic.5.review.1.x.md", "epic.5.review.3.x.md"] },
+    subs: { "{epic-directory}": "$DIR", "{P}": "1", "{E}": "5" },
+    vars: { REVIEW_N: ["epic.1.5.review.1.x.md", "epic.1.5.review.3.x.md"] },
   },
   "review-task": {
     subs: { "{task-directory}": "$DIR", "task.{n}": "task.9" },
@@ -156,7 +156,7 @@ const SITES = {
   finalise: {
     subs: {
       "{document-directory}": "$DIR",
-      "{story.{epic}.{story} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}":
+      "{story.{P}.{E}.{S} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}":
         "task.9",
     },
     vars: { DOD_N: ["task.9.dod.1.x.md", "task.9.dod.3.x.md"] },

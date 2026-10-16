@@ -1,0 +1,82 @@
+schema: 2
+task: 'task.207.doc-numbering-enforcement-and-sweep'
+task_title: 'Doc numbering enforcement and sweep'
+gate: CONCERNS
+status_reason: 'Gate-the-last-fix half-cycle on 1f8de5cd. No HIGH by the grading used since gate 4. The layout sweep is still incomplete: tree diagrams and concrete example paths keep a flat feature directory above epics/, which FLAT_LAYOUT (placeholder-only, one line at a time) cannot see.'
+reviewer: 'QA Engineer'
+head: '1f8de5cd5659a5f6e50a51eae9145691ec546cb2'
+updated: '2026-10-16T18:20:37Z'
+
+top_issues:
+  - id: 'TASK-207-BUG-3'
+    severity: medium
+    file: 'skills/documentation-standards-validator/references/prd-structure-guide.md'
+    finding: 'Reopened (CR6-1, CR6-2): tree diagrams root epics/ under a flat [feature]/ (prd-structure-guide.md:25,638; qa-story/SKILL.md:3340). The reviewer rated CR6-1 high; graded medium, as the same class was at gates 4 and 5.'
+    suggested_action: 'Rename the tree roots to prd.[P].[feature]/; add a tree-diagram check to §5 or name the gap in its MISSES list.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-207-CR6-4'
+    severity: medium
+    file: 'skills/develop/SKILL.md'
+    finding: 'Concrete example paths keep <dir>/epics/epic.* with no prd.* parent: ~23 lines in 14 files (git grep "/epics/epic\." minus "prd\.[^/]*/epics/epic\."), e.g. finalise, edit-epic, review-prd, qa-gate, ensure-*-jira-issue, invocation.md.'
+    suggested_action: 'Rewrite the population; widen FLAT_LAYOUT to any /epics/epic. segment whose parent is not prd.*.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-207-CR6-3'
+    severity: medium
+    file: 'skills/documentation-standards-validator/references/prd-structure-guide.md'
+    finding: 'Epic Numbering Patterns (:301-304) still describe story.1.5.1 / story.2.1 by the old meanings, contradicting the story.[P].[E].[S] format two lines above.'
+    suggested_action: 'Rewrite the bullets and the :293, :308-310, :325-326 examples as P.E.S ids.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-207-CR6-5'
+    severity: medium
+    file: 'skills/develop/SKILL.md'
+    finding: 'Line 261: epic directory epic.178.<name> holds story.1.178.8.'
+    suggested_action: 'epic.1.178.<name>, prd.1.<feature>.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-207-CR6-6'
+    severity: low
+    file: 'skills/develop/SKILL.md'
+    finding: 'Line 117 says the input matched epic.178.*; the input is epic.1.178.*. Also CR6-7 (create-issue prd.<P> under P=1 ids), CR6-9 (qa-story:2521 [Story [P].[E].N]).'
+    suggested_action: 'Align each example with its own ids.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 17
+  phases_verified: 5/5
+  ci: 'PR checks all pass on aac45de6 (test, validate, link-check, shellcheck, branch policy)'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4]
+    phases_with_issues: [3]
+
+bug_resolution:
+  bugs_fixed: 0
+  bugs_reopened: 1
+  verification_method: 'scoped review of the 14 files cycle 5 changed'
+
+nfr_validation:
+  security: { status: PASS, evidence: reasoned, notes: 'No boundary changed since gate 1.' }
+  performance: { status: PASS, notes: 'Unchanged.' }
+  reliability: { status: PASS, notes: 'Executable contracts (ingester bindings, chokepoint) hold.' }
+  maintainability: { status: CONCERNS, notes: 'Layout-path residue in prose examples and trees.' }
+
+recommendations:
+  immediate:
+    - action: 'One enumerated sweep: every /epics/epic. path and every tree diagram, then FLAT_LAYOUT widened to the parent-directory rule (CR6-8 hyphen/digit P forms with it).'
+      refs: ['tests/doc-id-chokepoint.test.js']
+  future:
+    - action: 'Carried from gate 5: create-parallel-stories scheme, create-epic milestone override, step-0a cross-block reads, doc-id.parse hardening, story-template ../epics/ links, qa-gate-template naming, backfill epic-meta reuse.'
+      refs: ['skills/create-epic/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['Layout residue swept or accepted']

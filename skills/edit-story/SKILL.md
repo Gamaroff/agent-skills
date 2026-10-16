@@ -19,21 +19,21 @@ Use this skill when you need to:
 Natural language triggers:
 
 - "Edit story 323.2 to add new acceptance criterion"
-- "Update story.178.8.example-feature.md to change status"
+- "Update story.1.178.8.example-feature.md to change status"
 - "Modify story 163.1 to update tasks"
 
 **Slash Command Usage:**
 
 ```bash
 # Using story directory (auto-discovers story file)
-/edit-story ${PRD_ROOT}/.../stories/story.323.2.emergency-recovery-unlock/
+/edit-story ${PRD_ROOT}/.../stories/story.1.323.2.emergency-recovery-unlock/
 
 # Using specific story file
-/edit-story ${PRD_ROOT}/.../stories/story.323.2.emergency-recovery-unlock/story.323.2.emergency-recovery-unlock.md
+/edit-story ${PRD_ROOT}/.../stories/story.1.323.2.emergency-recovery-unlock/story.1.323.2.emergency-recovery-unlock.md
 
 # Natural language
 "Edit story 323.2 to update priority"
-"Use @edit-story for story.178.8.example-feature.md"
+"Use @edit-story for story.1.178.8.example-feature.md"
 ```
 
 **Related Skills**:
@@ -52,15 +52,15 @@ Natural language triggers:
 
 You can invoke this skill with either:
 
-- **A specific story file**: `story.323.2.emergency-recovery-unlock.md`
-- **A story directory**: `stories/story.323.2.emergency-recovery-unlock/`
+- **A specific story file**: `story.1.323.2.emergency-recovery-unlock.md`
+- **A story directory**: `stories/story.1.323.2.emergency-recovery-unlock/`
 
 **File Discovery Logic:**
 
 When given a directory path:
 
 1. List all files in the directory
-2. Find the story file by pattern: `story.[epic].[story].[name].md`
+2. Find the story file by pattern: `story.[P].[E].[S].[name].md`
 3. Exclude files containing: `.qa.`, `.gate.`, or `.bug.`
 4. If multiple story files found, use the one matching the directory name
 5. If no story file found, HALT and ask user for the correct path
@@ -74,19 +74,19 @@ When given a file path:
    > "Error: This is an epic file, not a story file.
    >
    > File: {filename}
-   > Pattern detected: epic.[number].[name].md
+   > Pattern detected: epic.[P].[E].[name].md
    >
    > To edit epic files, use the `edit-epic` skill instead:
    > `/edit-epic {filepath}`"
-3. Verify filename matches story pattern: `story.[epic].[story].[name].md`
+3. Verify filename matches story pattern: `story.[P].[E].[S].[name].md`
 4. If pattern doesn't match, warn user and ask for confirmation
 
 **Example:**
 
 ```
-Input: ${PRD_ROOT}/.../stories/story.323.2.emergency-recovery-unlock/
-Discovers: story.323.2.emergency-recovery-unlock.md
-Rejects: epic.323.pin-advanced-security.md (if provided)
+Input: ${PRD_ROOT}/.../stories/story.1.323.2.emergency-recovery-unlock/
+Discovers: story.1.323.2.emergency-recovery-unlock.md
+Rejects: epic.1.323.pin-advanced-security.md (if provided)
 ```
 
 ---
@@ -154,11 +154,11 @@ Rejects: epic.323.pin-advanced-security.md (if provided)
 
 **A. File Naming Convention & Location**
 
-- Filename follows pattern: `story.[epic].[story].[name].md`
-- File must be placed inside a subdirectory with the exact same name: `story.[epic].[story].[name]/story.[epic].[story].[name].md`
+- Filename follows pattern: `story.[P].[E].[S].[name].md`
+- File must be placed inside a subdirectory with the exact same name: `story.[P].[E].[S].[name]/story.[P].[E].[S].[name].md`
 - Uses DOTS for number separators (not underscores)
 - Uses hyphens for word separation in descriptive name (not underscores)
-- Example valid: `story.163.1.seed-phrase-validator/story.163.1.seed-phrase-validator.md`
+- Example valid: `story.1.163.1.seed-phrase-validator/story.1.163.1.seed-phrase-validator.md`
 - Example invalid: `story_163_1_seed_phrase_validator.md`
 
 **B. YAML Frontmatter (if present)**
@@ -328,20 +328,20 @@ If validation fails, present findings to user:
 
 **Valid Patterns:**
 
-- `story.163.1.seed-phrase-validator/story.163.1.seed-phrase-validator.md` ✓
-- `story.323.2.emergency-recovery-unlock/story.323.2.emergency-recovery-unlock.md` ✓
-- `story.178.8.example-feature/story.178.8.example-feature.md` ✓
+- `story.1.163.1.seed-phrase-validator/story.1.163.1.seed-phrase-validator.md` ✓
+- `story.1.323.2.emergency-recovery-unlock/story.1.323.2.emergency-recovery-unlock.md` ✓
+- `story.1.178.8.example-feature/story.1.178.8.example-feature.md` ✓
 
 **Invalid Patterns:**
 
 - `story_163_1_seed_phrase_validator.md` ✗ (underscores instead of dots)
 - `story.163_1.seed-phrase-validator.md` ✗ (mixed separators)
 - `story-163.1.seed-phrase-validator.md` ✗ (hyphen for number separator)
-- `story.163.1.seed-phrase-validator.md` ✗ (must be inside a self-named subdirectory)
+- `story.1.163.1.seed-phrase-validator.md` ✗ (must be inside a self-named subdirectory)
 
 **Rule from Documentation:**
 
-> Use DOTS for numbers: `story.163.1.name.md` not `story_163_1_name.md`
+> Use DOTS for numbers: `story.1.163.1.name.md` not `story_163_1_name.md`
 > Use hyphens for word separation in descriptive names: `seed-phrase-validator` not `seed_phrase_validator`
 > Each story MUST be placed in its own self-named subdirectory within the epic's `stories` folder.
 
@@ -451,7 +451,7 @@ User: "Add new AC for rate limiting to story 323.2"
 
 Agent:
 
-1. Loads story.323.2.emergency-recovery-unlock.md
+1. Loads story.1.323.2.emergency-recovery-unlock.md
 2. Validates file type and structure
 3. Locates Acceptance Criteria section
 4. Generates new AC in proper format:
@@ -469,7 +469,7 @@ User: "Change story 178.8 status to ready-for-qa"
 
 Agent:
 
-1. Loads story.178.8.example-feature.md
+1. Loads story.1.178.8.example-feature.md
 2. Validates file type
 3. Locates status field (frontmatter or markdown)
 4. Risk classification: single-field update → LOW RISK → apply directly
@@ -484,7 +484,7 @@ User: "Mark task 2.3 as complete in story 163.1"
 
 Agent:
 
-1. Loads story.163.1.seed-phrase-validator.md
+1. Loads story.1.163.1.seed-phrase-validator.md
 2. Validates file type
 3. Locates task 2.3 in Tasks section
 4. Risk classification: checkbox toggle → LOW RISK → apply directly
@@ -497,10 +497,10 @@ Agent:
 ## Workflow Example
 
 ```
-User: /edit-story ${PRD_ROOT}/.../stories/story.323.2.emergency-recovery-unlock/
+User: /edit-story ${PRD_ROOT}/.../stories/story.1.323.2.emergency-recovery-unlock/
 
 Agent:
-1. Discovers: story.323.2.emergency-recovery-unlock.md
+1. Discovers: story.1.323.2.emergency-recovery-unlock.md
 2. Validates: File type confirmed as story ✓
 3. Loads story and parses structure
 4. Validates: Pre-edit checks pass ✓

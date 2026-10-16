@@ -160,8 +160,8 @@ Tracker linkage inside `finalise` uses the platform resolver (GitHub or Jira) �
 | Aspect | Story | Task |
 |---|---|---|
 | Upstream docs | PRD → epic → story | Task only |
-| Numbering authority | epic registry + per-epic story sequence | task registry (global) |
-| Branch model | `develop` → `feature/story.{E}.{S}.*` (or `epic/{N}.*` → `feature/story.{E}.{S}.*` where the epic opts in) | `develop` → `feature/task.{N}.*` |
+| Numbering authority | PRD registry + per-PRD epic and per-epic story sequence | task registry (global) |
+| Branch model | `develop` → `feature/story.{P}.{E}.{S}.*` (or `epic/{P}.{E}.*` → `feature/story.{P}.{E}.{S}.*` where the epic opts in) | `develop` → `feature/task.{N}.*` |
 | PR target | Q2 answer — `develop`, or the epic integration branch | Configurable base (default `develop`) |
 | QA skill | `qa-story` | `qa-task` (NFR/refactor-aware) |
 | Epic issue helper | `ensure-epic-{github,jira}-issue` | n/a |

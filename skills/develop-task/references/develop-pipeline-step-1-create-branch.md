@@ -132,7 +132,7 @@ cat > .claude/state/develop-pipeline.lock <<EOF
 {
   "skill": "develop-story",
   "report_path": "{implementation-report-path}",
-  "task_or_story_id": "{epic}.{story}",
+  "task_or_story_id": "{prd}.{epic}.{story}",
   "task_or_story_directory": "{story-directory}",
   "branch": "{branch-name}",
   "pr_url": "",

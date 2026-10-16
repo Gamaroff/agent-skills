@@ -140,7 +140,7 @@ question: "How would you like the review output delivered?"
 header: "Output Mode"
 options:
   - label: "Co-located report"
-    description: "Save an epic.[N].review.[n].[name].md report alongside the epic file for async review and future reference."
+    description: "Save an epic.[P].[E].review.[n].[name].md report alongside the epic file for async review and future reference."
   - label: "Inline action plan"
     description: "Present prioritised recommendations immediately as numbered steps to action now."
 ```
@@ -176,8 +176,8 @@ Store choice as `output_mode` for Step 9.
 
 **Actions**: Execute the full protocol in `references/review-pipeline-step-0a-branch-setup.md`. Apply the **review-epic** variant throughout:
 
-- 0a.2 extract `EPIC_NUM`, `EPIC_SLUG`, `EPIC_BRANCH` from the epic filename (`epic.{N}.{slug}.md`).
-- 0a.3 auto-skip when on `feature/epic.${EPIC_NUM}.*`.
+- 0a.2 read `PRD_NUM`, `EPIC_NUM`, `EPIC_SLUG` and `EPIC_BRANCH` from the epic filename (`epic.{P}.{E}.{slug}.md`) through `doc-id.js`, never a positional split.
+- 0a.3 auto-skip when on `feature/epic.${PRD_NUM}.${EPIC_NUM}.*`.
 - 0a.4 prompt: single question — "Create epic branch `${EPIC_BRANCH}` from `${BASE_DEFAULT}`?" (Recommended Yes / "Other (specify branch)" / "Abort review").
 - 0a.5–0a.8 stash (`git stash create` + `store`) → ensure epic branch exists (guarded local create + push) → pop stash. No `/create-branch` invocation (the epic branch is created inline).
 
@@ -213,7 +213,7 @@ Store choice as `output_mode` for Step 9.
    - `.claude/notifications.md` (if epic touches notifications)
 
 4. **Scan for existing stories**
-   - Glob: `${PRD_ROOT}/**/epics/epic.[N].*/stories/**/story.*.md`
+   - Glob: `${PRD_ROOT}/**/epics/epic.[P].[E].*/stories/**/story.*.md`
    - Read each story found
 
 **Output**: Full context package ready for analysis.
@@ -558,17 +558,17 @@ If flagged: recommend splitting into sub-epics and suggest how to divide the sco
 
 **Option A — Co-located Report**:
 
-Save to: `${PRD_ROOT}/[domain]/[feature]/epics/epic.[N].[name]/epic.[N].review.[n].[name].md`
+Save to: `${PRD_ROOT}/[domain]/prd.[P].[feature]/epics/epic.[P].[E].[name]/epic.[P].[E].review.[n].[name].md`
 
-- `[N]` is the epic number; `[name]` is the parent epic file's own name slug (the hyphenated portion after `epic.[N].` in the epic filename) — NOT a free-form summary of the review focus.
+- `[P]` is the PRD number and `[E]` the epic number within it; `[name]` is the parent epic file's own name slug (the hyphenated portion after `epic.[P].[E].` in the epic filename) — NOT a free-form summary of the review focus.
 - `[n]` is a sequence number for multiple reviews of the same epic, computed below — never counted by eye (mirrors the QA `qa.{n}` and story `review.{n}` patterns). Use DOTS as structural separators and hyphens within the name slug.
-- Example: epic file `epic.1.mastra-runtime-foundation.md` → review file `epic.1.review.1.mastra-runtime-foundation.md`.
+- Example: epic file `epic.1.1.mastra-runtime-foundation.md` → review file `epic.1.1.review.1.mastra-runtime-foundation.md`.
 
 Compute `[n]`, from the repository root:
 
 ```bash
 source .agents/skills/review-epic/references/newest-numbered.sh || exit 1
-REVIEW_N=$(next_numbered "{epic-directory}" review -name "epic.{epic-number}.review.*.md") || exit 1
+REVIEW_N=$(next_numbered "{epic-directory}" review -name "epic.{P}.{E}.review.*.md") || exit 1
 ```
 
 and use `$REVIEW_N` as `[n]`. It is the highest existing `[n]` plus 1 (1 when there is none), never the number of reports plus 1: a directory holding `.1.` and `.3.` gets `.4.`, where a count would overwrite `.3.`. `next_numbered`'s header in the sourced file states the full rule (obs #272, task.186).
@@ -576,7 +576,7 @@ and use `$REVIEW_N` as `[n]`. It is the highest existing `[n]` plus 1 (1 when th
 **Report structure**:
 
 ```markdown
-# Epic Review Report: Epic [N] — [Epic Name]
+# Epic Review Report: Epic [P].[E] — [Epic Name]
 
 **Review Date**: YYYY-MM-DD
 **Reviewer**: Claude (review-epic skill)
@@ -660,7 +660,7 @@ and use `$REVIEW_N` as `[n]`. It is the highest existing `[n]` plus 1 (1 when th
 
 | Epic Deliverable | Story              | Status          |
 | ---------------- | ------------------ | --------------- |
-| [Deliverable 1]  | story.[N].1.[name] | ✅ Covered      |
+| [Deliverable 1]  | story.[P].[E].1.[name] | ✅ Covered      |
 | [Deliverable 2]  | —                  | ❌ No story yet |
 
 ---
@@ -690,7 +690,7 @@ and use `$REVIEW_N` as `[n]`. It is the highest existing `[n]` plus 1 (1 when th
 Present immediately in conversation as:
 
 ```
-## Epic [N] Review: Inline Action Plan
+## Epic [P].[E] Review: Inline Action Plan
 
 **Score**: [X.X/5.0] | **Ready for stories**: ✅/⚠️/❌
 
@@ -765,15 +765,15 @@ options:
 5. Report which fixes were applied and which (if any) were skipped with reason
 6. **Mark recommendations as implemented** — update both documents:
 
-   **In the review report** (`epic.[N].review.[n].[name].md`):
+   **In the review report** (`epic.[P].[E].review.[n].[name].md`):
    - Add the following line immediately after the Story Writing Readiness line in the Executive Summary:
      `> **Implementation Status**: ✅ All [N] recommendations implemented — YYYY-MM-DD`
      (or: `> **Implementation Status**: ✅ Critical/Major recommendations implemented — YYYY-MM-DD` if partial)
    - In the Recommended Actions list, prefix each applied recommendation with `✅ ` and each skipped one with `⏭️ skipped —` followed by the reason
 
-   **In the epic file** (`epic.[N].[name].md`):
+   **In the epic file** (`epic.[P].[E].[name].md`):
    - Add the following line immediately after the `**Last Updated**` status line:
-     `**Review**: ✅ All review recommendations from \`epic.[N].review.[n].[name].md\` implemented YYYY-MM-DD`(or:`**Review**: ✅ Critical/Major recommendations implemented YYYY-MM-DD — see review report for details`)
+     `**Review**: ✅ All review recommendations from \`epic.[P].[E].review.[n].[name].md\` implemented YYYY-MM-DD`(or:`**Review**: ✅ Critical/Major recommendations implemented YYYY-MM-DD — see review report for details`)
    - Update the `last_reviewed` YAML frontmatter field to today's date if not already done in Step 10
 
 7. **Append a Change Log row** recording the review outcome, and bump frontmatter `updated` to today in the same edit. Canonical format: [document-change-log.md](references/document-change-log.md). A review verdict bumps the minor version; `Author` is the skill name. Illustrative row:

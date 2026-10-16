@@ -58,8 +58,8 @@ QA Skill".
 
 You can invoke this skill with either:
 
-- **A specific story file**: `story.178.8.example-feature.md`
-- **A story directory**: `stories/story.178.8.example-feature/`
+- **A specific story file**: `story.1.178.8.example-feature.md`
+- **A story directory**: `stories/story.1.178.8.example-feature/`
 
 **Important**: Requires active PR for current branch. Review will halt if no PR found. See Prerequisites section.
 
@@ -94,28 +94,28 @@ Set `CODE_REVIEW_BLOCKING_ARG` from the `code_review_blocking=` token in `args` 
 When given a directory path:
 
 1. List all files in the directory
-2. Find the story file by pattern: `story.{epic}.{story}.{name}.md`
+2. Find the story file by pattern: `story.{P}.{E}.{S}.{name}.md`
 3. Exclude files containing: `.qa.`, `.gate.`, or `.bug.`
 4. If multiple story files found, use the one matching the directory name
 5. If no story file found, HALT and ask user for the correct path
 
-When given only a story ID (e.g., `story.336.1`) with no path, locate the story directory using the nested pattern: `${PRD_ROOT}/**/epics/*/stories/story.{epic}.{story}.*`
+When given only a story ID (e.g., `story.1.336.1`) with no path, locate the story directory using the nested pattern: `${PRD_ROOT}/**/epics/*/stories/story.{P}.{E}.{S}.*`
 
 **QA Artifacts Creation:**
 
 When creating QA reports and gate files, they will be placed in the same directory as the story file with the appropriate naming:
 
-- QA Report: `story.{epic}.{story}.qa.{number}.{descriptive-name}.md`
-- Gate File: `story.{epic}.{story}.gate.{number}.{descriptive-name}.yml`
-- Bug Reports: `story.{epic}.{story}.bug.{number}.{description}.md`
+- QA Report: `story.{P}.{E}.{S}.qa.{number}.{descriptive-name}.md`
+- Gate File: `story.{P}.{E}.{S}.gate.{number}.{descriptive-name}.yml`
+- Bug Reports: `story.{P}.{E}.{S}.bug.{number}.{description}.md`
 
 **Example:**
 
 ```
-Input: stories/story.178.8.example-feature/
-Discovers: story.178.8.example-feature.md
-Creates: story.178.8.qa.1.initial-review.md
-Creates: story.178.8.gate.1.initial-review.yml
+Input: stories/story.1.178.8.example-feature/
+Discovers: story.1.178.8.example-feature.md
+Creates: story.1.178.8.qa.1.initial-review.md
+Creates: story.1.178.8.gate.1.initial-review.yml
 ```
 
 ---
@@ -332,7 +332,7 @@ When performing a re-review (QA #2, #3, etc.), include this section at the top o
 ```markdown
 ## Re-Review Context
 
-**Previous QA Review**: [story.{epic}.{story}.qa.{prev_num}.{name}.md]
+**Previous QA Review**: [story.{P}.{E}.{S}.qa.{prev_num}.{name}.md]
 **Previous Gate**: {PASS/CONCERNS/FAIL} (Quality Score: {score}/100)
 **Previous Issues**: {count} ({high} HIGH, {medium} MEDIUM, {low} LOW)
 
@@ -415,7 +415,7 @@ gate: PASS
 top_issues:
   - issue: "Task 2 checkboxes not marked"
     severity: medium
-    file: "docs/stories/story.1.3.auth/story.1.3.auth.md"
+    file: "docs/stories/story.1.1.3.auth/story.1.1.3.auth.md"
 ```
 
 Action: Perform re-review to check if checkboxes are now marked.
@@ -506,7 +506,7 @@ Perform a comprehensive test architecture review with quality assessment. This a
 **CRITICAL**: Before starting the review, check if QA artifacts already exist.
 
 1. **Search for existing gate files:**
-   - Look for `story.{epic}.{story}.gate.*.yml` files in story directory
+   - Look for `story.{P}.{E}.{S}.gate.*.yml` files in story directory
    - If found, read the latest gate file (most recent by timestamp)
 
 2. **Analyze latest gate file:**
@@ -601,12 +601,12 @@ Perform a comprehensive test architecture review with quality assessment. This a
 
 Before running independent NFR and risk analysis, check the story directory for pre-existing qa-planning files:
 
-1. **Glob for risk assessments**: `story.{epic}.{story}.risk.*.md` in the story directory
+1. **Glob for risk assessments**: `story.{P}.{E}.{S}.risk.*.md` in the story directory
    - If found: load as baseline risk profile
    - Validate whether implementation mitigated the pre-identified risks rather than re-deriving them from scratch
    - Log: "Found qa-planning risk assessment — using as baseline"
 
-2. **Glob for test design documents**: `story.{epic}.{story}.test-design.*.md` in the story directory
+2. **Glob for test design documents**: `story.{P}.{E}.{S}.test-design.*.md` in the story directory
    - If found: use the pre-defined test scenarios as the traceability baseline
    - Flag which P0/P1 scenarios are covered vs missing in the implementation
    - Log: "Found qa-planning test design — using as traceability baseline"
@@ -1535,7 +1535,7 @@ You are **AUTHORIZED** to update the following sections in story/task files:
 
 **QA Report Location and Naming:**
 
-- **Stories**: `story.[epic].[story].qa.[number].[descriptive-name].md`
+- **Stories**: `story.[P].[E].[S].qa.[number].[descriptive-name].md`
 - **Tasks**: `task.[number].qa.[number].[descriptive-name].md`
 - **MUST co-locate with the story/task file in the same directory**
 
@@ -1545,18 +1545,18 @@ Each story has its own subdirectory containing all related files:
 
 ```
 stories/
-└── story.{epic}.{story}.{story-name}/
-    ├── story.{epic}.{story}.{story-name}.md           # Story file
-    ├── story.{epic}.{story}.qa.{number}.{descriptive-name}.md  # QA report
-    ├── story.{epic}.{story}.gate.{number}.{descriptive-name}.yml # Gate file
-    ├── story.{epic}.{story}.bug.1.{description}.md    # Bug report 1
-    ├── story.{epic}.{story}.bug.2.{description}.md    # Bug report 2
+└── story.{P}.{E}.{S}.{story-name}/
+    ├── story.{P}.{E}.{S}.{story-name}.md           # Story file
+    ├── story.{P}.{E}.{S}.qa.{number}.{descriptive-name}.md  # QA report
+    ├── story.{P}.{E}.{S}.gate.{number}.{descriptive-name}.yml # Gate file
+    ├── story.{P}.{E}.{S}.bug.1.{description}.md    # Bug report 1
+    ├── story.{P}.{E}.{S}.bug.2.{description}.md    # Bug report 2
     └── ...
 ```
 
 **Naming Convention:**
 
-- All files in a story directory share the same base: `story.{epic}.{story}`
+- All files in a story directory share the same base: `story.{P}.{E}.{S}`
 - File type is indicated by the segment after the story ID: `.qa.`, `.gate.`, `.bug.{number}.`
 - QA reports and Gates include a sequential number: `.qa.1.`, `.gate.1.`, etc.
 - Bug reports include a sequential number: `.bug.1.`, `.bug.2.`, etc.
@@ -1564,19 +1564,19 @@ stories/
 
 **Examples:**
 
-- Story directory: `docs/prd/domain-name/module-name/example-area/epics/epic.178.feature-ui/stories/story.178.8.example-feature/`
-- Story file: `story.178.8.example-feature.md`
-- QA report: `story.178.8.qa.1.example-feature.md`
-- Gate file: `story.178.8.gate.1.example-feature.yml`
-- Bug report: `story.178.8.bug.1.android-swipe-jank.md`
+- Story directory: `docs/prd/domain-name/prd.1.example-area/epics/epic.1.178.feature-ui/stories/story.1.178.8.example-feature/`
+- Story file: `story.1.178.8.example-feature.md`
+- QA report: `story.1.178.8.qa.1.example-feature.md`
+- Gate file: `story.1.178.8.gate.1.example-feature.yml`
+- Bug report: `story.1.178.8.bug.1.android-swipe-jank.md`
 
 **QA Report Structure:**
 
 ````markdown
-# QA Report: Story [epic].[story] - [Story Title]
+# QA Report: Story [P].[E].[S] - [Story Title]
 
 **Epic**: [Epic Name]
-**Story**: [epic].[story] - [Story Title]
+**Story**: [P].[E].[S] - [Story Title]
 **QA Engineer**: QA Engineer
 **Testing Completed**: [Date]
 **Status**: PASS/CONCERNS/FAIL
@@ -1766,8 +1766,8 @@ Re-enumerated {the boundary's inputs, named} and tested each against the current
 
 ---
 
-**QA Report Reference**: `story.[epic].[story].qa.[number].[descriptive-name].md` (co-located)
-**Gate File**: `story.[epic].[story].gate.[number].[descriptive-name].yml` (co-located)
+**QA Report Reference**: `story.[P].[E].[S].qa.[number].[descriptive-name].md` (co-located)
+**Gate File**: `story.[P].[E].[S].gate.[number].[descriptive-name].yml` (co-located)
 
 ````
 
@@ -1778,8 +1778,8 @@ obs #155). The engine resolves against the git index, so a sibling this run wrot
 until it is staged — stage first:
 
 ```bash
-git add "{story-directory}/story.{epic}.{story}.qa.{number}.{descriptive-name}.md"
-node .agents/skills/qa-story/references/doc-links.js --file "{story-directory}/story.{epic}.{story}.qa.{number}.{descriptive-name}.md"
+git add "{story-directory}/story.{P}.{E}.{S}.qa.{number}.{descriptive-name}.md"
+node .agents/skills/qa-story/references/doc-links.js --file "{story-directory}/story.{P}.{E}.{S}.qa.{number}.{descriptive-name}.md"
 ```
 
 Exit 1 → fix the quotation (put it in a fence, or break the `[..](..)` shape so it no longer reads
@@ -1807,11 +1807,11 @@ gate once it is written.
 **CRITICAL: Gate files MUST be co-located with story/task files (Updated 2025-12-09)**
 
 **Gate File Location and Naming:**
-- **Stories**: `story.[epic].[story].gate.[number].[descriptive-name].yml`
+- **Stories**: `story.[P].[E].[S].gate.[number].[descriptive-name].yml`
 - **Tasks**: `task.[number].gate.[number].[descriptive-name].yml`
 - **MUST co-locate with the story/task file in the same directory**
 - Examples:
-  - Story: `docs/prd/domain-name/module-name/epics/epic.1.<name>/stories/story.1.1.5.<slug>/story.1.1.5.gate.1.feature-implementation.yml`
+  - Story: `docs/prd/domain-name/prd.1.module-name/epics/epic.1.1.<name>/stories/story.1.1.5.<slug>/story.1.1.5.gate.1.feature-implementation.yml`
   - Task: `docs/tasks/task.44.transactions-account-backend-integration/task.44.gate.1.transactions-account-backend-integration.yml`
 
 **Legacy Note**: Old pattern of storing gates in `docs/qa/gates/[prd-path]/` is deprecated. All new gate files must be co-located.
@@ -1837,7 +1837,7 @@ Step 3b scope block at the next cycle and by the 5c conformance lens, while the 
 
 ```yaml
 schema: 2
-story: '{epic}.{story}'
+story: '{prd}.{epic}.{story}'
 story_title: '{story title}'
 gate: PASS|CONCERNS|FAIL|WAIVED
 status_reason: '1-2 sentence explanation of gate decision'
@@ -1958,8 +1958,8 @@ For each issue in `top_issues`, include a `suggested_owner`:
 
 After review:
 
-1. Create QA report file: `story.[epic].[story].qa.[number].[descriptive-name].md` (co-located with story file)
-2. Create quality gate file: `story.[epic].[story].gate.[number].[descriptive-name].yml` (co-located with story file — the directory `qa-cycle.sh` searches; a gate written elsewhere is one no later step finds, obs #194)
+1. Create QA report file: `story.[P].[E].[S].qa.[number].[descriptive-name].md` (co-located with story file)
+2. Create quality gate file: `story.[P].[E].[S].gate.[number].[descriptive-name].yml` (co-located with story file — the directory `qa-cycle.sh` searches; a gate written elsewhere is one no later step finds, obs #194)
 3. **Update Story/Task File with QA Results**:
 
    **Replace the whole `## QA Testing Results` section from the gate just written — never patch
@@ -1984,8 +1984,8 @@ After review:
 
    ### QA Report
 
-   - **Full Report**: [story.[epic].[story].qa.[number].[descriptive-name].md](./story.[epic].[story].qa.[number].[descriptive-name].md)
-   - **Gate File**: [story.[epic].[story].gate.[number].[descriptive-name].yml](./story.[epic].[story].gate.[number].[descriptive-name].yml)
+   - **Full Report**: [story.[P].[E].[S].qa.[number].[descriptive-name].md](./story.[P].[E].[S].qa.[number].[descriptive-name].md)
+   - **Gate File**: [story.[P].[E].[S].gate.[number].[descriptive-name].yml](./story.[P].[E].[S].gate.[number].[descriptive-name].yml)
 
    ### Test Coverage Summary
 
@@ -2194,8 +2194,8 @@ cat > "$BODY_FILE" <<'EOF'
 
 ### 📋 QA Artifacts
 
-- **QA Report**: [story.[epic].[story].qa.[number].[descriptive-name].md](path/to/report.md)
-- **Gate File**: [story.[epic].[story].gate.[number].[descriptive-name].yml](path/to/gate.yml)
+- **QA Report**: [story.[P].[E].[S].qa.[number].[descriptive-name].md](path/to/report.md)
+- **Gate File**: [story.[P].[E].[S].gate.[number].[descriptive-name].yml](path/to/gate.yml)
 
 ### ✅ Summary
 
@@ -2461,7 +2461,7 @@ When issues are found during story review, create bug reports following the docu
 
 **Unhappy Path (Issues Found)**:
 
-1. QA creates QA report: `story.[epic].[story].qa.[number].[descriptive-name].md`
+1. QA creates QA report: `story.[P].[E].[S].qa.[number].[descriptive-name].md`
 2. QA creates bug report files for each HIGH/MEDIUM severity issue
 3. QA updates story status to "Reopened"
 4. Iterative fix cycle begins (detailed below)
@@ -2494,7 +2494,7 @@ Review all issues found and categorize by severity:
 
 Use sequential numbering within each story:
 
-**Format**: `story.[epic].[story].bug.[bug-number].[descriptive-name].md`
+**Format**: `story.[P].[E].[S].bug.[bug-number].[descriptive-name].md`
 
 **Examples**:
 
@@ -2517,8 +2517,8 @@ Use sequential numbering within each story:
 **Required Bug Report Sections**:
 
 ```markdown
-**Bug ID**: story.[epic].[story].bug.[bug-number].[description]
-**Related Story**: [[Story [Epic].N] [Story Name]](./story.[epic].[story].[name].md)
+**Bug ID**: story.[P].[E].[S].bug.[bug-number].[description]
+**Related Story**: [[Story [P].[E].[S]] [Story Name]](./story.[P].[E].[S].[name].md)
 **Status**: 🆕 New
 **Priority**: Critical | High | Medium | Low
 **Severity**: Blocker | Major | Minor | Trivial
@@ -2745,7 +2745,7 @@ Quick NFR validation focused on the core four: security, performance, reliabilit
 Assess non-functional requirements for a story and generate:
 
 1. YAML block for the gate file's `nfr_validation` section
-2. Brief markdown assessment saved to `{qa.qaLocation}/assessments/{epic}.{story}-nfr-{YYYYMMDD}.md`
+2. Brief markdown assessment saved to `{qa.qaLocation}/assessments/{prd}.{epic}.{story}-nfr-{YYYYMMDD}.md`
 
 ### Fail-safe for Missing Inputs
 
@@ -2928,10 +2928,10 @@ If `technical-preferences.md` defines custom weights, use those instead.
 
 #### Output 2: Brief Assessment Report
 
-**ALWAYS save to:** `{qa.qaLocation}/assessments/{epic}.{story}-nfr-{YYYYMMDD}.md`
+**ALWAYS save to:** `{qa.qaLocation}/assessments/{prd}.{epic}.{story}-nfr-{YYYYMMDD}.md`
 
 ```markdown
-# NFR Assessment: {epic}.{story}
+# NFR Assessment: {prd}.{epic}.{story}
 
 Date: {date}
 Reviewer: QA Engineer
@@ -2967,7 +2967,7 @@ Reviewer: QA Engineer
 **Print this line for integration into QA report:**
 
 ```
-NFR assessment: {qa.qaLocation}/assessments/{epic}.{story}-nfr-{YYYYMMDD}.md
+NFR assessment: {qa.qaLocation}/assessments/{prd}.{epic}.{story}-nfr-{YYYYMMDD}.md
 ```
 
 #### Output 4: Gate Integration Line
@@ -2975,7 +2975,7 @@ NFR assessment: {qa.qaLocation}/assessments/{epic}.{story}-nfr-{YYYYMMDD}.md
 **Always print at the end:**
 
 ```
-Gate NFR block ready → paste into {story-directory}/story.{epic}.{story}.gate.{N}.{slug}.yml under nfr_validation
+Gate NFR block ready → paste into {story-directory}/story.{P}.{E}.{S}.gate.{N}.{slug}.yml under nfr_validation
 ```
 
 ### NFR Quick Reference
@@ -3107,21 +3107,21 @@ trace:
     full: 3
     partial: 1
     none: 1
-  planning_ref: "{qa.qaLocation}/assessments/{epic}.{story}-test-design-{YYYYMMDD}.md"
+  planning_ref: "{qa.qaLocation}/assessments/{prd}.{epic}.{story}-test-design-{YYYYMMDD}.md"
   uncovered:
     - ac: "AC3"
       reason: "No test found for password reset timing"
-  notes: "See {qa.qaLocation}/assessments/{epic}.{story}-trace-{YYYYMMDD}.md"
+  notes: "See {qa.qaLocation}/assessments/{prd}.{epic}.{story}-trace-{YYYYMMDD}.md"
 ```
 
 #### Output 2: Traceability Report
 
-**Save to:** `{qa.qaLocation}/assessments/{epic}.{story}-trace-{YYYYMMDD}.md`
+**Save to:** `{qa.qaLocation}/assessments/{prd}.{epic}.{story}-trace-{YYYYMMDD}.md`
 
 ```markdown
 # Requirements Traceability Matrix
 
-## Story: {epic}.{story} - {title}
+## Story: {prd}.{epic}.{story} - {title}
 
 ### Coverage Summary
 
@@ -3187,7 +3187,7 @@ Based on gaps identified, recommend:
 **Print this line for integration:**
 
 ```text
-Trace matrix: {qa.qaLocation}/assessments/{epic}.{story}-trace-{YYYYMMDD}.md
+Trace matrix: {qa.qaLocation}/assessments/{prd}.{epic}.{story}-trace-{YYYYMMDD}.md
 ```
 
 ### Traceability Best Practices
@@ -3305,14 +3305,14 @@ This traceability feeds into quality gates:
 
 **Resolve paths first.** Source `references/resolve-paths.sh` to populate `${PRD_ROOT}` (default `docs/prd`) — the PRD root is configurable. The nested structure under it (and QA artifact co-location) is fixed (see [docs/reference/configuration.md](../../docs/reference/configuration.md#configurable-roots-and-fixed-conventions)):
 
-- Stories: nested at `${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.{name}/stories/story.{E}.{S}.{name}/`
+- Stories: nested at `${PRD_ROOT}/{domain}/prd.{P}.{feature}/epics/epic.{P}.{E}.{name}/stories/story.{P}.{E}.{S}.{name}/`
 - QA artifacts (review report, NFR, traceability, gate, DoD): co-located with the story file. No `qa.qaLocation` key.
 
 ### File Naming Conventions (Updated 2025-12-09)
 
 **QA Reports**:
 
-- Stories: `story.[epic].[story].qa.[number].[descriptive-name].md` (co-located with story)
+- Stories: `story.[P].[E].[S].qa.[number].[descriptive-name].md` (co-located with story)
 - Tasks: `task.[number].qa.[number].[descriptive-name].md` (co-located with task)
 
 **Gate Files** — the `[number]` after `gate.` is the QA cycle, and it is **load-bearing**: it is the
@@ -3321,11 +3321,11 @@ from the gate filename. A gate written without it cannot be keyed to a cycle, an
 rather than guesses (task.121). Every writer (`qa-gate`, `qa-story`, `qa-task`) produces the numbered
 form; the un-numbered form this section once documented is not valid.
 
-- Stories: `story.[epic].[story].gate.[number].[descriptive-name].yml` (co-located with story)
+- Stories: `story.[P].[E].[S].gate.[number].[descriptive-name].yml` (co-located with story)
 - Tasks: `task.[number].gate.[number].[descriptive-name].yml` (co-located with task)
 
-**NFR Assessments**: `{qa.qaLocation}/assessments/{epic}.{story}-nfr-{YYYYMMDD}.md` (legacy, deprecated)
-**Trace Reports**: `{qa.qaLocation}/assessments/{epic}.{story}-trace-{YYYYMMDD}.md` (legacy, deprecated)
+**NFR Assessments**: `{qa.qaLocation}/assessments/{prd}.{epic}.{story}-nfr-{YYYYMMDD}.md` (legacy, deprecated)
+**Trace Reports**: `{qa.qaLocation}/assessments/{prd}.{epic}.{story}-trace-{YYYYMMDD}.md` (legacy, deprecated)
 
 **Note**: NFR and Trace assessments should now be included within the main QA report (co-located), not as separate files.
 
@@ -3337,14 +3337,14 @@ form; the un-numbered form this section once documented is not valid.
 docs/
 ├── prd/
 │   └── [domain]/
-│       └── [feature]/
+│       └── prd.1.feature-name/
 │           └── epics/
-│               └── epic.1.epic-name/
+│               └── epic.1.1.epic-name/
 │                   └── stories/
-│                       └── story.1.1.story-name/          # One directory per story — the helper scans it
-│                           ├── story.1.1.story-name.md
-│                           ├── story.1.1.qa.1.story-name.md    # Co-located QA report (cycle 1)
-│                           └── story.1.1.gate.1.story-name.yml # Co-located gate file (cycle 1)
+│                       └── story.1.1.1.story-name/          # One directory per story — the helper scans it
+│                           ├── story.1.1.1.story-name.md
+│                           ├── story.1.1.1.qa.1.story-name.md    # Co-located QA report (cycle 1)
+│                           └── story.1.1.1.gate.1.story-name.yml # Co-located gate file (cycle 1)
 └── tasks/
     └── task.44.name/
         ├── task.44.name.md
@@ -3362,7 +3362,7 @@ docs/
     │   └── 1.1-trace-20250130.md
     └── gates/             # Deprecated - use co-located gate files
         └── [mirrored PRD structure]/
-            └── story.1.1.gate.1.epic-name.yml
+            └── story.1.1.1.gate.1.epic-name.yml
 ```
 
 ---

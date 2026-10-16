@@ -14,7 +14,7 @@ One-way sync of a local epic markdown file to GitHub Issues. Auto-detects create
 | Absent / null | **Pre-flight dedup search by title**, then **Create** (top-level epic issue, milestone auto-created) if no match. Writes `github_issue` back to file. |
 | Present | **Update** existing GitHub issue (title, body, labels, milestone), reconcile open/closed state with frontmatter `status`. A Change Log row is written only if the status transitioned. |
 
-**Difference from `sync-jira-epic`:** GitHub Issues are markdown-native, so no ADF translation; auth/retry/rate-limit are handled by the `gh` CLI; "status transitions" map to `gh issue close` / `gh issue reopen`, since GitHub only has `open`/`closed`. Labels carry the priority signal, and the epic milestone (`Epic {N} — {title}`) is the hierarchical anchor that child stories/tasks attach to — there is no GitHub equivalent of a Jira Epic-Name customfield.
+**Difference from `sync-jira-epic`:** GitHub Issues are markdown-native, so no ADF translation; auth/retry/rate-limit are handled by the `gh` CLI; "status transitions" map to `gh issue close` / `gh issue reopen`, since GitHub only has `open`/`closed`. Labels carry the priority signal, and the epic milestone (`Epic {P}.{E} — {title}`) is the hierarchical anchor that child stories/tasks attach to — there is no GitHub equivalent of a Jira Epic-Name customfield.
 
 **Difference from `sync-github-story`:** epics are **top-level** — no parent issue lookup, no sub-issue linking. The create path delegates to the `ensure-epic-github-issue` sub-routine (the same primitive `create-story`/`review-story` use), so an epic synced here and an epic auto-created during story work converge on one issue. Epics carry `estimated_sprints`, not `estimated_effort_hours`, so the board Estimate field is **not** mirrored.
 
@@ -39,7 +39,7 @@ Source `references/resolve-paths.sh` to populate `${PRD_ROOT}` (default `docs/pr
 ### Required Files
 
 - An epic markdown file at:
-  `${PRD_ROOT}/<domain>/<feature>/epics/epic.<N>.<name>/epic.<N>.<name>.md`
+  `${PRD_ROOT}/<domain>/prd.<P>.<feature>/epics/epic.<P>.<E>.<name>/epic.<P>.<E>.<name>.md`
 - `project.yml` at the repo root with:
   ```yaml
   github:
@@ -59,7 +59,7 @@ Source `references/resolve-paths.sh` to populate `${PRD_ROOT}` (default `docs/pr
 ### 1. Identify the Epic File
 
 ```
-${PRD_ROOT}/<domain>/<feature>/epics/epic.<N>.<slug>/epic.<N>.<slug>.md
+${PRD_ROOT}/<domain>/prd.<P>.<feature>/epics/epic.<P>.<E>.<slug>/epic.<P>.<E>.<slug>.md
 ```
 
 To find epics that have **not yet been synced** (no `github_issue`):

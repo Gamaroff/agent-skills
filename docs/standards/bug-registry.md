@@ -35,4 +35,4 @@ references unambiguous when a cross-cutting bug is cited across years of history
 - [Bug documents](./bug-documents.md)
 - [File naming](./file-naming.md)
 - [Task registry](./task-registry.md) — parallel rules for tasks
-- [Epic registry](./epic-registry.md) — parallel rules for epics
+- [PRD registry](./prd-registry.md) — parallel rules for PRDs (epics and stories count within their parent)

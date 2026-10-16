@@ -46,7 +46,6 @@ const LITERALS = [
 
 // file → why it may still carry a literal. Each must still carry one.
 const ALLOW = new Map([
-  ["shared/resources/open-knowledge-format.md", "task.207 — prose sweep"],
   [
     "shared/resources/migrate-doc-numbering.mjs",
     "task.203 — the migration WRITES the retired pointer at docs/development/epic-registry.md",

@@ -68,7 +68,7 @@ In the **parent story file**'s `## Bug Reports` section, move this bug from *Ope
 ```markdown
 ### Closed Bugs
 
-- [Bug {epic}.{story}.{n}: {desc}](./{bug-file-stem}.md) - ✅ Closed - Priority: {priority} (Fixed {date})
+- [Bug {prd}.{epic}.{story}.{n}: {desc}](./{bug-file-stem}.md) - ✅ Closed - Priority: {priority} (Fixed {date})
 ```
 If this was the parent story's **only** open bug and the story status is `Reopened`, restore it to its prior status (`Ready for Review`/`In Progress` as recorded before the bug was filed). If other open bugs remain, leave the story `Reopened`.
 

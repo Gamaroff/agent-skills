@@ -103,9 +103,9 @@ The skill writes the first story under the epic:
 
 ```
 docs/prd/footer-link/prd.{P}.footer-link/epics/epic.{P}.{E}.footer-link/stories/
-└── story.{E}.1.add-footer-link/
-    ├── story.{E}.1.add-footer-link.md
-    └── story.{E}.1.plan.add-footer-link.md
+└── story.{P}.{E}.1.add-footer-link/
+    ├── story.{P}.{E}.1.add-footer-link.md
+    └── story.{P}.{E}.1.plan.add-footer-link.md
 ```
 
 No additional prompts beyond confirming the story title.
@@ -115,7 +115,7 @@ No additional prompts beyond confirming the story title.
 ## 5. Develop the story (≤ 45 min)
 
 ```text
-/develop-story docs/prd/footer-link/prd.{P}.footer-link/epics/epic.{P}.{E}.footer-link/stories/story.{E}.1.add-footer-link/
+/develop-story docs/prd/footer-link/prd.{P}.footer-link/epics/epic.{P}.{E}.footer-link/stories/story.{P}.{E}.1.add-footer-link/
 ```
 
 Phase 0 of `/develop-story` asks two questions. Recommended answers for a practice run:
@@ -140,7 +140,7 @@ If QA loops more than once it is working as intended; a one-line README change s
 ## 6. Review your artifacts (≤ 2 min)
 
 ```bash
-ls docs/prd/footer-link/prd.{P}.footer-link/epics/epic.{P}.{E}.footer-link/stories/story.{E}.1.add-footer-link/
+ls docs/prd/footer-link/prd.{P}.footer-link/epics/epic.{P}.{E}.footer-link/stories/story.{P}.{E}.1.add-footer-link/
 ```
 
 You should have all 10 artifact types:
@@ -149,14 +149,14 @@ You should have all 10 artifact types:
 | --- | ------------------------------------------------- | -------------------------------------------------------------------------- |
 | 1   | `prd.{P}.footer-link.md`                          | Practice PRD                                                               |
 | 2   | `epic.{P}.{E}.footer-link.md`                         | Parent epic                                                                |
-| 3   | `story.{E}.1.add-footer-link.md`                  | Story spec                                                                 |
-| 4   | `story.{E}.1.plan.add-footer-link.md`             | Co-located implementation plan                                             |
-| 5   | `story.{E}.1.review.1.add-footer-link.md`         | Story review report                                                        |
-| 6   | `story.{E}.1.implementation.1.add-footer-link.md` | What was built + pipeline log                                              |
+| 3   | `story.{P}.{E}.1.add-footer-link.md`                  | Story spec                                                                 |
+| 4   | `story.{P}.{E}.1.plan.add-footer-link.md`             | Co-located implementation plan                                             |
+| 5   | `story.{P}.{E}.1.review.1.add-footer-link.md`         | Story review report                                                        |
+| 6   | `story.{P}.{E}.1.implementation.1.add-footer-link.md` | What was built + pipeline log                                              |
 | 7   | PR URL                                            | Pull Request opened by `/develop-story` (GitHub or Bitbucket per your VCS) |
-| 8   | `story.{E}.1.qa.1.add-footer-link.md`             | QA findings + traceability matrix                                          |
-| 9   | `story.{E}.1.gate.1.add-footer-link.yml`          | PASS / CONCERNS / FAIL gate                                                |
-| 10  | `story.{E}.1.dod.1.add-footer-link.md`            | Definition-of-Done checklist + sprint review summary                       |
+| 8   | `story.{P}.{E}.1.qa.1.add-footer-link.md`             | QA findings + traceability matrix                                          |
+| 9   | `story.{P}.{E}.1.gate.1.add-footer-link.yml`          | PASS / CONCERNS / FAIL gate                                                |
+| 10  | `story.{P}.{E}.1.dod.1.add-footer-link.md`            | Definition-of-Done checklist + sprint review summary                       |
 
 For annotated worked examples of the upstream artifacts, see [`examples/prd-example/`](../../examples/prd-example/) (the PRD that drove this onboarding effort) and [`examples/epic-examples/`](../../examples/epic-examples/) (its four epics). For a deliberate FAIL → PASS walkthrough, see [Day 3 — Messy Path](../runbooks/first-week/day-3-messy-path.md).
 
@@ -168,9 +168,9 @@ Pick one:
 
 **A. Keep the artifact as proof (recommended for first-time users).**
 
-Leave the branch as-is. Mark the epic row `CANCELLED` in `docs/development/epic-registry.md`. Mark the story `status: cancelled` in its frontmatter. Numbers are never recycled — the rows stay forever as records.
+Leave the branch as-is. Mark the epic and the story `status: cancelled` in their frontmatter. Keep the documents: an epic's number `E` is counted from the epics on disk within its PRD, so a cancelled epic that stays on disk keeps its number, and a deleted one frees it.
 
-> **What a registry row looks like:** epic rows have columns `Epic # | Tracker key | Domain | Folder | Title | Status | Created`. To cancel, change the `Status` cell to `CANCELLED` (or `🚫 Cancelled`) and leave the other cells untouched. Do **not** decrement the **Next Available Epic Number** counter — numbers stay used even when cancelled. Full schemas: [`../standards/epic-registry.md`](../standards/epic-registry.md), [`../standards/task-registry.md`](../standards/task-registry.md).
+> **Where numbers come from:** a PRD number comes from the [PRD registry](../standards/prd-registry.md) and is never reused; epic and story numbers are counted within their parent by `doc-id.js` — there is no epic registry to edit. Task numbers come from the [task registry](../standards/task-registry.md).
 
 Close the practice PR on your VCS host (GitHub/Bitbucket) and close any practice tracker issues the chain opened (GitHub Issues or Jira).
 
@@ -178,10 +178,10 @@ Close the practice PR on your VCS host (GitHub/Bitbucket) and close any practice
 
 ```bash
 git checkout develop
-git branch -D feature/story.{E}.1.add-footer-link
+git branch -D feature/story.{P}.{E}.1.add-footer-link
 ```
 
-Revert or drop the PRD/epic/story commits from your branch. Mark registry rows `CANCELLED` — do NOT delete them.
+Revert or drop the PRD/epic/story commits from your branch. If the practice run added a row to `docs/prd/prd-registry.md`, mark it `cancelled` — never delete it: a PRD number is never reused. Epic and story numbers need nothing: they are counted from the documents on disk.
 
 If a practice GitHub milestone or Jira sprint/version was created: delete it once all linked issues are closed.
 

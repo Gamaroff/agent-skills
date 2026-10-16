@@ -30,7 +30,7 @@ The marker makes that documented omission a non-finding rather than a `section-m
 
 ## Story variant
 
-Created as `story.{epic}.{story}.implementation.{N}.{descriptive-name}.md` in the story directory.
+Created as `story.{P}.{E}.{S}.implementation.{N}.{descriptive-name}.md` in the story directory.
 
 ```markdown
 # Implementation Report: {story title}
@@ -66,12 +66,12 @@ Created as `story.{epic}.{story}.implementation.{N}.{descriptive-name}.md` in th
 
 | Step                        | Status     | Required Artifacts                                                                           | Notes | Subagent summary ref | Completed (UTC) |
 | --------------------------- | ---------- | -------------------------------------------------------------------------------------------- | ----- | -------------------- | --------------- |
-| 1. create-story-branch      | ⏳ Pending | Branch `feature/story.{epic}.{story}.*` exists in git                                        |       | —                    |                 |
-| 2. review-story             | ⏳ Pending | `story.{epic}.{story}.review.{N}.{name}.md` exists (or skip logged)                          |       | —                    |                 |
+| 1. create-story-branch      | ⏳ Pending | Branch `feature/story.{P}.{E}.{S}.*` exists in git                                        |       | —                    |                 |
+| 2. review-story             | ⏳ Pending | `story.{P}.{E}.{S}.review.{N}.{name}.md` exists (or skip logged)                          |       | —                    |                 |
 | 3. develop                  | ⏳ Pending | Story status == `Ready for Review`                                                           |       | —                    |                 |
 | 4. create-pr                | ⏳ Pending | PR URL targets `develop` (or chosen base); issue/tracker comment posted                      |       | —                    |                 |
-| 5–6. qa-story / qa-fix loop | ⏳ Pending | `story.{epic}.{story}.qa.{N}.*.md`; `story.{epic}.{story}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                 | ⏳ Pending | `story.{epic}.{story}.dod.{N}.*.md`; story `status: accepted`                                |       | —                    |                 |
+| 5–6. qa-story / qa-fix loop | ⏳ Pending | `story.{P}.{E}.{S}.qa.{N}.*.md`; `story.{P}.{E}.{S}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
+| 7. finalise                 | ⏳ Pending | `story.{P}.{E}.{S}.dod.{N}.*.md`; story `status: accepted`                                |       | —                    |                 |
 | 8. commit-changes           | ⏳ Pending | All artifacts committed and pushed                                                           |       | —                    |                 |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `shared/resources/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.

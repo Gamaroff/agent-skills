@@ -42,7 +42,7 @@ Source `references/resolve-paths.sh` to populate `${PRD_ROOT}` (default `docs/pr
 ### Required Files
 
 - A story markdown file at:
-  `${PRD_ROOT}/<domain>/<feature>/epics/epic.<N>.<name>/stories/story.<N>.<M>.<slug>/story.<N>.<M>.<slug>.md`
+  `${PRD_ROOT}/<domain>/prd.<P>.<feature>/epics/epic.<P>.<E>.<name>/stories/story.<P>.<E>.<S>.<slug>/story.<P>.<E>.<S>.<slug>.md`
 - `project.yml` at the repo root with:
   ```yaml
   github:
@@ -62,7 +62,7 @@ Source `references/resolve-paths.sh` to populate `${PRD_ROOT}` (default `docs/pr
 ### 1. Identify the Story File
 
 ```
-${PRD_ROOT}/<domain>/<feature>/epics/epic.<N>.<slug>/stories/story.<N>.<M>.<slug>/story.<N>.<M>.<slug>.md
+${PRD_ROOT}/<domain>/prd.<P>.<feature>/epics/epic.<P>.<E>.<slug>/stories/story.<P>.<E>.<S>.<slug>/story.<P>.<E>.<S>.<slug>.md
 ```
 
 To find stories that have **not yet been synced** (no `github_issue`):

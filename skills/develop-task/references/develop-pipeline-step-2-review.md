@@ -18,7 +18,7 @@ Re-read the document's `Status:` field (captured in Phase 0). Then check for an 
 
 #### develop-story
 ```bash
-find {story-directory} -maxdepth 1 -name "story.{epic}.{story}.review.*.md" 2>/dev/null | sed -E 's/^(.*\.review\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-
+find {story-directory} -maxdepth 1 -name "story.{P}.{E}.{S}.review.*.md" 2>/dev/null | sed -E 's/^(.*\.review\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-
 ```
 
 #### develop-task
@@ -233,11 +233,11 @@ Proceed to Step 3.
 ## If Running the Review Skill
 
 #### develop-story
-Invoke the `/review-story` skill with the story file path in **validate-and-apply** mode (`MODE=validate` + `APPLY=true`). This is non-interactive — no output-format question is asked. The variant scores the story, applies critical + important fixes, and promotes `Draft → Ready for Development` on a GO (HALT on NO-GO), then writes a comprehensive `story.{epic}.{story}.review.{n}.{story-name}.md` report for the pipeline audit trail. Log: "review-story invoked in validate-and-apply mode".
+Invoke the `/review-story` skill with the story file path in **validate-and-apply** mode (`MODE=validate` + `APPLY=true`). This is non-interactive — no output-format question is asked. The variant scores the story, applies critical + important fixes, and promotes `Draft → Ready for Development` on a GO (HALT on NO-GO), then writes a comprehensive `story.{P}.{E}.{S}.review.{n}.{story-name}.md` report for the pipeline audit trail. Log: "review-story invoked in validate-and-apply mode".
 
 After review-story completes, locate the generated review report:
 ```bash
-find {story-directory} -maxdepth 1 -name "story.{epic}.{story}.review.*.md" 2>/dev/null | sed -E 's/^(.*\.review\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-
+find {story-directory} -maxdepth 1 -name "story.{P}.{E}.{S}.review.*.md" 2>/dev/null | sed -E 's/^(.*\.review\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-
 ```
 Record the path in the Decisions Log: "Review report: {path}". If no review report file is found, log a warning in the Issues Log ("review-story did not produce a review report file") but do not halt.
 
@@ -377,7 +377,7 @@ deliverable is executed by a reader; a gap in it is a branch, not an omission.
 - **Draft → Ready for Development**: Log "Draft promoted to Ready for Development by review-story" in Decisions Log. Proceed autonomously.
 - **Non-blocking suggestions**: Log as "Proceeding despite minor review suggestions: {list}" and continue.
 - **Clean pass**: Log "Story review passed" and continue.
-- **Blocking issues** (contradictory specs, missing ACs, status still `Draft`): Log each in Issues Log, invoke `/commit-changes` (message: `docs(story.{epic}.{story}): implementation report — review-story blocking halt`), then HALT: "review-story could not resolve blocking issues — human input required before development can proceed".
+- **Blocking issues** (contradictory specs, missing ACs, status still `Draft`): Log each in Issues Log, invoke `/commit-changes` (message: `docs(story.{P}.{E}.{S}): implementation report — review-story blocking halt`), then HALT: "review-story could not resolve blocking issues — human input required before development can proceed".
 
 #### develop-task
 

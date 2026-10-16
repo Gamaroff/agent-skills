@@ -9,7 +9,7 @@ Implementation plans must be co-located with the work they describe — never le
 | Plan type | Location | Filename |
 |---|---|---|
 | Task plan | Inside the task directory | `task.{N}.plan.{descriptive-name}.md` |
-| Story plan | Inside the story directory (alongside story doc) | `story.{E}.{S}.plan.{descriptive-name}.md` |
+| Story plan | Inside the story directory (alongside story doc) | `story.{P}.{E}.{S}.plan.{descriptive-name}.md` |
 | General plan (not tied to a task/story) | `.agents/plans/` in the repo | `{descriptive-kebab-case-name}.md` |
 
 ## Rule

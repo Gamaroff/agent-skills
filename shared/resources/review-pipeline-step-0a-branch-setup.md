@@ -106,11 +106,21 @@ BUG_PREFIX="$BUG_BASENAME"                            # the full stem; used for 
 
 #### review-epic
 
+The ids are `doc-id.js`'s, as in the story block above: in `epic.{P}.{E}.{slug}` the second field
+is the PRD, so `awk -F.` read P where it meant E, and the auto-skip below matched every epic of the
+PRD (task 207).
+
 ```bash
-EPIC_BASENAME=$(basename "$DOC_FILE" .md)            # e.g. epic.42.payments
-EPIC_NUM=$(echo "$EPIC_BASENAME" | awk -F. '{print $2}')
-EPIC_SLUG=$(echo "$EPIC_BASENAME" | sed 's/epic\.[0-9]*\.//')
-EPIC_BRANCH="feature/epic.${EPIC_NUM}.${EPIC_SLUG}"
+# 0a.2 review-epic — epic ids through doc-id (task 207). DOC_FILE is the epic document.
+DOC_ID="$PWD/.agents/skills/review-epic/references/doc-id.js"
+EPIC_ID_JSON=$(command node "$DOC_ID" parse "$(basename "$DOC_FILE")" --json) \
+  || { echo "❌ $(basename "$DOC_FILE") is not an epic id doc-id can read (epic.P.E.slug.md); a legacy epic.E name is migrated first with migrate-doc-numbering"; exit 1; }
+[ "$(printf '%s' "$EPIC_ID_JSON" | jq -r '"\(.kind) \(.artifact)"')" = "epic null" ] \
+  || { echo "❌ $(basename "$DOC_FILE") is not an epic document"; exit 1; }
+PRD_NUM=$(printf '%s' "$EPIC_ID_JSON" | jq -r '.prd')
+EPIC_NUM=$(printf '%s' "$EPIC_ID_JSON" | jq -r '.epic')
+EPIC_SLUG=$(printf '%s' "$EPIC_ID_JSON" | jq -r '.slug')
+EPIC_BRANCH="feature/epic.${PRD_NUM}.${EPIC_NUM}.${EPIC_SLUG}"   # e.g. feature/epic.1.42.payments
 ```
 
 ---
@@ -159,8 +169,16 @@ esac
 #### review-epic
 
 ```bash
+# 0a.3 review-epic — every value re-derived HERE: 0a.1's and 0a.2's blocks are other shells, and an
+# unbound PRD_NUM/EPIC_NUM collapsed the pattern to `feature/epic..*` so the skip never fired (task.207
+# QA cycle 1, CR-1). DOC_FILE is the epic document. Empty on a detached HEAD: no skip.
+EPIC_ID_JSON=$(command node "$PWD/.agents/skills/review-epic/references/doc-id.js" parse "$(basename "$DOC_FILE")" --json) \
+  || { echo "❌ $(basename "$DOC_FILE") is not an epic id doc-id can read"; exit 1; }
+PRD_NUM=$(printf '%s' "$EPIC_ID_JSON" | jq -r '.prd')
+EPIC_NUM=$(printf '%s' "$EPIC_ID_JSON" | jq -r '.epic')
+CURRENT_BRANCH=$(git branch --show-current)
 case "$CURRENT_BRANCH" in
-  feature/epic.${EPIC_NUM}.*) BRANCH_NAME="$CURRENT_BRANCH"; AUTO_SKIPPED=true ;;
+  "feature/epic.${PRD_NUM}.${EPIC_NUM}."*) BRANCH_NAME="$CURRENT_BRANCH"; AUTO_SKIPPED=true ;;
 esac
 ```
 
@@ -254,7 +272,7 @@ Save the stash ref for 0a.8:
 
 > **Idempotence**: re-check immediately before each mutation — the branch may have appeared on remote between detection and creation.
 >
-> This creates an ordinary epic-**document** feature branch (`feature/epic.{n}.{name}`) from `${BASE_DEFAULT}` for reviewing/editing the epic doc — it is **not** a long-lived integration branch. review-story and review-task never reach this section; they branch a story/task feature branch from `${BASE_DEFAULT}` in 0a.7.
+> This creates an ordinary epic-**document** feature branch (`feature/epic.{P}.{E}.{name}`) from `${BASE_DEFAULT}` for reviewing/editing the epic doc — it is **not** a long-lived integration branch. review-story and review-task never reach this section; they branch a story/task feature branch from `${BASE_DEFAULT}` in 0a.7.
 
 ```bash
 git fetch origin

@@ -58,7 +58,7 @@ After the Explore subagent returns, look for a co-located plan file:
 
 #### develop-story
 ```bash
-find {story-directory} -maxdepth 1 -name "story.{epic}.{story}.plan.*.md" 2>/dev/null | head -1
+find {story-directory} -maxdepth 1 -name "story.{P}.{E}.{S}.plan.*.md" 2>/dev/null | head -1
 ```
 If found, read the plan file and include its content as additional context when invoking `/develop`. The plan file contains implementation-level detail (code snippets, exact file changes, function signatures) that supplements the story's Tasks section. Log in Decisions Log: "Plan file found: {path} — included as implementation context for /develop".
 
@@ -385,7 +385,7 @@ item you already have open. From Step 4 onward that block is omitted.
 ## On Halt
 
 #### develop-story
-Log the reason in Issues Log, invoke the `/commit-changes` skill to save the report (suggested message: `docs(story.{epic}.{story}): implementation report — develop halt`), then HALT with the report path.
+Log the reason in Issues Log, invoke the `/commit-changes` skill to save the report (suggested message: `docs(story.{P}.{E}.{S}): implementation report — develop halt`), then HALT with the report path.
 
 #### develop-task
 Log the reason in Issues Log, invoke the `/commit-changes` skill to save the report (suggested message: `docs(task.{id}): implementation report — develop halt`), then HALT with the report path.

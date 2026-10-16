@@ -49,7 +49,7 @@ Before step 1:
 
   Both roots are configurable (defaults shown). Nested structure under each root is fixed — see [Configurable roots and fixed conventions](../reference/configuration.md#configurable-roots-and-fixed-conventions).
 
-- `docs/development/epic-registry.md` exists (empty registry — `create-epic` and `epic-registry-manager` will populate it).
+- No epic registry is needed: `create-prd` bootstraps `docs/prd/prd-registry.md`, and `create-epic` numbers epics within their PRD.
 - `develop` branch created from `main`.
 - Choose your platform combo — VCS (`github` or `bitbucket`) and tracker (`github` Issues or `jira`) are independent. Auto-detected from git remote + `JIRA_URL` env var, or override explicitly in `skills-config.yaml`:
 

@@ -43,7 +43,7 @@ status: draft
 │   ├── examples/            # Copy-paste starter assets (e.g. docs/examples/architecture/)
 │   ├── prd/                 # PRDs that drive this repo's own development (dogfood)
 │   ├── tasks/               # Standalone technical tasks (task-registry.md owns numbering)
-│   ├── epic-registry.md     # Global epic numbering — single source of truth
+│   ├── epic-registry.md     # Retired — old → new epic mapping only (PRD numbers: docs/prd/prd-registry.md)
 │   └── README.md
 │
 ├── tests/                   # Cross-cutting tests that don't belong to a single skill

@@ -552,7 +552,7 @@ Actions:
    - Bug Reports
 
 2. **File Naming Convention**:
-   - MUST follow: `story.[epic].[story].[descriptive-name].md`
+   - MUST follow: `story.[P].[E].[S].[descriptive-name].md`
    - Use DOTS (.) for structural separators
    - Use hyphens (-) within descriptive names
    - Examples:
@@ -1653,7 +1653,7 @@ Report:  <path>
 **Report Structure**:
 
 ```markdown
-# Story Validation Report: Story [Epic].[Story] — [Title]
+# Story Validation Report: Story [P].[E].[S] — [Title]
 
 **Validated:** [ISO date]
 **Validation Depth:** [Quick/Standard/Thorough]
@@ -1781,7 +1781,7 @@ The Implementation Readiness Score is calculated as a weighted average across al
 **Report Structure**:
 
 ```markdown
-# Story Review Report: Story [Epic].[Story] - [Title]
+# Story Review Report: Story [P].[E].[S] - [Title]
 
 **Reviewed:** [Date]
 **Review Depth:** [Quick/Standard/Thorough]
@@ -2845,7 +2845,7 @@ architecture:
 Both roots are configurable; nested structure is fixed (see [docs/reference/configuration.md](../../docs/reference/configuration.md#configurable-roots-and-fixed-conventions)):
 
 - PRDs live under `${PRD_ROOT}/`
-- Epics: `${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md`
+- Epics: `${PRD_ROOT}/{domain}/prd.{P}.{feature}/epics/epic.{P}.{E}.{name}/epic.{P}.{E}.{name}.md`
 - Stories: nested at `{epic-dir}/stories/`
 
 **Note**: If `skills-config.yaml` is missing, the skill will use sensible defaults based on your project organization.

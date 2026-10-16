@@ -142,7 +142,7 @@ The one lookup from a tracker key to its work-item document. `develop-story`, `d
 # whatever its slug says (task.5.request/task.5.request.md); any other file whose BASENAME carries
 # an artifact kind segment — numbered, dated or slug-form (task.12.review.2026-05-06.md) — or is
 # finalise's sprint-review summary is dropped, because artifacts copy the item's key. Only the
-# basename is read, so a directory such as epic.4.qa.tools/ excludes nothing.
+# basename is read, so a directory such as epic.1.4.qa.tools/ excludes nothing.
 # An empty KEY_VALUE would match every blank key field, so both inputs must be bound.
 : "${KEY_FIELD:?bind KEY_FIELD (jira_key or github_issue)}" "${KEY_VALUE:?bind KEY_VALUE (the key or issue number)}"
 # A missing or unreadable docs/ (the wrong cwd) is its own HALT, never "no document has this key".

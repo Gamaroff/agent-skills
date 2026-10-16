@@ -158,13 +158,13 @@ risk_summary:
 
 #### Output 2: Markdown Risk Report
 
-**Save to:** `{storyDirectory}/story.{epic}.{story}.risk.1.{story-name}.md`
+**Save to:** `{storyDirectory}/story.{P}.{E}.{S}.risk.1.{story-name}.md`
 
 - If re-running planning (rare): increment to `.risk.2.`, `.risk.3.` etc.
 - For tasks: `{taskDirectory}/task.{id}.risk.1.{task-name}.md`
 
 ```markdown
-# Risk Profile: Story {epic}.{story}
+# Risk Profile: Story {prd}.{epic}.{story}
 
 Date: {date}
 Reviewer: QA Engineer
@@ -270,7 +270,7 @@ Review and update risk profile when:
 **Print this line for qa-story skill to reference:**
 
 ```text
-Risk profile: {storyDirectory}/story.{epic}.{story}.risk.1.{story-name}.md
+Risk profile: {storyDirectory}/story.{P}.{E}.{S}.risk.1.{story-name}.md
 ```
 
 ### Risk Scoring Algorithm
@@ -434,7 +434,7 @@ For each identified test need, create:
 
 ```yaml
 test_scenario:
-  id: "{epic}.{story}-{LEVEL}-{SEQ}"
+  id: "{prd}.{epic}.{story}-{LEVEL}-{SEQ}"
   requirement: "AC1: User can login with valid credentials"
   priority: P0
   level: integration
@@ -465,13 +465,13 @@ Ensure:
 
 #### Output 1: Test Design Document
 
-**Save to:** `{storyDirectory}/story.{epic}.{story}.test-design.1.{story-name}.md`
+**Save to:** `{storyDirectory}/story.{P}.{E}.{S}.test-design.1.{story-name}.md`
 
 - If re-running planning (rare): increment to `.test-design.2.`, `.test-design.3.` etc.
 - For tasks: `{taskDirectory}/task.{id}.test-design.1.{task-name}.md`
 
 ```markdown
-# Test Design: Story {epic}.{story}
+# Test Design: Story {prd}.{epic}.{story}
 
 Date: {date}
 Designer: QA Engineer
@@ -558,7 +558,7 @@ test_design:
 Print for use by qa-story skill (trace-requirements workflow):
 
 ```text
-Test design matrix: {storyDirectory}/story.{epic}.{story}.test-design.1.{story-name}.md
+Test design matrix: {storyDirectory}/story.{P}.{E}.{S}.test-design.1.{story-name}.md
 P0 tests identified: 5
 ```
 
@@ -570,7 +570,7 @@ Before finalizing, verify:
 - [ ] Test levels are appropriate (not over-testing)
 - [ ] No duplicate coverage across levels
 - [ ] Priorities align with business risk
-- [ ] Test IDs follow naming convention `{epic}.{story}-{LEVEL}-{SEQ}`
+- [ ] Test IDs follow naming convention `{prd}.{epic}.{story}-{LEVEL}-{SEQ}`
 - [ ] Scenarios are atomic and independent
 - [ ] Test data requirements documented
 - [ ] Risk coverage mapped (if risk profile exists)
@@ -640,8 +640,8 @@ qa:
 
 All qa-planning outputs are co-located in the story (or task) directory following the canonical naming convention:
 
-**Risk Reports** (stories): `story.{epic}.{story}.risk.{num}.{story-name}.md`
-**Test Design** (stories): `story.{epic}.{story}.test-design.{num}.{story-name}.md`
+**Risk Reports** (stories): `story.{P}.{E}.{S}.risk.{num}.{story-name}.md`
+**Test Design** (stories): `story.{P}.{E}.{S}.test-design.{num}.{story-name}.md`
 
 **Risk Reports** (tasks): `task.{id}.risk.{num}.{task-name}.md`
 **Test Design** (tasks): `task.{id}.test-design.{num}.{task-name}.md`
@@ -654,18 +654,18 @@ RISK_N=$(next_numbered "{document-directory}" risk -name "{stem}.risk.*.md") || 
 TEST_DESIGN_N=$(next_numbered "{document-directory}" test-design -name "{stem}.test-design.*.md") || exit 1
 ```
 
-`{stem}` is `story.{epic}.{story}` or `task.{id}`; use `$RISK_N` and `$TEST_DESIGN_N` as `{num}`. Each is the highest existing `{num}` of its series plus 1 (1 when there is none), never the number of reports plus 1: a directory holding `.1.` and `.3.` gets `.4.`, where a count would overwrite `.3.`. `next_numbered`'s header in the sourced file states the full rule (obs #272, task.186).
+`{stem}` is `story.{P}.{E}.{S}` or `task.{id}`; use `$RISK_N` and `$TEST_DESIGN_N` as `{num}`. Each is the highest existing `{num}` of its series plus 1 (1 when there is none), never the number of reports plus 1: a directory holding `.1.` and `.3.` gets `.4.`, where a count would overwrite `.3.`. `next_numbered`'s header in the sourced file states the full rule (obs #272, task.186).
 
 ### Directory Structure
 
 ```
-story.312.1.user-authentication/
-├── story.312.1.user-authentication.md
-├── story.312.1.risk.1.user-authentication.md       ← qa-planning (pre-dev)
-├── story.312.1.test-design.1.user-authentication.md ← qa-planning (pre-dev)
-├── story.312.1.qa.1.user-authentication.md         ← qa-story
-├── story.312.1.gate.1.user-authentication.yml      ← qa-story
-└── story.312.1.dod.1.user-authentication.md        ← finalise
+story.1.312.1.user-authentication/
+├── story.1.312.1.user-authentication.md
+├── story.1.312.1.risk.1.user-authentication.md       ← qa-planning (pre-dev)
+├── story.1.312.1.test-design.1.user-authentication.md ← qa-planning (pre-dev)
+├── story.1.312.1.qa.1.user-authentication.md         ← qa-story
+├── story.1.312.1.gate.1.user-authentication.yml      ← qa-story
+└── story.1.312.1.dod.1.user-authentication.md        ← finalise
 ```
 
 ---

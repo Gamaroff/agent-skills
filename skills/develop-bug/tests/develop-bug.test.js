@@ -85,7 +85,7 @@ test("banners use the DEVELOP-BUG prefix, not STORY/TASK", () => {
 // All three bug modes covered
 // ---------------------------------------------------------------------------
 test("Step 0 resolves all three bug modes with their filename patterns", () => {
-  assert.match(STEP0, /story\.\{epic\}\.\{story\}\.bug\.\{n\}/);
+  assert.match(STEP0, /story\.\{P\}\.\{E\}\.\{S\}\.bug\.\{n\}/);
   assert.match(STEP0, /task\.\{id\}\.bug\.\{n\}/);
   assert.match(STEP0, /bug\.\{N\}\.\{name\}/);
 });

@@ -204,7 +204,7 @@ After each step: update the Pipeline Progress table (✅ Done / ❌ Failed / ⚠
 
 Follow the generic mechanics in [`references/develop-pipeline-step-1-create-branch.md`](references/develop-pipeline-step-1-create-branch.md) (use the **develop-task variant** for stash/restore, lock-collision, post-branch, and lock-file creation), with these **bug substitutions**:
 
-- **work item** = the bug file; **work-item dir** = the bug directory; **id** = the bug prefix (`story.{e}.{s}.bug.{n}` / `task.{id}.bug.{n}` / `bug.{N}`).
+- **work item** = the bug file; **work-item dir** = the bug directory; **id** = the bug prefix (`story.{P}.{E}.{S}.bug.{n}` / `task.{id}.bug.{n}` / `bug.{N}`).
 - **Branch base and type** come from Phase 0d:
   - **Bugfix** (default) → invoke `/create-branch` with the bug file; select `develop` as the base when asked (Q2 answer). The branch is `bugfix/{bug file stem}` (create-branch's **Bugfix** row, e.g. `bugfix/task.110.bug.1.whitelist-admits-mutating-shapes`): never a shortened or re-separated form.
   - **Hotfix** (Q1 = production hotfix) → invoke `/create-branch --hotfix v{X.Y.Z}` (branch off `main`). The version is the Q-derived next patch; if unknown, ask once during Step 1.
@@ -353,7 +353,7 @@ If a situation arises that is not in this table or the shared defaults table and
 
 ## File References
 
-- Story bug: `{story-dir}/story.{epic}.{story}.bug.{n}.{name}.md` (co-located with the story)
+- Story bug: `{story-dir}/story.{P}.{E}.{S}.bug.{n}.{name}.md` (co-located with the story)
 - Task bug: `docs/tasks/task.{id}.{name}/task.{id}.bug.{n}.{name}.md`
 - General bug: `docs/bugs/bug.{N}.{name}/bug.{N}.{name}.md` (+ `docs/bugs/bug-registry.md`)
 - Implementation report: `{bug-directory}/{bug-prefix}.implementation.{N}.{descriptive-name}.md` — `{bug-prefix}` is the **short** id **Step 0 defines** (`bug.14`, `task.67.bug.3`; `bug-doc.js` `bug_id`), never the bug file's full stem, which is `{bug-file-stem}` (TASK-125-BUG-18). Runs before task.125 wrote `{bug-file-stem}.implementation.{N}.*.md` too, so every reader of the report (Step 0's resume lookup above, `finalise` 6a/6b, `bug-doc.js`) accepts both shapes; a writer uses the short id (TASK-125-BUG-13).
