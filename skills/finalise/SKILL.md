@@ -552,8 +552,9 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
      });' .claude/state/probe-plan.json "$RUNNER" 2>/dev/null)
    # A budget that is not a positive integer means the runner did not load: say so and carry on — the
    # run below fails the same way and reports "no result"; aborting here would print nothing at all.
+   # The pattern is set-waiting-on.sh's own, so the two checks accept the same values (task.189 CR6-5).
    case "$BUDGET" in
-     ''|*[!0-9]*) echo "⚠️  probe plan: the runner did not load — the wait is not marked" ;;
+     ''|*[!0-9]*|0*) echo "⚠️  probe plan: the runner did not load — the wait is not marked" ;;
      *) bash .agents/skills/finalise/references/set-waiting-on.sh "step-7 probe plan" --kind task \
           --budget-minutes "$BUDGET" ;;
    esac

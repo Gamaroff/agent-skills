@@ -447,17 +447,17 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.189.qa.5.read-only-agents-never-write.md](./task.189.qa.5.read-only-agents-never-write.md)
-- **Gate File**: [task.189.gate.5.read-only-agents-never-write.yml](./task.189.gate.5.read-only-agents-never-write.yml)
+- **Full Report**: [task.189.qa.6.read-only-agents-never-write.md](./task.189.qa.6.read-only-agents-never-write.md)
+- **Gate File**: [task.189.gate.6.read-only-agents-never-write.yml](./task.189.gate.6.read-only-agents-never-write.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 70
+- **Tests Executed**: 56
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-Cycle-4 fixes hold. One medium: the Step 3b.1 block's budget abort runs before the stale result is removed (CR5-1); bug.5 reopened.
+CR5-1 fixed and mutation-proven; bug.5 closed. One medium in test machinery: the fix's `2>/dev/null` makes the cycle-4 argv-order stderr assertion vacuous (CR6-1, bug.6).
 
 <!-- change-log-start -->
 ## Change Log
@@ -478,6 +478,8 @@ Cycle-4 fixes hold. One medium: the Step 3b.1 block's budget abort runs before t
 | 2026-10-16 |  | QA findings fixed — cycle 4, 1 gate finding (CR4-1) + 4 advisory (CR4-2..CR4-5), run rule consolidated into the Step 3b.1 block | qa-fix |
 | 2026-10-16 |  | QA gate CONCERNS (90/100) — 1 medium finding; bug.5 reopened | qa-task |
 | 2026-10-16 |  | QA findings fixed — cycle 5, 1 gate finding (CR5-1) + 2 advisory (CR5-3, CR5-4) | qa-fix |
+| 2026-10-16 |  | QA gate CONCERNS (90/100) — 1 medium finding (test machinery); bug.5 closed, bug.6 opened | qa-task |
+| 2026-10-16 |  | QA findings fixed — cycle 6, 1 gate finding (CR6-1) + 3 advisory (CR6-3..CR6-5); CR6-2 left advisory | qa-fix |
 <!-- change-log-end -->
 
 ---

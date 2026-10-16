@@ -1,7 +1,7 @@
 ---
 type: bug
 id: task.189.bug.5
-status: ready-for-qa
+status: closed
 severity: medium
 priority: P2
 created: 2026-10-16
@@ -13,7 +13,7 @@ created: 2026-10-16
 **Bug ID**: TASK-189-BUG-5
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (qa-task cycle 3, finding QA3-1, from reviewer CR-1)
 **Date Found**: 2026-10-16
 
@@ -100,3 +100,4 @@ Run the Step 3b.1 block backgrounded (`run_in_background`, marked with `set-wait
 | 2026-10-16 | Ready for QA | qa-fix | Fixed in QA cycle 4 (iteration 2) |
 | 2026-10-16 | Reopened | qa-task | Iteration 2's ${BUDGET:?} abort runs before the stale result is removed (CR5-1); task.189.qa.5 |
 | 2026-10-16 | Ready for QA | qa-fix | Fixed in QA cycle 5 (iteration 3) |
+| 2026-10-16 | Closed | qa-task | Verified by task.189.qa.6.read-only-agents-never-write.md |

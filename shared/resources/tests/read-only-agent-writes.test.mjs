@@ -572,6 +572,11 @@ test("Step 3b.1: a run killed mid-write leaves no result — never a partial or 
   const r = run("bash", block, { cwd: work });
   assert.match(r.stdout, /probe-plan exit=137/);
   assert.match(r.stdout, /probe-plan: no result — the run did not complete/);
+  // The budget path is taken on purpose (CR5-3), so assert it was (CR6-3): an empty plan is one entry.
+  assert.deepEqual(waitLog(work), [
+    "step-7 probe plan --kind task --budget-minutes 6",
+    "--clear",
+  ]);
   assert.equal(
     fs.existsSync(path.join(work, ".claude/state/probe-plan-result.json")),
     false,
@@ -671,7 +676,22 @@ test("the block marks its own wait with a budget from the plan and clears it (CR
       ],
     },
   ]);
-  const r = run("bash", stepBlock(), { cwd: work });
+  // The block discards the budget import's stderr; the test sends it to a file instead, so the guard
+  // below can see a CLI run it would otherwise never be shown (CR6-1).
+  const IMPORT_ERR = `"$RUNNER" 2>/dev/null)`;
+  const source = stepBlock();
+  assert.equal(
+    source.split(IMPORT_ERR).length,
+    2,
+    "the budget import's stderr redirect moved",
+  );
+  const r = run(
+    "bash",
+    source.split(IMPORT_ERR).join(`"$RUNNER" 2>.budget.err)`),
+    {
+      cwd: work,
+    },
+  );
   assert.equal(r.status, 0, r.stderr);
   const log = waitLog(work);
   const expected = Math.ceil((2 * ENGINE_TIMEOUT_MS) / 60000) + 5;
@@ -686,7 +706,12 @@ test("the block marks its own wait with a budget from the plan and clears it (CR
   );
   assert.equal(log[1], "--clear");
   // Importing the runner to read its bound must not run it as a CLI (its entry guard reads argv[1]).
-  assert.ok(!/unknown argument/.test(r.stderr), r.stderr);
+  const importErr = fs.readFileSync(path.join(work, ".budget.err"), "utf8");
+  assert.equal(
+    importErr,
+    "",
+    `the budget import printed to stderr: ${importErr}`,
+  );
 });
 
 test("the result is validated with node, so a host without jq still gets a result (CR4-3)", () => {
@@ -744,7 +769,12 @@ test("a runner that fails to load still removes the stale result and reports no 
   });
   const r = run("bash", block, { cwd: work });
   assert.match(r.stdout, /the runner did not load — the wait is not marked/);
-  assert.match(r.stdout, /probe-plan exit=/);
+  assert.match(r.stdout, /probe-plan exit=[1-9]/);
+  assert.deepEqual(
+    waitLog(work),
+    ["--clear"],
+    "a wait was marked for a runner that did not load",
+  );
   assert.match(r.stdout, /probe-plan: no result — the run did not complete/);
   assert.equal(
     fs.existsSync(path.join(work, ".claude/state/probe-plan-result.json")),
