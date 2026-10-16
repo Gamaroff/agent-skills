@@ -14,7 +14,8 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import {
   UNPREFIXED_ARTIFACTS,
-  WORK_ITEM_ARTIFACT_RE,
+  isWorkItemDocument,
+  parseWorkItemName,
 } from "../finalise-fix-and-recheck.mjs";
 
 const require = createRequire(import.meta.url);
@@ -328,11 +329,19 @@ const KNOWN = new Set([
   "docs/tasks/task.14.implementation-report-stash-hardening/task.14.implementation-report-stash-hardening.md → ./task.14.qa.1.implementation-report-stash-hardening.md",
   "docs/tasks/task.28.develop-task-loop-iteration-audit-subagent/task.28.develop-task-loop-iteration-audit-subagent.md → ../../../../shared/resources/develop-pipeline-step-3-develop-loop.md",
 ]);
-const WORK_ITEM_RE = /(^|\/)(task\.\d+|story\.\d+\.\d+|epic\.\d+)\.[^/]+\.md$/;
-// The ONE definition of "a pipeline artifact beside a work item", imported from
-// the fix-and-recheck evaluator so the corpus guards and 8a's admission rule read
-// the same set (task.152 QA-1).
-const ARTIFACT_RE = WORK_ITEM_ARTIFACT_RE;
+// "Is this a work-item document / artifact" is the evaluator's doc-id reading,
+// imported — never a restated id pattern, which assumed `story.{E}.{S}` and
+// stemmed a hierarchical story wrongly (task 206).
+const docId = require(path.join(REPO_ROOT, "shared", "resources", "doc-id.js"));
+// A work-item artifact: a doc-id name with an artifact segment, or one doc-id
+// recognises as an artifact it cannot read (`task.28.validation.2026-05-10.md`,
+// reason `bad-artifact`) — walked, because CI link-checks it whatever its name.
+const isWorkItemArtifact = (f) => {
+  const base = f.slice(f.lastIndexOf("/") + 1);
+  const id = parseWorkItemName(f);
+  if (id) return id.artifact !== null;
+  return docId.parse(base).reason === "bad-artifact";
+};
 
 function workItemDocs() {
   return execFileSync(
@@ -344,7 +353,7 @@ function workItemDocs() {
     },
   )
     .split("\0")
-    .filter((f) => f && WORK_ITEM_RE.test(f) && !ARTIFACT_RE.test(f));
+    .filter((f) => f && isWorkItemDocument(f));
 }
 
 test("corpus: every work-item document's relative links resolve and every fence closes (KNOWN pinned by file:target, ratchet only tightens)", () => {
@@ -421,7 +430,7 @@ function artifactDocs() {
       (f) =>
         f &&
         f.endsWith(".md") &&
-        ((WORK_ITEM_RE.test(f) && ARTIFACT_RE.test(f)) ||
+        (isWorkItemArtifact(f) ||
           // The unprefixed artifacts finalise writes beside a document — the
           // evaluator's own list. The walk is a SUPERSET of what 8a admits: it
           // also reads `.bug.` reports and summaries with no document beside

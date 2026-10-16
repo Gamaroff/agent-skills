@@ -1,0 +1,65 @@
+schema: 2
+task: 'task.206.hierarchical-story-ids-in-pipeline'
+task_title: 'Hierarchical story ids in the pipeline'
+gate: PASS
+status_reason: 'Cycle 2 fixes verified: bug.5 (0a.3 binds CURRENT_BRANCH) and test gaps QA2-1/QA2-2 closed, each mutation-proven by a committed test. Scoped review found no high-confidence bug; three low and two cleanup findings are advisory.'
+reviewer: 'QA Engineer'
+head: 'ad9491ecc5cbbe4855cbfdfd345fc468156164fc'
+updated: '2026-10-16T07:51:08Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 5756
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+  ci: 'not waited on (QA loop rule); local ci:fast 5756/0, eval:all, bundle:check, validate:all, lint:shell all exit 0 at ad9491ec'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 40
+    notes: 'isWorkItemDocument re-probed (path, filename, 15 targeted cases): engages, 0 reproduced. Record: task.206.qa.3.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'No hot-path change this cycle.'
+  reliability:
+    status: PASS
+    notes: 'CR2-1 fixed and verified. Advisory: CR-1 (Step 0 epic lookup swallows find errors), CR-3 (uat-status --check scan errors share the registry-invalid remedy) — both low, routed to future.'
+  maintainability:
+    status: PASS
+    notes: 'Cleanups CR-4 (triplicated story-meta derivation in ensure-story) and CR-5 (duplicated warnings merge) advisory.'
+
+bug_resolution:
+  bugs_fixed: 5
+  bugs_remaining: 0
+  fix_date: '2026-10-16'
+  total_iterations: 2
+  verification_method: 'Committed tests + QA mutation spot checks (4/4 covered)'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1: Step 0 epic lookup sends find errors to /dev/null and swallows its exit; warn with the unreadable paths so a partial listing is not read as a full one.'
+      refs: ['shared/resources/develop-pipeline-step-0-resolve-and-prepare.md']
+    - action: 'CR-2: the find-permission test is vacuous as root; assert find fails in the fixture or skip when getuid() === 0.'
+      refs: ['evals/shared/tests/step-0-epic-resolution.test.mjs']
+    - action: 'CR-3: distinguish uat-status --check scan errors from registry errors and give qa-next a remedy naming migrate-doc-numbering / the surfaces key.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+    - action: 'CR-4/CR-5 cleanups: one story-meta helper for ensure-story blocks; loadStories reuses storyScan.'
+      refs: ['skills/ensure-story-github-issue/SKILL.md', 'skills/qa-next/scripts/uat-status.mjs']
+    - action: 'Carried from gate 2: CR2-2/CR2-3 unbound STORY_TITLE etc. in tracker create/edit blocks (pre-existing; task Deferred Work).'
+      refs: ['skills/ensure-story-github-issue/SKILL.md', 'skills/sync-github-story/SKILL.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

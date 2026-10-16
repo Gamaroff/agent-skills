@@ -1,19 +1,19 @@
 {
   "name": "01-happy",
   "skill": "create-story",
-  "description": "Happy-path create-story: agent produces story.178.8.example-feature.md with all required sections, a Change Log seeded with one row, ≥2 source citations, valid frontmatter, and appends to sprint-status under stories: list. No skills-config.yaml sign-off block is present, so the Stakeholder Sign-off section must NOT be emitted.",
-  "prompt": "Create story 8 under epic 178 for the example feature. Source: docs/architecture/tech-stack.md#typescript and docs/architecture/coding-standards.md#naming.",
+  "description": "Happy-path create-story: agent produces story.1.178.8.example-feature.md with all required sections, a Change Log seeded with one row, ≥2 source citations, valid frontmatter, and appends to sprint-status under stories: list. No skills-config.yaml sign-off block is present, so the Stakeholder Sign-off section must NOT be emitted.",
+  "prompt": "Create story 8 under epic 1.178 for the example feature. Source: docs/architecture/tech-stack.md#typescript and docs/architecture/coding-standards.md#naming.",
   "assertions": [
     {
       "fn": "fileExists",
       "args": [
-        "$SANDBOX/docs/stories/story.178.8.example-feature.md"
+        "$SANDBOX/docs/stories/story.1.178.8.example-feature.md"
       ]
     },
     {
       "fn": "frontmatterHas",
       "args": [
-        "$SANDBOX/docs/stories/story.178.8.example-feature.md",
+        "$SANDBOX/docs/stories/story.1.178.8.example-feature.md",
         [
           "id",
           "status",
@@ -26,9 +26,9 @@
     {
       "fn": "frontmatterEquals",
       "args": [
-        "$SANDBOX/docs/stories/story.178.8.example-feature.md",
+        "$SANDBOX/docs/stories/story.1.178.8.example-feature.md",
         {
-          "id": "story.178.8.example-feature",
+          "id": "story.1.178.8.example-feature",
           "status": "draft"
         }
       ]
@@ -36,70 +36,70 @@
     {
       "fn": "fileMatches",
       "args": [
-        "$SANDBOX/docs/stories/story.178.8.example-feature.md",
+        "$SANDBOX/docs/stories/story.1.178.8.example-feature.md",
         "## Status"
       ]
     },
     {
       "fn": "fileMatches",
       "args": [
-        "$SANDBOX/docs/stories/story.178.8.example-feature.md",
+        "$SANDBOX/docs/stories/story.1.178.8.example-feature.md",
         "## Story"
       ]
     },
     {
       "fn": "fileMatches",
       "args": [
-        "$SANDBOX/docs/stories/story.178.8.example-feature.md",
+        "$SANDBOX/docs/stories/story.1.178.8.example-feature.md",
         "## Acceptance Criteria"
       ]
     },
     {
       "fn": "fileMatches",
       "args": [
-        "$SANDBOX/docs/stories/story.178.8.example-feature.md",
+        "$SANDBOX/docs/stories/story.1.178.8.example-feature.md",
         "## Tasks / Subtasks"
       ]
     },
     {
       "fn": "fileMatches",
       "args": [
-        "$SANDBOX/docs/stories/story.178.8.example-feature.md",
+        "$SANDBOX/docs/stories/story.1.178.8.example-feature.md",
         "## Dev Notes"
       ]
     },
     {
       "fn": "fileDoesNotMatch",
       "args": [
-        "$SANDBOX/docs/stories/story.178.8.example-feature.md",
+        "$SANDBOX/docs/stories/story.1.178.8.example-feature.md",
         "Stakeholder Sign-off"
       ]
     },
     {
       "fn": "fileMatches",
       "args": [
-        "$SANDBOX/docs/stories/story.178.8.example-feature.md",
+        "$SANDBOX/docs/stories/story.1.178.8.example-feature.md",
         "\\n## Change Log\\n"
       ]
     },
     {
       "fn": "fileDoesNotMatch",
       "args": [
-        "$SANDBOX/docs/stories/story.178.8.example-feature.md",
+        "$SANDBOX/docs/stories/story.1.178.8.example-feature.md",
         "\\n## \\d+\\. Change Log"
       ]
     },
     {
       "fn": "fileMatches",
       "args": [
-        "$SANDBOX/docs/stories/story.178.8.example-feature.md",
+        "$SANDBOX/docs/stories/story.1.178.8.example-feature.md",
         "\\|\\s*Date\\s*\\|\\s*Version\\s*\\|\\s*Description\\s*\\|\\s*Author\\s*\\|"
       ]
     },
     {
       "fn": "hasAtLeastNSourceCitations",
       "args": [
-        "$SANDBOX/docs/stories/story.178.8.example-feature.md",
+        "$SANDBOX/docs/stories/story.1.178.8.example-feature.md",
         2
       ]
     },
@@ -107,7 +107,7 @@
       "fn": "fileMatches",
       "args": [
         "$SANDBOX/docs/sprint-status.yaml",
-        "- id: story\\.178\\.8\\.example-feature\\n {4}status: ready-for-dev"
+        "- id: story\\.1\\.178\\.8\\.example-feature\\n {4}status: ready-for-dev"
       ]
     },
     {

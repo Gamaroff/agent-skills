@@ -37,6 +37,8 @@ const {
   checkCoverage,
   scoreboard,
   storyIds,
+  scanStories,
+  surfaceKeyWarnings,
   specPaths,
   parseFindings,
   checkFindings,
@@ -59,16 +61,16 @@ const REGISTRY = `
 ### A. Shell
 
 ${HEAD}
-| A.1 | Open the site signed out | A visitor lands on Home. | / | 7.1 · 40.1 | A.1.1–A.1.3 | apps/portal/e2e/smoke/catalog.smoke.spec.ts | ${STATES.untested} |  |  |
-| A.2 | Use the account menu | A signed-in user opens the menu. | / | [40.6](../prd/s.md) |  | manual only | ${STATES.na} |  | menu is chrome, accepted with A.1 |
+| A.1 | Open the site signed out | A visitor lands on Home. | / | 1.7.1 · 1.40.1 | A.1.1–A.1.3 | apps/portal/e2e/smoke/catalog.smoke.spec.ts | ${STATES.untested} |  |  |
+| A.2 | Use the account menu | A signed-in user opens the menu. | / | [1.40.6](../prd/s.md) |  | manual only | ${STATES.na} |  | menu is chrome, accepted with A.1 |
 
 ### D. Score
 
 ${HEAD}
-| D.1 | Play a game | A visitor plays in the sandboxed iframe. | /games/:slug | 7.5 | D.1.1–D.1.5 | apps/portal/e2e/smoke/play-score.smoke.spec.ts · apps/portal/src/x.spec.ts | ${STATES.accepted} | ${RUN} | accepted 2026-09-21 |
-| D.2 | Submit a score | A game posts SCORE_SUBMIT. | /games/:slug | 7.5 · 31.1 | D.2.1–D.2.9 | \`apps/portal/e2e/smoke/play-score.smoke.spec.ts\` | ${STATES.fail} | ${RUN} | [bug.92.x](../bugs/bug.92.x.md) |
-| D.3 | Theater mode | A player expands the frame. | /games/:slug | 31.2 |  |  | ${STATES.blocked} |  | flag off in test env |
-| D.4 | See the leaderboard | A visitor reads the rail. | /games/:slug | 31.3 |  |  | ${STATES.untested} |  |  |
+| D.1 | Play a game | A visitor plays in the sandboxed iframe. | /games/:slug | 1.7.5 | D.1.1–D.1.5 | apps/portal/e2e/smoke/play-score.smoke.spec.ts · apps/portal/src/x.spec.ts | ${STATES.accepted} | ${RUN} | accepted 2026-09-21 |
+| D.2 | Submit a score | A game posts SCORE_SUBMIT. | /games/:slug | 1.7.5 · 1.31.1 | D.2.1–D.2.9 | \`apps/portal/e2e/smoke/play-score.smoke.spec.ts\` | ${STATES.fail} | ${RUN} | [bug.92.x](../bugs/bug.92.x.md) |
+| D.3 | Theater mode | A player expands the frame. | /games/:slug | 1.31.2 |  |  | ${STATES.blocked} |  | flag off in test env |
+| D.4 | See the leaderboard | A visitor reads the rail. | /games/:slug | 1.31.3 |  |  | ${STATES.untested} |  |  |
 `;
 const cfg = { storyNa: {}, uatSpecPattern: "^apps/portal/e2e/(smoke|uat)/" };
 const story = (id, status = "accepted", surface = "D") => ({
@@ -78,9 +80,15 @@ const story = (id, status = "accepted", surface = "D") => ({
   status,
   surface,
 });
-const stories = ["7.1", "40.1", "40.6", "7.5", "31.1", "31.2", "31.3"].map(
-  (id) => story(id),
-);
+const stories = [
+  "1.7.1",
+  "1.40.1",
+  "1.40.6",
+  "1.7.5",
+  "1.31.1",
+  "1.31.2",
+  "1.31.3",
+].map((id) => story(id));
 
 test("parseRegistry is header-driven: cells are keyed by column name, the separator is skipped", () => {
   const { sections } = parseRegistry(REGISTRY);
@@ -113,7 +121,10 @@ test("parseRegistry is header-driven: cells are keyed by column name, the separa
 });
 
 test("storyIds and specPaths read their cells", () => {
-  assert.deepEqual(storyIds("[7.5](../x.md) · 31.1 · 7.5"), ["7.5", "31.1"]);
+  assert.deepEqual(storyIds("[1.7.5](../x.md) · 1.31.1 · 1.7.5"), [
+    "1.7.5",
+    "1.31.1",
+  ]);
   assert.deepEqual(storyIds(""), []);
   assert.deepEqual(
     specPaths("`apps/portal/e2e/smoke/a.spec.ts` · apps/portal/src/b.spec.ts"),
@@ -195,43 +206,51 @@ test("checkRegistry: state rules — pass/fail/accepted need a run, fail needs a
 });
 
 test("checkRegistry: Stories must name real stories; non-accepted ones and uncovered accepted ones warn", () => {
-  const t = parseRegistry(REGISTRY.replace("| 7.5 · 31.1 |", "| 7.5 · 99.9 |"));
+  const t = parseRegistry(
+    REGISTRY.replace("| 1.7.5 · 1.31.1 |", "| 1.7.5 · 1.99.9 |"),
+  );
   const { errors, warns } = checkRegistry(
     t,
     [
-      ...stories.map((s) => (s.id === "31.3" ? { ...s, status: "draft" } : s)),
-      story("50.1"),
+      ...stories.map((s) =>
+        s.id === "1.31.3" ? { ...s, status: "draft" } : s,
+      ),
+      story("1.50.1"),
     ],
     cfg,
   );
-  assert.ok(errors.includes("D.2: Stories names 99.9, which is not a story"));
-  assert.ok(warns.includes("D.4: story 31.3 is draft, not accepted"));
+  assert.ok(errors.includes("D.2: Stories names 1.99.9, which is not a story"));
+  assert.ok(warns.includes("D.4: story 1.31.3 is draft, not accepted"));
   assert.ok(
     warns.includes(
-      "50.1: accepted story is covered by no function — --coverage",
+      "1.50.1: accepted story is covered by no function — --coverage",
     ),
   );
   assert.ok(
     warns.includes(
-      "31.1: accepted story is covered by no function — --coverage",
+      "1.31.1: accepted story is covered by no function — --coverage",
     ),
-    "31.1 lost its only reference when D.2 was edited",
+    "1.31.1 lost its only reference when D.2 was edited",
   );
 });
 
 test("checkCoverage: unmapped carries a suggested surface; storyNa and non-accepted are excluded; unknown ids listed", () => {
   const c = checkCoverage(
-    parseRegistry(REGISTRY.replace("| 7.5 · 31.1 |", "| 7.5 · 99.9 |")),
-    [...stories, story("50.1", "accepted", "F"), story("50.2", "draft", "F")],
-    { ...cfg, storyNa: { 31.1: "renamed away" } },
+    parseRegistry(REGISTRY.replace("| 1.7.5 · 1.31.1 |", "| 1.7.5 · 1.99.9 |")),
+    [
+      ...stories,
+      story("1.50.1", "accepted", "F"),
+      story("1.50.2", "draft", "F"),
+    ],
+    { ...cfg, storyNa: { "1.31.1": "renamed away" } },
   );
   assert.deepEqual(
     c.unmapped.map((s) => [s.id, s.suggestedSurface]),
-    [["50.1", "F"]],
-    "31.1 is n/a, 50.2 is not accepted",
+    [["1.50.1", "F"]],
+    "1.31.1 is n/a, 1.50.2 is not accepted",
   );
-  assert.deepEqual(c.unknown, ["99.9"]);
-  assert.deepEqual(c.na, [{ id: "31.1", note: "renamed away" }]);
+  assert.deepEqual(c.unknown, ["1.99.9"]);
+  assert.deepEqual(c.na, [{ id: "1.31.1", note: "renamed away" }]);
   assert.deepEqual(c.notAccepted, []);
 });
 
@@ -256,18 +275,18 @@ function corpus() {
       "docs/prd",
       prd,
       "epics",
-      `epic.${epic}.e`,
+      `epic.1.${epic}.e`,
       "stories",
-      `story.${epic}.${n}.s`,
+      `story.1.${epic}.${n}.s`,
     );
     mkdirSync(dir, { recursive: true });
     writeFileSync(
-      path.join(dir, `story.${epic}.${n}.s.md`),
-      `---\ntitle: "Story ${epic}.${n}"\nstatus: ${status}\n${extra}---\n`,
+      path.join(dir, `story.1.${epic}.${n}.s.md`),
+      `---\ntitle: "Story 1.${epic}.${n}"\nstatus: ${status}\n${extra}---\n`,
     );
     // a sidecar that must NOT be read as a story
     writeFileSync(
-      path.join(dir, `story.${epic}.${n}.qa.1.s.md`),
+      path.join(dir, `story.1.${epic}.${n}.qa.1.s.md`),
       `---\ntitle: sidecar\nstatus: accepted\n---\n`,
     );
   };
@@ -287,9 +306,9 @@ function corpus() {
         { letter: "D", title: "Score" },
         { letter: "Z", title: "Unmapped" },
       ],
-      epicSurface: { 7: "D", 31: "D" },
-      storySurface: { 7.1: "A" },
-      storyNa: { 7.1: "monorepo scaffolding — nothing observable" },
+      epicSurface: { 1.7: "D", 1.31: "D" },
+      storySurface: { "1.7.1": "A" },
+      storyNa: { "1.7.1": "monorepo scaffolding — nothing observable" },
     }),
   );
   return root;
@@ -318,8 +337,8 @@ function addRows(root, letter, rows) {
   lines.splice(sep + 1, 0, ...rows.trimEnd().split("\n"));
   writeFileSync(REG(root), lines.join("\n"));
 }
-const D_ROWS = `| D.1 | Play a game | A visitor plays. | /games/:slug | 7.5 |  | apps/portal/e2e/smoke/play-score.smoke.spec.ts · apps/portal/src/x.spec.ts | ⬜ untested |  |  |
-| D.2 | Submit a score | A game posts a score. | /games/:slug | 7.5 · 31.1 | D.2.1–D.2.3, S2 |  | ⬜ untested |  |  |
+const D_ROWS = `| D.1 | Play a game | A visitor plays. | /games/:slug | 1.7.5 |  | apps/portal/e2e/smoke/play-score.smoke.spec.ts · apps/portal/src/x.spec.ts | ⬜ untested |  |  |
+| D.2 | Submit a score | A game posts a score. | /games/:slug | 1.7.5 · 1.31.1 | D.2.1–D.2.3, S2 |  | ⬜ untested |  |  |
 `;
 
 test("CLI: init writes an empty skeleton per surface and refuses to overwrite; rows are authored by hand", () => {
@@ -353,16 +372,16 @@ test("CLI: coverage names accepted stories no function covers, honouring storyNa
   run(root, "--init");
   let { code, out } = run(root, "--coverage");
   assert.equal(code, 0);
-  assert.match(out, /^unmapped {3}7\.5 {2}Story 7\.5 {2}→ surface D$/m);
-  assert.match(out, /^unmapped {3}31\.1 /m);
+  assert.match(out, /^unmapped {3}1\.7\.5 {2}Story 1\.7\.5 {2}→ surface D$/m);
+  assert.match(out, /^unmapped {3}1\.31\.1 /m);
   assert.doesNotMatch(
     out,
-    /^unmapped +(7\.1|1\.1|31\.9) /m,
+    /^unmapped +(1\.7\.1|1\.1\.1|1\.31\.9) /m,
     "n/a, excluded and draft stories are not unmapped",
   );
   assert.match(
     out,
-    /^coverage: 2 accepted stories covered by no function · 1 n\/a · 0 referenced but not accepted · 0 unknown$/m,
+    /^coverage: 2 accepted stories covered by no function · 1 n\/a · 0 referenced but not accepted · 0 unknown · 0 warning\(s\)$/m,
   );
   addRows(root, "D", D_ROWS);
   ({ code, out } = run(root, "--coverage", "--json"));
@@ -397,9 +416,9 @@ test("CLI: next resolves stories, filters UAT-lane specs and finds the checklist
   assert.equal(d1.function, "Play a game");
   assert.deepEqual(d1.stories, [
     {
-      id: "7.5",
-      title: "Story 7.5",
-      path: "docs/prd/prd.live/epics/epic.7.e/stories/story.7.5.s/story.7.5.s.md",
+      id: "1.7.5",
+      title: "Story 1.7.5",
+      path: "docs/prd/prd.live/epics/epic.1.7.e/stories/story.1.7.5.s/story.1.7.5.s.md",
       storyType: "",
     },
   ]);
@@ -418,7 +437,7 @@ test("CLI: next resolves stories, filters UAT-lane specs and finds the checklist
   assert.equal(d2.id, "D.2");
   assert.deepEqual(
     d2.stories.map((s) => s.id),
-    ["7.5", "31.1"],
+    ["1.7.5", "1.31.1"],
   );
   assert.deepEqual(d2.uatSpecs, []);
   assert.deepEqual(
@@ -494,7 +513,7 @@ test("CLI: set → items → automated → accept round-trip; refusals are real;
   const text = readFileSync(REG(root), "utf8");
   assert.match(
     text,
-    /^\| D\.2 \| Submit a score \| A game posts a score\. \| \/games\/:slug \| 7\.5 · 31\.1 \| D\.2\.1–D\.2\.9 \| apps\/portal\/e2e\/uat\/D\.2\.uat\.spec\.ts \| ✅ accepted \| \[r\]\(runs\/D\.2\/r\.md\) \| accepted \d{4}-\d{2}-\d{2} — looks right \|$/m,
+    /^\| D\.2 \| Submit a score \| A game posts a score\. \| \/games\/:slug \| 1\.7\.5 · 1\.31\.1 \| D\.2\.1–D\.2\.9 \| apps\/portal\/e2e\/uat\/D\.2\.uat\.spec\.ts \| ✅ accepted \| \[r\]\(runs\/D\.2\/r\.md\) \| accepted \d{4}-\d{2}-\d{2} — looks right \|$/m,
   );
   assert.match(
     text,
@@ -510,15 +529,18 @@ test("CLI: check reports a ragged hand-edited row and a Stories id with no story
   addRows(
     root,
     "D",
-    "| D.1 | Play | x | / | 7.5 · 8.8 |  | ⬜ untested |  |  |\n",
+    "| D.1 | Play | x | / | 1.7.5 · 1.8.8 |  | ⬜ untested |  |  |\n",
   );
   const { code, out } = run(root, "--check");
   assert.equal(code, 1);
   assert.match(out, /\[ERROR\] D\.1: 9 cells, header has 10/);
-  assert.match(out, /\[ERROR\] D\.1: Stories names 8\.8, which is not a story/);
   assert.match(
     out,
-    /\[warn \] 31\.1: accepted story is covered by no function/,
+    /\[ERROR\] D\.1: Stories names 1\.8\.8, which is not a story/,
+  );
+  assert.match(
+    out,
+    /\[warn \] 1\.31\.1: accepted story is covered by no function/,
   );
 });
 
@@ -1612,7 +1634,7 @@ test("render and parse are inverses — a pipe does not accumulate backslashes (
   addRows(
     root,
     "D",
-    "| D.9 | Submit a \\| b | It posts a \\| b. | /g | 7.5 |  |  | ⬜ untested |  |  |\n",
+    "| D.9 | Submit a \\| b | It posts a \\| b. | /g | 1.7.5 |  |  | ⬜ untested |  |  |\n",
   );
   mkdirSync(path.join(root, "docs/qa/runs/D.9"), { recursive: true });
   writeFileSync(path.join(root, "docs/qa/runs/D.9/r1.md"), "# run\n");
@@ -1712,7 +1734,7 @@ test("--check validates relative bug links on EVERY row, and leaves prose URLs a
   addRows(
     root,
     "D",
-    "| D.1 | Submit | A game posts. | /g | 7.5 |  |  | ❌ fail | [r](runs/D.1/r.md) | [bug.1.real](../bugs/bug.1.real.md) — see [bug.99 discussion](https://example.com/issues/99) |\n",
+    "| D.1 | Submit | A game posts. | /g | 1.7.5 |  |  | ❌ fail | [r](runs/D.1/r.md) | [bug.1.real](../bugs/bug.1.real.md) — see [bug.99 discussion](https://example.com/issues/99) |\n",
   );
   let check = run(root, "--check");
   assert.equal(
@@ -1726,7 +1748,7 @@ test("--check validates relative bug links on EVERY row, and leaves prose URLs a
   addRows(
     root,
     "D",
-    "| D.2 | Board | A visitor reads. | /g | 7.5 |  |  | ⏸ blocked |  | stale [bug.7.gone](../bugs/bug.7.gone.md) |\n",
+    "| D.2 | Board | A visitor reads. | /g | 1.7.5 |  |  | ⏸ blocked |  | stale [bug.7.gone](../bugs/bug.7.gone.md) |\n",
   );
   assert.equal(
     JSON.parse(run(root, "--item", "D.2", "--json").out).bug,
@@ -1768,7 +1790,7 @@ test("the link --check validates IS the link --item publishes (TASK-141-BUG-16)"
   addRows(
     root,
     "D",
-    "| D.1 | Submit | A game posts. | /g | 7.5 |  |  | ❌ fail | [r](runs/D.1/r.md) | [bug.1.real](../bugs/bug.1.real.md) — see [bug.99 discussion](https://example.com/issues/99) |\n",
+    "| D.1 | Submit | A game posts. | /g | 1.7.5 |  |  | ❌ fail | [r](runs/D.1/r.md) | [bug.1.real](../bugs/bug.1.real.md) — see [bug.99 discussion](https://example.com/issues/99) |\n",
   );
   assert.equal(
     run(root, "--check").code,
@@ -1790,7 +1812,7 @@ test("the link --check validates IS the link --item publishes (TASK-141-BUG-16)"
   addRows(
     root2,
     "D",
-    "| D.1 | Submit | A game posts. | /g | 7.5 |  |  | ❌ fail | [r](runs/D.1/r.md) | see [bug.99 discussion](https://example.com/issues/99) |\n",
+    "| D.1 | Submit | A game posts. | /g | 1.7.5 |  |  | ❌ fail | [r](runs/D.1/r.md) | see [bug.99 discussion](https://example.com/issues/99) |\n",
   );
   const only = run(root2, "--check");
   assert.equal(
@@ -1819,7 +1841,7 @@ test("a #fragment on a relative bug link resolves, and the payload is the path t
   addRows(
     root,
     "D",
-    "| D.1 | Submit | A game posts. | /g | 7.5 |  |  | ❌ fail | [r](runs/D.1/r.md) | [bug.1.real](../bugs/bug.1.real.md#repro) |\n",
+    "| D.1 | Submit | A game posts. | /g | 1.7.5 |  |  | ❌ fail | [r](runs/D.1/r.md) | [bug.1.real](../bugs/bug.1.real.md#repro) |\n",
   );
   assert.equal(
     run(root, "--check").code,
@@ -1964,7 +1986,7 @@ test("each clause of BUG_LINK_RULE is what --check does (TASK-141-BUG-20)", () =
     addRows(
       root,
       "D",
-      `| D.1 | Submit | A game posts. | /g | 7.5 |  |  | ${state} | ${runCell} | ${notes} |\n`,
+      `| D.1 | Submit | A game posts. | /g | 1.7.5 |  |  | ${state} | ${runCell} | ${notes} |\n`,
     );
     assert.equal(run(root, "--check").code, want, clause);
     if (wantBug !== undefined)
@@ -1993,7 +2015,7 @@ test("the payload's bug round-trips through --set fail --bug (TASK-141-BUG-21)",
   addRows(
     root,
     "D",
-    "| D.1 | Submit | A game posts. | /g | 7.5 |  |  | ❌ fail | [r](runs/D.1/r.md) | [bug.1.real](../bugs/bug.1.real.md) |\n",
+    "| D.1 | Submit | A game posts. | /g | 1.7.5 |  |  | ❌ fail | [r](runs/D.1/r.md) | [bug.1.real](../bugs/bug.1.real.md) |\n",
   );
   const { bug } = JSON.parse(run(root, "--item", "D.1", "--json").out);
   assert.equal(
@@ -2287,12 +2309,12 @@ test("a run through the state commands keeps the PRE-run priorRuns and bug (TASK
   addRows(
     root,
     "A",
-    "| A.9 | Placeholder | x | / | 7.5 |  |  | ⬜ untested |  |  |\n",
+    "| A.9 | Placeholder | x | / | 1.7.5 |  |  | ⬜ untested |  |  |\n",
   );
   // D.1 re-shaped as a failed row linking bug.1.old — the re-run the id argument exists for.
   const reg = readFileSync(REG(root), "utf8").replace(
     /^\| D\.1 \|.*$/m,
-    "| D.1 | Play a game | A visitor plays. | /games/:slug | 7.5 |  |  | ❌ fail | [r](runs/D.1/2026-09-01-lan.md) | [bug.1.old](../bugs/bug.1.old.md) |",
+    "| D.1 | Play a game | A visitor plays. | /games/:slug | 1.7.5 |  |  | ❌ fail | [r](runs/D.1/2026-09-01-lan.md) | [bug.1.old](../bugs/bug.1.old.md) |",
   );
   writeFileSync(REG(root), reg);
   assert.equal(run(root, "--check").code, 0, run(root, "--check").out);
@@ -2368,7 +2390,7 @@ test("a v0.51.0-shape state file is answered with targeted, priorRuns, bug and f
     REG(root),
     readFileSync(REG(root), "utf8").replace(
       /^\| D\.1 \|.*$/m,
-      "| D.1 | Play a game | A visitor plays. | /games/:slug | 7.5 |  |  | ❌ fail | [r](runs/D.1/2026-09-01-lan.md) | [bug.1.old](../bugs/bug.1.old.md) |",
+      "| D.1 | Play a game | A visitor plays. | /games/:slug | 1.7.5 |  |  | ❌ fail | [r](runs/D.1/2026-09-01-lan.md) | [bug.1.old](../bugs/bug.1.old.md) |",
     ),
   );
   // Exactly the example object SKILL.md shipped in v0.51.0.
@@ -2380,7 +2402,7 @@ test("a v0.51.0-shape state file is answered with targeted, priorRuns, bug and f
         item: "D.1",
         function: "Play a game",
         surface: "D",
-        stories: ["7.5"],
+        stories: ["1.7.5"],
         uatSpecs: [],
         lane: null,
         runFile: "runs/D.1/2026-09-24-lan.md",
@@ -2445,7 +2467,7 @@ test("a real v0.51.0 file has runFile null: its own file is found by the file-na
         REG(root),
         readFileSync(REG(root), "utf8").replace(
           /^\| D\.1 \|.*$/m,
-          `| D.1 | Play a game | A visitor plays. | /games/:slug | 7.5 |  |  | 🟡 pass | [r](${lastRun}) |  |`,
+          `| D.1 | Play a game | A visitor plays. | /games/:slug | 1.7.5 |  |  | 🟡 pass | [r](${lastRun}) |  |`,
         ),
       );
       mkdirSync(path.dirname(STATE(root)), { recursive: true });
@@ -2455,7 +2477,7 @@ test("a real v0.51.0 file has runFile null: its own file is found by the file-na
           item: "D.1",
           function: "Play a game",
           surface: "D",
-          stories: ["7.5"],
+          stories: ["1.7.5"],
           uatSpecs: [],
           lane: null,
           runFile: null,
@@ -2791,4 +2813,121 @@ test("CLI: --run-path refuses a two-digit or path-steering --env and creates not
     assert.equal(r.code, 2, r.out);
     assert.equal(existsSync(path.join(root, "docs/qa/runs/D.2")), false, env);
   }
+});
+
+// ---------- task 206: hierarchical story ids ----------
+
+test("scanStories reads story.P.E.S through doc-id: id 1.2.3, epicSurface keyed P.E, sorted (P, E, S), and an unparseable story name is REPORTED, not skipped", () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "qa-next-206-"));
+  const put = (rel, title, status = "accepted") => {
+    mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
+    writeFileSync(
+      path.join(root, rel),
+      `---\ntitle: "${title}"\nstatus: ${status}\n---\n`,
+    );
+  };
+  const S = "docs/prd/prd.1.live/epics";
+  put(`${S}/epic.1.2.e/stories/story.1.2.30.s/story.1.2.30.s.md`, "thirty");
+  put(`${S}/epic.1.2.e/stories/story.1.2.3.s/story.1.2.3.s.md`, "three");
+  put(`${S}/epic.1.2.e/stories/story.1.2.3.s/story.1.2.3.qa.1.s.md`, "sidecar");
+  put(`${S}/epic.1.2.e/stories/story.1.2.3A.s/story.1.2.3A.s.md`, "three-a");
+  put(`${S}/epic.1.10.e/stories/story.1.10.1.s/story.1.10.1.s.md`, "ten");
+  put(
+    "docs/prd/prd.2.other/epics/epic.2.2.e/stories/story.2.2.1.s/story.2.2.1.s.md",
+    "other prd",
+  );
+  // A legacy two-number story the old STORY_FILE regex would have read as 5.1,
+  // and doc-id cannot: it must be reported, not dropped.
+  put(`${S}/epic.5.e/stories/story.5.1.s/story.5.1.s.md`, "legacy");
+  const cfg = {
+    excludedPrds: [],
+    defaultSurface: "Z",
+    epicSurface: { 1.2: "D", 2.2: "B" },
+    storySurface: { "1.2.3A": "A" },
+    storyNa: {},
+  };
+  const { stories, warnings } = scanStories({ root, stories: "docs/prd" }, cfg);
+  assert.deepEqual(
+    stories.map((s) => [s.id, s.surface]),
+    [
+      ["1.2.3", "D"],
+      ["1.2.3A", "A"],
+      ["1.2.30", "D"],
+      ["1.10.1", "Z"],
+      ["2.2.1", "B"],
+    ],
+    "P.E.S ids; epic 2 of PRD 2 is not epic 1.2's surface; numeric (P, E, S) order",
+  );
+  assert.equal(warnings.length, 1);
+  assert.match(
+    warnings[0],
+    /story\.5\.1\.s\.md: not a story id doc-id can read/,
+  );
+  assert.match(warnings[0], /migrate-doc-numbering/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+test("surfaceKeyWarnings reports a bare-number epicSurface key and a two-number story key, and accepts P.E / P.E.S (task 206)", () => {
+  assert.deepEqual(
+    surfaceKeyWarnings({
+      epicSurface: { 1.5: "A" },
+      storySurface: { "1.5.2": "B" },
+      storyNa: { "1.5.3A": "n/a" },
+    }),
+    [],
+  );
+  const w = surfaceKeyWarnings({
+    epicSurface: { 5: "A" },
+    storySurface: { 5.2: "B" },
+    storyNa: {},
+  });
+  assert.equal(w.length, 2);
+  assert.match(w[0], /epicSurface key "5" is not an epic id P\.E/);
+  assert.match(w[1], /storySurface key "5\.2" is not a story id P\.E\.S/);
+});
+
+test("storyIds collects P.E.S and sub-story tokens whole, so a Stories cell never splits 1.2.3 into 1.2 (task 206)", () => {
+  assert.deepEqual(storyIds("1.2.3 · [1.2.3A](x.md) · 1.10.1 · 1.2.3"), [
+    "1.2.3",
+    "1.2.3A",
+    "1.10.1",
+  ]);
+});
+
+test("CLI: --check FAILS on, and --coverage COUNTS, an unreadable story and an old-shape surface key in their own output, not only on stderr (task.206 QA cycle 1, CR-9)", () => {
+  const root = corpus();
+  run(root, "--init");
+  const legacy = path.join(
+    root,
+    "docs/prd/prd.live/epics/epic.9.e/stories/story.9.1.s",
+  );
+  mkdirSync(legacy, { recursive: true });
+  writeFileSync(
+    path.join(legacy, "story.9.1.s.md"),
+    "---\ntitle: legacy\nstatus: accepted\n---\n",
+  );
+  const surfaces = path.join(root, "docs/qa/uat-surfaces.json");
+  const cfg = JSON.parse(readFileSync(surfaces, "utf8"));
+  cfg.epicSurface["5"] = "D";
+  writeFileSync(surfaces, JSON.stringify(cfg));
+  const check = run(root, "--check");
+  assert.match(
+    check.out,
+    /\[ERROR\] .*story\.9\.1\.s\.md: not a story id doc-id can read/,
+  );
+  assert.match(
+    check.out,
+    /\[ERROR\] .*epicSurface key "5" is not an epic id P\.E/,
+  );
+  assert.match(check.out, /uat-check: [2-9]\d* error\(s\)/);
+  assert.equal(
+    check.code,
+    1,
+    "an unreadable story fails --check, which qa-next gates on (QA cycle 2, CR2-4)",
+  );
+  const cov = JSON.parse(run(root, "--coverage", "--json").out);
+  assert.equal(cov.warnings.length, 2, JSON.stringify(cov.warnings));
+  const text = run(root, "--coverage").out;
+  assert.match(text, /· 2 warning\(s\)$/m);
+  rmSync(root, { recursive: true, force: true });
 });

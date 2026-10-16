@@ -18,9 +18,9 @@ Loaded by `/develop-story` and `/develop-task` during Phase 0. Where story and t
 
 Accept any of:
 
-- **Story file**: `docs/stories/story.8.2.configure-validation-pipe/story.8.2.configure-validation-pipe.md`
-- **Story directory**: `docs/stories/story.8.2.configure-validation-pipe/`
-- **Bare filename**: `story.8.2.configure-validation-pipe.md`
+- **Story file**: `docs/prd/{domain}/prd.1.x/epics/epic.1.8.y/stories/story.1.8.2.configure-validation-pipe/story.1.8.2.configure-validation-pipe.md`
+- **Story directory**: `…/stories/story.1.8.2.configure-validation-pipe/`
+- **Bare filename**: `story.1.8.2.configure-validation-pipe.md`
 - **GitHub issue URL** (direct or project board): `https://github.com/.../issues/297` or URL containing `issue=`
 - **Issue hash notation**: `#297`
 - **Bare issue number**: `297`
@@ -29,33 +29,64 @@ Jira key inline resolution: run [§ Key → document lookup](#key--document-look
 
 GitHub issue inline resolution: extract `ISSUE_NUM`, fetch body, parse `DOC_URL`. Not found → fall back to [§ Key → document lookup](#key--document-lookup) with `KEY_FIELD=github_issue`, `KEY_VALUE=${ISSUE_NUM}`. Still not found → HALT: "No local document found for issue #{N}. Run `/create-story` first, or provide the file path directly."
 
-Explore subagent (file/directory/bare-filename inputs): find file matching `story.{epic}.{story}.*.md` that does NOT contain `.qa.`, `.gate.`, `.bug.`, or `.implementation.` in its name. Return absolute file path and story directory path.
+Explore subagent (file/directory/bare-filename inputs): find the story document under `docs/` whose
+name `doc-id.js parse` reads as kind `story` with no artifact segment — `story.{P}.{E}.{S}{sub?}.{name}.md`,
+not a `.qa.`, `.gate.`, `.bug.` or `.implementation.` sidecar. Return absolute file path and story directory path.
 
-Extract `{epic_number}` and `{story_number}` from the pattern `story.{epic}.{story}.{name}.md`.
-
-**Epic resolution** — immediately after extracting epic_number/story_number:
-
-```bash
-EPIC_REF=$(grep '^epic:' {story-file} | awk '{print $2}')
-```
-
-If `EPIC_REF` is empty or missing: **HALT** — "Story must have an `epic:` frontmatter field referencing a parent epic (e.g. `epic: epic.178.feature-ui`). Add the field and re-run."
+**Story ids and epic resolution** — one block, run as soon as the story file is resolved. Every id is
+read by `doc-id.js` (task 202), never split on `.` positionally: in `story.{P}.{E}.{S}` the second
+field is the PRD, and E restarts at 1 in every PRD, so an epic is found by **(P, E)** and never by
+E alone. Zero matches or two or more is a HALT, never `head -1` (task 206).
 
 ```bash
-EPIC_NUM=$(echo "$EPIC_REF" | grep -oE '[0-9]+' | head -1)
-EPIC_SLUG=$(echo "$EPIC_REF" | sed 's/epic\.[0-9]*\.//')
+# Story ids and epic resolution (task 206). INPUT: {story-file}, the resolved story document.
+# pipefail: the epic listing below pipes find | node | sort, and a crashed node filter must reach the
+# "could not list" HALT, not read as zero epics (task.206 QA cycle 1, CR-10).
+set -o pipefail
+DOC_ID="$PWD/.agents/skills/develop-story/references/doc-id.js"
+STORY_FILE="{story-file}"
+STORY_ID_JSON=$(command node "$DOC_ID" parse "$(basename "$STORY_FILE")" --json) \
+  || { echo "HALT: $(basename "$STORY_FILE") is not a story id doc-id can read (story.P.E.S.slug.md); a legacy story.E.S name is migrated first with migrate-doc-numbering"; exit 1; }
+STORY_KIND=$(printf '%s' "$STORY_ID_JSON" | jq -r '.kind')
+PRD_NUM=$(printf '%s' "$STORY_ID_JSON" | jq -r '.prd')
+EPIC_NUM=$(printf '%s' "$STORY_ID_JSON" | jq -r '.epic')
+STORY_NUM=$(printf '%s' "$STORY_ID_JSON" | jq -r '.story')
+STORY_STEM=$(printf '%s' "$STORY_ID_JSON" | jq -r '.id')
+[ "$STORY_KIND" = "story" ] && [ "$(printf '%s' "$STORY_ID_JSON" | jq -r '.artifact')" = "null" ] \
+  || { echo "HALT: $(basename "$STORY_FILE") is not a story document"; exit 1; }
+
+EPIC_REF=$(grep -m1 '^epic:' "$STORY_FILE" | awk '{print $2}' | tr -d "\"'")
+[ -n "$EPIC_REF" ] \
+  || { echo "HALT: the story has no epic: frontmatter field naming its parent epic (e.g. epic: epic.$PRD_NUM.$EPIC_NUM.feature-ui) — add it and re-run"; exit 1; }
+EPIC_REF_JSON=$(command node "$DOC_ID" parse "$EPIC_REF" --json) \
+  || { echo "HALT: epic: $EPIC_REF is not an epic id doc-id can read (epic.P.E.slug)"; exit 1; }
+[ "$(printf '%s' "$EPIC_REF_JSON" | jq -r '"\(.kind) \(.prd).\(.epic)"')" = "epic $PRD_NUM.$EPIC_NUM" ] \
+  || { echo "HALT: epic: $EPIC_REF disagrees with the story's own id $STORY_STEM (its epic is $PRD_NUM.$EPIC_NUM)"; exit 1; }
+EPIC_SLUG=$(printf '%s' "$EPIC_REF_JSON" | jq -r '.slug')
+
+# The epic document of (P, E): matchesEpic over every epic.*.md under docs/, artifacts excluded.
+# find's own non-zero exit (an unreadable subdirectory) must not trip pipefail: only the node filter's
+# failure is a "could not list" (task.206 QA cycle 2, CR2-6).
+EPIC_FILES=$({ find docs -type f -name 'epic.*.md' 2>/dev/null || true; } | command node -e '
+  const d = require(process.argv[1]);
+  const [P, E] = [Number(process.argv[2]), Number(process.argv[3])];
+  for (const f of require("fs").readFileSync(0, "utf8").split("\n").filter(Boolean)) {
+    const b = f.slice(f.lastIndexOf("/") + 1);
+    const p = d.parse(b);
+    if (p.ok && p.kind === "epic" && p.artifact === null && d.matchesEpic(b, P, E)) console.log(f);
+  }' "$DOC_ID" "$PRD_NUM" "$EPIC_NUM" | sort) \
+  || { echo "HALT: could not list epic documents under docs/"; exit 1; }
+EPIC_COUNT=$(printf '%s' "$EPIC_FILES" | grep -c .)
+case "$EPIC_COUNT" in
+  1) EPIC_FILE="$EPIC_FILES" ;;
+  0) echo "HALT: no epic document epic.$PRD_NUM.$EPIC_NUM.*.md under docs/ — create or migrate it before running develop-story"; exit 1 ;;
+  *) echo "HALT: $EPIC_COUNT epic documents claim epic $PRD_NUM.$EPIC_NUM:"; printf '%s\n' "$EPIC_FILES"; exit 1 ;;
+esac
+echo "story $STORY_STEM — epic $PRD_NUM.$EPIC_NUM: $EPIC_FILE"
 ```
 
-Locate the epic file (required):
-
-```bash
-EPIC_FILE=$(find docs/ -name "epic.${EPIC_NUM}.*.md" 2>/dev/null \
-  | grep -v '\.review\.' | grep -v '\.gate\.' | grep -v '\.implementation\.' | head -1)
-```
-
-If `EPIC_FILE` is empty: **HALT** — "Epic file `epic.{EPIC_NUM}.*` not found in `docs/`. Ensure the epic document exists before running develop-story."
-
-Store `EPIC_NUM`, `EPIC_SLUG`, and `EPIC_FILE` as pipeline-wide variables.
+Store `PRD_NUM`, `EPIC_NUM`, `STORY_NUM`, `STORY_STEM`, `EPIC_SLUG` and `EPIC_FILE` as pipeline-wide
+variables. `{story-stem}` below is `STORY_STEM` (`story.1.8.2`, or `story.1.8.2A` for a sub-story).
 
 #### develop-task
 
@@ -166,7 +197,7 @@ Prompt template (pass verbatim to Explore subagent):
 
 ```
 Find the {story/task} file that matches:
-  - develop-story: pattern story.{epic}.{story}.*.md, does NOT contain .qa., .gate., .bug., or .implementation. in the filename
+  - develop-story: a story.{P}.{E}.{S}.*.md document (`doc-id.js parse` reads it as kind story, no artifact) — NOT a .qa., .gate., .bug., or .implementation. sidecar
   - develop-task:  pattern task.{id}.*.md, does NOT contain .qa., .gate., .bug., or .implementation. in the filename
 
 Search under docs/. Return:
@@ -186,7 +217,7 @@ Run the tracker state poller (https://github.com/Gamaroff/agent-skills/blob/deve
 Inputs:
   PR_NUMBER=    # empty string (no PR yet in Phase 0)
   ISSUE_KEY={ISSUE_KEY}    # GitHub issue number or Jira key extracted from document frontmatter
-                           # For file/dir inputs: locate the file (pattern task.{id}.*.md or story.{epic}.{story}.*.md under docs/)
+                           # For file/dir inputs: locate the file (pattern task.{id}.*.md or story.{P}.{E}.{S}.*.md under docs/)
                            # and extract github_issue: or jira_key: from its YAML frontmatter.
                            # If not found, use empty string.
 
@@ -199,7 +230,7 @@ Return the compact JSON object only — no prose.
 Prompt template (pass verbatim to Explore subagent):
 
 ```
-Read the document at {file_path} (or for file/dir inputs: find the file matching task.{id}.*.md or story.{epic}.{story}.*.md under docs/).
+Read the document at {file_path} (or for file/dir inputs: find the file matching task.{id}.*.md or story.{P}.{E}.{S}.*.md under docs/).
 
 DETERMINE the lite-mode inputs by reading the document. This is the normal path — evaluate each
 condition from what the document actually says, and report the three inputs as separate fields. Do NOT
@@ -278,9 +309,9 @@ Before asking any questions, check whether a previous run was started:
 #### develop-story
 
 ```bash
-git branch --list "feature/story.{epic}.{story}.*"
-gh pr list --head "feature/story.{epic}.{story}.*" --json number,url,state 2>/dev/null
-find {story-directory} -maxdepth 1 -name "story.{epic}.{story}.implementation.*.md" 2>/dev/null
+git branch --list "feature/{story-stem}.*"
+gh pr list --head "feature/{story-stem}.*" --json number,url,state 2>/dev/null
+find {story-directory} -maxdepth 1 -name "{story-stem}.implementation.*.md" 2>/dev/null
 ```
 
 **If a previous run is detected**: ask "A previous pipeline run exists for this story. What would you like to do?" Options: "Resume from last completed step" (Recommended) / "Start fresh".
@@ -610,25 +641,30 @@ PRD root) and read its branch-model declaration. Key names are configurable; def
 
 ```yaml
 branch_model: epic-integration
-integration_branch: "epic/178.feature-ui"
+integration_branch: "epic/1.178.feature-ui"
 ```
 
-| Epic declares                                             | `EPIC_BRANCH`                                            | Q1/Q2 recommendation  |
-| --------------------------------------------------------- | -------------------------------------------------------- | --------------------- |
-| `branch_model: epic-integration` + `integration_branch`   | as declared                                              | `EPIC_BRANCH`         |
-| `branch_model: epic-integration`, no `integration_branch` | derived from `branchPattern` (default `epic/{n}.{slug}`) | `EPIC_BRANCH`         |
-| nothing, or `develop-direct`, or epic unreadable          | unset                                                    | `develop` (unchanged) |
+| Epic declares                                             | `EPIC_BRANCH`                                                  | Q1/Q2 recommendation  |
+| --------------------------------------------------------- | -------------------------------------------------------------- | --------------------- |
+| `branch_model: epic-integration` + `integration_branch`   | as declared                                                    | `EPIC_BRANCH`         |
+| `branch_model: epic-integration`, no `integration_branch` | derived from `branchPattern` (default `epic/{p}.{n}.{slug}`)   | `EPIC_BRANCH`         |
+| nothing, or `develop-direct`, or epic unreadable          | unset                                                          | `develop` (unchanged) |
 
 **A declared `integration_branch` is used verbatim** — the epic document is the authority on its own
 branch name. If the epic cannot be resolved, proceed with `EPIC_BRANCH` unset; never guess, never block.
 
-> `epic/{n}.{name}` (integration branch — stories merge into it) is **not** `feature/epic.{n}.{name}`
+**A derived name comes from `/create-branch` Step 2b.4's block, run with `{epic-file}` = `EPIC_FILE`** —
+the one place `branchPattern` is applied. `{p}` is the PRD number: E restarts at 1 in every PRD, so a
+configured `branchPattern` without `{p}` is a **HALT naming `branching.epicIntegration.branchPattern`**,
+never a name that collides across PRDs (task 206). Deriving a name has no side effect, so it is safe here.
+
+> `epic/{p}.{n}.{name}` (integration branch — stories merge into it) is **not** `feature/epic.{p}.{n}.{name}`
 > (an ordinary short-lived branch for editing the epic document, which `/review-epic` creates). Do not
 > substitute one for the other.
 
 #### develop-story Q1 options
 
-Ask "Which branch should `feature/story.{epic}.{story}.{name}` be based on?"
+Ask "Which branch should `feature/{story-stem}.{name}` be based on?"
 
 **When `EPIC_BRANCH` is set** — it leads and is Recommended, because a story in an
 integration-branch epic that lands on `develop` alone defeats the point of the epic delivering as one unit:
@@ -775,7 +811,7 @@ Required` marked `<!-- optional -->`. Create the report from the matching varian
 
 #### develop-story
 
-Create `story.{epic}.{story}.implementation.{N}.{descriptive-name}.md` in the story directory from
+Create `{story-stem}.implementation.{N}.{descriptive-name}.md` in the story directory from
 the template's **Story variant**.
 
 #### develop-task
@@ -807,7 +843,7 @@ asked nothing still shows where every answer came from:
 🚀 Starting automated story pipeline
 
 Story:        {story filename}
-Branch:       feature/story.{epic}.{story}.{name} ← {Q1 base branch}   [{sources.base}]
+Branch:       feature/{story-stem}.{name} ← {Q1 base branch}   [{sources.base}]
 PR target:    {Q2 answer}   [{sources.target}]
 Mode:         {answers.mode}   [{sources.mode}]
 Skips:        {answers.skips, or "none"}{ — WAIVED gate, approved by {waiver.approved_by}, when a step is skipped}

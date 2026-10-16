@@ -15,7 +15,7 @@ bugs are first-class, globally-numbered documents tracked in the [bug registry](
 
 When a bug *does* have an owner, file it against that owner instead:
 
-- Found during **story testing** → story bug (`story.{epic}.{story}.bug.{n}.{name}.md`, co-located with the story).
+- Found during **story testing** → story bug (`story.{prd}.{epic}.{story}.bug.{n}.{name}.md`, co-located with the story).
 - Found during **technical-task QA** → task bug (`task.{id}.bug.{n}.{name}.md`, co-located in the task subdirectory).
 
 ## Directory layout

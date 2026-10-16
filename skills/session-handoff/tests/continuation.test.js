@@ -42,7 +42,7 @@ function fakeFs({ paths = [], dirs = {}, stories = {} } = {}) {
   return {
     exists: (p) => existing.has(path.normalize(p)),
     list: (d) => dirs[path.normalize(d)] ?? [],
-    findStory: (e, s) => stories[`${e}.${s}`] ?? null,
+    findStory: (id) => stories[id] ?? null,
   };
 }
 
@@ -121,32 +121,69 @@ test("task branch whose directory is absent → .agents/handoffs fallback", asyn
 
 test("story branch: found under the PRD root → story dir; not found → fallback", async () => {
   const mod = await load();
-  const dir = "/repo/docs/prd/x/epics/epic.2.e/stories/story.2.3.add-footer";
+  const dir =
+    "/repo/docs/prd/x/epics/epic.1.2.e/stories/story.1.2.3.add-footer";
   const found = resolveWith(mod, {
-    branch: "feature/story.2.3.add-footer",
+    branch: "feature/story.1.2.3.add-footer",
     fsSpec: {
-      stories: { 2.3: dir },
-      dirs: { [dir]: ["story.2.3.add-footer.md"] },
+      stories: { "story.1.2.3": dir },
+      dirs: { [dir]: ["story.1.2.3.add-footer.md"] },
     },
   });
   assert.equal(
     found.path,
-    "docs/prd/x/epics/epic.2.e/stories/story.2.3.add-footer/story.2.3.handoff.1.add-footer.md",
+    "docs/prd/x/epics/epic.1.2.e/stories/story.1.2.3.add-footer/story.1.2.3.handoff.1.add-footer.md",
   );
-  assert.equal(found.workItem.id, "story.2.3");
+  assert.equal(found.workItem.id, "story.1.2.3");
 
-  const missing = resolveWith(mod, { branch: "feature/story.2.3.add-footer" });
+  const missing = resolveWith(mod, {
+    branch: "feature/story.1.2.3.add-footer",
+  });
   assert.match(
     missing.path,
-    /^\.agents\/handoffs\/2026-10-01-feature-story-2-3-add-footer\.md$/,
+    /^\.agents\/handoffs\/2026-10-01-feature-story-1-2-3-add-footer\.md$/,
   );
 
   // A story directory outside the repository is never written into.
   const outside = resolveWith(mod, {
-    branch: "feature/story.2.3.add-footer",
-    fsSpec: { stories: { 2.3: "/elsewhere/story.2.3.add-footer" } },
+    branch: "feature/story.1.2.3.add-footer",
+    fsSpec: { stories: { "story.1.2.3": "/elsewhere/story.1.2.3.add-footer" } },
   });
   assert.match(outside.path, /^\.agents\/handoffs\//);
+});
+
+test("story branch: story.1.2.3 never reads story.1.2.30's handoffs, a sub-story keeps its letter, and a legacy branch is not a story (task 206)", async () => {
+  const mod = await load();
+  const dir = "/repo/docs/prd/x/epics/epic.1.2.e/stories/story.1.2.3.s";
+  const r = resolveWith(mod, {
+    branch: "feature/story.1.2.3.s",
+    fsSpec: {
+      stories: { "story.1.2.3": dir },
+      // story.1.2.30's handoffs share the old `story.1.2.3` name prefix.
+      dirs: { [dir]: ["story.1.2.3.s.md", "story.1.2.30.handoff.4.s.md"] },
+    },
+  });
+  assert.match(r.path, /\/story\.1\.2\.3\.handoff\.1\.s\.md$/);
+
+  assert.deepEqual(mod.storyOfBranch("feature/story.1.2.3A.core-ui"), {
+    id: "story.1.2.3A",
+    slug: "core-ui",
+  });
+  assert.equal(
+    mod.storyOfBranch("feature/story.2.3.add-footer"),
+    null,
+    "legacy E.S",
+  );
+  assert.equal(
+    mod.storyOfBranch("feature/story.1.2.3.qa.1.x"),
+    null,
+    "an artifact name",
+  );
+  assert.equal(
+    mod.storyOfBranch("story.1.2.3.x"),
+    null,
+    "not a feature branch",
+  );
 });
 
 test("detached HEAD and develop → fallback; slug from --slug, else the branch", async () => {
@@ -309,11 +346,15 @@ test("CLI --json on a task branch: piped output parses; unknown flag exits 2", (
 
 test("PRD root precedence: --prd-root > skills-config.yaml > docs/prd", async (t) => {
   const mod = await load();
-  const repo = tempRepo(t, "feature/story.2.3.add-footer");
+  const repo = tempRepo(t, "feature/story.1.2.3.add-footer");
   const mk = (rel) => {
-    const d = path.join(repo, rel, "stories/story.2.3.add-footer");
+    const d = path.join(repo, rel, "stories/story.1.2.3.add-footer");
     fs.mkdirSync(d, { recursive: true });
-    fs.writeFileSync(path.join(d, "story.2.3.add-footer.md"), "x\n");
+    fs.writeFileSync(path.join(d, "story.1.2.3.add-footer.md"), "x\n");
+    // A neighbour whose name extends this story's: the walk must not stop on it.
+    const n = path.join(repo, rel, "stories/zzz/story.1.2.30.other");
+    fs.mkdirSync(n, { recursive: true });
+    fs.writeFileSync(path.join(n, "story.1.2.30.other.md"), "x\n");
   };
   mk("docs/prd");
   const io = {
@@ -333,7 +374,7 @@ test("PRD root precedence: --prd-root > skills-config.yaml > docs/prd", async (t
   mk("flag/prd");
   assert.match(
     mod.run(["--repo", repo, "--prd-root", "flag/prd"], io).path,
-    /^flag\/prd\/stories\/story\.2\.3\.add-footer\/story\.2\.3\.handoff\.1\.add-footer\.md$/,
+    /^flag\/prd\/stories\/story\.1\.2\.3\.add-footer\/story\.1\.2\.3\.handoff\.1\.add-footer\.md$/,
   );
 });
 

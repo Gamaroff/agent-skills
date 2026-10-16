@@ -51,7 +51,14 @@ import {
   realpathSync,
 } from "node:fs";
 import { join, relative, dirname, resolve, basename } from "node:path";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
+
+// The one definition of a document id (task 202). A story file is read through
+// it: ids are `P.E.S`, and an epic is `P.E` — E restarts in every PRD, so E alone
+// names an epic in each of them (task 206).
+const require = createRequire(import.meta.url);
+const docId = require("../references/doc-id.js");
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -147,7 +154,30 @@ export function loadSurfaces(opts) {
   cfg.excludedPrds ??= [];
   cfg.defaultSurface ??= cfg.surfaces.at(-1).letter;
   cfg.uatSpecPattern ??= "^apps/portal/e2e/(smoke|uat)/";
+  // Reported by the command that reads them: --check fails on them and --coverage
+  // counts them; commands that read stories print them to stderr (loadStories);
+  // --init, --run-path, --set and --accept read no story and do not report them.
+  cfg.warnings = surfaceKeyWarnings(cfg, opts.surfaces);
   return cfg;
+}
+
+// An epic is `P.E` and a story `P.E.S` (task 206). A key in the old shape — a bare
+// epic number `"5"`, a two-number story `"7.1"` — would never match, and every
+// story it was meant for would silently fall to the default surface. Reported.
+export function surfaceKeyWarnings(cfg, file = "uat-surfaces.json") {
+  const out = [];
+  const isEpic = (k) => docId.parse(`epic.${k}.x`).ok;
+  const isStory = (k) => docId.parse(`story.${k}.x`).ok;
+  for (const k of Object.keys(cfg.epicSurface ?? {}))
+    if (!isEpic(k))
+      out.push(
+        `${file}: epicSurface key "${k}" is not an epic id P.E — rename it (e.g. "1.${k}") after migrate-doc-numbering`,
+      );
+  for (const field of ["storySurface", "storyNa"])
+    for (const k of Object.keys(cfg[field] ?? {}))
+      if (!isStory(k))
+        out.push(`${file}: ${field} key "${k}" is not a story id P.E.S`);
+  return out;
 }
 
 // ---------- stories ----------
@@ -161,9 +191,19 @@ function walk(dir, out = []) {
   return out;
 }
 
-// Canonical story file only — sidecars (story.7.5.review.1.name.md, story.7.5.qa.1.name.md) have
-// a dotted segment between the number and the name and are excluded by the [a-z0-9-]+ name.
-const STORY_FILE = /\/story\.(\d+)\.(\d+)\.[a-z0-9-]+\.md$/;
+// Canonical story file only, read by doc-id — sidecars (story.1.7.5.review.1.name.md,
+// story.1.7.5.qa.1.name.md) parse as artifacts and are skipped. A `story.*.md` doc-id
+// cannot read (a legacy story.{E}.{S}, a malformed name) is REPORTED, never skipped:
+// an empty queue is the one answer nobody questions (task 206).
+function storyFile(file) {
+  const name = basename(file);
+  if (!name.startsWith("story.") || !name.endsWith(".md"))
+    return { skip: true };
+  const p = docId.parse(name);
+  if (!p.ok) return { bad: p.reason };
+  if (p.kind !== "story" || p.artifact !== null) return { skip: true };
+  return { id: p };
+}
 
 function frontmatter(text) {
   const m = text.match(/^---\n([\s\S]*?)\n---/);
@@ -176,34 +216,70 @@ function frontmatter(text) {
   return fm;
 }
 
-export function loadStories(opts, cfg) {
+/**
+ * Pure apart from the reads: `{ stories, warnings }`. `warnings` names every
+ * `story.*.md` under the stories root that doc-id could not read.
+ */
+export function scanStories(opts, cfg) {
   const base = join(opts.root, opts.stories);
   if (!existsSync(base)) die(`stories root not found: ${opts.stories}`);
   const excluded = new Set(cfg.excludedPrds);
   const stories = [];
+  const warnings = [];
   for (const file of walk(base)) {
-    const m = file.match(STORY_FILE);
-    if (!m) continue;
+    const f = storyFile(file);
+    if (f.skip) continue;
     const rel = relative(opts.root, file);
     const prd = relative(base, file).split("/")[0];
     if (excluded.has(prd)) continue;
+    if (f.bad) {
+      warnings.push(
+        `${rel}: not a story id doc-id can read (${f.bad}) — story.{P}.{E}.{S}.{slug}.md; a legacy story.{E}.{S} is migrated with migrate-doc-numbering`,
+      );
+      continue;
+    }
+    const p = f.id;
     const fm = frontmatter(readFileSync(file, "utf8"));
-    const id = `${m[1]}.${m[2]}`;
+    const id = p.id.slice("story.".length); // "1.2.3", "1.2.3A"
     stories.push({
       id,
-      epic: Number(m[1]),
-      story: Number(m[2]),
+      prd: p.prd,
+      epic: p.epic,
+      story: p.story,
+      sub: p.sub,
       title: fm.title ?? "",
       status: fm.status ?? "",
       storyType: fm.story_type ?? "",
       path: rel,
       surface:
         cfg.storySurface[id] ??
-        cfg.epicSurface[String(m[1])] ??
+        cfg.epicSurface[`${p.prd}.${p.epic}`] ??
         cfg.defaultSurface,
     });
   }
-  return stories.sort((a, b) => a.epic - b.epic || a.story - b.story);
+  stories.sort(
+    (a, b) =>
+      a.prd - b.prd ||
+      a.epic - b.epic ||
+      a.story - b.story ||
+      (a.sub ?? "").localeCompare(b.sub ?? ""),
+  );
+  return { stories, warnings };
+}
+
+export function loadStories(opts, cfg) {
+  const { stories, warnings } = scanStories(opts, cfg);
+  for (const w of [...(cfg.warnings ?? []), ...warnings])
+    console.error(`uat-status: warning: ${w}`);
+  return stories;
+}
+
+// The warnings a reader of --check / --coverage must see in the result itself, not
+// only on stderr: "every story is covered" and "the stories could not be read"
+// must not print the same summary (task.206 QA cycle 1, CR-9).
+function storyScan(opts, cfg) {
+  const { stories, warnings } = scanStories(opts, cfg);
+  return { stories, warnings: [...(cfg.warnings ?? []), ...warnings] };
 }
 
 // ---------- registry parse / render ----------
@@ -277,8 +353,12 @@ export function stateKey(cell) {
   );
 }
 
+// Every dotted-number token in a Stories cell (`1.2.3`, `1.2.3A`, a legacy `7.1`).
+// Deliberately not a story grammar: it collects what the cell names, and --check
+// reports any token that is not a real story id — a legacy `7.1` included —
+// rather than letting a narrower pattern drop it unseen (task 206).
 export function storyIds(cell) {
-  return [...new Set((cell ?? "").match(/\b\d+\.\d+\b/g) ?? [])];
+  return [...new Set((cell ?? "").match(/\b\d+(?:\.\d+)+[A-Z]?\b/g) ?? [])];
 }
 
 export function specPaths(cell) {
@@ -388,7 +468,7 @@ function requireSurfaces(opts) {
   mkdirSync(join(opts.root, dirname(opts.surfaces)), { recursive: true });
   copyFileSync(template, join(opts.root, opts.surfaces));
   die(
-    `${opts.surfaces} did not exist — a template was written there. Fill in surfaces / epicSurface / excludedPrds for this project, then re-run.`,
+    `${opts.surfaces} did not exist — a template was written there. Fill in surfaces / epicSurface (keys are epic ids "P.E") / excludedPrds for this project, then re-run.`,
   );
 }
 
@@ -439,8 +519,13 @@ export function checkCoverage({ sections }, stories, cfg) {
 
 function cmdCoverage(opts) {
   const cfg = requireSurfaces(opts);
-  const c = checkCoverage(readRegistry(opts), loadStories(opts, cfg), cfg);
+  const scan = storyScan(opts, cfg);
+  const c = {
+    ...checkCoverage(readRegistry(opts), scan.stories, cfg),
+    warnings: scan.warnings,
+  };
   if (opts.has("--json")) return console.log(JSON.stringify(c, null, 2));
+  for (const w of c.warnings) console.log(`warning    ${w}`);
   for (const s of c.unmapped)
     console.log(
       `unmapped   ${s.id}  ${s.title}  → surface ${s.suggestedSurface}`,
@@ -449,7 +534,7 @@ function cmdCoverage(opts) {
     console.log(`not-accepted ${s.id}  ${s.title}  (${s.status})`);
   for (const id of c.unknown) console.log(`unknown    ${id}  (no story file)`);
   console.log(
-    `coverage: ${c.unmapped.length} accepted stories covered by no function · ${c.na.length} n/a · ${c.notAccepted.length} referenced but not accepted · ${c.unknown.length} unknown`,
+    `coverage: ${c.unmapped.length} accepted stories covered by no function · ${c.na.length} n/a · ${c.notAccepted.length} referenced but not accepted · ${c.unknown.length} unknown · ${c.warnings.length} warning(s)`,
   );
 }
 
@@ -663,12 +748,17 @@ export function checkFindings(findings) {
 function cmdCheck(opts) {
   const cfg = requireSurfaces(opts);
   const exists = (rel) => existsSync(join(opts.root, repoPathOf(opts, rel)));
+  const scan = storyScan(opts, cfg);
   const { errors, warns } = checkRegistry(
     readRegistry(opts),
-    loadStories(opts, cfg),
+    scan.stories,
     cfg,
     exists,
   );
+  // An unreadable story or a legacy surface key makes coverage a claim about the
+  // wrong set of stories, and qa-next gates on this exit code: an ERROR, so the
+  // registry is never tested on top of a scan that could not read it (CR2-4).
+  errors.unshift(...scan.warnings);
   errors.push(...checkFindings(loadFindings(opts)));
   for (const w of warns) console.log(`[warn ] ${w}`);
   for (const e of errors) console.log(`[ERROR] ${e}`);

@@ -1,11 +1,11 @@
 {
   "name": "develop-story-step-05-qa-story",
   "skill": "develop-story",
-  "description": "Step 5: qa-story produces a gate file and QA report for story.5.1.example.",
-  "prompt": "Run step 5 (qa-story) of the develop-story pipeline for story.5.1.example.",
+  "description": "Step 5: qa-story produces a gate file and QA report for story.1.1.1.example.",
+  "prompt": "Run step 5 (qa-story) of the develop-story pipeline for story.1.1.1.example.",
   "assertions": [
-    { "fn": "fileExists",   "args": ["$SANDBOX/docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/story.5.1.gate.1.example.yml"] },
-    { "fn": "fileExists",   "args": ["$SANDBOX/docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/story.5.1.qa.1.example.md"] },
-    { "fn": "fileMatches",  "args": ["$SANDBOX/docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/story.5.1.gate.1.example.yml", "PASS"] }
+    { "fn": "fileExists",   "args": ["$SANDBOX/docs/prd/domain/prd.1.feature/epics/epic.1.1.example/stories/story.1.1.1.example/story.1.1.1.gate.1.example.yml"] },
+    { "fn": "fileExists",   "args": ["$SANDBOX/docs/prd/domain/prd.1.feature/epics/epic.1.1.example/stories/story.1.1.1.example/story.1.1.1.qa.1.example.md"] },
+    { "fn": "fileMatches",  "args": ["$SANDBOX/docs/prd/domain/prd.1.feature/epics/epic.1.1.example/stories/story.1.1.1.example/story.1.1.1.gate.1.example.yml", "PASS"] }
   ]
 }

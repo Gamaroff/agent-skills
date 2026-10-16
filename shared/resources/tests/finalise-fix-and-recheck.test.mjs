@@ -31,6 +31,7 @@ import {
   gitFacts,
   isWorkItemDocument,
   isCoLocatedArtifact,
+  parseWorkItemName,
 } from "../finalise-fix-and-recheck.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -114,8 +115,8 @@ test("isWorkItemDocument is exported, so the boundary the docs-link admission re
   assert.equal(typeof isWorkItemDocument, "function");
   for (const doc of [
     "docs/tasks/task.1.x/task.1.x.md",
-    "docs/prd/a/b/epics/epic.2.x/stories/story.2.1.y/story.2.1.y.md",
-    "docs/prd/a/b/epics/epic.2.x/epic.2.x.md",
+    "docs/prd/a/b/epics/epic.1.2.x/stories/story.1.2.1.y/story.1.2.1.y.md",
+    "docs/prd/a/b/epics/epic.1.2.x/epic.1.2.x.md",
     "docs/bugs/bug.3.z/bug.3.z.md",
   ]) {
     assert.equal(isWorkItemDocument(doc), true, doc);
@@ -177,7 +178,7 @@ test("inside-files-summary: the work item's own document is in scope when named 
     );
   }
   for (const doc2 of [
-    "docs/prd/a/b/epics/epic.2.x/stories/story.2.1.y/story.2.1.y.md",
+    "docs/prd/a/b/epics/epic.1.2.x/stories/story.1.2.1.y/story.1.2.1.y.md",
     "docs/bugs/bug.3.z/bug.3.z.md",
   ]) {
     assert.deepEqual(
@@ -229,7 +230,8 @@ test("inside-files-summary: a co-located QA report named in artifactPaths is in 
     [],
   );
   // Every artifact kind the 8a clause names, for a story too.
-  const story = "docs/prd/a/epics/epic.2.x/stories/story.2.1.y/story.2.1.y.md";
+  const story =
+    "docs/prd/a/epics/epic.1.2.x/stories/story.1.2.1.y/story.1.2.1.y.md";
   for (const kind of [
     "qa.1",
     "dod.2",
@@ -238,7 +240,7 @@ test("inside-files-summary: a co-located QA report named in artifactPaths is in 
     "pr-review.1",
     "sprint-review-summary",
   ]) {
-    const p = `docs/prd/a/epics/epic.2.x/stories/story.2.1.y/story.2.1.${kind}.y.md`;
+    const p = `docs/prd/a/epics/epic.1.2.x/stories/story.1.2.1.y/story.1.2.1.${kind}.y.md`;
     assert.equal(isCoLocatedArtifact(story, p), true, p);
   }
 });
@@ -704,9 +706,10 @@ test("the security agent's schema carries `severity` on probes and FAIL checks",
 });
 
 test("a sprint-review summary is a co-located artifact, never a work-item document — the evaluator and the corpus guard share one artifact set (task.152 QA cycle 1, QA-1)", () => {
-  const story = "docs/prd/a/epics/epic.2.x/stories/story.2.1.y/story.2.1.y.md";
+  const story =
+    "docs/prd/a/epics/epic.1.2.x/stories/story.1.2.1.y/story.1.2.1.y.md";
   const summary =
-    "docs/prd/a/epics/epic.2.x/stories/story.2.1.y/story.2.1.sprint-review-summary.md";
+    "docs/prd/a/epics/epic.1.2.x/stories/story.1.2.1.y/story.1.2.1.sprint-review-summary.md";
   assert.equal(isWorkItemDocument(summary), false, "not a document");
   assert.equal(
     isCoLocatedArtifact(story, summary),
@@ -718,20 +721,36 @@ test("a sprint-review summary is a co-located artifact, never a work-item docume
     ["inside-files-summary"],
     "and it cannot admit itself as the document",
   );
-  // One definition: the doc-links corpus guards import this regex rather than
-  // restating it, so the two cannot disagree again.
+  // One definition: the doc-links corpus guards import the evaluator's readings
+  // rather than restating them, so the two cannot disagree again — and since
+  // task 206 they restate no id pattern either (`story\.\d+\.\d+` assumed the
+  // legacy two-number story id).
   const guard = read("shared/resources/tests/doc-links.test.mjs");
-  assert.match(
-    guard,
-    /import \{[^}]*\bWORK_ITEM_ARTIFACT_RE\b[^}]*\} from "\.\.\/finalise-fix-and-recheck\.mjs"/,
-  );
-  assert.match(guard, /const ARTIFACT_RE = WORK_ITEM_ARTIFACT_RE;/);
+  for (const name of [
+    "UNPREFIXED_ARTIFACTS",
+    "isWorkItemDocument",
+    "parseWorkItemName",
+  ]) {
+    assert.match(
+      guard,
+      new RegExp(
+        `import \\{[^}]*\\b${name}\\b[^}]*\\} from "\\.\\.\\/finalise-fix-and-recheck\\.mjs"`,
+      ),
+      name,
+    );
+  }
   assert.doesNotMatch(guard, /const ARTIFACT_RE =\s*\//, "no second literal");
+  assert.doesNotMatch(
+    guard,
+    /\/[^/\n]*(?:task|story|epic)\\\.\\d/,
+    "no restated work-item id pattern",
+  );
 });
 
 test("the unprefixed sprint-review-summary.md finalise writes beside a document is a co-located artifact — and only there (task.152 QA cycle 2, CR-2)", () => {
-  const story = "docs/prd/a/epics/epic.2.x/stories/story.2.1.y/story.2.1.y.md";
-  const dir = "docs/prd/a/epics/epic.2.x/stories/story.2.1.y/";
+  const story =
+    "docs/prd/a/epics/epic.1.2.x/stories/story.1.2.1.y/story.1.2.1.y.md";
+  const dir = "docs/prd/a/epics/epic.1.2.x/stories/story.1.2.1.y/";
   assert.equal(
     isCoLocatedArtifact(story, dir + "sprint-review-summary.md"),
     true,
@@ -746,11 +765,11 @@ test("the unprefixed sprint-review-summary.md finalise writes beside a document 
   );
   for (const [why, p] of Object.entries({
     "another directory":
-      "docs/prd/a/epics/epic.2.x/stories/story.2.2.z/sprint-review-summary.md",
+      "docs/prd/a/epics/epic.1.2.x/stories/story.1.2.2.z/sprint-review-summary.md",
     "a subdirectory": dir + "old/sprint-review-summary.md",
     "a .yml": dir + "sprint-review-summary.yml",
     "a lookalike name": dir + "xsprint-review-summary.md",
-    "a .. path": dir + "../story.2.1.y/sprint-review-summary.md",
+    "a .. path": dir + "../story.1.2.1.y/sprint-review-summary.md",
   })) {
     assert.equal(isCoLocatedArtifact(story, p), false, why);
   }
@@ -768,7 +787,8 @@ test("the unprefixed sprint-review-summary.md finalise writes beside a document 
 });
 
 test("a raw LF or CR in a path is refused by both predicates — one string here, two paths to a line-oriented reader (task.152 finalise DoD security probe)", () => {
-  const story = "docs/prd/p/epics/epic.1.x/stories/story.1.2.x/story.1.2.x.md";
+  const story =
+    "docs/prd/p/epics/epic.1.1.x/stories/story.1.1.2.x/story.1.1.2.x.md";
   for (const p of [
     TASK_DOC.replace(/[^/]+$/, "task.139.qa.1.x.md\nREADME.md"),
     TASK_DOC.replace(/[^/]+$/, "task.139.qa.1.x.md\r\n.md"),
@@ -789,7 +809,7 @@ test("a raw LF or CR in a path is refused by both predicates — one string here
   assert.equal(
     isCoLocatedArtifact(
       story,
-      story.replace(/[^/]+$/, "story.1.2.qa.1.x.md\nx.md"),
+      story.replace(/[^/]+$/, "story.1.1.2.qa.1.x.md\nx.md"),
     ),
     false,
     "story anchor",
@@ -802,4 +822,56 @@ test("a raw LF or CR in a path is refused by both predicates — one string here
   }
   // The guard does not over-block: the ordinary artifact still passes.
   assert.equal(isCoLocatedArtifact(TASK_DOC, QA4), true);
+});
+
+test("isCoLocatedArtifact keys on the doc-id story id: story.1.2.3 admits its own artifacts and never story.1.2.30, story.1.2.4 or the sub-story 1.2.3A (task 206)", () => {
+  const dir = "docs/prd/p/epics/epic.1.2.e/stories/story.1.2.3.s/";
+  const story = `${dir}story.1.2.3.s.md`;
+  assert.equal(
+    isWorkItemDocument(story),
+    true,
+    "a hierarchical story is a work-item document",
+  );
+  assert.equal(
+    isCoLocatedArtifact(story, `${dir}story.1.2.3.qa.1.s.md`),
+    true,
+    "its own QA report",
+  );
+  assert.equal(
+    isCoLocatedArtifact(story, `${dir}story.1.2.3.dod.2.s.md`),
+    true,
+    "its own DoD",
+  );
+  for (const neighbour of [
+    "story.1.2.30.qa.1.s.md", // a story whose number extends this one's
+    "story.1.2.4.qa.1.s.md", // the next story — the old `story\.\d+\.\d+` stem, story.1.2, admitted it
+    "story.1.2.3A.qa.1.s.md", // a sub-story is its own work item
+    "story.1.2.qa.1.s.md", // an epic-level name
+  ]) {
+    assert.equal(isCoLocatedArtifact(story, dir + neighbour), false, neighbour);
+  }
+  const sub = `${dir}story.1.2.3A.s.md`;
+  assert.equal(
+    isCoLocatedArtifact(sub, `${dir}story.1.2.3A.qa.1.s.md`),
+    true,
+    "a sub-story's own artifact",
+  );
+  assert.equal(
+    isCoLocatedArtifact(sub, `${dir}story.1.2.3.qa.1.s.md`),
+    false,
+    "its parent story's artifact",
+  );
+});
+
+test("a legacy story.{E}.{S} name is not a work-item document — it is migrated first, never mis-stemmed (task 206)", () => {
+  const legacy = "docs/prd/p/epics/epic.5.e/stories/story.5.1.s/story.5.1.s.md";
+  assert.equal(isWorkItemDocument(legacy), false);
+  assert.equal(parseWorkItemName(legacy), null);
+  assert.equal(
+    isCoLocatedArtifact(
+      legacy,
+      "docs/prd/p/epics/epic.5.e/stories/story.5.1.s/story.5.1.qa.1.s.md",
+    ),
+    false,
+  );
 });

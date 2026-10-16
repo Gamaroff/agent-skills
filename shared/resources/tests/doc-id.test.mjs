@@ -327,15 +327,15 @@ test("matchesEpic: P is required, and neither epic.12.1 nor epic.1.21 is claimed
   assert.throws(() => d.matchesEpic("epic.1.2.x", 0, 2), TypeError);
 });
 
-test("nextNumber: highest + 1 — a deleted number is never reused (unlike nextStoryId)", () => {
+test("nextNumber: highest + 1 — a deleted number is never reused, and create-story's nextStoryId is the same rule (task 206)", () => {
   assert.equal(d.nextNumber("story", ["story.1.1.1.a", "story.1.1.3.b"]), 4);
   const { nextStoryId } = require(
     join(repoRoot, "skills/create-story/scripts/lib.js"),
   );
   assert.equal(
-    nextStoryId(["story.1.1.a.md", "story.1.3.b.md"], 1),
-    2,
-    "the contrast: create-story fills the gap",
+    nextStoryId(["story.1.1.1.a.md", "story.1.1.3.b.md"], 1, 1),
+    4,
+    "one allocator: create-story delegates to doc-id, so the two cannot disagree",
   );
   assert.equal(
     d.nextNumber("epic", ["epic.1.1.a", "epic.1.4.b", "epic.1.2.qa.9.x"]),

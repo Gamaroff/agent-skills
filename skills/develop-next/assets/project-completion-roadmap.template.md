@@ -46,11 +46,14 @@ milestones are done you may archive them out to a `roadmap-history.md`.
 
 # PHASE 1 — <first milestone>
 
-## <Area or Epic N — name>
+## <Area, or Epic P.E — name>
 
-- [ ] **1.1** <title> — [story](<relative/path/to/story.1.1.<name>.md>) · deps: none · `/develop-story`
-- [ ] **1.2** <title> — [task](<relative/path/to/task.<n>.<name>.md>) · deps: 1.1 · `/develop-task`
-- [ ] **1.3** <title> — [bug](<relative/path/to/bug.<n>.<name>.md>) · deps: none · `/develop-bug`
+<!-- An epic heading names its epic as `Epic P.E` (PRD P, epic E within it — E restarts in every PRD).
+     A bare `Epic N` is a selector error: run migrate-doc-numbering and rewrite it. -->
+
+- [ ] **1.1.1** <title> — [story](<relative/path/to/story.1.1.1.<name>.md>) · deps: none · `/develop-story`
+- [ ] **T1** <title> — [task](<relative/path/to/task.<n>.<name>.md>) · deps: 1.1.1 · `/develop-task`
+- [ ] **B1** <title> — [bug](<relative/path/to/bug.<n>.<name>.md>) · deps: none · `/develop-bug`
 
 ---
 

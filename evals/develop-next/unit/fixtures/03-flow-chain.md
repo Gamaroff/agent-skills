@@ -2,7 +2,7 @@
 
 ## PHASE 2 execution
 
-### Epic 17 — notifications
+### Epic 1.17 — notifications
 
 Flow: 17.1 → 17.2 → (17.4 ‖ 17.3-1)
 

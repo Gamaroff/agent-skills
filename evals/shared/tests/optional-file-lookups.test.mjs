@@ -83,6 +83,7 @@ const P = (dir) => ({
   "{id}": "7",
   "{epic}": "2",
   "{story}": "3",
+  "{story-stem}": "story.1.2.3",
   "{story-or-task-prefix}": "task.7",
   // The step docs address a bundled helper through the pipeline placeholder;
   // any one member resolves in the consumer root (task.158).
@@ -259,7 +260,7 @@ const ROWS = [
   {
     file: "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md",
     needle:
-      'find {story-directory} -maxdepth 1 -name "story.{epic}.{story}.implementation',
+      'find {story-directory} -maxdepth 1 -name "{story-stem}.implementation',
     stdout: "",
   },
   {

@@ -361,12 +361,17 @@ test("create-story — naming convention examples are accepted by validator", ()
     path.join(SKILLS_DIR, "create-story", "scripts", "lib.js"),
   );
   assert.equal(
-    lib.validateStoryFilename("story.178.8.example-feature.md").ok,
+    lib.validateStoryFilename("story.1.178.8.example-feature.md").ok,
     true,
+  );
+  // A legacy two-number name is refused: it is migrated first (task 206).
+  assert.equal(
+    lib.validateStoryFilename("story.178.8.example-feature.md").ok,
+    false,
   );
   assert.equal(lib.validateStoryFilename("story_1_2_example.md").ok, false);
   assert.equal(
-    lib.validateStoryFilename("story.1.2.exampleFeature.md").ok,
+    lib.validateStoryFilename("story.1.2.3.exampleFeature.md").ok,
     false,
   );
 });

@@ -29,6 +29,7 @@ const SCRIPT = path.join(
 
 const {
   parseRoadmap,
+  epicRef,
   selectNext,
   selectBatch,
   parseTouches,
@@ -341,7 +342,7 @@ test("10: -NFR suffix ids are distinct from their base id (7.11 ≠ 7.11-NFR2)",
   );
 });
 
-test("10: once 15/17/12/13 clear, the 🚧-gated Epic 25 row stops the run", () => {
+test("10: once 15/17/12/13 clear, the 🚧-gated Epic 1.25 row stops the run", () => {
   let text = fixture("10-real-world.md");
   for (const id of [
     "12.1",
@@ -462,7 +463,7 @@ test("template: the scaffold asset is a valid, lint-clean starter roadmap", () =
   // A scaffold parses and reaches its first item; it won't be "selected" until
   // the placeholder <path> is replaced with a real story/task link.
   assert.notEqual(r.status, "halt");
-  assert.equal(r.item.id, "1.1");
+  assert.equal(r.item.id, "1.1.1");
 });
 
 test("template: the Change Log header is the one the change-log engine writes", async () => {
@@ -539,14 +540,14 @@ test("11: a T-row is excluded from its host epic's section rows", () => {
   // stories of it — counting them would strand the epic forever.
   const m = parseRoadmap(fixture("11-task-ids.md"));
   assert.deepEqual(
-    m.epicSections["28"].rowIds,
+    m.epicSections["1.28"].rowIds,
     ["28.1", "28.2"],
-    "T22 must be excluded from Epic 28",
+    "T22 must be excluded from Epic 1.28",
   );
   assert.deepEqual(
-    m.epicSections["20"].rowIds,
+    m.epicSections["1.20"].rowIds,
     ["20.8"],
-    "T26 must be excluded from Epic 20",
+    "T26 must be excluded from Epic 1.20",
   );
 });
 
@@ -622,7 +623,7 @@ test("12: touches: does not disturb the deps: capture beside it", () => {
   const m = parseRoadmap(
     [
       "# PHASE 1",
-      "## Epic 9",
+      "## Epic 1.9",
       "- [ ] **9.1** A · deps: — · touches: schema~ · /develop-story docs/p/s/story.9.1.a/story.9.1.a.md",
       "- [ ] **9.2** B · deps: 9.1 · touches: leaderboard! · /develop-story docs/p/s/story.9.2.b/story.9.2.b.md",
       "",
@@ -639,7 +640,7 @@ test("12: touches: does not disturb the deps: capture beside it", () => {
 
 const BATCH_ROADMAP = [
   "# PHASE 1 — MVP",
-  "## Epic 8",
+  "## Epic 1.8",
   "- [ ] **8.1** Ready A · deps: — · touches: schema~, +own · /develop-story docs/p/s/story.8.1.a/story.8.1.a.md",
   "- [ ] **8.2** Ready B (soft-shares schema) · deps: — · touches: schema~ · /develop-story docs/p/s/story.8.2.b/story.8.2.b.md",
   "- [ ] **8.3** Ready C (hard leaderboard) · deps: — · touches: leaderboard! · /develop-story docs/p/s/story.8.3.c/story.8.3.c.md",
@@ -694,11 +695,11 @@ test("12: --batch advances past a fully-blocked phase, recording it", () => {
   const m = parseRoadmap(
     [
       "# PHASE 1 — blocked",
-      "## Epic 7",
+      "## Epic 1.7",
       // ⛔ with no parseable blocker id (a legal/ops gate) → never ready, but actionable.
       "- [ ] **7.1** Gated · deps: — · **⛔ legal-gate** — blocked on counsel · touches: +own · /develop-story docs/p/s/story.7.1.g/story.7.1.g.md",
       "# PHASE 2 — ready",
-      "## Epic 8",
+      "## Epic 1.8",
       "- [ ] **8.1** Ready · deps: — · touches: +own · /develop-story docs/p/s/story.8.1.a/story.8.1.a.md",
       "",
     ].join("\n"),
@@ -729,7 +730,7 @@ test("12: selectNext is unchanged by the presence of touches: (parity)", () => {
 
 const UNANNOTATED_ROADMAP = [
   "# PHASE 1 — MVP",
-  "## Epic 9",
+  "## Epic 1.9",
   // 9.1 and 9.2 have no touches: field at all → un-annotated (+own default).
   "- [ ] **9.1** Ready A · deps: — · /develop-story docs/p/s/story.9.1.a/story.9.1.a.md",
   "- [ ] **9.2** Ready B · deps: — · /develop-story docs/p/s/story.9.2.b/story.9.2.b.md",
@@ -783,7 +784,7 @@ test("13: a single un-annotated row does not warn", () => {
   const m = parseRoadmap(
     [
       "# PHASE 1",
-      "## Epic 9",
+      "## Epic 1.9",
       "- [ ] **9.1** Ready A · deps: — · /develop-story docs/p/s/story.9.1.a/story.9.1.a.md",
       "- [ ] **9.3** Ready C · deps: — · touches: +own · /develop-story docs/p/s/story.9.3.c/story.9.3.c.md",
       "",
@@ -1040,7 +1041,7 @@ test("13b: --check-root prints the normalised root, or refuses with exit 1", () 
 
 const BUG_ROADMAP = [
   "# PHASE 1 — MVP",
-  "## Epic 4",
+  "## Epic 1.4",
   "- [ ] **4.1** Login times out · deps: — · touches: auth! · /develop-bug docs/bugs/bug.7.login-timeout/bug.7.login-timeout.md",
   "",
 ].join("\n");
@@ -1064,7 +1065,7 @@ test("14: a general bug resolves via a [bug](…) link, not just an inline arg",
     parseRoadmap(
       [
         "# PHASE 1",
-        "## Epic 4",
+        "## Epic 1.4",
         "- [ ] **4.1** Login times out — [bug](docs/bugs/bug.7.login-timeout/bug.7.login-timeout.md) · deps: — · `/develop-bug`",
         "",
       ].join("\n"),
@@ -1085,7 +1086,7 @@ test("14: story and task bug reports resolve via their link too", () => {
   ]) {
     const r = selectNext(
       parseRoadmap(
-        `# PHASE 1\n\n## Epic 4\n\n- [ ] **4.1** Bug — [bug](${href}) · deps: — · \`/develop-bug\`\n`,
+        `# PHASE 1\n\n## Epic 1.4\n\n- [ ] **4.1** Bug — [bug](${href}) · deps: — · \`/develop-bug\`\n`,
       ),
     );
     assert.equal(r.status, "selected", href);
@@ -1115,7 +1116,7 @@ test("14: a /develop-bug row participates in --batch and touches: disjointness",
     parseRoadmap(
       [
         "# PHASE 1 — MVP",
-        "## Epic 8",
+        "## Epic 1.8",
         "- [ ] **8.1** Story A · deps: — · touches: schema~ · /develop-story docs/p/s/story.8.1.a/story.8.1.a.md",
         "- [ ] **8.2** Bug B (soft-shares schema) · deps: — · touches: schema~ · /develop-bug docs/bugs/bug.7.x/bug.7.x.md",
         "- [ ] **8.3** Bug C (hard auth) · deps: — · touches: auth! · /develop-bug docs/bugs/bug.8.y/bug.8.y.md",
@@ -1146,7 +1147,7 @@ test("14: a /develop-bug row participates in --batch and touches: disjointness",
 test("14: a bug row is dep-blocked and ⛔-blocked like any other row", () => {
   const text = [
     "# PHASE 1",
-    "## Epic 4",
+    "## Epic 1.4",
     "- [ ] **4.1** Prereq story · deps: — · /develop-story docs/p/s/story.4.1.a/story.4.1.a.md",
     "- [ ] **4.2** Bug · deps: 4.1 · /develop-bug docs/bugs/bug.7.x/bug.7.x.md",
     "",
@@ -1165,7 +1166,7 @@ test("14: regression — widening the alternation is not 'accept anything'", () 
   // three commands are legal.
   const r = selectNext(
     parseRoadmap(
-      "# PHASE 1\n\n## Epic 4\n\n- [ ] **4.1** Do the epic · deps: — · /develop-epic docs/p/e/epic.4.x.md\n",
+      "# PHASE 1\n\n## Epic 1.4\n\n- [ ] **4.1** Do the epic · deps: — · /develop-epic docs/p/e/epic.4.x.md\n",
     ),
   );
   assert.equal(r.status, "stop");
@@ -1186,7 +1187,7 @@ test("14: regression — widening the alternation is not 'accept anything'", () 
 test("14: a /develop-bug row with no resolvable path is a manual-checkpoint stop", () => {
   const r = selectNext(
     parseRoadmap(
-      "# PHASE 1\n\n## Epic 4\n\n- [ ] **4.1** Fix the thing · deps: — · `/develop-bug`\n",
+      "# PHASE 1\n\n## Epic 1.4\n\n- [ ] **4.1** Fix the thing · deps: — · `/develop-bug`\n",
     ),
   );
   assert.equal(r.status, "stop");
@@ -1325,14 +1326,14 @@ test("B: a bug row inside an epic section is excluded from that epic's completio
 
 ## PHASE 1 — build
 
-## Epic 4
+## Epic 1.4
 
 - [x] **4.1** the only actual story · /develop-story docs/stories/story.4.1.x/story.4.1.x.md
 - [ ] **T65** a cross-cutting task · /develop-task docs/tasks/task.65.x/task.65.x.md
 - [ ] **B2** a cross-cutting bug · /develop-bug docs/bugs/bug.2.flake/bug.2.flake.md
 `);
 
-  const rowIds = model.epicSections[4].rowIds;
+  const rowIds = model.epicSections["1.4"].rowIds;
   assert.deepEqual(
     rowIds,
     ["4.1"],
@@ -3118,7 +3119,7 @@ test("B8: the code lifecycles match docs/standards/bug-documents.md", () => {
 
 const EPIC_BATCH_ROADMAP = [
   "# PHASE 1 — MVP",
-  "## Epic 8",
+  "## Epic 1.8",
   "- [ ] **8.1** Ordinary story · deps: — · touches: +own · /develop-story docs/p/e8/story.8.1.a/story.8.1.a.md",
   "- [ ] **8.2** Integration story · deps: — · touches: +own · /develop-story docs/p/e9/story.9.1.b/story.9.1.b.md",
   "- [ ] **T5** A task · deps: — · touches: +own · /develop-task docs/tasks/task.5.x/task.5.x.md",
@@ -3572,7 +3573,7 @@ test("task.202: a roadmap line linking a PRD is still not a work item", () => {
     parseRoadmap(
       [
         "# PHASE 1",
-        "## Epic 4",
+        "## Epic 1.4",
         "- [ ] **4.1** Home PRD — [prd](docs/prd/web/prd.1.home/prd.1.home.md) · deps: — · `/develop-story`",
         "",
       ].join("\n"),
@@ -3581,4 +3582,104 @@ test("task.202: a roadmap line linking a PRD is still not a work item", () => {
   assert.equal(r.status, "stop");
   assert.equal(r.stopReason, "manual-checkpoint");
   assert.equal(r.item.commandArg, null, "the PRD link is not a work-item path");
+});
+
+// ---------- task 206: hierarchical epic ids ----------
+
+test('Epic P.E: a heading keys its section on "P.E", deps: Epic P.E blocks until the epic\'s stories are done, and task 12 / epic 1.2 / story 1.2.1 coexist (task 206)', () => {
+  const md = `# Roadmap
+
+## PHASE 1 — build
+
+## Epic 2.2 — another PRD's second epic, listed first
+
+- [ ] **2.2.1** other · deps: Epic 1.2 · /develop-story docs/s/story.2.2.1.x/story.2.2.1.x.md
+- [ ] **T12** a task · deps: 2.2.1 · /develop-task docs/tasks/task.12.x/task.12.x.md
+
+## Epic 1.2 — payments
+
+- [ ] **1.2.1** charge a card · /develop-story docs/s/story.1.2.1.x/story.1.2.1.x.md
+`;
+  const m = parseRoadmap(md);
+  assert.deepEqual(m.errors, []);
+  assert.deepEqual(Object.keys(m.epicSections).sort(), ["1.2", "2.2"]);
+  assert.deepEqual(m.epicSections["1.2"].rowIds, ["1.2.1"]);
+  assert.deepEqual(
+    m.epicSections["2.2"].rowIds,
+    ["2.2.1"],
+    "E alone does not merge PRD 1's and PRD 2's epic 2",
+  );
+  const row = m.byId.get("2.2.1");
+  assert.deepEqual(
+    row.deps.map((d) => d.id),
+    ["1.2"],
+  );
+  const r = selectNext(m);
+  assert.equal(r.status, "selected");
+  assert.equal(
+    r.item.id,
+    "1.2.1",
+    "2.2.1 waits on Epic 1.2 and T12 on 2.2.1, so 1.2.1 is first",
+  );
+  assert.ok(
+    r.skipped.some((s) => s.id === "2.2.1"),
+    "2.2.1 is skipped for its outstanding epic dep",
+  );
+});
+
+test("a legacy `## Epic 8` heading and a legacy `deps: Epic 8` are model ERRORS naming the migration — never an epic silently keyed on E (task 206)", () => {
+  const heading = parseRoadmap(`# Roadmap
+
+## PHASE 1
+
+## Epic 8 — legacy
+
+- [ ] **8.1** x · /develop-story docs/s/story.8.1.x/story.8.1.x.md
+`);
+  assert.equal(heading.errors.length, 1);
+  assert.match(
+    heading.errors[0],
+    /line 5: "Epic 8" predates hierarchical numbering/,
+  );
+  assert.match(heading.errors[0], /migrate-doc-numbering/);
+  assert.equal(selectNext(heading).status, "halt");
+
+  const dep = parseRoadmap(`# Roadmap
+
+## PHASE 1
+
+## Epic 1.9
+
+- [ ] **1.9.1** x · deps: Epic 8 · /develop-story docs/s/story.1.9.1.x/story.1.9.1.x.md
+`);
+  assert.equal(dep.errors.length, 1);
+  assert.match(
+    dep.errors[0],
+    /1\.9\.1 deps: "Epic 8" predates hierarchical numbering/,
+  );
+
+  // An archived legacy heading (inside a Deferred section) is history, not an error.
+  const archived = parseRoadmap(`# Roadmap
+
+## PHASE 1
+
+## Epic 1.1
+
+- [ ] **1.1.1** x · /develop-story docs/s/story.1.1.1.x/story.1.1.1.x.md
+
+## Deferred
+
+### Epic 3 — parked
+
+- [ ] **3.1** parked
+`);
+  assert.deepEqual(archived.errors, []);
+});
+
+test("epicRef reads doc-id's epic grammar: P.E, no leading zero, not a story id", () => {
+  assert.deepEqual(epicRef("## Epic 1.12 — x"), { id: "1.12" });
+  assert.equal(epicRef("no epic here"), null);
+  assert.match(epicRef("Epic 01.2").error, /not an epic id P\.E/);
+  assert.match(epicRef("Epic 1.2.3").error, /not an epic id P\.E/);
+  assert.match(epicRef("Epic 7").error, /predates hierarchical numbering/);
 });

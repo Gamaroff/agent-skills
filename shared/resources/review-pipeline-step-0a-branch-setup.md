@@ -67,16 +67,27 @@ Run **before** the auto-skip check — auto-skip patterns depend on these IDs.
 
 #### review-story
 
-```bash
-STORY_BASENAME=$(basename "$DOC_FILE" .md)           # e.g. story.8.2.configure-validation-pipe
-EPIC_NUM=$(echo "$STORY_BASENAME" | awk -F. '{print $2}')
-STORY_NUM=$(echo "$STORY_BASENAME" | awk -F. '{print $3}')
+The ids are `doc-id.js`'s, never a positional split: in `story.{P}.{E}.{S}` the second field is the
+PRD, so `awk -F.` read P where it meant E and the auto-skip below matched a whole epic (task 206).
 
-EPIC_REF=$(grep '^epic:' "$DOC_FILE" | awk '{print $2}')
+```bash
+# 0a.2 review-story — story ids through doc-id (task 206). DOC_FILE is the story document.
+DOC_ID="$PWD/.agents/skills/review-story/references/doc-id.js"
+STORY_ID_JSON=$(command node "$DOC_ID" parse "$(basename "$DOC_FILE")" --json) \
+  || { echo "❌ $(basename "$DOC_FILE") is not a story id doc-id can read (story.P.E.S.slug.md); a legacy story.E.S name is migrated first with migrate-doc-numbering"; exit 1; }
+[ "$(printf '%s' "$STORY_ID_JSON" | jq -r '.kind')" = "story" ] \
+  || { echo "❌ $(basename "$DOC_FILE") is not a story document"; exit 1; }
+PRD_NUM=$(printf '%s' "$STORY_ID_JSON" | jq -r '.prd')
+EPIC_NUM=$(printf '%s' "$STORY_ID_JSON" | jq -r '.epic')
+STORY_NUM=$(printf '%s' "$STORY_ID_JSON" | jq -r '.story')
+STORY_STEM=$(printf '%s' "$STORY_ID_JSON" | jq -r '.id')   # e.g. story.1.8.2, or story.1.8.2A
+
+EPIC_REF=$(grep -m1 '^epic:' "$DOC_FILE" | awk '{print $2}')
 if [ -z "$EPIC_REF" ]; then
-  echo "❌ Story must have an 'epic:' frontmatter field (e.g. epic: epic.178.feature-ui)."
+  echo "❌ Story must have an 'epic:' frontmatter field (e.g. epic: epic.$PRD_NUM.$EPIC_NUM.feature-ui)."
   exit 1
 fi
+echo "story $STORY_STEM — PRD $PRD_NUM, epic $EPIC_NUM, story $STORY_NUM"
 ```
 
 #### review-task
@@ -111,8 +122,17 @@ If `CURRENT_BRANCH` already matches the doc's expected feature-branch pattern, s
 #### review-story
 
 ```bash
+# The full story stem plus a dot: story.1.2.3 never matches feature/story.1.2.30.* or story.1.2.4.*.
+# STORY_STEM is derived HERE — 0a.2's block is another shell, and an unbound stem matches only
+# `feature/.*`, so the auto-skip would silently never fire (task.206 QA cycle 1, CR-8).
+STORY_STEM=$(command node "$PWD/.agents/skills/review-story/references/doc-id.js" parse "$(basename "$DOC_FILE")" --json \
+  | jq -r 'select(.kind == "story") | .id')
+[ -n "$STORY_STEM" ] || { echo "❌ $(basename "$DOC_FILE") is not a story id doc-id can read"; exit 1; }
+# CURRENT_BRANCH too — 0a.1's block is another shell; unbound, the case below never matches and the
+# auto-skip silently never fires (task.206 QA cycle 2, CR2-1). Empty on a detached HEAD: no skip.
+CURRENT_BRANCH=$(git branch --show-current)
 case "$CURRENT_BRANCH" in
-  feature/story.${EPIC_NUM}.${STORY_NUM}.*)
+  "feature/${STORY_STEM}."*)
     BRANCH_NAME="$CURRENT_BRANCH"; AUTO_SKIPPED=true ;;
 esac
 ```
@@ -159,7 +179,7 @@ Story branches are cut from `${BASE_DEFAULT}` (standard Gitflow feature branches
 - On `${BASE_DEFAULT}` or `main`: options `${BASE_DEFAULT}` (Recommended) / `main` / `Other`
 - On any `feature/*` branch: options `${BASE_DEFAULT}` (Recommended) / `feature/{current}` / `Other`
 
-**Header:** `Story branch` — **Question:** "Which branch should `feature/story.${EPIC_NUM}.${STORY_NUM}.*` be based on?"
+**Header:** `Story branch` — **Question:** "Which branch should `feature/${STORY_STEM}.*` be based on?"
 
 #### review-task
 

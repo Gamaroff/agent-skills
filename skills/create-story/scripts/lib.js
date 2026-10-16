@@ -17,100 +17,123 @@ const {
 } = shared;
 
 // ---------------------------------------------------------------------------
-// Filename validation — `story.{E}.{S}.{kebab-name}.md`
-// Both E and S are positive integers, no leading zeros.
+// Filename validation — `story.{P}.{E}.{S}{sub?}.{kebab-name}.md`
+// The id is doc-id's (task 202): P, E and S are positive integers with no leading
+// zeros, `3A` is a sub-story, and the slug begins with a letter. This file
+// declares no id grammar of its own (task 206) — a local `story.{E}.{S}` pattern
+// read P where it meant E once ids grew a segment.
 // ---------------------------------------------------------------------------
-const STORY_FILENAME_RE =
-  /^story\.(?<epic>[1-9][0-9]*)\.(?<story>[1-9][0-9]*)\.(?<name>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
+const docId = require("../references/doc-id.js");
+
+const STORY_SHAPE = "story.{P}.{E}.{S}.{kebab-name}.md";
+
+function storyNameFailure(name, parsed) {
+  if (/_/.test(name)) return "underscores not allowed — use dots/hyphens";
+  if (parsed.reason === "bad-slug" && /[A-Z]/.test(name))
+    return "uppercase not allowed — use kebab-case";
+  if (parsed.reason === "bad-number")
+    return (
+      `does not match ${STORY_SHAPE} — P, E and S are positive integers with no ` +
+      "leading zero; a legacy story.{E}.{S} name is migrated first (migrate-doc-numbering)"
+    );
+  return `does not match ${STORY_SHAPE}`;
+}
 
 function validateStoryFilename(name) {
   if (typeof name !== "string" || name.length === 0) {
     return { ok: false, reason: "filename is empty" };
   }
-  const m = name.match(STORY_FILENAME_RE);
-  if (!m) {
-    if (/_/.test(name))
+  const p = docId.parse(name);
+  if (!name.endsWith(".md") || !p.ok || p.kind !== "story" || p.artifact) {
+    if (p.ok && p.artifact)
       return {
         ok: false,
-        reason: "underscores not allowed — use dots/hyphens",
+        reason: `a ${p.artifact} artifact, not a story document`,
       };
-    if (/[A-Z]/.test(name))
-      return { ok: false, reason: "uppercase not allowed — use kebab-case" };
-    if (/^story\.0/.test(name) || /^story\.\d+\.0/.test(name)) {
-      return { ok: false, reason: "leading zero in epic/story id not allowed" };
-    }
-    return {
-      ok: false,
-      reason: "does not match story.{E}.{S}.{kebab-name}.md",
-    };
+    return { ok: false, reason: storyNameFailure(name, p) };
   }
   return {
     ok: true,
-    epic: Number(m.groups.epic),
-    story: Number(m.groups.story),
-    name: m.groups.name,
+    prd: p.prd,
+    epic: p.epic,
+    story: p.story,
+    sub: p.sub,
+    name: p.slug,
   };
 }
 
 function validateStoryPlanFilename(name) {
-  const re =
-    /^story\.(?<epic>[1-9][0-9]*)\.(?<story>[1-9][0-9]*)\.plan\.(?<name>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
-  if (typeof name !== "string" || !re.test(name)) {
+  const p = typeof name === "string" ? docId.parse(name) : { ok: false };
+  if (
+    typeof name !== "string" ||
+    !name.endsWith(".md") ||
+    !p.ok ||
+    p.kind !== "story" ||
+    p.artifact !== "plan"
+  ) {
     return {
       ok: false,
-      reason: "does not match story.{E}.{S}.plan.{kebab-name}.md",
+      reason: "does not match story.{P}.{E}.{S}.plan.{kebab-name}.md",
     };
   }
-  const m = name.match(re);
   return {
     ok: true,
-    epic: Number(m.groups.epic),
-    story: Number(m.groups.story),
-    name: m.groups.name,
+    prd: p.prd,
+    epic: p.epic,
+    story: p.story,
+    sub: p.sub,
+    name: p.slug,
   };
 }
 
 // ---------------------------------------------------------------------------
-// Story ID uniqueness — given a directory listing (array of names) under a
-// given epic, return the set of in-use story numbers + next free number.
-// Entries can be flat files (`story.1.2.foo.md`) or directories
-// (`story.1.2.foo`).
+// Story ID uniqueness — given a directory listing (array of names) under an
+// epic, the story numbers in use in THAT epic `(P, E)`. Entries can be flat
+// files (`story.1.2.3.foo.md`) or directories (`story.1.2.3.foo`). Keyed on the
+// pair: E restarts at 1 in every PRD, so E alone names an epic in each of them.
 // ---------------------------------------------------------------------------
-function scanExistingStoryIds(entries, epicNum) {
-  if (!Array.isArray(entries)) throw new TypeError("entries must be string[]");
-  if (!Number.isInteger(epicNum) || epicNum < 1) {
-    throw new TypeError("epicNum must be a positive integer");
+function assertPositive(label, v) {
+  if (!Number.isInteger(v) || v < 1) {
+    throw new TypeError(`${label} must be a positive integer, got ${v}`);
   }
+}
+
+function storiesOfEpic(entries, prdNum, epicNum) {
+  if (!Array.isArray(entries)) throw new TypeError("entries must be string[]");
+  assertPositive("prdNum", prdNum);
+  assertPositive("epicNum", epicNum);
+  return entries.filter((e) => docId.matchesEpic(e, prdNum, epicNum));
+}
+
+function scanExistingStoryIds(entries, prdNum, epicNum) {
   const ids = new Set();
-  const re = new RegExp(`^story\\.${epicNum}\\.([1-9][0-9]*)\\b`);
-  for (const e of entries) {
-    const m = e.match(re);
-    if (m) ids.add(Number(m[1]));
+  for (const e of storiesOfEpic(entries, prdNum, epicNum)) {
+    const p = docId.parse(e);
+    // Documents only — the population doc-id's allocator counts, so nextStoryId and
+    // assertUniqueStoryId cannot disagree about which numbers are in use (task.206 QA cycle 1, CR-12).
+    if (p.kind === "story" && p.artifact === null) ids.add(p.story);
   }
   return ids;
 }
 
-function nextStoryId(entries, epicNum) {
-  const ids = scanExistingStoryIds(entries, epicNum);
-  let n = 1;
-  while (ids.has(n)) n++;
-  return n;
+/**
+ * The next story number in epic `(P, E)` — doc-id's allocator, so this and
+ * `doc-id next story --epic-dir` cannot disagree: highest + 1, a gap is never
+ * refilled (task 206; it used to fill the lowest gap, a second rule).
+ */
+function nextStoryId(entries, prdNum, epicNum) {
+  return docId.nextNumber("story", storiesOfEpic(entries, prdNum, epicNum));
 }
 
-function assertUniqueStoryId(epicNum, storyNum, entries) {
-  if (!Number.isInteger(epicNum) || epicNum < 1) {
-    throw new Error(
-      `assertUniqueStoryId: epicNum must be positive integer, got ${epicNum}`,
-    );
-  }
-  if (!Number.isInteger(storyNum) || storyNum < 1) {
-    throw new Error(
-      `assertUniqueStoryId: storyNum must be positive integer, got ${storyNum}`,
-    );
-  }
-  const ids = scanExistingStoryIds(entries, epicNum);
+function assertUniqueStoryId(prdNum, epicNum, storyNum, entries) {
+  assertPositive("assertUniqueStoryId: prdNum", prdNum);
+  assertPositive("assertUniqueStoryId: epicNum", epicNum);
+  assertPositive("assertUniqueStoryId: storyNum", storyNum);
+  const ids = scanExistingStoryIds(entries, prdNum, epicNum);
   if (ids.has(storyNum)) {
-    throw new Error(`HALT: story.${epicNum}.${storyNum} already exists`);
+    throw new Error(
+      `HALT: story.${prdNum}.${epicNum}.${storyNum} already exists`,
+    );
   }
   return true;
 }
@@ -157,7 +180,6 @@ function mergeSprintStatus(yaml, entry) {
 }
 
 module.exports = {
-  STORY_FILENAME_RE,
   REQUIRED_STORY_SECTION_IDS,
   parseFrontmatter,
   extractSourceCitations,
