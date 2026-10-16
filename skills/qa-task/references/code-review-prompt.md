@@ -210,6 +210,8 @@ the other behaviour-driving keys the QA skills already read (`status`, `github_i
 
 ## Scoping (caller responsibility — keeps raw diff bytes out of main context)
 
+<!-- caller-runs -->
+
 **Standalone (`/review-code`):**
 - Default: uncommitted working changes — `git diff HEAD > <DIFF_FILE>` (add `--staged`/include untracked as needed).
 - PR / branch: `git diff <base>...HEAD > <DIFF_FILE>`, or for a given PR resolve its base via
@@ -254,6 +256,8 @@ So on **cycle 2 only** (exactly one prior gate exists):
 Cycles 3+ keep the narrowed scope. This is affordable because the pipeline's convergence check ends
 the loop shortly after cycle 3 when it is not converging: the trade is **two deep cycles instead of
 five shallow ones**, not six cycles instead of five.
+
+<!-- /caller-runs -->
 
 ## Cleanup
 
