@@ -118,6 +118,13 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`uat-status.mjs` reads no longer write the surfaces template.** With no `uat-surfaces.json`,
+  `--check`, `--coverage`, `--next`, `--item` and the scoreboard each copied the template into the
+  tree before exiting 2, so a read left an untracked `docs/qa/` behind (observation #57). Only
+  `--init` scaffolds the file now, as the qa-next skill already said; every other command exits 2
+  with `uat-surfaces.json not found — run --init …` and writes nothing. `/qa-next` Step 0 sends that
+  refusal to `--init` and `surfaces-unmapped` rather than to `registry-invalid`.
+
 - **A documentation-only DoD fix no longer re-enters QA.** After `/finalise` halts on Definition of
   Done gaps, `reenter-qa-after-finalise.sh` counted every commit outside the work item's directory
   as a code change. A CHANGELOG entry or a standards page therefore cost a full QA cycle and a
