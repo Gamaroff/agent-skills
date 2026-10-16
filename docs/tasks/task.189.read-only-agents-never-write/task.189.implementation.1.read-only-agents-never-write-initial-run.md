@@ -3,7 +3,7 @@
 **Task**: `task.189.read-only-agents-never-write.md`
 **Run Number**: 1
 **Started**: 2026-10-16 22:26
-**Status**: In Progress
+**Status**: Escalated
 
 ---
 
@@ -34,8 +34,8 @@ Make every pipeline step that dispatches a read-only Explore subagent the only w
 | 1. create-branch           | ✅ Done    | Branch `feature/task.189.*` exists in git                             | Branch created at `b996b1de`; pushed with upstream | —                    | 2026-10-16T20:27Z |
 | 2. review-task             | ✅ Done    | `task.189.review.{N}.{name}.md` exists (or skip logged)               | `task.189.review.1.read-only-agents-never-write.md` — READY TO IMPLEMENT 9/10 after 7 Important fixes; Planned → Ready for Development | — (pre-pass B/C inline in review) | 2026-10-16T20:32Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan + surface map); 1 iteration; audit ready-for-review 17/17; ci:fast 5797/0 | `.summaries/step-3-loop-audit-1.json` | 2026-10-16T21:09Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.189.qa.{N}.*.md`; `task.189.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #683: https://github.com/Gamaroff/agent-skills/pull/683 | — | 2026-10-16T21:12Z |
+| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.189.qa.{N}.*.md`; `task.189.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 5 cycles, HIGH 0 throughout; loop limit — half-cycle declined (medium-not-falling); escalated | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.189.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
@@ -85,6 +85,17 @@ Make every pipeline step that dispatches a read-only Explore subagent the only w
 - Guard test redirect pattern tightened during development: the first form (`>` followed by a quote or `<`, with no whitespace requirement) reported 39 false positives on placeholders such as `"<a>", "<b>"`; the shipped form requires shell redirect syntax (whitespace or an fd before `>`). `npm run bundle:check` is excluded from the generator shape (read-only).
 - Contract tests updated: `finalise-dod-prompt-contract.test.mjs` (obs #10 test → "the agent plans the probe and /finalise always runs it"; "Plan the run" heading; read-only clause; "The total is"), `probes-executed-population.test.mjs` (invocation-walk floor 4 → 3).
 - Development completion comment posted to github issue 588 (develop-complete).
+### Step 4 — create-pr — 2026-10-16
+
+- SCOPE_PATHS: work-item dir, CHANGELOG.md, evals/shared/tests, shared/resources, skills/{develop-story,develop-task,finalise,qa-story,qa-task,review-code,review-pr}/references, skills/finalise, tests (`tests` added by hand: the new guard test sits in a directory with no tracked change). Pre-flight guard held nothing; leak check clean.
+- Pre-commit hook refused the first commit (untracked bundled `skills/finalise/references/security-probe-plan.mjs`); commits reordered so the finalise commit carries it. 4 commits: bf5dc95b, 8e951dcc, 3c2d3e24, 16f8ed4f.
+- New tests re-run in a clean detached worktree (no `.agents/skills` symlink): 57/57 pass.
+- PR created: https://github.com/Gamaroff/agent-skills/pull/683 (base develop, Closes #588). Issue comment `in-review`: posted. Lock pr_url set.
+- Post-PR state check (direct `gh pr view`, not the Explore poller): OPEN, head 16f8ed4f.
+- GitHub board: in-review → stage-disabled.
+
+### Step 3 — notes continued
+
 - Mutation proofs (each file backed up, mutated, test run, restored): M1 mapper prompt "Write the matrix file" restored → guard fail 2; M2 inline dispatch write restored → fail 2; M3 code-review caller-runs marker removed → fail 1; M4 docs agent told to run `npm run generate-catalog` → fail 1; M5 runner counts an exit-2 entry as a run → read-only-agent-writes fail 1; M6 runner composes the count instead of reading the record → fail 3; M7 matrix block discards a returned matrix → fail 1.
 
 ---
@@ -101,14 +112,101 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-10-16
+**Gate Result**: CONCERNS
+**Issues Found**: 4 — CR-1 Step 8a re-runs a command the agent no longer records (medium); CR-2 runner drops engine escapes (medium); QA-1 owned-flag refusal not probeable (medium); QA-2 empty marked block leaves an empty .summaries/ (low)
+**HIGH findings**: 0
+**MEDIUM findings**: 3
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 1 of 5)
+
+- Traceability mapper dispatched under the new contract (dogfood): returned the matrix between markers, no write attempted; the Step 5 block wrote it.
+- 5b (qa-fix cycle 1): findings ingester (Explore) confirmed 3 medium + 1 low + 3 advisory; all fixed — CR-1 Step 8a.4, CR-2 escapes, QA-1 planArgvAllowed, QA-2 matrix block dir, CR-3 FORBIDS, CR-4 readRecord, CR-5 independent sum. 6 mutation proofs, each red. Fast gate 5801/0. Commit cb79ae69, pushed. changes-requested: stage-disabled. PR + tracker qa-fix-1 comments posted.
+
+### QA Cycle 2 — 2026-10-16
+**Gate Result**: CONCERNS
+**Issues Found**: 1 gate (CR2-1 probe severities merged by case id, medium) + 4 advisory (CR2-2..5); cycle-1 bugs 1-3 closed
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 2 of 5)
+
+- Refute pass + safety re-probe (SAFETY_REPROBE true by judgement: a gate-1 top issue was a sandbox escape). Engine probes: planArgvAllowed 18 cases engages; matrix block 8 cases engages; 26 executed, 0 reproduced.
+- 5b (qa-fix cycle 2): ingester confirmed 1 gate + 4 advisory; all fixed (CR2-1 key, CR2-2 whole plan, CR2-3 null record, CR2-4 --timeout owned + bounded run, CR2-5 wording). 5 mutation proofs red. Fast gate 5804/0. Commit 815f45b8, pushed. PR + qa-fix-2 comments posted.
+
+### QA Cycle 3 — 2026-10-16
+**Gate Result**: CONCERNS
+**Issues Found**: QA3-1 Step 3b.1 foreground run can outlive the tool call (medium, QA-promoted from reviewer medium/medium); CR3-2 duplicate inline case ids share a key (low); CR3-3 prompt owned-flag lists omit --emit-block (low); bug.4 closed
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 3 of 5)
+
+- Convergence check: HIGH 0 on gates 1-3 — nothing to stall on. Diminishing-returns exit: residue is not test machinery (a step doc and the runner) — not taken.
+- 5a ran from the already-loaded /qa-task instructions (not re-invoked) to save context; scoped to files since gate 2's head.
+- Route classifier (qa-diminishing-returns.js classifyLoopRoute): continue (not-a-pass-gate).
+- 5b (qa-fix cycle 3): fixed QA3-1 (background + atomic result), CR3-2 (duplicate ids), CR3-3 (owned flags consolidated against OWNED_FLAGS — Step 2.6 consolidate move). Contract test narrowed to `--record <path>` and sliced by heading. 4 mutation proofs red. Fast gate 5807/0. Commit 95248a84, pushed. Comments posted.
+
+### QA Cycle 4 — 2026-10-16
+**Gate Result**: CONCERNS
+**Issues Found**: CR4-1 Step 3b.1 background wait has no budget (medium); advisory CR4-2 (8a.4 re-run not backgrounded), CR4-3, CR4-4, CR4-5; bug.5 reopened
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 4 of 5)
+
+- Route classifier: continue (not-a-pass-gate). Narrowing residue offer applies (gates 3 and 4 MEDIUMs both name skills/finalise/SKILL.md at HIGH 0): passed to qa-fix as "consolidate the run rule into the block".
+- 5b (qa-fix cycle 4): consolidated the run rule into the Step 3b.1 block (wait mark with plan-derived budget + clear); CR4-3/4/5 fixed. Fast gate attempt 1 red (1 of 5810: qa-loop-lock-fields-parity — a dispatch line needs a set-waiting-on marker within 12 lines; named in prose), attempt 2 5810/0. 6 mutation proofs red. Commit 74f9e5bc, pushed.
+
+### QA Cycle 5 — 2026-10-17
+**Gate Result**: CONCERNS
+**Issues Found**: CR5-1 Step 3b.1 block's BUDGET abort runs before the stale result is removed (medium); advisory CR5-2..CR5-4; bug.5 reopened
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Escalating — loop limit reached
+
+- 5b (qa-fix cycle 5): fixed CR5-1 (stale result removed first; no abort on a failed load), CR5-3, CR5-4. Fast gate 5811/0. Mutation proofs G1–G3 red. Commit 67ea055e, pushed. Comments posted.
+- Gate-the-last-fix half-cycle (route 2c): declined by `classifyLoopRoute` — `medium-not-falling` ("MEDIUM reads 1, 1, 1 over cycles 3–5").
+
+### QA Loop Limit Reached — 2026-10-17
+
+The pipeline completed 5 qa-task/qa-fix cycles without a clean PASS.
+
+**Final gate status**: CONCERNS (gate 5, 90/100) — its one finding (CR5-1) was fixed in cycle 5's 5b (`67ea055e`); no gate has read that fix.
+**HIGH findings per cycle**: 0, 0, 0, 0, 0 — no blocker at any cycle
+**MEDIUM findings per cycle**: 3, 1, 1, 1, 1 — flat at 1 from cycle 2 onward
+**Remaining issues** (from final gate file):
+- CR5-1 — medium — `skills/finalise/SKILL.md` — Step 3b.1's BUDGET abort ran before the stale result was removed. **Fixed in `67ea055e` (ungated).**
+- Advisory, not gate entries: CR5-2 (low/low, the wait is marked by the background process, not before the yield); CR3-4 (engine scope: SIGKILL on timeout skips the sandbox cleanup).
+
+**What was attempted per cycle**:
+- Cycle 1: CR-1 Step 8a.4 re-run, CR-2 escapes, QA-1 probeable owned-flag refusal (`planArgvAllowed`), QA-2 matrix-block directory, + CR-3/4/5 advisory
+- Cycle 2: CR2-1 probe keys unique per run, + CR2-2..5 (whole-plan re-run, null record, `--timeout` owned + bounded run, wording)
+- Cycle 3: QA3-1 Step 3b.1 backgrounded with an atomic result, CR3-2 duplicate ids, CR3-3 owned-flag lists checked against `OWNED_FLAGS`
+- Cycle 4: CR4-1 wait budget — the run rule consolidated into the block (Step 2.6), + CR4-2..5
+- Cycle 5: CR5-1 stale-result ordering, + CR5-3/4
+
+**Likely root cause**: not a failing mechanism — every cycle's MEDIUM was a different, real defect, each fixed and mutation-proven. Cycles 3–5 all circled one subject: the operational shell around Step 3b.1 (how a long backgrounded probe run is waited on, bounded and read back), and each fix to that shell exposed its next edge. The deliverable's core — the mapper returns, the agent plans, the runner executes, the guard test holds — has been stable since cycle 2, and both new boundaries engaged under the probe engine every cycle (28 executed, 0 reproduced).
+
+**Recommended next steps**:
+1. Grant one gate for cycle 5's fix: re-run `/develop-task` and choose "Resume at 5a with 1 more cycles". CR5-1's fix is mutation-proven (G1, G2), so a clean gate is likely.
+2. Or accept the current state: run Step 5c (`/review-pr --effort medium --comment --no-code`), then `/finalise`.
+3. Consider extracting Step 3b.1's shell (the run, the wait, the atomic result) into a tested script; the remaining edges were all in prose-embedded shell.
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-10-17 (HALT — QA loop limit)
+**Final Status**: Escalated
 **Branch**: feature/task.189.read-only-agents-never-write
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/683
+**QA Iterations**: 5 (loop limit)
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
