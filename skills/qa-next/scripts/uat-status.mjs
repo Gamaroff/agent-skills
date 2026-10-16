@@ -680,8 +680,6 @@ const BUG_CLOSED = /^(closed|done|fixed|resolved)$/i;
 // link as the bug, so a linked run file would turn the note into a "bug" with a non-bug status.
 const RESOLUTION_MARK = /\bresolved (\d{4}-\d{2}-\d{2}) by `([^`]+)`\s*$/;
 const COMMIT_EVIDENCE = /^[0-9a-f]{7,40}$/;
-// The marker as the writer appends it, separator included — what a replacement removes.
-const OLD_MARK = new RegExp(`(?:\\s*—)?\\s*${RESOLUTION_MARK.source}`);
 
 // The Findings table's rows as [line index, FINDING_ROW match] — the one locator both the reader
 // (parseFindings) and the writer (--resolve-finding) use, so they cannot disagree on which line is
@@ -722,7 +720,8 @@ export function parseFindings(text) {
 const RUN_NAME = /^(\d{4}-\d{2}-\d{2})-(.+?)(?:-(\d{2}))?\.md$/;
 const runName = (p) => {
   const m = basename(p).match(RUN_NAME);
-  return m
+  // A name whose date is not a real day carries no date at all: 2026-13-45 is never later.
+  return m && isRealDate(m[1])
     ? { dir: dirname(p), date: m[1], env: m[2], seq: Number(m[3] ?? 1) }
     : null;
 };
@@ -773,6 +772,10 @@ function gitCommitState(root) {
     execFileSync("git", ["-C", root, ...args], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
+      // A partial clone would fetch a missing object over the network; a hung git must not hang
+      // --check. Either way the answer is "not verified here", never an accepted commit.
+      env: { ...process.env, GIT_NO_LAZY_FETCH: "1" },
+      timeout: 10_000,
     });
   return (sha) => {
     if (inRepo === undefined) {
@@ -1004,10 +1007,16 @@ function cmdResolveFinding(opts) {
   const end = body.lastIndexOf("|");
   const from = body.lastIndexOf("|", end - 1) + 1;
   const cell = body.slice(from, end);
-  // A marker that no longer holds is dropped before the new one is appended.
-  const content = (
-    stale ? cell.trim().replace(OLD_MARK, "") : cell.trim()
-  ).trim();
+  // A marker that no longer holds is dropped before the new one is appended — every trailing
+  // marker, with whatever dash separated it. Cut at RESOLUTION_MARK's own match index rather than
+  // with a second unanchored pattern, which was super-linear on a whitespace run (QA cycle 2).
+  let content = cell.trim();
+  for (let m; stale && (m = content.match(RESOLUTION_MARK));)
+    content = content
+      .slice(0, m.index)
+      .trimEnd()
+      .replace(/[—–-]$/, "")
+      .trimEnd();
   const mark = `resolved ${date} by \`${by}\``;
   const lead = cell.match(/^\s*/)[0];
   // The trailing padding is the CELL's, not what follows `content`: a replaced marker makes
@@ -1016,6 +1025,21 @@ function cmdResolveFinding(opts) {
   const trail = lead.length < cell.length ? cell.match(/\s*$/)[0] : "";
   lines[idx] =
     `${body.slice(0, from)}${lead}${content ? `${content} — ${mark}` : mark}${trail}${body.slice(end)}`;
+  // Read the row back through the reader before writing it. Evidence that verified can still
+  // break the table (a run file named with a pipe or a backtick): a marker the reader would not
+  // see closes nothing, and a split cell corrupts the row, so either is refused with nothing written.
+  const back = lines[idx].match(FINDING_ROW);
+  const got = back && rowFinding(back);
+  if (
+    !got ||
+    got.n !== f.n ||
+    got.bug !== null ||
+    got.resolution?.date !== date ||
+    got.resolution?.evidence !== by
+  )
+    die(
+      `${runRel} finding ${f.n}: the marker for \`${by}\` would not read back from the table — refused, nothing written`,
+    );
   writeFileSync(runPath, lines.join("\n"));
   console.log(
     `${stale ? `replaced a resolution that did not hold (${stale}): ` : "resolved: "}${runRel} finding ${f.n} — ${content ? `${content} — ` : ""}${mark}`,

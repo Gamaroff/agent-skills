@@ -341,24 +341,23 @@ None.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-16
-**Quality Score**: 70/100
+**Quality Score**: 80/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.212.qa.1.qa-next-resolvable-note-findings.md](./task.212.qa.1.qa-next-resolvable-note-findings.md)
-- **Gate File**: [task.212.gate.1.qa-next-resolvable-note-findings.yml](./task.212.gate.1.qa-next-resolvable-note-findings.yml)
+- **Full Report**: [task.212.qa.2.qa-next-resolvable-note-findings.md](./task.212.qa.2.qa-next-resolvable-note-findings.md)
+- **Gate File**: [task.212.gate.2.qa-next-resolvable-note-findings.yml](./task.212.gate.2.qa-next-resolvable-note-findings.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 77 (qa-next unit) + 12 security probes
+- **Tests Executed**: 79 (qa-next unit) + 14 security probes
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Three MEDIUM findings are open:
-- **T212-QA1-CR1**: an invalid marker cannot be repaired.
-- **T212-QA1-CR2**: "later" is not chronological across directories, and undated files are accepted as runs.
-- **T212-QA1-CR3**: a duplicate finding number sends the writer to the wrong row.
+- **Cycle 1**: all three findings are fixed, each with a test that fails when the fix is reverted.
+- **Open, MEDIUM**: T212-QA2-CR1. A resumed run has no record of which earlier run files it edited.
+- **Open, LOW**: T212-QA2-CR2 (the writer does not read back the row it wrote) and T212-QA2-CR7 (a run file with an impossible date counts as later).
 
 ## Change Log
 <!-- change-log-start -->
@@ -371,6 +370,8 @@ Three MEDIUM findings are open:
 | 2026-10-16 |         | Implemented — 4 code/doc files + CHANGELOG, 9 tests (mutation-proved); status → ready-for-review | develop |
 | 2026-10-16 |         | QA gate CONCERNS (70/100) — 3 findings | qa-task |
 | 2026-10-16 |         | QA findings fixed — cycle 1, 3 findings (CR-1 stale-marker repair, CR-2 later-by-name, CR-3 duplicate numbers) + 2 low | qa-fix |
+| 2026-10-16 |         | QA gate CONCERNS (80/100) — 3 findings | qa-task |
+| 2026-10-16 |         | QA findings fixed — cycle 2, 3 findings (CR1 Step 5 stages edited runs from the tree, CR2 writer read-back, CR7 real-date run names) + 4 advisory | qa-fix |
 <!-- change-log-end -->
 
 ---

@@ -180,7 +180,7 @@ Then `--state-set phase executed`.
    Whichever bug this run ends up linking — a new one, or the open one it reuses below — record its repo-relative path with `--state-set filedBug <path>` before Step 4.4. A pass, a block or an n/a leaves it `null`.
 
    **A repeat failure reuses the open bug.** `--state-get`'s `bug` is the repo-relative path of the bug the row linked when this run began, in the form `--bug` takes (`null` when there is none). `--state-init` recorded it. Read it from `--state-get`; never take it from a fresh `--item` and never re-parse the registry. When it is non-null and that bug is not closed, append a dated re-test section to it (what was run, what was observed, which items still fail) and link the same bug again. File a **new** bug only when there is none, or when the existing one is closed — a closed bug failing again is a new fact and deserves its own record. Fixing then re-testing is the main reason the `id` argument exists; filing bug #2, #3 and #4 against one defect is its obvious first-order failure.
-3. File the findings, independently of the verdict. For each row: **story mode** against the story it concerns when one of this function's stories owns it; **general mode** (`docs/bugs/`, no parent) when it belongs to another surface, to the environment or to this harness — never file a foreign defect against the story you happened to be testing. Severity as recorded; reproduction from the row. File only what a stranger could reproduce from the row alone; otherwise `Filed as` stays `note` and the row itself is the record. Put each bug's link (relative to the run file) in its row's `Filed as` cell. A finding that matches an **open** finding on this function from an earlier run (`--findings --all --json`, matched on *Where* + *What was observed*) reuses that bug's link in its `Filed as` cell instead of filing a duplicate. And the converse: when this run shows that an earlier run's open `note` no longer holds — the subject is gone or fixed — close it with this run as the evidence: `uat-status.mjs --resolve-finding <earlier run> <n> --by <this run file>` (both paths as `--findings` prints them). It appends `— resolved YYYY-MM-DD by `<evidence>`` to that row's `Filed as` cell; `--resolve-finding` is the marker's only writer, and evidence may also be a commit sha. A note is never closed by absence — only by a run that looked.
+3. File the findings, independently of the verdict. For each row: **story mode** against the story it concerns when one of this function's stories owns it; **general mode** (`docs/bugs/`, no parent) when it belongs to another surface, to the environment or to this harness — never file a foreign defect against the story you happened to be testing. Severity as recorded; reproduction from the row. File only what a stranger could reproduce from the row alone; otherwise `Filed as` stays `note` and the row itself is the record. Put each bug's link (relative to the run file) in its row's `Filed as` cell. A finding that matches an **open** finding on this function from an earlier run (`--findings --all --json`, matched on *Where* + *What was observed*) reuses that bug's link in its `Filed as` cell instead of filing a duplicate. And the converse: when this run shows that an earlier run's open `note` no longer holds — the subject is gone or fixed — close it with this run as the evidence: `uat-status.mjs --resolve-finding <earlier run> <n> --by <this run file>` (both paths as `--findings` prints them). It appends `— resolved YYYY-MM-DD by `<evidence>`` to that row's `Filed as` cell; `--resolve-finding` is the marker's only writer, and evidence may also be a commit sha. A note is never closed by absence — only by a run that looked. A `run-not-later` refusal means this run cannot be ordered after that one (a same-day run of another function or environment): leave the note open and carry on — it is not a failed step.
 4. Registry:
    - pass → `--set <id> pass --run runs/<id>/<file>.md`, plus the note flag the table below gives for the row's current state: `--clear-note` on every row except `✅`
    - fail → `--set <id> fail --run runs/<id>/<file>.md --bug <filedBug>` (from `--state-get`)
@@ -202,11 +202,22 @@ Then `--state-set phase recorded`.
 
 ## Step 5 — Commit
 
-Only if `qaNext.commit` is true. Stage **only** the run file, any earlier run file this run resolved a finding in (Step 4.3's `--resolve-finding`), the registry, the surface checklist and the bug reports — the function's and any filed from the Findings table, plus `docs/bugs/bug-registry.md` when a general bug was filed (never `git add -A`, never `uat-surfaces.json` — that file is the owner's), then:
+Only if `qaNext.commit` is true. Stage **only** the run file, any earlier run file this run resolved a finding in (Step 4.3's `--resolve-finding` — listed by the block below), the registry, the surface checklist and the bug reports — the function's and any filed from the Findings table, plus `docs/bugs/bug-registry.md` when a general bug was filed (never `git add -A`, never `uat-surfaces.json` — that file is the owner's), then:
 
 ```
 qa(uat): <id> <pass|fail|blocked> — <Function>
 ```
+
+**The earlier run files to stage are read from the tree, never remembered.** A run that crashed after `phase recorded` resumes here with no record of which run files Step 4.3 edited; the edit itself is the record. The tracked run files git reports changed are exactly those, and the new run file this run wrote is untracked, so it is not in the list:
+
+```bash
+# Earlier run files this run resolved a finding in — tracked files under runs/ that differ from HEAD.
+# REGISTRY_DIR is the registry's directory (default docs/qa).
+REGISTRY_DIR="${REGISTRY_DIR:-docs/qa}"
+git diff --name-only HEAD -- "$REGISTRY_DIR/runs"
+```
+
+Stage each path it prints with the rest.
 
 For a targeted re-run (`--state-get`'s `priorRuns` is non-empty):
 

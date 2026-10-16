@@ -3065,6 +3065,7 @@ test("verifyResolution names every reason; it is pure over injected runs and com
     "runs/A.5/2026-10-16-staging.md",
     "runs/A.4/2026-10-17-lan.md",
     "runs/zz.md",
+    "runs/A.5/2026-13-45-lan.md",
   ];
   const lookup = (states) => (sha) => states[sha] ?? "absent";
   const env = { runs, commitState: lookup({ "96d7948e": "commit" }) };
@@ -3116,6 +3117,11 @@ test("verifyResolution names every reason; it is pure over injected runs and com
     at("runs/zz.md"),
     "run-not-later",
     "a file with no date in its name is never later",
+  );
+  assert.equal(
+    at("runs/A.5/2026-13-45-lan.md"),
+    "run-not-later",
+    "an impossible date is no date (QA cycle 2, CR7)",
   );
   assert.equal(
     at("../../README.md"),
@@ -3556,5 +3562,114 @@ test("CLI: --resolve-finding refuses a finding number two rows share, writing no
   assert.equal(r.code, 2, r.out);
   assert.match(r.out, /2 findings numbered 1/);
   assert.equal(readFileSync(p1, "utf8"), before);
+  rmSync(root, { recursive: true, force: true });
+});
+
+test("CLI: --resolve-finding reads its row back and refuses a marker the table would not hold (task 212, QA cycle 2 CR2)", () => {
+  const { root } = gitCorpus();
+  run(root, "--init");
+  const r1 = "runs/A.5/2026-10-16-lan.md";
+  const p1 = writeRun(root, r1, ["| 1 | /a | x | Minor | note |"]);
+  // Later run files whose names verify but would break the cell: a pipe splits it, a backtick
+  // ends the marker's evidence early. Both are run names runPathFor does not refuse.
+  for (const name of ["2026-10-17-a|b.md", "2026-10-17-a`b.md"]) {
+    writeRun(root, `runs/A.5/${name}`, ["| 1 | /b | y | Minor | note |"]);
+    const before = readFileSync(p1, "utf8");
+    const r = run(
+      root,
+      "--resolve-finding",
+      r1,
+      "1",
+      "--by",
+      `runs/A.5/${name}`,
+    );
+    assert.equal(r.code, 2, `${name}: ${r.out}`);
+    assert.match(r.out, /would not read back/);
+    assert.equal(readFileSync(p1, "utf8"), before, `${name} wrote nothing`);
+  }
+  rmSync(root, { recursive: true, force: true });
+});
+
+test("CLI: replacing a stale marker drops every trailing marker and its dash, whatever the dash (task 212, QA cycle 2 CR-6)", () => {
+  const { root, sha } = gitCorpus();
+  run(root, "--init");
+  const r1 = "runs/A.5/2026-10-16-lan.md";
+  const p1 = writeRun(root, r1, [
+    "| 1 | /a | x | Minor | note - resolved 2026-10-16 by `runs/A.5/gone-1.md` — resolved 2026-10-16 by `runs/A.5/gone-2.md` |",
+  ]);
+  const r = run(
+    root,
+    "--resolve-finding",
+    r1,
+    "1",
+    "--by",
+    sha,
+    "--date",
+    "2026-10-17",
+  );
+  assert.equal(r.code, 0, r.out);
+  assert.equal(
+    readFileSync(p1, "utf8")
+      .split("\n")
+      .find((l) => l.startsWith("| 1 |")),
+    `| 1 | /a | x | Minor | note — resolved 2026-10-17 by \`${sha}\` |`,
+  );
+  rmSync(root, { recursive: true, force: true });
+});
+
+test("SKILL.md Step 5's staging block lists exactly the tracked run files a run edited — executed, not read (task 212, QA cycle 2 CR1)", () => {
+  const skill = readFileSync(
+    path.resolve(__dirname, "../../../skills/qa-next/SKILL.md"),
+    "utf8",
+  );
+  const step5 = skill.slice(
+    skill.indexOf("## Step 5"),
+    skill.indexOf("## Step 6"),
+  );
+  const blocks = [...step5.matchAll(/```bash\n([\s\S]*?)```/g)].map(
+    (m) => m[1],
+  );
+  const block = blocks.find((b) => b.includes("git diff --name-only HEAD"));
+  assert.ok(block, "Step 5 carries the tree-derived staging block");
+  const { root } = gitCorpus();
+  const git = (...a) =>
+    execFileSync(
+      "git",
+      [
+        "-c",
+        "user.email=qa@example.invalid",
+        "-c",
+        "user.name=qa",
+        "-c",
+        "commit.gpgsign=false",
+        ...a,
+      ],
+      { cwd: root, encoding: "utf8" },
+    );
+  writeRun(root, "runs/A.4/2026-10-15-lan.md", [
+    "| 1 | /a | x | Minor | note |",
+  ]);
+  writeRun(root, "runs/A.5/2026-10-15-lan.md", [
+    "| 1 | /b | y | Minor | note |",
+  ]);
+  git("add", "-A");
+  git("commit", "-q", "-m", "runs");
+  // This run: a new (untracked) run file, and one earlier run edited by --resolve-finding.
+  writeRun(root, "runs/A.5/2026-10-16-lan.md", [
+    "| 1 | /c | z | Minor | note |",
+  ]);
+  const edited = path.join(root, "docs/qa/runs/A.4/2026-10-15-lan.md");
+  writeFileSync(
+    edited,
+    readFileSync(edited, "utf8").replace(
+      "| note |",
+      "| note — resolved 2026-10-16 by `runs/A.5/2026-10-16-lan.md` |",
+    ),
+  );
+  const out = execFileSync("bash", ["-c", block], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  assert.equal(out, "docs/qa/runs/A.4/2026-10-15-lan.md\n");
   rmSync(root, { recursive: true, force: true });
 });
