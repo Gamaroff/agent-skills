@@ -461,9 +461,16 @@ function writeRegistry(opts, lines) {
   );
 }
 
-function requireSurfaces(opts) {
+// Only --init scaffolds the surfaces file. Every other command refuses and names --init: a
+// --check, --coverage or --next run that found no file used to write the template into the
+// consumer's tree as a side effect of a read (obs #57).
+function requireSurfaces(opts, { scaffold = false } = {}) {
   const cfg = loadSurfaces(opts);
   if (cfg) return cfg;
+  if (!scaffold)
+    die(
+      `${opts.surfaces} not found — run --init to scaffold it from the template, fill it in, then re-run. Nothing was written.`,
+    );
   const template = join(HERE, "..", "assets", "uat-surfaces.template.json");
   mkdirSync(join(opts.root, dirname(opts.surfaces)), { recursive: true });
   copyFileSync(template, join(opts.root, opts.surfaces));
@@ -473,7 +480,7 @@ function requireSurfaces(opts) {
 }
 
 function cmdInit(opts) {
-  const cfg = requireSurfaces(opts);
+  const cfg = requireSurfaces(opts, { scaffold: true });
   const p = join(opts.root, opts.registry);
   if (existsSync(p) && !opts.has("--force"))
     die(

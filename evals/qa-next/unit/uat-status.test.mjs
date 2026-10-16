@@ -553,6 +553,46 @@ test("CLI: a missing surfaces file is scaffolded from the template and the run s
   assert.ok(existsSync(path.join(root, "docs/qa/uat-surfaces.json")));
 });
 
+// obs #57: only --init scaffolds. A read with no surfaces file used to write the template into the
+// tree — found when `--check` was run from a repository root that keeps no UAT registry.
+test("CLI: a missing surfaces file is refused, never scaffolded, by every command but --init", () => {
+  const tree = (root) => {
+    const out = [];
+    const walk = (dir) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const p = path.join(dir, e.name);
+        out.push(path.relative(root, p));
+        if (e.isDirectory()) walk(p);
+      }
+    };
+    walk(root);
+    return out.sort();
+  };
+  const commands = [
+    ["--check"],
+    ["--coverage"],
+    ["--next"],
+    ["--item", "D.1"],
+    [],
+  ];
+  for (const withRegistry of [false, true]) {
+    const root = mkdtempSync(path.join(os.tmpdir(), "qa-next-"));
+    mkdirSync(path.join(root, "docs/prd"), { recursive: true });
+    if (withRegistry) {
+      mkdirSync(path.dirname(REG(root)), { recursive: true });
+      writeFileSync(REG(root), "# UAT registry\n");
+    }
+    const before = tree(root);
+    for (const args of commands) {
+      const label = `${args.join(" ") || "(scoreboard)"}, registry ${withRegistry ? "present" : "absent"}`;
+      const { code, out } = run(root, ...args);
+      assert.equal(code, 2, `${label}: ${out}`);
+      assert.match(out, /uat-surfaces\.json not found — run --init/, label);
+      assert.deepEqual(tree(root), before, `${label} wrote to the tree`);
+    }
+  }
+});
+
 // ---------- findings ----------
 
 const RUN_FILE = `# UAT run — D.2
