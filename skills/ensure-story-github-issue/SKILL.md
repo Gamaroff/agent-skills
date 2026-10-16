@@ -11,7 +11,7 @@ type: internal
 This is an **internal sub-routine** called by `create-story` and `review-story`. Do not invoke directly.
 
 **Inputs (set by the calling skill before invoking):**
-- `STORY_FILE_PATH` — repo-relative path to the story markdown file (e.g. `${PRD_ROOT}/onboarding/epics/epic.1.first-task-in-10-minutes/stories/story.1.1.first-task-in-10-minutes/story.1.1.first-task-in-10-minutes.md`; `${PRD_ROOT}` defaults to `docs/prd`)
+- `STORY_FILE_PATH` — repo-relative path to the story markdown file (e.g. `${PRD_ROOT}/onboarding/prd.1.onboarding/epics/epic.1.1.quickstart/stories/story.1.1.1.first-task/story.1.1.1.first-task.md`; `${PRD_ROOT}` defaults to `docs/prd`)
 - `EPIC_ISSUE_NUM` — parent epic GitHub issue number (integer string, or empty if no parent epic issue exists)
 
 **Output (set by this sub-routine, available to the calling skill):**
@@ -30,10 +30,35 @@ This is an **internal sub-routine** called by `create-story` and `review-story`.
    - `status` — story status
    - `priority` — story priority (lowercase; default `medium` if absent)
    - `estimated_effort_hours` — story effort estimate in hours (number; absent/empty if not set)
-3. Parse the epic and story numbers from the filename: pattern `story.{E}.{S}.` → `STORY_E`, `STORY_S`.
-4. Strip any leading `Story {E}.{S}: ` prefix (or an already-bracketed `[Story {E}.{S}] ` prefix) from `title` to get the bare title for display: `STORY_TITLE`. Stripping both forms prevents a double prefix like `[Story 1.3] Story 1.3: …` — local story titles are now authored in bracket form, so the bracket case is the common one.
+3. Read the story id and its epic's milestone through `doc-id.js` — never a positional split of the
+   filename (task 206). A story is `story.{P}.{E}.{S}{sub?}`, and E restarts at 1 in every PRD, so the
+   milestone is `Epic P.E — {epic title}`, the same string the epic's own issue uses (`doc-id.js
+   epic-meta`):
+
+   ```bash
+   # ensure-story Step S1 — story id + epic milestone through doc-id (task 206).
+   : "${STORY_FILE_PATH:?bind STORY_FILE_PATH to the story document}"
+   DOC_ID=.agents/skills/ensure-story-github-issue/references/doc-id.js
+   STORY_JSON=$(command node "$DOC_ID" parse "$(basename "$STORY_FILE_PATH")" --json) \
+     || { echo "❌ $(basename "$STORY_FILE_PATH") is not a story id doc-id can read (story.P.E.S.slug.md)"; exit 1; }
+   [ "$(printf '%s' "$STORY_JSON" | jq -r '"\(.kind) \(.artifact)"')" = "story null" ] \
+     || { echo "❌ $(basename "$STORY_FILE_PATH") is not a story document"; exit 1; }
+   STORY_ID=$(printf '%s' "$STORY_JSON" | jq -r '.id | sub("^story\\."; "")')   # 1.2.3, or 1.2.3A
+   STORY_EPIC="$(printf '%s' "$STORY_JSON" | jq -r '"\(.prd).\(.epic)"')"
+   EPIC_DIR=$(dirname "$(dirname "$(dirname "$STORY_FILE_PATH")")")
+   EPIC_TITLE=""; MILESTONE_TITLE=""
+   if META=$(command node "$DOC_ID" epic-meta "${EPIC_DIR}/$(basename "$EPIC_DIR").md" --json 2>/dev/null) \
+      && [ "$(printf '%s' "$META" | jq -r '.id')" = "$STORY_EPIC" ]; then
+     EPIC_TITLE=$(printf '%s' "$META" | jq -r '.title')
+     MILESTONE_TITLE=$(printf '%s' "$META" | jq -r '.milestone')
+   else
+     # No readable epic, or one whose (P, E) is not the story's: no milestone rather than a wrong one.
+     echo "⚠️  epic ${STORY_EPIC} not readable beside the story — the issue gets no milestone"
+   fi
+   echo "STORY_ID=$STORY_ID MILESTONE_TITLE=$MILESTONE_TITLE"
+   ```
+4. Strip any leading `Story {P}.{E}.{S}: ` prefix (or an already-bracketed `[Story {P}.{E}.{S}] ` prefix) from `title` to get the bare title for display: `STORY_TITLE`. Stripping both forms prevents a double prefix like `[Story 1.1.3] Story 1.1.3: …` — local story titles are now authored in bracket form, so the bracket case is the common one.
 5. Set `STORY_RELATIVE_PATH` = the path relative to the repo root.
-6. Derive the parent epic title from the grandparent directory. `EPIC_DIR=$(dirname "$(dirname "$(dirname "$STORY_FILE_PATH")")")`. Read `${EPIC_DIR}/$(basename "$EPIC_DIR").md` and pull `title` from its frontmatter. Strip any leading `Epic {E}: ` prefix (or an already-bracketed `[Epic {E}] ` prefix) → `EPIC_TITLE`. On failure, set `EPIC_TITLE=""`.
 
 ### Step S2: Check if Story Issue Already Exists
 
@@ -49,7 +74,7 @@ If `github_issue` is absent, null, or empty:
 Before creating, search for an issue with a matching title:
 
 ```bash
-DEDUP=$(gh issue list --search "in:title \"[Story ${STORY_E}.${STORY_S}]\"" --state all \
+DEDUP=$(gh issue list --search "in:title \"[Story ${STORY_ID}]\"" --state all \
   --json number,url,state,title 2>/dev/null)
 ```
 
@@ -62,7 +87,7 @@ Behaviour:
   - Log `Linked existing story issue #${N} (skipped create)`.
   - Skip to Step S6 (write frontmatter + body link). Do **not** re-link as sub-issue (existing issue is assumed already linked to its parent epic).
 - **Zero matches** → continue to Step S4.
-- **Multiple matches** → log `⚠️ Dedup: {N} matches found for "[Story ${STORY_E}.${STORY_S}]": #n1, #n2, … — proceeding to create` and continue to Step S4.
+- **Multiple matches** → log `⚠️ Dedup: {N} matches found for "[Story ${STORY_ID}]": #n1, #n2, … — proceeding to create` and continue to Step S4.
 
 ### Step S4: Create the Story GitHub Issue
 
@@ -73,7 +98,7 @@ REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
 OWNER=$(grep '^ *owner:' project.yml | head -1 | awk '{print $(2)}')
 PROJECT_NUM=$(grep 'project_board_number:' project.yml | awk '{print $(2)}')
 PROJECT_NAME=$(grep 'project_board_name:' project.yml | sed -E 's/.*: *"?([^"]+)"?/\1/')
-MILESTONE_TITLE="Epic ${STORY_E} — ${EPIC_TITLE}"
+# MILESTONE_TITLE comes from Step S1's block (`doc-id.js epic-meta`) — `Epic P.E — {title}`, or empty.
 # Prefer the current branch's remote-tracking branch (strip the remote prefix),
 # so the link points at the branch where the work lives. Fall back to the repo's
 # default branch when there is no upstream / HEAD is detached, then to `develop`.
@@ -85,7 +110,8 @@ DOC_URL="https://github.com/$REPO/blob/${DOC_BRANCH:-$DEFAULT_BRANCH}/${STORY_RE
 Auto-create the milestone if it doesn't exist yet:
 
 ```bash
-node references/tracker-issue.js \
+# No milestone when Step S1 found no epic for this story's (P, E) — never an empty-titled one.
+[ -z "${MILESTONE_TITLE}" ] || node references/tracker-issue.js \
   --kind milestone --title "${MILESTONE_TITLE}" --quiet 2>/dev/null || true
 ```
 
@@ -148,12 +174,14 @@ LABEL_ARGS=()
 while IFS= read -r l; do [ -n "$l" ] && LABEL_ARGS+=(--label "$l"); done \
   < <(gh_labels_filter "story" "priority:${priority}")
 
+MILESTONE_ARGS=()
+[ -n "${MILESTONE_TITLE}" ] && MILESTONE_ARGS=(--milestone "${MILESTONE_TITLE}")
 STORY_ISSUE_NUM=$(node references/tracker-issue.js \
   --kind create \
-  --title "[Story ${STORY_E}.${STORY_S}] ${STORY_TITLE}" \
+  --title "[Story ${STORY_ID}] ${STORY_TITLE}" \
   --body-file .claude/state/issue-body.md \
   "${LABEL_ARGS[@]}" \
-  --milestone "${MILESTONE_TITLE}")
+  "${MILESTONE_ARGS[@]}")
 ```
 
 The CLI prints the issue **number** — the old `grep -oE '[0-9]+$'` on the URL is

@@ -41,6 +41,16 @@ const REPO_ROOT = path.resolve(__dirname, "..");
 
 // Declared inputs — `file#NAME`: why the document may read it unbound.
 const INPUTS = new Map([
+  // task.206: the story-id blocks of the two story tracker skills run as their own shell; the
+  // story document is bound by the agent from the skill's input.
+  [
+    "skills/ensure-story-github-issue/SKILL.md#STORY_FILE_PATH",
+    "input of Step S1's story-id block (the story document); the `:?` is the loud-failure guard",
+  ],
+  [
+    "skills/sync-github-story/SKILL.md#STORY_FILE_PATH",
+    "input of Step 3's story-id block (the story document); the `:?` is the loud-failure guard",
+  ],
   // task.204: create-prd's Step 1.5 / registry-row blocks and review-prd's resolution and migration
   // blocks each run as their own shell; their inputs are bound by the agent from the step before.
   [

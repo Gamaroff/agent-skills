@@ -22,9 +22,9 @@ Use this skill when:
 
 Invoke this skill with any of:
 
-- **A story file path**: `story.178.8.example-feature.md`
-- **A story directory**: `stories/story.178.8.example-feature/`
-- **An epic file path**: `epic.178.feature-ui.md` → creates `feature/epic.178.feature-ui` from `develop`
+- **A story file path**: `story.1.178.8.example-feature.md`
+- **A story directory**: `stories/story.1.178.8.example-feature/`
+- **An epic file path**: `epic.1.178.feature-ui.md` → creates `feature/epic.1.178.feature-ui` from `develop`
 - **A task document**: `docs/prd/.../task.123.some-task.md`
 - **A raw description**: `"implement user authentication"`
 - **Explicit type flag**: `--hotfix`, `--release`, `--feature`
@@ -50,7 +50,7 @@ Invoke this skill with any of:
 
 1. Check current branch: `git branch --show-current`
 2. If currently on a feature branch (starts with `feature/`):
-   - Detect if the new branch is a sub-story (e.g., creating `story.309.2.3A` while on `feature/story.309.2.3`)
+   - Detect if the new branch is a sub-story (e.g., creating `story.1.2.3A` while on `feature/story.1.2.3`)
    - Present user with options for base branch
 3. If currently on `develop` or `main`:
    - Default to `develop` but still ask for confirmation
@@ -60,10 +60,10 @@ Invoke this skill with any of:
 Use `AskUserQuestion` to present options:
 
 ```
-Question: "Which branch should be the base for feature/story.309.2.3A.core-notification-ui?"
+Question: "Which branch should be the base for feature/story.1.2.3A.core-notification-ui?"
 
 Options:
-1. feature/story.309.2.3.mobile-notification-center (current branch - recommended for sub-stories)
+1. feature/story.1.2.3.mobile-notification-center (current branch - recommended for sub-stories)
    - Use when this is a sub-story or related work
    - Changes will be grouped together for review
 
@@ -76,17 +76,19 @@ Options:
 
 A branch is likely a sub-story if:
 
-- Current branch: `feature/story.X.Y.name`
-- New branch: `feature/story.X.Y.Z.name` (where Z extends X.Y)
+- Current branch: `feature/story.P.E.S.name`
+- New branch: `feature/story.P.E.SA.name` — the same story id with a capital letter on S, which is how
+  `doc-id.js` writes a sub-story (`story.1.2.3A` is sub-story A of story 1.2.3; P is the PRD, E the epic
+  within it, S the story)
 
-Example: Creating `story.309.2.3A` while on `feature/story.309.2.3` → likely a sub-story
+Example: Creating `story.1.2.3A` while on `feature/story.1.2.3` → likely a sub-story
 
 ### Naming Conventions
 
 | Branch Type         | Pattern                               | Example                                             |
 | ------------------- | ------------------------------------- | --------------------------------------------------- |
-| **Feature (epic)**  | `feature/epic.<n>.<name>`             | `feature/epic.178.feature-ui`                       |
-| **Feature (story)** | `feature/story.<epic>.<story>.<name>` | `feature/story.180.3.quick-re-search-functionality` |
+| **Feature (epic)**  | `feature/epic.<prd>.<n>.<name>`       | `feature/epic.1.178.feature-ui`                     |
+| **Feature (story)** | `feature/story.<prd>.<epic>.<story>.<name>` | `feature/story.1.180.3.quick-re-search-functionality` |
 | **Feature (task)**  | `feature/task.<id>.<name>`            | `feature/task.123.api-validation`                   |
 | **Feature (desc)**  | `feature/<kebab-case-description>`    | `feature/user-authentication`                       |
 | **Bugfix**          | `bugfix/<bug-file-stem>`              | `bugfix/task.110.bug.1.whitelist-admits-mutating-shapes` |
@@ -100,31 +102,31 @@ Example: Creating `story.309.2.3A` while on `feature/story.309.2.3` → likely a
 Determine the input type and extract relevant information:
 
 ```
-Input: epic.178.feature-ui.md
+Input: epic.1.178.feature-ui.md
  → Type: feature (from epic)
- → Branch Name: feature/epic.178.feature-ui
+ → Branch Name: feature/epic.1.178.feature-ui
  → Base: develop (fixed — no user prompt for epic-DOCUMENT branches)
 
-Input: story.178.8.example-feature.md
+Input: story.1.178.8.example-feature.md
  → Type: feature (from story)
- → Branch Name: feature/story.178.8.example-feature
+ → Branch Name: feature/story.1.178.8.example-feature
  → Base: TBD (will ask user)
 
-Input: task.110.bug.1.whitelist-admits-mutating-shapes.md   (also story.E.S.bug.M.*, bug.N.*)
+Input: task.110.bug.1.whitelist-admits-mutating-shapes.md   (also story.P.E.S.bug.M.*, bug.N.*)
  → Type: bugfix (from bug report)
  → Branch Name: bugfix/task.110.bug.1.whitelist-admits-mutating-shapes
  → Base: TBD (will ask user; develop-bug passes its Q2 answer)
 ```
 
 > **A bug branch is the bug file's stem, verbatim, under `bugfix/`.** The stem already carries the bug's
-> identity in all three modes (`bug.N`, `task.N.bug.M`, `story.E.S.bug.M`), so do not shorten it or
+> identity in all three modes (`bug.N`, `task.N.bug.M`, `story.P.E.S.bug.M`), so do not shorten it or
 > re-separate it. Before this row existed, `develop-bug` runs improvised the name and merged branches
 > came out as `bugfix/bug.17.<name>`, `bugfix/task.144-<name>` and `bugfix/obs-126-<name>`; anything
 > that keys on a branch name then had to accept all of them (obs #304). A production hotfix still takes
 > the **Hotfix** row (`hotfix/v<version>`), which carries no work-item id.
 
-> **`feature/epic.*` and `epic/*` are different things.** `feature/epic.{n}.{name}` is an ordinary
-> short-lived branch for editing the epic **document** (what `/review-epic` creates). `epic/{n}.{name}`
+> **`feature/epic.*` and `epic/*` are different things.** `feature/epic.{p}.{n}.{name}` is an ordinary
+> short-lived branch for editing the epic **document** (what `/review-epic` creates). `epic/{p}.{n}.{name}`
 > is an **integration branch** that a whole epic's stories merge into — see Step 2b. Never use one name
 > for the other.
 
@@ -163,7 +165,7 @@ configurable (see [Configuration](#configuration) below); the defaults are:
 
 ```yaml
 branch_model: epic-integration
-integration_branch: "epic/178.feature-ui"
+integration_branch: "epic/1.178.feature-ui"
 ```
 
 **3. Derive the recommendation:**
@@ -178,20 +180,51 @@ integration_branch: "epic/178.feature-ui"
 adds an option, never a default change.
 
 **4. Derive the branch name** when the epic wants an integration branch but does not name one. Default
-pattern (configurable):
+pattern (configurable as `branching.epicIntegration.branchPattern`):
 
 ```
-epic/{epic_number}.{epic-slug}      e.g.  epic/178.feature-ui
+epic/{p}.{n}.{slug}      e.g.  epic/1.178.feature-ui   (PRD 1, epic 178 within it)
+```
+
+`{p}` is the PRD number, `{n}` the epic number within that PRD, `{slug}` the epic's slug — all three read
+from the epic document's name by `doc-id.js`. **A configured pattern without `{p}` is refused** (a HALT
+naming the key): E restarts at 1 in every PRD, so a name built from E alone is the same branch for epic 2
+of every PRD (task 206). Run this block, never a hand substitution:
+
+```bash
+# Step 2b.4 — the integration branch name, when the epic wants one but names none (task 206).
+# INPUTS, substituted into THIS block: {branch-pattern} — branching.epicIntegration.branchPattern from
+# skills-config.yaml, or the default (epic/{p}.{n}.{slug}) when it is unset; {epic-file} — the epic
+# document resolved in 2b.1.
+DOC_ID="$PWD/.agents/skills/create-branch/references/doc-id.js"
+PATTERN="{branch-pattern}"
+P_TOKEN=$(printf '{%s}' p)
+N_TOKEN=$(printf '{%s}' n)
+S_TOKEN=$(printf '{%s}' slug)
+case "$PATTERN" in
+  *"$P_TOKEN"*) ;;
+  *) echo "HALT: branching.epicIntegration.branchPattern \"$PATTERN\" has no $P_TOKEN — E restarts in every PRD, so a branch named from E alone collides across PRDs; add $P_TOKEN"; exit 1 ;;
+esac
+EPIC_JSON=$(command node "$DOC_ID" parse "$(basename "{epic-file}")" --json) \
+  || { echo "HALT: $(basename "{epic-file}") is not an epic id doc-id can read (epic.P.E.slug)"; exit 1; }
+[ "$(printf '%s' "$EPIC_JSON" | jq -r '.kind')" = "epic" ] \
+  || { echo "HALT: $(basename "{epic-file}") is not an epic document"; exit 1; }
+EPIC_BRANCH=$PATTERN
+EPIC_BRANCH=${EPIC_BRANCH//"$P_TOKEN"/$(printf '%s' "$EPIC_JSON" | jq -r '.prd')}
+EPIC_BRANCH=${EPIC_BRANCH//"$N_TOKEN"/$(printf '%s' "$EPIC_JSON" | jq -r '.epic')}
+EPIC_BRANCH=${EPIC_BRANCH//"$S_TOKEN"/$(printf '%s' "$EPIC_JSON" | jq -r '.slug')}
+echo "EPIC_BRANCH=$EPIC_BRANCH"
 ```
 
 Use the declared `integration_branch` **verbatim** whenever it is present, even if it does not match this
-pattern — the epic document is the authority on its own branch name, not this skill.
+pattern — the epic document is the authority on its own branch name, not this skill, and a declared name is
+never checked for `{p}`.
 
 **5. Create it if absent.** Only after the user selects the integration branch in Step 3, and before
 Step 5 checks out a base:
 
 ```bash
-EPIC_BRANCH="epic/178.feature-ui"
+EPIC_BRANCH="epic/1.178.feature-ui"
 git fetch origin
 if git show-ref --verify --quiet "refs/heads/${EPIC_BRANCH}"; then
   :                                                    # already local — use it
@@ -217,13 +250,13 @@ Use `AskUserQuestion` with context-aware options:
 **Scenario A: Creating sub-story from feature branch**
 
 ```
-Current: feature/story.309.2.3.mobile-notification-center
-New: feature/story.309.2.3A.core-notification-ui
+Current: feature/story.1.2.3.mobile-notification-center
+New: feature/story.1.2.3A.core-notification-ui
 
-Question: "Which branch should be the base for feature/story.309.2.3A.core-notification-ui?"
+Question: "Which branch should be the base for feature/story.1.2.3A.core-notification-ui?"
 
 Options:
-1. feature/story.309.2.3.mobile-notification-center (Recommended)
+1. feature/story.1.2.3.mobile-notification-center (Recommended)
    Description: "Use current branch - groups related sub-story work together"
 
 2. develop
@@ -233,16 +266,16 @@ Options:
 **Scenario B: Creating unrelated feature from feature branch**
 
 ```
-Current: feature/story.309.2.3.mobile-notification-center
-New: feature/story.310.1.new-unrelated-feature
+Current: feature/story.1.2.3.mobile-notification-center
+New: feature/story.1.3.1.new-unrelated-feature
 
-Question: "Which branch should be the base for feature/story.310.1.new-unrelated-feature?"
+Question: "Which branch should be the base for feature/story.1.3.1.new-unrelated-feature?"
 
 Options:
 1. develop (Recommended)
    Description: "Standard Gitflow - for independent features"
 
-2. feature/story.309.2.3.mobile-notification-center
+2. feature/story.1.2.3.mobile-notification-center
    Description: "Use current branch - only if this depends on uncommitted work"
 ```
 
@@ -250,9 +283,9 @@ Options:
 
 ```
 Current: develop
-New: feature/story.309.2.3.mobile-notification-center
+New: feature/story.1.2.3.mobile-notification-center
 
-Question: "Which branch should be the base for feature/story.309.2.3.mobile-notification-center?"
+Question: "Which branch should be the base for feature/story.1.2.3.mobile-notification-center?"
 
 Options:
 1. develop (Recommended)
@@ -267,13 +300,13 @@ without a recommendation when the epic declares nothing.
 
 ```
 Current: develop
-New: feature/story.178.8.example-feature
-Epic 178 declares: branch_model: epic-integration → epic/178.feature-ui
+New: feature/story.1.178.8.example-feature
+Epic 1.178 declares: branch_model: epic-integration → epic/1.178.feature-ui
 
-Question: "Which branch should be the base for feature/story.178.8.example-feature?"
+Question: "Which branch should be the base for feature/story.1.178.8.example-feature?"
 
 Options:
-1. epic/178.feature-ui (Recommended)
+1. epic/1.178.feature-ui (Recommended)
    Description: "Epic integration branch - epic 178 delivers as one unit; created from develop if absent"
 
 2. develop
@@ -287,8 +320,8 @@ Options:
 1. develop (Recommended)
    Description: "Standard Gitflow - start from develop"
 
-2. epic/178.feature-ui — create epic integration branch
-   Description: "Only if epic 178 must arrive whole. Creates the branch from develop, then bases this
+2. epic/1.178.feature-ui — create epic integration branch
+   Description: "Only if epic 1.178 must arrive whole. Creates the branch from develop, then bases this
                  story on it. Every later story in the epic must use it too."
 ```
 
@@ -320,7 +353,7 @@ If there are uncommitted changes:
 git fetch origin
 
 # Checkout the user-selected base branch
-git checkout <selected-base-branch>  # e.g., develop or feature/story.309.2.3
+git checkout <selected-base-branch>  # e.g., develop or feature/story.1.2.3
 
 # Pull latest changes
 git pull origin <selected-base-branch>
@@ -341,7 +374,7 @@ Step 6):
 
 ```bash
 git fetch origin
-git checkout -b feature/story.178.8.example-feature "origin/<selected-base-branch>"
+git checkout -b feature/story.1.178.8.example-feature "origin/<selected-base-branch>"
 ```
 
 The normal single-tree path (Step 5 checkout/pull + Step 6 below) is unchanged.
@@ -349,7 +382,7 @@ The normal single-tree path (Step 5 checkout/pull + Step 6 below) is unchanged.
 ### Step 6: Create and Switch to New Branch
 
 ```bash
-git checkout -b feature/story.178.8.example-feature
+git checkout -b feature/story.1.178.8.example-feature
 ```
 
 ### Step 6: Push Branch (Optional)
@@ -357,7 +390,7 @@ git checkout -b feature/story.178.8.example-feature
 Optionally push the branch to set up tracking:
 
 ```bash
-git push -u origin feature/story.178.8.example-feature
+git push -u origin feature/story.1.178.8.example-feature
 ```
 
 ### Step 7: Confirm Success
@@ -365,9 +398,9 @@ git push -u origin feature/story.178.8.example-feature
 Output a summary with context:
 
 ```
-✅ Created branch: feature/story.178.8.example-feature
+✅ Created branch: feature/story.1.178.8.example-feature
    Base: develop (user selected)
-   Tracking: origin/feature/story.178.8.example-feature
+   Tracking: origin/feature/story.1.178.8.example-feature
 
 Ready to start development!
 ```
@@ -375,9 +408,9 @@ Ready to start development!
 Or for sub-stories:
 
 ```
-✅ Created branch: feature/story.309.2.3A.core-notification-ui
-   Base: feature/story.309.2.3.mobile-notification-center (sub-story)
-   Tracking: origin/feature/story.309.2.3A.core-notification-ui
+✅ Created branch: feature/story.1.2.3A.core-notification-ui
+   Base: feature/story.1.2.3.mobile-notification-center (sub-story)
+   Tracking: origin/feature/story.1.2.3A.core-notification-ui
 
 Ready to start development on sub-story!
 ```
@@ -395,15 +428,16 @@ branching:
     epicFrontmatterKey: branch_model # epic frontmatter key holding the model
     epicFrontmatterValue: epic-integration # the value that means "use an integration branch"
     branchKey: integration_branch # epic frontmatter key holding the branch name
-    branchPattern: "epic/{n}.{slug}" # used ONLY when the epic wants one but names none
+    branchPattern: "epic/{p}.{n}.{slug}" # used ONLY when the epic wants one but names none; must hold {p}
     offerWhenUndeclared: true # false ⇒ never offer the option unless an epic declares it
 ```
 
 `offerWhenUndeclared: false` is the setting for a team that wants integration branches to exist only
 where an epic has explicitly opted in — the prompt then never shows the option to anyone else.
 
-`branchPattern` is a fallback, not an enforced shape. A declared `integration_branch` is always used
-verbatim.
+`branchPattern` is a fallback, not an enforced shape — except that it must contain `{p}`: Step 2b.4
+refuses a pattern without it, naming the key, because E restarts in every PRD (task 206). A declared
+`integration_branch` is always used verbatim.
 
 ## Quick Reference: Gitflow Rules
 
@@ -421,7 +455,7 @@ verbatim.
 >
 > - Feature branches **never** interact directly with `main`
 > - Story branches are created from `develop` and PR back to `develop` (short-lived feature branches — standard Gitflow). **By default an epic is an organisational construct (Jira/docs), not a git branch.**
-> - **Exception, opt-in per epic:** an epic may declare `branch_model: epic-integration`, giving it an integration branch (`epic/{n}.{name}`) that its stories are cut from and merge into. The integration branch reaches `develop` once, at the end. See Step 2b. An epic that declares nothing behaves exactly as before.
+> - **Exception, opt-in per epic:** an epic may declare `branch_model: epic-integration`, giving it an integration branch (`epic/{p}.{n}.{name}`) that its stories are cut from and merge into. The integration branch reaches `develop` once, at the end. See Step 2b. An epic that declares nothing behaves exactly as before.
 > - `feature/epic.*` branches exist only for epic-**document** work and are ordinary feature branches: created from `develop`, PR back to `develop`. They are **not** integration branches and must not be confused with `epic/*`.
 > - Never mix bases within one epic — if the epic has an integration branch, every story in it uses that branch.
 > - Hotfix branches **must** be merged back to both `main` AND `develop`
@@ -462,11 +496,11 @@ If fetch fails:
 ### Create Feature Branch from Story (Standard)
 
 ```
-Input: /create-branch story.180.3.quick-re-search-functionality.md
+Input: /create-branch story.1.180.3.quick-re-search-functionality.md
 Current Branch: develop
 
 User Prompt:
-  Question: "Which branch should be the base for feature/story.180.3.quick-re-search-functionality?"
+  Question: "Which branch should be the base for feature/story.1.180.3.quick-re-search-functionality?"
 
   Options:
   1. develop (Recommended)
@@ -475,33 +509,33 @@ User Prompt:
 User selects: develop
 
 Output:
-  ✅ Created branch: feature/story.180.3.quick-re-search-functionality
+  ✅ Created branch: feature/story.1.180.3.quick-re-search-functionality
      Base: develop (user selected)
-     Tracking: origin/feature/story.180.3.quick-re-search-functionality
+     Tracking: origin/feature/story.1.180.3.quick-re-search-functionality
 ```
 
 ### Create Sub-story Branch from Feature Branch
 
 ```
-Input: /create-branch story.309.2.3A.core-notification-ui.md
-Current Branch: feature/story.309.2.3.mobile-notification-center
+Input: /create-branch story.1.2.3A.core-notification-ui.md
+Current Branch: feature/story.1.2.3.mobile-notification-center
 
 User Prompt:
-  Question: "Which branch should be the base for feature/story.309.2.3A.core-notification-ui?"
+  Question: "Which branch should be the base for feature/story.1.2.3A.core-notification-ui?"
 
   Options:
-  1. feature/story.309.2.3.mobile-notification-center (Recommended)
+  1. feature/story.1.2.3.mobile-notification-center (Recommended)
      Description: "Use current branch - groups related sub-story work together"
 
   2. develop
      Description: "Standard Gitflow - treats as independent feature"
 
-User selects: feature/story.309.2.3.mobile-notification-center
+User selects: feature/story.1.2.3.mobile-notification-center
 
 Output:
-  ✅ Created branch: feature/story.309.2.3A.core-notification-ui
-     Base: feature/story.309.2.3.mobile-notification-center (sub-story)
-     Tracking: origin/feature/story.309.2.3A.core-notification-ui
+  ✅ Created branch: feature/story.1.2.3A.core-notification-ui
+     Base: feature/story.1.2.3.mobile-notification-center (sub-story)
+     Tracking: origin/feature/story.1.2.3A.core-notification-ui
 ```
 
 ### Create Hotfix Branch

@@ -12,16 +12,16 @@ invokes: [ensure-epic-github-issue, ensure-epic-jira-issue, ensure-story-github-
 
 Use this skill when you need to:
 
-- **Create the next sequential story** in an epic ("create next story", "draft story 2.3")
-- **Prepare a new story** with complete developer context ("setup new story for epic 1")
+- **Create the next sequential story** in an epic ("create next story", "draft story 1.2.3")
+- **Prepare a new story** with complete developer context ("setup new story for epic 1.2")
 - **Extract story requirements** from PRD and architecture docs systematically
 
 Natural language triggers:
 
-- "Create the next story for epic 2"
-- "Draft story 3.4"
+- "Create the next story for epic 1.2"
+- "Draft story 1.3.4"
 - "Prepare the next story in sequence"
-- "Setup story 1.1"
+- "Setup story 1.1.1"
 
 **Looking for a different workflow?**
 
@@ -49,9 +49,9 @@ This skill produces **the story document and its co-located plan file**, and the
 
 **Allowed writes** (the only filesystem changes this skill may make):
 
-- ✅ The story directory `{epic-directory}/stories/story.{E}.{S}.{name}/`
-- ✅ `story.{E}.{S}.{name}.md` (story doc)
-- ✅ `story.{E}.{S}.plan.{name}.md` (plan doc — MUST be co-located in the story directory above)
+- ✅ The story directory `{epic-directory}/stories/story.{P}.{E}.{S}.{name}/`
+- ✅ `story.{P}.{E}.{S}.{name}.md` (story doc)
+- ✅ `story.{P}.{E}.{S}.plan.{name}.md` (plan doc — MUST be co-located in the story directory above)
 - ✅ `${PRD_ROOT}/sprint-status.yaml` status field update (Step 6.2)
 - ✅ *(only after the user opts in at Step 5.2a)* Creating the tracker issue(s) and writing `github_issue` / `jira_key` / `jira_url` back into the story frontmatter
 
@@ -105,10 +105,13 @@ architecture:
 ```
 
 > **CRITICAL — Story File Location**: Stories are **always** saved inside the `stories/` subdirectory of the epic directory that was provided as input (or identified in Step 1). The path is:
-> `{epic-directory}/stories/story.{epicNum}.{storyNum}.{story-title-short}/story.{epicNum}.{storyNum}.{story-title-short}.md`
+> `{epic-directory}/stories/story.{prdNum}.{epicNum}.{storyNum}.{story-title-short}/story.{prdNum}.{epicNum}.{storyNum}.{story-title-short}.md`
 >
-> Example: If the epic is at `docs/prd/domain-name/my-feature/epics/epic.336.my-epic/epic.336.my-epic.md`, stories go to:
-> `docs/prd/domain-name/my-feature/epics/epic.336.my-epic/stories/story.336.1.my-story/story.336.1.my-story.md`
+> Example: If the epic is at `docs/prd/domain-name/prd.3.my-feature/epics/epic.3.6.my-epic/epic.3.6.my-epic.md`, stories go to:
+> `docs/prd/domain-name/prd.3.my-feature/epics/epic.3.6.my-epic/stories/story.3.6.1.my-story/story.3.6.1.my-story.md`
+>
+> `prdNum` and `epicNum` come from the epic's own name and `storyNum` from `doc-id.js next story` (Step 1.1)
+> — never typed, never counted by eye. E restarts at 1 in every PRD, so a story id always carries its P.
 >
 > Do **NOT** use a global `docs/stories/` directory.
 
@@ -120,35 +123,58 @@ architecture:
 
 ### 1.1 Locate Epic Files and Review Existing Stories
 
-1. Locate epic files at `${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.*/epic.{N}.*.md`.
+1. Locate epic files at `${PRD_ROOT}/{domain}/prd.{P}.{feature}/epics/epic.{P}.{E}.*/epic.{P}.{E}.*.md`.
 
-2. Look for existing story files inside the epic's `stories/` subdirectory (i.e. `{epic-directory}/stories/`). Load the highest-numbered `story.{epicNum}.{storyNum}.*` file found there.
+2. **Allocate the story id with `doc-id.js`** — one block, run against the epic document. It reads P and E
+   from the epic's name and allocates S as highest + 1 over the epic's existing stories (a gap left by a
+   deleted story is not refilled; `scripts/lib.js` `nextStoryId` delegates to the same rule):
+
+   ```bash
+   # create-story Step 1.1 — the story id (task 206). INPUT: {epic-file}, the epic document.
+   DOC_ID="$PWD/.agents/skills/create-story/references/doc-id.js"
+   EPIC_FILE="{epic-file}"
+   EPIC_JSON=$(command node "$DOC_ID" parse "$(basename "$EPIC_FILE")" --json) \
+     || { echo "HALT: $(basename "$EPIC_FILE") is not an epic id doc-id can read (epic.P.E.slug); a legacy epic.E name is migrated first with migrate-doc-numbering"; exit 1; }
+   [ "$(printf '%s' "$EPIC_JSON" | jq -r '.kind')" = "epic" ] \
+     || { echo "HALT: $(basename "$EPIC_FILE") is not an epic document"; exit 1; }
+   PRD_NUM=$(printf '%s' "$EPIC_JSON" | jq -r '.prd')
+   EPIC_NUM=$(printf '%s' "$EPIC_JSON" | jq -r '.epic')
+   NEXT_JSON=$(command node "$DOC_ID" next story --epic-dir "$(dirname "$EPIC_FILE")" --json) \
+     || { echo "HALT: doc-id could not allocate a story number: $NEXT_JSON"; exit 1; }
+   STORY_NUM=$(printf '%s' "$NEXT_JSON" | jq -r '.next')
+   echo "next story: $(printf '%s' "$NEXT_JSON" | jq -r '.id') (PRD $PRD_NUM, epic $EPIC_NUM, story $STORY_NUM)"
+   ```
+
+   Then load the highest-numbered existing story in `{epic-directory}/stories/` — the one numbered
+   `STORY_NUM - 1`, if any.
 
 3. **If highest story exists**:
    - Verify status is `Done`
    - If NOT Done, alert user:
 
      > "ALERT: Found incomplete story!
-     > File: {lastEpicNum}.{lastStoryNum}.story.md
+     > File: story.{prdNum}.{epicNum}.{lastStoryNum}.{name}.md
      > Status: [current status]
      > You should fix this story first, but would you like to accept risk & override to create the next story in draft?"
 
    - If proceeding, select next sequential story in the current epic
    - If epic is complete, prompt user:
 
-     > "Epic {epicNum} Complete: All stories in Epic {epicNum} have been completed.
+     > "Epic {prdNum}.{epicNum} Complete: All stories in Epic {prdNum}.{epicNum} have been completed.
      > Would you like to:
      >
-     > 1. Begin Epic {epicNum + 1} with story 1
+     > 1. Begin the next epic in PRD {prdNum} with story 1 — the next row of the PRD's epics index
+     >    (`generate-prd-epic-index`), not `{epicNum} + 1`: epics are numbered within their PRD, and the next
+     >    one may not exist yet
      > 2. Select a specific story to work on
      > 3. Cancel story creation"
 
    - **CRITICAL**: NEVER automatically skip to another epic. User MUST explicitly instruct which story to create.
 
-4. **If no story files exist**: The next story is ALWAYS `1.1` (first story of first epic)
+4. **If no story files exist**: the block above allocates story 1 of this epic — `story.{prdNum}.{epicNum}.1`
 
 5. Announce the identified story to the user:
-   > "Identified next story for preparation: {epicNum}.{storyNum} - {Story Title}"
+   > "Identified next story for preparation: {prdNum}.{epicNum}.{storyNum} - {Story Title}"
 
 ---
 
@@ -158,7 +184,7 @@ architecture:
 
 ### 2.1 Extract Story Requirements
 
-1. Read the identified epic file (at `${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md`)
+1. Read the identified epic file (at `${PRD_ROOT}/{domain}/prd.{P}.{feature}/epics/epic.{P}.{E}.{name}/epic.{P}.{E}.{name}.md`)
 2. Extract for this specific story:
    - Story title and description
    - Acceptance criteria (numbered list)
@@ -311,7 +337,10 @@ Recommend following Project Structure Guide for consistency.
 
 ### 5.1 Create Story File and Directory
 
-1. Determine story path name: `story.{epicNum}.{storyNum}.{story-title-short}`
+1. Determine story path name: `story.{prdNum}.{epicNum}.{storyNum}.{story-title-short}` — the three numbers
+   from Step 1.1's block. Before creating anything, confirm the id is free with
+   `command node -e 'require("./.agents/skills/create-story/scripts/lib.js").assertUniqueStoryId(Number(process.argv[1]), Number(process.argv[2]), Number(process.argv[3]), require("fs").readdirSync(process.argv[4]))' "$PRD_NUM" "$EPIC_NUM" "$STORY_NUM" "{epic-directory}/stories"`
+   — it throws `HALT: story.P.E.S already exists` on a collision (a story created since Step 1.1 ran).
 2. Derive the output root from the epic file path provided (or identified in Step 1): `{epic-directory}/stories/`
 3. Create directory: `{epic-directory}/stories/{story-path-name}/`
 4. Create file inside directory: `{epic-directory}/stories/{story-path-name}/{story-path-name}.md`
@@ -325,7 +354,7 @@ Recommend following Project Structure Guide for consistency.
 
 ```yaml
 ---
-epic: epic.{epicNum}.{epic-name}
+epic: epic.{prdNum}.{epicNum}.{epic-name}
 title: "{story title}"
 type: story            # OKF's one hard requirement — must be exactly `story`
 description: "{one-sentence summary of the story}"   # OKF-recommended
@@ -444,7 +473,7 @@ source references/resolve-platform.sh || exit 1
 
 3. Invoke the `ensure-story-github-issue` sub-routine with `STORY_FILE_PATH={just-written story file path}` and `EPIC_ISSUE_NUM` from step 2. The sub-routine handles:
    - dedup-by-title search (adopts an existing issue if exactly one matches),
-   - creating the issue with title `[Story {epic}.{story}] {title}`, `story` + `priority:{priority}` labels, milestone `Epic {epic} — {epic_title}`,
+   - creating the issue with title `[Story {prd}.{epic}.{story}] {title}`, `story` + `priority:{priority}` labels, milestone `Epic {prd}.{epic} — {epic_title}`,
    - adding it to the GitHub Project board,
    - mirroring the priority label onto the board's Priority single-select field,
    - linking the new issue as a sub-issue of the parent epic issue (when `EPIC_ISSUE_NUM` is non-empty),
@@ -832,7 +861,7 @@ Review all sections for:
    ```markdown
    | {today} | 1.0 | Initial draft | create-story |
    ```
-3. Save the story file to the self-named subdirectory inside the epic's `stories/` folder: `{epic-directory}/stories/story.{epicNum}.{storyNum}.{story-title}/story.{epicNum}.{storyNum}.{story-title}.md`
+3. Save the story file to the self-named subdirectory inside the epic's `stories/` folder: `{epic-directory}/stories/story.{prdNum}.{epicNum}.{storyNum}.{story-title}/story.{prdNum}.{epicNum}.{storyNum}.{story-title}.md`
 4. If `${PRD_ROOT}/sprint-status.yaml` exists, update it:
    - Load the full file, preserving all comments and structure
    - Find the entry matching this story's key
@@ -851,7 +880,7 @@ Review all sections for:
 Run the tracker-card preflight on the document just written, **before** reporting completion:
 
 ```bash
-node references/card-preflight.js --file "{epic-directory}/stories/story.{E}.{S}.{name}/story.{E}.{S}.{name}.md"
+node references/card-preflight.js --file "{epic-directory}/stories/story.{P}.{E}.{S}.{name}/story.{P}.{E}.{S}.{name}.md"
 ```
 
 Offline — no auth, no network, no writes. It reports whether this document will publish a complete
@@ -915,10 +944,10 @@ Generate a comprehensive summary including:
 ```markdown
 ## Story Creation Complete
 
-**Story Created**: `{epic-directory}/stories/story.{epicNum}.{storyNum}.{story-title}/story.{epicNum}.{storyNum}.{story-title}.md`
+**Story Created**: `{epic-directory}/stories/story.{prdNum}.{epicNum}.{storyNum}.{story-title}/story.{prdNum}.{epicNum}.{storyNum}.{story-title}.md`
 **Status**: Draft
-**Epic**: {epicNum} - {Epic Title}
-**Story Number**: {storyNum}
+**Epic**: {prdNum}.{epicNum} - {Epic Title}
+**Story Number**: {prdNum}.{epicNum}.{storyNum}
 
 ### Key Technical Components Included
 
@@ -1009,8 +1038,8 @@ Expected configuration structure:
 ```yaml
 # PRD/epic/story locations are fixed conventions (see docs/reference/configuration.md):
 #   PRDs:    docs/prd/
-#   Epics:   ${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md
-#   Stories: nested at {epic-dir}/stories/story.{E}.{S}.{title}/story.{E}.{S}.{title}.md
+#   Epics:   ${PRD_ROOT}/{domain}/prd.{P}.{feature}/epics/epic.{P}.{E}.{name}/epic.{P}.{E}.{name}.md
+#   Stories: nested at {epic-dir}/stories/story.{P}.{E}.{S}.{title}/story.{P}.{E}.{S}.{title}.md
 # PRD and architecture roots are configurable; the nested structure is fixed.
 
 prd:

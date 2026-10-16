@@ -82,9 +82,21 @@ source references/resolve-platform.sh || exit 1
 
 Extract from frontmatter: `title`, `status`, `priority`, `estimated_effort_hours` (number; absent/empty if not set), `github_issue` (if present), `labels`.
 
-Parse the epic/story numbers from the filename: `story.{E}.{S}.` → `STORY_E`, `STORY_S`.
+Read the story id through `doc-id.js` — never a positional split of the filename (task 206). A story is
+`story.{P}.{E}.{S}{sub?}`; the id in a tracker title is `P.E.S`:
 
-Strip any leading `Story {E}.{S}: ` prefix (or an already-bracketed `[Story {E}.{S}] ` prefix) from `title` to get the bare display title: `STORY_TITLE`. The update path (Step 5b) wraps this once as `[Story {E}.{S}] ${STORY_TITLE}`; stripping first prevents a double prefix like `[Story 1.3] Story 1.3: …`.
+```bash
+# sync-github-story Step 3 — the story id through doc-id (task 206).
+: "${STORY_FILE_PATH:?bind STORY_FILE_PATH to the story document}"
+STORY_JSON=$(command node .agents/skills/sync-github-story/references/doc-id.js parse "$(basename "$STORY_FILE_PATH")" --json) \
+  || { echo "❌ $(basename "$STORY_FILE_PATH") is not a story id doc-id can read (story.P.E.S.slug.md)"; exit 1; }
+[ "$(printf '%s' "$STORY_JSON" | jq -r '"\(.kind) \(.artifact)"')" = "story null" ] \
+  || { echo "❌ $(basename "$STORY_FILE_PATH") is not a story document"; exit 1; }
+STORY_ID=$(printf '%s' "$STORY_JSON" | jq -r '.id | sub("^story\\."; "")')   # 1.2.3, or 1.2.3A
+echo "STORY_ID=$STORY_ID"
+```
+
+Strip any leading `Story {P}.{E}.{S}: ` prefix (or an already-bracketed `[Story {P}.{E}.{S}] ` prefix) from `title` to get the bare display title: `STORY_TITLE`. The update path (Step 5b) wraps this once as `[Story ${STORY_ID}] ${STORY_TITLE}`; stripping first prevents a double prefix like `[Story 1.1.3] Story 1.1.3: …`.
 
 Derive the parent epic file path:
 
@@ -175,7 +187,7 @@ REMOVE_ARGS=()
 [ -n "$OLD_PRIORITY" ] && [ -n "$NEW_PRIORITY" ] && REMOVE_ARGS=(--remove-label "$OLD_PRIORITY")
 
 node references/tracker-issue.js --kind edit --issue ${ISSUE_NUM} \
-  --title "[Story ${STORY_E}.${STORY_S}] ${STORY_TITLE}" \
+  --title "[Story ${STORY_ID}] ${STORY_TITLE}" \
   --body-file .claude/state/issue-body.md \
   "${LABEL_ARGS[@]}" \
   "${REMOVE_ARGS[@]}"
