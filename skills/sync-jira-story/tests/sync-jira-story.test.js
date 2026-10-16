@@ -1316,6 +1316,20 @@ test("relatedDocInfo — reads the artifact through doc-id, sub-stories included
   );
 });
 
+test("relatedDocInfo — only a plain basename is linked (finalise DoD security probe, task 207)", () => {
+  for (const hostile of [
+    "../story.1.2.4.review.1.demo.md",
+    "story.1.2.4.review.1.demo.md\nx",
+    "story.1.2.4.review.1.$(id).md",
+    "story.1.2.4.review.1.demo\u0000.md",
+  ])
+    assert.equal(lib.relatedDocInfo(hostile), null, JSON.stringify(hostile));
+  assert.equal(
+    lib.relatedDocInfo("story.1.2.4.review.1.update-examples.md").label,
+    "Story review",
+  );
+});
+
 // ---------------------------------------------------------------------------
 // mapStatusCandidates / statusMap config forms
 // ---------------------------------------------------------------------------

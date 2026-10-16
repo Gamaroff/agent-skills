@@ -198,6 +198,11 @@ const RELATED_DOC_TYPES = [
 // The artifact kind and its number are doc-id's (task 207): a private regex read
 // `[\d.]+?` for the story id and so missed a sub-story (`story.1.2.4A`).
 function relatedDocInfo(filename) {
+  // A plain basename only (finalise DoD security probe, task 207): doc-id.parse reads a
+  // `../` prefix, a newline, NUL or `$(…)` inside the slug as part of a valid name, and the
+  // anchored regex this replaced rejected the first two. A link is never built from one.
+  if (typeof filename !== "string" || !/^[A-Za-z0-9._-]+$/.test(filename))
+    return null;
   const p = docId.parse(filename);
   if (!p.ok || p.kind !== "story" || !p.artifact) return null;
   const type = RELATED_DOC_TYPES.find((t) => t.key === p.artifact);
