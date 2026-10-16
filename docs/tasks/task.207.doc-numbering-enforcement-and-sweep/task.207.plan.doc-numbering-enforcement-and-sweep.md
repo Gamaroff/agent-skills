@@ -47,18 +47,22 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
-const { checkCorpus } = await import(                       // ← use the real export name from Phase 0
+// doc-id.js is CommonJS; Node's named-export detection reads its `module.exports = { … }`
+// literal, so the named import works (verified in review.1).
+const { checkCorpus } = await import(
   pathToFileURL(path.join(REPO_ROOT, "shared/resources/doc-id.js")).href);
 
-// Floor: the migrated corpus held 1 PRD, 4 epics, 17 story dirs on 2026-10-13
-// (`find docs/prd -type d -name 'story.*' | wc -l`). It only grows.
-const MIN = { prd: 1, epic: 4, story: 17 };
+// Floor: the migrated corpus held 22 documents — 1 PRD, 4 epics, 17 stories — on 2026-10-16
+// (`checkCorpus("docs/prd").documents`). It only grows. The engine returns a total, not
+// per-kind counts: `{ reason, findings, documents, unreadable }`.
+const MIN_DOCUMENTS = 22;
 
 test("the docs/prd corpus is numbered, consistent and registered", () => {
-  const r = checkCorpus({ root: path.join(REPO_ROOT, "docs/prd") });
-  assert.ok(r.counts.prd >= MIN.prd && r.counts.epic >= MIN.epic && r.counts.story >= MIN.story,
-    `vacuous read: ${JSON.stringify(r.counts)}`);
-  assert.deepEqual(r.findings, [], r.findings.map((f) => `${f.path}: ${f.reason}`).join("\n"));
+  const r = checkCorpus(path.join(REPO_ROOT, "docs/prd"));
+  // root-missing / empty / unreadable are instrument failures, never a clean pass.
+  assert.ok(["ok", "findings"].includes(r.reason), `corpus not read: ${r.reason}`);
+  assert.ok(r.documents >= MIN_DOCUMENTS, `vacuous read: ${r.documents} documents`);
+  assert.deepEqual(r.findings, [], r.findings.map((f) => `${f.path}: ${f.reason} — ${f.detail}`).join("\n"));
 });
 ```
 
@@ -66,11 +70,11 @@ Mutation cases. Each runs on a copy made with `cpSync(docs/prd, tmp, {recursive:
 
 1. Rename one `story.1.N.S.slug/` directory, and its file, back to `story.N.S.slug`. Expect a finding.
 2. Remove the `prd_number:` line from the PRD frontmatter. Expect a finding.
-3. Copy one epic directory to a sibling with a different slug and the same `(P, E)`. Expect a
-   duplicate finding.
+3. Copy one epic **document alone** into a sibling directory `epic.P.E.other/epic.P.E.other.md`
+   (same `(P, E)`, different slug). Copying the whole directory duplicates its stories too.
 
-Assert each produces **≥1 finding with the expected `reason`**. Copy the reason strings from the
-engine, not from memory.
+Expected reasons, measured against the engine in review.1: (1) `bad-shape`, (2)
+`frontmatter-mismatch`, (3) `duplicate-id`. Assert each produces **≥1 finding with that `reason`**.
 
 ### Phase 2: Chokepoint test
 
@@ -94,10 +98,16 @@ helper both files import.
 | `id-regex-literal` | code | regex literal containing `(story\|epic\|prd)\\\.` followed by `\(\\d` / `\\d` / `\[0-9` / `\[1-9` / `\[\\d` | the id grammar; plain `story.` in a string does not hit |
 | `id-regex-built` | code | `new RegExp(` on the same line as `` `^?(story\|epic\|prd)\\\\. `` | `create-story/scripts/lib.js:85` |
 | `title-regex` | code | regex literal containing `\[?(Epic\|Story)\\s` followed by a digit class | `[Epic N]` / `Story N.N` summary parsers |
-| `field-split` | md fence | `(awk -F\.\|cut -d\.)` on a line whose subject var matches `/(STORY\|EPIC\|PRD)[A-Z_]*/` | `review-pipeline-step-0a-branch-setup.md:72` |
-| `first-number` | md fence | `grep -oE '\[0-9\]\+' \| head -1` on a `(STORY\|EPIC\|PRD)` var | `develop-pipeline-step-0-resolve-and-prepare.md:44` |
+| `field-split` | md fence | `(awk -F\.\|cut -d\.)` on a line whose subject var matches `/(STORY\|EPIC\|PRD)[A-Z_]*/` | `review-pipeline-step-0a-branch-setup.md:111` (review-epic, a live defect) |
+| `first-number` | md fence | `grep -oE '\[0-9\]\+' \| head -1` on a `(STORY\|EPIC\|PRD)` var | (no live site after task.206) |
 
-**Allowlist.** Use the shape of `mutation-call-site-coverage.test.js`'s list: `{ "shared/resources/bug-doc.js": "bug-artifact grammar — accepts any parent depth via [\\d.]+?, delegates the parent id to doc-id.parse" }`.
+**Comments are not regexes.** Strip comment text before matching the code shapes: a raw-line match
+reports `finalise-fix-and-recheck.mjs:79` (JSDoc quoting the old regex) and two comments in
+`finalise-fix-and-recheck.test.mjs`. Add one to `MUST_MISS`.
+
+**Allowlist.** Use the shape of `mutation-call-site-coverage.test.js`'s list, for example
+`{ "skills/develop-next/scripts/select-next.mjs": "roadmap prose grammar — `Epic 1.2` in a row's text, not a document id" }`.
+`bug-doc.js` no longer hits (task.206 routed it through `doc-id.parse`).
 The stale-entry test asserts that every allowlisted path exists, still matches ≥1 shape, and has a
 reason of ≥20 characters.
 
@@ -122,6 +132,7 @@ const MUST_MISS = [
   ["md",   "TASK_ID=$(echo \"$TASK_BASENAME\" | awk -F. '{print $2}')"],   // different rule
   ["code", "const fixture = 'story.1.1.example';"],                         // fixture name, not a parser
   ["code", "const R = /task\\.(\\d+)/;"],                                   // task grammar, not in scope
+  ["code", "// the old `story\\.\\d+\\.\\d+` stem admitted it"],              // a comment, not a parser
 ];
 ```
 
