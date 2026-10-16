@@ -1,7 +1,7 @@
 ---
 type: bug
 id: task.189.bug.1
-status: ready-for-qa
+status: closed
 severity: medium
 priority: P2
 created: 2026-10-16
@@ -13,7 +13,7 @@ created: 2026-10-16
 **Bug ID**: TASK-189-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (qa-task cycle 1, finding CR-1)
 **Date Found**: 2026-10-16
 
@@ -62,3 +62,4 @@ Point Step 8a.4 at `security-probe-plan.mjs` with the saved plan and this run's 
 |------|--------|------------|-------|
 | 2026-10-16 | New | qa-task | Found by task.189.qa.1.read-only-agents-never-write.md |
 | 2026-10-16 | Ready for QA | qa-fix | Fixed in QA cycle 1 |
+| 2026-10-16 | Closed | qa-task | Verified by task.189.qa.2.read-only-agents-never-write.md |

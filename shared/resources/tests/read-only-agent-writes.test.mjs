@@ -371,6 +371,7 @@ test("planArgvAllowed refuses every owned flag in both spellings, and allows a c
     "--cases-file",
     "--json",
     "--emit-block",
+    "--timeout",
   ]) {
     assert.equal(
       planArgvAllowed([...base, flag, "v"]),
@@ -440,4 +441,91 @@ test("the runner reports an unfoldable record as record-unreadable, never as zer
   assert.equal(out.runs.length, 1);
   assert.equal(out.reason, "record-unreadable");
   assert.match(out.error, /not a control/);
+});
+
+// --- task.189 QA cycle 2 regressions -------------------------------------------------------------
+
+test("each probe carries a key unique within the run, even when two controls share case ids (CR2-1)", () => {
+  const work = probeRepo([]);
+  write(
+    work,
+    "lib/absent-control-2.mjs",
+    fs.readFileSync(path.join(FIXTURES, "absent-control.mjs"), "utf8"),
+  );
+  write(
+    work,
+    ".claude/state/probe-plan.json",
+    JSON.stringify([
+      {
+        argv: [
+          "--sink",
+          "url-authority",
+          "--entry",
+          "lib/absent-control.mjs#validateHost",
+        ],
+      },
+      {
+        argv: [
+          "--sink",
+          "url-authority",
+          "--entry",
+          "lib/absent-control-2.mjs#validateHost",
+        ],
+      },
+    ]),
+  );
+  const r = run("bash", stepBlock(), { cwd: work });
+  assert.equal(r.status, 0, r.stderr);
+  const out = result(work);
+  const ids = out.probes.map((p) => p.id);
+  const keys = out.probes.map((p) => p.key);
+  assert.ok(
+    new Set(ids).size < ids.length,
+    "the fixture no longer shares ids — the test proves nothing",
+  );
+  assert.equal(new Set(keys).size, keys.length, "two probes share a key");
+  for (const p of out.probes) assert.match(p.key, /^\d+:/);
+});
+
+async function stubRun(work, body, extra = {}) {
+  const { runPlan } = await import(RUNNER);
+  write(work, "stub.mjs", body);
+  write(
+    work,
+    "plan.json",
+    JSON.stringify([{ argv: ["--sink", "path", "--entry", "x#y"] }]),
+  );
+  return runPlan({
+    plan: path.join(work, "plan.json"),
+    record: path.join(work, "run.json"),
+    casesBase: path.join(work, "cases"),
+    repoRoot: work,
+    engine: path.join(work, "stub.mjs"),
+    ...extra,
+  });
+}
+
+test("a run whose record has no entry directory is record-unreadable, not zero (CR2-3)", async () => {
+  const { work } = fixtureRepo();
+  const { out } = await stubRun(
+    work,
+    [
+      "export function readRecord() { return null; }",
+      "if (process.argv[1] && process.argv[1].endsWith('stub.mjs')) {",
+      "  process.stdout.write(JSON.stringify({ entry: 'x#y', verdict: 'engages', executed: 4, reproduced: [], overblocked: [], escapes: [] }));",
+      "}",
+    ].join("\n"),
+  );
+  assert.equal(out.runs.length, 1);
+  assert.equal(out.reason, "record-unreadable");
+});
+
+test("an engine run past the overall bound is killed and recorded as a refusal, never executed (CR2-4)", async () => {
+  const { work } = fixtureRepo();
+  const { out } = await stubRun(work, "setTimeout(() => {}, 60000);", {
+    engineTimeoutMs: 300,
+  });
+  assert.deepEqual(out.runs, []);
+  assert.match(out.refusals[0].reason, /timed out/);
+  assert.equal(out.probes_executed, 0);
 });

@@ -443,21 +443,21 @@ None.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-16
-**Quality Score**: 70/100
+**Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.189.qa.1.read-only-agents-never-write.md](./task.189.qa.1.read-only-agents-never-write.md)
-- **Gate File**: [task.189.gate.1.read-only-agents-never-write.yml](./task.189.gate.1.read-only-agents-never-write.yml)
+- **Full Report**: [task.189.qa.2.read-only-agents-never-write.md](./task.189.qa.2.read-only-agents-never-write.md)
+- **Gate File**: [task.189.gate.2.read-only-agents-never-write.yml](./task.189.gate.2.read-only-agents-never-write.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 90
+- **Tests Executed**: 61
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Three medium findings: finalise Step 8a still re-runs a command the agent no longer records (CR-1); the probe-plan runner drops engine sandbox escapes (CR-2); the runner's owned-flag refusal cannot be probed by the engine (QA-1). One low: an empty marked matrix block leaves an empty `.summaries/` directory (QA-2).
+Cycle-1 findings all fixed and verified (bugs 1–3 closed; both new boundaries engage under the probe engine). One new medium: Step 3b.1 merges probe severities by a corpus case id that is not unique across controls (CR2-1).
 
 <!-- change-log-start -->
 ## Change Log
@@ -470,6 +470,8 @@ Three medium findings: finalise Step 8a still re-runs a command the agent no lon
 | 2026-10-16 |  | Implemented — 13 source files (+ bundled copies), 1 new runner, 2 new test files (19 tests), 2 contract tests updated; 7 mutation proofs | develop |
 | 2026-10-16 |  | QA gate CONCERNS (70/100) — 3 medium, 1 low finding | qa-task |
 | 2026-10-16 |  | QA findings fixed — cycle 1, 4 gate findings (CR-1, CR-2, QA-1, QA-2) + 2 advisory (CR-3, CR-4/5) | qa-fix |
+| 2026-10-16 |  | QA gate CONCERNS (90/100) — 1 medium finding; cycle-1 bugs 1-3 closed | qa-task |
+| 2026-10-16 |  | QA findings fixed — cycle 2, 1 gate finding (CR2-1) + 4 advisory (CR2-2..CR2-5) | qa-fix |
 <!-- change-log-end -->
 
 ---

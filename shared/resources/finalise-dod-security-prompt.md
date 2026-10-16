@@ -185,8 +185,8 @@ on task.158 the attempt came back as a false `probe mode executed no candidates`
 Do not reason abstractly about what the code would return either — reasoning about it is precisely
 what the checklist already does, and what it gets wrong. The plan is how the boundary gets executed.
 
-Leave out the four arguments `/finalise` owns: the run record, the repository root, the cases-file
-path and the JSON-output switch. An entry that carries one is refused, never run. One element per
+Leave out the arguments `/finalise` owns: the run record, the repository root, the cases-file path,
+the JSON-output switch and the per-case timeout. An entry that carries one is refused, never run. One element per
 argument is load-bearing: an entry such as `fence:<doc>#<heading text>` or an `--argv` template
 holds spaces inside one argument, and a single command string would be split at them.
 
@@ -295,7 +295,7 @@ the input attached verbatim so a reader can re-run it.
 Because `probes[]` is filtered, it cannot also serve as the record of how much work was done. The total
 is **`probes_executed:`** — every candidate actually executed, including the legitimate inputs from
 step 5 and every candidate that behaved correctly — **taken from the run record** (`totals.executed`,
-equal to the sum of `executed` in the engine's JSON across your plan), never counted by hand.
+the record's folded total, one control per control key), never counted by hand.
 `/finalise` Step 3b.1 fills both fields from the record after running your plan; you emit neither. An
 empty `probes[]` with a high `probes_executed` is
 the *good* result; an empty `probes[]` with `probes_executed: 0` is the failure in the guard below. The
@@ -353,7 +353,8 @@ security_review:
   internal_reason: "<path#export> — <the artefact, and why no sink fits>" # REQUIRED when boundary is internal; omit otherwise
   probe_plan: # REQUIRED when boundary is true — one entry per control; /finalise Step 3b.1 runs them.
     - argv: ["--sink", "<sink>", "--entry", "<path-from-repo-root>#<exportName>"] # one element
-        # per argument; never the run record, the repository root, the cases-file path or --json
+        # per argument; never the run record, the repository root, the cases-file path, --json
+        # or --timeout
       cases: null # or the JSON array of cases, verbatim, when the corpus does not fit (Step 4.2)
   # The two fields below are FILLED BY /finalise Step 3b.1 from the run record — do not emit them.
   probes_executed: 0 # totals.executed from the run record: every candidate actually run,

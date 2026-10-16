@@ -601,8 +601,8 @@ test("the agent plans the probe and /finalise always runs it (obs #10, task.189)
       "a rebuilt probe must not be graded low by the orchestrator",
     ],
     [
-      "a `severity` per probe `id`",
-      "a reproduced probe must be graded, or Step 8a's low-severity path never opens",
+      "a `severity` per probe `key`",
+      "a reproduced probe must be graded by its unique key, or Step 8a's low path never opens or opens on the wrong probe (task.189 CR2-1)",
     ],
     [
       "still takes the zero-guard",
@@ -619,6 +619,11 @@ test("the agent plans the probe and /finalise always runs it (obs #10, task.189)
     [
       "record-unreadable",
       "an unfoldable record must not read as zero executed (task.189 CR-4)",
+    ],
+
+    [
+      "corrected **whole** plan",
+      "a corrected-plan re-run must carry every entry, or it drops the first run's probes (task.189 CR2-2)",
     ],
   ]) {
     assert.ok(

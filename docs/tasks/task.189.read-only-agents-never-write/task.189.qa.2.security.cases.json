@@ -1,0 +1,252 @@
+[
+  {
+    "id": "t189.argv.record-separate",
+    "sink": "shell-exec",
+    "input": [
+      "--sink",
+      "path",
+      "--entry",
+      "lib/x.js#isSafe",
+      "--record",
+      "/x"
+    ],
+    "why": "owned flag --record as its own argument",
+    "correct": "refused (null)",
+    "direction": "hostile"
+  },
+  {
+    "id": "t189.argv.record-equals",
+    "sink": "shell-exec",
+    "input": [
+      "--sink",
+      "path",
+      "--entry",
+      "lib/x.js#isSafe",
+      "--record=/x"
+    ],
+    "why": "owned flag --record in --flag=value spelling",
+    "correct": "refused (null)",
+    "direction": "hostile"
+  },
+  {
+    "id": "t189.argv.repo-root-separate",
+    "sink": "shell-exec",
+    "input": [
+      "--sink",
+      "path",
+      "--entry",
+      "lib/x.js#isSafe",
+      "--repo-root",
+      "/x"
+    ],
+    "why": "owned flag --repo-root as its own argument",
+    "correct": "refused (null)",
+    "direction": "hostile"
+  },
+  {
+    "id": "t189.argv.repo-root-equals",
+    "sink": "shell-exec",
+    "input": [
+      "--sink",
+      "path",
+      "--entry",
+      "lib/x.js#isSafe",
+      "--repo-root=/x"
+    ],
+    "why": "owned flag --repo-root in --flag=value spelling",
+    "correct": "refused (null)",
+    "direction": "hostile"
+  },
+  {
+    "id": "t189.argv.cases-file-separate",
+    "sink": "shell-exec",
+    "input": [
+      "--sink",
+      "path",
+      "--entry",
+      "lib/x.js#isSafe",
+      "--cases-file",
+      "/x"
+    ],
+    "why": "owned flag --cases-file as its own argument",
+    "correct": "refused (null)",
+    "direction": "hostile"
+  },
+  {
+    "id": "t189.argv.cases-file-equals",
+    "sink": "shell-exec",
+    "input": [
+      "--sink",
+      "path",
+      "--entry",
+      "lib/x.js#isSafe",
+      "--cases-file=/x"
+    ],
+    "why": "owned flag --cases-file in --flag=value spelling",
+    "correct": "refused (null)",
+    "direction": "hostile"
+  },
+  {
+    "id": "t189.argv.json-separate",
+    "sink": "shell-exec",
+    "input": [
+      "--sink",
+      "path",
+      "--entry",
+      "lib/x.js#isSafe",
+      "--json",
+      "/x"
+    ],
+    "why": "owned flag --json as its own argument",
+    "correct": "refused (null)",
+    "direction": "hostile"
+  },
+  {
+    "id": "t189.argv.json-equals",
+    "sink": "shell-exec",
+    "input": [
+      "--sink",
+      "path",
+      "--entry",
+      "lib/x.js#isSafe",
+      "--json=/x"
+    ],
+    "why": "owned flag --json in --flag=value spelling",
+    "correct": "refused (null)",
+    "direction": "hostile"
+  },
+  {
+    "id": "t189.argv.emit-block-separate",
+    "sink": "shell-exec",
+    "input": [
+      "--sink",
+      "path",
+      "--entry",
+      "lib/x.js#isSafe",
+      "--emit-block",
+      "/x"
+    ],
+    "why": "owned flag --emit-block as its own argument",
+    "correct": "refused (null)",
+    "direction": "hostile"
+  },
+  {
+    "id": "t189.argv.emit-block-equals",
+    "sink": "shell-exec",
+    "input": [
+      "--sink",
+      "path",
+      "--entry",
+      "lib/x.js#isSafe",
+      "--emit-block=/x"
+    ],
+    "why": "owned flag --emit-block in --flag=value spelling",
+    "correct": "refused (null)",
+    "direction": "hostile"
+  },
+  {
+    "id": "t189.argv.record-first",
+    "sink": "shell-exec",
+    "input": [
+      "--record",
+      "/x",
+      "--sink",
+      "path",
+      "--entry",
+      "lib/x.js#isSafe"
+    ],
+    "why": "owned flag before the entry",
+    "correct": "refused (null)",
+    "direction": "hostile"
+  },
+  {
+    "id": "t189.argv.empty",
+    "sink": "shell-exec",
+    "input": [],
+    "why": "an empty argv",
+    "correct": "refused (null)",
+    "direction": "hostile"
+  },
+  {
+    "id": "t189.argv.non-string",
+    "sink": "shell-exec",
+    "input": [
+      "--sink",
+      "path",
+      "--entry",
+      "lib/x.js#isSafe",
+      7
+    ],
+    "why": "a non-string element",
+    "correct": "refused (null)",
+    "direction": "hostile"
+  },
+  {
+    "id": "t189.argv.string-not-array",
+    "sink": "shell-exec",
+    "input": "--sink path --entry lib/x.js#isSafe",
+    "why": "a single command string",
+    "correct": "refused (null)",
+    "direction": "hostile"
+  },
+  {
+    "id": "t189.argv.plain",
+    "sink": "shell-exec",
+    "input": [
+      "--sink",
+      "path",
+      "--entry",
+      "lib/x.js#isSafe"
+    ],
+    "why": "the documented shape",
+    "correct": "allowed (argv returned)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "t189.argv.cli-argv",
+    "sink": "shell-exec",
+    "input": [
+      "--sink",
+      "path",
+      "--entry",
+      "cli:bin/x.mjs",
+      "--argv",
+      "[\"--flag\",\"{input}\"]",
+      "--name",
+      "guarded flag"
+    ],
+    "why": "cli form with an --argv template",
+    "correct": "allowed (argv returned)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "t189.argv.name-mentions-flag",
+    "sink": "shell-exec",
+    "input": [
+      "--sink",
+      "path",
+      "--entry",
+      "lib/x.js#isSafe",
+      "--name",
+      "record-keeper --record"
+    ],
+    "why": "a value that only mentions an owned flag",
+    "correct": "allowed (argv returned)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "t189.argv.fence-heading",
+    "sink": "shell-exec",
+    "input": [
+      "--sink",
+      "filename",
+      "--entry",
+      "fence:doc.md#My Guard",
+      "--slot",
+      "{x}"
+    ],
+    "why": "a fence entry with a space",
+    "correct": "allowed (argv returned)",
+    "direction": "legitimate"
+  }
+]

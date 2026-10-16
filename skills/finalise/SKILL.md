@@ -543,8 +543,9 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
    argument, which an unquoted shell expansion would split. It writes inline cases beside the record
    (`…security.cases.json`, or `…security.cases.<i>.json` for entry *i* of several), records every
    entry into the **one** run record (the engine folds each control into it), and refuses an entry
-   whose arguments carry `--record`, `--repo-root`, `--cases-file`, `--json` or `--emit-block`,
-   which it owns. Exit 1 (`bad-plan`) means the JSON you wrote is not an array: fix the file, re-run.
+   whose arguments carry `--record`, `--repo-root`, `--cases-file`, `--json`, `--emit-block` or
+   `--timeout`, which it owns, and kills an engine run that outlives its overall bound (a refusal,
+   never an execution). Exit 1 (`bad-plan`) means the JSON you wrote is not an array: fix the file, re-run.
    `reason: record-unreadable` means entries ran but their record cannot be folded (`error` says
    why): add a `probe record unreadable — {error}` FAIL check with no `severity`, and never read the
    0 it reports as nothing executed.
@@ -554,8 +555,10 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
    refused, with its input verbatim. A probe built here carries **no `severity`**, so Step 8a reads
    it as not-low and halts. **When `probes[]` is non-empty, grade it:** re-dispatch the security
    agent once with `.claude/state/probe-plan-result.json` and the record path, asking only for a
-   `severity` per probe `id` (a read — it runs nothing). Merge each returned severity onto its probe;
-   one it does not grade stays without, and halts. Without this step every reproduced probe would
+   `severity` per probe `key` (a read — it runs nothing). Merge each returned severity onto the probe
+   with that `key`, never by `id`: `id` is the corpus case id, which every control on the same sink
+   shares, so an `id` match can put one control's grade on another's probe (task.189 CR2-1). A probe
+   it does not grade stays without, and halts. Without this step every reproduced probe would
    halt, and the low-severity fix-and-recheck path Step 8a offers would never open.
 4. **An escape is a finding, whatever the verdict.** Each `escapes[]` entry is a case the engine saw
    write outside its sandbox — the engine exits 1 on one even when the control engages. Add a
@@ -563,7 +566,10 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
 5. **Refusals are not executions.** Each `refusals[]` entry is a control the plan named that was
    never probed — the engine refused its arguments (exit 2, the reason is its first stderr line) or
    the runner refused the entry. It adds nothing to `probes_executed`. Re-dispatch the security agent
-   once with the refusal reasons, asking for a corrected plan, and re-run this step. Still refused:
+   once with the refusal reasons, asking for the corrected **whole** plan — the refused entries fixed,
+   every other entry unchanged — and re-run this step on it. A re-run's result replaces the first, so a
+   plan of only the corrected entries would drop the first run's probes and escapes while the shared
+   record still counts them (task.189 CR2-2). Still refused:
    add a `checks[]` entry `probe plan entry refused: {entry} — {reason}` with `status: FAIL` and
    no `severity`.
 6. **The zero-guard still applies — now to this run.** `boundary: true` with `probes_executed: 0`

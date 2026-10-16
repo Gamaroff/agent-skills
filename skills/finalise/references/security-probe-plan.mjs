@@ -29,9 +29,11 @@
  *   --repo-root   the consumer's repository root; passed to the engine as --repo-root.
  *   --engine      the probe engine (default: security-probe.mjs beside this file).
  *
- * The plan's argv must not carry --record, --repo-root, --cases-file, --json or --emit-block:
- * this script owns them, so a plan cannot redirect the record or the containment root. An entry
- * that does is refused (`plan-entry-owns-flag`) and never run.
+ * The plan's argv must not carry --record, --repo-root, --cases-file, --json, --emit-block or
+ * --timeout: this script owns them, so a plan cannot redirect the record or the containment root,
+ * or lift the engine's per-case time budget. An entry that does is refused (`plan-entry-owns-flag`)
+ * and never run. Each engine run is also bounded as a whole (ENGINE_TIMEOUT_MS); one that outlives
+ * it is killed and recorded as a refusal, never as executed (task.189 CR2-4).
  *
  * Output (--json): {
  *   reason:          "ran" | "empty-plan" | "record-unreadable" (entries ran, but the record
@@ -44,8 +46,10 @@
  *                    path}. Non-empty is a finding whatever the verdict — the engine exits 1 on
  *                    an escape even when the control engages,
  *   probes:          one per case the engine reported reproduced (a hostile case accepted) or
- *                    overblocked (a legitimate case refused): {control, id, input, expected,
- *                    actual, reproduced: true}. No `severity` — the orchestrator does not grade,
+ *                    overblocked (a legitimate case refused): {key, control, id, input,
+ *                    expected, actual, reproduced: true}. `key` is `<plan index>:<id>`, unique
+ *                    within the run — `id` is the corpus case id, which every control on the same
+ *                    sink shares, so grading and merging go by `key` (task.189 CR2-1). No `severity` — the orchestrator does not grade,
  *                    and /finalise Step 8a reads a probe without one as not-low,
  *   refusals:        entries that never ran or the engine refused: {index, entry, reason},
  *   runs:            {index, entry, exit, verdict, executed, escapes} for every entry the
@@ -69,7 +73,11 @@ const OWNED_FLAGS = Object.freeze([
   "--cases-file",
   "--json",
   "--emit-block",
+  "--timeout",
 ]);
+// One engine run, bounded as a whole. The engine bounds each case; this bounds the run, so a plan
+// with an unbounded inline `cases` list cannot hold Step 3b.1 open indefinitely.
+const ENGINE_TIMEOUT_MS = 20 * 60 * 1000;
 
 function parseArgs(argv) {
   const opts = { json: false, engine: path.join(HERE, "security-probe.mjs") };
@@ -159,7 +167,13 @@ async function readExecuted(record, engine) {
   try {
     const { readRecord } = await import(path.resolve(engine));
     const rec = readRecord(record);
-    if (rec === null) return { ok: true, executed: 0 };
+    // Only called after at least one run, and every run writes an entry: no entry directory now
+    // is an unreadable record, not "nothing executed" (task.189 CR2-3).
+    if (rec === null)
+      return {
+        ok: false,
+        error: "entries ran, but the record has no entry directory",
+      };
     const n = rec.totals && rec.totals.executed;
     return Number.isInteger(n) && n >= 0
       ? { ok: true, executed: n }
@@ -252,14 +266,21 @@ export async function runPlan(opts) {
         opts.record,
         "--json",
       ],
-      { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
+      {
+        encoding: "utf8",
+        maxBuffer: 64 * 1024 * 1024,
+        timeout: opts.engineTimeoutMs ?? ENGINE_TIMEOUT_MS,
+        killSignal: "SIGKILL",
+      },
     );
     if (child.status === 2 || child.status === null) {
-      const why =
-        (child.stderr || "").split("\n").find((l) => l.trim()) ||
-        (child.error
-          ? child.error.message
-          : `engine exited ${child.status ?? child.signal}`);
+      const timedOut = child.error && child.error.code === "ETIMEDOUT";
+      const why = timedOut
+        ? `engine timed out after ${(opts.engineTimeoutMs ?? ENGINE_TIMEOUT_MS) / 1000} s`
+        : (child.stderr || "").split("\n").find((l) => l.trim()) ||
+          (child.error
+            ? child.error.message
+            : `engine exited ${child.status ?? child.signal}`);
       out.refusals.push({ index: i, entry: entryName, reason: why.trim() });
       continue;
     }
@@ -296,6 +317,7 @@ export async function runPlan(opts) {
       for (const id of Array.isArray(ids) ? ids : []) {
         const c = caseFor(pool, id);
         out.probes.push({
+          key: `${i}:${id}`,
           control: res.entry ?? entryName,
           id,
           input: c ? c.input : null,
