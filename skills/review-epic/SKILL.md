@@ -576,7 +576,7 @@ and use `$REVIEW_N` as `[n]`. It is the highest existing `[n]` plus 1 (1 when th
 **Report structure**:
 
 ```markdown
-# Epic Review Report: Epic [N] — [Epic Name]
+# Epic Review Report: Epic [P].[E] — [Epic Name]
 
 **Review Date**: YYYY-MM-DD
 **Reviewer**: Claude (review-epic skill)
@@ -690,7 +690,7 @@ and use `$REVIEW_N` as `[n]`. It is the highest existing `[n]` plus 1 (1 when th
 Present immediately in conversation as:
 
 ```
-## Epic [N] Review: Inline Action Plan
+## Epic [P].[E] Review: Inline Action Plan
 
 **Score**: [X.X/5.0] | **Ready for stories**: ✅/⚠️/❌
 

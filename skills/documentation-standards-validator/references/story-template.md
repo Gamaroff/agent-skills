@@ -598,7 +598,7 @@ const data = jsonString ? JSON.parse(jsonString) : defaults;
 ### Epic Documentation
 
 - [[Epic N] Name](../epics/epic-[n]-[name].md) - Parent epic
-- [Epic [N] Roadmap](../epics/EPIC-[N]-ROADMAP.md) - Weekly plan
+- [Epic [P].[E] Roadmap](../epics/EPIC-[P].[E]-ROADMAP.md) - Weekly plan
 
 ### Related Stories
 
@@ -800,4 +800,4 @@ Before marking this story as "Ready for QA", verify:
 
 ---
 
-**Status**: Last updated YYYY-MM-DD | **Assigned**: [Developer] | **Epic**: [Epic [N]]
+**Status**: Last updated YYYY-MM-DD | **Assigned**: [Developer] | **Epic**: [Epic [P].[E]]

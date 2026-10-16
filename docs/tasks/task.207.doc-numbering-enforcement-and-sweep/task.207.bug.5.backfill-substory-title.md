@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa
+status: closed
 severity: Major
 priority: Medium
 created: 2026-10-16
@@ -14,7 +14,7 @@ description: "backfill-story-issues.sh builds the issue title from doc-id's stor
 **Bug ID**: TASK-207-BUG-5
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 2, finding CR-3)
 **Date Found**: 2026-10-16
 **Location**: `.agents/scripts/backfill-story-issues.sh:65`
@@ -67,3 +67,4 @@ Build the label from doc-id's `.id` minus `story.`, and skip unless `.kind == "s
 | 2026-10-16 | New | qa-task | Raised by task.207.qa.2 |
 | 2026-10-16 | In Progress | qa-fix | Fix cycle 2 started |
 | 2026-10-16 | Ready for QA | qa-fix | Fixed in QA fix cycle 2 |
+| 2026-10-16 | Closed | qa-task | Verified by task.207.qa.3.doc-numbering-enforcement-and-sweep.md |

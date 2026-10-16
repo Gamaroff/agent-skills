@@ -1653,7 +1653,7 @@ Report:  <path>
 **Report Structure**:
 
 ```markdown
-# Story Validation Report: Story [Epic].[Story] — [Title]
+# Story Validation Report: Story [P].[E].[S] — [Title]
 
 **Validated:** [ISO date]
 **Validation Depth:** [Quick/Standard/Thorough]
@@ -1781,7 +1781,7 @@ The Implementation Readiness Score is calculated as a weighted average across al
 **Report Structure**:
 
 ```markdown
-# Story Review Report: Story [Epic].[Story] - [Title]
+# Story Review Report: Story [P].[E].[S] - [Title]
 
 **Reviewed:** [Date]
 **Review Depth:** [Quick/Standard/Thorough]

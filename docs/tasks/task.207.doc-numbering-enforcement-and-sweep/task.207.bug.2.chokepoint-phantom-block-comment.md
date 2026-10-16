@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa
+status: closed
 severity: Major
 priority: Medium
 created: 2026-10-16
@@ -14,7 +14,7 @@ description: "Chokepoint comment stripper opens a phantom block comment on a `//
 **Bug ID**: TASK-207-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 1, finding CR-2)
 **Date Found**: 2026-10-16
 **Location**: `tests/doc-id-chokepoint.test.js:91`
@@ -85,3 +85,4 @@ Strip a `//` line comment before searching for `/*` (or lift the quote-aware str
 | 2026-10-16 | Reopened | qa-task | Not fixed — same mechanism survives (task.207.qa.2 CR-2) |
 | 2026-10-16 | In Progress | qa-fix | Fix cycle 2 started |
 | 2026-10-16 | Ready for QA | qa-fix | Fixed in QA fix cycle 2 |
+| 2026-10-16 | Closed | qa-task | Verified by task.207.qa.3.doc-numbering-enforcement-and-sweep.md |

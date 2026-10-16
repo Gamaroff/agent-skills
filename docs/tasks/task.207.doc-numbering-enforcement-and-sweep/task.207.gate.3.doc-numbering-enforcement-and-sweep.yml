@@ -1,0 +1,87 @@
+schema: 2
+task: 'task.207.doc-numbering-enforcement-and-sweep'
+task_title: 'Doc numbering enforcement and sweep'
+gate: FAIL
+status_reason: 'Cycle 2 renamed the ingester prompt globs to <P>.<E>.<S> without renaming the substitution list its callers follow, so story-mode ingestion matches nothing (HIGH); §5 still misses uppercase and title spellings (EPIC-[N], Epic {N}, Story [epic].[story]).'
+reviewer: 'QA Engineer'
+head: '26e783e40f2cb1ba3af38bc7c0d228b12a5d9162'
+updated: '2026-10-16T17:40:34Z'
+
+top_issues:
+  - id: 'TASK-207-BUG-6'
+    severity: high
+    file: 'shared/resources/qa-findings-ingester-prompt.md'
+    finding: 'The story-mode globs now name <P>, <E>, <S>, but qa-findings-ingester-prompt.md:198 and skills/qa-fix/SKILL.md:376 still substitute <epic> and <story>; the globs match nothing (CR-1).'
+    suggested_action: 'Rename both substitution lists; find every other renamed placeholder whose binding list lives elsewhere.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-207-BUG-3'
+    severity: medium
+    file: 'tests/doc-id-chokepoint.test.js'
+    finding: 'Reopened (CR-2): §5 sees only lowercase story./epic./epic/ heads, so EPIC-[N]-ROADMAP.md, the milestone Epic {N} — {title} and Story [epic].[story] survive (prd-structure-guide, epic-template, sync-github-epic, create-epic, qa-story). CR-3 (sync-github-epic:17) is one of them.'
+    suggested_action: 'Extend the allow-list to EPIC- / Epic / [Epic / Story heads with hit and miss rows; sweep what it reports.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-207-CR3-4'
+    severity: low
+    file: 'tests/doc-id-chokepoint.test.js'
+    finding: 'The allow-list checks only the first placeholder, so story.{P}.{S} (a dropped level) passes.'
+    suggested_action: 'Count placeholder segments after a PRD head (3 for story., 2 for epic.).'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-207-CR3-5'
+    severity: low
+    file: '.agents/scripts/backfill-story-issues.sh'
+    finding: 'A missing jq makes every story read as not a story document, the same message a real epic gets.'
+    suggested_action: 'Take kind/artifact/label from the node call that already parses the name, or check for jq up front.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 19
+  phases_verified: 5/5
+  ci: 'fast gate exit 0 on 26e783e4 (.agents/skills moved aside); PR checks not read'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4]
+    phases_with_issues: [2, 3]
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_reopened: 1
+  bugs_new: 1
+  verification_method: 'scoped review of the 17 files cycle 2 changed; tokenizer line alignment and harness assertions checked by the reviewer; chokepoint 12/12'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'No boundary changed since gate 1; relatedDocInfo run record (task.207.qa.1.security.run.json, totals.executed 26) stands.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: FAIL
+    notes: 'BUG-6: /qa-fix story-mode ingestion silently matches nothing.'
+  maintainability:
+    status: CONCERNS
+    notes: 'BUG-3 reopened (uppercase/title spellings).'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-207-BUG-6 (HIGH) and BUG-3 (reopened).'
+      refs: ['shared/resources/qa-findings-ingester-prompt.md', 'skills/qa-fix/SKILL.md', 'tests/doc-id-chokepoint.test.js']
+  future:
+    - action: 'backfill-story-issues.sh builds MILESTONE by hand; doc-id.js epic-meta --json .milestone is the single definition (CR3-6, cleanup).'
+      refs: ['.agents/scripts/backfill-story-issues.sh']
+    - action: 'review-pipeline-step-0a cross-block reads (gate 2 future item), doc-id.parse hardening (gate 1), create-parallel-stories scheme (Deferred Work).'
+      refs: ['shared/resources/review-pipeline-step-0a-branch-setup.md', 'shared/resources/doc-id.js', 'skills/create-parallel-stories/SKILL.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['TASK-207-BUG-6 and BUG-3 fixed']

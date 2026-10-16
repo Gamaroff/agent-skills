@@ -372,8 +372,8 @@ Delegate entirely to `/sync-jira-epic` — it is idempotent (create-or-update), 
 Invoke the `ensure-epic-github-issue` sub-routine with the epic file path. On return, `EPIC_ISSUE_NUM` is set (integer) or empty. The sub-routine is idempotent and handles everything inline:
 
 - skips creation and returns the existing number if `github_issue` is already set in frontmatter;
-- auto-creates the milestone (`Epic {N} — {epic_title}`, or the frontmatter `milestone:` value) if absent;
-- creates the issue (`[Epic {N}] {epic_title}`, label `epic`, milestone attached);
+- auto-creates the milestone (`Epic {P}.{E} — {epic_title}`, or the frontmatter `milestone:` value) if absent;
+- creates the issue (`[Epic {P}.{E}] {epic_title}`, label `epic`, milestone attached);
 - adds it to the GitHub Project board;
 - writes `github_issue` back to the epic frontmatter.
 

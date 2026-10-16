@@ -543,17 +543,17 @@ unaffected and listed as such.
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.207.qa.2.doc-numbering-enforcement-and-sweep.md](./task.207.qa.2.doc-numbering-enforcement-and-sweep.md)
-- **Gate File**: [task.207.gate.2.doc-numbering-enforcement-and-sweep.yml](./task.207.gate.2.doc-numbering-enforcement-and-sweep.yml)
+- **Full Report**: [task.207.qa.3.doc-numbering-enforcement-and-sweep.md](./task.207.qa.3.doc-numbering-enforcement-and-sweep.md)
+- **Gate File**: [task.207.gate.3.doc-numbering-enforcement-and-sweep.yml](./task.207.gate.3.doc-numbering-enforcement-and-sweep.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 19
 - **Phases Verified**: 5/5
 - **Critical Issues**: 1
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: FAIL
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: CONCERNS
 
 ### Key Findings
-Cycle 2 refute pass: BUG-1 and BUG-4 fixed and closed. BUG-3 reopened at HIGH (the §5 prose guard misses angle-bracket and story.{N}.{M} placeholders still used in nine files), BUG-2 reopened (a /* inside a regex literal still opens a phantom block comment), BUG-5 new (backfill title drops the sub-story letter).
+Cycle 3: BUG-2 and BUG-5 closed. BUG-6 (HIGH): the ingester prompt's story globs were renamed to <P>.<E>.<S> but its callers still bind <epic>/<story>. BUG-3 reopened: §5 misses uppercase and title spellings.
 
 ## Change Log
 
@@ -569,6 +569,8 @@ Cycle 2 refute pass: BUG-1 and BUG-4 fixed and closed. BUG-3 reopened at HIGH (t
 | 2026-10-16 |         | QA findings fixed — BUG-1..4, CR-5, CR-6; §5 placeholder guard added; 1 iteration | qa-fix |
 | 2026-10-16 |         | QA gate FAIL (60/100) — 1 high, 2 medium, 1 low; BUG-2, BUG-3 reopened (task.207.qa.2) | qa-task |
 | 2026-10-16 |         | QA findings fixed — BUG-2, BUG-3 by structural moves (shared JS tokenizer; §5 allow-list), BUG-5, CR2-6; 1 iteration | qa-fix |
+| 2026-10-16 |         | QA gate FAIL (60/100) — 1 high, 1 medium, 2 low; BUG-3 reopened, BUG-6 new (task.207.qa.3) | qa-task |
+| 2026-10-16 |         | QA findings fixed — BUG-6 (ingester placeholder contract + test), BUG-3 title spellings, CR3-5; 1 iteration | qa-fix |
 
 <!-- change-log-end -->
 

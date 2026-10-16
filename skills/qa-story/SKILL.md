@@ -1573,7 +1573,7 @@ stories/
 **QA Report Structure:**
 
 ````markdown
-# QA Report: Story [epic].[story] - [Story Title]
+# QA Report: Story [P].[E].[S] - [Story Title]
 
 **Epic**: [Epic Name]
 **Story**: [epic].[story] - [Story Title]

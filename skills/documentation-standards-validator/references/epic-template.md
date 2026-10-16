@@ -377,12 +377,12 @@ Re-render
 
 ### Blocks (What this epic enables)
 
-- [ ] **Epic [N+1]**: [Epic Name]
-  - **Reason**: [Why Epic [N+1] depends on this]
+- [ ] **Epic [P].[E+1]**: [Epic Name]
+  - **Reason**: [Why Epic [P].[E+1] depends on this]
   - **Specific requirement**: [What specifically is needed]
 
-- [ ] **Epic [N+2]**: [Epic Name]
-  - **Reason**: [Why Epic [N+2] depends on this]
+- [ ] **Epic [P].[E+2]**: [Epic Name]
+  - **Reason**: [Why Epic [P].[E+2] depends on this]
   - **Specific requirement**: [What specifically is needed]
 
 ### Parallel Work Opportunities
@@ -646,7 +646,7 @@ Epic [P.E] is complete when all criteria below are met:
 
 ### Epic Roadmap
 
-- [Epic [N] Roadmap](./EPIC-[N]-ROADMAP.md) - Week-by-week execution plan
+- [Epic [P].[E] Roadmap](./EPIC-[P].[E]-ROADMAP.md) - Week-by-week execution plan
 
 ### Related Documentation
 

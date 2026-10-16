@@ -49,7 +49,7 @@ docs/prd/[domain]/[feature]/
         │
         ├── epic.[P].[E].[name]/                  # Epic subdirectory
         │   ├── epic.[P].[E].[name].md            # Epic file
-        │   ├── EPIC-[N]-ROADMAP.md           # Week-by-week plan (optional)
+        │   ├── EPIC-[P].[E]-ROADMAP.md           # Week-by-week plan (optional)
         │   └── stories/                      # Stories for this epic
         │       ├── story.[P].[E].1.[name].md
         │       ├── story.[P].[E].1.[name].completion.md    # Completion doc
@@ -176,7 +176,7 @@ Each epic has its own subdirectory containing:
 
 1. **epic.[P].[E].[name]/** - Epic subdirectory
    - **epic.[P].[E].[name].md** - Epic file with YAML frontmatter
-   - **EPIC-[N]-ROADMAP.md** - Week-by-week execution plan (optional for complex epics)
+   - **EPIC-[P].[E]-ROADMAP.md** - Week-by-week execution plan (optional for complex epics)
    - **stories/** - Subdirectory for all stories in this epic
 
 2. **index.md** - Epic roadmap and overview (at `epics/` level)
@@ -212,7 +212,7 @@ Authoritative copy: `references/epic-template.md` (byte-identical to `docs/templ
 docs/prd/{domain}/{feature}/epics/
 ├── epic.[P].[E].[name]/
 │   ├── epic.[P].[E].[name].md       ← Epic file here
-│   ├── EPIC-[N]-ROADMAP.md      ← Roadmap here (optional)
+│   ├── EPIC-[P].[E]-ROADMAP.md      ← Roadmap here (optional)
 │   └── stories/                 ← Stories here
 │       └── story.[P].[E].1.[name].md
 ```
@@ -285,7 +285,7 @@ docs/prd/{domain}/{feature}/epics/epic.[P].[E].[name]/stories/
 
 ### Epic Roadmaps
 
-**Format**: `EPIC-[N]-ROADMAP.md`
+**Format**: `EPIC-[P].[E]-ROADMAP.md`
 
 **Examples**:
 
@@ -393,7 +393,7 @@ docs/prd/{domain}/{feature}/epics/epic.[P].[E].[name]/stories/
 
 **Create**:
 
-- [ ] `epics/EPIC-[N]-ROADMAP.md` - Week-by-week plan for complex epics
+- [ ] `epics/EPIC-[P].[E]-ROADMAP.md` - Week-by-week plan for complex epics
 
 **Why**: Provide detailed execution guidance for critical epics
 
@@ -539,7 +539,7 @@ Is this a new epic?
     └─ No → Update existing epic
 
 Is this epic particularly complex (>2 weeks, >5 stories)?
-    ├─ Yes → Create EPIC-[N]-ROADMAP.md
+    ├─ Yes → Create EPIC-[P].[E]-ROADMAP.md
     └─ No → Epic document is sufficient
 
 Is this a new story?
@@ -658,7 +658,7 @@ docs/prd/ui-domain/example-component/
 - [ ] Write stories for Epic 1
 - [ ] Write stories for Epic 2+
 - [ ] Create EPIC-[P].[E]-STORIES-INDEX.md for large epics
-- [ ] Create EPIC-[N]-ROADMAP.md for complex epics
+- [ ] Create EPIC-[P].[E]-ROADMAP.md for complex epics
 
 ### Development Phase
 

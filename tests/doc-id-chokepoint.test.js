@@ -495,12 +495,16 @@ test("§4 the review-epic blocks refuse a name doc-id cannot read", () => {
 // references the grep never searched; one of them was an executable glob that
 // numbered every epic review `review.1`. This is that population as a test.
 //
-// (a) KEY: an old-scheme placeholder — a kind word, a dot, and ONE bracketed or
-//     braced epic/story number that is not `{P}`/`[P]`. The new scheme always
-//     leads with P, so `story.{P}.{E}.{S}` and `{prd}.{epic}.{story}` never match.
+// (a) KEY, two shapes. A filename head — `story.`, `epic.`, `epic/` — whose FIRST
+//     placeholder does not name the PRD (an allow-list, below). And a title head —
+//     `EPIC-`, `Epic `, `[Epic `, `Story `, `[Story ` — whose first placeholder is a
+//     single-level number (`N`, `N+1`, `E`, `epic`, `epicNum`, `epic_number`); a title
+//     head also takes non-id placeholders (`Story [prev]`, `epic <path>`), so it cannot
+//     demand a PRD name the way a filename head can (QA cycle 3, CR-2).
 // (b) MISSES, accepted and named: a literal flat id (`story.4.2.x`) — those are
 //     negative examples as often as mistakes, and the corpus test catches a flat
-//     DOCUMENT; and a placeholder with a novel spelling outside the key.
+//     DOCUMENT; a filename head that names the PRD but drops a level
+//     (`story.{P}.{S}`, QA cycle 3 CR3-4); and a title head with a novel number name.
 // (c) POPULATION: every tracked Markdown file under skills/ (generated references
 //     dropped by their AUTO-GENERATED marker), shared/resources/, docs/ and the
 //     root, minus the historical records below.
@@ -515,8 +519,12 @@ const PLACEHOLDER_HEAD =
 const PRD_PLACEHOLDER =
   /^(?:P|p|PRD|prd|prdNum|prd_num|prd_number|prd-number|prd-num)$/;
 // The one restatement with no kind word in front: a bare two-level `{epic}.{story}` id.
-const BARE_TWO_LEVEL =
-  /(?<!\{prd\}\.)(?<!\{P\}\.)(?<![\w.])\{epic\}\.\{story\}/;
+// `(?<![\w.])` alone: any `{epic}` after a dot is already a later segment of a longer id.
+const BARE_TWO_LEVEL = /(?<![\w.])\{epic\}\.\{story\}/;
+const TITLE_HEAD =
+  /(?:EPIC-|\bEpic |\[Epic |\bStory |\[Story )(?:\{\{?([^{}.]+)\}|\[([^\[\].]+)\]|<([^<>.]+)>)/g;
+const FLAT_NUMBER =
+  /^(?:[NnEe]|[Nn]\s*[+-]\s*\d+|epic|Epic|epicNum|epic_num|epic_number|story|storyNum)$/;
 
 /** The old-scheme placeholder heads on one line, or [] when it states none. */
 function oldPlaceholders(line) {
@@ -524,6 +532,10 @@ function oldPlaceholders(line) {
   for (const m of line.matchAll(PLACEHOLDER_HEAD)) {
     const name = m[1] ?? m[2] ?? m[3];
     if (!PRD_PLACEHOLDER.test(name.trim())) out.push(m[0]);
+  }
+  for (const m of line.matchAll(TITLE_HEAD)) {
+    const name = m[1] ?? m[2] ?? m[3];
+    if (FLAT_NUMBER.test(name.trim())) out.push(m[0]);
   }
   if (BARE_TWO_LEVEL.test(line)) out.push("{epic}.{story}");
   return out;
@@ -618,6 +630,12 @@ test("§5 the placeholder check refuses every flat spelling and spares the new o
     "epic.[N].[name]/",
     "epic/{n}.{slug}",
     "Source ID: `{epic}.{story}`",
+    "EPIC-[N]-ROADMAP.md",
+    "milestone (`Epic {N} — {title}`)",
+    "[Epic [N+1]: [Name]](../x.md)",
+    "Story [epic].[story]",
+    "[Story {{epic_number}}.{{story_number}}]",
+    "Epic {epicNum}",
   ])
     assert.ok(oldPlaceholders(hit).length > 0, `expected a hit: ${hit}`);
   for (const miss of [
@@ -631,6 +649,12 @@ test("§5 the placeholder check refuses every flat spelling and spares the new o
     "epic/{P}.{E}.{slug}",
     "story_id: '{prd}.{epic}.{story}'",
     "`story.4.2.checkout.md` — a literal negative example",
+    "EPIC-[P].[E]-STORIES-INDEX.md",
+    "milestone (`Epic {P.E} — {title}`)",
+    "[Story [P].[E].1]",
+    "Story [prev] links back",
+    "pass the epic <path>",
+    "Epic {any id} is accepted",
   ])
     assert.deepEqual(oldPlaceholders(miss), [], `expected no hit: ${miss}`);
 });

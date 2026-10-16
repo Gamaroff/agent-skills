@@ -189,10 +189,10 @@ Epic 4: Reporting & Analytics
 **Structure:**
 
 ```
-[Epic {{epic_number}}] {{epic_title}}
+[Epic {{prd_number}}.{{epic_number}}] {{epic_title}}
   Epic Goal: 2-3 sentences describing objective and value
 
-  [Story {{epic_number}}.{{story_number}}] {{story_title}}
+  [Story {{prd_number}}.{{epic_number}}.{{story_number}}] {{story_title}}
     As a {{user_type}},
     I want {{action}},
     so that {{benefit}}.

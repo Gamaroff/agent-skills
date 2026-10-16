@@ -75,6 +75,20 @@ Rewrite the glob and template to `epic.{P}.{E}`; sweep the other `epic.[N]` / `{
 
 **Testing**: `command node --test tests/doc-id-chokepoint.test.js` 12/12. Mutation: allow-list accepts any head → §5 control red; restore `story.<epic>.<story>` in the ingester prompt → §5 red.
 
+### Iteration 3
+
+#### Fix Implementation (In Progress → Ready for QA)
+
+**Date**: 2026-10-16
+
+**Root Cause**: §5's key covered filename heads only; uppercase and title spellings (`EPIC-[N]`, `Epic {N}`, `[Epic [N+1]]`, `Story [epic].[story]`, `{{epic_number}}`) were outside it.
+
+**Fix Description**: §5 adds a title-head check: after `EPIC-`, `Epic `, `[Epic `, `Story `, `[Story `, a single-level number name (`N`, `N±k`, `E`, `epic`, `epicNum`, `epic_number`) is refused; non-id placeholders (`Story [prev]`, `epic <path>`) are not judged. It surfaced 32 lines in 16 files, all rewritten (epic/story/task templates, prd-structure-guide roadmap names, create-epic and sync-github-epic milestone, create-prd, create-bug-report, prd-template, qa-story, review-epic, review-story). Header comment rewritten for the allow-list (CR-8); dead lookbehinds dropped (CR-7). Dropped-level check (CR3-4) deferred — it would refuse legitimate truncations such as `story.{P}.{E}.*`.
+
+**Files Modified**: tests/doc-id-chokepoint.test.js and 16 prose files
+
+**Testing**: `tests/doc-id-chokepoint.test.js` 12/12. Mutation: restore `Epic {N} — {title}` in sync-github-epic → §5 red.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -85,3 +99,6 @@ Rewrite the glob and template to `epic.{P}.{E}`; sweep the other `epic.[N]` / `{
 | 2026-10-16 | Reopened | qa-task | Not fixed — same mechanism survives (task.207.qa.2 CR-1) |
 | 2026-10-16 | In Progress | qa-fix | Fix cycle 2 started |
 | 2026-10-16 | Ready for QA | qa-fix | Fixed in QA fix cycle 2 |
+| 2026-10-16 | Reopened | qa-task | Not fixed — §5 misses uppercase and title spellings (task.207.qa.3 CR-2) |
+| 2026-10-16 | In Progress | qa-fix | Fix cycle 3 started |
+| 2026-10-16 | Ready for QA | qa-fix | Fixed in QA fix cycle 3 |

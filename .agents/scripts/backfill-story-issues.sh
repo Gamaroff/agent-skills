@@ -6,6 +6,10 @@
 # Usage: backfill-story-issues.sh <story-file> [<story-file> ...]
 set -euo pipefail
 
+# jq decides which files are story documents below; without it every story would read as
+# "not a story document" — the same message a real epic gets (task.207 QA cycle 3, CR3-5).
+command -v jq >/dev/null || { echo "backfill-story-issues: jq is required" >&2; exit 1; }
+
 OWNER=Gamaroff
 REPO_NAME=agent-skills
 REPO="${OWNER}/${REPO_NAME}"

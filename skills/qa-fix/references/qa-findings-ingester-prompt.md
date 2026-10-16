@@ -196,5 +196,5 @@ Dispatch Explore subagent:
   - `<dir>`: absolute path to story/task directory
   - `<mode>`: `story` or `task`
   - `<pr_review>`: the `report` path from `pr-review-current.js --dir <dir> --json`, or `none` when its `reason` is `superseded` or `none`
-  - `<epic>`, `<story>` (story mode) OR `<id>` (task mode): from current context
+  - `<P>`, `<E>`, `<S>` (story mode — the story id's PRD, epic and story numbers, as `doc-id.js parse` reads them; a sub-story's `<S>` carries its letter, e.g. `3A`) OR `<id>` (task mode): from current context
 ```

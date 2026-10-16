@@ -753,7 +753,7 @@ PRDs grow over time — it is expected and normal to add new epics as scope evol
   append-only, newest last, four columns. Leave `Version` blank for this machine-written row:
 
   ```markdown
-  | {today} |  | Epic {N} appended | create-prd |
+  | {today} |  | Epic {P}.{E} appended | create-prd |
   ```
 
   PRDs keep the log nested as `### Change Log` under §1 — do not promote it to `## `.
