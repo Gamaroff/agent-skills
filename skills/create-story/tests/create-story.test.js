@@ -19,14 +19,22 @@ const TEMPLATE_PATH = path.join(
 );
 
 // ===========================================================================
-// validateStoryFilename
+// validateStoryFilename — the id is doc-id's story.{P}.{E}.{S}{sub?} (task 206)
 // ===========================================================================
-test("validateStoryFilename — happy path", () => {
-  const r = lib.validateStoryFilename("story.178.8.example-feature.md");
+test("validateStoryFilename — happy path reads P, E and S", () => {
+  const r = lib.validateStoryFilename("story.1.178.8.example-feature.md");
   assert.equal(r.ok, true);
+  assert.equal(r.prd, 1);
   assert.equal(r.epic, 178);
   assert.equal(r.story, 8);
+  assert.equal(r.sub, null);
   assert.equal(r.name, "example-feature");
+});
+
+test("validateStoryFilename — a sub-story carries its letter on S", () => {
+  const r = lib.validateStoryFilename("story.1.2.3A.core-ui.md");
+  assert.equal(r.ok, true);
+  assert.deepEqual([r.prd, r.epic, r.story, r.sub], [1, 2, 3, "A"]);
 });
 
 test("validateStoryFilename — rejects underscores", () => {
@@ -36,82 +44,103 @@ test("validateStoryFilename — rejects underscores", () => {
 });
 
 test("validateStoryFilename — rejects camelCase descriptive name", () => {
-  const r = lib.validateStoryFilename("story.1.2.exampleFeature.md");
+  const r = lib.validateStoryFilename("story.1.2.3.exampleFeature.md");
   assert.equal(r.ok, false);
   assert.match(r.reason, /uppercase/i);
 });
 
 test("validateStoryFilename — rejects leading-zero ids", () => {
-  assert.equal(lib.validateStoryFilename("story.01.2.foo.md").ok, false);
-  assert.equal(lib.validateStoryFilename("story.1.02.foo.md").ok, false);
+  assert.equal(lib.validateStoryFilename("story.01.2.3.foo.md").ok, false);
+  assert.equal(lib.validateStoryFilename("story.1.02.3.foo.md").ok, false);
+  assert.equal(lib.validateStoryFilename("story.1.2.03.foo.md").ok, false);
 });
 
-test("validateStoryFilename — rejects missing parts", () => {
-  assert.equal(lib.validateStoryFilename("story.1.foo.md").ok, false);
-  assert.equal(lib.validateStoryFilename("story.1.2.md").ok, false);
-  assert.equal(lib.validateStoryFilename("story.1.2.foo").ok, false);
+test("validateStoryFilename — a legacy story.{E}.{S} name is refused, naming the migration", () => {
+  const r = lib.validateStoryFilename("story.178.8.example-feature.md");
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /migrate-doc-numbering/);
+});
+
+test("validateStoryFilename — rejects missing parts and artifacts", () => {
+  assert.equal(lib.validateStoryFilename("story.1.2.foo.md").ok, false);
+  assert.equal(lib.validateStoryFilename("story.1.2.3.md").ok, false);
+  assert.equal(lib.validateStoryFilename("story.1.2.3.foo").ok, false);
+  assert.equal(lib.validateStoryFilename("story.1.2.3.qa.1.foo.md").ok, false);
 });
 
 test("validateStoryPlanFilename — happy path", () => {
   const r = lib.validateStoryPlanFilename(
-    "story.178.8.plan.example-feature.md",
+    "story.1.178.8.plan.example-feature.md",
   );
   assert.equal(r.ok, true);
-  assert.equal(r.epic, 178);
-  assert.equal(r.story, 8);
+  assert.deepEqual([r.prd, r.epic, r.story], [1, 178, 8]);
   assert.equal(r.name, "example-feature");
 });
 
 test("validateStoryPlanFilename — rejects missing 'plan' marker", () => {
   assert.equal(
-    lib.validateStoryPlanFilename("story.1.2.example-feature.md").ok,
+    lib.validateStoryPlanFilename("story.1.2.3.example-feature.md").ok,
     false,
   );
 });
 
 // ===========================================================================
-// scanExistingStoryIds / nextStoryId / assertUniqueStoryId
+// scanExistingStoryIds / nextStoryId / assertUniqueStoryId — keyed on (P, E)
 // ===========================================================================
-test("scanExistingStoryIds — scoped to given epic", () => {
+test("scanExistingStoryIds — scoped to the epic (P, E), never E alone or a prefix", () => {
   const ids = lib.scanExistingStoryIds(
     [
-      "story.1.1.foo.md",
-      "story.1.2.bar", // directory
-      "story.2.1.baz.md", // different epic — ignored
-      "story.1.5.qux.md",
+      "story.1.2.1.foo.md",
+      "story.1.2.2.bar", // directory
+      "story.2.2.7.baz.md", // epic 2 of ANOTHER PRD — ignored
+      "story.1.20.9.qux.md", // epic 1.20 — the old `^story\\.2\\.` prefix shape would read it
+      "story.1.2.30.quux.md", // story 30 of epic 1.2 — counted
+      "story.1.2.5.qa.1.x.md", // an artifact still names story 5 of epic 1.2
       "README.md",
     ],
     1,
+    2,
   );
   assert.deepEqual(
     [...ids].sort((a, b) => a - b),
-    [1, 2, 5],
+    [1, 2, 5, 30],
   );
 });
 
-test("scanExistingStoryIds — rejects bad epicNum", () => {
-  assert.throws(() => lib.scanExistingStoryIds([], 0), /positive integer/);
-  assert.throws(() => lib.scanExistingStoryIds([], "1"), /positive integer/);
+test("scanExistingStoryIds — rejects a bad prd or epic number", () => {
+  assert.throws(() => lib.scanExistingStoryIds([], 0, 1), /positive integer/);
+  assert.throws(() => lib.scanExistingStoryIds([], 1, "1"), /positive integer/);
+  assert.throws(() => lib.scanExistingStoryIds([], 1), /positive integer/);
 });
 
-test("nextStoryId — fills lowest gap within epic", () => {
-  assert.equal(lib.nextStoryId([], 1), 1);
-  assert.equal(lib.nextStoryId(["story.1.1.a.md"], 1), 2);
-  assert.equal(lib.nextStoryId(["story.1.1.a.md", "story.1.3.c.md"], 1), 2);
-  // Cross-epic isolation: story.2.1 doesn't fill story.1's gap.
-  assert.equal(lib.nextStoryId(["story.2.1.a.md"], 1), 1);
-});
-
-test("assertUniqueStoryId — HALTs on collision", () => {
-  assert.throws(
-    () => lib.assertUniqueStoryId(1, 2, ["story.1.1.a.md", "story.1.2.b.md"]),
-    /HALT.*story\.1\.2 already exists/,
-  );
-});
-
-test("assertUniqueStoryId — passes when free across epics", () => {
+test("nextStoryId — doc-id's allocator: highest + 1 within (P, E), a gap is not refilled", () => {
+  assert.equal(lib.nextStoryId([], 1, 1), 1);
+  assert.equal(lib.nextStoryId(["story.1.1.1.a.md"], 1, 1), 2);
   assert.equal(
-    lib.assertUniqueStoryId(2, 1, ["story.1.1.a.md", "story.1.2.b.md"]),
+    lib.nextStoryId(["story.1.1.1.a.md", "story.1.1.3.c.md"], 1, 1),
+    4,
+  );
+  // Isolation: epic 1 of PRD 2, and epic 1.10, do not move epic 1.1's counter.
+  assert.equal(
+    lib.nextStoryId(["story.2.1.4.a.md", "story.1.10.6.b.md"], 1, 1),
+    1,
+  );
+});
+
+test("assertUniqueStoryId — HALTs on an existing (P, E, S)", () => {
+  assert.throws(
+    () =>
+      lib.assertUniqueStoryId(1, 2, 3, [
+        "story.1.2.1.a.md",
+        "story.1.2.3.b.md",
+      ]),
+    /HALT.*story\.1\.2\.3 already exists/,
+  );
+});
+
+test("assertUniqueStoryId — passes when the number is free in this (P, E)", () => {
+  assert.equal(
+    lib.assertUniqueStoryId(2, 2, 3, ["story.1.2.3.a.md", "story.1.2.1.b.md"]),
     true,
   );
 });

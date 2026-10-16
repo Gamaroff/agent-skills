@@ -564,8 +564,8 @@ function registryNumbers(text) {
  *                  `entries` (PRD directory names) only guard against a stale counter.
  *   epic / story — highest + 1 over `entries` (directory basenames that parse as
  *                  documents of that kind); 1 when there are none. A gap left by a
- *                  deleted epic or story is never refilled — deliberately NOT the
- *                  gap-filling rule of create-story's nextStoryId. These numbers have
+ *                  deleted epic or story is never refilled. create-story's
+ *                  nextStoryId delegates here (task 206), so there is one rule. These numbers have
  *                  no counter, so deleting the HIGHEST-numbered one does free its
  *                  number again (QA cycle 1, CR-1).
  *

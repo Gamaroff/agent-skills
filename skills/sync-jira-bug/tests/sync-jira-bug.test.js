@@ -32,22 +32,41 @@ function write(dir, name, body) {
 // ===========================================================================
 
 test("a story bug is recognised from its filename", () => {
-  const m = bug.resolveBugMode("/x/docs/prd/a/story.7.4.bug.4.tap-target.md");
+  const m = bug.resolveBugMode("/x/docs/prd/a/story.1.7.4.bug.4.tap-target.md");
   assert.equal(m.mode, "story");
-  assert.equal(m.bugId, "story.7.4.bug.4");
+  assert.equal(m.bugId, "story.1.7.4.bug.4");
   assert.equal(m.parentKind, "story");
-  assert.equal(m.parentId, "7.4");
+  assert.equal(m.parentId, "1.7.4");
   assert.equal(m.bugNumber, 4);
-  assert.equal(m.bugStem, "story.7.4.bug.4.tap-target");
+  assert.equal(m.bugStem, "story.1.7.4.bug.4.tap-target");
 });
 
 test("a three-part story id parses without swallowing the bug number", () => {
-  // The id capture is lazy up to `.bug.`; a greedy one would read "8.5.3.bug.2"
-  // as the id and lose the bug number entirely.
+  // The story id is doc-id's: `story.8.5.3` is P=8 E=5 S=3, and the bug number
+  // is the artifact's seq, never part of the id.
   const m = bug.resolveBugMode("/x/story.8.5.3.bug.2.sync-fails.md");
   assert.equal(m.parentId, "8.5.3");
   assert.equal(m.bugNumber, 2);
   assert.equal(m.bugId, "story.8.5.3.bug.2");
+});
+
+test("a sub-story bug resolves to its sub-story parent, and a legacy two-number story bug is not guessed at (task 206)", () => {
+  const m = bug.resolveBugMode("/x/story.1.2.3A.bug.1.x.md");
+  assert.equal(m.mode, "story");
+  assert.equal(m.parentId, "1.2.3A");
+  assert.equal(m.bugId, "story.1.2.3A.bug.1");
+  assert.equal(m.bugNumber, 1);
+  assert.deepEqual(
+    bug.resolveBugMode("/x/story.1.2.3A.bug.1.x.md", {
+      related: "story 1.2.3A",
+    }).warnings,
+    [],
+    "a correct claim about a sub-story is not a mismatch",
+  );
+  // A legacy name: doc-id cannot read it, so no parent is invented for it.
+  const legacy = bug.resolveBugMode("/x/story.7.4.bug.4.tap-target.md");
+  assert.equal(legacy.mode, "unknown");
+  assert.equal(legacy.parentId, null);
 });
 
 test("a task bug is recognised from its filename", () => {
@@ -80,25 +99,25 @@ test("a `related:` that disagrees with the path warns but does not win", () => {
   // A wrong parent link is worse than a missing one, so the structurally
   // guaranteed signal (the path) beats the free-text one.
   const m = bug.resolveBugMode(
-    "/x/story.7.4.bug.4.tap-target.md",
-    { related: "story 9.1" },
+    "/x/story.1.7.4.bug.4.tap-target.md",
+    { related: "story 1.9.1" },
     "",
   );
-  assert.equal(m.parentId, "7.4", "the document's claim overruled the path");
+  assert.equal(m.parentId, "1.7.4", "the document's claim overruled the path");
   assert.equal(m.warnings.length, 1);
-  assert.match(m.warnings[0], /story 9\.1.*Path wins/s);
+  assert.match(m.warnings[0], /story 1\.9\.1.*Path wins/s);
 });
 
 test("a hand-added story_id is tolerated and corroborated", () => {
   const agree = bug.resolveBugMode(
-    "/x/story.7.4.bug.4.t.md",
-    { story_id: "7.4" },
+    "/x/story.1.7.4.bug.4.t.md",
+    { story_id: "1.7.4" },
     "",
   );
   assert.deepEqual(agree.warnings, []);
   const disagree = bug.resolveBugMode(
-    "/x/story.7.4.bug.4.t.md",
-    { story_id: "9.9" },
+    "/x/story.1.7.4.bug.4.t.md",
+    { story_id: "1.9.9" },
     "",
   );
   assert.equal(disagree.warnings.length, 1);
@@ -119,8 +138,8 @@ test("a general bug's `none — cross-cutting` related value raises no warning",
 
 const HEADER_BODY = `# Bug: Tap target too small
 
-**Bug ID**: story.7.4.bug.4
-**Related**: [story 7.4](./story.7.4.tap-targets.md)
+**Bug ID**: story.1.7.4.bug.4
+**Related**: [story 1.7.4](./story.1.7.4.tap-targets.md)
 **Status**: ✅ Closed
 **Priority**: High
 **Severity**: Major
@@ -134,7 +153,7 @@ Small.
 
 test("the bold-line header block is parsed", () => {
   const h = bug.parseBugHeaderBlock(HEADER_BODY);
-  assert.equal(h["Bug ID"], "story.7.4.bug.4");
+  assert.equal(h["Bug ID"], "story.1.7.4.bug.4");
   assert.equal(h.Priority, "High");
   assert.equal(h.Severity, "Major");
   assert.equal(h.Created, "2026-07-21");
@@ -458,8 +477,8 @@ test("every Source Documents entry carries a real ADF link mark", () => {
 
 test("the sync label is derived from the bug's own stem", () => {
   assert.equal(
-    bug.syncLabelFor("/x/docs/prd/a/story.7.4.bug.4.tap-target.md"),
-    "synced-from-story.7.4.bug.4.tap-target",
+    bug.syncLabelFor("/x/docs/prd/a/story.1.7.4.bug.4.tap-target.md"),
+    "synced-from-story.1.7.4.bug.4.tap-target",
   );
 });
 
@@ -469,13 +488,13 @@ test("sibling bugs in one directory get DIFFERENT sync labels", () => {
   // would make the idempotency search adopt the first card it found, so bug 2
   // would silently update bug 1's card.
   const dir = "/x/docs/prd/epic-7/";
-  const a = bug.syncLabelFor(`${dir}story.7.4.bug.1.first.md`);
-  const b = bug.syncLabelFor(`${dir}story.7.4.bug.2.second.md`);
+  const a = bug.syncLabelFor(`${dir}story.1.7.4.bug.1.first.md`);
+  const b = bug.syncLabelFor(`${dir}story.1.7.4.bug.2.second.md`);
   assert.notEqual(a, b);
 });
 
 test("a bug's sync label differs from its parent story's directory name", () => {
-  const label = bug.syncLabelFor("/x/docs/prd/epic-7/story.7.4.bug.1.a.md");
+  const label = bug.syncLabelFor("/x/docs/prd/epic-7/story.1.7.4.bug.1.a.md");
   assert.ok(!label.endsWith("epic-7"));
 });
 
@@ -486,10 +505,10 @@ test("a bug's sync label differs from its parent story's directory name", () => 
 test("the summary is wrapped in the bug id, idempotently", () => {
   const once = bug.normaliseBugSummary(
     "Tap target too small",
-    "story.7.4.bug.4",
+    "story.1.7.4.bug.4",
   );
-  assert.equal(once, "[story.7.4.bug.4] Tap target too small");
-  assert.equal(bug.normaliseBugSummary(once, "story.7.4.bug.4"), once);
+  assert.equal(once, "[story.1.7.4.bug.4] Tap target too small");
+  assert.equal(bug.normaliseBugSummary(once, "story.1.7.4.bug.4"), once);
 });
 
 test("a leading `Bug:` prefix is dropped rather than nested in the bracket", () => {
@@ -1089,21 +1108,21 @@ test("a task bug finds its parent task, not the task's QA report", () => {
 
 test("a story bug finds its parent story", () => {
   const dir = tmpdir();
-  write(dir, "story.7.4.tap-targets.md", "# Story\n");
-  write(dir, "story.7.4.bug.1.other.md", "# Other bug\n");
-  const file = write(dir, "story.7.4.bug.4.tap-target.md", "# Bug\n");
+  write(dir, "story.1.7.4.tap-targets.md", "# Story\n");
+  write(dir, "story.1.7.4.bug.1.other.md", "# Other bug\n");
+  const file = write(dir, "story.1.7.4.bug.4.tap-target.md", "# Bug\n");
 
   assert.equal(
-    path.basename(bug.findParentDoc(file, "story", "7.4")),
-    "story.7.4.tap-targets.md",
+    path.basename(bug.findParentDoc(file, "story", "1.7.4")),
+    "story.1.7.4.tap-targets.md",
   );
 });
 
 test("an unresolvable parent yields null rather than a plausible wrong file", () => {
   const dir = tmpdir();
   write(dir, "story.9.9.something-else.md", "# Other story\n");
-  const file = write(dir, "story.7.4.bug.4.tap-target.md", "# Bug\n");
-  assert.equal(bug.findParentDoc(file, "story", "7.4"), null);
+  const file = write(dir, "story.1.7.4.bug.4.tap-target.md", "# Bug\n");
+  assert.equal(bug.findParentDoc(file, "story", "1.7.4"), null);
 });
 
 test("related docs are the bug's own artifacts, not its parent's", () => {
