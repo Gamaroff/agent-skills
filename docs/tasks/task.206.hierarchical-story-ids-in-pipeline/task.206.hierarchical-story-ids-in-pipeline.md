@@ -5,18 +5,20 @@ type: task
 description: "Move every story-side reader and writer of story and epic identifiers (create-story, the Step 0 and 0a shell snippets, create-branch, session-handoff, qa-next, the tracker story syncs, select-next and the finalise artifact regex) off its own regex and onto the task.202 doc-id engine, so the pipeline runs end to end on story.{P}.{E}.{S} documents and feature/story.{P}.{E}.{S} / epic/{P}.{E} branches."
 tags: [doc-id, numbering, create-story, develop-story, create-branch, session-handoff, qa-next, develop-next, migration]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-13
 updated: 2026-10-16
 assignee:
 estimated_effort_hours: 16
 github_issue: 649
+completed_date: 2026-10-16
+pr_number: 677
 ---
 
 # Technical Task: Hierarchical story ids in the pipeline
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.206.review.1.hierarchical-story-ids-in-pipeline.md` implemented 2026-10-16
 
@@ -598,9 +600,31 @@ every new executable block is mutation-proved (implementation report, Decisions 
 ### Key Findings
 Cycle 2's fixes are verified: bug.5 is closed, and test gaps QA2-1 and QA2-2 are closed, each proven by mutation. There is no high-confidence finding. Three low bugs (CR-1 to CR-3) and two cleanups are advisory and routed to follow-up.
 
-## Change Log
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.206.qa.3.hierarchical-story-ids-in-pipeline.md`
+**Gate File**: `task.206.gate.3.hierarchical-story-ids-in-pipeline.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (3 QA cycles; bug.1–5 closed)
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 16/16 met. AC9 (npm test wall time) measured +1.7% on the PR head against base; AC10 scenario count 44 → 44; AC11 regex sweep clean, with the repository-wide guard assigned to task.207
+✅ **Tests & PR Review:** PR #677; CI green over 5 checks at `acf2e2e1`; Step 5c review `task.206.pr-review.1` (CONCERNS, PC-1 fixed, PC-2/PC-3 low)
+✅ **Documentation:** CHANGELOG [Unreleased] entry with the four breaking changes; `docs/reference/configuration.md` documents `{p}`
+✅ **Security Review:** PASS — 20 boundary probes executed, 0 reproduced
+⚠️ **Compliance Review:** Not applicable (internal id-parsing refactor)
+
+**Detailed Verification Log:** See `task.206.dod.1.hierarchical-story-ids-in-pipeline.md` for complete verification evidence and timestamps.
+
+**Task marked as ACCEPTED on:** 2026-10-16
 
 <!-- change-log-start -->
+## Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
@@ -613,7 +637,7 @@ Cycle 2's fixes are verified: bug.5 is closed, and test gaps QA2-1 and QA2-2 are
 | 2026-10-16 |  | QA gate FAIL (80/100) — 1 high (0a.3 CURRENT_BRANCH), 2 low test gaps; bugs 1–4 closed | qa-task |
 | 2026-10-16 |  | QA findings fixed — CR2-1 (0a.3 binds CURRENT_BRANCH), QA2-1/QA2-2 test gaps, advisory CR2-4..7, 1 iteration | qa-fix |
 | 2026-10-16 |  | QA gate PASS (100/100) — 0 gated; bug.5 closed; 3 low + 2 cleanups advisory | qa-task |
-
+| 2026-10-16 | 1.2 | DoD passed — accepted (PR #677) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
