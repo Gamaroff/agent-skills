@@ -7,6 +7,6 @@ description: Stub parent epic for the develop-story eval fixtures (task 206).
 status: in-progress
 ---
 
-# Epic 5: Example
+# Epic 1.1: Example
 
 Stub parent document for `story.1.1.1.example`.

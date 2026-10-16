@@ -1,15 +1,15 @@
 ---
-id: story.178.8.example-feature
+id: story.1.178.8.example-feature
 status: draft
 jira_key: null
 jira_url: null
-epic: epic.178.feature-ui
+epic: epic.1.178.feature-ui
 acceptance_criteria:
   - Component renders given valid props
   - Failure path emits typed error
 ---
 
-# Story 178.8 — Example feature
+# Story 1.178.8 — Example feature
 
 ## Status
 

@@ -5,5 +5,5 @@ tasks:
 stories:
   - id: story.178.7.previous-feature
     status: done
-  - id: story.178.8.example-feature
+  - id: story.1.178.8.example-feature
     status: ready-for-dev

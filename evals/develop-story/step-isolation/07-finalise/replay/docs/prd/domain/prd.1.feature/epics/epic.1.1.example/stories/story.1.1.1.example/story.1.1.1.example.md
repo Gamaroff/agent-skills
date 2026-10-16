@@ -6,7 +6,7 @@ status: accepted
 epic: epic.1.1.example
 ---
 
-# Story 5.1: Example story for eval
+# Story 1.1.1: Example story for eval
 
 **Status:** Accepted
 
