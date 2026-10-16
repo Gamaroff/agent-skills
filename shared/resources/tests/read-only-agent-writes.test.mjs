@@ -529,3 +529,109 @@ test("an engine run past the overall bound is killed and recorded as a refusal, 
   assert.match(out.refusals[0].reason, /timed out/);
   assert.equal(out.probes_executed, 0);
 });
+
+// --- task.189 QA cycle 3 regressions -------------------------------------------------------------
+
+test("Step 3b.1: a run killed mid-write leaves no result — never a partial or a stale one (QA3-1)", () => {
+  const { work } = fixtureRepo();
+  // A stand-in runner that prints half a JSON object and dies the way a killed process does.
+  write(
+    work,
+    "killed-runner.mjs",
+    'process.stdout.write(\'{"reason": "ran", "probes_exec\'); process.exit(137);\n',
+  );
+  write(work, ".claude/state/probe-plan.json", "[]");
+  write(
+    work,
+    ".claude/state/probe-plan-result.json",
+    JSON.stringify({ reason: "ran", probes_executed: 99 }),
+  );
+  const block = bind(blockBy(readDoc(FINALISE), "security-probe-plan.mjs"), {
+    ".agents/skills/finalise/references/security-probe-plan.mjs": path.join(
+      work,
+      "killed-runner.mjs",
+    ),
+    "{story.{P}.{E}.{S} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}":
+      "task.9",
+    "{Step 0's DOD_N}": "2",
+    "{document-directory}": "docs/tasks/task.9.x",
+  });
+  const r = run("bash", block, { cwd: work });
+  assert.match(r.stdout, /probe-plan exit=137/);
+  assert.match(r.stdout, /probe-plan: no result — the run did not complete/);
+  assert.equal(
+    fs.existsSync(path.join(work, ".claude/state/probe-plan-result.json")),
+    false,
+    "a stale or partial result survived",
+  );
+  assert.equal(
+    fs.existsSync(path.join(work, ".claude/state/probe-plan-result.json.tmp")),
+    false,
+  );
+});
+
+test("the runner refuses inline cases that repeat an id, so every probe key stays unique (CR3-2)", async () => {
+  const { runPlan } = await import(RUNNER);
+  const { work } = fixtureRepo();
+  const c = {
+    sink: "url-authority",
+    input: "a",
+    why: "w",
+    correct: "c",
+    direction: "hostile",
+  };
+  write(
+    work,
+    "plan.json",
+    JSON.stringify([
+      {
+        argv: ["--sink", "url-authority", "--entry", "x#y"],
+        cases: [
+          { id: "dup", ...c },
+          { id: "dup", ...c },
+        ],
+      },
+    ]),
+  );
+  const { out } = await runPlan({
+    plan: path.join(work, "plan.json"),
+    record: path.join(work, "run.json"),
+    casesBase: path.join(work, "cases"),
+    repoRoot: work,
+  });
+  assert.deepEqual(out.runs, []);
+  assert.match(out.refusals[0].reason, /plan-entry-cases-duplicate-id: dup/);
+  assert.deepEqual(out.cases_files, [], "a refused entry's cases were written");
+});
+
+test("every site that lists the runner's owned flags names each one (CR3-3)", async () => {
+  const { OWNED_FLAGS } = await import(RUNNER);
+  assert.ok(
+    OWNED_FLAGS.length >= 6,
+    "OWNED_FLAGS shrank — check this test still means something",
+  );
+  const step = readDoc(FINALISE);
+  const at = step.indexOf("#### Step 3b.1: Run the security probe plan");
+  assert.ok(at >= 0);
+  const step3b1 = step.slice(at, step.indexOf("#### Step 3c", at));
+  const prompt = readDoc("shared/resources/finalise-dod-security-prompt.md");
+  const yaml = prompt.match(/```yaml\n([\s\S]*?)```/)[1];
+  const prose = prompt.slice(
+    prompt.indexOf("Do not pass the arguments"),
+    prompt.indexOf("Do not pass the arguments") + 400,
+  );
+  for (const flag of OWNED_FLAGS) {
+    assert.ok(
+      step3b1.includes(`\`${flag}\``),
+      `finalise Step 3b.1 does not name ${flag}`,
+    );
+    assert.ok(
+      yaml.includes(flag),
+      `the prompt's output YAML comment does not name ${flag}`,
+    );
+    assert.ok(
+      prose.includes(`\`${flag}\``),
+      `the prompt's owned-argument sentence does not name ${flag}`,
+    );
+  }
+});

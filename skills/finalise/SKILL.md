@@ -520,7 +520,11 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
 1. **Write the plan.** Save `SECURITY_RESULT.probe_plan` as a JSON array to
    `.claude/state/probe-plan.json` (Write tool — it is YAML in your context, not a shell variable).
    An absent or empty plan under `boundary: true` is written as `[]`; it is not skipped.
-2. **Run it** — one call, from the repository root:
+2. **Run it — backgrounded**, one call from the repository root (`run_in_background`), marking the wait
+   beside it (`bash .agents/skills/finalise/references/set-waiting-on.sh "step-7 probe plan" --kind task`)
+   and clearing it when the notification arrives. Each entry may run for minutes, and a foreground
+   call is stopped at the host's tool timeout (120–600 s), which would leave no result (task.189
+   QA3-1):
 
    ```bash
    # Step 3b.1 — run the security agent's probe plan (task.189). INPUTS, substituted into THIS block:
@@ -528,14 +532,23 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
    STEM="{story.{P}.{E}.{S} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}"
    DOD_N="{Step 0's DOD_N}"
    DOC_DIR="{document-directory}"
+   RESULT=.claude/state/probe-plan-result.json
+   # A result exists only when a run completed: the stale one goes first, and the new one is moved into
+   # place only once it parses — a run killed mid-write leaves NO result, never a partial one.
+   rm -f "$RESULT" "$RESULT.tmp"
    command node .agents/skills/finalise/references/security-probe-plan.mjs \
      --plan .claude/state/probe-plan.json \
      --record "$DOC_DIR/$STEM.dod.$DOD_N.security.run.json" \
      --cases-base "$DOC_DIR/$STEM.dod.$DOD_N.security.cases" \
      --repo-root "$(git rev-parse --show-toplevel)" \
-     --json > .claude/state/probe-plan-result.json
-   echo "probe-plan exit=$?"
-   jq -c '{reason, probes_executed, reproduced: (.probes | length), escapes: (.escapes | length), refusals}' .claude/state/probe-plan-result.json
+     --json > "$RESULT.tmp"
+   rc=$?
+   jq -e . "$RESULT.tmp" >/dev/null 2>&1 && mv "$RESULT.tmp" "$RESULT"
+   rm -f "$RESULT.tmp"
+   echo "probe-plan exit=$rc"
+   [ -f "$RESULT" ] \
+     && jq -c '{reason, probes_executed, reproduced: (.probes | length), escapes: (.escapes | length), refusals}' "$RESULT" \
+     || echo "probe-plan: no result — the run did not complete"
    ```
 
    The runner (`references/security-probe-plan.mjs`) builds each entry's argument list as an array —
@@ -544,8 +557,11 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
    (`…security.cases.json`, or `…security.cases.<i>.json` for entry *i* of several), records every
    entry into the **one** run record (the engine folds each control into it), and refuses an entry
    whose arguments carry `--record`, `--repo-root`, `--cases-file`, `--json`, `--emit-block` or
-   `--timeout`, which it owns, and kills an engine run that outlives its overall bound (a refusal,
-   never an execution). Exit 1 (`bad-plan`) means the JSON you wrote is not an array: fix the file, re-run.
+   `--timeout`, which it owns, refuses an entry whose inline `cases` repeat an id (each probe's `key`
+   must be unique), and kills an engine run that outlives its overall bound (a refusal, never an
+   execution). Exit 1 (`bad-plan`) means the JSON you wrote is not an array: fix the file, re-run.
+   **`probe-plan: no result` is not an empty plan** — the run did not complete (killed, or its output
+   did not parse): re-run the step; never fill `SECURITY_RESULT` from an absent result.
    `reason: record-unreadable` means entries ran but their record cannot be folded (`error` says
    why): add a `probe record unreadable — {error}` FAIL check with no `severity`, and never read the
    0 it reports as nothing executed.

@@ -67,7 +67,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const OWNED_FLAGS = Object.freeze([
+export const OWNED_FLAGS = Object.freeze([
   "--record",
   "--repo-root",
   "--cases-file",
@@ -183,7 +183,9 @@ async function readExecuted(record, engine) {
   }
 }
 
-export async function runPlan(opts) {
+export async function runPlan(options) {
+  // The engine defaults to the one beside this file, as the CLI does.
+  const opts = { engine: path.join(HERE, "security-probe.mjs"), ...options };
   let plan;
   try {
     plan = JSON.parse(fs.readFileSync(opts.plan, "utf8"));
@@ -237,6 +239,23 @@ export async function runPlan(opts) {
     const extra = [];
     let cases = null;
     if (Array.isArray(item.cases)) {
+      // Each probe's key is `<index>:<id>`, unique only while ids are unique within the entry
+      // (task.189 CR3-2): a repeated id would give two probes one key, and one grade both.
+      const seen = new Set();
+      const dup = item.cases.find((c) => {
+        const id = c && c.id;
+        if (seen.has(id)) return true;
+        seen.add(id);
+        return false;
+      });
+      if (dup) {
+        out.refusals.push({
+          index: i,
+          entry: entryName,
+          reason: `plan-entry-cases-duplicate-id: ${dup.id}`,
+        });
+        continue;
+      }
       const file =
         plan.length === 1
           ? `${opts.casesBase}.json`

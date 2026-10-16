@@ -1,0 +1,80 @@
+schema: 2
+task: 'task.189.read-only-agents-never-write'
+task_title: 'Read-only agents never write'
+gate: CONCERNS
+status_reason: 'Cycle-2 fixes verified (bug.4 closed; planArgvAllowed engages incl. --timeout, 28 executed, 0 reproduced). One QA-promoted medium: Step 3b.1 runs the plan as one foreground call that the host can kill before the runner finishes. Two cheap lows on the runner and prompt.'
+reviewer: 'QA Engineer'
+head: '815f45b8b68e1fed9035ab955edb1ff52203d1e0'
+updated: '2026-10-16T21:45:35Z'
+
+top_issues:
+  - id: 'QA3-1'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'Step 3b.1 item 2 runs the whole probe plan as one foreground call; the host stops foreground calls at 120-600 s while the runner bounds each entry at 20 minutes, so a multi-entry plan can be killed mid-run and leave probe-plan-result.json empty with no stated meaning. Promoted by QA from reviewer CR-1 (medium/medium). Bug: task.189.bug.5.'
+    suggested_action: 'Run Step 3b.1 backgrounded with an exit line and read the result on a later turn; treat a missing or non-JSON result as no result; write the runner JSON atomically.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR3-2'
+    severity: low
+    file: 'shared/resources/security-probe-plan.mjs'
+    finding: 'probe key is <index>:<id>, but an entry''s inline cases can repeat an id, so two probes can share a key and one grade lands on both.'
+    suggested_action: 'Refuse an inline cases array with duplicate ids as a plan-entry refusal.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR3-3'
+    severity: low
+    file: 'shared/resources/finalise-dod-security-prompt.md'
+    finding: 'The prompt''s owned-argument lists (prose and YAML comment) name 5 of the runner''s 6 OWNED_FLAGS (no --emit-block), and nothing checks the lists against OWNED_FLAGS.'
+    suggested_action: 'Name --emit-block in both lists, and add a test that every site listing the owned flags names each OWNED_FLAGS entry.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 64
+  phases_verified: '4/4'
+  ci: 'not read this cycle'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 28
+    notes: 'planArgvAllowed: 20 cases incl. --timeout separate and --timeout=, engages, 0 reproduced, 0 overblocked. Matrix block: 8 cases, engages.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'QA3-1: the foreground Step 3b.1 call can be killed before the plan finishes.'
+  maintainability:
+    status: PASS
+    notes: 'CR3-3 drift risk on the owned-flag lists.'
+
+recommendations:
+  immediate:
+    - action: 'Fix QA3-1 (task.189.bug.5), CR3-2, CR3-3.'
+      refs: ['skills/finalise/SKILL.md', 'shared/resources/security-probe-plan.mjs', 'shared/resources/finalise-dod-security-prompt.md']
+  future:
+    - action: 'CR3-4 (low/medium): a timed-out engine run is SIGKILLed, so the engine''s sandbox cleanup never runs and a temp sandbox is left behind; needs a SIGTERM handler in security-probe.mjs (engine scope, not this task).'
+      refs: ['shared/resources/security-probe.mjs']
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 1
+  fix_date: '2026-10-16'
+  total_iterations: 2
+  verification_method: 'Committed tests + engine probes'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['QA3-1 fixed']

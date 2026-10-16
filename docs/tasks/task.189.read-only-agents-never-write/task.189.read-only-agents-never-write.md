@@ -447,17 +447,17 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.189.qa.2.read-only-agents-never-write.md](./task.189.qa.2.read-only-agents-never-write.md)
-- **Gate File**: [task.189.gate.2.read-only-agents-never-write.yml](./task.189.gate.2.read-only-agents-never-write.yml)
+- **Full Report**: [task.189.qa.3.read-only-agents-never-write.md](./task.189.qa.3.read-only-agents-never-write.md)
+- **Gate File**: [task.189.gate.3.read-only-agents-never-write.yml](./task.189.gate.3.read-only-agents-never-write.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 61
+- **Tests Executed**: 64
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Cycle-1 findings all fixed and verified (bugs 1–3 closed; both new boundaries engage under the probe engine). One new medium: Step 3b.1 merges probe severities by a corpus case id that is not unique across controls (CR2-1).
+Cycle-2 fixes verified (bug.4 closed). One medium: Step 3b.1 runs the probe plan as one foreground call the host can kill mid-run (QA3-1). Two lows on duplicate inline case ids and the prompt's owned-flag lists.
 
 <!-- change-log-start -->
 ## Change Log
@@ -472,6 +472,8 @@ Cycle-1 findings all fixed and verified (bugs 1–3 closed; both new boundaries 
 | 2026-10-16 |  | QA findings fixed — cycle 1, 4 gate findings (CR-1, CR-2, QA-1, QA-2) + 2 advisory (CR-3, CR-4/5) | qa-fix |
 | 2026-10-16 |  | QA gate CONCERNS (90/100) — 1 medium finding; cycle-1 bugs 1-3 closed | qa-task |
 | 2026-10-16 |  | QA findings fixed — cycle 2, 1 gate finding (CR2-1) + 4 advisory (CR2-2..CR2-5) | qa-fix |
+| 2026-10-16 |  | QA gate CONCERNS (90/100) — 1 medium, 2 low findings; bug.4 closed | qa-task |
+| 2026-10-16 |  | QA findings fixed — cycle 3, 3 gate findings (QA3-1, CR3-2, CR3-3) | qa-fix |
 <!-- change-log-end -->
 
 ---

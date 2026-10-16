@@ -186,8 +186,8 @@ on task.158 the attempt came back as a false `probe mode executed no candidates`
 Do not reason abstractly about what the code would return either — reasoning about it is precisely
 what the checklist already does, and what it gets wrong. The plan is how the boundary gets executed.
 
-Leave out the arguments `/finalise` owns: the run record, the repository root, the cases-file path,
-the JSON-output switch and the per-case timeout. An entry that carries one is refused, never run. One element per
+Do not pass the arguments `/finalise` owns — `--record`, `--repo-root`, `--cases-file`, `--json`,
+`--emit-block` and `--timeout` — and do not repeat a case `id` within one entry's `cases`. An entry that carries one is refused, never run. One element per
 argument is load-bearing: an entry such as `fence:<doc>#<heading text>` or an `--argv` template
 holds spaces inside one argument, and a single command string would be split at them.
 
@@ -354,8 +354,8 @@ security_review:
   internal_reason: "<path#export> — <the artefact, and why no sink fits>" # REQUIRED when boundary is internal; omit otherwise
   probe_plan: # REQUIRED when boundary is true — one entry per control; /finalise Step 3b.1 runs them.
     - argv: ["--sink", "<sink>", "--entry", "<path-from-repo-root>#<exportName>"] # one element
-        # per argument; never the run record, the repository root, the cases-file path, --json
-        # or --timeout
+        # per argument; never --record, --repo-root, --cases-file, --json, --emit-block or
+        # --timeout (the runner owns them)
       cases: null # or the JSON array of cases, verbatim, when the corpus does not fit (Step 4.2)
   # The two fields below are FILLED BY /finalise Step 3b.1 from the run record — do not emit them.
   probes_executed: 0 # totals.executed from the run record: every candidate actually run,

@@ -1,7 +1,7 @@
 ---
 type: bug
 id: task.189.bug.4
-status: ready-for-qa
+status: closed
 severity: medium
 priority: P2
 created: 2026-10-16
@@ -13,7 +13,7 @@ created: 2026-10-16
 **Bug ID**: TASK-189-BUG-4
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (qa-task cycle 2, finding CR2-1)
 **Date Found**: 2026-10-16
 
@@ -62,3 +62,4 @@ Give each runner probe a unique `key` (`<plan index>:<id>`), grade and merge by 
 |------|--------|------------|-------|
 | 2026-10-16 | New | qa-task | Found by task.189.qa.2.read-only-agents-never-write.md |
 | 2026-10-16 | Ready for QA | qa-fix | Fixed in QA cycle 2 |
+| 2026-10-16 | Closed | qa-task | Verified by task.189.qa.3.read-only-agents-never-write.md |

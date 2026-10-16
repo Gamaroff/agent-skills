@@ -545,12 +545,18 @@ test("the agent plans the probe and /finalise always runs it (obs #10, task.189)
     `${PROMPT}: the returned YAML block no longer carries probe_plan / argv / cases — a read-only ` +
       `agent has no other way to hand the probe run to /finalise`,
   );
-  for (const gone of ["probe_command:", "probe_cases:", "--record"]) {
+  for (const gone of ["probe_command:", "probe_cases:"]) {
     assert.ok(
       !source().includes(gone),
       `${PROMPT}: "${gone}" is back — the agent must not run the engine or name its record`,
     );
   }
+  // `--record` may be NAMED (the prompt lists it among the flags the runner owns — task.189 CR3-3);
+  // it may never be USED with a path, which is the agent running the engine into a record.
+  assert.ok(
+    !/--record\s+["'<$\w./]/.test(source()),
+    `${PROMPT}: "--record <path>" is back — the agent must not run the engine or name its record`,
+  );
   assert.ok(
     has(source(), "`probe_plan:` is required whenever `boundary: true`"),
     `${PROMPT}: the probe rule no longer requires a plan on a boundary`,
@@ -577,7 +583,8 @@ test("the agent plans the probe and /finalise always runs it (obs #10, task.189)
     ),
     "skills/finalise/SKILL.md: Step 8a.4 no longer re-runs the saved probe plan",
   );
-  const block = s.slice(at, at + 6000);
+  // The whole of Step 3b.1 — to the next heading, not a fixed window it can outgrow.
+  const block = s.slice(at, s.indexOf("#### Step 3c", at));
   for (const [needle, why] of [
     ["probe_plan", "the step must run the plan the agent returned"],
     [
