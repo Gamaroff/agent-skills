@@ -141,6 +141,9 @@ nobody has dealt with". A resolved note leaves the count only on evidence a read
 
 - Parse, verify, count and check resolutions in `uat-status.mjs`.
 - `--resolve-finding` with its refusals and exit codes, and its line in the header usage block (`:24`).
+- `--changed-runs`, which prints the tracked run files under `<registry dir>/runs` that differ from
+  `HEAD`, with its usage line. SKILL.md Step 5 calls it to stage the earlier runs a run resolved
+  (added in QA cycle 3, T212-QA3-CR1).
 - Unit tests in `evals/qa-next/unit/uat-status.test.mjs`.
 - Docs that define the cell:
   - `skills/qa-next/assets/run.template.md` § Findings, the **Filed as** definition;
@@ -192,10 +195,11 @@ See [task.212.plan.qa-next-resolvable-note-findings.md](task.212.plan.qa-next-re
 
 ## 7. Files Summary
 
-1. `skills/qa-next/scripts/uat-status.mjs`: Phases 1–2.
+1. `skills/qa-next/scripts/uat-status.mjs`: Phases 1–2, and `--changed-runs` (QA cycle 3).
 2. `evals/qa-next/unit/uat-status.test.mjs`: every criterion in § 9 has a row here.
 3. `skills/qa-next/assets/run.template.md`: the **Filed as** definition.
-4. `skills/qa-next/SKILL.md`: Step 4.3, Step 5, § "What this skill never does", § "Running as a loop".
+4. `skills/qa-next/SKILL.md`: Step 4.3, Step 5 (its staging block calls `--changed-runs`), § "What this skill
+   never does", § "Running as a loop".
 5. `skills/qa-next/README.md`: § findings.
 6. `CHANGELOG.md`: an `[Unreleased]` entry.
 
@@ -249,7 +253,8 @@ See [task.212.plan.qa-next-resolvable-note-findings.md](task.212.plan.qa-next-re
 
 - [x] `run.template.md`, `SKILL.md` and `README.md` define the marker grammar identically and name
       `--resolve-finding` as its only writer.
-- [x] SKILL.md Step 5 stages the earlier run files a run resolved findings in.
+- [x] SKILL.md Step 5 stages the earlier run files a run resolved findings in, as listed by
+      `uat-status.mjs --changed-runs` under the configured registry.
 - [x] SKILL.md § "What this skill never does" states the one exception to "Overwrite a previous run
       file": `--resolve-finding` appends to a single `Filed as` cell.
 
@@ -295,7 +300,10 @@ See [task.212.plan.qa-next-resolvable-note-findings.md](task.212.plan.qa-next-re
 | `checkFindings` | adds one error per resolution that does not hold, naming the run, the finding number, the reason and the evidence |
 | `cmdFindings` | renders `[note — resolved <date> by <evidence>]` for a valid resolution and `[note — resolution does not hold: <reason>]` for an invalid one |
 | `cmdResolveFinding` (`--resolve-finding`) | rewrites only the last cell of the row, keeping its padding and anything after the closing pipe, including a CRLF `\r`. It exits 4 when the run or the finding does not exist. It exits 2 on a bug link, a different-evidence re-resolution, any verification reason, or a missing `--by`. The same evidence again exits 0 with no write |
-| `OPTIONS`, `dispatch`, header usage | `--resolve-finding`, `--by` and `--date` added |
+| `OPTIONS`, `dispatch`, header usage | `--resolve-finding`, `--by` and `--date` added; `--changed-runs` added in QA cycle 3 |
+| `isLaterRun` / `runName` (QA cycles 1–2) | a later run is one with a later real date, or the same date, directory and environment with a higher sequence number. An unreal date counts as undated |
+| writer repair and read-back (QA cycles 1–2) | `--resolve-finding` replaces a marker that no longer holds, refuses a finding number two rows share, and reads its row back through `rowFinding` before writing |
+| `cmdChangedRuns` (`--changed-runs`, QA cycle 3) | lists the tracked run files under `<registry dir>/runs` that differ from `HEAD`, so Step 5 stages them from the tree and not from memory. The registry comes from `--registry` |
 
 The docs are `run.template.md` (the **Filed as** definition), `SKILL.md` (Step 4.3 converse, Step 5 staging, the § "never does" exception, § "Running as a loop"), `README.md` § Findings, and a `CHANGELOG.md` `[Unreleased]` entry.
 
@@ -322,7 +330,12 @@ One mutation survived: dropping the CRLF handling. The `\r` sits after the closi
 
 ### Testing Results
 
-- `evals/qa-next/unit/uat-status.test.mjs` has 9 new tests, all passing:
+**Final counts (after QA cycle 3, measured 2026-10-16):** 84 tests in
+`evals/qa-next/unit/uat-status.test.mjs`, all passing: 68 pre-existing and 16 for task 212.
+`npm run ci:fast` passed 5773/0 at `2f44919f`. The list below is the run-1 snapshot; QA reports
+`task.212.qa.{1..4}` record what each cycle added.
+
+- Run 1: `evals/qa-next/unit/uat-status.test.mjs` has 9 new tests, all passing:
   - parser shapes;
   - every `verifyResolution` reason;
   - `isOpenFinding` and `checkFindings` on plain objects;
@@ -402,6 +415,7 @@ All Definition of Done criteria have been verified:
 | 2026-10-16 |         | QA findings fixed — cycle 3, 1 finding (CR1: --changed-runs owns the run-file listing; Step 5 calls it); status → ready-for-review | qa-fix |
 | 2026-10-16 |         | QA gate PASS (100/100) — 0 findings | qa-task |
 | 2026-10-16 | 1.2 | DoD passed — accepted (PR #680) | finalise |
+| 2026-10-16 |  | Folded in pr-review.1 PC-1/PC-2: `--changed-runs` named in §4, §7 and §9; Implementation Record gains the QA-cycle additions and final test counts (84 = 68 + 16) | Claude |
 <!-- change-log-end -->
 
 ---
