@@ -6,6 +6,15 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **A `/qa-next` note finding can be resolved, with evidence (task 212).** A `note` row in a run
+  file's Findings table used to stay open forever. `uat-status.mjs --resolve-finding <run> <n> --by
+  <evidence> [--date YYYY-MM-DD]` now appends ` — resolved YYYY-MM-DD by \`<evidence>\`` to its
+  `Filed as` cell — the only edit ever made to a written run file — where the evidence is a commit
+  sha or a later run file. `--findings` counts a validly resolved note as closed; `--check` reports
+  every marker whose evidence does not hold (`commit-not-found`, `not-a-git-repo`, `run-not-found`,
+  `run-is-self`, `run-not-later`, `on-a-bug-link`, `bad-date`, `bad-evidence`). Run files without
+  markers read exactly as before.
+
 - **One engine for hierarchical document ids, and a PRD registry (task 202).** The new
   `shared/resources/doc-id.js` parses, formats, allocates and checks `prd.{P}`, `epic.{P}.{E}` and
   `story.{P}.{E}.{S}` names: `P` comes from a new PRD registry, `E` counts epics within a PRD, and
