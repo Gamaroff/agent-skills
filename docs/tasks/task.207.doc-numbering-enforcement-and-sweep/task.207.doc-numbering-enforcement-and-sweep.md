@@ -5,18 +5,20 @@ type: task
 description: "Make the hierarchical PRD → epic → story numbering scheme hold by construction: a corpus test that fails on any unnumbered, mismatched or unregistered document under docs/prd, a chokepoint test that fails on a story/epic/prd identifier parsed anywhere but doc-id.js, and a sweep of every prose restatement of the old flat patterns."
 tags: [doc-id, prd-registry, numbering, corpus-test, chokepoint, doc-sweep, create-prd, create-epic, create-story]
 category: testing
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-13
 updated: 2026-10-16
 assignee:
 estimated_effort_hours: 16
 github_issue: 650
+completed_date: 2026-10-16
+pr_number: 682
 ---
 
 # Technical Task: Doc numbering enforcement and sweep
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.207.review.1.doc-numbering-enforcement-and-sweep.md` implemented 2026-10-16
 
@@ -555,12 +557,34 @@ unaffected and listed as such.
 ### Key Findings
 PASS at cycle 8; three LOW cleanups carried to recommendations.future (route 2b) and to Deferred Work.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.207.qa.8.doc-numbering-enforcement-and-sweep.md`
+**Gate File**: `task.207.gate.8.doc-numbering-enforcement-and-sweep.yml`
+**Gate Status**: ✅ PASS (Cosmetic-residue exit; three LOW items in Deferred Work)
+**Quality Score**: 90/100
+**PR Review (5c)**: `task.207.pr-review.1.doc-numbering-enforcement-and-sweep.md` — ✅ APPROVE
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 12/12 — corpus and chokepoint tests with mutation cases, stale-entry and floor checks, the < 2 s bound re-measured on the PR head (1.26 s), zero unexplained hits in the Section 7 population
+✅ **PR:** #682 — CI green on the fix head
+✅ **Documentation:** CHANGELOG `[Unreleased]` entry with consumer upgrade note; AGENTS.md § PRD Registry; standards, runbooks and skills swept
+✅ **Security Review:** PASS — `relatedDocInfo` probed (12 cases); four low findings fixed in `/finalise` Step 8a (`05322e4f`) and re-probed clean
+⚠️ **Compliance Review:** NOT_APPLICABLE — internal tooling
+
+**Task marked as ACCEPTED on:** 2026-10-16
+
+**Detailed Verification Log:** See `task.207.dod.1.doc-numbering-enforcement-and-sweep.md` for complete verification evidence and timestamps.
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
-
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-13 | 1.0     | Initial draft | create-task |
 | 2026-10-16 | 1.1     | Review (8/10) — corpus-test API corrected to `checkCorpus(prdRoot)` / `documents` floor; site list re-measured after task.206; review-epic `awk` defect brought into scope with an executed test; retirement allowlist entry, comment-safe chokepoint key and measured < 2 s bound added | review-task |
 | 2026-10-16 |         | Status → ready-for-development | review-task |
@@ -580,7 +604,7 @@ PASS at cycle 8; three LOW cleanups carried to recommendations.future (route 2b)
 | 2026-10-16 |         | QA gate CONCERNS (70/100) — 3 medium, 1 low; BUG-3 still open (task.207.qa.7) | qa-task |
 | 2026-10-16 |         | QA findings fixed (user-approved cycle 7) — mixed-id examples, FLAT_LITERAL name start; guide story layout and ASCII trees moved to Deferred Work | qa-fix |
 | 2026-10-16 |         | QA gate PASS (90/100) — 3 LOW carried to future (route 2b); BUG-3 closed (task.207.qa.8) | qa-task |
-
+| 2026-10-16 | 1.2 | DoD passed — accepted (PR #682) | finalise |
 <!-- change-log-end -->
 
 ---
