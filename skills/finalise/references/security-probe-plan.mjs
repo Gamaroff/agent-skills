@@ -77,7 +77,7 @@ export const OWNED_FLAGS = Object.freeze([
 ]);
 // One engine run, bounded as a whole. The engine bounds each case; this bounds the run, so a plan
 // with an unbounded inline `cases` list cannot hold Step 3b.1 open indefinitely.
-const ENGINE_TIMEOUT_MS = 20 * 60 * 1000;
+export const ENGINE_TIMEOUT_MS = 20 * 60 * 1000;
 
 function parseArgs(argv) {
   const opts = { json: false, engine: path.join(HERE, "security-probe.mjs") };
@@ -242,13 +242,15 @@ export async function runPlan(options) {
       // Each probe's key is `<index>:<id>`, unique only while ids are unique within the entry
       // (task.189 CR3-2): a repeated id would give two probes one key, and one grade both.
       const seen = new Set();
-      const dup = item.cases.find((c) => {
+      // findIndex, not find: a repeated FALSY element (null, null) is still a repeat (CR4-5).
+      const at = item.cases.findIndex((c) => {
         const id = c && c.id;
         if (seen.has(id)) return true;
         seen.add(id);
         return false;
       });
-      if (dup) {
+      if (at >= 0) {
+        const dup = { id: item.cases[at] && item.cases[at].id };
         out.refusals.push({
           index: i,
           entry: entryName,

@@ -551,10 +551,23 @@ test("the agent plans the probe and /finalise always runs it (obs #10, task.189)
       `${PROMPT}: "${gone}" is back — the agent must not run the engine or name its record`,
     );
   }
+  // The use shape, in both spellings the runner refuses — and its own controls, so a regex that stops
+  // seeing one spelling goes red here rather than passing the prompt vacuously (task.189 CR4-4).
+  const RECORD_USE = /--record(?:\s+|=)["'<$\w./]/;
+  for (const use of [
+    "--record <STORY_DIR>/x.run.json",
+    "--record=<STORY_DIR>/x.run.json",
+  ]) {
+    assert.ok(RECORD_USE.test(use), `the --record matcher misses: ${use}`);
+  }
+  assert.ok(
+    !RECORD_USE.test("`--record`, `--repo-root`"),
+    "the --record matcher fires on the flag's name alone",
+  );
   // `--record` may be NAMED (the prompt lists it among the flags the runner owns — task.189 CR3-3);
   // it may never be USED with a path, which is the agent running the engine into a record.
   assert.ok(
-    !/--record\s+["'<$\w./]/.test(source()),
+    !RECORD_USE.test(source()),
     `${PROMPT}: "--record <path>" is back — the agent must not run the engine or name its record`,
   );
   assert.ok(
@@ -579,7 +592,7 @@ test("the agent plans the probe and /finalise always runs it (obs #10, task.189)
   );
   assert.ok(
     s.includes(
-      "Step 3b.1's block, re-run on the plan it saved at `.claude/state/probe-plan.json`",
+      "Step 3b.1's block, re-run backgrounded exactly as item 2 runs it",
     ),
     "skills/finalise/SKILL.md: Step 8a.4 no longer re-runs the saved probe plan",
   );

@@ -56,9 +56,28 @@ Run the Step 3b.1 block backgrounded (`run_in_background`, marked with `set-wait
 
 **Testing**: `read-only-agent-writes.test.mjs` 17/17 — new: a runner killed mid-write leaves no result (stale removed, partial not moved); duplicate inline ids refused; owned-flag sites checked against `OWNED_FLAGS`. Four mutation proofs (E1–E4), each red.
 
+### Iteration 2
+
+#### Re-Investigation (Reopened → In Progress)
+
+**Date**: 2026-10-16
+**Developer**: qa-fix (develop-task Step 5b, cycle 4)
+
+**QA Reopening Reason**: the wait was marked in prose with no budget (10-minute default vs a 20-minute per-entry bound — CR4-1), and Step 8a.4 re-runs the same block without the background rule (CR4-2).
+
+**Revised Approach**: consolidate (Step 2.6, pipeline narrowing-residue offer) — the run rule moves into the block. The block marks its own wait with `--budget-minutes` computed from the plan's entry count and the runner's exported `ENGINE_TIMEOUT_MS`, and clears it at the end; Step 8a.4 says to run the block as item 2 does. Same cycle: the result is validated with node, not jq (CR4-3), and the summary line no longer reports "no result" when only jq is missing; the contract test's `--record` matcher catches `--record=<path>` with in-test controls (CR4-4); a repeated falsy inline case is refused (CR4-5).
+
+#### Fix Implementation
+
+**Files Modified**: `skills/finalise/SKILL.md`, `shared/resources/security-probe-plan.mjs`, `shared/resources/tests/read-only-agent-writes.test.mjs`, `evals/shared/tests/finalise-dod-prompt-contract.test.mjs`
+
+**Testing**: `read-only-agent-writes.test.mjs` 20/20 — the block's wait call is logged by a stub and asserted (budget = ceil(2 × 20) + 5 = 45 for two entries, then `--clear`); no result is reported missing without jq; falsy duplicate refused. Six mutation proofs (F1–F6), each red.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
 |------|--------|------------|-------|
 | 2026-10-16 | New | qa-task | Found by task.189.qa.3.read-only-agents-never-write.md |
 | 2026-10-16 | Ready for QA | qa-fix | Fixed in QA cycle 3 |
+| 2026-10-16 | Reopened | qa-task | Partial — backgrounding landed, but the wait has no budget (CR4-1) and Step 8a.4's re-run of the same block is not backgrounded (CR4-2); task.189.qa.4 |
+| 2026-10-16 | Ready for QA | qa-fix | Fixed in QA cycle 4 (iteration 2) |

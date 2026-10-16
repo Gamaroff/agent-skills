@@ -447,17 +447,17 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.189.qa.3.read-only-agents-never-write.md](./task.189.qa.3.read-only-agents-never-write.md)
-- **Gate File**: [task.189.gate.3.read-only-agents-never-write.yml](./task.189.gate.3.read-only-agents-never-write.yml)
+- **Full Report**: [task.189.qa.4.read-only-agents-never-write.md](./task.189.qa.4.read-only-agents-never-write.md)
+- **Gate File**: [task.189.gate.4.read-only-agents-never-write.yml](./task.189.gate.4.read-only-agents-never-write.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 64
+- **Tests Executed**: 67
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Cycle-2 fixes verified (bug.4 closed). One medium: Step 3b.1 runs the probe plan as one foreground call the host can kill mid-run (QA3-1). Two lows on duplicate inline case ids and the prompt's owned-flag lists.
+Cycle-3 fixes hold. One medium: Step 3b.1's background wait has no budget (CR4-1); bug.5 reopened because Step 8a.4 re-runs the same block without the background rule.
 
 <!-- change-log-start -->
 ## Change Log
@@ -474,6 +474,8 @@ Cycle-2 fixes verified (bug.4 closed). One medium: Step 3b.1 runs the probe plan
 | 2026-10-16 |  | QA findings fixed — cycle 2, 1 gate finding (CR2-1) + 4 advisory (CR2-2..CR2-5) | qa-fix |
 | 2026-10-16 |  | QA gate CONCERNS (90/100) — 1 medium, 2 low findings; bug.4 closed | qa-task |
 | 2026-10-16 |  | QA findings fixed — cycle 3, 3 gate findings (QA3-1, CR3-2, CR3-3) | qa-fix |
+| 2026-10-16 |  | QA gate CONCERNS (90/100) — 1 medium finding; bug.5 reopened | qa-task |
+| 2026-10-16 |  | QA findings fixed — cycle 4, 1 gate finding (CR4-1) + 4 advisory (CR4-2..CR4-5), run rule consolidated into the Step 3b.1 block | qa-fix |
 <!-- change-log-end -->
 
 ---

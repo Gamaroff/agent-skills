@@ -108,9 +108,17 @@ const FIXTURES = path.join(
   "shared/resources/tests/fixtures/security-probe",
 );
 
+const WAIT_STUB = ".wait-stub.sh";
+const waitLog = (work) =>
+  fs.existsSync(path.join(work, ".wait.log"))
+    ? fs.readFileSync(path.join(work, ".wait.log"), "utf8").trim().split("\n")
+    : [];
+
 function stepBlock() {
   return bind(blockBy(readDoc(FINALISE), "security-probe-plan.mjs"), {
     ".agents/skills/finalise/references/security-probe-plan.mjs": RUNNER,
+    // A stand-in that logs its arguments, so the wait the block marks can be asserted (CR4-1).
+    ".agents/skills/finalise/references/set-waiting-on.sh": WAIT_STUB,
     "{story.{P}.{E}.{S} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}":
       "task.9",
     "{Step 0's DOD_N}": "2",
@@ -125,6 +133,7 @@ function probeRepo(plan) {
     write(work, `lib/${f}`, fs.readFileSync(path.join(FIXTURES, f), "utf8"));
   }
   write(work, ".claude/state/probe-plan.json", JSON.stringify(plan));
+  write(work, WAIT_STUB, 'echo "$*" >> .wait.log\n');
   return work;
 }
 
@@ -551,6 +560,7 @@ test("Step 3b.1: a run killed mid-write leaves no result — never a partial or 
       work,
       "killed-runner.mjs",
     ),
+    ".agents/skills/finalise/references/set-waiting-on.sh": WAIT_STUB,
     "{story.{P}.{E}.{S} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}":
       "task.9",
     "{Step 0's DOD_N}": "2",
@@ -634,4 +644,79 @@ test("every site that lists the runner's owned flags names each one (CR3-3)", as
       `the prompt's owned-argument sentence does not name ${flag}`,
     );
   }
+});
+
+// --- task.189 QA cycle 4 regressions -------------------------------------------------------------
+
+test("the block marks its own wait with a budget from the plan and clears it (CR4-1, CR4-2)", async () => {
+  const { ENGINE_TIMEOUT_MS } = await import(RUNNER);
+  const work = probeRepo([
+    {
+      argv: [
+        "--sink",
+        "url-authority",
+        "--entry",
+        "lib/engaging-control.mjs#validateHost",
+      ],
+    },
+    {
+      argv: [
+        "--sink",
+        "url-authority",
+        "--entry",
+        "lib/absent-control.mjs#validateHost",
+      ],
+    },
+  ]);
+  const r = run("bash", stepBlock(), { cwd: work });
+  assert.equal(r.status, 0, r.stderr);
+  const log = waitLog(work);
+  const expected = Math.ceil((2 * ENGINE_TIMEOUT_MS) / 60000) + 5;
+  assert.equal(
+    log.length,
+    2,
+    `expected a mark and a clear, got: ${JSON.stringify(log)}`,
+  );
+  assert.match(
+    log[0],
+    new RegExp(`^step-7 probe plan --kind task --budget-minutes ${expected}$`),
+  );
+  assert.equal(log[1], "--clear");
+  // Importing the runner to read its bound must not run it as a CLI (its entry guard reads argv[1]).
+  assert.ok(!/unknown argument/.test(r.stderr), r.stderr);
+});
+
+test("the result is validated with node, so a host without jq still gets a result (CR4-3)", () => {
+  const work = probeRepo([]);
+  const block = "jq() { return 127; }\n" + stepBlock();
+  const r = run("bash", block, { cwd: work });
+  assert.doesNotMatch(
+    r.stdout,
+    /no result/,
+    "a missing jq was reported as a run that did not complete",
+  );
+  assert.ok(
+    fs.existsSync(path.join(work, ".claude/state/probe-plan-result.json")),
+    `no result without jq: ${r.stdout}`,
+  );
+});
+
+test("a repeated falsy inline case is still refused as a duplicate (CR4-5)", async () => {
+  const { runPlan } = await import(RUNNER);
+  const { work } = fixtureRepo();
+  write(
+    work,
+    "plan.json",
+    JSON.stringify([
+      { argv: ["--sink", "path", "--entry", "x#y"], cases: [null, null] },
+    ]),
+  );
+  const { out } = await runPlan({
+    plan: path.join(work, "plan.json"),
+    record: path.join(work, "run.json"),
+    casesBase: path.join(work, "cases"),
+    repoRoot: work,
+  });
+  assert.deepEqual(out.runs, []);
+  assert.match(out.refusals[0].reason, /plan-entry-cases-duplicate-id/);
 });

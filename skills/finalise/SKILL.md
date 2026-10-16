@@ -520,11 +520,13 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
 1. **Write the plan.** Save `SECURITY_RESULT.probe_plan` as a JSON array to
    `.claude/state/probe-plan.json` (Write tool — it is YAML in your context, not a shell variable).
    An absent or empty plan under `boundary: true` is written as `[]`; it is not skipped.
-2. **Run it — backgrounded**, one call from the repository root (`run_in_background`), marking the wait
-   beside it (`bash .agents/skills/finalise/references/set-waiting-on.sh "step-7 probe plan" --kind task`)
-   and clearing it when the notification arrives. Each entry may run for minutes, and a foreground
-   call is stopped at the host's tool timeout (120–600 s), which would leave no result (task.189
-   QA3-1):
+2. **Run it — backgrounded**, one call from the repository root (`run_in_background`), and read the
+   `probe-plan exit=` line when the notification arrives. Each entry may run for minutes, and a
+   foreground call is stopped at the host's tool timeout (120–600 s), which would leave no result
+   (task.189 QA3-1). **The block marks and clears its own wait** (`set-waiting-on.sh "step-7 probe plan"
+   --kind task --budget-minutes …`), with a budget computed from the plan
+   and the runner's per-run bound — so every caller of this block, Step 8a.4's re-run included, gets
+   the same rule by running it (QA cycle 4, CR4-1, CR4-2):
 
    ```bash
    # Step 3b.1 — run the security agent's probe plan (task.189). INPUTS, substituted into THIS block:
@@ -533,22 +535,43 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
    DOD_N="{Step 0's DOD_N}"
    DOC_DIR="{document-directory}"
    RESULT=.claude/state/probe-plan-result.json
+   RUNNER=.agents/skills/finalise/references/security-probe-plan.mjs
+   # The wait, marked HERE so no caller can run the block without it. Budget: the runner's own bound per
+   # entry (ENGINE_TIMEOUT_MS) times the plan's entries, plus 5 minutes. The plan path goes first: the
+   # runner's entry guard reads argv[1], and must not take this import for a CLI run.
+   BUDGET=$(command node -e '
+     const fs = require("fs"), path = require("path");
+     import(path.resolve(process.argv[2])).then((m) => {
+       let n = 1;
+       try { n = Math.max(1, JSON.parse(fs.readFileSync(process.argv[1], "utf8")).length); } catch {}
+       console.log(Math.ceil((n * m.ENGINE_TIMEOUT_MS) / 60000) + 5);
+     });' .claude/state/probe-plan.json "$RUNNER")
+   bash .agents/skills/finalise/references/set-waiting-on.sh "step-7 probe plan" --kind task \
+     --budget-minutes "${BUDGET:?the runner did not load — check the bundled path}"
    # A result exists only when a run completed: the stale one goes first, and the new one is moved into
    # place only once it parses — a run killed mid-write leaves NO result, never a partial one.
    rm -f "$RESULT" "$RESULT.tmp"
-   command node .agents/skills/finalise/references/security-probe-plan.mjs \
+   command node "$RUNNER" \
      --plan .claude/state/probe-plan.json \
      --record "$DOC_DIR/$STEM.dod.$DOD_N.security.run.json" \
      --cases-base "$DOC_DIR/$STEM.dod.$DOD_N.security.cases" \
      --repo-root "$(git rev-parse --show-toplevel)" \
      --json > "$RESULT.tmp"
    rc=$?
-   jq -e . "$RESULT.tmp" >/dev/null 2>&1 && mv "$RESULT.tmp" "$RESULT"
+   # Parsed with node, which the run above already needed — not jq, whose absence would read as a run
+   # that did not complete (CR4-3).
+   command node -e 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))' "$RESULT.tmp" 2>/dev/null \
+     && mv "$RESULT.tmp" "$RESULT"
    rm -f "$RESULT.tmp"
+   bash .agents/skills/finalise/references/set-waiting-on.sh --clear
    echo "probe-plan exit=$rc"
-   [ -f "$RESULT" ] \
-     && jq -c '{reason, probes_executed, reproduced: (.probes | length), escapes: (.escapes | length), refusals}' "$RESULT" \
-     || echo "probe-plan: no result — the run did not complete"
+   if [ -f "$RESULT" ]; then
+     # The summary is a convenience: without jq the result is printed whole, never reported missing.
+     jq -c '{reason, probes_executed, reproduced: (.probes | length), escapes: (.escapes | length), refusals}' "$RESULT" 2>/dev/null \
+       || cat "$RESULT"
+   else
+     echo "probe-plan: no result — the run did not complete"
+   fi
    ```
 
    The runner (`references/security-probe-plan.mjs`) builds each entry's argument list as an array —
@@ -2850,7 +2873,8 @@ wait — until it is `SUCCESS`. Record it in the running summary as
 `CI reading 1 (fix head): {CI_ROLLUP} @ {CI_HEAD_1}`. `FAILURE` → Step 8.
 
 **4. Re-run ONLY the failed section's reproduction.** Not the four agents. For security, that is
-Step 3b.1's block, re-run on the plan it saved at `.claude/state/probe-plan.json` and into this run's
+Step 3b.1's block, re-run backgrounded exactly as item 2 runs it (the block marks its own wait) on
+the plan it saved at `.claude/state/probe-plan.json` and into this run's
 record, so the record's `totals.executed` is refreshed from the fixed tree — the security agent
 returns a plan and records no command (task.189); for a checklist FAIL it is the check's own
 citation re-read. The section is PASS when the reproduction no longer reproduces **and** the record
