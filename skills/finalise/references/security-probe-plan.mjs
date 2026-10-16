@@ -34,16 +34,22 @@
  * that does is refused (`plan-entry-owns-flag`) and never run.
  *
  * Output (--json): {
- *   reason:          "ran" | "empty-plan",
+ *   reason:          "ran" | "empty-plan" | "record-unreadable" (entries ran, but the record
+ *                    they wrote cannot be folded — never read as zero executed),
  *   record:          the --record path,
- *   probes_executed: the record's totals.executed — copied, never composed; 0 when no entry
- *                    reached the record (empty plan, every entry refused),
+ *   probes_executed: the record's totals.executed, read through the engine's own readRecord()
+ *                    (the entry files, never the human snapshot) — copied, never composed; 0
+ *                    when no entry reached the record (empty plan, every entry refused),
+ *   escapes:         every case the engine saw write outside its sandbox: {index, entry, id,
+ *                    path}. Non-empty is a finding whatever the verdict — the engine exits 1 on
+ *                    an escape even when the control engages,
  *   probes:          one per case the engine reported reproduced (a hostile case accepted) or
  *                    overblocked (a legitimate case refused): {control, id, input, expected,
  *                    actual, reproduced: true}. No `severity` — the orchestrator does not grade,
  *                    and /finalise Step 8a reads a probe without one as not-low,
  *   refusals:        entries that never ran or the engine refused: {index, entry, reason},
- *   runs:            {index, entry, exit, verdict, executed} for every entry the engine took,
+ *   runs:            {index, entry, exit, verdict, executed, escapes} for every entry the
+ *                    engine took (escapes is that entry's count),
  *   cases_files:     the cases files written,
  * }
  *
@@ -92,6 +98,22 @@ function parseArgs(argv) {
   return opts;
 }
 
+/**
+ * The plan entry's argv when the runner may run it, else null — the refusal boundary in the shape
+ * the probe engine reads (a returned value is acceptance, null is refusal), so it can be probed
+ * directly (task.189 QA-1). Refused: anything that is not a non-empty array of strings, and any
+ * argv carrying a flag this runner owns, in either spelling (`--record x` or `--record=x`).
+ */
+export function planArgvAllowed(argv) {
+  if (
+    !Array.isArray(argv) ||
+    argv.length === 0 ||
+    !argv.every((a) => typeof a === "string")
+  )
+    return null;
+  return ownedFlagIn(argv) === null ? argv : null;
+}
+
 /** The flag a plan entry may not carry, or null. Matches `--flag` and `--flag=value`. */
 export function ownedFlagIn(argv) {
   for (const a of argv) {
@@ -127,13 +149,23 @@ async function corpusCases(sink, engineDir) {
   }
 }
 
-function readTotalsExecuted(record) {
+/**
+ * totals.executed, folded by the engine's own readRecord() from the record's entry files — the
+ * snapshot at `record` is for humans and never authoritative (security-probe.mjs). `{ok:false}`
+ * when the record cannot be folded: a run that wrote entries and an unreadable record are not
+ * the same state as nothing executed, and must not both read as 0 (task.189 CR-4).
+ */
+async function readExecuted(record, engine) {
   try {
-    const snap = JSON.parse(fs.readFileSync(record, "utf8"));
-    const n = snap && snap.totals && snap.totals.executed;
-    return Number.isInteger(n) && n >= 0 ? n : 0;
-  } catch {
-    return 0;
+    const { readRecord } = await import(path.resolve(engine));
+    const rec = readRecord(record);
+    if (rec === null) return { ok: true, executed: 0 };
+    const n = rec.totals && rec.totals.executed;
+    return Number.isInteger(n) && n >= 0
+      ? { ok: true, executed: n }
+      : { ok: false, error: "the record carries no totals.executed" };
+  } catch (e) {
+    return { ok: false, error: String((e && e.message) || e) };
   }
 }
 
@@ -158,6 +190,7 @@ export async function runPlan(opts) {
     record: opts.record,
     probes_executed: 0,
     probes: [],
+    escapes: [],
     refusals: [],
     runs: [],
     cases_files: [],
@@ -179,12 +212,11 @@ export async function runPlan(opts) {
       });
       continue;
     }
-    const owned = ownedFlagIn(argv);
-    if (owned) {
+    if (planArgvAllowed(argv) === null) {
       out.refusals.push({
         index: i,
         entry: entryName,
-        reason: `plan-entry-owns-flag: ${owned}`,
+        reason: `plan-entry-owns-flag: ${ownedFlagIn(argv)}`,
       });
       continue;
     }
@@ -242,13 +274,18 @@ export async function runPlan(opts) {
       });
       continue;
     }
+    const escapes = Array.isArray(res.escapes) ? res.escapes : [];
     out.runs.push({
       index: i,
       entry: res.entry ?? entryName,
       exit: child.status,
       verdict: res.verdict ?? null,
       executed: res.executed ?? 0,
+      escapes: escapes.length,
     });
+    for (const e of escapes) {
+      out.escapes.push({ index: i, entry: res.entry ?? entryName, ...e });
+    }
     const pool =
       cases ||
       (await corpusCases(res.sink ?? valueOf(argv, "--sink"), engineDir));
@@ -269,7 +306,14 @@ export async function runPlan(opts) {
       }
     }
   }
-  out.probes_executed = readTotalsExecuted(opts.record);
+  if (out.runs.length > 0) {
+    const r = await readExecuted(opts.record, opts.engine);
+    if (r.ok) out.probes_executed = r.executed;
+    else {
+      out.reason = "record-unreadable";
+      out.error = r.error;
+    }
+  }
   return { exit: 0, out };
 }
 

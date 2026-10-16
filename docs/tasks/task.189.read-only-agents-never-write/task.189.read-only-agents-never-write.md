@@ -438,6 +438,27 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-16
+**Quality Score**: 70/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.189.qa.1.read-only-agents-never-write.md](./task.189.qa.1.read-only-agents-never-write.md)
+- **Gate File**: [task.189.gate.1.read-only-agents-never-write.yml](./task.189.gate.1.read-only-agents-never-write.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 90
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+Three medium findings: finalise Step 8a still re-runs a command the agent no longer records (CR-1); the probe-plan runner drops engine sandbox escapes (CR-2); the runner's owned-flag refusal cannot be probed by the engine (QA-1). One low: an empty marked matrix block leaves an empty `.summaries/` directory (QA-2).
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -447,6 +468,8 @@ None.
 | 2026-10-16 | 1.1 | Review (9/10 after fixes) — Phase 2 now replaces the obs #10 fallback (Step 3b.1, not a second Step 3c), keeps `<DOD_N>` record/cases paths, builds argv as an array; guard population adds inline dispatches, `> <` redirects and a caller-runs marker; two contract tests listed | review-task |
 | 2026-10-16 |  | Status → ready-for-development | review-task |
 | 2026-10-16 |  | Implemented — 13 source files (+ bundled copies), 1 new runner, 2 new test files (19 tests), 2 contract tests updated; 7 mutation proofs | develop |
+| 2026-10-16 |  | QA gate CONCERNS (70/100) — 3 medium, 1 low finding | qa-task |
+| 2026-10-16 |  | QA findings fixed — cycle 1, 4 gate findings (CR-1, CR-2, QA-1, QA-2) + 2 advisory (CR-3, CR-4/5) | qa-fix |
 <!-- change-log-end -->
 
 ---

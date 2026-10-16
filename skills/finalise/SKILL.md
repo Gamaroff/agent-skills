@@ -535,7 +535,7 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
      --repo-root "$(git rev-parse --show-toplevel)" \
      --json > .claude/state/probe-plan-result.json
    echo "probe-plan exit=$?"
-   jq -c '{reason, probes_executed, reproduced: (.probes | length), refusals}' .claude/state/probe-plan-result.json
+   jq -c '{reason, probes_executed, reproduced: (.probes | length), escapes: (.escapes | length), refusals}' .claude/state/probe-plan-result.json
    ```
 
    The runner (`references/security-probe-plan.mjs`) builds each entry's argument list as an array —
@@ -545,6 +545,9 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
    entry into the **one** run record (the engine folds each control into it), and refuses an entry
    whose arguments carry `--record`, `--repo-root`, `--cases-file`, `--json` or `--emit-block`,
    which it owns. Exit 1 (`bad-plan`) means the JSON you wrote is not an array: fix the file, re-run.
+   `reason: record-unreadable` means entries ran but their record cannot be folded (`error` says
+   why): add a `probe record unreadable — {error}` FAIL check with no `severity`, and never read the
+   0 it reports as nothing executed.
 3. **Fill the result from the record.** Set `SECURITY_RESULT.probes_executed` to the output's
    `probes_executed` — the record's `totals.executed`, copied, never composed. Set `probes[]` to
    the output's `probes`: each is a hostile case the control accepted or a legitimate case it
@@ -554,18 +557,21 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
    `severity` per probe `id` (a read — it runs nothing). Merge each returned severity onto its probe;
    one it does not grade stays without, and halts. Without this step every reproduced probe would
    halt, and the low-severity fix-and-recheck path Step 8a offers would never open.
-4. **Refusals are not executions.** Each `refusals[]` entry is a control the plan named that was
+4. **An escape is a finding, whatever the verdict.** Each `escapes[]` entry is a case the engine saw
+   write outside its sandbox — the engine exits 1 on one even when the control engages. Add a
+   `probe escaped its sandbox: {entry} ({id} → {path})` FAIL check per entry, with no `severity`.
+5. **Refusals are not executions.** Each `refusals[]` entry is a control the plan named that was
    never probed — the engine refused its arguments (exit 2, the reason is its first stderr line) or
    the runner refused the entry. It adds nothing to `probes_executed`. Re-dispatch the security agent
    once with the refusal reasons, asking for a corrected plan, and re-run this step. Still refused:
    add a `checks[]` entry `probe plan entry refused: {entry} — {reason}` with `status: FAIL` and
    no `severity`.
-5. **The zero-guard still applies — now to this run.** `boundary: true` with `probes_executed: 0`
+6. **The zero-guard still applies — now to this run.** `boundary: true` with `probes_executed: 0`
    (an empty plan, every entry refused or declined) adds the `probe mode executed no candidates`
    FAIL check; a zero from this run **still takes the zero-guard**, because then the engine declined
    the entry, which is the guard's real case. Recompute `overall`: FAIL if any check or general
    check FAILs or any probe reproduced, otherwise PASS.
-6. **Say so.** Add `- Probe run by /finalise from the security agent's plan — {N} control(s), record
+7. **Say so.** Add `- Probe run by /finalise from the security agent's plan — {N} control(s), record
    `{record path}`` under the security section's Probe Results.
 
 The record and every cases file are under the work-item directory, numbered by this run's `$DOD_N`
@@ -2821,9 +2827,10 @@ Step 6 rollup query **through the background poll** the CI gate already uses —
 wait — until it is `SUCCESS`. Record it in the running summary as
 `CI reading 1 (fix head): {CI_ROLLUP} @ {CI_HEAD_1}`. `FAILURE` → Step 8.
 
-**4. Re-run ONLY the failed section's reproduction.** Not the four agents. For security, that is the
-engine command the agent recorded (`security-probe.mjs … --record …`), re-run so the record's
-`totals.executed` is refreshed from the fixed tree; for a checklist FAIL it is the check's own
+**4. Re-run ONLY the failed section's reproduction.** Not the four agents. For security, that is
+Step 3b.1's block, re-run on the plan it saved at `.claude/state/probe-plan.json` and into this run's
+record, so the record's `totals.executed` is refreshed from the fixed tree — the security agent
+returns a plan and records no command (task.189); for a checklist FAIL it is the check's own
 citation re-read. The section is PASS when the reproduction no longer reproduces **and** the record
 shows the count. The other three sections were evaluated against a tree the fix did not change — the
 `touched` paths are inside the Files Summary, which is what `inside-files-summary` guarantees — and

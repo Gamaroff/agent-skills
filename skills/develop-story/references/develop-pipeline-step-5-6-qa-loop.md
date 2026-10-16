@@ -225,11 +225,12 @@ END='^<!-- matrix-end -->[[:space:]]*$'
 if [ -f "$REPLY_FILE" ] \
    && [ "$(grep -cE "$START" "$REPLY_FILE")" = 1 ] && [ "$(grep -cE "$END" "$REPLY_FILE")" = 1 ] \
    && [ "$(grep -nE "$START" "$REPLY_FILE" | cut -d: -f1)" -lt "$(grep -nE "$END" "$REPLY_FILE" | cut -d: -f1)" ]; then
-  mkdir -p "$(dirname "$MATRIX")"
-  awk -v s="$START" -v e="$END" '$0 ~ e { f = 0 } f { print } $0 ~ s { f = 1 }' "$REPLY_FILE" > "$MATRIX.tmp" \
-    && [ -s "$MATRIX.tmp" ] && mv "$MATRIX.tmp" "$MATRIX" \
+  # Extracted beside the reply, not into the doc directory: the directory is created only once a
+  # non-empty matrix exists, so a refused reply leaves nothing behind (task.189 QA-2).
+  awk -v s="$START" -v e="$END" '$0 ~ e { f = 0 } f { print } $0 ~ s { f = 1 }' "$REPLY_FILE" > "$REPLY_FILE.matrix" \
+    && [ -s "$REPLY_FILE.matrix" ] && mkdir -p "$(dirname "$MATRIX")" && mv "$REPLY_FILE.matrix" "$MATRIX" \
     && echo "matrix: written to $MATRIX" \
-    || { rm -f "$MATRIX.tmp"; echo "⚠️ mapper returned an empty matrix — proceeding without it"; }
+    || { rm -f "$REPLY_FILE.matrix"; echo "⚠️ mapper returned an empty matrix — proceeding without it"; }
 else
   echo "⚠️ mapper returned no matrix — proceeding without it"
 fi

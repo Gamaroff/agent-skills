@@ -89,6 +89,12 @@ for (const shell of SHELLS) {
         false,
         `a matrix was written for: ${JSON.stringify(reply)}`,
       );
+      // QA-2 (task.189 cycle 1): a refused reply leaves nothing behind — not even the directory.
+      assert.equal(
+        fs.existsSync(path.join(work, "docs/tasks/task.1.x")),
+        false,
+        `a directory was created for: ${JSON.stringify(reply)}`,
+      );
     }
   });
 }
@@ -167,6 +173,12 @@ test("Step 3b.1: probes_executed is the record's totals.executed, across every c
   );
   assert.equal(out.probes_executed, rec.totals.executed);
   assert.equal(out.runs.length, 2);
+  // An independent check (task.189 CR-5): the runs' own engine counts, summed, agree with the
+  // record the runner read — the record is not the only witness.
+  assert.equal(
+    out.probes_executed,
+    out.runs.reduce((n, x) => n + x.executed, 0),
+  );
   // The accept-everything control reproduces hostile cases; each probe carries its input verbatim
   // and no severity (Step 8a must read it as not-low).
   const hostile = out.probes.filter(
@@ -315,4 +327,117 @@ test("Step 3b.1: an empty plan executes nothing, so the zero-guard has a zero to
   const out = result(work);
   assert.equal(out.reason, "empty-plan");
   assert.equal(out.probes_executed, 0);
+});
+
+// --- task.189 QA cycle 1 regressions -------------------------------------------------------------
+
+test("Step 3b.1: an escape reaches the result, even on a control that engages (CR-2)", () => {
+  const work = probeRepo([]);
+  write(
+    work,
+    "lib/engaging-but-escaping.mjs",
+    fs.readFileSync(path.join(FIXTURES, "engaging-but-escaping.mjs"), "utf8"),
+  );
+  write(
+    work,
+    ".claude/state/probe-plan.json",
+    JSON.stringify([
+      {
+        argv: [
+          "--sink",
+          "url-authority",
+          "--entry",
+          "lib/engaging-but-escaping.mjs#validateHost",
+        ],
+      },
+    ]),
+  );
+  const r = run("bash", stepBlock(), { cwd: work });
+  assert.equal(r.status, 0, r.stderr);
+  const out = result(work);
+  assert.equal(out.runs[0].verdict, "engages");
+  assert.ok(out.runs[0].escapes > 0, "the run's escape count was dropped");
+  assert.equal(out.escapes.length, out.runs[0].escapes);
+  assert.match(out.escapes[0].path, /escaped-while-engaging/);
+});
+
+test("planArgvAllowed refuses every owned flag in both spellings, and allows a clean argv (QA-1)", async () => {
+  const { planArgvAllowed } = await import(RUNNER);
+  const base = ["--sink", "path", "--entry", "lib/x.js#isSafe"];
+  assert.deepEqual(planArgvAllowed(base), base);
+  for (const flag of [
+    "--record",
+    "--repo-root",
+    "--cases-file",
+    "--json",
+    "--emit-block",
+  ]) {
+    assert.equal(
+      planArgvAllowed([...base, flag, "v"]),
+      null,
+      `${flag} allowed`,
+    );
+    assert.equal(
+      planArgvAllowed([...base, `${flag}=v`]),
+      null,
+      `${flag}=v allowed`,
+    );
+  }
+  for (const bad of [[], "--sink path", [1, 2], null, ["--sink", 3]]) {
+    assert.equal(planArgvAllowed(bad), null, `${JSON.stringify(bad)} allowed`);
+  }
+  // A value that merely CONTAINS an owned flag's name is not that flag.
+  const named = [...base, "--name", "record-keeper --record"];
+  assert.deepEqual(planArgvAllowed(named), named);
+});
+
+test("Step 3b.1: the runner refuses an owned flag in its --flag=value spelling (QA-1)", () => {
+  const work = probeRepo([
+    {
+      argv: [
+        "--sink",
+        "url-authority",
+        "--entry",
+        "lib/engaging-control.mjs#validateHost",
+        "--repo-root=/",
+      ],
+    },
+  ]);
+  const r = run("bash", stepBlock(), { cwd: work });
+  assert.equal(r.status, 0, r.stderr);
+  const out = result(work);
+  assert.deepEqual(out.runs, []);
+  assert.match(out.refusals[0].reason, /plan-entry-owns-flag: --repo-root/);
+});
+
+test("the runner reports an unfoldable record as record-unreadable, never as zero executed (CR-4)", async () => {
+  const { runPlan } = await import(RUNNER);
+  const { work } = fixtureRepo();
+  // A stub engine: the CLI answers like a run, and readRecord() cannot fold the record.
+  write(
+    work,
+    "stub-engine.mjs",
+    [
+      "export function readRecord() { throw new Error('entry 1 is not a control'); }",
+      "if (process.argv[1] && process.argv[1].endsWith('stub-engine.mjs')) {",
+      "  process.stdout.write(JSON.stringify({ entry: 'x#y', verdict: 'engages', executed: 4, reproduced: [], overblocked: [], escapes: [] }));",
+      "}",
+    ].join("\n"),
+  );
+  write(
+    work,
+    "plan.json",
+    JSON.stringify([{ argv: ["--sink", "path", "--entry", "x#y"] }]),
+  );
+  const { exit, out } = await runPlan({
+    plan: path.join(work, "plan.json"),
+    record: path.join(work, "run.json"),
+    casesBase: path.join(work, "cases"),
+    repoRoot: work,
+    engine: path.join(work, "stub-engine.mjs"),
+  });
+  assert.equal(exit, 0);
+  assert.equal(out.runs.length, 1);
+  assert.equal(out.reason, "record-unreadable");
+  assert.match(out.error, /not a control/);
 });

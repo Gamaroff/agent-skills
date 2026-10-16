@@ -566,6 +566,17 @@ test("the agent plans the probe and /finalise always runs it (obs #10, task.189)
     !s.includes("`/finalise` runs the probe itself"),
     "skills/finalise/SKILL.md: the obs #10 conditional fallback is back beside Step 3b.1 — two mechanisms for one run",
   );
+  // Step 8a.4's re-run is the plan's re-run: the agent records no command (task.189 CR-1).
+  assert.ok(
+    !s.includes("engine command the agent recorded"),
+    "skills/finalise/SKILL.md: Step 8a re-runs a command the security agent no longer records",
+  );
+  assert.ok(
+    s.includes(
+      "Step 3b.1's block, re-run on the plan it saved at `.claude/state/probe-plan.json`",
+    ),
+    "skills/finalise/SKILL.md: Step 8a.4 no longer re-runs the saved probe plan",
+  );
   const block = s.slice(at, at + 6000);
   for (const [needle, why] of [
     ["probe_plan", "the step must run the plan the agent returned"],
@@ -600,6 +611,14 @@ test("the agent plans the probe and /finalise always runs it (obs #10, task.189)
     [
       "Refusals are not executions",
       "an entry the engine refused must not be counted",
+    ],
+    [
+      "probe escaped its sandbox",
+      "an engine escape must reach the DoD as a FAIL, whatever the verdict (task.189 CR-2)",
+    ],
+    [
+      "record-unreadable",
+      "an unfoldable record must not read as zero executed (task.189 CR-4)",
     ],
   ]) {
     assert.ok(

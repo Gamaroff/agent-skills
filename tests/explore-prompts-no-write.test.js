@@ -60,7 +60,9 @@ const WRITE_SHAPES = [
     /\bnpm run (?:generate-catalog|bundle|build)(?![\w:-])|\bgenerate_catalog\.py\b|\bbundle_skill\.py\b/,
   ],
 ];
-const FORBIDS = /\b(?:never|do not|don't|must not|no)\b/i;
+// A bare `no` is deliberately absent: "If there is no matrix file, write it to <dir>" is an
+// instruction to write, and `no` there negates the condition, not the write (task.189 CR-3).
+const FORBIDS = /\b(?:never|do not|don't|must not)\b/i;
 
 /** Blank every line inside a caller-runs region, keeping line numbers. */
 function withoutCallerRuns(text) {
@@ -221,6 +223,10 @@ test("control: the matcher fires on every write shape", () => {
       "write instruction",
     ],
     ["write it to `<STORY_DIR>/<stem>.cases.json`", "write instruction"],
+    [
+      "If there is no matrix file, write it to `<STORY_DIR>/.summaries/`.",
+      "write instruction",
+    ],
     [
       "  --record <STORY_DIR>/<stem>.dod.<DOD_N>.security.run.json --json",
       "--record",
