@@ -1,8 +1,8 @@
 # Task Registry
 
 **Purpose:** Central tracking for all task numbers in this repo.
-**Last Updated:** 2026-10-14
-**Next Available Task Number:** **213**
+**Last Updated:** 2026-10-18
+**Next Available Task Number:** **215**
 
 ## How to use
 
@@ -254,6 +254,8 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 210 | [macOS check of the setup-consumer agent checkbox list](task.210.macos-check-of-agent-checkbox-list/task.210.macos-check-of-agent-checkbox-list.md) | planned | testing | Low | 2026-10-14 | — | task.209 — real-terminal run under macOS bash 3.2 from zsh, normal and narrow widths; deferred from task.209 criterion 6
 | 211 | [Migration engine: monolith and domain-less PRDs](task.211.migration-engine-monolith-and-domainless-prds/task.211.migration-engine-monolith-and-domainless-prds.md) | planned | refactoring | Medium | 2026-10-15 | #676 | task.204 — engine fixes for task.204 gate 8 CR-2/CR-4/CR-5; lifts review-prd's migration-guard refusals
 | 212 | [qa-next: a note finding can be resolved, with evidence](task.212.qa-next-resolvable-note-findings/task.212.qa-next-resolvable-note-findings.md) | accepted | feature | Medium | 2026-10-16 | — | — from a tinker-city /qa-next session: 39 of 45 open findings were notes, which nothing can close; adds a verified `resolved <date> by <evidence>` marker and `--resolve-finding` |
+| 213 | [loop-supervisor: an engine registry (claude, agy) and a --model flag](task.213.loop-supervisor-engine-registry-and-model-flag/task.213.loop-supervisor-engine-registry-and-model-flag.md) | planned | infrastructure | Medium | 2026-10-18 | — | — from an external handoff; engine-specific argv, result envelope and transcript path move into a registry so more engines and models follow (stated later goal) |
+| 214 | [loop-supervisor: find select-next.mjs wherever the skills are installed](task.214.loop-supervisor-probe-script-resolution/task.214.loop-supervisor-probe-script-resolution.md) | planned | infrastructure | Medium | 2026-10-18 | — | — from the same handoff; independent of task.213 |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
@@ -271,6 +273,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 
 ## Notes
 
+- **Tasks 213–214 are the loop-supervisor multi-engine handoff (2026-10-18)** — one shippable unit each, independent of one another: 213 ships the engine registry, `--engine`/`--model`/`--effort` and the normalised result envelope together, because an engine whose result line is never parsed is classified without its error signal and is not mergeable alone; 214 fixes the `probeScript` default and touches `adapters.js` and one `resolveAdapter` call, so it may land in either order (213 edits `run-loop.mjs` near that call; rebase whichever lands second).
 - **Tasks 202–207 are the hierarchical document numbering sequence** (`prd.P` → `epic.P.E` → `story.P.E.S`; design: [`.agents/plans/hierarchical-doc-numbering.md`](../../.agents/plans/hierarchical-doc-numbering.md)) — one shippable unit each, in dependency order: 202 ships the `doc-id.js` engine and PRD registry with no call site moved; 203 ships the migration script and renumbers this repo's onboarding tree; 204 (PRD skills) and 205 (epic skills) both depend on 203 and are independent of each other; 206 (story and pipeline code) depends on 205, because both edit `review-pipeline-step-0a-branch-setup.md`; 207 (corpus and chokepoint tests, prose sweep) runs last.
 - **Tasks 196–199 are the 2026-10-07 doc-drift audit follow-ups** (`.agents/plans/doc-drift-audit-2026-10-07.md`) — one shippable unit each, independent of one another: they split the audit's 94 medium/low findings by theme, each finding in exactly one task. All four start after PR #598 (the 12 high-severity fixes) merges, since it edits some of the same files. Where two of them edit one file, they touch different findings, so they may land in any order.
 - **Tasks 177–178 are the task.176 follow-ups (PR #554)** — one shippable unit each, independent of one another: 177 closes four `/review-pr` resolution edge cases (`.env` inline comment, docs-less repo, scheme-less URLs, rung 2 artifact filter); 178 makes review-task and review-story cite the shared §0a key lookup and adds a guard test. They touch different skills and may land in either order.
