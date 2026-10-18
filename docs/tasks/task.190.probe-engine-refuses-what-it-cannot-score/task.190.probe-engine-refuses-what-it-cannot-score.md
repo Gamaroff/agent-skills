@@ -5,18 +5,20 @@ type: task
 description: "security-probe.mjs refuses a cases file with an unknown direction or sink before running anything, resolves its default repo root from the git checkout when run from a bundled copy and refuses an entry it cannot find before writing a record, and carries each declined case's reason into the run record."
 tags: [security-probe, finalise, review-security, observation, run-record]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-07
 updated: 2026-10-18
 assignee:
 estimated_effort_hours: 8
 github_issue: 589
+completed_date: 2026-10-18
+pr_number: 685
 ---
 
 # Technical Task: Probe engine refuses what it cannot score
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.190.review.1.probe-engine-refuses-what-it-cannot-score.md` implemented 2026-10-18
 **GitHub Issue**: [#589](https://github.com/Gamaroff/agent-skills/issues/589)
 
@@ -403,6 +405,30 @@ None.
 No critical issues identified. The diff review raised 3 low/medium bugs and 1 cleanup, all advisory
 (CR-1 to CR-4 in the report). Five QA mutations each turned a committed test red.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.190.qa.1.probe-engine-refuses-what-it-cannot-score.md`
+**Gate File**: `task.190.gate.1.probe-engine-refuses-what-it-cannot-score.yml`
+**PR Review**: `task.190.pr-review.1.probe-engine-refuses-what-it-cannot-score.md` — APPROVE, 0 findings
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 9/9 met, each held by a per-PR test (QA mutations QM1–QM5 each turned one red)
+✅ **Tests:** 12 new tests; `security-probe.test.mjs` 182 and `review-security.test.js` 55 passing
+✅ **PR Review:** PR #685 — Step 5c `/review-pr` APPROVE (host requires no reviews); CI green on `f2433d6f`
+✅ **Documentation:** CHANGELOG `[Unreleased]` › Fixed entry (task 190)
+✅ **Security Review:** PASS — no secrets, no unsafe exec, fixed-argv git spawn; `validateCases` recorded `boundary: internal`
+✅ **Compliance Review:** Not applicable (developer tooling, no user data)
+
+**Task marked as ACCEPTED on:** 2026-10-18
+
+**Detailed Verification Log:** See `task.190.dod.1.probe-engine-refuses-what-it-cannot-score.md` for complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
@@ -413,6 +439,7 @@ No critical issues identified. The diff review raised 3 low/medium bugs and 1 cl
 | 2026-10-18 |  | Status → ready-for-development | review-task |
 | 2026-10-18 |  | Implemented — 9 files (engine + 4 bundled copies, 2 test files, CHANGELOG, this doc), 12 tests | develop |
 | 2026-10-18 |  | QA gate PASS (100/100) — 0 blocking, 4 advisory findings | qa-task |
+| 2026-10-18 | 1.2 | DoD passed — accepted (PR #685) | finalise |
 <!-- change-log-end -->
 
 ---
