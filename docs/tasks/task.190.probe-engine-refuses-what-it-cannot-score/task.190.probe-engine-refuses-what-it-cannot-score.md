@@ -378,6 +378,31 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-18
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Full Report**: [task.190.qa.1.probe-engine-refuses-what-it-cannot-score.md](./task.190.qa.1.probe-engine-refuses-what-it-cannot-score.md)
+- **Gate File**: [task.190.gate.1.probe-engine-refuses-what-it-cannot-score.yml](./task.190.gate.1.probe-engine-refuses-what-it-cannot-score.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 237 (182 security-probe, 55 review-security)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+No critical issues identified. The diff review raised 3 low/medium bugs and 1 cleanup, all advisory
+(CR-1 to CR-4 in the report). Five QA mutations each turned a committed test red.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -386,7 +411,8 @@ None.
 | 2026-10-07 | 1.0 | Initial draft — cut from observations #201, #207, #211 | create-task |
 | 2026-10-18 | 1.1 | Review passed (8/10) — re-anchored to f0448911, entry check covers all six forms with a second breaking change, review-security nested-copy test added to scope, transitive copy in the Phase 2 test, --json shape stated | review-task |
 | 2026-10-18 |  | Status → ready-for-development | review-task |
-| 2026-10-18 |  | Implemented — 9 files (engine + 4 bundled copies, 2 test files, CHANGELOG, this doc), 13 tests | develop |
+| 2026-10-18 |  | Implemented — 9 files (engine + 4 bundled copies, 2 test files, CHANGELOG, this doc), 12 tests | develop |
+| 2026-10-18 |  | QA gate PASS (100/100) — 0 blocking, 4 advisory findings | qa-task |
 <!-- change-log-end -->
 
 ---
