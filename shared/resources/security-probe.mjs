@@ -276,7 +276,12 @@ import {
   sandboxEnv,
   snapshotTree,
 } from "./qa-execute-snippets.mjs";
-import { MATERIALISED_SINKS, corpusFor } from "./security-input-corpus.mjs";
+import {
+  DIRECTIONS,
+  MATERIALISED_SINKS,
+  SINKS,
+  corpusFor,
+} from "./security-input-corpus.mjs";
 import { spawnBudget, neverRan, readInt } from "./spawn-budget.mjs";
 // Re-exported so the signal list ships beside the engine in every bundled copy:
 // the bundler follows sibling imports, and a prompt that cites the module by
@@ -423,12 +428,85 @@ function extractResult(stdout) {
 // ── Entry resolution ─────────────────────────────────────────────────────────
 
 /**
- * The repository root — the directory two levels above this file
- * (it lives in `shared/resources/`, so two levels up is the repo root).
- * Overridable so tests can point the containment check at a fixture tree.
+ * The repository root. In the source tree the engine lives in `shared/resources/`,
+ * so two levels up is the repo root. A bundled copy lives in
+ * `<skills>/<skill>/references/`, where two levels up is the skills directory —
+ * a repo-relative entry then resolved under it, did not exist, and the failed
+ * run reached the record (obs #211). There the root is the git checkout the
+ * caller runs in, falling back to two levels up when git cannot say.
+ * Overridable (`repoRoot`, `--repo-root`) so tests can point the containment
+ * check at a fixture tree; an explicit root always wins.
  */
 export function defaultRepoRoot() {
-  return resolve(__dirname, "..", "..");
+  const twoUp = resolve(__dirname, "..", "..");
+  if (
+    basename(__dirname) === "resources" &&
+    basename(dirname(__dirname)) === "shared"
+  ) {
+    return twoUp;
+  }
+  const r = spawnSync("git", ["rev-parse", "--show-toplevel"], {
+    cwd: process.cwd(),
+    encoding: "utf8",
+  });
+  const top =
+    r.status === 0 && typeof r.stdout === "string" ? r.stdout.trim() : "";
+  return top !== "" ? top : twoUp;
+}
+
+/**
+ * The first supplied case the engine cannot score, or `null` (obs #201).
+ *
+ * Scoring splits cases by `direction`, so a case whose direction is neither
+ * `hostile` nor `legitimate` counted toward neither side: the run executed,
+ * and the verdict was computed over fewer cases than it was given, with no
+ * mention of the value. `sink` is optional on a case (the run's sink applies
+ * when it is absent) but, when present, must name a sink — it selects the
+ * fixture. Checked: not an object, a `direction` outside `DIRECTIONS`, a
+ * present `sink` outside `SINKS`.
+ *
+ * @returns {null | {id: string, field: string, value: unknown, accepted: string[]}}
+ */
+export function validateCases(cases) {
+  if (!Array.isArray(cases)) {
+    return {
+      id: "(file)",
+      field: "cases",
+      value: cases === null ? "null" : typeof cases,
+      accepted: ["array"],
+    };
+  }
+  for (const [i, c] of cases.entries()) {
+    const isObject = c !== null && typeof c === "object" && !Array.isArray(c);
+    const id = isObject && c.id != null ? String(c.id) : `#${i}`;
+    if (!isObject) {
+      return {
+        id,
+        field: "case",
+        value: c === null ? "null" : Array.isArray(c) ? "array" : typeof c,
+        accepted: ["object"],
+      };
+    }
+    if (!DIRECTIONS.includes(c.direction)) {
+      return {
+        id,
+        field: "direction",
+        value: c.direction,
+        accepted: [...DIRECTIONS],
+      };
+    }
+    if (c.sink !== undefined && !SINKS.includes(c.sink)) {
+      return { id, field: "sink", value: c.sink, accepted: [...SINKS] };
+    }
+  }
+  return null;
+}
+
+/** The one sentence a `validateCases` finding renders as, for the CLI and the library. */
+export function describeBadCase(bad) {
+  const value =
+    bad.value === undefined ? "undefined" : JSON.stringify(bad.value);
+  return `case "${bad.id}" has ${bad.field} ${value}; accepted: ${bad.accepted.join(", ")}`;
 }
 
 /**
@@ -1329,7 +1407,11 @@ export function runProbeSpec({
   }
 
   let probeCases;
-  if (Array.isArray(cases)) {
+  if (cases !== undefined && cases !== null) {
+    // Refused before any case runs: a case the scorer cannot place would
+    // otherwise execute and count toward neither side (obs #201).
+    const bad = validateCases(cases);
+    if (bad) return decline("bad-cases", describeBadCase(bad));
     probeCases = cases;
   } else {
     try {
@@ -3199,7 +3281,8 @@ function cliControlName(c) {
 
 /**
  * Reduce a `runProbeSpec` result to the per-control entry the record stores.
- * Counts only — the per-case detail stays in the engine's own `--json` output.
+ * Counts, plus each declined case's id, reason and detail — the per-case
+ * results of the cases that ran stay in the engine's own `--json` output.
  */
 export function toRecordEntry(result, { name, callSite } = {}) {
   return {
@@ -3214,6 +3297,16 @@ export function toRecordEntry(result, { name, callSite } = {}) {
     reproduced: result.reproduced?.length ?? 0,
     overblocked: result.overblocked?.length ?? 0,
     declined: result.declined?.length ?? 0,
+    // Why each declined case was not run (obs #207). The count alone told a
+    // reader that cases were declined but not why; the reason surfaced only on
+    // a --json re-run. Additive: every reader of the record reads the counts.
+    declined_cases: (Array.isArray(result.declined) ? result.declined : []).map(
+      (d) => ({
+        id: d?.id ?? null,
+        reason: d?.reason ?? null,
+        detail: d?.detail ?? null,
+      }),
+    ),
     escaped: result.escapes?.length ?? 0,
     // Which shells each case ran under (shell form), or null. The count is
     // cases × shells, and a reader must not have to divide (cycle 2, CR-5).
@@ -3750,6 +3843,18 @@ export function main(argv = process.argv.slice(2)) {
     }
   }
 
+  // The two refusals below are ARGUMENT errors that a `--json` caller must be
+  // able to read: stderr carries the line, and under --json stdout carries
+  // `{reason, detail}`. Both run before preflightRecord, so a run the engine
+  // cannot set up never reaches the record (obs #201, #211).
+  const refuse = (reason, detail) => {
+    process.stderr.write(`${reason}: ${detail}\n`);
+    if (opts.json) {
+      process.stdout.write(`${JSON.stringify({ reason, detail }, null, 2)}\n`);
+    }
+    return 2;
+  };
+
   let cases;
   if (opts.casesFile) {
     try {
@@ -3758,6 +3863,20 @@ export function main(argv = process.argv.slice(2)) {
       process.stderr.write(`cannot read --cases-file: ${e.message}\n`);
       return 2;
     }
+    const bad = validateCases(cases);
+    if (bad) return refuse("bad-cases", describeBadCase(bad));
+  }
+
+  // The entry must exist before anything runs or is recorded. A resolveEntry
+  // failure (bad-entry, outside-repo-root) is left to runProbeSpec, which
+  // declines it as before; only the missing path is refused here.
+  const repoRoot = opts.repoRoot ? resolve(opts.repoRoot) : defaultRepoRoot();
+  const resolvedEntry = resolveEntry(opts.entry, repoRoot);
+  if (resolvedEntry.ok && !existsSync(resolvedEntry.entryPath)) {
+    return refuse(
+      "entry-not-found",
+      `${resolvedEntry.entryPath} (repo root ${repoRoot})`,
+    );
   }
 
   if (opts.record) {
@@ -3779,7 +3898,7 @@ export function main(argv = process.argv.slice(2)) {
     slot: opts.slot,
     fixtureSetup: opts.fixtureSetup,
     timeoutMs: opts.timeoutMs,
-    ...(opts.repoRoot ? { repoRoot: resolve(opts.repoRoot) } : {}),
+    repoRoot,
   });
 
   const escaped = result.escapes?.length ?? 0;
