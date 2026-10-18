@@ -1,0 +1,56 @@
+schema: 2
+task: 'task.190.probe-engine-refuses-what-it-cannot-score'
+task_title: 'Probe engine refuses what it cannot score'
+gate: PASS
+status_reason: 'All 4 phases and 9 success criteria verified against committed tests; 5 QA mutations each turned a committed test red. The diff review raised no high-confidence bug; its 3 low/medium bugs and 1 cleanup are advisory.'
+reviewer: 'QA Engineer'
+head: '98b87d5bfc37153c6c62b968f3b3d744e14d6399'
+updated: '2026-10-18T20:26:02Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 237
+  phases_verified: 4/4
+  ci: 'pass @ 98b87d5bfc37 (test, validate, shellcheck, link-check)'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: internal for security-probe.mjs#validateCases (input is a probe cases file the pipeline writes; no corpus sink models a case array). The entry-exists check is boundary: false (an existence precondition after resolveEntry, whose containment is unchanged). CR-1 (root follows cwd/GIT_DIR) widens nothing --repo-root does not already allow; advisory.'
+  performance:
+    status: PASS
+    notes: 'One extra git rev-parse per bundled-copy CLI run; case count unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Both refusals exit 2 before preflightRecord, so no partial record. CR-2: describeBadCase throws on a BigInt or circular value, unreachable from a JSON cases file; advisory.'
+  maintainability:
+    status: PASS
+    notes: 'CR-4: copyEngine duplicates the import walk in review-security.test.js; advisory.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-2: render the bad value with a non-throwing formatter in describeBadCase.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'CR-3: treat sink: null as absent in validateCases, matching the c.sink ?? sink consumers.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'CR-1: consider stripping GIT_DIR/GIT_WORK_TREE from the defaultRepoRoot git lookup.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'CR-4: share the transitive import walk between the two test suites.'
+      refs: ['shared/resources/tests/security-probe.test.mjs', 'skills/review-security/tests/review-security.test.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

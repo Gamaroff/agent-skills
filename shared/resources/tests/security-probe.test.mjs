@@ -33,7 +33,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 
 import {
@@ -63,8 +63,9 @@ import {
   SHELL_ARGV_PREFIX,
   shellArgvSpawnArgs,
   toRecordEntry,
+  validateCases,
 } from "../security-probe.mjs";
-import { corpusFor } from "../security-input-corpus.mjs";
+import { corpusFor, DIRECTIONS, SINKS } from "../security-input-corpus.mjs";
 import { sandboxEnv } from "../qa-execute-snippets.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -5688,5 +5689,304 @@ test("shell-argv entry: --fake-gh is accepted and its gh answers the run (task.1
     assert.equal(toRecordEntry(r).fake_gh, join(root, "fake"));
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// ── task.190: refuse what the engine cannot score ─────────────────────────────
+
+// runMain (above, with the cli: tests) captures main()'s stdout and stderr.
+
+/** A temp dir holding a record path and a cases file; removed by the caller. */
+function recordFixture(cases) {
+  const dir = mkdtempSync(join(tmpdir(), "probe-t190-"));
+  const record = join(dir, "run.json");
+  const casesFile = join(dir, "cases.json");
+  if (cases !== undefined) writeFileSync(casesFile, JSON.stringify(cases));
+  return { dir, record, casesFile };
+}
+
+const noRecord = (record) =>
+  !existsSync(record) && !existsSync(recordEntriesDir(record));
+
+test("validateCases: an unknown direction is refused, naming the case and the accepted values (obs #201)", () => {
+  const bad = validateCases([
+    CASES[0],
+    { ...CASES[3], id: "t.benign", direction: "benign" },
+  ]);
+  assert.deepEqual(bad, {
+    id: "t.benign",
+    field: "direction",
+    value: "benign",
+    accepted: [...DIRECTIONS],
+  });
+});
+
+test("validateCases: a present sink outside SINKS is refused; an absent sink is not (control)", () => {
+  assert.deepEqual(validateCases([{ ...CASES[0], sink: "nope" }]), {
+    id: CASES[0].id,
+    field: "sink",
+    value: "nope",
+    accepted: [...SINKS],
+  });
+  // Control: sink is optional on a case — the run's sink applies. The check
+  // must not over-fire on an absent optional field.
+  const { sink, ...noSink } = CASES[3];
+  assert.equal(sink, "url-authority");
+  assert.equal(validateCases([{ ...noSink, direction: "legitimate" }]), null);
+  assert.equal(validateCases(CASES), null);
+});
+
+test("validateCases: a non-array file and a non-object case are refused; an id-less case is named by index", () => {
+  assert.equal(validateCases({ cases: [] }).field, "cases");
+  assert.deepEqual(validateCases([CASES[0], "x"]), {
+    id: "#1",
+    field: "case",
+    value: "string",
+    accepted: ["object"],
+  });
+  assert.equal(validateCases([null]).value, "null");
+  assert.equal(validateCases([{ direction: "sideways" }]).id, "#0");
+});
+
+test("validateCases: every case of every sink's corpus passes — a failure is a corpus bug", () => {
+  let n = 0;
+  for (const sink of SINKS) {
+    const cases = corpusFor(sink);
+    n += cases.length;
+    assert.equal(validateCases(cases), null, sink);
+  }
+  assert.ok(n > 0, "the corpus loop measured something");
+});
+
+test("CLI: a cases file with an unknown direction exits 2 bad-cases, runs nothing and writes no record", () => {
+  const fx = recordFixture([
+    ...CASES,
+    { ...CASES[3], id: "t.benign", direction: "benign" },
+  ]);
+  try {
+    const r = runMain([
+      "--entry",
+      entry("engaging-control"),
+      "--cases-file",
+      fx.casesFile,
+      "--record",
+      fx.record,
+    ]);
+    assert.equal(r.rc, 2, r.err);
+    assert.match(
+      r.err,
+      /^bad-cases: case "t\.benign" has direction "benign"; accepted: hostile, legitimate\n$/,
+    );
+    assert.equal(r.out, "", "nothing ran: no verdict line");
+    assert.ok(noRecord(fx.record), "no record written");
+  } finally {
+    rmSync(fx.dir, { recursive: true, force: true });
+  }
+});
+
+test("CLI: a case sink outside SINKS exits 2 bad-cases with the sink list; --json prints the reason", () => {
+  const fx = recordFixture([{ ...CASES[0], sink: "nope" }]);
+  try {
+    const r = runMain([
+      "--entry",
+      entry("engaging-control"),
+      "--cases-file",
+      fx.casesFile,
+      "--record",
+      fx.record,
+      "--json",
+    ]);
+    assert.equal(r.rc, 2, r.err);
+    assert.match(
+      r.err,
+      new RegExp(`has sink "nope"; accepted: ${SINKS.join(", ")}`),
+    );
+    const j = JSON.parse(r.out);
+    assert.equal(j.reason, "bad-cases");
+    assert.match(j.detail, /case "t\.slash" has sink "nope"/);
+    assert.ok(noRecord(fx.record));
+  } finally {
+    rmSync(fx.dir, { recursive: true, force: true });
+  }
+});
+
+test("CLI control: a valid cases file runs and records as before", () => {
+  const fx = recordFixture(CASES);
+  try {
+    const r = runMain([
+      "--entry",
+      entry("engaging-control"),
+      "--cases-file",
+      fx.casesFile,
+      "--record",
+      fx.record,
+    ]);
+    assert.equal(r.rc, 0, r.err);
+    assert.match(r.out, /^engages /);
+    const rec = readRecord(fx.record);
+    assert.equal(rec.controls.length, 1);
+    assert.equal(rec.controls[0].executed, CASES.length);
+    assert.deepEqual(rec.controls[0].declined_cases, []);
+  } finally {
+    rmSync(fx.dir, { recursive: true, force: true });
+  }
+});
+
+test("runProbeSpec: supplied cases the scorer cannot place are declined bad-cases before any case runs", () => {
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: entry("engaging-control"),
+    cases: [{ ...CASES[0], direction: "benign" }],
+  });
+  assert.equal(r.verdict, "unverifiable");
+  assert.equal(r.reason, "bad-cases");
+  assert.equal(r.executed, 0);
+  assert.match(
+    r.declined[0].detail,
+    /has direction "benign"; accepted: hostile, legitimate/,
+  );
+});
+
+test("CLI: a missing entry exits 2 entry-not-found and writes no record, for every entry form with a path (obs #211)", () => {
+  const missing = `${FIXTURES}/t190-does-not-exist`;
+  const forms = [
+    ["js", [`${missing}.mjs#validateHost`]],
+    ["shell", [`shell:${missing}.sh`]],
+    ["shell-fn", [`shell-fn:${missing}.sh#fn`]],
+    ["cli", [`cli:${missing}.mjs`, "--argv", '["{input}"]']],
+    ["shell-argv", [`shell-argv:${missing}.sh`, "--argv", '["{input}"]']],
+    ["fence", [`fence:${missing}.md#Heading`, "--slot", "<x>"]],
+  ];
+  for (const [form, [ent, ...rest]] of forms) {
+    const fx = recordFixture();
+    try {
+      const r = runMain([
+        "--sink",
+        "filename",
+        "--entry",
+        ent,
+        ...rest,
+        "--record",
+        fx.record,
+        "--json",
+        "--repo-root",
+        REPO_ROOT,
+      ]);
+      assert.equal(r.rc, 2, `${form}: ${r.err}`);
+      assert.ok(r.err.startsWith("entry-not-found: "), `${form}: ${r.err}`);
+      assert.ok(r.err.includes("t190-does-not-exist"), form);
+      assert.ok(r.err.includes(`(repo root ${REPO_ROOT})`), form);
+      assert.equal(JSON.parse(r.out).reason, "entry-not-found", form);
+      assert.ok(noRecord(fx.record), `${form}: no record written`);
+    } finally {
+      rmSync(fx.dir, { recursive: true, force: true });
+    }
+  }
+});
+
+test("CLI: a resolveEntry failure is left to runProbeSpec — an escape is still declined, not refused as missing", () => {
+  const r = runMain([
+    "--sink",
+    "url-authority",
+    "--entry",
+    "../outside.mjs#f",
+    "--json",
+    "--repo-root",
+    REPO_ROOT,
+  ]);
+  assert.equal(r.rc, 1, r.err);
+  assert.equal(JSON.parse(r.out).reason, "outside-repo-root");
+});
+
+test("toRecordEntry carries each declined case's id, reason and detail beside the count (obs #207)", () => {
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: entry("not-a-function"),
+    cases: CASES,
+  });
+  assert.equal(r.declined.length, 1);
+  const fx = recordFixture();
+  try {
+    recordRun(fx.record, r, { name: "t190" });
+    const row = readRecord(fx.record).controls[0];
+    assert.equal(row.declined, 1);
+    assert.deepEqual(row.declined_cases, [
+      {
+        id: r.declined[0].id,
+        reason: r.declined[0].reason,
+        detail: r.declined[0].detail,
+      },
+    ]);
+    assert.match(row.declined_cases[0].detail, /not a function/);
+  } finally {
+    rmSync(fx.dir, { recursive: true, force: true });
+  }
+});
+
+/**
+ * Copy the engine and its sibling imports, walked transitively from the source,
+ * into `dest`. A hand list of the imports goes stale the first time the engine
+ * gains one (review-security.test.js, task.128).
+ */
+function copyEngine(dest) {
+  const src = join(__dirname, "..");
+  const seen = new Set();
+  const walk = (f) => {
+    if (seen.has(f)) return;
+    seen.add(f);
+    const text = readFileSync(join(src, f), "utf8");
+    for (const m of text.matchAll(
+      /(?:from|import)\s+["']\.\/([A-Za-z0-9._-]+\.m?js)["']/g,
+    )) {
+      walk(m[1]);
+    }
+  };
+  walk("security-probe.mjs");
+  mkdirSync(dest, { recursive: true });
+  for (const f of seen) cpSync(join(src, f), join(dest, f));
+  return join(dest, "security-probe.mjs");
+}
+
+/** defaultRepoRoot() as the copy at `engine` computes it, run from `cwd`. */
+function rootFrom(engine, cwd, env = process.env) {
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--input-type=module",
+      "-e",
+      "const m = await import(process.argv[1]); process.stdout.write(m.defaultRepoRoot());",
+      pathToFileURL(engine).href,
+    ],
+    { cwd, encoding: "utf8", env },
+  );
+  assert.equal(r.status, 0, r.stderr);
+  return r.stdout;
+}
+
+test("defaultRepoRoot: a bundled copy defaults to the git top level; a shared/resources copy to two up; no git falls back (obs #211)", () => {
+  const base = realpathSync(mkdtempSync(join(tmpdir(), "probe-t190-root-")));
+  try {
+    const repo = join(base, "repo");
+    mkdirSync(repo);
+    const init = spawnSync("git", ["init", "-q", repo], { encoding: "utf8" });
+    assert.equal(init.status, 0, init.stderr);
+    // A bundled copy: two levels up is <repo>/skills, not the repository.
+    const bundled = copyEngine(join(repo, "skills", "x", "references"));
+    assert.equal(rootFrom(bundled, repo), repo);
+    // A source-tree copy under a nested shared/resources: two levels up, which
+    // here is NOT the git top level — so the result tells the branches apart.
+    const source = copyEngine(join(repo, "sub", "shared", "resources"));
+    assert.equal(rootFrom(source, repo), join(repo, "sub"));
+    // Outside any git checkout: git fails and the copy falls back to two up.
+    const loose = copyEngine(join(base, "loose", "a", "references"));
+    const env = { ...process.env, GIT_CEILING_DIRECTORIES: base };
+    delete env.GIT_DIR;
+    delete env.GIT_WORK_TREE;
+    assert.equal(
+      rootFrom(loose, join(base, "loose"), env),
+      join(base, "loose"),
+    );
+  } finally {
+    rmSync(base, { recursive: true, force: true });
   }
 });

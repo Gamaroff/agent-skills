@@ -146,6 +146,20 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The security probe refuses what it cannot score, and the record says why a case was declined
+  (task 190).** `security-probe.mjs` now exits 2 before running or recording anything in two cases
+  that used to produce a misleading verdict. A `--cases-file` case whose `direction` is not
+  `hostile` or `legitimate`, or whose `sink` is not a known sink, is refused `bad-cases`, naming
+  the case and the accepted values (obs #201) — such a case used to run and count toward neither
+  side. An entry whose path does not exist is refused `entry-not-found`, naming the path and the
+  root (obs #211). Under `--json` both print `{reason, detail}`. A bundled copy run without
+  `--repo-root` now defaults its root to the git checkout it runs in, not the skills directory two
+  levels above it. Each record entry gains `declined_cases: [{id, reason, detail}]` beside the
+  `declined` count (obs #207); the field is additive. `runProbeSpec` declines `bad-cases` for a
+  library caller and still declines a missing entry `entry-not-probeable`.
+  **Breaking:** a CLI run with an unknown case direction or sink, or a missing entry, exits 2 where it
+  used to exit 0 or 1. Fix the value or the path; the error names both.
+
 - **Read-only Explore subagents are never asked to write (task 189, observations #191, #218).** Two
   pipeline steps dispatched a read-only Explore agent and then told it to write a file; it refused
   every time, and each run finished only because the orchestrator noticed and did the write by hand

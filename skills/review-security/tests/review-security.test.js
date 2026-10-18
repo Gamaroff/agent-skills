@@ -708,10 +708,13 @@ test("CLI: every operand flag rejects a missing or flag-shaped operand with exit
   assert.match(probeMode.stderr, /--mode must be diff or full/);
 });
 
-test("CLI: --repo-root re-anchors containment so a bundled copy can probe the consumer's tree", async () => {
+test("CLI: a bundled copy probes the consumer's tree by default, and --repo-root still re-anchors it", async () => {
   // Copy the engine and its imports into a nested dir, as the bundler does into
-  // skills/*/references/. From there defaultRepoRoot() is the nested dir and a
-  // repo-relative entry is an escape; --repo-root makes it resolve again.
+  // skills/*/references/. Two levels above that copy is not the repository, so
+  // the default root is the git checkout the caller runs in (task.190, obs #211):
+  // a repo-relative entry resolves with no --repo-root. An explicit --repo-root
+  // still wins, and one under which the entry does not exist is refused before
+  // anything runs.
   const nest = fs.mkdtempSync(
     path.join(REPO_ROOT, "skills/review-security/tests/.t118-nest-"),
   );
@@ -758,15 +761,17 @@ test("CLI: --repo-root re-anchors containment so a bundled copy can probe the co
         { cwd: REPO_ROOT, encoding: "utf8" },
       );
     const without = JSON.parse(runNested([]).stdout);
-    assert.equal(without.verdict, "unverifiable");
-    // Not an escape: the path is CONTAINED in the nested root and simply does
-    // not exist there. Asserting the reason is what keeps this test honest about
-    // which failure --repo-root fixes.
-    assert.equal(
-      without.reason,
-      "entry-not-probeable",
-      JSON.stringify(without.declined),
-    );
+    assert.equal(without.verdict, "engages", JSON.stringify(without.declined));
+    // The root the copy used to default to: two levels above it. The entry is
+    // CONTAINED there and simply does not exist, so the run is refused as an
+    // argument error (exit 2) rather than declined into a verdict a record
+    // would carry. Asserting the reason keeps this test honest about which
+    // failure the refusal names.
+    const oldRoot = path.join(nest, "..", "..");
+    const wrongRoot = runNested(["--repo-root", oldRoot]);
+    assert.equal(wrongRoot.status, 2, wrongRoot.stderr);
+    assert.equal(JSON.parse(wrongRoot.stdout).reason, "entry-not-found");
+    assert.match(wrongRoot.stderr, /^entry-not-found: /);
     const withRoot = JSON.parse(runNested(["--repo-root", REPO_ROOT]).stdout);
     assert.equal(
       withRoot.verdict,
