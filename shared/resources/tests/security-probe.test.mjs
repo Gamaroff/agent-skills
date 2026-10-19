@@ -46,6 +46,7 @@ import {
   computeVerdict,
   defaultRepoRoot,
   describeBadCase,
+  emitBlock,
   expectedProblem,
   extractFencedBlock,
   FENCE_PREFIX,
@@ -865,6 +866,68 @@ test("shell entry: escapes and shells survive the all-errored decline (CR-3)", (
     assert.ok(r.escapes.length > 0, "the escape must survive the collapse");
     assert.deepEqual(r.shells, [...probeShells()]);
     assert.ok(toRecordEntry(r).escaped > 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("record: totals.escaped sums every control's escapes, and the emitted block carries it (obs #73)", () => {
+  // qa-task read totals.executed and totals.reproduced and gated PASS over a record whose one
+  // control had escaped 10 times; /finalise, reading the same record per control, halted on it.
+  // The count lives in totals now, where both readers already look.
+  const dir = mkdtempSync(join(REPO_ROOT, "shared/resources/tests/.obs73-"));
+  try {
+    const leaky = join(dir, "leaky.sh");
+    writeFileSync(
+      leaky,
+      '#!/usr/bin/env bash\ntouch "$HOME/PWNED-$RANDOM"\nprintf \'%s\\n\' "$1"\n',
+      { mode: 0o755 },
+    );
+    const clean = join(dir, "clean.sh");
+    writeFileSync(clean, "#!/usr/bin/env bash\nprintf '%s\\n' \"$1\"\n", {
+      mode: 0o755,
+    });
+    const cases = corpusFor("filename").slice(0, 2);
+    const record = join(dir, "x.security.run.json");
+    const leakyRun = runProbeSpec({
+      sink: "filename",
+      entry: `shell:${relative(REPO_ROOT, leaky)}`,
+      cases,
+    });
+    const cleanRun = runProbeSpec({
+      sink: "filename",
+      entry: `shell:${relative(REPO_ROOT, clean)}`,
+      cases,
+    });
+    assert.ok(
+      leakyRun.escapes.length > 0,
+      "premise: the leaky control escapes",
+    );
+    assert.equal(
+      cleanRun.escapes.length,
+      0,
+      "premise: the clean control does not",
+    );
+    recordRun(record, leakyRun, { name: "leaky" });
+    recordRun(record, cleanRun, { name: "clean" });
+
+    const rec = readRecord(record);
+    const perControl = rec.controls.map((c) => c.escaped);
+    assert.equal(rec.totals.escaped, leakyRun.escapes.length);
+    assert.equal(
+      rec.totals.escaped,
+      perControl.reduce((a, b) => a + b, 0),
+    );
+    // The snapshot a jq reader opens carries the same total.
+    assert.equal(
+      JSON.parse(readFileSync(record, "utf8")).totals.escaped,
+      rec.totals.escaped,
+    );
+
+    const block = emitBlock(rec);
+    assert.match(block, new RegExp(`^  escaped: ${rec.totals.escaped}$`, "m"));
+    assert.match(block, /^ {6}escaped: 0$/m, "the clean control reads 0");
+    assert.match(emitBlock(null), /^ {2}escaped: 0$/m);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

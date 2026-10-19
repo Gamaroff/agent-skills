@@ -3693,13 +3693,17 @@ export function toRecordEntry(result, { name, callSite } = {}) {
   };
 }
 
+// `escaped` is totalled beside `executed` so every reader of the record sees it at the same depth.
+// It used to live only per control, and qa-task gated PASS over a record whose one control had
+// escaped 10 times while /finalise, reading the same record, halted on it (obs #73).
 function totalsOf(controls) {
   return controls.reduce(
     (t, c) => ({
       executed: t.executed + (c.executed ?? 0),
       reproduced: t.reproduced + (c.reproduced ?? 0),
+      escaped: t.escaped + (c.escaped ?? 0),
     }),
-    { executed: 0, reproduced: 0 },
+    { executed: 0, reproduced: 0, escaped: 0 },
   );
 }
 
@@ -3968,6 +3972,7 @@ export function emitBlock(record, { mode = "diff" } = {}) {
   if (!record) {
     lines.push(
       "  probes_executed: 0    # no run record — the engine did not run",
+      "  escaped: 0",
       `  evidence: ${evidence}    # computed by security-probe.mjs; measured needs a record`,
       "  controls: []",
     );
@@ -3976,6 +3981,8 @@ export function emitBlock(record, { mode = "diff" } = {}) {
   const totals = totalsOf(record.controls);
   lines.push(
     `  probes_executed: ${totals.executed}`,
+    // A non-zero count is a finding whatever the verdicts say (probe-boundary-rule.md).
+    `  escaped: ${totals.escaped}`,
     `  evidence: ${evidence}    # computed by security-probe.mjs from the run record`,
   );
   if (record.controls.length === 0) {
@@ -3992,6 +3999,7 @@ export function emitBlock(record, { mode = "diff" } = {}) {
         `      sink: ${yamlStr(c.sink)}`,
         `      reason: ${yamlStr(c.reason)}`,
         `      probes_executed: ${c.executed}`,
+        `      escaped: ${c.escaped ?? 0}`,
         ...(Array.isArray(c.shells) && c.shells.length > 0
           ? [`      shells: [${c.shells.join(", ")}]`]
           : []),

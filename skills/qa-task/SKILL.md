@@ -716,7 +716,15 @@ JSON
    `finding` naming the input verbatim). Record the total executed as **`probes_executed: N`**
    beside the block, **copied from the run record's `totals.executed`** (the file `--record`
    wrote — equal to `executed` in the engine's JSON), never counted by hand; the gate's
-   `nfr_validation.security.evidence` may read `measured` only when that total is positive. An empty
+   `nfr_validation.security.evidence` may read `measured` only when that total is positive.
+   **An escape is a finding, whatever the verdict.** Copy the run record's `totals.escaped` beside
+   it as **`escaped: N`**. A non-zero count is a gate finding in `top_issues[]`, never a
+   `recommendations.future` item, even when every case scored as its direction requires: the
+   probe saw the entry point write outside its sandbox, which is a defect in the shipped code
+   (`file_line` = the entry point, `finding` naming each escaping case id and the path it wrote).
+   `/finalise` Step 3b.1 reads the same record and halts on the same count, so a gate that passes
+   over it only moves the finding to the DoD (obs #73).
+   An empty
    findings list with `probes_executed: 0` is a review that read the boundary and did not test it,
    which is the defect this item closes. So when `boundary: true` and the run record's
    `totals.executed` is 0, that is a QA finding, not a `reasoned` pass: name the remedy in it — make
@@ -1211,6 +1219,7 @@ nfr_validation:
     # probes_executed rule: references/qa-gate-security-evidence.md
     evidence: measured|reasoned|unverified
     probes_executed: 0 # REQUIRED when evidence: measured; `measured` with 0 is a schema error
+    escaped: 0 # the run record's totals.escaped; non-zero is a top_issues[] finding, never PASS
     notes: 'Specific findings'
   performance:
     status: PASS|CONCERNS|FAIL
