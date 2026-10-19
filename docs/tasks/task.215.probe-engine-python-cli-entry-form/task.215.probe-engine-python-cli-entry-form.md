@@ -169,6 +169,9 @@ Both items need a merged, tagged release, and `/finalise` runs before merge, so 
   (`--entry 'cli:scripts/threatradar.py' --argv '["merge-back","--schema","3","{input}"]'`) executes candidates. Open
   point: the `path` sink's cases must fit a `merge-back` target (a case may need `--cases-file`, and the `cli:` form has no
   `--fixture-setup`). Settle it against the consumer; if the form needs a missing piece, that is a follow-up task.
+- **TASK-215-QA7-1** (LOW) — carried to gate 7 `recommendations.future` (route 2b, cycle 7): the thread-crash test's direct spawn depends on the cwd.
+- **TASK-215-QA7-2** (LOW) — carried to gate 7 `recommendations.future` (route 2b, cycle 7): the exit-120 detail carries no stderr.
+- **TASK-215-QA7-3** (LOW) — carried to gate 7 `recommendations.future` (route 2b, cycle 7): CHANGELOG wording narrower than the rule doc.
 
 ---
 
