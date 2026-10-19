@@ -1,0 +1,61 @@
+schema: 2
+task: 'task.215.probe-engine-python-cli-entry-form'
+task_title: 'security-probe: run a Python CLI under the cli: entry form'
+gate: CONCERNS
+status_reason: 'Cycle 4 fixes verified: the exit record is positive, so a closed, replaced or reopened fd 3, os._exit, exec and an interpreter that cannot start are errored, never scored (probe: 26 cases, every crash shape errored, 7 executed and passed). One MEDIUM: an exception outside the main frame (a joined worker thread, an atexit handler) exits 0 under python3 and is scored accepted — the false-alarm direction, but not stated as a limit.'
+reviewer: 'QA Engineer'
+head: '0aff23d70913b967ee17a117f13b3dc3a1befb8f'
+updated: '2026-10-19T13:24:46Z'
+
+top_issues:
+  - id: 'TASK-215-QA5-1'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'PYTHON_BOOTSTRAP writes the answer record when the main-thread body returns, so an exception raised in a joined worker thread or an atexit handler leaves python3 exiting 0 and the case is scored accepted rather than errored; isPythonCrash reads stderr only on exit 1, and probe-boundary-rule.md does not state the shape. Diff reviewer CR-1 (medium/high), reproduced by the cycle-5 probe (py-cli.thread-crash-answers, py-cli.crash-in-atexit: accepted, exit 0). The score matches python3 <entry> (measured exit 0 for both) and errs toward a false alarm on a hostile case, so SC4 (never rejected) holds. Bug report: task.215.bug.9.crash-outside-main-frame-scored-answer.md'
+    suggested_action: 'State the shape in probe-boundary-rule.md as a limit (scored by the exit status python3 gives; a hostile case reads accepted, a reproduction to investigate), or wrap threading.excepthook and sys.unraisablehook to write a crash record, with a stated reason and fixtures.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 322
+  phases_verified: 2/2
+  ci: 'not read; CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 7
+    notes: 'cli: arm probed with the engine against a crash-matrix CLI (run record task.215.qa.5.security.run.json): 26 cases, 7 executed and passed, 19 errored as required — 11 crash shapes behind a silent excepthook, fd 3 closed / reopened as the script''s own file / dup2''d over, a forged answer with the real nonce (crash record wins), SIGKILL, and the fail-safe limits (os._exit, exec, a closed fd 3 on an answer). No crash shape scored rejected. One MEDIUM (TASK-215-QA5-1): a crash outside the main frame is scored by python3''s exit 0.'
+  performance:
+    status: PASS
+    notes: 'A forked daemon no longer holds a case to the timeout (fork-daemon test, 2 s timeout); one fstat per record write.'
+  reliability:
+    status: PASS
+    notes: 'An interpreter that cannot start a case writes no record and is declined once (TASK-215-QA4-2 closed).'
+  maintainability:
+    status: PASS
+    notes: 'One record reader, read once per case (CR-3 closed); rule stated once in probe-boundary-rule.md; bundle in sync.'
+
+recommendations:
+  immediate:
+    - action: 'TASK-215-QA5-1: state the outside-the-main-frame shape as a limit in probe-boundary-rule.md (or wrap the thread and unraisable hooks with a stated reason).'
+      refs: ['shared/resources/probe-boundary-rule.md', 'shared/resources/security-probe.mjs']
+  future:
+    - action: 'Commit a test for crash-record precedence: a script that writes `answer <nonce>` itself (from sys.orig_argv) and then crashes must stay errored. Spot-check mutation "answer wins over crash" reds no test (no-red-untested); the cycle-5 probe case py-cli.crash-forged-nonce shows the behaviour.'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+    - action: 'Pre-existing wording: a child killed by a signal it sent itself reads "killed by SIGKILL (timeout 60000ms)" — the timeout clause is printed for every signal.'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-215-QA5-1 stated as a limit or fixed']

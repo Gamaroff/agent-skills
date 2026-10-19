@@ -345,8 +345,10 @@ takes it.
   recorded as having answered. A stdin-reading function, or one needing more
   than argv, is still declined (§ Out of Scope, task.128).
 
-  **`cli:path --argv '<JSON array>'` runs a Node CLI** — a `.mjs` / `.js`
-  script — as `node <path> ...argv`, one probe per case, for the boundary that
+  **`cli:path --argv '<JSON array>'` runs a Node or Python CLI** — a `.mjs` /
+  `.js` script as `node <path> ...argv`, a `.py` script as
+  `python3 -E -s -B <path> ...argv` would run it (task.215; through a bootstrap that catches a
+  crash, below) — one probe per case, for the boundary that
   lives behind a **flag parser** rather than a one-argument export (task.141's
   `uat-status.mjs --env` guard sits behind a three-argument function; the JS
   form could not reach it, and the gate recorded zero probes executed). The
@@ -379,6 +381,55 @@ takes it.
     turns the false pass into a false alarm a reader will investigate, which is
     the direction to err in. Neither makes the crash *errored*: only Node's
     uncaught-error footer, a kill or a timeout does.
+  - **A Python crash exits 1, which is what a refusal exits with**, and prints
+    no Node footer, so the engine does not read the crash off the exit status.
+    A `.py` entry runs inside a bootstrap (`PYTHON_BOOTSTRAP`) that runs it as
+    `python3 <path>` would — `sys.argv[0]` is the script, `sys.path[0]` its
+    directory, `__name__` is `"__main__"` and stays so after the body returns
+    — and writes an **exit record** on fd 3 for every exit it controls:
+    `answer <nonce>` when the body returns or raises `SystemExit` (the
+    script's answer, so a plain `sys.exit(1)` or `sys.exit("refused: …")`
+    stays *rejected*), and `crash <nonce>` when it raises anything else,
+    caught **before any excepthook runs** and written before anything is read
+    off the exception (its `Class: message` follows, best-effort, as the
+    detail); the script's own excepthook then prints it and the child exits 1.
+    A crash record makes the case *errored*, so an exception whose `str()` or
+    class name raises is still a crash (task.215 QA cycle 3), and so is one
+    behind a replaced `sys.excepthook` (rich, Typer), `sys.stderr` redirected
+    or `None`, or `sys.tracebacklimit = 0` — each exits 1 with no frame, which
+    stderr alone read as a refusal (task.215 QA cycle 2). **A case with no
+    record is *errored* too** — the channel is positive, so every way to lose
+    the write fails safe (task.215 QA cycle 4). The nonce is the engine's, per
+    case. A record is written only while fd 3 is still the pipe the bootstrap
+    started with, and only by the process that started it; a forked child
+    closes fd 3, so a child's crash is not the script's answer and a daemon
+    does not hold the case open past it. **Stated limit, the safe direction:** a script that
+    closes inherited descriptors (`os.closerange(3, …)`), leaves by
+    `os._exit` or replaces itself with `exec`, and a `python3` that answers
+    `--version` but cannot start inside the sandbox (the engine probes it
+    under its own environment, not the case's), leave no record and are
+    *errored* on every case — declined `entry-not-probeable`, never scored.
+    **Stated limit, the false-alarm direction:** an exception the body's
+    frame never sees — raised in a worker thread the body started and joined,
+    in an atexit handler, or in a finaliser — is printed by Python and
+    swallowed, `python3 <path>` exits 0, and the bootstrap has already written
+    `answer`. The case is scored by that exit status, so a hostile case reads
+    *accepted*: a reproduction to investigate, never a pass (task.215 QA cycle
+    5). A control that validates in a worker thread is scored by the exit
+    status its main thread chooses, except that an exit 1 after the thread's
+    traceback is read as a crash by the stderr signal below — *errored*, the
+    safe direction. The one failure of this kind that changes the exit status,
+    a failed flush of stdout or stderr at shutdown (CPython exits 120), is
+    *errored* for a `.py` entry whatever the record says, and so is a script
+    that calls `sys.exit(120)` itself (task.215 QA cycle 6). **Beside the exit
+    record, the stderr signal:** an exit 1 whose stderr holds a `File "…", line N` frame under a
+    `Traceback (most recent call last):` header (an ExceptionGroup's
+    included), or a frame and a `SyntaxError`-family line, is *errored*
+    whatever follows it, so a script that catches its failure, prints the
+    traceback itself and exits 1 reads as a crash — the safe direction. A
+    refusal that prints an exception-shaped line with no frame stays
+    *rejected*, and so does an "Exception ignored" traceback beside an answer
+    on any status but 1.
   - **A materialised sink writes the case's name into the fixture.** For a sink
     in `MATERIALISED_SINKS` the fixture directory holds the sink's controls
     *and* a file named by the case's input — the cwd, and `{fixture}`, are what
@@ -414,10 +465,20 @@ takes it.
     `warning: replaced control …` line and the write still happens — the
     remedy is `--name`, not a reordered template.
 
-  `cli:` does **not** touch §2: the engine chooses the interpreter
-  (`process.execPath`) and the script is fixed by `--entry` and
+  `cli:` does **not** touch §2: the engine chooses the interpreter by the
+  script's extension (`process.execPath` for `.mjs` / `.js`, the host's
+  `python3` for `.py`) and the script is fixed by `--entry` and
   containment-checked before anything spawns, exactly as the JS form already
-  runs a Node child. `node` stays off `SAFE_COMMANDS`.
+  runs a Node child. `node` and `python3` stay off `SAFE_COMMANDS`. A `.py`
+  entry runs with `-E` (no `PYTHON*` variable is honoured — and the sandbox
+  passes none), `-s` (no user site-packages) and `-B` (no bytecode: without it
+  a sibling import writes `__pycache__/` into the watched script directory and
+  every case reports an escape); never `-I`, which drops the script's own
+  directory from `sys.path` and breaks a sibling import. `python3` is resolved
+  once per run with `python3 --version` on the engine's `PATH`; when it does
+  not run, the entry is declined `entry-not-probeable` once, naming `python3`.
+  The result and the record carry `interpreter` (`{ name, version }`), `null`
+  for every other form, so a record says which Python answered.
 
   **`shell-argv:path --argv '<JSON array>'` runs a bash script that takes
   several arguments or flags** (task.181) — `verify-push-state.sh --base …
@@ -531,7 +592,7 @@ takes it.
   task.150 spent three QA cycles finding them one layer at a time (obs #209).
 
 The precondition — a pure-ish predicate, composer, single-argument script,
-argv-driven Node CLI or shell script, or fenced bash block with one
+argv-driven Node or Python CLI or shell script, or fenced bash block with one
 placeholder — is what the
 boundary rule selects for anyway. If it turns
 out that most real controls are reachable by none of the forms and the engine declines almost
@@ -545,7 +606,7 @@ entry form reaches) is not exempt from being tested; it is exempt from the
 *engine*. **Reach for this only after the entry forms have been tried** — a
 one-argument script is `shell:`'s job, a shell script taking several arguments
 or flags is `shell-argv:`'s (with `--fixture-setup` when it needs a
-repository), a Node CLI driven by its argv is `cli:`'s and a fenced bash block
+repository), a Node or Python CLI driven by its argv is `cli:`'s and a fenced bash block
 in a step doc is `fence:`'s, and a by-hand probe of any of them is the self-report the engine
 exists to remove. A `cli:` probe exercises **one arm**
 — the CLI's own argv; the other arms below (a wrapper, an env-var path) still

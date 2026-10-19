@@ -153,7 +153,7 @@ clean result:
    `file:line`, recording the module path the engine resolved, and downgrading any citation naming no
    file in scope to `unverifiable`.
 3. **A non-JS entry point is routed to the engine's `shell:` entry form** — or `shell-fn:` for a
-   sourced library, `cli:` with an `--argv` template for a Node CLI whose decision sits behind
+   sourced library, `cli:` with an `--argv` template for a Node or Python CLI whose decision sits behind
    its flags, `shell-argv:` with an `--argv` template (and `--fixture-setup` when it needs a
    repository) for a shell script that takes several arguments or flags, and `fence:` with
    `--slot` for a fenced bash block in a step doc — never recorded `unverifiable` for being

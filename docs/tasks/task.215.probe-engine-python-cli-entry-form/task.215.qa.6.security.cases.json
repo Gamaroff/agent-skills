@@ -1,0 +1,6 @@
+[
+  {"id":"py-cli.legit-host","direction":"legitimate","input":"example.com"},
+  {"id":"py-cli.legit-host-port","direction":"legitimate","input":"example.com:8080"},
+  {"id":"py-cli.hostile-userinfo","direction":"hostile","input":"a@b"},
+  {"id":"py-cli.hostile-userinfo-port","direction":"hostile","input":"user@evil.example:443"}
+]

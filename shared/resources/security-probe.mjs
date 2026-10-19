@@ -23,8 +23,9 @@
  *                        with the case's input as its argv, per case under bash
  *                        and (when present) zsh. See "The shell-fn entry form".
  *                        or `cli:relative/path.mjs` — a NODE CLI run with the
- *                        `--argv` template, one probe per case. See "The cli
- *                        entry form".
+ *                        `--argv` template, one probe per case; a `.py` path is
+ *                        a PYTHON CLI, run the same way under python3. See "The
+ *                        cli entry form".
  *                        or `shell-argv:relative/path.sh` — a SHELL SCRIPT taking
  *                        several arguments or flags, run with the `--argv`
  *                        template under bash, called from bash and (when present)
@@ -179,6 +180,20 @@
  * so two different controls on one script
  * (`--env {input}`, `--clear-note {input}`) are two controls, not one.
  *
+ * A PYTHON CLI (task.215) takes the same form: `cli:<path>.py` runs the script
+ * under `python3 -E -s -B` with the same template, sandbox, timeout and
+ * verdict. The interpreter is chosen by extension (CLI_INTERPRETERS) and the
+ * host's python3 is resolved once per process (probePython); when it does not
+ * run, the entry is declined `entry-not-probeable` once, by name. A Python crash
+ * exits 1 — a refusal's status — and prints no Node footer, so the script runs
+ * inside PYTHON_BOOTSTRAP, which writes an exit record on fd 3 for every exit
+ * it controls — `answer` when the body returns or raises SystemExit, `crash`
+ * when it raises anything else, caught before any excepthook runs. A case
+ * with no record is `errored`, so every way to lose the write fails safe.
+ * A traceback on stderr with exit 1 (isPythonCrash) is read as a crash too. The
+ * result and the record carry `interpreter` ({ name, version }), null for every
+ * other form.
+ *
  * THE SHELL-ARGV ENTRY FORM (task.181). A boundary delivered as a SHELL SCRIPT
  * TAKING SEVERAL ARGUMENTS OR FLAGS (`verify-push-state.sh --base … --scope …`,
  * `reenter-qa-after-finalise.sh <doc-dir> <report>`) matched none of the forms —
@@ -241,7 +256,7 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import {
   accessSync,
   constants as fsConstants,
@@ -701,8 +716,159 @@ export const FENCE_PREFIX = "fence:";
 export const ARGV_SLOTS = Object.freeze(["{input}", "{fixture}"]);
 /** Anything shaped like a slot, known or not — used to refuse unknown and embedded ones. */
 const SLOT_SHAPE = /\{[A-Za-z_][A-Za-z0-9_-]*\}/;
-/** Script extensions the cli: form runs under `process.execPath`. */
-const CLI_EXTENSIONS = Object.freeze([".mjs", ".js"]);
+/**
+ * The interpreter the cli: form runs a script under, by extension. `node` is
+ * `process.execPath`; `python3` is the host's, resolved once per process by
+ * probePython() (task.215).
+ */
+const CLI_INTERPRETERS = Object.freeze({
+  ".mjs": "node",
+  ".js": "node",
+  ".py": "python3",
+});
+const CLI_EXTENSIONS = Object.freeze(Object.keys(CLI_INTERPRETERS));
+/**
+ * How a `.py` entry is run: `python3 -E -s -B -c PYTHON_BOOTSTRAP <entry>
+ * ...argv` (task.215). `-E` ignores every PYTHON* variable (a second line:
+ * caseEnv passes none), `-s` drops user site-packages, and `-B` writes no
+ * bytecode — without it a script that imports a sibling writes __pycache__/
+ * into its own directory, which watchedSpawn reports as an escape on every
+ * case. Never `-I`: it drops the script's directory from sys.path, so a
+ * sibling import fails to start.
+ */
+const PYTHON_FLAGS = Object.freeze(["-E", "-s", "-B"]);
+
+/**
+ * The fd a Python child reports how it ended on: the first after stdin,
+ * stdout and stderr. runCliCase gives a Python child a pipe there; nothing
+ * else writes it.
+ */
+const PYTHON_RECORD_FD = 3;
+
+/**
+ * The two records PYTHON_BOOTSTRAP writes on PYTHON_RECORD_FD, each followed
+ * by the case's nonce: `answer <nonce>` when the body returned or raised
+ * SystemExit, `crash <nonce>` when it raised anything else.
+ */
+const PYTHON_ANSWER = "answer";
+const PYTHON_CRASH = "crash";
+
+/**
+ * The status CPython exits with when flushing sys.stdout or sys.stderr fails
+ * at interpreter shutdown — after the body returned and `answer` was written.
+ * A refusal never needs it, and read as one it scored a crash `rejected`
+ * (QA cycle 6, TASK-215-QA6-1). A script that calls sys.exit(120) itself is
+ * `errored` too: the safe direction.
+ */
+const PYTHON_FINALIZE_STATUS = 120;
+
+/**
+ * Runs the entry as `python3 <entry>` would — sys.argv[0] is the entry,
+ * sys.path[0] its directory, the body executed in a fresh `__main__` module
+ * that stays `sys.modules["__main__"]` after the body returns (atexit handlers
+ * and threads see the script's module, as under `python3 <entry>`; QA cycle 3,
+ * TASK-215-QA3-4) — and reports how the body ended on PYTHON_RECORD_FD.
+ *
+ * THE CHANNEL IS POSITIVE (QA cycle 4, TASK-215-QA4-1). Every exit the
+ * bootstrap controls writes a record: `answer <nonce>` when the body returns
+ * or raises SystemExit (the script's answer, which propagates untouched), and
+ * `crash <nonce>` when it raises anything else — caught BEFORE any excepthook
+ * runs, so a replaced sys.excepthook (rich, Typer), sys.stderr redirected or
+ * None, or sys.tracebacklimit = 0 cannot hide it (QA cycle 2). The crash
+ * record is a constant written before the exception is touched; its
+ * `Class: message` follows on the next line, best-effort, as the detail only
+ * (QA cycle 3). Then the script's own excepthook prints the crash as it would
+ * have (traceback trimmed to the entry's frames) and the child exits 1.
+ *
+ * A child with NO record is `errored`: whatever lost the write — a script
+ * that closed or reopened fd 3, os._exit, an exec, an interpreter that never
+ * reached the bootstrap (TASK-215-QA4-2) — fails safe. Cycles 2–4 wrote a
+ * record only on a crash and read its absence as an answer, so every way to
+ * lose the write was a false `rejected`. A record is written only while fd 3
+ * is still the pipe the bootstrap started with (same st_dev and st_ino), so a
+ * script that closed it and opened a file of its own there never has a record
+ * written into that file. The nonce is the engine's, per case, and comes off
+ * argv before the body runs: nothing else on the fd reads as a record.
+ *
+ * The record speaks for the body's frame only. An exception Python prints and
+ * swallows elsewhere — a joined worker thread, an atexit handler, a finaliser
+ * — leaves `python3 <entry>` exiting 0 after `answer` was written, and the
+ * case is scored by that exit status: a hostile case reads accepted, a false
+ * alarm, never a pass. The one such failure that changes the status, a
+ * failed flush at shutdown (exit 120), is errored (PYTHON_FINALIZE_STATUS,
+ * QA cycle 6). A stated limit in probe-boundary-rule.md (QA cycle 5,
+ * TASK-215-QA5-1).
+ *
+ * Only the process that started the bootstrap writes, and a forked child
+ * closes the fd (QA cycle 3, TASK-215-QA3-2/QA3-3): a child would otherwise
+ * report for the parent, and a daemon holding the pipe kept every case
+ * waiting for the timeout. The fd is also not inherited across exec, so no
+ * process the script starts can hold the pipe open past its exit.
+ */
+const PYTHON_BOOTSTRAP = [
+  "import os, sys",
+  "boot_pid = os.getpid()",
+  "try:",
+  `    boot_st = os.fstat(${PYTHON_RECORD_FD})`,
+  "    boot_id = (boot_st.st_dev, boot_st.st_ino)",
+  `    os.set_inheritable(${PYTHON_RECORD_FD}, False)`,
+  "except OSError:",
+  "    boot_id = None",
+  "def close_record_fd():",
+  "    try:",
+  `        os.close(${PYTHON_RECORD_FD})`,
+  "    except OSError:",
+  "        pass",
+  "os.register_at_fork(after_in_child=close_record_fd)",
+  "def record(data):",
+  "    if boot_id is None or os.getpid() != boot_pid:",
+  "        return",
+  "    try:",
+  `        st = os.fstat(${PYTHON_RECORD_FD})`,
+  "        if (st.st_dev, st.st_ino) == boot_id:",
+  `            os.write(${PYTHON_RECORD_FD}, data)`,
+  "    except BaseException:",
+  "        pass",
+  "nonce = sys.argv[1].encode()",
+  "entry = sys.argv[2]",
+  "sys.argv = sys.argv[2:]",
+  "sys.path[0] = os.path.dirname(os.path.abspath(entry))",
+  "boot_main = sys.modules['__main__']",
+  "main = type(sys)('__main__')",
+  "main.__file__ = entry",
+  "main.__cached__ = None",
+  "sys.modules['__main__'] = main",
+  "try:",
+  "    with open(entry, 'rb') as f:",
+  "        source = f.read()",
+  "    exec(compile(source, entry, 'exec'), main.__dict__)",
+  "except SystemExit:",
+  `    record(b'${PYTHON_ANSWER} ' + nonce + b'\\n')`,
+  "    raise",
+  "except BaseException as e:",
+  `    record(b'${PYTHON_CRASH} ' + nonce + b'\\n')`,
+  "    try:",
+  "        line = type(e).__name__",
+  "        try:",
+  "            text = (str(e).splitlines() or [''])[0]",
+  "            if text:",
+  "                line = line + ': ' + text",
+  "        except BaseException:",
+  "            pass",
+  "        record(line.encode('utf-8', 'replace')[:400] + b'\\n')",
+  "    except BaseException:",
+  "        pass",
+  "    tb = e.__traceback__",
+  "    while tb is not None and tb.tb_frame.f_code.co_filename != entry:",
+  "        tb = tb.tb_next",
+  "    try:",
+  "        sys.excepthook(type(e), e.with_traceback(tb), tb)",
+  "    except BaseException:",
+  "        pass",
+  "    sys.exit(1)",
+  "else:",
+  `    record(b'${PYTHON_ANSWER} ' + nonce + b'\\n')`,
+].join("\n");
 
 /**
  * Validate a `--argv` template (task.144). Accepts the CLI's JSON text or an
@@ -947,6 +1113,31 @@ const SHELL_FN_BODY =
  * Memoised: probing for zsh once per process, not once per case.
  */
 let _shells;
+let _python;
+/**
+ * The host's `python3`, as `{ name, version }`, or null when `python3 --version`
+ * does not run on the engine's PATH — the PATH caseEnv hands the child, so the
+ * resolution and the spawn agree. Memoised like probeShells(): once per process,
+ * never once per case (task.215). It runs under the engine's environment, not
+ * caseEnv, so it can pass for an interpreter that then cannot start inside the
+ * sandbox (a real-HOME dependency); such a child writes no exit record and
+ * every case is `errored`, never scored (QA cycle 4, TASK-215-QA4-2).
+ */
+export function probePython() {
+  if (_python !== undefined) return _python;
+  const r = spawnSync("python3", ["--version"], {
+    encoding: "utf8",
+    timeout: 10_000,
+  });
+  // Python 3.4+ prints the version on stdout; older ones on stderr.
+  const version = `${r.stdout ?? ""}${r.stderr ?? ""}`.trim().split("\n")[0];
+  _python =
+    r.status === 0 && /^Python \d/.test(version)
+      ? Object.freeze({ name: "python3", version })
+      : null;
+  return _python;
+}
+
 export function probeShells() {
   if (_shells) return _shells;
   const hasZsh =
@@ -1124,6 +1315,9 @@ export function runProbeSpec({
     sink: sink ?? null,
     entry: entry ?? null,
     shells: null,
+    // The interpreter a cli: `.py` entry ran under (task.215), or null for
+    // every other form and for anything declined before a case ran.
+    interpreter: null,
     executed: 0,
     passed: 0,
     reproduced: [],
@@ -1252,12 +1446,12 @@ export function runProbeSpec({
     isCliForm &&
     !CLI_EXTENSIONS.some((x) => resolved.entryPath.endsWith(x))
   ) {
-    // Run under process.execPath, so a .sh, .py or extensionless file would be
-    // handed to node and fail to parse on every case — declined here, once, by
-    // name, rather than surfacing as N identical crashes.
+    // The interpreter is chosen by extension, so a .sh or extensionless file
+    // has none — declined here, once, by name, rather than handed to node and
+    // surfacing as N identical crashes.
     return decline(
       "entry-not-probeable",
-      `${resolved.entryPath} is not a ${CLI_EXTENSIONS.join(" / ")} script — the cli: form runs it with node`,
+      `${resolved.entryPath} is not a ${CLI_EXTENSIONS.join(" / ")} script — the cli: form runs .mjs / .js with node and .py with python3`,
     );
   }
   if (isShellForm || isCliForm || isFenceForm || isShellArgvForm) {
@@ -1276,6 +1470,24 @@ export function runProbeSpec({
       return decline(
         "entry-not-probeable",
         `script is not a readable regular file: ${e.message}`,
+      );
+    }
+  }
+  // The cli: child's interpreter (task.215). A `.py` entry needs the host's
+  // python3; without one it is declined once, by name — every case would
+  // otherwise fail to spawn and read as N identical errors.
+  const cliRuntime = isCliForm
+    ? CLI_INTERPRETERS[
+        CLI_EXTENSIONS.find((x) => resolved.entryPath.endsWith(x))
+      ]
+    : null;
+  let interpreter = null;
+  if (cliRuntime === "python3") {
+    interpreter = probePython();
+    if (interpreter === null) {
+      return decline(
+        "entry-not-probeable",
+        `${resolved.entryPath} is a .py script and \`python3 --version\` does not run on this PATH — the cli: form runs .py with python3`,
       );
     }
   }
@@ -1580,6 +1792,7 @@ export function runProbeSpec({
         runCliCase(c, {
           sink,
           entryPath: resolved.entryPath,
+          runtime: cliRuntime,
           template,
           sandboxRoot,
           sandboxHome,
@@ -1704,6 +1917,7 @@ export function runProbeSpec({
       cases: caseResults,
       escapes,
       shells: shells ?? null,
+      interpreter,
       fakeGh: fakeGhDir,
       args: base.args,
     };
@@ -1725,6 +1939,7 @@ export function runProbeSpec({
       // effect; and the record must say which shells ran (cycle 4, CR-3).
       escapes,
       shells: shells ?? null,
+      interpreter,
       fakeGh: fakeGhDir,
       args: base.args,
     };
@@ -1756,6 +1971,8 @@ export function runProbeSpec({
     // form. Stated in the result so a record can say "bash only" on a host
     // without zsh rather than leaving the reader to divide the count.
     shells: shells ?? null,
+    // The interpreter a cli: `.py` entry ran under (task.215), or null.
+    interpreter,
     executed: ran.length,
     passed: ran.length - reproduced.length - overblocked.length,
     // A shell-form case ran once per shell, so its id carries the shell: two
@@ -1928,11 +2145,12 @@ function caseEnv({ fixtureDir, sandboxHome, sandboxTmp }) {
 function watchedSpawn(
   command,
   argv,
-  { cwd, env, timeoutMs },
+  { cwd, env, timeoutMs, extraFds = 0 },
   { sandboxRoot, workDirName, scriptDir, escapes, escapeId, shell = null },
 ) {
   const before = snapshotTree(sandboxRoot, workDirName);
   const scriptDirBefore = listDirStamps(scriptDir);
+  // extraFds: further pipes after stderr, read back as child.output[3…].
   const child = spawnSync(command, argv, {
     input: "",
     cwd,
@@ -1940,6 +2158,9 @@ function watchedSpawn(
     encoding: "utf8",
     timeout: timeoutMs,
     maxBuffer: 8 * 1024 * 1024,
+    ...(extraFds > 0
+      ? { stdio: ["pipe", "pipe", "pipe", ...Array(extraFds).fill("pipe")] }
+      : {}),
   });
   const tag = shell === null ? {} : { shell };
   const after = snapshotTree(sandboxRoot, workDirName);
@@ -2201,9 +2422,93 @@ const NODE_FATAL_FOOTER = new RegExp(
 );
 
 /**
- * Run one case against a Node CLI through its `--argv` template (task.144).
+ * A frame of a Python traceback: `  File "<path>", line N`, always indented.
+ * An ExceptionGroup prefixes each of its lines with `|` (`  |   File …`).
+ */
+const PY_FRAME = /^(?: *\|)? {2,}File ".*", line \d+/m;
+/**
+ * The header an uncaught runtime exception prints, plain or as an
+ * ExceptionGroup's (`  + Exception Group Traceback (most recent call last):`).
+ */
+const PY_TRACEBACK =
+  /^(?: *[+|] )?(?:Exception Group )?Traceback \(most recent call last\):$/m;
+/** Compile-time errors print a frame and this line, with no Traceback header. */
+const PY_COMPILE_ERROR = /^(?:SyntaxError|IndentationError|TabError)\b/m;
+/** An exception line, after an ExceptionGroup's `|` prefix: a (dotted) class, optionally `: message`. */
+const PY_EXCEPTION_LINE = /^(?: *\| )?([A-Za-z_][\w.]*(?::\s.*)?)$/;
+
+/**
+ * Did a Python child CRASH rather than answer (task.215)? A Python crash exits
+ * 1 — the status a refusal exits with — and prints no footer like Node's, so
+ * the exit code cannot tell them apart. Its stderr can: a `File "…", line N`
+ * frame AND either a `Traceback (most recent call last):` header (an uncaught
+ * runtime exception, an ExceptionGroup's included) or a SyntaxError-family
+ * line (a compile error, which prints the frame with no header).
  *
- * One probe per case — Node is the runtime, so there is no shell multiplicity.
+ * What comes AFTER the traceback does not matter. A multi-line message, an
+ * `add_note()` hint, an ExceptionGroup's box drawing and an atexit handler's
+ * output all put something other than the exception last, and keying on the
+ * last line read each of them as a refusal — a false pass (QA cycle 1,
+ * TASK-215-QA1-1). So a script that catches its failure and prints the
+ * traceback itself, then refuses, also reads as a crash: `errored`, "could not
+ * look" — the safe direction. A refusal that prints an exception-shaped line
+ * with no frame, or a frame-shaped log line with no header, stays a refusal.
+ * The caller asks only on exit 1 (an uncaught exception always exits 1), so an
+ * "Exception ignored" traceback before a refusal that exits 3 is not a crash.
+ */
+export function isPythonCrash(stderr) {
+  if (typeof stderr !== "string") return false;
+  if (!PY_FRAME.test(stderr)) return false;
+  return PY_TRACEBACK.test(stderr) || PY_COMPILE_ERROR.test(stderr);
+}
+
+/**
+ * The record PYTHON_BOOTSTRAP wrote on PYTHON_RECORD_FD for this case's
+ * `nonce`: `{ kind: "crash", line }`, `{ kind: "answer" }`, or null when there
+ * is none — the bootstrap never ran, or the write was lost, and the caller
+ * reads that as "could not look" (QA cycle 4, TASK-215-QA4-1). Only a whole
+ * line `<kind> <nonce>` is a record; a crash wins over an answer. `line` is
+ * the exception's `Class: message` when the bootstrap could format it.
+ */
+function pythonExitRecord(child, nonce) {
+  const text = child.output?.[PYTHON_RECORD_FD];
+  if (typeof text !== "string") return null;
+  const lines = text.split("\n");
+  const crashAt = lines.indexOf(`${PYTHON_CRASH} ${nonce}`);
+  if (crashAt !== -1) {
+    const line = lines[crashAt + 1];
+    return { kind: "crash", line: line && line.trim() !== "" ? line : null };
+  }
+  return lines.includes(`${PYTHON_ANSWER} ${nonce}`)
+    ? { kind: "answer" }
+    : null;
+}
+
+/**
+ * The exception line of a Python crash, for the decline detail: the first
+ * exception-shaped line after the last frame, which skips the frame's source
+ * and caret lines and stops before a message's continuation, a note or an
+ * atexit line. The last non-empty line when none is found.
+ */
+function pythonExceptionLine(stderr) {
+  const lines = stderr.split("\n");
+  let lastFrame = -1;
+  lines.forEach((l, i) => {
+    if (PY_FRAME.test(l)) lastFrame = i;
+  });
+  for (const l of lines.slice(lastFrame + 1)) {
+    const m = PY_EXCEPTION_LINE.exec(l);
+    if (m) return m[1];
+  }
+  return lines.filter((l) => l.trim() !== "").at(-1) ?? "uncaught exception";
+}
+
+/**
+ * Run one case against a Node or Python CLI through its `--argv` template
+ * (task.144; Python, task.215 — `runtime` is "python3" for a `.py` entry).
+ *
+ * One probe per case — the interpreter is the runtime, so there is no shell
+ * multiplicity.
  * The template's `{input}` element becomes the case's input as ONE argv element
  * and each `{fixture}` element becomes this case's fixture directory, which is
  * built by the same helper the shell arm uses: the sink's controls plus the
@@ -2211,10 +2516,15 @@ const NODE_FATAL_FOOTER = new RegExp(
  *
  * Outcome:
  *   killed, timed out, never ran, or crashed      → "errored" (could not look)
+ *   Python, no exit record from the bootstrap      → "errored" (could not look)
  *   no `expected`: exit 0                          → "accepted"
  *   no `expected`: exit non-zero                   → "rejected"
  *   `expected`: compared, mapped through direction → as the shell arm
- * A crash is Node's fatal-error footer on stderr. Scoring it as a refusal
+ * A crash is Node's fatal-error footer on stderr, or for Python the crash
+ * record PYTHON_BOOTSTRAP writes on PYTHON_RECORD_FD, or an exit 1 whose stderr
+ * isPythonCrash reads as a traceback (Python exits 1 on a crash, as a refusal
+ * does, so the exit status alone cannot tell them apart).
+ * Scoring it as a refusal
  * would let a script that fails to LOAD read as a control that rejects every
  * hostile input; errored, every case folds into one `entry-not-probeable`.
  */
@@ -2223,6 +2533,7 @@ function runCliCase(
   {
     sink,
     entryPath,
+    runtime = "node",
     template,
     sandboxRoot,
     sandboxHome,
@@ -2283,13 +2594,18 @@ function runCliCase(
   const args = template.map((a) =>
     a === "{input}" ? c.input : a === "{fixture}" ? fixtureDir : a,
   );
+  const isPython = runtime === "python3";
+  const nonce = isPython ? randomBytes(12).toString("hex") : null;
   const child = watchedSpawn(
-    process.execPath,
-    [entryPath, ...args],
+    isPython ? "python3" : process.execPath,
+    isPython
+      ? [...PYTHON_FLAGS, "-c", PYTHON_BOOTSTRAP, nonce, entryPath, ...args]
+      : [entryPath, ...args],
     {
       cwd: fixtureDir,
       env: caseEnv({ fixtureDir, sandboxHome, sandboxTmp }),
       timeoutMs,
+      extraFds: isPython ? PYTHON_RECORD_FD - 2 : 0,
     },
     {
       sandboxRoot,
@@ -2300,6 +2616,8 @@ function runCliCase(
     },
   );
 
+  // Read once (QA cycle 3, CR-3); null for a Node child, which has no record.
+  const pyRecord = isPython ? pythonExitRecord(child, nonce) : null;
   let outcome;
   let detail = null;
   if (neverRan(child)) {
@@ -2307,7 +2625,33 @@ function runCliCase(
     detail = child.signal
       ? `killed by ${child.signal} (timeout ${timeoutMs}ms)`
       : `never ran: ${child.error?.message ?? "no exit status"}`;
-  } else if (NODE_FATAL_FOOTER.test(child.stderr ?? "")) {
+  } else if (isPython && pyRecord === null) {
+    // No record: the bootstrap did not see the body end — the write was lost
+    // (fd 3 closed or replaced, os._exit, an exec) or python3 never reached
+    // it. Not an answer; the safe direction (QA cycle 4, TASK-215-QA4-1/QA4-2).
+    outcome = "errored";
+    const said = (child.stderr ?? "").trim().split("\n")[0].slice(0, 160);
+    detail = `the CLI exited (exit ${child.status}) without the bootstrap's exit record — could not tell an answer from a crash${said ? `: ${said}` : ""}`;
+  } else if (
+    isPython &&
+    (pyRecord.kind === "crash" ||
+      (child.status === 1 && isPythonCrash(child.stderr)))
+  ) {
+    // The crash record is the signal: it is written whatever the script did
+    // to stderr or its excepthook. A traceback on stderr with exit 1 is read
+    // too — a script that prints its own and exits 1 is not answering. Exit 1
+    // only for that one: an "Exception ignored" traceback on any other status
+    // sits beside an answer.
+    outcome = "errored";
+    const line =
+      (pyRecord.kind === "crash" ? pyRecord.line : null) ??
+      pythonExceptionLine(child.stderr ?? "");
+    detail = `the CLI crashed (exit ${child.status}) rather than answering: ${line.trim().slice(0, 160)}`;
+  } else if (isPython && child.status === PYTHON_FINALIZE_STATUS) {
+    // The body answered, then Python failed at shutdown (QA cycle 6).
+    outcome = "errored";
+    detail = `the CLI answered, then python3 failed at shutdown (exit ${PYTHON_FINALIZE_STATUS}, a failed flush of stdout or stderr) — could not tell an answer from a crash`;
+  } else if (!isPython && NODE_FATAL_FOOTER.test(child.stderr ?? "")) {
     outcome = "errored";
     const first = (child.stderr ?? "")
       .split("\n")
@@ -3320,6 +3664,15 @@ export function toRecordEntry(result, { name, callSite } = {}) {
     // Which shells each case ran under (shell form), or null. The count is
     // cases × shells, and a reader must not have to divide (cycle 2, CR-5).
     shells: Array.isArray(result.shells) ? [...result.shells] : null,
+    // The interpreter a cli: `.py` entry ran under (task.215), or null — the
+    // record says which python3 answered, as `shells` says which shells did.
+    interpreter:
+      result.interpreter && typeof result.interpreter === "object"
+        ? {
+            name: result.interpreter.name ?? null,
+            version: result.interpreter.version ?? null,
+          }
+        : null,
     // The directory whose `gh` answered the shell runs (task.136), or null —
     // the record must say what answered, not leave a reader to assume the
     // real one did not.
@@ -3641,6 +3994,10 @@ export function emitBlock(record, { mode = "diff" } = {}) {
         `      probes_executed: ${c.executed}`,
         ...(Array.isArray(c.shells) && c.shells.length > 0
           ? [`      shells: [${c.shells.join(", ")}]`]
+          : []),
+        // Which python3 ran a cli: `.py` control (task.215).
+        ...(c.interpreter && typeof c.interpreter.version === "string"
+          ? [`      interpreter: ${yamlStr(c.interpreter.version)}`]
           : []),
         // A JSON array of strings is a valid YAML flow sequence. Printed so two
         // cli: controls on one script read as two in the block (task.144).

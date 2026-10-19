@@ -1,0 +1,97 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": null,
+      "entry": "cli:.claude/state/qa4/cli-crash-matrix.py",
+      "name": null,
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 8,
+      "passed": 7,
+      "reproduced": 0,
+      "overblocked": 1,
+      "declined": 11,
+      "declined_cases": [
+        {
+          "id": "py-cli.crash-plain",
+          "reason": "case-errored",
+          "detail": "the CLI crashed (exit 1) rather than answering: ValueError: plain"
+        },
+        {
+          "id": "py-cli.crash-str-raises",
+          "reason": "case-errored",
+          "detail": "the CLI crashed (exit 1) rather than answering: StrRaises"
+        },
+        {
+          "id": "py-cli.crash-str-exits",
+          "reason": "case-errored",
+          "detail": "the CLI crashed (exit 1) rather than answering: StrExits"
+        },
+        {
+          "id": "py-cli.crash-str-not-str",
+          "reason": "case-errored",
+          "detail": "the CLI crashed (exit 1) rather than answering: StrNotStr"
+        },
+        {
+          "id": "py-cli.crash-nameless",
+          "reason": "case-errored",
+          "detail": "the CLI crashed (exit 1) rather than answering: uncaught exception"
+        },
+        {
+          "id": "py-cli.crash-name-not-str",
+          "reason": "case-errored",
+          "detail": "the CLI crashed (exit 1) rather than answering: uncaught exception"
+        },
+        {
+          "id": "py-cli.crash-bigint",
+          "reason": "case-errored",
+          "detail": "the CLI crashed (exit 1) rather than answering: KeyError"
+        },
+        {
+          "id": "py-cli.crash-recursion",
+          "reason": "case-errored",
+          "detail": "the CLI crashed (exit 1) rather than answering: RecursionError: maximum recursion depth exceeded"
+        },
+        {
+          "id": "py-cli.crash-interrupt",
+          "reason": "case-errored",
+          "detail": "the CLI crashed (exit 1) rather than answering: KeyboardInterrupt"
+        },
+        {
+          "id": "py-cli.crash-stderr-closed",
+          "reason": "case-errored",
+          "detail": "the CLI crashed (exit 1) rather than answering: ValueError: stderr closed"
+        },
+        {
+          "id": "py-cli.crash-after-thread",
+          "reason": "case-errored",
+          "detail": "the CLI crashed (exit 1) rather than answering: ValueError: after thread"
+        }
+      ],
+      "escaped": 0,
+      "shells": null,
+      "interpreter": {
+        "name": "python3",
+        "version": "Python 3.14.8"
+      },
+      "fake_gh": null,
+      "argv": [
+        "--mode",
+        "strict",
+        "--host",
+        "{input}"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-10-19T12:03:49.862Z"
+    }
+  ],
+  "totals": {
+    "executed": 8,
+    "reproduced": 0
+  },
+  "updated_at": "2026-10-19T12:03:49.862Z"
+}

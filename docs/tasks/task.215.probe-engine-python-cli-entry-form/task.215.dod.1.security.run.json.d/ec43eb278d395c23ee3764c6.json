@@ -1,0 +1,57 @@
+{
+  "sink": "url-authority",
+  "entry": "cli:shared/resources/tests/fixtures/security-probe/cli-crasher-excepthook.py",
+  "name": "py-cli: crash behind a replaced excepthook is errored",
+  "call_site": null,
+  "verdict": "unverifiable",
+  "reason": "no-hostile-evidence",
+  "executed": 3,
+  "passed": 3,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 5,
+  "declined_cases": [
+    {
+      "id": "py-cli.hostile-userinfo",
+      "reason": "case-errored",
+      "detail": "the CLI crashed (exit 1) rather than answering: ValueError: cannot parse host 'a@b'"
+    },
+    {
+      "id": "py-cli.hostile-userinfo-port",
+      "reason": "case-errored",
+      "detail": "the CLI crashed (exit 1) rather than answering: ValueError: cannot parse host 'user@evil.example:443'"
+    },
+    {
+      "id": "py-cli.hostile-path-at",
+      "reason": "case-errored",
+      "detail": "the CLI crashed (exit 1) rather than answering: ValueError: cannot parse host 'evil.example/@good.example'"
+    },
+    {
+      "id": "py-cli.hostile-fragment-at",
+      "reason": "case-errored",
+      "detail": "the CLI crashed (exit 1) rather than answering: ValueError: cannot parse host 'good.example:80#@evil.example'"
+    },
+    {
+      "id": "py-cli.hostile-homoglyph",
+      "reason": "case-errored",
+      "detail": "the CLI crashed (exit 1) rather than answering: ValueError: cannot parse host 'exаmple.com'"
+    }
+  ],
+  "escaped": 0,
+  "shells": null,
+  "interpreter": {
+    "name": "python3",
+    "version": "Python 3.14.8"
+  },
+  "fake_gh": null,
+  "argv": [
+    "--mode",
+    "strict",
+    "--host",
+    "{input}"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-10-19T14:23:24.537Z"
+}

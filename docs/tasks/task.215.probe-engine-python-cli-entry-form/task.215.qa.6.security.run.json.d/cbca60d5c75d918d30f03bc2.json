@@ -1,0 +1,29 @@
+{
+  "sink": "url-authority",
+  "entry": "cli:.claude/state/qa6/cli-shutdown-flush-crash.py",
+  "name": null,
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 4,
+  "passed": 4,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": null,
+  "interpreter": {
+    "name": "python3",
+    "version": "Python 3.14.8"
+  },
+  "fake_gh": null,
+  "argv": [
+    "--host",
+    "{input}"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-10-19T13:43:23.731Z"
+}

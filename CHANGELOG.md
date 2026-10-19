@@ -6,6 +6,28 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **The security probe runs a Python CLI under the `cli:` entry form (task 215).** `cli:<path>.py`
+  now runs the script under `python3 -E -s -B` with the same `--argv` template, sandbox, timeout and
+  exit-status verdict as a Node CLI, so a Python boundary reaches the DoD probe instead of being
+  declined `entry-not-probeable` and tripping the zero-candidates guard. A Python crash exits 1, the
+  status a refusal exits with, so the script runs inside a bootstrap that writes an exit record on
+  fd 3 for every exit it controls: `answer` when the script returns or calls `sys.exit`, `crash`
+  when it raises anything else, caught before any excepthook runs. A replaced excepthook (rich,
+  Typer), a redirected `sys.stderr` or an exception that cannot be printed cannot hide a crash, and
+  a forked child neither writes the record nor holds the pipe open. A case with **no** record is
+  `errored` too, so a script that closes fd 3, leaves by `os._exit` or cannot start inside the
+  sandbox is declined, never scored. An exit 1 with a traceback on stderr also counts as a crash. A
+  crash is scored `errored`, never `rejected`. One stated limit: an exception Python prints and
+  swallows outside the script's main frame (a joined worker thread, an atexit handler) leaves
+  `python3` exiting 0, so the case is scored by that exit status — a hostile case reads `accepted`, a
+  false alarm, never a pass. A failed flush of stdout at shutdown (exit 120) is `errored`. `-B`
+  stops a sibling import writing `__pycache__/` into the watched script directory; `-I` is not
+  used because it breaks sibling imports. With no `python3` on `PATH` the entry is declined once,
+  naming `python3`. The result and the run record carry a new `interpreter` field
+  (`{ name, version }`, `null` for every other form).
+  **Consumer upgrade:** re-vendor (`setup-consumer.sh --update`); a `cli:` probe of a `.py` boundary
+  that was recorded `unverifiable` can now be re-run.
+
 - **Two CI guards hold hierarchical document numbering, and the docs stop teaching the old scheme
   (task 207).** `evals/shared/tests/doc-numbering-corpus.test.mjs` runs `doc-id.js`'s `checkCorpus`
   over the PRD root and fails on any unnumbered, mismatched, unregistered or duplicate PRD, epic or
