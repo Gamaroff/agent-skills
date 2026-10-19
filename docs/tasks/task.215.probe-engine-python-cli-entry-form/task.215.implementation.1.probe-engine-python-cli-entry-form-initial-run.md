@@ -3,7 +3,7 @@
 **Task**: `task.215.probe-engine-python-cli-entry-form.md`
 **Run Number**: 1
 **Started**: 2026-10-19 12:23
-**Status**: Escalated
+**Status**: Completed
 
 ---
 
@@ -35,9 +35,9 @@ Extend the probe engine's `cli:` entry form to run a `.py` entry under `python3`
 | 2. review-task             | ✅ Done    | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               | `task.215.review.1.probe-engine-python-cli-entry-form.md` — READY TO IMPLEMENT 9/10; 0 critical, 5 important (all applied); Planned → Ready for Development | —                    | 2026-10-19T10:28Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration; 11 tests + 9 fixtures; ci:fast green (5917 / 0 fail); 9 mutations red | `.summaries/step-3-iteration-audit.json` | 2026-10-19T10:39Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #692: https://github.com/Gamaroff/agent-skills/pull/692 | —                    | 2026-10-19T10:41Z |
-| 5–6. qa-task / qa-fix loop | 🛑 Escalated | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | Gate 7 PASS 95 (route 2b); 5c `/review-pr` APPROVE, PC-1/PC-2 fixed | —                    | 2026-10-19T14:18Z |
+| 7. finalise                | ✅ Done    | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      | `task.215.dod.1.probe-engine-python-cli-entry-form.md` — ACCEPTED; acceptance commit `0455955a`; issue #689 closed | —                    | 2026-10-19T14:36Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Implementation report only (acceptance artefacts committed by `/finalise` 6a) | —                    | 2026-10-19T14:36Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -148,6 +148,16 @@ Extend the probe engine's `cli:` entry form to run a `.py` entry under `python3`
 - Post-fix PR state check (inline `gh pr view`): OPEN, MERGEABLE, head `0aff23d7`.
 - Cycle 5: `/qa-task` with `code_review_blocking=true`; `SAFETY_REPROBE=true` (clauses 2 and 3), unscoped, re-probe directive (not a refute cycle). Reviewer dispatched 13:17:16Z, `duration_ms` 352113; probe and mutation spot checks (4: 2 covered, 2 no-red-untested) ran meanwhile, mutations in a scratch worktree. Probe: crash-matrix CLI (`.claude/state/qa5/`), 26 cases, 7 executed and passed, 19 errored as required; no crash shape scored `rejected`. Gate CONCERNS 90/100: cycle-4 findings verified fixed (bugs 7–8 closed); new MEDIUM TASK-215-QA5-1 (reviewer CR-1, anchor `ok`) — kept at the reviewer's severity (no measured basis to lower it); bug 9 filed. PR comment and issue `qa-gate-5` comment `posted`.
 - Cycle 5 route: Convergence check not tripped (HIGH_N 0; sequence 1, 1, 1, 1, 0); route classifier `continue` (not-a-pass-gate; route 2 declined: high-findings-remain) → 5b.
+
+### Step 7 — finalise
+
+- Task completed. DoD `task.215.dod.1.probe-engine-python-cli-entry-form.md`: ACCEPTED. AC 4/4 PASS (note: SC1's `--sink path` example has no `.py` test, but the setup is shared with the tested Node arm); Docs PASS; Security PASS; Compliance NOT_APPLICABLE. Four Explore agents ran in parallel.
+- Security agent returned `boundary: true` and a 12-control plan; `/finalise` ran it (Step 3b.1): 71 executed, 0 reproduced, 0 escapes, 0 refusals. Six refusal controls and `isPythonCrash` read `engages`; the five crash controls read `unverifiable` by design (hostile cases `errored`). Record `task.215.dod.1.security.run.json`.
+- CI reading 1: SUCCESS @ 918e077c9f4e; CI reading 2: SUCCESS (tree-equivalent to 918e077c9f4e) @ 0455955ac3bb (5 checks, 30s; the acceptance commit is docs-only).
+- Acceptance commit `0455955a` (6a): task document, DoD, sprint review, registry tick, 5c review report and PC-2 fix (carried), probe record and cases files. Pushed; 6b assertions passed; 6d CHANGELOG cites task 215.
+- Canonical PR comment: https://github.com/Gamaroff/agent-skills/pull/692#issuecomment-6269756632. DoD body posted to PR — comment URL: https://github.com/Gamaroff/agent-skills/pull/692#issuecomment-6269775955.
+- GitHub Issue #689 — Document link already on `develop`; `done` comment `posted` (orchestrator re-post: `already`); close: CLOSED ✅ (verified with `gh issue view`, inline rather than the poller subagent). Board: done → already.
+- Earlier, 5c: `ready-for-merge` stage → `stage-disabled`.
 
 ---
 
@@ -300,14 +310,26 @@ _Track each QA review/fix cycle._
 **Fixes Applied**: QA6-1 (`.py` exit 120 → `errored`), QA6-2 (limit text), QA6-3 (test). 23 python tests; full suite 5929, 0 fail; 2 mutations red. Bug 10 → Ready for QA.
 **Commit**: `505645df`
 
+### QA Cycle 7 — 2026-10-19
+**Gate Result**: PASS (95/100)
+**Issues Found**: 3 LOW. Cycle 6 fixes verified (bug 10 closed); probe 8 executed, 0 reproduced. Re-entry: 1-cycle grant after the loop-limit halt (maintainer: "go ahead"). The route-2b write first ran partway — gate edited and committed in `f38aac1f` before the Deferred Work append refused on the existing H2; completed in the next commit.
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: APPROVE — `task.215.pr-review.1.probe-engine-python-cli-entry-form.md` (conformance lens only, `--no-code`; 2 LOW). PC-2 fixed (task body `**Status:**` line) and staged; PC-1 (this report's Status and loop row) fixed at the Step 7 transition.
+**Carried to 6a**: task.215.pr-review.1.probe-engine-python-cli-entry-form.md task.215.probe-engine-python-cli-entry-form.md
+**Loop exit**: Cosmetic-residue exit taken — PASS gate at cycle 7 with HIGH 0 for cycles 6 and 7; all 3 open findings are LOW and are carried to the gate's recommendations.future by id (TASK-215-QA7-1, TASK-215-QA7-2, TASK-215-QA7-3). This is a CLEAN exit, not a stall: nothing is blocked and nothing is being accepted over; a full qa-fix cycle for cosmetic findings is what this route exists to avoid.
+**Action**: Proceeding to 5c (PR conformance review)
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-10-19T14:36Z
+**Final Status**: Completed
 **Branch**: feature/task.215.probe-engine-python-cli-entry-form
 **PR**: https://github.com/Gamaroff/agent-skills/pull/692
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 7
+**DoD Summary**: `task.215.dod.1.probe-engine-python-cli-entry-form.md`
+**Tracker debt**: none
+
+**Completion Summary**: The probe engine's `cli:` form now runs a `.py` entry under `python3 -E -s -B`, records the interpreter, and scores a Python crash `errored` from a positive exit record on fd 3 (`answer`/`crash` nonce; a missing record or a `.py` exit 120 is `errored`). Seven QA cycles (three grants) found and closed bugs 1–10. Each cycle hardened the crash-versus-answer decision: the stderr heuristics were replaced by the positive record, and the residue is stated as two directional limits in `probe-boundary-rule.md`. The loop exited clean by the cosmetic-residue route at gate 7 (PASS 95, 3 LOWs carried to Deferred Work). The DoD probe held (71 executed, 0 reproduced).
