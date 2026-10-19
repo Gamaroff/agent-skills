@@ -1,6 +1,6 @@
 ---
 name: develop-story
-description: 'Automates the full end-to-end story development lifecycle: create-story-branch → review-story → develop → create-pr → qa-story → qa-fix (iterative, up to 5 cycles) → review-pr (Step 5c, the QA loop''s exit gate) → finalise → commit-changes. Story branches are cut from `develop` and PR back to `develop` (standard Gitflow); an epic has no branch of its own unless it opts in to `branch_model: epic-integration`, in which case its stories are cut from and PR into that epic''s integration branch (`epic/{n}.{name}`), created on demand. Features: Explore subagent for story resolution and pre-develop codebase mapping; context hygiene between steps; lite mode for low-risk stories; resume with per-step artifact verification; bounded develop loop (MAX_ITER=5). Records all decisions in a co-located implementation report. Invoke with `/develop-story [story-file-path]` or "develop and QA this story end to end".'
+description: 'Automates the full end-to-end story development lifecycle: create-story-branch → review-story → develop → create-pr → qa-story → qa-fix (iterative, up to 5 cycles) → review-pr (Step 5c, the QA loop''s exit gate) → finalise → commit-changes. Story branches are cut from `develop` and PR back to `develop` (standard Gitflow); an epic has no branch of its own unless it opts in to `branch_model: epic-integration`, in which case its stories are cut from and PR into that epic''s integration branch (`epic/{P}.{E}.{name}`), created on demand. Features: Explore subagent for story resolution and pre-develop codebase mapping; context hygiene between steps; lite mode for low-risk stories; resume with per-step artifact verification; bounded develop loop (MAX_ITER=5). Records all decisions in a co-located implementation report. Invoke with `/develop-story [story-file-path]` or "develop and QA this story end to end".'
 invokes: [create-branch, review-story, develop, create-pr, qa-story, qa-fix, review-pr, finalise, commit-changes]
 ---
 
@@ -54,6 +54,8 @@ Resolution order, conflicts and the 0f source column: `references/develop-pipeli
 See `references/develop-pipeline-step-0-resolve-and-prepare.md` for the full resolve-and-prepare protocol: file/issue resolution (0a), pipeline state check (0b), upfront context reading including status handling and lite-mode detection (0c), tracker signal/board update procedure (0c-reg — **defined in step-0 but invoked from Step 1** after the lock is written; see step-1 §"Signal Work Started"), upfront prompts via AskUserQuestion (0d — Q1 base + Q2 PR target with auto-derived recommended option; qa-planning silent skip, no Q3), implementation report creation with templates (0e), and pre-flight summary (0f).
 
 > Phase 0 parallel dispatch (resolver + tracker poller + lite-mode detector) is defined in the shared resource above — do not duplicate the dispatch logic here. Modifications belong in `references/develop-pipeline-step-0-resolve-and-prepare.md`.
+>
+> The lite-mode detector sources `references/resolve-paths.sh` for `PRD_ROOT` and `ARCH_ROOT`.
 
 ---
 
@@ -95,7 +97,7 @@ See `references/develop-pipeline-resume-contract.md` — Phase 0a for the full d
 **Step 1 — Recover pipeline state from the implementation report:**
 
 ```bash
-find {story-directory} -maxdepth 1 -name "story.{epic}.{story}.implementation.*.md" 2>/dev/null | sed -E 's/^(.*\.implementation\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-
+find {story-directory} -maxdepth 1 -name "story.{P}.{E}.{S}.implementation.*.md" 2>/dev/null | sed -E 's/^(.*\.implementation\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-
 ```
 
 1. Read the implementation report. Find the last ✅ step in the Pipeline Progress table.
@@ -251,7 +253,7 @@ budget; `CONCERNS` records findings without blocking; `APPROVE` exits to Step 7.
 `ready-for-merge` stage fires there, after the review clears — not on the QA gate. `/review-pr`
 stays advisory throughout: it writes no gate file and never edits code, and this orchestrator is
 what acts on its verdict. Lite mode degrades it to `--effort low` and never skips it. It leaves
-`story.{epic}.{story}.pr-review.{n}.{name}.md` beside the work item.
+`story.{P}.{E}.{S}.pr-review.{n}.{name}.md` beside the work item.
 
 ### Step 7: Finalise
 
@@ -306,7 +308,7 @@ See `references/develop-pipeline-autonomous-defaults.md` for the full shared aut
 
 | Situation                                                           | Default                                                                                                                                                                                                                                       |
 | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| review-story invocation mode                                        | Always **validate-and-apply** (`MODE=validate` + `APPLY=true`) — non-interactive, no questions asked. This variant runs the constrained forms of Steps 9.5 and 10 below and writes a `story.{epic}.{story}.review.{n}.{story-name}.md` report |
+| review-story invocation mode                                        | Always **validate-and-apply** (`MODE=validate` + `APPLY=true`) — non-interactive, no questions asked. This variant runs the constrained forms of Steps 9.5 and 10 below and writes a `story.{P}.{E}.{S}.review.{n}.{story-name}.md` report |
 | review-story Step 9.5 (implement fixes)                             | Apply all critical + important fixes automatically — the pipeline needs the story fully corrected before Step 3 runs `/develop`                                                                                                               |
 | review-story Step 10 (update status) when GO / READY TO IMPLEMENT   | Promote `Draft → Ready for Development` automatically — the pipeline needs that status before Step 3                                                                                                                                          |
 | review-story Step 10 when NO-GO (NEEDS REVISION or REQUIRES REWORK) | HALT — story is not ready; surface review findings to user before proceeding                                                                                                                                                                  |
@@ -371,13 +373,13 @@ If a situation arises that is not in the shared defaults table and the stakes ar
 
 ## File References
 
-- Stories: co-located within epic directories — `${PRD_ROOT}/<domain>/<feature>/epics/epic.{N}.<name>/stories/`
-- Story directory: `${PRD_ROOT}/<domain>/<feature>/epics/epic.{N}.<name>/stories/story.{epic}.{story}.{name}/`
-- Story file: `story.{epic}.{story}.{name}.md`
-- Implementation report: `story.{epic}.{story}.implementation.{N}.{descriptive-name}.md`
-- Review report: `story.{epic}.{story}.review.{N}.{name}.md` (generated by Step 2 `/review-story`)
-- QA gate: `story.{epic}.{story}.gate.{N}.{name}.yml`
-- QA report: `story.{epic}.{story}.qa.{N}.{name}.md`
+- Stories: co-located within epic directories — `${PRD_ROOT}/<domain>/prd.<P>.<feature>/epics/epic.{P}.{E}.<name>/stories/`
+- Story directory: `${PRD_ROOT}/<domain>/prd.<P>.<feature>/epics/epic.{P}.{E}.<name>/stories/story.{P}.{E}.{S}.{name}/`
+- Story file: `story.{P}.{E}.{S}.{name}.md`
+- Implementation report: `story.{P}.{E}.{S}.implementation.{N}.{descriptive-name}.md`
+- Review report: `story.{P}.{E}.{S}.review.{N}.{name}.md` (generated by Step 2 `/review-story`)
+- QA gate: `story.{P}.{E}.{S}.gate.{N}.{name}.yml`
+- QA report: `story.{P}.{E}.{S}.qa.{N}.{name}.md`
 
 ## Related Skills
 

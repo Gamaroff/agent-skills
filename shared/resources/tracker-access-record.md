@@ -247,7 +247,7 @@ pipelines do not.
 
 ```
 task.{n}.handover.{n}.{name}.{md,sh,json}
-story.{epic}.{story}.handover.{n}.{name}.{md,sh,json}
+story.{P}.{E}.{S}.handover.{n}.{name}.{md,sh,json}
 ```
 
 Co-located in the work-item directory, so `/commit-changes --scope {work-item-dir}` already picks

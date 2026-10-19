@@ -1,0 +1,61 @@
+schema: 2
+task: 'task.191.snippet-engine-runs-pipeline-blocks'
+task_title: 'Snippet engine runs pipeline blocks'
+gate: CONCERNS
+status_reason: 'Cycle 3 replaced the struck function-propagation mechanism (a function''s reach is now the union of every definition of its name), which closes CR3-1 (bug 10 verified). The unscoped safety re-probe found no new defect, and 102 probes executed with 0 reproduced. Reliability stays CONCERNS on two carried advisories.'
+reviewer: 'QA Engineer'
+head: '3644878b05548adbfbecefe625f2329e235cdc2d'
+updated: '2026-10-19T06:31:17Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 180
+  phases_verified: 4/4
+  ci: 'not awaited (QA cycles do not wait on CI); local ci:fast 5878/0 @ 3644878b0554'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+  bug_resolution:
+    closed: ['task.191.bug.10']
+    reopened: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 102
+    notes: 'boundary: true. Run record task.191.qa.4.security.run.json: isRunnableBlock over the shell-exec corpus, the helper cases from cycles 1-3 and 6 cycle-4 redefinition shapes (67/67 engage), and the --diff-base revision refusal (35/35); 0 reproduced. The unscoped re-probe reviewer reported no bug, but it probed by reading only.'
+  performance:
+    status: PASS
+    notes: 'Helper depth bounded at 2. A function name holds at most one body per definition site (deduplicated).'
+  reliability:
+    status: CONCERNS
+    notes: 'CR2-7 (runBlock timeout kills only the outer shell) and CR2-8 (empty-fence span) remain open, advisory.'
+  maintainability:
+    status: PASS
+    notes: 'The struck mechanism was replaced, not patched again (third-strike move: replace). Two low cleanups are advisory: an orphaned classifyInternal JSDoc left by the cycle-3 insertion, and the helper path recomputed in the caller.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR4-1/CR4-2 cleanups: put the orphaned JSDoc back on classifyInternal; have resolveHelperCall return the resolved path and its operand index.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'Observation #67 (pre-existing base scan): a command after a heredoc, "$(…)" inside double quotes, quoted deny words.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'CR2-7: run each block in its own process group and kill the group on timeout. CR2-8: store the closing-fence line on the block.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'Observation #68: security-probe.mjs keys a JS-entry control by sink+entry, so a second --name replaces the first.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'Carried: --no-textconv has no test.'
+      refs: ['shared/resources/tests/qa-execute-snippets.test.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR2-7 / CR2-8 accepted as advisory or fixed in a follow-up']

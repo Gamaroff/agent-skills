@@ -5,18 +5,21 @@ type: task
 description: "qa-read-back.js refuses a document whose QA section Gate Decision or newest QA Change Log row does not match this cycle's gate token, and retries a git add that fails only on a transient .git/index.lock before reporting it."
 tags: [qa-task, qa-story, qa-read-back, observation, index-lock]
 category: refactoring
-status: planned
+status: accepted
 priority: Medium
 created: 2026-10-07
-updated: 2026-10-07
+updated: 2026-10-19
 assignee:
 estimated_effort_hours: 8
 github_issue: 591
+completed_date: 2026-10-19
+pr_number: 688
 ---
 
 # Technical Task: Read-back checks this cycle's verdict
 
-**Status:** Planned
+**Status:** Accepted
+**Review**: ✅ All review recommendations from `task.192.review.1.read-back-checks-this-cycles-verdict.md` implemented 2026-10-19
 **GitHub Issue**: [#591](https://github.com/Gamaroff/agent-skills/issues/591)
 
 ---
@@ -69,7 +72,7 @@ bundled copies, a CHANGELOG entry.
 
 ### Current Architecture
 
-Line numbers are from `develop` at `5978d32e`, paired with the text they point at.
+Line numbers are from `develop` at `41adc7bb` (re-measured by review 1), paired with the text they point at.
 
 - **Staging**: `const stage = (abs) => { const r = git(["add", "--", rel(abs)], root); …` (`:213`).
   On any non-zero exit it records `could not stage <path> (<stderr>) — a held .git/index.lock? retry`
@@ -77,36 +80,57 @@ Line numbers are from `develop` at `5978d32e`, paired with the text they point a
 - **This-cycle checks**: the gate and report come from `qa-cycle.sh --path` (`function artifact`,
   `:95`). Since `1002e881` (2026-09-29) a document that does not link them gets
   `the document does not link this cycle's gate …` (around `:266`). The Change Log check is
-  `engines.changeLog.checkUpdatedCoherence` (`:276`), which asks only that a row exists and that
+  `engines.changeLog.checkUpdatedCoherence` (`:277`), which asks only that a row exists and that
   `updated:` is not older than it.
-- **Parsers to reuse**: `findQaResults(content)` (`shared/resources/qa-results.js:520`, exported) returns
+- **Parsers to reuse**: `findQaResults(content)` (`shared/resources/qa-results.js:597`, exported) returns
   `{ sections, changeLog }`. `extractEntries` (exported from `shared/resources/change-log.js`) returns
   the log's rows as strings.
-- **Field shapes**: the QA section writes `**Gate Decision**: <TOKEN>` (the field list at
-  `qa-results.js:155`); the QA row reads `QA gate <TOKEN> (<score>) — …` with author `qa-task` or
-  `qa-story` (`skills/qa-task/SKILL.md:1476`, `skills/qa-story/SKILL.md:1450`).
+- **Field shapes**: the QA section writes `**Gate Decision**: <TOKEN>` (the field list `RE_QA_FIELD` at
+  `qa-results.js:160`); the QA row reads `QA gate <TOKEN> (<score>) — …` with author `qa-task` or
+  `qa-story` (`skills/qa-task/SKILL.md:1575`, `skills/qa-story/SKILL.md:1547`). In the document the
+  token is bare (`**Gate Decision**: PASS`); the emoji form at `qa-story/SKILL.md:2207` is the PR-comment
+  body, not the document.
 - **Tests**: `shared/resources/tests/qa-read-back.test.mjs`; its case "a stage that fails" writes a
-  persistent `.git/index.lock` and expects `/could not stage/` (`:158`–`:162`).
+  persistent `.git/index.lock` and expects `/could not stage/` (`:158`–`:162`). Every case is built on
+  one fixture, `repo()` (`:29`), whose gate is `gate: FAIL`, which has **no** `## QA Testing Results`
+  section, and whose only Change Log row is authored `a`. The verdict checks make that fixture HALT, so
+  Phase 1 must update it (below). Tests call `readBack()` in-process; the runner reaches the file
+  through `shared/resources/tests/*.test.mjs` in `package.json`.
+- **Existing retry mechanisms** (same class): `gh-stage.js` has `withRetry` (`:292`, retries every
+  thrown error at 1 s / 2 s) and `sleepSync` (`:308`, `Atomics.wait` in a `try`); `resolve-platform.sh`
+  has the shell `tracker_call_with_retry`. The new retry **sits beside** them: it must retry only an
+  `index.lock` failure and report every other failure on the first attempt, which `withRetry` does not
+  do, and requiring `gh-stage.js` would pull a tracker CLI into the qa-task/qa-story bundle closure.
+  It copies `sleepSync`'s guarded `Atomics.wait`. One shared helper is a Future Improvement.
 
 ### Target Architecture
 
 - **Verdict checks**, after the link checks:
   1. Read this cycle's gate token: the `gate:` line of the gate file `artifact()` returned.
-  2. `**Gate Decision**` inside the QA section `findQaResults` finds. Missing → problem
+  2. `**Gate Decision**` inside the QA section `findQaResults` finds (the span `start`–`end` of each
+     entry in `sections`). No QA section → problem `the document has no ## QA Testing Results section —
+     the Step 12 edit did not land`. A section with no `**Gate Decision**` line → problem
      `the QA section has no **Gate Decision** line`. A different token → problem
      `**Gate Decision** is <X> but this cycle's gate <file> says <TOKEN> — the Step 12 edit did not land`.
-  3. The newest Change Log row whose author cell is `qa-task` or `qa-story`. Missing → problem.
-     When its description does not contain `QA gate <TOKEN>` → problem naming the row and the token.
-     Rows by other authors after it (`qa-fix`, `finalise`) are ignored.
+     More than one section → each is read, and each mismatch is its own problem.
+  3. The newest Change Log row (from `extractEntries`) whose author cell — the last non-empty cell — is
+     `qa-task` or `qa-story`. Missing → problem. When its description does not match
+     `QA gate <TOKEN>` followed by a word boundary → problem naming the row and the token.
+     _QA cycle 2 (QA2-1, QA2-2):_ the verdict row is the newest qa-* row whose description starts
+     `QA gate`, so QA's own `Status →` rows and later `finalise` rows are ignored. A `qa-fix` row
+     after it is a problem: that cycle wrote no row of its own.
 - **Lock retry**: `stage()` retries `git add` when stderr contains `index.lock`, up to 3 more
   attempts at 200 ms, 400 ms and 800 ms (a synchronous sleep via `Atomics.wait` on a
   `SharedArrayBuffer`, since the script is synchronous). A lock that outlasts the backoff is reported
-  as today, with "(after 4 attempts)". Any other failure is reported on the first attempt.
+  as today, with "(after 4 attempts)". Any other failure is reported on the first attempt. The
+  `--json` result gains `stageAttempts`, an object mapping each staged path (repo-relative) to the
+  number of `git add` attempts it took.
 
 ### Important Clarifications
 
 - **Measured before writing**: the verdict rule was run against the accepted documents of tasks
-  183, 185, 186, 170 and 172 on `5978d32e`. In each, the newest gate's token, the `**Gate Decision**`
+  183, 185, 186, 170 and 172 on `5978d32e`; review 1 re-ran it on `41adc7bb` over those five plus 189,
+  190, 191, 204, 205, 206 and 207 — all twelve agree (PASS ×8, CONCERNS ×4). In each, the newest gate's token, the `**Gate Decision**`
   line and the newest `qa-task` row agree. The rule does not over-fire on a correct document. The
   command is in the plan. The test re-measures it on fixtures, not on these documents.
 - `review-pr` Step 7 and `commit-changes` hit the same lock race (obs #216's 2026-10-04 line). They
@@ -144,24 +168,28 @@ That is the defect the check exists for.
 
 **Risk**: Low. **Files**: `shared/resources/qa-read-back.js`, its test.
 
-- [ ] Read the gate token from this cycle's gate file.
-- [ ] Compare the QA section's `**Gate Decision**` (via `findQaResults`) to it.
-- [ ] Compare the newest `qa-task`/`qa-story` row (via `extractEntries`) to it.
-- [ ] One problem message per mismatch, naming the gate file and both values.
+- [x] Update the shared test fixture `repo()` so a complete cycle stays clean: a
+  `## QA Testing Results` section with `**Gate Decision**: FAIL` (matching its `gate: FAIL`) and a
+  Change Log row `QA gate FAIL (…) — …` authored `qa-task` (task shape) / `qa-story` (story shape).
+- [x] Read the gate token from this cycle's gate file.
+- [x] Compare the QA section's `**Gate Decision**` (via `findQaResults`) to it.
+- [x] Compare the newest `qa-task`/`qa-story` row (via `extractEntries`) to it.
+- [x] One problem message per mismatch, naming the gate file and both values.
 
 ### Phase 2: Lock retry (obs #216)
 
 **Risk**: Low. **Files**: same.
 
-- [ ] Retry `git add` on `index.lock` stderr, 3 more attempts with 200/400/800 ms backoff.
-- [ ] Keep the existing message for a persistent lock, add the attempt count.
+- [x] Retry `git add` on `index.lock` stderr, 3 more attempts with 200/400/800 ms backoff.
+- [x] Keep the existing message for a persistent lock, add the attempt count.
+- [x] Expose `stageAttempts` (`{ path: attempts }`) in the result.
 
 ### Phase 3: Bundle and changelog
 
 **Risk**: Low. **Files**: bundled copies, `CHANGELOG.md`.
 
-- [ ] `npm run bundle`; `npm run bundle:check` clean.
-- [ ] `[Unreleased]` › Fixed entry citing obs #205 and #216.
+- [x] `npm run bundle`; `npm run bundle:check` clean.
+- [x] `[Unreleased]` › Fixed entry citing obs #205 and #216.
 
 ---
 
@@ -174,6 +202,10 @@ That is the defect the check exists for.
 ### Files to Modify (Tests)
 
 2. ✅ `shared/resources/tests/qa-read-back.test.mjs`
+2a. ✅ `tests/qa-read-back-block.test.js` — runs the SKILL.md read-back blocks against its own
+   consumer-shaped fixture; its fixture gains the verdict and its hand-written engine copy list gains
+   `qa-results.js` (found by the fast gate: `git grep -ln qa-read-back -- '*.test.*'` lists four
+   files, two of which only pin SKILL.md text)
 
 ### Files to Modify (Generated)
 
@@ -183,6 +215,8 @@ That is the defect the check exists for.
 ### Files to Modify (Documentation)
 
 4. ✅ `CHANGELOG.md`
+5. ✅ `skills/qa-task/SKILL.md` Step 12b and `skills/qa-story/SKILL.md` Review Completion 3e — the
+   read-back's check list gains the verdict check and the lock retry (QA cycle 1, QA-1)
 
 ### Files to Delete
 
@@ -195,15 +229,21 @@ None.
 ### Unit Tests
 
 - **Command**: `command node --test shared/resources/tests/qa-read-back.test.mjs`
-- **Verdict**: from the existing clean fixture (gate `PASS`, section `PASS`, row `QA gate PASS`):
-  change the section to `CONCERNS` → problem naming both values; change only the newest `qa-task`
-  row to `QA gate CONCERNS` → problem; delete the `**Gate Decision**` line → problem; append a
+- **Verdict**: from the updated clean fixture (gate `FAIL`, section `FAIL`, row `QA gate FAIL`, per
+  Phase 1): change the section to `CONCERNS` → problem naming both values; change only the newest `qa-task`
+  row to `QA gate CONCERNS` → problem; delete the `**Gate Decision**` line → problem; delete the
+  whole QA section → problem; append a
   `qa-fix` row after the QA row → still clean (**control**: the rule reads the newest QA row, not the
-  newest row).
+  newest row). *QA cycle 2 changed this: a `qa-fix` row after the newest `QA gate` row now HALTs
+  (QA2-1, bug.2), and the control is a QA `Status →` row plus a `finalise` row after it, which read
+  clean (QA2-2, bug.3).*
 - **Lock**: a lock file removed by a timer during the backoff → clean, staged (the case the retry
   exists for). The existing persistent-lock case still reports `could not stage`, now with
-  "after 4 attempts". A non-lock `git add` failure (a path outside the repo) reports on the first
-  attempt, with no added delay.
+  "after 4 attempts". A non-lock `git add` failure reports on the first attempt (`stageAttempts` = 1),
+  with no added delay. The input is a gitignored gate (`*.yml` added to the fixture's `.gitignore`):
+  `git add` exits 1 with "paths are ignored" and no `index.lock` in stderr (measured by review 1). A path
+  outside the repository is not reachable — `stage()` only receives the document, the gate, the report
+  and link targets inside the work item's directory.
 
 ### Integration Tests
 
@@ -211,8 +251,9 @@ None.
 
 ### Mutation proofs
 
-- Compare against the newest row of any author → the `qa-fix` control goes red.
-- Retry on every failure → the non-lock case's timing assertion goes red.
+- Compare against the newest row of any author → the `qa-fix` control goes red. *(QA cycle 2: the
+  control is now the status-row case; dropping the `QA gate` description filter turns it red.)*
+- Retry on every failure → the non-lock case's attempt-count assertion (`stageAttempts` = 1) goes red.
 
 ### Performance Tests
 
@@ -227,8 +268,9 @@ None.
 
 - [ ] A `**Gate Decision**` that differs from this cycle's gate token is a problem, and the read-back
   exits 1 — held by `qa-read-back.test.mjs` (Phase 1).
-- [ ] A newest `qa-task`/`qa-story` row that does not name the token is a problem; a later `qa-fix`
-  row does not trigger it — held by the same test (Phase 1).
+- [ ] A newest `QA gate` row by `qa-task`/`qa-story` that does not name the token is a problem; a
+  `qa-fix` row after it is a problem (QA cycle 2, QA2-1), and later QA `Status →` and `finalise`
+  rows are ignored — held by the same test (Phase 1).
 - [ ] A missing `**Gate Decision**` line is a problem — held by the same test (Phase 1).
 - [ ] A lock released during the backoff stages cleanly; a persistent lock is reported after 4
   attempts; a non-lock failure is reported after 1 — held by the same test (Phase 2).
@@ -291,12 +333,69 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: ✅ PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-19
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Full Report**: [task.192.qa.3.read-back-checks-this-cycles-verdict.md](./task.192.qa.3.read-back-checks-this-cycles-verdict.md)
+- **Gate File**: [task.192.gate.3.read-back-checks-this-cycles-verdict.yml](./task.192.gate.3.read-back-checks-this-cycles-verdict.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 162 (targeted suites); 22 security probes
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+- All findings from cycles 1 and 2 are fixed and verified. Bugs [1](./task.192.bug.1.skill-md-read-back-omits-verdict-check.md), [2](./task.192.bug.2.same-verdict-cycle-reads-clean-without-its-row.md) and [3](./task.192.bug.3.status-row-after-verdict-halts-a-correct-document.md) are closed.
+- Three LOW code-review items are routed to future work in the gate.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.192.qa.3.read-back-checks-this-cycles-verdict.md`
+**Gate File**: `task.192.gate.3.read-back-checks-this-cycles-verdict.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (3 QA cycles; bugs 1–3 closed)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 7/7 met, each held by a test or CI lane that runs on every PR
+✅ **PR Review:** PR #688. CI is green. The 5c PR review returned CONCERNS; its doc findings are fixed and carried
+✅ **Documentation:** CHANGELOG [Unreleased] entry; qa-task and qa-story SKILL.md read-back lists
+✅ **Security Review:** ✅ PASS — no shell, eval or secrets; the boundary was probed with 28 cases, 0 reproduced
+➖ **Compliance Review:** NOT_APPLICABLE (internal tooling)
+
+**Task marked as ACCEPTED on:** 2026-10-19
+
+**Detailed Verification Log:** See `task.192.dod.1.read-back-checks-this-cycles-verdict.md` for the full verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-10-07 | 1.0 | Initial draft — cut from observations #205, #216 | create-task |
+| 2026-10-19 | 1.1 | Review passed (8/10) — fixture update added to Phase 1, reachable non-lock failure input, existing retry mechanisms named, anchors refreshed | review-task |
+| 2026-10-19 |  | Status → ready-for-development | review-task |
+| 2026-10-19 |  | Implemented — engine, 2 test suites, CHANGELOG (bundled copies regenerated); 16 new tests | develop |
+| 2026-10-19 |  | QA gate CONCERNS (90/100) — 2 findings | qa-task |
+| 2026-10-19 |  | QA findings fixed — cycle 1, 2 findings (SKILL.md read-back lists; every Gate Decision line) | qa-fix |
+| 2026-10-19 |  | QA gate CONCERNS (80/100) — 2 findings | qa-task |
+| 2026-10-19 |  | QA findings fixed — cycle 2, 2 findings (verdict row = newest QA gate row; a qa-fix row after it halts) | qa-fix |
+| 2026-10-19 |  | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-10-19 |  | PR review CONCERNS — success criterion and Target Architecture step 3 aligned to the cycle-2 row rule (PC-1, PC-3) | develop-task |
+| 2026-10-19 | 1.2 | DoD passed — accepted (PR #688) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -305,15 +404,46 @@ None.
 
 ### Phase 1: Verdict checks
 
-- [ ] Not started
+- [x] Complete 2026-10-19 — `verdictProblems()`: gate token, every QA section's `**Gate Decision**`, newest `qa-task`/`qa-story` row; fixtures of both read-back suites updated
 
 ### Phase 2: Lock retry
 
-- [ ] Not started
+- [x] Complete 2026-10-19 — `stage()` retries an `index.lock` failure at 200/400/800 ms, once per run; `stageAttempts` in the result
 
 ### Phase 3: Bundle and changelog
 
-- [ ] Not started
+- [x] Complete 2026-10-19 — `npm run bundle` (qa-task, qa-story copies), `bundle:check` clean, CHANGELOG `[Unreleased]` › Fixed
+
+### Implementation Summary
+
+**Approach.** Phase 1 adds `verdictProblems(engines, text, gateFile)` to `qa-read-back.js`, called after
+the link checks when this cycle's gate exists. It reads the gate's `gate:` token, every section
+`findQaResults` returns, and the newest row from `extractEntries` whose last cell is `qa-task` or
+`qa-story`. Phase 2 wraps `git add` in a four-attempt loop that continues only while stderr names
+`index.lock`.
+
+**Deviations from the plan (each recorded in the implementation report).**
+
+1. **One backoff per run, not per path.** A persistent lock waited 1.4 s on every staged path
+   (≥ 4 paths ≈ 5.6 s) — not the "at most 1.4 s" § 8 states. Once one path exhausts the backoff, later
+   paths try once. Held by "a lock that outlasts the backoff is reported after 4 attempts".
+2. **An injectable `sleepMs` seam** (`readBack(doc, { sleepMs })`, the shape of `gh-stage.js`
+   `withRetry`). The plan's only released-lock test removed the lock on a 300 ms timer while a child
+   started; under load the child can start after the timer, so an attempt-count assertion there
+   would flake. The deterministic case uses the seam; the child-process case is kept and asserts
+   only exit 0 and the staged file.
+3. **A gate with no readable `gate:` token is a problem.** The plan said it "is already a problem
+   elsewhere (check `artifact()`)"; `artifact()` reads no content, so without a message the verdict
+   check would silently skip.
+
+**Testing results.** `qa-read-back.test.mjs` 46/46 (16 new cases); `qa-read-back-block.test.js`
+12/12. Five mutation proofs each turn a named test red (implementation report § Step 3). The engine
+reads all twelve accepted documents measured in § 3 clean (`exit 0`, no problems).
+
+**Completion date.** 2026-10-19.
+
+**Deferred work.** None beyond § Future Improvements (the shared lock-retry helper for `review-pr`
+Step 7 and `commit-changes`).
 
 ---
 

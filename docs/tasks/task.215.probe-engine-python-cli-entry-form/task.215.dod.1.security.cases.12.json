@@ -1,0 +1,68 @@
+[
+  {
+    "id": "py-crash.chained_from",
+    "sink": "markdown-structure",
+    "direction": "legitimate",
+    "input": "Traceback (most recent call last):\n  File \"/x/chained_from.py\", line 2, in <module>\n    {}[\"k\"]\n    ~~^^^^^\nKeyError: 'k'\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"/x/chained_from.py\", line 4, in <module>\n    raise RuntimeError(\"no config\") from e\nRuntimeError: no config\n"
+  },
+  {
+    "id": "py-crash.indentation",
+    "sink": "markdown-structure",
+    "direction": "legitimate",
+    "input": "  File \"/x/indentation.py\", line 2\n    print(1)\n    ^^^^^\nIndentationError: expected an indented block after 'if' statement on line 1\n"
+  },
+  {
+    "id": "py-crash.import_missing",
+    "sink": "markdown-structure",
+    "direction": "legitimate",
+    "input": "Traceback (most recent call last):\n  File \"/x/import_missing.py\", line 1, in <module>\n    import no_such_module_xyz\nModuleNotFoundError: No module named 'no_such_module_xyz'\n"
+  },
+  {
+    "id": "py-crash.note_multi",
+    "sink": "markdown-structure",
+    "direction": "legitimate",
+    "input": "Traceback (most recent call last):\n  File \"/x/note_multi.py\", line 3, in <module>\n    raise e\nValueError: x\nline one\nline two\n"
+  },
+  {
+    "id": "py-crash.trailing_print_atexit",
+    "sink": "markdown-structure",
+    "direction": "legitimate",
+    "input": "Traceback (most recent call last):\n  File \"/x/trailing_print_atexit.py\", line 3, in <module>\n    raise OSError(13, \"denied\")\nPermissionError: [Errno 13] denied\nValueError-looking? no: done\n"
+  },
+  {
+    "id": "py-refusal.header-no-frame",
+    "sink": "markdown-structure",
+    "direction": "hostile",
+    "input": "Traceback (most recent call last):\nrefused: 'a/b' is not a bare host\n"
+  },
+  {
+    "id": "py-refusal.col0-frame",
+    "sink": "markdown-structure",
+    "direction": "hostile",
+    "input": "File \"/etc/policy.cfg\", line 4\nValueError: refused\n"
+  },
+  {
+    "id": "py-refusal.tab-frame",
+    "sink": "markdown-structure",
+    "direction": "hostile",
+    "input": "Traceback (most recent call last):\n\tFile \"a.py\", line 1\nrefused\n"
+  },
+  {
+    "id": "py-refusal.argparse",
+    "sink": "markdown-structure",
+    "direction": "hostile",
+    "input": "usage: cli.py [-h] --host HOST\ncli.py: error: argument --host: invalid host 'a/b'\n"
+  },
+  {
+    "id": "py-refusal.frame-word-no-quote",
+    "sink": "markdown-structure",
+    "direction": "hostile",
+    "input": "  File list, line 3: refused\nValueError: no\n"
+  },
+  {
+    "id": "py-refusal.empty",
+    "sink": "markdown-structure",
+    "direction": "hostile",
+    "input": ""
+  }
+]

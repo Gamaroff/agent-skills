@@ -23,9 +23,9 @@ Activate this skill when:
 **Prerequisites:**
 
 - PRD must be sharded first (using `shard-prd`)
-- Shards exist in PRD root directory (`${PRD_ROOT}/<system-name>/` — `${PRD_ROOT}` resolves to `docs/prd` by default; source `references/resolve-paths.sh` to override)
+- Shards exist in the PRD's own directory (`${PRD_ROOT}/{domain}/prd.{P}.{feature}/` — `${PRD_ROOT}` resolves to `docs/prd` by default; source `references/resolve-paths.sh` to override)
 - Understanding of system architecture and dependencies
-- **CRITICAL**: Access to epic registry (`/docs/development/epic-registry.md`) for number allocation
+- **CRITICAL**: every epic is numbered **within this PRD** (`epic.{P}.{E}`); `E` is allocated by `references/doc-id.js` in Step 4, never by hand and never from a registry
 
 **Do NOT use for:**
 
@@ -86,7 +86,8 @@ Convert PRD shards into focused implementation epics:
 
 **Locate PRD Shards:**
 
-- Identify PRD directory (user provides or prompt)
+- Identify PRD directory (user provides or prompt) — a `prd.{P}.{feature}/` directory
+- Read `P` from its name (`command node .agents/skills/create-epics-from-shards/references/doc-id.js parse "prd.{P}.{feature}" --json | jq -r .prd`); **halt** if it does not parse as a PRD — every epic needs a PRD number, and `/create-prd` makes the PRD
 - Verify sharded files exist
 - Read `index.md` to understand structure
 - List all shard files for processing
@@ -94,7 +95,8 @@ Convert PRD shards into focused implementation epics:
 **Example structure:**
 
 ```
-docs/prd/chat-system/
+docs/prd/chat/prd.2.chat-system/
+├── prd.2.chat-system.md        # The PRD (P = 2)
 ├── index.md                    # Overview
 ├── core-chat-integration.md    # Shard 1
 ├── payment-processing.md       # Shard 2
@@ -126,16 +128,17 @@ For each identified epic, create using this structure:
 
 ```markdown
 ---
-epic_number: N # REQUIRED — the globally-unique integer reserved in Step 4. Drives the PRD epic index.
-title: "[Epic N] Epic Name"
-prd_source: "[shard-filename.md]"
+prd_number: P # REQUIRED — the parent PRD's number (Step 1)
+epic_number: E # REQUIRED — E within this PRD, allocated in Step 4. Drives the PRD epic index.
+title: "[Epic P.E] Epic Name"
+prd_source: "docs/prd/{domain}/prd.{P}.{feature}/prd.{P}.{feature}.md" # repo-relative path to the parent PRD (required)
 epic_type: "system_implementation"
 priority: "[high|medium|low]"
 estimated_sprints: "[1-6]"
-dependencies: ["epic.163", "epic.164"] # Use actual epic numbers from registry
+dependencies: ["epic.P.1", "epic.P.2"] # epic.{P}.{E} ids of the epics this one depends on
 ---
 
-# [Epic N] Epic Name
+# [Epic P.E] Epic Name
 
 ## Epic Goal
 
@@ -212,12 +215,12 @@ dependencies: ["epic.163", "epic.164"] # Use actual epic numbers from registry
 
 **Depends On:**
 
-- [ ] [Epic N] Epic name - [Reason]
+- [ ] [Epic P.E] Epic name - [Reason]
 - [ ] [External dependency] - [Reason]
 
 **Blocks:**
 
-- [ ] [Epic N] Epic name - [Reason]
+- [ ] [Epic P.E] Epic name - [Reason]
 
 ## Risks & Mitigation
 
@@ -257,37 +260,38 @@ dependencies: ["epic.163", "epic.164"] # Use actual epic numbers from registry
 
 ### Step 4: Epic Naming and Organization
 
-**CRITICAL - Epic Registry Integration:**
+**CRITICAL — numbers come from `doc-id.js`, within the PRD:**
 
-Before creating any epic files, you MUST:
+One `next epic` call gives the first free `E` in this PRD; the batch takes consecutive numbers from
+it. Run it once, before writing any epic file:
 
-1. Check `/docs/development/epic-registry.md` for next available epic number
-2. Reserve N sequential numbers in the registry (where N = number of epics you're creating)
-3. Update "Next Available Epic Number" counter in registry
-4. Use the reserved numbers for your epic files
+```bash
+# INPUT: {PRD dir} — substitute the PRD directory found in Step 1 (prd.{P}.{feature}/).
+PRD_DIR="{PRD dir}"
+[ -d "$PRD_DIR" ] || { echo "❌ ${PRD_DIR} is not a directory — substitute the PRD directory from Step 1"; exit 1; }
+NEXT=$(command node .agents/skills/create-epics-from-shards/references/doc-id.js next epic --prd-dir "$PRD_DIR" --json) \
+  || { echo "❌ doc-id next epic failed for ${PRD_DIR}: $(printf '%s' "$NEXT" | jq -r '.detail // .reason')"; exit 1; }
+E0=$(printf '%s' "$NEXT" | jq -r '.next')
+echo "E0=${E0}"   # epics of this batch: E0, E0+1, … E0+n-1
+```
 
-**Example Registry Workflow:**
-
-- Registry shows "Next Available Epic Number: 163"
-- You're creating 3 epics
-- Reserve numbers 163, 164, 165
-- Update registry to "Next Available Epic Number: 166"
-- Use these numbers in filenames below
+**Example:** PRD 2 already has epics `epic.2.1` and `epic.2.2`; `next epic` answers `3`; creating
+three epics gives `epic.2.3`, `epic.2.4`, `epic.2.5`.
 
 **File Naming Convention:**
 
-- Format: `epic.[number].[feature-name].md` (NOTE: Use DOTS, not dashes)
-- Use globally unique sequential numbers from registry
-- Lowercase with hyphens for descriptive names only
-- Example: `epic.163.basic-messaging.md` (NOT `epic-163-basic-messaging.md`)
+- Format: `epic.{P}.{E}.{feature-name}.md` (NOTE: Use DOTS, not dashes)
+- Lowercase with hyphens for descriptive names only; the name begins with a letter
+- Example: `epic.2.3.basic-messaging.md` (NOT `epic-2-3-basic-messaging.md`, NOT `epic.3.basic-messaging.md`)
 
-**Epic Directory:**
+**Epic Directory** — one directory per epic, named like its file (the PRD epic index and `doc-id check`
+both require this layout):
 
 ```
-${PRD_ROOT}/[system-name]/epics/
-├── epic.163.core-infrastructure.md
-├── epic.164.basic-messaging.md
-├── epic.165.payment-integration.md
+${PRD_ROOT}/{domain}/prd.{P}.{feature}/epics/
+├── epic.2.3.core-infrastructure/epic.2.3.core-infrastructure.md
+├── epic.2.4.basic-messaging/epic.2.4.basic-messaging.md
+├── epic.2.5.payment-integration/epic.2.5.payment-integration.md
 └── index.md  # Epic overview and roadmap
 ```
 
@@ -307,16 +311,16 @@ represents focused development phase with clear deliverables.
 
 ### Phase 1: Foundation
 
-- [Epic 163: Core Infrastructure](./epic.163.core-infrastructure.md)
+- [Epic 2.3: Core Infrastructure](./epic.2.3.core-infrastructure/epic.2.3.core-infrastructure.md)
 
 ### Phase 2: Core Features
 
-- [Epic 164: Basic Features](./epic.164.basic-features.md)
-- [Epic 165: Integration Layer](./epic.165.integration-layer.md)
+- [Epic 2.4: Basic Features](./epic.2.4.basic-features/epic.2.4.basic-features.md)
+- [Epic 2.5: Integration Layer](./epic.2.5.integration-layer/epic.2.5.integration-layer.md)
 
 ### Phase 3: Advanced Features
 
-- [Epic 166: Advanced Features](./epic.166.advanced-features.md)
+- [Epic 2.6: Advanced Features](./epic.2.6.advanced-features/epic.2.6.advanced-features.md)
 
 ## Dependencies
 
@@ -327,7 +331,6 @@ graph TD
     B --> D[Epic 4]
     C --> D
 ```
-````
 
 ## Development Timeline
 
@@ -346,8 +349,7 @@ graph TD
 
 ### Step 6: Regenerate the PRD Epic Index
 
-After all epic files are written (Step 3) **and** the epic-registry update is committed
-(Step 4), refresh the parent PRD's linked epic index so PRD→epic links stay complete and
+After all epic files are written (Steps 3–4), refresh the parent PRD's linked epic index so PRD→epic links stay complete and
 statuses current. This is the PRD-level index injected into `prd.<feature>.md` — distinct
 from the epic roadmap `epics/index.md` created in Step 5; keep both.
 
@@ -365,14 +367,56 @@ from the epic roadmap `epics/index.md` created in Step 5; keep both.
      || node references/generate-prd-epic-index.mjs --prd-root "${PRD_ROOT}"
    ```
 
-   Every new epic MUST carry `epic_number` in its frontmatter (Step 3) — the generator
-   silently skips any epic that lacks it. Add `--strict` to turn a missing `epic_number`
-   into a hard error when you want to fail loudly instead.
+   Every new epic MUST carry `prd_number` and `epic_number` matching its directory (Step 3) —
+   the generator skips, and names on stderr, any epic whose numbers disagree. Add `--strict` to
+   turn a skip into a hard error when you want to fail loudly instead.
 
 3. Stage the changed `prd.*.md` alongside the epic files in the **same** commit, so the
    downstream `docs:epic-index:check` never sees drift.
 
 ### Step 7: Quality Validation
+
+**Id check (blocking)** — run on every epic of the batch; any `reason` other than `ok` is a HALT,
+printed verbatim:
+
+```bash
+# INPUTS: {PRD dir} — the same PRD directory as Step 4; {E0} and {count} — this batch's first epic
+# number (Step 4's E0) and how many epics it wrote. PRD_ROOT is resolved here (QA cycle 2, CR-7).
+PRD_DIR="{PRD dir}"
+E0="{E0}"; COUNT="{count}"
+# Each input on its own: joined, one substituted value would cover a missing other (QA cycle 4, CR-5).
+for v in "$E0" "$COUNT"; do
+  case "$v" in ''|*[!0-9]*|0*) echo "❌ substitute {E0} and {count} with this batch's numbers (positive integers)"; exit 1 ;; esac
+done
+[ -d "$PRD_DIR/epics" ] || { echo "❌ ${PRD_DIR}/epics does not exist — substitute the PRD directory from Step 1"; exit 1; }
+source .agents/skills/create-epics-from-shards/references/resolve-paths.sh || exit 1
+CHECKED=0
+for f in "$PRD_DIR"/epics/epic.*/epic.*.md; do
+  [ -f "$f" ] || continue
+  case "${f##*/}" in "$(basename "$(dirname "$f")").md") ;; *) continue ;; esac
+  OUT=$(command node .agents/skills/create-epics-from-shards/references/doc-id.js check "$f" --prd-root "${PRD_ROOT}" --json) \
+    || { echo "❌ doc-id check failed: $f"; printf '%s\n' "$OUT"; exit 1; }
+  CHECKED=$((CHECKED + 1))
+done
+# Every epic of THIS batch must be present: a floor of "any epic" passes a batch that wrote nothing
+# whenever the PRD already had epics (QA cycle 3, CR-3).
+P=$(command node .agents/skills/create-epics-from-shards/references/doc-id.js parse "$(basename "$PRD_DIR")" --json | jq -r 'select(.kind == "prd") | .prd')
+[ -n "$P" ] || { echo "❌ $(basename "$PRD_DIR") is not a prd.{P}.{feature} directory"; exit 1; }
+E=$E0
+while [ "$E" -lt $((E0 + COUNT)) ]; do
+  # Exactly one epic.P.E.{slug}/epic.P.E.{slug}.md — the only shape the loop above checks, so a
+  # misnamed batch file cannot pass unchecked (QA cycle 5, CR-1).
+  FOUND=0
+  for d in "$PRD_DIR/epics/epic.$P.$E."*/; do
+    d=${d%/}
+    [ -f "$d/${d##*/}.md" ] && FOUND=$((FOUND + 1))
+  done
+  [ "$FOUND" -eq 1 ] \
+    || { echo "❌ epic.$P.$E is missing — the batch did not write one epic.$P.$E.{slug}/epic.$P.$E.{slug}.md (found $FOUND)"; exit 1; }
+  E=$((E + 1))
+done
+echo "doc-id check: ${CHECKED} epic(s) ok; batch epic.$P.$E0 … epic.$P.$((E0 + COUNT - 1)) present"
+```
 
 **Epic Quality Checklist:**
 - [ ] Epic has clear, measurable goal
@@ -460,15 +504,16 @@ Successful epic creation produces:
 User: "Create implementation epics from the sharded PRD"
 
 → create-epics-from-shards activates
-→ Locates docs/prd/chat-system/
+→ Locates docs/prd/chat/prd.2.chat-system/ (P = 2)
 → Reads index.md (8 shards found)
 → Analyzes each shard for complexity
-→ Creates 5 epics in docs/prd/chat-system/epics/:
-   - epic.163.core-infrastructure.md
-   - epic.164.basic-messaging.md
-   - epic.165.payment-integration.md
-   - epic.166.group-features.md
-   - epic.167.advanced-features.md
+→ doc-id next epic --prd-dir … → 1 (no epics yet)
+→ Creates 5 epics in docs/prd/chat/prd.2.chat-system/epics/, one directory each:
+   - epic.2.1.core-infrastructure/epic.2.1.core-infrastructure.md
+   - epic.2.2.basic-messaging/epic.2.2.basic-messaging.md
+   - epic.2.3.payment-integration/epic.2.3.payment-integration.md
+   - epic.2.4.group-features/epic.2.4.group-features.md
+   - epic.2.5.advanced-features/epic.2.5.advanced-features.md
 → Creates epics/index.md with roadmap
 → Validates quality
 → Presents handoff summary

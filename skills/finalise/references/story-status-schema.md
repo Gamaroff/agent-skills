@@ -41,7 +41,7 @@ any → cancelled (requirements changed)
 ```yaml
 ---
 title: Story Title
-epic: epic.123.epic-name
+epic: epic.1.123.epic-name
 story_number: story.123.4
 status: in_progress
 assigned_to: developer-name
@@ -89,7 +89,7 @@ When updating status to `accepted`, the following fields MUST be present:
 ```yaml
 ---
 title: Implement User Authentication
-epic: epic.311.example-domain
+epic: epic.1.311.example-domain
 story_number: story.311.1
 status: in_progress
 assigned_to: jane-doe
@@ -103,7 +103,7 @@ pr_number: 789
 ```yaml
 ---
 title: Implement User Authentication
-epic: epic.311.example-domain
+epic: epic.1.311.example-domain
 story_number: story.311.1
 status: accepted
 assigned_to: jane-doe

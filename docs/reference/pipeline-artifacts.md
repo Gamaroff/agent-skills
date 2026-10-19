@@ -11,15 +11,15 @@ Filename grammar lives in [File naming](../standards/file-naming.md); this page 
 Everything the pipeline produces is **co-located with the work item** — there is no central `docs/qa/` or `docs/reports/` directory.
 
 ```
-docs/prd/{domain}/{feature}/epics/epic.{N}.{name}/stories/story.{E}.{S}.{name}/
-├── story.{E}.{S}.{name}.md                     # you wrote this
-├── story.{E}.{S}.plan.{name}.md                # you (or /plan) wrote this
-├── story.{E}.{S}.review.{n}.{name}.md          # ← Step 2
-├── story.{E}.{S}.implementation.{n}.{name}.md  # ← Phase 0e, appended to all run
-├── story.{E}.{S}.qa.{n}.{name}.md              # ← Step 5, one per QA cycle
-├── story.{E}.{S}.gate.{n}.{name}.yml           # ← Step 5, one per QA cycle
-├── story.{E}.{S}.pr-review.{n}.{name}.md       # ← Step 5c, on the cycle that exits
-├── story.{E}.{S}.dod.{n}.{name}.md             # ← Step 7
+docs/prd/{domain}/prd.{P}.{feature}/epics/epic.{P}.{E}.{name}/stories/story.{P}.{E}.{S}.{name}/
+├── story.{P}.{E}.{S}.{name}.md                     # you wrote this
+├── story.{P}.{E}.{S}.plan.{name}.md                # you (or /plan) wrote this
+├── story.{P}.{E}.{S}.review.{n}.{name}.md          # ← Step 2
+├── story.{P}.{E}.{S}.implementation.{n}.{name}.md  # ← Phase 0e, appended to all run
+├── story.{P}.{E}.{S}.qa.{n}.{name}.md              # ← Step 5, one per QA cycle
+├── story.{P}.{E}.{S}.gate.{n}.{name}.yml           # ← Step 5, one per QA cycle
+├── story.{P}.{E}.{S}.pr-review.{n}.{name}.md       # ← Step 5c, on the cycle that exits
+├── story.{P}.{E}.{S}.dod.{n}.{name}.md             # ← Step 7
 └── .summaries/                                 # ← runtime only, gitignored
 ```
 
@@ -39,14 +39,14 @@ docs/tasks/task.{N}.{name}/
 └── .summaries/                                 # ← runtime only, gitignored
 ```
 
-The two pipelines are the same shape. Read `story.{E}.{S}` and `task.{N}` as interchangeable prefixes below.
+The two pipelines are the same shape. Read `story.{P}.{E}.{S}` and `task.{N}` as interchangeable prefixes below.
 
 ## Step → artifact
 
 | Step | Skill | Artifact produced | Committed? |
 | --- | --- | --- | --- |
 | Phase 0e | (orchestrator) | **Implementation report** `*.implementation.{n}.{name}.md` | Yes — Step 8 |
-| 1 | `create-branch` | **Feature branch** `feature/story.{E}.{S}.*` / `feature/task.{N}.*`, plus the epic integration branch if you chose one that did not exist | n/a (git ref) |
+| 1 | `create-branch` | **Feature branch** `feature/story.{P}.{E}.{S}.*` / `feature/task.{N}.*`, plus the epic integration branch if you chose one that did not exist | n/a (git ref) |
 | 1 (end) | (orchestrator) | **Pipeline lock** `.claude/state/develop-pipeline.lock` | No |
 | 2 | `review-story` / `review-task` | **Review report** `*.review.{n}.{name}.md` | Yes — Step 8 |
 | 3 | `develop` | Source changes, tests, and transient **test logs** `.claude/state/test-output-{ITER}-*.log` | Source yes, logs no |

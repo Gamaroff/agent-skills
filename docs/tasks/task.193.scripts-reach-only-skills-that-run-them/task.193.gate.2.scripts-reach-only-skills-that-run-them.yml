@@ -1,0 +1,77 @@
+schema: 2
+task: 'task.193.scripts-reach-only-skills-that-run-them'
+task_title: 'Scripts reach only the skills that run them'
+gate: CONCERNS
+status_reason: 'Cycle 1 fixes hold (cite exemption gone, verified end to end), but the refute pass found the guard still blind to two shapes the bundler copies: a nested shared/resources path, and prose that RUN_PREFIX reads as a command (a parenthetical or line-initial "source", a closing backtick).'
+reviewer: 'QA Engineer'
+head: 'beb6896816d322947b0cad7b5628983f2b9d8489'
+updated: '2026-10-19T08:47:34Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'tests/shared-script-literals.test.js'
+    finding: 'SCRIPT_LITERAL excludes "/" from the name, so a nested literal such as shared/resources/tests/x.test.mjs is never seen, while the bundler''s SHARED_REF_RE captures and copies it (the task.123 and task.147 incidents were this shape).'
+    suggested_action: 'Match with the bundler''s capture class, strip fragment and trailing punctuation as split_fragment does, then filter on the script extension; add a nested-path fixture.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-2'
+    severity: medium
+    file: 'tests/shared-script-literals.test.js'
+    finding: 'RUN_PREFIX exempts prose: "(source `shared/resources/x.js`)", a hard-wrapped line starting "source `…`", and a closing backtick read as an opening one.'
+    suggested_action: 'Accept a command only after "$(" or a backtick that opens a code span (even count before it); add the three shapes as must-report fixtures.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 6
+  phases_verified: 4/4
+  ci: 'not checked this cycle (gated at /finalise)'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+bug_resolution:
+  - id: 'CR-1 (gate 1)'
+    status: fixed
+    evidence: 'a cite-wrapped grant-qa-cycles.sh literal restored into the resume contract is reported (§2 red); npm run bundle:skill confirms the bundler copies a cite-wrapped script'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No runtime boundary; the scanner is a test-only classifier (boundary: false — scan/RUN_PREFIX gate a CI lint, take no external input).'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'bundle:check 0 problems; ci:fast 5903/0 fail on beb68968.'
+  maintainability:
+    status: CONCERNS
+    notes: 'CR-1 and CR-2 leave the guard narrower than the bundler it polices.'
+
+recommendations:
+  immediate:
+    - action: 'CR-1: align the scanner''s literal matcher with the bundler''s.'
+      refs: ['tests/shared-script-literals.test.js']
+    - action: 'CR-2: accept a command only in an opening code span or after "$(".'
+      refs: ['tests/shared-script-literals.test.js']
+  future:
+    - action: 'CR-3 (pre-existing, outside the task''s population): fenced literals are exempt, but the fenced quote at probe-boundary-rule.md:66 copies qa-execute-snippets.test.mjs into qa-story and qa-task (identical on origin/develop). Follow-up: classify fenced literals too, or cite that test by bare filename.'
+      refs: ['shared/resources/probe-boundary-rule.md', 'tests/shared-script-literals.test.js']
+    - action: 'CR-4 (advisory, medium confidence): ALLOWED reasons claim a bundler set the test does not check; a new bundler would silently receive the copy.'
+      refs: ['tests/shared-script-literals.test.js']
+    - action: 'CR-5 (cleanup): no end boundary after the extension (foo.json reads as foo.js).'
+      refs: ['tests/shared-script-literals.test.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 and CR-2 fixed and re-reviewed']

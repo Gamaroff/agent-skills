@@ -44,7 +44,7 @@ status: in-progress
 severity: 'Major'
 priority: 'High'
 created: 2026-09-07
-related: 'story 7.4'
+related: 'story 1.7.4'
 description: 'Tap target too small'
 ---
 
@@ -61,7 +61,7 @@ const FIELDS = {
   severity: "Major",
   priority: "High",
   created: "2026-09-07",
-  related: "story 7.4",
+  related: "story 1.7.4",
   description: "Tap target too small",
 };
 
@@ -87,7 +87,7 @@ function sync(file, over = {}) {
 
 test("no bug_bitbucket_url is written to frontmatter", () => {
   const dir = tmpdir();
-  const file = writeDoc(dir, "story.7.4.bug.4.tap-target.md", BUG_DOC);
+  const file = writeDoc(dir, "story.1.7.4.bug.4.tap-target.md", BUG_DOC);
 
   const { frontmatter } = lib.parseFrontmatter(sync(file));
   assert.equal(
@@ -105,7 +105,7 @@ test("no bug_bitbucket_url is written to frontmatter", () => {
 
 test("an absolute src/<ref>/ URL appears nowhere in the written document", () => {
   const dir = tmpdir();
-  const file = writeDoc(dir, "story.7.4.bug.4.tap-target.md", BUG_DOC);
+  const file = writeDoc(dir, "story.1.7.4.bug.4.tap-target.md", BUG_DOC);
 
   assert.doesNotMatch(
     sync(file),
@@ -120,11 +120,11 @@ test("an absolute src/<ref>/ URL appears nowhere in the written document", () =>
 
 test("the Bug File line is a relative link to the document itself", () => {
   const dir = tmpdir();
-  const file = writeDoc(dir, "story.7.4.bug.4.tap-target.md", BUG_DOC);
+  const file = writeDoc(dir, "story.1.7.4.bug.4.tap-target.md", BUG_DOC);
 
   assert.match(
     sync(file),
-    /^\*\*Bug File\*\*: \[story\.7\.4\.bug\.4\.tap-target\.md\]\(\.\/story\.7\.4\.bug\.4\.tap-target\.md\)$/m,
+    /^\*\*Bug File\*\*: \[story\.1\.7\.4\.bug\.4\.tap-target\.md\]\(\.\/story\.1\.7\.4\.bug\.4\.tap-target\.md\)$/m,
   );
 });
 
@@ -132,9 +132,9 @@ test("an existing absolute Bug File line is REPLACED, not left in place", () => 
   const dir = tmpdir();
   const stale = BUG_DOC.replace(
     "# Bug: Tap target too small\n",
-    `# Bug: Tap target too small\n\n**Bug File**: [View on Bitbucket](${BB}/src/feature/gone/story.7.4.bug.4.tap-target.md)\n`,
+    `# Bug: Tap target too small\n\n**Bug File**: [View on Bitbucket](${BB}/src/feature/gone/story.1.7.4.bug.4.tap-target.md)\n`,
   );
-  const file = writeDoc(dir, "story.7.4.bug.4.tap-target.md", stale);
+  const file = writeDoc(dir, "story.1.7.4.bug.4.tap-target.md", stale);
 
   const written = sync(file);
   assert.doesNotMatch(written, /View on Bitbucket/);
@@ -153,7 +153,7 @@ test("an existing **Jira** header-block line is replaced, not duplicated", () =>
     "# Bug: Tap target too small\n",
     "# Bug: Tap target too small\n\n**Jira**: RAPP-000\n",
   );
-  const file = writeDoc(dir, "story.7.4.bug.4.tap-target.md", stale);
+  const file = writeDoc(dir, "story.1.7.4.bug.4.tap-target.md", stale);
 
   const written = sync(file);
   assert.equal((written.match(/^\*\*Jira\*\*:/gm) || []).length, 1);
@@ -176,8 +176,8 @@ test("the Bug File line is still written when no Bitbucket base could be resolve
 
 const HEADERED_BUG = `# Bug: Tap target too small
 
-**Bug ID**: story.7.4.bug.4
-**Related**: [story 7.4](./story.7.4.tap-targets.md)
+**Bug ID**: story.1.7.4.bug.4
+**Related**: [story 1.7.4](./story.1.7.4.tap-targets.md)
 **Status**: ✅ Closed
 **Priority**: High
 **Severity**: Major
@@ -193,7 +193,7 @@ test("a file with no frontmatter still ends up with a persisted jira_key", () =>
   // unchanged and SILENTLY — the issue is created and the key is never stored,
   // so the next run creates a duplicate.
   const dir = tmpdir();
-  const file = writeDoc(dir, "story.7.4.bug.4.tap-target.md", HEADERED_BUG);
+  const file = writeDoc(dir, "story.1.7.4.bug.4.tap-target.md", HEADERED_BUG);
 
   const written = sync(file);
   const { frontmatter } = lib.parseFrontmatter(written);
@@ -205,7 +205,7 @@ test("a file with no frontmatter still ends up with a persisted jira_key", () =>
 
 test("adopting frontmatter leaves the body verbatim", () => {
   const dir = tmpdir();
-  const file = writeDoc(dir, "story.7.4.bug.4.tap-target.md", HEADERED_BUG);
+  const file = writeDoc(dir, "story.1.7.4.bug.4.tap-target.md", HEADERED_BUG);
 
   const written = sync(file);
   const body = lib.parseFrontmatter(written).body;
@@ -225,7 +225,7 @@ test("resolveRelativeLink turns the relative href back into an absolute URL", ()
   const dir = tmpdir();
   const file = writeDoc(
     dir,
-    "docs/prd/x/story.7.4.bug.4.tap-target.md",
+    "docs/prd/x/story.1.7.4.bug.4.tap-target.md",
     BUG_DOC,
   );
   const resolver = lib.makeRelativeLinkResolver({
@@ -236,8 +236,8 @@ test("resolveRelativeLink turns the relative href back into an absolute URL", ()
   });
 
   assert.equal(
-    resolver("./story.7.4.bug.4.tap-target.md"),
-    `${BB}/src/develop/docs/prd/x/story.7.4.bug.4.tap-target.md`,
+    resolver("./story.1.7.4.bug.4.tap-target.md"),
+    `${BB}/src/develop/docs/prd/x/story.1.7.4.bug.4.tap-target.md`,
   );
 });
 
@@ -247,10 +247,10 @@ test("a relative link INSIDE the bug body is absolutised at ADF-render time", ()
   // rendering it verbatim into a Jira description produces a dead link, because
   // Jira has no "relative to this file" base path.
   const dir = tmpdir();
-  writeDoc(dir, "docs/prd/x/story.7.4.tap-targets.md", "# Story\n");
+  writeDoc(dir, "docs/prd/x/story.1.7.4.tap-targets.md", "# Story\n");
   const file = writeDoc(
     dir,
-    "docs/prd/x/story.7.4.bug.4.tap-target.md",
+    "docs/prd/x/story.1.7.4.bug.4.tap-target.md",
     `---
 type: bug
 status: new
@@ -260,7 +260,7 @@ status: new
 
 ## Bug Description
 
-Violates [the story](./story.7.4.tap-targets.md) acceptance criteria.
+Violates [the story](./story.1.7.4.tap-targets.md) acceptance criteria.
 `,
   );
   const resolver = lib.makeRelativeLinkResolver({
@@ -273,7 +273,7 @@ Violates [the story](./story.7.4.tap-targets.md) acceptance criteria.
   const adf = bugSync.buildDescriptionAdf({
     body: lib.parseFrontmatter(fs.readFileSync(file, "utf-8")).body,
     fields: FIELDS,
-    bugBbUrl: `${BB}/src/develop/docs/prd/x/story.7.4.bug.4.tap-target.md`,
+    bugBbUrl: `${BB}/src/develop/docs/prd/x/story.1.7.4.bug.4.tap-target.md`,
     parentDocUrl: null,
     parentDocLabel: "Parent story document",
     parentKey: null,
@@ -286,7 +286,7 @@ Violates [the story](./story.7.4.tap-targets.md) acceptance criteria.
 
   const hrefs = collectHrefs(adf);
   assert.ok(
-    hrefs.includes(`${BB}/src/develop/docs/prd/x/story.7.4.tap-targets.md`),
+    hrefs.includes(`${BB}/src/develop/docs/prd/x/story.1.7.4.tap-targets.md`),
     `the in-body relative link was not absolutised; hrefs were ${JSON.stringify(hrefs)}`,
   );
   assert.ok(

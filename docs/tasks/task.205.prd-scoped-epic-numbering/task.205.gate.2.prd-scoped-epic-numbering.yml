@@ -1,0 +1,112 @@
+schema: 2
+task: 'task.205.prd-scoped-epic-numbering'
+task_title: 'PRD-scoped epic numbering'
+gate: FAIL
+status_reason: 'Cycle 2 refute pass: cycle 1''s three gating findings are fixed, but one HIGH remains — the task milestone block reads an unbound $EPIC_REF — plus four MEDIUM (a second title parser, rename/edit block inputs never bound, a failed milestone lookup creating a duplicate, review-epic ignoring a configured PRD root) and two LOW. Suite green: 5666 pass, 0 fail.'
+reviewer: 'QA Engineer'
+head: 'a1d73c9e9b2b246a582bcbc55018a33694abe1cb'
+updated: '2026-10-15T10:50:44Z'
+
+top_issues:
+  - id: 'TASK-205-QA2-CR1'
+    severity: high
+    file: 'skills/ensure-task-github-issue/SKILL.md'
+    finding: 'The Step T3 block reads an unbound $EPIC_REF, so a real run gives every epic-linked task the standalone milestone at exit 0 (TASK-205-BUG-3).'
+    suggested_action: 'Read epic: from the task file frontmatter inside the block; guard the file path.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-205-QA2-CR2'
+    severity: medium
+    file: 'skills/ensure-task-github-issue/SKILL.md'
+    finding: 'The task block parses the epic title with its own sed, so a single-quoted title gives a milestone key unlike the epic''s own (TASK-205-BUG-4).'
+    suggested_action: 'Use doc-id.js frontmatterField as the epic id blocks do.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-205-QA2-CR3'
+    severity: medium
+    file: 'skills/sync-github-epic/SKILL.md'
+    finding: 'The rename and edit blocks guard ISSUE_NUM / EPIC_ID / EPIC_TITLE / MILESTONE_TITLE but never bind them, so a real run stops at the guard (TASK-205-BUG-5).'
+    suggested_action: 'Re-derive the values in each block from EPIC_FILE_PATH.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-205-QA2-CR4'
+    severity: medium
+    file: 'shared/resources/tracker-issue.js'
+    finding: 'A failed milestone listing reads as "old title absent", so --rename-from creates a second milestone and strands the old one (TASK-205-BUG-6).'
+    suggested_action: 'With --rename-from set, a failed lookup returns unverifiable and creates nothing.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-205-QA2-CR5'
+    severity: medium
+    file: 'skills/review-epic/SKILL.md'
+    finding: 'review-epic''s Input Resolution block still defaults PRD_ROOT; the BUG-2 fix reached only ensure-task (TASK-205-BUG-7).'
+    suggested_action: 'Source resolve-paths.sh in the block; enumerate every added block reading PRD_ROOT.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-205-QA2-CR6'
+    severity: low
+    file: 'skills/create-epic/SKILL.md'
+    finding: 'The id-check block claims its inputs are re-bound there but assigns none, so it always stops at the guard when run alone.'
+    suggested_action: 'Derive P/E/PRD_DIR from the written epic file path; source resolve-paths.sh.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-205-QA2-CR8'
+    severity: low
+    file: 'shared/resources/doc-id.js'
+    finding: 'A bare hyphen now separates, so "Epic 10-Year Plan" strips to "Year Plan"; "Story 1.2.3 Foo" is no longer stripped as base did.'
+    suggested_action: 'Require whitespace before a hyphen separator; decide whitespace-only separation for story ids explicitly, tested both ways.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 5680
+  phases_verified: '7/7'
+  ci: 'not read at this cycle (gated at /finalise)'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5, 6]
+    phases_with_issues: [1, 3, 4, 5]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 10
+    notes: 'review-epic Input Resolution re-probed (fence form, 10 cases, verdict engages).'
+  performance:
+    status: PASS
+    notes: 'Unchanged since cycle 1 (0.039 s against a 1 s bound).'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-4: a failed lookup under --rename-from strands a milestone; CR-1/CR-3: skill blocks fail or degrade when run as shipped.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Block inputs are declared in comments but bound in other blocks — the same unbound-read class recurs across five blocks.'
+
+recommendations:
+  immediate:
+    - action: 'Every task-205 skill block derives its own inputs from the document it operates on (CR-1, CR-3, CR-6, CR-7); one title parser (CR-2).'
+      refs: ['skills/ensure-task-github-issue/SKILL.md', 'skills/sync-github-epic/SKILL.md', 'skills/create-epic/SKILL.md', 'skills/create-epics-from-shards/SKILL.md']
+    - action: 'tracker-issue.js: a failed lookup with --rename-from is unverifiable (CR-4).'
+      refs: ['shared/resources/tracker-issue.js']
+    - action: 'review-epic resolves PRD_ROOT (CR-5); stripIdPrefix hyphen rule (CR-8).'
+      refs: ['skills/review-epic/SKILL.md', 'shared/resources/doc-id.js']
+  future:
+    - action: 'Advisory: limit the title-match rename branch to legacy one-number ids (CR-9, low confidence); create-epics-from-shards Step 7 binds PRD_DIR (CR-7, medium confidence).'
+      refs: ['skills/sync-github-epic/SKILL.md', 'skills/create-epics-from-shards/SKILL.md']
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 5
+  fix_date: '2026-10-15'
+  total_iterations: 1
+  verification_method: 'Executed skill blocks (guard test) + mutation proofs'
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

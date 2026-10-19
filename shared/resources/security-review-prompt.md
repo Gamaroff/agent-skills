@@ -98,7 +98,7 @@ answer to a question nobody asked.
 `entry` is `path#exportName`, resolved from the repository root. It must be:
 
 - **A real, importable ES module export — or a shell script via the `shell:` entry form, a
-  sourced library via `shell-fn:`, a Node CLI via `cli:`, a multi-argument shell script via
+  sourced library via `shell-fn:`, a Node or Python CLI via `cli:`, a multi-argument shell script via
   `shell-argv:`, or a fenced bash block via `fence:`.** A bash script taking one positional argument is probed with
   `--entry 'shell:<path>'` (and a materialised sink such as `filename`); a bash script taking
   **several arguments or flags** with `--entry 'shell-argv:<path>' --argv '["--flag","{input}"]'`,
@@ -108,8 +108,8 @@ answer to a question nobody asked.
   `probe-boundary-rule.md` §5) — with `--entry 'shell-fn:<path>#<function>' --cases-file
   <cases.json>`, plus `--fake-gh <dir>` when the function's body names `gh`. "It is not JS" is
   never a reason to report `unverifiable`, and `shell:` against a library is the task.125 result
-  (sourced, never called, `absent` behind a full count). A **Node CLI** whose decision sits
-  behind its flags is probed with `--entry 'cli:<path>' --argv '["--flag","{input}"]'` — the
+  (sourced, never called, `absent` behind a full count). A **Node CLI** — or a **Python CLI**
+  (`.py`, run as `python3 -E -s -B`) — whose decision sits behind its flags is probed with `--entry 'cli:<path>' --argv '["--flag","{input}"]'` — the
   template's one `"{input}"` element is the case, the exit status is the verdict (0 accepted,
   non-zero rejected; a case carrying `expected` is compared instead), a crash is `errored`, and each
   guarded flag is its own control, named with `--name`. A **fenced bash block in a step doc** — a
@@ -169,7 +169,7 @@ re-run is an assertion, not evidence.
 A shell-script boundary takes the same row with `--entry 'shell:<path>'` in place of the
 `path#export` form (and `--sink filename` for a script that lists a directory): the engine
 materialises each case as a fixture directory and runs the script against it under bash and zsh, so
-"it is not JS" is never the reason a control row reads `unverifiable`. A Node CLI takes it with
+"it is not JS" is never the reason a control row reads `unverifiable`. A Node or Python CLI takes it with
 `--entry 'cli:<path>' --argv '[…"{input}"…]'`, a shell script that takes several arguments or flags
 with `--entry 'shell-argv:<path>' --argv '[…"{input}"…]'` (and `--fixture-setup` for a repository it
 reads), and "it takes several flags" is never that reason either. A fenced bash block takes it with `--entry 'fence:<doc.md>#<heading>' --slot '<placeholder>'`.
@@ -265,7 +265,7 @@ over-read a clean result.
    site's `file:line`, record the module path the engine actually resolved, and **downgrade to
    `unverifiable` any citation naming no file in scope**.
 3. **A non-JS entry point is routed to `--entry 'shell:<path>'`** — or, for a sourced library,
-   `--entry 'shell-fn:<path>#<function>'`, for a Node CLI, `--entry 'cli:<path>' --argv …`, for a
+   `--entry 'shell-fn:<path>#<function>'`, for a Node or Python CLI, `--entry 'cli:<path>' --argv …`, for a
    shell script with several arguments or flags, `--entry 'shell-argv:<path>' --argv …`, and for
    a fenced bash block in a step doc, `--entry 'fence:<doc.md>#<heading>' --slot '<placeholder>'`
    — not recorded `unverifiable`; only a target no entry form reaches (stdin, network) is declined — and the decline names the reason. The `cli:`

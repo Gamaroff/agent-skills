@@ -51,7 +51,7 @@ Gates are **advisory** - teams choose their quality bar, but gates provide trans
 
 ### Naming Convention
 
-**Format**: `story.[epic].[story].gate.[number].[descriptive-name].yml`
+**Format**: `story.[P].[E].[S].gate.[number].[descriptive-name].yml`
 
 **Examples**:
 
@@ -63,13 +63,13 @@ Gates are **advisory** - teams choose their quality bar, but gates provide trans
 Gate files are **co-located** in the same directory as the story they belong to. Never use a central `docs/qa/gates/` path.
 
 ```
-${PRD_ROOT}/<domain>/<feature>/epics/epic.<N>.<name>/stories/story.<N>.<M>.<slug>/
-├── story.<N>.<M>.<slug>.md
-├── story.<N>.<M>.qa.1.<name>.md      # QA report
-└── story.<N>.<M>.gate.1.<name>.yml   # Gate file (co-located)
+${PRD_ROOT}/<domain>/prd.<P>.<feature>/epics/epic.<P>.<E>.<name>/stories/story.<P>.<E>.<S>.<slug>/
+├── story.<P>.<E>.<S>.<slug>.md
+├── story.<P>.<E>.<S>.qa.1.<name>.md      # QA report
+└── story.<P>.<E>.<S>.gate.1.<name>.yml   # Gate file (co-located)
 ```
 
-**Example**: If story is at `${PRD_ROOT}/domain-name/module-name/epics/epic.1.<name>/stories/story.1.1.5.<slug>/story.1.1.5.<slug>.md`, gate goes to `${PRD_ROOT}/domain-name/module-name/epics/epic.1.<name>/stories/story.1.1.5.<slug>/story.1.1.5.gate.1.feature-cache.yml`
+**Example**: If story is at `${PRD_ROOT}/domain-name/prd.1.module-name/epics/epic.1.1.<name>/stories/story.1.1.5.<slug>/story.1.1.5.<slug>.md`, gate goes to `${PRD_ROOT}/domain-name/prd.1.module-name/epics/epic.1.1.<name>/stories/story.1.1.5.<slug>/story.1.1.5.gate.1.feature-cache.yml`
 
 For tasks: gate is co-located in the task directory at `docs/tasks/task.<id>.<name>/task.<id>.gate.<N>.<name>.yml`.
 
@@ -377,7 +377,7 @@ quality_weights:
 
 ### File Creation Steps
 
-1. **Create gate file** at: `{qa.qaLocation}/gates/[prd-path]/story.[epic].[story].gate.[number].[descriptive-name].yml`
+1. **Create gate file** at: `{qa.qaLocation}/gates/[prd-path]/story.[P].[E].[S].gate.[number].[descriptive-name].yml`
 2. **Keep status_reason** to 1-2 sentences maximum
 3. **Use severity values exactly**: `low`, `medium`, or `high` (no variations)
 4. **Mirror PRD structure**: Gate file directory matches story file location
@@ -487,7 +487,7 @@ Gate files are co-located alongside their story or task — not under `docs/qa/g
 
 ```yaml
 schema: 2
-story: "{epic}.{story}"
+story: "{prd}.{epic}.{story}"
 gate: PASS|CONCERNS|FAIL|WAIVED
 status_reason: "{1-2 sentence explanation}"
 reviewer: "QA Engineer"
@@ -501,7 +501,7 @@ waiver: { active: false }
 
 ```yaml
 schema: 2
-story: "{epic}.{story}"
+story: "{prd}.{epic}.{story}"
 story_title: "{story title}"
 gate: PASS|CONCERNS|FAIL|WAIVED
 status_reason: "{1-2 sentence explanation}"

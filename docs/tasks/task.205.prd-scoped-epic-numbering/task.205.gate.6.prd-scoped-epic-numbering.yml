@@ -1,0 +1,72 @@
+schema: 2
+task: 'task.205.prd-scoped-epic-numbering'
+task_title: 'PRD-scoped epic numbering'
+gate: CONCERNS
+status_reason: 'Cycle 5''s fixes hold (bugs 12–13 closed, both mutation-proven). No HIGH. One MEDIUM: a stray four-backtick fence at create-epics-from-shards SKILL.md:334 (pre-existing on develop) turns Steps 6–7 into a code block, so no engine reaches the Step 7 guard this task added — the probe record holds executed 0 for a boundary (TASK-205-BUG-14). With the fence deleted in a scratch worktree the guard engages 8/8. Two low advisories from the diff review. Suite: npm run ci:fast green — 5690 tests, 5676 pass, 0 fail (format check clean).'
+reviewer: 'QA Engineer'
+head: 'a6897af1f176476cebc6e00531c572d005a7e28f'
+updated: '2026-10-15T12:54:47Z'
+
+top_issues:
+  - id: 'TASK-205-QA6-1'
+    severity: medium
+    file: 'skills/create-epics-from-shards/SKILL.md'
+    finding: 'A stray four-backtick fence at line 334 closes the Step 5 index template early; the real closer at 349 then opens a code block to 471 that swallows Steps 6–7. The fence-form probe declines the Step 7 guard (entry-not-probeable: heading not found), so the boundary this task added has probes_executed 0, which /finalise''s zero-guard fails; qa-execute-snippets sees 1 of 4 bash blocks; GitHub renders Steps 6–7 as code (TASK-205-BUG-14).'
+    suggested_action: 'Delete the stray fence at line 334; re-run the fence probe against the committed doc (cases: .claude/state/t205-qa6-cases2.json) and record it.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 5690
+  phases_verified: '7/7'
+  ci: 'not read at this cycle (gated at /finalise)'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5, 6]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'The Step 7 batch guard is a repo-state boundary; the fence probe declined it (entry-not-probeable — BUG-14), record task.205.qa.6.security.run.json totals.executed 0. A scratch-worktree run with the stray fence removed engaged 8/8 — not counted. The committed test executes the guard on the misnamed, missing and failing-check shapes.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Batch presence now matches the id-checked shape; the id check prints its reason. Under zsh an absent epic.P.E aborts on nomatch without the message (fails closed; advisory CR-1).'
+  maintainability:
+    status: CONCERNS
+    notes: 'Unbalanced fence in create-epics-from-shards SKILL.md hides Steps 6–7 from renderers and tools.'
+
+recommendations:
+  immediate:
+    - action: 'Delete the stray fence at create-epics-from-shards SKILL.md:334 and record a fence probe of Step 7 against the committed doc (QA6-1, BUG-14).'
+      refs: ['skills/create-epics-from-shards/SKILL.md']
+  future:
+    - action: 'Advisory (bug/low/medium confidence, CR-1): the Step 7 presence loop globs in its word list; under zsh nomatch an absent epic.P.E aborts without the missing-epic message. Enumerate with find. zsh not installed on the QA host — not executed.'
+      refs: ['skills/create-epics-from-shards/SKILL.md']
+    - action: 'Cleanup (CR-2): FOUND >= 2 (duplicate P.E) still reports "is missing"; branch the message on FOUND.'
+      refs: ['skills/create-epics-from-shards/SKILL.md']
+    - action: 'Carried from gate 5: later blocks of sync-github-epic and ensure-epic-github-issue use bare references/ paths; issue-body blocks read values bound elsewhere (pre-existing on develop); two blocks bind unused epic-meta values.'
+      refs: ['skills/sync-github-epic/SKILL.md', 'skills/ensure-epic-github-issue/SKILL.md']
+    - action: 'A guard that every SKILL.md fence closes where it opens would have caught BUG-14 at authoring.'
+      refs: ['tests/']
+
+bug_resolution:
+  bugs_fixed: 13
+  bugs_remaining: 1
+  fix_date: '2026-10-15'
+  total_iterations: 5
+  verification_method: 'Executed skill blocks (committed test) + mutation proofs + fence probe (scratch)'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['bug 14']

@@ -5,18 +5,22 @@ type: task
 description: "Move every story-side reader and writer of story and epic identifiers (create-story, the Step 0 and 0a shell snippets, create-branch, session-handoff, qa-next, the tracker story syncs, select-next and the finalise artifact regex) off its own regex and onto the task.202 doc-id engine, so the pipeline runs end to end on story.{P}.{E}.{S} documents and feature/story.{P}.{E}.{S} / epic/{P}.{E} branches."
 tags: [doc-id, numbering, create-story, develop-story, create-branch, session-handoff, qa-next, develop-next, migration]
 category: refactoring
-status: planned
+status: accepted
 priority: Medium
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-16
 assignee:
 estimated_effort_hours: 16
 github_issue: 649
+completed_date: 2026-10-16
+pr_number: 677
 ---
 
 # Technical Task: Hierarchical story ids in the pipeline
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.206.review.1.hierarchical-story-ids-in-pipeline.md` implemented 2026-10-16
 
 **GitHub Issue**: [#649](https://github.com/Gamaroff/agent-skills/issues/649)
 
@@ -94,9 +98,13 @@ No step reads `P` where it meant `E`.
 
 ### Dependencies
 
-- **task.202** ships `shared/resources/doc-id.js`: `parse`, `format`, `matchesEpic(stem, P, E)`,
-  `next story --epic <dir>`, the canonical regexes and the `check` CLI. This task consumes that API
-  and adds nothing to it. If a site needs a function task.202 did not ship, that is a task.202
+- **task.202** ships `shared/resources/doc-id.js`. Measured against its `module.exports` and CLI
+  usage on 2026-10-16: `parse(name)` returns `{ok, kind, prd, epic, story, sub, artifact, seq, slug,
+  id, reason}` (failure is `{ok:false, reason}`, never `null`; the stem is `id`, e.g.
+  `story.1.2.3A`); `matchesEpic(name, P, E)`; `format`; and the CLI `parse <name>`,
+  `next story --epic-dir <dir>`, `check`, `epic-meta`. It exports **no regex** and has **no epic
+  lookup subcommand**: a site that needs a regex derives its decision from `parse`, and epic
+  resolution is `matchesEpic` over a file listing. This task consumes that API and adds nothing to it. If a site needs a function task.202 did not ship, that is a task.202
   defect: fix it there, not here.
 - **task.203** ships `migrate-doc-numbering.mjs` and migrates this repository's `docs/prd/` tree.
   This task runs the same script over the eval fixture trees.
@@ -124,14 +132,14 @@ Each site below was found with the Files Summary commands, run 2026-10-13. Gener
 | `skills/session-handoff/scripts/continuation.mjs:178-185` | handoff path build | `story.${e}.${st}.handoff.{k}` |
 | `skills/session-handoff/scripts/continuation.mjs:288` | `findStoryDir` | `want = story.${e}.${s}.` |
 | `skills/qa-next/scripts/uat-status.mjs:166` | `STORY_FILE` | `\/story\.(\d+)\.(\d+)\.[a-z0-9-]+\.md$` |
-| `skills/qa-next/scripts/uat-status.mjs:196-207` | `id`, `epic`, `epicSurface[String(m[1])]`, sort | id `E.S`; surface keyed on E alone |
-| `skills/develop-next/scripts/select-next.mjs:351` | roadmap heading match | `\bEpic\s+(\d+)\b`; `epicSections` keyed on that number (`:314`, `:354`, `:367`, `:464`) |
-| `skills/develop-next/scripts/select-next.mjs:578` | `depSatisfied` → `epicActionable` | `deps: Epic 8` |
+| `skills/qa-next/scripts/uat-status.mjs:185-206` | `id`, `epic`, `epicSurface[String(m[1])]`, sort | id `E.S`; surface keyed on E alone |
+| `skills/develop-next/scripts/select-next.mjs:435` | roadmap heading match | `\bEpic\s+(\d+)\b`; `epicSections` keyed on that number (`:398`, `:438`, `:548`, `:609`) |
+| `skills/develop-next/scripts/select-next.mjs:650`, `:662` | `depSatisfied` → `epicActionable` | `deps: Epic 8` |
 | `shared/resources/bug-doc.js:51` | `RE_STORY_BUG` | `[\d.]+?`. It already accepts any segment count, but not a sub-story letter (`3A`) |
 
 **Already shape-tolerant (unchanged; a test case each proves it):**
 
-- `select-next.mjs:213` `ID_RE_SRC` (`\d+(?:\.\d+)*[a-z]?…`) and `:299` `isWorkItemHref`.
+- `select-next.mjs:287` `ID_RE_SRC` (`[TB]?\d+(?:\.\d+)*[a-z]?…`) and `:373` `isWorkItemHref`.
 - `select-next.mjs` `storyBranchModel`, which resolves by `epic_source` / the `epic:` directory stem.
 - `sync-jira-story.js:198` (related-doc lookup) and `:253` / `:807` (`[\d.]+` in
   `normaliseStorySummary`).
@@ -156,6 +164,8 @@ Each site below was found with the Files Summary commands, run 2026-10-13. Gener
 | `skills/create-story/resources/story-template.yaml` and `skills/review-story/resources/story-template.yaml` | `filename` / `title` `story.{{epic_num}}.{{story_num}}` | two numbers |
 | `skills/create-branch/SKILL.md` | `feature/story.<e>.<s>`, sub-story example `story.309.2.3A` | the example already has three numbers plus a suffix. Under the new grammar it reads P=309, E=2, S=3, sub=A, which is what the doc-id grammar defines |
 | `shared/resources/read-config.sh:599` comment, `docs/reference/configuration.md` (`branching.epicIntegration.branchPattern`) | `epic/{n}.{slug}` | needs a `{p}` placeholder |
+| `skills/create-branch/SKILL.md` § Configuration (`branching.epicIntegration.branchPattern`, lines 387–405) | `epic/{n}.{slug}` default; the only place the pattern is applied | needs `{p}`, and is where a `{p}`-less pattern is refused — `git grep branchPattern -- '*.js' '*.mjs' '*.sh'` finds no code reader |
+| `skills/develop-next/assets/project-completion-roadmap.template.md:49`, `skills/develop-next/references/roadmap-selection.md:31` | `## <Area or Epic N — name>`; "bare epic refs (`Epic 8`)" | teaches the legacy heading the selector will refuse |
 
 ### Target
 
@@ -196,7 +206,7 @@ Each site below was found with the Files Summary commands, run 2026-10-13. Gener
 - ✅ Renaming eval and test fixtures through `migrate-doc-numbering.mjs` (task.203), and updating
   the scenario JSON that names their paths.
 - ✅ Wiring `nextStoryId` into `create-story`, so the story number is allocated by
-  `doc-id next story`.
+  `doc-id next story --epic-dir`.
 
 ### Out of scope
 
@@ -242,30 +252,30 @@ consumer on a half-moved pipeline breaks (§ 10, Risk 1).
 
 ### Phase 1: Shared code consumers (Risk: Medium)
 
-- [ ] `finalise-fix-and-recheck.mjs`: replace `WORK_ITEM_DOC_RE` and the `:122` stem match with doc-id; export the result.
-- [ ] `doc-links.test.mjs:331`: import the regex instead of restating it.
-- [ ] `bug-doc.js`: `RE_STORY_BUG` accepts the sub-story suffix via doc-id's story grammar.
-- [ ] `create-story/scripts/lib.js`: filename and plan validators, `scanExistingStoryIds`, `nextStoryId` and `assertUniqueStoryId` all key on `(P, E)` through doc-id.
+- [x] `finalise-fix-and-recheck.mjs`: replace `WORK_ITEM_DOC_RE` and the `:122` stem match with doc-id; export the result.
+- [x] `doc-links.test.mjs:331`: import the regex instead of restating it.
+- [x] `bug-doc.js`: `RE_STORY_BUG` accepts the sub-story suffix via doc-id's story grammar.
+- [x] `create-story/scripts/lib.js`: filename and plan validators, `scanExistingStoryIds`, `nextStoryId` and `assertUniqueStoryId` all key on `(P, E)` through doc-id.
 
 ### Phase 2: Selectors and handoff (Risk: Medium)
 
-- [ ] `continuation.mjs`: `STORY_BRANCH`, handoff path and `findStoryDir` through doc-id.
-- [ ] `uat-status.mjs`: `STORY_FILE`, id, `epicSurface` key and sort; report unparseable files.
-- [ ] `select-next.mjs`: `Epic P.E` headings, `epicSections` keyed `"P.E"`, `deps: Epic P.E`; legacy `Epic N` is a model error.
+- [x] `continuation.mjs`: `STORY_BRANCH`, handoff path and `findStoryDir` through doc-id.
+- [x] `uat-status.mjs`: `STORY_FILE`, id, `epicSurface` key and sort; report unparseable files.
+- [x] `select-next.mjs`: `Epic P.E` headings, `epicSections` keyed `"P.E"`, `deps: Epic P.E`; legacy `Epic N` is a model error. Update the roadmap template, `roadmap-selection.md`, and every `develop-next` fixture that carries a legacy heading (Files Summary item 17a).
 
 ### Phase 3: Executable snippets and story-pipeline prose (Risk: High)
 
-- [ ] `develop-pipeline-step-0-resolve-and-prepare.md`: id extraction and epic resolution through `doc-id parse`; HALT on 0 or 2+ epic matches; `branchPattern` `{p}`.
-- [ ] `review-pipeline-step-0a-branch-setup.md` review-story stanzas (0a.2, 0a.3, Q-prompt).
-- [ ] `create-story/SKILL.md`: paths, `epic:` stem, "next epic in the same PRD", `doc-id next story`; both `story-template.yaml` copies.
-- [ ] `review-story/SKILL.md`, `create-branch/SKILL.md`, `ensure-story-github-issue/SKILL.md`, `sync-github-story/SKILL.md`: ids, titles, labels, milestone keyed `Epic P.E`.
-- [ ] `docs/reference/configuration.md` and the `read-config.sh` comment: `branchPattern` `{p}`.
+- [x] `develop-pipeline-step-0-resolve-and-prepare.md`: id extraction and epic resolution through `doc-id parse`; HALT on 0 or 2+ epic matches; `branchPattern` `{p}`.
+- [x] `review-pipeline-step-0a-branch-setup.md` review-story stanzas (0a.2, 0a.3, Q-prompt).
+- [x] `create-story/SKILL.md`: paths, `epic:` stem, "next epic in the same PRD", `doc-id next story --epic-dir`; both `story-template.yaml` copies.
+- [x] `review-story/SKILL.md`, `create-branch/SKILL.md`, `ensure-story-github-issue/SKILL.md`, `sync-github-story/SKILL.md`: ids, titles, labels, milestone keyed `Epic P.E`.
+- [x] `docs/reference/configuration.md` and the `read-config.sh` comment: `branchPattern` `{p}`.
 
 ### Phase 4: Fixtures, tests, bundle (Risk: Medium)
 
-- [ ] Run `migrate-doc-numbering.mjs` over each `evals/**/replay/docs` tree. Update the `scenario.json` paths and READMEs it names.
-- [ ] Update the measured test population (Files Summary) to the new shape, with a case per "already tolerant" site.
-- [ ] `npm run bundle`, `npm test`, `npm run eval:all`, `npm run bundle:check`.
+- [x] Run `migrate-doc-numbering.mjs` over each `evals/**/replay/docs` tree. Update the `scenario.json` paths and READMEs it names.
+- [x] Update the measured test population (Files Summary) to the new shape, with a case per "already tolerant" site.
+- [x] `npm run bundle`, `npm run generate-catalog`, `npm test`, `npm run eval:all`, `npm run bundle:check`.
 
 ---
 
@@ -294,7 +304,7 @@ On 2026-10-13 these returned:
 | Population | Count |
 |---|---|
 | Test files | 32 |
-| Fixture paths | 45, across 9 `evals/develop-story/step-isolation/*` scenarios and 1 `evals/create-story` scenario |
+| Fixture paths | 45, across 9 `evals/develop-story/step-isolation/*` scenarios and 2 `evals/create-story` scenarios (`01-happy`, `03-sign-off-enabled`) — re-measured 2026-10-16 |
 | Eval files naming `story.5.1` / `epic.5.` | 32 |
 
 Of the 32 test files, those owned by task.205 are excluded: `generate-prd-epic-index.test.mjs`
@@ -324,13 +334,27 @@ and the `sync-jira-epic` tests.
 
 ### Fixtures
 
-17. `evals/develop-story/step-isolation/*/replay/docs/prd/domain/feature/epics/epic.5.example/**` and `evals/create-story/scenarios/03-sign-off-enabled/replay/docs/**`. Renamed by the migration script.
+17. `evals/develop-story/step-isolation/*/replay/docs/prd/domain/feature/epics/epic.5.example/**` and `evals/create-story/scenarios/03-sign-off-enabled/replay/docs/**`. Renamed by the migration script, after a `prd.1.*` / `epic.1.5.*` stub is added to each tree (Notes, decision 1).
+    - `evals/create-story/scenarios/01-happy/replay/docs/stories/story.178.8.example-feature.md` has no PRD or epic directory at all, so the migration script cannot rename it. Rename it by hand and record why in the implementation report.
+17a. `develop-next` fixtures carrying a legacy `Epic N` heading or `deps: Epic N` (`git grep -lE '\bEpic\s+[0-9]+\b' -- 'evals/develop-next/**'`, 2026-10-16): `evals/develop-next/unit/fixtures/{01-first-item,02-deps-and-markers,03-flow-chain,04-blocked-annotation,06-forward-deps,09-planning-gap,10-real-world,11-task-ids}.md` and `evals/develop-next/step-isolation/02-human-gated-stop/replay/docs/development/project-completion-roadmap.md`. Rewritten to `Epic P.E` by hand (they are roadmaps, not PRD trees), plus `skills/develop-next/assets/project-completion-roadmap.template.md` and `skills/develop-next/references/roadmap-selection.md`.
 18. `evals/develop-story/**/scenario.json`, `evals/develop-story/README.md`, `evals/develop-story/smoke/01-end-to-end-dry/README.md`.
 
 ### Documentation
 
 19. `docs/reference/configuration.md` (`branchPattern`), `shared/resources/read-config.sh` comment.
 20. CHANGELOG `[Unreleased]`: the breaking changes and the migration order.
+
+### Also touched during implementation (2026-10-16)
+
+22. New test: `evals/shared/tests/step-0-epic-resolution.test.mjs`.
+23. Tests whose pinned literal moved: `evals/develop-story/protocol/develop-branch-flow-rules.test.mjs`
+    (`epic/{p}.{n}.{slug}`), `evals/shared/tests/optional-file-lookups.test.mjs` (Step 0's
+    `{story-stem}.implementation` find), `tests/unbound-default-reads.test.js` (two declared inputs),
+    `shared/resources/tests/doc-id.test.mjs` (the allocator contrast), `skills/sync-jira-bug/tests/*`.
+24. `skills/session-handoff/SKILL.md` (handoff path prose), `skills/qa-next/assets/uat-surfaces.template.json`
+    (`epicSurface` key `"1.1"`), `shared/resources/doc-id.js` (a comment only — nextStoryId now delegates).
+25. `evals/create-story/scenarios/02-missing-core-config/{scenario.json,replay/.eval/halt.log}` (the path
+    it names).
 
 ### Generated (do not hand-edit)
 
@@ -374,31 +398,31 @@ None. Id parsing is not on a hot path, so no baseline is needed.
 
 ### Functional
 
-- [ ] `review-pipeline-step-0a-branch-setup.md` (review-story) and `develop-pipeline-step-0-resolve-and-prepare.md` extract `(P, E, S)` via `doc-id parse`. A snippet test feeds `story.1.2.3.x.md` and asserts `P=1 E=2 S=3`.
-- [ ] Step 0 epic resolution HALTs on zero matches and on two or more matches for `(P, E)`. It never takes `head -1`.
-- [ ] `uat-status.mjs` lists `story.1.2.3.x.md` with id `1.2.3`, and reports (does not skip) an unparseable story filename.
-- [ ] `isCoLocatedArtifact` does not admit `story.1.2.4.*` artifacts as co-located with `story.1.2.3`.
-- [ ] `continuation.mjs` writes `story.1.2.3.handoff.{k}.{slug}.md` from branch `feature/story.1.2.3.{slug}`. It does not resolve `story.1.2.30`.
-- [ ] `select-next.mjs` keys `## Epic 1.2` and `deps: Epic 1.2`, and reports a legacy `## Epic 2` as an error.
-- [ ] `bug-doc.js` resolves `story.1.2.3A.bug.1.x.md` to parent `story.1.2.3A`.
-- [ ] `create-story` allocates S through `doc-id next story`. `assertUniqueStoryId` HALTs on an existing `(P, E, S)`.
+- [x] `review-pipeline-step-0a-branch-setup.md` (review-story) and `develop-pipeline-step-0-resolve-and-prepare.md` extract `(P, E, S)` via `doc-id parse`. A snippet test feeds `story.1.2.3.x.md` and asserts `P=1 E=2 S=3`.
+- [x] Step 0 epic resolution HALTs on zero matches and on two or more matches for `(P, E)`. It never takes `head -1`.
+- [x] `uat-status.mjs` lists `story.1.2.3.x.md` with id `1.2.3`, and reports (does not skip) an unparseable story filename.
+- [x] `isCoLocatedArtifact` does not admit `story.1.2.4.*` artifacts as co-located with `story.1.2.3`.
+- [x] `continuation.mjs` writes `story.1.2.3.handoff.{k}.{slug}.md` from branch `feature/story.1.2.3.{slug}`. It does not resolve `story.1.2.30`.
+- [x] `select-next.mjs` keys `## Epic 1.2` and `deps: Epic 1.2`, and reports a legacy `## Epic 2` as an error.
+- [x] `bug-doc.js` resolves `story.1.2.3A.bug.1.x.md` to parent `story.1.2.3A`.
+- [x] `create-story` allocates S through `doc-id next story --epic-dir`. `assertUniqueStoryId` HALTs on an existing `(P, E, S)`.
 
 ### Performance
 
-- [ ] `npm test` wall time is within 10% of the pre-change run on the same machine. The baseline is recorded in the implementation report.
-- [ ] `eval:all` scenario count is unchanged: no scenario is dropped while its fixtures are renamed.
+- [x] `npm test` wall time is within 10% of the pre-change run on the same machine. Measured with `uptime; time npm test` on the base commit (baseline, before Phase 1) and on the PR head, both recorded with their load averages in the implementation report.
+- [x] `eval:all` scenario count is unchanged: no scenario is dropped while its fixtures are renamed. Measured as the number of scenario directories `eval:all`'s own `package.json` globs match (`ls -d <each glob> | wc -l`), on the base commit and on the PR head.
 
 ### Code quality
 
-- [ ] No source file outside `doc-id.js` declares a story or epic id regex. Measured with the Files Summary `git grep` (task.207 makes this a CI guard).
-- [ ] `npm test`, `npm run eval:all`, `npm run bundle:check`, `npm run lint:shell` and `npm run validate:all` pass.
-- [ ] Every Phase 1–2 site has a mutation-proved test.
+- [x] No code site in § 3's code-site table declares a story or epic id regex; each derives its decision from `doc-id.js`. Measured with the Files Summary `git grep`, **excluding** the "already tolerant" sites listed in § 3 (`sync-jira-story.js:198`/`:253`/`:807`, `select-next.mjs` `ID_RE_SRC` and `isWorkItemHref`), which keep their own shape-tolerant patterns. The repository-wide guard is task.207.
+- [x] `npm test`, `npm run eval:all`, `npm run bundle:check`, `npm run lint:shell` and `npm run validate:all` pass.
+- [x] Every Phase 1–2 site has a mutation-proved test.
 
 ### Migration
 
-- [ ] The eval and create-story fixtures were renamed by `migrate-doc-numbering.mjs`, and its log is cited in the implementation report.
-- [ ] CHANGELOG `[Unreleased]` states all four breaking changes and the "migrate first, then upgrade" order.
-- [ ] `docs/reference/configuration.md` documents `{p}` and the refusal of a `{p}`-less pattern.
+- [x] The eval and create-story fixtures were renamed by `migrate-doc-numbering.mjs`, and its log is cited in the implementation report.
+- [x] CHANGELOG `[Unreleased]` states all four breaking changes and the "migrate first, then upgrade" order.
+- [x] `docs/reference/configuration.md` documents `{p}` and the refusal of a `{p}`-less pattern.
 
 ---
 
@@ -415,8 +439,8 @@ None. Id parsing is not on a hot path, so no baseline is needed.
    `epics/epic.5.example/stories/…` (for example `02-review-story/replay/docs/prd/domain/feature/…`),
    and task.203's script reports PRD-less epics as blockers.
    - **Probability:** High. **Impact:** High, because Phase 4 cannot run.
-   - **Mitigation:** task.203 must accept an explicit `--assign-prd <dir>=<P>`, or this task adds a
-     minimal `prd.1.feature.md` stub to each tree first. **Author decision** (see Notes).
+   - **Mitigation:** this task adds a minimal `prd.1.*` / `epic.1.5.*` stub to each tree first
+     (resolved — see Notes, decision 1).
    - **Rollback:** not applicable.
 
 ### Medium risk
@@ -473,29 +497,162 @@ None. Id parsing is not on a hot path, so no baseline is needed.
 
 ---
 
-## Change Log
+## Implementation Record
+
+**Completion Date:** 2026-10-16 (develop-task Step 3, run 1 — inline; see the implementation report)
+
+### Implementation Summary
+
+Every site in § 3 now reads a story or epic id through `shared/resources/doc-id.js` (`parse`,
+`matchesEpic`, `nextNumber`, the `parse` / `next story --epic-dir` / `epic-meta` CLI). No § 3 code
+site declares an id grammar of its own; an epic is resolved by **(P, E)**, and two-plus or zero
+matches is a HALT.
+
+| Site | Now |
+|---|---|
+| `finalise-fix-and-recheck.mjs` | `parseWorkItemName` (exported) + `isWorkItemDocument` read doc-id; `isCoLocatedArtifact` keys on `parse(…).id`; `WORK_ITEM_ARTIFACT_RE` is built from `doc-id.ARTIFACTS` |
+| `doc-links.test.mjs` | imports `isWorkItemDocument` / `parseWorkItemName`; `WORK_ITEM_RE` deleted |
+| `bug-doc.js` | a story bug is `parse` → `kind story, artifact bug`; sub-story `3A` resolves; `RE_STORY_BUG` deleted (it had no consumer) |
+| `create-story/scripts/lib.js` | validators delegate to `parse`; `scanExistingStoryIds` / `nextStoryId` / `assertUniqueStoryId` take `(P, E)` through `matchesEpic` and `nextNumber` |
+| `continuation.mjs` | `storyOfBranch` (exported) parses `feature/story.P.E.S.slug`; handoff prefix and `findStory` key on the doc-id id |
+| `uat-status.mjs` | `scanStories` (exported) reads `P.E.S` ids, `epicSurface["P.E"]`, `(P, E, S, sub)` sort, and reports an unparseable `story.*.md`; `surfaceKeyWarnings` reports old-shape surface keys |
+| `select-next.mjs` | `epicRef` (exported): `Epic P.E` headings and `deps: Epic P.E` keyed `"P.E"`; a bare `Epic N` is a model error (ignored inside a never-candidate section) |
+| Step 0 / Step 0a / create-branch 2b.4 / create-story 1.1 / ensure-story S1 / sync-github-story 3 | executable fenced blocks over the doc-id CLI, each run by `evals/shared/tests/step-0-epic-resolution.test.mjs` |
+
+### Approach
+
+Phases 1–3 were implemented in place from the plan (corrected by review.1); Phase 4 renamed the nine
+develop-story replay trees through `migrate-doc-numbering.mjs` after giving each a PRD and an epic stub
+(Notes, decision 1), and hand-renamed the two flat `create-story` fixtures. Every Phase 1–2 site and
+every new executable block is mutation-proved (implementation report, Decisions Log).
+
+### Deviations from the plan
+
+1. **`uat-status.mjs` `storyIds` (line 281) was a fourth two-number pattern** the § 3 table missed:
+   `\b\d+\.\d+\b` split a `Stories` cell's `1.2.3` into `1.2`. It now collects whole dotted tokens, and
+   `--check` reports any that is not a real story.
+2. **`nextStoryId` now allocates highest + 1, not the lowest gap.** "Wire it in" meant one allocator:
+   it delegates to `doc-id.nextNumber`, so `create-story` (`doc-id next story --epic-dir`) and the
+   library cannot disagree. `doc-id.test.mjs`'s contrast test now asserts the agreement.
+3. **The migration numbers the stub epic `1.1`, not `1.5`.** Epics are numbered within their PRD, so
+   `story.5.1.example` became `story.1.1.1.example` under `prd.1.feature/epics/epic.1.1.example/`.
+4. **Both `create-story` fixtures are flat `docs/stories/` files** with no PRD or epic tree (`01-happy`
+   and `03-sign-off-enabled`, plus the path `02-missing-core-config` names); all three were renamed by
+   hand to `story.1.178.{8,9}`.
+5. **`bug-doc.js` corroboration** now reads a sub-story letter in a `related:` claim, so a correct
+   `story 1.2.3A` claim is not reported as a mismatch.
+
+### Testing Results
+
+- `npm run ci:fast` (format + `npm test`): 5752 tests, 0 failures (iteration 3). `npm run eval:all`:
+  exit 0. `bundle:check`, `lint:shell`, `validate:all` (128 passed) and `check:generated`: exit 0.
+- `npm test` wall time, `uptime; time npm test` back to back on one machine: base `4378323e` (clean
+  worktree) 115.7 s at load 5.52; this change 117.2 s at load 4.74 — **+1.3%**, within 10%. The base
+  run had 3 failures that are artefacts of running in a detached worktree (`observation-log`,
+  `from-observation`, `test-clean-checkout`), not of this change. Measured on the working tree before
+  the commit; re-measure on the PR head if a reviewer needs the head figure.
+- `eval:all` scenario count, from its own `package.json` globs: base 44, head 44 — unchanged.
+- New: `evals/shared/tests/step-0-epic-resolution.test.mjs` (Step 0, 0a, create-branch 2b.4,
+  create-story 1.1, ensure-story S1, sync-github-story 3 — executed under bash, and zsh where present).
+- New cases in the finalise, doc-id, create-story, continuation, uat-status, select-next and
+  sync-jira-bug suites, one per site.
+
+### Deferred Work
+
+- **`review-pipeline-step-0a-branch-setup.md` review-epic stanza (task.205's) is still positional**:
+  `awk -F. '{print $2}'` reads P as `EPIC_NUM`, so its auto-skip `feature/epic.${EPIC_NUM}.*` matches every
+  epic branch of PRD P. Out of scope here (§ 3 assigns it to task.205); recorded for task.207's sweep.
+- **Story-bug name readers (QA cycle 1, CR-6).** `create-bug-report` (the writer) and
+  `docs/standards/bug-documents.md` now name `story.{P}.{E}.{S}.bug`; six readers still restate the
+  old shape in prose — `develop-bug/SKILL.md`, `develop-bug/references/develop-bug-step-0-resolve-bug.md`,
+  `develop/SKILL.md`, `qa-fix/SKILL.md`, `qa-story/SKILL.md`, `review-bug/SKILL.md` (population:
+  `git grep -l -F 'story.{epic}.{story}.bug'` over skills and shared resources, generated copies
+  excluded) — task.207's placeholder sweep. `bug-doc.js`, the one code reader, is fixed.
+- **Cross-block reads in neighbouring blocks (QA cycle 2).** The task, bug and epic 0a.3 variants
+  read `TASK_ID` / `BUG_PREFIX` / `EPIC_NUM` and `CURRENT_BRANCH` from 0a.1 / 0a.2 (unchanged since
+  before this task; only the review-story stanza is in scope). The ensure-story create block and the
+  sync-github-story Step 5b block still read `STORY_TITLE`, `DOC_URL`, `STORY_RELATIVE_PATH`,
+  `NEW_BODY` and `ISSUE_NUM` without binding them — pre-existing on the base (no block anywhere sets
+  `STORY_TITLE`; QA cycle 2 CR2-2 / CR2-3). A follow-up should make those blocks self-binding.
+- The remaining `story.{epic}.{story}` placeholders in `develop-story/SKILL.md`, the Step 1 lock
+  template, `qa-story`, `qa-fix`, `develop` and other prose are task.207's sweep, as § 4 states.
+- Post-merge consumer smoke test (§ 8, Consumer tests): `/create-prd` → `/create-epic` → `/create-story`
+  → `/develop-story` to Step 4 in a scratch consumer — needs a live run, not a per-PR test.
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-16
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.206.qa.3.hierarchical-story-ids-in-pipeline.md](./task.206.qa.3.hierarchical-story-ids-in-pipeline.md)
+- **Gate File**: [task.206.gate.3.hierarchical-story-ids-in-pipeline.yml](./task.206.gate.3.hierarchical-story-ids-in-pipeline.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 5756
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+Cycle 2's fixes are verified: bug.5 is closed, and test gaps QA2-1 and QA2-2 are closed, each proven by mutation. There is no high-confidence finding. Three low bugs (CR-1 to CR-3) and two cleanups are advisory and routed to follow-up.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.206.qa.3.hierarchical-story-ids-in-pipeline.md`
+**Gate File**: `task.206.gate.3.hierarchical-story-ids-in-pipeline.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (3 QA cycles; bug.1–5 closed)
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 16/16 met. AC9 (npm test wall time) measured +1.7% on the PR head against base; AC10 scenario count 44 → 44; AC11 regex sweep clean, with the repository-wide guard assigned to task.207
+✅ **Tests & PR Review:** PR #677; CI green over 5 checks at `acf2e2e1`; Step 5c review `task.206.pr-review.1` (CONCERNS, PC-1 fixed, PC-2/PC-3 low)
+✅ **Documentation:** CHANGELOG [Unreleased] entry with the four breaking changes; `docs/reference/configuration.md` documents `{p}`
+✅ **Security Review:** PASS — 20 boundary probes executed, 0 reproduced
+⚠️ **Compliance Review:** Not applicable (internal id-parsing refactor)
+
+**Detailed Verification Log:** See `task.206.dod.1.hierarchical-story-ids-in-pipeline.md` for complete verification evidence and timestamps.
+
+**Task marked as ACCEPTED on:** 2026-10-16
 
 <!-- change-log-start -->
+## Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-10-13 | 1.0 | Initial draft — T5 of the hierarchical numbering plan | create-task |
-
+| 2026-10-16 | 1.1 | Review passed (8/10) — shipped doc-id API named; regex criterion scoped; develop-next fixtures, create-story 01-happy and create-branch config added; measured-criterion commands; author decisions resolved | review-task |
+| 2026-10-16 |  | Status → ready-for-development | review-task |
+| 2026-10-16 |  | Implemented — 141 non-generated files (11 code sites, 9 executable blocks, 9 migrated + 3 hand-renamed fixture trees), 1 new suite + 15 updated test files; ci:fast 5752/0 | develop |
+| 2026-10-16 |  | QA gate CONCERNS (60/100) — 4 medium + 1 low gated findings, 7 advisory | qa-task |
+| 2026-10-16 |  | QA findings fixed — 5 gated (CR-1, CR-2/3, CR-4, CR-5, CR-8) + 5 advisory (CR-6 writers, CR-7, CR-9, CR-10, CR-11/12), 1 iteration | qa-fix |
+| 2026-10-16 |  | QA gate FAIL (80/100) — 1 high (0a.3 CURRENT_BRANCH), 2 low test gaps; bugs 1–4 closed | qa-task |
+| 2026-10-16 |  | QA findings fixed — CR2-1 (0a.3 binds CURRENT_BRANCH), QA2-1/QA2-2 test gaps, advisory CR2-4..7, 1 iteration | qa-fix |
+| 2026-10-16 |  | QA gate PASS (100/100) — 0 gated; bug.5 closed; 3 low + 2 cleanups advisory | qa-task |
+| 2026-10-16 | 1.2 | DoD passed — accepted (PR #677) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
 
 ### Phase 1: Shared code consumers
-- [ ] Complete
+- [x] Complete
 
 ### Phase 2: Selectors and handoff
-- [ ] Complete
+- [x] Complete
 
 ### Phase 3: Executable snippets and story-pipeline prose
-- [ ] Complete
+- [x] Complete
 
 ### Phase 4: Fixtures, tests, bundle
-- [ ] Complete
+- [x] Complete
 
 ---
 
@@ -509,13 +666,11 @@ None. Id parsing is not on a hot path, so no baseline is needed.
 
 **Depends on:** task.202, task.203, task.205.
 
-**Open author decisions:**
+**Author decisions (resolved 2026-10-16, review.1 — the recommended options, taken by the autonomous pipeline):**
 
-1. **Fixture parents.** Should task.203's script take `--assign-prd`, or should this task add PRD
-   and epic stub documents to each replay tree? Stubs are recommended, because they keep the
-   fixtures realistic and the script strict.
-2. **`branchPattern` without `{p}`.** The draft refuses it. The alternative is to warn and prepend
-   `{p}.`.
+1. **Fixture parents → stubs.** This task adds PRD and epic stub documents to each replay tree;
+   task.203's script is not changed. Stubs keep the fixtures realistic and the script strict.
+2. **`branchPattern` without `{p}` → refused**, with a message naming the key. Not warn-and-prepend.
 
 QA artifacts will land in this directory:
 

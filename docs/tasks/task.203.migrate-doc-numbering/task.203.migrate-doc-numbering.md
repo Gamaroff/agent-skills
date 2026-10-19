@@ -5,11 +5,13 @@ type: task
 description: "Ship a dry-run-by-default migration script that renames PRDs, epics and stories to the hierarchical prd.P / epic.P.E / story.P.E.S scheme, rewrites their frontmatter and links, builds the PRD registry and retires the global epic registry — then run it on this repository's onboarding PRD."
 tags: [doc-numbering, prd, epic, story, migration, prd-registry, epic-registry]
 category: refactoring
-status: planned
+status: accepted
 priority: Medium
 risk_level: high
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-15
+completed_date: 2026-10-15
+pr_number: 671
 assignee:
 estimated_effort_hours: 16
 github_issue: 646
@@ -17,7 +19,9 @@ github_issue: 646
 
 # Technical Task: Migrate documents to hierarchical numbering
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.203.review.1.migrate-doc-numbering.md` implemented 2026-10-15
 
 **GitHub Issue**: [#646](https://github.com/Gamaroff/agent-skills/issues/646)
 
@@ -60,8 +64,9 @@ PRD registry. No skill's prose changes here. Tasks 204–207 rewire the skills.
 - **Renaming by hand breaks links silently.** The tree holds 192 relative markdown links, 17 of
   which leave the PRD directory. Ten of those 17 are live today. Moving the PRD down one directory
   level (into its own `prd.1.onboarding/` folder) changes what every one of those 17 resolves to.
-  Four files outside the tree carry 19 live links into it. (Measured with the link scan in the plan
-  file, Phase 4.)
+  Four files outside the tree carry 19 live links into it. (These are authoring-time figures. The
+  engine's dry-run link index re-measures them, defined as every relative link in `git ls-files
+  '*.md'` outside fenced code, and the implementation report records the measured numbers.)
 - **This repository's PRD is already off-standard.** The PRD file sits directly in the domain
   folder (`docs/prd/onboarding/prd.onboarding.md`), so the directory name `onboarding` does not
   match the file stem `prd.onboarding`. The standard at `v0.55.0` wants
@@ -113,6 +118,12 @@ docs/prd/onboarding/
 - **Artifact names use two infix shapes.**
   - The short-id form: `story.1.1.validate.2026-05-12.md`.
   - The full-stem form: `story.3.1.before-you-start-anchor-runbooks.validate.2026-05-13.md`.
+- **Seven `.validate.{date}.md` reports sit outside doc-id's artifact vocabulary**
+  (`git ls-files docs/prd | grep -c '\.validate\.'` → 7). `review-story`'s standalone validate mode
+  writes them (`skills/review-story/SKILL.md:147`). `validate` is not in `ARTIFACTS`
+  (`doc-id.js:47`), so `parseLegacy` rejects them with `bad-artifact`. Renamed as they are,
+  `checkCorpus` would walk each as a *document* and report `bad-shape`, and every run would end
+  `post-check-failed` (review C1). Phase 0 adds `validate` to the shared vocabulary.
 - **Story main-doc statuses:** 16 `accepted` and 1 `cancelled` (`story.2.3`). No story is in flight.
 
 **Story frontmatter that names a parent** (`git grep -n -E '^(epic|epic_file|prd_source):' -- docs/prd`):
@@ -137,6 +148,7 @@ and the line **Next Available Epic Number: 5**.
 |---|---|---|
 | Live markdown links into the tree | `CHANGELOG.md` (1), `examples/README.md` (13), `examples/epic-examples/README.md` (4), `examples/prd-example/README.md` (1) | 19 links in 4 files |
 | Path literals in code spans or frontmatter | `docs/runbooks/story-development.md` (5 `_Provenance:` lines), `docs/runbooks/task-development.md` (4), `examples/epic-examples/epic.*.md` (`prd_source:` and `source_path:`, 8) | `git grep -n 'docs/prd/onboarding' -- ':!docs/prd' ':!docs/tasks'` |
+| Literals the run must **not** rewrite (same search) | `examples/prd-example/prd.onboarding.md` (7, body of a frozen copy), the bodies of `examples/epic-examples/*.md` (prose, not frontmatter), `skills/sync-jira-epic/tests/relative-doc-links.test.js` (7, synthetic fixture strings), `evals/develop-next/unit/select-next.test.mjs` (1, already the new path) | Bodies under `examples/**` are frozen and fixtures are out of scope (§ 4). `.agents/plans/**` and `CHANGELOG.md` are history |
 | Test allowlist keyed on live paths | `shared/resources/tests/doc-links.test.mjs:405` `KNOWN_ARTIFACT_LINKS`, `:418` `KNOWN_ARTIFACT_FENCES` | 13 `docs/prd` entries |
 | History | `docs/tasks/**`, `CHANGELOG.md` prose, `.agents/**` | left untouched (see Clarifications) |
 
@@ -146,14 +158,20 @@ and the line **Next Available Epic Number: 5**.
   blocks (`migrateLegacyRow`, `change-log.js:416`). Its rule, *"migration must never"* rewrite a row
   that already has the new shape (`:414`), is the pattern this engine copies for its idempotence.
 - `shared/resources/resolve-paths.sh:55` resolves `PRD_ROOT` from `prd.prdShardedLocation`
-  (default `docs/prd`). The engine reads the same key and never hard-codes `docs/prd`.
-- task.202 ships `shared/resources/doc-id.js`, which provides:
-  - `parse`, `format` and the canonical regexes
-  - the PRD-registry format and `next prd`
-  - `check --corpus`
+  (default `docs/prd`). `doc-id.js` already ports that rule as `resolvePrdRoot(argv, cwd)`
+  (`doc-id.js:853`; `--prd-root` → `skills-config.yaml` → `docs/prd`). The engine calls
+  `resolvePrdRoot` and does not write a second resolver. It never hard-codes `docs/prd`.
+- task.202 ships `shared/resources/doc-id.js` (CommonJS, `e28a1cce`). Its exports, re-read at
+  review: `parse`, `parseLegacy`, `format`, `matchesEpic`, `next`, `nextNumber`, `check`,
+  `checkCorpus`, `resolvePrdRoot`, `registryNumbers`, `frontmatterField`, `ARTIFACTS`, `KINDS`.
+  - `parse`, `parseLegacy`, `format` and the canonical regexes
+  - the PRD-registry reader and `next prd` (`nextNumber` throws `registry-missing` on absent
+    registry text)
+  - `checkCorpus` and `frontmatterField` (a frontmatter scalar reader, used here for every
+    frontmatter read)
 
-  This engine calls those functions and does not define a second identifier regex. task.207's
-  no-hand-rolled-regex test enforces that.
+  This engine calls those functions and does not define a second identifier regex. A test in this
+  task's suite enforces that (§ 8). task.207 later generalises it repo-wide.
 
 ### Legacy shapes the engine must read
 
@@ -197,7 +215,17 @@ docs/prd/
    - **Epic numbers.** Within each PRD, epics are renumbered 1..n in ascending order of their old
      global number. An already-numbered epic keeps its number.
    - **Story numbers.** Unchanged within the epic. Only the prefix changes.
-   - Every file whose basename starts with an old id prefix gets the new prefix.
+   - Every file whose basename starts with an old id prefix gets the new prefix. The rename is a
+     prefix substitution, never conditional on `parseLegacy` accepting the whole name. A
+     non-canonical artifact still moves with its parent.
+   - **The parent PRD is decided by location.** It is the PRD document that owns the epic's
+     `epics/` directory: the PRD file in the same directory for L2, or the directory above for L1.
+     `prd_source` is rewritten to that PRD's new path and is never used to place an epic.
+   - **The PRD registry is bootstrapped when absent.** With no `${PRD_ROOT}/prd-registry.md` and no
+     numbered PRD on disk, the plan creates it from the format in
+     `docs/standards/prd-registry.md` (frontmatter `type: registry`, counter `1`, empty table),
+     before calling `nextNumber`. With no registry but a numbered PRD already on disk, the run
+     blocks with `registry-missing` and never invents rows.
 3. **Verify.** Run the blocker checks below. Simulate every rewrite and re-resolve every live link
    against the post-move tree.
 4. **Apply** (only with `--apply`).
@@ -223,13 +251,16 @@ docs/prd/
 
 | Code | Raised when |
 |---|---|
-| `prd-less-epic` | An epic has no resolvable parent PRD (`brownfield-enhancement`, a missing path, or no PRD in an ancestor dir). It is never guessed |
+| `prd-less-epic` | An epic's `epics/` directory is owned by no PRD document. This is the shape `create-epic` writes for a `brownfield-enhancement` epic (`create-epic/SKILL.md:92,109`). Location decides, so the code fires whatever `prd_source` says. It is never guessed |
 | `unplaced-prd` | An L3 monolith or index PRD has no feature slug. It needs `--name <path>=<slug>` |
 | `in-flight` | A story's status is not terminal (`accepted` or `cancelled`), so a live branch and run state still name it. `--allow-in-flight` overrides this |
 | `target-exists` | A destination path is already occupied |
-| `dirty-path` | A path to be moved has uncommitted changes |
+| `dirty-path` | A path the run would change — a move source, a file it edits in place, a registry it rewrites — has uncommitted changes (QA cycle 2, CR-1) |
 | `link-would-break` | A link that resolves today would be dead after the move |
 | `registry-behind` | The PRD registry counter is lower than the highest PRD number on disk (from task.202 `nextNumber`). It is never overridden |
+| `registry-missing` | There is no PRD registry, but a numbered PRD already exists on disk. Rows are never invented. With no numbered PRD, the registry is bootstrapped instead (§ 3, Plan) |
+| `id-collision` | Two documents would carry one id after the move — a legacy story landing on the number an already-numbered story holds under the same epic. Raised by the dry run (QA cycle 2, CR-2) |
+| `registry-unwritable` | `appendPrdRow` would refuse a row: an unrecognised table header, a duplicate number, or a malformed cell. Raised by the dry run and by `--check`, never first at `--apply` (QA cycle 1, CR-3). `registry-invalid` and `bad-slug` are passed through from `doc-id.js` the same way |
 
 ### Important Clarifications
 
@@ -249,6 +280,12 @@ docs/prd/
   `CHANGELOG.md` prose stay as written, because they record what was true at the time. Live
   markdown links are re-pointed everywhere, history included, because a dead link is a defect
   wherever it sits.
+- **The literal pass has two more exclusions.**
+  - **Frozen copies.** The *bodies* of files under `examples/**` are frozen copies. Only their
+    frontmatter `prd_source:` and `source_path:` literals are rewritten.
+  - **Test fixtures.** Test files (`*.test.*`, `tests/**`, `evals/**`) hold fixtures and are not
+    rewritten. The one exception is `shared/resources/tests/doc-links.test.mjs`, named explicitly,
+    whose `KNOWN_ARTIFACT_*` keys are live repo paths.
 - **In this repository, epic renumbering is the identity.** The four epics are the only ones under
   PRD 1, and their old global order is 1–4. So `epic.1.quickstart…` becomes `epic.1.1.quickstart…`
   and the E stays the same. The mapping report still records every row, so a consumer with
@@ -273,6 +310,11 @@ verify and apply, with `--apply`, `--check`, `--json`, `--name`, `--allow-in-fli
 that keeps a historical old → new mapping table
 ✅ Running the migration on this repository, including re-keying `doc-links.test.mjs`'s
 `KNOWN_ARTIFACT_LINKS` and `KNOWN_ARTIFACT_FENCES` entries to the moved paths
+✅ Adding `validate` to the one shared artifact vocabulary: `ARTIFACTS` in `doc-id.js` and
+`WORK_ITEM_ARTIFACT_RE` in `finalise-fix-and-recheck.mjs`, which `doc-id.test.mjs` pins equal (review C1)
+✅ Correcting the three sentences that call the epic registry live until task 203, which become false
+at merge: `docs/architecture/concepts/coding-standards.md:64`, `docs/standards/epic-registry.md`
+(the "Superseded" note) and `docs/standards/file-naming.md:92`. The skill-prose sweep stays with task.207
 
 ### Out of Scope
 
@@ -366,45 +408,48 @@ two. The pointer file names task.205 so the window is visible.
 
 **Risk**: Low · **Depends on**: task.202 merged to `develop`
 
-- [ ] HALT unless `shared/resources/doc-id.js` exists on `develop` and exports `parse`, `parseLegacy`, `format`, `nextNumber` and `checkCorpus` (the names task.202 plans). Re-read its actual exports and registry format, and adjust the plan file before writing code
-- [ ] Add `appendPrdRow` to `doc-id.js` (task.202 plans no row writer), so the registry format keeps one owner
+- [x] HALT unless `shared/resources/doc-id.js` exists on `develop` and exports `parse`, `parseLegacy`, `format`, `nextNumber` and `checkCorpus` (the names task.202 plans). Re-read its actual exports and registry format, and adjust the plan file before writing code. Confirmed at review: all present, plus `next`, `resolvePrdRoot`, `registryNumbers` and `frontmatterField`
+- [x] Add `appendPrdRow` to `doc-id.js` (task.202 plans no row writer), so the registry format keeps one owner. It also renders the empty registry used for the bootstrap
+- [x] Add `validate` to `ARTIFACTS` (`doc-id.js`) and to `WORK_ITEM_ARTIFACT_RE` (`finalise-fix-and-recheck.mjs`) in one commit. The `doc-id.test.mjs` contract and classification-agreement tests must stay green. Add a `parse` test: `story.1.1.1.validate.2026-05-12.md` is a non-canonical artifact, not `bad-artifact`
 
 ### Phase 1: Discover and plan (pure)
 
 **Risk**: Medium · **Files**: `shared/resources/migrate-doc-numbering.mjs`, `shared/resources/tests/migrate-doc-numbering.test.mjs`
 
-- [ ] `discover(root)` classifies PRDs (L1/L2/L3), epics, stories and artifacts using `doc-id.parse`
-- [ ] `plan(discovery, registry)` returns the rename map (old path → new path) and the frontmatter edits. It numbers per the rules in § 3
-- [ ] Already-numbered documents are left alone; this is the idempotence rule
-- [ ] Unit tests cover L1, L2 and L3, integer and stem `epic:`, both infix forms, unprefixed files, multiple PRDs (the epic renumber order) and a mixed partially-migrated tree
+- [x] `discover(root)` classifies PRDs (L1/L2/L3), epics, stories and artifacts using `doc-id.parse`
+- [x] `plan(discovery, registry)` returns the rename map (old path → new path) and the frontmatter edits. It numbers per the rules in § 3
+- [x] Already-numbered documents are left alone; this is the idempotence rule
+- [x] Unit tests cover L1, L2 and L3, integer and stem `epic:`, both infix forms, unprefixed files, multiple PRDs (the epic renumber order) and a mixed partially-migrated tree
 
 ### Phase 2: Blockers and verification
 
 **Risk**: High · **Files**: same module and test
 
-- [ ] Implement the seven blocker codes, aggregated: one run reports every blocker, not just the first
-- [ ] A simulated link pass resolves every relative link before and after the move against the rename map. Any `live → dead` transition is `link-would-break`
-- [ ] A test for each blocker, each mutation-proven (disable the check, watch its test go red)
+- [x] Implement the eight blocker codes, aggregated: one run reports every blocker, not just the first
+- [x] A simulated link pass resolves every relative link before and after the move against the rename map. Any `live → dead` transition is `link-would-break`
+- [x] A test for each blocker, each mutation-proven (disable the check, watch its test go red)
 
 ### Phase 3: Apply and the CLI
 
 **Risk**: High · **Files**: same module, CLI section
 
-- [ ] `--apply`: moves per file (`git mv` for tracked files, a rename for untracked ones), removes empty old dirs, then rewrites text
-- [ ] Rewrite rules: frontmatter fields, whole-stem and whole-basename tokens, live relative links (repo-wide) and exact path literals (outside history)
-- [ ] Writes the PRD registry through task.202's writer, and the epic-registry pointer with its historical table
-- [ ] Runs `doc-id check --corpus` afterwards and returns `post-check-failed` on any finding
-- [ ] `--check`, `--json` and `--name`; the exit and `reason` contract from § 3
-- [ ] A fixture test applies to a temp git repo, then re-runs and asserts `already` with zero diff
+- [x] `--apply`: moves per file (`git mv` for tracked files, a rename for untracked ones), removes empty old dirs, then rewrites text
+- [x] Rewrite rules: frontmatter fields, whole-stem and whole-basename tokens, live relative links (repo-wide) and exact path literals (outside history, `examples/**` bodies and test fixtures; see Clarifications)
+- [x] Read `PRD_ROOT` through `doc-id.resolvePrdRoot` (`--root` maps to `--prd-root`), and read frontmatter values through `doc-id.frontmatterField`
+- [x] Writes the PRD registry through task.202's writer, and the epic-registry pointer with its historical table
+- [x] Runs `doc-id check --corpus` afterwards and returns `post-check-failed` on any finding
+- [x] `--check`, `--json` and `--name`; the exit and `reason` contract from § 3
+- [x] A fixture test applies to a temp git repo, then re-runs and asserts `already` with zero diff
 
 ### Phase 4: Migrate this repository
 
 **Risk**: Medium · **Files**: `docs/prd/**`, `docs/development/epic-registry.md`, `docs/prd/prd-registry.md`, the 4 inbound-link files, 2 runbooks, 4 example epics, `shared/resources/tests/doc-links.test.mjs`
 
-- [ ] Dry run: review the mapping (1 PRD, 4 epics, 17 stories, 146 files). Record it in the implementation report
-- [ ] `--apply`, then commit as a single commit
-- [ ] Re-run: `already`, with a clean `git status`
-- [ ] `npm test` and `npm run eval:all` pass, and the doc-links ratchet reports no new or healed entries
+- [x] Dry run: review the mapping (1 PRD, 4 epics, 17 stories, 146 files). Record it in the implementation report
+- [x] `--apply`, then commit as a single commit
+- [x] Re-run: `already`, with a clean `git status`
+- [x] Correct the three stale epic-registry sentences (`coding-standards.md:64`, `docs/standards/epic-registry.md`, `docs/standards/file-naming.md:92`) to say the registry is retired, and point to `docs/prd/prd-registry.md`
+- [x] `npm test` and `npm run eval:all` pass, and the doc-links ratchet reports no new or healed entries
 
 ---
 
@@ -417,7 +462,9 @@ two. The pointer file names task.205 so the window is visible.
 
 ### Files to Modify (Core Implementation)
 
-2a. ✅ `shared/resources/doc-id.js` (from task.202) — add `appendPrdRow`, the registry's one row writer
+2a. ✅ `shared/resources/doc-id.js` (from task.202) — add `appendPrdRow`, the registry's one row writer; add `validate` to `ARTIFACTS`
+2b. ✅ `shared/resources/finalise-fix-and-recheck.mjs` — add `validate` to `WORK_ITEM_ARTIFACT_RE` (pinned equal to `ARTIFACTS`), then `npm run bundle` to refresh its bundled copies
+2c. ✅ `docs/architecture/concepts/coding-standards.md`, `docs/standards/epic-registry.md`, `docs/standards/file-naming.md` — the three "until task 203" sentences
 
 ### Files to Create (Tests)
 
@@ -454,6 +501,16 @@ None. Old directories become empty and are removed by the move. Nothing is delet
 - **Command**: `command node --test shared/resources/tests/migrate-doc-numbering.test.mjs`
 - **Mutation proof**: for each blocker, and for the identity-on-already-numbered rule, revert the
   check and confirm a named test goes red.
+- **Named tests for the non-prose criteria:**
+  - **`apply makes one move per file`.** It injects the io, counts `git mv` and rename calls (one per
+    tracked or untracked file) and counts full-tree walks (at most one discovery walk, not one per
+    file).
+  - **`engine defines no id regex`.** It reads the engine source and fails on a regex literal that
+    matches a `story.` or `epic.` id shape. Identifiers must go through `doc-id.js`.
+  - **`validate report is a non-canonical artifact`.** It lives in `doc-id.test.mjs`.
+  - **`absent registry is bootstrapped` and `absent registry with a numbered PRD blocks`.**
+  - **`location decides the parent PRD`.** A `brownfield-enhancement` epic under an L2 PRD moves
+    with it; the same epic with no owning PRD blocks.
 
 ### Integration Tests
 
@@ -485,32 +542,33 @@ None. Old directories become empty and are removed by the move. Nothing is delet
 
 ### Functional
 
-- [ ] On this repository, a dry run prints a map of 1 PRD, 4 epics, 17 stories and 146 files, and writes nothing (`git status` is unchanged)
-- [ ] `--apply` produces `docs/prd/onboarding/prd.1.onboarding/prd.1.onboarding.md` with `prd_number: 1` and `name: prd.1.onboarding`
-- [ ] Every story doc has `id: story.1.E.S.<slug>`, `epic: epic.1.E.<slug>`, a resolving `epic_file:` and `prd_source:`, and `prd_number: 1`
-- [ ] Every gate's `story:` reads `1.E.S`
-- [ ] A second `--apply` returns `reason: already` and exits 0 with an empty diff
-- [ ] An epic with `prd_source: brownfield-enhancement` returns `reason: blocked` with code `prd-less-epic`, and nothing is written (Phase 2)
-- [ ] A story with `status: in-progress` blocks with `in-flight` unless `--allow-in-flight` is passed (Phase 2)
-- [ ] `--check` exits 1 with `needs-migration` before the run and exits 0 with `already` after it
+- [x] On this repository, a dry run prints a map of 1 PRD, 4 epics, 17 stories and 146 files, and writes nothing (`git status` is unchanged)
+- [x] `--apply` produces `docs/prd/onboarding/prd.1.onboarding/prd.1.onboarding.md` with `prd_number: 1` and `name: prd.1.onboarding`
+- [x] Every story doc has `id: story.1.E.S.<slug>`, `epic: epic.1.E.<slug>`, a resolving `epic_file:` and `prd_source:`, and `prd_number: 1`
+- [x] Every gate's `story:` reads `1.E.S`
+- [x] A second `--apply` returns `reason: already` and exits 0 with an empty diff
+- [x] An epic with `prd_source: brownfield-enhancement` returns `reason: blocked` with code `prd-less-epic`, and nothing is written (Phase 2)
+- [x] A story with `status: in-progress` blocks with `in-flight` unless `--allow-in-flight` is passed (Phase 2)
+- [x] `--check` exits 1 with `needs-migration` before the run and exits 0 with `already` after it
 
 ### Performance
 
-- [ ] A dry run over this repository's 146 files finishes in under 5 seconds
-- [ ] `--apply` makes one `git mv` per tracked file, with no repeated full-tree walks inside the per-file loop
+- [x] A dry run over this repository's 146 files finishes in under 5 seconds. This is a wall-clock bound, held by a measurement on the head commit: `uptime; time command node shared/resources/migrate-doc-numbering.mjs --json >/dev/null`, with the output recorded in the implementation report
+- [x] `--apply` makes one `git mv` per tracked file, with no repeated full-tree walks inside the per-file loop. Held by the test `apply makes one move per file` (§ 8)
 
 ### Code Quality
 
-- [ ] Every identifier is parsed through `doc-id.js`. No new `story\.(\d+)` or `epic\.(\d+)` regex exists in the engine
-- [ ] Each blocker and the idempotence rule are mutation-proven
-- [ ] `npm test`, `npm run eval:all` and `npm run bundle:check` pass
+- [x] Every identifier is parsed through `doc-id.js`. No new `story\.(\d+)` or `epic\.(\d+)` regex exists in the engine. Held by the test `engine defines no id regex` (§ 8)
+- [x] `checkCorpus` classifies a `.validate.{date}.md` report as an artifact. Held by `validate report is a non-canonical artifact`, with the `ARTIFACTS` ≡ `WORK_ITEM_ARTIFACT_RE` contract test green
+- [x] Each blocker and the idempotence rule are mutation-proven
+- [x] `npm test`, `npm run eval:all` and `npm run bundle:check` pass
 
 ### Migration
 
-- [ ] No relative link that resolved before the run is dead after it, repo-wide
-- [ ] `docs/development/epic-registry.md` is a pointer whose historical table maps 1–4 to 1.1–1.4 and names task.205
-- [ ] `doc-links.test.mjs` passes with its KNOWN sets re-keyed and no `healed` entries
-- [ ] The implementation report records the full old → new mapping table
+- [x] No relative link that resolved before the run is dead after it, repo-wide
+- [x] `docs/development/epic-registry.md` is a pointer whose historical table maps 1–4 to 1.1–1.4 and names task.205
+- [x] `doc-links.test.mjs` passes with its KNOWN sets re-keyed and no `healed` entries
+- [x] The implementation report records the full old → new mapping table
 
 ---
 
@@ -542,12 +600,18 @@ None. Old directories become empty and are removed by the move. Nothing is delet
    - **Impact**: A mixed tree.
    - **Mitigation**: All verification happens before the first write. Moves come before rewrites,
      and the engine is idempotent over a mixed tree (Phase 1), so re-running finishes the job.
-   - **Rollback**: `git checkout -- . && git clean -fd docs/prd` on the uncommitted state.
+   - **Rollback**: on the uncommitted state, run the `revert` command the run prints. It lists exactly the paths the run moved, edited or wrote — never a directory — and runs `git restore --source=HEAD --staged --worktree` on those paths, plus an exact `rm -f` of any file the run created, from the repository top level. Untracked files the run moved are named for moving back by hand, and nothing is cleaned. The run refuses (`dirty-path`) when any path it would change has uncommitted edits, so the revert can never erase work it did not write. A whole-tree `git checkout -- .` does not undo the staged `git mv` renames, and `git clean` deletes untracked work (QA cycles 1–2, CR-2 / CR-1). A move or write that fails part-way returns `post-check-failed` with the revert for what was actually done.
 
 ### Medium Risk Areas
 
 1. **The epic-registry window before task.205.** `/create-epic` reads a counter that no longer
    exists. Mitigation: the pointer names task.205, and the registry note orders 205 next.
+1a. **Widening the artifact vocabulary (`validate`).**
+   - **What changes.** `isWorkItemDocument` (finalise 8a) and the doc-links corpus partition start
+     treating `.validate.` files as artifacts. Today `WORK_ITEM_DOC_RE` misreads them as documents.
+   - **Mitigation.** The seven files carry no relative links (`doc-links.js --file` → 0 each), so
+     the ratchet partition is unchanged. The existing classification-agreement test runs over every
+     tracked task and bug file.
 2. **The shape of task.202's API differs from this plan.** Mitigation: the Phase 0 gate re-reads
    the actual exports and amends the plan before any code is written.
 
@@ -570,7 +634,7 @@ None. Old directories become empty and are removed by the move. Nothing is delet
 - A consumer reports a broken tree.
 
 **Steps**:
-1. Uncommitted: `git checkout -- . && git clean -fd docs/prd`.
+1. Uncommitted: run the `revert` command the run printed (`--json` `.revert`), described in § 10 High Risk 3. It restores from HEAD only the paths the run touched.
 2. Committed or merged: `git revert <migration commit>`. The run is one commit by design.
 3. Re-run `npm test`.
 
@@ -599,30 +663,121 @@ the second-run no-op guarantee no longer describes the tree.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer (qa-task, develop-task pipeline)
+**Testing Date**: 2026-10-15
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.203.qa.4.migrate-doc-numbering.md](./task.203.qa.4.migrate-doc-numbering.md)
+- **Gate File**: [task.203.gate.4.migrate-doc-numbering.yml](./task.203.gate.4.migrate-doc-numbering.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: `doc-links` 24/24; `ci:fast` 5551 pass on the scratch worktree (3 environmental file failures that pass 83/83 in the main tree)
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+- Cycle 4 re-entered QA after the finalise DoD gaps. Both gaps are fixed: 10 pre-existing dead links were repointed, and the CHANGELOG has a task 203 entry.
+- One low cleanup is advisory: the CHANGELOG blocker list names 8 of the 12 blocker codes.
+- Reliability CONCERNS is carried from gate 3, because the engine is unchanged.
+
+## Definition of Done - Gaps Identified — run 1 (historical, superseded by run 2)
+
+**Status:** IN PROGRESS at run 1. Both gaps were closed in `acccb861`; see the PASSED section below.
+
+### QA Gate Status
+
+**QA Report**: `task.203.qa.3.migrate-doc-numbering.md`
+**Gate File**: `task.203.gate.3.migrate-doc-numbering.yml`
+**Gate Status**: ⚠️ CONCERNS (empty queue; non-blocking)
+**Quality Score**: 90/100
+
+### Missing Criteria:
+
+1. **CI:**
+   - [ ] Clear `link-check` on the head. It is red on 10 dead relative links in 4 migrated files (`story.1.1.1.plan…`, `story.1.1.2.plan…`, `story.1.2.1.sprint-review-summary.md`, `story.1.4.4.plan…`). Every one was already dead at its old path on `develop`; the job checks these files only because the migration renamed them, and AC15 keeps dead links byte-identical. Either repair the links (documentation-only) or record a human waiver.
+
+2. **Documentation:**
+   - [ ] Add a `(task 203)` entry under `CHANGELOG.md` `[Unreleased]`: the new `migrate-doc-numbering.mjs` CLI, the PRD registry, and the retired global epic registry.
+
+### Next Steps:
+
+Both fixes touch only documentation, so `/finalise` re-runs directly with no QA re-entry.
+
+**Estimated Effort:** Small
+
+**Gap Report Generated:** 2026-10-15
+**QA Gate Reference**: See `task.203.gate.3.migrate-doc-numbering.yml`
+
+**Detailed Verification Log:** See `task.203.dod.1.migrate-doc-numbering.md` for the complete verification evidence.
+<!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.203.qa.4.migrate-doc-numbering.md`
+**Gate File**: `task.203.gate.4.migrate-doc-numbering.yml`
+**Gate Status**: ⚠️ CONCERNS (empty queue; the reservation is the advisory reliability edge cases, non-blocking)
+**Quality Score**: 90/100
+**PR Review**: `task.203.pr-review.2.migrate-doc-numbering.md`, ✅ APPROVE
+
+All Definition of Done criteria have been verified (run 2):
+
+✅ **Success Criteria:** 18/18 pass. Sixteen are held by per-PR tests, AC9 is measured (0.501 s against a 5 s bound) and AC18 is documentation.
+✅ **Tests & PR:** PR #671. Every check is green on `e36429f8`: test, validate, link-check, shellcheck and branch policy.
+✅ **Documentation:** a CHANGELOG `(task 203)` entry; the standards are corrected; the epic registry is retired to a pointer; the PRD registry is created.
+✅ **Security Review:** PASS. `checkPrdRoot` was probed with 11 cases, and none reproduced.
+⚠️ **Compliance Review:** not applicable (an internal docs migration).
+
+**Run 1** found 2 gaps: CI `link-check` red on 10 pre-existing dead links, and no CHANGELOG entry. Both were fixed in `acccb861` and re-gated at QA cycle 4.
+
+**Task marked as ACCEPTED on:** 2026-10-15
+
+**Detailed Verification Log:** See `task.203.dod.2.migrate-doc-numbering.md` (run 2) and `task.203.dod.1.migrate-doc-numbering.md` (run 1, gaps).
+
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-13 | 1.0     | Initial draft | create-task |
+| 2026-10-15 | 1.1     | Review (8/10 after fixes) — `validate` artifact vocabulary gap (C1); PRD-registry bootstrap and `registry-missing` blocker; literal-pass exclusions; stale-standards fix; reuse `resolvePrdRoot`/`frontmatterField`; location decides parent PRD; tests named for three criteria | review-task |
+| 2026-10-15 |         | Status → ready-for-development | review-task |
+| 2026-10-15 |  | Implemented — engine + 33 tests (2 test files, 2 shared sources, 1 bundled copy); repository migrated: 146 files moved, 112 links re-pointed, corpus ok (22 documents) | develop |
+| 2026-10-15 |  | QA gate FAIL (50/100) — 1 HIGH, 3 MEDIUM (bugs 1–4) | qa-task |
+| 2026-10-15 |  | QA findings fixed — bugs 1–4 (CR-1, CR-2, CR-3, QA-1) and CR-4; 5 tests added, 1 iteration | qa-fix |
+| 2026-10-15 |  | QA gate FAIL (60/100) — 1 HIGH, 2 MEDIUM (bug 2 reopened; bugs 5, 6) | qa-task |
+| 2026-10-15 |  | QA findings fixed — bug 2 (revert scoped to a touch record, dirty-path widened), bug 5 (id-collision), bug 6 (apply wrapped), plus CR-4–CR-7; 7 tests added, 2 iterations | qa-fix |
+| 2026-10-15 |  | QA gate CONCERNS (90/100) — 0 open findings; 2 advisory reliability edge cases | qa-task |
+| 2026-10-15 |  | DoD incomplete — 2 gaps identified (CI link-check, CHANGELOG) | finalise |
+| 2026-10-15 |  | QA gate CONCERNS (90/100) — 0 open findings; 1 low cleanup (cycle 4, after finalise re-entry) | qa-task |
+| 2026-10-15 | 1.2 | DoD passed — accepted (PR #671) | finalise |
 
 ---
+<!-- change-log-end -->
 
 ## Progress Tracking
 
 ### Phase 0: Dependency gate
-- [ ] task.202 merged; the plan file is amended to its real API
+- [x] task.202 merged; the plan file is amended to its real API
 
 ### Phase 1: Discover and plan
-- [ ] `discover` and `plan`, with unit tests
+- [x] `discover` and `plan`, with unit tests
 
 ### Phase 2: Blockers and verification
-- [ ] Seven blockers and the link simulator, mutation-proven
+- [x] Eight blockers and the link simulator, mutation-proven
 
 ### Phase 3: Apply and the CLI
-- [ ] `--apply`, `--check`, `--json`; the fixture apply and re-run test
+- [x] `--apply`, `--check`, `--json`; the fixture apply and re-run test
 
 ### Phase 4: Migrate this repository
-- [ ] Dry run reviewed, applied, re-run is a no-op, suites green
+- [x] Dry run reviewed, applied, re-run is a no-op, suites green
 
 ---
 

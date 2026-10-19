@@ -1,0 +1,148 @@
+[
+  {
+    "id": "t189.matrix.no-markers",
+    "sink": "filename",
+    "input": "doc",
+    "why": "the pre-task.189 confirmation line, no matrix",
+    "correct": "no matrix file is written and the warning is printed",
+    "direction": "hostile",
+    "expected": {
+      "stdout": "⚠️ mapper returned no matrix — proceeding without it\n",
+      "exit": 0,
+      "absent": [
+        "doc"
+      ]
+    },
+    "fixture": {
+      "files": {
+        ".claude/state/mapper-reply.md": "Matrix written to x — 3 ACs mapped.\n"
+      }
+    }
+  },
+  {
+    "id": "t189.matrix.start-only",
+    "sink": "filename",
+    "input": "doc",
+    "why": "unterminated block",
+    "correct": "no matrix file is written and the warning is printed",
+    "direction": "hostile",
+    "expected": {
+      "stdout": "⚠️ mapper returned no matrix — proceeding without it\n",
+      "exit": 0,
+      "absent": [
+        "doc"
+      ]
+    },
+    "fixture": {
+      "files": {
+        ".claude/state/mapper-reply.md": "<!-- matrix-start -->\n# QA Traceability Matrix\n\n| SC | spec | src | full | — |\n"
+      }
+    }
+  },
+  {
+    "id": "t189.matrix.end-before-start",
+    "sink": "filename",
+    "input": "doc",
+    "why": "markers inverted",
+    "correct": "no matrix file is written and the warning is printed",
+    "direction": "hostile",
+    "expected": {
+      "stdout": "⚠️ mapper returned no matrix — proceeding without it\n",
+      "exit": 0,
+      "absent": [
+        "doc"
+      ]
+    },
+    "fixture": {
+      "files": {
+        ".claude/state/mapper-reply.md": "<!-- matrix-end -->\n# QA Traceability Matrix\n\n| SC | spec | src | full | — |\n<!-- matrix-start -->\n"
+      }
+    }
+  },
+  {
+    "id": "t189.matrix.two-blocks",
+    "sink": "filename",
+    "input": "doc",
+    "why": "ambiguous: two matrices",
+    "correct": "no matrix file is written and the warning is printed",
+    "direction": "hostile",
+    "expected": {
+      "stdout": "⚠️ mapper returned no matrix — proceeding without it\n",
+      "exit": 0,
+      "absent": [
+        "doc"
+      ]
+    },
+    "fixture": {
+      "files": {
+        ".claude/state/mapper-reply.md": "<!-- matrix-start -->\n# QA Traceability Matrix\n\n| SC | spec | src | full | — |\n<!-- matrix-end -->\n<!-- matrix-start -->\nx\n<!-- matrix-end -->\n"
+      }
+    }
+  },
+  {
+    "id": "t189.matrix.empty-block",
+    "sink": "filename",
+    "input": "doc",
+    "why": "markers with nothing between",
+    "correct": "no matrix file is written and the warning is printed",
+    "direction": "hostile",
+    "expected": {
+      "stdout": "⚠️ mapper returned an empty matrix — proceeding without it\n",
+      "exit": 0,
+      "absent": [
+        "doc"
+      ]
+    },
+    "fixture": {
+      "files": {
+        ".claude/state/mapper-reply.md": "<!-- matrix-start -->\n<!-- matrix-end -->\n"
+      }
+    }
+  },
+  {
+    "id": "t189.matrix.inline-markers",
+    "sink": "filename",
+    "input": "doc",
+    "why": "markers not on lines of their own",
+    "correct": "no matrix file is written and the warning is printed",
+    "direction": "hostile",
+    "expected": {
+      "stdout": "⚠️ mapper returned no matrix — proceeding without it\n",
+      "exit": 0,
+      "absent": [
+        "doc"
+      ]
+    },
+    "fixture": {
+      "files": {
+        ".claude/state/mapper-reply.md": "text <!-- matrix-start --> # QA Traceability Matrix\n\n| SC | spec | src | full | — |\n <!-- matrix-end -->\n"
+      }
+    }
+  },
+  {
+    "id": "t189.matrix.well-formed",
+    "sink": "filename",
+    "input": "doc",
+    "why": "the contract's own shape",
+    "correct": "the marked matrix is written byte for byte",
+    "direction": "legitimate",
+    "fixture": {
+      "files": {
+        ".claude/state/mapper-reply.md": "Mapped.\n<!-- matrix-start -->\n# QA Traceability Matrix\n\n| SC | spec | src | full | — |\n<!-- matrix-end -->\n1 ACs mapped.\n"
+      }
+    }
+  },
+  {
+    "id": "t189.matrix.crlf",
+    "sink": "filename",
+    "input": "doc",
+    "why": "a reply with CRLF line ends",
+    "correct": "the marked matrix is written byte for byte",
+    "direction": "legitimate",
+    "fixture": {
+      "files": {
+        ".claude/state/mapper-reply.md": "<!-- matrix-start -->\r\n# QA Traceability Matrix\n\n| SC | spec | src | full | — |\n<!-- matrix-end -->\r\n"
+      }
+    }
+  }
+]

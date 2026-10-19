@@ -6,7 +6,7 @@ Schema and conventions for epic markdown files consumed by `create-epic`, `revie
 
 ## Purpose
 
-An epic is a mid-scope work unit nested inside a PRD. It owns 1–N stories. Epic numbers are globally unique.
+An epic is a mid-scope work unit nested inside a PRD, and every epic has one — an epic with no PRD is not allowed. It owns 1–N stories. Its id is `epic.{P}.{E}`: `P` is its PRD's number and `E` counts epics **within that PRD**, so `epic.1.2` and `epic.2.2` are different epics.
 
 An epic is an **organisational construct, not a git branch** — by default its stories are cut from `develop` and merge back into `develop` independently. An epic whose stories are meaningless apart may opt into a long-lived integration branch by declaring `branch_model: epic-integration` in its frontmatter; see [Story documents § Branch strategy](./story-documents.md#branch-strategy).
 
@@ -15,24 +15,31 @@ An epic is an **organisational construct, not a git branch** — by default its 
 ```
 docs/prd/
 └── {domain}/
-    └── {feature}/
+    └── prd.{P}.{feature}/
         └── epics/
-            └── epic.{N}.{name}/
-                ├── epic.{N}.{name}.md      # main document
+            └── epic.{P}.{E}.{name}/
+                ├── epic.{P}.{E}.{name}.md  # main document
                 └── stories/                # child stories
 ```
 
-`{N}` is assigned by the [epic registry](./epic-registry.md).
+`E` is the highest epic number under PRD `P` plus 1 (`doc-id.js next epic --prd-dir …`). A gap left
+by a deleted epic is never refilled, but no registry or counter allocates `E`, so deleting the
+highest-numbered epic frees its number again.
+
+> **Adopted (2026-10-16, tasks 202–207).** Every skill writes and reads this scheme through `doc-id.js` (tasks 204–206), and two CI tests hold it (task 207): `doc-numbering-corpus.test.mjs` fails on any unnumbered, mismatched, unregistered or duplicate document under the PRD root, and `doc-id-chokepoint.test.js` fails on an id parsed anywhere but `doc-id.js`. A legacy flat-numbered tree is migrated with `migrate-doc-numbering.mjs`; `doc-id.js parseLegacy` reads the old shapes only for that migration.
+
 
 ## File naming
 
-See [file naming](./file-naming.md). Pattern: `epic.{N}.{name}.md`. Directory stem matches.
+See [file naming](./file-naming.md). Pattern: `epic.{P}.{E}.{name}.md`; `{name}` begins with a letter. Directory stem matches.
 
 ## Frontmatter schema
 
 ```yaml
 ---
-epic_number: 178
+prd_number: 1
+epic_number: 2
+prd_source: web/prd.1.feature-ui/prd.1.feature-ui.md
 title: "Feature UI"
 type: epic
 description: "One-sentence summary of what this epic delivers."
@@ -47,7 +54,8 @@ updated: 2026-01-15
 
 | Field | Type | Required | Values / Notes |
 |---|---|---|---|
-| `epic_number` | integer | Yes | Globally unique — register in [epic registry](./epic-registry.md) |
+| `prd_number` | integer | Yes | `P` — the parent PRD's number; equals the filename's first number |
+| `epic_number` | integer | Yes | `E` — unique **within its PRD**; equals the filename's second number |
 | `title` | string | Yes | Human-readable title |
 | `type` | literal | Yes | Must be exactly `epic` (OKF `type` — the one hard requirement) |
 | `description` | string | Recommended | One-sentence summary (OKF `description`) — what consumers and agents index on |
@@ -58,7 +66,7 @@ updated: 2026-01-15
 | `created` | ISO date | Yes | `YYYY-MM-DD` |
 | `updated` | ISO date | Yes | `YYYY-MM-DD` — update on every change |
 | `estimated_stories` | integer | Optional | Planned story count |
-| `prd_source` | string | Optional | Source PRD filename |
+| `prd_source` | string | **Yes** | The parent PRD document — an epic with no PRD is not allowed |
 | `github_issue` | integer | Optional | Linked GitHub issue number |
 | `jira_key` | string\|null | Optional | `PROJ-123` or `null` |
 | `jira_url` | string\|null | Optional | Full Jira URL or `null` |
@@ -97,7 +105,8 @@ See [`status-lifecycle.md`](./status-lifecycle.md). Epic status reflects the rol
 
 ## See also
 
-- [Epic registry](./epic-registry.md)
+- [PRD registry](./prd-registry.md)
+- [Epic registry](./epic-registry.md) — the legacy global numbering, retired by task 203
 - [Story documents](./story-documents.md)
 - [Story Development Runbook](../runbooks/story-development.md) — Phase B
 - [`create-epic` SKILL.md](../../skills/create-epic/SKILL.md)

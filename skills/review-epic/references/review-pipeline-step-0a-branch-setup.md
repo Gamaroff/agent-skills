@@ -68,16 +68,27 @@ Run **before** the auto-skip check — auto-skip patterns depend on these IDs.
 
 #### review-story
 
-```bash
-STORY_BASENAME=$(basename "$DOC_FILE" .md)           # e.g. story.8.2.configure-validation-pipe
-EPIC_NUM=$(echo "$STORY_BASENAME" | awk -F. '{print $2}')
-STORY_NUM=$(echo "$STORY_BASENAME" | awk -F. '{print $3}')
+The ids are `doc-id.js`'s, never a positional split: in `story.{P}.{E}.{S}` the second field is the
+PRD, so `awk -F.` read P where it meant E and the auto-skip below matched a whole epic (task 206).
 
-EPIC_REF=$(grep '^epic:' "$DOC_FILE" | awk '{print $2}')
+```bash
+# 0a.2 review-story — story ids through doc-id (task 206). DOC_FILE is the story document.
+DOC_ID="$PWD/.agents/skills/review-story/references/doc-id.js"
+STORY_ID_JSON=$(command node "$DOC_ID" parse "$(basename "$DOC_FILE")" --json) \
+  || { echo "❌ $(basename "$DOC_FILE") is not a story id doc-id can read (story.P.E.S.slug.md); a legacy story.E.S name is migrated first with migrate-doc-numbering"; exit 1; }
+[ "$(printf '%s' "$STORY_ID_JSON" | jq -r '.kind')" = "story" ] \
+  || { echo "❌ $(basename "$DOC_FILE") is not a story document"; exit 1; }
+PRD_NUM=$(printf '%s' "$STORY_ID_JSON" | jq -r '.prd')
+EPIC_NUM=$(printf '%s' "$STORY_ID_JSON" | jq -r '.epic')
+STORY_NUM=$(printf '%s' "$STORY_ID_JSON" | jq -r '.story')
+STORY_STEM=$(printf '%s' "$STORY_ID_JSON" | jq -r '.id')   # e.g. story.1.8.2, or story.1.8.2A
+
+EPIC_REF=$(grep -m1 '^epic:' "$DOC_FILE" | awk '{print $2}')
 if [ -z "$EPIC_REF" ]; then
-  echo "❌ Story must have an 'epic:' frontmatter field (e.g. epic: epic.178.feature-ui)."
+  echo "❌ Story must have an 'epic:' frontmatter field (e.g. epic: epic.$PRD_NUM.$EPIC_NUM.feature-ui)."
   exit 1
 fi
+echo "story $STORY_STEM — PRD $PRD_NUM, epic $EPIC_NUM, story $STORY_NUM"
 ```
 
 #### review-task
@@ -96,11 +107,21 @@ BUG_PREFIX="$BUG_BASENAME"                            # the full stem; used for 
 
 #### review-epic
 
+The ids are `doc-id.js`'s, as in the story block above: in `epic.{P}.{E}.{slug}` the second field
+is the PRD, so `awk -F.` read P where it meant E, and the auto-skip below matched every epic of the
+PRD (task 207).
+
 ```bash
-EPIC_BASENAME=$(basename "$DOC_FILE" .md)            # e.g. epic.42.payments
-EPIC_NUM=$(echo "$EPIC_BASENAME" | awk -F. '{print $2}')
-EPIC_SLUG=$(echo "$EPIC_BASENAME" | sed 's/epic\.[0-9]*\.//')
-EPIC_BRANCH="feature/epic.${EPIC_NUM}.${EPIC_SLUG}"
+# 0a.2 review-epic — epic ids through doc-id (task 207). DOC_FILE is the epic document.
+DOC_ID="$PWD/.agents/skills/review-epic/references/doc-id.js"
+EPIC_ID_JSON=$(command node "$DOC_ID" parse "$(basename "$DOC_FILE")" --json) \
+  || { echo "❌ $(basename "$DOC_FILE") is not an epic id doc-id can read (epic.P.E.slug.md); a legacy epic.E name is migrated first with migrate-doc-numbering"; exit 1; }
+[ "$(printf '%s' "$EPIC_ID_JSON" | jq -r '"\(.kind) \(.artifact)"')" = "epic null" ] \
+  || { echo "❌ $(basename "$DOC_FILE") is not an epic document"; exit 1; }
+PRD_NUM=$(printf '%s' "$EPIC_ID_JSON" | jq -r '.prd')
+EPIC_NUM=$(printf '%s' "$EPIC_ID_JSON" | jq -r '.epic')
+EPIC_SLUG=$(printf '%s' "$EPIC_ID_JSON" | jq -r '.slug')
+EPIC_BRANCH="feature/epic.${PRD_NUM}.${EPIC_NUM}.${EPIC_SLUG}"   # e.g. feature/epic.1.42.payments
 ```
 
 ---
@@ -112,8 +133,17 @@ If `CURRENT_BRANCH` already matches the doc's expected feature-branch pattern, s
 #### review-story
 
 ```bash
+# The full story stem plus a dot: story.1.2.3 never matches feature/story.1.2.30.* or story.1.2.4.*.
+# STORY_STEM is derived HERE — 0a.2's block is another shell, and an unbound stem matches only
+# `feature/.*`, so the auto-skip would silently never fire (task.206 QA cycle 1, CR-8).
+STORY_STEM=$(command node "$PWD/.agents/skills/review-story/references/doc-id.js" parse "$(basename "$DOC_FILE")" --json \
+  | jq -r 'select(.kind == "story") | .id')
+[ -n "$STORY_STEM" ] || { echo "❌ $(basename "$DOC_FILE") is not a story id doc-id can read"; exit 1; }
+# CURRENT_BRANCH too — 0a.1's block is another shell; unbound, the case below never matches and the
+# auto-skip silently never fires (task.206 QA cycle 2, CR2-1). Empty on a detached HEAD: no skip.
+CURRENT_BRANCH=$(git branch --show-current)
 case "$CURRENT_BRANCH" in
-  feature/story.${EPIC_NUM}.${STORY_NUM}.*)
+  "feature/${STORY_STEM}."*)
     BRANCH_NAME="$CURRENT_BRANCH"; AUTO_SKIPPED=true ;;
 esac
 ```
@@ -140,8 +170,16 @@ esac
 #### review-epic
 
 ```bash
+# 0a.3 review-epic — every value re-derived HERE: 0a.1's and 0a.2's blocks are other shells, and an
+# unbound PRD_NUM/EPIC_NUM collapsed the pattern to `feature/epic..*` so the skip never fired (task.207
+# QA cycle 1, CR-1). DOC_FILE is the epic document. Empty on a detached HEAD: no skip.
+EPIC_ID_JSON=$(command node "$PWD/.agents/skills/review-epic/references/doc-id.js" parse "$(basename "$DOC_FILE")" --json) \
+  || { echo "❌ $(basename "$DOC_FILE") is not an epic id doc-id can read"; exit 1; }
+PRD_NUM=$(printf '%s' "$EPIC_ID_JSON" | jq -r '.prd')
+EPIC_NUM=$(printf '%s' "$EPIC_ID_JSON" | jq -r '.epic')
+CURRENT_BRANCH=$(git branch --show-current)
 case "$CURRENT_BRANCH" in
-  feature/epic.${EPIC_NUM}.*) BRANCH_NAME="$CURRENT_BRANCH"; AUTO_SKIPPED=true ;;
+  "feature/epic.${PRD_NUM}.${EPIC_NUM}."*) BRANCH_NAME="$CURRENT_BRANCH"; AUTO_SKIPPED=true ;;
 esac
 ```
 
@@ -160,7 +198,7 @@ Story branches are cut from `${BASE_DEFAULT}` (standard Gitflow feature branches
 - On `${BASE_DEFAULT}` or `main`: options `${BASE_DEFAULT}` (Recommended) / `main` / `Other`
 - On any `feature/*` branch: options `${BASE_DEFAULT}` (Recommended) / `feature/{current}` / `Other`
 
-**Header:** `Story branch` — **Question:** "Which branch should `feature/story.${EPIC_NUM}.${STORY_NUM}.*` be based on?"
+**Header:** `Story branch` — **Question:** "Which branch should `feature/${STORY_STEM}.*` be based on?"
 
 #### review-task
 
@@ -235,7 +273,7 @@ Save the stash ref for 0a.8:
 
 > **Idempotence**: re-check immediately before each mutation — the branch may have appeared on remote between detection and creation.
 >
-> This creates an ordinary epic-**document** feature branch (`feature/epic.{n}.{name}`) from `${BASE_DEFAULT}` for reviewing/editing the epic doc — it is **not** a long-lived integration branch. review-story and review-task never reach this section; they branch a story/task feature branch from `${BASE_DEFAULT}` in 0a.7.
+> This creates an ordinary epic-**document** feature branch (`feature/epic.{P}.{E}.{name}`) from `${BASE_DEFAULT}` for reviewing/editing the epic doc — it is **not** a long-lived integration branch. review-story and review-task never reach this section; they branch a story/task feature branch from `${BASE_DEFAULT}` in 0a.7.
 
 ```bash
 git fetch origin

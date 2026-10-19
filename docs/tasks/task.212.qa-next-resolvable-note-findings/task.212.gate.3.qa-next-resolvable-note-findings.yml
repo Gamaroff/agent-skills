@@ -1,0 +1,58 @@
+schema: 2
+task: 'task.212.qa-next-resolvable-note-findings'
+task_title: 'qa-next: a note finding can be resolved, with evidence'
+gate: FAIL
+status_reason: 'Cycle-2 fixes CR2 and CR7 hold (mutation-proven) and the --by boundary engages (17 probes), but the cycle-2 Step 5 staging block hardcodes the default registry directory, so any consumer with a non-default qaNext.registryPath never stages the run files --resolve-finding edited (HIGH).'
+reviewer: 'QA Engineer'
+head: '428fcbcfef235ffc9536c4f5e0d7ccf26daf31b3'
+updated: '2026-10-16T15:27:18Z'
+
+top_issues:
+  - id: 'T212-QA3-CR1'
+    severity: high
+    file: 'skills/qa-next/SKILL.md'
+    finding: 'SKILL.md Step 5''s staging block runs git diff --name-only HEAD -- "$REGISTRY_DIR/runs" with REGISTRY_DIR defaulting to docs/qa, and nothing binds it from qaNext.registryPath (a documented config key, SKILL.md:52). A consumer whose registry lives elsewhere gets an empty list (git exits 0 on a pathspec that matches nothing), the edited earlier run files are never staged, and the next /qa-next halts on a dirty tree. The new test runs only the default path, so it cannot see this. Introduced by the cycle-2 fix for T212-QA2-CR1.'
+    suggested_action: 'Move the listing into uat-status.mjs, which already resolves registryDir from --registry: a read-only command (e.g. --changed-runs) printing the tracked run files under <registryDir>/runs that differ from HEAD, called by Step 5 the way every other step calls the tool. Test it with a non-default --registry. Remove the shell default.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 82
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 17
+    notes: 'cli: probe of --resolve-finding --by (sink path): 16 hostile incl. pipe and backtick run names (read-back) and an impossible-date run (run-not-later), 1 legitimate: verdict engages, 0 escapes.'
+  performance:
+    status: PASS
+    notes: 'Stale-marker strip is linear; git calls bounded by a 10 s timeout.'
+  reliability:
+    status: FAIL
+    notes: 'T212-QA3-CR1: resolution markers left uncommitted for any non-default registry path.'
+  maintainability:
+    status: PASS
+    notes: 'Cycle-2 fixes each held by a test that goes red when reverted.'
+
+recommendations:
+  immediate:
+    - action: 'Fix T212-QA3-CR1 by moving the changed-run listing into uat-status.mjs and testing a non-default --registry.'
+      refs: ['skills/qa-next/SKILL.md', 'skills/qa-next/scripts/uat-status.mjs']
+  future:
+    - action: 'CR-2 (medium, low confidence): a git timeout or spawn error is cached as no-repo/absent, so a slow repo reads as not-a-git-repo / commit-not-found and the writer could replace a marker that holds. Tell a timeout apart from a git refusal and refuse to replace on an unverified state.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['Fix T212-QA3-CR1']

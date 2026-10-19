@@ -5,18 +5,21 @@ type: task
 description: "qa-execute-snippets.mjs gains --slot to fill {template} slots, runs a block that calls or sources a bundled helper when the helper itself classifies as runnable, and reports changed blocks separately via --diff-base, so qa-task Step 4b and qa-story Phase 1.7 execute the blocks a change actually touches."
 tags: [qa-task, qa-story, qa-execute-snippets, observation, runnable-prose]
 category: refactoring
-status: planned
+status: accepted
 priority: Medium
 created: 2026-10-07
-updated: 2026-10-07
+updated: 2026-10-19
 assignee:
 estimated_effort_hours: 16
 github_issue: 590
+completed_date: 2026-10-19
+pr_number: 687
 ---
 
 # Technical Task: Snippet engine runs pipeline blocks
 
-**Status:** Planned
+**Status:** Accepted
+**Review**: ✅ All review recommendations from `task.191.review.1.snippet-engine-runs-pipeline-blocks.md` implemented 2026-10-19
 **GitHub Issue**: [#590](https://github.com/Gamaroff/agent-skills/issues/590)
 
 ---
@@ -81,27 +84,28 @@ copies, CHANGELOG.
 
 ### Current Architecture
 
-Line numbers are from `develop` at `5f09b4da`, paired with the text they point at.
+Line numbers are from `develop` at `faefb677` (re-anchored by review 1; first written against `5f09b4da`), paired with the text they point at.
 
 - **Classification** (`shared/resources/qa-execute-snippets.mjs`, `export function
   classifyBlock(code, bindings = {})`, `:1261`). The order is: deny patterns, `sed w`, `-o` writes,
   write redirection, then command words against `SAFE_COMMANDS` (`:396`). Any word not on the list →
-  `mutating`, `unrecognised-command: … (fail-closed)` (`:1316`). Then `PLACEHOLDER_PATTERNS` (`:778`:
+  `mutating`, `unrecognised-command: … (fail-closed)` (`:1317`). Then `PLACEHOLDER_PATTERNS` (`:778`:
   `{name}` not preceded by `$`, and `<name>` in argument position) → `placeholder`, `template slot`
   (`:1323`). Then unbound variables → `placeholder`, `unbound-variable: …`. `bash`, `sh`, `source`
   and `.` are not in `SAFE_COMMANDS`. `COMMAND_RUNNERS` (`:444`) is a separate set (`awk`, `env`,
   `eval`, `xargs`, …) that is always refused.
-- **Binding**: `--bind NAME=VALUE` (`main`, `:1899`) feeds `bindings`, which only satisfies the
+- **Binding**: `--bind NAME=VALUE` (`main`, `:1943`) feeds `bindings`, which only satisfies the
   unbound-variable check and the environment the block runs with (`sandboxEnv`, `:1425`).
-- **Execution** happens in a temp copy seeded by `--copy <dir>` / `--copy-as SRC:DEST` (`:1665`,
-  `:1722`), with a before/after `snapshotTree` sentinel (`:1367`, `:1456`, `:1515`).
-- **Zero-run findings** (`:1764`–`:1830`): `zero-blocks-executed` when `counts.placeholder > 0`, with
-  the detail "supply the missing values with --bind to execute the placeholder blocks" (`:1804`);
+- **Execution** happens in a temp copy seeded by `--copy <dir>` / `--copy-as SRC:DEST` (`:1702`,
+  `:1713`), with a before/after `snapshotTree` sentinel (`:1368`). `executeFile` seeds the copy
+  **before** its block loop, so the copy already exists when a block is classified.
+- **Zero-run findings** (`:1820`–`:1875`): `zero-blocks-executed` when `counts.placeholder > 0`, with
+  the detail "supply the missing values with --bind to execute the placeholder blocks" (`:1848`);
   `no-executable-blocks` when every block was refused as `mutating`. Nothing distinguishes changed
   blocks from unchanged ones.
-- **Callers**: qa-task `### Step 4b: Execute the Documented Commands` (`skills/qa-task/SKILL.md:831`,
-  `node references/qa-execute-snippets.mjs --file "$SKILL_FILE" --json`, `:851`), and qa-story's
-  equivalent (`skills/qa-story/SKILL.md:1228`). The rule they cite is
+- **Callers**: qa-task `### Step 4b: Execute the Documented Commands` (`skills/qa-task/SKILL.md:884`,
+  `node references/qa-execute-snippets.mjs --file "$SKILL_FILE" --json`, `:904`), and qa-story's
+  equivalent (`skills/qa-story/SKILL.md:1304`). The rule they cite is
   `shared/resources/qa-runnable-prose-detection.md`.
 - **Tests**: `shared/resources/tests/qa-execute-snippets.test.mjs`. Per project memory it is
   load-sensitive: re-run the file alone before believing a timing failure.
@@ -121,22 +125,31 @@ Line numbers are from `develop` at `5f09b4da`, paired with the text they point a
   2. It resolves (realpath) to a regular `.sh` file inside `helperRoot`.
   3. That file's text, classified by the same function with the same root, is `runnable`, to a depth
      of 2.
+  4. The block does not change directory: no `cd`, `pushd` or `popd` anywhere in it (review 1, I1).
+     The path is resolved against `helperRoot`, but the shell runs it from the block's working
+     directory, and `bash` falls back to `PATH` when the name has no slash and is not found there.
+     A block that `cd`s first would run a file the classifier never read. Such a block keeps the
+     runner word unrecognised, with reason `helper call after a directory change`.
 
   For `source` / `.`, the function names the helper defines (`^name() {` or `function name`) become
-  recognised words for the rest of the block. Anything else stays `unrecognised-command`. A helper
+  recognised words in that block. `commandWords` carries no positions, so "in that block" means
+  anywhere in it; a call before the `source` fails at run time with command-not-found, which writes
+  nothing. Anything else stays `unrecognised-command`. A helper
   that writes (for example `advance-pipeline-lock.sh`) stays refused for its own reasons, which the
   reason string carries (`helper <path>: mutating: …`).
 - **Helper syntax** (the author's decision, 2026-10-07). Today a real helper file cannot classify
   as runnable even when it only reads. Classified on `5f09b4da`, `qa-cycle.sh` is
   `unrecognised-command: shopt, <unparseable>` and `newest-numbered.sh` is `<unparseable>`. The
   causes are syntax, not writes: a function definition (`name() {` in command position), a `case`
-  pattern line (`''|*[!0-9]*)`), an array append (`hits+=("$f")`), and `shopt -s nullglob`.
+  pattern line (`''|*[!0-9]*)`), an array append (`hits+=("$f")`), and `shopt -s nullglob`. (`local` is already a recognised builtin in
+  `SHELL_KEYWORDS`.)
   `classifyBlock` learns these in **helper mode**: a definition is not an invocation, and its name
   becomes a recognised word for that text; a `case` pattern line is not a command; `name+=(…)` is an
-  assignment; `shopt -s|-u <option>` and `local` are harmless builtins. Helper mode also skips the
+  assignment; `shopt -s|-u <option>` is a harmless builtin. Helper mode also skips the
   template-slot and unbound-variable checks, because a helper's `<dir>` comments and `$1` arguments
-  are code and arguments, not slots. Writers stay refused: the same measurement over all 29
-  `shared/resources/*.sh` helpers (excluding `*.test.sh`) shows most of them call `mktemp`, `mv` or
+  are code and arguments, not slots. Writers stay refused: the same measurement over the `shared/resources/*.sh` helpers (excluding
+  `*.test.sh`; population: `ls shared/resources/*.sh | grep -v '\.test\.sh'`, 32 files at `faefb677`;
+  the test records the figure) shows most of them call `mktemp`, `mv` or
   `rm`. The command and its per-file output are in the plan.
 - **`--diff-base <rev>`**. The engine reads `git diff -U0 <rev> -- <file>` for the file's changed
   line ranges, and marks each block `changed: true` when its line span overlaps one. The JSON
@@ -146,7 +159,12 @@ Line numbers are from `develop` at `5f09b4da`, paired with the text they point a
   finding, never instead of it. Without `--diff-base`, behaviour is unchanged.
 - **Callers.** Step 4b and Phase 1.7 pass `--diff-base origin/<base>`, `--slot` for the
   work item's template values, and `--copy-as .agents:.agents` when the change set calls bundled
-  helpers. They report the `changed` counts first.
+  helpers. They report the `changed` counts first. **Where `.agents/skills` is a symlink** — this
+  repository, where it is a gitignored `skills -> ../skills` link that CI does not have —
+  `--copy-as .agents:.agents` copies the link, which resolves nowhere inside the copy, so every
+  helper is refused. The callers name the alternative seeding `--copy-as skills:.agents/skills`
+  (review 1, I2). The engine does not dereference: following a link out of the copy is what the
+  helper rule must refuse.
 
 ### Important Clarifications
 
@@ -190,9 +208,9 @@ when its helper is runnable. That is the intended change, and it happens only in
 
 **Risk**: Low. **Files**: `qa-execute-snippets.mjs`, its test.
 
-- [ ] Parse `--slot NAME=VALUE` (repeatable, same validation shape as `--bind`).
-- [ ] Substitute slots in block text before classification and execution.
-- [ ] Reason `template slot: …` names the unfilled slots; the `zero-blocks-executed` detail names
+- [x] Parse `--slot NAME=VALUE` (repeatable, same validation shape as `--bind`).
+- [x] Substitute slots in block text before classification and execution.
+- [x] Reason `template slot: …` names the unfilled slots; the `zero-blocks-executed` detail names
   `--slot` or `--bind` by placeholder kind.
 
 ### Phase 2: Helper calls (obs #219, #278)
@@ -200,31 +218,32 @@ when its helper is runnable. That is the intended change, and it happens only in
 **Risk**: Medium (touches the safety boundary). **Files**: same. **Depends on**: Phase 1 (slot
 substitution happens before the path is read).
 
-- [ ] Helper mode in `classifyBlock`/`commandWords`: function definitions, `case` pattern lines,
+- [x] Helper mode in `classifyBlock`/`commandWords`: function definitions, `case` pattern lines,
   array appends, `shopt -s|-u`, `local`; no slot or unbound-variable check.
-- [ ] `classifyBlock(code, bindings, { helperRoot, depth })`: recognise `bash`/`sh`/`source`/`.`
-  only under the three conditions in § 3.
-- [ ] Sourced helpers' function names become recognised words for the rest of that block.
-- [ ] Reason strings carry the helper path and its own classification when refused.
-- [ ] `runBlock` passes the temp copy as `helperRoot`.
+- [x] `classifyBlock(code, bindings, { helperRoot, depth })`: recognise `bash`/`sh`/`source`/`.`
+  only under the four conditions in § 3.
+- [x] Sourced helpers' function names become recognised words for the rest of that block.
+- [x] Reason strings carry the helper path and its own classification when refused.
+- [x] `runBlock` passes the temp copy as `helperRoot`.
 
 ### Phase 3: `--diff-base` and changed-block reporting (obs #219)
 
 **Risk**: Low. **Files**: same.
 
-- [ ] Changed line ranges from `git diff -U0 <rev> -- <file>` (run in the repo, not the copy).
-- [ ] Per-block `changed`, the `changed` summary, and the `changed-blocks-not-executed` finding.
-- [ ] Bad revision → exit 2, `bad-diff-base`, naming the revision.
+- [x] Changed line ranges from `git diff -U0 <rev> -- <file>` (run in the repo, not the copy).
+- [x] Per-block `changed`, the `changed` summary, and the `changed-blocks-not-executed` finding.
+- [x] Bad revision → exit 2, `bad-diff-base`, naming the revision.
 
 ### Phase 4: Callers, rule document, changelog
 
 **Risk**: Low. **Files**: `qa-runnable-prose-detection.md`, `skills/qa-task/SKILL.md`,
 `skills/qa-story/SKILL.md`, `CHANGELOG.md`. **Depends on**: Phases 1–3.
 
-- [ ] Rule document: the helper rule and why it keeps the allow-list the boundary.
-- [ ] Step 4b / Phase 1.7: pass `--diff-base`, `--slot`, `--copy-as .agents:.agents`; report
-  `changed` first; keep the two blocks' parity (check `tests/qa-execution-step-parity*.test.*`).
-- [ ] `npm run bundle`; CHANGELOG `[Unreleased]` › Changed citing obs #186, #219, #278.
+- [x] Rule document: the helper rule and why it keeps the allow-list the boundary.
+- [x] Step 4b / Phase 1.7: pass `--diff-base`, `--slot`, `--copy-as .agents:.agents` (and name
+  `--copy-as skills:.agents/skills` for a symlinked `.agents/skills`); report `changed` first; keep
+  the two blocks' parity (`evals/shared/tests/qa-execution-step-parity.test.mjs`).
+- [x] `npm run bundle`; CHANGELOG `[Unreleased]` › Changed citing obs #186, #219, #278.
 
 ---
 
@@ -268,7 +287,9 @@ None.
   block `bash .agents/skills/s/references/read.sh a` runs; a helper containing `mv` is refused with
   `helper …: mutating`. A block `source …/read.sh || exit 1; my_fn x` runs when `read.sh` defines
   `my_fn`. **Controls:** a `source "$X"` (variable path) stays refused; a path that symlinks outside
-  the copy stays refused; a helper that sources a mutating helper (depth 2) stays refused.
+  the copy stays refused (including a seeded `.agents/skills -> ../skills` link); a helper that
+  sources a mutating helper (depth 2) stays refused; `cd sub && bash read.sh` stays refused even
+  when `read.sh` at the root is runnable.
 - **Changed blocks**: in a temp git repo, a file with two blocks where the diff touches one →
   `changed.total: 1`; that block refused → `changed-blocks-not-executed` naming its line.
 
@@ -299,15 +320,15 @@ Not applicable: one extra classification per helper file, bounded by depth 2.
 - [ ] A slot value that adds a write makes the block `mutating` — held by the same test (Phase 1).
 - [ ] `bash` / `source` of a runnable helper inside the copy runs, and sourced functions are
   recognised — held by the same test (Phase 2).
-- [ ] A writing helper, a variable path, a path escaping the copy, and a depth-2 writing helper all
-  stay refused — held by the same test (Phase 2).
+- [ ] A writing helper, a variable path, a path escaping the copy, a depth-2 writing helper, and a
+  helper call in a block that changes directory all stay refused — held by the same test (Phase 2).
 - [ ] In helper mode the real `shared/resources/qa-cycle.sh` and `newest-numbered.sh` classify
   `runnable`, and the real `advance-pipeline-lock.sh` and `set-qa-phase.sh` classify `mutating` —
   held by the same test, reading the shipped files (Phase 2).
 - [ ] With `--diff-base`, changed blocks are counted apart, and `changed-blocks-not-executed` fires
   when none of them ran — held by the same test (Phase 3).
-- [ ] Step 4b and Phase 1.7 pass `--diff-base` and report `changed` first — held by the existing
-  qa execution-step parity test, extended (Phase 4).
+- [ ] Step 4b and Phase 1.7 pass `--diff-base` and report `changed` first — held by
+  `evals/shared/tests/qa-execution-step-parity.test.mjs`, extended (Phase 4).
 
 ### Performance
 
@@ -371,12 +392,68 @@ None. All execution stays in the temp copy, and the snapshot sentinel still repo
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-19
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.191.qa.4.snippet-engine-runs-pipeline-blocks.md](./task.191.qa.4.snippet-engine-runs-pipeline-blocks.md)
+- **Gate File**: [task.191.gate.4.snippet-engine-runs-pipeline-blocks.yml](./task.191.gate.4.snippet-engine-runs-pipeline-blocks.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 180 (engine suite); ci:fast 5878/0
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+Bug 10 is verified fixed and closed. There are no blocking findings: 2 low cleanups (CR4-1, CR4-2) and the carried reliability advisories CR2-7 and CR2-8.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.191.qa.4.snippet-engine-runs-pipeline-blocks.md`
+**Gate File**: `task.191.gate.4.snippet-engine-runs-pipeline-blocks.yml`
+**Gate Status**: ⚠️ CONCERNS (non-blocking, `top_issues: []`)
+**Quality Score**: 90/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 11/11 success criteria met, each traced to code and to a per-PR test or a green CI lane
+✅ **Unit Tests:** 180 tests in `shared/resources/tests/qa-execute-snippets.test.mjs`; ci:fast 5878/0; CI green on `97f29ef2`
+✅ **PR Review:** PR #687; Step 5c `/review-pr` APPROVE (`task.191.pr-review.1.snippet-engine-runs-pipeline-blocks.md`)
+✅ **Documentation:** rule doc §2aa/§2c/§4a, qa-task Step 4b, qa-story Phase 1.7, CHANGELOG entry
+✅ **Security Review:** ✅ PASS — the helper-rule boundary and the `--diff-base` refusal held over 102 executed probes (0 reproduced)
+⚠️ **Compliance Review:** NOT_APPLICABLE — internal QA tooling
+⚠️ **Reliability:** CONCERNS — CR2-7 (timeout kills only the outer shell) and CR2-8 (empty-fence span) carried as advisory follow-ups
+
+**Task marked as ACCEPTED on:** 2026-10-19
+
+**Detailed Verification Log:** See `task.191.dod.1.snippet-engine-runs-pipeline-blocks.md` for complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-10-07 | 1.0 | Initial draft — cut from observations #186, #219, #278 | create-task |
+| 2026-10-19 | 1.1 | Review passed (8/10) — added the no-directory-change helper condition (I1), the symlinked `.agents/skills` seeding (I2), the parity test path (I3); re-anchored line numbers | review-task |
+| 2026-10-19 |  | Status → ready-for-development | review-task |
+| 2026-10-19 |  | Implemented all four phases (`--slot`, helper calls, `--diff-base`, callers); status → ready-for-review | develop |
+| 2026-10-19 |  | QA gate FAIL (40/100) — 6 findings (3 high, 3 medium); status → in-progress | qa-task |
+| 2026-10-19 |  | QA findings fixed — 6 of 6 (bugs 1-6 Ready for QA) plus CR-5/6/8 advisories and 3 gaps the fix pass found, 1 iteration; status → ready-for-review | qa-fix |
+| 2026-10-19 |  | QA gate FAIL (0/100) — 5 findings (5 high); bugs 3-6 closed, 1-2 reopened; status → in-progress | qa-task |
+| 2026-10-19 |  | QA findings fixed — 5 of 5 (bugs 1, 2, 7, 8, 9 Ready for QA) plus CR2-6, 1 iteration; status → ready-for-review | qa-fix |
+| 2026-10-19 |  | QA gate FAIL (40/100) — 1 finding (1 high); bugs 1, 2, 7, 8, 9 closed; status → in-progress | qa-task |
+| 2026-10-19 |  | QA findings fixed — 1 of 1 (bug 10 Ready for QA; third strike, mechanism replaced), 1 iteration; status → ready-for-review | qa-fix |
+| 2026-10-19 |  | QA gate CONCERNS (90/100) — 0 blocking, 2 low cleanups; bug 10 closed | qa-task |
+| 2026-10-19 | 1.2 | DoD verified — accepted (PR #687) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -385,19 +462,19 @@ None. All execution stays in the temp copy, and the snapshot sentinel still repo
 
 ### Phase 1: `--slot`
 
-- [ ] Not started
+- [x] Complete 2026-10-19 — `applySlots`, `--slot` CLI, slot-naming reason and remedy
 
 ### Phase 2: Helper calls
 
-- [ ] Not started
+- [x] Complete 2026-10-19 — helper mode, `resolveHelperCall`, per-invocation admission, the no-directory-change condition; 3 of 32 shipped helpers runnable
 
 ### Phase 3: `--diff-base` and changed-block reporting
 
-- [ ] Not started
+- [x] Complete 2026-10-19 — `changedLineRanges`, `parseDiffRanges`, `changed` summary, `changed-blocks-not-executed`, `bad-diff-base` exit 2
 
 ### Phase 4: Callers, rule document, changelog
 
-- [ ] Not started
+- [x] Complete 2026-10-19 — rule doc §2aa/§2c/§4a, qa-task Step 4b + qa-story Phase 1.7, parity test extended, CHANGELOG, bundle
 
 ---
 

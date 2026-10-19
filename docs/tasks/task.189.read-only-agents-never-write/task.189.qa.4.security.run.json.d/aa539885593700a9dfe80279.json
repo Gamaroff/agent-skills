@@ -1,0 +1,23 @@
+{
+  "sink": "filename",
+  "entry": "fence:shared/resources/develop-pipeline-step-5-6-qa-loop.md#Write the matrix from the mapper's reply",
+  "name": "step-5 matrix write block",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 8,
+  "passed": 8,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": [
+    "bash"
+  ],
+  "fake_gh": null,
+  "argv": null,
+  "args": null,
+  "slot": "{doc-directory}",
+  "fixture_setup": null,
+  "ran_at": "2026-10-16T21:52:47.128Z"
+}

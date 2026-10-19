@@ -390,3 +390,33 @@ test("a genuine remote edit still trips the concurrent-edit guard", async () => 
     "the guard did not fire on a genuine remote edit — the fix disabled it",
   );
 });
+
+// ===========================================================================
+// Task 205 — PRD-scoped numbering end to end
+// ===========================================================================
+// An `epic.1.2.*` epic under its PRD creates a card summarised `[Epic 1.2] …`
+// (from prd_number + epic_number, whatever the H1 says) and links its child
+// stories as `Story 1.2.S`.
+test("task 205: an epic.1.2 file creates a [Epic 1.2] card that links Story 1.2.S children", async () => {
+  const dir = "docs/prd/shop/prd.1.shop/epics/epic.1.2.checkout";
+  const md = EPIC_MD.replace(
+    "type: epic\n",
+    "type: epic\nprd_number: 1\nepic_number: 2\n",
+  );
+  const root = gitRepo("epic-e2e-205-", {
+    [`${dir}/epic.1.2.checkout.md`]: md,
+    [`${dir}/stories/story.1.2.1.tap-targets/story.1.2.1.tap-targets.md`]:
+      "---\ntitle: Tap targets\n---\n\n# Tap targets\n",
+  });
+  const { state, fetchImpl } = fakeJira();
+
+  const res = await runSync(
+    root,
+    path.join(root, dir, "epic.1.2.checkout.md"),
+    fetchImpl,
+    ["--quiet"],
+  );
+  const card = state.issues[res.result.issueKey].fields;
+  assert.equal(card.summary, "[Epic 1.2] Checkout flow hardening");
+  assert.match(JSON.stringify(card.description), /Story 1\.2\.1 — Tap targets/);
+});

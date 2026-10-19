@@ -41,6 +41,68 @@ const REPO_ROOT = path.resolve(__dirname, "..");
 
 // Declared inputs — `file#NAME`: why the document may read it unbound.
 const INPUTS = new Map([
+  // task.206: the story-id blocks of the two story tracker skills run as their own shell; the
+  // story document is bound by the agent from the skill's input.
+  [
+    "skills/ensure-story-github-issue/SKILL.md#STORY_FILE_PATH",
+    "input of Step S1's story-id block (the story document); the `:?` is the loud-failure guard",
+  ],
+  [
+    "skills/sync-github-story/SKILL.md#STORY_FILE_PATH",
+    "input of Step 3's story-id block (the story document); the `:?` is the loud-failure guard",
+  ],
+  // task.204: create-prd's Step 1.5 / registry-row blocks and review-prd's resolution and migration
+  // blocks each run as their own shell; their inputs are bound by the agent from the step before.
+  [
+    "skills/create-prd/SKILL.md#DOMAIN",
+    "input of the allocate / register blocks (the PRD's domain directory); the `:?` is the loud-failure guard",
+  ],
+  [
+    "skills/create-prd/SKILL.md#FEATURE",
+    "input of the allocate block (the feature slug); the `:?` is the loud-failure guard",
+  ],
+  [
+    "skills/create-prd/SKILL.md#FOUND_PRD",
+    "input of the keep-the-number block (the PRD continuation detection found); the `:?` is the loud-failure guard",
+  ],
+  [
+    "skills/create-prd/SKILL.md#TITLE",
+    "input of the register block (the PRD title); the `:?` is the loud-failure guard",
+  ],
+  [
+    "skills/review-prd/SKILL.md#PRD_INPUT",
+    "input of the resolve block (the skill's argument: a number, id, slug or path); the `:?` is the loud-failure guard",
+  ],
+  [
+    "skills/shard-prd/SKILL.md#PRD_FILE",
+    "input of the shard block (the numbered PRD to explode); the `:?` is the loud-failure guard",
+  ],
+  [
+    "skills/review-prd/SKILL.md#MIG_NAME",
+    "optional input of the migration blocks — empty unless the plan blocked on unplaced-prd and the user named the slug",
+  ],
+  // task.205: the Discover Parent PRD and Input Resolution blocks each run as their own shell, so
+  // their inputs are bound by the agent from the steps before them; each `${NAME:?}` is the guard.
+  [
+    "skills/create-epic/SKILL.md#DOMAIN",
+    "input of the Discover Parent PRD block (the epic's domain directory); the `:?` is the loud-failure guard",
+  ],
+  [
+    "skills/ensure-task-github-issue/SKILL.md#TASK_FILE_PATH",
+    "input of the task milestone block (the sub-routine's argument); the `:?` is the loud-failure guard",
+  ],
+  [
+    "skills/ensure-epic-github-issue/SKILL.md#EPIC_FILE_PATH",
+    "input of the epic id block (the sub-routine's argument); the `:?` is the loud-failure guard",
+  ],
+  [
+    "skills/sync-github-epic/SKILL.md#EPIC_FILE_PATH",
+    "input of the epic id block (the skill's argument); the `:?` is the loud-failure guard",
+  ],
+  [
+    "skills/review-epic/SKILL.md#INPUT",
+    "input of the Input Resolution block (the skill argument); the `:?` is the loud-failure guard",
+  ],
   [
     "skills/create-issue/SKILL.md#JIRA_PROJECT_KEY",
     "environment knob (Jira project), documented in the skill's env table",

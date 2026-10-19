@@ -17,6 +17,8 @@
 
 PASS=0
 FAIL=0
+# shellcheck source=undefined-command-guard.sh
+. "$(dirname "$0")/undefined-command-guard.sh"
 SCRIPT="$(cd "$(dirname "$0")" && pwd)/grant-qa-cycles.sh"
 
 pass() { echo "  PASS  $1"; PASS=$((PASS + 1)); }
@@ -271,5 +273,6 @@ run "$D/lock.json" "$D/snap.json" "$D/doc" 2 >/dev/null 2>&1; RC=$?
 [ "$RC" -ne 0 ] && [ ! -f "$D/lock.json" ] && pass "no lock and no snapshot → refused, no lock fabricated" || fail "no lock/no snapshot" "rc=$RC"
 
 echo ""
+undefined_commands_check || FAIL=$((FAIL + 1))
 echo "  grant-qa-cycles.test.sh: $PASS passed, $FAIL failed."
 [ "$FAIL" -eq 0 ]

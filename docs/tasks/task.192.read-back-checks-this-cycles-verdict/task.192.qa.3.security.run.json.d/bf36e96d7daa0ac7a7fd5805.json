@@ -1,0 +1,25 @@
+{
+  "sink": "markdown-structure",
+  "entry": "cli:shared/resources/qa-read-back.js",
+  "name": null,
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 22,
+  "passed": 22,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "argv": [
+    "--doc",
+    "{input}"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-10-19T07:47:19.786Z"
+}

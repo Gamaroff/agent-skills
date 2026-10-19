@@ -1,0 +1,162 @@
+[
+ {
+  "id": "wid.legit.task-doc",
+  "sink": "path",
+  "input": "docs/tasks/task.206.hierarchical-story-ids-in-pipeline/task.206.hierarchical-story-ids-in-pipeline.md",
+  "why": "finalise DoD probe (task.206)",
+  "correct": "isWorkItemDocument returns true only for a docs/ work-item document doc-id reads with no artifact",
+  "direction": "legitimate"
+ },
+ {
+  "id": "wid.legit.story-pes",
+  "sink": "path",
+  "input": "docs/prd/prd.1.feature/epics/epic.1.2.example/stories/story.1.2.3.example.md",
+  "why": "finalise DoD probe (task.206)",
+  "correct": "isWorkItemDocument returns true only for a docs/ work-item document doc-id reads with no artifact",
+  "direction": "legitimate"
+ },
+ {
+  "id": "wid.legit.sub-story",
+  "sink": "path",
+  "input": "docs/prd/prd.1.feature/epics/epic.1.2.example/stories/story.1.2.3A.sub-story.md",
+  "why": "finalise DoD probe (task.206)",
+  "correct": "isWorkItemDocument returns true only for a docs/ work-item document doc-id reads with no artifact",
+  "direction": "legitimate"
+ },
+ {
+  "id": "wid.legit.epic-pe",
+  "sink": "path",
+  "input": "docs/prd/prd.1.feature/epics/epic.1.2.example/epic.1.2.example.md",
+  "why": "finalise DoD probe (task.206)",
+  "correct": "isWorkItemDocument returns true only for a docs/ work-item document doc-id reads with no artifact",
+  "direction": "legitimate"
+ },
+ {
+  "id": "wid.legit.bug",
+  "sink": "path",
+  "input": "docs/bugs/bug.14.some-bug.md",
+  "why": "finalise DoD probe (task.206)",
+  "correct": "isWorkItemDocument returns true only for a docs/ work-item document doc-id reads with no artifact",
+  "direction": "legitimate"
+ },
+ {
+  "id": "wid.traversal-out",
+  "sink": "path",
+  "input": "docs/tasks/task.206.x/../../../etc/passwd.md",
+  "why": "finalise DoD probe (task.206)",
+  "correct": "isWorkItemDocument returns true only for a docs/ work-item document doc-id reads with no artifact",
+  "direction": "hostile"
+ },
+ {
+  "id": "wid.traversal-wellformed-basename",
+  "sink": "path",
+  "input": "docs/tasks/task.206.x/../../task.206.x.md",
+  "why": "finalise DoD probe (task.206)",
+  "correct": "isWorkItemDocument returns true only for a docs/ work-item document doc-id reads with no artifact",
+  "direction": "hostile"
+ },
+ {
+  "id": "wid.nul-suffix",
+  "sink": "path",
+  "input": "docs/tasks/task.206.x/task.206.x.md\u0000.md",
+  "why": "finalise DoD probe (task.206)",
+  "correct": "isWorkItemDocument returns true only for a docs/ work-item document doc-id reads with no artifact",
+  "direction": "hostile"
+ },
+ {
+  "id": "wid.lf-second-path",
+  "sink": "path",
+  "input": "docs/tasks/task.206.x/task.206.x.md\n/etc/task.1.y.md",
+  "why": "finalise DoD probe (task.206)",
+  "correct": "isWorkItemDocument returns true only for a docs/ work-item document doc-id reads with no artifact",
+  "direction": "hostile"
+ },
+ {
+  "id": "wid.cr",
+  "sink": "path",
+  "input": "docs/tasks/task.206.x/task.206.x.md\r.md",
+  "why": "finalise DoD probe (task.206)",
+  "correct": "isWorkItemDocument returns true only for a docs/ work-item document doc-id reads with no artifact",
+  "direction": "hostile"
+ },
+ {
+  "id": "wid.absolute",
+  "sink": "path",
+  "input": "/etc/docs/task.206.x.md",
+  "why": "finalise DoD probe (task.206)",
+  "correct": "isWorkItemDocument returns true only for a docs/ work-item document doc-id reads with no artifact",
+  "direction": "hostile"
+ },
+ {
+  "id": "wid.artifact-qa",
+  "sink": "path",
+  "input": "docs/tasks/task.206.x/task.206.qa.1.x.md",
+  "why": "finalise DoD probe (task.206)",
+  "correct": "isWorkItemDocument returns true only for a docs/ work-item document doc-id reads with no artifact",
+  "direction": "hostile"
+ },
+ {
+  "id": "wid.artifact-dod",
+  "sink": "path",
+  "input": "docs/tasks/task.206.x/task.206.dod.1.x.md",
+  "why": "finalise DoD probe (task.206)",
+  "correct": "isWorkItemDocument returns true only for a docs/ work-item document doc-id reads with no artifact",
+  "direction": "hostile"
+ },
+ {
+  "id": "wid.artifact-gate",
+  "sink": "path",
+  "input": "docs/tasks/task.206.x/task.206.gate.1.x.md",
+  "why": "finalise DoD probe (task.206)",
+  "correct": "isWorkItemDocument returns true only for a docs/ work-item document doc-id reads with no artifact",
+  "direction": "hostile"
+ },
+ {
+  "id": "wid.story-impl-artifact",
+  "sink": "path",
+  "input": "docs/prd/prd.1.f/epics/epic.1.2.e/stories/story.1.2.3.implementation.1.x.md",
+  "why": "finalise DoD probe (task.206)",
+  "correct": "isWorkItemDocument returns true only for a docs/ work-item document doc-id reads with no artifact",
+  "direction": "hostile"
+ },
+ {
+  "id": "wid.legacy-story-es",
+  "sink": "path",
+  "input": "docs/stories/story.5.1.legacy.md",
+  "why": "finalise DoD probe (task.206)",
+  "correct": "isWorkItemDocument returns true only for a docs/ work-item document doc-id reads with no artifact",
+  "direction": "hostile"
+ },
+ {
+  "id": "wid.prd-not-work-item",
+  "sink": "path",
+  "input": "docs/prd/prd.1.feature/prd.1.feature.md",
+  "why": "finalise DoD probe (task.206)",
+  "correct": "isWorkItemDocument returns true only for a docs/ work-item document doc-id reads with no artifact",
+  "direction": "hostile"
+ },
+ {
+  "id": "wid.yml-extension",
+  "sink": "path",
+  "input": "docs/tasks/task.206.x/task.206.x.yml",
+  "why": "finalise DoD probe (task.206)",
+  "correct": "isWorkItemDocument returns true only for a docs/ work-item document doc-id reads with no artifact",
+  "direction": "hostile"
+ },
+ {
+  "id": "wid.uppercase-ext",
+  "sink": "path",
+  "input": "docs/tasks/task.206.x/task.206.x.MD",
+  "why": "finalise DoD probe (task.206)",
+  "correct": "isWorkItemDocument returns true only for a docs/ work-item document doc-id reads with no artifact",
+  "direction": "hostile"
+ },
+ {
+  "id": "wid.unprefixed-artifact",
+  "sink": "path",
+  "input": "docs/tasks/task.206.x/sprint-review-summary.md",
+  "why": "finalise DoD probe (task.206)",
+  "correct": "isWorkItemDocument returns true only for a docs/ work-item document doc-id reads with no artifact",
+  "direction": "hostile"
+ }
+]

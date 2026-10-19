@@ -13,36 +13,43 @@ A story is the unit of implementation. One story → one branch → one PR → o
 ```
 docs/prd/
 └── {domain}/
-    └── {feature}/
+    └── prd.{P}.{feature}/
         └── epics/
-            └── epic.{N}.{name}/
+            └── epic.{P}.{E}.{name}/
                 └── stories/
-                    └── story.{E}.{S}.{name}/
-                        ├── story.{E}.{S}.{name}.md                      # main document (human-authored)
-                        ├── story.{E}.{S}.plan.{name}.md                 # story plan
-                        ├── story.{E}.{S}.review.{N}.{name}.md           # review report (auto)
-                        ├── story.{E}.{S}.implementation.{N}.{name}.md   # pipeline report (auto)
-                        ├── story.{E}.{S}.qa.{N}.{name}.md               # QA assessment (auto)
-                        ├── story.{E}.{S}.dod.{N}.{name}.md              # definition of done (auto)
-                        └── story.{E}.{S}.gate.{N}.{name}.yml            # QA gate decision (auto)
+                    └── story.{P}.{E}.{S}.{name}/
+                        ├── story.{P}.{E}.{S}.{name}.md                      # main document (human-authored)
+                        ├── story.{P}.{E}.{S}.plan.{name}.md                 # story plan
+                        ├── story.{P}.{E}.{S}.review.{N}.{name}.md           # review report (auto)
+                        ├── story.{P}.{E}.{S}.implementation.{N}.{name}.md   # pipeline report (auto)
+                        ├── story.{P}.{E}.{S}.qa.{N}.{name}.md               # QA assessment (auto)
+                        ├── story.{P}.{E}.{S}.dod.{N}.{name}.md              # definition of done (auto)
+                        └── story.{P}.{E}.{S}.gate.{N}.{name}.yml            # QA gate decision (auto)
 ```
+
+`P` is the PRD's number, `E` the epic's number within that PRD, and `S` the story's number within
+that epic: the highest in use plus 1 (`doc-id.js next story --epic-dir …`), never a reused gap. A
+sub-story carries a capital-letter suffix on `S` (`story.1.2.3A.core-ui`).
 
 **Example**:
 ```
-docs/prd/auth/login-flow/epics/epic.178.feature-ui/stories/story.178.1.login-form/story.178.1.login-form.md
+docs/prd/auth/prd.1.login-flow/epics/epic.1.2.feature-ui/stories/story.1.2.1.login-form/story.1.2.1.login-form.md
 ```
+
+> **Adopted (2026-10-16, tasks 202–207).** Every skill writes and reads this scheme through `doc-id.js` (tasks 204–206), and two CI tests hold it (task 207): `doc-numbering-corpus.test.mjs` fails on any unnumbered, mismatched, unregistered or duplicate document under the PRD root, and `doc-id-chokepoint.test.js` fails on an id parsed anywhere but `doc-id.js`. A legacy flat-numbered tree is migrated with `migrate-doc-numbering.mjs`; `doc-id.js parseLegacy` reads the old shapes only for that migration.
 
 Nested story layout under `${PRD_ROOT}` is a [fixed convention](../reference/configuration.md#configurable-roots-and-fixed-conventions) — flat layouts are not supported. The PRD root itself is configurable (default `docs/prd`).
 
 ## File naming
 
-See [file naming](./file-naming.md). Pattern: `story.{E}.{S}.{name}.md`. Directory stem matches.
+See [file naming](./file-naming.md). Pattern: `story.{P}.{E}.{S}.{name}.md`; `{name}` begins with a letter, which is what keeps the id unambiguous. Directory stem matches.
 
 ## Frontmatter schema
 
 ```yaml
 ---
-epic: epic.178.feature-ui
+prd_number: 1
+epic: epic.1.2.feature-ui
 title: "Login form validation"
 type: story
 status: ready-for-development
@@ -55,7 +62,8 @@ updated: 2026-01-15
 
 | Field | Type | Required | Values / Notes |
 |---|---|---|---|
-| `epic` | string | **YES — HARD GATE** | Must match the parent epic's directory stem, e.g. `epic.178.feature-ui`. Pipeline **HALTS** immediately if absent |
+| `prd_number` | integer | Yes | `P` — equals the filename's first number |
+| `epic` | string | **YES — HARD GATE** | Must match the parent epic's directory stem, e.g. `epic.1.2.feature-ui`, and carry the same `P` and `E` as the story's filename. Pipeline **HALTS** immediately if absent |
 | `title` | string | Yes | Human-readable title |
 | `type` | literal | Yes | Must be exactly `story` (OKF `type` — the one hard requirement) |
 | `description` | string | Recommended | One-sentence summary (OKF `description`) — what consumers and agents index on |
@@ -101,13 +109,13 @@ These files are generated automatically by skills during the pipeline. Do not cr
 
 | Artifact | Pattern | Written by | Purpose |
 |---|---|---|---|
-| Plan file | `story.{E}.{S}.plan.{name}.md` | `create-story` | Story implementation guide |
-| Review report | `story.{E}.{S}.review.{N}.{name}.md` | `review-story` (Step 2) | Review findings |
-| PR review report | `story.{E}.{S}.pr-review.{N}.{name}.md` | `review-pr` (Step 5c of the develop pipelines, and standalone) | PR-vs-work-item conformance + code findings |
-| Implementation report | `story.{E}.{S}.implementation.{N}.{name}.md` | `develop-story` pipeline | Pipeline run record |
-| QA report | `story.{E}.{S}.qa.{N}.{name}.md` | `qa-story` (Step 5) | QA assessment narrative |
-| Definition of Done | `story.{E}.{S}.dod.{N}.{name}.md` | `finalise` (Step 7) | DoD checklist outcome |
-| QA gate | `story.{E}.{S}.gate.{N}.{name}.yml` | `qa-story` / `qa-gate` | Machine-readable gate decision — **never modified by dev skills** |
+| Plan file | `story.{P}.{E}.{S}.plan.{name}.md` | `create-story` | Story implementation guide |
+| Review report | `story.{P}.{E}.{S}.review.{N}.{name}.md` | `review-story` (Step 2) | Review findings |
+| PR review report | `story.{P}.{E}.{S}.pr-review.{N}.{name}.md` | `review-pr` (Step 5c of the develop pipelines, and standalone) | PR-vs-work-item conformance + code findings |
+| Implementation report | `story.{P}.{E}.{S}.implementation.{N}.{name}.md` | `develop-story` pipeline | Pipeline run record |
+| QA report | `story.{P}.{E}.{S}.qa.{N}.{name}.md` | `qa-story` (Step 5) | QA assessment narrative |
+| Definition of Done | `story.{P}.{E}.{S}.dod.{N}.{name}.md` | `finalise` (Step 7) | DoD checklist outcome |
+| QA gate | `story.{P}.{E}.{S}.gate.{N}.{name}.yml` | `qa-story` / `qa-gate` | Machine-readable gate decision — **never modified by dev skills** |
 
 ## Status lifecycle
 
@@ -127,21 +135,21 @@ These files are generated automatically by skills during the pipeline. Do not cr
 
 | Model | Story branch | Created from | PR targets | Reaches `develop` |
 |---|---|---|---|---|
-| **Develop-direct** (default) | `feature/story.{E}.{S}.{name}` | `develop` | `develop` | per story, continuously |
-| **Epic integration** (opt-in) | `feature/story.{E}.{S}.{name}` | `epic/{N}.{slug}` | `epic/{N}.{slug}` | once, when the epic branch is merged by hand |
+| **Develop-direct** (default) | `feature/story.{P}.{E}.{S}.{name}` | `develop` | `develop` | per story, continuously |
+| **Epic integration** (opt-in) | `feature/story.{P}.{E}.{S}.{name}` | `epic/{P}.{E}.{slug}` | `epic/{P}.{E}.{slug}` | once, when the epic branch is merged by hand |
 
 Which one is *recommended* in the prompt comes from the parent epic's frontmatter — but the other option is always selectable:
 
 ```yaml
-branch_model: epic-integration      # ⇒ epic/{N}.{slug} leads, "develop" still offered
+branch_model: epic-integration      # ⇒ epic/{P}.{E}.{slug} leads, "develop" still offered
 integration_branch: "epic/178.feature-ui"   # optional — used verbatim when present
 ```
 
 Absent, or `branch_model: develop-direct` ⇒ `develop` leads and the integration branch is offered last, unrecommended. Set `branching.epicIntegration.offerWhenUndeclared: false` in `skills-config.yaml` to drop that trailing option entirely.
 
-Choose epic integration only when the epic's stories are meaningless apart — a workspace foundation, a migration, a compliance boundary — where a partial landing on `develop` is worse than no landing. Long-lived integration branches drift, defer integration, and end in a big-bang merge; `develop` is the default for a reason. Nothing automates the final `epic/{N}.{slug}` → `develop` promotion: raise that PR by hand.
+Choose epic integration only when the epic's stories are meaningless apart — a workspace foundation, a migration, a compliance boundary — where a partial landing on `develop` is worse than no landing. Long-lived integration branches drift, defer integration, and end in a big-bang merge; `develop` is the default for a reason. Nothing automates the final `epic/{P}.{E}.{slug}` → `develop` promotion: raise that PR by hand.
 
-> `epic/{N}.{name}` (integration branch) is **not** `feature/epic.{N}.{name}` (an ordinary short-lived branch for editing the epic *document*, which `/review-epic` creates). Do not substitute one for the other.
+> `epic/{P}.{E}.{name}` (integration branch) is **not** `feature/epic.{P}.{E}.{name}` (an ordinary short-lived branch for editing the epic *document*, which `/review-epic` creates). Do not substitute one for the other.
 
 **Q1 and Q2 must agree.** Basing a story on `epic/178.feature-ui` and then targeting `develop` produces a PR whose diff includes every earlier story in the epic.
 
@@ -153,6 +161,7 @@ Before running `develop-story`, verify:
 
 - [ ] Story file exists at the correct nested path under `docs/prd/`
 - [ ] `epic:` frontmatter is set and matches an actual epic directory stem
+- [ ] `prd_number:` and the `epic:` stem carry the story filename's `P` and `E` (`doc-id.js check <story-file>`)
 - [ ] Parent epic file exists
 - [ ] Story lives at the nested path under `${PRD_ROOT}` (default `docs/prd/`; configurable)
 - [ ] `status:` is `draft`, `planned`, or `ready-for-development`
@@ -161,8 +170,8 @@ Before running `develop-story`, verify:
 ## Invocation
 
 ```
-/develop docs/prd/auth/login-flow/epics/epic.178.feature-ui/stories/story.178.1.login-form/
-/develop story.178.1.login-form.md
+/develop docs/prd/auth/prd.1.login-flow/epics/epic.1.2.feature-ui/stories/story.1.2.1.login-form/
+/develop story.1.2.1.login-form.md
 /develop #297    # GitHub issue number
 ```
 

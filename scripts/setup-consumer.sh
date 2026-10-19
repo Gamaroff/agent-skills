@@ -9,7 +9,7 @@
 #   3. Credential collection      (gh auth check, Bitbucket/Jira API tokens)
 #   4. .env files                 (.env.example always; .env optionally; gitignore)
 #   5. skills-config.yaml         (PRD path, architecture path, coding-standards path)
-#   6. Registry creation          (docs/development/epic-registry.md, docs/tasks/task-registry.md)
+#   6. Registry creation          (docs/tasks/task-registry.md — epics are numbered within their PRD)
 #   7. docs/ scaffold             (PRD root, architecture/concepts/ stubs)
 #   8. Skills install             (latest release from github.com/Gamaroff/agent-skills;
 #                                  skips the other tracker's skills — see --all-skills)
@@ -807,14 +807,8 @@ create_registries() {
 
   local _created=0 _kept=0
 
-  if [[ -f "docs/development/epic-registry.md" ]]; then
-    info "docs/development/epic-registry.md exists — skipped"
-    (( _kept++ )) || true
-  else
-    touch_file "docs/development/epic-registry.md"
-    ok "docs/development/epic-registry.md"
-    (( _created++ )) || true
-  fi
+  # No epic registry: epics are numbered within their parent PRD (epic.{P}.{E}),
+  # allocated by doc-id.js, so there is no global counter to scaffold (task 205).
 
   if [[ -f "docs/tasks/task-registry.md" ]]; then
     info "docs/tasks/task-registry.md exists — skipped"
@@ -1679,10 +1673,16 @@ install_skills() {
       # header). This file is vendor-managed — do NOT hand-edit it downstream;
       # change it in agent-skills' shared/resources/ and re-run --update.
       local _gen_src="${_tmpdir}/shared/resources/generate-prd-epic-index.mjs"
-      if [[ -f "$_gen_src" ]]; then
+      # The generator reads ids with doc-id.js, so it travels beside it — as
+      # doc-id.CJS: the engine is CommonJS, and in a consumer whose package.json
+      # says "type": "module" a vendored doc-id.js would be parsed as ESM and fail
+      # on `require`. The generator loads ./doc-id.cjs first (task 205).
+      local _docid_src="${_tmpdir}/shared/resources/doc-id.js"
+      if [[ -f "$_gen_src" && -f "$_docid_src" ]]; then
         mkdir -p scripts
         cp "$_gen_src" scripts/generate-prd-epic-index.mjs
-        info "  vendored scripts/generate-prd-epic-index.mjs (vendor-managed — do not hand-edit)"
+        cp "$_docid_src" scripts/doc-id.cjs
+        info "  vendored scripts/generate-prd-epic-index.mjs + scripts/doc-id.cjs (vendor-managed — do not hand-edit)"
       fi
       rm -rf "$_tmpdir"
       local _detail="${_installed} new, ${_updated} updated"

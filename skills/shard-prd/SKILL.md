@@ -18,7 +18,7 @@ Activate this skill when:
 
 - "Split my PRD into smaller files"
 - "Shard the PRD document"
-- "Break down docs/prd.md"
+- "Break down prd.3.shop.md"
 - "Organize PRD by sections"
 
 **Do NOT use for:**
@@ -35,6 +35,29 @@ Split large markdown documents into multiple smaller files:
 - Splits by level 2 sections (`## Heading`)
 - Maintains all content integrity (code blocks, diagrams, markdown formatting)
 - Generates index file with links to all shards
+
+## Which PRD, and Where Its Shards Go
+
+A PRD lives in its own directory, `${PRD_ROOT}/{domain}/prd.{P}.{feature}/prd.{P}.{feature}.md`,
+where `{P}` is its number from the PRD registry (`/create-prd` allocates it). **Shard it in place**:
+the section files and `index.md` go into that same directory, beside the PRD, and the numbered PRD
+file stays where it is as the entry point the registry and every `epic.{P}.{E}` point to.
+`create-epics-from-shards` reads the shards from that directory.
+
+**Refuse a PRD that predates numbering.** If the source is a root-level `docs/prd.md`, or any PRD
+file whose name has no number after `prd.` (`prd.{feature}.md`), **stop** and do not shard it:
+
+```
+"{path} predates numbered PRDs, so it has no number and no place under ${PRD_ROOT} to be
+sharded into. Run /review-prd on it — it reports the PRD and offers the numbering migration,
+which moves it to ${PRD_ROOT}/{domain}/prd.{P}.{feature}/. Then shard the numbered file."
+```
+
+Never explode such a file into `${PRD_ROOT}` itself: shards written flat there belong to no PRD, and
+no epic can be numbered from them.
+
+**Refuse a numbered PRD reached through a symlink out of `${PRD_ROOT}`** too: the shards would be
+written through the link. No migration fixes this — replace the link with the real directory.
 
 ## Execution Approach
 
@@ -80,12 +103,43 @@ npm install -g @kayvan/markdown-tree-parser
 
 **Usage:**
 
-First source `references/resolve-paths.sh` to populate `${PRD_ROOT}` and `${ARCH_ROOT}` (defaults: `docs/prd`, `docs/architecture`).
+For a PRD, run this block from the repository root. It refuses anything that is not a numbered PRD
+owning its directory under `${PRD_ROOT}` — the refusal described in
+[§ Which PRD, and Where Its Shards Go](#which-prd-and-where-its-shards-go) — and only then explodes it
+in place:
 
 ```bash
-# For PRD — explode the monolithic PRD into the configured sharded location
-md-tree explode docs/prd.md "$PRD_ROOT"
+# shard-prd — explode a numbered PRD in place (task 204)
+# INPUT: PRD_FILE, the numbered PRD (e.g. docs/prd/shop/prd.3.shop/prd.3.shop.md). PRD_ROOT is resolved HERE.
+DOC_ID=.agents/skills/shard-prd/references/doc-id.js
+source .agents/skills/shard-prd/references/resolve-paths.sh || exit 1
+: "${PRD_FILE:?bind PRD_FILE to the numbered PRD}"
+command node -e '
+  const d = require(process.argv[1]);
+  const fs = require("fs");
+  const path = require("path");
+  const [root, file] = process.argv.slice(2);
+  const p = d.parse(path.basename(file));
+  const dir = path.basename(path.dirname(path.resolve(file)));
+  // Both the file and the directory md-tree writes into: a linked directory holding a link back to a
+  // real PRD passes a file-only check while its shards land outside the root.
+  const within = (p) => fs.realpathSync(p).startsWith(fs.realpathSync(root) + path.sep);
+  const inside = fs.existsSync(file) && within(file) && within(path.dirname(file));
+  if (!p.ok || p.kind !== "prd" || p.artifact || dir !== path.basename(file, ".md")) {
+    console.log(`❌ ${file} is not a numbered PRD in its own directory under ${root} — run /review-prd on it, which reports it and offers the numbering migration`);
+    process.exit(1);
+  }
+  if (!inside) {
+    console.log(`❌ ${file} is missing or resolves outside ${root} through a symlink — replace the link with the real directory under the root (no migration can fix this)`);
+    process.exit(1);
+  }
+' "$PWD/$DOC_ID" "$PRD_ROOT" "$PRD_FILE" || exit 1
+md-tree explode "$PRD_FILE" "$(dirname "$PRD_FILE")"
+```
 
+The other uses, for reference:
+
+```bash
 # For Architecture
 md-tree explode docs/architecture.md "$ARCH_ROOT"
 
@@ -119,8 +173,11 @@ I will now proceed with the manual sharding process."
 #### Step 1: Identify Document and Target Location
 
 - Determine document path (user-provided)
-- Create folder: `docs/{document-name}/` (without extension)
-- Example: `docs/prd.md` → create `docs/prd/`
+- **A PRD** (`prd.{P}.{feature}.md`): the target folder is the PRD's own directory — no new folder.
+  Example: `docs/prd/shop/prd.3.shop/prd.3.shop.md` → shards go into `docs/prd/shop/prd.3.shop/`, and
+  the PRD file stays as the entry point
+- **Any other document**: create folder `docs/{document-name}/` (without extension).
+  Example: `docs/architecture.md` → create `docs/architecture/`
 
 #### Step 2: Parse and Extract Sections
 
@@ -273,11 +330,11 @@ Successful sharding produces:
 **Automatic Method:**
 
 ```
-User: "Split docs/prd.md into smaller files"
+User: "Split docs/prd/shop/prd.3.shop/prd.3.shop.md into smaller files"
 
 → shard-prd activates
 → Checks skills-config.yaml for markdownExploder setting (default: true)
-→ Runs: md-tree explode docs/prd.md "$PRD_ROOT"
+→ Runs: md-tree explode docs/prd/shop/prd.3.shop/prd.3.shop.md docs/prd/shop/prd.3.shop
 → Success - 8 files created
 → Reports results
 ```

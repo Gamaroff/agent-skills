@@ -47,7 +47,7 @@ flowchart TD
 ```
 1. /create-parallel-stories <epic-path>     → produces coordination matrix + worktree setup commands
 2. For each parallelisable story:
-   git worktree add .worktrees/story-{E}.{S} feature/story.{E}.{S}.{name}
+   git worktree add .worktrees/story-{E}.{S} feature/story.{P}.{E}.{S}.{name}
    cd .worktrees/story-{E}.{S}
    /develop-story <story-path>
 3. Merge each story PR to its target as it lands (any order): `develop` by default, or the epic

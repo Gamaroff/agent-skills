@@ -1,0 +1,66 @@
+schema: 2
+task: 'task.215.probe-engine-python-cli-entry-form'
+task_title: 'security-probe: run a Python CLI under the cli: entry form'
+gate: FAIL
+status_reason: 'Cycle 1 fixes verified: the three crash shapes are errored and the flags test has its floor. The refute pass found a wider false-pass class: a crash that does not reach stderr through the default excepthook (a replaced sys.excepthook, as rich and Typer install; sys.stderr redirected or None) exits 1 and is scored rejected. SC4 is still unmet.'
+reviewer: 'QA Engineer'
+head: 'e6894a474ccb3378ef11d460b77c3d066344c34f'
+updated: '2026-10-19T11:08:18Z'
+
+top_issues:
+  - id: 'TASK-215-QA2-1'
+    severity: high
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'isPythonCrash reads only what the default sys.excepthook prints, so an uncaught exception that exits 1 is scored rejected when the script replaced sys.excepthook (rich.traceback.install(), Typer pretty exceptions), set sys.stderr = sys.stdout, or set sys.stderr = None. Reproduced on python3 3.14 for a custom excepthook, stderr redirected to stdout and stderr None (exit 1, isPythonCrash false). An input-dependent crash of these shapes yields engages: a false pass. Diff reviewer CR-1 (high/high). Bug report: task.215.bug.2.crash-outside-default-excepthook.md'
+    suggested_action: 'Detect the uncaught exception out of band, not from stderr: run the entry through a python3 -E -s -B -c bootstrap that sets sys.argv and sys.path[0], runs runpy.run_path(entry, run_name="__main__"), and catches BaseException other than SystemExit before any excepthook runs, then reports it on a channel the script cannot write (a reserved exit status or a dedicated fd). This also covers sys.tracebacklimit = 0.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-215-QA2-2'
+    severity: medium
+    file: 'shared/resources/probe-boundary-rule.md'
+    finding: 'The rule names sys.tracebacklimit = 0 as the one undetectable crash and calls it unavoidable; a replaced excepthook and a redirected or None sys.stderr are scored the same false rejected, and all are detectable from the process. The documented limit understates the class. Diff reviewer CR-2 (medium/high). Bug report: task.215.bug.3.limit-note-understates-class.md'
+    suggested_action: 'Close the class with TASK-215-QA2-1 and drop the limitation note; if any shape stays undetectable, list every one and say an input-dependent crash of that shape yields engages.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 314
+  phases_verified: 2/2
+  ci: 'not read; CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 17
+    notes: 'isPythonCrash probed with the engine: 17 cases (11 real crash shapes captured this cycle, 6 refusal shapes), all as required (run record task.215.qa.2.security.run.json). The open false pass is outside the predicate''s input: a crash whose traceback never reaches stderr (TASK-215-QA2-1), reproduced by hand and not counted in probes_executed.'
+  performance:
+    status: PASS
+    notes: 'Unchanged: python3 --version once per process; one spawn per case. The new regexes stay linear on 1e6-character pathological input.'
+  reliability:
+    status: PASS
+    notes: 'An uncaught KeyboardInterrupt dies by SIGINT and is errored via neverRan; the exit-1 gate loses no crash Python reports by status.'
+  maintainability:
+    status: PASS
+    notes: 'Crash rule stated once in probe-boundary-rule.md; bundle in sync.'
+
+recommendations:
+  immediate:
+    - action: 'Detect an uncaught Python exception out of band rather than from stderr (TASK-215-QA2-1), and correct the limitation note (TASK-215-QA2-2).'
+      refs: ['shared/resources/security-probe.mjs', 'shared/resources/probe-boundary-rule.md']
+  future:
+    - action: 'CR-3 (advisory, low/low): probe the interpreter version under the case child''s env and cwd, or record sys.version from the child, so a pyenv/asdf shim cannot make the recorded interpreter differ from the one that ran.'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['TASK-215-QA2-1 fixed and re-reviewed']

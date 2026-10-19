@@ -1,0 +1,72 @@
+schema: 2
+task: 'task.189.read-only-agents-never-write'
+task_title: 'Read-only agents never write'
+gate: CONCERNS
+status_reason: 'All cycle-1 findings verified fixed (bugs 1-3 closed; both boundaries now engage under the engine, 26 executed, 0 reproduced). The cycle-2 refute pass found one new medium: probe severities are merged by corpus case id, which collides across controls on one sink.'
+reviewer: 'QA Engineer'
+head: 'cb79ae69393e5889f3732dc0c250b7d7ccad2c91'
+updated: '2026-10-16T21:35:32Z'
+
+top_issues:
+  - id: 'CR2-1'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'Step 3b.1 item 3 grades and merges probe severities by corpus case id alone; two controls on one sink share ids (18 probes, 9 distinct ids measured), so a low grade can land on another control''s probe and open the Step 8a low path. Bug: task.189.bug.4.'
+    suggested_action: 'Give each runner probe a unique key (<plan index>:<id>), grade and merge by it, and test two controls reproducing the same id.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 61
+  phases_verified: '4/4'
+  ci: 'not read this cycle'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 26
+    notes: 'planArgvAllowed probed with 18 cases (13 hostile incl. every owned flag in both spellings, 5 legitimate): engages, 0 reproduced, 0 overblocked. Matrix block re-probed: engages, 8 executed. CR2-1 can mis-grade a security probe as low.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Step 8a.4 fixed (CR-1); unreadable record reported (CR-4). Advisory: corrected-plan re-run can drop the first run probes (CR2-2).'
+  maintainability:
+    status: PASS
+    notes: 'Unchanged.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR2-1 (task.189.bug.4).'
+      refs: ['skills/finalise/SKILL.md', 'shared/resources/security-probe-plan.mjs']
+  future:
+    - action: 'CR2-2 (medium/medium, advisory): a corrected-plan re-run of Step 3b.1 replaces probes/escapes with the second run only; require the whole plan on re-run, or merge by control.'
+      refs: ['skills/finalise/SKILL.md']
+    - action: 'CR2-3 (low): readRecord null after a run should be record-unreadable, not 0.'
+      refs: ['shared/resources/security-probe-plan.mjs']
+    - action: 'CR2-4 (low): bound the engine spawn with a timeout; own or clamp --timeout.'
+      refs: ['shared/resources/security-probe-plan.mjs']
+    - action: 'CR2-5 (cleanup): the prompt says totals.executed equals the sum across the plan; false when two entries share a control key.'
+      refs: ['shared/resources/finalise-dod-security-prompt.md']
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 1
+  fix_date: '2026-10-16'
+  total_iterations: 1
+  verification_method: 'Committed tests + engine probes (planArgvAllowed, matrix block) + reading Step 8a.4'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR2-1 fixed']

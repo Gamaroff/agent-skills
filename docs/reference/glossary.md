@@ -47,7 +47,8 @@ Quick reference. Where a term has a full standards doc or runbook, the entry lin
 
 | Term                       | Definition                                                                                                                                                                                |
 | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Epic registry**          | `docs/development/epic-registry.md` in the consuming project. Single source of truth for epic numbers. Globally unique, never reused. See [Epic registry](../standards/epic-registry.md). |
+| **Epic registry**          | Retired (tasks 202–205). Epics are numbered within their PRD (`epic.{P}.{E}`); `docs/development/epic-registry.md` keeps only an old → new mapping. See [Epic registry](../standards/epic-registry.md) and the **PRD registry**. |
+| **PRD registry**           | `${PRD_ROOT}/prd-registry.md` in the consuming project. Single source of truth for PRD numbers. Globally unique, never reused. See [PRD registry](../standards/prd-registry.md). |
 | **Task registry**          | `docs/tasks/task-registry.md` in the consuming project. Single source of truth for task numbers. Globally unique, never reused. See [Task registry](../standards/task-registry.md).       |
 | **Atomic registry update** | Rule that a new epic/task and its registry row must commit in the same git commit.                                                                                                        |
 

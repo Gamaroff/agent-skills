@@ -1,0 +1,21 @@
+{
+  "sink": null,
+  "entry": "skills/sync-jira-story/scripts/sync-jira-story.js#relatedDocInfo",
+  "name": "relatedDocInfo",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 12,
+  "passed": 12,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-10-16T19:44:46.875Z"
+}

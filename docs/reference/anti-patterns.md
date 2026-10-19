@@ -18,7 +18,7 @@ Rules scattered across the docs, collected and explained. Each entry: the rule, 
 
 ## Never reuse a cancelled epic or task number
 
-**Rule:** Numbers in the [epic registry](../standards/epic-registry.md) and [task registry](../standards/task-registry.md) are append-only. Cancelled items keep their number forever.
+**Rule:** Numbers in the [PRD registry](../standards/prd-registry.md) and [task registry](../standards/task-registry.md) are append-only. Cancelled items keep their number forever. An epic or story number is counted from the documents on disk within its parent, so a cancelled epic keeps its number by keeping its document.
 
 **Why:** Branch names, PR titles, commit messages, and historical references all encode the number. Reuse creates ambiguity in `git log` and tracker history that can never be resolved.
 
@@ -36,7 +36,7 @@ Rules scattered across the docs, collected and explained. Each entry: the rule, 
 
 ## Never leave plans in agent scratch directories
 
-**Rule:** Plans live in-repo, co-located with the work (`task.{N}.plan.*.md` inside the task dir, `story.{E}.{S}.plan.*.md` inside the story dir, or `.agents/plans/` for general plans). Never `~/.agents/plans/`, `~/.claude/plans/`, or `/tmp/`.
+**Rule:** Plans live in-repo, co-located with the work (`task.{N}.plan.*.md` inside the task dir, `story.{P}.{E}.{S}.plan.*.md` inside the story dir, or `.agents/plans/` for general plans). Never `~/.agents/plans/`, `~/.claude/plans/`, or `/tmp/`.
 
 **Why:** Plans outside the repo are not version-controlled and invisible to teammates. They evaporate when you switch machines, lose their connection to the work, and can't be reviewed in PRs.
 
@@ -80,9 +80,9 @@ Rules scattered across the docs, collected and explained. Each entry: the rule, 
 
 ## Never invent epic numbers
 
-**Rule:** Use `create-epic`, which delegates to `epic-registry-manager`. Never pick a number yourself.
+**Rule:** Use `create-epic`, which allocates `E` within the PRD with `doc-id.js`. Never pick a number yourself.
 
-**Why:** Concurrent authors will collide. The registry is the only safe source of "next available."
+**Why:** A hand-picked number skips the parent check and collides with a sibling. Two authors who branch at once can still both take the next `E`; `doc-numbering-corpus.test.mjs` fails that merge on `duplicate-id`.
 
 **If you ignore it:** two authors create `epic.42.*` in the same week and the merge is messy.
 

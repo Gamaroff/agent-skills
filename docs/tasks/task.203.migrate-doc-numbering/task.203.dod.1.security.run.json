@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "path",
+      "entry": "shared/resources/migrate-doc-numbering.mjs#checkPrdRoot",
+      "name": null,
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 11,
+      "passed": 11,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": [
+        "/tmp/claude-1000/-home-gamaroff-Development-agent-skills/60500445-8e0e-40b6-bb8f-16969db015d7/scratchpad/probe-base"
+      ],
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-10-15T08:31:28.952Z"
+    }
+  ],
+  "totals": {
+    "executed": 11,
+    "reproduced": 0
+  },
+  "updated_at": "2026-10-15T08:31:28.952Z"
+}

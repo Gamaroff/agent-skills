@@ -229,8 +229,8 @@ not here.
 
    Use `path`, `verifier` and `resumePrompt` exactly as given. The script writes nothing. On a
    `feature/task.N.slug` branch whose `docs/tasks/task.N.slug/` exists the file goes there as
-   `task.N.handoff.{k}.slug.md`; on `feature/story.E.S.slug` it goes beside the story
-   (`story.E.S.handoff.{k}.slug.md`, the story found under the PRD root); anything else goes to
+   `task.N.handoff.{k}.slug.md`; on `feature/story.P.E.S.slug` it goes beside the story
+   (`story.P.E.S.handoff.{k}.slug.md`, the story found under the PRD root by its `doc-id.js` id); anything else goes to
    `.agents/handoffs/{YYYY-MM-DD}-{slug}.md` (`--slug` names it; create the directory if absent).
    `reason: no-verifier` means no `handoff-verify.mjs` was found — the prompt then tells the reader
    to re-measure by hand, and that step is never dropped.

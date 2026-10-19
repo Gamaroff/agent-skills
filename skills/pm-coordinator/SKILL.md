@@ -145,11 +145,9 @@ User Request Analysis:
 
 **Epic Numbering (CRITICAL)**:
 
-- Epic numbers are globally unique across the entire system
-- PRDs use relative numbers ("Epic 1", "Epic 2")
-- Epic files use global registry numbers (epic.163.md, epic.164.md, etc.)
-- Check `/docs/development/epic-registry.md` before creating epic files
-- See [Epic Numbering System in CLAUDE.md](../../CLAUDE.md#epic-numbering-system)
+- Epics are numbered **within their PRD** (`epic.{P}.{E}`), so the PRD's "Epic 2" is the file
+  `epic.{P}.2` — one number in the PRD, the file, the tracker and the epics index
+- Every epic has a parent PRD; `create-epic` allocates `E` with `doc-id.js` — never by hand
 
 ### Quality Standards
 

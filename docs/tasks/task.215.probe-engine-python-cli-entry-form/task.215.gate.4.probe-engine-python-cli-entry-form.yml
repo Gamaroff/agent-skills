@@ -1,0 +1,68 @@
+schema: 2
+task: 'task.215.probe-engine-python-cli-entry-form'
+task_title: 'security-probe: run a Python CLI under the cli: entry form'
+gate: FAIL
+status_reason: 'Cycle 3 fixes verified: an unprintable or nameless exception, a forked child and a forked daemon now behave correctly, and __main__ stays the script module (probe: 11 crash shapes errored; 4 mutations covered). The safety re-probe found the channel can still be lost: a script that closes fd 3 (and may reopen it as its own file) has its crash scored rejected (reproduced twice). The interpreter probe also runs under a different environment from the cases (MEDIUM).'
+reviewer: 'QA Engineer'
+head: 'e94dd3555930a9eb1ced7d790cd3e53ceecb390a'
+updated: '2026-10-19T12:11:23Z'
+
+top_issues:
+  - id: 'TASK-215-QA4-1'
+    severity: high
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'PYTHON_BOOTSTRAP writes the crash token to whatever fd 3 is at crash time and the engine reads only its presence, so a script that runs os.closerange(3, N) loses the marker, or has it written into a file it opened afterwards; behind a quiet excepthook the crash is scored rejected. Reproduced by the cycle-4 probe (py-cli.crash-closes-fd3, overblocked) and by diff reviewer CR-1 (hostile cases rejected, verdict engages). (location unverified: shared/resources/security-probe.mjs:807 — the reviewer line_text differs from the source by one backslash escape; line 807 is the token write) Bug report: task.215.bug.7.closed-fd3-loses-crash-marker.md'
+    suggested_action: 'Make the channel positive — a token on every exit the bootstrap controls, a missing token read as errored — and check fd 3 is still the engine pipe before writing; or have the maintainer scope SC4 to scripts that leave fd 3 open.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-215-QA4-2'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'platform-variance: probePython checks python3 under the engine env (real HOME, PYTHON* variables) while every case runs under caseEnv, so an interpreter that starts only under the real HOME passes the probe and then scores every case rejected (rejects-every-input) instead of entry-not-probeable. Diff reviewer CR-2 (medium/high), reproduced with a HOME-dependent python3 shim. Bug report: task.215.bug.8.interpreter-probe-env-differs.md'
+    suggested_action: 'Probe the interpreter as a case runs it (caseEnv-shaped env, PYTHON_FLAGS, a trivial -c body), or let a bootstrap start token turn a child that never started into errored.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 50
+
+evidence:
+  tests_reviewed: 320
+  phases_verified: 2/2
+  ci: 'not read; CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 8
+    notes: 'cli: arm probed with the engine against a crash-matrix CLI (run record task.215.qa.4.security.run.json): 19 cases, 8 executed, 11 crash shapes errored and declined as required (unprintable, nameless, non-str name, bigint KeyError, recursion, KeyboardInterrupt, stderr closed, str() raising SystemExit); 1 overblocked — the closed-fd-3 crash scored rejected (TASK-215-QA4-1).'
+  performance:
+    status: PASS
+    notes: 'A forked daemon no longer holds a case to the timeout (fork-daemon test, 2 s timeout).'
+  reliability:
+    status: CONCERNS
+    notes: 'The interpreter probe and the cases run under different environments (TASK-215-QA4-2).'
+  maintainability:
+    status: PASS
+    notes: 'One bootstrap constant, one marker reader, rule stated once; bundle in sync.'
+
+recommendations:
+  immediate:
+    - action: 'TASK-215-QA4-1: a positive channel (a token on every bootstrap-controlled exit; a missing token is errored) with an fd-identity check — or a maintainer decision to scope SC4.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'TASK-215-QA4-2: probe python3 under the case environment.'
+      refs: ['shared/resources/security-probe.mjs']
+  future:
+    - action: 'CR-3 (cleanup): compute pythonCrashMarker(child) once in runCliCase.'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['TASK-215-QA4-1 fixed and re-reviewed, or SC4 scoped by the maintainer']

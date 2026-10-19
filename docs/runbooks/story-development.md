@@ -10,7 +10,7 @@
 
 - [`file-naming.md`](../standards/file-naming.md) — DOTS, kebab-case, dots-as-separators
 - [`status-lifecycle.md`](../standards/status-lifecycle.md) — frontmatter status pairing
-- [`epic-registry.md`](../standards/epic-registry.md) — globally-unique numbering
+- [`prd-registry.md`](../standards/prd-registry.md) — globally-unique PRD numbering; epics and stories count within their parent
 
 **Use a different runbook instead if:**
 
@@ -39,8 +39,8 @@ Use when the change is large enough to need product framing: it lives under a PR
     - docs/architecture/concepts/coding-standards.md
   ```
   PRD and architecture roots are configurable (defaults shown). Nested layout under `${PRD_ROOT}` is fixed — see [Configurable roots and fixed conventions](../reference/configuration.md#configurable-roots-and-fixed-conventions). QA artifacts are co-located with the story — no `qa.qaLocation` config is needed.
-- The repo has an **epic registry** at `docs/development/epic-registry.md`. Epic numbers are globally unique — `create-epic` and `epic-registry-manager` enforce this.
-- Branch hygiene: `develop` exists. Story PRs target `develop` by default, or the epic's `epic/{N}.{slug}` integration branch when the epic opts in with `branch_model: epic-integration` (see [Branch model](#branch-model--you-choose-per-story)).
+- The repo has a **PRD registry** at `docs/prd/prd-registry.md`. PRD numbers are globally unique; an epic is numbered within its PRD and a story within its epic — `create-prd`, `create-epic` and `create-story` allocate them with `doc-id.js`.
+- Branch hygiene: `develop` exists. Story PRs target `develop` by default, or the epic's `epic/{P}.{E}.{slug}` integration branch when the epic opts in with `branch_model: epic-integration` (see [Branch model](#branch-model--you-choose-per-story)).
 - Platform detection (GitHub vs Bitbucket vs Jira) is automatic — see [`../../shared/resources/platform-detection.md`](../../shared/resources/platform-detection.md).
 
 ## Pipeline diagram
@@ -73,7 +73,7 @@ flowchart TD
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Invoke**    | `"create a PRD for X"` · `/create-prd`                                                                                                                                                                                                                             |
 | **Inputs**    | Product context, goals, constraints. Skill is interactive — it elicits section-by-section.                                                                                                                                                                         |
-| **Outputs**   | `docs/prd/{domain}/{feature}/prd.md` (or path per `skills-config.yaml`). YAML frontmatter with `status: draft`.                                                                                                                                                    |
+| **Outputs**   | `docs/prd/{domain}/prd.{P}.{feature}/prd.{P}.{feature}.md` (root per `skills-config.yaml`), with `{P}` allocated from `docs/prd/prd-registry.md` and a registry row added. YAML frontmatter with `status: draft` and `prd_number: {P}`.                                                                                                                                                    |
 | **Pitfalls**  | Don't skip the interactive elicitation — `create-doc` enforces it. Frontmatter `status:` is lowercase kebab-case; body `Status:` is Title Case (see [`../../shared/resources/document-status-lifecycle.md`](../../shared/resources/document-status-lifecycle.md)). |
 | **Calls**     | `create-doc`, `brownfield-prd-template` (or `prd-template` for greenfield), `pm-checklist`, optionally `mermaid-architect` for embedded diagrams.                                                                                                                  |
 | **Reference** | [`../../skills/create-prd/SKILL.md`](../../skills/create-prd/SKILL.md)                                                                                                                                                                                             |
@@ -86,7 +86,7 @@ flowchart TD
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Invoke**       | `"review the PRD at <path>"` · `/review-prd <path>`                                                                                                                   |
 | **What it does** | Verifies claims against the actual codebase, checks requirements traceability, detects staleness, asks clarifying questions.                                          |
-| **Outputs**      | Co-located review report `prd.review.{YYYY-MM-DD}.md`, or an inline action plan if minor. Update frontmatter `status: ready-for-development` once review is resolved. |
+| **Outputs**      | Co-located review report `prd.{P}.{feature}.review.{n}.{name}.md`, or an inline action plan if minor. Numbering defects are Critical, with the migration offered when its plan has no blockers. Update frontmatter `status: ready-for-development` once review is resolved. |
 | **Pitfalls**     | The review _will_ find inaccuracies — budget time to revise. Don't write epics until `status: ready-for-development`.                                                 |
 | **Reference**    | [`../../skills/review-prd/SKILL.md`](../../skills/review-prd/SKILL.md)                                                                                                |
 
@@ -95,7 +95,7 @@ flowchart TD
 If the PRD exceeds ~5 epics or ~30 stories, shard it by level-2 sections to keep epic creation manageable.
 
 ```
-/shard-prd docs/prd/{domain}/{feature}/prd.md
+/shard-prd docs/prd/{domain}/prd.{P}.{feature}/prd.{P}.{feature}.md
 ```
 
 Produces one file per section under the same directory. See [`../../skills/shard-prd/SKILL.md`](../../skills/shard-prd/SKILL.md).
@@ -112,9 +112,9 @@ Produces one file per section under the same directory. See [`../../skills/shard
 | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Invoke**    | `"create an epic for <scope> from <prd-path>"` · `/create-epic`                                                                                                                           |
 | **Inputs**    | PRD path; the section/sections this epic covers.                                                                                                                                          |
-| **Outputs**   | `docs/prd/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md` plus a stories/ subdir (empty at first). `{N}` is the next number from the **epic registry**.                      |
-| **Pitfalls**  | Never invent an epic number — `epic-registry-manager` assigns it and updates `docs/development/epic-registry.md`. Commit the registry update **in the same commit** as the new epic file. |
-| **Calls**     | `epic-registry-manager`, `documentation-standards-validator`, optionally `mermaid-architect`.                                                                                             |
+| **Outputs**   | `docs/prd/{domain}/prd.{P}.{feature}/epics/epic.{P}.{E}.{name}/epic.{P}.{E}.{name}.md` plus a stories/ subdir (empty at first). `{E}` is allocated within PRD `{P}`.                      |
+| **Pitfalls**  | Never invent an epic number — `create-epic` allocates `E` within the PRD from the epics on disk. Two branches that both take the next `E` collide at merge (`duplicate-id`).          |
+| **Calls**     | `documentation-standards-validator`, optionally `mermaid-architect`.                                                                                                                      |
 | **Reference** | [`../../skills/create-epic/SKILL.md`](../../skills/create-epic/SKILL.md)                                                                                                                  |
 
 ### B.2 `review-epic`
@@ -123,7 +123,7 @@ Produces one file per section under the same directory. See [`../../skills/shard
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Invoke**       | `"review epic <path>"` · `/review-epic <path>`                                                                                                |
 | **What it does** | Template compliance, scope-overlap detection with existing epics, architecture-doc alignment, codebase scan for already-implemented features. |
-| **Outputs**      | Co-located review report `epic.{N}.review.{YYYY-MM-DD}.md`.                                                                                   |
+| **Outputs**      | Co-located review report `epic.{P}.{E}.review.{YYYY-MM-DD}.md`.                                                                                   |
 | **Pitfalls**     | The codebase scan often reveals duplicate work — don't ignore it. Resolve scope overlaps before writing stories.                              |
 | **Reference**    | [`../../skills/review-epic/SKILL.md`](../../skills/review-epic/SKILL.md)                                                                      |
 
@@ -141,7 +141,7 @@ Epic GitHub/Jira issues are created automatically downstream by `develop-story` 
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Invoke**       | `"create the next story for epic <N>"` · `/create-story <epic-path>`                                                                                                               |
 | **What it does** | 10-step process that identifies the next logical story, extracts technical context from architecture docs and the codebase, and writes a story with anti-hallucination safeguards. |
-| **Outputs**      | `docs/prd/.../epics/epic.{N}.{name}/stories/story.{E}.{S}.{name}/story.{E}.{S}.{name}.md`. Story directory is created with the same stem as the file.                              |
+| **Outputs**      | `docs/prd/.../prd.{P}.{feature}/epics/epic.{P}.{E}.{name}/stories/story.{P}.{E}.{S}.{name}/story.{P}.{E}.{S}.{name}.md`. Story directory is created with the same stem as the file.                              |
 | **Pitfalls**     | Don't hand-edit story numbering — the skill computes the next `{S}` from existing siblings. Story acceptance criteria must be testable; vague criteria block `review-story`.       |
 | **Calls**        | `documentation-standards-validator`, optionally `mermaid-architect`.                                                                                                               |
 | **Reference**    | [`../../skills/create-story/SKILL.md`](../../skills/create-story/SKILL.md)                                                                                                         |
@@ -161,7 +161,7 @@ Two options depending on how much human input you want:
 /review-story --validate <story-path>
 ```
 
-`review-story` produces a co-located review report `story.{E}.{S}.review.{n}.{name}.md`. Validate mode produces `story.{E}.{S}.validate.{YYYY-MM-DD}.md`. Both update the story's `status` once it's `ready-for-development`.
+`review-story` produces a co-located review report `story.{P}.{E}.{S}.review.{n}.{name}.md`. Validate mode produces `story.{P}.{E}.{S}.validate.{YYYY-MM-DD}.md`. Both update the story's `status` once it's `ready-for-development`.
 
 Reference: [`../../skills/review-story/SKILL.md`](../../skills/review-story/SKILL.md).
 
@@ -172,16 +172,16 @@ Reference: [`../../skills/review-story/SKILL.md`](../../skills/review-story/SKIL
 This is the orchestrator. One command runs the full lifecycle.
 
 ```bash
-/develop-story docs/prd/.../stories/story.{E}.{S}.{name}/
+/develop-story docs/prd/.../stories/story.{P}.{E}.{S}.{name}/
 # or
-/develop-story docs/prd/.../story.{E}.{S}.{name}.md
+/develop-story docs/prd/.../story.{P}.{E}.{S}.{name}.md
 ```
 
 ### Phase 0 — Resolve & Prepare
 
 `develop-story` prompts (via `AskUserQuestion`) for exactly two things:
 
-- **Q1 — Feature branch base**: which branch `feature/story.{E}.{S}.{name}` is cut from
+- **Q1 — Feature branch base**: which branch `feature/story.{P}.{E}.{S}.{name}` is cut from
 - **Q2 — PR target branch**: which branch the PR merges into
 
 (Story path is prompted for only if not supplied. Lite mode is auto-detected, not asked. The `qa-planning` skip is silent.)
@@ -194,23 +194,23 @@ Both models are always on the menu. The prompt marks one **Recommended**; the ot
 
 ```
 develop
-└── feature/story.{E}.{S}.{name}     ← cut from develop, PRs back to develop
+└── feature/story.{P}.{E}.{S}.{name}     ← cut from develop, PRs back to develop
 ```
 
 **Epic integration (opt-in).** Every story in the epic merges into one long-lived integration branch, which reaches `develop` once, at the end, as a single reviewed unit.
 
 ```
 develop
-└── epic/{N}.{slug}                  ← integration branch, created on demand
-    └── feature/story.{E}.{S}.{name} ← cut from the epic branch, PRs back to it
+└── epic/{P}.{E}.{slug}                  ← integration branch, created on demand
+    └── feature/story.{P}.{E}.{S}.{name} ← cut from the epic branch, PRs back to it
 ```
 
 Which one leads the prompt comes from the parent epic's frontmatter:
 
 | Epic frontmatter | Q1/Q2 Recommended | Other option |
 |---|---|---|
-| `branch_model: epic-integration` (+ optional `integration_branch:`) | `epic/{N}.{slug}` | `develop` |
-| nothing, or `branch_model: develop-direct` | `develop` | `epic/{N}.{slug}` — *create epic integration branch*, listed last, never recommended |
+| `branch_model: epic-integration` (+ optional `integration_branch:`) | `epic/{P}.{E}.{slug}` | `develop` |
+| nothing, or `branch_model: develop-direct` | `develop` | `epic/{P}.{E}.{slug}` — *create epic integration branch*, listed last, never recommended |
 
 Set `branching.epicIntegration.offerWhenUndeclared: false` in `skills-config.yaml` to drop that trailing option for epics that never opted in. See [Configuration](../reference/configuration.md).
 
@@ -220,9 +220,9 @@ Three things to know if you pick it:
 
 1. **Q1 and Q2 must agree.** Basing a story on `epic/178.feature-ui` and targeting `develop` produces a PR whose diff includes every earlier story in the epic — the base is in `develop`'s future, not its past. The pipeline re-asks rather than proceeding.
 2. **Selecting the option does not update the epic document.** Record `branch_model:` / `integration_branch:` in the epic's frontmatter so later stories get the recommendation instead of relying on whoever runs them next remembering.
-3. **Nothing promotes the integration branch.** `develop-next` / `develop-batch` merge each story PR into the base the PR declares, but the final `epic/{N}.{slug}` → `develop` PR is raised by hand. Every roadmap row ticked ≠ the epic has landed. (The PRs they merge are pre-reviewed: both orchestrators delegate to `/develop-story` / `/develop-task`, whose Step 5c ran `review-pr` before the run ever reached the merge.)
+3. **Nothing promotes the integration branch.** `develop-next` / `develop-batch` merge each story PR into the base the PR declares, but the final `epic/{P}.{E}.{slug}` → `develop` PR is raised by hand. Every roadmap row ticked ≠ the epic has landed. (The PRs they merge are pre-reviewed: both orchestrators delegate to `/develop-story` / `/develop-task`, whose Step 5c ran `review-pr` before the run ever reached the merge.)
 
-> `epic/{N}.{name}` (integration branch) is **not** `feature/epic.{N}.{name}` — an ordinary short-lived branch for editing the epic *document*, which `/review-epic` creates.
+> `epic/{P}.{E}.{name}` (integration branch) is **not** `feature/epic.{P}.{E}.{name}` — an ordinary short-lived branch for editing the epic *document*, which `/review-epic` creates.
 
 ### Phase 1 — 8-step pipeline
 
@@ -232,17 +232,17 @@ Three things to know if you pick it:
 | 2    | `review-story`        | Runs the interactive review (skipped if the story was reviewed recently and is still `ready-for-development`).                                                      |
 | 3    | `develop`             | Implements the story. Bounded loop, `MAX_ITER=5`. Each iteration: plan → code → test → DoD check.                                                                   |
 | 4    | `create-pr`           | Pushes the branch, opens a PR with auto-generated description. `--base` is the Q2 answer, pre-supplied from Phase 0.                                                |
-| 5–6  | `qa-story` → `qa-fix` → `review-pr` | QA review produces a gate file (`PASS` / `CONCERNS` / `FAIL` / `WAIVED`). `qa-fix` runs on `FAIL`, or on an open `top_issues[]` entry that no active waiver covers; a gate in the accepting-route set (any of the QA loop's §5c five routes) hands to `review-pr`. Up to 5 cycles. **Step 5c is the loop's exit gate**: a gate in the accepting-route set hands to `review-pr`, which reviews the PR against the story. `REQUEST CHANGES` returns to `qa-fix` and consumes a cycle from the same 5-cycle budget; `APPROVE`/`CONCERNS` exit to Step 7. Leaves `story.{E}.{S}.pr-review.{n}.{name}.md`. |
+| 5–6  | `qa-story` → `qa-fix` → `review-pr` | QA review produces a gate file (`PASS` / `CONCERNS` / `FAIL` / `WAIVED`). `qa-fix` runs on `FAIL`, or on an open `top_issues[]` entry that no active waiver covers; a gate in the accepting-route set (any of the QA loop's §5c five routes) hands to `review-pr`. Up to 5 cycles. **Step 5c is the loop's exit gate**: a gate in the accepting-route set hands to `review-pr`, which reviews the PR against the story. `REQUEST CHANGES` returns to `qa-fix` and consumes a cycle from the same 5-cycle budget; `APPROVE`/`CONCERNS` exit to Step 7. Leaves `story.{P}.{E}.{S}.pr-review.{n}.{name}.md`. |
 | 7    | `finalise`            | Validates against the Definition of Done, posts DoD summary to the PR, comments the tracker issue, updates the board. **Runs full side-effects even in lite mode.** |
 | 8    | `commit-changes`      | Stages and commits any final artifacts (implementation report, DoD summary, status updates).                                                                        |
 
-Throughout, `develop-story` records every decision in a co-located implementation report: `story.{E}.{S}.implementation.{N}.{name}.md`.
+Throughout, `develop-story` records every decision in a co-located implementation report: `story.{P}.{E}.{S}.implementation.{N}.{name}.md`.
 
 For the full list of files each step writes — including the runtime state you should never commit — see [Pipeline artifacts](../reference/pipeline-artifacts.md).
 
 ### Phase 2 — Completion
 
-Story `status` advances to `accepted`. The PR is left for human merge. If the story used an epic integration branch, the `epic/{N}.{slug}` → `develop` PR is also yours to raise — nothing auto-merges it.
+Story `status` advances to `accepted`. The PR is left for human merge. If the story used an epic integration branch, the `epic/{P}.{E}.{slug}` → `develop` PR is also yours to raise — nothing auto-merges it.
 
 ### Lite mode
 
@@ -284,7 +284,7 @@ Inside `finalise`, the platform resolver picks one of:
 | Parent         | Calls                                                                                        |
 | -------------- | -------------------------------------------------------------------------------------------- |
 | `create-prd`   | `create-doc`, `(brownfield-)prd-template`, `pm-checklist`, optionally `mermaid-architect`    |
-| `create-epic`  | `epic-registry-manager`, `documentation-standards-validator`, optionally `mermaid-architect` |
+| `create-epic`  | `documentation-standards-validator`, optionally `mermaid-architect`                          |
 | `create-story` | `documentation-standards-validator`, optionally `mermaid-architect`                          |
 
 ---
@@ -296,18 +296,18 @@ After the pipeline completes, confirm:
 ```bash
 # Gate file exists, and the last QA cycle's Action row (implementation report) reads
 # 'Proceeding to 5c' — the record that the gate took one of §5c's five routes
-ls docs/prd/.../story.{E}.{S}.{name}/*.gate.*.yml
-grep '^gate:' docs/prd/.../story.{E}.{S}.{name}/*.gate.*.yml
+ls docs/prd/.../story.{P}.{E}.{S}.{name}/*.gate.*.yml
+grep '^gate:' docs/prd/.../story.{P}.{E}.{S}.{name}/*.gate.*.yml
 # Expected output: exactly one line reading `**Action**: Proceeding to 5c (PR conformance review)`.
 # An empty result is a failure — `-h` is required: with more than one implementation report
 # matching the glob, grep prefixes each line with `filename-` and the `^` anchor matches nothing.
-grep -h -A8 '^### QA Cycle' docs/prd/.../story.{E}.{S}.{name}/*.implementation.*.md | grep '^\*\*Action\*\*' | tail -1
+grep -h -A8 '^### QA Cycle' docs/prd/.../story.{P}.{E}.{S}.{name}/*.implementation.*.md | grep '^\*\*Action\*\*' | tail -1
 
 # Story status is accepted
-grep -E '^status:|^Status:' docs/prd/.../story.{E}.{S}.{name}.md
+grep -E '^status:|^Status:' docs/prd/.../story.{P}.{E}.{S}.{name}.md
 
 # Implementation report exists
-ls docs/prd/.../story.{E}.{S}.{name}/*.implementation.*.md
+ls docs/prd/.../story.{P}.{E}.{S}.{name}/*.implementation.*.md
 ```
 
 PR-side checks depend on your VCS:
@@ -322,7 +322,7 @@ source shared/resources/bitbucket-auth.sh && curl "${BB_CURL_AUTH[@]}" \
   "https://api.bitbucket.org/2.0/repositories/{workspace}/{repo}/pullrequests/{id}"
 ```
 
-Once you're satisfied, merge the PR (manual gate). If the epic used an integration branch, raise the `epic/{N}.{slug}` → `develop` PR once all its stories are accepted.
+Once you're satisfied, merge the PR (manual gate). If the epic used an integration branch, raise the `epic/{P}.{E}.{slug}` → `develop` PR once all its stories are accepted.
 
 ---
 
@@ -348,7 +348,7 @@ Friction events recorded during this PRD's dogfood run (Epics 1–3).
 1. Open a fresh Claude Code session.
 2. Run `/develop-story <story-file-path>` and choose **Resume**.
 
-_Provenance: `docs/prd/onboarding/epics/epic.3.runbook-tutorial-wrappers/stories/story.3.1.before-you-start-anchor-runbooks/story.3.1.implementation.1.before-you-start-anchor-runbooks-initial-run.md`_
+_Provenance: `docs/prd/onboarding/prd.1.onboarding/epics/epic.1.3.runbook-tutorial-wrappers/stories/story.1.3.1.before-you-start-anchor-runbooks/story.1.3.1.implementation.1.before-you-start-anchor-runbooks-initial-run.md`_
 
 ### Phase 0 base-branch prompt shows no `develop` option
 
@@ -358,7 +358,7 @@ _Provenance: `docs/prd/onboarding/epics/epic.3.runbook-tutorial-wrappers/stories
 1. `git checkout -b develop main && git push -u origin develop`
 2. Re-invoke `/develop-story <path>` — `develop` will appear.
 
-_Provenance: `docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entry-point/stories/story.1.1.first-task-in-10-minutes/story.1.1.implementation.1.first-task-in-10-minutes-initial-run.md`_
+_Provenance: `docs/prd/onboarding/prd.1.onboarding/epics/epic.1.1.quickstart-and-decision-tree-entry-point/stories/story.1.1.1.first-task-in-10-minutes/story.1.1.1.implementation.1.first-task-in-10-minutes-initial-run.md`_
 
 ### "Lock file exists" blocks a fresh pipeline run
 
@@ -368,7 +368,7 @@ _Provenance: `docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entr
 1. `rm .claude/state/develop-pipeline.lock`
 2. Re-run `/develop-story <path>`.
 
-_Provenance: `docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entry-point/stories/story.1.2.first-story-in-60-minutes/story.1.2.implementation.1.first-story-in-60-minutes-initial-run.md`_
+_Provenance: `docs/prd/onboarding/prd.1.onboarding/epics/epic.1.1.quickstart-and-decision-tree-entry-point/stories/story.1.1.2.first-story-in-60-minutes/story.1.1.2.implementation.1.first-story-in-60-minutes-initial-run.md`_
 
 ### Step 4 marked ✅ Done but PR URL is empty
 
@@ -378,7 +378,7 @@ _Provenance: `docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entr
 1. Re-run `/develop-story <path>` and choose **Resume**.
 2. Pipeline re-enters Step 4 and creates the PR.
 
-_Provenance: `docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/stories/story.2.3.capture-story-messy-path/story.2.3.implementation.1.capture-story-messy-path.md`_
+_Provenance: `docs/prd/onboarding/prd.1.onboarding/epics/epic.1.2.worked-prd-epic-story-examples/stories/story.1.2.3.capture-story-messy-path/story.1.2.3.implementation.1.capture-story-messy-path.md`_
 
 ### `/finalise` flags "CHANGELOG.md not updated"
 
@@ -388,4 +388,4 @@ _Provenance: `docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/st
 1. Add an entry to `CHANGELOG.md` under the current version heading.
 2. Re-invoke `/finalise` — it detects the entry and clears the gap.
 
-_Provenance: `docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entry-point/stories/story.1.5.readme-start-here-callout/story.1.5.implementation.1.readme-start-here-callout-initial-run.md`_
+_Provenance: `docs/prd/onboarding/prd.1.onboarding/epics/epic.1.1.quickstart-and-decision-tree-entry-point/stories/story.1.1.5.readme-start-here-callout/story.1.1.5.implementation.1.readme-start-here-callout-initial-run.md`_

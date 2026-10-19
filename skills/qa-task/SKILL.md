@@ -676,8 +676,9 @@ JSON
    `references/probe-boundary-rule.md` §5) takes the shell-fn form instead:
    `--entry 'shell-fn:<path>#<function>' --sink filename --cases-file <cases.json>`, plus
    `--fake-gh <dir>` when the function's body names `gh` — running `shell:` against a library is
-   the task.125 result: sourced, never called, `absent` behind a full count. A **Node CLI** whose
-   decision sits behind its flags (task.141: `uat-status.mjs --env`) takes the cli form:
+   the task.125 result: sourced, never called, `absent` behind a full count. A **Node CLI** — or a
+   **Python CLI** (`.py`, run under `python3`) — whose decision sits behind its flags (task.141:
+   `uat-status.mjs --env`) takes the cli form:
    `--entry 'cli:<path>' --argv '["--flag","{input}"]' --cases-file <cases.json>` — the
    template's one `"{input}"` element is each case, exit status is the verdict, a crash is
    `errored`, and each guarded flag is its own control, named with `--name`; "it takes several flags" is never a reason
@@ -901,12 +902,31 @@ a clean Step 4b as covering what the harness delivers. (create-skill § *Runnabl
 When it does fire, run the engine over each changed in-scope file:
 
 ```bash
-node references/qa-execute-snippets.mjs --file "$SKILL_FILE" --json
+# From the repository root, once per changed in-scope file ({changed-file}). BASE is the PR's base
+# branch, re-bound here because a fenced block is its own shell; the MERGE BASE is what --diff-base
+# takes, or the base branch's later edits count as this change's. --copy-as seeds the bundled helpers.
+BASE="origin/$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo develop)"
+command node .agents/skills/qa-task/references/qa-execute-snippets.mjs --file "{changed-file}" \
+  --diff-base "$(git merge-base "$BASE" HEAD)" --copy-as .agents:.agents --json
 ```
 
-Bind any caller values the documented snippets expect with repeated `--bind NAME=VALUE`, and seed the
-temp working directory from a real directory with `--copy <dir>` so the blocks see real data rather than
-an empty tree. Execution always happens in that temp copy — never the live tree.
+`--diff-base` marks the blocks the change touched and reports them **apart** (`changed` in the JSON).
+Report the `changed` counts **first**: they are what the change is judged on. A
+`changed-blocks-not-executed` finding is a statement about the change, not the file — every block the
+change touched was skipped — and it is reported beside the file-level records, never instead of them.
+
+Fill each `{NAME}` / `<NAME>` template slot the work item supplies with a repeated `--slot NAME=VALUE`
+(`--slot task-directory=docs/tasks/task.12.x`); a slot is text, and `--bind` cannot fill one. Bind
+the shell variables the snippets read with repeated `--bind NAME=VALUE`, and seed the temp working
+directory from a real directory with `--copy <dir>` so the blocks see real data. Execution always
+happens in that temp copy — never the live tree.
+
+A block that calls a bundled helper (`bash .agents/skills/<skill>/references/x.sh`,
+`source …/x.sh || exit 1`) runs only when that helper is in the copy and its own text would run — the
+rule is `references/qa-runnable-prose-detection.md` §2aa. `--copy-as .agents:.agents` seeds the
+helpers. **Where `.agents/skills` is a symlink** (this repository's own checkout), that copies the
+link and every helper is refused: pass `--copy-as skills:.agents/skills` instead. Drop the flag when
+the change set calls no helper.
 
 `--copy <dir>` places the directory's **contents** at the temp root. When a block addresses a path —
 `find docs/tasks …` in the `sync-github-*` discovery blocks — seed it at that path instead with
@@ -916,6 +936,8 @@ A block that fails only because it was seeded at the wrong path is a harness fin
 finding (obs #143).
 
 **Document results:**
+- **The `changed` counts first** — changed blocks, and how many executed / `runnable` / `placeholder` /
+  `mutating`
 - Blocks found, and the count classified `runnable` / `placeholder` / `mutating`
 - **Every skipped block, with its line number and reason.** A silent skip recreates the exact failure
   this step exists to prevent
@@ -932,7 +954,7 @@ other `category: bug` finding. No new report or gate schema.
 > other to quiet the report.
 >
 > - **`zero-blocks-executed`** (finding, `medium`) — fired when `placeholder > 0`. The run was
->   under-configured; `--bind` / `--copy` is the fix and the detail says so.
+>   under-configured; `--slot` / `--bind` / `--copy` is the fix and the detail names which.
 > - **`no-executable-blocks`** (information, in `notes[]`, exit `0`) — fired when `placeholder === 0`
 >   and every block was refused as `mutating`. This file documents `gh` / `curl` / `rm` / write
 >   redirections because that is what the skill *does*, and those are deny-listed by design. **No
@@ -1582,14 +1604,17 @@ command node .agents/skills/qa-task/references/qa-read-back.js --doc "{task-file
 (`references/tests/qa-read-back.test.mjs`). It **decides**: exit 0 is clean, exit 1 is a
 Step 12b HALT with each problem and its remedy printed, and exit 2 is "could not look" (bad
 arguments, an unreadable document, a sibling engine that did not load). Exit 2 is never a pass. It
-checks four things:
+checks five things:
 
 1. **The claims exist.** This cycle's gate and QA report are in the work item's directory, the
    document links **those two files** — not an earlier cycle's (task.158) — and it has a Change Log
    row. An absent one halts, named.
 2. **What this run wrote is staged.** The link check reads the index, so the script stages the
    document, gate and report, plus every linked target that is **`untracked`** and a regular file
-   under the work item's own directory. A `git add` that fails halts. An untracked target elsewhere
+   under the work item's own directory. A `git add` that fails on a held `.git/index.lock` is
+   retried at 200, 400 and 800 ms, once per run — after one path outlasts the retries, later
+   paths try once — and `--json` reports `stageAttempts`; any other failure, or a lock that
+   outlasts the retries, halts. An untracked target elsewhere
    is left alone and reported, so unrelated work never rides into the QA commit.
 3. **Every link resolves against the index.** It uses `doc-links.js`, where **`missing`** means
    never written, or a case-mismatched name that only a case-insensitive disk found. **`ignored`**
@@ -1597,6 +1622,13 @@ checks four things:
    halt.
 4. **`updated:` accounts for the newest row** (`change-log.js` `checkUpdatedCoherence`). When it
    does not, apply `bumpUpdated(content, <that row's date>)` and re-run.
+5. **The verdict is this cycle's** (task.192). Every `**Gate Decision**` line in the
+   `## QA Testing Results` section, and the newest `QA gate …` row written by `qa-task` or
+   `qa-story`, name the token in this cycle's gate (`gate:`). Later `finalise` rows and QA's own
+   `Status →` rows are ignored. A `qa-fix` row after that `QA gate` row halts: it means this
+   cycle wrote no row of its own, which a repeated verdict would otherwise hide. A missing
+   section, decision line, `QA gate` row or `gate:` token halts too. When it halts, re-render
+   the section from this gate and append the `QA gate <TOKEN>` row, then re-run.
 
 **Do not post the PR comment (Step 13) over exit 1 or 2.** Posting over it reproduces task.141: a PR comment linked
 a report that did not exist, found only by CI's `link-check`, and a row was dated after `updated:`,

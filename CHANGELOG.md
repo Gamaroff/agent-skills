@@ -4,6 +4,296 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.58.0] - 2026-10-19
+
+### Added
+
+- **The security probe runs a Python CLI under the `cli:` entry form (task 215).** `cli:<path>.py`
+  now runs the script under `python3 -E -s -B` with the same `--argv` template, sandbox, timeout and
+  exit-status verdict as a Node CLI, so a Python boundary reaches the DoD probe instead of being
+  declined `entry-not-probeable` and tripping the zero-candidates guard. A Python crash exits 1, the
+  status a refusal exits with, so the script runs inside a bootstrap that writes an exit record on
+  fd 3 for every exit it controls: `answer` when the script returns or calls `sys.exit`, `crash`
+  when it raises anything else, caught before any excepthook runs. A replaced excepthook (rich,
+  Typer), a redirected `sys.stderr` or an exception that cannot be printed cannot hide a crash, and
+  a forked child neither writes the record nor holds the pipe open. A case with **no** record is
+  `errored` too, so a script that closes fd 3, leaves by `os._exit` or cannot start inside the
+  sandbox is declined, never scored. An exit 1 with a traceback on stderr also counts as a crash. A
+  crash is scored `errored`, never `rejected`. One stated limit: an exception Python prints and
+  swallows outside the script's main frame (a joined worker thread, an atexit handler) leaves
+  `python3` exiting 0, so the case is scored by that exit status — a hostile case reads `accepted`, a
+  false alarm, never a pass. A failed flush of stdout at shutdown (exit 120) is `errored`. `-B`
+  stops a sibling import writing `__pycache__/` into the watched script directory; `-I` is not
+  used because it breaks sibling imports. With no `python3` on `PATH` the entry is declined once,
+  naming `python3`. The result and the run record carry a new `interpreter` field
+  (`{ name, version }`, `null` for every other form).
+  **Consumer upgrade:** re-vendor (`setup-consumer.sh --update`); a `cli:` probe of a `.py` boundary
+  that was recorded `unverifiable` can now be re-run.
+
+- **Two CI guards hold hierarchical document numbering, and the docs stop teaching the old scheme
+  (task 207).** `evals/shared/tests/doc-numbering-corpus.test.mjs` runs `doc-id.js`'s `checkCorpus`
+  over the PRD root and fails on any unnumbered, mismatched, unregistered or duplicate PRD, epic or
+  story — with a 22-document non-vacuity floor and three mutation cases. `tests/doc-id-chokepoint.test.js`
+  fails on a PRD/epic/story id regex, a string-built id regex, a `[Epic N]`-style title regex or a
+  positional `awk -F.` / `cut -d.` split on a STORY/EPIC/PRD variable anywhere but `doc-id.js` — in
+  tracked code and in the bash fences of `SKILL.md` and `shared/resources/*.md` — with a per-shape
+  allowlist, a stale-entry check and a positive control. Fixed with it: `review-epic`'s branch setup
+  read the PRD number as the epic number (`awk -F.` on `epic.P.E.slug`), so its auto-skip matched
+  every epic of the PRD; it now reads both through `doc-id.js`. `sync-jira-story` reads related
+  artifacts through `doc-id.js` and so now links a sub-story's artifacts. The prose sweep rewrote
+  every `story.{epic}.{story}`, `epic.{N}`, `epic/{N}` and flat example id in `SKILL.md`,
+  `shared/resources/*.md` and `docs/`, replaced AGENTS.md § Epic Registry with § PRD Registry, and
+  removed the docs that still sent readers to the retired epic registry and `epic-registry-manager`.
+  **Consumer upgrade:** a project still on flat numbering migrates once with
+  `node .agents/skills/review-prd/references/migrate-doc-numbering.mjs --check`, then `--apply`
+  (`[--apply | --check] [--json] [--root <dir>] [--name <path>=<slug>]... [--allow-in-flight]`).
+
+- **A `/qa-next` note finding can be resolved, with evidence (task 212).** A `note` row in a run
+  file's Findings table used to stay open forever. `uat-status.mjs --resolve-finding <run> <n> --by
+  <evidence> [--date YYYY-MM-DD]` now appends ` — resolved YYYY-MM-DD by \`<evidence>\`` to its
+  `Filed as` cell — the only edit ever made to a written run file — where the evidence is a commit
+  sha or a later run file. `--findings` counts a validly resolved note as closed; `--check` reports
+  every marker whose evidence does not hold (`commit-not-found`, `not-a-git-repo`, `run-not-found`,
+  `run-is-self`, `run-not-later`, `on-a-bug-link`, `bad-date`, `bad-evidence`). `--changed-runs`
+  lists the earlier run files a resolution edited, so `/qa-next` Step 5 stages them even on a
+  resumed run. Run files without markers read exactly as before.
+
+- **One engine for hierarchical document ids, and a PRD registry (task 202).** The new
+  `shared/resources/doc-id.js` parses, formats, allocates and checks `prd.{P}`, `epic.{P}.{E}` and
+  `story.{P}.{E}.{S}` names: `P` comes from a new PRD registry, `E` counts epics within a PRD, and
+  `S` counts stories within an epic. Its CLI (`parse`, `next`, `check`, `check --corpus`) follows the
+  `--json` `reason` and exit-code contract of the other engines, and refuses a directory it cannot
+  read rather than reporting it empty. `select-next.mjs` now reads a PRD registry (`kind: "prd"`)
+  by the same rules as its bug and task registries, and a roadmap line linking a PRD is still not a
+  work item. New standard: `docs/standards/prd-registry.md`. The file-naming, PRD, epic and story
+  standards now describe the scheme, each with a dated interim note. No skill uses it yet; tasks
+  203–207 migrate the callers.
+
+- **A one-shot migration to hierarchical document numbering, run on this repository (task 203).**
+  The new `shared/resources/migrate-doc-numbering.mjs` renames an existing PRD, its epics and its
+  stories to `prd.{P}`, `epic.{P}.{E}` and `story.{P}.{E}.{S}`. It rewrites their frontmatter, gate
+  `story:` fields and every relative link into the moved tree, and appends the PRD to the PRD
+  registry. It is a dry run by default. `--apply` writes nothing until every blocker has passed:
+  an epic with no PRD, an in-flight story, a target that already exists, a dirty path, a link that
+  would break, a missing or stale registry, or two documents mapping to one new id. `--check`
+  exits 1 while a migration is pending and 0 once it is done. A run that fails part-way returns
+  `post-check-failed` with a revert command that names only the paths it touched. This repository's
+  onboarding PRD is now `docs/prd/onboarding/prd.1.onboarding/`, with epics `1.1`–`1.4` and
+  stories `story.1.E.S`. `doc-id.js` recognises the `validate` artifact kind.
+
+### Changed
+
+- **The snippet engine runs the pipeline blocks a change touches (task 191).**
+  `qa-execute-snippets.mjs` gains three things, each opt-in. `--slot NAME=VALUE` fills a `{NAME}` /
+  `<NAME>` template slot with literal text **before** classification, so a value that adds a write is
+  refused like written code; an unfilled slot is named in the reason (`template slot: {a}, <b>`), and
+  `zero-blocks-executed` now names `--slot` or `--bind` by placeholder kind (obs #186). The **helper
+  rule**: `bash` / `sh` / `source` / `.` of a literal `.sh` path inside the temp copy runs when the
+  helper's own text classifies runnable (helper mode: function definitions, `case` arm patterns,
+  `name+=(…)`, `shopt -s|-u`; an arm pattern only at an arm position), to a depth of 2, and never in
+  a block that changes directory, changes `PATH`, names a shell start-up variable (`BASH_ENV`, `ENV`,
+  `SHELLOPTS`, `BASHOPTS`, `PS4`), or runs an `export`/`local`/`readonly`/`read` of a name that is not
+  a plain identifier as written (or `export -f`, `printf -v`). A function a sourced helper defines is
+  callable in that block when its name shadows no builtin or PATH command; a sourced helper sees the
+  functions sourced before it, and a function's reach is every definition of its name the block may
+  see, so a later helper's redefinition is never hidden by an earlier one. A call to such a function, a helper script's own arguments and a
+  sourced helper's `set --` parameters are refused when, read as written or unquoted, they would be
+  refused written to a command the helper runs.
+  `isRunnableBlock` exposes the classifier to the security probe. `SAFE_COMMANDS` is unchanged
+  (obs #219, #278). `--diff-base <rev>` marks the blocks `git diff -U0` touches, adds a `changed`
+  summary and the finding `changed-blocks-not-executed` when none of them ran; a bad revision is exit 2,
+  `bad-diff-base`, and so is a diff with output and no hunk; the user's colour and diff drivers are
+  switched off. qa-task Step 4b and qa-story Phase 1.7 pass the PR's merge base as `--diff-base` and `--copy-as
+  .agents:.agents` (or `skills:.agents/skills` where `.agents/skills` is a symlink), name `--slot`, and
+  report the `changed` counts first; `qa-runnable-prose-detection.md` gains §2aa, §2c and §4a.
+
+- **The story pipeline reads hierarchical story ids (task 206). Breaking.** Every story-side reader
+  and writer of a story or epic id now goes through `doc-id.js` instead of its own pattern:
+  `finalise-fix-and-recheck.mjs` (8a's co-location rule and the doc-links corpus guards),
+  `bug-doc.js`, `create-story` (its validators and allocator), the Step 0 and Step 0a story blocks,
+  `create-branch`, `ensure-story-github-issue`, `sync-github-story`, `session-handoff`'s
+  continuation, `qa-next`'s UAT selector and `develop-next`'s roadmap selector. A story is
+  `story.{P}.{E}.{S}` (`3A` is a sub-story) and an epic is found by **(P, E)**: E restarts at 1 in
+  every PRD, so Step 0 now HALTs on zero or two-plus epic documents for the pair instead of taking
+  `head -1`, and `story.1.2.3` no longer admits `story.1.2.30`'s artifacts at 8a. `create-story`
+  allocates S with `doc-id next story --epic-dir` (highest + 1; `nextStoryId` delegates to the same
+  rule). Four changes reach a consumer, and **the order is: migrate first, then upgrade the skills**
+  — run task.203's `migrate-doc-numbering.mjs` on your tree (dry run, then `--apply`), then install
+  this release; finish any in-flight story branch on the old skills or rename it with `git branch -m`:
+  1. **Story and branch names.** `story.{E}.{S}` → `story.{P}.{E}.{S}`, and
+     `feature/story.{E}.{S}.slug` → `feature/story.{P}.{E}.{S}.slug`. A legacy story name is refused
+     with a message naming the migration; new tracker issues are titled `[Story P.E.S]` with the
+     milestone `Epic P.E — {title}`. Existing issues are not renamed; dedup by title runs only for a
+     story with no `github_issue`.
+  2. **`branching.epicIntegration.branchPattern`.** The default is now `epic/{p}.{n}.{slug}`, and a
+     configured pattern without `{p}` is refused (`/create-branch` Step 2b.4 HALTs naming the key).
+     Add `{p}` to a configured pattern. A declared `integration_branch:` is still used verbatim.
+  3. **`qa-next` surfaces file.** `epicSurface` keys are epic ids `"P.E"` (`"5"` → `"1.5"`), and
+     `storySurface` / `storyNa` keys are story ids `P.E.S`. A key in the old shape is reported by
+     `uat-status.mjs`, and a `story.*.md` it cannot read is reported rather than skipped.
+  4. **Roadmap epic headings.** `## Epic 8` → `## Epic 1.8`, and `deps: Epic 8` → `deps: Epic 1.8`.
+     A leftover bare `Epic N` is a selector **error** naming the migration (inside a Deferred,
+     Housekeeping or Change Log section it is history and is ignored). The roadmap template now
+     shows the new heading.
+
+- **The PRD skills write, check and migrate numbered PRDs (task 204). Breaking.** `create-prd`
+  allocates the PRD's number `P` from `${PRD_ROOT}/prd-registry.md` (bootstrapping it on first use),
+  writes `${PRD_ROOT}/{domain}/prd.{P}.{feature}/prd.{P}.{feature}.md` with `prd_number: P`, adds the
+  registry row, and stops on any `doc-id.js check` result other than `ok`. Re-running it on an
+  existing PRD keeps its number. The greenfield path no longer writes `docs/prd.md`.
+  `review-prd` reports a missing registry, an unnumbered PRD, a directory/stem/frontmatter mismatch
+  and an unnumbered or wrongly-parented epic or story as **Critical**, offers the task-203
+  migration when its plan has no blockers, and writes its report as
+  `prd.{P}.{feature}.review.{n}.{name}.md`. A new `review-prd/scripts/migration-guard.mjs` withholds
+  that offer for three shapes the migration cannot yet carry — no frontmatter, a PRD with no domain,
+  and a `docs/prd.md` that files outside the PRD root mention — until task 211 lands. `shard-prd`
+  explodes a numbered PRD in place and refuses a legacy one. Every PRD-path block refuses a path that
+  resolves outside `${PRD_ROOT}` through a symlink. The migration's token pass no longer rewrites the
+  bare words `prd` and `index`, which turned `type: prd` in every other PRD into `type: prd.{P}.{slug}`.
+
+- **Epics are numbered within their PRD, and every epic needs a PRD (task 205). Breaking.** Every
+  epic skill now names a new epic `epic.{P}.{E}.{name}`: `P` is the parent PRD's number and `E` is
+  allocated by `doc-id.js next epic --prd-dir <PRD dir>`. The PRD's "Epic 2" and the file
+  `epic.{P}.2` are now the same thing. Six changes reach a consumer:
+  1. **Epic filename and frontmatter.** `epic.163.x` becomes `epic.1.2.x`, with `prd_number: 1` and
+     `epic_number: 2`. `create-epic` and `create-epics-from-shards` run `doc-id.js check` on what they
+     write and stop on any reason other than `ok`. `create-epics-from-shards` now writes one directory
+     per epic. To migrate existing epics, run task.203's `migrate-doc-numbering.mjs`: dry run first,
+     then `--apply`.
+  2. **A parent PRD is mandatory.** `create-epic` stops with `No parent PRD found … Run /create-prd
+     first` instead of writing `prd_source: "brownfield-enhancement"`. The sentinel is gone from every
+     skill. The migration reports a sentinel epic as a blocker. Give it a PRD with `/create-prd`, then
+     re-run the migration.
+  3. **Tracker identity is `[Epic P.E]`.** Jira summaries and GitHub titles become `[Epic 1.3] Foo`,
+     and the milestone becomes `Epic 1.3 — Foo`. Both Jira scripts build the summary with one shared
+     helper, `doc-id.js` `epicSummary`. When the frontmatter numbers are missing, the summary is the
+     bare title; it never guesses an id from the title. `sync-github-epic` renames the epic's
+     own milestone in place through the new `tracker-issue.js --kind milestone --rename-from`, so
+     stories already on it stay grouped; a sprint or other shared milestone is never renamed, and a
+     failed milestone lookup renames and creates nothing. The milestone key has one definition,
+     `doc-id.js epic-meta`, which the epic sub-routines and the task milestone lookup all call. No manual step: an epic converges on its next sync.
+  4. **`epic-registry-manager` is removed.** Delete `.agents/skills/epic-registry-manager/` in each
+     consumer, because the installer does not prune. `create-epic` covers what it did.
+     `setup-consumer.sh` no longer creates `docs/development/epic-registry.md`. A task's `epic:`
+     milestone lookup now resolves the epic through `doc-id.js` instead of the registry.
+  5. **`review-epic` refuses a bare number.** Use `/review-epic 1.3`, a path or a name. `/review-epic 3`
+     is refused because `3` is ambiguous across PRDs. A new Critical check runs `doc-id.js check` on
+     the epic, and the review now compares the epic against every epic on disk instead of a registry.
+  6. **The PRD epic-index column reads `P.E`.** `generate-prd-epic-index.mjs` now also finds PRDs
+     under a domain directory (`docs/prd/{domain}/prd.{P}.{feature}/`), sorts by `E`, and skips and
+     names any epic whose numbers disagree with its directory. It loads `doc-id`, which
+     `setup-consumer.sh` vendors beside it as `scripts/doc-id.cjs`, so a `"type": "module"` consumer
+     can load it. Run `setup-consumer.sh --update`, then `node scripts/generate-prd-epic-index.mjs`
+     once.
+
+- **The global epic registry is retired (task 203).** `docs/development/epic-registry.md` is now a
+  pointer to `docs/prd/prd-registry.md`, and it keeps the old epic numbers as a historical mapping
+  (`1`–`4` → `1.1`–`1.4`). Epic numbers now count within their PRD. Skills that still read the old
+  registry are migrated by tasks 204–207. Ten relative links in four onboarding story artifacts
+  were already dead before the move; they now point at their real targets.
+
+### Fixed
+
+- **Scripts reach only the skills that run them (task 193, obs #263, #289, #175).** A
+  `shared/resources/<script>` literal in the prose of a shared document copies the script into every
+  skill that bundles the document. Eleven such literals named a script some bundling skills never run;
+  they now name the bare filename, and the 21 copies nothing ran are removed: `grant-qa-cycles.sh`
+  from develop-bug, qa-story, qa-task and review-pr; `gh-stage.js`, `handover-render.js` and
+  `handover-verify.js` from qa-story, qa-task and review-pr; and `pipeline-answers.js`, `qa-cycle.sh`,
+  `report-lint.js`, `resolve-paths.sh` and `tracker-comment.js` from review-pr; `resolve-paths.sh` from
+  develop-bug; and `tests/qa-execute-snippets.test.mjs` from qa-story and qa-task. develop-bug, which runs
+  `pipeline-answers.js` from its own step-0 document, now names it in `SKILL.md`. The new
+  `tests/shared-script-literals.test.js` fails on a prose script literal that is not in its
+  allowlist, where each of the 23 entries names the skills that bundle its document and why each
+  needs the copy. It also fails on an entry that no longer matches a line, and on a skill that starts
+  bundling the document without being added. Like the bundler, it reads fenced lines, nested paths
+  and `<!-- cite: -->`-wrapped scripts (a cite of a script is still a dependency). A literal counts
+  as run only inside `require(`/`import(`, after `$(`, or when a command opens the code span it sits
+  in (in a fence, also a shell command at the line start), so `Engine source: …`, `(source …)` and a
+  fenced quote of a path do not pass as commands. The same test pins
+  create-skill's rule sentence in the wording the bundler cannot rewrite.
+
+- **The QA read-back now checks this cycle's verdict, and waits out a moment's `.git/index.lock`
+  (task 192, obs #205, #216).** `qa-read-back.js` HALTs when the QA section's `**Gate Decision**`, or
+  the newest `QA gate …` row written by `qa-task`/`qa-story`, does not name this cycle's gate token.
+  Before, a document whose links were updated while its verdict line or row was left at the previous
+  cycle read clean. A `qa-fix` row after that `QA gate` row is a HALT too, because it means this cycle
+  wrote no row, which a repeated verdict would hide. So is a missing QA section, `**Gate Decision**`
+  line, `QA gate` row or readable `gate:` token. Later `finalise` rows and QA's own `Status →` rows
+  are ignored. `git add` failing on a held `index.lock` is
+  retried three times (200 / 400 / 800 ms) before it is reported, once per run; any other staging
+  failure is reported on the first attempt. `--json` gains `stageAttempts`.
+
+- **The security probe's case check no longer refuses a `null` sink or throws on a value JSON cannot
+  hold (task 190 follow-up, CR-2 and CR-3).** `validateCases` treats `"sink": null` as absent, as the
+  code that reads a case's sink already did. `describeBadCase` renders a BigInt or circular value with
+  `String` instead of throwing, so `runProbeSpec` declines such a case `bad-cases` for a library
+  caller. `probe-boundary-rule.md` now lists `bad-cases` among the decline reasons.
+- **The security probe refuses what it cannot score, and the record says why a case was declined
+  (task 190).** `security-probe.mjs` now exits 2 before running or recording anything in two cases
+  that used to produce a misleading verdict. A `--cases-file` case whose `direction` is not
+  `hostile` or `legitimate`, or whose `sink` is not a known sink, is refused `bad-cases`, naming
+  the case and the accepted values (obs #201) — such a case used to run and count toward neither
+  side. An entry whose path does not exist is refused `entry-not-found`, naming the path and the
+  root (obs #211). Under `--json` both print `{reason, detail}`. A bundled copy run without
+  `--repo-root` now defaults its root to the git checkout it runs in, not the skills directory two
+  levels above it. Each record entry gains `declined_cases: [{id, reason, detail}]` beside the
+  `declined` count (obs #207); the field is additive. `runProbeSpec` declines `bad-cases` for a
+  library caller and still declines a missing entry `entry-not-probeable`.
+  **Breaking:** a CLI run with an unknown case direction or sink, or a missing entry, exits 2 where it
+  used to exit 0 or 1. Fix the value or the path; the error names both.
+
+- **Read-only Explore subagents are never asked to write (task 189, observations #191, #218).** Two
+  pipeline steps dispatched a read-only Explore agent and then told it to write a file; it refused
+  every time, and each run finished only because the orchestrator noticed and did the write by hand
+  (seven recurrences). The dispatching step is now the only writer:
+  - **The QA traceability mapper returns its matrix** between `<!-- matrix-start -->` /
+    `<!-- matrix-end -->` markers. The Steps 5–6 doc saves the reply and a fenced block writes the
+    marked text, byte for byte, to `.summaries/qa-traceability-matrix.md`. The fallback warns only
+    when the reply has no well-formed marked block — a matrix the mapper returned is never discarded.
+  - **The finalise DoD security agent returns a probe plan, and `/finalise` always runs it.** The
+    agent returns `probe_plan[]` (the engine's arguments as an array, plus inline `cases`); the new
+    `/finalise` Step 3b.1 runs it through `security-probe-plan.mjs` into the one
+    `<stem>.dod.<DOD_N>.security.run.json` record and fills `probes_executed` (the record's
+    `totals.executed`) and `probes[]` from it. An entry the engine refuses is recorded with its
+    reason and never counted; an argument holding a space reaches the engine as one argument. This
+    replaces the obs #10 fallback that ran the agent's command only when the record was absent.
+    **Breaking for a custom dispatcher of `finalise-dod-security-prompt.md`:** the agent's YAML no
+    longer carries `probes_executed`, `probe_command` or `probe_cases`; run Step 3b.1's block after
+    the agent returns. `/finalise` users need do nothing.
+  - **The DoD docs agent runs no generator.** It judges a stale skill catalog from the PR diff (a
+    `SKILL.md` frontmatter change with no `docs/reference/skill-catalog.md` change), and now receives
+    `<DIFF_FILE>` to do it.
+  - **`tests/explore-prompts-no-write.test.js`** re-measures every Explore-dispatched prompt — named on
+    a dispatch line, self-declared, or inline in an `Agent(subagent_type="Explore", prompt="…")` call —
+    and fails on a write instruction outside a `<!-- caller-runs -->` region. `code-review-prompt.md`'s
+    caller-side diff scoping is marked that way.
+
+- **`uat-status.mjs` reads no longer write the surfaces template.** With no `uat-surfaces.json`,
+  `--check`, `--coverage`, `--next`, `--item` and the scoreboard each copied the template into the
+  tree before exiting 2, so a read left an untracked `docs/qa/` behind (observation #57). Only
+  `--init` scaffolds the file now, as the qa-next skill already said; every other command exits 2
+  with `uat-surfaces.json not found — run --init …` and writes nothing. `/qa-next` Step 0 sends that
+  refusal to `--init` and `surfaces-unmapped` rather than to `registry-invalid`.
+
+- **A documentation-only DoD fix no longer re-enters QA.** After `/finalise` halts on Definition of
+  Done gaps, `reenter-qa-after-finalise.sh` counted every commit outside the work item's directory
+  as a code change. A CHANGELOG entry or a standards page therefore cost a full QA cycle and a
+  second PR review before `/finalise` could re-run (observation #44, task 202's run). The script
+  now classifies the changed paths with `ci.docsOnly.patterns` through `ci-tree-equivalence.js`,
+  the definition the docs-only CI rule and the 5c carry rule already use. It reads the configuration
+  at `HEAD`, and documentation alone resumes at Step 7. A classifier that cannot run, a malformed
+  configuration and `enabled: false` all count every path as code. This repository's patterns now
+  include `CHANGELOG.md`.
+- **A shell test suite fails when it calls an undefined command.** Previously such a call printed
+  "command not found" and was skipped, and the suite stayed green. The new
+  `shared/resources/undefined-command-guard.sh` records each miss through bash's
+  `command_not_found_handle`, and every `*.test.sh` now sources it and fails on a miss.
+  `tests/shell-suite-guard.test.js` keeps every tracked suite wired and registered in `npm test`.
+  Wiring it in found an assertion in `tracker-access.test.sh` that had never run since task.56: it
+  called helpers that suite never defined. It is fixed, and it fails when the stale banner wording
+  returns.
+
 ## [v0.57.1] - 2026-10-14
 
 ### Changed
@@ -2673,7 +2963,7 @@ All notable changes to this project will be documented in this file. Format foll
   link check is path-filtered to `docs/**` and never saw them.
 
 - **The onboarding PRD and its shipped example linked to `~/.claude/plans/…`**
-  ([`docs/prd/onboarding/prd.onboarding.md`](docs/prd/onboarding/prd.onboarding.md),
+  ([`docs/prd/onboarding/prd.onboarding.md`](docs/prd/onboarding/prd.1.onboarding/prd.1.onboarding.md),
   [`examples/prd-example/prd.onboarding.md`](examples/prd-example/prd.onboarding.md)) — a live link to an
   agent scratch file, in the example that teaches the plan-location rule forbidding it. Replaced with
   a note that the pre-flight plan is not retained.

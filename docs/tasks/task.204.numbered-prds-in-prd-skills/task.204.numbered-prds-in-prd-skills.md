@@ -5,10 +5,12 @@ type: task
 description: "Make create-prd allocate a registry-backed PRD number and write prd.{P}.{feature} in both modes, move the templates, greenfield wrapper and shard-prd onto the numbered path, and make review-prd raise Critical findings for any unnumbered or mismatched PRD, epic or story under it, with an offer to run the migration."
 tags: [create-prd, review-prd, new-product-prd, shard-prd, prd-template, brownfield-prd-template, doc-numbering, prd-registry]
 category: feature
-status: planned
+status: accepted
 priority: Medium
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-15
+completed_date: 2026-10-15
+pr_number: 675
 assignee:
 estimated_effort_hours: 16
 github_issue: 647
@@ -16,7 +18,9 @@ github_issue: 647
 
 # Technical Task: Numbered PRDs in the PRD skills
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.204.review.1.numbered-prds-in-prd-skills.md` implemented 2026-10-15
 
 **GitHub Issue**: [#647](https://github.com/Gamaroff/agent-skills/issues/647)
 
@@ -38,14 +42,15 @@ greenfield path `docs/prd.md`. The engine (`doc-id.js`, task.202) and the migrat
 
 **Key deliverables**:
 
-1. `create-prd` allocates `P` via `doc-id next prd`. It writes the registry row, the
-   `prd.{P}.{feature}/prd.{P}.{feature}.md` file and `prd_number: P`, then runs `doc-id check`,
-   which blocks.
+1. `create-prd` allocates `P` via `doc-id next prd` (bootstrapping a missing registry at `P = 1`).
+   It writes the `prd.{P}.{feature}/prd.{P}.{feature}.md` file with `prd_number: P`, writes the
+   registry row through `doc-id.js`'s `appendPrdRow`, then runs `doc-id check`, which blocks.
 2. The templates, `new-product-prd` and `shard-prd` use the numbered path, and `docs/prd.md` stops
    being a default anywhere.
 3. `review-prd` adds Critical checks for: no registry, an unnumbered PRD, a disagreeing
    dir/stem/frontmatter, and epics or stories under the PRD that are unnumbered or carry the wrong
-   `P`. Each comes with a migration offer. It also fixes the report-name drift.
+   `P`. Each comes with a migration offer. It also fixes the report-name drift, writing
+   `prd.{P}.{feature}.review.{n}.{name}.md`.
 
 **Plan of record**: [`.agents/plans/hierarchical-doc-numbering.md`](../../../.agents/plans/hierarchical-doc-numbering.md), item T3.
 
@@ -77,7 +82,7 @@ greenfield path `docs/prd.md`. The engine (`doc-id.js`, task.202) and the migrat
   for the PRD's number.
 - **review-prd's report name disagrees with the standard.** The skill writes
   `prd.review.{N}.{feature}.md` (`review-prd/SKILL.md:597`, `:599`, `:140`, `:779`), while
-  `docs/standards/file-naming.md:77` says `prd.{name}.review.{n}.{name}.md`. No such report exists
+  `docs/standards/file-naming.md:84` (task.202's row) says `prd.{P}.{name}.review.{n}.{name}.md`. No such report exists
   in the tree today (`find docs -name "prd*review*"` returns nothing), so the fix has no readers to
   migrate.
 
@@ -131,12 +136,26 @@ PRD naming.
 
 ### Dependencies consumed (not built here)
 
-- **task.202, `shared/resources/doc-id.js`.** Provides `next prd` (reads `${PRD_ROOT}/prd-registry.md`),
-  `check <path>`, `parse`/`format`, and the `--json` `reason` contract. This task calls those
-  subcommands as task.202 ships them. If task.202's spelling differs from the plan's, this task
-  follows task.202.
-- **task.203, `shared/resources/migrate-doc-numbering.mjs`.** Has a `--check` mode (read-only
-  report) and an apply mode. `review-prd` calls `--check` and offers the apply.
+- **task.202, `shared/resources/doc-id.js`.** Shipped CLI (recorded at review, 2026-10-15):
+  `parse <name>`, `next prd [--prd-root R]`, `next epic --prd-dir`, `next story --epic-dir`,
+  `check <path> [--prd-root R]`, `check --corpus [--prd-root R]`, `epic-meta`; exit 0 ok / 1 guard /
+  2 usage, `--json` `reason`.
+  - `next prd` answers `{ok, reason, next}`; reasons `ok`, `registry-missing` (no registry file — it
+    does **not** bootstrap), `registry-invalid`, `registry-behind`, `unreadable`.
+  - `check <path>` answers `reason: ok | findings` with `findings[]` of `{reason, path, detail}`;
+    finding reasons are `CHECK_REASONS`: `bad-shape`, `dir-stem-mismatch`, `frontmatter-mismatch`,
+    `parent-missing`, `parent-number-mismatch`, `unregistered`, `duplicate-id`, `registry-missing`,
+    `unreadable`. `check --corpus` adds `documents` and the run reasons `empty`, `root-missing`.
+  - **No CLI command writes a registry row.** The library export `appendPrdRow(registryText, {n,
+    title, href, folder, status, created})` does, and bootstraps the empty registry when
+    `registryText` is `null`. `create-prd` calls it through one `command node -e` snippet that
+    requires the bundled `references/doc-id.js`; the engine is not changed by this task.
+- **task.203, `shared/resources/migrate-doc-numbering.mjs`.** `--check` (read-only), default dry run,
+  `--apply`; `--name <path>=<slug>` names a PRD whose slug cannot be derived. `--check` answers
+  `needs-migration` (exit 1) **before** consulting blockers, so its payload's `blockers[]` must be read
+  too; other fields `mapping`, `counts`, `corpus`. A root-level `docs/prd.md` is discovered as an L3
+  monolith and blocks with `unplaced-prd` until `--name docs/prd.md=<slug>` is passed
+  (`migrate-doc-numbering.mjs:310–322`, `:425–431`). `review-prd` calls `--check` and offers the apply.
 - **The PRD registry format** (`docs/standards/prd-registry.md`) and the updated `prd-documents.md`
   / `file-naming.md` rows are task.202's. This task does not restate them.
 
@@ -146,19 +165,22 @@ PRD naming.
 create-prd (both modes)
   Step 1  pre-flight, unchanged; continuation keeps an existing PRD's number
   Step 1c (new) resolve {domain}, {feature}; P = `doc-id next prd`
-          (bootstraps ${PRD_ROOT}/prd-registry.md when absent)
+          registry-missing + no prd.{N}.* dir under ${PRD_ROOT} → P = 1 (bootstrap)
+          registry-missing + a numbered PRD dir exists       → HALT (run /review-prd)
   Step 2  create-doc → ${PRD_ROOT}/{domain}/prd.{P}.{feature}/prd.{P}.{feature}.md
           frontmatter: name: prd.{P}.{feature}, prd_number: P
-          registry row appended (P, feature, path, status draft, created)
+          registry row via appendPrdRow (P, title, href, folder, draft, created);
+          creates ${PRD_ROOT}/prd-registry.md when absent
   Step 3.5 (new) `doc-id check <prd file>` → non-ok = HALT, name the reason
-  Step 5  completion: "commit the PRD and the registry row together" (handed to the user)
+  Step 4  next steps: "commit the PRD and the registry row together" (handed to the user)
 
 review-prd
   Input   accepts prd.{P}, bare P, slug, or path; keeps kind=prd, no artifact infix
   Step 1  loads the PRD registry + the PRD's epics-index; epic registry dropped
-  Step 2  `doc-id check` over the PRD and its subtree → each failure is Critical
-          `migrate-doc-numbering.mjs --check` → offer apply (AskUserQuestion)
-  Step 11 report: prd.{P}.review.{n}.{feature}.md
+  Step 2  one `doc-id check --corpus` over ${PRD_ROOT}, findings filtered to the
+          PRD directory by path prefix → each finding is Critical
+          `migrate-doc-numbering.mjs --check` → no blockers: offer apply (AskUserQuestion)
+  Step 11 report: prd.{P}.{feature}.review.{n}.{name}.md
 ```
 
 ### Important Clarifications
@@ -168,7 +190,11 @@ review-prd
   therefore becomes the completion message's instruction: name both paths and say they go in one
   commit. It is not a `git commit` inside the skill.
 - **A number is never re-allocated for the same PRD.** *Resume* and *Start fresh (overwrite)* keep
-  the existing `P`, and so do *Extend* and *Revise*. Only a genuinely new PRD calls `next prd`. A
+  the existing `P`, and so do *Extend* and *Revise*. Only a genuinely new PRD calls `next prd` — the
+  complete-PRD menu's *Start fresh*, which this task relabels "Create a new, separate PRD (new number;
+  this one is untouched)" so it no longer shares a label with the incomplete menu's overwrite. A found
+  PRD with no number (a legacy name) is not continued: the skill halts and points at `/review-prd`,
+  which offers the migration. A
   PRD abandoned after allocation keeps its row, with status `cancelled`. Numbers are never reused,
   as in the task and bug registries.
 - **Greenfield gets a `{domain}` too.** It is asked once, and the recommended answer is the product
@@ -183,10 +209,10 @@ review-prd
   to fill. The template instruction says the number comes from `create-prd` and that an unfilled
   `{{prd_number}}` means stop. That closes the bypass where `create-doc` + `prd-template` writes an
   unnumbered PRD.
-- **Report name.** `prd.{P}.review.{n}.{feature}.md` uses the short-id form that epic, story and
-  task review reports already use (`file-naming.md:36`, `:51`, `:76`). It must agree with whatever
-  row task.202 writes into `file-naming.md`. If task.202 chose the full-stem form instead, this task
-  follows it (see Notes, *Author decisions*).
+- **Report name.** `prd.{P}.{feature}.review.{n}.{name}.md`, the full-stem form task.202 wrote into
+  `file-naming.md:84` (resolved at review, 2026-10-15). `{n}` is the highest existing plus 1 over
+  `prd.{P}.*.review.*.md` in the PRD directory. `doc-id parse` reads it as kind `prd`, artifact
+  `review`, which is how input resolution excludes it.
 
 ---
 
@@ -220,6 +246,14 @@ review-prd
 
 - ❌ `doc-id.js`, the registry format and the standards rows. These are task.202.
 - ❌ The migration script and migrating this repo. These are task.203.
+  - **Deviation, recorded at acceptance (PR review 1, PC-5; PR review 2, PC-4):** three edits to
+    `shared/resources/migrate-doc-numbering.mjs` shipped here. The third (QA cycle 9) exports
+    `inRewriteScope` and moves the literal pass onto it, so the run and review-prd's migration guard
+    share one rewrite-scope rule. The `TEST_FILE_EXCEPTIONS` literal is
+    built from segments, so bundling review-prd stops pulling 45 extra files. The token pass skips
+    undotted stems (`prd`, `index`), because migrating `docs/prd.md` through review-prd rewrote
+    `type: prd` in every other PRD (gate 7 CR-1). The remaining engine defects go to task.211
+    (GitHub #676).
 - ❌ Epic-side skills (`create-epic`, `create-epics-from-shards`, `review-epic`,
   `generate-prd-epic-index.mjs`). These are task.205. Independent of this task.
 - ❌ Story and pipeline id parsing. This is task.206.
@@ -239,9 +273,10 @@ review-prd
 - **Affected**: consumers holding a monolithic `docs/prd.md`, and the ten reader sites above.
 - **Migration path**: the reader sites move in this task (Phase 3). An existing `docs/prd.md` is
   handled by `migrate-doc-numbering.mjs` (task.203). `review-prd` detects it, reports Critical, and
-  offers the migration. **Precondition**: task.203 must treat a root-level `docs/prd.md` as a PRD
-  to number and place. If task.203 does not, Phase 2 of this task halts on a found `docs/prd.md`
-  with a message naming the manual move. It never silently ignores the file.
+  offers the migration. **Precondition (met)**: task.203 discovers a root-level `docs/prd.md` as an
+  L3 monolith and numbers it once its slug is given with `--name docs/prd.md=<slug>`
+  (`migrate-doc-numbering.mjs:310–322`, `:425–431`). `review-prd` asks for that slug when the dry run
+  reports `unplaced-prd`; `shard-prd` refuses the file. Neither silently ignores it.
 
 ### 5.2 `create-prd` refuses to finish on a name `doc-id check` rejects
 
@@ -254,7 +289,7 @@ review-prd
 ### 5.3 review-prd report filename
 
 - **Before**: `prd.review.{N}.{feature}.md`.
-- **After**: `prd.{P}.review.{n}.{feature}.md`.
+- **After**: `prd.{P}.{feature}.review.{n}.{name}.md` (`file-naming.md:84`).
 - **Affected**: nobody. No report of the old form exists in the tree, and no code reads it.
 - **Migration path**: none.
 
@@ -266,54 +301,56 @@ review-prd
 
 **Phase 0, gate.** HALT unless task.202 and task.203 are `accepted` in
 `docs/tasks/task-registry.md`, and `shared/resources/doc-id.js` and
-`shared/resources/migrate-doc-numbering.mjs` exist. Record the exact subcommand spellings and
-`reason` values they ship before writing any prose that calls them.
+`shared/resources/migrate-doc-numbering.mjs` exist. The shipped subcommand spellings and `reason`
+values are recorded under *Dependencies consumed* (checked at review, 2026-10-15); re-confirm them
+before writing prose that calls them.
 
 ### Phase 1: `create-prd` allocates and checks the number
 
 **Risk**: Medium. **Files**: `skills/create-prd/SKILL.md`. **Depends on**: Phase 0.
 
-- [ ] Mode Parameter table: both rows output `${PRD_ROOT}/{domain}/prd.{P}.{feature}/prd.{P}.{feature}.md`. Greenfield `{domain}` defaults to the product slug.
-- [ ] New *Step 1c — Allocate the PRD number*. Source `references/resolve-paths.sh || exit 1`, then run `doc-id next prd --json`, which bootstraps the registry when absent. Act on `reason`, and never hand-compute "highest + 1".
-- [ ] Continuation (1a): Resume, Start fresh (overwrite), Extend and Revise reuse the found PRD's `prd_number`. Only "Start fresh — Create a new PRD" allocates.
-- [ ] *PRD Frontmatter*: add `prd_number` and `name: prd.{P}.{feature}`.
-- [ ] Registry row appended in the same step that writes the file.
-- [ ] New *Step 3.5 — Numbering check (blocking)*: `doc-id check "<prd file>" --json`. A non-`ok` result HALTs with the reason verbatim.
-- [ ] Allowed writes: add `${PRD_ROOT}/prd-registry.md`; drop `docs/prd.md` from both lists.
-- [ ] Rewrite *IMPORTANT — Epic Numbering* (`:516`): epic files take `epic.{P}.{E}`, where E counts within this PRD and equals the PRD's own "Epic N".
-- [ ] Completion message: the PRD and the registry row are one commit, made by the user.
-- [ ] Example Activations (`:720`): show the numbered path.
+- [x] Mode Parameter table: both rows output `${PRD_ROOT}/{domain}/prd.{P}.{feature}/prd.{P}.{feature}.md`. Greenfield `{domain}` defaults to the product slug.
+- [x] New *Step 1c — Allocate the PRD number* (shipped as **Step 1.5**: create-prd's brownfield branch already has a `1c`), one fenced block. Source `references/resolve-paths.sh || exit 1`, then run `doc-id next prd --json`. `ok` → `P = next`. `registry-missing` → `P = 1` when no directory under `${PRD_ROOT}` parses as a numbered PRD (`doc-id parse`), else HALT ("registry missing but numbered PRDs exist — run `/review-prd`"). Any other reason → HALT with it. Never hand-compute "highest + 1".
+- [x] Continuation (1a): Resume, Start fresh (overwrite), Extend and Revise reuse the found PRD's `prd_number`, read by one fenced block (`doc-id parse` of the found file's name, cross-checked with frontmatter `prd_number`). A found PRD that does not parse as numbered → HALT, pointing at `/review-prd` (migration). Only the complete-PRD menu's *Start fresh*, relabelled "Create a new, separate PRD (new number; this one is untouched)", allocates.
+- [x] *PRD Frontmatter*: add `prd_number` and `name: prd.{P}.{feature}`.
+- [x] New registry-row block, run in the step that writes the file: one `command node -e` that requires the bundled `references/doc-id.js`, reads `${PRD_ROOT}/prd-registry.md` (or `null` when absent — `appendPrdRow` bootstraps it), appends `{n: P, title, href: "{domain}/prd.{P}.{feature}/prd.{P}.{feature}.md", folder: "{domain}", status: "draft", created}`, and writes the file. A thrown `.reason` (`duplicate-row`, `registry-invalid`, `no-table`, `bad-row`) HALTs with it.
+- [x] New *Step 3.5 — Numbering check (blocking)*: `doc-id check "<prd file>" --json`. A non-`ok` result HALTs with the reason verbatim.
+- [x] Allowed writes: add `${PRD_ROOT}/prd-registry.md`; drop `docs/prd.md` from both lists.
+- [x] Rewrite *IMPORTANT — Epic Numbering* (`:516`): epic files take `epic.{P}.{E}`, where E counts within this PRD and equals the PRD's own "Epic N".
+- [x] Step 4 (*Next Steps*) completion message: the PRD and the registry row are one commit, made by the user.
+- [x] Example Activations (`:720`): show the numbered path.
 
 ### Phase 2: Templates, greenfield wrapper and sharding
 
 **Risk**: Low. **Files**: the two template YAMLs, their SKILL.md files, `new-product-prd/SKILL.md`, `shard-prd/SKILL.md`. **Depends on**: Phase 1.
 
-- [ ] `prd-tmpl.yaml` and `brownfield-prd-tmpl.yaml`: `output.filename` set to the placeholder path. Update the SKILL.md metadata copies to match.
-- [ ] Template epic-numbering notes (`prd-tmpl.yaml:141`, `brownfield-prd-tmpl.yaml:237`): change to per-PRD numbering.
-- [ ] Template instruction: `{{prd_number}}` is allocated by `create-prd`. An unfilled one means stop and run `/create-prd`.
-- [ ] `new-product-prd/SKILL.md:67`, `:98`: numbered output.
-- [ ] `shard-prd/SKILL.md`, Method 1 (`:87`): explode the numbered PRD into its own directory. Method 2 (`:123`) gets a PRD special case: the target is the PRD's directory, not `docs/{document-name}/`. Update the examples (`:21`, `:276-280`).
-- [ ] `shard-prd`: a found root-level `docs/prd.md` is reported as legacy and pointed at `/review-prd` (migration). It is never exploded into `$PRD_ROOT`.
+- [x] `prd-tmpl.yaml` and `brownfield-prd-tmpl.yaml`: `output.filename` set to the placeholder path. Update the SKILL.md metadata copies to match.
+- [x] Template epic-numbering notes (`prd-tmpl.yaml:141`, `brownfield-prd-tmpl.yaml:237`): change to per-PRD numbering.
+- [x] Template instruction: `{{prd_number}}` is allocated by `create-prd`. An unfilled one means stop and run `/create-prd`.
+- [x] `new-product-prd/SKILL.md:67`, `:98`: numbered output.
+- [x] `shard-prd/SKILL.md`, Method 1 (`:87`): explode the numbered PRD into its own directory. Method 2 (`:123`) gets a PRD special case: the target is the PRD's directory, not `docs/{document-name}/`. Update the examples (`:21`, `:276-280`).
+- [x] `shard-prd`: a found root-level `docs/prd.md` is reported as legacy and pointed at `/review-prd` (migration). It is never exploded into `$PRD_ROOT`.
 
 ### Phase 3: `review-prd` enforces numbering, and the readers follow the path
 
 **Risk**: Medium. **Files**: `skills/review-prd/SKILL.md` plus the ten reader sites. **Depends on**: Phase 1.
 
-- [ ] Input Resolution: accept `prd.{P}`, a bare `P` and a slug. Keep only matches that `doc-id` parses as kind `prd` with no artifact infix, which excludes review reports.
-- [ ] Step 1: load `${PRD_ROOT}/prd-registry.md` and the PRD's epics-index block. Drop the epic registry (`:196-197`, `:819`).
-- [ ] Step 2: replace the `prd.[kebab-name]` checks (`:225-226`) with `doc-id check` over the PRD file and every epic and story under it. Each non-`ok` is **Critical** and carries its `reason`. Four classes: registry missing, PRD unnumbered, dir/stem/frontmatter disagree, child unnumbered or wrong `P`.
-- [ ] Step 2: when any of those fire, run `migrate-doc-numbering.mjs --check` and fold its plan into QUESTION POINT 1 as an apply/skip choice. Apply only on an explicit yes, then re-run `check`.
-- [ ] Step 5 and Step 6 examples (`:411-413`): `epic.{P}.{E}` and `story.{P}.{E}.{S}`.
-- [ ] Step 11 and Step 0 (`:140`, `:597-599`, `:779`): report name `prd.{P}.review.{n}.{feature}.md`, with N from that glob.
-- [ ] Reader sites: replace `docs/prd.md` with "the PRD under `${PRD_ROOT}/**/prd.{P}.*/`; ask which when several exist".
+- [x] Input Resolution: accept `prd.{P}`, a bare `P` and a slug. Keep only matches that `doc-id` parses as kind `prd` with no artifact infix, which excludes review reports.
+- [x] Step 1: load `${PRD_ROOT}/prd-registry.md` and the PRD's epics-index block. Drop the epic registry (`:196-197`, `:819`).
+- [x] Step 2: replace the `prd.[kebab-name]` checks (`:225-226`) with one fenced block: `doc-id check --corpus --json` over `${PRD_ROOT}`, findings kept when their `path` lies under the PRD's directory. Each finding is **Critical** and carries its `reason`. Four classes: registry missing (`registry-missing`), PRD unnumbered (the PRD file fails `doc-id parse`, so the corpus walk reports `bad-shape`), dir/stem/frontmatter disagree (`dir-stem-mismatch`, `frontmatter-mismatch`), child unnumbered or wrong `P` (`bad-shape`, `parent-number-mismatch`).
+- [x] Step 2: when any of those fire, run `migrate-doc-numbering.mjs --check --json` and read `reason`, `blockers[]` and `mapping`. No blockers → fold `mapping` into QUESTION POINT 1 as an apply/skip choice. `unplaced-prd` on a monolith → ask for its slug and re-run with `--name <path>=<slug>`. Any other blocker → report it as Critical and offer no apply. Apply (`--apply`) only on an explicit yes, then re-run the corpus check.
+- [x] Step 5 and Step 6 examples (`:411-413`): `epic.{P}.{E}` and `story.{P}.{E}.{S}`.
+- [x] Step 11 and Step 0 (`:140`, `:597-599`, `:779`): report name `prd.{P}.{feature}.review.{n}.{name}.md`, `{n}` the highest existing plus 1 over `prd.{P}.*.review.*.md`.
+- [x] Reader sites: replace `docs/prd.md` with "the PRD under `${PRD_ROOT}/**/prd.{P}.*/`; ask which when several exist".
+- [x] `tests/epic-numbering-retirement.test.js`: drop the `skills/create-prd/SKILL.md` and `skills/review-prd/SKILL.md` entries from `ALLOW` — this task removes their last `epic-registry.md` literal (`create-prd/SKILL.md:516`, `review-prd/SKILL.md:197`, `:819`), and the guard's second test fails on an allowlisted file that no longer carries one. Found by `git grep -nE "epic-registry|prd\.review\.|docs/prd\.md" -- '*.test.*' 'tests/**'`.
 
 ### Phase 4: Behavioural test, bundle, catalog
 
 **Risk**: Low. **Files**: `evals/shared/tests/prd-skill-numbering.test.mjs` (new), `package.json` only if its glob does not already reach the file. **Depends on**: Phases 1–3.
 
-- [ ] Snippet test: slice the live allocation, check and migration-offer snippets out of `create-prd/SKILL.md` and `review-prd/SKILL.md`. Run them under bash in a `makeConsumerRoot` scratch tree and assert outcomes (see Testing Strategy).
-- [ ] Mutation-prove each assertion.
-- [ ] `npm run bundle`: `doc-id.js` and `migrate-doc-numbering.mjs` now reach `create-prd` and `review-prd`. Then `npm run bundle:check`, `npm run generate-catalog`, and `npm run validate` on each touched skill.
+- [x] Snippet test: slice the live allocation, check and migration-offer snippets out of `create-prd/SKILL.md` and `review-prd/SKILL.md`. Run them under bash in a `makeConsumerRoot` scratch tree and assert outcomes (see Testing Strategy).
+- [x] Mutation-prove each assertion.
+- [x] `npm run bundle`: `doc-id.js` and `migrate-doc-numbering.mjs` now reach `create-prd` and `review-prd`. Then `npm run bundle:check`, `npm run generate-catalog`, and `npm run validate` on each touched skill.
 
 ---
 
@@ -344,12 +381,13 @@ Population command (re-run before editing; the list above is its 2026-10-13 outp
 
 ### Tests
 
-15. ✅ `evals/shared/tests/prd-skill-numbering.test.mjs` (new). It reuses `evals/shared/lib/consumer-root.mjs` (`makeConsumerRoot`) and the slice-the-live-line pattern of `evals/shared/tests/optional-file-lookups.test.mjs`.
+15. ✅ `evals/shared/tests/prd-skill-numbering.test.mjs` (new). It reuses `evals/shared/lib/consumer-root.mjs` (`makeConsumerRoot`) and the slice-the-live-line pattern of `evals/shared/tests/optional-file-lookups.test.mjs`. Reached by `npm test`'s `'evals/shared/tests/*.test.mjs'` glob — no runner edit.
+16. ✅ `tests/epic-numbering-retirement.test.js`: two `ALLOW` entries removed.
 
 ### Generated (bundle output, not hand-edited)
 
-16. `skills/create-prd/references/doc-id.js` and `skills/review-prd/references/{doc-id.js,migrate-doc-numbering.mjs}`, plus their closures.
-17. `docs/reference/skill-catalog.md`.
+17. `skills/create-prd/references/doc-id.js` and `skills/review-prd/references/{doc-id.js,migrate-doc-numbering.mjs}`, plus their closures.
+18. `docs/reference/skill-catalog.md`.
 
 ---
 
@@ -362,13 +400,19 @@ shipped. It asserts behaviour, never that a string exists.
 
 | # | Fixture | Snippet | Expect |
 |---|---|---|---|
-| 1 | empty `docs/prd/` | create-prd allocation | `P = 1`; `docs/prd/prd-registry.md` created |
+| 1 | empty `docs/prd/` (no registry) | create-prd allocation, then registry-row block | `P = 1`; `docs/prd/prd-registry.md` created with row 1 and counter 2 |
+| 1b | no registry, but `docs/prd/x/prd.2.x/` exists | create-prd allocation | HALT branch fires, no number, no registry written |
 | 2 | registry with next = 3 | allocation | `P = 3` |
 | 3 | PRD written at the numbered path with `prd_number` | create-prd check | `reason: ok`, exit 0 |
 | 4 | the same PRD with `prd_number` stripped | create-prd check | non-`ok`, non-zero exit (the HALT branch fires) |
 | 5 | legacy `prd.onboarding/prd.onboarding.md` with an epic below | review-prd check | a non-`ok` for the PRD and for the epic |
 | 6 | the same as #5 | review-prd migration `--check` | lists the planned renames; writes nothing (`git status --porcelain` empty) |
-| 7 | numbered PRD with review reports `prd.1.review.{1,2}.x.md` | review-prd N glob | next is `3`; input resolution does not pick a report as the PRD |
+| 6b | the same as #5 | review-prd apply snippet, then the corpus check | renames applied; the corpus check answers `ok` |
+| 7 | numbered PRD with review reports `prd.1.x.review.{1,3}.y.md` | review-prd N block | next is `4` (highest + 1, not count + 1); input resolution does not pick a report as the PRD |
+| 8 | existing `prd.4.x/prd.4.x.md` (`prd_number: 4`), registry next = 5 | create-prd continuation block | `P = 4`; registry byte-identical |
+| 9 | found legacy `prd.x/prd.x.md` | create-prd continuation block | HALT branch fires, pointing at `/review-prd` |
+| 10 | numbered PRD, registry deleted; and one with `prd_number` wrong | review-prd check | `registry-missing`; `frontmatter-mismatch` — the two classes row 5 does not show |
+| 11 | the create-prd allocation, row and check blocks as sliced | count `command node` invocations | exactly 3 (the Performance bound) |
 
 **Control case** (create-task § 8): row 7's PRD sits beside `prd.12.other/`. Resolving `1` must
 not match `12`. Row 5 includes a numbered PRD whose epic carries the *wrong* `P`, a defect class
@@ -377,6 +421,10 @@ that this document's own example (an unnumbered PRD) never shows.
 **Mutation proof**:
 - Delete the HALT line in Step 3.5 → row 4 goes red.
 - Swap the input filter for the old `prd.*{name}*` glob → row 7 goes red.
+- Make the `registry-missing` branch allocate unconditionally → row 1b goes red.
+- Drop the unnumbered-PRD HALT in continuation → row 9 goes red.
+- Count reports instead of taking the highest → row 7 goes red (its series has a gap).
+- Drop the PRD-directory prefix filter in the numbering check → row 5 goes red.
 
 ### Integration Tests
 
@@ -398,30 +446,42 @@ that this document's own example (an unnumbered PRD) never shows.
 
 ### Functional
 
-- [ ] A brownfield and a greenfield `create-prd` run each produce `${PRD_ROOT}/{domain}/prd.{P}.{feature}/prd.{P}.{feature}.md` with `prd_number: P` and a registry row (test rows 1–3; integration smoke).
-- [ ] Re-running `create-prd` on an existing PRD (any continuation option except "create a new PRD") keeps its `P` and allocates nothing.
+- [ ] A brownfield and a greenfield `create-prd` run each produce `${PRD_ROOT}/{domain}/prd.{P}.{feature}/prd.{P}.{feature}.md` with `prd_number: P` and a registry row; a missing registry is bootstrapped only when no numbered PRD exists (test rows 1, 1b, 2, 3; integration smoke).
+- [ ] Re-running `create-prd` on an existing PRD (any continuation option except "Create a new, separate PRD") keeps its `P` and allocates nothing; an unnumbered found PRD halts (test rows 8, 9).
 - [ ] `create-prd` HALTs on any non-`ok` `doc-id check` result (row 4).
-- [ ] `review-prd` reports each of the four numbering classes as **Critical**, with the engine's `reason` (row 5 plus integration).
-- [ ] `review-prd` offers the migration, applies it only on a yes, and re-checks afterwards (row 6).
-- [ ] `review-prd` writes `prd.{P}.review.{n}.{feature}.md` and never resolves a review report as the PRD (row 7).
-- [ ] `git grep -n "docs/prd\.md" -- ':!docs/tasks' ':!docs/bugs' ':!**/references/**'` returns only the legacy-detection lines in `shard-prd` and `review-prd`.
+- [ ] `review-prd` reports each of the four numbering classes as **Critical**, with the engine's `reason` (rows 5 and 10).
+- [ ] `review-prd` offers the migration only when `--check` reports no blockers, applies it only on a yes, and re-checks afterwards (rows 6, 6b).
+- [ ] `review-prd` writes `prd.{P}.{feature}.review.{n}.{name}.md` and never resolves a review report as the PRD (row 7).
+- [ ] `git grep -n "docs/prd\.md" -- ':!docs/tasks' ':!docs/bugs' ':!**/references/**' ':!.agents/plans' ':!shared/resources/tests' ':!evals/shared/tests/prd-skill-numbering.test.mjs' ':!CHANGELOG.md'` returns only the legacy-detection lines in `shard-prd` and `review-prd` (its migration guard included). (The exclusions are the plan of record, task.203's monolith fixtures and this task's own test fixtures and the CHANGELOG entry, which name the legacy path on purpose.)
 
 ### Performance
 
-- [ ] Allocation and check add at most two `command node` calls to a `create-prd` run.
-- [ ] `review-prd`'s subtree check is a single `doc-id check` invocation over the PRD directory, or one per document if task.202 checks only files. It does not run a separate find per epic.
+- [ ] Allocation, the registry row and the check add exactly three `command node` calls to a `create-prd` run (test row 11).
+- [ ] `review-prd`'s subtree check is a single `doc-id check --corpus` invocation, filtered by path prefix. It does not run a separate check per epic (documentation criterion: the block in `review-prd/SKILL.md` shows one invocation).
 
 ### Code Quality
 
-- [ ] `npm test` and `npm run eval:all` pass with `.agents/skills` moved aside.
+- [ ] `npm run ci:fast` (`format:check` + `npm test`) and `npm run eval:all` pass with `.agents/skills` moved aside.
 - [ ] `npm run bundle:check` is clean, with no `UNREACHED` copies.
 - [ ] `npm run validate -- skills/<skill>/` passes for every touched skill. `npm run generate-catalog` produces no diff after a commit.
 - [ ] Every assertion in the new test is mutation-proven (Testing Strategy).
+  - **Narrowed at acceptance (DoD 1, CQ4; corrected at DoD 2):** the evidence is a count per cycle,
+    not a per-row map. Each QA fix cycle's **Fixes Applied** entry in the implementation report records
+    how many mutations it ran and that each turned a row red as predicted — cycle 1: 16 (21/21 rows,
+    re-confirmed by gate 2's QA-2), then 11, 6, 2, 5, 4, 5, 8, 4 and 2 for cycles 2–10. Most entries
+    give the count only; they do not name each mutation and the row it turned red, and no
+    member-by-member map of the 41 rows exists.
 
 ### Migration
 
-- [ ] `docs/standards/file-naming.md`'s PRD review row (task.202) and the review-prd report name agree.
+- [ ] `docs/standards/file-naming.md:84`'s PRD review row (task.202) and the review-prd report name agree: `prd.{P}.{name}.review.{n}.{name}.md`.
 - [ ] A consumer holding `docs/prd.md` gets a Critical finding plus a migration offer from `review-prd`, and a refusal from `shard-prd`. Neither skill silently reads it.
+  - **Narrowed at acceptance (PR review 1, PC-1):** the Critical finding and the `shard-prd` refusal
+    hold for every `docs/prd.md`. The migration **offer** is withheld, with a Critical blocker naming
+    the hand fix, when `review-prd/scripts/migration-guard.mjs` refuses the shape: no closed
+    frontmatter block (`no-frontmatter`), a PRD that would land outside a domain directory
+    (`no-domain`), or a monolith that files outside the PRD root name (`outside-links`). The guard
+    is lifted shape by shape by task.211 (GitHub #676).
 
 ---
 
@@ -484,12 +544,125 @@ that this document's own example (an unnumbered PRD) never shows.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-15
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.204.qa.10.numbered-prds-in-prd-skills.md](./task.204.qa.10.numbered-prds-in-prd-skills.md)
+- **Gate File**: [task.204.gate.10.numbered-prds-in-prd-skills.yml](./task.204.gate.10.numbered-prds-in-prd-skills.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 41 (new) + full suite 5717 pass / 0 fail
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0 high, 2 medium (+3 advisory)
+- **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+- Gate 9's findings are fixed and verified.
+- The migration guard's reference test misses C-quoted paths (CR-1) and scans long runs quadratically (CR-2).
+
+## Definition of Done - Gaps Identified — run 1 (historical, superseded by run 2)
+
+**Status:** SUPERSEDED — every gap below was closed; see the run 2 section that follows
+
+### QA Gate Status
+
+**QA Report**: `task.204.qa.8.numbered-prds-in-prd-skills.md`
+**Gate File**: `task.204.gate.8.numbered-prds-in-prd-skills.yml`
+**Gate Status**: ⚠️ CONCERNS — **Quality Score**: 50/100 (accepted for finalise via Step 5c, PR review 1 CONCERNS)
+
+### Missing Criteria:
+
+1. **Code Quality (CQ1) — CI is red:**
+   - [ ] `skills/review-prd/scripts/migration-guard.mjs:25` calls `process.exit` straight after `console.log`, which `shared/resources/tests/stdout-drain-on-exit.test.mjs` forbids in a new file. CI `test` failed on `63c1e06b`, `687560bb` and `a61f3e28`.
+
+2. **Code Quality (CQ4) — mutation evidence:**
+   - [ ] "Every assertion in the new test is mutation-proven" has per-cycle counts, not a member-by-member map of the 40 rows.
+
+3. **Documentation:**
+   - [ ] CHANGELOG.md `[Unreleased]` has no task 204 entry.
+   - [ ] `docs/concepts/quickstart-story.md` (lines 72–75, 83, 149) and `docs/reference/configuration.md` (line 20) show the old unnumbered PRD paths.
+
+### Next Steps:
+
+- [ ] **BLOCKING**: set `process.exitCode` and return in `migration-guard.mjs`; the code change re-enters QA at 5a
+- [ ] Add the CHANGELOG entry; update the two reference docs
+- [ ] Map each test row to a recorded mutation, or narrow CQ4
+- [ ] Re-run /finalise
+
+**Estimated Effort:** Small–Medium (1–2 hours)
+
+**Gap Report Generated:** 2026-10-15
+**Detailed Verification Log:** See `task.204.dod.1.numbered-prds-in-prd-skills.md` for complete verification evidence.
+
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.204.qa.10.numbered-prds-in-prd-skills.md`
+**Gate File**: `task.204.gate.10.numbered-prds-in-prd-skills.yml`
+**Gate Status**: ⚠️ CONCERNS (80/100) — both findings fixed in `bcacdfea`, accepted without a gate via Step 5c (PR review 2, CONCERNS, 0 high)
+
+All Definition of Done criteria have been verified (run 2):
+
+✅ **Acceptance Criteria:** 16/16 (CQ4 and the `docs/prd.md` grep criterion as amended at acceptance)
+✅ **Tests:** `evals/shared/tests/prd-skill-numbering.test.mjs`, 41 rows; CI `test` SUCCESS @ `ec926081`
+✅ **PR Review:** PR #675 — `task.204.pr-review.2.numbered-prds-in-prd-skills.md` (single-maintainer host)
+✅ **Documentation:** CHANGELOG entry; reference docs and standards notes match what shipped
+✅ **Security Review:** 24 probes executed, 0 reproduced; no secrets, no shell spawns
+⚠️ **Compliance Review:** not applicable
+
+**Follow-ups:** task.211 (#676) — migration-engine fixes that lift review-prd's migration guard;
+a shared PRD-path containment predicate in `doc-id.js` and recovery for a PRD written without its
+registry row (recorded in gates 2–10).
+
+**Task marked as ACCEPTED on:** 2026-10-15
+
+**Detailed Verification Log:** See `task.204.dod.2.numbered-prds-in-prd-skills.md` for complete verification evidence.
+
+---
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-13 | 1.0     | Initial draft (from plan T3) | create-task |
+| 2026-10-15 | 1.1     | Review passed (8/10) after fixes — `next prd` does not bootstrap and no CLI writes a row (row write via `appendPrdRow`); report name follows file-naming.md:84 full stem; migration payload `blockers[]`/`--name`; retirement-guard ALLOW entries; grep exclusions; test rows 1b, 6b, 8–11 | review-task |
+| 2026-10-15 |         | Status → ready-for-development | review-task |
+| 2026-10-15 |         | Implemented — 25 files, 16 tests (`prd-skill-numbering.test.mjs`) | develop |
+| 2026-10-15 |         | QA gate CONCERNS (60/100) — 4 findings | qa-task |
+| 2026-10-15 |         | QA findings fixed — cycle 1, 4 findings (CR-1, CR-2, QA-1, QA-2) + 2 advisory (CR-3, CR-4); 21 test rows, each mutation-proven | qa-fix |
+| 2026-10-15 |         | QA gate CONCERNS (60/100) — 4 findings | qa-task |
+| 2026-10-15 |         | QA findings fixed — cycle 2, 4 findings (CR-1, CR-2, CR-3, CR-5) + 3 advisory (CR-6, CR-7, CR-8); CR-4 deferred; 29 test rows | qa-fix |
+| 2026-10-15 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-10-15 |         | QA findings fixed — cycle 3, 1 finding (CR-1) + 4 advisory (CR-2..CR-5); 33 test rows | qa-fix |
+| 2026-10-15 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-10-15 |         | QA findings fixed — cycle 4, 1 finding (CR-1) + 1 advisory (CR-2); 34 test rows | qa-fix |
+| 2026-10-15 |         | QA gate CONCERNS (70/100) — 3 findings | qa-task |
+| 2026-10-15 |         | QA findings fixed — cycle 5, 3 findings (CR-1..CR-3) + 1 advisory (CR-4); shard-prd block guarded; 36 test rows | qa-fix |
+| 2026-10-15 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-10-15 |         | QA findings fixed — cycle 6, 1 finding (CR-1) + 1 advisory (CR-2); review-prd stops on a PRD outside the root; 37 test rows | qa-fix |
+| 2026-10-15 |         | QA gate FAIL (70/100) — 2 findings | qa-task |
+| 2026-10-15 |         | QA findings fixed — cycle 7, 2 findings (CR-1 migration token pass, CR-2 shard directory) + 1 advisory (CR-3); 39 test rows | qa-fix |
+| 2026-10-15 |         | QA gate CONCERNS (50/100) — 5 findings | qa-task |
+| 2026-10-15 |         | QA findings fixed — cycle 8, 5 findings: review-prd apply shows findings and undo (CR-1), several --name pairs (CR-3); migration guard refuses no-frontmatter, no-domain and outside-links shapes (CR-2, CR-4, CR-5 — engine fixes to a follow-up task); 40 test rows | qa-fix |
+| 2026-10-15 |         | PR review 1 (Step 5c, conformance) CONCERNS — 5 findings; Scope deviation, Migration criterion narrowing and grep exclusion recorded; engine follow-up filed as task.211 (#676) | review-pr |
+| 2026-10-15 |         | DoD incomplete — 4 gaps identified | finalise |
+| 2026-10-15 |         | QA gate CONCERNS (80/100) — 4 findings (re-entry after DoD 1) | qa-task |
+| 2026-10-15 |         | QA findings fixed — cycle 9, 4 findings (CR-1 outside-links counts real references only, CR-2 reference-doc epic/story paths, CR-4, CR-5) + CR-3 advisory deferred; 41 test rows | qa-fix |
+| 2026-10-15 |         | QA gate CONCERNS (80/100) — 2 findings | qa-task |
+| 2026-10-15 |         | QA findings fixed — cycle 10, 2 findings (CR-1 quoted paths, CR-2 quadratic scan): outside-links is a fail-closed mention check, no parser; 41 test rows | qa-fix |
+| 2026-10-15 |         | PR review 2 (Step 5c, conformance) CONCERNS — 4 findings; grep criterion excludes CHANGELOG, third engine edit recorded | review-pr |
+| 2026-10-15 | 1.2 | DoD passed — accepted (PR #675) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -497,19 +670,19 @@ that this document's own example (an unnumbered PRD) never shows.
 ## Progress Tracking
 
 ### Phase 0: Gate
-- [ ] task.202 and task.203 accepted; shipped CLI spellings recorded
+- [x] task.202 and task.203 accepted; shipped CLI spellings recorded
 
 ### Phase 1: `create-prd` allocates and checks
-- [ ] Complete
+- [x] Complete
 
 ### Phase 2: Templates, greenfield wrapper, sharding
-- [ ] Complete
+- [x] Complete
 
 ### Phase 3: `review-prd` enforcement and reader sites
-- [ ] Complete
+- [x] Complete
 
 ### Phase 4: Test, bundle, catalog
-- [ ] Complete
+- [x] Complete
 
 ---
 
@@ -530,11 +703,11 @@ that this document's own example (an unnumbered PRD) never shows.
   `npm run bundle` reverts the fix.
 - Use `command node`, never bare `node`.
 
-### Author decisions (open; confirm at `/review-task`)
+### Author decisions (resolved at `/review-task`, 2026-10-15)
 
-1. **PRD review report name**: `prd.{P}.review.{n}.{feature}.md` (short id, like epic, story and
-   task) or the full stem. It follows task.202's `file-naming.md` row.
+1. **PRD review report name**: the full stem, `prd.{P}.{feature}.review.{n}.{name}.md`, as task.202's
+   `file-naming.md:84` row says.
 2. **Shard location**: in place, inside `prd.{P}.{feature}/`, with the numbered file kept as the
-   entry point. This must agree with task.205's `create-epics-from-shards` input.
-3. **Greenfield `{domain}`**: asked, with the product slug recommended. The alternative is to fix
-   it to the product slug and not ask.
+   entry point. Agrees with task.205's `create-epics-from-shards`, which reads `index.md` from the
+   `prd.{P}.{feature}/` directory.
+3. **Greenfield `{domain}`**: asked, with the product slug recommended.

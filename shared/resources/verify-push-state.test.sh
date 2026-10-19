@@ -22,6 +22,8 @@
 
 PASS=0
 FAIL=0
+# shellcheck source=undefined-command-guard.sh
+. "$(dirname "$0")/undefined-command-guard.sh"
 SCRIPT="$(cd "$(dirname "$0")" && pwd)/verify-push-state.sh"
 
 pass() { echo "  PASS  $1"; PASS=$((PASS + 1)); }
@@ -408,5 +410,6 @@ else
 fi
 
 echo
+undefined_commands_check || FAIL=$((FAIL + 1))
 echo "  $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] || exit 1

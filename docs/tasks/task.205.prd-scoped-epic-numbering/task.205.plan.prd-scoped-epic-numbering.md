@@ -115,9 +115,9 @@ Both `SKILL.md` files gain a bare `references/doc-id.js` mention (a dependency, 
 - **Epic Numbering** (`:68-72`) and **File Naming Convention** (`:74-98`) rewritten:
   ```bash
   P=$(command node references/doc-id.js parse "$(basename "$(dirname "$PRD_SOURCE_PATH")")" --json | jq -r .prd)
-  E=$(command node references/doc-id.js next epic --prd "$P" --prd-root "$PRD_ROOT" --json | jq -r .next)
+  E=$(command node references/doc-id.js next epic --prd-dir "$(dirname "$PRD_SOURCE_PATH")" --json | jq -r .next)
   ```
-  Use the CLI's actual flag and field names from task.202. These are the plan's names. Examples become
+  Flag and field verified against task.202's CLI (2026-10-15 review). Examples become
   `epic.1.1.feature-notifications`, `epic.1.2.payment-integration`. Delete the decimal line (`:90`).
 - **Discover Parent PRD** (`:101-111`): step 1 becomes the canonical `${PRD_ROOT}/{domain}/prd.{P}.{feature}/prd.{P}.{feature}.md`,
   step 2 is the glob `prd.*.md` at depth ≤ 2 under the domain, and step 3 **halts**:
@@ -178,7 +178,7 @@ with `doc-id.matchesEpic`. Do **not** reintroduce a raw glob without the filter.
 
 `skills/edit-epic/SKILL.md`: `:44` and `:568-571` delete the `epic-registry-manager` entries. `:62`, `:80`,
 `:178` pattern `epic.{P}.{E}.{name}.md`. `:404` drops the registry reminder. `:642` becomes "Epic numbers
-count within their PRD. Renumber with `doc-id next epic --prd P`. Moving an epic to another PRD changes
+count within their PRD. Renumber with `doc-id next epic --prd-dir <PRD dir>`. Moving an epic to another PRD changes
 `P` for it and every story: use `migrate-doc-numbering.mjs` (task.203), never a hand rename."
 
 `skills/pm-coordinator/SKILL.md:148-152`: replace the four bullets with "Epics are numbered within their

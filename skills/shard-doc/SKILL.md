@@ -242,8 +242,8 @@ Document sharded successfully:
 ## Common Sharding Scenarios
 
 ### PRD Sharding
-**Source**: `docs/prd.md` (monolithic file at repo root)
-**Destination**: `${PRD_ROOT}/` (default `docs/prd/`)
+**Source**: the numbered PRD, `${PRD_ROOT}/{domain}/prd.{P}.{feature}/prd.{P}.{feature}.md`
+**Destination**: the PRD's own directory — shard in place with `shard-prd`, which refuses a PRD that predates numbering
 **Typical sections**: Overview, Goals, Tech Stack, Architecture, etc.
 
 ### Architecture Sharding
@@ -252,8 +252,8 @@ Document sharded successfully:
 **Typical sections**: System Design, Data Models, API Endpoints, etc.
 
 ### Large Epic Sharding
-**Source**: `${PRD_ROOT}/<domain>/<feature>/epics/epic.<N>.<name>/epic.<N>.<name>.md`
-**Destination**: `${PRD_ROOT}/<domain>/<feature>/epics/epic.<N>.<name>/shards/`
+**Source**: `${PRD_ROOT}/<domain>/prd.<P>.<feature>/epics/epic.<P>.<E>.<name>/epic.<P>.<E>.<name>.md`
+**Destination**: `${PRD_ROOT}/<domain>/prd.<P>.<feature>/epics/epic.<P>.<E>.<name>/shards/`
 **Typical sections**: Multiple user stories, acceptance criteria lists
 
 ---

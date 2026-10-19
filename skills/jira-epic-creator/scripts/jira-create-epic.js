@@ -21,6 +21,10 @@ const path = require("path");
 // "in-tree fallback" this used to carry was rewritten into a byte-identical
 // copy of its own try branch: a catch that could never succeed where the try
 // had already failed.
+// The summary rule is doc-id.js `epicSummary` (task 205) — the same function
+// sync-jira-epic.js calls, so the two scripts cannot disagree on "[Epic P.E]".
+const docId = require("../references/doc-id.js");
+
 let dm = null;
 try {
   dm = require("../references/defer-mutation.js");
@@ -377,19 +381,7 @@ function extractEpicDescription(body, frontmatter) {
   return sections.join("\n\n");
 }
 
-function normaliseEpicSummary(summary, epicNumber) {
-  const bracket = summary.match(/^\s*\[Epic\s+(\d+)\]\s*(.*)$/i);
-  const colon = summary.match(/^\s*Epic\s+(\d+)\s*:\s*(.*)$/i);
-  let epicId = epicNumber != null ? String(epicNumber) : null;
-  if (bracket) {
-    epicId = epicId || bracket[1];
-    summary = bracket[2].trim();
-  } else if (colon) {
-    epicId = epicId || colon[1];
-    summary = colon[2].trim();
-  }
-  return epicId != null ? `[Epic ${epicId}] ${summary}` : summary;
-}
+const normaliseEpicSummary = docId.epicSummary;
 
 function getAuth() {
   const url = process.env.JIRA_URL;
@@ -667,7 +659,7 @@ async function main() {
 
   let summary, description, priority, labels;
   let filePath = null;
-  let epicNumber = null;
+  let epicIds = {};
 
   // Parse from file if provided
   if (args.file) {
@@ -680,8 +672,7 @@ async function main() {
     const content = fs.readFileSync(filePath, "utf-8");
     const { frontmatter, body } = await parseFrontmatter(content);
 
-    epicNumber =
-      frontmatter.epic_number != null ? frontmatter.epic_number : null;
+    epicIds = { prd: frontmatter.prd_number, epic: frontmatter.epic_number };
     summary = args.summary || frontmatter.summary || frontmatter.title || "";
     // Use the epic-aware description extractor
     const epicDesc = extractEpicDescription(body, frontmatter);
@@ -723,7 +714,7 @@ async function main() {
     }
   }
 
-  summary = normaliseEpicSummary(summary, epicNumber);
+  summary = normaliseEpicSummary(summary, epicIds);
 
   // Create the epic
   const issueKey = await createEpic({

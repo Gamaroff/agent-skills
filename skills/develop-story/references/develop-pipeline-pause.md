@@ -103,7 +103,7 @@ The pause flow is therefore: a shell hook (independent execution budget, runs ev
 |-------|---------|
 | `skill` | `develop-task` or `develop-story` — selects the resume command and report style |
 | `report_path` | Path to the implementation report. Hook appends pause entry here. |
-| `task_or_story_id` | `42` for tasks; `{epic}.{story}` for stories. Used in commit messages. |
+| `task_or_story_id` | `42` for tasks; `{prd}.{epic}.{story}` for stories. Used in commit messages. |
 | `task_or_story_directory` | Directory holding the task/story file + co-located artifacts |
 | `branch` | Feature branch name (used in pause summary) |
 | `pr_url` | Empty until Step 4 succeeds, then the PR URL |

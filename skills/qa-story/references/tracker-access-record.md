@@ -248,7 +248,7 @@ pipelines do not.
 
 ```
 task.{n}.handover.{n}.{name}.{md,sh,json}
-story.{epic}.{story}.handover.{n}.{name}.{md,sh,json}
+story.{P}.{E}.{S}.handover.{n}.{name}.{md,sh,json}
 ```
 
 Co-located in the work-item directory, so `/commit-changes --scope {work-item-dir}` already picks
@@ -370,5 +370,5 @@ invisible-drift failure this whole sequence exists to remove.
 ## See also
 
 - [`defer-mutation.js`](defer-mutation.js) — the single writer (CLI + `require`)
-- [`handover-render.js`](handover-render.js) — the four renderers
+- [`handover-render.js`](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/handover-render.js) — the four renderers
 - [`platform-detection.md`](platform-detection.md) — how `ACCESS_TRACKER` is resolved

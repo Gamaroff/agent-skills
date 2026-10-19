@@ -1,20 +1,13 @@
 <!--
-╔═══════════════════════════════════════════════════════════════╗
-║ ⚠️  CRITICAL: Check Epic Registry BEFORE Creating This Epic  ║
-║                                                                ║
-║ 1. Open: /docs/development/epic-registry.md                  ║
-║ 2. Use "Next Available Epic Number" for YOUR epic number     ║
-║ 3. Update registry table with your epic details              ║
-║ 4. Increment "Next Available Epic Number" counter            ║
-║ 5. Commit registry + epic file together                      ║
-║                                                                ║
-║ Epic numbers are GLOBALLY UNIQUE across entire system        ║
-╚═══════════════════════════════════════════════════════════════╝
+Numbered within its parent PRD: epic.{P}.{E}.{name}, where P is the PRD's number and E counts
+epics in that PRD. `create-epic` allocates E via `doc-id.js next epic`; never pick one by hand.
+Every epic has a parent PRD — `prd_source` is a required repo-relative path.
 -->
 
 ---
 
-epic_number: N
+prd_number: P
+epic_number: E
 title: "[Epic Name]"
 type: epic
 description: "[One-sentence summary of what this epic delivers]"
@@ -25,11 +18,11 @@ priority: "Critical | High | Medium | Low"
 estimated_stories: N
 created: YYYY-MM-DD
 target_completion: YYYY-MM-DD
-prd_source: "{{PRD_SOURCE_PATH}}" # repo-relative PRD path, or "brownfield-enhancement"
+prd_source: "{{PRD_SOURCE_PATH}}" # repo-relative path to the parent PRD (required)
 
 ---
 
-# [Epic N] Epic Name
+# [Epic P.E] Epic Name
 
 **Status**: [Emoji] [Detailed Status Description]
 **Last Updated**: YYYY-MM-DD
@@ -48,7 +41,7 @@ prd_source: "{{PRD_SOURCE_PATH}}" # repo-relative PRD path, or "brownfield-enhan
 ### Source PRD Section
 
 **Source PRD**: [View document]({{PRD_URL}})
-<!-- Full https:// URL built from prd_source + git remote at epic creation time. Omit this line when prd_source is "brownfield-enhancement". -->
+<!-- Full https:// URL built from prd_source + git remote at epic creation time. Every epic has a parent PRD, so this line is always present. -->
 **Related Specs**: [[Specification Name]](../[spec-name].md)
 
 ### System Integration
@@ -63,9 +56,9 @@ This epic integrates with:
 
 Before starting this epic, the following must exist:
 
-- [x] [Prerequisite 1] - ✅ Complete (Epic [N])
-- [x] [Prerequisite 2] - ✅ Complete (Epic [N])
-- [ ] [Prerequisite 3] - ❌ Blocking (needs Epic [N])
+- [x] [Prerequisite 1] - ✅ Complete (Epic [P.E])
+- [x] [Prerequisite 2] - ✅ Complete (Epic [P.E])
+- [ ] [Prerequisite 3] - ❌ Blocking (needs Epic [P.E])
 
 **Current State**:
 
@@ -127,7 +120,7 @@ Before starting this epic, the following must exist:
 
 ## Stories Breakdown
 
-### [Story [Epic].1] [Story Name]
+### [Story [P].[E].1] [Story Name]
 
 **Status**: ❌ Not Started | 🔄 In Progress | ✅ Complete | ⚠️ Blocked
 **Priority**: Critical | High | Medium | Low
@@ -166,7 +159,7 @@ path/to/file3.spec.ts - [Purpose]
 
 ---
 
-### [Story [Epic].2] [Story Name]
+### [Story [P].[E].2] [Story Name]
 
 **Status**: ❌ Not Started | 🔄 In Progress | ✅ Complete | ⚠️ Blocked
 **Priority**: Critical | High | Medium | Low
@@ -202,7 +195,7 @@ path/to/file2.ts - [Purpose]
 
 ---
 
-### [Story [Epic].3] [Story Name]
+### [Story [P].[E].3] [Story Name]
 
 **Status**: ❌ Not Started | 🔄 In Progress | ✅ Complete | ⚠️ Blocked
 **Priority**: Critical | High | Medium | Low
@@ -229,7 +222,7 @@ path/to/file2.ts - [Purpose]
 
 ---
 
-### [Story [Epic].N] [Additional Stories...]
+### [Story [P].[E].N] [Additional Stories...]
 
 [Continue pattern for all stories in epic]
 
@@ -372,7 +365,7 @@ Re-render
 
 ### Depends On (Blockers)
 
-- [ ] **Epic [N]**: [Epic Name]
+- [ ] **Epic [P.E]**: [Epic Name]
   - **Reason**: [Why this is a dependency]
   - **Status**: [Status]
   - **Impact if not complete**: [Impact description]
@@ -384,25 +377,25 @@ Re-render
 
 ### Blocks (What this epic enables)
 
-- [ ] **Epic [N+1]**: [Epic Name]
-  - **Reason**: [Why Epic [N+1] depends on this]
+- [ ] **Epic [P].[E+1]**: [Epic Name]
+  - **Reason**: [Why Epic [P].[E+1] depends on this]
   - **Specific requirement**: [What specifically is needed]
 
-- [ ] **Epic [N+2]**: [Epic Name]
-  - **Reason**: [Why Epic [N+2] depends on this]
+- [ ] **Epic [P].[E+2]**: [Epic Name]
+  - **Reason**: [Why Epic [P].[E+2] depends on this]
   - **Specific requirement**: [What specifically is needed]
 
 ### Parallel Work Opportunities
 
 **Can be developed in parallel**:
 
-- [Story [Epic].1] and [Story [Epic].3] (no dependencies)
-- [Story [Epic].2] can start after [Story [Epic].1] completes
+- [Story [P].[E].1] and [Story [P].[E].3] (no dependencies)
+- [Story [P].[E].2] can start after [Story [P].[E].1] completes
 
 **Must be sequential**:
 
-- [Story [Epic].4] requires [Story [Epic].2] completion
-- [Story [Epic].5] requires all previous stories
+- [Story [P].[E].4] requires [Story [P].[E].2] completion
+- [Story [P].[E].5] requires all previous stories
 
 ---
 
@@ -414,7 +407,7 @@ Re-render
 
 - **Probability**: High | Medium | Low
 - **Impact**: High | Medium | Low
-- **Affected Stories**: [Story [Epic].1], [Story [Epic].2]
+- **Affected Stories**: [Story [P].[E].1], [Story [P].[E].2]
 - **Mitigation Strategy**: [Detailed strategy]
 - **Contingency Plan**: [Backup plan]
 - **Owner**: [Person responsible]
@@ -424,7 +417,7 @@ Re-render
 
 - **Probability**: High | Medium | Low
 - **Impact**: High | Medium | Low
-- **Affected Stories**: [Story [Epic].3]
+- **Affected Stories**: [Story [P].[E].3]
 - **Mitigation Strategy**: [Detailed strategy]
 - **Contingency Plan**: [Backup plan]
 - **Owner**: [Person responsible]
@@ -522,7 +515,7 @@ Re-render
 
 ## Definition of Done
 
-Epic [N] is complete when all criteria below are met:
+Epic [P.E] is complete when all criteria below are met:
 
 ### Story Completion
 
@@ -588,9 +581,9 @@ Epic [N] is complete when all criteria below are met:
 
 ### Development Phase
 
-- **Sprint 1**: [Story [Epic].1], [Story [Epic].2]
-- **Sprint 2**: [Story [Epic].3], [Story [Epic].4]
-- **Sprint 3**: [Story [Epic].5], testing
+- **Sprint 1**: [Story [P].[E].1], [Story [P].[E].2]
+- **Sprint 2**: [Story [P].[E].3], [Story [P].[E].4]
+- **Sprint 3**: [Story [P].[E].5], testing
 - **Total**: [X] sprints ([X] weeks)
 
 ### Testing & Polish Phase
@@ -646,14 +639,14 @@ Epic [N] is complete when all criteria below are met:
 
 ### Story Documentation
 
-- [[Story [Epic].1] Name](./stories/story.[epic].1.[name].md)
-- [[Story [Epic].2] Name](./stories/story.[epic].2.[name].md)
-- [[Story [Epic].3] Name](./stories/story.[epic].3.[name].md)
+- [[Story [P].[E].1] Name](./stories/story.[P].[E].1.[name].md)
+- [[Story [P].[E].2] Name](./stories/story.[P].[E].2.[name].md)
+- [[Story [P].[E].3] Name](./stories/story.[P].[E].3.[name].md)
 - [Additional stories...]
 
 ### Epic Roadmap
 
-- [Epic [N] Roadmap](./EPIC-[N]-ROADMAP.md) - Week-by-week execution plan
+- [Epic [P].[E] Roadmap](./EPIC-[P].[E]-ROADMAP.md) - Week-by-week execution plan
 
 ### Related Documentation
 
@@ -664,13 +657,13 @@ Epic [N] is complete when all criteria below are met:
 
 ### Related Epics
 
-- [Epic [N-1]: [Name]](../epic.[n-1].[name]/epic.[n-1].[name].md) - Previous epic
-- [Epic [N+1]: [Name]](../epic.[n+1].[name]/epic.[n+1].[name].md) - Next epic
+- [Epic [P].[E-1]: [Name]](../epic.[P].[E-1].[name]/epic.[P].[E-1].[name].md) - Previous epic
+- [Epic [P].[E+1]: [Name]](../epic.[P].[E+1].[name]/epic.[P].[E+1].[name].md) - Next epic
 
 ### Project Resources
 
 - [Project completion roadmap]({REPO_ROOT}/docs/development/project-completion-roadmap.md) - Ordered backlog `develop-next` selects from
-- [Epic registry]({REPO_ROOT}/docs/development/epic-registry.md) - Global epic numbering
+- [PRD registry]({REPO_ROOT}/docs/standards/prd-registry.md) - Global PRD numbering; epics are numbered within their PRD
 - [Task registry]({REPO_ROOT}/docs/tasks/task-registry.md) - Global task numbering
 
 ---

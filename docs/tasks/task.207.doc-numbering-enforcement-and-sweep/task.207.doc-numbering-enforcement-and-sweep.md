@@ -5,18 +5,22 @@ type: task
 description: "Make the hierarchical PRD → epic → story numbering scheme hold by construction: a corpus test that fails on any unnumbered, mismatched or unregistered document under docs/prd, a chokepoint test that fails on a story/epic/prd identifier parsed anywhere but doc-id.js, and a sweep of every prose restatement of the old flat patterns."
 tags: [doc-id, prd-registry, numbering, corpus-test, chokepoint, doc-sweep, create-prd, create-epic, create-story]
 category: testing
-status: planned
+status: accepted
 priority: Medium
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-16
 assignee:
 estimated_effort_hours: 16
 github_issue: 650
+completed_date: 2026-10-16
+pr_number: 682
 ---
 
 # Technical Task: Doc numbering enforcement and sweep
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.207.review.1.doc-numbering-enforcement-and-sweep.md` implemented 2026-10-16
 
 **GitHub Issue**: [#650](https://github.com/Gamaroff/agent-skills/issues/650)
 
@@ -106,29 +110,33 @@ At the time of writing, task.202–task.206 have not landed. The anchors below a
   - it carries an allowlist in which every entry states a reason
   - it checks for stale allowlist entries (`§2 every allowlisted file exists and still contains a
     mutating mention`, line 380)
-- **Hand-rolled id regexes in non-test code.** Command:
-  `git grep -nE '(story|epic|prd)\\\\?\.' -- '*.js' '*.mjs' '*.cjs' '*.py' '*.sh' ':!skills/*/references/*'`,
-  filtered to regex literals. Each witness:
-  - `shared/resources/finalise-fix-and-recheck.mjs:69` (`WORK_ITEM_DOC_RE`) and `:122`
-  - `skills/create-story/scripts/lib.js:24` (`STORY_FILENAME_RE`), `:39`, `:57`, and `:85`, which
-    builds the regex from a template literal with `new RegExp`
-  - `skills/qa-next/scripts/uat-status.mjs:166` (`STORY_FILE`)
-  - `skills/session-handoff/scripts/continuation.mjs:71` (`STORY_BRANCH`)
-  - `skills/sync-jira-epic/scripts/sync-jira-epic.js:56` (strips `^prd\.`) and `:313`
-    (`findChildStories`)
-  - `skills/sync-jira-story/scripts/sync-jira-story.js:198` (artifact-kind lookup) and `:807`
-  - `shared/resources/bug-doc.js:51` (`RE_STORY_BUG`)
-- **Hand-rolled title regexes** (`[Epic N]`, `Epic N:`, `[Story N.N]`):
-  - `shared/resources/generate-prd-epic-index.mjs:135`
-  - `skills/develop-next/scripts/select-next.mjs:351`
-  - `skills/jira-epic-creator/scripts/jira-create-epic.js:381-382`
-  - `skills/sync-jira-epic/scripts/sync-jira-epic.js:359-360`
-  - `skills/sync-jira-story/scripts/sync-jira-story.js:253`
+- **Hand-rolled sites left after task.206** (re-measured 2026-10-16 at `fc69695a`, review.1 I2).
+  Definition: the code shapes in §6 Phase 2 (a kind word `story|epic|prd`, an escaped dot, then a
+  digit class within four characters; `new RegExp(` with an escaped kind word; `(Epic|Story)\s`),
+  run line by line over `git ls-files -- '*.js' '*.mjs' '*.cjs' '*.py' '*.sh' ':!skills/*/references/*'`
+  minus `shared/resources/doc-id.js`. Each hit:
+  - `skills/sync-jira-story/scripts/sync-jira-story.js:198` (`relatedDocInfo`, artifact-kind lookup)
+    and `:807` (story number for the summary)
+  - `shared/resources/tests/generate-prd-epic-index.test.mjs:58` (a test hand-rolling `prd\.(\d+)`)
+  - title regexes: `skills/develop-next/scripts/select-next.mjs:343` (roadmap prose `Epic 1.2`) and
+    `skills/sync-jira-story/scripts/sync-jira-story.js:253-254` (`[Story N.N]`, `Story N.N:`)
+  - **comment and string false positives** the shapes must not report:
+    `shared/resources/finalise-fix-and-recheck.mjs:79` (JSDoc quoting the old regex) and
+    `shared/resources/tests/finalise-fix-and-recheck.test.mjs:726`, `:847` (comments)
+
+  The sites this section listed at `a0f1f97d` (`bug-doc.js:51`, `create-story/scripts/lib.js`,
+  `uat-status.mjs`, `continuation.mjs`, `finalise-fix-and-recheck.mjs:69/:122`,
+  `generate-prd-epic-index.mjs:135`, `jira-create-epic.js`, `sync-jira-epic.js`) no longer hit:
+  task.206 moved them onto `doc-id.js`.
 - **Field-position parsing in executable Markdown**, from
-  `git grep -nE "awk -F\.|cut -d\.|grep -oE '\[0-9\]\+' \| head -1" -- 'skills/*/SKILL.md' 'shared/resources/*.md'`:
-  - `review-pipeline-step-0a-branch-setup.md:72,73,100` (story/epic)
-  - `review-pipeline-step-0a-branch-setup.md:86` (`TASK_ID`, a **task** id, a different rule)
-  - `develop-pipeline-step-0-resolve-and-prepare.md:44`
+  `git grep -nE "awk -F\.|cut -d\.|grep -oE '\[0-9\]\+' \| head -1" -- 'skills/*/SKILL.md' 'shared/resources/*.md'`
+  (re-measured 2026-10-16):
+  - `review-pipeline-step-0a-branch-setup.md:111-112`, the **review-epic** block. A live defect:
+    `awk -F. '{print $2}'` on `EPIC_BASENAME` reads the PRD number (`1` for `epic.1.42.payments`), and
+    the auto-skip at `:163` (`feature/epic.${EPIC_NUM}.*`) then matches every PRD-1 epic branch — the
+    defect task.206 fixed for the story block. It moves onto `doc-id.js` (§6 Phase 2).
+  - `review-pipeline-step-0a-branch-setup.md:97` (`TASK_ID`, a **task** id, a different rule — the
+    control that must stay green)
 - **CI.** `.github/workflows/test.yml` runs `npm test` and `npm run eval:all` on every pull request
   and on pushes to `main`/`develop`, with **no `paths:` filter**. `validate.yml` and
   `docs-link-check.yml` **are** path-filtered (`skills/**`, `shared/resources/**`, …;
@@ -147,7 +155,7 @@ At the time of writing, task.202–task.206 have not landed. The anchors below a
 
 ```
 docs/prd/** ──► doc-numbering-corpus.test.mjs ──► doc-id.js check --corpus (imported, never restated)
-                    └─ floor: ≥1 PRD, ≥4 epics, ≥17 story dirs read
+                    └─ floor: reason "ok", ≥22 documents read (1 PRD + 4 epics + 17 stories)
 
 code (*.js *.mjs *.cjs *.py *.sh, not references/)  ┐
 bash fences in skills/*/SKILL.md, shared/resources/*.md ┘──► doc-id-chokepoint.test.js
@@ -172,6 +180,9 @@ bash fences in skills/*/SKILL.md, shared/resources/*.md ┘──► doc-id-chok
     character class (`\d`, `[0-9]`, `[1-9]`, `[\d.]`). For the shell shape, a field split must
     operate on a variable whose name contains `STORY` or `EPIC` or `PRD`, so the task-id split is
     out of scope by construction.
+    The code shapes match **regex literals only**: comment text (`//`, `/* */`, JSDoc) is stripped
+    before matching, because a raw-line match reports a comment that quotes an old regex — three
+    such hits exist today (§3 Current Architecture, review.1 I1).
   - (b) Restatements the key will **not** see:
     - `stem.split(".")[1]`, an untyped split on a stem
     - a `startsWith("story.")` followed by `parseInt`
@@ -201,7 +212,9 @@ bash fences in skills/*/SKILL.md, shared/resources/*.md ┘──► doc-id-chok
   - an allowlist with reasons and a stale-entry check
   - a positive control and a scanned-file floor
 - ✅ Each remaining hand-rolled site the chokepoint test finds after task.206 is either moved onto
-  `doc-id.js` or allowlisted with a reason. `bug-doc.js:51` is the expected candidate.
+  `doc-id.js` or allowlisted with a reason. The measured sites are listed in §3; the review-epic
+  block in `review-pipeline-step-0a-branch-setup.md` is a live defect and is **moved**, not
+  allowlisted, with a test that executes the rewritten block.
 - ✅ The prose sweep over the population defined in Section 7:
   - `skills/*/SKILL.md`, `shared/resources/*.md` and `docs/**`
   - `AGENTS.md` § File Naming and § Epic Registry
@@ -246,57 +259,67 @@ contributor has two steps:
 
 ### Phase 0: Dependency gate (Risk: Low)
 
-- [ ] Confirm task.204, task.205 and task.206 read `status: accepted`; HALT otherwise
-- [ ] Confirm `shared/resources/doc-id.js` exports the corpus check and its regexes
+- [x] Confirm task.204, task.205 and task.206 read `status: accepted`; HALT otherwise
+- [x] Confirm `shared/resources/doc-id.js` exports the corpus check and its regexes
       (`git grep -n "export" shared/resources/doc-id.js`); HALT if the names differ from the plan
       and update the plan first
 
 ### Phase 1: Corpus test (Risk: Low)
 
-- [ ] Write `evals/shared/tests/doc-numbering-corpus.test.mjs`, importing the corpus check from
+- [x] Write `evals/shared/tests/doc-numbering-corpus.test.mjs`, importing the corpus check from
       `doc-id.js`
-- [ ] Non-vacuity floor: ≥1 PRD, ≥4 epics, ≥17 story directories read (the counts come from the
-      engine's result, not a separate walk)
-- [ ] Mutation-prove: in a temp copy of the corpus, rename one story directory back to the flat shape
-      and confirm the test goes red; strip `prd_number` from the PRD and confirm red; add a duplicate
-      `(P, E)` and confirm red
+- [x] Non-vacuity floor: `reason === "ok"` and `documents >= 22` (1 PRD + 4 epics + 17 stories on
+      2026-10-16). `checkCorpus(prdRoot)` returns `{ reason, findings, documents, unreadable }` — a
+      total, not per-kind counts — and `root-missing`, `empty` and `unreadable` must fail the test
+- [x] Mutation-prove: in a temp copy of the corpus, rename one story directory back to the flat shape
+      (→ `bad-shape`); strip `prd_number` from the PRD (→ `frontmatter-mismatch`); copy one epic
+      **document alone** into a sibling `epic.P.E.other/` (→ `duplicate-id`). Each confirmed red
+      (all three reasons measured against the engine in review.1 I5)
 
 ### Phase 2: Chokepoint test (Risk: Medium)
 
-- [ ] Write `tests/doc-id-chokepoint.test.js` with the compound shapes from Section 3 (code regex
+- [x] Write `tests/doc-id-chokepoint.test.js` with the compound shapes from Section 3 (code regex
       literal, string-built regex, executable-Markdown field split on a `STORY`/`EPIC`/`PRD` variable,
       title regex)
-- [ ] Scope: tracked `*.js *.mjs *.cjs *.py *.sh` excluding `skills/*/references/**` and
+- [x] Scope: tracked `*.js *.mjs *.cjs *.py *.sh` excluding `skills/*/references/**` and
       `node_modules`, plus bash fences in `skills/*/SKILL.md` and `shared/resources/*.md`
-- [ ] Test files are in scope. A test that hand-rolls the grammar is a second definition, as
+- [x] Test files are in scope. A test that hand-rolls the grammar is a second definition, as
       `shared/resources/tests/doc-links.test.mjs:331` showed. Fixture-building string literals are
       not regexes and the shapes do not match them
-- [ ] Positive control: `doc-id.js` matches ≥1 shape, and the scan reads ≥400 code files (455 today
+- [x] Positive control: `doc-id.js` matches ≥1 shape, and the scan reads ≥400 code files (455 today
       by `git ls-files -- '*.js' '*.mjs' '*.cjs' '*.py' '*.sh' ':!skills/*/references/*' | wc -l`)
-- [ ] Allowlist `{path: reason}` and a stale-entry check, mirroring
+- [x] Allowlist `{path: reason}` and a stale-entry check, mirroring
       `mutation-call-site-coverage.test.js` §2
-- [ ] Run it. Every hit task.206 left is either moved to `doc-id.js` or allowlisted with a reason
-- [ ] Mutation-prove: re-add `/story\.(\d+)\.(\d+)/` to a scratch copy of `uat-status.mjs` and
+- [x] Run it. Every hit task.206 left is either moved to `doc-id.js` or allowlisted with a reason
+- [x] Rewrite the review-epic block in `shared/resources/review-pipeline-step-0a-branch-setup.md`
+      (`EPIC_NUM` / `EPIC_SLUG` / `EPIC_BRANCH`) onto `doc-id.js parse`, as the story block above it
+      already is, and add a test that extracts and runs it against a fixture `epic.1.42.payments.md`:
+      `EPIC_NUM=42`, the PRD number 1, `EPIC_BRANCH=feature/epic.1.42.payments`, and an auto-skip
+      pattern that does not match `feature/epic.1.7.other`
+- [x] Mutation-prove: re-add `/story\.(\d+)\.(\d+)/` to a scratch copy of `uat-status.mjs` and
       confirm red; re-add an `awk -F. '{print $2}'` on `$STORY_BASENAME` to a fenced block and confirm
       red; confirm the task-id `awk` at `review-pipeline-step-0a-branch-setup.md:86` stays green
 
 ### Phase 3: Prose sweep (Risk: Medium)
 
-- [ ] Re-measure the population with the Section 7 command; record the count in the PR description
-- [ ] Rewrite each hit to the new scheme (`prd.{P}`, `epic.{P}.{E}`, `story.{P}.{E}.{S}`,
+- [x] Re-measure the population with the Section 7 command; record the count in the PR description
+- [x] Rewrite each hit to the new scheme (`prd.{P}`, `epic.{P}.{E}`, `story.{P}.{E}.{S}`,
       `epic/{P}.{E}.{slug}`), or state it as unaffected (a historical quote, a task/bug pattern)
-- [ ] `AGENTS.md`: update § File Naming, and replace § Epic Registry with a PRD Registry section
+- [x] `AGENTS.md`: update § File Naming, and replace § Epic Registry with a PRD Registry section
       pointing at `docs/standards/prd-registry.md`
-- [ ] `docs/standards/file-naming.md` example ids, `docs/runbooks/*` walkthroughs,
+- [x] When the sweep removes `epic-registry.md` from `shared/resources/open-knowledge-format.md`,
+      drop its entry from `ALLOW` in `tests/epic-numbering-retirement.test.js` in the same commit —
+      that test's stale-entry check fails otherwise (review.1 I3)
+- [x] `docs/standards/file-naming.md` example ids, `docs/runbooks/*` walkthroughs,
       `docs/operations/workflows.md`, `docs/reference/{faq,glossary,invocation,troubleshooting,anti-patterns}.md`
-- [ ] Re-run the population command: zero unexplained hits
+- [x] Re-run the population command: zero unexplained hits
 
 ### Phase 4: Regenerate and close out (Risk: Low)
 
-- [ ] `npm run bundle`, then `npm run bundle:check` clean (no `UNREACHED`, no untracked copies)
-- [ ] `npm run generate-catalog`; commit the regenerated `docs/reference/skill-catalog.md`
-- [ ] CHANGELOG `[Unreleased]`: the scheme, the migration script, the two guards
-- [ ] Full `npm test` and `npm run eval:all` with the gitignored `.agents/skills` symlink moved aside
+- [x] `npm run bundle`, then `npm run bundle:check` clean (no `UNREACHED`, no untracked copies)
+- [x] `npm run generate-catalog`; commit the regenerated `docs/reference/skill-catalog.md`
+- [x] CHANGELOG `[Unreleased]`: the scheme, the migration script, the two guards
+- [x] Full `npm test` and `npm run eval:all` with the gitignored `.agents/skills` symlink moved aside
 
 ---
 
@@ -307,8 +330,20 @@ contributor has two steps:
 1. ✅ `evals/shared/tests/doc-numbering-corpus.test.mjs` (new). Reached by `npm test`'s existing
    `evals/shared/tests/*.test.mjs` glob (`package.json:26`), so no glob edit is needed.
 2. ✅ `tests/doc-id-chokepoint.test.js` (new). Reached by the existing `tests/*.test.js` glob.
-3. ✅ Remaining hand-rolled sites the chokepoint test reports after task.206. These are moved onto
-   `doc-id.js` or allowlisted. Expected: `shared/resources/bug-doc.js:51`.
+3. ✅ Remaining hand-rolled sites the chokepoint test reports after task.206 (measured list in §3).
+   These are moved onto `doc-id.js` or allowlisted. Expected: `sync-jira-story.js:198`, `:807`,
+   `:253-254`; `select-next.mjs:343` (roadmap prose — an allowlist candidate);
+   `shared/resources/tests/generate-prd-epic-index.test.mjs:58`.
+3a. ✅ `shared/resources/review-pipeline-step-0a-branch-setup.md` — the review-epic block moves onto
+   `doc-id.js`, plus a test that executes it (a new case in `tests/doc-id-chokepoint.test.js` or a
+   sibling under `tests/`, reached by the same glob).
+3b. ✅ `tests/epic-numbering-retirement.test.js` — drop the `open-knowledge-format.md` `ALLOW` entry
+   when the sweep clears that file.
+3c. ✅ As implemented, also: `.agents/scripts/backfill-story-issues.sh` (onto `doc-id.js`);
+   `skills/review-epic/SKILL.md` (0a.2/0a.3 summary); `skills/sync-jira-story/tests/sync-jira-story.test.js`
+   (fixtures migrated to `story.1.2.4.*`, sub-story case added); `docs/contributing/evals/live-github-test.md`
+   (fixture tree made hierarchical, with a PRD registry row); the bundled `references/doc-id.js` in
+   `sync-jira-story`.
 
 > **Glob wiring.** Both files land under directories `npm test` already lists. If implementation
 > moves either test into a new `skills/*/tests/` directory, add that glob to `package.json:26` in the
@@ -326,17 +361,20 @@ git grep -lE 'story\.\{(epic|E|e)\}|story\.\{E\}\.\{S\}|epic\.\{(N|n|number|epic
   ':!docs/tasks/**' ':!docs/bugs/**' ':!docs/prd/**'
 ```
 
-Measured 2026-10-13 at `a0f1f97d`:
+Measured 2026-10-16 at `fc69695a` (files):
 
 | Glob | Count |
 |---|---|
-| `skills/*/SKILL.md` | 25 |
-| `shared/resources/*.md` | 12 |
-| `docs/**` | 22 |
+| `skills/*/SKILL.md` | 19 |
+| `shared/resources/*.md` | 11 |
+| `docs/**` | 20 |
 
-Re-measure; the count will move as task.204–task.206 rewrite their own files. Literal example ids
+(At `a0f1f97d` on 2026-10-13 it was 25 / 12 / 22.) Re-measure before starting. Literal example ids
 (`story.2.3.`, `epic.178.`) are a second pattern. Sweep them with
-`git grep -nE '\b(story\.[0-9]+\.[0-9]+\.|epic\.[0-9]+\.)[a-z]'` over the same globs.
+`git grep -nE '\b(story\.[0-9]+\.[0-9]+\.|epic\.[0-9]+\.)[a-z]'` over the same globs (25 / 4 / 3
+files on 2026-10-16). That grep also hits **deliberate negative examples**, such as
+`skills/create-epic/SKILL.md:93` ("❌ Wrong: `epic.3.auto-hide` (no PRD number)"); those are
+unaffected and listed as such.
 
 4. ✅ `AGENTS.md`: § File Naming and § Epic Registry
 5. ✅ `docs/standards/file-naming.md`, `epic-registry.md` (retired, replaced by a pointer), and
@@ -362,6 +400,12 @@ Re-measure; the count will move as task.204–task.206 rewrite their own files. 
     - the task-id `awk` on `$TASK_BASENAME`
     - the string `"story.1.1.example"` used as a fixture name
     - prose that says "`story.{P}.{E}.{S}`" outside a fence
+    - a comment that quotes an old regex (`// the old \`story\.\d+\.\d+\` stem …`), as at
+      `finalise-fix-and-recheck.mjs:79`
+- **Review-epic block.** Extracted from `review-pipeline-step-0a-branch-setup.md` and run with bash
+  against a fixture `epic.1.42.payments.md`: `EPIC_NUM` is `42`, `EPIC_BRANCH` is
+  `feature/epic.1.42.payments`, and the auto-skip pattern does not match `feature/epic.1.7.other`.
+  Mutation-prove: restore the `awk -F.` line and confirm red.
 
   The control set varies the kind word, the variable name and the context (fence vs prose), not just
   the file.
@@ -389,34 +433,36 @@ Re-measure; the count will move as task.204–task.206 rewrite their own files. 
 
 ### Functional
 
-- [ ] The corpus test passes on the migrated corpus and fails on each of its three mutation cases
+- [x] The corpus test passes on the migrated corpus and fails on each of its three mutation cases
       (Phase 1).
-- [ ] The chokepoint test passes on `develop` after task.206 and fails on each "must hit" fixture
+- [x] The chokepoint test passes on `develop` after task.206 and fails on each "must hit" fixture
       (Phase 2).
-- [ ] The chokepoint test stays green on the task-id `awk` at
+- [x] The chokepoint test stays green on the task-id `awk` at
       `review-pipeline-step-0a-branch-setup.md:86` (Phase 2 control).
-- [ ] Every allowlist entry names a reason, and the stale-entry check fails when an allowlisted file
+- [x] Every allowlist entry names a reason, and the stale-entry check fails when an allowlisted file
       no longer contains a matching shape.
 
 ### Performance
 
-- [ ] Both new tests together add < 2 s to `npm test` on CI.
-- [ ] The chokepoint scan reads ≥ 400 code files (scanned-file floor holds).
+- [x] Both new tests together add < 2 s to `npm test`. A measured bound, not a per-PR assertion:
+      `uptime; time command node --test tests/doc-id-chokepoint.test.js evals/shared/tests/doc-numbering-corpus.test.mjs`
+      run on the PR head, with its output (load included) recorded in the implementation report.
+- [x] The chokepoint scan reads ≥ 400 code files (scanned-file floor holds).
 
 ### Code Quality
 
-- [ ] Neither test restates the id grammar. Both import from `shared/resources/doc-id.js`
+- [x] Neither test restates the id grammar. Both import from `shared/resources/doc-id.js`
       (`git grep -n "doc-id" tests/doc-id-chokepoint.test.js evals/shared/tests/doc-numbering-corpus.test.mjs`).
-- [ ] `npm run bundle:check` is clean; `npm run validate -- skills/<skill>/` passes for every skill
+- [x] `npm run bundle:check` is clean; `npm run validate -- skills/<skill>/` passes for every skill
       whose `SKILL.md` the sweep touched.
-- [ ] `npm run format:check` passes.
+- [x] `npm run format:check` passes.
 
 ### Migration
 
-- [ ] The Section 7 population command returns zero unexplained hits after the sweep.
-- [ ] `AGENTS.md` has no `## Epic Registry` section describing a global counter; the PRD registry
+- [x] The Section 7 population command returns zero unexplained hits after the sweep.
+- [x] `AGENTS.md` has no `## Epic Registry` section describing a global counter; the PRD registry
       is documented instead.
-- [ ] CHANGELOG `[Unreleased]` names the scheme, the migration script and both guards.
+- [x] CHANGELOG `[Unreleased]` names the scheme, the migration script and both guards.
 
 ---
 
@@ -490,14 +536,75 @@ Re-measure; the count will move as task.204–task.206 rewrite their own files. 
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-16
+**Quality Score**: 90/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.207.qa.8.doc-numbering-enforcement-and-sweep.md](./task.207.qa.8.doc-numbering-enforcement-and-sweep.md)
+- **Gate File**: [task.207.gate.8.doc-numbering-enforcement-and-sweep.yml](./task.207.gate.8.doc-numbering-enforcement-and-sweep.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 18
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+PASS at cycle 8; three LOW cleanups carried to recommendations.future (route 2b) and to Deferred Work.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.207.qa.8.doc-numbering-enforcement-and-sweep.md`
+**Gate File**: `task.207.gate.8.doc-numbering-enforcement-and-sweep.yml`
+**Gate Status**: ✅ PASS (Cosmetic-residue exit; three LOW items in Deferred Work)
+**Quality Score**: 90/100
+**PR Review (5c)**: `task.207.pr-review.1.doc-numbering-enforcement-and-sweep.md` — ✅ APPROVE
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 12/12 — corpus and chokepoint tests with mutation cases, stale-entry and floor checks, the < 2 s bound re-measured on the PR head (1.26 s), zero unexplained hits in the Section 7 population
+✅ **PR:** #682 — CI green on the fix head
+✅ **Documentation:** CHANGELOG `[Unreleased]` entry with consumer upgrade note; AGENTS.md § PRD Registry; standards, runbooks and skills swept
+✅ **Security Review:** PASS — `relatedDocInfo` probed (12 cases); four low findings fixed in `/finalise` Step 8a (`05322e4f`) and re-probed clean
+⚠️ **Compliance Review:** NOT_APPLICABLE — internal tooling
+
+**Task marked as ACCEPTED on:** 2026-10-16
+
+**Detailed Verification Log:** See `task.207.dod.1.doc-numbering-enforcement-and-sweep.md` for complete verification evidence and timestamps.
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
-
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-13 | 1.0     | Initial draft | create-task |
-
+| 2026-10-16 | 1.1     | Review (8/10) — corpus-test API corrected to `checkCorpus(prdRoot)` / `documents` floor; site list re-measured after task.206; review-epic `awk` defect brought into scope with an executed test; retirement allowlist entry, comment-safe chokepoint key and measured < 2 s bound added | review-task |
+| 2026-10-16 |         | Status → ready-for-development | review-task |
+| 2026-10-16 |         | Implemented — 2 new tests (14 cases), 2 parsers moved onto doc-id.js, review-epic awk defect fixed, ~60 docs swept; status → ready-for-review | develop |
+| 2026-10-16 |         | QA gate CONCERNS (60/100) — 4 medium, 3 low findings (task.207.qa.1) | qa-task |
+| 2026-10-16 |         | QA findings fixed — BUG-1..4, CR-5, CR-6; §5 placeholder guard added; 1 iteration | qa-fix |
+| 2026-10-16 |         | QA gate FAIL (60/100) — 1 high, 2 medium, 1 low; BUG-2, BUG-3 reopened (task.207.qa.2) | qa-task |
+| 2026-10-16 |         | QA findings fixed — BUG-2, BUG-3 by structural moves (shared JS tokenizer; §5 allow-list), BUG-5, CR2-6; 1 iteration | qa-fix |
+| 2026-10-16 |         | QA gate FAIL (60/100) — 1 high, 1 medium, 2 low; BUG-3 reopened, BUG-6 new (task.207.qa.3) | qa-task |
+| 2026-10-16 |         | QA findings fixed — BUG-6 (ingester placeholder contract + test), BUG-3 title spellings, CR3-5; 1 iteration | qa-fix |
+| 2026-10-16 |         | QA gate CONCERNS (80/100) — 2 medium, 2 low; BUG-3, BUG-6 reopened (task.207.qa.4) | qa-task |
+| 2026-10-16 |         | QA findings fixed — BUG-3 (YAML population; PRD-relative titles restored and exempted by name), BUG-6 (<S> = .story+.sub), CR4-4, CR4-5; 1 iteration | qa-fix |
+| 2026-10-16 |         | QA gate CONCERNS (70/100) — 3 medium, 1 low; BUG-3 reopened (task.207.qa.5) | qa-task |
+| 2026-10-16 |         | QA findings fixed — BUG-3 layout paths (13 files) + FLAT_LAYOUT key, CR5-2, CR5-3 (anchored exemptions), CR5-5; 1 iteration | qa-fix |
+| 2026-10-16 |         | QA gate CONCERNS (70/100), gate-the-last-fix half-cycle — 4 medium, 1 low; BUG-3 reopened (task.207.qa.6) | qa-task |
+| 2026-10-16 |         | QA findings fixed (user-approved cycle 6) — enumerated layout/literal/tree sweep, 15 prose files; §5 parent, literal and tree checks | qa-fix |
+| 2026-10-16 |         | QA gate CONCERNS (70/100) — 3 medium, 1 low; BUG-3 still open (task.207.qa.7) | qa-task |
+| 2026-10-16 |         | QA findings fixed (user-approved cycle 7) — mixed-id examples, FLAT_LITERAL name start; guide story layout and ASCII trees moved to Deferred Work | qa-fix |
+| 2026-10-16 |         | QA gate PASS (90/100) — 3 LOW carried to future (route 2b); BUG-3 closed (task.207.qa.8) | qa-task |
+| 2026-10-16 | 1.2 | DoD passed — accepted (PR #682) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -506,23 +613,23 @@ Re-measure; the count will move as task.204–task.206 rewrite their own files. 
 
 ### Phase 0: Dependency gate
 
-- [ ] Complete
+- [x] Complete
 
 ### Phase 1: Corpus test
 
-- [ ] Complete
+- [x] Complete
 
 ### Phase 2: Chokepoint test
 
-- [ ] Complete
+- [x] Complete
 
 ### Phase 3: Prose sweep
 
-- [ ] Complete
+- [x] Complete
 
 ### Phase 4: Regenerate and close out
 
-- [ ] Complete
+- [x] Complete
 
 ---
 
@@ -532,6 +639,67 @@ Re-measure; the count will move as task.204–task.206 rewrite their own files. 
 - `evals/shared/tests/task-registry-drift.test.mjs`: the corpus-guard model
 - `tests/mutation-call-site-coverage.test.js`: the chokepoint-guard model
 - `docs/reference/anti-patterns.md`: the enumeration class (two definitions drift)
+
+## Implementation Summary
+
+**Completion Date:** 2026-10-16
+
+**Approach.** Both guards import from `shared/resources/doc-id.js` and restate no grammar.
+`doc-numbering-corpus.test.mjs` calls `checkCorpus(prdRoot)` over the configured PRD root
+(`resolvePrdRoot`), requires `reason` `ok`/`findings` and `documents >= 22`, and proves each of its
+three defect classes red on a temp copy. `doc-id-chokepoint.test.js` derives its population from
+`git ls-files` (470 code files) plus the bash fences of `skills/*/SKILL.md` and
+`shared/resources/*.md`, strips comments before matching, and excuses a site only per shape.
+
+**Sites the chokepoint test found, and what happened to each:**
+
+| Site | Outcome |
+|---|---|
+| `shared/resources/review-pipeline-step-0a-branch-setup.md` review-epic 0a.2/0a.3 | **Defect fixed** — moved onto `doc-id.js`; executed by §4 of the test |
+| `skills/sync-jira-story/scripts/sync-jira-story.js:198`, `:807` | Moved onto `doc-id.js`; sub-story artifacts now link (new unit test) |
+| `shared/resources/tests/generate-prd-epic-index.test.mjs:58` | Moved onto `doc-id.js` |
+| `.agents/scripts/backfill-story-issues.sh:39-40` | Moved onto `doc-id.js` (found only once the shell subject widened to assigned names; task.206 deferred it here) |
+| `skills/develop-next/scripts/select-next.mjs:343` | Allowlisted (`title`) — roadmap prose grammar, token handed to `doc-id.parse` |
+| `skills/sync-jira-story/scripts/sync-jira-story.js:253-254` | Allowlisted (`title`) — published `[Story N.N]` tracker titles |
+
+**Sweep population, re-measured after the sweep** (§7 command plus the literal-id grep; 2026-10-16):
+zero unexplained hits. Remaining, each unaffected: `docs/reference/develop-story-pipeline-audit.2026-08-20.md`
+(a dated historical record); `shared/resources/security-input-corpus.md` (test input data parsed by
+`security-input-corpus.mjs`); `skills/create-epic/SKILL.md:93` and
+`skills/create-epics-from-shards/SKILL.md:285` (deliberate ❌ negative examples);
+`skills/create-parallel-stories/SKILL.md` (Deferred Work below); `docs/standards/epic-registry.md`
+(the retirement note names the retired skill). A second spelling the §7 command does not match —
+bare `{epic}.{story}` ids — was swept too (7 files).
+
+**Testing Results.** `command node --test tests/doc-id-chokepoint.test.js evals/shared/tests/doc-numbering-corpus.test.mjs`:
+14/14 pass. Mutation proofs, each confirmed red then restored: an id regex appended to
+`uat-status.mjs` (§1); an `awk -F.` on `$STORY_BASENAME` in a `SKILL.md` fence (§1); the old
+review-epic `awk` (§1, §3, §4); an id regex in a title-only allowlisted file (§1); the old
+`relatedDocInfo` regex (`sync-jira-story.test.js`); the corpus test pointed at one epic directory
+(floor). Performance bound: `uptime; time command node --test …` → load 1.02, `real 0m0.360s`
+(< 2 s), measured on the working tree at develop; re-measured on the PR head at finalise.
+
+## Deferred Work
+
+- **`create-parallel-stories` keeps its `{epic}.1-{n}` scheme.** task.206 deferred it here as a
+  sweep item, but it is a whole numbering scheme (~40 lines: ids, branch names, worktree paths)
+  that `doc-id.js` rejects (`story.1.2.1-1` → `bad-number`). Moving it to sub-stories
+  (`story.{P}.{E}.{S}A`) is a design change to that skill, not a prose rewrite — owner: a follow-up
+  task.
+- **`prd-structure-guide.md` draws story files loose in `stories/`** (QA cycle 7, CR7-5). Its
+  template trees (`:54-64`, `:217`, `:235-238`) and checklists predate this task and disagree with
+  `docs/standards/story-documents.md`, which gives each story its own `story.{P}.{E}.{S}.{name}/`
+  directory; the link examples rewritten here already assume that directory. Redrawing the guide is a
+  layout change, not numbering — owner: a follow-up task, together with the next three items.
+- **§5's tree check reads box-drawing trees only** (CR7-8): an ASCII tree (`+--`, `|`) or an
+  `epics/ ← note` annotation is not checked. None exists in the repository today.
+- **Cosmetic LOWs carried at gate 8 (route 2b)**: `TASK-207-CR8-1` (`FLAT_NAME` should spare level
+  placeholders rather than require a name keyword), `TASK-207-CR8-2` (four flat-intent glob examples:
+  `edit-epic:609`, `create-pr:294,435`, `anti-patterns.md:87`), `TASK-207-CR8-3` (rewrap one comment).
+- **Pre-existing items QA routed to `recommendations.future`**: `create-epic`'s milestone override
+  clause; `review-pipeline-step-0a` cross-block reads; `doc-id.parse` hardening (`../`, newline, NUL);
+  `story-template.md`'s `../epics/` links; `qa-gate-template.yaml` naming; backfill reuse of
+  `doc-id.js epic-meta`.
 
 ## Notes
 

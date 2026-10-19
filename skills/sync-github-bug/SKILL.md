@@ -1,6 +1,6 @@
 ---
 name: sync-github-bug
-description: Sync a local bug report markdown file to GitHub Issues — creates the bug issue if it has no github_issue, updates it if github_issue is already set. Handles all three bug modes (story bug, task bug, general bug), inferred from the file's own path. Links the bug as a sub-issue of its parent story or task issue when that parent has one; a general bug is anchored to the bug registry and to nothing else. Adds the issue to the project board and mirrors the priority label onto the board's Priority field. Closes/reopens the issue based on the bug's lifecycle status. Reads bug files with or without YAML frontmatter, and prepends a minimal block to those without one. Writes Status History rows — never a Change Log, which bug reports are barred from carrying — on issue creation and status transition only. GitHub-only sibling of sync-jira-bug. Use when the user says "create this bug in GitHub", "sync bug to GitHub", "push bug changes to GitHub", or "publish bug to GitHub".
+description: Sync a local bug report markdown file to GitHub Issues — creates the issue if it has no github_issue, updates it if it has one. Handles story, task and general bugs, inferred from the file's path. Links the bug as a sub-issue of its parent story or task when that parent has an issue; a general bug has none. Adds it to the project board, mirrors its priority, and closes or reopens it with the bug's status. Writes Status History rows, never a Change Log. GitHub-only sibling of sync-jira-bug. Use when the user says "create this bug in GitHub", "sync bug to GitHub", "push bug changes to GitHub", or "publish bug to GitHub".
 ---
 
 # sync-github-bug
@@ -37,7 +37,7 @@ One-way sync of a local bug report to GitHub Issues. Auto-detects create vs upda
 A bug report in one of the three documented layouts:
 
 ```
-docs/prd/<...>/story.{e}.{s}.bug.{n}.{name}.md          # story bug
+docs/prd/<...>/story.{P}.{E}.{S}.bug.{n}.{name}.md          # story bug
 docs/tasks/task.{id}.{name}/task.{id}.bug.{n}.{name}.md # task bug
 docs/bugs/bug.{N}.{name}/bug.{N}.{name}.md              # general bug
 ```
@@ -192,7 +192,7 @@ A `reopened` bug reopening a closed issue is the expected direction of travel he
 
 ### 6. Report to User
 
-- ✅ Bug mode and id (e.g. `story bug — story.7.4.bug.4`)
+- ✅ Bug mode and id (e.g. `story bug — story.1.7.4.bug.4`)
 - ✅ GitHub issue number and URL
 - ✅ Parent document, and parent issue if the sub-issue link landed
 - ✅ Added to project board + Priority field mirrored

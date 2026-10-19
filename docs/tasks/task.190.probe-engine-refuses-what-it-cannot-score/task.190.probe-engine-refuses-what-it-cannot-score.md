@@ -5,18 +5,21 @@ type: task
 description: "security-probe.mjs refuses a cases file with an unknown direction or sink before running anything, resolves its default repo root from the git checkout when run from a bundled copy and refuses an entry it cannot find before writing a record, and carries each declined case's reason into the run record."
 tags: [security-probe, finalise, review-security, observation, run-record]
 category: refactoring
-status: planned
+status: accepted
 priority: Medium
 created: 2026-10-07
-updated: 2026-10-07
+updated: 2026-10-18
 assignee:
 estimated_effort_hours: 8
 github_issue: 589
+completed_date: 2026-10-18
+pr_number: 685
 ---
 
 # Technical Task: Probe engine refuses what it cannot score
 
-**Status:** Planned
+**Status:** Accepted
+**Review**: ✅ All review recommendations from `task.190.review.1.probe-engine-refuses-what-it-cannot-score.md` implemented 2026-10-18
 **GitHub Issue**: [#589](https://github.com/Gamaroff/agent-skills/issues/589)
 
 ---
@@ -75,30 +78,39 @@ CHANGELOG entry.
 
 ### Current Architecture
 
-Line numbers are from `develop` at `b1807611`, paired with the text they point at.
+Line numbers are from `develop` at `f0448911` (re-anchored at review: tasks 180 and 181 landed
+after the `b1807611` draft), paired with the text they point at.
 
 - **Vocabulary** (`shared/resources/security-input-corpus.mjs`): `export const SINKS` (`:29`) and
   `export const DIRECTIONS = Object.freeze(["hostile", "legitimate"])` (`:40`). The engine imports
-  only `MATERIALISED_SINKS` and `corpusFor` from it (`security-probe.mjs:192`).
-- **Cases intake.** `main` (`security-probe.mjs:2396`) parses `--cases-file` with `JSON.parse` and
-  nothing else (`cannot read --cases-file` is its only error). `runProbeSpec` (`:873`) takes supplied
-  cases as-is: `if (Array.isArray(cases)) { probeCases = cases; }` (`:1093`).
+  only `MATERIALISED_SINKS` and `corpusFor` from it (`security-probe.mjs:279`).
+- **Cases intake.** `main` (`security-probe.mjs:3593`) parses `--cases-file` with `JSON.parse` and
+  nothing else (`cannot read --cases-file` is its only error, `:3758`). `runProbeSpec` (`:1000`) takes supplied
+  cases as-is: `if (Array.isArray(cases)) { probeCases = cases; }` (`:1332`).
 - **Scoring** filters by direction (`const hostile = ran.filter((c) => c.direction === "hostile")`,
-  `:824`; legitimate likewise). A case with any other direction is in neither list.
+  `:948`; legitimate likewise). A case with any other direction is in neither list.
 - **Default root**: `export function defaultRepoRoot() { return resolve(__dirname, "..", ".."); }`
-  (`:343`), with `__dirname` from `fileURLToPath(import.meta.url)` (`:202`). Node resolves the
+  (`:430`), with `__dirname` from `fileURLToPath(import.meta.url)` (`:289`). Node resolves the
   `.agents/skills` symlink to its real path, so from a bundled copy two levels up is `skills/`.
   Every shipped prompt passes `--repo-root "$(git rev-parse --show-toplevel)"`; only a hand re-run
   without it fails.
 - **Record**: `main` runs `preflightRecord` before the run and `recordRun(opts.record, result, …)`
-  (`:2207`) after it, whatever the verdict. `toRecordEntry` (`:2030`) stores counts only
+  (`:3794`) after it, whatever the verdict. `toRecordEntry` (`:3204`) stores counts only
   (`declined: result.declined?.length ?? 0`), while `result.declined` holds `{id, reason, detail}`.
 - **Argv cases.** Since `5f553950` (2026-09-23) the `cli:` form writes a per-case file only when the
-  sink is in `MATERIALISED_SINKS` (`writeInput: fixture !== null`, `:1836`), and
+  sink is in `MATERIALISED_SINKS` (`writeInput: fixture !== null`, `:2183`), and
   `probe-boundary-rule.md` says argv-only input belongs under a sink that writes no files. The
   task.151 incident used `--sink filename`. The part of obs #207 still open is the record's missing
   reasons.
-- **Tests**: `shared/resources/tests/security-probe.test.mjs` (118 `test(` calls on `b1807611`).
+- **Tests**: `shared/resources/tests/security-probe.test.mjs` (measured with
+  `grep -c 'test(' shared/resources/tests/security-probe.test.mjs`; 179 on `f0448911`). One more test
+  runs the engine's CLI from a nested copy: `skills/review-security/tests/review-security.test.js`,
+  test "CLI: --repo-root re-anchors containment so a bundled copy can probe the consumer's tree"
+  (`:711`). It asserts that the copy run **without** `--repo-root` reads `unverifiable` /
+  `entry-not-probeable` (`:760-768`), which is the obs #211 defect this task fixes.
+- **Entry forms** (`resolveEntry`, `:462`): `path#export` (js), `shell:`, `shell-fn:`, `cli:`,
+  `shell-argv:` (task.181) and `fence:` (task.180). Every `ok` result carries `entryPath`; a path
+  that does not exist keeps its lexical form and is declined `entry-not-probeable` later, inside the run.
 
 ### Target Architecture
 
@@ -106,24 +118,33 @@ Line numbers are from `develop` at `b1807611`, paired with the text they point a
   first bad case: not an object, a `direction` not in `DIRECTIONS`, or a `sink` present and not in
   `SINKS`. `main` calls it after parsing `--cases-file` and before `preflightRecord`: on a bad case
   it writes `bad-cases: case "<id>" has <field> "<value>"; accepted: <list>` to stderr and returns
-  2. In `--json` mode it prints `{ reason: "bad-cases", … }`. `runProbeSpec` calls it too and returns
+  2. In `--json` mode it also prints `{ "reason": "bad-cases", "detail": "<the stderr line>" }` on
+  stdout. The other exit-2 arms in `main` print nothing on stdout; the two new refusals print the
+  JSON so a `--json` caller can read `reason`. `runProbeSpec` calls it too and returns
   `decline("bad-cases", …)` for library callers. Nothing executes and nothing is recorded.
 - **`defaultRepoRoot()`**: when the file's directory is a `shared/resources` directory, keep two
   levels up. Otherwise (a bundled `references/` copy) use `git rev-parse --show-toplevel` run from
   `process.cwd()`. If git fails, fall back to two levels up, as today. An explicit `--repo-root`
   always wins.
-- **Entry must exist before a record is written.** `main` resolves the entry (`resolveEntry`, `:371`)
-  before `preflightRecord`. A resolved path that does not exist on disk → exit 2,
-  `reason: entry-not-found`, naming the resolved path and the root used. No record is written.
+- **Entry must exist before a record is written.** `main` resolves the entry (`resolveEntry`, `:462`)
+  before `preflightRecord`, for **every** entry form (all six carry `entryPath`), whether or not
+  `--record` is given. A resolved path that does not exist on disk → exit 2,
+  `reason: entry-not-found`, stderr `entry-not-found: <path> (repo root <root>)`, and under `--json`
+  the same JSON shape as `bad-cases`. No record is written. A `resolveEntry` failure
+  (`bad-entry`, `outside-repo-root`) is left to `runProbeSpec`, unchanged: `main` refuses only
+  the missing path. `runProbeSpec` itself is unchanged here — a library caller with a missing entry
+  still gets `decline("entry-not-probeable")`.
 - **`toRecordEntry`** keeps every count and adds
   `declined_cases: [{ id, reason, detail }]` (empty array when none). This is additive; record
   readers that read counts are unchanged.
 
 ### Important Clarifications
 
-- Task.180 (`fence:` form) and task.181 (`shell-argv:` form), both planned, edit the same engine and
-  test file. Their changes are new entry forms; this task touches intake, the default root and the
-  record. Whichever lands second rebases. Neither depends on this one.
+- Task.180 (`fence:` form) and task.181 (`shell-argv:` form) have both landed on `develop` since
+  this task was drafted. Their entry forms are in scope of the entry-exists check above.
+- Comments in `security-probe.mjs` cite a sibling by bare filename (`security-input-corpus.mjs`),
+  never by its `shared/resources/…` path: inside a shared source that literal is a bundling
+  instruction.
 - No sink is added for argv cases: the existing rule (a sink that writes no files) already covers
   obs #207's first remedy.
 
@@ -135,6 +156,8 @@ Line numbers are from `develop` at `b1807611`, paired with the text they point a
 
 ✅ `security-probe.mjs`: `validateCases`, the `main` checks, `defaultRepoRoot`, `toRecordEntry`.
 ✅ `security-probe.test.mjs` cases for each.
+✅ `skills/review-security/tests/review-security.test.js` — update the nested-copy `--repo-root` test
+   (`:711`), whose no-`--repo-root` assertion this task inverts.
 ✅ Bundled copies via `npm run bundle`; CHANGELOG.
 
 ### Out of Scope
@@ -156,6 +179,19 @@ Line numbers are from `develop` at `b1807611`, paired with the text they point a
   direction outside `hostile`/`legitimate` is part of Phase 1; on `b1807611` the incident's file was
   a `.claude/state` scratch file, not committed.
 - **Migration**: correct the value to `hostile` or `legitimate`; the error names the case.
+- **Measured at review** (`f0448911`): `git ls-files '*.json' | xargs grep -l '"direction"'` lists 47
+  files; every case in each has a `direction` in `DIRECTIONS` and no `sink` outside `SINKS`.
+
+### Breaking Change 2: the CLI refuses a missing entry with exit 2
+
+- **Before**: the run declines `entry-not-probeable`, exits 1 (`unverifiable`), and `--record` writes
+  that entry.
+- **After**: exit 2, `reason: entry-not-found`, nothing executed, nothing recorded. `runProbeSpec`
+  (the library) is unchanged.
+- **Affected**: a CLI caller that relied on exit 1 for a missing entry. In the tree, only the
+  review-security nested-copy test named in Technical Background runs the CLI against a path that
+  does not exist; the library tests that assert `entry-not-probeable` call `runProbeSpec`.
+- **Migration**: fix the path or pass `--repo-root`; the error names both.
 
 ---
 
@@ -167,34 +203,37 @@ Line numbers are from `develop` at `b1807611`, paired with the text they point a
 
 **Risk**: Low. **Files**: `shared/resources/security-probe.mjs`, its test.
 
-- [ ] Export `validateCases`; import `DIRECTIONS` and `SINKS` from the corpus module.
-- [ ] `main`: validate after parsing `--cases-file`, before `preflightRecord`; exit 2 `bad-cases`.
-- [ ] `runProbeSpec`: same check on supplied `cases`, returning `decline("bad-cases", …)`.
-- [ ] Grep committed cases files (`git ls-files '*.json'` containing `"direction"`) for unknown
+- [x] Export `validateCases`; import `DIRECTIONS` and `SINKS` from the corpus module.
+- [x] `main`: validate after parsing `--cases-file`, before `preflightRecord`; exit 2 `bad-cases`.
+- [x] `runProbeSpec`: same check on supplied `cases`, returning `decline("bad-cases", …)`.
+- [x] Grep committed cases files (`git ls-files '*.json'` containing `"direction"`) for unknown
   values; fix any found.
 
 ### Phase 2: Default root and missing entry (obs #211)
 
 **Risk**: Medium (every default call changes root on bundled copies). **Files**: same.
 
-- [ ] `defaultRepoRoot`: git top level when not running from `shared/resources`; fallback as today.
-- [ ] `main`: resolve the entry before `preflightRecord`; a missing path → exit 2
-  `entry-not-found`, no record.
+- [x] `defaultRepoRoot`: git top level when not running from `shared/resources`; fallback as today.
+- [x] `main`: resolve the entry before `preflightRecord` (all six forms, with or without `--record`);
+  a missing path → exit 2 `entry-not-found`, no record.
+- [x] Update `skills/review-security/tests/review-security.test.js:711`: the copy run without
+  `--repo-root` now reads `engages` (the default root is the git top level); keep the negative by
+  running with an explicit `--repo-root` at the nested dir and asserting exit 2 `entry-not-found`.
 
 ### Phase 3: Declined reasons in the record (obs #207)
 
 **Risk**: Low. **Files**: same.
 
-- [ ] `toRecordEntry`: add `declined_cases: [{id, reason, detail}]`.
-- [ ] Confirm every reader of the record (`git grep -n 'totals\.\|declined' -- shared/resources/*.mjs
+- [x] `toRecordEntry`: add `declined_cases: [{id, reason, detail}]`.
+- [x] Confirm every reader of the record (`git grep -n 'totals\.\|declined' -- shared/resources/*.mjs
   shared/resources/*.md`) reads counts only, so the field is additive.
 
 ### Phase 4: Bundle and changelog
 
 **Risk**: Low. **Files**: bundled copies, `CHANGELOG.md`.
 
-- [ ] `npm run bundle`; `npm run bundle:check` clean.
-- [ ] `[Unreleased]` › Fixed entry citing obs #201, #207, #211.
+- [x] `npm run bundle`; `npm run bundle:check` clean.
+- [x] `[Unreleased]` › Fixed entry citing obs #201, #207, #211.
 
 ---
 
@@ -208,15 +247,16 @@ Line numbers are from `develop` at `b1807611`, paired with the text they point a
 ### Files to Modify (Tests)
 
 2. ✅ `shared/resources/tests/security-probe.test.mjs` — new cases per phase.
+3. ✅ `skills/review-security/tests/review-security.test.js` — the nested-copy `--repo-root` test.
 
 ### Files to Modify (Generated)
 
-3. ✅ Bundled copies of `security-probe.mjs` under `skills/*/references/` (finalise, qa-task,
+4. ✅ Bundled copies of `security-probe.mjs` under `skills/*/references/` (finalise, qa-task,
    qa-story, review-security, and any other the bundler reaches), regenerated by `npm run bundle`.
 
 ### Files to Modify (Documentation)
 
-4. ✅ `CHANGELOG.md` — `[Unreleased]` › Fixed.
+5. ✅ `CHANGELOG.md` — `[Unreleased]` › Fixed.
 
 ### Files to Delete
 
@@ -235,8 +275,13 @@ None.
   passes validation (the check must not over-fire on an absent optional field).
 - **Phase 2**: `defaultRepoRoot` evaluated from a copy of the engine placed under a temp
   `skills/x/references/` inside a temp git repo returns the repo's top level; from a copy under
-  `shared/resources/` returns two levels up; outside any git repo it falls back. A missing entry with
-  `--record` → exit 2 `entry-not-found`, record file absent.
+  `shared/resources/` returns two levels up; outside any git repo it falls back. The copy takes the
+  engine's sibling imports **transitively** (`qa-execute-snippets.mjs`, `spawn-budget.mjs`,
+  `probe-boundary-signals.mjs` and what they import), walked from the source the way
+  `review-security.test.js:719` does — a hand list of two files fails to import. A missing entry with
+  `--record` → exit 2 `entry-not-found`, record file absent; one missing-entry case per entry form
+  that has a path (js, `shell:`, `cli:`, `fence:` at least). **Control**: an existing entry with
+  `--record` still writes its record.
 - **Phase 3**: a run with one declined case writes a record whose entry carries `declined_cases` with
   that case's id, reason and detail, and `declined: 1`.
 
@@ -249,6 +294,7 @@ None.
 - Remove the `main` validation call → the "benign" case runs and the exit-2 test goes red.
 - Revert `defaultRepoRoot` → the bundled-copy test goes red.
 - Move the entry check after `preflightRecord` → the "record file absent" assertion goes red.
+- Drop `declined_cases` from `toRecordEntry` → the Phase 3 test goes red.
 
 ### Performance Tests
 
@@ -260,28 +306,30 @@ Not applicable: one validation pass over the cases and one `git` call on the def
 
 ### Functional
 
-- [ ] A cases file with a `direction` outside `DIRECTIONS` exits 2 with `bad-cases`, names the case
+- [x] A cases file with a `direction` outside `DIRECTIONS` exits 2 with `bad-cases`, names the case
   and the accepted values, executes nothing and writes no record — held by `security-probe.test.mjs`
   (Phase 1).
-- [ ] A case `sink` outside `SINKS` is refused the same way — held by the same test (Phase 1).
-- [ ] Run from a bundled `references/` copy inside a git repo with no `--repo-root`, the default root
+- [x] A case `sink` outside `SINKS` is refused the same way — held by the same test (Phase 1).
+- [x] Run from a bundled `references/` copy inside a git repo with no `--repo-root`, the default root
   is the repo's top level — held by the same test (Phase 2).
-- [ ] A non-existent entry with `--record` exits 2 with `entry-not-found` and leaves no record — held
+- [x] A non-existent entry with `--record` exits 2 with `entry-not-found` and leaves no record — held
   by the same test (Phase 2).
-- [ ] A record entry carries `declined_cases` with each declined case's `id`, `reason` and `detail` —
+- [x] Under `--json`, both refusals print `{ "reason": … }` on stdout — held by the same test
+  (Phases 1–2).
+- [x] A record entry carries `declined_cases` with each declined case's `id`, `reason` and `detail` —
   held by the same test (Phase 3).
 
 ### Performance
 
-- [ ] Not applicable: no change to how many cases run.
+- [x] Not applicable: no change to how many cases run.
 
 ### Code Quality
 
-- [ ] `npm test`, `npm run bundle:check`, `prettier --check .` pass.
+- [x] `npm test`, `npm run bundle:check`, `prettier --check .` pass.
 
 ### Migration
 
-- [ ] CHANGELOG entry states the new exit-2 refusals and the `declined_cases` field.
+- [x] CHANGELOG entry states the new exit-2 refusals and the `declined_cases` field.
 
 ---
 
@@ -298,8 +346,10 @@ None.
      elsewhere.
    - **Probability**: Low — every shipped prompt passes `--repo-root` explicitly.
    - **Mitigation**: the explicit flag still wins; the fallback keeps today's root when git fails.
-2. **Overlap with tasks 180 and 181**
-   - **Mitigation**: disjoint functions; rebase whichever lands second.
+2. **Tasks 180 and 181 (landed)**
+   - **Risk**: the entry-exists check must cover their `fence:` and `shell-argv:` forms too.
+   - **Mitigation**: the check reads `entryPath` from `resolveEntry`, which every form returns; a
+     missing-entry test per form with a path.
 
 ### Low Risk Areas
 
@@ -330,12 +380,66 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-18
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Full Report**: [task.190.qa.1.probe-engine-refuses-what-it-cannot-score.md](./task.190.qa.1.probe-engine-refuses-what-it-cannot-score.md)
+- **Gate File**: [task.190.gate.1.probe-engine-refuses-what-it-cannot-score.yml](./task.190.gate.1.probe-engine-refuses-what-it-cannot-score.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 237 (182 security-probe, 55 review-security)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+No critical issues identified. The diff review raised 3 low/medium bugs and 1 cleanup, all advisory
+(CR-1 to CR-4 in the report). Five QA mutations each turned a committed test red.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.190.qa.1.probe-engine-refuses-what-it-cannot-score.md`
+**Gate File**: `task.190.gate.1.probe-engine-refuses-what-it-cannot-score.yml`
+**PR Review**: `task.190.pr-review.1.probe-engine-refuses-what-it-cannot-score.md` — APPROVE, 0 findings
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 9/9 met, each held by a per-PR test (QA mutations QM1–QM5 each turned one red)
+✅ **Tests:** 12 new tests; `security-probe.test.mjs` 182 and `review-security.test.js` 55 passing
+✅ **PR Review:** PR #685 — Step 5c `/review-pr` APPROVE (host requires no reviews); CI green on `f2433d6f`
+✅ **Documentation:** CHANGELOG `[Unreleased]` › Fixed entry (task 190)
+✅ **Security Review:** PASS — no secrets, no unsafe exec, fixed-argv git spawn; `validateCases` recorded `boundary: internal`
+✅ **Compliance Review:** Not applicable (developer tooling, no user data)
+
+**Task marked as ACCEPTED on:** 2026-10-18
+
+**Detailed Verification Log:** See `task.190.dod.1.probe-engine-refuses-what-it-cannot-score.md` for complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-10-07 | 1.0 | Initial draft — cut from observations #201, #207, #211 | create-task |
+| 2026-10-18 | 1.1 | Review passed (8/10) — re-anchored to f0448911, entry check covers all six forms with a second breaking change, review-security nested-copy test added to scope, transitive copy in the Phase 2 test, --json shape stated | review-task |
+| 2026-10-18 |  | Status → ready-for-development | review-task |
+| 2026-10-18 |  | Implemented — 9 files (engine + 4 bundled copies, 2 test files, CHANGELOG, this doc), 12 tests | develop |
+| 2026-10-18 |  | QA gate PASS (100/100) — 0 blocking, 4 advisory findings | qa-task |
+| 2026-10-18 | 1.2 | DoD passed — accepted (PR #685) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -344,19 +448,19 @@ None.
 
 ### Phase 1: Validate supplied cases
 
-- [ ] Not started
+- [x] Complete
 
 ### Phase 2: Default root and missing entry
 
-- [ ] Not started
+- [x] Complete
 
 ### Phase 3: Declined reasons in the record
 
-- [ ] Not started
+- [x] Complete
 
 ### Phase 4: Bundle and changelog
 
-- [ ] Not started
+- [x] Complete
 
 ---
 
@@ -365,7 +469,7 @@ None.
 - Observation #201 — security-probe accepts an unknown case direction silently and scores it as neither
 - Observation #207 — security-probe cli: form materialises argv cases as fixture files, declining the edge inputs an argv parser must refuse
 - Observation #211 — security-probe default --repo-root resolves through the .agents/skills symlink to skills/, so a repo-relative entry is unprobeable and the decline lands in the record
-- task.180, task.181 — planned entry-form work on the same engine
+- task.180, task.181 — entry-form work on the same engine (both landed)
 
 ---
 
@@ -383,3 +487,49 @@ None.
 
 - Validate the rest of a case's shape (`id` presence and uniqueness, `input` type per entry form) in
   the same function.
+
+---
+
+## Implementation Summary
+
+**Completion Date:** 2026-10-18
+
+**Approach.** Three independent changes to `security-probe.mjs`, each refused or recorded before
+the run's result can mislead.
+
+- **`validateCases`** (exported, with `describeBadCase`) returns the first case that is not an
+  object, has a `direction` outside `DIRECTIONS`, or a present `sink` outside `SINKS`. `main`
+  calls it right after parsing `--cases-file` and refuses `bad-cases` (exit 2) before
+  `preflightRecord`. `runProbeSpec` applies it to any supplied `cases` and declines `bad-cases`.
+- **`defaultRepoRoot`** keeps two levels up when the file sits in a `shared/resources` directory;
+  otherwise (a bundled `references/` copy) it returns `git rev-parse --show-toplevel` from the
+  caller's cwd, falling back to two up. `main` resolves the root once and passes it to the run.
+- **Entry exists.** `main` runs `resolveEntry` before `preflightRecord` for all six forms, with or
+  without `--record`, and refuses a missing `entryPath` `entry-not-found` (exit 2), naming the path
+  and the root. A `resolveEntry` failure is still declined by `runProbeSpec`.
+- **Both refusals** write `<reason>: <detail>` to stderr and, under `--json`, `{reason, detail}` to
+  stdout.
+- **`toRecordEntry`** adds `declined_cases: [{id, reason, detail}]` beside the `declined` count. No
+  reader of the record keys on its field set (`git grep -n 'declined' -- 'shared/resources/*.mjs'
+  'shared/resources/*.js' 'shared/resources/*.md' 'skills/*/SKILL.md'` finds no other reader).
+
+**Testing Results.**
+
+- `command node --test shared/resources/tests/security-probe.test.mjs`: 12 new tests. They cover
+  validateCases ×4 (direction, sink + absent-sink control, shapes, every corpus case), CLI bad-cases
+  ×2 (no record; `--json`), a valid-file control that records, runProbeSpec bad-cases, entry-not-found
+  for all six forms (no record), a resolveEntry escape still declined (control), declined_cases
+  round-tripped through a record on disk, and defaultRepoRoot from a bundled, a
+  `shared/resources` and a no-git copy (transitive import copy).
+- `skills/review-security/tests/review-security.test.js:711`: updated. A nested copy without
+  `--repo-root` now `engages`; an explicit old root exits 2 `entry-not-found`.
+- `npm run ci:fast`: 5837 tests, 5823 pass, 0 fail. `npm run bundle:check`: 128 skills, 0 problems.
+- Mutation proofs, each red then restored: M1 drop `main`'s validation → fail 2; M2 revert
+  `defaultRepoRoot` → fail 1; M3 disable the entry check → fail 1; M3b move the entry check after
+  `preflightRecord` → fail 1; M4 drop `declined_cases`' id → fail 1; M5 drop `runProbeSpec`'s
+  validation → fail 1.
+
+## Deferred Work
+
+- **None from this task's scope.** Notes › Future Improvements (validating `id` presence and
+  uniqueness, `input` type per entry form) stands as written.

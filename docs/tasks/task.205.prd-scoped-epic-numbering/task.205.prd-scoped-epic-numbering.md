@@ -5,18 +5,22 @@ type: task
 description: "Number every epic within its parent PRD as epic.{P}.{E}, make a parent PRD mandatory, and retire the global epic registry and the epic-registry-manager skill, across the epic authoring, review, index and tracker-sync skills."
 tags: [create-epic, create-epics-from-shards, review-epic, edit-epic, epic-registry-manager, generate-prd-epic-index, sync-jira-epic, jira-epic-creator, ensure-epic-github-issue, sync-github-epic, doc-numbering]
 category: refactoring
-status: planned
+status: accepted
 priority: Medium
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-15
 assignee:
 estimated_effort_hours: 16
 github_issue: 648
+completed_date: 2026-10-15
+pr_number: 674
 ---
 
 # Technical Task: PRD-scoped epic numbering
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.205.review.1.prd-scoped-epic-numbering.md` implemented 2026-10-15
 
 **GitHub Issue**: [#648](https://github.com/Gamaroff/agent-skills/issues/648)
 
@@ -44,7 +48,7 @@ copies, and the retirement of `epic-registry-manager` and the registry's setup a
 **Key deliverables**:
 
 1. Every epic-creating path names the file `epic.{P}.{E}.{name}`, takes `E` from
-   `doc-id.js next epic --prd P`, writes `prd_number` + `epic_number`, and halts when no parent PRD exists.
+   `doc-id.js next epic --prd-dir <PRD dir>`, writes `prd_number` + `epic_number`, and halts when no parent PRD exists.
 2. `review-epic` blocks (Critical) on an epic whose numbers disagree with its directory or its parent PRD,
    and resolves epics by `P.E`, never by a bare number.
 3. Tracker identity becomes `[Epic P.E]` / milestone `Epic P.E — {title}` on Jira and GitHub, with
@@ -81,7 +85,7 @@ copies, and the retirement of `epic-registry-manager` and the registry's setup a
 
 ### Benefits of PRD-scoped numbering
 
-1. **One allocator, in code.** `doc-id.js next epic --prd P` replaces three hand-reservation procedures.
+1. **One allocator, in code.** `doc-id.js next epic --prd-dir <PRD dir>` replaces three hand-reservation procedures.
 2. **The PRD and its files agree.** "Epic 2 of PRD 1" is `epic.1.2` everywhere: file, frontmatter,
    index, Jira summary, GitHub milestone.
 3. **No global counter to conflict on.** Two branches creating epics under different PRDs can no
@@ -119,7 +123,7 @@ Every name below was grepped on 2026-10-13 (`git grep -n`, canonical sources onl
   `skills/create-task/SKILL.md:666`. The task `epic:` field it keys on is documented nowhere in
   `docs/standards/task-documents.md` and set by no task in this repository
   (`grep -rln "^epic:" docs/tasks/*/task.*.md` → no hits).
-- `scripts/setup-consumer.sh:705-710` creates an empty `docs/development/epic-registry.md` in every consumer.
+- `scripts/setup-consumer.sh:810-815` creates an empty `docs/development/epic-registry.md` in every consumer.
 - Skill lists naming `epic-registry-manager`: `tests/skill-doc-coverage.test.js:96`,
   `tests/skill-protocol.test.js:331` (change-log instruction loop), `:489` (byte-lock list),
   `skills/create-skill/scripts/generate_catalog.py:64`, generated `shared/resources/skill-dependencies.json:23,126`
@@ -151,7 +155,7 @@ the sentinel (`git grep -n brownfield -- '*.js' '*.mjs' '*.sh' '*.py'` → only 
   PRD is never visited; `:213` *(`parseInt(frontmatterField(fm, "epic_number"), 10)`)*; `:226`
   *(`epics.sort((a, b) => a.number - b.number)`)*; `cleanTitle` `:135` *(`/^\[Epic\s+\d+\]\s*/i`)*;
   `buildBlock` emits the `| # |` column from `e.number`. The file is also vendored to consumers' `scripts/`
-  by `scripts/setup-consumer.sh:1570-1580`. Tests: `shared/resources/tests/generate-prd-epic-index.test.mjs`
+  by `scripts/setup-consumer.sh:1681-1685`. Tests: `shared/resources/tests/generate-prd-epic-index.test.mjs`
   (12 tests; fixtures write `epic_number:` at `:56`).
 - `skills/sync-jira-epic/scripts/sync-jira-epic.js` — `normaliseEpicSummary` `:358-369`
   *(`/^\s*\[Epic\s+(\d+)\]\s*(.*)$/i`)*, called at `:834` with `frontmatter.epic_number`;
@@ -176,11 +180,13 @@ the sentinel (`git grep -n brownfield -- '*.js' '*.mjs' '*.sh' '*.py'` → only 
 
 ### Existing mechanisms this task reuses or extends (obs #103)
 
-- **`doc-id.js`** (task.202) — `parse`, `format`, `matchesEpic(stem, P, E)`, `next epic --prd P`,
-  `check <path>`. This task **calls** it everywhere it currently parses an epic id; it adds no parser of
-  its own. Two helpers this task needs and adds to `doc-id.js` beside the existing API (same file, same
-  tests): `stripIdPrefix(kind, title)` (drops a leading `[Epic …]` / `Epic …:` in either the legacy
-  one-number or the `P.E` form) and `idLabel(parsed)` (`"1.3"`). They **replace** the two
+- **`doc-id.js`** (task.202) — `parse`, `format`, `matchesEpic(stem, P, E)`, `next epic --prd-dir <dir>`
+  (prints `{ next, id }`; verified 2026-10-15: `next epic --prd-dir docs/prd/onboarding/prd.1.onboarding --json`
+  → `"next": 5, "id": "epic.1.5"`), `check <path>`. This task **calls** it everywhere it currently parses an
+  epic id; it adds no parser of its own. Three helpers this task needs and adds to `doc-id.js` beside the
+  existing API (same file, same tests): `stripIdPrefix(kind, title)` (drops a leading `[Epic …]` /
+  `Epic …:` in either the legacy one-number or the `P.E` form), `idLabel(parsed)` (`"1.3"`) and
+  `epicSummary(summary, { prd, epic })` (built on the other two). They **replace** the two
   `normaliseEpicSummary` regex copies and `cleanTitle`'s regex — they do not sit beside them.
 - **`generate-prd-epic-index.mjs`** is **extended**, not replaced: the PRD-discovery walk and the number
   column change; idempotence, `--check`, `--strict` and the function-replacement guard (`:228-233`) stay.
@@ -198,7 +204,7 @@ ${PRD_ROOT}/{domain}/prd.{P}.{feature}/
 ```
 
 - **Allocation**: `create-epic` reads `P` from the parent PRD (`doc-id parse` of the PRD stem, checked
-  against its `prd_number`), then `E=$(command node references/doc-id.js next epic --prd "$P" --json)`.
+  against its `prd_number`), then `E=$(command node references/doc-id.js next epic --prd-dir "$PRD_DIR" --json | jq -r .next)`.
   `create-epics-from-shards` takes the first `E` the same way and numbers its batch `E…E+n-1`.
 - **Gate**: after writing, both skills run `doc-id.js check <epic file>`; a non-`ok` reason halts
   (blocking — the skill chose the name, so a mismatch is the skill's defect).
@@ -311,59 +317,60 @@ run `npm run bundle` at the end of every phase that touches a shared source.
 
 ### Phase 0: Preconditions (Low)
 
-- [ ] HALT unless task.202 (`doc-id.js` with `parse`, `format`, `matchesEpic`, `next epic`, `check`) and task.203 (this repo migrated) are merged to `develop`
-- [ ] Re-run the §3 greps; every hit is updated or listed as an exclusion
+- [x] HALT unless task.202 (`doc-id.js` with `parse`, `format`, `matchesEpic`, `next epic`, `check`) and task.203 (this repo migrated) are merged to `develop`
+- [x] Re-run the §3 greps; every hit is updated or listed as an exclusion
 
 ### Phase 1: Shared id helpers and the index generator (Medium)
 
 **Files**: `shared/resources/doc-id.js`, `shared/resources/generate-prd-epic-index.mjs`, their tests.
-- [ ] Add `stripIdPrefix(kind, title)`, `idLabel(parsed)` and `epicSummary(summary, {prd, epic})` to `doc-id.js`, with unit tests
-- [ ] Generator: discover PRD directories at depth 1 **or** 2 by `doc-id parse` of the directory name (kind `prd`), not by "every directory"
-- [ ] Generator: number column `idLabel` (`P.E`); sort by `epic` numerically within the PRD; read `prd_number` + `epic_number`; an epic whose directory stem disagrees with its frontmatter is skipped and reported (`--strict` fails)
-- [ ] Generator: `cleanTitle` uses `stripIdPrefix("epic", …)`
-- [ ] Extend `generate-prd-epic-index.test.mjs` (§8)
+- [x] Add `stripIdPrefix(kind, title)`, `idLabel(parsed)` and `epicSummary(summary, {prd, epic})` to `doc-id.js`, with unit tests
+- [x] Generator: discover PRD directories at depth 1 **or** 2 by `doc-id parse` of the directory name (kind `prd`), not by "every directory"
+- [x] Generator: number column `idLabel` (`P.E`); sort by `epic` numerically within the PRD; read `prd_number` + `epic_number`; an epic whose directory stem disagrees with its frontmatter is skipped and reported (`--strict` fails)
+- [x] Generator: `cleanTitle` uses `stripIdPrefix("epic", …)`
+- [x] Extend `generate-prd-epic-index.test.mjs` (§8)
 
 ### Phase 2: Jira epic paths (Medium)
 
 **Files**: `skills/sync-jira-epic/scripts/sync-jira-epic.js`, `skills/jira-epic-creator/scripts/jira-create-epic.js`, their tests.
-- [ ] Replace both `normaliseEpicSummary` copies with calls to the one `doc-id.epicSummary(summary, { prd, epic })`; the frontmatter pair wins over any id in the title, and a missing pair yields the bare title, never a guessed id
-- [ ] `findChildStories`: parse with `doc-id`, keep only stories whose `(P, E)` equals the epic's, sort by story number, label `Story P.E.S`
-- [ ] Bundle `doc-id.js` into both skills (a bare `references/doc-id.js` mention in each `SKILL.md` + `require`)
+- [x] Replace both `normaliseEpicSummary` copies with calls to the one `doc-id.epicSummary(summary, { prd, epic })`; the frontmatter pair wins over any id in the title, and a missing pair yields the bare title, never a guessed id
+- [x] `findChildStories`: parse with `doc-id`, keep only stories whose `(P, E)` equals the epic's, sort by story number, label `Story P.E.S`
+- [x] Bundle `doc-id.js` into both skills (a bare `references/doc-id.js` mention in each `SKILL.md` + `require`)
 
 ### Phase 3: Epic authoring skills and the template (Medium)
 
 **Files**: `skills/create-epic/SKILL.md`, `skills/create-epics-from-shards/SKILL.md`, `docs/templates/epic-template.md` + `skills/documentation-standards-validator/references/epic-template.md`, `skills/documentation-standards-validator/references/prd-structure-guide.md`.
-- [ ] `create-epic` Discover Parent PRD: canonical path → glob → **halt** (no sentinel); read `P`; allocate `E` with `doc-id next epic`; name `epic.{P}.{E}`; frontmatter `prd_number`; `[Epic P.E]` H1; remove the decimal example, the registry steps, the registry allowed-write and `epic-registry-manager` from `invokes:`
-- [ ] `create-epic` post-creation: run `doc-id check` on the new file (blocking) before the epic-index step; the index step no longer has a skip branch
-- [ ] `create-epics-from-shards`: read `P` from the PRD directory; allocate the batch from one `next epic`; dir-per-epic layout; `dependencies: ["epic.P.E", …]`; Step 4 registry procedure removed
-- [ ] Epic template: banner says "allocated by `create-epic` via `doc-id.js`"; `prd_source` comment requires a path; `prd_number` field; copy byte-identically to the validator copy; update `prd-structure-guide.md:210`
+- [x] `create-epic` Discover Parent PRD: canonical path → glob → **halt** (no sentinel); read `P`; allocate `E` with `doc-id next epic --prd-dir <PRD dir>` (inside a fenced bash block — see §8 "Executable skill blocks"); name `epic.{P}.{E}`; frontmatter `prd_number`; `[Epic P.E]` H1; remove the decimal example, the registry steps, the registry allowed-write and `epic-registry-manager` from `invokes:`
+- [x] `create-epic` post-creation: run `doc-id check` on the new file (blocking) before the epic-index step; the index step no longer has a skip branch
+- [x] `create-epics-from-shards`: read `P` from the PRD directory; allocate the batch from one `next epic`; dir-per-epic layout; `dependencies: ["epic.P.E", …]`; Step 4 registry procedure removed
+- [x] Epic template: banner says "allocated by `create-epic` via `doc-id.js`"; `prd_source` comment requires a path; `prd_number` field; copy byte-identically to the validator copy; update `prd-structure-guide.md:210`
 
 ### Phase 4: Review and edit skills (Medium)
 
 **Files**: `skills/review-epic/SKILL.md`, `skills/edit-epic/SKILL.md`, `skills/pm-coordinator/SKILL.md`.
-- [ ] `review-epic` input: `P.E` → `doc-id` resolution; bare integer refused with the `P.E` hint; name search unchanged
-- [ ] `review-epic` Step 3 becomes **Epic Corpus Conflict Detection**: enumerate epics with `doc-id check --corpus --json` (or the `epics-index` of each PRD); same duplicate / overlap / dependency checks; "missing registry entry" and "stale registry entry" are removed; dependency refs are `epic.P.E`
-- [ ] `review-epic` new Critical checks: `doc-id check` reason ≠ `ok` (directory/stem/frontmatter disagree, or `prd_number` ≠ parent PRD's); `prd_source` absent or unresolvable — no sentinel exemption; title-format regex accepts `P.E`
-- [ ] `edit-epic`: renumber inside a PRD through `doc-id next epic`; refuse a change of `P` and point at task.203's migration script; registry reminders removed
-- [ ] `pm-coordinator:148-152`: per-PRD numbering stated; registry line removed
+- [x] `review-epic` input: `P.E` → `doc-id` resolution; bare integer refused with the `P.E` hint; name search unchanged. The resolution is one fenced bash block that `tests/epic-numbering-retirement.test.js` extracts and runs (§8)
+- [x] `review-epic` Step 3 becomes **Epic Corpus Conflict Detection**: enumerate epics with `doc-id check --corpus --json` (or the `epics-index` of each PRD); same duplicate / overlap / dependency checks; "missing registry entry" and "stale registry entry" are removed; dependency refs are `epic.P.E`
+- [x] `review-epic` new Critical checks: `doc-id check` reason ≠ `ok` (directory/stem/frontmatter disagree, or `prd_number` ≠ parent PRD's); `prd_source` absent or unresolvable — no sentinel exemption; title-format regex accepts `P.E`
+- [x] `edit-epic`: renumber inside a PRD through `doc-id next epic --prd-dir <PRD dir>`; refuse a change of `P` and point at task.203's migration script; registry reminders removed
+- [x] `pm-coordinator:148-152`: per-PRD numbering stated; registry line removed
 
 ### Phase 5: GitHub epic paths and task milestone lookup (Medium)
 
 **Files**: `shared/resources/tracker-issue.js` (+ test), `skills/ensure-epic-github-issue/SKILL.md`, `skills/sync-github-epic/SKILL.md`, `skills/ensure-task-github-issue/SKILL.md`, `skills/sync-github-task/SKILL.md`, `skills/review-task/SKILL.md`, `skills/create-task/SKILL.md`.
-- [ ] `tracker-issue.js --kind milestone --title <new> --rename-from <old>`: rename when `<old>` exists and `<new>` does not; `already` when `<new>` exists; deferred under a deferring access mode like every other kind
-- [ ] `ensure-epic-github-issue` / `sync-github-epic`: `EPIC_ID` from `doc-id parse` (`P.E`); title `[Epic P.E]`; milestone `Epic P.E — {title}`; sentinel branches removed
-- [ ] `sync-github-epic` update path: when the issue's current milestone differs from the target title, rename it with `--rename-from`, never create-and-move
-- [ ] Task milestone lookup step 2: resolve the task's `epic:` value (`P.E` or an epic directory stem) through `doc-id` to the epic file and use `Epic P.E — {epic title}`; no registry read. Restatements in `sync-github-task`, `review-task`, `create-task` point at the one step
+- [x] `tracker-issue.js --kind milestone --title <new> --rename-from <old>`: rename when `<old>` exists and `<new>` does not; `already` when `<new>` exists; deferred under a deferring access mode like every other kind
+- [x] `ensure-epic-github-issue` / `sync-github-epic`: `EPIC_ID` from `doc-id parse` (`P.E`); title `[Epic P.E]`; milestone `Epic P.E — {title}`; sentinel branches removed
+- [x] `sync-github-epic` update path: when the issue's current milestone is the epic's own (`Epic {P.E} — …`, or `Epic {any id} — {title}`) and differs from the target title, rename it with `--rename-from`, never create-and-move; any other milestone is never renamed (QA cycle 1, CR-1)
+- [x] Task milestone lookup step 2: resolve the task's `epic:` value (`P.E` or an epic directory stem) through `doc-id` to the epic file and use `Epic P.E — {epic title}`; no registry read. Restatements in `sync-github-task`, `review-task`, `create-task` point at the one step
 
 ### Phase 6: Retire the registry and the skill; close-out (Low)
 
 **Files**: `skills/epic-registry-manager/` (deleted), `tests/skill-doc-coverage.test.js`, `tests/skill-protocol.test.js`, `skills/create-skill/scripts/generate_catalog.py`, `scripts/setup-consumer.sh`, `docs/standards/epic-registry.md`, `docs/standards/epic-documents.md`, `CHANGELOG.md`.
-- [ ] `git rm -r skills/epic-registry-manager/`; drop it from the three test lists and `generate_catalog.py`; regenerate `skill-dependencies.json` and the catalog
-- [ ] `setup-consumer.sh`: stop creating `docs/development/epic-registry.md`; its header comment (`:12`) updated; the generator vendor block (`:1570-1580`) also copies `doc-id.js` beside `scripts/generate-prd-epic-index.mjs`, which now imports it
-- [ ] `docs/standards/epic-registry.md` → a retired notice pointing at the PRD registry standard and the epics-index; `epic-documents.md` `epic_number` row says "within the PRD" (if task.202 has not already)
-- [ ] Add the guard test (§8 "No registry reader, no sentinel")
-- [ ] CHANGELOG entry with the six breaking changes and the consumer steps
-- [ ] `npm run bundle`, `npm run generate-catalog`, `npm test`, `npm run bundle:check`
+- [x] `git rm -r skills/epic-registry-manager/`; drop it from the three test lists and `generate_catalog.py`; regenerate `skill-dependencies.json` and the catalog
+- [x] `setup-consumer.sh`: stop creating `docs/development/epic-registry.md`; its header comment (`:12`) updated; the generator vendor block (`:1681-1685`) also copies `doc-id.js` beside `scripts/generate-prd-epic-index.mjs`, **as `scripts/doc-id.cjs`** — a consumer whose `package.json` says `"type": "module"` would parse a vendored `doc-id.js` as ESM and fail on `require`. The generator loads it through `createRequire(import.meta.url)`, trying `./doc-id.cjs` first and `./doc-id.js` second (this repository's `shared/resources/` copy)
+- [x] Interim notices this task's landing falsifies, updated in the same PR: `docs/development/epic-registry.md` ("until **task.205** rewires them — do not run `/create-epic`"), the pointer template that writes it (`shared/resources/migrate-doc-numbering.mjs:1232`), and `docs/architecture/concepts/coding-standards.md:64` (*"until task 205, do not run `/create-epic` here"*). The rest of `coding-standards.md` (`:89`) stays with task.207
+- [x] `docs/standards/epic-registry.md` → a retired notice pointing at the PRD registry standard and the epics-index; `epic-documents.md` `epic_number` row says "within the PRD" (if task.202 has not already)
+- [x] Add the guard test (§8 "No registry reader, no sentinel")
+- [x] CHANGELOG entry with the six breaking changes and the consumer steps
+- [x] `npm run bundle`, `npm run generate-catalog`, `npm test`, `npm run bundle:check`, `npm run lint:shell` (ShellCheck — this phase edits `setup-consumer.sh`)
 
 ---
 
@@ -393,13 +400,23 @@ run `npm run bundle` at the end of every phase that touches a shared source.
 
 ### Files to Modify (Tests)
 
+Tests that pin a literal or a behaviour this task removes (found by searching the literal —
+`git grep -n "normaliseEpicSummary\|cleanTitle\|findChildStories\|epic-registry-manager" -- '*.test.*' evals`
+and `git grep -n "\[Epic " -- '*.test.*'`, 2026-10-15):
+
+- `skills/sync-jira-epic/tests/sync-jira-epic.test.js:763-788` — `normaliseEpicSummary` cases move to `doc-id.epicSummary`. **`:787` inverts**: it pins "falls back to the title's prefix id when `epic_number` is absent", and this task's rule is "a missing pair yields the bare title, never a guessed id".
+- `skills/sync-jira-epic/tests/sync-jira-epic.test.js:792-867` — `findChildStories` fixtures use two-segment `story.E.S` dirs and labels `Story 2.1`; they become `story.P.E.S` / `Story P.E.S`.
+- `shared/resources/tests/generate-prd-epic-index.test.mjs` — fixtures write flat `prd.x` / `epic.1.one` dirs, `[Epic N]` titles and a single `number`; they move to `prd.P.x` under a domain, `epic.P.E.slug`, `prd_number` + `epic_number`.
+- `tests/skill-protocol.test.js:331`, `:489` and `tests/skill-doc-coverage.test.js:96` — the `epic-registry-manager` list entries.
+- Not affected: `tests/work-item-artifact-naming.test.js:88` (a task directory name), `shared/resources/tests/change-log.test.mjs:45` (title text only).
+
 20. ✅ `shared/resources/tests/generate-prd-epic-index.test.mjs`
 21. ✅ `shared/resources/tests/doc-id.test.mjs` (task.202's file) — the two helpers
 22. ✅ `shared/resources/tests/tracker-issue.test.mjs` — `--rename-from`
 23. ✅ `skills/sync-jira-epic/tests/sync-jira-epic.test.js`
 24. ✅ `skills/jira-epic-creator/tests/` — a normaliser test
 25. ✅ `tests/skill-protocol.test.js`, `tests/skill-doc-coverage.test.js`
-26. ✅ New guard: `tests/epic-numbering-retirement.test.js`
+26. ✅ New guard: `tests/epic-numbering-retirement.test.js` (reached by the `'tests/*.test.js'` glob in `package.json` `test`)
 
 ### Files to Modify (Documentation)
 
@@ -442,8 +459,18 @@ both literals belong to this rule alone (`git grep` on 2026-10-13 shows no other
 restatement it misses**: prose that says "look up the epic in the global registry" without the filename.
 That form is caught by review, not by this test, and the test says so in a comment. **(c) Population**: derived
 from the globs, with a non-vacuity floor (the scan must read ≥ 100 files) so an emptied glob fails loudly.
-Allowlist: the task.204-owned PRD skill lines (`create-prd/SKILL.md`, `review-prd/SKILL.md`) and the task.207-owned `shared/resources/open-knowledge-format.md:64`, each with a comment naming its owning task. The test
+Allowlist: the task.204-owned PRD skill lines (`create-prd/SKILL.md`, `review-prd/SKILL.md`), the task.207-owned `shared/resources/open-knowledge-format.md:64`, and `shared/resources/migrate-doc-numbering.mjs` — task.203's migration **writes** the retired pointer at that path, so it names the file as a writer, not a reader — each with a comment naming its owning task or reason. The test
 fails on any allowlisted line that no longer exists, so the allowlist is emptied as task.204 and task.207 land.
+
+### Executable skill blocks (obs #258)
+
+A behaviour criterion whose fix lands in a `SKILL.md` is held only if a test runs it. Three skill
+blocks are written as fenced `bash` blocks that `tests/epic-numbering-retirement.test.js` extracts
+(by a marker comment on the block's first line) and runs against a temp fixture tree:
+
+- `review-epic` input resolution: `1.3` → exactly one file; `3` → non-zero exit and the `P.E` hint; a name → the name search.
+- `create-epic` Discover Parent PRD: a domain with no PRD → non-zero exit with the `/create-prd` message; a domain with `prd.1.x/` → `P=1` and `E` from `next epic --prd-dir`.
+- `sync-github-epic` update path: the block passes `--rename-from "<current milestone title>"` to `tracker-issue.js --kind milestone` only for the epic's own milestone — run with a recording `node` stand-in on `PATH` over own, foreign and shared milestones (the rename itself is held by `tracker-issue.test.mjs`).
 
 ### Mutation proof
 
@@ -465,25 +492,25 @@ Not applicable — no hot path changes; the generator's walk gains one directory
 
 ### Functional
 
-- [ ] `create-epic` names a new epic `epic.{P}.{E}.{name}` with `E` from `doc-id next epic --prd P`, and halts when no parent PRD exists (Phase 3)
+- [ ] `create-epic` names a new epic `epic.{P}.{E}.{name}` with `E` from `doc-id next epic --prd-dir <PRD dir>`, and halts when no parent PRD exists — held by the extracted Discover Parent PRD block in `tests/epic-numbering-retirement.test.js` (Phase 3)
 - [ ] `create-epics-from-shards` writes dir-per-epic `epic.{P}.{E}` files with consecutive `E`, and the PRD index lists them (Phases 1, 3)
-- [ ] `review-epic` raises Critical when `doc-id check` on the epic returns any reason other than `ok`, and when `prd_source` is absent or unresolvable (Phase 4)
-- [ ] `review-epic 3` is refused with the `P.E` hint; `review-epic 1.3` resolves exactly one file (Phase 4)
-- [ ] `generate-prd-epic-index.mjs` indexes a PRD under a domain directory and prints `P.E` (Phase 1)
-- [ ] Both Jira scripts produce `[Epic P.E] {title}` from one shared helper; no `\[Epic\\s+\(\\d+\)\]` regex remains in either (Phase 2)
-- [ ] A GitHub epic already on milestone `Epic 3 — Foo` ends on a milestone **renamed** to `Epic 1.3 — Foo`, with no second milestone created (Phase 5)
+- [ ] `skills/review-epic/SKILL.md` instructs a Critical finding when `doc-id check` on the epic returns any reason other than `ok`, and when `prd_source` is absent or unresolvable, with no sentinel exemption — a documentation criterion, asserted by `tests/epic-numbering-retirement.test.js` (Phase 4)
+- [ ] `review-epic 3` is refused with the `P.E` hint; `review-epic 1.3` resolves exactly one file — held by the extracted input-resolution block in `tests/epic-numbering-retirement.test.js` (Phase 4)
+- [ ] `generate-prd-epic-index.mjs` indexes a PRD under a domain directory and prints `P.E` — held by `generate-prd-epic-index.test.mjs` (Phase 1)
+- [ ] Both Jira scripts produce `[Epic P.E] {title}` from one shared helper — held by the `epicSummary` cases in `doc-id.test.mjs` and a call-through case in each script's test file; no `\[Epic\\s+\(\\d+\)\]` regex remains in either (Phase 2)
+- [ ] A GitHub epic already on milestone `Epic 3 — Foo` ends on a milestone **renamed** to `Epic 1.3 — Foo`, with no second milestone created — held by the `--rename-from` cases in `tracker-issue.test.mjs` (old exists → one edit call, zero create calls) and the extracted `sync-github-epic` block assertion (Phase 5)
 - [ ] `skills/epic-registry-manager/` no longer exists and no shipped skill reads `epic-registry.md` (guard test, Phase 6)
 
 ### Performance
 
-- [ ] `generate-prd-epic-index.mjs --check` on this repository completes in under 1 s (it walks one more level than today)
-- [ ] No new network call on any path that had none (`--rename-from` replaces a create call; it does not add one)
+- [ ] `generate-prd-epic-index.mjs --check` on this repository completes in under 1 s (it walks one more level than today) — a measured bound: `uptime; time command node shared/resources/generate-prd-epic-index.mjs --check`, run on the PR head and cited in the implementation report
+- [ ] No new network call on any path that had none (`--rename-from` replaces a create call; it does not add one) — held by the `tracker-issue.test.mjs` call-count assertions
 
 ### Code Quality
 
 - [ ] `npm test` passes; `npm run bundle:check` is clean; `npm run generate-catalog` produces no diff after commit
 - [ ] Each new guard is mutation-proven (§8)
-- [ ] `python skills/create-skill/scripts/quick_validate.py` passes for every changed skill
+- [ ] `python skills/create-skill/scripts/quick_validate.py` passes for every changed skill; `npm run lint:shell` passes
 - [ ] The local green is confirmed with the gitignored `.agents/skills` symlink moved aside
 
 ### Migration
@@ -513,7 +540,7 @@ Not applicable — no hot path changes; the generator's walk gains one directory
 
 1. **Retiring a skill a consumer invokes by name.** Mitigation: CHANGELOG entry; `create-epic` covers the use case.
 2. **`create-epic` loses its "no PRD needed" niche.** A small enhancement now needs a PRD. Mitigation: the halt message names `/create-prd`; the owner chose this (plan decision 2).
-3. **Vendored generator drift in consumers** (`setup-consumer.sh:1570`). Mitigation: `--update` re-vendors; CHANGELOG step.
+3. **Vendored generator drift in consumers** (`setup-consumer.sh:1681`). Mitigation: `--update` re-vendors; CHANGELOG step. The generator's new `doc-id` dependency is vendored as `scripts/doc-id.cjs` so an ESM (`"type": "module"`) consumer does not parse it as ESM.
 4. **Jira dedup label changes with the directory name.** Only affects an epic with no `jira_key` whose create crashed before write-back. Mitigation: documented in §3; `tracker-reconcile` finds orphans.
 
 ### Low Risk Areas
@@ -548,36 +575,103 @@ Not applicable — no hot path changes; the generator's walk gains one directory
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-15
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.205.qa.7.prd-scoped-epic-numbering.md](./task.205.qa.7.prd-scoped-epic-numbering.md)
+- **Gate File**: [task.205.gate.7.prd-scoped-epic-numbering.yml](./task.205.gate.7.prd-scoped-epic-numbering.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 5690 (5676 pass, 0 fail)
+- **Phases Verified**: 7/7
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+- Cycle 6's fix verified and mutation-proven; [BUG-14](./task.205.bug.14.shards-stray-fence-hides-step-7-guard.md) closed — all 14 bugs closed.
+- The Step 7 batch guard is probed against the committed doc: engages, 8/8.
+- One low cleanup (test hook style); advisories carried in the gate's `recommendations.future`.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.205.qa.7.prd-scoped-epic-numbering.md`
+**Gate File**: `task.205.gate.7.prd-scoped-epic-numbering.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (7 QA cycles; bugs 1–14 closed)
+**PR review (Step 5c)**: ⚠️ CONCERNS, non-blocking — `task.205.pr-review.1.prd-scoped-epic-numbering.md`
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 17/17 met, each with code and per-PR test evidence (AC9 re-measured on the PR head at 0.18 s against a 1 s bound)
+✅ **Tests & CI:** CI SUCCESS on `82762a2b` over 5 checks; local fast gate 5690 tests, 0 failures
+✅ **PR Review:** the host requires no reviews; the Step 5c conformance review reads CONCERNS, with two scope findings recorded
+✅ **Documentation:** CHANGELOG breaking entry, retired registry standard, updated skill files, regenerated catalog, README count
+✅ **Security Review:** ✅ PASS. Three fenced guards probed, 34 candidates executed, 0 reproduced
+⚠️ **Compliance Review:** not applicable (internal tooling refactor)
+
+**Task marked as ACCEPTED on:** 2026-10-15
+
+**Detailed Verification Log:** See `task.205.dod.1.prd-scoped-epic-numbering.md` for the complete verification evidence and timestamps.
+
+<!-- change-log-start -->
 ## Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-10-13 | 1.0 | Initial draft | create-task |
+| 2026-10-15 | 1.1 | Review passed (8/10) — allocator flag corrected to `--prd-dir`; ESM-safe `doc-id.cjs` vendoring; interim notices, tests to update, guard allowlist and executable-block tests added | review-task |
+| 2026-10-15 |  | Status → ready-for-development | review-task |
+| 2026-10-15 |  | Implemented — 44 files changed vs develop (bundled copies excluded), `epic-registry-manager` removed; new or changed tests in 7 suites (doc-id helpers, generator, both Jira scripts, `--rename-from`, migration pointer, retirement guard with 5 executed skill blocks) | develop |
+| 2026-10-15 |  | QA gate FAIL (70/100) — 3 gating findings (1 high, 1 medium, 1 low) | qa-task |
+| 2026-10-15 |  | QA findings fixed — cycle 1, 7 findings (3 gating + 4 advisory), 4 mutation-proven | qa-fix |
+| 2026-10-15 |  | QA gate FAIL (60/100) — refute pass, 7 gating findings (1 high, 4 medium, 2 low); bugs 1–2 closed | qa-task |
+| 2026-10-15 |  | QA findings fixed — cycle 2, 9 findings; every new block derives its inputs from its own document via `doc-id.js epic-meta`; 7 mutation-proven | qa-fix |
+| 2026-10-15 |  | QA gate CONCERNS (80/100) — 2 medium findings (one re-rated from high on a measurement); bugs 3–7 closed | qa-task |
+| 2026-10-15 |  | QA findings fixed — cycle 3, 6 findings (2 gating + 3 advisory + 1 cleanup); population of cross-block reads enumerated; 4 mutation-proven | qa-fix |
+| 2026-10-15 |  | QA gate FAIL (50/100) — 3 gating findings (2 high, one root; 1 medium); bugs 8–9 closed | qa-task |
+| 2026-10-15 |  | QA findings fixed — cycle 4, 4 findings (one path root per block, enforced by a test; batch guard; one frontmatter parser); 4 mutation-proven | qa-fix |
+| 2026-10-15 |  | QA gate CONCERNS (80/100) — 0 high; 1 medium, 1 low gating; bugs 10–11 closed | qa-task |
+| 2026-10-15 |  | QA findings fixed — cycle 5, 2 gating findings + 1 advisory (batch presence shape; id-check reason printed; create-epic preflight path root); 2 mutation-proven | qa-fix |
+| 2026-10-15 |  | QA gate CONCERNS (80/100) — 0 high; 1 medium gating (stray fence hides the Step 7 guard from every engine); bugs 12–13 closed | qa-task |
+| 2026-10-15 |  | QA findings fixed — cycle 6, 1 gating finding (stray fence removed; the retirement test reads blocks through the shared fence reader); 1 mutation-proven | qa-fix |
+| 2026-10-15 |  | QA gate PASS (100/100) — 0 gating findings, 1 low cleanup; bug 14 closed | qa-task |
+| 2026-10-15 | 1.2 | DoD passed — accepted (PR #674) | finalise |
 
 ---
+<!-- change-log-end -->
 
 ## Progress Tracking
 
 ### Phase 0: Preconditions
-- [ ] Complete
+- [x] Complete
 
 ### Phase 1: Shared id helpers and the index generator
-- [ ] Complete
+- [x] Complete
 
 ### Phase 2: Jira epic paths
-- [ ] Complete
+- [x] Complete
 
 ### Phase 3: Epic authoring skills and the template
-- [ ] Complete
+- [x] Complete
 
 ### Phase 4: Review and edit skills
-- [ ] Complete
+- [x] Complete
 
 ### Phase 5: GitHub epic paths and task milestone lookup
-- [ ] Complete
+- [x] Complete
 
 ### Phase 6: Retire the registry and the skill; close-out
-- [ ] Complete
+- [x] Complete
 
 ---
 

@@ -1,0 +1,91 @@
+schema: 2
+task: 'task.204.numbered-prds-in-prd-skills'
+task_title: 'Numbered PRDs in the PRD skills'
+gate: CONCERNS
+status_reason: 'Scoped re-review after the finalise DoD gaps (QA re-entered at 5a). The DoD fixes hold (stdout-drain guard green). Two reproduced mediums: the migration guard''s outside-links check matches any mention of the PRD''s basename, so a consumer that commits its vendored skills can never migrate docs/prd.md; and the reference docs still give the pre-numbering epic and story paths beside the corrected PRD path. Two lows in the guard and the apply block.'
+reviewer: 'QA Engineer'
+head: 'a8810b54741a0fb3e191e21547c8cf4ec9e1b0d3'
+updated: '2026-10-15T22:00:26Z'
+
+top_issues:
+  - id: CR-1
+    severity: medium
+    file: 'skills/review-prd/scripts/migration-guard.mjs'
+    finding: 'outside-links flags every tracked file that mentions the basename prd.md, not only files that reference this PRD; in a consumer that commits .agents/skills the vendored review-prd and shard-prd prose always matches, so the docs/prd.md migration is always refused (reproduced). The gate-8 row hides it by gitignoring .agents/.'
+    suggested_action: 'Count only real references (the repo-relative path, or a relative link that resolves to the PRD), exclude the vendored skills tree, and add a row that commits .agents/skills.'
+    suggested_owner: dev
+    status: open
+  - id: CR-2
+    severity: medium
+    file: 'docs/reference/configuration.md'
+    finding: 'configuration.md:21-22,25, quickstart-story.md (epic section), pipeline-artifacts.md:14 and story-development.md:115 still describe {domain}/{feature}/epics/epic.{N}, contradicting the corrected PRD path beside them and the layout create-epic writes (prd.{P}.{feature}/epics/epic.{P}.{E}). Pre-existing since task 205, but a8810b54 made the same paragraphs self-contradictory.'
+    suggested_action: 'Rewrite every PRD-subtree path in those docs to prd.{P}.{feature}/epics/epic.{P}.{E}.{name}/stories/story.{P}.{E}.{S}.{name}/ in one pass.'
+    suggested_owner: dev
+    status: open
+  - id: CR-4
+    severity: low
+    file: 'skills/review-prd/SKILL.md'
+    finding: 'In the apply block''s refusal print, `,` binds tighter than `|`, so (.error // empty) is evaluated per blocker; a guard usage error prints the refusal heading with no reason (reproduced).'
+    suggested_action: 'Parenthesise: (.blockers[]? | "..."), (.error // empty).'
+    suggested_owner: dev
+    status: open
+  - id: CR-5
+    severity: low
+    file: 'skills/review-prd/scripts/migration-guard.mjs'
+    finding: 'Only . is escaped in the basename put into git grep -E, so a PRD name with +, (, [ or ? does not match itself and outside-links passes over real links (reproduced with docs/prd+v2.md).'
+    suggested_action: 'Search with fixed strings (git grep -F) and decide the reference in JS.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 40
+  phases_verified: 5/5
+  ci: 'test FAILURE @ a61f3e28 (stdout-drain guard) — fixed in a8810b54; not yet read'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4]
+    phases_with_issues: [3, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 24
+    notes: 'Allocation controls engage (task.204.qa.9.security.run.json).'
+  performance:
+    status: PASS
+    notes: 'Row 11: three node processes.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1: a guard that always refuses in one supported consumer layout. Advisory CR-3 (medium confidence): MIG_NAME is an unbound input in both blocks, carried only by the agent between shells.'
+  maintainability:
+    status: CONCERNS
+    notes: 'CR-2: reference docs contradict the shipped layout.'
+
+bug_resolution:
+  dod_1_gaps: 4
+  fixed_and_verified: 4
+  verification_method: 'stdout-drain-on-exit.test.mjs green at a8810b54 (red on the 63c1e06b version); CHANGELOG entry present; PRD paths updated; CQ4 narrowed'
+
+recommendations:
+  immediate:
+    - action: 'CR-1, CR-5: outside-links counts real references only, by fixed-string search, excluding the vendored skills tree.'
+      refs: ['skills/review-prd/scripts/migration-guard.mjs']
+    - action: 'CR-2: one-pass rewrite of PRD-subtree paths in the reference docs.'
+      refs: ['docs/reference/configuration.md', 'docs/concepts/quickstart-story.md']
+    - action: 'CR-4: parenthesise the jq refusal print.'
+      refs: ['skills/review-prd/SKILL.md']
+  future:
+    - action: 'CR-3 (advisory): bind MIG_NAME inside the plan and apply blocks, or persist the pairs between them.'
+      refs: ['skills/review-prd/SKILL.md']
+    - action: 'task.211: the migration-engine fixes that lift the guard.'
+      refs: ['shared/resources/migrate-doc-numbering.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1, CR-2 closed']

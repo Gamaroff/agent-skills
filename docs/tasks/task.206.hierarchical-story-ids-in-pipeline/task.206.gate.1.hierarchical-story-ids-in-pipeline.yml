@@ -1,0 +1,95 @@
+schema: 2
+task: 'task.206.hierarchical-story-ids-in-pipeline'
+task_title: 'Hierarchical story ids in the pipeline'
+gate: CONCERNS
+status_reason: 'Every task.206 site reads ids through doc-id and the suite is green (5752/0), but the diff review found four medium high-confidence bugs: three executable blocks read a value only another block binds, and bug-doc rejects a digit-led story-bug slug.'
+reviewer: 'QA Engineer'
+head: 'f1476ed0bce256a2826fe1ca32a5c1f154fcb35f'
+updated: '2026-10-16T07:11:20Z'
+
+top_issues:
+  - id: 'TASK-206-CR-1'
+    severity: medium
+    file: 'skills/sync-github-story/SKILL.md'
+    finding: 'Step 5b edit block reads STORY_ID that only Step 3 binds; run as its own shell it renames the issue to "[Story ] {title}" (bug.1).'
+    suggested_action: 'Re-derive STORY_ID with doc-id parse inside the block; refuse an empty id; test the block executed alone.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-206-CR-2'
+    severity: medium
+    file: 'skills/ensure-story-github-issue/SKILL.md'
+    finding: 'Milestone (l.114) and S4 create (l.178) blocks read MILESTONE_TITLE set only in Step S1, so an unbound value silently creates the issue without a milestone; the S3 dedup block reads STORY_ID the same way (CR-3, advisory) (bug.2).'
+    suggested_action: 'Bind STORY_ID and the milestone (doc-id parse + epic-meta) inside each block that reads them; HALT on an empty id before the dedup search.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-206-CR-4'
+    severity: medium
+    file: 'shared/resources/bug-doc.js'
+    finding: 'story.1.2.3.bug.1.500-error.md now resolves as mode unknown: doc-id requires a letter-first slug, where the base regex accepted it — a regression (bug.3).'
+    suggested_action: 'Parent id from doc-id, remainder read with the looser bug-slug rule; add a digit-led-slug test.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-206-CR-5'
+    severity: medium
+    file: 'skills/create-story/SKILL.md'
+    finding: 'The assertUniqueStoryId one-liner readdirSyncs {epic-directory}/stories, which does not exist for an epic first story, so it throws ENOENT instead of passing (bug.4).'
+    suggested_action: 'Treat a missing stories/ directory as empty; move the check into an executed, tested block.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-206-CR-8'
+    severity: low
+    file: 'shared/resources/review-pipeline-step-0a-branch-setup.md'
+    finding: 'The 0a.3 auto-skip block reads STORY_STEM that only the 0a.2 block binds; unbound, the auto-skip silently never fires.'
+    suggested_action: 'Re-derive STORY_STEM from DOC_FILE with doc-id inside the 0a.3 block.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 5752
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 3]
+  ci: 'ci:fast 5752/0 on the pre-commit tree of f1476ed0 (identical code); eval:all, bundle:check, lint:shell, validate:all, check:generated exit 0'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 40
+    notes: 'isWorkItemDocument probed (path + filename corpora + 15 targeted cases incl. NUL, LF, traversal, artifacts, legacy, leading zero): verdict engages, 0 reproduced. Record: task.206.qa.1.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'npm test wall +1.3% (115.7 s base vs 117.2 s head, back to back); eval:all scenarios 44 → 44.'
+  reliability:
+    status: CONCERNS
+    notes: 'Unbound cross-block reads (CR-1, CR-2, CR-3, CR-8) fail silently into a wrong-but-plausible result; Step 0 epic listing guard checks sort, not the node filter (CR-10, advisory).'
+  maintainability:
+    status: PASS
+    notes: 'One id definition (doc-id) across 11 sites; 12 dev mutation proofs + 2 QA spot checks covered.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1, CR-2 (+CR-3), CR-4, CR-5, CR-8 and pin each with an executed or unit test.'
+      refs: ['skills/sync-github-story/SKILL.md', 'skills/ensure-story-github-issue/SKILL.md', 'shared/resources/bug-doc.js', 'skills/create-story/SKILL.md', 'shared/resources/review-pipeline-step-0a-branch-setup.md']
+  future:
+    - action: 'CR-6: create-bug-report still names story bugs story.{epic}.{story}.bug — move every story-bug name writer to P.E.S or record each as task.207 sweep work.'
+      refs: ['skills/create-bug-report/SKILL.md']
+    - action: 'CR-7: review-story label fallback drops the sub-story letter; build it from STORY_STEM.'
+      refs: ['skills/review-story/SKILL.md']
+    - action: 'CR-9: uat-status scan/surface warnings reach only stderr; fold them into --check and --coverage output.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+    - action: 'CR-10: Step 0 epic listing — pipefail so a crashed node filter reaches the could-not-list HALT.'
+      refs: ['shared/resources/develop-pipeline-step-0-resolve-and-prepare.md']
+    - action: 'CR-11/CR-12 cleanups: bug-doc warning still names story.{e}.{s}.bug; scanExistingStoryIds counts artifacts while nextStoryId does not.'
+      refs: ['shared/resources/bug-doc.js', 'skills/create-story/scripts/lib.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['the four medium findings fixed and re-reviewed']

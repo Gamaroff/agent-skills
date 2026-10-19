@@ -597,7 +597,7 @@ _config_subset_scan() {
     # An unbalanced `{` opens a flow mapping the next line continues — the shape that used to read
     # as "not configured" and resolve access to `full`. Counting braces (rather than matching the
     # opener) also catches a bare `{` continuation line. Quoted values carrying balanced braces,
-    # like `branchPattern: "epic/{n}.{slug}"`, are unaffected.
+    # like `branchPattern: "epic/{p}.{n}.{slug}"`, are unaffected.
     { if (gsub(/\{/, "{", s) > gsub(/\}/, "}", s)) refuse("a flow mapping spanning lines") }
 
     END { if (!found) printf "-" }

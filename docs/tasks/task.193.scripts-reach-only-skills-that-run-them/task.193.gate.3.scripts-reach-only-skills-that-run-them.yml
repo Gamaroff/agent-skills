@@ -1,0 +1,71 @@
+schema: 2
+task: 'task.193.scripts-reach-only-skills-that-run-them'
+task_title: 'Scripts reach only the skills that run them'
+gate: FAIL
+status_reason: 'Cycle 2 fixes hold on real documents, but the guard still exempts every fenced literal while the bundler copies from fences too; two live fenced literals are not in command position and copy scripts (one into skills that never run it). This is the task''s own defect class, so it is unfinished work, not pre-existing debt.'
+reviewer: 'QA Engineer'
+head: '53f725874ee11a898907fd5d4fcbce7f07f0b769'
+updated: '2026-10-19T08:56:43Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: high
+    file: 'tests/shared-script-literals.test.js'
+    finding: 'scan() skips every fenced literal, but parse_shared_refs ignores fences: probe-boundary-rule.md:66 quotes shared/resources/tests/qa-execute-snippets.test.mjs in a fence and copies it into qa-story and qa-task, which never run it; develop-pipeline-step-0-resolve-and-prepare.md:251 is the incident shape ("Source `shared/resources/resolve-paths.sh`") inside a fenced prompt.'
+    suggested_action: 'Classify fenced literals too (run only when a shell command or one of isRun''s forms opens them); switch probe-boundary-rule.md:66 to the bare filename and remove the copies; classify step-0:251 and either justify it or bare-name it.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 7
+  phases_verified: 4/4
+  ci: 'not checked this cycle (gated at /finalise)'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+bug_resolution:
+  - id: 'CR-1 (gate 2)'
+    status: fixed
+    evidence: 'a nested shared/resources/tests/qa-loop-route.test.mjs literal written into the resume contract is reported (scratch worktree, 53f72587)'
+  - id: 'CR-2 (gate 2)'
+    status: fixed
+    evidence: '"(source `shared/resources/grant-qa-cycles.sh`)" in the resume contract is reported; a new skill holding develop-pipeline-step-5-6-qa-loop.md fails the bundler-set test'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No runtime boundary; boundary: false — scan/isRun classify a CI lint finding, no external input.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'ci:fast 5904/0 fail on 53f72587; bundle:check clean.'
+  maintainability:
+    status: CONCERNS
+    notes: 'CR-1; CHANGELOG overstates what the guard sees (CR-4).'
+
+recommendations:
+  immediate:
+    - action: 'CR-1: classify fenced literals; fix probe-boundary-rule.md:66 and step-0:251.'
+      refs: ['tests/shared-script-literals.test.js', 'shared/resources/probe-boundary-rule.md', 'shared/resources/develop-pipeline-step-0-resolve-and-prepare.md']
+  future:
+    - action: 'CR-2 (advisory): count a bundler only when it receives the script, so a cite-only holder of the doc is not a false failure.'
+      refs: ['tests/shared-script-literals.test.js']
+    - action: 'CR-3 (advisory, low/low): code-span parity is per line; a span that wraps across lines can flip it.'
+      refs: ['tests/shared-script-literals.test.js']
+    - action: 'CR-4 (cleanup): CHANGELOG claims the guard sees what the bundler sees.'
+      refs: ['CHANGELOG.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['CR-1 fixed and re-reviewed']

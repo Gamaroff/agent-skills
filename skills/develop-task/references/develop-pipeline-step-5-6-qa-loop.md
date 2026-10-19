@@ -157,7 +157,7 @@ fi
 An empty `QA_CYCLE` (and so an empty `LATEST_GATE`) means no QA run has written a gate yet.
 
 > The helper reads every `*.gate.*.yml` in the directory. The story form this replaced was keyed on
-> the story's own stem (`story.{epic}.{story}.gate.*`); no co-located bug writes a gate today, and a
+> the story's own stem (`story.{P}.{E}.{S}.gate.*`); no co-located bug writes a gate today, and a
 > stem filter for the helper is a recorded follow-up (task.149 gate 8 CR-2).
 
 **Note (tasks only)**: The legacy path `docs/qa/gates/tasks/` is deprecated. qa-task v2.0 co-locates gate files in the task directory alongside the task document.
@@ -187,7 +187,7 @@ Read the gate file to determine the gate result.
 
 **Pre-step: Dispatch traceability mapper (standard mode only)**
 
-Before invoking `/qa-story`, dispatch the QA traceability mapper as an Explore subagent (see `references/qa-traceability-mapper-prompt.md` for the full execution protocol). Mark the wait beside the dispatch — `bash .agents/skills/develop-story/references/set-waiting-on.sh "step-5 traceability mapper"` — and `… --clear` once its confirmation is read (task.124):
+Before invoking `/qa-story`, dispatch the QA traceability mapper as an Explore subagent (see `references/qa-traceability-mapper-prompt.md` for the full execution protocol). Mark the wait beside the dispatch — `bash .agents/skills/develop-story/references/set-waiting-on.sh "step-5 traceability mapper"` — and `… --clear` once its reply is read (task.124):
 
 ```
 Agent(subagent_type="Explore", prompt="Run the QA traceability mapper (references/qa-traceability-mapper-prompt.md).
@@ -195,18 +195,50 @@ Inputs:
   STORY_FILE={story-file}
   STORY_DIR={story-directory}
 
-Follow the Execution Protocol exactly. Write the matrix file and return a one-line confirmation.")
+Follow the Execution Protocol exactly. Return the matrix between the markers; do not create or modify any file.")
 ```
 
 `{story-file}` and `{story-directory}` are the story file path and story directory path resolved in Phase 0a.
 
 After the subagent completes:
 
-1. Confirm `{story-directory}/.summaries/qa-traceability-matrix.md` was written.
+1. Save its reply **verbatim** to `.claude/state/mapper-reply.md` (Write tool — the reply is text in
+   your context, not a shell variable), then run the block below with `{doc-directory}` =
+   `{story-directory}`. The mapper is read-only: it **returns** the matrix and this step writes it
+   (task.189, obs #191 — on every run that told it to write, it refused and returned the table inline).
 2. Write the summary JSON artifact to `{story-directory}/.summaries/step-5-traceability-mapper.json` (schema: `references/subagent-summary-artifact.md`).
 3. Update the Pipeline Progress `Subagent summary ref` column for Step 5–6 with the JSON path.
 
-If the subagent fails or the matrix file is absent: log warning in Issues Log and proceed without the matrix (qa-story falls back to internal mapping).
+If the subagent fails, or the block above prints a `⚠️` line (no well-formed marked block in its reply): log warning in Issues Log and proceed without the matrix (qa-story falls back to internal mapping).
+
+##### Write the matrix from the mapper's reply
+
+```bash
+# Step 5 — write the traceability matrix the mapper RETURNED (task.189, obs #191).
+# INPUTS, substituted into THIS block: {doc-directory} — the story or task directory. The reply is
+# read from .claude/state/mapper-reply.md, which the orchestrator wrote verbatim with its Write tool.
+REPLY_FILE=.claude/state/mapper-reply.md
+MATRIX="{doc-directory}/.summaries/qa-traceability-matrix.md"
+START='^<!-- matrix-start -->[[:space:]]*$'
+END='^<!-- matrix-end -->[[:space:]]*$'
+# Exactly one of each marker, start before end — anything else is "no matrix", never a guess.
+if [ -f "$REPLY_FILE" ] \
+   && [ "$(grep -cE "$START" "$REPLY_FILE")" = 1 ] && [ "$(grep -cE "$END" "$REPLY_FILE")" = 1 ] \
+   && [ "$(grep -nE "$START" "$REPLY_FILE" | cut -d: -f1)" -lt "$(grep -nE "$END" "$REPLY_FILE" | cut -d: -f1)" ]; then
+  # Extracted beside the reply, not into the doc directory: the directory is created only once a
+  # non-empty matrix exists, so a refused reply leaves nothing behind (task.189 QA-2).
+  awk -v s="$START" -v e="$END" '$0 ~ e { f = 0 } f { print } $0 ~ s { f = 1 }' "$REPLY_FILE" > "$REPLY_FILE.matrix" \
+    && [ -s "$REPLY_FILE.matrix" ] && mkdir -p "$(dirname "$MATRIX")" && mv "$REPLY_FILE.matrix" "$MATRIX" \
+    && echo "matrix: written to $MATRIX" \
+    || { rm -f "$REPLY_FILE.matrix"; echo "⚠️ mapper returned an empty matrix — proceeding without it"; }
+else
+  echo "⚠️ mapper returned no matrix — proceeding without it"
+fi
+rm -f "$REPLY_FILE"
+```
+
+The text between the markers is written byte for byte. A reply that carries the marked matrix is
+**never discarded**: the warning fires only when the reply has no well-formed marked block.
 
 Skip this pre-step when any of:
 
@@ -243,7 +275,7 @@ Conditions to dispatch the mapper for tasks (all must be true):
 1. `PIPELINE_MODE = standard` (lite mode skips the mapper)
 2. `HAS_SUCCESS_CRITERIA_TABLE = true` (set by Phase 0a Agent 3 — the lite-mode/always-load detector)
 
-If both are true, dispatch the mapper as an Explore subagent — same prompt as develop-story, but pass the **task** file/directory as the values for `STORY_FILE`/`STORY_DIR` (the mapper accepts both doc types — see `qa-traceability-mapper-prompt.md` "Doc type" note). Mark the wait beside the dispatch — `bash .agents/skills/develop-task/references/set-waiting-on.sh "step-5 traceability mapper"` — and `… --clear` once its confirmation is read (task.124):
+If both are true, dispatch the mapper as an Explore subagent — same prompt as develop-story, but pass the **task** file/directory as the values for `STORY_FILE`/`STORY_DIR` (the mapper accepts both doc types — see `qa-traceability-mapper-prompt.md` "Doc type" note). Mark the wait beside the dispatch — `bash .agents/skills/develop-task/references/set-waiting-on.sh "step-5 traceability mapper"` — and `… --clear` once its reply is read (task.124):
 
 ```
 Agent(subagent_type="Explore", prompt="Run the QA traceability mapper (references/qa-traceability-mapper-prompt.md).
@@ -251,16 +283,17 @@ Inputs:
   STORY_FILE={task-file}
   STORY_DIR={task-directory}
 
-Follow the Execution Protocol exactly. Write the matrix file and return a one-line confirmation.")
+Follow the Execution Protocol exactly. Return the matrix between the markers; do not create or modify any file.")
 ```
 
 After the subagent completes:
 
-1. Confirm `{task-directory}/.summaries/qa-traceability-matrix.md` was written.
+1. Save its reply verbatim to `.claude/state/mapper-reply.md` and run the develop-story block
+   **Write the matrix from the mapper's reply** above with `{doc-directory}` = `{task-directory}`.
 2. Write the summary JSON artifact to `{task-directory}/.summaries/step-5-traceability-mapper.json` (schema: `references/subagent-summary-artifact.md`).
 3. Update the Pipeline Progress `Subagent summary ref` column for Step 5–6 with the JSON path.
 
-If the subagent fails or the matrix file is absent: log warning in Issues Log and proceed without the matrix (qa-task falls back to its internal mapping).
+If the subagent fails, or that block prints a `⚠️` line (no well-formed marked block in its reply): log warning in Issues Log and proceed without the matrix (qa-task falls back to its internal mapping).
 
 Skip this pre-step when `PIPELINE_MODE=lite` OR `HAS_SUCCESS_CRITERIA_TABLE=false`. Tasks with no Success Criteria table (e.g. pure infra cleanup) gain nothing from the mapper.
 
@@ -1101,7 +1134,7 @@ working tree, where a branch switch loses it and no reader of the PR ever sees i
    Committing here rather than at the Step 7 transition is load-bearing twice over: 5c reads the
    artifact trail **off the branch**, so an uncommitted gate is invisible to the very review that
    audits it; and if 5c returns `REQUEST CHANGES`, the Step 7 transition never happens on this
-   cycle. Message: `docs(story.{epic}.{story}): QA cycle {N} gate + report` (or `docs(task.{id}): …`).
+   cycle. Message: `docs(story.{P}.{E}.{S}): QA cycle {N} gate + report` (or `docs(task.{id}): …`).
 
    > **This is the one path on which a cycle commits twice, and the push budget is what matters.**
    > A `REQUEST CHANGES` verdict re-enters 5b *inside the same cycle N*, and 5b then makes its own
@@ -1188,7 +1221,7 @@ After fixes are applied:
 
    **Bound this retry at 2 attempts.** After a second red gate in the same cycle, stop retrying:
    **commit the attempt without pushing** — `fix(task.{id}): qa-fix cycle {N} — fast gate red, not
-   pushed` (or `fix(story.{epic}.{story}): …`), carrying this cycle's gate and QA report as step
+   pushed` (or `fix(story.{P}.{E}.{S}): …`), carrying this cycle's gate and QA report as step
    0-stage staged them, with the implementation report still excluded per step 1 — record the
    failing output in the QA Iteration History, and let the cycle end so the next QA review writes a
    gate. Skip step 3's push: the next push — the next cycle's, or the one before its 5c — carries
@@ -1218,13 +1251,13 @@ After fixes are applied:
    git reset HEAD -- '**/task.*.implementation.*.md' 2>/dev/null || true
    ```
 
-   Then invoke `/commit-changes` with an explicit `exclude` directive in the prompt: pass `exclude=story.{epic}.{story}.implementation.*.md` (or `task.{id}.implementation.*.md`). The skill respects the directive and will not re-stage the report.
+   Then invoke `/commit-changes` with an explicit `exclude` directive in the prompt: pass `exclude=story.{P}.{E}.{S}.implementation.*.md` (or `task.{id}.implementation.*.md`). The skill respects the directive and will not re-stage the report.
 
    Conventional Commits message:
 
    #### develop-story
 
-   `fix(story.{epic}.{story}): qa-fix cycle {N} — {brief summary of fixes}`
+   `fix(story.{P}.{E}.{S}): qa-fix cycle {N} — {brief summary of fixes}`
 
    #### develop-task
 
@@ -1914,7 +1947,7 @@ and QA report get committed** in 5b):
 
 #### develop-story escalation commit
 
-Suggested commit message: `docs(story.{epic}.{story}): implementation report — qa loop escalation`
+Suggested commit message: `docs(story.{P}.{E}.{S}): implementation report — qa loop escalation`
 
 #### develop-task escalation commit
 

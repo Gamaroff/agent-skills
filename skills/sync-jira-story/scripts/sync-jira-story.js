@@ -20,6 +20,7 @@ const fs = require("fs");
 const path = require("path");
 const lib = require("../references/jira-sync.js");
 const CL = require("../references/change-log.js");
+const docId = require("../references/doc-id.js");
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -193,15 +194,22 @@ const RELATED_DOC_TYPES = [
   { key: "dod", label: "Definition of Done" },
 ];
 
-// story.2.4.review.1.update-examples-readme.md → { label: "Story review", instance: "1" }
+// story.1.2.4.review.1.update-examples-readme.md → { label: "Story review", instance: "1" }
+// The artifact kind and its number are doc-id's (task 207): a private regex read
+// `[\d.]+?` for the story id and so missed a sub-story (`story.1.2.4A`).
 function relatedDocInfo(filename) {
-  const m = filename.match(/^story\.[\d.]+?\.([a-z]+)\.(?:(\d+)\.)?.*\.md$/i);
-  if (!m) return null;
-  const type = RELATED_DOC_TYPES.find((t) => t.key === m[1].toLowerCase());
+  // A plain basename only (finalise DoD security probe, task 207): doc-id.parse reads a
+  // `../` prefix, a newline, NUL or `$(…)` inside the slug as part of a valid name, and the
+  // anchored regex this replaced rejected the first two. A link is never built from one.
+  if (typeof filename !== "string" || !/^[A-Za-z0-9._-]+$/.test(filename))
+    return null;
+  const p = docId.parse(filename);
+  if (!p.ok || p.kind !== "story" || !p.artifact) return null;
+  const type = RELATED_DOC_TYPES.find((t) => t.key === p.artifact);
   return type
     ? {
         label: type.label,
-        instance: m[2] || null,
+        instance: p.seq == null ? null : String(p.seq),
         order: RELATED_DOC_TYPES.indexOf(type),
       }
     : null;
@@ -802,9 +810,10 @@ async function run({
     return { exitCode: 1 };
   }
   // Normalise to the canonical "[Story N.N] {title}" bracket form (see helper).
+  const own = docId.parse(path.basename(filePath));
   summary = normaliseStorySummary(
     summary,
-    path.basename(filePath).match(/^story\.([\d.]+)\./i)?.[1],
+    own.ok && own.kind === "story" ? own.id.slice("story.".length) : undefined,
   );
 
   const http = lib.makeHttp({

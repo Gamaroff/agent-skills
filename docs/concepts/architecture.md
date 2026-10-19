@@ -12,7 +12,7 @@ flowchart TB
         SC[skills-config.yaml]
         AS[.agents/skills/<br/>installed zips]
         PJD[docs/prd/<br/>docs/tasks/]
-        ER[docs/development/epic-registry.md]
+        ER[docs/prd/prd-registry.md]
         TR[docs/tasks/task-registry.md]
     end
 
@@ -99,7 +99,7 @@ flowchart TD
     CS[create-story] --> DSV[documentation-<br/>standards-validator]
     CS --> MA[mermaid-architect]
 
-    CE[create-epic] --> ERM[epic-registry-manager]
+    CE[create-epic] --> ERM[doc-id.js<br/>epic.P.E allocation]
     CE --> DSV
     CE --> MA
 

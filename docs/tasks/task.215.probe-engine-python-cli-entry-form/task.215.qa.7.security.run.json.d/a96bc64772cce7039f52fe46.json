@@ -1,0 +1,40 @@
+{
+  "sink": "url-authority",
+  "entry": "cli:.claude/state/qa7/cli-shutdown-flush-crash.py",
+  "name": null,
+  "call_site": null,
+  "verdict": "unverifiable",
+  "reason": "no-hostile-evidence",
+  "executed": 2,
+  "passed": 2,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 2,
+  "declined_cases": [
+    {
+      "id": "py-cli.hostile-userinfo",
+      "reason": "case-errored",
+      "detail": "the CLI answered, then python3 failed at shutdown (exit 120, a failed flush of stdout or stderr) — could not tell an answer from a crash"
+    },
+    {
+      "id": "py-cli.hostile-userinfo-port",
+      "reason": "case-errored",
+      "detail": "the CLI answered, then python3 failed at shutdown (exit 120, a failed flush of stdout or stderr) — could not tell an answer from a crash"
+    }
+  ],
+  "escaped": 0,
+  "shells": null,
+  "interpreter": {
+    "name": "python3",
+    "version": "Python 3.14.8"
+  },
+  "fake_gh": null,
+  "argv": [
+    "--host",
+    "{input}"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-10-19T14:07:04.931Z"
+}

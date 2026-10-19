@@ -1,0 +1,70 @@
+schema: 2
+task: 'task.192.read-back-checks-this-cycles-verdict'
+task_title: "Read-back checks this cycle's verdict"
+gate: CONCERNS
+status_reason: "Cycle 1's two findings are fixed and verified (bug.1 closed; the probe now refuses all 12 hostile cases). The refute pass found two medium defects in the new verdict rule: it halts a correct FAIL document whose QA run added a status row after the verdict row, and it reads clean when a cycle repeats the last verdict without writing its own row."
+reviewer: 'QA Engineer'
+head: '2d6facdf3777ef2f5c40cd021a06d290b8149b82'
+updated: '2026-10-19T07:39:02Z'
+
+top_issues:
+  - id: 'QA2-1'
+    severity: medium
+    file: 'shared/resources/qa-read-back.js'
+    finding: 'The verdict rule compares only the token, so a cycle with the same verdict as the previous one that wrote no Change Log row of its own reads clean (exit 0, reproduced). Promoted from code review CR-1 (bug/high).'
+    suggested_action: 'Tie the verdict row to the cycle: for example, require the newest QA gate row to follow every qa-fix row. Measure that on the accepted corpus, and add a same-token VERDICT_HALTS case.'
+    suggested_owner: dev
+    bug_ref: 'task.192.bug.2.same-verdict-cycle-reads-clean-without-its-row.md'
+  - id: 'QA2-2'
+    severity: medium
+    file: 'shared/resources/qa-read-back.js'
+    finding: 'The verdict row is the newest qa-task/qa-story row, so a "Status → in-progress | qa-task" row written after a FAIL verdict row halts a correct document (exit 1 here, 0 on origin/develop). The corpus has 8 such rows, the newest from task.160 on 2026-09-27. QA regression finding, also raised as CR-2 (bug/medium).'
+    suggested_action: 'Select the newest qa-* row whose description starts with "QA gate", and add a FAIL-path control case with a status row after the verdict row.'
+    suggested_owner: dev
+    bug_ref: 'task.192.bug.3.status-row-after-verdict-halts-a-correct-document.md'
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 106
+  phases_verified: 3/3
+  ci: 'not read this cycle (no cycle waits on CI)'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 17
+    notes: 'cli:shared/resources/qa-read-back.js --doc was probed with 17 cases (5 legitimate, 12 hostile). All 17 were executed and none reproduced; stale-decision-after-current is now refused. Record: task.192.qa.2.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'Unchanged since cycle 1: a persistent lock costs at most 1.4 s, and a non-lock failure costs 0 ms.'
+  reliability:
+    status: CONCERNS
+    notes: 'The verdict rule halts a correct FAIL document carrying a status row (QA2-2) and misses a same-token cycle with no row (QA2-1).'
+  maintainability:
+    status: PASS
+    notes: 'Both SKILL.md read-back lists now describe five checks and the lock retry (bug.1 closed).'
+
+recommendations:
+  immediate:
+    - action: 'Fix the row selection (QA2-2) and tie the row to the cycle (QA2-1), each with a VERDICT_HALTS case or a control case.'
+      refs: ['shared/resources/qa-read-back.js', 'shared/resources/tests/qa-read-back.test.mjs']
+  future:
+    - action: "CR-4: match git's held-lock wording (index.lock': File exists) instead of the bare file name, so a permission failure does not wait 1.4 s."
+      refs: ['shared/resources/qa-read-back.js']
+    - action: 'CR-5 (= cycle 1 CR-3): skip the qa-row problem when the document has no Change Log rows at all.'
+      refs: ['shared/resources/qa-read-back.js']
+    - action: "CR-3 (= cycle 1 CR-2): the real-time CLI lock test does not assert that a retry happened; cycle 1 kept it that way deliberately because of the child start-up race, and the seam test holds the retry."
+      refs: ['shared/resources/tests/qa-read-back.test.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['QA2-1 and QA2-2 fixed']

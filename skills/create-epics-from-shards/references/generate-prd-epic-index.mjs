@@ -16,15 +16,21 @@
  * generate-prd-epic-index.mjs
  *
  * Injects (or regenerates) a marker-delimited "## Epics" index into every sharded
- * sub-PRD under <prd-root>/<prd>/, giving each PRD clickable links down to its child
+ * sub-PRD under <prd-root>/ — a `prd.{P}.{feature}/` directory at depth 1 or under a
+ * domain directory at depth 2 — giving each PRD clickable links down to its child
  * epic files. The reverse link already exists (each epic's `prd_source` frontmatter
  * points back up); this closes the loop between a PRD and its epics.
  *
  * The index is derived from the filesystem, not from `prd_source` (which is sometimes
- * a bare filename): for a PRD dir `<prd-root>/<p>/`, the PRD file is
- * `<prd-root>/<p>/<p>.md` and each epic is `<prd-root>/<p>/epics/<dir>/<dir>.md`
- * (the canonical epic file is the one whose basename equals its directory — this
- * excludes `epic.N.review.M.*.md` siblings).
+ * a bare filename): for a PRD dir `<p>/`, the PRD file is `<p>/<p>.md` and each epic
+ * is `<p>/epics/<dir>/<dir>.md` (the canonical epic file is the one whose basename
+ * equals its directory — this excludes `epic.P.E.review.M.*.md` siblings).
+ *
+ * Ids are read with doc-id.js, never a regex of this file's own (task 205). An epic is
+ * indexed only when its directory parses as `epic.{P}.{E}.{slug}`, `P` is the PRD's
+ * number, and its `prd_number` / `epic_number` frontmatter agree with the directory;
+ * any other epic directory is skipped and named. The `#` column reads `P.E`, sorted by
+ * `E` numerically within the PRD.
  *
  * Idempotent: re-running produces byte-identical output. Safe to run any time an epic
  * is added, renumbered, retitled, or its status changes.
@@ -37,12 +43,17 @@
  * Usage:  node scripts/generate-prd-epic-index.mjs [--prd-root <path>] [--check] [--strict]
  *   --prd-root <path>  base directory of the PRD shard tree (overrides config).
  *   --check            exit non-zero if any PRD's index is stale (for CI); writes nothing.
- *   --strict           treat a canonical epic file missing `epic_number` as a hard
- *                      error (non-zero exit) instead of silently skipping it.
+ *   --strict           treat a skipped epic (missing or disagreeing numbers) as a hard
+ *                      error (non-zero exit) instead of reporting and skipping it.
  *
  * This file is the single source of truth. It is bundled into consuming skills'
  * `references/` by `npm run bundle`, and vendored into consumer repos at
  * `scripts/generate-prd-epic-index.mjs` by `setup-consumer.sh`. Do not fork the logic.
+ *
+ * Its doc-id dependency is loaded with createRequire, from `./doc-id.cjs` when present
+ * (the consumer's vendored copy — `.cjs` so a `"type": "module"` consumer does not parse
+ * the CommonJS engine as ESM) and from `./doc-id.js` otherwise (this repository and a
+ * skill's bundled `references/`).
  */
 import {
   readFileSync,
@@ -52,6 +63,12 @@ import {
   statSync,
 } from "node:fs";
 import { join, basename } from "node:path";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
+const docId = existsSync(new URL("./doc-id.cjs", import.meta.url))
+  ? require("./doc-id.cjs")
+  : require("./doc-id.js");
 
 const START = "<!-- epics-index-start -->";
 const END = "<!-- epics-index-end -->";
@@ -129,18 +146,37 @@ function unquote(value) {
   return v;
 }
 
-/** Clean an epic title for display: drop a leading "[Epic N] " prefix, escape table pipes. */
+/** Clean an epic title for display: drop a leading id prefix (either form), escape table pipes. */
 function cleanTitle(raw) {
-  return raw
-    .replace(/^\[Epic\s+\d+\]\s*/i, "")
-    .replace(/\|/g, "\\|")
-    .trim();
+  return docId.stripIdPrefix("epic", raw).replace(/\|/g, "\\|").trim();
 }
 
 function listDirs(dir) {
   return readdirSync(dir)
     .map((n) => join(dir, n))
     .filter((p) => statSync(p).isDirectory());
+}
+
+const isPrdDir = (d) => {
+  const p = docId.parse(basename(d));
+  return p.ok && p.kind === "prd" && !p.artifact;
+};
+
+/**
+ * Every PRD directory under the root: `prd.{P}.{feature}/` at depth 1, or under a
+ * `{domain}/` directory at depth 2. Discovered by parsing the directory name — a
+ * directory that is not a PRD is never treated as one.
+ */
+function prdDirs(root) {
+  const out = [];
+  for (const d1 of listDirs(root)) {
+    if (isPrdDir(d1)) {
+      out.push(d1);
+      continue;
+    }
+    for (const d2 of listDirs(d1)) if (isPrdDir(d2)) out.push(d2);
+  }
+  return out;
 }
 
 function buildBlock(epics) {
@@ -154,7 +190,7 @@ function buildBlock(epics) {
     "| #   | Epic | Status |",
     "| --- | ---- | ------ |",
     ...epics.map(
-      (e) => `| ${e.number} | [${e.title}](${e.link}) | ${e.status || "—"} |`,
+      (e) => `| ${e.label} | [${e.title}](${e.link}) | ${e.status || "—"} |`,
     ),
     "",
     END,
@@ -198,9 +234,10 @@ function main() {
   let stale = 0;
   const skipped = [];
 
-  for (const prdDir of listDirs(PRDS_DIR)) {
+  for (const prdDir of prdDirs(PRDS_DIR)) {
     const p = basename(prdDir);
-    const prdFile = join(prdDir, `${p}.md`); // dir is already named prd.<name>, file is <dir>.md
+    const P = docId.parse(p).prd;
+    const prdFile = join(prdDir, `${p}.md`); // dir is already named prd.<P>.<name>, file is <dir>.md
     const epicsDir = join(prdDir, "epics");
     if (!existsSync(prdFile) || !existsSync(epicsDir)) continue;
 
@@ -209,14 +246,29 @@ function main() {
       const d = basename(epicDir);
       const epicFile = join(epicDir, `${d}.md`);
       if (!existsSync(epicFile)) continue; // excludes review/QA siblings
+      const id = docId.parse(d);
+      if (!id.ok || id.kind !== "epic" || id.artifact) {
+        skipped.push(`${epicFile} (directory is not epic.{P}.{E}.{slug})`);
+        continue;
+      }
+      if (id.prd !== P) {
+        skipped.push(
+          `${epicFile} (directory says PRD ${id.prd}, parent is PRD ${P})`,
+        );
+        continue;
+      }
       const fm = readFileSync(epicFile, "utf8");
-      const number = parseInt(frontmatterField(fm, "epic_number"), 10);
-      if (Number.isNaN(number)) {
-        skipped.push(`${epicFile} (no epic_number)`);
+      const fmPrd = frontmatterField(fm, "prd_number");
+      const fmEpic = frontmatterField(fm, "epic_number");
+      if (fmPrd !== String(id.prd) || fmEpic !== String(id.epic)) {
+        skipped.push(
+          `${epicFile} (frontmatter prd_number/epic_number ${fmPrd || "—"}/${fmEpic || "—"} disagrees with directory ${docId.idLabel(id)})`,
+        );
         continue;
       }
       epics.push({
-        number,
+        number: id.epic,
+        label: docId.idLabel(id),
         title: cleanTitle(frontmatterField(fm, "title")) || d,
         status: frontmatterField(fm, "status"),
         link: `epics/${d}/${d}.md`,
@@ -257,7 +309,7 @@ function main() {
 
   if (STRICT && skipped.length) {
     console.error(
-      `\n${skipped.length} epic file(s) missing epic_number (--strict).`,
+      `\n${skipped.length} epic file(s) skipped — missing or disagreeing numbers (--strict).`,
     );
     process.exitCode = 2;
     return;

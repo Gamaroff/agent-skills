@@ -90,7 +90,7 @@ The wizard sets up:
 | Platform      | Choose GitHub Issues, GitHub+Jira, or Bitbucket+Jira                              |
 | Credentials   | Writes `.env` + `.env.example`; adds `.env` to `.gitignore`                       |
 | Config        | Creates `skills-config.yaml` (PRD path, architecture path, coding-standards path) |
-| Registries    | Creates `docs/development/epic-registry.md` and `docs/tasks/task-registry.md`     |
+| Registries    | Creates `docs/tasks/task-registry.md` (epics are numbered within their PRD)        |
 | Docs scaffold | Creates `docs/prd/` and `docs/architecture/concepts/` stub files                  |
 | Skill profile | Asks which install profile you want — `full`, `pipeline` or `minimal` (see below)  |
 | Skills        | Downloads latest tagged release → `.agents/skills/`                               |

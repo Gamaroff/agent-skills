@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "path",
+      "entry": "shared/resources/finalise-fix-and-recheck.mjs#isWorkItemDocument",
+      "name": null,
+      "call_site": null,
+      "verdict": "unverifiable",
+      "reason": "rejects-every-input",
+      "executed": 11,
+      "passed": 8,
+      "reproduced": 0,
+      "overblocked": 3,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-10-16T07:36:07.253Z"
+    },
+    {
+      "sink": null,
+      "entry": "shared/resources/finalise-fix-and-recheck.mjs#isWorkItemDocument",
+      "name": null,
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 15,
+      "passed": 15,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-10-16T07:36:08.661Z"
+    },
+    {
+      "sink": "filename",
+      "entry": "shared/resources/finalise-fix-and-recheck.mjs#isWorkItemDocument",
+      "name": null,
+      "call_site": null,
+      "verdict": "unverifiable",
+      "reason": "rejects-every-input",
+      "executed": 14,
+      "passed": 9,
+      "reproduced": 0,
+      "overblocked": 5,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-10-16T07:36:07.946Z"
+    }
+  ],
+  "totals": {
+    "executed": 40,
+    "reproduced": 0
+  },
+  "updated_at": "2026-10-16T07:36:08.661Z"
+}

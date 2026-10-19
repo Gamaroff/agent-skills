@@ -31,7 +31,7 @@ Systematically consume QA outputs and apply code/test changes:
 
 ```yaml
 required:
-  - story_id: '{epic}.{story}' # e.g., "2.2"
+  - story_id: '{prd}.{epic}.{story}' # e.g., "1.2.2"
   - qa_root: from skills-config.yaml key qa.qaLocation (default: docs/qa)
   - story_location: nested (stories stored within epic directories)
 
@@ -46,8 +46,8 @@ optional:
 
 You can invoke this skill with either:
 
-- **A specific file**: `story.178.8.example-feature.md`, `story.178.8.qa.1.initial-review.md`, or `story.178.8.gate.1.initial-review.yml`
-- **A story directory**: `stories/story.178.8.example-feature/`
+- **A specific file**: `story.1.178.8.example-feature.md`, `story.1.178.8.qa.1.initial-review.md`, or `story.1.178.8.gate.1.initial-review.yml`
+- **A story directory**: `stories/story.1.178.8.example-feature/`
 
 **Pipeline Skill args** (optional, after the path):
 
@@ -77,26 +77,26 @@ You can invoke this skill with either:
 When given a directory path, discover all relevant QA artifacts:
 
 1. **Story File**:
-   - Pattern: `story.{epic}.{story}.{name}.md`
+   - Pattern: `story.{P}.{E}.{S}.{name}.md`
    - Exclude files containing: `.qa.`, `.gate.`, or `.bug.`
    - Use the one matching the directory name if multiple found
 
 2. **QA Report** (most recent if multiple):
-   - Pattern: `story.{epic}.{story}.qa.{number}.*.md`
+   - Pattern: `story.{P}.{E}.{S}.qa.{number}.*.md`
    - Logic: Identify files with numeric version.
    - Sort: Use highest number (latest). If unnumbered, use modification time.
 
 3. **Gate File** (most recent if multiple):
-   - Pattern: `story.{epic}.{story}.gate.{number}.*.yml`
+   - Pattern: `story.{P}.{E}.{S}.gate.{number}.*.yml`
    - Logic: Identify files with numeric version.
    - Sort: Use highest number (latest). If unnumbered, use modification time.
 
 4. **Bug Reports** (all matching):
-   - Pattern: `story.{epic}.{story}.bug.*.md`
+   - Pattern: `story.{P}.{E}.{S}.bug.*.md`
    - Load all bug reports found
    - Filter by status: only process "New" or "Reopened"
 
-**For technical tasks**, the same discovery rules apply with `task.{id}` in place of `story.{epic}.{story}`:
+**For technical tasks**, the same discovery rules apply with `task.{id}` in place of `story.{P}.{E}.{S}`:
 
 - Task file: `task.{id}.{name}.md` (exclude `.qa.`, `.gate.`, `.bug.`)
 - QA Report: `task.{id}.qa.{number}.*.md` (highest number wins)
@@ -106,12 +106,12 @@ When given a directory path, discover all relevant QA artifacts:
 **Example:**
 
 ```
-Input: stories/story.178.8.example-feature/
+Input: stories/story.1.178.8.example-feature/
 Discovers:
-  - Story: story.178.8.example-feature.md
-  - QA Report: story.178.8.qa.1.initial-review.md
-  - Gate: story.178.8.gate.1.initial-review.yml
-  - Bugs: story.178.8.bug.1.platform-issue.md, story.178.8.bug.2.platform-issue.md
+  - Story: story.1.178.8.example-feature.md
+  - QA Report: story.1.178.8.qa.1.initial-review.md
+  - Gate: story.1.178.8.gate.1.initial-review.yml
+  - Bugs: story.1.178.8.bug.1.platform-issue.md, story.1.178.8.bug.2.platform-issue.md
 ```
 
 ## QA Artifact Locations
@@ -124,26 +124,26 @@ Each story has its own subdirectory containing all related files:
 
 ```
 stories/
-└── story.{epic}.{story}.{story-name}/
-    ├── story.{epic}.{story}.{story-name}.md           # Story file
-    ├── story.{epic}.{story}.qa.{number}.{descriptive-name}.md  # QA report
-    ├── story.{epic}.{story}.gate.{number}.{descriptive-name}.yml # Gate file
-    ├── story.{epic}.{story}.bug.1.{description}.md    # Bug report 1
-    ├── story.{epic}.{story}.bug.2.{description}.md    # Bug report 2
+└── story.{P}.{E}.{S}.{story-name}/
+    ├── story.{P}.{E}.{S}.{story-name}.md           # Story file
+    ├── story.{P}.{E}.{S}.qa.{number}.{descriptive-name}.md  # QA report
+    ├── story.{P}.{E}.{S}.gate.{number}.{descriptive-name}.yml # Gate file
+    ├── story.{P}.{E}.{S}.bug.1.{description}.md    # Bug report 1
+    ├── story.{P}.{E}.{S}.bug.2.{description}.md    # Bug report 2
     └── ...
 ```
 
 **File Naming Convention:**
 
-- All files share the same base: `story.{epic}.{story}`
+- All files share the same base: `story.{P}.{E}.{S}`
 - File type indicated by segment after story ID: `.qa.{number}.`, `.gate.{number}.`, `.bug.{number}.`
 - Bug reports include sequential number: `.bug.1.`, `.bug.2.`, etc.
 - Descriptive name comes last before file extension
 
 **Assessment Files** (co-located in story subdirectory, canonical naming):
 
-- Risk Assessment: `story.{epic}.{story}.risk.*.{name}.md`
-- Test Design: `story.{epic}.{story}.test-design.*.{name}.md`
+- Risk Assessment: `story.{P}.{E}.{S}.risk.*.{name}.md`
+- Test Design: `story.{P}.{E}.{S}.test-design.*.{name}.md`
 
 For tasks:
 
@@ -152,10 +152,10 @@ For tasks:
 
 **Bug Report Files** (co-located in story subdirectory):
 
-- Pattern: `story.{epic}.{story}.bug.*.md` in story's own subdirectory
-- Sequential numbering: `story.{epic}.{story}.bug.1.*.md`, `story.{epic}.{story}.bug.2.*.md`, etc.
+- Pattern: `story.{P}.{E}.{S}.bug.*.md` in story's own subdirectory
+- Sequential numbering: `story.{P}.{E}.{S}.bug.1.*.md`, `story.{P}.{E}.{S}.bug.2.*.md`, etc.
 - Status tracking: New | In Progress | Ready for QA | Reopened | Closed
-- Example: `stories/story.178.8.example-feature/story.178.8.bug.1.platform-issue.md`
+- Example: `stories/story.1.178.8.example-feature/story.1.178.8.bug.1.platform-issue.md`
 
 ### For Technical Tasks (Non-User-Facing Work)
 
@@ -337,7 +337,7 @@ Before starting fixes:
    > "`skills-config.yaml` not found. Create this file to customize paths, or continue with default settings."
 
 3. Resolve paths: source `references/resolve-paths.sh` to populate `${PRD_ROOT}` (default `docs/prd`). QA artifacts are co-located with the story (no `qa.qaLocation` key).
-4. Locate story file via glob `${PRD_ROOT}/**/epics/*/stories/**/story.{epic}.{story}.*.md` — this searches the full nested epic structure. HALT if not found → ask user for path.
+4. Locate story file via glob `${PRD_ROOT}/**/epics/*/stories/**/story.{P}.{E}.{S}.*.md` — this searches the full nested epic structure. HALT if not found → ask user for path.
 5. HALT if story not found → ask for correct story id/path
 6. Bind `FIX_CYCLE_ARG` from the Skill args — the value of `fix_cycle=<N>` when it is a positive
    integer, else empty. Record which in the Decisions Log ("fix_cycle: 3 (caller-supplied)" /
@@ -373,7 +373,7 @@ Load the prompt from `references/qa-findings-ingester-prompt.md`. Substitute pla
 - `<dir>`: substitute with absolute path to the story or task directory
 - `<mode>`: substitute with `story` or `task`
 - `<pr_review>`: substitute with `PR_REVIEW` — the selected report path, or `none`
-- `<epic>`, `<story>` (story mode) OR `<id>` (task mode): substitute with the relevant IDs from context
+- `<P>`, `<E>`, `<S>` (story mode — from `doc-id.js parse`: `<P>` = `.prd`, `<E>` = `.epic`, `<S>` = `.story` followed by `.sub` when `.sub` is not null — `story.1.2.3A` gives `<S>` = `3A`, never `3`) OR `<id>` (task mode): substitute with the relevant IDs from context
 
 Dispatch: `Agent(subagent_type="Explore", prompt=<loaded-prompt-with-substitutions>)`
 
@@ -418,14 +418,14 @@ Read assessment markdowns and extract:
 
 **Load qa-planning artifacts** (if present in story directory):
 
-- Glob for `story.{epic}.{story}.risk.*.md` — load all risk assessments found
-- Glob for `story.{epic}.{story}.test-design.*.md` — load all test design documents found
+- Glob for `story.{P}.{E}.{S}.risk.*.md` — load all risk assessments found
+- Glob for `story.{P}.{E}.{S}.test-design.*.md` — load all test design documents found
 - Use these to understand pre-identified risks and intended test coverage when building the fix plan
 - For tasks: glob `task.{id}.risk.*.md` and `task.{id}.test-design.*.md` in task subdirectory
 
 **Parse Bug Reports** (if any exist):
 
-Locate all bug report files: `story.{epic}.{story}.bug.*.md` in story directory
+Locate all bug report files: `story.{P}.{E}.{S}.bug.*.md` in story directory
 
 For each bug report, extract:
 
@@ -1252,9 +1252,9 @@ Before marking complete:
 
 ### Locating Bug Reports
 
-**Pattern**: `story.{epic}.{story}.bug.*.md` in the same directory as the story file
+**Pattern**: `story.{P}.{E}.{S}.bug.*.md` in the same directory as the story file
 
-**Glob Pattern**: `story.{epic}.{story}.bug.*.md`
+**Glob Pattern**: `story.{P}.{E}.{S}.bug.*.md`
 
 **Examples**:
 

@@ -15,6 +15,8 @@
 
 PASS=0
 FAIL=0
+# shellcheck source=undefined-command-guard.sh
+. "$(dirname "$0")/undefined-command-guard.sh"
 SCRIPT="$(cd "$(dirname "$0")" && pwd)/reenter-qa-after-finalise.sh"
 
 pass() { echo "  PASS  $1"; PASS=$((PASS + 1)); }
@@ -172,6 +174,59 @@ mkrepo committed; codefix
 WANT_MAX=5; accept "committed code fix (existing budget 5 > base 2 + 2 is kept)"
 [ "$(jq -r '.qa_reentry.gate_head' "$L")" = "$(git -C "$R" rev-parse HEAD~2)" ] && pass "qa_reentry.gate_head is the gate's head" || fail "gate_head recorded" "$(jq -c .qa_reentry "$L")"
 [ "$(jq -r '.branch' "$L")" = "feature/x" ] && pass "pipeline fields carried over from the snapshot" || fail "fields carried" "$(cat "$L")"
+
+# ── Observation #44: documentation OUTSIDE the work item is not movement ──────
+# A DoD gap closed by a CHANGELOG entry or a standards page is a document-only fix. "Documentation"
+# is ci.docsOnly.patterns, read by ci-tree-equivalence.js at HEAD; with no skills-config.yaml the
+# defaults (**/*.md, docs/**) apply. Every doubt counts as code.
+docfix() { # $1 = repo-relative path — a committed change to it, outside the work item
+  mkdir -p "$(dirname "$R/$1")"; echo "entry" >> "$R/$1"; git -C "$R" add -A; git -C "$R" commit -qm "doc fix: $1"
+}
+setcfg() { # $1 = skills-config.yaml body, committed BEFORE the gate is re-recorded at the new head
+  printf '%s' "$1" > "$R/skills-config.yaml"; git -C "$R" add -A; git -C "$R" commit -qm cfg
+  sed -i.bak -E "s/^head: .*/head: $(git -C "$R" rev-parse HEAD)/" "$R/$DOC/task.42.gate.2.example.yml" && rm -f "$R/$DOC/task.42.gate.2.example.yml.bak"
+  git -C "$R" commit -qam "gate re-recorded after the config"
+}
+mkrepo docs-outside; docfix CHANGELOG.md; docfix docs/standards/x.txt
+expect_refusal "a CHANGELOG + docs/ fix outside the work item is document-only" no-code-moved
+rm -f "$L"; ERR=$(run 2>&1 >/dev/null)
+printf '%s' "$ERR" | grep -q 'only documentation changed' && printf '%s' "$ERR" | grep -q 'CHANGELOG.md' \
+  && pass "the document-only refusal names the documentation paths" || fail "docs named" "err=$ERR"
+mkrepo docs-plus-code; docfix CHANGELOG.md; codefix
+WANT_MAX=5; accept "documentation beside a code fix still re-enters"
+rm -f "$L"; mkrepo docs-plus-code-why; docfix CHANGELOG.md; codefix
+ERR=$(run 2>&1 >/dev/null)
+printf '%s' "$ERR" | grep -q 'not documentation under ci.docsOnly: src/code.sh' && ! printf '%s' "$ERR" | grep -q 'CHANGELOG.md' \
+  && pass "the re-entry names the code path, not the documentation" || fail "code named" "err=$ERR"
+mkrepo narrowed; setcfg $'ci:\n  docsOnly:\n    patterns:\n      - "docs/**"\n'; docfix CHANGELOG.md
+WANT_MAX=5; accept "patterns narrowed to docs/** → a root CHANGELOG.md is code and re-enters"
+mkrepo widened; setcfg $'ci:\n  docsOnly:\n    patterns:\n      - "docs/**"\n      - "CHANGELOG.md"\n'; docfix CHANGELOG.md
+expect_refusal "patterns that name CHANGELOG.md → document-only" no-code-moved
+mkrepo disabled; setcfg $'ci:\n  docsOnly:\n    enabled: false\n'; docfix CHANGELOG.md
+WANT_MAX=5; accept "ci.docsOnly.enabled: false → every path counts, the fix re-enters"
+mkrepo cfg-change; docfix README.md; setcfg $'ci:\n  docsOnly:\n    patterns:\n      - "**/*"\n'
+sed -i.bak -E "s/^head: .*/head: $(git -C "$R" rev-parse HEAD~3)/" "$R/$DOC/task.42.gate.2.example.yml" && rm -f "$R/$DOC/task.42.gate.2.example.yml.bak"
+git -C "$R" commit -qam "gate head before the config change"
+WANT_MAX=5; accept "a fix that widens the patterns itself is code (skills-config.yaml never counts as docs)"
+mkrepo moved-under-docs; git -C "$R" mv src/code.sh docs/code.md; git -C "$R" commit -qm "move code under docs"
+WANT_MAX=5; accept "code moved under docs/ is code (renames split; the deletion counts)"
+mkrepo bad-cfg; setcfg $'ci:\n  docsOnly:\n    patterns: "**/*.md"\n'; docfix CHANGELOG.md
+WANT_MAX=5; accept "a malformed ci.docsOnly block → unclassifiable, counted as code"
+# Patterns that do NOT cover the work item's directory, so only the exclusion keeps its record out.
+mkrepo docs-plus-itemfile; setcfg $'ci:\n  docsOnly:\n    patterns:\n      - "CHANGELOG.md"\n'; docfix CHANGELOG.md; echo '{}' > "$R/$DOC/task.42.dod.1.security.run.json"; git -C "$R" add -A; git -C "$R" commit -qm "item record"
+expect_refusal "a non-markdown file INSIDE the work item is not classified (excluded, as the count excludes it)" no-code-moved
+# The configuration is read at HEAD: an untracked skills-config.yaml that widens the patterns must not
+# turn a committed code fix into documentation.
+mkrepo wt-config; codefix; printf 'ci:\n  docsOnly:\n    patterns:\n      - "**/*"\n' > "$R/skills-config.yaml"
+WANT_MAX=5; accept "an untracked working-tree config that widens the patterns does not decide — the fix re-enters"
+mkrepo no-node; docfix CHANGELOG.md
+NSTUB="$T/nonode"; mkdir -p "$NSTUB"; printf '#!/usr/bin/env bash\necho "simulated node failure" >&2; exit 1\n' > "$NSTUB/node"; chmod +x "$NSTUB/node"
+ERR=$(cd "$R" && PATH="$NSTUB:$PATH" PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" "$DOC" "$DOC/report.md" 2>&1 >/dev/null); RC=$?
+if [ "$RC" -eq 0 ] && [ "$(jq -r '.current_step' "$L" 2>/dev/null)" = "5" ] && printf '%s' "$ERR" | grep -q 'could not be classified (simulated node failure) — counted as code'; then
+  pass "a classifier that fails → counted as code, re-entered, the cause named"
+else
+  fail "classifier failure" "rc=$RC lock=$(cat "$L" 2>/dev/null) err=$ERR"
+fi
 
 # Uncommitted work is refused, never accepted and never sent to /finalise: the re-entered review reads
 # committed history and qa-task Step 3b HALTs on an uncommitted tracked change (QA cycle 3, CR-4).
@@ -378,5 +433,6 @@ else
 fi
 
 echo ""
+undefined_commands_check || FAIL=$((FAIL + 1))
 echo "Results: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

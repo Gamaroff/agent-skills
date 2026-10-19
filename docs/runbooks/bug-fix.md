@@ -37,7 +37,7 @@ The mode decides the filename, the directory and the numbering.
 
 | Mode            | When                                                    | Lives in                             | Filename                                 | Numbering                          |
 | --------------- | ------------------------------------------------------- | ------------------------------------ | ---------------------------------------- | ---------------------------------- |
-| **Story bug**   | Found during story testing                              | beside the story file                | `story.{epic}.{story}.bug.{n}.{name}.md` | per-story (scan the dir, max + 1)  |
+| **Story bug**   | Found during story testing                              | beside the story file                | `story.{P}.{E}.{S}.bug.{n}.{name}.md` | per-story (scan the dir, max + 1)  |
 | **Task bug**    | Found during technical-task QA                          | `docs/tasks/task.{id}.{name}/`       | `task.{id}.bug.{n}.{name}.md`            | per-task (scan the dir, max + 1)   |
 | **General bug** | Cross-cutting, **no single story or task owner**        | `docs/bugs/bug.{N}.{name}/`          | `bug.{N}.{name}.md`                      | **global**, via the bug registry   |
 

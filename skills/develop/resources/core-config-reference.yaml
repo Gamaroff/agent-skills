@@ -19,6 +19,6 @@ devLoadAlwaysFiles: # Files to load on dev agent activation
 
 
 # Usage Examples (substitute ${PRD_ROOT} / ${ARCH_ROOT} for the literals shown):
-# - Epic files:  ${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md
-# - Story files: {epic-directory}/stories/story.{E}.{S}.{name}/story.{E}.{S}.{name}.md
+# - Epic files:  ${PRD_ROOT}/{domain}/prd.{P}.{feature}/epics/epic.{P}.{E}.{name}/epic.{P}.{E}.{name}.md
+# - Story files: {epic-directory}/stories/story.{P}.{E}.{S}.{name}/story.{P}.{E}.{S}.{name}.md
 # - QA artifacts: co-located with the story file (no qa.qaLocation key)

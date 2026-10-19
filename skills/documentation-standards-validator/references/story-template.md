@@ -1,8 +1,8 @@
-# [Story [Epic].N] [Story Name]
+# [Story [P].[E].N] [Story Name]
 
-**Epic**: [[Epic N] Epic Name](../epics/epic.[n].[name].md)
-**Story ID**: [Story [Epic].N]
-**Branch Name**: `feature/story.[epic].[story].[name]`
+**Epic**: [[Epic P.E] Epic Name](../epics/epic.[P].[E].[name].md)
+**Story ID**: [Story [P].[E].N]
+**Branch Name**: `feature/story.[P].[E].[S].[name]`
 **Status**: ❌ Not Started | 🔄 In Progress | ✅ Complete | ⚠️ Blocked
 **Priority**: Critical | High | Medium | Low
 **Estimated Effort**: [Story Points or Hours]
@@ -417,7 +417,7 @@ const data = jsonString ? JSON.parse(jsonString) : defaults;
 
 ## Definition of Done
 
-[Story [Epic].N] is complete when:
+[Story [P].[E].N] is complete when:
 
 ### Implementation
 
@@ -538,13 +538,13 @@ const data = jsonString ? JSON.parse(jsonString) : defaults;
 
 **Depends On** (must complete first):
 
-- [ ] [Story [Epic].N-1] [Story Name]
+- [ ] [Story [P].[E].N-1] [Story Name]
   - **Reason**: [Why this is a dependency]
   - **Status**: [Status]
 
 **Blocks** (this story blocks):
 
-- [ ] [Story [Epic].N+1] [Story Name]
+- [ ] [Story [P].[E].N+1] [Story Name]
   - **Reason**: [Why this story blocks it]
 
 ### External Dependencies
@@ -597,13 +597,13 @@ const data = jsonString ? JSON.parse(jsonString) : defaults;
 
 ### Epic Documentation
 
-- [[Epic N] Name](../epics/epic-[n]-[name].md) - Parent epic
-- [Epic [N] Roadmap](../epics/EPIC-[N]-ROADMAP.md) - Weekly plan
+- [[Epic [P].[E]] Name](../../epic.[P].[E].[name].md) - Parent epic
+- [Epic [P].[E] Roadmap](../epics/EPIC-[P].[E]-ROADMAP.md) - Weekly plan
 
 ### Related Stories
 
-- [[Story [Epic].N-1] Name](./[epic]-[n-1].story.[name].md) - Previous story
-- [[Story [Epic].N+1] Name](./[epic]-[n+1].story.[name].md) - Next story
+- [[Story [P].[E].[S-1]] Name](../story.[P].[E].[S-1].[name]/story.[P].[E].[S-1].[name].md) - Previous story
+- [[Story [P].[E].[S+1]] Name](../story.[P].[E].[S+1].[name]/story.[P].[E].[S+1].[name].md) - Next story
 
 ### Technical Documentation
 
@@ -628,7 +628,7 @@ const data = jsonString ? JSON.parse(jsonString) : defaults;
 
 **Completed**: [Date]
 **Developer**: [Your Name]
-**Branch**: `feature/story.[epic].[story].[name]`
+**Branch**: `feature/story.[P].[E].[S].[name]`
 **PR**: #[PR Number] - [PR Title]
 
 ### Summary of Changes
@@ -800,4 +800,4 @@ Before marking this story as "Ready for QA", verify:
 
 ---
 
-**Status**: Last updated YYYY-MM-DD | **Assigned**: [Developer] | **Epic**: [Epic [N]]
+**Status**: Last updated YYYY-MM-DD | **Assigned**: [Developer] | **Epic**: [Epic [P].[E]]

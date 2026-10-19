@@ -34,7 +34,7 @@ This checklist ensures Product Requirements Documents (PRDs) and epic definition
 
 Before starting validation, ensure you have:
 
-1. **prd.md** - The Product Requirements Document (check `docs/prd.md`)
+1. **The PRD** - The Product Requirements Document (check the PRD under `${PRD_ROOT}/**/prd.{P}.*/prd.{P}.*.md` — ask which when several exist)
 2. Any user research, market analysis, or competitive analysis documents
 3. Business goals and strategy documents
 4. Any existing epic definitions or user stories
@@ -507,9 +507,9 @@ new-product-prd: PRD creation complete, running pm-checklist
 **Direct activation:**
 
 ```
-User: "Is my PRD at docs/prd.md ready for the architect?"
+User: "Is my PRD at docs/prd/shop/prd.3.shop/prd.3.shop.md ready for the architect?"
 → pm-checklist activates
-→ Loads docs/prd.md
+→ Loads docs/prd/shop/prd.3.shop/prd.3.shop.md
 → Runs validation
 → Presents report with recommendations
 ```

@@ -1,0 +1,242 @@
+[
+  {
+    "id": "docid.newline",
+    "sink": "filename",
+    "input": "story.1.2.3.x\nprd.9.y",
+    "why": "A newline smuggles a second name past a line-oriented consumer",
+    "correct": "parse returns { ok: false, reason }",
+    "direction": "hostile"
+  },
+  {
+    "id": "docid.trailing-newline",
+    "sink": "filename",
+    "input": "prd.1.home\n",
+    "why": "JS $ anchors at end of input, but a careless regex anchors before a trailing newline",
+    "correct": "parse returns { ok: false, reason }",
+    "direction": "hostile"
+  },
+  {
+    "id": "docid.nul",
+    "sink": "filename",
+    "input": "prd.1.ho\u0000me",
+    "why": "NUL truncates at the syscall",
+    "correct": "parse returns { ok: false, reason }",
+    "direction": "hostile"
+  },
+  {
+    "id": "docid.cmd-subst",
+    "sink": "filename",
+    "input": "prd.1.$(touch PWNED)",
+    "why": "A slug that reaches a shell runs the substitution",
+    "correct": "parse returns { ok: false, reason }",
+    "direction": "hostile"
+  },
+  {
+    "id": "docid.backtick",
+    "sink": "filename",
+    "input": "epic.1.2.`touch PWNED2`",
+    "why": "Backtick substitution in a slug",
+    "correct": "parse returns { ok: false, reason }",
+    "direction": "hostile"
+  },
+  {
+    "id": "docid.space",
+    "sink": "filename",
+    "input": "story.1.2.3.my story",
+    "why": "Whitespace splits a name into two shell words",
+    "correct": "parse returns { ok: false, reason }",
+    "direction": "hostile"
+  },
+  {
+    "id": "docid.uppercase",
+    "sink": "filename",
+    "input": "epic.1.2.Hero",
+    "why": "Slugs are lowercase kebab-case",
+    "correct": "parse returns { ok: false, reason }",
+    "direction": "hostile"
+  },
+  {
+    "id": "docid.unicode",
+    "sink": "filename",
+    "input": "prd.1.résumé",
+    "why": "Non-ASCII slug outside the grammar",
+    "correct": "parse returns { ok: false, reason }",
+    "direction": "hostile"
+  },
+  {
+    "id": "docid.leading-zero",
+    "sink": "filename",
+    "input": "epic.01.2.hero",
+    "why": "Leading zeros give one id two spellings",
+    "correct": "parse returns { ok: false, reason }",
+    "direction": "hostile"
+  },
+  {
+    "id": "docid.zero",
+    "sink": "filename",
+    "input": "story.1.0.3.x",
+    "why": "Numbers are positive",
+    "correct": "parse returns { ok: false, reason }",
+    "direction": "hostile"
+  },
+  {
+    "id": "docid.digit-slug",
+    "sink": "filename",
+    "input": "story.1.2.3.4x",
+    "why": "A digit-first slug makes the id ambiguous",
+    "correct": "parse returns { ok: false, reason }",
+    "direction": "hostile"
+  },
+  {
+    "id": "docid.legacy-story",
+    "sink": "filename",
+    "input": "story.1.2.first-task",
+    "why": "The legacy two-number story must not read as a new id",
+    "correct": "parse returns { ok: false, reason }",
+    "direction": "hostile"
+  },
+  {
+    "id": "docid.legacy-epic",
+    "sink": "filename",
+    "input": "epic.4.first-week",
+    "why": "The legacy epic must not read as a new id",
+    "correct": "parse returns { ok: false, reason }",
+    "direction": "hostile"
+  },
+  {
+    "id": "docid.legacy-prd",
+    "sink": "filename",
+    "input": "prd.onboarding",
+    "why": "The legacy prd must not read as a new id",
+    "correct": "parse returns { ok: false, reason }",
+    "direction": "hostile"
+  },
+  {
+    "id": "docid.double-hyphen",
+    "sink": "filename",
+    "input": "prd.1.a--b",
+    "why": "Not kebab-case",
+    "correct": "parse returns { ok: false, reason }",
+    "direction": "hostile"
+  },
+  {
+    "id": "docid.trailing-hyphen",
+    "sink": "filename",
+    "input": "prd.1.a-",
+    "why": "Not kebab-case",
+    "correct": "parse returns { ok: false, reason }",
+    "direction": "hostile"
+  },
+  {
+    "id": "docid.sub-then-digit",
+    "sink": "filename",
+    "input": "story.1.2.3A1.x",
+    "why": "A sub-story suffix is one letter",
+    "correct": "parse returns { ok: false, reason }",
+    "direction": "hostile"
+  },
+  {
+    "id": "docid.huge-number",
+    "sink": "filename",
+    "input": "prd.99999999999999999999.x",
+    "why": "A number past Number.MAX_SAFE_INTEGER loses precision, so the parsed number no longer names the file",
+    "correct": "parse returns { ok: false, reason }",
+    "direction": "hostile"
+  },
+  {
+    "id": "docid.extra-segment",
+    "sink": "filename",
+    "input": "prd.1.home.notes",
+    "why": "Two-segment remainder with no artifact keyword",
+    "correct": "parse returns { ok: false, reason }",
+    "direction": "hostile"
+  },
+  {
+    "id": "docid.empty-slug",
+    "sink": "filename",
+    "input": "prd.1.",
+    "why": "Empty slug",
+    "correct": "parse returns { ok: false, reason }",
+    "direction": "hostile"
+  },
+  {
+    "id": "docid.unknown-kind",
+    "sink": "filename",
+    "input": "pdr.1.x",
+    "why": "Unknown kind",
+    "correct": "parse returns { ok: false, reason }",
+    "direction": "hostile"
+  },
+  {
+    "id": "docid.prd",
+    "sink": "filename",
+    "input": "prd.1.onboarding.md",
+    "why": "PRD document",
+    "correct": "parse returns ok: true with the id",
+    "direction": "legitimate"
+  },
+  {
+    "id": "docid.epic",
+    "sink": "filename",
+    "input": "epic.12.3.hero-banner",
+    "why": "Epic document",
+    "correct": "parse returns ok: true with the id",
+    "direction": "legitimate"
+  },
+  {
+    "id": "docid.story-sub",
+    "sink": "filename",
+    "input": "story.1.2.3A.hero",
+    "why": "Sub-story",
+    "correct": "parse returns ok: true with the id",
+    "direction": "legitimate"
+  },
+  {
+    "id": "docid.artifact",
+    "sink": "filename",
+    "input": "story.1.2.3.qa.4.anim.md",
+    "why": "Canonical artifact",
+    "correct": "parse returns ok: true with the id",
+    "direction": "legitimate"
+  },
+  {
+    "id": "docid.task",
+    "sink": "filename",
+    "input": "task.202.doc-id-engine-and-prd-registry.md",
+    "why": "Task document",
+    "correct": "parse returns ok: true with the id",
+    "direction": "legitimate"
+  },
+  {
+    "id": "docid.dated",
+    "sink": "filename",
+    "input": "task.12.review.2026-05-06.md",
+    "why": "Non-canonical artifact in the tree",
+    "correct": "parse returns ok: true with the id",
+    "direction": "legitimate"
+  },
+  {
+    "id": "docid.unsafe-seq",
+    "sink": "filename",
+    "input": "story.1.2.3.qa.99999999999999999999.x",
+    "why": "An unsafe seq falls to the keyword branch: it is still an artifact, by the WORK_ITEM_ARTIFACT_RE rule, and carries no number",
+    "correct": "parse classifies it as a non-canonical artifact (seq null) — never a lossy seq number",
+    "direction": "legitimate"
+  },
+  {
+    "id": "docid.unsafe-epic",
+    "sink": "filename",
+    "input": "epic.1.99999999999999999999.x",
+    "why": "An unsafe epic number loses precision",
+    "correct": "parse returns { ok: false, reason }",
+    "direction": "hostile"
+  },
+  {
+    "id": "docid.unsafe-task",
+    "sink": "filename",
+    "input": "task.99999999999999999999.x",
+    "why": "An unsafe task number loses precision",
+    "correct": "parse returns { ok: false, reason }",
+    "direction": "hostile"
+  }
+]

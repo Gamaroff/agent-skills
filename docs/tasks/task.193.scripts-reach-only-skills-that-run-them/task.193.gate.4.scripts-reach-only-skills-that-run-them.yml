@@ -1,0 +1,59 @@
+schema: 2
+task: 'task.193.scripts-reach-only-skills-that-run-them'
+task_title: 'Scripts reach only the skills that run them'
+gate: PASS
+status_reason: 'Gate 3 CR-1 fixed and mutation-proven: fenced literals are classified, the two live sites are bare-named and four more unrun copies are removed (21 total). Cycle 4 raised two low findings, neither promoted: a latent over-match in the fenced shell rule (no live case) and a stale header line.'
+reviewer: 'QA Engineer'
+head: 'e82c342538aca432b63f72ae22e028732c1bbd4b'
+updated: '2026-10-19T09:07:38Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 92
+
+evidence:
+  tests_reviewed: 8
+  phases_verified: 4/4
+  ci: 'not checked this cycle (gated at /finalise)'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+bug_resolution:
+  - id: 'CR-1 (gate 3)'
+    status: fixed
+    evidence: 'restoring either live fenced literal turns §2 live tree red; restoring the fence exemption turns §1 fenced red; bundle:check 0 problems'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No runtime boundary; boundary: false — scan/isRunInFence classify a CI lint finding, no external input.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'ci:fast 5905/0 fail on e82c3425; bundle:check clean.'
+  maintainability:
+    status: PASS
+    notes: 'Two low follow-ups recorded below.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 (cycle 4, low/medium): SHELL_BEFORE reads fenced prose as a command — "time. ", "do. " (the `.` builtin after a keyword with no space) and "(source " inside a fence; require whitespace after a keyword and add §1 negative fixtures. No live case.'
+      refs: ['tests/shared-script-literals.test.js']
+    - action: 'CR-2 (cycle 4, cleanup): the §1 header still says a fenced line must not be reported.'
+      refs: ['tests/shared-script-literals.test.js']
+    - action: 'CR-3 (gate 3, low/low): code-span parity is per line; a span wrapping across lines can flip it.'
+      refs: ['tests/shared-script-literals.test.js']
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: []

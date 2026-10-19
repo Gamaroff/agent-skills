@@ -160,8 +160,8 @@ Tracker linkage inside `finalise` uses the platform resolver (GitHub or Jira) �
 | Aspect | Story | Task |
 |---|---|---|
 | Upstream docs | PRD → epic → story | Task only |
-| Numbering authority | epic registry + per-epic story sequence | task registry (global) |
-| Branch model | `develop` → `feature/story.{E}.{S}.*` (or `epic/{N}.*` → `feature/story.{E}.{S}.*` where the epic opts in) | `develop` → `feature/task.{N}.*` |
+| Numbering authority | PRD registry + per-PRD epic and per-epic story sequence | task registry (global) |
+| Branch model | `develop` → `feature/story.{P}.{E}.{S}.*` (or `epic/{P}.{E}.*` → `feature/story.{P}.{E}.{S}.*` where the epic opts in) | `develop` → `feature/task.{N}.*` |
 | PR target | Q2 answer — `develop`, or the epic integration branch | Configurable base (default `develop`) |
 | QA skill | `qa-story` | `qa-task` (NFR/refactor-aware) |
 | Epic issue helper | `ensure-epic-{github,jira}-issue` | n/a |
@@ -225,7 +225,7 @@ Friction events from this PRD's dogfood run; shared entries cross-referenced fro
 1. Open a fresh Claude Code session.
 2. Run `/develop-task <task-file-path>` and choose **Resume**.
 
-_Provenance: `docs/prd/onboarding/epics/epic.3.runbook-tutorial-wrappers/stories/story.3.1.before-you-start-anchor-runbooks/story.3.1.implementation.1.before-you-start-anchor-runbooks-initial-run.md` (same PreCompact hook mechanism)_
+_Provenance: `docs/prd/onboarding/prd.1.onboarding/epics/epic.1.3.runbook-tutorial-wrappers/stories/story.1.3.1.before-you-start-anchor-runbooks/story.1.3.1.implementation.1.before-you-start-anchor-runbooks-initial-run.md` (same PreCompact hook mechanism)_
 
 ### Phase 0 base-branch prompt shows no `develop` option
 
@@ -235,7 +235,7 @@ _Provenance: `docs/prd/onboarding/epics/epic.3.runbook-tutorial-wrappers/stories
 1. `git checkout -b develop main && git push -u origin develop`
 2. Re-invoke `/develop-task <path>` — `develop` will appear.
 
-_Provenance: `docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entry-point/stories/story.1.1.first-task-in-10-minutes/story.1.1.implementation.1.first-task-in-10-minutes-initial-run.md` (same Phase 0 mechanism)_
+_Provenance: `docs/prd/onboarding/prd.1.onboarding/epics/epic.1.1.quickstart-and-decision-tree-entry-point/stories/story.1.1.1.first-task-in-10-minutes/story.1.1.1.implementation.1.first-task-in-10-minutes-initial-run.md` (same Phase 0 mechanism)_
 
 ### "Lock file exists" blocks a fresh pipeline run
 
@@ -245,7 +245,7 @@ _Provenance: `docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entr
 1. `rm .claude/state/develop-pipeline.lock`
 2. Re-run `/develop-task <path>`.
 
-_Provenance: `docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entry-point/stories/story.1.2.first-story-in-60-minutes/story.1.2.implementation.1.first-story-in-60-minutes-initial-run.md` (same lock mechanism)_
+_Provenance: `docs/prd/onboarding/prd.1.onboarding/epics/epic.1.1.quickstart-and-decision-tree-entry-point/stories/story.1.1.2.first-story-in-60-minutes/story.1.1.2.implementation.1.first-story-in-60-minutes-initial-run.md` (same lock mechanism)_
 
 ### `/finalise` flags "CHANGELOG.md not updated"
 
@@ -255,7 +255,7 @@ _Provenance: `docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entr
 1. Add an entry to `CHANGELOG.md` under the current version heading.
 2. Re-invoke `/finalise` — it detects the entry and clears the gap.
 
-_Provenance: `docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entry-point/stories/story.1.5.readme-start-here-callout/story.1.5.implementation.1.readme-start-here-callout-initial-run.md` (same DoD check)_
+_Provenance: `docs/prd/onboarding/prd.1.onboarding/epics/epic.1.1.quickstart-and-decision-tree-entry-point/stories/story.1.1.5.readme-start-here-callout/story.1.1.5.implementation.1.readme-start-here-callout-initial-run.md` (same DoD check)_
 
 ### Task registry shows a duplicate "Next Available" number
 

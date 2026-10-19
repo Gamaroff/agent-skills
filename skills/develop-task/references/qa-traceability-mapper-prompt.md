@@ -1,6 +1,6 @@
 ---
 name: qa-traceability-mapper-prompt
-description: Read-only Explore subagent prompt for building an AC/Success-Criteria → spec → src traceability matrix before /qa-story or /qa-task runs. Reads the story or task file, extracts criteria, greps for related spec and source files, and writes a markdown table to <doc-dir>/.summaries/qa-traceability-matrix.md. Dispatched by the develop-story orchestrator in Step 5 (always in standard mode) and by the develop-task orchestrator in Step 5 (only when the task has a Success Criteria table — see lite-mode detector flag `has_success_criteria_table`).
+description: Read-only Explore subagent prompt for building an AC/Success-Criteria → spec → src traceability matrix before /qa-story or /qa-task runs. Reads the story or task file, extracts criteria, greps for related spec and source files, and returns a markdown table between markers; the dispatching step writes it to <doc-dir>/.summaries/qa-traceability-matrix.md. Dispatched by the develop-story orchestrator in Step 5 (always in standard mode) and by the develop-task orchestrator in Step 5 (only when the task has a Success Criteria table — see lite-mode detector flag `has_success_criteria_table`).
 ---
 <!-- AUTO-GENERATED — DO NOT EDIT. Source: shared/resources/qa-traceability-mapper-prompt.md. Regenerate via `npm run bundle`. -->
 
@@ -8,7 +8,7 @@ description: Read-only Explore subagent prompt for building an AC/Success-Criter
 
 ## Purpose
 
-Read-only pre-QA mapping pass. Runs in an Explore subagent so grep output and file reads never land in main context. Produces a markdown table written to `<doc-dir>/.summaries/qa-traceability-matrix.md`. **Never mutates source files or QA artifacts.**
+Read-only pre-QA mapping pass. Runs in an Explore subagent so grep output and file reads never land in main context. Returns a markdown table between `<!-- matrix-start -->` / `<!-- matrix-end -->` markers; the step that dispatched it writes the table to `<doc-dir>/.summaries/qa-traceability-matrix.md`. **Never writes any file** — an Explore subagent is read-only, and on every run that asked it to write the matrix it refused and returned the table inline instead (obs #191, seven recurrences).
 
 > **Doc type**: this prompt accepts both **story** and **task** documents. Variable names use `STORY_FILE`/`STORY_DIR` for backwards compatibility, but the values may point at a task file/directory. The mapper detects the doc type from the filename prefix (`story.*` vs `task.*`) and writes the title row accordingly. For task docs, the source criteria section is **Success Criteria** instead of **Acceptance Criteria** — both produce the same matrix shape.
 
@@ -16,14 +16,14 @@ Read-only pre-QA mapping pass. Runs in an Explore subagent so grep output and fi
 
 ## Output
 
-**File written**: `<story-dir>/.summaries/qa-traceability-matrix.md`
+**Returned** between the markers in Step 7. The dispatching step writes it to `<story-dir>/.summaries/qa-traceability-matrix.md`.
 
 **Format**:
 
 ```markdown
 # QA Traceability Matrix
 
-**Story** (or **Task**): story.{epic}.{story}.{name}.md / task.{id}.{name}.md
+**Story** (or **Task**): story.{P}.{E}.{S}.{name}.md / task.{id}.{name}.md
 **Generated**: {YYYY-MM-DD}
 
 | Criterion | Spec files | Src files | Coverage | Uncertainty |
@@ -52,12 +52,14 @@ Inputs:
   STORY_FILE={story-file}       # absolute path to the story markdown file (resolved in Phase 0a)
   STORY_DIR={story-directory}   # absolute path to the story directory (resolved in Phase 0a)
 
-Follow the Execution Protocol exactly. Write the matrix file and return a one-line confirmation: "Matrix written to {STORY_DIR}/.summaries/qa-traceability-matrix.md — {N} ACs mapped."
+Follow the Execution Protocol exactly. Return the matrix between the markers in Step 7; do not create or modify any file.
 ```
 
 ### Extracting results
 
-After the subagent returns, the matrix is at `{STORY_DIR}/.summaries/qa-traceability-matrix.md`. Pass the path to `/qa-story` via Skill args:
+<!-- caller-runs -->
+
+After the subagent returns, the dispatching step extracts the marked block from the reply and writes it to `{STORY_DIR}/.summaries/qa-traceability-matrix.md` — the block that does this lives beside each dispatch in `develop-pipeline-step-5-6-qa-loop.md` ("Write the matrix from the mapper's reply"). A reply with no marked block means no matrix: warn and proceed without it. Then pass the path to `/qa-story` via Skill args:
 
 ```
 args="traceability_matrix={STORY_DIR}/.summaries/qa-traceability-matrix.md"
@@ -85,6 +87,8 @@ Write a subagent summary JSON artifact to `{story-directory}/.summaries/step-5-t
   ]
 }
 ```
+
+<!-- /caller-runs -->
 
 ## Execution Protocol (run inside the Explore subagent)
 
@@ -141,20 +145,21 @@ For each AC:
 - No spec, but integration test dir has related file → `integration`; note path
 - Nothing found → `none`; note in `Uncertainty`
 
-### Step 6 — Ensure output directory exists and write matrix
+### Step 6 — Build the matrix
 
-```bash
-mkdir -p {STORY_DIR}/.summaries
-```
+Build the markdown table following the Output format above. Do not create a directory or a file for
+it: you are read-only, and the dispatching step owns the write.
 
-Write the markdown table to `{STORY_DIR}/.summaries/qa-traceability-matrix.md` following the Output format above.
+### Step 7 — Return the matrix
 
-### Step 7 — Return confirmation
-
-Output a single line:
+Output exactly this, and nothing else:
 
 ```
-Matrix written to {STORY_DIR}/.summaries/qa-traceability-matrix.md — {N} ACs mapped.
+<!-- matrix-start -->
+{the whole matrix from Step 6, title and table}
+<!-- matrix-end -->
+{N} ACs mapped.
 ```
 
-No other prose. The pipeline orchestrator reads the matrix from disk.
+The pipeline orchestrator extracts the text between the markers and writes it. The markers must
+appear exactly once each, on lines of their own: a reply without them is read as "no matrix".

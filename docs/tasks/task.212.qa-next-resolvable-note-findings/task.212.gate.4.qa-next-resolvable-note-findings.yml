@@ -1,0 +1,53 @@
+schema: 2
+task: 'task.212.qa-next-resolvable-note-findings'
+task_title: 'qa-next: a note finding can be resolved, with evidence'
+gate: PASS
+status_reason: 'The cycle-3 HIGH is fixed: --changed-runs resolves the registry directory from --registry and Step 5 calls it, held by an executed-block test, a non-default-registry test and a no-repo refusal test (mutation-proven). The --by boundary engages on 17 probes. The cycle-4 review raised only low-confidence or low-severity advisories.'
+reviewer: 'QA Engineer'
+head: '2f44919f86b2c070cab50862e0a7c63458da62cb'
+updated: '2026-10-16T15:36:30Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 85
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 17
+    notes: 'cli: probe of --resolve-finding --by (sink path, 16 hostile, 1 legitimate) at head 2f44919f: verdict engages, 0 escapes. --changed-runs is read-only and takes no caller input beyond --registry.'
+  performance:
+    status: PASS
+    notes: 'One git diff per --changed-runs call; git elsewhere lazy and bounded.'
+  reliability:
+    status: PASS
+    notes: 'Resolution markers are staged from the tree under the configured registry; refusals write nothing; a marker that stops holding can be replaced.'
+  maintainability:
+    status: PASS
+    notes: 'Each QA-cycle fix is held by a test that goes red when reverted.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 (low): add --diff-filter=M to --changed-runs so a deleted run file or an already-staged new one is never listed (qa-next preflight already requires a clean tree, so owner edits cannot reach it).'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+    - action: 'CR-2 (low, low confidence) / CR-3: refuse a registry outside --root rather than print an empty list, and test --changed-runs from a subdirectory --root.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs', 'evals/qa-next/unit/uat-status.test.mjs']
+    - action: 'QA3 CR-2 (medium, low confidence): tell a git timeout apart from a git refusal so a slow repo is not reported as not-a-git-repo / commit-not-found.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

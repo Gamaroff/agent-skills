@@ -1,0 +1,62 @@
+schema: 2
+task: 'task.202.doc-id-engine-and-prd-registry'
+task_title: 'Doc-id engine and PRD registry'
+gate: CONCERNS
+status_reason: 'Cycle 4 holds: parse() is unchanged over all 4708 distinct tracked path segments, parseLegacy changes only the 23 intended new-scheme refusals, and all 135 legacy docs/prd names read as before. One medium: the digit-first refusal misses the sub-story suffix, so parseLegacy still accepts story.1.2.3A.* artifacts. No HIGH findings.'
+reviewer: 'QA Engineer'
+head: '5fbf970b33121162d60aae304da2f27d7da15a65'
+updated: '2026-10-15T04:39:17Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/doc-id.js'
+    finding: 'The parseLegacy digit-first guard /^\.\d+(?:\.|$)/ misses a sub-story suffix, so story.1.2.3A.qa.1.anim.md, story.1.2.3A.dod.md and story.1.2.3A.review.2026-01-01.md still read as legacy artifacts (ok:true).'
+    suggested_action: 'Widen the guard to /^\.\d+[A-Z]?(?:\.|$)/ and add the sub-story names to the refusal test.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 59
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1]
+  ci: 'not read — CI is gated at /finalise'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 30
+    notes: 'security-probe.mjs on doc-id.js#parse: engages.'
+  performance:
+    status: PASS
+    notes: 'check --corpus 0.031 s on head 5fbf970b (uptime load 2.25, 2.50, 2.04).'
+  reliability:
+    status: PASS
+    notes: 'parse() unchanged over the tracked tree; legacy docs/prd names unchanged.'
+  maintainability:
+    status: PASS
+    notes: 'One guard pattern to widen.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1.'
+      refs: ['shared/resources/doc-id.js', 'shared/resources/tests/doc-id.test.mjs']
+  future: []
+
+bug_resolution:
+  previous_gate: 'task.202.gate.4.doc-id-engine-and-prd-registry.yml'
+  fixed: ['CR-1', 'advisory CR-2']
+  fix_commit: '5fbf970b'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 fixed']

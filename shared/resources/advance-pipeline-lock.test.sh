@@ -66,6 +66,8 @@
 
 PASS=0
 FAIL=0
+# shellcheck source=undefined-command-guard.sh
+. "$(dirname "$0")/undefined-command-guard.sh"
 SCRIPT="$(cd "$(dirname "$0")" && pwd)/advance-pipeline-lock.sh"
 
 pass() { echo "  PASS  $1"; PASS=$((PASS + 1)); }
@@ -797,5 +799,6 @@ fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo ""
+undefined_commands_check || FAIL=$((FAIL + 1))
 echo "Results: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1

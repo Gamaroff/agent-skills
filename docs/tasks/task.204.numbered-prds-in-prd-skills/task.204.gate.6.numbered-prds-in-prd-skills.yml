@@ -1,0 +1,68 @@
+schema: 2
+task: 'task.204.numbered-prds-in-prd-skills'
+task_title: 'Numbered PRDs in the PRD skills'
+gate: CONCERNS
+status_reason: 'Gate 5''s three findings are fixed and verified at 88f8ba81. The cycle-6 safety re-probe found one reproduced medium: review-prd reports a PRD that resolves outside the root as Critical but does not stop, and its next-report-number block has no containment, so the report and Step 12 edits would go through the link. One low advisory in shard-prd''s refusal message.'
+reviewer: 'QA Engineer'
+head: '18ff932ded29411a8253949dca84ad107cae797c'
+updated: '2026-10-15T19:27:26Z'
+
+top_issues:
+  - id: CR-1
+    severity: medium
+    file: 'skills/review-prd/SKILL.md'
+    finding: 'The numbering block prints a resolves-outside-root finding as Critical and exits 0, so the review continues; the next-report-number block has no PRD_ROOT and no containment and prints REPORT under the symlinked directory, where the Step 11 report and Step 12 edits would be written (reproduced with docs/prd/evil/prd.2.evil linked outside the repo).'
+    suggested_action: 'Halt the review on a resolves-outside finding (exit non-zero with the replace-the-link message, as create-prd keep and shard-prd do) and add realpath containment to the next-report-number block before it reads the directory or prints REPORT.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 36
+  phases_verified: 5/5
+  ci: 'not read this cycle'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 24
+    notes: 'Allocation controls engage (task.204.qa.6.security.run.json, slug 11 + domain 13). CR-1 is a containment gap reachable only through a symlink the repository never creates (find docs/prd -type l → 0).'
+  performance:
+    status: PASS
+    notes: 'Row 11: three node processes.'
+  reliability:
+    status: PASS
+    notes: 'Gate 5 CR-3 fixed: the keep outside-root refusal has its own message. Advisory CR-2 (low): shard-prd''s guard shares one refusal for outside-root and off-layout.'
+  maintainability:
+    status: PASS
+    notes: 'One predicate duplicated per block remains a recorded follow-up (doc-id.js).'
+
+bug_resolution:
+  gate_5_findings: 3
+  fixed_and_verified: 3
+  verification_method: 'Gate-5 row "every block that reads or writes a PRD path refuses a symlink out of the root" at 18ff932d; mutation spot check: review-prd realpath test disabled → 1 test red (covered)'
+
+recommendations:
+  immediate:
+    - action: 'CR-1: review-prd halts on a PRD that resolves outside the root; the next-report-number block checks containment.'
+      refs: ['skills/review-prd/SKILL.md']
+  future:
+    - action: 'CR-2 (advisory, low): give shard-prd''s outside-root refusal its own message.'
+      refs: ['skills/shard-prd/SKILL.md']
+    - action: 'One layout-and-containment predicate in doc-id.js, called by every block (follow-up task: engine change).'
+      refs: ['shared/resources/doc-id.js']
+    - action: 'Gate-2 CR-4: register a found PRD that has no registry row.'
+      refs: ['skills/create-prd/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 closed']

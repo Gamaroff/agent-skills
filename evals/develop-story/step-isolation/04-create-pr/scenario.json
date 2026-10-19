@@ -2,7 +2,7 @@
   "name": "develop-story-step-04-create-pr",
   "skill": "develop-story",
   "description": "Step 4: create-pr targets develop.",
-  "prompt": "Run step 4 (create-pr) of the develop-story pipeline for story.5.1.example.",
+  "prompt": "Run step 4 (create-pr) of the develop-story pipeline for story.1.1.1.example.",
   "assertions": [
     {
       "fn": "prTargetsBranch",

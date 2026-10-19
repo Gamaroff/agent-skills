@@ -131,7 +131,7 @@ The full wizard runs all 10 steps. The `--update` flag runs only steps 1 and 8 �
 | 3    | Checks `gh` auth (GitHub), collects Bitbucket/Jira credentials with hidden input                                                   | —                                                    |
 | 4    | Writes `.env.example` (keys only); optionally writes `.env` + adds to `.gitignore`                                                 | Yes                                                  |
 | 5    | Scaffolds `skills-config.yaml` — prompts PRD path, story layout, coding-standards path                                             | Yes (skips if file exists and you decline overwrite) |
-| 6    | Creates `docs/development/epic-registry.md` and `docs/tasks/task-registry.md` if absent                                            | Idempotent                                           |
+| 6    | Creates `docs/tasks/task-registry.md` if absent (epics are numbered within their PRD; `create-prd` bootstraps the PRD registry)    | Idempotent                                           |
 | 7    | Scaffolds `docs/prd/`, `docs/architecture/concepts/` (3 required stubs), `docs/tasks/`                                             | Idempotent                                           |
 | 8    | Downloads the latest release from GitHub and extracts skills into `.agents/skills/`, applying **your install profile** (see below) and **skipping the tracker-specific skills your platform can never fire** (see below)                                                | Yes                                                  |
 | 8b   | Shows a checkbox list of agents and makes the local links each one needs to `AGENTS.md` and `.agents/skills/`, gitignored. See [1a](#1a-link-your-agent-to-agentsmd-and-agentsskills) | Yes (tick nothing, or no terminal) |
@@ -252,7 +252,6 @@ to "sync this story to the tracker".
 .env.example                          # credential keys, no values
 .secrets/tooling.env                  # live credentials (if confirmed)
 skills-config.yaml                    # project configuration
-docs/development/epic-registry.md                 # empty — populated by /create-epic
 docs/tasks/task-registry.md           # empty — populated by /create-task
 .agents/skills/                       # installed skills
 .claude/settings.json                 # updated with pipeline hooks
@@ -428,15 +427,14 @@ PRD and architecture roots are configurable (defaults shown). The _nested_ layou
 
 ## 3. Create the registries
 
-Stories and tasks need globally unique numbers. If you are working in a **new project** (not a clone of `agent-skills`), create empty registries:
+PRDs and tasks need globally unique numbers. If you are working in a **new project** (not a clone of `agent-skills`), create an empty task registry:
 
 ```bash
 mkdir -p docs/tasks
-touch docs/development/epic-registry.md
 touch docs/tasks/task-registry.md
 ```
 
-The first `/create-epic` and `/create-task` invocations will populate them. See [epic registry](../standards/epic-registry.md) and [task registry](../standards/task-registry.md).
+The first `/create-task` invocation populates it, and the first `/create-prd` bootstraps the [PRD registry](../standards/prd-registry.md). Epics and stories need no registry: an epic is numbered within its PRD and a story within its epic. See [task registry](../standards/task-registry.md).
 
 > If you cloned `agent-skills` to run a quickstart, these registries already exist — skip this step.
 
@@ -452,7 +450,7 @@ Not sure what to run? See [which-path.md](./which-path.md) — a three-question 
 | First refactor / infra task             | [Task Development](../runbooks/task-development.md)                   |
 | Just learning what skills are           | [Overview](./overview.md)                                             |
 
-**Story work introduces one extra concept:** `/develop-story` asks in Phase 0 which branch the story is cut from and which branch its PR targets. The default for both is `develop` — short-lived feature branches, integrated continuously. An epic whose stories are meaningless apart can instead opt into an _integration branch_ (`epic/{N}.{slug}`) that all its stories merge into and that reaches `develop` once, at the end. Both options appear in the prompt every time; see [Story documents § Branch strategy](../standards/story-documents.md#branch-strategy).
+**Story work introduces one extra concept:** `/develop-story` asks in Phase 0 which branch the story is cut from and which branch its PR targets. The default for both is `develop` — short-lived feature branches, integrated continuously. An epic whose stories are meaningless apart can instead opt into an _integration branch_ (`epic/{P}.{E}.{slug}`) that all its stories merge into and that reaches `develop` once, at the end. Both options appear in the prompt every time; see [Story documents § Branch strategy](../standards/story-documents.md#branch-strategy).
 
 ## 5. Run your first command
 

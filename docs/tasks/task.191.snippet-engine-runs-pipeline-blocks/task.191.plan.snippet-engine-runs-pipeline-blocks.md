@@ -50,10 +50,13 @@ Segmenting: reuse `commandWords` (it already yields per-command words). Read its
 using it for "first word of a segment". It may already split `source x || exit 1`. When
 `helperRoot` is absent (library callers, today's behaviour), skip the branch entirely.
 
-`runBlock` (`:1437`) receives the temp copy path; pass it to `classifyBlock` as `helperRoot`.
-Classification currently happens before the copy exists: check the order in the main loop and move
-classification after seeding if needed. **The copy must exist when a helper is resolved**, or every
-helper resolves to nothing.
+`executeFile` passes the temp copy (`tmp`) to `classifyBlock` as `helperRoot`. Review 1 checked the
+order: `executeFile` seeds `--copy` / `--copy-as` (`:1702`, `:1713`) **before** its block loop, so the
+copy exists when a helper is resolved — no reordering is needed.
+
+**Fourth condition (review 1, I1):** a block containing `cd`, `pushd` or `popd` gets no helper
+recognition — the path is resolved against `helperRoot`, but the shell runs it from the block's working
+directory. Reason: `helper call after a directory change`. Control: `cd sub && bash read.sh`.
 
 Note that the helper's text is classified as a block, so its `#!/usr/bin/env bash` and `set -e`
 lines must classify as harmless. Run the real `qa-cycle.sh` and `newest-numbered.sh` through it

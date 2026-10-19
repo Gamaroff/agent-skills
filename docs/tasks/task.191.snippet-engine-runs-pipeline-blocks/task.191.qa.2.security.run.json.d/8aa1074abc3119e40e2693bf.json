@@ -1,0 +1,27 @@
+{
+  "sink": "shell-exec",
+  "entry": "shared/resources/qa-execute-snippets.mjs#isRunnableBlock",
+  "name": "isRunnableBlock: shell-exec corpus + helper-rule cases",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 43,
+  "passed": 43,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": [
+    {},
+    {
+      "helperRoot": "/home/gamaroff/Development/agent-skills"
+    }
+  ],
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-10-19T05:26:52.609Z"
+}

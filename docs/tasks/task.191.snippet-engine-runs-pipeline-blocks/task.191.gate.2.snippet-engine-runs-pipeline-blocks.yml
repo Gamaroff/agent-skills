@@ -1,0 +1,100 @@
+schema: 2
+task: 'task.191.snippet-engine-runs-pipeline-blocks'
+task_title: 'Snippet engine runs pipeline blocks'
+gate: FAIL
+status_reason: 'Cycle 1 closed four of six findings (CR-2 merge base, CR-3 shadowing names, CR-4 diff config, QA-2 probeable). The cycle-2 refute pass reproduced five new HIGH fail-opens in the helper rule: two respell the cycle-1 fixes (BUG-1, BUG-2 reopened) and three are new mechanisms. All five are on the same widened boundary.'
+reviewer: 'QA Engineer'
+head: '881944880f5c4f59f606acd81c94a4ee36c6721c'
+updated: '2026-10-19T05:37:18Z'
+
+top_issues:
+  - id: 'CR2-1'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'The forwarded-argument check (reach) matches the function name as literal prose text, but the scan unquotes it first: newest_\numbered docs dod -delete and next_number''''ed docs review -exec rm {} + classify runnable against the real newest-numbered.sh. Reproduced.'
+    suggested_action: 'Run the check on the unquoted invocation stream commandInvocations produces (word + args), not a regex over prose lines; control tests for both respellings.'
+    suggested_owner: dev
+    bug_ref: 'task.191.bug.2.sourced-function-arguments-never-scanned.md'
+  - id: 'CR2-2'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'A helper script''s own arguments are never checked: with h/fwd.sh = find docs "$@", bash h/fwd.sh -delete and set -- -delete; source h/fwd.sh classify runnable. Reproduced.'
+    suggested_action: 'Apply the forwarded-argument check to helper-runner calls and set --, or refuse a helper call with arguments when the helper reads positional parameters.'
+    suggested_owner: dev
+    bug_ref: 'task.191.bug.7.helper-script-arguments-never-scanned.md'
+  - id: 'CR2-3'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'The start-up-variable refusal matches the literal name: export BASH\_ENV=…, export "BASH""_ENV"=… and export "$(echo bash_env | tr a-z A-Z)=…" before bash h/plain.sh classify runnable. Reproduced.'
+    suggested_action: 'Refuse a helper call in a block or sourced helper that runs export/declare/typeset/readonly/set -a/printf -v or assigns through a non-literal name; or run helper shells with those variables forcibly unset.'
+    suggested_owner: dev
+    bug_ref: 'task.191.bug.1.helper-call-runs-the-file-bash-env-names.md'
+  - id: 'CR2-4'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'Helper mode rewrites any a|b) line inside a case to _), including a line that closes a multi-line $( opened on the previous line, so x|touch${IFS}pwned) in a helper is never scanned and the helper classifies runnable. Reproduced.'
+    suggested_action: 'Rewrite an arm pattern only directly after case … in or an arm terminator, never while a $(, ( or backtick from an earlier line is open.'
+    suggested_owner: dev
+    bug_ref: 'task.191.bug.8.case-arm-rewrite-hides-a-continued-command.md'
+  - id: 'CR2-5'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'Each helper is classified without the functions sourced before it: source h1.sh (ls() { find "$@"; }); source h2.sh (ls docs -delete) is runnable, as is export -f ls; bash h2.sh. Reproduced.'
+    suggested_action: 'Pass the accumulated defines and forwarding map into each later helper''s classification; refuse export -f in a block with a helper call.'
+    suggested_owner: dev
+    bug_ref: 'task.191.bug.9.helpers-classified-without-the-functions-sourced-before-them.md'
+
+waiver:
+  active: false
+
+quality_score: 0
+
+evidence:
+  tests_reviewed: 173
+  phases_verified: 4/4
+  ci: 'not awaited (QA cycles do not wait on CI); local ci:fast 5871/0 @ 881944880f5c'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+  bug_resolution:
+    closed: ['task.191.bug.3', 'task.191.bug.4', 'task.191.bug.5', 'task.191.bug.6']
+    reopened: ['task.191.bug.1', 'task.191.bug.2']
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 78
+    notes: 'boundary: true. Run record task.191.qa.2.security.run.json: isRunnableBlock over the shell-exec corpus plus 12 helper-rule cases engages (43/43), --diff-base revision refusal engages (35/35); 0 reproduced. The five HIGH fail-opens were found by the refute pass and reproduced by classification. None is in the corpus.'
+  performance:
+    status: PASS
+    notes: 'Helper depth bounded at 2; shadowsCommand is one cached bash spawn per distinct defined name.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR2-7 (medium confidence): runBlock''s timeout kills only the outer shell, so a helper grandchild such as bash h/loop.sh; true outlives it. A backgrounded loop already does this on develop. CR2-8: an empty fence''s span runs one line past its close.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Second consecutive gate with HIGH findings on one file (helper rule): gate 1 had 2 there, gate 2 has 5; a third would be a third strike. Each fix closes the named spelling and the next review respells it. The struck mechanism is the deny-list modelling of shell semantics in the helper rule.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR2-1..CR2-5. Before patching, consider the structural move (qa-fix Step 2.6, obs #276): the helper rule is a deny-list over a parser''s input. An allow-list of accepted helper-call shapes would refuse everything else. Every word in a block with a helper call must be a plain literal (no quote, backslash or expansion). A helper call takes no arguments, or only literal non-dash words. Such a block may contain no export/declare/set/PATH assignment and no export -f. Helper text may not hold a multi-line substitution.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+  future:
+    - action: 'CR2-6 (medium confidence): shadowsCommand reads the host PATH, but a block that assigns PATH can make an untrusted name resolve to a file in the copy; distrust defined names in a block that assigns PATH or runs hash.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'CR2-7 (medium confidence, partly pre-existing): run each block in its own process group and kill the group on timeout.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'CR2-8 (low): store the closing-fence line on the block rather than deriving it from the code''s line count (an empty fence spans one extra line).'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'Mutation spot check: removing --no-textconv reds no test (no-red-untested); the helper''s own forwardsTo seeding is absorbed by its fallback (absorbed).'
+      refs: ['shared/resources/tests/qa-execute-snippets.test.mjs']
+    - action: 'Pre-existing in security-probe.mjs: a JS-entry control is keyed by sink+entry only, so a second --name''d run with different cases silently replaces the first in the record (fence: and cli: forms key on --name).'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'Carried from gate 1: PS4=''$(cmd)''; set -x; ls classifies runnable on develop (pre-existing); the residual quoted-option deny-list gap (find docs "-delete") is pre-existing.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

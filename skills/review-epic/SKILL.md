@@ -19,12 +19,12 @@ Use this skill when:
 
 Natural language triggers:
 
-- "Review epic 180"
+- "Review epic 1.3"
 - "Check this epic for conflicts"
 - "Is this epic well-formed?"
 - "Review the epic before we write stories"
-- "Validate epic 276 against architecture"
-- "Check epic for registry overlap"
+- "Validate epic 2.1 against architecture"
+- "Check epic for overlap with other epics"
 - "Pre-story review on this epic"
 
 ## Purpose
@@ -54,7 +54,7 @@ required:
 
 optional:
   - output_mode: "report" | "inline"  # if omitted, ask user in Step 0
-  - focus_areas: Specific areas to concentrate on (e.g., "registry conflicts only")
+  - focus_areas: Specific areas to concentrate on (e.g., "corpus conflicts only")
 ```
 
 ---
@@ -65,37 +65,63 @@ Before entering the workflow, resolve the input to an absolute file path stored 
 
 **Step 1 — Detect input type:**
 
-| Pattern                                | Matches               |
-| -------------------------------------- | --------------------- |
-| Path containing `/` or ending in `.md` | Direct file path      |
-| All digits (e.g. `180`)                | Epic number           |
-| Anything else                          | Natural-language name |
+| Pattern                                | Matches                                         |
+| -------------------------------------- | ----------------------------------------------- |
+| Path containing `/` or ending in `.md` | Direct file path                                |
+| `P.E` (e.g. `1.3`)                     | Epic id — epic `E` of PRD `P`                   |
+| All digits (e.g. `3`)                  | **Refused** — a bare number is ambiguous across PRDs |
+| Anything else                          | Natural-language name                           |
 
-**Step 2 — Resolve to file:**
+**Step 2 — Resolve to file.** Run from the repository root. Only a canonical epic file counts — the
+file named after its own directory — so a review or QA artifact beside it never resolves; a `P.E` id
+is matched by parsing each name with `references/doc-id.js`, never by a glob, so `3` cannot claim
+every epic of PRD 3 and `1.3` cannot claim `1.30`:
 
 ```bash
+# review-epic — resolve the input to DOC_FILE (task 205)
+# INPUTS: INPUT (the skill argument). PRD_ROOT is resolved HERE from skills-config.yaml (default
+# docs/prd), never defaulted in place (QA cycle 2, CR-5).
+DOC_ID=.agents/skills/review-epic/references/doc-id.js
+source .agents/skills/review-epic/references/resolve-paths.sh || exit 1
+: "${INPUT:?bind INPUT to the skill argument}"
+epic_files() {
+  find "$PRD_ROOT" -type f -name 'epic.*.md' 2>/dev/null | while IFS= read -r f; do
+    b=${f##*/}; d=${f%/*}; d=${d##*/}
+    [ "$b" = "$d.md" ] && printf '%s\n' "$f"
+  done | sort
+}
 case "$INPUT" in
   */*|*.md)
-    DOC_FILE="$INPUT"
-    ;;
-  [0-9]*)
-    DOC_FILE=$(find docs/ -name "epic.${INPUT}.*.md" 2>/dev/null \
-      | grep -v -E '\.(review|gate|implementation)\.' | head -1)
-    ;;
+    DOC_FILE="$INPUT" ;;
+  *[!0-9.]*)
+    DOC_FILE=$(epic_files | grep -i -F -- "$INPUT") ;;
+  *.*)
+    case "$INPUT" in
+      [0-9]*.[0-9]*) ;;
+      *) echo "❌ '$INPUT' is not an epic id — use P.E (e.g. 1.3)"; exit 1 ;;
+    esac
+    case "$INPUT" in *.*.*) echo "❌ '$INPUT' is not an epic id — use P.E (e.g. 1.3)"; exit 1 ;; esac
+    DOC_FILE=$(epic_files | while IFS= read -r f; do
+        b=${f##*/}
+        id=$(command node "$DOC_ID" parse "${b%.md}" --json | jq -r 'select(.kind == "epic" and .artifact == null) | "\(.prd).\(.epic)"')
+        [ "$id" = "$INPUT" ] && printf '%s\n' "$f"
+      done) ;;
   *)
-    DOC_FILE=$(find docs/ -name "epic.*.md" 2>/dev/null \
-      | grep -v -E '\.(review|gate|implementation)\.' \
-      | grep -i "$INPUT" | head -1)
-    ;;
+    echo "❌ Epic ids are P.E (e.g. 1.3) — a bare number is ambiguous across PRDs. Pass P.E, a path, or a name."
+    exit 1 ;;
 esac
-
-if [ ! -f "$DOC_FILE" ]; then
-  echo "❌ Epic file not found for input: $INPUT"
-  exit 1
-fi
+COUNT=$(printf '%s' "$DOC_FILE" | grep -c .)
+case "$COUNT" in
+  0) echo "❌ Epic file not found for input: $INPUT"; exit 1 ;;
+  1) [ -f "$DOC_FILE" ] || { echo "❌ Epic file not found for input: $INPUT"; exit 1; } ;;
+  *) echo "ASK: ${COUNT} epics match '$INPUT' — ask the user which one:"; printf '%s\n' "$DOC_FILE"; exit 3 ;;
+esac
+echo "DOC_FILE=$DOC_FILE"
 ```
 
-If multiple candidates: list and ask the user to confirm via `AskUserQuestion`.
+Exit 1 is a HALT with the message. Exit 3 lists several candidates: ask the user which one via
+`AskUserQuestion`, then re-run with that path as `INPUT`. (For a `P.E` id, several matches is a
+duplicate `(P, E)` — Step 2's numbering check will also flag it.)
 
 **Step 3 — Continue with `DOC_FILE` resolved.** This file path is consumed by Step 0a (branch setup) and Step 1.
 
@@ -114,7 +140,7 @@ question: "How would you like the review output delivered?"
 header: "Output Mode"
 options:
   - label: "Co-located report"
-    description: "Save an epic.[N].review.[n].[name].md report alongside the epic file for async review and future reference."
+    description: "Save an epic.[P].[E].review.[n].[name].md report alongside the epic file for async review and future reference."
   - label: "Inline action plan"
     description: "Present prioritised recommendations immediately as numbered steps to action now."
 ```
@@ -127,9 +153,9 @@ Store choice as `output_mode` for Step 9.
 | --------------------------- | ------------------------------------------------------- |
 | Determine output mode       | Capture report vs inline action-plan preference         |
 | Branch setup                | Ensure review runs on a feature branch (Step 0a)        |
-| Load epic & reference docs  | Locate epic file, template, registry, architecture docs |
+| Load epic & reference docs  | Locate epic file, template, parent PRD, architecture docs |
 | Template compliance         | Verify epic structure against template                  |
-| Registry conflict detection | Check for epic number/scope collisions                  |
+| Corpus conflict detection   | Check for epic id/scope collisions across all epics     |
 | Architecture conflicts      | Verify epic aligns with codebase patterns               |
 | Existing story drift        | Check stories haven't diverged from epic intent         |
 | Consistency check           | Detect internal contradictions                          |
@@ -150,8 +176,8 @@ Store choice as `output_mode` for Step 9.
 
 **Actions**: Execute the full protocol in `references/review-pipeline-step-0a-branch-setup.md`. Apply the **review-epic** variant throughout:
 
-- 0a.2 extract `EPIC_NUM`, `EPIC_SLUG`, `EPIC_BRANCH` from the epic filename (`epic.{N}.{slug}.md`).
-- 0a.3 auto-skip when on `feature/epic.${EPIC_NUM}.*`.
+- 0a.2 read `PRD_NUM`, `EPIC_NUM`, `EPIC_SLUG` and `EPIC_BRANCH` from the epic filename (`epic.{P}.{E}.{slug}.md`) through `doc-id.js`, never a positional split.
+- 0a.3 auto-skip when on `feature/epic.${PRD_NUM}.${EPIC_NUM}.*`.
 - 0a.4 prompt: single question — "Create epic branch `${EPIC_BRANCH}` from `${BASE_DEFAULT}`?" (Recommended Yes / "Other (specify branch)" / "Abort review").
 - 0a.5–0a.8 stash (`git stash create` + `store`) → ensure epic branch exists (guarded local create + push) → pop stash. No `/create-branch` invocation (the epic branch is created inline).
 
@@ -170,13 +196,13 @@ Store choice as `output_mode` for Step 9.
 0. **Resolve paths.** Source `references/resolve-paths.sh` to populate `${PRD_ROOT}` (default `docs/prd`) and `${ARCH_ROOT}` (default `docs/architecture`). Path operations below substitute these env vars.
 
 1. **Locate epic file**
-   - Accept: absolute path, epic number (e.g. `180`), or descriptive name
-   - Search pattern: `${PRD_ROOT}/**/epics/epic.[N].*/epic.[N].*.md`
+   - Accept: absolute path, epic id `P.E` (e.g. `1.3`), or descriptive name — resolved in Input Resolution
+   - Search pattern: `${PRD_ROOT}/**/epics/epic.{P}.{E}.*/epic.{P}.{E}.*.md`
    - If ambiguous, list candidates and ask user to confirm
 
 2. **Load core references**
    - `docs/templates/epic-template.md` — template compliance baseline
-   - `docs/development/epic-registry.md` — registry conflict detection
+   - The parent PRD (`prd_source`) and its `<!-- epics-index -->` block — the PRD's list of its epics
 
 3. **Load architecture docs** (all in parallel)
    - `.claude/backend-patterns.md`
@@ -187,7 +213,7 @@ Store choice as `output_mode` for Step 9.
    - `.claude/notifications.md` (if epic touches notifications)
 
 4. **Scan for existing stories**
-   - Glob: `${PRD_ROOT}/**/epics/epic.[N].*/stories/**/story.*.md`
+   - Glob: `${PRD_ROOT}/**/epics/epic.[P].[E].*/stories/**/story.*.md`
    - Read each story found
 
 **Output**: Full context package ready for analysis.
@@ -220,11 +246,12 @@ Score each section: ✅ Complete | ⚠️ Partial | ❌ Missing
 
 - No unfilled placeholders: `[N]`, `[Epic Name]`, `[Description]`, `YYYY-MM-DD`, `[Team]`
 - YAML `dependencies` list matches `blocked_by` field (if present)
-- Epic number in filename matches `title` field
-- File naming: `epic.[N].[kebab-name]/epic.[N].[kebab-name].md` (DOTS.md convention, directory exactly matches filename)
-- **Title format** (Major): if the `title` frontmatter embeds an epic number prefix it **must** use the canonical bracket form `[Epic N] Name` — not the colon form `Epic N: Name`. Detect by matching `^\s*Epic\s+\d+\s*:` against the title value. Flag as a **Major** issue when the colon form is found, because `sync-jira-epic` normalises on push but the local doc title and any manually-created Jira issue will show the wrong format until corrected. The fix is: update `title` in frontmatter to bracket form and re-run `sync-jira-epic` so the Jira issue summary is corrected in the same operation.
-- **`prd_source` resolves to a real file** (Critical): unless the value is the standalone sentinel `brownfield-enhancement`, the path must point to an actual file in the repo. Flag as a **Critical** issue if the file is missing, the path is still the `[source-document].md` placeholder, or `prd_source` is absent entirely. Stakeholders cannot navigate to a PRD that isn't linked.
-- **PRD reference visible in the body** (Major): the epic body must contain a clickable PRD reference (a `**Source PRD**:` line or any markdown link to the `prd_source` path), not just the frontmatter field. Flag as a **Major** issue if the path lives only in frontmatter — readers of the rendered markdown won't see it. (Skip both checks when `prd_source` is `brownfield-enhancement`.)
+- Epic id in filename matches `title` field
+- File naming: `epic.{P}.{E}.[kebab-name]/epic.{P}.{E}.[kebab-name].md` (DOTS.md convention, directory exactly matches filename)
+- **Numbering** (Critical): run `command node .agents/skills/review-epic/references/doc-id.js check "$DOC_FILE" --prd-root "${PRD_ROOT}" --json`. Any `reason` other than `ok` is a **Critical** issue — print the reason verbatim: the directory and the stem disagree, `prd_number` / `epic_number` disagree with the filename, `prd_number` is not the parent PRD's, or another epic holds the same `(P, E)`.
+- **Title format** (Major): if the `title` frontmatter embeds an epic id prefix it **must** use the canonical bracket form `[Epic P.E] Name` — not the colon form `Epic P.E: Name`, and not a legacy one-number id. Detect by matching `^\s*Epic\s+\d+(\.\d+)?\s*:` against the title value. Flag as a **Major** issue when the colon form is found, because `sync-jira-epic` normalises on push but the local doc title and any manually-created Jira issue will show the wrong format until corrected. The fix is: update `title` in frontmatter to bracket form and re-run `sync-jira-epic` so the Jira issue summary is corrected in the same operation.
+- **`prd_source` resolves to a real file** (Critical): every epic has a parent PRD, so the path must point to an actual file in the repo — there is no exemption. Flag as a **Critical** issue if the file is missing, the path is still the `[source-document].md` placeholder, or `prd_source` is absent entirely. Stakeholders cannot navigate to a PRD that isn't linked, and an epic with no PRD has no `P`.
+- **PRD reference visible in the body** (Major): the epic body must contain a clickable PRD reference (a `**Source PRD**:` line or any markdown link to the `prd_source` path), not just the frontmatter field. Flag as a **Major** issue if the path lives only in frontmatter — readers of the rendered markdown won't see it.
 - **OKF frontmatter conformance** (see [`open-knowledge-format.md`](references/open-knowledge-format.md)):
   - `type: epic` present and non-empty → **Critical** if missing or empty (OKF's one hard requirement).
   - `description` present (one-sentence summary) → **Important** if missing.
@@ -281,28 +308,30 @@ the exact fix. Add `--json` for a machine-readable `{ok, findings, blocks}`.
 
 ---
 
-### Step 3 — Epic Registry Conflict Detection
+### Step 3 — Epic Corpus Conflict Detection
 
-**Purpose**: Detect scope overlap, duplication, and dependency errors against the registry.
+**Purpose**: Detect scope overlap, duplication, and dependency errors against every other epic. There is
+no global epic registry: the epics on disk are the list, and each PRD's `<!-- epics-index -->` block is
+that PRD's view of it.
 
 **Actions**:
 
-1. Read full `docs/development/epic-registry.md`
+1. Enumerate every epic under `${PRD_ROOT}` — the canonical files Input Resolution's `epic_files`
+   lists, each with its `P.E` id from `references/doc-id.js` `parse`. `doc-id.js check --corpus --json`
+   reports any id defect across the tree (a duplicate `(P, E)` among them).
 2. Extract this epic's domain, title, and primary deliverables
-3. For every other epic in the registry:
+3. For every other epic:
    - Compare titles for near-duplicates (semantic overlap, not just exact string match)
    - Compare deliverables: flag if same feature/service/endpoint appears in both
-   - Check dependency references: every epic listed in `dependencies` or `blocked_by` must exist in the registry
-4. Verify this epic's registry entry exists and matches the file content (title, status, domain)
-5. Verify epic number uniqueness (no two epics share the same number)
+   - Check dependency references: every `epic.P.E` listed in `dependencies` or `blocked_by` must exist on disk
+4. Verify `(P, E)` uniqueness — no other epic holds this epic's id
 
 **Flag categories**:
 
 - **Exact duplicate**: Same deliverable described identically
 - **Partial overlap**: Overlapping feature domain (e.g., both epics create a "ContactService")
-- **Dependency mismatch**: References an epic number that doesn't exist in registry
-- **Missing registry entry**: This epic has no entry in the registry
-- **Stale registry entry**: Registry entry contradicts the epic file (status, title mismatch)
+- **Dependency mismatch**: References an `epic.P.E` that does not exist
+- **Duplicate id**: Another epic holds the same `(P, E)` (also a Critical numbering finding in Step 2)
 
 **Collect all issues** — do NOT ask questions yet. Proceed to Step 4.
 
@@ -382,7 +411,7 @@ the exact fix. Add `--json` for a machine-readable `{ok, findings, blocks}`.
 **Ask questions about**:
 
 - Critical missing sections from Step 2 (if multiple, batch into one multi-select)
-- Ambiguous scope boundaries that need clarification before registry/arch analysis
+- Ambiguous scope boundaries that need clarification before corpus/arch analysis
 - "Out of Scope" items that may be intentional vs. accidental gaps
 - Dependencies referencing non-existent epic numbers (confirm correct number)
 
@@ -461,7 +490,7 @@ Score each dimension 1–5:
 | Dimension                  | 1 (Poor)                            | 3 (Adequate)                             | 5 (Excellent)                                      |
 | -------------------------- | ----------------------------------- | ---------------------------------------- | -------------------------------------------------- |
 | **Template Compliance**    | Multiple missing sections           | Most sections present                    | All sections complete, no placeholders, Change Log present and current |
-| **Registry Integrity**     | Not in registry or wrong number     | In registry but stale                    | Registry entry accurate and current                |
+| **Numbering Integrity**    | `doc-id check` fails or id duplicated | Id valid, title prefix non-canonical   | Id valid, unique, title `[Epic P.E]`               |
 | **Architecture Alignment** | Multiple violations                 | Minor deviations                         | Fully compliant with all arch docs                 |
 | **Scope Clarity**          | Vague deliverables, no out-of-scope | Deliverables listed, out-of-scope sparse | Crystal clear deliverables and explicit exclusions |
 | **Dependency Accuracy**    | Invalid epic references             | All exist but direction wrong            | All valid, bidirectional, and documented           |
@@ -529,17 +558,17 @@ If flagged: recommend splitting into sub-epics and suggest how to divide the sco
 
 **Option A — Co-located Report**:
 
-Save to: `${PRD_ROOT}/[domain]/[feature]/epics/epic.[N].[name]/epic.[N].review.[n].[name].md`
+Save to: `${PRD_ROOT}/[domain]/prd.[P].[feature]/epics/epic.[P].[E].[name]/epic.[P].[E].review.[n].[name].md`
 
-- `[N]` is the epic number; `[name]` is the parent epic file's own name slug (the hyphenated portion after `epic.[N].` in the epic filename) — NOT a free-form summary of the review focus.
+- `[P]` is the PRD number and `[E]` the epic number within it; `[name]` is the parent epic file's own name slug (the hyphenated portion after `epic.[P].[E].` in the epic filename) — NOT a free-form summary of the review focus.
 - `[n]` is a sequence number for multiple reviews of the same epic, computed below — never counted by eye (mirrors the QA `qa.{n}` and story `review.{n}` patterns). Use DOTS as structural separators and hyphens within the name slug.
-- Example: epic file `epic.1.mastra-runtime-foundation.md` → review file `epic.1.review.1.mastra-runtime-foundation.md`.
+- Example: epic file `epic.1.1.mastra-runtime-foundation.md` → review file `epic.1.1.review.1.mastra-runtime-foundation.md`.
 
 Compute `[n]`, from the repository root:
 
 ```bash
 source .agents/skills/review-epic/references/newest-numbered.sh || exit 1
-REVIEW_N=$(next_numbered "{epic-directory}" review -name "epic.{epic-number}.review.*.md") || exit 1
+REVIEW_N=$(next_numbered "{epic-directory}" review -name "epic.{P}.{E}.review.*.md") || exit 1
 ```
 
 and use `$REVIEW_N` as `[n]`. It is the highest existing `[n]` plus 1 (1 when there is none), never the number of reports plus 1: a directory holding `.1.` and `.3.` gets `.4.`, where a count would overwrite `.3.`. `next_numbered`'s header in the sourced file states the full rule (obs #272, task.186).
@@ -547,7 +576,7 @@ and use `$REVIEW_N` as `[n]`. It is the highest existing `[n]` plus 1 (1 when th
 **Report structure**:
 
 ```markdown
-# Epic Review Report: Epic [N] — [Epic Name]
+# Epic Review Report: Epic [P].[E] — [Epic Name]
 
 **Review Date**: YYYY-MM-DD
 **Reviewer**: Claude (review-epic skill)
@@ -631,7 +660,7 @@ and use `$REVIEW_N` as `[n]`. It is the highest existing `[n]` plus 1 (1 when th
 
 | Epic Deliverable | Story              | Status          |
 | ---------------- | ------------------ | --------------- |
-| [Deliverable 1]  | story.[N].1.[name] | ✅ Covered      |
+| [Deliverable 1]  | story.[P].[E].1.[name] | ✅ Covered      |
 | [Deliverable 2]  | —                  | ❌ No story yet |
 
 ---
@@ -661,7 +690,7 @@ and use `$REVIEW_N` as `[n]`. It is the highest existing `[n]` plus 1 (1 when th
 Present immediately in conversation as:
 
 ```
-## Epic [N] Review: Inline Action Plan
+## Epic [P].[E] Review: Inline Action Plan
 
 **Score**: [X.X/5.0] | **Ready for stories**: ✅/⚠️/❌
 
@@ -736,15 +765,15 @@ options:
 5. Report which fixes were applied and which (if any) were skipped with reason
 6. **Mark recommendations as implemented** — update both documents:
 
-   **In the review report** (`epic.[N].review.[n].[name].md`):
+   **In the review report** (`epic.[P].[E].review.[n].[name].md`):
    - Add the following line immediately after the Story Writing Readiness line in the Executive Summary:
      `> **Implementation Status**: ✅ All [N] recommendations implemented — YYYY-MM-DD`
      (or: `> **Implementation Status**: ✅ Critical/Major recommendations implemented — YYYY-MM-DD` if partial)
    - In the Recommended Actions list, prefix each applied recommendation with `✅ ` and each skipped one with `⏭️ skipped —` followed by the reason
 
-   **In the epic file** (`epic.[N].[name].md`):
+   **In the epic file** (`epic.[P].[E].[name].md`):
    - Add the following line immediately after the `**Last Updated**` status line:
-     `**Review**: ✅ All review recommendations from \`epic.[N].review.[n].[name].md\` implemented YYYY-MM-DD`(or:`**Review**: ✅ Critical/Major recommendations implemented YYYY-MM-DD — see review report for details`)
+     `**Review**: ✅ All review recommendations from \`epic.[P].[E].review.[n].[name].md\` implemented YYYY-MM-DD`(or:`**Review**: ✅ Critical/Major recommendations implemented YYYY-MM-DD — see review report for details`)
    - Update the `last_reviewed` YAML frontmatter field to today's date if not already done in Step 10
 
 7. **Append a Change Log row** recording the review outcome, and bump frontmatter `updated` to today in the same edit. Canonical format: [document-change-log.md](references/document-change-log.md). A review verdict bumps the minor version; `Author` is the skill name. Illustrative row:
@@ -830,7 +859,7 @@ source references/resolve-platform.sh || exit 1
 1. **Every conflict citation** must reference an actual file path and section header
 2. **Never invent architecture violations** — if you're not sure, say "could not verify against [doc]"
 3. **Codebase search results**: When Glob/Grep finds nothing, state explicitly: "No existing implementation found for [X]"
-4. **Registry overlap**: Must quote the conflicting epic's actual title and number from the registry file
+4. **Corpus overlap**: Must quote the conflicting epic's actual title, `P.E` id and file path
 5. **Recommendations** must be specific actions, not vague suggestions like "improve this section"
 6. **Score justifications**: Every score must reference specific issues or confirm specific compliance
 
@@ -841,7 +870,7 @@ source references/resolve-platform.sh || exit 1
 | File                                         | Purpose                                           |
 | -------------------------------------------- | ------------------------------------------------- |
 | `docs/templates/epic-template.md`            | Template compliance baseline                      |
-| `docs/development/epic-registry.md`          | Registry conflict detection                       |
+| `references/doc-id.js`                       | Epic id parse, numbering check, corpus check      |
 | `.claude/backend-patterns.md`                | Architecture source — NestJS, API, DI             |
 | `.claude/database-redis.md`                  | Architecture source — DB, Redis, safety rules     |
 | `.claude/testing.md`                         | Architecture source — test standards, co-location |

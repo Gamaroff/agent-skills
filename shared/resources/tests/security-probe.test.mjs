@@ -33,7 +33,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 
 import {
@@ -45,11 +45,13 @@ import {
   compareExpected,
   computeVerdict,
   defaultRepoRoot,
+  describeBadCase,
   expectedProblem,
   extractFencedBlock,
   FENCE_PREFIX,
   fixtureProblem,
   isLaunchFailure,
+  isPythonCrash,
   main,
   namesGh,
   ghFreePath,
@@ -63,8 +65,9 @@ import {
   SHELL_ARGV_PREFIX,
   shellArgvSpawnArgs,
   toRecordEntry,
+  validateCases,
 } from "../security-probe.mjs";
-import { corpusFor } from "../security-input-corpus.mjs";
+import { corpusFor, DIRECTIONS, SINKS } from "../security-input-corpus.mjs";
 import { sandboxEnv } from "../qa-execute-snippets.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -2769,6 +2772,631 @@ test("cli entry: every cli result path returns the JS form's key set", () => {
     "bad-argv": { entry: CLI("refuser") },
     "not a script": { entry: `cli:${FIXTURES}/eval-names.sh`, argv: HOST_ARGV },
     crashed: { entry: CLI("crasher"), argv: HOST_ARGV },
+  };
+  for (const [name, spec] of Object.entries(paths)) {
+    const r = runProbeSpec({ sink: "url-authority", cases: CASES, ...spec });
+    assert.deepEqual(Object.keys(r).sort(), expected, `${name} key set`);
+  }
+});
+
+// ── The cli entry form, Python (task.215) ────────────────────────────────────
+//
+// `cli:<path>.py` runs the script under `python3 -E -s -B` with the same argv
+// template, sandbox and verdict rules as the Node arm. Two things differ, and
+// each row below holds one: a Python crash exits 1 exactly as a refusal does,
+// so it is told apart by its traceback frame, not by a Node footer; and the
+// interpreter is the host's, so the result says which one ran.
+
+const PY = (name) => `cli:${FIXTURES}/${name}.py`;
+
+test("cli entry (python): a refusing .py CLI engages under python3, one probe per case, and the result names the interpreter", () => {
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-refuser"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+  assert.equal(r.executed, CASES.length);
+  assert.equal(r.shells, null);
+  assert.deepEqual(r.escapes, []);
+  assert.equal(r.interpreter.name, "python3");
+  assert.match(r.interpreter.version, /^Python 3\.\d+/);
+  for (const c of r.cases) {
+    assert.equal(c.exit, c.direction === "hostile" ? 3 : 0, c.id);
+  }
+});
+
+test("cli entry (python): the child runs as python3 -E -s -B, never -I", () => {
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-flags"),
+    cases: CASES.filter((c) => c.direction === "legitimate"),
+    argv: HOST_ARGV,
+  });
+  // A run that declines before spawning has no cases, and the loop below
+  // would then check no flag at all (QA cycle 1, CR-2).
+  assert.equal(r.interpreter?.name, "python3", JSON.stringify(r));
+  assert.equal(
+    r.executed,
+    CASES.filter((c) => c.direction === "legitimate").length,
+  );
+  for (const c of r.cases) {
+    assert.equal(c.outcome, "accepted", `${c.id}: ${c.detail}`);
+  }
+});
+
+test("cli entry (python): a script that imports a sibling module runs, and writes no __pycache__ escape", () => {
+  // A bytecode directory left by a manual run is not this run's; clear it so
+  // the existence check below reads only what the probe wrote.
+  rmSync(join(REPO_ROOT, FIXTURES, "__pycache__"), {
+    recursive: true,
+    force: true,
+  });
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-imports-sibling"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+  assert.deepEqual(r.escapes, []);
+  assert.equal(
+    existsSync(join(REPO_ROOT, FIXTURES, "__pycache__")),
+    false,
+    "python wrote bytecode beside the fixture",
+  );
+});
+
+test("cli entry (python): an uncaught exception and a SyntaxError are errored — never scored as refusals", () => {
+  for (const [name, shape] of [
+    ["cli-crasher", /RuntimeError: cannot start/],
+    ["cli-syntax-error", /SyntaxError/],
+    // The traceback does not end on the exception: a two-line message, then
+    // an atexit line. The detail still names the exception (QA cycle 1).
+    ["cli-crasher-multiline", /ValueError: cannot start/],
+    // No traceback reaches stderr at all: stderr is None, or the traceback is
+    // cut to the bare line a refusal could print (QA cycle 2).
+    ["cli-crasher-stderr-none", /RuntimeError: cannot start/],
+    ["cli-crasher-tracebacklimit", /KeyError: 'no policy/],
+  ]) {
+    const r = runProbeSpec({
+      sink: "url-authority",
+      entry: PY(name),
+      cases: CASES,
+      argv: HOST_ARGV,
+    });
+    // Both exit 1 on every case — what a refusal exits with. Scored, every
+    // case would read `rejected` and the control would look like it refuses.
+    assert.equal(r.verdict, "unverifiable", name);
+    assert.equal(r.reason, "entry-not-probeable", name);
+    assert.equal(r.executed, 0, name);
+    assert.match(r.declined[0].detail, /crashed \(exit 1\)/, name);
+    assert.match(r.declined[0].detail, shape, name);
+  }
+});
+
+test("cli entry (python): a crash behind a replaced excepthook is errored on the inputs it crashes on — never a refusal", () => {
+  // The fixture answers legitimate input and crashes on hostile input after
+  // replacing sys.excepthook (as rich and Typer do): exit 1, no frame on
+  // stderr. Read off stderr, every hostile case scored `rejected` and the
+  // verdict was `engages` — a false pass (QA cycle 2, TASK-215-QA2-1).
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-crasher-excepthook"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.notEqual(r.verdict, "engages", JSON.stringify(r));
+  const hostile = CASES.filter((c) => c.direction === "hostile");
+  assert.ok(hostile.length > 0);
+  for (const c of hostile) {
+    const got = [...r.cases, ...r.declined].find((x) => x.id === c.id);
+    assert.ok(got, `${c.id} missing`);
+    assert.equal(got.outcome, "errored", `${c.id}: ${got.detail}`);
+    assert.match(
+      got.detail,
+      /crashed \(exit 1\).*ValueError: cannot parse host/,
+    );
+  }
+  for (const c of r.cases.filter((x) => x.direction === "legitimate")) {
+    assert.equal(c.outcome, "accepted", c.id);
+  }
+});
+
+test("cli entry (python): a crash whose exception cannot be printed is errored — the signal is not the exception's text", () => {
+  // The replaced excepthook prints nothing: exit 1, empty stderr. A marker
+  // built from the exception's text was lost when formatting it raised, and
+  // every hostile case scored `rejected` (QA cycle 3, TASK-215-QA3-1). Its
+  // str() raises; the second fixture's class name cannot be read at all, so
+  // the detail has nothing to name.
+  for (const [name, detail] of [
+    ["cli-crasher-unprintable", /rather than answering: UnprintableError$/],
+    ["cli-crasher-nameless", /rather than answering: uncaught exception$/],
+  ]) {
+    const r = runProbeSpec({
+      sink: "url-authority",
+      entry: PY(name),
+      cases: CASES,
+      argv: HOST_ARGV,
+    });
+    assert.notEqual(r.verdict, "engages", `${name}: ${JSON.stringify(r)}`);
+    const hostile = CASES.filter((c) => c.direction === "hostile");
+    assert.ok(hostile.length > 0);
+    for (const c of hostile) {
+      const got = [...r.cases, ...r.declined].find((x) => x.id === c.id);
+      assert.ok(got, `${name} ${c.id} missing`);
+      assert.equal(got.outcome, "errored", `${name} ${c.id}: ${got.detail}`);
+      assert.match(got.detail, /crashed \(exit 1\)/, name);
+      assert.match(got.detail, detail, name);
+    }
+    for (const c of r.cases.filter((x) => x.direction === "legitimate")) {
+      assert.equal(c.outcome, "accepted", `${name} ${c.id}`);
+    }
+  }
+});
+
+test("cli entry (python): a forked child that crashes does not override the script's answer", () => {
+  // The child unwinds into the bootstrap with the crash fd still open. Were it
+  // to write the marker, every case — a parent that answered 0 or 3 — would
+  // read `errored` (QA cycle 3, TASK-215-QA3-2).
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-fork-child-crash"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.equal(r.verdict, "engages", JSON.stringify(r));
+  assert.equal(r.executed, CASES.length);
+  for (const c of r.cases) {
+    assert.equal(c.exit, c.direction === "hostile" ? 3 : 0, c.id);
+  }
+});
+
+test("cli entry (python): a forked daemon does not hold the case open past the script's answer", () => {
+  // The daemon outlives the answer by 4 s; the per-case timeout is 2 s. Were
+  // the crash fd left open in the child, every case would wait for the timeout
+  // and read `errored` (QA cycle 3, TASK-215-QA3-3).
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-fork-daemon"),
+    cases: CASES,
+    argv: HOST_ARGV,
+    timeoutMs: 2000,
+  });
+  assert.equal(r.verdict, "engages", JSON.stringify(r));
+  assert.equal(r.executed, CASES.length);
+  for (const c of r.cases) {
+    assert.equal(c.exit, c.direction === "hostile" ? 3 : 0, c.id);
+  }
+});
+
+test("cli entry (python): a case with no exit record is errored — a closed fd 3, a forged line and os._exit never score", () => {
+  // The channel is positive: the bootstrap writes `answer <nonce>` or
+  // `crash <nonce>` on every exit it controls, and a case without one is
+  // errored. cli-closes-record-fd closes fd 3 and opens its own file there,
+  // then crashes behind a quiet excepthook on hostile input; read as "no crash
+  // record, so it answered", every hostile case scored `rejected` and the
+  // verdict was `engages` (QA cycle 4, TASK-215-QA4-1). cli-forged-record
+  // writes nonce-less `answer` / `crash` lines itself and leaves by os._exit.
+  for (const name of ["cli-closes-record-fd", "cli-forged-record"]) {
+    const r = runProbeSpec({
+      sink: "url-authority",
+      entry: PY(name),
+      cases: CASES,
+      argv: HOST_ARGV,
+    });
+    assert.equal(r.verdict, "unverifiable", `${name}: ${JSON.stringify(r)}`);
+    assert.equal(r.reason, "entry-not-probeable", name);
+    assert.equal(r.executed, 0, name);
+    assert.equal(r.cases.length, CASES.length, name);
+    for (const c of r.cases) {
+      assert.equal(c.outcome, "errored", `${name} ${c.id}: ${c.detail}`);
+      assert.match(c.detail, /without the bootstrap's exit record/, name);
+      // Exit 7: the bootstrap wrote into the script's own fd 3.
+      assert.notEqual(
+        c.exit,
+        7,
+        `${name} ${c.id}: record written into the script's file`,
+      );
+    }
+  }
+});
+
+test("cli entry (python): a forged answer record does not outrank the crash that follows it", () => {
+  // cli-forged-answer-crash writes `answer <nonce>` with the real nonce (it is
+  // on sys.orig_argv), then crashes behind a quiet excepthook. Read with the
+  // answer first, every hostile case scored `rejected` (QA cycle 5 mutation:
+  // "answer wins over crash" reddened nothing).
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-forged-answer-crash"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.notEqual(r.verdict, "engages", JSON.stringify(r));
+  const hostile = CASES.filter((c) => c.direction === "hostile");
+  assert.ok(hostile.length > 0);
+  for (const c of hostile) {
+    const got = [...r.cases, ...r.declined].find((x) => x.id === c.id);
+    assert.ok(got, `${c.id} missing`);
+    assert.equal(got.outcome, "errored", `${c.id}: ${got.detail}`);
+    assert.match(
+      got.detail,
+      /crashed \(exit 1\).*ValueError: cannot parse host/,
+    );
+  }
+});
+
+test("cli entry (python): a failed flush at shutdown (exit 120) is errored, never a refusal", () => {
+  // The body answers, then python3 cannot flush stdout and exits 120. Read
+  // as a refusal, every hostile case scored `rejected` and the verdict read
+  // `engages` (QA cycle 6, TASK-215-QA6-1).
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-shutdown-flush-crash"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.notEqual(r.verdict, "engages", JSON.stringify(r));
+  const hostile = CASES.filter((c) => c.direction === "hostile");
+  assert.ok(hostile.length > 0);
+  for (const c of hostile) {
+    const got = [...r.cases, ...r.declined].find((x) => x.id === c.id);
+    assert.ok(got, `${c.id} missing`);
+    assert.equal(got.outcome, "errored", `${c.id}: ${got.detail}`);
+    assert.match(got.detail, /failed at shutdown \(exit 120/);
+  }
+});
+
+test("cli entry (python): a crash outside the main frame is scored by python3's exit status — never a pass", () => {
+  // The stated limit (probe-boundary-rule.md): a worker thread that raises
+  // while the main thread exits 0 is what `python3 <entry>` reports, so a
+  // hostile case reads `accepted` — a reproduction, the false-alarm direction.
+  // What must never happen is a pass (QA cycle 5, TASK-215-QA5-1). Every
+  // hostile case is looked up, and the thread is shown to have raised, so a
+  // fixture that simply accepts every input cannot pass (QA cycle 6, QA6-3).
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-thread-crash"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.notEqual(r.verdict, "engages", JSON.stringify(r));
+  const hostile = CASES.filter((c) => c.direction === "hostile");
+  assert.ok(hostile.length > 0);
+  for (const c of hostile) {
+    const got = [...r.cases, ...r.declined].find((x) => x.id === c.id);
+    assert.ok(got, `${c.id} missing`);
+    assert.equal(got.outcome, "accepted", `${c.id}: ${got.detail}`);
+    assert.equal(got.exit, 0, c.id);
+  }
+  const direct = spawnSync(
+    "python3",
+    [
+      PY("cli-thread-crash").slice("cli:".length),
+      "--mode",
+      "strict",
+      "--host",
+      hostile[0].input,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.equal(direct.status, 0, direct.stderr);
+  assert.match(direct.stderr, /Exception in thread/);
+});
+
+test("cli entry (python): __main__ is still the script's module after the body returns", () => {
+  // cli-main-atexit's atexit handler exits 8 unless __main__ is the script's
+  // module; runpy swapped the bootstrap back in (QA cycle 3, TASK-215-QA3-4).
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-main-atexit"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+  for (const c of r.cases) {
+    assert.equal(c.exit, c.direction === "hostile" ? 3 : 0, c.id);
+  }
+});
+
+test("cli entry (python): the script runs as python3 <path> runs it — __main__, argv[0] and its own directory", () => {
+  // The bootstrap that catches a crash must not change how the script runs:
+  // cli-main-guard exits 9 unless sys.argv[0] is itself, and answers only
+  // under `if __name__ == "__main__"`; cli-imports-sibling needs sys.path[0].
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-main-guard"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+  assert.equal(r.executed, CASES.length);
+  for (const c of r.cases) {
+    assert.equal(c.exit, c.direction === "hostile" ? 3 : 0, c.id);
+  }
+});
+
+test("cli entry (python): a plain sys.exit(1) refusal, and a refusal that prints an exception-shaped line, stay rejected", () => {
+  for (const name of ["cli-exit-one", "cli-refuser-error-text"]) {
+    const r = runProbeSpec({
+      sink: "url-authority",
+      entry: PY(name),
+      cases: CASES,
+      argv: HOST_ARGV,
+    });
+    assert.equal(r.verdict, "engages", `${name}: ${JSON.stringify(r.cases)}`);
+    assert.equal(r.executed, CASES.length, name);
+    for (const c of r.cases) {
+      if (c.direction === "hostile") {
+        assert.equal(c.outcome, "rejected", `${name} ${c.id}`);
+        assert.equal(c.exit, 1, `${name} ${c.id}`);
+      }
+    }
+  }
+});
+
+test("cli entry (python): a traceback on a non-1 exit is not a crash — the exit status still answers", () => {
+  // Python prints an "Exception ignored" traceback from a failing __del__ and
+  // carries on; an uncaught exception always exits 1. So a refusal exiting 3,
+  // and an acceptance exiting 0, are answers even with a traceback on stderr.
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-refuser-unraisable"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+  assert.equal(r.executed, CASES.length);
+  for (const c of r.cases) {
+    assert.equal(c.exit, c.direction === "hostile" ? 3 : 0, c.id);
+  }
+});
+
+test("cli entry (python): isPythonCrash reads the traceback, not the last line", () => {
+  const tb = [
+    "Traceback (most recent call last):",
+    '  File "/x/a.py", line 2, in <module>',
+    '    raise ValueError("x")',
+    "ValueError: x",
+  ].join("\n");
+  const syntax = [
+    '  File "/x/a.py", line 1',
+    "    def f(:",
+    "          ^",
+    "SyntaxError: invalid syntax",
+  ].join("\n");
+  const interrupt = [
+    "Traceback (most recent call last):",
+    '  File "/x/a.py", line 3, in <module>',
+    "    time.sleep(9)",
+    "KeyboardInterrupt",
+  ].join("\n");
+  const dotted = [
+    "Traceback (most recent call last):",
+    '  File "/x/a.py", line 3, in <module>',
+    "json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)",
+  ].join("\n");
+  assert.equal(isPythonCrash(tb), true);
+  assert.equal(isPythonCrash(`${tb}\n\n`), true);
+  assert.equal(isPythonCrash(syntax), true);
+  assert.equal(isPythonCrash(interrupt), true);
+  assert.equal(isPythonCrash(dotted), true);
+  // Real Python 3 crashes whose last stderr line is not the exception
+  // (QA cycle 1, TASK-215-QA1-1 — each was read as a refusal).
+  const multiline = [
+    "Traceback (most recent call last):",
+    '  File "/x/a.py", line 1, in <module>',
+    '    raise ValueError("cannot start\\nsee docs")',
+    "ValueError: cannot start",
+    "see docs at https://example.invalid/policy",
+  ].join("\n");
+  const group = [
+    "  + Exception Group Traceback (most recent call last):",
+    '  |   File "/x/a.py", line 1, in <module>',
+    '  |     raise ExceptionGroup("startup failed", [ValueError("a")])',
+    "  | ExceptionGroup: startup failed (1 sub-exception)",
+    "  +-+---------------- 1 ----------------",
+    "    | ValueError: a",
+    "    +------------------------------------",
+  ].join("\n");
+  const trailing = `${tb}\ncleanup done, bye`;
+  const noted = `${tb}\nhint (set POLICY_PATH)`;
+  const importedSyntax = [
+    "Traceback (most recent call last):",
+    '  File "/x/main.py", line 2, in <module>',
+    "    import helper",
+    '  File "/x/helper.py", line 1',
+    "    def f(:",
+    "          ^",
+    "SyntaxError: invalid syntax",
+  ].join("\n");
+  for (const [name, text] of Object.entries({
+    multiline,
+    group,
+    trailing,
+    noted,
+    importedSyntax,
+  })) {
+    assert.equal(isPythonCrash(text), true, name);
+  }
+  assert.equal(
+    isPythonCrash(
+      [
+        "Traceback (most recent call last):",
+        '  File "/x/a.py", line 9, in <module>',
+        "__main__.Refused: no",
+      ].join("\n"),
+    ),
+    true,
+    "a custom exception class is a crash too",
+  );
+  assert.equal(isPythonCrash("ValueError: refused host 'a/b'"), false);
+  assert.equal(isPythonCrash("refused: 'a/b' is not a bare host"), false);
+  assert.equal(isPythonCrash(""), false);
+  // Each clause is load-bearing on its own: an exception-shaped last line
+  // after a frame-shaped log line but with no Traceback header is not a
+  // runtime crash, and a SyntaxError-shaped refusal with no frame is not a
+  // compile error.
+  assert.equal(
+    isPythonCrash('  File "/etc/policy.cfg", line 4\nPermissionError: refused'),
+    false,
+  );
+  assert.equal(isPythonCrash("SyntaxError: refused input"), false);
+  assert.equal(isPythonCrash(undefined), false);
+  // A frame alone, at column 0, is a log line, not a traceback frame.
+  assert.equal(
+    isPythonCrash(
+      'Traceback (most recent call last):\nFile "/x", line 1\nValueError: x',
+    ),
+    false,
+  );
+  // A traceback followed by a refusal message reads as a crash: the probe
+  // cannot tell a caught-and-printed failure from an uncaught one, and
+  // `errored` ("could not look") is the safe direction — never a false pass.
+  // runCliCase asks only on exit 1, so a refusal exiting 3 is not affected.
+  assert.equal(
+    isPythonCrash(`${tb}\nrecovered — refused: 'a/b' is not a bare host`),
+    true,
+  );
+});
+
+test("cli entry (python): a write to $HOME is an escape inside the sandbox, never the real home", () => {
+  const real = join(
+    process.env.HOME ?? "/nonexistent",
+    "cli-probe-side-effect-py",
+  );
+  const before = existsSync(real);
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-writes-home"),
+    cases: CASES,
+    argv: ["--host", "{input}"],
+  });
+  assert.equal(r.verdict, "engages");
+  assert.equal(r.escapes.length, CASES.length);
+  assert.match(r.escapes[0].path, /home[/\\]cli-probe-side-effect-py$/);
+  assert.equal(existsSync(real), before, "the real HOME was written");
+});
+
+test("cli entry (python): a .py entry with no --argv is bad-argv, and nothing runs", () => {
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-refuser"),
+    cases: CASES,
+  });
+  assert.equal(r.reason, "bad-argv");
+  assert.equal(r.cases.length, 0);
+  assert.equal(r.interpreter, null);
+});
+
+test("cli entry (python): with no python3 on PATH the entry is declined once, by name, and no case spawns", () => {
+  const emptyBin = mkdtempSync(join(tmpdir(), "probe-no-python-"));
+  try {
+    const child = spawnSync(
+      process.execPath,
+      [
+        join(REPO_ROOT, "shared/resources/security-probe.mjs"),
+        "--sink",
+        "url-authority",
+        "--entry",
+        PY("cli-refuser"),
+        "--argv",
+        JSON.stringify(HOST_ARGV),
+        "--json",
+      ],
+      { cwd: REPO_ROOT, encoding: "utf8", env: { PATH: emptyBin } },
+    );
+    const r = JSON.parse(child.stdout);
+    assert.equal(r.verdict, "unverifiable", child.stderr);
+    assert.equal(r.reason, "entry-not-probeable");
+    assert.equal(r.declined.length, 1);
+    assert.match(r.declined[0].detail, /python3/);
+    assert.equal(r.executed, 0);
+    assert.equal(r.cases.length, 0);
+    assert.equal(r.interpreter, null);
+  } finally {
+    rmSync(emptyBin, { recursive: true, force: true });
+  }
+});
+
+test("cli entry (python): a python3 that answers --version but cannot start a case is declined, never scored", () => {
+  // probePython runs under the engine's environment and every case under
+  // caseEnv, so an interpreter that needs the real HOME passes the probe and
+  // then exits 1 on every case before the bootstrap runs. Read off the exit
+  // status, every case scored `rejected` (QA cycle 4, TASK-215-QA4-2); with no
+  // exit record, every case is errored and the entry is declined once.
+  const shimBin = mkdtempSync(join(tmpdir(), "probe-python-shim-"));
+  try {
+    const shim = join(shimBin, "python3");
+    writeFileSync(
+      shim,
+      '#!/bin/sh\nif [ "$1" = --version ]; then echo "Python 3.99.0"; exit 0; fi\necho "Fatal Python error: init_fs_encoding" >&2\nexit 1\n',
+    );
+    chmodSync(shim, 0o755);
+    const child = spawnSync(
+      process.execPath,
+      [
+        join(REPO_ROOT, "shared/resources/security-probe.mjs"),
+        "--sink",
+        "url-authority",
+        "--entry",
+        PY("cli-refuser"),
+        "--argv",
+        JSON.stringify(HOST_ARGV),
+        "--json",
+      ],
+      {
+        cwd: REPO_ROOT,
+        encoding: "utf8",
+        env: { PATH: `${shimBin}:${process.env.PATH}` },
+      },
+    );
+    const r = JSON.parse(child.stdout);
+    assert.equal(r.interpreter?.version, "Python 3.99.0", child.stderr);
+    assert.equal(r.verdict, "unverifiable", JSON.stringify(r));
+    assert.equal(r.reason, "entry-not-probeable");
+    assert.equal(r.declined.length, 1);
+    assert.match(r.declined[0].detail, /without the bootstrap's exit record/);
+    assert.match(r.declined[0].detail, /Fatal Python error/);
+    assert.equal(r.executed, 0);
+  } finally {
+    rmSync(shimBin, { recursive: true, force: true });
+  }
+});
+
+test("cli entry (python): the record entry carries the interpreter, and null for a Node CLI", () => {
+  const py = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-refuser"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.deepEqual(toRecordEntry(py).interpreter, py.interpreter);
+  assert.equal(toRecordEntry(py).interpreter.name, "python3");
+  const node = runProbeSpec({
+    sink: "url-authority",
+    entry: CLI("refuser"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.equal(node.interpreter, null);
+  assert.equal(toRecordEntry(node).interpreter, null);
+});
+
+test("cli entry (python): every .py result path returns the JS form's key set", () => {
+  const expected = Object.keys(
+    runProbeSpec({
+      sink: "url-authority",
+      entry: entry("engaging-control"),
+      cases: CASES,
+    }),
+  ).sort();
+  const paths = {
+    success: { entry: PY("cli-refuser"), argv: HOST_ARGV },
+    "bad-argv": { entry: PY("cli-refuser") },
+    crashed: { entry: PY("cli-crasher"), argv: HOST_ARGV },
   };
   for (const [name, spec] of Object.entries(paths)) {
     const r = runProbeSpec({ sink: "url-authority", cases: CASES, ...spec });
@@ -5688,5 +6316,346 @@ test("shell-argv entry: --fake-gh is accepted and its gh answers the run (task.1
     assert.equal(toRecordEntry(r).fake_gh, join(root, "fake"));
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// ── task.190: refuse what the engine cannot score ─────────────────────────────
+
+// runMain (above, with the cli: tests) captures main()'s stdout and stderr.
+
+/** A temp dir holding a record path and a cases file; removed by the caller. */
+function recordFixture(cases) {
+  const dir = mkdtempSync(join(tmpdir(), "probe-t190-"));
+  const record = join(dir, "run.json");
+  const casesFile = join(dir, "cases.json");
+  if (cases !== undefined) writeFileSync(casesFile, JSON.stringify(cases));
+  return { dir, record, casesFile };
+}
+
+const noRecord = (record) =>
+  !existsSync(record) && !existsSync(recordEntriesDir(record));
+
+test("validateCases: an unknown direction is refused, naming the case and the accepted values (obs #201)", () => {
+  const bad = validateCases([
+    CASES[0],
+    { ...CASES[3], id: "t.benign", direction: "benign" },
+  ]);
+  assert.deepEqual(bad, {
+    id: "t.benign",
+    field: "direction",
+    value: "benign",
+    accepted: [...DIRECTIONS],
+  });
+});
+
+test("validateCases: a present sink outside SINKS is refused; an absent sink is not (control)", () => {
+  assert.deepEqual(validateCases([{ ...CASES[0], sink: "nope" }]), {
+    id: CASES[0].id,
+    field: "sink",
+    value: "nope",
+    accepted: [...SINKS],
+  });
+  // Control: sink is optional on a case — the run's sink applies. The check
+  // must not over-fire on an absent optional field.
+  const { sink, ...noSink } = CASES[3];
+  assert.equal(sink, "url-authority");
+  assert.equal(validateCases([{ ...noSink, direction: "legitimate" }]), null);
+  assert.equal(validateCases(CASES), null);
+});
+
+test("validateCases: a null sink is absent, as the readers' `c.sink ?? sink` treat it (CR-3)", () => {
+  assert.equal(validateCases([{ ...CASES[0], sink: null }]), null);
+});
+
+test("describeBadCase never throws: a BigInt or circular value still renders (CR-2)", () => {
+  const circular = {};
+  circular.self = circular;
+  for (const value of [10n, circular]) {
+    const line = describeBadCase({
+      id: "c1",
+      field: "sink",
+      value,
+      accepted: ["a"],
+    });
+    assert.match(line, /^case "c1" has sink .+; accepted: a$/);
+  }
+  // Control: a JSON value renders as before.
+  assert.equal(
+    describeBadCase({
+      id: "c1",
+      field: "sink",
+      value: "nope",
+      accepted: ["a"],
+    }),
+    'case "c1" has sink "nope"; accepted: a',
+  );
+});
+
+test("validateCases: a non-array file and a non-object case are refused; an id-less case is named by index", () => {
+  assert.equal(validateCases({ cases: [] }).field, "cases");
+  assert.deepEqual(validateCases([CASES[0], "x"]), {
+    id: "#1",
+    field: "case",
+    value: "string",
+    accepted: ["object"],
+  });
+  assert.equal(validateCases([null]).value, "null");
+  assert.equal(validateCases([{ direction: "sideways" }]).id, "#0");
+});
+
+test("validateCases: every case of every sink's corpus passes — a failure is a corpus bug", () => {
+  let n = 0;
+  for (const sink of SINKS) {
+    const cases = corpusFor(sink);
+    n += cases.length;
+    assert.equal(validateCases(cases), null, sink);
+  }
+  assert.ok(n > 0, "the corpus loop measured something");
+});
+
+test("CLI: a cases file with an unknown direction exits 2 bad-cases, runs nothing and writes no record", () => {
+  const fx = recordFixture([
+    ...CASES,
+    { ...CASES[3], id: "t.benign", direction: "benign" },
+  ]);
+  try {
+    const r = runMain([
+      "--entry",
+      entry("engaging-control"),
+      "--cases-file",
+      fx.casesFile,
+      "--record",
+      fx.record,
+    ]);
+    assert.equal(r.rc, 2, r.err);
+    assert.match(
+      r.err,
+      /^bad-cases: case "t\.benign" has direction "benign"; accepted: hostile, legitimate\n$/,
+    );
+    assert.equal(r.out, "", "nothing ran: no verdict line");
+    assert.ok(noRecord(fx.record), "no record written");
+  } finally {
+    rmSync(fx.dir, { recursive: true, force: true });
+  }
+});
+
+test("CLI: a case sink outside SINKS exits 2 bad-cases with the sink list; --json prints the reason", () => {
+  const fx = recordFixture([{ ...CASES[0], sink: "nope" }]);
+  try {
+    const r = runMain([
+      "--entry",
+      entry("engaging-control"),
+      "--cases-file",
+      fx.casesFile,
+      "--record",
+      fx.record,
+      "--json",
+    ]);
+    assert.equal(r.rc, 2, r.err);
+    assert.match(
+      r.err,
+      new RegExp(`has sink "nope"; accepted: ${SINKS.join(", ")}`),
+    );
+    const j = JSON.parse(r.out);
+    assert.equal(j.reason, "bad-cases");
+    assert.match(j.detail, /case "t\.slash" has sink "nope"/);
+    assert.ok(noRecord(fx.record));
+  } finally {
+    rmSync(fx.dir, { recursive: true, force: true });
+  }
+});
+
+test("CLI control: a valid cases file runs and records as before", () => {
+  const fx = recordFixture(CASES);
+  try {
+    const r = runMain([
+      "--entry",
+      entry("engaging-control"),
+      "--cases-file",
+      fx.casesFile,
+      "--record",
+      fx.record,
+    ]);
+    assert.equal(r.rc, 0, r.err);
+    assert.match(r.out, /^engages /);
+    const rec = readRecord(fx.record);
+    assert.equal(rec.controls.length, 1);
+    assert.equal(rec.controls[0].executed, CASES.length);
+    assert.deepEqual(rec.controls[0].declined_cases, []);
+  } finally {
+    rmSync(fx.dir, { recursive: true, force: true });
+  }
+});
+
+test("runProbeSpec: supplied cases the scorer cannot place are declined bad-cases before any case runs", () => {
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: entry("engaging-control"),
+    cases: [{ ...CASES[0], direction: "benign" }],
+  });
+  assert.equal(r.verdict, "unverifiable");
+  assert.equal(r.reason, "bad-cases");
+  assert.equal(r.executed, 0);
+  assert.match(
+    r.declined[0].detail,
+    /has direction "benign"; accepted: hostile, legitimate/,
+  );
+});
+
+test("runProbeSpec: a BigInt or circular case value is declined bad-cases, not thrown (CR-2)", () => {
+  const circular = {};
+  circular.self = circular;
+  for (const sink of [10n, circular]) {
+    const r = runProbeSpec({
+      sink: "url-authority",
+      entry: entry("engaging-control"),
+      cases: [{ ...CASES[0], sink }],
+    });
+    assert.equal(r.reason, "bad-cases");
+    assert.equal(r.executed, 0);
+  }
+});
+
+test("CLI: a missing entry exits 2 entry-not-found and writes no record, for every entry form with a path (obs #211)", () => {
+  const missing = `${FIXTURES}/t190-does-not-exist`;
+  const forms = [
+    ["js", [`${missing}.mjs#validateHost`]],
+    ["shell", [`shell:${missing}.sh`]],
+    ["shell-fn", [`shell-fn:${missing}.sh#fn`]],
+    ["cli", [`cli:${missing}.mjs`, "--argv", '["{input}"]']],
+    ["shell-argv", [`shell-argv:${missing}.sh`, "--argv", '["{input}"]']],
+    ["fence", [`fence:${missing}.md#Heading`, "--slot", "<x>"]],
+  ];
+  for (const [form, [ent, ...rest]] of forms) {
+    const fx = recordFixture();
+    try {
+      const r = runMain([
+        "--sink",
+        "filename",
+        "--entry",
+        ent,
+        ...rest,
+        "--record",
+        fx.record,
+        "--json",
+        "--repo-root",
+        REPO_ROOT,
+      ]);
+      assert.equal(r.rc, 2, `${form}: ${r.err}`);
+      assert.ok(r.err.startsWith("entry-not-found: "), `${form}: ${r.err}`);
+      assert.ok(r.err.includes("t190-does-not-exist"), form);
+      assert.ok(r.err.includes(`(repo root ${REPO_ROOT})`), form);
+      assert.equal(JSON.parse(r.out).reason, "entry-not-found", form);
+      assert.ok(noRecord(fx.record), `${form}: no record written`);
+    } finally {
+      rmSync(fx.dir, { recursive: true, force: true });
+    }
+  }
+});
+
+test("CLI: a resolveEntry failure is left to runProbeSpec — an escape is still declined, not refused as missing", () => {
+  const r = runMain([
+    "--sink",
+    "url-authority",
+    "--entry",
+    "../outside.mjs#f",
+    "--json",
+    "--repo-root",
+    REPO_ROOT,
+  ]);
+  assert.equal(r.rc, 1, r.err);
+  assert.equal(JSON.parse(r.out).reason, "outside-repo-root");
+});
+
+test("toRecordEntry carries each declined case's id, reason and detail beside the count (obs #207)", () => {
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: entry("not-a-function"),
+    cases: CASES,
+  });
+  assert.equal(r.declined.length, 1);
+  const fx = recordFixture();
+  try {
+    recordRun(fx.record, r, { name: "t190" });
+    const row = readRecord(fx.record).controls[0];
+    assert.equal(row.declined, 1);
+    assert.deepEqual(row.declined_cases, [
+      {
+        id: r.declined[0].id,
+        reason: r.declined[0].reason,
+        detail: r.declined[0].detail,
+      },
+    ]);
+    assert.match(row.declined_cases[0].detail, /not a function/);
+  } finally {
+    rmSync(fx.dir, { recursive: true, force: true });
+  }
+});
+
+/**
+ * Copy the engine and its sibling imports, walked transitively from the source,
+ * into `dest`. A hand list of the imports goes stale the first time the engine
+ * gains one (review-security.test.js, task.128).
+ */
+function copyEngine(dest) {
+  const src = join(__dirname, "..");
+  const seen = new Set();
+  const walk = (f) => {
+    if (seen.has(f)) return;
+    seen.add(f);
+    const text = readFileSync(join(src, f), "utf8");
+    for (const m of text.matchAll(
+      /(?:from|import)\s+["']\.\/([A-Za-z0-9._-]+\.m?js)["']/g,
+    )) {
+      walk(m[1]);
+    }
+  };
+  walk("security-probe.mjs");
+  mkdirSync(dest, { recursive: true });
+  for (const f of seen) cpSync(join(src, f), join(dest, f));
+  return join(dest, "security-probe.mjs");
+}
+
+/** defaultRepoRoot() as the copy at `engine` computes it, run from `cwd`. */
+function rootFrom(engine, cwd, env = process.env) {
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--input-type=module",
+      "-e",
+      "const m = await import(process.argv[1]); process.stdout.write(m.defaultRepoRoot());",
+      pathToFileURL(engine).href,
+    ],
+    { cwd, encoding: "utf8", env },
+  );
+  assert.equal(r.status, 0, r.stderr);
+  return r.stdout;
+}
+
+test("defaultRepoRoot: a bundled copy defaults to the git top level; a shared/resources copy to two up; no git falls back (obs #211)", () => {
+  const base = realpathSync(mkdtempSync(join(tmpdir(), "probe-t190-root-")));
+  try {
+    const repo = join(base, "repo");
+    mkdirSync(repo);
+    const init = spawnSync("git", ["init", "-q", repo], { encoding: "utf8" });
+    assert.equal(init.status, 0, init.stderr);
+    // A bundled copy: two levels up is <repo>/skills, not the repository.
+    const bundled = copyEngine(join(repo, "skills", "x", "references"));
+    assert.equal(rootFrom(bundled, repo), repo);
+    // A source-tree copy under a nested shared/resources: two levels up, which
+    // here is NOT the git top level — so the result tells the branches apart.
+    const source = copyEngine(join(repo, "sub", "shared", "resources"));
+    assert.equal(rootFrom(source, repo), join(repo, "sub"));
+    // Outside any git checkout: git fails and the copy falls back to two up.
+    const loose = copyEngine(join(base, "loose", "a", "references"));
+    const env = { ...process.env, GIT_CEILING_DIRECTORIES: base };
+    delete env.GIT_DIR;
+    delete env.GIT_WORK_TREE;
+    assert.equal(
+      rootFrom(loose, join(base, "loose"), env),
+      join(base, "loose"),
+    );
+  } finally {
+    rmSync(base, { recursive: true, force: true });
   }
 });
