@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa
+status: closed
 severity: medium
 priority: P2
 updated: 2026-10-19
@@ -12,7 +12,7 @@ updated: 2026-10-19
 **Bug ID**: TASK-192-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 2 refute pass, from code review CR-1)
 **Date Found**: 2026-10-19
 
@@ -86,3 +86,4 @@ gate as having no row of its own. Corpus: 269 cycles follow a fix, and each wrot
 | 2026-10-19 | New | qa-task | Raised by task.192.qa.2.read-back-checks-this-cycles-verdict.md |
 | 2026-10-19 | In Progress | qa-fix | Investigation started |
 | 2026-10-19 | Ready for QA | qa-fix | Fixed in verdictProblems |
+| 2026-10-19 | Closed | qa-task | Verified by task.192.qa.3.read-back-checks-this-cycles-verdict.md |
