@@ -1198,9 +1198,13 @@ test("bug.7: a placeholder present keeps it a finding, with the --bind remedy", 
   const f = report.findings.find((x) => x.kind === "zero-blocks-executed");
   assert.ok(f, "an under-configured run is still a finding");
   assert.equal(f.confidence, "medium");
+  // task.191: the remedy names the flag that fills THIS kind of placeholder.
+  // `echo {id}` is a template slot, which only --slot can fill; --bind binds a
+  // shell variable and never could (obs #186). The --bind arm is held by
+  // "T191 zero-blocks-executed names --bind for unbound variables".
   assert.match(
     f.detail,
-    /--bind/,
+    /--slot NAME=VALUE for the template slots/,
     "the remedy must be stated — this is the branch where one exists",
   );
 
@@ -2889,4 +2893,497 @@ test("QA-28: a --copy-as DEST whose name begins with two dots is seeded, not ref
     copyAs: [{ src: join(root, "docs"), dest: "..seed" }],
   });
   assert.deepEqual(r.findings, []);
+});
+
+// ── task.191: --slot, helper calls, --diff-base ───────────────────────────────
+
+const { applySlots, parseDiffRanges, changedLineRanges, MAX_HELPER_DEPTH } =
+  await import(MODULE);
+
+test("T191 --slot: a {NAME} block runs with the slot filled, and is placeholder naming it without", () => {
+  const root = docsFixture();
+  const file = join(tmp(), "SKILL.md");
+  writeFileSync(file, bash("ls {task-directory}/a.md"));
+  const copyAs = [{ src: join(root, "docs"), dest: "docs" }];
+
+  const filled = executeFile(file, {
+    allowZsh: false,
+    copyAs,
+    slots: new Map([["task-directory", "docs/tasks"]]),
+  });
+  assert.equal(filled.counts.runnable, 1);
+  assert.equal(filled.results[0].skipped, false);
+  assert.equal(filled.results[0].runs.bash.stdout, "docs/tasks/a.md");
+  assert.deepEqual(filled.findings, []);
+
+  const unfilled = executeFile(file, { allowZsh: false, copyAs });
+  assert.equal(unfilled.results[0].klass, "placeholder");
+  assert.equal(unfilled.results[0].reason, "template slot: {task-directory}");
+});
+
+test("T191 --slot: the reason lists every unfilled slot, brace and angle", () => {
+  // `<id>` last: a `>` followed by more text is a write redirection, which the
+  // classifier decides first (pre-existing, and correct for `cat <a> b`).
+  assert.deepEqual(
+    classifyBlock("echo {task-directory} {task-directory} <id>"),
+    {
+      klass: "placeholder",
+      reason: "template slot: {task-directory}, <id>",
+    },
+  );
+});
+
+test("T191 --slot: a slot value that adds a write is refused — slots are filled BEFORE classification", () => {
+  // Mutation proof: classify block.code instead of the filled code and this
+  // block runs `rm -rf x` inside the copy instead of being refused.
+  const file = join(tmp(), "SKILL.md");
+  writeFileSync(file, bash("ls {dir}"));
+  const r = executeFile(file, {
+    allowZsh: false,
+    slots: new Map([["dir", "docs; rm -rf x"]]),
+  });
+  assert.equal(r.results[0].klass, "mutating");
+  assert.match(r.results[0].reason, /rm -rf/);
+  assert.equal(r.results[0].skipped, true);
+});
+
+test("T191 applySlots: literal text, never a replacement pattern, and never a shell expansion", () => {
+  const slots = new Map([
+    ["d", "a$&b$'c"],
+    ["id", "7"],
+  ]);
+  assert.equal(
+    applySlots("ls {d}; echo <id>; echo ${d}; cat 2>&1 <id>", slots),
+    "ls a$&b$'c; echo 7; echo ${d}; cat 2>&1 7",
+  );
+  // A slot name holding regex metacharacters is matched literally.
+  assert.equal(
+    applySlots("x {a|b} {aXb}", new Map([["a|b", "Y"]])),
+    "x Y {aXb}",
+  );
+});
+
+test("T191 --slot CLI: NAME=VALUE validated like --bind, and the name must be a slot name", () => {
+  const file = join(tmp(), "SKILL.md");
+  writeFileSync(file, bash("echo {id}"));
+  assert.equal(main(["--file", file, "--slot", "noequals"]).exitCode, 2);
+  assert.equal(main(["--file", file, "--slot", "=x"]).exitCode, 2);
+  assert.equal(main(["--file", file, "--slot", "9bad=x"]).exitCode, 2);
+  const ok = main(["--file", file, "--no-zsh", "--slot", "id=7"]);
+  assert.equal(ok.exitCode, 0);
+  assert.equal(ok.report.results[0].runs.bash.stdout, "7");
+});
+
+test("T191 zero-blocks-executed names --bind for unbound variables, --slot for slots", () => {
+  const file = join(tmp(), "SKILL.md");
+  writeFileSync(
+    file,
+    md(bash("git push origin main"), bash('echo "$UNSET_X"')),
+  );
+  const f = executeFile(file, { allowZsh: false }).findings.find(
+    (x) => x.kind === "zero-blocks-executed",
+  );
+  assert.match(f.detail, /--bind NAME=VALUE for the unbound variables/);
+  assert.doesNotMatch(f.detail, /--slot/);
+});
+
+// Helper fixture: a temp copy holding helpers the rule must admit and refuse.
+function helperFixture() {
+  const root = tmp();
+  const refs = join(root, ".agents", "skills", "s", "references");
+  mkdirSync(refs, { recursive: true });
+  mkdirSync(join(root, "sub"), { recursive: true });
+  const outside = join(tmp(), "outside.sh");
+  writeFileSync(outside, "#!/usr/bin/env bash\necho outside\n");
+  writeFileSync(
+    join(refs, "read.sh"),
+    [
+      "#!/usr/bin/env bash",
+      "set -u",
+      "# usage: read.sh <dir>",
+      "my_fn() {",
+      '  printf "fn:%s\\n" "$1"',
+      "}",
+      "count_lines() {",
+      '  grep -c . "$1"',
+      "}",
+    ].join("\n"),
+  );
+  writeFileSync(join(refs, "write.sh"), 'mv "$1" "$2"\n');
+  writeFileSync(
+    join(refs, "sources-write.sh"),
+    "source .agents/skills/s/references/write.sh\n",
+  );
+  writeFileSync(
+    join(refs, "deep1.sh"),
+    "source .agents/skills/s/references/deep2.sh\n",
+  );
+  writeFileSync(
+    join(refs, "deep2.sh"),
+    "source .agents/skills/s/references/deep3.sh\n",
+  );
+  writeFileSync(join(refs, "deep3.sh"), "echo deep\n");
+  writeFileSync(join(refs, "moves.sh"), "cd sub\n");
+  writeFileSync(join(refs, "notes.txt"), "echo not a helper\n");
+  symlinkSync(outside, join(refs, "out.sh"));
+  writeFileSync(join(root, "read.sh"), "echo root\n");
+  writeFileSync(join(root, "sub", "read.sh"), "mv a b\n");
+  return root;
+}
+
+const R = ".agents/skills/s/references";
+
+test("T191 helpers: bash / source of a runnable helper inside the copy is runnable, and sourced functions are recognised", () => {
+  const root = helperFixture();
+  const at = (code) => classifyBlock(code, {}, { helperRoot: root });
+  assert.deepEqual(at(`bash ${R}/read.sh x`), {
+    klass: "runnable",
+    reason: null,
+  });
+  assert.deepEqual(at(`sh ${R}/read.sh x`), {
+    klass: "runnable",
+    reason: null,
+  });
+  assert.deepEqual(at(`source ${R}/read.sh || exit 1\nmy_fn x`), {
+    klass: "runnable",
+    reason: null,
+  });
+  assert.deepEqual(at(`. ./${R}/read.sh\nmy_fn x`), {
+    klass: "runnable",
+    reason: null,
+  });
+  // Run, not only classified: the block executes in the copy and the function runs.
+  const file = join(tmp(), "SKILL.md");
+  writeFileSync(file, bash(`source ${R}/read.sh || exit 1\nmy_fn x`));
+  const r = executeFile(file, {
+    allowZsh: false,
+    copyAs: [{ src: join(root, ".agents"), dest: ".agents" }],
+  });
+  assert.equal(r.results[0].skipped, false);
+  assert.equal(r.results[0].runs.bash.stdout, "fn:x");
+});
+
+test("T191 helpers: a function is known only once its helper is SOURCED, never through bash", () => {
+  const root = helperFixture();
+  const at = (code) => classifyBlock(code, {}, { helperRoot: root });
+  assert.match(at("my_fn x").reason, /unrecognised-command: my_fn/);
+  assert.match(
+    at(`bash ${R}/read.sh\nmy_fn x`).reason,
+    /unrecognised-command: my_fn/,
+  );
+});
+
+test("T191 helpers: every control stays refused", () => {
+  const root = helperFixture();
+  const at = (code) => classifyBlock(code, {}, { helperRoot: root });
+  const refused = (code, re) => {
+    const v = at(code);
+    assert.equal(v.klass, "mutating", code);
+    assert.match(v.reason, re, code);
+  };
+  // A writing helper — its own reason carried. Mutation proof: drop the
+  // "helper text classifies runnable" check and this control goes green.
+  refused(
+    `bash ${R}/write.sh a b`,
+    /^helper \.agents\/skills\/s\/references\/write\.sh: mutating: unrecognised-command: mv/,
+  );
+  // Depth 2: a helper that sources a writing helper.
+  refused(
+    `source ${R}/sources-write.sh`,
+    /sources-write\.sh: mutating: helper .*write\.sh: mutating/,
+  );
+  // Deeper than MAX_HELPER_DEPTH.
+  assert.equal(MAX_HELPER_DEPTH, 2);
+  refused(`source ${R}/deep1.sh`, /nesting deeper than 2/);
+  // Not literal.
+  refused('source "$X"', /not a literal path/);
+  refused("source $X", /not a literal path/);
+  refused(`bash ${R}/*.sh`, /not a literal path/);
+  refused(`bash -c 'mv a b'`, /not a literal path/);
+  // No slash — the shell would search PATH.
+  refused("source read.sh", /no slash/);
+  // A link out of the copy, and a path that climbs out.
+  refused(`bash ${R}/out.sh`, /resolves outside the working copy/);
+  refused(`bash ${R}/../../../../../outside.sh`, /not found|outside/);
+  // Not a .sh file, and missing.
+  refused(`source ${R}/notes.txt`, /not a regular \.sh file/);
+  refused(`bash ${R}/missing.sh`, /not found in the working copy/);
+  // Admission is per invocation: a runnable helper does not license the next call.
+  refused(`bash ${R}/read.sh; bash ${R}/write.sh a b`, /write\.sh: mutating/);
+});
+
+test("T191 helpers: a block that changes directory gets no helper recognition (review 1, I1)", () => {
+  const root = helperFixture();
+  const at = (code) => classifyBlock(code, {}, { helperRoot: root });
+  // ./read.sh at the root is runnable, but after `cd sub` the shell runs
+  // sub/read.sh, which writes — the file the classifier read is not the one run.
+  assert.deepEqual(at("bash ./read.sh"), { klass: "runnable", reason: null });
+  for (const code of [
+    "cd sub && bash ./read.sh",
+    "bash ./read.sh; cd sub",
+    `source ${R}/moves.sh\nbash ./read.sh`,
+  ]) {
+    assert.deepEqual(
+      at(code),
+      { klass: "mutating", reason: "helper call after a directory change" },
+      code,
+    );
+  }
+  // `cd` alone, with no helper call, is unchanged.
+  assert.equal(at("cd sub && ls").klass, "runnable");
+});
+
+test("T191 helpers: without a helper root the runner words stay unrecognised, as before", () => {
+  const root = helperFixture();
+  assert.equal(
+    classifyBlock(`bash ${join(root, R)}/read.sh`).reason,
+    "unrecognised-command: bash (fail-closed)",
+  );
+  assert.match(
+    classifyBlock(`source ${R}/read.sh`).reason,
+    /unrecognised-command: source/,
+  );
+});
+
+test("T191 helpers: a symlinked .agents/skills (this repository's layout) is refused; a real copy runs", () => {
+  const repo = tmp();
+  const refs = join(repo, "skills", "s", "references");
+  mkdirSync(refs, { recursive: true });
+  writeFileSync(join(refs, "read.sh"), "echo ok\n");
+  mkdirSync(join(repo, ".agents"));
+  symlinkSync("../skills", join(repo, ".agents", "skills"));
+  const file = join(tmp(), "SKILL.md");
+  writeFileSync(file, bash(`bash ${R}/read.sh`));
+
+  const linked = executeFile(file, {
+    allowZsh: false,
+    copyAs: [{ src: join(repo, ".agents"), dest: ".agents" }],
+  });
+  assert.equal(linked.results[0].klass, "mutating");
+  assert.match(
+    linked.results[0].reason,
+    /resolves outside the working copy|not found/,
+  );
+
+  const real = executeFile(file, {
+    allowZsh: false,
+    copyAs: [{ src: join(repo, "skills"), dest: ".agents/skills" }],
+  });
+  assert.equal(real.results[0].skipped, false);
+  assert.equal(real.results[0].runs.bash.stdout, "ok");
+});
+
+test("T191 helpers: in helper mode the shipped read-only helpers are runnable and the writers are not", () => {
+  const dir = join(__dirname, "..");
+  const asHelper = (f) =>
+    classifyBlock(
+      readFileSync(join(dir, f), "utf8"),
+      {},
+      {
+        helperRoot: dir,
+        depth: 1,
+        helperMode: true,
+      },
+    ).klass;
+  assert.equal(asHelper("qa-cycle.sh"), "runnable");
+  assert.equal(asHelper("newest-numbered.sh"), "runnable");
+  assert.equal(asHelper("advance-pipeline-lock.sh"), "mutating");
+  assert.equal(asHelper("set-qa-phase.sh"), "mutating");
+});
+
+test("T191 helpers: the shipped helper population — writers stay refused (measured, not a contract)", () => {
+  // The population the plan measured: every shared/resources/*.sh but *.test.sh.
+  // The figures are recorded here, by the test that reads them, not in prose.
+  const dir = join(__dirname, "..");
+  const files = readdirSync(dir).filter(
+    (f) => f.endsWith(".sh") && !f.endsWith(".test.sh"),
+  );
+  assert.ok(
+    files.length >= 20,
+    `population too small to mean anything: ${files.length}`,
+  );
+  const runnable = files
+    .filter(
+      (f) =>
+        classifyBlock(
+          readFileSync(join(dir, f), "utf8"),
+          {},
+          {
+            helperRoot: dir,
+            depth: 1,
+            helperMode: true,
+          },
+        ).klass === "runnable",
+    )
+    .sort();
+  // A NEW runnable helper is fine — read it, then add it here. A writer
+  // appearing here is a fail-open.
+  assert.deepEqual(runnable, [
+    "bitbucket-auth.sh",
+    "newest-numbered.sh",
+    "qa-cycle.sh",
+  ]);
+});
+
+// ── the three incidents' shapes, now executed ────────────────────────────────
+
+function incidentCopy() {
+  const root = tmp();
+  const refs = join(root, ".agents", "skills", "x", "references");
+  mkdirSync(refs, { recursive: true });
+  for (const f of ["qa-cycle.sh", "newest-numbered.sh"])
+    writeFileSync(
+      join(refs, f),
+      readFileSync(join(__dirname, "..", f), "utf8"),
+    );
+  const task = join(root, "docs", "tasks", "task.1.x");
+  mkdirSync(task, { recursive: true });
+  writeFileSync(join(task, "task.1.plan.x.md"), "plan\n");
+  writeFileSync(join(task, "task.1.gate.2.x.yml"), "gate: PASS\n");
+  writeFileSync(join(task, "task.1.review.1.x.md"), "r\n");
+  return root;
+}
+
+test("T191 incidents: task.147's slot block, task.158's bash helper call and task.186's sourced helper all execute", () => {
+  const root = incidentCopy();
+  const file = join(tmp(), "SKILL.md");
+  writeFileSync(
+    file,
+    md(
+      // task.147 — develop-pipeline-step-3 plan discovery, slots only.
+      bash(
+        'find {task-directory} -maxdepth 1 -name "task.{id}.plan.*.md" 2>/dev/null | head -1',
+      ),
+      // task.158 — the canonical helper call.
+      bash("bash .agents/skills/x/references/qa-cycle.sh {task-directory}"),
+      // task.186 — source a numbering helper, then call its function.
+      bash(
+        [
+          "source .agents/skills/x/references/newest-numbered.sh || exit 1",
+          'REVIEW_N=$(next_numbered "{task-directory}" review -name "task.{id}.review.*.md") || exit 1',
+          'echo "$REVIEW_N"',
+        ].join("\n"),
+      ),
+    ),
+  );
+  const r = executeFile(file, {
+    allowZsh: false,
+    copyAs: [
+      { src: join(root, ".agents"), dest: ".agents" },
+      { src: join(root, "docs"), dest: "docs" },
+    ],
+    slots: new Map([
+      ["task-directory", "docs/tasks/task.1.x"],
+      ["id", "1"],
+    ]),
+  });
+  assert.deepEqual(
+    r.results.map((x) => [x.klass, x.reason]),
+    [
+      ["runnable", null],
+      ["runnable", null],
+      ["runnable", null],
+    ],
+  );
+  assert.deepEqual(r.findings, []);
+  assert.deepEqual(
+    r.results.map((x) => x.runs.bash.stdout),
+    ["docs/tasks/task.1.x/task.1.plan.x.md", "2", "2"],
+  );
+});
+
+// ── --diff-base ───────────────────────────────────────────────────────────────
+
+test("T191 parseDiffRanges: additions, pure deletions and single-line hunks", () => {
+  assert.deepEqual(
+    parseDiffRanges(
+      [
+        "diff --git a/x b/x",
+        "@@ -3,0 +4,2 @@",
+        "+a",
+        "+b",
+        "@@ -9,2 +10,0 @@",
+        "-c",
+        "@@ -20 +20 @@",
+      ].join("\n"),
+    ),
+    [
+      [4, 5],
+      [10, 10],
+      [20, 20],
+    ],
+  );
+  assert.deepEqual(parseDiffRanges(""), []);
+});
+
+function gitRepoWithDoc(blocks) {
+  const repo = tmp();
+  const git = (...a) => {
+    const r = spawnSync("git", a, { cwd: repo, encoding: "utf8" });
+    assert.equal(r.status, 0, `git ${a.join(" ")}: ${r.stderr}`);
+  };
+  git("init", "-q");
+  git("config", "user.email", "t@example.com");
+  git("config", "user.name", "t");
+  git("config", "commit.gpgsign", "false");
+  const file = join(repo, "SKILL.md");
+  writeFileSync(file, md(...blocks.map(bash)) + "\n");
+  git("add", ".");
+  git("commit", "-q", "-m", "base");
+  return { repo, file };
+}
+
+test("T191 --diff-base: changed blocks are counted apart; none executed → changed-blocks-not-executed naming the line", () => {
+  const { file } = gitRepoWithDoc(["echo one", "echo two"]);
+  // Change only the SECOND block, to one the classifier refuses.
+  writeFileSync(
+    file,
+    md(bash("echo one"), bash("git push origin main")) + "\n",
+  );
+  const r = executeFile(file, { allowZsh: false, diffBase: "HEAD" });
+  assert.deepEqual(
+    r.results.map((x) => x.changed),
+    [false, true],
+  );
+  assert.deepEqual(r.changed, {
+    total: 1,
+    runnable: 0,
+    placeholder: 0,
+    mutating: 1,
+    executed: 0,
+  });
+  const f = r.findings.find((x) => x.kind === "changed-blocks-not-executed");
+  assert.ok(f, "every changed block was refused — that must be a finding");
+  assert.equal(f.confidence, "medium");
+  assert.deepEqual(f.blocks, [
+    { line: 5, klass: "mutating", reason: r.results[1].reason },
+  ]);
+  // Reported in ADDITION to the file-level outcome, never instead of it.
+  assert.equal(r.counts.runnable, 1);
+});
+
+test("T191 --diff-base: a changed block that ran is no finding; without the flag nothing changes", () => {
+  const { file } = gitRepoWithDoc(["echo one", "echo two"]);
+  writeFileSync(file, md(bash("echo one"), bash("echo TWO")) + "\n");
+  const r = executeFile(file, { allowZsh: false, diffBase: "HEAD" });
+  assert.equal(r.changed.total, 1);
+  assert.equal(r.changed.executed, 1);
+  assert.equal(
+    r.findings.find((x) => x.kind === "changed-blocks-not-executed"),
+    undefined,
+  );
+
+  const plain = executeFile(file, { allowZsh: false });
+  assert.equal("changed" in plain, false);
+  assert.equal("changed" in plain.results[0], false);
+});
+
+test("T191 --diff-base: a bad revision is exit 2, bad-diff-base, naming the revision", () => {
+  const { file } = gitRepoWithDoc(["echo one"]);
+  const r = main(["--file", file, "--diff-base", "no-such-rev-191"]);
+  assert.equal(r.exitCode, 2);
+  assert.match(r.error, /^bad-diff-base: .*no-such-rev-191/);
+  assert.equal(main(["--file", file, "--diff-base", "--cached"]).exitCode, 2);
+  assert.equal(main(["--file", file, "--diff-base"]).exitCode, 2);
+  assert.throws(() => changedLineRanges(file, "-x"), /bad-diff-base/);
 });

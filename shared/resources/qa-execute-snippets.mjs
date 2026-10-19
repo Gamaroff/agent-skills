@@ -9,6 +9,12 @@
  * Options:
  *   --file <path>        markdown file to analyse (required)
  *   --bind NAME=VALUE    bind a caller-supplied variable; repeatable
+ *   --slot NAME=VALUE    fill the template slot {NAME} / <NAME> with VALUE before
+ *                        the block is classified; repeatable (obs #186)
+ *   --diff-base <rev>    mark the blocks whose lines `git diff <rev> -- <file>`
+ *                        touches, count them apart, and report
+ *                        `changed-blocks-not-executed` when none of them ran.
+ *                        An untracked file has no diff, so no block is changed
  *   --copy <dir>         seed the temp working directory from this directory
  *                        (its CONTENTS land at the temp root; linked git
  *                        worktrees nested inside it are not copied)
@@ -20,6 +26,10 @@
  *                        `find docs/tasks …` (obs #143)
  *   --timeout <ms>       per-block, per-shell timeout (default 10000)
  *   --no-zsh             force the bash arm only (testing / mutation proving)
+ *
+ * Helper calls (obs #219, #278): `bash <path>.sh`, `sh`, `source` and `.` run
+ * only when the helper is a literal file inside the temp copy whose own text
+ * classifies runnable — see `resolveHelperCall`.
  *   --json               emit one JSON object on stdout
  *
  * Exit codes (repository convention):
@@ -784,6 +794,47 @@ const PLACEHOLDER_PATTERNS = [
   /(?<![<>&\w])<[A-Za-z][\w -]*>/,
 ];
 
+/** The grammar a slot name must have — the brace pattern's, which the angle one's is a subset of. */
+const SLOT_NAME = /^[A-Za-z][\w .:|/-]*$/;
+const ANGLE_SLOT_NAME = /^[A-Za-z][\w -]*$/;
+
+const escapeRegExp = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Fill template slots with literal text (obs #186). `--bind` binds a SHELL
+ * variable, which can never satisfy `{task-directory}`; this replaces the text.
+ *
+ * The patterns are PLACEHOLDER_PATTERNS' own, with the name fixed, so what counts
+ * as a slot here and what classifies as one there cannot disagree. The value is
+ * inserted by a replacer function, never a replacement string, so a `$&` or
+ * `$'` in it is text. Slots are filled BEFORE classification: a value that adds a
+ * write (`; rm -rf x`) is then caught by the same rules as written code.
+ */
+export function applySlots(code, slots) {
+  if (!slots || slots.size === 0) return code;
+  let out = code;
+  for (const [name, value] of slots) {
+    out = out.replace(
+      new RegExp(`(?<!\\$)\\{${escapeRegExp(name)}\\}`, "g"),
+      () => value,
+    );
+    if (ANGLE_SLOT_NAME.test(name))
+      out = out.replace(
+        new RegExp(`(?<![<>&\\w])<${escapeRegExp(name)}>`, "g"),
+        () => value,
+      );
+  }
+  return out;
+}
+
+/** Every unfilled slot in `text`: the `{…}` slots, then the `<…>` ones. */
+function unfilledSlots(text) {
+  const found = new Set();
+  for (const re of PLACEHOLDER_PATTERNS)
+    for (const m of text.matchAll(new RegExp(re.source, "g"))) found.add(m[0]);
+  return [...found];
+}
+
 /** Shell variables that are always available and never need binding. */
 const IMPLICIT_VARS = new Set([
   "?",
@@ -1100,6 +1151,18 @@ function gitSubcommand(tokensAfterGit) {
 
 /** The leading word of every simple command in the block. */
 export function commandWords(code) {
+  return commandInvocations(code)
+    .filter((inv) => !inv.keyword)
+    .map((inv) => inv.word);
+}
+
+/**
+ * Every simple command in the block: its leading word and the tokens after it,
+ * as the scan saw them (quoted spans collapsed to `""`). `commandWords` is this
+ * with the arguments and the `keyword: true` entries (`cd`) dropped; the
+ * helper rule needs both.
+ */
+function commandInvocations(code) {
   const stripped = stripNonCode(code)
     // Backslash line-continuations join one command across several lines. Splitting
     // on the raw newline first makes the continuation's tail look like a fresh
@@ -1191,9 +1254,13 @@ export function commandWords(code) {
       // it continues past `if`, the `[` of `if [ -n "$N" ]; then …` reaches this
       // point and must be read as the test builtin it is.
       if (SHELL_KEYWORDS.has(word)) {
-        // A keyword is never an invocation, so it is never pushed. What matters
-        // is whether a command can follow it in the SAME segment — see
-        // COMMAND_INTRODUCING_KEYWORDS.
+        // A keyword is never an invocation, so `commandWords` never reports it.
+        // `cd` is recorded all the same, marked: the helper rule must know the
+        // block moves its working directory (task.191 review 1, I1). What
+        // matters for the scan is whether a command can follow it in the SAME
+        // segment — see COMMAND_INTRODUCING_KEYWORDS.
+        if (DIRECTORY_CHANGERS.has(word))
+          words.push({ word, args: toks.slice(ti + 1), keyword: true });
         inCommandPosition = COMMAND_INTRODUCING_KEYWORDS.has(word);
         continue;
       }
@@ -1203,7 +1270,7 @@ export function commandWords(code) {
         // A tilde path, a glob that expands to a binary (`/usr/bin/[t]ouch`), a
         // variable command name — the scanner cannot say what any of them runs,
         // and "cannot say" must never resolve to "safe".
-        words.push("<unparseable>");
+        words.push({ word: "<unparseable>", args: [] });
         break;
       }
       tok = word;
@@ -1218,9 +1285,12 @@ export function commandWords(code) {
         // and was refused, and `case log in log) git checkout -- . ;; esac`
         // resolved to the allow-listed `git:log` and RAN — a fail-open.
         const rest = gitSubcommand(toks.slice(ti + 1));
-        words.push(rest ? `git:${rest}` : "git");
+        words.push({
+          word: rest ? `git:${rest}` : "git",
+          args: toks.slice(ti + 1),
+        });
       } else {
-        words.push(tok);
+        words.push({ word: tok, args: toks.slice(ti + 1) });
       }
       break; // the command word of this segment is found
     }
@@ -1254,12 +1324,151 @@ export function unboundVariables(code, bindings) {
   );
 }
 
+// ── Helper calls (obs #219, #278) ─────────────────────────────────────────────
+
+/** The words that run a FILE. They are known only through `resolveHelperCall`. */
+const HELPER_RUNNERS = new Set(["bash", "sh", "source", "."]);
+
+/** A block is depth 0; the helper it calls is 1; a helper that helper calls is 2. */
+export const MAX_HELPER_DEPTH = 2;
+
+/**
+ * Builtins that move the shell's working directory. A helper path is resolved
+ * against the temp copy's root, but the shell resolves it against its working
+ * directory, so after one of these the file the classifier read and the file the
+ * shell runs can differ (task.191 review 1, I1).
+ */
+const DIRECTORY_CHANGERS = new Set(["cd", "pushd", "popd"]);
+
+/** A helper path the classifier can resolve without a shell: no expansion of any kind. */
+const LITERAL_PATH = /^[\w.\/@+-]+$/;
+
+/**
+ * A helper's text has syntax a documented block does not, and none of it is a
+ * write. Rewrite exactly that syntax into shapes the scan already reads:
+ *
+ * - `name() {` and `function name {` define a function; the definition is not an
+ *   invocation, and `name` becomes a word this text may call.
+ * - A multi-line `case` arm pattern (`''|*[!0-9]*)`) is a glob, not a command.
+ * - `name+=(…)` is an assignment.
+ * - `shopt -s|-u <option>` sets a shell option.
+ *
+ * Nothing else is learned. Writers stay refused by the same rules as any block.
+ */
+function prepareHelperText(code) {
+  const names = new Set();
+  const codeOnly = stripProse(code);
+  for (const m of codeOnly.matchAll(
+    /^[ \t]*(?:function[ \t]+)?([A-Za-z_][\w-]*)[ \t]*\(\)/gm,
+  ))
+    names.add(m[1]);
+  for (const m of codeOnly.matchAll(
+    /^[ \t]*function[ \t]+([A-Za-z_][\w-]*)(?=[ \t]*\{)/gm,
+  ))
+    names.add(m[1]);
+
+  let inCase = false;
+  const lines = code.split("\n").map((raw) => {
+    let line = raw
+      .replace(/^([ \t]*)(?:function[ \t]+)?[A-Za-z_][\w-]*[ \t]*\(\)/, "$1")
+      .replace(/^([ \t]*)function[ \t]+[A-Za-z_][\w-]*(?=[ \t]*\{)/, "$1")
+      .replace(/(^|[\s;&|])([A-Za-z_][A-Za-z0-9_]*)\+=/g, "$1$2=")
+      .replace(/\bshopt(?:[ \t]+-[su])+\b/g, "true");
+    // Only a line that OPENS a case (`case … in` and nothing after) starts arm
+    // patterns; a `case` mentioned anywhere else starts nothing.
+    if (/^[ \t]*case\b[^;]*\bin[ \t]*$/.test(line)) inCase = true;
+    else if (/\besac\b/.test(line)) inCase = false;
+    else if (inCase)
+      line = line.replace(/^([ \t]*)(?:[^\s|()]*\|)+[^\s|()]*\)/, "$1_)");
+    return line;
+  });
+  return { code: lines.join("\n"), names };
+}
+
+/**
+ * Decide one `bash`/`sh`/`source`/`.` invocation. A helper runs only when ALL of:
+ *
+ *   1. its path is a literal (no `$`, glob, quote or substitution) holding a `/`
+ *      — without one, `source` and `bash` search PATH, and the file the shell
+ *      finds is not the file this function read;
+ *   2. it resolves, through realpath, to a regular `.sh` file inside the temp copy
+ *      — a link out of the copy is refused, not followed;
+ *   3. its own text, classified by this classifier in helper mode with the same
+ *      root, is `runnable`, to MAX_HELPER_DEPTH.
+ *
+ * The fourth condition — the block does not change directory — is the caller's,
+ * because it is a property of the whole block (`classifyInternal`).
+ *
+ * Returns `{ ok: true, sub }` or `{ ok: false, reason }`.
+ */
+function resolveHelperCall(inv, { helperRoot, depth, bindings }) {
+  const path = inv.args.find((a) => a !== "");
+  if (!path) return { ok: false, reason: `${inv.word} names no helper file` };
+  const refuse = (why) => ({ ok: false, reason: `helper ${path}: ${why}` });
+  if (path.startsWith("-") || !LITERAL_PATH.test(path))
+    return refuse("not a literal path");
+  if (!path.includes("/"))
+    return refuse("no slash in the path, so the shell would search PATH");
+  if (depth + 1 > MAX_HELPER_DEPTH)
+    return refuse(`helper nesting deeper than ${MAX_HELPER_DEPTH}`);
+  let real;
+  let rootReal;
+  try {
+    rootReal = realpathSync(helperRoot);
+    real = realpathSync(resolve(helperRoot, path));
+  } catch {
+    return refuse("not found in the working copy");
+  }
+  if (!isWithin(rootReal, real))
+    return refuse("resolves outside the working copy");
+  if (!real.endsWith(".sh") || !statSync(real).isFile())
+    return refuse("not a regular .sh file");
+  const sub = classifyInternal(readFileSync(real, "utf8"), bindings, {
+    helperRoot,
+    depth: depth + 1,
+    helperMode: true,
+  });
+  if (sub.klass !== "runnable") return refuse(`${sub.klass}: ${sub.reason}`);
+  return { ok: true, sub };
+}
+
 /**
  * Exactly one of: runnable | placeholder | mutating.
  * Order matters — `mutating` is decided before `placeholder`, so a block that is
  * both templated and dangerous is reported by its dangerous property.
+ *
+ * `helperRoot` (the temp copy) turns on the helper rule; without it `bash`,
+ * `sh`, `source` and `.` stay unrecognised, as they always were. `depth` and
+ * `helperMode` are this function's own recursion state.
  */
-export function classifyBlock(code, bindings = {}) {
+export function classifyBlock(code, bindings = {}, opts = {}) {
+  const { klass, reason } = classifyInternal(code, bindings, opts);
+  return { klass, reason };
+}
+
+/**
+ * `classifyBlock` plus what a caller sourcing this text needs: the functions it
+ * defines (its own and those of the helpers it sources) and whether it changes
+ * the working directory.
+ */
+function classifyInternal(
+  code,
+  bindings = {},
+  { helperRoot = null, depth = 0, helperMode = false } = {},
+) {
+  let defines = new Set();
+  if (helperMode) {
+    const prepared = prepareHelperText(code);
+    code = prepared.code;
+    defines = prepared.names;
+  }
+  const verdict = (klass, reason, changesDir = false) => ({
+    klass,
+    reason,
+    defines,
+    changesDir,
+  });
+
   // Scan prose-stripped code, not raw: a heredoc body or a comment that merely
   // MENTIONS `git push` is documentation. Scanning raw text would classify a doc
   // for its own examples and skip a block that is in fact safe to run.
@@ -1303,36 +1512,70 @@ export function classifyBlock(code, bindings = {}) {
     .replace(/\bcommand\s+-[vV]\b/g, "true")
     .replace(/(^|[\s;|&(])command\s+(?![-])/g, "$1");
 
-  const unknown = commandWords(codeForScan).filter((w) => {
-    if (COMMAND_RUNNERS.has(w)) return true; // CR-5/CR-6 — before the allow-list
-    if (SHELL_KEYWORDS.has(w)) return false;
-    if (SAFE_COMMANDS.has(w)) return false;
-    if (w.startsWith("git:")) return !SAFE_GIT_SUBCOMMANDS.has(w.slice(4));
-    return true;
-  });
+  const invocations = commandInvocations(codeForScan);
+  let changesDir = invocations.some((inv) => DIRECTORY_CHANGERS.has(inv.word));
+
+  // The helper rule. Each admitted invocation is known for ITSELF only: admitting
+  // `bash a.sh` must not license a later `bash b.sh`, so admission is per index,
+  // never per word.
+  const admitted = new Set();
+  if (helperRoot) {
+    const calls = invocations
+      .map((inv, i) => [inv, i])
+      .filter(([inv]) => HELPER_RUNNERS.has(inv.word));
+    for (const [inv, i] of calls) {
+      const r = resolveHelperCall(inv, { helperRoot, depth, bindings });
+      if (!r.ok) return verdict("mutating", r.reason);
+      admitted.add(i);
+      // A SOURCED helper runs in this shell: its functions become callable here,
+      // and a `cd` inside it moves this shell. `bash x.sh` runs in a child, so
+      // neither reaches the caller.
+      if (inv.word === "source" || inv.word === ".") {
+        for (const n of r.sub.defines) defines.add(n);
+        if (r.sub.changesDir) changesDir = true;
+      }
+    }
+    if (calls.length > 0 && changesDir)
+      return verdict("mutating", "helper call after a directory change");
+  }
+
+  const unknown = invocations
+    .filter(({ word: w }, i) => {
+      if (admitted.has(i)) return false;
+      if (COMMAND_RUNNERS.has(w)) return true; // CR-5/CR-6 — before the allow-list
+      if (SHELL_KEYWORDS.has(w)) return false;
+      if (SAFE_COMMANDS.has(w)) return false;
+      // After the runner check: a helper that defines `xargs` does not make
+      // `xargs` safe.
+      if (defines.has(w)) return false;
+      if (w.startsWith("git:")) return !SAFE_GIT_SUBCOMMANDS.has(w.slice(4));
+      return true;
+    })
+    .map((inv) => inv.word);
 
   if (unknown.length > 0) {
-    return {
-      klass: "mutating",
-      reason: `unrecognised-command: ${[...new Set(unknown.map((w) => w.replace(":", " ")))].join(", ")} (fail-closed)`,
-    };
+    return verdict(
+      "mutating",
+      `unrecognised-command: ${[...new Set(unknown.map((w) => w.replace(":", " ")))].join(", ")} (fail-closed)`,
+    );
   }
 
-  // Same reasoning for template slots.
-  for (const re of PLACEHOLDER_PATTERNS) {
-    if (re.test(prose))
-      return { klass: "placeholder", reason: "template slot" };
-  }
+  // A helper's `<dir>` comments and `$1` arguments are code and arguments, not
+  // slots, so helper mode stops here.
+  if (helperMode) return verdict("runnable", null, changesDir);
+
+  // Same reasoning for template slots. The reason names them, so the caller
+  // knows which `--slot` to pass (obs #186).
+  const slots = unfilledSlots(prose);
+  if (slots.length > 0)
+    return verdict("placeholder", `template slot: ${slots.join(", ")}`);
 
   const unbound = unboundVariables(code, bindings);
   if (unbound.length > 0) {
-    return {
-      klass: "placeholder",
-      reason: `unbound-variable: ${unbound.join(", ")}`,
-    };
+    return verdict("placeholder", `unbound-variable: ${unbound.join(", ")}`);
   }
 
-  return { klass: "runnable", reason: null };
+  return verdict("runnable", null, changesDir);
 }
 
 // ── Dual-shell execution ──────────────────────────────────────────────────────
@@ -1655,14 +1898,66 @@ function refuseSymlinkedPath(root, target, dest) {
   }
 }
 
+/**
+ * The changed line ranges of `filePath` against `rev`, from `git diff -U0`.
+ *
+ * Run from the FILE's directory, never the temp copy: the copy holds no history,
+ * and the revision belongs to the repository the file lives in. A revision git
+ * rejects is a hard error (`bad-diff-base`), never "nothing changed" — reading
+ * a failed lookup as an empty diff would report a clean change set.
+ */
+export function changedLineRanges(filePath, rev) {
+  if (typeof rev !== "string" || rev === "" || rev.startsWith("-"))
+    throw new Error(`bad-diff-base: not a revision: ${rev}`);
+  const abs = resolve(filePath);
+  const r = spawnSync("git", ["diff", "-U0", rev, "--", abs], {
+    cwd: dirname(abs),
+    encoding: "utf8",
+  });
+  if (r.status !== 0)
+    throw new Error(
+      `bad-diff-base: git diff ${rev} failed: ${(r.stderr || r.error?.message || "").trim()}`,
+    );
+  return parseDiffRanges(r.stdout);
+}
+
+/**
+ * `@@ -a,b +c,d @@` → `[c, c + d - 1]` on the new side. A pure deletion
+ * (`d = 0`) removed lines after line `c`; it is marked at `c`, so a block
+ * that lost a line still counts as changed.
+ */
+export function parseDiffRanges(diffText) {
+  const ranges = [];
+  for (const m of diffText.matchAll(
+    /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/gm,
+  )) {
+    const start = Number(m[1]);
+    const count = m[2] === undefined ? 1 : Number(m[2]);
+    ranges.push([start, start + Math.max(count, 1) - 1]);
+  }
+  return ranges;
+}
+
+/** A fence spans its opening line to its closing one; a table cell is one line. */
+function blockSpan(block) {
+  if (block.origin !== "fence") return [block.line, block.line];
+  return [block.line, block.line + block.code.split("\n").length + 1];
+}
+
 export function executeFile(filePath, opts = {}) {
   const {
     bindings = {},
+    slots = new Map(),
     timeout = 10_000,
     copyFrom = null,
     copyAs = [],
     allowZsh = true,
+    diffBase = null,
   } = opts;
+
+  // Before the temp copy exists, so a bad revision leaves nothing behind.
+  const changedRanges =
+    diffBase === null ? null : changedLineRanges(filePath, diffBase);
 
   const markdown = readFileSync(filePath, "utf8");
   // Two extractors, one stream. Everything downstream consumes `{line, code}` and
@@ -1766,7 +2061,19 @@ export function executeFile(filePath, opts = {}) {
       });
     }
     for (const block of blocks) {
-      const { klass, reason } = classifyBlock(block.code, bindings);
+      // Slots are filled BEFORE classification, and the filled text is what runs.
+      const code = applySlots(block.code, slots);
+      // The copy is seeded above, so a helper the block calls resolves against
+      // the files the block will actually see.
+      const { klass, reason } = classifyBlock(code, bindings, {
+        helperRoot: tmp,
+      });
+      const changed =
+        changedRanges === null
+          ? undefined
+          : (([a, b]) => changedRanges.some(([c, d]) => a <= d && c <= b))(
+              blockSpan(block),
+            );
       if (klass !== "runnable") {
         results.push({
           line: block.line,
@@ -1775,10 +2082,11 @@ export function executeFile(filePath, opts = {}) {
           klass,
           reason,
           skipped: true,
+          ...(changed === undefined ? {} : { changed }),
         });
         continue;
       }
-      const { runs, findings: blockFindings } = runBlock(block.code, {
+      const { runs, findings: blockFindings } = runBlock(code, {
         shells,
         cwd: tmp,
         timeout,
@@ -1792,6 +2100,7 @@ export function executeFile(filePath, opts = {}) {
         klass,
         reason: null,
         skipped: false,
+        ...(changed === undefined ? {} : { changed }),
         runs,
       });
       // A finding carries the origin too. `line 82` alone sends a reader to a
@@ -1839,13 +2148,25 @@ export function executeFile(filePath, opts = {}) {
       // run did not supply, which is the "noise trains reviewers to ignore it"
       // failure the rule warns about. It is still reported, which is what "a
       // finding, not a pass" requires.
+      // Name the flag that fills each kind of placeholder (obs #186): a template
+      // slot is text, which only --slot replaces; --bind binds a shell variable
+      // and can never fill one, so advising it for a slot sends the reader to a
+      // remedy that cannot work.
+      const slotHeld = results.filter(
+        (r) => r.klass === "placeholder" && /^template slot/.test(r.reason),
+      ).length;
+      const remedies = [
+        slotHeld > 0 && "--slot NAME=VALUE for the template slots",
+        counts.placeholder - slotHeld > 0 &&
+          "--bind NAME=VALUE for the unbound variables",
+      ].filter(Boolean);
       findings.push({
         kind: "zero-blocks-executed",
         confidence: "medium",
         detail:
           `${blocks.length} bash block(s) found, none classified runnable ` +
           `(${counts.placeholder} placeholder, ${counts.mutating} mutating)` +
-          " — supply the missing values with --bind to execute the placeholder blocks",
+          ` — supply the missing values with ${remedies.join(" and ")} to execute the placeholder blocks`,
       });
     } else {
       // The refusal reasons are carried verbatim rather than summarised away. An
@@ -1871,6 +2192,36 @@ export function executeFile(filePath, opts = {}) {
     }
   }
 
+  // The change set, apart from the file (obs #219). A file-level count folds the
+  // changed blocks in with every templated block the change did not touch, so a
+  // run in which every changed block was refused read like any other. Reported IN
+  // ADDITION to the file-level findings above, never instead of them.
+  let changed;
+  if (changedRanges !== null) {
+    const touched = results.filter((r) => r.changed);
+    changed = {
+      total: touched.length,
+      runnable: touched.filter((r) => r.klass === "runnable").length,
+      placeholder: touched.filter((r) => r.klass === "placeholder").length,
+      mutating: touched.filter((r) => r.klass === "mutating").length,
+      executed: touched.filter((r) => !r.skipped).length,
+    };
+    if (changed.total > 0 && changed.executed === 0) {
+      // `medium`, like zero-blocks-executed: a statement about what the gate
+      // covered, not a defect in the work item.
+      findings.push({
+        kind: "changed-blocks-not-executed",
+        confidence: "medium",
+        detail: `${changed.total} changed block(s), none executed`,
+        blocks: touched.map((r) => ({
+          line: r.line,
+          klass: r.klass,
+          reason: r.reason,
+        })),
+      });
+    }
+  }
+
   return {
     file: filePath,
     shells,
@@ -1879,6 +2230,7 @@ export function executeFile(filePath, opts = {}) {
       allowZsh && !useZsh ? "zsh-unavailable" : allowZsh ? null : "disabled",
     blocks: blocks.length,
     counts,
+    ...(changed === undefined ? {} : { changed }),
     results,
     findings,
     notes,
@@ -1889,7 +2241,8 @@ export function executeFile(filePath, opts = {}) {
 
 const USAGE =
   "Usage: qa-execute-snippets --file <path.md> [--bind NAME=VALUE]... " +
-  "[--copy <dir>] [--copy-as SRC:DEST]... [--timeout <ms>] [--no-zsh] [--json]";
+  "[--slot NAME=VALUE]... [--copy <dir>] [--copy-as SRC:DEST]... " +
+  "[--diff-base <rev>] [--timeout <ms>] [--no-zsh] [--json]";
 
 export function main(argv = process.argv.slice(2)) {
   let file = null;
@@ -1898,7 +2251,9 @@ export function main(argv = process.argv.slice(2)) {
   let timeout = 10_000;
   let allowZsh = true;
   let json = false;
+  let diffBase = null;
   const bindings = {};
+  const slots = new Map();
 
   for (let i = 0; i < argv.length; i++) {
     switch (argv[i]) {
@@ -1951,6 +2306,29 @@ export function main(argv = process.argv.slice(2)) {
         bindings[pair.slice(0, eq)] = pair.slice(eq + 1);
         break;
       }
+      case "--slot": {
+        // Same NAME=VALUE shape as --bind; the name must be one the placeholder
+        // grammar can match, or the slot could never be filled.
+        const pair = argv[++i] ?? "";
+        const eq = pair.indexOf("=");
+        if (eq < 1 || !SLOT_NAME.test(pair.slice(0, eq)))
+          return {
+            exitCode: 2,
+            error: `bad --slot (want NAME=VALUE, NAME a template slot name): ${pair}`,
+          };
+        slots.set(pair.slice(0, eq), pair.slice(eq + 1));
+        break;
+      }
+      case "--diff-base": {
+        const rev = argv[++i];
+        if (!rev)
+          return {
+            exitCode: 2,
+            error: "bad-diff-base: --diff-base needs a revision",
+          };
+        diffBase = rev;
+        break;
+      }
       case "-h":
       case "--help":
         return { exitCode: 0, usage: USAGE };
@@ -1965,6 +2343,8 @@ export function main(argv = process.argv.slice(2)) {
   try {
     report = executeFile(file, {
       bindings,
+      slots,
+      diffBase,
       timeout,
       copyFrom,
       copyAs,
@@ -1991,6 +2371,16 @@ function render(report) {
   lines.push(
     `  shells: ${report.shells.join(", ")}${report.zshAvailable ? "" : "  (zsh-unavailable)"}`,
   );
+  // The change set first, when one was named: it is what the change is judged on.
+  if (report.changed) {
+    const c = report.changed;
+    lines.splice(
+      2,
+      0,
+      `  changed: ${c.total} block(s) — ${c.executed} executed, ${c.runnable} runnable, ` +
+        `${c.placeholder} placeholder, ${c.mutating} mutating`,
+    );
+  }
   lines.push("");
   // `(table cell)` rather than nothing: the two constructs are found by different
   // means and fixed in different ways, and a reader who cannot tell them apart
@@ -2018,6 +2408,8 @@ function render(report) {
       lines.push(
         `  ${f.kind}  ${f.line ? `${where(f)}  ` : ""}[${f.confidence}] ${f.detail}`,
       );
+      for (const b of f.blocks ?? [])
+        lines.push(`      line ${b.line}  ${b.klass} — ${b.reason ?? "ran"}`);
     }
   }
   return lines.join("\n");

@@ -267,3 +267,53 @@ test("the engine the skills invoke actually exists and exports what the rule pro
     assert.equal(typeof mod[fn], "function", `engine must export ${fn}()`);
   }
 });
+
+// task.191 — the change set is reported apart, and both skills say so in one
+// shape. A skill that runs the engine without --diff-base folds the changed
+// blocks into the file-level count, which is how a run where every changed block
+// was refused read like any other (obs #219).
+test("both skills pass --diff-base, name --slot, and report the changed counts first (task.191)", () => {
+  const commandOf = (src) =>
+    src.match(
+      /^command node \.agents\/skills\/qa-(?:task|story)\/references\/qa-execute-snippets\.mjs [^\n]*\\\n[^\n]*$/m,
+    )?.[0];
+  for (const [name, src] of [
+    ["qa-task", qaTask],
+    ["qa-story", qaStory],
+  ]) {
+    const cmd = commandOf(src);
+    assert.ok(cmd, `${name} must run the engine from the repository root`);
+    assert.match(cmd, /--diff-base "\$BASE"/, `${name} must pass --diff-base`);
+    assert.match(
+      cmd,
+      /--copy-as \.agents:\.agents/,
+      `${name} must seed the bundled helpers`,
+    );
+    assert.match(
+      src,
+      /--slot NAME=VALUE/,
+      `${name} must name --slot for template slots`,
+    );
+    assert.match(
+      src,
+      /changed-blocks-not-executed/,
+      `${name} must name the change-set finding`,
+    );
+    assert.match(
+      src,
+      /`changed` counts\*?\*?\s+\*?\*?first/,
+      `${name} must report the changed counts first`,
+    );
+    assert.match(
+      src,
+      /--copy-as skills:\.agents\/skills/,
+      `${name} must name the seeding for a symlinked .agents/skills`,
+    );
+  }
+  // One shape: the engine call is the same in both, modulo the skill's own name.
+  assert.equal(
+    commandOf(qaTask).replace("qa-task", "qa-X"),
+    commandOf(qaStory).replace("qa-story", "qa-X"),
+    "the two engine calls must not drift apart",
+  );
+});

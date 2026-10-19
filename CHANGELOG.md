@@ -59,6 +59,21 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **The snippet engine runs the pipeline blocks a change touches (task 191).**
+  `qa-execute-snippets.mjs` gains three things, each opt-in. `--slot NAME=VALUE` fills a `{NAME}` /
+  `<NAME>` template slot with literal text **before** classification, so a value that adds a write is
+  refused like written code; an unfilled slot is named in the reason (`template slot: {a}, <b>`), and
+  `zero-blocks-executed` now names `--slot` or `--bind` by placeholder kind (obs #186). The **helper
+  rule**: `bash` / `sh` / `source` / `.` of a literal `.sh` path inside the temp copy runs when the
+  helper's own text classifies runnable (helper mode: function definitions, `case` arm patterns,
+  `name+=(…)`, `shopt -s|-u`), to a depth of 2, and never in a block that changes directory;
+  functions a sourced helper defines are callable in that block. `SAFE_COMMANDS` is unchanged
+  (obs #219, #278). `--diff-base <rev>` marks the blocks `git diff -U0` touches, adds a `changed`
+  summary and the finding `changed-blocks-not-executed` when none of them ran; a bad revision is exit 2,
+  `bad-diff-base`. qa-task Step 4b and qa-story Phase 1.7 pass `--diff-base` and `--copy-as
+  .agents:.agents` (or `skills:.agents/skills` where `.agents/skills` is a symlink), name `--slot`, and
+  report the `changed` counts first; `qa-runnable-prose-detection.md` gains §2aa, §2c and §4a.
+
 - **The story pipeline reads hierarchical story ids (task 206). Breaking.** Every story-side reader
   and writer of a story or epic id now goes through `doc-id.js` instead of its own pattern:
   `finalise-fix-and-recheck.mjs` (8a's co-location rule and the doc-links corpus guards),

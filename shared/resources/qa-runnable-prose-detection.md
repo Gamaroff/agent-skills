@@ -180,12 +180,61 @@ Three further rules fall out of the same principle, each added after a review fo
   recognised by its trailing `)`. That is why the scanner no longer erases bare parentheses — without
   the `)` there is nothing to distinguish `*://*/pull/*)` from `/usr/bin/[t]ouch`.
 
+### 2aa. Helper calls run only when the helper itself would
+
+`bash`, `sh`, `source` and `.` execute a file, which is exactly what the allow-list exists to refuse —
+and they are also how this repository calls a bundled helper from a block
+(`bash .agents/skills/<skill>/references/qa-cycle.sh …`, `source …/newest-numbered.sh || exit 1`).
+Refusing every one meant Step 4b executed none of the blocks a pipeline change touches (obs #219,
+#278). So a helper call is recognised when, and only when, **all four** of these hold:
+
+1. **The path is a literal holding a `/`** — no `$`, glob, quote or command substitution. Without a
+   slash, `source` and `bash` search `PATH`, and the file the shell finds is not the file the
+   classifier read.
+2. **It resolves, through realpath, to a regular `.sh` file inside the temp copy.** A link out of the
+   copy is refused, not followed.
+3. **The helper's own text classifies `runnable`**, by this same classifier, to a depth of 2 (a block,
+   the helper it calls, and one helper that one calls). A helper that writes —
+   `advance-pipeline-lock.sh`, `set-qa-phase.sh` — stays refused for its own reason, which the
+   block's reason carries: `helper <path>: mutating: deny-list: rm -rf`.
+4. **The block does not change directory** — no `cd`, `pushd` or `popd` in it, nor in a helper it
+   sources. The path is resolved against the copy's root, but the shell resolves it against its
+   working directory, so after a `cd` the two can be different files. Reason:
+   `helper call after a directory change`.
+
+**`SAFE_COMMANDS` is not widened, and this is why the boundary is still the allow-list.** A helper
+adds nothing the allow-list would refuse: its text is scanned command by command by the same rules,
+so a helper is only ever as permissive as a block holding its text. Admission is per invocation —
+`bash a.sh` admitted does not license `bash b.sh` — and a function a **sourced** helper defines is
+callable in that block (not through `bash`, which runs the helper in a child shell).
+
+A helper is classified in **helper mode**, which reads the syntax a helper has and a documented block
+does not, and nothing else: a function definition (`name() {`) is not an invocation; a multi-line
+`case` arm pattern (`''|*[!0-9]*)`) is a glob; `name+=(…)` is an assignment; `shopt -s|-u` sets an
+option. Helper mode skips the template-slot and unbound-variable checks — a helper's `<dir>` comments
+and `$1` arguments are code and arguments, not slots. Measured over `shared/resources/*.sh` (not
+`*.test.sh`), three helpers classify runnable; every other one names a real writer and is the control
+population (`qa-execute-snippets.test.mjs` records the figures).
+
+The rule needs the helpers to be **in the copy**: seed them with `--copy-as .agents:.agents`. Where
+`.agents/skills` is itself a symlink (this repository, whose `.agents/skills -> ../skills` is
+gitignored), that copies the link, which resolves out of the copy and is refused by condition 2 — seed
+`--copy-as skills:.agents/skills` instead.
+
 ### 2b. Unbound variables are placeholders, not failures
 
 The caller supplies a binding set (`DOC_FILE`, `D`, `PR_NUMBER`, …). A block that reads a variable which
 is neither bound by the caller nor assigned inside the block itself is reclassified `placeholder` — it
 was written to be run in a context this gate cannot reconstruct. That is a skip with a reason, not a
 defect.
+
+### 2c. Template slots are filled with `--slot`, never `--bind`
+
+`--bind NAME=VALUE` binds a **shell variable**; it can never fill `{task-directory}`, which is text.
+`--slot NAME=VALUE` replaces `{NAME}` and `<NAME>` with `VALUE` as literal text (no shell expansion)
+**before** the block is classified, so a value that adds a write — `; rm -rf x` — is refused by the
+same rules as written code (obs #186). A block with a slot still unfilled stays `placeholder`, and its
+reason names the slots: `template slot: {task-directory}, <id>`.
 
 ---
 
@@ -290,7 +339,8 @@ discriminates on `counts.placeholder`:
 | `placeholder === 0` (every block refused as `mutating`) | **information** | `no-executable-blocks` | never gates; exit `0` |
 
 **`placeholder > 0` — the run was under-configured.** Some block reads a value the run did not supply.
-`--bind` / `--copy` fixes it and the `detail` string says so. This is the case the guard was written
+`--slot` (template slots), `--bind` (unbound variables) or `--copy` fixes it, and the `detail` string
+names the flag for the kind of placeholder it found. This is the case the guard was written
 for, and it stays a finding.
 
 Its `confidence` is **`medium`**, unlike the two findings in §3. It is a statement about *coverage* —
@@ -321,12 +371,30 @@ be an over-refusal the classifier should learn (see `bug.6`, `bug.10`), and coll
 > **Do not suppress either record**, and do not convert one into the other to quiet a report. If a file
 > genuinely should have runnable blocks, the fix is bindings or a classifier correction — not silence.
 
+### 4a. The change set is reported apart from the file
+
+A file-level count folds the blocks a change touched in with every templated block it did not, so a
+run in which **every changed block was refused** read exactly like any other (obs #219).
+`--diff-base <rev>` reads `git diff -U0 <rev> -- <file>` (from the file's repository, never the temp
+copy), marks each block whose lines overlap a hunk `changed: true`, and adds a summary
+`changed: { total, runnable, placeholder, mutating, executed }`.
+
+| Condition | Record | Kind | Gate |
+|---|---|---|---|
+| `changed.total > 0` and `changed.executed === 0` | **finding**, `confidence: medium`, listing each changed block's line and reason | `changed-blocks-not-executed` | eligible for `top_issues[]` |
+
+It is reported **in addition to** the file-level records above, never instead of them: it is a
+statement about the change, and they are statements about the file. A revision git rejects is exit
+`2` (`bad-diff-base`), never "nothing changed". An untracked file has no diff, so it has no changed
+blocks — QA runs on a committed branch.
+
 ---
 
 ## 5. Reporting
 
 The QA report records, for the file under review:
 
+- with `--diff-base`, the `changed` counts **first** — they are what the change is judged on
 - how many blocks were found, and the count in each class
 - **every skipped block with its line number and reason** — a silent skip recreates the problem
 - which shells actually ran (and `zsh-unavailable` when applicable)
@@ -356,8 +424,10 @@ block was correctly refused exits **`0`** — it carries a `notes[]` record, not
 report carries `findings[]` and `notes[]` side by side; a caller that reads only the exit code sees the
 distinction too, which is why the split reaches the exit code and not just the payload.
 
-Bind caller values with repeated `--bind NAME=VALUE`, seed the temp working directory from a real
-directory with `--copy <dir>`, and set the per-block timeout with `--timeout <ms>`.
+Bind caller values with repeated `--bind NAME=VALUE`, fill template slots with repeated
+`--slot NAME=VALUE` (§2c), report the change set apart with `--diff-base <rev>` (§4a), seed the temp
+working directory from a real directory with `--copy <dir>`, and set the per-block timeout with
+`--timeout <ms>`.
 
 `--copy <dir>` places the directory's **contents** at the temp root, so a block that addresses a
 path — `find docs/tasks …` — finds nothing whatever is copied. Seed at the addressed path with
