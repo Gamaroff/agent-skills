@@ -132,6 +132,23 @@ Extend the probe engine's `cli:` entry form to run a `.py` entry under `python3`
 - Severity of QA4-1 kept at the reviewer's HIGH: no measured plausibility check was made to lower it, and SC4 is an absolute ("never `rejected`"). This orchestrator also wrote cycle 3's fix, so a self-assessed downgrade that would have avoided the convergence trip was not made.
 - Cycle 4 Convergence check: HIGH sequence (cycles 2–4) 1, 1, 1 → **tripped**. Not running 5b; escalating (*QA Loop Not Converging*). Third strike would also apply again (HIGH on `security-probe.mjs` in gates 2–4).
 
+### Re-entry — QA loop (second grant), 2026-10-19
+
+- QA loop re-entry: 2 extra cycles granted (user chose "Grant 2, positive channel" at the Phase 0b prompt); 0 cycle(s) run outside the loop back-filled from disk (gates 1–4, 4 report entries). `grant-qa-cycles.sh`: lock restored from the halt snapshot; QA_CYCLE=4, qa_max_cycles=6, reenter_at=5b.
+- Direction (user decision): escalation step 2 — make the crash channel positive. The bootstrap writes a token on every exit it controls, an answer included, and a missing token reads as `errored`, so every lost write fails safe. Covers QA4-1, QA4-2 and CR-3.
+- PR #692 state at resume: OPEN, MERGEABLE, head `9007be07` = local HEAD. Phase 0a detector not dispatched: snapshot, gates and report read directly and agree.
+- QA Cycle 4 — changes-requested: stage-disabled.
+- Third strike: `shared/resources/security-probe.mjs` (HIGH in gates 2, 3, 4). Struck mechanism passed to `/qa-fix`: crash detection through a negative signal (token only on a crash; absence read as an answer). Narrowing offer: not signalled (high-findings-remain).
+- `/qa-fix` cycle 4 (fix_cycle: not supplied — derived from the gate). Findings read from gate 4 and bugs 7–8 directly (2 findings + CR-3, all in context; ingester not dispatched). Pre-fix Explore mapping skipped: one function family, its test file and fixtures, read directly.
+- Move: **replace** — exit record on every bootstrap-controlled exit (`answer <nonce>` / `crash <nonce>`), written only while `fstat(3)` matches the boot identity; no record → `errored`. QA4-2 covered by the same channel (a child that never starts writes nothing); `probePython` unchanged, comment states why. CR-3: record read once.
+- Step 3.5: the pid check alone is no longer observable (identity check + at-fork close already stop a forked child); kept for a fork that bypasses the at-fork hooks. New stated limit, fail-safe: `os._exit` / `exec` leave no record → declined. The nonce is readable by a script that inspects `sys.orig_argv`; only a script forging its own record deliberately could use it — out of scope (the script under test is the consumer's control). Probe: phrases `marker on fd 3`, `loses the marker`, `Anything on fd 3`, `PYTHON_BOOTSTRAP`, `probePython` → `probe-boundary-rule.md` updated; `CHANGELOG.md` and the task doc updated. Population 1.
+- Tests: 2 fixtures, 2 new tests (20 python tests), both red on the cycle-3 engine. Mutations: 8, each red.
+- Fast gate `npm run ci:fast` attempt 1 GATE_EXIT=0, 5926 tests, 0 failures; log deleted.
+- Cycle 4 commit `0aff23d7` fix(task.215) — engine, rule doc, fixtures, tests, CHANGELOG, task doc, bugs 7–8, bundled copies; gate 4 and QA report 4 already committed by the escalation commit. One push. PR comment and issue #689 `qa-fix-4` comment `posted`.
+- Post-fix PR state check (inline `gh pr view`): OPEN, MERGEABLE, head `0aff23d7`.
+- Cycle 5: `/qa-task` with `code_review_blocking=true`; `SAFETY_REPROBE=true` (clauses 2 and 3), unscoped, re-probe directive (not a refute cycle). Reviewer dispatched 13:17:16Z, `duration_ms` 352113; probe and mutation spot checks (4: 2 covered, 2 no-red-untested) ran meanwhile, mutations in a scratch worktree. Probe: crash-matrix CLI (`.claude/state/qa5/`), 26 cases, 7 executed and passed, 19 errored as required; no crash shape scored `rejected`. Gate CONCERNS 90/100: cycle-4 findings verified fixed (bugs 7–8 closed); new MEDIUM TASK-215-QA5-1 (reviewer CR-1, anchor `ok`) — kept at the reviewer's severity (no measured basis to lower it); bug 9 filed. PR comment and issue `qa-gate-5` comment `posted`.
+- Cycle 5 route: Convergence check not tripped (HIGH_N 0; sequence 1, 1, 1, 1, 0); route classifier `continue` (not-a-pass-gate; route 2 declined: high-findings-remain) → 5b.
+
 ---
 
 ## Issues Log
@@ -187,6 +204,32 @@ The pipeline stopped after 4 qa-task/qa-fix cycles: the HIGH finding count faile
 2. Or make the channel positive (one more change of shape, not a patch): the bootstrap writes a token on every exit it controls, an answer included, after checking fd 3 is still the engine's pipe; a missing token reads as `errored`, so every lost write fails safe. That also covers QA4-2 (a child that never started writes nothing). Run it as a fresh grant (`Resume at 5a with 2 more cycles` → re-enters at 5b) or by hand followed by `/qa-task`.
 3. Take CR-3 (marker computed twice) with whichever of the above runs.
 
+### QA Loop Limit Reached — 2026-10-19
+
+The pipeline completed 6 qa-task/qa-fix cycles without a clean PASS.
+
+**Final gate status**: CONCERNS (85/100) — `task.215.gate.6.probe-engine-python-cli-entry-form.yml`
+**HIGH findings per cycle**: 1, 1, 1, 1, 0, 0 — HIGH cleared at cycle 5 (the positive exit record)
+**Remaining issues** (from final gate file — all fixed in `505645df`, none yet gated):
+- TASK-215-QA6-1 (medium, `shared/resources/security-probe.mjs`): a `.py` exit 120 (failed flush at shutdown) was scored `rejected`, a measured false pass → now `errored` (bug 10, Ready for QA).
+- TASK-215-QA6-2 (low, `shared/resources/probe-boundary-rule.md`): the worker-thread sentence was inaccurate for an exit 1 → corrected.
+- TASK-215-QA6-3 (low, `shared/resources/tests/security-probe.test.mjs`): the thread-crash test's gap → tightened.
+
+**What was attempted per cycle**:
+- Cycles 1–3: crash detection by stderr parsing, then a negative crash marker on fd 3 (third strike).
+- Cycle 4 (second grant): replaced with a positive exit record; a missing record is `errored`.
+- Cycle 5: an exception outside the main frame stated as a limit and pinned; crash-record precedence tested.
+- Cycle 6: a `.py` exit 120 is `errored`; limit text corrected; thread-crash test tightened.
+
+**Route 2c (gate-the-last-fix half-cycle)**: declined — `medium-not-falling` (MEDIUM 1, 1, 1 over cycles 4–6).
+
+**Likely root cause**: not a stalled loop. Since the positive channel (cycle 4) every finding has been a narrower edge of one documented limit: what the exit record cannot see after the body returns. HIGH is 0 for two gates. Each cycle's safety re-read finds one more exit path (thread, atexit, then shutdown flush), and that is what keeps MEDIUM at 1. The last fix has no gate.
+
+**Recommended next steps**:
+1. Run `/qa-task` once on `505645df` (or resume with 1 more cycle). If it reads PASS or carries only LOWs, go to `/review-pr` and then `/finalise`.
+2. Or accept gate 6 as is: the fix for its one MEDIUM is in, and the run goes to `/review-pr` and then `/finalise`.
+3. Take the pre-existing signal-kill wording ("timeout" printed for every signal) as a follow-up task.
+
 ---
 
 ## QA Iteration History
@@ -231,6 +274,31 @@ _Track each QA review/fix cycle._
 **PR Review**: not reached — gate did not exit the loop
 **Loop exit**: n/a — this exit not taken
 **Action**: Escalating — loop not converging
+**Re-entry**: 2 cycles granted (second grant); cycle 4's fix run at 5b (third strike: replace — positive exit record)
+**Fixes Applied**: exit record on every bootstrap-controlled exit, written only while fd 3 is the boot pipe; a missing record is errored (QA4-1, QA4-2); record read once (CR-3)
+**Commit**: `0aff23d7`
+
+### QA Cycle 5 — 2026-10-19
+**Gate Result**: CONCERNS (90/100)
+**Issues Found**: 3. Cycle 4's three findings verified fixed (bugs 7–8 closed). TASK-215-QA5-1 (MEDIUM): an exception outside the main frame (a joined worker thread, an atexit handler) exits 0 under `python3` and is scored `accepted` — the false-alarm direction, unstated as a limit (reviewer CR-1, probe-reproduced). LOW ×2 advisory: crash-record precedence untested (mutation no-red-untested); signal-kill detail prints a timeout clause.
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 5 of 6)
+**Fixes Applied**: TASK-215-QA5-1 stated as a limit (probe-boundary-rule.md, bootstrap comment, CHANGELOG) and pinned by `cli-thread-crash.py`; crash-record precedence tested (`cli-forged-answer-crash.py`). 22 python tests; full suite 5928, 0 fail; 2 mutations red. Bug 9 → Ready for QA. First commit attempt refused by the Prettier pre-commit check; formatted and re-committed.
+**Commit**: `cdbb8ab4`
+
+### QA Cycle 6 — 2026-10-19
+**Gate Result**: CONCERNS (85/100)
+**Issues Found**: 3. Cycle 5 fix verified (bug 9 closed). TASK-215-QA6-1 (MEDIUM, bug 10): a `.py` exit 120 (failed stdout flush at shutdown) is scored `rejected` — measured false pass, verdict `engages`. QA6-2 (LOW): worker-thread sentence inaccurate for exit 1. QA6-3 (LOW): thread-crash test gap. Scope: files changed since gate 5 (SAFETY_REPROBE false). Wording commit `46f6c7b3` landed during review at the maintainer's request.
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Escalating — loop limit reached
+**Fixes Applied**: QA6-1 (`.py` exit 120 → `errored`), QA6-2 (limit text), QA6-3 (test). 23 python tests; full suite 5929, 0 fail; 2 mutations red. Bug 10 → Ready for QA.
+**Commit**: `505645df`
 
 ---
 
