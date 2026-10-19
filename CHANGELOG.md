@@ -10,9 +10,10 @@ All notable changes to this project will be documented in this file. Format foll
   now runs `python3 -E -s -B <path> ...argv` with the same `--argv` template, sandbox, timeout and
   exit-status verdict as a Node CLI, so a Python boundary reaches the DoD probe instead of being
   declined `entry-not-probeable` and tripping the zero-candidates guard. A Python crash exits 1, the
-  status a refusal exits with, so the engine tells them apart by stderr (`isPythonCrash`: a
-  traceback frame plus a final exception line, under a `Traceback` header or a `SyntaxError`-family
-  class) and scores a crash `errored`, never `rejected`. `-B` stops a sibling import writing
+  status a refusal exits with, so on exit 1 the engine tells them apart by stderr (`isPythonCrash`:
+  a traceback frame under a `Traceback` header, an ExceptionGroup's included, or a frame and a
+  `SyntaxError`-family line, whatever follows the traceback) and scores a crash `errored`, never
+  `rejected`. `-B` stops a sibling import writing
   `__pycache__/` into the watched script directory; `-I` is not used because it breaks sibling
   imports. With no `python3` on `PATH` the entry is declined once, naming `python3`. The result and
   the run record carry a new `interpreter` field (`{ name, version }`, `null` for every other form).

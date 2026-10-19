@@ -171,6 +171,35 @@ Both items need a merged, tagged release, and `/finalise` runs before merge, so 
   `--fixture-setup`). Settle it against the consumer; if the form needs a missing piece, that is a follow-up task.
 
 ---
+
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-19
+**Quality Score**: 70/100
+**Gate Decision**: FAIL
+
+### QA Report
+
+- **Full Report**: [task.215.qa.1.probe-engine-python-cli-entry-form.md](./task.215.qa.1.probe-engine-python-cli-entry-form.md)
+- **Gate File**: [task.215.gate.1.probe-engine-python-cli-entry-form.yml](./task.215.gate.1.probe-engine-python-cli-entry-form.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 313
+- **Phases Verified**: 2/2
+- **Critical Issues**: 1
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+- TASK-215-QA1-1 (HIGH): `isPythonCrash` reads three shapes of real Python crash as refusals (a multi-line message, an `ExceptionGroup`, output after the traceback). SC4 is unmet. Bug report: [task.215.bug.1.python-crash-read-as-refusal.md](./task.215.bug.1.python-crash-read-as-refusal.md)
+- TASK-215-CR-2 (LOW): the flags test has no non-vacuity floor.
+
+### Bug Reports
+
+- [TASK-215-BUG-1: Python crash read as refusal](./task.215.bug.1.python-crash-read-as-refusal.md) — ✅ Ready for QA — Priority: High (fixed 2026-10-19, QA fix cycle 1)
 <!-- change-log-start -->
 ## Change Log
 
@@ -180,6 +209,8 @@ Both items need a merged, tagged release, and `/finalise` runs before merge, so 
 | 2026-10-19 | 1.1     | Review passed (9/10) — added the Python crash branch, decided `-E -s -B`, recorded the doc-site search, moved tests to `shared/resources/tests/`, moved release and consumer proof to Deferred Work | review-task |
 | 2026-10-19 |         | Status → ready-for-development | review-task |
 | 2026-10-19 |  | Implemented — 20 files (5 sources, 3 SKILL.md, 9 fixtures, CHANGELOG, tests; plus bundled copies), 11 tests | develop |
+| 2026-10-19 |  | QA gate FAIL (70/100) — 2 findings; Status → In Progress | qa-task |
+| 2026-10-19 |  | QA findings fixed — cycle 1, 2 findings (TASK-215-QA1-1, CR-2); Status → Ready for Review | qa-fix |
 <!-- change-log-end -->
 
 ---
@@ -211,6 +242,7 @@ Both items need a merged, tagged release, and `/finalise` runs before merge, so 
   because a custom `class Refused(Exception)` raised uncaught prints `__main__.Refused: …`, and missing it would score a
   crash as a refusal. To keep refusals refusals it requires all three: a `File "…", line N` frame, a final
   exception line, and a `Traceback (most recent call last):` header or a `SyntaxError`-family class.
+  *Superseded by QA fix cycle 1 below: the final-exception-line clause is gone.*
 - `interpreter` (`{ name, version }`, else `null`) is on every result path (`base`, the all-errored and needs-fake-gh
   returns, the success return), in `toRecordEntry`, and printed as `interpreter:` in `--emit-block` when set.
 - Testing: 11 new tests in `security-probe.test.mjs` (`cli entry (python): …`); `npm run ci:fast` green (5917 tests,
@@ -218,5 +250,23 @@ Both items need a merged, tagged release, and `/finalise` runs before merge, so 
   `-I`; drop `interpreter` from the result; from the record entry; drop the traceback-header clause; drop the frame
   clause; drop the missing-python3 decline.
 - Deferred work: see Deferred Work (release, re-vendor, consumer proof).
+
+### QA Fix — cycle 1 (2026-10-19)
+
+- TASK-215-QA1-1: `isPythonCrash` no longer reads the last stderr line. A crash is a `File "…", line N` frame under a
+  `Traceback` header (an ExceptionGroup's `+ Exception Group Traceback` and `|`-prefixed frames included), or a frame
+  and a SyntaxError-family line, whatever follows. `runCliCase` asks only on exit 1, the status every uncaught
+  exception exits with, so an "Exception ignored" traceback beside a refusal exiting 3 stays an answer. The decline
+  detail names the exception via `pythonExceptionLine` (first exception-shaped line after the last frame).
+- The unit case "a traceback followed by a refusal line is false" is reversed to `true`: the probe cannot tell a
+  caught-and-printed traceback from an uncaught one, and `errored` is the safe direction.
+- Stated limit, not fixed: `sys.tracebacklimit = 0` prints no frame, so that crash is indistinguishable from a
+  refusal printing the same line; recorded in `probe-boundary-rule.md`.
+- TASK-215-CR-2: the flags test asserts `interpreter.name === "python3"` and the executed count before its loop.
+- Tests: 2 fixtures (`cli-crasher-multiline.py`, `cli-refuser-unraisable.py`), 1 new test, 3 extended; 12 python tests.
+  Mutations, each red: restore the last-line rule; drop the exit-1 gate; frame or header regex without the
+  ExceptionGroup form; frame matched at column 0; drop the compile-error clause; drop the header clause; detail from
+  the last line; drop `.py` from the map (now also reds the flags test — the CR-2 floor). `npm run ci:fast` green
+  (5918 tests, 0 failures). QA's probe cases re-run: 12 executed, every case as expected.
 
 - QA artifacts land beside this file: `task.215.qa.{N}.*.md`, `task.215.bug.{N}.*.md`, `task.215.gate.{N}.*.yml`.

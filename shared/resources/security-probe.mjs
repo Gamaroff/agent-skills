@@ -185,9 +185,9 @@
  * verdict. The interpreter is chosen by extension (CLI_INTERPRETERS) and the
  * host's python3 is resolved once per process (probePython); when it does not
  * run, the entry is declined `entry-not-probeable` once, by name. A Python crash
- * exits 1 — a refusal's status — and prints no Node footer, so it is told apart
- * by its stderr instead (isPythonCrash): a traceback frame plus a final exception
- * line, under a Traceback header or a SyntaxError-family class. The result and
+ * exits 1 — a refusal's status — and prints no Node footer, so an exit 1 is told
+ * apart by its stderr instead (isPythonCrash): a traceback frame under a
+ * Traceback header, or a SyntaxError-family line, whatever follows. The result and
  * the record carry `interpreter` ({ name, version }), null for every other form.
  *
  * THE SHELL-ARGV ENTRY FORM (task.181). A boundary delivered as a SHELL SCRIPT
@@ -2277,36 +2277,64 @@ const NODE_FATAL_FOOTER = new RegExp(
   `(?:^|\\n)Node\\.js ${escapeRegExp(process.version)}\\s*$`,
 );
 
-/** A frame of a Python traceback: `  File "<path>", line N`. */
-const PY_FRAME = /^ {2}File ".*", line \d+/m;
-/** The traceback header an uncaught runtime exception prints. */
-const PY_TRACEBACK = /^Traceback \(most recent call last\):$/m;
-/** An exception line: a (dotted) class name, optionally `: message`. */
-const PY_EXCEPTION_LINE = /^[A-Za-z_][\w.]*(?::\s.*)?$/;
-/** Compile-time errors print a frame but no Traceback header. */
-const PY_COMPILE_ERROR = /^(?:SyntaxError|IndentationError|TabError)\b/;
+/**
+ * A frame of a Python traceback: `  File "<path>", line N`, always indented.
+ * An ExceptionGroup prefixes each of its lines with `|` (`  |   File …`).
+ */
+const PY_FRAME = /^(?: *\|)? {2,}File ".*", line \d+/m;
+/**
+ * The header an uncaught runtime exception prints, plain or as an
+ * ExceptionGroup's (`  + Exception Group Traceback (most recent call last):`).
+ */
+const PY_TRACEBACK =
+  /^(?: *[+|] )?(?:Exception Group )?Traceback \(most recent call last\):$/m;
+/** Compile-time errors print a frame and this line, with no Traceback header. */
+const PY_COMPILE_ERROR = /^(?:SyntaxError|IndentationError|TabError)\b/m;
+/** An exception line, after an ExceptionGroup's `|` prefix: a (dotted) class, optionally `: message`. */
+const PY_EXCEPTION_LINE = /^(?: *\| )?([A-Za-z_][\w.]*(?::\s.*)?)$/;
 
 /**
  * Did a Python child CRASH rather than answer (task.215)? A Python crash exits
  * 1 — the status a refusal exits with — and prints no footer like Node's, so
- * the exit code cannot tell them apart. Its stderr can: the LAST non-empty line
- * is the exception (`ValueError: x`, `json.decoder.JSONDecodeError: …`,
- * `KeyboardInterrupt`, a custom `__main__.Refused: x`) AND a `File "…", line N`
- * frame precedes it AND either a `Traceback (most recent call last):` header
- * (an uncaught runtime exception) or a SyntaxError-family class (a compile
- * error, which prints the frame with no header). All three, so a refusal that
- * merely prints an exception-shaped line, or prints a traceback and then a
- * refusal message, is still a refusal. A script that catches its failure and
- * prints the traceback itself reads as a crash: `errored`, "could not look" —
- * the safe direction, never a false pass.
+ * the exit code cannot tell them apart. Its stderr can: a `File "…", line N`
+ * frame AND either a `Traceback (most recent call last):` header (an uncaught
+ * runtime exception, an ExceptionGroup's included) or a SyntaxError-family
+ * line (a compile error, which prints the frame with no header).
+ *
+ * What comes AFTER the traceback does not matter. A multi-line message, an
+ * `add_note()` hint, an ExceptionGroup's box drawing and an atexit handler's
+ * output all put something other than the exception last, and keying on the
+ * last line read each of them as a refusal — a false pass (QA cycle 1,
+ * TASK-215-QA1-1). So a script that catches its failure and prints the
+ * traceback itself, then refuses, also reads as a crash: `errored`, "could not
+ * look" — the safe direction. A refusal that prints an exception-shaped line
+ * with no frame, or a frame-shaped log line with no header, stays a refusal.
+ * The caller asks only on exit 1 (an uncaught exception always exits 1), so an
+ * "Exception ignored" traceback before a refusal that exits 3 is not a crash.
  */
 export function isPythonCrash(stderr) {
   if (typeof stderr !== "string") return false;
-  const lines = stderr.split("\n").filter((l) => l.trim() !== "");
-  const last = lines.at(-1);
-  if (last === undefined || !PY_EXCEPTION_LINE.test(last)) return false;
   if (!PY_FRAME.test(stderr)) return false;
-  return PY_TRACEBACK.test(stderr) || PY_COMPILE_ERROR.test(last);
+  return PY_TRACEBACK.test(stderr) || PY_COMPILE_ERROR.test(stderr);
+}
+
+/**
+ * The exception line of a Python crash, for the decline detail: the first
+ * exception-shaped line after the last frame, which skips the frame's source
+ * and caret lines and stops before a message's continuation, a note or an
+ * atexit line. The last non-empty line when none is found.
+ */
+function pythonExceptionLine(stderr) {
+  const lines = stderr.split("\n");
+  let lastFrame = -1;
+  lines.forEach((l, i) => {
+    if (PY_FRAME.test(l)) lastFrame = i;
+  });
+  for (const l of lines.slice(lastFrame + 1)) {
+    const m = PY_EXCEPTION_LINE.exec(l);
+    if (m) return m[1];
+  }
+  return lines.filter((l) => l.trim() !== "").at(-1) ?? "uncaught exception";
 }
 
 /**
@@ -2325,9 +2353,10 @@ export function isPythonCrash(stderr) {
  *   no `expected`: exit 0                          → "accepted"
  *   no `expected`: exit non-zero                   → "rejected"
  *   `expected`: compared, mapped through direction → as the shell arm
- * A crash is Node's fatal-error footer on stderr, or for Python what
- * isPythonCrash reads (a traceback frame and a final exception line — Python
- * exits 1 on a crash, as a refusal does). Scoring it as a refusal
+ * A crash is Node's fatal-error footer on stderr, or for Python an exit 1
+ * whose stderr isPythonCrash reads as a traceback (a frame under a Traceback
+ * header, or a compile error — Python exits 1 on a crash, as a refusal does).
+ * Scoring it as a refusal
  * would let a script that fails to LOAD read as a control that rejects every
  * hostile input; errored, every case folds into one `entry-not-probeable`.
  */
@@ -2422,14 +2451,11 @@ function runCliCase(
     detail = child.signal
       ? `killed by ${child.signal} (timeout ${timeoutMs}ms)`
       : `never ran: ${child.error?.message ?? "no exit status"}`;
-  } else if (isPython && isPythonCrash(child.stderr)) {
-    // The exception line is the last one, so it names the crash.
+  } else if (isPython && child.status === 1 && isPythonCrash(child.stderr)) {
+    // Exit 1 only: an uncaught exception always exits 1, and a traceback on
+    // any other status (an "Exception ignored" warning) sits beside an answer.
     outcome = "errored";
-    const last = (child.stderr ?? "")
-      .split("\n")
-      .filter((l) => l.trim() !== "")
-      .at(-1);
-    detail = `the CLI crashed (exit ${child.status}) rather than answering: ${last.trim().slice(0, 160)}`;
+    detail = `the CLI crashed (exit ${child.status}) rather than answering: ${pythonExceptionLine(child.stderr).trim().slice(0, 160)}`;
   } else if (!isPython && NODE_FATAL_FOOTER.test(child.stderr ?? "")) {
     outcome = "errored";
     const first = (child.stderr ?? "")

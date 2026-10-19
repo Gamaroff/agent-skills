@@ -380,15 +380,24 @@ takes it.
     the direction to err in. Neither makes the crash *errored*: only Node's
     uncaught-error footer, a kill or a timeout does.
   - **A Python crash exits 1, which is what a refusal exits with**, and prints
-    no Node footer. For a `.py` entry the engine reads stderr instead: the last
-    non-empty line is an exception (`ValueError: …`, a dotted or custom class,
-    `KeyboardInterrupt`), a `File "…", line N` frame precedes it, and there is
-    either a `Traceback (most recent call last):` header or a `SyntaxError` /
-    `IndentationError` / `TabError` (a compile error prints the frame with no
-    header). All three make the case *errored*. A plain `sys.exit(1)`, or a
-    refusal that prints an exception-shaped line with no frame, stays
-    *rejected*. A script that catches its failure and prints the traceback
-    itself reads as a crash — *errored*, the safe direction.
+    no Node footer. For a `.py` entry that exits 1 the engine reads stderr
+    instead: a `File "…", line N` frame under a `Traceback (most recent call
+    last):` header (an ExceptionGroup's `+ Exception Group Traceback` included),
+    or a frame and a `SyntaxError` / `IndentationError` / `TabError` line (a
+    compile error prints no header), makes the case *errored* — **whatever comes
+    after the traceback**. A multi-line message, an `add_note()` hint, an
+    ExceptionGroup's box drawing and an atexit handler's output all put
+    something other than the exception last; keying on the last line read each
+    as a refusal (task.215 QA cycle 1). A plain `sys.exit(1)`, a refusal that
+    prints an exception-shaped line with no frame, and a frame-shaped log line
+    with no header stay *rejected*. A script that catches its failure and
+    prints the traceback itself reads as a crash — *errored*, the safe
+    direction. Only exit 1 is read this way, because an uncaught exception
+    always exits 1: an "Exception ignored" traceback before an answer on any
+    other status (0, or a refusal's 3) is not a crash. One crash is not
+    detectable: a script that sets `sys.tracebacklimit = 0` prints the bare
+    exception line with no frame, which is byte-for-byte what a refusal
+    printing that line looks like, so it reads as *rejected*.
   - **A materialised sink writes the case's name into the fixture.** For a sink
     in `MATERIALISED_SINKS` the fixture directory holds the sink's controls
     *and* a file named by the case's input — the cwd, and `{fixture}`, are what

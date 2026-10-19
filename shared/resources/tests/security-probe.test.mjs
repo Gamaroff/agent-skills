@@ -2814,6 +2814,13 @@ test("cli entry (python): the child runs as python3 -E -s -B, never -I", () => {
     cases: CASES.filter((c) => c.direction === "legitimate"),
     argv: HOST_ARGV,
   });
+  // A run that declines before spawning has no cases, and the loop below
+  // would then check no flag at all (QA cycle 1, CR-2).
+  assert.equal(r.interpreter?.name, "python3", JSON.stringify(r));
+  assert.equal(
+    r.executed,
+    CASES.filter((c) => c.direction === "legitimate").length,
+  );
   for (const c of r.cases) {
     assert.equal(c.outcome, "accepted", `${c.id}: ${c.detail}`);
   }
@@ -2845,6 +2852,9 @@ test("cli entry (python): an uncaught exception and a SyntaxError are errored �
   for (const [name, shape] of [
     ["cli-crasher", /RuntimeError: cannot start/],
     ["cli-syntax-error", /SyntaxError/],
+    // The traceback does not end on the exception: a two-line message, then
+    // an atexit line. The detail still names the exception (QA cycle 1).
+    ["cli-crasher-multiline", /ValueError: cannot start/],
   ]) {
     const r = runProbeSpec({
       sink: "url-authority",
@@ -2881,7 +2891,24 @@ test("cli entry (python): a plain sys.exit(1) refusal, and a refusal that prints
   }
 });
 
-test("cli entry (python): isPythonCrash needs a traceback frame AND a final exception line", () => {
+test("cli entry (python): a traceback on a non-1 exit is not a crash — the exit status still answers", () => {
+  // Python prints an "Exception ignored" traceback from a failing __del__ and
+  // carries on; an uncaught exception always exits 1. So a refusal exiting 3,
+  // and an acceptance exiting 0, are answers even with a traceback on stderr.
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-refuser-unraisable"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+  assert.equal(r.executed, CASES.length);
+  for (const c of r.cases) {
+    assert.equal(c.exit, c.direction === "hostile" ? 3 : 0, c.id);
+  }
+});
+
+test("cli entry (python): isPythonCrash reads the traceback, not the last line", () => {
   const tb = [
     "Traceback (most recent call last):",
     '  File "/x/a.py", line 2, in <module>',
@@ -2910,6 +2937,44 @@ test("cli entry (python): isPythonCrash needs a traceback frame AND a final exce
   assert.equal(isPythonCrash(syntax), true);
   assert.equal(isPythonCrash(interrupt), true);
   assert.equal(isPythonCrash(dotted), true);
+  // Real Python 3 crashes whose last stderr line is not the exception
+  // (QA cycle 1, TASK-215-QA1-1 — each was read as a refusal).
+  const multiline = [
+    "Traceback (most recent call last):",
+    '  File "/x/a.py", line 1, in <module>',
+    '    raise ValueError("cannot start\\nsee docs")',
+    "ValueError: cannot start",
+    "see docs at https://example.invalid/policy",
+  ].join("\n");
+  const group = [
+    "  + Exception Group Traceback (most recent call last):",
+    '  |   File "/x/a.py", line 1, in <module>',
+    '  |     raise ExceptionGroup("startup failed", [ValueError("a")])',
+    "  | ExceptionGroup: startup failed (1 sub-exception)",
+    "  +-+---------------- 1 ----------------",
+    "    | ValueError: a",
+    "    +------------------------------------",
+  ].join("\n");
+  const trailing = `${tb}\ncleanup done, bye`;
+  const noted = `${tb}\nhint (set POLICY_PATH)`;
+  const importedSyntax = [
+    "Traceback (most recent call last):",
+    '  File "/x/main.py", line 2, in <module>',
+    "    import helper",
+    '  File "/x/helper.py", line 1',
+    "    def f(:",
+    "          ^",
+    "SyntaxError: invalid syntax",
+  ].join("\n");
+  for (const [name, text] of Object.entries({
+    multiline,
+    group,
+    trailing,
+    noted,
+    importedSyntax,
+  })) {
+    assert.equal(isPythonCrash(text), true, name);
+  }
   assert.equal(
     isPythonCrash(
       [
@@ -2934,10 +2999,20 @@ test("cli entry (python): isPythonCrash needs a traceback frame AND a final exce
   );
   assert.equal(isPythonCrash("SyntaxError: refused input"), false);
   assert.equal(isPythonCrash(undefined), false);
-  // A frame earlier in stderr and a refusal message last is not a crash.
+  // A frame alone, at column 0, is a log line, not a traceback frame.
+  assert.equal(
+    isPythonCrash(
+      'Traceback (most recent call last):\nFile "/x", line 1\nValueError: x',
+    ),
+    false,
+  );
+  // A traceback followed by a refusal message reads as a crash: the probe
+  // cannot tell a caught-and-printed failure from an uncaught one, and
+  // `errored` ("could not look") is the safe direction — never a false pass.
+  // runCliCase asks only on exit 1, so a refusal exiting 3 is not affected.
   assert.equal(
     isPythonCrash(`${tb}\nrecovered — refused: 'a/b' is not a bare host`),
-    false,
+    true,
   );
 });
 
