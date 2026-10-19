@@ -781,6 +781,13 @@ const PYTHON_CRASH = "crash";
  * written into that file. The nonce is the engine's, per case, and comes off
  * argv before the body runs: nothing else on the fd reads as a record.
  *
+ * The record speaks for the body's frame only. An exception Python prints and
+ * swallows elsewhere — a joined worker thread, an atexit handler, a finaliser
+ * — leaves `python3 <entry>` exiting 0 after `answer` was written, and the
+ * case is scored by that exit status: a hostile case reads accepted, a false
+ * alarm, never a pass. A stated limit in probe-boundary-rule.md (QA cycle 5,
+ * TASK-215-QA5-1).
+ *
  * Only the process that started the bootstrap writes, and a forked child
  * closes the fd (QA cycle 3, TASK-215-QA3-2/QA3-3): a child would otherwise
  * report for the parent, and a daemon holding the pipe kept every case

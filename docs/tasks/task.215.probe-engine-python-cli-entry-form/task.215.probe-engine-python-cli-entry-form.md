@@ -174,29 +174,28 @@ Both items need a merged, tagged release, and `/finalise` runs before merge, so 
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-19
-**Quality Score**: 50/100
-**Gate Decision**: FAIL
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
 
-- **Full Report**: [task.215.qa.4.probe-engine-python-cli-entry-form.md](./task.215.qa.4.probe-engine-python-cli-entry-form.md)
-- **Gate File**: [task.215.gate.4.probe-engine-python-cli-entry-form.yml](./task.215.gate.4.probe-engine-python-cli-entry-form.yml)
+- **Full Report**: [task.215.qa.5.probe-engine-python-cli-entry-form.md](./task.215.qa.5.probe-engine-python-cli-entry-form.md)
+- **Gate File**: [task.215.gate.5.probe-engine-python-cli-entry-form.yml](./task.215.gate.5.probe-engine-python-cli-entry-form.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 320
+- **Tests Executed**: 322
 - **Phases Verified**: 2/2
-- **Critical Issues**: 1
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 0
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-- Cycle 3 findings fixed and verified (TASK-215-QA3-1 to QA3-4; bugs 4–6 closed). Probe: 11 crash shapes behind a silent excepthook are `errored`.
-- TASK-215-QA4-1 (HIGH): a script that closes fd 3 loses the crash marker (or has it written into its own file), so the crash is scored `rejected`. SC4 is unmet. Bug report: [task.215.bug.7.closed-fd3-loses-crash-marker.md](./task.215.bug.7.closed-fd3-loses-crash-marker.md)
-- TASK-215-QA4-2 (MEDIUM): `probePython` runs under a different environment from the cases. Bug report: [task.215.bug.8.interpreter-probe-env-differs.md](./task.215.bug.8.interpreter-probe-env-differs.md)
+- Cycle 4 findings fixed and verified (TASK-215-QA4-1, QA4-2, CR-3; bugs 7–8 closed). Probe: 26 cases, no crash shape scored `rejected`; a closed, replaced or reopened fd 3, `os._exit`, `exec` and an interpreter that cannot start are `errored`, never scored.
+- TASK-215-QA5-1 (MEDIUM): an exception outside the main frame (a joined worker thread, an atexit handler) exits 0 under `python3` and is scored `accepted` — the false-alarm direction, but not stated as a limit. Bug report: [task.215.bug.9.crash-outside-main-frame-scored-answer.md](./task.215.bug.9.crash-outside-main-frame-scored-answer.md)
 
 ### Bug Reports
 
@@ -206,8 +205,9 @@ Both items need a merged, tagged release, and `/finalise` runs before merge, so 
 - [TASK-215-BUG-4: unprintable exception loses the crash marker](./task.215.bug.4.unprintable-exception-loses-marker.md) — ✅ Closed — Priority: High (verified QA cycle 4)
 - [TASK-215-BUG-5: forked child writes the crash marker](./task.215.bug.5.forked-child-writes-marker.md) — ✅ Closed — Priority: Medium (verified QA cycle 4)
 - [TASK-215-BUG-6: forked daemon holds the crash fd](./task.215.bug.6.forked-daemon-holds-crash-fd.md) — ✅ Closed — Priority: Medium (verified QA cycle 4)
-- [TASK-215-BUG-7: a closed fd 3 loses the crash marker](./task.215.bug.7.closed-fd3-loses-crash-marker.md) — ✅ Ready for QA — Priority: High (fixed QA-fix cycle 4)
-- [TASK-215-BUG-8: the interpreter probe runs under a different environment](./task.215.bug.8.interpreter-probe-env-differs.md) — ✅ Ready for QA — Priority: Medium (fixed QA-fix cycle 4)
+- [TASK-215-BUG-7: a closed fd 3 loses the crash marker](./task.215.bug.7.closed-fd3-loses-crash-marker.md) — ✅ Closed — Priority: High (verified QA cycle 5)
+- [TASK-215-BUG-8: the interpreter probe runs under a different environment](./task.215.bug.8.interpreter-probe-env-differs.md) — ✅ Closed — Priority: Medium (verified QA cycle 5)
+- [TASK-215-BUG-9: a crash outside the main frame is scored as the answer](./task.215.bug.9.crash-outside-main-frame-scored-answer.md) — ✅ Ready for QA — Priority: Medium (fixed QA-fix cycle 5)
 
 <!-- change-log-start -->
 ## Change Log
@@ -226,6 +226,8 @@ Both items need a merged, tagged release, and `/finalise` runs before merge, so 
 | 2026-10-19 |  | QA findings fixed — cycle 3, 4 findings (TASK-215-QA3-1 to QA3-4); Status → Ready for Review | qa-fix |
 | 2026-10-19 |  | QA gate FAIL (50/100) — 2 findings; Status → In Progress | qa-task |
 | 2026-10-19 |  | QA findings fixed — cycle 4, 3 findings (TASK-215-QA4-1, QA4-2, CR-3); Status → Ready for Review | qa-fix |
+| 2026-10-19 |  | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-10-19 |  | QA findings fixed — cycle 5, 1 finding (TASK-215-QA5-1); Status → Ready for Review | qa-fix |
 <!-- change-log-end -->
 
 ---
@@ -339,5 +341,18 @@ maintainer chose the positive channel over scoping SC4.
 - Tests: 2 fixtures, 2 new tests; 20 python tests. Both new tests red on the cycle-3 engine. 8
   mutations each red: no fd-identity check; nonce ignored (crash, answer); missing record read as
   an answer; no record on `SystemExit`; no record on return; no `register_at_fork`; no crash record.
+
+### QA Fix — cycle 5 (2026-10-19)
+
+- TASK-215-QA5-1 (BUG-9): an exception outside the body's frame (a joined worker thread, an atexit
+  handler) exits 0 under `python3` and is scored `accepted`. Stated as a limit in
+  `probe-boundary-rule.md`, the engine's bootstrap comment and CHANGELOG, and pinned by a test
+  (`cli-thread-crash.py`). Not fixed by wrapping `threading.excepthook`: that would score a worker
+  that logs and recovers as `errored`, which `python3 <entry>` does not do.
+- Gate 5 advisory (crash-record precedence untested): new test with `cli-forged-answer-crash.py`,
+  a script that writes `answer <nonce>` itself and then crashes — every hostile case `errored`.
+- Tests: 2 fixtures, 2 new tests; 22 python tests. Mutations each red: answer record outranks the
+  crash record (the forged-answer test); a traceback read on any exit status (the thread test and 3
+  others).
 
 - QA artifacts land beside this file: `task.215.qa.{N}.*.md`, `task.215.bug.{N}.*.md`, `task.215.gate.{N}.*.yml`.

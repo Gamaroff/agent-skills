@@ -17,7 +17,10 @@ All notable changes to this project will be documented in this file. Format foll
   a forked child neither writes the record nor holds the pipe open. A case with **no** record is
   `errored` too, so a script that closes fd 3, leaves by `os._exit` or cannot start inside the
   sandbox is declined, never scored. An exit 1 with a traceback on stderr also counts as a crash. A
-  crash is scored `errored`, never `rejected`. `-B` stops a sibling import writing
+  crash is scored `errored`, never `rejected`. One stated limit: an exception Python prints and
+  swallows outside the script's main frame (a joined worker thread, an atexit handler) leaves
+  `python3` exiting 0, so the case is scored by that exit status — a hostile case reads `accepted`, a
+  false alarm, never a pass. `-B` stops a sibling import writing
   `__pycache__/` into the watched script directory; `-I` is not used because it breaks sibling
   imports. With no `python3` on `PATH` the entry is declined once, naming `python3`. The result and
   the run record carry a new `interpreter` field (`{ name, version }`, `null` for every other form).

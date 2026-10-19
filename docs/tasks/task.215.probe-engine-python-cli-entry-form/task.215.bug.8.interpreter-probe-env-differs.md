@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa
+status: closed
 severity: 'Minor'
 priority: 'Medium'
 created: 2026-10-19
@@ -15,7 +15,7 @@ tags: [task.215, security-probe, python, platform-variance]
 **Bug ID**: TASK-215-BUG-8
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle 4 safety re-probe: diff reviewer CR-2)
 **Date Found**: 2026-10-19
 
@@ -83,3 +83,4 @@ turn this into `errored`.
 | 2026-10-19 | New | qa-task | Found in QA cycle 4 |
 | 2026-10-19 | In Progress | qa-fix | Investigation started |
 | 2026-10-19 | Ready for QA | qa-fix | Fix implemented (QA fix cycle 4) |
+| 2026-10-19 | Closed | qa-task | Verified by task.215.qa.5.probe-engine-python-cli-entry-form.md |

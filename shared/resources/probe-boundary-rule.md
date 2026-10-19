@@ -407,7 +407,15 @@ takes it.
     `os._exit` or replaces itself with `exec`, and a `python3` that answers
     `--version` but cannot start inside the sandbox (the engine probes it
     under its own environment, not the case's), leave no record and are
-    *errored* on every case — declined `entry-not-probeable`, never scored. As a second
+    *errored* on every case — declined `entry-not-probeable`, never scored.
+    **A second stated limit, the other direction:** an exception the body's
+    frame never sees — raised in a worker thread the body started and joined,
+    in an atexit handler, or in a finaliser — is printed by Python and
+    swallowed, `python3 <path>` exits 0, and the bootstrap has already written
+    `answer`. The case is scored by that exit status, so a hostile case reads
+    *accepted*: a reproduction to investigate, never a pass (task.215 QA cycle
+    5). A control that validates in a worker thread is probed through the
+    exit status its main thread chooses. As a second
     signal, an exit 1 whose stderr holds a `File "…", line N` frame under a
     `Traceback (most recent call last):` header (an ExceptionGroup's
     included), or a frame and a `SyntaxError`-family line, is *errored*

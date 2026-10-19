@@ -3003,6 +3003,51 @@ test("cli entry (python): a case with no exit record is errored — a closed fd 
   }
 });
 
+test("cli entry (python): a forged answer record does not outrank the crash that follows it", () => {
+  // cli-forged-answer-crash writes `answer <nonce>` with the real nonce (it is
+  // on sys.orig_argv), then crashes behind a quiet excepthook. Read with the
+  // answer first, every hostile case scored `rejected` (QA cycle 5 mutation:
+  // "answer wins over crash" reddened nothing).
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-forged-answer-crash"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.notEqual(r.verdict, "engages", JSON.stringify(r));
+  const hostile = CASES.filter((c) => c.direction === "hostile");
+  assert.ok(hostile.length > 0);
+  for (const c of hostile) {
+    const got = [...r.cases, ...r.declined].find((x) => x.id === c.id);
+    assert.ok(got, `${c.id} missing`);
+    assert.equal(got.outcome, "errored", `${c.id}: ${got.detail}`);
+    assert.match(
+      got.detail,
+      /crashed \(exit 1\).*ValueError: cannot parse host/,
+    );
+  }
+});
+
+test("cli entry (python): a crash outside the main frame is scored by python3's exit status — never a pass", () => {
+  // The stated limit (probe-boundary-rule.md): a worker thread that raises
+  // while the main thread exits 0 is what `python3 <entry>` reports, so a
+  // hostile case reads `accepted` — a reproduction, the false-alarm direction.
+  // What must never happen is a pass (QA cycle 5, TASK-215-QA5-1).
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-thread-crash"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.notEqual(r.verdict, "engages", JSON.stringify(r));
+  const hostile = r.cases.filter((c) => c.direction === "hostile");
+  assert.ok(hostile.length > 0, JSON.stringify(r));
+  for (const c of hostile) {
+    assert.equal(c.outcome, "accepted", `${c.id}: ${c.detail}`);
+    assert.equal(c.exit, 0, c.id);
+  }
+});
+
 test("cli entry (python): __main__ is still the script's module after the body returns", () => {
   // cli-main-atexit's atexit handler exits 8 unless __main__ is the script's
   // module; runpy swapped the bootstrap back in (QA cycle 3, TASK-215-QA3-4).
