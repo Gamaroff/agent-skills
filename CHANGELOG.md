@@ -10,12 +10,14 @@ All notable changes to this project will be documented in this file. Format foll
   now runs the script under `python3 -E -s -B` with the same `--argv` template, sandbox, timeout and
   exit-status verdict as a Node CLI, so a Python boundary reaches the DoD probe instead of being
   declined `entry-not-probeable` and tripping the zero-candidates guard. A Python crash exits 1, the
-  status a refusal exits with, so the script runs inside a bootstrap that catches an uncaught
-  exception before any excepthook runs and writes a constant marker on fd 3, which the script does
-  not write, before reading anything off the exception; a replaced excepthook (rich, Typer), a
-  redirected `sys.stderr` or an exception that cannot be printed cannot hide it, and a forked
-  child neither writes the marker nor holds the pipe open. An exit 1 with a
-  traceback on stderr also counts. A crash is scored `errored`, never `rejected`. `-B` stops a sibling import writing
+  status a refusal exits with, so the script runs inside a bootstrap that writes an exit record on
+  fd 3 for every exit it controls: `answer` when the script returns or calls `sys.exit`, `crash`
+  when it raises anything else, caught before any excepthook runs. A replaced excepthook (rich,
+  Typer), a redirected `sys.stderr` or an exception that cannot be printed cannot hide a crash, and
+  a forked child neither writes the record nor holds the pipe open. A case with **no** record is
+  `errored` too, so a script that closes fd 3, leaves by `os._exit` or cannot start inside the
+  sandbox is declined, never scored. An exit 1 with a traceback on stderr also counts as a crash. A
+  crash is scored `errored`, never `rejected`. `-B` stops a sibling import writing
   `__pycache__/` into the watched script directory; `-I` is not used because it breaks sibling
   imports. With no `python3` on `PATH` the entry is declined once, naming `python3`. The result and
   the run record carry a new `interpreter` field (`{ name, version }`, `null` for every other form).

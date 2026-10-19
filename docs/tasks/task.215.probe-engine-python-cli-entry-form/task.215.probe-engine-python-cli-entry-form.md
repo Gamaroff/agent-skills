@@ -5,7 +5,7 @@ type: task
 description: "Let shared/resources/security-probe.mjs probe a Python script through the existing cli: form (by file extension), so a Python boundary reaches the DoD probe instead of failing the zero-candidates guard."
 tags: [security-probe, finalise, qa-task, qa-story, review-security, observation]
 category: infrastructure
-status: in-progress
+status: ready-for-review
 priority: Medium
 created: 2026-10-19
 updated: 2026-10-19
@@ -206,8 +206,8 @@ Both items need a merged, tagged release, and `/finalise` runs before merge, so 
 - [TASK-215-BUG-4: unprintable exception loses the crash marker](./task.215.bug.4.unprintable-exception-loses-marker.md) — ✅ Closed — Priority: High (verified QA cycle 4)
 - [TASK-215-BUG-5: forked child writes the crash marker](./task.215.bug.5.forked-child-writes-marker.md) — ✅ Closed — Priority: Medium (verified QA cycle 4)
 - [TASK-215-BUG-6: forked daemon holds the crash fd](./task.215.bug.6.forked-daemon-holds-crash-fd.md) — ✅ Closed — Priority: Medium (verified QA cycle 4)
-- [TASK-215-BUG-7: a closed fd 3 loses the crash marker](./task.215.bug.7.closed-fd3-loses-crash-marker.md) — 🆕 New — Priority: High (QA cycle 4)
-- [TASK-215-BUG-8: the interpreter probe runs under a different environment](./task.215.bug.8.interpreter-probe-env-differs.md) — 🆕 New — Priority: Medium (QA cycle 4)
+- [TASK-215-BUG-7: a closed fd 3 loses the crash marker](./task.215.bug.7.closed-fd3-loses-crash-marker.md) — ✅ Ready for QA — Priority: High (fixed QA-fix cycle 4)
+- [TASK-215-BUG-8: the interpreter probe runs under a different environment](./task.215.bug.8.interpreter-probe-env-differs.md) — ✅ Ready for QA — Priority: Medium (fixed QA-fix cycle 4)
 
 <!-- change-log-start -->
 ## Change Log
@@ -225,6 +225,7 @@ Both items need a merged, tagged release, and `/finalise` runs before merge, so 
 | 2026-10-19 |  | QA gate FAIL (50/100) — 4 findings; Status → In Progress | qa-task |
 | 2026-10-19 |  | QA findings fixed — cycle 3, 4 findings (TASK-215-QA3-1 to QA3-4); Status → Ready for Review | qa-fix |
 | 2026-10-19 |  | QA gate FAIL (50/100) — 2 findings; Status → In Progress | qa-task |
+| 2026-10-19 |  | QA findings fixed — cycle 4, 3 findings (TASK-215-QA4-1, QA4-2, CR-3); Status → Ready for Review | qa-fix |
 <!-- change-log-end -->
 
 ---
@@ -316,5 +317,27 @@ Run after the QA loop's not-converging escalation, on a granted re-entry (2 extr
 - Tests: 5 fixtures, 4 new tests; 18 python tests. 6 mutations each red: no token; the `str()`
   failure not caught; the reader taking the token line as the detail; no pid check; no
   `register_at_fork`; `runpy` restoring `__main__`.
+
+### QA Fix — cycle 4 (2026-10-19)
+
+Run after the second not-converging escalation, on a second granted re-entry (2 extra cycles); the
+maintainer chose the positive channel over scoping SC4.
+
+- Struck mechanism (third strike on `security-probe.mjs`, cycles 2–4): crash detection through a
+  **negative** signal — a token written only on a crash, its absence read as an answer, so every
+  way to lose the write was a false `rejected`. Move: **replace** — the bootstrap writes an exit
+  record on every exit it controls (`answer <nonce>` on return or `SystemExit`, `crash <nonce>`
+  on anything else), only while fd 3 is still the pipe it started with; a case with no record is
+  `errored`. TASK-215-QA4-1: a script that closes fd 3 (or opens its own file there) is now
+  declined, and nothing is written into its file (BUG-7).
+- Other findings in the file, fixed as usual: QA4-2 — an interpreter that answers `--version` but
+  cannot start a case writes no record, so every case is `errored` and the entry is declined once
+  (BUG-8); `probePython` itself is unchanged and its comment says why. CR-3 — the record is read
+  once per case.
+- Stated limit, fail-safe: a script that leaves by `os._exit` or `exec` also leaves no record and
+  is declined (`probe-boundary-rule.md`).
+- Tests: 2 fixtures, 2 new tests; 20 python tests. Both new tests red on the cycle-3 engine. 8
+  mutations each red: no fd-identity check; nonce ignored (crash, answer); missing record read as
+  an answer; no record on `SystemExit`; no record on return; no `register_at_fork`; no crash record.
 
 - QA artifacts land beside this file: `task.215.qa.{N}.*.md`, `task.215.bug.{N}.*.md`, `task.215.gate.{N}.*.yml`.

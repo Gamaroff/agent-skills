@@ -1,6 +1,6 @@
 ---
 type: bug
-status: new
+status: ready-for-qa
 severity: 'Minor'
 priority: 'Medium'
 created: 2026-10-19
@@ -15,7 +15,7 @@ tags: [task.215, security-probe, python, platform-variance]
 **Bug ID**: TASK-215-BUG-8
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: New
+**Status**: ✅ Ready for QA
 **Found By**: QA Engineer (cycle 4 safety re-probe: diff reviewer CR-2)
 **Date Found**: 2026-10-19
 
@@ -50,8 +50,36 @@ Probe the interpreter the way a case runs it: `caseEnv`-shaped environment, `PYT
 trivial `-c` body. A start token written by the bootstrap (see BUG-7's recommendation) would also
 turn this into `errored`.
 
+## Developer Fix Cycle
+
+### Iteration 1
+
+#### Investigation (New → In Progress)
+
+**Date**: 2026-10-19
+
+**Root Cause**: `probePython` runs `python3 --version` under the engine environment; cases run under `caseEnv`. An interpreter that cannot start under the sandbox HOME exited 1 on every case with no crash marker, which read as a refusal.
+
+#### Fix Implementation (In Progress → Ready for QA)
+
+**Date**: 2026-10-19
+
+**Fix Description**: Covered by the positive channel: a child that never reaches the bootstrap writes no exit record, so every case is `errored` and the entry is declined once. `probePython` is unchanged; its comment states the gap and why it is now safe.
+
+**Files Modified**:
+
+- `shared/resources/security-probe.mjs` (and its bundled copies)
+- `shared/resources/tests/security-probe.test.mjs`
+- `shared/resources/probe-boundary-rule.md` (and its bundled copies)
+
+**Testing**: New test `a python3 that answers --version but cannot start a case …` (PATH shim). Red on the cycle-3 engine (`rejects-every-input`).
+
+**Verification Steps for QA**: Put a `python3` shim first on PATH that answers `--version` and exits 1 otherwise; run the probe on `cli-refuser.py`: `unverifiable` / `entry-not-probeable`, detail names the missing record and the shim's stderr.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
 | --- | --- | --- | --- |
 | 2026-10-19 | New | qa-task | Found in QA cycle 4 |
+| 2026-10-19 | In Progress | qa-fix | Investigation started |
+| 2026-10-19 | Ready for QA | qa-fix | Fix implemented (QA fix cycle 4) |

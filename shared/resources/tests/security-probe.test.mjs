@@ -2971,6 +2971,38 @@ test("cli entry (python): a forked daemon does not hold the case open past the s
   }
 });
 
+test("cli entry (python): a case with no exit record is errored — a closed fd 3, a forged line and os._exit never score", () => {
+  // The channel is positive: the bootstrap writes `answer <nonce>` or
+  // `crash <nonce>` on every exit it controls, and a case without one is
+  // errored. cli-closes-record-fd closes fd 3 and opens its own file there,
+  // then crashes behind a quiet excepthook on hostile input; read as "no crash
+  // record, so it answered", every hostile case scored `rejected` and the
+  // verdict was `engages` (QA cycle 4, TASK-215-QA4-1). cli-forged-record
+  // writes nonce-less `answer` / `crash` lines itself and leaves by os._exit.
+  for (const name of ["cli-closes-record-fd", "cli-forged-record"]) {
+    const r = runProbeSpec({
+      sink: "url-authority",
+      entry: PY(name),
+      cases: CASES,
+      argv: HOST_ARGV,
+    });
+    assert.equal(r.verdict, "unverifiable", `${name}: ${JSON.stringify(r)}`);
+    assert.equal(r.reason, "entry-not-probeable", name);
+    assert.equal(r.executed, 0, name);
+    assert.equal(r.cases.length, CASES.length, name);
+    for (const c of r.cases) {
+      assert.equal(c.outcome, "errored", `${name} ${c.id}: ${c.detail}`);
+      assert.match(c.detail, /without the bootstrap's exit record/, name);
+      // Exit 7: the bootstrap wrote into the script's own fd 3.
+      assert.notEqual(
+        c.exit,
+        7,
+        `${name} ${c.id}: record written into the script's file`,
+      );
+    }
+  }
+});
+
 test("cli entry (python): __main__ is still the script's module after the body returns", () => {
   // cli-main-atexit's atexit handler exits 8 unless __main__ is the script's
   // module; runpy swapped the bootstrap back in (QA cycle 3, TASK-215-QA3-4).
@@ -3203,6 +3235,51 @@ test("cli entry (python): with no python3 on PATH the entry is declined once, by
     assert.equal(r.interpreter, null);
   } finally {
     rmSync(emptyBin, { recursive: true, force: true });
+  }
+});
+
+test("cli entry (python): a python3 that answers --version but cannot start a case is declined, never scored", () => {
+  // probePython runs under the engine's environment and every case under
+  // caseEnv, so an interpreter that needs the real HOME passes the probe and
+  // then exits 1 on every case before the bootstrap runs. Read off the exit
+  // status, every case scored `rejected` (QA cycle 4, TASK-215-QA4-2); with no
+  // exit record, every case is errored and the entry is declined once.
+  const shimBin = mkdtempSync(join(tmpdir(), "probe-python-shim-"));
+  try {
+    const shim = join(shimBin, "python3");
+    writeFileSync(
+      shim,
+      '#!/bin/sh\nif [ "$1" = --version ]; then echo "Python 3.99.0"; exit 0; fi\necho "Fatal Python error: init_fs_encoding" >&2\nexit 1\n',
+    );
+    chmodSync(shim, 0o755);
+    const child = spawnSync(
+      process.execPath,
+      [
+        join(REPO_ROOT, "shared/resources/security-probe.mjs"),
+        "--sink",
+        "url-authority",
+        "--entry",
+        PY("cli-refuser"),
+        "--argv",
+        JSON.stringify(HOST_ARGV),
+        "--json",
+      ],
+      {
+        cwd: REPO_ROOT,
+        encoding: "utf8",
+        env: { PATH: `${shimBin}:${process.env.PATH}` },
+      },
+    );
+    const r = JSON.parse(child.stdout);
+    assert.equal(r.interpreter?.version, "Python 3.99.0", child.stderr);
+    assert.equal(r.verdict, "unverifiable", JSON.stringify(r));
+    assert.equal(r.reason, "entry-not-probeable");
+    assert.equal(r.declined.length, 1);
+    assert.match(r.declined[0].detail, /without the bootstrap's exit record/);
+    assert.match(r.declined[0].detail, /Fatal Python error/);
+    assert.equal(r.executed, 0);
+  } finally {
+    rmSync(shimBin, { recursive: true, force: true });
   }
 });
 

@@ -385,21 +385,29 @@ takes it.
     A `.py` entry runs inside a bootstrap (`PYTHON_BOOTSTRAP`) that runs it as
     `python3 <path>` would — `sys.argv[0]` is the script, `sys.path[0]` its
     directory, `__name__` is `"__main__"` and stays so after the body returns
-    — and catches an uncaught exception **before any excepthook runs**, writes
-    a constant marker on fd 3 before reading anything off the exception (its
-    `Class: message` follows, best-effort, as the detail), then lets the
-    script's own excepthook print it and exits 1. Anything on fd 3 makes the
-    case *errored*; its presence is the signal, never its text, so an
-    exception whose `str()` or class name raises is still a crash (task.215
-    QA cycle 3). That is what stderr alone could not see: a replaced
-    `sys.excepthook` (rich, Typer), `sys.stderr` redirected or `None`, and
-    `sys.tracebacklimit = 0` each exit 1 with no frame, and read as refusals
-    (task.215 QA cycle 2). Only the process that started the bootstrap writes
-    the marker, and a forked child closes fd 3: a child's crash is not the
-    script's answer, and a daemon does not hold the case open past it. A
-    script that closes fd 3 itself loses the marker and is left to the second
-    signal below. `SystemExit` is the script's answer, so a plain
-    `sys.exit(1)` or `sys.exit("refused: …")` stays *rejected*. As a second
+    — and writes an **exit record** on fd 3 for every exit it controls:
+    `answer <nonce>` when the body returns or raises `SystemExit` (the
+    script's answer, so a plain `sys.exit(1)` or `sys.exit("refused: …")`
+    stays *rejected*), and `crash <nonce>` when it raises anything else,
+    caught **before any excepthook runs** and written before anything is read
+    off the exception (its `Class: message` follows, best-effort, as the
+    detail); the script's own excepthook then prints it and the child exits 1.
+    A crash record makes the case *errored*, so an exception whose `str()` or
+    class name raises is still a crash (task.215 QA cycle 3), and so is one
+    behind a replaced `sys.excepthook` (rich, Typer), `sys.stderr` redirected
+    or `None`, or `sys.tracebacklimit = 0` — each exits 1 with no frame, which
+    stderr alone read as a refusal (task.215 QA cycle 2). **A case with no
+    record is *errored* too** — the channel is positive, so every way to lose
+    the write fails safe (task.215 QA cycle 4). The nonce is the engine's, per
+    case. A record is written only while fd 3 is still the pipe the bootstrap
+    started with, and only by the process that started it; a forked child
+    closes fd 3, so a child's crash is not the script's answer and a daemon
+    does not hold the case open past it. **Stated limit:** a script that
+    closes inherited descriptors (`os.closerange(3, …)`), leaves by
+    `os._exit` or replaces itself with `exec`, and a `python3` that answers
+    `--version` but cannot start inside the sandbox (the engine probes it
+    under its own environment, not the case's), leave no record and are
+    *errored* on every case — declined `entry-not-probeable`, never scored. As a second
     signal, an exit 1 whose stderr holds a `File "…", line N` frame under a
     `Traceback (most recent call last):` header (an ExceptionGroup's
     included), or a frame and a `SyntaxError`-family line, is *errored*
