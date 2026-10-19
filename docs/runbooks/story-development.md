@@ -234,7 +234,7 @@ Three things to know if you pick it:
 | 4    | `create-pr`           | Pushes the branch, opens a PR with auto-generated description. `--base` is the Q2 answer, pre-supplied from Phase 0.                                                |
 | 5–6  | `qa-story` → `qa-fix` → `review-pr` | QA review produces a gate file (`PASS` / `CONCERNS` / `FAIL` / `WAIVED`). `qa-fix` runs on `FAIL`, or on an open `top_issues[]` entry that no active waiver covers; a gate in the accepting-route set (any of the QA loop's §5c five routes) hands to `review-pr`. Up to `QA_MAX_CYCLES` cycles (default 5). **Step 5c is the loop's exit gate**: a gate in the accepting-route set hands to `review-pr`, which reviews the PR against the story. `REQUEST CHANGES` returns to `qa-fix` and consumes a cycle from the same cycle budget; `APPROVE`/`CONCERNS` exit to Step 7. Leaves `story.{P}.{E}.{S}.pr-review.{n}.{name}.md`. |
 | 7    | `finalise`            | Validates against the Definition of Done, posts DoD summary to the PR, comments the tracker issue, updates the board. **Runs full side-effects even in lite mode.** |
-| 8    | `commit-changes`      | Stages and commits any final artifacts (implementation report, DoD summary, status updates).                                                                        |
+| 8    | `commit-changes`      | Commits the final implementation report and pushes. The DoD summary and `status: accepted` were already committed by `/finalise` (6a). |
 
 Throughout, `develop-story` records every decision in a co-located implementation report: `story.{P}.{E}.{S}.implementation.{N}.{name}.md`.
 
@@ -272,7 +272,7 @@ What the orchestrator invokes internally, top-down.
 | [`qa-fix`](../../skills/qa-fix/SKILL.md)                 | Applies fixes for `FAIL` gates and for open `top_issues[]` entries no active waiver covers, and for `review-pr`'s `REQUEST CHANGES`. Up to `QA_MAX_CYCLES` cycles (default 5). |
 | [`review-pr`](../../skills/review-pr/SKILL.md)           | Step 5c — the QA loop's exit gate. Reviews the PR against the story (conformance + code). Advisory: writes no gate file; the orchestrator acts on its verdict. |
 | [`finalise`](../../skills/finalise/SKILL.md)             | DoD check, PR comment, tracker comment, board update.              |
-| [`commit-changes`](../../skills/commit-changes/SKILL.md) | Final commit of artifacts and status updates.                      |
+| [`commit-changes`](../../skills/commit-changes/SKILL.md) | Final commit of the implementation report (`/finalise` committed the acceptance artifacts). |
 
 Inside `finalise`, the platform resolver picks one of:
 

@@ -17,7 +17,7 @@ Automated orchestrator (preferred):
 ```
 develop-story [story-file-path]
   └── create-branch → review-story → develop → create-pr → qa-story
-        → qa-fix (up to 5 cycles) → review-pr (Step 5c, loop exit gate)
+        → qa-fix (up to QA_MAX_CYCLES cycles, default 5) → review-pr (Step 5c, loop exit gate)
         → finalise → commit-changes
 ```
 
@@ -35,7 +35,7 @@ Automated orchestrator (preferred):
 ```
 develop-task [task-file-path]
   └── create-branch → review-task → develop → create-pr → qa-task
-        → qa-fix (up to 5 cycles) → review-pr (Step 5c, loop exit gate)
+        → qa-fix (up to QA_MAX_CYCLES cycles, default 5) → review-pr (Step 5c, loop exit gate)
         → finalise → commit-changes
 ```
 

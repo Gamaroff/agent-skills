@@ -1,0 +1,130 @@
+schema: 2
+task: 'task.196.pipeline-docs-qa-loop-and-artifacts'
+task_title: 'Pipeline docs: QA loop, resume and artifacts'
+gate: CONCERNS
+status_reason: 'All 31 audit findings fixed and every routing, budget, resume, commit-timing, merge-gate, hook and naming claim checks against source; but the new README flowcharts send the not-converging resume and the route 2c half-cycle to the wrong node, and the new Step 8 row overstates what Step 8 HALTs on. Three medium, eight low.'
+reviewer: 'QA Engineer'
+head: 'd964bcbf5e1eb401956a315c296dffb8b8ef102c'
+updated: '2026-10-19T19:16:41Z'
+
+top_issues:
+  - id: 'QA-1'
+    severity: medium
+    file: 'skills/develop-task/README.md'
+    finding: 'Diagram 1: HALTCONV resume edge points at 5a (S5; S5pre in develop-story/README.md). grant-qa-cycles.sh re-enters a not-converging halt at 5b, because the convergence check fired before the last gate reached qa-fix (grant-qa-cycles.sh:70-74; resume contract 651-653).'
+    suggested_action: 'In both READMEs point the HALTCONV edge at S6 (qa-fix), labelled "resume: Resume at 5a with k more cycles, grant-qa-cycles.sh re-enters at 5b".'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-2'
+    severity: medium
+    file: 'skills/develop-task/README.md'
+    finding: 'Diagram 1: the route 2c half-cycle edge returns to the ordinary gate fork, so an open entry could reach qa-fix again. The half-cycle has no 5b: no open entry goes to 5c, any open entry escalates (step-5-6-qa-loop.md:1834-1845). Same edge in develop-story/README.md.'
+    suggested_action: 'Add a half-cycle gate node in both READMEs: S6half -- yes --> S5half[5a only, no 5b]; S5half -- no open entry --> S5c; S5half -- open entry --> HALTQA.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-3'
+    severity: medium
+    file: 'docs/reference/pipeline-artifacts.md'
+    finding: 'Step 8 row says "Step 8 HALTs if anything else is dirty". Step 8 also carries tracker handover files and a Jira jira_last_* frontmatter residue; a dirty DoD / sprint review / document body is a Step 7 publish-boundary defect (step-8-commit.md:84-91).'
+    suggested_action: 'Reword: final commit = implementation report, plus any tracker handover files and a Jira jira_last_* frontmatter residue; a dirty DoD, sprint review or document body is caught by Step 7 publish-boundary check.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-4'
+    severity: low
+    file: 'docs/runbooks/story-development.md'
+    finding: 'Step 8 rows still say it commits the DoD summary and status updates (story-development.md:237, :275; task-development.md:116, :152). /finalise 6a commits those (step-8-commit.md:82-86).'
+    suggested_action: 'Reword the four rows: Step 8 commits the final implementation report and pushes; the DoD and status: accepted were committed by /finalise 6a.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-5'
+    severity: low
+    file: 'docs/reference/troubleshooting.md'
+    finding: 'Says the loop has three exits; the source names five routes to 5c (incl. Cosmetic-residue 2b and half-cycle 2c), and the convergence check escalates rather than exits (step-5-6-qa-loop.md:26-37).'
+    suggested_action: 'Add a Cosmetic-residue (route 2b) row and reword the lead-in so the convergence check reads as an escalation.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-6'
+    severity: low
+    file: 'skills/develop-task/README.md'
+    finding: 'Diagram 1 gate fork: an active WAIVED gate keeps its waived findings in top_issues[] with no status:, and goes to 5c whatever its queue (step-5-6-qa-loop.md:416). The labels read as if open entries decide it. Same in develop-story/README.md.'
+    suggested_action: 'Label the branches "no open entry, or an active WAIVED" and "yes: FAIL, or open entries on a non-waived gate".'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-7'
+    severity: low
+    file: 'skills/develop-task/README.md'
+    finding: 'Diagram 5 says the DoD-gaps re-entry is offered when the fix was "committed as code". Phase 0b offers it on any halt_step 7 with GAPS, and the script decides (develop-story SKILL.md:351). Same in develop-story/README.md.'
+    suggested_action: 'Reword: "halt_step 7, DoD GAPS (script refuses a document-only or uncommitted fix)".'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-8'
+    severity: low
+    file: 'skills/develop-batch/README.md'
+    finding: 'Points the bug-item gate table at develop-batch SKILL.md Step 3; develop-batch defers to develop-next Step 3 for bug rows (develop-batch SKILL.md:477-480).'
+    suggested_action: 'In develop-batch/README.md, cite develop-next SKILL.md Step 3 for the table.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-9'
+    severity: low
+    file: 'docs/runbooks/first-week/day-3-messy-path.md'
+    finding: 'Calls qa-gate "the manual-override skill". qa-gate writes the gate file that qa-story relies on (qa-gate SKILL.md:51).'
+    suggested_action: 'Reword: "qa-gate only writes the gate file; qa-story runs the review that decides it".'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-10'
+    severity: low
+    file: 'docs/operations/workflows.md'
+    finding: 'Lines 20 and 38 still say "qa-fix (up to 5 cycles)", the literal-5 wording the PR replaced elsewhere.'
+    suggested_action: 'Reword as "up to QA_MAX_CYCLES cycles (default 5)".'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-11'
+    severity: low
+    file: 'skills/develop-task/README.md'
+    finding: 'The Halt snapshot artifact row still says only "terminal HALT" and "deleted by Start fresh". A PreCompact pause also writes the snapshot, and --restore consumes it on Resume. Same in develop-story/README.md.'
+    suggested_action: 'Match pipeline-artifacts.md: written by a terminal HALT or a PreCompact pause; consumed by --restore on Resume, deleted on Start fresh.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 5969
+  phases_verified: 7/7
+  ci: 'pending @ d964bcbf (test job); link-check, validate, shellcheck pass'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5, 6]
+    phases_with_issues: [2, 3, 5]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'Documentation only; no predicate, script or prompt added (boundary: false — no candidates: the diff adds no function).'
+  performance:
+    status: PASS
+    notes: 'No runtime change.'
+  reliability:
+    status: PASS
+    notes: 'Docs only; rollback is git revert.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Two new diagram edges misstate the loop (QA-1, QA-2); one artifact row overstates Step 8 (QA-3).'
+
+recommendations:
+  immediate:
+    - action: 'Fix QA-1..QA-3 (diagram edges in both develop READMEs; pipeline-artifacts Step 8 row).'
+      refs: ['skills/develop-task/README.md', 'skills/develop-story/README.md', 'docs/reference/pipeline-artifacts.md']
+  future:
+    - action: 'Gap deferred by the review: story-documents.md / file-naming.md lack the sprint-review-summary row (follow-up named in the task Notes).'
+      refs: ['docs/standards/story-documents.md', 'docs/standards/file-naming.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['QA-1..QA-3 fixed']

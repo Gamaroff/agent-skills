@@ -55,7 +55,7 @@ Most of `/develop-story`'s value is in the iteration loop. If your first 5 stori
 
 - [ ] Read the FAIL findings in the gate file
 - [ ] Trim the section to ≤ 50 lines
-- [ ] Re-run `qa-story` (or let the `/develop-story` `qa-fix` loop handle it automatically) — `qa-gate` is the manual-override skill, not the re-review
+- [ ] Re-run `qa-story` (or let the `/develop-story` `qa-fix` loop handle it automatically) — `qa-gate` only writes the gate file; `qa-story` runs the review that decides it
 - [ ] Observe the PASS gate artifact
 
 **Expected artifact:** `story.{P}.{E}.{S}.gate.2.*.yml` with `gate: PASS`

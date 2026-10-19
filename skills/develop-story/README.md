@@ -117,8 +117,8 @@ flowchart TD
     S5map --> S5
     S5[Step 5: qa-story<br/>traceability_matrix arg if mapper ran<br/>lite directive if PIPELINE_MODE=lite]
     S5 --> S5gate{Open top_issues entry?}
-    S5gate -- no: PASS / CONCERNS / active WAIVED --> S5c[Step 5c: review-pr<br/>--effort medium, low if lite<br/>--comment]
-    S5gate -- yes: FAIL or open entries --> S5conv{Convergence check<br/>HIGH stopped falling, cycle ≥ 3?}
+    S5gate -- "no open entry, or an active WAIVED:<br/>PASS / CONCERNS / WAIVED" --> S5c[Step 5c: review-pr<br/>--effort medium, low if lite<br/>--comment]
+    S5gate -- "yes: FAIL, or open entries<br/>on a non-waived gate" --> S5conv{Convergence check<br/>HIGH stopped falling, cycle ≥ 3?}
     S5gate -- malformed gate --> HALTGATE[HALT: gate matches no arm]
     S5conv -- yes --> HALTCONV[HALT: not converging]
     S5conv -- no --> S5route{Route classifier<br/>classifyLoopRoute}
@@ -136,10 +136,12 @@ flowchart TD
     S6prc -- open --> S6cyc{cycle &lt; QA_MAX_CYCLES?<br/>lock qa_max_cycles, default 5}
     S6cyc -- yes --> S5pre
     S6cyc -- no --> S6half{Route 2c:<br/>last fix ungated?}
-    S6half -- yes: one half-cycle --> S5pre
+    S6half -- yes --> S5half[Half-cycle: 5a only, no 5b]
+    S5half -- no open entry --> S5c
+    S5half -- open entry --> HALTQA
     S6half -- no --> HALTQA[HALT: QA loop limit reached]
     HALTQA -.->|"resume: Resume at 5a with k more cycles<br/>grant-qa-cycles.sh"| S5pre
-    HALTCONV -.->|"resume: Resume at 5a with k more cycles"| S5pre
+    HALTCONV -.->|"resume: Resume at 5a with k more cycles<br/>grant-qa-cycles.sh re-enters at 5b"| S6
 
     S7[Step 7: finalise<br/>DoD + 6a acceptance commit + push<br/>CI readings 1 and 2 + tracker close + board Done] --> S7chk{All 3 artifacts?<br/>dod.N.md + status:accepted + PR comment}
     S7chk -- no --> HALT7[HALT: DoD gaps]
@@ -425,8 +427,8 @@ sequenceDiagram
     else
         alt halt snapshot: loop-limit / not-converging
             H->>U: offer "Resume at 5a with {k} more cycles"
-            H->>Lock: grant-qa-cycles.sh — extra_cycles_granted, qa_max_cycles, qa_phase
-        else halt_step 7, DoD ❌ GAPS, fix committed as code
+            H->>Lock: grant-qa-cycles.sh — extra_cycles_granted, qa_max_cycles, qa_phase<br/>(qa_phase 5a, or 5b after not-converging)
+        else halt_step 7, DoD ❌ GAPS (the script refuses a document-only or uncommitted fix)
             H->>U: offer "Re-enter QA at 5a" (Recommended)
             H->>Lock: reenter-qa-after-finalise.sh — current_step 5, qa_phase 5a
         end
@@ -473,7 +475,7 @@ Every file the harness creates or mutates, with its lifecycle. Anchor for "did t
 | Artifact                    | Path pattern                                        | Created by                                                               | Mutated by                                                                                                                 | Terminal state                                  | Resume verification                                                                                           |
 | --------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | Pipeline lock               | `.claude/state/develop-pipeline.lock`               | Step 1 (end of)                                                          | Steps 2–8 banners (`current_step`), Step 4 (`pr_url`), PreCompact hook (rm), Step 8 (rm), terminal HALT (snapshot then rm) | absent at Step 8 success or HALT                | `cat ... \| jq` — read by resume detector                                                                     |
-| Halt snapshot               | `.claude/state/develop-pipeline.last-halt.json`     | terminal HALT (snapshot of lock + `halted_at`/`halt_reason`/`halt_step`) | overwritten on subsequent terminal HALT; deleted by user choosing "Start fresh" on resume                                  | persists until next resume choice               | resume detector reads when active lock absent (`source: "halt_snapshot"`)                                     |
+| Halt snapshot               | `.claude/state/develop-pipeline.last-halt.json`     | terminal HALT or PreCompact pause (snapshot of lock + `halted_at`/`halt_reason`/`halt_step`) | overwritten on a later HALT or pause; consumed by `--restore` on Resume, deleted on "Start fresh"                                         | persists until next resume choice               | resume detector reads when active lock absent (`source: "halt_snapshot"`)                                     |
 | Implementation report       | `story.{P}.{E}.{S}.implementation.{N}.{name}.md` | Phase 0e                                                                 | every step (Pipeline Progress, Decisions Log, Issues Log, QA Iteration History, Subagent summary ref)                      | committed in Step 8                             | read for resume + last ✅ step                                                                                |
 | Story branch                | `feature/story.{P}.{E}.{S}.*`                    | Step 1 via `/create-branch` (from `develop` or the epic integration branch)                             | dev commits, qa-fix commits, final commit                                                                                  | pushed in Step 8                                | `git branch --list`                                                                                           |
 | Review report               | `story.{P}.{E}.{S}.review.{n}.{name}.md`         | Step 2 via `/review-story` (validate-and-apply)                          | —                                                                                                                          | committed with Step 4's commit                  | optional (only if review ran)                                                                                 |

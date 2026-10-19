@@ -56,7 +56,7 @@ The two pipelines are the same shape. Read `story.{P}.{E}.{S}` and `task.{N}` as
 | 6 | `qa-fix` | Fix commits pushed to the branch (no new document) | Yes — immediately |
 | 7 | `finalise` | **DoD summary** `*.dod.{n}.{name}.md`, a PR comment, a tracker-issue comment, a board move, and `status: accepted` on the work item (plus `sprint-review-summary.md`, and for a task the registry tick) | Yes — `/finalise` 6a commits and pushes them, then takes a second CI reading |
 | Run end | `handover-render` | **Tracker handover** `*.handover.{n}.{name}.{md,sh,json}` — written only when the run deferred (or failed) a tracker mutation; an empty journal writes nothing | Yes — Step 8 |
-| 8 | `commit-changes` | The final commit — the implementation report; Step 8 HALTs if anything else is dirty | — |
+| 8 | `commit-changes` | The final commit — the implementation report, plus any tracker handover files and, on Jira, a `jira_last_*` frontmatter residue. A dirty DoD, sprint review or document body is a Step 7 defect, caught by `/finalise`'s publish-boundary check | — |
 
 Steps 5–6 loop up to `QA_MAX_CYCLES` cycles (the lock's `qa_max_cycles`, default 5). Cycle *n* produces `qa.{n}` **and** `gate.{n}` as a pair — a gate file without its report (or vice versa) means the cycle did not finish, and resume will redo it.
 
