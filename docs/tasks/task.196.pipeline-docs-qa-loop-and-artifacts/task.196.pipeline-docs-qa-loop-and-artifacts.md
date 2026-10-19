@@ -5,18 +5,20 @@ type: task
 description: "Bring the develop-pipeline docs in line with how the QA loop routes, how a halted run resumes, and which artifacts a run writes: 31 medium/low findings from the 2026-10-07 doc-drift audit."
 tags: [docs, develop-task, develop-story, qa-loop, doc-drift]
 category: documentation
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-07
 updated: 2026-10-19
 assignee:
 estimated_effort_hours: 8
 github_issue: 599
+completed_date: 2026-10-19
+pr_number: 701
 ---
 
 # Technical Task: Pipeline docs: QA loop, resume and artifacts
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.196.review.1.pipeline-docs-qa-loop-and-artifacts.md` implemented 2026-10-19
 **GitHub Issue**: [#599](https://github.com/Gamaroff/agent-skills/issues/599)
 
@@ -244,23 +246,23 @@ Not applicable.
 
 ### Functional
 
-- [ ] **SC-1** Every finding in the plan is either fixed, or closed in Phase 0 with the reason recorded.
-- [ ] **SC-2** No changed doc still states the old behaviour a finding names (grep of the old wording, recorded per finding).
-- [ ] **SC-3** Every command this task adds to a doc or changes in one is run once, or its source is cited where running it would write to a tracker. Commands a doc already showed and this task leaves unchanged are out of scope.
+- [x] **SC-1** Every finding in the plan is either fixed, or closed in Phase 0 with the reason recorded.
+- [x] **SC-2** No changed doc still states the old behaviour a finding names (grep of the old wording, recorded per finding).
+- [x] **SC-3** Every command this task adds to a doc or changes in one is run once, or its source is cited where running it would write to a tracker. Commands a doc already showed and this task leaves unchanged are out of scope.
 
 ### Performance
 
-- [ ] **SC-4** Not applicable — documentation only; recorded as N/A in the DoD.
+- [x] **SC-4** Not applicable — documentation only; recorded as N/A in the DoD.
 
 ### Code Quality
 
-- [ ] **SC-5** `doc-links.js` passes on every changed doc (Prettier ignores `*.md` in this repository, so it is not a check here).
-- [ ] **SC-6** The CI link checker passes on the PR for every changed doc under `docs/`, including anchors; every `#anchor` added or changed in a skill README resolves to a heading in its target.
-- [ ] **SC-7** `npm run validate:all` passes on the PR head (a regression check — a README edit does not touch the `SKILL.md` frontmatter the validator reads).
+- [x] **SC-5** `doc-links.js` passes on every changed doc (Prettier ignores `*.md` in this repository, so it is not a check here).
+- [x] **SC-6** The CI link checker passes on the PR for every changed doc under `docs/`, including anchors; every `#anchor` added or changed in a skill README resolves to a heading in its target.
+- [x] **SC-7** `npm run validate:all` passes on the PR head (a regression check — a README edit does not touch the `SKILL.md` frontmatter the validator reads).
 
 ### Migration
 
-- [ ] **SC-8** The audit report marks each finding of this task fixed or closed.
+- [x] **SC-8** The audit report marks each finding of this task fixed or closed.
 
 ---
 
@@ -329,11 +331,34 @@ Four QA cycles. All gate 1–3 findings fixed. One LOW carried by the Cosmetic-r
 
 - **CR4-1** (LOW) — carried to gate 4 `recommendations.future` (route 2b, cycle 4): day-3-messy-path.md lines 41 and 77 overstate what qa-story runs for an AC
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.196.qa.4.pipeline-docs-qa-loop-and-artifacts.md`
+**Gate File**: `task.196.gate.4.pipeline-docs-qa-loop-and-artifacts.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (4 QA cycles; Cosmetic-residue exit, CR4-1 carried)
+**PR Review (Step 5c)**: ✅ APPROVE — `task.196.pr-review.1.pipeline-docs-qa-loop-and-artifacts.md`
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** SC-1 to SC-3 and SC-5 to SC-8 met; SC-4 N/A (documentation only). SC-2's per-finding old-wording grep record is in the DoD file.
+✅ **PR:** #701. The host requires no reviews; Step 5c APPROVE. CI green on `bf965c95` (test, link-check, shellcheck, validate).
+✅ **Documentation:** all 15 docs in scope are updated, and the audit report marks 31 findings resolved.
+✅ **Security Review:** PASS. Documentation only, no boundary.
+✅ **Compliance Review:** N/A.
+
+**Task marked as ACCEPTED on:** 2026-10-19
+
+**Detailed Verification Log:** See `task.196.dod.1.pipeline-docs-qa-loop-and-artifacts.md` for the complete verification evidence.
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                                        | Author      |
-| ---------- | ------- | ------------------------------------------------------------------ | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-07 | 1.0     | Initial draft — cut from the 2026-10-07 doc-drift audit | create-task |
 | 2026-10-19 | 1.1     | Review passed (8/10) — format check moved from Prettier (ignores `*.md`) to `doc-links.js`; CI link-check reach stated; SC-3 scoped to changed commands; SC-7 to `validate:all`; out-of-list `story-documents.md` / `file-naming.md` gap deferred | review-task |
 | 2026-10-19 |         | Status → ready-for-development | review-task |
@@ -345,6 +370,7 @@ Four QA cycles. All gate 1–3 findings fixed. One LOW carried by the Cosmetic-r
 | 2026-10-19 |         | QA gate CONCERNS (90/100) — 1 medium, 2 low findings | qa-task |
 | 2026-10-19 |         | QA findings fixed — cycle 3, 3 findings (CR3-1..CR3-3) | qa-fix |
 | 2026-10-19 |         | QA gate PASS (100/100) — 1 low finding, carried (route 2b) | qa-task |
+| 2026-10-19 | 1.2 | DoD passed — accepted (PR #701) | finalise |
 <!-- change-log-end -->
 
 ---
