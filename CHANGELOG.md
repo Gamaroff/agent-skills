@@ -146,6 +146,11 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The security probe's case check no longer refuses a `null` sink or throws on a value JSON cannot
+  hold (task 190 follow-up, CR-2 and CR-3).** `validateCases` treats `"sink": null` as absent, as the
+  code that reads a case's sink already did. `describeBadCase` renders a BigInt or circular value with
+  `String` instead of throwing, so `runProbeSpec` declines such a case `bad-cases` for a library
+  caller. `probe-boundary-rule.md` now lists `bad-cases` among the decline reasons.
 - **The security probe refuses what it cannot score, and the record says why a case was declined
   (task 190).** `security-probe.mjs` now exits 2 before running or recording anything in two cases
   that used to produce a misleading verdict. A `--cases-file` case whose `direction` is not

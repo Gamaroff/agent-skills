@@ -45,6 +45,7 @@ import {
   compareExpected,
   computeVerdict,
   defaultRepoRoot,
+  describeBadCase,
   expectedProblem,
   extractFencedBlock,
   FENCE_PREFIX,
@@ -5736,6 +5737,34 @@ test("validateCases: a present sink outside SINKS is refused; an absent sink is 
   assert.equal(validateCases(CASES), null);
 });
 
+test("validateCases: a null sink is absent, as the readers' `c.sink ?? sink` treat it (CR-3)", () => {
+  assert.equal(validateCases([{ ...CASES[0], sink: null }]), null);
+});
+
+test("describeBadCase never throws: a BigInt or circular value still renders (CR-2)", () => {
+  const circular = {};
+  circular.self = circular;
+  for (const value of [10n, circular]) {
+    const line = describeBadCase({
+      id: "c1",
+      field: "sink",
+      value,
+      accepted: ["a"],
+    });
+    assert.match(line, /^case "c1" has sink .+; accepted: a$/);
+  }
+  // Control: a JSON value renders as before.
+  assert.equal(
+    describeBadCase({
+      id: "c1",
+      field: "sink",
+      value: "nope",
+      accepted: ["a"],
+    }),
+    'case "c1" has sink "nope"; accepted: a',
+  );
+});
+
 test("validateCases: a non-array file and a non-object case are refused; an id-less case is named by index", () => {
   assert.equal(validateCases({ cases: [] }).field, "cases");
   assert.deepEqual(validateCases([CASES[0], "x"]), {
@@ -5845,6 +5874,20 @@ test("runProbeSpec: supplied cases the scorer cannot place are declined bad-case
     r.declined[0].detail,
     /has direction "benign"; accepted: hostile, legitimate/,
   );
+});
+
+test("runProbeSpec: a BigInt or circular case value is declined bad-cases, not thrown (CR-2)", () => {
+  const circular = {};
+  circular.self = circular;
+  for (const sink of [10n, circular]) {
+    const r = runProbeSpec({
+      sink: "url-authority",
+      entry: entry("engaging-control"),
+      cases: [{ ...CASES[0], sink }],
+    });
+    assert.equal(r.reason, "bad-cases");
+    assert.equal(r.executed, 0);
+  }
 });
 
 test("CLI: a missing entry exits 2 entry-not-found and writes no record, for every entry form with a path (obs #211)", () => {

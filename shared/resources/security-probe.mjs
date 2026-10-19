@@ -463,7 +463,8 @@ export function defaultRepoRoot() {
  * mention of the value. `sink` is optional on a case (the run's sink applies
  * when it is absent) but, when present, must name a sink — it selects the
  * fixture. Checked: not an object, a `direction` outside `DIRECTIONS`, a
- * present `sink` outside `SINKS`.
+ * present `sink` outside `SINKS`. A `null` sink is absent, as the readers'
+ * `c.sink ?? sink` treat it.
  *
  * @returns {null | {id: string, field: string, value: unknown, accepted: string[]}}
  */
@@ -495,17 +496,25 @@ export function validateCases(cases) {
         accepted: [...DIRECTIONS],
       };
     }
-    if (c.sink !== undefined && !SINKS.includes(c.sink)) {
+    if (c.sink != null && !SINKS.includes(c.sink)) {
       return { id, field: "sink", value: c.sink, accepted: [...SINKS] };
     }
   }
   return null;
 }
 
-/** The one sentence a `validateCases` finding renders as, for the CLI and the library. */
+/**
+ * The one sentence a `validateCases` finding renders as, for the CLI and the library.
+ * It never throws: a library caller's BigInt or circular value is rendered with
+ * `String`, so `runProbeSpec` declines `bad-cases` rather than throwing.
+ */
 export function describeBadCase(bad) {
-  const value =
-    bad.value === undefined ? "undefined" : JSON.stringify(bad.value);
+  let value;
+  try {
+    value = bad.value === undefined ? "undefined" : JSON.stringify(bad.value);
+  } catch {
+    value = String(bad.value);
+  }
   return `case "${bad.id}" has ${bad.field} ${value}; accepted: ${bad.accepted.join(", ")}`;
 }
 
