@@ -423,24 +423,27 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-19
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.195.qa.1.finding-anchors-follow-ups.md](./task.195.qa.1.finding-anchors-follow-ups.md)
-- **Gate File**: [task.195.gate.1.finding-anchors-follow-ups.yml](./task.195.gate.1.finding-anchors-follow-ups.yml)
+
+- **Full Report**: [task.195.qa.2.finding-anchors-follow-ups.md](./task.195.qa.2.finding-anchors-follow-ups.md)
+- **Gate File**: [task.195.gate.2.finding-anchors-follow-ups.yml](./task.195.gate.2.finding-anchors-follow-ups.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5959
-- **Phases Verified**: 4/4
+
+- **Tests Executed**: 5961
+- **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-TASK-195-QA1-1 (MEDIUM): a `code_review` finding with no `file_line` reads the clean `no-line`. TASK-195-QA1-2 (LOW): the `--inline` guard passes a file that has no findings array.
+
+Both cycle 1 findings were fixed and mutation-proven. The cycle 2 refute pass found 3 advisory bugs, all medium or low confidence, and routed them to future work: CR-1 (review-pr guard accepts one broken lens), CR-2 (null entry crashes the checker, pre-existing) and CR-3 (`--staged --fix` index vs worktree).
 
 <!-- change-log-start -->
 ## Change Log
@@ -454,6 +457,7 @@ TASK-195-QA1-1 (MEDIUM): a `code_review` finding with no `file_line` reads the c
 | 2026-10-19 |         | Status → ready-for-review | develop |
 | 2026-10-19 |         | QA gate CONCERNS (90/100) — 2 findings | qa-task |
 | 2026-10-19 |         | QA findings fixed — 2 of 2 (TASK-195-QA1-1, -2), 1 iteration | qa-fix |
+| 2026-10-19 |         | QA gate PASS (100/100) — 0 findings (3 advisory) | qa-task |
 <!-- change-log-end -->
 
 ---
