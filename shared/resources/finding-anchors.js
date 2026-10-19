@@ -29,16 +29,26 @@
  *                   may be a substring of the line (a reviewer quoting part of a
  *                   long line is not wrong)
  *   unchecked-text  the line exists; no `line_text` was given (range checked only)
- *   no-line         the anchor is not `path:line`: an AC id, a bare path, a range
- *                   (`x.ts:42-58`), or a compound `ref` (`AC-3 / x.js:8`). Nothing
+ *   no-line         a conformance `ref` that is not `path:line`: an AC id, a bare path,
+ *                   a frontmatter field, or a compound `ref` (`AC-3 / x.js:8`). Nothing
  *                   to verify, which is correct for a criterion reference
  *   no-such-file    the path does not exist in the tree being checked (or climbs
  *                   out of `--root`)
  *   out-of-range    the line is < 1 or past the file's last line
  *   text-mismatch   the line exists but does not say `line_text`
+ *   unparseable     a code `file_line` that is not `path:line` — a bare path, a range
+ *                   (`x.ts:42-58`), empty. The code lens's contract is one line, so a
+ *                   value that does not parse is the reviewer breaking it (task.195)
  *
- * The first three are clean; the last three are malformed — "the reviewer is
+ * The first three are clean; the last four are malformed — "the reviewer is
  * wrong" — and are kept apart from `no-line` ("nothing to verify") on purpose.
+ *
+ * ## Which lens — decided by the key, never by the wrapper
+ *
+ * A finding that carries `file_line` is a code-lens finding; one that carries only `ref` is a
+ * conformance finding. The key decides, so a bare array is judged exactly as the wrapped shapes
+ * are. Only a conformance `ref` may legitimately not be a line: `AC-3` is a criterion, but a
+ * `file_line` of `src/x.ts` is a high-confidence bug with no usable location (task.195).
  *
  * A path never contains whitespace, so the anchor pattern is `^(\S+):(-?\d+)$`.
  * Review 1 of task.194 found that a lazy `^(.+?):` parsed the conformance lens's
@@ -49,13 +59,16 @@
  *
  * `--rev <rev>` reads each file with `git cat-file blob <rev>:./<path>` from `--root`, so a
  * merged PR, a fork, or a branch other than the one checked out is checked against the tree
- * that was reviewed. Without `--rev` it reads the working tree under `--root`. Either way the
- * path is relative to `--root`.
+ * that was reviewed; `--root` must itself be in that commit (`git cat-file -t <rev>:./` reads
+ * `tree`), or every finding would read `no-such-file` (task.195). `--index` reads the staged
+ * content with `git cat-file blob :./<path>` — the tree a `--staged` review diffed — and is a
+ * usage error together with `--rev`. With neither, it reads the working tree under `--root`.
+ * Every route resolves the path relative to `--root`.
  * Callers pick (task.194 § Callers): `/review-pr` the PR head, `/qa-*` `HEAD`,
- * `/review-code` nothing for a working-tree review.
+ * `/review-code` nothing for a working-tree review, `--index` for `--staged`.
  *
  * Usage:
- *   node finding-anchors.js --findings-file <json> [--root <dir>] [--rev <git-rev>]
+ *   node finding-anchors.js --findings-file <json> [--root <dir>] [--rev <git-rev> | --index]
  *                           [--annotate <out-file>] [--json]
  *
  * The findings file is `{code_review:{findings:[…]}}`, `{pr_conformance:{findings:[…]}}`,
@@ -67,8 +80,8 @@
  * Exit codes: 0 every anchor is ok / unchecked-text / no-line (`reason: ok`);
  * 1 any is malformed (`reason: malformed-anchors`) — a caller marks and continues,
  * it does not halt; 2 the call is wrong — usage (`reason: usage`), a `--root` that is not a
- * directory (`reason: bad-root`), or a `--rev` that does not name a commit in it
- * (`reason: bad-rev`). The last two are "could not look", which is not the reviewer's fault
+ * directory, is not in the `--rev` tree, or (with `--index`) is not in a git work tree
+ * (`reason: bad-root`), or a `--rev` that does not name a commit in it (`reason: bad-rev`). The last two are "could not look", which is not the reviewer's fault
  * and must never read as `no-such-file` (`checkTree()`).
  */
 "use strict";
@@ -77,13 +90,25 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 
-const MALFORMED = new Set(["no-such-file", "out-of-range", "text-mismatch"]);
+const MALFORMED = new Set([
+  "no-such-file",
+  "out-of-range",
+  "text-mismatch",
+  "unparseable",
+]);
 
-/** `{path, line}` for a `path:line` anchor, or null. `file_line` (code lens) wins over `ref` (conformance lens). */
+/**
+ * `{lens, path, line}` for a `path:line` anchor, or `{lens, path: null}` when the value does not
+ * parse. The lens is the KEY the finding carries: `file_line` is the code lens, `ref` alone the
+ * conformance lens (task.195).
+ */
 function anchorOf(finding) {
-  const raw = finding.file_line ?? finding.ref ?? "";
-  const m = /^(\S+):(-?\d+)$/.exec(String(raw).trim());
-  return m ? { path: m[1], line: Number(m[2]) } : null;
+  const lens = Object.prototype.hasOwnProperty.call(finding, "file_line")
+    ? "code"
+    : "conformance";
+  const raw = lens === "code" ? finding.file_line : finding.ref;
+  const m = /^(\S+):(-?\d+)$/.exec(String(raw ?? "").trim());
+  return m ? { lens, path: m[1], line: Number(m[2]) } : { lens, path: null };
 }
 
 const norm = (s) => String(s).replace(/\s+/g, " ").trim();
@@ -97,22 +122,27 @@ function checkAnchors(findings, { readFile }) {
   return findings.map((f) => {
     const id = f.id ?? null;
     const a = anchorOf(f);
-    if (!a) return { id, verdict: "no-line" };
-    if (!cache.has(a.path)) cache.set(a.path, readFile(a.path));
-    const text = cache.get(a.path);
-    if (text == null) return { id, verdict: "no-such-file", ...a };
+    if (a.path === null) {
+      return a.lens === "code"
+        ? { id, verdict: "unparseable", fileLine: f.file_line ?? null }
+        : { id, verdict: "no-line" };
+    }
+    const { lens, ...at } = a; // the verdict reports where, not which lens
+    if (!cache.has(at.path)) cache.set(at.path, readFile(at.path));
+    const text = cache.get(at.path);
+    if (text == null) return { id, verdict: "no-such-file", ...at };
     const lines = text.split("\n");
     if (text.endsWith("\n")) lines.pop(); // the trailing newline is not a line
-    if (a.line < 1 || a.line > lines.length) {
-      return { id, verdict: "out-of-range", ...a, lineCount: lines.length };
+    if (at.line < 1 || at.line > lines.length) {
+      return { id, verdict: "out-of-range", ...at, lineCount: lines.length };
     }
     if (f.line_text == null || norm(f.line_text) === "") {
-      return { id, verdict: "unchecked-text", ...a };
+      return { id, verdict: "unchecked-text", ...at };
     }
-    const actual = norm(lines[a.line - 1]);
+    const actual = norm(lines[at.line - 1]);
     return actual.includes(norm(f.line_text))
-      ? { id, verdict: "ok", ...a }
-      : { id, verdict: "text-mismatch", ...a, expected: f.line_text, actual };
+      ? { id, verdict: "ok", ...at }
+      : { id, verdict: "text-mismatch", ...at, expected: f.line_text, actual };
   });
 }
 
@@ -155,9 +185,12 @@ function resolveRev(root, rev, exec = execFileSync) {
  * Either failure is the CALLER's, never the reviewer's, so it exits 2 with its own reason instead of
  * reading every finding as `no-such-file` — cycle 1 closed that for --rev (CR-1) and cycle 2 found
  * it again for --root (CR2-2), which is why both now pass through this one function.
+ * task.195 widened it, rather than adding a second preflight: with --rev the root must also be in
+ * that commit (a root on disk but not in the rev read every finding `no-such-file`), and with
+ * --index the root must be inside a git work tree.
  * Returns { ok: true, rev } with `rev` the resolved SHA (or null), or { ok: false, reason, message }.
  */
-function checkTree({ root, rev }, exec = execFileSync) {
+function checkTree({ root, rev, index }, exec = execFileSync) {
   const absRoot = path.resolve(root);
   let isDir = false;
   try {
@@ -172,6 +205,28 @@ function checkTree({ root, rev }, exec = execFileSync) {
       message: `--root '${root}' is not a directory — pass the root of the tree that was reviewed; no anchor was checked`,
     };
   }
+  const git = (args) =>
+    exec("git", args, {
+      cwd: absRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  if (index) {
+    let inside = "";
+    try {
+      inside = git(["rev-parse", "--is-inside-work-tree"]);
+    } catch {
+      inside = "";
+    }
+    if (inside !== "true") {
+      return {
+        ok: false,
+        reason: "bad-root",
+        message: `--root '${root}' is not inside a git work tree, so --index has no staged content to read; no anchor was checked`,
+      };
+    }
+    return { ok: true, rev: null };
+  }
   if (!rev) return { ok: true, rev: null };
   const sha = resolveRev(absRoot, rev, exec);
   if (!sha) {
@@ -181,10 +236,25 @@ function checkTree({ root, rev }, exec = execFileSync) {
       message: `--rev '${rev}' does not name a commit in ${absRoot} — fetch it, or pass the revision that was reviewed; no anchor was checked`,
     };
   }
+  // The root must be in that commit too. `<sha>:./` resolves relative to the cwd, so from a root
+  // that exists on disk but not in the rev it fails (rc 128, "exists on disk, but not in …").
+  let type = "";
+  try {
+    type = git(["cat-file", "-t", `${sha}:./`]);
+  } catch {
+    type = "";
+  }
+  if (type !== "tree") {
+    return {
+      ok: false,
+      reason: "bad-root",
+      message: `--root '${root}' is not in ${rev} — pass the root of the tree that was reviewed; no anchor was checked`,
+    };
+  }
   return { ok: true, rev: sha };
 }
 
-function makeReader({ root, rev, exec = execFileSync }) {
+function makeReader({ root, rev, index, exec = execFileSync }) {
   const absRoot = path.resolve(root);
   // Containment is judged on REAL paths in the working tree: a lexical check alone passes a
   // symlink inside the root whose target is outside it (task.194 QA cycle 1, SEC-1). With --rev,
@@ -199,14 +269,16 @@ function makeReader({ root, rev, exec = execFileSync }) {
     const abs = path.resolve(absRoot, p);
     // A reviewer path that climbs out of the root names no file in the tree under review.
     if (abs !== absRoot && !abs.startsWith(absRoot + path.sep)) return null;
-    if (rev) {
-      // Both routes resolve a path against --root. `<rev>:./<rel>` is relative to the cwd, which is
+    if (rev || index) {
+      // Every git route resolve a path against --root. `<rev>:./<rel>` is relative to the cwd, which is
       // the root; a bare `<rev>:<rel>` is relative to the repository top level, which silently
       // ignored a --root below it (QA cycle 2, CR2-1). `cat-file blob` refuses a tree, where
       // `git show` printed a directory listing that read as a file (CR2-4).
       try {
         const rel = path.relative(absRoot, abs).split(path.sep).join("/");
-        return exec("git", ["cat-file", "blob", `${rev}:./${rel}`], {
+        // `:./<rel>` is the index entry (stage 0) — the content a `--staged` review diffed.
+        const spec = index ? `:./${rel}` : `${rev}:./${rel}`;
+        return exec("git", ["cat-file", "blob", spec], {
           cwd: absRoot,
           encoding: "utf8",
           stdio: ["ignore", "pipe", "ignore"],
@@ -232,7 +304,7 @@ function makeReader({ root, rev, exec = execFileSync }) {
 }
 
 function parseArgs(argv) {
-  const opts = { root: process.cwd(), json: false };
+  const opts = { root: process.cwd(), json: false, index: false };
   const takes = {
     "--findings-file": "findingsFile",
     "--root": "root",
@@ -242,6 +314,7 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--json") opts.json = true;
+    else if (a === "--index") opts.index = true;
     else if (a === "--help" || a === "-h") opts.help = true;
     else if (takes[a]) {
       const v = argv[++i];
@@ -260,7 +333,7 @@ function emit(opts, payload) {
     for (const r of payload.results || []) {
       if (MALFORMED.has(r.verdict)) {
         process.stdout.write(
-          `  ⚠️ ${r.id ?? "?"} ${r.path}:${r.line} — ${r.verdict}\n`,
+          `  ⚠️ ${r.id ?? "?"} ${r.path === undefined ? JSON.stringify(r.fileLine ?? null) : `${r.path}:${r.line}`} — ${r.verdict}\n`,
         );
       }
     }
@@ -273,7 +346,7 @@ function usage(opts, message) {
     reason: "usage",
     message:
       message === "help"
-        ? "node finding-anchors.js --findings-file <json> [--root <dir>] [--rev <git-rev>] [--annotate <out-file>] [--json]"
+        ? "node finding-anchors.js --findings-file <json> [--root <dir>] [--rev <git-rev> | --index] [--annotate <out-file>] [--json]"
         : message,
     exitCode: 2,
   };
@@ -289,6 +362,12 @@ function run(argv, deps = {}) {
   if (opts.error) return usage({ json: argv.includes("--json") }, opts.error);
   if (opts.help) return usage(opts, "help");
   if (!opts.findingsFile) return usage(opts, "--findings-file is required");
+  if (opts.index && opts.rev) {
+    return usage(
+      opts,
+      "--index and --rev name two different trees — pass one: --index for a staged review, --rev for a commit",
+    );
+  }
   let doc;
   try {
     doc = JSON.parse(fs.readFileSync(opts.findingsFile, "utf8"));
@@ -305,19 +384,24 @@ function run(argv, deps = {}) {
       "--findings-file holds no findings array (code_review.findings, pr_conformance.findings, or a bare array)",
     );
   }
-  const tree = checkTree({ root: opts.root, rev: opts.rev }, deps.exec);
+  const tree = checkTree(
+    { root: opts.root, rev: opts.rev, index: opts.index },
+    deps.exec,
+  );
   if (!tree.ok) {
     return emit(opts, {
       reason: tree.reason,
       message: tree.message,
       root: opts.root,
       rev: opts.rev ?? null,
+      index: opts.index,
       exitCode: 2,
     });
   }
   const readFile = makeReader({
     root: opts.root,
     rev: tree.rev,
+    index: opts.index,
     exec: deps.exec,
   });
   const results = checkAnchors(findings, { readFile });
@@ -336,6 +420,7 @@ function run(argv, deps = {}) {
       ? `${malformed.length} of ${results.length} anchor(s) do not point at the line they name — mark them, do not drop them`
       : `${results.length} finding(s) checked; every path:line anchor resolves`,
     rev: opts.rev ?? null,
+    index: opts.index,
     annotated: opts.annotate ?? null,
     results,
     exitCode: malformed.length ? 1 : 0,
