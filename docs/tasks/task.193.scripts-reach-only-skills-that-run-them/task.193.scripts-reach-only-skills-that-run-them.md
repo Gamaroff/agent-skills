@@ -5,7 +5,7 @@ type: task
 description: "Classify every script a shared/resources/*.md names by its shared/resources/ literal in prose, switch the unneeded ones to bare filenames and remove their unreached bundled copies, and add a guard that fails on a new prose script literal not in a reasoned allowlist; also pin create-skill's shared-literal rule sentence."
 tags: [create-skill, bundler, observation, shared-resources, guard]
 category: refactoring
-status: in-progress
+status: ready-for-review
 priority: Medium
 created: 2026-10-07
 updated: 2026-10-19
@@ -16,7 +16,7 @@ github_issue: 592
 
 # Technical Task: Scripts reach only the skills that run them
 
-**Status:** In Progress
+**Status:** Ready for Review
 **Review**: ✅ All review recommendations from `task.193.review.1.scripts-reach-only-skills-that-run-them.md` implemented 2026-10-19
 **GitHub Issue**: [#592](https://github.com/Gamaroff/agent-skills/issues/592)
 
@@ -332,27 +332,27 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-19
-**Quality Score**: 80/100
-**Gate Decision**: FAIL
+**Quality Score**: 92/100
+**Gate Decision**: PASS
 
 ### QA Report
 
-- **Full Report**: [task.193.qa.3.scripts-reach-only-skills-that-run-them.md](./task.193.qa.3.scripts-reach-only-skills-that-run-them.md)
-- **Gate File**: [task.193.gate.3.scripts-reach-only-skills-that-run-them.yml](./task.193.gate.3.scripts-reach-only-skills-that-run-them.yml)
+- **Full Report**: [task.193.qa.4.scripts-reach-only-skills-that-run-them.md](./task.193.qa.4.scripts-reach-only-skills-that-run-them.md)
+- **Gate File**: [task.193.gate.4.scripts-reach-only-skills-that-run-them.yml](./task.193.gate.4.scripts-reach-only-skills-that-run-them.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 7 (guard) plus `ci:fast` 5904 on `53f72587`
+- **Tests Executed**: 8 (guard) plus `ci:fast` 5905 on `e82c3425`
 - **Phases Verified**: 4/4
-- **Critical Issues**: 1
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-Cycle 2's fixes hold. CR-1 (HIGH): the guard exempts every fenced literal, but the bundler copies from fences; `probe-boundary-rule.md:66` and `develop-pipeline-step-0-resolve-and-prepare.md:251` are live cases.
+Gate 3's CR-1 fixed and mutation-proven; 21 unrun copies removed in total. Two low follow-ups: a latent over-match in the fenced shell rule (no live case) and a stale header line.
 
 <!-- change-log-start -->
 ## Change Log
@@ -370,6 +370,8 @@ Cycle 2's fixes hold. CR-1 (HIGH): the guard exempts every fenced literal, but t
 | 2026-10-19 |  | QA gate FAIL (80/100) — 1 finding (CR-1 HIGH: fenced literals exempt; 2 live); 3 advisory | qa-task |
 | 2026-10-19 |  | Status → in-progress | qa-task |
 | 2026-10-19 |  | QA fix cycle 3 — CR-1: fenced literals classified (shell-position run rule); `probe-boundary-rule.md:66` and step-0:251 bare-named, 4 more copies removed (21 total); develop-task and develop-story `SKILL.md` name `references/resolve-paths.sh`; CR-2: a bundler must hold the script too; CR-4: CHANGELOG reworded | qa-fix |
+| 2026-10-19 |  | QA gate PASS (92/100) — gate 3 CR-1 fixed; 2 low follow-ups (fenced shell-rule over-match, stale header) | qa-task |
+| 2026-10-19 |  | Status → ready-for-review | qa-task |
 <!-- change-log-end -->
 
 ---
