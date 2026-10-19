@@ -159,6 +159,7 @@ Declining conditions, each reported with its reason:
 | `bad-entry` | The entry spec is not `path#exportName`. |
 | `outside-repo-root` | The resolved path escapes the containment root. |
 | `unknown-sink` | No corpus for that sink. `corpusFor` throws rather than returning `[]`, deliberately. |
+| `bad-cases` | A supplied case is not an object, its `direction` is not `hostile` or `legitimate`, or its `sink` is set and is not a known sink. A `null` sink counts as absent. The CLI refuses the same input with exit 2. |
 | `entry-not-probeable` | The module would not import, the export is absent, or it is not a function. An **absent** export is a module-private predicate: export it and re-run — never a reason for `boundary: false` (obs #156). For `fence:`: the heading is not in the doc, appears twice, or has no ```` ```bash ```` block under it. |
 | `case-errored` | One case timed out or its child never ran. |
 | `bad-args` | `--args-json` is not a JSON array, or was given with a `shell:` / `shell-fn:` / `cli:` / `shell-argv:` / `fence:` entry, which cannot append an argument to a call. |
