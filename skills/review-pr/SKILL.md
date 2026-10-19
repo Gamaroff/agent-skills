@@ -611,17 +611,26 @@ HEAD=$(bash .agents/skills/review-pr/scripts/resolve-head-rev.sh --vcs "$VCS" \
 HEAD_REV=$(printf '%s\n' "$HEAD" | sed -n 's/^rev=//p')
 HEAD_VIA=$(printf '%s\n' "$HEAD" | sed -n 's/^via=//p')
 printf 'HEAD_REV=%s HEAD_VIA=%s\n' "$HEAD_REV" "$HEAD_VIA"
-command node .agents/skills/review-pr/references/finding-anchors.js \
+# Decide on the checker's `reason`, never on its exit code: `node` also exits 1 when the script
+# cannot load, and that must not read as "malformed anchors — mark and continue" (task.195).
+CHECK_OUT=$(command node .agents/skills/review-pr/references/finding-anchors.js \
   --findings-file "$FINDINGS_JSON" --root "$(git rev-parse --show-toplevel)" \
-  --rev "$HEAD_REV" --annotate "$FINDINGS_JSON" --json
-# exit 1 = malformed anchors exist. NOT a halt: every finding now carries anchor_check — mark, continue.
-# exit 2 = the call is wrong: usage (the findings file), bad-root (--root is not a directory), or bad-rev
-#   (--rev names no commit here — fetch it).
-#   Fix the call; never render unchecked anchors as verified.
+  --rev "$HEAD_REV" --annotate "$FINDINGS_JSON" --json)
+REASON=$(printf '%s' "$CHECK_OUT" | jq -r '.reason // empty' 2>/dev/null)
+case "$REASON" in
+  ok|malformed-anchors)   # every finding now carries anchor_check — mark the malformed ones, continue
+    echo "finding-anchors: $REASON" ;;
+  bad-root|bad-rev|usage) # the call is wrong (the findings file, --root, or an unfetched --rev)
+    echo "HALT: finding-anchors refused the call ($REASON): $(printf '%s' "$CHECK_OUT" | jq -r '.message // empty')"
+    echo "  Fix the call; never render unchecked anchors as verified."; exit 1 ;;
+  *)                      # no JSON reason at all: the checker did not run
+    echo "HALT: finding-anchors checker not runnable (no JSON reason) — check .agents/skills/review-pr/references/finding-anchors.js; never render unchecked anchors as verified"; exit 1 ;;
+esac
 ```
 
 Every finding now carries `anchor_check`: `ok`, `unchecked-text` and `no-line` are clean;
-`no-such-file`, `out-of-range` and `text-mismatch` mean the reviewer named a line that is not the
+`no-such-file`, `out-of-range`, `text-mismatch` and `unparseable` (a code `file_line` that is not
+`path:line` at all) mean the reviewer named a line that is not the
 line it meant. **A malformed anchor is never dropped.** It renders with `⚠️ unverified anchor`
 after its `ref`, keeps the reviewer's value in the machine-readable block with its `anchor_check`
 beside it, and is left out of `--inline` (Step 8), so it reaches the PR only through the summary
@@ -778,7 +787,7 @@ findings:
     severity: {low|medium|high}
     confidence: {low|medium|high}
     ref: {the same ref rendered after the em-dash, quoted}
-    anchor_check: {ok|unchecked-text|no-line|no-such-file|out-of-range|text-mismatch}
+    anchor_check: {ok|unchecked-text|no-line|no-such-file|out-of-range|text-mismatch|unparseable}
     finding: {one sentence: what is wrong}
     suggested_action: {one sentence: the fix approach}
 truncated_count: {integer — the two lenses' counts summed}
@@ -957,6 +966,11 @@ INLINE_FILE="$(mktemp -t review-pr-inline.XXXXXX.json)"
 # `anchor_check` is Step 6's verdict (finding-anchors.js --annotate). Only a verified
 # anchor posts inline: a malformed one would land on the wrong line, or on none, and
 # report `posted` — it reaches the PR through the summary comment instead.
+# Refuse un-annotated input first: that select keeps only verified anchors, so a file Step 6 never
+# annotated yields [] — the same output as "no anchorable findings" (task.195).
+jq -e '[ (.code_review.findings[]?, .pr_conformance.findings[]?) | select(has("anchor_check") | not) ] | length == 0' \
+   "$FINDINGS_JSON" >/dev/null || {
+  echo "HALT: a finding in $FINDINGS_JSON carries no anchor_check (or the file is not findings JSON) — run Step 6's anchor check first; nothing posted inline"; exit 1; }
 jq '[ (.code_review.findings[]? | select(.anchor_check == "ok" or .anchor_check == "unchecked-text")
        | . + {anchor: .file_line}),
       (.pr_conformance.findings[]? | select(.anchor_check == "ok" or .anchor_check == "unchecked-text")

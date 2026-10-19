@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+
+- **The finding-anchors checker no longer has a state its callers misread (task 195).** Seven
+  advisory findings left by task 194 are closed. **A code finding whose `file_line` is not
+  `path:line`** — a bare path, a range, empty — now reads `unparseable`, a new verdict in the
+  malformed set (exit 1), instead of the clean `no-line`; the lens is decided by the key the finding
+  carries, so a conformance `ref` such as `AC-3` stays `no-line`. **`--rev` with a `--root` missing
+  from that commit** exits 2 `bad-root` instead of reading every finding `no-such-file`. **`--index`**
+  (new) reads the staged content, so `/review-code --staged` is checked against the tree it reviewed;
+  it is a usage error together with `--rev`. **The four dispatcher blocks** (`/review-pr`,
+  `/review-code`, `/qa-task`, `/qa-story`) decide on the checker's JSON `reason`, never its exit
+  code — `node` also exits 1 when the script cannot load — and HALT as "checker not runnable" when
+  there is no reason at all. **Both `--inline` blocks** refuse a findings file with an un-annotated
+  finding instead of posting `[]`. **The develop-bug verify loop** carries a blocking finding with a
+  malformed anchor as `(location unverified: {file_line})`, and the population guard now covers every
+  executed document that consumes code-review findings, not only the dispatchers.
+  **Consumer upgrade:** re-vendor (`setup-consumer.sh --update`). An external caller that branched on
+  `no-line` for code findings treats `unparseable` like `out-of-range`.
+
 ## [v0.58.0] - 2026-10-19
 
 ### Added

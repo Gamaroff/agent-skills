@@ -2487,3 +2487,63 @@ for (const shell of SHELLS) {
     );
   });
 }
+
+// task.195 SC-5: the --inline select keeps only verified anchors, so a findings file the checker never
+// annotated used to yield [] — indistinguishable from "no anchorable findings". The guard before it
+// must refuse such a file, and must let a fully annotated one through (control).
+function extractInlineGuard(skillText) {
+  const m = skillText.match(
+    /^[ \t]*jq -e '\[[^\n]*select\(has\("anchor_check"\) \| not\)[\s\S]*?exit 1; \}/m,
+  );
+  return m ? m[0] : null;
+}
+
+test("--inline refuses a findings file with an un-annotated finding, and passes an annotated one", (t) => {
+  const { spawnSync: run } = require("child_process");
+  if (run("jq", ["--version"]).error) return t.skip("jq not installed");
+  const guard = extractInlineGuard(read("SKILL.md"));
+  assert.ok(
+    guard,
+    "could not find the --inline anchor_check guard before the jq select",
+  );
+  const dir = fs.mkdtempSync(
+    path.join(require("os").tmpdir(), "inline-guard-"),
+  );
+  try {
+    const file = path.join(dir, "findings.json");
+    const runGuard = (doc) => {
+      fs.writeFileSync(file, JSON.stringify(doc));
+      return run("bash", ["-c", guard], {
+        encoding: "utf8",
+        env: { ...process.env, FINDINGS_JSON: file },
+      });
+    };
+    const never = runGuard({
+      code_review: { findings: [{ file_line: "src/x.ts:4", finding: "f" }] },
+    });
+    assert.equal(
+      never.status,
+      1,
+      "an un-annotated finding must HALT the --inline block",
+    );
+    assert.match(never.stdout, /HALT: .*anchor_check.*Step 6/);
+    const annotated = runGuard({
+      code_review: {
+        findings: [
+          {
+            file_line: "src/x.ts:4",
+            finding: "f",
+            anchor_check: "text-mismatch",
+          },
+        ],
+      },
+    });
+    assert.equal(
+      annotated.status,
+      0,
+      `an annotated file must pass:\n${annotated.stdout}${annotated.stderr}`,
+    );
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
