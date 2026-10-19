@@ -901,12 +901,31 @@ a clean Step 4b as covering what the harness delivers. (create-skill § *Runnabl
 When it does fire, run the engine over each changed in-scope file:
 
 ```bash
-node references/qa-execute-snippets.mjs --file "$SKILL_FILE" --json
+# From the repository root, once per changed in-scope file ({changed-file}). BASE is the PR's base
+# branch, re-bound here because a fenced block is its own shell; the MERGE BASE is what --diff-base
+# takes, or the base branch's later edits count as this change's. --copy-as seeds the bundled helpers.
+BASE="origin/$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo develop)"
+command node .agents/skills/qa-task/references/qa-execute-snippets.mjs --file "{changed-file}" \
+  --diff-base "$(git merge-base "$BASE" HEAD)" --copy-as .agents:.agents --json
 ```
 
-Bind any caller values the documented snippets expect with repeated `--bind NAME=VALUE`, and seed the
-temp working directory from a real directory with `--copy <dir>` so the blocks see real data rather than
-an empty tree. Execution always happens in that temp copy — never the live tree.
+`--diff-base` marks the blocks the change touched and reports them **apart** (`changed` in the JSON).
+Report the `changed` counts **first**: they are what the change is judged on. A
+`changed-blocks-not-executed` finding is a statement about the change, not the file — every block the
+change touched was skipped — and it is reported beside the file-level records, never instead of them.
+
+Fill each `{NAME}` / `<NAME>` template slot the work item supplies with a repeated `--slot NAME=VALUE`
+(`--slot task-directory=docs/tasks/task.12.x`); a slot is text, and `--bind` cannot fill one. Bind
+the shell variables the snippets read with repeated `--bind NAME=VALUE`, and seed the temp working
+directory from a real directory with `--copy <dir>` so the blocks see real data. Execution always
+happens in that temp copy — never the live tree.
+
+A block that calls a bundled helper (`bash .agents/skills/<skill>/references/x.sh`,
+`source …/x.sh || exit 1`) runs only when that helper is in the copy and its own text would run — the
+rule is `references/qa-runnable-prose-detection.md` §2aa. `--copy-as .agents:.agents` seeds the
+helpers. **Where `.agents/skills` is a symlink** (this repository's own checkout), that copies the
+link and every helper is refused: pass `--copy-as skills:.agents/skills` instead. Drop the flag when
+the change set calls no helper.
 
 `--copy <dir>` places the directory's **contents** at the temp root. When a block addresses a path —
 `find docs/tasks …` in the `sync-github-*` discovery blocks — seed it at that path instead with
@@ -916,6 +935,8 @@ A block that fails only because it was seeded at the wrong path is a harness fin
 finding (obs #143).
 
 **Document results:**
+- **The `changed` counts first** — changed blocks, and how many executed / `runnable` / `placeholder` /
+  `mutating`
 - Blocks found, and the count classified `runnable` / `placeholder` / `mutating`
 - **Every skipped block, with its line number and reason.** A silent skip recreates the exact failure
   this step exists to prevent
@@ -932,7 +953,7 @@ other `category: bug` finding. No new report or gate schema.
 > other to quiet the report.
 >
 > - **`zero-blocks-executed`** (finding, `medium`) — fired when `placeholder > 0`. The run was
->   under-configured; `--bind` / `--copy` is the fix and the detail says so.
+>   under-configured; `--slot` / `--bind` / `--copy` is the fix and the detail names which.
 > - **`no-executable-blocks`** (information, in `notes[]`, exit `0`) — fired when `placeholder === 0`
 >   and every block was refused as `mutating`. This file documents `gh` / `curl` / `rm` / write
 >   redirections because that is what the skill *does*, and those are deny-listed by design. **No

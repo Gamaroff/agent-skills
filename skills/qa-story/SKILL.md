@@ -1301,12 +1301,31 @@ the QA report's Review Methodology and move on.
 When it does fire, run the engine over each changed in-scope file:
 
 ```bash
-node references/qa-execute-snippets.mjs --file "$SKILL_FILE" --json
+# From the repository root, once per changed in-scope file ({changed-file}). BASE is the PR's base
+# branch, re-bound here because a fenced block is its own shell; the MERGE BASE is what --diff-base
+# takes, or the base branch's later edits count as this change's. --copy-as seeds the bundled helpers.
+BASE="origin/$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo develop)"
+command node .agents/skills/qa-story/references/qa-execute-snippets.mjs --file "{changed-file}" \
+  --diff-base "$(git merge-base "$BASE" HEAD)" --copy-as .agents:.agents --json
 ```
 
-Bind any caller values the documented snippets expect with repeated `--bind NAME=VALUE`, and seed the
-temp working directory from a real directory with `--copy <dir>` so the blocks see real data. Execution
-always happens in that temp copy — never the live tree.
+`--diff-base` marks the blocks the change touched and reports them **apart** (`changed` in the JSON).
+Report the `changed` counts **first**: they are what the change is judged on. A
+`changed-blocks-not-executed` finding is a statement about the change, not the file — every block the
+change touched was skipped — and it is reported beside the file-level records, never instead of them.
+
+Fill each `{NAME}` / `<NAME>` template slot the work item supplies with a repeated `--slot NAME=VALUE`
+(`--slot task-directory=docs/tasks/task.12.x`); a slot is text, and `--bind` cannot fill one. Bind
+the shell variables the snippets read with repeated `--bind NAME=VALUE`, and seed the temp working
+directory from a real directory with `--copy <dir>` so the blocks see real data. Execution always
+happens in that temp copy — never the live tree.
+
+A block that calls a bundled helper (`bash .agents/skills/<skill>/references/x.sh`,
+`source …/x.sh || exit 1`) runs only when that helper is in the copy and its own text would run — the
+rule is `references/qa-runnable-prose-detection.md` §2aa. `--copy-as .agents:.agents` seeds the
+helpers. **Where `.agents/skills` is a symlink** (this repository's own checkout), that copies the
+link and every helper is refused: pass `--copy-as skills:.agents/skills` instead. Drop the flag when
+the change set calls no helper.
 
 `--copy <dir>` places the directory's **contents** at the temp root. When a block addresses a path —
 `find docs/tasks …` in the `sync-github-*` discovery blocks — seed it at that path instead with
@@ -1317,7 +1336,9 @@ finding (obs #143).
 
 Record in the QA report:
 
-1. **Counts** — blocks found, and how many classified `runnable` / `placeholder` / `mutating`.
+1. **Counts** — **the `changed` counts first** (changed blocks, and how many executed / `runnable` /
+   `placeholder` / `mutating`), then blocks found, and how many classified `runnable` /
+   `placeholder` / `mutating`.
 2. **Every skipped block, with its line number and reason.** A silent skip recreates the failure this
    phase exists to prevent.
 3. **Shells used** — note `zsh-unavailable` when the host has no zsh.
@@ -1329,7 +1350,7 @@ Record in the QA report:
 > apart for you.** Report whichever it emits; do not suppress either.
 >
 > - **`zero-blocks-executed`** (finding, `medium`) — `placeholder > 0`: the run was under-configured,
->   and `--bind` / `--copy` is the fix.
+>   and `--slot` / `--bind` / `--copy` is the fix — the detail names which.
 > - **`no-executable-blocks`** (information, in `notes[]`, exit `0`) — `placeholder === 0` and every
 >   block refused as `mutating`: the file documents side-effecting commands that are deny-listed by
 >   design, so **no configuration will ever make them runnable**. Still recorded, with a per-reason
