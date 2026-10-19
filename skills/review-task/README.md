@@ -82,11 +82,13 @@ The review-task skill performs a 7-step comprehensive analysis:
 
 ## Output
 
-Generates a comprehensive review report:
+Step 0 asks for the output format. **Comprehensive report** (the default, and what `develop-task` always selects) saves:
 
 ```
-[task-directory]/task.{n}.review.{descriptive-name}.md
+[task-directory]/task.{n}.review.{N}.{descriptive-name}.md
 ```
+
+`{N}` is the highest existing review number plus 1, computed with `next_numbered` (`references/newest-numbered.sh`). **Action plan only** prints a prioritised fix list and saves no file.
 
 Report includes:
 

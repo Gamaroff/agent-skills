@@ -108,10 +108,13 @@ You should see:
 |---|---|
 | `task.{N}.readme-contributor-footnote.md` | Original task spec |
 | `task.{N}.plan.readme-contributor-footnote.md` | Co-located implementation plan |
+| `task.{N}.review.1.readme-contributor-footnote.md` | Task review report (`/review-task`, Step 2) |
 | `task.{N}.implementation.1.readme-contributor-footnote.md` | What was built |
 | `task.{N}.qa.1.readme-contributor-footnote.md` | QA findings + traceability |
 | `task.{N}.gate.1.readme-contributor-footnote.yml` | PASS/CONCERNS/FAIL gate |
+| `task.{N}.pr-review.1.readme-contributor-footnote.md` | PR conformance review (`/review-pr`, Step 5c — the QA loop's exit gate) |
 | `task.{N}.dod.1.readme-contributor-footnote.md` | Definition-of-Done checklist |
+| `sprint-review-summary.md` | Sprint review summary (`/finalise`, accepted path only) |
 
 The pattern reference is `examples/README.md` — same artifact shapes, walked end-to-end on `task.6` there.
 

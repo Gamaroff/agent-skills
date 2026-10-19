@@ -11,7 +11,7 @@ created: 2026-05-13
 
 **Status:** Draft
 
-> By the end of today you will have produced a `qa-gate: FAIL` artifact and recovered to PASS on your own story. The messy path will stop being a surprise.
+> By the end of today you will have produced a QA gate artifact reading `gate: FAIL` and recovered to PASS on your own story. The messy path will stop being a surprise.
 
 ## Prerequisites
 
@@ -44,10 +44,10 @@ Most of `/develop-story`'s value is in the iteration loop. If your first 5 stori
 
 - [ ] `/create-story` using the AC above
 - [ ] Open the story file and deliberately write **100 lines** of content for the first draft (padding with comments, blank lines, or verbose prose — it does not matter)
-- [ ] `/develop-story` — let the pipeline run through to `qa-gate`
+- [ ] `/develop-story` — let the pipeline run through to its first QA gate (Step 5, `qa-story`)
 - [ ] Observe the FAIL gate artifact in your story directory
 
-**Expected artifact:** `story.{P}.{E}.{S}.gate.1.*.yml` with `decision: FAIL` (or `CONCERNS` flagging line-count overage)
+**Expected artifact:** `story.{P}.{E}.{S}.gate.1.*.yml` with `gate: FAIL` (or `CONCERNS` flagging line-count overage) — the verdict key is `gate:`, so `grep '^gate:'` finds it
 
 ---
 
@@ -55,10 +55,10 @@ Most of `/develop-story`'s value is in the iteration loop. If your first 5 stori
 
 - [ ] Read the FAIL findings in the gate file
 - [ ] Trim the section to ≤ 50 lines
-- [ ] Re-run `qa-gate` (or let the `/develop-story` `qa-fix` loop handle it automatically)
+- [ ] Re-run `qa-story` (or let the `/develop-story` `qa-fix` loop handle it automatically) — `qa-gate` is the manual-override skill, not the re-review
 - [ ] Observe the PASS gate artifact
 
-**Expected artifact:** `story.{P}.{E}.{S}.gate.2.*.yml` with `decision: PASS`
+**Expected artifact:** `story.{P}.{E}.{S}.gate.2.*.yml` with `gate: PASS`
 
 ---
 
@@ -75,7 +75,7 @@ Run these checks before calling Day 3 done:
 ## What you learned
 
 - `qa-gate` is mechanical — it checks ACs literally, including line counts via `wc -l`
-- `qa-fix` loops up to 5 iterations; usually 1 is enough. A clean gate then hands to `review-pr` (Step 5c), which can send the run back into `qa-fix` on the same budget
+- `qa-fix` loops up to `QA_MAX_CYCLES` cycles (default 5); usually 1 is enough. A gate with no open finding then hands to `review-pr` (Step 5c), which can send the run back into `qa-fix` on the same budget
 - The messy path is just normal engineering: read the failure, change the code, re-run
 - A FAIL gate is not a sign something is broken — it is the pipeline doing its job
 

@@ -143,7 +143,7 @@ If QA loops more than once it is working as intended; a one-line README change s
 ls docs/prd/footer-link/prd.{P}.footer-link/epics/epic.{P}.{E}.footer-link/stories/story.{P}.{E}.1.add-footer-link/
 ```
 
-You should have all 10 artifact types:
+The story directory holds rows 3–6 and 8–12; the PRD and epic (rows 1–2) live in its parent directories, and the PR (row 7) is on your VCS host. You should have all 12 artifact types:
 
 | #   | Artifact                                          | What it is                                                                 |
 | --- | ------------------------------------------------- | -------------------------------------------------------------------------- |
@@ -156,7 +156,9 @@ You should have all 10 artifact types:
 | 7   | PR URL                                            | Pull Request opened by `/develop-story` (GitHub or Bitbucket per your VCS) |
 | 8   | `story.{P}.{E}.1.qa.1.add-footer-link.md`             | QA findings + traceability matrix                                          |
 | 9   | `story.{P}.{E}.1.gate.1.add-footer-link.yml`          | PASS / CONCERNS / FAIL gate                                                |
-| 10  | `story.{P}.{E}.1.dod.1.add-footer-link.md`            | Definition-of-Done checklist + sprint review summary                       |
+| 10  | `story.{P}.{E}.1.pr-review.1.add-footer-link.md`      | PR conformance review (`/review-pr`, Step 5c — the QA loop's exit gate)    |
+| 11  | `story.{P}.{E}.1.dod.1.add-footer-link.md`            | Definition-of-Done checklist                                               |
+| 12  | `sprint-review-summary.md`                        | Sprint review summary (`/finalise`, accepted path only)                    |
 
 For annotated worked examples of the upstream artifacts, see [`examples/prd-example/`](../../examples/prd-example/) (the PRD that drove this onboarding effort) and [`examples/epic-examples/`](../../examples/epic-examples/) (its four epics). For a deliberate FAIL → PASS walkthrough, see [Day 3 — Messy Path](../runbooks/first-week/day-3-messy-path.md).
 
@@ -198,7 +200,6 @@ If a practice GitHub milestone or Jira sprint/version was created: delete it onc
 | Jira issue creation fails               | Wrong `JIRA_URL` or token                     | Verify `curl -u $JIRA_USER_EMAIL:$JIRA_API_TOKEN $JIRA_URL/rest/api/3/myself` returns 200 |
 | Skill picked wrong platform             | Auto-detect mis-fired                         | Set explicit `tracker:` / `vcs:` in `skills-config.yaml`                                  |
 | Phase 0 prompts differ from table above | Skill version drift                           | Check `.agents/skills/develop-story/` version                                             |
-| `/develop-story` pauses at QA planning  | Expected — test plan generation               | Wait 30–60 s                                                                              |
 | QA loop ran more than once              | Practice change touched something non-trivial | Use a simpler story (one-line file change)                                                |
 | Elapsed > 60 min                        | VCS/tracker API latency                       | API round-trips are out-of-scope; timer pauses while waiting                              |
 | Epic registry conflict on merge         | Two branches appended the same row            | Resolve conflict: increment the number in your branch                                     |
@@ -208,7 +209,7 @@ If a practice GitHub milestone or Jira sprint/version was created: delete it onc
 
 ## See also
 
-- `docs/standards/status-lifecycle.md` — lifecycle states (`draft → ready-for-development → in-progress → accepted`)
+- `docs/standards/status-lifecycle.md` — lifecycle states (`draft → ready-for-development → in-progress → ready-for-review → accepted` for a story; tasks add `planned` after `draft`)
 - `docs/standards/file-naming.md` — naming conventions for story artifacts
 - `docs/runbooks/story-development.md` — deep-dive on the full story development workflow (Phase A–D)
 - `examples/README.md` — annotated full-lifecycle artifact set (`task.6` worked task example)

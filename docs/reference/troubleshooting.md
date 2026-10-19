@@ -185,18 +185,18 @@ See [Status lifecycle](../standards/status-lifecycle.md).
 
 ## QA fix loop hits 5 cycles
 
-**Symptom:** `qa-fix` ran five times and the gate is still `CONCERNS` or `FAIL`.
+**Symptom:** `qa-fix` ran five times (the default `QA_MAX_CYCLES`) and the gate still has open findings.
 
 **Cause:** The fixes don't address root cause, or the gate findings are infrastructure-level and need human attention.
 
-**Fix:** Stop the orchestrator. Read the QA report, address the underlying issue manually, then run `/qa-story` or `/qa-task` to re-gate. Consider whether the failures warrant a `WAIVED` decision recorded via `/qa-gate`.
+**Fix:** Read the QA report and the escalation entry in the implementation report. To let the pipeline continue, re-invoke `/develop-story` or `/develop-task` on the same document and choose **"Resume at 5a with {k} more cycles"**: resume rebuilds the cycle count from the gate files on disk, back-fills any cycle you ran by hand, and records the grant on the lock (`grant-qa-cycles.sh` writes `extra_cycles_granted` and `qa_max_cycles`). A `/qa-story` or `/qa-task` you run standalone in the meantime is counted on resume, not repeated. Consider whether the failures warrant a `WAIVED` decision recorded via `/qa-gate`. Procedure: [resume contract, Re-entry after a QA loop escalation](../../shared/resources/develop-pipeline-resume-contract.md#re-entry-after-a-qa-loop-escalation).
 
 **Note that reaching five cycles is no longer the only way out.** The loop has three exits and they mean different things:
 
 | Exit | Fires when | What it means |
 |---|---|---|
-| Clean gate | `PASS` / `WAIVED` | The work is done. Hands to Step 5c |
-| **Diminishing returns** | Two consecutive **zero-HIGH** gates, the residue is entirely test machinery, **and** nothing implicates product behaviour | The loop **finished working**. Exits cleanly and hands to Step 5c, exactly as a clean gate does |
+| No open finding | a gate with no open `top_issues[]` entry — `PASS`, an active `WAIVED`, or a `CONCERNS` whose queue is empty or all closed | The work is done. Hands to Step 5c |
+| **Diminishing returns** | Two consecutive **zero-HIGH** gates, the residue is entirely test machinery, **and** nothing implicates product behaviour | The loop **finished working**. Exits cleanly and hands to Step 5c, exactly as a gate with no open finding does |
 | Convergence check | HIGH findings **remain and stop falling** | The loop **stopped working**. Escalates |
 
 The two guards are opposites, and neither can claim the other's run: the diminishing-returns exit requires two consecutive zero-HIGH gates, so a flat non-zero sequence is never its business. If you are seeing cycle 4 and 5 spent refining test pins while the product has been finished since cycle 2, that is the case the exit was added for — check `qa.testArtifactGlobs` in `skills-config.yaml`, which is what tells it which paths count as machinery.
@@ -236,6 +236,21 @@ The loop deliberately never substitutes a replacement gate for you. Choosing one
 | PR creation | The PR (`gh pr close --delete-branch`) |
 | QA review | The gate file `*.gate.{N}.{name}.yml` |
 | Implementation report | `*.implementation.{N}.{name}.md` |
+
+## Finalise halted with DoD gaps and I fixed code
+
+**Symptom:** `/finalise` HALTed at Step 7 with `❌ GAPS`, you closed the gaps by changing code, and you want the run to accept the fix.
+
+**Cause:** A resume at Step 7 would accept a head no QA gate has read.
+
+**Fix:** Commit the fix, then re-invoke `/develop-story` or `/develop-task` on the same document and choose **"Re-enter QA at 5a"** (Recommended). `reenter-qa-after-finalise.sh` measures what moved since the newest gate's `head:` and re-enters the QA loop at step 5 / `qa_phase` 5a, with `qa_max_cycles` set to at least two cycles past the reconstructed count. It refuses before writing anything:
+
+| Refusal | What to do |
+|---|---|
+| `no-code-moved` — the fix is document-only | Nothing: the run resumes at Step 7 and `/finalise` re-runs |
+| `uncommitted-fix` — a tracked change outside the work item's directory is uncommitted | Commit the fix and re-invoke |
+
+The full refusal list and its routes: [resume contract, Re-entry after a finalise DoD-gaps halt](../../shared/resources/develop-pipeline-resume-contract.md#re-entry-after-a-finalise-dod-gaps-halt).
 
 ## Platform resolver picked the wrong tracker
 

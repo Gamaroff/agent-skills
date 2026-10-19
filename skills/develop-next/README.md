@@ -17,7 +17,7 @@
 
 The merge gate is layered — all of these must hold before `gh pr merge`:
 
-- QA gate file `PASS` + document `accepted` (finalise output);
+- document `accepted` (finalise output), gate not `FAIL`, and no `open` entry in the gate's `top_issues[]` — a `CONCERNS` gate with no open finding merges, and so does a `WAIVED` gate whose waiver is documented (a `/develop-bug` item is gated on `closed`, an accepted DoD and a `PASS` verify verdict instead; table: `SKILL.md` Step 3);
 - the PR's `headRefOid` matches the locally-tested HEAD (never gate one commit and merge another);
 - if the PR has CI checks, `gh pr checks` all green;
 - `developNext.qualityGateCommand` (default `npm run ci` — the project's full CI-equivalent) clean on the branch being merged — this is the whole gate for projects that don't yet run CI on PRs.

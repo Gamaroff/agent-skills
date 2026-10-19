@@ -125,7 +125,7 @@ an approval prompt. Full contract and worked examples:
 Identical to `develop-next` — the per-item merge gate is layered, and all must hold before
 `gh pr merge`:
 
-- QA gate file `PASS` + document `accepted` (finalise output);
+- document `accepted` (finalise output), gate not `FAIL`, and no `open` entry in the gate's `top_issues[]` — a `CONCERNS` gate with no open finding merges, and so does a `WAIVED` gate whose waiver is documented (a `/develop-bug` item is gated on `closed`, an accepted DoD and a `PASS` verify verdict instead; table: `SKILL.md` Step 3);
 - the PR's `headRefOid` matches the locally-tested HEAD **after the rebase** (never gate one
   commit and merge another);
 - if the PR has CI checks, `gh pr checks` all green;
