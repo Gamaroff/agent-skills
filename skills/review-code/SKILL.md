@@ -113,8 +113,8 @@ esac
 ```
 
 Every finding now carries `anchor_check`. `ok`, `unchecked-text` and `no-line` are clean;
-`no-such-file`, `out-of-range`, `text-mismatch` and `unparseable` (a code `file_line` that is not
-`path:line` at all) mean the reviewer named a line that is not
+`no-such-file`, `out-of-range`, `text-mismatch` and `unparseable` (a code finding whose `file_line` is absent or is not
+`path:line`) mean the reviewer named a line that is not
 the one it meant. **A malformed anchor is never dropped**: Step 3 renders it with
 `⚠️ unverified anchor`, Step 4 keeps it out of the inline set (it goes in the summary), and Step 5
 never edits it. The checker reports and never repairs — guessing the intended line would hide the
@@ -166,7 +166,9 @@ Only if `--comment` is set and a PR exists for the current branch (or `target` n
    FINDINGS_JSON="{findings-json}"   # Step 2b — the file finding-anchors.js annotated
    # Refuse un-annotated input first. The select below keeps only verified anchors, so a file
    # the checker never annotated yields [] — the same output as "no anchorable findings" (task.195).
-   jq -e '[ .code_review.findings[]? | select(has("anchor_check") | not) ] | length == 0' \
+   # The array must exist: `{}` would otherwise select nothing and pass as "every finding annotated".
+   jq -e '(.code_review.findings | type == "array")
+          and ([ .code_review.findings[]? | select(has("anchor_check") | not) ] | length == 0)' \
       "$FINDINGS_JSON" >/dev/null || {
      echo "HALT: a finding in $FINDINGS_JSON carries no anchor_check (or the file is not findings JSON) — run Step 2b's anchor check first; nothing posted inline"; exit 1; }
    jq '[ .code_review.findings[]?

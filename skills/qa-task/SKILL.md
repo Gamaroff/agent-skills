@@ -657,8 +657,8 @@ JSON
    ```
 
    Every finding now carries `anchor_check`. `ok`, `unchecked-text` and `no-line` are clean;
-   `no-such-file`, `out-of-range`, `text-mismatch` and `unparseable` (a code `file_line` that is not
-   `path:line` at all) mean the reviewer named a line that is not the
+   `no-such-file`, `out-of-range`, `text-mismatch` and `unparseable` (a code finding whose `file_line` is absent or is not
+   `path:line`) mean the reviewer named a line that is not the
    one it meant. **A malformed anchor is never dropped**: it renders in `## Code Review` with
    `⚠️ unverified anchor` (item 5), and item 6 never maps it to `top_issues[]` with a location it
    does not have. The checker reports and never repairs — guessing the intended line would hide the

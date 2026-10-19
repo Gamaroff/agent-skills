@@ -37,18 +37,21 @@
  *   out-of-range    the line is < 1 or past the file's last line
  *   text-mismatch   the line exists but does not say `line_text`
  *   unparseable     a code `file_line` that is not `path:line` — a bare path, a range
- *                   (`x.ts:42-58`), empty. The code lens's contract is one line, so a
+ *                   (`x.ts:42-58`), empty, absent. The code lens's contract is one line, so a
  *                   value that does not parse is the reviewer breaking it (task.195)
  *
  * The first three are clean; the last four are malformed — "the reviewer is
  * wrong" — and are kept apart from `no-line` ("nothing to verify") on purpose.
  *
- * ## Which lens — decided by the key, never by the wrapper
+ * ## Which lens — the wrapper when there is one, else the key
  *
- * A finding that carries `file_line` is a code-lens finding; one that carries only `ref` is a
- * conformance finding. The key decides, so a bare array is judged exactly as the wrapped shapes
- * are. Only a conformance `ref` may legitimately not be a line: `AC-3` is a criterion, but a
- * `file_line` of `src/x.ts` is a high-confidence bug with no usable location (task.195).
+ * A finding under `code_review.findings` is a code-lens finding and one under
+ * `pr_conformance.findings` a conformance finding, whatever keys it carries: a code finding that
+ * has lost its `file_line` is still a code finding with no location, and keying on the missing key
+ * would read it as a clean conformance `no-line` (task.195 QA cycle 1). A bare array has no wrapper,
+ * so there the key decides — `file_line` is code, `ref` alone conformance. Only a conformance `ref`
+ * may legitimately not be a line: `AC-3` is a criterion, but a `file_line` of `src/x.ts`, or none,
+ * is a high-confidence bug with no usable location (task.195).
  *
  * A path never contains whitespace, so the anchor pattern is `^(\S+):(-?\d+)$`.
  * Review 1 of task.194 found that a lazy `^(.+?):` parsed the conformance lens's
@@ -99,13 +102,15 @@ const MALFORMED = new Set([
 
 /**
  * `{lens, path, line}` for a `path:line` anchor, or `{lens, path: null}` when the value does not
- * parse. The lens is the KEY the finding carries: `file_line` is the code lens, `ref` alone the
- * conformance lens (task.195).
+ * parse. `lens` is the wrapper's, from `lensesOf`; without one the KEY decides: `file_line` is the
+ * code lens, `ref` alone the conformance lens (task.195).
  */
-function anchorOf(finding) {
-  const lens = Object.prototype.hasOwnProperty.call(finding, "file_line")
-    ? "code"
-    : "conformance";
+function anchorOf(finding, lens) {
+  if (lens !== "code" && lens !== "conformance") {
+    lens = Object.prototype.hasOwnProperty.call(finding, "file_line")
+      ? "code"
+      : "conformance";
+  }
   const raw = lens === "code" ? finding.file_line : finding.ref;
   const m = /^(\S+):(-?\d+)$/.exec(String(raw ?? "").trim());
   return m ? { lens, path: m[1], line: Number(m[2]) } : { lens, path: null };
@@ -115,13 +120,14 @@ const norm = (s) => String(s).replace(/\s+/g, " ").trim();
 
 /**
  * Pure: one verdict per finding, in input order. `readFile(path)` returns the
- * file's text or null, and is called at most once per distinct path.
+ * file's text or null, and is called at most once per distinct path. `lenses` is `lensesOf(doc)`,
+ * parallel to `findings`; null (a bare array) lets each finding's key decide.
  */
-function checkAnchors(findings, { readFile }) {
+function checkAnchors(findings, { readFile, lenses = null }) {
   const cache = new Map();
-  return findings.map((f) => {
+  return findings.map((f, i) => {
     const id = f.id ?? null;
-    const a = anchorOf(f);
+    const a = anchorOf(f, lenses?.[i]);
     if (a.path === null) {
       return a.lens === "code"
         ? { id, verdict: "unparseable", fileLine: f.file_line ?? null }
@@ -154,6 +160,16 @@ function findingsOf(doc) {
   const pc = doc.pr_conformance?.findings;
   if (!Array.isArray(cr) && !Array.isArray(pc)) return null;
   return [...(Array.isArray(cr) ? cr : []), ...(Array.isArray(pc) ? pc : [])];
+}
+
+/** The lens of each finding `findingsOf(doc)` returns, by wrapper; null for a bare array. */
+function lensesOf(doc) {
+  if (Array.isArray(doc) || !doc || typeof doc !== "object") return null;
+  const n = (a) => (Array.isArray(a) ? a.length : 0);
+  return [
+    ...Array(n(doc.code_review?.findings)).fill("code"),
+    ...Array(n(doc.pr_conformance?.findings)).fill("conformance"),
+  ];
 }
 
 /**
@@ -404,7 +420,10 @@ function run(argv, deps = {}) {
     index: opts.index,
     exec: deps.exec,
   });
-  const results = checkAnchors(findings, { readFile });
+  const results = checkAnchors(findings, {
+    readFile,
+    lenses: lensesOf(doc),
+  });
   const malformed = results.filter((r) => MALFORMED.has(r.verdict));
 
   if (opts.annotate) {
@@ -431,6 +450,7 @@ module.exports = {
   anchorOf,
   checkAnchors,
   findingsOf,
+  lensesOf,
   makeReader,
   parseArgs,
   run,

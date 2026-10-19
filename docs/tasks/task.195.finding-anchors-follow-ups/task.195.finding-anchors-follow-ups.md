@@ -421,6 +421,27 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-19
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.195.qa.1.finding-anchors-follow-ups.md](./task.195.qa.1.finding-anchors-follow-ups.md)
+- **Gate File**: [task.195.gate.1.finding-anchors-follow-ups.yml](./task.195.gate.1.finding-anchors-follow-ups.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 5959
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+TASK-195-QA1-1 (MEDIUM): a `code_review` finding with no `file_line` reads the clean `no-line`. TASK-195-QA1-2 (LOW): the `--inline` guard passes a file that has no findings array.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -431,6 +452,8 @@ None.
 | 2026-10-19 |         | Status → ready-for-development | review-task |
 | 2026-10-19 |         | Implemented — 12 files (engine, 4 dispatcher blocks, develop-bug loop, 5 test files, CHANGELOG), 29 engine + 14 block + 16 guard tests | develop |
 | 2026-10-19 |         | Status → ready-for-review | develop |
+| 2026-10-19 |         | QA gate CONCERNS (90/100) — 2 findings | qa-task |
+| 2026-10-19 |         | QA findings fixed — 2 of 2 (TASK-195-QA1-1, -2), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---
@@ -496,4 +519,24 @@ None.
 - **Mutation proofs** (each red, restored with `cmp`): lens-by-key; root-in-rev; the `--index` reader; the qa-task `reason`
   decision; review-code staged → `--index`; the develop-bug `anchor_check` mention (full removal; removing one of its two
   mentions stays green by design); the review-pr `--inline` guard.
+
+### QA Fix — cycle 1 (2026-10-19)
+
+- **TASK-195-QA1-1** (MEDIUM): the lens now comes from the wrapper when the input has one (`lensesOf(doc)`,
+  passed to `checkAnchors` by `run`), and from the key only for a bare array. A `code_review` finding that has
+  lost its `file_line` reads `unparseable`, not `no-line`. **Deviation from §3 Target Architecture, recorded:**
+  §3 says the lens is decided by the key alone; that rule produced this finding, so the wrapper now wins. Tests:
+  the wrapped keyless unit case with a bare-array control, and a CLI case annotating both lenses.
+- **TASK-195-QA1-2** (LOW): both `--inline` guards require a findings array (review-pr: at least one of the two)
+  before testing `anchor_check`; `{}`, `{code_review:{}}` and `[]` HALT, and an empty array still passes.
+- Mutation proofs, each red and restored with `cmp`: `run` passing no lenses; `anchorOf` ignoring its lens;
+  each guard without its array check. The review-code proof first stayed green, because the guard iterated
+  with `[]` and jq's error refused `{}` before the type check could; it now iterates with `[]?`, so the type
+  check is the one mechanism and the proof goes red.
+- Probe (Step 3.5): the population command from qa-fix Step 3.5, phrase ``path:line` at all`` (the old
+  observable), over `skills/*/SKILL.md`, hand-authored `skills/*/references/*.md` and `shared/resources/*`
+  — qa-task, qa-story, review-code, review-pr: updated ("a code finding whose `file_line` is absent or is not
+  `path:line`"); `CHANGELOG.md`: updated; §3 of this document: left as written, deviation recorded above.
+  Population 4 + 2; the restatement is the nine-site enumeration task.195 already swept, so the move is patch,
+  not consolidate: each site names the verdict for its own reader.
 

@@ -2493,7 +2493,7 @@ for (const shell of SHELLS) {
 // must refuse such a file, and must let a fully annotated one through (control).
 function extractInlineGuard(skillText) {
   const m = skillText.match(
-    /^[ \t]*jq -e '\[[^\n]*select\(has\("anchor_check"\) \| not\)[\s\S]*?exit 1; \}/m,
+    /^[ \t]*jq -e '[\s\S]*?select\(has\("anchor_check"\) \| not\)[\s\S]*?exit 1; \}/m,
   );
   return m ? m[0] : null;
 }
@@ -2527,6 +2527,23 @@ test("--inline refuses a findings file with an un-annotated finding, and passes 
       "an un-annotated finding must HALT the --inline block",
     );
     assert.match(never.stdout, /HALT: .*anchor_check.*Step 6/);
+    // A file with no findings array selects nothing; it must not pass as "all annotated"
+    // (task.195 QA cycle 1, TASK-195-QA1-2). An empty array is a legitimate empty review.
+    for (const notFindings of [{}, { code_review: {} }, []]) {
+      const r = runGuard(notFindings);
+      assert.equal(r.status, 1, `${JSON.stringify(notFindings)} must HALT`);
+      assert.match(r.stdout, /HALT: /);
+    }
+    assert.equal(runGuard({ code_review: { findings: [] } }).status, 0);
+    assert.equal(
+      runGuard({
+        pr_conformance: {
+          findings: [{ ref: "AC-1", anchor_check: "no-line" }],
+        },
+      }).status,
+      0,
+      "a conformance-only file passes",
+    );
     const annotated = runGuard({
       code_review: {
         findings: [

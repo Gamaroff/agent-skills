@@ -629,8 +629,8 @@ esac
 ```
 
 Every finding now carries `anchor_check`: `ok`, `unchecked-text` and `no-line` are clean;
-`no-such-file`, `out-of-range`, `text-mismatch` and `unparseable` (a code `file_line` that is not
-`path:line` at all) mean the reviewer named a line that is not the
+`no-such-file`, `out-of-range`, `text-mismatch` and `unparseable` (a code finding whose `file_line` is absent or is not
+`path:line`) mean the reviewer named a line that is not the
 line it meant. **A malformed anchor is never dropped.** It renders with `⚠️ unverified anchor`
 after its `ref`, keeps the reviewer's value in the machine-readable block with its `anchor_check`
 beside it, and is left out of `--inline` (Step 8), so it reaches the PR only through the summary
@@ -968,7 +968,9 @@ INLINE_FILE="$(mktemp -t review-pr-inline.XXXXXX.json)"
 # report `posted` — it reaches the PR through the summary comment instead.
 # Refuse un-annotated input first: that select keeps only verified anchors, so a file Step 6 never
 # annotated yields [] — the same output as "no anchorable findings" (task.195).
-jq -e '[ (.code_review.findings[]?, .pr_conformance.findings[]?) | select(has("anchor_check") | not) ] | length == 0' \
+# At least one findings array must exist: `{}` would otherwise select nothing and pass.
+jq -e '((.code_review.findings | type == "array") or (.pr_conformance.findings | type == "array"))
+       and ([ (.code_review.findings[]?, .pr_conformance.findings[]?) | select(has("anchor_check") | not) ] | length == 0)' \
    "$FINDINGS_JSON" >/dev/null || {
   echo "HALT: a finding in $FINDINGS_JSON carries no anchor_check (or the file is not findings JSON) — run Step 6's anchor check first; nothing posted inline"; exit 1; }
 jq '[ (.code_review.findings[]? | select(.anchor_check == "ok" or .anchor_check == "unchecked-text")

@@ -28,7 +28,7 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ENGINE = path.join(__dirname, "..", "finding-anchors.js");
-const { checkAnchors, anchorOf, makeReader, findingsOf, MALFORMED } =
+const { checkAnchors, anchorOf, makeReader, findingsOf, lensesOf, MALFORMED } =
   createRequire(import.meta.url)(ENGINE);
 
 // The PR #594 fixture file: 11 lines, the real line of the defect is 8.
@@ -185,6 +185,27 @@ test("unparseable vs no-line is decided by the key, in a bare array and a wrappe
   // A compound conformance ref stays clean; the same text as a file_line does not.
   assert.equal(verdictOf({ ref: "AC-3 / x.js:8" }), "no-line");
   assert.equal(verdictOf({ file_line: "AC-3 / x.js:8" }), "unparseable");
+});
+
+// task.195 QA cycle 1 (TASK-195-QA1-1): a code finding that has LOST its file_line key read as a
+// clean conformance no-line, because the lens was decided by the key alone. Under a wrapper the
+// wrapper decides; only a bare array, which has none, falls back to the key.
+test("under a wrapper the wrapper decides the lens: a code finding with no file_line is unparseable", () => {
+  const doc = {
+    code_review: { findings: [{ id: "CR-9", finding: "no location at all" }] },
+    pr_conformance: { findings: [{ id: "PC-1", ref: "AC-3" }] },
+  };
+  const findings = findingsOf(doc);
+  assert.deepEqual(lensesOf(doc), ["code", "conformance"]);
+  assert.deepEqual(
+    checkAnchors(findings, { ...reader(), lenses: lensesOf(doc) }).map(
+      (r) => r.verdict,
+    ),
+    ["unparseable", "no-line"],
+  );
+  // Control: the same keyless finding in a bare array has no wrapper — the key decides, as before.
+  assert.equal(lensesOf([{ id: "x" }]), null);
+  assert.equal(verdictOf({ id: "CR-9" }), "no-line");
 });
 
 test("a conformance ref of the path:line form is checked like a file_line", () => {
@@ -638,6 +659,31 @@ test("unparseable exits 1 malformed-anchors through the CLI and annotates the fi
       JSON.parse(readFileSync(f, "utf8")).code_review.findings[0].anchor_check,
       "unparseable",
     );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("CLI: a wrapped code finding with no file_line exits 1 and is annotated unparseable", () => {
+  const dir = gitRepo();
+  try {
+    const f = path.join(dir, "f.json");
+    writeFileSync(
+      f,
+      JSON.stringify({
+        code_review: { findings: [{ id: "CR-1", finding: "x" }] },
+        pr_conformance: { findings: [{ id: "PC-1", ref: "AC-3" }] },
+      }),
+    );
+    const r = cli(
+      ["--findings-file", f, "--root", dir, "--annotate", f, "--json"],
+      dir,
+    );
+    assert.equal(r.code, 1);
+    assert.equal(r.json().reason, "malformed-anchors");
+    const out = JSON.parse(readFileSync(f, "utf8"));
+    assert.equal(out.code_review.findings[0].anchor_check, "unparseable");
+    assert.equal(out.pr_conformance.findings[0].anchor_check, "no-line");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
