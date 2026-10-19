@@ -5,7 +5,7 @@ type: task
 description: "Let shared/resources/security-probe.mjs probe a Python script through the existing cli: form (by file extension), so a Python boundary reaches the DoD probe instead of failing the zero-candidates guard."
 tags: [security-probe, finalise, qa-task, qa-story, review-security, observation]
 category: infrastructure
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-10-19
 updated: 2026-10-19
@@ -15,7 +15,9 @@ github_issue: 689
 
 # Technical Task: security-probe — a Python CLI under `cli:`
 
-**Status:** Planned
+**Status:** Ready for Review
+
+**Review**: ✅ All review recommendations from `task.215.review.1.probe-engine-python-cli-entry-form.md` implemented 2026-10-19
 
 **GitHub Issue**: [#689](https://github.com/Gamaroff/agent-skills/issues/689)
 
@@ -41,7 +43,18 @@ are a recorded human override or this task.
 ## 3. Technical Background
 
 - `CLI_EXTENSIONS = [".mjs", ".js"]` (`shared/resources/security-probe.mjs:705`) and the check at `:1252-1261` decline any
-  other extension; the child is always `process.execPath` (`:1617`).
+  other extension; the `cli:` child is always `process.execPath` (`runCliCase`, `:2286-2288`).
+- `runCliCase` tells a crash from a refusal only by `NODE_FATAL_FOOTER` (`:2199`), the `Node.js vX.Y.Z` line Node prints
+  on an uncaught error. Python prints no such footer, and a Python crash exits **1**, the same status as a refusal.
+  Measured: an uncaught exception exits 1 after a `Traceback (most recent call last):` block; a `SyntaxError` exits 1
+  after a `File "…", line N` block with **no** Traceback header; `sys.exit(1)` exits 1 with empty stderr.
+- The child's environment is `caseEnv()`: `sandboxEnv()` (`qa-execute-snippets.mjs:2038`) carries only `PATH`, `HOME`,
+  `LANG`, `TERM`, `TMPDIR` and `PWD`, and `caseEnv` points `HOME` and `TMPDIR` at directories inside the sandbox root. No
+  `PYTHON*` or `XDG_*` variable is passed at all. A write to `$HOME` lands in the sandbox root and is recorded as an escape.
+- `watchedSpawn` records any change to the script's own directory as an escape (`:1950-1954`). Python writes
+  `__pycache__/` there when a script imports a sibling module, unless it runs with `-B`.
+- `python3` is the consumer's interpreter, resolved from `PATH` when a `.py` entry is probed. It is not a dependency of
+  this repository. The CI test lane (`test.yml`, `ubuntu-latest`) ships `python3`.
 - The `cli:` form's contract is already general: the case's input is one element of an `--argv` template, the exit
   status is the verdict, a crash is `errored`, and each guarded flag is its own control (`--name`).
 - Precedent: tasks 144 (`cli:`), 180 (`fence:`) and 181 (`shell-argv:`) each added one entry form with its own
@@ -53,10 +66,11 @@ are a recorded human override or this task.
 containment, timeout and environment hygiene as the Node arm. Record the interpreter in the run record (as `shells` is
 recorded for the shell forms). Decline by name, once, when `python3` is not on `PATH`.
 
-**Design choice to confirm in review.** Extend `cli:` by extension (recommended: one contract, no new prefix) rather
-than add a `py-cli:` prefix.
+**Design choice (confirmed in review 1).** Extend `cli:` by extension rather than add a `py-cli:` prefix: the `cli:`
+contract does not depend on the runtime, and a second prefix would duplicate every decline reason and doc paragraph.
 
-**Out.** Importing a Python function (a `py:path#function` form); a Python test runner; any other language.
+**Out.** Importing a Python function (a `py:path#function` form); a Python test runner; any other language; the release
+and consumer proof (see Deferred Work).
 
 ## 5. Breaking Changes
 
@@ -64,68 +78,116 @@ None. `.py` entries were declined before; every existing form and decline reason
 
 ## 6. Implementation Plan
 
-1. `security-probe.mjs`: replace `CLI_EXTENSIONS` with an extension → interpreter map; resolve `python3` once per run;
-   decline `entry-not-probeable` with a detail naming the missing interpreter. Spawn it with a clean environment:
-   no inherited `PYTHON*` variables, no user site-packages (`-s`), no bytecode writes (`-B`). Do not use `-I` blindly:
-   it drops the script's directory from `sys.path`, which breaks scripts that import a sibling module — decide and test.
-2. Sandbox: the Python child must not reach the real home or data dir. Confirm the `cli:` arm's `HOME` / `XDG_*`
-   redirection covers it, and add a test with a fixture CLI that writes under `$HOME`.
-3. Run record: add the interpreter name and version to the control entry.
-4. Docs: `probe-boundary-rule.md` §5 and `finalise-dod-security-prompt.md` Step 4 (entry-form list: "a Python CLI takes the
-   cli: form"), the engine's header comment, `docs/reference/` if the forms are listed there.
+1. `security-probe.mjs`: replace `CLI_EXTENSIONS` with an extension → interpreter map (`.mjs` / `.js` → `process.execPath`,
+   `.py` → `python3`). Resolve `python3` once per run, by `python3 --version` on the engine's `PATH`; when it does not
+   run, decline `entry-not-probeable` once, with a detail naming `python3`. Spawn
+   `python3 -E -s -B <entry> …argv` through the same `watchedSpawn` / `caseEnv` path as the Node arm:
+   - `-E` ignores any `PYTHON*` variable (a second line of defence: `caseEnv` passes none);
+   - `-s` drops user site-packages;
+   - `-B` writes no bytecode. Without it, a script that imports a sibling writes `__pycache__/` into its own directory,
+     which `watchedSpawn` records as an escape on every case;
+   - **not `-I`**: it drops the script's directory from `sys.path`. Measured: a sibling import exits 0 under `-E -s -B`
+     and fails `ModuleNotFoundError` under `-I -B`.
+
+   **Crash branch for a `.py` entry.** A non-zero exit whose stderr's last non-empty line is a Python exception line
+   (`^[A-Za-z_][\w.]*(Error|Exception|Interrupt|Exit)\b`) **and** stderr holds at least one `  File "…", line N` frame is
+   `errored`, never `rejected`. This covers the uncaught-exception shape and the `SyntaxError` shape (which has no
+   Traceback header). The Node arm keeps `NODE_FATAL_FOOTER` unchanged.
+2. Sandbox: no change to containment is expected. `caseEnv` already gives the child a sandbox `HOME` and `TMPDIR` and
+   passes no `XDG_*` or `PYTHON*` variable. Hold it with a test: a fixture CLI that writes under `$HOME` leaves the real
+   home untouched and appears in the result's `escapes`.
+3. Result and run record: a top-level `interpreter` field, `{ name: "python3", version: "<python3 --version output>" }` for
+   a `.py` entry and `null` for every other form, beside `shells` (`:1758`).
+4. Docs. Every site that routes "a Node CLI" to `cli:` gains "or a Python CLI (`.py`, run under `python3`)". The site list
+   is the output of `git grep -n "Node CLI" -- 'shared/resources/*.md' 'skills/*/SKILL.md'`, re-run before editing:
+   `probe-boundary-rule.md` (§5 at 347, and 533, 547), `finalise-dod-security-prompt.md` (48, 277),
+   `security-review-prompt.md` (101, 111, 172, 268), `skills/qa-task/SKILL.md:679`, `skills/qa-story/SKILL.md:1169` and
+   `skills/review-security/SKILL.md:156`. Also the engine's header comment (`security-probe.mjs:151`, `:166`, `:692`,
+   `:704`) and the `runCliCase` doc comment. Inside `shared/resources/`, cite a sibling by bare filename.
 5. Bundle (`npm run bundle`) into finalise, qa-story, qa-task and review-security; CHANGELOG `[Unreleased]`.
-6. Release a tag and re-vendor into consumers (`setup-consumer.sh --update`).
 
 ## 7. Files Summary
 
 `shared/resources/security-probe.mjs`; its bundled copies under `skills/{finalise,qa-story,qa-task,review-security}/references/`;
-`shared/resources/probe-boundary-rule.md`; `shared/resources/finalise-dod-security-prompt.md` (and copies); engine tests under
-`evals/shared/tests/`; `CHANGELOG.md`.
+`shared/resources/probe-boundary-rule.md`, `shared/resources/finalise-dod-security-prompt.md` and
+`shared/resources/security-review-prompt.md` (and their bundled copies); `skills/qa-task/SKILL.md`, `skills/qa-story/SKILL.md`,
+`skills/review-security/SKILL.md`; engine tests in `shared/resources/tests/security-probe.test.mjs` (already reached by the
+`npm test` glob `'shared/resources/tests/*.test.mjs'`); `CHANGELOG.md`.
+
+**Added** (test fixtures, `shared/resources/tests/fixtures/security-probe/`): `cli-refuser.py`, `cli-exit-one.py`,
+`cli-refuser-error-text.py`, `cli-crasher.py`, `cli-syntax-error.py`, `cli-imports-sibling.py`, `cli_sibling_helper.py`,
+`cli-writes-home.py`, `cli-flags.py`.
 
 ## 8. Testing Strategy
 
-A fixture Python CLI (`argv[1]` path: exits 0 for a safe path, 1 for a refused one). Cases: runs under `python3`; verdict from
-exit status; a crash is `errored`; a missing interpreter is declined once by name; a `.py` entry with `--argv` missing is
-`bad-argv`; the child cannot write outside its sandbox; the run record names the interpreter; a mutation (revert the
-extension map) makes the `.py` test red. Keep the existing `.mjs` / `.js` tests unchanged and green.
+All in `shared/resources/tests/security-probe.test.mjs`, test-first. A fixture Python CLI (`argv[1]` path: exits 0 for a
+safe path, 1 for a refused one), written to a temp directory by the test. Cases:
+
+- it runs under `python3` and the verdict comes from the exit status (`executed > 0`);
+- **crash shapes are `errored`**: an uncaught exception, and a `SyntaxError` script. **Control case:** a plain
+  `sys.exit(1)` refusal with empty stderr stays `rejected`, and a refusal that prints a one-line message to stderr stays
+  `rejected`;
+- a fixture that imports a sibling module runs, and records no escape (holds `-B` and not-`-I`);
+- a missing interpreter is declined once, by name: run the engine CLI as a child (`process.execPath`, absolute) with `PATH`
+  set to an empty temp directory, and assert one `entry-not-probeable` naming `python3`;
+- a `.py` entry with `--argv` missing is `bad-argv`;
+- a fixture that writes under `$HOME` leaves the real home untouched and is listed in `escapes`;
+- the result and the run record carry `interpreter` for `.py`, and `null` for a `.mjs` entry;
+- mutation: revert the extension map and the `.py` test goes red; drop the crash branch and the crash tests go red.
+
+Keep the existing `.mjs` / `.js` tests unchanged and green.
 
 ## 9. Success Criteria
 
 1. `security-probe.mjs --entry cli:<fixture>.py --argv '[...,"{input}"]' --sink path` returns `executed > 0` with the expected
    verdicts. Test: the fixture suite above, per PR.
 2. A `.py` entry no longer returns `entry-not-probeable` for the extension; every other decline reason is unchanged.
-3. The run record carries the interpreter. Test: record assertion.
-4. Consumer proof (omarchy-leak-radar, after re-vendoring): the `probe_command` from its `dod.1.security.run.json`
-   (`--entry 'cli:scripts/threatradar.py' --argv '["merge-back","--schema","3","{input}"]'`) executes candidates. Open
-   point: the `path` sink's cases must fit a `merge-back` target (a case may need `--cases-file`, and the `cli:` form has no
-   `--fixture-setup`); settle this against the consumer, and add the missing piece to this task if the form needs it.
+3. The result and run record carry `interpreter` (`python3` and its version) for a `.py` entry, `null` otherwise. Test:
+   record assertion.
+4. A Python crash (uncaught exception or `SyntaxError`) is `errored`, never `rejected`, while a plain `sys.exit(1)` refusal
+   stays `rejected`. Test: the crash-shape cases and their control.
 
 ## 10. Risk Assessment
 
-Low. The change is additive and isolated behind an extension that was previously declined. The one real risk is the
-sandbox: a Python child that writes to `$HOME`. Covered by the test in the plan.
+Low blast radius: the change is additive and isolated behind an extension that was previously declined. Two risks:
+
+- **A crash read as a refusal** (the silent one). A Python crash exits 1, like a refusal, so without the crash branch a
+  script that crashes on every input reads as a control that refuses every hostile input. Oracle: the crash-shape tests
+  with a plain refusal as the control case (Success Criterion 4).
+- **The sandbox**: a Python child that writes to `$HOME`. `caseEnv` already redirects it; held by the `$HOME` test.
 
 ## 11. Rollback Plan
 
 Revert the engine change and re-bundle; `.py` entries return to `entry-not-probeable`.
 
----
+## Deferred Work
 
+Both items need a merged, tagged release, and `/finalise` runs before merge, so neither is a success criterion here.
+
+- **Release and re-vendor.** Release a tag and re-vendor into consumers (`setup-consumer.sh --update`).
+- **Consumer proof** (omarchy-leak-radar, after re-vendoring): the `probe_command` from its `dod.1.security.run.json`
+  (`--entry 'cli:scripts/threatradar.py' --argv '["merge-back","--schema","3","{input}"]'`) executes candidates. Open
+  point: the `path` sink's cases must fit a `merge-back` target (a case may need `--cases-file`, and the `cli:` form has no
+  `--fixture-setup`). Settle it against the consumer; if the form needs a missing piece, that is a follow-up task.
+
+---
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                                                                  | Author      |
-| ---------- | ------- | -------------------------------------------------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-19 | 1.0     | Initial draft, written from omarchy-leak-radar (story 3.1.1 halted at /finalise on this gap) | create-task |
+| 2026-10-19 | 1.1     | Review passed (9/10) — added the Python crash branch, decided `-E -s -B`, recorded the doc-site search, moved tests to `shared/resources/tests/`, moved release and consumer proof to Deferred Work | review-task |
+| 2026-10-19 |         | Status → ready-for-development | review-task |
+| 2026-10-19 |  | Implemented — 20 files (5 sources, 3 SKILL.md, 9 fixtures, CHANGELOG, tests; plus bundled copies), 11 tests | develop |
 <!-- change-log-end -->
 
 ---
 
 ## Progress Tracking
 
-- [ ] Implementation Plan steps 1-3: extension map, sandbox, run record (tests first)
-- [ ] Implementation Plan steps 4-5: docs, bundle, CHANGELOG
-- [ ] Implementation Plan step 6: release, re-vendor and consumer proof
+- [x] Implementation Plan steps 1-3: extension map, sandbox, run record (tests first) — 11 tests, 9 fixtures; 9 mutations each red
+- [x] Implementation Plan steps 4-5: docs, bundle, CHANGELOG — every site of the recorded `Node CLI` search updated; `npm run bundle` clean
 
 ---
 
@@ -138,5 +200,23 @@ Revert the engine change and re-bundle; `.py` entries return to `entry-not-probe
 ---
 
 ## Notes
+
+### Implementation Summary (2026-10-19)
+
+- `security-probe.mjs`: `CLI_EXTENSIONS` became `CLI_INTERPRETERS` (`.mjs` / `.js` → node, `.py` → python3);
+  `probePython()` resolves `python3 --version` once per process; a `.py` entry spawns
+  `python3 -E -s -B <entry> ...argv` (`PYTHON_FLAGS`) through the unchanged `watchedSpawn` / `caseEnv` path.
+- Crash branch: exported `isPythonCrash(stderr)`. **Deviation from the plan's regex, recorded:** the plan named
+  `(Error|Exception|Interrupt|Exit)` class suffixes; the engine accepts any (dotted) class name as the last line,
+  because a custom `class Refused(Exception)` raised uncaught prints `__main__.Refused: …`, and missing it would score a
+  crash as a refusal. To keep refusals refusals it requires all three: a `File "…", line N` frame, a final
+  exception line, and a `Traceback (most recent call last):` header or a `SyntaxError`-family class.
+- `interpreter` (`{ name, version }`, else `null`) is on every result path (`base`, the all-errored and needs-fake-gh
+  returns, the success return), in `toRecordEntry`, and printed as `interpreter:` in `--emit-block` when set.
+- Testing: 11 new tests in `security-probe.test.mjs` (`cli entry (python): …`); `npm run ci:fast` green (5917 tests,
+  0 failures). Mutations, each turning its test red: drop `.py` from the map; drop the crash branch; drop `-B`; use
+  `-I`; drop `interpreter` from the result; from the record entry; drop the traceback-header clause; drop the frame
+  clause; drop the missing-python3 decline.
+- Deferred work: see Deferred Work (release, re-vendor, consumer proof).
 
 - QA artifacts land beside this file: `task.215.qa.{N}.*.md`, `task.215.bug.{N}.*.md`, `task.215.gate.{N}.*.yml`.
