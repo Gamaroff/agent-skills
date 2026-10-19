@@ -1,6 +1,7 @@
 /**
  * Corpus guard — every accepted task merged since the last tag is cited in
- * `CHANGELOG.md` under `## [Unreleased]`.
+ * `CHANGELOG.md` under `## [Unreleased]` — or under a release section `release.sh
+ * --prepare` wrote and no tag covers yet.
  *
  * task.115 (obs #59). The release checklist in `docs/contributing/releases.md`
  * has one box per generated artefact, and every one of them had a mechanism —
@@ -21,7 +22,8 @@
  * -------------------------
  *   window   = merge commits in `<last tag>..HEAD` whose subject names a PR
  *   required = accepted task documents whose `pr_number` is one of those PRs
- *   cited    = task numbers `[Unreleased]` names as `(task N` / `task N` / `task.N`
+ *   cited    = task numbers `[Unreleased]`, or a `## [vX.Y.Z]` section newer than the
+ *              last tag, names as `(task N` / `task N` / `task.N`
  *   assert   required ⊆ cited, naming every task that is not
  *
  * Tasks only. `[Unreleased]` today cites bug 14 but not bugs 13 and 15 — all
@@ -84,6 +86,47 @@ export function unreleasedSection(changelog) {
     }
   }
   return lines.slice(start + 1, end).join("\n");
+}
+
+/** `vX.Y.Z` → `[X, Y, Z]`, or null for anything else. */
+export function parseVersion(v) {
+  const m = /^v?([0-9]+)\.([0-9]+)\.([0-9]+)$/.exec(v ?? "");
+  return m ? m.slice(1).map(Number) : null;
+}
+
+function isNewer(a, b) {
+  for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] > b[i];
+  return false;
+}
+
+/**
+ * The text that may cite work merged since `tag`: the `[Unreleased]` body, plus the body of every
+ * `## [vX.Y.Z]` section newer than `tag`. `release.sh --prepare` moves `[Unreleased]` into
+ * `## [vX.Y.Z]` on develop, and `--tag` tags it later, from main. Between the two, the release
+ * commit's own CI runs with `[Unreleased]` empty and every citation in a section no tag covers yet.
+ * Reading `[Unreleased]` alone failed every task in the window on the v0.58.0 release-prep PR
+ * (#693). An unparseable tag counts `[Unreleased]` only: fail closed.
+ */
+export function untaggedSections(changelog, tag) {
+  const out = [];
+  const unreleased = unreleasedSection(changelog);
+  if (unreleased !== null) out.push(unreleased);
+  const base = parseVersion(tag);
+  if (!base) return out.join("\n");
+  const lines = changelog.split("\n");
+  let body = null;
+  for (const line of lines) {
+    if (/^## \[/.test(line)) {
+      if (body) out.push(body.join("\n"));
+      const m = /^## \[(v?[0-9]+\.[0-9]+\.[0-9]+)\]/.exec(line);
+      const v = m ? parseVersion(m[1]) : null;
+      body = v && isNewer(v, base) ? [] : null;
+      continue;
+    }
+    if (body) body.push(line);
+  }
+  if (body) out.push(body.join("\n"));
+  return out.join("\n");
 }
 
 /**
@@ -195,6 +238,30 @@ test("unreleasedSection stops at the next release heading", () => {
   assert.equal(unreleasedSection("# Changelog\n\n## [v1.0.0]\n"), null);
 });
 
+test("untaggedSections counts a prepared release section newer than the tag, and no older one", () => {
+  const log =
+    "# Changelog\n\n## [Unreleased]\n\n- (task 1)\n\n## [v1.1.0] - 2026-02-01\n\n- (task 2)\n\n" +
+    "## [v1.0.0] - 2026-01-01\n\n- (task 3)\n\n## [v0.9.0] - 2025-12-01\n\n- (task 4)\n";
+  const cited = (tag) =>
+    [...citedTasks(untaggedSections(log, tag))].sort((a, b) => a - b);
+  assert.deepEqual(cited("v1.0.0"), [1, 2], "v1.1.0 is prepared, not tagged");
+  assert.deepEqual(cited("v1.1.0"), [1], "a tagged section is released");
+  assert.deepEqual(cited("v0.9.0"), [1, 2, 3]);
+  assert.deepEqual(cited("not-a-tag"), [1], "an unparseable tag fails closed");
+  assert.deepEqual(
+    [
+      ...citedTasks(
+        untaggedSections(
+          "# Changelog\n\n## [v2.0.0]\n\n- (task 5)\n",
+          "v1.0.0",
+        ),
+      ),
+    ],
+    [5],
+    "an emptied [Unreleased] heading is not required for the release section to count",
+  );
+});
+
 test("taskFrontmatter reads status and a numeric pr_number, and rejects the rest", () => {
   assert.deepEqual(
     taskFrontmatter("---\nstatus: accepted\npr_number: 371\n---\n# T"),
@@ -234,7 +301,7 @@ test("non-vacuity floor: the corpus read finds accepted tasks with a pr_number",
   );
 });
 
-test("every accepted task merged since the last tag is cited in [Unreleased]", () => {
+test("every accepted task merged since the last tag is cited in [Unreleased] or a prepared release section", () => {
   const tag = lastTag();
   assert.ok(
     tag,
@@ -247,13 +314,15 @@ test("every accepted task merged since the last tag is cited in [Unreleased]", (
   const required = corpus
     .filter((t) => merged.has(t.pr))
     .sort((a, b) => a.n - b.n);
-  const cited = citedTasks(unreleasedSection(readFileSync(CHANGELOG, "utf8")));
+  const cited = citedTasks(
+    untaggedSections(readFileSync(CHANGELOG, "utf8"), tag),
+  );
 
   const missing = required.filter((t) => !cited.has(t.n));
   assert.deepEqual(
     missing.map((t) => `task ${t.n} (PR #${t.pr}, ${t.doc})`),
     [],
-    `accepted and merged since ${tag}, but not cited under ## [Unreleased] as \`(task N)\`:\n  ` +
+    `accepted and merged since ${tag}, but not cited under ## [Unreleased] (or a prepared, untagged release section) as \`(task N)\`:\n  ` +
       missing.map((t) => `task ${t.n} — PR #${t.pr} — ${t.doc}`).join("\n  ") +
       "\nWrite the entry at acceptance (`/finalise` warns on this — convention in docs/contributing/releases.md).",
   );
