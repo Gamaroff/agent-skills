@@ -5,18 +5,20 @@ type: task
 description: "Close the seven advisory items task.194 left in its gate 3 and PR review: an unparseable code file_line gets its own malformed verdict, a --root missing from the --rev tree is bad-root, a new --index read for staged reviews, dispatchers read the checker's reason instead of its exit code, the --inline blocks refuse un-annotated input, /review-pr binds the head SHA on both platforms, and the population guard covers every consumer of findings."
 tags: [review-pr, review-code, qa-task, qa-story, develop-bug, finding-anchors, follow-up]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-07
 updated: 2026-10-19
 assignee:
 estimated_effort_hours: 8
 github_issue: 597
+completed_date: 2026-10-19
+pr_number: 695
 ---
 
 # Technical Task: Finding-anchors follow-ups
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.195.review.1.finding-anchors-follow-ups.md` implemented 2026-10-19
 **GitHub Issue**: [#597](https://github.com/Gamaroff/agent-skills/issues/597)
 
@@ -445,9 +447,9 @@ None.
 
 TASK-195-QA4-1 is fixed. One field reader, `fieldOf`, now decides `file_line`, `ref` and `line_text`. A non-string `line_text` reads `text-mismatch`, and only an absent or blank one is unchecked. The cycle 5 review found nothing. The security probe measured 43 cases with 0 reproduced and 0 escapes. Advisory items are carried to future work in the gate.
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 1 (historical, superseded by run 2)
 
-**Status:** IN PROGRESS
+**Status:** SUPERSEDED — every gap below was closed in QA cycles 3–5; see the run 2 section that follows
 
 ### QA Gate Status
 
@@ -477,6 +479,29 @@ TASK-195-QA4-1 is fixed. One field reader, `fieldOf`, now decides `file_line`, `
 **QA Gate Reference**: See `task.195.gate.2.finding-anchors-follow-ups.yml`
 
 **Detailed Verification Log:** See `task.195.dod.1.finding-anchors-follow-ups.md` for the complete verification evidence and the probe record `task.195.dod.1.security.run.json`.
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.195.qa.5.finding-anchors-follow-ups.md`
+**Gate File**: `task.195.gate.5.finding-anchors-follow-ups.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100. Five QA cycles: CONCERNS 90, PASS 100, CONCERNS 90, CONCERNS 90, PASS 100.
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 11 of 11 met. Each has a code citation and a test that runs on every PR.
+✅ **PR Review:** PR #695. The 5c `/review-pr` gave APPROVE with 0 findings. The repository requires no reviews.
+✅ **CI:** SUCCESS on `05f97433` across 5 checks (test, validate, link-check, shellcheck, branch policy).
+✅ **Documentation:** The CHANGELOG `[Unreleased]` › Fixed entry covers the new verdict, `--index` and the reason-deciding dispatchers. Four dispatcher SKILL.md files and the develop-bug verify loop document the behaviour.
+✅ **Security Review:** PASS. A probe of 57 candidates against two boundary controls (the review-pr `--inline` guard and the review-code Step 2b checker) reproduced 0 with 0 escapes. All of run 1's gaps are closed.
+⚠️ **Compliance Review:** Not applicable. This is internal tooling, with no personal, payment or health data and no UI.
+
+**Task marked as ACCEPTED on:** 2026-10-19
+
+**Detailed Verification Log:** See `task.195.dod.2.finding-anchors-follow-ups.md` for the complete verification evidence and the probe record `task.195.dod.2.security.run.json`.
 <!-- change-log-start -->
 ## Change Log
 
@@ -496,6 +521,7 @@ TASK-195-QA4-1 is fixed. One field reader, `fieldOf`, now decides `file_line`, `
 | 2026-10-19 |  | QA gate CONCERNS (90/100) — 1 finding (TASK-195-QA4-1) | qa-task |
 | 2026-10-19 |  | QA findings fixed — 1 of 1 (TASK-195-QA4-1: a non-string line_text is a text-mismatch; one field reader for file_line, ref and line_text), 1 iteration | qa-fix |
 | 2026-10-19 |  | QA gate PASS (100/100) | qa-task |
+| 2026-10-19 | 1.2 | DoD passed — accepted (PR #695) | finalise |
 <!-- change-log-end -->
 
 ---
