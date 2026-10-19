@@ -346,7 +346,8 @@ takes it.
 
   **`cli:path --argv '<JSON array>'` runs a Node or Python CLI** — a `.mjs` /
   `.js` script as `node <path> ...argv`, a `.py` script as
-  `python3 -E -s -B <path> ...argv` (task.215) — one probe per case, for the boundary that
+  `python3 -E -s -B <path> ...argv` would run it (task.215; through a bootstrap that catches a
+  crash, below) — one probe per case, for the boundary that
   lives behind a **flag parser** rather than a one-argument export (task.141's
   `uat-status.mjs --env` guard sits behind a three-argument function; the JS
   form could not reach it, and the gate recorded zero probes executed). The
@@ -380,24 +381,25 @@ takes it.
     the direction to err in. Neither makes the crash *errored*: only Node's
     uncaught-error footer, a kill or a timeout does.
   - **A Python crash exits 1, which is what a refusal exits with**, and prints
-    no Node footer. For a `.py` entry that exits 1 the engine reads stderr
-    instead: a `File "…", line N` frame under a `Traceback (most recent call
-    last):` header (an ExceptionGroup's `+ Exception Group Traceback` included),
-    or a frame and a `SyntaxError` / `IndentationError` / `TabError` line (a
-    compile error prints no header), makes the case *errored* — **whatever comes
-    after the traceback**. A multi-line message, an `add_note()` hint, an
-    ExceptionGroup's box drawing and an atexit handler's output all put
-    something other than the exception last; keying on the last line read each
-    as a refusal (task.215 QA cycle 1). A plain `sys.exit(1)`, a refusal that
-    prints an exception-shaped line with no frame, and a frame-shaped log line
-    with no header stay *rejected*. A script that catches its failure and
-    prints the traceback itself reads as a crash — *errored*, the safe
-    direction. Only exit 1 is read this way, because an uncaught exception
-    always exits 1: an "Exception ignored" traceback before an answer on any
-    other status (0, or a refusal's 3) is not a crash. One crash is not
-    detectable: a script that sets `sys.tracebacklimit = 0` prints the bare
-    exception line with no frame, which is byte-for-byte what a refusal
-    printing that line looks like, so it reads as *rejected*.
+    no Node footer, so the engine does not read the crash off the exit status.
+    A `.py` entry runs inside a bootstrap (`PYTHON_BOOTSTRAP`) that runs it as
+    `python3 <path>` would — `sys.argv[0]` is the script, `sys.path[0]` its
+    directory, `__name__` is `"__main__"` — and catches an uncaught exception
+    **before any excepthook runs**, names it on fd 3, then lets the script's
+    own excepthook print it and exits 1. Any line on fd 3 makes the case
+    *errored*. That is what stderr alone could not see: a replaced
+    `sys.excepthook` (rich, Typer), `sys.stderr` redirected or `None`, and
+    `sys.tracebacklimit = 0` each exit 1 with no frame, and read as refusals
+    (task.215 QA cycle 2). `SystemExit` is the script's answer, so a plain
+    `sys.exit(1)` or `sys.exit("refused: …")` stays *rejected*. As a second
+    signal, an exit 1 whose stderr holds a `File "…", line N` frame under a
+    `Traceback (most recent call last):` header (an ExceptionGroup's
+    included), or a frame and a `SyntaxError`-family line, is *errored*
+    whatever follows it, so a script that catches its failure, prints the
+    traceback itself and exits 1 reads as a crash — the safe direction. A
+    refusal that prints an exception-shaped line with no frame stays
+    *rejected*, and so does an "Exception ignored" traceback beside an answer
+    on any status but 1.
   - **A materialised sink writes the case's name into the fixture.** For a sink
     in `MATERIALISED_SINKS` the fixture directory holds the sink's controls
     *and* a file named by the case's input — the cwd, and `{fixture}`, are what

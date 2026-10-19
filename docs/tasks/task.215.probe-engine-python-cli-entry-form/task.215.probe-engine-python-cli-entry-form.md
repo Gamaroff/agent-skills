@@ -177,29 +177,33 @@ Both items need a merged, tagged release, and `/finalise` runs before merge, so 
 **QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-19
-**Quality Score**: 70/100
+**Quality Score**: 60/100
 **Gate Decision**: FAIL
 
 ### QA Report
 
-- **Full Report**: [task.215.qa.1.probe-engine-python-cli-entry-form.md](./task.215.qa.1.probe-engine-python-cli-entry-form.md)
-- **Gate File**: [task.215.gate.1.probe-engine-python-cli-entry-form.yml](./task.215.gate.1.probe-engine-python-cli-entry-form.yml)
+- **Full Report**: [task.215.qa.2.probe-engine-python-cli-entry-form.md](./task.215.qa.2.probe-engine-python-cli-entry-form.md)
+- **Gate File**: [task.215.gate.2.probe-engine-python-cli-entry-form.yml](./task.215.gate.2.probe-engine-python-cli-entry-form.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 313
+- **Tests Executed**: 314
 - **Phases Verified**: 2/2
 - **Critical Issues**: 1
 - **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-- TASK-215-QA1-1 (HIGH): `isPythonCrash` reads three shapes of real Python crash as refusals (a multi-line message, an `ExceptionGroup`, output after the traceback). SC4 is unmet. Bug report: [task.215.bug.1.python-crash-read-as-refusal.md](./task.215.bug.1.python-crash-read-as-refusal.md)
-- TASK-215-CR-2 (LOW): the flags test has no non-vacuity floor.
+- Cycle 1 findings fixed and verified (TASK-215-QA1-1, TASK-215-CR-2).
+- TASK-215-QA2-1 (HIGH): a crash outside the default excepthook (a replaced `sys.excepthook`, as rich and Typer install; stderr redirected or `None`) exits 1 and is scored `rejected`. SC4 is unmet. Bug report: [task.215.bug.2.crash-outside-default-excepthook.md](./task.215.bug.2.crash-outside-default-excepthook.md)
+- TASK-215-QA2-2 (MEDIUM): the limitation note in `probe-boundary-rule.md` understates the class. Bug report: [task.215.bug.3.limit-note-understates-class.md](./task.215.bug.3.limit-note-understates-class.md)
 
 ### Bug Reports
 
-- [TASK-215-BUG-1: Python crash read as refusal](./task.215.bug.1.python-crash-read-as-refusal.md) — ✅ Ready for QA — Priority: High (fixed 2026-10-19, QA fix cycle 1)
+- [TASK-215-BUG-1: Python crash read as refusal](./task.215.bug.1.python-crash-read-as-refusal.md) — ✅ Closed — Priority: High (verified QA cycle 2)
+- [TASK-215-BUG-2: crash outside the default excepthook](./task.215.bug.2.crash-outside-default-excepthook.md) — ✅ Ready for QA — Priority: High (fixed 2026-10-19, QA fix cycle 2)
+- [TASK-215-BUG-3: limit note understates the class](./task.215.bug.3.limit-note-understates-class.md) — ✅ Ready for QA — Priority: Medium (fixed 2026-10-19, QA fix cycle 2)
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -211,6 +215,8 @@ Both items need a merged, tagged release, and `/finalise` runs before merge, so 
 | 2026-10-19 |  | Implemented — 20 files (5 sources, 3 SKILL.md, 9 fixtures, CHANGELOG, tests; plus bundled copies), 11 tests | develop |
 | 2026-10-19 |  | QA gate FAIL (70/100) — 2 findings; Status → In Progress | qa-task |
 | 2026-10-19 |  | QA findings fixed — cycle 1, 2 findings (TASK-215-QA1-1, CR-2); Status → Ready for Review | qa-fix |
+| 2026-10-19 |  | QA gate FAIL (60/100) — 2 findings; Status → In Progress | qa-task |
+| 2026-10-19 |  | QA findings fixed — cycle 2, 2 findings (TASK-215-QA2-1, QA2-2); Status → Ready for Review | qa-fix |
 <!-- change-log-end -->
 
 ---
@@ -268,5 +274,20 @@ Both items need a merged, tagged release, and `/finalise` runs before merge, so 
   ExceptionGroup form; frame matched at column 0; drop the compile-error clause; drop the header clause; detail from
   the last line; drop `.py` from the map (now also reds the flags test — the CR-2 floor). `npm run ci:fast` green
   (5918 tests, 0 failures). QA's probe cases re-run: 12 executed, every case as expected.
+
+### QA Fix — cycle 2 (2026-10-19)
+
+- TASK-215-QA2-1: the crash is no longer read only off stderr. A `.py` entry runs through
+  `PYTHON_BOOTSTRAP` (`python3 -E -s -B -c …`), which runs the script as `python3 <entry>` would and
+  catches an uncaught exception before any excepthook runs, naming it on fd 3. A replaced
+  `sys.excepthook` (rich, Typer), `sys.stderr` redirected or `None`, and `sys.tracebacklimit = 0`
+  are now `errored`. The stderr traceback reader stays as a second signal on exit 1.
+- Narrowing residue: crash detection in `security-probe.mjs` (repeat subject — cycle 1 fixed the
+  same mechanism). Move: consolidate — the deny-list of stderr shapes became one channel the
+  script does not write, rather than more shapes.
+- TASK-215-QA2-2: the limitation note is gone; the crash bullet is rewritten around the bootstrap.
+- CR-3 (advisory): not taken — `recommendations.future`.
+- Tests: 4 fixtures, 2 new tests, 1 extended; 14 python tests. 7 mutations each red (listed in the
+  bug report). `npm run ci:fast` 5920 tests, 0 failures.
 
 - QA artifacts land beside this file: `task.215.qa.{N}.*.md`, `task.215.bug.{N}.*.md`, `task.215.gate.{N}.*.yml`.

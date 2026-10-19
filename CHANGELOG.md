@@ -7,13 +7,13 @@ All notable changes to this project will be documented in this file. Format foll
 ### Added
 
 - **The security probe runs a Python CLI under the `cli:` entry form (task 215).** `cli:<path>.py`
-  now runs `python3 -E -s -B <path> ...argv` with the same `--argv` template, sandbox, timeout and
+  now runs the script under `python3 -E -s -B` with the same `--argv` template, sandbox, timeout and
   exit-status verdict as a Node CLI, so a Python boundary reaches the DoD probe instead of being
   declined `entry-not-probeable` and tripping the zero-candidates guard. A Python crash exits 1, the
-  status a refusal exits with, so on exit 1 the engine tells them apart by stderr (`isPythonCrash`:
-  a traceback frame under a `Traceback` header, an ExceptionGroup's included, or a frame and a
-  `SyntaxError`-family line, whatever follows the traceback) and scores a crash `errored`, never
-  `rejected`. `-B` stops a sibling import writing
+  status a refusal exits with, so the script runs inside a bootstrap that catches an uncaught
+  exception before any excepthook runs and names it on fd 3, which the script does not write; a
+  replaced excepthook (rich, Typer) or a redirected `sys.stderr` cannot hide it. An exit 1 with a
+  traceback on stderr also counts. A crash is scored `errored`, never `rejected`. `-B` stops a sibling import writing
   `__pycache__/` into the watched script directory; `-I` is not used because it breaks sibling
   imports. With no `python3` on `PATH` the entry is declined once, naming `python3`. The result and
   the run record carry a new `interpreter` field (`{ name, version }`, `null` for every other form).

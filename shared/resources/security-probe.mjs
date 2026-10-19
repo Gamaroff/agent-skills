@@ -180,15 +180,17 @@
  * so two different controls on one script
  * (`--env {input}`, `--clear-note {input}`) are two controls, not one.
  *
- * A PYTHON CLI (task.215) takes the same form: `cli:<path>.py` runs
- * `python3 -E -s -B <path> ...argv` with the same template, sandbox, timeout and
+ * A PYTHON CLI (task.215) takes the same form: `cli:<path>.py` runs the script
+ * under `python3 -E -s -B` with the same template, sandbox, timeout and
  * verdict. The interpreter is chosen by extension (CLI_INTERPRETERS) and the
  * host's python3 is resolved once per process (probePython); when it does not
  * run, the entry is declined `entry-not-probeable` once, by name. A Python crash
- * exits 1 — a refusal's status — and prints no Node footer, so an exit 1 is told
- * apart by its stderr instead (isPythonCrash): a traceback frame under a
- * Traceback header, or a SyntaxError-family line, whatever follows. The result and
- * the record carry `interpreter` ({ name, version }), null for every other form.
+ * exits 1 — a refusal's status — and prints no Node footer, so the script runs
+ * inside PYTHON_BOOTSTRAP, which catches an uncaught exception before any
+ * excepthook runs and names it on fd 3, a channel the script does not write.
+ * A traceback on stderr with exit 1 (isPythonCrash) is read as a crash too. The
+ * result and the record carry `interpreter` ({ name, version }), null for every
+ * other form.
  *
  * THE SHELL-ARGV ENTRY FORM (task.181). A boundary delivered as a SHELL SCRIPT
  * TAKING SEVERAL ARGUMENTS OR FLAGS (`verify-push-state.sh --base … --scope …`,
@@ -724,14 +726,63 @@ const CLI_INTERPRETERS = Object.freeze({
 });
 const CLI_EXTENSIONS = Object.freeze(Object.keys(CLI_INTERPRETERS));
 /**
- * How a `.py` entry is run: `python3 -E -s -B <entry> ...argv` (task.215).
- * `-E` ignores every PYTHON* variable (a second line: caseEnv passes none),
- * `-s` drops user site-packages, and `-B` writes no bytecode — without it a
- * script that imports a sibling writes __pycache__/ into its own directory,
- * which watchedSpawn reports as an escape on every case. Never `-I`: it drops
- * the script's directory from sys.path, so a sibling import fails to start.
+ * How a `.py` entry is run: `python3 -E -s -B -c PYTHON_BOOTSTRAP <entry>
+ * ...argv` (task.215). `-E` ignores every PYTHON* variable (a second line:
+ * caseEnv passes none), `-s` drops user site-packages, and `-B` writes no
+ * bytecode — without it a script that imports a sibling writes __pycache__/
+ * into its own directory, which watchedSpawn reports as an escape on every
+ * case. Never `-I`: it drops the script's directory from sys.path, so a
+ * sibling import fails to start.
  */
 const PYTHON_FLAGS = Object.freeze(["-E", "-s", "-B"]);
+
+/**
+ * The fd a Python child names its crash on: the first after stdin, stdout and
+ * stderr. runCliCase gives a Python child a pipe there; nothing else writes it.
+ */
+const PYTHON_CRASH_FD = 3;
+
+/**
+ * Runs the entry as `python3 <entry>` would — sys.argv[0] is the entry,
+ * sys.path[0] its directory, `__name__ == "__main__"` — and catches an uncaught
+ * exception BEFORE any excepthook runs (QA cycle 2, TASK-215-QA2-1). Reading
+ * the crash off stderr alone missed every script that changes how one is
+ * reported: a replaced sys.excepthook (rich, Typer), sys.stderr redirected or
+ * None, sys.tracebacklimit = 0. Each exits 1 with no frame, which scored as a
+ * refusal. Here the exception's first line goes to PYTHON_CRASH_FD, then the
+ * script's own excepthook prints it as it would have (traceback trimmed to the
+ * entry's frames), and the child exits 1. SystemExit is the script's answer and
+ * propagates untouched. The fd is not inherited, so a process the script
+ * starts cannot hold the pipe open past the script's own exit.
+ */
+const PYTHON_BOOTSTRAP = [
+  "import os, sys, runpy",
+  "try:",
+  `    os.set_inheritable(${PYTHON_CRASH_FD}, False)`,
+  "except OSError:",
+  "    pass",
+  "entry = sys.argv[1]",
+  "sys.argv = sys.argv[1:]",
+  "sys.path[0] = os.path.dirname(os.path.abspath(entry))",
+  "try:",
+  "    runpy.run_path(entry, run_name='__main__')",
+  "except SystemExit:",
+  "    raise",
+  "except BaseException as e:",
+  "    line = (f'{type(e).__name__}: {e}'.splitlines() or [type(e).__name__])[0]",
+  "    try:",
+  `        os.write(${PYTHON_CRASH_FD}, line.encode('utf-8', 'replace')[:400] + b'\\n')`,
+  "    except OSError:",
+  "        pass",
+  "    tb = e.__traceback__",
+  "    while tb is not None and tb.tb_frame.f_code.co_filename != entry:",
+  "        tb = tb.tb_next",
+  "    try:",
+  "        sys.excepthook(type(e), e.with_traceback(tb), tb)",
+  "    except BaseException:",
+  "        pass",
+  "    sys.exit(1)",
+].join("\n");
 
 /**
  * Validate a `--argv` template (task.144). Accepts the CLI's JSON text or an
@@ -2005,11 +2056,12 @@ function caseEnv({ fixtureDir, sandboxHome, sandboxTmp }) {
 function watchedSpawn(
   command,
   argv,
-  { cwd, env, timeoutMs },
+  { cwd, env, timeoutMs, extraFds = 0 },
   { sandboxRoot, workDirName, scriptDir, escapes, escapeId, shell = null },
 ) {
   const before = snapshotTree(sandboxRoot, workDirName);
   const scriptDirBefore = listDirStamps(scriptDir);
+  // extraFds: further pipes after stderr, read back as child.output[3…].
   const child = spawnSync(command, argv, {
     input: "",
     cwd,
@@ -2017,6 +2069,9 @@ function watchedSpawn(
     encoding: "utf8",
     timeout: timeoutMs,
     maxBuffer: 8 * 1024 * 1024,
+    ...(extraFds > 0
+      ? { stdio: ["pipe", "pipe", "pipe", ...Array(extraFds).fill("pipe")] }
+      : {}),
   });
   const tag = shell === null ? {} : { shell };
   const after = snapshotTree(sandboxRoot, workDirName);
@@ -2319,6 +2374,17 @@ export function isPythonCrash(stderr) {
 }
 
 /**
+ * The line PYTHON_BOOTSTRAP wrote on PYTHON_CRASH_FD — the uncaught exception's
+ * `Class: message` first line — or null when it wrote none (no crash, or a
+ * child that never reached the bootstrap).
+ */
+function pythonCrashMarker(child) {
+  const text = child.output?.[PYTHON_CRASH_FD];
+  if (typeof text !== "string" || text.trim() === "") return null;
+  return text.split("\n")[0];
+}
+
+/**
  * The exception line of a Python crash, for the decline detail: the first
  * exception-shaped line after the last frame, which skips the frame's source
  * and caret lines and stops before a message's continuation, a note or an
@@ -2353,9 +2419,10 @@ function pythonExceptionLine(stderr) {
  *   no `expected`: exit 0                          → "accepted"
  *   no `expected`: exit non-zero                   → "rejected"
  *   `expected`: compared, mapped through direction → as the shell arm
- * A crash is Node's fatal-error footer on stderr, or for Python an exit 1
- * whose stderr isPythonCrash reads as a traceback (a frame under a Traceback
- * header, or a compile error — Python exits 1 on a crash, as a refusal does).
+ * A crash is Node's fatal-error footer on stderr, or for Python the line
+ * PYTHON_BOOTSTRAP writes on PYTHON_CRASH_FD, or an exit 1 whose stderr
+ * isPythonCrash reads as a traceback (Python exits 1 on a crash, as a refusal
+ * does, so the exit status alone cannot tell them apart).
  * Scoring it as a refusal
  * would let a script that fails to LOAD read as a control that rejects every
  * hostile input; errored, every case folds into one `entry-not-probeable`.
@@ -2429,11 +2496,14 @@ function runCliCase(
   const isPython = runtime === "python3";
   const child = watchedSpawn(
     isPython ? "python3" : process.execPath,
-    isPython ? [...PYTHON_FLAGS, entryPath, ...args] : [entryPath, ...args],
+    isPython
+      ? [...PYTHON_FLAGS, "-c", PYTHON_BOOTSTRAP, entryPath, ...args]
+      : [entryPath, ...args],
     {
       cwd: fixtureDir,
       env: caseEnv({ fixtureDir, sandboxHome, sandboxTmp }),
       timeoutMs,
+      extraFds: isPython ? PYTHON_CRASH_FD - 2 : 0,
     },
     {
       sandboxRoot,
@@ -2451,11 +2521,20 @@ function runCliCase(
     detail = child.signal
       ? `killed by ${child.signal} (timeout ${timeoutMs}ms)`
       : `never ran: ${child.error?.message ?? "no exit status"}`;
-  } else if (isPython && child.status === 1 && isPythonCrash(child.stderr)) {
-    // Exit 1 only: an uncaught exception always exits 1, and a traceback on
-    // any other status (an "Exception ignored" warning) sits beside an answer.
+  } else if (
+    isPython &&
+    (pythonCrashMarker(child) !== null ||
+      (child.status === 1 && isPythonCrash(child.stderr)))
+  ) {
+    // The bootstrap's marker is the signal: it is written whatever the script
+    // did to stderr or its excepthook. A traceback on stderr with exit 1 is
+    // read too — a script that prints its own and exits 1 is not answering.
+    // Exit 1 only for that one: an "Exception ignored" traceback on any other
+    // status sits beside an answer.
     outcome = "errored";
-    detail = `the CLI crashed (exit ${child.status}) rather than answering: ${pythonExceptionLine(child.stderr).trim().slice(0, 160)}`;
+    const line =
+      pythonCrashMarker(child) ?? pythonExceptionLine(child.stderr ?? "");
+    detail = `the CLI crashed (exit ${child.status}) rather than answering: ${line.trim().slice(0, 160)}`;
   } else if (!isPython && NODE_FATAL_FOOTER.test(child.stderr ?? "")) {
     outcome = "errored";
     const first = (child.stderr ?? "")

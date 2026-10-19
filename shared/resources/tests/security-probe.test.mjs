@@ -2855,6 +2855,10 @@ test("cli entry (python): an uncaught exception and a SyntaxError are errored â€
     // The traceback does not end on the exception: a two-line message, then
     // an atexit line. The detail still names the exception (QA cycle 1).
     ["cli-crasher-multiline", /ValueError: cannot start/],
+    // No traceback reaches stderr at all: stderr is None, or the traceback is
+    // cut to the bare line a refusal could print (QA cycle 2).
+    ["cli-crasher-stderr-none", /RuntimeError: cannot start/],
+    ["cli-crasher-tracebacklimit", /KeyError: 'no policy/],
   ]) {
     const r = runProbeSpec({
       sink: "url-authority",
@@ -2869,6 +2873,51 @@ test("cli entry (python): an uncaught exception and a SyntaxError are errored â€
     assert.equal(r.executed, 0, name);
     assert.match(r.declined[0].detail, /crashed \(exit 1\)/, name);
     assert.match(r.declined[0].detail, shape, name);
+  }
+});
+
+test("cli entry (python): a crash behind a replaced excepthook is errored on the inputs it crashes on â€” never a refusal", () => {
+  // The fixture answers legitimate input and crashes on hostile input after
+  // replacing sys.excepthook (as rich and Typer do): exit 1, no frame on
+  // stderr. Read off stderr, every hostile case scored `rejected` and the
+  // verdict was `engages` â€” a false pass (QA cycle 2, TASK-215-QA2-1).
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-crasher-excepthook"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.notEqual(r.verdict, "engages", JSON.stringify(r));
+  const hostile = CASES.filter((c) => c.direction === "hostile");
+  assert.ok(hostile.length > 0);
+  for (const c of hostile) {
+    const got = [...r.cases, ...r.declined].find((x) => x.id === c.id);
+    assert.ok(got, `${c.id} missing`);
+    assert.equal(got.outcome, "errored", `${c.id}: ${got.detail}`);
+    assert.match(
+      got.detail,
+      /crashed \(exit 1\).*ValueError: cannot parse host/,
+    );
+  }
+  for (const c of r.cases.filter((x) => x.direction === "legitimate")) {
+    assert.equal(c.outcome, "accepted", c.id);
+  }
+});
+
+test("cli entry (python): the script runs as python3 <path> runs it â€” __main__, argv[0] and its own directory", () => {
+  // The bootstrap that catches a crash must not change how the script runs:
+  // cli-main-guard exits 9 unless sys.argv[0] is itself, and answers only
+  // under `if __name__ == "__main__"`; cli-imports-sibling needs sys.path[0].
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-main-guard"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+  assert.equal(r.executed, CASES.length);
+  for (const c of r.cases) {
+    assert.equal(c.exit, c.direction === "hostile" ? 3 : 0, c.id);
   }
 });
 

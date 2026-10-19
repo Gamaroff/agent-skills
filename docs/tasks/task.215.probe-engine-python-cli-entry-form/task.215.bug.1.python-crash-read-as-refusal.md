@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa
+status: closed
 severity: 'Major'
 priority: 'High'
 created: 2026-10-19
@@ -15,7 +15,7 @@ tags: [task.215, security-probe, python, crash-detection]
 **Bug ID**: TASK-215-BUG-1
 **Severity**: HIGH
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle 1: engine probe of `isPythonCrash` and the diff reviewer's CR-1, independently)
 **Date Found**: 2026-10-19
 
@@ -123,3 +123,4 @@ cases re-run against the fix, every case as expected.
 | 2026-10-19 | New | qa-task | Found in QA cycle 1 |
 | 2026-10-19 | In Progress | qa-fix | Investigation started |
 | 2026-10-19 | Ready for QA | qa-fix | Fix implemented (QA fix cycle 1) |
+| 2026-10-19 | Closed | qa-task | Verified by task.215.qa.2.probe-engine-python-cli-entry-form.md |
