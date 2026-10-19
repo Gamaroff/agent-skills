@@ -5,18 +5,20 @@ type: task
 description: "Classify every script a shared/resources/*.md names by its shared/resources/ literal in prose, switch the unneeded ones to bare filenames and remove their unreached bundled copies, and add a guard that fails on a new prose script literal not in a reasoned allowlist; also pin create-skill's shared-literal rule sentence."
 tags: [create-skill, bundler, observation, shared-resources, guard]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-07
 updated: 2026-10-19
 assignee:
 estimated_effort_hours: 8
 github_issue: 592
+completed_date: 2026-10-19
+pr_number: 691
 ---
 
 # Technical Task: Scripts reach only the skills that run them
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.193.review.1.scripts-reach-only-skills-that-run-them.md` implemented 2026-10-19
 **GitHub Issue**: [#592](https://github.com/Gamaroff/agent-skills/issues/592)
 
@@ -354,6 +356,30 @@ None.
 
 Gate 3's CR-1 fixed and mutation-proven; 21 unrun copies removed in total. Two low follow-ups: a latent over-match in the fenced shell rule (no live case) and a stale header line.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.193.qa.4.scripts-reach-only-skills-that-run-them.md`
+**Gate File**: `task.193.gate.4.scripts-reach-only-skills-that-run-them.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 92/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** All 7 criteria met, each traced to code and to per-PR CI
+✅ **Unit Tests:** `tests/shared-script-literals.test.js` (9 tests); `ci:fast` 5906 pass, 0 fail
+✅ **PR Review:** PR #691, 5c review APPROVE (`task.193.pr-review.1.scripts-reach-only-skills-that-run-them.md`)
+✅ **Documentation:** CHANGELOG entry; develop-bug, develop-story and develop-task `SKILL.md` name the scripts they run
+✅ **Security Review:** PASS — 39 boundary probes; 6 low reproductions fixed in `097cfe8f` during /finalise, 0 on re-run
+⚠️ **Compliance Review:** NOT_APPLICABLE — internal refactor
+✅ **CI:** SUCCESS @ `097cfe8f`
+
+**Detailed Verification Log:** See `task.193.dod.1.scripts-reach-only-skills-that-run-them.md` for complete verification evidence and timestamps.
+
+**Task marked as ACCEPTED on:** 2026-10-19
 <!-- change-log-start -->
 ## Change Log
 
@@ -372,6 +398,7 @@ Gate 3's CR-1 fixed and mutation-proven; 21 unrun copies removed in total. Two l
 | 2026-10-19 |  | QA fix cycle 3 — CR-1: fenced literals classified (shell-position run rule); `probe-boundary-rule.md:66` and step-0:251 bare-named, 4 more copies removed (21 total); develop-task and develop-story `SKILL.md` name `references/resolve-paths.sh`; CR-2: a bundler must hold the script too; CR-4: CHANGELOG reworded | qa-fix |
 | 2026-10-19 |  | QA gate PASS (92/100) — gate 3 CR-1 fixed; 2 low follow-ups (fenced shell-rule over-match, stale header) | qa-task |
 | 2026-10-19 |  | Status → ready-for-review | qa-task |
+| 2026-10-19 | 1.2 | DoD passed — accepted (PR #691) | finalise |
 <!-- change-log-end -->
 
 ---
