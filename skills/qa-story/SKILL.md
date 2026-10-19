@@ -1166,8 +1166,9 @@ JSON
    `references/probe-boundary-rule.md` §5) takes the shell-fn form instead:
    `--entry 'shell-fn:<path>#<function>' --sink filename --cases-file <cases.json>`, plus
    `--fake-gh <dir>` when the function's body names `gh` — running `shell:` against a library is
-   the task.125 result: sourced, never called, `absent` behind a full count. A **Node CLI** whose
-   decision sits behind its flags (task.141: `uat-status.mjs --env`) takes the cli form:
+   the task.125 result: sourced, never called, `absent` behind a full count. A **Node CLI** — or a
+   **Python CLI** (`.py`, run under `python3`) — whose decision sits behind its flags (task.141:
+   `uat-status.mjs --env`) takes the cli form:
    `--entry 'cli:<path>' --argv '["--flag","{input}"]' --cases-file <cases.json>` — the
    template's one `"{input}"` element is each case, exit status is the verdict, a crash is
    `errored`, and each guarded flag is its own control, named with `--name`; "it takes several flags" is never a reason

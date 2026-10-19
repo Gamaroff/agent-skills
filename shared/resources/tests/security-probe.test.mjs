@@ -51,6 +51,7 @@ import {
   FENCE_PREFIX,
   fixtureProblem,
   isLaunchFailure,
+  isPythonCrash,
   main,
   namesGh,
   ghFreePath,
@@ -2771,6 +2772,265 @@ test("cli entry: every cli result path returns the JS form's key set", () => {
     "bad-argv": { entry: CLI("refuser") },
     "not a script": { entry: `cli:${FIXTURES}/eval-names.sh`, argv: HOST_ARGV },
     crashed: { entry: CLI("crasher"), argv: HOST_ARGV },
+  };
+  for (const [name, spec] of Object.entries(paths)) {
+    const r = runProbeSpec({ sink: "url-authority", cases: CASES, ...spec });
+    assert.deepEqual(Object.keys(r).sort(), expected, `${name} key set`);
+  }
+});
+
+// ── The cli entry form, Python (task.215) ────────────────────────────────────
+//
+// `cli:<path>.py` runs the script under `python3 -E -s -B` with the same argv
+// template, sandbox and verdict rules as the Node arm. Two things differ, and
+// each row below holds one: a Python crash exits 1 exactly as a refusal does,
+// so it is told apart by its traceback frame, not by a Node footer; and the
+// interpreter is the host's, so the result says which one ran.
+
+const PY = (name) => `cli:${FIXTURES}/${name}.py`;
+
+test("cli entry (python): a refusing .py CLI engages under python3, one probe per case, and the result names the interpreter", () => {
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-refuser"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+  assert.equal(r.executed, CASES.length);
+  assert.equal(r.shells, null);
+  assert.deepEqual(r.escapes, []);
+  assert.equal(r.interpreter.name, "python3");
+  assert.match(r.interpreter.version, /^Python 3\.\d+/);
+  for (const c of r.cases) {
+    assert.equal(c.exit, c.direction === "hostile" ? 3 : 0, c.id);
+  }
+});
+
+test("cli entry (python): the child runs as python3 -E -s -B, never -I", () => {
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-flags"),
+    cases: CASES.filter((c) => c.direction === "legitimate"),
+    argv: HOST_ARGV,
+  });
+  for (const c of r.cases) {
+    assert.equal(c.outcome, "accepted", `${c.id}: ${c.detail}`);
+  }
+});
+
+test("cli entry (python): a script that imports a sibling module runs, and writes no __pycache__ escape", () => {
+  // A bytecode directory left by a manual run is not this run's; clear it so
+  // the existence check below reads only what the probe wrote.
+  rmSync(join(REPO_ROOT, FIXTURES, "__pycache__"), {
+    recursive: true,
+    force: true,
+  });
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-imports-sibling"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+  assert.deepEqual(r.escapes, []);
+  assert.equal(
+    existsSync(join(REPO_ROOT, FIXTURES, "__pycache__")),
+    false,
+    "python wrote bytecode beside the fixture",
+  );
+});
+
+test("cli entry (python): an uncaught exception and a SyntaxError are errored — never scored as refusals", () => {
+  for (const [name, shape] of [
+    ["cli-crasher", /RuntimeError: cannot start/],
+    ["cli-syntax-error", /SyntaxError/],
+  ]) {
+    const r = runProbeSpec({
+      sink: "url-authority",
+      entry: PY(name),
+      cases: CASES,
+      argv: HOST_ARGV,
+    });
+    // Both exit 1 on every case — what a refusal exits with. Scored, every
+    // case would read `rejected` and the control would look like it refuses.
+    assert.equal(r.verdict, "unverifiable", name);
+    assert.equal(r.reason, "entry-not-probeable", name);
+    assert.equal(r.executed, 0, name);
+    assert.match(r.declined[0].detail, /crashed \(exit 1\)/, name);
+    assert.match(r.declined[0].detail, shape, name);
+  }
+});
+
+test("cli entry (python): a plain sys.exit(1) refusal, and a refusal that prints an exception-shaped line, stay rejected", () => {
+  for (const name of ["cli-exit-one", "cli-refuser-error-text"]) {
+    const r = runProbeSpec({
+      sink: "url-authority",
+      entry: PY(name),
+      cases: CASES,
+      argv: HOST_ARGV,
+    });
+    assert.equal(r.verdict, "engages", `${name}: ${JSON.stringify(r.cases)}`);
+    assert.equal(r.executed, CASES.length, name);
+    for (const c of r.cases) {
+      if (c.direction === "hostile") {
+        assert.equal(c.outcome, "rejected", `${name} ${c.id}`);
+        assert.equal(c.exit, 1, `${name} ${c.id}`);
+      }
+    }
+  }
+});
+
+test("cli entry (python): isPythonCrash needs a traceback frame AND a final exception line", () => {
+  const tb = [
+    "Traceback (most recent call last):",
+    '  File "/x/a.py", line 2, in <module>',
+    '    raise ValueError("x")',
+    "ValueError: x",
+  ].join("\n");
+  const syntax = [
+    '  File "/x/a.py", line 1',
+    "    def f(:",
+    "          ^",
+    "SyntaxError: invalid syntax",
+  ].join("\n");
+  const interrupt = [
+    "Traceback (most recent call last):",
+    '  File "/x/a.py", line 3, in <module>',
+    "    time.sleep(9)",
+    "KeyboardInterrupt",
+  ].join("\n");
+  const dotted = [
+    "Traceback (most recent call last):",
+    '  File "/x/a.py", line 3, in <module>',
+    "json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)",
+  ].join("\n");
+  assert.equal(isPythonCrash(tb), true);
+  assert.equal(isPythonCrash(`${tb}\n\n`), true);
+  assert.equal(isPythonCrash(syntax), true);
+  assert.equal(isPythonCrash(interrupt), true);
+  assert.equal(isPythonCrash(dotted), true);
+  assert.equal(
+    isPythonCrash(
+      [
+        "Traceback (most recent call last):",
+        '  File "/x/a.py", line 9, in <module>',
+        "__main__.Refused: no",
+      ].join("\n"),
+    ),
+    true,
+    "a custom exception class is a crash too",
+  );
+  assert.equal(isPythonCrash("ValueError: refused host 'a/b'"), false);
+  assert.equal(isPythonCrash("refused: 'a/b' is not a bare host"), false);
+  assert.equal(isPythonCrash(""), false);
+  // Each clause is load-bearing on its own: an exception-shaped last line
+  // after a frame-shaped log line but with no Traceback header is not a
+  // runtime crash, and a SyntaxError-shaped refusal with no frame is not a
+  // compile error.
+  assert.equal(
+    isPythonCrash('  File "/etc/policy.cfg", line 4\nPermissionError: refused'),
+    false,
+  );
+  assert.equal(isPythonCrash("SyntaxError: refused input"), false);
+  assert.equal(isPythonCrash(undefined), false);
+  // A frame earlier in stderr and a refusal message last is not a crash.
+  assert.equal(
+    isPythonCrash(`${tb}\nrecovered — refused: 'a/b' is not a bare host`),
+    false,
+  );
+});
+
+test("cli entry (python): a write to $HOME is an escape inside the sandbox, never the real home", () => {
+  const real = join(
+    process.env.HOME ?? "/nonexistent",
+    "cli-probe-side-effect-py",
+  );
+  const before = existsSync(real);
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-writes-home"),
+    cases: CASES,
+    argv: ["--host", "{input}"],
+  });
+  assert.equal(r.verdict, "engages");
+  assert.equal(r.escapes.length, CASES.length);
+  assert.match(r.escapes[0].path, /home[/\\]cli-probe-side-effect-py$/);
+  assert.equal(existsSync(real), before, "the real HOME was written");
+});
+
+test("cli entry (python): a .py entry with no --argv is bad-argv, and nothing runs", () => {
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-refuser"),
+    cases: CASES,
+  });
+  assert.equal(r.reason, "bad-argv");
+  assert.equal(r.cases.length, 0);
+  assert.equal(r.interpreter, null);
+});
+
+test("cli entry (python): with no python3 on PATH the entry is declined once, by name, and no case spawns", () => {
+  const emptyBin = mkdtempSync(join(tmpdir(), "probe-no-python-"));
+  try {
+    const child = spawnSync(
+      process.execPath,
+      [
+        join(REPO_ROOT, "shared/resources/security-probe.mjs"),
+        "--sink",
+        "url-authority",
+        "--entry",
+        PY("cli-refuser"),
+        "--argv",
+        JSON.stringify(HOST_ARGV),
+        "--json",
+      ],
+      { cwd: REPO_ROOT, encoding: "utf8", env: { PATH: emptyBin } },
+    );
+    const r = JSON.parse(child.stdout);
+    assert.equal(r.verdict, "unverifiable", child.stderr);
+    assert.equal(r.reason, "entry-not-probeable");
+    assert.equal(r.declined.length, 1);
+    assert.match(r.declined[0].detail, /python3/);
+    assert.equal(r.executed, 0);
+    assert.equal(r.cases.length, 0);
+    assert.equal(r.interpreter, null);
+  } finally {
+    rmSync(emptyBin, { recursive: true, force: true });
+  }
+});
+
+test("cli entry (python): the record entry carries the interpreter, and null for a Node CLI", () => {
+  const py = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-refuser"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.deepEqual(toRecordEntry(py).interpreter, py.interpreter);
+  assert.equal(toRecordEntry(py).interpreter.name, "python3");
+  const node = runProbeSpec({
+    sink: "url-authority",
+    entry: CLI("refuser"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.equal(node.interpreter, null);
+  assert.equal(toRecordEntry(node).interpreter, null);
+});
+
+test("cli entry (python): every .py result path returns the JS form's key set", () => {
+  const expected = Object.keys(
+    runProbeSpec({
+      sink: "url-authority",
+      entry: entry("engaging-control"),
+      cases: CASES,
+    }),
+  ).sort();
+  const paths = {
+    success: { entry: PY("cli-refuser"), argv: HOST_ARGV },
+    "bad-argv": { entry: PY("cli-refuser") },
+    crashed: { entry: PY("cli-crasher"), argv: HOST_ARGV },
   };
   for (const [name, spec] of Object.entries(paths)) {
     const r = runProbeSpec({ sink: "url-authority", cases: CASES, ...spec });

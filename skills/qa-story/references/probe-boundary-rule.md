@@ -345,8 +345,9 @@ takes it.
   recorded as having answered. A stdin-reading function, or one needing more
   than argv, is still declined (§ Out of Scope, task.128).
 
-  **`cli:path --argv '<JSON array>'` runs a Node CLI** — a `.mjs` / `.js`
-  script — as `node <path> ...argv`, one probe per case, for the boundary that
+  **`cli:path --argv '<JSON array>'` runs a Node or Python CLI** — a `.mjs` /
+  `.js` script as `node <path> ...argv`, a `.py` script as
+  `python3 -E -s -B <path> ...argv` (task.215) — one probe per case, for the boundary that
   lives behind a **flag parser** rather than a one-argument export (task.141's
   `uat-status.mjs --env` guard sits behind a three-argument function; the JS
   form could not reach it, and the gate recorded zero probes executed). The
@@ -379,6 +380,16 @@ takes it.
     turns the false pass into a false alarm a reader will investigate, which is
     the direction to err in. Neither makes the crash *errored*: only Node's
     uncaught-error footer, a kill or a timeout does.
+  - **A Python crash exits 1, which is what a refusal exits with**, and prints
+    no Node footer. For a `.py` entry the engine reads stderr instead: the last
+    non-empty line is an exception (`ValueError: …`, a dotted or custom class,
+    `KeyboardInterrupt`), a `File "…", line N` frame precedes it, and there is
+    either a `Traceback (most recent call last):` header or a `SyntaxError` /
+    `IndentationError` / `TabError` (a compile error prints the frame with no
+    header). All three make the case *errored*. A plain `sys.exit(1)`, or a
+    refusal that prints an exception-shaped line with no frame, stays
+    *rejected*. A script that catches its failure and prints the traceback
+    itself reads as a crash — *errored*, the safe direction.
   - **A materialised sink writes the case's name into the fixture.** For a sink
     in `MATERIALISED_SINKS` the fixture directory holds the sink's controls
     *and* a file named by the case's input — the cwd, and `{fixture}`, are what
@@ -414,10 +425,20 @@ takes it.
     `warning: replaced control …` line and the write still happens — the
     remedy is `--name`, not a reordered template.
 
-  `cli:` does **not** touch §2: the engine chooses the interpreter
-  (`process.execPath`) and the script is fixed by `--entry` and
+  `cli:` does **not** touch §2: the engine chooses the interpreter by the
+  script's extension (`process.execPath` for `.mjs` / `.js`, the host's
+  `python3` for `.py`) and the script is fixed by `--entry` and
   containment-checked before anything spawns, exactly as the JS form already
-  runs a Node child. `node` stays off `SAFE_COMMANDS`.
+  runs a Node child. `node` and `python3` stay off `SAFE_COMMANDS`. A `.py`
+  entry runs with `-E` (no `PYTHON*` variable is honoured — and the sandbox
+  passes none), `-s` (no user site-packages) and `-B` (no bytecode: without it
+  a sibling import writes `__pycache__/` into the watched script directory and
+  every case reports an escape); never `-I`, which drops the script's own
+  directory from `sys.path` and breaks a sibling import. `python3` is resolved
+  once per run with `python3 --version` on the engine's `PATH`; when it does
+  not run, the entry is declined `entry-not-probeable` once, naming `python3`.
+  The result and the record carry `interpreter` (`{ name, version }`), `null`
+  for every other form, so a record says which Python answered.
 
   **`shell-argv:path --argv '<JSON array>'` runs a bash script that takes
   several arguments or flags** (task.181) — `verify-push-state.sh --base …
@@ -531,7 +552,7 @@ takes it.
   task.150 spent three QA cycles finding them one layer at a time (obs #209).
 
 The precondition — a pure-ish predicate, composer, single-argument script,
-argv-driven Node CLI or shell script, or fenced bash block with one
+argv-driven Node or Python CLI or shell script, or fenced bash block with one
 placeholder — is what the
 boundary rule selects for anyway. If it turns
 out that most real controls are reachable by none of the forms and the engine declines almost
@@ -545,7 +566,7 @@ entry form reaches) is not exempt from being tested; it is exempt from the
 *engine*. **Reach for this only after the entry forms have been tried** — a
 one-argument script is `shell:`'s job, a shell script taking several arguments
 or flags is `shell-argv:`'s (with `--fixture-setup` when it needs a
-repository), a Node CLI driven by its argv is `cli:`'s and a fenced bash block
+repository), a Node or Python CLI driven by its argv is `cli:`'s and a fenced bash block
 in a step doc is `fence:`'s, and a by-hand probe of any of them is the self-report the engine
 exists to remove. A `cli:` probe exercises **one arm**
 — the CLI's own argv; the other arms below (a wrapper, an env-var path) still

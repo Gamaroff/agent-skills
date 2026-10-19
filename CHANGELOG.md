@@ -6,6 +6,19 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **The security probe runs a Python CLI under the `cli:` entry form (task 215).** `cli:<path>.py`
+  now runs `python3 -E -s -B <path> ...argv` with the same `--argv` template, sandbox, timeout and
+  exit-status verdict as a Node CLI, so a Python boundary reaches the DoD probe instead of being
+  declined `entry-not-probeable` and tripping the zero-candidates guard. A Python crash exits 1, the
+  status a refusal exits with, so the engine tells them apart by stderr (`isPythonCrash`: a
+  traceback frame plus a final exception line, under a `Traceback` header or a `SyntaxError`-family
+  class) and scores a crash `errored`, never `rejected`. `-B` stops a sibling import writing
+  `__pycache__/` into the watched script directory; `-I` is not used because it breaks sibling
+  imports. With no `python3` on `PATH` the entry is declined once, naming `python3`. The result and
+  the run record carry a new `interpreter` field (`{ name, version }`, `null` for every other form).
+  **Consumer upgrade:** re-vendor (`setup-consumer.sh --update`); a `cli:` probe of a `.py` boundary
+  that was recorded `unverifiable` can now be re-run.
+
 - **Two CI guards hold hierarchical document numbering, and the docs stop teaching the old scheme
   (task 207).** `evals/shared/tests/doc-numbering-corpus.test.mjs` runs `doc-id.js`'s `checkCorpus`
   over the PRD root and fails on any unnumbered, mismatched, unregistered or duplicate PRD, epic or

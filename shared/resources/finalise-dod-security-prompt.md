@@ -45,7 +45,7 @@ Signals — any **one** is sufficient:
 - a named allow-list or deny-list in any form (array, regex alternation, `switch`, set membership)
 - a function whose own tests are mostly of the shape "X is refused"
 - a work-item document whose Success Criteria contain *never*, *must not*, *fails closed*, or *refused*
-- a script or function whose own header or doc comment says it *refuses*, *never guesses*, or *fails closed* — in any language; a bash script is a boundary by its own words, and "not importable" routes it to the engine's `shell:` entry form — or, for a **sourced library** (a header that says *source it*, or functions with no top-level call), the `shell-fn:path#function` form with `--cases-file` and, when the body names `gh`, `--fake-gh` (Step 4; the signal that tells the two apart is stated once, in `probe-boundary-rule.md` §5); a **Node CLI** whose decision sits behind its flags routes to the `cli:path` form with an `--argv` template; a **shell script that takes several arguments or flags** routes to the `shell-argv:path` form with an `--argv` template and, when it reads a repository, `--fixture-setup <setup.sh>`; a **fenced bash block in a step doc** (a precondition, refusal or guard shipped as Markdown) routes to the `fence:<doc.md>#<heading>` form with `--slot <placeholder>` — never to `boundary: false`
+- a script or function whose own header or doc comment says it *refuses*, *never guesses*, or *fails closed* — in any language; a bash script is a boundary by its own words, and "not importable" routes it to the engine's `shell:` entry form — or, for a **sourced library** (a header that says *source it*, or functions with no top-level call), the `shell-fn:path#function` form with `--cases-file` and, when the body names `gh`, `--fake-gh` (Step 4; the signal that tells the two apart is stated once, in `probe-boundary-rule.md` §5); a **Node CLI** — or a **Python CLI** (`.py`, run under `python3`) — whose decision sits behind its flags routes to the `cli:path` form with an `--argv` template; a **shell script that takes several arguments or flags** routes to the `shell-argv:path` form with an `--argv` template and, when it reads a repository, `--fixture-setup <setup.sh>`; a **fenced bash block in a step doc** (a precondition, refusal or guard shipped as Markdown) routes to the `fence:<doc.md>#<heading>` form with `--slot <placeholder>` — never to `boundary: false`
 
 The list is data as well as prose: `probe-boundary-signals.mjs` (beside `security-probe.mjs`) exports it, and `classifyBoundaryText` applies the text-shaped signals to a header or a criteria section. Five QA gates on task.121 read a bash script that says "refuses rather than guesses" and recorded no boundary, because every signal above the last one is JS-shaped; the last one is what a script's own words match.
 
@@ -218,7 +218,8 @@ argv: ["--sink", "filename", "--entry", "shell-fn:<path-from-repo-root>#<functio
 cases: [ … ]
 
 # A NODE CLI boundary (a .mjs/.js script whose decision sits behind its flags — task.141's
-# `uat-status.mjs --env`) takes the cli form: node runs the script with the --argv template, whose ONE
+# `uat-status.mjs --env`) takes the cli form, and so does a PYTHON CLI (a .py script, run as
+# `python3 -E -s -B`; task.215): the engine runs the script with the --argv template, whose ONE
 # "{input}" element is each case's input as one argv element ("{fixture}", optional, is the case's
 # fixture directory). Exit status is the verdict — 0 accepted, non-zero rejected — so a case that
 # needs more carries `expected`; a crash is errored, never a refusal. A --argv shape error is refused
@@ -274,7 +275,7 @@ such a reason**: that is the `shell:` form's case, and recording it as unverifia
 outcome this form exists to end. **Nor is "it is a sourced function"**: that is the `shell-fn:`
 form's case, and running `shell:` against a library instead is the task.125 outcome — `absent`
 behind a full count — that *that* form exists to end. **Nor is "it is a multi-flag CLI" or "the
-function takes three arguments"** when a Node CLI calls it: that is the `cli:` form's case, and
+function takes three arguments"** when a Node or Python CLI calls it: that is the `cli:` form's case, and
 recording it unverifiable is the task.141 outcome that form exists to end. **Nor is "the script
 takes several arguments or flags"** for a shell script: that is the `shell-argv:` form's case, with
 `--fixture-setup` building the scratch repository it reads, and the by-hand probe it replaces is the

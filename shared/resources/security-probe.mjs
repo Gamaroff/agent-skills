@@ -23,8 +23,9 @@
  *                        with the case's input as its argv, per case under bash
  *                        and (when present) zsh. See "The shell-fn entry form".
  *                        or `cli:relative/path.mjs` — a NODE CLI run with the
- *                        `--argv` template, one probe per case. See "The cli
- *                        entry form".
+ *                        `--argv` template, one probe per case; a `.py` path is
+ *                        a PYTHON CLI, run the same way under python3. See "The
+ *                        cli entry form".
  *                        or `shell-argv:relative/path.sh` — a SHELL SCRIPT taking
  *                        several arguments or flags, run with the `--argv`
  *                        template under bash, called from bash and (when present)
@@ -178,6 +179,16 @@
  * SKELETON (flags and positionals kept, flag values dropped — see controlKey),
  * so two different controls on one script
  * (`--env {input}`, `--clear-note {input}`) are two controls, not one.
+ *
+ * A PYTHON CLI (task.215) takes the same form: `cli:<path>.py` runs
+ * `python3 -E -s -B <path> ...argv` with the same template, sandbox, timeout and
+ * verdict. The interpreter is chosen by extension (CLI_INTERPRETERS) and the
+ * host's python3 is resolved once per process (probePython); when it does not
+ * run, the entry is declined `entry-not-probeable` once, by name. A Python crash
+ * exits 1 — a refusal's status — and prints no Node footer, so it is told apart
+ * by its stderr instead (isPythonCrash): a traceback frame plus a final exception
+ * line, under a Traceback header or a SyntaxError-family class. The result and
+ * the record carry `interpreter` ({ name, version }), null for every other form.
  *
  * THE SHELL-ARGV ENTRY FORM (task.181). A boundary delivered as a SHELL SCRIPT
  * TAKING SEVERAL ARGUMENTS OR FLAGS (`verify-push-state.sh --base … --scope …`,
@@ -701,8 +712,26 @@ export const FENCE_PREFIX = "fence:";
 export const ARGV_SLOTS = Object.freeze(["{input}", "{fixture}"]);
 /** Anything shaped like a slot, known or not — used to refuse unknown and embedded ones. */
 const SLOT_SHAPE = /\{[A-Za-z_][A-Za-z0-9_-]*\}/;
-/** Script extensions the cli: form runs under `process.execPath`. */
-const CLI_EXTENSIONS = Object.freeze([".mjs", ".js"]);
+/**
+ * The interpreter the cli: form runs a script under, by extension. `node` is
+ * `process.execPath`; `python3` is the host's, resolved once per process by
+ * probePython() (task.215).
+ */
+const CLI_INTERPRETERS = Object.freeze({
+  ".mjs": "node",
+  ".js": "node",
+  ".py": "python3",
+});
+const CLI_EXTENSIONS = Object.freeze(Object.keys(CLI_INTERPRETERS));
+/**
+ * How a `.py` entry is run: `python3 -E -s -B <entry> ...argv` (task.215).
+ * `-E` ignores every PYTHON* variable (a second line: caseEnv passes none),
+ * `-s` drops user site-packages, and `-B` writes no bytecode — without it a
+ * script that imports a sibling writes __pycache__/ into its own directory,
+ * which watchedSpawn reports as an escape on every case. Never `-I`: it drops
+ * the script's directory from sys.path, so a sibling import fails to start.
+ */
+const PYTHON_FLAGS = Object.freeze(["-E", "-s", "-B"]);
 
 /**
  * Validate a `--argv` template (task.144). Accepts the CLI's JSON text or an
@@ -947,6 +976,28 @@ const SHELL_FN_BODY =
  * Memoised: probing for zsh once per process, not once per case.
  */
 let _shells;
+let _python;
+/**
+ * The host's `python3`, as `{ name, version }`, or null when `python3 --version`
+ * does not run on the engine's PATH — the PATH caseEnv hands the child, so the
+ * resolution and the spawn agree. Memoised like probeShells(): once per process,
+ * never once per case (task.215).
+ */
+export function probePython() {
+  if (_python !== undefined) return _python;
+  const r = spawnSync("python3", ["--version"], {
+    encoding: "utf8",
+    timeout: 10_000,
+  });
+  // Python 3.4+ prints the version on stdout; older ones on stderr.
+  const version = `${r.stdout ?? ""}${r.stderr ?? ""}`.trim().split("\n")[0];
+  _python =
+    r.status === 0 && /^Python \d/.test(version)
+      ? Object.freeze({ name: "python3", version })
+      : null;
+  return _python;
+}
+
 export function probeShells() {
   if (_shells) return _shells;
   const hasZsh =
@@ -1124,6 +1175,9 @@ export function runProbeSpec({
     sink: sink ?? null,
     entry: entry ?? null,
     shells: null,
+    // The interpreter a cli: `.py` entry ran under (task.215), or null for
+    // every other form and for anything declined before a case ran.
+    interpreter: null,
     executed: 0,
     passed: 0,
     reproduced: [],
@@ -1252,12 +1306,12 @@ export function runProbeSpec({
     isCliForm &&
     !CLI_EXTENSIONS.some((x) => resolved.entryPath.endsWith(x))
   ) {
-    // Run under process.execPath, so a .sh, .py or extensionless file would be
-    // handed to node and fail to parse on every case — declined here, once, by
-    // name, rather than surfacing as N identical crashes.
+    // The interpreter is chosen by extension, so a .sh or extensionless file
+    // has none — declined here, once, by name, rather than handed to node and
+    // surfacing as N identical crashes.
     return decline(
       "entry-not-probeable",
-      `${resolved.entryPath} is not a ${CLI_EXTENSIONS.join(" / ")} script — the cli: form runs it with node`,
+      `${resolved.entryPath} is not a ${CLI_EXTENSIONS.join(" / ")} script — the cli: form runs .mjs / .js with node and .py with python3`,
     );
   }
   if (isShellForm || isCliForm || isFenceForm || isShellArgvForm) {
@@ -1276,6 +1330,24 @@ export function runProbeSpec({
       return decline(
         "entry-not-probeable",
         `script is not a readable regular file: ${e.message}`,
+      );
+    }
+  }
+  // The cli: child's interpreter (task.215). A `.py` entry needs the host's
+  // python3; without one it is declined once, by name — every case would
+  // otherwise fail to spawn and read as N identical errors.
+  const cliRuntime = isCliForm
+    ? CLI_INTERPRETERS[
+        CLI_EXTENSIONS.find((x) => resolved.entryPath.endsWith(x))
+      ]
+    : null;
+  let interpreter = null;
+  if (cliRuntime === "python3") {
+    interpreter = probePython();
+    if (interpreter === null) {
+      return decline(
+        "entry-not-probeable",
+        `${resolved.entryPath} is a .py script and \`python3 --version\` does not run on this PATH — the cli: form runs .py with python3`,
       );
     }
   }
@@ -1580,6 +1652,7 @@ export function runProbeSpec({
         runCliCase(c, {
           sink,
           entryPath: resolved.entryPath,
+          runtime: cliRuntime,
           template,
           sandboxRoot,
           sandboxHome,
@@ -1704,6 +1777,7 @@ export function runProbeSpec({
       cases: caseResults,
       escapes,
       shells: shells ?? null,
+      interpreter,
       fakeGh: fakeGhDir,
       args: base.args,
     };
@@ -1725,6 +1799,7 @@ export function runProbeSpec({
       // effect; and the record must say which shells ran (cycle 4, CR-3).
       escapes,
       shells: shells ?? null,
+      interpreter,
       fakeGh: fakeGhDir,
       args: base.args,
     };
@@ -1756,6 +1831,8 @@ export function runProbeSpec({
     // form. Stated in the result so a record can say "bash only" on a host
     // without zsh rather than leaving the reader to divide the count.
     shells: shells ?? null,
+    // The interpreter a cli: `.py` entry ran under (task.215), or null.
+    interpreter,
     executed: ran.length,
     passed: ran.length - reproduced.length - overblocked.length,
     // A shell-form case ran once per shell, so its id carries the shell: two
@@ -2200,10 +2277,44 @@ const NODE_FATAL_FOOTER = new RegExp(
   `(?:^|\\n)Node\\.js ${escapeRegExp(process.version)}\\s*$`,
 );
 
+/** A frame of a Python traceback: `  File "<path>", line N`. */
+const PY_FRAME = /^ {2}File ".*", line \d+/m;
+/** The traceback header an uncaught runtime exception prints. */
+const PY_TRACEBACK = /^Traceback \(most recent call last\):$/m;
+/** An exception line: a (dotted) class name, optionally `: message`. */
+const PY_EXCEPTION_LINE = /^[A-Za-z_][\w.]*(?::\s.*)?$/;
+/** Compile-time errors print a frame but no Traceback header. */
+const PY_COMPILE_ERROR = /^(?:SyntaxError|IndentationError|TabError)\b/;
+
 /**
- * Run one case against a Node CLI through its `--argv` template (task.144).
+ * Did a Python child CRASH rather than answer (task.215)? A Python crash exits
+ * 1 — the status a refusal exits with — and prints no footer like Node's, so
+ * the exit code cannot tell them apart. Its stderr can: the LAST non-empty line
+ * is the exception (`ValueError: x`, `json.decoder.JSONDecodeError: …`,
+ * `KeyboardInterrupt`, a custom `__main__.Refused: x`) AND a `File "…", line N`
+ * frame precedes it AND either a `Traceback (most recent call last):` header
+ * (an uncaught runtime exception) or a SyntaxError-family class (a compile
+ * error, which prints the frame with no header). All three, so a refusal that
+ * merely prints an exception-shaped line, or prints a traceback and then a
+ * refusal message, is still a refusal. A script that catches its failure and
+ * prints the traceback itself reads as a crash: `errored`, "could not look" —
+ * the safe direction, never a false pass.
+ */
+export function isPythonCrash(stderr) {
+  if (typeof stderr !== "string") return false;
+  const lines = stderr.split("\n").filter((l) => l.trim() !== "");
+  const last = lines.at(-1);
+  if (last === undefined || !PY_EXCEPTION_LINE.test(last)) return false;
+  if (!PY_FRAME.test(stderr)) return false;
+  return PY_TRACEBACK.test(stderr) || PY_COMPILE_ERROR.test(last);
+}
+
+/**
+ * Run one case against a Node or Python CLI through its `--argv` template
+ * (task.144; Python, task.215 — `runtime` is "python3" for a `.py` entry).
  *
- * One probe per case — Node is the runtime, so there is no shell multiplicity.
+ * One probe per case — the interpreter is the runtime, so there is no shell
+ * multiplicity.
  * The template's `{input}` element becomes the case's input as ONE argv element
  * and each `{fixture}` element becomes this case's fixture directory, which is
  * built by the same helper the shell arm uses: the sink's controls plus the
@@ -2214,7 +2325,9 @@ const NODE_FATAL_FOOTER = new RegExp(
  *   no `expected`: exit 0                          → "accepted"
  *   no `expected`: exit non-zero                   → "rejected"
  *   `expected`: compared, mapped through direction → as the shell arm
- * A crash is Node's fatal-error footer on stderr. Scoring it as a refusal
+ * A crash is Node's fatal-error footer on stderr, or for Python what
+ * isPythonCrash reads (a traceback frame and a final exception line — Python
+ * exits 1 on a crash, as a refusal does). Scoring it as a refusal
  * would let a script that fails to LOAD read as a control that rejects every
  * hostile input; errored, every case folds into one `entry-not-probeable`.
  */
@@ -2223,6 +2336,7 @@ function runCliCase(
   {
     sink,
     entryPath,
+    runtime = "node",
     template,
     sandboxRoot,
     sandboxHome,
@@ -2283,9 +2397,10 @@ function runCliCase(
   const args = template.map((a) =>
     a === "{input}" ? c.input : a === "{fixture}" ? fixtureDir : a,
   );
+  const isPython = runtime === "python3";
   const child = watchedSpawn(
-    process.execPath,
-    [entryPath, ...args],
+    isPython ? "python3" : process.execPath,
+    isPython ? [...PYTHON_FLAGS, entryPath, ...args] : [entryPath, ...args],
     {
       cwd: fixtureDir,
       env: caseEnv({ fixtureDir, sandboxHome, sandboxTmp }),
@@ -2307,7 +2422,15 @@ function runCliCase(
     detail = child.signal
       ? `killed by ${child.signal} (timeout ${timeoutMs}ms)`
       : `never ran: ${child.error?.message ?? "no exit status"}`;
-  } else if (NODE_FATAL_FOOTER.test(child.stderr ?? "")) {
+  } else if (isPython && isPythonCrash(child.stderr)) {
+    // The exception line is the last one, so it names the crash.
+    outcome = "errored";
+    const last = (child.stderr ?? "")
+      .split("\n")
+      .filter((l) => l.trim() !== "")
+      .at(-1);
+    detail = `the CLI crashed (exit ${child.status}) rather than answering: ${last.trim().slice(0, 160)}`;
+  } else if (!isPython && NODE_FATAL_FOOTER.test(child.stderr ?? "")) {
     outcome = "errored";
     const first = (child.stderr ?? "")
       .split("\n")
@@ -3320,6 +3443,15 @@ export function toRecordEntry(result, { name, callSite } = {}) {
     // Which shells each case ran under (shell form), or null. The count is
     // cases × shells, and a reader must not have to divide (cycle 2, CR-5).
     shells: Array.isArray(result.shells) ? [...result.shells] : null,
+    // The interpreter a cli: `.py` entry ran under (task.215), or null — the
+    // record says which python3 answered, as `shells` says which shells did.
+    interpreter:
+      result.interpreter && typeof result.interpreter === "object"
+        ? {
+            name: result.interpreter.name ?? null,
+            version: result.interpreter.version ?? null,
+          }
+        : null,
     // The directory whose `gh` answered the shell runs (task.136), or null —
     // the record must say what answered, not leave a reader to assume the
     // real one did not.
@@ -3641,6 +3773,10 @@ export function emitBlock(record, { mode = "diff" } = {}) {
         `      probes_executed: ${c.executed}`,
         ...(Array.isArray(c.shells) && c.shells.length > 0
           ? [`      shells: [${c.shells.join(", ")}]`]
+          : []),
+        // Which python3 ran a cli: `.py` control (task.215).
+        ...(c.interpreter && typeof c.interpreter.version === "string"
+          ? [`      interpreter: ${yamlStr(c.interpreter.version)}`]
           : []),
         // A JSON array of strings is a valid YAML flow sequence. Printed so two
         // cli: controls on one script read as two in the block (task.144).
