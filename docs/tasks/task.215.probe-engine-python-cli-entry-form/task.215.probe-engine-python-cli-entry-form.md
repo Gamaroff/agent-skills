@@ -5,7 +5,7 @@ type: task
 description: "Let shared/resources/security-probe.mjs probe a Python script through the existing cli: form (by file extension), so a Python boundary reaches the DoD probe instead of failing the zero-candidates guard."
 tags: [security-probe, finalise, qa-task, qa-story, review-security, observation]
 category: infrastructure
-status: ready-for-review
+status: in-progress
 priority: Medium
 created: 2026-10-19
 updated: 2026-10-19
@@ -15,7 +15,7 @@ github_issue: 689
 
 # Technical Task: security-probe — a Python CLI under `cli:`
 
-**Status:** Ready for Review
+**Status:** In Progress
 
 **Review**: ✅ All review recommendations from `task.215.review.1.probe-engine-python-cli-entry-form.md` implemented 2026-10-19
 
@@ -182,32 +182,32 @@ Both items need a merged, tagged release, and `/finalise` runs before merge, so 
 
 ### QA Report
 
-- **Full Report**: [task.215.qa.3.probe-engine-python-cli-entry-form.md](./task.215.qa.3.probe-engine-python-cli-entry-form.md)
-- **Gate File**: [task.215.gate.3.probe-engine-python-cli-entry-form.yml](./task.215.gate.3.probe-engine-python-cli-entry-form.yml)
+- **Full Report**: [task.215.qa.4.probe-engine-python-cli-entry-form.md](./task.215.qa.4.probe-engine-python-cli-entry-form.md)
+- **Gate File**: [task.215.gate.4.probe-engine-python-cli-entry-form.yml](./task.215.gate.4.probe-engine-python-cli-entry-form.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 316
+- **Tests Executed**: 320
 - **Phases Verified**: 2/2
 - **Critical Issues**: 1
-- **NFR Status**: Security: CONCERNS, Performance: CONCERNS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
 
-- Cycle 2 findings fixed and verified (TASK-215-QA2-1, QA2-2).
-- TASK-215-QA3-1 (HIGH): an exception whose `str()` raises loses the bootstrap's crash marker, so behind a replaced excepthook the crash is scored `rejected`. SC4 is unmet. Bug report: [task.215.bug.4.unprintable-exception-loses-marker.md](./task.215.bug.4.unprintable-exception-loses-marker.md)
-- TASK-215-QA3-2, QA3-3 (MEDIUM): fd 3 survives `fork` — a forked child overrides the parent's answer, and a forked daemon holds the pipe until the timeout.
-- TASK-215-QA3-4 (LOW): `runpy.run_path` restores `__main__` after the body returns.
-- The QA loop's convergence check tripped (HIGH 1, 1, 1): the pipeline escalated rather than run a fourth fix.
+- Cycle 3 findings fixed and verified (TASK-215-QA3-1 to QA3-4; bugs 4–6 closed). Probe: 11 crash shapes behind a silent excepthook are `errored`.
+- TASK-215-QA4-1 (HIGH): a script that closes fd 3 loses the crash marker (or has it written into its own file), so the crash is scored `rejected`. SC4 is unmet. Bug report: [task.215.bug.7.closed-fd3-loses-crash-marker.md](./task.215.bug.7.closed-fd3-loses-crash-marker.md)
+- TASK-215-QA4-2 (MEDIUM): `probePython` runs under a different environment from the cases. Bug report: [task.215.bug.8.interpreter-probe-env-differs.md](./task.215.bug.8.interpreter-probe-env-differs.md)
 
 ### Bug Reports
 
 - [TASK-215-BUG-1: Python crash read as refusal](./task.215.bug.1.python-crash-read-as-refusal.md) — ✅ Closed — Priority: High (verified QA cycle 2)
 - [TASK-215-BUG-2: crash outside the default excepthook](./task.215.bug.2.crash-outside-default-excepthook.md) — ✅ Closed — Priority: High (verified QA cycle 3)
 - [TASK-215-BUG-3: limit note understates the class](./task.215.bug.3.limit-note-understates-class.md) — ✅ Closed — Priority: Medium (verified QA cycle 3)
-- [TASK-215-BUG-4: unprintable exception loses the crash marker](./task.215.bug.4.unprintable-exception-loses-marker.md) — ✅ Ready for QA — Priority: High (QA cycle 3)
-- [TASK-215-BUG-5: forked child writes the crash marker](./task.215.bug.5.forked-child-writes-marker.md) — ✅ Ready for QA — Priority: Medium (QA cycle 3)
-- [TASK-215-BUG-6: forked daemon holds the crash fd](./task.215.bug.6.forked-daemon-holds-crash-fd.md) — ✅ Ready for QA — Priority: Medium (QA cycle 3)
+- [TASK-215-BUG-4: unprintable exception loses the crash marker](./task.215.bug.4.unprintable-exception-loses-marker.md) — ✅ Closed — Priority: High (verified QA cycle 4)
+- [TASK-215-BUG-5: forked child writes the crash marker](./task.215.bug.5.forked-child-writes-marker.md) — ✅ Closed — Priority: Medium (verified QA cycle 4)
+- [TASK-215-BUG-6: forked daemon holds the crash fd](./task.215.bug.6.forked-daemon-holds-crash-fd.md) — ✅ Closed — Priority: Medium (verified QA cycle 4)
+- [TASK-215-BUG-7: a closed fd 3 loses the crash marker](./task.215.bug.7.closed-fd3-loses-crash-marker.md) — 🆕 New — Priority: High (QA cycle 4)
+- [TASK-215-BUG-8: the interpreter probe runs under a different environment](./task.215.bug.8.interpreter-probe-env-differs.md) — 🆕 New — Priority: Medium (QA cycle 4)
 
 <!-- change-log-start -->
 ## Change Log
@@ -224,6 +224,7 @@ Both items need a merged, tagged release, and `/finalise` runs before merge, so 
 | 2026-10-19 |  | QA findings fixed — cycle 2, 2 findings (TASK-215-QA2-1, QA2-2); Status → Ready for Review | qa-fix |
 | 2026-10-19 |  | QA gate FAIL (50/100) — 4 findings; Status → In Progress | qa-task |
 | 2026-10-19 |  | QA findings fixed — cycle 3, 4 findings (TASK-215-QA3-1 to QA3-4); Status → Ready for Review | qa-fix |
+| 2026-10-19 |  | QA gate FAIL (50/100) — 2 findings; Status → In Progress | qa-task |
 <!-- change-log-end -->
 
 ---

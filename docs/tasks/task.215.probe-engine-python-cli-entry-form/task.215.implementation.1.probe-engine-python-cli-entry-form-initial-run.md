@@ -115,6 +115,23 @@ Extend the probe engine's `cli:` entry form to run a `.py` entry under `python3`
 - Cycle 3: `/qa-task` with `code_review_blocking=true`; `SAFETY_REPROBE=true` (clause 2), unscoped, re-probe directive only (not a refute cycle). Reviewer dispatched 11:20:29Z, `duration_ms` 300937; mutation proofs and the corpus run through the cli arm made meanwhile (scratch worktree for mutations). Gate FAIL 50/100: cycle-2 findings verified fixed (bugs 2–3 closed); new HIGH TASK-215-QA3-1, MEDIUM QA3-2 and QA3-3, LOW QA3-4. QA reproduced QA3-1, QA3-2 and QA3-3 in `.claude/state/qa3/` (gitignored). PR comment and issue `qa-gate-3` comment `posted`.
 - Cycle 3 Convergence check: HIGH sequence 1, 1, 1 — HIGH present at all three readings and not strictly falling → **tripped**. Not running 5b; escalating (*QA Loop Not Converging*). The third-strike rule would also have applied (HIGH on `shared/resources/security-probe.mjs` in gates 1–3).
 
+### Re-entry — QA loop, 2026-10-19
+
+- QA loop re-entry: 2 extra cycles granted (user chose "Resume at 5a with 2 more cycles" in the invocation); 0 cycle(s) run outside the loop back-filled from disk (gates 1–3, 3 report entries). `grant-qa-cycles.sh`: lock restored from the halt snapshot; QA_CYCLE=3, qa_max_cycles=5, reenter_at=5b (a not-converging halt fired before 5b, so cycle 3's fix runs first).
+- Phase 0a detector not dispatched: the halt snapshot, gates and report were read directly and agree (current_step 5, qa_phase 5a at halt, gates 1–3, no PR merge).
+- QA Cycle 3 — changes-requested: stage-disabled.
+- Third strike: `shared/resources/security-probe.mjs` (HIGH in gates 1, 2, 3). Struck mechanism passed to `/qa-fix`: Python crash detection that depends on rendering the exception as text. Narrowing offer: not signalled (high-findings-remain).
+- `/qa-fix` cycle 3 (fix_cycle: not supplied — derived from the gate). Findings taken from gate 3 and bugs 4–6 read directly (ingester not dispatched; 4 findings, all in context). Pre-fix Explore mapping skipped: one function, its test file and fixtures, read directly.
+- Move: **replace** — the bootstrap writes a constant token on fd 3 before touching the exception; the `Class: message` line is detail only. This differs from the escalation's recommended step 1 (a guarded-formatting patch), which the third strike forbids.
+- QA3-2/QA3-3 fixed with a pid check plus `os.register_at_fork` closing fd 3 in children; QA3-4 by exec in a fresh `__main__` (also closes advisory CR-5).
+- Step 3.5: the pid check alone is unobservable once fd 3 is closed in the child, so the fork fixture's child opens a file (gets fd 3) and the parent exits 7 if the marker was written into it — then the pid-check mutation went red. A script that closes fd 3 itself loses the marker and falls back to the stderr reader: documented in `probe-boundary-rule.md`, not patched. Probe: phrases `runpy`, `fd 3`, `PYTHON_BOOTSTRAP`, `excepthook`, `cannot hold the pipe`, `__main__` → `probe-boundary-rule.md` updated; `CHANGELOG.md` and the task doc updated. Population 1.
+- Mutations: 6, each red. Fast gate attempt 1 red (`prettier --check` on `security-probe.mjs` only; log retained); formatted, attempt 2 `npm run ci:fast` TEST_EXIT=0, 5924 tests, 0 failures; log deleted.
+- Cycle 3 commit `e94dd355` fix(task.215) — code fix, fixtures, tests, docs, bugs 4–6; gate 3, QA report 3 and bugs were already committed by the escalation commit. One push. PR comment and issue #689 `qa-fix-3` comment `posted`.
+- Post-fix PR state check (inline `gh pr view`): OPEN, MERGEABLE, head `e94dd355`.
+- Cycle 4: `/qa-task` with `code_review_blocking=true`; `SAFETY_REPROBE=true` (clauses 2 and 3; clause 1 false), unscoped, re-probe directive (not a refute cycle). Reviewer dispatched 12:02:02Z, `duration_ms` 323955; mutation spot checks (4, all covered) ran in a scratch worktree meanwhile. Probe: a crash-matrix CLI (QA scratch, `.claude/state/qa4/`), crash shapes placed on legitimate cases so a misread shows as overblocked — 19 cases, 8 executed, 11 crash shapes errored, 1 overblocked (closed fd 3). Gate FAIL 50/100: cycle-3 findings verified fixed (bugs 4–6 closed); new HIGH TASK-215-QA4-1 (a closed or reopened fd 3 hides the crash — reproduced by the probe and by reviewer CR-1) and MEDIUM QA4-2 (interpreter probe environment — reviewer CR-2, the cycle-2 advisory CR-3 reproduced). CR-1's anchor read `text-mismatch` (one backslash of escaping in its quoted line; line 807 is the token write) — recorded with the ⚠️ mark, not repaired. PR comment and issue `qa-gate-4` comment `posted`.
+- Severity of QA4-1 kept at the reviewer's HIGH: no measured plausibility check was made to lower it, and SC4 is an absolute ("never `rejected`"). This orchestrator also wrote cycle 3's fix, so a self-assessed downgrade that would have avoided the convergence trip was not made.
+- Cycle 4 Convergence check: HIGH sequence (cycles 2–4) 1, 1, 1 → **tripped**. Not running 5b; escalating (*QA Loop Not Converging*). Third strike would also apply again (HIGH on `security-probe.mjs` in gates 2–4).
+
 ---
 
 ## Issues Log
@@ -147,6 +164,29 @@ The pipeline stopped after 3 qa-task/qa-fix cycles: the HIGH finding count faile
 2. Or scope SC4: keep the bootstrap and record the residual shapes (fork, unprintable exception) as a stated limit, with `/review-pr` then `/finalise` — only if the maintainer accepts a "never" that holds for the common shapes rather than all of them.
 3. Take QA3-4 (`__main__` restore) and CR-5 (stdlib shadowing) as follow-ups if not fixed in step 1.
 
+### QA Loop Not Converging — 2026-10-19 (after the 2-cycle grant)
+
+The pipeline stopped after 4 qa-task/qa-fix cycles: the HIGH finding count failed to strictly decrease across two consecutive cycles, so the loop was no longer converging. The remaining findings are NOT accepted — they are handed over below.
+
+**Final gate status**: FAIL (50/100) — `task.215.gate.4.probe-engine-python-cli-entry-form.yml`
+**HIGH findings per cycle**: 1, 1, 1, 1 — flat from cycle 1 onward
+**Remaining issues** (from final gate file):
+- TASK-215-QA4-1 (high, `shared/resources/security-probe.mjs`): the crash token is written to whatever fd 3 is at crash time and only its presence is read; a script that closes fd 3 (`os.closerange`) loses it, or has it written into a file it then opened, and behind a quiet excepthook the crash scores `rejected`.
+- TASK-215-QA4-2 (medium, `shared/resources/security-probe.mjs`): `probePython` checks `python3` under the engine's environment, cases run under `caseEnv`; an interpreter that needs the real `HOME` scores every case `rejected`.
+
+**What was attempted per cycle**:
+- Cycle 1: `isPythonCrash` stopped reading the last stderr line; exit-1 gate added.
+- Cycle 2: change of shape — a `runpy` bootstrap names the exception on fd 3 before any excepthook.
+- Cycle 3 (after the grant; third strike → replace): a constant token written before the exception is touched; pid check and `register_at_fork` for forked children; body exec'd in a fresh `__main__`.
+- Cycle 4: QA only — the escalation fired before 5b.
+
+**Likely root cause**: four cycles, four different defects, all in one place: how a Python crash is told apart from a refusal when both exit 1. Each mechanism closed the shapes it was given and the next safety re-probe found a narrower way around it: last-line parsing → stderr as a channel → formatting in the bootstrap → the fd itself. The channel is *negative* — a missing signal reads as "answered" — so every way to lose the signal is a false pass. SC4 is an absolute over code the script under test controls, including its own file descriptors.
+
+**Recommended next steps**:
+1. Scope SC4 (maintainer decision): keep the bootstrap and state the residual — a script that closes inherited descriptors in its main process, or an interpreter that cannot start under the case environment — as a documented limit. Then `/review-pr` and `/finalise`.
+2. Or make the channel positive (one more change of shape, not a patch): the bootstrap writes a token on every exit it controls, an answer included, after checking fd 3 is still the engine's pipe; a missing token reads as `errored`, so every lost write fails safe. That also covers QA4-2 (a child that never started writes nothing). Run it as a fresh grant (`Resume at 5a with 2 more cycles` → re-enters at 5b) or by hand followed by `/qa-task`.
+3. Take CR-3 (marker computed twice) with whichever of the above runs.
+
 ---
 
 ## QA Iteration History
@@ -176,6 +216,18 @@ _Track each QA review/fix cycle._
 **Issues Found**: 5. Cycle 2's two findings verified fixed. TASK-215-QA3-1 (HIGH): an exception whose `str()` raises escapes the bootstrap before the marker is written, so behind a replaced excepthook the crash is scored `rejected` (verdict `engages`). TASK-215-QA3-2 (MEDIUM): a forked child writes the marker. TASK-215-QA3-3 (MEDIUM): a forked daemon holds fd 3 until the timeout. TASK-215-QA3-4 (LOW): `__main__` restored after the body. CR-5 (LOW, advisory): stdlib shadowing from the cwd.
 **HIGH findings**: 1
 **MEDIUM findings**: 2
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 3 of 5) — re-entered after the not-converging escalation (escalated before 5b; 2 cycles granted)
+**Re-entry**: 2 cycles granted; cycle 3's fix run at 5b (third strike: replace)
+**Fixes Applied**: constant crash token written first on fd 3 (QA3-1); pid check + fd 3 closed in forked children (QA3-2, QA3-3); body exec'd in a fresh `__main__` (QA3-4, CR-5)
+**Commit**: `e94dd355`
+
+### QA Cycle 4 — 2026-10-19
+**Gate Result**: FAIL (50/100)
+**Issues Found**: 3. Cycle 3's four findings verified fixed. TASK-215-QA4-1 (HIGH): the crash token goes to whatever fd 3 is, so a script that closes fd 3 (or reopens it as its own file) has its crash scored `rejected` (probe: overblocked; reviewer: verdict `engages`). TASK-215-QA4-2 (MEDIUM): `probePython` runs under the engine env, cases under `caseEnv`. CR-3 (LOW, cleanup): marker computed twice.
+**HIGH findings**: 1
+**MEDIUM findings**: 1
 **PR Review**: not reached — gate did not exit the loop
 **Loop exit**: n/a — this exit not taken
 **Action**: Escalating — loop not converging

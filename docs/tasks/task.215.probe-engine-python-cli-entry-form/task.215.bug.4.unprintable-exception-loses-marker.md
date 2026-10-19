@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa
+status: closed
 severity: 'Major'
 priority: 'High'
 created: 2026-10-19
@@ -15,7 +15,7 @@ tags: [task.215, security-probe, python, crash-detection]
 **Bug ID**: TASK-215-BUG-4
 **Severity**: HIGH
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle 3 safety re-probe: diff reviewer CR-1, reproduced by QA)
 **Date Found**: 2026-10-19
 
@@ -84,3 +84,4 @@ exception behind a replaced excepthook.
 | 2026-10-19 | New | qa-task | Found in QA cycle 3 |
 | 2026-10-19 | In Progress | qa-fix | Investigation started |
 | 2026-10-19 | Ready for QA | qa-fix | Fix implemented (QA fix cycle 3) |
+| 2026-10-19 | Closed | qa-task | Verified by task.215.qa.4.probe-engine-python-cli-entry-form.md |
