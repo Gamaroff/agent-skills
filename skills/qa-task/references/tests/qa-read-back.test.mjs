@@ -581,6 +581,18 @@ const VERDICT_HALTS = [
       ),
     /\*\*Gate Decision\*\* is PASS but this cycle's gate .* says FAIL/,
   ],
+  [
+    // task.192 QA-2: the first line matches, a later one is stale — the probe case
+    // stale-decision-after-current, which read clean when only the first line was read.
+    "a stale **Gate Decision** after a current one in the same section",
+    ({ doc }) =>
+      edit(
+        doc,
+        "**Gate Decision**: FAIL\n",
+        "**Gate Decision**: FAIL\n\n### History\n\n**Gate Decision**: PASS\n",
+      ),
+    /\*\*Gate Decision\*\* is PASS but this cycle's gate .* says FAIL/,
+  ],
 ];
 
 for (const [name, mutate, says] of VERDICT_HALTS) {

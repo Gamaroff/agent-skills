@@ -211,6 +211,8 @@ That is the defect the check exists for.
 ### Files to Modify (Documentation)
 
 4. ✅ `CHANGELOG.md`
+5. ✅ `skills/qa-task/SKILL.md` Step 12b and `skills/qa-story/SKILL.md` Review Completion 3e — the
+   read-back's check list gains the verdict check and the lock retry (QA cycle 1, QA-1)
 
 ### Files to Delete
 
@@ -323,6 +325,31 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: ⚠️ CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-19
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.192.qa.1.read-back-checks-this-cycles-verdict.md](./task.192.qa.1.read-back-checks-this-cycles-verdict.md)
+- **Gate File**: [task.192.gate.1.read-back-checks-this-cycles-verdict.yml](./task.192.gate.1.read-back-checks-this-cycles-verdict.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 104 (targeted suites); ci:fast 5893
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+
+- QA-1 (MEDIUM): both SKILL.md read-back sections still list four checks and omit the lock retry — [bug 1](./task.192.bug.1.skill-md-read-back-omits-verdict-check.md).
+- QA-2 (LOW): only the first `**Gate Decision**` line of a QA section is checked (probe-reproduced).
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -332,6 +359,8 @@ None.
 | 2026-10-19 | 1.1 | Review passed (8/10) — fixture update added to Phase 1, reachable non-lock failure input, existing retry mechanisms named, anchors refreshed | review-task |
 | 2026-10-19 |  | Status → ready-for-development | review-task |
 | 2026-10-19 |  | Implemented — engine, 2 test suites, CHANGELOG (bundled copies regenerated); 16 new tests | develop |
+| 2026-10-19 |  | QA gate CONCERNS (90/100) — 2 findings | qa-task |
+| 2026-10-19 |  | QA findings fixed — cycle 1, 2 findings (SKILL.md read-back lists; every Gate Decision line) | qa-fix |
 <!-- change-log-end -->
 
 ---

@@ -125,18 +125,23 @@ function verdictProblems(engines, text, gateFile) {
       "the document has no ## QA Testing Results section — the Step 12 edit did not land",
     );
   for (const sec of sections) {
-    // Tolerates a leading emoji or bold before the token; the token is the first word.
-    const m = text
-      .slice(sec.start, sec.end)
-      .match(/^\*\*Gate Decision\*\*:[^A-Za-z\n]*([A-Za-z]+)/m);
-    if (!m)
+    // Every decision line, not the first: a stale line after a current one is still stale
+    // (task.192 QA-2). Tolerates a leading emoji or bold before the token; the token is the
+    // first word.
+    const lines = [
+      ...text
+        .slice(sec.start, sec.end)
+        .matchAll(/^\*\*Gate Decision\*\*:[^A-Za-z\n]*([A-Za-z]+)/gm),
+    ];
+    if (!lines.length)
       problems.push(
         "the QA section has no **Gate Decision** line — the Step 12 edit did not land",
       );
-    else if (m[1].toUpperCase() !== want)
-      problems.push(
-        `**Gate Decision** is ${m[1]} but this cycle's gate ${base} says ${want} — the Step 12 edit did not land`,
-      );
+    for (const m of lines)
+      if (m[1].toUpperCase() !== want)
+        problems.push(
+          `**Gate Decision** is ${m[1]} but this cycle's gate ${base} says ${want} — the Step 12 edit did not land`,
+        );
   }
 
   // The newest row QA wrote — not the newest row: qa-fix and finalise rows follow it.
