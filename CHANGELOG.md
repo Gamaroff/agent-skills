@@ -11,8 +11,10 @@ All notable changes to this project will be documented in this file. Format foll
   exit-status verdict as a Node CLI, so a Python boundary reaches the DoD probe instead of being
   declined `entry-not-probeable` and tripping the zero-candidates guard. A Python crash exits 1, the
   status a refusal exits with, so the script runs inside a bootstrap that catches an uncaught
-  exception before any excepthook runs and names it on fd 3, which the script does not write; a
-  replaced excepthook (rich, Typer) or a redirected `sys.stderr` cannot hide it. An exit 1 with a
+  exception before any excepthook runs and writes a constant marker on fd 3, which the script does
+  not write, before reading anything off the exception; a replaced excepthook (rich, Typer), a
+  redirected `sys.stderr` or an exception that cannot be printed cannot hide it, and a forked
+  child neither writes the marker nor holds the pipe open. An exit 1 with a
   traceback on stderr also counts. A crash is scored `errored`, never `rejected`. `-B` stops a sibling import writing
   `__pycache__/` into the watched script directory; `-I` is not used because it breaks sibling
   imports. With no `python3` on `PATH` the entry is declined once, naming `python3`. The result and

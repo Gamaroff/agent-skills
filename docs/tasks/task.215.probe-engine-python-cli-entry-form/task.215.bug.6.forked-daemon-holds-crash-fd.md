@@ -1,6 +1,6 @@
 ---
 type: bug
-status: new
+status: ready-for-qa
 severity: 'Minor'
 priority: 'Medium'
 created: 2026-10-19
@@ -15,7 +15,7 @@ tags: [task.215, security-probe, python, crash-detection]
 **Bug ID**: TASK-215-BUG-6
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: New
+**Status**: ✅ Ready for QA
 **Found By**: QA Engineer (cycle 3 safety re-probe: diff reviewer CR-3, reproduced by QA)
 **Date Found**: 2026-10-19
 
@@ -42,8 +42,39 @@ full timeout.
 Close fd 3 in forked children with `os.register_at_fork(after_in_child=...)`, and correct the
 comment.
 
+## Developer Fix Cycle
+
+### Iteration 1
+
+#### Investigation (New → In Progress)
+
+**Date**: 2026-10-19
+
+**Root Cause**: A forked daemon kept fd 3 open (non-inheritable closes on `exec`, not `fork`), so `spawnSync` waited on the pipe until the timeout. The bootstrap comment claimed no started process could hold the pipe.
+
+#### Fix Implementation (In Progress → Ready for QA)
+
+**Date**: 2026-10-19
+
+**Fix Description**:
+
+- `os.register_at_fork(after_in_child=…)` closes fd 3 in every forked child, so the pipe closes when the script exits.
+- The bootstrap comment now says the fd is closed on fork and not inherited across exec.
+
+**Files Modified**:
+
+- `shared/resources/security-probe.mjs` (+ 4 bundled copies)
+- `shared/resources/tests/security-probe.test.mjs`
+- New fixture: `cli-fork-daemon.py` — a refuser that forks a detached daemon outliving the answer by 4 s
+
+**Testing**: New test at `timeoutMs: 2000`: every case answers (0 / 3), none times out, verdict `engages`. Mutation red: `register_at_fork` removed (every case killed at the timeout). `npm run ci:fast` green (QA fix cycle 3).
+
+**Verification Steps for QA**: probe `cli:shared/resources/tests/fixtures/security-probe/cli-fork-daemon.py` with a 2 s timeout; no case is `errored`.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
 | --- | --- | --- | --- |
 | 2026-10-19 | New | qa-task | Found in QA cycle 3 |
+| 2026-10-19 | In Progress | qa-fix | Investigation started |
+| 2026-10-19 | Ready for QA | qa-fix | Fix implemented (QA fix cycle 3) |

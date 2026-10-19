@@ -5,7 +5,7 @@ type: task
 description: "Let shared/resources/security-probe.mjs probe a Python script through the existing cli: form (by file extension), so a Python boundary reaches the DoD probe instead of failing the zero-candidates guard."
 tags: [security-probe, finalise, qa-task, qa-story, review-security, observation]
 category: infrastructure
-status: in-progress
+status: ready-for-review
 priority: Medium
 created: 2026-10-19
 updated: 2026-10-19
@@ -15,7 +15,7 @@ github_issue: 689
 
 # Technical Task: security-probe — a Python CLI under `cli:`
 
-**Status:** In Progress
+**Status:** Ready for Review
 
 **Review**: ✅ All review recommendations from `task.215.review.1.probe-engine-python-cli-entry-form.md` implemented 2026-10-19
 
@@ -205,9 +205,9 @@ Both items need a merged, tagged release, and `/finalise` runs before merge, so 
 - [TASK-215-BUG-1: Python crash read as refusal](./task.215.bug.1.python-crash-read-as-refusal.md) — ✅ Closed — Priority: High (verified QA cycle 2)
 - [TASK-215-BUG-2: crash outside the default excepthook](./task.215.bug.2.crash-outside-default-excepthook.md) — ✅ Closed — Priority: High (verified QA cycle 3)
 - [TASK-215-BUG-3: limit note understates the class](./task.215.bug.3.limit-note-understates-class.md) — ✅ Closed — Priority: Medium (verified QA cycle 3)
-- [TASK-215-BUG-4: unprintable exception loses the crash marker](./task.215.bug.4.unprintable-exception-loses-marker.md) — 🆕 New — Priority: High (QA cycle 3)
-- [TASK-215-BUG-5: forked child writes the crash marker](./task.215.bug.5.forked-child-writes-marker.md) — 🆕 New — Priority: Medium (QA cycle 3)
-- [TASK-215-BUG-6: forked daemon holds the crash fd](./task.215.bug.6.forked-daemon-holds-crash-fd.md) — 🆕 New — Priority: Medium (QA cycle 3)
+- [TASK-215-BUG-4: unprintable exception loses the crash marker](./task.215.bug.4.unprintable-exception-loses-marker.md) — ✅ Ready for QA — Priority: High (QA cycle 3)
+- [TASK-215-BUG-5: forked child writes the crash marker](./task.215.bug.5.forked-child-writes-marker.md) — ✅ Ready for QA — Priority: Medium (QA cycle 3)
+- [TASK-215-BUG-6: forked daemon holds the crash fd](./task.215.bug.6.forked-daemon-holds-crash-fd.md) — ✅ Ready for QA — Priority: Medium (QA cycle 3)
 
 <!-- change-log-start -->
 ## Change Log
@@ -223,6 +223,7 @@ Both items need a merged, tagged release, and `/finalise` runs before merge, so 
 | 2026-10-19 |  | QA gate FAIL (60/100) — 2 findings; Status → In Progress | qa-task |
 | 2026-10-19 |  | QA findings fixed — cycle 2, 2 findings (TASK-215-QA2-1, QA2-2); Status → Ready for Review | qa-fix |
 | 2026-10-19 |  | QA gate FAIL (50/100) — 4 findings; Status → In Progress | qa-task |
+| 2026-10-19 |  | QA findings fixed — cycle 3, 4 findings (TASK-215-QA3-1 to QA3-4); Status → Ready for Review | qa-fix |
 <!-- change-log-end -->
 
 ---
@@ -295,5 +296,24 @@ Both items need a merged, tagged release, and `/finalise` runs before merge, so 
 - CR-3 (advisory): not taken — `recommendations.future`.
 - Tests: 4 fixtures, 2 new tests, 1 extended; 14 python tests. 7 mutations each red (listed in the
   bug report). `npm run ci:fast` 5920 tests, 0 failures.
+
+### QA Fix — cycle 3 (2026-10-19)
+
+Run after the QA loop's not-converging escalation, on a granted re-entry (2 extra cycles).
+
+- Struck mechanism (third strike on `security-probe.mjs`, cycles 1–3): crash detection that depends
+  on rendering the exception as text. Move: **replace** — the bootstrap's first act on an uncaught
+  exception is to write a constant token on fd 3; the `Class: message` line follows best-effort as
+  the detail only, and the engine reads the fd's presence, never its text. TASK-215-QA3-1: an
+  exception whose `str()` or class name raises is now `errored` (TASK-215-BUG-4).
+- Other findings in the file, fixed as usual: QA3-2/QA3-3 — the marker is written only by the
+  process that started the bootstrap, and `os.register_at_fork` closes fd 3 in forked children, so
+  a child's crash cannot override the answer and a daemon cannot hold the case to the timeout
+  (BUG-5, BUG-6). QA3-4 — the body runs in a fresh `__main__` module through `exec`, not
+  `runpy.run_path`, so `__main__` stays the script's after it returns; dropping `runpy` also closes
+  CR-5 (a `runpy.py` in the cwd can no longer shadow the bootstrap's import).
+- Tests: 5 fixtures, 4 new tests; 18 python tests. 6 mutations each red: no token; the `str()`
+  failure not caught; the reader taking the token line as the detail; no pid check; no
+  `register_at_fork`; `runpy` restoring `__main__`.
 
 - QA artifacts land beside this file: `task.215.qa.{N}.*.md`, `task.215.bug.{N}.*.md`, `task.215.gate.{N}.*.yml`.

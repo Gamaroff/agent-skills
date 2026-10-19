@@ -2904,6 +2904,88 @@ test("cli entry (python): a crash behind a replaced excepthook is errored on the
   }
 });
 
+test("cli entry (python): a crash whose exception cannot be printed is errored — the signal is not the exception's text", () => {
+  // The replaced excepthook prints nothing: exit 1, empty stderr. A marker
+  // built from the exception's text was lost when formatting it raised, and
+  // every hostile case scored `rejected` (QA cycle 3, TASK-215-QA3-1). Its
+  // str() raises; the second fixture's class name cannot be read at all, so
+  // the detail has nothing to name.
+  for (const [name, detail] of [
+    ["cli-crasher-unprintable", /rather than answering: UnprintableError$/],
+    ["cli-crasher-nameless", /rather than answering: uncaught exception$/],
+  ]) {
+    const r = runProbeSpec({
+      sink: "url-authority",
+      entry: PY(name),
+      cases: CASES,
+      argv: HOST_ARGV,
+    });
+    assert.notEqual(r.verdict, "engages", `${name}: ${JSON.stringify(r)}`);
+    const hostile = CASES.filter((c) => c.direction === "hostile");
+    assert.ok(hostile.length > 0);
+    for (const c of hostile) {
+      const got = [...r.cases, ...r.declined].find((x) => x.id === c.id);
+      assert.ok(got, `${name} ${c.id} missing`);
+      assert.equal(got.outcome, "errored", `${name} ${c.id}: ${got.detail}`);
+      assert.match(got.detail, /crashed \(exit 1\)/, name);
+      assert.match(got.detail, detail, name);
+    }
+    for (const c of r.cases.filter((x) => x.direction === "legitimate")) {
+      assert.equal(c.outcome, "accepted", `${name} ${c.id}`);
+    }
+  }
+});
+
+test("cli entry (python): a forked child that crashes does not override the script's answer", () => {
+  // The child unwinds into the bootstrap with the crash fd still open. Were it
+  // to write the marker, every case — a parent that answered 0 or 3 — would
+  // read `errored` (QA cycle 3, TASK-215-QA3-2).
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-fork-child-crash"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.equal(r.verdict, "engages", JSON.stringify(r));
+  assert.equal(r.executed, CASES.length);
+  for (const c of r.cases) {
+    assert.equal(c.exit, c.direction === "hostile" ? 3 : 0, c.id);
+  }
+});
+
+test("cli entry (python): a forked daemon does not hold the case open past the script's answer", () => {
+  // The daemon outlives the answer by 4 s; the per-case timeout is 2 s. Were
+  // the crash fd left open in the child, every case would wait for the timeout
+  // and read `errored` (QA cycle 3, TASK-215-QA3-3).
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-fork-daemon"),
+    cases: CASES,
+    argv: HOST_ARGV,
+    timeoutMs: 2000,
+  });
+  assert.equal(r.verdict, "engages", JSON.stringify(r));
+  assert.equal(r.executed, CASES.length);
+  for (const c of r.cases) {
+    assert.equal(c.exit, c.direction === "hostile" ? 3 : 0, c.id);
+  }
+});
+
+test("cli entry (python): __main__ is still the script's module after the body returns", () => {
+  // cli-main-atexit's atexit handler exits 8 unless __main__ is the script's
+  // module; runpy swapped the bootstrap back in (QA cycle 3, TASK-215-QA3-4).
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-main-atexit"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+  for (const c of r.cases) {
+    assert.equal(c.exit, c.direction === "hostile" ? 3 : 0, c.id);
+  }
+});
+
 test("cli entry (python): the script runs as python3 <path> runs it — __main__, argv[0] and its own directory", () => {
   // The bootstrap that catches a crash must not change how the script runs:
   // cli-main-guard exits 9 unless sys.argv[0] is itself, and answers only

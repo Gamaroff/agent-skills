@@ -187,7 +187,8 @@
  * run, the entry is declined `entry-not-probeable` once, by name. A Python crash
  * exits 1 — a refusal's status — and prints no Node footer, so the script runs
  * inside PYTHON_BOOTSTRAP, which catches an uncaught exception before any
- * excepthook runs and names it on fd 3, a channel the script does not write.
+ * excepthook runs and writes a constant marker on fd 3, a channel the script
+ * does not write, before reading anything off the exception.
  * A traceback on stderr with exit 1 (isPythonCrash) is read as a crash too. The
  * result and the record carry `interpreter` ({ name, version }), null for every
  * other form.
@@ -743,37 +744,80 @@ const PYTHON_FLAGS = Object.freeze(["-E", "-s", "-B"]);
 const PYTHON_CRASH_FD = 3;
 
 /**
+ * The first line PYTHON_BOOTSTRAP writes on PYTHON_CRASH_FD when the script
+ * raises: a constant, so writing it formats nothing the script controls.
+ */
+const PYTHON_CRASH_TOKEN = "crash";
+
+/**
  * Runs the entry as `python3 <entry>` would — sys.argv[0] is the entry,
- * sys.path[0] its directory, `__name__ == "__main__"` — and catches an uncaught
- * exception BEFORE any excepthook runs (QA cycle 2, TASK-215-QA2-1). Reading
- * the crash off stderr alone missed every script that changes how one is
- * reported: a replaced sys.excepthook (rich, Typer), sys.stderr redirected or
- * None, sys.tracebacklimit = 0. Each exits 1 with no frame, which scored as a
- * refusal. Here the exception's first line goes to PYTHON_CRASH_FD, then the
- * script's own excepthook prints it as it would have (traceback trimmed to the
- * entry's frames), and the child exits 1. SystemExit is the script's answer and
- * propagates untouched. The fd is not inherited, so a process the script
- * starts cannot hold the pipe open past the script's own exit.
+ * sys.path[0] its directory, the body executed in a fresh `__main__` module
+ * that stays `sys.modules["__main__"]` after the body returns (atexit handlers
+ * and threads see the script's module, as under `python3 <entry>`; QA cycle 3,
+ * TASK-215-QA3-4) — and catches an uncaught exception BEFORE any excepthook
+ * runs (QA cycle 2, TASK-215-QA2-1): a replaced sys.excepthook (rich, Typer),
+ * sys.stderr redirected or None, or sys.tracebacklimit = 0 each exit 1 with no
+ * frame, which read off stderr scored as a refusal.
+ *
+ * The crash signal is PYTHON_CRASH_TOKEN, a constant written first (QA cycle 3,
+ * TASK-215-QA3-1): a marker built from the exception's text was lost whenever
+ * formatting it raised — a raising __str__, KeyError(10**5000) — and behind a
+ * replaced excepthook that crash scored as a refusal. The exception's
+ * `Class: message` follows on the next line, best-effort, as the detail only.
+ * Then the script's own excepthook prints the crash as it would have
+ * (traceback trimmed to the entry's frames) and the child exits 1. SystemExit
+ * is the script's answer and propagates untouched.
+ *
+ * Only the process that started the bootstrap writes the token, and a forked
+ * child closes the fd (QA cycle 3, TASK-215-QA3-2/QA3-3): a child that raised
+ * would otherwise override the parent's answer, and a daemon holding the pipe
+ * kept every case waiting for the timeout. The fd is also not inherited across
+ * exec, so no process the script starts can hold the pipe open past its exit.
  */
 const PYTHON_BOOTSTRAP = [
-  "import os, sys, runpy",
+  "import os, sys",
+  "boot_pid = os.getpid()",
   "try:",
   `    os.set_inheritable(${PYTHON_CRASH_FD}, False)`,
   "except OSError:",
   "    pass",
+  "def close_crash_fd():",
+  "    try:",
+  `        os.close(${PYTHON_CRASH_FD})`,
+  "    except OSError:",
+  "        pass",
+  "os.register_at_fork(after_in_child=close_crash_fd)",
   "entry = sys.argv[1]",
   "sys.argv = sys.argv[1:]",
   "sys.path[0] = os.path.dirname(os.path.abspath(entry))",
+  "boot_main = sys.modules['__main__']",
+  "main = type(sys)('__main__')",
+  "main.__file__ = entry",
+  "main.__cached__ = None",
+  "sys.modules['__main__'] = main",
   "try:",
-  "    runpy.run_path(entry, run_name='__main__')",
+  "    with open(entry, 'rb') as f:",
+  "        source = f.read()",
+  "    exec(compile(source, entry, 'exec'), main.__dict__)",
   "except SystemExit:",
   "    raise",
   "except BaseException as e:",
-  "    line = (f'{type(e).__name__}: {e}'.splitlines() or [type(e).__name__])[0]",
-  "    try:",
-  `        os.write(${PYTHON_CRASH_FD}, line.encode('utf-8', 'replace')[:400] + b'\\n')`,
-  "    except OSError:",
-  "        pass",
+  "    if os.getpid() == boot_pid:",
+  "        try:",
+  `            os.write(${PYTHON_CRASH_FD}, b'${PYTHON_CRASH_TOKEN}\\n')`,
+  "        except OSError:",
+  "            pass",
+  "        try:",
+  "            line = type(e).__name__",
+  "            try:",
+  "                text = (str(e).splitlines() or [''])[0]",
+  "                if text:",
+  "                    line = line + ': ' + text",
+  "            except BaseException:",
+  "                pass",
+  `            os.write(${PYTHON_CRASH_FD}, line.encode('utf-8', 'replace')[:400] + b'\\n')`,
+  "        except BaseException:",
+  "            pass",
   "    tb = e.__traceback__",
   "    while tb is not None and tb.tb_frame.f_code.co_filename != entry:",
   "        tb = tb.tb_next",
@@ -2374,14 +2418,17 @@ export function isPythonCrash(stderr) {
 }
 
 /**
- * The line PYTHON_BOOTSTRAP wrote on PYTHON_CRASH_FD — the uncaught exception's
- * `Class: message` first line — or null when it wrote none (no crash, or a
- * child that never reached the bootstrap).
+ * What PYTHON_BOOTSTRAP wrote on PYTHON_CRASH_FD, or null when it wrote nothing
+ * (no crash, or a child that never reached the bootstrap). Anything written is
+ * a crash; the presence is the signal, never the text. `line` is the
+ * exception's `Class: message` when the bootstrap could format it, else null.
  */
 function pythonCrashMarker(child) {
   const text = child.output?.[PYTHON_CRASH_FD];
   if (typeof text !== "string" || text.trim() === "") return null;
-  return text.split("\n")[0];
+  const [first, second] = text.split("\n");
+  const line = first === PYTHON_CRASH_TOKEN ? second : first;
+  return { line: line && line.trim() !== "" ? line : null };
 }
 
 /**
@@ -2419,7 +2466,7 @@ function pythonExceptionLine(stderr) {
  *   no `expected`: exit 0                          → "accepted"
  *   no `expected`: exit non-zero                   → "rejected"
  *   `expected`: compared, mapped through direction → as the shell arm
- * A crash is Node's fatal-error footer on stderr, or for Python the line
+ * A crash is Node's fatal-error footer on stderr, or for Python anything
  * PYTHON_BOOTSTRAP writes on PYTHON_CRASH_FD, or an exit 1 whose stderr
  * isPythonCrash reads as a traceback (Python exits 1 on a crash, as a refusal
  * does, so the exit status alone cannot tell them apart).
@@ -2533,7 +2580,7 @@ function runCliCase(
     // status sits beside an answer.
     outcome = "errored";
     const line =
-      pythonCrashMarker(child) ?? pythonExceptionLine(child.stderr ?? "");
+      pythonCrashMarker(child)?.line ?? pythonExceptionLine(child.stderr ?? "");
     detail = `the CLI crashed (exit ${child.status}) rather than answering: ${line.trim().slice(0, 160)}`;
   } else if (!isPython && NODE_FATAL_FOOTER.test(child.stderr ?? "")) {
     outcome = "errored";

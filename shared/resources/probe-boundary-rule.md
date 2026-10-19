@@ -384,13 +384,21 @@ takes it.
     no Node footer, so the engine does not read the crash off the exit status.
     A `.py` entry runs inside a bootstrap (`PYTHON_BOOTSTRAP`) that runs it as
     `python3 <path>` would — `sys.argv[0]` is the script, `sys.path[0]` its
-    directory, `__name__` is `"__main__"` — and catches an uncaught exception
-    **before any excepthook runs**, names it on fd 3, then lets the script's
-    own excepthook print it and exits 1. Any line on fd 3 makes the case
-    *errored*. That is what stderr alone could not see: a replaced
+    directory, `__name__` is `"__main__"` and stays so after the body returns
+    — and catches an uncaught exception **before any excepthook runs**, writes
+    a constant marker on fd 3 before reading anything off the exception (its
+    `Class: message` follows, best-effort, as the detail), then lets the
+    script's own excepthook print it and exits 1. Anything on fd 3 makes the
+    case *errored*; its presence is the signal, never its text, so an
+    exception whose `str()` or class name raises is still a crash (task.215
+    QA cycle 3). That is what stderr alone could not see: a replaced
     `sys.excepthook` (rich, Typer), `sys.stderr` redirected or `None`, and
     `sys.tracebacklimit = 0` each exit 1 with no frame, and read as refusals
-    (task.215 QA cycle 2). `SystemExit` is the script's answer, so a plain
+    (task.215 QA cycle 2). Only the process that started the bootstrap writes
+    the marker, and a forked child closes fd 3: a child's crash is not the
+    script's answer, and a daemon does not hold the case open past it. A
+    script that closes fd 3 itself loses the marker and is left to the second
+    signal below. `SystemExit` is the script's answer, so a plain
     `sys.exit(1)` or `sys.exit("refused: …")` stays *rejected*. As a second
     signal, an exit 1 whose stderr holds a `File "…", line N` frame under a
     `Traceback (most recent call last):` header (an ExceptionGroup's
