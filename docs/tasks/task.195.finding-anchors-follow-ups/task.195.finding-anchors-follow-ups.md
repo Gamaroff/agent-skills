@@ -423,27 +423,27 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-19
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
 
-- **Full Report**: [task.195.qa.4.finding-anchors-follow-ups.md](./task.195.qa.4.finding-anchors-follow-ups.md)
-- **Gate File**: [task.195.gate.4.finding-anchors-follow-ups.yml](./task.195.gate.4.finding-anchors-follow-ups.yml)
+- **Full Report**: [task.195.qa.5.finding-anchors-follow-ups.md](./task.195.qa.5.finding-anchors-follow-ups.md)
+- **Gate File**: [task.195.gate.5.finding-anchors-follow-ups.yml](./task.195.gate.5.finding-anchors-follow-ups.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 5965
+- **Tests Executed**: 5968
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-TASK-195-QA3-1 is fixed: a non-string anchor reads `unparseable` or `no-line`. The fix also treated a non-string `line_text` as absent, which turned a wrong quote into a clean `unchecked-text`. That regression is TASK-195-QA4-1 (medium).
+TASK-195-QA4-1 is fixed. One field reader, `fieldOf`, now decides `file_line`, `ref` and `line_text`. A non-string `line_text` reads `text-mismatch`, and only an absent or blank one is unchecked. The cycle 5 review found nothing. The security probe measured 43 cases with 0 reproduced and 0 escapes. Advisory items are carried to future work in the gate.
 
 ## Definition of Done - Gaps Identified
 
@@ -495,6 +495,7 @@ TASK-195-QA3-1 is fixed: a non-string anchor reads `unparseable` or `no-line`. T
 | 2026-10-19 |  | QA findings fixed — 1 of 1 (TASK-195-QA3-1: a non-string anchor reads unparseable / no-line), 1 iteration | qa-fix |
 | 2026-10-19 |  | QA gate CONCERNS (90/100) — 1 finding (TASK-195-QA4-1) | qa-task |
 | 2026-10-19 |  | QA findings fixed — 1 of 1 (TASK-195-QA4-1: a non-string line_text is a text-mismatch; one field reader for file_line, ref and line_text), 1 iteration | qa-fix |
+| 2026-10-19 |  | QA gate PASS (100/100) | qa-task |
 <!-- change-log-end -->
 
 ---
