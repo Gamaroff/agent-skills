@@ -306,24 +306,28 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-19
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.196.qa.3.pipeline-docs-qa-loop-and-artifacts.md](./task.196.qa.3.pipeline-docs-qa-loop-and-artifacts.md)
-- **Gate File**: [task.196.gate.3.pipeline-docs-qa-loop-and-artifacts.yml](./task.196.gate.3.pipeline-docs-qa-loop-and-artifacts.yml)
+- **Full Report**: [task.196.qa.4.pipeline-docs-qa-loop-and-artifacts.md](./task.196.qa.4.pipeline-docs-qa-loop-and-artifacts.md)
+- **Gate File**: [task.196.gate.4.pipeline-docs-qa-loop-and-artifacts.yml](./task.196.gate.4.pipeline-docs-qa-loop-and-artifacts.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 5969
 - **Phases Verified**: 7/7
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Cycle 3: gate-2 findings fixed. One medium: the troubleshooting no-code-moved remedy comes after the Step 7 restore. Two low.
+Four QA cycles. All gate 1–3 findings fixed. One LOW carried by the Cosmetic-residue exit (see Deferred Work).
+
+## Deferred Work
+
+- **CR4-1** (LOW) — carried to gate 4 `recommendations.future` (route 2b, cycle 4): day-3-messy-path.md lines 41 and 77 overstate what qa-story runs for an AC
 
 <!-- change-log-start -->
 ## Change Log
@@ -340,6 +344,7 @@ Cycle 3: gate-2 findings fixed. One medium: the troubleshooting no-code-moved re
 | 2026-10-19 |         | QA findings fixed — cycle 2, 7 findings (CR-1..CR-7) | qa-fix |
 | 2026-10-19 |         | QA gate CONCERNS (90/100) — 1 medium, 2 low findings | qa-task |
 | 2026-10-19 |         | QA findings fixed — cycle 3, 3 findings (CR3-1..CR3-3) | qa-fix |
+| 2026-10-19 |         | QA gate PASS (100/100) — 1 low finding, carried (route 2b) | qa-task |
 <!-- change-log-end -->
 
 ---
