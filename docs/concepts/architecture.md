@@ -135,11 +135,11 @@ sequenceDiagram
     DEV-->>DS: status: ready-for-review
     DS->>CPR: Step 4 — create PR (--base epic branch)
     DS->>QS: Step 5a — QA review → gate file
-    alt gate CONCERNS / FAIL
-        DS->>QF: Step 5b — qa-fix (shared 5-cycle budget)
+    alt gate has open top_issues[] (FAIL, or CONCERNS / PASS with open entries)
+        DS->>QF: Step 5b — qa-fix (shared cycle budget), after the convergence check and route classifier
         QF-->>QS: re-run QA
     end
-    DS->>RPR: Step 5c — PR conformance review (clean gate only)
+    DS->>RPR: Step 5c — PR conformance review (no open entry, or a route-2/2b exit)
     alt verdict REQUEST CHANGES
         RPR-->>DS: findings
         DS->>QF: back to 5b — consumes a cycle
@@ -150,10 +150,13 @@ sequenceDiagram
     DS-->>U: status: accepted
 ```
 
-**A clean QA gate no longer exits the loop on its own.** `PASS`/`WAIVED` hands to **Step 5c**, the
-PR conformance review, which is the only way out to Step 7: `REQUEST CHANGES` routes back to
-`qa-fix` and consumes a cycle from the same 5-cycle budget, while `APPROVE`/`CONCERNS` exit and
-signal `ready-for-merge`. 5c is a third member of a loop that already had two — the pipeline is
+**The loop routes on the gate's open findings, not its verdict token.** A gate with no open
+`top_issues[]` entry (`PASS`, `CONCERNS` or an active `WAIVED`), or a Diminishing-returns (route 2)
+or Cosmetic-residue (route 2b) exit, hands to **Step 5c**; only `FAIL`, or a gate with open entries,
+goes to `qa-fix`. 5c, the PR conformance review, is the only way out to Step 7: `REQUEST CHANGES`
+routes back to `qa-fix` and consumes a cycle from the same budget (`QA_MAX_CYCLES`, default 5), while
+`APPROVE`/`CONCERNS` exit and signal `ready-for-merge`. The routes and guards are defined in the
+Step 5–6 doc linked below. 5c is a third member of a loop that already had two — the pipeline is
 still eight steps.
 
 Reference: [`skills/develop-story/README.md`](../../skills/develop-story/README.md) and

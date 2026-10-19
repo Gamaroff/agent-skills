@@ -16,10 +16,12 @@ docs/tasks/
     ├── task.{N}.{name}.md                       # main document (human-authored)
     ├── task.{N}.plan.{name}.md                  # implementation plan
     ├── task.{N}.review.{N}.{name}.md            # review report (auto)
+    ├── task.{N}.pr-review.{N}.{name}.md         # PR review report (auto, Step 5c)
     ├── task.{N}.implementation.{N}.{name}.md    # pipeline report (auto)
     ├── task.{N}.qa.{N}.{name}.md                # QA assessment (auto)
     ├── task.{N}.dod.{N}.{name}.md               # definition of done (auto)
-    └── task.{N}.gate.{N}.{name}.yml             # QA gate decision (auto)
+    ├── task.{N}.gate.{N}.{name}.yml             # QA gate decision (auto)
+    └── sprint-review-summary.md                 # sprint review summary (auto, Step 7)
 ```
 
 The base path `docs/tasks/` is fixed — no configuration key overrides it.
@@ -110,6 +112,12 @@ The **Implementation Plan** section must contain a checkbox list. `develop-task`
 | QA report | `task.{N}.qa.{N}.{name}.md` | `qa-task` (Step 5) | QA assessment narrative |
 | Definition of Done | `task.{N}.dod.{N}.{name}.md` | `finalise` (Step 7) | DoD checklist outcome |
 | QA gate | `task.{N}.gate.{N}.{name}.yml` | `qa-task` / `qa-gate` | Machine-readable gate decision — **never modified by dev skills** |
+| Sprint review summary | `sprint-review-summary.md` | `finalise` (Step 7, accepted path only) | Sprint Review summary of the accepted task |
+| Bug report | `task.{N}.bug.{N}.{name}.md` | `create-bug-report` | A bug found in this task's work |
+| Continuation handoff | `task.{N}.handoff.{N}.{name}.md` | `session-handoff` (continue mode) | Hands in-flight work to a fresh context |
+| Tracker handover | `task.{N}.handover.{N}.{name}.{md,sh,json}` | `handover-render` | Tracker mutations a run deferred or could not make |
+
+The full naming list, including story and bug artifacts: [File naming](./file-naming.md).
 
 ## Status lifecycle
 

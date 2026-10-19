@@ -123,7 +123,7 @@ Produces one file per section under the same directory. See [`../../skills/shard
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Invoke**       | `"review epic <path>"` · `/review-epic <path>`                                                                                                |
 | **What it does** | Template compliance, scope-overlap detection with existing epics, architecture-doc alignment, codebase scan for already-implemented features. |
-| **Outputs**      | Co-located review report `epic.{P}.{E}.review.{YYYY-MM-DD}.md`.                                                                                   |
+| **Outputs**      | Co-located review report `epic.{P}.{E}.review.{n}.{name}.md`.                                                                                   |
 | **Pitfalls**     | The codebase scan often reveals duplicate work — don't ignore it. Resolve scope overlaps before writing stories.                              |
 | **Reference**    | [`../../skills/review-epic/SKILL.md`](../../skills/review-epic/SKILL.md)                                                                      |
 
@@ -161,7 +161,7 @@ Two options depending on how much human input you want:
 /review-story --validate <story-path>
 ```
 
-`review-story` produces a co-located review report `story.{P}.{E}.{S}.review.{n}.{name}.md`. Validate mode produces `story.{P}.{E}.{S}.validate.{YYYY-MM-DD}.md`. Both update the story's `status` once it's `ready-for-development`.
+`review-story` produces a co-located review report `story.{P}.{E}.{S}.review.{n}.{name}.md`. Standalone validate mode (`--validate`) produces `story.{P}.{E}.{S}.validate.{YYYY-MM-DD}.md` and is read-only — it never modifies the story. Interactive mode updates the story's `status` once the review is resolved; so does the validate-and-apply variant `develop-story` runs at Step 2.
 
 Reference: [`../../skills/review-story/SKILL.md`](../../skills/review-story/SKILL.md).
 
@@ -229,12 +229,12 @@ Three things to know if you pick it:
 | Step | Skill                 | What happens                                                                                                                                                        |
 | ---- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1    | `create-branch`       | Cuts the story branch from the Q1 base. If that base is an epic integration branch that does not exist yet, creates and pushes it from `develop` first.             |
-| 2    | `review-story`        | Runs the interactive review (skipped if the story was reviewed recently and is still `ready-for-development`).                                                      |
+| 2    | `review-story`        | Runs `review-story` in validate-and-apply mode (no questions). Skipped when a `story.{P}.{E}.{S}.review.*.md` report exists and the status is Ready for Development or In Progress. |
 | 3    | `develop`             | Implements the story. Bounded loop, `MAX_ITER=5`. Each iteration: plan → code → test → DoD check.                                                                   |
 | 4    | `create-pr`           | Pushes the branch, opens a PR with auto-generated description. `--base` is the Q2 answer, pre-supplied from Phase 0.                                                |
-| 5–6  | `qa-story` → `qa-fix` → `review-pr` | QA review produces a gate file (`PASS` / `CONCERNS` / `FAIL` / `WAIVED`). `qa-fix` runs on `FAIL`, or on an open `top_issues[]` entry that no active waiver covers; a gate in the accepting-route set (any of the QA loop's §5c five routes) hands to `review-pr`. Up to 5 cycles. **Step 5c is the loop's exit gate**: a gate in the accepting-route set hands to `review-pr`, which reviews the PR against the story. `REQUEST CHANGES` returns to `qa-fix` and consumes a cycle from the same 5-cycle budget; `APPROVE`/`CONCERNS` exit to Step 7. Leaves `story.{P}.{E}.{S}.pr-review.{n}.{name}.md`. |
+| 5–6  | `qa-story` → `qa-fix` → `review-pr` | QA review produces a gate file (`PASS` / `CONCERNS` / `FAIL` / `WAIVED`). `qa-fix` runs on `FAIL`, or on an open `top_issues[]` entry that no active waiver covers; a gate in the accepting-route set (any of the QA loop's §5c five routes) hands to `review-pr`. Up to `QA_MAX_CYCLES` cycles (default 5). **Step 5c is the loop's exit gate**: a gate in the accepting-route set hands to `review-pr`, which reviews the PR against the story. `REQUEST CHANGES` returns to `qa-fix` and consumes a cycle from the same cycle budget; `APPROVE`/`CONCERNS` exit to Step 7. Leaves `story.{P}.{E}.{S}.pr-review.{n}.{name}.md`. |
 | 7    | `finalise`            | Validates against the Definition of Done, posts DoD summary to the PR, comments the tracker issue, updates the board. **Runs full side-effects even in lite mode.** |
-| 8    | `commit-changes`      | Stages and commits any final artifacts (implementation report, DoD summary, status updates).                                                                        |
+| 8    | `commit-changes`      | Commits the final implementation report and pushes. The DoD summary and `status: accepted` were already committed by `/finalise` (6a). |
 
 Throughout, `develop-story` records every decision in a co-located implementation report: `story.{P}.{E}.{S}.implementation.{N}.{name}.md`.
 
@@ -250,7 +250,7 @@ Add `--lite` to skip pre-develop codebase mapping and other context-gathering fo
 
 ### Resume semantics
 
-If the pipeline is interrupted, re-invoke `/develop-story <same-path>`. The skill verifies per-step artifacts (branch exists? PR open? gate file present?) and resumes at the first incomplete step. It will not redo completed work.
+If the pipeline is interrupted, re-invoke `/develop-story <same-path>`. The skill verifies per-step artifacts (branch exists? PR open? gate file present?) and resumes at the first incomplete step. It will not redo completed work. After a Step 7 HALT with DoD `❌ GAPS` that you fixed with a **committed code change**, pick **"Re-enter QA at 5a"** (Recommended) when `/develop-story` offers it, so a QA gate reads the new head before acceptance; a document-only fix resumes at Step 7, and an uncommitted fix is refused (`uncommitted-fix`). See [Troubleshooting → Finalise halted with DoD gaps](../reference/troubleshooting.md#finalise-halted-with-dod-gaps-and-i-fixed-code).
 
 **Reference:** [`../../skills/develop-story/SKILL.md`](../../skills/develop-story/SKILL.md). See also: [`../../skills/develop-story/README.md`](../../skills/develop-story/README.md).
 
@@ -269,10 +269,10 @@ What the orchestrator invokes internally, top-down.
 | [`develop`](../../skills/develop/SKILL.md)               | Actual implementation loop (plan → code → test → DoD).             |
 | [`create-pr`](../../skills/create-pr/SKILL.md)           | Pushes branch, opens PR with `--base` = the Q2 answer.             |
 | [`qa-story`](../../skills/qa-story/SKILL.md)             | Produces QA gate file. Dev skills must not edit gate files.        |
-| [`qa-fix`](../../skills/qa-fix/SKILL.md)                 | Applies fixes for `FAIL` gates and for open `top_issues[]` entries no active waiver covers, and for `review-pr`'s `REQUEST CHANGES`. Up to 5 cycles. |
+| [`qa-fix`](../../skills/qa-fix/SKILL.md)                 | Applies fixes for `FAIL` gates and for open `top_issues[]` entries no active waiver covers, and for `review-pr`'s `REQUEST CHANGES`. Up to `QA_MAX_CYCLES` cycles (default 5). |
 | [`review-pr`](../../skills/review-pr/SKILL.md)           | Step 5c — the QA loop's exit gate. Reviews the PR against the story (conformance + code). Advisory: writes no gate file; the orchestrator acts on its verdict. |
 | [`finalise`](../../skills/finalise/SKILL.md)             | DoD check, PR comment, tracker comment, board update.              |
-| [`commit-changes`](../../skills/commit-changes/SKILL.md) | Final commit of artifacts and status updates.                      |
+| [`commit-changes`](../../skills/commit-changes/SKILL.md) | Final commit of the implementation report (`/finalise` committed the acceptance artifacts). |
 
 Inside `finalise`, the platform resolver picks one of:
 

@@ -22,7 +22,7 @@ This document is structured for two audiences:
 | **GitHub**               | `gh issue comment/close/view`, `gh pr view/comment`, board moves via `gh-stage.js --stage <moment>` (columns resolved from `tracker-workflow.yaml`; Priority auto-set inline), PR creation via `/create-pr`                                                                                                                                                                       |
 | **Jira**                 | `tracker-comment.js`, status moves via `jira-stage.js --stage <moment>` (columns resolved from `tracker-workflow.yaml`). Atlassian MCP (`getTransitionsForJiraIssue`, `transitionJiraIssue`, `getJiraIssue`) is the **fallback only**, used when the CLI reports `no-credentials`                                                                                                                                                                                                        |
 | **Subagents (Explore)**  | resolver, tracker state poller, lite-mode + always-load detector, pipeline-resume stale-context detector, pre-develop surface map, initial loop audit, per-iteration loop audit, test-failure triage, post-fix tracker state poller                                                                                                  |
-| **Hooks**                | `PreCompact` → `scripts/on-precompact.sh` (graceful pause: report append, commit, push, PR/issue comment, lock removal, `🛑 PIPELINE-PAUSE-SIGNAL` emission)                                                                                                                                                                         |
+| **Hooks**                | `PreCompact` → `scripts/on-precompact.sh` (graceful pause: report append, commit, push, PR/issue comment, lock removal, `🛑 PIPELINE-PAUSE-SIGNAL` emission); `Stop` → `scripts/on-stop.sh` (blocks a premature stop mid-pipeline with `decision: "block"`). Install both with `bash .agents/skills/develop-task/scripts/install-hooks.sh` |
 
 ### State changes
 
@@ -109,9 +109,14 @@ flowchart TD
 
     S4[Step 4: create-pr<br/>--base / --issue / --exclude report] --> S5
     S5[Step 5: qa-task<br/>lite directive if PIPELINE_MODE=lite]
-    S5 --> S5gate{Gate result}
-    S5gate -- PASS / WAIVED --> S5c[Step 5c: review-pr<br/>--effort medium, low if lite<br/>--comment]
-    S5gate -- CONCERNS / FAIL --> S6[Step 6: qa-fix]
+    S5 --> S5gate{Open top_issues entry?}
+    S5gate -- "no open entry, or an active WAIVED:<br/>PASS / CONCERNS / WAIVED" --> S5c[Step 5c: review-pr<br/>--effort medium, low if lite<br/>--comment]
+    S5gate -- "yes: FAIL, or open entries<br/>(no active waiver)" --> S5conv{Convergence check<br/>HIGH stopped falling, cycle ≥ 3?}
+    S5gate -- malformed gate --> HALTGATE[HALT: gate matches no arm]
+    S5conv -- yes --> HALTCONV[HALT: not converging]
+    S5conv -- no --> S5route{Route classifier<br/>classifyLoopRoute}
+    S5route -- route 2 / 2b exit --> S5c
+    S5route -- fix --> S6[Step 6: qa-fix]
     S5c --> S5cv{Verdict}
     S5cv -- REQUEST CHANGES<br/>commit only, push already spent --> S6
     S5cv -- APPROVE / CONCERNS --> S5cm[signal ready-for-merge] --> S7
@@ -121,17 +126,24 @@ flowchart TD
     S6commit --> S6poll[Post-fix tracker state poller subagent]
     S6poll --> S6prc{PR open?}
     S6prc -- merged/closed --> HALTPR[HALT: PR state diverged]
-    S6prc -- open --> S6cyc{cycle &lt; 5?}
+    S6prc -- open --> S6cyc{cycle &lt; QA_MAX_CYCLES?<br/>lock qa_max_cycles, default 5}
     S6cyc -- yes --> S5
-    S6cyc -- no --> HALTQA[HALT: QA loop limit reached]
+    S6cyc -- no --> S6half{Route 2c applies?<br/>cycle ≥ 3, last 5a fix ungated,<br/>HIGH 0, MEDIUM falling or 0}
+    S6half -- yes --> S5half[Half-cycle: 5a only, no 5b]
+    S5half -- no open entry --> S5c
+    S5half -- open entry --> HALTQA
+    S6half -- no --> HALTQA[HALT: QA loop limit reached]
+    HALTQA -.->|"resume: Resume at 5a with k more cycles<br/>grant-qa-cycles.sh"| S5
+    HALTCONV -.->|"resume: Resume at 5a with k more cycles<br/>grant-qa-cycles.sh re-enters at 5b"| S6
 
-    S7[Step 7: finalise<br/>DoD + tracker close + board Done] --> S7chk{All 3 artifacts?<br/>dod.N.md + status:accepted + PR comment}
+    S7[Step 7: finalise<br/>DoD + 6a acceptance commit + push<br/>CI readings 1 and 2 + tracker close + board Done] --> S7chk{All 3 artifacts?<br/>dod.N.md + status:accepted + PR comment}
     S7chk -- no --> HALT7[HALT: DoD gaps]
+    HALT7 -.->|"resume after a committed code fix:<br/>Re-enter QA at 5a, reenter-qa-after-finalise.sh"| S5
     S7chk -- yes --> S8
     S8[Step 8: commit-changes<br/>final report + push + remove lock] --> DONE([✅ Pipeline Complete])
 
     classDef halt fill:#7f1d1d,stroke:#fca5a5,color:#fef2f2
-    class HALT0,HALT2,HALT3,HALTSTALL,HALTMAX,HALTNOFIX,HALTPR,HALTQA,HALT7 halt
+    class HALT0,HALT2,HALT3,HALTSTALL,HALTMAX,HALTNOFIX,HALTPR,HALTQA,HALTCONV,HALTGATE,HALT7 halt
     classDef subagent fill:#1e3a8a,stroke:#93c5fd,color:#eff6ff
     class RES,FAN,S3pre,S3init,S3triage,S3audit,S6poll subagent
 ```
@@ -280,10 +292,10 @@ sequenceDiagram
     participant GH as GitHub / Jira
     participant Sum as .summaries/
 
-    H->>FS: find latest gate file<br/>ls task.{id}.gate.*.yml | sort -t. -k4 -n | tail -1
-    H->>H: cycle = (count of "### QA Cycle" entries) + 1<br/>(0 entries → 1; 2 entries → 3; etc.)
+    H->>FS: QA_CYCLE / LATEST_GATE from references/qa-cycle.sh<br/>(highest-numbered cycle, two files claiming one cycle refused)
+    H->>H: QA_MAX_CYCLES = lock qa_max_cycles (default 5)
 
-    loop cycle ≤ 5
+    loop cycle ≤ QA_MAX_CYCLES
         alt PIPELINE_MODE == lite
             H->>+Q: /qa-task {task-file}<br/>prefix: "Use direct tools only — lite mode"
         else standard
@@ -293,14 +305,14 @@ sequenceDiagram
         Q-->>-H: gate result
 
         H->>FS: read gate file
-        alt gate == PASS / WAIVED
+        alt no open top_issues entry (PASS / CONCERNS / active WAIVED), or a route 2 / 2b exit
             H->>+CC: /commit-changes<br/>"docs(task.{id}): QA cycle {N} gate + report"
             CC-->>-H: committed + pushed (cycle's one push)
             H->>+PR: /review-pr --effort {medium|low} --comment --no-code<br/>Step 5c — the loop's exit gate
             PR->>FS: write task.{id}.pr-review.{n}.*.md
             PR-->>-H: verdict
             alt verdict == REQUEST CHANGES
-                note right of H: back to 5b — same 5-cycle budget,<br/>counter incremented by 5b step 7
+                note right of H: back to 5b — same cycle budget,<br/>counter incremented by 5b step 7
                 H->>+F: /qa-fix {gate} + {pr-review report}
                 F-->>-H: returns (commit only — push already spent)
             else verdict == APPROVE / CONCERNS
@@ -309,7 +321,8 @@ sequenceDiagram
             else verdict == review failed
                 H->>H: HALT — 5c could not run (do NOT fall through to Step 7)
             end
-        else CONCERNS / FAIL / has top_issues
+        else FAIL or open entries (convergence check and route classifier passed)
+            note right of H: Convergence check escalates when HIGH stops falling (cycle ≥ 3)<br/>classifyLoopRoute sends a route 2 / 2b exit to 5c (branch above)<br/>a gate matching no arm HALTs
             H->>+F: /qa-fix {gate-file-path}
             F->>FS: edit code per gate findings
             F-->>-H: returns
@@ -339,12 +352,13 @@ sequenceDiagram
         end
     end
 
-    alt cycle > 5 without clearing 5c
+    alt cycle > QA_MAX_CYCLES without clearing 5c (after a route 2c half-cycle, when it applies)
         H->>FS: write escalation entry<br/>(per-cycle summaries, root cause, next steps)
         H->>+CC: docs(task.{id}): implementation report — qa loop escalation
         CC-->>-H: hash
         H->>GH: git push origin HEAD
         H->>H: HALT — QA loop limit reached
+        note right of H: resume offers "Resume at 5a with {k} more cycles"<br/>(grant-qa-cycles.sh writes extra_cycles_granted, qa_max_cycles)
     end
 ```
 
@@ -376,7 +390,7 @@ sequenceDiagram
         Hook->>Rep: append "Pipeline Paused — {ts}" entry
         Hook->>GH: git add report && git commit && git push
         Hook->>GH: gh pr comment {pr_url} (best-effort)
-        Hook->>GH: gh issue comment {tracker_issue} (GitHub only)
+        Hook->>GH: tracker-comment.js {tracker_issue} (GitHub or Jira, deferred under restricted access.tracker)
         Hook->>Lock: rm -f
         Hook-->>CC: additionalContext = "🛑 PIPELINE-PAUSE-SIGNAL …"
     end
@@ -396,6 +410,13 @@ sequenceDiagram
     alt blocking_issues non-empty
         H->>U: HALT — manual resolution required
     else
+        alt halt snapshot: loop-limit / not-converging
+            H->>U: offer "Resume at 5a with {k} more cycles"
+            H->>Lock: grant-qa-cycles.sh — extra_cycles_granted, qa_max_cycles, qa_phase<br/>(qa_phase 5a, or 5b after not-converging)
+        else halt_step 7, DoD ❌ GAPS (the script refuses a document-only or uncommitted fix)
+            H->>U: offer "Re-enter QA at 5a" (Recommended)
+            H->>Lock: reenter-qa-after-finalise.sh — current_step 5, qa_phase 5a
+        end
         H->>H: Phase 0b verify ✅ steps up to recommended_step - 1<br/>(per artifact-verification table)
         alt any artifact missing
             H->>H: re-run that step (idempotent sub-skills)
@@ -437,19 +458,21 @@ Every file the harness creates or mutates, with its lifecycle. Anchor for "did t
 | Artifact                 | Path pattern                                    | Created by                                                               | Mutated by                                                                                                                 | Terminal state                                  | Resume verification                                                                                          |
 | ------------------------ | ----------------------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | Pipeline lock            | `.claude/state/develop-pipeline.lock`           | Step 1 (end of)                                                          | Steps 2–8 banners (`current_step`), Step 4 (`pr_url`), PreCompact hook (rm), Step 8 (rm), terminal HALT (snapshot then rm) | absent at Step 8 success or HALT                | `cat ... \| jq` — read by resume detector                                                                    |
-| Halt snapshot            | `.claude/state/develop-pipeline.last-halt.json` | terminal HALT (snapshot of lock + `halted_at`/`halt_reason`/`halt_step`) | overwritten on subsequent terminal HALT; deleted by user choosing "Start fresh" on resume                                  | persists until next resume choice               | resume detector reads when active lock absent (`source: "halt_snapshot"`)                                    |
+| Halt snapshot            | `.claude/state/develop-pipeline.last-halt.json` | terminal HALT or PreCompact pause (snapshot of lock + `halted_at`/`halt_reason` on a HALT or `paused_at`/`pause_reason` on a pause, plus `halt_step`) | overwritten on a later HALT or pause; consumed by `--restore` on Resume, deleted on "Start fresh"                                         | persists until next resume choice               | resume detector reads when active lock absent (`source: "halt_snapshot"`)                                    |
 | Implementation report    | `task.{id}.implementation.{N}.{name}.md`        | Phase 0e                                                                 | every step (Pipeline Progress, Decisions Log, Issues Log, QA Iteration History, Subagent summary ref)                      | committed in Step 8                             | read for resume + last ✅ step                                                                               |
 | Feature branch           | `feature/task.{id}.*`                           | Step 1 via `/create-branch`                                              | dev commits, qa-fix commits, final commit                                                                                  | pushed in Step 8                                | `git branch --list`                                                                                          |
-| Review report            | `task.{id}.review.{YYYY-MM-DD}.md`              | Step 2 via `/review-task`                                                | —                                                                                                                          | committed in Step 8                             | optional (only if review ran)                                                                                |
-| Plan file                | `task.{id}.plan.*.md`                           | upstream (created by `/plan` or manual)                                  | —                                                                                                                          | unchanged by pipeline                           | mtime check vs task file (Plan Freshness)                                                                    |
+| Review report            | `task.{id}.review.{N}.{name}.md`                | Step 2 via `/review-task` (`{N}` from `next_numbered`)                   | —                                                                                                                          | committed with Step 4's commit                  | optional (only if review ran)                                                                                |
+| Plan file                | `task.{id}.plan.*.md`                           | `/create-task` (or relocated from an upstream plan)                      | —                                                                                                                          | unchanged by pipeline                           | mtime check vs task file (Plan Freshness)                                                                    |
 | Pre-develop summary      | `.summaries/step-3-pre-develop-map.json`        | Step 3 pre-develop                                                       | —                                                                                                                          | retained on disk (gitignored)                   | replayed instead of re-dispatching subagent                                                                  |
 | Test-output log          | `.claude/state/test-output-{ITER}-*.log`        | `/develop` inside Step 3                                                 | triage subagent reads                                                                                                      | `rm -f` on `TEST_EXIT==0`; retained on failure  | none (transient)                                                                                             |
 | Test-triage summary      | `.summaries/step-3-test-triage-{ITER}.json`     | Step 3, on test failure                                                  | —                                                                                                                          | retained on disk                                | replayed                                                                                                     |
-| QA report                | `task.{id}.qa.{N}.{name}.md`                    | Step 5 via `/qa-task`                                                    | —                                                                                                                          | committed in Step 8                             | resume requires both qa.N.md AND gate.N.yml AND PR comment for cycle N to be ✅                              |
-| Gate file                | `task.{id}.gate.{N}.{name}.yml`                 | Step 5 via `/qa-task`                                                    | only QA skills (read-only to dev)                                                                                          | committed in Step 8                             | latest gate sorted by `-t. -k4 -n`                                                                           |
+| QA report                | `task.{id}.qa.{N}.{name}.md`                    | Step 5 via `/qa-task`                                                    | —                                                                                                                          | committed per QA cycle (one commit + push)      | resume requires both qa.N.md AND gate.N.yml AND PR comment for cycle N to be ✅                              |
+| Gate file                | `task.{id}.gate.{N}.{name}.yml`                 | Step 5 via `/qa-task`                                                    | only QA skills (read-only to dev)                                                                                          | committed per QA cycle (one commit + push)      | `QA_CYCLE` / `LATEST_GATE` from `references/qa-cycle.sh`                                                     |
 | QA traceability matrix   | (not produced by `develop-task`)                | —                                                                        | —                                                                                                                          | —                                               | — (this subagent is `develop-story`-only)                                                                    |
 | Post-fix tracker summary | `.summaries/step-5-post-fix-tracker-{N}.json`   | Step 5b after every qa-fix push (one file per cycle N)                   | —                                                                                                                          | retained on disk (per cycle, never overwritten) | replayed                                                                                                     |
-| DoD summary              | `task.{id}.dod.{N}.{name}.md`                   | Step 7 via `/finalise`                                                   | —                                                                                                                          | committed in Step 8                             | required for ✅; `grep -iE '^status:\s*accepted'` on task file + `gh pr view --comments \| grep -i accepted` |
+| DoD summary              | `task.{id}.dod.{N}.{name}.md`                   | Step 7 via `/finalise`                                                   | —                                                                                                                          | committed + pushed by `/finalise` 6a            | required for ✅; `grep -iE '^status:\s*accepted'` on task file + `gh pr view --comments \| grep -i accepted` |
+| Sprint review summary    | `sprint-review-summary.md`                      | Step 7 via `/finalise` (accepted path only)                              | —                                                                                                                          | committed + pushed by `/finalise` 6a            | —                                                                                                            |
+| Task registry row        | `docs/tasks/task-registry.md`                   | `/create-task`                                                           | Step 7 `/finalise` ticks Status (`registry-tick.js`)                                                                       | committed + pushed by `/finalise` 6a            | `task-registry-drift.test.mjs`                                                                               |
 | PR                       | github.com/.../pull/{N}                         | Step 4 via `/create-pr`                                                  | qa-fix pushes, finalise comment                                                                                            | merged manually post-pipeline                   | `gh pr view --json state`                                                                                    |
 
 `.summaries/` is gitignored — these are runtime-local artifacts. Resume tolerates absence (in-flight pipelines started before the convention existed).
@@ -491,7 +514,7 @@ Same moments, same call sites, same off-by-default set — only the CLI differs.
 | Step 5b        | —                   | tracker state poller (Jira branch — board status read)                                              |
 | Step 7         | `done`              | `tracker-comment.js --stage done` + `jira-stage.js --stage done`                                   |
 | Terminal HALT  | `blocked`           | `jira-stage.js --stage blocked` — real blockage only. *Off by default.*                             |
-| Pause hook     | —                   | **silent** — Jira posting requires authenticated MCP, unavailable from shell context                |
+| Pause hook     | —                   | `tracker-comment.js` (best-effort; posts when `JIRA_*` credentials are in the hook's environment; deferred under restricted `access.tracker`) |
 
 ---
 

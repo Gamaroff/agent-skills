@@ -17,7 +17,7 @@ Automated orchestrator (preferred):
 ```
 develop-story [story-file-path]
   └── create-branch → review-story → develop → create-pr → qa-story
-        → qa-fix (up to 5 cycles) → review-pr (Step 5c, loop exit gate)
+        → qa-fix (up to QA_MAX_CYCLES cycles, default 5) → review-pr (Step 5c, loop exit gate)
         → finalise → commit-changes
 ```
 
@@ -35,7 +35,7 @@ Automated orchestrator (preferred):
 ```
 develop-task [task-file-path]
   └── create-branch → review-task → develop → create-pr → qa-task
-        → qa-fix (up to 5 cycles) → review-pr (Step 5c, loop exit gate)
+        → qa-fix (up to QA_MAX_CYCLES cycles, default 5) → review-pr (Step 5c, loop exit gate)
         → finalise → commit-changes
 ```
 
@@ -121,9 +121,10 @@ qa-story / qa-task → gate file
 Fix Cycle (if needed):
 qa-fix → code/test changes → ready for review
 
-# On a PASS/WAIVED gate the loop does not end — it hands to Step 5c:
-qa-story / qa-task (PASS/WAIVED) → review-pr → verdict
-  → qa-fix (REQUEST CHANGES, same 5-cycle budget)
+# On a gate with no open findings (PASS, CONCERNS or an active WAIVED), or a route-2/2b exit,
+# the loop does not end — it hands to Step 5c. Only FAIL or open findings go to qa-fix:
+qa-story / qa-task (no open findings) → review-pr → verdict
+  → qa-fix (REQUEST CHANGES, same cycle budget)
   → finalise (APPROVE / CONCERNS)
     ↓
 Done or repeat fix cycle

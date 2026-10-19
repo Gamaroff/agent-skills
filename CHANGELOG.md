@@ -6,6 +6,20 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The develop-pipeline docs match how the QA loop routes, resumes and commits (task 196).**
+  31 findings from the 2026-10-07 doc-drift audit are fixed across 15 docs: the concepts and
+  operations overviews, pipeline-artifacts, troubleshooting, the runbooks, task-documents, and the
+  develop-task, develop-story, develop-next, develop-batch and review-task READMEs.
+  - **QA-loop routing.** A gate with no open findings hands to Step 5c. The docs now cover the
+    Diminishing-returns, Cosmetic-residue and Gate-the-last-fix routes and use `QA_MAX_CYCLES`
+    instead of a literal 5.
+  - **Resume paths.** A not-converging grant re-enters at 5b. A `/finalise` DoD-gaps halt
+    followed by a committed code fix re-enters QA at 5a.
+  - **Artifacts and commit timing.** Review reports are numbered. The docs now cover `pr-review`
+    and `sprint-review-summary.md`, and say that QA reports, gates and the DoD are committed when
+    they are written, not at Step 8.
+  - **Merge gate and hooks.** The `develop-next`/`develop-batch` merge-gate wording is
+    corrected, and the `Stop` hook is listed.
 - **A QA gate no longer passes over probe escapes that `/finalise` halts on (obs #73).** The probe
   run record now totals `escaped` beside `executed` and `reproduced`, and `--emit-block` prints it
   for the whole record and for each control. `/qa-task` and `/qa-story` copy `totals.escaped` into
