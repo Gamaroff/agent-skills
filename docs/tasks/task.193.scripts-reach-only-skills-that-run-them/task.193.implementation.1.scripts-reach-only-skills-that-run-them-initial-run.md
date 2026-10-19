@@ -34,10 +34,10 @@ Classify the prose `shared/resources/<script>` literals in `shared/resources/*.m
 | 1. create-branch           | ✅ Done    | Branch `feature/task.193.*` exists in git                             | Branch created at `eb44b9c3`; pushed | —                    | 2026-10-19T08:17Z |
 | 2. review-task             | ✅ Done    | `task.193.review.{N}.{name}.md` exists (or skip logged)               | review.1 — READY TO IMPLEMENT 8/10; 1C/2I/2O fixed; Planned → Ready for Development | —                    | 2026-10-19T08:21Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (iter 1); 11 literals switched, 17 copies removed, guard test (6) added; `ci:fast` 5903/0 fail | —                    | 2026-10-19T08:29Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.193.qa.{N}.*.md`; `task.193.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.193.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #691: https://github.com/Gamaroff/agent-skills/pull/691 | —                    | 2026-10-19T08:31Z |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.193.qa.{N}.*.md`; `task.193.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 4 cycles (CONCERNS→CONCERNS→FAIL→PASS 92); PR review 1 APPROVE | — | 2026-10-19T09:11Z |
+| 7. finalise                | ✅ Done    | `task.193.dod.{N}.*.md`; task `status: accepted`                      | DoD 1 ACCEPTED; 8a security fix `097cfe8f`; CI 1 SUCCESS @ 097cfe8f, CI 2 SUCCESS (tree-eq) @ ee6ee8f6 | —                    | 2026-10-19T09:44Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Implementation report committed and pushed | —                    | 2026-10-19T09:44Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -127,6 +127,23 @@ Population: `shared/resources/*.md`, outside fences, `shared/resources/<name>.(s
 - **Mutation proofs** (each restored after): M1 drop an `ALLOWED` entry → §2 unlisted red; M2 loosen the running-line rule to "token anywhere before" → §1 control red (and §2 stale red); M3 remove an allowed literal from its doc → §2 stale red; M4 restore the old create-skill rule form → §3 red; M5 drop the rule sentence → §3 red; M6 disable the fence branch → §1 and §2 red. The incident-line mutation runs on every push as its own test (§2 mutation).
 - Change Log row written once (develop).
 
+### Step 4 — create-pr
+
+- SCOPE_PATHS: the work-item dir, `CHANGELOG.md`, `shared/resources`, `skills/develop-bug`, `skills/develop-bug/references`, `skills/{develop-story,develop-task,qa-story,qa-task,review-pr,review-story,review-task}/references`, plus `tests/shared-script-literals.test.js` (untracked, in a dir with no tracked change — added by hand per the step doc). Pre-flight held nothing. Leak check: 0.
+- `/create-pr` resolved to a generic user-level copy without `--scope`; the scoped staging and the two commits (`fix(task.193)…`, `docs(task.193)…`) were made by hand within SCOPE_PATHS, then `gh pr create --base develop`. Commits rebuilt once before the push to correct "18 copies" → 17 (develop-bug kept `pipeline-answers.js`).
+- PR created: https://github.com/Gamaroff/agent-skills/pull/691 (base `develop`, `Closes #592`). Post-PR state: OPEN (checked inline, no poller dispatch).
+- Tracker: in-review comment posted on #592; GitHub board: in-review → stage-disabled (not mapped in `tracker-workflow.yaml`).
+
+### Step 7 — finalise
+
+- DoD file `task.193.dod.1.scripts-reach-only-skills-that-run-them.md`. Four DoD agents: AC PASS (7/7), docs PASS, compliance NOT_APPLICABLE, security PASS on the checklist with `boundary: true`.
+- Security probe plan (Step 3b.1): 39 candidates against `isRun` and `isRunInFence`. 6 reproduced on `584edced`, all graded low by the security agent: an escaped backtick and a closed double-tick span read as span openers, a double-tick command span read as closed, and `time`/`do`/`then` matched as shell keywords outside command position (the gate 4 follow-up).
+- **Fix-and-recheck (Step 8a), `097cfe8f`**: code spans now match by backtick run length (CommonMark), an escaped backtick opens nothing, and a fenced shell keyword counts only at the line start or after shell punctuation. The guard's stale §1 header was corrected in the same edit. One new control test pins all six. Mutation proof: red on reverting the run-length matcher, and red on reverting the keyword anchor. Fast gate 5906/0. Evaluator exit 0 three times (the first halted on `mutation-proved` only). The probe re-run reproduced 0 of 39.
+- CI reading 1: SUCCESS @ `584edced` (decision); retaken on the fix head: SUCCESS @ `097cfe8f` (5 checks). CI reading 2: SUCCESS (tree-equivalent to `097cfe8fc71c`) @ `ee6ee8f6` (5 checks).
+- Acceptance commit `ee6ee8f6` carried the 5c PR review report and the probe records. Registry row 237 ticked (`planned` → `accepted`). 6d: task 193 is cited in CHANGELOG.
+- Canonical PR comment posted. Issue #592: the Document link was already on `develop`; done comment posted; closed (verified CLOSED); board `done` → `already`.
+- Deviation: the 8a fix was verified inline, not by a further QA cycle or an independent reviewer (DoD § Deviations).
+
 ---
 
 ## Issues Log
@@ -139,14 +156,78 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-10-19
+
+**Gate Result**: CONCERNS
+**Issues Found**: 1 open — CR-1 (medium): the guard exempts a cite-wrapped script literal that the bundler still copies (`ref_kind` cites only `.md`). Advisory: CR-2 (`RUN_PREFIX` reads English "source …"), CR-3 (`.sh` comment literals unscanned).
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 1 of 5)
+
+- `/qa-task` resolved to no registered skill in this session (Skill tool: "Unknown skill"); its `SKILL.md` was read from `.claude/skills/qa-task/` and followed directly.
+- Step 3b reviewer: one Explore subagent, 198,784 ms, 3 findings, all anchors `ok`. Traceability mapper skipped: Success Criteria is a checklist, not a table.
+
+**Fixes Applied**: CR-1 — the guard no longer exempts a cite-wrapped script literal (the bundler cites only `.md`); CR-2 — a literal is run only when the command opens a code span, paren or line. Task § 8 control spec and plan corrected. CR-3 left advisory (scope stated in the test header). Fast gate 5903/0 fail; both fixes mutation-proven (§1 red). `/qa-fix` was not a registered skill this session; its `SKILL.md` was followed directly. Changes-requested stage: stage-disabled. Post-fix PR state: OPEN (checked inline).
+**Commit**: `beb68968`
+
+### QA Cycle 2 — 2026-10-19
+
+**Gate Result**: CONCERNS
+**Issues Found**: 2 open — CR-1 (medium): nested `shared/resources/…/x.mjs` literals invisible to the guard; CR-2 (medium): `(source …)`, a line-initial `source` and a closing backtick still read as commands. Advisory: CR-4 (ALLOWED bundler sets unchecked), CR-5 (no extension end boundary). Pre-existing, routed to future: CR-3 (fenced quote at `probe-boundary-rule.md:66` copies a test file; identical on `origin/develop`).
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 2 of 5)
+
+- Cycle 2 refute pass (whole branch diff), one Explore reviewer, 175,030 ms. Gate 1 CR-1 verified fixed in a scratch worktree, and its premise confirmed by `npm run bundle:skill skills/qa-task`, which copies a cite-wrapped script. Convergence check: HIGH sequence `[0, 0]`, precondition `HIGH_N > 0` unmet → no trip.
+
+**Fixes Applied**: CR-1 — the guard matches with the bundler's `SHARED_REF_RE` (nested paths), trimmed as `split_fragment` does, script extensions only (also CR-5). CR-2 — a command must open the code span or a `$(`. CR-4 — `ALLOWED` entries carry bundler sets, checked against the tree. CR-3 left as pre-existing follow-up. Fast gate 5904/0 fail; five mutations each red (one survived first — no fixture had a closing backtick right before a command word — and a fixture was added). Changes-requested: stage-disabled. PR state: OPEN.
+**Commit**: `53f72587`
+
+### QA Cycle 3 — 2026-10-19
+
+**Gate Result**: FAIL
+**Issues Found**: 1 open — CR-1 (high): the guard exempts every fenced literal, but the bundler copies from fences; live at `probe-boundary-rule.md:66` (copies a test file into qa-story, qa-task) and `develop-pipeline-step-0-resolve-and-prepare.md:251`. Advisory: CR-2 (cite-only holder would be a false failure; no live case), CR-3 (per-line backtick parity), CR-4 (CHANGELOG overstates).
+**HIGH findings**: 1
+**MEDIUM findings**: 0
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 3 of 5)
+
+- Scoped re-review (files changed since gate 2's head `beb68968`), one Explore reviewer, 129,334 ms. Gate 2's CR-1, CR-2, CR-4 and CR-5 were verified fixed against real documents in a scratch worktree.
+- Cycle 2 routed this finding to follow-up as outside the task's population. That was a misjudgement: it is the task's own defect class, and the bundler reads fences. Task status → `in-progress`.
+- Convergence check: HIGH `[0, 0, 1]`; `HIGH_{N-2} > 0` is unmet, so no trip. Route classifier: `continue (not-a-pass-gate)`. Third-strike: no file has 3 consecutive HIGH gates.
+
+**Fixes Applied**: CR-1 — fenced literals classified (shell-position run rule); `probe-boundary-rule.md:66` and step-0:251 now use the bare filename; 4 more copies removed (21 total); develop-task and develop-story `SKILL.md` name `references/resolve-paths.sh`. CR-2 — a bundler must also hold the script. CR-4 — CHANGELOG reworded. CR-3 not changed (advisory). Fast gate 5905/0 fail; five mutations each red (the cite-only one is a probe, not a held test). PR state: OPEN.
+**Commit**: `e82c3425`
+
+### QA Cycle 4 — 2026-10-19
+
+**Gate Result**: PASS
+**Issues Found**: 0 open. Follow-ups (not promoted): CR-1 low/medium — fenced shell rule reads `time. `, `do. `, `(source ` as commands, no live case; CR-2 cleanup — stale §1 header.
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: APPROVE — `task.193.pr-review.1.scripts-reach-only-skills-that-run-them.md` (conformance only, `--no-code`; 1 low finding PC-1, recorded not fixed — APPROVE carries no 5c fixes)
+**Carried to 6a**: docs/tasks/task.193.scripts-reach-only-skills-that-run-them/task.193.pr-review.1.scripts-reach-only-skills-that-run-them.md
+**Loop exit**: n/a — PASS with empty `top_issues` hands to 5c (classifier: continue (high-findings-remain), not consulted on this arm)
+**Action**: Proceeding to 5c (PR conformance review) → APPROVE; exit loop to Step 7
+
+- Process note: the PC-1 doc fix was first applied before the classify block ran. It was reverted to `HEAD` and recorded instead, per the APPROVE arm.
+- Scoped re-review (files changed since gate 3's head `53f72587`), one Explore reviewer, 174,363 ms. It found no remaining runner of the four removed copies.
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-10-19T09:44Z
+**Final Status**: Completed
 **Branch**: `feature/task.193.scripts-reach-only-skills-that-run-them`
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/691
+**QA Iterations**: 4
+**DoD Summary**: `task.193.dod.1.scripts-reach-only-skills-that-run-them.md` — ACCEPTED
+**Tracker debt**: none
+
+**Completion Summary**: Implemented a guard (`tests/shared-script-literals.test.js`) that fails on a `shared/resources/` script literal named in prose. Prose literals were switched to bare filenames, 21 bundled copies that no skill runs were removed, and develop-bug, develop-story and develop-task `SKILL.md` now name the scripts they run. It took four QA cycles. Cycle 3's FAIL caught fenced literals being exempt, and closing that removed four more copies. `/finalise` fixed six low-severity misreads, found by the security probe, through one bounded fix-and-recheck (`097cfe8f`). One low PR-review note (task § 8 Pin wording, PC-1) is recorded as a follow-up.
