@@ -229,12 +229,16 @@ copies. **Depends on**: Phase 1.
 
 - **Command**: `command node --test tests/shared-script-literals.test.js`
 - **Population definition** (the test re-measures it): every `shared/resources/*.md`; per line, outside
-  a fenced block, matches of `(?<![\w-]/)shared/resources/([A-Za-z0-9_.-]+\.(sh|js|mjs))` that are not
-  **run**, inside `<!-- cite: … -->` or not (QA cycle 1, CR-1). A literal is run when a command token sits **immediately**
-  before it, optionally behind one quote or backtick: `bash `, `sh `, `source `, `node `, `command node `,
-  `require(`, `import(`, or a JS `import … from `. A token anywhere else on the line does not count:
-  `Engine source:`, English "from" and "sourceable" are prose (review 1, I1 — 18 of the 20 lines the
-  looser "anywhere before" rule called running were prose).
+  a fenced block, every target the bundler's own `SHARED_REF_RE` captures (nested paths included — QA cycle 2,
+  CR-1), trimmed as `split_fragment` trims it and ending in `.sh`, `.js` or `.mjs`, that is not **run**, inside
+  `<!-- cite: … -->` or not (QA cycle 1, CR-1). A literal is run when a command sits **immediately** before it:
+  inside `require(` / `import(`, after `$(`, or at the start of a code span the literal sits in (`bash `, `sh `,
+  `source `, `node `, `command node `, with flags, or `import … from `), optionally behind one quote and a `./`.
+  A backtick opens a span only when an even number precede it. Anything else is prose: `Engine source:`, English
+  "from" and "sourceable" (review 1, I1 — 18 of the 20 lines the looser "anywhere before" rule called running
+  were prose), and a parenthetical or line-initial `source`, or a closing backtick (QA cycles 1–2, CR-2).
+- **Bundler sets**: each `ALLOWED` entry lists the skills that bundle its document, checked against the tree, so a
+  new bundler fails until it is confirmed to run the script (QA cycle 2, CR-4).
 - **Control case**: a fixture document with one prose literal, one ``Engine source: `shared/resources/x.js` ``
   line, one ``wrap it with f from `shared/resources/x.sh` `` line and one in a cite wrapper (all four must
   fail — the bundler cites only an `.md` target, so a cite-wrapped script is still a dependency; QA cycle 1,
@@ -337,19 +341,19 @@ None.
 
 ### QA Report
 
-- **Full Report**: [task.193.qa.1.scripts-reach-only-skills-that-run-them.md](./task.193.qa.1.scripts-reach-only-skills-that-run-them.md)
-- **Gate File**: [task.193.gate.1.scripts-reach-only-skills-that-run-them.yml](./task.193.gate.1.scripts-reach-only-skills-that-run-them.yml)
+- **Full Report**: [task.193.qa.2.scripts-reach-only-skills-that-run-them.md](./task.193.qa.2.scripts-reach-only-skills-that-run-them.md)
+- **Gate File**: [task.193.gate.2.scripts-reach-only-skills-that-run-them.yml](./task.193.gate.2.scripts-reach-only-skills-that-run-them.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 25 (plus `ci:fast` 5903 at Step 3)
+- **Tests Executed**: 6 (guard) plus `ci:fast` 5903 on `beb68968`
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
 
-CR-1 (medium): the guard exempts a cite-wrapped script literal, which the bundler still copies. CR-2 and CR-3 are advisory.
+Cycle 1's CR-1 is fixed. The cycle-2 refute pass found the guard blind to nested `shared/resources/…` paths (CR-1) and to three prose shapes the run rule exempts (CR-2). A fenced quote copying a test file is pre-existing and routed to follow-up (CR-3).
 
 <!-- change-log-start -->
 ## Change Log
@@ -362,6 +366,8 @@ CR-1 (medium): the guard exempts a cite-wrapped script literal, which the bundle
 | 2026-10-19 |  | Implemented — 11 literals switched, 17 bundled copies removed, 1 SKILL.md reference, 1 new test file (6 tests), CHANGELOG | develop |
 | 2026-10-19 |  | QA gate CONCERNS (90/100) — 1 finding (CR-1), 2 advisory | qa-task |
 | 2026-10-19 |  | QA fix cycle 1 — CR-1: a cite wrapper no longer exempts a script literal; CR-2: the run rule needs the command to open a code span or line; § 8 control spec corrected to match | qa-fix |
+| 2026-10-19 |  | QA gate CONCERNS (90/100) — 2 findings (CR-1 nested paths, CR-2 run rule); 2 advisory, 1 pre-existing | qa-task |
+| 2026-10-19 |  | QA fix cycle 2 — CR-1: the guard matches what the bundler captures (nested paths, trimmed, script extensions only); CR-2: a command must open the code span or `$(`; CR-4: ALLOWED entries name their bundler sets, checked against the tree; § 8 restated | qa-fix |
 <!-- change-log-end -->
 
 ---

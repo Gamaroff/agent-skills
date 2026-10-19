@@ -91,7 +91,7 @@ const ALLOWED = {
 ```
 
 - Scan per the task's § 8 population definition. Track fences with `fenceStep` from
-  `tests/lib/markdown-section.js`. **Running line = a command token immediately before the path**
+  `tests/lib/markdown-section.js`. **Running line = a command token immediately before the path** (QA cycles 1–2 narrowed this to a command opening the code span the path sits in, or `$(`; task § 8 and the test hold the current rule)
   (`bash `, `sh `, `source `, `node `, `command node `, `require(`, `import(`, JS `import … from `,
   optionally behind one quote/backtick) — never "a token anywhere earlier on the line", which passes
   `Engine source: \`shared/resources/x.js\`` prose (review 1, I1).

@@ -179,9 +179,12 @@ All notable changes to this project will be documented in this file. Format foll
   `report-lint.js` and `tracker-comment.js` from review-pr. develop-bug, which runs
   `pipeline-answers.js` from its own step-0 document, now names it in `SKILL.md`. The new
   `tests/shared-script-literals.test.js` fails on a prose script literal that is not in its
-  allowlist, where each of the 23 entries states why every bundling skill needs the copy, and on an
-  entry that no longer matches a line. A literal counts as run only when a command sits immediately
-  before it, so `Engine source: …` prose does not pass as a command. The same test pins
+  allowlist, where each of the 23 entries names the skills that bundle its document and why each
+  needs the copy. It also fails on an entry that no longer matches a line, and on a skill that starts
+  bundling the document without being added. It sees what the bundler sees, including nested paths
+  and `<!-- cite: -->`-wrapped scripts (a cite of a script is still a dependency). A literal counts
+  as run only when a command opens the code span it sits in, or a `$(…)`, so `Engine source: …` or
+  `(source …)` prose does not pass as a command. The same test pins
   create-skill's rule sentence in the wording the bundler cannot rewrite.
 
 - **The QA read-back now checks this cycle's verdict, and waits out a moment's `.git/index.lock`

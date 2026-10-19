@@ -19,8 +19,9 @@
  *
  * Three parts:
  *   §1 CONTROL — the scanner on inline fixtures: plain prose, an
- *      `Engine source:` line, prose "source"/"import … from" and a cite wrapper
- *      must be reported; a fenced line and a command line must not. A scanner
+ *      `Engine source:` line, prose "source"/"import … from", a cite wrapper and
+ *      a nested path must be reported; a fenced line, a command that opens a
+ *      code span or `$(`, and a non-script must not. A scanner
  *      that over- or under-fires is caught here before it judges the real tree.
  *
  * A cite wrapper is no exemption here. The bundler cites only a `.md` target
@@ -30,8 +31,8 @@
  * Scope: `shared/resources/*.md`, the task's population. A literal in a shared
  * `.sh` comment propagates the same way and is not read here (QA cycle 1, CR-3).
  *   §2 LIVE TREE — every reported literal is in ALLOWED (each entry carries the
- *      reason every bundling skill needs the copy), every ALLOWED entry still
- *      matches a line, and the incident line restored into the resume contract is
+ *      skills that bundle its doc, checked against the tree, and the reason each
+ *      needs the copy), every ALLOWED entry still matches a line, and the incident line restored into the resume contract is
  *      reported (the mutation proof, run on every push).
  *   §3 PIN — create-skill's rule paragraph keeps its unbundled wording (obs #175,
  *      #289).
@@ -48,74 +49,226 @@ const { fenceStep, sectionOf } = require("./lib/markdown-section.js");
 const REPO_ROOT = path.resolve(__dirname, "..");
 const SHARED = path.join(REPO_ROOT, "shared", "resources");
 
-/** SHARED_REF_RE in bundle_skill.py, narrowed to the script extensions this guard owns. */
-const SCRIPT_LITERAL =
-  /(?<![\w-]\/)shared\/resources\/([A-Za-z0-9_.-]+\.(?:sh|js|mjs))/g;
-
 /**
- * A literal is RUN when a command sits immediately before it, optionally behind
- * one quote or backtick. The command must open a code span, a `(` / `$(` or the
- * line, and may carry flags; `import … from` must sit inside one code span. A
- * token anywhere else does not count: "Engine source:", English "from" and
- * "sourceable" are prose, and an "anywhere before" rule passed 18 such lines
- * (task.193 review 1, I1). So is "the single source `…`" (QA cycle 1, CR-2).
+ * SHARED_REF_RE in bundle_skill.py, verbatim: what the bundler captures is what
+ * it copies, nested paths included (`shared/resources/tests/x.test.mjs`). A
+ * narrower class missed those (QA cycle 2, CR-1). The capture is then trimmed
+ * as quick_validate.py's split_fragment does and kept only for a script.
  */
-const RUN_PREFIX =
-  /(?:(?:^|[`(])\s*(?:command\s+)?(?:bash|sh|source|node)\s+(?:-\S+\s+)*|require\(\s*|import\(\s*|`[^`]*\bimport\b[^`]*\bfrom\s+)["'`]?(?:\.\/)?$/;
+const SHARED_REF = /(?<![\w-]\/)(?:\.\.\/)*shared\/resources\/([^\s`'")\]*]+)/g;
+const SCRIPT_EXT = /\.(?:sh|js|mjs)$/;
+
+/** The script a SHARED_REF match names, or null (split_fragment, then the extension). */
+function scriptOf(raw) {
+  const name = raw
+    .replace(/[.,;:]+$/, "")
+    .split("#")[0]
+    .replace(/[.,;:]+$/, "");
+  return SCRIPT_EXT.test(name) ? name : null;
+}
+
+/** Every script literal on one line, with where it starts. */
+function scriptLiterals(line) {
+  const out = [];
+  for (const m of line.matchAll(SHARED_REF)) {
+    const script = scriptOf(m[1]);
+    if (script) out.push({ index: m.index, script });
+  }
+  return out;
+}
 
 /**
- * Each "<doc>:<script>" whose prose literal stays, with the reason every skill
- * that bundles <doc> needs <script> bundled. A witness is a line that runs THAT
- * skill's own copy (task.193 Phase 1; the classification is in the task's
- * implementation report).
+ * A literal is RUN when a command sits immediately before it: inside `require(`
+ * or `import(`, after `$(`, or at the start of a code span the literal sits in
+ * (`bash …`, `command node --test …`, `import … from …`), optionally behind one
+ * quote and a `./`. A backtick opens a span only when an even number precede it
+ * on the line. Anything else is prose: "Engine source:", English "from",
+ * "sourceable" (task.193 review 1, I1), "the single source `…`" (QA cycle 1,
+ * CR-2), and "(source `…`)", a line that wraps to "source `…`" or a closing
+ * backtick read as an opening one (QA cycle 2, CR-2).
+ */
+const CALL_BEFORE = /(?:require|import)\(\s*["'`]?(?:\.\/)?$/;
+const COMMAND = String.raw`(?:command\s+)?(?:bash|sh|source|node)\s+(?:-\S+\s+)*["']?(?:\.\/)?`;
+const SUBSHELL_BEFORE = new RegExp(String.raw`\$\(\s*` + COMMAND + "$");
+const SPAN_COMMAND = new RegExp("^\\s*" + COMMAND + "$");
+const SPAN_IMPORT = /^\s*import\b.*\bfrom\s+["']?(?:\.\/)?$/;
+
+function isRun(prefix) {
+  if (CALL_BEFORE.test(prefix) || SUBSHELL_BEFORE.test(prefix)) return true;
+  const tick = prefix.lastIndexOf("`");
+  if (tick === -1) return false;
+  const opens = (prefix.slice(0, tick).match(/`/g) || []).length % 2 === 0;
+  const span = prefix.slice(tick + 1);
+  return opens && (SPAN_COMMAND.test(span) || SPAN_IMPORT.test(span));
+}
+
+/**
+ * Each "<doc>:<script>" whose prose literal stays, with the skills that bundle
+ * <doc> and the reason every one of them needs <script> bundled. A witness is a
+ * line that runs THAT skill's own copy (task.193 Phase 1; the classification is
+ * in the task's implementation report). `bundlers` is checked against the tree:
+ * a skill that starts bundling <doc> gets the copy too, so it fails here until
+ * someone confirms it runs the script (QA cycle 2, CR-4). `"*"` is for
+ * platform-detection.md only — the resolver spec every platform-aware skill
+ * bundles because it sources the resolver it describes.
  */
 const ALLOWED = {
-  "develop-pipeline-autonomous-defaults.md:resolve-platform.sh":
-    "all nine bundlers (develop-*, qa-fix, qa-*, review-pr/story/task) source their own resolve-platform.sh; e.g. develop-pipeline-hooks.md's `source references/resolve-platform.sh`",
-  "develop-pipeline-step-2-review.md:review-report-freshness.js":
-    "develop-story and develop-task require their own copy in the Step 2 freshness gate",
-  "develop-pipeline-step-2-review.md:tracker-comment.js":
-    "develop-story and develop-task post every pipeline comment through it",
-  "develop-pipeline-step-3-develop-loop.md:tracker-comment.js":
-    "develop-bug, develop-story and develop-task post every pipeline comment through it",
-  "develop-pipeline-step-4-create-pr.md:gh-stage.js":
-    "develop-bug, develop-story and develop-task move the board at Step 4 through it",
-  "develop-pipeline-step-4-create-pr.md:tracker-comment.js":
-    "develop-bug, develop-story and develop-task post the PR-opened comment through it",
-  "develop-pipeline-step-5-6-qa-loop.md:gh-stage.js":
-    "develop-story and develop-task (its only bundlers) move the board through it",
-  "develop-pipeline-step-5-6-qa-loop.md:grant-qa-cycles.sh":
-    "develop-story and develop-task (its only bundlers) run it from SKILL.md on a QA-loop re-entry",
-  "develop-pipeline-step-5-6-qa-loop.md:qa-diminishing-returns.js":
-    "develop-story and develop-task (its only bundlers) run it in the QA loop",
-  "develop-pipeline-step-5-6-qa-loop.md:set-qa-phase.sh":
-    "develop-story and develop-task (its only bundlers) run it at each QA sub-step",
-  "develop-pipeline-step-7-finalise.md:stakeholder-summary-cli.js":
-    "all six bundlers render leads through it (the PreCompact hook and the Step 7 comments)",
-  "develop-pipeline-step-7-finalise.md:tracker-issue.js":
-    "all six bundlers close or reopen the tracker issue through it (tracker-issue-cli.md)",
-  "develop-pipeline-step-8-commit.md:report-lint.js":
-    "develop-bug, develop-story and develop-task lint the report at every step transition",
-  "finalise-dod-security-prompt.md:security-input-corpus.mjs":
-    "finalise, qa-story and qa-task load it through their own security-probe.mjs",
-  "finalise-dod-security-prompt.md:security-probe.mjs":
-    'finalise\'s security-probe-plan.mjs runs the engine beside itself (path.join(HERE, "security-probe.mjs")); qa-story and qa-task run it from SKILL.md',
-  "jira-transition-protocol.md:jira-stage.js":
-    "all seven bundlers move Jira cards through it",
-  "platform-detection.md:resolve-platform.sh":
-    "every bundler sources its own resolve-platform.sh before branching on platform",
-  "platform-detection.md:bitbucket-auth.sh":
-    "every bundler's copy of platform-detection.md sources its own bitbucket-auth.sh on the Bitbucket arm",
-  "qa-runnable-prose-detection.md:qa-execute-snippets.mjs":
-    "all five bundlers run it to execute fenced snippets",
-  "security-input-corpus.md:security-input-corpus.mjs":
-    "all four bundlers load it through their own security-probe.mjs",
-  "security-review-prompt.md:security-input-corpus.mjs":
-    "review-security (its only bundler) loads it through security-probe.mjs",
-  "security-review-prompt.md:security-probe.mjs":
-    "review-security (its only bundler) runs it from the bundled prompt",
-  "tracker-state-poller-subagent.md:resolve-platform.sh":
-    "all six bundlers source their own resolve-platform.sh",
+  "develop-pipeline-autonomous-defaults.md:resolve-platform.sh": {
+    bundlers: [
+      "develop-bug",
+      "develop-story",
+      "develop-task",
+      "qa-fix",
+      "qa-story",
+      "qa-task",
+      "review-pr",
+      "review-story",
+      "review-task",
+    ],
+    reason:
+      "all nine bundlers (develop-*, qa-fix, qa-*, review-pr/story/task) source their own resolve-platform.sh; e.g. develop-pipeline-hooks.md's `source references/resolve-platform.sh`",
+  },
+  "develop-pipeline-step-2-review.md:review-report-freshness.js": {
+    bundlers: ["develop-story", "develop-task"],
+    reason:
+      "develop-story and develop-task require their own copy in the Step 2 freshness gate",
+  },
+  "develop-pipeline-step-2-review.md:tracker-comment.js": {
+    bundlers: ["develop-story", "develop-task"],
+    reason:
+      "develop-story and develop-task post every pipeline comment through it",
+  },
+  "develop-pipeline-step-3-develop-loop.md:tracker-comment.js": {
+    bundlers: ["develop-bug", "develop-story", "develop-task"],
+    reason:
+      "develop-bug, develop-story and develop-task post every pipeline comment through it",
+  },
+  "develop-pipeline-step-4-create-pr.md:gh-stage.js": {
+    bundlers: ["develop-bug", "develop-story", "develop-task"],
+    reason:
+      "develop-bug, develop-story and develop-task move the board at Step 4 through it",
+  },
+  "develop-pipeline-step-4-create-pr.md:tracker-comment.js": {
+    bundlers: ["develop-bug", "develop-story", "develop-task"],
+    reason:
+      "develop-bug, develop-story and develop-task post the PR-opened comment through it",
+  },
+  "develop-pipeline-step-5-6-qa-loop.md:gh-stage.js": {
+    bundlers: ["develop-story", "develop-task"],
+    reason:
+      "develop-story and develop-task (its only bundlers) move the board through it",
+  },
+  "develop-pipeline-step-5-6-qa-loop.md:grant-qa-cycles.sh": {
+    bundlers: ["develop-story", "develop-task"],
+    reason:
+      "develop-story and develop-task (its only bundlers) run it from SKILL.md on a QA-loop re-entry",
+  },
+  "develop-pipeline-step-5-6-qa-loop.md:qa-diminishing-returns.js": {
+    bundlers: ["develop-story", "develop-task"],
+    reason:
+      "develop-story and develop-task (its only bundlers) run it in the QA loop",
+  },
+  "develop-pipeline-step-5-6-qa-loop.md:set-qa-phase.sh": {
+    bundlers: ["develop-story", "develop-task"],
+    reason:
+      "develop-story and develop-task (its only bundlers) run it at each QA sub-step",
+  },
+  "develop-pipeline-step-7-finalise.md:stakeholder-summary-cli.js": {
+    bundlers: [
+      "develop-bug",
+      "develop-story",
+      "develop-task",
+      "qa-story",
+      "qa-task",
+      "review-pr",
+    ],
+    reason:
+      "all six bundlers render leads through it (the PreCompact hook and the Step 7 comments)",
+  },
+  "develop-pipeline-step-7-finalise.md:tracker-issue.js": {
+    bundlers: [
+      "develop-bug",
+      "develop-story",
+      "develop-task",
+      "qa-story",
+      "qa-task",
+      "review-pr",
+    ],
+    reason:
+      "all six bundlers close or reopen the tracker issue through it (tracker-issue-cli.md)",
+  },
+  "develop-pipeline-step-8-commit.md:report-lint.js": {
+    bundlers: ["develop-bug", "develop-story", "develop-task"],
+    reason:
+      "develop-bug, develop-story and develop-task lint the report at every step transition",
+  },
+  "finalise-dod-security-prompt.md:security-input-corpus.mjs": {
+    bundlers: ["finalise", "qa-story", "qa-task"],
+    reason:
+      "finalise, qa-story and qa-task load it through their own security-probe.mjs",
+  },
+  "finalise-dod-security-prompt.md:security-probe.mjs": {
+    bundlers: ["finalise", "qa-story", "qa-task"],
+    reason:
+      'finalise\'s security-probe-plan.mjs runs the engine beside itself (path.join(HERE, "security-probe.mjs")); qa-story and qa-task run it from SKILL.md',
+  },
+  "jira-transition-protocol.md:jira-stage.js": {
+    bundlers: [
+      "develop-bug",
+      "develop-story",
+      "develop-task",
+      "finalise",
+      "qa-story",
+      "qa-task",
+      "review-pr",
+    ],
+    reason: "all seven bundlers move Jira cards through it",
+  },
+  "platform-detection.md:resolve-platform.sh": {
+    bundlers: "*",
+    reason:
+      "every bundler sources its own resolve-platform.sh before branching on platform",
+  },
+  "platform-detection.md:bitbucket-auth.sh": {
+    bundlers: "*",
+    reason:
+      "every bundler's copy of platform-detection.md sources its own bitbucket-auth.sh on the Bitbucket arm",
+  },
+  "qa-runnable-prose-detection.md:qa-execute-snippets.mjs": {
+    bundlers: [
+      "develop-story",
+      "develop-task",
+      "double-check",
+      "qa-story",
+      "qa-task",
+    ],
+    reason: "all five bundlers run it to execute fenced snippets",
+  },
+  "security-input-corpus.md:security-input-corpus.mjs": {
+    bundlers: ["finalise", "qa-story", "qa-task", "review-security"],
+    reason: "all four bundlers load it through their own security-probe.mjs",
+  },
+  "security-review-prompt.md:security-input-corpus.mjs": {
+    bundlers: ["review-security"],
+    reason:
+      "review-security (its only bundler) loads it through security-probe.mjs",
+  },
+  "security-review-prompt.md:security-probe.mjs": {
+    bundlers: ["review-security"],
+    reason:
+      "review-security (its only bundler) runs it from the bundled prompt",
+  },
+  "tracker-state-poller-subagent.md:resolve-platform.sh": {
+    bundlers: [
+      "develop-bug",
+      "develop-story",
+      "develop-task",
+      "qa-story",
+      "qa-task",
+      "review-pr",
+    ],
+    reason: "all six bundlers source their own resolve-platform.sh",
+  },
 };
 
 /** Non-vacuity floors: shared/resources held 59 .md files at authoring time. */
@@ -135,12 +288,12 @@ function scan(text) {
     const isFenced = open !== null || step.isFence;
     open = step.open;
     if (isFenced) {
-      fenced += [...line.matchAll(SCRIPT_LITERAL)].length;
+      fenced += scriptLiterals(line).length;
       return;
     }
-    for (const m of line.matchAll(SCRIPT_LITERAL)) {
-      if (RUN_PREFIX.test(line.slice(0, m.index))) continue;
-      found.push({ line: i + 1, script: m[1], text: line.trim() });
+    for (const { index, script } of scriptLiterals(line)) {
+      if (isRun(line.slice(0, index))) continue;
+      found.push({ line: i + 1, script, text: line.trim() });
     }
   });
   return { found, fenced };
@@ -180,13 +333,33 @@ test("§1 control: the scanner reports prose and nothing else", () => {
     "Load it with `node -e 'require(\"./shared/resources/i.js\")'`.",
     "Then `command node --test shared/resources/j.mjs` runs it.",
     "Lift it with `import { x } from 'shared/resources/k.mjs'`.",
+    "The test is `shared/resources/tests/l.test.mjs`, and it pins the rule.",
+    "Only the resolver (source `shared/resources/m.sh`) knows the keys.",
+    "source `shared/resources/n.js` is the one place it is defined.",
+    "The `o` helpers import nothing from `shared/resources/p.js` directly.",
+    "Run it as `$(bash shared/resources/q.sh)` to read the value.",
+    "Config lives in `shared/resources/r.json` and `shared/resources/s.md#x`.",
+    "Inside `setup` source shared/resources/t.sh is read first.",
   ].join("\n");
   const r = scan(fixture);
   assert.deepEqual(
     r.found.map((h) => h.script),
-    ["a.sh", "b.js", "c.sh", "f.mjs", "g.js", "h.js"],
-    "prose, `Engine source:`, prose from/source and a cite wrapper are reported; " +
-      "fence, command lines and code-span require/import are not",
+    [
+      "a.sh",
+      "b.js",
+      "c.sh",
+      "f.mjs",
+      "g.js",
+      "h.js",
+      "tests/l.test.mjs",
+      "m.sh",
+      "n.js",
+      "p.js",
+      "t.sh",
+    ],
+    "prose, `Engine source:`, prose from/source, a cite wrapper, a nested path, a " +
+      "parenthetical or line-initial `source` and a closing backtick are reported; " +
+      "fence, command lines, `$(…)`, code-span require/import and non-scripts are not",
   );
   assert.equal(
     r.fenced,
@@ -217,7 +390,9 @@ test("§2 live tree: every prose script literal is justified in ALLOWED", () => 
     fenced >= MIN_FENCED,
     `${fenced} fenced script literal(s) seen — the fence branch is alive`,
   );
-  const unlisted = hits.filter((h) => !(`${h.doc}:${h.script}` in ALLOWED));
+  const unlisted = hits.filter(
+    (h) => !Object.hasOwn(ALLOWED, `${h.doc}:${h.script}`),
+  );
   assert.deepEqual(
     unlisted.map((h) => `shared/resources/${h.doc}:${h.line} → ${h.script}`),
     [],
@@ -236,9 +411,41 @@ test("§2 live tree: every ALLOWED entry still matches a line", () => {
     [],
     "stale ALLOWED entries — the literal is gone; delete the entry",
   );
-  for (const [k, reason] of Object.entries(ALLOWED)) {
+  for (const [k, { reason }] of Object.entries(ALLOWED)) {
     assert.ok(reason.trim().length > 20, `ALLOWED["${k}"] needs a reason`);
   }
+});
+
+test("§2 live tree: each ALLOWED entry names exactly the skills that bundle its doc", () => {
+  // The reason is a claim about every bundler. A skill that starts bundling the
+  // doc receives the script as well, so it must be confirmed here (CR-4).
+  const skills = fs.readdirSync(path.join(REPO_ROOT, "skills")).sort();
+  const drift = [];
+  for (const [k, { bundlers }] of Object.entries(ALLOWED)) {
+    if (bundlers === "*") {
+      assert.equal(
+        k.split(":")[0],
+        "platform-detection.md",
+        `ALLOWED["${k}"]: "*" is for platform-detection.md only`,
+      );
+      continue;
+    }
+    const doc = k.split(":")[0];
+    const live = skills.filter((s) =>
+      fs.existsSync(path.join(REPO_ROOT, "skills", s, "references", doc)),
+    );
+    if (JSON.stringify(live) !== JSON.stringify([...bundlers].sort())) {
+      drift.push(
+        `${k}: listed ${bundlers.join(", ")}; bundled by ${live.join(", ")}`,
+      );
+    }
+  }
+  assert.deepEqual(
+    drift,
+    [],
+    "The skills bundling a doc changed. Confirm each new one runs its own copy of the " +
+      "script (or switch the literal to a bare filename), then update `bundlers`.",
+  );
 });
 
 test("§2 mutation: the incident line restored into the resume contract is reported", () => {
@@ -255,7 +462,7 @@ test("§2 mutation: the incident line restored into the resume contract is repor
     "Source: `shared/resources/grant-qa-cycles.sh`; suite:",
   );
   const hits = scan(mutated).found.filter(
-    (h) => !(`${doc}:${h.script}` in ALLOWED),
+    (h) => !Object.hasOwn(ALLOWED, `${doc}:${h.script}`),
   );
   assert.deepEqual(
     hits.map((h) => h.script),
@@ -289,4 +496,4 @@ test("§3 pin: create-skill's rule paragraph keeps its unbundled wording", () =>
   );
 });
 
-module.exports = { scan, RUN_PREFIX };
+module.exports = { scan, isRun };
