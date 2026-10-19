@@ -5,7 +5,7 @@ type: task
 description: "Classify every script a shared/resources/*.md names by its shared/resources/ literal in prose, switch the unneeded ones to bare filenames and remove their unreached bundled copies, and add a guard that fails on a new prose script literal not in a reasoned allowlist; also pin create-skill's shared-literal rule sentence."
 tags: [create-skill, bundler, observation, shared-resources, guard]
 category: refactoring
-status: ready-for-review
+status: in-progress
 priority: Medium
 created: 2026-10-07
 updated: 2026-10-19
@@ -16,7 +16,7 @@ github_issue: 592
 
 # Technical Task: Scripts reach only the skills that run them
 
-**Status:** Ready for Review
+**Status:** In Progress
 **Review**: ✅ All review recommendations from `task.193.review.1.scripts-reach-only-skills-that-run-them.md` implemented 2026-10-19
 **GitHub Issue**: [#592](https://github.com/Gamaroff/agent-skills/issues/592)
 
@@ -113,8 +113,7 @@ two new tests, and a CHANGELOG entry.
 - **Fix** (Phase 2): rewrite not-needed literals, `npm run bundle`, `git rm` every copy `bundle:check`
   then reports `UNREACHED`.
 - **Guard** (Phase 3), `tests/shared-script-literals.test.js`. For each `shared/resources/*.md`, find
-  `shared/resources/<name>.(sh|js|mjs)` literals outside fences and not run by a command token
-  immediately before them (§ 8's running-line rule), whether or not inside `<!-- cite: … -->`. Each
+  `shared/resources/<name>.(sh|js|mjs)` literals, fenced or not, that no command runs (§ 8's running-line rule), whether or not inside `<!-- cite: … -->`. Each
   must be in `ALLOWED`, a map in the test of `"<doc>:<script>": "<reason>"`, filled from the needed
   half of Phase 1. An unlisted one fails, naming the doc, the line and the two remedies (bare
   filename, or an allowlist entry with a reason). An allowlist entry that no longer matches any line
@@ -228,8 +227,7 @@ copies. **Depends on**: Phase 1.
 ### Unit Tests
 
 - **Command**: `command node --test tests/shared-script-literals.test.js`
-- **Population definition** (the test re-measures it): every `shared/resources/*.md`; per line, outside
-  a fenced block, every target the bundler's own `SHARED_REF_RE` captures (nested paths included — QA cycle 2,
+- **Population definition** (the test re-measures it): every `shared/resources/*.md`; per line, fenced or not (the bundler reads fences — QA cycle 3, CR-1), every target the bundler's own `SHARED_REF_RE` captures (nested paths included — QA cycle 2,
   CR-1), trimmed as `split_fragment` trims it and ending in `.sh`, `.js` or `.mjs`, that is not **run**, inside
   `<!-- cite: … -->` or not (QA cycle 1, CR-1). A literal is run when a command sits **immediately** before it:
   inside `require(` / `import(`, after `$(`, or at the start of a code span the literal sits in (`bash `, `sh `,
@@ -237,7 +235,8 @@ copies. **Depends on**: Phase 1.
   A backtick opens a span only when an even number precede it. Anything else is prose: `Engine source:`, English
   "from" and "sourceable" (review 1, I1 — 18 of the 20 lines the looser "anywhere before" rule called running
   were prose), and a parenthetical or line-initial `source`, or a closing backtick (QA cycles 1–2, CR-2).
-- **Bundler sets**: each `ALLOWED` entry lists the skills that bundle its document, checked against the tree, so a
+- **Fenced lines** (QA cycle 3, CR-1): a fenced literal is run also after a shell command at the line start or after `;`, `&&`, `|`, `(`, `!` or a shell keyword, `. ` included; a quoted path or fenced prompt prose is reported.
+- **Bundler sets**: each `ALLOWED` entry lists the skills that hold both its document and the script (a cite-only holder receives no script — QA cycle 3, CR-2), checked against the tree, so a
   new bundler fails until it is confirmed to run the script (QA cycle 2, CR-4).
 - **Control case**: a fixture document with one prose literal, one ``Engine source: `shared/resources/x.js` ``
   line, one ``wrap it with f from `shared/resources/x.sh` `` line and one in a cite wrapper (all four must
@@ -333,27 +332,27 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-19
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 80/100
+**Gate Decision**: FAIL
 
 ### QA Report
 
-- **Full Report**: [task.193.qa.2.scripts-reach-only-skills-that-run-them.md](./task.193.qa.2.scripts-reach-only-skills-that-run-them.md)
-- **Gate File**: [task.193.gate.2.scripts-reach-only-skills-that-run-them.yml](./task.193.gate.2.scripts-reach-only-skills-that-run-them.yml)
+- **Full Report**: [task.193.qa.3.scripts-reach-only-skills-that-run-them.md](./task.193.qa.3.scripts-reach-only-skills-that-run-them.md)
+- **Gate File**: [task.193.gate.3.scripts-reach-only-skills-that-run-them.yml](./task.193.gate.3.scripts-reach-only-skills-that-run-them.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 6 (guard) plus `ci:fast` 5903 on `beb68968`
+- **Tests Executed**: 7 (guard) plus `ci:fast` 5904 on `53f72587`
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0
+- **Critical Issues**: 1
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
 
-Cycle 1's CR-1 is fixed. The cycle-2 refute pass found the guard blind to nested `shared/resources/…` paths (CR-1) and to three prose shapes the run rule exempts (CR-2). A fenced quote copying a test file is pre-existing and routed to follow-up (CR-3).
+Cycle 2's fixes hold. CR-1 (HIGH): the guard exempts every fenced literal, but the bundler copies from fences; `probe-boundary-rule.md:66` and `develop-pipeline-step-0-resolve-and-prepare.md:251` are live cases.
 
 <!-- change-log-start -->
 ## Change Log
@@ -368,6 +367,9 @@ Cycle 1's CR-1 is fixed. The cycle-2 refute pass found the guard blind to nested
 | 2026-10-19 |  | QA fix cycle 1 — CR-1: a cite wrapper no longer exempts a script literal; CR-2: the run rule needs the command to open a code span or line; § 8 control spec corrected to match | qa-fix |
 | 2026-10-19 |  | QA gate CONCERNS (90/100) — 2 findings (CR-1 nested paths, CR-2 run rule); 2 advisory, 1 pre-existing | qa-task |
 | 2026-10-19 |  | QA fix cycle 2 — CR-1: the guard matches what the bundler captures (nested paths, trimmed, script extensions only); CR-2: a command must open the code span or `$(`; CR-4: ALLOWED entries name their bundler sets, checked against the tree; § 8 restated | qa-fix |
+| 2026-10-19 |  | QA gate FAIL (80/100) — 1 finding (CR-1 HIGH: fenced literals exempt; 2 live); 3 advisory | qa-task |
+| 2026-10-19 |  | Status → in-progress | qa-task |
+| 2026-10-19 |  | QA fix cycle 3 — CR-1: fenced literals classified (shell-position run rule); `probe-boundary-rule.md:66` and step-0:251 bare-named, 4 more copies removed (21 total); develop-task and develop-story `SKILL.md` name `references/resolve-paths.sh`; CR-2: a bundler must hold the script too; CR-4: CHANGELOG reworded | qa-fix |
 <!-- change-log-end -->
 
 ---
@@ -380,7 +382,7 @@ Cycle 1's CR-1 is fixed. The cycle-2 refute pass found the guard blind to nested
 
 ### Phase 2: Fix the not-needed literals
 
-- [x] Complete — 11 literals switched, 17 copies removed, develop-bug `SKILL.md` names `references/pipeline-answers.js`; `bundle:check` 0 problems
+- [x] Complete — 11 literals switched, 17 copies removed (21 after QA cycle 3), develop-bug `SKILL.md` names `references/pipeline-answers.js`; `bundle:check` 0 problems
 
 ### Phase 3: Guard and pin
 

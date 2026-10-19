@@ -248,7 +248,7 @@ Extract, per shared/resources/develop-pipeline-lite-mode.md (the canonical contr
 Also check skills-config.yaml in the project root:
   - Does it exist?
   - If yes, extract the devLoadAlwaysFiles list (may be absent/empty).
-  - Source `shared/resources/resolve-paths.sh` (or its bundled `references/resolve-paths.sh`) to populate `PRD_ROOT` and `ARCH_ROOT` env vars. Defaults: `docs/prd` and `docs/architecture`. Pipeline steps below use these env vars for any path operation that touches the PRD or architecture trees.
+  - Source `resolve-paths.sh` (bundled into each skill that runs this prompt as `references/resolve-paths.sh`) to populate `PRD_ROOT` and `ARCH_ROOT` env vars. Defaults: `docs/prd` and `docs/architecture`. Pipeline steps below use these env vars for any path operation that touches the PRD or architecture trees.
 
 MERGE the document-derived fields with your skills-config discovery into the return shape below — every
 field is required. Omitting `skills_config_exists` / `always_load_files` breaks always-load resolution.

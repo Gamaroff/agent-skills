@@ -15,7 +15,7 @@
  * copy the literal reaches is reached. Task.193 classified every prose script
  * literal — a literal stays only when every skill that bundles its document runs
  * its own copy of the script — switched the rest to bare filenames and removed
- * 17 copies. This test is what keeps a new one from landing unjustified.
+ * 21 copies (17 at first, 4 more in QA cycle 3). This test is what keeps a new one from landing unjustified.
  *
  * Three parts:
  *   §1 CONTROL — the scanner on inline fixtures: plain prose, an
@@ -92,6 +92,23 @@ const COMMAND = String.raw`(?:command\s+)?(?:bash|sh|source|node)\s+(?:-\S+\s+)*
 const SUBSHELL_BEFORE = new RegExp(String.raw`\$\(\s*` + COMMAND + "$");
 const SPAN_COMMAND = new RegExp("^\\s*" + COMMAND + "$");
 const SPAN_IMPORT = /^\s*import\b.*\bfrom\s+["']?(?:\.\/)?$/;
+
+/**
+ * Inside a fence the line is code, so a command also runs at the start of the
+ * line or after shell punctuation (`;`, `&&`, `|`, `(`, `!`) or a keyword, and
+ * `.` sources. A fenced line is not exempt for being fenced: the bundler copies
+ * from fences too, and a fence that only quotes a path (probe-boundary-rule.md)
+ * or a fenced prompt that says "Source `…`" in prose copied scripts into skills
+ * that never run them (QA cycle 3, CR-1).
+ */
+const SHELL_BEFORE = new RegExp(
+  String.raw`(?:^|[;&|(!]|\b(?:if|then|do|else|elif|while|until|exec|time))\s*(?:command\s+(?:-\S+\s+)?)?(?:(?:bash|sh|source|node)\s+(?:-\S+\s+)*|\.\s+)["']?(?:\.\/)?$`,
+);
+const CODE_IMPORT = /^\s*import\b.*\bfrom\s+["']?(?:\.\/)?$/;
+
+function isRunInFence(prefix) {
+  return isRun(prefix) || SHELL_BEFORE.test(prefix) || CODE_IMPORT.test(prefix);
+}
 
 function isRun(prefix) {
   if (CALL_BEFORE.test(prefix) || SUBSHELL_BEFORE.test(prefix)) return true;
@@ -276,8 +293,8 @@ const MIN_DOCS = 40;
 const MIN_FENCED = 1;
 
 /**
- * The prose script literals in one document's text, plus how many literals the
- * fence branch skipped (the floor that proves the fence branch is alive).
+ * The script literals in one document's text that no command runs, plus how
+ * many fenced literals were read (the floor that proves the fence branch is alive).
  */
 function scan(text) {
   const found = [];
@@ -287,13 +304,11 @@ function scan(text) {
     const step = fenceStep(open, line);
     const isFenced = open !== null || step.isFence;
     open = step.open;
-    if (isFenced) {
-      fenced += scriptLiterals(line).length;
-      return;
-    }
+    const run = isFenced ? isRunInFence : isRun;
     for (const { index, script } of scriptLiterals(line)) {
-      if (isRun(line.slice(0, index))) continue;
-      found.push({ line: i + 1, script, text: line.trim() });
+      if (isFenced) fenced++;
+      if (run(line.slice(0, index))) continue;
+      found.push({ line: i + 1, script, text: line.trim(), fenced: isFenced });
     }
   });
   return { found, fenced };
@@ -368,6 +383,35 @@ test("§1 control: the scanner reports prose and nothing else", () => {
   );
 });
 
+test("§1 control: a fenced literal is reported unless a command runs it", () => {
+  const r = scan(
+    [
+      "```",
+      "shared/resources/tests/u.test.mjs",
+      '  → "the test that pins it"',
+      "```",
+      "```text",
+      "  - Source `shared/resources/v.sh` to set the roots.",
+      "```",
+      "```bash",
+      "if ! source shared/resources/w.sh; then exit 1; fi",
+      "x=$(command node shared/resources/x.js --json) && . shared/resources/y.sh",
+      "  bash -e shared/resources/z.sh",
+      "```",
+      "```js",
+      'import { a } from "./shared/resources/aa.mjs";',
+      'const b = require("../shared/resources/bb.js");',
+      "```",
+    ].join("\n"),
+  );
+  assert.deepEqual(
+    r.found.map((h) => h.script),
+    ["tests/u.test.mjs", "v.sh"],
+    "a quoted path and fenced prompt prose are reported; shell and JS commands are not",
+  );
+  assert.equal(r.fenced, 8, "every fenced literal is read, run or not");
+});
+
 test("§1 control: a cite wrapper spanning lines does not hide a script", () => {
   // The bundler reads a cite-wrapped script as a dependency (CR-1), so the
   // wrapper must not exempt it, on one line or across several.
@@ -396,7 +440,7 @@ test("§2 live tree: every prose script literal is justified in ALLOWED", () => 
   assert.deepEqual(
     unlisted.map((h) => `shared/resources/${h.doc}:${h.line} → ${h.script}`),
     [],
-    "A prose `shared/resources/<script>` literal copies the script into every skill that " +
+    "A `shared/resources/<script>` literal no command runs copies the script into every skill that " +
       "bundles the document. Cite it by bare filename, or — only when every bundling skill " +
       "runs its own copy — add `<doc>:<script>` to ALLOWED with that reason.",
   );
@@ -431,9 +475,12 @@ test("§2 live tree: each ALLOWED entry names exactly the skills that bundle its
       continue;
     }
     const doc = k.split(":")[0];
-    const live = skills.filter((s) =>
-      fs.existsSync(path.join(REPO_ROOT, "skills", s, "references", doc)),
-    );
+    // A skill that only cites the doc holds it without the script (the bundler
+    // follows nothing from a cite), so it is not a bundler here (QA cycle 3, CR-2).
+    const script = k.slice(doc.length + 1);
+    const holds = (s, f) =>
+      fs.existsSync(path.join(REPO_ROOT, "skills", s, "references", f));
+    const live = skills.filter((s) => holds(s, doc) && holds(s, script));
     if (JSON.stringify(live) !== JSON.stringify([...bundlers].sort())) {
       drift.push(
         `${k}: listed ${bundlers.join(", ")}; bundled by ${live.join(", ")}`,
@@ -496,4 +543,4 @@ test("§3 pin: create-skill's rule paragraph keeps its unbundled wording", () =>
   );
 });
 
-module.exports = { scan, isRun };
+module.exports = { scan, isRun, isRunInFence };
