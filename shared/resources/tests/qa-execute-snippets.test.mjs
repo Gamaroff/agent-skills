@@ -3720,6 +3720,43 @@ test("T191 CR2-5: a sourced helper is classified with the functions sourced befo
   assert.equal(at("source h/h1.sh; bash h/h2.sh").klass, "runnable");
 });
 
+test("T191 CR3-1: a function's reach is every definition of its name, whichever was sourced last", () => {
+  const root = cycle2Copy({
+    "echo-f.sh": 'f() { echo "$@"; }\n',
+    "sed-f.sh": 'f() { sed "$@"; }\n',
+    "sed-g.sh": 'g() { sed "$@"; }\n',
+    "calls-f.sh": 'f() { sed "$@"; }\nf -i s/a/b/ x\n',
+  });
+  const at = (code) => classifyBlock(code, {}, { helperRoot: root });
+  // Should merge: one name, two bodies — the sed body counts in either order.
+  // Mutation proof: make addBody replace the list instead of appending and the
+  // first two go runnable.
+  for (const code of [
+    "source h/echo-f.sh; source h/sed-f.sh; f 'w victim' x",
+    "source h/echo-f.sh; source h/sed-f.sh; f -i s/a/b/ x",
+    "source h/sed-f.sh; source h/echo-f.sh; f -i s/a/b/ x",
+  ])
+    assert.match(
+      at(code).reason ?? "",
+      /^function f forwards its arguments to sed: deny-list: sed /,
+      code,
+    );
+  // Inside the redefining helper too: its own call is judged by its own body.
+  assert.match(
+    at("source h/echo-f.sh; source h/calls-f.sh").reason ?? "",
+    /^helper h\/calls-f\.sh: mutating: .*sed -i/,
+  );
+  // Should not merge: a different name's sed body does not reach `f`.
+  assert.equal(
+    at("source h/echo-f.sh; source h/sed-g.sh; f -i s/a/b/ x").klass,
+    "runnable",
+  );
+  assert.equal(
+    at("source h/echo-f.sh; source h/sed-f.sh; f hello").klass,
+    "runnable",
+  );
+});
+
 test("T191 CR2-6: a helper call in a block that changes PATH is refused", () => {
   const root = cycle2Copy({
     "nf.sh": "zz_helper_fn() { echo hi; }\n",

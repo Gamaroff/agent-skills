@@ -244,6 +244,12 @@ it**, because it runs in the same shell: `source h1.sh; source h2.sh`, where `h1
 `ls() { find "$@"; }`, reads `h2.sh`'s `ls docs -delete` as the `find` it is. A function only reaches
 a child `bash` when it is exported, so `export -f` is refused (condition 5).
 
+**A function's reach is every definition of its name the block may see.** When `h1.sh` defines
+`f() { echo "$@"; }` and `h2.sh` defines `f() { sed "$@"; }`, a call to `f` is judged against both
+`echo` and `sed`, in either source order. Definitions are only ever added, never replaced: which one
+the shell runs turns on order and on branches the classifier does not model, so it assumes any of them
+may run. Over-approximating refuses more, never less.
+
 **What a helper adds is bounded by what its text would do as a block.** The helper's text, and a
 forwarded argument, are judged by the same scan as any block, so the scan's own limits apply to them
 exactly as they do to a block written with that text — no more. Those limits are tracked against the

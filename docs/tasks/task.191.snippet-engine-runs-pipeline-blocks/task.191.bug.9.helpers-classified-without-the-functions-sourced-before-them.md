@@ -4,7 +4,7 @@
 **Bug ID**: TASK-191-BUG-9
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 2, CR2-5)
 **Date Found**: 2026-10-19
 
@@ -66,3 +66,4 @@ Pass the caller's defines and forwarding map into each later helper's classifica
 | 2026-10-19 | New | qa-task | Found in QA cycle 2 |
 | 2026-10-19 | In Progress | qa-fix | Investigation started (QA cycle 2) |
 | 2026-10-19 | Ready for QA | qa-fix | Fix implemented, mutation-proven (QA cycle 2) |
+| 2026-10-19 | Closed | qa-task | Verified by task.191.qa.3.snippet-engine-runs-pipeline-blocks.md |

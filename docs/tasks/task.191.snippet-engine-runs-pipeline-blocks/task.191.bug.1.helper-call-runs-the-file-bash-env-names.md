@@ -4,7 +4,7 @@
 **Bug ID**: TASK-191-BUG-1
 **Severity**: HIGH
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle 1, QA-1)
 **Date Found**: 2026-10-19
 
@@ -98,3 +98,4 @@ The cycle-1 repros are refused. The refusal matches the **literal spelling** of 
 | 2026-10-19 | Reopened | qa-task | Not fixed by task.191.qa.2.snippet-engine-runs-pipeline-blocks.md — the named repro is refused, a respelling of it is not (cycle 2 CR2-3) |
 | 2026-10-19 | In Progress | qa-fix | Investigation started (QA cycle 2) |
 | 2026-10-19 | Ready for QA | qa-fix | Fix implemented, mutation-proven (QA cycle 2) |
+| 2026-10-19 | Closed | qa-task | Verified by task.191.qa.3.snippet-engine-runs-pipeline-blocks.md |

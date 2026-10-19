@@ -1657,6 +1657,21 @@ export function isRunnableBlock(code, bindings = {}, opts = {}) {
  * defines (its own and those of the helpers it sources) and whether it changes
  * the working directory.
  */
+/**
+ * Record one more body a function name may run. A table entry is the list of
+ * every definition of that name the block may see, from the text itself (`null`:
+ * the text's own commands) and from each helper it sources, and a call reaches
+ * the union. Bodies are only ever added, never replaced: which definition the
+ * shell runs turns on order and on branches the classifier does not model, so
+ * it assumes any of them may run. A table where the last write decided was
+ * patched three cycles running (CR-1/CR-3, CR2-1/CR2-5, CR3-1).
+ */
+function addBody(table, name, body) {
+  const bodies = table.get(name) ?? [];
+  if (!bodies.includes(body)) bodies.push(body);
+  table.set(name, bodies);
+}
+
 function classifyInternal(
   code,
   bindings = {},
@@ -1665,20 +1680,23 @@ function classifyInternal(
   // `defines`: every function this text defines, its own and those of the helpers
   // it sources — what a caller sourcing it inherits. `trusted`: the subset that
   // may stand as a known word (`shadowsCommand`). `forwardsTo`: for each defined
-  // function, the commands its text runs, which its arguments may reach.
+  // function, EVERY body the block may run under that name (`addBody`).
   let defines = new Set();
   const forwardsTo = new Map();
   if (helperMode) {
     const prepared = prepareHelperText(code);
     code = prepared.code;
     defines = prepared.names;
+    for (const n of defines) addBody(forwardsTo, n, null);
   }
   // A SOURCED helper runs in its caller's shell, so the functions the caller has
-  // already sourced are callable in it: its `ls` may be one (CR2-5).
+  // already sourced are callable in it: its `ls` may be one (CR2-5). They join
+  // its own definitions of the same name; they never replace them (CR3-1).
   if (inherited)
     for (const n of inherited.defines) {
       defines.add(n);
-      forwardsTo.set(n, inherited.forwardsTo.get(n));
+      for (const b of inherited.forwardsTo.get(n) ?? [null])
+        addBody(forwardsTo, n, b ?? inherited.commands);
     }
   // Why a helper call in this text could run code the classifier never read, or
   // null: a start-up variable named, set through a name it cannot read, or PATH
@@ -1761,17 +1779,18 @@ function classifyInternal(
   const argsOf = (i) => (raw ? operands(raw[i].args) : null);
   const positional = raw ? raw.flatMap(positionalArgs) : null;
 
-  // What a defined function's arguments reach: the commands its text runs, closed
-  // over the defined functions those call. A function with no entry is this
-  // text's own, and reaches every command this text runs.
+  // What a defined function's arguments reach: the commands of every body it may
+  // have, closed over the defined functions those call. A `null` body, or a
+  // function with no entry, is this text's own, and reaches every command this
+  // text runs.
   const reach = (cmds, defs, fwd, own, seen = new Set()) => {
     const out = new Set();
     for (const c of cmds) {
       if (defs.has(c)) {
         if (seen.has(c)) continue;
         seen.add(c);
-        for (const d of reach(fwd.get(c) ?? own, defs, fwd, own, seen))
-          out.add(d);
+        for (const body of fwd.get(c) ?? [null])
+          for (const d of reach(body ?? own, defs, fwd, own, seen)) out.add(d);
       } else if (!SHELL_KEYWORDS.has(c)) out.add(c);
     }
     return out;
@@ -1810,7 +1829,7 @@ function classifyInternal(
         helperRoot,
         depth,
         bindings,
-        inherited: sourced ? { defines, forwardsTo } : null,
+        inherited: sourced ? { defines, forwardsTo, commands } : null,
       });
       if (!r.ok) return verdict("mutating", r.reason);
       admitted.add(i);
@@ -1843,7 +1862,8 @@ function classifyInternal(
       if (sourced) {
         for (const n of r.sub.defines) {
           defines.add(n);
-          forwardsTo.set(n, r.sub.forwardsTo.get(n) ?? r.sub.commands);
+          for (const b of r.sub.forwardsTo.get(n) ?? [null])
+            addBody(forwardsTo, n, b ?? r.sub.commands);
         }
         if (r.sub.changesDir) changesDir = true;
         if (r.sub.startupHazard && !startupHazard)

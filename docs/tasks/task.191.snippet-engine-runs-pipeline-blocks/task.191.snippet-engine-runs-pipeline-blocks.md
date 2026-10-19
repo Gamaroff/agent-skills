@@ -395,21 +395,21 @@ None. All execution stays in the temp copy, and the snapshot sentinel still repo
 **QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-19
-**Quality Score**: 0/100
+**Quality Score**: 40/100
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.191.qa.2.snippet-engine-runs-pipeline-blocks.md](./task.191.qa.2.snippet-engine-runs-pipeline-blocks.md)
-- **Gate File**: [task.191.gate.2.snippet-engine-runs-pipeline-blocks.yml](./task.191.gate.2.snippet-engine-runs-pipeline-blocks.yml)
+- **Full Report**: [task.191.qa.3.snippet-engine-runs-pipeline-blocks.md](./task.191.qa.3.snippet-engine-runs-pipeline-blocks.md)
+- **Gate File**: [task.191.gate.3.snippet-engine-runs-pipeline-blocks.yml](./task.191.gate.3.snippet-engine-runs-pipeline-blocks.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 173 (engine suite); ci:fast 5871/0
-- **Phases Verified**: 3/4
-- **Critical Issues**: 5
+- **Tests Executed**: 179 (engine suite); ci:fast 5877/0
+- **Phases Verified**: 4/4 (Phase 2 with one finding)
+- **Critical Issues**: 1
 - **NFR Status**: Security: FAIL, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
 
 ### Key Findings
-Cycle 1 closed bugs 3–6. The cycle-2 refute pass reproduced five HIGH fail-opens in the helper rule. Two are respellings of cycle 1's fixes: a quoted or escaped function name (CR2-1) and a quoted or computed `BASH_ENV` (CR2-3), so bugs 2 and 1 are reopened. Three are new: unscanned helper-script arguments (CR2-2), the case-arm rewrite hiding a command (CR2-4), and helpers classified without earlier-sourced functions (CR2-5).
+Bugs 1, 2, 7, 8 and 9 are verified fixed and closed. CR3-1 is new (bug 10): a function that a later sourced helper redefines keeps the earlier helper's forwarding reach.
 
 <!-- change-log-start -->
 ## Change Log
@@ -424,6 +424,8 @@ Cycle 1 closed bugs 3–6. The cycle-2 refute pass reproduced five HIGH fail-ope
 | 2026-10-19 |  | QA findings fixed — 6 of 6 (bugs 1-6 Ready for QA) plus CR-5/6/8 advisories and 3 gaps the fix pass found, 1 iteration; status → ready-for-review | qa-fix |
 | 2026-10-19 |  | QA gate FAIL (0/100) — 5 findings (5 high); bugs 3-6 closed, 1-2 reopened; status → in-progress | qa-task |
 | 2026-10-19 |  | QA findings fixed — 5 of 5 (bugs 1, 2, 7, 8, 9 Ready for QA) plus CR2-6, 1 iteration; status → ready-for-review | qa-fix |
+| 2026-10-19 |  | QA gate FAIL (40/100) — 1 finding (1 high); bugs 1, 2, 7, 8, 9 closed; status → in-progress | qa-task |
+| 2026-10-19 |  | QA findings fixed — 1 of 1 (bug 10 Ready for QA; third strike, mechanism replaced), 1 iteration; status → ready-for-review | qa-fix |
 <!-- change-log-end -->
 
 ---

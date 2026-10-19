@@ -71,7 +71,8 @@ All notable changes to this project will be documented in this file. Format foll
   `SHELLOPTS`, `BASHOPTS`, `PS4`), or runs an `export`/`local`/`readonly`/`read` of a name that is not
   a plain identifier as written (or `export -f`, `printf -v`). A function a sourced helper defines is
   callable in that block when its name shadows no builtin or PATH command; a sourced helper sees the
-  functions sourced before it. A call to such a function, a helper script's own arguments and a
+  functions sourced before it, and a function's reach is every definition of its name the block may
+  see, so a later helper's redefinition is never hidden by an earlier one. A call to such a function, a helper script's own arguments and a
   sourced helper's `set --` parameters are refused when, read as written or unquoted, they would be
   refused written to a command the helper runs.
   `isRunnableBlock` exposes the classifier to the security probe. `SAFE_COMMANDS` is unchanged
