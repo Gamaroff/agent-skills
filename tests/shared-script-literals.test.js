@@ -20,8 +20,9 @@
  * Three parts:
  *   §1 CONTROL — the scanner on inline fixtures: plain prose, an
  *      `Engine source:` line, prose "source"/"import … from", a cite wrapper and
- *      a nested path must be reported; a fenced line, a command that opens a
- *      code span or `$(`, and a non-script must not. A scanner
+ *      a nested path, and a fenced quote or fenced prompt prose must be reported;
+ *      a command that opens a code span, a `$(`, a fenced shell or JS command, and a
+ *      non-script must not. A scanner
  *      that over- or under-fires is caught here before it judges the real tree.
  *
  * A cite wrapper is no exemption here. The bundler cites only a `.md` target
@@ -81,8 +82,9 @@ function scriptLiterals(line) {
  * A literal is RUN when a command sits immediately before it: inside `require(`
  * or `import(`, after `$(`, or at the start of a code span the literal sits in
  * (`bash …`, `command node --test …`, `import … from …`), optionally behind one
- * quote and a `./`. A backtick opens a span only when an even number precede it
- * on the line. Anything else is prose: "Engine source:", English "from",
+ * quote and a `./`. Code spans are matched as CommonMark matches them: a run of
+ * N backticks opens a span that only a run of exactly N closes, and an escaped
+ * backtick opens nothing (finalise DoD probes, task.193). Anything else is prose: "Engine source:", English "from",
  * "sourceable" (task.193 review 1, I1), "the single source `…`" (QA cycle 1,
  * CR-2), and "(source `…`)", a line that wraps to "source `…`" or a closing
  * backtick read as an opening one (QA cycle 2, CR-2).
@@ -101,8 +103,10 @@ const SPAN_IMPORT = /^\s*import\b.*\bfrom\s+["']?(?:\.\/)?$/;
  * or a fenced prompt that says "Source `…`" in prose copied scripts into skills
  * that never run them (QA cycle 3, CR-1).
  */
+// A keyword counts only in command position — at the line start or after shell
+// punctuation — so "at the same time source …" in a fenced prompt stays prose.
 const SHELL_BEFORE = new RegExp(
-  String.raw`(?:^|[;&|(!]|\b(?:if|then|do|else|elif|while|until|exec|time))\s*(?:command\s+(?:-\S+\s+)?)?(?:(?:bash|sh|source|node)\s+(?:-\S+\s+)*|\.\s+)["']?(?:\.\/)?$`,
+  String.raw`(?:^|[;&|(])\s*(?:(?:if|then|do|else|elif|while|until|exec|time)\s+)*(?:!\s*)?(?:command\s+(?:-\S+\s+)?)?(?:(?:bash|sh|source|node)\s+(?:-\S+\s+)*|\.\s+)["']?(?:\.\/)?$`,
 );
 const CODE_IMPORT = /^\s*import\b.*\bfrom\s+["']?(?:\.\/)?$/;
 
@@ -110,13 +114,48 @@ function isRunInFence(prefix) {
   return isRun(prefix) || SHELL_BEFORE.test(prefix) || CODE_IMPORT.test(prefix);
 }
 
+/** The text of the code span still open at the end of `prefix`, or null. */
+function openSpan(prefix) {
+  const runAt = (i) => {
+    let n = 0;
+    while (prefix[i + n] === "`") n++;
+    return n;
+  };
+  let i = 0;
+  while (i < prefix.length) {
+    if (prefix[i] === "\\" && prefix[i + 1] === "`") {
+      i += 2;
+      continue;
+    }
+    if (prefix[i] !== "`") {
+      i++;
+      continue;
+    }
+    const n = runAt(i);
+    let j = i + n;
+    let close = -1;
+    while (j < prefix.length) {
+      if (prefix[j] !== "`") {
+        j++;
+        continue;
+      }
+      const m = runAt(j);
+      if (m === n) {
+        close = j;
+        break;
+      }
+      j += m;
+    }
+    if (close === -1) return prefix.slice(i + n);
+    i = close + n;
+  }
+  return null;
+}
+
 function isRun(prefix) {
   if (CALL_BEFORE.test(prefix) || SUBSHELL_BEFORE.test(prefix)) return true;
-  const tick = prefix.lastIndexOf("`");
-  if (tick === -1) return false;
-  const opens = (prefix.slice(0, tick).match(/`/g) || []).length % 2 === 0;
-  const span = prefix.slice(tick + 1);
-  return opens && (SPAN_COMMAND.test(span) || SPAN_IMPORT.test(span));
+  const span = openSpan(prefix);
+  return span !== null && (SPAN_COMMAND.test(span) || SPAN_IMPORT.test(span));
 }
 
 /**
@@ -410,6 +449,31 @@ test("§1 control: a fenced literal is reported unless a command runs it", () =>
     "a quoted path and fenced prompt prose are reported; shell and JS commands are not",
   );
   assert.equal(r.fenced, 8, "every fenced literal is read, run or not");
+});
+
+test("§1 control: spans match by run length; a shell keyword needs command position", () => {
+  // The six candidates /finalise's security probe reproduced (task.193 dod.1).
+  const r = scan(
+    [
+      "Prose \\` bash shared/resources/e1.sh here.",
+      "See ``a`b`` bash shared/resources/e2.sh here.",
+      "Run ``bash shared/resources/e3.sh`` to start.",
+      "```text",
+      "  - At the same time source shared/resources/k1.sh",
+      "  - Please do source shared/resources/k2.sh",
+      "  - If unset, then bash shared/resources/k3.sh",
+      "```",
+      "```bash",
+      "for f in a b; do source shared/resources/k4.sh; done",
+      "```",
+    ].join("\n"),
+  );
+  assert.deepEqual(
+    r.found.map((h) => h.script),
+    ["e1.sh", "e2.sh", "k1.sh", "k2.sh", "k3.sh"],
+    "an escaped tick and a closed double-tick span are prose, a double-tick command " +
+      "span runs, and if/then/do/time count only in command position",
+  );
 });
 
 test("§1 control: a cite wrapper spanning lines does not hide a script", () => {
