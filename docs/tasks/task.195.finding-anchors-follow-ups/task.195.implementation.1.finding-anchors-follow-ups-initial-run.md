@@ -3,7 +3,7 @@
 **Task**: `task.195.finding-anchors-follow-ups.md`
 **Run Number**: 1
 **Started**: 2026-10-19 17:38
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -35,9 +35,9 @@ Close the seven advisory findings task.194 left: an `unparseable` verdict, root-
 | 2. review-task             | ✅ Done    | `task.195.review.{N}.{name}.md` exists (or skip logged)               | review.1 — READY TO IMPLEMENT 8/10; Planned → Ready for Development | —                    | 2026-10-19T15:43Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; 13/13 phase items; commits 16ce1fc6, 14fe0880, e906efd0; ci:fast 5959/0 | .summaries/step-3-loop-audit-1.json | 2026-10-19T15:57Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #695: https://github.com/Gamaroff/agent-skills/pull/695 | —                    | 2026-10-19T15:58Z |
-| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.195.qa.{N}.*.md`; `task.195.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 2 cycles: gate.1 CONCERNS 90 → qa-fix `bdd4b66e` → gate.2 PASS 100 (refute pass); 5c review-pr APPROVE (pr-review.1) | —                    | 2026-10-19T16:18Z |
-| 7. finalise                | ❌ Halted  | `task.195.dod.{N}.*.md`; task `status: accepted`                      | dod.1 GAPS: security FAIL on the review-pr `--inline` guard (2 probes reproduced: medium + low; 13 sandbox escapes); CI reading 1 PENDING; status unchanged | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.195.qa.{N}.*.md`; `task.195.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 2 cycles: gate.1 CONCERNS 90 → qa-fix `bdd4b66e` → gate.2 PASS 100 (refute pass); 5c review-pr APPROVE (pr-review.1). Re-entry after finalise DoD gaps: gate.3 CONCERNS 90 → `882b2643` → gate.4 CONCERNS 90 → `f192e953` (consolidate) → gate.5 PASS 100; 5c APPROVE (pr-review.2) | —                    | 2026-10-19T16:18Z |
+| 7. finalise                | ✅ Done    | `task.195.dod.{N}.*.md`; task `status: accepted`                      | dod.1 GAPS → fixed in `4d6f7f25`, QA re-entered at 5a; dod.2 ACCEPTED (AC 11/11, probe 57/0/0, docs PASS); acceptance commit `865e4341`; #597 closed, board Done | —                    | 2026-10-19T17:39Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Implementation report committed and pushed | —                    | 2026-10-19T17:39Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -104,6 +104,30 @@ Close the seven advisory findings task.194 left: an `unparseable` verdict, root-
 - CI reading 1: PENDING @ `faec9ea45bf9` over 5 checks (runners were queued for the whole run).
 - DoD gaps: halt. The task stays `ready-for-review`. The gaps Change Log row is written, and the PR comment is https://github.com/Gamaroff/agent-skills/pull/695#issuecomment-6272038817.
 
+### Resume — QA re-entry after finalise DoD gaps (2026-10-19)
+
+- Gap fix committed in `4d6f7f25`: review-pr `--inline` guard requires an array for every lens present and a string `anchor_check`; `mktemp` moved after the guard; `findingsOf` in the engine applies the same every-lens rule. 5 mutation proofs, all red; `ci:fast` 5963/0.
+- develop-next auto-answer (Phase 0b, `--defaults`): "Re-enter QA at 5a" (Recommended).
+- QA re-entry after finalise DoD gaps: reenter-qa: re-entered QA at step 5 / qa_phase 5a — qa_max_cycles=5 (base 2), gate_head=bdd4b66e11c6f83e0e982a669e0aac8739a9dc99.
+- QA cycle 3: `SAFETY_REPROBE=true` was set by judgement (clause 1 false on gate 2; finalise DoD 1 failed on the security axis of the `--inline` guard), so the review ran unscoped over the full branch diff. The traceability mapper was not dispatched: no matrix exists from earlier cycles, so behaviour matches cycles 1–2.
+- QA cycle 3 — changes-requested: stage-disabled. Narrowing offer: not signalled (no-medium). Route classifier: continue (not-a-pass-gate).
+- QA cycle 3 qa-fix: the findings ingester was not dispatched. The gate held one finding, written in this session, so it was read inline; there was no independent ingestion.
+- QA cycle 3 fix commit `882b2643` (fix + gate.3 + qa.3 + probe record), one push.
+- QA cycle 4: scoped to the 14 files changed since gate 3 (default; clause 1 false). Changes-requested: stage-disabled. Route: continue (not-a-pass-gate).
+- QA cycle 4 narrowing offer: Narrowing residue — every MEDIUM on gates 3 and 4 names shared/resources/finding-anchors.js (TASK-195-QA3-1, TASK-195-QA4-1); HIGH 0 on both. Move chosen: consolidate. One allow-list field reader decides string / absent / invalid for file_line, ref and line_text.
+- QA cycle 4 qa-fix: fix_cycle not supplied (derived from the gate). The findings ingester was not dispatched: the gate held one finding, written in this session, so it was read inline. `fieldOf` is now the only reader: an invalid `line_text` reads text-mismatch, and only an absent or blank one reads unchecked-text. An invalid conformance `ref` still reads no-line, like any ref that is not a path:line, so "never clean" is claimed for `line_text` only. Mutation-proven 3 of 3 (M1 QA3 behaviour, M2 stringify-and-compare, M3 empty array merged with absent). ci:fast 5968 tests, 0 failed.
+- QA cycle 4 fix commit `f192e953` (fix + gate.4 + qa.4 + probe record), one push. PR and tracker qa-fix-4 comments posted.
+
+### Finalise run 2 (2026-10-19)
+
+- DoD 2 dispatched four Explore agents in parallel: AC PASS (11/11), security PASS (`boundary: true`), compliance NOT_APPLICABLE, docs PASS.
+- Step 3b.1 probe plan: 2 controls, 57 executed, 0 reproduced, 0 escapes, 0 refusals. The record is `task.195.dod.2.security.run.json`. Control 1 (the review-pr `--inline` guard) ran 25 cases; control 2 (the review-code Step 2b checker) ran 32, 9 of them aimed at `fieldOf`.
+- The PR-approval criterion is satisfied by the 5c `/review-pr` APPROVE (pr-review.2). `reviewDecision` is empty because this single-maintainer repo requires no reviews.
+- The run 1 gaps section in the task body was retitled "run 1 (historical, superseded by run 2)", and the run 2 PASSED section was added before the change-log block.
+- CI reading 1: SUCCESS @ 05f97433a0a9 over 5 checks; CI reading 2: SUCCESS (tree-equivalent to 05f97433a0a9) @ 865e43413580 over 5 checks after 30s. The acceptance commit is docs-only, so the docs-only rule resolved reading 2 against reading 1's green head.
+- Acceptance commit `865e4341` carried the 5c pr-review.2 and the dod.2 probe record, and ticked the registry (`ticked`, planned → accepted). The 6b assertions passed. 6d: the CHANGELOG cites task 195.
+- Side-effects after the boundary: the PR canonical comment was posted (issuecomment-6273386456). The Document link was already on `develop`. The tracker `done` comment was posted. #597 is CLOSED. `gh-stage` returned `already`, because the card was already in Done.
+
 ---
 
 ## Issues Log
@@ -113,7 +137,8 @@ _Problems encountered and how they were resolved or escalated._
 - **Step 7 DoD gap — security (medium):** the review-pr `--inline` guard (`skills/review-pr/SKILL.md:971-975`) needs one findings array, not one per wrapper present. The probe reproduces a non-array `code_review.findings` beside annotated conformance findings being accepted. QA 2 had routed this to future work as CR-1; finalise's probe reproduced it, so it is now blocking. **Escalated.**
 - **Step 7 DoD gap — security (low):** the same guard accepts `anchor_check: null`. **Escalated.**
 - **Step 7 DoD gap — security (escape):** `INLINE_FILE="$(mktemp …)"` at `skills/review-pr/SKILL.md:951` runs before the guard and is not removed on HALT, giving 13 sandbox escapes. QA 2's record showed `escaped: 10` on the same control, but its report did not surface it. **Escalated.**
-- **Step 7 DoD gap — CI:** reading 1 was PENDING on `faec9ea4` (GitHub runners queued). **Open.**
+- **Step 7 DoD gap — CI:** reading 1 was PENDING on `faec9ea4` (GitHub runners queued). **Resolved:** finalise run 2 read SUCCESS on `05f97433`.
+- **Resolution of the three security gaps above:** fixed in `4d6f7f25`, then re-probed in QA cycles 3–5 and in DoD 2 (57/0/0). **Resolved.**
 
 ---
 
@@ -134,13 +159,15 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: Escalated — halted at Step 7 (DoD gaps, `task.195.dod.1.finding-anchors-follow-ups.md`)
+**Finished**: 2026-10-19T17:39Z
+**Final Status**: Completed
 **Branch**: `feature/task.195.finding-anchors-follow-ups`
 **PR**: https://github.com/Gamaroff/agent-skills/pull/695
-**QA Iterations**: {populated at end}
-**DoD Summary**: [task.195.dod.1.finding-anchors-follow-ups.md](./task.195.dod.1.finding-anchors-follow-ups.md) — ❌ GAPS
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 5
+**DoD Summary**: [task.195.dod.2.finding-anchors-follow-ups.md](./task.195.dod.2.finding-anchors-follow-ups.md) — ✅ ACCEPTED (run 1: [dod.1](./task.195.dod.1.finding-anchors-follow-ups.md) — GAPS, superseded)
+**Tracker debt**: none
+
+**Completion Summary**: This run implemented the seven task.194 follow-ups: the `unparseable` verdict, root-in-rev, `--index`, reason-deciding dispatchers, the `--inline` guards, the head SHA on both platforms, and develop-bug's unverified-location rule. It took 5 QA cycles and 2 finalise runs. Finalise run 1's probe reproduced gaps in the review-pr `--inline` guard; these were fixed and QA re-entered at 5a. Cycles 3 and 4 each found another non-string field read leniently, and cycle 4 ended that pattern with the consolidate move: one allow-list reader (`fieldOf`). DoD 2 accepted the task on a measured probe of 57/0/0.
 
 ### QA Cycle 2 — 2026-10-19
 **Gate Result**: PASS
@@ -151,3 +178,30 @@ _Track each QA review/fix cycle._
 **Carried to 6a**: docs/tasks/task.195.finding-anchors-follow-ups/task.195.pr-review.1.finding-anchors-follow-ups.md
 **Loop exit**: n/a — this exit not taken
 **Action**: Proceeding to 5c (PR conformance review)
+
+### QA Cycle 3 — 2026-10-19
+**Gate Result**: CONCERNS
+**Issues Found**: 1 — TASK-195-QA3-1 (MEDIUM, a non-string `file_line` reads as a clean anchor instead of `unparseable`); 3 advisory low (routed to future)
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 3 of 5)
+
+### QA Cycle 4 — 2026-10-19
+**Gate Result**: CONCERNS
+**Issues Found**: 1 — TASK-195-QA4-1 (MEDIUM, a non-string `line_text` reads `unchecked-text` instead of `text-mismatch`; introduced by the cycle 3 fix)
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 4 of 5)
+
+### QA Cycle 5 — 2026-10-19
+**Gate Result**: PASS
+**Issues Found**: 0
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: ✅ APPROVE — `task.195.pr-review.2.finding-anchors-follow-ups.md` (conformance lens only, `--no-code`; 0 findings)
+**Loop exit**: gate PASS with no open entry → 5c
+**Action**: Proceeding to 5c (gate 5 + report committed in `05f97433`)
