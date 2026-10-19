@@ -170,6 +170,15 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The QA read-back now checks this cycle's verdict, and waits out a moment's `.git/index.lock`
+  (task 192, obs #205, #216).** `qa-read-back.js` HALTs when the QA section's `**Gate Decision**`, or
+  the newest `qa-task`/`qa-story` Change Log row, does not name this cycle's gate token — a document
+  whose links were updated while its verdict line or row was left at the previous cycle read clean
+  before. A missing QA section, `**Gate Decision**` line, QA row or readable `gate:` token is a HALT
+  too; later `qa-fix` and `finalise` rows are ignored. `git add` failing on a held `index.lock` is
+  retried three times (200 / 400 / 800 ms) before it is reported, once per run; any other staging
+  failure is reported on the first attempt. `--json` gains `stageAttempts`.
+
 - **The security probe's case check no longer refuses a `null` sink or throws on a value JSON cannot
   hold (task 190 follow-up, CR-2 and CR-3).** `validateCases` treats `"sink": null` as absent, as the
   code that reads a case's sink already did. `describeBadCase` renders a BigInt or circular value with

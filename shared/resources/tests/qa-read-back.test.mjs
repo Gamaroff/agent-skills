@@ -22,8 +22,12 @@ const ENGINE = path.join(HERE, "..", "qa-read-back.js");
 const { readBack } = require(ENGINE);
 
 const SHAPES = {
-  task: { dir: "docs/tasks/task.9.x", stem: "task.9" },
-  story: { dir: "docs/prd/p/epics/e/stories/story.9.1.x", stem: "story.9.1" },
+  task: { dir: "docs/tasks/task.9.x", stem: "task.9", qa: "qa-task" },
+  story: {
+    dir: "docs/prd/p/epics/e/stories/story.9.1.x",
+    stem: "story.9.1",
+    qa: "qa-story",
+  },
 };
 
 function repo(shape = "task", mutate) {
@@ -39,7 +43,7 @@ function repo(shape = "task", mutate) {
   fs.writeFileSync(path.join(root, ".gitignore"), "*.log\n");
   git("add", ".gitignore");
   git("commit", "-qm", "init");
-  const { dir: d, stem } = SHAPES[shape];
+  const { dir: d, stem, qa } = SHAPES[shape];
   const dir = path.join(root, d);
   fs.mkdirSync(dir, { recursive: true });
   const doc = path.join(dir, `${path.basename(d)}.md`);
@@ -54,23 +58,32 @@ function repo(shape = "task", mutate) {
       "",
       `- [r](./${stem}.qa.1.x.md) [g](./${stem}.gate.1.x.yml) [b](./${stem}.bug.1.y.md)`,
       "",
+      // task.192 — what Step 12 writes: the section's verdict and the QA row both name
+      // the gate's token, so a complete cycle reads clean.
+      "## QA Testing Results",
+      "",
+      "**QA Status**: ❌ FAIL",
+      "**Gate Decision**: FAIL",
+      "",
       "## Change Log",
       "",
       "| Date | Version | Description | Author |",
       "| -- | -- | -- | -- |",
       "| 2026-09-26 | | x | a |",
+      `| 2026-09-26 | | QA gate FAIL (40/100) — 1 finding | ${qa} |`,
       "",
     ].join("\n"),
   );
   fs.writeFileSync(path.join(dir, `${stem}.gate.1.x.yml`), "gate: FAIL\n");
   fs.writeFileSync(path.join(dir, `${stem}.qa.1.x.md`), "# r\n");
   fs.writeFileSync(path.join(dir, `${stem}.bug.1.y.md`), "# b\n");
-  if (mutate) mutate({ root, dir, doc, stem });
+  if (mutate) mutate({ root, dir, doc, stem, qa });
   return {
     root,
     dir,
     doc,
     stem,
+    qa,
     done: () => fs.rmSync(root, { recursive: true, force: true }),
   };
 }
@@ -79,10 +92,10 @@ const append = (f, s) => fs.appendFileSync(f, s);
 const edit = (f, from, to) =>
   fs.writeFileSync(f, fs.readFileSync(f, "utf8").replace(from, to));
 
-function verdict(shape, mutate) {
+function verdict(shape, mutate, opts) {
   const w = repo(shape, mutate);
   try {
-    return { ...readBack(w.doc), root: w.root };
+    return { ...readBack(w.doc, opts), root: w.root };
   } finally {
     w.done();
   }
@@ -186,7 +199,8 @@ const HALTS = [
 
 for (const [name, mutate, says] of HALTS) {
   test(`halts on ${name}`, () => {
-    const r = verdict("task", mutate);
+    // No real backoff: the lock case is timed by its own tests below.
+    const r = verdict("task", mutate, { sleepMs: () => {} });
     assert.equal(r.exitCode, 1, JSON.stringify(r));
     assert.match(r.problems.join("\n"), says);
   });
@@ -438,7 +452,7 @@ test("two regular files claiming the cycle's gate halt, naming both, and neither
 // task.158 (task.149 5c CR-1) — existence is not the claim. From cycle 2 on the
 // document must link THIS cycle's gate and report; before this check a document
 // left linking gate.1 / qa.1 read clean because every link still resolved.
-function cycleTwo({ root, dir, stem }, relink) {
+function cycleTwo({ root, dir, doc, stem, qa }, relink) {
   execFileSync(
     "git",
     ["-c", "user.email=a@b", "-c", "user.name=a", "add", "-A"],
@@ -451,6 +465,12 @@ function cycleTwo({ root, dir, stem }, relink) {
   );
   fs.writeFileSync(path.join(dir, `${stem}.gate.2.x.yml`), "gate: PASS\n");
   fs.writeFileSync(path.join(dir, `${stem}.qa.2.x.md`), "# r2\n");
+  // Cycle 2's verdict lands; these cases isolate the links (task.192 checks the verdict).
+  edit(doc, "**Gate Decision**: FAIL", "**Gate Decision**: PASS");
+  append(
+    doc,
+    `| 2026-09-26 | | QA gate PASS (100/100) — 0 findings | ${qa} |\n`,
+  );
   if (relink) relink();
 }
 
@@ -505,4 +525,171 @@ test("a link with a #fragment to this cycle's gate counts as linked", () => {
     }),
   );
   assert.equal(r.exitCode, 0, JSON.stringify(r.problems));
+});
+
+// task.192 (obs #205) — the verdict is the claim too. A document whose links name
+// this cycle's gate but whose `**Gate Decision**` or newest QA row still carries a
+// previous verdict read clean before this check.
+const VERDICT_HALTS = [
+  [
+    "a **Gate Decision** that differs from the gate's token",
+    ({ doc }) =>
+      edit(doc, "**Gate Decision**: FAIL", "**Gate Decision**: CONCERNS"),
+    /\*\*Gate Decision\*\* is CONCERNS but this cycle's gate task\.9\.gate\.1\.x\.yml says FAIL/,
+  ],
+  [
+    "a newest QA row that names another verdict",
+    ({ doc }) =>
+      edit(doc, "QA gate FAIL (40/100)", "QA gate CONCERNS (80/100)"),
+    /newest QA Change Log row reads "QA gate CONCERNS \(80\/100\) — 1 finding" but this cycle's gate task\.9\.gate\.1\.x\.yml says FAIL/,
+  ],
+  [
+    "a QA section with no **Gate Decision** line",
+    ({ doc }) => edit(doc, "**Gate Decision**: FAIL\n", ""),
+    /the QA section has no \*\*Gate Decision\*\* line/,
+  ],
+  [
+    "no QA section at all",
+    ({ doc }) =>
+      edit(doc, /## QA Testing Results[\s\S]*?(?=## Change Log)/, ""),
+    /no ## QA Testing Results section/,
+  ],
+  [
+    "no qa-task row",
+    ({ doc }) => edit(doc, /\n\| 2026-09-26 \| \| QA gate FAIL.*\n/, "\n"),
+    /no qa-task\/qa-story Change Log row/,
+  ],
+  [
+    "a row that only begins with the token (QA gate FAILED is not FAIL)",
+    ({ doc }) => edit(doc, "QA gate FAIL (40/100)", "QA gate FAILED (40/100)"),
+    /newest QA Change Log row reads/,
+  ],
+  [
+    "a gate with no readable gate: token",
+    ({ dir, stem }) =>
+      fs.writeFileSync(path.join(dir, `${stem}.gate.1.x.yml`), "decision: ?\n"),
+    /gate task\.9\.gate\.1\.x\.yml has no readable gate: token/,
+  ],
+  [
+    "a second QA section left at the previous verdict",
+    ({ doc }) =>
+      edit(
+        doc,
+        "## Change Log",
+        "## QA Testing Results\n\n**Gate Decision**: PASS\n\n## Change Log",
+      ),
+    /\*\*Gate Decision\*\* is PASS but this cycle's gate .* says FAIL/,
+  ],
+];
+
+for (const [name, mutate, says] of VERDICT_HALTS) {
+  test(`halts on ${name}`, () => {
+    const r = verdict("task", mutate);
+    assert.equal(r.exitCode, 1, JSON.stringify(r));
+    assert.match(r.problems.join("\n"), says);
+  });
+}
+
+// The control: the rule reads the newest QA row, not the newest row.
+for (const shape of Object.keys(SHAPES)) {
+  test(`${shape}: a qa-fix and a finalise row after the QA row still read clean`, () => {
+    const r = verdict(shape, ({ doc }) =>
+      append(
+        doc,
+        "| 2026-09-26 | | Fixed 1 finding | qa-fix |\n| 2026-09-26 | | DoD | finalise |\n",
+      ),
+    );
+    assert.equal(r.exitCode, 0, JSON.stringify(r.problems));
+  });
+}
+
+test("a **Gate Decision** written with a leading emoji is read by its token", () => {
+  const r = verdict("task", ({ doc }) =>
+    edit(doc, "**Gate Decision**: FAIL", "**Gate Decision**: ❌ FAIL"),
+  );
+  assert.equal(r.exitCode, 0, JSON.stringify(r.problems));
+});
+
+// task.192 (obs #216) — a held index.lock is waited out; nothing else is.
+const lockOf = (root) => path.join(root, ".git", "index.lock");
+
+test("a lock released during the backoff stages cleanly, on the second attempt", () => {
+  let lock;
+  const sleeps = [];
+  const r = verdict(
+    "task",
+    ({ root }) => {
+      lock = lockOf(root);
+      fs.writeFileSync(lock, "");
+    },
+    {
+      // The other git process finishes while we wait.
+      sleepMs: (ms) => {
+        sleeps.push(ms);
+        fs.rmSync(lock, { force: true });
+      },
+    },
+  );
+  assert.equal(r.exitCode, 0, JSON.stringify(r.problems));
+  assert.equal(r.stageAttempts["docs/tasks/task.9.x/task.9.x.md"], 2);
+  assert.deepEqual(sleeps, [200]);
+  assert.ok(r.staged.includes("docs/tasks/task.9.x/task.9.x.md"));
+});
+
+test("a lock that outlasts the backoff is reported after 4 attempts", () => {
+  const sleeps = [];
+  const r = verdict("task", ({ root }) => fs.writeFileSync(lockOf(root), ""), {
+    sleepMs: (ms) => sleeps.push(ms),
+  });
+  assert.equal(r.exitCode, 1, JSON.stringify(r));
+  assert.match(
+    r.problems.join("\n"),
+    /could not stage docs\/tasks\/task\.9\.x\/task\.9\.x\.md [\s\S]*index\.lock[\s\S]*\(after 4 attempts\)/,
+  );
+  assert.equal(r.stageAttempts["docs/tasks/task.9.x/task.9.x.md"], 4);
+  // One backoff for the run: the gate and report, staged after, try once each.
+  assert.equal(r.stageAttempts["docs/tasks/task.9.x/task.9.gate.1.x.yml"], 1);
+  assert.equal(r.stageAttempts["docs/tasks/task.9.x/task.9.qa.1.x.md"], 1);
+  assert.deepEqual(sleeps, [200, 400, 800]);
+});
+
+test("a failure that is not a lock is reported on the first attempt, with no wait", () => {
+  const sleeps = [];
+  const r = verdict(
+    "task",
+    // A gitignored gate: `git add` refuses it, and no wait will change that.
+    ({ root }) => append(path.join(root, ".gitignore"), "*.yml\n"),
+    { sleepMs: (ms) => sleeps.push(ms) },
+  );
+  assert.equal(r.exitCode, 1, JSON.stringify(r));
+  const gate = "docs/tasks/task.9.x/task.9.gate.1.x.yml";
+  assert.equal(r.stageAttempts[gate], 1);
+  assert.deepEqual(sleeps, []);
+  const said = r.problems.find((p) => p.startsWith(`could not stage ${gate}`));
+  assert.ok(said, r.problems.join("\n"));
+  assert.match(said, /\(after 1 attempt\)$/);
+  assert.doesNotMatch(said, /index\.lock/);
+});
+
+test("the CLI waits out a lock another process releases in real time", async () => {
+  const w = repo("task");
+  const lock = lockOf(w.root);
+  fs.writeFileSync(lock, "");
+  try {
+    const { spawn } = await import("node:child_process");
+    const child = spawn(process.execPath, [ENGINE, "--doc", w.doc, "--json"]);
+    let out = "";
+    child.stdout.on("data", (d) => (out += d));
+    // The child's Atomics.wait blocks only the child; this timer runs meanwhile.
+    setTimeout(() => fs.rmSync(lock, { force: true }), 300);
+    const code = await new Promise((res) => child.on("close", res));
+    assert.equal(code, 0, out);
+    const indexed = execFileSync("git", ["ls-files"], {
+      cwd: w.root,
+      encoding: "utf8",
+    });
+    assert.match(indexed, /task\.9\.x\.md/);
+  } finally {
+    w.done();
+  }
 });
