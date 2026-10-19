@@ -423,27 +423,27 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: PASS
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-19
-**Quality Score**: 100/100
-**Gate Decision**: PASS
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
 
-- **Full Report**: [task.195.qa.2.finding-anchors-follow-ups.md](./task.195.qa.2.finding-anchors-follow-ups.md)
-- **Gate File**: [task.195.gate.2.finding-anchors-follow-ups.yml](./task.195.gate.2.finding-anchors-follow-ups.yml)
+- **Full Report**: [task.195.qa.3.finding-anchors-follow-ups.md](./task.195.qa.3.finding-anchors-follow-ups.md)
+- **Gate File**: [task.195.gate.3.finding-anchors-follow-ups.yml](./task.195.gate.3.finding-anchors-follow-ups.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 5961
+- **Tests Executed**: 5963
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
 
-Both cycle 1 findings were fixed and mutation-proven. The cycle 2 refute pass found 3 advisory bugs, all medium or low confidence, and routed them to future work: CR-1 (review-pr guard accepts one broken lens), CR-2 (null entry crashes the checker, pre-existing) and CR-3 (`--staged --fix` index vs worktree).
+Cycle 3 re-entered QA after finalise's DoD gaps. All three security gaps on the review-pr `--inline` guard are fixed and mutation-proven, and the probe reproduces 0 of 43 with 0 escapes. The safety re-probe found TASK-195-QA3-1 (medium): a non-string `file_line` reads as a clean anchor instead of `unparseable`. Three low advisory findings were routed to future work.
 
 ## Definition of Done - Gaps Identified
 
@@ -491,6 +491,8 @@ Both cycle 1 findings were fixed and mutation-proven. The cycle 2 refute pass fo
 | 2026-10-19 |         | QA findings fixed — 2 of 2 (TASK-195-QA1-1, -2), 1 iteration | qa-fix |
 | 2026-10-19 |         | QA gate PASS (100/100) — 0 findings (3 advisory) | qa-task |
 | 2026-10-19 |  | DoD incomplete — 4 gaps identified (3 security on the review-pr --inline guard, CI pending) | finalise |
+| 2026-10-19 |  | QA gate CONCERNS (90/100) — 1 finding (TASK-195-QA3-1; 3 advisory) | qa-task |
+| 2026-10-19 |  | QA findings fixed — 1 of 1 (TASK-195-QA3-1: a non-string anchor reads unparseable / no-line), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

@@ -8,8 +8,9 @@ All notable changes to this project will be documented in this file. Format foll
 
 - **The finding-anchors checker no longer has a state its callers misread (task 195).** Seven
   advisory findings left by task 194 are closed. **A code finding whose `file_line` is not
-  `path:line`** — a bare path, a range, empty, or no `file_line` at all — now reads `unparseable`, a
-  new verdict in the malformed set (exit 1), instead of the clean `no-line`. The lens comes from the
+  `path:line`** — a bare path, a range, empty, a value that is not a string, or no `file_line` at
+  all — now reads `unparseable`, a new verdict in the malformed set (exit 1), instead of the clean
+  `no-line`. The lens comes from the
   wrapper (`code_review` or `pr_conformance`), or from the key in a bare array, so a conformance
   `ref` such as `AC-3` stays `no-line`. **`--rev` with a `--root` missing
   from that commit** exits 2 `bad-root` instead of reading every finding `no-such-file`. **`--index`**

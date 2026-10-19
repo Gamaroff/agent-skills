@@ -104,7 +104,8 @@ const MALFORMED = new Set([
 /**
  * `{lens, path, line}` for a `path:line` anchor, or `{lens, path: null}` when the value does not
  * parse. `lens` is the wrapper's, from `lensesOf`; without one the KEY decides: `file_line` is the
- * code lens, `ref` alone the conformance lens (task.195).
+ * code lens, `ref` alone the conformance lens (task.195). Only a string parses: a stringified array
+ * (`["x.js:8"]`) would verify here and then fail every consumer that reads it as text (QA3-1).
  */
 function anchorOf(finding, lens) {
   if (lens !== "code" && lens !== "conformance") {
@@ -113,7 +114,7 @@ function anchorOf(finding, lens) {
       : "conformance";
   }
   const raw = lens === "code" ? finding.file_line : finding.ref;
-  const m = /^(\S+):(-?\d+)$/.exec(String(raw ?? "").trim());
+  const m = typeof raw === "string" ? /^(\S+):(-?\d+)$/.exec(raw.trim()) : null;
   return m ? { lens, path: m[1], line: Number(m[2]) } : { lens, path: null };
 }
 
@@ -143,7 +144,8 @@ function checkAnchors(findings, { readFile, lenses = null }) {
     if (at.line < 1 || at.line > lines.length) {
       return { id, verdict: "out-of-range", ...at, lineCount: lines.length };
     }
-    if (f.line_text == null || norm(f.line_text) === "") {
+    // A non-string line_text quotes nothing, so the text is unchecked, never matched (QA3-1).
+    if (typeof f.line_text !== "string" || norm(f.line_text) === "") {
       return { id, verdict: "unchecked-text", ...at };
     }
     const actual = norm(lines[at.line - 1]);

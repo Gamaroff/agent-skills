@@ -208,6 +208,37 @@ test("under a wrapper the wrapper decides the lens: a code finding with no file_
   assert.equal(verdictOf({ id: "CR-9" }), "no-line");
 });
 
+// task.195 QA cycle 3 (TASK-195-QA3-1). A non-string anchor was stringified before matching, so
+// ["x.js:8"] read as x.js:8 and verified, and the inline selector later failed on the non-string.
+test("a non-string anchor is never matched: code reads unparseable, conformance no-line", () => {
+  const anchor = "scripts/smoke/slugify.js:8";
+  for (const raw of [[anchor], { file: anchor }, 8, true]) {
+    assert.equal(
+      verdictOf({ file_line: raw }),
+      "unparseable",
+      JSON.stringify(raw),
+    );
+    assert.equal(verdictOf({ ref: raw }), "no-line", JSON.stringify(raw));
+  }
+  // A non-string line_text is no quote at all: the range is checked, the text is not.
+  assert.equal(
+    verdictOf({
+      file_line: anchor,
+      line_text: [".replace(/[^a-z0-9]+/g, '-');"],
+    }),
+    "unchecked-text",
+  );
+  // Controls: the same anchor and quote as strings still verify.
+  assert.equal(verdictOf({ file_line: anchor }), "unchecked-text");
+  assert.equal(
+    verdictOf({
+      file_line: anchor,
+      line_text: ".replace(/[^a-z0-9]+/g, '-');",
+    }),
+    "ok",
+  );
+});
+
 test("a conformance ref of the path:line form is checked like a file_line", () => {
   assert.equal(
     verdictOf({
@@ -730,6 +761,41 @@ test("CLI: a wrapped code finding with no file_line exits 1 and is annotated unp
     const out = JSON.parse(readFileSync(f, "utf8"));
     assert.equal(out.code_review.findings[0].anchor_check, "unparseable");
     assert.equal(out.pr_conformance.findings[0].anchor_check, "no-line");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("CLI: an array file_line exits 1 malformed-anchors and is annotated unparseable", () => {
+  const dir = gitRepo();
+  try {
+    const f = path.join(dir, "f.json");
+    writeFileSync(
+      f,
+      JSON.stringify({
+        code_review: { findings: [{ id: "CR-1", file_line: ["top.js:1"] }] },
+      }),
+    );
+    const r = cli(
+      [
+        "--findings-file",
+        f,
+        "--root",
+        dir,
+        "--rev",
+        "HEAD",
+        "--annotate",
+        f,
+        "--json",
+      ],
+      dir,
+    );
+    assert.equal(r.code, 1);
+    assert.equal(r.json().reason, "malformed-anchors");
+    assert.equal(
+      JSON.parse(readFileSync(f, "utf8")).code_review.findings[0].anchor_check,
+      "unparseable",
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
