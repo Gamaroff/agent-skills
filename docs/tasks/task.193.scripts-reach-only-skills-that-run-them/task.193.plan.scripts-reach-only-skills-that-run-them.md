@@ -17,7 +17,10 @@ one test that guards the class and pins create-skill's rule sentence.
 ## Phase 1: Classification
 
 **The 34 prose literals** (`b36d7d32`; doc:line → script). Re-measure with the population
-definition in the task's § 8 before starting; the list may have moved.
+definition in the task's § 8 before starting; the list has moved. Review 1 measured **37** on
+`eb44b9c3` with the corrected running-line rule (a command token immediately before the path): the
+table below plus `step-0:729 pipeline-answers.js` and `step-8-commit:50 report-lint.js`, at shifted
+line numbers (e.g. the resume contract's incident line is now `:614`).
 
 | Citing document | Lines | Script |
 | --- | --- | --- |
@@ -69,6 +72,15 @@ skills with `NONE`. A mixed verdict means switching to the bare filename **and**
   until clean.
 - Run `npm test` before committing: lifted-block tests resolve scripts through bundled
   `references/`, and they are what would catch a skill that lost a script it runs.
+- **Removed-literal test sweep** (review 1, I2). For the scripts Phase 1 switches, search the tests for
+  the literal and for the bundled copies being removed:
+  `git grep -nE "shared/resources/(<script1>|<script2>…)" -- '*.test.*' 'tests/**' 'evals/**'` and
+  `git grep -nE "(<skill>)/references/(<script>)" -- '*.test.*' 'tests/**' 'evals/**'`. On `eb44b9c3` the
+  first finds only tests that read the **source** scripts by path (`qa-loop-lock-fields-parity.test.mjs`,
+  `tests/qa-cycle.test.js:449`, `report-lint-call-sites.test.mjs:153`, `security-probe.test.mjs`,
+  `review-security.test.js`, `stdout-drain-on-exit.test.mjs:379`) — unaffected by a prose edit — and the
+  second finds nothing for `develop-bug`/`qa-story`/`qa-task`/`review-pr`. List any new hit as a test
+  to update.
 
 ## Phase 3: `tests/shared-script-literals.test.js`
 
@@ -78,15 +90,23 @@ const ALLOWED = {
 };
 ```
 
-- Scan per the task's § 8 population definition. Track fences with the same fence regex the repo's
-  other line scanners use (`tests/lib/markdown-section.js` exports helpers; reuse if one fits).
+- Scan per the task's § 8 population definition. Track fences with `fenceStep` from
+  `tests/lib/markdown-section.js`. **Running line = a command token immediately before the path**
+  (`bash `, `sh `, `source `, `node `, `command node `, `require(`, `import(`, JS `import … from `,
+  optionally behind one quote/backtick) — never "a token anywhere earlier on the line", which passes
+  `Engine source: \`shared/resources/x.js\`` prose (review 1, I1).
 - Assertions: (1) every match is in `ALLOWED`; (2) every `ALLOWED` key matches at least one line;
   (3) floors: ≥ 40 `.md` files read, ≥ 1 fenced script literal seen (proves the fence branch runs).
-- Control fixtures: run the scanner function on four inline strings (prose, fenced, `bash` line,
-  cite wrapper) before the tree scan.
+- Control fixtures: run the scanner function on six inline strings before the tree scan — must fail:
+  plain prose, ``Engine source: `shared/resources/x.js` ``, ``wrap it with f from `shared/resources/x.sh` ``;
+  must pass: fenced, a `bash shared/resources/x.sh` line, a cite wrapper.
 - Pin: `sectionOf(read("skills/create-skill/SKILL.md"), "### Inside \`shared/resources/\`, a \`shared/resources/\` literal is a bundling instruction")`
-  contains `shared-resources directory` and not `references/<file>`. The heading text is also quoted by
-  `tests/bundle-missing-source.test.js:307`, so keep both in step.
+  returns an **array of lines** — join it, collapse whitespace — and assert it contains
+  `A literal that puts the shared-resources directory in front of the filename is not a reference`
+  and does **not** contain the old rule form `` A literal `references/<file>` ``. Do **not** forbid the
+  bare token `references/<file>`: the section's obs #175 sentence names it on purpose, so that pin is red
+  on today's tree (review 1, C1 — measured). The heading text is also quoted by
+  `tests/bundle-missing-source.test.js:308`, so keep both in step.
 
 ## Key Patterns and References
 

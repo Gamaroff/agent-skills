@@ -5,10 +5,10 @@ type: task
 description: "Classify every script a shared/resources/*.md names by its shared/resources/ literal in prose, switch the unneeded ones to bare filenames and remove their unreached bundled copies, and add a guard that fails on a new prose script literal not in a reasoned allowlist; also pin create-skill's shared-literal rule sentence."
 tags: [create-skill, bundler, observation, shared-resources, guard]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-10-07
-updated: 2026-10-07
+updated: 2026-10-19
 assignee:
 estimated_effort_hours: 8
 github_issue: 592
@@ -16,7 +16,8 @@ github_issue: 592
 
 # Technical Task: Scripts reach only the skills that run them
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.193.review.1.scripts-reach-only-skills-that-run-them.md` implemented 2026-10-19
 **GitHub Issue**: [#592](https://github.com/Gamaroff/agent-skills/issues/592)
 
 ---
@@ -79,17 +80,20 @@ two new tests, and a CHANGELOG entry.
   `<!-- cite: … -->` is a citation.
 - **Population** (measured on `b36d7d32`, definition in § 8): 47 script literals (`.sh`, `.js`, `.mjs`)
   in `shared/resources/*.md`. 13 are inside a fence or on an invocation line; **34 are in prose**,
-  across 15 documents. The per-member list is in the plan.
-- **The incident line** is still present: `develop-pipeline-resume-contract.md:551`
+  across 15 documents. The per-member list is in the plan. Re-measured on `eb44b9c3` (review 1) with the
+  corrected running-line rule in § 8: 48 literals, 8 fenced, 3 on a command line, **37 in prose**
+  (`pipeline-answers.js` is new). The test records the number; this figure is not a criterion.
+- **The incident line** is still present: `develop-pipeline-resume-contract.md:614`
   (``Source: `shared/resources/grant-qa-cycles.sh`; suite: `grant-qa-cycles.test.sh`.``) and a
   second prose mention at `develop-pipeline-step-5-6-qa-loop.md:16` (`writer:
   shared/resources/grant-qa-cycles.sh`).
-- **create-skill rule sentence**: `skills/create-skill/SKILL.md:297` (heading) and `:301`
-  ("puts the shared-resources directory in front of the filename is not a reference; it is an …"),
-  reworded by PR #585. A repo grep for the old self-contradicting form (`A literal \`references/<file>\``)
+- **create-skill rule sentence**: `skills/create-skill/SKILL.md:304` (heading) and `:306-308`
+  ("A literal that puts the shared-resources directory in front of the filename is not a reference; it is
+  an …"), reworded by PR #585. The section's last sentence names `references/<file>` **on purpose**, to
+  explain obs #175, so a pin cannot forbid that token. A repo grep for the old self-contradicting form (`A literal \`references/<file>\``)
   in `skills/*/SKILL.md` finds nothing on `b36d7d32`, so #289's sweep has no further sites.
 - **Existing guards**: `tests/bundle-comment-origin.test.js` (`.js`/`.mjs` comments),
-  `tests/bundle-missing-source.test.js` (quotes the rule's heading at `:307`), `bundle:check`
+  `tests/bundle-missing-source.test.js` (quotes the rule's heading at `:308`), `bundle:check`
   (`UNREACHED` copies only).
 
 ### Target Architecture
@@ -109,15 +113,18 @@ two new tests, and a CHANGELOG entry.
 - **Fix** (Phase 2): rewrite not-needed literals, `npm run bundle`, `git rm` every copy `bundle:check`
   then reports `UNREACHED`.
 - **Guard** (Phase 3), `tests/shared-script-literals.test.js`. For each `shared/resources/*.md`, find
-  `shared/resources/<name>.(sh|js|mjs)` literals outside fences and not on a line that runs the script
-  (the same "running line" pattern as the classification), and not inside `<!-- cite: … -->`. Each
+  `shared/resources/<name>.(sh|js|mjs)` literals outside fences and not run by a command token
+  immediately before them (§ 8's running-line rule), and not inside `<!-- cite: … -->`. Each
   must be in `ALLOWED`, a map in the test of `"<doc>:<script>": "<reason>"`, filled from the needed
   half of Phase 1. An unlisted one fails, naming the doc, the line and the two remedies (bare
   filename, or an allowlist entry with a reason). An allowlist entry that no longer matches any line
   also fails, so the list cannot rot. Non-vacuity: the scan reads ≥ 40 `.md` files and finds ≥ 1
   script literal in a fence (the pattern is alive).
-- **Pin** (Phase 3): the same test asserts that the create-skill rule paragraph (`sectionOf` the
-  heading at `:297`) does not contain `references/<file>`, and contains `shared-resources directory`.
+- **Pin** (Phase 3): the same test reads the create-skill section (`sectionOf` the heading at `:304`,
+  joined — it returns an array of lines) and asserts it contains the rule sentence `A literal that` …
+  `puts the shared-resources directory in front of the filename is not a reference` (compared with
+  whitespace collapsed) and does **not** contain the old rule form `` A literal `references/<file>` ``.
+  It must not forbid the bare token `references/<file>`: the section names it on purpose (review 1, C1).
 
 ### Important Clarifications
 
@@ -163,31 +170,31 @@ finds such a case, and Phase 2 gives that skill a direct reference.
 
 **Risk**: Low (read-only). **Files**: the plan's classification table.
 
-- [ ] For each literal: bundling skills, each skill's running line or "none", verdict.
-- [ ] Record the table in the implementation report with its commands.
+- [x] For each literal: bundling skills, each skill's running line or "none", verdict.
+- [x] Record the table in the implementation report with its commands.
 
 ### Phase 2: Fix the not-needed literals
 
 **Risk**: Medium (changes what skills ship). **Files**: the citing `shared/resources/*.md`; bundled
 copies. **Depends on**: Phase 1.
 
-- [ ] Rewrite each not-needed literal to the bare filename.
-- [ ] Where a running skill would lose its copy, add a `references/<script>` mention to its `SKILL.md`.
-- [ ] `npm run bundle`; `git rm` each `UNREACHED` copy; `npm run bundle:check` clean.
+- [x] Rewrite each not-needed literal to the bare filename.
+- [x] Where a running skill would lose its copy, add a `references/<script>` mention to its `SKILL.md`.
+- [x] `npm run bundle`; `git rm` each `UNREACHED` copy; `npm run bundle:check` clean.
 
 ### Phase 3: Guard and pin
 
 **Risk**: Low. **Files**: `tests/shared-script-literals.test.js` (new). **Depends on**: Phase 2.
 
-- [ ] Scan, `ALLOWED` map with reasons, stale-entry check, floors.
-- [ ] create-skill rule sentence pin.
-- [ ] Mutation proof: restore the `grant-qa-cycles.sh` literal in a copy of the resume contract → red.
+- [x] Scan, `ALLOWED` map with reasons, stale-entry check, floors.
+- [x] create-skill rule sentence pin.
+- [x] Mutation proof: restore the `grant-qa-cycles.sh` literal in a copy of the resume contract → red.
 
 ### Phase 4: Changelog
 
 **Risk**: Low. **Files**: `CHANGELOG.md`.
 
-- [ ] `[Unreleased]` › Fixed entry citing obs #263 and #289 (#175).
+- [x] `[Unreleased]` › Fixed entry citing obs #263 and #289 (#175).
 
 ---
 
@@ -222,11 +229,15 @@ copies. **Depends on**: Phase 1.
 
 - **Command**: `command node --test tests/shared-script-literals.test.js`
 - **Population definition** (the test re-measures it): every `shared/resources/*.md`; per line, outside
-  a fenced block, matches of `(?<![\w-]/)shared/resources/([A-Za-z0-9_.-]+\.(sh|js|mjs))` that are not on
-  a running line (`bash|sh|source|node|require(|import|from` before the literal on the same line) and
-  not inside `<!-- cite: … -->`.
-- **Control case**: a fixture document with one prose literal (must fail), one in a fence, one on a
-  `bash` line and one in a cite wrapper (all three must pass). This shows the scanner neither over-
+  a fenced block, matches of `(?<![\w-]/)shared/resources/([A-Za-z0-9_.-]+\.(sh|js|mjs))` that are not
+  **run** and not inside `<!-- cite: … -->`. A literal is run when a command token sits **immediately**
+  before it, optionally behind one quote or backtick: `bash `, `sh `, `source `, `node `, `command node `,
+  `require(`, `import(`, or a JS `import … from `. A token anywhere else on the line does not count:
+  `Engine source:`, English "from" and "sourceable" are prose (review 1, I1 — 18 of the 20 lines the
+  looser "anywhere before" rule called running were prose).
+- **Control case**: a fixture document with one prose literal, one ``Engine source: `shared/resources/x.js` ``
+  line and one ``wrap it with f from `shared/resources/x.sh` `` line (all three must fail), and one in a
+  fence, one on a `bash` line and one in a cite wrapper (all three must pass). This shows the scanner neither over-
   nor under-fires, before it runs on the real tree.
 - **Pin**: the create-skill section text contains `shared-resources directory` and no
   `references/<file>`.
@@ -250,25 +261,25 @@ Not applicable: one text scan over `shared/resources/*.md`.
 
 ### Functional
 
-- [ ] Every prose script literal in `shared/resources/*.md` is either a bare filename, in a cite
+- [x] Every prose script literal in `shared/resources/*.md` is either a bare filename, in a cite
   wrapper, or in `ALLOWED` with a reason — held by `tests/shared-script-literals.test.js` (Phase 3).
-- [ ] An `ALLOWED` entry that matches no line fails — held by the same test (Phase 3).
-- [ ] No bundled copy of `grant-qa-cycles.sh` sits in a skill that does not run it, and
+- [x] An `ALLOWED` entry that matches no line fails — held by the same test (Phase 3).
+- [x] No bundled copy of `grant-qa-cycles.sh` sits in a skill that does not run it, and
   `npm run bundle:check` reports no `UNREACHED` copy — held by `bundle:check` in CI and the same test's
   population (Phase 2).
-- [ ] The create-skill rule paragraph reads the unbundled form — held by the same test (Phase 3).
+- [x] The create-skill rule paragraph reads the unbundled form — held by the same test (Phase 3).
 
 ### Performance
 
-- [ ] Not applicable: one text scan, no runtime path.
+- [x] Not applicable: one text scan, no runtime path.
 
 ### Code Quality
 
-- [ ] `npm test`, `npm run bundle:check`, `prettier --check .` pass.
+- [x] `npm test`, `npm run bundle:check`, `prettier --check .` pass.
 
 ### Migration
 
-- [ ] CHANGELOG entry names the guard and the removed copies.
+- [x] CHANGELOG entry names the guard and the removed copies.
 
 ---
 
@@ -321,6 +332,9 @@ None.
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-10-07 | 1.0 | Initial draft — cut from observations #263, #289 | create-task |
+| 2026-10-19 | 1.1 | Review passed (8/10) — pin re-specified against the old rule form (it failed on today's text); running-line rule tightened to a command token immediately before the path, with `Engine source:` and prose-`from` control fixtures; removed-literal test search recorded; anchors and population re-measured | review-task |
+| 2026-10-19 |  | Status → ready-for-development | review-task |
+| 2026-10-19 |  | Implemented — 11 literals switched, 17 bundled copies removed, 1 SKILL.md reference, 1 new test file (6 tests), CHANGELOG | develop |
 <!-- change-log-end -->
 
 ---
@@ -329,19 +343,19 @@ None.
 
 ### Phase 1: Classify the 34
 
-- [ ] Not started
+- [x] Complete — 37 literals classified on `eb44b9c3`; 11 switched (table in the implementation report)
 
 ### Phase 2: Fix the not-needed literals
 
-- [ ] Not started
+- [x] Complete — 11 literals switched, 17 copies removed, develop-bug `SKILL.md` names `references/pipeline-answers.js`; `bundle:check` 0 problems
 
 ### Phase 3: Guard and pin
 
-- [ ] Not started
+- [x] Complete — `tests/shared-script-literals.test.js`, 6 tests, 23 `ALLOWED` entries; 6 mutations each red
 
 ### Phase 4: Changelog
 
-- [ ] Not started
+- [x] Complete
 
 ---
 
