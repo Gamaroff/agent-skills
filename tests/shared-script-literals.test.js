@@ -18,10 +18,17 @@
  * 17 copies. This test is what keeps a new one from landing unjustified.
  *
  * Three parts:
- *   §1 CONTROL — the scanner on six inline fixtures: plain prose, an
- *      `Engine source:` line and a prose "from" line must be reported; a fenced
- *      line, a command line and a cite wrapper must not. A scanner that over- or
- *      under-fires is caught here before it judges the real tree.
+ *   §1 CONTROL — the scanner on inline fixtures: plain prose, an
+ *      `Engine source:` line, prose "source"/"import … from" and a cite wrapper
+ *      must be reported; a fenced line and a command line must not. A scanner
+ *      that over- or under-fires is caught here before it judges the real tree.
+ *
+ * A cite wrapper is no exemption here. The bundler cites only a `.md` target
+ * (quick_validate.py `ref_kind`, CITABLE_SUFFIXES): `<!-- cite: …x.js -->` is a
+ * dependency and copies x.js like a bare literal does (task.193 QA cycle 1, CR-1).
+ *
+ * Scope: `shared/resources/*.md`, the task's population. A literal in a shared
+ * `.sh` comment propagates the same way and is not read here (QA cycle 1, CR-3).
  *   §2 LIVE TREE — every reported literal is in ALLOWED (each entry carries the
  *      reason every bundling skill needs the copy), every ALLOWED entry still
  *      matches a line, and the incident line restored into the resume contract is
@@ -46,16 +53,15 @@ const SCRIPT_LITERAL =
   /(?<![\w-]\/)shared\/resources\/([A-Za-z0-9_.-]+\.(?:sh|js|mjs))/g;
 
 /**
- * A literal is RUN when a command token sits immediately before it, optionally
- * behind one quote or backtick. A token anywhere else on the line does not count:
- * "Engine source:", English "from" and "sourceable" are prose, and an
- * "anywhere before" rule passed 18 such lines (task.193 review 1, I1).
+ * A literal is RUN when a command sits immediately before it, optionally behind
+ * one quote or backtick. The command must open a code span, a `(` / `$(` or the
+ * line, and may carry flags; `import … from` must sit inside one code span. A
+ * token anywhere else does not count: "Engine source:", English "from" and
+ * "sourceable" are prose, and an "anywhere before" rule passed 18 such lines
+ * (task.193 review 1, I1). So is "the single source `…`" (QA cycle 1, CR-2).
  */
 const RUN_PREFIX =
-  /(?:\b(?:bash|sh|source|node|command node)\s+|require\(\s*|import\(\s*|\bimport\b.*\bfrom\s+)["'`]?$/;
-
-const CITE_OPEN = "<!-- cite:";
-const CITE_CLOSE = "-->";
+  /(?:(?:^|[`(])\s*(?:command\s+)?(?:bash|sh|source|node)\s+(?:-\S+\s+)*|require\(\s*|import\(\s*|`[^`]*\bimport\b[^`]*\bfrom\s+)["'`]?(?:\.\/)?$/;
 
 /**
  * Each "<doc>:<script>" whose prose literal stays, with the reason every skill
@@ -124,7 +130,6 @@ function scan(text) {
   const found = [];
   let fenced = 0;
   let open = null;
-  let inCite = false;
   text.split(/\r?\n/).forEach((line, i) => {
     const step = fenceStep(open, line);
     const isFenced = open !== null || step.isFence;
@@ -133,37 +138,12 @@ function scan(text) {
       fenced += [...line.matchAll(SCRIPT_LITERAL)].length;
       return;
     }
-    // Walk the line in order so a cite wrapper opened on an earlier line, or
-    // earlier on this one, covers the literals inside it.
-    let pos = 0;
     for (const m of line.matchAll(SCRIPT_LITERAL)) {
-      inCite = citeState(inCite, line.slice(pos, m.index));
-      pos = m.index;
-      if (inCite) continue;
       if (RUN_PREFIX.test(line.slice(0, m.index))) continue;
       found.push({ line: i + 1, script: m[1], text: line.trim() });
     }
-    inCite = citeState(inCite, line.slice(pos));
   });
   return { found, fenced };
-}
-
-function citeState(inCite, segment) {
-  let state = inCite;
-  let i = 0;
-  for (;;) {
-    if (state) {
-      const close = segment.indexOf(CITE_CLOSE, i);
-      if (close === -1) return state;
-      state = false;
-      i = close + CITE_CLOSE.length;
-    } else {
-      const openAt = segment.indexOf(CITE_OPEN, i);
-      if (openAt === -1) return state;
-      state = true;
-      i = openAt + CITE_OPEN.length;
-    }
-  }
 }
 
 function liveDocs() {
@@ -195,12 +175,18 @@ test("§1 control: the scanner reports prose and nothing else", () => {
     "```",
     "Run `bash shared/resources/e.sh` once.",
     "See <!-- cite: shared/resources/f.mjs --> for the engine.",
+    "This is the single source `shared/resources/g.js` for the rule.",
+    "Callers import nothing from `shared/resources/h.js` directly.",
+    "Load it with `node -e 'require(\"./shared/resources/i.js\")'`.",
+    "Then `command node --test shared/resources/j.mjs` runs it.",
+    "Lift it with `import { x } from 'shared/resources/k.mjs'`.",
   ].join("\n");
   const r = scan(fixture);
   assert.deepEqual(
     r.found.map((h) => h.script),
-    ["a.sh", "b.js", "c.sh"],
-    "prose, `Engine source:` and prose `from` are reported; fence, command line and cite are not",
+    ["a.sh", "b.js", "c.sh", "f.mjs", "g.js", "h.js"],
+    "prose, `Engine source:`, prose from/source and a cite wrapper are reported; " +
+      "fence, command lines and code-span require/import are not",
   );
   assert.equal(
     r.fenced,
@@ -209,13 +195,15 @@ test("§1 control: the scanner reports prose and nothing else", () => {
   );
 });
 
-test("§1 control: a cite wrapper spanning lines covers what it wraps", () => {
+test("§1 control: a cite wrapper spanning lines does not hide a script", () => {
+  // The bundler reads a cite-wrapped script as a dependency (CR-1), so the
+  // wrapper must not exempt it, on one line or across several.
   const r = scan(
     "Before <!-- cite:\nshared/resources/g.js\n--> after `shared/resources/h.js`.",
   );
   assert.deepEqual(
     r.found.map((h) => h.script),
-    ["h.js"],
+    ["g.js", "h.js"],
   );
 });
 

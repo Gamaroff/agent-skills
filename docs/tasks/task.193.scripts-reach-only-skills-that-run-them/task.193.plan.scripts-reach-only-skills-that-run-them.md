@@ -99,7 +99,8 @@ const ALLOWED = {
   (3) floors: ≥ 40 `.md` files read, ≥ 1 fenced script literal seen (proves the fence branch runs).
 - Control fixtures: run the scanner function on six inline strings before the tree scan — must fail:
   plain prose, ``Engine source: `shared/resources/x.js` ``, ``wrap it with f from `shared/resources/x.sh` ``;
-  must pass: fenced, a `bash shared/resources/x.sh` line, a cite wrapper.
+  and a cite wrapper (the bundler cites only `.md`; QA cycle 1, CR-1); must pass: fenced, a
+  `bash shared/resources/x.sh` line.
 - Pin: `sectionOf(read("skills/create-skill/SKILL.md"), "### Inside \`shared/resources/\`, a \`shared/resources/\` literal is a bundling instruction")`
   returns an **array of lines** — join it, collapse whitespace — and assert it contains
   `A literal that puts the shared-resources directory in front of the filename is not a reference`

@@ -42,8 +42,8 @@ two new tests, and a CHANGELOG entry.
 1. A per-literal classification (witness per member) in the plan: **needed** (every skill that
    bundles the citing document runs the script) or **not needed**.
 2. Not-needed literals switched to bare filenames, their unreached copies removed with `git rm`.
-3. `tests/shared-script-literals.test.js`: a prose script literal outside a `<!-- cite: … -->` wrapper
-   and not on the reasoned allowlist fails. A pin on create-skill's rule sentence.
+3. `tests/shared-script-literals.test.js`: a prose script literal not on the reasoned allowlist
+   fails, inside a `<!-- cite: … -->` wrapper or not (a cite of a script is a dependency). A pin on create-skill's rule sentence.
 
 ---
 
@@ -77,7 +77,7 @@ two new tests, and a CHANGELOG entry.
 - **Bundler**: `SHARED_REF_RE = re.compile(r'(?<![\w-]/)(?:\.\./)*shared/resources/([^\s`\'")\]*]+)')`
   (`skills/create-skill/scripts/bundle_skill.py:45`) matches any `shared/resources/<file>` literal,
   in prose or code. A match is a dependency; a fragment link to an `.md` is a citation; a mention inside
-  `<!-- cite: … -->` is a citation.
+  `<!-- cite: … -->` is a citation — of an `.md` only; a cited script is still a dependency.
 - **Population** (measured on `b36d7d32`, definition in § 8): 47 script literals (`.sh`, `.js`, `.mjs`)
   in `shared/resources/*.md`. 13 are inside a fence or on an invocation line; **34 are in prose**,
   across 15 documents. The per-member list is in the plan. Re-measured on `eb44b9c3` (review 1) with the
@@ -114,7 +114,7 @@ two new tests, and a CHANGELOG entry.
   then reports `UNREACHED`.
 - **Guard** (Phase 3), `tests/shared-script-literals.test.js`. For each `shared/resources/*.md`, find
   `shared/resources/<name>.(sh|js|mjs)` literals outside fences and not run by a command token
-  immediately before them (§ 8's running-line rule), and not inside `<!-- cite: … -->`. Each
+  immediately before them (§ 8's running-line rule), whether or not inside `<!-- cite: … -->`. Each
   must be in `ALLOWED`, a map in the test of `"<doc>:<script>": "<reason>"`, filled from the needed
   half of Phase 1. An unlisted one fails, naming the doc, the line and the two remedies (bare
   filename, or an allowlist entry with a reason). An allowlist entry that no longer matches any line
@@ -230,14 +230,15 @@ copies. **Depends on**: Phase 1.
 - **Command**: `command node --test tests/shared-script-literals.test.js`
 - **Population definition** (the test re-measures it): every `shared/resources/*.md`; per line, outside
   a fenced block, matches of `(?<![\w-]/)shared/resources/([A-Za-z0-9_.-]+\.(sh|js|mjs))` that are not
-  **run** and not inside `<!-- cite: … -->`. A literal is run when a command token sits **immediately**
+  **run**, inside `<!-- cite: … -->` or not (QA cycle 1, CR-1). A literal is run when a command token sits **immediately**
   before it, optionally behind one quote or backtick: `bash `, `sh `, `source `, `node `, `command node `,
   `require(`, `import(`, or a JS `import … from `. A token anywhere else on the line does not count:
   `Engine source:`, English "from" and "sourceable" are prose (review 1, I1 — 18 of the 20 lines the
   looser "anywhere before" rule called running were prose).
 - **Control case**: a fixture document with one prose literal, one ``Engine source: `shared/resources/x.js` ``
-  line and one ``wrap it with f from `shared/resources/x.sh` `` line (all three must fail), and one in a
-  fence, one on a `bash` line and one in a cite wrapper (all three must pass). This shows the scanner neither over-
+  line, one ``wrap it with f from `shared/resources/x.sh` `` line and one in a cite wrapper (all four must
+  fail — the bundler cites only an `.md` target, so a cite-wrapped script is still a dependency; QA cycle 1,
+  CR-1), and one in a fence and one on a `bash` line (both must pass). This shows the scanner neither over-
   nor under-fires, before it runs on the real tree.
 - **Pin**: the create-skill section text contains `shared-resources directory` and no
   `references/<file>`.
@@ -261,8 +262,8 @@ Not applicable: one text scan over `shared/resources/*.md`.
 
 ### Functional
 
-- [x] Every prose script literal in `shared/resources/*.md` is either a bare filename, in a cite
-  wrapper, or in `ALLOWED` with a reason — held by `tests/shared-script-literals.test.js` (Phase 3).
+- [x] Every prose script literal in `shared/resources/*.md` is either a bare filename or in
+  `ALLOWED` with a reason (a cite wrapper does not exempt a script) — held by `tests/shared-script-literals.test.js` (Phase 3).
 - [x] An `ALLOWED` entry that matches no line fails — held by the same test (Phase 3).
 - [x] No bundled copy of `grant-qa-cycles.sh` sits in a skill that does not run it, and
   `npm run bundle:check` reports no `UNREACHED` copy — held by `bundle:check` in CI and the same test's
@@ -326,6 +327,30 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-19
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.193.qa.1.scripts-reach-only-skills-that-run-them.md](./task.193.qa.1.scripts-reach-only-skills-that-run-them.md)
+- **Gate File**: [task.193.gate.1.scripts-reach-only-skills-that-run-them.yml](./task.193.gate.1.scripts-reach-only-skills-that-run-them.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 25 (plus `ci:fast` 5903 at Step 3)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+
+CR-1 (medium): the guard exempts a cite-wrapped script literal, which the bundler still copies. CR-2 and CR-3 are advisory.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -335,6 +360,8 @@ None.
 | 2026-10-19 | 1.1 | Review passed (8/10) — pin re-specified against the old rule form (it failed on today's text); running-line rule tightened to a command token immediately before the path, with `Engine source:` and prose-`from` control fixtures; removed-literal test search recorded; anchors and population re-measured | review-task |
 | 2026-10-19 |  | Status → ready-for-development | review-task |
 | 2026-10-19 |  | Implemented — 11 literals switched, 17 bundled copies removed, 1 SKILL.md reference, 1 new test file (6 tests), CHANGELOG | develop |
+| 2026-10-19 |  | QA gate CONCERNS (90/100) — 1 finding (CR-1), 2 advisory | qa-task |
+| 2026-10-19 |  | QA fix cycle 1 — CR-1: a cite wrapper no longer exempts a script literal; CR-2: the run rule needs the command to open a code span or line; § 8 control spec corrected to match | qa-fix |
 <!-- change-log-end -->
 
 ---
