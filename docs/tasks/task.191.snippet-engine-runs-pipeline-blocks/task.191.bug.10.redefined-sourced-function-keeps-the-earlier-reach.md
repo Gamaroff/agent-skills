@@ -4,7 +4,7 @@
 **Bug ID**: TASK-191-BUG-10
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 3, CR3-1)
 **Date Found**: 2026-10-19
 
@@ -39,6 +39,7 @@ Let a helper's own definition win, or use the union of the two reaches. Never le
 | 2026-10-19 | New | qa-task | Found in QA cycle 3 (CR3-1) |
 | 2026-10-19 | In Progress | qa-fix | Third strike: mechanism replaced |
 | 2026-10-19 | Ready for QA | qa-fix | Union of every definition (addBody); T191 CR3-1 |
+| 2026-10-19 | Closed | qa-task | Verified by task.191.qa.4.snippet-engine-runs-pipeline-blocks.md |
 
 ## Developer Fix Cycle
 
