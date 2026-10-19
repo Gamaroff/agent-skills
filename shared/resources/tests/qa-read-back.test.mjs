@@ -592,6 +592,21 @@ const VERDICT_HALTS = [
       ),
     /\*\*Gate Decision\*\* is PASS but this cycle's gate .* says FAIL/,
   ],
+  [
+    // task.192 QA2-1: the previous cycle's row names the same token, and a qa-fix row after it
+    // shows this cycle wrote none. A token-only check read this clean.
+    "a cycle that repeats the verdict but wrote no row after the qa-fix row",
+    ({ doc }) =>
+      append(doc, "| 2026-09-26 | | QA findings fixed — cycle 1 | qa-fix |\n"),
+    /comes before a qa-fix row — this cycle's gate task\.9\.gate\.1\.x\.yml has no Change Log row of its own/,
+  ],
+  [
+    // task.192 QA2-2, the remaining half: with no QA gate row, a status row is not taken for one.
+    "only a status row written by QA",
+    ({ doc }) =>
+      edit(doc, "QA gate FAIL (40/100) — 1 finding", "Status → in-progress"),
+    /no qa-task\/qa-story Change Log row naming a QA gate verdict/,
+  ],
 ];
 
 for (const [name, mutate, says] of VERDICT_HALTS) {
@@ -602,18 +617,33 @@ for (const [name, mutate, says] of VERDICT_HALTS) {
   });
 }
 
-// The control: the rule reads the newest QA row, not the newest row.
+// The controls: the rule reads the newest QA gate row, not the newest row and not the newest
+// qa-* row. A QA run's own `Status →` row after its verdict row is the corpus shape that halted a
+// correct FAIL document (task.192 QA2-2; task.160 carries one).
 for (const shape of Object.keys(SHAPES)) {
-  test(`${shape}: a qa-fix and a finalise row after the QA row still read clean`, () => {
+  const skill = shape === "story" ? "qa-story" : "qa-task";
+  test(`${shape}: a status row and a finalise row after the QA gate row still read clean`, () => {
     const r = verdict(shape, ({ doc }) =>
       append(
         doc,
-        "| 2026-09-26 | | Fixed 1 finding | qa-fix |\n| 2026-09-26 | | DoD | finalise |\n",
+        `| 2026-09-26 | | Status → in-progress | ${skill} |\n| 2026-09-26 | | DoD | finalise |\n`,
       ),
     );
     assert.equal(r.exitCode, 0, JSON.stringify(r.problems));
   });
 }
+
+// The other direction of QA2-1: a qa-fix row BETWEEN two cycles' rows is the normal loop, and the
+// newest cycle's row after it reads clean.
+test("a qa-fix row followed by this cycle's own QA gate row reads clean", () => {
+  const r = verdict("task", ({ doc }) =>
+    append(
+      doc,
+      "| 2026-09-26 | | QA findings fixed — cycle 1 | qa-fix |\n| 2026-09-26 | | QA gate FAIL (50/100) — 1 finding | qa-task |\n",
+    ),
+  );
+  assert.equal(r.exitCode, 0, JSON.stringify(r.problems));
+});
 
 test("a **Gate Decision** written with a leading emoji is read by its token", () => {
   const r = verdict("task", ({ doc }) =>

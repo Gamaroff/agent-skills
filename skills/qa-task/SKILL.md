@@ -1622,11 +1622,12 @@ checks five things:
 4. **`updated:` accounts for the newest row** (`change-log.js` `checkUpdatedCoherence`). When it
    does not, apply `bumpUpdated(content, <that row's date>)` and re-run.
 5. **The verdict is this cycle's** (task.192). Every `**Gate Decision**` line in the
-   `## QA Testing Results` section, and the newest Change Log row written by `qa-task` or
-   `qa-story`, name the token in this cycle's gate (`gate:`); later `qa-fix` and `finalise`
-   rows are ignored. A missing section, decision line, QA row or `gate:` token halts too. When
-   it halts, re-render the section from this gate and append the `QA gate <TOKEN>` row, then
-   re-run.
+   `## QA Testing Results` section, and the newest `QA gate …` row written by `qa-task` or
+   `qa-story`, name the token in this cycle's gate (`gate:`). Later `finalise` rows and QA's own
+   `Status →` rows are ignored. A `qa-fix` row after that `QA gate` row halts: it means this
+   cycle wrote no row of its own, which a repeated verdict would otherwise hide. A missing
+   section, decision line, `QA gate` row or `gate:` token halts too. When it halts, re-render
+   the section from this gate and append the `QA gate <TOKEN>` row, then re-run.
 
 **Do not post the PR comment (Step 13) over exit 1 or 2.** Posting over it reproduces task.141: a PR comment linked
 a report that did not exist, found only by CI's `link-check`, and a row was dated after `updated:`,

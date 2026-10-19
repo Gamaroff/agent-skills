@@ -230,7 +230,9 @@ None.
   row to `QA gate CONCERNS` → problem; delete the `**Gate Decision**` line → problem; delete the
   whole QA section → problem; append a
   `qa-fix` row after the QA row → still clean (**control**: the rule reads the newest QA row, not the
-  newest row).
+  newest row). *QA cycle 2 changed this: a `qa-fix` row after the newest `QA gate` row now HALTs
+  (QA2-1, bug.2), and the control is a QA `Status →` row plus a `finalise` row after it, which read
+  clean (QA2-2, bug.3).*
 - **Lock**: a lock file removed by a timer during the backoff → clean, staged (the case the retry
   exists for). The existing persistent-lock case still reports `could not stage`, now with
   "after 4 attempts". A non-lock `git add` failure reports on the first attempt (`stageAttempts` = 1),
@@ -245,7 +247,8 @@ None.
 
 ### Mutation proofs
 
-- Compare against the newest row of any author → the `qa-fix` control goes red.
+- Compare against the newest row of any author → the `qa-fix` control goes red. *(QA cycle 2: the
+  control is now the status-row case; dropping the `QA gate` description filter turns it red.)*
 - Retry on every failure → the non-lock case's attempt-count assertion (`stageAttempts` = 1) goes red.
 
 ### Performance Tests
@@ -330,25 +333,26 @@ None.
 **QA Status**: ⚠️ CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-19
-**Quality Score**: 90/100
+**Quality Score**: 80/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
 
-- **Full Report**: [task.192.qa.1.read-back-checks-this-cycles-verdict.md](./task.192.qa.1.read-back-checks-this-cycles-verdict.md)
-- **Gate File**: [task.192.gate.1.read-back-checks-this-cycles-verdict.yml](./task.192.gate.1.read-back-checks-this-cycles-verdict.yml)
+- **Full Report**: [task.192.qa.2.read-back-checks-this-cycles-verdict.md](./task.192.qa.2.read-back-checks-this-cycles-verdict.md)
+- **Gate File**: [task.192.gate.2.read-back-checks-this-cycles-verdict.yml](./task.192.gate.2.read-back-checks-this-cycles-verdict.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 104 (targeted suites); ci:fast 5893
+- **Tests Executed**: 106 (targeted suites); 17 security probes
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
 
-- QA-1 (MEDIUM): both SKILL.md read-back sections still list four checks and omit the lock retry — [bug 1](./task.192.bug.1.skill-md-read-back-omits-verdict-check.md).
-- QA-2 (LOW): only the first `**Gate Decision**` line of a QA section is checked (probe-reproduced).
+- Cycle 1's QA-1 and QA-2 are fixed and verified ([bug 1](./task.192.bug.1.skill-md-read-back-omits-verdict-check.md) closed).
+- QA2-2 (MEDIUM): a status row after a FAIL verdict row halts a correct document — [bug 3](./task.192.bug.3.status-row-after-verdict-halts-a-correct-document.md).
+- QA2-1 (MEDIUM): a cycle repeating the previous verdict reads clean without its own row — [bug 2](./task.192.bug.2.same-verdict-cycle-reads-clean-without-its-row.md).
 
 <!-- change-log-start -->
 ## Change Log
@@ -361,6 +365,8 @@ None.
 | 2026-10-19 |  | Implemented — engine, 2 test suites, CHANGELOG (bundled copies regenerated); 16 new tests | develop |
 | 2026-10-19 |  | QA gate CONCERNS (90/100) — 2 findings | qa-task |
 | 2026-10-19 |  | QA findings fixed — cycle 1, 2 findings (SKILL.md read-back lists; every Gate Decision line) | qa-fix |
+| 2026-10-19 |  | QA gate CONCERNS (80/100) — 2 findings | qa-task |
+| 2026-10-19 |  | QA findings fixed — cycle 2, 2 findings (verdict row = newest QA gate row; a qa-fix row after it halts) | qa-fix |
 <!-- change-log-end -->
 
 ---

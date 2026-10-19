@@ -144,21 +144,33 @@ function verdictProblems(engines, text, gateFile) {
         );
   }
 
-  // The newest row QA wrote — not the newest row: qa-fix and finalise rows follow it.
-  const qaRow = engines.changeLog
-    .extractEntries(text)
-    .filter((r) => /^qa-(task|story)$/.test(cells(r).at(-1) || ""))
-    .at(-1);
-  if (!qaRow)
+  // The verdict row is the newest row QA wrote that records a verdict — not the newest row,
+  // and not the newest qa-* row: a QA run may follow it with a `Status →` row of its own
+  // (task.192 QA2-2).
+  const rows = engines.changeLog.extractEntries(text);
+  const author = (r) => cells(r).at(-1) || "";
+  const at = rows.findLastIndex(
+    (r) =>
+      /^qa-(task|story)$/.test(author(r)) &&
+      /^QA gate\b/.test(cells(r).at(-2) || ""),
+  );
+  if (at < 0)
     problems.push(
-      "no qa-task/qa-story Change Log row — the verdict row did not land",
+      "no qa-task/qa-story Change Log row naming a QA gate verdict — the verdict row did not land",
     );
-  else if (!new RegExp(`\\bQA gate ${want}\\b`).test(qaRow)) {
-    const c = cells(qaRow);
+  else if (!new RegExp(`\\bQA gate ${want}\\b`).test(rows[at])) {
+    const c = cells(rows[at]);
     problems.push(
-      `the newest QA Change Log row reads "${c.at(-2) || qaRow.trim()}" but this cycle's gate ${base} says ${want}`,
+      `the newest QA Change Log row reads "${c.at(-2) || rows[at].trim()}" but this cycle's gate ${base} says ${want}`,
     );
-  }
+  } else if (rows.slice(at + 1).some((r) => author(r) === "qa-fix"))
+    // This cycle's row, not only this cycle's token. The read-back runs right after QA writes
+    // its row, and every cycle after a fix writes one, so a qa-fix row after the newest verdict
+    // row means this cycle wrote none; a repeated verdict hides that from the token check
+    // (task.192 QA2-1).
+    problems.push(
+      `the newest QA gate row ("${cells(rows[at]).at(-2)}") comes before a qa-fix row — this cycle's gate ${base} has no Change Log row of its own`,
+    );
   return problems;
 }
 

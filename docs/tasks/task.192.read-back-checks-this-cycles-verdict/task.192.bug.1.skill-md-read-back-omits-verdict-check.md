@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa
+status: closed
 severity: medium
 priority: P2
 updated: 2026-10-19
@@ -12,7 +12,7 @@ updated: 2026-10-19
 **Bug ID**: TASK-192-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 1, from code review CR-1)
 **Date Found**: 2026-10-19
 
@@ -87,3 +87,4 @@ hits, and each list carries item 5.
 | 2026-10-19 | New | qa-task | Raised by task.192.qa.1.read-back-checks-this-cycles-verdict.md |
 | 2026-10-19 | In Progress | qa-fix | Investigation started |
 | 2026-10-19 | Ready for QA | qa-fix | Both SKILL.md read-back lists updated |
+| 2026-10-19 | Closed | qa-task | Verified by task.192.qa.2.read-back-checks-this-cycles-verdict.md |
