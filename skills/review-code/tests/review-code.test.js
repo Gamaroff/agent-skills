@@ -376,7 +376,7 @@ test("the inline-comment jq snippet executes against a schema-shaped fixture", (
 // must refuse such a file, and must let a fully annotated one through (control).
 function extractInlineGuard(skillText) {
   const m = skillText.match(
-    /^[ \t]*jq -e '[\s\S]*?select\(has\("anchor_check"\) \| not\)[\s\S]*?exit 1; \}/m,
+    /^[ \t]*jq -e '[\s\S]*?select\(\(\.anchor_check \| type\) != "string"\)[\s\S]*?exit 1; \}/m,
   );
   return m ? m[0] : null;
 }
@@ -412,7 +412,19 @@ test("--inline refuses a findings file with an un-annotated finding, and passes 
     assert.match(never.stdout, /HALT: .*anchor_check.*Step 2b/);
     // A file with no findings array selects nothing; it must not pass as "all annotated"
     // (task.195 QA cycle 1, TASK-195-QA1-2). An empty array is a legitimate empty review.
-    for (const notFindings of [{}, { code_review: {} }, []]) {
+    // task.195 DoD 1: a null anchor_check is not a checker verdict — the checker always writes a string.
+    for (const notFindings of [
+      {},
+      { code_review: {} },
+      [],
+      {
+        code_review: {
+          findings: [
+            { file_line: "src/x.ts:4", finding: "f", anchor_check: null },
+          ],
+        },
+      },
+    ]) {
       const r = runGuard(notFindings);
       assert.equal(r.status, 1, `${JSON.stringify(notFindings)} must HALT`);
       assert.match(r.stdout, /HALT: /);

@@ -18,7 +18,10 @@ All notable changes to this project will be documented in this file. Format foll
   `/review-code`, `/qa-task`, `/qa-story`) decide on the checker's JSON `reason`, never its exit
   code — `node` also exits 1 when the script cannot load — and HALT as "checker not runnable" when
   there is no reason at all. **Both `--inline` blocks** refuse a findings file with an un-annotated
-  finding instead of posting `[]`. **The develop-bug verify loop** carries a blocking finding with a
+  finding (a missing or null `anchor_check`) instead of posting `[]`. The review-pr block and the
+  checker also refuse a file where any lens present has no findings array, which used to drop that
+  lens's findings silently. The review-pr block no longer leaves a scratch file in `$TMPDIR` when it
+  refuses. **The develop-bug verify loop** carries a blocking finding with a
   malformed anchor as `(location unverified: {file_line})`, and the population guard now covers every
   executed document that consumes code-review findings, not only the dispatchers.
   **Consumer upgrade:** re-vendor (`setup-consumer.sh --update`). An external caller that branched on

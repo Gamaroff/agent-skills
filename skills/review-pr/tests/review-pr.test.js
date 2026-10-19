@@ -2493,7 +2493,7 @@ for (const shell of SHELLS) {
 // must refuse such a file, and must let a fully annotated one through (control).
 function extractInlineGuard(skillText) {
   const m = skillText.match(
-    /^[ \t]*jq -e '[\s\S]*?select\(has\("anchor_check"\) \| not\)[\s\S]*?exit 1; \}/m,
+    /^[ \t]*jq -e '[\s\S]*?select\(\(\.anchor_check \| type\) != "string"\)[\s\S]*?exit 1; \}/m,
   );
   return m ? m[0] : null;
 }
@@ -2529,7 +2529,27 @@ test("--inline refuses a findings file with an un-annotated finding, and passes 
     assert.match(never.stdout, /HALT: .*anchor_check.*Step 6/);
     // A file with no findings array selects nothing; it must not pass as "all annotated"
     // (task.195 QA cycle 1, TASK-195-QA1-2). An empty array is a legitimate empty review.
-    for (const notFindings of [{}, { code_review: {} }, []]) {
+    // task.195 DoD 1: every lens present must hold an array — a non-array beside a valid lens dropped
+    // that lens unseen — and a null anchor_check is not a checker verdict.
+    for (const notFindings of [
+      {},
+      { code_review: {} },
+      [],
+      {
+        code_review: { findings: "oops" },
+        pr_conformance: {
+          findings: [{ ref: "AC-1", anchor_check: "no-line" }],
+        },
+      },
+      { code_review: { findings: [] }, pr_conformance: {} },
+      {
+        code_review: {
+          findings: [
+            { file_line: "src/x.ts:4", finding: "f", anchor_check: null },
+          ],
+        },
+      },
+    ]) {
       const r = runGuard(notFindings);
       assert.equal(r.status, 1, `${JSON.stringify(notFindings)} must HALT`);
       assert.match(r.stdout, /HALT: /);
@@ -2543,6 +2563,16 @@ test("--inline refuses a findings file with an un-annotated finding, and passes 
       }).status,
       0,
       "a conformance-only file passes",
+    );
+    assert.equal(
+      runGuard({
+        code_review: null,
+        pr_conformance: {
+          findings: [{ ref: "AC-1", anchor_check: "no-line" }],
+        },
+      }).status,
+      0,
+      "a lens that did not run may be null",
     );
     const annotated = runGuard({
       code_review: {
@@ -2560,6 +2590,69 @@ test("--inline refuses a findings file with an un-annotated finding, and passes 
       0,
       `an annotated file must pass:\n${annotated.stdout}${annotated.stderr}`,
     );
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// task.195 DoD 1: the --inline block made its scratch file before the guard and never removed it on a
+// refusal, so every refused input left one in $TMPDIR. Run the whole block: refused or posted,
+// nothing may be left behind.
+test("--inline leaves no scratch file behind, whether it refuses the input or posts it", (t) => {
+  if (spawnSync("jq", ["--version"]).error) return t.skip("jq not installed");
+  const m = SKILL.match(
+    /^FINDINGS_JSON="\{findings-json\}" {3}# Step 6 — the file finding-anchors\.js annotated\n[\s\S]*?^rm -f "\$INLINE_FILE"$/m,
+  );
+  assert.ok(m, "could not find the --inline block");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "inline-block-"));
+  try {
+    const tmp = path.join(dir, "tmp");
+    const work = path.join(dir, "work");
+    const poster = path.join(work, ".agents/skills/review-pr/references");
+    fs.mkdirSync(tmp);
+    fs.mkdirSync(poster, { recursive: true });
+    fs.writeFileSync(
+      path.join(poster, "pr-inline-comment.js"),
+      'process.stdout.write(JSON.stringify({ reason: "posted" }) + "\\n");\n',
+    );
+    const body = path.join(dir, "body.md");
+    fs.writeFileSync(body, "summary\n");
+    const findings = path.join(dir, "findings.json");
+    const runBlock = (doc) => {
+      fs.writeFileSync(findings, JSON.stringify(doc));
+      const script = m[0]
+        .replaceAll("{findings-json}", findings)
+        .replaceAll("{pr-number}", "7")
+        .replaceAll("{body-file}", body);
+      return spawnSync("bash", ["-c", script], {
+        cwd: work,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          TMPDIR: tmp,
+          PATH: `${path.dirname(process.execPath)}:${process.env.PATH}`,
+        },
+      });
+    };
+    const refused = runBlock({
+      code_review: { findings: "oops" },
+      pr_conformance: { findings: [{ ref: "AC-1", anchor_check: "no-line" }] },
+    });
+    assert.equal(refused.status, 1, refused.stdout + refused.stderr);
+    assert.match(refused.stdout, /HALT: /);
+    assert.deepEqual(
+      fs.readdirSync(tmp),
+      [],
+      "a refusal leaves no scratch file",
+    );
+    const posted = runBlock({
+      code_review: {
+        findings: [{ file_line: "a.js:1", finding: "f", anchor_check: "ok" }],
+      },
+    });
+    assert.equal(posted.status, 0, posted.stdout + posted.stderr);
+    assert.match(posted.stdout, /"reason":"posted"/);
+    assert.deepEqual(fs.readdirSync(tmp), [], "a post leaves no scratch file");
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

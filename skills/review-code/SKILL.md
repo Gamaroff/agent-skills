@@ -167,8 +167,9 @@ Only if `--comment` is set and a PR exists for the current branch (or `target` n
    # Refuse un-annotated input first. The select below keeps only verified anchors, so a file
    # the checker never annotated yields [] — the same output as "no anchorable findings" (task.195).
    # The array must exist: `{}` would otherwise select nothing and pass as "every finding annotated".
+   # `anchor_check` must be a string — the checker always writes one, so a null is un-annotated.
    jq -e '(.code_review.findings | type == "array")
-          and ([ .code_review.findings[]? | select(has("anchor_check") | not) ] | length == 0)' \
+          and ([ .code_review.findings[]? | select((.anchor_check | type) != "string") ] | length == 0)' \
       "$FINDINGS_JSON" >/dev/null || {
      echo "HALT: a finding in $FINDINGS_JSON carries no anchor_check (or the file is not findings JSON) — run Step 2b's anchor check first; nothing posted inline"; exit 1; }
    jq '[ .code_review.findings[]?

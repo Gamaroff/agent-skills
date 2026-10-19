@@ -156,10 +156,13 @@ function checkAnchors(findings, { readFile, lenses = null }) {
 function findingsOf(doc) {
   if (Array.isArray(doc)) return doc;
   if (!doc || typeof doc !== "object") return null;
-  const cr = doc.code_review?.findings;
-  const pc = doc.pr_conformance?.findings;
-  if (!Array.isArray(cr) && !Array.isArray(pc)) return null;
-  return [...(Array.isArray(cr) ? cr : []), ...(Array.isArray(pc) ? pc : [])];
+  // Every lens present must hold an array, not just one of them: a non-array beside a valid one
+  // would drop that lens's findings unseen and read as a clean run (task.195 DoD 1). A lens that
+  // did not run is absent or null.
+  const lenses = [doc.code_review, doc.pr_conformance].filter((w) => w != null);
+  if (lenses.length === 0 || !lenses.every((w) => Array.isArray(w.findings)))
+    return null;
+  return lenses.flatMap((w) => w.findings);
 }
 
 /** The lens of each finding `findingsOf(doc)` returns, by wrapper; null for a bare array. */
@@ -397,7 +400,7 @@ function run(argv, deps = {}) {
   if (!findings) {
     return usage(
       opts,
-      "--findings-file holds no findings array (code_review.findings, pr_conformance.findings, or a bare array)",
+      "--findings-file holds no findings array for every lens present (code_review.findings, pr_conformance.findings, or a bare array)",
     );
   }
   const tree = checkTree(

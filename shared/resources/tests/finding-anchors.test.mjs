@@ -374,6 +374,52 @@ test("CLI exits 2 on a findings file with no findings array", () => {
   }
 });
 
+// task.195 DoD 1: one lens's findings that is not an array, beside a valid other lens, used to be
+// skipped — its findings vanished and the run read `ok`. Every lens present must hold an array.
+test("every lens present must hold a findings array; a lens that did not run may be absent or null", () => {
+  const conformance = { findings: [{ id: "PC-1", ref: "AC-3" }] };
+  assert.equal(
+    findingsOf({
+      code_review: { findings: "oops" },
+      pr_conformance: conformance,
+    }),
+    null,
+  );
+  assert.equal(
+    findingsOf({ code_review: { findings: [] }, pr_conformance: {} }),
+    null,
+  );
+  assert.equal(
+    findingsOf({ code_review: "x", pr_conformance: conformance }),
+    null,
+  );
+  // Controls: an absent or null lens is a lens that did not run.
+  assert.deepEqual(
+    findingsOf({ pr_conformance: conformance }),
+    conformance.findings,
+  );
+  assert.deepEqual(
+    findingsOf({ code_review: null, pr_conformance: conformance }),
+    conformance.findings,
+  );
+  const dir = scratch();
+  try {
+    const f = path.join(dir, "findings.json");
+    writeFileSync(
+      f,
+      JSON.stringify({
+        code_review: { findings: "oops" },
+        pr_conformance: conformance,
+      }),
+    );
+    const r = cli(["--findings-file", f, "--json"], dir);
+    assert.equal(r.code, 2);
+    assert.equal(r.json().reason, "usage");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("CLI refuses a path that climbs out of --root as no-such-file", () => {
   const dir = scratch();
   try {

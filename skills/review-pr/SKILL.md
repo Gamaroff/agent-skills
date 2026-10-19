@@ -948,7 +948,6 @@ BODY_FILE="{body-file}"           # the BODY_FILE= line the summary block printe
 [ -s "$FINDINGS_JSON" ] || { echo "HALT: FINDINGS_JSON ($FINDINGS_JSON) is missing or empty"; exit 1; }
 [ -s "$BODY_FILE" ] || { echo "HALT: BODY_FILE ($BODY_FILE) is missing — run the summary block first"; exit 1; }
 : "${PR_NUMBER:?re-bind PR_NUMBER from Step 1b}"
-INLINE_FILE="$(mktemp -t review-pr-inline.XXXXXX.json)"
 
 # Findings from both lenses, reshaped into the CLI's input contract.
 # `.code_review.findings[]`, NOT `.code_review[]` — the latter iterates the
@@ -968,11 +967,17 @@ INLINE_FILE="$(mktemp -t review-pr-inline.XXXXXX.json)"
 # report `posted` — it reaches the PR through the summary comment instead.
 # Refuse un-annotated input first: that select keeps only verified anchors, so a file Step 6 never
 # annotated yields [] — the same output as "no anchorable findings" (task.195).
-# At least one findings array must exist: `{}` would otherwise select nothing and pass.
-jq -e '((.code_review.findings | type == "array") or (.pr_conformance.findings | type == "array"))
-       and ([ (.code_review.findings[]?, .pr_conformance.findings[]?) | select(has("anchor_check") | not) ] | length == 0)' \
+# At least one lens must be present, and EVERY lens present must hold a findings array: `{}` would
+# otherwise select nothing and pass, and a non-array beside a valid lens would drop that lens's
+# findings unseen (task.195 DoD 1). A lens that did not run is absent or null. `anchor_check` must
+# be a string — the checker always writes one, so a null is an un-annotated finding.
+jq -e '([.code_review, .pr_conformance] | map(select(. != null)) | length > 0)
+       and all(.code_review, .pr_conformance | select(. != null); .findings | type == "array")
+       and ([ (.code_review.findings[]?, .pr_conformance.findings[]?) | select((.anchor_check | type) != "string") ] | length == 0)' \
    "$FINDINGS_JSON" >/dev/null || {
   echo "HALT: a finding in $FINDINGS_JSON carries no anchor_check (or the file is not findings JSON) — run Step 6's anchor check first; nothing posted inline"; exit 1; }
+# The scratch file is made only once the input is accepted, so no refusal leaves one behind.
+INLINE_FILE="$(mktemp -t review-pr-inline.XXXXXX.json)"
 jq '[ (.code_review.findings[]? | select(.anchor_check == "ok" or .anchor_check == "unchecked-text")
        | . + {anchor: .file_line}),
       (.pr_conformance.findings[]? | select(.anchor_check == "ok" or .anchor_check == "unchecked-text")
@@ -983,7 +988,7 @@ jq '[ (.code_review.findings[]? | select(.anchor_check == "ok" or .anchor_check 
          body: (.finding
                 + (if .suggested_action then "\n\n→ " + .suggested_action else "" end))} ]' \
    "$FINDINGS_JSON" > "$INLINE_FILE" || {
-  echo "findings JSON did not match the schema — not posting inline"; exit 1; }
+  rm -f "$INLINE_FILE"; echo "findings JSON did not match the schema — not posting inline"; exit 1; }
 
 command node .agents/skills/review-pr/references/pr-inline-comment.js \
   --pr "$PR_NUMBER" --findings-file "$INLINE_FILE" \
