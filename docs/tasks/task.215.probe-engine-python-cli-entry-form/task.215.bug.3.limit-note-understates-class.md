@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa
+status: closed
 severity: 'Minor'
 priority: 'Medium'
 created: 2026-10-19
@@ -15,7 +15,7 @@ tags: [task.215, security-probe, python, documentation]
 **Bug ID**: TASK-215-BUG-3
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle 2: diff reviewer CR-2)
 **Date Found**: 2026-10-19
 
@@ -59,3 +59,4 @@ note is removed and the crash bullet in `probe-boundary-rule.md` is rewritten ar
 | --- | --- | --- | --- |
 | 2026-10-19 | New | qa-task | Found in QA cycle 2 |
 | 2026-10-19 | Ready for QA | qa-fix | Fixed with TASK-215-BUG-2 (QA fix cycle 2) |
+| 2026-10-19 | Closed | qa-task | Verified by task.215.qa.3.probe-engine-python-cli-entry-form.md |
