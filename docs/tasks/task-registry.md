@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-10-19
-**Next Available Task Number:** **217**
+**Next Available Task Number:** **218**
 
 ## How to use
 
@@ -258,6 +258,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 214 | [loop-supervisor: find select-next.mjs wherever the skills are installed](task.214.loop-supervisor-probe-script-resolution/task.214.loop-supervisor-probe-script-resolution.md) | planned | infrastructure | Medium | 2026-10-18 | — | — from the same handoff; independent of task.213 |
 | 215 | [security-probe: run a Python CLI under the cli: entry form](task.215.probe-engine-python-cli-entry-form/task.215.probe-engine-python-cli-entry-form.md) | accepted | infrastructure | Medium | 2026-10-19 | [#689](https://github.com/Gamaroff/agent-skills/issues/689) | — the Python sibling of task.144 (cli:), task.180 (fence:) and task.181 (shell-argv:); unblocks omarchy-leak-radar story 3.1.1 (PR #63 there) and its later PRD 3 Python boundaries · PR #692 merged |
 | 216 | [security-probe: the cli: form honours a case's fixture.files (and env)](task.216.probe-engine-cli-case-fixture-files/task.216.probe-engine-cli-case-fixture-files.md) | draft | infrastructure | Medium | 2026-10-19 | [#696](https://github.com/Gamaroff/agent-skills/issues/696) | — follow-up to task.215 (v0.58.0); found by omarchy-leak-radar re-probing `threat-radar merge-back`: every input is refused because a `cli:` case cannot carry the data dir it needs |
+| 217 | [Finding-anchors advisory follow-ups](task.217.finding-anchors-advisory-follow-ups/task.217.finding-anchors-advisory-follow-ups.md) | planned | refactoring | Medium | 2026-10-19 | [#698](https://github.com/Gamaroff/agent-skills/issues/698) | task.195 — the nine advisory items task.195's QA gates 1–5 carried to future work: non-object findings, a checker-only stamp the `--inline` guards require, selector/checker anchor parity, `--staged --fix`, review-code `--inline` bindings, two test-hygiene gaps |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
