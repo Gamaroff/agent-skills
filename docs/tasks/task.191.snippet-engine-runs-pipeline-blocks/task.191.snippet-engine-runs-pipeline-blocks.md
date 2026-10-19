@@ -395,21 +395,21 @@ None. All execution stays in the temp copy, and the snapshot sentinel still repo
 **QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-19
-**Quality Score**: 40/100
+**Quality Score**: 0/100
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.191.qa.1.snippet-engine-runs-pipeline-blocks.md](./task.191.qa.1.snippet-engine-runs-pipeline-blocks.md)
-- **Gate File**: [task.191.gate.1.snippet-engine-runs-pipeline-blocks.yml](./task.191.gate.1.snippet-engine-runs-pipeline-blocks.yml)
+- **Full Report**: [task.191.qa.2.snippet-engine-runs-pipeline-blocks.md](./task.191.qa.2.snippet-engine-runs-pipeline-blocks.md)
+- **Gate File**: [task.191.gate.2.snippet-engine-runs-pipeline-blocks.yml](./task.191.gate.2.snippet-engine-runs-pipeline-blocks.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 166 (engine + parity suites); ci:fast 5846/0
-- **Phases Verified**: 4/4
-- **Critical Issues**: 3
-- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Tests Executed**: 173 (engine suite); ci:fast 5871/0
+- **Phases Verified**: 3/4
+- **Critical Issues**: 5
+- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
 
 ### Key Findings
-Three HIGH: a helper call runs the file `BASH_ENV` names (QA-1); arguments to a sourced function are never scanned (CR-1); the callers pass a two-dot `--diff-base` (CR-2). Three MEDIUM: conditionally-defined helper names are trusted (CR-3); a coloured git diff reads as no change (CR-4); the classifier cannot be probed (QA-2).
+Cycle 1 closed bugs 3–6. The cycle-2 refute pass reproduced five HIGH fail-opens in the helper rule. Two are respellings of cycle 1's fixes: a quoted or escaped function name (CR2-1) and a quoted or computed `BASH_ENV` (CR2-3), so bugs 2 and 1 are reopened. Three are new: unscanned helper-script arguments (CR2-2), the case-arm rewrite hiding a command (CR2-4), and helpers classified without earlier-sourced functions (CR2-5).
 
 <!-- change-log-start -->
 ## Change Log
@@ -422,6 +422,8 @@ Three HIGH: a helper call runs the file `BASH_ENV` names (QA-1); arguments to a 
 | 2026-10-19 |  | Implemented all four phases (`--slot`, helper calls, `--diff-base`, callers); status → ready-for-review | develop |
 | 2026-10-19 |  | QA gate FAIL (40/100) — 6 findings (3 high, 3 medium); status → in-progress | qa-task |
 | 2026-10-19 |  | QA findings fixed — 6 of 6 (bugs 1-6 Ready for QA) plus CR-5/6/8 advisories and 3 gaps the fix pass found, 1 iteration; status → ready-for-review | qa-fix |
+| 2026-10-19 |  | QA gate FAIL (0/100) — 5 findings (5 high); bugs 3-6 closed, 1-2 reopened; status → in-progress | qa-task |
+| 2026-10-19 |  | QA findings fixed — 5 of 5 (bugs 1, 2, 7, 8, 9 Ready for QA) plus CR2-6, 1 iteration; status → ready-for-review | qa-fix |
 <!-- change-log-end -->
 
 ---

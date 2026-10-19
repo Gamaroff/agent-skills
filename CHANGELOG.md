@@ -66,10 +66,14 @@ All notable changes to this project will be documented in this file. Format foll
   `zero-blocks-executed` now names `--slot` or `--bind` by placeholder kind (obs #186). The **helper
   rule**: `bash` / `sh` / `source` / `.` of a literal `.sh` path inside the temp copy runs when the
   helper's own text classifies runnable (helper mode: function definitions, `case` arm patterns,
-  `name+=(…)`, `shopt -s|-u`), to a depth of 2, and never in a block that changes directory or names
-  a shell start-up variable (`BASH_ENV`, `ENV`, `SHELLOPTS`, `BASHOPTS`, `PS4`). A function a sourced
-  helper defines is callable in that block when its name shadows no builtin or PATH command, and a
-  call to it is refused when its arguments would be refused written to a command the helper runs.
+  `name+=(…)`, `shopt -s|-u`; an arm pattern only at an arm position), to a depth of 2, and never in
+  a block that changes directory, changes `PATH`, names a shell start-up variable (`BASH_ENV`, `ENV`,
+  `SHELLOPTS`, `BASHOPTS`, `PS4`), or runs an `export`/`local`/`readonly`/`read` of a name that is not
+  a plain identifier as written (or `export -f`, `printf -v`). A function a sourced helper defines is
+  callable in that block when its name shadows no builtin or PATH command; a sourced helper sees the
+  functions sourced before it. A call to such a function, a helper script's own arguments and a
+  sourced helper's `set --` parameters are refused when, read as written or unquoted, they would be
+  refused written to a command the helper runs.
   `isRunnableBlock` exposes the classifier to the security probe. `SAFE_COMMANDS` is unchanged
   (obs #219, #278). `--diff-base <rev>` marks the blocks `git diff -U0` touches, adds a `changed`
   summary and the finding `changed-blocks-not-executed` when none of them ran; a bad revision is exit 2,

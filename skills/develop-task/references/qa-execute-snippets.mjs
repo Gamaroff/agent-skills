@@ -1236,7 +1236,12 @@ function commandInvocations(code) {
       // scanner that reads them as unparseable-therefore-absent is a scanner an
       // attacker only has to add one quote to defeat. Verified: all three
       // executed under the previous version.
-      let word = tok.replace(/\\(.)/g, "$1").replace(/['"]/g, "");
+      // A quoted span `rawInvocations` stands in for unquotes to nothing, as the
+      // collapsed `""` it replaces does.
+      let word = tok
+        .replace(/\u0001\d+\u0001/g, "")
+        .replace(/\\(.)/g, "$1")
+        .replace(/['"]/g, "");
 
       // `((expr))` and `[[expr]]` written without spaces arrive as ONE token that
       // cannot be a command name. Spaced, they tokenise as the `((`/`[[` keywords
@@ -1260,7 +1265,7 @@ function commandInvocations(code) {
         // block moves its working directory (task.191 review 1, I1). What
         // matters for the scan is whether a command can follow it in the SAME
         // segment — see COMMAND_INTRODUCING_KEYWORDS.
-        if (DIRECTORY_CHANGERS.has(word))
+        if (DIRECTORY_CHANGERS.has(word) || RECORDED_KEYWORDS.has(word))
           words.push({ word, args: toks.slice(ti + 1), keyword: true });
         inCommandPosition = COMMAND_INTRODUCING_KEYWORDS.has(word);
         continue;
@@ -1271,7 +1276,9 @@ function commandInvocations(code) {
         // A tilde path, a glob that expands to a binary (`/usr/bin/[t]ouch`), a
         // variable command name — the scanner cannot say what any of them runs,
         // and "cannot say" must never resolve to "safe".
-        words.push({ word: "<unparseable>", args: [] });
+        // Its arguments are kept: the raw reading of a respelled name
+        // (`next_number''ed`) lands here, and the helper rule reads them.
+        words.push({ word: "<unparseable>", args: toks.slice(ti + 1) });
         break;
       }
       tok = word;
@@ -1356,6 +1363,141 @@ const LITERAL_PATH = /^[\w.\/@+-]+$/;
 const STARTUP_VARIABLES = ["BASH_ENV", "ENV", "SHELLOPTS", "BASHOPTS", "PS4"];
 const STARTUP_VARIABLE = new RegExp(`\\b(?:${STARTUP_VARIABLES.join("|")})\\b`);
 
+/**
+ * PATH named as a word that is not an expansion: `PATH=`, `export PATH`, `read
+ * PATH`, `for PATH in`. After any of them a helper's `find` may be a file in the
+ * copy, and a defined name that shadows nothing may resolve to one (CR2-6). A read
+ * of `$PATH` is not a match; a mention in a string is, which only refuses.
+ */
+const PATH_WORD = /(?<![$\w{])PATH(?!\w)/;
+
+/**
+ * Keyword builtins the scan records (as `keyword: true`) besides the directory
+ * changers: each can set a variable, and `set` the positional parameters, so the
+ * helper rule reads their arguments.
+ */
+const RECORDED_KEYWORDS = new Set([
+  "export",
+  "local",
+  "readonly",
+  "read",
+  "set",
+]);
+
+const PLAIN_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const REDIRECTION = /^\d*[<>]/;
+
+/** An invocation's arguments with redirections, their operands and closing `)`/`}` removed. */
+function operands(args) {
+  const out = [];
+  for (let i = 0; i < args.length; i += 1) {
+    const a = args[i];
+    if (REDIRECTION.test(a)) {
+      if (/^\d*[<>]+[&|]?$/.test(a)) i += 1; // a bare operator: its operand is next
+      continue;
+    }
+    const t = a.replace(/[)}]+$/, "");
+    if (t !== "") out.push(t);
+  }
+  return out;
+}
+
+/**
+ * Why this invocation could set a variable the helper rule cannot read by name,
+ * or null. An ALLOW-LIST over what the scan sees, not a list of bad spellings
+ * (task.191 QA cycle 2, CR2-3): the scan has already unquoted nothing in an
+ * argument and collapsed every quoted span to `""`, so `BASH\\_ENV`,
+ * `"BASH""_ENV"` and `"$(…)"` all arrive as a name that is not a plain
+ * identifier, and are refused for that. `-n` (a nameref) and `-f` (export a
+ * function into a child shell) are refused outright, as is `printf -v`.
+ */
+function assignmentHazard({ word, args }) {
+  if (word === "printf")
+    return args.some((a) => /^-[A-Za-z]*v/.test(a)) ? "printf -v" : null;
+  if (!["export", "local", "readonly", "read"].includes(word)) return null;
+  const ops = operands(args);
+  for (let i = 0; i < ops.length; i += 1) {
+    const a = ops[i];
+    if (a === "--") continue;
+    if (/^-[A-Za-z]+$/.test(a)) {
+      if (word !== "read" && /[nf]/.test(a)) return `${word} ${a}`;
+      if (word === "read") {
+        if (/[dinNptu]/.test(a)) i += 1; // the option's operand, not a name
+        // `-a NAME` names an array: the next operand is checked as a name below.
+      }
+      continue;
+    }
+    const name = a.replace(/\+?=[\s\S]*$/, "");
+    if (!PLAIN_NAME.test(name)) return `${word} of a non-literal name`;
+  }
+  return null;
+}
+
+/**
+ * The positional parameters a `set` invocation assigns, or []. Options come
+ * first (`-o`/`+o` take a name); `--` or `-` ends them, and so does the first
+ * word that is not one: `set -e -- -delete` assigns `-delete`.
+ */
+function positionalArgs({ word, args }) {
+  if (word !== "set") return [];
+  const ops = operands(args);
+  for (let i = 0; i < ops.length; i += 1) {
+    const a = ops[i];
+    if (a === "--" || a === "-") return ops.slice(i + 1);
+    if (a === "-o" || a === "+o") i += 1;
+    else if (!/^[-+]/.test(a)) return ops.slice(i);
+  }
+  return [];
+}
+
+/**
+ * `commandInvocations` over the same text with each quoted span kept as written,
+ * so an argument reads as the shell would be given it (`"-delete"`, not `""`).
+ * Each span stands in as an opaque token while the text is split, then is put
+ * back. Returns null when the two readings do not line up one-to-one, or a quote
+ * never closes: a caller then cannot say what an argument is.
+ */
+function rawInvocations(scanText, expected) {
+  const spans = [];
+  let out = "";
+  let quote = null;
+  let start = -1;
+  for (let i = 0; i < scanText.length; i += 1) {
+    const ch = scanText[i];
+    if (quote === null) {
+      if (ch === "'" || ch === '"') {
+        quote = ch;
+        start = i;
+      } else if (ch === "\\" && i + 1 < scanText.length) {
+        out += ch + scanText[i + 1];
+        i += 1;
+      } else out += ch;
+    } else if (quote === '"' && ch === "\\" && i + 1 < scanText.length) {
+      i += 1;
+    } else if (ch === quote) {
+      spans.push(scanText.slice(start, i + 1));
+      out += `\u0001${spans.length - 1}\u0001`;
+      quote = null;
+    }
+  }
+  if (quote !== null) return null;
+  const restore = (t) =>
+    t.replace(/\u0001(\d+)\u0001/g, (_, n) => spans[Number(n)]);
+  const invs = commandInvocations(out).map((inv) => ({
+    ...inv,
+    args: inv.args.map(restore),
+  }));
+  if (
+    invs.length !== expected.length ||
+    invs.some((inv, i) => Boolean(inv.keyword) !== Boolean(expected[i].keyword))
+  )
+    return null;
+  return invs;
+}
+
+/** An argument as the shell passes it: quotes and backslashes removed. */
+const unquote = (a) => a.replace(/\\(.)/g, "$1").replace(/['"]/g, "");
+
 const SHADOW_CACHE = new Map();
 
 /**
@@ -1414,6 +1556,7 @@ function prepareHelperText(code) {
     names.add(m[1]);
 
   let inCase = false;
+  let prev = "";
   const lines = code.split("\n").map((raw) => {
     let line = raw
       .replace(/^([ \t]*)(?:function[ \t]+)?[A-Za-z_][\w-]*[ \t]*\(\)/, "$1")
@@ -1422,10 +1565,17 @@ function prepareHelperText(code) {
       .replace(/\bshopt(?:[ \t]+-[su])+\b/g, "true");
     // Only a line that OPENS a case (`case … in` and nothing after) starts arm
     // patterns; a `case` mentioned anywhere else starts nothing.
+    // An arm pattern sits right after `case … in` or an arm terminator. Any other
+    // line that looks like one may be the tail of a multi-line `$(` or subshell,
+    // and rewriting it would hide the command on it (task.191 QA cycle 2, CR2-4).
+    const armPosition =
+      /^[ \t]*case\b[^;]*\bin[ \t]*$/.test(prev) ||
+      /(?:;;&?|;&)[ \t]*$/.test(prev);
     if (/^[ \t]*case\b[^;]*\bin[ \t]*$/.test(line)) inCase = true;
     else if (/\besac\b/.test(line)) inCase = false;
-    else if (inCase)
+    else if (inCase && armPosition)
       line = line.replace(/^([ \t]*)(?:[^\s|()]*\|)+[^\s|()]*\)/, "$1_)");
+    if (line.trim() !== "" && !/^[ \t]*#/.test(line)) prev = line;
     return line;
   });
   return { code: lines.join("\n"), names };
@@ -1447,7 +1597,7 @@ function prepareHelperText(code) {
  *
  * Returns `{ ok: true, sub }` or `{ ok: false, reason }`.
  */
-function resolveHelperCall(inv, { helperRoot, depth, bindings }) {
+function resolveHelperCall(inv, { helperRoot, depth, bindings, inherited }) {
   const path = inv.args.find((a) => a !== "");
   if (!path) return { ok: false, reason: `${inv.word} names no helper file` };
   const refuse = (why) => ({ ok: false, reason: `helper ${path}: ${why}` });
@@ -1473,6 +1623,7 @@ function resolveHelperCall(inv, { helperRoot, depth, bindings }) {
     helperRoot,
     depth: depth + 1,
     helperMode: true,
+    inherited,
   });
   if (sub.klass !== "runnable") return refuse(`${sub.klass}: ${sub.reason}`);
   return { ok: true, sub };
@@ -1509,7 +1660,7 @@ export function isRunnableBlock(code, bindings = {}, opts = {}) {
 function classifyInternal(
   code,
   bindings = {},
-  { helperRoot = null, depth = 0, helperMode = false } = {},
+  { helperRoot = null, depth = 0, helperMode = false, inherited = null } = {},
 ) {
   // `defines`: every function this text defines, its own and those of the helpers
   // it sources — what a caller sourcing it inherits. `trusted`: the subset that
@@ -1522,7 +1673,20 @@ function classifyInternal(
     code = prepared.code;
     defines = prepared.names;
   }
-  let setsStartup = STARTUP_VARIABLE.test(stripProse(code));
+  // A SOURCED helper runs in its caller's shell, so the functions the caller has
+  // already sourced are callable in it: its `ls` may be one (CR2-5).
+  if (inherited)
+    for (const n of inherited.defines) {
+      defines.add(n);
+      forwardsTo.set(n, inherited.forwardsTo.get(n));
+    }
+  // Why a helper call in this text could run code the classifier never read, or
+  // null: a start-up variable named, set through a name it cannot read, or PATH
+  // moved. A sourced helper's reason becomes its caller's.
+  let startupHazard = STARTUP_VARIABLE.test(stripProse(code))
+    ? `a shell start-up variable set (${STARTUP_VARIABLES.join(", ")})`
+    : null;
+  let movesPath = PATH_WORD.test(stripProse(code)) || "PATH" in bindings;
   const commands = new Set();
   const verdict = (klass, reason, changesDir = false) => ({
     klass,
@@ -1530,7 +1694,8 @@ function classifyInternal(
     defines,
     forwardsTo,
     commands,
-    setsStartup,
+    startupHazard,
+    movesPath,
     changesDir,
   });
 
@@ -1579,11 +1744,57 @@ function classifyInternal(
 
   const invocations = commandInvocations(codeForScan);
   let changesDir = invocations.some((inv) => DIRECTORY_CHANGERS.has(inv.word));
-  for (const inv of invocations)
-    if (!inv.keyword && inv.word !== "<unparseable>")
-      commands.add(inv.word.startsWith("git:") ? "git" : inv.word);
-  // A helper's own functions reach the commands its own text runs.
-  if (helperMode) for (const n of defines) forwardsTo.set(n, commands);
+  for (const inv of invocations) {
+    if (!inv.keyword && inv.word !== "<unparseable>") commands.add(inv.word);
+    const why = assignmentHazard(inv);
+    if (why && !startupHazard) startupHazard = why;
+  }
+  // The same invocations with their arguments as written — what a forwarded
+  // argument is judged by. Null when the two readings disagree: then no call that
+  // forwards arguments is admitted (fail-closed).
+  const raw = rawInvocations(
+    stripProse(code)
+      .replace(/\bcommand\s+-[vV]\b/g, "true")
+      .replace(/(^|[\s;|&(])command\s+(?![-])/g, "$1"),
+    invocations,
+  );
+  const argsOf = (i) => (raw ? operands(raw[i].args) : null);
+  const positional = raw ? raw.flatMap(positionalArgs) : null;
+
+  // What a defined function's arguments reach: the commands its text runs, closed
+  // over the defined functions those call. A function with no entry is this
+  // text's own, and reaches every command this text runs.
+  const reach = (cmds, defs, fwd, own, seen = new Set()) => {
+    const out = new Set();
+    for (const c of cmds) {
+      if (defs.has(c)) {
+        if (seen.has(c)) continue;
+        seen.add(c);
+        for (const d of reach(fwd.get(c) ?? own, defs, fwd, own, seen))
+          out.add(d);
+      } else if (!SHELL_KEYWORDS.has(c)) out.add(c);
+    }
+    return out;
+  };
+  // The first deny rule an argument list trips when written to one of `cmds`, or
+  // null. Judged twice: as written, which is exactly what the same arguments typed
+  // after the command would get, and with quotes and backslashes removed, as the
+  // command receives them — `"-delete"` and `-dele\\te` are `-delete` (CR2-2).
+  // An `unrecognised-command` says nothing about the arguments, so it is not one.
+  // Null args mean the raw reading failed: nothing can be said, so refuse.
+  const forwardedHazard = (cmds, args) => {
+    if (args === null) return "arguments the classifier cannot read";
+    if (args.length === 0) return null;
+    for (const cmd of cmds) {
+      const name = cmd.replace(":", " ");
+      for (const text of [args.join(" "), args.map(unquote).join(" ")]) {
+        const r = classifyInternal(`${name} ${text}`, bindings);
+        if (r.klass === "mutating" && !/^unrecognised-command/.test(r.reason))
+          return `${name}: ${r.reason}`;
+      }
+    }
+    return null;
+  };
 
   // The helper rule. Each admitted invocation is known for ITSELF only: admitting
   // `bash a.sh` must not license a later `bash b.sh`, so admission is per index,
@@ -1594,69 +1805,87 @@ function classifyInternal(
       .map((inv, i) => [inv, i])
       .filter(([inv]) => HELPER_RUNNERS.has(inv.word));
     for (const [inv, i] of calls) {
-      const r = resolveHelperCall(inv, { helperRoot, depth, bindings });
+      const sourced = inv.word === "source" || inv.word === ".";
+      const r = resolveHelperCall(inv, {
+        helperRoot,
+        depth,
+        bindings,
+        inherited: sourced ? { defines, forwardsTo } : null,
+      });
       if (!r.ok) return verdict("mutating", r.reason);
       admitted.add(i);
+      const reaches = reach(
+        r.sub.commands,
+        r.sub.defines,
+        r.sub.forwardsTo,
+        r.sub.commands,
+      );
+      // A helper's arguments are its positional parameters, and so are `set --`'s
+      // for a helper sourced into this shell (CR2-2). The path is the first
+      // operand; everything after it is an argument.
+      const path = inv.args.find((a) => a !== "");
+      const all = argsOf(i);
+      const args = all && all.slice(1);
+      const why = forwardedHazard(
+        reaches,
+        args && sourced ? [...args, ...positional] : args,
+      );
+      if (why)
+        return verdict(
+          "mutating",
+          `helper ${path} forwards its arguments to ${why}`,
+        );
+      // A function of this text that calls the helper reaches what it runs.
+      for (const c of reaches) commands.add(c);
       // A SOURCED helper runs in this shell: its functions become callable here,
       // and a `cd` inside it moves this shell. `bash x.sh` runs in a child, so
       // neither reaches the caller.
-      if (inv.word === "source" || inv.word === ".") {
+      if (sourced) {
         for (const n of r.sub.defines) {
           defines.add(n);
           forwardsTo.set(n, r.sub.forwardsTo.get(n) ?? r.sub.commands);
         }
         if (r.sub.changesDir) changesDir = true;
-        if (r.sub.setsStartup) setsStartup = true;
+        if (r.sub.startupHazard && !startupHazard)
+          startupHazard = r.sub.startupHazard;
+        if (r.sub.movesPath) movesPath = true;
       }
     }
     if (calls.length > 0 && changesDir)
       return verdict("mutating", "helper call after a directory change");
     // A --bind reaches the shell's environment too.
-    const boundStartup = Object.keys(bindings).some((k) =>
-      STARTUP_VARIABLES.includes(k),
+    // A key that is not a plain name (`BASH_FUNC_ls%%`) defines a function in a
+    // child bash, so it is refused with them.
+    const boundStartup = Object.keys(bindings).some(
+      (k) => STARTUP_VARIABLES.includes(k) || !PLAIN_NAME.test(k),
     );
-    if (calls.length > 0 && (setsStartup || boundStartup))
+    if (calls.length > 0 && boundStartup)
       return verdict(
         "mutating",
         `helper call with a shell start-up variable set (${STARTUP_VARIABLES.join(", ")})`,
       );
+    if (calls.length > 0 && startupHazard)
+      return verdict("mutating", `helper call with ${startupHazard}`);
+    if (calls.length > 0 && movesPath)
+      return verdict("mutating", "helper call with PATH changed");
   }
 
   // A call to a helper-defined function is only as permissive as its arguments
-  // would be if written to each command the helper runs: `newest_numbered docs dod
-  // -delete` forwards `-delete` to `find` (task.191 CR-1). Every line that calls
-  // one is re-read with the function name replaced by each such command; a deny
-  // rule that fires there refuses the block. An `unrecognised-command` there says
-  // nothing about the arguments, so it is not a refusal.
-  // A function reaches what the functions it calls reach, so the set is closed
-  // over defined names; a continuation line is one command line.
-  const reach = (fn, seen = new Set()) => {
-    const out = new Set();
-    if (seen.has(fn)) return out;
-    seen.add(fn);
-    for (const c of forwardsTo.get(fn) ?? commands) {
-      if (defines.has(c)) for (const d of reach(c, seen)) out.add(d);
-      else if (!SHELL_KEYWORDS.has(c)) out.add(c);
-    }
-    return out;
-  };
-  const callLines = prose.replace(/\\\n/g, " ").split("\n");
-  for (const fn of new Set(invocations.map((inv) => inv.word))) {
-    if (!defines.has(fn)) continue;
-    const call = new RegExp(
-      `(^|[\\s;&|(\`])${escapeRegExp(fn)}(?=[\\s;&|)]|$)`,
+  // would be if written to each command it reaches: `newest_numbered docs dod
+  // -delete` forwards `-delete` to `find` (task.191 CR-1). Read off the scan's
+  // invocations, whose word is already unquoted, so `newest_\\numbered` is the
+  // same call (CR2-1).
+  for (const [i, inv] of invocations.entries()) {
+    if (inv.keyword || !defines.has(inv.word)) continue;
+    const why = forwardedHazard(
+      reach([inv.word], defines, forwardsTo, commands),
+      argsOf(i),
     );
-    for (const line of callLines) {
-      if (!call.test(line)) continue;
-      for (const cmd of reach(fn)) {
-        const r = classifyInternal(line.replace(call, `$1${cmd}`), bindings);
-        if (r.klass === "mutating" && !/^unrecognised-command/.test(r.reason))
-          return verdict(
-            "mutating",
-            `function ${fn} forwards its arguments to ${cmd}: ${r.reason}`,
-          );
-      }
-    }
+    if (why)
+      return verdict(
+        "mutating",
+        `function ${inv.word} forwards its arguments to ${why}`,
+      );
   }
 
   const unknown = invocations
@@ -1667,7 +1896,8 @@ function classifyInternal(
       if (SAFE_COMMANDS.has(w)) return false;
       // After the runner check: a helper that defines `xargs` does not make
       // `xargs` safe — and no defined name that shadows a real command is trusted.
-      if (defines.has(w) && !shadowsCommand(w)) return false;
+      // A name that shadows nothing is safe only while PATH is the host's (CR2-6).
+      if (defines.has(w) && !movesPath && !shadowsCommand(w)) return false;
       if (w.startsWith("git:")) return !SAFE_GIT_SUBCOMMANDS.has(w.slice(4));
       return true;
     })

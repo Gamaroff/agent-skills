@@ -3585,3 +3585,162 @@ test("T191 CR-4: a mode-only change is no hunk and no error", () => {
   chmodSync(file, 0o755);
   assert.deepEqual(changedLineRanges(file, "HEAD"), []);
 });
+
+// ── task.191 QA cycle 2 ───────────────────────────────────────────────────────
+
+/** A temp copy holding `h/<name>` for each entry, plus the real newest-numbered.sh. */
+function cycle2Copy(helpers) {
+  const root = tmp();
+  mkdirSync(join(root, "h"));
+  writeFileSync(
+    join(root, "h", "newest-numbered.sh"),
+    readFileSync(join(__dirname, "..", "newest-numbered.sh"), "utf8"),
+  );
+  for (const [name, text] of Object.entries(helpers))
+    writeFileSync(join(root, "h", name), text);
+  return root;
+}
+
+test("T191 CR2-1: a respelled function name, and a quoted argument, are the same call", () => {
+  const root = cycle2Copy({});
+  const at = (code) =>
+    classifyBlock(
+      `source h/newest-numbered.sh || exit 1\n${code}`,
+      {},
+      {
+        helperRoot: root,
+      },
+    );
+  // Mutation proof: read the forwarding check's call off the prose again and the
+  // two respellings go runnable; drop the unquoted reading and the four quoted
+  // arguments do.
+  for (const code of [
+    "newest_\\numbered docs dod -delete",
+    "next_number''ed docs review -exec rm {} +",
+    'newest_numbered docs dod "-delete"',
+    "newest_numbered docs dod '-delete'",
+    'newest_numbered docs dod -dele"te"',
+    "newest_numbered docs dod -dele\\te",
+  ])
+    assert.match(
+      at(code).reason ?? "",
+      /^function ne(?:west|xt)_numbered forwards its arguments to find: deny-list/,
+      code,
+    );
+  assert.equal(
+    at('N=$(next_numbered "docs/tasks/x" review -name "task.1.review.*.md")')
+      .klass,
+    "runnable",
+  );
+});
+
+test("T191 CR2-2: a helper script's own arguments, and set --, are checked", () => {
+  const root = cycle2Copy({ "fwd.sh": 'find docs "$@"\n' });
+  const at = (code) => classifyBlock(code, {}, { helperRoot: root });
+  // Mutation proof: drop the forwarded check from the helper-call loop and all
+  // four go runnable; read `set`'s operands from the first word only and the
+  // `set -e --` case does.
+  for (const code of [
+    "bash h/fwd.sh -delete",
+    'bash h/fwd.sh "-delete"',
+    "set -- -delete; source h/fwd.sh",
+    "set -e -- -delete; source h/fwd.sh",
+  ])
+    assert.match(
+      at(code).reason ?? "",
+      /^helper h\/fwd\.sh forwards its arguments to find: deny-list/,
+      code,
+    );
+  assert.equal(at("bash h/fwd.sh -name x").klass, "runnable");
+  assert.equal(at("bash h/fwd.sh").klass, "runnable");
+});
+
+test("T191 CR2-3: a start-up variable set through a name the scan cannot read is refused", () => {
+  const root = cycle2Copy({
+    "plain.sh": "echo plain\n",
+    "write.sh": "echo UNVETTED-RAN; mv a b\n",
+  });
+  const at = (code, bindings = {}) =>
+    classifyBlock(code, bindings, { helperRoot: root });
+  // Mutation proof: make assignmentHazard return null and the first five go
+  // runnable; drop the non-plain --bind key arm and the last one does.
+  for (const code of [
+    "export BASH\\_ENV=h/write.sh; bash h/plain.sh",
+    'export "BASH""_ENV"=h/write.sh; bash h/plain.sh',
+    'export "$(echo bash_env | tr a-z A-Z)=h/write.sh"; bash h/plain.sh',
+    "read BASH\\_ENV <<< h/write.sh; export BASH\\_ENV; bash h/plain.sh",
+    "local -n R=X; bash h/plain.sh",
+  ])
+    assert.match(at(code).reason ?? "", /^helper call with /, code);
+  assert.match(
+    at("bash h/plain.sh", { "BASH_FUNC_echo%%": "() { mv a b; }" }).reason ??
+      "",
+    /^helper call with a shell start-up variable set/,
+  );
+  // A plain export is not one.
+  assert.equal(at("export FOO=bar; bash h/plain.sh").klass, "runnable");
+  // Executed, not only classified: the respelled BASH_ENV's file never runs.
+  const file = join(tmp(), "SKILL.md");
+  writeFileSync(file, bash("export BASH\\_ENV=h/write.sh; bash h/plain.sh"));
+  const r = executeFile(file, { allowZsh: false, copyFrom: root });
+  assert.equal(r.results[0].skipped, true);
+  assert.equal(r.results[0].runs, undefined);
+});
+
+test("T191 CR2-4: a case-arm-shaped line that is not at an arm position keeps its command", () => {
+  const root = cycle2Copy({
+    "case.sh": 'case "$1" in\n  *) y=$(true\nx|touch${IFS}pwned)\n  ;;\nesac\n',
+    "arms.sh":
+      "case \"$1\" in\n  a|b)\n    echo ab\n    ;;\n  ''|*[!0-9]*)\n    echo other\n    ;;\nesac\n",
+  });
+  const at = (code) => classifyBlock(code, {}, { helperRoot: root });
+  // Mutation proof: rewrite at every line inside a case again and this goes runnable.
+  assert.equal(at("bash h/case.sh x").klass, "mutating");
+  // Real arms, after `case … in` and after `;;`, are still read as patterns.
+  assert.equal(at("bash h/arms.sh a").klass, "runnable");
+});
+
+test("T191 CR2-5: a sourced helper is classified with the functions sourced before it", () => {
+  const root = cycle2Copy({
+    "h1.sh": 'ls() { find "$@"; }\n',
+    "h2.sh": "ls docs -delete\n",
+  });
+  const at = (code) => classifyBlock(code, {}, { helperRoot: root });
+  // Mutation proof: stop passing `inherited` to resolveHelperCall and this goes runnable.
+  assert.match(
+    at("source h/h1.sh; source h/h2.sh").reason ?? "",
+    /^helper h\/h2\.sh: mutating: function ls forwards its arguments to find/,
+  );
+  // Mutation proof: drop `f` from assignmentHazard's export options and this goes runnable.
+  assert.match(
+    at("export -f ls; bash h/h2.sh").reason ?? "",
+    /^helper call with export -f/,
+  );
+  // A child `bash` inherits no unexported function: its `ls` is the real one.
+  assert.equal(at("source h/h1.sh; bash h/h2.sh").klass, "runnable");
+});
+
+test("T191 CR2-6: a helper call in a block that changes PATH is refused", () => {
+  const root = cycle2Copy({
+    "nf.sh": "zz_helper_fn() { echo hi; }\n",
+    "path.sh": "PATH=h:$PATH\n",
+    "plain.sh": "echo plain\n",
+  });
+  const at = (code, bindings = {}) =>
+    classifyBlock(code, bindings, { helperRoot: root });
+  // Mutation proof: make movesPath false and the first four go runnable.
+  for (const [code, bindings] of [
+    ["PATH=h:$PATH; source h/nf.sh; zz_helper_fn", {}],
+    ["read PATH <<< h; source h/nf.sh; zz_helper_fn", {}],
+    ["source h/path.sh; bash h/plain.sh", {}],
+    ["source h/nf.sh; zz_helper_fn", { PATH: "h" }],
+  ])
+    assert.match(
+      at(code, bindings).reason ?? "",
+      /^helper call with PATH changed$/,
+      code,
+    );
+  assert.equal(at("source h/nf.sh; zz_helper_fn").klass, "runnable");
+  // Reading PATH is not changing it.
+  assert.equal(at('echo "$PATH"; bash h/plain.sh').klass, "runnable");
+});

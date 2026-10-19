@@ -4,7 +4,7 @@
 **Bug ID**: TASK-191-BUG-6
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle 1, QA-2)
 **Date Found**: 2026-10-19
 
@@ -65,3 +65,4 @@ Export a boolean predicate (e.g. `isRunnableBlock(code, bindings, opts)` → `cl
 | 2026-10-19 | New | qa-task | Found in QA cycle 1 |
 | 2026-10-19 | In Progress | qa-fix | Investigation started |
 | 2026-10-19 | Ready for QA | qa-fix | Fix implemented, mutation-proven |
+| 2026-10-19 | Closed | qa-task | Verified by task.191.qa.2.snippet-engine-runs-pipeline-blocks.md |

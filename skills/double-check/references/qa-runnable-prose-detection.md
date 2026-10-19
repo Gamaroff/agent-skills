@@ -187,7 +187,7 @@ Three further rules fall out of the same principle, each added after a review fo
 and they are also how this repository calls a bundled helper from a block
 (`bash .agents/skills/<skill>/references/qa-cycle.sh …`, `source …/newest-numbered.sh || exit 1`).
 Refusing every one meant Step 4b executed none of the blocks a pipeline change touches (obs #219,
-#278). So a helper call is recognised when, and only when, **all four** of these hold:
+#278). So a helper call is recognised when, and only when, **all six** of these hold:
 
 1. **The path is a literal holding a `/`** — no `$`, glob, quote or command substitution. Without a
    slash, `source` and `bash` search `PATH`, and the file the shell finds is not the file the
@@ -206,7 +206,17 @@ Refusing every one meant Step 4b executed none of the blocks a pipeline change t
    `PS4`, in the block, in a helper it sources, or in a `--bind`. Bash sources `$BASH_ENV` before
    the script it was given, and an exported xtrace expands `PS4`, command substitutions included, so
    the shell would run code the classifier never read. Reason: `helper call with a shell start-up
-   variable set (…)`.
+   variable set (…)`. Matching the names alone is not enough, because a name can be spelled so the
+   match misses it: `export BASH\_ENV=…` and `export "BASH""_ENV"=…` set the same variable. So every
+   `export`, `local`, `readonly` and `read` in the text must name **plain identifiers as written**
+   — an allow-list over what the scan sees, not a list of bad spellings — and `-n` (nameref),
+   `export -f` and `printf -v` are refused outright. A `--bind` key that is not a plain name
+   (`BASH_FUNC_ls%%`, which defines a function in a child bash) is refused with the start-up
+   variables. Reason: `helper call with export of a non-literal name` (or `export -f`, …).
+6. **PATH is not changed** — `PATH` as a word that is not an expansion (`PATH=`, `export PATH`,
+   `read PATH`, `for PATH in`), in the block, in a helper it sources, or as a `--bind` key. After one,
+   a helper's `find` may be a file in the copy. Reading `$PATH` is not a change. Reason: `helper call
+   with PATH changed`.
 
 **`SAFE_COMMANDS` is not widened, and this is why the boundary is still the allow-list.** A helper
 adds nothing the allow-list would refuse: its text is scanned command by command by the same rules.
@@ -216,19 +226,36 @@ Admission is per invocation — `bash a.sh` admitted does not license `bash b.sh
 - **A call is checked as if its arguments went straight to each command the helper runs.**
   `newest_numbered docs dod -delete` is re-read as `find docs dod -delete` (and as `sed …`,
   `sort …`), and a deny rule that fires there refuses the block: `function newest_numbered forwards
-  its arguments to find: deny-list: find write action`. The check is the inline equivalent, so it is
-  exactly as strong as the deny-list on that command — no stronger.
+  its arguments to find: deny-list: find write action`. The call is found in the scan's own
+  invocations, whose command word is already unquoted, so `newest_\numbered` and `next_number''ed`
+  are the same call. The arguments are read **as written**, quoted spans intact, and judged twice: as
+  written, which is exactly what they would get typed after the command, and with quotes and
+  backslashes removed, as the command receives them — `"-delete"` and `-dele\te` are `-delete`.
+  The same check covers a **helper script's** arguments (`bash h.sh -delete` → the commands `h.sh`
+  runs) and, for a sourced helper, the positional parameters a `set --` gave it. It is no stronger
+  than the deny-list on that command.
 - **A name is trusted only when it shadows nothing.** A helper function called `mv`, `cat` or any
   builtin or PATH command is never a known word: if its definition sat in a branch that did not run,
   or the call comes before the `source`, the shell runs the real command. A name that shadows nothing
   fails as command-not-found in both cases, which writes nothing.
 
 A sourced helper's functions are callable in that block; through `bash` they are not, because `bash`
-runs the helper in a child shell.
+runs the helper in a child shell. A sourced helper is classified **with the functions sourced before
+it**, because it runs in the same shell: `source h1.sh; source h2.sh`, where `h1.sh` defines
+`ls() { find "$@"; }`, reads `h2.sh`'s `ls docs -delete` as the `find` it is. A function only reaches
+a child `bash` when it is exported, so `export -f` is refused (condition 5).
+
+**What a helper adds is bounded by what its text would do as a block.** The helper's text, and a
+forwarded argument, are judged by the same scan as any block, so the scan's own limits apply to them
+exactly as they do to a block written with that text — no more. Those limits are tracked against the
+base scan, not this rule: a variable's value is not followed (`X=-delete; find docs $X`), and the
+quoted and heredoc shapes recorded in the observation log for the base scan.
 
 A helper is classified in **helper mode**, which reads the syntax a helper has and a documented block
 does not, and nothing else: a function definition (`name() {`) is not an invocation; a multi-line
-`case` arm pattern (`''|*[!0-9]*)`) is a glob; `name+=(…)` is an assignment; `shopt -s|-u` sets an
+`case` arm pattern (`''|*[!0-9]*)`) is a glob — only at an arm position, right after `case … in`
+or an arm terminator (`;;`, `;&`, `;;&`), because the same shape on any other line can be the tail
+of a multi-line `$(` whose command it would hide; `name+=(…)` is an assignment; `shopt -s|-u` sets an
 option. Helper mode skips the template-slot and unbound-variable checks — a helper's `<dir>` comments
 and `$1` arguments are code and arguments, not slots. Measured over `shared/resources/*.sh` (not
 `*.test.sh`), three helpers classify runnable; every other one names a real writer and is the control
