@@ -5,18 +5,20 @@ type: task
 description: "qa-execute-snippets.mjs gains --slot to fill {template} slots, runs a block that calls or sources a bundled helper when the helper itself classifies as runnable, and reports changed blocks separately via --diff-base, so qa-task Step 4b and qa-story Phase 1.7 execute the blocks a change actually touches."
 tags: [qa-task, qa-story, qa-execute-snippets, observation, runnable-prose]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-07
 updated: 2026-10-19
 assignee:
 estimated_effort_hours: 16
 github_issue: 590
+completed_date: 2026-10-19
+pr_number: 687
 ---
 
 # Technical Task: Snippet engine runs pipeline blocks
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.191.review.1.snippet-engine-runs-pipeline-blocks.md` implemented 2026-10-19
 **GitHub Issue**: [#590](https://github.com/Gamaroff/agent-skills/issues/590)
 
@@ -411,6 +413,30 @@ None. All execution stays in the temp copy, and the snapshot sentinel still repo
 ### Key Findings
 Bug 10 is verified fixed and closed. There are no blocking findings: 2 low cleanups (CR4-1, CR4-2) and the carried reliability advisories CR2-7 and CR2-8.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.191.qa.4.snippet-engine-runs-pipeline-blocks.md`
+**Gate File**: `task.191.gate.4.snippet-engine-runs-pipeline-blocks.yml`
+**Gate Status**: ⚠️ CONCERNS (non-blocking, `top_issues: []`)
+**Quality Score**: 90/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 11/11 success criteria met, each traced to code and to a per-PR test or a green CI lane
+✅ **Unit Tests:** 180 tests in `shared/resources/tests/qa-execute-snippets.test.mjs`; ci:fast 5878/0; CI green on `97f29ef2`
+✅ **PR Review:** PR #687; Step 5c `/review-pr` APPROVE (`task.191.pr-review.1.snippet-engine-runs-pipeline-blocks.md`)
+✅ **Documentation:** rule doc §2aa/§2c/§4a, qa-task Step 4b, qa-story Phase 1.7, CHANGELOG entry
+✅ **Security Review:** ✅ PASS — the helper-rule boundary and the `--diff-base` refusal held over 102 executed probes (0 reproduced)
+⚠️ **Compliance Review:** NOT_APPLICABLE — internal QA tooling
+⚠️ **Reliability:** CONCERNS — CR2-7 (timeout kills only the outer shell) and CR2-8 (empty-fence span) carried as advisory follow-ups
+
+**Task marked as ACCEPTED on:** 2026-10-19
+
+**Detailed Verification Log:** See `task.191.dod.1.snippet-engine-runs-pipeline-blocks.md` for complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
@@ -427,6 +453,7 @@ Bug 10 is verified fixed and closed. There are no blocking findings: 2 low clean
 | 2026-10-19 |  | QA gate FAIL (40/100) — 1 finding (1 high); bugs 1, 2, 7, 8, 9 closed; status → in-progress | qa-task |
 | 2026-10-19 |  | QA findings fixed — 1 of 1 (bug 10 Ready for QA; third strike, mechanism replaced), 1 iteration; status → ready-for-review | qa-fix |
 | 2026-10-19 |  | QA gate CONCERNS (90/100) — 0 blocking, 2 low cleanups; bug 10 closed | qa-task |
+| 2026-10-19 | 1.2 | DoD verified — accepted (PR #687) | finalise |
 <!-- change-log-end -->
 
 ---

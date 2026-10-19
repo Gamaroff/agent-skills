@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "shell-exec",
+      "entry": "shared/resources/qa-execute-snippets.mjs#isRunnableBlock",
+      "name": null,
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 67,
+      "passed": 67,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": [
+        {},
+        {
+          "helperRoot": "/tmp/claude-1000/-home-gamaroff-Development-agent-skills/b1311c2d-2dc2-448e-9f3e-f9e015af17d5/scratchpad/probe191/root4"
+        }
+      ],
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-10-19T06:42:21.430Z"
+    },
+    {
+      "sink": "shell-exec",
+      "entry": "cli:shared/resources/qa-execute-snippets.mjs",
+      "name": "qa-execute-snippets --diff-base revision refusal",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 35,
+      "passed": 35,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": [
+        "--file",
+        "/tmp/claude-1000/-home-gamaroff-Development-agent-skills/b1311c2d-2dc2-448e-9f3e-f9e015af17d5/scratchpad/probe191/repo/SKILL.md",
+        "--no-zsh",
+        "--diff-base",
+        "{input}"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-10-19T06:42:27.643Z"
+    }
+  ],
+  "totals": {
+    "executed": 102,
+    "reproduced": 0
+  },
+  "updated_at": "2026-10-19T06:42:27.643Z"
+}
