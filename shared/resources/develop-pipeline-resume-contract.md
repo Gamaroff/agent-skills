@@ -611,7 +611,7 @@ This convention ensures the cycle budget is respected across resumes.
    bash .agents/skills/{develop-story|develop-task}/references/grant-qa-cycles.sh {doc-directory} {k} {implementation-report-path}
    ```
 
-   Source: `shared/resources/grant-qa-cycles.sh`; suite: `grant-qa-cycles.test.sh`. Everything it
+   Source: `grant-qa-cycles.sh`; suite: `grant-qa-cycles.test.sh`. Everything it
    does was a defect when the prose left it to the caller (task.123 QA cycles 2 and 3):
 
    - It **reconstructs the base** as `max(highest gate on disk, `### QA Cycle` entries in the

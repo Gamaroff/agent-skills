@@ -170,6 +170,20 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **Scripts reach only the skills that run them (task 193, obs #263, #289, #175).** A
+  `shared/resources/<script>` literal in the prose of a shared document copies the script into every
+  skill that bundles the document. Eleven such literals named a script some bundling skills never run;
+  they now name the bare filename, and the 17 copies nothing ran are removed: `grant-qa-cycles.sh`
+  from develop-bug, qa-story, qa-task and review-pr; `gh-stage.js`, `handover-render.js` and
+  `handover-verify.js` from qa-story, qa-task and review-pr; and `pipeline-answers.js`, `qa-cycle.sh`,
+  `report-lint.js` and `tracker-comment.js` from review-pr. develop-bug, which runs
+  `pipeline-answers.js` from its own step-0 document, now names it in `SKILL.md`. The new
+  `tests/shared-script-literals.test.js` fails on a prose script literal that is not in its
+  allowlist, where each of the 23 entries states why every bundling skill needs the copy, and on an
+  entry that no longer matches a line. A literal counts as run only when a command sits immediately
+  before it, so `Engine source: …` prose does not pass as a command. The same test pins
+  create-skill's rule sentence in the wording the bundler cannot rewrite.
+
 - **The QA read-back now checks this cycle's verdict, and waits out a moment's `.git/index.lock`
   (task 192, obs #205, #216).** `qa-read-back.js` HALTs when the QA section's `**Gate Decision**`, or
   the newest `QA gate …` row written by `qa-task`/`qa-story`, does not name this cycle's gate token.
