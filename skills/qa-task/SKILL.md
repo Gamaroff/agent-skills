@@ -901,11 +901,12 @@ a clean Step 4b as covering what the harness delivers. (create-skill § *Runnabl
 When it does fire, run the engine over each changed in-scope file:
 
 ```bash
-# From the repository root. BASE is the PR's base branch — re-bound here, because a fenced block is
-# its own shell. --copy-as seeds the bundled helpers a changed block calls (see below).
+# From the repository root, once per changed in-scope file ({changed-file}). BASE is the PR's base
+# branch, re-bound here because a fenced block is its own shell; the MERGE BASE is what --diff-base
+# takes, or the base branch's later edits count as this change's. --copy-as seeds the bundled helpers.
 BASE="origin/$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo develop)"
-command node .agents/skills/qa-task/references/qa-execute-snippets.mjs --file "$SKILL_FILE" \
-  --diff-base "$BASE" --copy-as .agents:.agents --json
+command node .agents/skills/qa-task/references/qa-execute-snippets.mjs --file "{changed-file}" \
+  --diff-base "$(git merge-base "$BASE" HEAD)" --copy-as .agents:.agents --json
 ```
 
 `--diff-base` marks the blocks the change touched and reports them **apart** (`changed` in the JSON).

@@ -202,12 +202,29 @@ Refusing every one meant Step 4b executed none of the blocks a pipeline change t
    sources. The path is resolved against the copy's root, but the shell resolves it against its
    working directory, so after a `cd` the two can be different files. Reason:
    `helper call after a directory change`.
+5. **Nothing names a shell start-up variable** — `BASH_ENV`, `ENV`, `SHELLOPTS`, `BASHOPTS` or
+   `PS4`, in the block, in a helper it sources, or in a `--bind`. Bash sources `$BASH_ENV` before
+   the script it was given, and an exported xtrace expands `PS4`, command substitutions included, so
+   the shell would run code the classifier never read. Reason: `helper call with a shell start-up
+   variable set (…)`.
 
 **`SAFE_COMMANDS` is not widened, and this is why the boundary is still the allow-list.** A helper
-adds nothing the allow-list would refuse: its text is scanned command by command by the same rules,
-so a helper is only ever as permissive as a block holding its text. Admission is per invocation —
-`bash a.sh` admitted does not license `bash b.sh` — and a function a **sourced** helper defines is
-callable in that block (not through `bash`, which runs the helper in a child shell).
+adds nothing the allow-list would refuse: its text is scanned command by command by the same rules.
+Admission is per invocation — `bash a.sh` admitted does not license `bash b.sh`. Two rules make a
+**sourced** helper's functions no more permissive than its text written inline:
+
+- **A call is checked as if its arguments went straight to each command the helper runs.**
+  `newest_numbered docs dod -delete` is re-read as `find docs dod -delete` (and as `sed …`,
+  `sort …`), and a deny rule that fires there refuses the block: `function newest_numbered forwards
+  its arguments to find: deny-list: find write action`. The check is the inline equivalent, so it is
+  exactly as strong as the deny-list on that command — no stronger.
+- **A name is trusted only when it shadows nothing.** A helper function called `mv`, `cat` or any
+  builtin or PATH command is never a known word: if its definition sat in a branch that did not run,
+  or the call comes before the `source`, the shell runs the real command. A name that shadows nothing
+  fails as command-not-found in both cases, which writes nothing.
+
+A sourced helper's functions are callable in that block; through `bash` they are not, because `bash`
+runs the helper in a child shell.
 
 A helper is classified in **helper mode**, which reads the syntax a helper has and a documented block
 does not, and nothing else: a function definition (`name() {`) is not an invocation; a multi-line
@@ -377,7 +394,7 @@ be an over-refusal the classifier should learn (see `bug.6`, `bug.10`), and coll
 A file-level count folds the blocks a change touched in with every templated block it did not, so a
 run in which **every changed block was refused** read exactly like any other (obs #219).
 `--diff-base <rev>` reads `git diff -U0 <rev> -- <file>` (from the file's repository, never the temp
-copy), marks each block whose lines overlap a hunk `changed: true`, and adds a summary
+copy, and with the user's colour, external-diff and textconv config switched off), marks each block whose lines overlap a hunk `changed: true`, and adds a summary
 `changed: { total, runnable, placeholder, mutating, executed }`.
 
 | Condition | Record | Kind | Gate |
@@ -385,9 +402,12 @@ copy), marks each block whose lines overlap a hunk `changed: true`, and adds a s
 | `changed.total > 0` and `changed.executed === 0` | **finding**, `confidence: medium`, listing each changed block's line and reason | `changed-blocks-not-executed` | eligible for `top_issues[]` |
 
 It is reported **in addition to** the file-level records above, never instead of them: it is a
-statement about the change, and they are statements about the file. A revision git rejects is exit
-`2` (`bad-diff-base`), never "nothing changed". An untracked file has no diff, so it has no changed
-blocks — QA runs on a committed branch.
+statement about the change, and they are statements about the file. A revision git rejects, or a diff
+that printed output with no hunk the parser reads, is exit `2` (`bad-diff-base`), never "nothing
+changed". **Pass the merge base, not the base branch's tip**: `git diff <rev> -- <file>` compares
+`<rev>` with the working tree, so a tip that has moved on counts the base branch's later edits as the
+change's own. An untracked file has no diff; it gets an `untracked-file` note in `notes[]`, so it does
+not read like a file the change left alone. A pure deletion marks only the block it falls inside.
 
 ---
 

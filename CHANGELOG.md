@@ -66,11 +66,15 @@ All notable changes to this project will be documented in this file. Format foll
   `zero-blocks-executed` now names `--slot` or `--bind` by placeholder kind (obs #186). The **helper
   rule**: `bash` / `sh` / `source` / `.` of a literal `.sh` path inside the temp copy runs when the
   helper's own text classifies runnable (helper mode: function definitions, `case` arm patterns,
-  `name+=(…)`, `shopt -s|-u`), to a depth of 2, and never in a block that changes directory;
-  functions a sourced helper defines are callable in that block. `SAFE_COMMANDS` is unchanged
+  `name+=(…)`, `shopt -s|-u`), to a depth of 2, and never in a block that changes directory or names
+  a shell start-up variable (`BASH_ENV`, `ENV`, `SHELLOPTS`, `BASHOPTS`, `PS4`). A function a sourced
+  helper defines is callable in that block when its name shadows no builtin or PATH command, and a
+  call to it is refused when its arguments would be refused written to a command the helper runs.
+  `isRunnableBlock` exposes the classifier to the security probe. `SAFE_COMMANDS` is unchanged
   (obs #219, #278). `--diff-base <rev>` marks the blocks `git diff -U0` touches, adds a `changed`
   summary and the finding `changed-blocks-not-executed` when none of them ran; a bad revision is exit 2,
-  `bad-diff-base`. qa-task Step 4b and qa-story Phase 1.7 pass `--diff-base` and `--copy-as
+  `bad-diff-base`, and so is a diff with output and no hunk; the user's colour and diff drivers are
+  switched off. qa-task Step 4b and qa-story Phase 1.7 pass the PR's merge base as `--diff-base` and `--copy-as
   .agents:.agents` (or `skills:.agents/skills` where `.agents/skills` is a symlink), name `--slot`, and
   report the `changed` counts first; `qa-runnable-prose-detection.md` gains §2aa, §2c and §4a.
 

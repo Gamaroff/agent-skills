@@ -283,7 +283,13 @@ test("both skills pass --diff-base, name --slot, and report the changed counts f
   ]) {
     const cmd = commandOf(src);
     assert.ok(cmd, `${name} must run the engine from the repository root`);
-    assert.match(cmd, /--diff-base "\$BASE"/, `${name} must pass --diff-base`);
+    // The merge base, never the tip: git diff <rev> -- <file> is two-dot against
+    // the working tree, so a moved tip counts the base's later edits (QA cycle 1, CR-2).
+    assert.match(
+      cmd,
+      /--diff-base "\$\(git merge-base "\$BASE" HEAD\)"/,
+      `${name} must pass the merge base as --diff-base`,
+    );
     assert.match(
       cmd,
       /--copy-as \.agents:\.agents/,

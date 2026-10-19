@@ -1345,6 +1345,51 @@ const DIRECTORY_CHANGERS = new Set(["cd", "pushd", "popd"]);
 const LITERAL_PATH = /^[\w.\/@+-]+$/;
 
 /**
+ * Variables a shell reads when it STARTS, before the script it was given:
+ * non-interactive bash sources `$BASH_ENV`, `sh` reads `$ENV`, and an exported
+ * `SHELLOPTS`/`BASHOPTS` turns on xtrace, whose `PS4` is expanded — command
+ * substitutions included — on every traced line. A helper call in a text that
+ * names one of them runs code the helper rule never read (task.191 QA-1). Matched
+ * as a bare name anywhere in the code: refusing a block that only READS `$ENV`
+ * is the right direction to be wrong in.
+ */
+const STARTUP_VARIABLES = ["BASH_ENV", "ENV", "SHELLOPTS", "BASHOPTS", "PS4"];
+const STARTUP_VARIABLE = new RegExp(`\\b(?:${STARTUP_VARIABLES.join("|")})\\b`);
+
+const SHADOW_CACHE = new Map();
+
+/**
+ * True when `name` already means something to a shell — a builtin, a keyword or
+ * an executable on PATH. A helper function with such a name is never trusted as a
+ * known word: if the definition did not run (it sat in a branch, or the call came
+ * before the `source`), the shell runs the real command instead (task.191 CR-3).
+ * A name that shadows nothing fails as command-not-found in both cases, which
+ * writes nothing. Asked of a fresh shell with only PATH, so no inherited function
+ * or alias answers for it.
+ */
+function shadowsCommand(name) {
+  if (SHADOW_CACHE.has(name)) return SHADOW_CACHE.get(name);
+  const env = { PATH: process.env.PATH ?? "" };
+  const bash = spawnSync(
+    "bash",
+    ["--norc", "--noprofile", "-c", 'type -t -- "$1"', "_", name],
+    { env, encoding: "utf8" },
+  );
+  let shadows =
+    bash.status !== 0 ? bash.status !== 1 : bash.stdout.trim() !== "";
+  if (!shadows && zshAvailable()) {
+    // zsh runs every block too, and has builtins bash does not.
+    const zsh = spawnSync("zsh", ["-f", "-c", 'whence -w -- "$1"', "_", name], {
+      env,
+      encoding: "utf8",
+    });
+    shadows = !/: none\s*$/.test(zsh.stdout ?? "");
+  }
+  SHADOW_CACHE.set(name, shadows);
+  return shadows;
+}
+
+/**
  * A helper's text has syntax a documented block does not, and none of it is a
  * write. Rewrite exactly that syntax into shapes the scan already reads:
  *
@@ -1448,6 +1493,15 @@ export function classifyBlock(code, bindings = {}, opts = {}) {
 }
 
 /**
+ * `classifyBlock` as a predicate: `true` only for `runnable`. The shape the
+ * security probe engine scores (a falsy return is a refusal), so the classifier's
+ * hostile corpus can be run against it (task.191 QA-2).
+ */
+export function isRunnableBlock(code, bindings = {}, opts = {}) {
+  return classifyInternal(code, bindings, opts).klass === "runnable";
+}
+
+/**
  * `classifyBlock` plus what a caller sourcing this text needs: the functions it
  * defines (its own and those of the helpers it sources) and whether it changes
  * the working directory.
@@ -1457,16 +1511,26 @@ function classifyInternal(
   bindings = {},
   { helperRoot = null, depth = 0, helperMode = false } = {},
 ) {
+  // `defines`: every function this text defines, its own and those of the helpers
+  // it sources — what a caller sourcing it inherits. `trusted`: the subset that
+  // may stand as a known word (`shadowsCommand`). `forwardsTo`: for each defined
+  // function, the commands its text runs, which its arguments may reach.
   let defines = new Set();
+  const forwardsTo = new Map();
   if (helperMode) {
     const prepared = prepareHelperText(code);
     code = prepared.code;
     defines = prepared.names;
   }
+  let setsStartup = STARTUP_VARIABLE.test(stripProse(code));
+  const commands = new Set();
   const verdict = (klass, reason, changesDir = false) => ({
     klass,
     reason,
     defines,
+    forwardsTo,
+    commands,
+    setsStartup,
     changesDir,
   });
 
@@ -1515,6 +1579,11 @@ function classifyInternal(
 
   const invocations = commandInvocations(codeForScan);
   let changesDir = invocations.some((inv) => DIRECTORY_CHANGERS.has(inv.word));
+  for (const inv of invocations)
+    if (!inv.keyword && inv.word !== "<unparseable>")
+      commands.add(inv.word.startsWith("git:") ? "git" : inv.word);
+  // A helper's own functions reach the commands its own text runs.
+  if (helperMode) for (const n of defines) forwardsTo.set(n, commands);
 
   // The helper rule. Each admitted invocation is known for ITSELF only: admitting
   // `bash a.sh` must not license a later `bash b.sh`, so admission is per index,
@@ -1532,12 +1601,62 @@ function classifyInternal(
       // and a `cd` inside it moves this shell. `bash x.sh` runs in a child, so
       // neither reaches the caller.
       if (inv.word === "source" || inv.word === ".") {
-        for (const n of r.sub.defines) defines.add(n);
+        for (const n of r.sub.defines) {
+          defines.add(n);
+          forwardsTo.set(n, r.sub.forwardsTo.get(n) ?? r.sub.commands);
+        }
         if (r.sub.changesDir) changesDir = true;
+        if (r.sub.setsStartup) setsStartup = true;
       }
     }
     if (calls.length > 0 && changesDir)
       return verdict("mutating", "helper call after a directory change");
+    // A --bind reaches the shell's environment too.
+    const boundStartup = Object.keys(bindings).some((k) =>
+      STARTUP_VARIABLES.includes(k),
+    );
+    if (calls.length > 0 && (setsStartup || boundStartup))
+      return verdict(
+        "mutating",
+        `helper call with a shell start-up variable set (${STARTUP_VARIABLES.join(", ")})`,
+      );
+  }
+
+  // A call to a helper-defined function is only as permissive as its arguments
+  // would be if written to each command the helper runs: `newest_numbered docs dod
+  // -delete` forwards `-delete` to `find` (task.191 CR-1). Every line that calls
+  // one is re-read with the function name replaced by each such command; a deny
+  // rule that fires there refuses the block. An `unrecognised-command` there says
+  // nothing about the arguments, so it is not a refusal.
+  // A function reaches what the functions it calls reach, so the set is closed
+  // over defined names; a continuation line is one command line.
+  const reach = (fn, seen = new Set()) => {
+    const out = new Set();
+    if (seen.has(fn)) return out;
+    seen.add(fn);
+    for (const c of forwardsTo.get(fn) ?? commands) {
+      if (defines.has(c)) for (const d of reach(c, seen)) out.add(d);
+      else if (!SHELL_KEYWORDS.has(c)) out.add(c);
+    }
+    return out;
+  };
+  const callLines = prose.replace(/\\\n/g, " ").split("\n");
+  for (const fn of new Set(invocations.map((inv) => inv.word))) {
+    if (!defines.has(fn)) continue;
+    const call = new RegExp(
+      `(^|[\\s;&|(\`])${escapeRegExp(fn)}(?=[\\s;&|)]|$)`,
+    );
+    for (const line of callLines) {
+      if (!call.test(line)) continue;
+      for (const cmd of reach(fn)) {
+        const r = classifyInternal(line.replace(call, `$1${cmd}`), bindings);
+        if (r.klass === "mutating" && !/^unrecognised-command/.test(r.reason))
+          return verdict(
+            "mutating",
+            `function ${fn} forwards its arguments to ${cmd}: ${r.reason}`,
+          );
+      }
+    }
   }
 
   const unknown = invocations
@@ -1547,8 +1666,8 @@ function classifyInternal(
       if (SHELL_KEYWORDS.has(w)) return false;
       if (SAFE_COMMANDS.has(w)) return false;
       // After the runner check: a helper that defines `xargs` does not make
-      // `xargs` safe.
-      if (defines.has(w)) return false;
+      // `xargs` safe — and no defined name that shadows a real command is trusted.
+      if (defines.has(w) && !shadowsCommand(w)) return false;
       if (w.startsWith("git:")) return !SAFE_GIT_SUBCOMMANDS.has(w.slice(4));
       return true;
     })
@@ -1911,21 +2030,57 @@ export function changedLineRanges(filePath, rev) {
   if (typeof rev !== "string" || rev === "" || rev.startsWith("-"))
     throw new Error(`bad-diff-base: not a revision: ${rev}`);
   const abs = resolve(filePath);
-  const r = spawnSync("git", ["diff", "-U0", rev, "--", abs], {
-    cwd: dirname(abs),
-    encoding: "utf8",
-  });
+  // The user's diff config must not reach the parse: colour puts escapes in the
+  // hunk headers, and an external or textconv driver replaces them (task.191 CR-4).
+  const r = spawnSync(
+    "git",
+    [
+      "diff",
+      "--no-color",
+      "--no-ext-diff",
+      "--no-textconv",
+      "-U0",
+      rev,
+      "--",
+      abs,
+    ],
+    { cwd: dirname(abs), encoding: "utf8" },
+  );
   if (r.status !== 0)
     throw new Error(
       `bad-diff-base: git diff ${rev} failed: ${(r.stderr || r.error?.message || "").trim()}`,
     );
-  return parseDiffRanges(r.stdout);
+  const ranges = parseDiffRanges(r.stdout);
+  // A diff that printed something beyond its headers but yielded no hunk was not
+  // read — never "nothing changed" (a binary diff, or a shape this parser does not
+  // know). A mode-only or rename-only change is headers alone, and has no lines.
+  const DIFF_HEADER =
+    /^(?:diff --git |index |old mode |new mode |deleted file mode |new file mode |similarity index |dissimilarity index |rename from |rename to |copy from |copy to |--- |\+\+\+ )/;
+  const unread = r.stdout
+    .split("\n")
+    .filter((l) => l !== "" && !DIFF_HEADER.test(l));
+  if (ranges.length === 0 && unread.length > 0)
+    throw new Error(
+      `bad-diff-base: git diff ${rev} printed no hunk this parser reads`,
+    );
+  return ranges;
+}
+
+/** True when git does not track `filePath` — it then has no diff to report. */
+export function isUntracked(filePath) {
+  const abs = resolve(filePath);
+  const r = spawnSync("git", ["ls-files", "--error-unmatch", "--", abs], {
+    cwd: dirname(abs),
+    encoding: "utf8",
+  });
+  return r.status !== 0;
 }
 
 /**
  * `@@ -a,b +c,d @@` → `[c, c + d - 1]` on the new side. A pure deletion
- * (`d = 0`) removed lines after line `c`; it is marked at `c`, so a block
- * that lost a line still counts as changed.
+ * (`d = 0`) removed lines BETWEEN lines `c` and `c + 1`; it is the point
+ * `c + 0.5`, so it marks a block only when the gap falls inside the block's
+ * span — never the block that ends at line `c` (task.191 CR-6).
  */
 export function parseDiffRanges(diffText) {
   const ranges = [];
@@ -1934,7 +2089,9 @@ export function parseDiffRanges(diffText) {
   )) {
     const start = Number(m[1]);
     const count = m[2] === undefined ? 1 : Number(m[2]);
-    ranges.push([start, start + Math.max(count, 1) - 1]);
+    ranges.push(
+      count === 0 ? [start + 0.5, start + 0.5] : [start, start + count - 1],
+    );
   }
   return ranges;
 }
@@ -2192,6 +2349,15 @@ export function executeFile(filePath, opts = {}) {
       });
     }
   }
+
+  // An untracked file has no diff, so it has no changed blocks — say so rather
+  // than let it read like a file the change did not touch (task.191 CR-8).
+  if (changedRanges !== null && isUntracked(filePath))
+    notes.push({
+      kind: "untracked-file",
+      detail:
+        "--diff-base: the file is not tracked by git, so no block is marked changed — commit it, then re-run",
+    });
 
   // The change set, apart from the file (obs #219). A file-level count folds the
   // changed blocks in with every templated block the change did not touch, so a

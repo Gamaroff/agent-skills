@@ -19,6 +19,7 @@
 import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import {
+  chmodSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -2897,8 +2898,13 @@ test("QA-28: a --copy-as DEST whose name begins with two dots is seeded, not ref
 
 // ── task.191: --slot, helper calls, --diff-base ───────────────────────────────
 
-const { applySlots, parseDiffRanges, changedLineRanges, MAX_HELPER_DEPTH } =
-  await import(MODULE);
+const {
+  applySlots,
+  parseDiffRanges,
+  changedLineRanges,
+  isRunnableBlock,
+  MAX_HELPER_DEPTH,
+} = await import(MODULE);
 
 test("T191 --slot: a {NAME} block runs with the slot filled, and is placeholder naming it without", () => {
   const root = docsFixture();
@@ -3309,7 +3315,7 @@ test("T191 parseDiffRanges: additions, pure deletions and single-line hunks", ()
     ),
     [
       [4, 5],
-      [10, 10],
+      [10.5, 10.5], // a pure deletion is the gap after line 10 (QA cycle 1, CR-6)
       [20, 20],
     ],
   );
@@ -3386,4 +3392,197 @@ test("T191 --diff-base: a bad revision is exit 2, bad-diff-base, naming the revi
   assert.equal(main(["--file", file, "--diff-base", "--cached"]).exitCode, 2);
   assert.equal(main(["--file", file, "--diff-base"]).exitCode, 2);
   assert.throws(() => changedLineRanges(file, "-x"), /bad-diff-base/);
+});
+
+// ── task.191 QA cycle 1 fixes ─────────────────────────────────────────────────
+
+test("T191 QA-1: a helper call is refused when anything names a shell start-up variable", () => {
+  const root = helperFixture();
+  writeFileSync(join(root, R, "sets-env.sh"), "export BASH_ENV=x\n");
+  const at = (code, bindings = {}) =>
+    classifyBlock(code, bindings, { helperRoot: root });
+  const reason = /^helper call with a shell start-up variable set/;
+  for (const code of [
+    `BASH_ENV=${R}/write.sh bash ${R}/read.sh`,
+    `export BASH_ENV=${R}/write.sh; bash ${R}/read.sh`,
+    `ENV=${R}/write.sh sh ${R}/read.sh`,
+    `set -x; export SHELLOPTS; export PS4='$(mv a b)'; bash ${R}/read.sh`,
+    `BASHOPTS=x bash ${R}/read.sh`,
+    `source ${R}/sets-env.sh\nbash ${R}/read.sh`,
+  ]) {
+    const v = at(code);
+    assert.equal(v.klass, "mutating", code);
+    assert.match(v.reason, reason, code);
+  }
+  assert.match(
+    at(`bash ${R}/read.sh`, { BASH_ENV: "x" }).reason,
+    reason,
+    "a --bind reaches the env too",
+  );
+  // No helper call: the rule does not fire.
+  assert.equal(at("echo PS4").klass, "runnable");
+});
+
+test("T191 QA-1: the BASH_ENV file never runs (executed, not only classified)", () => {
+  const seed = tmp();
+  mkdirSync(join(seed, "h"));
+  writeFileSync(join(seed, "h", "write.sh"), "echo UNVETTED-RAN\n");
+  writeFileSync(join(seed, "h", "read.sh"), "echo read-ok\n");
+  const file = join(tmp(), "SKILL.md");
+  writeFileSync(file, bash("BASH_ENV=h/write.sh bash h/read.sh"));
+  const r = executeFile(file, { allowZsh: false, copyFrom: seed });
+  assert.equal(r.results[0].skipped, true);
+  assert.equal(r.results[0].runs, undefined);
+});
+
+test("T191 CR-1: a sourced function's arguments are checked as if written to each command its helper runs", () => {
+  const dir = join(__dirname, "..");
+  const root = tmp();
+  mkdirSync(join(root, "h"));
+  writeFileSync(
+    join(root, "h", "newest-numbered.sh"),
+    readFileSync(join(dir, "newest-numbered.sh"), "utf8"),
+  );
+  const at = (code) => classifyBlock(code, {}, { helperRoot: root });
+  // Mutation proof: delete the forwarding loop in classifyInternal and this goes runnable.
+  assert.deepEqual(
+    at(
+      "source h/newest-numbered.sh || exit 1\nnewest_numbered docs dod -delete",
+    ),
+    {
+      klass: "mutating",
+      reason:
+        "function newest_numbered forwards its arguments to find: deny-list: find write action",
+    },
+  );
+  assert.match(
+    at(
+      "source h/newest-numbered.sh || exit 1\nN=$(next_numbered docs review -exec rm {} +)",
+    ).reason,
+    /^function next_numbered forwards its arguments to find/,
+  );
+  // The documented shape stays runnable.
+  assert.equal(
+    at(
+      'source h/newest-numbered.sh || exit 1\nN=$(next_numbered "docs/tasks/x" review -name "task.1.review.*.md") || exit 1\necho "$N"',
+    ).klass,
+    "runnable",
+  );
+});
+
+test("T191 CR-3: a helper name that shadows a real command is never trusted, wherever it is defined", () => {
+  const root = tmp();
+  mkdirSync(join(root, "h"));
+  writeFileSync(
+    join(root, "h", "cond.sh"),
+    "if false; then\n  mv() { echo shadow; }\nfi\n",
+  );
+  writeFileSync(
+    join(root, "h", "top.sh"),
+    "mv() { echo shadow; }\nmy_safe_fn() { echo ok; }\n",
+  );
+  const at = (code) => classifyBlock(code, {}, { helperRoot: root });
+  for (const code of [
+    "source h/cond.sh\nmv a b",
+    "mv a b\nsource h/cond.sh",
+    "source h/top.sh\nmv a b",
+  ]) {
+    assert.deepEqual(
+      at(code),
+      { klass: "mutating", reason: "unrecognised-command: mv (fail-closed)" },
+      code,
+    );
+  }
+  // A name that shadows nothing is still trusted.
+  assert.equal(at("source h/top.sh\nmy_safe_fn").klass, "runnable");
+});
+
+test("T191 QA-2: isRunnableBlock is classifyBlock as a predicate", () => {
+  assert.equal(isRunnableBlock("ls"), true);
+  assert.equal(isRunnableBlock("rm -rf x"), false);
+  assert.equal(isRunnableBlock("echo {slot}"), false);
+});
+
+test("T191 CR-4: the user's git colour config cannot empty the change set", () => {
+  const { repo, file } = gitRepoWithDoc(["echo one", "echo two"]);
+  spawnSync("git", ["config", "color.diff", "always"], { cwd: repo });
+  spawnSync("git", ["config", "color.ui", "always"], { cwd: repo });
+  writeFileSync(file, md(bash("echo one"), bash("echo TWO")) + "\n");
+  const r = executeFile(file, { allowZsh: false, diffBase: "HEAD" });
+  assert.equal(r.changed.total, 1, "a coloured diff must still parse");
+});
+
+test("T191 CR-4: a diff with output and no hunk is bad-diff-base, never an empty change set", () => {
+  const { file } = gitRepoWithDoc(["echo one"]);
+  writeFileSync(file, "binary\u0000content\n");
+  assert.throws(
+    () => changedLineRanges(file, "HEAD"),
+    /bad-diff-base: .*no hunk/,
+  );
+});
+
+test("T191 CR-6: deleting the line after a closing fence does not mark that block changed", () => {
+  const { repo, file } = gitRepoWithDoc(["echo one"]);
+  writeFileSync(file, md(bash("echo one"), "prose after the fence") + "\n");
+  spawnSync("git", ["commit", "-qam", "prose"], { cwd: repo });
+  writeFileSync(file, md(bash("echo one")) + "\n");
+  assert.equal(
+    changedLineRanges(file, "HEAD").length,
+    1,
+    "the deletion is a hunk",
+  );
+  const r = executeFile(file, { allowZsh: false, diffBase: "HEAD" });
+  assert.equal(r.changed.total, 0);
+  // A deletion INSIDE the block still marks it.
+  const { file: f2 } = gitRepoWithDoc(["echo one\necho two"]);
+  writeFileSync(f2, readFileSync(f2, "utf8").replace("echo two\n", ""));
+  assert.equal(
+    executeFile(f2, { allowZsh: false, diffBase: "HEAD" }).changed.total,
+    1,
+  );
+});
+
+test("T191 CR-8: an untracked file under --diff-base carries an untracked-file note", () => {
+  const { repo } = gitRepoWithDoc(["echo one"]);
+  const file = join(repo, "NEW.md");
+  writeFileSync(file, md(bash("echo new")));
+  const r = executeFile(file, { allowZsh: false, diffBase: "HEAD" });
+  assert.equal(r.changed.total, 0);
+  assert.ok(r.notes.some((n) => n.kind === "untracked-file"));
+});
+
+test("T191 CR-1: a continued call line and a call through a second helper's function are both checked", () => {
+  const dir = join(__dirname, "..");
+  const root = tmp();
+  mkdirSync(join(root, "h"));
+  writeFileSync(
+    join(root, "h", "newest-numbered.sh"),
+    readFileSync(join(dir, "newest-numbered.sh"), "utf8"),
+  );
+  writeFileSync(
+    join(root, "h", "wrap.sh"),
+    'source h/newest-numbered.sh\nwrap_newest() { newest_numbered "$@"; }\n',
+  );
+  const at = (code) => classifyBlock(code, {}, { helperRoot: root });
+  assert.match(
+    at(
+      "source h/newest-numbered.sh || exit 1\nnewest_numbered docs dod \\\n  -delete",
+    ).reason,
+    /forwards its arguments to find/,
+  );
+  assert.match(
+    at("source h/wrap.sh || exit 1\nwrap_newest docs dod -delete").reason,
+    /^function wrap_newest forwards its arguments to find/,
+  );
+  assert.equal(
+    at('source h/wrap.sh || exit 1\nwrap_newest docs dod -name "x"').klass,
+    "runnable",
+  );
+});
+
+test("T191 CR-4: a mode-only change is no hunk and no error", () => {
+  const { repo, file } = gitRepoWithDoc(["echo one"]);
+  spawnSync("git", ["config", "core.fileMode", "true"], { cwd: repo });
+  chmodSync(file, 0o755);
+  assert.deepEqual(changedLineRanges(file, "HEAD"), []);
 });
