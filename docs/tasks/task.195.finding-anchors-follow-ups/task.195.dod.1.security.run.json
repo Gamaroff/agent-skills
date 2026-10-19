@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "filename",
+      "entry": "fence:skills/review-code/SKILL.md#Step 4 — `--comment` (optional)",
+      "name": "review-code --inline un-annotated guard",
+      "call_site": null,
+      "verdict": "unverifiable",
+      "reason": "bad-slot",
+      "executed": 0,
+      "passed": 0,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 1,
+      "declined_cases": [
+        {
+          "id": "fence:skills/review-code/SKILL.md#Step 4 — `--comment` (optional)",
+          "reason": "bad-slot",
+          "detail": "slot \"{findings-json}\" does not appear in the block under \"Step 4 — `--comment` (optional)\" (line 146) — a slot that substitutes nothing tests nothing"
+        }
+      ],
+      "escaped": 0,
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": "{findings-json}",
+      "fixture_setup": null,
+      "ran_at": "2026-10-19T16:26:59.213Z"
+    },
+    {
+      "sink": "filename",
+      "entry": "fence:skills/review-pr/SKILL.md#`--inline` — findings beside the lines they are about",
+      "name": "review-pr --inline un-annotated guard",
+      "call_site": null,
+      "verdict": "present-but-inert",
+      "reason": "a-hostile-case-passed-a-control-that-rejects-others",
+      "executed": 20,
+      "passed": 18,
+      "reproduced": 2,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 13,
+      "shells": [
+        "bash"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": "{findings-json}",
+      "fixture_setup": null,
+      "ran_at": "2026-10-19T16:26:59.166Z"
+    },
+    {
+      "sink": "filename",
+      "entry": "fence:skills/review-code/SKILL.md#Step 2b — Check every anchor (always)",
+      "name": "review-code Step 2b checker: containment, unparseable, reason decision",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 23,
+      "passed": 23,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": [
+        "bash"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": "{target: worktree | staged | range}",
+      "fixture_setup": null,
+      "ran_at": "2026-10-19T16:26:58.798Z"
+    }
+  ],
+  "totals": {
+    "executed": 43,
+    "reproduced": 2
+  },
+  "updated_at": "2026-10-19T16:26:59.213Z"
+}

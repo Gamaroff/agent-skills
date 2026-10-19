@@ -445,11 +445,43 @@ None.
 
 Both cycle 1 findings were fixed and mutation-proven. The cycle 2 refute pass found 3 advisory bugs, all medium or low confidence, and routed them to future work: CR-1 (review-pr guard accepts one broken lens), CR-2 (null entry crashes the checker, pre-existing) and CR-3 (`--staged --fix` index vs worktree).
 
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**QA Report**: `task.195.qa.2.finding-anchors-follow-ups.md`
+**Gate File**: `task.195.gate.2.finding-anchors-follow-ups.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+### Missing Criteria:
+
+1. **Security Review** (the /finalise probe of the review-pr `--inline` guard ran 43 cases: 2 reproduced and 13 escaped):
+   - [ ] **Medium.** `skills/review-pr/SKILL.md:971-975`: the guard must require an array for every wrapper key present. `{"code_review":{"findings":"oops"},"pr_conformance":{"findings":[annotated]}}` passes, and the code findings are dropped silently. This is QA 2's CR-1, now reproduced. `findingsOf` has the same leniency.
+   - [ ] **Low.** The same guard must treat `anchor_check: null` as absent (`.anchor_check | type == "string"`).
+   - [ ] **Escape.** `skills/review-pr/SKILL.md:951` runs `mktemp -t review-pr-inline.XXXXXX.json` before the guard and never removes it on HALT. 13 refused inputs leave a scratch file in `$TMPDIR`.
+
+2. **CI:**
+   - [ ] Reading 1 is PENDING on `faec9ea4`. Acceptance needs a green run on the head carrying the final code.
+
+### Next Steps:
+
+- [ ] **BLOCKING**: fix the three review-pr `--inline` gaps and add the reproducing cases to `skills/review-pr/tests/review-pr.test.js`, with a mutation proof for each
+- [ ] Re-enter QA at 5a (this is a code change), then re-run `/finalise`
+
+**Estimated Effort:** Small (≈1 hour)
+
+**Gap Report Generated:** 2026-10-19
+**QA Gate Reference**: See `task.195.gate.2.finding-anchors-follow-ups.yml`
+
+**Detailed Verification Log:** See `task.195.dod.1.finding-anchors-follow-ups.md` for the complete verification evidence and the probe record `task.195.dod.1.security.run.json`.
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                                                 | Author      |
-| ---------- | ------- | --------------------------------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-07 | 1.0     | Initial draft — cut from task.194's gate 3 and PR review advisory findings | create-task |
 | 2026-10-19 | 1.1     | Review passed (8/10) — Phase 3 rescoped (superseded by `319bf779`), malformed-set enumeration sweep and the pinned `no-line` test added, anchors corrected | review-task |
 | 2026-10-19 |         | Status → ready-for-development | review-task |
@@ -458,6 +490,7 @@ Both cycle 1 findings were fixed and mutation-proven. The cycle 2 refute pass fo
 | 2026-10-19 |         | QA gate CONCERNS (90/100) — 2 findings | qa-task |
 | 2026-10-19 |         | QA findings fixed — 2 of 2 (TASK-195-QA1-1, -2), 1 iteration | qa-fix |
 | 2026-10-19 |         | QA gate PASS (100/100) — 0 findings (3 advisory) | qa-task |
+| 2026-10-19 |  | DoD incomplete — 4 gaps identified (3 security on the review-pr --inline guard, CI pending) | finalise |
 <!-- change-log-end -->
 
 ---
