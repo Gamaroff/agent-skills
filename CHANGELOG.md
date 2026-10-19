@@ -6,6 +6,13 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **A QA gate no longer passes over probe escapes that `/finalise` halts on (obs #73).** The probe
+  run record now totals `escaped` beside `executed` and `reproduced`, and `--emit-block` prints it
+  for the whole record and for each control. `/qa-task` and `/qa-story` copy `totals.escaped` into
+  the gate as `nfr_validation.security.escaped`. A non-zero count is a `top_issues[]` finding,
+  never a future-work item and never a `PASS`: the same rule `/finalise` Step 3b.1 applies to the
+  same record. Before this, task 195's QA cycle 2 gated PASS over 10 escapes, and the DoD found
+  them after the full QA loop.
 - **The finding-anchors checker no longer has a state its callers misread (task 195).** Seven
   advisory findings left by task 194 are closed. **A code finding whose `file_line` is not
   `path:line`** — a bare path, a range, empty, a value that is not a string, or no `file_line` at
