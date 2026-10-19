@@ -5,18 +5,20 @@ type: task
 description: "qa-read-back.js refuses a document whose QA section Gate Decision or newest QA Change Log row does not match this cycle's gate token, and retries a git add that fails only on a transient .git/index.lock before reporting it."
 tags: [qa-task, qa-story, qa-read-back, observation, index-lock]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-07
 updated: 2026-10-19
 assignee:
 estimated_effort_hours: 8
 github_issue: 591
+completed_date: 2026-10-19
+pr_number: 688
 ---
 
 # Technical Task: Read-back checks this cycle's verdict
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.192.review.1.read-back-checks-this-cycles-verdict.md` implemented 2026-10-19
 **GitHub Issue**: [#591](https://github.com/Gamaroff/agent-skills/issues/591)
 
@@ -114,7 +116,9 @@ Line numbers are from `develop` at `41adc7bb` (re-measured by review 1), paired 
   3. The newest Change Log row (from `extractEntries`) whose author cell — the last non-empty cell — is
      `qa-task` or `qa-story`. Missing → problem. When its description does not match
      `QA gate <TOKEN>` followed by a word boundary → problem naming the row and the token.
-     Rows by other authors after it (`qa-fix`, `finalise`) are ignored.
+     _QA cycle 2 (QA2-1, QA2-2):_ the verdict row is the newest qa-* row whose description starts
+     `QA gate`, so QA's own `Status →` rows and later `finalise` rows are ignored. A `qa-fix` row
+     after it is a problem: that cycle wrote no row of its own.
 - **Lock retry**: `stage()` retries `git add` when stderr contains `index.lock`, up to 3 more
   attempts at 200 ms, 400 ms and 800 ms (a synchronous sleep via `Atomics.wait` on a
   `SharedArrayBuffer`, since the script is synchronous). A lock that outlasts the backoff is reported
@@ -264,8 +268,9 @@ None.
 
 - [ ] A `**Gate Decision**` that differs from this cycle's gate token is a problem, and the read-back
   exits 1 — held by `qa-read-back.test.mjs` (Phase 1).
-- [ ] A newest `qa-task`/`qa-story` row that does not name the token is a problem; a later `qa-fix`
-  row does not trigger it — held by the same test (Phase 1).
+- [ ] A newest `QA gate` row by `qa-task`/`qa-story` that does not name the token is a problem; a
+  `qa-fix` row after it is a problem (QA cycle 2, QA2-1), and later QA `Status →` and `finalise`
+  rows are ignored — held by the same test (Phase 1).
 - [ ] A missing `**Gate Decision**` line is a problem — held by the same test (Phase 1).
 - [ ] A lock released during the backoff stages cleanly; a persistent lock is reported after 4
   attempts; a non-lock failure is reported after 1 — held by the same test (Phase 2).
@@ -353,6 +358,28 @@ None.
 - All findings from cycles 1 and 2 are fixed and verified. Bugs [1](./task.192.bug.1.skill-md-read-back-omits-verdict-check.md), [2](./task.192.bug.2.same-verdict-cycle-reads-clean-without-its-row.md) and [3](./task.192.bug.3.status-row-after-verdict-halts-a-correct-document.md) are closed.
 - Three LOW code-review items are routed to future work in the gate.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.192.qa.3.read-back-checks-this-cycles-verdict.md`
+**Gate File**: `task.192.gate.3.read-back-checks-this-cycles-verdict.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (3 QA cycles; bugs 1–3 closed)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 7/7 met, each held by a test or CI lane that runs on every PR
+✅ **PR Review:** PR #688. CI is green. The 5c PR review returned CONCERNS; its doc findings are fixed and carried
+✅ **Documentation:** CHANGELOG [Unreleased] entry; qa-task and qa-story SKILL.md read-back lists
+✅ **Security Review:** ✅ PASS — no shell, eval or secrets; the boundary was probed with 28 cases, 0 reproduced
+➖ **Compliance Review:** NOT_APPLICABLE (internal tooling)
+
+**Task marked as ACCEPTED on:** 2026-10-19
+
+**Detailed Verification Log:** See `task.192.dod.1.read-back-checks-this-cycles-verdict.md` for the full verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
@@ -367,6 +394,8 @@ None.
 | 2026-10-19 |  | QA gate CONCERNS (80/100) — 2 findings | qa-task |
 | 2026-10-19 |  | QA findings fixed — cycle 2, 2 findings (verdict row = newest QA gate row; a qa-fix row after it halts) | qa-fix |
 | 2026-10-19 |  | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-10-19 |  | PR review CONCERNS — success criterion and Target Architecture step 3 aligned to the cycle-2 row rule (PC-1, PC-3) | develop-task |
+| 2026-10-19 | 1.2 | DoD passed — accepted (PR #688) | finalise |
 <!-- change-log-end -->
 
 ---
