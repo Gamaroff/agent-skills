@@ -833,7 +833,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** Pipelines also write sprint-review-summary.md (finalise 6a), continuation handoff task.{n}.handoff.{n}.{name}.md (session-handoff continue), tracker handover task.{n}.handover.{n}.{name}.{md,sh,json} and task bug reports; the layout tree also omits the pr-review file
 - **Evidence:** skills/finalise/SKILL.md:1289,1338 (sprint-review-summary.md committed at 6a); docs/standards/file-naming.md:54-56 (handoff/handover rows); CHANGELOG.md [Unreleased] task.156
 - **Fix:** Add rows for sprint-review-summary.md, handoff, handover and bug reports (or link file-naming.md for the full list), and add the pr-review line to the tree. Same gap in docs/standards/story-documents.md:21-27 and :102-110; file-naming.md has no sprint-review-summary row either.
-- **Resolved:** fixed by task.196 (2026-10-19).
+- **Resolved:** partially — task-documents.md fixed by task.196 (2026-10-19). The story-documents.md and file-naming.md gaps were deferred out of scope (task.196 review D1) and remain open.
 
 ### SKILL-READMES-STANDARDS-30 — `docs/standards/README.md:7` (missing)
 

@@ -313,8 +313,8 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.196.qa.1.pipeline-docs-qa-loop-and-artifacts.md](./task.196.qa.1.pipeline-docs-qa-loop-and-artifacts.md)
-- **Gate File**: [task.196.gate.1.pipeline-docs-qa-loop-and-artifacts.yml](./task.196.gate.1.pipeline-docs-qa-loop-and-artifacts.yml)
+- **Full Report**: [task.196.qa.2.pipeline-docs-qa-loop-and-artifacts.md](./task.196.qa.2.pipeline-docs-qa-loop-and-artifacts.md)
+- **Gate File**: [task.196.gate.2.pipeline-docs-qa-loop-and-artifacts.yml](./task.196.gate.2.pipeline-docs-qa-loop-and-artifacts.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 5969
@@ -323,7 +323,7 @@ None.
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-Three medium documentation-accuracy findings: two README flowchart edges (not-converging resume enters at 5b; the route 2c half-cycle has no 5b) and an overstated Step 8 row in `pipeline-artifacts.md`. Eight low wording findings.
+Cycle 2 refute pass: all gate-1 findings fixed. Two medium (route 2c trigger and the no-code-moved row in troubleshooting.md) and five low findings.
 
 <!-- change-log-start -->
 ## Change Log
@@ -336,6 +336,8 @@ Three medium documentation-accuracy findings: two README flowchart edges (not-co
 | 2026-10-19 |         | Implemented — 31 findings fixed across the 15 docs (RUNBOOKS-12's review-prd part already fixed, closed on re-check); four adjacent stale passages in `pipeline-artifacts.md`, `day-3-messy-path.md` and `troubleshooting.md` fixed with them; audit report marked. Status → ready-for-review | develop-task |
 | 2026-10-19 |         | QA gate CONCERNS (90/100) — 3 medium, 8 low findings | qa-task |
 | 2026-10-19 |         | QA findings fixed — cycle 1, 11 findings (QA-1..QA-11) | qa-fix |
+| 2026-10-19 |         | QA gate CONCERNS (90/100) — 2 medium, 5 low findings | qa-task |
+| 2026-10-19 |         | QA findings fixed — cycle 2, 7 findings (CR-1..CR-7) | qa-fix |
 <!-- change-log-end -->
 
 ---

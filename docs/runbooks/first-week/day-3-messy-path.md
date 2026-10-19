@@ -38,7 +38,7 @@ Most of `/develop-story`'s value is in the iteration loop. If your first 5 stori
 
 **Story:** "Add a short 'About this repo' section to `docs/concepts/overview.md`. AC: section body ≤ 50 lines (verified by `wc -l`)."
 
-**Why line count?** `qa-gate` checks ACs mechanically. Line count is verifiable with a single shell command (`wc -l`), so the FAIL is deterministic — you control it.
+**Why line count?** `qa-story` checks ACs mechanically. Line count is verifiable with a single shell command (`wc -l`), so the FAIL is deterministic — you control it.
 
 **Steps:**
 
@@ -55,7 +55,7 @@ Most of `/develop-story`'s value is in the iteration loop. If your first 5 stori
 
 - [ ] Read the FAIL findings in the gate file
 - [ ] Trim the section to ≤ 50 lines
-- [ ] Re-run `qa-story` (or let the `/develop-story` `qa-fix` loop handle it automatically) — `qa-gate` only writes the gate file; `qa-story` runs the review that decides it
+- [ ] Re-run `qa-story` (or let the `/develop-story` `qa-fix` loop handle it automatically) — `qa-gate` records a gate decision from findings that already exist; `qa-story` runs the review that produces them
 - [ ] Observe the PASS gate artifact
 
 **Expected artifact:** `story.{P}.{E}.{S}.gate.2.*.yml` with `gate: PASS`
@@ -74,7 +74,7 @@ Run these checks before calling Day 3 done:
 
 ## What you learned
 
-- `qa-gate` is mechanical — it checks ACs literally, including line counts via `wc -l`
+- `qa-story` is mechanical — it checks ACs literally, including line counts via `wc -l`, and records the verdict in the gate file
 - `qa-fix` loops up to `QA_MAX_CYCLES` cycles (default 5); usually 1 is enough. A gate with no open finding then hands to `review-pr` (Step 5c), which can send the run back into `qa-fix` on the same budget
 - The messy path is just normal engineering: read the failure, change the code, re-run
 - A FAIL gate is not a sign something is broken — it is the pipeline doing its job
