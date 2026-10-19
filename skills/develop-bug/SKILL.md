@@ -44,7 +44,8 @@ Hooks noop outside pipeline runs — zero overhead when no `.claude/state/develo
 - `--mode` and `--skip` are refused here with the reason: this pipeline has its own lite rule and no QA
   gate to record a waiver in.
 
-Resolution order: `references/develop-bug-step-0-resolve-bug.md` §0d.
+Resolution order: `references/develop-bug-step-0-resolve-bug.md` §0d. The engine it runs is
+`references/pipeline-answers.js`.
 
 ---
 

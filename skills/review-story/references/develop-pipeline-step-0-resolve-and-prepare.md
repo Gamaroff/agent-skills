@@ -249,7 +249,7 @@ Extract, per https://github.com/Gamaroff/agent-skills/blob/develop/shared/resour
 Also check skills-config.yaml in the project root:
   - Does it exist?
   - If yes, extract the devLoadAlwaysFiles list (may be absent/empty).
-  - Source `references/resolve-paths.sh` (or its bundled `references/resolve-paths.sh`) to populate `PRD_ROOT` and `ARCH_ROOT` env vars. Defaults: `docs/prd` and `docs/architecture`. Pipeline steps below use these env vars for any path operation that touches the PRD or architecture trees.
+  - Source `resolve-paths.sh` (bundled into each skill that runs this prompt as `references/resolve-paths.sh`) to populate `PRD_ROOT` and `ARCH_ROOT` env vars. Defaults: `docs/prd` and `docs/architecture`. Pipeline steps below use these env vars for any path operation that touches the PRD or architecture trees.
 
 MERGE the document-derived fields with your skills-config discovery into the return shape below — every
 field is required. Omitting `skills_config_exists` / `always_load_files` breaks always-load resolution.
@@ -418,7 +418,7 @@ If `TRACKER_ISSUE` is set (extracted in Phase 0c), signal that work has started 
 
 The comment is the same on either tracker, so it is **one** call — `tracker-comment.js` branches on `TRACKER` internally:
 
-> Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
+> Engine source: `tracker-comment.js` (bundled into each skill that runs it as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
 
 
 ```bash
@@ -510,7 +510,7 @@ node .agents/skills/{develop-story|develop-task|develop-bug}/references/gh-stage
   --issue {TRACKER_ISSUE} --stage work-started --add-to-board --json
 ```
 
-Engine source: `https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/gh-stage.js` (bundled into each skill as `references/gh-stage.js`).
+Engine source: `gh-stage.js` (bundled into each skill that runs it as `references/gh-stage.js`).
 
 `--add-to-board` is what makes this call, and only this call, ensure board **membership** before setting status — `ensureOnBoard` performs the `gh project item-add`, waits for Projects API propagation, and re-queries once if the first read comes back empty. Board membership is not board status, so no later moment passes this flag.
 
@@ -727,7 +727,7 @@ above build. A flag is **validated, never blindly obeyed**: one that contradicts
 `branch_model`, breaks Q1/Q2 agreement, or disagrees with the answer already recorded for this run is
 asked about with the conflict stated. The rule lives once, in the engine — never read the flags by eye:
 
-> Engine source: `https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/pipeline-answers.js` (bundled into each skill as `references/pipeline-answers.js`). Speed modes, skips and the floor: `https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/develop-pipeline-lite-mode.md#speed-modes-and-skips`.
+> Engine source: `pipeline-answers.js` (bundled into each skill that runs it as `references/pipeline-answers.js`). Speed modes, skips and the floor: `https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/develop-pipeline-lite-mode.md#speed-modes-and-skips`.
 
 | Flag | Answers | Policy key |
 | --- | --- | --- |
@@ -819,7 +819,7 @@ the template's **Story variant**.
 Create `task.{id}.implementation.{N}.{descriptive-name}.md` in the task directory from the
 template's **Task variant**.
 
-**Why the template is not inlined here.** `https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/report-lint.js` derives the sections a
+**Why the template is not inlined here.** `report-lint.js` derives the sections a
 report must carry — exactly once, in order, the optional one at most once — from the same fences,
 and it runs after every report Edit (Step Transition Protocol action 2), before the HALT commit, in
 the PreCompact hook and at Step 8. A second copy of the section list in this file would be a second

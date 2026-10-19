@@ -1,0 +1,178 @@
+[
+  {
+    "id": "h-plain-prose",
+    "sink": "shell-exec",
+    "input": "Plain prose naming `",
+    "why": "A prose mention copies the script into every bundling skill",
+    "correct": "false: reported",
+    "direction": "hostile"
+  },
+  {
+    "id": "h-engine-source",
+    "sink": "shell-exec",
+    "input": "Engine source: `",
+    "why": "The word 'source' followed by a colon is prose (review 1, I1)",
+    "correct": "false: reported",
+    "direction": "hostile"
+  },
+  {
+    "id": "h-prose-from",
+    "sink": "shell-exec",
+    "input": "Shell calls wrap with f from `",
+    "why": "The English word 'from' is not an import",
+    "correct": "false: reported",
+    "direction": "hostile"
+  },
+  {
+    "id": "h-single-source",
+    "sink": "shell-exec",
+    "input": "This is the single source `",
+    "why": "The noun 'source' sits before a code span the literal opens (QA cycle 1, CR-2)",
+    "correct": "false: reported",
+    "direction": "hostile"
+  },
+  {
+    "id": "h-paren-source",
+    "sink": "shell-exec",
+    "input": "Only the resolver (source `",
+    "why": "A parenthetical 'source' is prose (QA cycle 2, CR-2)",
+    "correct": "false: reported",
+    "direction": "hostile"
+  },
+  {
+    "id": "h-line-initial-source",
+    "sink": "shell-exec",
+    "input": "source `",
+    "why": "A line that wraps to 'source `...`' is prose, because the command is outside the span",
+    "correct": "false: reported",
+    "direction": "hostile"
+  },
+  {
+    "id": "h-closing-tick",
+    "sink": "shell-exec",
+    "input": "Inside `setup` source ",
+    "why": "The last backtick closes a span, so the text after it is prose",
+    "correct": "false: reported",
+    "direction": "hostile"
+  },
+  {
+    "id": "h-cite-wrapper",
+    "sink": "shell-exec",
+    "input": "See <!-- cite: ",
+    "why": "The bundler cites only an .md, so a cited script is still a dependency (QA cycle 1, CR-1)",
+    "correct": "false: reported",
+    "direction": "hostile"
+  },
+  {
+    "id": "h-sourceable",
+    "sink": "shell-exec",
+    "input": "The helpers are sourceable from `",
+    "why": "'sourceable' is prose (review 1, I1)",
+    "correct": "false: reported",
+    "direction": "hostile"
+  },
+  {
+    "id": "h-span-non-command-after-flag",
+    "sink": "shell-exec",
+    "input": "`bash -c 'echo ",
+    "why": "The span starts with bash, but echo is what sits before the path",
+    "correct": "false: reported",
+    "direction": "hostile"
+  },
+  {
+    "id": "h-sh-word-span",
+    "sink": "shell-exec",
+    "input": "`sh` scripts such as ",
+    "why": "A closed `sh` span followed by prose",
+    "correct": "false: reported",
+    "direction": "hostile"
+  },
+  {
+    "id": "h-escaped-backtick",
+    "sink": "shell-exec",
+    "input": "Prose \\` bash ",
+    "why": "An escaped backtick does not open a code span (CommonMark), so 'bash x' here is prose. The parity count sees zero ticks before it and reads it as an opener",
+    "correct": "false: reported",
+    "direction": "hostile"
+  },
+  {
+    "id": "h-odd-tick-in-double-span",
+    "sink": "shell-exec",
+    "input": "See ``a`b`` bash ",
+    "why": "``a`b`` is one closed code span, so the trailing 'bash x' is prose. The even total of 4 ticks makes the closing tick look like an opener",
+    "correct": "false: reported",
+    "direction": "hostile"
+  },
+  {
+    "id": "l-span-bash",
+    "sink": "shell-exec",
+    "input": "Run `bash ",
+    "why": "A command that opens the code span runs the literal",
+    "correct": "true",
+    "direction": "legitimate"
+  },
+  {
+    "id": "l-span-command-node-flags",
+    "sink": "shell-exec",
+    "input": "Then `command node --test ",
+    "why": "'command node' with flags at the span start",
+    "correct": "true",
+    "direction": "legitimate"
+  },
+  {
+    "id": "l-span-dot-slash",
+    "sink": "shell-exec",
+    "input": "`bash ./",
+    "why": "The spec allows an optional ./",
+    "correct": "true",
+    "direction": "legitimate"
+  },
+  {
+    "id": "l-span-quote",
+    "sink": "shell-exec",
+    "input": "`source \"",
+    "why": "The spec allows one optional quote",
+    "correct": "true",
+    "direction": "legitimate"
+  },
+  {
+    "id": "l-require",
+    "sink": "shell-exec",
+    "input": "Load it with `node -e 'require(\"./",
+    "why": "Inside require(",
+    "correct": "true",
+    "direction": "legitimate"
+  },
+  {
+    "id": "l-dynamic-import",
+    "sink": "shell-exec",
+    "input": "await import(\"",
+    "why": "Inside import(",
+    "correct": "true",
+    "direction": "legitimate"
+  },
+  {
+    "id": "l-subshell",
+    "sink": "shell-exec",
+    "input": "Run it as `$(bash ",
+    "why": "After $(",
+    "correct": "true",
+    "direction": "legitimate"
+  },
+  {
+    "id": "l-span-import-from",
+    "sink": "shell-exec",
+    "input": "Lift it with `import { x } from '",
+    "why": "'import ... from' at the span start",
+    "correct": "true",
+    "direction": "legitimate"
+  },
+  {
+    "id": "l-double-backtick-span",
+    "sink": "shell-exec",
+    "input": "Run ``bash ",
+    "why": "A double-backtick code span that bash opens is a command span (CommonMark). The parity count sees one tick before the last tick and calls it a closer",
+    "correct": "true",
+    "direction": "legitimate"
+  }
+]

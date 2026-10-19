@@ -33,7 +33,7 @@ Lite mode trades **QA depth** for speed on low-risk work. It does NOT trade away
 4. **Comment on the linked tracker issue** via `tracker-comment.js` (and, on GitHub, `gh issue close`) with the PR URL and DoD verdict
 5. **Update the project board / Jira board** status to Done — `gh-stage.js --stage done` on GitHub, `jira-stage.js --stage done` on Jira. Both resolve the target column from the consumer's `tracker-workflow.yaml`; neither is skipped in lite mode.
 
-> Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
+> Engine source: `tracker-comment.js` (bundled into each skill that runs it as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
 
 
 Skipping any of these in lite mode leaves the issue stuck "In Progress" forever and hides acceptance evidence from reviewers. The full Step 7 protocol in `references/develop-pipeline-step-7-finalise.md` applies in lite mode without exception.

@@ -63,7 +63,7 @@ one-line change to a list; it is a decision to stop having the boundary.
 This refusal is asserted in code, not only here:
 
 ```
-shared/resources/tests/qa-execute-snippets.test.mjs
+qa-execute-snippets.test.mjs
   → "task.80 parity: no interpreter is on the snippet allow-list"
 ```
 
