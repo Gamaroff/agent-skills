@@ -1,0 +1,37 @@
+{
+  "sink": "url-authority",
+  "entry": "cli:shared/resources/tests/fixtures/security-probe/cli-closes-record-fd.py",
+  "name": "py-cli: closed or reopened fd 3 is errored, never scored",
+  "call_site": null,
+  "verdict": "unverifiable",
+  "reason": "entry-not-probeable",
+  "executed": 0,
+  "passed": 0,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 1,
+  "declined_cases": [
+    {
+      "id": "cli:shared/resources/tests/fixtures/security-probe/cli-closes-record-fd.py",
+      "reason": "entry-not-probeable",
+      "detail": "the CLI exited (exit 0) without the bootstrap's exit record — could not tell an answer from a crash"
+    }
+  ],
+  "escaped": 0,
+  "shells": null,
+  "interpreter": {
+    "name": "python3",
+    "version": "Python 3.14.8"
+  },
+  "fake_gh": null,
+  "argv": [
+    "--mode",
+    "strict",
+    "--host",
+    "{input}"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-10-19T14:23:27.818Z"
+}

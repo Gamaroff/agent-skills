@@ -5,17 +5,19 @@ type: task
 description: "Let shared/resources/security-probe.mjs probe a Python script through the existing cli: form (by file extension), so a Python boundary reaches the DoD probe instead of failing the zero-candidates guard."
 tags: [security-probe, finalise, qa-task, qa-story, review-security, observation]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-19
 updated: 2026-10-19
+completed_date: 2026-10-19
+pr_number: 692
 estimated_effort_hours: 6
 github_issue: 689
 ---
 
 # Technical Task: security-probe — a Python CLI under `cli:`
 
-**Status:** In Progress
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.215.review.1.probe-engine-python-cli-entry-form.md` implemented 2026-10-19
 
@@ -213,6 +215,29 @@ Both items need a merged, tagged release, and `/finalise` runs before merge, so 
 - [TASK-215-BUG-9: a crash outside the main frame is scored as the answer](./task.215.bug.9.crash-outside-main-frame-scored-answer.md) — ✅ Closed — Priority: Medium (verified QA cycle 6)
 - [TASK-215-BUG-10: a crash at shutdown flush is scored as a refusal](./task.215.bug.10.shutdown-flush-crash-scored-refusal.md) — ✅ Closed — Priority: Medium (verified QA cycle 7)
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.215.qa.7.probe-engine-python-cli-entry-form.md`
+**Gate File**: `task.215.gate.7.probe-engine-python-cli-entry-form.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 95/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 4/4 met. SC1–SC4 each trace to engine code and a per-PR test in `shared/resources/tests/security-probe.test.mjs`
+✅ **PR Review:** PR #692. The host requires no reviews; Step 5c `/review-pr` APPROVE (`task.215.pr-review.1.probe-engine-python-cli-entry-form.md`)
+✅ **Documentation:** CHANGELOG `[Unreleased]` entry; every `Node CLI` routing site names Python CLIs; bundle in sync
+✅ **Security Review:** PASS. Probe from /finalise: 12 controls, 71 executed, 0 reproduced, 0 escapes (`task.215.dod.1.security.run.json`)
+⚠️ **Compliance Review:** NOT_APPLICABLE (internal tooling)
+✅ **CI:** reading 1 SUCCESS @ `918e077c9f4e` (5 checks)
+
+**Task marked as ACCEPTED on:** 2026-10-19
+
+**Detailed Verification Log:** See `task.215.dod.1.probe-engine-python-cli-entry-form.md` for the full verification evidence.
 <!-- change-log-start -->
 ## Change Log
 
@@ -235,6 +260,7 @@ Both items need a merged, tagged release, and `/finalise` runs before merge, so 
 | 2026-10-19 |  | QA gate CONCERNS (85) — 3 findings | qa-task |
 | 2026-10-19 |  | QA findings fixed — cycle 6, 3 findings (TASK-215-QA6-1 to QA6-3); Status → Ready for Review | qa-fix |
 | 2026-10-19 |  | QA gate PASS (95) — 3 findings | qa-task |
+| 2026-10-19 | 1.2 | DoD passed — accepted (PR #692) | finalise |
 <!-- change-log-end -->
 
 ---

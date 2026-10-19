@@ -1,0 +1,31 @@
+{
+  "sink": "url-authority",
+  "entry": "cli:shared/resources/tests/fixtures/security-probe/cli-exit-one.py",
+  "name": "py-cli: plain sys.exit(1) refusal stays rejected",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 8,
+  "passed": 8,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": null,
+  "interpreter": {
+    "name": "python3",
+    "version": "Python 3.14.8"
+  },
+  "fake_gh": null,
+  "argv": [
+    "--mode",
+    "strict",
+    "--host",
+    "{input}"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-10-19T14:23:18.355Z"
+}
