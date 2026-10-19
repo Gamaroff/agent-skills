@@ -174,29 +174,28 @@ Both items need a merged, tagged release, and `/finalise` runs before merge, so 
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-19
-**Quality Score**: 85/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 95/100
+**Gate Decision**: PASS
 
 ### QA Report
 
-- **Full Report**: [task.215.qa.6.probe-engine-python-cli-entry-form.md](./task.215.qa.6.probe-engine-python-cli-entry-form.md)
-- **Gate File**: [task.215.gate.6.probe-engine-python-cli-entry-form.yml](./task.215.gate.6.probe-engine-python-cli-entry-form.yml)
+- **Full Report**: [task.215.qa.7.probe-engine-python-cli-entry-form.md](./task.215.qa.7.probe-engine-python-cli-entry-form.md)
+- **Gate File**: [task.215.gate.7.probe-engine-python-cli-entry-form.yml](./task.215.gate.7.probe-engine-python-cli-entry-form.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 22
+- **Tests Executed**: 23
 - **Phases Verified**: 2/2
 - **Critical Issues**: 0
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-- Cycle 5 fix verified (TASK-215-QA5-1 stated and pinned; crash-record precedence tested; bug 9 closed).
-- TASK-215-QA6-1 (MEDIUM): a `.py` CLI that crashes flushing stdout at shutdown exits 120 and is scored `rejected` — a measured false pass the limit says cannot happen. Bug report: [task.215.bug.10.shutdown-flush-crash-scored-refusal.md](./task.215.bug.10.shutdown-flush-crash-scored-refusal.md)
-- TASK-215-QA6-2, QA6-3 (LOW): the worker-thread sentence is inaccurate (safe direction); the thread-crash test has a coverage gap.
+- Cycle 6 fixes verified (TASK-215-QA6-1 to QA6-3; bug 10 closed). Probe: 8 executed, 0 reproduced; a `.py` exit 120 is `errored`, no crash shape scored `rejected`.
+- TASK-215-QA7-1 to QA7-3 (LOW): the thread-crash test's direct spawn depends on the cwd; the exit-120 detail carries no stderr; the CHANGELOG wording is narrower than the rule doc.
 
 ### Bug Reports
 
@@ -209,7 +208,7 @@ Both items need a merged, tagged release, and `/finalise` runs before merge, so 
 - [TASK-215-BUG-7: a closed fd 3 loses the crash marker](./task.215.bug.7.closed-fd3-loses-crash-marker.md) — ✅ Closed — Priority: High (verified QA cycle 5)
 - [TASK-215-BUG-8: the interpreter probe runs under a different environment](./task.215.bug.8.interpreter-probe-env-differs.md) — ✅ Closed — Priority: Medium (verified QA cycle 5)
 - [TASK-215-BUG-9: a crash outside the main frame is scored as the answer](./task.215.bug.9.crash-outside-main-frame-scored-answer.md) — ✅ Closed — Priority: Medium (verified QA cycle 6)
-- [TASK-215-BUG-10: a crash at shutdown flush is scored as a refusal](./task.215.bug.10.shutdown-flush-crash-scored-refusal.md) — ✅ Ready for QA — Priority: Medium (fixed QA-fix cycle 6)
+- [TASK-215-BUG-10: a crash at shutdown flush is scored as a refusal](./task.215.bug.10.shutdown-flush-crash-scored-refusal.md) — ✅ Closed — Priority: Medium (verified QA cycle 7)
 
 <!-- change-log-start -->
 ## Change Log
@@ -232,6 +231,7 @@ Both items need a merged, tagged release, and `/finalise` runs before merge, so 
 | 2026-10-19 |  | QA findings fixed — cycle 5, 1 finding (TASK-215-QA5-1); Status → Ready for Review | qa-fix |
 | 2026-10-19 |  | QA gate CONCERNS (85) — 3 findings | qa-task |
 | 2026-10-19 |  | QA findings fixed — cycle 6, 3 findings (TASK-215-QA6-1 to QA6-3); Status → Ready for Review | qa-fix |
+| 2026-10-19 |  | QA gate PASS (95) — 3 findings | qa-task |
 <!-- change-log-end -->
 
 ---

@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa
+status: closed
 severity: 'Minor'
 priority: 'Medium'
 created: 2026-10-19
@@ -15,7 +15,7 @@ tags: [task.215, security-probe, python]
 **Bug ID**: TASK-215-BUG-10
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 6: diff reviewer CR-2, confirmed by engine run)
 **Date Found**: 2026-10-19
 
@@ -94,3 +94,4 @@ swallows with the exit status unchanged.
 | 2026-10-19 | New | qa-task | Found in QA cycle 6 |
 | 2026-10-19 | In Progress | qa-fix | QA-fix cycle 6 |
 | 2026-10-19 | Ready for QA | qa-fix | QA-fix cycle 6 |
+| 2026-10-19 | Closed | qa-task | Verified by task.215.qa.7.probe-engine-python-cli-entry-form.md |

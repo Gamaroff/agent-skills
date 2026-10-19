@@ -1,0 +1,86 @@
+schema: 2
+task: 'task.215.probe-engine-python-cli-entry-form'
+task_title: 'security-probe: run a Python CLI under the cli: entry form'
+gate: PASS
+status_reason: 'Cycle 6 fixes verified: a .py exit 120 is errored (probe: the shutdown-flush crash and a stdout-to-/dev/full crash both errored/120, no reproduction), the limit text is accurate, the thread-crash test looks up every hostile case. Three LOW findings remain, none affecting a verdict.'
+reviewer: 'QA Engineer'
+head: '066813660d517780780d210aa0f43d3e0726bc3e'
+updated: '2026-10-19T14:09:21Z'
+
+top_issues:
+  - id: 'TASK-215-QA7-1'
+    severity: low
+    file: 'shared/resources/tests/security-probe.test.mjs'
+    finding: 'The thread-crash test''s direct spawnSync passes the repo-relative fixture path with no cwd, so it depends on process.cwd() while runProbeSpec resolves against REPO_ROOT; run from shared/resources the test fails (measured: 1 fail, the other 22 python tests pass). Test-only; CI runs from the root. Diff reviewer CR-1.'
+    suggested_action: 'Spawn join(REPO_ROOT, FIXTURES, "cli-thread-crash.py") with cwd: REPO_ROOT.'
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+  - id: 'TASK-215-QA7-2'
+    severity: low
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'The exit-120 detail names a failed flush as the cause, but a script''s own sys.exit(120) reaches the same branch; the detail carries no stderr, so a reader cannot tell the two apart. The outcome (errored) is right for both. Diff reviewer CR-2 (cleanup).'
+    suggested_action: 'Append the first stderr line (CPython''s "Exception ignored while flushing" on a real flush failure) and word the cause as likely.'
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+  - id: 'TASK-215-QA7-3'
+    severity: low
+    file: 'CHANGELOG.md'
+    finding: 'The CHANGELOG names only a failed stdout flush; the rule doc and engine say stdout or stderr, and the CHANGELOG omits that a script''s own sys.exit(120) is errored. Diff reviewer CR-3 (cleanup).'
+    suggested_action: 'Match the rule doc: stdout or stderr, plus the sys.exit(120) case.'
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 23
+  phases_verified: 2/2
+  ci: 'not read; CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 8
+    notes: 'Engine run (task.215.qa.7.security.run.json, 4 cases x 4 CLIs): shutdown-flush crash errored/120 (was rejected/120, verdict engages, at gate 6); stdout to /dev/full errored/120; sys.exit(120) refusal errored/120 (stated safe direction); worker-thread refusal exiting 1 errored/1. 8 executed, 0 reproduced, no crash shape scored rejected.'
+  performance:
+    status: PASS
+    notes: 'No change since gate 5.'
+  reliability:
+    status: PASS
+    notes: 'No change since gate 5.'
+  maintainability:
+    status: PASS
+    notes: 'Bundle in sync; limits stated once, in probe-boundary-rule.md.'
+
+recommendations:
+  immediate: []
+  future:
+    - id: 'TASK-215-QA7-1'
+      action: 'Spawn join(REPO_ROOT, FIXTURES, "cli-thread-crash.py") with cwd: REPO_ROOT in the thread-crash test (it depends on process.cwd()).'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+      carried_from: 'top_issues (route 2b, cycle 7)'
+    - id: 'TASK-215-QA7-2'
+      action: 'Append the first stderr line to the exit-120 detail and word the cause as likely (a script''s own sys.exit(120) reaches the same branch).'
+      refs: ['shared/resources/security-probe.mjs']
+      carried_from: 'top_issues (route 2b, cycle 7)'
+    - id: 'TASK-215-QA7-3'
+      action: 'Match the CHANGELOG to the rule doc: stdout or stderr, plus the sys.exit(120) case.'
+      refs: ['CHANGELOG.md']
+      carried_from: 'top_issues (route 2b, cycle 7)'
+    - action: 'Carried: the signal-kill detail prints a timeout clause for every signal (pre-existing).'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: []
