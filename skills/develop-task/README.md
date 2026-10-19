@@ -128,7 +128,7 @@ flowchart TD
     S6prc -- merged/closed --> HALTPR[HALT: PR state diverged]
     S6prc -- open --> S6cyc{cycle &lt; QA_MAX_CYCLES?<br/>lock qa_max_cycles, default 5}
     S6cyc -- yes --> S5
-    S6cyc -- no --> S6half{Route 2c applies?<br/>last 5a fix ungated, HIGH 0,<br/>MEDIUM falling or 0}
+    S6cyc -- no --> S6half{Route 2c applies?<br/>cycle ≥ 3, last 5a fix ungated,<br/>HIGH 0, MEDIUM falling or 0}
     S6half -- yes --> S5half[Half-cycle: 5a only, no 5b]
     S5half -- no open entry --> S5c
     S5half -- open entry --> HALTQA

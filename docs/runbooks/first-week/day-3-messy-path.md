@@ -38,7 +38,7 @@ Most of `/develop-story`'s value is in the iteration loop. If your first 5 stori
 
 **Story:** "Add a short 'About this repo' section to `docs/concepts/overview.md`. AC: section body ≤ 50 lines (verified by `wc -l`)."
 
-**Why line count?** `qa-story` checks ACs mechanically. Line count is verifiable with a single shell command (`wc -l`), so the FAIL is deterministic — you control it.
+**Why line count?** `qa-story` checks each AC against the change, and can run the command an AC names. Line count is verifiable with a single shell command (`wc -l`), so the FAIL is reproducible — you control it.
 
 **Steps:**
 
@@ -74,7 +74,7 @@ Run these checks before calling Day 3 done:
 
 ## What you learned
 
-- `qa-story` is mechanical — it checks ACs literally, including line counts via `wc -l`, and records the verdict in the gate file
+- `qa-story` checks each AC and can run the command an AC names (a line count via `wc -l`), then records the verdict in the gate file
 - `qa-fix` loops up to `QA_MAX_CYCLES` cycles (default 5); usually 1 is enough. A gate with no open finding then hands to `review-pr` (Step 5c), which can send the run back into `qa-fix` on the same budget
 - The messy path is just normal engineering: read the failure, change the code, re-run
 - A FAIL gate is not a sign something is broken — it is the pipeline doing its job

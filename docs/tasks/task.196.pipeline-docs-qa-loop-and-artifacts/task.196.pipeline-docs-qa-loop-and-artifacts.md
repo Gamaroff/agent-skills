@@ -313,8 +313,8 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.196.qa.2.pipeline-docs-qa-loop-and-artifacts.md](./task.196.qa.2.pipeline-docs-qa-loop-and-artifacts.md)
-- **Gate File**: [task.196.gate.2.pipeline-docs-qa-loop-and-artifacts.yml](./task.196.gate.2.pipeline-docs-qa-loop-and-artifacts.yml)
+- **Full Report**: [task.196.qa.3.pipeline-docs-qa-loop-and-artifacts.md](./task.196.qa.3.pipeline-docs-qa-loop-and-artifacts.md)
+- **Gate File**: [task.196.gate.3.pipeline-docs-qa-loop-and-artifacts.yml](./task.196.gate.3.pipeline-docs-qa-loop-and-artifacts.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 5969
@@ -323,7 +323,7 @@ None.
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-Cycle 2 refute pass: all gate-1 findings fixed. Two medium (route 2c trigger and the no-code-moved row in troubleshooting.md) and five low findings.
+Cycle 3: gate-2 findings fixed. One medium: the troubleshooting no-code-moved remedy comes after the Step 7 restore. Two low.
 
 <!-- change-log-start -->
 ## Change Log
@@ -338,6 +338,8 @@ Cycle 2 refute pass: all gate-1 findings fixed. Two medium (route 2c trigger and
 | 2026-10-19 |         | QA findings fixed — cycle 1, 11 findings (QA-1..QA-11) | qa-fix |
 | 2026-10-19 |         | QA gate CONCERNS (90/100) — 2 medium, 5 low findings | qa-task |
 | 2026-10-19 |         | QA findings fixed — cycle 2, 7 findings (CR-1..CR-7) | qa-fix |
+| 2026-10-19 |         | QA gate CONCERNS (90/100) — 1 medium, 2 low findings | qa-task |
+| 2026-10-19 |         | QA findings fixed — cycle 3, 3 findings (CR3-1..CR3-3) | qa-fix |
 <!-- change-log-end -->
 
 ---
