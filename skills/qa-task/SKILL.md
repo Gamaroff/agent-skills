@@ -1603,14 +1603,17 @@ command node .agents/skills/qa-task/references/qa-read-back.js --doc "{task-file
 (`references/tests/qa-read-back.test.mjs`). It **decides**: exit 0 is clean, exit 1 is a
 Step 12b HALT with each problem and its remedy printed, and exit 2 is "could not look" (bad
 arguments, an unreadable document, a sibling engine that did not load). Exit 2 is never a pass. It
-checks four things:
+checks five things:
 
 1. **The claims exist.** This cycle's gate and QA report are in the work item's directory, the
    document links **those two files** — not an earlier cycle's (task.158) — and it has a Change Log
    row. An absent one halts, named.
 2. **What this run wrote is staged.** The link check reads the index, so the script stages the
    document, gate and report, plus every linked target that is **`untracked`** and a regular file
-   under the work item's own directory. A `git add` that fails halts. An untracked target elsewhere
+   under the work item's own directory. A `git add` that fails on a held `.git/index.lock` is
+   retried at 200, 400 and 800 ms, once per run — after one path outlasts the retries, later
+   paths try once — and `--json` reports `stageAttempts`; any other failure, or a lock that
+   outlasts the retries, halts. An untracked target elsewhere
    is left alone and reported, so unrelated work never rides into the QA commit.
 3. **Every link resolves against the index.** It uses `doc-links.js`, where **`missing`** means
    never written, or a case-mismatched name that only a case-insensitive disk found. **`ignored`**
@@ -1618,6 +1621,13 @@ checks four things:
    halt.
 4. **`updated:` accounts for the newest row** (`change-log.js` `checkUpdatedCoherence`). When it
    does not, apply `bumpUpdated(content, <that row's date>)` and re-run.
+5. **The verdict is this cycle's** (task.192). Every `**Gate Decision**` line in the
+   `## QA Testing Results` section, and the newest `QA gate …` row written by `qa-task` or
+   `qa-story`, name the token in this cycle's gate (`gate:`). Later `finalise` rows and QA's own
+   `Status →` rows are ignored. A `qa-fix` row after that `QA gate` row halts: it means this
+   cycle wrote no row of its own, which a repeated verdict would otherwise hide. A missing
+   section, decision line, `QA gate` row or `gate:` token halts too. When it halts, re-render
+   the section from this gate and append the `QA gate <TOKEN>` row, then re-run.
 
 **Do not post the PR comment (Step 13) over exit 1 or 2.** Posting over it reproduces task.141: a PR comment linked
 a report that did not exist, found only by CI's `link-check`, and a row was dated after `updated:`,

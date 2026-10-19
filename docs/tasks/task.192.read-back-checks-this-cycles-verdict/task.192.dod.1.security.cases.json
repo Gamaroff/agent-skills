@@ -1,0 +1,289 @@
+[
+  {
+    "id": "clean",
+    "sink": "markdown-structure",
+    "input": "/tmp/claude-1000/-home-gamaroff-Development-agent-skills/cb21680e-ce6e-45ca-b417-59acbc781e2c/scratchpad/probe/repo/docs/tasks/task.100.x/task.100.x.md",
+    "why": "verdict surface: clean",
+    "correct": "read clean (exit 0)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "emoji-decision-pass",
+    "sink": "markdown-structure",
+    "input": "/tmp/claude-1000/-home-gamaroff-Development-agent-skills/cb21680e-ce6e-45ca-b417-59acbc781e2c/scratchpad/probe/repo/docs/tasks/task.101.x/task.101.x.md",
+    "why": "verdict surface: emoji-decision-pass",
+    "correct": "read clean (exit 0)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "quoted-gate-token",
+    "sink": "markdown-structure",
+    "input": "/tmp/claude-1000/-home-gamaroff-Development-agent-skills/cb21680e-ce6e-45ca-b417-59acbc781e2c/scratchpad/probe/repo/docs/tasks/task.102.x/task.102.x.md",
+    "why": "verdict surface: quoted-gate-token",
+    "correct": "read clean (exit 0)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "qa-fix-row-after",
+    "sink": "markdown-structure",
+    "input": "/tmp/claude-1000/-home-gamaroff-Development-agent-skills/cb21680e-ce6e-45ca-b417-59acbc781e2c/scratchpad/probe/repo/docs/tasks/task.103.x/task.103.x.md",
+    "why": "verdict surface: qa-fix-row-after",
+    "correct": "HALT (exit 1) naming the verdict mismatch",
+    "direction": "hostile",
+    "expected": {
+      "exit": 1
+    }
+  },
+  {
+    "id": "finalise-row-after",
+    "sink": "markdown-structure",
+    "input": "/tmp/claude-1000/-home-gamaroff-Development-agent-skills/cb21680e-ce6e-45ca-b417-59acbc781e2c/scratchpad/probe/repo/docs/tasks/task.104.x/task.104.x.md",
+    "why": "verdict surface: finalise-row-after",
+    "correct": "read clean (exit 0)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "stale-section-verdict",
+    "sink": "markdown-structure",
+    "input": "/tmp/claude-1000/-home-gamaroff-Development-agent-skills/cb21680e-ce6e-45ca-b417-59acbc781e2c/scratchpad/probe/repo/docs/tasks/task.105.x/task.105.x.md",
+    "why": "verdict surface: stale-section-verdict",
+    "correct": "HALT (exit 1) naming the verdict mismatch",
+    "direction": "hostile",
+    "expected": {
+      "exit": 1
+    }
+  },
+  {
+    "id": "stale-qa-row",
+    "sink": "markdown-structure",
+    "input": "/tmp/claude-1000/-home-gamaroff-Development-agent-skills/cb21680e-ce6e-45ca-b417-59acbc781e2c/scratchpad/probe/repo/docs/tasks/task.106.x/task.106.x.md",
+    "why": "verdict surface: stale-qa-row",
+    "correct": "HALT (exit 1) naming the verdict mismatch",
+    "direction": "hostile",
+    "expected": {
+      "exit": 1
+    }
+  },
+  {
+    "id": "no-qa-section",
+    "sink": "markdown-structure",
+    "input": "/tmp/claude-1000/-home-gamaroff-Development-agent-skills/cb21680e-ce6e-45ca-b417-59acbc781e2c/scratchpad/probe/repo/docs/tasks/task.107.x/task.107.x.md",
+    "why": "verdict surface: no-qa-section",
+    "correct": "HALT (exit 1) naming the verdict mismatch",
+    "direction": "hostile",
+    "expected": {
+      "exit": 1
+    }
+  },
+  {
+    "id": "no-decision-line",
+    "sink": "markdown-structure",
+    "input": "/tmp/claude-1000/-home-gamaroff-Development-agent-skills/cb21680e-ce6e-45ca-b417-59acbc781e2c/scratchpad/probe/repo/docs/tasks/task.108.x/task.108.x.md",
+    "why": "verdict surface: no-decision-line",
+    "correct": "HALT (exit 1) naming the verdict mismatch",
+    "direction": "hostile",
+    "expected": {
+      "exit": 1
+    }
+  },
+  {
+    "id": "no-qa-row",
+    "sink": "markdown-structure",
+    "input": "/tmp/claude-1000/-home-gamaroff-Development-agent-skills/cb21680e-ce6e-45ca-b417-59acbc781e2c/scratchpad/probe/repo/docs/tasks/task.109.x/task.109.x.md",
+    "why": "verdict surface: no-qa-row",
+    "correct": "HALT (exit 1) naming the verdict mismatch",
+    "direction": "hostile",
+    "expected": {
+      "exit": 1
+    }
+  },
+  {
+    "id": "row-token-prefix-only",
+    "sink": "markdown-structure",
+    "input": "/tmp/claude-1000/-home-gamaroff-Development-agent-skills/cb21680e-ce6e-45ca-b417-59acbc781e2c/scratchpad/probe/repo/docs/tasks/task.110.x/task.110.x.md",
+    "why": "verdict surface: row-token-prefix-only",
+    "correct": "HALT (exit 1) naming the verdict mismatch",
+    "direction": "hostile",
+    "expected": {
+      "exit": 1
+    }
+  },
+  {
+    "id": "second-stale-section",
+    "sink": "markdown-structure",
+    "input": "/tmp/claude-1000/-home-gamaroff-Development-agent-skills/cb21680e-ce6e-45ca-b417-59acbc781e2c/scratchpad/probe/repo/docs/tasks/task.111.x/task.111.x.md",
+    "why": "verdict surface: second-stale-section",
+    "correct": "HALT (exit 1) naming the verdict mismatch",
+    "direction": "hostile",
+    "expected": {
+      "exit": 1
+    }
+  },
+  {
+    "id": "gate-no-token",
+    "sink": "markdown-structure",
+    "input": "/tmp/claude-1000/-home-gamaroff-Development-agent-skills/cb21680e-ce6e-45ca-b417-59acbc781e2c/scratchpad/probe/repo/docs/tasks/task.112.x/task.112.x.md",
+    "why": "verdict surface: gate-no-token",
+    "correct": "HALT (exit 1) naming the verdict mismatch",
+    "direction": "hostile",
+    "expected": {
+      "exit": 1
+    }
+  },
+  {
+    "id": "gate-token-indented-only",
+    "sink": "markdown-structure",
+    "input": "/tmp/claude-1000/-home-gamaroff-Development-agent-skills/cb21680e-ce6e-45ca-b417-59acbc781e2c/scratchpad/probe/repo/docs/tasks/task.113.x/task.113.x.md",
+    "why": "verdict surface: gate-token-indented-only",
+    "correct": "HALT (exit 1) naming the verdict mismatch",
+    "direction": "hostile",
+    "expected": {
+      "exit": 1
+    }
+  },
+  {
+    "id": "stale-decision-after-current",
+    "sink": "markdown-structure",
+    "input": "/tmp/claude-1000/-home-gamaroff-Development-agent-skills/cb21680e-ce6e-45ca-b417-59acbc781e2c/scratchpad/probe/repo/docs/tasks/task.114.x/task.114.x.md",
+    "why": "verdict surface: stale-decision-after-current",
+    "correct": "HALT (exit 1) naming the verdict mismatch",
+    "direction": "hostile",
+    "expected": {
+      "exit": 1
+    }
+  },
+  {
+    "id": "stale-decision-before-current",
+    "sink": "markdown-structure",
+    "input": "/tmp/claude-1000/-home-gamaroff-Development-agent-skills/cb21680e-ce6e-45ca-b417-59acbc781e2c/scratchpad/probe/repo/docs/tasks/task.115.x/task.115.x.md",
+    "why": "verdict surface: stale-decision-before-current",
+    "correct": "HALT (exit 1) naming the verdict mismatch",
+    "direction": "hostile",
+    "expected": {
+      "exit": 1
+    }
+  },
+  {
+    "id": "qa-row-older-than-fix-mismatch",
+    "sink": "markdown-structure",
+    "input": "/tmp/claude-1000/-home-gamaroff-Development-agent-skills/cb21680e-ce6e-45ca-b417-59acbc781e2c/scratchpad/probe/repo/docs/tasks/task.116.x/task.116.x.md",
+    "why": "verdict surface: qa-row-older-than-fix-mismatch",
+    "correct": "HALT (exit 1) naming the verdict mismatch",
+    "direction": "hostile",
+    "expected": {
+      "exit": 1
+    }
+  },
+  {
+    "id": "status-row-after-verdict",
+    "sink": "markdown-structure",
+    "input": "/tmp/claude-1000/-home-gamaroff-Development-agent-skills/cb21680e-ce6e-45ca-b417-59acbc781e2c/scratchpad/probe/repo/docs/tasks/task.117.x/task.117.x.md",
+    "why": "verdict surface: status-row-after-verdict",
+    "correct": "read clean (exit 0)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "normal-loop-two-cycles",
+    "sink": "markdown-structure",
+    "input": "/tmp/claude-1000/-home-gamaroff-Development-agent-skills/cb21680e-ce6e-45ca-b417-59acbc781e2c/scratchpad/probe/repo/docs/tasks/task.118.x/task.118.x.md",
+    "why": "verdict surface: normal-loop-two-cycles",
+    "correct": "read clean (exit 0)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "verdict-row-carrying-status",
+    "sink": "markdown-structure",
+    "input": "/tmp/claude-1000/-home-gamaroff-Development-agent-skills/cb21680e-ce6e-45ca-b417-59acbc781e2c/scratchpad/probe/repo/docs/tasks/task.119.x/task.119.x.md",
+    "why": "verdict surface: verdict-row-carrying-status",
+    "correct": "read clean (exit 0)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "same-token-no-row-after-fix",
+    "sink": "markdown-structure",
+    "input": "/tmp/claude-1000/-home-gamaroff-Development-agent-skills/cb21680e-ce6e-45ca-b417-59acbc781e2c/scratchpad/probe/repo/docs/tasks/task.120.x/task.120.x.md",
+    "why": "verdict surface: same-token-no-row-after-fix",
+    "correct": "HALT (exit 1) naming the verdict mismatch",
+    "direction": "hostile",
+    "expected": {
+      "exit": 1
+    }
+  },
+  {
+    "id": "status-row-only",
+    "sink": "markdown-structure",
+    "input": "/tmp/claude-1000/-home-gamaroff-Development-agent-skills/cb21680e-ce6e-45ca-b417-59acbc781e2c/scratchpad/probe/repo/docs/tasks/task.121.x/task.121.x.md",
+    "why": "verdict surface: status-row-only",
+    "correct": "HALT (exit 1) naming the verdict mismatch",
+    "direction": "hostile",
+    "expected": {
+      "exit": 1
+    }
+  },
+  {
+    "id": "dod-missing-path",
+    "sink": "markdown-structure",
+    "input": "/tmp/claude-1000/-home-gamaroff-Development-agent-skills/cb21680e-ce6e-45ca-b417-59acbc781e2c/scratchpad/probe/repo/docs/tasks/task.100.x/does-not-exist.md",
+    "why": "an unreadable --doc must never read as a pass",
+    "correct": "could not look (exit 2)",
+    "direction": "hostile",
+    "expected": {
+      "exit": 2
+    }
+  },
+  {
+    "id": "dod-directory-as-doc",
+    "sink": "markdown-structure",
+    "input": "/tmp/claude-1000/-home-gamaroff-Development-agent-skills/cb21680e-ce6e-45ca-b417-59acbc781e2c/scratchpad/probe/repo/docs/tasks/task.100.x",
+    "why": "a directory passes realpath, and git add on it would sweep everything under it (TASK-149-BUG-8)",
+    "correct": "could not look (exit 2), nothing staged",
+    "direction": "hostile",
+    "expected": {
+      "exit": 2
+    }
+  },
+  {
+    "id": "dod-dev-null",
+    "sink": "markdown-structure",
+    "input": "/dev/null",
+    "why": "a character device is not a regular file",
+    "correct": "could not look (exit 2)",
+    "direction": "hostile",
+    "expected": {
+      "exit": 2
+    }
+  },
+  {
+    "id": "dod-unsubstituted-placeholder",
+    "sink": "markdown-structure",
+    "input": "{task-file}",
+    "why": "the SKILL.md block's placeholder left unsubstituted",
+    "correct": "could not look (exit 2)",
+    "direction": "hostile",
+    "expected": {
+      "exit": 2
+    }
+  },
+  {
+    "id": "dod-flag-as-doc",
+    "sink": "markdown-structure",
+    "input": "--json",
+    "why": "flag form: an option in the --doc value slot",
+    "correct": "could not look (exit 2), usage",
+    "direction": "hostile",
+    "expected": {
+      "exit": 2
+    }
+  },
+  {
+    "id": "dod-empty-doc",
+    "sink": "markdown-structure",
+    "input": "",
+    "why": "an empty --doc value",
+    "correct": "could not look (exit 2), usage",
+    "direction": "hostile",
+    "expected": {
+      "exit": 2
+    }
+  }
+]

@@ -1,0 +1,60 @@
+schema: 2
+task: 'task.192.read-back-checks-this-cycles-verdict'
+task_title: "Read-back checks this cycle's verdict"
+gate: PASS
+status_reason: "Cycle 2's two medium findings are fixed and verified. bug.2 and bug.3 are closed, both fixes are mutation-proven covered, and the probe ran 22 cases with 0 reproduced. The scoped review found only LOW items, which are routed to future work."
+reviewer: 'QA Engineer'
+head: 'a13b1e8d730426fc3dc810afbb42989c198111f7'
+updated: '2026-10-19T07:50:27Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 162
+  phases_verified: 3/3
+  ci: 'not read this cycle (no cycle waits on CI)'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 22
+    notes: 'cli:shared/resources/qa-read-back.js --doc was probed with 22 cases: 7 legitimate, all accepted, and 15 hostile, all refused. Added this cycle: status-row-after-verdict, normal-loop-two-cycles, verdict-row-carrying-status, same-token-no-row-after-fix and status-row-only. qa-fix-row-after is reclassified as hostile under the QA2-1 rule. Record: task.192.qa.3.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'Unchanged: a persistent lock costs at most 1.4 s; a non-lock failure costs 0 ms.'
+  reliability:
+    status: PASS
+    notes: 'A status row after a verdict row reads clean, and a same-token cycle with no row halts. CR-1 (a row naming a second QA gate token) is LOW and contrived; it is routed to future work.'
+  maintainability:
+    status: PASS
+    notes: "The SKILL.md lists and the CHANGELOG match the rule. The engine's own header comment still states the old row rule (CR-2, LOW, routed to future work)."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "CR-1 (cycle 3): test the token against the selected description cell, anchored as ^QA gate <TOKEN>\\b, not anywhere in the row. Today a row reading 'QA gate CONCERNS … QA gate FAIL …' passes a FAIL gate (reproduced, exit 0)."
+      refs: ['shared/resources/qa-read-back.js']
+    - action: "CR-2 (cycle 3): update the qa-read-back.js header contract (exit 0) to name the newest QA gate row and the HALT on a later qa-fix row."
+      refs: ['shared/resources/qa-read-back.js']
+    - action: 'CR-3 (cycle 3): give a separate message when a qa-* verdict row exists in another format (41 corpus rows, e.g. "QA cycle 3 — gate PASS"), so the remedy is to fix that row rather than add a second one.'
+      refs: ['shared/resources/qa-read-back.js']
+    - action: "CR-4 (cycle 2): match git's held-lock wording (index.lock': File exists) instead of the bare file name."
+      refs: ['shared/resources/qa-read-back.js']
+    - action: 'CR-5 (cycle 2, = cycle 1 CR-3): skip the qa-row problem when the document has no Change Log rows at all.'
+      refs: ['shared/resources/qa-read-back.js']
+    - action: 'CR-3 (cycle 2, = cycle 1 CR-2): the real-time CLI lock test does not assert that a retry happened, because of the child start-up race; the seam test holds the retry.'
+      refs: ['shared/resources/tests/qa-read-back.test.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

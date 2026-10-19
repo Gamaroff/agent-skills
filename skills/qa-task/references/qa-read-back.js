@@ -22,8 +22,10 @@
  * Contract:
  *   node qa-read-back.js --doc <work-item.md> [--json]
  *     exit 0  clean — the gate, the report and a Change Log row exist, every link
- *             in the document resolves against the index, and `updated:` accounts
- *             for the newest row
+ *             in the document resolves against the index, `updated:` accounts
+ *             for the newest row, and the document's verdict is this cycle's: the
+ *             QA section's `**Gate Decision**` and the newest qa-task/qa-story
+ *             Change Log row both name the gate's `gate:` token (task.192, obs #205)
  *     exit 1  HALT — one of those does not hold; each problem is printed with the
  *             remedy. Do not post the PR comment / QA summary over it.
  *     exit 2  could not look — the check as a whole could not run: bad arguments,
@@ -47,6 +49,16 @@
  * fails is a halt: an index that was not updated would make every artifact read
  * as untracked.
  *
+ * Lock retry (task.192, obs #216). An editor refreshing the index holds
+ * .git/index.lock for a moment; `git add` then fails with an index.lock error
+ * that clears within a second. That one failure is retried, three more times at
+ * 200 / 400 / 800 ms, before it is reported; every other failure is reported on
+ * the first attempt. A lock that outlasts one path's backoff is not waited for
+ * again: later paths try once, so the whole run waits at most 1.4 s.
+ * `stageAttempts` in the result records each path's count.
+ * Beside, not on top of, gh-stage.js `withRetry`: that retries every error, and
+ * requiring it would pull a tracker CLI into the qa-* bundles.
+ *
  * bundle-dependency: shared/resources/qa-cycle.sh
  */
 
@@ -59,6 +71,7 @@ function load() {
     return {
       docLinks: require("./doc-links.js"),
       changeLog: require("./change-log.js"),
+      qaResults: require("./qa-results.js"),
     };
   } catch (e) {
     return { error: e.message };
@@ -68,6 +81,97 @@ function load() {
 function git(args, cwd) {
   const r = spawnSync("git", args, { cwd, encoding: "utf8" });
   return { status: r.status, stdout: r.stdout || "", stderr: r.stderr || "" };
+}
+
+// Synchronous by design, like every other call in this script — the same guarded
+// Atomics.wait gh-stage.js's sleepSync uses.
+function sleepSync(ms) {
+  try {
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+  } catch (_) {}
+}
+
+// The waits before each `git add` attempt: the first is immediate, three retries follow.
+const STAGE_WAITS = [0, 200, 400, 800];
+
+// A Markdown table row's cells, outer pipes dropped, empty cells kept.
+const cells = (row) =>
+  row
+    .split("|")
+    .slice(1, -1)
+    .map((c) => c.trim());
+
+/**
+ * The document's verdict against this cycle's gate token (task.192, obs #205).
+ * A document whose links were updated and whose verdict line or row was not
+ * still carries the previous cycle's verdict; every link check passes it.
+ * Returns the problems, one per mismatch.
+ */
+function verdictProblems(engines, text, gateFile) {
+  const base = path.basename(gateFile);
+  const token = (fs
+    .readFileSync(gateFile, "utf8")
+    .match(/^gate:[ \t]*["']?([A-Za-z]+)/m) || [])[1];
+  if (!token)
+    return [
+      `this cycle's gate ${base} has no readable gate: token — the verdict cannot be checked against it`,
+    ];
+  const want = token.toUpperCase();
+  const problems = [];
+
+  const { sections } = engines.qaResults.findQaResults(text);
+  if (!sections.length)
+    problems.push(
+      "the document has no ## QA Testing Results section — the Step 12 edit did not land",
+    );
+  for (const sec of sections) {
+    // Every decision line, not the first: a stale line after a current one is still stale
+    // (task.192 QA-2). Tolerates a leading emoji or bold before the token; the token is the
+    // first word.
+    const lines = [
+      ...text
+        .slice(sec.start, sec.end)
+        .matchAll(/^\*\*Gate Decision\*\*:[^A-Za-z\n]*([A-Za-z]+)/gm),
+    ];
+    if (!lines.length)
+      problems.push(
+        "the QA section has no **Gate Decision** line — the Step 12 edit did not land",
+      );
+    for (const m of lines)
+      if (m[1].toUpperCase() !== want)
+        problems.push(
+          `**Gate Decision** is ${m[1]} but this cycle's gate ${base} says ${want} — the Step 12 edit did not land`,
+        );
+  }
+
+  // The verdict row is the newest row QA wrote that records a verdict — not the newest row,
+  // and not the newest qa-* row: a QA run may follow it with a `Status →` row of its own
+  // (task.192 QA2-2).
+  const rows = engines.changeLog.extractEntries(text);
+  const author = (r) => cells(r).at(-1) || "";
+  const at = rows.findLastIndex(
+    (r) =>
+      /^qa-(task|story)$/.test(author(r)) &&
+      /^QA gate\b/.test(cells(r).at(-2) || ""),
+  );
+  if (at < 0)
+    problems.push(
+      "no qa-task/qa-story Change Log row naming a QA gate verdict — the verdict row did not land",
+    );
+  else if (!new RegExp(`\\bQA gate ${want}\\b`).test(rows[at])) {
+    const c = cells(rows[at]);
+    problems.push(
+      `the newest QA Change Log row reads "${c.at(-2) || rows[at].trim()}" but this cycle's gate ${base} says ${want}`,
+    );
+  } else if (rows.slice(at + 1).some((r) => author(r) === "qa-fix"))
+    // This cycle's row, not only this cycle's token. The read-back runs right after QA writes
+    // its row, and every cycle after a fix writes one, so a qa-fix row after the newest verdict
+    // row means this cycle wrote none; a repeated verdict hides that from the token check
+    // (task.192 QA2-1).
+    problems.push(
+      `the newest QA gate row ("${cells(rows[at]).at(-2)}") comes before a qa-fix row — this cycle's gate ${base} has no Change Log row of its own`,
+    );
+  return problems;
 }
 
 /**
@@ -122,12 +226,12 @@ const REMEDY = {
     "is unverifiable — git answered neither yes nor no for this path (a link through a symlinked directory?); it is not a missing artifact, so link to the real path",
 };
 
-function readBack(docArg) {
+function readBack(docArg, opts = {}) {
   // TASK-149-BUG-8 — a run that could not complete is exit 2. An error the
   // body did not anticipate (an unreadable file, a throw from an engine) would
   // otherwise exit 1 with a stack trace and read as a HALT.
   try {
-    return readBackUnguarded(docArg);
+    return readBackUnguarded(docArg, opts);
   } catch (e) {
     return {
       problems: [],
@@ -140,8 +244,9 @@ function readBack(docArg) {
   }
 }
 
-function readBackUnguarded(docArg) {
-  const out = { problems: [], staged: [], links: [] };
+// opts.sleepMs replaces the backoff's sleep — a test seam, as in gh-stage.js withRetry.
+function readBackUnguarded(docArg, { sleepMs = sleepSync } = {}) {
+  const out = { problems: [], staged: [], links: [], stageAttempts: {} };
   const engines = load();
   if (engines.error)
     return {
@@ -211,12 +316,28 @@ function readBackUnguarded(docArg) {
   out.cycle = c.cycle || null;
 
   const failedStage = new Set();
+  // A lock that outlasted one path's backoff is not a moment's refresh: later paths
+  // try once, so a persistent lock costs one backoff (1.4 s), not one per path.
+  let lockOutlasted = false;
   const stage = (abs) => {
-    const r = git(["add", "--", rel(abs)], root);
+    let r;
+    let attempts = 0;
+    let locked = false;
+    for (const wait of lockOutlasted ? [0] : STAGE_WAITS) {
+      if (wait) sleepMs(wait);
+      attempts += 1;
+      r = git(["add", "--", rel(abs)], root);
+      locked = /index\.lock/.test(r.stderr);
+      // Only a held lock is worth waiting out; any other failure will not clear.
+      if (r.status === 0 || !locked) break;
+    }
+    out.stageAttempts[rel(abs)] = attempts;
+    if (r.status !== 0 && locked) lockOutlasted = true;
     if (r.status !== 0) {
       failedStage.add(rel(abs));
+      const tried = `after ${attempts} attempt${attempts > 1 ? "s" : ""}`;
       out.problems.push(
-        `could not stage ${rel(abs)} (${r.stderr.trim() || `git exit ${r.status}`}) — a held .git/index.lock? retry`,
+        `could not stage ${rel(abs)} (${r.stderr.trim() || `git exit ${r.status}`}) — ${locked ? "a held .git/index.lock? retry " : ""}(${tried})`,
       );
       return false;
     }
@@ -275,9 +396,10 @@ function readBackUnguarded(docArg) {
       `a fence opened at line ${links.unterminatedFence} never closes — links after it were not checked`,
     );
 
-  const coherence = engines.changeLog.checkUpdatedCoherence(
-    fs.readFileSync(doc, "utf8"),
-  );
+  const text = fs.readFileSync(doc, "utf8");
+  if (gate) out.problems.push(...verdictProblems(engines, text, gate));
+
+  const coherence = engines.changeLog.checkUpdatedCoherence(text);
   out.changeLog = coherence;
   if (coherence.reason === "no-log")
     out.problems.push("no Change Log row — the verdict row did not land");
@@ -349,7 +471,7 @@ function report(r, json) {
   process.stdout.write(
     r.exitCode
       ? `HALT qa-read-back: ${r.problems.length} problem(s) in ${r.doc} — do not post the QA comment over this\n`
-      : `ok qa-read-back: ${r.doc} — gate, report and Change Log row present; every link resolves against the index\n`,
+      : `ok qa-read-back: ${r.doc} — gate, report and Change Log row present; every link resolves against the index; the verdict is this cycle's\n`,
   );
   return r.exitCode;
 }
