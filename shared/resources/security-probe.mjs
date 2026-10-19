@@ -754,6 +754,15 @@ const PYTHON_ANSWER = "answer";
 const PYTHON_CRASH = "crash";
 
 /**
+ * The status CPython exits with when flushing sys.stdout or sys.stderr fails
+ * at interpreter shutdown — after the body returned and `answer` was written.
+ * A refusal never needs it, and read as one it scored a crash `rejected`
+ * (QA cycle 6, TASK-215-QA6-1). A script that calls sys.exit(120) itself is
+ * `errored` too: the safe direction.
+ */
+const PYTHON_FINALIZE_STATUS = 120;
+
+/**
  * Runs the entry as `python3 <entry>` would — sys.argv[0] is the entry,
  * sys.path[0] its directory, the body executed in a fresh `__main__` module
  * that stays `sys.modules["__main__"]` after the body returns (atexit handlers
@@ -785,7 +794,9 @@ const PYTHON_CRASH = "crash";
  * swallows elsewhere — a joined worker thread, an atexit handler, a finaliser
  * — leaves `python3 <entry>` exiting 0 after `answer` was written, and the
  * case is scored by that exit status: a hostile case reads accepted, a false
- * alarm, never a pass. A stated limit in probe-boundary-rule.md (QA cycle 5,
+ * alarm, never a pass. The one such failure that changes the status, a
+ * failed flush at shutdown (exit 120), is errored (PYTHON_FINALIZE_STATUS,
+ * QA cycle 6). A stated limit in probe-boundary-rule.md (QA cycle 5,
  * TASK-215-QA5-1).
  *
  * Only the process that started the bootstrap writes, and a forked child
@@ -2636,6 +2647,10 @@ function runCliCase(
       (pyRecord.kind === "crash" ? pyRecord.line : null) ??
       pythonExceptionLine(child.stderr ?? "");
     detail = `the CLI crashed (exit ${child.status}) rather than answering: ${line.trim().slice(0, 160)}`;
+  } else if (isPython && child.status === PYTHON_FINALIZE_STATUS) {
+    // The body answered, then Python failed at shutdown (QA cycle 6).
+    outcome = "errored";
+    detail = `the CLI answered, then python3 failed at shutdown (exit ${PYTHON_FINALIZE_STATUS}, a failed flush of stdout or stderr) — could not tell an answer from a crash`;
   } else if (!isPython && NODE_FATAL_FOOTER.test(child.stderr ?? "")) {
     outcome = "errored";
     const first = (child.stderr ?? "")

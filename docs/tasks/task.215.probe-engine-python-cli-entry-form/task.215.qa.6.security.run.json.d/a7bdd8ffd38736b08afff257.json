@@ -1,0 +1,31 @@
+{
+  "sink": "url-authority",
+  "entry": "cli:shared/resources/tests/fixtures/security-probe/cli-thread-crash.py",
+  "name": null,
+  "call_site": null,
+  "verdict": "absent",
+  "reason": "no-hostile-case-was-rejected",
+  "executed": 4,
+  "passed": 2,
+  "reproduced": 2,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": null,
+  "interpreter": {
+    "name": "python3",
+    "version": "Python 3.14.8"
+  },
+  "fake_gh": null,
+  "argv": [
+    "--mode",
+    "strict",
+    "--host",
+    "{input}"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-10-19T13:43:23.898Z"
+}

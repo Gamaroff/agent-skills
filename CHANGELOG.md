@@ -20,10 +20,11 @@ All notable changes to this project will be documented in this file. Format foll
   crash is scored `errored`, never `rejected`. One stated limit: an exception Python prints and
   swallows outside the script's main frame (a joined worker thread, an atexit handler) leaves
   `python3` exiting 0, so the case is scored by that exit status — a hostile case reads `accepted`, a
-  false alarm, never a pass. `-B` stops a sibling import writing
-  `__pycache__/` into the watched script directory; `-I` is not used because it breaks sibling
-  imports. With no `python3` on `PATH` the entry is declined once, naming `python3`. The result and
-  the run record carry a new `interpreter` field (`{ name, version }`, `null` for every other form).
+  false alarm, never a pass. A failed flush of stdout at shutdown (exit 120) is `errored`. `-B`
+  stops a sibling import writing `__pycache__/` into the watched script directory; `-I` is not
+  used because it breaks sibling imports. With no `python3` on `PATH` the entry is declined once,
+  naming `python3`. The result and the run record carry a new `interpreter` field
+  (`{ name, version }`, `null` for every other form).
   **Consumer upgrade:** re-vendor (`setup-consumer.sh --update`); a `cli:` probe of a `.py` boundary
   that was recorded `unverifiable` can now be re-run.
 

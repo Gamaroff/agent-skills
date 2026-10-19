@@ -3028,11 +3028,34 @@ test("cli entry (python): a forged answer record does not outrank the crash that
   }
 });
 
+test("cli entry (python): a failed flush at shutdown (exit 120) is errored, never a refusal", () => {
+  // The body answers, then python3 cannot flush stdout and exits 120. Read
+  // as a refusal, every hostile case scored `rejected` and the verdict read
+  // `engages` (QA cycle 6, TASK-215-QA6-1).
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-shutdown-flush-crash"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.notEqual(r.verdict, "engages", JSON.stringify(r));
+  const hostile = CASES.filter((c) => c.direction === "hostile");
+  assert.ok(hostile.length > 0);
+  for (const c of hostile) {
+    const got = [...r.cases, ...r.declined].find((x) => x.id === c.id);
+    assert.ok(got, `${c.id} missing`);
+    assert.equal(got.outcome, "errored", `${c.id}: ${got.detail}`);
+    assert.match(got.detail, /failed at shutdown \(exit 120/);
+  }
+});
+
 test("cli entry (python): a crash outside the main frame is scored by python3's exit status — never a pass", () => {
   // The stated limit (probe-boundary-rule.md): a worker thread that raises
   // while the main thread exits 0 is what `python3 <entry>` reports, so a
   // hostile case reads `accepted` — a reproduction, the false-alarm direction.
-  // What must never happen is a pass (QA cycle 5, TASK-215-QA5-1).
+  // What must never happen is a pass (QA cycle 5, TASK-215-QA5-1). Every
+  // hostile case is looked up, and the thread is shown to have raised, so a
+  // fixture that simply accepts every input cannot pass (QA cycle 6, QA6-3).
   const r = runProbeSpec({
     sink: "url-authority",
     entry: PY("cli-thread-crash"),
@@ -3040,12 +3063,27 @@ test("cli entry (python): a crash outside the main frame is scored by python3's 
     argv: HOST_ARGV,
   });
   assert.notEqual(r.verdict, "engages", JSON.stringify(r));
-  const hostile = r.cases.filter((c) => c.direction === "hostile");
-  assert.ok(hostile.length > 0, JSON.stringify(r));
+  const hostile = CASES.filter((c) => c.direction === "hostile");
+  assert.ok(hostile.length > 0);
   for (const c of hostile) {
-    assert.equal(c.outcome, "accepted", `${c.id}: ${c.detail}`);
-    assert.equal(c.exit, 0, c.id);
+    const got = [...r.cases, ...r.declined].find((x) => x.id === c.id);
+    assert.ok(got, `${c.id} missing`);
+    assert.equal(got.outcome, "accepted", `${c.id}: ${got.detail}`);
+    assert.equal(got.exit, 0, c.id);
   }
+  const direct = spawnSync(
+    "python3",
+    [
+      PY("cli-thread-crash").slice("cli:".length),
+      "--mode",
+      "strict",
+      "--host",
+      hostile[0].input,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.equal(direct.status, 0, direct.stderr);
+  assert.match(direct.stderr, /Exception in thread/);
 });
 
 test("cli entry (python): __main__ is still the script's module after the body returns", () => {

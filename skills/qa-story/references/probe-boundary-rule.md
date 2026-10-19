@@ -415,9 +415,14 @@ takes it.
     swallowed, `python3 <path>` exits 0, and the bootstrap has already written
     `answer`. The case is scored by that exit status, so a hostile case reads
     *accepted*: a reproduction to investigate, never a pass (task.215 QA cycle
-    5). A control that validates in a worker thread is probed through the
-    exit status its main thread chooses. **Beside the exit record, the stderr
-    signal:** an exit 1 whose stderr holds a `File "…", line N` frame under a
+    5). A control that validates in a worker thread is scored by the exit
+    status its main thread chooses, except that an exit 1 after the thread's
+    traceback is read as a crash by the stderr signal below — *errored*, the
+    safe direction. The one failure of this kind that changes the exit status,
+    a failed flush of stdout or stderr at shutdown (CPython exits 120), is
+    *errored* for a `.py` entry whatever the record says, and so is a script
+    that calls `sys.exit(120)` itself (task.215 QA cycle 6). **Beside the exit
+    record, the stderr signal:** an exit 1 whose stderr holds a `File "…", line N` frame under a
     `Traceback (most recent call last):` header (an ExceptionGroup's
     included), or a frame and a `SyntaxError`-family line, is *errored*
     whatever follows it, so a script that catches its failure, prints the

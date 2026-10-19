@@ -177,25 +177,26 @@ Both items need a merged, tagged release, and `/finalise` runs before merge, so 
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-19
-**Quality Score**: 90/100
+**Quality Score**: 85/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
 
-- **Full Report**: [task.215.qa.5.probe-engine-python-cli-entry-form.md](./task.215.qa.5.probe-engine-python-cli-entry-form.md)
-- **Gate File**: [task.215.gate.5.probe-engine-python-cli-entry-form.yml](./task.215.gate.5.probe-engine-python-cli-entry-form.yml)
+- **Full Report**: [task.215.qa.6.probe-engine-python-cli-entry-form.md](./task.215.qa.6.probe-engine-python-cli-entry-form.md)
+- **Gate File**: [task.215.gate.6.probe-engine-python-cli-entry-form.yml](./task.215.gate.6.probe-engine-python-cli-entry-form.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 322
+- **Tests Executed**: 22
 - **Phases Verified**: 2/2
 - **Critical Issues**: 0
 - **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-- Cycle 4 findings fixed and verified (TASK-215-QA4-1, QA4-2, CR-3; bugs 7–8 closed). Probe: 26 cases, no crash shape scored `rejected`; a closed, replaced or reopened fd 3, `os._exit`, `exec` and an interpreter that cannot start are `errored`, never scored.
-- TASK-215-QA5-1 (MEDIUM): an exception outside the main frame (a joined worker thread, an atexit handler) exits 0 under `python3` and is scored `accepted` — the false-alarm direction, but not stated as a limit. Bug report: [task.215.bug.9.crash-outside-main-frame-scored-answer.md](./task.215.bug.9.crash-outside-main-frame-scored-answer.md)
+- Cycle 5 fix verified (TASK-215-QA5-1 stated and pinned; crash-record precedence tested; bug 9 closed).
+- TASK-215-QA6-1 (MEDIUM): a `.py` CLI that crashes flushing stdout at shutdown exits 120 and is scored `rejected` — a measured false pass the limit says cannot happen. Bug report: [task.215.bug.10.shutdown-flush-crash-scored-refusal.md](./task.215.bug.10.shutdown-flush-crash-scored-refusal.md)
+- TASK-215-QA6-2, QA6-3 (LOW): the worker-thread sentence is inaccurate (safe direction); the thread-crash test has a coverage gap.
 
 ### Bug Reports
 
@@ -207,7 +208,8 @@ Both items need a merged, tagged release, and `/finalise` runs before merge, so 
 - [TASK-215-BUG-6: forked daemon holds the crash fd](./task.215.bug.6.forked-daemon-holds-crash-fd.md) — ✅ Closed — Priority: Medium (verified QA cycle 4)
 - [TASK-215-BUG-7: a closed fd 3 loses the crash marker](./task.215.bug.7.closed-fd3-loses-crash-marker.md) — ✅ Closed — Priority: High (verified QA cycle 5)
 - [TASK-215-BUG-8: the interpreter probe runs under a different environment](./task.215.bug.8.interpreter-probe-env-differs.md) — ✅ Closed — Priority: Medium (verified QA cycle 5)
-- [TASK-215-BUG-9: a crash outside the main frame is scored as the answer](./task.215.bug.9.crash-outside-main-frame-scored-answer.md) — ✅ Ready for QA — Priority: Medium (fixed QA-fix cycle 5)
+- [TASK-215-BUG-9: a crash outside the main frame is scored as the answer](./task.215.bug.9.crash-outside-main-frame-scored-answer.md) — ✅ Closed — Priority: Medium (verified QA cycle 6)
+- [TASK-215-BUG-10: a crash at shutdown flush is scored as a refusal](./task.215.bug.10.shutdown-flush-crash-scored-refusal.md) — ✅ Ready for QA — Priority: Medium (fixed QA-fix cycle 6)
 
 <!-- change-log-start -->
 ## Change Log
@@ -228,6 +230,8 @@ Both items need a merged, tagged release, and `/finalise` runs before merge, so 
 | 2026-10-19 |  | QA findings fixed — cycle 4, 3 findings (TASK-215-QA4-1, QA4-2, CR-3); Status → Ready for Review | qa-fix |
 | 2026-10-19 |  | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-10-19 |  | QA findings fixed — cycle 5, 1 finding (TASK-215-QA5-1); Status → Ready for Review | qa-fix |
+| 2026-10-19 |  | QA gate CONCERNS (85) — 3 findings | qa-task |
+| 2026-10-19 |  | QA findings fixed — cycle 6, 3 findings (TASK-215-QA6-1 to QA6-3); Status → Ready for Review | qa-fix |
 <!-- change-log-end -->
 
 ---
@@ -354,5 +358,16 @@ maintainer chose the positive channel over scoping SC4.
 - Tests: 2 fixtures, 2 new tests; 22 python tests. Mutations each red: answer record outranks the
   crash record (the forged-answer test); a traceback read on any exit status (the thread test and 3
   others).
+
+### QA Fix — cycle 6 (2026-10-19)
+
+- TASK-215-QA6-1 (BUG-10): a `.py` exit 120 (CPython's failed flush at shutdown, after the answer
+  record) is now `errored`, not the script's refusal (`PYTHON_FINALIZE_STATUS`). New fixture
+  `cli-shutdown-flush-crash.py` and test; drop the branch and that test is red.
+- TASK-215-QA6-2: the worker-thread sentence in `probe-boundary-rule.md` now says an exit 1 after
+  the thread's traceback is read as a crash (`errored`), and names exit 120.
+- TASK-215-QA6-3: the thread-crash test looks up every hostile case in `cases` and `declined`, and
+  spawns the fixture to show the thread raised; a fixture that never raises turns it red.
+- Tests: 1 fixture, 1 new test, 1 tightened; 23 python tests. Two mutations, both red.
 
 - QA artifacts land beside this file: `task.215.qa.{N}.*.md`, `task.215.bug.{N}.*.md`, `task.215.gate.{N}.*.yml`.
