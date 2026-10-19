@@ -431,19 +431,19 @@ None.
 
 ### QA Report
 
-- **Full Report**: [task.195.qa.3.finding-anchors-follow-ups.md](./task.195.qa.3.finding-anchors-follow-ups.md)
-- **Gate File**: [task.195.gate.3.finding-anchors-follow-ups.yml](./task.195.gate.3.finding-anchors-follow-ups.yml)
+- **Full Report**: [task.195.qa.4.finding-anchors-follow-ups.md](./task.195.qa.4.finding-anchors-follow-ups.md)
+- **Gate File**: [task.195.gate.4.finding-anchors-follow-ups.yml](./task.195.gate.4.finding-anchors-follow-ups.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 5963
+- **Tests Executed**: 5965
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
 
-Cycle 3 re-entered QA after finalise's DoD gaps. All three security gaps on the review-pr `--inline` guard are fixed and mutation-proven, and the probe reproduces 0 of 43 with 0 escapes. The safety re-probe found TASK-195-QA3-1 (medium): a non-string `file_line` reads as a clean anchor instead of `unparseable`. Three low advisory findings were routed to future work.
+TASK-195-QA3-1 is fixed: a non-string anchor reads `unparseable` or `no-line`. The fix also treated a non-string `line_text` as absent, which turned a wrong quote into a clean `unchecked-text`. That regression is TASK-195-QA4-1 (medium).
 
 ## Definition of Done - Gaps Identified
 
@@ -493,6 +493,8 @@ Cycle 3 re-entered QA after finalise's DoD gaps. All three security gaps on the 
 | 2026-10-19 |  | DoD incomplete — 4 gaps identified (3 security on the review-pr --inline guard, CI pending) | finalise |
 | 2026-10-19 |  | QA gate CONCERNS (90/100) — 1 finding (TASK-195-QA3-1; 3 advisory) | qa-task |
 | 2026-10-19 |  | QA findings fixed — 1 of 1 (TASK-195-QA3-1: a non-string anchor reads unparseable / no-line), 1 iteration | qa-fix |
+| 2026-10-19 |  | QA gate CONCERNS (90/100) — 1 finding (TASK-195-QA4-1) | qa-task |
+| 2026-10-19 |  | QA findings fixed — 1 of 1 (TASK-195-QA4-1: a non-string line_text is a text-mismatch; one field reader for file_line, ref and line_text), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

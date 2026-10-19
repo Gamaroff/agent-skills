@@ -28,8 +28,15 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ENGINE = path.join(__dirname, "..", "finding-anchors.js");
-const { checkAnchors, anchorOf, makeReader, findingsOf, lensesOf, MALFORMED } =
-  createRequire(import.meta.url)(ENGINE);
+const {
+  checkAnchors,
+  anchorOf,
+  fieldOf,
+  makeReader,
+  findingsOf,
+  lensesOf,
+  MALFORMED,
+} = createRequire(import.meta.url)(ENGINE);
 
 // The PR #594 fixture file: 11 lines, the real line of the defect is 8.
 const SLUGIFY =
@@ -220,14 +227,7 @@ test("a non-string anchor is never matched: code reads unparseable, conformance 
     );
     assert.equal(verdictOf({ ref: raw }), "no-line", JSON.stringify(raw));
   }
-  // A non-string line_text is no quote at all: the range is checked, the text is not.
-  assert.equal(
-    verdictOf({
-      file_line: anchor,
-      line_text: [".replace(/[^a-z0-9]+/g, '-');"],
-    }),
-    "unchecked-text",
-  );
+  // A non-string line_text is checked further in "line_text: only absent is unchecked …" below.
   // Controls: the same anchor and quote as strings still verify.
   assert.equal(verdictOf({ file_line: anchor }), "unchecked-text");
   assert.equal(
@@ -237,6 +237,66 @@ test("a non-string anchor is never matched: code reads unparseable, conformance 
     }),
     "ok",
   );
+});
+
+// task.195 QA cycle 4 (TASK-195-QA4-1). The QA3-1 fix read a non-string line_text as absent, so
+// a wrong quote became the clean unchecked-text. One field reader decides absent / string / invalid
+// for every field; across the input class, only absent is unchecked, and invalid is a mismatch.
+test("line_text: only absent is unchecked; every other non-string is a text-mismatch", () => {
+  const anchor = "scripts/smoke/slugify.js:8";
+  const real = ".replace(/[^a-z0-9]+/g, '-');";
+  // Should merge: every absent spelling reads the same, unchecked.
+  for (const q of [undefined, null, "", "   ", "\t\n"]) {
+    assert.equal(
+      verdictOf({ file_line: anchor, line_text: q }),
+      "unchecked-text",
+      JSON.stringify(q),
+    );
+  }
+  // Should not merge with absent: an invalid quote, including one that holds the right text, an
+  // empty array and a falsy scalar, is a mismatch on both lenses.
+  for (const q of [
+    [real],
+    ["return y;"],
+    [],
+    {},
+    { text: real },
+    0,
+    8,
+    false,
+    true,
+  ]) {
+    assert.equal(
+      verdictOf({ file_line: anchor, line_text: q }),
+      "text-mismatch",
+      JSON.stringify(q),
+    );
+    assert.equal(
+      verdictOf({ ref: anchor, line_text: q }),
+      "text-mismatch",
+      `ref ${JSON.stringify(q)}`,
+    );
+  }
+  // The mismatch reports the quote as given, not a stringified one.
+  const [r] = checkAnchors([{ file_line: anchor, line_text: [real] }], {
+    readFile: () => SLUGIFY,
+  });
+  assert.deepEqual(r.expected, [real]);
+  // Controls: the string quote matches; a wrong string quote is still a mismatch.
+  assert.equal(verdictOf({ file_line: anchor, line_text: real }), "ok");
+  assert.equal(
+    verdictOf({ file_line: anchor, line_text: "return y;" }),
+    "text-mismatch",
+  );
+});
+
+test("fieldOf: the one reader of every finding field", () => {
+  for (const v of [undefined, null, "", "  "])
+    assert.equal(fieldOf(v).kind, "absent");
+  assert.deepEqual(fieldOf("a.js:1"), { kind: "string", value: "a.js:1" });
+  for (const v of [[], ["a.js:1"], {}, 0, 1, false, true]) {
+    assert.equal(fieldOf(v).kind, "invalid", JSON.stringify(v));
+  }
 });
 
 test("a conformance ref of the path:line form is checked like a file_line", () => {
@@ -795,6 +855,37 @@ test("CLI: an array file_line exits 1 malformed-anchors and is annotated unparse
     assert.equal(
       JSON.parse(readFileSync(f, "utf8")).code_review.findings[0].anchor_check,
       "unparseable",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("CLI: an array line_text exits 1 malformed-anchors and is annotated text-mismatch", () => {
+  const dir = gitRepo();
+  try {
+    const f = path.join(dir, "f.json");
+    const bad = { id: "CR-1", file_line: "top.js:1", line_text: ["return y;"] };
+    writeFileSync(f, JSON.stringify({ code_review: { findings: [bad] } }));
+    const r = cli(
+      [
+        "--findings-file",
+        f,
+        "--root",
+        dir,
+        "--rev",
+        "HEAD",
+        "--annotate",
+        f,
+        "--json",
+      ],
+      dir,
+    );
+    assert.equal(r.code, 1);
+    assert.equal(r.json().reason, "malformed-anchors");
+    assert.equal(
+      JSON.parse(readFileSync(f, "utf8")).code_review.findings[0].anchor_check,
+      "text-mismatch",
     );
   } finally {
     rmSync(dir, { recursive: true, force: true });

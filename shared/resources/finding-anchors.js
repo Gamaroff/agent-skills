@@ -101,10 +101,24 @@ const MALFORMED = new Set([
 ]);
 
 /**
+ * How every finding field the checker reads is read, in one place (task.195 QA4): `absent`
+ * (missing, null or blank), `string`, or `invalid` — any other type. Only the first two are
+ * accepted shapes. An invalid anchor never parses, and an invalid `line_text` is a mismatch, never
+ * an unchecked quote: stringifying `["x.js:8"]` verified it (QA3-1), and reading `["return y;"]`
+ * as absent made a wrong quote clean (QA4-1).
+ */
+function fieldOf(v) {
+  if (v == null || (typeof v === "string" && v.trim() === ""))
+    return { kind: "absent" };
+  return typeof v === "string"
+    ? { kind: "string", value: v }
+    : { kind: "invalid", value: v };
+}
+
+/**
  * `{lens, path, line}` for a `path:line` anchor, or `{lens, path: null}` when the value does not
  * parse. `lens` is the wrapper's, from `lensesOf`; without one the KEY decides: `file_line` is the
- * code lens, `ref` alone the conformance lens (task.195). Only a string parses: a stringified array
- * (`["x.js:8"]`) would verify here and then fail every consumer that reads it as text (QA3-1).
+ * code lens, `ref` alone the conformance lens (task.195). Only a string field parses (`fieldOf`).
  */
 function anchorOf(finding, lens) {
   if (lens !== "code" && lens !== "conformance") {
@@ -112,8 +126,9 @@ function anchorOf(finding, lens) {
       ? "code"
       : "conformance";
   }
-  const raw = lens === "code" ? finding.file_line : finding.ref;
-  const m = typeof raw === "string" ? /^(\S+):(-?\d+)$/.exec(raw.trim()) : null;
+  const raw = fieldOf(lens === "code" ? finding.file_line : finding.ref);
+  const m =
+    raw.kind === "string" ? /^(\S+):(-?\d+)$/.exec(raw.value.trim()) : null;
   return m ? { lens, path: m[1], line: Number(m[2]) } : { lens, path: null };
 }
 
@@ -143,12 +158,11 @@ function checkAnchors(findings, { readFile, lenses = null }) {
     if (at.line < 1 || at.line > lines.length) {
       return { id, verdict: "out-of-range", ...at, lineCount: lines.length };
     }
-    // A non-string line_text quotes nothing, so the text is unchecked, never matched (QA3-1).
-    if (typeof f.line_text !== "string" || norm(f.line_text) === "") {
+    const quote = fieldOf(f.line_text);
+    if (quote.kind === "absent")
       return { id, verdict: "unchecked-text", ...at };
-    }
     const actual = norm(lines[at.line - 1]);
-    return actual.includes(norm(f.line_text))
+    return quote.kind === "string" && actual.includes(norm(quote.value))
       ? { id, verdict: "ok", ...at }
       : { id, verdict: "text-mismatch", ...at, expected: f.line_text, actual };
   });
@@ -454,6 +468,7 @@ function run(argv, deps = {}) {
 module.exports = {
   anchorOf,
   checkAnchors,
+  fieldOf,
   findingsOf,
   lensesOf,
   makeReader,
