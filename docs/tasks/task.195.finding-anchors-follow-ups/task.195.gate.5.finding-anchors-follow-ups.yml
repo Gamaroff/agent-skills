@@ -1,0 +1,57 @@
+schema: 2
+task: 'task.195.finding-anchors-follow-ups'
+task_title: 'finding-anchors follow-ups'
+gate: PASS
+status_reason: 'TASK-195-QA4-1 is fixed and mutation-proven. One allow-list reader (fieldOf) now classifies file_line, ref and line_text. A non-string line_text reads text-mismatch, and only an absent or blank one reads unchecked-text. The cycle 5 review found nothing, and every string input gives the same verdict as origin/develop.'
+reviewer: 'QA Engineer'
+head: 'f192e953972ba43d020d975a484a1cfe818c4117'
+updated: '2026-10-19T17:18:05Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 5968
+  phases_verified: 3/3
+  ci: 'fast gate 5968 tests, 0 failed @ f192e953 (PR CI not read)'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 43
+    notes: 'task.195.qa.5.security.run.json: review-pr --inline guard 20/20 engages, review-code Step 2b checker 23/23 engages, 0 reproduced, 0 escapes.'
+  performance:
+    status: PASS
+    notes: 'One classification per field; no new I/O.'
+  reliability:
+    status: PASS
+    notes: 'A non-string line_text is no longer a silent clean verdict.'
+  maintainability:
+    status: PASS
+    notes: 'One reader decides every field (Step 2.6 consolidate move), and a unit test holds it.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Carried from gates 3–4: CR-2 (reviewer-supplied anchor_check passes the guards), CR-3 (non-object conformance finding not annotated), CR-4 (selector colon split), a leading-whitespace file_line reaching the selector untrimmed, null finding crash, --staged --fix, and the review-code --inline unbound variables.'
+      refs: ['docs/tasks/task.195.finding-anchors-follow-ups/task.195.gate.4.finding-anchors-follow-ups.yml']
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: '2026-10-19'
+  total_iterations: 5
+  verification_method: 'committed tests, mutation proof 3 of 3, probe 43/0, code review clean'
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: []

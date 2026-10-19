@@ -1,0 +1,25 @@
+{
+  "sink": "filename",
+  "entry": "fence:skills/review-pr/SKILL.md#`--inline` — findings beside the lines they are about",
+  "name": "review-pr --inline un-annotated guard",
+  "call_site": null,
+  "verdict": "present-but-inert",
+  "reason": "a-hostile-case-passed-a-control-that-rejects-others",
+  "executed": 20,
+  "passed": 18,
+  "reproduced": 2,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 13,
+  "shells": [
+    "bash"
+  ],
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": null,
+  "slot": "{findings-json}",
+  "fixture_setup": null,
+  "ran_at": "2026-10-19T16:26:59.166Z"
+}

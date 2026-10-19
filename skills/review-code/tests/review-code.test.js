@@ -370,3 +370,83 @@ test("the inline-comment jq snippet executes against a schema-shaped fixture", (
     );
   }
 });
+
+// task.195 SC-5: the --inline select keeps only verified anchors, so a findings file the checker never
+// annotated used to yield [] — indistinguishable from "no anchorable findings". The guard before it
+// must refuse such a file, and must let a fully annotated one through (control).
+function extractInlineGuard(skillText) {
+  const m = skillText.match(
+    /^[ \t]*jq -e '[\s\S]*?select\(\(\.anchor_check \| type\) != "string"\)[\s\S]*?exit 1; \}/m,
+  );
+  return m ? m[0] : null;
+}
+
+test("--inline refuses a findings file with an un-annotated finding, and passes an annotated one", (t) => {
+  const { spawnSync: run } = require("child_process");
+  if (run("jq", ["--version"]).error) return t.skip("jq not installed");
+  const guard = extractInlineGuard(read("SKILL.md"));
+  assert.ok(
+    guard,
+    "could not find the --inline anchor_check guard before the jq select",
+  );
+  const dir = fs.mkdtempSync(
+    path.join(require("os").tmpdir(), "inline-guard-"),
+  );
+  try {
+    const file = path.join(dir, "findings.json");
+    const runGuard = (doc) => {
+      fs.writeFileSync(file, JSON.stringify(doc));
+      return run("bash", ["-c", guard], {
+        encoding: "utf8",
+        env: { ...process.env, FINDINGS_JSON: file },
+      });
+    };
+    const never = runGuard({
+      code_review: { findings: [{ file_line: "src/x.ts:4", finding: "f" }] },
+    });
+    assert.equal(
+      never.status,
+      1,
+      "an un-annotated finding must HALT the --inline block",
+    );
+    assert.match(never.stdout, /HALT: .*anchor_check.*Step 2b/);
+    // A file with no findings array selects nothing; it must not pass as "all annotated"
+    // (task.195 QA cycle 1, TASK-195-QA1-2). An empty array is a legitimate empty review.
+    // task.195 DoD 1: a null anchor_check is not a checker verdict — the checker always writes a string.
+    for (const notFindings of [
+      {},
+      { code_review: {} },
+      [],
+      {
+        code_review: {
+          findings: [
+            { file_line: "src/x.ts:4", finding: "f", anchor_check: null },
+          ],
+        },
+      },
+    ]) {
+      const r = runGuard(notFindings);
+      assert.equal(r.status, 1, `${JSON.stringify(notFindings)} must HALT`);
+      assert.match(r.stdout, /HALT: /);
+    }
+    assert.equal(runGuard({ code_review: { findings: [] } }).status, 0);
+    const annotated = runGuard({
+      code_review: {
+        findings: [
+          {
+            file_line: "src/x.ts:4",
+            finding: "f",
+            anchor_check: "text-mismatch",
+          },
+        ],
+      },
+    });
+    assert.equal(
+      annotated.status,
+      0,
+      `an annotated file must pass:\n${annotated.stdout}${annotated.stderr}`,
+    );
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

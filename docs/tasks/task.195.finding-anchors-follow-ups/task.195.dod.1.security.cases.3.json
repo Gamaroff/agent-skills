@@ -1,0 +1,89 @@
+[
+  {
+    "id": "empty-object",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "no findings array",
+    "correct": "HALT, nothing posted inline",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{}",
+        ".agents/skills/review-code/references/pr-inline-comment.js": "#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({reason:\"posted\"})+\"\\n\");\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: a finding in f.json carries no anchor_check (or the file is not findings JSON) — run Step 2b's anchor check first; nothing posted inline\n"
+    }
+  },
+  {
+    "id": "unannotated-code",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "a code finding the checker never annotated",
+    "correct": "HALT, nothing posted inline",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{\"code_review\": {\"findings\": [{\"id\": \"CR-1\", \"file_line\": \"a.js:1\", \"finding\": \"f\"}]}}",
+        ".agents/skills/review-code/references/pr-inline-comment.js": "#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({reason:\"posted\"})+\"\\n\");\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: a finding in f.json carries no anchor_check (or the file is not findings JSON) — run Step 2b's anchor check first; nothing posted inline\n"
+    }
+  },
+  {
+    "id": "findings-not-array",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "findings key holding a string",
+    "correct": "HALT, nothing posted inline",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{\"code_review\": {\"findings\": \"x\"}}",
+        ".agents/skills/review-code/references/pr-inline-comment.js": "#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({reason:\"posted\"})+\"\\n\");\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: a finding in f.json carries no anchor_check (or the file is not findings JSON) — run Step 2b's anchor check first; nothing posted inline\n"
+    }
+  },
+  {
+    "id": "annotated-code",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "every code finding annotated",
+    "correct": "the guard passes and the poster runs",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{\"code_review\": {\"findings\": [{\"id\": \"CR-1\", \"file_line\": \"a.js:1\", \"finding\": \"f\", \"anchor_check\": \"ok\"}]}}",
+        ".agents/skills/review-code/references/pr-inline-comment.js": "#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({reason:\"posted\"})+\"\\n\");\n"
+      }
+    }
+  },
+  {
+    "id": "empty-review",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "a legitimate empty findings array",
+    "correct": "the guard passes and the poster runs",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{\"code_review\": {\"findings\": []}}",
+        ".agents/skills/review-code/references/pr-inline-comment.js": "#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({reason:\"posted\"})+\"\\n\");\n"
+      }
+    }
+  }
+]

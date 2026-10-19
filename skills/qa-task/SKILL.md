@@ -639,17 +639,26 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
 {findings-json}
 JSON
    # --rev HEAD: the diff under review is $BASE...HEAD, so uncommitted edits are not what was reviewed.
-   command node .agents/skills/qa-task/references/finding-anchors.js \
+   # Decide on the checker's `reason`, never on its exit code: `node` also exits 1 when the script
+   # cannot load, and that must not read as "malformed anchors — mark and continue" (task.195).
+   CHECK_OUT=$(command node .agents/skills/qa-task/references/finding-anchors.js \
      --findings-file "$FINDINGS_JSON" --root "$(git rev-parse --show-toplevel)" \
-     --rev HEAD --annotate "$FINDINGS_JSON" --json
-   # exit 1 = malformed anchors exist. NOT a halt: every finding now carries anchor_check — mark, continue.
-   # exit 2 = the call is wrong: usage (the findings file), bad-root (--root is not a directory), or bad-rev
-   #   (--rev names no commit here — fetch it).
-   #   Fix the call; never treat unchecked anchors as verified.
+     --rev HEAD --annotate "$FINDINGS_JSON" --json)
+   REASON=$(printf '%s' "$CHECK_OUT" | jq -r '.reason // empty' 2>/dev/null)
+   case "$REASON" in
+     ok|malformed-anchors)   # every finding now carries anchor_check — mark the malformed ones, continue
+       echo "finding-anchors: $REASON" ;;
+     bad-root|bad-rev|usage) # the call is wrong (the findings file, --root, or an unfetched --rev)
+       echo "HALT: finding-anchors refused the call ($REASON): $(printf '%s' "$CHECK_OUT" | jq -r '.message // empty')"
+       echo "  Fix the call; never treat unchecked anchors as verified."; exit 1 ;;
+     *)                      # no JSON reason at all: the checker did not run
+       echo "HALT: finding-anchors checker not runnable (no JSON reason) — check .agents/skills/qa-task/references/finding-anchors.js; never treat unchecked anchors as verified"; exit 1 ;;
+   esac
    ```
 
    Every finding now carries `anchor_check`. `ok`, `unchecked-text` and `no-line` are clean;
-   `no-such-file`, `out-of-range` and `text-mismatch` mean the reviewer named a line that is not the
+   `no-such-file`, `out-of-range`, `text-mismatch` and `unparseable` (a code finding whose `file_line` is absent or is not
+   `path:line`) mean the reviewer named a line that is not the
    one it meant. **A malformed anchor is never dropped**: it renders in `## Code Review` with
    `⚠️ unverified anchor` (item 5), and item 6 never maps it to `top_issues[]` with a location it
    does not have. The checker reports and never repairs — guessing the intended line would hide the
@@ -783,7 +792,7 @@ JSON
    else CR_BLOCKING=false; fi
    ```
 
-   `$CODE_REVIEW_BLOCKING_ARG` comes from the `code_review_blocking=` token in Skill `args` (see **Pipeline Skill args**). When `CR_BLOCKING=true`, append each finding that is `category: bug` AND `confidence: high` to the gate `top_issues[]` as `{ id, severity, file, finding, suggested_action, suggested_owner: dev }` — `file` is the path from the finding's own `file:line`, which every code-review finding already carries (Step 10's deterministic rules then decide). **A finding whose `anchor_check` is `no-such-file`, `out-of-range` or `text-mismatch` still maps when it qualifies** — a high-confidence bug is still a bug — but its `finding` gains `(location unverified: {file_line})`, and its `file` is `null` when the verdict is `no-such-file`, so `/qa-fix` is never sent to a line as though it were verified. Otherwise — resolved advisory, or every cleanup or non-high-confidence finding — the gate is **unaffected**.
+   `$CODE_REVIEW_BLOCKING_ARG` comes from the `code_review_blocking=` token in Skill `args` (see **Pipeline Skill args**). When `CR_BLOCKING=true`, append each finding that is `category: bug` AND `confidence: high` to the gate `top_issues[]` as `{ id, severity, file, finding, suggested_action, suggested_owner: dev }` — `file` is the path from the finding's own `file:line`, which every code-review finding already carries (Step 10's deterministic rules then decide). **A finding whose `anchor_check` is `no-such-file`, `out-of-range`, `text-mismatch` or `unparseable` still maps when it qualifies** — a high-confidence bug is still a bug — but its `finding` gains `(location unverified: {file_line})`, and its `file` is `null` when the verdict is `no-such-file` or `unparseable` (neither names a usable path), so `/qa-fix` is never sent to a line as though it were verified. Otherwise — resolved advisory, or every cleanup or non-high-confidence finding — the gate is **unaffected**.
 
    **Re-rating a promoted finding.** QA may lower a promoted finding's severity only with a measured
    plausibility check: a corpus count, and whether any writer or template in the repository can
