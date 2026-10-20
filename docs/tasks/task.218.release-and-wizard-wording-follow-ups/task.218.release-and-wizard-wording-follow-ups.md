@@ -5,18 +5,22 @@ type: task
 description: "Fix five low wording defects task.199's QA gate 4 carried to future work: the release runbook's develop-sync section opens with a dangling Otherwise and leaves the operator on develop, the wizard's approve summary points at a checklist it never named, the wizard's section banners use older step numbers than its header, and restricted-access.md omits the autonomous-run fallback for approve."
 tags: [docs, release, setup-consumer, restricted-access, follow-up]
 category: documentation
-status: planned
+status: accepted
 priority: Low
 created: 2026-10-20
 updated: 2026-10-20
 assignee:
 estimated_effort_hours: 2
 github_issue: 705
+completed_date: 2026-10-20
+pr_number: 707
 ---
 
 # Technical Task: Release runbook and setup wizard wording follow-ups
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.218.review.1.release-and-wizard-wording-follow-ups.md` implemented 2026-10-20
 
 **GitHub Issue**: [#705](https://github.com/Gamaroff/agent-skills/issues/705)
 
@@ -30,7 +34,7 @@ task.199 (PR #704, merged 2026-10-20) brought the setup, configuration and proce
 
 **Key deliverables**:
 
-1. The release runbook's §4 opens with its condition, and both mid-sync recoveries end where `release.sh` ends: on `main`.
+1. The release runbook's §4 opens with its condition, and every path through it (the manual block and both mid-sync recoveries) ends where `release.sh` ends: on `main`.
 2. The wizard's closing summary names the checklist that `/tracker-reconcile` ticks, and its section banners use the header's step numbers.
 3. `restricted-access.md` names both cases where `approve` falls back to `command`: no tty, and an autonomous run.
 
@@ -56,6 +60,8 @@ task.199 (PR #704, merged 2026-10-20) brought the setup, configuration and proce
    | `agent links` (1934), unnumbered | `link_agents` | 8b |
 
    The header also leaves out the skill-profile step that getting-started lists as 2b.
+
+   The table comes from `grep -n '^# ── ' scripts/setup-consumer.sh`: 22 banners at `965c7e19`. Most name a helper block (`colours`, `flags`, `summary`); the five above are the ones whose step number disagrees with the header, or that run as a numbered step without one.
 5. **`restricted-access.md` names only one fallback for `approve`.** Limits item 2 (`docs/concepts/restricted-access.md:34`, "**Without a tty it degrades to `command`**") and the mode table's `approve` row (`:72`, "degrades to `command` (sh only) without one") name only the missing tty. The step-7 finalise doc says "no tty (or an autonomous pipeline run)" (`shared/resources/develop-pipeline-step-7-finalise.md:514`). `which-access.md:51` and `configuration.md:944` already name both.
 
 ### Benefits of Fixing Them
@@ -77,9 +83,9 @@ task.199 (PR #704, merged 2026-10-20) brought the setup, configuration and proce
 
 ### Target Architecture
 
-- §4 opens: "Run this step only if you passed `--no-sync-develop`; otherwise `--tag` has already merged `main` into `develop` and pushed it." The merge-conflict and push-rejected recoveries each end with `git checkout main`.
+- §4 opens: "Run this step only if you passed `--no-sync-develop`; otherwise `--tag` has already merged `main` into `develop` and pushed it." The manual block gains `git checkout main` as its last line, and the merge-conflict and push-rejected recoveries each end with `git checkout main`. The third recovery (`git pull --rebase` failed) sends the reader back to the manual block, so it ends on `main` too.
 - The shared summary line names its artifact: "Later, /tracker-reconcile re-reads the board and ticks the committed *.handover.*.md checklist."
-- Banners use the header's numbering: `2b. skill install profile`, `2. tracker access level`, `8a. tracker-workflow.yaml`, `8b. agent links`. The profile-helper banner keeps its place without a step number (`install profile helpers (task 84)`), because it holds helpers, not a wizard step. The header gains `2b. Skill install profile`.
+- Banners use the header's numbering: `2b. skill install profile`, `2. tracker access level`, `8a. tracker-workflow.yaml`, `8b. agent links`. The profile-helper banner keeps its place without a step number (`install profile helpers (task 84)`), because it holds helpers, not a wizard step. The header gains `2b. Skill install profile`. After the change two banners read `2.` (`2. platform` and `2. tracker access level`). That is intended: the header's and getting-started's step 2 covers both prompts.
 - `restricted-access.md:34` and `:72` name both cases: "without a tty, or in an autonomous run".
 
 ### Important Clarifications
@@ -120,24 +126,25 @@ None. This task changes documentation, comment lines and one `echo` string. No f
 **Risk**: Low
 **Files**: `docs/runbooks/release-and-install.md`
 
-- [ ] Open §4 with its condition (QA-9)
-- [ ] End the merge-conflict and push-rejected recoveries with `git checkout main` (QA-8)
+- [x] Open §4 with its condition (QA-9)
+- [x] End the manual block and the merge-conflict and push-rejected recoveries with `git checkout main` (QA-8)
 
 ### Phase 2: Setup wizard text
 
 **Risk**: Low
-**Files**: `scripts/setup-consumer.sh`
+**Files**: `scripts/setup-consumer.sh`, `shared/resources/tests/setup-consumer-config.test.mjs`
 
-- [ ] Name the `*.handover.*.md` checklist in the shared summary line (QA-10)
-- [ ] Renumber the four banners, un-number the profile-helper banner, and add `2b` to the header
+- [x] Name the `*.handover.*.md` checklist in the shared summary line (QA-10)
+- [x] Add a test that renders `print_summary` under `approve` and `command` and asserts the `/tracker-reconcile` line names `*.handover.*.md`
+- [x] Renumber the four banners, un-number the profile-helper banner, and add `2b` to the header
 
 ### Phase 3: restricted-access.md and the changelog
 
 **Risk**: Low
 **Files**: `docs/concepts/restricted-access.md`, `CHANGELOG.md`
 
-- [ ] Name the autonomous-run fallback in Limits item 2 and the `approve` table row
-- [ ] CHANGELOG entry
+- [x] Name the autonomous-run fallback in Limits item 2 and the `approve` table row
+- [x] CHANGELOG entry
 
 ---
 
@@ -149,7 +156,7 @@ None. This task changes documentation, comment lines and one `echo` string. No f
 
 ### Files to Modify (Tests)
 
-None. `setup-consumer.sh`'s existing suites (`shared/resources/tests/setup-consumer-config.test.mjs`, `setup-consumer-agent-links.test.mjs`) must stay green.
+5. ✅ `shared/resources/tests/setup-consumer-config.test.mjs`: one new test for the rendered summary. The file already sources the wizard with `SETUP_CONSUMER_NO_MAIN=1` and calls `print_summary` (`runWorkflowWriter`), and `npm test` already reaches it. The other `setup-consumer-*.test.mjs` suites must stay green.
 
 ### Files to Modify (Dependencies)
 
@@ -171,14 +178,20 @@ None.
 
 ### Unit Tests
 
-Not applicable: no logic changes. `npm test` must stay green.
+One new test in `shared/resources/tests/setup-consumer-config.test.mjs`, `rendered summary names the checklist /tracker-reconcile ticks`. For each of `approve` and `command`, it sources the wizard in a temp directory with `SETUP_CONSUMER_NO_MAIN=1` and `ACCESS_TRACKER=<mode>` in the environment, then runs `print_summary`. It asserts that:
+
+- the line containing `/tracker-reconcile` also contains `*.handover.*.md`
+- the output does not contain `ticks that checklist`
+- under `command`, the branch line `After a run, work the committed *.handover.*.md checklist` is still printed
+
+Mutation proof: restore the old `echo` and the test goes red. The rest of `npm test` must stay green.
 
 ### Integration Tests
 
-- **Rendered summary.** From a scratch directory:
+- **Rendered summary, by eye.** From a scratch directory:
   `SETUP_CONSUMER_NO_MAIN=1 bash -c 'source <repo>/scripts/setup-consumer.sh; ACCESS_TRACKER=approve; UPDATE_ONLY=false; DRY_RUN=true; print_summary'`.
-  The `Tracker access is approve:` block names `*.handover.*.md`. Repeat with `ACCESS_TRACKER=command` and check the block reads correctly there too. This command was run on `develop` at `9067ba92` while writing this task, and it renders the current text.
-- **Syntax.** `bash -n scripts/setup-consumer.sh` and `shellcheck scripts/setup-consumer.sh` are clean.
+  Repeat with `ACCESS_TRACKER=command`. The review ran this at `965c7e19`, and it renders the current text. The new line is 97 columns, so it stays one `echo`.
+- **Syntax.** `bash -n scripts/setup-consumer.sh` and `shellcheck --severity=warning scripts/setup-consumer.sh` (the CI gate's severity) are clean.
 
 ### Performance Tests
 
@@ -194,27 +207,27 @@ Not applicable.
 
 ### Functional
 
-- [ ] `release-and-install.md` §4's first sentence begins "Run this step only if you passed `--no-sync-develop`"
-- [ ] Both §4 recovery bullets (merge conflict, push rejected) end with `git checkout main`, matching `release.sh`'s sync block
-- [ ] The rendered `approve` summary (§8 command) names `*.handover.*.md` in the `/tracker-reconcile` line
-- [ ] Every numbered `# ── N. … ──` banner in `setup-consumer.sh` uses a step number from the header list, and the header lists `2b. Skill install profile`
-- [ ] `restricted-access.md` Limits item 2 and the `approve` table row both name "an autonomous run" beside the missing tty
+- [x] `release-and-install.md` §4's first sentence begins "Run this step only if you passed `--no-sync-develop`"
+- [x] §4's manual block and both recovery bullets (merge conflict, push rejected) end with `git checkout main`, matching `release.sh`'s sync block
+- [x] The rendered `approve` and `command` summaries name `*.handover.*.md` in the `/tracker-reconcile` line, held by the new `setup-consumer-config.test.mjs` test (§8 Unit Tests)
+- [x] Every numbered banner in `setup-consumer.sh` (`grep -nE '^# ── [0-9]+[a-z]?\. ' scripts/setup-consumer.sh`) uses a step number from the header list, and the header lists `2b. Skill install profile`
+- [x] `restricted-access.md` Limits item 2 and the `approve` table row both name "an autonomous run" beside the missing tty
 
 ### Performance
 
-- [ ] No behaviour change: `git diff develop -- scripts/setup-consumer.sh` touches only comment lines and the one summary `echo`
-- [ ] The rendered summary under `ACCESS_TRACKER=command` is unchanged apart from the shared line
+- [x] No behaviour change. `git diff develop -- scripts/setup-consumer.sh | grep -E '^[+-][^+-]' | grep -vE '^[+-]#'` prints exactly two lines, the old and new summary `echo`. Measured in the implementation report.
+- [x] Under `ACCESS_TRACKER=command`, the summary's branch line is unchanged, held by the same test's third assertion
 
 ### Code Quality
 
-- [ ] `npm run ci` passes (format, tests, evals, bundle:check, shellcheck)
-- [ ] `bash -n scripts/setup-consumer.sh` is clean
-- [ ] `command node shared/resources/doc-links.js --file <doc>` reports `ok` for both changed docs
+- [x] `npm run ci` passes (format, tests, evals, bundle:check, shellcheck)
+- [x] `bash -n scripts/setup-consumer.sh` is clean
+- [x] `command node shared/resources/doc-links.js --file <doc>` reports `ok` for both changed docs
 
 ### Migration
 
-- [ ] CHANGELOG `[Unreleased]` › Fixed cites `(task 218)`
-- [ ] No consumer action needed: the wizard text changes on the next `setup-consumer.sh --update`
+- [x] CHANGELOG `[Unreleased]` › Fixed cites `(task 218)`
+- [x] No consumer action needed: the wizard text changes on the next `setup-consumer.sh --update`
 
 ---
 
@@ -267,12 +280,88 @@ None.
 
 ---
 
+## Implementation Summary
+
+**Completion Date:** 2026-10-20
+
+All five wording items from task.199's gate 4 are fixed. A new test checks the wizard's rendered summary under `approve` and `command`. No script behaviour changed.
+
+### Approach
+
+| Item | File | Change |
+| --- | --- | --- |
+| QA-9 | `docs/runbooks/release-and-install.md` | §4 opens with its condition |
+| QA-8 | `docs/runbooks/release-and-install.md` | The manual block and both mid-sync recoveries end with `git checkout main`, as `release.sh`'s sync block does (review D1 added the manual block) |
+| QA-10 | `scripts/setup-consumer.sh` | The shared `/tracker-reconcile` line names `*.handover.*.md` |
+| Banners | `scripts/setup-consumer.sh` | `2a`→`2b`, `2b`→`2`, `5b`→`8a`, the profile helpers are un-numbered, and `agent links` becomes `8b`. Each banner keeps the 79-column width. The header gains `2b. Skill install profile`, and step 2 now names the tracker-access prompt, so the `2.` access banner has a header entry |
+| Fallback | `docs/concepts/restricted-access.md` | Limits item 2 and the `approve` table row name the autonomous run |
+
+### Testing Results
+
+- New test `rendered summary names the checklist /tracker-reconcile ticks` (`shared/resources/tests/setup-consumer-config.test.mjs`). It was red on the old `echo` and is green on the new one, which is the mutation proof.
+- `bash -n` and `shellcheck --severity=warning` on `scripts/setup-consumer.sh` are clean. `doc-links.js` reports `ok` on both changed docs (8 and 18 links).
+- The diff criterion: `git diff develop -- scripts/setup-consumer.sh | grep -E '^[+-][^+-]' | grep -vE '^[+-]#'` prints exactly the old and new summary `echo`.
+- `npm run ci:fast` passed 5956 of 5971 tests. The one failure was `tests/bundle-missing-source.test.js`, which states it is load-sensitive: 21.9s against its 20s budget under the full suite. Re-run alone, all 7 of its tests pass in 16.2s. This task does not touch that test.
+
+### Deferred Work
+
+None.
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-20
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.218.qa.1.release-and-wizard-wording-follow-ups.md](./task.218.qa.1.release-and-wizard-wording-follow-ups.md)
+- **Gate File**: [task.218.gate.1.release-and-wizard-wording-follow-ups.yml](./task.218.gate.1.release-and-wizard-wording-follow-ups.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 1 new test (mutation-proven, 2 mutations), plus the full `npm run ci`
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No critical issues identified. The diff review returned no findings.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.218.qa.1.release-and-wizard-wording-follow-ups.md`
+**Gate File**: `task.218.gate.1.release-and-wizard-wording-follow-ups.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR Review (5c)**: `task.218.pr-review.1.release-and-wizard-wording-follow-ups.md`, ✅ APPROVE with 0 findings
+
+Every Definition of Done criterion was verified:
+
+✅ **Success Criteria:** All 12 met (5 functional, 2 performance, 3 code quality, 2 migration). The two behaviour criteria are each held by a per-PR test that was mutation-proven.
+✅ **Tests & PR:** PR #707, with all 5 checks green on `49344075`. The repository requires no reviewers, so the 5c review report stands in for an approval.
+✅ **Documentation:** The CHANGELOG cites `(task 218)`, and the runbook and restricted-access wording is in the diff.
+✅ **Security Review:** PASS. No secrets and no unsafe patterns. The deliverable is not a boundary, so no probe ran.
+✅ **Compliance Review:** Not applicable. No personal, payment or health data is touched, and the only UI is one line of terminal text.
+
+**Task marked as ACCEPTED on:** 2026-10-20
+
+**Detailed Verification Log:** See `task.218.dod.1.release-and-wizard-wording-follow-ups.md` for the full verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-20 | 1.0     | Initial draft — the five wording items task.199's QA gate 4 carried to future work | create-task |
+| 2026-10-20 | 1.1     | Review passed (8/10), ready to build. Added a per-PR test for the rendered summary, recorded the banner grep, gave the diff criterion its command, and extended QA-8 to the manual block | review-task |
+| 2026-10-20 |         | Status → ready-for-development | review-task |
+| 2026-10-20 |         | Implemented: 5 files and 1 new test; status → ready-for-review | develop-task (inline) |
+| 2026-10-20 |         | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-10-20 | 1.2 | DoD passed — accepted (PR #707) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -280,16 +369,17 @@ None.
 ## Progress Tracking
 
 ### Phase 1: Release runbook §4
-- [ ] Opening condition (QA-9)
-- [ ] `git checkout main` in both recoveries (QA-8)
+- [x] Opening condition (QA-9)
+- [x] `git checkout main` in the manual block and both recoveries (QA-8)
 
 ### Phase 2: Setup wizard text
-- [ ] Summary line names the checklist (QA-10)
-- [ ] Banners and header renumbered
+- [x] Summary line names the checklist (QA-10)
+- [x] Rendered-summary test
+- [x] Banners and header renumbered
 
 ### Phase 3: restricted-access.md and changelog
-- [ ] Autonomous-run fallback named
-- [ ] CHANGELOG
+- [x] Autonomous-run fallback named
+- [x] CHANGELOG
 
 ---
 
