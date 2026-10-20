@@ -5,18 +5,20 @@ type: task
 description: "Give the general-bug registry's Status cell one tested writer, a --bug-status mode of registry-tick.js, and call it at every bug status transition, including the two /qa-fix makes after a reopen that today leave the row stale."
 tags: [bug-registry, registry-tick, qa-fix, develop-bug, follow-up]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-20
 updated: 2026-10-20
+completed_date: 2026-10-20
 assignee:
 estimated_effort_hours: 8
 github_issue: 706
+pr_number: 708
 ---
 
 # Technical Task: General-bug registry status: one writer at every transition
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.219.review.1.bug-registry-status-mirror.md` implemented 2026-10-20
 
@@ -339,9 +341,9 @@ None.
 ### Key Findings
 Cycle 2 closes the finalise DoD gap PERF1 with a mutation-proven test that counts registry reads and writes. The whole-branch refute review raised one low/low bug and one cleanup, both advisory. The classifier probe ran 19 cases with 0 escaped.
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 1 (historical, superseded)
 
-**Status:** IN PROGRESS
+**Status:** SUPERSEDED by run 2 (accepted below). Run 1's record, kept as history.
 
 ### QA Gate Status
 
@@ -367,6 +369,34 @@ All other criteria pass: 13 of 14 success criteria, docs, security (19 probes, 0
 **Gap Report Generated:** 2026-10-20
 
 **Detailed Verification Log:** See `task.219.dod.1.bug-registry-status-mirror.md` for complete verification evidence and timestamps.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.219.qa.2.bug-registry-status-mirror.md`
+**Gate File**: `task.219.gate.2.bug-registry-status-mirror.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR Review**: `task.219.pr-review.2.bug-registry-status-mirror.md`: ✅ APPROVE
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 14 of 14 met, each with per-PR test evidence (MIG1 is a documentation criterion). PERF1, run 1's gap, is held by the counted-I/O test from `3f98c7b7`
+✅ **Unit Tests:** registry-tick 69/69, develop-bug 24/24, bug-registry-drift 4/4; `ci:fast` 5,991 pass / 0 fail
+✅ **PR Review:** PR #708; single-maintainer repo, so the Step 5c review report (APPROVE) stands in for review approval
+✅ **Documentation:** CHANGELOG `[Unreleased]` cites task 219; qa-fix and develop-bug call-site docs and the five bundled copies updated
+✅ **Security Review:** ✅ PASS - boundary probed (general-bug classifier), 19 executed, 0 reproduced, 0 escaped
+⚠️ **Compliance Review:** NOT_APPLICABLE - internal skill tooling, no personal, payment, UI or health data
+✅ **CI:** reading 1 SUCCESS @ `5a8ba97f` over 5 checks
+
+**Advisory follow-ups (non-blocking):** gate 2 CR-1 (guard the `select-next.mjs` export names), gate 2 CR-2 (widen the test preload), gate 1 CR-1 to CR-3.
+
+**Task marked as ACCEPTED on:** 2026-10-20
+
+**Detailed Verification Log:** See `task.219.dod.2.bug-registry-status-mirror.md` for complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
@@ -379,6 +409,7 @@ All other criteria pass: 13 of 14 success criteria, docs, security (19 probes, 0
 | 2026-10-20 |         | QA gate PASS (100/100) — 0 findings in gate, 3 advisory | qa-task |
 | 2026-10-20 |  | DoD incomplete — 1 gap identified (PERF1 test evidence) | finalise |
 | 2026-10-20 |  | QA gate PASS (100/100) — cycle 2, PERF1 gap closed; 0 findings in gate, 2 advisory | qa-task |
+| 2026-10-20 | 1.2 | DoD verified (run 2, 14/14) — accepted (PR #708) | finalise |
 <!-- change-log-end -->
 
 ---
