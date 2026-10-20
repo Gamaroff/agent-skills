@@ -5,7 +5,7 @@ How to use this document: work top to bottom. Only `[ ]` rows are candidates; `[
 [`roadmap-history.md`](./roadmap-history.md), so a `deps:` entry naming no current row means
 _already shipped_, not an error. Resolve any such reference there.
 
-**Phases 1 through 11 are complete and archived** to
+**Phases 1 through 12 are complete and archived** to
 [`roadmap-history.md`](./roadmap-history.md) — resolve any `deps:` naming a row you cannot find here
 against that file. The rows under "Deferred / human-gated" remain invisible to selection.
 
@@ -20,7 +20,7 @@ finished work. Rules:
 §"Registry fallback frontier".
 
 Add a phase only to express *sequencing* the registries cannot: a deliberate order, a dependency
-chain, a human gate. **Phase 12 is open** (opened 2026-10-20); Phase 11 closed 2026-10-16.
+chain, a human gate. **No phase is open** (Phase 12 closed 2026-10-20) — selection falls through to the registries.
 
 > ⚠️ **A phase costs upkeep that a registry row does not, and the cost is not obvious.** Roadmap rows
 > are matched on the **checkbox alone** — they do **not** consult the target document's frontmatter.
@@ -69,14 +69,6 @@ Read only by `--batch`. Two rows conflict when they share a tag that **either** 
 
 ---
 
-## PHASE 12 — consumer-neutral library (opened 2026-10-20)
-
-The library names one consumer in what it ships: provenance notes, example Jira keys and hosts, and a format profile in the wireframe skill. This phase removes them and adds a guard so they cannot return.
-
-- [x] **T220** No consumer names in shipped skills · deps: none · touches: bundles!, jira-sync~, pipeline-steps~, finalise~, test-harness~, review-skills~ · /develop-task docs/tasks/task.220.no-consumer-names-in-shipped-skills/task.220.no-consumer-names-in-shipped-skills.md
-
----
-
 ## Deferred / human-gated
 
 Rows here are invisible to selection. Move a row up into a phase when it becomes actionable.
@@ -88,7 +80,7 @@ Rows here are invisible to selection. Move a row up into a phase when it becomes
 
 ## Housekeeping
 
-- [x] Archive accepted rows to `roadmap-history.md` at each phase close — Phase 5 archived 2026-09-12; Phases 6, 7 and 8 archived 2026-10-06; Phases 9 and 10 archived 2026-10-11; Phase 11 archived 2026-10-16
+- [x] Archive accepted rows to `roadmap-history.md` at each phase close — Phase 5 archived 2026-09-12; Phases 6, 7 and 8 archived 2026-10-06; Phases 9 and 10 archived 2026-10-11; Phase 11 archived 2026-10-16; Phase 12 archived 2026-10-20
 - [ ] If a phase is ever re-opened: tick its rows `[x]` as each item is accepted — an unticked row for an accepted item is still selected and stalls the loop
 
 **Registry-selected items need no row here.** When selection falls through to the registries (the
@@ -201,3 +193,4 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-10-16 | **T212 accepted + merged — PR #680 merged** (`879ac337`). `/qa-next` note findings can now be closed: `uat-status.mjs` reads a `— resolved YYYY-MM-DD by \`<evidence>\`` marker in a Findings row's Filed as cell and counts the row closed only while the evidence verifies (`git cat-file -e <sha>^{commit}`, or a later run file by name order), names every refusal (`commit-not-found`, `run-is-self`, `run-not-later`, `run-not-found`, `bad-evidence`, `bad-date`, `on-a-bug-link`, `not-a-git-repo`), and gains the `--resolve-finding` writer (one cell, idempotent, read-back, byte-identical refusals) and `--changed-runs` for SKILL.md Step 5 staging. QA ran 4 cycles: CONCERNS 70 (unrepairable stale marker, index-order "later", duplicate numbers), CONCERNS 80 (resume staging from memory, no read-back, unreal dates), FAIL 80 (Step 5 hardcoded `docs/qa`), then PASS 100. 5c APPROVE. DoD run 1 accepted 12/12; /finalise ran the security probe itself in a git fixture (27 executed, 0 reproduced). Merge gate `npm run ci` green. Issue #679 closed. **T207 is next.** |
 | 2026-10-16 | **T207 accepted + merged — PR #682 merged** (`cb57127e`). Hierarchical document numbering is enforced: `evals/shared/tests/doc-numbering-corpus.test.mjs` fails on any unnumbered, mismatched, unregistered or duplicate document under the PRD root, and `tests/doc-id-chokepoint.test.js` fails on an id regex, a string-built id regex or a positional `awk -F.` split outside `doc-id.js`, with §5 guarding every tracked Markdown/YAML file against the flat scheme (placeholders, titles, two-level ids, flat layouts, tree diagrams, literal ids). review-epic's step-0a `awk` split, `sync-jira-story`'s related-doc links and the story-issue backfill moved onto `doc-id.js`; ~70 files swept. QA ran 8 cycles: each early gate found another spelling of the old scheme because the sweep population was enumerated by remembered spellings (obs #60); the loop escalated at its budget with HIGH 0, the owner granted cycles 6–8, cycle 6 listed the population first, and gate 8 read PASS 90 (Cosmetic-residue exit). 5c APPROVE. DoD run 1 accepted after a Step 8a fix: `relatedDocInfo` accepted `../`, newline, NUL and `$(…)` names (12 probes, 4 reproduced → 0). Merge gate `npm run ci` green. Issue #650 closed. **Phase 11 closed and archived** to `roadmap-history.md`; selection now falls through to the registries. |
 | 2026-10-20 | **T220 accepted + merged — PR #710 merged** (`20a95cd4`). The library no longer names one consumer in anything it ships: provenance notes, example Jira keys and hosts, and fixture values under `skills/` and `shared/` are neutral (`PROJ-702`, `acme.atlassian.net`), ten fixtures were renamed (R100), and the wireframe skill ships no format profile (BREAKING, with a migration note in CHANGELOG). `tests/no-consumer-names.test.js` scans paths and contents over the whole shipped tree with a 500-file floor; it was red before the edits (346 hits in 146 files, 11 paths, recorded masked) and green after. Per-file test counts unchanged except wireframe −2. QA ran 1 cycle: PASS 100. 5c APPROVE. DoD run 1 accepted 9/9 after the 2 s bound was re-measured on the PR head (1.0–1.8 s at load ~11). CI 5/5 on the merged head. Issue #709 closed. |
+| 2026-10-20 | **Phase 12 closed and archived** to `roadmap-history.md` (T220 was its only row). No phase is open; selection falls through to the registries. |
