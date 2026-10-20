@@ -19,7 +19,7 @@ created: 2026-05-12
 
 Universal:
 
-- Node ≥ 20 (`node --version`)
+- Node ≥ 22 (`node --version`)
 - `git` (`git --version`)
 - Skills installed in your project. First-time setup runs the full wizard (skills + config + hooks + registries + docs scaffold):
   ```bash
@@ -51,7 +51,7 @@ Pick the check that matches your platform:
 gh auth status
 
 # Bitbucket VCS
-source shared/resources/bitbucket-auth.sh && echo "bitbucket auth ok ($BB_AUTH_SCHEME)"
+source .agents/skills/create-pr/references/bitbucket-auth.sh && echo "bitbucket auth ok ($BB_AUTH_SCHEME)"
 
 # Jira tracker (run in addition to VCS check above)
 [ -n "$JIRA_URL" ] && [ -n "$JIRA_API_TOKEN" ] && echo "jira auth ok"
@@ -196,7 +196,7 @@ If a practice GitHub milestone or Jira sprint/version was created: delete it onc
 | Symptom                                 | Likely cause                                  | Fix                                                                                       |
 | --------------------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | `gh auth status` not logged in          | `gh` not configured                           | Run `gh auth login`                                                                       |
-| Bitbucket calls return empty / 404      | `BITBUCKET_API_TOKEN` missing, expired, or created without Bitbucket scopes | Regenerate the Atlassian API token **with Bitbucket scopes ticked**; probe with `source shared/resources/bitbucket-auth.sh && curl -s -o /dev/null -w '%{http_code}' "${BB_CURL_AUTH[@]}" https://api.bitbucket.org/2.0/user` (expect 200) |
+| Bitbucket calls return empty / 404      | `BITBUCKET_API_TOKEN` missing, expired, or created without Bitbucket scopes | Regenerate the Atlassian API token **with Bitbucket scopes ticked**; probe with `source .agents/skills/create-pr/references/bitbucket-auth.sh && curl -s -o /dev/null -w '%{http_code}' "${BB_CURL_AUTH[@]}" https://api.bitbucket.org/2.0/user` (expect 200) |
 | Jira issue creation fails               | Wrong `JIRA_URL` or token                     | Verify `curl -u $JIRA_USER_EMAIL:$JIRA_API_TOKEN $JIRA_URL/rest/api/3/myself` returns 200 |
 | Skill picked wrong platform             | Auto-detect mis-fired                         | Set explicit `tracker:` / `vcs:` in `skills-config.yaml`                                  |
 | Phase 0 prompts differ from table above | Skill version drift                           | Check `.agents/skills/develop-story/` version                                             |

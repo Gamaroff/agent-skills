@@ -15,7 +15,7 @@ created: 2026-05-13
 
 ## Prerequisites
 
-- Node ≥ 20 (`node --version`)
+- Node ≥ 22 (`node --version`) — this repo's `package.json` requires it
 - A working agent CLI (e.g. Claude Code with skills installed). First-time setup: `bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh)`
 - A clone of this repo with a clean working tree on `develop`
 - Tracker access decided — this walkthrough assumes `access: full` (the default). If the agent must not hold a tracker write token, read [Restricted tracker access](../../concepts/restricted-access.md) first: the pipeline still completes, but each task ends with a committed handover checklist instead of board moves
@@ -78,7 +78,7 @@ This task is simple and will fly through QA with zero findings. The goal is to r
 - [ ] Pipeline completes after qa-fix; PR merged
 - [ ] Artifact set #3 confirmed in `docs/tasks/task.{N3}.readme-status-badge/`
 
-> 📖 If you need a reference for the qa-fix loop, see [`docs/runbooks/task-development.md`](../task-development.md) §"Phase B — QA loop".
+> 📖 If you need a reference for the qa-fix loop, see [`task-development.md` § Phase B — Implementation](../task-development.md#phase-b--implementation-develop-task) (the Steps 5–6 row).
 
 ---
 

@@ -8,7 +8,7 @@ From "I cloned the repo" to "I ran my first command" in under ten minutes.
 
 Before starting, confirm you have:
 
-- **Node ≥ 20** — `node --version`
+- **Node ≥ 22** — `node --version`
 - **git** — `git --version`
 - **jq** — `jq --version` (required by hook installer and Bitbucket scripts — `brew install jq` / `apt install jq`)
 - **curl** — `curl --version` (required by Bitbucket scripts — pre-installed on most systems)
@@ -121,7 +121,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/s
 
 ### What the wizard does
 
-The full wizard runs all 10 steps. The `--update` flag runs only steps 1 and 8 — all others are skipped, so the consumer's config, registries, docs scaffold, and hooks are left untouched.
+The full wizard runs every step below. The `--update` flag runs only steps 1 and 8 — all others are skipped, so the consumer's config, registries, docs scaffold, and hooks are left untouched.
 
 | Step | Action                                                                                                                             | Skippable?                                           |
 | ---- | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
@@ -129,13 +129,14 @@ The full wizard runs all 10 steps. The `--update` flag runs only steps 1 and 8 �
 | 2    | Prompts for platform: GitHub+Issues / GitHub+Jira / Bitbucket+Jira, then **tracker access** (`full` / `read-only` / `approve` / `command` / `manual`) | No                                                   |
 | 2b   | Prompts for the **skill install profile** (`full` / `pipeline` / `minimal`) plus optional per-skill add-ons (see below). Appears in the wizard summary as `Skill profile` | Yes (Enter accepts `full`, today's behaviour)        |
 | 3    | Checks `gh` auth (GitHub), collects Bitbucket/Jira credentials with hidden input                                                   | —                                                    |
-| 4    | Writes `.env.example` (keys only); optionally writes `.env` + adds to `.gitignore`                                                 | Yes                                                  |
+| 4    | Bitbucket or Jira only (nothing on GitHub + GitHub Issues): writes `.env.example` (keys only); optionally writes `.secrets/tooling.env` and adds `.secrets/` and `.env` to `.gitignore` | Yes                                                  |
 | 5    | Scaffolds `skills-config.yaml` — prompts PRD path, story layout, coding-standards path                                             | Yes (skips if file exists and you decline overwrite) |
 | 6    | Creates `docs/tasks/task-registry.md` if absent (epics are numbered within their PRD; `create-prd` bootstraps the PRD registry)    | Idempotent                                           |
 | 7    | Scaffolds `docs/prd/`, `docs/architecture/concepts/` (3 required stubs), `docs/tasks/`                                             | Idempotent                                           |
 | 8    | Downloads the latest release from GitHub and extracts skills into `.agents/skills/`, applying **your install profile** (see below) and **skipping the tracker-specific skills your platform can never fire** (see below)                                                | Yes                                                  |
+| 8a   | Writes `tracker-workflow.yaml` if absent — generated from your live board when the tracker CLI can read it, otherwise a generic template the wizard warns you to edit before the first pipeline run. An existing file is kept | Idempotent (keeps an existing file) |
 | 8b   | Shows a checkbox list of agents and makes the local links each one needs to `AGENTS.md` and `.agents/skills/`, gitignored. See [1a](#1a-link-your-agent-to-agentsmd-and-agentsskills) | Yes (tick nothing, or no terminal) |
-| 9    | Patches `.claude/settings.json` directly with the three pipeline hooks (inline jq — no dependency on skills being installed first) | Yes                                                  |
+| 9    | Patches `.claude/settings.json` directly with the two pipeline hooks, `PreCompact` and `Stop` (inline jq — no dependency on skills being installed first) | Yes                                                  |
 
 #### Skill profiles — choosing how much of the library to install
 
@@ -252,6 +253,7 @@ to "sync this story to the tracker".
 .env.example                          # credential keys, no values
 .secrets/tooling.env                  # live credentials (if confirmed)
 skills-config.yaml                    # project configuration
+tracker-workflow.yaml                 # board status ladder — from your board, or a template to edit
 docs/tasks/task-registry.md           # empty — populated by /create-task
 .agents/skills/                       # installed skills
 .claude/settings.json                 # updated with pipeline hooks
@@ -349,7 +351,7 @@ delete it, and re-run `--links-only`.
 
 ### 1b. Install pipeline hooks (one-time per project)
 
-The `develop-task` and `develop-story` pipelines run hands-free when three Claude Code hooks are registered in `.claude/settings.json`. Without the `Stop` hook the orchestrator relies on prose-level rules that fail under context pressure — **strongly recommended**.
+The `develop-task` and `develop-story` pipelines run hands-free when two Claude Code hooks are registered in `.claude/settings.json`. Without the `Stop` hook the orchestrator relies on prose-level rules that fail under context pressure — **strongly recommended**.
 
 ```bash
 bash .agents/skills/develop-task/scripts/install-hooks.sh

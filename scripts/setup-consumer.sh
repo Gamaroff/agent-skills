@@ -7,12 +7,14 @@
 #   1. Prerequisite checks        (node, git, jq, curl)
 #   2. Platform selection         (GitHub+Issues / GitHub+Jira / Bitbucket+Jira)
 #   3. Credential collection      (gh auth check, Bitbucket/Jira API tokens)
-#   4. .env files                 (.env.example always; .env optionally; gitignore)
+#   4. Credentials file           (Bitbucket/Jira only: .env.example; .secrets/tooling.env
+#                                  optionally; .secrets/ and .env gitignored)
 #   5. skills-config.yaml         (PRD path, architecture path, coding-standards path)
 #   6. Registry creation          (docs/tasks/task-registry.md — epics are numbered within their PRD)
 #   7. docs/ scaffold             (PRD root, architecture/concepts/ stubs)
 #   8. Skills install             (latest release from github.com/Gamaroff/agent-skills;
 #                                  skips the other tracker's skills — see --all-skills)
+#   8a. tracker-workflow.yaml     (board ladder + pipeline moments; never overwritten)
 #   8b. Agent links               (local, gitignored links for the agents you pick)
 #   9. Pipeline hook install      (.claude/settings.json via inline jq)
 #
@@ -355,7 +357,7 @@ select_access() {
   echo ""
   echo "  1) Full — the agent has write credentials and updates the tracker itself (default)"
   echo "  2) Read-only — the agent may read the tracker but not write to it"
-  echo "  3) Approve — credentials present; writes are still handed over today (ask prompt is not shipped)"
+  echo "  3) Approve — credentials present; writes are deferred, then one batched confirmation at handover"
   echo "  4) Command — the agent prints the commands; you run them"
   echo "  5) Manual — the agent prints instructions; you click through them"
   echo ""
@@ -2226,9 +2228,14 @@ print_summary() {
     if [[ "${ACCESS_TRACKER:-full}" != "full" ]]; then
       echo ""
       echo -e "${BOLD}Tracker access is ${ACCESS_TRACKER}:${NC}"
-      echo "  Pipeline runs still complete. Tracker writes are recorded, not performed."
-      echo "  After a run, work the committed *.handover.*.md checklist (or *.sh under command)."
-      echo "  /tracker-reconcile is not shipped yet (task.57) — re-check the board by hand."
+      echo "  Pipeline runs still complete. During a run, tracker writes are recorded, not performed."
+      if [[ "$ACCESS_TRACKER" == "approve" ]]; then
+        echo "  At handover you confirm them once, as a batch, and they run. With no tty, or in"
+        echo "  an autonomous run, there is no prompt: work the committed *.sh as under command."
+      else
+        echo "  After a run, work the committed *.handover.*.md checklist (or *.sh under command)."
+      fi
+      echo "  Later, /tracker-reconcile re-reads the board and ticks that checklist."
       echo "  Limits: enforcement is partial; /develop-next still needs VCS write."
       echo "  Guide: docs/concepts/restricted-access.md"
     fi

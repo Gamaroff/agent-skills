@@ -19,7 +19,7 @@ created: 2026-05-12
 
 Universal:
 
-- Node ≥ 20 (`node --version`)
+- Node ≥ 22 (`node --version`)
 - `git` (`git --version`)
 - Skills installed in your project. First-time setup runs the full wizard (skills + config + hooks + registries + docs scaffold):
   ```bash
@@ -50,13 +50,13 @@ git --version
 
 # VCS auth — pick your platform:
 gh auth status                                                              # GitHub
-source shared/resources/bitbucket-auth.sh && echo "ok ($BB_AUTH_SCHEME)"  # Bitbucket
+source .agents/skills/create-pr/references/bitbucket-auth.sh && echo "ok ($BB_AUTH_SCHEME)"  # Bitbucket
 
 # Jira (only if tracker is Jira):
 [ -n "$JIRA_URL" ] && [ -n "$JIRA_API_TOKEN" ] && echo ok
 ```
 
-Expected: Node ≥ 20, git present, VCS auth confirmed, Jira auth confirmed if applicable.
+Expected: Node ≥ 22, git present, VCS auth confirmed, Jira auth confirmed if applicable.
 
 ---
 

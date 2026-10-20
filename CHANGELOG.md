@@ -6,6 +6,21 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The setup, configuration and process docs match the scripts (task 199).** 20 findings from the
+  2026-10-07 doc-drift audit are fixed or closed across 16 docs: getting-started, both quickstarts,
+  which-access, which-path, configuration, faq, glossary, six runbooks, and the architecture-example
+  and standards READMEs. One finding was closed as superseded by the PRD-numbering work.
+  - **Install wizard.** The docs follow the wizard as it runs today: the tracker-workflow and access
+    steps, `.secrets/tooling.env` for Bitbucket or Jira credentials, and two hooks.
+  - **Configuration.** All eight pipeline moments are listed, and VCS resolution no longer shows an
+    env-var step it does not have.
+  - **Release.** The runbook covers `release.sh`'s CI-verdict check and how to recover when the
+    Sync develop step stops.
+  - **Bugs.** A general bug's status writes are mirrored into the bug registry, and all four Jira
+    sync skills are named.
+  - **Wizard text.** In `setup-consumer.sh`, the Approve option and the end-of-run summary now say
+    that approve defers tracker writes to one batched confirmation at handover.
+
 - **The skill reference and discovery docs list what ships (task 198).** 27 findings from the
   2026-10-07 doc-drift audit are fixed across 16 docs: commands, activation phrases and invocation,
   the concepts architecture and overview, the operations workflows, five runbooks, the README, and
