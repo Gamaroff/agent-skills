@@ -155,7 +155,10 @@ REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
 # finalise pinning a durable branch) verbatim; else the current branch's upstream only when it
 # names this story, else the repo's default branch, then `develop`.
 STORY_RELATIVE_PATH="{path of the story file, relative to the repo root}"
-DOC_BRANCH=$(command node .agents/skills/sync-github-story/references/doc-link-branch.js --doc "${STORY_RELATIVE_PATH}" --explicit "${DOC_BRANCH:-}")
+# The caller's pin is a skill input, not a shell variable: bind it here, empty when none was passed
+# (task.200 QA cycle 2, TASK-200-006).
+DOC_BRANCH_PIN="{the DOC_BRANCH input, or empty when the caller passed none}"
+DOC_BRANCH=$(command node .agents/skills/sync-github-story/references/doc-link-branch.js --doc "${STORY_RELATIVE_PATH}" --explicit "${DOC_BRANCH_PIN}")
 : "${DOC_BRANCH:?doc-link-branch.js resolved no branch — check the --doc path and that the bundled resolver is present}"
 DOC_URL="https://github.com/$REPO/blob/${DOC_BRANCH}/${STORY_RELATIVE_PATH}"
 

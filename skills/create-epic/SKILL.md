@@ -155,6 +155,9 @@ Then build `PRD_URL` — a full web URL for the body link that works in any mark
 
 ```bash
 source .agents/skills/create-epic/references/resolve-platform.sh || exit 1   # sets VCS=github|bitbucket
+# The parent PRD, as the parent-PRD block above resolved it. That block is another shell, so the path
+# is bound here too (task.200 QA cycle 2, TASK-200-005).
+PRD_SOURCE_PATH="{PRD_SOURCE_PATH from the parent-PRD block}"
 
 # The link branch (doc-link-branch.js, task.200): the current branch's upstream only when it
 # names the PRD's work item, else the repo's default branch. The checked-out branch is never

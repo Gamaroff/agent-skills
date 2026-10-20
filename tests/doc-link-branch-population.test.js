@@ -140,23 +140,25 @@ const LINK_ALLOW = [
   ],
 ];
 
-// The links in `text` whose branch variable no doc-link-branch.js line assigns.
+// The links in `text` whose branch variable is not resolved: no line assigns it, or some line
+// assigns it without calling doc-link-branch.js. One resolver assignment does not vouch for the
+// others — a later `V=$(git branch --show-current)` before the link passed when it did (task.200 QA
+// cycle 2, TASK-200-008).
 function unresolvedLinks(file, text) {
   if (file === RESOLVER) return [];
   const lines = text.split("\n");
-  const resolved = new Set(
-    lines
-      .filter((l) => l.includes("doc-link-branch.js"))
-      .map((l) => (l.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)=/) || [])[1])
-      .filter(Boolean),
-  );
+  const assigns = (v) =>
+    lines.filter((l) => new RegExp(`(?:^|[\\s;&|(])${v}=(?!=)`).test(l));
+  const resolved = (v) => {
+    const a = assigns(v);
+    return a.length > 0 && a.every((l) => l.includes("doc-link-branch.js"));
+  };
   return lines.flatMap((line, i) =>
     [...line.matchAll(LINK_RE)]
       .map((m) => m[1])
       .filter(
         (v) =>
-          !resolved.has(v) &&
-          !LINK_ALLOW.some(([f, a]) => f === file && a === v),
+          !resolved(v) && !LINK_ALLOW.some(([f, a]) => f === file && a === v),
       )
       .map((v) => `${file}:${i + 1}: ${v} in ${line.trim()}`),
   );
@@ -180,6 +182,17 @@ test("the link scan catches a branch taken from HEAD, under any spelling", () =>
     'PRD_URL="https://github.com/${REPO}/blob/${BRANCH}/${P}"',
   ].join("\n");
   assert.equal(unresolvedLinks("skills/x/SKILL.md", fixed).length, 0);
+  // The resolver's answer, overwritten from the checked-out branch before the link.
+  const reassigned = [
+    'BRANCH=$(command node .agents/skills/x/references/doc-link-branch.js --doc "${P}")',
+    "BRANCH=$(git branch --show-current)",
+    'PRD_URL="https://github.com/${REPO}/blob/${BRANCH}/${P}"',
+  ].join("\n");
+  assert.equal(
+    unresolvedLinks("skills/x/SKILL.md", reassigned).length,
+    1,
+    "a reassignment that bypasses the resolver is caught",
+  );
 });
 
 test("every document link takes its branch from doc-link-branch.js", () => {

@@ -277,7 +277,9 @@ None to any CLI or file format. Behaviour changes a consumer can observe:
 10. ➕ `shared/resources/tests/doc-link-branch.test.mjs`
 11. ➕ `tests/doc-link-branch-population.test.js` — the population test for upstream link derivation,
     and for a `blob/${…}` / `src/${…}` link whose branch no resolver call assigns
-11a. ➕ `tests/doc-link-branch-sites-execute.test.js` — runs each site's lines under bash (QA cycle 1)
+11a. ➕ `tests/doc-link-branch-sites-execute.test.js` — runs each site's lines under bash (QA cycle 1);
+    fails a call that reads a variable its block never binds, and runs a set pin (QA cycle 2)
+11b. ✅ `skills/review-story/SKILL.md` — the empty-pin fallback names the resolver's rule (QA cycle 2)
 12. ✅ `skills/sync-jira-task/tests/sync-jira-task.test.js` — the pinned `resolveDocBranch` tests stay green
     unchanged and gain a `docPath` case. (The `sync-jira-epic` and `sync-jira-story` suites pin only
     `stripRemotePrefix`, which stays green through the re-export; they have no `resolveDocBranch` tests.)
@@ -446,6 +448,18 @@ None to any CLI or file format. Behaviour changes a consumer can observe:
   Bitbucket passes its origin HEAD as `--default`). The population test gained a link scan that
   flags both of the old block's links, and the execute test runs both VCS arms.
 
+**QA fix cycle 2**
+
+- TASK-200-005 (HIGH): create-epic's PRD-link block binds `PRD_SOURCE_PATH` itself, and the
+  execute test asserts the block's binding instead of supplying one. Deleting it turns the test red.
+- TASK-200-006: sync-github-story binds the caller's pin as `DOC_BRANCH_PIN` and passes that to
+  `--explicit`. The execute test fails any call that reads a variable its block never binds, and
+  runs each pinned site with a pin set.
+- TASK-200-007: a bug's branch names that bug alone. `segmentNamesItem` rejects a `.bug.<n>`
+  remainder for another bug, with six new rows in the resolver's table.
+- TASK-200-008: the link scan requires every assignment of a link variable to call the resolver,
+  so QA cycle 2's reassignment mutation now turns it red.
+
 **Deferred Work**
 
 - The integration-branch lookup reads the default frontmatter key `integration_branch` only, not a
@@ -463,18 +477,17 @@ None to any CLI or file format. Behaviour changes a consumer can observe:
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.200.qa.1.tracker-side-effects-after-their-gate.md](./task.200.qa.1.tracker-side-effects-after-their-gate.md)
-- **Gate File**: [task.200.gate.1.tracker-side-effects-after-their-gate.yml](./task.200.gate.1.tracker-side-effects-after-their-gate.yml)
+- **Full Report**: [task.200.qa.2.tracker-side-effects-after-their-gate.md](./task.200.qa.2.tracker-side-effects-after-their-gate.md)
+- **Gate File**: [task.200.gate.2.tracker-side-effects-after-their-gate.yml](./task.200.gate.2.tracker-side-effects-after-their-gate.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 6054
-- **Phases Verified**: 5/5 (3 pass)
+- **Tests Executed**: 6060
+- **Phases Verified**: 5/5 implemented, 2 pass
 - **Critical Issues**: 1
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: CONCERNS
 
 ### Key Findings
-- HIGH: bash cannot parse the resolver guard line in all eight GitHub sites, and no test executes them (TASK-200-001).
-- MEDIUM: three sync sites read an unbound relative path (TASK-200-002); a Step 2 halt can still post Jira `blocked` (TASK-200-003); create-epic still links the checked-out branch (TASK-200-004).
+Cycle 1 fixed TASK-200-001 to 003; TASK-200-004 is partial. The cycle-2 refute pass found one HIGH: create-epic's PRD-link block reads an unbound path (TASK-200-005). It also found three MEDIUMs: the sync-github-story pin is dropped (006), a sibling bug's branch names the wrong work item (007), and the link scan misses a reassignment (008).
 
 <!-- change-log-start -->
 ## Change Log
@@ -487,6 +500,8 @@ None to any CLI or file format. Behaviour changes a consumer can observe:
 | 2026-10-20 |  | Implemented — resolver + CLI, 8 GitHub sites and jira-sync migrated, develop-bug Step 2b, create-bug-report grep rule; 25 files authored, 3 new test files (+ cases in 3 suites); status → ready-for-review | develop |
 | 2026-10-20 |  | QA gate FAIL (50/100) — 4 findings (1 high, 3 medium); status → in-progress | qa-task |
 | 2026-10-20 |  | QA findings fixed — 4 of 4 (cycle 1), 1 iteration; status → ready-for-review | qa-fix |
+| 2026-10-20 |  | QA gate FAIL (50/100) — cycle 2, 4 new findings (1 high, 3 medium); status → in-progress | qa-task |
+| 2026-10-20 |  | QA findings fixed — 4 of 4 (cycle 2), 1 iteration; status → ready-for-review | qa-fix |
 <!-- change-log-end -->
 
 ---

@@ -72,12 +72,25 @@ function segmentNames(segment, id) {
   );
 }
 
+// True when `segment` names `id` and is not a bug of it other than `self`. A bug branch's segment
+// is `{parent}.bug.{N}.{slug}`, which starts with `{parent}.` — so without this, the branch of bug 4
+// named its parent's own document and every sibling bug (task.200 QA cycle 2, TASK-200-007).
+function segmentNamesItem(segment, id, self) {
+  if (!segmentNames(segment, id)) return false;
+  const bug = segment.slice(id.length).match(/^\.bug\.(\d+)(?=$|[.-])/);
+  return !bug || `${id}.bug.${bug[1]}` === self;
+}
+
 function branchNamesWorkItem(branch, docPath, { integrationBranch = "" } = {}) {
   const item = workItemOf(docPath);
   const b = String(branch || "").trim();
   if (!item || !b) return false;
   const segment = b.slice(b.lastIndexOf("/") + 1);
-  if ([item.id, item.parent].some((id) => id && segmentNames(segment, id))) {
+  if (
+    [item.id, item.parent].some(
+      (id) => id && segmentNamesItem(segment, id, item.id),
+    )
+  ) {
     return true;
   }
   if (item.isBug && b.startsWith("hotfix/v")) return true;

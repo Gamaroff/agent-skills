@@ -27,9 +27,11 @@ All notable changes to this project will be documented in this file. Format foll
   and `sync-github-*` skills and `create-epic`'s PRD link call it, and `jira-sync.js`
   `resolveDocBranch` delegates to it. `tests/doc-link-branch-population.test.js` fails CI on a new
   upstream (`@{u}` / `@{upstream}`) read anywhere in the skill sources outside the resolver, and on
-  a `blob/${…}` or `src/${…}` link whose branch no resolver call assigns.
+  a `blob/${…}` or `src/${…}` link whose branch is assigned anywhere without a resolver call.
   `tests/doc-link-branch-sites-execute.test.js` runs each site's lines under bash, because a scan
-  of the text passed while a quote in the guard stopped all eight from parsing.
+  of the text passed while a quote in the guard stopped all eight from parsing. It also fails a call
+  that reads a variable its own block never binds, which is how `sync-github-story` dropped the
+  caller's durable-branch pin.
 
 ### Changed
 
@@ -45,7 +47,8 @@ All notable changes to this project will be documented in this file. Format foll
 - **A card created on an unrelated branch links to the default branch (task 200).** Before, a
   card created while HEAD was another work item's feature branch linked to that branch and 404'd
   once it was deleted (obs #287). The document's own branch, its parent's (a QA bug), its epic's
-  integration branch (a story) and a hotfix branch (a bug) still count.
+  integration branch (a story) and a hotfix branch (a bug) still count. A bug's branch names that
+  bug alone, not its parent's own card or a sibling bug.
 - **`create-bug-report`: an affected-site grep must match the defective line (task 200),** not a
   fallback or comment that correct files also carry, and the report records the command.
 

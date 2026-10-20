@@ -94,6 +94,14 @@ const TABLE = [
   ["feature/task.200.x", "task.20.x.md", false],
   ["feature/task.20.x", "task.200.x.md", false],
   ["bugfix/bug.170.x", "bug.17.x.md", false],
+  // a bug branch names that bug alone: not its parent's own document, not a sibling bug
+  // (task.200 QA cycle 2, TASK-200-007) — and a sibling whose number extends this one's
+  ["bugfix/task.67.bug.4.x", "task.67.bug.3.x.md", false],
+  ["bugfix/task.67.bug.4.x", "task.67.some-task.md", false],
+  ["bugfix/story.1.8.2.bug.1.x", "story.1.8.2.bug.2.x.md", false],
+  ["bugfix/story.1.8.2.bug.1.x", "story.1.8.2.configure-pipe.md", false],
+  ["bugfix/task.67.bug.30.x", "task.67.bug.3.x.md", false],
+  ["bugfix/task.67.bug.3", "task.67.bug.3.x.md", true],
   ["feature/story.1.8.20.x", "story.1.8.2.x.md", false],
   // nothing to compare
   ["", "task.200.x.md", false],

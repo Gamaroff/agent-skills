@@ -12,6 +12,11 @@
  * and the guard out of the same fenced block, runs them in a scratch repository with `gh` stubbed,
  * and expects the branch on stdout.
  *
+ * Every variable the call reads must be bound in its own block (task.200 QA cycle 2): an unbound
+ * read is empty in a fresh shell, and an empty optional input fails silently. sync-github-story
+ * read its caller's pin that way and always dropped it (TASK-200-006), and create-epic read its PRD
+ * path that way while this test supplied the binding itself (TASK-200-005).
+ *
  * Population, derived not listed: every `skills/*\/SKILL.md` that calls `doc-link-branch.js --doc`.
  */
 
@@ -44,7 +49,14 @@ function sh(cmd, args, opts = {}) {
   return r.stdout;
 }
 
-// The site's lines, from its fenced block: the binding of the path the call reads, the call, the
+// The variables a line reads: every `${NAME…}` in it.
+function reads(line) {
+  return [...line.matchAll(/\$\{([A-Za-z_][A-Za-z0-9_]*)[^}]*\}/g)].map(
+    (m) => m[1],
+  );
+}
+
+// The site's lines, from its fenced block: a binding of each variable the call reads, the call, the
 // guard. A binding outside the block is prose, and a shell running the block never sees it.
 function siteLines(text) {
   const lines = text.split("\n");
@@ -53,20 +65,33 @@ function siteLines(text) {
   const [, skill, pathVar] = lines[at].match(CALL_RE);
   let open = at;
   while (open > 0 && !/^\s*```/.test(lines[open - 1])) open--;
-  const bind = lines
-    .slice(open, at)
-    .filter((l) => l.startsWith(`${pathVar}=`))
-    .pop();
+  const before = lines.slice(open, at);
+  const binds = Object.fromEntries(
+    [...new Set(reads(lines[at]))].map((v) => [
+      v,
+      before.filter((l) => l.startsWith(`${v}=`)).pop() || null,
+    ]),
+  );
   const guard = lines[at + 1];
-  return { skill, pathVar, bind, call: lines[at], guard };
+  return { skill, pathVar, binds, call: lines[at], guard };
 }
 
-// Runs a site's lines in `repo`, with the binding's value replaced by a document of its kind.
-function runSite(repo, env, site) {
-  const doc = DOCS[site.pathVar];
-  const bind = site.bind ? `${site.pathVar}=${JSON.stringify(doc)}` : "";
+// The variables the call reads that its block never binds.
+function unboundReads(site) {
+  return Object.keys(site.binds).filter((v) => !site.binds[v]);
+}
+
+// Runs a site's lines in `repo`. Each bound variable takes a test value: the path a document of its
+// kind, any other input `values[v]`, else empty — an optional input the caller left unset.
+function runSite(repo, env, site, values = {}) {
+  const binds = Object.keys(site.binds)
+    .filter((v) => site.binds[v])
+    .map((v) => {
+      const value = v === site.pathVar ? DOCS[v] : values[v] || "";
+      return `${v}=${JSON.stringify(value)}`;
+    });
   const script = [
-    bind,
+    ...binds,
     site.call,
     site.guard,
     'printf "%s" "$DOC_BRANCH"',
@@ -117,7 +142,7 @@ test("control: the runner fails a guard with an apostrophe and a path left unbou
   const site = {
     skill: "sync-github-task",
     pathVar: "TASK_RELATIVE_PATH",
-    bind: 'TASK_RELATIVE_PATH="{path}"',
+    binds: { TASK_RELATIVE_PATH: 'TASK_RELATIVE_PATH="{path}"' },
     call: 'DOC_BRANCH=$(command node .agents/skills/sync-github-task/references/doc-link-branch.js --doc "${TASK_RELATIVE_PATH}")',
     guard:
       ': "${DOC_BRANCH:?doc-link-branch.js resolved no branch — check the --doc path and that the bundled resolver is present}"',
@@ -138,9 +163,24 @@ test("control: the runner fails a guard with an apostrophe and a path left unbou
       "an apostrophe in the guard word must fail to parse",
     );
 
-    const unbound = runSite(repo, env, { ...site, bind: undefined });
+    const unbound = runSite(repo, env, {
+      ...site,
+      binds: { TASK_RELATIVE_PATH: null },
+    });
     assert.notEqual(unbound.status, 0, "an unbound path must trip the guard");
     assert.match(unbound.stderr, /resolved no branch/);
+
+    // An unbound optional input runs clean and is wrong, so the block is read for it:
+    // sync-github-story's pre-fix pin.
+    const pin = siteLines(
+      [
+        "```bash",
+        'STORY_RELATIVE_PATH="{path}"',
+        'DOC_BRANCH=$(command node .agents/skills/x/references/doc-link-branch.js --doc "${STORY_RELATIVE_PATH}" --explicit "${DOC_BRANCH:-}")',
+        site.guard,
+      ].join("\n"),
+    );
+    assert.deepEqual(unboundReads(pin), ["DOC_BRANCH"]);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -156,9 +196,10 @@ test("every GitHub site's link-branch lines run under bash and print the branch"
   try {
     const failures = [];
     for (const { f, site } of found) {
-      if (!site.bind) {
+      const unbound = unboundReads(site);
+      if (unbound.length) {
         failures.push(
-          `${f}: no ${site.pathVar}= binding in the block before the call`,
+          `${f}: the call reads ${unbound.join(", ")}, which nothing in its block binds before it`,
         );
         continue;
       }
@@ -181,9 +222,32 @@ test("every GitHub site's link-branch lines run under bash and print the branch"
   }
 });
 
+// A site that takes a caller's pin passes it verbatim (TASK-200-006): review-story pins a story's
+// link to a durable branch so it survives the feature branch's deletion.
+test("a site's caller-passed pin reaches the resolver", () => {
+  const pinned = sites()
+    .map(({ f, site }) => {
+      const m = site.call.match(/--explicit "\$\{([A-Za-z_][A-Za-z0-9_]*)/);
+      return m && { f, site, pin: m[1] };
+    })
+    .filter(Boolean);
+  assert.ok(pinned.length >= 1, "sync-github-story takes a pin");
+  const { root, repo, env } = scratch(pinned.map(({ site }) => site.skill));
+  try {
+    for (const { f, site, pin } of pinned) {
+      const r = runSite(repo, env, site, { [pin]: "durable-pin" });
+      assert.equal(r.status, 0, `${f}: ${r.stderr}`);
+      assert.equal(r.stdout, "durable-pin", `${f}: the pin is used verbatim`);
+    }
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 // create-epic's PRD link has two arms: GitHub asks the resolver for gh's default, Bitbucket passes
 // its own (TASK-200-004). The scratch repository has no origin, so Bitbucket falls back to `main`,
-// and `gh` answers something else, which tells the arms apart.
+// and `gh` answers something else, which tells the arms apart. The PRD path is taken from the
+// block's own binding, never supplied by the test: supplying it hid an unbound read (TASK-200-005).
 test("create-epic's PRD link-branch lines run under bash on both VCS arms", () => {
   const text = fs.readFileSync(
     path.join(REPO, "skills/create-epic/SKILL.md"),
@@ -206,7 +270,20 @@ test("create-epic's PRD link-branch lines run under bash on both VCS arms", () =
     from > 0 && to < lines.length,
     "the VCS branch and its guard surround the call",
   );
-  const block = lines.slice(from, to + 1).join("\n");
+  let open = call;
+  while (open > 0 && !/^\s*```/.test(lines[open - 1])) open--;
+  const binding = lines
+    .slice(open, from)
+    .filter((l) => l.startsWith("PRD_SOURCE_PATH="));
+  assert.equal(
+    binding.length,
+    1,
+    "the block binds PRD_SOURCE_PATH before the call — the parent-PRD block that also binds it is another shell",
+  );
+  const block = [
+    'PRD_SOURCE_PATH="docs/prd/sample/prd.1.sample/prd.1.sample.md"',
+    ...lines.slice(from, to + 1),
+  ].join("\n");
   const { root, repo, env } = scratch(["create-epic"], "gh-default");
   try {
     for (const [vcs, want] of [
@@ -216,12 +293,7 @@ test("create-epic's PRD link-branch lines run under bash on both VCS arms", () =
       const file = path.join(repo, `create-epic-${vcs}.sh`);
       fs.writeFileSync(
         file,
-        [
-          `VCS=${vcs}`,
-          'PRD_SOURCE_PATH="docs/prd/sample/prd.1.sample/prd.1.sample.md"',
-          block,
-          'printf "%s" "$BRANCH"',
-        ].join("\n"),
+        [`VCS=${vcs}`, block, 'printf "%s" "$BRANCH"'].join("\n"),
       );
       const r = spawnSync("bash", [file], { cwd: repo, env, encoding: "utf8" });
       assert.equal(r.status, 0, `${vcs}: ${r.stderr}`);

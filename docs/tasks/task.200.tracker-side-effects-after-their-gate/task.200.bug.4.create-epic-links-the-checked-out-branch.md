@@ -67,6 +67,27 @@ to the nine `@{u}` sites.
 
 1. `command node --test tests/doc-link-branch-population.test.js tests/doc-link-branch-sites-execute.test.js`: all pass.
 
+### Iteration 2
+
+#### Re-Investigation (Reopened → In Progress)
+
+**Date**: 2026-10-20
+**Developer**: qa-fix (develop-task Step 5b, QA cycle 2)
+
+**QA Reopening Reason**: The PRD-link block reads an unbound path (BUG-5), and the link scan misses a reassignment (BUG-8).
+
+**Revised Approach**: Fix both in place rather than revise the migration: bind the path in the block (BUG-5), and require every assignment of a link variable to call the resolver (BUG-8).
+
+#### Fix Implementation (In Progress → Ready for QA)
+
+**Date**: 2026-10-20
+
+**Fix Description**: See BUG-5 and BUG-8. The create-epic execute test now takes the PRD path binding from the block.
+
+**Verification Steps for QA**:
+
+1. `command node --test tests/doc-link-branch-population.test.js tests/doc-link-branch-sites-execute.test.js`: all pass.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -74,3 +95,6 @@ to the nine `@{u}` sites.
 | 2026-10-20 | New | qa-task | Filed in QA cycle 1 |
 | 2026-10-20 | In Progress | qa-fix | Investigation started |
 | 2026-10-20 | Ready for QA | qa-fix | Fix implemented (cycle 1) |
+| 2026-10-20 | Reopened | qa-task | Not fixed: the PRD-link block reads an unbound path (BUG-5) and the link scan misses a reassignment (BUG-8) — task.200.qa.2.tracker-side-effects-after-their-gate.md |
+| 2026-10-20 | In Progress | qa-fix | QA cycle 2 fix (Iteration 2) |
+| 2026-10-20 | Ready for QA | qa-fix | QA cycle 2 fix (Iteration 2) |

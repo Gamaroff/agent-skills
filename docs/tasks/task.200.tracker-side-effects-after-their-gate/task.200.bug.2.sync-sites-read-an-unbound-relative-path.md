@@ -4,7 +4,7 @@
 **Bug ID**: TASK-200-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 1 diff code review, CR-1)
 **Date Found**: 2026-10-20
 
@@ -76,3 +76,4 @@ the block names, so an unbound read fails it.
 | 2026-10-20 | New | qa-task | Filed in QA cycle 1 |
 | 2026-10-20 | In Progress | qa-fix | Investigation started |
 | 2026-10-20 | Ready for QA | qa-fix | Fix implemented (cycle 1) |
+| 2026-10-20 | Closed | qa-task | Verified by task.200.qa.2.tracker-side-effects-after-their-gate.md |
