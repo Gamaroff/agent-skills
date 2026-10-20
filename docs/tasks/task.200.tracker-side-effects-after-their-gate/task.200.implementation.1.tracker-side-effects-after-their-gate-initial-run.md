@@ -36,8 +36,8 @@ Gate develop-bug's tracker writes behind review-bug's READY TO FIX, and replace 
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline from the plan; 1 develop iteration, 2 fast-gate runs (2 failures fixed); 7/7 mutations | —                    | 2026-10-20T18:28Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #711: https://github.com/Gamaroff/agent-skills/pull/711 | —                    | 2026-10-20T18:31Z |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.200.qa.{N}.*.md`; `task.200.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 3 cycles; gate 3 CONCERNS 90/100, nothing open; 5c APPROVE (`task.200.pr-review.1…`) | —                    | 2026-10-20T19:25Z |
-| 7. finalise                | 🛑 Halted  | `task.200.dod.{N}.*.md`; task `status: accepted`                       | DoD gaps: security probe, 4 low spec-sanctioned accepts (`task.200.dod.1…`); status left `ready-for-review` | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 7. finalise                | ✅ Done    | `task.200.dod.{N}.*.md`; task `status: accepted`                       | DoD 1: gaps (4 low spec-sanctioned accepts), so the rules were narrowed and the run re-entered QA. DoD 2 (`task.200.dod.2…`): ACCEPTED, 100 probes / 0 reproduced; CI reading 2 SUCCESS (tree-equivalent to 94612c09) @ 731c5814 | —                    | 2026-10-20T21:41Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Implementation report committed and pushed | —                    | 2026-10-20T21:41Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -116,6 +116,16 @@ Gate develop-bug's tracker writes behind review-bug's READY TO FIX, and replace 
 - QA re-entry after finalise DoD gaps: reenter-qa: re-entered QA at step 5 / qa_phase 5a — qa_max_cycles=5 (base 3), gate_head=aca4159160c7bfccd74a837e6acb19bc3c17a541.
 - develop-next run state: `halted` cleared to resume this item in-session.
 
+### Step 7 — finalise, DoD 2 (after the QA re-entry)
+
+- QA cycle 4 (gate 4 CONCERNS 90/100, nothing open) exited by route 3. The 5c `/review-pr --no-code` returned APPROVE with one low trail finding, PC-1: the DoD 1 gap section still read as open. Closed at acceptance by retitling that section `— run 1 (historical, superseded)`.
+- Four DoD agents ran in parallel. AC: 10/11 PASS. AC8 was accepted on the committed mutation records again, now including QA 4's mutants; the residue of 14 tests without their own mutant, and Q2 absorbed, is named in `task.200.dod.2…`. Docs: PASS. Compliance: NOT_APPLICABLE.
+- Security: /finalise ran the agent's probe plan. 6 controls (the source, four bundled copies, and a configured `integration/` prefix), 100 executed, 0 reproduced, 0 escaped, 0 refusals. The cases were the DoD 1 and QA 4 cases files re-read from disk, each verdict checked against the agent's plan. The agent's summary counted 108 cases, but its plan listed 100. All four DoD 1 reproductions are now refused.
+- CI reading 1: SUCCESS @ `94612c09` over 5 checks. Decision: ACCEPTED.
+- 6a: acceptance commit `731c5814` (task doc `status: accepted`, Change Log 1.2, registry ticked, DoD 2, sprint review, probe record and cases, and the 5c report carried), pushed. 6b assertions passed. 6d: CHANGELOG cites task 200.
+- CI reading 1: SUCCESS @ 94612c09; CI reading 2: SUCCESS (tree-equivalent to 94612c092e0c) @ 731c5814. The poll concluded after 30 s: the acceptance commit adds only docs on top of 94612c09, whose 5 checks were green.
+- Side-effects, after the publish boundary: canonical PR comment posted (issuecomment-6302155373). Issue #616: the Document link was already on `develop`; the `done` comment was posted; the issue was closed and confirmed CLOSED; the board move to `done` answered `already`. Lock advanced 7 → 8.
+
 ---
 
 ## Issues Log
@@ -174,16 +184,18 @@ _Track each QA review/fix cycle._
 **Issues Found**: none open. A QA re-entry after the DoD 1 gaps: 655ce648 narrows both predicates, and the DoD reproductions are refused (54 probes, 0 reproduced, 0 escaped). Advisory: CR-1, a fallback that only recognises `{p}.{n}` patterns (behaves the same on gate 3's head); CR-2, an empty `branchPattern` turns the fallback off; Q2, an absorbed mutant; two cleanups
 **HIGH findings**: 0
 **MEDIUM findings**: 0
-**PR Review**: pending (5c)
+**PR Review**: APPROVE — 1 low conformance finding (PC-1: the DoD 1 gap section still reads open; `/finalise` marks it superseded) (`--no-code`); report `task.200.pr-review.2.tracker-side-effects-after-their-gate.md`, PR comment updated in place
 **Loop exit**: route 3 — CONCERNS with no open entry in `top_issues[]`. Convergence check: HIGH 1 → 1 → 0 → 0, not rising.
 **Action**: Proceeding to 5c (PR conformance review)
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-10-20T21:41Z
+**Final Status**: Completed
 **Branch**: feature/task.200.tracker-side-effects-after-their-gate
 **PR**: https://github.com/Gamaroff/agent-skills/pull/711
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 4 (3 in the first run, plus 1 re-entry after DoD 1)
+**DoD Summary**: `task.200.dod.2.tracker-side-effects-after-their-gate.md` — ACCEPTED (DoD 1 recorded gaps, which were closed by 655ce648)
+**Tracker debt**: none
+
+**Completion Summary**: Implemented one document-link branch resolver (`doc-link-branch.js`), used by 8 GitHub sites, `create-epic` and `jira-sync`, and moved develop-bug's tracker issue, work-started signal and first push behind the review gate (Step 2b). The first run took 3 QA cycles, with 8 bugs filed and fixed. `/finalise` DoD 1 then found the branch rule broader than wanted. The operator chose to narrow it (configured `branchPattern` prefix; `hotfix/v<digit>`), and the run re-entered QA for a 4th cycle. Gate 4 CONCERNS 90/100 with nothing open, 5c APPROVE, DoD 2 accepted with 100 probes and 0 reproduced. Notable decisions: AC8 (each test mutation-proved) was accepted on the committed records, with its residue named; the advisory items (CR-1, CR-2, Q2) are in gate 4's `recommendations.future`.
