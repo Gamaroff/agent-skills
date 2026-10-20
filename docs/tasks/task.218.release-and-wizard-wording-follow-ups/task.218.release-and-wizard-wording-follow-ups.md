@@ -5,18 +5,20 @@ type: task
 description: "Fix five low wording defects task.199's QA gate 4 carried to future work: the release runbook's develop-sync section opens with a dangling Otherwise and leaves the operator on develop, the wizard's approve summary points at a checklist it never named, the wizard's section banners use older step numbers than its header, and restricted-access.md omits the autonomous-run fallback for approve."
 tags: [docs, release, setup-consumer, restricted-access, follow-up]
 category: documentation
-status: ready-for-review
+status: accepted
 priority: Low
 created: 2026-10-20
 updated: 2026-10-20
 assignee:
 estimated_effort_hours: 2
 github_issue: 705
+completed_date: 2026-10-20
+pr_number: 707
 ---
 
 # Technical Task: Release runbook and setup wizard wording follow-ups
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.218.review.1.release-and-wizard-wording-follow-ups.md` implemented 2026-10-20
 
@@ -326,16 +328,40 @@ None.
 ### Key Findings
 No critical issues identified. The diff review returned no findings.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.218.qa.1.release-and-wizard-wording-follow-ups.md`
+**Gate File**: `task.218.gate.1.release-and-wizard-wording-follow-ups.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR Review (5c)**: `task.218.pr-review.1.release-and-wizard-wording-follow-ups.md`, ✅ APPROVE with 0 findings
+
+Every Definition of Done criterion was verified:
+
+✅ **Success Criteria:** All 12 met (5 functional, 2 performance, 3 code quality, 2 migration). The two behaviour criteria are each held by a per-PR test that was mutation-proven.
+✅ **Tests & PR:** PR #707, with all 5 checks green on `49344075`. The repository requires no reviewers, so the 5c review report stands in for an approval.
+✅ **Documentation:** The CHANGELOG cites `(task 218)`, and the runbook and restricted-access wording is in the diff.
+✅ **Security Review:** PASS. No secrets and no unsafe patterns. The deliverable is not a boundary, so no probe ran.
+✅ **Compliance Review:** Not applicable. No personal, payment or health data is touched, and the only UI is one line of terminal text.
+
+**Task marked as ACCEPTED on:** 2026-10-20
+
+**Detailed Verification Log:** See `task.218.dod.1.release-and-wizard-wording-follow-ups.md` for the full verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-20 | 1.0     | Initial draft — the five wording items task.199's QA gate 4 carried to future work | create-task |
 | 2026-10-20 | 1.1     | Review passed (8/10), ready to build. Added a per-PR test for the rendered summary, recorded the banner grep, gave the diff criterion its command, and extended QA-8 to the manual block | review-task |
 | 2026-10-20 |         | Status → ready-for-development | review-task |
 | 2026-10-20 |         | Implemented: 5 files and 1 new test; status → ready-for-review | develop-task (inline) |
 | 2026-10-20 |         | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-10-20 | 1.2 | DoD passed — accepted (PR #707) | finalise |
 <!-- change-log-end -->
 
 ---
