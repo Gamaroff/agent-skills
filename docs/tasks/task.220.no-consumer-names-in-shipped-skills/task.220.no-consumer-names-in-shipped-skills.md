@@ -11,11 +11,14 @@ created: 2026-10-20
 updated: 2026-10-20
 assignee:
 estimated_effort_hours: 4
+github_issue: 709
 ---
 
 # Technical Task: No consumer names in shipped skills
 
 **Status:** Planned
+
+**GitHub Issue**: [#709](https://github.com/Gamaroff/agent-skills/issues/709)
 
 ---
 
@@ -372,6 +375,7 @@ Fix the fixture in place; the guard stays wide.
 | ---------- | ------- | ------------------------------------------------------------------------ | --------------- |
 | 2026-10-20 | 1.0     | Initial draft                                                            | create-task     |
 | 2026-10-20 | 1.1     | Create the guard here; add the wireframe skill's consumer profile to scope | Lorien Gamaroff |
+| 2026-10-20 |         | GitHub issue created (#709)                                              | sync-github-task |
 
 ---
 
