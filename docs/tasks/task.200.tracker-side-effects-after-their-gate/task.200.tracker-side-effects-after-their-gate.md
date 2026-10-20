@@ -470,24 +470,24 @@ None to any CLI or file format. Behaviour changes a consumer can observe:
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-20
-**Quality Score**: 50/100
-**Gate Decision**: FAIL
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.200.qa.2.tracker-side-effects-after-their-gate.md](./task.200.qa.2.tracker-side-effects-after-their-gate.md)
-- **Gate File**: [task.200.gate.2.tracker-side-effects-after-their-gate.yml](./task.200.gate.2.tracker-side-effects-after-their-gate.yml)
+- **Full Report**: [task.200.qa.3.tracker-side-effects-after-their-gate.md](./task.200.qa.3.tracker-side-effects-after-their-gate.md)
+- **Gate File**: [task.200.gate.3.tracker-side-effects-after-their-gate.yml](./task.200.gate.3.tracker-side-effects-after-their-gate.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 6060
-- **Phases Verified**: 5/5 implemented, 2 pass
-- **Critical Issues**: 1
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: CONCERNS
+- **Tests Executed**: 6067
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-Cycle 1 fixed TASK-200-001 to 003; TASK-200-004 is partial. The cycle-2 refute pass found one HIGH: create-epic's PRD-link block reads an unbound path (TASK-200-005). It also found three MEDIUMs: the sync-github-story pin is dropped (006), a sibling bug's branch names the wrong work item (007), and the link scan misses a reassignment (008).
+Cycle 2 fixed TASK-200-004 to 008, and all eight bugs are closed. Nothing is open. Maintainability CONCERNS covers two advisory guard-breadth gaps with no live instance: the link scan misses a defaulted expansion, and the unbound-read check accepts a one-hop binding.
 
 <!-- change-log-start -->
 ## Change Log
@@ -502,6 +502,7 @@ Cycle 1 fixed TASK-200-001 to 003; TASK-200-004 is partial. The cycle-2 refute p
 | 2026-10-20 |  | QA findings fixed — 4 of 4 (cycle 1), 1 iteration; status → ready-for-review | qa-fix |
 | 2026-10-20 |  | QA gate FAIL (50/100) — cycle 2, 4 new findings (1 high, 3 medium); status → in-progress | qa-task |
 | 2026-10-20 |  | QA findings fixed — 4 of 4 (cycle 2), 1 iteration; status → ready-for-review | qa-fix |
+| 2026-10-20 |  | QA gate CONCERNS (90/100) — cycle 3, 0 open findings (2 advisory) | qa-task |
 <!-- change-log-end -->
 
 ---

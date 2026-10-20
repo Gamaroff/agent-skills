@@ -4,7 +4,7 @@
 **Bug ID**: TASK-200-BUG-6
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 2, refute pass)
 **Date Found**: 2026-10-20
 
@@ -71,3 +71,4 @@ Add `DOC_BRANCH_PIN="{DOC_BRANCH input, or empty}"` before the call and pass `--
 | 2026-10-20 | New | qa-task | Filed in QA cycle 2 |
 | 2026-10-20 | In Progress | qa-fix | Investigation started |
 | 2026-10-20 | Ready for QA | qa-fix | Fix implemented (cycle 2) |
+| 2026-10-20 | Closed | qa-task | Verified by task.200.qa.3.tracker-side-effects-after-their-gate.md |

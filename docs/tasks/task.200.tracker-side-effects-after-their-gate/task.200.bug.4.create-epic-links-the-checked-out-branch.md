@@ -4,7 +4,7 @@
 **Bug ID**: TASK-200-BUG-4
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 1 diff code review, CR-3, verified)
 **Date Found**: 2026-10-20
 
@@ -98,3 +98,4 @@ to the nine `@{u}` sites.
 | 2026-10-20 | Reopened | qa-task | Not fixed: the PRD-link block reads an unbound path (BUG-5) and the link scan misses a reassignment (BUG-8) — task.200.qa.2.tracker-side-effects-after-their-gate.md |
 | 2026-10-20 | In Progress | qa-fix | QA cycle 2 fix (Iteration 2) |
 | 2026-10-20 | Ready for QA | qa-fix | QA cycle 2 fix (Iteration 2) |
+| 2026-10-20 | Closed | qa-task | Verified by task.200.qa.3.tracker-side-effects-after-their-gate.md |

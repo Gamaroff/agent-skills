@@ -1,0 +1,68 @@
+schema: 2
+task: "task.200.tracker-side-effects-after-their-gate"
+task_title: "Tracker side effects after their gate"
+gate: CONCERNS
+status_reason: "Cycle 2 fixed TASK-200-004 to 008. Each fix was mutation-proved by qa-fix and again by QA with different mutants, and the fast gate passes 6067/0. Nothing open. Maintainability CONCERNS: the link scan misses a defaulted expansion, and the unbound-read check accepts a one-hop binding (medium-confidence review findings, advisory). No current site has either shape."
+reviewer: "QA Engineer"
+head: "aca4159160c7bfccd74a837e6acb19bc3c17a541"
+updated: "2026-10-20T19:20:24Z"
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 6067
+  phases_verified: "5/5"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+  ci: "not read at review time — gated once at /finalise"
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 11
+    escaped: 0
+    notes: "security-probe path sink against doc-link-branch.js#integrationBranchOf, re-run because the resolver changed this cycle: 11 executed, 0 escaped. A read-only lookup that refuses nothing by design. The sibling-bug change (segmentNamesItem) narrows an identity match and builds no path."
+  performance:
+    status: PASS
+    notes: "At most one gh repo view per resolution. CR-4 (cleanup): runCli does the upstream and integration lookups even when --explicit decides."
+  reliability:
+    status: PASS
+    notes: "create-epic's PRD-link block binds its path, and sync-github-story's pin reaches the resolver. Both are executed under bash by committed tests, and both changed blocks pass bash -n (calibrated on cycle 1's apostrophe shape)."
+  maintainability:
+    status: CONCERNS
+    notes: "Two guard-breadth gaps, both reproduced, with no live instance: LINK_RE does not match blob/${V:-…}/ (CR-1), and a V= binding line is accepted whatever it reads (CR-2). One unreachable clause: the own-bug comparison in segmentNamesItem (mutation no-red-dead)."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "CR-1: let LINK_RE accept an optional :-/:=/:? operator inside the braces, capturing the name, with a control case for the defaulted shape (blob/${DOC_BRANCH:-$DEFAULT_BRANCH}/ was sync-github-story's pre-task shape)."
+      refs: ["tests/doc-link-branch-population.test.js"]
+    - action: "CR-2: in the execute test, accept a binding line only when its right-hand side is a {placeholder} literal or a variable bound earlier in the block, and count bare $NAME reads."
+      refs: ["tests/doc-link-branch-sites-execute.test.js"]
+    - action: "segmentNamesItem's own-bug comparison is unreachable: the item.id match already returns true for a bug's own branch. Drop it to return !bug, or keep it with a comment saying why."
+      refs: ["shared/resources/doc-link-branch.js"]
+    - action: "CR-3 (cleanup): review-story's sync confirmation still says 'current branch' for an empty pin."
+      refs: ["skills/review-story/SKILL.md"]
+    - action: "CR-4 (cleanup): return early on a non-empty --explicit in runCli."
+      refs: ["shared/resources/doc-link-branch.js"]
+    - action: "Carried from gate 2: CR-4 (GitHub CLI has no configured link-branch step), CR-5 (Step 2 halt message), CR-6 (lazy gitDefaultBranch), and a bash -n pass in Step 4b over refused blocks."
+      refs: ["shared/resources/doc-link-branch.js", "skills/develop-bug/references/develop-bug-step-2-review.md", "shared/resources/jira-sync.js", "shared/resources/qa-execute-snippets.mjs"]
+
+bug_resolution:
+  bugs_fixed: 5
+  bugs_reopened: 0
+  bugs_new: 0
+  fix_commit: "aca41591"
+  verification_method: "Executed tests in a scratch worktree with QA's own mutants (4 of 5 red; the fifth is the unreachable own-bug clause, no-red-dead) on top of qa-fix's 5 of 5. bash -n over both changed blocks."
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ["PR conformance review (5c) and finalise DoD"]
