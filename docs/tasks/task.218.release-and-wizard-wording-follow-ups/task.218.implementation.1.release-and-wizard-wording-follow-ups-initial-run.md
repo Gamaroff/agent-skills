@@ -3,7 +3,7 @@
 **Task**: `task.218.release-and-wizard-wording-follow-ups.md`
 **Run Number**: 1
 **Started**: 2026-10-20 12:01
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -34,10 +34,10 @@ First pipeline run: fix the five low wording items task.199's QA gate 4 carried 
 | 1. create-branch           | ✅ Done    | Branch `feature/task.218.*` exists in git                              | Branch created at `965c7e19`, pushed with upstream | —                    | 2026-10-20T10:02Z |
 | 2. review-task             | ✅ Done    | `task.218.review.{N}.{name}.md` exists (or skip logged)                | review.1: READY (8/10), 4 important + 3 optional applied; promoted to ready-for-development | —                    | 2026-10-20T10:20Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; 5 files + 1 test; ci:fast 5956/5971 (1 load-sensitive timing, passes alone) | —                    | 2026-10-20T10:22Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.218.qa.{N}.*.md`; `task.218.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.218.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #707: https://github.com/Gamaroff/agent-skills/pull/707 | —                    | 2026-10-20T10:24Z |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.218.qa.{N}.*.md`; `task.218.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 1 cycle, gate.1 PASS (100); 5c APPROVE (0 findings); QA and PR-review comments posted on #707 | —                    | 2026-10-20T10:31Z |
+| 7. finalise                | ✅ Done    | `task.218.dod.{N}.*.md`; task `status: accepted`                       | dod.1 ACCEPTED; acceptance commit `d676d0c9`; CI reading 2 SUCCESS; #705 closed, board Done | —                    | 2026-10-20T10:42Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Final report commit via /commit-changes (scope = work-item dir) | —                    | 2026-10-20T10:49Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -83,6 +83,37 @@ First pipeline run: fix the five low wording items task.199's QA gate 4 carried 
 - Deviation from the plan: the wizard header's step 2 gains a continuation line naming the tracker-access prompt, so the `2. tracker access level` banner has a header entry. This is a comment-only change.
 - The user said "merge when ready" (2026-10-20). Merge into develop is authorised once QA approves and CI on the PR is green.
 
+### Step 4: create-pr — 2026-10-20
+
+- SCOPE_PATHS: `docs/tasks/task.218.release-and-wizard-wording-follow-ups`, `CHANGELOG.md`, `docs/concepts`, `docs/runbooks`, `scripts`, `shared/resources/tests`. Pre-flight held nothing: both untracked files are inside the work-item dir.
+- Report links checked (`ok`) before the commit. Commit `5ad101de` via /commit-changes in scope mode. The pre-commit bundle check is in sync. Leak check OK.
+- PR created: https://github.com/Gamaroff/agent-skills/pull/707 (base develop). The PR body was written inline from the reviewed diff, without dispatching the summariser subagent; the diff is 9 files, all already read this run.
+- In-review comment on #705: `posted`. GitHub board: in-review → stage-disabled (the in-review moment is off on this board).
+- Post-PR state check: PR #707 state = OPEN, errors = 0. The lock's `pr_url` is set.
+
+### Steps 5–6: QA loop — 2026-10-20
+
+- Traceability mapper skipped. Task §9 holds checklists, not a Success Criteria table, so `/qa-task` mapped each criterion internally.
+- QA cycle 1 (`/qa-task`, `code_review_blocking=true`): gate.1 PASS (100/100), with HIGH 0 and MEDIUM 0. The diff reviewer returned 0 findings (anchor check `ok`). Both mutations of the summary `echo` turned the new test red (`covered`). Step 4b was not applicable.
+- QA commit `49344075` via /commit-changes (scope = the work-item directory, excluding this report). The read-back (`qa-read-back.js`) exited 0. QA comment on PR #707: issuecomment-6288838064. Tracker #705 `qa-gate-1`: `posted`.
+- The gate is PASS with no open entries, so the loop went to 5c. `/review-pr --effort medium --comment --no-code` returned ✅ APPROVE with 0 conformance findings. The report `task.218.pr-review.1.*` was staged for the acceptance commit, with no commit made between 5c and finalise. The summary comment is issuecomment-6288907547. GitHub board: ready-for-merge → stage-disabled.
+
+### Step 7: finalise — 2026-10-20
+
+- `/finalise` was invoked through the Skill tool, not inlined. Its 4 DoD agents returned: AC PASS (12/12), security PASS (`boundary: false`, no probe plan), compliance NOT_APPLICABLE, docs PASS.
+- `reviewDecision` is null because the repository requires no reviewers. The "Tests & PR Approved" column is met by `task.218.pr-review.1.*` (APPROVE).
+- DoD summary: docs/tasks/task.218.release-and-wizard-wording-follow-ups/task.218.dod.1.release-and-wizard-wording-follow-ups.md
+- CI reading 1: SUCCESS @ `49344075aaad` (5 checks); CI reading 2: SUCCESS @ `d676d0c9653b` (5 checks; the `Test` run for that head finished green at 10:39:57Z)
+- Acceptance commit `d676d0c9`: "docs(task.218): accept — DoD, sprint review; registry ticked; 5c review carried (#705)", pushed. It carries the task doc (`status: accepted`, Change Log 1.2), dod.1, the sprint review, the registry tick (`ticked`) and the 5c review report. The 6b tracked-and-pushed assertions passed, and 6d found `(task 218)` cited in CHANGELOG `[Unreleased]`.
+- Canonical summary comment on the PR: issuecomment-6289166694
+- DoD body posted to PR — comment URL: https://github.com/Gamaroff/agent-skills/pull/707#issuecomment-6289177732
+- The Document link was already on `develop`, so no re-point was needed. Tracker comment `done` on #705: `posted`.
+- Post-close state check: issue #705 state = CLOSED, errors = 0. Read with `gh issue view`, not the poller subagent.
+- GitHub Issue #705 — close: CLOSED ✅
+- GitHub Issue #705 — board: done → already (project item reads Done)
+- Accept gap: the journal is empty, so there is no tracker debt.
+- Task completed
+
 ---
 
 ## Issues Log
@@ -97,14 +128,39 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-10-20
+**Gate Result**: PASS (100/100)
+**Issues Found**: none. The diff reviewer returned 0 findings; 2 mutations of the summary `echo` both turned the new test red (`covered`).
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: APPROVE — 0 conformance findings (`--no-code`, medium); report `task.218.pr-review.1.release-and-wizard-wording-follow-ups.md`, staged for the acceptance commit; summary comment posted on PR #707; ready-for-merge → stage-disabled
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-10-20 12:49
+**Final Status**: Completed
 **Branch**: feature/task.218.release-and-wizard-wording-follow-ups
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/707
+**QA Iterations**: 1
+**DoD Summary**: docs/tasks/task.218.release-and-wizard-wording-follow-ups/task.218.dod.1.release-and-wizard-wording-follow-ups.md
+**Tracker debt**: none
+
+### Completion Summary
+
+Implemented the five wording follow-ups from task.199's QA gate 4:
+
+- Release runbook §4 now opens with its condition, and every path through it, the manual block and both recoveries, ends with `git checkout main`.
+- The setup wizard's `approve`/`command` summaries now name `*.handover.*.md`. A new per-PR test holds this.
+- The wizard's section banners match its header, which gains `2b. Skill install profile`.
+- `restricted-access.md` now names the autonomous-run fallback for `approve`.
+
+`scripts/setup-consumer.sh` has only two non-comment diff lines. The run took 1 QA cycle: gate.1 PASS at 100/100 with 0 findings, mutation-proven, and the 5c review was APPROVE. DoD accepted, with CI green on both readings.
+
+Notable decisions:
+
+- D1, from the review: the §4 manual block also gains `git checkout main`.
+- The header gained a continuation line naming the tracker-access prompt, so the `2.` banner maps to a header entry.
