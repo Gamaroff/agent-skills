@@ -16,7 +16,7 @@
 #
 # Rules:
 # - HOST FIRST. A URL's host picks the platform before any path arm is tried: Jira
-#   Cloud's issue view `…/projects/RAPP/issues/RAPP-702` contains `/issues/` and must
+#   Cloud's issue view `…/projects/PROJ/issues/PROJ-702` contains `/issues/` and must
 #   never reach the GitHub-issue arm.
 # - Anchored extraction. The key or number is the whole path segment after its
 #   marker, and `?query` / `#fragment` are stripped first — `…/pull/12/files` is PR 12.
@@ -25,7 +25,7 @@
 #   so an owner or a repository named like a marker cannot be mistaken for it, and the
 #   repository is reported for the skill to compare.
 # - No control characters. Output is one key=value per line, so a newline in the
-#   target would forge a line (`RAPP-1<LF>kind=pr`); such a target is refused.
+#   target would forge a line (`PROJ-1<LF>kind=pr`); such a target is refused.
 # - `host` is reported, never judged. The skill compares it per kind.
 # - No issue-type judgement: an epic key looks like any other key. Only malformed
 #   input is refused — a URL never falls through to the branch arm.

@@ -151,14 +151,14 @@ test("an existing **Jira** header-block line is replaced, not duplicated", () =>
   const dir = tmpdir();
   const stale = BUG_DOC.replace(
     "# Bug: Tap target too small\n",
-    "# Bug: Tap target too small\n\n**Jira**: RAPP-000\n",
+    "# Bug: Tap target too small\n\n**Jira**: PROJ-000\n",
   );
   const file = writeDoc(dir, "story.1.7.4.bug.4.tap-target.md", stale);
 
   const written = sync(file);
   assert.equal((written.match(/^\*\*Jira\*\*:/gm) || []).length, 1);
   assert.match(written, /^\*\*Jira\*\*: \[PROJ-1\]\(/m);
-  assert.doesNotMatch(written, /RAPP-000/);
+  assert.doesNotMatch(written, /PROJ-000/);
 });
 
 test("the Bug File line is still written when no Bitbucket base could be resolved", () => {

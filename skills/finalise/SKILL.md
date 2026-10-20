@@ -1018,7 +1018,7 @@ The same `NONE`/`CANCELLED`/`UNKNOWN` re-sampling loop below applies unchanged.
 > pull-request endpoints keep answering `200` on the same credential, so the token looks entirely
 > healthy. The result is indistinguishable from a repository that simply has no CI configured.
 >
-> Observed live (rebirth-wallet, stories 3.2 and 3.3, 2026-08-05 and 2026-08-08) — diagnosed
+> Observed live (a consumer project, two stories, 2026-08-05 and 2026-08-08) — diagnosed
 > independently both times, because nothing in the output says "scope". **Never infer CI presence
 > from an empty list; infer it from the status code.** On `UNKNOWN`, record the reason in the DoD
 > summary — "unverified: token lacks `read:pipeline:bitbucket`" is actionable, "no CI found" sends
@@ -2135,7 +2135,7 @@ POLLEOF
    >   never runs, in either order.
    > - *"It protects a consumer on an older **finalise** whose step 3 omits the flag."* Also no — and
    >   this one is backwards. In that pairing the sync runs **second** with status resolution live, so
-   >   it writes **last** and can walk the card straight off the ladder's target. That is the RAPP-715
+   >   it writes **last** and can walk the card straight off the ladder's target. That is the
    >   sequence recorded above, not a case ordering prevents.
    >
    > **What actually protects the close is block 4** — reading the status back and re-asserting it.
@@ -2154,7 +2154,7 @@ POLLEOF
    > This is not an exotic configuration — **it is the one this very step recommends**. See the
    > `stage-disabled` row below: *"a board that wants a card to sit in a merge queue until the PR
    > actually lands should leave `done` to a human"*. A consumer that took that advice is exactly the
-   > consumer this bites. Observed on RAPP-715 (2026-09-05): closed to `Done` + `resolution: Done`,
+   > consumer this bites. Observed on a consumer's card (2026-09-05): closed to `Done` + `resolution: Done`,
    > then the re-link returned it to `Waiting for Review` still carrying `resolution: Done` — matched
    > by *name*, because that workflow offers a transition literally called `Waiting for Review` and
    > that name was in the project's `accepted` candidate list.

@@ -6,8 +6,8 @@
 // second resolver (`loadStatusMap`) after the tracker-workflow ladder had already
 // made the call. On a consumer mapping `accepted` to a non-terminal column, that
 // second resolver walked the card back OUT of the terminal status the ladder had
-// just set, stranding the resolution it was closed with (observed: RAPP-715,
-// 2026-09-05 — closed to `Done`/`resolution: Done`, returned to `Waiting for
+// just set, stranding the resolution it was closed with (observed on a consumer's
+// card, 2026-09-05 — closed to `Done`/`resolution: Done`, returned to `Waiting for
 // Review` still carrying `resolution: Done`).
 //
 //   A — the gate itself.   `noTransition` issues ZERO HTTP requests and reports

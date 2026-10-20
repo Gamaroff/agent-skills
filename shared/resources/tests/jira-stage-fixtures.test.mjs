@@ -45,7 +45,7 @@ const load = (name) =>
 
 // The record this board would ship: every stage on for a Story, the three that
 // need columns this task workflow lacks turned off for the task type.
-const RAPP_RECORD = {
+const BOARD_RECORD = {
   stages: {
     "in-qa": {
       enabled: true,
@@ -70,7 +70,7 @@ const RAPP_RECORD = {
 
 /** What would `--stage <stage>` do from this fixture? */
 function act(fixture, currentStatus, stage, issueType) {
-  const spec = lib.resolveStage({ stage, issueType, record: RAPP_RECORD });
+  const spec = lib.resolveStage({ stage, issueType, record: BOARD_RECORD });
   if (!spec.enabled) return "disabled";
   const r = lib.resolveTransition({
     transitions: load(fixture),
@@ -93,17 +93,17 @@ test("fixtures are present — this suite is worthless without them", () => {
 test("Story: the full ladder resolves forward, one hop per stage", () => {
   const S = "Story";
   assert.equal(
-    act("rapp-story-in-progress.json", "In Progress", "in-review", S),
+    act("proj-story-in-progress.json", "In Progress", "in-review", S),
     "Waiting for Review",
     "In Review is NOT reachable from In Progress here — Waiting for Review is",
   );
   assert.equal(
-    act("rapp-story-waiting-for-review.json", "Waiting for Review", "in-qa", S),
+    act("proj-story-waiting-for-review.json", "Waiting for Review", "in-qa", S),
     "Ready for Testing",
   );
   assert.equal(
     act(
-      "rapp-story-ready-for-testing.json",
+      "proj-story-ready-for-testing.json",
       "Ready for Testing",
       "ready-for-merge",
       S,
@@ -111,7 +111,7 @@ test("Story: the full ladder resolves forward, one hop per stage", () => {
     "Waiting for merge",
   );
   assert.equal(
-    act("rapp-story-testing.json", "Testing", "ready-for-merge", S),
+    act("proj-story-testing.json", "Testing", "ready-for-merge", S),
     "Waiting for merge",
   );
 });
@@ -121,7 +121,7 @@ test("Story: work-started is a no-op once the card has left Selected for Develop
   // matcher alone would happily walk it backwards, which is the whole reason
   // the guard exists.
   assert.equal(
-    act("rapp-story-in-review.json", "In Review", "work-started", "Story"),
+    act("proj-story-in-review.json", "In Review", "work-started", "Story"),
     "skip:no-transition",
   );
 });
@@ -129,19 +129,19 @@ test("Story: work-started is a no-op once the card has left Selected for Develop
 test("Story: blocked is reachable ONLY from the testing columns", () => {
   const S = "Story";
   assert.equal(
-    act("rapp-story-ready-for-testing.json", "Ready for Testing", "blocked", S),
+    act("proj-story-ready-for-testing.json", "Ready for Testing", "blocked", S),
     "Blocked",
   );
   assert.equal(
-    act("rapp-story-testing.json", "Testing", "blocked", S),
+    act("proj-story-testing.json", "Testing", "blocked", S),
     "Blocked",
   );
   // Everywhere else the status exists in the workflow but no transition leads
   // to it — a HALT outside the QA window cannot set Blocked on this board.
   for (const [f, s] of [
-    ["rapp-story-in-progress.json", "In Progress"],
-    ["rapp-story-waiting-for-review.json", "Waiting for Review"],
-    ["rapp-story-in-review.json", "In Review"],
+    ["proj-story-in-progress.json", "In Progress"],
+    ["proj-story-waiting-for-review.json", "Waiting for Review"],
+    ["proj-story-in-review.json", "In Review"],
   ])
     assert.equal(act(f, s, "blocked", S), "skip:no-transition", `from ${s}`);
 });
@@ -149,15 +149,15 @@ test("Story: blocked is reachable ONLY from the testing columns", () => {
 test("Story: Blocked is close to a dead end — only the testing columns lead out", () => {
   const S = "Story";
   assert.equal(
-    act("rapp-story-blocked.json", "Blocked", "in-qa", S),
+    act("proj-story-blocked.json", "Blocked", "in-qa", S),
     "Testing",
   );
   assert.equal(
-    act("rapp-story-blocked.json", "Blocked", "done", S),
+    act("proj-story-blocked.json", "Blocked", "done", S),
     "skip:no-transition",
   );
   assert.equal(
-    act("rapp-story-blocked.json", "Blocked", "in-review", S),
+    act("proj-story-blocked.json", "Blocked", "in-review", S),
     "skip:no-transition",
   );
 });
@@ -167,7 +167,7 @@ test("Story: Blocked is close to a dead end — only the testing columns lead ou
 test("IT / DevOps Task: review works, the column-less stages report disabled", () => {
   const T = "IT / DevOps Task";
   assert.equal(
-    act("rapp-itdevops-task-in-progress.json", "In Progress", "in-review", T),
+    act("proj-itdevops-task-in-progress.json", "In Progress", "in-review", T),
     "Waiting for Review",
   );
   // Re-signalling in-review from a status that IS a review status is a no-op,
@@ -178,7 +178,7 @@ test("IT / DevOps Task: review works, the column-less stages report disabled", (
   // column a team stops at is theirs to decide, not the pipeline's.
   assert.equal(
     act(
-      "rapp-itdevops-task-waiting-for-review.json",
+      "proj-itdevops-task-waiting-for-review.json",
       "Waiting for Review",
       "in-review",
       T,
@@ -186,14 +186,14 @@ test("IT / DevOps Task: review works, the column-less stages report disabled", (
     "skip:already",
   );
   assert.ok(
-    load("rapp-itdevops-task-waiting-for-review.json").some(
+    load("proj-itdevops-task-waiting-for-review.json").some(
       (t) => t.to.name === "In Review",
     ),
     "In Review really is reachable from here — the no-op above is a choice, not a limitation",
   );
   for (const stage of ["in-qa", "ready-for-merge", "blocked"])
     assert.equal(
-      act("rapp-itdevops-task-in-progress.json", "In Progress", stage, T),
+      act("proj-itdevops-task-in-progress.json", "In Progress", stage, T),
       "disabled",
       stage,
     );
@@ -211,13 +211,13 @@ test("IT / DevOps Task: done needs no resolution from In Review, but does from e
   };
   // "Review passed" -> Done carries no required fields...
   assert.equal(
-    need("rapp-itdevops-task-in-review.json", "In Review").fields,
+    need("proj-itdevops-task-in-review.json", "In Review").fields,
     null,
   );
   // ...while the generic Done transition demands a resolution, which is filled
   // from that transition's own allowedValues rather than guessed.
   const early = need(
-    "rapp-itdevops-task-selected-for-development.json",
+    "proj-itdevops-task-selected-for-development.json",
     "Selected for Development",
   );
   assert.ok(
@@ -230,21 +230,21 @@ test("IT / DevOps Task: done needs no resolution from In Review, but does from e
 // --- the id-instability trap ----------------------------------------------
 
 test("transition id 21 means different things per issue type — destinations, never ids", () => {
-  const storyById = load("rapp-story-in-progress.json").find(
+  const storyById = load("proj-story-in-progress.json").find(
     (t) => t.id === "21",
   );
-  const taskById = load("rapp-itdevops-task-in-progress.json").find(
+  const taskById = load("proj-itdevops-task-in-progress.json").find(
     (t) => t.id === "21",
   );
   assert.equal(storyById.to.name, "READY FOR SHOWCASE");
   assert.equal(taskById.to.name, "Waiting for Review");
   // Same id, opposite meanings. Matching on destination gets both right.
   assert.equal(
-    act("rapp-story-in-progress.json", "In Progress", "in-review", "Story"),
+    act("proj-story-in-progress.json", "In Progress", "in-review", "Story"),
     "Waiting for Review",
   );
   assert.notEqual(
-    act("rapp-story-in-progress.json", "In Progress", "in-review", "Story"),
+    act("proj-story-in-progress.json", "In Progress", "in-review", "Story"),
     "READY FOR SHOWCASE",
   );
 });
@@ -259,9 +259,9 @@ test("transition id 21 means different things per issue type — destinations, n
 // NOTE ON COVERAGE. The demo walk named in task.38 —
 // `In Progress → READY FOR SHOWCASE → Waiting for Review` — cannot be replayed
 // end-to-end yet: the transitions available *from* the showcase column are
-// captured nowhere. `id=21` (rapp-story-in-progress) and `id=151`
-// (rapp-story-waiting-for-review) are both transitions *into* it. Capturing
-// `rapp-story-ready-for-showcase.json` needs a real issue parked in that column
+// captured nowhere. `id=21` (proj-story-in-progress) and `id=151`
+// (proj-story-waiting-for-review) are both transitions *into* it. Capturing
+// `proj-story-ready-for-showcase.json` needs a real issue parked in that column
 // and is tracked as an open item on the task.
 //
 // So the two-hop proof below uses a path this board HAS captured at both ends,
@@ -307,10 +307,10 @@ function replayWalk({ fixtures, from, targets, workflow, ...rest }) {
   return lib
     .walkLadder({
       http,
-      baseUrl: "https://rapp.atlassian.net",
+      baseUrl: "https://acme.atlassian.net",
       email: "e@x",
       token: "t",
-      issueKey: "RAPP-1",
+      issueKey: "PROJ-1",
       from,
       targets,
       workflow,
@@ -338,8 +338,8 @@ pipeline:
 `);
   const { res, posts, getCount } = await replayWalk({
     fixtures: [
-      "rapp-story-waiting-for-review.json", // offers 401 Start Review → In Review
-      "rapp-story-in-review.json", // offers 61 Review Passed → Ready for Testing
+      "proj-story-waiting-for-review.json", // offers 401 Start Review → In Review
+      "proj-story-in-review.json", // offers 61 Review Passed → Ready for Testing
     ],
     from: "Waiting for Review",
     targets: tw.resolveMoment("in-qa", wf).targets,
@@ -357,7 +357,7 @@ pipeline:
 
   // The property that makes the re-fetch load-bearing rather than tidy: hop 2's
   // transition is simply not on offer from where hop 1 began.
-  const fromReview = load("rapp-story-waiting-for-review.json");
+  const fromReview = load("proj-story-waiting-for-review.json");
   assert.equal(
     fromReview.some((t) => t.id === "61"),
     false,
@@ -381,7 +381,7 @@ pipeline:
   assert.equal(moment.isLastRung, true, "last rung of THIS ladder");
 
   const { res, posts } = await replayWalk({
-    fixtures: ["rapp-story-in-progress.json"],
+    fixtures: ["proj-story-in-progress.json"],
     from: "In Progress",
     targets: moment.targets,
     workflow: wf,
@@ -408,7 +408,7 @@ pipeline:
   const moment = tw.resolveMoment("done", wf);
   assert.equal(moment.isLastRung, false);
 
-  const doneCategory = load("rapp-story-in-progress.json").filter(
+  const doneCategory = load("proj-story-in-progress.json").filter(
     (t) => t.to && t.to.statusCategory && t.to.statusCategory.key === "done",
   );
   assert.equal(
@@ -420,7 +420,7 @@ pipeline:
   // Rebuild the ladder so the gate is NOT reachable in one hop either, forcing
   // the question "is there another way to finish?" that rule 4 used to answer.
   const { res, posts } = await replayWalk({
-    fixtures: ["rapp-story-testing.json"], // offers no route to the showcase column
+    fixtures: ["proj-story-testing.json"], // offers no route to the showcase column
     from: "Testing",
     targets: moment.targets,
     workflow: wf,
@@ -450,7 +450,7 @@ pipeline:
   // matches neither the rung nor the destination spelling by action name, so
   // this lands via the done-category rule.
   const { res, posts } = await replayWalk({
-    fixtures: ["rapp-itdevops-task-in-review.json"],
+    fixtures: ["proj-itdevops-task-in-review.json"],
     from: "In Review",
     targets: moment.targets,
     workflow: wf,

@@ -3976,7 +3976,7 @@ function loadWorklogTimeSpent(repoRoot) {
 //
 // Keyed on the LIVE Jira issue type name ("IT / DevOps Task"), not the docKind
 // ("task") that loadStatusMap uses. One board routinely gives several task
-// types genuinely different workflows — RAPP has six across three — and a
+// types genuinely different workflows — one consumer's has six across three — and a
 // story|task|epic layer cannot express that.
 function resolveStage({ stage, issueType, record } = {}) {
   const key = String(stage || "")
@@ -4436,8 +4436,8 @@ async function transitionToStatus({
       from: current,
     };
 
-  // Monotonicity guard. Boards routinely offer backward transitions — RAPP
-  // offers "Waiting for merge -> In Progress" — so a resumed pipeline
+  // Monotonicity guard. Boards routinely offer backward transitions — one
+  // consumer's offers "Waiting for merge -> In Progress" — so a resumed pipeline
   // re-running an earlier step would happily drag a card backwards. Refuse when
   // the caller declares the rank it is moving TO and the card already sits
   // higher. Unranked either side means no opinion: allow.
@@ -4619,7 +4619,7 @@ async function transitionToStatus({
   // transition whose screen has no Log Work field is REJECTED
   // ("Field 'worklog' cannot be set. It is not on the appropriate screen"), so
   // attaching one pre-emptively breaks transitions that would otherwise have
-  // succeeded. Observed on RAPP: two transitions succeed bare and 400 with a
+  // succeeded. Observed on a consumer's board: two transitions succeed bare and 400 with a
   // worklog, while three others 400 bare and succeed with one.
   //
   // Safe to retry because a failed validator is atomic — Jira applies nothing,
@@ -4911,7 +4911,7 @@ async function walkLadder({
     // the ladder's intermediate rung is simply not on this board's path from
     // here, and insisting on it invents a requirement the board never stated.
     //
-    // Observed live (rebirth-wallet RAPP-111, 2026-08-08): `ready-for-merge` from
+    // Observed live (a consumer project, 2026-08-08): `ready-for-merge` from
     // "Ready for Testing" planned a hop through "Ready for Showcase", which that
     // board does not offer from there — while "Waiting for merge", the actual
     // destination, WAS directly available and appeared in the run's own
