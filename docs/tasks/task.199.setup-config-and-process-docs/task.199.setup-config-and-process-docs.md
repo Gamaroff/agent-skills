@@ -5,10 +5,12 @@ type: task
 description: "Fix the install wizard, configuration, tracker and release-process docs where they no longer match the scripts: wizard steps, credential file, hooks, platform resolution, pipeline moments, release.sh's CI check, bug status mirroring: 20 findings from the 2026-10-07 doc-drift audit."
 tags: [docs, setup, configuration, release, doc-drift]
 category: documentation
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-07
 updated: 2026-10-20
+completed_date: 2026-10-20
+pr_number: 704
 assignee:
 estimated_effort_hours: 8
 github_issue: 602
@@ -16,7 +18,7 @@ github_issue: 602
 
 # Technical Task: Setup, configuration and process docs
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.199.review.1.setup-config-and-process-docs.md` implemented 2026-10-20
 **GitHub Issue**: [#602](https://github.com/Gamaroff/agent-skills/issues/602)
 
@@ -407,9 +409,9 @@ Four QA cycles. Cycles 1–3 (CONCERNS) found 11 stale or over-broad claims, all
 - **QA-9** (LOW) — carried to gate 4 `recommendations.future` (route 2b, cycle 4): §4 opens with a dangling "Otherwise"
 - **QA-10** (LOW) — carried to gate 4 `recommendations.future` (route 2b, cycle 4): setup-consumer.sh closing summary's "that checklist" has no referent under approve
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 1 (historical, superseded)
 
-**Status:** IN PROGRESS
+**Status:** SUPERSEDED — the gap below was closed in `743cd72c`, and DoD run 2 accepted the task (see the section after this one).
 
 ### QA Gate Status
 
@@ -435,6 +437,29 @@ All 8 success criteria, security (`boundary: false`), compliance (N/A) and CI (g
 **Gap Report Generated:** 2026-10-20
 
 **Detailed Verification Log:** See `task.199.dod.1.setup-config-and-process-docs.md` for complete verification evidence.
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.199.qa.4.setup-config-and-process-docs.md`
+**Gate File**: `task.199.gate.4.setup-config-and-process-docs.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 94/100
+
+All Definition of Done criteria have been verified (DoD run 2):
+
+✅ **Success Criteria:** 8/8 met (SC-1 to SC-8, each with read evidence)
+✅ **PR Review:** PR #704. The host requires no reviews. The Step 5c review was CONCERNS, and both of its findings (PC-1, PC-2) are fixed.
+✅ **Documentation:** 16 docs corrected, the audit report marked, and the CHANGELOG `[Unreleased]` entry added
+✅ **Security Review:** PASS. No secrets or unsafe patterns. Not a boundary deliverable.
+✅ **Compliance Review:** not applicable (documentation only)
+✅ **CI:** SUCCESS @ `743cd72c` over 4 checks
+
+**Task marked as ACCEPTED on:** 2026-10-20
+
+**Detailed Verification Log:** See `task.199.dod.2.setup-config-and-process-docs.md` for the complete verification evidence. Run 1 (`task.199.dod.1.setup-config-and-process-docs.md`) recorded the CHANGELOG gap.
 <!-- change-log-start -->
 ## Change Log
 
@@ -453,6 +478,7 @@ All 8 success criteria, security (`boundary: false`), compliance (N/A) and CI (g
 | 2026-10-20 |  | QA gate PASS (94/100) — 3 LOWs carried (route 2b) | qa-task |
 | 2026-10-20 |  | DoD incomplete — 1 gap identified (no CHANGELOG entry) | finalise |
 | 2026-10-20 |  | DoD gap closed (CHANGELOG entry); PR review PC-2 fixed — §5 and §7 name setup-consumer.sh's text changes | develop-task |
+| 2026-10-20 | 1.2 | DoD passed — accepted (PR #704) | finalise |
 <!-- change-log-end -->
 
 ---
