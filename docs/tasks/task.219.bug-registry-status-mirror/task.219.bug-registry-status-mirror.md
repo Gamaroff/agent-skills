@@ -5,7 +5,7 @@ type: task
 description: "Give the general-bug registry's Status cell one tested writer, a --bug-status mode of registry-tick.js, and call it at every bug status transition, including the two /qa-fix makes after a reopen that today leave the row stale."
 tags: [bug-registry, registry-tick, qa-fix, develop-bug, follow-up]
 category: infrastructure
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-10-20
 updated: 2026-10-20
@@ -16,7 +16,9 @@ github_issue: 706
 
 # Technical Task: General-bug registry status: one writer at every transition
 
-**Status:** Planned
+**Status:** Ready for Review
+
+**Review**: ✅ All review recommendations from `task.219.review.1.bug-registry-status-mirror.md` implemented 2026-10-20
 
 **GitHub Issue**: [#706](https://github.com/Gamaroff/agent-skills/issues/706)
 
@@ -46,7 +48,7 @@ This task adds one writer for the row, a `--bug-status` mode of `shared/resource
 
 1. **qa-fix leaves the row stale after a reopen.** develop-bug Step 5b reopens the bug and mirrors `reopened` into the row (`skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md:174`). It then invokes `/qa-fix` (`:176`). qa-fix moves the bug Reopened → In Progress → Ready for QA (`skills/qa-fix/SKILL.md:1308`, the Status Flow block under `### Bug Status Lifecycle`, and `#### Starting Investigation (New/Reopened → In Progress)`). `git grep -n "bug-registry" skills/qa-fix/SKILL.md` returns nothing (measured at `9067ba92`). So the row reads `⚠️ Reopened` while the file reads `ready-for-qa`, until develop-bug Step 7 writes `closed`.
 2. **The cost is a false red in consumers.** develop-bug's own callout (`develop-bug-step-3-investigate-fix.md:18-31`) records it. tinker-city's `scripts/check-bug-doc-consistency.js` runs in `test:guard` and the CI `guards` lane on every push, and it asserts that the row equals the file. Before Step 3 mirrored the row, that lane went red on the first push and stayed red until the close commit (bug.89, bug.90 and bug.91 in that repo). The same false red now happens after every reopen.
-3. **The rule is restated four times as prose, and it can only be tested by grep.** Status-writing sites that mirror the row today: `develop-bug-step-3-investigate-fix.md:16` (in-progress) and its callout (ready-for-qa), `develop-bug-step-5-6-verify-loop.md:174` (reopened), and `develop-bug-step-7-close-bug.md:83` (closed). qa-fix is the fifth writer, and it is the one that missed the rule. That is the drift `CLAUDE.md` § Stakeholder Summaries describes: a convention without a chokepoint drifts.
+3. **The rule is restated four times as prose, and it can only be tested by grep.** Status-writing sites that mirror the row today: `develop-bug-step-3-investigate-fix.md:16` (in-progress), `:99` (ready-for-qa) and `:110` (the pre-Step-4 row check), `develop-bug-step-5-6-verify-loop.md:174` (reopened), and `develop-bug-step-7-close-bug.md:83` (closed); `develop-bug/SKILL.md:234` and `:254` summarise them. qa-fix is the fifth writer, and it is the one that missed the rule. That is the drift `CLAUDE.md` § Stakeholder Summaries describes: a convention without a chokepoint drifts.
 4. **This repository has no bug-registry drift backstop.** `evals/shared/tests/task-registry-drift.test.mjs` fails CI when a task row and its document disagree. Bugs have only `document-status-lifecycle-corpus.test.mjs:128-145`, which checks that each row's status is a legal lifecycle value, not that it matches the file.
 
 ### Benefits
@@ -66,7 +68,7 @@ This task adds one writer for the row, a `--bug-status` mode of `shared/resource
   - `--annotate` appends `PR #n merged` to the row.
 
   It imports `parseRegistry` from `skills/develop-next/scripts/select-next.mjs` through `locateSelector` (`registry-tick.js:158`) and never reimplements it. It rewrites one line of the registry, keeping the line separators (`registry-tick.js:403`, `registryText.split(/(\r?\n)/)`), and keeps the cell's width (`setCell`, `:474`). Every outcome except a usage error exits 0. A bug document answers `not-a-task` (`:247`, `isBugStem`). `finalise --bug` relies on that answer (`skills/finalise/SKILL.md:1362`).
-- **The argument surface is pinned.** `shared/resources/tests/registry-tick.test.mjs:345` asserts the CLI's whole argument surface, so a new flag is a deliberate test change.
+- **The argument surface is pinned.** `shared/resources/tests/registry-tick.test.mjs:350` asserts the CLI's whole argument surface, so a new flag is a deliberate test change.
 - **`parseRegistry(text, "bug", path)`** (`select-next.mjs:1243`) returns rows with `registryStatus` (the lowercased raw Status cell), `line` and `path`. It reads columns by header name.
 - **The bug lifecycle** is `new → in-progress → ready-for-qa → closed | reopened` (`docs/standards/bug-documents.md:45`; `BUG_LIFECYCLE_STATUSES`, `select-next.mjs:234`).
 - **Two registry vocabularies exist.** This repository's rows use the lifecycle token (`closed`, `docs/bugs/bug-registry.md`). tinker-city's use an emoji label, `🆕 New` / `🔧 In Progress` / `🔍 Ready for QA` / `⚠️ Reopened` / `✅ Closed`, which `develop-bug-step-3-investigate-fix.md:27-29` tells the writer to read "from its existing rows".
@@ -78,7 +80,9 @@ This task adds one writer for the row, a `--bug-status` mode of `shared/resource
   - Reads the file's frontmatter `status:`, with any trailing `# comment` removed. A value outside `BUG_LIFECYCLE_STATUSES` → `not-a-lifecycle-status`.
   - A file that is not a general bug (a parent-stemmed bug, a task, a story) → `not-a-general-bug`, with nothing written.
   - Default registry: `docs/bugs/bug-registry.md`. Row lookup is by bug number.
-  - **Vocabulary is read from the registry, never assumed.** If most of the other rows' Status cells are emoji labels, write the emoji label for the target status. Otherwise write the lifecycle token. With no other rows, write the token. The five-entry label map lives in this one file, and `--json` reports the vocabulary it chose.
+  - **Vocabulary is read from the registry, never assumed.** A Status cell counts as the emoji vocabulary when it matches one of the five labels case-insensitively (`parseRegistry` lowercases the cell: `🔍 Ready for QA` arrives as `🔍 ready for qa`). If most of the other rows' Status cells are emoji labels, write the emoji label for the target status. Otherwise write the lifecycle token. With no other rows, write the token. `--json` reports the vocabulary it chose.
+  - **The label map has one definition, and it is importable.** `registry-tick.js` is a CJS CLI that today exports nothing. It gains `module.exports = { BUG_STATUS_LABELS, normaliseBugRegistryStatus }` (normalise either vocabulary to the lifecycle token), and its `main()` runs only under `require.main === module`, the CJS guard already used by `doc-links.js`, `change-log.js`, `card-preflight.js`, `bug-doc.js` and `doc-id.js`. Bug 16's symlink no-op was the ESM `resolve(argv[1]) === fileURLToPath(import.meta.url)` guard, not this one; a test still invokes the CLI through a symlinked path. The drift test and the integration test import the map and the normaliser from here, never restate them.
+  - **Only the Status cell.** The CLI does not touch Last Updated (a header line in this repository's registry, possibly a column elsewhere), the next-number line, or any other cell. Step 7's "refresh Last Updated" stays a hand edit.
   - Reasons, all exit 0: `mirrored`, `already`, `dry-run`, `not-a-general-bug`, `not-a-lifecycle-status`, `no-registry`, `no-row`, `row-malformed`, `ambiguous-row`, `engine-unavailable`. Exit 2 is a usage error.
 - **Call sites.** Every general-bug status write is followed by one call:
 
@@ -86,8 +90,8 @@ This task adds one writer for the row, a `--bug-status` mode of `shared/resource
   node .agents/skills/{skill}/references/registry-tick.js --bug-status --file "{bug-file}" --json
   ```
 
-  The sites are qa-fix (In Progress, Ready for QA) and develop-bug Steps 3 (in-progress, ready-for-qa), 5–6 (reopened) and 7 (closed). Each prose instruction to edit the row by hand is replaced by the call and a `reason` table. The tinker-city story and the vocabulary rule stay once, in the Step 3 callout.
-- **`evals/shared/tests/bug-registry-drift.test.mjs`.** For every `docs/bugs/bug.{N}.*/bug.{N}.*.md`, the row's status (normalised from either vocabulary) equals the file's status. It imports `parseRegistry` and `BUG_LIFECYCLE_STATUSES`, has a non-vacuity floor, and reports a row-less bug and a file-less row.
+  The sites are qa-fix (In Progress, Ready for QA) and develop-bug Steps 3 (in-progress, ready-for-qa), 5–6 (reopened) and 7 (closed). Each prose instruction to edit the row by hand is replaced by the call and a `reason` table. The tinker-city story and the vocabulary rule stay once, in the Step 3 callout. Step 3's pre-Step-4 row check (`:110`) becomes "the last call answered `mirrored` or `already`".
+- **`evals/shared/tests/bug-registry-drift.test.mjs`.** For every `docs/bugs/bug.{N}.*/bug.{N}.*.md`, the row's status, normalised by `registry-tick.js`'s exported `normaliseBugRegistryStatus`, equals the file's status. It imports `parseRegistry` and `BUG_LIFECYCLE_STATUSES`, has a non-vacuity floor, and reports a row-less bug and a file-less row.
 
 ### Important Clarifications
 
@@ -140,11 +144,12 @@ The CLI's argument surface grows by one flag, `--bug-status`. Existing invocatio
 **Risk**: Medium (the engine is bundled into four skills and gains two more)
 **Files**: `shared/resources/registry-tick.js`, `shared/resources/tests/registry-tick.test.mjs`
 
-- [ ] Parse `--bug-status`. Refuse it alongside `--annotate` (usage, exit 2)
-- [ ] Classify the file: general bug, parent-stemmed bug, or other. Read and validate frontmatter `status:`
-- [ ] Detect the registry's vocabulary from the other rows, and map the status
-- [ ] Rewrite the Status cell with the existing line rewrite and `setCell`; emit the reasons in §3
-- [ ] Tests: each of the five statuses in both vocabularies; idempotent `already`; CRLF registry; a task bug answers `not-a-general-bug`; no row; malformed row; ambiguous cell; `--dry-run` writes nothing; the default mode still answers `not-a-task` for a bug; the argument-surface assertion updated
+- [x] Parse `--bug-status`. Refuse it alongside `--annotate` (usage, exit 2)
+- [x] Classify the file: general bug, parent-stemmed bug, or other. Read and validate frontmatter `status:`
+- [x] Detect the registry's vocabulary from the other rows, and map the status
+- [x] Rewrite the Status cell with the existing line rewrite and `setCell`; emit the reasons in §3
+- [x] Export `BUG_STATUS_LABELS` and `normaliseBugRegistryStatus`; gate `main()` with `require.main === module`
+- [x] Tests: each of the five statuses in both vocabularies; idempotent `already`; CRLF registry; a task bug answers `not-a-general-bug`; no row; malformed row; ambiguous cell; `--dry-run` writes nothing; the default mode still answers `not-a-task` for a bug; the argument-surface assertion updated; the CLI still runs when invoked through a symlinked path; requiring the module writes nothing and prints nothing
 
 ### Phase 2: Call sites
 
@@ -152,19 +157,21 @@ The CLI's argument surface grows by one flag, `--bug-status`. Existing invocatio
 **Files**: `skills/qa-fix/SKILL.md`, `skills/develop-bug/SKILL.md`, `skills/develop-bug/references/develop-bug-step-3-investigate-fix.md`, `develop-bug-step-5-6-verify-loop.md`, `develop-bug-step-7-close-bug.md`
 **Depends on**: Phase 1
 
-- [ ] qa-fix: call after each general-bug status write (In Progress, Ready for QA), with a `reason` table
-- [ ] develop-bug Steps 3, 5–6 and 7: replace each hand edit of the row with the call
-- [ ] Keep one statement of why the row matters (the Step 3 callout). The other sites link to it
-- [ ] `npm run bundle`
+- [x] qa-fix: call after each general-bug status write (In Progress, Ready for QA), with a `reason` table
+- [x] develop-bug Steps 3, 5–6 and 7: replace each hand edit of the row with the call
+- [x] Keep one statement of why the row matters (the Step 3 callout). The other sites link to it
+- [x] Rewrite the tests that pin the removed prose (found by `git grep -n "bug-registry" -- skills/develop-bug/tests`): `skills/develop-bug/tests/develop-bug.test.js:96`, `:107`, `:108`, `:116`, `:124`. Each asserts the `registry-tick.js --bug-status` call at its site instead
+- [x] Add an assertion, in a test `npm test` reaches, that qa-fix's In Progress and Ready for QA steps carry the call
+- [x] `npm run bundle`
 
 ### Phase 3: Drift backstop and changelog
 
 **Risk**: Low
 **Files**: `evals/shared/tests/bug-registry-drift.test.mjs` (new), `CHANGELOG.md`
 
-- [ ] Drift test over this repository's general bugs, importing the parser and lifecycle
-- [ ] Mutation proof: change one row's status and the test goes red
-- [ ] CHANGELOG entry
+- [x] Drift test over this repository's general bugs, importing the parser and lifecycle
+- [x] Mutation proof: change one row's status and the test goes red
+- [x] CHANGELOG entry
 
 ---
 
@@ -184,6 +191,7 @@ The CLI's argument surface grows by one flag, `--bug-status`. Existing invocatio
 
 8. ✅ `shared/resources/tests/registry-tick.test.mjs`
 9. ✅ `evals/shared/tests/bug-registry-drift.test.mjs` (new)
+10. ✅ `skills/develop-bug/tests/develop-bug.test.js`: the five prose assertions at `:96`, `:107`, `:108`, `:116`, `:124`, plus the qa-fix call-site assertion
 
 ### Files to Modify (Dependencies)
 
@@ -191,13 +199,18 @@ None. `npm test` already globs `evals/shared/tests/*.test.mjs` (`package.json` `
 
 ### Files to Modify (Documentation)
 
-10. ✅ `CHANGELOG.md`
+11. ✅ `CHANGELOG.md`
 
 ### Files to Delete
 
 None.
 
-**Writer population, measured.** `git grep -n "bug-registry" -- skills/develop-bug skills/qa-fix ':!**/references/develop-pipeline-*'`, keeping only the lines that write a status, gives the four develop-bug sites in §2 and no qa-fix line (at `9067ba92`). The implementer re-runs it before Phase 2 and treats any new hit as in scope.
+**Writer population, measured (at `12ff2fee`).** Two searches, because qa-fix never names the registry:
+
+- `git grep -n "bug-registry" -- skills/develop-bug skills/qa-fix ':!**/references/develop-pipeline-*'`, keeping the lines that write or check a status: develop-bug step-3 `:16`, `:99`, `:110`; step-5-6 `:174`; step-7 `:83`; SKILL.md `:234`, `:254`. No qa-fix line.
+- `grep -n "Ready for QA)\|→ In Progress)" skills/qa-fix/SKILL.md`: qa-fix `:852` and `:858` (the Bug Report Update Workflow list) and `:1321` and `:1360` (the `### Updating Bug Reports` sections).
+
+The implementer re-runs both before Phase 2 and treats any new hit as in scope.
 
 ---
 
@@ -232,7 +245,8 @@ Not applicable: one file read and one line rewrite per call.
 - [ ] `registry-tick.js --bug-status --file docs/bugs/bug.N.x/bug.N.x.md` on a row reading `reopened`, with the file at `ready-for-qa`, rewrites that row's Status cell only and answers `mirrored` (Phase 1)
 - [ ] In an emoji-vocabulary registry, the same call writes `🔍 Ready for QA` (Phase 1)
 - [ ] A task bug (`task.67.bug.3.x.md`) answers `not-a-general-bug` and writes nothing. A bug file without `--bug-status` still answers `not-a-task` (Phase 1)
-- [ ] qa-fix's In Progress and Ready for QA steps each call the CLI for a general bug (Phase 2)
+- [ ] qa-fix's In Progress and Ready for QA steps each call the CLI for a general bug, held by the qa-fix assertion in `develop-bug.test.js` (Phase 2)
+- [ ] The drift test reads the label map through `registry-tick.js`'s exports; no second label map (a token-to-label table) exists in code outside `registry-tick.js` and its bundled copies; prose that names the labels for a reader is documentation, not a map (Phase 1, Phase 3)
 - [ ] develop-bug has no step that edits the row's Status cell by hand (Phase 2; the §7 grep)
 - [ ] `bug-registry-drift.test.mjs` passes on `develop` and goes red when one row's status is changed (Phase 3)
 
@@ -310,6 +324,9 @@ None.
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-10-20 | 1.0     | Initial draft — the /qa-fix bug-registry source gap from task.199's QA gate 4 | create-task |
+| 2026-10-20 | 1.1     | Review passed (9/10) — measured site list (2 greps, 4 qa-fix lines added), 5 pinned develop-bug test assertions listed, label map exported behind a `require.main` guard, Last Updated left out of the CLI, qa-fix assertion added | review-task |
+| 2026-10-20 |         | Status → ready-for-development | review-task |
+| 2026-10-20 |         | Implemented — 13 files (engine + 5 bundled copies, develop-bug SKILL + 3 step docs, qa-fix, 3 test files, CHANGELOG), 33 new tests; status → ready-for-review | develop |
 <!-- change-log-end -->
 
 ---
@@ -317,19 +334,19 @@ None.
 ## Progress Tracking
 
 ### Phase 1: `--bug-status` mode
-- [ ] Flag, classification, status read
-- [ ] Vocabulary detection and map
-- [ ] Row rewrite and reasons
-- [ ] Tests
+- [x] Flag, classification, status read
+- [x] Vocabulary detection and map
+- [x] Row rewrite and reasons
+- [x] Tests
 
 ### Phase 2: Call sites
-- [ ] qa-fix
-- [ ] develop-bug Steps 3, 5–6, 7
-- [ ] Bundle
+- [x] qa-fix
+- [x] develop-bug Steps 3, 5–6, 7
+- [x] Bundle
 
 ### Phase 3: Drift backstop and changelog
-- [ ] Drift test plus mutation proof
-- [ ] CHANGELOG
+- [x] Drift test plus mutation proof
+- [x] CHANGELOG
 
 ---
 

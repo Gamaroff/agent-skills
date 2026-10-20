@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **`registry-tick.js --bug-status` (task 219).** Sets a general bug's row in
+  `docs/bugs/bug-registry.md` to the bug file's status, in the registry's own vocabulary (the
+  lifecycle token, or the emoji labels when most rows use them). develop-bug Steps 3, 5–6 and 7 and
+  `/qa-fix` call it at every status change, so the row no longer goes stale after a reopen; qa-fix
+  now also writes the bug's frontmatter `status:`, which the call reads. A new drift test,
+  `evals/shared/tests/bug-registry-drift.test.mjs`, fails CI when a bug file and its row disagree.
+  The default mode still answers `not-a-task` for a bug, so `finalise --bug` is unchanged.
+
 ### Fixed
 
 - **Release runbook and setup wizard wording (task 218).** The release runbook's develop-sync

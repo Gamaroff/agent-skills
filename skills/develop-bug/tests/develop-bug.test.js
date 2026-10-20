@@ -101,27 +101,91 @@ test("Step 7 updates parent linkage per mode (story / task / general registry)",
 // the guard red from the first code push to the close commit (three
 // occurrences). Pin that EVERY status transition names the registry, not just
 // the close: Step 3's in-progress + ready-for-qa, Step 5-6's reopened.
-test("Step 3 mirrors both of its status transitions into the general-bug registry row", () => {
-  // Same paragraph/bullet must carry the transition AND the registry — a lone
-  // mention of the registry elsewhere in the doc does not satisfy this.
-  assert.match(STEP3, /status: in-progress[^\n]*bug-registry\.md/);
-  assert.match(STEP3, /status: ready-for-qa[^\n]*bug-registry\.md/);
+// task 219: the row has ONE writer, `registry-tick.js --bug-status`. Each site
+// must carry the transition AND that call in the same paragraph/bullet; a hand
+// edit of the Status cell is what drifted.
+const MIRROR_CALL =
+  /registry-tick\.js --bug-status --file "\{bug-file\}" --json/;
+const MIRROR_NAMED = /registry-tick\.js --bug-status/;
+
+test("Step 3 mirrors both of its status transitions through registry-tick.js --bug-status", () => {
+  assert.match(
+    STEP3,
+    /status: in-progress[^\n]*registry-tick\.js --bug-status/,
+  );
+  assert.match(
+    STEP3,
+    /status: ready-for-qa[^\n]*registry-tick\.js --bug-status/,
+  );
   assert.match(
     STEP3,
     /every write of the bug file's `status:`[\s\S]{0,200}paired with the registry row/,
   );
+  // The call and its reason table live once, in the callout.
+  assert.match(STEP3, MIRROR_CALL);
+  assert.match(STEP3, /\| `not-a-lifecycle-status` \|/);
 });
 
-test("Step 5-6 mirrors the reopen into the general-bug registry row", () => {
-  assert.match(STEP56, /status: reopened[^\n]*bug-registry\.md/);
+test("Step 5-6 mirrors the reopen through registry-tick.js --bug-status", () => {
+  assert.match(STEP56, /status: reopened[^\n]*registry-tick\.js --bug-status/);
 });
 
-test("Step 7 treats the close as the last mirrored registry write, not the first", () => {
+test("Step 7 closes the row through registry-tick.js --bug-status, the last mirrored write", () => {
+  assert.match(STEP7, /bug-registry\.md/);
+  assert.match(STEP7, MIRROR_CALL);
   assert.match(STEP7, /last\*\* of the row's mirrored writes/);
 });
 
-test("SKILL.md Step 3 summary states the registry-mirror rule", () => {
-  assert.match(SKILL, /mirrored into the `docs\/bugs\/bug-registry\.md` row/);
+test("no develop-bug step edits the registry row's Status cell by hand", () => {
+  // The hand-edit phrasings the call replaced (task 219 §2). A fallback after a
+  // failed call is allowed — it names the `reason` table, not a transition.
+  for (const [name, text] of [
+    ["SKILL.md", SKILL],
+    ["step-3", STEP3],
+    ["step-5-6", STEP56],
+    ["step-7", STEP7],
+  ]) {
+    assert.doesNotMatch(text, /Status cell → `/, name);
+    assert.doesNotMatch(text, /set the `Status` column to `closed`/, name);
+    assert.doesNotMatch(text, /row's Status cell \(`/, name);
+  }
+});
+
+test("SKILL.md Step 3 and Step 7 summaries name the registry-tick.js call", () => {
+  assert.match(
+    SKILL,
+    /mirrored into the `docs\/bugs\/bug-registry\.md` row's Status cell by `node \.agents\/skills\/develop-bug\/references\/registry-tick\.js --bug-status/,
+  );
+  assert.match(
+    SKILL,
+    /`closed` with the same `registry-tick\.js --bug-status` call/,
+  );
+});
+
+test("qa-fix mirrors both of its bug status writes through registry-tick.js --bug-status", () => {
+  const QAFIX = fs.readFileSync(
+    path.join(ROOT, "..", "qa-fix", "SKILL.md"),
+    "utf8",
+  );
+  assert.match(
+    QAFIX,
+    /node \.agents\/skills\/qa-fix\/references\/registry-tick\.js --bug-status --file "\{bug-file\}" --json/,
+  );
+  // Both transitions write the frontmatter (the CLI reads it) and point at the mirror.
+  for (const [token, heading] of [
+    ["in-progress", "Starting Investigation (New/Reopened → In Progress)"],
+    ["ready-for-qa", "Implementing Fix (In Progress → Ready for QA)"],
+  ]) {
+    const at = QAFIX.indexOf(`#### ${heading}`);
+    assert.ok(at > 0, `qa-fix has the ${heading} section`);
+    const section = QAFIX.slice(at, at + 400);
+    assert.match(section, new RegExp(`frontmatter \`status: ${token}\``));
+    assert.match(
+      section,
+      /Mirroring a General Bug's Status into the Bug Registry/,
+    );
+  }
+  assert.match(QAFIX, MIRROR_NAMED);
 });
 
 // ---------------------------------------------------------------------------
