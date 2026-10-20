@@ -1,8 +1,8 @@
 # Task Registry
 
 **Purpose:** Central tracking for all task numbers in this repo.
-**Last Updated:** 2026-10-19
-**Next Available Task Number:** **218**
+**Last Updated:** 2026-10-20
+**Next Available Task Number:** **220**
 
 ## How to use
 
@@ -259,6 +259,8 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 215 | [security-probe: run a Python CLI under the cli: entry form](task.215.probe-engine-python-cli-entry-form/task.215.probe-engine-python-cli-entry-form.md) | accepted | infrastructure | Medium | 2026-10-19 | [#689](https://github.com/Gamaroff/agent-skills/issues/689) | — the Python sibling of task.144 (cli:), task.180 (fence:) and task.181 (shell-argv:); unblocks omarchy-leak-radar story 3.1.1 (PR #63 there) and its later PRD 3 Python boundaries · PR #692 merged |
 | 216 | [security-probe: the cli: form honours a case's fixture.files (and env)](task.216.probe-engine-cli-case-fixture-files/task.216.probe-engine-cli-case-fixture-files.md) | draft | infrastructure | Medium | 2026-10-19 | [#696](https://github.com/Gamaroff/agent-skills/issues/696) | — follow-up to task.215 (v0.58.0); found by omarchy-leak-radar re-probing `threat-radar merge-back`: every input is refused because a `cli:` case cannot carry the data dir it needs |
 | 217 | [Finding-anchors advisory follow-ups](task.217.finding-anchors-advisory-follow-ups/task.217.finding-anchors-advisory-follow-ups.md) | planned | refactoring | Medium | 2026-10-19 | [#698](https://github.com/Gamaroff/agent-skills/issues/698) | task.195 — the nine advisory items task.195's QA gates 1–5 carried to future work: non-object findings, a checker-only stamp the `--inline` guards require, selector/checker anchor parity, `--staged --fix`, review-code `--inline` bindings, two test-hygiene gaps |
+| 218 | [Release runbook and setup wizard wording follow-ups](task.218.release-and-wizard-wording-follow-ups/task.218.release-and-wizard-wording-follow-ups.md) | planned | documentation | Low | 2026-10-20 | [#705](https://github.com/Gamaroff/agent-skills/issues/705) | task.199 — the five wording items task.199's QA gate 4 carried to future work: release runbook §4 (QA-8, QA-9), the wizard summary and banners (QA-10), restricted-access.md's approve fallback |
+| 219 | [General-bug registry status: one writer at every transition](task.219.bug-registry-status-mirror/task.219.bug-registry-status-mirror.md) | planned | infrastructure | Medium | 2026-10-20 | [#706](https://github.com/Gamaroff/agent-skills/issues/706) | task.199 — gate 4's source gap: /qa-fix leaves a general bug's registry row stale after a reopen; adds `registry-tick.js --bug-status`, the call sites and a bug-registry drift test |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
@@ -307,5 +309,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 - **Tasks 156–157 are the context-pressure handoff** — one shippable unit each, in dependency order: 156 ships `session-handoff` continue mode (a continuation file plus resume prompt) and is usable by hand before anything triggers it; 157 adds the measured trigger (status line recorder, `UserPromptSubmit` hook, user-level installer) whose note recommends 156's mode, so land 156 first.
 
 - **Tasks 180–181 each add an entry form to `security-probe.mjs`** — independent in outcome (180: `fence:` for a fenced block; 181: `shell-argv:` for a multi-argument shell script), but both edit the engine and the same six routing documents: land one, rebase the other, never in one worktree. 181's Phase 3 proof targets `reenter-qa-after-finalise.sh`, which ships with task.170.
+
+- **Tasks 218–219 were cut from task.199's QA gate 4 `recommendations.future`** — one shippable unit each, independent of each other. 218 is wording only (two docs, comment lines and one `echo` in `setup-consumer.sh`); 219 adds `registry-tick.js --bug-status` and changes qa-fix and develop-bug step prose. They share no file; either may land first. The gate's cross-file anchor item is observation #80, not a task.
 
 - Filenames follow `task.[N].[kebab-case-name].md` per [AGENTS.md](../../AGENTS.md#file-naming).
