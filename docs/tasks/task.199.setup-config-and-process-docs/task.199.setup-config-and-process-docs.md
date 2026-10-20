@@ -374,19 +374,19 @@ Probe: no test pins the summary strings. `restricted-access.md` (lines 34 and 72
 
 ### Deferred Work
 
-None.
+None from implementation. QA carried three LOWs — see [Deferred Work](#deferred-work).
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-20
-**Quality Score**: 85/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 94/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.199.qa.3.setup-config-and-process-docs.md](./task.199.qa.3.setup-config-and-process-docs.md)
-- **Gate File**: [task.199.gate.3.setup-config-and-process-docs.yml](./task.199.gate.3.setup-config-and-process-docs.yml)
+- **Full Report**: [task.199.qa.4.setup-config-and-process-docs.md](./task.199.qa.4.setup-config-and-process-docs.md)
+- **Gate File**: [task.199.gate.4.setup-config-and-process-docs.yml](./task.199.gate.4.setup-config-and-process-docs.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 5969
@@ -395,7 +395,13 @@ None.
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-The cycle 2 fixes hold. The scoped re-review found three gaps in the new text. One is medium: release-and-install §4's recovery fails on a half-done Sync develop (QA-5). Two are low: the wizard's closing summary for approve (QA-6), and configuration.md leaving out the autonomous-run fallback (QA-7).
+Four QA cycles. Cycles 1–3 (CONCERNS) found 11 stale or over-broad claims, all fixed. Cycle 4 is PASS with three low wording points (QA-8, QA-9, QA-10), carried by the Cosmetic-residue exit to the gate's `recommendations.future` — see Deferred Work.
+
+## Deferred Work
+
+- **QA-8** (LOW) — carried to gate 4 `recommendations.future` (route 2b, cycle 4): release-and-install §4's merge-conflict and rejected-push recoveries omit release.sh's closing `git checkout main`
+- **QA-9** (LOW) — carried to gate 4 `recommendations.future` (route 2b, cycle 4): §4 opens with a dangling "Otherwise"
+- **QA-10** (LOW) — carried to gate 4 `recommendations.future` (route 2b, cycle 4): setup-consumer.sh closing summary's "that checklist" has no referent under approve
 <!-- change-log-start -->
 ## Change Log
 
@@ -411,6 +417,7 @@ The cycle 2 fixes hold. The scoped re-review found three gaps in the new text. O
 | 2026-10-20 |  | QA findings fixed — cycle 2, 5 findings (CR-1, CR-2, CR-3, QA-3, QA-4) | qa-fix |
 | 2026-10-20 |  | QA gate CONCERNS (85/100) — 3 findings | qa-task |
 | 2026-10-20 |  | QA findings fixed — cycle 3, 3 findings (QA-5, QA-6, QA-7) | qa-fix |
+| 2026-10-20 |  | QA gate PASS (94/100) — 3 LOWs carried (route 2b) | qa-task |
 <!-- change-log-end -->
 
 ---
