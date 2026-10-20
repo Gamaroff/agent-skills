@@ -40,7 +40,7 @@ One row per thing a person does with the application, in the order you want them
 | **Entry** | the route, plus `· flag: <NAME>` when a flag gates it |
 | **Stories** | the story ids that built it, ` · `-separated (links optional; ids are what the tool reads) |
 | **Items** | leave empty — `/qa-next` authors the checklist and fills this with `--items` |
-| **Automated by** | the real-stack specs that already exercise it, or `manual only`; `/qa-next` updates it with `--automated` (as does `uat-automate`, where the consumer project has one) |
+| **Automated by** | the real-stack specs that already exercise it, or `manual only`; once a spec lands, `uat-status.mjs --automated <id> "<path>"` fills it, run by hand or by a consumer-side `uat-automate`; `/qa-next` only prints that hand-off |
 | **UAT** / **Last run** / **Notes / bug** | `⬜ untested` and empty — the tool owns these |
 
 Seeds worth mining: a manual feature checklist, the route table or site map, the epic list. Every accepted story should end up in some row's `Stories` or in `uat-surfaces.json` `storyNa` with a one-line reason (`"7.1": "monorepo scaffolding — nothing observable"`). `--coverage` tells you which are still missing and suggests a surface from the epic map.

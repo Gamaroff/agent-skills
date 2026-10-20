@@ -127,9 +127,9 @@ Produces one file per section under the same directory. See [`../../skills/shard
 | **Pitfalls**     | The codebase scan often reveals duplicate work — don't ignore it. Resolve scope overlaps before writing stories.                              |
 | **Reference**    | [`../../skills/review-epic/SKILL.md`](../../skills/review-epic/SKILL.md)                                                                      |
 
-### B.3 Tracker issue (auto, flagged for awareness)
+### B.3 Tracker issue (on request, flagged for awareness)
 
-Epic GitHub/Jira issues are created on request, not unprompted. `create-epic` and `review-epic` offer to sync the epic itself. `create-story` and `review-story` ensure the epic's issue, via `ensure-epic-github-issue` or `ensure-epic-jira-issue` (chosen by the platform resolver), when you accept their tracker sync. You generally don't invoke the `ensure-*` sub-routines directly.
+Epic GitHub/Jira issues are created on request, not unprompted. `create-epic` and `review-epic` offer to sync the epic itself. `create-story` and `review-story` ensure the epic's issue, via `ensure-epic-github-issue` or `ensure-epic-jira-issue`, when you accept their tracker sync: `create-story` asks which tracker to sync to (the platform resolver recommends one), and `review-story` uses the tracker the resolver detected. You generally don't invoke the `ensure-*` sub-routines directly.
 
 ---
 
@@ -280,7 +280,7 @@ What the orchestrator invokes internally, top-down.
 | -------------- | -------------------------------------------------------------------------------------------- |
 | `create-prd`   | `create-doc`, `(brownfield-)prd-template`, `pm-checklist`, optionally `mermaid-architect`    |
 | `create-epic`  | `documentation-standards-validator`, optionally `mermaid-architect`; when you choose to sync, `ensure-epic-github-issue` (GitHub) or `sync-jira-epic` (Jira) |
-| `create-story` | `documentation-standards-validator`, optionally `mermaid-architect`, `wireframe` (UI stories), `ensure-epic-*` and `ensure-story-*` (GitHub or Jira, picked by the platform resolver) |
+| `create-story` | `documentation-standards-validator`, optionally `mermaid-architect`, `wireframe` (UI stories), `ensure-epic-*` and `ensure-story-*` (GitHub or Jira, whichever you pick at its tracker-sync prompt) |
 | `review-story` | `create-branch` (Step 0a), `ensure-epic-*` and `ensure-story-*` (GitHub or Jira, picked by the platform resolver), `wireframe` (UI stories), `mermaid-architect` |
 
 ---

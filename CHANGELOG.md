@@ -8,8 +8,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 - **The skill reference and discovery docs list what ships (task 198).** 27 findings from the
   2026-10-07 doc-drift audit are fixed across 16 docs: commands, activation phrases and invocation,
-  the concepts and operations overviews, five runbooks, the README, and the develop-next, qa-next,
-  review-story and review-task READMEs.
+  the concepts architecture and overview, the operations workflows, five runbooks, the README, and
+  the develop-next, qa-next, review-story and review-task READMEs.
   - **Missing flags and modes.** `/review-pr` takes a work item (Jira key or URL, `#N`, issue URL)
     and `--effort`/`--inline`; `/review-code` takes a PR, a `base...head` range or `--staged`;
     `/create-task --from-observation`; session-handoff's continue mode; wireframe from an existing

@@ -306,19 +306,19 @@ None.
 
 ### QA Report
 
-- **Full Report**: [task.198.qa.1.skill-reference-and-discoverability-docs.md](./task.198.qa.1.skill-reference-and-discoverability-docs.md)
-- **Gate File**: [task.198.gate.1.skill-reference-and-discoverability-docs.yml](./task.198.gate.1.skill-reference-and-discoverability-docs.yml)
+- **Full Report**: [task.198.qa.2.skill-reference-and-discoverability-docs.md](./task.198.qa.2.skill-reference-and-discoverability-docs.md)
+- **Gate File**: [task.198.gate.2.skill-reference-and-discoverability-docs.yml](./task.198.gate.2.skill-reference-and-discoverability-docs.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 5969 (ci:fast; 5955 pass, 0 fail)
+- **Tests Executed**: 5969 (ci:fast at b47f076e; 5955 pass, 0 fail)
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-One medium: the new resolve-platform paragraph in overview.md over-claims which skills source the helper, and its grep does not list them (QA1-CR-1). Six low: incomplete caller lists and step lists (QA1-CR-2 to QA1-CR-7).
+Gate 1: 6 of 7 fixed, 1 partial. The cycle-2 refute pass found two medium issues: the qa-next README credits /qa-next with writing the Automated-by cell, and the B.3 heading still says "auto". It also found one low: the resolver is said to pick the tracker in create-story, where the user picks.
 
 <!-- change-log-start -->
 ## Change Log
@@ -331,6 +331,8 @@ One medium: the new resolve-platform paragraph in overview.md over-claims which 
 | 2026-10-20 |         | Implemented — 27 findings fixed across 16 docs, audit report marked; no tests added (docs only) | develop |
 | 2026-10-20 |         | QA gate CONCERNS (90/100) — 7 findings (1 medium, 6 low) | qa-task |
 | 2026-10-20 |         | QA findings fixed — cycle 1, 7 findings + 2 cleanups | qa-fix |
+| 2026-10-20 |         | QA gate CONCERNS (90/100) — 3 findings (2 medium, 1 low) | qa-task |
+| 2026-10-20 |         | QA findings fixed — cycle 2, 3 findings + 1 advisory + 2 cleanups | qa-fix |
 <!-- change-log-end -->
 
 ---
