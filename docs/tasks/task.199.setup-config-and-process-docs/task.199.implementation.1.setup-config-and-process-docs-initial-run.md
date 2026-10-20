@@ -130,6 +130,7 @@ Fix 20 doc-drift findings in setup, configuration, tracker and release-process d
 - finalise lock cooperation NOT run: `advance-pipeline-lock.sh --skill finalise` sets step 8 with no status check, so on a gaps run it would make the resume skip /finalise. Lock left at 7
 - The 5c carry (pr-review.1 + PC-1 task-doc fix) rides the halt commit instead of the 6a acceptance commit
 - HALT: DoD gaps. A docs-only fix resumes at Step 7
+- Resume (user approved): CHANGELOG `[Unreleased]` `### Fixed` entry for task 199 added. PC-2 fixed in the task doc: §5 names the setup-consumer.sh text changes and §7 lists the script (item 19). Docs-only, so the run resumes at Step 7 and `/finalise` re-runs
 
 ---
 

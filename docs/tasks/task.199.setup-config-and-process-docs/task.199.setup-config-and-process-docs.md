@@ -110,7 +110,7 @@ The setup, configuration, tracker and release docs match `scripts/setup-consumer
 
 ## 5. Breaking Changes
 
-None — documentation only. No API, script, config key or skill behaviour changes.
+None — documentation only. No API, config key or skill behaviour changes. `scripts/setup-consumer.sh` changes only in its text: the header comments, the Approve prompt, and the approve branch of the closing summary. What the wizard does is unchanged.
 
 ---
 
@@ -191,6 +191,10 @@ None — documentation only. No API, script, config key or skill behaviour chang
 15. ✅ `docs/standards/README.md`
 16. ✅ `docs/concepts/quickstart-story.md` (second site of OVERVIEW-9)
 17. ✅ `docs/runbooks/story-development.md` (a third site of OVERVIEW-9's broken command, not in the audit — found by the Phase 5 sweep)
+
+### Files to Modify (Scripts)
+
+19. ✅ `scripts/setup-consumer.sh` — text only: header comments (Phase 1), the Approve prompt (QA-2, cycle 2), and the approve branch of the closing summary (CR-2, cycle 2; QA-6, cycle 3). Added after PR review PC-2.
 
 ### Files to Modify (Tests)
 
@@ -448,6 +452,7 @@ All 8 success criteria, security (`boundary: false`), compliance (N/A) and CI (g
 | 2026-10-20 |  | QA findings fixed — cycle 3, 3 findings (QA-5, QA-6, QA-7) | qa-fix |
 | 2026-10-20 |  | QA gate PASS (94/100) — 3 LOWs carried (route 2b) | qa-task |
 | 2026-10-20 |  | DoD incomplete — 1 gap identified (no CHANGELOG entry) | finalise |
+| 2026-10-20 |  | DoD gap closed (CHANGELOG entry); PR review PC-2 fixed — §5 and §7 name setup-consumer.sh's text changes | develop-task |
 <!-- change-log-end -->
 
 ---
