@@ -5,18 +5,20 @@ type: task
 description: "Make the command reference, activation phrases, workflow overviews and skill READMEs list what ships: missing flags and modes, removed or never-shipped skills, and skills absent from the maps: 27 findings from the 2026-10-07 doc-drift audit."
 tags: [docs, commands, activation-phrases, skill-readmes, doc-drift]
 category: documentation
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-07
 updated: 2026-10-20
 assignee:
 estimated_effort_hours: 8
 github_issue: 601
+completed_date: 2026-10-20
+pr_number: 703
 ---
 
 # Technical Task: Skill reference and discoverability docs
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.198.review.1.skill-reference-and-discoverability-docs.md` implemented 2026-10-20
 **GitHub Issue**: [#601](https://github.com/Gamaroff/agent-skills/issues/601)
 
@@ -235,24 +237,24 @@ Not applicable.
 
 ### Functional
 
-- [ ] **SC-1** Every finding in the plan is either fixed, or closed in Phase 0 with the reason recorded.
-- [ ] **SC-2** No changed doc still states the old behaviour a finding names (grep of the old wording, recorded per finding).
-- [ ] **SC-3** Every shell command a changed doc shows is run once (or its source is cited where running it would write to a tracker), and every slash-command form matches the invocation line or arguments table of its `SKILL.md` (line cited).
+- [x] **SC-1** Every finding in the plan is either fixed, or closed in Phase 0 with the reason recorded.
+- [x] **SC-2** No changed doc still states the old behaviour a finding names (grep of the old wording, recorded per finding).
+- [x] **SC-3** Every shell command a changed doc shows is run once (or its source is cited where running it would write to a tracker), and every slash-command form matches the invocation line or arguments table of its `SKILL.md` (line cited).
 
 ### Performance
 
-- [ ] **SC-4** Not applicable — documentation only; recorded as N/A in the DoD.
+- [x] **SC-4** Not applicable — documentation only; recorded as N/A in the DoD.
 
 ### Code Quality
 
-- [ ] **SC-5** `prettier --check` passes on every changed doc.
-- [ ] **SC-6** `markdown-link-check@3` with the CI config passes on every changed doc, including the `skills/*/README.md` files CI does not check. Every new or changed cross-file `#anchor` resolves to its target heading (slug check, control miss recorded).
-- [ ] **SC-7** `quick_validate.py` passes for every skill whose README changed.
-- [ ] **SC-9** Every edited Mermaid block renders without error (validated after the edit).
+- [x] **SC-5** `prettier --check` passes on every changed doc.
+- [x] **SC-6** `markdown-link-check@3` with the CI config passes on every changed doc, including the `skills/*/README.md` files CI does not check. Every new or changed cross-file `#anchor` resolves to its target heading (slug check, control miss recorded).
+- [x] **SC-7** `quick_validate.py` passes for every skill whose README changed.
+- [x] **SC-9** Every edited Mermaid block renders without error (validated after the edit).
 
 ### Migration
 
-- [ ] **SC-8** The audit report marks each finding of this task fixed or closed.
+- [x] **SC-8** The audit report marks each finding of this task fixed or closed.
 
 ---
 
@@ -320,11 +322,34 @@ None.
 
 No open issues. Three QA cycles: gate 1 found 7 findings, gate 2 found 3, gate 3 is clean. All are fixed.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.198.qa.3.skill-reference-and-discoverability-docs.md`
+**Gate File**: `task.198.gate.3.skill-reference-and-discoverability-docs.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (3 QA cycles)
+**PR Review (Step 5c)**: ✅ APPROVE — `task.198.pr-review.1.skill-reference-and-discoverability-docs.md`
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 9/9 (SC-4 N/A, documentation only). 27/27 audit findings resolved
+✅ **PR & CI:** PR #703. CI test, validate, link-check and shellcheck are green at `2079289e`. The host requires no reviews, so the 5c review stands in for approval
+✅ **Documentation:** CHANGELOG [Unreleased] cites task 198. Reference, concepts, operations, runbook and README docs updated
+✅ **Security Review:** NOT_APPLICABLE. Documentation only; not a boundary
+✅ **Compliance Review:** NOT_APPLICABLE
+
+**Task marked as ACCEPTED on:** 2026-10-20
+
+**Detailed Verification Log:** See `task.198.dod.1.skill-reference-and-discoverability-docs.md` for complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                                        | Author      |
-| ---------- | ------- | ------------------------------------------------------------------ | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-07 | 1.0     | Initial draft — cut from the 2026-10-07 doc-drift audit | create-task |
 | 2026-10-20 | 1.1     | Review passed (8/10) — added jira-publish.md to scope; SC-3/SC-6 evidence made checkable; added SC-9 (Mermaid render) | review-task |
 | 2026-10-20 |         | Status → ready-for-development | review-task |
@@ -334,6 +359,7 @@ No open issues. Three QA cycles: gate 1 found 7 findings, gate 2 found 3, gate 3
 | 2026-10-20 |         | QA gate CONCERNS (90/100) — 3 findings (2 medium, 1 low) | qa-task |
 | 2026-10-20 |         | QA findings fixed — cycle 2, 3 findings + 1 advisory + 2 cleanups | qa-fix |
 | 2026-10-20 |         | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-10-20 | 1.2 | DoD passed — accepted (PR #703) | finalise |
 <!-- change-log-end -->
 
 ---
