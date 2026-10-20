@@ -77,19 +77,19 @@ keys: [`docs/reference/configuration.md`](../reference/configuration.md).
 
 ### Roadmap-driven orchestration
 
-The three pipelines above each take a path you supply. Two orchestrators sit one level up and
-**choose the path for you**, reading `docs/development/project-completion-roadmap.md`:
+The story, task and bug pipelines above each take a path you supply. Two orchestrators sit one
+level up and **choose the path for you**, reading `docs/development/project-completion-roadmap.md`:
 
 ```
 develop-next
-  └── select-next.mjs (deterministic) → /develop-story | /develop-task
+  └── select-next.mjs (deterministic) → /develop-story | /develop-task | /develop-bug
         → merge the green PR → tick the roadmap + Change Log
 ```
 
 ```
 develop-batch
   └── select-next.mjs --batch → N write-disjoint items
-        → one git worktree each, pipelines run concurrently
+        → one git worktree each, pipelines (/develop-story | /develop-task | /develop-bug) run concurrently
         → merge serially, rebasing each on the new base tip
 ```
 
@@ -100,7 +100,22 @@ conflict when they share a tag either side marks `!`.
 
 Both are crash-safe via a run-state file (re-running resumes), stop at manual/blocked rows,
 planning gaps, or any pipeline HALT, and support `--dry-run` for a read-only preview. Wrap either
-in `/loop` for continuous runs.
+in `/loop` for continuous runs. For runs that last hours or overnight, use `loop-supervisor`
+instead of `/loop`: it gives every iteration a fresh process and context, and classifies each
+outcome from what is on disk. See the [Unattended Overnight Runs](../runbooks/unattended-overnight-runs.md) runbook.
+
+`qa-next` is the verification sibling of `develop-next`: that loop builds, this one verifies.
+
+```
+qa-next [id]
+  └── uat-status.mjs --next → resolve the row to checklist items (author any missing)
+        → run its tagged spec, walk the rest → record 🟡 pass / ❌ fail / ⏸ blocked
+        → file a bug per failure → commit + report
+```
+
+It never marks a row ✅ accepted; that is the owner's `--accept`. `/qa-next <id>` runs one named
+row in any state, and `--coverage` lists shipped stories that no registry row covers yet. Reference:
+[`skills/qa-next/README.md`](../../skills/qa-next/README.md).
 
 References: [`skills/develop-next/README.md`](../../skills/develop-next/README.md),
 [`skills/develop-batch/README.md`](../../skills/develop-batch/README.md),

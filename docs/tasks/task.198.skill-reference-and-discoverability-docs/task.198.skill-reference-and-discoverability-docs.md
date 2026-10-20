@@ -5,10 +5,10 @@ type: task
 description: "Make the command reference, activation phrases, workflow overviews and skill READMEs list what ships: missing flags and modes, removed or never-shipped skills, and skills absent from the maps: 27 findings from the 2026-10-07 doc-drift audit."
 tags: [docs, commands, activation-phrases, skill-readmes, doc-drift]
 category: documentation
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-10-07
-updated: 2026-10-07
+updated: 2026-10-20
 assignee:
 estimated_effort_hours: 8
 github_issue: 601
@@ -16,7 +16,8 @@ github_issue: 601
 
 # Technical Task: Skill reference and discoverability docs
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.198.review.1.skill-reference-and-discoverability-docs.md` implemented 2026-10-20
 **GitHub Issue**: [#601](https://github.com/Gamaroff/agent-skills/issues/601)
 
 ---
@@ -25,7 +26,7 @@ github_issue: 601
 
 Make the command reference, activation phrases, workflow overviews and skill READMEs list what ships: missing flags and modes, removed or never-shipped skills, and skills absent from the maps.
 
-**Scope**: 27 confirmed findings (12 medium, 15 low) across 15 docs, from the 2026-10-07 doc-drift audit ([report](../../../.agents/plans/doc-drift-audit-2026-10-07.md)). The plan file lists every finding with its evidence and fix.
+**Scope**: 27 confirmed findings (12 medium, 15 low) across 16 docs, from the 2026-10-07 doc-drift audit ([report](../../../.agents/plans/doc-drift-audit-2026-10-07.md)). The plan file lists every finding with its evidence and fix.
 
 **Key deliverables**:
 
@@ -66,6 +67,7 @@ Docs in scope (finding count):
 - `docs/reference/commands.md` (4)
 - `docs/reference/invocation.md` (1)
 - `docs/runbooks/document-existing-project.md` (1)
+- `docs/runbooks/jira-publish.md` (RUNBOOKS-9's second site, ~line 124: "`ensure-epic-jira-issue` — called by `finalise`"; task.199 edits this file at ~line 105, a different section)
 - `docs/runbooks/qa-flow.md` (1)
 - `docs/runbooks/sprint-cycle.md` (1)
 - `docs/runbooks/story-development.md` (2)
@@ -93,7 +95,7 @@ Every command row, activation phrase and dependency map entry matches the shippe
 
 ### In Scope
 
-✅ The 27 findings listed in the plan, in the 15 docs named above
+✅ The 27 findings listed in the plan, in the 16 docs named above
 ✅ Prettier and link checks on every changed doc
 
 ### Out of Scope
@@ -117,8 +119,8 @@ None — documentation only. No API, script, config key or skill behaviour chang
 
 ### Phase 0: Re-verify (Risk: Low)
 
-- [ ] For each finding, open the doc line and the cited source; mark it open, closed (already fixed) or moved (re-cite)
-- [ ] Record the result per finding in the implementation report
+- [x] For each finding, open the doc line and the cited source; mark it open, closed (already fixed) or moved (re-cite)
+- [x] Record the result per finding in the implementation report
 
 **Dependencies**: PR #598 merged (it edits some of the same files).
 
@@ -126,8 +128,8 @@ None — documentation only. No API, script, config key or skill behaviour chang
 
 **Files**: `docs/concepts/architecture.md`, `docs/concepts/overview.md`, `docs/operations/workflows.md`, `README.md`
 
-- [ ] Apply the plan's fix for each open finding in these files
-- [ ] Prettier and link check the changed files
+- [x] Apply the plan's fix for each open finding in these files
+- [x] Prettier and link check the changed files
 
 **Dependencies**: Phase 0.
 
@@ -135,17 +137,17 @@ None — documentation only. No API, script, config key or skill behaviour chang
 
 **Files**: `docs/reference/activation-phrases.md`, `docs/reference/commands.md`, `docs/reference/invocation.md`
 
-- [ ] Apply the plan's fix for each open finding in these files
-- [ ] Prettier and link check the changed files
+- [x] Apply the plan's fix for each open finding in these files
+- [x] Prettier and link check the changed files
 
 **Dependencies**: Phase 0.
 
 ### Phase 3: Runbooks (Risk: Low)
 
-**Files**: `docs/runbooks/document-existing-project.md`, `docs/runbooks/qa-flow.md`, `docs/runbooks/sprint-cycle.md`, `docs/runbooks/story-development.md`
+**Files**: `docs/runbooks/document-existing-project.md`, `docs/runbooks/jira-publish.md`, `docs/runbooks/qa-flow.md`, `docs/runbooks/sprint-cycle.md`, `docs/runbooks/story-development.md`
 
-- [ ] Apply the plan's fix for each open finding in these files
-- [ ] Prettier and link check the changed files
+- [x] Apply the plan's fix for each open finding in these files
+- [x] Prettier and link check the changed files
 
 **Dependencies**: Phase 0.
 
@@ -153,15 +155,15 @@ None — documentation only. No API, script, config key or skill behaviour chang
 
 **Files**: `skills/develop-next/README.md`, `skills/qa-next/README.md`, `skills/review-story/README.md`, `skills/review-task/README.md`
 
-- [ ] Apply the plan's fix for each open finding in these files
-- [ ] Prettier and link check the changed files
+- [x] Apply the plan's fix for each open finding in these files
+- [x] Prettier and link check the changed files
 
 **Dependencies**: Phase 0.
 
 ### Phase 5: Close-out (Risk: Low)
 
-- [ ] Grep each changed doc for the old wording the findings name (the old behaviour, not only the edited sentence)
-- [ ] Update the audit report's entries for these findings to fixed / closed
+- [x] Grep each changed doc for the old wording the findings name (the old behaviour, not only the edited sentence)
+- [x] Update the audit report's entries for these findings to fixed / closed
 
 **Dependencies**: Phases 1–4.
 
@@ -186,10 +188,11 @@ None — documentation only. No API, script, config key or skill behaviour chang
 13. ✅ `skills/qa-next/README.md`
 14. ✅ `skills/review-story/README.md`
 15. ✅ `skills/review-task/README.md`
+16. ✅ `docs/runbooks/jira-publish.md` (RUNBOOKS-9 second site only)
 
 ### Files to Modify (Tests)
 
-None — the checks are `prettier --check` and the CI link checker (`.github/workflows/docs-link-check.yml`).
+None — the checks are `prettier --check`, `markdown-link-check@3` with the CI config (`.github/markdown-link-check.json`), and a render check on each edited Mermaid block.
 
 ### Files to Modify (Dependencies)
 
@@ -197,7 +200,7 @@ None.
 
 ### Files to Modify (Documentation)
 
-16. ✅ `.agents/plans/doc-drift-audit-2026-10-07.md` (mark findings fixed)
+17. ✅ `.agents/plans/doc-drift-audit-2026-10-07.md` (mark findings fixed)
 
 ### Files to Delete
 
@@ -213,8 +216,10 @@ Not applicable — no code changes.
 
 ### Integration Tests
 
-- Every command a changed doc tells a user to run is run once (or its source line is cited where running it would write to a tracker).
-- Link check: `markdown-link-check --config .github/markdown-link-check.json <file>` on each changed doc (the CI checker; it also checks `#anchors`).
+- Every **shell** command a changed doc tells a user to run is run once, or its source line is cited where running it would write to a tracker. Every **slash-command** form (`/review-pr …`) is checked against the invocation line or arguments table of its `SKILL.md`, and that line is cited.
+- Link check: run `npx markdown-link-check@3 --quiet --config .github/markdown-link-check.json <file>` locally on **every** changed doc. CI's `docs-link-check.yml` filters on `docs/**`, `README.md`, `AGENTS.md`, `CONTRIBUTING.md` and `examples/**`, so it never checks the four `skills/*/README.md` files.
+- Anchor check: `markdown-link-check` does not validate cross-file `#anchors` (task.197 probed this: a bogus anchor returned rc 0). Check each new or changed cross-file anchor against its target heading with a GitHub-slug script, plus a control anchor that must miss.
+- Mermaid: every edited `mermaid` block (the `docs/concepts/architecture.md` dependency map, for OVERVIEW-13 and OVERVIEW-22) is validated, and must render without error.
 
 ### Performance Tests
 
@@ -232,7 +237,7 @@ Not applicable.
 
 - [ ] **SC-1** Every finding in the plan is either fixed, or closed in Phase 0 with the reason recorded.
 - [ ] **SC-2** No changed doc still states the old behaviour a finding names (grep of the old wording, recorded per finding).
-- [ ] **SC-3** Every command a changed doc shows is run once, or its source is cited where running it would write to a tracker.
+- [ ] **SC-3** Every shell command a changed doc shows is run once (or its source is cited where running it would write to a tracker), and every slash-command form matches the invocation line or arguments table of its `SKILL.md` (line cited).
 
 ### Performance
 
@@ -241,8 +246,9 @@ Not applicable.
 ### Code Quality
 
 - [ ] **SC-5** `prettier --check` passes on every changed doc.
-- [ ] **SC-6** The CI link checker passes on every changed doc, including anchors.
+- [ ] **SC-6** `markdown-link-check@3` with the CI config passes on every changed doc, including the `skills/*/README.md` files CI does not check. Every new or changed cross-file `#anchor` resolves to its target heading (slug check, control miss recorded).
 - [ ] **SC-7** `quick_validate.py` passes for every skill whose README changed.
+- [ ] **SC-9** Every edited Mermaid block renders without error (validated after the edit).
 
 ### Migration
 
@@ -296,6 +302,9 @@ None.
 | Date       | Version | Description                                                        | Author      |
 | ---------- | ------- | ------------------------------------------------------------------ | ----------- |
 | 2026-10-07 | 1.0     | Initial draft — cut from the 2026-10-07 doc-drift audit | create-task |
+| 2026-10-20 | 1.1     | Review passed (8/10) — added jira-publish.md to scope; SC-3/SC-6 evidence made checkable; added SC-9 (Mermaid render) | review-task |
+| 2026-10-20 |         | Status → ready-for-development | review-task |
+| 2026-10-20 |         | Implemented — 27 findings fixed across 16 docs, audit report marked; no tests added (docs only) | develop |
 <!-- change-log-end -->
 
 ---
@@ -304,27 +313,27 @@ None.
 
 ### Phase 0: Re-verify
 
-- [ ] Complete
+- [x] Complete
 
 ### Phase 1: Overview (README, concepts, operations, examples)
 
-- [ ] Complete
+- [x] Complete
 
 ### Phase 2: Reference
 
-- [ ] Complete
+- [x] Complete
 
 ### Phase 3: Runbooks
 
-- [ ] Complete
+- [x] Complete
 
 ### Phase 4: Skill READMEs
 
-- [ ] Complete
+- [x] Complete
 
 ### Phase 5: Close-out
 
-- [ ] Complete
+- [x] Complete
 
 ---
 

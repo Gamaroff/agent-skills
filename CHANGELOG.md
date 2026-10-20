@@ -6,6 +6,20 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The skill reference and discovery docs list what ships (task 198).** 27 findings from the
+  2026-10-07 doc-drift audit are fixed across 16 docs: commands, activation phrases and invocation,
+  the concepts and operations overviews, five runbooks, the README, and the develop-next, qa-next,
+  review-story and review-task READMEs.
+  - **Missing flags and modes.** `/review-pr` takes a work item (Jira key or URL, `#N`, issue URL)
+    and `--effort`/`--inline`; `/review-code` takes a PR, a `base...head` range or `--staged`;
+    `/create-task --from-observation`; session-handoff's continue mode; wireframe from an existing
+    HTML screen; review-story's validate mode.
+  - **Skills that do not exist.** `document-project`, `simplify`, `qa-technical-task` and a shipped
+    `uat-automate` are gone from the docs.
+  - **Skills absent from the maps.** `qa-next`, `loop-supervisor`, `/develop-bug` dispatch, the
+    jira-sprint ceremony skills, `wireframe` and the `ensure-*` routines. Epic issues are ensured by
+    `create-story` and `review-story`, not `finalise`.
+
 - **The pipeline entry docs match how a run starts (task 197).** 16 findings from the 2026-10-07
   doc-drift audit are fixed across 13 docs: architecture, quickstart-story, anti-patterns, glossary,
   troubleshooting, five runbooks, story-documents, task-documents and the develop-task README.

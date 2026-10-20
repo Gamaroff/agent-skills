@@ -87,10 +87,10 @@ This means 124+ skills can coexist without blowing the context window. Only the 
 `api-endpoint-validator`, `code-smell-validator`, `error-handling-enforcer`, `platform-separation-validator`, `response-envelope-enforcer`, `offline-first-enforcer`, `test-co-location-enforcer`, `navigation-pattern-validator`
 
 **Documentation and research:**
-`create-doc`, `document-project`, `document-existing-project`, `deep-research-prompt`, `analyst`, `brainstorming`
+`create-doc`, `document-existing-project`, `deep-research-prompt`, `analyst`, `brainstorming`
 
 **Writing and editing:**
-`simplify`, `extract`
+`extract`
 
 ## The Development Pipeline
 
@@ -111,7 +111,7 @@ Key shared resources:
 | File                           | Purpose                                         |
 | ------------------------------ | ----------------------------------------------- |
 | `platform-detection.md`        | Canonical spec for tracker/VCS resolution       |
-| `resolve-platform.sh`          | Shell helper sourced by 8 platform-aware skills |
+| `resolve-platform.sh`          | Shell helper sourced by every platform-aware skill |
 | `document-status-lifecycle.md` | Status states and transition rules              |
 | `develop-pipeline-*.md`        | Step-by-step develop pipeline specs             |
 
@@ -124,9 +124,9 @@ Skills that interact with issue trackers or VCS resolve the platform in this ord
 3. Git remote — `bitbucket.org` in origin → Bitbucket; `github.com` → GitHub
 4. Default — GitHub for both
 
-Platform-aware skills: `create-pr`, `create-task`, `finalise`, `review-story`, `review-task`, `qa-fix`, `ensure-epic-jira-issue`, `create-epic`
+Platform-aware skills: every skill that touches a tracker or a PR sources `resolve-platform.sh`. That includes `create-pr`, `create-story`, `create-task`, `create-epic`, `finalise`, `qa-story`, `qa-task`, `qa-fix`, `review-pr`, `review-code`, `review-story`, `review-task`, `develop-next`, and the `ensure-*` and `sync-github-*` sub-routines. To list them all: `grep -l resolve-platform.sh skills/*/SKILL.md`.
 
-Platform-agnostic skills: `create-branch`, `commit-changes`, `create-story`, `qa-story`, `qa-gate`
+Platform-agnostic skills: `create-branch`, `commit-changes`, `qa-gate`
 
 ## Packaging and Distribution
 

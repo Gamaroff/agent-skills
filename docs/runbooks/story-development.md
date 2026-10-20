@@ -129,7 +129,7 @@ Produces one file per section under the same directory. See [`../../skills/shard
 
 ### B.3 Tracker issue (auto, flagged for awareness)
 
-Epic GitHub/Jira issues are created automatically downstream by `develop-story` → `finalise`, via `ensure-epic-github-issue` or `ensure-epic-jira-issue` (chosen by the platform resolver). You generally don't invoke these directly — but if you want the tracker issue _before_ story development, run the appropriate skill manually.
+Epic GitHub/Jira issues are ensured by `create-story` and `review-story`, via `ensure-epic-github-issue` or `ensure-epic-jira-issue` (chosen by the platform resolver), so the epic's issue exists by the time its first story is written or reviewed. You generally don't invoke these directly — but if you want the tracker issue before any story exists, run the appropriate skill manually.
 
 ---
 
@@ -143,7 +143,7 @@ Epic GitHub/Jira issues are created automatically downstream by `develop-story` 
 | **What it does** | 10-step process that identifies the next logical story, extracts technical context from architecture docs and the codebase, and writes a story with anti-hallucination safeguards. |
 | **Outputs**      | `docs/prd/.../prd.{P}.{feature}/epics/epic.{P}.{E}.{name}/stories/story.{P}.{E}.{S}.{name}/story.{P}.{E}.{S}.{name}.md`. Story directory is created with the same stem as the file.                              |
 | **Pitfalls**     | Don't hand-edit story numbering — the skill computes the next `{S}` from existing siblings. Story acceptance criteria must be testable; vague criteria block `review-story`.       |
-| **Calls**        | `documentation-standards-validator`, optionally `mermaid-architect`.                                                                                                               |
+| **Calls**        | `documentation-standards-validator`, optionally `mermaid-architect`, `wireframe` for UI stories, and the `ensure-epic-*` / `ensure-story-*` issue routines.                         |
 | **Reference**    | [`../../skills/create-story/SKILL.md`](../../skills/create-story/SKILL.md)                                                                                                         |
 
 ### C.2 Review the story
@@ -274,18 +274,14 @@ What the orchestrator invokes internally, top-down.
 | [`finalise`](../../skills/finalise/SKILL.md)             | DoD check, PR comment, tracker comment, board update.              |
 | [`commit-changes`](../../skills/commit-changes/SKILL.md) | Final commit of the implementation report (`/finalise` committed the acceptance artifacts). |
 
-Inside `finalise`, the platform resolver picks one of:
-
-- [`ensure-epic-github-issue`](../../skills/ensure-epic-github-issue/SKILL.md) — GitHub projects
-- [`ensure-epic-jira-issue`](../../skills/ensure-epic-jira-issue/SKILL.md) — Jira
-
 **Upstream skills also call others:**
 
 | Parent         | Calls                                                                                        |
 | -------------- | -------------------------------------------------------------------------------------------- |
 | `create-prd`   | `create-doc`, `(brownfield-)prd-template`, `pm-checklist`, optionally `mermaid-architect`    |
 | `create-epic`  | `documentation-standards-validator`, optionally `mermaid-architect`                          |
-| `create-story` | `documentation-standards-validator`, optionally `mermaid-architect`                          |
+| `create-story` | `documentation-standards-validator`, optionally `mermaid-architect`, `wireframe` (UI stories), `ensure-epic-*` and `ensure-story-*` (GitHub or Jira, picked by the platform resolver) |
+| `review-story` | `ensure-epic-*` and `ensure-story-*` (GitHub or Jira, picked by the platform resolver), `wireframe` (UI stories), `mermaid-architect` |
 
 ---
 

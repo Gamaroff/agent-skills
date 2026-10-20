@@ -121,7 +121,7 @@ All three sync skills drive the Jira issue's status from the local frontmatter `
 - [`sync-jira-bug` SKILL.md](../../skills/sync-jira-bug/SKILL.md)
 - [`ensure-bug-jira-issue` SKILL.md](../../skills/ensure-bug-jira-issue/SKILL.md) — called by `develop-bug`
 - [`jira-epic-creator` SKILL.md](../../skills/jira-epic-creator/SKILL.md)
-- [`ensure-epic-jira-issue` SKILL.md](../../skills/ensure-epic-jira-issue/SKILL.md) — called by `finalise`
+- [`ensure-epic-jira-issue` SKILL.md](../../skills/ensure-epic-jira-issue/SKILL.md) — called by `create-story` and `review-story`
 - [Platform detection](../../shared/resources/platform-detection.md)
 - [Story Development Runbook](./story-development.md)
 - [Task Development Runbook](./task-development.md)
