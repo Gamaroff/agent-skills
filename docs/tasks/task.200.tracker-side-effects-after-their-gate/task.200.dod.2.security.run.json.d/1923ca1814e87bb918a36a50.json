@@ -1,0 +1,25 @@
+{
+  "sink": "path",
+  "entry": ".agents/skills/ensure-bug-github-issue/references/doc-link-branch.js#branchNamesWorkItem",
+  "name": null,
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 17,
+  "passed": 17,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": null,
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": [
+    "docs/tasks/task.200.tracker-side-effects-after-their-gate/task.200.bug.3.step-2-halt-can-still-post-blocked.md"
+  ],
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-10-20T21:33:12.990Z"
+}

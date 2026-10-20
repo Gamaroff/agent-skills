@@ -5,10 +5,12 @@ type: task
 description: "develop-bug creates its tracker issue and signals work started only after review-bug says READY TO FIX, and every tracker document link uses the current branch only when that branch is the document's own work item."
 tags: [develop-bug, ensure-github-issue, sync-github, jira-sync, tracker, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-09
 updated: 2026-10-20
+completed_date: 2026-10-20
+pr_number: 711
 assignee:
 estimated_effort_hours: 16
 github_issue: 616
@@ -16,7 +18,7 @@ github_issue: 616
 
 # Technical Task: Tracker side effects after their gate
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.200.review.1.tracker-side-effects-after-their-gate.md` implemented 2026-10-09
 **GitHub Issue**: [#616](https://github.com/Gamaroff/agent-skills/issues/616)
 
@@ -493,9 +495,11 @@ None to any CLI or file format. Behaviour changes a consumer can observe:
 ### Key Findings
 QA re-entry after DoD 1. Commit 655ce648 narrows the story integration fallback to the configured `branchPattern` prefix and the bug hotfix rule to `hotfix/v<digit>`. All four DoD reproductions are now refused (54 probes, 0 reproduced, 0 escaped). Nothing is open. Maintainability CONCERNS covers advisory items only: gate 3's guard-breadth gaps, a fallback that only recognises `{p}.{n}` patterns (behaves the same on gate 3's head), and one absorbed mutant.
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 1 (historical, superseded)
 
-**Status:** READY FOR REVIEW (unchanged — not accepted)
+> **Superseded by DoD run 2.** Both gaps below were closed by narrowing the rules in 655ce648, which QA gate 4 re-reviewed. The decision boxes are left as DoD 1 wrote them. See the PASSED section below and `task.200.dod.2.tracker-side-effects-after-their-gate.md`.
+
+**Status:** READY FOR REVIEW (unchanged — not accepted) — as of DoD run 1
 
 ### QA Gate Status
 
@@ -525,6 +529,30 @@ QA re-entry after DoD 1. Commit 655ce648 narrows the story integration fallback 
 **Gap Report Generated:** 2026-10-20
 
 **Detailed Verification Log:** See `task.200.dod.1.tracker-side-effects-after-their-gate.md` for the full evidence, and `task.200.dod.1.security.run.json` for the probe record.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.200.qa.4.tracker-side-effects-after-their-gate.md`
+**Gate File**: `task.200.gate.4.tracker-side-effects-after-their-gate.yml`
+**Gate Status**: ⚠️ CONCERNS, nothing open (maintainability advisories only, in `recommendations.future`)
+**Quality Score**: 90/100
+**PR Review (5c)**: ✅ APPROVE — `task.200.pr-review.2.tracker-side-effects-after-their-gate.md`
+
+All Definition of Done criteria have been verified (DoD run 2):
+
+✅ **Acceptance Criteria:** 10 of 11 PASS with code and per-PR test evidence. AC8 ("each new test mutation-proved") is accepted on the committed mutation records, with its residue named in the DoD log: 14 new tests have no mutant of their own, and one QA 4 mutant was absorbed.
+✅ **PR Review & Tests:** PR #711; the 5c review APPROVE stands in for a review decision the host does not require. CI reading 1 SUCCESS @ `94612c09` over 5 checks.
+✅ **Documentation:** CHANGELOG `[Unreleased]` and `docs/reference/configuration.md` § Document link branch state the narrowed rule.
+✅ **Security Review:** PASS. 100 probes across 6 controls of `branchNamesWorkItem` (the source and four bundled copies, plus a configured `integration/` prefix): 0 reproduced, 0 escaped. DoD 1's four gaps are refused everywhere.
+✅ **Compliance Review:** NOT_APPLICABLE (internal skill library change).
+
+**Task marked as ACCEPTED on:** 2026-10-20
+
+**Detailed Verification Log:** See `task.200.dod.2.tracker-side-effects-after-their-gate.md` for the full evidence, and `task.200.dod.2.security.run.json` for the probe record.
 <!-- change-log-start -->
 ## Change Log
 
@@ -541,6 +569,7 @@ QA re-entry after DoD 1. Commit 655ce648 narrows the story integration fallback 
 | 2026-10-20 |  | QA gate CONCERNS (90/100) — cycle 3, 0 open findings (2 advisory) | qa-task |
 | 2026-10-20 |  | DoD incomplete — 2 gaps identified (security probe: spec-sanctioned branch accepts, low) | finalise |
 | 2026-10-20 |  | QA gate CONCERNS (90/100) — cycle 4 (re-entry after DoD 1), 0 open findings (DoD gaps closed) | qa-task |
+| 2026-10-20 | 1.2 | DoD passed — accepted (PR #711) | finalise |
 <!-- change-log-end -->
 
 ---
