@@ -127,7 +127,7 @@ function scratch(skills, ghAnswer = "main") {
   for (const s of skills) {
     const dest = path.join(repo, ".agents/skills", s, "references");
     fs.mkdirSync(dest, { recursive: true });
-    for (const f of ["doc-link-branch.js", "doc-id.js"]) {
+    for (const f of ["doc-link-branch.js", "doc-id.js", "yaml-subset.js"]) {
       fs.copyFileSync(
         path.join(REPO, "skills", s, "references", f),
         path.join(dest, f),

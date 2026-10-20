@@ -2073,6 +2073,30 @@ test("resolveDocBranch — with a docPath, an upstream for another work item is 
   });
 });
 
+test("resolveDocBranch — a story's integration branch is read from the configured branchPattern", () => {
+  // The upstream is stubbed on the shared resolver module, which jira-sync reads through.
+  const dlb = require("../references/doc-link-branch.js");
+  const real = dlb.currentUpstream;
+  dlb.currentUpstream = () => "int/1.4.ui";
+  try {
+    const story = "story.1.4.2.x.md";
+    const cfg =
+      'branching:\n  epicIntegration:\n    branchPattern: "int/{p}.{n}.{slug}"\n';
+    withConfig(cfg, (dir) => {
+      assert.equal(lib.resolveDocBranch(null, dir, story), "int/1.4.ui");
+    });
+    // the default pattern's prefix is epic/, so int/ is not the epic's branch
+    withConfig(null, (dir) => {
+      assert.equal(
+        lib.resolveDocBranch(null, dir, story),
+        lib.gitDefaultBranch(),
+      );
+    });
+  } finally {
+    dlb.currentUpstream = real;
+  }
+});
+
 test("getDefaultBranch — stays git-only; config must NOT leak into it", () => {
   // Guards the CR-2 fix: getDefaultBranch is the public name for git's default
   // branch. resolveDocBranch is the config-aware path. If these ever merge again,

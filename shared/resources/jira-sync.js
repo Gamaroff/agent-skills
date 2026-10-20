@@ -468,6 +468,7 @@ function resolveDocBranch(explicit, repoRoot, docPath) {
     defaultBranch: gitDefaultBranch(),
     docPath,
     integrationBranch: dlb.integrationBranchOf(docPath),
+    integrationPrefix: dlb.configuredIntegrationPrefix(repoRoot),
   });
 }
 

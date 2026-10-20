@@ -20,9 +20,12 @@
  * `task.20` never matches `feature/task.200.x`, and `bugfix/task.144-cli-decline`
  * matches task.144. Two more shapes count:
  *   - a story (or a story's bug) on its epic's integration branch: the branch the
- *     epic document declares as `integration_branch`, or a last segment that
- *     starts with `{P}.{E}` (the default `epic/{p}.{n}.{slug}` pattern);
- *   - a bug document on a `hotfix/v*` branch, which carries no work-item id.
+ *     epic document declares as `integration_branch`, or a branch built from
+ *     `branching.epicIntegration.branchPattern` (default `epic/{p}.{n}.{slug}`):
+ *     the pattern's literal prefix, then one segment starting `{P}.{E}`. Any other
+ *     prefix is refused, so `release/1.4.0` and `hotfix/1.4.1` never name story 1.4.x;
+ *   - a bug document on a `hotfix/v<digit>…` branch (a version hotfix), which
+ *     carries no work-item id. `hotfix/vendor-sdk-bump` is not one.
  * Ids are read by doc-id.js, never by a pattern of their own.
  *
  * Pure functions: workItemOf, branchNamesWorkItem, resolveDocLinkBranch,
@@ -41,6 +44,9 @@ const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");
 const docId = require("./doc-id.js");
+const { parseYamlSubset } = require("./yaml-subset.js");
+
+const DEFAULT_BRANCH_PATTERN = "epic/{p}.{n}.{slug}";
 
 const REAL_FS = {
   readFile: (p) => fs.readFileSync(p, "utf8"),
@@ -82,7 +88,22 @@ function segmentNamesItem(segment, id, self) {
   return !bug || `${id}.bug.${bug[1]}` === self;
 }
 
-function branchNamesWorkItem(branch, docPath, { integrationBranch = "" } = {}) {
+// The literal prefix of an integration-branch pattern: the text before `{p}`. "epic/" for the
+// default. Null when the pattern has no `{p}` (create-branch refuses one) or a placeholder before
+// it, since neither gives a literal prefix to match: only a declared `integration_branch` counts then.
+function integrationPrefixOf(pattern) {
+  const s = String(pattern == null ? DEFAULT_BRANCH_PATTERN : pattern);
+  const i = s.indexOf("{p}");
+  if (i < 0) return null;
+  const prefix = s.slice(0, i);
+  return prefix.includes("{") ? null : prefix;
+}
+
+function branchNamesWorkItem(
+  branch,
+  docPath,
+  { integrationBranch = "", integrationPrefix = "epic/" } = {},
+) {
   const item = workItemOf(docPath);
   const b = String(branch || "").trim();
   if (!item || !b) return false;
@@ -94,14 +115,23 @@ function branchNamesWorkItem(branch, docPath, { integrationBranch = "" } = {}) {
   ) {
     return true;
   }
-  if (item.isBug && b.startsWith("hotfix/v")) return true;
+  // A version hotfix only: `hotfix/v1.2.1`, never `hotfix/vendor-sdk-bump` (task.200 finalise probe).
+  if (item.isBug && /^hotfix\/v\d/.test(b)) return true;
   if (item.kind === "story") {
     if (integrationBranch && b === String(integrationBranch).trim())
       return true;
-    // A bare segment is not an integration branch: it needs the prefix the
-    // pattern gives it (`epic/` by default), whatever that prefix is.
-    if (b !== segment && segmentNames(segment, `${item.prd}.${item.epic}`)) {
-      return true;
+    // The configured pattern's prefix, then one segment naming {P}.{E}. Any prefix used to count,
+    // so a Gitflow `release/1.4.0` named story 1.4.x and its link 404'd after the release (task.200
+    // finalise probe). A bare segment counts only when the pattern itself has no prefix.
+    if (integrationPrefix !== null && b.startsWith(integrationPrefix)) {
+      const rest = b.slice(integrationPrefix.length);
+      if (
+        rest &&
+        !rest.includes("/") &&
+        segmentNames(rest, `${item.prd}.${item.epic}`)
+      ) {
+        return true;
+      }
     }
   }
   return false;
@@ -114,12 +144,16 @@ function resolveDocLinkBranch({
   defaultBranch,
   docPath,
   integrationBranch,
+  integrationPrefix,
 } = {}) {
   if (explicit && String(explicit).trim()) return String(explicit).trim();
   if (configured && String(configured).trim()) return String(configured).trim();
   if (
     upstream &&
-    branchNamesWorkItem(upstream, docPath, { integrationBranch })
+    branchNamesWorkItem(upstream, docPath, {
+      integrationBranch,
+      ...(integrationPrefix === undefined ? {} : { integrationPrefix }),
+    })
   ) {
     return String(upstream).trim();
   }
@@ -181,6 +215,28 @@ function integrationBranchOf(docPath, { io = REAL_FS } = {}) {
   }
 }
 
+// The integration prefix this repository configures: `branching.epicIntegration.branchPattern` in
+// skills-config.yaml at `root`, else the default pattern. A file that is absent or unreadable gives
+// the default, the same answer the branch would get with no configuration at all.
+function configuredIntegrationPrefix(
+  root = process.cwd(),
+  { io = REAL_FS } = {},
+) {
+  let pattern;
+  try {
+    const cfg = parseYamlSubset(
+      io.readFile(path.join(root, "skills-config.yaml")),
+    );
+    pattern =
+      cfg && cfg.branching && cfg.branching.epicIntegration
+        ? cfg.branching.epicIntegration.branchPattern
+        : undefined;
+  } catch (_) {
+    pattern = undefined;
+  }
+  return integrationPrefixOf(typeof pattern === "string" ? pattern : undefined);
+}
+
 function ghDefaultBranch() {
   try {
     const name = execFileSync(
@@ -209,6 +265,7 @@ function runCli(argv, deps = {}) {
     upstream = () => currentUpstream(),
     defaultBranch = ghDefaultBranch,
     integrationBranch = (doc) => integrationBranchOf(doc),
+    integrationPrefix = () => configuredIntegrationPrefix(),
   } = deps;
   const args = {};
   for (let i = 0; i < argv.length; i++) {
@@ -240,6 +297,7 @@ function runCli(argv, deps = {}) {
     defaultBranch: undefined,
     docPath: args.doc,
     integrationBranch: integrationBranch(args.doc),
+    integrationPrefix: integrationPrefix(),
   });
   const resolved = branch || args.default || defaultBranch();
   return {
@@ -270,5 +328,7 @@ module.exports = {
   stripRemotePrefix,
   currentUpstream,
   integrationBranchOf,
+  integrationPrefixOf,
+  configuredIntegrationPrefix,
   runCli,
 };

@@ -24,6 +24,8 @@ const {
   branchNamesWorkItem,
   resolveDocLinkBranch,
   integrationBranchOf,
+  integrationPrefixOf,
+  configuredIntegrationPrefix,
   runCli,
 } = require(SCRIPT);
 
@@ -78,9 +80,20 @@ const TABLE = [
   ["hotfix/v1.2.1", "task.67.bug.3.x.md", true],
   ["hotfix/v1.2.1", "task.3.x.md", false],
   ["hotfix/v1.2.1", "story.1.8.2.x.md", false],
+  // a version hotfix only (task.200 finalise probe): a "v" that starts a word is not a version
+  ["hotfix/vendor-sdk-bump", "bug.3.x.md", false],
+  ["hotfix/vendor-sdk-bump", "task.67.bug.3.x.md", false],
+  ["hotfix/1.2.1", "bug.3.x.md", false],
   // a story on its epic's integration branch (default pattern)
   ["epic/1.4.feature-ui", "story.1.4.2.x.md", true],
   ["epic/1.4.feature-ui", "story.1.4.2.bug.1.x.md", true],
+  ["epic/1.4", "story.1.4.2.x.md", true],
+  // only the pattern's own prefix (task.200 finalise probe): a release or hotfix whose version
+  // starts with {P}.{E} is deleted after it ships, and any other prefix is not the epic's branch
+  ["release/1.4.0", "story.1.4.2.x.md", false],
+  ["hotfix/1.4.1", "story.1.4.2.x.md", false],
+  ["feature/1.4.x", "story.1.4.2.x.md", false],
+  ["epic/1.4.feature-ui/wip", "story.1.4.2.x.md", false],
   // unrelated branches
   ["feature/task.99.other", "task.200.x.md", false],
   ["feature/task.99.other", "story.1.4.2.x.md", false],
@@ -128,6 +141,71 @@ test("a declared integration branch counts for a story, and only for a story", (
     branchNamesWorkItem("epic/feature-ui", "task.4.x.md", opts),
     false,
   );
+});
+
+test("a configured branchPattern sets the integration prefix", () => {
+  const story = "story.1.4.2.x.md";
+  const integration = { integrationPrefix: "integration/" };
+  assert.equal(
+    branchNamesWorkItem("integration/1.4.ui", story, integration),
+    true,
+  );
+  assert.equal(branchNamesWorkItem("epic/1.4.ui", story, integration), false);
+  // no {p} (refused by create-branch) or a placeholder before it: no literal prefix, no fallback
+  assert.equal(
+    branchNamesWorkItem("epic/1.4.ui", story, { integrationPrefix: null }),
+    false,
+  );
+  // a pattern with no prefix: the bare segment is the branch
+  assert.equal(
+    branchNamesWorkItem("1.4.ui", story, { integrationPrefix: "" }),
+    true,
+  );
+  assert.deepEqual(
+    [
+      undefined,
+      "epic/{p}.{n}.{slug}",
+      "integration/{p}.{n}-{slug}",
+      "{p}.{n}.{slug}",
+      "epic/{n}.{slug}",
+      "{slug}/{p}.{n}",
+    ].map(integrationPrefixOf),
+    ["epic/", "epic/", "integration/", "", null, null],
+  );
+});
+
+test("configuredIntegrationPrefix reads branching.epicIntegration.branchPattern, else the default", () => {
+  const io = (text) => ({
+    readFile: () => {
+      if (text === null)
+        throw Object.assign(new Error("absent"), { code: "ENOENT" });
+      return text;
+    },
+  });
+  assert.equal(configuredIntegrationPrefix("/r", { io: io(null) }), "epic/");
+  assert.equal(
+    configuredIntegrationPrefix("/r", {
+      io: io(
+        'branching:\n  epicIntegration:\n    branchPattern: "int/{p}.{n}.{slug}"\n',
+      ),
+    }),
+    "int/",
+  );
+  assert.equal(
+    configuredIntegrationPrefix("/r", { io: io("tracker: github\n") }),
+    "epic/",
+  );
+});
+
+test("runCli passes the configured prefix to the work-item rule", () => {
+  const run = (prefix) =>
+    runCli(["--doc", "story.1.4.2.x.md", "--default", "develop"], {
+      upstream: () => "int/1.4.ui",
+      integrationBranch: () => "",
+      integrationPrefix: () => prefix,
+    }).payload.branch;
+  assert.equal(run("int/"), "int/1.4.ui");
+  assert.equal(run("epic/"), "develop");
 });
 
 test("resolveDocLinkBranch: explicit → configured → upstream if it names the item → default", () => {

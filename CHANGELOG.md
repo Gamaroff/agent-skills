@@ -23,7 +23,9 @@ All notable changes to this project will be documented in this file. Format foll
 - **One resolver for a card's document-link branch (task 200).**
   `shared/resources/doc-link-branch.js` decides the branch every tracker card's document link
   points at: an explicit branch, then config (Jira), then the current branch's upstream **only
-  when it names the document's own work item**, then the default. The eight `ensure-*-github-issue`
+  when it names the document's own work item**, then the default. A story's epic integration
+  branch counts only under the configured `branching.epicIntegration.branchPattern` prefix, and a
+  bug's hotfix branch only as `hotfix/v<digit>…`, so `release/1.4.0` never names story 1.4.x. The eight `ensure-*-github-issue`
   and `sync-github-*` skills and `create-epic`'s PRD link call it, and `jira-sync.js`
   `resolveDocBranch` delegates to it. `tests/doc-link-branch-population.test.js` fails CI on a new
   upstream (`@{u}` / `@{upstream}`) read anywhere in the skill sources outside the resolver, and on

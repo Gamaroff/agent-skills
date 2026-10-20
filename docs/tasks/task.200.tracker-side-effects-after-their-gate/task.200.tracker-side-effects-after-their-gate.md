@@ -136,7 +136,7 @@ workItemOf(docPath)          // task.N | story.E.S | epic.N | story.E.S.bug.N | 
 branchNamesWorkItem(branch, docPath)
 // true when the branch's last segment starts with the document's id OR its parent's id
 // (task.N for task.N.bug.M, story.E.S for story.E.S.bug.M), followed by ".", "-" or the end;
-// a story also matches its epic's integration branch; hotfix/v* matches a bug document only.
+// a story also matches its epic's integration branch; hotfix/v<digit>… matches a bug document only.
 // Real shapes it must accept: bugfix/bug.17.<name>, bugfix/task.144-<name>, hotfix/v1.2.1,
 // feature/task.N.<name> for a QA bug of task.N.
 ```
@@ -410,8 +410,12 @@ None to any CLI or file format. Behaviour changes a consumer can observe:
   plan's own id regexes predate the task 202 numbering and would have tripped the chokepoint test).
   A branch names a work item when its last path segment is the document's id or its parent's id
   followed by `.`, `-` or the end. A story also matches its epic's integration branch — the
-  epic document's declared `integration_branch`, found by walking up from the story, or a segment
-  starting `{P}.{E}` under any prefix — and a bug matches `hotfix/v*`. The CLI asks `gh` for the
+  epic document's declared `integration_branch`, found by walking up from the story, or the
+  configured `branching.epicIntegration.branchPattern` prefix (`epic/` by default) followed by one
+  segment starting `{P}.{E}` — and a bug matches a version hotfix, `hotfix/v` then a digit. The
+  first version accepted any prefix and any `hotfix/v`; `/finalise` probed `release/1.4.0`,
+  `hotfix/1.4.1`, `feature/1.4.x` and `hotfix/vendor-sdk-bump`, and the operator chose to narrow
+  both rules (DoD 1). The CLI asks `gh` for the
   default branch only when the default is the answer, and never with `--default`.
 - **One definition of the upstream read.** `stripRemotePrefix` and the `@{u}` read moved into the
   resolver; `jira-sync.js` re-exports them and `resolveDocBranch(explicit, repoRoot, docPath)`
