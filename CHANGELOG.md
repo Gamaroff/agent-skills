@@ -6,6 +6,20 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The pipeline entry docs match how a run starts (task 197).** 16 findings from the 2026-10-07
+  doc-drift audit are fixed across 13 docs: architecture, quickstart-story, anti-patterns, glossary,
+  troubleshooting, five runbooks, story-documents, task-documents and the develop-task README.
+  - **Lite mode.** It is auto-detected and shortens QA only (direct-tools Step 5, `--effort low`
+    Step 5c). There is no `--lite` flag; `--mode lite|fast` (task 201) is named instead, and Step 7
+    still runs in full.
+  - **Phase 0.** It asks two questions, base and PR target, and only where `--base`, `--target` or
+    `--defaults` has not answered them.
+  - **Branches and invocation.** Story PRs target `develop` unless the epic opted in to an
+    integration branch. The standards invoke `/develop-story` and `/develop-task`, not `/develop`.
+    `depends_on` is informational. The parallel-story worktree commands use a scratch branch, so
+    they no longer fail with `invalid reference` and do not collide with the branch `/develop-story`
+    creates.
+
 - **The develop-pipeline docs match how the QA loop routes, resumes and commits (task 196).**
   31 findings from the 2026-10-07 doc-drift audit are fixed across 15 docs: the concepts and
   operations overviews, pipeline-artifacts, troubleshooting, the runbooks, task-documents, and the
