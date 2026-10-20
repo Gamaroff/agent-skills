@@ -5,18 +5,20 @@ type: task
 description: "Correct how the docs describe starting a pipeline: Phase 0 asks two questions, lite mode is auto-detected and QA-only, the epic branch is opt-in, and the entry point is develop-task/develop-story: 16 findings from the 2026-10-07 doc-drift audit."
 tags: [docs, phase-0, lite-mode, branch-model, doc-drift]
 category: documentation
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-07
 updated: 2026-10-20
 assignee:
 estimated_effort_hours: 8
 github_issue: 600
+completed_date: 2026-10-20
+pr_number: 702
 ---
 
 # Technical Task: Pipeline entry docs: Phase 0, lite mode and invocation
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.197.review.1.pipeline-entry-docs-phase-0-and-lite-mode.md` implemented 2026-10-20
 **GitHub Issue**: [#600](https://github.com/Gamaroff/agent-skills/issues/600)
 
@@ -320,11 +322,34 @@ None.
 ### Key Findings
 No issues after 4 cycles; 7 QA findings fixed across cycles 1–3. Two advisory cleanups and two follow-ups (the create-parallel-stories skill's worktree examples; the Jira card contract for `depends_on`) are recorded in the gate's recommendations.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.197.qa.4.pipeline-entry-docs-phase-0-and-lite-mode.md`
+**Gate File**: `task.197.gate.4.pipeline-entry-docs-phase-0-and-lite-mode.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (4 QA cycles; 7 QA findings fixed in cycles 1–3)
+**PR Review (5c)**: ✅ APPROVE — `task.197.pr-review.1.pipeline-entry-docs-phase-0-and-lite-mode.md`
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 9/9 met (SC-4 is N/A by design)
+✅ **Tests & PR:** PR #702; CI green (link-check, shellcheck, test, validate); the doc-reading tests pass
+✅ **Documentation:** 13 audited docs plus faq.md fixed; the audit report marks all 16 findings; CHANGELOG entry
+✅ **Security Review:** PASS. Documentation only, not a boundary
+✅ **Compliance Review:** NOT_APPLICABLE
+
+**Task marked as ACCEPTED on:** 2026-10-20
+
+**Detailed Verification Log:** See `task.197.dod.1.pipeline-entry-docs-phase-0-and-lite-mode.md` for complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                                        | Author      |
-| ---------- | ------- | ------------------------------------------------------------------ | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-07 | 1.0     | Initial draft — cut from the 2026-10-07 doc-drift audit | create-task |
 | 2026-10-20 | 1.1     | Review passed (8/10) — fixes re-worded for task.201's `--mode`/answer flags; link check made local (CI filter misses `skills/`, `.agents/plans/`); SC-9 adds the two doc-reading tests | review-task |
 | 2026-10-20 |         | Status → ready-for-development | review-task |
@@ -336,6 +361,7 @@ No issues after 4 cycles; 7 QA findings fixed across cycles 1–3. Two advisory 
 | 2026-10-20 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-10-20 |         | QA findings fixed — QA3-CR-1 (runbook reconciles its worktree form with the skill's printed commands), advisory CR-2 (`depends_on` card is GitHub-only); 3 iterations | qa-fix |
 | 2026-10-20 |         | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-10-20 | 1.2 | DoD passed — accepted (PR #702) | finalise |
 <!-- change-log-end -->
 
 ---
