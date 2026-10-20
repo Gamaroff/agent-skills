@@ -301,15 +301,15 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-20
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.197.qa.3.pipeline-entry-docs-phase-0-and-lite-mode.md](./task.197.qa.3.pipeline-entry-docs-phase-0-and-lite-mode.md)
-- **Gate File**: [task.197.gate.3.pipeline-entry-docs-phase-0-and-lite-mode.yml](./task.197.gate.3.pipeline-entry-docs-phase-0-and-lite-mode.yml)
+- **Full Report**: [task.197.qa.4.pipeline-entry-docs-phase-0-and-lite-mode.md](./task.197.qa.4.pipeline-entry-docs-phase-0-and-lite-mode.md)
+- **Gate File**: [task.197.gate.4.pipeline-entry-docs-phase-0-and-lite-mode.yml](./task.197.gate.4.pipeline-entry-docs-phase-0-and-lite-mode.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 5969
@@ -318,7 +318,7 @@ None.
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Cycle 2's fixes hold. The create-parallel-stories runbook shows a worktree shape that differs from the commands `/create-parallel-stories` prints, with no sentence reconciling them (QA3-CR-1, medium).
+No issues after 4 cycles; 7 QA findings fixed across cycles 1–3. Two advisory cleanups and two follow-ups (the create-parallel-stories skill's worktree examples; the Jira card contract for `depends_on`) are recorded in the gate's recommendations.
 
 <!-- change-log-start -->
 ## Change Log
@@ -335,6 +335,7 @@ Cycle 2's fixes hold. The create-parallel-stories runbook shows a worktree shape
 | 2026-10-20 |         | QA findings fixed — QA2-CR-1 (faq.md lite-mode wording), advisory CR-2 (scratch-branch cleanup) and CR-3 (`Depends on` scope); 2 iterations | qa-fix |
 | 2026-10-20 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-10-20 |         | QA findings fixed — QA3-CR-1 (runbook reconciles its worktree form with the skill's printed commands), advisory CR-2 (`depends_on` card is GitHub-only); 3 iterations | qa-fix |
+| 2026-10-20 |         | QA gate PASS (100/100) — 0 findings | qa-task |
 <!-- change-log-end -->
 
 ---
