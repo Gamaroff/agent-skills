@@ -36,8 +36,9 @@ git worktree add .worktrees/feat-x -b scratch/feat-x develop
 cd .worktrees/feat-x
 # Run /develop-story here independently
 
-# When the branch is merged, clean up (from the main checkout):
+# When the branch is merged, clean up (from the main checkout), including the scratch branch:
 git worktree remove .worktrees/feat-x
+git branch -D scratch/feat-x
 ```
 
 Worktrees share the same `.git` directory — so commits, fetches, and pushes are visible across all of them immediately.

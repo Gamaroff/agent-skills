@@ -308,8 +308,8 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.197.qa.1.pipeline-entry-docs-phase-0-and-lite-mode.md](./task.197.qa.1.pipeline-entry-docs-phase-0-and-lite-mode.md)
-- **Gate File**: [task.197.gate.1.pipeline-entry-docs-phase-0-and-lite-mode.yml](./task.197.gate.1.pipeline-entry-docs-phase-0-and-lite-mode.yml)
+- **Full Report**: [task.197.qa.2.pipeline-entry-docs-phase-0-and-lite-mode.md](./task.197.qa.2.pipeline-entry-docs-phase-0-and-lite-mode.md)
+- **Gate File**: [task.197.gate.2.pipeline-entry-docs-phase-0-and-lite-mode.yml](./task.197.gate.2.pipeline-entry-docs-phase-0-and-lite-mode.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 5969
@@ -318,7 +318,7 @@ None.
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-`--mode fast` is described as forcing lite at four sites, but it is refused unless `develop.skippable` allows it (QA1-CR-1, medium). The task-development Q1 recommendation omits the `feature/*` case (QA1-CR-2, low).
+Cycle 1's fixes hold. `faq.md:33` still says lite mode skips re-reading the codebase — the claim fixed at five other sites (QA2-CR-1, medium).
 
 <!-- change-log-start -->
 ## Change Log
@@ -331,6 +331,8 @@ None.
 | 2026-10-20 |         | Implemented — 16 findings fixed across 13 docs, 1 same-family primer line (day-4), audit report marked; no tests added (docs only) | develop |
 | 2026-10-20 |         | QA gate CONCERNS (90/100) — 2 findings | qa-task |
 | 2026-10-20 |         | QA findings fixed — QA1-CR-1 (`--mode fast` wording, 4 sites), QA1-CR-2 (Q1 recommendation), advisory CR-4 (worktree base); 1 iteration | qa-fix |
+| 2026-10-20 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-10-20 |         | QA findings fixed — QA2-CR-1 (faq.md lite-mode wording), advisory CR-2 (scratch-branch cleanup) and CR-3 (`Depends on` scope); 2 iterations | qa-fix |
 <!-- change-log-end -->
 
 ---

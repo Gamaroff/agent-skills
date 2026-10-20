@@ -63,7 +63,7 @@ flowchart TD
 - **File-boundary discipline is on you.** `create-parallel-stories` produces a coordination matrix; respect it. If a story's diff touches files claimed by a sibling, abort and re-sequence.
 - **Each PR targets the base chosen at `/develop-story` Phase 0 Q2** — `develop` by default, or the epic integration branch when the epic opted in with `branch_model: epic-integration`. Same convention as serial development.
 - **Worktrees go inside the repo, never beside it** — under `.worktrees/` (or `developBatch.worktreeRoot` in `skills-config.yaml`), which must be gitignored. A sibling directory is invisible to the repo's `.gitignore` and lands wherever the clone happens to sit.
-- **Worktree cleanup:** after merge, remove the worktree (`git worktree remove .worktrees/story-…`) to free disk space.
+- **Worktree cleanup:** after merge, remove the worktree and its scratch branch (`git worktree remove .worktrees/story-{E}.{S}`, then `git branch -D story/{P}.{E}.{S}`). Do the same before re-running the setup for a story whose run was discarded: `git worktree add -b` fails when the scratch branch already exists.
 
 ## See also
 
