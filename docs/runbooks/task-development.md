@@ -91,7 +91,7 @@ One command runs the full lifecycle.
 
 `develop-task` prompts (via `AskUserQuestion`) for exactly two things, and only where `--base`, `--target` or `--defaults` has not answered them ([answer resolution](../../shared/resources/develop-pipeline-step-0-resolve-and-prepare.md#answer-resolution--ask-only-what-nothing-answers)):
 
-- **Q1 — Base branch** for the task branch (recommended `develop`)
+- **Q1 — Base branch** for the task branch (recommended `develop`, or the current `feature/*` branch when invoked from one)
 - **Q2 — PR target branch** (recommended `develop`)
 
 The task path is asked for only if not supplied. Lite mode is auto-detected, not asked.
@@ -125,7 +125,7 @@ Task `status` advances to `accepted`. PR is left for human merge. The task regis
 
 ### Lite mode
 
-Lite mode is auto-detected in Phase 0 (low or absent `risk_level`, fewer than 3 phases, one module); there is no `--lite` flag. `--mode lite` can request it and `--mode fast` forces it — see [the lite-mode contract](../../shared/resources/develop-pipeline-lite-mode.md#speed-modes-and-skips). It shortens QA only: direct-tools Step 5, `--effort low` Step 5c. Step 7 (`finalise`) side-effects still run in full.
+Lite mode is auto-detected in Phase 0 (low or absent `risk_level`, fewer than 3 phases, one module); there is no `--lite` flag. `--mode lite` can request it (honoured only when those conditions hold), and `--mode fast` applies the same shortening regardless of the detector, but only when `develop.skippable` lists `qa-depth` and `review-pr-depth` (or `develop.defaultMode` is `fast`); otherwise it is refused with a reason — see [the lite-mode contract](../../shared/resources/develop-pipeline-lite-mode.md#speed-modes-and-skips). It shortens QA only: direct-tools Step 5, `--effort low` Step 5c. Step 7 (`finalise`) side-effects still run in full.
 
 ### Resume semantics
 

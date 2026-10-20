@@ -1,0 +1,69 @@
+schema: 2
+task: 'task.197.pipeline-entry-docs-phase-0-and-lite-mode'
+task_title: 'Pipeline entry docs: Phase 0, lite mode and invocation'
+gate: CONCERNS
+status_reason: 'All 16 findings fixed and every changed link resolves, but the new lite-mode wording says --mode fast "forces" the shortening at four sites, while fast is refused unless develop.skippable allows it; and task-development Q1 omits the feature/* recommendation.'
+reviewer: 'QA Engineer'
+head: '4fba415a8b882ac4e84aed6b0705dc0343cc6c49'
+updated: '2026-10-20T03:55:37Z'
+
+top_issues:
+  - id: 'QA1-CR-1'
+    severity: medium
+    file: 'docs/reference/glossary.md'
+    finding: '"--mode fast forces it" is false by default: lite-mode.md §Speed Modes (the fast row) and pipeline-answers.js refuse --mode fast unless develop.skippable lists qa-depth and review-pr-depth, or develop.defaultMode is fast. The same wording is at docs/runbooks/story-development.md:249, docs/runbooks/task-development.md:128 and docs/concepts/quickstart-story.md:130 ("request or force").'
+    suggested_action: 'At all four sites say --mode fast applies the shortening regardless of the detector only when develop.skippable allows qa-depth and review-pr-depth (or defaultMode is fast), and is refused with a reason otherwise.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA1-CR-2'
+    severity: low
+    file: 'docs/runbooks/task-development.md'
+    finding: 'Q1 says "recommended develop", but step-0 §0d develop-task Q1 options recommend feature/{current} when invoked from a feature/* branch; skills/develop-task/README.md:51 in the same diff says so, so the two changed docs disagree.'
+    suggested_action: 'Say "recommended develop, or the current feature/* branch when invoked from one".'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 5969
+  phases_verified: 5/5
+  ci: 'pending @ 4fba415a8b88 (validate, shellcheck, link-check pass; test pending)'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'Documentation only; no boundary (no predicate, script or runnable SKILL.md/shared prose changed).'
+  performance:
+    status: PASS
+    notes: 'N/A — docs only.'
+  reliability:
+    status: PASS
+    notes: 'Worktree command verified to run; old form reproduces fatal: invalid reference.'
+  maintainability:
+    status: PASS
+    notes: 'Fixes cite the canonical sections rather than restating them; the two inaccuracies are tracked in top_issues.'
+
+recommendations:
+  immediate:
+    - action: 'Fix QA1-CR-1 at its four sites and QA1-CR-2.'
+      refs: ['docs/reference/glossary.md', 'docs/runbooks/story-development.md', 'docs/runbooks/task-development.md', 'docs/concepts/quickstart-story.md']
+  future:
+    - action: 'create-parallel-stories SKILL.md still emits git worktree add .worktrees/story-1-1 -b feature/story-1-1-1 with no base (lines 249-255, 294, 374, 452, 769), which differs from the runbook scratch-branch form; out of scope (skill behaviour) — align in a follow-up task.'
+      refs: ['skills/create-parallel-stories/SKILL.md']
+    - action: 'create-parallel-stories runbook line 58 says /develop-story cuts the feature branch from origin/develop; it is origin/<Q1 base> (the epic integration branch when the epic opted in). Advisory (CR-4, medium confidence).'
+      refs: ['docs/runbooks/create-parallel-stories.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['QA1-CR-1 and QA1-CR-2 fixed']

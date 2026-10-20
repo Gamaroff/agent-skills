@@ -299,6 +299,27 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-20
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.197.qa.1.pipeline-entry-docs-phase-0-and-lite-mode.md](./task.197.qa.1.pipeline-entry-docs-phase-0-and-lite-mode.md)
+- **Gate File**: [task.197.gate.1.pipeline-entry-docs-phase-0-and-lite-mode.yml](./task.197.gate.1.pipeline-entry-docs-phase-0-and-lite-mode.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 5969
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+`--mode fast` is described as forcing lite at four sites, but it is refused unless `develop.skippable` allows it (QA1-CR-1, medium). The task-development Q1 recommendation omits the `feature/*` case (QA1-CR-2, low).
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -308,6 +329,8 @@ None.
 | 2026-10-20 | 1.1     | Review passed (8/10) — fixes re-worded for task.201's `--mode`/answer flags; link check made local (CI filter misses `skills/`, `.agents/plans/`); SC-9 adds the two doc-reading tests | review-task |
 | 2026-10-20 |         | Status → ready-for-development | review-task |
 | 2026-10-20 |         | Implemented — 16 findings fixed across 13 docs, 1 same-family primer line (day-4), audit report marked; no tests added (docs only) | develop |
+| 2026-10-20 |         | QA gate CONCERNS (90/100) — 2 findings | qa-task |
+| 2026-10-20 |         | QA findings fixed — QA1-CR-1 (`--mode fast` wording, 4 sites), QA1-CR-2 (Q1 recommendation), advisory CR-4 (worktree base); 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

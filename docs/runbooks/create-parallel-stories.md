@@ -55,7 +55,7 @@ flowchart TD
 4. After all parallel stories merge, sequential stories proceed normally.
 ```
 
-`-b` names a **scratch** branch for the worktree. `/develop-story` cuts `feature/story.{P}.{E}.{S}.{name}` itself, from `origin/develop`, inside the linked worktree (`/create-branch` Step 5, linked-worktree exception). Pre-creating the feature branch there makes Step 1 stop on "branch already exists", and omitting `-b` fails because no such branch exists yet. This is the same shape `/develop-batch` uses.
+`-b` names a **scratch** branch for the worktree. `/develop-story` cuts `feature/story.{P}.{E}.{S}.{name}` itself, from `origin/<Q1 base>` (normally `develop`, or the epic integration branch when the epic opted in), inside the linked worktree (`/create-branch` Step 5, linked-worktree exception). Pre-creating the feature branch there makes Step 1 stop on "branch already exists", and omitting `-b` fails because no such branch exists yet. This is the same shape `/develop-batch` uses.
 
 ## Pitfalls
 
