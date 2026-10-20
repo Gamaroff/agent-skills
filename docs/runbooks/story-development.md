@@ -314,7 +314,7 @@ gh pr view --json baseRefName,statusCheckRollup
 gh pr view --json comments | jq '.comments[].body' | grep -i 'definition of done'
 
 # Bitbucket — view PR in the web UI, or:
-source shared/resources/bitbucket-auth.sh && curl "${BB_CURL_AUTH[@]}" \
+source .agents/skills/create-pr/references/bitbucket-auth.sh && curl "${BB_CURL_AUTH[@]}" \
   "https://api.bitbucket.org/2.0/repositories/{workspace}/{repo}/pullrequests/{id}"
 ```
 

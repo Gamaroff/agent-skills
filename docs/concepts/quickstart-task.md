@@ -50,7 +50,7 @@ git --version
 
 # VCS auth — pick your platform:
 gh auth status                                                              # GitHub
-source shared/resources/bitbucket-auth.sh && echo "ok ($BB_AUTH_SCHEME)"  # Bitbucket
+source .agents/skills/create-pr/references/bitbucket-auth.sh && echo "ok ($BB_AUTH_SCHEME)"  # Bitbucket
 
 # Jira (only if tracker is Jira):
 [ -n "$JIRA_URL" ] && [ -n "$JIRA_API_TOKEN" ] && echo ok

@@ -568,19 +568,22 @@ file. They overlap but are not the same vocabulary — the pipeline passes throu
 no document status names, and a document can sit in a status the pipeline never visits. `jira.statusMap`
 configures the second; the workflow record configures the first.
 
-| Stage             | Fired at                                    | Default |
-| ----------------- | ------------------------------------------- | ------- |
-| `work-started`    | Step 1, once the branch and lock exist      | on      |
-| `in-review`       | Step 4, once the PR URL is confirmed        | on      |
-| `in-qa`           | Step 5, once, on entering the QA loop       | **off** |
-| `ready-for-merge` | Step 5c, on APPROVE / CONCERNS              | **off** |
-| `blocked`         | before a terminal HALT, real blockages only | **off** |
-| `done`            | Step 7, by `/finalise`                      | on      |
+| Stage               | Fired at                                                    | Default |
+| ------------------- | ----------------------------------------------------------- | ------- |
+| `work-started`      | Step 1, once the branch and lock exist                      | on      |
+| `in-review`         | Step 4, once the PR URL is confirmed                        | on      |
+| `changes-requested` | Step 5b, before `/qa-fix` — once per cycle                  | **off** |
+| `in-qa`             | Step 5, once, on entering the QA loop                       | **off** |
+| `ready-for-merge`   | Step 5c, on APPROVE / CONCERNS                              | **off** |
+| `pr-merged`         | `/develop-next` and `/develop-batch`, after the PR merges   | **off** |
+| `blocked`           | before a terminal HALT, real blockages only                 | **off** |
+| `done`              | Step 7, by `/finalise`                                      | on      |
 
-The three new stages default **off**. Consumers upgrade by replacing a skill directory wholesale, and
-a stage that defaulted on would start moving cards into columns that project has never used, with no
-one having asked for it. `work-started`, `in-review` and `done` behave exactly as they did before this
-existed.
+The five off-by-default stages stay **off** until a project enables them. Consumers upgrade by
+replacing a skill directory wholesale, and a stage that defaulted on would start moving cards into
+columns that project has never used, with no one having asked for it. `work-started`, `in-review` and
+`done` behave exactly as they did before this existed. What each moment means:
+[Tracker workflow § The moments](./tracker-workflow.md#the-moments).
 
 Turn one on in the workflow record:
 
@@ -1155,8 +1158,9 @@ a knob with no reader.
 Skills resolve tracker and VCS in this order:
 
 1. Explicit `tracker:` / `vcs:` in `skills-config.yaml`
-2. Environment variables (`JIRA_URL` present → Jira; `BITBUCKET_USERNAME` present → Bitbucket)
-3. Git remote URL pattern
+2. `JIRA_URL` in the environment, then in `.env` at the repo root → Jira (**tracker only** — no
+   environment variable selects the VCS)
+3. Git remote URL — `bitbucket.org` → Bitbucket (**VCS only**)
 4. Default: GitHub
 
 Full spec: [`shared/resources/platform-detection.md`](../../shared/resources/platform-detection.md).

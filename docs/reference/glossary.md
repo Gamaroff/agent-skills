@@ -12,7 +12,7 @@ Quick reference. Where a term has a full standards doc or runbook, the entry lin
 | **Epic**       | Mid-scope work unit nested in a PRD. Parent of stories. Globally unique number. See [Epic documents](../standards/epic-documents.md).       |
 | **Story**      | Unit of implementation. One story → one branch → one PR → one QA gate. See [Story documents](../standards/story-documents.md).              |
 | **Task**       | Standalone technical work (refactor, infra, cleanup) that doesn't need a PRD or epic. See [Task documents](../standards/task-documents.md). |
-| **Bug report** | Structured record of an issue found by QA or a user, scoped to an existing story.                                                           |
+| **Bug report** | Structured record of a defect. Three modes: a **story bug** beside its story, a **task bug** in its task directory, or a **general bug** (no single owner) in `docs/bugs/bug.{N}.{name}/`, numbered from the bug registry. See [Bug documents](../standards/bug-documents.md). |
 | **Plan file**  | Implementation plan for a task or story. Must be co-located with the work. See [Plan file locations](../standards/plan-file-locations.md).  |
 
 ## Pipelines
@@ -50,6 +50,7 @@ Quick reference. Where a term has a full standards doc or runbook, the entry lin
 | **Epic registry**          | Retired (tasks 202–205). Epics are numbered within their PRD (`epic.{P}.{E}`); `docs/development/epic-registry.md` keeps only an old → new mapping. See [Epic registry](../standards/epic-registry.md) and the **PRD registry**. |
 | **PRD registry**           | `${PRD_ROOT}/prd-registry.md` in the consuming project. Single source of truth for PRD numbers. Globally unique, never reused. See [PRD registry](../standards/prd-registry.md). |
 | **Task registry**          | `docs/tasks/task-registry.md` in the consuming project. Single source of truth for task numbers. Globally unique, never reused. See [Task registry](../standards/task-registry.md).       |
+| **Bug registry**           | `docs/bugs/bug-registry.md` in the consuming project. Single source of truth for **general** bug numbers (story and task bugs are numbered per parent). Globally unique, never reused. See [Bug registry](../standards/bug-registry.md). |
 | **Atomic registry update** | Rule that a new epic/task and its registry row must commit in the same git commit.                                                                                                        |
 
 ## Library mechanics
@@ -59,7 +60,7 @@ Quick reference. Where a term has a full standards doc or runbook, the entry lin
 | **SKILL.md**               | Required entry-point file for a skill. YAML frontmatter (name + description) + body instructions.                                                                                             |
 | **Frontmatter**            | YAML metadata block at the top of a document, between `---` delimiters.                                                                                                                       |
 | **Progressive disclosure** | Three-tier loading: metadata always in context → SKILL.md body on trigger → bundled resources on demand.                                                                                      |
-| **Shared resources**       | Cross-skill docs under `shared/resources/` in this repo. Auto-bundled into each skill's zip by the packager.                                                                                  |
+| **Shared resources**       | Cross-skill docs and scripts under `shared/resources/` in this repo. Copied into each referencing skill's `references/` directory by `npm run bundle` (and into each zip by the packager).    |
 | **Platform resolver**      | Logic that picks GitHub/Bitbucket/Jira based on `skills-config.yaml`, env vars, and git remote. See [`shared/resources/platform-detection.md`](../../shared/resources/platform-detection.md). |
 | **Access model**           | How much the agent may do to the tracker: `full` · `read-only` · `approve` · `command` · `manual`. Separate from *which* tracker. See [Restricted tracker access](../concepts/restricted-access.md). |
 | **Handover**               | The three committed renderings of deferred tracker writes: `*.handover.{n}.{name}.{md,sh,json}`. Checklist, script, JSON sidecar. See [Pipeline artifacts](./pipeline-artifacts.md). |
