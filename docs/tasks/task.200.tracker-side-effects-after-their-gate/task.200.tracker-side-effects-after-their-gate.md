@@ -481,17 +481,17 @@ None to any CLI or file format. Behaviour changes a consumer can observe:
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.200.qa.3.tracker-side-effects-after-their-gate.md](./task.200.qa.3.tracker-side-effects-after-their-gate.md)
-- **Gate File**: [task.200.gate.3.tracker-side-effects-after-their-gate.yml](./task.200.gate.3.tracker-side-effects-after-their-gate.yml)
+- **Full Report**: [task.200.qa.4.tracker-side-effects-after-their-gate.md](./task.200.qa.4.tracker-side-effects-after-their-gate.md)
+- **Gate File**: [task.200.gate.4.tracker-side-effects-after-their-gate.yml](./task.200.gate.4.tracker-side-effects-after-their-gate.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 6067
+- **Tests Executed**: 6079
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-Cycle 2 fixed TASK-200-004 to 008, and all eight bugs are closed. Nothing is open. Maintainability CONCERNS covers two advisory guard-breadth gaps with no live instance: the link scan misses a defaulted expansion, and the unbound-read check accepts a one-hop binding.
+QA re-entry after DoD 1. Commit 655ce648 narrows the story integration fallback to the configured `branchPattern` prefix and the bug hotfix rule to `hotfix/v<digit>`. All four DoD reproductions are now refused (54 probes, 0 reproduced, 0 escaped). Nothing is open. Maintainability CONCERNS covers advisory items only: gate 3's guard-breadth gaps, a fallback that only recognises `{p}.{n}` patterns (behaves the same on gate 3's head), and one absorbed mutant.
 
 ## Definition of Done - Gaps Identified
 
@@ -540,6 +540,7 @@ Cycle 2 fixed TASK-200-004 to 008, and all eight bugs are closed. Nothing is ope
 | 2026-10-20 |  | QA findings fixed — 4 of 4 (cycle 2), 1 iteration; status → ready-for-review | qa-fix |
 | 2026-10-20 |  | QA gate CONCERNS (90/100) — cycle 3, 0 open findings (2 advisory) | qa-task |
 | 2026-10-20 |  | DoD incomplete — 2 gaps identified (security probe: spec-sanctioned branch accepts, low) | finalise |
+| 2026-10-20 |  | QA gate CONCERNS (90/100) — cycle 4 (re-entry after DoD 1), 0 open findings (DoD gaps closed) | qa-task |
 <!-- change-log-end -->
 
 ---

@@ -107,6 +107,15 @@ Gate develop-bug's tracker writes behind review-bug's READY TO FIX, and replace 
 - Security: the boundary rule fired on `branchNamesWorkItem`. /finalise ran the agent's probe plan: 3 controls, 42 executed, 0 escapes, 4 reproduced. The security agent graded all four low. Each is the specified behaviour ("`{P}.{E}` under any prefix", "`hotfix/v*`"), stricter in the probe than in the spec.
 - Fix-and-recheck (8a) declined without running the evaluator. The fix would change specified behaviour in the code, the task doc and configuration.md, and raises a design question (should the story fallback read the configured `branchPattern`?) that is a scope decision for a person. Took Step 8: gap section and Change Log row written, `dod-gaps` PR comment posted, status unchanged.
 
+### Resume — DoD gaps closed by a code change (2026-10-20)
+
+- Operator decision on the DoD 1 gaps: **narrow both predicates** (option 1 of the halt report). The story fallback now needs the configured `branching.epicIntegration.branchPattern` prefix (`epic/` by default) followed by one segment starting `{P}.{E}`. The bug hotfix rule needs `hotfix/v` followed by a digit. `jira-sync` passes the configured prefix.
+- Fast gate attempt 1: 4 failures, all `Cannot find module ./yaml-subset.js` in `tests/doc-link-branch-sites-execute.test.js`, whose isolated install copies a fixed file list. Fixed by adding the file. Attempt 2: 6079 tests, 0 failures (`.agents/skills` moved aside).
+- Mutation proofs 7/7 red: hotfix prefix, any-prefix fallback, nested segment (its first row was vacuous and was replaced), CLI drops the prefix, placeholder prefix, Jira wiring.
+- Committed as 655ce648 and pushed. The first commit attempt was refused by the pre-commit hook for 8 unstaged generated `yaml-subset.js` copies.
+- QA re-entry after finalise DoD gaps: reenter-qa: re-entered QA at step 5 / qa_phase 5a — qa_max_cycles=5 (base 3), gate_head=aca4159160c7bfccd74a837e6acb19bc3c17a541.
+- develop-next run state: `halted` cleared to resume this item in-session.
+
 ---
 
 ## Issues Log
@@ -159,6 +168,15 @@ _Track each QA review/fix cycle._
 **Action**: Proceeding to 5c (PR conformance review)
 
 ---
+### QA Cycle 4 — 2026-10-20
+
+**Gate Result**: CONCERNS (90/100)
+**Issues Found**: none open. A QA re-entry after the DoD 1 gaps: 655ce648 narrows both predicates, and the DoD reproductions are refused (54 probes, 0 reproduced, 0 escaped). Advisory: CR-1, a fallback that only recognises `{p}.{n}` patterns (behaves the same on gate 3's head); CR-2, an empty `branchPattern` turns the fallback off; Q2, an absorbed mutant; two cleanups
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: pending (5c)
+**Loop exit**: route 3 — CONCERNS with no open entry in `top_issues[]`. Convergence check: HIGH 1 → 1 → 0 → 0, not rising.
+**Action**: Proceeding to 5c (PR conformance review)
 
 ## Completion
 
