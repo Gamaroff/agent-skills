@@ -7,12 +7,14 @@
 #   1. Prerequisite checks        (node, git, jq, curl)
 #   2. Platform selection         (GitHub+Issues / GitHub+Jira / Bitbucket+Jira)
 #   3. Credential collection      (gh auth check, Bitbucket/Jira API tokens)
-#   4. .env files                 (.env.example always; .env optionally; gitignore)
+#   4. Credentials file           (.env.example always; .secrets/tooling.env optionally;
+#                                  .secrets/ and .env gitignored)
 #   5. skills-config.yaml         (PRD path, architecture path, coding-standards path)
 #   6. Registry creation          (docs/tasks/task-registry.md — epics are numbered within their PRD)
 #   7. docs/ scaffold             (PRD root, architecture/concepts/ stubs)
 #   8. Skills install             (latest release from github.com/Gamaroff/agent-skills;
 #                                  skips the other tracker's skills — see --all-skills)
+#   8a. tracker-workflow.yaml     (board ladder + pipeline moments; never overwritten)
 #   8b. Agent links               (local, gitignored links for the agents you pick)
 #   9. Pipeline hook install      (.claude/settings.json via inline jq)
 #

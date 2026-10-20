@@ -8,7 +8,7 @@ From "I cloned the repo" to "I ran my first command" in under ten minutes.
 
 Before starting, confirm you have:
 
-- **Node ≥ 20** — `node --version`
+- **Node ≥ 22** — `node --version`
 - **git** — `git --version`
 - **jq** — `jq --version` (required by hook installer and Bitbucket scripts — `brew install jq` / `apt install jq`)
 - **curl** — `curl --version` (required by Bitbucket scripts — pre-installed on most systems)

@@ -707,7 +707,7 @@ workflow per type — an Epic with only `Open`/`Done` beside a Story with a full
 required field is reported and the transition is skipped rather than sent — a request the workflow has
 already declared incomplete would only return HTTP 400.
 
-**Inspecting a board.** `--probe-workflow` on any of the three sync skills prints the project's statuses
+**Inspecting a board.** `--probe-workflow` on any of the four sync skills prints the project's statuses
 per issue type, the live transitions from a sampled issue, and exactly which transition each local
 status would take and by which rule. Read-only; it transitions nothing:
 

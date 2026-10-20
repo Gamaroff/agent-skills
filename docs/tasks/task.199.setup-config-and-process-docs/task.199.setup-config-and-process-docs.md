@@ -247,7 +247,7 @@ Not applicable.
 ### Code Quality
 
 - [x] **SC-5** `prettier --check` passes on every changed doc.
-- [ ] **SC-6** `doc-links.js` passes on every changed doc, and the PR's `Docs link check` job (`markdown-link-check`, which checks anchors) is green.
+- [x] **SC-6** `doc-links.js` passes on every changed doc, and the PR's `Docs link check` job (`markdown-link-check`, which checks anchors) is green. _(PR #704 `link-check`: pass.)_
 - [x] **SC-7** Not applicable — no skill README is in scope; recorded as N/A in the DoD.
 
 ### Migration
@@ -340,19 +340,51 @@ Adjacent edits, each the same claim as a finding at a second site: getting-start
 - **SC-7:** not applicable — no skill README changed.
 - **Mermaid:** the two edited flowcharts (which-path.md, which-access.md) validate as `flowchart` via the Mermaid Chart validator (`valid: true`).
 
+### QA Fixes — cycle 1
+
+Gate 1 (CONCERNS) found three stale copies of corrected claims outside the original diff. All three are fixed:
+
+- **CR-1** `docs/reference/configuration.md` — `--probe-workflow` "any of the four sync skills" (sync-jira-bug, -epic, -story and -task each document the flag).
+- **QA-1** `docs/concepts/getting-started.md`, `quickstart-task.md` (2 sites), `quickstart-story.md` — Node ≥ 22 (`package.json` `engines.node`, `setup-consumer.sh` header).
+- **QA-2** `scripts/setup-consumer.sh` header — step 4 now names `.secrets/tooling.env` (with `.secrets/` and `.env` gitignored), and a new 8a line covers `tracker-workflow.yaml`, so its stated parity with the wizard table holds again. Comment-only change; `bash -n` and `shellcheck -S warning` are clean.
+
+Probe (each changed observable, tree-wide, excluding task/bug/PRD records and dated audits): no stale `three sync skills` outside `CHANGELOG.md` (historical release notes, left as written); no `Node ≥ 20` left; `numbering matches` appears only at the edited header. Tests: the setup-consumer, call-sites and install-hooks suites (208) pass.
+
 ### Deferred Work
 
 None.
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-20
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.199.qa.1.setup-config-and-process-docs.md](./task.199.qa.1.setup-config-and-process-docs.md)
+- **Gate File**: [task.199.gate.1.setup-config-and-process-docs.yml](./task.199.gate.1.setup-config-and-process-docs.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 5969
+- **Phases Verified**: 6/6
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+Every changed claim matches its source. Three stale copies of corrected claims remain outside the diff: configuration.md:710 says "three sync skills" (CR-1, medium); getting-started and the quickstarts still give Node ≥ 20 (QA-1, low); the `setup-consumer.sh` header no longer matches the wizard table (QA-2, low).
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                                        | Author      |
-| ---------- | ------- | ------------------------------------------------------------------ | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-07 | 1.0     | Initial draft — cut from the 2026-10-07 doc-drift audit | create-task |
 | 2026-10-20 | 1.1     | Review passed (8/10) — added quickstart-story.md, marked SKILL-READMES-STANDARDS-28 superseded, bounded SC-3, named the link checks in SC-6, SC-7 N/A | review-task |
 | 2026-10-20 |         | Status → ready-for-development | review-task |
 | 2026-10-20 |         | Implemented — 16 docs + audit report; 19 findings fixed, 1 closed as superseded | develop |
+| 2026-10-20 |  | QA gate CONCERNS (90/100) — 3 findings | qa-task |
+| 2026-10-20 |  | QA findings fixed — cycle 1, 3 findings (CR-1, QA-1, QA-2) | qa-fix |
 <!-- change-log-end -->
 
 ---

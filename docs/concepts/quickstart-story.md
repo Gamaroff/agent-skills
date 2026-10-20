@@ -19,7 +19,7 @@ created: 2026-05-12
 
 Universal:
 
-- Node ≥ 20 (`node --version`)
+- Node ≥ 22 (`node --version`)
 - `git` (`git --version`)
 - Skills installed in your project. First-time setup runs the full wizard (skills + config + hooks + registries + docs scaffold):
   ```bash
