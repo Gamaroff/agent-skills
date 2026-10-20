@@ -3,7 +3,7 @@
 **Task**: `task.219.bug-registry-status-mirror.md`
 **Run Number**: 1
 **Started**: 2026-10-20 12:58
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -36,9 +36,9 @@ Add a `--bug-status` mode to `registry-tick.js`, call it at every general-bug st
 | 2. review-task             | ✅ Done    | `task.219.review.{N}.{name}.md` exists (or skip logged)                | `task.219.review.1.bug-registry-status-mirror.md` — READY TO IMPLEMENT 9/10; Planned → Ready for Development | —                    | 2026-10-20T13:03Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; 15/15 plan items; commit `686c2d5b`; ci:fast 5,990 pass / 0 fail | —                    | 2026-10-20T13:29Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #708: https://github.com/Gamaroff/agent-skills/pull/708 | —                    | 2026-10-20T13:30Z |
-| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.219.qa.{N}.*.md`; `task.219.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 1 cycle, gate PASS 100/100 (`466bfb8e`); 5c PR review APPROVE, 0 findings (`task.219.pr-review.1.bug-registry-status-mirror.md`, staged for the acceptance commit) | —                    | 2026-10-20T13:53Z |
-| 7. finalise                | 🛑 HALT    | `task.219.dod.{N}.*.md`; task `status: accepted`                       | DoD gaps: 1 (PERF1 test evidence) — `task.219.dod.1.bug-registry-status-mirror.md`; status unchanged | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.219.qa.{N}.*.md`; `task.219.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 2 cycles. Cycle 1 PASS 100/100 (`466bfb8e`), 5c APPROVE (`task.219.pr-review.1`). Re-entered at 5a after the finalise PERF1 gap; cycle 2 PASS 100/100 (`5a8ba97f`), 5c APPROVE, 0 findings (`task.219.pr-review.2.bug-registry-status-mirror.md`, staged for the acceptance commit) | —                    | 2026-10-20T14:25Z |
+| 7. finalise                | ✅ Done    | `task.219.dod.{N}.*.md`; task `status: accepted`                       | Run 1 halted on DoD gap PERF1 (`task.219.dod.1`); gap closed by `3f98c7b7`, re-gated by QA cycle 2. Run 2 ACCEPTED (`task.219.dod.2`, 14/14); acceptance commit `6be1fd78`; CI reading 2 SUCCESS; #706 closed, board Done | —                    | 2026-10-20T14:43Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Implementation report committed and pushed | —                    | 2026-10-20T14:43Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -122,13 +122,39 @@ Add a `--bug-status` mode to `registry-tick.js`, call it at every general-bug st
 - Lock left at `current_step: 7`. `advance-pipeline-lock.sh --skill finalise` was NOT run: it would set step 8 with no acceptance guard, and a resume would then skip `/finalise`
 - The `dod-gaps` lead counted 2 open boxes: the gap plus its Next Steps checkbox in the same section. The engine counts every `- [ ]` in the section
 
+### Step 7 gap fix + QA re-entry — 2026-10-20
+
+- PERF1 gap closed by `3f98c7b7` test(task.219): a `node --require` preload counts registry fs reads/writes inside the CLI; asserts 1 read / 1 write (mirrored), 1 read / 0 writes (already, --dry-run). Mutation-proved: a second registry read in `bugStatus` → red (`mirrored: registry reads`); a write under --dry-run → red (`registry writes`). `ci:fast` with the symlink aside: 5,991 pass / 0 fail
+- Halt snapshot written late (`halt_reason: dod-gaps`, `halt_step: 7`) — the Step 7 halt had skipped the terminal-HALT snapshot + lock removal
+- QA re-entry after finalise DoD gaps: reenter-qa: re-entered QA at step 5 / qa_phase 5a — qa_max_cycles=5 (base 1), gate_head=7980a2529f03455b048b5a26cc4c20c1e19680f6
+- QA cycle 2: gate PASS 100/100 at head `3f98c7b7` (`task.219.gate.2`), 0 in gate; refute-pass code review (whole branch, Explore, 210515 ms) returned CR-1 low/low (stale select-next.mjs throws instead of engine-unavailable) and CR-2 cleanup (preload counts only the readFile family) → recommendations.future. Probe 19 executed, 0 escaped. Traceability mapper skipped (no Success Criteria table). Committed `5a8ba97f`
+- 5c (cycle 2) `/review-pr 708 --effort medium --comment --no-code`: APPROVE, conformance 0 findings; report `task.219.pr-review.2` staged (carry list header replaced pr-review.1); summary comment updated in place (issuecomment-6292485864); `ready-for-merge` → stage-disabled; lock 5 → 7
+
+### Step 7 (run 2) — 2026-10-20
+
+- `/finalise` run 2: DoD summary: `docs/tasks/task.219.bug-registry-status-mirror/task.219.dod.2.bug-registry-status-mirror.md`. Agents: AC PASS (14/14, PERF1 cited at `registry-tick.test.mjs:1620`), security PASS, compliance NOT_APPLICABLE, docs PASS. Probe plan run by /finalise: 1 control, 19 executed, 0 reproduced, 0 escaped, 0 refusals (record `task.219.dod.2.security.run.json`)
+- CI reading 1: SUCCESS @ `5a8ba97f0841` over 5 checks; CI reading 2: SUCCESS @ `6be1fd781c86` over 5 checks after 60s
+- Decision: ACCEPTED. Status → accepted, Change Log row (Version 1.2), registry row ticked (`planned` → `accepted`), run 1's gaps section retitled as historical, DoD PASSED section added, sprint review written
+- Acceptance commit `6be1fd78` (registry ticked; 5c review pr-review.2 and the dod.2 probe record/cases carried); 6b tracked-and-pushed assertions passed; 6d CHANGELOG cites task 219
+- Canonical PR summary posted: https://github.com/Gamaroff/agent-skills/pull/708#issuecomment-6293527208
+- DoD body posted to PR — comment URL: https://github.com/Gamaroff/agent-skills/pull/708#issuecomment-6293548190
+- Tracker `done` comment posted; Document link already on `develop`
+- GitHub Issue #706 — close: CLOSED ✅
+- GitHub Issue #706 — board: done → already
+- The CI poll script was written with the Write tool rather than the step's heredoc (operator shell-safety rule); content identical, with the Step 6 rollup query filled in
+- Task completed
+
+### Step 8 — 2026-10-20
+
+- Report finalised and linted before the commit; committed with `/commit-changes --scope docs/tasks/task.219.bug-registry-status-mirror/` and pushed
+
 ---
 
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
 
-- **Step 7 — DoD gap (PERF1)**: success criterion "One registry read and at most one write per call" holds in code (`shared/resources/registry-tick.js:612` sole read, `:674` sole write) but no test pins the counts. The DoD AC rule treats a bound a per-PR test could assert as a behaviour criterion, so with no test it fails. Fix-and-recheck (8a) refused: `severity-low` (ungraded) and `mutation-proved`; 8a also requires a finding produced by execution, and this one came from reading the code. Remedy: add a counted read/write test in `shared/resources/tests/registry-tick.test.mjs`, mutation-prove it (add a second registry read), then resume; the code change re-enters QA at 5a (`reenter-qa-after-finalise.sh`). **Status: open — pipeline HALTed.**
+- **Step 7 — DoD gap (PERF1)**: success criterion "One registry read and at most one write per call" holds in code (`shared/resources/registry-tick.js:612` sole read, `:674` sole write) but no test pins the counts. The DoD AC rule treats a bound a per-PR test could assert as a behaviour criterion, so with no test it fails. Fix-and-recheck (8a) refused: `severity-low` (ungraded) and `mutation-proved`; 8a also requires a finding produced by execution, and this one came from reading the code. Remedy: add a counted read/write test in `shared/resources/tests/registry-tick.test.mjs`, mutation-prove it (add a second registry read), then resume; the code change re-enters QA at 5a (`reenter-qa-after-finalise.sh`). **Status: resolved** — test added in `3f98c7b7`, QA cycle 2 PASS, `/finalise` run 2 accepted.
 
 ---
 
@@ -147,12 +173,28 @@ _Track each QA review/fix cycle._
 
 ---
 
+### QA Cycle 2 — 2026-10-20
+**Gate Result**: PASS
+**Issues Found**: none in the gate; 2 advisory refute-pass findings (CR-1 stale select-next.mjs throws instead of engine-unavailable, low/low; CR-2 I/O-count preload wraps only the readFile family, cleanup), routed to recommendations.future
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: APPROVE
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+**Carried to 6a**: docs/tasks/task.219.bug-registry-status-mirror/task.219.pr-review.2.bug-registry-status-mirror.md
+
+---
+
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-10-20 14:43
+**Final Status**: Completed
 **Branch**: feature/task.219.bug-registry-status-mirror
 **PR**: https://github.com/Gamaroff/agent-skills/pull/708
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 2
+**DoD Summary**: docs/tasks/task.219.bug-registry-status-mirror/task.219.dod.2.bug-registry-status-mirror.md
+**Tracker debt**: none
+
+### Completion Summary
+
+Implemented a `--bug-status` mode in `registry-tick.js`, which gives a general bug's registry Status cell one tested writer. develop-bug Steps 3, 5-6 and 7 and `/qa-fix` now call it, and a new drift test fails CI when a row and its bug file disagree. The task took 2 QA cycles, both PASS 100/100. `/finalise` run 1 found one DoD gap: no test pinned PERF1, the one-read, one-write bound. A mutation-proven I/O-count test closed it (`3f98c7b7`), QA re-ran, and `/finalise` run 2 accepted. Five low advisory recommendations remain in gate 2's `recommendations.future`.
