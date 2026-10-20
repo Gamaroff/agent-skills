@@ -1,0 +1,53 @@
+schema: 2
+task: 'task.220.no-consumer-names-in-shipped-skills'
+task_title: 'No consumer names in shipped skills'
+gate: PASS
+status_reason: 'All four phases verified; the new guard is red on the base tree and green on the head, and mutation-proven against five reintroductions. The diff review found no bugs and one advisory cleanup.'
+reviewer: 'QA Engineer'
+head: '56b6f2c7de9b1e977d71c1f46f901fde619d14a8'
+updated: '2026-10-20T17:27:04Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 6007
+  phases_verified: 4/4
+  ci: 'not read — CI is gated once at /finalise'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'No executable logic changed in any shipped script: every changed line in shared/resources/*.js|*.sh and skills/*/scripts/* is a comment. The one new predicate is the guard scanner in tests/no-consumer-names.test.js, which is test code with no external input (boundary: false).'
+  performance:
+    status: PASS
+    notes: 'Guard wall time 0.868 s at load average 7.32 (bound 2 s), measured on the PR head with uptime; time command node --test tests/no-consumer-names.test.js.'
+  reliability:
+    status: PASS
+    notes: 'Non-vacuity floor (>= 500 files plus named anchors) and a calibration test; five mutations each turned the predicted committed test red.'
+  maintainability:
+    status: PASS
+    notes: 'Bundled copies regenerated from source (bundle:check 0 problems); per-file test counts unchanged except the two removed wireframe profile tests.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 (cleanup): the new guard exempts all of pipeline-answers-generic.test.mjs, which keeps its own weaker key pattern; share one CONSUMER_NAMES list, or exempt only its calibration lines.'
+      refs: ['tests/no-consumer-names.test.js', 'shared/resources/tests/pipeline-answers-generic.test.mjs']
+    - action: 'Two files outside the shipped tree still carry the consumer key (docs/reference/activation-phrases.md: 1 line; tests/key-lookup-single-statement.test.js: 9 lines). Out of this task scope (skills/ and shared/); a follow-up could neutralise them and widen the guard scope.'
+      refs: ['docs/reference/activation-phrases.md', 'tests/key-lookup-single-statement.test.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

@@ -328,7 +328,7 @@ Nothing else changes behaviour: the other edits are comments, prose, examples an
 
 ### Performance
 
-- [ ] The guard adds under 2 s to the test run — measured on the PR's head commit with
+- [x] The guard adds under 2 s to the test run — measured on the PR's head commit with
       `uptime; time command node --test tests/no-consumer-names.test.js`, both outputs recorded in the
       implementation report.
 
@@ -403,6 +403,30 @@ Fix the fixture in place; the guard stays wide.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-20
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Full Report**: [task.220.qa.1.no-consumer-names-in-shipped-skills.md](./task.220.qa.1.no-consumer-names-in-shipped-skills.md)
+- **Gate File**: [task.220.gate.1.no-consumer-names-in-shipped-skills.yml](./task.220.gate.1.no-consumer-names-in-shipped-skills.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 6007 (`npm run ci:fast`: 5993 pass, 0 fail, 14 skipped)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+No critical issues identified. Five mutation proofs each turned the predicted committed guard test red. Two advisory items were routed to future work: one shared consumer-name list for both guards, and two out-of-scope files outside the shipped tree.
+
 ## Change Log
 
 | Date       | Version | Description                                                              | Author          |
@@ -413,6 +437,7 @@ Fix the fixture in place; the guard stays wide.
 | 2026-10-20 | 1.2     | Review passed (8/10) after fixes — guard patterns case-insensitive and letter-bounded, path scan added, ten fixture files renamed, `<KEY>_` identifiers and lower-case host in the edit pass, performance bound given its command, red evidence masked | review-task |
 | 2026-10-20 |         | Status → ready-for-development                                           | review-task |
 | 2026-10-20 |         | Implemented — 34 files (1 new guard, 10 fixtures renamed, 1 profile deleted) + 126 regenerated copies; guard 4 tests, 2 profile tests removed | develop |
+| 2026-10-20 |         | QA gate PASS (100/100) — 0 blocking findings, 2 advisory | qa-task |
 
 ---
 
