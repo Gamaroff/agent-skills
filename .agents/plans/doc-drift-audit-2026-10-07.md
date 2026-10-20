@@ -193,6 +193,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** Story branches are cut from `develop` and PR back to `develop` by default. An epic branch exists only when the epic opts in to `branch_model: epic-integration`.
 - **Evidence:** skills/develop-story/SKILL.md:3 (description: 'Story branches are cut from `develop` and PR back to `develop` … an epic has no branch of its own unless it opts in'); shared/resources/develop-pipeline-step-0-resolve-and-prepare.md:666
 - **Fix:** Change line 132 to 'story branch ready (from develop, or the epic integration branch when opted in)' and line 136 to 'Step 4 — create PR (--base develop, or the epic integration branch)'.
+- **Resolved:** fixed by task.197 (2026-10-20).
 
 ### OVERVIEW-15 — `docs/concepts/architecture.md:138` (stale)
 
@@ -257,6 +258,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** Lite mode is not a flag. Phase 0 sets it automatically when risk_level is low or absent, there are fewer than 3 tasks or phases, and the work touches a single module. It changes only QA: Step 5 uses direct tools only and Step 5c runs `/review-pr --effort low`. It does not skip pre-develop context-gathering.
 - **Evidence:** shared/resources/develop-pipeline-lite-mode.md:10-23 (Trigger Conditions; 'Lite mode trades QA depth for speed'); skills/develop-story/SKILL.md 'Lite mode applies to Step 5 only'
 - **Fix:** Redefine it as an auto-detected mode, triggered when risk_level is low or absent, there are fewer than 3 tasks or phases, and the work touches a single module. In this mode Step 5 QA uses direct tools only and Step 5c runs `/review-pr --effort low` (degraded, never skipped). Every other step, including Step 7's finalise side-effects, runs unchanged. Do not single out 'Steps 4, 7 and 8', because lite-mode.md says all other steps run unchanged.
+- **Resolved:** fixed by task.197 (2026-10-20).
 
 ### REFERENCE-8 — `docs/reference/anti-patterns.md:63` (stale)
 
@@ -264,6 +266,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** No `--lite` flag exists on the develop orchestrators; lite mode is auto-detected in Phase 0. It reduces QA depth rather than pre-develop context-gathering.
 - **Evidence:** git grep -- '--lite' over skills/develop-*/SKILL.md and shared/resources/develop-pipeline-*.md returns nothing; shared/resources/develop-pipeline-step-0-resolve-and-prepare.md:373 (PIPELINE_MODE computed from Agent 3); shared/resources/develop-pipeline-lite-mode.md:19-25
 - **Fix:** Drop `--lite`/'lite flag'. Say that lite mode, which is auto-detected and trades QA depth, never skips Step 7.
+- **Resolved:** fixed by task.197 (2026-10-20).
 
 ### REFERENCE-9 — `docs/reference/troubleshooting.md:168` (stale)
 
@@ -271,6 +274,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** No --lite flag exists. Lite mode is auto-detected and shortens QA: Step 5 uses direct tools and Step 5c runs at --effort low.
 - **Evidence:** shared/resources/develop-pipeline-lite-mode.md:10-23
 - **Fix:** Reword the symptom ('the run was in lite mode') and the cause (lite mode shortens QA only; Step 7 always runs in full).
+- **Resolved:** fixed by task.197 (2026-10-20).
 
 ### REFERENCE-10 — `docs/reference/glossary.md:15` (stale)
 
@@ -322,6 +326,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** Without `-b`, `git worktree add` requires the branch to already exist; the story branch does not exist until develop-story Step 1 creates it, so the command fails with 'invalid reference'. The create-parallel-stories skill's own setup commands use `-b`.
 - **Evidence:** skills/create-parallel-stories/SKILL.md:249 (`git worktree add ../worktrees/story-1-1 -b feature/story-1-1-1`)
 - **Fix:** Use `git worktree add -b feature/story.{E}.{S}.{name} ../{repo}-story-{E}.{S} develop` (or defer to the commands `/create-parallel-stories` prints). Same fix in docs/runbooks/first-week/day-4-parallel.md:57-58.
+- **Resolved:** fixed by task.197 (2026-10-20). The fix uses a scratch branch (`-b story/{P}.{E}.{S} develop`, as `/develop-batch` does), not `-b feature/story…`: pre-creating the feature branch makes `/develop-story` Step 1 stop on "branch already exists".
 
 ### RUNBOOKS-7 — `docs/runbooks/first-week/day-4-parallel.md:91` (inconsistent)
 
@@ -329,6 +334,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** The same page's steps (lines 62-64) say PRs open against the Phase 0 Q2 base, `develop` by default, which matches develop-story's develop-direct default. The verify checklist and lesson contradict both.
 - **Evidence:** docs/runbooks/first-week/day-4-parallel.md:62-64; skills/develop-story/SKILL.md:3
 - **Fix:** Line 91: 'Two PRs open against `develop` (or the epic integration branch if the epic opted in)'. Line 101: 'PRs target the base chosen at Phase 0 Q2, whatever the parallelism.'
+- **Resolved:** fixed by task.197 (2026-10-20).
 
 ### RUNBOOKS-8 — `docs/runbooks/first-week.md:36` (stale)
 
@@ -336,6 +342,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** Story PRs target `develop` by default (no epic branch unless opted in), and Day 2 itself only asks for a PR open on GitHub (day-2-stories.md:62, 72).
 - **Evidence:** skills/develop-story/SKILL.md:3; docs/runbooks/first-week/day-2-stories.md:72 ('≥ 1 story PR exists on GitHub')
 - **Fix:** Change to '1 story PR open (or merged) against `develop`; story status `accepted`'.
+- **Resolved:** fixed by task.197 (2026-10-20).
 
 ### RUNBOOKS-9 — `docs/runbooks/story-development.md:132` (stale)
 
@@ -350,6 +357,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** There is no `--lite` flag. Lite mode is set only by Phase 0 detection (risk_level low/absent AND <3 tasks AND single module), and it changes only QA depth: Step 5 uses direct tools, Step 5c runs `--effort low`, all other steps run unchanged (codebase mapping is not skipped).
 - **Evidence:** shared/resources/develop-pipeline-lite-mode.md:10-24 (trigger conditions; 'All other steps run unchanged'); shared/resources/develop-pipeline-step-0-resolve-and-prepare.md:373 ('there is no lite-mode CLI'); skills/develop-story/SKILL.md:242 ('Lite mode applies to Step 5 only')
 - **Fix:** Replace with: 'Lite mode is auto-detected in Phase 0 (low risk, <3 tasks, one module) — there is no flag. It shortens QA only (direct-tools Step 5, `--effort low` Step 5c); Step 7 still runs in full.'
+- **Resolved:** fixed by task.197 (2026-10-20).
 
 ### RUNBOOKS-11 — `docs/runbooks/task-development.md:92` (stale)
 
@@ -357,6 +365,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** Phase 0d asks exactly Q1 base + Q2 PR target; lite mode is auto-detected, never prompted, has no flag, and affects only Step 5 QA depth and Step 5c effort.
 - **Evidence:** skills/develop-task/SKILL.md:35 ('0d — Q1 base + Q2 PR target … no Q3'); shared/resources/develop-pipeline-step-0-resolve-and-prepare.md:693 ('Do NOT invent additional questions … lite-mode detection runs in 0a-parallel Agent 3'); shared/resources/develop-pipeline-lite-mode.md:10-24
 - **Fix:** Drop the 'Lite mode' prompt bullet; describe lite mode as auto-detected and QA-only, and remove `--lite` from line 128.
+- **Resolved:** fixed by task.197 (2026-10-20).
 
 ### RUNBOOKS-12 — `docs/runbooks/story-development.md:89` (stale)
 
@@ -387,6 +396,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** A task document lives inside its self-named directory: `docs/tasks/task.{N}.{name}/task.{N}.{name}.md`. The path given does not exist, so the verification grep fails.
 - **Evidence:** docs/runbooks/task-development.md:64 (same runbook: outputs `docs/tasks/task.{N}.{name}/task.{N}.{name}.md`); AGENTS.md Task Registry / task path `docs/tasks/task.{N}.{name}/`
 - **Fix:** Use `docs/tasks/task.{N}.{name}/task.{N}.{name}.md` at lines 87 and 189.
+- **Resolved:** fixed by task.197 (2026-10-20).
 
 ### RUNBOOKS-18 — `docs/runbooks/sprint-cycle.md:64` (missing)
 
@@ -401,6 +411,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** develop-story can create and target an epic integration branch (opt-in); only develop-task has no epic-branch concept
 - **Evidence:** shared/resources/develop-pipeline-step-1-create-branch.md:67-90; docs/standards/story-documents.md:124-148 (Branch strategy)
 - **Fix:** Reword: 'develop-task has no epic-branch concept; develop-story offers an opt-in epic integration branch when the parent epic declares branch_model: epic-integration.'
+- **Resolved:** fixed by task.197 (2026-10-20).
 
 ### SKILL-READMES-STANDARDS-3 — `skills/develop-task/README.md:283` (stale)
 
@@ -534,6 +545,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** No pipeline step reads the depends_on frontmatter key; develop-task's status gate checks only status, and select-next.mjs reads dependencies from the registry's 'Depends on' column, not frontmatter
 - **Evidence:** shared/resources/develop-pipeline-step-0-resolve-and-prepare.md:355-365 (task status table, no depends_on); grep for depends_on finds only skills/sync-github-task/SKILL.md:66, skills/ensure-task-github-issue/SKILL.md:156 (display) and skills/develop-next/scripts/select-next.mjs:914 (registry column header alias)
 - **Fix:** Mark depends_on as informational (synced to the tracker card); say that ordering is enforced by develop-next via the registry 'Depends on' column / roadmap deps:, or drop the 'blocks pipeline' claim and the checklist line.
+- **Resolved:** fixed by task.197 (2026-10-20).
 
 ### SKILL-READMES-STANDARDS-26 — `docs/standards/task-documents.md:146` (stale)
 
@@ -541,6 +553,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** The doc's own prerequisites are for develop-task, the end-to-end pipeline; /develop is the single implementation step and accepts no issue-number input (only file/dir/epic inputs). Issue forms (#297) are resolved by develop-task's Phase 0a
 - **Evidence:** skills/develop/SKILL.md:25-31 (input forms: story/task file or dir, epic file); shared/resources/develop-pipeline-step-0-resolve-and-prepare.md:24,67 ('Issue hash notation: #297'); skills/develop-task/SKILL.md:3 ('Invoke with /develop-task [task-file-path]')
 - **Fix:** Change the block to `/develop-task docs/tasks/task.17.cache-lib-simplification/`, `/develop-task task.17....md`, `/develop-task #297`.
+- **Resolved:** fixed by task.197 (2026-10-20).
 
 ### SKILL-READMES-STANDARDS-27 — `docs/standards/story-documents.md:163` (stale)
 
@@ -548,6 +561,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** Prerequisites target develop-story; /develop takes no issue number. The pipeline entry point is /develop-story, which resolves #297
 - **Evidence:** skills/develop/SKILL.md:25-31; skills/develop-story/SKILL.md:3 ('Invoke with /develop-story [story-file-path]')
 - **Fix:** Use `/develop-story` in all three invocation lines.
+- **Resolved:** fixed by task.197 (2026-10-20).
 
 ### SKILL-READMES-STANDARDS-28 — `docs/standards/prd-documents.md:16` (inconsistent)
 
@@ -609,6 +623,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** Only Q1 appends the epic-integration option, and only when `branching.epicIntegration.offerWhenUndeclared` is not false. Q2 offers develop / main / Other. Lite mode is auto-detected, so there is nothing to answer 'No' to.
 - **Evidence:** shared/resources/develop-pipeline-step-0-resolve-and-prepare.md:639-642 (Q1 append), :666 (Q2 'Otherwise: develop / main / Other')
 - **Fix:** Change to 'Q1 also offers an epic integration branch … (unless `offerWhenUndeclared: false`)'. Remove 'Pick `No` for anything…' from the lite-mode note.
+- **Resolved:** fixed by task.197 (2026-10-20).
 
 ### OVERVIEW-25 — `docs/concepts/quickstart-story.md:210` (inconsistent)
 
@@ -645,6 +660,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** Phase 0d's Upfront Setup asks exactly two questions: Q1, the feature branch base, and Q2, the PR target. Lite mode is computed from the document and never prompted for.
 - **Evidence:** shared/resources/develop-pipeline-step-0-resolve-and-prepare.md:684-690 (required-question count = 2: Q1 + Q2); :373 lite mode detection
 - **Fix:** Replace with 'Prompts for branch base and PR target; detects lite mode automatically'.
+- **Resolved:** fixed by task.197 (2026-10-20).
 
 ### REFERENCE-16 — `docs/reference/activation-phrases.md:32` (missing)
 

@@ -30,7 +30,7 @@ If dev skills could write gate files, the pipeline guarantee — "merged code ha
 
 ### Why does `finalise` run full side-effects in lite mode?
 
-Lite mode is about skipping work that's *recoverable* (re-reading the codebase, regenerating context). Step 7 side-effects (PR comment, tracker update, board move) are *not* recoverable — they update external state collaborators rely on. Skipping them silently would create drift between what's merged and what's tracked.
+Lite mode trades *QA depth* for speed — direct-tools Step 5 and `--effort low` Step 5c — which changes only how hard the work is checked, and a later review can always check it harder. Pre-develop codebase mapping still runs. Step 7 side-effects (PR comment, tracker update, board move) are *not* recoverable — they update external state collaborators rely on. Skipping them silently would create drift between what's merged and what's tracked.
 
 One deliberate exception in shape, not in spirit: under a restricted `access.tracker` mode the tracker mutations are **deferred, not skipped** — each one becomes a record in the committed handover checklist, the implementation report carries a `**Tracker debt:**` line and a populated `## Tracker Actions Required` section, and the PR gets a comment naming the outstanding actions. The rule above prohibits *silent* drift; a deferral this loud, committed and reviewable — and later reconciled by `/tracker-reconcile` — is the rule being honoured under a policy that forbids the write, not the skip it prohibits.
 

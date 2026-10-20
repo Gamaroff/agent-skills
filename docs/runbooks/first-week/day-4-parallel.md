@@ -27,16 +27,18 @@ If you haven't used `git worktree` before, read this first (branch (a) depends o
 
 ```bash
 # Add a worktree inside the repo, under the gitignored .worktrees/ directory,
-# pointing at an existing branch. Never put one beside the repo.
-git worktree add .worktrees/feat-x feature/feat-x
+# on a new scratch branch cut from develop. Never put one beside the repo.
+# (/develop-story cuts its own feature/story.… branch inside the worktree.)
+git worktree add .worktrees/feat-x -b scratch/feat-x develop
 
 # Now you have two checkouts of the same repo with two branches.
 # Each checkout has its own working tree — changes in one don't bleed into the other.
 cd .worktrees/feat-x
 # Run /develop-story here independently
 
-# When the branch is merged, clean up (from the main checkout):
+# When the branch is merged, clean up (from the main checkout), including the scratch branch:
 git worktree remove .worktrees/feat-x
+git branch -D scratch/feat-x
 ```
 
 Worktrees share the same `.git` directory — so commits, fetches, and pushes are visible across all of them immediately.
@@ -53,10 +55,10 @@ Worktrees share the same `.git` directory — so commits, fetches, and pushes ar
 
 - [ ] Open [`docs/runbooks/create-parallel-stories.md`](../create-parallel-stories.md) and confirm your two stories have no file overlap (check the coordination matrix).
 - [ ] Invoke `/create-parallel-stories <epic-path>` to generate the coordination matrix and worktree setup commands.
-- [ ] Set up two worktrees — one per story branch:
+- [ ] Set up two worktrees, each on its own scratch branch (`/develop-story` cuts the `feature/story.…` branch inside each one):
   ```bash
-  git worktree add .worktrees/story-A feature/story.{P}.{E}.{S1}.{name}
-  git worktree add .worktrees/story-B feature/story.{P}.{E}.{S2}.{name}
+  git worktree add .worktrees/story-A -b story/{P}.{E}.{S1} develop
+  git worktree add .worktrees/story-B -b story/{P}.{E}.{S2} develop
   ```
 - [ ] Open two terminal sessions (or agent sessions). In each, `cd` to the matching worktree and run `/develop-story <story-path>`.
 - [ ] Both pipelines run independently — commits in one worktree do not affect the other.
@@ -89,7 +91,7 @@ Worktrees share the same `.git` directory — so commits, fetches, and pushes ar
 
 Run these checks before calling Day 4 done:
 
-- [ ] **Branch (a):** Two PRs open against the epic branch, each from its own worktree, with no merge conflicts. **OR**
+- [ ] **Branch (a):** Two PRs open against `develop` (or the epic integration branch, if the epic opted in), each from its own worktree, with no merge conflicts. **OR**
 - [ ] **Branch (b):** One Sprint Change Proposal `.md` file committed to the repo with all 6 sections complete.
 
 ---
@@ -99,7 +101,7 @@ Run these checks before calling Day 4 done:
 **Branch (a):**
 - `git worktrees` let multiple agent sessions share one repo without stepping on each other.
 - `/create-parallel-stories` scopes file boundaries — respect the coordination matrix.
-- PRs target the epic branch regardless of how many stories run in parallel.
+- PRs target the base chosen at Phase 0 Q2, whatever the parallelism.
 
 **Branch (b):**
 - Plan-level disruption is handled by `change-management`, not by improvising edits.

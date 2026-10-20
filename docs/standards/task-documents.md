@@ -63,7 +63,7 @@ updated: 2026-01-15
 | `code_review_blocking` | boolean | Optional | Controls whether high-confidence correctness bugs from the QA diff code review gate the build (appended to the QA gate's `top_issues[]` → fixed in the qa-fix loop). **Under `/develop-task` this is ON by default** (the pipeline passes a run-level override); set `false` to opt this task **out** (escape hatch). Standalone `/qa-task`: absent → advisory, `true` → blocking. See [`qa-task`](../../skills/qa-task/SKILL.md) Step 3b |
 | `estimated_effort_hours` | number | Optional | Estimated dev hours. Synced to Jira `timetracking.originalEstimate` (and, when configured via [`jira.devEstimateField`](../reference/configuration.md#jira-estimate-field), a Jira custom field) and the GitHub Projects v2 `Estimate` number field. Captured at create time, surfaced as a LOW review gap if missing |
 | `effort` | string | Optional | Deprecated free-text estimate, e.g. `~0.5 day`. New tasks should use `estimated_effort_hours` instead |
-| `depends_on` | string | Optional | `task.N` — blocks pipeline if the dependency is not `accepted` |
+| `depends_on` | string | Optional | `task.N` — informational: shown on the GitHub issue card (the Jira sync does not carry it). No pipeline step reads it. When `develop-next` selects from the task registry (its fallback once the roadmap is complete), the registry's `Depends on` column gates selection (see [roadmap selection](../../skills/develop-next/references/roadmap-selection.md#dependencies--the-depends-on-column-gates-selection)) |
 | `sign_off_roles` | list | Optional | Per-task override of the `skills-config.yaml` sign-off roster, e.g. `[CTO, Tech Lead, Design (optional)]`. Replaces the config roster for this task only; `[]` means no signatures required. Read once, at creation — after that the table in the document is authoritative. See [`sign-off.md`](../../shared/resources/sign-off.md) |
 | `github_issue` | integer | Optional | Linked GitHub issue number |
 | `jira_key` | string\|null | Optional | `PROJ-123` or `null` |
@@ -147,14 +147,13 @@ Before running `develop-task`, verify:
 - [ ] `status:` is `draft`, `planned`, or `ready-for-development`
 - [ ] Implementation Plan has at least one unchecked item
 - [ ] Frontmatter `status:` and body `**Status:**` are in sync
-- [ ] If `depends_on` is set, the dependency task is `accepted`
 
 ## Invocation
 
 ```
-/develop docs/tasks/task.17.cache-lib-simplification/
-/develop task.17.cache-lib-simplification.md
-/develop #297    # GitHub issue number
+/develop-task docs/tasks/task.17.cache-lib-simplification/
+/develop-task task.17.cache-lib-simplification.md
+/develop-task #297    # GitHub issue number
 ```
 
 ## See also

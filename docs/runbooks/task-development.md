@@ -84,17 +84,17 @@ One command runs the full lifecycle.
 ```bash
 /develop-task docs/tasks/task.{N}.{name}/
 # or
-/develop-task docs/tasks/task.{N}.{name}.md
+/develop-task docs/tasks/task.{N}.{name}/task.{N}.{name}.md
 ```
 
 ### Phase 0 — Resolve & Prepare
 
-`develop-task` prompts (via `AskUserQuestion`) for:
+`develop-task` prompts (via `AskUserQuestion`) for exactly two things, and only where `--base`, `--target` or `--defaults` has not answered them ([answer resolution](../../shared/resources/develop-pipeline-step-0-resolve-and-prepare.md#answer-resolution--ask-only-what-nothing-answers)):
 
-- **Task path** if not supplied
-- **Base branch** for the task branch (default `develop`)
-- **PR target branch** (default = base branch)
-- **Lite mode** for low-risk tasks (skips pre-develop codebase mapping and other context-gathering)
+- **Q1 — Base branch** for the task branch (recommended `develop`, or the current `feature/*` branch when invoked from one)
+- **Q2 — PR target branch** (recommended `develop`)
+
+The task path is asked for only if not supplied. Lite mode is auto-detected, not asked.
 
 Branch model — simpler than stories, no epic branch:
 
@@ -125,7 +125,7 @@ Task `status` advances to `accepted`. PR is left for human merge. The task regis
 
 ### Lite mode
 
-`--lite` skips context-gathering steps for low-risk tasks. Step 7 (`finalise`) side-effects still run in full.
+Lite mode is auto-detected in Phase 0 (low or absent `risk_level`, fewer than 3 phases, one module); there is no `--lite` flag. `--mode lite` can request it (honoured only when those conditions hold), and `--mode fast` applies the same shortening regardless of the detector, but only when `develop.skippable` lists `qa-depth` and `review-pr-depth` (or `develop.defaultMode` is `fast`); otherwise it is refused with a reason — see [the lite-mode contract](../../shared/resources/develop-pipeline-lite-mode.md#speed-modes-and-skips). It shortens QA only: direct-tools Step 5, `--effort low` Step 5c. Step 7 (`finalise`) side-effects still run in full.
 
 ### Resume semantics
 
@@ -186,7 +186,7 @@ grep '^gate:' docs/tasks/task.{N}.{name}/*.gate.*.yml
 grep -h -A8 '^### QA Cycle' docs/tasks/task.{N}.{name}/*.implementation.*.md | grep '^\*\*Action\*\*' | tail -1
 
 # Task status is accepted
-grep -E '^status:|^Status:' docs/tasks/task.{N}.{name}.md
+grep -E '^status:|^Status:' docs/tasks/task.{N}.{name}/task.{N}.{name}.md
 
 # Registry row reflects final status
 grep "task.{N}" docs/tasks/task-registry.md

@@ -246,7 +246,7 @@ Story `status` advances to `accepted`. The PR is left for human merge. If the st
 
 ### Lite mode
 
-Add `--lite` to skip pre-develop codebase mapping and other context-gathering for low-risk stories. Lite mode is otherwise auto-detected in Phase 0a — it is not a prompt. Side-effects in Step 7 (`finalise`) **still run in full** — that's not a corner you can cut.
+Lite mode is auto-detected in Phase 0 (low or absent `risk_level`, fewer than 3 tasks, one module) — it is not a prompt, and there is no `--lite` flag. `--mode lite` can request it (honoured only when those conditions hold), and `--mode fast` applies the same shortening regardless of the detector, but only when `develop.skippable` lists `qa-depth` and `review-pr-depth` (or `develop.defaultMode` is `fast`); otherwise it is refused with a reason. See [the lite-mode contract](../../shared/resources/develop-pipeline-lite-mode.md#speed-modes-and-skips). It shortens QA only — direct-tools Step 5, `--effort low` Step 5c — and pre-develop codebase mapping still runs. Side-effects in Step 7 (`finalise`) **still run in full** — that's not a corner you can cut.
 
 ### Resume semantics
 

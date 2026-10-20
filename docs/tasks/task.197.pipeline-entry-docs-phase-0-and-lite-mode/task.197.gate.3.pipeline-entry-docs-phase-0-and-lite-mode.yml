@@ -1,0 +1,67 @@
+schema: 2
+task: 'task.197.pipeline-entry-docs-phase-0-and-lite-mode'
+task_title: 'Pipeline entry docs: Phase 0, lite mode and invocation'
+gate: CONCERNS
+status_reason: 'Cycle 2 fixes verified. The create-parallel-stories runbook now shows a scratch-branch worktree command and cleanup that differ from the setup commands its own step 1 says /create-parallel-stories produces, with no note reconciling the two.'
+reviewer: 'QA Engineer'
+head: '5155be5d27808580a69cdd78fbb27b210b015131'
+updated: '2026-10-20T04:12:49Z'
+
+top_issues:
+  - id: 'QA3-CR-1'
+    severity: medium
+    file: 'docs/runbooks/create-parallel-stories.md'
+    finding: 'Step 1 says /create-parallel-stories produces the worktree setup commands; step 2 and the cleanup bullet then show a different shape (-b story/{P}.{E}.{S} develop, git branch -D), while the skill emits -b feature/story-1-1-1 with no base and removes only the worktree (skills/create-parallel-stories/SKILL.md:249-255, 334). Changing the skill is out of scope (the skill is the reference), so the runbook must reconcile the two.'
+    suggested_action: 'Say that the commands the skill prints work as-is (their -b name is a scratch branch too, cut from the current checkout, so run them from develop), that the shape shown is the explicit-base equivalent, and that either scratch branch is deleted after git worktree remove.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 5969
+  phases_verified: 5/5
+  ci: 'informational — not awaited'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'Documentation only; no boundary.'
+  performance:
+    status: PASS
+    notes: 'N/A — docs only.'
+  reliability:
+    status: PASS
+    notes: 'git branch -D after git worktree remove verified by the reviewer against git semantics.'
+  maintainability:
+    status: PASS
+    notes: 'No change.'
+
+recommendations:
+  immediate:
+    - action: 'Fix QA3-CR-1.'
+      refs: ['docs/runbooks/create-parallel-stories.md']
+  future:
+    - action: 'task-documents.md:66 says depends_on is shown on the tracker card; only the GitHub issue renders it (ensure-task-github-issue, sync-github-task), Jira does not. Advisory (CR-2) — say "the GitHub issue card".'
+      refs: ['docs/standards/task-documents.md']
+    - action: 'Align skills/create-parallel-stories/SKILL.md worktree add/remove examples with the scratch-branch-from-base form and branch cleanup (follow-up task; skill behaviour is out of scope here).'
+      refs: ['skills/create-parallel-stories/SKILL.md']
+
+bug_resolution:
+  previous_gate: 2
+  fixed: ['QA2-CR-1']
+  verification_method: 'Scoped reviewer re-read faq.md:33 against lite-mode.md; no finding raised on it'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['QA3-CR-1 fixed']
