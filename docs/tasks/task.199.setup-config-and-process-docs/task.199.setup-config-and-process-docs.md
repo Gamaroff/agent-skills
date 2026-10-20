@@ -187,7 +187,7 @@ None — documentation only. No API, script, config key or skill behaviour chang
 11. ✅ `docs/runbooks/first-week/day-1-tasks.md`
 12. ✅ `docs/runbooks/jira-publish.md`
 13. ✅ `docs/runbooks/release-and-install.md`
-14. ✅ `docs/standards/prd-documents.md`
+14. ➖ `docs/standards/prd-documents.md` — not edited: SKILL-READMES-STANDARDS-28 closed as superseded in Phase 0
 15. ✅ `docs/standards/README.md`
 16. ✅ `docs/concepts/quickstart-story.md` (second site of OVERVIEW-9)
 17. ✅ `docs/runbooks/story-development.md` (a third site of OVERVIEW-9's broken command, not in the audit — found by the Phase 5 sweep)
@@ -402,6 +402,35 @@ Four QA cycles. Cycles 1–3 (CONCERNS) found 11 stale or over-broad claims, all
 - **QA-8** (LOW) — carried to gate 4 `recommendations.future` (route 2b, cycle 4): release-and-install §4's merge-conflict and rejected-push recoveries omit release.sh's closing `git checkout main`
 - **QA-9** (LOW) — carried to gate 4 `recommendations.future` (route 2b, cycle 4): §4 opens with a dangling "Otherwise"
 - **QA-10** (LOW) — carried to gate 4 `recommendations.future` (route 2b, cycle 4): setup-consumer.sh closing summary's "that checklist" has no referent under approve
+
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**QA Report**: `task.199.qa.4.setup-config-and-process-docs.md`
+**Gate File**: `task.199.gate.4.setup-config-and-process-docs.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 94/100
+
+### Missing Criteria:
+
+1. **Documentation:**
+   - [ ] `CHANGELOG.md` `[Unreleased]` `### Fixed` has no entry citing `(task 199)`. Sibling doc-drift tasks 196–198 each have one, and this PR also changes wizard text in `scripts/setup-consumer.sh` that users see.
+
+All 8 success criteria, security (`boundary: false`), compliance (N/A) and CI (green @ `02b5d31b`) pass.
+
+### Next Steps:
+
+- [ ] Add the task 199 entry under `CHANGELOG.md` `[Unreleased]` → `### Fixed`, matching the task 196–198 entries
+- [ ] Resume the pipeline at Step 7. The fix is document-only (`ci.docsOnly.patterns`), so `/finalise` re-runs directly
+
+**Estimated Effort:** Small (one CHANGELOG entry)
+
+**Gap Report Generated:** 2026-10-20
+
+**Detailed Verification Log:** See `task.199.dod.1.setup-config-and-process-docs.md` for complete verification evidence.
 <!-- change-log-start -->
 ## Change Log
 
@@ -418,6 +447,7 @@ Four QA cycles. Cycles 1–3 (CONCERNS) found 11 stale or over-broad claims, all
 | 2026-10-20 |  | QA gate CONCERNS (85/100) — 3 findings | qa-task |
 | 2026-10-20 |  | QA findings fixed — cycle 3, 3 findings (QA-5, QA-6, QA-7) | qa-fix |
 | 2026-10-20 |  | QA gate PASS (94/100) — 3 LOWs carried (route 2b) | qa-task |
+| 2026-10-20 |  | DoD incomplete — 1 gap identified (no CHANGELOG entry) | finalise |
 <!-- change-log-end -->
 
 ---

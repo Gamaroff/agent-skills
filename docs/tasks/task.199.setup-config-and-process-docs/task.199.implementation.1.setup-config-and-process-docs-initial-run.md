@@ -35,9 +35,9 @@ Fix 20 doc-drift findings in setup, configuration, tracker and release-process d
 | 1. create-branch           | ✅ Done    | Branch `feature/task.199.*` exists in git                              | Branch created at `174e06c1` | —                    | 2026-10-20T07:17Z |
 | 2. review-task             | ✅ Done    | `task.199.review.{N}.{name}.md` exists (or skip logged)                | review.1 — READY TO IMPLEMENT 8/10; Planned → Ready for Development | —                    | 2026-10-20T07:19Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | inline, 1 iteration; 6/6 phases; ci:fast 5969/0 fail | —                    | 2026-10-20T07:27Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.199.qa.{N}.*.md`; `task.199.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.199.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #704: https://github.com/Gamaroff/agent-skills/pull/704 | —                    | 2026-10-20T07:28Z |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.199.qa.{N}.*.md`; `task.199.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 4 cycles; gate.4 PASS 94; 5c CONCERNS (pr-review.1) | —                    | 2026-10-20 |
+| 7. finalise                | ❌ Gaps    | `task.199.dod.{N}.*.md`; task `status: accepted`                       | dod.1 — NOT ACCEPTED: 1 gap (no CHANGELOG entry); HALT | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
@@ -89,17 +89,106 @@ Fix 20 doc-drift findings in setup, configuration, tracker and release-process d
 - Loop audit performed inline (no Explore dispatch): status ready-for-review, §6 checkboxes 12/12 ticked → loop exit after iteration 1
 - Development completion comment posted to github issue 602 (develop-complete, posted)
 
+### Step 4 — create-pr
+
+- SCOPE_PATHS: docs/tasks/task.199.setup-config-and-process-docs, .agents/plans, docs/concepts, docs/examples/architecture, docs/reference, docs/runbooks, docs/runbooks/first-week, docs/standards
+- Pre-flight guard: no out-of-scope untracked files — nothing held
+- Report links checked (doc-links.js, 0 relative links) after staging
+- Commits: `ddd2f0dd` docs fixes + audit report; `d0c72dab` task.199 review, task doc, plan, this report. Leak check OK
+- PR created: https://github.com/Gamaroff/agent-skills/pull/704 (base develop, Closes #602). PR body written inline (no summariser subagent)
+- Issue #602 PR-opened comment: posted (stage in-review)
+- Post-PR state check (inline `gh pr view`): PR #704 state = OPEN, errors = 0
+- GitHub board: in-review → stage-disabled (this board's tracker-workflow does not enable it) — correct outcome, no move
+- Lock `pr_url` set
+
+### Steps 5–6 — QA loop
+
+- QA_MAX_CYCLES = 5 (lock has no qa_max_cycles)
+- GitHub board: QA-start re-assert → stage-disabled
+- Traceability mapper (standard mode, Success Criteria table present): matrix written to `.summaries/qa-traceability-matrix.md` — 8 criteria, 6 full / 2 partial; SC-6 ticked after PR #704 `link-check` passed
+- Gate 1: CONCERNS (90) — 3 open entries (0 high, 1 medium, 2 low); FAIL/CONCERNS-with-open arm; convergence check n/a (cycle < 3); route classifier n/a (cycle 1) → 5b
+- QA Cycle 1 — changes-requested: stage-disabled
+- qa-fix cycle 1: findings ingested inline (gate written this session; no ingester subagent — independence loss recorded); pr-review-current → none; no bug reports
+- Cycle 1 fast gate: ci:fast GATE_EXIT=0 (5969 / 0 fail), `.agents/skills` moved aside and restored
+- Post-fix PR state (inline `gh pr view`): OPEN
+- Gate 2 (cycle-2 refute pass, whole branch diff, qa-task followed inline — skill loaded this session): CONCERNS (80) — 0 high, 2 medium, 3 low; cycle-1 fixes 3/3 verified
+- Route classifier: continue (not-a-pass-gate; route 2 below-cycle-floor). Narrowing residue: not signalled (medium-files-differ). Convergence check n/a (cycle < 3) → 5b
+- QA Cycle 2 — changes-requested: stage-disabled; qa-fix followed inline; cycle-2 fast gate GATE_EXIT=0 (5969/0); post-fix PR state OPEN
+- Gate 3 (scoped re-review, 5 files since bbf9ac24; qa-task inline): CONCERNS (85) — 0 high, 1 medium, 2 low; all three reviewer findings medium-confidence, verified by QA and raised as QA-5..7; cycle-2 fixes 5/5 verified
+- Cycle 3: convergence check not tripped (HIGH 0,0,0 — HIGH_N > 0 precondition fails); route continue (not-a-pass-gate; route 2 declined non-test-finding); narrowing not signalled (medium-files-differ) → 5b
+- QA Cycle 3 fix committed 26e68d76 (fast gate 5969/0)
+- Gate 4 (scoped, 3 files since 732649da): PASS (94) — 3 LOWs; reviewer prompt passed as a file path (template unchanged, recorded in qa.4); route classifier → cosmetic-residue (route 2b): QA-8..10 carried to recommendations.future, `## Deferred Work` created in the task doc → 5c
+- 5c `/review-pr --effort medium --comment --no-code`: ⚠️ CONCERNS — report task.199.pr-review.1.setup-config-and-process-docs.md; PR comment posted; anchors verified (2 unchecked-text @ 02b5d31b). PC-1 (doc-only, task doc) fixed and staged for 6a; PC-2 recorded, not fixed (ref is the script — not a doc-only path). ready-for-merge: stage-disabled
+
+### Step 7 — finalise
+
+- `/finalise` dod.1: QA PASS 94; 8/8 success criteria PASS; security PASS (`boundary: false`, no probe plan); compliance N/A; docs FAIL (CHANGELOG.md has no task 199 entry)
+- CI reading 1: SUCCESS @ 02b5d31b over 4 checks (PR guard, link-check, shellcheck, test)
+- PR Approved column: no reviews required (`reviewDecision` null), so it is met by pr-review.1 (CONCERNS)
+- Step 8a fix-and-recheck refused: `finalise-fix-and-recheck.mjs` exit 1 on severity-low (the docs finding has no severity), inside-files-summary (CHANGELOG.md is outside §7), mutation-proved
+- Gaps path: DoD Verification Complete = GAPS; task doc got the gap section and a Change Log gaps row; status unchanged (ready-for-review); gaps PR comment posted (issuecomment-6286494408), gap count 1
+- finalise lock cooperation NOT run: `advance-pipeline-lock.sh --skill finalise` sets step 8 with no status check, so on a gaps run it would make the resume skip /finalise. Lock left at 7
+- The 5c carry (pr-review.1 + PC-1 task-doc fix) rides the halt commit instead of the 6a acceptance commit
+- HALT: DoD gaps. A docs-only fix resumes at Step 7
+
 ---
 
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
 
+- **Step 7 DoD gap — CHANGELOG entry missing.** `CHANGELOG.md` `[Unreleased]` has no `(task 199)` entry. Tasks 196–198 each have one, and this PR changes wizard text in `scripts/setup-consumer.sh` that users see. Escalated: pipeline HALTed at Step 7. Fix: add the entry under `### Fixed`, then resume at Step 7 (document-only fix).
+- **5c PC-2 (medium, scope) — recorded, not fixed.** §5 says no script changes and §7 does not list `scripts/setup-consumer.sh`, but the PR changes its prompt and summary text. The 5c doc-only rule could not carry it because its ref names the script. Open for a decision.
+
 ---
 
 ## QA Iteration History
 
 _Track each QA review/fix cycle._
+
+### QA Cycle 1 — 2026-10-20
+**Gate Result**: CONCERNS
+**Issues Found**: 3 — CR-1 configuration.md:710 "three sync skills" (medium); QA-1 Node ≥ 20 in getting-started + quickstarts (low); QA-2 setup-consumer.sh header parity (low)
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 1 of 5)
+**Fixes Applied**: CR-1 configuration.md four sync skills; QA-1 Node ≥ 22 in getting-started + quickstarts (4 sites); QA-2 setup-consumer.sh header parity (step 4, 8a). Fast gate 5969/0 fail
+**Commit**: `bbf9ac24`
+
+### QA Cycle 2 — 2026-10-20
+**Gate Result**: CONCERNS
+**Issues Found**: 5 — CR-1 bug-fix.md registry-mirroring over-claim (medium); CR-2 approve / tracker-reconcile stale in wizard + configuration.md (medium); CR-3 `.env.example` "always" (low); QA-3 agent-links row missing (low); QA-4 develop-sync error path (low)
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 2 of 5)
+**Fixes Applied**: CR-1 bug-fix.md mirroring narrowed; CR-2 approve prompt + tracker-reconcile line + configuration.md comment; CR-3 `.env.example` Bitbucket/Jira only (3 sites); QA-3 Agent links row; QA-4 §4 Sync-develop failure path. Fast gate 5969/0 fail
+**Commit**: `732649da`
+
+### QA Cycle 3 — 2026-10-20
+**Gate Result**: CONCERNS
+**Issues Found**: 3 — QA-5 release-and-install §4 recovery fails on a half-done Sync develop (medium); QA-6 wizard closing summary for approve (low); QA-7 configuration.md approve fallback omits autonomous run (low)
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 3 of 5)
+**Fixes Applied**: QA-5 §4 failed-sync recovery; QA-6 approve branch in the wizard summary (rendered); QA-7 configuration.md fallback triggers. Fast gate 5969/0 fail
+**Commit**: `26e68d76`
+
+### QA Cycle 4 — 2026-10-20
+**Gate Result**: PASS
+**Issues Found**: 3 — QA-8 §4 recoveries omit `git checkout main` (low); QA-9 §4 dangling "Otherwise" (low); QA-10 approve summary "that checklist" (low)
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: ⚠️ CONCERNS — task.199.pr-review.1.setup-config-and-process-docs.md (PC-2 medium scope, PC-1 low consistency)
+**Loop exit**: Cosmetic-residue exit taken — PASS gate at cycle 4 with HIGH 0 for cycles 3 and 4; all 3 open findings are LOW and are carried to the gate's recommendations.future by id (QA-8, QA-9, QA-10). This is a CLEAN exit, not a stall: nothing is blocked and nothing is being accepted over; a full qa-fix cycle for cosmetic findings is what this route exists to avoid.
+**Action**: Proceeding to 5c (PR conformance review)
+**Carried to 6a**: docs/tasks/task.199.setup-config-and-process-docs/task.199.pr-review.1.setup-config-and-process-docs.md docs/tasks/task.199.setup-config-and-process-docs/task.199.setup-config-and-process-docs.md
+**Not fixed (recorded)**: PC-2 — ref `scripts/setup-consumer.sh:360` is not doc-only, so the 5c carry does not touch it; its suggested action (list the script in §7, correct §5's "no script changes") is a task-doc edit left for review
 
 ---
 
@@ -108,7 +197,7 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: `feature/task.199.setup-config-and-process-docs`
-**PR**: {populated after Step 4}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/704
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
