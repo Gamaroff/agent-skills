@@ -129,7 +129,7 @@ The full wizard runs every step below. The `--update` flag runs only steps 1 and
 | 2    | Prompts for platform: GitHub+Issues / GitHub+Jira / Bitbucket+Jira, then **tracker access** (`full` / `read-only` / `approve` / `command` / `manual`) | No                                                   |
 | 2b   | Prompts for the **skill install profile** (`full` / `pipeline` / `minimal`) plus optional per-skill add-ons (see below). Appears in the wizard summary as `Skill profile` | Yes (Enter accepts `full`, today's behaviour)        |
 | 3    | Checks `gh` auth (GitHub), collects Bitbucket/Jira credentials with hidden input                                                   | —                                                    |
-| 4    | Writes `.env.example` (keys only); optionally writes `.secrets/tooling.env` and adds `.secrets/` and `.env` to `.gitignore`       | Yes                                                  |
+| 4    | Bitbucket or Jira only (nothing on GitHub + GitHub Issues): writes `.env.example` (keys only); optionally writes `.secrets/tooling.env` and adds `.secrets/` and `.env` to `.gitignore` | Yes                                                  |
 | 5    | Scaffolds `skills-config.yaml` — prompts PRD path, story layout, coding-standards path                                             | Yes (skips if file exists and you decline overwrite) |
 | 6    | Creates `docs/tasks/task-registry.md` if absent (epics are numbered within their PRD; `create-prd` bootstraps the PRD registry)    | Idempotent                                           |
 | 7    | Scaffolds `docs/prd/`, `docs/architecture/concepts/` (3 required stubs), `docs/tasks/`                                             | Idempotent                                           |

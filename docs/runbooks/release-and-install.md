@@ -59,7 +59,7 @@ when CI has been confirmed another way. (`scripts/release.sh` header, "What --ta
 
 ### 4. Sync `develop` forward
 
-Only if you passed `--no-sync-develop` — otherwise `--tag` has already merged `main` into `develop` and pushed it:
+Only if you passed `--no-sync-develop`, or `--tag` stopped during its **Sync develop** step (a merge conflict or a rejected push — the release is already out, and you are left on `develop`). Otherwise `--tag` has already merged `main` into `develop` and pushed it:
 
 ```bash
 git checkout develop && git pull --rebase
@@ -95,13 +95,14 @@ The wizard sets up:
 | ------------- | --------------------------------------------------------------------------------- |
 | Platform      | Choose GitHub Issues, GitHub+Jira, or Bitbucket+Jira                              |
 | Tracker access | Choose `access.tracker`: `full`, `read-only`, `approve`, `command` or `manual` — see [Which access model?](../concepts/which-access.md) |
-| Credentials   | Writes `.env.example`; optionally writes `.secrets/tooling.env` and adds `.secrets/` and `.env` to `.gitignore` |
+| Credentials   | Bitbucket or Jira only: writes `.env.example`; optionally writes `.secrets/tooling.env` and adds `.secrets/` and `.env` to `.gitignore` |
 | Config        | Creates `skills-config.yaml` (PRD path, architecture path, coding-standards path) |
 | Registries    | Creates `docs/tasks/task-registry.md` (epics are numbered within their PRD)        |
 | Docs scaffold | Creates `docs/prd/` and `docs/architecture/concepts/` stub files                  |
 | Skill profile | Asks which install profile you want — `full`, `pipeline` or `minimal` (see below)  |
 | Skills        | Downloads latest tagged release → `.agents/skills/`                               |
 | tracker-workflow | Writes `tracker-workflow.yaml` if absent — from your live board when it can read it, otherwise a template to edit before the first run |
+| Agent links   | Links the agents you tick to `AGENTS.md` and `.agents/skills/` (local, gitignored) |
 | Hooks         | Patches `PreCompact`, `Stop` into `.claude/settings.json`          |
 
 ### Choosing an install profile

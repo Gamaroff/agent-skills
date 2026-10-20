@@ -350,6 +350,18 @@ Gate 1 (CONCERNS) found three stale copies of corrected claims outside the origi
 
 Probe (each changed observable, tree-wide, excluding task/bug/PRD records and dated audits): no stale `three sync skills` outside `CHANGELOG.md` (historical release notes, left as written); no `Node ≥ 20` left; `numbering matches` appears only at the edited header. Tests: the setup-consumer, call-sites and install-hooks suites (208) pass.
 
+### QA Fixes — cycle 2
+
+Gate 2 (CONCERNS) came from a full-diff refute pass. All five findings are fixed:
+
+- **CR-1** `docs/runbooks/bug-fix.md` — the registry row mirrors `develop-bug`'s four writes, not "every status write". `/qa-fix`'s in-cycle writes after a reopen are not mirrored (develop-bug-step-5-6-verify-loop.md step 1), so the doc now says the row may read `reopened` mid-run.
+- **CR-2** `scripts/setup-consumer.sh` wizard prompt (approve: "writes are deferred, then one batched confirmation at handover"), its restricted-access summary (`/tracker-reconcile` is shipped), and `docs/reference/configuration.md`'s approve example comment. All three now match restricted-access.md §Limits 2 and 7.
+- **CR-3** `.env.example` is written only when the platform collects credentials (Bitbucket or Jira; `write_env_files` returns early otherwise). Fixed in the `setup-consumer.sh` header, getting-started.md row 4 and release-and-install.md's Credentials row.
+- **QA-3** release-and-install.md wizard table — an Agent links row (`link_agents`, between `write_tracker_workflow` and `install_hooks` in `main()`).
+- **QA-4** release-and-install.md §4 — also run it when `--tag` stopped during its Sync develop step (`release.sh` lines 600–604 run under `set -euo pipefail`).
+
+Probe (each changed observable, tree-wide, excluding records and dated audits): no `every status write`, `still deferred`, `ask prompt` or `writes are still handed over` remains. The `not shipped` hits are unrelated (macOS python). The approve-deferral class (`approve … defer|today|not shipped`) now reads consistently across restricted-access.md, which-access.md and the wizard. Out of scope and recorded in gate 2's `recommendations.future`: qa-fix's unmirrored writes (a source gap), and setup-consumer.sh's older in-file section banner numbers (cleanup).
+
 ### Deferred Work
 
 None.
@@ -359,12 +371,12 @@ None.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-20
-**Quality Score**: 90/100
+**Quality Score**: 80/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.199.qa.1.setup-config-and-process-docs.md](./task.199.qa.1.setup-config-and-process-docs.md)
-- **Gate File**: [task.199.gate.1.setup-config-and-process-docs.yml](./task.199.gate.1.setup-config-and-process-docs.yml)
+- **Full Report**: [task.199.qa.2.setup-config-and-process-docs.md](./task.199.qa.2.setup-config-and-process-docs.md)
+- **Gate File**: [task.199.gate.2.setup-config-and-process-docs.yml](./task.199.gate.2.setup-config-and-process-docs.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 5969
@@ -373,7 +385,7 @@ None.
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Every changed claim matches its source. Three stale copies of corrected claims remain outside the diff: configuration.md:710 says "three sync skills" (CR-1, medium); getting-started and the quickstarts still give Node ≥ 20 (QA-1, low); the `setup-consumer.sh` header no longer matches the wizard table (QA-2, low).
+The cycle 1 fixes hold. The cycle 2 refute pass found five more false claims. Two are medium: bug-fix.md over-promises registry mirroring (CR-1), and the approve and tracker-reconcile wording in the wizard and configuration.md is stale (CR-2). Three are low: `.env.example` "always" (CR-3), a missing agent-links row (QA-3), and the develop-sync error path (QA-4).
 <!-- change-log-start -->
 ## Change Log
 
@@ -385,6 +397,8 @@ Every changed claim matches its source. Three stale copies of corrected claims r
 | 2026-10-20 |         | Implemented — 16 docs + audit report; 19 findings fixed, 1 closed as superseded | develop |
 | 2026-10-20 |  | QA gate CONCERNS (90/100) — 3 findings | qa-task |
 | 2026-10-20 |  | QA findings fixed — cycle 1, 3 findings (CR-1, QA-1, QA-2) | qa-fix |
+| 2026-10-20 |  | QA gate CONCERNS (80/100) — 5 findings | qa-task |
+| 2026-10-20 |  | QA findings fixed — cycle 2, 5 findings (CR-1, CR-2, CR-3, QA-3, QA-4) | qa-fix |
 <!-- change-log-end -->
 
 ---

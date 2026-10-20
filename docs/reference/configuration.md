@@ -940,7 +940,8 @@ access:
 ```
 
 ```yaml
-# Credentials present; writes still deferred today (ask prompt is task.57).
+# Credentials present; writes are deferred during the run, then one batched
+# confirmation at handover (no tty → behaves like `command`).
 access:
   tracker: approve
 ```

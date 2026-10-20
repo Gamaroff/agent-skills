@@ -111,11 +111,15 @@ hotfix            →  main     →  hotfix/vX.Y.Z   →  PR to main, then merge
 | 7 | `finalise --bug` + close | The fix-evidence DoD in bug mode (no Change Log row, no `accepted`, no sprint review — the skip list is stated once in `finalise`'s SKILL.md), which writes `{bug-prefix}.dod.{N}.*.md` from a bug-shaped template, posts the PR comment and closes the tracker issue; then writes `## Resolution Summary`, sets `status: closed`, adds the final Status History row, and updates the parent: story bug → **Closed Bugs** in the story's `## Bug Reports`; task bug → ✅ Closed in the task's list; general bug → the registry row's last mirrored write, `closed`. |
 | 8 | `commit-changes` | Final commit of artifacts, final push, lock removed. |
 
-**A general bug's registry row mirrors every status write**, not only the last one. `in-progress` and
-`ready-for-qa` (Step 3), `reopened` (Steps 5–6) and `closed` (Step 7) are each written into the
-`docs/bugs/bug-registry.md` row's Status cell in the same edit as the bug file, because a drift guard
-compares the two on every push. Mid-run, check the row against the bug's current status, not for
-`closed`. Source: [`develop-bug` Step 3](../../skills/develop-bug/SKILL.md).
+**A general bug's registry row mirrors `develop-bug`'s own status writes**, not only the last one.
+`in-progress` and `ready-for-qa` (Step 3), `reopened` (Steps 5–6) and `closed` (Step 7) are each
+written into the `docs/bugs/bug-registry.md` row's Status cell in the same edit as the bug file,
+because a drift guard compares the two on every push. The writes `/qa-fix` makes inside a reopened
+cycle (back to `in-progress`, then `ready-for-qa`) are **not** mirrored, so after a reopen the row
+reads `reopened` while the file moves on, until Step 7 writes `closed` to both. Mid-run, expect the
+row to hold the last of those four writes, not necessarily the file's current status. Source:
+[`develop-bug` Step 3](../../skills/develop-bug/SKILL.md) and its
+[verify loop](../../skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md).
 
 **Lite mode applies to Step 5 only.** Step 7 runs in full in every mode.
 

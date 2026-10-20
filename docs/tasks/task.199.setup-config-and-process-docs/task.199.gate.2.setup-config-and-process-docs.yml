@@ -1,0 +1,100 @@
+schema: 2
+task: 'task.199.setup-config-and-process-docs'
+task_title: 'Setup, configuration and process docs'
+gate: CONCERNS
+status_reason: 'Cycle 1 fixes hold. A full-diff refute pass found five more false claims: two medium (bug-fix.md says the registry row mirrors every status write, but qa-fix does not mirror its in-cycle writes after a reopen; the corrected approve wording still contradicts the wizard prompt and configuration.md) and three low.'
+reviewer: 'QA Engineer'
+head: 'bbf9ac24aef1075af05e52b8ca603ce5f9ace0df'
+updated: '2026-10-20T07:45:17Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'docs/runbooks/bug-fix.md'
+    finding: 'bug-fix.md:114-118 says a general bug''s registry row "mirrors every status write" and tells readers to check the row against the bug''s current status mid-run; after a reopen, /qa-fix moves the bug file Reopened -> In Progress -> Ready for QA without touching the row (develop-bug verify loop step 1 mirrors only reopened), so on cycle 2+ the row reads reopened while the file reads ready-for-qa.'
+    suggested_action: 'Name the four writes develop-bug mirrors (in-progress, ready-for-qa, reopened, closed) without "every", state that qa-fix''s in-cycle writes on a reopened bug are not mirrored, and drop or qualify the mid-run check advice; record the source gap as a follow-up.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-2'
+    severity: medium
+    file: 'scripts/setup-consumer.sh'
+    finding: 'The diff corrected which-access.md to "approve — one batched confirmation at handover" (restricted-access.md, develop-pipeline-step-7-finalise.md), but the wizard prompt at setup-consumer.sh:360 still says approve writes are "still handed over today (ask prompt is not shipped)", configuration.md:943 says "writes still deferred today (ask prompt is task.57)", and setup-consumer.sh:2233 says /tracker-reconcile is not shipped although skills/tracker-reconcile exists.'
+    suggested_action: 'Update all three to the shipped behaviour (approve: one batched confirmation at handover; /tracker-reconcile available), then grep for "not shipped", "task.57" and "still deferred" across docs/, scripts/ and shared/resources/.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-3'
+    severity: low
+    file: 'scripts/setup-consumer.sh'
+    finding: 'The header (cycle 1) and getting-started.md:132 say .env.example is written "always"; write_env_files returns at once when ENV_LINES is empty, which it is for GitHub+GitHub Issues (only Bitbucket and Jira add lines), so no .env.example is written there.'
+    suggested_action: 'Say .env.example is written when the platform collects credentials (Bitbucket or Jira), in the header, the getting-started row 4 and the release-and-install Credentials row.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-3'
+    severity: low
+    file: 'docs/runbooks/release-and-install.md'
+    finding: 'The "wizard sets up" table (RUNBOOKS-22) omits the agent-links step: main() runs link_agents between write_tracker_workflow and install_hooks. Reviewer CR-5, verified by QA against main().'
+    suggested_action: 'Add an "Agent links" row between tracker-workflow and Hooks, and check the table against main()''s call list.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-4'
+    severity: low
+    file: 'docs/runbooks/release-and-install.md'
+    finding: 'release-and-install.md:62 tells readers to skip §4 unless they passed --no-sync-develop, but release.sh (set -euo pipefail) syncs develop after pushing the tag (lines 600-604), so a merge conflict or rejected push aborts with the release out and develop unsynced. Reviewer CR-4, verified by QA against release.sh.'
+    suggested_action: 'Also run §4 when --tag stopped during its "Sync develop" step.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 5969
+  phases_verified: 6/6
+  ci: 'pass @ bbf9ac24 (test, link-check, shellcheck)'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5]
+    phases_with_issues: [1, 2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'Documentation and a header comment only; no boundary in the change set.'
+  performance:
+    status: PASS
+    notes: 'N/A — documentation only.'
+  reliability:
+    status: PASS
+    notes: 'git revert is a full rollback; no behaviour change.'
+  maintainability:
+    status: PASS
+    notes: 'Residue is stale or over-broad claims, all with cited sources and one-line fixes.'
+
+bug_resolution:
+  cycle_1_findings: 3
+  fixed: 3
+  verified: 'CR-1 configuration.md:710 four; QA-1 Node >= 22 at 4 sites (grep: 0 left); QA-2 header step 4 + 8a present'
+
+recommendations:
+  immediate:
+    - action: 'Narrow the registry-mirroring claim in bug-fix.md (CR-1)'
+      refs: ['docs/runbooks/bug-fix.md']
+    - action: 'Bring the approve and tracker-reconcile wording in the wizard and configuration.md in line with the shipped behaviour (CR-2)'
+      refs: ['scripts/setup-consumer.sh', 'docs/reference/configuration.md']
+  future:
+    - action: 'Source gap: /qa-fix does not mirror a general bug''s in-cycle status writes into docs/bugs/bug-registry.md after a reopen — either mirror them or narrow develop-bug''s "every status write" wording'
+      refs: ['skills/qa-fix/SKILL.md', 'skills/develop-bug/SKILL.md']
+    - action: 'setup-consumer.sh section banners (5b/8b/2a/2b) use older numbering than the header (cleanup CR-6)'
+      refs: ['scripts/setup-consumer.sh']
+    - action: 'markdown-link-check@3 does not check cross-file anchors'
+      refs: ['.github/workflows/docs-link-check.yml']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CR-1 and CR-2 fixed; CR-3, QA-3, QA-4 in the same cycle'

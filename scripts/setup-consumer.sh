@@ -7,8 +7,8 @@
 #   1. Prerequisite checks        (node, git, jq, curl)
 #   2. Platform selection         (GitHub+Issues / GitHub+Jira / Bitbucket+Jira)
 #   3. Credential collection      (gh auth check, Bitbucket/Jira API tokens)
-#   4. Credentials file           (.env.example always; .secrets/tooling.env optionally;
-#                                  .secrets/ and .env gitignored)
+#   4. Credentials file           (Bitbucket/Jira only: .env.example; .secrets/tooling.env
+#                                  optionally; .secrets/ and .env gitignored)
 #   5. skills-config.yaml         (PRD path, architecture path, coding-standards path)
 #   6. Registry creation          (docs/tasks/task-registry.md — epics are numbered within their PRD)
 #   7. docs/ scaffold             (PRD root, architecture/concepts/ stubs)
@@ -357,7 +357,7 @@ select_access() {
   echo ""
   echo "  1) Full — the agent has write credentials and updates the tracker itself (default)"
   echo "  2) Read-only — the agent may read the tracker but not write to it"
-  echo "  3) Approve — credentials present; writes are still handed over today (ask prompt is not shipped)"
+  echo "  3) Approve — credentials present; writes are deferred, then one batched confirmation at handover"
   echo "  4) Command — the agent prints the commands; you run them"
   echo "  5) Manual — the agent prints instructions; you click through them"
   echo ""
@@ -2230,7 +2230,7 @@ print_summary() {
       echo -e "${BOLD}Tracker access is ${ACCESS_TRACKER}:${NC}"
       echo "  Pipeline runs still complete. Tracker writes are recorded, not performed."
       echo "  After a run, work the committed *.handover.*.md checklist (or *.sh under command)."
-      echo "  /tracker-reconcile is not shipped yet (task.57) — re-check the board by hand."
+      echo "  Later, /tracker-reconcile re-reads the board and ticks that checklist."
       echo "  Limits: enforcement is partial; /develop-next still needs VCS write."
       echo "  Guide: docs/concepts/restricted-access.md"
     fi
