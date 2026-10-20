@@ -101,6 +101,7 @@ The steps follow the headings in [SKILL.md](SKILL.md):
 - **Step 9.5 — Offer to implement fixes**
 - **Step 9.6 — Sync body changes to the tracker** (when fixes were applied)
 - **Step 10 — Update document status**
+- **Step 10a — Record the reviewed revision**: stamps the report so `develop-story` Step 2 can reuse the review
 - **Step 11 — Post tracker comment**
 
 ## Review Depths

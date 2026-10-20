@@ -117,7 +117,7 @@ flowchart TD
     CPRD --> BPT[brownfield-prd-template]
 ```
 
-`create-story` and `review-story` ensure the epic's tracker issue, picking `ensure-epic-github-issue` or `ensure-epic-jira-issue` through the [platform resolver](../../shared/resources/platform-detection.md). `create-story` does the same for the story issue with `ensure-story-{github,jira}-issue`. `create-epic` calls `ensure-epic-github-issue` when you choose to sync the new epic to GitHub; on Jira it hands off to `sync-jira-epic`. `finalise` calls none of them.
+`create-story` and `review-story` ensure the epic's tracker issue, picking `ensure-epic-github-issue` or `ensure-epic-jira-issue` through the [platform resolver](../../shared/resources/platform-detection.md). Both do the same for the story issue with `ensure-story-{github,jira}-issue`. `create-epic` calls `ensure-epic-github-issue` when you choose to sync the new epic to GitHub; on Jira it hands off to `sync-jira-epic`. `finalise` calls none of them.
 
 ## Pipeline phases (story)
 

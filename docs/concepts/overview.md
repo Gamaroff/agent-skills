@@ -111,7 +111,7 @@ Key shared resources:
 | File                           | Purpose                                         |
 | ------------------------------ | ----------------------------------------------- |
 | `platform-detection.md`        | Canonical spec for tracker/VCS resolution       |
-| `resolve-platform.sh`          | Shell helper sourced by every platform-aware skill |
+| `resolve-platform.sh`          | Shell helper the platform-aware skills source (see Platform Detection below) |
 | `document-status-lifecycle.md` | Status states and transition rules              |
 | `develop-pipeline-*.md`        | Step-by-step develop pipeline specs             |
 
@@ -124,7 +124,11 @@ Skills that interact with issue trackers or VCS resolve the platform in this ord
 3. Git remote — `bitbucket.org` in origin → Bitbucket; `github.com` → GitHub
 4. Default — GitHub for both
 
-Platform-aware skills: every skill that touches a tracker or a PR sources `resolve-platform.sh`. That includes `create-pr`, `create-story`, `create-task`, `create-epic`, `finalise`, `qa-story`, `qa-task`, `qa-fix`, `review-pr`, `review-code`, `review-story`, `review-task`, `develop-next`, and the `ensure-*` and `sync-github-*` sub-routines. To list them all: `grep -l resolve-platform.sh skills/*/SKILL.md`.
+Platform-aware skills source `resolve-platform.sh` before their first platform branch. They include `create-pr`, `create-story`, `create-task`, `create-epic`, `qa-story`, `qa-task`, `qa-fix`, `review-pr`, `review-story`, `review-task`, `review-epic`, `review-bug`, `develop-next`, and the `ensure-*-github-issue` and `sync-github-*` sub-routines. The develop pipelines (`develop-story`, `develop-task`, `develop-bug`) source it from their bundled references. Some skills do not source it: `finalise` and the `ensure-*-jira-issue` sub-routines read the `TRACKER` their caller resolved, and `create-issue` runs its own detection. To list the `SKILL.md` files that source it (the command in [platform-detection.md § Skills migrated to the helper](../../shared/resources/platform-detection.md#skills-migrated-to-the-helper)):
+
+```bash
+grep -rnoE '(^|[^=[:alnum:]_])source[[:space:]]+[^`]*resolve-platform\.sh' skills/*/SKILL.md
+```
 
 Platform-agnostic skills: `create-branch`, `commit-changes`, `qa-gate`
 

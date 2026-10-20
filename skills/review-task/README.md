@@ -85,6 +85,7 @@ The steps follow the headings in [SKILL.md](SKILL.md) (there is no Step 5; its g
 - **Step 8.5 — Offer to implement fixes**
 - **Step 8.6 — Push body changes to Jira** (Jira only, when fixes were applied)
 - **Step 9 — Update document status**
+- **Step 9a — Record the reviewed revision**: stamps the report so `develop-task` Step 2 can reuse the review
 - **Step 10 — Post tracker comment**
 
 ## Output

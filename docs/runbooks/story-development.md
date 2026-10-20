@@ -114,7 +114,7 @@ Produces one file per section under the same directory. See [`../../skills/shard
 | **Inputs**    | PRD path; the section/sections this epic covers.                                                                                                                                          |
 | **Outputs**   | `docs/prd/{domain}/prd.{P}.{feature}/epics/epic.{P}.{E}.{name}/epic.{P}.{E}.{name}.md` plus a stories/ subdir (empty at first). `{E}` is allocated within PRD `{P}`.                      |
 | **Pitfalls**  | Never invent an epic number — `create-epic` allocates `E` within the PRD from the epics on disk. Two branches that both take the next `E` collide at merge (`duplicate-id`).          |
-| **Calls**     | `documentation-standards-validator`, optionally `mermaid-architect`.                                                                                                                      |
+| **Calls**     | `documentation-standards-validator`, optionally `mermaid-architect`; when you choose to sync the new epic, `ensure-epic-github-issue` (GitHub) or `sync-jira-epic` (Jira).                |
 | **Reference** | [`../../skills/create-epic/SKILL.md`](../../skills/create-epic/SKILL.md)                                                                                                                  |
 
 ### B.2 `review-epic`
@@ -129,7 +129,7 @@ Produces one file per section under the same directory. See [`../../skills/shard
 
 ### B.3 Tracker issue (auto, flagged for awareness)
 
-Epic GitHub/Jira issues are ensured by `create-story` and `review-story`, via `ensure-epic-github-issue` or `ensure-epic-jira-issue` (chosen by the platform resolver), so the epic's issue exists by the time its first story is written or reviewed. You generally don't invoke these directly — but if you want the tracker issue before any story exists, run the appropriate skill manually.
+Epic GitHub/Jira issues are created on request, not unprompted. `create-epic` and `review-epic` offer to sync the epic itself. `create-story` and `review-story` ensure the epic's issue, via `ensure-epic-github-issue` or `ensure-epic-jira-issue` (chosen by the platform resolver), when you accept their tracker sync. You generally don't invoke the `ensure-*` sub-routines directly.
 
 ---
 
@@ -279,9 +279,9 @@ What the orchestrator invokes internally, top-down.
 | Parent         | Calls                                                                                        |
 | -------------- | -------------------------------------------------------------------------------------------- |
 | `create-prd`   | `create-doc`, `(brownfield-)prd-template`, `pm-checklist`, optionally `mermaid-architect`    |
-| `create-epic`  | `documentation-standards-validator`, optionally `mermaid-architect`                          |
+| `create-epic`  | `documentation-standards-validator`, optionally `mermaid-architect`; when you choose to sync, `ensure-epic-github-issue` (GitHub) or `sync-jira-epic` (Jira) |
 | `create-story` | `documentation-standards-validator`, optionally `mermaid-architect`, `wireframe` (UI stories), `ensure-epic-*` and `ensure-story-*` (GitHub or Jira, picked by the platform resolver) |
-| `review-story` | `ensure-epic-*` and `ensure-story-*` (GitHub or Jira, picked by the platform resolver), `wireframe` (UI stories), `mermaid-architect` |
+| `review-story` | `create-branch` (Step 0a), `ensure-epic-*` and `ensure-story-*` (GitHub or Jira, picked by the platform resolver), `wireframe` (UI stories), `mermaid-architect` |
 
 ---
 

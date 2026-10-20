@@ -296,6 +296,30 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-20
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.198.qa.1.skill-reference-and-discoverability-docs.md](./task.198.qa.1.skill-reference-and-discoverability-docs.md)
+- **Gate File**: [task.198.gate.1.skill-reference-and-discoverability-docs.yml](./task.198.gate.1.skill-reference-and-discoverability-docs.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 5969 (ci:fast; 5955 pass, 0 fail)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+One medium: the new resolve-platform paragraph in overview.md over-claims which skills source the helper, and its grep does not list them (QA1-CR-1). Six low: incomplete caller lists and step lists (QA1-CR-2 to QA1-CR-7).
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -305,6 +329,8 @@ None.
 | 2026-10-20 | 1.1     | Review passed (8/10) — added jira-publish.md to scope; SC-3/SC-6 evidence made checkable; added SC-9 (Mermaid render) | review-task |
 | 2026-10-20 |         | Status → ready-for-development | review-task |
 | 2026-10-20 |         | Implemented — 27 findings fixed across 16 docs, audit report marked; no tests added (docs only) | develop |
+| 2026-10-20 |         | QA gate CONCERNS (90/100) — 7 findings (1 medium, 6 low) | qa-task |
+| 2026-10-20 |         | QA findings fixed — cycle 1, 7 findings + 2 cleanups | qa-fix |
 <!-- change-log-end -->
 
 ---

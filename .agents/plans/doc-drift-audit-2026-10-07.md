@@ -233,7 +233,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** 28 SKILL.md files reference resolve-platform.sh, including create-story and qa-story, which the doc calls platform-agnostic. Also qa-task, review-pr, review-code, review-bug, review-epic, develop-next, all sync-github-* and all ensure-*.
 - **Evidence:** `grep -rl resolve-platform.sh skills/*/SKILL.md` → 28 files incl. skills/create-story/SKILL.md, skills/qa-story/SKILL.md, skills/review-pr/SKILL.md, skills/qa-task/SKILL.md
 - **Fix:** Drop the hard-coded count and lists. Say 'every skill that touches a tracker or PR sources resolve-platform.sh', remove create-story and qa-story from the agnostic list, or generate the list.
-- **Resolved:** fixed by task.198 (2026-10-20).
+- **Resolved:** fixed by task.198 (2026-10-20). Not as the Fix line words it: "every skill … sources it" is false (create-issue, finalise and the Jira ensure-* routines do not), so overview.md names the sourcing skills and uses the source-only grep from platform-detection.md § Skills migrated to the helper (task.198 QA cycle 1).
 
 ### REFERENCE-1 — `docs/reference/commands.md:62` (stale)
 
