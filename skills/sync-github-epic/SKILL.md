@@ -146,11 +146,11 @@ Continue to Step 5 (status reconciliation).
 ISSUE_NUM={github_issue from frontmatter}
 REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
 
-# Resolve the Document-link branch the same way as on create: current branch's
-# remote-tracking branch, falling back to the repo default branch, then `develop`.
-DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name' 2>/dev/null || echo develop)
-DOC_BRANCH=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null | sed 's|^[^/]*/||')
-DOC_URL="https://github.com/$REPO/blob/${DOC_BRANCH:-$DEFAULT_BRANCH}/${EPIC_RELATIVE_PATH}"
+# The link branch (doc-link-branch.js, task.200): the current branch's upstream only when it
+# names this document's work item, else the repo's default branch, then `develop`.
+DOC_BRANCH=$(command node .agents/skills/sync-github-epic/references/doc-link-branch.js --doc "${EPIC_RELATIVE_PATH}")
+: "${DOC_BRANCH:?doc-link-branch.js resolved no branch — is the skill's bundled copy of it present?}"
+DOC_URL="https://github.com/$REPO/blob/${DOC_BRANCH}/${EPIC_RELATIVE_PATH}"
 
 # Resolve the parent PRD link the same way as the create path, so create→update stays
 # diff-stable. Every epic has a parent PRD; PRD_LINE stays empty only when prd_source is
@@ -158,7 +158,7 @@ DOC_URL="https://github.com/$REPO/blob/${DOC_BRANCH:-$DEFAULT_BRANCH}/${EPIC_REL
 PRD_RELATIVE_PATH="${prd_source from frontmatter}"
 PRD_LINE=""
 if [ -n "$PRD_RELATIVE_PATH" ]; then
-  PRD_URL="https://github.com/$REPO/blob/${DOC_BRANCH:-$DEFAULT_BRANCH}/${PRD_RELATIVE_PATH}"
+  PRD_URL="https://github.com/$REPO/blob/${DOC_BRANCH}/${PRD_RELATIVE_PATH}"
   PRD_LINE=$'\n'"📋 [Parent PRD](${PRD_URL})"
 fi
 

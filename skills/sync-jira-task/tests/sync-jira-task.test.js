@@ -2047,6 +2047,32 @@ test("resolveDocBranch — with no config set, behaviour is unchanged (git decid
   });
 });
 
+test("resolveDocBranch — with a docPath, an upstream for another work item is not the link (task.200)", () => {
+  // No branch this suite can run on names task.999999, so whatever the upstream
+  // is, it is unrelated to the document and the link falls back to git's default.
+  withConfig(null, (dir) => {
+    assert.equal(
+      lib.resolveDocBranch(
+        null,
+        dir,
+        "docs/tasks/task.999999.unrelated/task.999999.unrelated.md",
+      ),
+      lib.gitDefaultBranch(),
+    );
+    // explicit and configured still win over the work-item check
+    assert.equal(
+      lib.resolveDocBranch("hotfix/x", dir, "task.999999.x.md"),
+      "hotfix/x",
+    );
+  });
+  withConfig("jira:\n  docBranch: develop\n", (dir) => {
+    assert.equal(
+      lib.resolveDocBranch(null, dir, "task.999999.x.md"),
+      "develop",
+    );
+  });
+});
+
 test("getDefaultBranch — stays git-only; config must NOT leak into it", () => {
   // Guards the CR-2 fix: getDefaultBranch is the public name for git's default
   // branch. resolveDocBranch is the config-aware path. If these ever merge again,

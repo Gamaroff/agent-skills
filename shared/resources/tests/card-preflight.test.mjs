@@ -589,6 +589,8 @@ test("C: the preflight runs with no sync-jira-* skill present", () => {
       "defer-mutation.js",
       "yaml-subset.js",
       "change-log.js",
+      "doc-link-branch.js",
+      "doc-id.js",
     ]) {
       const src = join(repoRoot, "shared/resources", f);
       try {

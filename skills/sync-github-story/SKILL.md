@@ -19,7 +19,7 @@ One-way sync of a local story markdown file to GitHub Issues. Auto-detects creat
 ### Inputs
 
 - `STORY_FILE_PATH` (required) — path to the local story markdown file.
-- `DOC_BRANCH` (optional) — branch to pin the issue's `## Document` link to. When set (e.g. `review-story` and `finalise` pass a durable branch like `develop` so the link survives feature-branch deletion), it is used verbatim. When unset, the link branch resolves to the current branch's remote-tracking branch, then the repo default branch, then `develop`.
+- `DOC_BRANCH` (optional) — branch to pin the issue's `## Document` link to. When set (e.g. `review-story` and `finalise` pass a durable branch like `develop` so the link survives feature-branch deletion), it is used verbatim. When unset, `doc-link-branch.js` resolves it: the current branch's upstream only when that branch names this story (its own branch, or its epic's integration branch), else the repo default branch, then `develop`.
 
 ## When to Use
 
@@ -151,12 +151,12 @@ Continue to Step 6 (status reconciliation).
 ISSUE_NUM={github_issue from frontmatter}
 REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
 
-# Resolve the Document-link branch. If the caller passed `DOC_BRANCH` (e.g. review-story /
-# finalise pinning a durable branch), honor it verbatim. Otherwise fall back to the same
-# resolution as on create: current branch's remote-tracking branch, then repo default, then `develop`.
-DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name' 2>/dev/null || echo develop)
-DOC_BRANCH="${DOC_BRANCH:-$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null | sed 's|^[^/]*/||')}"
-DOC_URL="https://github.com/$REPO/blob/${DOC_BRANCH:-$DEFAULT_BRANCH}/${STORY_RELATIVE_PATH}"
+# The link branch (doc-link-branch.js, task.200): a caller-passed `DOC_BRANCH` (e.g. review-story /
+# finalise pinning a durable branch) verbatim; else the current branch's upstream only when it
+# names this story, else the repo's default branch, then `develop`.
+DOC_BRANCH=$(command node .agents/skills/sync-github-story/references/doc-link-branch.js --doc "${STORY_RELATIVE_PATH}" --explicit "${DOC_BRANCH:-}")
+: "${DOC_BRANCH:?doc-link-branch.js resolved no branch — is the skill's bundled copy of it present?}"
+DOC_URL="https://github.com/$REPO/blob/${DOC_BRANCH}/${STORY_RELATIVE_PATH}"
 
 # Verify the issue still exists
 gh issue view ${ISSUE_NUM} --json state,title,labels,body > /tmp/issue-${ISSUE_NUM}.json \
