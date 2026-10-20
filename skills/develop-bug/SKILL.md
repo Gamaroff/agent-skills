@@ -105,7 +105,7 @@ find {bug-directory} -maxdepth 1 \( -name "{bug-prefix}.implementation.*.md" -o 
    **Exception — a record at step 8 (read before items 2–4, which it overrides).** When the lock's `current_step` (surviving or restored) or the snapshot's `halt_step` is 8, the Step 8 row is not evidence and items 2–3 do not verify it: the record means Step 8's Completion Checklist had not passed, and the detector recommends 8 for it. Resume from the first unfinished row at or below Step 7 if there is one (`/finalise` moves the lock to 8 before Step 7's tail completes); that row wins over `recommended_step` 8. Otherwise re-run Step 8 from the start, whatever the Step 8 row says (`references/develop-pipeline-resume-contract.md` Phase 0b states the rule once).
 2. **Verify each ✅ step's artifact exists up to `recommended_step - 1`** (see [`references/develop-pipeline-resume-contract.md`](references/develop-pipeline-resume-contract.md) — Phase 0b). Steps at or after `recommended_step` are treated as ⏳ Pending.
 3. Output: "⚠️ Context recovery — last verified step: Step {recommended_step - 1}. Resuming from recommended step {recommended_step}."
-4. Continue from `recommended_step` — do NOT re-run verified steps, do NOT skip pending steps. For a record at step 8, the exception under item 1 names the step.
+4. Continue from `recommended_step` — do NOT re-run verified steps, do NOT skip pending steps. For a record at step 8, the exception under item 1 names the step. **Past Step 2, first ask whether Step 2b ran** — the lock's `tracker_step` and `tracker_issue`, read by the resume contract's § develop-bug Step 2b re-entry, which states the six states and the rule once. When it did not, run 2b before `recommended_step`.
 
 **This recovery is mandatory even if the user did not explicitly re-invoke `/develop-bug`.** If you are in a conversation where `develop-bug` was previously running and context was then compressed, you are still the develop-bug orchestrator and must complete all remaining steps. A summary saying "next step: create-pr" means Step 4 is next, and Steps 5–8 still follow.
 
@@ -194,7 +194,7 @@ After each step: update the Pipeline Progress table (✅ Done / ❌ Failed / ⚠
 | Step | Name                                    | Reference                                                                                              |
 | ---- | --------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | 1    | **Create Branch**                       | shared step-1 (see §"Step 1" below) + branch-model deltas                                              |
-| 2    | **Review Bug**                          | [`references/develop-bug-step-2-review.md`](references/develop-bug-step-2-review.md)                   |
+| 2    | **Review Bug** (+ 2b: open the tracker issue) | [`references/develop-bug-step-2-review.md`](references/develop-bug-step-2-review.md); 2b in §"Step 2b" below |
 | 3    | **Investigate & Fix** (reproduce + fix) | [`references/develop-bug-step-3-investigate-fix.md`](references/develop-bug-step-3-investigate-fix.md) |
 | 4    | **Create PR**                           | shared step-4 (see §"Step 4" below) + branch-model deltas                                              |
 | 5–6  | **Verify & Fix Loop**                   | [`references/develop-bug-step-5-6-verify-loop.md`](references/develop-bug-step-5-6-verify-loop.md)     |
@@ -209,19 +209,39 @@ Follow the generic mechanics in [`references/develop-pipeline-step-1-create-bran
 - **Branch base and type** come from Phase 0d:
   - **Bugfix** (default) → invoke `/create-branch` with the bug file; select `develop` as the base when asked (Q2 answer). The branch is `bugfix/{bug file stem}` (create-branch's **Bugfix** row, e.g. `bugfix/task.110.bug.1.whitelist-admits-mutating-shapes`): never a shortened or re-separated form.
   - **Hotfix** (Q1 = production hotfix) → invoke `/create-branch --hotfix v{X.Y.Z}` (branch off `main`). The version is the Q-derived next patch; if unknown, ask once during Step 1.
-- **Ensure a tracker issue** (runs *before* the lock is written, so the lock records a real issue rather than an empty field it then contradicts). Branch on `TRACKER`:
-  - `TRACKER=jira` → invoke `ensure-bug-jira-issue` with `BUG_FILE_PATH={bug file}`. On return `BUG_JIRA_KEY` is a key or empty.
-  - `TRACKER=github` → invoke `ensure-bug-github-issue` with `BUG_FILE_PATH={bug file}`. On return `BUG_ISSUE_NUM` is a number or empty.
-
-  Set `TRACKER_ISSUE` to whichever came back. **Non-blocking**: an empty return is a degraded run, not a halt — the create may have failed, or been *deferred* by a restricted `access.tracker`, in which case the handover checklist carries the action and the next run converges. Never invent a placeholder key or number: a wrong one defeats the dedup search that stops the next run creating a duplicate.
-
-  This used to read *"most general/story/task bugs will not [have a tracker issue] — skip silently when empty"*. That described the gap rather than a design choice: there was no bug equivalent of `sync-jira-*`/`sync-github-*`, so bug cards were only ever created by hand through the generic `/create-issue` path — with no link embedding and no parent linkage. The sub-routines above close it.
-- **Lock file**: write `"skill": "develop-bug"`, `"task_or_story_id": "{bug-prefix}"`, `"task_or_story_directory": "{bug-directory}"`, `"tracker_issue": "{TRACKER_ISSUE}"`. The lock is read by `.agents/skills/develop-bug/scripts/on-precompact.sh`.
-- **Signal Work Started**: runs when `TRACKER_ISSUE` is non-empty, which is now the normal case rather than the exception. Skip silently when empty.
+- **No push.** Decline `/create-branch`'s optional push (its "Push Branch (Optional)" step). Step 2 may halt, and a halted bug branch stays local, holding `review-bug`'s report; Step 2b pushes it once the bug is ready to fix.
+- **No tracker write.** Step 1 creates no tracker issue and signals nothing: both wait for Step 2's READY TO FIX, in Step 2b. A bug that is already fixed, a duplicate, or under-specified then leaves no issue to close, no card to move back and no pushed branch to delete (obs #220 — bug.16's run opened issue #522 and moved its card to in-progress for a bug `review-bug` then found STALE).
+- **Lock file**: write `"skill": "develop-bug"`, `"task_or_story_id": "{bug-prefix}"`, `"task_or_story_directory": "{bug-directory}"`, `"tracker_issue": ""`, with **no** `tracker_step` field — Step 2b writes both. The lock is read by `.agents/skills/develop-bug/scripts/on-precompact.sh`, which posts no pause comment while `tracker_issue` is empty.
 
 ### Step 2: Review Bug
 
-See [`references/develop-bug-step-2-review.md`](references/develop-bug-step-2-review.md): invoke `/review-bug` in **validate-and-apply** mode against the bug file. review-bug checks fix-readiness — template/frontmatter compliance, reproducibility _from the report_, severity/priority correctness, mode/linkage — and runs two read-only pre-pass scans (duplicate; already-fixed/stale). Gate on its recommendation: **READY TO FIX** → proceed; **NEEDS DETAIL** (after auto-applied fixes), **DUPLICATE**, or **STALE (already fixed)** → **HALT** and surface. This is the bug analogue of `develop-task` Step 2 (review-task) and mirrors its NEEDS-REVISION halt.
+See [`references/develop-bug-step-2-review.md`](references/develop-bug-step-2-review.md): invoke `/review-bug` in **validate-and-apply** mode against the bug file. review-bug checks fix-readiness — template/frontmatter compliance, reproducibility _from the report_, severity/priority correctness, mode/linkage — and runs two read-only pre-pass scans (duplicate; already-fixed/stale). Gate on its recommendation: **READY TO FIX** → Step 2b, then Step 3; **NEEDS DETAIL** (after auto-applied fixes), **DUPLICATE**, or **STALE (already fixed)** → **HALT** and surface, naming the local bug branch and the review report. Nothing was pushed or posted, and the halt deletes nothing: the branch holds the report that is the verdict's evidence, so keeping or deleting it is the operator's call. This is the bug analogue of `develop-task` Step 2 (review-task) and mirrors its NEEDS-REVISION halt.
+
+### Step 2b: Open the Tracker Issue
+
+Runs once, after Step 2 returns **READY TO FIX** and before Step 3 — never on a halt. It is the tail of Step 2, not a step of its own: the lock moves `2 → 3` when it finishes, and the 8-step numbering is unchanged.
+
+1. **Push the branch**: `git push -u origin HEAD`. Step 1 deferred it; the work-started comment names the branch, so it must exist on the remote first.
+2. **Ensure a tracker issue.** Branch on `TRACKER`:
+   - `TRACKER=jira` → invoke `ensure-bug-jira-issue` with `BUG_FILE_PATH={bug file}`. On return `BUG_JIRA_KEY` is a key or empty.
+   - `TRACKER=github` → invoke `ensure-bug-github-issue` with `BUG_FILE_PATH={bug file}`. On return `BUG_ISSUE_NUM` is a number or empty.
+
+   Set `TRACKER_ISSUE` to whichever came back. **Non-blocking**: an empty return is a degraded run, not a halt — the create may have failed, or been *deferred* by a restricted `access.tracker`, in which case the handover checklist carries the action and the next run converges. Never invent a placeholder key or number: a wrong one defeats the dedup search that stops the next run creating a duplicate. A bug that already carries `github_issue`/`jira_key` returns that issue (the sub-routines dedup on the frontmatter first), so moving the call here changes when it runs, not what it creates.
+
+   This used to read *"most general/story/task bugs will not [have a tracker issue] — skip silently when empty"*. That described the gap rather than a design choice: there was no bug equivalent of `sync-jira-*`/`sync-github-*`, so bug cards were only ever created by hand through the generic `/create-issue` path — with no link embedding and no parent linkage. The sub-routines above close it.
+3. **Record it on the lock — one write, both fields:**
+
+   ```bash
+   # INPUT: {TRACKER_ISSUE}, substituted — the key or number item 2 returned, or empty.
+   LOCK=.claude/state/develop-pipeline.lock
+   TMP=$(mktemp "$LOCK.XXXXXX") || { echo "HALT: cannot write the lock"; exit 1; }
+   jq --arg t "{TRACKER_ISSUE}" '.tracker_issue = $t | .tracker_step = "opened"' "$LOCK" > "$TMP" \
+     && mv "$TMP" "$LOCK" \
+     || { rm -f "$TMP"; echo "HALT: the lock was not updated with tracker_issue"; exit 1; }
+   ```
+
+   `tracker_step: "opened"` is what tells a resume that this step ran, **including** when it returned no issue: a resume that read only `tracker_issue` could not tell "2b has not run" from "2b ran and the create was deferred", and would re-run the create on every resume. The six resume states are the resume contract's § develop-bug Step 2b re-entry.
+4. **Signal Work Started** (`references/develop-pipeline-step-0-resolve-and-prepare.md` §"0c-reg. Signal Work Started"): runs when `TRACKER_ISSUE` is non-empty, which is the normal case. Skip silently when empty.
 
 ### Step 3: Investigate & Fix (reproduce + fix)
 
@@ -238,7 +258,7 @@ See [`references/develop-bug-step-3-investigate-fix.md`](references/develop-bug-
 Follow the generic mechanics in [`references/develop-pipeline-step-4-create-pr.md`](references/develop-pipeline-step-4-create-pr.md) (**develop-task variant**: scope staging, pre-flight guard, leak check), with these **bug substitutions**:
 
 - `--base {Q3_answer}`: `develop` for a bugfix; `main` for a hotfix.
-- `--issue`: pass `${TRACKER_ISSUE}` when it is non-empty and `TRACKER=github`; omit otherwise. Step 1 ensures the issue, so a bug normally has one — an empty value means the create failed or was deferred, not that bugs do not get issues.
+- `--issue`: pass `${TRACKER_ISSUE}` when it is non-empty and `TRACKER=github`; omit otherwise. Step 2b ensures the issue, so a bug normally has one — an empty value means the create failed or was deferred, not that bugs do not get issues.
 - **Hotfix note**: a hotfix PR targets `main`. After merge, the fix must also land on `develop` — record this in the implementation report's Issues Log as a follow-up (`hotfix: merge-back to develop required`) so it is not lost. The version tag is created by the human/release process on merge to `main`.
 
 ### Step 5–6: Verify & Fix Loop
@@ -302,10 +322,10 @@ Every default applied must be recorded in the Decisions Log. See [`references/de
 
 | Situation                                                                        | Default                                                                                                                                                    |
 | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| review-bug (Step 2) returns **READY TO FIX**                                     | Proceed to Step 3 autonomously.                                                                                                                            |
-| review-bug returns **NEEDS DETAIL** after auto-applying critical+important fixes | **HALT** — the report lacks reproducibility detail only a human can supply.                                                                                |
-| review-bug returns **DUPLICATE**                                                 | **HALT** — surface the duplicate; do not fix.                                                                                                              |
-| review-bug returns **STALE (already fixed)**                                     | **HALT** — recommend closing the bug; do not fabricate a fix.                                                                                              |
+| review-bug (Step 2) returns **READY TO FIX**                                     | Run Step 2b (push, open the tracker issue, signal work started), then proceed to Step 3 autonomously.                                                     |
+| review-bug returns **NEEDS DETAIL** after auto-applying critical+important fixes | **HALT** — the report lacks reproducibility detail only a human can supply. Name the local bug branch and the review report; nothing was pushed or posted. |
+| review-bug returns **DUPLICATE**                                                 | **HALT** — surface the duplicate; do not fix. Name the local bug branch and the review report; nothing was pushed or posted.                              |
+| review-bug returns **STALE (already fixed)**                                     | **HALT** — recommend closing the bug; do not fabricate a fix. Name the local bug branch and the review report; nothing was pushed or posted.             |
 | Bug proves not reproducible in Step 3                                            | **HALT** — do not fabricate a fix for a bug you cannot reproduce. Surface the reproduction attempt to the user.                                            |
 | Bug severity `Blocker`/`Critical`                                                | Never run in lite mode — full QA verification in Steps 5–6 regardless of size.                                                                             |
 | Branch model ambiguous (Phase 0d Q1)                                             | Default **bugfix off `develop`**. Choose hotfix only when the bug is explicitly a production regression (frontmatter/desc says so) or the user selects it. |

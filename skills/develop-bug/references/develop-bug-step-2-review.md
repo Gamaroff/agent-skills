@@ -1,6 +1,6 @@
 ---
 name: develop-bug-step-2-review
-description: Step 2 (review bug) for the develop-bug pipeline. Invokes /review-bug in validate-and-apply mode as the fix-readiness gate, then branches on its recommendation — proceed on READY TO FIX, HALT on NEEDS DETAIL / DUPLICATE / STALE. Bug analogue of develop-task Step 2 (review-task).
+description: Step 2 (review bug) for the develop-bug pipeline. Invokes /review-bug in validate-and-apply mode as the fix-readiness gate, then branches on its recommendation — Step 2b then proceed on READY TO FIX, HALT on NEEDS DETAIL / DUPLICATE / STALE. Bug analogue of develop-task Step 2 (review-task).
 ---
 
 # Develop Bug Pipeline — Step 2: Review Bug
@@ -54,11 +54,21 @@ Record the path in the Decisions Log. If no report file was produced, log a warn
 
 | review-bug recommendation | Action |
 |---------------------------|--------|
-| ✅ **READY TO FIX** | Log "Bug review passed — ready to fix". Proceed to Step 3. |
+| ✅ **READY TO FIX** | Log "Bug review passed — ready to fix". Run Step 2b (`SKILL.md` §"Step 2b: Open the Tracker Issue": push, ensure the tracker issue, record it on the lock, signal work started), then proceed to Step 3. |
 | ⚠️ **NEEDS DETAIL** | The report still lacks reproducibility detail after auto-applied fixes — only a human can supply it. Commit the report (`/commit-changes`, `docs({bug-prefix}): implementation report — review-bug NEEDS DETAIL halt`), snapshot+remove the lock, then **HALT**: surface the review report and its top blockers. |
 | 🚨 **DUPLICATE** | Commit + snapshot + remove lock, then **HALT**: surface the suspected duplicate (`{id}`). Do not fix — recommend cancelling this bug in favour of the duplicate. |
 | 🚨 **STALE (already fixed)** | Commit + snapshot + remove lock, then **HALT**: surface the `found_at` evidence. Do not fabricate a fix — recommend closing the bug via its Resolution Summary. |
 
-Do NOT post a tracker comment on a halt — the commit + halt is sufficient (review-bug already posts its own outcome comment when the bug has a linked tracker issue).
+**What a halt leaves, and what it says.** Step 1 pushed nothing and opened no tracker issue (both wait for Step 2b), so a halt on any of the three verdicts leaves nothing outside the local checkout. The HALT message names both things that remain, so the operator can act on them:
+
+```
+Local branch:  {bug-branch} (not pushed)
+Review report: {review-report-path}
+Nothing was pushed and no tracker issue was opened or commented on.
+```
+
+**The halt deletes nothing.** The branch holds the review report — the evidence for the verdict — so keeping or deleting it is the operator's decision, not this step's (task.200, operator decision 2026-10-09).
+
+Do NOT post a tracker comment on a halt — the commit + halt is sufficient (review-bug already posts its own outcome comment when the bug has a linked tracker issue from an earlier run).
 
 On READY TO FIX, update Pipeline Progress: ✅ review-bug. Proceed to Step 3.

@@ -474,6 +474,30 @@ For ✅ steps whose `Subagent summary ref` column points to a `.summaries/step-<
 | 5–6. qa loop | **Both** `task.{id}.qa.{N}.*.md` **and** `task.{id}.gate.{N}.*.yml` exist **and** PR comment posted. **Conditional — the 5c check reads the implementation report, not the filesystem**: when the latest gate **reached 5c** — read mechanically from the same entry this check already opens: the highest `### QA Cycle {N}` entry's `**Action**` row reads `Proceeding to 5c` (5a writes it on every one of §5c's five accepting routes; do not re-derive the set from the gate's token or queue) — that entry's `**PR Review**` row must hold a **terminal verdict** — `APPROVE` or `CONCERNS`. Any other value (`pending — 5c not yet run`, `REQUEST CHANGES`, `review failed`, `not reached`, blank, or a missing row) means 5c did not clear, and Step 5–6 is **not** complete. A mid-loop resume on a gate that routed to 5b (its entry's `**Action**` row reads `Running qa-fix`) legitimately has no terminal verdict. **A terminal verdict that predates a QA re-entry does not count** — the **Second precedence** under QA Cycle Count Reconstruction decides when (`qa_reentry`); while it applies, Step 5–6 is **not** complete (task.170). | `ls {task-directory}/task.*.qa.*.md` AND `ls {task-directory}/task.*.gate.*.yml` AND `gh pr view {PR} --comments --json comments \| grep -i "QA"` — gate alone is insufficient. Then the 5c check, which is a **read of the implementation report** performed by the resume detector, not a shell command: take the last `### QA Cycle` entry and read its `**PR Review**` row. |
 | 7. finalise | **All three**: `task.{id}.dod.{N}.*.md` exists **and** task `status:` reads `accepted` **and** finalise acceptance comment posted to PR | `ls {task-directory}/task.{id}.dod.*.md` AND `grep -iE "^status:\s*accepted" {task-file}` AND `gh pr view {PR} --comments --json comments \| grep -i "accepted"` |
 
+### develop-bug Step 2b re-entry
+
+`develop-bug` opens its tracker issue in **Step 2b**, after `review-bug`'s READY TO FIX, not in Step 1 (task.200, obs #220). A resume therefore has one question to answer before it routes past Step 2: **did 2b run?** The lock answers it — `tracker_step: "opened"`, written by 2b in the same `jq` write as `tracker_issue` — and the six states it can be found in are:
+
+| # | State | Lock | Resume |
+| - | ----- | ---- | ------ |
+| 1 | Halted (or paused) before the Step 2 verdict | no `tracker_step`, `tracker_issue: ""`, `current_step` 2 | Step 2 re-runs, then 2b on READY TO FIX |
+| 2 | READY TO FIX, 2b not run | no `tracker_step`, `tracker_issue: ""`, `current_step` ≥ 3 | **2b runs first**, then the recommended step |
+| 3 | 2b created the issue but its lock write did not land | as state 2 | 2b runs again; the `ensure-bug-*` dedup finds the issue through the `github_issue`/`jira_key` frontmatter it already wrote |
+| 4 | 2b ran and returned no issue (deferred or failed create) | `tracker_step: "opened"`, `tracker_issue: ""` | 2b is **not** re-run; the handover checklist carries the create |
+| 5 | A lock written before task.200 (issue opened in Step 1) | `tracker_issue` set, no `tracker_step` | treated as opened — 2b skipped |
+| 6 | A PreCompact pause between Step 2 and 2b | as state 2 (the pause hook reads the empty `tracker_issue` and posts no pause comment) | as state 2 |
+
+The rule, stated once: **re-enter at 2b when the lock has neither `tracker_step` nor a non-empty `tracker_issue`, the resume is past Step 2, and the newest `review-bug` report's verdict is READY TO FIX.** A newest verdict that is anything else is the Step 2 HALT it already was — never a 2b run, which would open an issue for a bug the review declined.
+
+```bash
+# develop-bug resume, before routing past Step 2. Reads the lock as restored (--restore keeps both
+# fields: it strips only the halt/pause fields and waiting_on).
+LOCK=.claude/state/develop-pipeline.lock
+jq -r 'if (.tracker_step // "") != "" or (.tracker_issue // "") != "" then "opened" else "not-opened" end' "$LOCK"
+```
+
+`not-opened` past Step 2 with a READY TO FIX report → run `develop-bug` `SKILL.md` §"Step 2b: Open the Tracker Issue", then continue at the recommended step. Log: "Resume — Step 2b had not run; tracker issue opened before Step {N}."
+
 ## Plan Freshness (Step 3 Prerequisite)
 
 If the Decisions Log records a plan file from a prior session and Step 3 is being resumed, verify the plan file is at least as fresh as the story/task file:
