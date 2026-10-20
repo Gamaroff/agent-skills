@@ -13,6 +13,26 @@ All notable changes to this project will be documented in this file. Format foll
   now also writes the bug's frontmatter `status:`, which the call reads. A new drift test,
   `evals/shared/tests/bug-registry-drift.test.mjs`, fails CI when a bug file and its row disagree.
   The default mode still answers `not-a-task` for a bug, so `finalise --bug` is unchanged.
+- **No consumer names in shipped skills (task 220).** A new guard,
+  `tests/no-consumer-names.test.js`, fails CI when any tracked file under `skills/` or `shared/` —
+  bundled `references/` copies included — names the consumer project the library was first built
+  against, in a file's contents or its path. Provenance notes now say "a consumer project", and
+  example keys, hosts and board ids use `PROJ`, `acme.atlassian.net` and `12`. The Jira-board
+  replay fixtures under `shared/resources/tests/fixtures/` are renamed to a `proj-` prefix. The
+  older task.201 guard keeps its scanner and its exemption list is now empty.
+
+### Removed
+
+- **BREAKING — the wireframe skill no longer ships a format profile (task 220).**
+  `skills/wireframe/references/html-formats/` held a single profile, for one consumer's hi-fi
+  phone screens, and `SKILL.md`'s profile table linked it. Both are gone, with the two tests that
+  held the directory to account. The skill's conversion rules are unchanged. Step 2 of "Working
+  from an existing UI" now says a format belongs to a project: a project that converts one format
+  repeatedly keeps its profile in its own repository, outside `.agents/skills/`, and names it in
+  its own agent instructions. **Migration:** a consumer that used the profile copies it out of
+  `.agents/skills/wireframe/references/html-formats/` into its own tree **before** running
+  `setup-consumer.sh --update`, which removes it; it is also recoverable from this repository's
+  history.
 
 ### Fixed
 

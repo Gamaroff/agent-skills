@@ -5,7 +5,7 @@ type: task
 description: "Remove one consumer's names — its product and repository name, its brand, its Jira key and Jira host — from every shipped skill and shared resource, including the consumer format profile in the wireframe skill, and add tests/no-consumer-names.test.js so they cannot come back."
 tags: [consumer-neutral, guard-test, bundles, provenance-notes, wireframe]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-10-20
 updated: 2026-10-20
@@ -16,7 +16,9 @@ github_issue: 709
 
 # Technical Task: No consumer names in shipped skills
 
-**Status:** Planned
+**Status:** Ready for Review
+
+**Review**: ✅ All review recommendations from `task.220.review.1.no-consumer-names-in-shipped-skills.md` implemented 2026-10-20
 
 **GitHub Issue**: [#709](https://github.com/Gamaroff/agent-skills/issues/709)
 
@@ -28,6 +30,9 @@ The library names one of its consumers throughout what it ships: the consumer's 
 provenance notes, its Jira project key in examples and test fixtures, its Jira host in one test, and
 a whole format profile for its design system in the wireframe skill. This task removes or neutralises
 each one and adds a guard test so the names cannot return.
+
+`<BRAND>` (in a file name) and the other placeholders are defined in the plan, which spells no
+consumer name; neither document does.
 
 **Scope**: every tracked file under `skills/` and `shared/`, including the bundled
 `skills/*/references/` copies (regenerated, not hand-edited). Repository history (`CHANGELOG.md`,
@@ -69,7 +74,7 @@ each one and adds a guard test so the names cannot return.
   Its test 4 fails when an exemption no longer matches a line, so removing the names breaks it unless
   `EXEMPT` is emptied in the same change.
 - **The wireframe profile.** `skills/wireframe/SKILL.md` § "Working from an existing UI", step 2, has
-  a profile table with one row, linking `references/html-formats/rbt-hifi.md`. Two tests in
+  a profile table with one row, linking `references/html-formats/<BRAND>-hifi.md`. Two tests in
   `skills/wireframe/tests/wireframe.test.js` hold that directory to account: "every HTML format profile
   carries a worked example" (with a non-vacuity floor of one profile) and "SKILL.md's profile table and
   references/html-formats/ list the same profiles". With the only profile gone, the first loses its
@@ -88,12 +93,23 @@ jira-sync-no-transition, jira-sync-publishing-fidelity}.test.mjs`, `skills/final
 `skills/scaffold-tracker-workflow/{scripts/scaffold-tracker-workflow.js,
 tests/scaffold-tracker-workflow.test.js}`, `skills/sync-jira-bug/tests/{end-to-end,
 relative-doc-links}.test.js`, `skills/sync-jira-task/tests/sync-jira-task.test.js`, and
-`skills/wireframe/{SKILL.md, references/html-formats/rbt-hifi.md}`.
+`skills/wireframe/{SKILL.md, references/html-formats/<BRAND>-hifi.md}`.
+
+**The key has three spellings, and one of them is in file names.** Besides the upper-case key, the
+tree holds the key in lower case (`shared/resources/tests/fixtures/` has ten payload files whose names
+start with it, `jira-stage-fixtures.test.mjs` loads them by name about 35 times, and one fixture
+`baseUrl` is the lower-case key's `atlassian.net` host) and as an identifier prefix
+(`<KEY>_COLUMNS`, `<KEY>_TYPES`, `<KEY>_RECORD`). A case-sensitive `\b<KEY>\b` misses both: `_` is a
+word character, and lower case is not upper case. Measured 2026-10-20 (review 1) with
+`git ls-files skills shared | xargs grep -IoniE '[a-z0-9_]*<key>[a-z0-9_]*'` and
+`git ls-files skills shared | grep -i <key>`.
 
 ### Target Architecture
 
 - `tests/no-consumer-names.test.js` walks `git ls-files skills shared` and fails on the consumer's
-  product/repository name, Jira key, brand and Jira host.
+  product/repository name, Jira key, brand and Jira host, in any case, in a file's **path** as well as
+  its contents. The key and brand patterns are bounded by letters, not by `\b`, so `<KEY>_RECORD` and
+  `<key>-story-….json` match while English words that contain the letters do not.
 - Provenance notes keep their date and their lesson and say "a consumer project" or "a consumer's
   board/card".
 - Example keys use `PROJ`, example hosts `acme.atlassian.net`, the example board id `12`.
@@ -110,7 +126,14 @@ relative-doc-links}.test.js`, `skills/sync-jira-task/tests/sync-jira-task.test.j
 - **The wireframe rules stay.** Only the profile and its table row go. The general conversion rules in
   `SKILL.md` were learned on that format but name nothing in it.
 - **`CHANGELOG.md` and `docs/` keep their history.** Release notes and task records cite consumer
-  reports by design, and nothing executes them.
+  reports by design, and nothing executes them. The roadmap's open `T38-fixtures` row names a fixture
+  file not yet captured; whoever captures it uses the renamed `proj-` prefix.
+- **Fixture file names are renamed, not just their references.** The ten payload files move to a
+  `proj-` prefix with `git mv`, and every reference in `jira-stage-fixtures.test.mjs` follows. The
+  suite discovers fixtures by `.json` suffix and loads each by name, so nothing else changes.
+- **Evidence in this task's own documents is masked.** The guard's red output prints the names. Record
+  it in the implementation report as `path: count` per file, never as the raw lines, so the task's
+  documents stay as free of the names as the plan is.
 
 ---
 
@@ -121,9 +144,10 @@ relative-doc-links}.test.js`, `skills/sync-jira-task/tests/sync-jira-task.test.j
 ✅ **Guard**: create `tests/no-consumer-names.test.js` over `skills/` and `shared/`.
 ✅ **Provenance notes**: reword in `jira-sync.js`, `develop-pipeline-step-2-review.md`, `finalise/SKILL.md`
 and the five `shared/resources/tests/` files.
-✅ **Examples and fixtures**: the Jira key, host and board id in shared resources, `review-pr`,
+✅ **Examples and fixtures**: the Jira key (all three spellings), host and board id in shared resources, `review-pr`,
 `scaffold-tracker-workflow`, `sync-jira-bug` and `sync-jira-task`.
-✅ **Wireframe**: delete `references/html-formats/rbt-hifi.md`, rewrite `SKILL.md` step 2 without a
+✅ **Fixture file names**: rename the ten `shared/resources/tests/fixtures/<key>-*.json` files to `proj-*.json`.
+✅ **Wireframe**: delete `references/html-formats/<BRAND>-hifi.md`, rewrite `SKILL.md` step 2 without a
 profile table, remove the two profile tests.
 ✅ **Older guard**: empty `EXEMPT` in `pipeline-answers-generic.test.mjs`.
 ✅ **Bundles**: `npm run bundle` and commit the regenerated copies.
@@ -142,7 +166,7 @@ reinstalls the skills; that is the consumer's work, not this library's.
 
 ### Breaking Change 1: the wireframe skill no longer ships a format profile
 
-**What Changed**: `skills/wireframe/references/html-formats/rbt-hifi.md` is deleted and `SKILL.md` no
+**What Changed**: `skills/wireframe/references/html-formats/<BRAND>-hifi.md` is deleted and `SKILL.md` no
 longer lists it.
 
 **Impact**: the one consumer whose format it describes loses it from its vendored copy on its next
@@ -169,9 +193,10 @@ Nothing else changes behaviour: the other edits are comments, prose, examples an
 
 **Changes**:
 
-- [ ] Write the guard (shape in the plan): a scanner test with calibration samples, a non-vacuity test
-      over the walk, and the scan itself.
-- [ ] Run it; the scan must fail and list the hits. Keep that list as the population for Phases 2–3.
+- [x] Write the guard (shape in the plan): a scanner test with calibration samples, a non-vacuity test
+      over the walk, the content scan, and a path scan.
+- [x] Run it; both scans must fail and list the hits. Keep that list as the population for Phases 2–3,
+      and record it in the implementation report as `path: count` (masked).
 
 **Dependencies**: none
 
@@ -185,9 +210,10 @@ Nothing else changes behaviour: the other edits are comments, prose, examples an
 
 **Changes**:
 
-- [ ] Reword each provenance note (exact edits in the plan).
-- [ ] Replace the remaining key, host and board id with the neutral forms.
-- [ ] Empty `EXEMPT` in `pipeline-answers-generic.test.mjs`.
+- [x] Reword each provenance note (exact edits in the plan).
+- [x] `git mv` the ten `<key>-*.json` fixtures to `proj-*.json`.
+- [x] Replace the remaining key (all three spellings), host and board id with the neutral forms.
+- [x] Empty `EXEMPT` in `pipeline-answers-generic.test.mjs`.
 
 **Dependencies**: Phase 1
 
@@ -199,14 +225,14 @@ Nothing else changes behaviour: the other edits are comments, prose, examples an
 
 **Files**:
 
-- `skills/wireframe/references/html-formats/rbt-hifi.md` (delete)
+- `skills/wireframe/references/html-formats/<BRAND>-hifi.md` (delete)
 - `skills/wireframe/SKILL.md`
 - `skills/wireframe/tests/wireframe.test.js`
 
 **Changes**:
 
-- [ ] Delete the profile; rewrite step 2 of "Working from an existing UI" without the table.
-- [ ] Remove the two profile tests and the `FORMATS_DIR` helper.
+- [x] Delete the profile; rewrite step 2 of "Working from an existing UI" without the table.
+- [x] Remove the two profile tests and the `FORMATS_DIR` helper.
 
 **Dependencies**: Phase 1
 
@@ -218,10 +244,10 @@ Nothing else changes behaviour: the other edits are comments, prose, examples an
 
 **Changes**:
 
-- [ ] `npm run bundle`, then `npm run bundle:check` clean.
-- [ ] `npm run validate -- skills/wireframe`.
-- [ ] Guard green; `npm run ci:fast` green.
-- [ ] `CHANGELOG.md` `[Unreleased]` entry, with the breaking change and its migration path.
+- [x] `npm run bundle`, then `npm run bundle:check` clean.
+- [x] `npm run validate -- skills/wireframe`.
+- [x] Guard green; `npm run ci:fast` green.
+- [x] `CHANGELOG.md` `[Unreleased]` entry, with the breaking change and its migration path.
 
 **Dependencies**: Phases 2 and 3
 
@@ -250,6 +276,11 @@ Nothing else changes behaviour: the other edits are comments, prose, examples an
     `skills/sync-jira-bug/tests/{end-to-end,relative-doc-links}.test.js`, `skills/sync-jira-task/tests/sync-jira-task.test.js`
 14. ✅ `skills/wireframe/tests/wireframe.test.js` - remove the two profile tests
 
+### Files to Rename
+
+15a. ✅ `shared/resources/tests/fixtures/<key>-*.json` (10 files) → `proj-*.json`
+15b. ✅ `shared/resources/tests/jira-stage-fixtures.test.mjs` — loads the renamed fixtures (also under item 12)
+
 ### Files to Modify (Generated)
 
 15. ✅ `skills/*/references/*` - regenerated by `npm run bundle`
@@ -260,7 +291,7 @@ Nothing else changes behaviour: the other edits are comments, prose, examples an
 
 ### Files to Delete
 
-17. ❌ `skills/wireframe/references/html-formats/rbt-hifi.md` - one consumer's format profile
+17. ❌ `skills/wireframe/references/html-formats/<BRAND>-hifi.md` - one consumer's format profile
 
 ---
 
@@ -270,17 +301,18 @@ Nothing else changes behaviour: the other edits are comments, prose, examples an
 
 **Actions**:
 
-- [ ] `tests/no-consumer-names.test.js` red after Phase 1, green after Phase 4.
-- [ ] Its scanner test flags each sample and ignores look-alikes (`rapport`, `orbit`).
-- [ ] `pipeline-answers-generic.test.mjs` green with an empty `EXEMPT`.
-- [ ] Every test file whose fixtures changed passes with the same test count as before.
-- [ ] The wireframe suite passes with two tests fewer, and none of its other tests changed.
+- [x] `tests/no-consumer-names.test.js` red after Phase 1, green after Phase 4.
+- [x] Its scanner test flags each sample — including the lower-case key, a `<KEY>_` identifier and a
+      `<key>-….json` path — and ignores look-alikes (`rapport`, `TRAPPED`, `wrapper`, `bootstrapped`, `orbit`).
+- [x] `pipeline-answers-generic.test.mjs` green with an empty `EXEMPT`.
+- [x] Every test file whose fixtures changed passes with the same test count as before.
+- [x] The wireframe suite passes with two tests fewer, and none of its other tests changed.
 
 **Command**: `npm run ci:fast`, and each touched test file with `node --test <file>`.
 
 ### Contract Tests
 
-- [ ] No `scripts/` behaviour changes: the `review-pr` target-parser tests and the jira-stage walk
+- [x] No `scripts/` behaviour changes: the `review-pr` target-parser tests and the jira-stage walk
       tests pass with the renamed fixtures and the same assertion count.
 
 ---
@@ -289,24 +321,26 @@ Nothing else changes behaviour: the other edits are comments, prose, examples an
 
 ### Functional
 
-- [ ] `tests/no-consumer-names.test.js` walks `skills/` and `shared/` and passes.
-- [ ] Before Phase 2 it failed on the same tree (red shown in the implementation report).
-- [ ] `skills/wireframe/references/html-formats/` no longer exists and `SKILL.md` links nothing in it.
-- [ ] `npm run ci:fast` passes.
+- [x] `tests/no-consumer-names.test.js` walks `skills/` and `shared/`, scans paths and contents, and passes.
+- [x] Before Phase 2 it failed on the same tree (red shown in the implementation report as masked `path: count` lines).
+- [x] `skills/wireframe/references/html-formats/` no longer exists and `SKILL.md` links nothing in it.
+- [x] `npm run ci:fast` passes.
 
 ### Performance
 
-- [ ] The guard adds under 2 s to the test run.
+- [ ] The guard adds under 2 s to the test run — measured on the PR's head commit with
+      `uptime; time command node --test tests/no-consumer-names.test.js`, both outputs recorded in the
+      implementation report.
 
 ### Code Quality
 
-- [ ] `npm run bundle:check` is clean after the commit.
-- [ ] No `skills/*/references/` file was hand-edited.
-- [ ] `npm run validate -- skills/wireframe` passes.
+- [x] `npm run bundle:check` is clean after the commit.
+- [x] No `skills/*/references/` file was hand-edited.
+- [x] `npm run validate -- skills/wireframe` passes.
 
 ### Migration
 
-- [ ] `CHANGELOG.md` `[Unreleased]` records the change, the removed profile and its migration path.
+- [x] `CHANGELOG.md` `[Unreleased]` records the change, the removed profile and its migration path.
 
 ---
 
@@ -376,15 +410,18 @@ Fix the fixture in place; the guard stays wide.
 | 2026-10-20 | 1.0     | Initial draft                                                            | create-task     |
 | 2026-10-20 | 1.1     | Create the guard here; add the wireframe skill's consumer profile to scope | Lorien Gamaroff |
 | 2026-10-20 |         | GitHub issue created (#709)                                              | sync-github-task |
+| 2026-10-20 | 1.2     | Review passed (8/10) after fixes — guard patterns case-insensitive and letter-bounded, path scan added, ten fixture files renamed, `<KEY>_` identifiers and lower-case host in the edit pass, performance bound given its command, red evidence masked | review-task |
+| 2026-10-20 |         | Status → ready-for-development                                           | review-task |
+| 2026-10-20 |         | Implemented — 34 files (1 new guard, 10 fixtures renamed, 1 profile deleted) + 126 regenerated copies; guard 4 tests, 2 profile tests removed | develop |
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 1: Add the guard and see it red
-- [ ] Phase 2: Neutralise the sources
-- [ ] Phase 3: Remove the wireframe skill's consumer profile
-- [ ] Phase 4: Re-bundle and verify
+- [x] Phase 1: Add the guard and see it red
+- [x] Phase 2: Neutralise the sources
+- [x] Phase 3: Remove the wireframe skill's consumer profile
+- [x] Phase 4: Re-bundle and verify
 
 ---
 
