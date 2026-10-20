@@ -40,7 +40,7 @@ One row per thing a person does with the application, in the order you want them
 | **Entry** | the route, plus `· flag: <NAME>` when a flag gates it |
 | **Stories** | the story ids that built it, ` · `-separated (links optional; ids are what the tool reads) |
 | **Items** | leave empty — `/qa-next` authors the checklist and fills this with `--items` |
-| **Automated by** | the real-stack specs that already exercise it, or `manual only`; `/qa-next` and `uat-automate` update it with `--automated` |
+| **Automated by** | the real-stack specs that already exercise it, or `manual only`; once a spec lands, `uat-status.mjs --automated <id> "<path>"` fills it, run by hand or by a consumer-side `uat-automate`; `/qa-next` only prints that hand-off |
 | **UAT** / **Last run** / **Notes / bug** | `⬜ untested` and empty — the tool owns these |
 
 Seeds worth mining: a manual feature checklist, the route table or site map, the epic list. Every accepted story should end up in some row's `Stories` or in `uat-surfaces.json` `storyNa` with a one-line reason (`"7.1": "monorepo scaffolding — nothing observable"`). `--coverage` tells you which are still missing and suggests a surface from the epic map.
@@ -77,7 +77,7 @@ Read the run file before accepting — `runs/<id>/<date>-<env>.md` is the eviden
 | Real-stack E2E (the lane) | *a function works end-to-end*, deterministically | `/qa-next` Step 3a, tagged by function id; CI nightly if you wire it |
 | UAT (`/qa-next` Step 3b) | the function is the *right* one, plus what the spec did not encode | once per function, then again whenever the owner asks |
 
-When a function passes with no lane spec, the run file's **Automation candidate** block records the persona, the steps as executed with their selectors, and the assertions — a complete brief for a Playwright spec. `uat-automate <id>` (a separate skill: branch → spec from the candidate → green against the environment → `--automated` → PR) turns it into a regression test, so each UAT pass compounds. `/qa-next` itself never writes test code; that keeps the loop a verdict-recording loop, and keeps test code on the PR path with everything else.
+When a function passes with no lane spec, the run file's **Automation candidate** block records the persona, the steps as executed with their selectors, and the assertions — a complete brief for a Playwright spec. `uat-automate <id>` turns it into a regression test (branch → spec from the candidate → green against the environment → `--automated` → PR), so each UAT pass compounds. `uat-automate` is a consumer-side skill and does not ship in this library. Until the consumer has one, the Automation candidate block is the spec's brief: write the spec by hand, and when it lands run `uat-status.mjs --automated <id> "<path>"`. `/qa-next` itself never writes test code; that keeps the loop a verdict-recording loop, and keeps test code on the PR path with everything else.
 
 ## Findings — what a pass does not tell you
 

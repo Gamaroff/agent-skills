@@ -40,6 +40,7 @@ Every `/foo` command exposed by the skills in this library, what it does, and wh
 | `/create-epic` | Author an epic (assigns next registry number) | [Epic documents](../standards/epic-documents.md), [`create-epic`](../../skills/create-epic/SKILL.md) |
 | `/create-story` | Author the next story for an epic | [Story documents](../standards/story-documents.md), [`create-story`](../../skills/create-story/SKILL.md) |
 | `/create-task` | Author a standalone task (assigns next registry number) | [Task documents](../standards/task-documents.md), [`create-task`](../../skills/create-task/SKILL.md) |
+| `/create-task --from-observation <id>[,<id>…]` | Cut a task from observation-log entries: asks only what the entries leave open, cites their ids, and parks them on the new task | [`create-task`](../../skills/create-task/SKILL.md) |
 | `/create-bug-report` | Record a structured bug — story, task, or general (cross-cutting, numbered from the global bug registry) | [Bug Fix Runbook](../runbooks/bug-fix.md), [Bug documents](../standards/bug-documents.md) |
 | `/create-issue` | Create a tracker issue + matching local work-item doc (GitHub / Bitbucket / Jira, auto-detected) | [`create-issue`](../../skills/create-issue/SKILL.md) |
 | `/create-architecture-doc` | Author a project architecture doc | [`create-architecture-doc`](../../skills/create-architecture-doc/SKILL.md) |
@@ -56,10 +57,10 @@ Every `/foo` command exposed by the skills in this library, what it does, and wh
 | `/review-bug <path>` | Interactive bug-report review — reproduction detail, severity, duplicate + already-fixed scans | [`review-bug`](../../skills/review-bug/SKILL.md) |
 | `/review-story --validate <path>` | Non-interactive GO/NO-GO readiness score | [`review-story`](../../skills/review-story/SKILL.md) |
 | `/review-bug --validate <path>` | Non-interactive GO/NO-GO fix-readiness score (the gate `develop-bug` Step 2 runs) | [`review-bug`](../../skills/review-bug/SKILL.md) |
-| `/review-code` | Adversarial diff review of the working tree or a PR — advisory by default | [`review-code`](../../skills/review-code/SKILL.md) |
-| `/review-code --comment` / `--fix` | Post findings as inline PR comments, or apply them to the working tree | [`review-code`](../../skills/review-code/SKILL.md) |
-| `/review-pr [PR\|branch]` | Review a PR against its work item and pipeline artifacts — conformance + code, advisory. Also runs automatically as **Step 5c**, the exit gate of the develop pipelines' QA loop | [`review-pr`](../../skills/review-pr/SKILL.md) |
-| `/review-pr --comment` / `--no-code` / `--no-docs` | Post one summary PR comment, or run a single lens | [`review-pr`](../../skills/review-pr/SKILL.md) |
+| `/review-code [PR\|base...head\|--staged]` | Adversarial diff review — the working tree vs `HEAD` by default, or a PR number, a `base...head` range or the staged changes. Advisory by default | [`review-code`](../../skills/review-code/SKILL.md) |
+| `/review-code --effort LEVEL` / `--comment` / `--fix` | Set breadth vs. precision (`low`\|`medium`\|`high`\|`max`, default `medium`), post findings as inline PR comments, or apply them to the working tree | [`review-code`](../../skills/review-code/SKILL.md) |
+| `/review-pr [PR\|branch\|JIRA-KEY\|Jira-URL\|#issue\|issue-URL]` | Review a PR against its work item and pipeline artifacts — conformance + code, advisory. A work item (Jira key or URL, `#N`, GitHub issue URL) resolves to its PR. Also runs automatically as **Step 5c**, the exit gate of the develop pipelines' QA loop | [`review-pr`](../../skills/review-pr/SKILL.md) |
+| `/review-pr --effort LEVEL` / `--comment` / `--inline` / `--no-code` / `--no-docs` | Set breadth vs. precision for both lenses (`low`\|`medium`\|`high`\|`max`), post one summary PR comment, also post each finding inline (implies `--comment`), or run a single lens | [`review-pr`](../../skills/review-pr/SKILL.md) |
 | `/review-security [work-item]` | Establish whether each security control **engages**, by executing it against adversarial input — per-control `engages` / `present-but-inert` / `absent` / `unverifiable`. Advisory; owns no gate | [`review-security`](../../skills/review-security/SKILL.md) |
 | `/review-security --mode full` | Review the work item's whole security surface regardless of what changed | [`review-security`](../../skills/review-security/SKILL.md) |
 | `/double-check [target]` | Adversarial audit of the work just produced — disk state, negative constraints, clean-room re-derivation, requirement coverage | [`double-check`](../../skills/double-check/SKILL.md) |
@@ -142,6 +143,7 @@ family that reads `assignee`.
 | `/observe-work --review` | Work the observation backlog and stage skill updates for you to install | [Review cycle](../../skills/observe-work/references/review-cycle.md) |
 | `/session-handoff` | Write `.agents/handoff.md` in the fixed section order — every state figure carries the command that produced it; §5 Traps is a pointer to `docs/contributing/traps.md`, never content | [`session-handoff`](../../skills/session-handoff/SKILL.md) |
 | `/session-handoff` in read mode — ask by intent ("is the handoff still accurate?"), or run `command node .agents/skills/session-handoff/scripts/handoff-verify.mjs [path] [--json] [--timeout <s>]` directly | Re-measure the handoff before trusting it: re-run each figure's command through a read-only whitelist and report every line as `confirmed` / `stale` (with the new value) / `unverifiable` (with why). Never writes | [`session-handoff`](../../skills/session-handoff/SKILL.md) |
+| `/session-handoff` in continue mode — ask by intent ("hand off to a fresh session", "context is filling up") | Hand one piece of in-flight work to a fresh context: write a continuation file beside the work item (`task.N.handoff.{k}.slug.md`, the story equivalent, else `.agents/handoffs/`) with the next step, decisions and approaches ruled out, plus a paste-ready resume prompt that verifies it first | [Continue mode](../../skills/session-handoff/SKILL.md#continue--hand-in-flight-work-to-a-fresh-context) |
 
 ## Checklists
 

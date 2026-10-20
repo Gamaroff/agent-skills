@@ -174,7 +174,7 @@ Follows Gitflow: feature branches from `develop`, hotfixes from `main`.
 /create-pr
 ```
 
-Pushes branch, detects target (`develop`/`main`), generates description from template, creates via `gh pr create`.
+Commits any uncommitted changes (via `/commit-changes`), prompts for the target branch (typically `develop`), pushes the branch, generates the description, and opens the PR with `gh pr create` (GitHub) or the Bitbucket REST API (Bitbucket), auto-detected from the git remote.
 
 ### `finalise` — Sprint Completion
 

@@ -4,7 +4,7 @@
 
 Before you can run brownfield PRD flows (`create-prd`) or land enhancements safely, the pipeline needs a picture of what exists. `/document-existing-project` analyses your codebase and writes a **sharded** brownfield architecture tree under `docs/architecture/` — the exact layout downstream skills consume via `devLoadAlwaysFiles`.
 
-(Note: there is also a legacy `/document-project` slug; it is now a thin deprecation stub that points here.)
+(Note: the former `/document-project` skill was removed; use `/document-existing-project`.)
 
 ## When to use this runbook
 

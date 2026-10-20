@@ -93,22 +93,32 @@ flowchart TD
     DT --> FN
     DT --> CC
 
-    FN --> EGH[ensure-epic-github-issue]
-    FN --> EGJ[ensure-epic-jira-issue]
-
     CS[create-story] --> DSV[documentation-<br/>standards-validator]
     CS --> MA[mermaid-architect]
+    CS -->|UI stories| WF[wireframe]
+    CS --> EGH[ensure-epic-github-issue]
+    CS --> EGJ[ensure-epic-jira-issue]
+    CS --> ESGH[ensure-story-github-issue]
+    CS --> ESGJ[ensure-story-jira-issue]
+
+    RS --> EGH
+    RS --> EGJ
+    RS --> ESGH
+    RS --> ESGJ
+    RS -->|UI stories| WF
 
     CE[create-epic] --> ERM[doc-id.js<br/>epic.P.E allocation]
     CE --> DSV
     CE --> MA
+    CE -->|sync to GitHub| EGH
+    CE -->|sync to Jira| SJE[sync-jira-epic]
 
     CPRD[create-prd] --> CD[create-doc]
     CPRD --> PMC[pm-checklist]
     CPRD --> BPT[brownfield-prd-template]
 ```
 
-`finalise` picks one of `ensure-epic-{github,jira}-issue` via the [platform resolver](../../shared/resources/platform-detection.md).
+`create-story` and `review-story` ensure the epic's tracker issue with `ensure-epic-github-issue` or `ensure-epic-jira-issue` when you accept their tracker sync. `create-story` asks which tracker (the [platform resolver](../../shared/resources/platform-detection.md) recommends one), and `review-story` uses the tracker the resolver detected. Both do the same for the story issue with `ensure-story-{github,jira}-issue`. `create-epic` calls `ensure-epic-github-issue` when you choose to sync the new epic to GitHub; on Jira it hands off to `sync-jira-epic`. `finalise` calls none of them.
 
 ## Pipeline phases (story)
 

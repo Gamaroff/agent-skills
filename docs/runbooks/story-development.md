@@ -114,7 +114,7 @@ Produces one file per section under the same directory. See [`../../skills/shard
 | **Inputs**    | PRD path; the section/sections this epic covers.                                                                                                                                          |
 | **Outputs**   | `docs/prd/{domain}/prd.{P}.{feature}/epics/epic.{P}.{E}.{name}/epic.{P}.{E}.{name}.md` plus a stories/ subdir (empty at first). `{E}` is allocated within PRD `{P}`.                      |
 | **Pitfalls**  | Never invent an epic number — `create-epic` allocates `E` within the PRD from the epics on disk. Two branches that both take the next `E` collide at merge (`duplicate-id`).          |
-| **Calls**     | `documentation-standards-validator`, optionally `mermaid-architect`.                                                                                                                      |
+| **Calls**     | `documentation-standards-validator`, optionally `mermaid-architect`; when you choose to sync the new epic, `ensure-epic-github-issue` (GitHub) or `sync-jira-epic` (Jira).                |
 | **Reference** | [`../../skills/create-epic/SKILL.md`](../../skills/create-epic/SKILL.md)                                                                                                                  |
 
 ### B.2 `review-epic`
@@ -127,9 +127,9 @@ Produces one file per section under the same directory. See [`../../skills/shard
 | **Pitfalls**     | The codebase scan often reveals duplicate work — don't ignore it. Resolve scope overlaps before writing stories.                              |
 | **Reference**    | [`../../skills/review-epic/SKILL.md`](../../skills/review-epic/SKILL.md)                                                                      |
 
-### B.3 Tracker issue (auto, flagged for awareness)
+### B.3 Tracker issue (on request, flagged for awareness)
 
-Epic GitHub/Jira issues are created automatically downstream by `develop-story` → `finalise`, via `ensure-epic-github-issue` or `ensure-epic-jira-issue` (chosen by the platform resolver). You generally don't invoke these directly — but if you want the tracker issue _before_ story development, run the appropriate skill manually.
+Epic GitHub/Jira issues are created on request, not unprompted. `create-epic` and `review-epic` offer to sync the epic itself. `create-story` and `review-story` ensure the epic's issue, via `ensure-epic-github-issue` or `ensure-epic-jira-issue`, when you accept their tracker sync: `create-story` asks which tracker to sync to (the platform resolver recommends one), and `review-story` uses the tracker the resolver detected. You generally don't invoke the `ensure-*` sub-routines directly.
 
 ---
 
@@ -143,7 +143,7 @@ Epic GitHub/Jira issues are created automatically downstream by `develop-story` 
 | **What it does** | 10-step process that identifies the next logical story, extracts technical context from architecture docs and the codebase, and writes a story with anti-hallucination safeguards. |
 | **Outputs**      | `docs/prd/.../prd.{P}.{feature}/epics/epic.{P}.{E}.{name}/stories/story.{P}.{E}.{S}.{name}/story.{P}.{E}.{S}.{name}.md`. Story directory is created with the same stem as the file.                              |
 | **Pitfalls**     | Don't hand-edit story numbering — the skill computes the next `{S}` from existing siblings. Story acceptance criteria must be testable; vague criteria block `review-story`.       |
-| **Calls**        | `documentation-standards-validator`, optionally `mermaid-architect`.                                                                                                               |
+| **Calls**        | `documentation-standards-validator`, optionally `mermaid-architect`, `wireframe` for UI stories, and the `ensure-epic-*` / `ensure-story-*` issue routines.                         |
 | **Reference**    | [`../../skills/create-story/SKILL.md`](../../skills/create-story/SKILL.md)                                                                                                         |
 
 ### C.2 Review the story
@@ -274,18 +274,14 @@ What the orchestrator invokes internally, top-down.
 | [`finalise`](../../skills/finalise/SKILL.md)             | DoD check, PR comment, tracker comment, board update.              |
 | [`commit-changes`](../../skills/commit-changes/SKILL.md) | Final commit of the implementation report (`/finalise` committed the acceptance artifacts). |
 
-Inside `finalise`, the platform resolver picks one of:
-
-- [`ensure-epic-github-issue`](../../skills/ensure-epic-github-issue/SKILL.md) — GitHub projects
-- [`ensure-epic-jira-issue`](../../skills/ensure-epic-jira-issue/SKILL.md) — Jira
-
 **Upstream skills also call others:**
 
 | Parent         | Calls                                                                                        |
 | -------------- | -------------------------------------------------------------------------------------------- |
 | `create-prd`   | `create-doc`, `(brownfield-)prd-template`, `pm-checklist`, optionally `mermaid-architect`    |
-| `create-epic`  | `documentation-standards-validator`, optionally `mermaid-architect`                          |
-| `create-story` | `documentation-standards-validator`, optionally `mermaid-architect`                          |
+| `create-epic`  | `documentation-standards-validator`, optionally `mermaid-architect`; when you choose to sync, `ensure-epic-github-issue` (GitHub) or `sync-jira-epic` (Jira) |
+| `create-story` | `documentation-standards-validator`, optionally `mermaid-architect`, `wireframe` (UI stories), `ensure-epic-*` and `ensure-story-*` (GitHub or Jira, whichever you pick at its tracker-sync prompt) |
+| `review-story` | `create-branch` (Step 0a), `ensure-epic-*` and `ensure-story-*` (GitHub or Jira, picked by the platform resolver), `wireframe` (UI stories), `mermaid-architect` |
 
 ---
 

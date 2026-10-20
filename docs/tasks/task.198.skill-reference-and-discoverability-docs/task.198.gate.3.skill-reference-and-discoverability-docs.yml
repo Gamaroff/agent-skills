@@ -1,0 +1,56 @@
+schema: 2
+task: 'task.198.skill-reference-and-discoverability-docs'
+task_title: 'Skill reference and discoverability docs'
+gate: PASS
+status_reason: 'Gate 2 findings verified fixed at 6b517ceb; the scoped re-review of the five files changed since gate 2 found no false or contradictory claim. Links, anchors, the Mermaid map and ci:fast are clean.'
+reviewer: 'QA Engineer'
+head: '6b517cebdd4a1e095a9e964b6c59982114fbd824'
+updated: '2026-10-20T05:26:02Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 5969
+  phases_verified: 4/4
+  ci: 'not read for 6b517ceb (the fast gate at 6b517ceb passed 5955/0)'
+  trace:
+    phases_covered: [0, 1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'Documentation only; no boundary.'
+  performance:
+    status: PASS
+    notes: 'N/A — docs only.'
+  reliability:
+    status: PASS
+    notes: 'Links, anchors and the Mermaid map (re-validated after the cycle-2 edge change) resolve.'
+  maintainability:
+    status: PASS
+    notes: 'Fixes cite canonical sources; no open inaccuracy.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'finalise SKILL.md says "resolver already sourced above (TRACKER is set)" (:2094) but has no source line for resolve-platform.sh; standalone /finalise relies on an unset TRACKER. Out of scope (skill behaviour) — file a follow-up.'
+      refs: ['skills/finalise/SKILL.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
+
+bug_resolution:
+  gate_2_findings: 3
+  verified_fixed: 3
+  method: 'Scoped re-review of files changed since gate 2 head b47f076e, read against create-story/review-story/create-epic/finalise/qa-next sources'
