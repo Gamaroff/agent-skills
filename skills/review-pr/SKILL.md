@@ -1,6 +1,6 @@
 ---
 name: review-pr
-description: 'Reviews a pull request as a claim — does this change deliver what its story or task promised, and is the evidence behind it real? Resolves the PR back to its work item (branch stem, pr_number, gate URL, tracker issue), collects the co-located pipeline artifacts (implementation report, review report, QA reports, gate, DoD, sprint-review, bugs, handover), pulls the linked GitHub issue or Jira card, then runs two read-only lenses over the PR diff: the shared adversarial code reviewer and a conformance reviewer checking coverage, scope, trail and consistency. Accepts a Jira key, Jira URL or GitHub issue and finds its PR. Works on GitHub and Bitbucket. Advisory — writes a co-located report and optionally posts one summary PR comment; never approves, never writes a gate, never edits code. Triggers: review this PR, review pull request 123, does this PR match the task, review the PR for RAPP-702, /review-pr.'
+description: 'Reviews a pull request as a claim — does this change deliver what its story or task promised, and is the evidence behind it real? Resolves the PR back to its work item (branch stem, pr_number, gate URL, tracker issue), collects the co-located pipeline artifacts (implementation report, review report, QA reports, gate, DoD, sprint-review, bugs, handover), pulls the linked GitHub issue or Jira card, then runs two read-only lenses over the PR diff: the shared adversarial code reviewer and a conformance reviewer checking coverage, scope, trail and consistency. Accepts a Jira key, Jira URL or GitHub issue and finds its PR. Works on GitHub and Bitbucket. Advisory — writes a co-located report and optionally posts one summary PR comment; never approves, never writes a gate, never edits code. Triggers: review this PR, review pull request 123, does this PR match the task, review the PR for PROJ-702, /review-pr.'
 ---
 
 > **Platform detection**: see [`references/platform-detection.md`](references/platform-detection.md) and [`references/resolve-platform.sh`](references/resolve-platform.sh)
@@ -37,7 +37,7 @@ Invoke as `/review-pr [target] [--effort LEVEL] [--comment] [--inline] [--no-cod
 
 | Arg | Values | Default | Meaning |
 | --- | --- | --- | --- |
-| `target` | _(none)_ \| `<PR-number>` \| `<PR-URL>` \| `<branch>` \| `<JIRA-KEY>` \| `<Jira-URL>` \| `#<issue>` \| `<GitHub-issue-URL>` | open PR for the current branch | Which PR to review. A Jira key (`RAPP-702`), a Jira `/browse/` URL, a Jira board URL carrying `?selectedIssue=`, a Jira Cloud `…/issues/KEY` URL, a GitHub issue URL or `#N` names the **work item**; Step 1a resolves it to its PR |
+| `target` | _(none)_ \| `<PR-number>` \| `<PR-URL>` \| `<branch>` \| `<JIRA-KEY>` \| `<Jira-URL>` \| `#<issue>` \| `<GitHub-issue-URL>` | open PR for the current branch | Which PR to review. A Jira key (`PROJ-702`), a Jira `/browse/` URL, a Jira board URL carrying `?selectedIssue=`, a Jira Cloud `…/issues/KEY` URL, a GitHub issue URL or `#N` names the **work item**; Step 1a resolves it to its PR |
 | `--effort` | `low` \| `medium` \| `high` \| `max` | `medium` | Breadth vs. precision, for **both** lenses |
 | `--comment` | flag | off | Post one summary comment to the PR |
 | `--inline` | flag | off | Additionally post each finding as an inline comment on its own line. Implies `--comment` |
@@ -202,11 +202,11 @@ printf 'KIND=%s PR=%s BRANCH=%s JIRA_KEY=%s ISSUE_NUM=%s TARGET_HOST=%s TARGET_R
 | `pr-for-current-branch` | no argument | Step 1b, PR for `$BRANCH` |
 | `pr` | a bare number; a GitHub `/pull/N`, Bitbucket web `/pull-requests/N` or API `/pullrequests/N` URL (`…/pull/12/files` is PR 12) | Step 1b |
 | `branch` | anything else that is not a URL | Step 1b |
-| `jira` | a bare key (`RAPP-702`), `/browse/KEY`, a board URL's `selectedIssue=KEY`, Jira Cloud `…/issues/KEY` | Step 1a |
+| `jira` | a bare key (`PROJ-702`), `/browse/KEY`, a board URL's `selectedIssue=KEY`, Jira Cloud `…/issues/KEY` | Step 1a |
 | `github-issue` | `#N`, a GitHub `/issues/N` URL | Step 1a |
 
 **The URL's host picks the platform before any path arm is tried.** Jira Cloud's issue view
-`…/projects/RAPP/issues/RAPP-702` contains `/issues/` and must not be read as a GitHub issue. The
+`…/projects/PROJ/issues/PROJ-702` contains `/issues/` and must not be read as a GitHub issue. The
 parser never decides a key's issue type — a story key and an epic key look alike — so an epic is
 caught after the document resolves (Step 1a, rung 1), not here.
 
@@ -241,7 +241,7 @@ A first-hit-wins ladder. Record the rung as `resolved_via` (`jira key → <rung>
 | 2 | doc's `pr_number:` | `sed -nE "s/^pr_number:[[:space:]]*['\"]?([0-9]+)['\"]?[[:space:]]*$/\1/p" "$DOC_FILE"` → `PR` |
 | 3 | **branch stem** | `STEM=$(basename "$DOC_FILE" .md)`; a PR whose source branch is `STEM` or ends in `/STEM` — the rungs 3–4 block below |
 | 4 | key / closing PR | Jira: a PR whose title or description names `JIRA_KEY` — **candidates only**. GitHub issue: `gh issue view "$ISSUE_NUM" --json closedByPullRequestsReferences` — **`VCS=github` only** |
-| 5 | branch fallback | `KIND=jira` and still nothing → `BRANCH="$JIRA_KEY"`, Step 1b; `resolved_via: jira key → branch fallback` (a branch may be named `RAPP-702`) |
+| 5 | branch fallback | `KIND=jira` and still nothing → `BRANCH="$JIRA_KEY"`, Step 1b; `resolved_via: jira key → branch fallback` (a branch may be named `PROJ-702`) |
 | 6 | none | **HALT** naming every rung tried: `"No pull request found for {target}: tried work item doc, pr_number, branch stem, key search, branch fallback."` |
 
 **Rung 1 — no doc, or an epic.** No document → skip rungs 2–3 and continue at rung 4; the review that

@@ -135,8 +135,8 @@ The one lookup from a tracker key to its work-item document. `develop-story`, `d
 
 ```bash
 # KEY_FIELD: jira_key | github_issue.  KEY_VALUE: the Jira key or the issue number.
-# Anchored at both ends, so RAPP-70 does not match RAPP-702 and issue 5 does not match 55.
-# Quote-tolerant: jira_key is written quoted ('RAPP-702' or "RAPP-702") in most consumer docs.
+# Anchored at both ends, so PROJ-70 does not match PROJ-702 and issue 5 does not match 55.
+# Quote-tolerant: jira_key is written quoted ('PROJ-702' or "PROJ-702") in most consumer docs.
 # Recursive grep, not a docs/**/ glob — ** needs globstar in bash and matches one level without it.
 # Which file is the work item: one named after its own directory ({stem}/{stem}.md) is kept
 # whatever its slug says (task.5.request/task.5.request.md); any other file whose BASENAME carries
@@ -172,7 +172,7 @@ esac
 to its next route as if the key named nothing. Two work items carrying one key is a data error a
 human must settle; picking the first anchors the whole run on whichever file `grep` happened to list
 first. The previous form of this lookup was a bare `grep -rl "jira_key: ${JIRA_KEY}"` — a prefix
-match that resolved `RAPP-70` to `RAPP-702`'s document, matched no quoted key at all, and excluded
+match that resolved `PROJ-70` to `PROJ-702`'s document, matched no quoted key at all, and excluded
 only three artifact kinds, so a `.request.` file carrying the same key could win (task.176).
 
 If the Explore subagent cannot find the file, HALT and ask the user to confirm the path.

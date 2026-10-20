@@ -1364,11 +1364,8 @@ test("resolveRelativeLink — leaves absolute URLs, mailto:, and in-page anchors
     branch: "HEAD",
   };
   assert.equal(
-    lib.resolveRelativeLink(
-      "https://mediastreamag.atlassian.net/browse/RAPP-540",
-      ctx,
-    ),
-    "https://mediastreamag.atlassian.net/browse/RAPP-540",
+    lib.resolveRelativeLink("https://acme.atlassian.net/browse/PROJ-540", ctx),
+    "https://acme.atlassian.net/browse/PROJ-540",
   );
   assert.equal(
     lib.resolveRelativeLink("mailto:someone@example.com", ctx),

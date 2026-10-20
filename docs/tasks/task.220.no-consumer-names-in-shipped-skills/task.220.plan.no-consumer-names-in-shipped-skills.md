@@ -18,7 +18,7 @@ values, empty the old exemption list, remove the wireframe skill's consumer prof
 This file deliberately does not spell the consumer's names, so it adds none to the repository.
 `<NAME>` stands for the consumer's product and repository name, `<KEY>` for its Jira project key,
 `<BRAND>` for its brand (it also prefixes CSS classes and file names, as `<BRAND>-`), and `<HOST>`
-for its Jira host prefix. Read the real values off the pattern list in
+for its Jira host prefix; `<key>` is the key in lower case. Read the real values off the pattern list in
 `shared/resources/tests/pipeline-answers-generic.test.mjs` and the guard's Phase 1 failure list.
 
 ## Phase-by-Phase Implementation Guide
@@ -28,20 +28,31 @@ for its Jira host prefix. Read the real values off the pattern list in
 `tests/no-consumer-names.test.js` (CommonJS, `node:test`), following `tests/bundled-links.test.js`:
 
 ```js
-const CONSUMER_NAMES = [/<NAME>/i, /\b<KEY>\b/, /\b<BRAND>\b/i, /\b<BRAND>-/i, /<HOST>/i];
+// Letter-bounded, case-insensitive (review 1): `\b` treats `_` as a word
+// character, so `\b<KEY>\b` missed `<KEY>_RECORD`, and a case-sensitive key
+// missed `<key>-story-….json` and `https://<key>.atlassian.net`.
+const CONSUMER_NAMES = [
+  /<NAME>/i,
+  /(?<![a-z])<KEY>(?![a-z])/i,
+  /(?<![a-z])<BRAND>(?![a-z])/i,
+  /<HOST>/i,
+];
 const SCOPE = ["skills", "shared"];
 // The scanners' own calibration samples hold the names on purpose.
 const SELF = new Set(["shared/resources/tests/pipeline-answers-generic.test.mjs"]);
 ```
 
 - `shipped()`: `git ls-files -z ...SCOPE`, minus `SELF`; skip binary files (a NUL in the first 8 KB).
-- Test 1 — the scanner flags one sample per pattern and nothing in look-alikes such as
-  `rapport, TRAPPED, orbit`.
+- Test 1 — the scanner flags one sample per pattern, plus `<KEY>_RECORD`, `<key>-story-x.json` and
+  `https://<key>.atlassian.net`, and nothing in look-alikes such as
+  `rapport, TRAPPED, wrapper, bootstrapped, unwrapped, orbit`.
 - Test 2 — non-vacuity: at least 500 files walked, and the walk includes
   `shared/resources/jira-sync.js`, `skills/finalise/SKILL.md` and `skills/wireframe/SKILL.md`.
 - Test 3 — no shipped line matches; the failure lists `path:line: text`.
+- Test 4 — no shipped **path** matches (the fixture file names); the failure lists the paths.
 
-Run `node --test tests/no-consumer-names.test.js` and save the failure list.
+Run `node --test tests/no-consumer-names.test.js` and save the failure list. Record it in the
+implementation report as `path: count` per file — never the raw lines, which print the names.
 
 ### Phase 2: Edit the sources
 
@@ -71,13 +82,18 @@ exits 0 otherwise).
 | `skills/sync-jira-bug/tests/end-to-end.test.js` | `bug card <KEY>-713 and its siblings <KEY>-706/707/708` | `a bug card and three of its siblings` |
 | `skills/sync-jira-bug/tests/end-to-end.test.js` | `measured on <KEY>-713.` | `measured on that bug card.` |
 
+**Fixture renames**, before the regex pass: `git mv` each
+`shared/resources/tests/fixtures/<key>-*.json` to `proj-*.json`. Assert there are exactly 10 before
+moving any.
+
 **Regex pass**, over tracked files under `skills/` and `shared/`, skipping `*/references/*`,
 `skills/wireframe/` (Phase 3) and `pipeline-answers-generic.test.mjs`, in this order:
 
-1. `\b<KEY>_COLUMNS\b` → `BOARD_COLUMNS`
+1. `\b<KEY>_(COLUMNS|TYPES|RECORD)\b` → `BOARD_\1`
 2. `\b<KEY>\b` → `PROJ`
-3. `<HOST>\.atlassian\.net` → `acme.atlassian.net`
-4. `boards/407\b` → `boards/12`
+3. `(<HOST>|<key>)\.atlassian\.net` → `acme.atlassian.net`
+4. `(?<![a-z])<key>-` → `proj-` (the fixture names `jira-stage-fixtures.test.mjs` loads)
+5. `boards/407\b` → `boards/12`
 
 Then grep the diff for awkward results (`PROJ's`, `the PROJ board`) and reword by hand.
 
@@ -85,8 +101,10 @@ Then grep the diff for awkward results (`PROJ's`, `the PROJ board`) and reword b
 `EXEMPT` array with `const EXEMPT = [];` and a short comment pointing at
 `tests/no-consumer-names.test.js`. Keep its `CONSUMER_NAMES` and test 1 samples.
 
-A dry run of Phase 2 on 2026-10-20 touched 21 source files (114 lines changed each way) and left
-`pipeline-answers-generic.test.mjs` green after `EXEMPT` was emptied.
+A dry run of Phase 2 on 2026-10-20, before review 1 widened the pass, touched 21 source files (114
+lines changed each way) and left `pipeline-answers-generic.test.mjs` green after `EXEMPT` was
+emptied. The widened pass touches more; the guard's own failure list is the population, not this
+figure.
 
 ### Phase 3: The wireframe skill
 
@@ -121,7 +139,9 @@ the wireframe suite, which loses exactly two.
 
 ## Testing Approach
 
-- Guard red at Phase 1, green at Phase 4 (paste both into the implementation report).
+- Guard red at Phase 1, green at Phase 4 (record both in the implementation report, red as masked
+  `path: count` lines).
+- Time the guard on the PR's head commit: `uptime; time command node --test tests/no-consumer-names.test.js`.
 - Calibrate the scanner: each sample in test 1 is flagged, each look-alike is not.
 - Per-file test counts unchanged for every renamed fixture.
 - `npm run bundle:check` clean after the commit.
