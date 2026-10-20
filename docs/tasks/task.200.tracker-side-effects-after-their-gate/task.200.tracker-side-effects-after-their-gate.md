@@ -489,11 +489,43 @@ None to any CLI or file format. Behaviour changes a consumer can observe:
 ### Key Findings
 Cycle 2 fixed TASK-200-004 to 008, and all eight bugs are closed. Nothing is open. Maintainability CONCERNS covers two advisory guard-breadth gaps with no live instance: the link scan misses a defaulted expansion, and the unbound-read check accepts a one-hop binding.
 
+## Definition of Done - Gaps Identified
+
+**Status:** READY FOR REVIEW (unchanged — not accepted)
+
+### QA Gate Status
+
+**QA Report**: `task.200.qa.3.tracker-side-effects-after-their-gate.md`
+**Gate File**: `task.200.gate.3.tracker-side-effects-after-their-gate.yml`
+**Gate Status**: ⚠️ CONCERNS, nothing open
+**Quality Score**: 90/100
+**PR Review (5c)**: ✅ APPROVE — `task.200.pr-review.1.tracker-side-effects-after-their-gate.md`
+**CI reading 1**: SUCCESS @ `fc7e0527`
+
+### Missing Criteria:
+
+1. **Security Review** — `/finalise`'s probe of `branchNamesWorkItem` executed 42 cases. Four reproduced, all graded low and all **specified** behaviour (Implementation Summary above; `docs/reference/configuration.md` § Document link branch):
+   - [ ] A story accepts `release/1.4.0`, `hotfix/1.4.1` and `feature/1.4.x` under the "`{P}.{E}` under any prefix" rule. Decide: narrow it, e.g. to the configured `branching.epicIntegration.branchPattern` prefix, or confirm the spec and record these accepts as intended.
+   - [ ] A bug accepts `hotfix/vendor-sdk-bump` under `hotfix/v*`. Decide: require a version after `v`, or confirm the spec.
+
+2. **Acceptance Criteria (non-blocking, recorded):** the "each new test mutation-proved" criterion was accepted on the committed mutation records (develop 7/7, qa-fix cycles 1–2, QA cycle 3's own mutants). Not every new test has its own recorded mutant. See the DoD log.
+
+### Next Steps:
+
+- [ ] Make the scope decision on the two predicates above.
+- [ ] If narrowing: change `doc-link-branch.js`, its tests, this document and configuration.md; the run re-enters QA at 5a, then `/finalise`.
+- [ ] If confirming: record the accepts as intended in the DoD and re-run `/finalise`.
+
+**Estimated Effort:** Small (under 1 hour) once decided.
+
+**Gap Report Generated:** 2026-10-20
+
+**Detailed Verification Log:** See `task.200.dod.1.tracker-side-effects-after-their-gate.md` for the full evidence, and `task.200.dod.1.security.run.json` for the probe record.
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                      | Author      |
-| ---------- | ------- | ------------------------------------------------ | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-09 | 1.0     | Initial draft — cut from observations #220, #287 | create-task |
 | 2026-10-09 | 1.1 | Review 7/10, six Important fixes applied: id-or-parent branch match, halt keeps a local branch, tracker_step and six resume states, structural criteria, derivation-keyed population test, pinned tests listed | review-task |
 | 2026-10-09 |  | Status → ready-for-development | review-task |
@@ -503,6 +535,7 @@ Cycle 2 fixed TASK-200-004 to 008, and all eight bugs are closed. Nothing is ope
 | 2026-10-20 |  | QA gate FAIL (50/100) — cycle 2, 4 new findings (1 high, 3 medium); status → in-progress | qa-task |
 | 2026-10-20 |  | QA findings fixed — 4 of 4 (cycle 2), 1 iteration; status → ready-for-review | qa-fix |
 | 2026-10-20 |  | QA gate CONCERNS (90/100) — cycle 3, 0 open findings (2 advisory) | qa-task |
+| 2026-10-20 |  | DoD incomplete — 2 gaps identified (security probe: spec-sanctioned branch accepts, low) | finalise |
 <!-- change-log-end -->
 
 ---
