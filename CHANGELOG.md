@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **Release runbook and setup wizard wording (task 218).** The release runbook's develop-sync
+  section opens with its condition, and its manual block and recoveries end on `main` as
+  `release.sh` does. The setup wizard's summary names the `*.handover.*.md` checklist
+  `/tracker-reconcile` ticks, and its section banners use the step numbers in getting-started.
+  restricted-access.md names the autonomous-run fallback for `approve`.
 - **The setup, configuration and process docs match the scripts (task 199).** 20 findings from the
   2026-10-07 doc-drift audit are fixed or closed across 16 docs: getting-started, both quickstarts,
   which-access, which-path, configuration, faq, glossary, six runbooks, and the architecture-example

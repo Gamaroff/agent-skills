@@ -31,7 +31,7 @@ Restricted access is **not** "run without a tracker". It is "run with a tracker 
 These are shipped behaviour, not caveats:
 
 1. **Enforcement is partial.** Jira REST through `jira-sync.js`, the sprint scripts, `jira-epic-creator.js`, GitHub board Status/membership, Priority, Estimate, and every `gh` mutation routed through `tracker_write` are **deferred and recorded**. Since task.56 the **GitHub issue lifecycle** is gated too — create, edit, close, reopen, milestone create and the sub-issue link, through [`tracker-issue.js`](../../shared/resources/tracker-issue-cli.md). Still **not** gated, by design: Jira writes issued as raw `curl` or through the Atlassian MCP tools. A restricted run prints this on stderr every time — and the notice enumerates both halves, so trust it over this page if the two ever disagree. Key row: [`configuration.md` → `access.tracker`](../reference/configuration.md).
-2. **`approve` asks once, at handover.** During the run it defers and records like the other restricted modes — there is deliberately no per-mutation prompt. At handover the orchestrator asks **one batched confirmation** (`AskUserQuestion`) listing the outstanding actions; approved records execute via the committed script. **Without a tty it degrades to `command`** — no prompt, no execution, consent never assumed. See [task.57](../tasks/task.57.readonly-verification-and-reconcile/task.57.readonly-verification-and-reconcile.md).
+2. **`approve` asks once, at handover.** During the run it defers and records like the other restricted modes — there is deliberately no per-mutation prompt. At handover the orchestrator asks **one batched confirmation** (`AskUserQuestion`) listing the outstanding actions; approved records execute via the committed script. **Without a tty, or in an autonomous run, it degrades to `command`** — no prompt, no execution, consent never assumed. See [task.57](../tasks/task.57.readonly-verification-and-reconcile/task.57.readonly-verification-and-reconcile.md).
 3. **`/develop-next` and `/develop-batch` still need VCS write.** `access.vcs` accepts only `full`. Tracker restriction does **not** stop those orchestrators; git push and `gh pr merge` still happen. What they will not do is move the tracker card — that goes into the handover. See [`access.vcs`](../reference/configuration.md).
 4. **Issue creation converges over two runs — and the middle step is yours.** A deferred create writes **no** placeholder `jira_key` / `github_issue`, deliberately: a placeholder defeats the idempotent search that stops the next run creating a *duplicate*, so a wrong key is worse than no key. What makes it converge is three steps, not two:
 
@@ -69,7 +69,7 @@ The organising idea is one planned-mutation record. The access model decides **w
 | --- | --- | --- |
 | `full` | The agent | No handover, unless a write *failed* (`retry_of`) |
 | `read-only` | A human; the agent may read | Checklist + script + JSON. Reads still work. |
-| `approve` | The agent, after one batched confirmation at handover | md + sh + summary on a tty; degrades to `command` (sh only) without one |
+| `approve` | The agent, after one batched confirmation at handover | md + sh + summary on a tty; degrades to `command` (sh only) without one or in an autonomous run |
 | `command` | A human running the generated script | Same three files; the `.sh` is the intended path (dry-run by default) |
 | `manual` | A human clicking the tracker UI | Same three files; the `.md` checklist is the intended path |
 

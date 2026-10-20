@@ -38,9 +38,15 @@ Run this step only if you passed `--no-sync-develop`; otherwise `--tag` has alre
 - **Push rejected** (someone pushed to `develop` meanwhile): `git pull --no-rebase`, `git push origin develop`, then `git checkout main`. A rebasing pull would drop the merge commit.
 ```
 
-Leave the third bullet (`git pull --rebase` failed) alone. It sends the reader back to the manual block, and that block runs before any checkout back.
+Leave the third bullet (`git pull --rebase` failed) alone. It sends the reader back to the manual block, which now ends on `main` (below).
 
-**Optional, same section:** the manual block (`git checkout develop && git pull --rebase` / `git merge main && git push`) also leaves the reader on `develop`. Add `git checkout main` as its last line only if the reviewer agrees. It is the same defect, but gate 4 did not name it.
+**Manual block, same section.** The manual block also leaves the reader on `develop`. Gate 4 did not name it, but it is the same defect, and the review (review.1) decided to fix it here. Add `git checkout main` as its last line:
+
+```bash
+git checkout develop && git pull --rebase
+git merge main && git push
+git checkout main
+```
 
 ### Phase 2: Setup wizard text
 
@@ -58,7 +64,15 @@ becomes:
 echo "  Later, /tracker-reconcile re-reads the board and ticks the committed *.handover.*.md checklist."
 ```
 
-If that line is over 100 columns in the rendered output, split it across two `echo` lines in the same style as the `approve` branch above it.
+The rendered line is 97 columns (measured in review), so it stays a single `echo`.
+
+**Test.** In `shared/resources/tests/setup-consumer-config.test.mjs`, add `rendered summary names the checklist /tracker-reconcile ticks`. Follow `runWorkflowWriter`'s pattern: `execFileSync("bash", ["-c", \`source '${WIZARD}'; print_summary\`], { cwd: <mkdtemp>, env: { ...process.env, SETUP_CONSUMER_NO_MAIN: "1", ACCESS_TRACKER: mode } })`, for `mode` in `approve` and `command`. Assert that:
+
+- the line matching `/tracker-reconcile/` includes `*.handover.*.md`
+- the output does not include `ticks that checklist`
+- under `command`, the output includes `After a run, work the committed *.handover.*.md checklist`
+
+The review checked how the variables arrive. `ACCESS_TRACKER` from the environment reaches `print_summary`: the access block renders under `approve`. The flag defaults at `:45-46` reset `DRY_RUN` and `UPDATE_ONLY` to `false` when the script is sourced, so passing them in the environment does nothing. `UPDATE_ONLY=false` is the value the test needs anyway. Prove it by mutation: restore the old `echo` and confirm the test goes red.
 
 **Banners.** Change the comment lines only, and keep each banner's `─` padding to the same total width as its neighbours:
 
@@ -102,7 +116,8 @@ Before editing, re-run `git grep -n "ticks that checklist\|2a. skill install\|5b
 
 ## Testing Approach
 
-1. `bash -n scripts/setup-consumer.sh && shellcheck scripts/setup-consumer.sh`
-2. The rendered summary for `approve` and `command` (task §8 command), run from the scratchpad, not from the repository root
-3. `command node shared/resources/doc-links.js --file docs/runbooks/release-and-install.md` and the same for `docs/concepts/restricted-access.md`
-4. `npm run ci:fast`, then `npm run ci` before the PR
+1. `bash -n scripts/setup-consumer.sh && shellcheck --severity=warning scripts/setup-consumer.sh` (the CI gate's severity)
+2. `command node --test shared/resources/tests/setup-consumer-config.test.mjs`, plus the mutation proof above
+3. The rendered summary for `approve` and `command` (task §8 command), run from the scratchpad, not from the repository root
+4. `command node shared/resources/doc-links.js --file docs/runbooks/release-and-install.md` and the same for `docs/concepts/restricted-access.md`
+5. `npm run ci:fast`, then `npm run ci` before the PR
