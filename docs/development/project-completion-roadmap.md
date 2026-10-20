@@ -20,7 +20,7 @@ finished work. Rules:
 §"Registry fallback frontier".
 
 Add a phase only to express *sequencing* the registries cannot: a deliberate order, a dependency
-chain, a human gate. **No phase is open** (Phase 11 closed 2026-10-16) — selection falls through to the registries.
+chain, a human gate. **Phase 12 is open** (opened 2026-10-20); Phase 11 closed 2026-10-16.
 
 > ⚠️ **A phase costs upkeep that a registry row does not, and the cost is not obvious.** Roadmap rows
 > are matched on the **checkbox alone** — they do **not** consult the target document's frontmatter.
@@ -66,6 +66,14 @@ Read only by `--batch`. Two rows conflict when they share a tag that **either** 
 | `mutation-proving` | `shared/resources/mutation-proving.md`                                  |
 | `docs-pipeline`    | `docs/runbooks/*`, `docs/concepts/*`, `docs/reference/pipeline-artifacts.md`, `docs/operations/workflows.md`, `skills/develop-*/README.md` |
 | `pipeline-lock`    | `shared/resources/advance-pipeline-lock.sh`, `advance-pipeline-lock.test.sh`  |
+
+---
+
+## PHASE 12 — consumer-neutral library (opened 2026-10-20)
+
+The library names one consumer in what it ships: provenance notes, example Jira keys and hosts, and a format profile in the wireframe skill. This phase removes them and adds a guard so they cannot return.
+
+- [ ] **T220** No consumer names in shipped skills · deps: none · touches: bundles!, jira-sync~, pipeline-steps~, finalise~, test-harness~, review-skills~ · /develop-task docs/tasks/task.220.no-consumer-names-in-shipped-skills/task.220.no-consumer-names-in-shipped-skills.md
 
 ---
 
