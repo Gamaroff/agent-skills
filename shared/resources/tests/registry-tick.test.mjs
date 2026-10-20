@@ -1571,6 +1571,97 @@ test("--bug-status --dry-run reports the write and leaves the registry byte-iden
   }
 });
 
+// Counts every fs read and write of the registry inside the CLI process, so the
+// task's "one registry read, at most one write per call" bound is asserted
+// rather than read off the source. Loaded with `node --require`; the counts are
+// written to $REGISTRY_IO_COUNTS when the process exits.
+const REGISTRY_IO_PRELOAD = `
+const fs = require("fs");
+const path = require("path");
+const counts = { reads: 0, writes: 0 };
+const isRegistry = (p) =>
+  typeof p === "string" &&
+  path.resolve(p).endsWith(path.join("docs", "bugs", "bug-registry.md"));
+for (const [obj, name, kind] of [
+  [fs, "readFileSync", "reads"], [fs, "readFile", "reads"],
+  [fs.promises, "readFile", "reads"], [fs, "writeFileSync", "writes"],
+  [fs, "writeFile", "writes"], [fs.promises, "writeFile", "writes"],
+]) {
+  const orig = obj[name];
+  obj[name] = function (p, ...rest) {
+    if (isRegistry(p)) counts[kind]++;
+    return orig.call(this, p, ...rest);
+  };
+}
+process.on("exit", () => {
+  fs.writeFileSync(process.env.REGISTRY_IO_COUNTS, JSON.stringify(counts));
+});
+`;
+
+function runCounted(cwd, args) {
+  const preload = path.join(cwd, "registry-io-preload.cjs");
+  const countsFile = path.join(cwd, "registry-io-counts.json");
+  writeFileSync(preload, REGISTRY_IO_PRELOAD);
+  const out = execFileSync(
+    process.execPath,
+    ["--require", preload, CLI, ...args, "--json"],
+    {
+      cwd,
+      encoding: "utf8",
+      env: { ...process.env, REGISTRY_IO_COUNTS: countsFile },
+    },
+  );
+  return {
+    res: JSON.parse(out),
+    io: JSON.parse(readFileSync(countsFile, "utf8")),
+  };
+}
+
+test("--bug-status reads the registry once and writes it at most once per call", () => {
+  for (const [label, rows, status, extra, reason, writes] of [
+    [
+      "mirrored",
+      [bugRow(1, "closed"), bugRow(2, "new")],
+      "in-progress",
+      [],
+      "mirrored",
+      1,
+    ],
+    [
+      "already",
+      [bugRow(1, "closed"), bugRow(2, "new")],
+      "new",
+      [],
+      "already",
+      0,
+    ],
+    [
+      "dry-run",
+      [bugRow(1, "closed"), bugRow(2, "new")],
+      "in-progress",
+      ["--dry-run"],
+      "dry-run",
+      0,
+    ],
+  ]) {
+    const { dir } = bugSandbox(rows);
+    try {
+      const f = writeBug(dir, 2, status);
+      const { res, io } = runCounted(dir, [
+        "--bug-status",
+        ...extra,
+        "--file",
+        f,
+      ]);
+      assert.equal(res.reason, reason, label);
+      assert.equal(io.reads, 1, `${label}: registry reads`);
+      assert.equal(io.writes, writes, `${label}: registry writes`);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+});
+
 test("--bug-status with --annotate is a usage error (exit 2) and writes nothing", () => {
   const { dir, registry } = bugSandbox([bugRow(2, "new")]);
   try {
