@@ -77,11 +77,11 @@ const isFence = entry.startsWith(FENCE_PREFIX);
 if (isFence) return { ok: true, kind: "fence", entryPath, heading };
 ```
 
-3. `extractFencedBlock(docText, heading)`. Reuse `extractBlocks` from `./qa-execute-snippets.mjs` (already imported for `isWithin`, `sandboxEnv`, `snapshotTree` at `:191`). Match the heading line as `^#{1,6}\s+<heading>\s*$` (exact text, so a heading that is a prefix of another does not match). More than one match → `{ ok: false, detail: "heading appears at lines A and B" }`. Take the first block whose language is `bash` (or `sh`), whose `line` is greater than the heading's line, and which comes before the next heading of the same or a higher level.
+3. `extractFencedBlock(docText, heading)`. Reuse `extractBlocks` from `./qa-execute-snippets.mjs` (already imported for `isWithin`, `sandboxEnv`, `snapshotTree` at `:191`). Match the heading line as `^#{1,6}\s+<heading>\s*$` (exact text, so a heading that is a prefix of another does not match). More than one match → `{ ok: false, detail: "heading appears at lines A and B" }`. Take the first block (`extractBlocks` returns `bash` blocks only) whose `line` is greater than the heading's line, and which comes before the next heading of the same or a higher level. **Read headings only from lines outside fences**, tracking fence state as `extractBlocks` does — a `# comment` inside a bash block is not a heading (review I2).
 
 4. `runFenceCase(c, opts)`, modelled on `runCliCase` (`:1784`), not `runShellCase`:
    - Decline a non-string `input`, an invalid `expected` (`expectedProblem`, `:1381`) and an invalid `fixture` (non-object `env` values, file keys that are absolute or resolve outside the case directory through `isWithin`).
-   - Substitute: `script = block.replaceAll(slot, () => c.input)`. The replacer function is load-bearing.
+   - Substitute: `script = block.replaceAll(slot, () => c.input)`. The replacer function is load-bearing for `$&`. The input becomes script **source**: a `$(…)` in it runs, as it would for the document's reader, and its effects must stay in the work directory (review C1).
    - Write `script` to `<workDir>/fence.sh` and the fixture files under `<workDir>/`; run `<shell> fence.sh` per shell from `probeShells()` through `watchedSpawn` with `caseEnv(…)` plus `fixture.env` (applied **before** `HOME`/`TMPDIR`/`LC_ALL`, so a case cannot unset the sandbox).
    - Verdict: if `isLaunchFailure(child, …)`, the case is `errored`; with `expected`, use `compareExpected`; otherwise exit 0 is `accepted` and any other exit `rejected`.
 
@@ -100,7 +100,7 @@ if (isFence) return { ok: true, kind: "fence", entryPath, heading };
 - `probe-boundary-signals.mjs` (`:58`): the same clause in the signal text it exports (and update its test if it pins the text).
 - `security-review-prompt.md`, `skills/qa-task/SKILL.md`, `skills/qa-story/SKILL.md`, `skills/review-security/SKILL.md`: wherever `cli:` is offered as a form, offer `fence:` beside it.
 
-**Proof test** — commit `shared/resources/tests/fixtures/fence-probe/t167-cases.json`, the 13 cases from `.claude/state/t167-probe-cases.json` rewritten to the new shape (`input` is the gate command; `fixture: { env, files: { "package.json": …, ".npmrc": … } }`). Then:
+**Proof test** — commit `shared/resources/tests/fixtures/fence-probe/t167-cases.json`, the 13 cases reconstructed from task.167's DoD (`task.167.dod.1.fast-gate-precondition-npm-loglevel.md:123`–`:128`; the original `.claude/state/t167-probe-cases.json` is not in this checkout — review I1), in the new shape (`input` is the gate command; `fixture: { env, files: { "package.json": …, ".npmrc": … } }`). Then:
 
 ```js
 test("fence: task.167's cases against the shipped fast-gate precondition", () => {

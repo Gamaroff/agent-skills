@@ -1,0 +1,31 @@
+{
+  "sink": "path",
+  "entry": "cli:skills/qa-next/scripts/uat-status.mjs",
+  "name": "uat-status --resolve-finding --by",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 27,
+  "passed": 27,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "argv": [
+    "--root",
+    "/tmp/claude-1000/-home-gamaroff-Development-agent-skills/ed3299af-b695-40aa-aace-68009743f648/scratchpad/tmp.9isUfUGZxy",
+    "--resolve-finding",
+    "runs/A.1/2026-10-15-lan.md",
+    "1",
+    "--by",
+    "{input}",
+    "--date",
+    "2026-10-16"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-10-16T15:44:52.381Z"
+}

@@ -1,0 +1,138 @@
+[
+  {
+    "id": "fh-quoted-path-only",
+    "sink": "shell-exec",
+    "input": "",
+    "why": "A fence that only quotes the path, as at probe-boundary-rule.md:66 (QA cycle 3, CR-1)",
+    "correct": "false: reported",
+    "direction": "hostile"
+  },
+  {
+    "id": "fh-prompt-prose-source",
+    "sink": "shell-exec",
+    "input": "  - Source `",
+    "why": "A fenced prompt saying 'Source `...`' in prose (QA cycle 3, CR-1)",
+    "correct": "false: reported",
+    "direction": "hostile"
+  },
+  {
+    "id": "fh-yaml-key",
+    "sink": "shell-exec",
+    "input": "writer: ",
+    "why": "A YAML-ish key in a fence names the path without running it",
+    "correct": "false: reported",
+    "direction": "hostile"
+  },
+  {
+    "id": "fh-echo",
+    "sink": "shell-exec",
+    "input": "echo ",
+    "why": "echo prints the path and does not run it",
+    "correct": "false: reported",
+    "direction": "hostile"
+  },
+  {
+    "id": "fh-cat",
+    "sink": "shell-exec",
+    "input": "cat ",
+    "why": "cat reads the file and does not execute it",
+    "correct": "false: reported",
+    "direction": "hostile"
+  },
+  {
+    "id": "fh-keyword-time-prose",
+    "sink": "shell-exec",
+    "input": "  - At the same time source ",
+    "why": "'time' is an English word here, not in command position",
+    "correct": "false: reported",
+    "direction": "hostile"
+  },
+  {
+    "id": "fh-keyword-do-prose",
+    "sink": "shell-exec",
+    "input": "  - Please do source ",
+    "why": "'do' is prose, not the shell keyword",
+    "correct": "false: reported",
+    "direction": "hostile"
+  },
+  {
+    "id": "fh-keyword-then-prose",
+    "sink": "shell-exec",
+    "input": "  - If unset, then bash ",
+    "why": "'then' is prose in a list item, not in command position",
+    "correct": "false: reported",
+    "direction": "hostile"
+  },
+  {
+    "id": "fl-if-not-source",
+    "sink": "shell-exec",
+    "input": "if ! source ",
+    "why": "A shell guard that sources the script",
+    "correct": "true",
+    "direction": "legitimate"
+  },
+  {
+    "id": "fl-subshell-command-node",
+    "sink": "shell-exec",
+    "input": "x=$(command node ",
+    "why": "Runs inside $(",
+    "correct": "true",
+    "direction": "legitimate"
+  },
+  {
+    "id": "fl-and-dot-source",
+    "sink": "shell-exec",
+    "input": "x=1 && . ",
+    "why": "Dot-source after &&",
+    "correct": "true",
+    "direction": "legitimate"
+  },
+  {
+    "id": "fl-indented-bash-flag",
+    "sink": "shell-exec",
+    "input": "  bash -e ",
+    "why": "A command at the line start, with a flag",
+    "correct": "true",
+    "direction": "legitimate"
+  },
+  {
+    "id": "fl-esm-import",
+    "sink": "shell-exec",
+    "input": "import { a } from \"./",
+    "why": "A JS import in a code fence",
+    "correct": "true",
+    "direction": "legitimate"
+  },
+  {
+    "id": "fl-require",
+    "sink": "shell-exec",
+    "input": "const b = require(\"",
+    "why": "A JS require in a code fence",
+    "correct": "true",
+    "direction": "legitimate"
+  },
+  {
+    "id": "fl-pipe-sh",
+    "sink": "shell-exec",
+    "input": "cat x | sh ",
+    "why": "sh after a pipe",
+    "correct": "true",
+    "direction": "legitimate"
+  },
+  {
+    "id": "fl-loop-do-source",
+    "sink": "shell-exec",
+    "input": "for f in a b; do source ",
+    "why": "The real 'do' keyword in command position",
+    "correct": "true",
+    "direction": "legitimate"
+  },
+  {
+    "id": "fl-line-node-test",
+    "sink": "shell-exec",
+    "input": "node --test ",
+    "why": "node at the line start, with a flag",
+    "correct": "true",
+    "direction": "legitimate"
+  }
+]

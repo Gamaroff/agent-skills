@@ -12,28 +12,32 @@ A PRD frames a feature area. It is the parent of one or more [epics](./epic-docu
 
 ```
 docs/prd/
+├── prd-registry.md                  # allocates P — see prd-registry.md
 └── {domain}/
-    └── prd.{feature}/
-        ├── prd.{feature}.md        # main document
+    └── prd.{P}.{feature}/
+        ├── prd.{P}.{feature}.md     # main document
         └── epics/
-            └── epic.{N}.{name}/    # see epic-documents.md
+            └── epic.{P}.{E}.{name}/ # see epic-documents.md
 ```
 
-When sharded, the body splits across files in `prd.{feature}/` per level-2 section. The pipeline locates epics at `${PRD_ROOT}/{domain}/prd.{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md`, where `${PRD_ROOT}` is configurable (default `docs/prd`) — see [Configurable roots and fixed conventions](../reference/configuration.md#configurable-roots-and-fixed-conventions).
+> **Adopted (2026-10-16, tasks 202–207).** `create-prd`, `review-prd` and `shard-prd` write and check this scheme (task 204), and epics and stories follow it (tasks 205, 206). A legacy PRD (`prd.{feature}`, no `prd_number`) is reported by `review-prd` as Critical and migrated with `migrate-doc-numbering.mjs`.
+
+When sharded, the body splits across files in `prd.{P}.{feature}/` per level-2 section. The pipeline locates epics at `${PRD_ROOT}/{domain}/prd.{P}.{feature}/epics/epic.{P}.{E}.{name}/epic.{P}.{E}.{name}.md`, where `${PRD_ROOT}` is configurable (default `docs/prd`) — see [Configurable roots and fixed conventions](../reference/configuration.md#configurable-roots-and-fixed-conventions).
 
 ## File naming
 
-- Directory: `prd.{feature}` — kebab-case, all lowercase, prefixed with `prd.` to match the document file.
-- Main PRD file: `prd.{feature}.md` (same name as the parent directory, with `.md` extension).
+- Directory: `prd.{P}.{feature}` — `P` is the PRD number from the [PRD registry](./prd-registry.md), globally unique and never reused; `{feature}` is kebab-case, all lowercase, and begins with a letter.
+- Main PRD file: `prd.{P}.{feature}.md` (same name as the parent directory, with `.md` extension).
 - Directory segments (`{domain}`) are kebab-case, all lowercase.
 
 ## Frontmatter schema
 
 ```yaml
 ---
-name: prd.onboarding
+name: prd.1.onboarding
 title: "agent-skills Onboarding & Tutorials"
 type: prd
+prd_number: 1
 description: "One-sentence summary of the feature area this PRD frames."
 mode: brownfield
 status: draft
@@ -45,7 +49,8 @@ tags: [onboarding, docs]
 
 | Field | Type | Required | Values / Notes |
 |---|---|---|---|
-| `name` | string | Yes | `prd.{feature}` — matches the directory and file stem |
+| `name` | string | Yes | `prd.{P}.{feature}` — matches the directory and file stem |
+| `prd_number` | integer | Yes | `P` — equals the number in the filename; `doc-id.js check` reports a difference as `frontmatter-mismatch` |
 | `title` | string | Yes | Human-readable title |
 | `type` | literal | Yes | Must be exactly `prd` (OKF `type` — the one hard requirement) |
 | `description` | string | Recommended | One-sentence summary (OKF `description`) — what consumers and agents index on |
@@ -107,12 +112,13 @@ When a PRD exceeds ~5 epics or ~30 stories, shard it for navigability:
 /shard-prd <prd-path>
 ```
 
-`shard-prd` splits the document by level-2 section into separate files in the same `prd.{feature}/` directory. Epic creation then proceeds against the sharded files.
+`shard-prd` splits the document by level-2 section into separate files in the same `prd.{P}.{feature}/` directory. Shard files carry no `prd.` prefix, so the id checker never mistakes one for a document. Epic creation then proceeds against the sharded files.
 
 ## Prerequisites checklist
 
 Before running `create-prd` / `new-product-prd`:
 
+- [ ] PRD number allocated from the [PRD registry](./prd-registry.md) (`doc-id.js next prd`)
 - [ ] PRD lives under `${PRD_ROOT}` (default `docs/prd/`; configurable via `prd.prdShardedLocation` — see [Configuration](../reference/configuration.md#configurable-roots-and-fixed-conventions))
 - [ ] (Brownfield only) project architecture is documented — see `document-existing-project` SKILL
 - [ ] Stakeholder input gathered for goals, requirements, success criteria
@@ -135,6 +141,7 @@ Before downstream epic creation:
 ## See also
 
 - [Story Development Runbook — Phase A](../runbooks/story-development.md#phase-a--product-planning)
+- [PRD registry](./prd-registry.md)
 - [Epic documents](./epic-documents.md)
 - [Story documents](./story-documents.md)
 - [Status lifecycle](./status-lifecycle.md)

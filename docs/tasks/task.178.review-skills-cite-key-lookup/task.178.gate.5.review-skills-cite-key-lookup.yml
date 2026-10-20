@@ -1,0 +1,66 @@
+schema: 2
+task: 'task.178.review-skills-cite-key-lookup'
+task_title: 'review-task and review-story cite the §0a key lookup'
+gate: CONCERNS
+status_reason: 'Gate 4 HIGH fixed (backtick-first split). The cycle-4 unbalanced-quote fallback regressed quoted alternation on a line that also carries an unpaired apostrophe (CR-1, medium); HIGH 0.'
+reviewer: 'QA Engineer'
+head: '02b3e712f409a857d92120b482d1496d5df6816f'
+updated: '2026-10-12T07:57:38Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'tests/key-lookup-single-statement.test.js'
+    finding: 'A chunk whose quotes do not balance is split on every |, so one unpaired apostrophe in the chunk (a "# don''t" comment, "doesn''t" prose) breaks a quoted-alternation lookup into two segments; three such lines matched at 02b3e712^ and do not now.'
+    suggested_action: 'Read a single quote between two word characters as a literal apostrophe rather than a quote opener, and add the three lines to the fixture table.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 12
+  phases_verified: 3/3
+  ci: 'not read — CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged (scoped: CHANGELOG.md and the test file).'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Unchanged.'
+  maintainability:
+    status: CONCERNS
+    notes: 'CR-1 — a fixture-table shape is missed in combination with an apostrophe.'
+
+recommendations:
+  immediate:
+    - action: 'CR-1: word-internal apostrophe is literal; fixtures.'
+      refs: ['tests/key-lookup-single-statement.test.js']
+  future:
+    - action: 'Reviewer CR-2 (low/medium): the header should state the unbalanced-chunk behaviour and any residual unseen shape.'
+      refs: ['tests/key-lookup-single-statement.test.js']
+    - action: 'BND-1 (standing deferral): probe the Jira-key task-only check via task.180.'
+      refs: ['skills/review-task/SKILL.md']
+
+bug_resolution:
+  previous_gate: 4
+  fixed: ['CR-1 (gate 4)']
+  fix_commit: '02b3e712'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 fixed']

@@ -1,10 +1,13 @@
+# prd_number is allocated by /create-prd from the PRD registry (prd-registry.md under the PRD
+# root) — never invented. If {{prd_number}} is unfilled when this template runs, stop and run
+# /create-prd, which allocates it and fills this path.
 template:
   id: prd-template-v2
   name: Product Requirements Document
   version: 2.0
   output:
     format: markdown
-    filename: docs/prd.md
+    filename: "{{prd_root}}/{{domain}}/prd.{{prd_number}}.{{feature}}/prd.{{prd_number}}.{{feature}}.md"
     title: "{{project_name}} Product Requirements Document (PRD)"
 
 workflow:
@@ -138,7 +141,7 @@ sections:
       - Err on the side of less epics, but let the user know your rationale and offer options for splitting them if it seems some are too large or focused on disparate things.
       - Cross Cutting Concerns should flow through epics and stories and not be final stories. For example, adding a logging framework as a last story of an epic, or at the end of a project as a final epic or story would be terrible as we would not have logging from the beginning.
 
-      IMPORTANT NOTE ON EPIC NUMBERING: In the PRD, refer to epics as "Epic 1", "Epic 2", etc. (relative numbers within the PRD). When these are later converted to epic files, they will be assigned globally unique numbers from the system registry (/docs/development/epic-registry.md), such as epic.163.md, epic.164.md, etc.
+      IMPORTANT NOTE ON EPIC NUMBERING: In the PRD, refer to epics as "Epic 1", "Epic 2", etc. (relative numbers within the PRD). Those ARE the epic numbers: epic files created from this PRD are named epic.{{prd_number}}.{E}.{name}, where E counts within this PRD, so "Epic 1" becomes epic.{{prd_number}}.1. There is no separate global epic number.
     elicit: true
     examples:
       - "Epic 1: Foundation & Core Infrastructure: Establish project setup, authentication, and basic user management"

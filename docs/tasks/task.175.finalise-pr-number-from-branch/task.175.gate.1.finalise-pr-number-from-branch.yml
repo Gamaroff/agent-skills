@@ -1,0 +1,56 @@
+schema: 2
+task: 'task.175.finalise-pr-number-from-branch'
+task_title: "Resolve finalise's PR number from the branch, not the task body"
+gate: PASS
+status_reason: 'All four phases delivered and every functional criterion is held by an executed test (16 resolver cases, 3 pr-read cases, 7 mutations red). Two advisory code-review findings (medium/medium, low cleanup) are routed to future work; no high-confidence bug.'
+reviewer: 'QA Engineer'
+head: 'd79ed2078fa822f98e943f240ed4174e7e9db461'
+updated: '2026-10-12T06:22:29Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 19
+  phases_verified: 4/4
+  ci: 'not read — CI is gated once at /finalise'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: true — resolve-pr-number.sh refuses an unconfirmed body citation and another work item''s lock. No security-probe entry form reaches it (flag-parsed --doc, and the branch and body rungs are networked through gh), so it is unverifiable by the engine; the executed fixture suite covers the hostile states (another branch''s cited PR, another directory''s lock, a body pr_number: line). Finalise''s zero-guard will need a recorded DoD override until task.181 shell-argv exists.'
+  performance:
+    status: PASS
+    notes: 'One to three gh calls per resolution; no loops over unbounded input.'
+  reliability:
+    status: PASS
+    notes: 'Every rung fails toward the next rung, never toward a guessed number; exit 1 prints no number; pr_read failures are reported on stderr.'
+  maintainability:
+    status: PASS
+    notes: 'Rung 2 reuses pr-read.sh rather than a second forge query; header states the contract; shellcheck clean; bundle in sync.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 (advisory, medium/medium): the branch rung trusts any PR the checked-out branch has; a standalone finalise run on develop could pick a develop→main release PR over a correct frontmatter pr_number:. Consider refusing rung 2 when the PR head branch is the base or a long-lived branch.'
+      refs: ['shared/resources/resolve-pr-number.sh']
+    - action: 'CR-2 (advisory cleanup): distinguish "could not confirm" (pr_read failed) from "confirmed as another PR" in the body rung''s stderr and JSON reason.'
+      refs: ['shared/resources/resolve-pr-number.sh']
+    - action: 'Add a positive pin that Step 7.2 names the resolver''s PR_NUMBER (the presence pin only proves the old body copy is gone).'
+      refs: ['shared/resources/tests/resolve-pr-number.test.mjs']
+    - action: 'Security zero-guard: record a DoD override for resolve-pr-number.sh (no probe entry form reaches it) until task.181 shell-argv exists.'
+      refs: ['shared/resources/resolve-pr-number.sh']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

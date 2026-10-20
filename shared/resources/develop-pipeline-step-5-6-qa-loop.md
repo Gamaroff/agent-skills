@@ -156,7 +156,7 @@ fi
 An empty `QA_CYCLE` (and so an empty `LATEST_GATE`) means no QA run has written a gate yet.
 
 > The helper reads every `*.gate.*.yml` in the directory. The story form this replaced was keyed on
-> the story's own stem (`story.{epic}.{story}.gate.*`); no co-located bug writes a gate today, and a
+> the story's own stem (`story.{P}.{E}.{S}.gate.*`); no co-located bug writes a gate today, and a
 > stem filter for the helper is a recorded follow-up (task.149 gate 8 CR-2).
 
 **Note (tasks only)**: The legacy path `docs/qa/gates/tasks/` is deprecated. qa-task v2.0 co-locates gate files in the task directory alongside the task document.
@@ -186,7 +186,7 @@ Read the gate file to determine the gate result.
 
 **Pre-step: Dispatch traceability mapper (standard mode only)**
 
-Before invoking `/qa-story`, dispatch the QA traceability mapper as an Explore subagent (see `shared/resources/qa-traceability-mapper-prompt.md` for the full execution protocol). Mark the wait beside the dispatch — `bash .agents/skills/develop-story/references/set-waiting-on.sh "step-5 traceability mapper"` — and `… --clear` once its confirmation is read (task.124):
+Before invoking `/qa-story`, dispatch the QA traceability mapper as an Explore subagent (see `shared/resources/qa-traceability-mapper-prompt.md` for the full execution protocol). Mark the wait beside the dispatch — `bash .agents/skills/develop-story/references/set-waiting-on.sh "step-5 traceability mapper"` — and `… --clear` once its reply is read (task.124):
 
 ```
 Agent(subagent_type="Explore", prompt="Run the QA traceability mapper (shared/resources/qa-traceability-mapper-prompt.md).
@@ -194,18 +194,50 @@ Inputs:
   STORY_FILE={story-file}
   STORY_DIR={story-directory}
 
-Follow the Execution Protocol exactly. Write the matrix file and return a one-line confirmation.")
+Follow the Execution Protocol exactly. Return the matrix between the markers; do not create or modify any file.")
 ```
 
 `{story-file}` and `{story-directory}` are the story file path and story directory path resolved in Phase 0a.
 
 After the subagent completes:
 
-1. Confirm `{story-directory}/.summaries/qa-traceability-matrix.md` was written.
+1. Save its reply **verbatim** to `.claude/state/mapper-reply.md` (Write tool — the reply is text in
+   your context, not a shell variable), then run the block below with `{doc-directory}` =
+   `{story-directory}`. The mapper is read-only: it **returns** the matrix and this step writes it
+   (task.189, obs #191 — on every run that told it to write, it refused and returned the table inline).
 2. Write the summary JSON artifact to `{story-directory}/.summaries/step-5-traceability-mapper.json` (schema: `shared/resources/subagent-summary-artifact.md`).
 3. Update the Pipeline Progress `Subagent summary ref` column for Step 5–6 with the JSON path.
 
-If the subagent fails or the matrix file is absent: log warning in Issues Log and proceed without the matrix (qa-story falls back to internal mapping).
+If the subagent fails, or the block above prints a `⚠️` line (no well-formed marked block in its reply): log warning in Issues Log and proceed without the matrix (qa-story falls back to internal mapping).
+
+##### Write the matrix from the mapper's reply
+
+```bash
+# Step 5 — write the traceability matrix the mapper RETURNED (task.189, obs #191).
+# INPUTS, substituted into THIS block: {doc-directory} — the story or task directory. The reply is
+# read from .claude/state/mapper-reply.md, which the orchestrator wrote verbatim with its Write tool.
+REPLY_FILE=.claude/state/mapper-reply.md
+MATRIX="{doc-directory}/.summaries/qa-traceability-matrix.md"
+START='^<!-- matrix-start -->[[:space:]]*$'
+END='^<!-- matrix-end -->[[:space:]]*$'
+# Exactly one of each marker, start before end — anything else is "no matrix", never a guess.
+if [ -f "$REPLY_FILE" ] \
+   && [ "$(grep -cE "$START" "$REPLY_FILE")" = 1 ] && [ "$(grep -cE "$END" "$REPLY_FILE")" = 1 ] \
+   && [ "$(grep -nE "$START" "$REPLY_FILE" | cut -d: -f1)" -lt "$(grep -nE "$END" "$REPLY_FILE" | cut -d: -f1)" ]; then
+  # Extracted beside the reply, not into the doc directory: the directory is created only once a
+  # non-empty matrix exists, so a refused reply leaves nothing behind (task.189 QA-2).
+  awk -v s="$START" -v e="$END" '$0 ~ e { f = 0 } f { print } $0 ~ s { f = 1 }' "$REPLY_FILE" > "$REPLY_FILE.matrix" \
+    && [ -s "$REPLY_FILE.matrix" ] && mkdir -p "$(dirname "$MATRIX")" && mv "$REPLY_FILE.matrix" "$MATRIX" \
+    && echo "matrix: written to $MATRIX" \
+    || { rm -f "$REPLY_FILE.matrix"; echo "⚠️ mapper returned an empty matrix — proceeding without it"; }
+else
+  echo "⚠️ mapper returned no matrix — proceeding without it"
+fi
+rm -f "$REPLY_FILE"
+```
+
+The text between the markers is written byte for byte. A reply that carries the marked matrix is
+**never discarded**: the warning fires only when the reply has no well-formed marked block.
 
 Skip this pre-step when any of:
 
@@ -217,7 +249,7 @@ Log the bypass reason in the Decisions Log (`Traceability mapper skipped: {reaso
 
 **Invoke `/qa-story`**
 
-Invoke the `/qa-story` skill with the story file path. If `PIPELINE_MODE=lite`, prefix the invocation with explicit context: "Use **direct tools only** for this review — skip parallel agents regardless of the adaptive strategy decision. This story is running in lite mode."
+Invoke the `/qa-story` skill with the story file path. If the run's mode is `lite` or `fast`, or `--skip qa-depth` is in force (the lock's `answers.mode` / `answers.skips`, resolved in §0d), prefix the invocation with explicit context: "Use **direct tools only** for this review — skip parallel agents regardless of the adaptive strategy decision. This story is running in lite mode." When the lock carries a `waiver`, also prefix the waiver directive from the lite-mode contract (§"Directive Passed to the QA Skill").
 
 **Code-review-and-fix loop (pipeline default).** Always pass the run-level override `code_review_blocking=true`. This makes the diff code review qa-story already runs (Phase 1.6) gate the build on high-confidence correctness bugs, which then flow into this loop's qa-fix step (5b) and get fixed and re-reviewed each cycle. A story opts **out** with `code_review_blocking: false` in its frontmatter (escape hatch) — the override never overrides an explicit `false`. See the **Opt-in to blocking** resolution matrix in `shared/resources/code-review-prompt.md`.
 
@@ -242,7 +274,7 @@ Conditions to dispatch the mapper for tasks (all must be true):
 1. `PIPELINE_MODE = standard` (lite mode skips the mapper)
 2. `HAS_SUCCESS_CRITERIA_TABLE = true` (set by Phase 0a Agent 3 — the lite-mode/always-load detector)
 
-If both are true, dispatch the mapper as an Explore subagent — same prompt as develop-story, but pass the **task** file/directory as the values for `STORY_FILE`/`STORY_DIR` (the mapper accepts both doc types — see `qa-traceability-mapper-prompt.md` "Doc type" note). Mark the wait beside the dispatch — `bash .agents/skills/develop-task/references/set-waiting-on.sh "step-5 traceability mapper"` — and `… --clear` once its confirmation is read (task.124):
+If both are true, dispatch the mapper as an Explore subagent — same prompt as develop-story, but pass the **task** file/directory as the values for `STORY_FILE`/`STORY_DIR` (the mapper accepts both doc types — see `qa-traceability-mapper-prompt.md` "Doc type" note). Mark the wait beside the dispatch — `bash .agents/skills/develop-task/references/set-waiting-on.sh "step-5 traceability mapper"` — and `… --clear` once its reply is read (task.124):
 
 ```
 Agent(subagent_type="Explore", prompt="Run the QA traceability mapper (shared/resources/qa-traceability-mapper-prompt.md).
@@ -250,22 +282,23 @@ Inputs:
   STORY_FILE={task-file}
   STORY_DIR={task-directory}
 
-Follow the Execution Protocol exactly. Write the matrix file and return a one-line confirmation.")
+Follow the Execution Protocol exactly. Return the matrix between the markers; do not create or modify any file.")
 ```
 
 After the subagent completes:
 
-1. Confirm `{task-directory}/.summaries/qa-traceability-matrix.md` was written.
+1. Save its reply verbatim to `.claude/state/mapper-reply.md` and run the develop-story block
+   **Write the matrix from the mapper's reply** above with `{doc-directory}` = `{task-directory}`.
 2. Write the summary JSON artifact to `{task-directory}/.summaries/step-5-traceability-mapper.json` (schema: `shared/resources/subagent-summary-artifact.md`).
 3. Update the Pipeline Progress `Subagent summary ref` column for Step 5–6 with the JSON path.
 
-If the subagent fails or the matrix file is absent: log warning in Issues Log and proceed without the matrix (qa-task falls back to its internal mapping).
+If the subagent fails, or that block prints a `⚠️` line (no well-formed marked block in its reply): log warning in Issues Log and proceed without the matrix (qa-task falls back to its internal mapping).
 
 Skip this pre-step when `PIPELINE_MODE=lite` OR `HAS_SUCCESS_CRITERIA_TABLE=false`. Tasks with no Success Criteria table (e.g. pure infra cleanup) gain nothing from the mapper.
 
 **Invoke `/qa-task`**
 
-Invoke the `/qa-task` skill with the task file path. If `PIPELINE_MODE=lite`, prefix the invocation with explicit context: "Use **direct tools only** for this review — skip parallel agents regardless of the adaptive strategy decision. This task is running in lite mode."
+Invoke the `/qa-task` skill with the task file path. If the run's mode is `lite` or `fast`, or `--skip qa-depth` is in force (the lock's `answers.mode` / `answers.skips`, resolved in §0d), prefix the invocation with explicit context: "Use **direct tools only** for this review — skip parallel agents regardless of the adaptive strategy decision. This task is running in lite mode." When the lock carries a `waiver`, also prefix the waiver directive from the lite-mode contract (§"Directive Passed to the QA Skill").
 
 **Code-review-and-fix loop (pipeline default).** Always pass the run-level override `code_review_blocking=true`. This makes the diff code review qa-task already runs (Step 3b) gate the build on high-confidence correctness bugs, which then flow into this loop's qa-fix step (5b) and get fixed and re-reviewed each cycle. A task opts **out** with `code_review_blocking: false` in its frontmatter (escape hatch) — the override never overrides an explicit `false`. See the **Opt-in to blocking** resolution matrix in `shared/resources/code-review-prompt.md`.
 
@@ -306,6 +339,42 @@ Three rules make this loop's history readable rather than a churn log:
 
 A QA cycle that finds nothing still writes its verdict row: the verdict is the event being
 recorded, not the findings.
+
+### Recording a waived step (shared)
+
+Runs after the QA skill writes its gate and **before** the outcome branching below reads it — and only
+when the lock carries a `waiver` (a step was removed by `--skip`, task.201). **The QA skill writes the
+gate; this step only checks it** — dev-side steps never modify a gate file. The waiver directive the QA
+skill was given (lite-mode contract, §"Directive Passed to the QA Skill") tells it to record `WAIVED`
+for a review that would otherwise read `PASS` or `CONCERNS`. The engine's rule is a fixed point, so the
+recorded gate is correct exactly when the engine, given it, returns it unchanged:
+
+```bash
+LOCK=.claude/state/develop-pipeline.lock
+if [ "$(jq -r '.waiver.active // false' "$LOCK")" = "true" ]; then
+  GATE_FILE="{the latest gate file, per Finding the Latest Gate File}"
+  RECORDED=$(sed -nE 's/^gate:[[:space:]]*"?([A-Z]+)"?.*/\1/p' "$GATE_FILE" | head -1)
+  EXPECTED=$(command node .agents/skills/{develop-story|develop-task}/references/pipeline-answers.js gate \
+    --earned "$RECORDED" --skips "$(jq -r '.answers.skips | join(",")' "$LOCK")" \
+    --waiver-reason "$(jq -r '.waiver.reason' "$LOCK")" \
+    --approved-by "$(jq -r '.waiver.approved_by' "$LOCK")" --json | jq -r '.gate')
+  if [ "$EXPECTED" != "$RECORDED" ]; then
+    echo "WAIVER NOT RECORDED: gate reads $RECORDED, a skipped step requires $EXPECTED"
+  elif [ "$RECORDED" = "WAIVED" ] && ! grep -qE '^[[:space:]]+approved_by:[[:space:]]*"?[^"[:space:]]' "$GATE_FILE"; then
+    echo "WAIVER NOT RECORDED: gate reads WAIVED with no waiver.approved_by"
+  else
+    echo "waiver recorded: $RECORDED"
+  fi
+fi
+```
+
+- `waiver recorded` → continue to the outcome branching; the `WAIVED` arm routes it to 5c like any
+  accepted waiver, and a `FAIL` takes the `FAIL` arm — **a waiver never masks a failure**.
+- `WAIVER NOT RECORDED` → the QA skill wrote a verdict a skipped step cannot earn. Re-invoke it once,
+  same cycle, with the waiver directive restated first. If the second gate still fails the check,
+  **HALT**: a skipped step must never reach 5c reading `PASS`.
+
+Log `Gate {N}: {RECORDED} — waiver {recorded / re-invoked / HALT}` in the Decisions Log.
 
 ### Outcome branching (shared)
 
@@ -1064,7 +1133,7 @@ working tree, where a branch switch loses it and no reader of the PR ever sees i
    Committing here rather than at the Step 7 transition is load-bearing twice over: 5c reads the
    artifact trail **off the branch**, so an uncommitted gate is invisible to the very review that
    audits it; and if 5c returns `REQUEST CHANGES`, the Step 7 transition never happens on this
-   cycle. Message: `docs(story.{epic}.{story}): QA cycle {N} gate + report` (or `docs(task.{id}): …`).
+   cycle. Message: `docs(story.{P}.{E}.{S}): QA cycle {N} gate + report` (or `docs(task.{id}): …`).
 
    > **This is the one path on which a cycle commits twice, and the push budget is what matters.**
    > A `REQUEST CHANGES` verdict re-enters 5b *inside the same cycle N*, and 5b then makes its own
@@ -1151,7 +1220,7 @@ After fixes are applied:
 
    **Bound this retry at 2 attempts.** After a second red gate in the same cycle, stop retrying:
    **commit the attempt without pushing** — `fix(task.{id}): qa-fix cycle {N} — fast gate red, not
-   pushed` (or `fix(story.{epic}.{story}): …`), carrying this cycle's gate and QA report as step
+   pushed` (or `fix(story.{P}.{E}.{S}): …`), carrying this cycle's gate and QA report as step
    0-stage staged them, with the implementation report still excluded per step 1 — record the
    failing output in the QA Iteration History, and let the cycle end so the next QA review writes a
    gate. Skip step 3's push: the next push — the next cycle's, or the one before its 5c — carries
@@ -1181,13 +1250,13 @@ After fixes are applied:
    git reset HEAD -- '**/task.*.implementation.*.md' 2>/dev/null || true
    ```
 
-   Then invoke `/commit-changes` with an explicit `exclude` directive in the prompt: pass `exclude=story.{epic}.{story}.implementation.*.md` (or `task.{id}.implementation.*.md`). The skill respects the directive and will not re-stage the report.
+   Then invoke `/commit-changes` with an explicit `exclude` directive in the prompt: pass `exclude=story.{P}.{E}.{S}.implementation.*.md` (or `task.{id}.implementation.*.md`). The skill respects the directive and will not re-stage the report.
 
    Conventional Commits message:
 
    #### develop-story
 
-   `fix(story.{epic}.{story}): qa-fix cycle {N} — {brief summary of fixes}`
+   `fix(story.{P}.{E}.{S}): qa-fix cycle {N} — {brief summary of fixes}`
 
    #### develop-task
 
@@ -1351,7 +1420,7 @@ done
 # standard mode
 /review-pr --effort medium --comment --no-code
 
-# lite mode — degrades the review, never skips it
+# lite or fast mode, or --skip review-pr-depth — degrades the review, never skips it
 /review-pr --effort low --comment --no-code
 ```
 
@@ -1364,7 +1433,8 @@ done
 
 - **Target**: the open PR for this branch — pass nothing and `/review-pr` resolves it from the
   current branch.
-- **`--effort`**: `medium` in standard mode, `low` in lite mode. Lite **degrades** the review; it
+- **`--effort`**: `medium` in standard mode, `low` in lite mode — and in fast mode, or with
+  `--skip review-pr-depth` in force (the lock's `answers`). Lite **degrades** the review; it
   never skips it. See [`shared/resources/develop-pipeline-lite-mode.md`](develop-pipeline-lite-mode.md).
 - **`--no-code`**: always, in both modes. `/qa-story` and `/qa-task` already ran the code reviewer
   over this diff in 5a, with `code_review_blocking=true`, so 5c runs the **conformance lens only**
@@ -1876,7 +1946,7 @@ and QA report get committed** in 5b):
 
 #### develop-story escalation commit
 
-Suggested commit message: `docs(story.{epic}.{story}): implementation report — qa loop escalation`
+Suggested commit message: `docs(story.{P}.{E}.{S}): implementation report — qa loop escalation`
 
 #### develop-task escalation commit
 
@@ -1904,7 +1974,8 @@ On a convergence stall the remaining findings are outstanding, not accepted — 
 because it was no longer reducing them, which is a reason to look at them, not past them.
 Options:
 1. Fix remaining issues manually, then re-run /qa-story
-2. Accept the current gate status and proceed manually with /finalise
+2. Accept the current gate status: run Step 5c first (/review-pr --effort medium --comment
+   --no-code), then /finalise — on a host with no review decision, finalise needs that report
 3. Update the story requirements if issues reflect unintended scope
 4. Re-run /develop-story to resume with more cycles — Phase 0b offers "Resume at 5a with {k}
    more cycles"; any /qa-story you run by hand in between is counted from its gate on disk
@@ -1926,8 +1997,16 @@ On a convergence stall the remaining findings are outstanding, not accepted — 
 because it was no longer reducing them, which is a reason to look at them, not past them.
 Options:
 1. Fix remaining issues manually, then re-run /qa-task
-2. Accept the current gate status and proceed manually with /finalise
+2. Accept the current gate status: run Step 5c first (/review-pr --effort medium --comment
+   --no-code), then /finalise — on a host with no review decision, finalise needs that report
 3. Update the task requirements if issues reflect unintended scope
 4. Re-run /develop-task to resume with more cycles — Phase 0b offers "Resume at 5a with {k}
    more cycles"; any /qa-task you run by hand in between is counted from its gate on disk
 ```
+
+> **Option 2 goes through 5c, not around it.** A loop that escalates never reaches Step 5c, so no
+> `*.pr-review.*.md` exists. `/finalise` satisfies its "PR approved" column with a GitHub review
+> decision or, when the host has none (a single-maintainer repository), with that report — reading
+> APPROVE or CONCERNS. Taking option 2 straight to `/finalise` there produces a DoD gap. The review
+> also reads the trail, and on task.180 it found five bug reports whose fixes later gates had
+> verified but that no step had closed (obs #21).

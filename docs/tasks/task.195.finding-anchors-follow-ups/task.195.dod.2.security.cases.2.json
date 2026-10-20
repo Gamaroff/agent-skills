@@ -1,0 +1,770 @@
+[
+  {
+    "id": "abs-path-escape",
+    "sink": "filename",
+    "input": "worktree",
+    "why": "an absolute file_line outside --root, whose line 1 really says 'root'",
+    "correct": "no-such-file, so the block reports malformed-anchors and never ok",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        "a.js": "first line\n",
+        ".agents/skills/review-code/references/finding-anchors.js": "#!/usr/bin/env node\nrequire(\"/home/gamaroff/Development/agent-skills/.agents/skills/review-code/references/finding-anchors.js\").run(process.argv.slice(2));\n",
+        "{findings-json}": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"/etc/passwd:1\",\"line_text\":\"root\"}]}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "finding-anchors: malformed-anchors\n"
+    }
+  },
+  {
+    "id": "dotdot-escape",
+    "sink": "filename",
+    "input": "worktree",
+    "why": "a relative file_line that climbs out of --root",
+    "correct": "no-such-file, so malformed-anchors",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        "a.js": "first line\n",
+        ".agents/skills/review-code/references/finding-anchors.js": "#!/usr/bin/env node\nrequire(\"/home/gamaroff/Development/agent-skills/.agents/skills/review-code/references/finding-anchors.js\").run(process.argv.slice(2));\n",
+        "{findings-json}": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"../../../../../../../../../../etc/passwd:1\",\"line_text\":\"root\"}]}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "finding-anchors: malformed-anchors\n"
+    }
+  },
+  {
+    "id": "inner-dotdot-escape",
+    "sink": "filename",
+    "input": "worktree",
+    "why": "the climb starts after a real file name inside the root (position axis)",
+    "correct": "no-such-file, so malformed-anchors",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        "a.js": "first line\n",
+        ".agents/skills/review-code/references/finding-anchors.js": "#!/usr/bin/env node\nrequire(\"/home/gamaroff/Development/agent-skills/.agents/skills/review-code/references/finding-anchors.js\").run(process.argv.slice(2));\n",
+        "{findings-json}": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js/../../../../../../../../../../etc/passwd:1\",\"line_text\":\"root\"}]}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "finding-anchors: malformed-anchors\n"
+    }
+  },
+  {
+    "id": "dot-dotdot-escape",
+    "sink": "filename",
+    "input": "worktree",
+    "why": "a ./ prefix in front of the climb (alternative spelling)",
+    "correct": "no-such-file, so malformed-anchors",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        "a.js": "first line\n",
+        ".agents/skills/review-code/references/finding-anchors.js": "#!/usr/bin/env node\nrequire(\"/home/gamaroff/Development/agent-skills/.agents/skills/review-code/references/finding-anchors.js\").run(process.argv.slice(2));\n",
+        "{findings-json}": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"./../../../../../../../../../../etc/passwd:1\",\"line_text\":\"root\"}]}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "finding-anchors: malformed-anchors\n"
+    }
+  },
+  {
+    "id": "range-file-line",
+    "sink": "filename",
+    "input": "worktree",
+    "why": "a code file_line given as a range breaks the one-line contract (task.195 unparseable)",
+    "correct": "unparseable, so malformed-anchors",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        "a.js": "first line\n",
+        ".agents/skills/review-code/references/finding-anchors.js": "#!/usr/bin/env node\nrequire(\"/home/gamaroff/Development/agent-skills/.agents/skills/review-code/references/finding-anchors.js\").run(process.argv.slice(2));\n",
+        "{findings-json}": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js:1-1\",\"line_text\":\"first line\"}]}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "finding-anchors: malformed-anchors\n"
+    }
+  },
+  {
+    "id": "bare-path-file-line",
+    "sink": "filename",
+    "input": "worktree",
+    "why": "a code file_line with no line number",
+    "correct": "unparseable, so malformed-anchors",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        "a.js": "first line\n",
+        ".agents/skills/review-code/references/finding-anchors.js": "#!/usr/bin/env node\nrequire(\"/home/gamaroff/Development/agent-skills/.agents/skills/review-code/references/finding-anchors.js\").run(process.argv.slice(2));\n",
+        "{findings-json}": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js\",\"line_text\":\"first line\"}]}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "finding-anchors: malformed-anchors\n"
+    }
+  },
+  {
+    "id": "empty-file-line",
+    "sink": "filename",
+    "input": "worktree",
+    "why": "an empty code file_line",
+    "correct": "unparseable, so malformed-anchors",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        "a.js": "first line\n",
+        ".agents/skills/review-code/references/finding-anchors.js": "#!/usr/bin/env node\nrequire(\"/home/gamaroff/Development/agent-skills/.agents/skills/review-code/references/finding-anchors.js\").run(process.argv.slice(2));\n",
+        "{findings-json}": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"\"}]}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "finding-anchors: malformed-anchors\n"
+    }
+  },
+  {
+    "id": "null-file-line",
+    "sink": "filename",
+    "input": "worktree",
+    "why": "a JSON-null code file_line (alternative spelling of absent)",
+    "correct": "unparseable, so malformed-anchors",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        "a.js": "first line\n",
+        ".agents/skills/review-code/references/finding-anchors.js": "#!/usr/bin/env node\nrequire(\"/home/gamaroff/Development/agent-skills/.agents/skills/review-code/references/finding-anchors.js\").run(process.argv.slice(2));\n",
+        "{findings-json}": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":null}]}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "finding-anchors: malformed-anchors\n"
+    }
+  },
+  {
+    "id": "ref-only-code-finding",
+    "sink": "filename",
+    "input": "worktree",
+    "why": "a code-lens finding that lost file_line but carries ref; the wrapper decides the lens (task.195 QA1)",
+    "correct": "unparseable, not a clean conformance no-line",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        "a.js": "first line\n",
+        ".agents/skills/review-code/references/finding-anchors.js": "#!/usr/bin/env node\nrequire(\"/home/gamaroff/Development/agent-skills/.agents/skills/review-code/references/finding-anchors.js\").run(process.argv.slice(2));\n",
+        "{findings-json}": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"ref\":\"a.js:1\",\"line_text\":\"first line\"}]}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "finding-anchors: malformed-anchors\n"
+    }
+  },
+  {
+    "id": "spaced-colon",
+    "sink": "filename",
+    "input": "worktree",
+    "why": "whitespace around the colon is not path:line",
+    "correct": "unparseable, so malformed-anchors",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        "a.js": "first line\n",
+        ".agents/skills/review-code/references/finding-anchors.js": "#!/usr/bin/env node\nrequire(\"/home/gamaroff/Development/agent-skills/.agents/skills/review-code/references/finding-anchors.js\").run(process.argv.slice(2));\n",
+        "{findings-json}": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js : 1\",\"line_text\":\"first line\"}]}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "finding-anchors: malformed-anchors\n"
+    }
+  },
+  {
+    "id": "line-zero",
+    "sink": "filename",
+    "input": "worktree",
+    "why": "line 0 is below the first line",
+    "correct": "out-of-range, so malformed-anchors",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        "a.js": "first line\n",
+        ".agents/skills/review-code/references/finding-anchors.js": "#!/usr/bin/env node\nrequire(\"/home/gamaroff/Development/agent-skills/.agents/skills/review-code/references/finding-anchors.js\").run(process.argv.slice(2));\n",
+        "{findings-json}": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js:0\"}]}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "finding-anchors: malformed-anchors\n"
+    }
+  },
+  {
+    "id": "past-end",
+    "sink": "filename",
+    "input": "worktree",
+    "why": "the trailing newline is not a line; line 2 of a one-line file",
+    "correct": "out-of-range, so malformed-anchors",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        "a.js": "first line\n",
+        ".agents/skills/review-code/references/finding-anchors.js": "#!/usr/bin/env node\nrequire(\"/home/gamaroff/Development/agent-skills/.agents/skills/review-code/references/finding-anchors.js\").run(process.argv.slice(2));\n",
+        "{findings-json}": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js:2\"}]}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "finding-anchors: malformed-anchors\n"
+    }
+  },
+  {
+    "id": "one-bad-among-good",
+    "sink": "filename",
+    "input": "worktree",
+    "why": "one unparseable finding after a verified one (composition)",
+    "correct": "malformed-anchors; the good one does not mask it",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        "a.js": "first line\n",
+        ".agents/skills/review-code/references/finding-anchors.js": "#!/usr/bin/env node\nrequire(\"/home/gamaroff/Development/agent-skills/.agents/skills/review-code/references/finding-anchors.js\").run(process.argv.slice(2));\n",
+        "{findings-json}": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js:1\",\"line_text\":\"first line\"},{\"id\":\"CR-2\",\"file_line\":\"a.js\"}]}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "finding-anchors: malformed-anchors\n"
+    }
+  },
+  {
+    "id": "checker-missing",
+    "sink": "filename",
+    "input": "worktree",
+    "why": "node exits 1 when the script cannot load; that must not read as 'malformed, continue' (task.195 item 1)",
+    "correct": "HALT naming checker not runnable",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        "a.js": "first line\n",
+        "{findings-json}": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js:1\",\"line_text\":\"first line\"}]}}"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: finding-anchors checker not runnable (no JSON reason) — check .agents/skills/review-code/references/finding-anchors.js; never treat unchecked anchors as verified\n"
+    }
+  },
+  {
+    "id": "no-findings-array",
+    "sink": "filename",
+    "input": "worktree",
+    "why": "a findings file with no findings array is a wrong call, not a clean review",
+    "correct": "HALT on reason usage",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        "a.js": "first line\n",
+        ".agents/skills/review-code/references/finding-anchors.js": "#!/usr/bin/env node\nrequire(\"/home/gamaroff/Development/agent-skills/.agents/skills/review-code/references/finding-anchors.js\").run(process.argv.slice(2));\n",
+        "{findings-json}": "{}"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: finding-anchors refused the call (usage): --findings-file holds no findings array for every lens present (code_review.findings, pr_conformance.findings, or a bare array)\n  Fix the call; never treat unchecked anchors as verified.\n"
+    }
+  },
+  {
+    "id": "clean-exact",
+    "sink": "filename",
+    "input": "worktree",
+    "why": "an in-root anchor quoting its line exactly",
+    "correct": "ok, continue",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        "a.js": "first line\n",
+        ".agents/skills/review-code/references/finding-anchors.js": "#!/usr/bin/env node\nrequire(\"/home/gamaroff/Development/agent-skills/.agents/skills/review-code/references/finding-anchors.js\").run(process.argv.slice(2));\n",
+        "{findings-json}": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js:1\",\"line_text\":\"first line\"}]}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "finding-anchors: ok\n"
+    }
+  },
+  {
+    "id": "clean-partial-quote",
+    "sink": "filename",
+    "input": "worktree",
+    "why": "a reviewer quoting part of a line is not wrong",
+    "correct": "ok, continue",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        "a.js": "first line\n",
+        ".agents/skills/review-code/references/finding-anchors.js": "#!/usr/bin/env node\nrequire(\"/home/gamaroff/Development/agent-skills/.agents/skills/review-code/references/finding-anchors.js\").run(process.argv.slice(2));\n",
+        "{findings-json}": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js:1\",\"line_text\":\"first\"}]}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "finding-anchors: ok\n"
+    }
+  },
+  {
+    "id": "clean-whitespace",
+    "sink": "filename",
+    "input": "worktree",
+    "why": "whitespace runs are collapsed on both sides",
+    "correct": "ok, continue",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        "a.js": "first line\n",
+        ".agents/skills/review-code/references/finding-anchors.js": "#!/usr/bin/env node\nrequire(\"/home/gamaroff/Development/agent-skills/.agents/skills/review-code/references/finding-anchors.js\").run(process.argv.slice(2));\n",
+        "{findings-json}": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js:1\",\"line_text\":\"  first    line \"}]}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "finding-anchors: ok\n"
+    }
+  },
+  {
+    "id": "unchecked-text",
+    "sink": "filename",
+    "input": "worktree",
+    "why": "no line_text: range-checked only, which is clean",
+    "correct": "ok, continue",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        "a.js": "first line\n",
+        ".agents/skills/review-code/references/finding-anchors.js": "#!/usr/bin/env node\nrequire(\"/home/gamaroff/Development/agent-skills/.agents/skills/review-code/references/finding-anchors.js\").run(process.argv.slice(2));\n",
+        "{findings-json}": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js:1\"}]}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "finding-anchors: ok\n"
+    }
+  },
+  {
+    "id": "conformance-ac-id",
+    "sink": "filename",
+    "input": "worktree",
+    "why": "a conformance ref that is a criterion id is no-line, which is clean",
+    "correct": "ok, continue",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        "a.js": "first line\n",
+        ".agents/skills/review-code/references/finding-anchors.js": "#!/usr/bin/env node\nrequire(\"/home/gamaroff/Development/agent-skills/.agents/skills/review-code/references/finding-anchors.js\").run(process.argv.slice(2));\n",
+        "{findings-json}": "{\"pr_conformance\":{\"findings\":[{\"id\":\"PC-1\",\"ref\":\"AC-3\"}]}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "finding-anchors: ok\n"
+    }
+  },
+  {
+    "id": "empty-review",
+    "sink": "filename",
+    "input": "worktree",
+    "why": "a review with no findings",
+    "correct": "ok, continue",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        "a.js": "first line\n",
+        ".agents/skills/review-code/references/finding-anchors.js": "#!/usr/bin/env node\nrequire(\"/home/gamaroff/Development/agent-skills/.agents/skills/review-code/references/finding-anchors.js\").run(process.argv.slice(2));\n",
+        "{findings-json}": "{\"code_review\":{\"findings\":[]}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "finding-anchors: ok\n"
+    }
+  },
+  {
+    "id": "nested-path",
+    "sink": "filename",
+    "input": "worktree",
+    "why": "a path in a subdirectory of the root",
+    "correct": "ok, continue",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        "a.js": "first line\n",
+        "src/b.js": "one\ntwo\n",
+        ".agents/skills/review-code/references/finding-anchors.js": "#!/usr/bin/env node\nrequire(\"/home/gamaroff/Development/agent-skills/.agents/skills/review-code/references/finding-anchors.js\").run(process.argv.slice(2));\n",
+        "{findings-json}": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"src/b.js:2\",\"line_text\":\"two\"}]}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "finding-anchors: ok\n"
+    }
+  },
+  {
+    "id": "staged-reaches-checker",
+    "sink": "filename",
+    "input": "staged",
+    "why": "the --index route runs and the block continues on the checker's reason (the fixture has no index, so a.js reads no-such-file)",
+    "correct": "exit 0 with the checker's reason",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        "a.js": "first line\n",
+        ".agents/skills/review-code/references/finding-anchors.js": "#!/usr/bin/env node\nrequire(\"/home/gamaroff/Development/agent-skills/.agents/skills/review-code/references/finding-anchors.js\").run(process.argv.slice(2));\n",
+        "{findings-json}": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js:1\",\"line_text\":\"first line\"}]}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "finding-anchors: malformed-anchors\n"
+    }
+  },
+  {
+    "id": "line-text-array-correct",
+    "sink": "filename",
+    "input": "worktree",
+    "why": "f192e953 fieldOf: an array line_text holding the right text must not verify (TASK-195-QA4-1)",
+    "correct": "text-mismatch, so malformed-anchors",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        "a.js": "first line\n",
+        ".agents/skills/review-code/references/finding-anchors.js": "#!/usr/bin/env node\nrequire(\"/home/gamaroff/Development/agent-skills/.agents/skills/review-code/references/finding-anchors.js\").run(process.argv.slice(2));\n",
+        "{findings-json}": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js:1\",\"line_text\":[\"first line\"]}]}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "finding-anchors: malformed-anchors\n"
+    }
+  },
+  {
+    "id": "line-text-zero",
+    "sink": "filename",
+    "input": "worktree",
+    "why": "a numeric line_text 0 is invalid, not absent",
+    "correct": "text-mismatch, so malformed-anchors",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        "a.js": "first line\n",
+        ".agents/skills/review-code/references/finding-anchors.js": "#!/usr/bin/env node\nrequire(\"/home/gamaroff/Development/agent-skills/.agents/skills/review-code/references/finding-anchors.js\").run(process.argv.slice(2));\n",
+        "{findings-json}": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js:1\",\"line_text\":0}]}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "finding-anchors: malformed-anchors\n"
+    }
+  },
+  {
+    "id": "line-text-false",
+    "sink": "filename",
+    "input": "worktree",
+    "why": "a boolean line_text false is invalid, not absent",
+    "correct": "text-mismatch, so malformed-anchors",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        "a.js": "first line\n",
+        ".agents/skills/review-code/references/finding-anchors.js": "#!/usr/bin/env node\nrequire(\"/home/gamaroff/Development/agent-skills/.agents/skills/review-code/references/finding-anchors.js\").run(process.argv.slice(2));\n",
+        "{findings-json}": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js:1\",\"line_text\":false}]}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "finding-anchors: malformed-anchors\n"
+    }
+  },
+  {
+    "id": "line-text-object",
+    "sink": "filename",
+    "input": "worktree",
+    "why": "an object line_text is invalid, not absent",
+    "correct": "text-mismatch, so malformed-anchors",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        "a.js": "first line\n",
+        ".agents/skills/review-code/references/finding-anchors.js": "#!/usr/bin/env node\nrequire(\"/home/gamaroff/Development/agent-skills/.agents/skills/review-code/references/finding-anchors.js\").run(process.argv.slice(2));\n",
+        "{findings-json}": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js:1\",\"line_text\":{}}]}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "finding-anchors: malformed-anchors\n"
+    }
+  },
+  {
+    "id": "line-text-wrong-string",
+    "sink": "filename",
+    "input": "worktree",
+    "why": "a string line_text that is not on the named line",
+    "correct": "text-mismatch, so malformed-anchors",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        "a.js": "first line\n",
+        ".agents/skills/review-code/references/finding-anchors.js": "#!/usr/bin/env node\nrequire(\"/home/gamaroff/Development/agent-skills/.agents/skills/review-code/references/finding-anchors.js\").run(process.argv.slice(2));\n",
+        "{findings-json}": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js:1\",\"line_text\":\"return y;\"}]}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "finding-anchors: malformed-anchors\n"
+    }
+  },
+  {
+    "id": "file-line-array",
+    "sink": "filename",
+    "input": "worktree",
+    "why": "882b2643: an array file_line must not stringify into a verified anchor (TASK-195-QA3-1)",
+    "correct": "unparseable, so malformed-anchors",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        "a.js": "first line\n",
+        ".agents/skills/review-code/references/finding-anchors.js": "#!/usr/bin/env node\nrequire(\"/home/gamaroff/Development/agent-skills/.agents/skills/review-code/references/finding-anchors.js\").run(process.argv.slice(2));\n",
+        "{findings-json}": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":[\"a.js:1\"],\"line_text\":\"first line\"}]}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "finding-anchors: malformed-anchors\n"
+    }
+  },
+  {
+    "id": "file-line-number",
+    "sink": "filename",
+    "input": "worktree",
+    "why": "a numeric file_line is not path:line",
+    "correct": "unparseable, so malformed-anchors",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        "a.js": "first line\n",
+        ".agents/skills/review-code/references/finding-anchors.js": "#!/usr/bin/env node\nrequire(\"/home/gamaroff/Development/agent-skills/.agents/skills/review-code/references/finding-anchors.js\").run(process.argv.slice(2));\n",
+        "{findings-json}": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":1}]}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "finding-anchors: malformed-anchors\n"
+    }
+  },
+  {
+    "id": "line-text-null",
+    "sink": "filename",
+    "input": "worktree",
+    "why": "a null line_text is absent: range-checked only, which is clean",
+    "correct": "ok, continue",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        "a.js": "first line\n",
+        ".agents/skills/review-code/references/finding-anchors.js": "#!/usr/bin/env node\nrequire(\"/home/gamaroff/Development/agent-skills/.agents/skills/review-code/references/finding-anchors.js\").run(process.argv.slice(2));\n",
+        "{findings-json}": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js:1\",\"line_text\":null}]}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "finding-anchors: ok\n"
+    }
+  },
+  {
+    "id": "line-text-blank",
+    "sink": "filename",
+    "input": "worktree",
+    "why": "a whitespace-only line_text is absent, not a mismatch",
+    "correct": "ok, continue",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        "a.js": "first line\n",
+        ".agents/skills/review-code/references/finding-anchors.js": "#!/usr/bin/env node\nrequire(\"/home/gamaroff/Development/agent-skills/.agents/skills/review-code/references/finding-anchors.js\").run(process.argv.slice(2));\n",
+        "{findings-json}": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js:1\",\"line_text\":\"   \"}]}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "finding-anchors: ok\n"
+    }
+  }
+]

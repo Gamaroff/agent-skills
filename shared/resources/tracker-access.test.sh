@@ -23,6 +23,8 @@
 
 PASS=0
 FAIL=0
+# shellcheck source=undefined-command-guard.sh
+. "$(dirname "$0")/undefined-command-guard.sh"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 RESOLVER="$HERE/resolve-platform.sh"
 PATHS="$HERE/resolve-paths.sh"
@@ -496,9 +498,9 @@ assert_stderr_has "non-full mode → names raw curl / MCP as a gap"  "raw curl o
 # coverage, which sends an operator hunting for a mutation the run already
 # recorded. Both directions, always — that is this block's whole point.
 if grep -q "GitHub calls whose output the caller captures" "$STDERR_FILE"; then
-  fail "non-full mode → no stale 'caller captures' gap claim" "absent" "present"
+  bad "non-full mode → no stale 'caller captures' gap claim" "the banner still claims caller-captured GitHub calls are ungated"
 else
-  pass "non-full mode → no stale 'caller captures' gap claim"
+  ok "non-full mode → no stale 'caller captures' gap claim"
 fi
 
 # The gap wording must not survive its own closure. `gh issue comment` IS gated as of task.54, so a
@@ -1728,5 +1730,6 @@ done
 
 # --- Summary -----------------------------------------------------------------
 echo ""
+undefined_commands_check || FAIL=$((FAIL + 1))
 echo "Results: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1

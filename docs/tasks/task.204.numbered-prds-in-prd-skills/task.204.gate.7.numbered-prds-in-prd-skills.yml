@@ -1,0 +1,77 @@
+schema: 2
+task: 'task.204.numbered-prds-in-prd-skills'
+task_title: 'Numbered PRDs in the PRD skills'
+gate: FAIL
+status_reason: 'Gate 6''s finding is fixed and verified. The cycle-7 safety re-probe found a reproduced HIGH outside the containment class: the monolith migration review-prd now drives rewrites the bare word "prd" across the whole PRD tree, including type: prd in every other PRD, and exits ok. Plus one promoted medium (shard-prd checks the file''s realpath, not the directory md-tree writes into).'
+reviewer: 'QA Engineer'
+head: '84b065af078afca7fbc5c8baa2028cf354c4c28f'
+updated: '2026-10-15T19:44:35Z'
+
+top_issues:
+  - id: CR-1
+    severity: high
+    file: 'shared/resources/migrate-doc-numbering.mjs'
+    finding: 'Applying the numbering migration to a root-level docs/prd.md (the path review-prd prescribes: unplaced-prd, then MIG_NAME=docs/prd.md=<slug>) puts the monolith''s old stem "prd" in the whole-word token pass, so every standalone "prd" under ${PRD_ROOT} becomes prd.{N}.{slug} — type: prd in every other PRD''s frontmatter (OKF''s one hard requirement) and prose — and the run exits ok. Reproduced by QA (same fixture, develop''s engine identical; develop''s review-prd never calls it, so the call path is this change''s).'
+    suggested_action: 'Keep undotted stems (prd, index) and their basenames out of the token pass — their paths still move through the literal pass — and add a regression row that migrates docs/prd.md beside a numbered PRD and asserts that PRD''s bytes are unchanged.'
+    suggested_owner: dev
+    status: open
+  - id: CR-2
+    severity: medium
+    file: 'skills/shard-prd/SKILL.md'
+    finding: 'The shard guard checks only the realpath of the PRD file, but md-tree explodes into the literal dirname(PRD_FILE): a stem directory symlinked out of the root holding a file symlink back to a real PRD inside it passes, and the shards are written outside the root (reproduced by the reviewer).'
+    suggested_action: 'Check the realpath of dirname(PRD_FILE), the directory md-tree writes into, for containment under realpath(PRD_ROOT).'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 37
+  phases_verified: 5/5
+  ci: 'not read this cycle'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 24
+    notes: 'Allocation controls engage (task.204.qa.7.security.run.json, slug 11 + domain 13). CR-2 (shard directory) and advisory CR-3 (a legacy PRD above the root that symlinks out of the working tree is not stopped) are containment gaps reachable only through symlinks the repository never creates.'
+  performance:
+    status: PASS
+    notes: 'Row 11: three node processes.'
+  reliability:
+    status: FAIL
+    notes: 'CR-1: the migration review-prd offers silently rewrites other PRDs'' frontmatter and prose and reports ok.'
+  maintainability:
+    status: PASS
+    notes: 'One predicate duplicated per block remains a recorded follow-up (doc-id.js).'
+
+bug_resolution:
+  gate_6_findings: 1
+  fixed_and_verified: 1
+  verification_method: 'gate-6 row (numbering stops; no REPORT through the link; legacy PRD still gets its report) at 84b065af, mutation-proven in cycle 6'
+
+recommendations:
+  immediate:
+    - action: 'CR-1: keep undotted stems out of the migration token pass; regression row.'
+      refs: ['shared/resources/migrate-doc-numbering.mjs', 'skills/review-prd/SKILL.md']
+    - action: 'CR-2: shard-prd checks the realpath of the directory it explodes into.'
+      refs: ['skills/shard-prd/SKILL.md']
+  future:
+    - action: 'CR-3 (advisory, medium confidence): run the realpath stop before review-prd''s text-outside-root early exit, against the working tree for a legacy PRD above the root.'
+      refs: ['skills/review-prd/SKILL.md']
+    - action: 'One layout-and-containment predicate in doc-id.js, called by every block (follow-up task: engine change).'
+      refs: ['shared/resources/doc-id.js']
+    - action: 'Gate-2 CR-4: register a found PRD that has no registry row.'
+      refs: ['skills/create-prd/SKILL.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['CR-1 closed', 'CR-2 closed']

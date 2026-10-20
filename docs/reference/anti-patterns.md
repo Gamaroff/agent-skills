@@ -18,7 +18,7 @@ Rules scattered across the docs, collected and explained. Each entry: the rule, 
 
 ## Never reuse a cancelled epic or task number
 
-**Rule:** Numbers in the [epic registry](../standards/epic-registry.md) and [task registry](../standards/task-registry.md) are append-only. Cancelled items keep their number forever.
+**Rule:** Numbers in the [PRD registry](../standards/prd-registry.md) and [task registry](../standards/task-registry.md) are append-only. Cancelled items keep their number forever. An epic or story number is counted from the documents on disk within its parent, so a cancelled epic keeps its number by keeping its document.
 
 **Why:** Branch names, PR titles, commit messages, and historical references all encode the number. Reuse creates ambiguity in `git log` and tracker history that can never be resolved.
 
@@ -36,7 +36,7 @@ Rules scattered across the docs, collected and explained. Each entry: the rule, 
 
 ## Never leave plans in agent scratch directories
 
-**Rule:** Plans live in-repo, co-located with the work (`task.{N}.plan.*.md` inside the task dir, `story.{E}.{S}.plan.*.md` inside the story dir, or `.agents/plans/` for general plans). Never `~/.agents/plans/`, `~/.claude/plans/`, or `/tmp/`.
+**Rule:** Plans live in-repo, co-located with the work (`task.{N}.plan.*.md` inside the task dir, `story.{P}.{E}.{S}.plan.*.md` inside the story dir, or `.agents/plans/` for general plans). Never `~/.agents/plans/`, `~/.claude/plans/`, or `/tmp/`.
 
 **Why:** Plans outside the repo are not version-controlled and invisible to teammates. They evaporate when you switch machines, lose their connection to the work, and can't be reviewed in PRs.
 
@@ -60,13 +60,13 @@ Rules scattered across the docs, collected and explained. Each entry: the rule, 
 
 ## Never skip Step 7 (`finalise`) side-effects
 
-**Rule:** `finalise` always runs its full side-effects — DoD check, PR comment, tracker update, board move — even in `--lite` mode.
+**Rule:** `finalise` always runs its full side-effects — DoD check, PR comment, tracker update, board move — in every mode, including lite and fast.
 
-**Why:** Lite mode is about skipping *context-gathering* before development (which is reversible and read-only). Step 7 side-effects are about *recording state* (which collaborators rely on).
+**Why:** Lite mode — auto-detected in Phase 0, or requested with `--mode lite|fast` — trades *QA depth* for speed (direct-tools Step 5, `--effort low` Step 5c), which only changes how hard the work is checked. Step 7 side-effects are about *recording state* (which collaborators rely on). See [the lite-mode contract](../../shared/resources/develop-pipeline-lite-mode.md).
 
 **If you ignore it:** PRs ship without DoD records, tracker boards drift from reality, and Jira/GitHub state stops reflecting what's actually merged.
 
-**Do this instead:** if you genuinely need to skip Step 7, bypass `develop-*` and drive the pipeline manually. The lite flag is not the right tool.
+**Do this instead:** if you genuinely need to skip Step 7, bypass `develop-*` and drive the pipeline manually. No mode is the right tool, and no `--skip` can remove Step 7: it is on the [floor](../../shared/resources/develop-pipeline-lite-mode.md#the-floor--never-skippable-in-any-mode).
 
 **The restricted-access deferral is not this skip.** Under `access.tracker: read-only | approve | command | manual`, Step 7 still runs in full — but its tracker mutations are **deferred and recorded** in the committed handover artifacts (`*.handover.{n}.{name}.{md,sh,json}`), the implementation report's `## Tracker Actions Required` section, a `**Tracker debt:**` line, and a PR comment. This rule's stated harm is *silent* drift; a deferral with a loud, committed, reviewable record — one a later `/tracker-reconcile` run ticks back against the live board — is the opposite of silent. Do not "fix" a restricted run into performing the mutations anyway, and do not read its deferral as a violation of this rule.
 
@@ -80,9 +80,9 @@ Rules scattered across the docs, collected and explained. Each entry: the rule, 
 
 ## Never invent epic numbers
 
-**Rule:** Use `create-epic`, which delegates to `epic-registry-manager`. Never pick a number yourself.
+**Rule:** Use `create-epic`, which allocates `E` within the PRD with `doc-id.js`. Never pick a number yourself.
 
-**Why:** Concurrent authors will collide. The registry is the only safe source of "next available."
+**Why:** A hand-picked number skips the parent check and collides with a sibling. Two authors who branch at once can still both take the next `E`; `doc-numbering-corpus.test.mjs` fails that merge on `duplicate-id`.
 
 **If you ignore it:** two authors create `epic.42.*` in the same week and the merge is messy.
 

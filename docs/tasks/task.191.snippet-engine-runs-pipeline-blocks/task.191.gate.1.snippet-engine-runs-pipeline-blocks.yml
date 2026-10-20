@@ -1,0 +1,102 @@
+schema: 2
+task: 'task.191.snippet-engine-runs-pipeline-blocks'
+task_title: 'Snippet engine runs pipeline blocks'
+gate: FAIL
+status_reason: 'All 4 phases are implemented and CI is green, but the widened safety boundary fails open three ways (BASH_ENV start-up file, unscanned arguments to a sourced function, conditionally-defined names), and the callers pass a two-dot --diff-base. 3 HIGH, 3 MEDIUM.'
+reviewer: 'QA Engineer'
+head: '35b11d1e771fe734421cde5e581c315a38eeb9c2'
+updated: '2026-10-19T05:08:25Z'
+
+top_issues:
+  - id: 'QA-1'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'A helper call in a block that sets BASH_ENV (inline or exported) classifies runnable; bash sources the unclassified file first. Reproduced: UNVETTED-RAN printed; develop refuses the same block. Exported SHELLOPTS+PS4 reaches the same through xtrace.'
+    suggested_action: 'Refuse helper recognition when the block or a sourced helper sets/exports/prefixes BASH_ENV, ENV, SHELLOPTS, BASHOPTS or PS4; control test per shape.'
+    suggested_owner: dev
+    bug_ref: 'task.191.bug.1.helper-call-runs-the-file-bash-env-names.md'
+  - id: 'CR-1'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'Arguments to a sourced-helper function are never scanned: source newest-numbered.sh; newest_numbered docs dod -delete classifies runnable and runs find -delete.'
+    suggested_action: 'Refuse a call to a sourced function that forwards positional parameters to an argument-sensitive command, or scan its arguments with that command''s deny rules; control test.'
+    suggested_owner: dev
+    bug_ref: 'task.191.bug.2.sourced-function-arguments-never-scanned.md'
+  - id: 'CR-2'
+    severity: high
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'Step 4b / Phase 1.7 pass origin/<base> as --diff-base; git diff <rev> -- file is two-dot against the working tree, so develop''s later edits count as the PR''s changed blocks (qa-story/SKILL.md has the same line).'
+    suggested_action: 'Pass $(git merge-base "$BASE" HEAD) in both callers and in §4a; extend the parity test.'
+    suggested_owner: dev
+    bug_ref: 'task.191.bug.3.diff-base-tip-is-two-dot-against-the-working-tree.md'
+  - id: 'CR-3'
+    severity: medium
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'Every name a sourced helper might define is trusted anywhere in the block: if false; then mv() {…}; fi makes mv a b runnable, before or after the source line.'
+    suggested_action: 'Trust only top-level unconditional definitions, never a non-safe or runner name, and only after the source line; control tests.'
+    suggested_owner: dev
+    bug_ref: 'task.191.bug.4.sourced-helper-names-trusted-conditionally-and-out-of-order.md'
+  - id: 'CR-4'
+    severity: medium
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'changedLineRanges honours user git config: with color.diff=always parseDiffRanges returns [] for a 4-hunk diff, so the run reports no changed blocks and no finding.'
+    suggested_action: 'git diff --no-color --no-ext-diff --no-textconv -U0; a non-empty diff with zero parsed hunks is bad-diff-base; test with -c color.diff=always.'
+    suggested_owner: dev
+    bug_ref: 'task.191.bug.5.git-diff-honours-user-config-and-reads-empty.md'
+  - id: 'QA-2'
+    severity: medium
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'The widened boundary (classifyBlock) returns {klass, reason}, which no probe-engine entry form can score, so the shell-exec corpus written for this classifier cannot be run against it.'
+    suggested_action: 'Export a boolean predicate (isRunnableBlock) and record a probe run with --args-json carrying a helper root.'
+    suggested_owner: dev
+    bug_ref: 'task.191.bug.6.classifier-verdict-not-probeable.md'
+
+waiver:
+  active: false
+
+quality_score: 40
+
+evidence:
+  tests_reviewed: 166
+  phases_verified: 4/4
+  ci: 'pass @ 35b11d1e771f (test, validate, shellcheck, link-check)'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 3, 4]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 35
+    notes: 'boundary: true. Control --diff-base revision refusal engages (35 executed: 31 hostile rejected incl. --output=, 4 real revisions accepted). The classifier itself is unprobeable (QA-2); QA-1, CR-1 and CR-3 are fail-opens reproduced by hand and new to this change.'
+  performance:
+    status: PASS
+    notes: 'Helper classification bounded at depth 2; one git diff per file with --diff-base.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-4: a coloured or external diff reads as an empty change set rather than an error.'
+  maintainability:
+    status: PASS
+    notes: 'Rule doc §2aa/§2c/§4a; one engine call shared by both callers, held by the parity test. CR-7 (the doc''s "only as permissive as its text" claim) follows CR-1/CR-3.'
+
+recommendations:
+  immediate:
+    - action: 'Fix QA-1, CR-1, CR-2 (HIGH) and CR-3, CR-4, QA-2 (MEDIUM).'
+      refs: ['shared/resources/qa-execute-snippets.mjs', 'skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+  future:
+    - action: 'Pre-existing (develop identical): PS4=''$(cmd)''; set -x; ls classifies runnable and runs cmd — PS4 is expanded at trace time inside single quotes. Out of task.191 scope; needs its own classifier fix.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'CR-5: the rewritten Step 4b / Phase 1.7 block reads $SKILL_FILE unbound; use a {changed-file} slot.'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+    - action: 'CR-6: a pure-deletion hunk right after a closing fence marks the block changed.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'CR-8: an untracked file under --diff-base reports no changed blocks with no note.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'DEP0190 warning (shell: true with args) is pre-existing on develop.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

@@ -59,7 +59,7 @@ Log each gap with specific detail in Issues Log. Invoke the `/commit-changes` sk
 
 #### develop-story
 
-Suggested commit message: `docs(story.{epic}.{story}): implementation report — finalise gaps identified`
+Suggested commit message: `docs(story.{P}.{E}.{S}): implementation report — finalise gaps identified`
 
 #### develop-task
 
@@ -77,12 +77,14 @@ Then HALT:
 ⚠️ Finalise identified Definition of Done gaps.
 Review the implementation report at {path} and address the gaps before re-running /finalise.
 A gap closed by changing code re-enters QA at 5a before /finalise re-runs — the resume offers it.
+A fix that touches only documentation (ci.docsOnly.patterns, e.g. a CHANGELOG entry) resumes at 7.
 ```
 
 **A gap closed by a code change is gated before acceptance.** On the resume, a halt at 7 whose fix
 changed code outside the work item's directory re-enters the QA loop at 5a through
 `reenter-qa-after-finalise.sh` rather than re-running `/finalise` over a head no gate has read; a
-document-only fix (a re-scoped criterion) resumes at 7. The rule and the script's refusals are the
+document-only fix resumes at 7 — inside the directory (a re-scoped criterion) or outside it, when every
+path it changed matches `ci.docsOnly.patterns` (a CHANGELOG entry, a standards page). The rule and the script's refusals are the
 resume contract's **Re-entry after a finalise DoD-gaps halt** (task.170).
 
 ---
@@ -217,7 +219,7 @@ For Bitbucket, attach `$PR_COMMENT_BODY` to the PR via the equivalent Bitbucket 
 
 > Engine source: `shared/resources/stakeholder-summary-cli.js` (bundled into each skill as `references/stakeholder-summary-cli.js`). Standard: `shared/resources/stakeholder-summary.md`.
 
-> Engine source: `shared/resources/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `shared/resources/tracker-comment-contract.md`.
+> Engine source: `tracker-comment.js` (bundled into each skill that runs it as `references/tracker-comment.js`). Contract: `shared/resources/tracker-comment-contract.md`.
 
 
 Log in Decisions Log: "DoD body posted to PR — comment URL: {url}."
@@ -313,7 +315,7 @@ tracker_call_with_retry node .agents/skills/develop-task/references/tracker-issu
   --kind close --issue {TRACKER_ISSUE} --reason completed --json
 ```
 
-Engine sources: `shared/resources/tracker-comment.js` and `shared/resources/tracker-issue.js` (each bundled into every skill as `references/<name>`). Contracts: `shared/resources/tracker-comment-contract.md` and `shared/resources/tracker-issue-cli.md`.
+Engine sources: `tracker-comment.js` and `shared/resources/tracker-issue.js` (each bundled into the skills that run it as `references/<name>`). Contracts: `shared/resources/tracker-comment-contract.md` and `shared/resources/tracker-issue-cli.md`.
 
 Read each `reason` and act per the table in [`shared/resources/tracker-comment-contract.md`](tracker-comment-contract.md) — `posted`/`already`/`deferred` need nothing, `unverifiable` is logged and **never** posted over, and `no-credentials` is the one case that may fall back to MCP.
 
@@ -337,7 +339,7 @@ node .agents/skills/{develop-story|develop-task|develop-bug}/references/gh-stage
   --issue {TRACKER_ISSUE} --stage done --json
 ```
 
-Engine source: `shared/resources/gh-stage.js` (bundled into each skill as `references/gh-stage.js`).
+Engine source: `gh-stage.js` (bundled into each skill that runs it as `references/gh-stage.js`).
 
 The column this lands in comes from `pipeline.done` in `tracker-workflow.yaml`. A consumer who omitted `done:` from `pipeline:` — because a human moves the final card themselves — gets `reason: "stage-disabled"`, and that is a **success, not a warning**. Do not log it as a failure. Likewise `already` (the card is on the final column) and `would-regress` (a human moved it somewhere beyond Done) are correct outcomes.
 
@@ -432,8 +434,8 @@ debt line, no comment. When it is non-empty:
    `summary`). Artifact names follow the established grammar, co-located with the work item:
    `{prefix}.handover.{n}.{name}.{md,sh,json}`.
 
-   > Engine sources: `shared/resources/handover-render.js` and
-   > `shared/resources/handover-verify.js` (bundled into each skill as
+   > Engine sources: `handover-render.js` and
+   > `handover-verify.js` (bundled into the skills that run them as
    > `references/handover-render.js` / `references/handover-verify.js`).
 
    ```bash
@@ -552,7 +554,7 @@ Locate the DoD summary file created by finalise:
 #### develop-story
 
 ```bash
-find {story-directory} -maxdepth 1 -name "story.{epic}.{story}.dod.*.md" 2>/dev/null | sed -E 's/^(.*\.dod\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-
+find {story-directory} -maxdepth 1 -name "story.{P}.{E}.{S}.dod.*.md" 2>/dev/null | sed -E 's/^(.*\.dod\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-
 ```
 
 #### develop-task

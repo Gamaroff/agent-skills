@@ -133,7 +133,7 @@ Tarball installs (via `setup-consumer.sh`, which downloads the tagged GitHub rel
 The pre-commit hook handles this automatically. It is wired up via the `prepare` npm script, so a fresh clone just needs:
 
 ```bash
-npm install   # runs git config core.hooksPath .githooks
+npm install   # runs git config core.hooksPath .githooks, and links .agents/skills and .claude/skills
 ```
 
 To bundle manually (e.g. after a failed hook or without committing):

@@ -2,13 +2,13 @@
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![Validate Skills](https://github.com/Gamaroff/agent-skills/actions/workflows/validate.yml/badge.svg)](https://github.com/Gamaroff/agent-skills/actions/workflows/validate.yml)
-[![Skills](https://img.shields.io/badge/skills-129-brightgreen)](#skill-catalog)
+[![Skills](https://img.shields.io/badge/skills-128-brightgreen)](#skill-catalog)
 
-A library of **AI coding agent skills** — modular, self-contained packages that extend agent capabilities with specialized workflows, domain knowledge, and tooling. 129 skills covering development, story management, QA, PM, architecture, validation, and more.
+A library of **AI coding agent skills** — modular, self-contained packages that extend agent capabilities with specialized workflows, domain knowledge, and tooling. 128 skills covering development, story management, QA, PM, architecture, validation, and more.
 
 Skills live in `.agents/skills/` inside any project. Compatible agents (Claude Code and others) pick them up automatically at startup — no config needed. Skills activate by context match or explicit invocation.
 
-**Example.** Type `/create-story` in an agent session → the `create-story` skill activates → the agent walks you through 10 questions → a fully-formed `story.{N}.{name}.md` lands in your repo with frontmatter, acceptance criteria, technical context, and links to its parent epic. Type `/develop-story <path>` next and the agent runs the full review → branch → implement → PR → QA loop.
+**Example.** Type `/create-story` in an agent session → the `create-story` skill activates → the agent walks you through 10 questions → a fully-formed `story.{P}.{E}.{S}.{name}.md` lands in your repo with frontmatter, acceptance criteria, technical context, and links to its parent epic. Type `/develop-story <path>` next and the agent runs the full review → branch → implement → PR → QA loop.
 
 See [docs/concepts/overview.md](./docs/concepts/overview.md) for the model, or jump straight into the Learning Path below.
 
@@ -145,7 +145,7 @@ See [`CONTRIBUTING.md`](./CONTRIBUTING.md). Short version:
 1. Scaffold: `python3 skills/create-skill/scripts/init_skill.py <name> --path skills/`
 2. Write a sharp `description` in frontmatter (this is what activates the skill)
 3. Validate: `python3 skills/create-skill/scripts/quick_validate.py skills/<name>`
-4. Update [`docs/reference/skill-catalog.md`](./docs/reference/skill-catalog.md)
+4. Run `npm run generate-catalog` (regenerates [`docs/reference/skill-catalog.md`](./docs/reference/skill-catalog.md) and the README skills badge; CI fails on a stale catalog)
 5. Open a PR — one skill per PR
 
 No hardcoded project names, server addresses, or credentials.

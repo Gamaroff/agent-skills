@@ -1,0 +1,210 @@
+[
+  {
+    "id": "py-cli.crash-plain",
+    "sink": "url-authority",
+    "input": "crash-plain.example",
+    "direction": "legitimate",
+    "why": "the CLI crashes (crash-plain) behind an excepthook that prints nothing",
+    "correct": "errored (crash), never rejected"
+  },
+  {
+    "id": "py-cli.crash-str-raises",
+    "sink": "url-authority",
+    "input": "crash-str-raises.example",
+    "direction": "legitimate",
+    "why": "the CLI crashes (crash-str-raises) behind an excepthook that prints nothing",
+    "correct": "errored (crash), never rejected"
+  },
+  {
+    "id": "py-cli.crash-str-exits",
+    "sink": "url-authority",
+    "input": "crash-str-exits.example",
+    "direction": "legitimate",
+    "why": "the CLI crashes (crash-str-exits) behind an excepthook that prints nothing",
+    "correct": "errored (crash), never rejected"
+  },
+  {
+    "id": "py-cli.crash-str-not-str",
+    "sink": "url-authority",
+    "input": "crash-str-not-str.example",
+    "direction": "legitimate",
+    "why": "the CLI crashes (crash-str-not-str) behind an excepthook that prints nothing",
+    "correct": "errored (crash), never rejected"
+  },
+  {
+    "id": "py-cli.crash-nameless",
+    "sink": "url-authority",
+    "input": "crash-nameless.example",
+    "direction": "legitimate",
+    "why": "the CLI crashes (crash-nameless) behind an excepthook that prints nothing",
+    "correct": "errored (crash), never rejected"
+  },
+  {
+    "id": "py-cli.crash-name-not-str",
+    "sink": "url-authority",
+    "input": "crash-name-not-str.example",
+    "direction": "legitimate",
+    "why": "the CLI crashes (crash-name-not-str) behind an excepthook that prints nothing",
+    "correct": "errored (crash), never rejected"
+  },
+  {
+    "id": "py-cli.crash-bigint",
+    "sink": "url-authority",
+    "input": "crash-bigint.example",
+    "direction": "legitimate",
+    "why": "the CLI crashes (crash-bigint) behind an excepthook that prints nothing",
+    "correct": "errored (crash), never rejected"
+  },
+  {
+    "id": "py-cli.crash-recursion",
+    "sink": "url-authority",
+    "input": "crash-recursion.example",
+    "direction": "legitimate",
+    "why": "the CLI crashes (crash-recursion) behind an excepthook that prints nothing",
+    "correct": "errored (crash), never rejected"
+  },
+  {
+    "id": "py-cli.crash-interrupt",
+    "sink": "url-authority",
+    "input": "crash-interrupt.example",
+    "direction": "legitimate",
+    "why": "the CLI crashes (crash-interrupt) behind an excepthook that prints nothing",
+    "correct": "errored (crash), never rejected"
+  },
+  {
+    "id": "py-cli.crash-stderr-closed",
+    "sink": "url-authority",
+    "input": "crash-stderr-closed.example",
+    "direction": "legitimate",
+    "why": "the CLI crashes (crash-stderr-closed) behind an excepthook that prints nothing",
+    "correct": "errored (crash), never rejected"
+  },
+  {
+    "id": "py-cli.crash-after-thread",
+    "sink": "url-authority",
+    "input": "crash-after-thread.example",
+    "direction": "legitimate",
+    "why": "the CLI crashes (crash-after-thread) behind an excepthook that prints nothing",
+    "correct": "errored (crash), never rejected"
+  },
+  {
+    "id": "py-cli.crash-closes-fd3",
+    "sink": "url-authority",
+    "input": "crash-closes-fd3.example",
+    "direction": "legitimate",
+    "why": "the CLI crashes (crash-closes-fd3) behind an excepthook that prints nothing",
+    "correct": "errored (crash), never rejected"
+  },
+  {
+    "id": "py-cli.ok",
+    "sink": "url-authority",
+    "input": "ok.example",
+    "direction": "legitimate",
+    "why": "the CLI answers 0 (ok)",
+    "correct": "accepted \u2014 the script's exit status is the answer"
+  },
+  {
+    "id": "py-cli.fork-child-crash",
+    "sink": "url-authority",
+    "input": "fork-child-crash.example",
+    "direction": "legitimate",
+    "why": "the CLI answers 0 (fork-child-crash)",
+    "correct": "accepted \u2014 the script's exit status is the answer"
+  },
+  {
+    "id": "py-cli.thread-crash-answers",
+    "sink": "url-authority",
+    "input": "thread-crash-answers.example",
+    "direction": "legitimate",
+    "why": "the CLI answers 0 (thread-crash-answers)",
+    "correct": "accepted \u2014 the script's exit status is the answer"
+  },
+  {
+    "id": "py-cli.refuse",
+    "sink": "url-authority",
+    "input": "refuse.example",
+    "direction": "hostile",
+    "why": "the CLI refuses (refuse)",
+    "correct": "rejected \u2014 a deliberate exit is an answer"
+  },
+  {
+    "id": "py-cli.exit-one",
+    "sink": "url-authority",
+    "input": "exit-one.example",
+    "direction": "hostile",
+    "why": "the CLI refuses (exit-one)",
+    "correct": "rejected \u2014 a deliberate exit is an answer"
+  },
+  {
+    "id": "py-cli.exit-msg",
+    "sink": "url-authority",
+    "input": "exit-msg.example",
+    "direction": "hostile",
+    "why": "the CLI refuses (exit-msg)",
+    "correct": "rejected \u2014 a deliberate exit is an answer"
+  },
+  {
+    "id": "py-cli.os-exit-one",
+    "sink": "url-authority",
+    "input": "os-exit-one.example",
+    "direction": "hostile",
+    "why": "the CLI refuses (os-exit-one)",
+    "correct": "rejected \u2014 a deliberate exit is an answer"
+  },
+  {
+    "id": "py-cli.crash-reopens-fd3",
+    "sink": "url-authority",
+    "input": "crash-reopens-fd3.example",
+    "direction": "legitimate",
+    "why": "closes fd 3, opens its own file there, crashes quietly",
+    "correct": "errored (no record), never rejected; nothing written into own.log"
+  },
+  {
+    "id": "py-cli.crash-dup2-fd3",
+    "sink": "url-authority",
+    "input": "crash-dup2-fd3.example",
+    "direction": "legitimate",
+    "why": "dup2s /dev/null over fd 3, crashes quietly",
+    "correct": "errored (no record), never rejected"
+  },
+  {
+    "id": "py-cli.crash-forged-nonce",
+    "sink": "url-authority",
+    "input": "crash-forged-nonce.example",
+    "direction": "legitimate",
+    "why": "writes `answer <real nonce>` itself, then crashes quietly",
+    "correct": "errored (crash record wins), never rejected"
+  },
+  {
+    "id": "py-cli.crash-sigkill",
+    "sink": "url-authority",
+    "input": "crash-sigkill.example",
+    "direction": "legitimate",
+    "why": "kills itself with SIGKILL",
+    "correct": "errored (killed)"
+  },
+  {
+    "id": "py-cli.crash-in-atexit",
+    "sink": "url-authority",
+    "input": "crash-in-atexit.example",
+    "direction": "legitimate",
+    "why": "answers 0; an atexit handler raises",
+    "correct": "accepted \u2014 python3 <entry> exits 0 here too"
+  },
+  {
+    "id": "py-cli.answer-closes-fd3",
+    "sink": "url-authority",
+    "input": "answer-closes-fd3.example",
+    "direction": "legitimate",
+    "why": "closes fd 3, then answers 0",
+    "correct": "errored (no record) \u2014 stated limit, fail-safe"
+  },
+  {
+    "id": "py-cli.exec-refuses",
+    "sink": "url-authority",
+    "input": "exec-refuses.example",
+    "direction": "hostile",
+    "why": "execs `sh -c 'exit 3'`",
+    "correct": "errored (no record) \u2014 stated limit, fail-safe; never scored"
+  }
+]

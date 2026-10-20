@@ -1,0 +1,86 @@
+schema: 2
+task: 'task.204.numbered-prds-in-prd-skills'
+task_title: 'Numbered PRDs in the PRD skills'
+gate: CONCERNS
+status_reason: 'Gate 4''s finding is fixed and verified. The cycle-5 safety re-probe found the same containment class at three more sites: the registry write follows a symlink, review-prd''s numbering check compares paths as text, and the keep block''s refusal points at a remedy that cannot help. All reproduced; two re-rated high → medium on a measured plausibility check.'
+reviewer: 'QA Engineer'
+head: '5ad0b163f0a81af08cbfb9afd18748ac9ce6aad8'
+updated: '2026-10-15T16:23:33Z'
+
+top_issues:
+  - id: CR-1
+    severity: medium
+    reviewer_severity: high
+    rerating: 'no symlink exists under docs/prd (find docs/prd -type l → 0) and no PRD skill writer creates one (git grep symlinkSync/ln -s over the PRD skills → 0)'
+    file: 'skills/create-prd/SKILL.md'
+    finding: 'The register block checks the PRD file by realpath but writes the registry through writeFileSync without checking it: a /prd-registry.md symlinked out of the root is written outside it, and a dangling one creates a new registry at the outside target (reproduced).'
+    suggested_action: 'lstat the registry before reading or writing it: refuse a symlink, and require the realpath of its directory to be the realpath of the root.'
+    suggested_owner: dev
+    status: open
+  - id: CR-2
+    severity: medium
+    reviewer_severity: high
+    rerating: 'same measurement as CR-1: no symlink in the corpus, no writer that makes one'
+    file: 'skills/review-prd/SKILL.md'
+    finding: 'review-prd''s numbering check compares paths as text only: a PRD file that is a symlink out of the root reads "numbering ok" (reproduced), so review-prd would write its report and fixes through the link; create-prd''s keep block refuses the same file.'
+    suggested_action: 'When the file exists, compare realpaths as the create-prd blocks do and report a file that resolves outside the root as a Critical finding.'
+    suggested_owner: dev
+    status: open
+  - id: CR-3
+    severity: medium
+    file: 'skills/create-prd/SKILL.md'
+    finding: 'The keep block''s "resolves outside" refusal shares the off-layout message that sends the user to /review-prd for a migration, which neither reports the case nor can fix it — the remedy loops.'
+    suggested_action: 'Give the realpath-outside case its own reason and message: a symlink out of , fixed by hand.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 34
+  phases_verified: 5/5
+  ci: 'not read this cycle'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4]
+    phases_with_issues: [1, 2, 3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 24
+    notes: 'Allocation controls engage (task.204.qa.5.security.run.json). CR-1 and CR-2 are containment gaps reachable only through a symlink the repository never creates.'
+  performance:
+    status: PASS
+    notes: 'Row 11: three node processes.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-3: a refusal message that points at a remedy that cannot apply. Advisory CR-4 (medium confidence): the shard-prd block reads PRD_FILE without a guard and does not enforce its prose refusal.'
+  maintainability:
+    status: PASS
+    notes: 'Gate 4 CR-3 (one predicate in three blocks) still a recorded follow-up.'
+
+bug_resolution:
+  gate_4_findings: 1
+  fixed_and_verified: 1
+  verification_method: 'The symlink row runs allocate, register and keep at 5ad0b163; mutation-proven'
+
+recommendations:
+  immediate:
+    - action: 'CR-1, CR-2, CR-3: complete the realpath containment at the registry write and in review-prd, and give the outside-root refusal its own message.'
+      refs: ['skills/create-prd/SKILL.md', 'skills/review-prd/SKILL.md']
+  future:
+    - action: 'CR-4 (advisory): guard and enforce the shard-prd block (PRD_FILE bound, numbered, inside the root).'
+      refs: ['skills/shard-prd/SKILL.md']
+    - action: 'One layout-and-containment predicate in doc-id.js, called by every block (follow-up task: engine change).'
+      refs: ['shared/resources/doc-id.js']
+    - action: 'Gate-2 CR-4: register a found PRD that has no registry row.'
+      refs: ['skills/create-prd/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1, CR-2, CR-3 closed']

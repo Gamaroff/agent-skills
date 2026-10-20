@@ -1,0 +1,95 @@
+schema: 2
+task: 'task.204.numbered-prds-in-prd-skills'
+task_title: 'Numbered PRDs in the PRD skills'
+gate: CONCERNS
+status_reason: 'Every gate-1 finding is fixed and verified, but the cycle-2 refute pass found four reproduced defects in the new blocks: a PRD file that does not own its directory (docs/prd/index.md) still absorbs every other PRD''s findings, and the PRD file itself is never checked; a full-stem input (prd.3.shop) does not resolve; and DOMAIN is not validated, so create-prd allocates a path outside ${PRD_ROOT}.'
+reviewer: 'QA Engineer'
+head: '703dd53658a49a79302537cbba6f4e342b1886d1'
+updated: '2026-10-15T15:57:45Z'
+
+top_issues:
+  - id: CR-1
+    severity: medium
+    file: 'skills/review-prd/SKILL.md'
+    finding: 'The cycle-1 outside-root guard only catches a PRD above ${PRD_ROOT}; a PRD file that does not own its directory (docs/prd/index.md, the legacy md-tree output Step 3 names as an entry point, or a flat domain/prd.x.md) passes it, and the prefix filter then reports every other PRD''s findings as its own (reproduced: index.md reported prd.3.shop''s and prd.x''s findings).'
+    suggested_action: 'Use the directory filter only when the PRD file owns its directory (basename(dirname) equals its stem) strictly below the root; otherwise report the one bad-shape finding for the file itself.'
+    suggested_owner: dev
+    status: open
+  - id: CR-2
+    severity: medium
+    file: 'skills/review-prd/SKILL.md'
+    finding: 'The numbering check never checks PRD_FILE itself, only corpus findings under its folder, and the corpus walk skips any .md without a prd/epic/story prefix, so a resolved file the walk skips reads as numbering ok — "could not look" and "found nothing" give one result.'
+    suggested_action: 'Run doc-id check on PRD_FILE itself and merge its findings with the folder-filtered corpus findings (deduplicated by path and reason).'
+    suggested_owner: dev
+    status: open
+  - id: CR-3
+    severity: medium
+    file: 'skills/review-prd/SKILL.md'
+    finding: 'A full-stem input such as prd.3.shop, the most natural PRD id, resolves to nothing: the number path refuses it and the slug fallback looks for "3.shop" inside slug "shop" (reproduced: exit 1, No PRD found).'
+    suggested_action: 'Parse the input as a PRD stem first and match number plus slug (or the exact directory name) before the number-only and slug fallbacks; add a row for prd.N.slug input.'
+    suggested_owner: dev
+    status: open
+  - id: CR-5
+    severity: medium
+    file: 'skills/create-prd/SKILL.md'
+    finding: 'The allocate block validates FEATURE through doc-id format but never validates DOMAIN, so DOMAIN=../.. allocates PRD_FILE=docs/prd/../../prd.1.evil/prd.1.evil.md, outside ${PRD_ROOT}, breaking the skill''s Allowed-writes rule (reproduced, exit 0).'
+    suggested_action: 'Validate DOMAIN (and the register block''s folder) against the lowercase kebab-case slug rule inside the node script and refuse with bad-domain; add hostile DOMAIN cases to the probe and a test row.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 21
+  phases_verified: 5/5
+  ci: 'not read this cycle'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4]
+    phases_with_issues: [1, 3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 11
+    notes: 'The feature-slug guard engages on 11 cases (task.204.qa.2.security.run.json), but DOMAIN reaches the path unvalidated (CR-5): a traversal value allocates outside ${PRD_ROOT}. The probe only covered FEATURE.'
+  performance:
+    status: PASS
+    notes: 'Row 11: three node processes for allocate + register + check.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-2 (numbering ok reported for a file the check never read); CR-4 advisory (an abandoned create between file write and row write leaves a PRD no skill can register).'
+  maintainability:
+    status: PASS
+    notes: 'CR-8 advisory: the register block''s Folder cell could derive from the href instead of DOMAIN.'
+
+bug_resolution:
+  gate_1_findings: 4
+  fixed_and_verified: 4
+  verification_method: 'Re-ran each reproduction against 703dd536; test rows CR-1, CR-2, CR-3 (resolver failure), QA-1, register derivation, each mutation-proven'
+
+recommendations:
+  immediate:
+    - action: 'CR-1/CR-2: report the PRD file''s own findings; use the folder filter only for a PRD that owns its directory.'
+      refs: ['skills/review-prd/SKILL.md']
+    - action: 'CR-3: resolve a full-stem input.'
+      refs: ['skills/review-prd/SKILL.md']
+    - action: 'CR-5: validate DOMAIN; probe it.'
+      refs: ['skills/create-prd/SKILL.md']
+  future:
+    - action: 'CR-4: the keep path registers a found PRD that has no registry row (recovery from an abandoned create).'
+      refs: ['skills/create-prd/SKILL.md']
+    - action: 'CR-6: keep a duplicate-id finding when any of its paths is under the PRD folder.'
+      refs: ['skills/review-prd/SKILL.md']
+    - action: 'CR-7: on duplicate-row, say to move the already-written file to the re-allocated path.'
+      refs: ['skills/create-prd/SKILL.md']
+    - action: 'CR-8: derive the Folder cell from the href.'
+      refs: ['skills/create-prd/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1, CR-2, CR-3, CR-5 closed']

@@ -1,0 +1,66 @@
+schema: 2
+task: 'task.215.probe-engine-python-cli-entry-form'
+task_title: 'security-probe: run a Python CLI under the cli: entry form'
+gate: FAIL
+status_reason: 'Success Criterion 4 is measurably unmet. isPythonCrash reads three shapes of real uncaught Python crash (a multi-line message, an ExceptionGroup, output after the traceback) as refusals, so the cli: arm scores them rejected. That is a false pass. Everything else verified.'
+reviewer: 'QA Engineer'
+head: '03fb5f063df1aee5aa9ee7f7a1b39fac68351934'
+updated: '2026-10-19T10:45:40Z'
+
+top_issues:
+  - id: 'TASK-215-QA1-1'
+    severity: high
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'isPythonCrash requires the LAST non-empty stderr line to be an exception line, so an uncaught crash with a multi-line message, an ExceptionGroup, or stderr output after the traceback (atexit) returns false and is scored rejected. 3 of 7 measured crash shapes; a fourth (add_note) passes by accident. SC4 says never rejected. Reviewer CR-1 rated this medium/high confidence. QA raises it to high on measurement: SC4 is unmet and the effect is a false pass (run record task.215.qa.1.security.run.json). Bug report: task.215.bug.1.python-crash-read-as-refusal.md'
+    suggested_action: 'Anchor on the traceback, not the last line: a Traceback header plus a File frame is a crash whatever follows; a frame plus a SyntaxError-family line is a compile crash. Add the three shapes as test inputs or fixtures, and revisit the unit case asserting a traceback followed by a refusal line is false.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-215-CR-2'
+    severity: low
+    file: 'shared/resources/tests/security-probe.test.mjs'
+    finding: 'The "-E -s -B, never -I" flags test asserts only inside a loop over r.cases and has no non-vacuity floor, so a run that declines with zero cases passes without checking any flag.'
+    suggested_action: 'Assert r.executed > 0 and r.interpreter.name === "python3" before the loop.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 313
+  phases_verified: 2/2
+  ci: 'not read; CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 12
+    notes: 'isPythonCrash probed with the engine: 12 cases (7 real crash shapes, 5 refusal shapes), carried by the markdown-structure sink because no corpus sink models Python stderr. All 5 refusals were rejected, and 3 of 7 crashes were rejected (TASK-215-QA1-1). The sandbox is unchanged: a .py write to $HOME is an escape inside the sandbox root.'
+  performance:
+    status: PASS
+    notes: 'python3 --version is resolved once per process; one spawn per case, the same as the Node form.'
+  reliability:
+    status: PASS
+    notes: 'Missing python3 is declined once, by name; a .py entry with no --argv is bad-argv. Every result path carries the JS key set.'
+  maintainability:
+    status: PASS
+    notes: 'The interpreter map is one table; the docs at every site the recorded search returned are updated; bundle in sync.'
+
+recommendations:
+  immediate:
+    - action: 'Fix isPythonCrash so every uncaught crash with a Traceback header is a crash (TASK-215-QA1-1).'
+      refs: ['shared/resources/security-probe.mjs', 'shared/resources/tests/security-probe.test.mjs']
+  future:
+    - action: 'Add the CR-2 non-vacuity floor to the flags test.'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['TASK-215-QA1-1 fixed and re-reviewed']

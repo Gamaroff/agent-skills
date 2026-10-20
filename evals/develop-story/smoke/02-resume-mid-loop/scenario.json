@@ -6,7 +6,7 @@
   "stages": [
     {
       "label": "stage-1-run-to-qa-fix",
-      "prompt": "Run the develop-story pipeline for story.5.1.example. Start from the beginning.",
+      "prompt": "Run the develop-story pipeline for story.1.1.1.example. Start from the beginning.",
       "killOn": {
         "type": "marker",
         "path": ".task-state/qa-fix-iter-2.marker"
@@ -14,7 +14,7 @@
     },
     {
       "label": "stage-2-resume",
-      "prompt": "Resume the develop-story pipeline for story.5.1.example from where it was interrupted.",
+      "prompt": "Resume the develop-story pipeline for story.1.1.1.example from where it was interrupted.",
       "killOn": null
     }
   ],

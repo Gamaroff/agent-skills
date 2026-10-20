@@ -1,0 +1,78 @@
+schema: 2
+task: 'task.207.doc-numbering-enforcement-and-sweep'
+task_title: 'Doc numbering enforcement and sweep'
+gate: PASS
+status_reason: 'User-approved cycle 8 on 4be7d8d3. No HIGH or MEDIUM; the cycle-7 examples are consistent and FLAT_NAME adds no false positive over the prose population. Three LOW cleanups remain.'
+reviewer: 'QA Engineer'
+head: '4be7d8d3abd0584a858a6695b8d7442a00f71952'
+updated: '2026-10-16T19:26:06Z'
+
+top_issues:
+  - id: 'TASK-207-CR8-1'
+    severity: low
+    file: 'tests/doc-id-chokepoint.test.js'
+    finding: 'FLAT_NAME placeholder branch needs a lowercase name keyword, so epic.12.[x] or epic.1.{Name} now pass (none exist today).'
+    suggested_action: 'Spare only level placeholders instead of requiring a name keyword; add a hit fixture.'
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+  - id: 'TASK-207-CR8-2'
+    severity: low
+    file: 'skills/edit-epic/SKILL.md'
+    finding: 'Flat-intent globs pass: edit-epic:609 story.178.3.*.md, create-pr:294,435 feature/story.37.1.*, anti-patterns.md:87 epic.42.*.'
+    suggested_action: 'Rewrite the four examples by hand to hierarchical ids.'
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+  - id: 'TASK-207-CR8-3'
+    severity: low
+    file: 'tests/doc-id-chokepoint.test.js'
+    finding: 'The new FLAT_NAME comment line is ~160 characters, unwrapped.'
+    suggested_action: 'Rewrap to the file comment width.'
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 18
+  phases_verified: 5/5
+  ci: 'fast gate exit 0 on 4be7d8d3 (.agents/skills moved aside)'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4]
+    phases_with_issues: []
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_reopened: 0
+  verification_method: 'scoped review of the 5 files cycle 7 changed; reviewer ran FLAT_LITERAL over the §5 population and probe spellings'
+
+nfr_validation:
+  security: { status: PASS, evidence: reasoned, notes: 'No boundary changed since gate 1.' }
+  performance: { status: PASS, notes: 'Unchanged.' }
+  reliability: { status: PASS, notes: 'Unchanged.' }
+  maintainability: { status: PASS, notes: 'Residue is three LOW cleanups.' }
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'TASK-207-CR8-1: Spare only level placeholders instead of requiring a name keyword; add a hit fixture. (FLAT_NAME placeholder branch needs a lowercase name keyword, so epic.12.[x] or epic.1.{Name} now pass (none exist today).)'
+      refs: ['tests/doc-id-chokepoint.test.js']
+      carried_from: 'top_issues (route 2b, cycle 8)'
+    - action: 'TASK-207-CR8-2: Rewrite the four examples by hand to hierarchical ids. (Flat-intent globs pass: edit-epic:609 story.178.3.*.md, create-pr:294,435 feature/story.37.1.*, anti-patterns.md:87 epic.42.*.)'
+      refs: ['skills/edit-epic/SKILL.md']
+      carried_from: 'top_issues (route 2b, cycle 8)'
+    - action: 'TASK-207-CR8-3: Rewrap to the file comment width. (The new FLAT_NAME comment line is ~160 characters, unwrapped.)'
+      refs: ['tests/doc-id-chokepoint.test.js']
+      carried_from: 'top_issues (route 2b, cycle 8)'
+    - action: 'Deferred Work in the task document: prd-structure-guide story-directory redraw (CR7-5), ASCII trees (CR7-8), create-parallel-stories scheme, and the pre-existing items routed earlier.'
+      refs: ['skills/documentation-standards-validator/references/prd-structure-guide.md']
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: []

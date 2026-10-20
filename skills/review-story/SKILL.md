@@ -30,7 +30,7 @@ Natural language triggers:
 - "Review story 2.3"
 - "Check the story document for issues"
 - "What's wrong with this story?"
-- "Review the quality of story.310.5.md"
+- "Review the quality of story.1.310.5.md"
 - "Find problems in the notification story"
 
 ### Validate Mode (`--validate`)
@@ -47,7 +47,7 @@ Use when:
 Natural language triggers:
 
 - "Validate story 2.3"
-- "Is story.310.5 ready to implement?"
+- "Is story.1.310.5 ready to implement?"
 - "Run the pre-implementation gate on #297"
 - "Score this story's readiness"
 - "Batch validate all stories in Epic 4"
@@ -57,7 +57,7 @@ Natural language triggers:
 ```
 /review-story --validate path/to/story.md
 /review-story --validate #297
-/review-story --validate story.310.5
+/review-story --validate story.1.310.5
 ```
 
 Or via natural language (agent detects intent): "Is this story ready?", "Score this story", "Validate all stories in Epic 4".
@@ -145,7 +145,7 @@ Default to **Interactive mode** for all other invocations.
 Validate mode (`MODE=validate`) is always non-interactive. It has two variants, selected by the `APPLY` flag:
 
 - **Standalone validate** (`APPLY=false`, the default) — strictly **read-only**. Runs scoring and renders a GO / NO-GO verdict, skips Steps 9.5 and 10, never modifies the story document, and saves the report as `.validate.{date}.md`. This is the contract for CI gates, batch validation, and direct `--validate` calls.
-- **Validate-and-apply** (`APPLY=true`) — set automatically when invoked by the `develop-story`/`po` orchestrator. Runs the same scoring, then runs the **constrained, non-interactive** forms of Step 9.5 (apply critical + important fixes) and Step 10 (promote `Draft → Ready for Development` on a GO; HALT on NO-GO). Saves a normal review report as `story.{epic}.{story}.review.{n}.{story-name}.md`, so the orchestrator's `…review.*.md` lookup finds it.
+- **Validate-and-apply** (`APPLY=true`) — set automatically when invoked by the `develop-story`/`po` orchestrator. Runs the same scoring, then runs the **constrained, non-interactive** forms of Step 9.5 (apply critical + important fixes) and Step 10 (promote `Draft → Ready for Development` on a GO; HALT on NO-GO). Saves a normal review report as `story.{prd}.{epic}.{story}.review.{n}.{story-name}.md`, so the orchestrator's `…review.*.md` lookup finds it.
 
 ## Input Resolution
 
@@ -186,7 +186,7 @@ LOCAL_PATH=$(echo "$DOC_URL" | sed 's|https://github\.com/[^/]*/[^/]*/blob/[^/]*
 ```
 
 - If `LOCAL_PATH` is non-empty and the file exists: use it as `story_file`, skip to Step 4.
-- If no Document link found (older issue without Document section): fall back to `grep -rl "github_issue: {N}" docs/` and find `story.{epic}.{story}.*.md` in the result (excluding `.qa.`, `.gate.`, `.bug.`, `.implementation.` files).
+- If no Document link found (older issue without Document section): fall back to [§0a Key → document lookup](references/develop-pipeline-step-0-resolve-and-prepare.md#key--document-lookup) with `KEY_FIELD=github_issue KEY_VALUE={N}`, and check the `LOCAL_PATH` it binds is a `story.{prd}.{epic}.{story}.*.md` document. It already excludes artifacts and HALTs on several matches.
 - If still not found: HALT — inform user: "No local document found for issue #{N}. Run `/create-story` first, or provide the file path directly."
 
 **Step 4 — Continue with the resolved `story_file`.**
@@ -418,7 +418,7 @@ If a pre-pass summary is absent (agent failed or returned `alignment: unknown` /
 1. **Detect mode** (from invocation flags / natural language — see Mode Detection above):
    - **Validate mode**: set `MODE=validate`. Skip `AskUserQuestion` entirely. Skip the Unified Question Point. Then branch on the `APPLY` flag (see Validate Sub-Modes above):
      - **Standalone validate** (`APPLY=false`, default, read-only): save the report as `.validate.{date}.md`. Skip Steps 9.5 and 10 — never modify the story document.
-     - **Validate-and-apply** (`APPLY=true`, set automatically by the `develop-story`/`po` orchestrator): save the report as `story.{epic}.{story}.review.{n}.{story-name}.md`, then run the constrained, non-interactive forms of Steps 9.5 (apply critical + important fixes) and 10 (promote `Draft → Ready for Development` on a GO; HALT on NO-GO). See those steps' Pipeline notes.
+     - **Validate-and-apply** (`APPLY=true`, set automatically by the `develop-story`/`po` orchestrator): save the report as `story.{prd}.{epic}.{story}.review.{n}.{story-name}.md`, then run the constrained, non-interactive forms of Steps 9.5 (apply critical + important fixes) and 10 (promote `Draft → Ready for Development` on a GO; HALT on NO-GO). See those steps' Pipeline notes.
    - **Interactive mode**: set `MODE=interactive`. Continue to step 2 below.
 
 2. **Interactive mode only** — use `AskUserQuestion` to ask about desired output format:
@@ -428,14 +428,14 @@ question: "Would you like a comprehensive review report saved to a file, or just
 header: "Output Format"
 options:
   - label: "Comprehensive report"
-    description: "Generate detailed review report saved to story.{epic}.{story}.review.{n}.{story-name}.md with all findings, user decisions, and recommendations documented. The {story-name} slug MUST match the parent story file's name slug exactly (the hyphenated portion after `story.{epic}.{story}.` in the story filename) — never a free-form summary of the review focus."
+    description: "Generate detailed review report saved to story.{prd}.{epic}.{story}.review.{n}.{story-name}.md with all findings, user decisions, and recommendations documented. The {story-name} slug MUST match the parent story file's name slug exactly (the hyphenated portion after `story.{prd}.{epic}.{story}.` in the story filename) — never a free-form summary of the review focus."
   - label: "Action plan only"
     description: "Provide prioritized list of issues and fixes to action immediately without saving a report file."
 ```
 
 3. Store `MODE` and output format preference for use throughout the workflow.
 
-**Pipeline note**: When invoked by the `develop-story` orchestrator, always use the **validate-and-apply** variant — set `MODE=validate` and `APPLY=true`, and skip the `AskUserQuestion`. This applies critical + important fixes and promotes the story on a GO (Steps 9.5 and 10 run in their constrained, non-interactive forms) and writes the report as `story.{epic}.{story}.review.{n}.{story-name}.md`. Only ask interactively when invoked standalone in interactive mode; standalone validate (`APPLY=false`) stays read-only.
+**Pipeline note**: When invoked by the `develop-story` orchestrator, always use the **validate-and-apply** variant — set `MODE=validate` and `APPLY=true`, and skip the `AskUserQuestion`. This applies critical + important fixes and promotes the story on a GO (Steps 9.5 and 10 run in their constrained, non-interactive forms) and writes the report as `story.{prd}.{epic}.{story}.review.{n}.{story-name}.md`. Only ask interactively when invoked standalone in interactive mode; standalone validate (`APPLY=false`) stays read-only.
 
 4. **Initialize task list** — use `TaskCreate` to register every step as a tracked task. Mark each `in_progress` before starting and `completed` immediately after finishing. This prevents silently skipping steps.
 
@@ -486,8 +486,8 @@ options:
 **Actions**: Execute the full protocol in `references/review-pipeline-step-0a-branch-setup.md`. Apply the **review-story** variant throughout:
 
 - 0a.0 validate-mode short-circuit (skips entirely when `MODE=validate`).
-- 0a.2 extract `EPIC_NUM`, `STORY_NUM` from filename + validate story `epic:` frontmatter is present.
-- 0a.3 auto-skip when on `feature/story.${EPIC_NUM}.${STORY_NUM}.*`.
+- 0a.2 extract `PRD_NUM`, `EPIC_NUM`, `STORY_NUM` and `STORY_STEM` from the filename through `doc-id.js parse` (never a positional split — task 206) + validate story `epic:` frontmatter is present.
+- 0a.3 auto-skip when on `feature/${STORY_STEM}.*` — the full story stem plus a dot, so `story.1.2.3` never matches `story.1.2.30` or `story.1.2.4`.
 - 0a.4 prompt: single question — story branch base (default `${BASE_DEFAULT}`, i.e. `develop`; overridable). No epic branch is created.
 - 0a.5–0a.8 stash (`git stash create` + `store`) → invoke `/create-branch` with resolved `BASE_BRANCH` → pop stash by hash.
 
@@ -552,11 +552,11 @@ Actions:
    - Bug Reports
 
 2. **File Naming Convention**:
-   - MUST follow: `story.[epic].[story].[descriptive-name].md`
+   - MUST follow: `story.[P].[E].[S].[descriptive-name].md`
    - Use DOTS (.) for structural separators
    - Use hyphens (-) within descriptive names
    - Examples:
-     - ✅ `story.2.1.auto-hide.md`
+     - ✅ `story.1.2.1.auto-hide.md`
      - ❌ `story-2-1-auto-hide.md`
      - ❌ `2.1-auto-hide.md`
 
@@ -636,10 +636,10 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 > **Expect legacy documents to report exactly one Important finding.** There is no backfill: every document written before the Change Log spec existed has no section. `advisory` is the default precisely so those documents score one point lower and report one extra finding while still returning GO. A missing section on an old document is not a defect in that document — it is the adoption boundary.
 
 5. **Title Format**:
-   - When the story `title` frontmatter (or the `# ` heading) embeds a story-id prefix, it MUST use the canonical bracket form `[Story N.M] Name` — never the colon form `Story N.M: Name` nor the hyphen form `Story N-M: Name`.
-   - Detect by matching `^\s*Story\s+[\d.\-]+\s*:` against the title/heading value; also flag a bare `Story N.M` / `Story N-M` prefix that lacks the brackets.
-   - Flag as a **Major** issue. `sync-jira-story`'s `normaliseStorySummary` strips the **colon-dot** form on push, but the **hyphen** form (`Story 1-1:`) is NOT stripped and produces a doubled summary (`[Story 1.1] Story 1-1: …`); either way the local doc title shows the wrong format until corrected.
-   - Fix: set `title` to the bracket form `[Story N.M] Name` (or to the bare descriptive name — `sync-jira-story` prepends `[Story {epic}.{story}]` automatically), then re-run `sync-jira-story` so the Jira issue summary is corrected in the same operation. Apply this fix before any tracker sync.
+   - When the story `title` frontmatter (or the `# ` heading) embeds a story-id prefix, it MUST use the canonical bracket form `[Story P.E.S] Name` — never the colon form `Story P.E.S: Name` nor the hyphen form `Story P-E-S: Name`.
+   - Detect by matching `^\s*Story\s+[\d.\-]+\s*:` against the title/heading value; also flag a bare `Story P.E.S` / `Story P-E-S` prefix that lacks the brackets.
+   - Flag as a **Major** issue. `sync-jira-story`'s `normaliseStorySummary` strips the **colon-dot** form on push, but the **hyphen** form (`Story 1-1-1:`) is NOT stripped and produces a doubled summary (`[Story 1.1.1] Story 1-1-1: …`); either way the local doc title shows the wrong format until corrected.
+   - Fix: set `title` to the bracket form `[Story P.E.S] Name` (or to the bare descriptive name — `sync-jira-story` prepends `[Story {prd}.{epic}.{story}]` automatically), then re-run `sync-jira-story` so the Jira issue summary is corrected in the same operation. Apply this fix before any tracker sync.
 
 6. **Tracker Issue Linkage**:
 
@@ -667,10 +667,10 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 
 # Tracker Dedup Fallback Search Addendum (Applies to both Jira and GitHub paths):
 
-- Pattern Match Search (Primary): Query by string prefix "[Story {epic}.{story}] {title}".
+- Pattern Match Search (Primary): Query by string prefix "[Story {prd}.{epic}.{story}] {title}".
 - Structural Label Search (Fallback - Execute if primary match returns zero results):
-  - For Jira: Execute Atlassian MCP searchJiraIssuesUsingJql with jql: `project = {JIRA_PROJECT_KEY} AND labels = "story-${EPIC_NUM}.${STORY_NUM}"`.
-  - For GitHub: Run `gh issue list --search "label:story-${EPIC_NUM}.${STORY_NUM}" --state all --json number,url,state,title`.
+  - For Jira: Execute Atlassian MCP searchJiraIssuesUsingJql with jql: `project = {JIRA_PROJECT_KEY} AND labels = "story-${STORY_STEM#story.}"`.
+  - For GitHub: Run `gh issue list --search "label:story-${STORY_STEM#story.}" --state all --json number,url,state,title`.
 - Handling Drift: If a single match is found via the fallback label search but the title has drifted from the local filename/title, link the existing tracker issue, write back the keys to frontmatter, and log a warning: "⚠️ Title drift detected between local file and existing tracker issue. Issue linked via structural label." Also insert/repair the body cross-reference link so the next review pass does not flag it as missing.
 
   **Jira path:**
@@ -691,10 +691,10 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
     - **Skip / no sync chosen** → make no remote changes, keep the Important gap flagged, log `"Tracker sync skipped by user — run /sync-jira-story later."` and continue the review. Do NOT halt.
     - If the user chooses **Sync to Jira**: 0. **Pre-create dedup search (Tracker dedup)** — run before steps 1–4:
       - Use Atlassian MCP `searchJiraIssuesUsingJql`:
-        - `jql`: `summary ~ "[Story {epic}.{story}] {title}" AND project={JIRA_PROJECT_KEY}` (no status filter — all states)
+        - `jql`: `summary ~ "[Story {prd}.{epic}.{story}] {title}" AND project={JIRA_PROJECT_KEY}` (no status filter — all states)
         - Verify story title pattern against what `/create-story` Step 5.2a / `sync-jira-story` actually emits; align if the format differs
         - On search failure (outage / rate-limit): log `"⚠️ Jira dedup search failed — proceeding to create"` and fall through to steps 1–4 below (preserves current behaviour)
-        - **Fallback Structural Label Search**: If primary title match returns zero results, execute fallback search with jql: `project = {JIRA_PROJECT_KEY} AND labels = "story-${EPIC_NUM}.${STORY_NUM}"` (see Tracker Dedup Fallback Search Addendum for details).
+        - **Fallback Structural Label Search**: If primary title match returns zero results, execute fallback search with jql: `project = {JIRA_PROJECT_KEY} AND labels = "story-${STORY_STEM#story.}"` (see Tracker Dedup Fallback Search Addendum for details).
       - **Exactly one match** → link existing, skip steps 1–4 entirely (including `ensure-epic-jira-issue`):
         - Extract `jira_key` and build `jira_url = ${JIRA_URL}/browse/${jira_key}`
         - Write `jira_key: {jira_key}` and `jira_url: {jira_url}` into frontmatter (sed-based insert before closing `---`, same pattern as `create-task`)
@@ -703,7 +703,7 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
         - If matched issue status is `Closed` or `Done`: log `"⚠️  Linked existing CLOSED tracker issue {jira_key} — verify intent before continuing."`
         - Log `"Linked existing tracker issue {jira_key} (skipped create)"` and **skip steps 1–4 below**
       - **Zero matches** → fall through to steps 1–4 below
-      - **Multiple matches** → log `"⚠️ Dedup: {N} matches found for \"[Story {epic}.{story}]\": {key1}, {key2}, … — proceeding to create"` and fall through to steps 1–4 below
+      - **Multiple matches** → log `"⚠️ Dedup: {N} matches found for \"[Story {prd}.{epic}.{story}]\": {key1}, {key2}, … — proceeding to create"` and fall through to steps 1–4 below
       1.  Derive the epic file path using the grandparent directory rule:
           ```bash
           STORY_DIR=$(dirname "{resolved story file path}")
@@ -739,12 +739,12 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
     - If the user chooses **Sync to GitHub**: 0. **Pre-create dedup search (Tracker dedup)** — run before steps 1–4:
       1. Search for an existing issue:
          ```bash
-         gh issue list --search "in:title \"[Story {epic}.{story}]\"" --state all \
+         gh issue list --search "in:title \"[Story {prd}.{epic}.{story}]\"" --state all \
            --json number,url,state,title
          ```
          Verify story title pattern against what `/create-story` Step 5.2a actually emits; align if the format differs.
          On failure: log `"⚠️ GitHub dedup search failed — proceeding to create"` and fall through to steps 1–4 below
-         - **Fallback Structural Label Search**: If primary title match returns zero results, run: `gh issue list --search "label:story-${EPIC_NUM}.${STORY_NUM}" --state all --json number,url,state,title` (see Tracker Dedup Fallback Search Addendum for details).
+         - **Fallback Structural Label Search**: If primary title match returns zero results, run: `gh issue list --search "label:story-${STORY_STEM#story.}" --state all --json number,url,state,title` (see Tracker Dedup Fallback Search Addendum for details).
       2. **Exactly one match** → link existing, skip steps 1–4 entirely (including `ensure-epic-github-issue`):
          - Extract `N` (issue number) and `url` from the result
          - Write `github_issue: {N}` into frontmatter (sed-based insert before closing `---`, same pattern as `create-task`)
@@ -753,7 +753,7 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
          - If matched issue `state` is `CLOSED`: log `"⚠️  Linked existing CLOSED tracker issue #{N} — verify intent before continuing."`
          - Log `"Linked existing tracker issue #{N} (skipped create)"` and **skip steps 1–4 below**
       3. **Zero matches** → fall through to steps 1–4 below
-      4. **Multiple matches** → log `"⚠️ Dedup: {count} matches found for \"[Story {epic}.{story}]\": #{n1}, #{n2}, … — proceeding to create"` and fall through to steps 1–4 below
+      4. **Multiple matches** → log `"⚠️ Dedup: {count} matches found for \"[Story {prd}.{epic}.{story}]\": #{n1}, #{n2}, … — proceeding to create"` and fall through to steps 1–4 below
       5. Derive the epic file path using the grandparent directory rule:
          ```bash
          STORY_DIR=$(dirname "{resolved story file path}")
@@ -763,7 +763,7 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
          If the file doesn't exist, glob for `epic.*.md` in `$EPIC_DIR`. If still not found, log `⚠️ Epic file not found — skipping parent epic issue check` and set `EPIC_ISSUE_NUM=""`.
       6. If the file exists, invoke the `ensure-epic-github-issue` sub-routine with `EPIC_FILE_PATH`. On return, `EPIC_ISSUE_NUM` is set or empty. Set `EPIC_TRACKER_KIND="github"`.
       7. Invoke the `ensure-story-github-issue` sub-routine with `STORY_FILE_PATH={resolved story file path}` and `EPIC_ISSUE_NUM={value returned by ensure-epic-github-issue}`. The sub-routine handles:
-         - creating the issue (with title `[Story {epic}.{story}] {title}`, `story` + `priority:{priority}` labels, milestone `Epic {epic} — {epic_title}`)
+         - creating the issue (with title `[Story {prd}.{epic}.{story}] {title}`, `story` + `priority:{priority}` labels, milestone `Epic {prd}.{epic} — {epic_title}`)
          - adding it to the GitHub Project board
          - mirroring the priority label onto the board's Priority single-select field
          - linking the new issue as a sub-issue of the parent epic issue (only if `EPIC_ISSUE_NUM` is non-empty)
@@ -1638,7 +1638,7 @@ The Implementation Readiness Score is calculated as a weighted average across al
    - ✅ **GO** — score ≥ 8 AND zero Critical issues
    - ⚠️ **NO-GO (Revision)** — score 5–7, OR Important issues materially blocking confidence
    - 🚨 **NO-GO (Rework)** — score < 5 OR any Critical issue present
-3. Write the report. **Standalone validate** (`APPLY=false`) → `[story-directory]/[story-name].validate.[date].md`. **Validate-and-apply** (`APPLY=true`, orchestrated) → `[story-directory]/story.{epic}.{story}.review.{n}.{story-name}.md` (the canonical review-report name, so the orchestrator's `…review.*.md` lookup finds it).
+3. Write the report. **Standalone validate** (`APPLY=false`) → `[story-directory]/[story-name].validate.[date].md`. **Validate-and-apply** (`APPLY=true`, orchestrated) → `[story-directory]/story.{prd}.{epic}.{story}.review.{n}.{story-name}.md` (the canonical review-report name, so the orchestrator's `…review.*.md` lookup finds it).
 4. Print a concise stdout summary (for CI / pipeline callers):
 
 ```
@@ -1653,7 +1653,7 @@ Report:  <path>
 **Report Structure**:
 
 ```markdown
-# Story Validation Report: Story [Epic].[Story] — [Title]
+# Story Validation Report: Story [P].[E].[S] — [Title]
 
 **Validated:** [ISO date]
 **Validation Depth:** [Quick/Standard/Thorough]
@@ -1755,7 +1755,7 @@ Report:  <path>
 _Generated by /review-story --validate. In standalone validate (`APPLY=false`) no changes are made to the story document — to apply fixes, run /review-story (interactive). Under validate-and-apply (`APPLY=true`, orchestrated) critical + important fixes are applied and the status is promoted on a GO._
 ```
 
-**Output**: Validation report saved (`.validate.{date}.md` for standalone validate; `story.{epic}.{story}.review.{n}.{story-name}.md` for validate-and-apply). Stdout summary printed.
+**Output**: Validation report saved (`.validate.{date}.md` for standalone validate; `story.{prd}.{epic}.{story}.review.{n}.{story-name}.md` for validate-and-apply). Stdout summary printed.
 
 ---
 
@@ -1772,16 +1772,16 @@ The Implementation Readiness Score is calculated as a weighted average across al
 - The Verdict must instantly drop to NO-GO (Rework) or NO-GO (Revision), regardless of perfect scores in Template Compliance or Consistency.
 - Ensure the breakdown summary includes a specific annotation if this floor rule is triggered (e.g., "Overall score capped due to critical technical accuracy or completeness deficits").
 
-2. Save to file: `[story-directory]/story.{epic}.{story}.review.{n}.{story-name}.md`
-   - `{story-name}` MUST be the parent story's own name slug — the hyphenated portion after `story.{epic}.{story}.` in the story filename. Do NOT invent a free-form descriptive slug summarizing the review focus.
-   - Example: story file `story.1.2.configure-typescript-path-mapping.md` → review file `story.1.2.review.1.configure-typescript-path-mapping.md`.
-   - Derive programmatically: strip `.md`, strip the leading `story.{epic}.{story}.` prefix from the basename — the remainder is `{story-name}`.
+2. Save to file: `[story-directory]/story.{prd}.{epic}.{story}.review.{n}.{story-name}.md`
+   - `{story-name}` MUST be the parent story's own name slug — the hyphenated portion after `story.{prd}.{epic}.{story}.` in the story filename. Do NOT invent a free-form descriptive slug summarizing the review focus.
+   - Example: story file `story.1.1.2.configure-typescript-path-mapping.md` → review file `story.1.1.2.review.1.configure-typescript-path-mapping.md`.
+   - Derive programmatically: strip `.md`, strip the leading `story.{prd}.{epic}.{story}.` prefix from the basename — the remainder is `{story-name}`.
 3. Display summary to user with file location
 
 **Report Structure**:
 
 ```markdown
-# Story Review Report: Story [Epic].[Story] - [Title]
+# Story Review Report: Story [P].[E].[S] - [Title]
 
 **Reviewed:** [Date]
 **Review Depth:** [Quick/Standard/Thorough]
@@ -2119,7 +2119,7 @@ _[Add Q3, Q4 as needed — up to the 4-question batch maximum.]_
 - **Review Duration:** [time]
 ```
 
-**Output**: Save review report to `[story-directory]/story.{epic}.{story}.review.{n}.{story-name}.md` — `{story-name}` is the parent story's own name slug (same hyphenated suffix as the story filename), NOT a free-form review-focus summary.
+**Output**: Save review report to `[story-directory]/story.{prd}.{epic}.{story}.review.{n}.{story-name}.md` — `{story-name}` is the parent story's own name slug (same hyphenated suffix as the story filename), NOT a free-form review-focus summary.
 
 ---
 
@@ -2453,6 +2453,28 @@ Change Log Updated: Review entry added
 User Can Now: Run `/develop` to begin implementation
 ```
 
+### Step 10a: Record the Reviewed Revision
+
+**Purpose**: stamp the review report with the exact revision of the document it reviewed, so a
+develop pipeline's Step 2 can reuse this review instead of running it again (task.201).
+
+**When to Execute**: always, when a review report file was written — after every edit this review
+makes to the document (fixes, Change Log rows, status), because the hash must include them. Skip it
+only when no report file exists (action plan only).
+
+```bash
+command node .agents/skills/review-story/references/record-reviewed-blob.js \
+  --doc "{story-file-path}" --report "{review report path}" --json
+```
+
+> Engine source: `references/record-reviewed-blob.js` (bundled into each skill as `references/record-reviewed-blob.js`).
+
+It writes `**reviewed_blob:** <git hash-object of the document>` under the report's `**Reviewed:**`
+line, and reads it back. Read `reason`: `written` needs nothing; any other value (`no-doc`,
+`no-report`, `git-failed`, `unreadable-after-write`) is logged and the review continues — the cost of
+a missing stamp is one re-review, never a halt. **Edit the document after this step and the stamp is
+stale by design**: Step 2 then reviews it again.
+
 ---
 
 ### Step 11: Post Tracker Comment (graceful — non-blocking)
@@ -2676,7 +2698,7 @@ EOF
 ✅ Hallucinations identified and documented with evidence
 ✅ Scoring breakdown produced with per-dimension scores
 ✅ Clear GO / NO-GO (Revision) / NO-GO (Rework) verdict rendered with justification
-✅ Report saved — `[story-dir]/[story-name].validate.[date].md` (standalone) or `[story-dir]/story.{epic}.{story}.review.{n}.{story-name}.md` (validate-and-apply)
+✅ Report saved — `[story-dir]/[story-name].validate.[date].md` (standalone) or `[story-dir]/story.{prd}.{epic}.{story}.review.{n}.{story-name}.md` (validate-and-apply)
 ✅ Stdout summary printed for pipeline/CI callers
 ✅ Exit non-zero if verdict is any NO-GO variant
 ✅ **Standalone validate only**: zero modifications to the story document (besides the `.validate.` report itself). Under validate-and-apply, critical + important fixes are applied and status is promoted on a GO.
@@ -2711,7 +2733,7 @@ EOF
 
 ### 1. Pre-Implementation Gate (Validate mode)
 
-"Is story 2.3 ready to develop?" / `/review-story --validate story.2.3.auth-flow.md`
+"Is story 1.2.3 ready to develop?" / `/review-story --validate story.1.2.3.auth-flow.md`
 
 Standard depth → verdict → if GO, proceed to `/develop`; if NO-GO, run interactive mode.
 
@@ -2823,7 +2845,7 @@ architecture:
 Both roots are configurable; nested structure is fixed (see [docs/reference/configuration.md](../../docs/reference/configuration.md#configurable-roots-and-fixed-conventions)):
 
 - PRDs live under `${PRD_ROOT}/`
-- Epics: `${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.{name}/epic.{N}.{name}.md`
+- Epics: `${PRD_ROOT}/{domain}/prd.{P}.{feature}/epics/epic.{P}.{E}.{name}/epic.{P}.{E}.{name}.md`
 - Stories: nested at `{epic-dir}/stories/`
 
 **Note**: If `skills-config.yaml` is missing, the skill will use sensible defaults based on your project organization.
@@ -2841,7 +2863,7 @@ This skill uses:
 
 ## Notes
 
-- Review reports are saved as `story.{epic}.{story}.review.{n}.{story-name}.md`, where `{story-name}` is the parent story file's own name slug (the hyphenated portion after `story.{epic}.{story}.` in the story filename) — NOT a free-form descriptive slug summarizing the review focus. Use DOTS as structural separators. Example: parent story `story.1.2.configure-typescript-path-mapping.md` → review `story.1.2.review.1.configure-typescript-path-mapping.md`. The `{n}` is a sequence number for multiple reviews of the same story (mirrors the QA `qa.{n}` pattern).
+- Review reports are saved as `story.{prd}.{epic}.{story}.review.{n}.{story-name}.md`, where `{story-name}` is the parent story file's own name slug (the hyphenated portion after `story.{prd}.{epic}.{story}.` in the story filename) — NOT a free-form descriptive slug summarizing the review focus. Use DOTS as structural separators. Example: parent story `story.1.1.2.configure-typescript-path-mapping.md` → review `story.1.1.2.review.1.configure-typescript-path-mapping.md`. The `{n}` is a sequence number for multiple reviews of the same story (mirrors the QA `qa.{n}` pattern).
 - Story status is updated in-place only when review outcome is READY TO IMPLEMENT and user confirms
 - Can be used at any stage: draft, in progress, completed
 - Use `--validate` flag (or natural language like "is this story ready?") for the automated non-interactive gate. Standalone validate is a strict subset of interactive mode — same checks, same scoring, no questions, read-only, CI-friendly exit codes. The orchestrated **validate-and-apply** variant (`APPLY=true`, set by `develop-story`/`po`) adds the constrained Steps 9.5 and 10: it applies critical + important fixes and promotes the story on a GO.

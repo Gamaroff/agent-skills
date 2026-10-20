@@ -37,7 +37,7 @@ The mode decides the filename, the directory and the numbering.
 
 | Mode            | When                                                    | Lives in                             | Filename                                 | Numbering                          |
 | --------------- | ------------------------------------------------------- | ------------------------------------ | ---------------------------------------- | ---------------------------------- |
-| **Story bug**   | Found during story testing                              | beside the story file                | `story.{epic}.{story}.bug.{n}.{name}.md` | per-story (scan the dir, max + 1)  |
+| **Story bug**   | Found during story testing                              | beside the story file                | `story.{P}.{E}.{S}.bug.{n}.{name}.md` | per-story (scan the dir, max + 1)  |
 | **Task bug**    | Found during technical-task QA                          | `docs/tasks/task.{id}.{name}/`       | `task.{id}.bug.{n}.{name}.md`            | per-task (scan the dir, max + 1)   |
 | **General bug** | Cross-cutting, **no single story or task owner**        | `docs/bugs/bug.{N}.{name}/`          | `bug.{N}.{name}.md`                      | **global**, via the bug registry   |
 
@@ -105,11 +105,21 @@ hotfix            →  main     →  hotfix/vX.Y.Z   →  PR to main, then merge
 |---|---|---|
 | 1 | `create-branch` | Cuts the branch per Q1. **Ensures the tracker issue first** (see below), so the lock records a real issue. |
 | 2 | `review-bug` | Validate-and-apply. **READY TO FIX** → proceed. **NEEDS DETAIL**, **DUPLICATE**, or **STALE (already fixed)** → HALT. |
-| 3 | Investigate & fix | Sets `new → in-progress`, opens `### Iteration 1`, **reproduces** the failure, locates the root cause, implements the fix **plus a regression test that fails without it**, writes Investigation + Fix Implementation into the Developer Fix Cycle, adds a Status History row, sets `ready-for-qa`. Not reproducible → HALT; never fabricate a fix. |
+| 3 | Investigate & fix | Sets `new → in-progress`, opens `### Iteration 1`, **reproduces** the failure, locates the root cause, implements the fix **plus a regression test that fails without it**, writes Investigation + Fix Implementation into the Developer Fix Cycle, adds a Status History row, sets `ready-for-qa`. General bug: both status writes are mirrored into its registry row (see below). Not reproducible → HALT; never fabricate a fix. |
 | 4 | `create-pr` | Pushes and opens the PR against the Q3 target. |
-| 5–6 | Verify & fix loop | QA verifies **the bug scenario is gone** and nothing regressed. PASS → writes QA Verification (✅ Fixed). FAIL → appends `### Iteration N+1`, sets status `reopened`, runs `/qa-fix`. Bounded at 5 cycles. |
-| 7 | `finalise --bug` + close | The fix-evidence DoD in bug mode (no Change Log row, no `accepted`, no sprint review — the skip list is stated once in `finalise`'s SKILL.md), which writes `{bug-prefix}.dod.{N}.*.md` from a bug-shaped template, posts the PR comment and closes the tracker issue; then writes `## Resolution Summary`, sets `status: closed`, adds the final Status History row, and updates the parent: story bug → **Closed Bugs** in the story's `## Bug Reports`; task bug → ✅ Closed in the task's list; general bug → the registry row flips to `closed`. |
+| 5–6 | Verify & fix loop | QA verifies **the bug scenario is gone** and nothing regressed. PASS → writes QA Verification (✅ Fixed). FAIL → appends `### Iteration N+1`, sets status `reopened` (mirrored into a general bug's registry row), runs `/qa-fix`. Bounded at 5 cycles. |
+| 7 | `finalise --bug` + close | The fix-evidence DoD in bug mode (no Change Log row, no `accepted`, no sprint review — the skip list is stated once in `finalise`'s SKILL.md), which writes `{bug-prefix}.dod.{N}.*.md` from a bug-shaped template, posts the PR comment and closes the tracker issue; then writes `## Resolution Summary`, sets `status: closed`, adds the final Status History row, and updates the parent: story bug → **Closed Bugs** in the story's `## Bug Reports`; task bug → ✅ Closed in the task's list; general bug → the registry row's last mirrored write, `closed`. |
 | 8 | `commit-changes` | Final commit of artifacts, final push, lock removed. |
+
+**A general bug's registry row mirrors `develop-bug`'s own status writes**, not only the last one.
+`in-progress` and `ready-for-qa` (Step 3), `reopened` (Steps 5–6) and `closed` (Step 7) are each
+written into the `docs/bugs/bug-registry.md` row's Status cell in the same edit as the bug file,
+because a drift guard compares the two on every push. The writes `/qa-fix` makes inside a reopened
+cycle (back to `in-progress`, then `ready-for-qa`) are **not** mirrored, so after a reopen the row
+reads `reopened` while the file moves on, until Step 7 writes `closed` to both. Mid-run, expect the
+row to hold the last of those four writes, not necessarily the file's current status. Source:
+[`develop-bug` Step 3](../../skills/develop-bug/SKILL.md) and its
+[verify loop](../../skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md).
 
 **Lite mode applies to Step 5 only.** Step 7 runs in full in every mode.
 

@@ -1,0 +1,236 @@
+[
+  {
+    "id": "bug-status.task-bug",
+    "sink": "filename",
+    "input": "task.67.bug.3.x.md",
+    "why": "a task bug carries its parent's stem first and has no registry row",
+    "correct": "not-a-general-bug, nothing written",
+    "direction": "hostile",
+    "expected": {
+      "stdout": "not-a-general-bug: task.67.bug.3.x.md is not a general bug (bug.{N}.…, type=unset) — no bug-registry row applies\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "bug-status.story-bug",
+    "sink": "filename",
+    "input": "story.1.2.3.bug.1.x.md",
+    "why": "a story bug has no registry row",
+    "correct": "not-a-general-bug, nothing written",
+    "direction": "hostile",
+    "expected": {
+      "stdout": "not-a-general-bug: story.1.2.3.bug.1.x.md is not a general bug (bug.{N}.…, type=unset) — no bug-registry row applies\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "bug-status.prefix-lookalike",
+    "sink": "filename",
+    "input": "xbug.5.y.md",
+    "why": "prefix must be anchored at the start of the basename",
+    "correct": "not-a-general-bug, nothing written",
+    "direction": "hostile",
+    "expected": {
+      "stdout": "not-a-general-bug: xbug.5.y.md is not a general bug (bug.{N}.…, type=unset) — no bug-registry row applies\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "bug-status.digits-without-dot",
+    "sink": "filename",
+    "input": "bug.5x.y.md",
+    "why": "the number must be followed by a dot",
+    "correct": "not-a-general-bug, nothing written",
+    "direction": "hostile",
+    "expected": {
+      "stdout": "not-a-general-bug: bug.5x.y.md is not a general bug (bug.{N}.…, type=unset) — no bug-registry row applies\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "bug-status.command-substitution-name",
+    "sink": "filename",
+    "input": "$(touch PWNED).md",
+    "why": "a name that would execute if any layer shelled it",
+    "correct": "not-a-general-bug, nothing written",
+    "direction": "hostile",
+    "expected": {
+      "stdout": "not-a-general-bug: $(touch PWNED).md is not a general bug (bug.{N}.…, type=unset) — no bug-registry row applies\n",
+      "exit": 0,
+      "absent": [
+        "PWNED"
+      ]
+    }
+  },
+  {
+    "id": "bug-status.newline-composed-name",
+    "sink": "filename",
+    "input": "task.1.md\nbug.5.x.md",
+    "why": "a multiline-anchored or line-wise match would accept the second line",
+    "correct": "not-a-general-bug, nothing written",
+    "direction": "hostile",
+    "expected": {
+      "stdout": "not-a-general-bug: task.1.md\nbug.5.x.md is not a general bug (bug.{N}.…, type=unset) — no bug-registry row applies\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "bug-status.leading-space",
+    "sink": "filename",
+    "input": " bug.5.x.md",
+    "why": "a classifier that trims before matching would accept it",
+    "correct": "not-a-general-bug, nothing written",
+    "direction": "hostile",
+    "expected": {
+      "stdout": "not-a-general-bug:  bug.5.x.md is not a general bug (bug.{N}.…, type=unset) — no bug-registry row applies\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "bug-status.uppercase-prefix",
+    "sink": "filename",
+    "input": "BUG.5.x.md",
+    "why": "a case-insensitive match widens the set of files that may write a row",
+    "correct": "not-a-general-bug, nothing written",
+    "direction": "hostile",
+    "expected": {
+      "stdout": "not-a-general-bug: BUG.5.x.md is not a general bug (bug.{N}.…, type=unset) — no bug-registry row applies\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "bug-status.arabic-indic-digit",
+    "sink": "filename",
+    "input": "bug.٥.x.md",
+    "why": "a Unicode-aware digit class would accept a non-ASCII digit that Number() turns into NaN",
+    "correct": "not-a-general-bug, nothing written",
+    "direction": "hostile",
+    "expected": {
+      "stdout": "not-a-general-bug: bug.٥.x.md is not a general bug (bug.{N}.…, type=unset) — no bug-registry row applies\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "bug-status.fullwidth-digit",
+    "sink": "filename",
+    "input": "bug.５.x.md",
+    "why": "fullwidth digit five that NFKC folds to 5",
+    "correct": "not-a-general-bug, nothing written",
+    "direction": "hostile",
+    "expected": {
+      "stdout": "not-a-general-bug: bug.５.x.md is not a general bug (bug.{N}.…, type=unset) — no bug-registry row applies\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "bug-status.empty-number",
+    "sink": "filename",
+    "input": "bug..x.md",
+    "why": "no number at all; a \\d* pattern would read it as bug 0",
+    "correct": "not-a-general-bug, nothing written",
+    "direction": "hostile",
+    "expected": {
+      "stdout": "not-a-general-bug: bug..x.md is not a general bug (bug.{N}.…, type=unset) — no bug-registry row applies\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "bug-status.negative-number",
+    "sink": "filename",
+    "input": "bug.-5.x.md",
+    "why": "a looser parse would turn it into bug -5",
+    "correct": "not-a-general-bug, nothing written",
+    "direction": "hostile",
+    "expected": {
+      "stdout": "not-a-general-bug: bug.-5.x.md is not a general bug (bug.{N}.…, type=unset) — no bug-registry row applies\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "bug-status.no-trailing-dot",
+    "sink": "filename",
+    "input": "bug.5",
+    "why": "a $-or-dot alternation would accept a bare bug.5",
+    "correct": "not-a-general-bug, nothing written",
+    "direction": "hostile",
+    "expected": {
+      "stdout": "not-a-general-bug: bug.5 is not a general bug (bug.{N}.…, type=unset) — no bug-registry row applies\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "bug-status.flag-as-file-registry",
+    "sink": "filename",
+    "input": "--registry",
+    "why": "a --file value spelled as a flag could redirect the write",
+    "correct": "usage error, exit 2, nothing written",
+    "direction": "hostile",
+    "expected": {
+      "stdout": "",
+      "exit": 2
+    }
+  },
+  {
+    "id": "bug-status.flag-as-file-json",
+    "sink": "filename",
+    "input": "--json",
+    "why": "a --file value that is a known boolean flag",
+    "correct": "usage error, exit 2, nothing written",
+    "direction": "hostile",
+    "expected": {
+      "stdout": "",
+      "exit": 2
+    }
+  },
+  {
+    "id": "bug-status.typed-general-bug",
+    "sink": "filename",
+    "input": "bug.5.x.md",
+    "why": "a general bug the classifier must let through",
+    "correct": "passes the classifier; no-registry",
+    "direction": "legitimate",
+    "expected": {
+      "stdout": "no-registry: no registry at docs/bugs/bug-registry.md — this project does not keep one\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "bug-status.untyped-general-bug",
+    "sink": "filename",
+    "input": "bug.12.my-long-name.md",
+    "why": "a general bug the classifier must let through",
+    "correct": "passes the classifier; no-registry",
+    "direction": "legitimate",
+    "expected": {
+      "stdout": "no-registry: no registry at docs/bugs/bug-registry.md — this project does not keep one\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "bug-status.minimal-general-bug",
+    "sink": "filename",
+    "input": "bug.1.md",
+    "why": "the shortest name satisfying bug.{N}.",
+    "correct": "passes the classifier; no-registry",
+    "direction": "legitimate",
+    "expected": {
+      "stdout": "no-registry: no registry at docs/bugs/bug-registry.md — this project does not keep one\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "bug-status.general-bug-with-substitution-slug",
+    "sink": "filename",
+    "input": "bug.5.$(touch PWNED).md",
+    "why": "a valid prefix with a shell substitution in the slug must pass and never execute",
+    "correct": "passes the classifier; no-registry; PWNED never created",
+    "direction": "legitimate",
+    "expected": {
+      "stdout": "no-registry: no registry at docs/bugs/bug-registry.md — this project does not keep one\n",
+      "exit": 0,
+      "absent": [
+        "PWNED"
+      ]
+    }
+  }
+]

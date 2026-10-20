@@ -5,19 +5,23 @@ type: task
 description: "Follow-ups from task.170's PR review 2. The no-gate refusal in reenter-qa-after-finalise.sh discards qa-cycle.sh's stderr, so three different gate states print one message. A failing git status reads as a clean tree. And the qa_reentry lock field, plus the second writer of qa_max_cycles and qa_phase, never reached the hooks doc, the resume detector prompt or the lock-fields parity test."
 tags: [develop-task, develop-story, resume, pipeline-lock, qa-loop, review-follow-up]
 category: infrastructure
-status: planned
+status: accepted
 priority: Medium
 created: 2026-10-04
-updated: 2026-10-04
+updated: 2026-10-13
 assignee:
 estimated_effort_hours: 4
 risk_level: low
 github_issue: 565
+completed_date: 2026-10-13
+pr_number: 642
 ---
 
 # Technical Task: reenter-qa refusal diagnostics and the `qa_reentry` reader population
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.182.review.1.reenter-qa-refusal-diagnostics-and-qa-reentry-population.md` implemented 2026-10-13
 
 **GitHub Issue**: [#565](https://github.com/Gamaroff/agent-skills/issues/565)
 
@@ -44,7 +48,7 @@ This task closes the three code-review findings that task.170's Step 5c review (
   - gate files with no cycle number (`:100`);
   - two files claiming one cycle (`:125`).
 
-  The contract's route for `no-gate` (`shared/resources/develop-pipeline-resume-contract.md:632`) tells the operator to "resolve the gate files first if the refusal names an ambiguity". The refusal can never name one.
+  The contract's route for `no-gate` (`shared/resources/develop-pipeline-resume-contract.md:693-705`, the `no-gate` bullet) tells the operator to "resolve the gate files first if the refusal names an ambiguity". The refusal can never name one.
 - **A failed read is a clean tree (CR-3).** The uncommitted-fix check is `DIRTY=$(git status … 2>/dev/null)` (`reenter-qa-after-finalise.sh:169`). If `git status` fails, `DIRTY` is empty and the check passes. The script can then go on to refuse `no-code-moved`, whose route resumes `/finalise` at step 7. That is the one outcome the script exists to prevent. It needs a failing git (index lock, corrupt index), so it is rare, but it fails open.
 - **The reader population stopped at task.123 (CR-2).** task.170 added the `qa_reentry` field and a second writer of `qa_max_cycles` and `qa_phase`. They were not carried to two readers:
   - `shared/resources/develop-pipeline-hooks.md:86` says `qa_max_cycles` and `extra_cycles_granted` are "written together at a resume after a loop-limit halt" and does not mention `qa_reentry`.
@@ -70,17 +74,17 @@ This task closes the three code-review findings that task.170's Step 5c review (
 
 ### Target Architecture
 
-- `no-gate` captures both `qa-cycle.sh` calls' stderr. On refusal it prints the captured reason line(s) as `reenter-qa:`-prefixed lines on stderr before the `refused (no-gate)` line. The reason `no-gate` and its route are unchanged.
+- `no-gate` captures both `qa-cycle.sh` calls' stderr. On refusal it prints the captured reason line(s) as `reenter-qa:`-prefixed lines on stderr before the `refused (no-gate)` line. The reason `no-gate` is unchanged; its route changed in QA cycle 2 (see Scope amendment below): back to the operator, never step 7.
 - The uncommitted-fix check reads `git status`'s exit code. On a non-zero exit it refuses with a new reason, `git-unreadable`, whose route is **back to the operator, never step 7**. This is the same route as `uncommitted-fix`, and it is added to the contract's refusal list and the script header.
-- `develop-pipeline-hooks.md:86` names `qa_reentry` and both writers of `qa_max_cycles` / `qa_phase`.
-- The detector prompt gains a `qa_reentry` line. It reports `{from_step, reason, gate_head}` in `deltas_since_pause` so the operator sees the run is a re-entry.
+- `develop-pipeline-hooks.md:86` names `qa_reentry` and states each loop field's writers exactly (measured 2026-10-13): `qa_max_cycles` — `grant-qa-cycles.sh` and `reenter-qa-after-finalise.sh`; `extra_cycles_granted` — `grant-qa-cycles.sh` only; `qa_phase` — `set-qa-phase.sh` inside the loop, and both re-entry scripts; `qa_reentry` — `reenter-qa-after-finalise.sh` only.
+- The detector prompt gains a `qa_reentry` line. It reports `from_step`, `reason`, `gate_head` and `report_entries` (the field the resume contract's Second precedence reads) in `deltas_since_pause`, from the lock or the snapshot, so the operator sees the run is a re-entry.
 - The lock-fields parity test gains `qa_reentry`, with its writer (`reenter-qa-after-finalise.sh`) and its readers (resume contract, pause doc, hooks doc, detector prompt, both develop-* SKILL.md).
 
 ### Important Clarifications
 
 - **Scope of the population sweep (measured, not recalled).** The population is the sources that name a QA-loop lock field:
   `git grep -ln -E 'qa_max_cycles|extra_cycles_granted|qa_phase|qa_reentry' -- shared/resources skills/*/SKILL.md evals scripts | grep -v '/references/'`
-  On 2026-10-04, for `qa_max_cycles|extra_cycles_granted`, it returned 21 paths: 6 eval fixtures, 11 shared sources, 2 SKILL.md, the parity test and a report-lint fixture. `qa_reentry` appeared in 8 of them. Phase 3 re-runs the command and classifies each path: fixture, writer, reader that must name `qa_reentry`, or reader that need not. The count goes in the PR, and the test owns the enforced subset.
+  On 2026-10-04, for `qa_max_cycles|extra_cycles_granted`, it returned 21 paths: 6 eval fixtures, 11 shared sources, 2 SKILL.md, the parity test and a report-lint fixture. `qa_reentry` appeared in 8 of them. On 2026-10-13 the full four-token command returned 32 paths (task.181 added `shared/resources/tests/fixtures/shell-argv/reenter-qa-setup.sh`). Phase 3 re-runs the command and classifies each path: fixture, writer, reader that must name `qa_reentry`, or reader that need not. The count goes in the PR, and the test owns the enforced subset.
 - The eval fixtures (`evals/*/step-isolation/12-qa-reentry-after-loop-limit-with-grant/`) are loop-limit grants, not re-entries. They are not expected to carry `qa_reentry`.
 
 ## 4. Scope
@@ -96,13 +100,22 @@ This task closes the three code-review findings that task.170's Step 5c review (
 
 ### Out of Scope
 
-❌ Changing what `no-gate` routes to. The fix is the message, not the decision.
+❌ ~~Changing what `no-gate` routes to.~~ Moved in scope by QA cycle 2 — see Scope amendment.
 ❌ The other carried follow-ups: gate 6 CR-1/2/3, gate 7 CR-1 (the bash 3.x runtime suite) and PR review 2 PC-2. Each is low and unrelated to these three.
 ❌ task.181's `shell-argv:` probe form. That is a separate branch and task.
 
+### Scope amendment (QA cycles 2–3)
+
+The QA loop added four items to this task's scope. Each is a direct consequence of the fixes above, recorded here so the document matches what shipped (PR review 1, PC-2 and PC-5):
+
+- **The `no-gate` route** (QA cycle 2, CR-2). Once the refusal relays an ambiguous gate, the old route ("resolve the gate files, then the next bullet", which is the step-7 restore) could send a code fix to `/finalise` over a head no gate had read. It now routes back to the operator, who resolves the gate files and runs the script again. It never reaches step 7.
+- **The cwd usage guard** (QA cycle 2, CR-5). A cwd that is not `<doc-dir>`'s repository root exits 2 (usage) before the `git status` read. Run from another repository, `git status` would otherwise exit 128 and refuse `git-unreadable`, telling the operator to repair a healthy repository.
+- **One statement of the grant's `qa_phase`** (QA cycles 1–3, TASK-182-001/003/004). The `qa_phase` row of the lock schema in `develop-pipeline-pause.md` states the value `grant-qa-cycles.sh` writes; the hooks doc, the resume contract and both develop-* SKILL.md cite it. A parity check over a derived describer population fails on a restatement.
+- **Every never-step-7 refusal is named wherever the set is summarised** (QA cycle 2, CR-3). The resume contract's halt-7 bullet and both SKILL.md examples name `uncommitted-fix`, `git-unreadable` and `no-gate`. The refusal-parity test derives the set from the contract's list.
+
 ## 5. Breaking Changes
 
-None. The API is stable. `no-gate` keeps its reason and route, and gains stderr lines above it. `git-unreadable` is a new refusal on a path that used to fall through. A caller reading the exit code sees 1 for both, as for every refusal.
+None for a caller reading exit codes. `no-gate` keeps its reason and exit 1, and gains stderr lines above it. Its route changed: back to the operator, never step 7, where it was the ordinary restore at step 7. `git-unreadable` is a new refusal on a path that used to fall through (exit 1). A cwd that is not the repository root of `<doc-dir>` is now a usage error (exit 2) where it used to be measured from the wrong directory. Every documented call site runs the script from the repository root, so none is affected.
 
 ## 6. Implementation Plan
 
@@ -112,50 +125,53 @@ None. The API is stable. `no-gate` keeps its reason and route, and gains stderr 
 
 - **Risk:** Low
 - **Files:** `shared/resources/reenter-qa-after-finalise.test.sh`, `evals/shared/tests/qa-loop-lock-fields-parity.test.mjs`
-- [ ] For each of the three `no-gate` causes (no gate file; an unnumbered gate file; two gate files claiming one cycle), the refusal exits 1, reads `refused (no-gate)`, and its stderr contains `qa-cycle.sh`'s reason fragment for that cause. Write the fragments from the measured messages at `qa-cycle.sh:100`, `:102` and `:125`.
-- [ ] A `git` that fails on `status` (a PATH stub, the same technique as the suite's failed-write case with its `jq` stub) gives `refused (git-unreadable)`, exit 1, no lock written and no snapshot consumed.
-- [ ] The parity test pins `qa_reentry` in its writer and each named reader.
-- [ ] All three go red on current code.
+- [x] For each of the three `no-gate` causes (no gate file; an unnumbered gate file; two gate files claiming one cycle), the refusal exits 1, reads `refused (no-gate)`, and its stderr contains `qa-cycle.sh`'s reason fragment for that cause. Write the fragments from the measured messages at `qa-cycle.sh:100`, `:102` and `:125`.
+- [x] A `git` that fails on `status` (a PATH stub, the same technique as the suite's failed-write case with its `jq` stub) gives `refused (git-unreadable)`, exit 1, no lock written and no snapshot consumed.
+- [x] The parity test pins `qa_reentry` in its writer and each named reader, and pins that the hooks doc names `reenter-qa-after-finalise.sh` as a writer of `qa_max_cycles`.
+- [x] All three go red on current code.
 
 ### Phase 2: The script
 
 - **Risk:** Low
 - **Files:** `shared/resources/reenter-qa-after-finalise.sh`, `shared/resources/develop-pipeline-resume-contract.md`
-- [ ] Capture both `qa-cycle.sh` calls' stderr, as the `no-snapshot` block does, and print it before `refuse no-gate`.
-- [ ] Add `|| refuse git-unreadable "…"` on the `git status` read. The branch: **condition** = `git status` exits non-zero; **outcome** = `refused (git-unreadable)`, before any write.
-- [ ] Add `git-unreadable` to the script header and to the contract's refusal list, with **Route:** back to the operator, never step 7.
-- [ ] `npm run bundle`.
+- [x] Capture both `qa-cycle.sh` calls' stderr, as the `no-snapshot` block does, and print it before `refuse no-gate`.
+- [x] Add `|| refuse git-unreadable "…"` on the `git status` read. The branch: **condition** = `git status` exits non-zero; **outcome** = `refused (git-unreadable)`, before any write.
+- [x] Add `git-unreadable` to the script header and to the contract's refusal list, with **Route:** back to the operator, never step 7.
+- [x] `npm run bundle`.
 
 ### Phase 3: The reader population
 
 - **Risk:** Low
 - **Files:** `shared/resources/develop-pipeline-hooks.md`, `shared/resources/pipeline-resume-detector-prompt.md`
-- [ ] Re-run the population command from §3 and classify every path. Record the count and the command in the PR.
-- [ ] Hooks doc line 86: name `qa_reentry`, and say `qa_max_cycles` / `qa_phase` have two writers (`grant-qa-cycles.sh` and `reenter-qa-after-finalise.sh`).
-- [ ] Detector prompt: add a `qa_reentry` line under "QA-loop fields" with its `deltas_since_pause` shape.
-- [ ] CHANGELOG `[Unreleased]` › Fixed, citing task 182. Re-run `npm run bundle`.
+- [x] Re-run the population command from §3 and classify every path. Record the count and the command in the PR.
+- [x] Hooks doc line 86: name `qa_reentry`, and state each field's writers exactly — `qa_max_cycles`: `grant-qa-cycles.sh` and `reenter-qa-after-finalise.sh`; `extra_cycles_granted`: `grant-qa-cycles.sh` only; `qa_phase`: `set-qa-phase.sh` and both re-entry scripts. The hook still reads only `current_step` and `qa_phase`.
+- [x] Detector prompt: add a `qa_reentry` line under "QA-loop fields" with its `deltas_since_pause` shape.
+- [x] CHANGELOG `[Unreleased]` › Fixed, citing task 182. Re-run `npm run bundle`.
 
 ## 7. Files Summary
 
 ### Files to Modify (Core Implementation)
 
 1. ✅ `shared/resources/reenter-qa-after-finalise.sh`: `no-gate` stderr pass-through; `git-unreadable` refusal; header
-2. ✅ `shared/resources/develop-pipeline-resume-contract.md`: `git-unreadable` in the refusal list
+2. ✅ `shared/resources/develop-pipeline-resume-contract.md`: `git-unreadable` in the refusal list; `no-gate` route; the halt-7 bullet's never-step-7 set; the grant paragraph cites the lock schema
 
 ### Files to Modify (Documentation — the reader population)
 
 3. ✅ `shared/resources/develop-pipeline-hooks.md`: line 86
 4. ✅ `shared/resources/pipeline-resume-detector-prompt.md`: QA-loop fields
+4a. ✅ `shared/resources/develop-pipeline-pause.md`: the lock schema's `qa_phase` row — the one statement of the grant's value (QA cycles 2–3)
+4b. ✅ `skills/develop-task/SKILL.md`, `skills/develop-story/SKILL.md`: the grant sentence cites the lock schema; the never-step-7 example names all three refusals (QA cycles 1–2)
 5. ✅ `CHANGELOG.md`: `[Unreleased]` › Fixed
 
 ### Files to Modify (Tests)
 
 6. ✅ `shared/resources/reenter-qa-after-finalise.test.sh`
 7. ✅ `evals/shared/tests/qa-loop-lock-fields-parity.test.mjs`
+7a. ✅ `evals/shared/tests/reenter-qa-refusals-parity.test.mjs`: `git-unreadable` must never route to step 7 (added in implementation)
 
 ### Files Regenerated
 
-8. ✅ Bundled `references/` copies of the files above. `npm run bundle` regenerates them; never hand-edit them.
+8. ✅ Bundled `references/` copies of the files above (21 copies across develop, develop-bug, develop-story, develop-task, qa-story, qa-task, review-pr — `git diff --name-only origin/develop...HEAD -- '*/references/*' | wc -l`). `npm run bundle` regenerates them; never hand-edit them.
 
 ### Files to Delete
 
@@ -181,37 +197,37 @@ None.
 
 ### Performance Tests
 
-None needed. The change adds one `mktemp` on the refusal path.
+None needed. The change adds one `mktemp`, one `sort` and one `rm` at the gate read, and the QA cycle 2 cwd usage guard adds three `git rev-parse` calls before it (every run that reaches it), and nothing else.
 
 ### Consumer Tests
 
 - The develop-task and develop-story Phase 0b re-entry is unchanged on the accept path. The suite's accept cases must stay green.
-- Run the suite under `/bin/bash` 3.2 on macOS (task.170 DoD gap 1).
+- `shared/resources/tests/security-probe.test.mjs` (task.181's shell-argv proof run) runs this script end to end under hostile directory names. It is in `npm test`; it must stay green.
+- bash 3.2 compatibility (task.170 DoD gap 1) is checked by reading the diff: no unparenthesised `case` pattern inside `$(…)`, no `mapfile`, no `${v,,}`. A macOS `/bin/bash` 3.2 run is not available on this host (Linux) or in CI (`ubuntu-latest`), and is recorded as not run, not as a criterion.
 
 ## 9. Success Criteria
 
 ### Functional
 
-- [ ] Each of the three `no-gate` causes refuses `no-gate` (exit 1). Its stderr carries `qa-cycle.sh`'s reason for that cause (Phase 2, first bullet).
-- [ ] A `git status` that exits non-zero refuses `git-unreadable` before any write. No lock is lowered and no snapshot is consumed (Phase 2, second bullet).
-- [ ] The contract's refusal list equals the script's reasons, including `git-unreadable` (`reenter-qa-refusals-parity.test.mjs`).
-- [ ] The hooks doc and the detector prompt name `qa_reentry`. The hooks doc names both writers of `qa_max_cycles`.
+- [x] Each of the three `no-gate` causes refuses `no-gate` (exit 1). Its stderr carries `qa-cycle.sh`'s reason for that cause (Phase 2, first bullet).
+- [x] A `git status` that exits non-zero refuses `git-unreadable` before any write. No lock is lowered and no snapshot is consumed (Phase 2, second bullet).
+- [x] The contract's refusal list equals the script's reasons, including `git-unreadable` (`reenter-qa-refusals-parity.test.mjs`).
+- [x] The hooks doc and the detector prompt name `qa_reentry`. The hooks doc names both writers of `qa_max_cycles`.
 
 ### Performance
 
-- [ ] No measurable change. The accept path makes no extra calls.
-- [ ] The re-entry suite's runtime stays within its current order of magnitude.
+- [x] No per-PR performance test applies. The only additions on any path that reaches the gate read, the accept path included, are one `mktemp`, one `sort` and one `rm`, plus the cwd usage guard's three `git rev-parse` calls added in QA cycle 2 (documentation criterion, checked against the diff; amended at `/finalise`, DoD AC5). The suite's runtime is recorded in the PR as information, not as a bound.
 
 ### Code Quality
 
-- [ ] ShellCheck `--severity=warning` is clean on the changed `.sh`. Prettier is clean.
-- [ ] `npm test` is green, and so is `npm run bundle:check`.
-- [ ] Each new case is mutation-proven.
+- [x] ShellCheck `--severity=warning` is clean on the changed `.sh`. Prettier is clean.
+- [x] `npm test` is green, and so is `npm run bundle:check`.
+- [x] Each new case is mutation-proven. The four assertions with no proof recorded in QA (the unnumbered-gate and two-gates `expect_refusal` cases, the writer's five-field shape, both `qa_max_cycles` writers in the hooks doc) were proven at `/finalise`: `task.182.dod.1.mutation-proofs.txt`.
 
 ### Migration
 
-- [ ] CHANGELOG `[Unreleased]` › Fixed cites task 182.
-- [ ] No consumer migration (a new refusal on a formerly fall-through path).
+- [x] CHANGELOG `[Unreleased]` › Fixed cites task 182.
+- [x] No consumer migration (a new refusal on a formerly fall-through path).
 
 ## 10. Risk Assessment
 
@@ -255,29 +271,101 @@ None.
 - **Critical:** the accept path refuses on a healthy tree.
 - **Non-critical:** a reworded stderr line. Fix this forward.
 
-## Change Log
+## Implementation Summary
 
+**Completed:** 2026-10-13 (develop-task run 1 — `task.182.implementation.1.reenter-qa-refusal-diagnostics-and-qa-reentry-population-initial-run.md`)
+
+**Approach.** `reenter-qa-after-finalise.sh` captures both `qa-cycle.sh` calls' stderr into one `mktemp` file (`2>>`), dedupes it with `sort -u`, and on a `no-gate` refusal prints it with the `⚠️  qa-cycle:` prefix rewritten to `reenter-qa:`, above the refused line — the `no-snapshot` block's pattern. The uncommitted-fix read drops its `2>/dev/null` and gains `|| refuse git-unreadable …`, so a failing `git status` refuses before any write instead of reading as a clean tree. `git-unreadable` joins the script header and the resume contract's refusal list with the route "back to the operator; **never** step 7". QA cycle 2 added a cwd usage guard: the script exits 2 unless the cwd is the root of `<doc-dir>`'s repository (both `git rev-parse --show-toplevel` values equal, and an empty `--show-prefix`). The hooks doc states each loop field's writers (`qa_max_cycles`: `grant-qa-cycles.sh` and `reenter-qa-after-finalise.sh`; `extra_cycles_granted`: `grant-qa-cycles.sh`; `qa_reentry`: `reenter-qa-after-finalise.sh`; `qa_phase`: `set-qa-phase.sh` and both re-entry scripts). The detector prompt reports `qa_reentry` with `from_step`, `reason`, `gate_head` and `report_entries`.
+
+**Population (Phase 3).** `git grep -ln -E 'qa_max_cycles|extra_cycles_granted|qa_phase|qa_reentry' -- shared/resources 'skills/*/SKILL.md' evals scripts | grep -v '/references/'` → **32** paths on 2026-10-13: 3 writers (`reenter-qa-after-finalise.sh`, `grant-qa-cycles.sh`, `set-qa-phase.sh`); 6 readers that must name `qa_reentry` (resume contract, detector prompt, pause doc, hooks doc, both develop-* SKILL.md — all now do, pinned by the parity test); 4 readers that need not (`develop-pipeline-on-stop.sh` reads only `current_step`/`qa_phase`; `develop-pipeline-step-5-6-qa-loop.md` reads `qa_max_cycles` and already names both writers; `pipeline-lock-cooperation.md` and `set-waiting-on.sh` mention `qa_phase` only); 9 test files; 10 fixtures (8 eval-replay loop-limit grants, the report-lint fixture, task.181's shell-argv setup).
+
+**Testing results.** `reenter-qa-after-finalise.test.sh`: 58 pass (53 before + 5: the three `no-gate` causes each relay `qa-cycle.sh`'s reason with the prefix rewritten and the refused line last; an unnumbered gate and two gates claiming one cycle refuse `no-gate`; a `git` stub failing only on `status` refuses `git-unreadable` with nothing written and nothing consumed). `qa-loop-lock-fields-parity.test.mjs`: new test pins `qa_reentry` in the writer and six readers (non-vacuity floor), the writer's five-field shape, the detector's four sub-fields and the hooks doc's two `qa_max_cycles` writers; `qaReentry` / `qa_re_entry` added to the misspellings. `reenter-qa-refusals-parity.test.mjs`: `git-unreadable` must route **never** to step 7, beside `uncommitted-fix`. Mutations — relay disabled (3 cause cases red), `|| refuse git-unreadable` neutralised (git-failure case red), detector `qa_reentry` line deleted (parity red). `npm run ci:fast` with the `.agents/skills` symlink moved aside: 5424 pass, 0 fail. `bundle:check` clean. ShellCheck `--severity=warning` clean on both `.sh`. No bash-3.2-rejected construct in the added lines (checked on the diff; no macOS host). Suite runtime 4.5 s at load 2.34 (information, not a bound).
+
+**Deferred work.** One item. QA cycle 2's CR-6: the Phase 0b option label "Resume at 5a with {k} more cycles" (both SKILL.md, `develop-pipeline-resume-contract.md:607`, `develop-pipeline-step-5-6-qa-loop.md:1947/1970`, `grant-qa-cycles.sh:6`) contradicts a not-converging grant that re-enters at `5b`. The label predates this task (task.123) and is pinned by the eval replay fixtures `evals/develop-{task,story}/step-isolation/12-qa-reentry-after-loop-limit-with-grant/` and by `qa-loop-lock-fields-parity.test.mjs`, so relabelling it is a change to recorded eval answers, out of this task's scope — a follow-up task. A macOS `/bin/bash` 3.2 run was not available (Linux host, `ubuntu-latest` CI).
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-13
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.182.qa.4.reenter-qa-refusal-diagnostics-and-qa-reentry-population.md](./task.182.qa.4.reenter-qa-refusal-diagnostics-and-qa-reentry-population.md)
+- **Gate File**: [task.182.gate.4.reenter-qa-refusal-diagnostics-and-qa-reentry-population.yml](./task.182.gate.4.reenter-qa-refusal-diagnostics-and-qa-reentry-population.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: re-entry suite 61/61; parity tests 12/12; security probe 8 executed, 0 reproduced (gate 3 record; script unchanged)
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+- Four QA cycles; [task.182.bug.1](./task.182.bug.1.hooks-doc-qa-phase-writer-claim.md) and [task.182.bug.2](./task.182.bug.2.consolidated-qa-phase-rule-restated.md) closed.
+- Diminishing-returns exit at cycle 4: TASK-182-005 (LOW, test machinery) carried to the gate's `recommendations.future` — see Deferred Work.
+
+## Deferred Work
+
+- **TASK-182-005** (LOW) — carried to gate 4 `recommendations.future` (route 2, cycle 4): the one-statement guard's `VALUE_CLAIM` and its `git grep` population are case-sensitive and narrowly worded, so a sentence-initial "The grant writes", a singular "re-entry writer", an unbackticked value or another verb passes it.
+- **Option label** (QA cycle 2 CR-6 / cycle 4 CR-1, advisory) — "Resume at 5a with {k} more cycles" names a phase a not-converging grant does not write. Pre-existing (task.123) and pinned by eval replay fixtures; a follow-up task.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.182.qa.4.reenter-qa-refusal-diagnostics-and-qa-reentry-population.md`
+**Gate File**: `task.182.gate.4.reenter-qa-refusal-diagnostics-and-qa-reentry-population.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (4 cycles; diminishing-returns exit, TASK-182-005 carried to Deferred Work)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 10/10 — AC5's performance text amended to name the cwd guard's `git rev-parse` calls; AC8's four unrecorded mutation proofs run at `/finalise`
+✅ **Tests:** re-entry suite 61/61, parity tests, all in `npm test` per PR
+✅ **PR Review:** PR #642 — Step 5c `/review-pr` CONCERNS, doc-only findings fixed
+✅ **Documentation:** CHANGELOG `[Unreleased]` › Fixed (task 182); contract, hooks doc, detector prompt, pause reference, both SKILL.md
+✅ **Security Review:** PASS — boundary probed, 8 executed, 0 reproduced
+✅ **Compliance Review:** NOT_APPLICABLE — internal developer tooling
+
+**Task marked as ACCEPTED on:** 2026-10-13
+
+**Detailed Verification Log:** See `task.182.dod.1.reenter-qa-refusal-diagnostics-and-qa-reentry-population.md` for complete verification evidence and timestamps.
 <!-- change-log-start -->
+## Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-10-04 | 1.0 | Initial draft — from task.170 PR review 2 (CR-1, CR-2, CR-3) | create-task |
-
+| 2026-10-13 | 1.1 | Review passed (8/10) — hooks-doc writer list corrected per field, performance criteria restated (accept path gains mktemp/sort/rm), macOS run descoped, detector shape aligned, contract anchor fixed | review-task |
+| 2026-10-13 |  | Status → ready-for-development | review-task |
+| 2026-10-13 |  | Implemented — 9 source files (+16 bundled copies), 7 new test cases; status → ready-for-review | develop |
+| 2026-10-13 |  | QA gate CONCERNS (90/100) — 2 findings (1 medium, 1 low) | qa-task |
+| 2026-10-13 |  | QA findings fixed — TASK-182-001, TASK-182-002 + advisory CR-3, CR-4 and one probe sibling; 1 iteration | qa-fix |
+| 2026-10-13 |  | QA gate CONCERNS (90/100) — 1 finding (medium) + 6 advisory | qa-task |
+| 2026-10-13 |  | QA findings fixed — TASK-182-003 by consolidating the qa_phase writer rule; advisory CR-2, CR-3, CR-4, CR-5, CR-7 fixed; CR-6 deferred; 2 iterations | qa-fix |
+| 2026-10-13 |  | QA gate CONCERNS (90/100) — 1 finding (medium) + 1 deferred | qa-task |
+| 2026-10-13 |  | QA findings fixed — TASK-182-004 by scoping the claim to the grant's value; guard population derived; 3 iterations | qa-fix |
+| 2026-10-13 |  | QA gate PASS (100/100) — 1 LOW carried by the diminishing-returns exit (route 2) | qa-task |
+| 2026-10-13 |  | PR review 1 CONCERNS — scope amendment recorded (no-gate route, cwd guard, one-statement qa_phase rule, never-step-7 set); Target Architecture, Breaking Changes and Files Summary corrected | develop-task |
+| 2026-10-13 | 1.2 | DoD passed — accepted (PR #642) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
 
 ### Phase 1: Tests first (red)
 
-- [ ] No-gate cause cases, the git-failure case and the parity rows written, and red
+- [x] No-gate cause cases, the git-failure case and the parity rows written, and red
 
 ### Phase 2: The script
 
-- [ ] Stderr pass-through, `git-unreadable`, contract line, bundle
+- [x] Stderr pass-through, `git-unreadable`, contract line, bundle
 
 ### Phase 3: The reader population
 
-- [ ] Population measured and classified; hooks doc, detector prompt, CHANGELOG
+- [x] Population measured and classified; hooks doc, detector prompt, CHANGELOG
 
 ## References
 

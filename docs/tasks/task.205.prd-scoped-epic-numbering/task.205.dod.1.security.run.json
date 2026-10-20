@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "filename",
+      "entry": "fence:skills/create-epics-from-shards/SKILL.md#Step 7: Quality Validation",
+      "name": "shards-step7-batch-check",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 8,
+      "passed": 8,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": [
+        "bash"
+      ],
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": "{PRD dir}\"\nE0=\"{E0}\"; COUNT=\"{count}",
+      "fixture_setup": null,
+      "ran_at": "2026-10-15T14:15:16.101Z"
+    },
+    {
+      "sink": "filename",
+      "entry": "fence:skills/create-epic/SKILL.md#Discover Parent PRD",
+      "name": "create-epic-discover-parent-prd",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 16,
+      "passed": 16,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": [
+        "bash"
+      ],
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": ": \"${DOMAIN:?bind DOMAIN to the domain directory of the epic}\"",
+      "fixture_setup": null,
+      "ran_at": "2026-10-15T14:14:37.917Z"
+    },
+    {
+      "sink": null,
+      "entry": "fence:skills/review-epic/SKILL.md#Input Resolution",
+      "name": "review-epic-input-resolution",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 10,
+      "passed": 10,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": [
+        "bash"
+      ],
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": "$INPUT",
+      "fixture_setup": null,
+      "ran_at": "2026-10-15T14:15:08.840Z"
+    }
+  ],
+  "totals": {
+    "executed": 34,
+    "reproduced": 0
+  },
+  "updated_at": "2026-10-15T14:15:16.101Z"
+}

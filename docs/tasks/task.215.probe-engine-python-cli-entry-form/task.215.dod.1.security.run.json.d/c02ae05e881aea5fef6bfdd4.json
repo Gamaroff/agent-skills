@@ -1,0 +1,57 @@
+{
+  "sink": "url-authority",
+  "entry": "cli:shared/resources/tests/fixtures/security-probe/cli-shutdown-flush-crash.py",
+  "name": "py-cli: exit 120 shutdown flush failure is errored",
+  "call_site": null,
+  "verdict": "unverifiable",
+  "reason": "no-hostile-evidence",
+  "executed": 3,
+  "passed": 3,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 5,
+  "declined_cases": [
+    {
+      "id": "py-cli.hostile-userinfo",
+      "reason": "case-errored",
+      "detail": "the CLI answered, then python3 failed at shutdown (exit 120, a failed flush of stdout or stderr) — could not tell an answer from a crash"
+    },
+    {
+      "id": "py-cli.hostile-userinfo-port",
+      "reason": "case-errored",
+      "detail": "the CLI answered, then python3 failed at shutdown (exit 120, a failed flush of stdout or stderr) — could not tell an answer from a crash"
+    },
+    {
+      "id": "py-cli.hostile-path-at",
+      "reason": "case-errored",
+      "detail": "the CLI answered, then python3 failed at shutdown (exit 120, a failed flush of stdout or stderr) — could not tell an answer from a crash"
+    },
+    {
+      "id": "py-cli.hostile-fragment-at",
+      "reason": "case-errored",
+      "detail": "the CLI answered, then python3 failed at shutdown (exit 120, a failed flush of stdout or stderr) — could not tell an answer from a crash"
+    },
+    {
+      "id": "py-cli.hostile-homoglyph",
+      "reason": "case-errored",
+      "detail": "the CLI answered, then python3 failed at shutdown (exit 120, a failed flush of stdout or stderr) — could not tell an answer from a crash"
+    }
+  ],
+  "escaped": 0,
+  "shells": null,
+  "interpreter": {
+    "name": "python3",
+    "version": "Python 3.14.8"
+  },
+  "fake_gh": null,
+  "argv": [
+    "--mode",
+    "strict",
+    "--host",
+    "{input}"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-10-19T14:23:28.848Z"
+}

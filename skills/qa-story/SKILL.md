@@ -27,6 +27,14 @@ When invoked from the `/develop-story` orchestrator, the call may be prefixed wi
 
 If invoked outside the pipeline (no lite directive), the normal Adaptive Review Strategy applies.
 
+**Waiver directive (task.201).** When a pipeline step was skipped with `--skip`, the `/develop-story`
+orchestrator also prefixes a waiver directive naming the skip and its approver. Decide the gate as
+usual; if the decision would be `PASS` or `CONCERNS`, write `gate: WAIVED` with the `waiver:` block
+(`active: true`, the directive's `reason`, its `approved_by`) and keep `top_issues[]` as found. A `FAIL`
+stays `FAIL`. The orchestrator checks the gate afterwards and re-invokes this skill if a skipped step's
+gate reads `PASS`. Directive text: `references/develop-pipeline-lite-mode.md` §"Directive Passed to the
+QA Skill".
+
 ## When to Use This Skill
 
 - **Story Review**: When developer marks story as "Review" or "Ready for QA"
@@ -50,8 +58,8 @@ If invoked outside the pipeline (no lite directive), the normal Adaptive Review 
 
 You can invoke this skill with either:
 
-- **A specific story file**: `story.178.8.example-feature.md`
-- **A story directory**: `stories/story.178.8.example-feature/`
+- **A specific story file**: `story.1.178.8.example-feature.md`
+- **A story directory**: `stories/story.1.178.8.example-feature/`
 
 **Important**: Requires active PR for current branch. Review will halt if no PR found. See Prerequisites section.
 
@@ -86,28 +94,28 @@ Set `CODE_REVIEW_BLOCKING_ARG` from the `code_review_blocking=` token in `args` 
 When given a directory path:
 
 1. List all files in the directory
-2. Find the story file by pattern: `story.{epic}.{story}.{name}.md`
+2. Find the story file by pattern: `story.{P}.{E}.{S}.{name}.md`
 3. Exclude files containing: `.qa.`, `.gate.`, or `.bug.`
 4. If multiple story files found, use the one matching the directory name
 5. If no story file found, HALT and ask user for the correct path
 
-When given only a story ID (e.g., `story.336.1`) with no path, locate the story directory using the nested pattern: `${PRD_ROOT}/**/epics/*/stories/story.{epic}.{story}.*`
+When given only a story ID (e.g., `story.1.336.1`) with no path, locate the story directory using the nested pattern: `${PRD_ROOT}/**/epics/*/stories/story.{P}.{E}.{S}.*`
 
 **QA Artifacts Creation:**
 
 When creating QA reports and gate files, they will be placed in the same directory as the story file with the appropriate naming:
 
-- QA Report: `story.{epic}.{story}.qa.{number}.{descriptive-name}.md`
-- Gate File: `story.{epic}.{story}.gate.{number}.{descriptive-name}.yml`
-- Bug Reports: `story.{epic}.{story}.bug.{number}.{description}.md`
+- QA Report: `story.{P}.{E}.{S}.qa.{number}.{descriptive-name}.md`
+- Gate File: `story.{P}.{E}.{S}.gate.{number}.{descriptive-name}.yml`
+- Bug Reports: `story.{P}.{E}.{S}.bug.{number}.{description}.md`
 
 **Example:**
 
 ```
-Input: stories/story.178.8.example-feature/
-Discovers: story.178.8.example-feature.md
-Creates: story.178.8.qa.1.initial-review.md
-Creates: story.178.8.gate.1.initial-review.yml
+Input: stories/story.1.178.8.example-feature/
+Discovers: story.1.178.8.example-feature.md
+Creates: story.1.178.8.qa.1.initial-review.md
+Creates: story.1.178.8.gate.1.initial-review.yml
 ```
 
 ---
@@ -324,7 +332,7 @@ When performing a re-review (QA #2, #3, etc.), include this section at the top o
 ```markdown
 ## Re-Review Context
 
-**Previous QA Review**: [story.{epic}.{story}.qa.{prev_num}.{name}.md]
+**Previous QA Review**: [story.{P}.{E}.{S}.qa.{prev_num}.{name}.md]
 **Previous Gate**: {PASS/CONCERNS/FAIL} (Quality Score: {score}/100)
 **Previous Issues**: {count} ({high} HIGH, {medium} MEDIUM, {low} LOW)
 
@@ -364,6 +372,29 @@ Re-review scope: unscoped — prior gate carries no head: (schema 1)
 Naming the scope is what makes a quiet cycle auditable. Without it, "we found nothing" and "we did
 not look" are the same sentence.
 
+### Close or reopen the bug reports this re-review verified
+
+Re-reviews only. For each co-located bug report still at **Ready for QA**, act on the row the
+Re-Review Context gives its finding: `✅ FIXED` → close it; `⚠️ PARTIAL` or `❌ NOT FIXED` →
+reopen it. One call per bug sets the status wherever the report carries it (frontmatter
+`status:`, the `**Status**` header line, or both) and appends the Status History row, in one
+write:
+
+```bash
+command node .agents/skills/qa-story/references/status-history.js --file "{bug-file}" --set-status \
+  --status "{closed or reopened}" --date "$(date -u +%Y-%m-%d)" --changed-by qa-story \
+  --notes "{Verified or Not fixed} by {this cycle's QA report filename}" --json
+```
+
+Read `reason`: `updated` is done. `no-status-field` (exit 1) means the report carries neither
+field, so nothing was written; name it in the QA report. `usage` (exit 2) means the call is wrong.
+Stage each bug report with the gate and QA report, so the cycle's commit carries it.
+
+The bug lifecycle has QA move a fixed bug from Ready for QA to Closed or Reopened, and until this
+step nothing did: task.180 ended with five bug reports at Ready for QA whose fixes later gates had
+verified, found only by the PR review (obs #21). A bug left at Ready for QA after the gate that
+verified it reads as open to every later reader.
+
 ### Example Re-Review Scenarios
 
 **Scenario 1: Clean PASS → Skip**
@@ -384,7 +415,7 @@ gate: PASS
 top_issues:
   - issue: "Task 2 checkboxes not marked"
     severity: medium
-    file: "docs/stories/story.1.3.auth/story.1.3.auth.md"
+    file: "docs/stories/story.1.1.3.auth/story.1.1.3.auth.md"
 ```
 
 Action: Perform re-review to check if checkboxes are now marked.
@@ -475,7 +506,7 @@ Perform a comprehensive test architecture review with quality assessment. This a
 **CRITICAL**: Before starting the review, check if QA artifacts already exist.
 
 1. **Search for existing gate files:**
-   - Look for `story.{epic}.{story}.gate.*.yml` files in story directory
+   - Look for `story.{P}.{E}.{S}.gate.*.yml` files in story directory
    - If found, read the latest gate file (most recent by timestamp)
 
 2. **Analyze latest gate file:**
@@ -570,12 +601,12 @@ Perform a comprehensive test architecture review with quality assessment. This a
 
 Before running independent NFR and risk analysis, check the story directory for pre-existing qa-planning files:
 
-1. **Glob for risk assessments**: `story.{epic}.{story}.risk.*.md` in the story directory
+1. **Glob for risk assessments**: `story.{P}.{E}.{S}.risk.*.md` in the story directory
    - If found: load as baseline risk profile
    - Validate whether implementation mitigated the pre-identified risks rather than re-deriving them from scratch
    - Log: "Found qa-planning risk assessment — using as baseline"
 
-2. **Glob for test design documents**: `story.{epic}.{story}.test-design.*.md` in the story directory
+2. **Glob for test design documents**: `story.{P}.{E}.{S}.test-design.*.md` in the story directory
    - If found: use the pre-defined test scenarios as the traceability baseline
    - Flag which P0/P1 scenarios are covered vs missing in the implementation
    - Log: "Found qa-planning test design — using as traceability baseline"
@@ -1098,17 +1129,26 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
 {findings-json}
 JSON
    # --rev HEAD: the diff under review is $BASE...HEAD, so uncommitted edits are not what was reviewed.
-   command node .agents/skills/qa-story/references/finding-anchors.js \
+   # Decide on the checker's `reason`, never on its exit code: `node` also exits 1 when the script
+   # cannot load, and that must not read as "malformed anchors — mark and continue" (task.195).
+   CHECK_OUT=$(command node .agents/skills/qa-story/references/finding-anchors.js \
      --findings-file "$FINDINGS_JSON" --root "$(git rev-parse --show-toplevel)" \
-     --rev HEAD --annotate "$FINDINGS_JSON" --json
-   # exit 1 = malformed anchors exist. NOT a halt: every finding now carries anchor_check — mark, continue.
-   # exit 2 = the call is wrong: usage (the findings file), bad-root (--root is not a directory), or bad-rev
-   #   (--rev names no commit here — fetch it).
-   #   Fix the call; never treat unchecked anchors as verified.
+     --rev HEAD --annotate "$FINDINGS_JSON" --json)
+   REASON=$(printf '%s' "$CHECK_OUT" | jq -r '.reason // empty' 2>/dev/null)
+   case "$REASON" in
+     ok|malformed-anchors)   # every finding now carries anchor_check — mark the malformed ones, continue
+       echo "finding-anchors: $REASON" ;;
+     bad-root|bad-rev|usage) # the call is wrong (the findings file, --root, or an unfetched --rev)
+       echo "HALT: finding-anchors refused the call ($REASON): $(printf '%s' "$CHECK_OUT" | jq -r '.message // empty')"
+       echo "  Fix the call; never treat unchecked anchors as verified."; exit 1 ;;
+     *)                      # no JSON reason at all: the checker did not run
+       echo "HALT: finding-anchors checker not runnable (no JSON reason) — check .agents/skills/qa-story/references/finding-anchors.js; never treat unchecked anchors as verified"; exit 1 ;;
+   esac
    ```
 
    Every finding now carries `anchor_check`. `ok`, `unchecked-text` and `no-line` are clean;
-   `no-such-file`, `out-of-range` and `text-mismatch` mean the reviewer named a line that is not the
+   `no-such-file`, `out-of-range`, `text-mismatch` and `unparseable` (a code finding whose `file_line` is absent or is not
+   `path:line`) mean the reviewer named a line that is not the
    one it meant. **A malformed anchor is never dropped**: it renders in `## Code Review` with
    `⚠️ unverified anchor` (item 5), and item 6 never maps it to `top_issues[]` with a location it
    does not have. The checker reports and never repairs — guessing the intended line would hide the
@@ -1122,8 +1162,8 @@ JSON
    do not restate them here. **Runnable prose is in scope:** a fenced bash block in a `SKILL.md` or a
    `shared/resources/*.md` that clears, refuses or HALTs on repository state is a boundary under that
    Step 1b's repo-state signal, exactly as a script would be. When no engine form reaches it, record
-   `boundary: true` and the zero-guard finding naming the remedy (an extracted script, or task.181's
-   `shell-argv:`), never `boundary: false`. QA recorded `false` on task.173's 5c classify block for
+   `boundary: true` and the zero-guard finding naming the remedy (an extracted script the
+   `shell:` or `shell-argv:` form reaches), never `boundary: false`. QA recorded `false` on task.173's 5c classify block for
    seven cycles, and `/finalise` then raised the same boundary as a DoD gap (obs #298). When the rule fires, the probe engine is the harness — **run it**:
    `node references/security-probe.mjs --sink <sink> --entry '<path>#<export>' --repo-root "$(git rev-parse --show-toplevel)" --record <work-item-dir>/<stem>.qa.<N>.security.run.json --json`
    — or, for a **shell-script** boundary (one positional argument; a script whose header says it
@@ -1135,12 +1175,24 @@ JSON
    `references/probe-boundary-rule.md` §5) takes the shell-fn form instead:
    `--entry 'shell-fn:<path>#<function>' --sink filename --cases-file <cases.json>`, plus
    `--fake-gh <dir>` when the function's body names `gh` — running `shell:` against a library is
-   the task.125 result: sourced, never called, `absent` behind a full count. A **Node CLI** whose
-   decision sits behind its flags (task.141: `uat-status.mjs --env`) takes the cli form:
+   the task.125 result: sourced, never called, `absent` behind a full count. A **Node CLI** — or a
+   **Python CLI** (`.py`, run under `python3`) — whose decision sits behind its flags (task.141:
+   `uat-status.mjs --env`) takes the cli form:
    `--entry 'cli:<path>' --argv '["--flag","{input}"]' --cases-file <cases.json>` — the
    template's one `"{input}"` element is each case, exit status is the verdict, a crash is
    `errored`, and each guarded flag is its own control, named with `--name`; "it takes several flags" is never a reason
-   to record `boundary: false`.
+   to record `boundary: false`. A **shell script that takes several arguments or flags** (task.170:
+   `reenter-qa-after-finalise.sh <doc-dir> <report>`) takes the shell-argv form:
+   `--entry 'shell-argv:<path>' --argv '["{input}","<second-argument>"]' --cases-file <cases.json>`,
+   plus `--fixture-setup <setup.sh>` when it reads a repository — the cli form's template and verdict,
+   bash as the interpreter, and a setup that fails is `errored`, never a refusal. A **fenced bash block in a step doc** (a guard shipped as Markdown —
+   task.167's fast-gate precondition) takes the fence form:
+   `--entry 'fence:<doc.md>#<heading>' --slot '<placeholder>' --cases-file <cases.json>` — the block
+   under the heading runs with each case's input in place of the placeholder, each case's
+   `fixture: {env, files}` supplies what else it reads, and every hostile case carries `expected` with the
+   guard's own refusal output (a non-empty stdout or stderr) — or is declined (scoring order:
+   `scoreFenceRun`); "it is prose,
+   not a script" is never a reason to record `boundary: false`.
    A predicate the engine cannot import because it is **not exported** — a module-private `const` —
    takes the same answer: export it (one word) and probe it. "It is not exported" is never a reason to
    record `boundary: false`; the engine's `entry-not-probeable` detail names the remedy. On task.139
@@ -1154,7 +1206,15 @@ JSON
    `finding` naming the input verbatim). Record the total executed as **`probes_executed: N`**
    beside the block, **copied from the run record's `totals.executed`** (the file `--record`
    wrote — equal to `executed` in the engine's JSON), never counted by hand; the gate's
-   `nfr_validation.security.evidence` may read `measured` only when that total is positive. An empty
+   `nfr_validation.security.evidence` may read `measured` only when that total is positive.
+   **An escape is a finding, whatever the verdict.** Copy the run record's `totals.escaped` beside
+   it as **`escaped: N`**. A non-zero count is a gate finding in `top_issues[]`, never a
+   `recommendations.future` item, even when every case scored as its direction requires: the
+   probe saw the entry point write outside its sandbox, which is a defect in the shipped code
+   (`file_line` = the entry point, `finding` naming each escaping case id and the path it wrote).
+   `/finalise` Step 3b.1 reads the same record and halts on the same count, so a gate that passes
+   over it only moves the finding to the DoD (obs #73).
+   An empty
    findings list with `probes_executed: 0` is a review that read the boundary and did not test it,
    which is the defect this item closes. So when `boundary: true` and the run record's
    `totals.executed` is 0, that is a QA finding, not a `reasoned` pass: name the remedy in it — make
@@ -1226,7 +1286,7 @@ JSON
    else CR_BLOCKING=false; fi
    ```
 
-   `$CODE_REVIEW_BLOCKING_ARG` comes from the `code_review_blocking=` token in Skill `args` (see **Input Handling**). When `CR_BLOCKING=true`, append each `category: bug` + `confidence: high` finding to the gate `top_issues[]` as `{ id, severity, file, finding, suggested_action, suggested_owner: dev }` — `file` is the path from the finding's own `file:line`, which every code-review finding already carries; the existing **Gate Decision Criteria** then apply unchanged. **A finding whose `anchor_check` is `no-such-file`, `out-of-range` or `text-mismatch` still maps when it qualifies** — a high-confidence bug is still a bug — but its `finding` gains `(location unverified: {file_line})`, and its `file` is `null` when the verdict is `no-such-file`, so `/qa-fix` is never sent to a line as though it were verified. Otherwise — resolved advisory, or every cleanup or non-high-confidence finding — the gate is **unaffected**.
+   `$CODE_REVIEW_BLOCKING_ARG` comes from the `code_review_blocking=` token in Skill `args` (see **Input Handling**). When `CR_BLOCKING=true`, append each `category: bug` + `confidence: high` finding to the gate `top_issues[]` as `{ id, severity, file, finding, suggested_action, suggested_owner: dev }` — `file` is the path from the finding's own `file:line`, which every code-review finding already carries; the existing **Gate Decision Criteria** then apply unchanged. **A finding whose `anchor_check` is `no-such-file`, `out-of-range`, `text-mismatch` or `unparseable` still maps when it qualifies** — a high-confidence bug is still a bug — but its `finding` gains `(location unverified: {file_line})`, and its `file` is `null` when the verdict is `no-such-file` or `unparseable` (neither names a usable path), so `/qa-fix` is never sent to a line as though it were verified. Otherwise — resolved advisory, or every cleanup or non-high-confidence finding — the gate is **unaffected**.
 
    **Re-rating a promoted finding.** QA may lower a promoted finding's severity only with a measured
    plausibility check: a corpus count, and whether any writer or template in the repository can
@@ -1259,12 +1319,31 @@ the QA report's Review Methodology and move on.
 When it does fire, run the engine over each changed in-scope file:
 
 ```bash
-node references/qa-execute-snippets.mjs --file "$SKILL_FILE" --json
+# From the repository root, once per changed in-scope file ({changed-file}). BASE is the PR's base
+# branch, re-bound here because a fenced block is its own shell; the MERGE BASE is what --diff-base
+# takes, or the base branch's later edits count as this change's. --copy-as seeds the bundled helpers.
+BASE="origin/$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo develop)"
+command node .agents/skills/qa-story/references/qa-execute-snippets.mjs --file "{changed-file}" \
+  --diff-base "$(git merge-base "$BASE" HEAD)" --copy-as .agents:.agents --json
 ```
 
-Bind any caller values the documented snippets expect with repeated `--bind NAME=VALUE`, and seed the
-temp working directory from a real directory with `--copy <dir>` so the blocks see real data. Execution
-always happens in that temp copy — never the live tree.
+`--diff-base` marks the blocks the change touched and reports them **apart** (`changed` in the JSON).
+Report the `changed` counts **first**: they are what the change is judged on. A
+`changed-blocks-not-executed` finding is a statement about the change, not the file — every block the
+change touched was skipped — and it is reported beside the file-level records, never instead of them.
+
+Fill each `{NAME}` / `<NAME>` template slot the work item supplies with a repeated `--slot NAME=VALUE`
+(`--slot task-directory=docs/tasks/task.12.x`); a slot is text, and `--bind` cannot fill one. Bind
+the shell variables the snippets read with repeated `--bind NAME=VALUE`, and seed the temp working
+directory from a real directory with `--copy <dir>` so the blocks see real data. Execution always
+happens in that temp copy — never the live tree.
+
+A block that calls a bundled helper (`bash .agents/skills/<skill>/references/x.sh`,
+`source …/x.sh || exit 1`) runs only when that helper is in the copy and its own text would run — the
+rule is `references/qa-runnable-prose-detection.md` §2aa. `--copy-as .agents:.agents` seeds the
+helpers. **Where `.agents/skills` is a symlink** (this repository's own checkout), that copies the
+link and every helper is refused: pass `--copy-as skills:.agents/skills` instead. Drop the flag when
+the change set calls no helper.
 
 `--copy <dir>` places the directory's **contents** at the temp root. When a block addresses a path —
 `find docs/tasks …` in the `sync-github-*` discovery blocks — seed it at that path instead with
@@ -1275,7 +1354,9 @@ finding (obs #143).
 
 Record in the QA report:
 
-1. **Counts** — blocks found, and how many classified `runnable` / `placeholder` / `mutating`.
+1. **Counts** — **the `changed` counts first** (changed blocks, and how many executed / `runnable` /
+   `placeholder` / `mutating`), then blocks found, and how many classified `runnable` /
+   `placeholder` / `mutating`.
 2. **Every skipped block, with its line number and reason.** A silent skip recreates the failure this
    phase exists to prevent.
 3. **Shells used** — note `zsh-unavailable` when the host has no zsh.
@@ -1287,7 +1368,7 @@ Record in the QA report:
 > apart for you.** Report whichever it emits; do not suppress either.
 >
 > - **`zero-blocks-executed`** (finding, `medium`) — `placeholder > 0`: the run was under-configured,
->   and `--bind` / `--copy` is the fix.
+>   and `--slot` / `--bind` / `--copy` is the fix — the detail names which.
 > - **`no-executable-blocks`** (information, in `notes[]`, exit `0`) — `placeholder === 0` and every
 >   block refused as `mutating`: the file documents side-effecting commands that are deny-listed by
 >   design, so **no configuration will ever make them runnable**. Still recorded, with a per-reason
@@ -1493,7 +1574,7 @@ You are **AUTHORIZED** to update the following sections in story/task files:
 
 **QA Report Location and Naming:**
 
-- **Stories**: `story.[epic].[story].qa.[number].[descriptive-name].md`
+- **Stories**: `story.[P].[E].[S].qa.[number].[descriptive-name].md`
 - **Tasks**: `task.[number].qa.[number].[descriptive-name].md`
 - **MUST co-locate with the story/task file in the same directory**
 
@@ -1503,18 +1584,18 @@ Each story has its own subdirectory containing all related files:
 
 ```
 stories/
-└── story.{epic}.{story}.{story-name}/
-    ├── story.{epic}.{story}.{story-name}.md           # Story file
-    ├── story.{epic}.{story}.qa.{number}.{descriptive-name}.md  # QA report
-    ├── story.{epic}.{story}.gate.{number}.{descriptive-name}.yml # Gate file
-    ├── story.{epic}.{story}.bug.1.{description}.md    # Bug report 1
-    ├── story.{epic}.{story}.bug.2.{description}.md    # Bug report 2
+└── story.{P}.{E}.{S}.{story-name}/
+    ├── story.{P}.{E}.{S}.{story-name}.md           # Story file
+    ├── story.{P}.{E}.{S}.qa.{number}.{descriptive-name}.md  # QA report
+    ├── story.{P}.{E}.{S}.gate.{number}.{descriptive-name}.yml # Gate file
+    ├── story.{P}.{E}.{S}.bug.1.{description}.md    # Bug report 1
+    ├── story.{P}.{E}.{S}.bug.2.{description}.md    # Bug report 2
     └── ...
 ```
 
 **Naming Convention:**
 
-- All files in a story directory share the same base: `story.{epic}.{story}`
+- All files in a story directory share the same base: `story.{P}.{E}.{S}`
 - File type is indicated by the segment after the story ID: `.qa.`, `.gate.`, `.bug.{number}.`
 - QA reports and Gates include a sequential number: `.qa.1.`, `.gate.1.`, etc.
 - Bug reports include a sequential number: `.bug.1.`, `.bug.2.`, etc.
@@ -1522,19 +1603,19 @@ stories/
 
 **Examples:**
 
-- Story directory: `docs/prd/domain-name/module-name/example-area/epics/epic.178.feature-ui/stories/story.178.8.example-feature/`
-- Story file: `story.178.8.example-feature.md`
-- QA report: `story.178.8.qa.1.example-feature.md`
-- Gate file: `story.178.8.gate.1.example-feature.yml`
-- Bug report: `story.178.8.bug.1.android-swipe-jank.md`
+- Story directory: `docs/prd/domain-name/prd.1.example-area/epics/epic.1.178.feature-ui/stories/story.1.178.8.example-feature/`
+- Story file: `story.1.178.8.example-feature.md`
+- QA report: `story.1.178.8.qa.1.example-feature.md`
+- Gate file: `story.1.178.8.gate.1.example-feature.yml`
+- Bug report: `story.1.178.8.bug.1.android-swipe-jank.md`
 
 **QA Report Structure:**
 
 ````markdown
-# QA Report: Story [epic].[story] - [Story Title]
+# QA Report: Story [P].[E].[S] - [Story Title]
 
 **Epic**: [Epic Name]
-**Story**: [epic].[story] - [Story Title]
+**Story**: [P].[E].[S] - [Story Title]
 **QA Engineer**: QA Engineer
 **Testing Completed**: [Date]
 **Status**: PASS/CONCERNS/FAIL
@@ -1724,8 +1805,8 @@ Re-enumerated {the boundary's inputs, named} and tested each against the current
 
 ---
 
-**QA Report Reference**: `story.[epic].[story].qa.[number].[descriptive-name].md` (co-located)
-**Gate File**: `story.[epic].[story].gate.[number].[descriptive-name].yml` (co-located)
+**QA Report Reference**: `story.[P].[E].[S].qa.[number].[descriptive-name].md` (co-located)
+**Gate File**: `story.[P].[E].[S].gate.[number].[descriptive-name].yml` (co-located)
 
 ````
 
@@ -1736,8 +1817,8 @@ obs #155). The engine resolves against the git index, so a sibling this run wrot
 until it is staged — stage first:
 
 ```bash
-git add "{story-directory}/story.{epic}.{story}.qa.{number}.{descriptive-name}.md"
-node .agents/skills/qa-story/references/doc-links.js --file "{story-directory}/story.{epic}.{story}.qa.{number}.{descriptive-name}.md"
+git add "{story-directory}/story.{P}.{E}.{S}.qa.{number}.{descriptive-name}.md"
+node .agents/skills/qa-story/references/doc-links.js --file "{story-directory}/story.{P}.{E}.{S}.qa.{number}.{descriptive-name}.md"
 ```
 
 Exit 1 → fix the quotation (put it in a fence, or break the `[..](..)` shape so it no longer reads
@@ -1765,11 +1846,11 @@ gate once it is written.
 **CRITICAL: Gate files MUST be co-located with story/task files (Updated 2025-12-09)**
 
 **Gate File Location and Naming:**
-- **Stories**: `story.[epic].[story].gate.[number].[descriptive-name].yml`
+- **Stories**: `story.[P].[E].[S].gate.[number].[descriptive-name].yml`
 - **Tasks**: `task.[number].gate.[number].[descriptive-name].yml`
 - **MUST co-locate with the story/task file in the same directory**
 - Examples:
-  - Story: `docs/prd/domain-name/module-name/epics/epic.1.<name>/stories/story.1.1.5.<slug>/story.1.1.5.gate.1.feature-implementation.yml`
+  - Story: `docs/prd/domain-name/prd.1.module-name/epics/epic.1.1.<name>/stories/story.1.1.5.<slug>/story.1.1.5.gate.1.feature-implementation.yml`
   - Task: `docs/tasks/task.44.transactions-account-backend-integration/task.44.gate.1.transactions-account-backend-integration.yml`
 
 **Legacy Note**: Old pattern of storing gates in `docs/qa/gates/[prd-path]/` is deprecated. All new gate files must be co-located.
@@ -1795,7 +1876,7 @@ Step 3b scope block at the next cycle and by the 5c conformance lens, while the 
 
 ```yaml
 schema: 2
-story: '{epic}.{story}'
+story: '{prd}.{epic}.{story}'
 story_title: '{story title}'
 gate: PASS|CONCERNS|FAIL|WAIVED
 status_reason: '1-2 sentence explanation of gate decision'
@@ -1834,6 +1915,7 @@ nfr_validation:
     # probes_executed rule: references/qa-gate-security-evidence.md
     evidence: measured|reasoned|unverified
     probes_executed: 0 # REQUIRED when evidence: measured; `measured` with 0 is a schema error
+    escaped: 0 # the run record's totals.escaped; non-zero is a top_issues[] finding, never PASS
     notes: 'Specific findings'
   performance:
     status: PASS|CONCERNS|FAIL
@@ -1916,8 +1998,8 @@ For each issue in `top_issues`, include a `suggested_owner`:
 
 After review:
 
-1. Create QA report file: `story.[epic].[story].qa.[number].[descriptive-name].md` (co-located with story file)
-2. Create quality gate file: `story.[epic].[story].gate.[number].[descriptive-name].yml` (co-located with story file — the directory `qa-cycle.sh` searches; a gate written elsewhere is one no later step finds, obs #194)
+1. Create QA report file: `story.[P].[E].[S].qa.[number].[descriptive-name].md` (co-located with story file)
+2. Create quality gate file: `story.[P].[E].[S].gate.[number].[descriptive-name].yml` (co-located with story file — the directory `qa-cycle.sh` searches; a gate written elsewhere is one no later step finds, obs #194)
 3. **Update Story/Task File with QA Results**:
 
    **Replace the whole `## QA Testing Results` section from the gate just written — never patch
@@ -1942,8 +2024,8 @@ After review:
 
    ### QA Report
 
-   - **Full Report**: [story.[epic].[story].qa.[number].[descriptive-name].md](./story.[epic].[story].qa.[number].[descriptive-name].md)
-   - **Gate File**: [story.[epic].[story].gate.[number].[descriptive-name].yml](./story.[epic].[story].gate.[number].[descriptive-name].yml)
+   - **Full Report**: [story.[P].[E].[S].qa.[number].[descriptive-name].md](./story.[P].[E].[S].qa.[number].[descriptive-name].md)
+   - **Gate File**: [story.[P].[E].[S].gate.[number].[descriptive-name].yml](./story.[P].[E].[S].gate.[number].[descriptive-name].yml)
 
    ### Test Coverage Summary
 
@@ -1973,9 +2055,9 @@ After review:
      if (!["replaced", "relocated", "created"].includes(r.reason)) {
        console.error(`HALT qa-results: ${r.reason}${r.detail ? ` (${r.detail})` : ""} — ${file} not written.` +
          (r.reason === "multiple" ? " Keep the copy whose Gate File link names the highest gate, delete the others by hand, re-run." :
-       r.reason === "unbounded" ? " The existing section cannot be bounded: it opens a fence that never closes, or the text a replace would remove holds a change-log marker, an H1/H2 (setext included), a Change Log heading (a fenced `# comment` counts) or, under a change log, a dated log row. The detail names the line. Fix that section by hand, re-run." :
+       r.reason === "unbounded" ? " The existing section cannot be bounded: it opens a fence that never closes, or the text a replace would remove holds a change-log marker, an H1/H2 (setext included), a Change Log heading (a fenced `# comment` counts) or, under a change log, a dated log row; or a carried Bug Reports / Deferred Work list continues past a label and a paragraph (`carried-tail:`). The detail names the line. Fix that section by hand, re-run." :
        r.reason === "bad-section" ? " The rendered section was refused; the detail names the rule. Fix the render (one section, no own Bug Reports or Deferred Work block, no trailing HTML comment), re-run." :
-       r.reason === "unplaceable" ? " The write would not read back as exactly one section (an unclosed fence near the insertion point?). Fix by hand, re-run." : ""));
+       r.reason === "unplaceable" ? " The write would not read back as exactly one section (an unclosed fence near the insertion point?), or the written section would be refused by the next write (the detail names the line: a dated row under a change log, or a carried list cut by a label and a paragraph). Fix by hand, re-run." : ""));
        process.exit(1);
      }
      fs.writeFileSync(file, r.content);
@@ -1990,7 +2072,10 @@ After review:
    (`relocated`), and **refuses** a document that already carries more than one (`multiple`) — it
    never guesses which copy is current. It also refuses a section it cannot bound (`unbounded`: an
    unclosed fence, or removed text that carries a change-log marker, an H1/H2 or a Change Log
-   heading — scanned ignoring fences, so a fenced `# comment` counts) and a write that would not read back as one section (`unplaceable`). On any
+   heading — scanned ignoring fences, so a fenced `# comment` counts — or a carried Bug Reports /
+   Deferred Work list that continues past a label and a paragraph, `carried-tail:`) and a write
+   that would not read back as one section, or whose written section the next write would refuse
+   (`unplaceable`). On any
    refusal the step halts; a hand edit is not a fallback. A `### Bug Reports`
    list (`create-bug-report`) or `### Deferred Work` block (the pipeline's loop exit) already inside the
    section is carried through the replace; the rendered section must not include either — a render
@@ -2075,14 +2160,17 @@ After review:
    (`references/tests/qa-read-back.test.mjs`). It **decides**: exit 0 is clean, exit 1 is a
    item 3e HALT with each problem and its remedy printed, and exit 2 is "could not look" (bad
    arguments, an unreadable document, a sibling engine that did not load). Exit 2 is never a pass. It
-   checks four things:
+   checks five things:
 
    1. **The claims exist.** This cycle's gate and QA report are in the work item's directory, the
       document links **those two files** — not an earlier cycle's (task.158) — and it has a Change
       Log row. An absent one halts, named.
    2. **What this run wrote is staged.** The link check reads the index, so the script stages the
       document, gate and report, plus every linked target that is **`untracked`** and a regular file
-      under the work item's own directory. A `git add` that fails halts. An untracked target elsewhere
+      under the work item's own directory. A `git add` that fails on a held `.git/index.lock` is
+      retried at 200, 400 and 800 ms, once per run — after one path outlasts the retries, later
+      paths try once — and `--json` reports `stageAttempts`; any other failure, or a lock that
+      outlasts the retries, halts. An untracked target elsewhere
       is left alone and reported, so unrelated work never rides into the QA commit.
    3. **Every link resolves against the index.** It uses `doc-links.js`, where **`missing`** means
       never written, or a case-mismatched name that only a case-insensitive disk found. **`ignored`**
@@ -2090,6 +2178,13 @@ After review:
       halt.
    4. **`updated:` accounts for the newest row** (`change-log.js` `checkUpdatedCoherence`). When it
       does not, apply `bumpUpdated(content, <that row's date>)` and re-run.
+   5. **The verdict is this cycle's** (task.192). Every `**Gate Decision**` line in the
+      `## QA Testing Results` section, and the newest `QA gate …` row written by `qa-task` or
+      `qa-story`, name the token in this cycle's gate (`gate:`). Later `finalise` rows and QA's own
+      `Status →` rows are ignored. A `qa-fix` row after that `QA gate` row halts: it means this
+      cycle wrote no row of its own, which a repeated verdict would otherwise hide. A missing
+      section, decision line, `QA gate` row or `gate:` token halts too. When it halts, re-render
+      the section from this gate and append the `QA gate <TOKEN>` row, then re-run.
 
    **Do not post the QA summary (item 6) over exit 1 or 2.** Posting over it reproduces task.141: a PR comment linked
    a report that did not exist, found only by CI's `link-check`, and a row was dated after `updated:`,
@@ -2149,8 +2244,8 @@ cat > "$BODY_FILE" <<'EOF'
 
 ### 📋 QA Artifacts
 
-- **QA Report**: [story.[epic].[story].qa.[number].[descriptive-name].md](path/to/report.md)
-- **Gate File**: [story.[epic].[story].gate.[number].[descriptive-name].yml](path/to/gate.yml)
+- **QA Report**: [story.[P].[E].[S].qa.[number].[descriptive-name].md](path/to/report.md)
+- **Gate File**: [story.[P].[E].[S].gate.[number].[descriptive-name].yml](path/to/gate.yml)
 
 ### ✅ Summary
 
@@ -2416,7 +2511,7 @@ When issues are found during story review, create bug reports following the docu
 
 **Unhappy Path (Issues Found)**:
 
-1. QA creates QA report: `story.[epic].[story].qa.[number].[descriptive-name].md`
+1. QA creates QA report: `story.[P].[E].[S].qa.[number].[descriptive-name].md`
 2. QA creates bug report files for each HIGH/MEDIUM severity issue
 3. QA updates story status to "Reopened"
 4. Iterative fix cycle begins (detailed below)
@@ -2449,7 +2544,7 @@ Review all issues found and categorize by severity:
 
 Use sequential numbering within each story:
 
-**Format**: `story.[epic].[story].bug.[bug-number].[descriptive-name].md`
+**Format**: `story.[P].[E].[S].bug.[bug-number].[descriptive-name].md`
 
 **Examples**:
 
@@ -2472,8 +2567,8 @@ Use sequential numbering within each story:
 **Required Bug Report Sections**:
 
 ```markdown
-**Bug ID**: story.[epic].[story].bug.[bug-number].[description]
-**Related Story**: [[Story [Epic].N] [Story Name]](./story.[epic].[story].[name].md)
+**Bug ID**: story.[P].[E].[S].bug.[bug-number].[description]
+**Related Story**: [[Story [P].[E].[S]] [Story Name]](./story.[P].[E].[S].[name].md)
 **Status**: 🆕 New
 **Priority**: Critical | High | Medium | Low
 **Severity**: Blocker | Major | Minor | Trivial
@@ -2700,7 +2795,7 @@ Quick NFR validation focused on the core four: security, performance, reliabilit
 Assess non-functional requirements for a story and generate:
 
 1. YAML block for the gate file's `nfr_validation` section
-2. Brief markdown assessment saved to `{qa.qaLocation}/assessments/{epic}.{story}-nfr-{YYYYMMDD}.md`
+2. Brief markdown assessment saved to `{qa.qaLocation}/assessments/{prd}.{epic}.{story}-nfr-{YYYYMMDD}.md`
 
 ### Fail-safe for Missing Inputs
 
@@ -2883,10 +2978,10 @@ If `technical-preferences.md` defines custom weights, use those instead.
 
 #### Output 2: Brief Assessment Report
 
-**ALWAYS save to:** `{qa.qaLocation}/assessments/{epic}.{story}-nfr-{YYYYMMDD}.md`
+**ALWAYS save to:** `{qa.qaLocation}/assessments/{prd}.{epic}.{story}-nfr-{YYYYMMDD}.md`
 
 ```markdown
-# NFR Assessment: {epic}.{story}
+# NFR Assessment: {prd}.{epic}.{story}
 
 Date: {date}
 Reviewer: QA Engineer
@@ -2922,7 +3017,7 @@ Reviewer: QA Engineer
 **Print this line for integration into QA report:**
 
 ```
-NFR assessment: {qa.qaLocation}/assessments/{epic}.{story}-nfr-{YYYYMMDD}.md
+NFR assessment: {qa.qaLocation}/assessments/{prd}.{epic}.{story}-nfr-{YYYYMMDD}.md
 ```
 
 #### Output 4: Gate Integration Line
@@ -2930,7 +3025,7 @@ NFR assessment: {qa.qaLocation}/assessments/{epic}.{story}-nfr-{YYYYMMDD}.md
 **Always print at the end:**
 
 ```
-Gate NFR block ready → paste into {story-directory}/story.{epic}.{story}.gate.{N}.{slug}.yml under nfr_validation
+Gate NFR block ready → paste into {story-directory}/story.{P}.{E}.{S}.gate.{N}.{slug}.yml under nfr_validation
 ```
 
 ### NFR Quick Reference
@@ -3062,21 +3157,21 @@ trace:
     full: 3
     partial: 1
     none: 1
-  planning_ref: "{qa.qaLocation}/assessments/{epic}.{story}-test-design-{YYYYMMDD}.md"
+  planning_ref: "{qa.qaLocation}/assessments/{prd}.{epic}.{story}-test-design-{YYYYMMDD}.md"
   uncovered:
     - ac: "AC3"
       reason: "No test found for password reset timing"
-  notes: "See {qa.qaLocation}/assessments/{epic}.{story}-trace-{YYYYMMDD}.md"
+  notes: "See {qa.qaLocation}/assessments/{prd}.{epic}.{story}-trace-{YYYYMMDD}.md"
 ```
 
 #### Output 2: Traceability Report
 
-**Save to:** `{qa.qaLocation}/assessments/{epic}.{story}-trace-{YYYYMMDD}.md`
+**Save to:** `{qa.qaLocation}/assessments/{prd}.{epic}.{story}-trace-{YYYYMMDD}.md`
 
 ```markdown
 # Requirements Traceability Matrix
 
-## Story: {epic}.{story} - {title}
+## Story: {prd}.{epic}.{story} - {title}
 
 ### Coverage Summary
 
@@ -3142,7 +3237,7 @@ Based on gaps identified, recommend:
 **Print this line for integration:**
 
 ```text
-Trace matrix: {qa.qaLocation}/assessments/{epic}.{story}-trace-{YYYYMMDD}.md
+Trace matrix: {qa.qaLocation}/assessments/{prd}.{epic}.{story}-trace-{YYYYMMDD}.md
 ```
 
 ### Traceability Best Practices
@@ -3260,14 +3355,14 @@ This traceability feeds into quality gates:
 
 **Resolve paths first.** Source `references/resolve-paths.sh` to populate `${PRD_ROOT}` (default `docs/prd`) — the PRD root is configurable. The nested structure under it (and QA artifact co-location) is fixed (see [docs/reference/configuration.md](../../docs/reference/configuration.md#configurable-roots-and-fixed-conventions)):
 
-- Stories: nested at `${PRD_ROOT}/{domain}/{feature}/epics/epic.{N}.{name}/stories/story.{E}.{S}.{name}/`
+- Stories: nested at `${PRD_ROOT}/{domain}/prd.{P}.{feature}/epics/epic.{P}.{E}.{name}/stories/story.{P}.{E}.{S}.{name}/`
 - QA artifacts (review report, NFR, traceability, gate, DoD): co-located with the story file. No `qa.qaLocation` key.
 
 ### File Naming Conventions (Updated 2025-12-09)
 
 **QA Reports**:
 
-- Stories: `story.[epic].[story].qa.[number].[descriptive-name].md` (co-located with story)
+- Stories: `story.[P].[E].[S].qa.[number].[descriptive-name].md` (co-located with story)
 - Tasks: `task.[number].qa.[number].[descriptive-name].md` (co-located with task)
 
 **Gate Files** — the `[number]` after `gate.` is the QA cycle, and it is **load-bearing**: it is the
@@ -3276,11 +3371,11 @@ from the gate filename. A gate written without it cannot be keyed to a cycle, an
 rather than guesses (task.121). Every writer (`qa-gate`, `qa-story`, `qa-task`) produces the numbered
 form; the un-numbered form this section once documented is not valid.
 
-- Stories: `story.[epic].[story].gate.[number].[descriptive-name].yml` (co-located with story)
+- Stories: `story.[P].[E].[S].gate.[number].[descriptive-name].yml` (co-located with story)
 - Tasks: `task.[number].gate.[number].[descriptive-name].yml` (co-located with task)
 
-**NFR Assessments**: `{qa.qaLocation}/assessments/{epic}.{story}-nfr-{YYYYMMDD}.md` (legacy, deprecated)
-**Trace Reports**: `{qa.qaLocation}/assessments/{epic}.{story}-trace-{YYYYMMDD}.md` (legacy, deprecated)
+**NFR Assessments**: `{qa.qaLocation}/assessments/{prd}.{epic}.{story}-nfr-{YYYYMMDD}.md` (legacy, deprecated)
+**Trace Reports**: `{qa.qaLocation}/assessments/{prd}.{epic}.{story}-trace-{YYYYMMDD}.md` (legacy, deprecated)
 
 **Note**: NFR and Trace assessments should now be included within the main QA report (co-located), not as separate files.
 
@@ -3292,14 +3387,14 @@ form; the un-numbered form this section once documented is not valid.
 docs/
 ├── prd/
 │   └── [domain]/
-│       └── [feature]/
+│       └── prd.1.feature-name/
 │           └── epics/
-│               └── epic.1.epic-name/
+│               └── epic.1.1.epic-name/
 │                   └── stories/
-│                       └── story.1.1.story-name/          # One directory per story — the helper scans it
-│                           ├── story.1.1.story-name.md
-│                           ├── story.1.1.qa.1.story-name.md    # Co-located QA report (cycle 1)
-│                           └── story.1.1.gate.1.story-name.yml # Co-located gate file (cycle 1)
+│                       └── story.1.1.1.story-name/          # One directory per story — the helper scans it
+│                           ├── story.1.1.1.story-name.md
+│                           ├── story.1.1.1.qa.1.story-name.md    # Co-located QA report (cycle 1)
+│                           └── story.1.1.1.gate.1.story-name.yml # Co-located gate file (cycle 1)
 └── tasks/
     └── task.44.name/
         ├── task.44.name.md
@@ -3317,7 +3412,7 @@ docs/
     │   └── 1.1-trace-20250130.md
     └── gates/             # Deprecated - use co-located gate files
         └── [mirrored PRD structure]/
-            └── story.1.1.gate.1.epic-name.yml
+            └── story.1.1.1.gate.1.epic-name.yml
 ```
 
 ---

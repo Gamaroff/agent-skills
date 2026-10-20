@@ -18,6 +18,7 @@ nfr_validation:
     status: PASS|CONCERNS|FAIL
     evidence: measured|reasoned|unverified   # ALWAYS below status: — see "Placement"
     probes_executed: 0                       # REQUIRED when evidence: measured
+    escaped: 0                               # the record's totals.escaped — see rule 4
     notes: '...'
 ```
 
@@ -35,7 +36,7 @@ nesting in any test that scans a gate for this field.
 | `reasoned` | the verdict rests on **reading** — the code was examined and judged, however confidently | — |
 | `unverified` | **no security verdict was supplied** — nothing assessed this axis, or the assessment could not run | — |
 
-Three rules give those values their teeth:
+Four rules give those values their teeth:
 
 1. **`measured` requires `probes_executed > 0`.** Asserting `measured` with a zero count is a
    **schema error**, not a warning. Zero executed candidates is a finding, not a pass — the same
@@ -47,6 +48,13 @@ Three rules give those values their teeth:
 3. **A missing `evidence:` key reads as `unverified`.** Not as a parse failure, and not as
    `reasoned`. Every gate written before this field existed has no key, and the honest reading of
    such a gate is *nothing is known about how this verdict was reached*.
+4. **`escaped:` is the record's `totals.escaped`, and a non-zero count is never a `PASS`.** An escape
+   is a write outside the probe's sandbox, and it is a finding whatever the control's verdict was
+   (probe-boundary-rule.md, "An escape overrides the verdict"). Copy the count like
+   `probes_executed`, never count it by hand. Any value above zero puts a finding in `top_issues[]`.
+   `/finalise` reads the same record and halts on the same count. A gate that read only
+   `executed` and `reproduced` passed task.195's QA cycle 2 over 10 escapes, and the DoD found
+   them instead (obs #73).
 
 ## Placement — the one hard constraint
 

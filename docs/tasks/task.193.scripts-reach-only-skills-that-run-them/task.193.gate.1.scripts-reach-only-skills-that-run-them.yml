@@ -1,0 +1,61 @@
+schema: 2
+task: 'task.193.scripts-reach-only-skills-that-run-them'
+task_title: 'Scripts reach only the skills that run them'
+gate: CONCERNS
+status_reason: 'All four phases verified and every gate measured green, but the new guard exempts a cite-wrapped script literal that the bundler still treats as a dependency, so the obs #263 incident can recur through a cite wrapper while the test passes (CR-1, promoted under code_review_blocking).'
+reviewer: 'QA Engineer'
+head: 'a5e40c7a2e0904328f4ede0948e2b08cd777a329'
+updated: '2026-10-19T08:36:18Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'tests/shared-script-literals.test.js'
+    finding: 'scan() skips any script literal inside a cite wrapper (line 142), but quick_validate.py ref_kind (CITABLE_SUFFIXES = (".md",)) makes a cite-wrapped .sh/.js/.mjs a DEP, so it is still copied into every bundling skill; the §1 control fixture asserts the blind spot as correct.'
+    suggested_action: 'Exempt a cite wrapper only for .md targets (never true for this guard''s script extensions, so drop the exemption), and flip the cite fixture so a cite-wrapped script literal must be reported.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 25
+  phases_verified: 4/4
+  ci: 'not checked this cycle (gated at /finalise)'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No runtime boundary: the change set is prose, deleted bundled copies and a test-only scanner (boundary: false — scan/citeState/RUN_PREFIX classify lint findings in CI, they gate no runtime action and take no external input).'
+  performance:
+    status: PASS
+    notes: 'One text scan of ~60 files, ~15 ms per test.'
+  reliability:
+    status: PASS
+    notes: 'bundle:check 0 problems; no skill runs a removed copy (reviewer checked all 17); ci:fast 5903/0 fail at Step 3.'
+  maintainability:
+    status: CONCERNS
+    notes: 'CR-1 leaves a hole in the guard this task adds; CR-2/CR-3 advisory.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1: drop the cite exemption for script literals and flip its §1 fixture.'
+      refs: ['tests/shared-script-literals.test.js']
+  future:
+    - action: 'CR-2: tighten RUN_PREFIX so English "source " / "import … from" prose cannot pass as a command (advisory, low).'
+      refs: ['tests/shared-script-literals.test.js']
+    - action: 'CR-3: shared .sh comment literals also propagate copies and no guard reads them; extend the scan or record the .md-only scope (advisory, low).'
+      refs: ['tests/shared-script-literals.test.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 fixed and re-reviewed']

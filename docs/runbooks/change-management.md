@@ -53,12 +53,12 @@ flowchart TD
 
 `change-checklist` walks you through:
 
-1. **Issue summary** — what changed and why
-2. **Affected artifacts** — PRD, epics, stories, tasks impacted
-3. **Cascade analysis** — downstream artifacts that must change
-4. **Options** — at least two paths forward, with trade-offs
-5. **Recommended action** — chosen path with rationale
-6. **Edits** — specific changes to make, in priority order
+1. **Understand Trigger & Context** — fully understand what went wrong and why
+2. **Epic Impact Assessment** — ripple effects through the epics and their stories
+3. **Artifact Conflict & Impact Analysis** — conflicts and needed updates in the PRD, architecture and other docs
+4. **Path Forward Evaluation** — clear options with trade-offs
+5. **Sprint Change Proposal Components** — the actionable proposal, including the specific edits
+6. **Final Review & Handoff** — coordination and approval
 
 Full spec: [`change-checklist` SKILL.md](../../skills/change-checklist/SKILL.md).
 

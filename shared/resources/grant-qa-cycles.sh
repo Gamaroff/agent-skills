@@ -67,7 +67,8 @@
 #   • qa_max_cycles on the lock is not an integer               → warning on stderr, treated as 0
 #   • otherwise → writes extra_cycles_granted, qa_max_cycles AND qa_phase in one write. qa_phase is the
 #     RE-ENTRY POINT, and it depends on where the halt stopped (obs #228):
-#       - the restored candidate's halt_reason is `not-converging` → 5b. The Convergence check fires
+#       - the restored candidate's halt_reason is `not-converging`, alone or followed by `:` or a space
+#         and detail (the HALT's own spelling, obs #17) → 5b. The Convergence check fires
 #         at 5a, BEFORE 5b, so the last gate's queue was never handed to /qa-fix; re-entering at 5a
 #         would review unchanged code, re-raise the same HIGH and trip the check again, spending
 #         the grant with no fix attempted. 5b on the latest gate finishes that cycle first.
@@ -228,7 +229,14 @@ fi
 undo_restore() { [ -n "$RESTORED" ] && echo "grant-qa-cycles: lock restored from $RESTORED is kept (its snapshot was consumed); the grant was not written" >&2; return 0; }
 TMP=$(mktemp "$(dirname "$LOCK")/.grant-qa-cycles.XXXXXX") || { undo_restore; exit 1; }
 REENTER=5a
-[ "$HALT_REASON" = "not-converging" ] && REENTER=5b
+# The token, then optionally ':' or a space and the detail the HALT appends. The orchestrator writes
+# halt_reason as free text ("not-converging: QA loop HIGH 1,1,1 at cycle 3 (…)"), and SKILL.md matches
+# it as a pattern; an exact compare sent every real not-converging halt to 5a, which re-reviews
+# unchanged code and spends the grant (obs #17: four of four on task.180, 2026-10-12). A token that
+# merely STARTS with the word ("not-convergingX") is not this reason.
+case "$HALT_REASON" in
+  not-converging | not-converging:* | "not-converging "*) REENTER=5b ;;
+esac
 if ! jq --argjson k "$K" --argjson c "$QA_CYCLE" --arg p "$REENTER" \
      '.extra_cycles_granted = $k | .qa_max_cycles = ($c + $k) | .qa_phase = $p' "$LOCK" > "$TMP"; then
   rm -f "$TMP"

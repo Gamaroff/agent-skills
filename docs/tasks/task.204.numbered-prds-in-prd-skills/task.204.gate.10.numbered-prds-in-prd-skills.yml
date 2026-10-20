@@ -1,0 +1,73 @@
+schema: 2
+task: 'task.204.numbered-prds-in-prd-skills'
+task_title: 'Numbered PRDs in the PRD skills'
+gate: CONCERNS
+status_reason: 'Gate 9''s findings are fixed and verified. Two reproduced mediums, both in cycle 9''s new outside-links reference test: a C-quoted git grep path (non-ASCII or quote) reads as "no reference", and the unanchored token regex is quadratic on a long run. Three advisory lows (link forms the regex misses, missing right boundary, retired epic-registry prose in the runbook).'
+reviewer: 'QA Engineer'
+head: '8c1b6d4ecaf694f4d83cc30785f0c0dfdb3dfb55'
+updated: '2026-10-15T22:15:38Z'
+
+top_issues:
+  - id: CR-1
+    severity: medium
+    file: 'skills/review-prd/scripts/migration-guard.mjs'
+    finding: 'git grep -l without -z C-quotes a path with non-ASCII characters or a quote; existsSync on the quoted name is false, the file reads as empty and a real reference counts as none (reproduced with docs/été.md) — a cycle-9 regression.'
+    suggested_action: 'Use -z and split on NUL; treat an unreadable listed file as a blocker, never as no reference.'
+    suggested_owner: dev
+    status: open
+  - id: CR-2
+    severity: medium
+    file: 'skills/review-prd/scripts/migration-guard.mjs'
+    finding: 'The token regex has no left boundary, so each start inside a long [A-Za-z0-9_./+-] run scans and backtracks — quadratic (reproduced: 110 KB base64 run in a file that mentions prd.md took 13.9 s).'
+    suggested_action: 'Anchor the token, or find occurrences without a regex scan; add a timed row.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 41
+  phases_verified: 5/5
+  ci: 'test IN_PROGRESS @ 8c1b6d4e (all other checks SUCCESS)'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 24
+    notes: 'Allocation controls engage (task.204.qa.10.security.run.json).'
+  performance:
+    status: CONCERNS
+    notes: 'CR-2: quadratic scan in the guard.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1: a real reference read as none. Advisory CR-3 (HTML/encoded links missed), CR-4 (no right boundary; repo-relative rule applied to link targets).'
+  maintainability:
+    status: PASS
+    notes: 'Advisory CR-5: the story-development runbook still describes the retired global epic registry beside the corrected Outputs row (task 205 residue; task.207 sweep).'
+
+bug_resolution:
+  gate_9_findings: 4
+  fixed_and_verified: 4
+  verification_method: 'gate-9 row at 8c1b6d4e; reviewer re-probed 15 should-match and 10 should-not-match cases'
+
+recommendations:
+  immediate:
+    - action: 'CR-1, CR-2: replace the reference parser with a NUL-separated fixed-string mention check over the rewrite scope (fail closed); no regex scan.'
+      refs: ['skills/review-prd/scripts/migration-guard.mjs']
+  future:
+    - action: 'CR-3, CR-4: superseded by the mention check; task.211 replaces the guard with the engine re-pointing the links.'
+      refs: ['shared/resources/migrate-doc-numbering.mjs']
+    - action: 'CR-5: retired epic-registry prose in docs/runbooks/story-development.md (task.207 sweep).'
+      refs: ['docs/runbooks/story-development.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1, CR-2 closed']

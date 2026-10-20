@@ -2,29 +2,43 @@
 
 **Interactive** comprehensive story document review that asks clarifying questions instead of making assumptions. Identifies inaccuracies, gaps, inconsistencies, and quality issues through collaborative user input.
 
+It has a second mode, **Validate** (`--validate`, or "is this story ready?"): a non-interactive GO/NO-GO gate with a 1–10 readiness score. See [Validate mode](#validate-mode) below.
+
 ## Key Features
 
 🎯 **Interactive Review** - Asks clarifying questions rather than making assumptions
 🤝 **User-Aligned** - Recommendations based on your vision and decisions
-🔍 **Comprehensive Analysis** - 8-step review process with anti-hallucination detection
-📊 **Batched Questions** - 3 question points (max 4 questions each) for efficient clarification
+🔍 **Comprehensive Analysis** - analysis Steps 2–8 plus Mermaid and wireframe checks, with anti-hallucination detection
+📊 **Batched Questions** - one Unified Question Point (at most 4 questions) after the analysis, skipped in validate mode
 ✅ **Actionable Output** - Specific fixes aligned with user's intent
 
 ## Quick Start
 
 ```bash
 # Basic usage - review a story document
-/review-story story.310.5.socketio-real-time-delivery.md
+/review-story story.1.310.5.socketio-real-time-delivery.md
 
 # With specific focus areas
-/review-story story.2.3.auto-hide.md --focus testing,api-specs
+/review-story story.1.2.3.auto-hide.md --focus testing,api-specs
 
 # Quick review (15-30 min)
-/review-story story.4.1.user-auth.md --depth quick
+/review-story story.1.4.1.user-auth.md --depth quick
 
 # Thorough review (60-90+ min)
-/review-story story.1.5.critical-feature.md --depth thorough
+/review-story story.1.1.5.critical-feature.md --depth thorough
+
+# Validate mode - non-interactive GO/NO-GO gate
+/review-story --validate story.1.310.5
 ```
+
+## Validate mode
+
+`/review-story --validate <path | #issue | story id>` (or "is this story ready?", "score this story") runs the same analysis without asking anything and returns a **GO / NO-GO** verdict with a 1–10 readiness score.
+
+- **Standalone validate** is read-only. It never edits the story, saves its report as `.validate.{date}.md`, and exits non-zero on NO-GO, so it works as a CI gate or a batch check across an epic.
+- **Validate-and-apply** is the variant `develop-story` (and `po`) runs at Step 2. It still asks nothing, but it applies the critical and important fixes, promotes `Draft → Ready for Development` on a GO (HALT on NO-GO), and writes a normal `.review.{n}.{story-name}.md` report.
+
+Full contract: [SKILL.md § Validate Sub-Modes](SKILL.md#validate-sub-modes).
 
 ## Interactive Review Process
 
@@ -42,13 +56,9 @@ The skill asks questions when it encounters:
 
 ### Question Batching Strategy
 
-Questions are asked in **3 batched rounds** (max 4 questions per round):
+The analysis steps collect every finding without stopping to ask. Then, after Step 8, **one Unified Question Point** asks at most 4 high-impact questions covering everything found. Validate mode skips it.
 
-1. **After Steps 1-2**: Epic alignment & structure questions
-2. **After Steps 3-4**: Technical accuracy & completeness questions
-3. **After Steps 5-7**: Quality, clarity & consistency questions
-
-This minimizes interruptions while ensuring all issues are clarified.
+The pre-flight prompts still fire where they are defined: the Step 0 output-format choice, the Step 0a branch setup, and the Step 2 tracker-sync opt-in.
 
 ### Example Question
 
@@ -72,16 +82,27 @@ All recommendations in the final report are based on **your decisions**, not AI 
 
 ## What It Does
 
-The review-story skill performs an 8-step comprehensive analysis:
+The steps follow the headings in [SKILL.md](SKILL.md):
 
-1. **Template Structure Compliance** - Verifies all required sections present
-2. **Epic Alignment** - Ensures story implements epic requirements accurately
-3. **Technical Accuracy** - Detects hallucinations and verifies technical claims
-4. **Completeness & Gaps** - Identifies missing information
-5. **Consistency & Conflicts** - Finds contradictions
-6. **Quality & Clarity** - Assesses clarity and developer usability
-7. **Previous Story Context** - Checks continuity with previous work
-8. **Review Report** - Generates actionable recommendations
+- **Step 0 — Mode and output format**: interactive or validate; full report or action plan
+- **Step 0a — Branch setup**: makes sure review edits land on a feature branch
+- **Step 1 — Context discovery**: loads the story, epic and architecture docs, and runs the parallel pre-pass (epic alignment, architecture alignment, codebase scan)
+- **Step 2 — Template structure compliance**: required sections, metadata, tracker linkage, card preflight
+- **Step 3 — Epic alignment**: the story implements what the epic asks
+- **Step 4 — Technical accuracy**: detects hallucinations and verifies technical claims
+- **Step 5 — Completeness and gaps**: missing information
+- **Step 6 — Consistency and conflicts**: contradictions
+- **Step 6.5 — Mermaid diagram validation** (via `mermaid-architect`)
+- **Step 6.6 — Wireframe verification** (via `wireframe`): checks embedded wireloom blocks and suggests a wireframe for UI stories
+- **Step 7 — Quality and clarity**: developer usability
+- **Step 8 — Previous story context**: continuity with earlier stories
+- **Unified Question Point** (interactive mode only)
+- **Step 9 — Generate output**: the review report or action plan
+- **Step 9.5 — Offer to implement fixes**
+- **Step 9.6 — Sync body changes to the tracker** (when fixes were applied)
+- **Step 10 — Update document status**
+- **Step 10a — Record the reviewed revision**: stamps the report so `develop-story` Step 2 can reuse the review
+- **Step 11 — Post tracker comment**
 
 ## Review Depths
 
@@ -97,7 +118,7 @@ The review-story skill performs an 8-step comprehensive analysis:
 
 ### Standard (30-60 minutes) - DEFAULT
 
-- All 8 steps fully executed
+- Every analysis step fully executed
 - Comprehensive issue detection
 - Actionable recommendations
 - Full report
@@ -118,7 +139,7 @@ The review-story skill performs an 8-step comprehensive analysis:
 Generates a comprehensive review report:
 
 ```
-[story-directory]/story.{epic}.{story}.review.{n}.{story-name}.md
+[story-directory]/story.{P}.{E}.{S}.review.{n}.{story-name}.md
 ```
 
 Report includes:

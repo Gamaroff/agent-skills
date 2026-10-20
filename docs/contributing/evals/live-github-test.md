@@ -90,13 +90,34 @@ Repo slug (owner/name) is derived at runtime from `gh repo view` / `git remote g
 Create the document tree. All three files are intentionally minimal — the goal is exercising the pipeline, not the content.
 
 ```bash
-mkdir -p docs/prd/app/core/epics/epic.1.health-endpoint/stories/story.1.1.add-health-route
+mkdir -p docs/prd/app/prd.1.app-core/epics/epic.1.1.health-endpoint/stories/story.1.1.1.add-health-route
 ```
 
 ### PRD
 
 ```bash
-cat > docs/prd/app/core/prd.app-core.md << 'EOF'
+cat > docs/prd/prd-registry.md << 'EOF'
+---
+type: registry
+---
+
+# PRD Registry
+
+**Next Available PRD Number:** **2**
+
+| PRD # | Title | Folder | Status | Created |
+|---|---|---|---|---|
+| 1 | App Core | app/prd.1.app-core | draft | 2026-05-11 |
+EOF
+
+cat > docs/prd/app/prd.1.app-core/prd.1.app-core.md << 'EOF'
+---
+prd_number: 1
+type: prd
+title: "App Core"
+status: draft
+---
+
 # App Core — Product Requirements Document
 
 ## Goals and Background Context
@@ -115,22 +136,23 @@ NFR1: Response time under 50 ms at p99.
 
 ## Epic List
 
-- Epic 1: Health Endpoint — add `/health` route with tests.
+- Epic 1.1: Health Endpoint — add `/health` route with tests.
 
 ## Epic Details
 
-### Epic 1: Health Endpoint
+### Epic 1.1: Health Endpoint
 
 **Stories:**
-- Story 1.1: Add health route — implement `GET /health` returning `{ status: "ok" }`.
+- Story 1.1.1: Add health route — implement `GET /health` returning `{ status: "ok" }`.
 EOF
 ```
 
 ### Epic
 
 ```bash
-cat > docs/prd/app/core/epics/epic.1.health-endpoint/epic.1.health-endpoint.md << 'EOF'
+cat > docs/prd/app/prd.1.app-core/epics/epic.1.1.health-endpoint/epic.1.1.health-endpoint.md << 'EOF'
 ---
+prd_number: 1
 epic_number: 1
 title: "Health Endpoint"
 type: epic
@@ -141,7 +163,7 @@ created: 2026-05-11
 updated: 2026-05-11
 ---
 
-# Epic 1: Health Endpoint
+# Epic 1.1: Health Endpoint
 
 **Status**: In Progress
 
@@ -153,22 +175,23 @@ Add a `/health` endpoint to allow uptime monitors to probe service availability.
 
 | Story | Title | Status |
 |---|---|---|
-| 1.1 | Add health route | Ready for Development |
+| 1.1.1 | Add health route | Ready for Development |
 EOF
 ```
 
 ### Story
 
 ```bash
-cat > docs/prd/app/core/epics/epic.1.health-endpoint/stories/story.1.1.add-health-route/story.1.1.add-health-route.md << 'EOF'
+cat > docs/prd/app/prd.1.app-core/epics/epic.1.1.health-endpoint/stories/story.1.1.1.add-health-route/story.1.1.1.add-health-route.md << 'EOF'
 ---
-id: story.1.1.add-health-route
+id: story.1.1.1.add-health-route
+prd_number: 1
 title: "Add health route"
 status: ready-for-development
-epic: epic.1.health-endpoint
+epic: epic.1.1.health-endpoint
 ---
 
-# Story 1.1: Add health route
+# Story 1.1.1: Add health route
 
 **Status:** Ready for Development
 
@@ -214,12 +237,12 @@ git push origin develop
 Open Claude Code in `~/sandbox/eval-sandbox` and invoke:
 
 ```
-/develop-story docs/prd/app/core/epics/epic.1.health-endpoint/stories/story.1.1.add-health-route/story.1.1.add-health-route.md
+/develop-story docs/prd/app/prd.1.app-core/epics/epic.1.1.health-endpoint/stories/story.1.1.1.add-health-route/story.1.1.1.add-health-route.md
 ```
 
 Phase 0 asks exactly two questions:
 
-1. **Q1 — Feature branch base** — `Which branch should feature/story.1.1.add-health-route be based on?` → choose **develop** (recommended default).
+1. **Q1 — Feature branch base** — `Which branch should feature/story.1.1.1.add-health-route be based on?` → choose **develop** (recommended default).
 2. **Q2 — PR target branch** — `Which branch should the pull request target?` → choose **develop** (recommended default).
 
 Both prompts also list `epic/1.health-endpoint — create epic integration branch` as a trailing, unrecommended option. Do not pick it for this test: epic 1 declares no `branch_model:`, so `develop` is the path under test. (A third prompt, or an "Epic branch creation" question, means you are on a pre-v0.24.0 build — see [recipes § develop-story evals](./recipes.md).)
@@ -228,7 +251,7 @@ Expected pipeline progression — every step banner below is preceded by a `═�
 
 ```
 ═══ DEVELOP-STORY PIPELINE: STEP 1/8 — CREATE-BRANCH ═══
-  creates feature/story.1.1.add-health-route from develop
+  creates feature/story.1.1.1.add-health-route from develop
 
 ═══ DEVELOP-STORY PIPELINE: STEP 2/8 — REVIEW-STORY ═══
 
@@ -260,14 +283,14 @@ git branch -a | grep -E "epic\.1|story\.1\.1"
 gh pr list --repo $(gh api user --jq .login)/eval-sandbox --json number,title,baseRefName
 
 # Implementation report present
-find docs/ -name "story.1.1.implementation.*.md"
+find docs/ -name "story.1.1.1.implementation.*.md"
 
 # QA report + gate present
-find docs/ -name "story.1.1.qa.*.md"
-find docs/ -name "story.1.1.gate.*.yml"
+find docs/ -name "story.1.1.1.qa.*.md"
+find docs/ -name "story.1.1.1.gate.*.yml"
 
 # DoD checklist present
-find docs/ -name "story.1.1.dod.*.md"
+find docs/ -name "story.1.1.1.dod.*.md"
 
 # Lock file removed (pipeline completed cleanly)
 [ ! -f .claude/state/develop-pipeline.lock ] && echo "PASS: lock cleaned up"
@@ -284,12 +307,12 @@ git log --format="%ai %s" | head -20
 | Check | Expected |
 |---|---|
 | Epic branch | none — epic 1 declares no `branch_model:`, so no branch is created for it |
-| Story branch | `feature/story.1.1.add-health-route` based on `develop` |
+| Story branch | `feature/story.1.1.1.add-health-route` based on `develop` |
 | PR base | `develop` |
-| Implementation report | `story.1.1.implementation.{N}.{name}.md` with `status: accepted` |
-| QA report | `story.1.1.qa.{N}.{name}.md` |
-| QA gate | `story.1.1.gate.{N}.{name}.yml` with `gate: PASS` or `CONCERNS` |
-| DoD checklist | `story.1.1.dod.{N}.{name}.md` |
+| Implementation report | `story.1.1.1.implementation.{N}.{name}.md` with `status: accepted` |
+| QA report | `story.1.1.1.qa.{N}.{name}.md` |
+| QA gate | `story.1.1.1.gate.{N}.{name}.yml` with `gate: PASS` or `CONCERNS` |
+| DoD checklist | `story.1.1.1.dod.{N}.{name}.md` |
 | Lock file | absent (`.claude/state/develop-pipeline.lock` removed by step 8) |
 | Halt snapshot | absent (`.claude/state/develop-pipeline.last-halt.json` not created) |
 | Health route | `src/routes/health.js` or inline in `src/index.js` |
@@ -313,7 +336,7 @@ rm -rf ~/sandbox/eval-sandbox
 
 If this run reveals a regression, convert it to a replay fixture:
 
-1. Copy the artifacts from `docs/prd/app/core/epics/` into a new step-isolation scenario under `evals/develop-story/step-isolation/<name>/replay/`.
+1. Copy the artifacts from `docs/prd/app/prd.1.app-core/epics/` into a new step-isolation scenario under `evals/develop-story/step-isolation/<name>/replay/`.
 2. Add a `scenario.json` with assertions targeting the failing behaviour.
 3. Run `npm run eval:develop-story` to verify the fixture catches the regression.
 

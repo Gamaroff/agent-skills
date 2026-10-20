@@ -71,7 +71,7 @@ flowchart TD
 |---|---|
 | **Invoke** | `"review task <path>"` · `/review-task <path>` |
 | **What it does** | Interactive review that resolves inaccuracies, gaps, and implementability issues by asking clarifying questions — does **not** make assumptions. |
-| **Outputs** | Co-located review report `task.{N}.review.{name}.md`. Updates task `status` to `ready-for-development` when resolved. |
+| **Outputs** | Co-located review report `task.{N}.review.{n}.{name}.md`. Updates task `status` to `ready-for-development` when resolved. |
 | **Pitfalls** | The skill will pause on ambiguous success criteria. Answer rather than skipping — `develop-task` will surface the same issue later, more expensively. |
 | **Reference** | [`../../skills/review-task/SKILL.md`](../../skills/review-task/SKILL.md) |
 
@@ -84,17 +84,17 @@ One command runs the full lifecycle.
 ```bash
 /develop-task docs/tasks/task.{N}.{name}/
 # or
-/develop-task docs/tasks/task.{N}.{name}.md
+/develop-task docs/tasks/task.{N}.{name}/task.{N}.{name}.md
 ```
 
 ### Phase 0 — Resolve & Prepare
 
-`develop-task` prompts (via `AskUserQuestion`) for:
+`develop-task` prompts (via `AskUserQuestion`) for exactly two things, and only where `--base`, `--target` or `--defaults` has not answered them ([answer resolution](../../shared/resources/develop-pipeline-step-0-resolve-and-prepare.md#answer-resolution--ask-only-what-nothing-answers)):
 
-- **Task path** if not supplied
-- **Base branch** for the task branch (default `develop`)
-- **PR target branch** (default = base branch)
-- **Lite mode** for low-risk tasks (skips pre-develop codebase mapping and other context-gathering)
+- **Q1 — Base branch** for the task branch (recommended `develop`, or the current `feature/*` branch when invoked from one)
+- **Q2 — PR target branch** (recommended `develop`)
+
+The task path is asked for only if not supplied. Lite mode is auto-detected, not asked.
 
 Branch model — simpler than stories, no epic branch:
 
@@ -108,12 +108,12 @@ develop
 | Step | Skill | What happens |
 |---|---|---|
 | 1 | `create-branch` | Cuts the task branch from the base chosen in Phase 0. |
-| 2 | `review-task` | Runs the interactive review (skipped if recently reviewed and `ready-for-development`). |
+| 2 | `review-task` | Runs `review-task` with its prompts auto-answered (no questions). Skipped when a `task.{N}.review.*.md` report exists and the status is Ready for Development or In Progress, or the status is Planned and the report is current for the task document as it stands. |
 | 3 | `develop` | Implements the task. Bounded loop, `MAX_ITER=5`. Each iteration: plan → code → test → success-criteria check. |
 | 4 | `create-pr` | Pushes the branch, opens a PR against the chosen base with `--base` pre-supplied. |
-| 5–6 | `qa-task` → `qa-fix` → `review-pr` | QA review produces a gate file. `qa-fix` runs on `FAIL`, or on an open `top_issues[]` entry that no active waiver covers; a gate in the accepting-route set (any of the QA loop's §5c five routes) hands to `review-pr`. Up to 5 cycles. `qa-task` focuses on success-criteria validation, implementation-phase verification, and NFRs for infra/refactor work. **Step 5c is the loop's exit gate**: a gate in the accepting-route set hands to `review-pr`, which reviews the PR against the task. `REQUEST CHANGES` returns to `qa-fix` and consumes a cycle from the same 5-cycle budget; `APPROVE`/`CONCERNS` exit to Step 7. Leaves `task.{N}.pr-review.{n}.{name}.md`. |
+| 5–6 | `qa-task` → `qa-fix` → `review-pr` | QA review produces a gate file. `qa-fix` runs on `FAIL`, or on an open `top_issues[]` entry that no active waiver covers; a gate in the accepting-route set (any of the QA loop's §5c five routes) hands to `review-pr`. Up to `QA_MAX_CYCLES` cycles (default 5). `qa-task` focuses on success-criteria validation, implementation-phase verification, and NFRs for infra/refactor work. **Step 5c is the loop's exit gate**: a gate in the accepting-route set hands to `review-pr`, which reviews the PR against the task. `REQUEST CHANGES` returns to `qa-fix` and consumes a cycle from the same cycle budget; `APPROVE`/`CONCERNS` exit to Step 7. Leaves `task.{N}.pr-review.{n}.{name}.md`. |
 | 7 | `finalise` | Validates against the Definition of Done, posts DoD summary to the PR, comments the tracker issue, updates the board. **Full side-effects in lite mode too.** Also flips the task registry row to the final status. |
-| 8 | `commit-changes` | Final commit of artifacts and status updates. |
+| 8 | `commit-changes` | Commits the final implementation report and pushes. The DoD summary, `status: accepted` and the registry tick were already committed by `/finalise` (6a). |
 
 `develop-task` records every decision in a co-located implementation report: `task.{N}.implementation.{M}.{name}.md`.
 
@@ -125,11 +125,11 @@ Task `status` advances to `accepted`. PR is left for human merge. The task regis
 
 ### Lite mode
 
-`--lite` skips context-gathering steps for low-risk tasks. Step 7 (`finalise`) side-effects still run in full.
+Lite mode is auto-detected in Phase 0 (low or absent `risk_level`, fewer than 3 phases, one module); there is no `--lite` flag. `--mode lite` can request it (honoured only when those conditions hold), and `--mode fast` applies the same shortening regardless of the detector, but only when `develop.skippable` lists `qa-depth` and `review-pr-depth` (or `develop.defaultMode` is `fast`); otherwise it is refused with a reason — see [the lite-mode contract](../../shared/resources/develop-pipeline-lite-mode.md#speed-modes-and-skips). It shortens QA only: direct-tools Step 5, `--effort low` Step 5c. Step 7 (`finalise`) side-effects still run in full.
 
 ### Resume semantics
 
-Re-invoke `/develop-task <same-path>` to resume. The skill verifies per-step artifacts (branch, PR, gate file, etc.) and continues at the first incomplete step.
+Re-invoke `/develop-task <same-path>` to resume. The skill verifies per-step artifacts (branch, PR, gate file, etc.) and continues at the first incomplete step. After a Step 7 HALT with DoD `❌ GAPS` that you fixed with a **committed code change**, pick **"Re-enter QA at 5a"** (Recommended) when `/develop-task` offers it, so a QA gate reads the new head before acceptance; a document-only fix resumes at Step 7, and an uncommitted fix is refused (`uncommitted-fix`). See [Troubleshooting → Finalise halted with DoD gaps](../reference/troubleshooting.md#finalise-halted-with-dod-gaps-and-i-fixed-code).
 
 **Reference:** [`../../skills/develop-task/SKILL.md`](../../skills/develop-task/SKILL.md). See also: [`../../skills/develop-task/README.md`](../../skills/develop-task/README.md).
 
@@ -146,10 +146,10 @@ Re-invoke `/develop-task <same-path>` to resume. The skill verifies per-step art
 | [`develop`](../../skills/develop/SKILL.md) | Actual implementation loop. |
 | [`create-pr`](../../skills/create-pr/SKILL.md) | Pushes branch, opens PR with `--base` pre-supplied. |
 | [`qa-task`](../../skills/qa-task/SKILL.md) | Produces QA gate file. Dev skills must not edit gate files. |
-| [`qa-fix`](../../skills/qa-fix/SKILL.md) | Applies fixes for `FAIL` gates and for open `top_issues[]` entries no active waiver covers, and for `review-pr`'s `REQUEST CHANGES`. Up to 5 cycles. |
+| [`qa-fix`](../../skills/qa-fix/SKILL.md) | Applies fixes for `FAIL` gates and for open `top_issues[]` entries no active waiver covers, and for `review-pr`'s `REQUEST CHANGES`. Up to `QA_MAX_CYCLES` cycles (default 5). |
 | [`review-pr`](../../skills/review-pr/SKILL.md) | Step 5c — the QA loop's exit gate. Reviews the PR against the task (conformance + code). Advisory: writes no gate file; the orchestrator acts on its verdict. |
 | [`finalise`](../../skills/finalise/SKILL.md) | DoD check, PR comment, tracker comment, board update, registry-row finalisation. |
-| [`commit-changes`](../../skills/commit-changes/SKILL.md) | Final commit of artifacts and status updates. |
+| [`commit-changes`](../../skills/commit-changes/SKILL.md) | Final commit of the implementation report (`/finalise` committed the acceptance artifacts). |
 
 Tracker linkage inside `finalise` uses the platform resolver (GitHub or Jira) — no epic-issue helper is needed since tasks are standalone.
 
@@ -160,8 +160,8 @@ Tracker linkage inside `finalise` uses the platform resolver (GitHub or Jira) �
 | Aspect | Story | Task |
 |---|---|---|
 | Upstream docs | PRD → epic → story | Task only |
-| Numbering authority | epic registry + per-epic story sequence | task registry (global) |
-| Branch model | `develop` → `feature/story.{E}.{S}.*` (or `epic/{N}.*` → `feature/story.{E}.{S}.*` where the epic opts in) | `develop` → `feature/task.{N}.*` |
+| Numbering authority | PRD registry + per-PRD epic and per-epic story sequence | task registry (global) |
+| Branch model | `develop` → `feature/story.{P}.{E}.{S}.*` (or `epic/{P}.{E}.*` → `feature/story.{P}.{E}.{S}.*` where the epic opts in) | `develop` → `feature/task.{N}.*` |
 | PR target | Q2 answer — `develop`, or the epic integration branch | Configurable base (default `develop`) |
 | QA skill | `qa-story` | `qa-task` (NFR/refactor-aware) |
 | Epic issue helper | `ensure-epic-{github,jira}-issue` | n/a |
@@ -186,7 +186,7 @@ grep '^gate:' docs/tasks/task.{N}.{name}/*.gate.*.yml
 grep -h -A8 '^### QA Cycle' docs/tasks/task.{N}.{name}/*.implementation.*.md | grep '^\*\*Action\*\*' | tail -1
 
 # Task status is accepted
-grep -E '^status:|^Status:' docs/tasks/task.{N}.{name}.md
+grep -E '^status:|^Status:' docs/tasks/task.{N}.{name}/task.{N}.{name}.md
 
 # Registry row reflects final status
 grep "task.{N}" docs/tasks/task-registry.md
@@ -225,7 +225,7 @@ Friction events from this PRD's dogfood run; shared entries cross-referenced fro
 1. Open a fresh Claude Code session.
 2. Run `/develop-task <task-file-path>` and choose **Resume**.
 
-_Provenance: `docs/prd/onboarding/epics/epic.3.runbook-tutorial-wrappers/stories/story.3.1.before-you-start-anchor-runbooks/story.3.1.implementation.1.before-you-start-anchor-runbooks-initial-run.md` (same PreCompact hook mechanism)_
+_Provenance: `docs/prd/onboarding/prd.1.onboarding/epics/epic.1.3.runbook-tutorial-wrappers/stories/story.1.3.1.before-you-start-anchor-runbooks/story.1.3.1.implementation.1.before-you-start-anchor-runbooks-initial-run.md` (same PreCompact hook mechanism)_
 
 ### Phase 0 base-branch prompt shows no `develop` option
 
@@ -235,7 +235,7 @@ _Provenance: `docs/prd/onboarding/epics/epic.3.runbook-tutorial-wrappers/stories
 1. `git checkout -b develop main && git push -u origin develop`
 2. Re-invoke `/develop-task <path>` — `develop` will appear.
 
-_Provenance: `docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entry-point/stories/story.1.1.first-task-in-10-minutes/story.1.1.implementation.1.first-task-in-10-minutes-initial-run.md` (same Phase 0 mechanism)_
+_Provenance: `docs/prd/onboarding/prd.1.onboarding/epics/epic.1.1.quickstart-and-decision-tree-entry-point/stories/story.1.1.1.first-task-in-10-minutes/story.1.1.1.implementation.1.first-task-in-10-minutes-initial-run.md` (same Phase 0 mechanism)_
 
 ### "Lock file exists" blocks a fresh pipeline run
 
@@ -245,7 +245,7 @@ _Provenance: `docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entr
 1. `rm .claude/state/develop-pipeline.lock`
 2. Re-run `/develop-task <path>`.
 
-_Provenance: `docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entry-point/stories/story.1.2.first-story-in-60-minutes/story.1.2.implementation.1.first-story-in-60-minutes-initial-run.md` (same lock mechanism)_
+_Provenance: `docs/prd/onboarding/prd.1.onboarding/epics/epic.1.1.quickstart-and-decision-tree-entry-point/stories/story.1.1.2.first-story-in-60-minutes/story.1.1.2.implementation.1.first-story-in-60-minutes-initial-run.md` (same lock mechanism)_
 
 ### `/finalise` flags "CHANGELOG.md not updated"
 
@@ -255,7 +255,7 @@ _Provenance: `docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entr
 1. Add an entry to `CHANGELOG.md` under the current version heading.
 2. Re-invoke `/finalise` — it detects the entry and clears the gap.
 
-_Provenance: `docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entry-point/stories/story.1.5.readme-start-here-callout/story.1.5.implementation.1.readme-start-here-callout-initial-run.md` (same DoD check)_
+_Provenance: `docs/prd/onboarding/prd.1.onboarding/epics/epic.1.1.quickstart-and-decision-tree-entry-point/stories/story.1.1.5.readme-start-here-callout/story.1.1.5.implementation.1.readme-start-here-callout-initial-run.md` (same DoD check)_
 
 ### Task registry shows a duplicate "Next Available" number
 

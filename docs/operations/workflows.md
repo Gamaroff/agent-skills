@@ -17,7 +17,7 @@ Automated orchestrator (preferred):
 ```
 develop-story [story-file-path]
   └── create-branch → review-story → develop → create-pr → qa-story
-        → qa-fix (up to 5 cycles) → review-pr (Step 5c, loop exit gate)
+        → qa-fix (up to QA_MAX_CYCLES cycles, default 5) → review-pr (Step 5c, loop exit gate)
         → finalise → commit-changes
 ```
 
@@ -35,7 +35,7 @@ Automated orchestrator (preferred):
 ```
 develop-task [task-file-path]
   └── create-branch → review-task → develop → create-pr → qa-task
-        → qa-fix (up to 5 cycles) → review-pr (Step 5c, loop exit gate)
+        → qa-fix (up to QA_MAX_CYCLES cycles, default 5) → review-pr (Step 5c, loop exit gate)
         → finalise → commit-changes
 ```
 
@@ -62,21 +62,34 @@ References: [`skills/review-bug/SKILL.md`](../../skills/review-bug/SKILL.md), [`
 
 QA gate files (`PASS` / `CONCERNS` / `FAIL` / `WAIVED`) are owned by QA skills — **dev skills never modify gate files**.
 
+### Up-front answers and speed modes
+
+The develop pipelines resolve their Phase 0d questions, speed mode and skips once, before asking
+anything: **flag → `develop:` policy in `skills-config.yaml` → derived recommendation → ask**
+(task.201). `--defaults` takes every recommendation, so a run with nothing in conflict asks nothing —
+`develop-next` and `develop-batch` dispatch that way. `--mode fast` shortens QA and the PR review
+without capping QA cycles; `--skip` works only within the consumer's `develop.skippable` allow-list
+(default empty). A skipped step makes the QA gate `WAIVED` with reason and approver — written by the QA
+skill, checked by the pipeline — never `PASS`, and a `FAIL` stays `FAIL`. Branch, PR, finalise, commit
+and tracker signals cannot be skipped. Step 2 also reuses a review whose `reviewed_blob:` still matches
+the document. Contract: [`shared/resources/develop-pipeline-lite-mode.md`](../../shared/resources/develop-pipeline-lite-mode.md);
+keys: [`docs/reference/configuration.md`](../reference/configuration.md).
+
 ### Roadmap-driven orchestration
 
-The three pipelines above each take a path you supply. Two orchestrators sit one level up and
-**choose the path for you**, reading `docs/development/project-completion-roadmap.md`:
+The story, task and bug pipelines above each take a path you supply. Two orchestrators sit one
+level up and **choose the path for you**, reading `docs/development/project-completion-roadmap.md`:
 
 ```
 develop-next
-  └── select-next.mjs (deterministic) → /develop-story | /develop-task
+  └── select-next.mjs (deterministic) → /develop-story | /develop-task | /develop-bug
         → merge the green PR → tick the roadmap + Change Log
 ```
 
 ```
 develop-batch
   └── select-next.mjs --batch → N write-disjoint items
-        → one git worktree each, pipelines run concurrently
+        → one git worktree each, pipelines (/develop-story | /develop-task | /develop-bug) run concurrently
         → merge serially, rebasing each on the new base tip
 ```
 
@@ -87,7 +100,22 @@ conflict when they share a tag either side marks `!`.
 
 Both are crash-safe via a run-state file (re-running resumes), stop at manual/blocked rows,
 planning gaps, or any pipeline HALT, and support `--dry-run` for a read-only preview. Wrap either
-in `/loop` for continuous runs.
+in `/loop` for continuous runs. For runs that last hours or overnight, use `loop-supervisor`
+instead of `/loop`: it gives every iteration a fresh process and context, and classifies each
+outcome from what is on disk. See the [Unattended Overnight Runs](../runbooks/unattended-overnight-runs.md) runbook.
+
+`qa-next` is the verification sibling of `develop-next`: that loop builds, this one verifies.
+
+```
+qa-next [id]
+  └── uat-status.mjs --next → resolve the row to checklist items (author any missing)
+        → run its tagged spec, walk the rest → record 🟡 pass / ❌ fail / ⏸ blocked
+        → file a bug per failure → commit + report
+```
+
+It never marks a row ✅ accepted; that is the owner's `--accept`. `/qa-next <id>` runs one named
+row in any state, and `--coverage` lists shipped stories that no registry row covers yet. Reference:
+[`skills/qa-next/README.md`](../../skills/qa-next/README.md).
 
 References: [`skills/develop-next/README.md`](../../skills/develop-next/README.md),
 [`skills/develop-batch/README.md`](../../skills/develop-batch/README.md),
@@ -108,9 +136,10 @@ qa-story / qa-task → gate file
 Fix Cycle (if needed):
 qa-fix → code/test changes → ready for review
 
-# On a PASS/WAIVED gate the loop does not end — it hands to Step 5c:
-qa-story / qa-task (PASS/WAIVED) → review-pr → verdict
-  → qa-fix (REQUEST CHANGES, same 5-cycle budget)
+# On a gate with no open findings (PASS, CONCERNS or an active WAIVED), or a route-2/2b exit,
+# the loop does not end — it hands to Step 5c. Only FAIL or open findings go to qa-fix:
+qa-story / qa-task (no open findings) → review-pr → verdict
+  → qa-fix (REQUEST CHANGES, same cycle budget)
   → finalise (APPROVE / CONCERNS)
     ↓
 Done or repeat fix cycle
@@ -119,8 +148,7 @@ Done or repeat fix cycle
 ## Epic workflow
 
 ```
-1. epic-registry-manager → assign unique epic number, validate filename, update registry
-2. create-epic           → epic document with stories breakdown
+1. create-epic           → epic.{P}.{E} document with stories breakdown — E allocated within the PRD by doc-id.js
 3. review-epic           → validate quality, detect scope overlap
 4. create-story          → derive stories from the epic
 ```

@@ -1,0 +1,63 @@
+schema: 2
+task: 'task.184.qa-results-carried-block-and-log-residuals'
+task_title: 'qa-results carried-block and log residuals'
+gate: PASS
+status_reason: 'Cycle 3''s performance refactor is behaviour-neutral (a 2,831-document differential fuzz is byte-identical to the previous engine) and brings engine CPU back to base. No open finding; two cosmetic cleanups are recorded as future work.'
+reviewer: 'QA Engineer'
+head: '9c5547befa7965bc5fb772e8dcdebde6ad78b025'
+updated: '2026-10-13T09:17:46Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 104
+  phases_verified: 4/4
+  ci: 'not read — CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-10-13'
+  total_iterations: 2
+  verification_method: 'R7–R10; mutation spot checks M1–M7 covered; reviewer fuzzes (450k documents at cycle 3, 2,831 differential at cycle 4)'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: internal — shared/resources/qa-results.js#upsertQaResults judges a work-item document and a section this pipeline renders; markdown-structure models the implementation report and the disqualified-entries table lists only report-lint.js#lintReport. Unchanged from gates 1–3.'
+  performance:
+    status: PASS
+    notes: 'PERF-1 closed: engine CPU benchmark base 16,584 ms / before 18,871 ms / after 16,984 ms; suites back to back with af294361 under identical load 5.81/6.27 s vs 6.48/7.07 s (af294361 measured 1.08 s at idle). External load (another project) prevented an idle re-measure here; the criterion is re-measured at finalise.'
+  reliability:
+    status: PASS
+    notes: 'Write-then-refuse closed by construction; fuzz clean across cycles 3–4.'
+  maintainability:
+    status: PASS
+    notes: 'Two cosmetic cleanups: carriedBlocks'' doc comment now sits above collectAll; R8''s loop runs once.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Move the outermost-only / union comment back above carriedBlocks (cycle 4 CR-1).'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'Replace R8''s single-iteration loop with one direct write (cycle 4 CR-2).'
+      refs: ['shared/resources/tests/qa-results.test.mjs']
+    - action: 'Gate 2 CR-4: decide whether a fenced block after a stopping label is a tail.'
+      refs: ['shared/resources/qa-results.js']
+    - action: 'Gate 1 CR-3: compute the "directly under a marker-less log" predicate once.'
+      refs: ['shared/resources/qa-results.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

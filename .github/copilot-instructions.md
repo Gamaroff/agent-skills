@@ -13,7 +13,7 @@ This repo is a library of **Claude Code skills**. AI agents writing code here mu
 
 - Skill directories: kebab-case (`create-story`, not `CreateStory`).
 - Path references: agent-agnostic — always `.agents/skills/`, never `.claude/skills/`.
-- Document filenames follow patterns in `CLAUDE.md` (e.g. `epic.{n}.{name}.md`, `story.{epic}.{story}.{name}.md`).
+- Document filenames follow patterns in `CLAUDE.md` (e.g. `epic.{P}.{E}.{name}.md`, `story.{P}.{E}.{S}.{name}.md`).
 
 ## When adding or editing a skill
 

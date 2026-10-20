@@ -19,7 +19,7 @@ created: 2026-05-12
 
 Universal:
 
-- Node ≥ 20 (`node --version`)
+- Node ≥ 22 (`node --version`)
 - `git` (`git --version`)
 - Skills installed in your project. First-time setup runs the full wizard (skills + config + hooks + registries + docs scaffold):
   ```bash
@@ -51,7 +51,7 @@ Pick the check that matches your platform:
 gh auth status
 
 # Bitbucket VCS
-source shared/resources/bitbucket-auth.sh && echo "bitbucket auth ok ($BB_AUTH_SCHEME)"
+source .agents/skills/create-pr/references/bitbucket-auth.sh && echo "bitbucket auth ok ($BB_AUTH_SCHEME)"
 
 # Jira tracker (run in addition to VCS check above)
 [ -n "$JIRA_URL" ] && [ -n "$JIRA_API_TOKEN" ] && echo "jira auth ok"
@@ -67,11 +67,12 @@ Tell the agent:
 
 > `/create-prd` Add a footer link to `docs/runbooks/README.md` pointing at `CONTRIBUTING.md`. Single-epic brownfield enhancement. Title: "footer-link".
 
-The skill creates:
+The skill allocates the PRD's number `{P}` from `docs/prd/prd-registry.md`, adds its row there, and creates:
 
 ```
 docs/prd/footer-link/
-└── prd.footer-link.md
+└── prd.{P}.footer-link/
+    └── prd.{P}.footer-link.md
 ```
 
 When prompted, answer **No** to sharding (single-epic PRD needs no split).
@@ -80,14 +81,14 @@ When prompted, answer **No** to sharding (single-epic PRD needs no split).
 
 ## 3. Create the epic (≤ 3 min)
 
-> `/create-epic docs/prd/footer-link/prd.footer-link.md`
+> `/create-epic docs/prd/footer-link/prd.{P}.footer-link/prd.{P}.footer-link.md`
 
-The skill assigns the next epic number from `docs/development/epic-registry.md` and writes:
+The skill allocates the epic's number `{E}` within PRD `{P}` and writes:
 
 ```
-docs/prd/footer-link/epics/
-└── epic.{N}.footer-link/
-    └── epic.{N}.footer-link.md
+docs/prd/footer-link/prd.{P}.footer-link/epics/
+└── epic.{P}.{E}.footer-link/
+    └── epic.{P}.{E}.footer-link.md
 ```
 
 When prompted for tracker, choose **Skip — docs only** to avoid creating a practice issue in your tracker. That is *no tracker for this run*. A standing restriction (`access.tracker: manual` / `command`) is a different choice — [Restricted tracker access](./restricted-access.md).
@@ -96,15 +97,15 @@ When prompted for tracker, choose **Skip — docs only** to avoid creating a pra
 
 ## 4. Create the story (≤ 3 min)
 
-> `/create-story docs/prd/footer-link/epics/epic.{N}.footer-link/epic.{N}.footer-link.md`
+> `/create-story docs/prd/footer-link/prd.{P}.footer-link/epics/epic.{P}.{E}.footer-link/epic.{P}.{E}.footer-link.md`
 
 The skill writes the first story under the epic:
 
 ```
-docs/prd/footer-link/epics/epic.{N}.footer-link/stories/
-└── story.{N}.1.add-footer-link/
-    ├── story.{N}.1.add-footer-link.md
-    └── story.{N}.1.plan.add-footer-link.md
+docs/prd/footer-link/prd.{P}.footer-link/epics/epic.{P}.{E}.footer-link/stories/
+└── story.{P}.{E}.1.add-footer-link/
+    ├── story.{P}.{E}.1.add-footer-link.md
+    └── story.{P}.{E}.1.plan.add-footer-link.md
 ```
 
 No additional prompts beyond confirming the story title.
@@ -114,7 +115,7 @@ No additional prompts beyond confirming the story title.
 ## 5. Develop the story (≤ 45 min)
 
 ```text
-/develop-story docs/prd/footer-link/epics/epic.{N}.footer-link/stories/story.{N}.1.add-footer-link/
+/develop-story docs/prd/footer-link/prd.{P}.footer-link/epics/epic.{P}.{E}.footer-link/stories/story.{P}.{E}.1.add-footer-link/
 ```
 
 Phase 0 of `/develop-story` asks two questions. Recommended answers for a practice run:
@@ -124,9 +125,9 @@ Phase 0 of `/develop-story` asks two questions. Recommended answers for a practi
 | Q1 — Feature branch base | `develop` (or `main` if your repo has no `develop` branch) |
 | Q2 — PR target           | `develop` (same as Q1)                                     |
 
-Both prompts also offer an epic integration branch (`epic/{N}.footer-link`) as a trailing, unrecommended option. Ignore it for a practice run — it exists for epics whose stories must land as one unit, and it adds a manual promotion step at the end. Lite mode is auto-detected for a story this small; it is not a prompt.
+Q1 also offers an epic integration branch (`epic/{P}.{E}.footer-link`) as a trailing, unrecommended option, unless `branching.epicIntegration.offerWhenUndeclared` is `false`; Q2 offers `develop`, `main` or another branch. Ignore the epic option for a practice run — it exists for epics whose stories must land as one unit, and it adds a manual promotion step at the end. Lite mode is auto-detected for a story this small; it is not a prompt.
 
-> **What is lite mode?** A shorter pipeline mode that trades QA depth for speed on low-risk stories (single-file changes, docs edits, trivial refactors). It skips the parallel QA agents and the traceability matrix step, but **still runs every Step 7 side-effect** — PR comment, tracker update, board move, DoD post — so the audit trail is unchanged. See [`develop-pipeline-lite-mode.md`](../../shared/resources/develop-pipeline-lite-mode.md) for trigger conditions and exact behaviour. Pick `No` for anything with cross-file impact, security implications, or unclear acceptance criteria.
+> **What is lite mode?** A shorter pipeline mode that trades QA depth for speed on low-risk stories (single-file changes, docs edits, trivial refactors). QA (Step 5) uses direct tools instead of parallel agents and the PR review (Step 5c) runs at `--effort low` — traceability and the gate decision still run — and it **still runs every Step 7 side-effect** — PR comment, tracker update, board move, DoD post — so the audit trail is unchanged. See [`develop-pipeline-lite-mode.md`](../../shared/resources/develop-pipeline-lite-mode.md) for trigger conditions and exact behaviour, including `--mode`: `--mode lite` can request the shorter QA, and `--mode fast` applies it regardless of the detector when `develop.skippable` allows it. There is nothing to answer: Phase 0 decides it from the story.
 
 The agent then chains: **create-branch → review-story → develop → create-pr → qa-story → qa-fix → review-pr → finalise → commit**. Sit back — the chain completes automatically. A PASS gate is not the end of the QA loop: it hands to `review-pr` (Step 5c), which checks the PR against the story and can send the run back into `qa-fix` before `finalise` runs.
 
@@ -139,23 +140,25 @@ If QA loops more than once it is working as intended; a one-line README change s
 ## 6. Review your artifacts (≤ 2 min)
 
 ```bash
-ls docs/prd/footer-link/epics/epic.{N}.footer-link/stories/story.{N}.1.add-footer-link/
+ls docs/prd/footer-link/prd.{P}.footer-link/epics/epic.{P}.{E}.footer-link/stories/story.{P}.{E}.1.add-footer-link/
 ```
 
-You should have all 10 artifact types:
+The story directory holds rows 3–6 and 8–12; the PRD and epic (rows 1–2) live in its parent directories, and the PR (row 7) is on your VCS host. You should have all 12 artifact types:
 
 | #   | Artifact                                          | What it is                                                                 |
 | --- | ------------------------------------------------- | -------------------------------------------------------------------------- |
-| 1   | `prd.footer-link.md`                              | Practice PRD                                                               |
-| 2   | `epic.{N}.footer-link.md`                         | Parent epic                                                                |
-| 3   | `story.{N}.1.add-footer-link.md`                  | Story spec                                                                 |
-| 4   | `story.{N}.1.plan.add-footer-link.md`             | Co-located implementation plan                                             |
-| 5   | `story.{N}.1.review.1.add-footer-link.md`         | Story review report                                                        |
-| 6   | `story.{N}.1.implementation.1.add-footer-link.md` | What was built + pipeline log                                              |
+| 1   | `prd.{P}.footer-link.md`                          | Practice PRD                                                               |
+| 2   | `epic.{P}.{E}.footer-link.md`                         | Parent epic                                                                |
+| 3   | `story.{P}.{E}.1.add-footer-link.md`                  | Story spec                                                                 |
+| 4   | `story.{P}.{E}.1.plan.add-footer-link.md`             | Co-located implementation plan                                             |
+| 5   | `story.{P}.{E}.1.review.1.add-footer-link.md`         | Story review report                                                        |
+| 6   | `story.{P}.{E}.1.implementation.1.add-footer-link.md` | What was built + pipeline log                                              |
 | 7   | PR URL                                            | Pull Request opened by `/develop-story` (GitHub or Bitbucket per your VCS) |
-| 8   | `story.{N}.1.qa.1.add-footer-link.md`             | QA findings + traceability matrix                                          |
-| 9   | `story.{N}.1.gate.1.add-footer-link.yml`          | PASS / CONCERNS / FAIL gate                                                |
-| 10  | `story.{N}.1.dod.1.add-footer-link.md`            | Definition-of-Done checklist + sprint review summary                       |
+| 8   | `story.{P}.{E}.1.qa.1.add-footer-link.md`             | QA findings + traceability matrix                                          |
+| 9   | `story.{P}.{E}.1.gate.1.add-footer-link.yml`          | PASS / CONCERNS / FAIL gate                                                |
+| 10  | `story.{P}.{E}.1.pr-review.1.add-footer-link.md`      | PR conformance review (`/review-pr`, Step 5c — the QA loop's exit gate)    |
+| 11  | `story.{P}.{E}.1.dod.1.add-footer-link.md`            | Definition-of-Done checklist                                               |
+| 12  | `sprint-review-summary.md`                        | Sprint review summary (`/finalise`, accepted path only)                    |
 
 For annotated worked examples of the upstream artifacts, see [`examples/prd-example/`](../../examples/prd-example/) (the PRD that drove this onboarding effort) and [`examples/epic-examples/`](../../examples/epic-examples/) (its four epics). For a deliberate FAIL → PASS walkthrough, see [Day 3 — Messy Path](../runbooks/first-week/day-3-messy-path.md).
 
@@ -167,9 +170,9 @@ Pick one:
 
 **A. Keep the artifact as proof (recommended for first-time users).**
 
-Leave the branch as-is. Mark the epic row `CANCELLED` in `docs/development/epic-registry.md`. Mark the story `status: cancelled` in its frontmatter. Numbers are never recycled — the rows stay forever as records.
+Leave the branch as-is. Mark the epic and the story `status: cancelled` in their frontmatter. Keep the documents: an epic's number `E` is counted from the epics on disk within its PRD, so a cancelled epic that stays on disk keeps its number, and a deleted one frees it.
 
-> **What a registry row looks like:** epic rows have columns `Epic # | Tracker key | Domain | Folder | Title | Status | Created`. To cancel, change the `Status` cell to `CANCELLED` (or `🚫 Cancelled`) and leave the other cells untouched. Do **not** decrement the **Next Available Epic Number** counter — numbers stay used even when cancelled. Full schemas: [`../standards/epic-registry.md`](../standards/epic-registry.md), [`../standards/task-registry.md`](../standards/task-registry.md).
+> **Where numbers come from:** a PRD number comes from the [PRD registry](../standards/prd-registry.md) and is never reused; epic and story numbers are counted within their parent by `doc-id.js` — there is no epic registry to edit. Task numbers come from the [task registry](../standards/task-registry.md).
 
 Close the practice PR on your VCS host (GitHub/Bitbucket) and close any practice tracker issues the chain opened (GitHub Issues or Jira).
 
@@ -177,10 +180,10 @@ Close the practice PR on your VCS host (GitHub/Bitbucket) and close any practice
 
 ```bash
 git checkout develop
-git branch -D feature/story.{N}.1.add-footer-link
+git branch -D feature/story.{P}.{E}.1.add-footer-link
 ```
 
-Revert or drop the PRD/epic/story commits from your branch. Mark registry rows `CANCELLED` — do NOT delete them.
+Revert or drop the PRD/epic/story commits from your branch. If the practice run added a row to `docs/prd/prd-registry.md`, mark it `cancelled` — never delete it: a PRD number is never reused. Epic and story numbers need nothing: they are counted from the documents on disk.
 
 If a practice GitHub milestone or Jira sprint/version was created: delete it once all linked issues are closed.
 
@@ -193,11 +196,10 @@ If a practice GitHub milestone or Jira sprint/version was created: delete it onc
 | Symptom                                 | Likely cause                                  | Fix                                                                                       |
 | --------------------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | `gh auth status` not logged in          | `gh` not configured                           | Run `gh auth login`                                                                       |
-| Bitbucket calls return empty / 404      | `BITBUCKET_API_TOKEN` missing, expired, or created without Bitbucket scopes | Regenerate the Atlassian API token **with Bitbucket scopes ticked**; probe with `source shared/resources/bitbucket-auth.sh && curl -s -o /dev/null -w '%{http_code}' "${BB_CURL_AUTH[@]}" https://api.bitbucket.org/2.0/user` (expect 200) |
+| Bitbucket calls return empty / 404      | `BITBUCKET_API_TOKEN` missing, expired, or created without Bitbucket scopes | Regenerate the Atlassian API token **with Bitbucket scopes ticked**; probe with `source .agents/skills/create-pr/references/bitbucket-auth.sh && curl -s -o /dev/null -w '%{http_code}' "${BB_CURL_AUTH[@]}" https://api.bitbucket.org/2.0/user` (expect 200) |
 | Jira issue creation fails               | Wrong `JIRA_URL` or token                     | Verify `curl -u $JIRA_USER_EMAIL:$JIRA_API_TOKEN $JIRA_URL/rest/api/3/myself` returns 200 |
 | Skill picked wrong platform             | Auto-detect mis-fired                         | Set explicit `tracker:` / `vcs:` in `skills-config.yaml`                                  |
 | Phase 0 prompts differ from table above | Skill version drift                           | Check `.agents/skills/develop-story/` version                                             |
-| `/develop-story` pauses at QA planning  | Expected — test plan generation               | Wait 30–60 s                                                                              |
 | QA loop ran more than once              | Practice change touched something non-trivial | Use a simpler story (one-line file change)                                                |
 | Elapsed > 60 min                        | VCS/tracker API latency                       | API round-trips are out-of-scope; timer pauses while waiting                              |
 | Epic registry conflict on merge         | Two branches appended the same row            | Resolve conflict: increment the number in your branch                                     |
@@ -207,7 +209,7 @@ If a practice GitHub milestone or Jira sprint/version was created: delete it onc
 
 ## See also
 
-- `docs/standards/status-lifecycle.md` — lifecycle states (`draft → ready-for-development → in-progress → accepted`)
+- `docs/standards/status-lifecycle.md` — lifecycle states (`draft → ready-for-development → in-progress → ready-for-review → accepted` for a story; tasks add `planned` after `draft`)
 - `docs/standards/file-naming.md` — naming conventions for story artifacts
 - `docs/runbooks/story-development.md` — deep-dive on the full story development workflow (Phase A–D)
 - `examples/README.md` — annotated full-lifecycle artifact set (`task.6` worked task example)

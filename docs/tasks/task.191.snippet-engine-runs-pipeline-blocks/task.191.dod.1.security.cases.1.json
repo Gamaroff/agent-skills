@@ -1,0 +1,538 @@
+[
+  {
+    "id": "shell-exec.quote-split-single",
+    "sink": "shell-exec",
+    "input": "who'am'i",
+    "why": "Quote removal rejoins the word to `whoami`, so a matcher comparing the raw token sees a command name that is on no list at all.",
+    "correct": "Compare the effective command word — after quote removal — not the literal token.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.quote-split-double",
+    "sink": "shell-exec",
+    "input": "to\"u\"ch /tmp/x",
+    "why": "Double quotes split the same way: the effective command is `touch`, which writes.",
+    "correct": "Apply quote removal before matching.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.backslash-escape",
+    "sink": "shell-exec",
+    "input": "t\\ouch /tmp/x",
+    "why": "`\\o` is just `o` after escape removal, so the effective command is `touch`.",
+    "correct": "Apply escape removal before matching.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.glob-bracket",
+    "sink": "shell-exec",
+    "input": "/usr/bin/[t]ouch /tmp/x",
+    "why": "Pathname expansion resolves `[t]ouch` to `touch`; the literal never equals the name a list is keyed on.",
+    "correct": "Treat glob metacharacters in a command word as unresolvable and deny, rather than matching the unexpanded literal.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.glob-question",
+    "sink": "shell-exec",
+    "input": "/usr/bin/touc? /tmp/x",
+    "why": "`?` matches any single character, so the expansion is `touch`.",
+    "correct": "Same as the bracket case: an unresolvable command word is a deny.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.tilde-traversal",
+    "sink": "shell-exec",
+    "input": "~/../../usr/bin/whoami",
+    "why": "Tilde expansion followed by `..` traversal reaches an absolute path that a prefix check on `~/` is satisfied by and never sees.",
+    "correct": "Expand and normalise to a real path before deciding, then match on the result.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.escaped-tool-name",
+    "sink": "shell-exec",
+    "input": "g\\h pr comment 1 --body x",
+    "why": "Escape removal yields `gh`, so a rule keyed on the tool name `gh` does not fire and an outbound write posts.",
+    "correct": "Apply escape removal before matching the tool name.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.quote-split-curl",
+    "sink": "shell-exec",
+    "input": "cu'r'l -X POST https://x/",
+    "why": "Quote removal yields `curl`, and the request is a POST — a network write from a command that scanned as unknown.",
+    "correct": "Apply quote removal before matching.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.heredoc-redirect",
+    "sink": "shell-exec",
+    "input": "cat <<EOF > /tmp/x",
+    "why": "The write is in the redirection, not in the command word. `cat` inspects as read-only and the statement creates a file.",
+    "correct": "Parse redirections separately from the command word; any `>` or `>>` target is a write regardless of what precedes it.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.heredoc-append-rc",
+    "sink": "shell-exec",
+    "input": "cat <<'EOF' >> ~/.zshrc",
+    "why": "The same shape, appending to a shell rc file — a persistent change that runs again in every future shell.",
+    "correct": "Treat `>>` as a write, and a write to a shell rc path as persistent, regardless of the command word.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.sed-inplace-trailing",
+    "sink": "shell-exec",
+    "input": "sed 's/a/b/' -i file.txt",
+    "why": "`-i` edits in place, and here it sits in trailing position — after the script operand — where a check that only inspects leading flags never looks.",
+    "correct": "Scan every argument position for write-capable flags, not just the leading run.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.sed-inplace-after-e",
+    "sink": "shell-exec",
+    "input": "sed -e 's/a/b/' -i file.txt",
+    "why": "The same trailing `-i`, now separated from the command by a flag that takes an operand — which is what makes a positional heuristic stop early.",
+    "correct": "Consume each flag's operand while scanning, and keep scanning to the end of the argument list.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.sort-output-long",
+    "sink": "shell-exec",
+    "input": "sort --output=/tmp/x file.txt",
+    "why": "`sort` reads as a read-only filter, and `--output=` writes a file. The write is in a flag the tool's reputation does not suggest.",
+    "correct": "Know the write-capable flags of every tool named by hand, in long and short form (`-o` and `--output`).",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.git-diff-output",
+    "sink": "shell-exec",
+    "input": "git diff --output=/tmp/x",
+    "why": "`git diff` is the canonical read-only subcommand, and `--output=` makes it write.",
+    "correct": "Match on the (subcommand, flags) pair, not on the subcommand alone.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.keyword-if",
+    "sink": "shell-exec",
+    "input": "if touch /tmp/x; then echo hi; fi",
+    "why": "A shell keyword occupies command position, so a parser reading the first word sees `if` and swallows the whole segment — never reaching the `touch` inside it.",
+    "correct": "Recurse into keyword-introduced compound commands and classify each contained command on its own.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.keyword-elif",
+    "sink": "shell-exec",
+    "input": "elif touch /tmp/x; then echo hi; fi",
+    "why": "The same escape through a different keyword; enumerating `if` alone leaves the rest reachable.",
+    "correct": "Recurse into every compound-command keyword, not a hand-picked subset.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.keyword-while",
+    "sink": "shell-exec",
+    "input": "while touch /tmp/x; do break; done",
+    "why": "The loop condition is a command, and it runs — at least once — before the body is ever considered.",
+    "correct": "Classify the loop condition as a command in its own right.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.keyword-until",
+    "sink": "shell-exec",
+    "input": "until touch /tmp/x; do break; done",
+    "why": "As `while`, with the sense inverted and the same command position unexamined.",
+    "correct": "Classify the loop condition as a command in its own right.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.keyword-case",
+    "sink": "shell-exec",
+    "input": "case x in a) touch /tmp/x;; esac",
+    "why": "`case` puts commands after a pattern and a `)`, a position that whitespace tokenisation does not recognise as command-initial.",
+    "correct": "Parse the case-arm structure and classify each arm's commands.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.git-global-flag-operand",
+    "sink": "shell-exec",
+    "input": "git -C log push origin main",
+    "why": "`-C` takes a directory operand. Reading the token after the flags as the subcommand yields `log` — read-only — when the real subcommand is `push`, which writes to a remote.",
+    "correct": "Consume each global flag's operand before reading the subcommand.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.redirect-glued",
+    "sink": "shell-exec",
+    "input": "echo pwned>/tmp/x",
+    "why": "No space before `>`, so whitespace tokenisation produces the single word `pwned>/tmp/x` and reports no redirection at all.",
+    "correct": "Tokenise redirection operators independently of whitespace — the shell does.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.redirect-glued-cat",
+    "sink": "shell-exec",
+    "input": "cat README.md>/tmp/x",
+    "why": "The same gluing, now attached to a filename, which makes the resulting token look even more like an ordinary operand.",
+    "correct": "Split redirection operators out of every token before classifying.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.redirect-glued-append",
+    "sink": "shell-exec",
+    "input": "echo pwned>>/tmp/x",
+    "why": "The append form glued the same way; a scan that special-cases a spaced ` > ` misses both.",
+    "correct": "Handle `>`, `>>`, `>|` and fd-prefixed forms as operators, not as text.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.quote-state-span",
+    "sink": "shell-exec",
+    "input": "echo \"it's fine\"; touch /tmp/x; echo \"don't\"",
+    "why": "The apostrophe inside a double-quoted string opens a single-quote span for a scanner that ignores which quote type is already open. The span it then blanks runs across the `touch`, deleting it from the scan.",
+    "correct": "Track quote state per character, recording the enclosing quote type; an apostrophe inside double quotes is a literal.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.heredoc-in-quoted-example",
+    "sink": "shell-exec",
+    "input": "echo \"example: cat <<EOF\"\ntouch /tmp/x",
+    "why": "A heredoc marker inside a quoted string is text, not a heredoc. Treating it as one consumes the following real command as heredoc body and never classifies it.",
+    "correct": "Recognise heredoc operators only outside quoted spans.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.sed-w-flag",
+    "sink": "shell-exec",
+    "input": "sed -n 's/a/b/w /tmp/x' README.md",
+    "why": "`sed` writes a file through the `w` flag inside the script — with neither `-i` nor a shell redirection to notice.",
+    "correct": "Parse the sed script itself, not only the tool's flags.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.sed-w-command",
+    "sink": "shell-exec",
+    "input": "sed 'w /tmp/x' README.md",
+    "why": "The bare `w` command form, which does not even carry a substitution to draw attention to the script.",
+    "correct": "Parse the sed script; treat `w` and `W` as writes wherever they appear in it.",
+    "direction": "hostile"
+  },
+  {
+    "id": "shell-exec.grep-only-matching",
+    "sink": "shell-exec",
+    "input": "grep -o 'foo' README.md",
+    "why": "A blanket `-o means output file` heuristic refuses this. For grep, `-o` is `--only-matching`: it prints matched parts to stdout and writes nothing.",
+    "correct": "Resolve flag meaning per tool. Accept as read-only.",
+    "direction": "legitimate"
+  },
+  {
+    "id": "shell-exec.find-or-operator",
+    "sink": "shell-exec",
+    "input": "find . -name a -o -name b",
+    "why": "The same heuristic refuses this one too. For find, `-o` is the boolean OR operator between predicates, not an output file.",
+    "correct": "Resolve flag meaning per tool. Accept as read-only.",
+    "direction": "legitimate"
+  },
+  {
+    "id": "shell-exec.plain-read",
+    "sink": "shell-exec",
+    "input": "cat README.md",
+    "why": "The baseline. A classifier tightened until it refuses even this is passing the hostile half by refusing everything.",
+    "correct": "Accept as read-only.",
+    "direction": "legitimate"
+  },
+  {
+    "id": "shell-exec.git-status-read",
+    "sink": "shell-exec",
+    "input": "git status --short",
+    "why": "A read-only subcommand carrying a flag. A rule that denies any `git` invocation with flags — a tempting response to the `-C` case above — rejects this too.",
+    "correct": "Accept as read-only: the subcommand decides, and `--short` only changes formatting.",
+    "direction": "legitimate"
+  },
+  {
+    "id": "helper.bash-env-prefix",
+    "sink": "shell-exec",
+    "input": "BASH_ENV=shared/resources/set-qa-phase.sh bash shared/resources/qa-cycle.sh docs",
+    "why": "bash sources $BASH_ENV first",
+    "correct": "Refuse the helper call.",
+    "direction": "hostile"
+  },
+  {
+    "id": "helper.bash-env-export",
+    "sink": "shell-exec",
+    "input": "export BASH_ENV=shared/resources/set-qa-phase.sh; bash shared/resources/qa-cycle.sh docs",
+    "why": "exported BASH_ENV",
+    "correct": "Refuse the helper call.",
+    "direction": "hostile"
+  },
+  {
+    "id": "helper.sh-env",
+    "sink": "shell-exec",
+    "input": "ENV=shared/resources/set-qa-phase.sh sh shared/resources/qa-cycle.sh docs",
+    "why": "sh reads $ENV",
+    "correct": "Refuse the helper call.",
+    "direction": "hostile"
+  },
+  {
+    "id": "helper.shellopts-ps4",
+    "sink": "shell-exec",
+    "input": "set -x; export SHELLOPTS; PS4='$(mv a b)' bash shared/resources/qa-cycle.sh docs",
+    "why": "xtrace expands PS4",
+    "correct": "Refuse the helper call.",
+    "direction": "hostile"
+  },
+  {
+    "id": "helper.forward-delete",
+    "sink": "shell-exec",
+    "input": "source shared/resources/newest-numbered.sh || exit 1\nnewest_numbered docs dod -delete",
+    "why": "argument forwarded to find",
+    "correct": "Refuse the helper call.",
+    "direction": "hostile"
+  },
+  {
+    "id": "helper.forward-exec",
+    "sink": "shell-exec",
+    "input": "source shared/resources/newest-numbered.sh || exit 1\nN=$(next_numbered docs review -exec rm {} +)",
+    "why": "argument forwarded to find",
+    "correct": "Refuse the helper call.",
+    "direction": "hostile"
+  },
+  {
+    "id": "helper.forward-continued",
+    "sink": "shell-exec",
+    "input": "source shared/resources/newest-numbered.sh || exit 1\nnewest_numbered docs dod \\\n  -delete",
+    "why": "continuation line",
+    "correct": "Refuse the helper call.",
+    "direction": "hostile"
+  },
+  {
+    "id": "helper.helper-outside",
+    "sink": "shell-exec",
+    "input": "bash /etc/profile.sh",
+    "why": "outside the copy",
+    "correct": "Refuse the helper call.",
+    "direction": "hostile"
+  },
+  {
+    "id": "helper.helper-no-slash",
+    "sink": "shell-exec",
+    "input": "bash qa-cycle.sh docs",
+    "why": "PATH search",
+    "correct": "Refuse the helper call.",
+    "direction": "hostile"
+  },
+  {
+    "id": "helper.helper-after-cd",
+    "sink": "shell-exec",
+    "input": "cd docs && bash shared/resources/qa-cycle.sh x",
+    "why": "cwd moved",
+    "correct": "Refuse the helper call.",
+    "direction": "hostile"
+  },
+  {
+    "id": "helper.legit-qa-cycle",
+    "sink": "shell-exec",
+    "input": "bash shared/resources/qa-cycle.sh docs/tasks/x",
+    "why": "shipped read-only helper",
+    "correct": "Refuse the helper call.",
+    "direction": "legitimate"
+  },
+  {
+    "id": "helper.legit-newest",
+    "sink": "shell-exec",
+    "input": "source shared/resources/newest-numbered.sh || exit 1\nN=$(next_numbered \"docs/tasks/x\" review -name \"task.1.review.*.md\") || exit 1\necho \"$N\"",
+    "why": "documented shape",
+    "correct": "Refuse the helper call.",
+    "direction": "legitimate"
+  },
+  {
+    "id": "helper.c3.respelled-fn-backslash",
+    "sink": "shell-exec",
+    "input": "source shared/resources/newest-numbered.sh || exit 1\nnewest_\\numbered docs dod -delete",
+    "why": "Backslash respells the function name.",
+    "correct": "Refuse the helper call.",
+    "direction": "hostile"
+  },
+  {
+    "id": "helper.c3.respelled-fn-quotes",
+    "sink": "shell-exec",
+    "input": "source shared/resources/newest-numbered.sh || exit 1\nnext_number''ed docs review -exec rm {} +",
+    "why": "Empty quotes respell the function name.",
+    "correct": "Refuse the helper call.",
+    "direction": "hostile"
+  },
+  {
+    "id": "helper.c3.quoted-arg",
+    "sink": "shell-exec",
+    "input": "source shared/resources/newest-numbered.sh || exit 1\nnewest_numbered docs dod \"-delete\"",
+    "why": "Quoted deny word forwarded to find.",
+    "correct": "Refuse the helper call.",
+    "direction": "hostile"
+  },
+  {
+    "id": "helper.c3.partial-quoted-arg",
+    "sink": "shell-exec",
+    "input": "source shared/resources/newest-numbered.sh || exit 1\nnewest_numbered docs dod -dele\"te\"",
+    "why": "Partially quoted deny word.",
+    "correct": "Refuse the helper call.",
+    "direction": "hostile"
+  },
+  {
+    "id": "helper.c3.script-arg",
+    "sink": "shell-exec",
+    "input": "bash h/fwd.sh -delete",
+    "why": "Helper script argument reaches find.",
+    "correct": "Refuse the helper call.",
+    "direction": "hostile"
+  },
+  {
+    "id": "helper.c3.script-arg-quoted",
+    "sink": "shell-exec",
+    "input": "bash h/fwd.sh \"-delete\"",
+    "why": "Quoted helper script argument.",
+    "correct": "Refuse the helper call.",
+    "direction": "hostile"
+  },
+  {
+    "id": "helper.c3.set-positional",
+    "sink": "shell-exec",
+    "input": "set -- -delete; source h/fwd.sh",
+    "why": "set -- feeds a sourced helper.",
+    "correct": "Refuse the helper call.",
+    "direction": "hostile"
+  },
+  {
+    "id": "helper.c3.set-opts-positional",
+    "sink": "shell-exec",
+    "input": "set -e -- -delete; source h/fwd.sh",
+    "why": "set with options then --.",
+    "correct": "Refuse the helper call.",
+    "direction": "hostile"
+  },
+  {
+    "id": "helper.c3.bash-env-backslash",
+    "sink": "shell-exec",
+    "input": "export BASH\\_ENV=shared/resources/set-qa-phase.sh; bash h/plain.sh",
+    "why": "Respelled BASH_ENV.",
+    "correct": "Refuse the helper call.",
+    "direction": "hostile"
+  },
+  {
+    "id": "helper.c3.bash-env-quotes",
+    "sink": "shell-exec",
+    "input": "export \"BASH\"\"_ENV\"=shared/resources/set-qa-phase.sh; bash h/plain.sh",
+    "why": "Quote-split BASH_ENV.",
+    "correct": "Refuse the helper call.",
+    "direction": "hostile"
+  },
+  {
+    "id": "helper.c3.bash-env-subst",
+    "sink": "shell-exec",
+    "input": "export \"$(echo bash_env | tr a-z A-Z)=shared/resources/set-qa-phase.sh\"; bash h/plain.sh",
+    "why": "Computed BASH_ENV name.",
+    "correct": "Refuse the helper call.",
+    "direction": "hostile"
+  },
+  {
+    "id": "helper.c3.case-arm-tail",
+    "sink": "shell-exec",
+    "input": "bash h/case.sh x",
+    "why": "Case-arm rewrite hides a command.",
+    "correct": "Refuse the helper call.",
+    "direction": "hostile"
+  },
+  {
+    "id": "helper.c3.inherited-fn",
+    "sink": "shell-exec",
+    "input": "source h/h1.sh; source h/h2.sh",
+    "why": "Earlier-sourced function shadows ls.",
+    "correct": "Refuse the helper call.",
+    "direction": "hostile"
+  },
+  {
+    "id": "helper.c3.export-f",
+    "sink": "shell-exec",
+    "input": "export -f ls; bash h/h2.sh",
+    "why": "Exported function reaches child bash.",
+    "correct": "Refuse the helper call.",
+    "direction": "hostile"
+  },
+  {
+    "id": "helper.c3.path-change",
+    "sink": "shell-exec",
+    "input": "PATH=h:$PATH; source h/nf.sh; zz_helper_fn",
+    "why": "PATH moved before a helper call.",
+    "correct": "Refuse the helper call.",
+    "direction": "hostile"
+  },
+  {
+    "id": "helper.c3.plain-arg",
+    "sink": "shell-exec",
+    "input": "bash h/fwd.sh -name x",
+    "why": "Documented helper shape.",
+    "correct": "Run it.",
+    "direction": "legitimate"
+  },
+  {
+    "id": "helper.c3.plain-export",
+    "sink": "shell-exec",
+    "input": "export FOO=bar; bash h/plain.sh",
+    "why": "Documented helper shape.",
+    "correct": "Run it.",
+    "direction": "legitimate"
+  },
+  {
+    "id": "helper.c3.nonshadow-fn",
+    "sink": "shell-exec",
+    "input": "source h/nf.sh; zz_helper_fn",
+    "why": "Documented helper shape.",
+    "correct": "Run it.",
+    "direction": "legitimate"
+  },
+  {
+    "id": "helper.c4.redef-w",
+    "sink": "shell-exec",
+    "input": "source h/echo-f.sh; source h/sed-f.sh; f 'w victim' x",
+    "why": "A later helper redefines f to sed; the earlier echo body must not hide it (CR3-1).",
+    "correct": "Refuse: a function's reach is every definition of its name the block may see.",
+    "direction": "hostile"
+  },
+  {
+    "id": "helper.c4.redef-i",
+    "sink": "shell-exec",
+    "input": "source h/echo-f.sh; source h/sed-f.sh; f -i s/a/b/ x",
+    "why": "Same, sed -i.",
+    "correct": "Refuse: a function's reach is every definition of its name the block may see.",
+    "direction": "hostile"
+  },
+  {
+    "id": "helper.c4.redef-reverse",
+    "sink": "shell-exec",
+    "input": "source h/sed-f.sh; source h/echo-f.sh; f -i s/a/b/ x",
+    "why": "Reverse order: the echo redefinition must not hide the sed one.",
+    "correct": "Refuse: a function's reach is every definition of its name the block may see.",
+    "direction": "hostile"
+  },
+  {
+    "id": "helper.c4.redef-own-call",
+    "sink": "shell-exec",
+    "input": "source h/echo-f.sh; source h/calls-f.sh",
+    "why": "The redefining helper's own call is judged by its own body.",
+    "correct": "Refuse: a function's reach is every definition of its name the block may see.",
+    "direction": "hostile"
+  },
+  {
+    "id": "helper.c4.redef-indirect",
+    "sink": "shell-exec",
+    "input": "source h/sed-f.sh; source h/g-calls-f.sh; g -i s/a/b/ x",
+    "why": "g forwards to f, which reaches sed.",
+    "correct": "Refuse: a function's reach is every definition of its name the block may see.",
+    "direction": "hostile"
+  },
+  {
+    "id": "helper.c4.redef-indirect-shadow",
+    "sink": "shell-exec",
+    "input": "source h/echo-f.sh; source h/g-calls-f.sh; source h/sed-f.sh; g -i s/a/b/ x",
+    "why": "f redefined after g was sourced; g still reaches sed at call time.",
+    "correct": "Refuse: a function's reach is every definition of its name the block may see.",
+    "direction": "hostile"
+  }
+]

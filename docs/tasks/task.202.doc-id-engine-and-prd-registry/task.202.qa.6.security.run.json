@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "filename",
+      "entry": "shared/resources/doc-id.js#parse",
+      "name": null,
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 30,
+      "passed": 30,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-10-15T05:20:31.277Z"
+    }
+  ],
+  "totals": {
+    "executed": 30,
+    "reproduced": 0
+  },
+  "updated_at": "2026-10-15T05:20:31.277Z"
+}

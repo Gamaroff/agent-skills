@@ -174,6 +174,7 @@ Kinds and their required flags:
   --kind close            --issue <N> [--reason <completed|not planned>]
   --kind reopen           --issue <N>
   --kind milestone        --title <t> [--state <open|closed>]
+                          [--rename-from <old title>]
                           → prints the milestone NUMBER on stdout
   --kind sub-issue-link   --issue <N> --parent <N>
 
@@ -193,6 +194,11 @@ Options:
   --reason        Close reason: completed | not planned.
                   ("duplicate" needs gh's --duplicate-of, which this CLI has no flag for.)
   --state         Milestone state: open | closed. Default open.
+  --rename-from   Milestone only. When no milestone titled --title exists but
+                  one titled <old title> does, RENAME that one in place
+                  (PATCH), rather than create a second milestone — so the
+                  issues already on it stay grouped. --title existing wins
+                  (\`already\`); neither existing creates, as without the flag.
   --repo          owner/name. Default: the current repository.
   --json          Emit a JSON result object on stdout.
   --quiet         Suppress informational output.
@@ -515,6 +521,7 @@ function parseArgs(argv) {
     milestone: "",
     reason: "",
     state: "",
+    renameFrom: "",
     repo: "",
     json: false,
     quiet: false,
@@ -560,6 +567,9 @@ function parseArgs(argv) {
         break;
       case "--state":
         opts.state = value(++i, "--state");
+        break;
+      case "--rename-from":
+        opts.renameFrom = value(++i, "--rename-from");
         break;
       case "--repo":
         opts.repo = value(++i, "--repo");
@@ -700,7 +710,9 @@ function recordShape({ kind, args, body, slug }) {
 
     case "milestone":
       return {
-        intent: `Create GitHub milestone "${args.title}" in ${repoUi}`,
+        intent: args.renameFrom
+          ? `Rename GitHub milestone "${args.renameFrom}" to "${args.title}" in ${repoUi} (create it if neither exists)`
+          : `Create GitHub milestone "${args.title}" in ${repoUi}`,
         target: {
           repo: slug,
           url: slug
@@ -708,10 +720,16 @@ function recordShape({ kind, args, body, slug }) {
             : repoUi,
           ui_url: slug ? `https://github.com/${slug}/milestones/new` : repoUi,
         },
-        desired: { title: args.title, state: args.state || "open" },
+        desired: {
+          title: args.title,
+          state: args.state || "open",
+          ...(args.renameFrom ? { rename_from: args.renameFrom } : {}),
+        },
         manual: {
           deepLink: slug ? `https://github.com/${slug}/milestones/new` : repoUi,
-          ui: "Open the repository → Issues → Milestones → New milestone → Create. Then write the milestone number into the document and re-run the skill.",
+          ui: args.renameFrom
+            ? `Open the repository → Issues → Milestones. If "${args.title}" exists, nothing to do. Else if "${args.renameFrom}" exists, edit it and change its title to "${args.title}" — do NOT create a second milestone, or its issues split from the new one. Else New milestone → Create. Then write the milestone number into the document and re-run the skill.`
+            : "Open the repository → Issues → Milestones → New milestone → Create. Then write the milestone number into the document and re-run the skill.",
           fields: [
             { name: "Title", value: args.title },
             { name: "State", value: args.state || "open" },
@@ -832,6 +850,18 @@ function ghReopenArgv(args, slug) {
   return ["gh", "issue", "reopen", args.issue, ...repoFlag(slug)];
 }
 
+function ghMilestoneRenameArgv(args, slug, number) {
+  return [
+    "gh",
+    "api",
+    "--method",
+    "PATCH",
+    `/repos/${slug}/milestones/${number}`,
+    "-f",
+    `title=${args.title}`,
+  ];
+}
+
 function ghMilestoneArgv(args, slug) {
   return [
     "gh",
@@ -949,6 +979,7 @@ function perform({
       // defaults to open-only, 30 per page, so a closed milestone or a busy
       // repo silently missed an existing title and tried to re-create it.
       let existing = "";
+      let renameSource = "";
       try {
         // A CONSTANT jq filter — no interpolation, so no title can alter the
         // program — emitting NDJSON: one compact object per line. That makes
@@ -973,6 +1004,7 @@ function perform({
           cwd,
         );
         let hit = null;
+        let old = null;
         for (const line of String(raw).split("\n")) {
           const t = line.trim();
           if (!t) continue;
@@ -982,18 +1014,49 @@ function perform({
               hit = m;
               break;
             }
+            if (m && args.renameFrom && !old && m.title === args.renameFrom) {
+              old = m;
+            }
           } catch (_) {
             /* a malformed line is skipped, never guessed at */
           }
         }
         existing = hit ? String(hit.number) : "";
+        renameSource = !hit && old ? String(old.number) : "";
       } catch (_) {
+        // With --rename-from, "could not look" must not read as "the old title is
+        // absent": creating here would move only this issue onto a new milestone,
+        // and every later run would answer `already` and never rename the old one —
+        // the split the flag exists to prevent (task 205, QA cycle 2, CR-4).
+        if (args.renameFrom) {
+          output.warn(
+            "⚠️  Could not list milestones — not renaming or creating. Re-run when gh can read the repository.",
+          );
+          return emit({ performed: false, reason: "unverifiable" }, skipCode);
+        }
         existing = "";
+        renameSource = "";
       }
       if (existing) {
         output.value(existing);
         return emit(
           { performed: false, reason: "already", milestone: existing },
+          0,
+        );
+      }
+      // --rename-from: the old title exists and the new one does not — rename in
+      // place (task 205). Creating instead would move only the caller's issue onto
+      // a new milestone and strand every issue already grouped on the old one.
+      if (renameSource) {
+        plain(ghMilestoneRenameArgv(args, slug, renameSource));
+        output.value(renameSource);
+        return emit(
+          {
+            performed: true,
+            reason: "performed",
+            milestone: renameSource,
+            renamedFrom: args.renameFrom,
+          },
           0,
         );
       }
@@ -1140,6 +1203,15 @@ function run({
       output.err(`Error: --kind ${args.kind} requires --${req}`);
       return { exitCode: 2 };
     }
+  }
+
+  // `--rename-from` renames a MILESTONE; on any other kind it would be silently
+  // ignored, which is a caller believing a rename happened. Refuse it locally.
+  if (args.renameFrom && args.kind !== "milestone") {
+    output.err(
+      `Error: --rename-from applies to --kind milestone only (got --kind ${args.kind})`,
+    );
+    return { exitCode: 2 };
   }
 
   // Numeric flags are validated as numbers. `gh issue close PROJ-1` would

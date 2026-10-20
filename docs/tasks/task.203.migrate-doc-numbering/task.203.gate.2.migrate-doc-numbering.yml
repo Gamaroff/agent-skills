@@ -1,0 +1,76 @@
+schema: 2
+task: 'task.203.migrate-doc-numbering'
+task_title: 'Migrate documents to hierarchical numbering'
+gate: FAIL
+status_reason: 'Cycle 1 fixed bugs 1, 3 and 4 (verified). The refute pass found that the bug-2 revert hint restores the whole PRD root and so can erase uncommitted work the run never touched (HIGH, bug 2 reopened), plus two MEDIUM failure-path gaps: a story-number collision passes the dry run, and an apply failure strands the tree with no revert hint.'
+reviewer: 'QA Engineer (qa-task, develop-task pipeline, cycle 2 refute pass)'
+head: 'b210c0bb58190bfea298b1cac004fee9cd5dd86a'
+updated: '2026-10-15T08:12:09Z'
+
+top_issues:
+  - id: CR-1
+    severity: high
+    file: 'shared/resources/migrate-doc-numbering.mjs'
+    finding: 'revertHint restores the whole PRD root (and every touched outside file), while verify() refuses only dirty fileMap sources, so running the hint erases uncommitted edits to unmoved tracked files under the root (prd-registry.md, an already-numbered PRD) and to dirty outside files the literal pass rewrote; the nothing-to-move branch offers the same whole-root restore.'
+    suggested_action: 'Refuse (dirty-path) when any path the run will edit, write or move is dirty, and limit the hint to the exact paths the run moved, edited and wrote; drop the whole-root restore from the nothing-to-move branch.'
+    suggested_owner: dev
+    bug_ref: 'task.203.bug.2.revert-hint-does-not-revert.md'
+    status: open
+  - id: CR-2
+    severity: medium
+    file: 'shared/resources/migrate-doc-numbering.mjs'
+    finding: 'Stories keep their number under the new parent with no collision check, so a legacy story and an already-numbered one that map to one story.P.E.S pass the dry run and fail post-check with duplicate-id after the moves (reproduced in memory).'
+    suggested_action: 'Collect new story ids per target epic, existing ones included, in plan/verify and raise a blocker on any collision.'
+    suggested_owner: dev
+    bug_ref: 'task.203.bug.5.story-number-collision-unblocked.md'
+    status: open
+  - id: CR-3
+    severity: medium
+    file: 'shared/resources/migrate-doc-numbering.mjs'
+    finding: 'apply() is not wrapped: a git mv or write failure part-way throws out of run() with no payload and no revert hint, leaving a document directory split (reproduced: a move() that throws on its third call).'
+    suggested_action: 'Catch errors around apply() and return post-check-failed with a revert hint built from the moves and writes already made.'
+    suggested_owner: dev
+    bug_ref: 'task.203.bug.6.apply-failure-strands-tree.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 38
+  phases_verified: 5/5
+  ci: 'not read this cycle (CI is gated at /finalise)'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4]
+    phases_with_issues: [1, 3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 11
+    notes: 'checkPrdRoot probed with the path corpus: engages, 11 executed, 0 reproduced, 0 escapes (task.203.qa.2.security.run.json). Advisory: it still accepts the repository root and .git / node_modules (CR-4), and an absolute --root through a symlinked repo path is refused (CR-5).'
+  performance:
+    status: PASS
+    notes: 'Dry run on head 0.328 s (already) at load 6.11; the migration-pending dry run measured 2.248 s at 61baa8dc. One move per file is held by a test.'
+  reliability:
+    status: CONCERNS
+    notes: 'The revert hint can erase uncommitted work (CR-1); a story collision passes the dry run (CR-2); an apply failure strands the tree with no hint (CR-3).'
+  maintainability:
+    status: PASS
+    notes: '38 tests; the cycle-1 fixes are mutation-proven (7/7). Three low advisories (CR-5, CR-6, CR-7).'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1 (bug 2 reopened), CR-2 (bug 5) and CR-3 (bug 6).'
+      refs: ['shared/resources/migrate-doc-numbering.mjs']
+  future:
+    - action: 'CR-4: refuse the repository root, .git and node_modules as a PRD root, and make apply remove only the directories its own moves emptied. CR-5: compare containment on realpaths. CR-6: add explicit move sources to the candidate set. CR-7: root the revert pathspecs (git -C or :/).'
+      refs: ['shared/resources/migrate-doc-numbering.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

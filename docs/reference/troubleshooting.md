@@ -98,8 +98,8 @@ echo "PRD_ROOT=$PRD_ROOT ARCH_ROOT=$ARCH_ROOT"
 
 # Does it exist?
 ls "$PRD_ROOT"                              # base PRD directory
-ls "$PRD_ROOT"/*/epics/epic.*.md            # epic files
-ls "$PRD_ROOT"/*/epics/*/stories            # nested story directories
+ls "$PRD_ROOT"/*/prd.*/epics/epic.*/epic.*.md            # epic files
+ls "$PRD_ROOT"/*/prd.*/epics/*/stories            # nested story directories
 ```
 
 If the root is wrong, set `prd.prdShardedLocation` in `skills-config.yaml` to the right path. If the *nested* layout is non-standard (e.g. you have a global `docs/stories/` folder), move files onto the convention — skills won't adapt to custom nested layouts.
@@ -110,7 +110,7 @@ If the root is wrong, set `prd.prdShardedLocation` in `skills-config.yaml` to th
 
 **Cause:** Hard gate — every story must declare its parent epic for branch targeting.
 
-**Fix:** Add `epic: epic.{N}.{name}` to the story frontmatter, matching the parent epic directory stem exactly. Re-run.
+**Fix:** Add `epic: epic.{P}.{E}.{name}` to the story frontmatter, matching the parent epic directory stem exactly. Re-run.
 
 See [Story documents](../standards/story-documents.md#frontmatter-schema).
 
@@ -120,25 +120,25 @@ See [Story documents](../standards/story-documents.md#frontmatter-schema).
 
 **Cause:** You accepted the default at the Phase 0 Q1 prompt without checking that the project's integration branch is `develop` (not `main`), or Q1 and Q2 disagreed — basing on an epic integration branch and then targeting `develop` yields a PR containing every earlier story in the epic.
 
-**Fix:** rebase onto the base you meant, where `{CORRECT_BASE}` is `develop` or the epic integration branch (`epic/{N}.{slug}`):
+**Fix:** rebase onto the base you meant, where `{CORRECT_BASE}` is `develop` or the epic integration branch (`epic/{P}.{E}.{slug}`):
 
 ```bash
-git checkout feature/story.{E}.{S}.{name}
+git checkout feature/story.{P}.{E}.{S}.{name}
 git rebase --onto {CORRECT_BASE} <wrong-base>
 git push --force-with-lease
 ```
 
 If the PR is already open, update its base via `gh pr edit --base {CORRECT_BASE}`. Q1 and Q2 must name the same branch.
 
-## Epic / task registry collision
+## PRD / epic / task number collision
 
-**Symptom:** `create-epic` or `create-task` fails because the assigned number already exists.
+**Symptom:** `create-prd` or `create-task` fails because the assigned number already exists, or CI fails `doc-numbering-corpus.test.mjs` with `duplicate-id`.
 
-**Cause:** Another author created an artifact with the same number, or you used a stale registry snapshot.
+**Cause:** Another author created an artifact with the same number — a stale registry snapshot (PRD, task), or two branches that each took the next epic number within the same PRD.
 
-**Fix:** Pull the latest registry. The skill re-reads **Next Available** and assigns the next free number. If you've already committed locally with a colliding number, rename your epic/task directory and file to the new number before pushing.
+**Fix:** Pull the latest `develop`. A registry skill re-reads **Next Available** and assigns the next free number; `create-epic` recounts the epics on disk. If you've already committed locally with a colliding number, rename the directory and file to the new number before pushing.
 
-See [Epic registry](../standards/epic-registry.md), [Task registry](../standards/task-registry.md).
+See [PRD registry](../standards/prd-registry.md), [Task registry](../standards/task-registry.md).
 
 ## Gate file conflicts
 
@@ -149,7 +149,7 @@ See [Epic registry](../standards/epic-registry.md), [Task registry](../standards
 **Fix:** Do not hand-merge gate files. Discard your local gate file and re-run `qa-story` / `qa-task` to regenerate it. **Dev skills must never modify gate files** — they're owned by QA skills.
 
 ```bash
-git checkout --theirs path/to/story.{E}.{S}.gate.{N}.{name}.yml
+git checkout --theirs path/to/story.{P}.{E}.{S}.gate.{N}.{name}.yml
 /qa-story <story-path>
 ```
 
@@ -165,9 +165,9 @@ See [Status lifecycle](../standards/status-lifecycle.md).
 
 ## Lite mode surprise: side-effects still ran
 
-**Symptom:** You expected `--lite` to skip the PR comment / tracker update.
+**Symptom:** The run was in lite (or fast) mode, and you expected it to skip the PR comment / tracker update.
 
-**Cause:** This is by design. Lite mode skips context-gathering before development; Step 7 (`finalise`) always runs its full side-effects — DoD post to PR, tracker comment, board update.
+**Cause:** This is by design. Lite and fast modes shorten QA only — direct-tools Step 5, `--effort low` Step 5c. Step 7 (`finalise`) always runs its full side-effects — DoD post to PR, tracker comment, board update — and no `--skip` can remove it. See [the lite-mode contract](../../shared/resources/develop-pipeline-lite-mode.md).
 
 **Fix:** Not a bug. If you genuinely need to skip Step 7, bypass `develop-*` and drive the pipeline manually.
 
@@ -185,19 +185,21 @@ See [Status lifecycle](../standards/status-lifecycle.md).
 
 ## QA fix loop hits 5 cycles
 
-**Symptom:** `qa-fix` ran five times and the gate is still `CONCERNS` or `FAIL`.
+**Symptom:** `qa-fix` ran five times (the default `QA_MAX_CYCLES`) and the gate still has open findings.
 
 **Cause:** The fixes don't address root cause, or the gate findings are infrastructure-level and need human attention.
 
-**Fix:** Stop the orchestrator. Read the QA report, address the underlying issue manually, then run `/qa-story` or `/qa-task` to re-gate. Consider whether the failures warrant a `WAIVED` decision recorded via `/qa-gate`.
+**Fix:** Read the QA report and the escalation entry in the implementation report. To let the pipeline continue, re-invoke `/develop-story` or `/develop-task` on the same document and choose **"Resume at 5a with {k} more cycles"**: resume rebuilds the cycle count from the gate files on disk, back-fills any cycle you ran by hand, and records the grant on the lock (`grant-qa-cycles.sh` writes `extra_cycles_granted` and `qa_max_cycles`). A `/qa-story` or `/qa-task` you run standalone in the meantime is counted on resume, not repeated. Consider whether the failures warrant a `WAIVED` decision recorded via `/qa-gate`. Procedure: [resume contract, Re-entry after a QA loop escalation](../../shared/resources/develop-pipeline-resume-contract.md#re-entry-after-a-qa-loop-escalation).
 
-**Note that reaching five cycles is no longer the only way out.** The loop has three exits and they mean different things:
+**Note that reaching the cycle budget is no longer the only way out.** The loop reaches Step 5c by several routes, and escalates by two; they mean different things:
 
 | Exit | Fires when | What it means |
 |---|---|---|
-| Clean gate | `PASS` / `WAIVED` | The work is done. Hands to Step 5c |
-| **Diminishing returns** | Two consecutive **zero-HIGH** gates, the residue is entirely test machinery, **and** nothing implicates product behaviour | The loop **finished working**. Exits cleanly and hands to Step 5c, exactly as a clean gate does |
-| Convergence check | HIGH findings **remain and stop falling** | The loop **stopped working**. Escalates |
+| No open finding | a gate with no open `top_issues[]` entry — `PASS`, an active `WAIVED`, or a `CONCERNS` whose queue is empty or all closed | The work is done. Hands to Step 5c |
+| **Diminishing returns** | Two consecutive **zero-HIGH** gates, the residue is entirely test machinery, **and** nothing implicates product behaviour | The loop **finished working**. Exits cleanly and hands to Step 5c, exactly as a gate with no open finding does |
+| **Cosmetic residue** | Two consecutive **zero-HIGH** gates (from cycle 2), and a `PASS` gate whose only open entries are LOW | What is left is not worth a fix cycle. Hands to Step 5c |
+| **Gate the last fix** (half-cycle) | Cycle 3 or later, the budget is spent, the last cycle ran `qa-fix` from 5a (not after a 5c `REQUEST CHANGES`), so its fix has no gate; the last gate raised no HIGH; and MEDIUM fell strictly over the last three gates or is 0 on the last gate | One more review and gate, with no fix: no open entry hands to Step 5c, anything open escalates |
+| Convergence check | HIGH findings **remain and stop falling** | The loop **stopped working**. Escalates (not an exit) |
 
 The two guards are opposites, and neither can claim the other's run: the diminishing-returns exit requires two consecutive zero-HIGH gates, so a flat non-zero sequence is never its business. If you are seeing cycle 4 and 5 spent refining test pins while the product has been finished since cycle 2, that is the case the exit was added for — check `qa.testArtifactGlobs` in `skills-config.yaml`, which is what tells it which paths count as machinery.
 
@@ -236,6 +238,21 @@ The loop deliberately never substitutes a replacement gate for you. Choosing one
 | PR creation | The PR (`gh pr close --delete-branch`) |
 | QA review | The gate file `*.gate.{N}.{name}.yml` |
 | Implementation report | `*.implementation.{N}.{name}.md` |
+
+## Finalise halted with DoD gaps and I fixed code
+
+**Symptom:** `/finalise` HALTed at Step 7 with `❌ GAPS`, you closed the gaps by changing code, and you want the run to accept the fix.
+
+**Cause:** A resume at Step 7 would accept a head no QA gate has read.
+
+**Fix:** Commit the fix, then re-invoke `/develop-story` or `/develop-task` on the same document and choose **"Re-enter QA at 5a"** (Recommended). `reenter-qa-after-finalise.sh` measures what moved since the newest gate's `head:` and re-enters the QA loop at step 5 / `qa_phase` 5a, with `qa_max_cycles` set to at least two cycles past the reconstructed count. It refuses before writing anything:
+
+| Refusal | What to do |
+|---|---|
+| `no-code-moved` — the fix is document-only | Nothing: the run restores at Step 7 by itself and `/finalise` re-runs. The refusal also names any untracked files outside the work item. If one belongs to the fix, stop the run before `/finalise` accepts, commit the file and run `/qa-task` or `/qa-story` on it: once the run has restored at Step 7, re-invoking does not offer QA re-entry |
+| `uncommitted-fix` — a tracked change outside the work item's directory is uncommitted | Commit the fix and re-invoke |
+
+The full refusal list and its routes: [resume contract, Re-entry after a finalise DoD-gaps halt](../../shared/resources/develop-pipeline-resume-contract.md#re-entry-after-a-finalise-dod-gaps-halt).
 
 ## Platform resolver picked the wrong tracker
 

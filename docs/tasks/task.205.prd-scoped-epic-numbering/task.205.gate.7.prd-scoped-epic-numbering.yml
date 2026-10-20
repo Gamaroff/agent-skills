@@ -1,0 +1,63 @@
+schema: 2
+task: 'task.205.prd-scoped-epic-numbering'
+task_title: 'PRD-scoped epic numbering'
+gate: PASS
+status_reason: 'Cycle 6''s fix holds: the stray fence is gone, Steps 6–7 of create-epics-from-shards are visible to every engine, and the fence probe of the Step 7 guard engages 8/8 against the committed doc (BUG-14 closed). The retirement test now reads blocks through the shared fence reader; mutation-proven both ways. One low cleanup from the diff review. Suite: npm run ci:fast green — 5690 tests, 5676 pass, 0 fail.'
+reviewer: 'QA Engineer'
+head: '632d175288c90fd76312fe7ce7917c186afee145'
+updated: '2026-10-15T14:04:03Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 5690
+  phases_verified: '7/7'
+  ci: 'not read at this cycle (gated at /finalise)'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5, 6]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 8
+    notes: 'Step 7 batch guard probed with the fence form against the committed doc: engages, 8/8 (2 legitimate accepted; misnamed file, missing, duplicate P.E, epic.2.20 prefix collision, second-of-batch missing, E0=0 rejected). Record: task.205.qa.7.security.run.json. bash only (zsh not installed on the QA host).'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Batch presence and id checks hold; zsh nomatch message gap remains advisory (fails closed).'
+  maintainability:
+    status: PASS
+    notes: 'Fence structure restored; the test and the engines now share one fence reader.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Cleanup (CR-1): use test.before instead of a second require of node:test (precedent: tests/release-ci-verdict.test.js).'
+      refs: ['tests/epic-numbering-retirement.test.js']
+    - action: 'Carried from gate 6 (advisory): Step 7 presence loop globs in its word list — under zsh nomatch an absent epic.P.E aborts without its message; a duplicate P.E reads "is missing".'
+      refs: ['skills/create-epics-from-shards/SKILL.md']
+    - action: 'Carried from gates 4–5: later blocks of sync-github-epic and ensure-epic-github-issue use bare references/ paths; issue-body blocks read values bound elsewhere (pre-existing); two blocks bind unused epic-meta values.'
+      refs: ['skills/sync-github-epic/SKILL.md', 'skills/ensure-epic-github-issue/SKILL.md']
+    - action: 'A repository-wide guard that every SKILL.md fence closes where it opens (fence-reader block count equals raw bash-fence count).'
+      refs: ['tests/']
+
+bug_resolution:
+  bugs_fixed: 14
+  bugs_remaining: 0
+  fix_date: '2026-10-15'
+  total_iterations: 6
+  verification_method: 'Executed skill blocks (committed test, shared fence reader) + mutation proofs + fence probe (recorded)'
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

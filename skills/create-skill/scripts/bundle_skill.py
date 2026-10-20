@@ -142,10 +142,30 @@ COMMENT_LINE_RE = re.compile(r'^\s*(?://|/\*|\*|#)')
 BUNDLE_DECL_RE = re.compile(r'bundle-dependency:\s*(?:\.\./)*shared/resources/')
 
 
+@functools.lru_cache(maxsize=None)
+def _sibling_names(text, suffix):
+    """Sibling files a shared source requires, imports or sources, in match
+    order. Depends on the text alone, so it is cached: a shared source is
+    scanned once per skill that bundles it."""
+    if suffix in ('.js', '.mjs'):
+        return tuple(m.group(1) for m in JS_SIBLING_RE.finditer(text)) + \
+            tuple(m.group(1) for m in JS_ESM_SIBLING_RE.finditer(text))
+    if suffix == '.sh':
+        return tuple(m.group(1) for m in SH_SIBLING_RE.finditer(text))
+    return ()
+
+
 def comment_only_refs(text):
     """Return [(line_no, target)] for every shared/resources/ reference in a
     JS/MJS source that sits on a comment-only line and is not an explicit
-    `bundle-dependency:` declaration. Pure; the caller decides what to print."""
+    `bundle-dependency:` declaration. Pure; the caller decides what to print.
+    Cached on the text, as parse_shared_refs is: a shared source is visited once
+    per skill that bundles it. Each caller gets a fresh list."""
+    return list(_comment_only_refs_cached(text))
+
+
+@functools.lru_cache(maxsize=None)
+def _comment_only_refs_cached(text):
     out = []
     for i, line in enumerate(text.split('\n'), 1):
         if not COMMENT_LINE_RE.match(line) or BUNDLE_DECL_RE.search(line):
@@ -154,7 +174,7 @@ def comment_only_refs(text):
             target, _ = split_fragment(m.group(1))
             if target:
                 out.append((i, target))
-    return out
+    return tuple(out)
 
 
 def refs_refs_with_kind(text):
@@ -387,6 +407,11 @@ def rewrite_md_links(content, src_dir, dst_dir, skill_dir, bundled_names):
             continue
         if m:
             fence = (m.group(1)[0], len(m.group(1)))
+            out.append(line)
+            continue
+        if '](' not in line:
+            # LINK_RE cannot match without `](`; most lines carry no link, and
+            # scanning their code spans was most of a `bundle --check` run.
             out.append(line)
             continue
         spans = _code_spans(line)
@@ -665,11 +690,7 @@ def discover_needed(skill_path, shared_dir, refs_dir):
         warn_comment_only_refs(src, text, repo_root)
         # Sibling edges carry the citing file but no line: the regexes match
         # across the whole text, and the file is what a reader needs to act.
-        if src.suffix in ('.js', '.mjs'):
-            pending.extend((m.group(1), (rel_src, None), DEP) for m in JS_SIBLING_RE.finditer(text))
-            pending.extend((m.group(1), (rel_src, None), DEP) for m in JS_ESM_SIBLING_RE.finditer(text))
-        if src.suffix == '.sh':
-            pending.extend((m.group(1), (rel_src, None), DEP) for m in SH_SIBLING_RE.finditer(text))
+        pending.extend((n, (rel_src, None), DEP) for n in _sibling_names(text, src.suffix))
         if src.suffix in ('.md', '.sh'):
             # `pending_quiet`, not `pending`: a missing source here is not an
             # authoring error worth a warning — it is a skill-native script that

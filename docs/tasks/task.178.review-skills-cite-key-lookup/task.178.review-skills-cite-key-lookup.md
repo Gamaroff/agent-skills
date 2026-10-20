@@ -5,10 +5,12 @@ type: task
 description: "Replace the three restated, unanchored jira_key / github_issue lookups in review-task and review-story with citations of the shared §0a Key → document lookup that task.176 corrected."
 tags: [review-task, review-story, input-resolution, follow-up]
 category: refactoring
-status: planned
+status: accepted
 priority: Medium
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-12
+completed_date: 2026-10-12
+pr_number: 636
 assignee:
 estimated_effort_hours: 8
 github_issue: 556
@@ -16,7 +18,8 @@ github_issue: 556
 
 # Technical Task: review-task and review-story cite the §0a key lookup
 
-**Status:** Planned
+**Status:** Accepted
+**Review**: ✅ All review recommendations from `task.178.review.1.review-skills-cite-key-lookup.md` implemented 2026-10-12
 **GitHub Issue**: [#556](https://github.com/Gamaroff/agent-skills/issues/556)
 
 ---
@@ -90,9 +93,21 @@ document today (`ls … | grep -c develop-pipeline-step-0` → 0).
   bundler copies the step-0 document alone into each skill, not its closure (AGENTS.md "Cite or depend").
 - review-task's line-99 block keeps its task-only constraint (a `task.{N}` document) as a check on the
   lookup's result, never as a second grep.
-- A guard test fails on any `grep -rl "jira_key: ` / `"github_issue: ` in a canonical source outside the
-  allowlisted §0a history note. It carries a non-vacuity floor: the §0a block must still match its own
-  anchored pattern.
+- A guard test fails on any canonical source other than §0a's own lookup that greps the `docs` tree
+  for a tracker-key value. Its key is what the line does, not how its flags are
+  spelled: within one command segment, a grep-family command (`grep`, `egrep`, `git grep`, `rg`), a
+  key field followed by a value (`jira_key: X`, `github_issue: {N}`, `${KEY_FIELD}:…`) and the
+  `docs` tree as a path argument (QA cycle 2 replaced two flag-spelling keys that each missed real
+  spellings). Before this task it matched the three sites; after it, only §0a's own lookup, which is
+  the allowlist's one entry. It is a tripwire over the shapes in its fixture table, not a parser: its
+  header lists the shapes it does not see (QA cycle 3 scoped the claim rather than chase more
+  spellings). It deliberately does **not** match
+  `sync-github-bug/SKILL.md:58` / `sync-jira-bug/SKILL.md:105`, which run `grep -rL` (files *without*
+  a key — a different rule); the lowercase `l` is what separates them. It carries a non-vacuity floor:
+  the §0a block must still match its own anchored pattern.
+- review-task's Jira-key branch stays in **fenced blocks** (the binding, then the task-only check, around
+  the cited §0a block), which the skill says to run as one script in one shell; the check refuses its
+  unbound inputs when run alone (QA cycle 1, CR-1). A test extracts and executes them.
 
 ### Important Clarifications
 
@@ -134,11 +149,11 @@ match now reports "no local document". CHANGELOG says so.
 
 **Files**: `skills/review-task/SKILL.md`, `skills/review-story/SKILL.md`
 
-- [ ] review-task Step 2's Jira-key branch runs the §0a lookup (cited) with `KEY_FIELD=jira_key`, then
+- [x] review-task Step 2's Jira-key branch runs the §0a lookup (cited) with `KEY_FIELD=jira_key`, then
       checks the result is a `task.{N}` document.
-- [ ] review-task:134 and review-story:189 fallbacks cite §0a with `KEY_FIELD=github_issue` (or
+- [x] review-task:134 and review-story:189 fallbacks cite §0a with `KEY_FIELD=github_issue` (or
       `jira_key`).
-- [ ] `npm run bundle` — the step-0 document is added to both skills' `references/`.
+- [x] `npm run bundle` — the step-0 document is added to both skills' `references/`.
 
 **Dependencies**: none.
 
@@ -148,9 +163,17 @@ match now reports "no local document". CHANGELOG says so.
 
 **Files**: `tests/key-lookup-single-statement.test.js` (new)
 
-- [ ] Fail on a `grep -rl "(jira_key|github_issue): ` in any canonical source except the allowlisted
-      §0a history note; assert the §0a block still holds its anchored pattern (non-vacuity).
-- [ ] Mutation check: re-insert one old grep and confirm the test goes red.
+- [x] Fail on the compound key (§3 Target Architecture) in any canonical source — `skills/*/SKILL.md`,
+      `shared/resources/*.md`, hand-authored `skills/*/references/*.md`, and tracked shell under
+      `shared/resources/` and `skills/*/scripts/` — except §0a's own lookup, the one allowlisted entry; assert the
+      §0a block still holds its anchored pattern (non-vacuity). Assert the two `grep -rL` sites are not
+      matched (the discriminator is pinned, not assumed).
+- [x] Executed fixture test, same file: extract the §0a fenced block and review-task's Jira-key fenced
+      block, run them under bash and zsh (zsh skipped when absent, as the other suites do) against a
+      temp `docs/` fixture holding a task document with a quoted key (`jira_key: 'RAPP-70'`), a
+      `.request.` sibling carrying the same key, a prefix neighbour (`RAPP-702`), and a non-task document
+      for the task-only check. Pattern: `skills/review-pr/tests/review-pr.test.js` §0a extraction.
+- [x] Mutation check: re-insert one old grep (and a single-quoted variant) and confirm the test goes red.
 
 **Dependencies**: Phase 1.
 
@@ -158,7 +181,7 @@ match now reports "no local document". CHANGELOG says so.
 
 **Risk Level**: Low
 
-- [ ] `[Unreleased]` entry citing (task 178).
+- [x] `[Unreleased]` entry citing (task 178).
 
 **Dependencies**: Phase 2.
 
@@ -194,7 +217,9 @@ None.
 
 ### Unit Tests
 
-- The guard test (Phase 2), with its non-vacuity floor and an allowlist of exactly one entry.
+- The guard test (Phase 2), with its non-vacuity floor, an allowlist of exactly one entry, and a pinned
+  `grep -rL` exclusion.
+- The executed fixture test for review-task's Jira-key branch (Phase 2, same file).
 
 ### Integration Tests
 
@@ -217,10 +242,11 @@ None.
 
 ### Functional
 
-- [ ] No canonical source restates `grep -rl "jira_key: ` or `grep -rl "github_issue: ` outside the
-      allowlisted §0a history note (guard test).
+- [ ] No canonical source other than §0a's own lookup greps the `docs` tree for a tracker-key value
+      — the key `tests/key-lookup-single-statement.test.js` defines (guard test).
 - [ ] review-task's Jira-key branch resolves a quoted key to its one task document and not to a
-      `.request.` sibling or a prefix neighbour (executed fixture test, bash and zsh).
+      `.request.` sibling or a prefix neighbour (executed fixture test in
+      `tests/key-lookup-single-statement.test.js`, bash and zsh — CI installs zsh).
 
 ### Performance
 
@@ -275,14 +301,71 @@ accurate.
 
 ---
 
-<!-- change-log-start -->
+## QA Testing Results
 
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-12
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.178.qa.6.review-skills-cite-key-lookup.md](./task.178.qa.6.review-skills-cite-key-lookup.md)
+- **Gate File**: [task.178.gate.6.review-skills-cite-key-lookup.yml](./task.178.gate.6.review-skills-cite-key-lookup.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 12 (new file); fast gate 5377
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+- Gate 5 CR-1 fixed (`dcf86760`), mutation-proven.
+- One advisory low/medium matcher edge case (a quote glued between word characters); routed to future work.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.178.qa.6.review-skills-cite-key-lookup.md`
+**Gate File**: `task.178.gate.6.review-skills-cite-key-lookup.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (6 QA cycles — 5 budgeted plus 1 granted after the loop-limit escalation)
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 6/6, each held by a test that runs per PR
+✅ **PR Review:** PR #636 — Step 5c conformance review APPROVE (no host review required); CI green on `a557658`
+✅ **Documentation:** CHANGELOG [Unreleased] entry (task 178); three sites cite §0a; step-0 document bundled into both skills
+✅ **Security Review:** PASS — the task-only check is a boundary, probed by /finalise through the engine (17 executed, 0 reproduced)
+⚠️ **Compliance Review:** NOT_APPLICABLE — internal refactor
+
+**Task marked as ACCEPTED on:** 2026-10-12
+
+**Detailed Verification Log:** See `task.178.dod.1.review-skills-cite-key-lookup.md` for complete verification evidence and timestamps.
+<!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                       | Author      |
-| ---------- | ------- | ------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-02 | 1.0     | Initial draft — task.176 Deferred Work item 5     | create-task |
-
+| 2026-10-12 | 1.1     | Review passed (8/10) — guard key widened to a quote- and flag-order-tolerant compound pattern with the `grep -rL` exclusion pinned; executed fixture test named for the Jira-key criterion; tracked shell added to the guard population | review-task |
+| 2026-10-12 |         | Status → ready-for-development | review-task |
+| 2026-10-12 |         | Implemented — 4 files changed, 1 test file (10 tests), 2 bundled copies | develop |
+| 2026-10-12 |         | QA gate CONCERNS (90/100) — 3 findings (1 medium, 2 low; 1 deferred) | qa-task |
+| 2026-10-12 |         | QA findings fixed — cycle 1, 2 findings + 1 cleanup (one-shell Jira-key branch, flag-token guard key, fixture cleanup) | qa-fix |
+| 2026-10-12 |         | QA gate CONCERNS (90/100) — 3 findings (1 medium, 1 low, 1 deferred) | qa-task |
+| 2026-10-12 |         | QA findings fixed — cycle 2, 2 findings (guard key replaced: grep over the docs tree for a key value, per command segment) | qa-fix |
+| 2026-10-12 |         | QA gate CONCERNS (90/100) — 2 findings (2 medium) | qa-task |
+| 2026-10-12 |         | QA findings fixed — cycle 3, 2 findings (quote-aware segments, prefixed/globbed docs paths; guard claim scoped to its fixture table) | qa-fix |
+| 2026-10-12 |         | QA gate FAIL (80/100) — 1 finding (1 high) | qa-task |
+| 2026-10-12 |         | QA findings fixed — cycle 4, 1 finding + 1 advisory + 2 cleanups (backtick-first segment split; brace sets need a comma; CHANGELOG and header wording) | qa-fix |
+| 2026-10-12 |         | QA gate CONCERNS (90/100) — 1 finding (1 medium) | qa-task |
+| 2026-10-12 |         | QA findings fixed — cycle 5, 1 finding (a word-internal apostrophe is literal, not a quote opener) | qa-fix |
+| 2026-10-12 |         | QA gate PASS (100/100) — 0 blocking findings (1 low advisory) — cycle 6, granted after escalation | qa-task |
+| 2026-10-12 | 1.2 | DoD passed — accepted (PR #636) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -291,19 +374,19 @@ accurate.
 
 ### Phase 1: Cite §0a
 
-- [ ] review-task:99
-- [ ] review-task:134
-- [ ] review-story:189
-- [ ] Bundle
+- [x] review-task:99
+- [x] review-task:134
+- [x] review-story:189
+- [x] Bundle
 
 ### Phase 2: Guard test
 
-- [ ] Test
-- [ ] Mutation check
+- [x] Test
+- [x] Mutation check
 
 ### Phase 3: CHANGELOG
 
-- [ ] Entry
+- [x] Entry
 
 ---
 

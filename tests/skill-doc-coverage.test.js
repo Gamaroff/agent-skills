@@ -93,7 +93,6 @@ const UNDOCUMENTED_AT_ADOPTION = new Set([
   "ensure-task-jira-issue",
   "ensure-bug-github-issue",
   "ensure-bug-jira-issue",
-  "epic-registry-manager",
   "error-handling-enforcer",
   "explain-simply",
   "extract",

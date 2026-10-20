@@ -12,7 +12,7 @@ invokes: [qa-planning]
 
 Use this skill when:
 
-- Implementing user stories from `{epic-directory}/stories/` (co-located inside epic dirs, e.g. `${PRD_ROOT}/<domain>/<feature>/epics/epic.{N}.<name>/stories/`)
+- Implementing user stories from `{epic-directory}/stories/` (co-located inside epic dirs, e.g. `${PRD_ROOT}/<domain>/prd.<P>.<feature>/epics/epic.{P}.{E}.<name>/stories/`)
 - Executing technical tasks from `docs/tasks/`
 - Starting new feature development
 - Need guidance on development workflow
@@ -25,19 +25,19 @@ Use this skill when:
 
 You can invoke this skill with:
 
-- **A specific story file**: `story.178.8.example-feature.md`
-- **A story directory**: `stories/story.178.8.example-feature/`
+- **A specific story file**: `story.1.178.8.example-feature.md`
+- **A story directory**: `stories/story.1.178.8.example-feature/`
 - **A specific task file**: `task.1.cache-lib-simplification.md`
 - **A task directory**: `docs/tasks/task.1.cache-lib-simplification/`
-- **An epic file**: `epic.178.feature-management.md` (triggers creation workflow)
+- **An epic file**: `epic.1.178.feature-management.md` (triggers creation workflow)
 
 **File Type Detection:**
 
-1. **Epic File Detection** - Matches pattern: `epic.{number}.{name}.md`
+1. **Epic File Detection** - Matches pattern: `epic.{P}.{E}.{name}.md`
    - If detected: Invoke epic handling workflow (see Epic File Handling section)
 
-2. **Story File Detection** - Matches pattern: `story.{epic}.{story}.{name}.md`
-   - Location: co-located within epic directories (`${PRD_ROOT}/<domain>/<feature>/epics/epic.{N}.<name>/stories/`) or as provided by the caller
+2. **Story File Detection** - Matches pattern: `story.{P}.{E}.{S}.{name}.md`
+   - Location: co-located within epic directories (`${PRD_ROOT}/<domain>/prd.<P>.<feature>/epics/epic.{P}.{E}.<name>/stories/`) or as provided by the caller
    - Exclude files containing: `.qa.`, `.gate.`, or `.bug.`
 
 3. **Task File Detection** - Matches pattern: `task.{id}.{name}.md`
@@ -58,15 +58,15 @@ When given a directory path:
 **Examples:**
 
 ```
-Input: stories/story.178.8.example-feature/
-Discovers: story.178.8.example-feature.md
+Input: stories/story.1.178.8.example-feature/
+Discovers: story.1.178.8.example-feature.md
 Type: Story File → Use Story Workflow
 
 Input: docs/tasks/task.1.cache-lib-simplification/
 Discovers: task.1.cache-lib-simplification.md
 Type: Task File → Use Task Workflow
 
-Input: epic.178.feature-management.md
+Input: epic.1.178.feature-management.md
 Type: Epic File → Trigger Epic Handling Workflow
 ```
 
@@ -76,7 +76,7 @@ Type: Epic File → Trigger Epic Handling Workflow
 
 When an epic file is provided as input:
 
-1. **Detect Epic File** - Match pattern: `epic.{number}.{name}.md`
+1. **Detect Epic File** - Match pattern: `epic.{P}.{E}.{name}.md`
 
 2. **Warn User** - Display clear message:
 
@@ -86,7 +86,7 @@ When an epic file is provided as input:
    Epic files cannot be developed directly. You must create individual
    stories or tasks from this epic first.
 
-   Epic: epic.{number}.{name}.md
+   Epic: epic.{P}.{E}.{name}.md
    Location: {file_path}
    ```
 
@@ -112,24 +112,24 @@ When an epic file is provided as input:
 **Example Flow:**
 
 ```
-User Input: /develop epic.178.feature-management.md
+User Input: /develop epic.1.178.feature-management.md
 
-System Detection: Epic file detected (matches pattern epic.178.*)
+System Detection: Epic file detected (matches pattern epic.1.178.*)
 
 System Warning:
 ⚠️  EPIC FILE DETECTED
 Epic files cannot be developed directly. You must create individual
 stories or tasks from this epic first.
 
-Epic: epic.178.feature-management.md
-Location: ${PRD_ROOT}/ui-domain/module-name/epics/epic.178.feature-management/epic.178.feature-management.md
+Epic: epic.1.178.feature-management.md
+Location: ${PRD_ROOT}/ui-domain/prd.1.module-name/epics/epic.1.178.feature-management/epic.1.178.feature-management.md
 
 System Prompt: [Displays AskUserQuestion with 3 options]
 
 User Selection: "Create Story"
 
 System Action: Invokes /create-story skill
-→ Proceeds to create story.178.1.{name}.md
+→ Proceeds to create story.1.178.1.{name}.md
 → Story ready for development via /develop
 ```
 
@@ -171,7 +171,7 @@ When invoked by an orchestrator (`develop-story`, `develop-task`, or any future 
 | Type                        | Format                                                                                                       | Effect                                                                                                                                                        |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Pre-develop surface map** | Compact list of file paths + 1-line descriptions (max 20 files) generated by an Explore subagent             | Skip the Explore-based file discovery in Implementation Alignment Analysis — use the supplied map instead                                                     |
-| **Plan file path**          | `task.{id}.plan.*.md` or `story.{epic}.{story}.plan.*.md` included as context                                | Treat as authoritative implementation detail (code snippets, signatures, exact changes) that supplements the document's own Tasks/Implementation Plan section |
+| **Plan file path**          | `task.{id}.plan.*.md` or `story.{P}.{E}.{S}.plan.*.md` included as context                                | Treat as authoritative implementation detail (code snippets, signatures, exact changes) that supplements the document's own Tasks/Implementation Plan section |
 | **Iteration hint**          | Plain text: `"Resuming from partial completion — see [story/task] checkboxes for completed [tasks/phases]."` | Skip completed checkboxes and start from the first unchecked item                                                                                             |
 
 **Contract rule:** If the caller prepends one of the above, `/develop` must honour it and must NOT re-derive the same information (no second Explore call, no re-read of already-summarised files, no fresh checkbox scan when an iteration hint is present). This keeps context lean across the full pipeline run and is the attach point for any future orchestrator that builds on this interface.
@@ -247,7 +247,7 @@ When invoked by an orchestrator (`develop-story`, `develop-task`, or any future 
 ### Example Flow
 
 ```
-User Input: /develop story.178.8.example-feature.md
+User Input: /develop story.1.178.8.example-feature.md
 
 System Detection: Story file detected
 System Status Check: Status field shows "draft"
@@ -256,9 +256,9 @@ System Warning:
 ⚠️  DRAFT DOCUMENT DETECTED
 This document has "draft" status and may not be ready for development.
 
-Document: story.178.8.example-feature.md
+Document: story.1.178.8.example-feature.md
 Status: draft
-Location: ${PRD_ROOT}/<domain>/<feature>/epics/epic.178.<name>/stories/story.178.8.example-feature/
+Location: ${PRD_ROOT}/<domain>/prd.1.<feature>/epics/epic.1.178.<name>/stories/story.1.178.8.example-feature/
 
 System Prompt: [Displays AskUserQuestion with 3 options]
 
@@ -320,7 +320,7 @@ System Action: Invokes /review-story skill
 ### Example Flow
 
 ```
-User Input: /develop story.312.1.user-authentication.md
+User Input: /develop story.1.312.1.user-authentication.md
 
 System Detection: Story file detected
 System Status Check: Status shows "Ready for Development"
@@ -328,7 +328,7 @@ System Risk Check: risk_level = high
 
 System Warning:
 ⚠️  HIGH RISK STORY DETECTED
-Story: story.312.1.user-authentication.md
+Story: story.1.312.1.user-authentication.md
 Risk Level: high
 
 System Prompt: [Displays AskUserQuestion with 3 options]
@@ -444,7 +444,7 @@ System Action: Invokes /qa-planning skill
 ### Example Flow
 
 ```
-User Input: /develop story.310.5.socketio-real-time-delivery.md
+User Input: /develop story.1.310.5.socketio-real-time-delivery.md
 
 System Detection: Story file detected
 System Status Check: Status shows "Ready for Development"
@@ -546,8 +546,8 @@ This skill works best with the following conventions in your project (adapt as n
 
 ### 1. Develop Story Workflow
 
-**File Pattern**: `story.{epic}.{story}.{name}.md`
-**Location**: co-located inside the epic dir: `{epic-directory}/stories/story.{epic}.{story}.{name}/story.{epic}.{story}.{name}.md` (epic-directory = `${PRD_ROOT}/<domain>/<feature>/epics/epic.{N}.<name>/`). Never a global `docs/stories/`.
+**File Pattern**: `story.{P}.{E}.{S}.{name}.md`
+**Location**: co-located inside the epic dir: `{epic-directory}/stories/story.{P}.{E}.{S}.{name}/story.{P}.{E}.{S}.{name}.md` (epic-directory = `${PRD_ROOT}/<domain>/prd.<P>.<feature>/epics/epic.{P}.{E}.<name>/`). Never a global `docs/stories/`.
 
 **Starting Development**:
 
@@ -846,9 +846,9 @@ Teach what and why you did in detail, as if training a junior engineer.
 
 **Key Paths**:
 
-- Stories: `${PRD_ROOT}/<domain>/<feature>/epics/epic.{N}.<name>/stories/` (co-located within epics)
+- Stories: `${PRD_ROOT}/<domain>/prd.<P>.<feature>/epics/epic.{P}.{E}.<name>/stories/` (co-located within epics)
 - Tasks: `docs/tasks/`
-- QA Artifacts: gate files and QA reports are **co-located** with their story/task (e.g. `{story-dir}/story.{N}.{M}.gate.{n}.{name}.yml`); `docs/qa/` is reserved for cross-cutting assessments only
+- QA Artifacts: gate files and QA reports are **co-located** with their story/task (e.g. `{story-dir}/story.{P}.{E}.{S}.gate.{n}.{name}.yml`); `docs/qa/` is reserved for cross-cutting assessments only
 - PRD: `${PRD_ROOT}/` (sharded; default `docs/prd/`, configurable)
 - Architecture: `${ARCH_ROOT}/` (sharded; default `docs/architecture/`, configurable)
 - Debug Log: `.ai/debug-log.md`
@@ -860,25 +860,25 @@ Teach what and why you did in detail, as if training a junior engineer.
 Each story has its own subdirectory containing all related files:
 
 ```
-${PRD_ROOT}/<domain>/<feature>/epics/epic.{N}.<name>/stories/
-└── story.{epic}.{story}.{story-name}/
-    ├── story.{epic}.{story}.{story-name}.md           # Story file (source of truth)
-    ├── story.{epic}.{story}.qa.{number}.{descriptive-name}.md  # QA report (created by QA)
-    ├── story.{epic}.{story}.gate.{number}.{descriptive-name}.yml # Quality gate (created by QA)
-    ├── story.{epic}.{story}.bug.1.{description}.md    # Bug report 1 (created by QA)
-    ├── story.{epic}.{story}.bug.2.{description}.md    # Bug report 2 (created by QA)
+${PRD_ROOT}/<domain>/prd.<P>.<feature>/epics/epic.{P}.{E}.<name>/stories/
+└── story.{P}.{E}.{S}.{story-name}/
+    ├── story.{P}.{E}.{S}.{story-name}.md           # Story file (source of truth)
+    ├── story.{P}.{E}.{S}.qa.{number}.{descriptive-name}.md  # QA report (created by QA)
+    ├── story.{P}.{E}.{S}.gate.{number}.{descriptive-name}.yml # Quality gate (created by QA)
+    ├── story.{P}.{E}.{S}.bug.1.{description}.md    # Bug report 1 (created by QA)
+    ├── story.{P}.{E}.{S}.bug.2.{description}.md    # Bug report 2 (created by QA)
     └── ...
 ```
 
 **File Naming Convention:**
 
-- All files in a story directory share the same base: `story.{epic}.{story}`
+- All files in a story directory share the same base: `story.{P}.{E}.{S}`
 - File type is indicated by the segment after the story ID:
   - `.qa.{number}.` = QA report
   - `.gate.{number}.` = Quality gate file
   - `.bug.{number}.` = Bug report (sequential numbering)
 - Descriptive name comes last before the file extension
-- Example: `story.178.8.example-feature.md`
+- Example: `story.1.178.8.example-feature.md`
 
 **Developer Responsibilities:**
 
@@ -998,8 +998,8 @@ Reference: See CLAUDE.md "Testing & Quality Standards" for complete testing patt
 
 **File Naming**:
 
-- Epics: `epic.[number].[name].md`
-- Stories: `story.[epic].[story].[name].md`
+- Epics: `epic.[P].[E].[name].md`
+- Stories: `story.[P].[E].[S].[name].md`
 - Use dots (.) for structural separators, hyphens (-) within descriptive names
 
 Reference: See CLAUDE.md "Documentation Standards" and `docs/templates/README.md`

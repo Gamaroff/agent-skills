@@ -93,20 +93,88 @@ Before starting the review, resolve the input to a local file path:
 
 **Step 1 — Detect input type:**
 
-| Pattern                                        | Action                        |
-| ---------------------------------------------- | ----------------------------- |
-| Absolute or relative file path ending in `.md` | Use directly                  |
-| Directory path containing `prd.`               | Look for `prd.*.md` inside it |
-| Name string (e.g. "docker-infrastructure")     | Search via Glob               |
+| Pattern                                        | Action                                            |
+| ---------------------------------------------- | ------------------------------------------------- |
+| Absolute or relative file path ending in `.md` | Use directly                                      |
+| Directory path containing `prd.`               | Use the `{dir}/{dir}.md` document inside it       |
+| A PRD id or number (`prd.3`, `3`)              | Resolve by number — Step 2                        |
+| Name string (e.g. "docker-infrastructure")     | Resolve by slug — Step 2                          |
 
-**Step 2 — Glob search for PRD by name:**
+**Step 2 — Resolve a number, an id or a name to the PRD document:**
 
-(First source `references/resolve-paths.sh` to populate `${PRD_ROOT}` — default `docs/prd`.)
+Run this block from the repository root. It walks `${PRD_ROOT}` and keeps only files that
+`references/doc-id.js` reads as a PRD **document** sitting in its own directory — never an artifact,
+so a review report such as `prd.1.onboarding.review.2.pm-check.md` can never resolve as the PRD. A
+number is compared as a number, so `1` cannot match `prd.12.*`. A PRD written before numbered PRDs
+(`prd.{feature}/prd.{feature}.md`) still resolves by its slug, so Step 2 can report it.
 
-Search patterns (try in order, use first match):
+```bash
+# review-prd — resolve the PRD (task 204)
+# INPUT: PRD_INPUT — a PRD number (3), an id (prd.3), a slug (onboarding) or a path ending in .md.
+DOC_ID=.agents/skills/review-prd/references/doc-id.js
+source .agents/skills/review-prd/references/resolve-paths.sh || exit 1
+: "${PRD_INPUT:?bind PRD_INPUT to the PRD number, id, slug or path}"
+MATCHES=$(command node -e '
+  const d = require(process.argv[1]);
+  const fs = require("fs");
+  const path = require("path");
+  const [root, raw] = process.argv.slice(2);
+  if (raw.endsWith(".md")) {
+    if (fs.existsSync(raw)) console.log(raw);
+    process.exit(0);
+  }
+  // A directory is resolved to its own document, {dir}/{dir}.md, and to nothing else.
+  let isDir = false;
+  try { isDir = fs.statSync(raw).isDirectory(); } catch {}
+  if (isDir) {
+    const own = path.join(raw, `${path.basename(path.resolve(raw))}.md`);
+    if (fs.existsSync(own)) console.log(own);
+    process.exit(0);
+  }
+  const input = path.basename(raw.replace(/\/+$/, ""));
+  // A full stem (prd.3.shop, or a legacy prd.shop) selects the PRD whose directory is that stem.
+  const stem = d.parse(input).ok ? d.parse(input) : d.parseLegacy(input);
+  const wantStem = stem.ok && stem.kind === "prd" && !stem.artifact ? input : null;
+  // A bare number, or prd.{N} with no slug, selects by number.
+  const asId = d.parse(`${input.startsWith("prd.") ? input : `prd.${input}`}.x`);
+  const wantN = asId.ok && asId.kind === "prd" && !asId.artifact && asId.slug === "x" ? asId.prd : null;
+  const wantSlug = input.replace(/^prd\./, "");
+  const out = [];
+  const walk = (dir) => {
+    let ents = [];
+    try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of ents) {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) { walk(full); continue; }
+      if (!e.name.endsWith(".md")) continue;
+      const stem = e.name.slice(0, -3);
+      if (path.basename(dir) !== stem) continue;            // a PRD document owns its directory
+      const p = d.parse(e.name);
+      const doc = p.ok ? p : d.parseLegacy(e.name);
+      if (!doc.ok || doc.kind !== "prd" || doc.artifact) continue;
+      const hit = wantStem !== null ? stem === wantStem
+        : wantN !== null ? p.ok && p.prd === wantN
+        : doc.slug.includes(wantSlug);
+      if (hit) out.push(full);
+    }
+  };
+  walk(root);
+  out.sort().forEach((f) => console.log(f));
+' "$PWD/$DOC_ID" "$PRD_ROOT" "$PRD_INPUT") \
+  || { echo "❌ The PRD resolver could not run (is ${DOC_ID} installed?) — this is not a missing PRD."; exit 2; }
+COUNT=$(printf '%s' "$MATCHES" | grep -c .)
+case "$COUNT" in
+  0) echo "❌ No PRD found matching '${PRD_INPUT}'."; exit 1 ;;
+  1) PRD_FILE="$MATCHES"; echo "PRD_FILE=${PRD_FILE}" ;;
+  *) echo "ASK: ${COUNT} PRDs match '${PRD_INPUT}' — ask the user which, bind PRD_INPUT to its path, and re-run:"
+     printf '%s\n' "$MATCHES"; exit 3 ;;
+esac
+```
 
-1. `${PRD_ROOT}/**/prd.*{name}*.md`
-2. `${PRD_ROOT}/**/*{name}*/*.md` (sharded PRD — look for index or primary file)
+Exit 1 → Step 4 below. Exit 2 → the resolver itself failed: report that, never "no PRD found".
+Exit 3 → ask the user which PRD with `AskUserQuestion`, bind `PRD_INPUT` to
+that path, and run the block again. A root-level `docs/prd.md` resolves only when given as a path;
+Step 2 reports it as a PRD that predates numbering.
 
 **Step 3 — Handle sharded PRDs:**
 
@@ -120,7 +188,8 @@ If no match found: HALT with message:
 "No PRD found matching '[input]'. Available PRDs:"
 ```
 
-Then list results of `Glob: ${PRD_ROOT}/**/prd.*.md` and `Glob: ${PRD_ROOT}/**/index.md`.
+Then list the PRDs under `${PRD_ROOT}` — the rows of `${PRD_ROOT}/prd-registry.md` when it exists, and
+the `prd.*/` directories otherwise.
 
 ---
 
@@ -137,7 +206,7 @@ question: "How would you like the review output delivered?"
 header: "Output Mode"
 options:
   - label: "Co-located report"
-    description: "Save a prd.review.{N}.{name}.md alongside the PRD file for async review and future reference."
+    description: "Save a prd.{P}.{feature}.review.{N}.{name}.md alongside the PRD file for async review and future reference."
   - label: "Inline action plan"
     description: "Present prioritised recommendations immediately as numbered steps to action now."
 ```
@@ -187,14 +256,15 @@ Store choice as `output_mode` for Step 11.
    - `docs/standards/file-naming.md`
    - `.claude/notifications.md` (if PRD touches notifications)
 
-4. **Scan for child epics**:
-   - Glob: `${PRD_ROOT}/[domain]/[feature]/epics/epic.*/epic.*.md`
+4. **Scan for child epics** — relative to the resolved PRD's directory:
+   - Glob: `{PRD dir}/epics/epic.*/epic.*.md`
 
 5. **Scan for child stories** under each epic found:
-   - Glob: `${PRD_ROOT}/[domain]/[feature]/epics/epic.*/stories/**/story.*.md`
+   - Glob: `{PRD dir}/epics/epic.*/stories/**/story.*.md`
 
-6. **Load epic registry**:
-   - `docs/development/epic-registry.md`
+6. **Load the PRD registry and the PRD's epic index**:
+   - `${PRD_ROOT}/prd-registry.md` — the PRD's row, number and status
+   - The PRD's `<!-- epics-index-start -->` … `<!-- epics-index-end -->` block, when it has one
 
 **Output**: Full context package ready for analysis.
 
@@ -222,8 +292,7 @@ Score each section: ✅ Complete | ⚠️ Partial | ❌ Missing
 **Also check**:
 
 - No unfilled placeholders: `{{...}}`, `[TBD]`, `[TODO]`, `YYYY-MM-DD`
-- PRD filename follows `prd.[kebab-name].md` convention
-- Directory follows `prd.[kebab-name]/` convention
+- **Numbering (blocking)** — see [§ Numbering check](#numbering-check) below. Every finding is **Critical**.
 - **Change Log — presence and currency** (conditional; canonical spec: [`document-change-log.md`](references/document-change-log.md)). Read `change-log.enabled` from `skills-config.yaml`; it defaults to **`true`**, unlike sign-off. Skip entirely when `change-log.enabled: false` or `change-log.enforcement: off`. Otherwise check two things:
   - **Presence** — a Change Log section with at least one row. **PRDs keep `### Change Log` nested under §1** — accept H3 (and optional section numbering, e.g. `### 1.5 Change Log`); do not flag it for not being H2. A PRD predating the four-column table may still have five columns; that is expected and is not a finding.
   - **Currency** — the newest row is consistent with frontmatter `status`. Flag **only** when `status` has advanced past `draft` **and** no row mentions a review or status change. Define this narrowly: a heuristic eager enough to flag legitimately quiet documents trains reviewers to ignore it, and an ignored check is a check that does not exist. A no-findings review still writes a row (Step 12), so the quiet case is covered by a writer rather than exempted here.
@@ -241,6 +310,155 @@ Score each section: ✅ Complete | ⚠️ Partial | ❌ Missing
   **Expect legacy PRDs to report exactly one Important finding.** There is no backfill, and `advisory` is the default precisely so those documents score one point lower while still returning GO.
 - YAML frontmatter present with `status`, `version`, `created`, `updated` fields
 - **OKF frontmatter conformance** (see [`open-knowledge-format.md`](references/open-knowledge-format.md)): `type: prd` present and non-empty → **Critical** if missing/empty (OKF's one hard requirement); `description` (one-sentence summary) present → **Important** if missing; `tags` is a list / `resource` is a URI when present → **Optional** if malformed
+
+#### Numbering check
+
+Every PRD is `prd.{P}.{feature}`, every epic under it `epic.{P}.{E}`, every story `story.{P}.{E}.{S}`,
+and the PRD is registered in `${PRD_ROOT}/prd-registry.md`. Check the PRD and everything under it in
+one pass — the engine's corpus check over `${PRD_ROOT}`, kept to the PRD's own directory:
+
+```bash
+# review-prd — numbering check (task 204)
+# INPUT: PRD_FILE from Input Resolution.
+DOC_ID=.agents/skills/review-prd/references/doc-id.js
+source .agents/skills/review-prd/references/resolve-paths.sh || exit 1
+: "${PRD_FILE:?bind PRD_FILE to the resolved PRD}"
+NUMBERING=$(command node -e '
+  const d = require(process.argv[1]);
+  const path = require("path");
+  const [root, file] = process.argv.slice(2);
+  const abs = path.resolve(file);
+  const rootAbs = path.resolve(root);
+  const dirAbs = path.dirname(abs);
+  const stem = path.basename(abs, ".md");
+  const say = (findings) => {
+    console.log(JSON.stringify({ reason: findings.length ? "findings" : "ok", findings }));
+    process.exit(findings.length ? 1 : 0);
+  };
+  // Text is not enough: a file, or its directory, that is a symlink out of where its path says it is
+  // (the PRD root for a PRD under it, the working tree for a legacy PRD above it) would carry every
+  // read and write of this review with it. That is not a finding to report and carry on from — the
+  // report and every fix would be written through the link — so the review stops here (exit 3).
+  // Checked first, so a legacy PRD above the root is held to it too.
+  const fs = require("fs");
+  const textIn = (p, b) => p === b || p.startsWith(b + path.sep);
+  const underRoot = abs.startsWith(rootAbs + path.sep);
+  const base = underRoot ? rootAbs : path.resolve(".");
+  if (fs.existsSync(abs) && !(textIn(fs.realpathSync(abs), fs.realpathSync(base))
+      && textIn(fs.realpathSync(dirAbs), fs.realpathSync(base)))) {
+    console.log(JSON.stringify({ reason: "outside-root", findings: [{ reason: "bad-shape", path: abs,
+      detail: `resolves outside ${underRoot ? root : "the working tree"} through a symlink` }] }));
+    process.exit(3);
+  }
+  // A PRD outside the PRD root (a root-level docs/prd.md) has one finding: that it is there.
+  if (!underRoot) {
+    say([{ reason: "bad-shape", path: abs, detail: `outside ${root} — a PRD written before numbered PRDs` }]);
+  }
+  // The file itself, always — the corpus walk below skips any name without a prd/epic/story prefix.
+  const own = d.check(abs, { prdRoot: rootAbs });
+  // The subtree belongs to this PRD only when the PRD owns its directory (prd.P.x/prd.P.x.md). A file
+  // that does not (index.md beside other PRDs, a flat domain/prd.x.md) owns no subtree, and a folder
+  // filter on its parent would claim the findings of every PRD beside it.
+  if (path.basename(dirAbs) !== stem || dirAbs === rootAbs) {
+    say(own.length ? own : [{ reason: "bad-shape", path: abs,
+      detail: `does not own its directory (${path.basename(dirAbs)}/) — not a numbered PRD document` }]);
+  }
+  const r = d.runCli(["check", "--corpus", "--prd-root", root, "--json"]).payload;
+  if (!["ok", "findings", "empty"].includes(r.reason)) {
+    console.log(JSON.stringify({ reason: r.reason, findings: own, unreadable: r.unreadable || [] }));
+    process.exit(2);
+  }
+  const under = dirAbs + path.sep;
+  const seen = new Set();
+  const findings = [];
+  for (const f of [...own, ...(r.findings || [])]) {
+    // A duplicate-id finding is attached to one path but names all of them in its detail.
+    const mine = f.path.startsWith(under) || (f.reason === "duplicate-id" && f.detail.includes(under));
+    const key = `${f.reason}|${f.path}|${f.detail}`;
+    if (mine && !seen.has(key)) { seen.add(key); findings.push(f); }
+  }
+  say(findings);
+' "$PWD/$DOC_ID" "$PRD_ROOT" "$PRD_FILE")
+NUMBERING_RC=$?
+# The verdict is the exit code AND the reason it printed, together: a node process that crashed
+# (a missing doc-id.js) also exits 1, with no JSON at all, and must never read as "no findings".
+NUMBERING_REASON=$(printf '%s' "$NUMBERING" | jq -r '.reason // empty' 2>/dev/null)
+case "${NUMBERING_RC}:${NUMBERING_REASON}" in
+  0:ok)       echo "✅ numbering ok under $(dirname "$PRD_FILE")" ;;
+  1:findings) printf '%s' "$NUMBERING" | jq -r '.findings[] | "[Critical] numbering \(.reason): \(.path) — \(.detail)"' ;;
+  3:outside-root)
+    printf '%s' "$NUMBERING" | jq -r '.findings[] | "❌ \(.path) \(.detail)"'
+    echo "❌ review stopped: a symlink leads out of ${PRD_ROOT} (or, for a PRD above it, the working tree), and the report and fixes would be written through it — replace the link with the real directory under the root (no migration can fix this), then re-run /review-prd"; exit 1 ;;
+  *) echo "❌ numbering check could not run (exit ${NUMBERING_RC}${NUMBERING_REASON:+, ${NUMBERING_REASON}}) — this is not a clean PRD"; exit 1 ;;
+esac
+```
+
+Report each line as a **Critical** issue carrying the engine's `reason` — there is no advisory tier,
+because a wrong number propagates into every epic and story id below it. A PRD that resolves outside
+`${PRD_ROOT}` through a symlink is not reported and carried on from: the block stops the review, because
+the report and every fix would be written through the link. The four classes:
+
+| Class | Engine `reason` |
+| :-- | :-- |
+| No PRD registry | `registry-missing` |
+| PRD unnumbered (a legacy `prd.{feature}` name, or a file outside `${PRD_ROOT}`) | `bad-shape` |
+| Directory, stem and frontmatter disagree | `dir-stem-mismatch`, `frontmatter-mismatch`, `unregistered` |
+| Epic or story unnumbered, or carrying another PRD's `P` | `bad-shape`, `parent-number-mismatch`, `parent-missing` |
+
+**When any fire, plan the migration** — read-only, nothing is written:
+
+```bash
+# review-prd — numbering migration plan, read-only (task 204)
+# INPUT: MIG_NAME — empty, or one `<path>=<slug>` per line, one for each PRD the plan cannot name
+# (blocker unplaced-prd).
+MIGRATE=.agents/skills/review-prd/references/migrate-doc-numbering.mjs
+GUARD=.agents/skills/review-prd/scripts/migration-guard.mjs
+source .agents/skills/review-prd/references/resolve-paths.sh || exit 1
+NAME_ARGS=()
+while IFS= read -r pair; do [ -n "$pair" ] && NAME_ARGS+=(--name "$pair"); done <<< "${MIG_NAME:-}"
+MIG=$(command node "$MIGRATE" --check --json --root "$PRD_ROOT" "${NAME_ARGS[@]}")
+MIG_RC=$?
+MIG_REASON=$(printf '%s' "$MIG" | jq -r '.reason // empty' 2>/dev/null)
+# Only these answers are a plan. A usage error (no git repository, a missing PRD root) or a crash
+# carries no blockers list, and an absent list must not read as "no blockers".
+case "${MIG_RC}:${MIG_REASON}" in
+  0:already|1:needs-migration) ;;
+  1:post-check-failed)
+    # Nothing is left to move, but the corpus is not clean: there is no plan to apply.
+    echo "migration: post-check-failed — nothing to migrate; the numbering findings above need a hand fix"
+    printf '%s' "$MIG" | jq -r '.findings[]? | "  ✖ \(.reason): \(.path) — \(.detail)"'
+    exit 0 ;;
+  *) echo "❌ migration plan could not run (exit ${MIG_RC}${MIG_REASON:+, ${MIG_REASON}}): $(printf '%s' "$MIG" | jq -r '.error // empty' 2>/dev/null)"; exit 1 ;;
+esac
+printf '%s' "$MIG" | jq -r '"migration: \(.reason)",
+  (.blockers[]? | "  ✖ blocker \(.code): \(.path) — \(.detail)"),
+  (.mapping[]? | "  \(.kind) \(.oldId) → \(.newId)   \(.old) → \(.new)")'
+# The shapes the migration cannot carry through yet (no frontmatter, no domain, links from outside
+# the PRD root) are refused here, as blockers, so no apply is offered for them.
+[ "$MIG_REASON" = "needs-migration" ] || exit 0
+GUARDED=$(printf '%s' "$MIG" | command node "$GUARD" --root "$PRD_ROOT")
+case "$?:$(printf '%s' "$GUARDED" | jq -r '.reason // empty' 2>/dev/null)" in
+  0:ok) ;;
+  1:blocked) printf '%s' "$GUARDED" | jq -r '.blockers[] | "  ✖ blocker \(.code): \(.path) — \(.detail)"' ;;
+  *) echo "❌ migration guard could not run — offer no apply: $(printf '%s' "$GUARDED" | jq -r '.error // empty' 2>/dev/null)"; exit 1 ;;
+esac
+```
+
+`--check` answers `needs-migration` **before** it consults its blockers, so read `blockers[]`, never
+the `reason` alone:
+
+- **No blockers** → fold the planned renames into QUESTION POINT 1 as an apply/skip question.
+- **`unplaced-prd`** on a PRD the plan cannot name (a root-level `docs/prd.md`, a root `index.md`) →
+  ask the user for its slug, add a `<path>=<slug>` line to `MIG_NAME` — one line per such PRD, keeping
+  the ones already there — and run the plan again.
+- **`no-frontmatter`**, **`no-domain`**, **`outside-links`** — the migration guard's refusals: a PRD
+  the migration cannot number, would place outside a domain directory, or that files outside the PRD
+  root mention (history and vendored copies aside) — the migration would not re-point them. Report
+  each as Critical with its detail; the detail names the hand fix.
+- **Any other blocker** (`dirty-path`, `in-flight`, `target-exists`, …) → report it as Critical with its
+  detail and offer no apply. The blocker names what to fix first.
+- **`already`** or **`post-check-failed`** → nothing to migrate; the numbering findings need a hand
+  fix, and no apply is offered.
 
 **Optional pm-checklist integration**: If `run_pm_checklist` is true, invoke the pm-checklist skill here and incorporate its 9-category findings into this step. Otherwise, perform the lighter structural check above.
 
@@ -351,6 +569,43 @@ Report: `[PASS] CRs complete and specific` or `[FAIL] N CRs missing or vague: [l
 
 **Format**: Use `AskUserQuestion` with max 4 questions in one call. Use `multiSelect: true` for "which of these are intentional?" type questions.
 
+**Numbering migration** — when Step 2's numbering check fired and the migration plan has no
+blockers, one of the questions is *"Apply the numbering migration now?"*, showing the planned renames,
+with options **Apply** and **Skip**. Apply only on an explicit **Apply**, then run the
+[numbering check](#numbering-check) again — its results replace the numbering findings:
+
+```bash
+# review-prd — apply the numbering migration (task 204)
+# Run ONLY after the user chose Apply. INPUT: MIG_NAME, as the plan used it.
+MIGRATE=.agents/skills/review-prd/references/migrate-doc-numbering.mjs
+GUARD=.agents/skills/review-prd/scripts/migration-guard.mjs
+source .agents/skills/review-prd/references/resolve-paths.sh || exit 1
+NAME_ARGS=()
+while IFS= read -r pair; do [ -n "$pair" ] && NAME_ARGS+=(--name "$pair"); done <<< "${MIG_NAME:-}"
+# The guard again, on a fresh plan: nothing is moved for a shape it refuses.
+GUARDED=$(command node "$MIGRATE" --check --json --root "$PRD_ROOT" "${NAME_ARGS[@]}" | command node "$GUARD" --root "$PRD_ROOT")
+case "$?:$(printf '%s' "$GUARDED" | jq -r '.reason // empty' 2>/dev/null)" in
+  0:ok) ;;
+  *) echo "❌ migration not applied — the plan's guard refused it:"
+     printf '%s' "$GUARDED" | jq -r '(.blockers[]? | "  ✖ \(.code): \(.path) — \(.detail)"), (.error // empty)' 2>/dev/null
+     exit 1 ;;
+esac
+MIG=$(command node "$MIGRATE" --apply --json --root "$PRD_ROOT" "${NAME_ARGS[@]}")
+case $? in
+  0) echo "migration: $(printf '%s' "$MIG" | jq -r '.reason') — re-run the numbering check" ;;
+  *) echo "❌ migration: $(printf '%s' "$MIG" | jq -r '.reason + " " + (.error // "")')"
+     printf '%s' "$MIG" | jq -r '.blockers[]? | "  ✖ \(.code): \(.path) — \(.detail)"'
+     # Files may already have moved: show what failed and how to undo it.
+     printf '%s' "$MIG" | jq -r '.findings[]? | "  ✖ \(.reason): \(.path) — \(.detail)"'
+     printf '%s' "$MIG" | jq -r 'if .revert then "  undo: \(.revert)" else empty end'
+     exit 1 ;;
+esac
+```
+
+The migration moves files with `git mv` and leaves the changes uncommitted, so the PRD path may have
+changed: resolve it again (Input Resolution, by its new number) before the re-check. A failure is
+reported with the engine's reason and any revert command it printed; nothing is retried.
+
 **Example question**:
 
 ```yaml
@@ -392,9 +647,9 @@ options:
 
 | PRD Deliverable / Requirement | Covered By Epic | Covered By Story | Gap?           |
 | ----------------------------- | --------------- | ---------------- | -------------- |
-| [FR1: Feature description]    | epic.N.name     | story.N.1.name   | ✅             |
+| [FR1: Feature description]    | epic.P.E.name   | story.P.E.1.name | ✅             |
 | [FR2: Feature description]    | —               | —                | ❌ No epic     |
-| [Out of Scope item]           | epic.N.name     | story.N.3.name   | ⚠️ Scope creep |
+| [Out of Scope item]           | epic.P.E.name   | story.P.E.3.name | ⚠️ Scope creep |
 
 **Collect all issues — do NOT ask questions yet. Proceed to Step 6.**
 
@@ -408,9 +663,9 @@ options:
 
 | Requirement | Epic          | Story           | AC(s)    | IV Present?   | Status          |
 | ----------- | ------------- | --------------- | -------- | ------------- | --------------- |
-| FR1         | epic.3.docker | story.3.1.setup | AC1, AC3 | Yes (IV1-IV3) | ✅ Fully traced |
-| FR2         | —             | —               | —        | —             | ❌ NOT TRACED   |
-| NFR1        | epic.3.docker | story.3.2.perf  | AC2      | Yes (IV3)     | ⚠️ Partial      |
+| FR1         | epic.1.3.docker | story.1.3.1.setup | AC1, AC3 | Yes (IV1-IV3) | ✅ Fully traced |
+| FR2         | —               | —                 | —        | —             | ❌ NOT TRACED   |
+| NFR1        | epic.1.3.docker | story.1.3.2.perf  | AC2      | Yes (IV3)     | ⚠️ Partial      |
 | CR1         | —             | —               | —        | —             | ❌ NOT TRACED   |
 
 **Flag**:
@@ -594,9 +849,48 @@ If flagged: recommend splitting into separate PRDs and suggest scope boundaries.
 
 **Option A — Co-located Report**:
 
-Save to: `${PRD_ROOT}/[domain]/[feature]/prd.review.{N}.{feature}.md`
+Save to: `{PRD dir}/{PRD stem}.review.{N}.{name}.md` — for `prd.1.onboarding.md`,
+`prd.1.onboarding.review.{N}.{name}.md` (`docs/standards/file-naming.md`, PRD review report row). It
+carries the PRD's full stem, so `doc-id.js` reads it as an artifact of that PRD, never as the PRD.
 
-Determine `{N}` by globbing the PRD directory for existing `prd.review.*.{feature}.md` files and incrementing the highest index found (start at 1 if none exist).
+`{N}` is the highest existing plus 1 — 1 when there is none, never the number of reports plus 1 —
+read through `doc-id.js`, which owns the artifact grammar:
+
+```bash
+# review-prd — next review report number (task 204)
+# INPUT: PRD_FILE from Input Resolution. PRD_ROOT is resolved HERE.
+DOC_ID=.agents/skills/review-prd/references/doc-id.js
+source .agents/skills/review-prd/references/resolve-paths.sh || exit 1
+: "${PRD_FILE:?bind PRD_FILE to the resolved PRD}"
+REVIEW_N=$(command node -e '
+  const d = require(process.argv[1]);
+  const fs = require("fs");
+  const path = require("path");
+  const [root, file] = process.argv.slice(2);
+  const stem = path.basename(file, ".md");
+  // The report is written beside the PRD, so the directory must be where its text says: inside the
+  // PRD root for a PRD under it, inside the working tree for a legacy PRD above it — never through
+  // a symlink that leads out of either.
+  const dirAbs = path.dirname(path.resolve(file));
+  const textIn = (p, base) => p === base || p.startsWith(base + path.sep);
+  const base = textIn(dirAbs, path.resolve(root)) ? root : ".";
+  if (!fs.existsSync(dirAbs) || !textIn(fs.realpathSync(dirAbs), fs.realpathSync(base))) {
+    console.error(`❌ ${path.dirname(file)} resolves outside ${base === "." ? "the working tree" : root} — no report is written through a symlink; replace the link with the real directory`);
+    process.exit(1);
+  }
+  const own = (n) => (d.parse(n).ok ? d.parse(n) : d.parseLegacy(n));
+  const me = own(path.basename(file));
+  let high = 0;
+  for (const n of fs.readdirSync(path.dirname(file))) {
+    if (!n.startsWith(`${stem}.review.`)) continue;     // reports of this PRD only
+    const a = own(n);
+    if (a.ok && a.kind === "prd" && a.artifact === "review" && a.prd === me.prd && a.seq > high) high = a.seq;
+  }
+  console.log(high + 1);
+' "$PWD/$DOC_ID" "$PRD_ROOT" "$PRD_FILE") || exit 1
+PRD_STEM=$(basename "$PRD_FILE" .md)
+echo "REPORT=$(dirname "$PRD_FILE")/${PRD_STEM}.review.${REVIEW_N}.{name}.md"
+```
 
 **Report structure**:
 
@@ -776,13 +1070,13 @@ options:
 5. Report which fixes were applied and which (if any) were skipped with reason
 6. **Mark recommendations as implemented** — update both documents:
 
-   **In the review report** (`prd.review.{N}.{name}.md`):
+   **In the review report** (`{PRD stem}.review.{N}.{name}.md`):
    - Add the following line immediately after the Epic/Story Readiness line in the Executive Summary:
      `> **Implementation Status**: ✅ All [N] recommendations implemented — YYYY-MM-DD`
      (or: `> **Implementation Status**: ✅ Critical/Major recommendations implemented — YYYY-MM-DD` if partial)
    - In the Recommended Actions list, prefix each applied recommendation with `✅ ` and each skipped one with `⏭️ skipped —` followed by the reason
 
-   **In the PRD file** (`prd.[name].md`):
+   **In the PRD file** (`prd.{P}.{feature}.md`):
    - Append the following row to the Change Log — four columns, canonical format: [document-change-log.md](references/document-change-log.md). A review verdict bumps the minor version; `Author` is the skill name, not `Claude`:
      `| YYYY-MM-DD | [version] | Applied [N] recommendations from review-prd | review-prd |`
    - Update the `updated` YAML frontmatter field to today's date **in the same edit** — a row that does not move `updated` leaves the PRD claiming it was last touched before its own most recent recorded change
@@ -816,7 +1110,9 @@ options:
 | File                                         | Purpose                                                   |
 | -------------------------------------------- | --------------------------------------------------------- |
 | Brownfield PRD template YAML                 | Template compliance baseline (section structure)          |
-| `docs/development/epic-registry.md`          | Epic alignment verification                               |
+| `${PRD_ROOT}/prd-registry.md`                | PRD number and status; numbering check                    |
+| `references/doc-id.js`                       | PRD resolution, numbering check (`check --corpus`)        |
+| `references/migrate-doc-numbering.mjs`       | Numbering migration plan (`--check`) and apply            |
 | `.claude/backend-patterns.md`                | Architecture source — NestJS, API, DI                     |
 | `.claude/database-redis.md`                  | Architecture source — DB, Redis, safety rules             |
 | `.claude/testing.md`                         | Architecture source — test standards, co-location         |

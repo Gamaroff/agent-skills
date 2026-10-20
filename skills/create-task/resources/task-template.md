@@ -424,7 +424,7 @@ Sign when you have reviewed this document: replace your **Signature** cell with 
 
 - **Related Skill**: `.agents/skills/[skill-name]/`
 - **Related Documentation**: `docs/[path]/`
-- **Related Epic** (if applicable): Epic [N] - [Name]
+- **Related Epic** (if applicable): Epic [P].[E] - [Name]
 
 ---
 

@@ -18,12 +18,18 @@
 #        no-dod               no {stem}.dod.{N}.*.md beside the document — keyed on the work
 #                             item's stem, so a co-located bug's DoD is never read as its verdict
 #        dod-not-gaps         the newest DoD file's Final Status is not ❌ GAPS
-#        no-gate              qa-cycle.sh found no single current gate
+#        no-gate              qa-cycle.sh found no single current gate — its own reason line(s) are
+#                             relayed above the refusal (no gate file, an unnumbered gate, two gates
+#                             claiming one cycle), so the operator can tell an ambiguity from an absence
+#        git-unreadable       git status failed — the tree cannot be read, so the re-entry cannot be
+#                             judged; never read as a clean tree (that would route a fix to step 7)
 #        uncommitted-fix      a TRACKED change outside <doc-dir> is uncommitted: the re-entered
 #                             review reads committed history (qa-task Step 3b HALTs on it), so
 #                             commit the fix and re-run — never resume at 7 over it
-#        no-code-moved        no commit outside <doc-dir> since the gate's head: a document-only
-#                             fix, for which /finalise at 7 is correct. Untracked files outside
+#        no-code-moved        no commit outside <doc-dir> since the gate's head, or every path those
+#                             commits changed is documentation under ci.docsOnly.patterns (the one
+#                             definition, read by ci-tree-equivalence.js — observation #44): a
+#                             document-only fix, for which /finalise at 7 is correct. Untracked files outside
 #                             <doc-dir> are NAMED in the message, never a refusal of their own —
 #                             Step 4 restores the files it held aside, so the measure cannot tell
 #                             one of those from a new fix file; the operator, who can, decides
@@ -35,7 +41,9 @@
 #   2. MEASURES code movement as COMMITTED history, because that is what the re-entered review reads
 #      (qa-task Step 3b scopes from commits and HALTs on an uncommitted tracked change): commits since
 #      the gate's `head:` outside <doc-dir>; a head that is absent, not 40-hex, not a commit or not an
-#      ancestor of HEAD counts as moved. Uncommitted work is not movement — it is refused
+#      ancestor of HEAD counts as moved. When commits exist, the paths they changed are classified
+#      against ci.docsOnly.patterns (configuration read at HEAD), and documentation alone is not
+#      movement; a path the rule cannot vouch for — or any path when it cannot run — is. Uncommitted work is not movement — it is refused
 #      (uncommitted-fix), because it can neither be reviewed nor safely left for /finalise. Untracked
 #      files are never counted and never refused: after Step 4 restores the files it held aside an
 #      untracked file is the normal state of a branch, and no measure here can tell one of those from
@@ -68,8 +76,9 @@
 # The report is REQUIRED: report_entries is read from it, and without it the resume precedence would
 # have nothing to key on.
 #
-# Run from the repository root — the movement measure's pathspecs are relative to it, and a
-# <doc-dir> that IS the root is refused (its exclusion would hide every change).
+# Run from the repository root — the movement measure's pathspecs are relative to it, so a cwd that
+# is not the root of <doc-dir>'s repository is a usage error, and a <doc-dir> that IS the root is
+# refused (its exclusion would hide every change).
 # Exit: 0 re-entered; 1 refused or failed (the reason on stderr); 2 usage.
 # Paths honour PIPELINE_LOCK and PIPELINE_HALT_SNAPSHOT for tests; both pass through to --restore.
 
@@ -85,6 +94,8 @@ ADVANCE="$HERE/advance-pipeline-lock.sh"
 QA_CYCLE_SH="$HERE/qa-cycle.sh"
 # bundle-dependency: shared/resources/newest-numbered.sh
 NEWEST_SH="$HERE/newest-numbered.sh"
+# bundle-dependency: shared/resources/ci-tree-equivalence.js
+TREE_EQ="$HERE/ci-tree-equivalence.js"
 
 usage() {
   echo "Usage: reenter-qa-after-finalise.sh <doc-dir> <implementation-report>   (run from the repository root)" >&2
@@ -107,13 +118,21 @@ if [ ! -f "$REPORT" ]; then
 fi
 command -v jq >/dev/null 2>&1 || { echo "reenter-qa: jq not found — the re-entry cannot be recorded" >&2; exit 1; }
 command -v git >/dev/null 2>&1 || { echo "reenter-qa: git not found — code movement cannot be measured" >&2; exit 1; }
-for f in "$ADVANCE" "$QA_CYCLE_SH" "$NEWEST_SH"; do
+for f in "$ADVANCE" "$QA_CYCLE_SH" "$NEWEST_SH" "$TREE_EQ"; do
   [ -f "$f" ] || { echo "reenter-qa: $(basename "$f") not found beside this script ($f) — re-bundle the skill" >&2; exit 1; }
 done
 # A <doc-dir> at the repository root makes ":(exclude)$DOC_DIR" exclude the whole tree, and the
 # measure would read 0 for every change (the qa-task Phase 0 guard, task.135 QA cycle 3, CR3-2).
 PREFIX=$(git -C "$DOC_DIR" rev-parse --show-prefix 2>/dev/null) || { echo "reenter-qa: '$DOC_DIR' is not inside a git work tree" >&2; usage; }
 [ -n "$PREFIX" ] || { echo "reenter-qa: '$DOC_DIR' is the repository root — its own files cannot be told from the code" >&2; usage; }
+# The measure's pathspecs are relative to the cwd, so the cwd must be <doc-dir>'s repository root. From
+# another repository `git status` exits 128 on the exclude pathspec and would read as git-unreadable,
+# telling the operator to repair a healthy repository (task.182 QA cycle 2, CR-5) — a usage error.
+DOC_TOP=$(git -C "$DOC_DIR" rev-parse --show-toplevel 2>/dev/null)
+CWD_TOP=$(git rev-parse --show-toplevel 2>/dev/null) || CWD_TOP=""
+CWD_PREFIX=$(git rev-parse --show-prefix 2>/dev/null) || CWD_PREFIX="?"
+[ -n "$CWD_TOP" ] && [ "$CWD_TOP" = "$DOC_TOP" ] && [ -z "$CWD_PREFIX" ] \
+  || { echo "reenter-qa: run from the root of the repository that holds '$DOC_DIR' ($DOC_TOP), not '$PWD'" >&2; usage; }
 
 # ── 1. Refusals — every one before any write ─────────────────────────────────
 [ -f "$LOCK" ] && refuse lock-present "a live lock exists at '$LOCK'; this re-entry starts from a halt snapshot, and a live lock means the run is already resumed"
@@ -158,18 +177,32 @@ grep -q '^\*\*Final Status:\*\* ❌ GAPS' "$DOD" || refuse dod-not-gaps "the new
 # it names — a second gate key here would let this script and the loop disagree about the base
 # (task.170 QA cycle 2, CR-6; tests/qa-cycle.test.js forbids another gate derivation in a helper).
 # A co-located bug gate that makes the cycle ambiguous is refused by qa-cycle.sh, never guessed.
-GATE=$(bash "$QA_CYCLE_SH" "$DOC_DIR" --path gate 2>/dev/null) || GATE=""
-BASE=$(bash "$QA_CYCLE_SH" "$DOC_DIR" 2>/dev/null) || BASE=""
+# qa-cycle.sh names its cause on stderr — no gate file, gate files with no cycle number, or two files
+# claiming one cycle — and the last fails only under --path, so the reason comes from whichever call
+# failed. Both are captured and relayed as the no-snapshot refusal relays --restore --which (task.182,
+# CR-1); sort -u drops the duplicate when both calls fail for the same cause.
+GATE_ERR=$(mktemp) || exit 1
+GATE=$(bash "$QA_CYCLE_SH" "$DOC_DIR" --path gate 2>>"$GATE_ERR") || GATE=""
+BASE=$(bash "$QA_CYCLE_SH" "$DOC_DIR" 2>>"$GATE_ERR") || BASE=""
+GATE_WHY=$(sort -u "$GATE_ERR"); rm -f "$GATE_ERR"
 case "$BASE" in ''|*[!0-9]*) BASE="" ;; esac
-[ -n "$GATE" ] && [ -f "$GATE" ] && [ -n "$BASE" ] || refuse no-gate "qa-cycle.sh found no single current gate in '$DOC_DIR'"
+if ! { [ -n "$GATE" ] && [ -f "$GATE" ] && [ -n "$BASE" ]; }; then
+  [ -n "$GATE_WHY" ] && printf '%s\n' "$GATE_WHY" | sed 's/^⚠️  qa-cycle:/reenter-qa:/' >&2
+  refuse no-gate "qa-cycle.sh found no single current gate in '$DOC_DIR'"
+fi
 
 # ── 2. Movement, measured as committed history ───────────────────────────────
 # Uncommitted tracked work outside the work item is refused first, whatever else moved: the
 # re-entered review cannot read it (qa-task Step 3b HALTs on it), and /finalise must not run over it.
-DIRTY=$(git status --porcelain --untracked-files=no -- . ":(exclude)$DOC_DIR" ":(exclude).claude/state" 2>/dev/null)
+# A git status that fails is a refusal, never an empty answer: read as a clean tree, it would let the
+# measure below refuse no-code-moved, whose route is step 7 — the one outcome this script exists to
+# prevent (task.182, CR-3). git's own error reaches the operator.
+DIRTY=$(git status --porcelain --untracked-files=no -- . ":(exclude)$DOC_DIR" ":(exclude).claude/state") \
+  || refuse git-unreadable "git status failed in '$PWD' — the tree cannot be read, so a re-entry cannot be judged; repair the repository and run this script again (do NOT resume at step 7)"
 [ -z "$DIRTY" ] || refuse uncommitted-fix "uncommitted changes outside '$DOC_DIR' — commit the fix, then re-run this script (the re-entered review reads committed history; do NOT resume at step 7 over them): $(printf '%s' "$DIRTY" | tr '\n' ' ')"
 UNTRACKED=$(git ls-files --others --exclude-standard -- . ":(exclude)$DOC_DIR" ":(exclude).claude/state" 2>/dev/null)
 GATE_HEAD=$(grep -E '^head:' "$GATE" 2>/dev/null | head -1 | sed -E "s/^head:[[:space:]]*//; s/[[:space:]]+#.*$//; s/['\"]//g; s/[[:space:]]*$//")
+HEAD_OK=0
 if [ -z "$GATE_HEAD" ]; then
   MOVED=1; WHY_MOVED="the gate carries no head: (schema 1) — it cannot vouch for the present tree"
 elif ! { printf '%s' "$GATE_HEAD" | grep -qE '^[0-9a-f]{40}$' \
@@ -177,8 +210,50 @@ elif ! { printf '%s' "$GATE_HEAD" | grep -qE '^[0-9a-f]{40}$' \
          && git merge-base --is-ancestor "$GATE_HEAD" HEAD 2>/dev/null; }; then
   MOVED=1; WHY_MOVED="the gate head '$GATE_HEAD' is not a 40-hex commit on this branch"
 else
+  HEAD_OK=1
   MOVED=$(git rev-list --count "$GATE_HEAD"..HEAD -- . ":(exclude)$DOC_DIR" 2>/dev/null || echo 1)
   WHY_MOVED="$MOVED commit(s) outside '$DOC_DIR' since the gate's head ${GATE_HEAD:0:12}"
+fi
+# A commit outside <doc-dir> is not necessarily code. A DoD gap is often closed outside it — a
+# CHANGELOG entry, a standards page — and re-entering QA for that costs a full cycle and a second 5c
+# review over nothing reviewable (observation #44, task.202). "Documentation" has ONE definition in
+# the pipeline: ci.docsOnly.patterns, read and matched by ci-tree-equivalence.js, the same reader the
+# 5c carry rule uses. The configuration is read at HEAD, never the working tree; the diff is
+# gate head..HEAD with renames split, so a code file moved under docs/ still counts as code. Every
+# doubt counts as code, the direction that re-reviews: no node, a classifier failure, a malformed
+# configuration, `enabled: false`, a submodule pointer, and skills-config.yaml itself.
+DOCS_ONLY=0; DOCS_NOTE=""
+if [ "$HEAD_OK" -eq 1 ] && [ "$MOVED" -gt 0 ] 2>/dev/null; then
+  CLASS_ERR=$(mktemp) || exit 1
+  if ! command -v node >/dev/null 2>&1; then
+    CLASS=""; echo "node not found" > "$CLASS_ERR"
+  else
+    CLASS=$(node -e '
+      const [engine, gateHead, prefix] = process.argv.slice(1);
+      const { execFileSync } = require("child_process");
+      const E = require(engine);
+      const exec = (cmd, args, opts) => execFileSync(cmd, args, opts);
+      const root = process.cwd();
+      const head = execFileSync("git", ["rev-parse", "--verify", "HEAD^{commit}"], { encoding: "utf8" }).trim();
+      const cfg = E.readConfigAtCommit(exec, root, head);
+      const names = E.diffNames(exec, root, gateHead, head);
+      if (!Array.isArray(names)) throw new Error("the diff " + gateHead.slice(0, 12) + "..HEAD could not be computed");
+      const outside = names.filter((f) => !f.startsWith(prefix) && !f.startsWith(".claude/state/"));
+      const code = cfg.enabled === false ? outside : outside.filter((f) => !E.isDocsPath(f, cfg.patterns));
+      process.stdout.write(JSON.stringify({ enabled: cfg.enabled !== false, code, docs: outside.filter((f) => !code.includes(f)) }));
+    ' "$TREE_EQ" "$GATE_HEAD" "$PREFIX" 2>"$CLASS_ERR") || CLASS=""
+  fi
+  if [ -n "$CLASS" ] && printf '%s' "$CLASS" | jq -e '.code | type == "array"' >/dev/null 2>&1; then
+    if [ "$(printf '%s' "$CLASS" | jq '.code | length')" -eq 0 ]; then
+      DOCS_ONLY=1
+      DOCS_NOTE=$(printf '%s' "$CLASS" | jq -r '.docs | if length == 0 then "no net change" else (.[0:5] | join(", ")) + (if length > 5 then ", … \(length) in all" else "" end) end')
+    else
+      WHY_MOVED="$WHY_MOVED; not documentation under ci.docsOnly$(printf '%s' "$CLASS" | jq -r 'if .enabled then "" else " (the rule is disabled — every path counts)" end'): $(printf '%s' "$CLASS" | jq -r '.code | (.[0:5] | join(", ")) + (if length > 5 then ", … \(length) in all" else "" end)')"
+    fi
+  else
+    WHY_MOVED="$WHY_MOVED; the changed paths could not be classified ($(head -c 300 "$CLASS_ERR" | tr '\n' ' ' | sed 's/[[:space:]]*$//')) — counted as code"
+  fi
+  rm -f "$CLASS_ERR"
 fi
 # Untracked files are named, never counted and never refused (task.170 QA cycle 4, CR-2): Step 4
 # restores the files it held aside, so an untracked file is the normal state of a branch, and nothing
@@ -186,6 +261,7 @@ fi
 # judgement to the operator, who can make it, instead of a rule that is wrong in one direction.
 UNTRACKED_NOTE=""
 [ -z "$UNTRACKED" ] || UNTRACKED_NOTE=" Untracked files outside '$DOC_DIR' (not read by any review — if one is part of the fix, commit it and run this script again): $(printf '%s' "$UNTRACKED" | tr '\n' ' ')"
+[ "$DOCS_ONLY" -eq 0 ] || refuse no-code-moved "only documentation changed outside '$DOC_DIR' since the gate's head ${GATE_HEAD:0:12} (ci.docsOnly.patterns: $DOCS_NOTE) — a document-only fix; resume at step 7 with advance-pipeline-lock.sh --restore and re-run /finalise.$UNTRACKED_NOTE"
 [ "$MOVED" -gt 0 ] 2>/dev/null || refuse no-code-moved "nothing outside '$DOC_DIR' was committed since the gate's head ${GATE_HEAD:0:12} — a document-only fix; resume at step 7 with advance-pipeline-lock.sh --restore and re-run /finalise.$UNTRACKED_NOTE"
 [ -z "$UNTRACKED_NOTE" ] || echo "reenter-qa:$UNTRACKED_NOTE" >&2
 

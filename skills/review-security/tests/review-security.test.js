@@ -420,11 +420,11 @@ test("the skill states its own limits", () => {
   // script with more than one positional, the network — never "non-JS". With
   // task.144 a multi-flag Node CLI is reachable too (`cli:`), so it must not be
   // listed as declined, and the limit names every form a reader can route to.
-  assert.match(
-    SKILL,
-    /target no form reaches \(stdin, a shell script with more than one positional, network\)/,
-  );
-  for (const form of ["shell:", "shell-fn:", "cli:"]) {
+  // With task.181 a multi-argument shell script is reachable too
+  // (`shell-argv:`), so it leaves the declined list the same way.
+  assert.match(SKILL, /target no form reaches \(stdin,\s+network\)/);
+  assert.doesNotMatch(SKILL, /more than one positional/);
+  for (const form of ["shell:", "shell-fn:", "cli:", "shell-argv:"]) {
     assert.ok(
       SKILL.includes(`\`${form}\``),
       `the limits must name the ${form} form`,
@@ -708,10 +708,13 @@ test("CLI: every operand flag rejects a missing or flag-shaped operand with exit
   assert.match(probeMode.stderr, /--mode must be diff or full/);
 });
 
-test("CLI: --repo-root re-anchors containment so a bundled copy can probe the consumer's tree", async () => {
+test("CLI: a bundled copy probes the consumer's tree by default, and --repo-root still re-anchors it", async () => {
   // Copy the engine and its imports into a nested dir, as the bundler does into
-  // skills/*/references/. From there defaultRepoRoot() is the nested dir and a
-  // repo-relative entry is an escape; --repo-root makes it resolve again.
+  // skills/*/references/. Two levels above that copy is not the repository, so
+  // the default root is the git checkout the caller runs in (task.190, obs #211):
+  // a repo-relative entry resolves with no --repo-root. An explicit --repo-root
+  // still wins, and one under which the entry does not exist is refused before
+  // anything runs.
   const nest = fs.mkdtempSync(
     path.join(REPO_ROOT, "skills/review-security/tests/.t118-nest-"),
   );
@@ -758,15 +761,17 @@ test("CLI: --repo-root re-anchors containment so a bundled copy can probe the co
         { cwd: REPO_ROOT, encoding: "utf8" },
       );
     const without = JSON.parse(runNested([]).stdout);
-    assert.equal(without.verdict, "unverifiable");
-    // Not an escape: the path is CONTAINED in the nested root and simply does
-    // not exist there. Asserting the reason is what keeps this test honest about
-    // which failure --repo-root fixes.
-    assert.equal(
-      without.reason,
-      "entry-not-probeable",
-      JSON.stringify(without.declined),
-    );
+    assert.equal(without.verdict, "engages", JSON.stringify(without.declined));
+    // The root the copy used to default to: two levels above it. The entry is
+    // CONTAINED there and simply does not exist, so the run is refused as an
+    // argument error (exit 2) rather than declined into a verdict a record
+    // would carry. Asserting the reason keeps this test honest about which
+    // failure the refusal names.
+    const oldRoot = path.join(nest, "..", "..");
+    const wrongRoot = runNested(["--repo-root", oldRoot]);
+    assert.equal(wrongRoot.status, 2, wrongRoot.stderr);
+    assert.equal(JSON.parse(wrongRoot.stdout).reason, "entry-not-found");
+    assert.match(wrongRoot.stderr, /^entry-not-found: /);
     const withRoot = JSON.parse(runNested(["--repo-root", REPO_ROOT]).stdout);
     assert.equal(
       withRoot.verdict,

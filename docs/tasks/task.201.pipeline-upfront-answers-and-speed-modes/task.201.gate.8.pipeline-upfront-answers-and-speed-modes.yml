@@ -1,0 +1,70 @@
+schema: 2
+task: 'task.201.pipeline-upfront-answers-and-speed-modes'
+task_title: 'Pipeline up-front answers and speed modes'
+gate: PASS
+status_reason: 'Gate 7 CR-1 (env leak into test 2d) and CR-2 (flag read outside the resolve span) closed by debadda8; both mutation-proven. One low promoted finding: the awk iteration of 2d is never shown to have run awk.'
+reviewer: 'QA Engineer'
+head: 'debadda8e80535928e48eac68210e3b94dc8bf38'
+updated: '2026-10-11T05:57:21Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: low
+    file: 'shared/resources/tests/pipeline-answers-docs.test.mjs'
+    finding: 'Nothing proves the "awk" iteration of 2d ran tier 2: both tiers answer the same on these fixtures. Mutation: deleting the AGENT_SKILLS_CONFIG_TIER pin (line 308) leaves 2d green (no-red-untested).'
+    suggested_action: 'Print which tier ran from the generated script and assert it reads awk on the awk iteration.'
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 5305
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+  ci: 'not read this cycle'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'The change set since gate 7 is one test file and documents; no boundary is delivered (boundary: false).'
+  performance:
+    status: PASS
+    notes: 'Test 2d spawns bash six times; negligible.'
+  reliability:
+    status: PASS
+    notes: 'Fast gate green: 5305 tests, 0 failures. 2d now passes under SKILLS_CONFIG_FILE=/nonexistent.yaml.'
+  maintainability:
+    status: PASS
+    notes: 'flagsPassedTo now delegates to a shared commandSpan(); behaviour unchanged for its other callers (tests 2, 3a).'
+
+bug_resolution:
+  previous_gate: 7
+  closed: ['CR-1', 'CR-2']
+
+recommendations:
+  immediate: []
+  future:
+    - id: 'CR-1'
+      action: 'Nothing proves the "awk" iteration of 2d ran tier 2 (deleting the AGENT_SKILLS_CONFIG_TIER pin leaves 2d green). Print which tier ran from the generated script and assert it reads awk on the awk iteration.'
+      refs: ['shared/resources/tests/pipeline-answers-docs.test.mjs']
+      carried_from: top_issues (route 2b, cycle 8)
+    - action: 'Advisory (low/medium) CR-2: the "" tier is not pinned to python; on a host without pyyaml both iterations run awk. Iterate over python and awk; skip python loudly when unavailable.'
+      refs: ['shared/resources/tests/pipeline-answers-docs.test.mjs']
+    - action: 'Advisory (low/low) CR-3: build the child env from an allowlist, or also drop BASH_ENV and PYTHONPATH.'
+      refs: ['shared/resources/tests/pipeline-answers-docs.test.mjs']
+    - action: 'Cleanup CR-4: flagsPassedTo doc comment left stacked above commandSpan (line 56).'
+      refs: ['shared/resources/tests/pipeline-answers-docs.test.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

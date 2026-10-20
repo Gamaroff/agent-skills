@@ -68,7 +68,7 @@ In the **parent story file**'s `## Bug Reports` section, move this bug from *Ope
 ```markdown
 ### Closed Bugs
 
-- [Bug {epic}.{story}.{n}: {desc}](./{bug-file-stem}.md) - ✅ Closed - Priority: {priority} (Fixed {date})
+- [Bug {prd}.{epic}.{story}.{n}: {desc}](./{bug-file-stem}.md) - ✅ Closed - Priority: {priority} (Fixed {date})
 ```
 If this was the parent story's **only** open bug and the story status is `Reopened`, restore it to its prior status (`Ready for Review`/`In Progress` as recorded before the bug was filed). If other open bugs remain, leave the story `Reopened`.
 
@@ -80,7 +80,13 @@ In the **parent task file**'s Bug Reports list, mark this bug ✅ Closed:
 Tasks do not use the `Reopened` status — no parent-status change needed.
 
 #### General bug
-Update the row for this bug in `docs/bugs/bug-registry.md` — set the `Status` column to `closed` (registry vocabulary: `✅ Closed`) and refresh **Last Updated**. Do **not** change the registry's Next Available Bug Number (numbers are never reused). The registry edit is committed atomically with the bug file in Step 8, which carries it as `{extra-scope-paths}` — Step 8 stages only the paths it is told, so this file must be named there, not swept in (task.147). This is the **last** of the row's mirrored writes, not the first: Step 3 wrote `🔧 In Progress` and `🔍 Ready for QA`, and Step 5–6 wrote `⚠️ Reopened` on every failed cycle (Step 3 callout). If the row still reads `🆕 New` here, an earlier step skipped its mirror — note it in the Issues Log; the close still corrects it.
+After writing the bug file's `status: closed`, set its row in `docs/bugs/bug-registry.md` with the one writer, and act on its `reason` per the Step 3 callout:
+
+```bash
+node .agents/skills/develop-bug/references/registry-tick.js --bug-status --file "{bug-file}" --json
+```
+
+It writes `closed`, or `✅ Closed` when the registry's other rows use the labels, into the Status cell only. Then refresh the registry's **Last Updated** by hand — the CLI does not write it. Do **not** change the registry's Next Available Bug Number (numbers are never reused). The registry edit is committed atomically with the bug file in Step 8, which carries it as `{extra-scope-paths}` — Step 8 stages only the paths it is told, so this file must be named there, not swept in (task.147). This is the **last** of the row's mirrored writes, not the first: Step 3 wrote `🔧 In Progress` and `🔍 Ready for QA`, and Step 5–6 wrote `⚠️ Reopened` on every failed cycle (Step 3 callout). If the row still reads `🆕 New` here, an earlier step skipped its mirror — note it in the Issues Log; the close still corrects it.
 
 ### B4. Tracker close (only if linked)
 

@@ -89,4 +89,4 @@ Tasks aren't scoped to an epic, PRD, or feature area — they cut across the pro
 - [`finalise` SKILL.md](../../skills/finalise/SKILL.md)
 - [Task documents](./task-documents.md)
 - [File naming](./file-naming.md)
-- [Epic registry](./epic-registry.md) — parallel rules for epics
+- [PRD registry](./prd-registry.md) — parallel rules for PRDs (epics and stories count within their parent)

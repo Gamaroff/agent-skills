@@ -1,0 +1,82 @@
+schema: 2
+task: 'task.205.prd-scoped-epic-numbering'
+task_title: 'PRD-scoped epic numbering'
+gate: FAIL
+status_reason: 'Cycle 3''s fixes hold (bugs 8–9 closed). Two HIGH from one root: blocks this task touched call doc-id from the repository root and tracker-issue.js / gh-labels.sh as bare references/…, so one half fails from either working directory. One MEDIUM: the shards Step 7 guard validates its two inputs joined. Two MEDIUM reads of unbound body values are base patterns (pre-existing), routed to future. Suite green: 5675 pass, 0 fail.'
+reviewer: 'QA Engineer'
+head: '134e9630c0a1dd5a12f29af258c974f69ce7e484'
+updated: '2026-10-15T11:33:55Z'
+
+top_issues:
+  - id: 'TASK-205-QA4-CR1'
+    severity: high
+    file: 'skills/ensure-epic-github-issue/SKILL.md'
+    finding: 'The milestone and create blocks mix a repository-root doc-id path with bare references/ tracker-issue.js and gh-labels.sh, so one half fails from either cwd (TASK-205-BUG-10).'
+    suggested_action: 'Resolve every helper in the block from the repository root.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-205-QA4-CR2'
+    severity: high
+    file: 'skills/sync-github-epic/SKILL.md'
+    finding: 'The edit block mixes the two path roots too; the one-root fix reached only the rename block and nothing enumerates such blocks (TASK-205-BUG-10).'
+    suggested_action: 'Enumerate every touched block mixing the roots, fix all, and assert none remains.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-205-QA4-CR5'
+    severity: medium
+    file: 'skills/create-epics-from-shards/SKILL.md'
+    finding: 'The Step 7 guard validates "$E0$COUNT" joined, so one missing input passes and the batch loop checks nothing (TASK-205-BUG-11).'
+    suggested_action: 'Validate E0 and COUNT separately as positive integers.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 50
+
+evidence:
+  tests_reviewed: 5689
+  phases_verified: '7/7'
+  ci: 'not read at this cycle (gated at /finalise)'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5, 6]
+    phases_with_issues: [3, 5]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 10
+    notes: 'review-epic Input Resolution re-probed (fence form, 10 cases, verdict engages).'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'Mixed working-directory assumptions inside blocks; a batch guard that passes on a missing input.'
+  maintainability:
+    status: CONCERNS
+    notes: 'A second frontmatter parser remains in create-epic and shards (CR-6, cleanup).'
+
+recommendations:
+  immediate:
+    - action: 'One path root per block, every touched block, with a test that fails on a mixed block (CR-1, CR-2); validate E0 and COUNT separately (CR-5).'
+      refs: ['skills/ensure-epic-github-issue/SKILL.md', 'skills/sync-github-epic/SKILL.md', 'skills/create-epics-from-shards/SKILL.md']
+  future:
+    - action: 'Pre-existing (identical reads on origin/develop: ensure-epic-github-issue lines 114–120, sync-github-epic lines 162/169): the issue-body blocks read DOC_URL / EPIC_RELATIVE_PATH / PRD_LINE / EPIC_STATUS / NEW_BODY / priority bound in prose or other blocks (CR-3, CR-4). A follow-up for the GitHub sync skills as a whole, not this task.'
+      refs: ['skills/ensure-epic-github-issue/SKILL.md', 'skills/sync-github-epic/SKILL.md']
+    - action: 'Cleanup: read prd_number and P through doc-id.js in create-epic and the shards block (CR-6).'
+      refs: ['skills/create-epic/SKILL.md', 'skills/create-epics-from-shards/SKILL.md']
+
+bug_resolution:
+  bugs_fixed: 9
+  bugs_remaining: 2
+  fix_date: '2026-10-15'
+  total_iterations: 3
+  verification_method: 'Executed skill blocks (guard test) + mutation proofs'
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

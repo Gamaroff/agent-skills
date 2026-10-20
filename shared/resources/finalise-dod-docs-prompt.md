@@ -1,11 +1,11 @@
 ---
 name: finalise-dod-docs-prompt
-description: Explore subagent prompt for CHANGELOG.md, README, and type-specific documentation verification in /finalise DoD parallel dispatch. Substitute <STORY_FILE>, <PR_NUMBER>, and <STORY_TYPE> before dispatching.
+description: Explore subagent prompt for CHANGELOG.md, README, and type-specific documentation verification in /finalise DoD parallel dispatch. Substitute <STORY_FILE>, <PR_NUMBER>, <STORY_TYPE> and <DIFF_FILE> before dispatching.
 ---
 
 # Docs & Changelog Check — Explore Subagent Prompt
 
-**Usage**: Dispatch as an Explore subagent from `/finalise` Steps 3–5 parallel dispatch. Substitute `<STORY_FILE>`, `<PR_NUMBER>`, and `<STORY_TYPE>` before sending.
+**Usage**: Dispatch as an Explore subagent from `/finalise` Steps 3–5 parallel dispatch. Substitute `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>` and `<DIFF_FILE>` (the PR diff `/finalise` Step 3a wrote) before sending.
 
 ---
 
@@ -52,7 +52,13 @@ Based on `<STORY_TYPE>`, check:
 
 #### task / refactoring / skill
 - Are any skill `SKILL.md` files, shared resource files, or README files updated for the changed functionality?
-- If a skill was modified, is the skill catalog regenerated (check for `npm run generate-catalog` in the task or PR)?
+- If a skill's catalog entry changed, is the catalog regenerated? Judge from the PR's changed files
+  (`grep '^diff --git' <DIFF_FILE>`, then that `SKILL.md`'s hunks in `<DIFF_FILE>`):
+  the catalog is built from `SKILL.md` frontmatter only, so a `SKILL.md` whose frontmatter changed in
+  the diff with no `docs/reference/skill-catalog.md` change in the same diff is the gap, and a body-only
+  `SKILL.md` change is not. **Never run the generator, or any other command that writes, to find
+  out** — you are read-only, and a generator run is a write even when it changes nothing (task.189,
+  obs #218).
 
 ### Step 4: Check README and architecture docs
 

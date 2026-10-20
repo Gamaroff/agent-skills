@@ -1,0 +1,73 @@
+schema: 2
+task: 'task.188.resume-from-evidence-not-flags'
+task_title: 'Resume from evidence, not flags'
+gate: CONCERNS
+status_reason: 'All six functional criteria are held by passing executed and shape tests, but the Step 0.1 reconciliation is silent on Bitbucket (VCS unbound at item 1) and its tick check cannot tell an unticked row from a failed look.'
+reviewer: 'QA Engineer'
+head: '0465ae8e45879533f6831c876e46dc69a9b9b108'
+updated: '2026-10-11T14:00:04Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'skills/develop-next/SKILL.md'
+    finding: 'Step 0.1 merge-flag reconciliation reads VCS and the BB_* credentials, which only Step 0 item 6 binds, after item 1; on Bitbucket VCS is empty, the gh arm runs, fails, and reconciliation silently does nothing. The executed test injects VCS=github so it cannot see this.'
+    suggested_action: 'Make the block resolve its own platform (or refuse loudly when VCS is unbound) and add an executed case that runs it without injecting VCS.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-1'
+    severity: medium
+    file: 'skills/develop-next/SKILL.md'
+    finding: 'Step 0.1 tick-flag reconciliation prints not-ticked both for an unticked row and for a failed look (git fetch unchecked, git show failure swallowed by || continue, a node import or parse error), so a failed look routes to Step 4, which re-ticks and adds a duplicate Change Log row (reviewer CR-2, medium confidence; verified by QA by reading the block).'
+    suggested_action: 'Give the block three answers — ticked, not-ticked, unknown — with distinct exits, check the fetch, and leave the flags as recorded (no Step 4) on unknown; add executed cases for a failed fetch/show.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-2'
+    severity: low
+    file: 'skills/develop-next/SKILL.md'
+    finding: 'The merge-verdict and reconciliation blocks are boundaries (they refuse on platform and repository state); no security-probe entry form reaches a fenced prose block, so probes_executed is 0 and the DoD zero-guard will fire.'
+    suggested_action: 'No code change: record a DoD override at finalise citing the executed fixture harness (merge-delete-branch-guard.test.mjs, hostile states OPEN/CLOSED and the exit-0/OPEN control), until task.181 shell-argv exists.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 106
+  phases_verified: '4/4'
+  ci: 'not read at QA (gated at finalise)'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Boundary: true (refusals on PR state and git status). No engine form reaches prose blocks; the executed fixture harness covers OPEN/CLOSED/exit-0-OPEN and asserts no remote delete of an unmerged PR under bash. See QA-2.'
+  performance:
+    status: PASS
+    notes: 'One extra gh pr view per merge and per resume; no timing criterion.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1 (silent on Bitbucket) and QA-1 (failed look reads as not-ticked) are both resume-reliability defects in the new reconciliation.'
+  maintainability:
+    status: PASS
+    notes: 'Rule stated once and cited; shared merged-PR query; tests pin ordering. quick_validate, bundle:check, prettier, lint:shell clean.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1 and QA-1 in the Step 0.1 reconciliation blocks, with executed cases.'
+      refs: ['skills/develop-next/SKILL.md', 'shared/resources/tests/merge-delete-branch-guard.test.mjs']
+  future:
+    - action: 'Probe prose boundaries once task.181 shell-argv exists; a Bitbucket stub for the guard test.'
+      refs: ['shared/resources/tests/merge-delete-branch-guard.test.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 and QA-1 fixed']

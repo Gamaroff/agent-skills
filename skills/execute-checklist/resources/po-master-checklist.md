@@ -13,7 +13,7 @@ First, determine the project type by checking:
 
 2. Is this a BROWNFIELD project (enhancing existing system)?
    - Look for: References to existing codebase, enhancement/modification language
-   - Check for: create-prd output (docs/prd.md), docs/architecture/index.md (sharded brownfield arch from document-existing-project), existing system analysis
+   - Check for: create-prd output (the PRD under ${PRD_ROOT}/**/prd.{P}.*/prd.{P}.*.md — ask which when several exist), docs/architecture/index.md (sharded brownfield arch from document-existing-project), existing system analysis
 
 3. Does the project include UI/UX components?
    - Check for: frontend-architecture.md, UI/UX specifications, design files

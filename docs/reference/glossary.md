@@ -12,7 +12,7 @@ Quick reference. Where a term has a full standards doc or runbook, the entry lin
 | **Epic**       | Mid-scope work unit nested in a PRD. Parent of stories. Globally unique number. See [Epic documents](../standards/epic-documents.md).       |
 | **Story**      | Unit of implementation. One story → one branch → one PR → one QA gate. See [Story documents](../standards/story-documents.md).              |
 | **Task**       | Standalone technical work (refactor, infra, cleanup) that doesn't need a PRD or epic. See [Task documents](../standards/task-documents.md). |
-| **Bug report** | Structured record of an issue found by QA or a user, scoped to an existing story.                                                           |
+| **Bug report** | Structured record of a defect. Three modes: a **story bug** beside its story, a **task bug** in its task directory, or a **general bug** (no single owner) in `docs/bugs/bug.{N}.{name}/`, numbered from the bug registry. See [Bug documents](../standards/bug-documents.md). |
 | **Plan file**  | Implementation plan for a task or story. Must be co-located with the work. See [Plan file locations](../standards/plan-file-locations.md).  |
 
 ## Pipelines
@@ -22,11 +22,11 @@ Quick reference. Where a term has a full standards doc or runbook, the entry lin
 | **Pipeline**          | Chained sequence of skills that takes a story or task from `draft` to `accepted`.                                                      |
 | **Orchestrator**      | A skill that drives a multi-step pipeline by calling other skills. Examples: `develop-story`, `develop-task`.                          |
 | **Leaf skill**        | A skill the orchestrator invokes but that doesn't itself orchestrate others. Examples: `create-branch`, `commit-changes`.              |
-| **Phase 0**           | Pre-pipeline resolve & prepare step. Prompts for story/task path, base branch, lite mode. Always idempotent and re-runnable.           |
+| **Phase 0**           | Pre-pipeline resolve & prepare step. Asks for the branch base and PR target, unless `--base`/`--target`/`--defaults` answer them; detects lite mode automatically. Always idempotent and re-runnable.           |
 | **Step N**            | One of the 8 numbered steps inside an orchestrator's Phase 1 pipeline.                                                                 |
 | **Anchor runbook**    | Full-lifecycle runbook (~200–300 lines). Examples: story-development, task-development.                                                |
 | **Satellite runbook** | Focused single-scenario runbook (~80–150 lines). Examples: hotfix, bug-fix, sprint-cycle.                                              |
-| **Lite mode**         | Optional flag that skips pre-develop context-gathering for low-risk stories/tasks. Step 7 (`finalise`) side-effects still run in full. |
+| **Lite mode**         | Shorter QA, auto-detected in Phase 0 when `risk_level` is low or absent, there are fewer than 3 tasks/phases, and the work touches one module (`--mode lite` can request it; `--mode fast` applies the same shortening regardless of the detector, but only when `develop.skippable` lists `qa-depth` and `review-pr-depth` (or `develop.defaultMode` is `fast`); otherwise it is refused with a reason). Step 5 QA uses direct tools only and Step 5c runs `/review-pr --effort low` (degraded, never skipped); every other step, including Step 7's side-effects, runs unchanged. There is no `--lite` flag. See [the lite-mode contract](../../shared/resources/develop-pipeline-lite-mode.md). |
 | **Resume**            | Re-invoking an orchestrator on an interrupted run. Detects per-step artifacts and continues from the first incomplete step.            |
 | **MAX_ITER**          | Bounded-loop cap (5) on develop and qa-fix iterations, to prevent runaway agent costs. The QA loop's 5 cycles are shared with Step 5c — a `review-pr` `REQUEST CHANGES` consumes one. |
 
@@ -47,8 +47,10 @@ Quick reference. Where a term has a full standards doc or runbook, the entry lin
 
 | Term                       | Definition                                                                                                                                                                                |
 | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Epic registry**          | `docs/development/epic-registry.md` in the consuming project. Single source of truth for epic numbers. Globally unique, never reused. See [Epic registry](../standards/epic-registry.md). |
+| **Epic registry**          | Retired (tasks 202–205). Epics are numbered within their PRD (`epic.{P}.{E}`); `docs/development/epic-registry.md` keeps only an old → new mapping. See [Epic registry](../standards/epic-registry.md) and the **PRD registry**. |
+| **PRD registry**           | `${PRD_ROOT}/prd-registry.md` in the consuming project. Single source of truth for PRD numbers. Globally unique, never reused. See [PRD registry](../standards/prd-registry.md). |
 | **Task registry**          | `docs/tasks/task-registry.md` in the consuming project. Single source of truth for task numbers. Globally unique, never reused. See [Task registry](../standards/task-registry.md).       |
+| **Bug registry**           | `docs/bugs/bug-registry.md` in the consuming project. Single source of truth for **general** bug numbers (story and task bugs are numbered per parent). Globally unique, never reused. See [Bug registry](../standards/bug-registry.md). |
 | **Atomic registry update** | Rule that a new epic/task and its registry row must commit in the same git commit.                                                                                                        |
 
 ## Library mechanics
@@ -58,7 +60,7 @@ Quick reference. Where a term has a full standards doc or runbook, the entry lin
 | **SKILL.md**               | Required entry-point file for a skill. YAML frontmatter (name + description) + body instructions.                                                                                             |
 | **Frontmatter**            | YAML metadata block at the top of a document, between `---` delimiters.                                                                                                                       |
 | **Progressive disclosure** | Three-tier loading: metadata always in context → SKILL.md body on trigger → bundled resources on demand.                                                                                      |
-| **Shared resources**       | Cross-skill docs under `shared/resources/` in this repo. Auto-bundled into each skill's zip by the packager.                                                                                  |
+| **Shared resources**       | Cross-skill docs and scripts under `shared/resources/` in this repo. Copied into each referencing skill's `references/` directory by `npm run bundle` (and into each zip by the packager).    |
 | **Platform resolver**      | Logic that picks GitHub/Bitbucket/Jira based on `skills-config.yaml`, env vars, and git remote. See [`shared/resources/platform-detection.md`](../../shared/resources/platform-detection.md). |
 | **Access model**           | How much the agent may do to the tracker: `full` · `read-only` · `approve` · `command` · `manual`. Separate from *which* tracker. See [Restricted tracker access](../concepts/restricted-access.md). |
 | **Handover**               | The three committed renderings of deferred tracker writes: `*.handover.{n}.{name}.{md,sh,json}`. Checklist, script, JSON sidecar. See [Pipeline artifacts](./pipeline-artifacts.md). |

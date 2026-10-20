@@ -34,7 +34,7 @@ Two independent axes, deliberately not collapsed into one key:
 | **Identity** | `tracker:` / `vcs:`             | *Which* system is this project on? |
 | **Access**   | `access.tracker` / `access.vcs` | *How much* may the agent do to it? |
 
-A restricted run still needs the identity: emitting "move RAPP-605 to In Review" with the right URL
+A restricted run still needs the identity: emitting "move PROJ-605 to In Review" with the right URL
 and field names is only possible if the agent knows the tracker is Jira. So `manual` is a value of
 `access.tracker`, never of `tracker`.
 
@@ -291,7 +291,7 @@ key set — a grammar, rather than one more spelling patched shut each cycle.
 | Empty flow sequence | `worktreeSeedPaths: []` |
 | Quoted key this reader never reads | `"my key": 1` |
 | Duplicate of a key this reader never reads | `x: 1` … `x: 2` |
-| Balanced braces inside a quoted value | `branchPattern: "epic/{n}.{slug}"` |
+| Balanced braces inside a quoted value | `branchPattern: "epic/{P}.{E}.{slug}"` |
 
 Nesting depth, sequences and flow sequences are **deliberately** on this list. A shape-based subset
 ("nothing deeper than two levels") was drafted first and would have refused

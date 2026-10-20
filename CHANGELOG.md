@@ -4,8 +4,564 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **`registry-tick.js --bug-status` (task 219).** Sets a general bug's row in
+  `docs/bugs/bug-registry.md` to the bug file's status, in the registry's own vocabulary (the
+  lifecycle token, or the emoji labels when most rows use them). develop-bug Steps 3, 5–6 and 7 and
+  `/qa-fix` call it at every status change, so the row no longer goes stale after a reopen; qa-fix
+  now also writes the bug's frontmatter `status:`, which the call reads. A new drift test,
+  `evals/shared/tests/bug-registry-drift.test.mjs`, fails CI when a bug file and its row disagree.
+  The default mode still answers `not-a-task` for a bug, so `finalise --bug` is unchanged.
+- **No consumer names in shipped skills (task 220).** A new guard,
+  `tests/no-consumer-names.test.js`, fails CI when any tracked file under `skills/` or `shared/` —
+  bundled `references/` copies included — names the consumer project the library was first built
+  against, in a file's contents or its path. Provenance notes now say "a consumer project", and
+  example keys, hosts and board ids use `PROJ`, `acme.atlassian.net` and `12`. The Jira-board
+  replay fixtures under `shared/resources/tests/fixtures/` are renamed to a `proj-` prefix. The
+  older task.201 guard keeps its scanner and its exemption list is now empty.
+
+### Removed
+
+- **BREAKING — the wireframe skill no longer ships a format profile (task 220).**
+  `skills/wireframe/references/html-formats/` held a single profile, for one consumer's hi-fi
+  phone screens, and `SKILL.md`'s profile table linked it. Both are gone, with the two tests that
+  held the directory to account. The skill's conversion rules are unchanged. Step 2 of "Working
+  from an existing UI" now says a format belongs to a project: a project that converts one format
+  repeatedly keeps its profile in its own repository, outside `.agents/skills/`, and names it in
+  its own agent instructions. **Migration:** a consumer that used the profile copies it out of
+  `.agents/skills/wireframe/references/html-formats/` into its own tree **before** running
+  `setup-consumer.sh --update`, which removes it; it is also recoverable from this repository's
+  history.
+
+### Fixed
+
+- **Release runbook and setup wizard wording (task 218).** The release runbook's develop-sync
+  section opens with its condition, and its manual block and recoveries end on `main` as
+  `release.sh` does. The setup wizard's summary names the `*.handover.*.md` checklist
+  `/tracker-reconcile` ticks, and its section banners use the step numbers in getting-started.
+  restricted-access.md names the autonomous-run fallback for `approve`.
+- **The setup, configuration and process docs match the scripts (task 199).** 20 findings from the
+  2026-10-07 doc-drift audit are fixed or closed across 16 docs: getting-started, both quickstarts,
+  which-access, which-path, configuration, faq, glossary, six runbooks, and the architecture-example
+  and standards READMEs. One finding was closed as superseded by the PRD-numbering work.
+  - **Install wizard.** The docs follow the wizard as it runs today: the tracker-workflow and access
+    steps, `.secrets/tooling.env` for Bitbucket or Jira credentials, and two hooks.
+  - **Configuration.** All eight pipeline moments are listed, and VCS resolution no longer shows an
+    env-var step it does not have.
+  - **Release.** The runbook covers `release.sh`'s CI-verdict check and how to recover when the
+    Sync develop step stops.
+  - **Bugs.** A general bug's status writes are mirrored into the bug registry, and all four Jira
+    sync skills are named.
+  - **Wizard text.** In `setup-consumer.sh`, the Approve option and the end-of-run summary now say
+    that approve defers tracker writes to one batched confirmation at handover.
+
+- **The skill reference and discovery docs list what ships (task 198).** 27 findings from the
+  2026-10-07 doc-drift audit are fixed across 16 docs: commands, activation phrases and invocation,
+  the concepts architecture and overview, the operations workflows, five runbooks, the README, and
+  the develop-next, qa-next, review-story and review-task READMEs.
+  - **Missing flags and modes.** `/review-pr` takes a work item (Jira key or URL, `#N`, issue URL)
+    and `--effort`/`--inline`; `/review-code` takes a PR, a `base...head` range or `--staged`;
+    `/create-task --from-observation`; session-handoff's continue mode; wireframe from an existing
+    HTML screen; review-story's validate mode.
+  - **Skills that do not exist.** `document-project`, `simplify`, `qa-technical-task` and a shipped
+    `uat-automate` are gone from the docs.
+  - **Skills absent from the maps.** `qa-next`, `loop-supervisor`, `/develop-bug` dispatch, the
+    jira-sprint ceremony skills, `wireframe` and the `ensure-*` routines. Epic issues are ensured by
+    `create-story` and `review-story`, not `finalise`.
+
+- **The pipeline entry docs match how a run starts (task 197).** 16 findings from the 2026-10-07
+  doc-drift audit are fixed across 13 docs: architecture, quickstart-story, anti-patterns, glossary,
+  troubleshooting, five runbooks, story-documents, task-documents and the develop-task README.
+  - **Lite mode.** It is auto-detected and shortens QA only (direct-tools Step 5, `--effort low`
+    Step 5c). There is no `--lite` flag; `--mode lite|fast` (task 201) is named instead, and Step 7
+    still runs in full.
+  - **Phase 0.** It asks two questions, base and PR target, and only where `--base`, `--target` or
+    `--defaults` has not answered them.
+  - **Branches and invocation.** Story PRs target `develop` unless the epic opted in to an
+    integration branch. The standards invoke `/develop-story` and `/develop-task`, not `/develop`.
+    `depends_on` is informational. The parallel-story worktree commands use a scratch branch, so
+    they no longer fail with `invalid reference` and do not collide with the branch `/develop-story`
+    creates.
+
+- **The develop-pipeline docs match how the QA loop routes, resumes and commits (task 196).**
+  31 findings from the 2026-10-07 doc-drift audit are fixed across 15 docs: the concepts and
+  operations overviews, pipeline-artifacts, troubleshooting, the runbooks, task-documents, and the
+  develop-task, develop-story, develop-next, develop-batch and review-task READMEs.
+  - **QA-loop routing.** A gate with no open findings hands to Step 5c. The docs now cover the
+    Diminishing-returns, Cosmetic-residue and Gate-the-last-fix routes and use `QA_MAX_CYCLES`
+    instead of a literal 5.
+  - **Resume paths.** A not-converging grant re-enters at 5b. A `/finalise` DoD-gaps halt
+    followed by a committed code fix re-enters QA at 5a.
+  - **Artifacts and commit timing.** Review reports are numbered. The docs now cover `pr-review`
+    and `sprint-review-summary.md`, and say that QA reports, gates and the DoD are committed when
+    they are written, not at Step 8.
+  - **Merge gate and hooks.** The `develop-next`/`develop-batch` merge-gate wording is
+    corrected, and the `Stop` hook is listed.
+- **A QA gate no longer passes over probe escapes that `/finalise` halts on (obs #73).** The probe
+  run record now totals `escaped` beside `executed` and `reproduced`, and `--emit-block` prints it
+  for the whole record and for each control. `/qa-task` and `/qa-story` copy `totals.escaped` into
+  the gate as `nfr_validation.security.escaped`. A non-zero count is a `top_issues[]` finding,
+  never a future-work item and never a `PASS`: the same rule `/finalise` Step 3b.1 applies to the
+  same record. Before this, task 195's QA cycle 2 gated PASS over 10 escapes, and the DoD found
+  them after the full QA loop.
+- **The finding-anchors checker no longer has a state its callers misread (task 195).** Seven
+  advisory findings left by task 194 are closed. **A code finding whose `file_line` is not
+  `path:line`** — a bare path, a range, empty, a value that is not a string, or no `file_line` at
+  all — now reads `unparseable`, a new verdict in the malformed set (exit 1), instead of the clean
+  `no-line`. A `line_text` that is not a string is a `text-mismatch`; only an absent or blank
+  one leaves the text unchecked. The lens comes from the
+  wrapper (`code_review` or `pr_conformance`), or from the key in a bare array, so a conformance
+  `ref` such as `AC-3` stays `no-line`. **`--rev` with a `--root` missing
+  from that commit** exits 2 `bad-root` instead of reading every finding `no-such-file`. **`--index`**
+  (new) reads the staged content, so `/review-code --staged` is checked against the tree it reviewed;
+  it is a usage error together with `--rev`. **The four dispatcher blocks** (`/review-pr`,
+  `/review-code`, `/qa-task`, `/qa-story`) decide on the checker's JSON `reason`, never its exit
+  code — `node` also exits 1 when the script cannot load — and HALT as "checker not runnable" when
+  there is no reason at all. **Both `--inline` blocks** refuse a findings file with an un-annotated
+  finding (a missing or null `anchor_check`) instead of posting `[]`. The review-pr block and the
+  checker also refuse a file where any lens present has no findings array, which used to drop that
+  lens's findings silently. The review-pr block no longer leaves a scratch file in `$TMPDIR` when it
+  refuses. **The develop-bug verify loop** carries a blocking finding with a
+  malformed anchor as `(location unverified: {file_line})`, and the population guard now covers every
+  executed document that consumes code-review findings, not only the dispatchers.
+  **Consumer upgrade:** re-vendor (`setup-consumer.sh --update`). An external caller that branched on
+  `no-line` for code findings treats `unparseable` like `out-of-range`.
+
+## [v0.58.0] - 2026-10-19
+
+### Added
+
+- **The security probe runs a Python CLI under the `cli:` entry form (task 215).** `cli:<path>.py`
+  now runs the script under `python3 -E -s -B` with the same `--argv` template, sandbox, timeout and
+  exit-status verdict as a Node CLI, so a Python boundary reaches the DoD probe instead of being
+  declined `entry-not-probeable` and tripping the zero-candidates guard. A Python crash exits 1, the
+  status a refusal exits with, so the script runs inside a bootstrap that writes an exit record on
+  fd 3 for every exit it controls: `answer` when the script returns or calls `sys.exit`, `crash`
+  when it raises anything else, caught before any excepthook runs. A replaced excepthook (rich,
+  Typer), a redirected `sys.stderr` or an exception that cannot be printed cannot hide a crash, and
+  a forked child neither writes the record nor holds the pipe open. A case with **no** record is
+  `errored` too, so a script that closes fd 3, leaves by `os._exit` or cannot start inside the
+  sandbox is declined, never scored. An exit 1 with a traceback on stderr also counts as a crash. A
+  crash is scored `errored`, never `rejected`. One stated limit: an exception Python prints and
+  swallows outside the script's main frame (a joined worker thread, an atexit handler) leaves
+  `python3` exiting 0, so the case is scored by that exit status — a hostile case reads `accepted`, a
+  false alarm, never a pass. A failed flush of stdout at shutdown (exit 120) is `errored`. `-B`
+  stops a sibling import writing `__pycache__/` into the watched script directory; `-I` is not
+  used because it breaks sibling imports. With no `python3` on `PATH` the entry is declined once,
+  naming `python3`. The result and the run record carry a new `interpreter` field
+  (`{ name, version }`, `null` for every other form).
+  **Consumer upgrade:** re-vendor (`setup-consumer.sh --update`); a `cli:` probe of a `.py` boundary
+  that was recorded `unverifiable` can now be re-run.
+
+- **Two CI guards hold hierarchical document numbering, and the docs stop teaching the old scheme
+  (task 207).** `evals/shared/tests/doc-numbering-corpus.test.mjs` runs `doc-id.js`'s `checkCorpus`
+  over the PRD root and fails on any unnumbered, mismatched, unregistered or duplicate PRD, epic or
+  story — with a 22-document non-vacuity floor and three mutation cases. `tests/doc-id-chokepoint.test.js`
+  fails on a PRD/epic/story id regex, a string-built id regex, a `[Epic N]`-style title regex or a
+  positional `awk -F.` / `cut -d.` split on a STORY/EPIC/PRD variable anywhere but `doc-id.js` — in
+  tracked code and in the bash fences of `SKILL.md` and `shared/resources/*.md` — with a per-shape
+  allowlist, a stale-entry check and a positive control. Fixed with it: `review-epic`'s branch setup
+  read the PRD number as the epic number (`awk -F.` on `epic.P.E.slug`), so its auto-skip matched
+  every epic of the PRD; it now reads both through `doc-id.js`. `sync-jira-story` reads related
+  artifacts through `doc-id.js` and so now links a sub-story's artifacts. The prose sweep rewrote
+  every `story.{epic}.{story}`, `epic.{N}`, `epic/{N}` and flat example id in `SKILL.md`,
+  `shared/resources/*.md` and `docs/`, replaced AGENTS.md § Epic Registry with § PRD Registry, and
+  removed the docs that still sent readers to the retired epic registry and `epic-registry-manager`.
+  **Consumer upgrade:** a project still on flat numbering migrates once with
+  `node .agents/skills/review-prd/references/migrate-doc-numbering.mjs --check`, then `--apply`
+  (`[--apply | --check] [--json] [--root <dir>] [--name <path>=<slug>]... [--allow-in-flight]`).
+
+- **A `/qa-next` note finding can be resolved, with evidence (task 212).** A `note` row in a run
+  file's Findings table used to stay open forever. `uat-status.mjs --resolve-finding <run> <n> --by
+  <evidence> [--date YYYY-MM-DD]` now appends ` — resolved YYYY-MM-DD by \`<evidence>\`` to its
+  `Filed as` cell — the only edit ever made to a written run file — where the evidence is a commit
+  sha or a later run file. `--findings` counts a validly resolved note as closed; `--check` reports
+  every marker whose evidence does not hold (`commit-not-found`, `not-a-git-repo`, `run-not-found`,
+  `run-is-self`, `run-not-later`, `on-a-bug-link`, `bad-date`, `bad-evidence`). `--changed-runs`
+  lists the earlier run files a resolution edited, so `/qa-next` Step 5 stages them even on a
+  resumed run. Run files without markers read exactly as before.
+
+- **One engine for hierarchical document ids, and a PRD registry (task 202).** The new
+  `shared/resources/doc-id.js` parses, formats, allocates and checks `prd.{P}`, `epic.{P}.{E}` and
+  `story.{P}.{E}.{S}` names: `P` comes from a new PRD registry, `E` counts epics within a PRD, and
+  `S` counts stories within an epic. Its CLI (`parse`, `next`, `check`, `check --corpus`) follows the
+  `--json` `reason` and exit-code contract of the other engines, and refuses a directory it cannot
+  read rather than reporting it empty. `select-next.mjs` now reads a PRD registry (`kind: "prd"`)
+  by the same rules as its bug and task registries, and a roadmap line linking a PRD is still not a
+  work item. New standard: `docs/standards/prd-registry.md`. The file-naming, PRD, epic and story
+  standards now describe the scheme, each with a dated interim note. No skill uses it yet; tasks
+  203–207 migrate the callers.
+
+- **A one-shot migration to hierarchical document numbering, run on this repository (task 203).**
+  The new `shared/resources/migrate-doc-numbering.mjs` renames an existing PRD, its epics and its
+  stories to `prd.{P}`, `epic.{P}.{E}` and `story.{P}.{E}.{S}`. It rewrites their frontmatter, gate
+  `story:` fields and every relative link into the moved tree, and appends the PRD to the PRD
+  registry. It is a dry run by default. `--apply` writes nothing until every blocker has passed:
+  an epic with no PRD, an in-flight story, a target that already exists, a dirty path, a link that
+  would break, a missing or stale registry, or two documents mapping to one new id. `--check`
+  exits 1 while a migration is pending and 0 once it is done. A run that fails part-way returns
+  `post-check-failed` with a revert command that names only the paths it touched. This repository's
+  onboarding PRD is now `docs/prd/onboarding/prd.1.onboarding/`, with epics `1.1`–`1.4` and
+  stories `story.1.E.S`. `doc-id.js` recognises the `validate` artifact kind.
+
 ### Changed
 
+- **The snippet engine runs the pipeline blocks a change touches (task 191).**
+  `qa-execute-snippets.mjs` gains three things, each opt-in. `--slot NAME=VALUE` fills a `{NAME}` /
+  `<NAME>` template slot with literal text **before** classification, so a value that adds a write is
+  refused like written code; an unfilled slot is named in the reason (`template slot: {a}, <b>`), and
+  `zero-blocks-executed` now names `--slot` or `--bind` by placeholder kind (obs #186). The **helper
+  rule**: `bash` / `sh` / `source` / `.` of a literal `.sh` path inside the temp copy runs when the
+  helper's own text classifies runnable (helper mode: function definitions, `case` arm patterns,
+  `name+=(…)`, `shopt -s|-u`; an arm pattern only at an arm position), to a depth of 2, and never in
+  a block that changes directory, changes `PATH`, names a shell start-up variable (`BASH_ENV`, `ENV`,
+  `SHELLOPTS`, `BASHOPTS`, `PS4`), or runs an `export`/`local`/`readonly`/`read` of a name that is not
+  a plain identifier as written (or `export -f`, `printf -v`). A function a sourced helper defines is
+  callable in that block when its name shadows no builtin or PATH command; a sourced helper sees the
+  functions sourced before it, and a function's reach is every definition of its name the block may
+  see, so a later helper's redefinition is never hidden by an earlier one. A call to such a function, a helper script's own arguments and a
+  sourced helper's `set --` parameters are refused when, read as written or unquoted, they would be
+  refused written to a command the helper runs.
+  `isRunnableBlock` exposes the classifier to the security probe. `SAFE_COMMANDS` is unchanged
+  (obs #219, #278). `--diff-base <rev>` marks the blocks `git diff -U0` touches, adds a `changed`
+  summary and the finding `changed-blocks-not-executed` when none of them ran; a bad revision is exit 2,
+  `bad-diff-base`, and so is a diff with output and no hunk; the user's colour and diff drivers are
+  switched off. qa-task Step 4b and qa-story Phase 1.7 pass the PR's merge base as `--diff-base` and `--copy-as
+  .agents:.agents` (or `skills:.agents/skills` where `.agents/skills` is a symlink), name `--slot`, and
+  report the `changed` counts first; `qa-runnable-prose-detection.md` gains §2aa, §2c and §4a.
+
+- **The story pipeline reads hierarchical story ids (task 206). Breaking.** Every story-side reader
+  and writer of a story or epic id now goes through `doc-id.js` instead of its own pattern:
+  `finalise-fix-and-recheck.mjs` (8a's co-location rule and the doc-links corpus guards),
+  `bug-doc.js`, `create-story` (its validators and allocator), the Step 0 and Step 0a story blocks,
+  `create-branch`, `ensure-story-github-issue`, `sync-github-story`, `session-handoff`'s
+  continuation, `qa-next`'s UAT selector and `develop-next`'s roadmap selector. A story is
+  `story.{P}.{E}.{S}` (`3A` is a sub-story) and an epic is found by **(P, E)**: E restarts at 1 in
+  every PRD, so Step 0 now HALTs on zero or two-plus epic documents for the pair instead of taking
+  `head -1`, and `story.1.2.3` no longer admits `story.1.2.30`'s artifacts at 8a. `create-story`
+  allocates S with `doc-id next story --epic-dir` (highest + 1; `nextStoryId` delegates to the same
+  rule). Four changes reach a consumer, and **the order is: migrate first, then upgrade the skills**
+  — run task.203's `migrate-doc-numbering.mjs` on your tree (dry run, then `--apply`), then install
+  this release; finish any in-flight story branch on the old skills or rename it with `git branch -m`:
+  1. **Story and branch names.** `story.{E}.{S}` → `story.{P}.{E}.{S}`, and
+     `feature/story.{E}.{S}.slug` → `feature/story.{P}.{E}.{S}.slug`. A legacy story name is refused
+     with a message naming the migration; new tracker issues are titled `[Story P.E.S]` with the
+     milestone `Epic P.E — {title}`. Existing issues are not renamed; dedup by title runs only for a
+     story with no `github_issue`.
+  2. **`branching.epicIntegration.branchPattern`.** The default is now `epic/{p}.{n}.{slug}`, and a
+     configured pattern without `{p}` is refused (`/create-branch` Step 2b.4 HALTs naming the key).
+     Add `{p}` to a configured pattern. A declared `integration_branch:` is still used verbatim.
+  3. **`qa-next` surfaces file.** `epicSurface` keys are epic ids `"P.E"` (`"5"` → `"1.5"`), and
+     `storySurface` / `storyNa` keys are story ids `P.E.S`. A key in the old shape is reported by
+     `uat-status.mjs`, and a `story.*.md` it cannot read is reported rather than skipped.
+  4. **Roadmap epic headings.** `## Epic 8` → `## Epic 1.8`, and `deps: Epic 8` → `deps: Epic 1.8`.
+     A leftover bare `Epic N` is a selector **error** naming the migration (inside a Deferred,
+     Housekeeping or Change Log section it is history and is ignored). The roadmap template now
+     shows the new heading.
+
+- **The PRD skills write, check and migrate numbered PRDs (task 204). Breaking.** `create-prd`
+  allocates the PRD's number `P` from `${PRD_ROOT}/prd-registry.md` (bootstrapping it on first use),
+  writes `${PRD_ROOT}/{domain}/prd.{P}.{feature}/prd.{P}.{feature}.md` with `prd_number: P`, adds the
+  registry row, and stops on any `doc-id.js check` result other than `ok`. Re-running it on an
+  existing PRD keeps its number. The greenfield path no longer writes `docs/prd.md`.
+  `review-prd` reports a missing registry, an unnumbered PRD, a directory/stem/frontmatter mismatch
+  and an unnumbered or wrongly-parented epic or story as **Critical**, offers the task-203
+  migration when its plan has no blockers, and writes its report as
+  `prd.{P}.{feature}.review.{n}.{name}.md`. A new `review-prd/scripts/migration-guard.mjs` withholds
+  that offer for three shapes the migration cannot yet carry — no frontmatter, a PRD with no domain,
+  and a `docs/prd.md` that files outside the PRD root mention — until task 211 lands. `shard-prd`
+  explodes a numbered PRD in place and refuses a legacy one. Every PRD-path block refuses a path that
+  resolves outside `${PRD_ROOT}` through a symlink. The migration's token pass no longer rewrites the
+  bare words `prd` and `index`, which turned `type: prd` in every other PRD into `type: prd.{P}.{slug}`.
+
+- **Epics are numbered within their PRD, and every epic needs a PRD (task 205). Breaking.** Every
+  epic skill now names a new epic `epic.{P}.{E}.{name}`: `P` is the parent PRD's number and `E` is
+  allocated by `doc-id.js next epic --prd-dir <PRD dir>`. The PRD's "Epic 2" and the file
+  `epic.{P}.2` are now the same thing. Six changes reach a consumer:
+  1. **Epic filename and frontmatter.** `epic.163.x` becomes `epic.1.2.x`, with `prd_number: 1` and
+     `epic_number: 2`. `create-epic` and `create-epics-from-shards` run `doc-id.js check` on what they
+     write and stop on any reason other than `ok`. `create-epics-from-shards` now writes one directory
+     per epic. To migrate existing epics, run task.203's `migrate-doc-numbering.mjs`: dry run first,
+     then `--apply`.
+  2. **A parent PRD is mandatory.** `create-epic` stops with `No parent PRD found … Run /create-prd
+     first` instead of writing `prd_source: "brownfield-enhancement"`. The sentinel is gone from every
+     skill. The migration reports a sentinel epic as a blocker. Give it a PRD with `/create-prd`, then
+     re-run the migration.
+  3. **Tracker identity is `[Epic P.E]`.** Jira summaries and GitHub titles become `[Epic 1.3] Foo`,
+     and the milestone becomes `Epic 1.3 — Foo`. Both Jira scripts build the summary with one shared
+     helper, `doc-id.js` `epicSummary`. When the frontmatter numbers are missing, the summary is the
+     bare title; it never guesses an id from the title. `sync-github-epic` renames the epic's
+     own milestone in place through the new `tracker-issue.js --kind milestone --rename-from`, so
+     stories already on it stay grouped; a sprint or other shared milestone is never renamed, and a
+     failed milestone lookup renames and creates nothing. The milestone key has one definition,
+     `doc-id.js epic-meta`, which the epic sub-routines and the task milestone lookup all call. No manual step: an epic converges on its next sync.
+  4. **`epic-registry-manager` is removed.** Delete `.agents/skills/epic-registry-manager/` in each
+     consumer, because the installer does not prune. `create-epic` covers what it did.
+     `setup-consumer.sh` no longer creates `docs/development/epic-registry.md`. A task's `epic:`
+     milestone lookup now resolves the epic through `doc-id.js` instead of the registry.
+  5. **`review-epic` refuses a bare number.** Use `/review-epic 1.3`, a path or a name. `/review-epic 3`
+     is refused because `3` is ambiguous across PRDs. A new Critical check runs `doc-id.js check` on
+     the epic, and the review now compares the epic against every epic on disk instead of a registry.
+  6. **The PRD epic-index column reads `P.E`.** `generate-prd-epic-index.mjs` now also finds PRDs
+     under a domain directory (`docs/prd/{domain}/prd.{P}.{feature}/`), sorts by `E`, and skips and
+     names any epic whose numbers disagree with its directory. It loads `doc-id`, which
+     `setup-consumer.sh` vendors beside it as `scripts/doc-id.cjs`, so a `"type": "module"` consumer
+     can load it. Run `setup-consumer.sh --update`, then `node scripts/generate-prd-epic-index.mjs`
+     once.
+
+- **The global epic registry is retired (task 203).** `docs/development/epic-registry.md` is now a
+  pointer to `docs/prd/prd-registry.md`, and it keeps the old epic numbers as a historical mapping
+  (`1`–`4` → `1.1`–`1.4`). Epic numbers now count within their PRD. Skills that still read the old
+  registry are migrated by tasks 204–207. Ten relative links in four onboarding story artifacts
+  were already dead before the move; they now point at their real targets.
+
+### Fixed
+
+- **Scripts reach only the skills that run them (task 193, obs #263, #289, #175).** A
+  `shared/resources/<script>` literal in the prose of a shared document copies the script into every
+  skill that bundles the document. Eleven such literals named a script some bundling skills never run;
+  they now name the bare filename, and the 21 copies nothing ran are removed: `grant-qa-cycles.sh`
+  from develop-bug, qa-story, qa-task and review-pr; `gh-stage.js`, `handover-render.js` and
+  `handover-verify.js` from qa-story, qa-task and review-pr; and `pipeline-answers.js`, `qa-cycle.sh`,
+  `report-lint.js`, `resolve-paths.sh` and `tracker-comment.js` from review-pr; `resolve-paths.sh` from
+  develop-bug; and `tests/qa-execute-snippets.test.mjs` from qa-story and qa-task. develop-bug, which runs
+  `pipeline-answers.js` from its own step-0 document, now names it in `SKILL.md`. The new
+  `tests/shared-script-literals.test.js` fails on a prose script literal that is not in its
+  allowlist, where each of the 23 entries names the skills that bundle its document and why each
+  needs the copy. It also fails on an entry that no longer matches a line, and on a skill that starts
+  bundling the document without being added. Like the bundler, it reads fenced lines, nested paths
+  and `<!-- cite: -->`-wrapped scripts (a cite of a script is still a dependency). A literal counts
+  as run only inside `require(`/`import(`, after `$(`, or when a command opens the code span it sits
+  in (in a fence, also a shell command at the line start), so `Engine source: …`, `(source …)` and a
+  fenced quote of a path do not pass as commands. The same test pins
+  create-skill's rule sentence in the wording the bundler cannot rewrite.
+
+- **The QA read-back now checks this cycle's verdict, and waits out a moment's `.git/index.lock`
+  (task 192, obs #205, #216).** `qa-read-back.js` HALTs when the QA section's `**Gate Decision**`, or
+  the newest `QA gate …` row written by `qa-task`/`qa-story`, does not name this cycle's gate token.
+  Before, a document whose links were updated while its verdict line or row was left at the previous
+  cycle read clean. A `qa-fix` row after that `QA gate` row is a HALT too, because it means this cycle
+  wrote no row, which a repeated verdict would hide. So is a missing QA section, `**Gate Decision**`
+  line, `QA gate` row or readable `gate:` token. Later `finalise` rows and QA's own `Status →` rows
+  are ignored. `git add` failing on a held `index.lock` is
+  retried three times (200 / 400 / 800 ms) before it is reported, once per run; any other staging
+  failure is reported on the first attempt. `--json` gains `stageAttempts`.
+
+- **The security probe's case check no longer refuses a `null` sink or throws on a value JSON cannot
+  hold (task 190 follow-up, CR-2 and CR-3).** `validateCases` treats `"sink": null` as absent, as the
+  code that reads a case's sink already did. `describeBadCase` renders a BigInt or circular value with
+  `String` instead of throwing, so `runProbeSpec` declines such a case `bad-cases` for a library
+  caller. `probe-boundary-rule.md` now lists `bad-cases` among the decline reasons.
+- **The security probe refuses what it cannot score, and the record says why a case was declined
+  (task 190).** `security-probe.mjs` now exits 2 before running or recording anything in two cases
+  that used to produce a misleading verdict. A `--cases-file` case whose `direction` is not
+  `hostile` or `legitimate`, or whose `sink` is not a known sink, is refused `bad-cases`, naming
+  the case and the accepted values (obs #201) — such a case used to run and count toward neither
+  side. An entry whose path does not exist is refused `entry-not-found`, naming the path and the
+  root (obs #211). Under `--json` both print `{reason, detail}`. A bundled copy run without
+  `--repo-root` now defaults its root to the git checkout it runs in, not the skills directory two
+  levels above it. Each record entry gains `declined_cases: [{id, reason, detail}]` beside the
+  `declined` count (obs #207); the field is additive. `runProbeSpec` declines `bad-cases` for a
+  library caller and still declines a missing entry `entry-not-probeable`.
+  **Breaking:** a CLI run with an unknown case direction or sink, or a missing entry, exits 2 where it
+  used to exit 0 or 1. Fix the value or the path; the error names both.
+
+- **Read-only Explore subagents are never asked to write (task 189, observations #191, #218).** Two
+  pipeline steps dispatched a read-only Explore agent and then told it to write a file; it refused
+  every time, and each run finished only because the orchestrator noticed and did the write by hand
+  (seven recurrences). The dispatching step is now the only writer:
+  - **The QA traceability mapper returns its matrix** between `<!-- matrix-start -->` /
+    `<!-- matrix-end -->` markers. The Steps 5–6 doc saves the reply and a fenced block writes the
+    marked text, byte for byte, to `.summaries/qa-traceability-matrix.md`. The fallback warns only
+    when the reply has no well-formed marked block — a matrix the mapper returned is never discarded.
+  - **The finalise DoD security agent returns a probe plan, and `/finalise` always runs it.** The
+    agent returns `probe_plan[]` (the engine's arguments as an array, plus inline `cases`); the new
+    `/finalise` Step 3b.1 runs it through `security-probe-plan.mjs` into the one
+    `<stem>.dod.<DOD_N>.security.run.json` record and fills `probes_executed` (the record's
+    `totals.executed`) and `probes[]` from it. An entry the engine refuses is recorded with its
+    reason and never counted; an argument holding a space reaches the engine as one argument. This
+    replaces the obs #10 fallback that ran the agent's command only when the record was absent.
+    **Breaking for a custom dispatcher of `finalise-dod-security-prompt.md`:** the agent's YAML no
+    longer carries `probes_executed`, `probe_command` or `probe_cases`; run Step 3b.1's block after
+    the agent returns. `/finalise` users need do nothing.
+  - **The DoD docs agent runs no generator.** It judges a stale skill catalog from the PR diff (a
+    `SKILL.md` frontmatter change with no `docs/reference/skill-catalog.md` change), and now receives
+    `<DIFF_FILE>` to do it.
+  - **`tests/explore-prompts-no-write.test.js`** re-measures every Explore-dispatched prompt — named on
+    a dispatch line, self-declared, or inline in an `Agent(subagent_type="Explore", prompt="…")` call —
+    and fails on a write instruction outside a `<!-- caller-runs -->` region. `code-review-prompt.md`'s
+    caller-side diff scoping is marked that way.
+
+- **`uat-status.mjs` reads no longer write the surfaces template.** With no `uat-surfaces.json`,
+  `--check`, `--coverage`, `--next`, `--item` and the scoreboard each copied the template into the
+  tree before exiting 2, so a read left an untracked `docs/qa/` behind (observation #57). Only
+  `--init` scaffolds the file now, as the qa-next skill already said; every other command exits 2
+  with `uat-surfaces.json not found — run --init …` and writes nothing. `/qa-next` Step 0 sends that
+  refusal to `--init` and `surfaces-unmapped` rather than to `registry-invalid`.
+
+- **A documentation-only DoD fix no longer re-enters QA.** After `/finalise` halts on Definition of
+  Done gaps, `reenter-qa-after-finalise.sh` counted every commit outside the work item's directory
+  as a code change. A CHANGELOG entry or a standards page therefore cost a full QA cycle and a
+  second PR review before `/finalise` could re-run (observation #44, task 202's run). The script
+  now classifies the changed paths with `ci.docsOnly.patterns` through `ci-tree-equivalence.js`,
+  the definition the docs-only CI rule and the 5c carry rule already use. It reads the configuration
+  at `HEAD`, and documentation alone resumes at Step 7. A classifier that cannot run, a malformed
+  configuration and `enabled: false` all count every path as code. This repository's patterns now
+  include `CHANGELOG.md`.
+- **A shell test suite fails when it calls an undefined command.** Previously such a call printed
+  "command not found" and was skipped, and the suite stayed green. The new
+  `shared/resources/undefined-command-guard.sh` records each miss through bash's
+  `command_not_found_handle`, and every `*.test.sh` now sources it and fails on a miss.
+  `tests/shell-suite-guard.test.js` keeps every tracked suite wired and registered in `npm test`.
+  Wiring it in found an assertion in `tracker-access.test.sh` that had never run since task.56: it
+  called helpers that suite never defined. It is fixed, and it fails when the stale banner wording
+  returns.
+
+## [v0.57.1] - 2026-10-14
+
+### Changed
+
+- **A release no longer commits to `main` (maintainers).** `scripts/release.sh` now runs in two
+  halves. `--prepare --patch|--minor|--major` runs on `develop` (or a `hotfix/*` or `release/*`
+  branch). It moves `[Unreleased]` to `[vX.Y.Z]`, refreshes the catalog and bundled references,
+  commits `chore(release): vX.Y.Z`, pushes, and opens the `Release prep — vX.Y.Z` PR into `main`.
+  After that PR merges, `--tag` on `main` reads the version from `CHANGELOG.md`, runs the same CI
+  and local checks as before, and pushes the tag alone. It used to commit on `main` and push there.
+  `main`'s required check runs on pull requests only, so each of those pushes went through on an
+  admin bypass, and v0.57.0 printed `Bypassed rule violations for refs/heads/main`. `--tag` also
+  refuses a stale catalog or bundle instead of committing a fix to `main`. A bare `--minor` now
+  refuses and prints the two steps. The release test runs against an origin that refuses every
+  push to `main`.
+
+## [v0.57.0] - 2026-10-14
+
+### Added
+
+- **The setup wizard links your agents (task.209).** `setup-consumer.sh` shows a checkbox list of ten
+  agents (↑/↓, space, enter) and makes the local links each ticked one needs to `AGENTS.md` and
+  `.agents/skills/`, gitignored with anchored rules. Six of the ten need nothing and say so. It never
+  replaces or deletes an existing file. `--link-agents claude,gemini` picks without the list, and
+  `--links-only` runs just this step in a new clone or worktree. getting-started §1a now lists what
+  each agent needs. An unknown agent name is refused before any step runs, and a run whose summary
+  reports a failed step now exits 1 (it used to exit 0 after, for example, invalid hook JSON).
+
+### Changed
+
+- **Worktrees live inside the repo, under a configurable root (task.208).** A new
+  `developBatch.worktreeRoot` key (default `.worktrees`) sets where worktrees go. `select-next.mjs
+  --batch` takes it as `--worktree-root` and emits `<root>/batch-<slug>`. It used to emit
+  `../tc-wt-<slug>`, beside the checkout, with a prefix left over from another project. The selector
+  refuses a root with `..`, an absolute path, a control character, or a symlink that leads outside
+  the repository. `develop-batch` now checks the root is gitignored
+  before it creates a worktree (falling back to `.git/info/exclude` and saying so), and its stale
+  check looks for `<root>/batch-*`. It used to look for `../wt-*`, which nothing ever created, so
+  the check could never fire. `create-parallel-stories` and the parallel-story runbooks use
+  `.worktrees/<name>`. **Upgrading:** add `/.worktrees/` to your `.gitignore`, and to any test
+  runner or linter that does not read it.
+
+- **Getting started now says how to link an agent to the skills (docs).** A consumer commits only
+  `AGENTS.md` and `.agents/skills/`; each user creates gitignored links such as `CLAUDE.md -> AGENTS.md`
+  and `.claude/skills -> ../.agents/skills`. The guide used to say Claude Code picks up `.agents/skills/`
+  on its own, which it does not.
+
+### Fixed
+
+- **Root-wide searches and copies skip nested worktrees (task.208).** `qa-execute-snippets --copy`
+  and `--copy-as` no longer copy linked worktrees found inside the source directory. Submodules
+  and the copy root itself are still copied. The repo-wide `grep -r` and `find .` commands in
+  `qa-traceability-mapper-prompt`, `test-co-location-enforcer` and `railway-postgres-crud` exclude
+  `.worktrees/`. `test-co-location-enforcer`'s `__tests__` file search also had an unparenthesised
+  `-o` that matched every `*.spec.ts` in the tree; it is now grouped.
+
+- **The roadmap template's Change Log header matches the canonical one (docs).**
+  `project-completion-roadmap.template.md` said `| Date | Version | Change | Author |`. Every other
+  Change Log, and the `change-log.js` engine, uses `Description` for the third column. Nothing
+  parsed the old name: the engine reads rows by position and accepts either header, so roadmaps
+  already scaffolded keep working. A test now ties the template's header to the one the engine
+  writes.
+
+- **`setup-consumer.sh` could leave `.env` unignored.** The `.gitignore` helper checked for an
+  existing rule by substring, so a `.gitignore` holding `!.env.example` (or `.env.local`) read as
+  already ignoring `.env`, and the rule was never added. It now matches whole lines.
+
+## [v0.56.0] - 2026-10-14
+
+### Added
+
+- **Develop pipelines take their answers and their speed up front (task.201).** `/develop-story`,
+  `/develop-task` and `/develop-bug` accept `--defaults` (take every Phase 0d recommendation, ask
+  nothing), `--base` / `--target` (and `--branch-model` for bugs), `--mode standard|lite|fast` and
+  `--skip review,qa-depth,review-pr-depth`. Every answer resolves **flag → `skills-config.yaml`
+  `develop:` policy → derived recommendation → ask**, in one tested engine
+  (`shared/resources/pipeline-answers.js`); a flag that contradicts the epic's `branch_model`, Q1/Q2
+  agreement or the answer already recorded is asked about, never applied. The 0f summary shows each
+  answer's source, and the answers persist in the pipeline lock so a resume asks nothing already
+  answered. `develop.skippable` defaults to empty; a skipped step writes the QA gate as `WAIVED` with
+  reason and approver, never `PASS`, and a `FAIL` stays `FAIL`. Branch, PR, finalise, commit and
+  tracker signals are never skippable. With no flags and no policy, behaviour is unchanged.
+- **Step 2 reuses a review of the same revision.** Review reports now record `**reviewed_blob:**` —
+  `git hash-object` of the document after the review's own edits (`record-reviewed-blob.js`, called by
+  `review-task`, `review-story` and `review-bug`). Step 2 reuses a report exactly when the hash still
+  matches, a same-day edit included; a report written before this change keeps the date rule.
+- **Per-step timestamps.** Implementation reports gain a `Completed (UTC)` column in Pipeline Progress,
+  stamped once by the Step Transition Protocol, so step timing can be measured instead of reconstructed
+  from commits.
+- **security-probe reaches a shell script that takes several arguments or flags (task 181, obs
+  #189).** A sixth entry form, `--entry 'shell-argv:<path>' --argv '<JSON array>'`, runs a bash
+  script with `cli:`'s template, verdict and record key — the case's input crosses as one argv
+  element, exit status is the verdict — with every caller shell running the script under bash. An
+  optional `--fixture-setup <path>` names a committed script that builds each (case, shell)
+  directory first (the scratch git repository these scripts read); a setup that fails, or writes
+  anywhere but its case directory, is `errored`, never a refusal, and never charged to the entry. A case's `fixture` is honoured as for `fence:`, with `fence:`'s `gh` checks over it
+  (fixture text, `ghFreePath`), and the form takes the shell forms' `gh` handling. `--argv`'s refusal now names both forms that take it; `--fixture-setup` with any
+  other form is exit 2, `bad-fixture-setup`. Proved against `reenter-qa-after-finalise.sh`
+  (`shared/resources/tests/fixtures/shell-argv/`): `engages`, every case past its usage line. A
+  multi-positional shell script leaves §5.1's by-hand list.
+- **security-probe reaches a fenced bash block in a step doc (task 180, obs #261).** A fifth entry
+  form, `--entry 'fence:<doc.md>#<heading>' --slot '<placeholder>'`, reads the doc on every run, takes
+  the first ```` ```bash ```` block under the heading (headings are read outside fences), substitutes
+  each case's input for the placeholder and runs it under bash and zsh. A hostile case must state the
+  guard's refusal output (a non-empty stdout or stderr) in `expected` and is declined without one,
+  because an exit status cannot tell a refusal from a shell that stopped on the input; a legitimate case is scored by exit status, and a
+  script that does not parse (`<shell> -n`) is `errored`. A new optional case field, `fixture: {env, files}`, supplies what else the block reads. The
+  slot is source substitution, as for the document's reader: a `$(…)` input runs, inside the case's
+  sandbox directory; a write to an absolute path outside the sandbox is not observed (a stated limit).
+  Without `--fake-gh`, a block, input or fixture that names `gh` is declined `needs-fake-gh` before it runs,
+  and every `PATH` directory that holds `gh` is shadowed by a copy without it for each case. A guard shipped as Markdown — task.159's and task.167's, each probed through a
+  hand-written wrapper under `.claude/state/` — is now probed by the engine, and the record names an
+  entry that resolves in every checkout. Every document that routes a non-JS entry names the new form,
+  held by a parity test.
+
+### Changed
+
+- **`review-task` and `review-story` resolve a tracker key through the shared §0a lookup** instead of
+  their own `grep -rl "jira_key: …"` copies (task 178). The three sites now cite
+  `develop-pipeline-step-0-resolve-and-prepare.md#key--document-lookup`, which each skill now ships:
+  the lookup is anchored (`RAPP-70` no longer resolves `RAPP-702`'s document), quote-tolerant, drops
+  artifacts such as `.request.` files, and HALTs on several matches instead of taking the first. A
+  review that resolved a document only by prefix match now reports "no local document".
+  `review-task`'s Jira-key branch also refuses a key that resolves to a non-task document.
+  `tests/key-lookup-single-statement.test.js` fails when a canonical source other than §0a matches
+  one of the lookup shapes in its fixture table — a grep-family command searching the `docs` tree for
+  a tracker-key value, across flag spellings, quoted alternation, prose code spans and prefixed or
+  globbed `docs` paths (files-without-match searches excluded). It is a tripwire, not a parser: its
+  header lists the shapes it does not see. It also runs the Jira-key branch against a fixture under
+  bash and zsh; the branch's three blocks run as one shell, and its check refuses unbound inputs.
+- **`develop-next` and `develop-batch` dispatch with `--defaults`** instead of restating Phase 0d's
+  answers in a prose directive — the restatement that drifted in bug.18. `develop-batch` passes
+  `--defaults --base <baseBranch> --target <baseBranch>` and keeps its HALT for an integration branch.
+
+- **`npm install` links the skill directories in a contributor checkout.** The `prepare` script now
+  runs `scripts/link-skills.sh`, which creates the gitignored `.agents/skills -> ../skills` and
+  `.claude/skills -> ../.agents/skills` links. It is skipped when `CI` is set, so CI's checkout keeps
+  failing on any test that reaches `.agents/skills/…` from the repository root (obs #149). It never
+  replaces an existing path and always exits 0. `CLAUDE.md` is now a symlink to `AGENTS.md` instead
+  of a three-line `@AGENTS.md` import stub.
+
+- **`create-branch` names a bug branch after the bug file.** A new **Bugfix** row,
+  `bugfix/<bug-file-stem>` (e.g. `bugfix/task.110.bug.1.whitelist-admits-mutating-shapes`), covers the
+  bug files `develop-bug` hands it. Without one, merged bug branches came out in three shapes (obs #304).
 - **Nine prose rules from the 2026-10-09 observation review.** `develop`: scripted document edits
   use split/join or a replacer function, then assert a structural invariant (obs #292). `qa-fix` Step
   3.5: probe for the old behaviour's observable, not the text you edited (#293). `create-skill`: a
@@ -42,6 +598,133 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`qa-results.js` keeps a nested Bug Reports tail and refuses two shapes it used to lose
+  (task 184).** Three content-loss shapes that predate task 183, each identical on the base branch:
+  a bold `**Bug Reports**` block nested in a `#### Bug Reports` block that runs past it now **keeps**
+  its tail (it was carried by no block and deleted). A section directly under a marker-less change log
+  whose last `Date` table above the section is not Date-first is now **refused** (`unbounded`,
+  `structural-line:`), never relocated with quoted rows left in the log — this includes the
+  `| Reviewer | Date |` shape task 183 relocated. And a carried bold block whose list continues past
+  a label and a paragraph is now **refused** with a new `carried-tail:<line>` detail, where the list
+  was deleted — unless another carried block already carries the list. The engine also holds the
+  section it writes to the guard it applies to the section it replaces, so it never writes a document
+  its next write would refuse: such a write is refused up front (`unplaceable`, with the guard's
+  detail). Migration for any of these refusals: the Step 12 HALT names the line; move the section above
+  `## Change Log` (or make the log Date-first), or put the list directly under its label, then re-run.
+- **A refused QA re-entry says why, and an unreadable tree is no longer a clean one (task 182).**
+  `reenter-qa-after-finalise.sh`'s `no-gate` refusal discarded `qa-cycle.sh`'s stderr, so a missing
+  gate, an unnumbered gate and two gates claiming one cycle all printed one message, and the
+  contract's "resolve the gate files first if the refusal names an ambiguity" could never fire. Both
+  `qa-cycle.sh` calls' reason lines are now relayed above the refusal as `reenter-qa:` lines, and
+  `no-gate` now routes back to the operator, never to step 7. Run from anywhere but `<doc-dir>`'s
+  repository root, the script is now a usage error (exit 2) instead of a misleading refusal. A
+  failing `git status` read as an empty, clean tree and could route a code fix to `/finalise` at
+  step 7 through `no-code-moved`; it now refuses `git-unreadable`, whose route is back to the
+  operator and never step 7. The `qa_reentry` lock field reaches the readers task.170 missed: the
+  hooks doc states each loop field's writers (`qa_max_cycles` has two, `extra_cycles_granted` one),
+  the resume detector reports a re-entry with its four sub-fields, and
+  `qa-loop-lock-fields-parity.test.mjs` pins `qa_reentry` in its writer, its two readers and its four describers, and the `qa_phase` writer rule is stated once, in the pause reference's lock schema, which the hooks doc and both SKILL.md cite.
+
+- **A QA re-review now closes the bug reports it verified (observation #21).** The bug lifecycle
+  has QA move a fixed bug from Ready for QA to Closed or Reopened, and nothing did: task.180 ended with
+  five verified bug reports still at Ready for QA. `status-history.js` gains `--set-status`, which sets
+  the bug's status in frontmatter and its `**Status**` header line (keeping each one's style, skipping
+  fenced examples) and appends the Status History row in one write, refusing a report that carries
+  neither field. `qa-task` (Step 9b) and `qa-story` (Re-Review Context) call it for each bug whose
+  finding the cycle verified.
+- **The QA-loop escalation option "accept the gate and finalise" now runs Step 5c first (observation #21).**
+  An escalated loop never reaches 5c, so no PR review report exists, and on a host with no review
+  decision `/finalise` needs that report for its "PR approved" column. Option 2 of both HALT
+  messages in `develop-pipeline-step-5-6-qa-loop.md` now names `/review-pr --effort medium --comment
+  --no-code` before `/finalise`, with a note on why.
+- **A not-converging QA halt now resumes at 5b, as the grant intends (observation #17).**
+  `grant-qa-cycles.sh` chose the re-entry phase by comparing `halt_reason` to exactly
+  `not-converging`, but the HALT writes it with detail appended (`not-converging: QA loop HIGH 1,1,1 at
+  cycle 3 …`). Every real not-converging grant therefore re-entered at 5a, re-reviewing code whose
+  fix had not run and spending the granted cycle — four of four re-entries on task.180. The script
+  now reads the leading token (alone, or followed by `:` or a space); `grant-qa-cycles.test.sh` adds
+  detailed reasons in both directions.
+- **`/finalise` judges its own pull request, not the first one its document cites (task 175).**
+  Step 3a read `pr_number:` and otherwise the first `PR #N` / `pull/N` in the document body; inside a
+  pipeline the frontmatter has no `pr_number:` yet, so three runs judged a PR their document merely
+  cited (task.146 → #472, task.147 → #207, task.166 → #505; observation #184). A new resolver,
+  `shared/resources/resolve-pr-number.sh`, reads an explicit `--pr`, then the current branch's PR
+  (through `pr-read.sh`), then the pipeline lock's `pr_url` when the lock is for this document, then
+  frontmatter, and a body citation only when that PR's head branch is the current branch; with no
+  source it exits 1 and prints no number. The AC and fix-evidence agents now take the number they
+  are given, and Step 7.2 writes the resolved number instead of copying one from the body.
+  `pr_read` also reports the PR's head branch (`PR_READ_HEAD_BRANCH`).
+
+- **`develop-next` and `develop-batch` resume from evidence, not flags (task.188).** A merge is
+  judged by the PR's state (`gh pr view --json state`), never by `gh pr merge`'s exit code, which also
+  covers local follow-ups: a merge that landed before a network error no longer reads as failed, and a
+  command that exits 0 on an unmerged PR halts instead of deleting its branch (obs #197).
+  `develop-next`'s run state gains `prNumber`, `halted` and `haltKind` (develop-batch's meanings); a
+  pipeline HALT is recorded, and Step 0.1 surfaces it and stops instead of routing to Step 3
+  (obs #286, #195). Before routing, Step 0.1 in both skills reconciles `merged` from the PR state, and
+  `develop-next` reconciles `ticked` from the roadmap row on `origin` — so a finished item is no longer
+  re-merged or re-ticked (obs #180) — and a dispatched item whose document is not `accepted`
+  re-dispatches Step 2 rather than halting at Step 3 (obs #9). An existing run-state file resumes
+  unchanged.
+- **`/finalise` runs the security probe when its read-only agent cannot (obs #10).** The DoD security
+  agent is an Explore subagent, and the probe engine creates a sandbox and writes a run record. On
+  task.201 the agent refused both and returned a zero-guard FAIL on a boundary that held (72
+  executed, 0 reproduced). The agent now always returns `probe_command` (and `probe_cases` when it
+  could not write the cases file); when the record is absent, `/finalise` runs the command and takes
+  the count and probes from the record. A rebuilt probe carries no severity, so it halts rather than
+  taking the low-severity path.
+- **Handoff probes no longer hard-code one machine's observation workspace (obs #1).** A probe that
+  read the observation log spelled out `/Users/<name>/.claude/projects/<encoded path>`, so on any
+  other machine it read `unverifiable — command failed` because the path was wrong, not because the
+  state had changed. Probes now write `{observation-workspace}`. `handoff-verify.mjs` resolves it once
+  per run through the bundled `resolve-observation-workspace.sh`, substituting per token before the
+  whitelist judges the line, and reports an unresolvable workspace with the resolver's own reason.
+  This repository's `AGENTS.md` and handoff now name `skills/session-handoff/…`, which exists in every
+  clone. The shipped skill keeps the consumer's `.agents/skills/…` path.
+
+- **`/finalise`'s CI-reading-2 poll no longer publishes an unqualified `SUCCESS` on timeout.** When
+  `MAX_WAIT` ran out, the poll printed the last sampled state. So a rollup that read `SUCCESS` but
+  stayed below reading 1's check floor, or never settled, was accepted as green: the partial-rollup
+  case the floor exists to refuse (obs #4). The final sample is now judged once after the loop, and a
+  `SUCCESS` that still does not qualify is written `UNDECIDED`, which the reader HALTs on. Two poll
+  cases, each mutation-proved, cover the HALT and the qualifying last sample.
+
+- **`/finalise`'s CI-reading-2 check floor counts distinct checks.** Reading 1's `CI_CHECKS_1` and
+  the 6c poll's `checks()` counted rollup entries. One check can be listed twice, so a head that
+  listed it once could never reach the floor, and the poll ran out its whole `MAX_WAIT` (25 minutes)
+  on a green head (PR #625). Both now use one query over distinct check names. A test runs that
+  query through the poll on a rollup with a duplicated entry.
+- **`develop-next` Step 3 gates a bug item on its own evidence.** The verify-green table keyed on
+  `status: accepted` and a gate file, neither of which a bug has, so read literally it HALTed every
+  `/develop-bug` item. New bug rows require `status: closed`, a DoD reading `✅ ACCEPTED` and a last
+  verify verdict of `PASS`. `develop-batch` points at them instead of copying them.
+
+- **Autonomous runs take Phase 0d's branch recommendation, not a hardcoded one (bug.18).** The
+  `develop-next` and `develop-batch` directives named `develop` / `<baseBranch>` as the base and PR
+  target, overriding the epic's integration branch that Phase 0d recommends for an
+  `epic-integration` story. `develop-next`'s directive now defers to the recommendation and names no
+  branch. `develop-batch`'s still names `<baseBranch>`, the base its worktree was cut from, but HALTs
+  the item if Phase 0d finds an integration branch. A guard test enforces both rules.
+  `select-next.mjs --batch` excludes `epic-integration` stories with a logged reason, because a batch
+  worktree is cut from and rebased onto the base branch, and names any story whose epic it cannot
+  find in `lint.warnings`. `/develop-next` runs the excluded stories instead.
+
+- **`registry-tick` no longer reports a rejected row as missing, and a registry can keep its document
+  path in its own column (bug 19).** A task registry with a plain-text title and the path in a
+  `Document` column had every row rejected by the shared parser, and `registry-tick` reported
+  each as `no-row`, so `/finalise` never ticked it. `parseRegistry` now reads a
+  `Document`/`Doc`/`Path`/`File` column when the title carries no link, so the tick and
+  `develop-next`'s registry frontier both see those rows. A path there must name a work item inside
+  the repository: an absolute path, a backslash, a control character or a path outside the repo
+  root makes the row malformed. A title link that leaves the repository is now malformed too. A row the parser still rejects now answers `row-malformed`, with
+  the parser's reason and line, and `--annotate` never writes a note into the document column.
+
+- **`set-qa-phase.sh` and `set-waiting-on.sh` stop when a paused run on this branch has no lock.**
+  After a compaction, the summary carried the pre-pause lock state, the session never ran `--restore`,
+  and both helpers no-oped silently until Step 7 (task.185). They now exit 1 naming
+  `advance-pipeline-lock.sh --restore` when a halt snapshot or pause claim records the current branch.
+  The new read-only `advance-pipeline-lock.sh --paused-here` answers that question once for both. A
+  snapshot for another branch, a finished run, stays a silent no-op (obs #275).
 - **GitHub bodies no longer lose a quoted control-character escape.** GitHub stores `\u0000` as
   `\^@` and `\u001f` as `\^_`. `tracker-issue.js`, `tracker-comment.js` (GitHub only) and `create-pr`
   now send each `\u0000`–`\u001f` escape as `U+00XX` through the new `github-body-text.js`, and say
@@ -751,7 +1434,7 @@ All notable changes to this project will be documented in this file. Format foll
   Before, a relocate deleted that log's rows. The two task.171 CR-7 false refusals (a `---` after a
   list continuation line or an HTML comment's closing line) stay refused: inferring their context
   line by line deleted real sections in QA, so CR-7 is deferred. A bold `**Bug Reports**` / `**Deferred Work**` block now keeps its `####` groups and
-  every bug list grouped under a sub-label; a stale QA list after it is still carried (a duplicate,
+  every bug list grouped directly under a sub-label; a stale QA list after it is still carried (a duplicate,
   never a deletion — CR2-4 deferred). The corpus write survey now skips documents that never name the section.
 
 - **The QA loop's Deferred Work record has one home, and `qa-results.js` closes task.155's residuals
@@ -2404,7 +3087,7 @@ All notable changes to this project will be documented in this file. Format foll
   link check is path-filtered to `docs/**` and never saw them.
 
 - **The onboarding PRD and its shipped example linked to `~/.claude/plans/…`**
-  ([`docs/prd/onboarding/prd.onboarding.md`](docs/prd/onboarding/prd.onboarding.md),
+  ([`docs/prd/onboarding/prd.onboarding.md`](docs/prd/onboarding/prd.1.onboarding/prd.1.onboarding.md),
   [`examples/prd-example/prd.onboarding.md`](examples/prd-example/prd.onboarding.md)) — a live link to an
   agent scratch file, in the example that teaches the plan-location rule forbidding it. Replaced with
   a note that the pre-flight plan is not retained.

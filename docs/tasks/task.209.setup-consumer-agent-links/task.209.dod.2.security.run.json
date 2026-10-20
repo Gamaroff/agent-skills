@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "shell-exec",
+      "entry": "shell-argv:scripts/setup-consumer.sh",
+      "name": "setup-consumer --link-agents id check",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 9,
+      "passed": 9,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "escaped": 0,
+      "shells": [
+        "bash"
+      ],
+      "fake_gh": "/home/gamaroff/Development/agent-skills/.worktrees/pipeline-catchup/.claude/state/fakegh",
+      "argv": [
+        "--links-only",
+        "--link-agents",
+        "{input}"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-10-14T17:16:03.639Z"
+    }
+  ],
+  "totals": {
+    "executed": 9,
+    "reproduced": 0
+  },
+  "updated_at": "2026-10-14T17:16:03.639Z"
+}

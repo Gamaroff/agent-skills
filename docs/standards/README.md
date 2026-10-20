@@ -10,14 +10,17 @@ Rules and schemas that documents in a consuming project must follow. Skills enfo
 - [Epic documents](./epic-documents.md) — epic frontmatter and layout
 - [Story documents](./story-documents.md) — story frontmatter, layout, artifacts
 - [Task documents](./task-documents.md) — task frontmatter, layout, artifacts
+- [Bug documents](./bug-documents.md) — bug report schema and the three modes (story, task, general)
 
 ## Cross-cutting rules
 
 - [File naming](./file-naming.md) — canonical filename patterns
 - [Status lifecycle](./status-lifecycle.md) — frontmatter `status:` values and transitions
 - [Plan file locations](./plan-file-locations.md) — where implementation plans live
-- [Epic registry](./epic-registry.md) — global epic numbering
+- [PRD registry](./prd-registry.md) — global PRD numbering; `P` in every hierarchical id
+- [Epic registry](./epic-registry.md) — legacy global epic numbering, superseded by per-PRD numbering (retired by task 203)
 - [Task registry](./task-registry.md) — global task numbering
+- [Bug registry](./bug-registry.md) — global numbering for general (cross-cutting) bugs
 - [Architecture documents](./architecture-docs.md) — required `docs/architecture/` tree, shard rules, version field
 
 ## Section template

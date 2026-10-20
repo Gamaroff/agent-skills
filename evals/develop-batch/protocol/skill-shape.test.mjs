@@ -10,6 +10,7 @@
  *   - the per-item merge gate is develop-next's gate (head-SHA + configured gate/strategy)
  *   - development fans out in parallel but merges run serially (rebase-per-item)
  *   - worktrees are removed with `git worktree remove`, never `rm -rf`
+ *   - worktrees live inside the repo under developBatch.worktreeRoot, never beside it
  *   - a missing roadmap reuses develop-next's scaffold-then-STOP; never fabricated
  *   - no consumer-project facts baked into a library skill
  *
@@ -22,9 +23,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile, access } from "node:fs/promises";
+import { spawnSync, execFileSync } from "node:child_process";
+import {
+  mkdtempSync,
+  mkdirSync,
+  symlinkSync,
+  readFileSync,
+  existsSync,
+} from "node:fs";
+import os from "node:os";
 import { constants } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
@@ -126,6 +136,33 @@ test("SKILL.md: worktrees are removed with git worktree remove, never rm -rf", (
   assert.match(flat, /never `rm -rf`/);
 });
 
+test("worktrees live inside the repo: the selector's paths and Step 0's stale check agree", async () => {
+  const { BATCH_WORKTREE_PREFIX, DEFAULT_WORKTREE_ROOT } = await import(
+    pathToFileURL(SELECTOR_PATH).href
+  );
+  // The selector is told the configured root, and the stale check looks for the
+  // prefix the selector actually emits. These two drifted once (`../tc-wt-` emitted,
+  // `../wt-*` checked), which made the stale check unable to find anything.
+  assert.match(
+    flat,
+    /select-next\.mjs --batch [^`]*--worktree-root <worktreeRoot>/,
+  );
+  assert.ok(
+    flat.includes(`<worktreeRoot>/${BATCH_WORKTREE_PREFIX}*`),
+    `Step 0 stale check must look for <worktreeRoot>/${BATCH_WORKTREE_PREFIX}*`,
+  );
+  assert.ok(
+    skill.includes(`| \`${DEFAULT_WORKTREE_ROOT}\``),
+    "SKILL.md config table states the selector's default root",
+  );
+  // The root is ignored before any worktree is created, or the next run's
+  // dirty check halts on the batch's own worktrees. Behaviour: the Step 0.3a
+  // test below runs the block itself.
+  assert.match(flat, /git check-ignore -q "\$ROOT\/"/);
+  // No worktree path in the skill points outside the repository.
+  assert.doesNotMatch(skill, /\.\.\/(?:tc-)?wt-|\.\.\/worktrees\//);
+});
+
 test("SKILL.md: a halted item does not sink the batch; its worktree is left for inspection", () => {
   assert.match(flat, /halted/);
   assert.match(
@@ -161,10 +198,14 @@ test("no consumer-project facts leak into the library skill", async () => {
     path.join(SKILL_DIR, "references", "execution-resources.md"),
     "utf-8",
   );
+  // The selector emits the worktree paths this skill runs, so it is held to the
+  // same rule: the `tc-wt` prefix lived there long after it left this SKILL.md.
+  const selector = await readFile(SELECTOR_PATH, "utf-8");
   for (const [name, content] of [
     ["SKILL.md", skill],
     ["README.md", readme],
     ["references/execution-resources.md", reference],
+    ["develop-next/scripts/select-next.mjs", selector],
   ]) {
     for (const re of banned) {
       assert.doesNotMatch(
@@ -191,6 +232,7 @@ test("config keys documented in SKILL.md and configuration reference", async () 
     "developBatch.requireTouches",
     "developBatch.resources",
     "developBatch.worktreeSeedPaths",
+    "developBatch.worktreeRoot",
     "developBatch.maxResumeAttempts",
     "developBatch.maxRebatches",
   ]) {
@@ -199,6 +241,7 @@ test("config keys documented in SKILL.md and configuration reference", async () 
   for (const key of [
     "developBatch.maxParallel",
     "developBatch.requireTouches",
+    "developBatch.worktreeRoot",
   ]) {
     assert.ok(configDoc.includes(key), `configuration.md missing ${key}`);
   }
@@ -392,4 +435,109 @@ test("Step 3 lane: the acceptance record branches on source with all three arms"
     /git diff --quiet HEAD -- docs\/tasks\/task-registry\.md/,
     "already checks for a dirty registry",
   );
+});
+
+// ── task.188: resume from evidence, not flags ───────────────────────────────
+
+test("Step 0.1 reconciles merged from the PR state before resuming on the flags (obs #180)", () => {
+  const step0 = skill.slice(
+    skill.indexOf("## Step 0"),
+    skill.indexOf("## Step 1"),
+  );
+  const recon = step0.indexOf("**Reconcile first, then route**");
+  const block = step0.indexOf("# Step 0.1 reconciliation (develop-batch)");
+  const resume = step0.indexOf("**Resume**: skip items already");
+  assert.ok(recon > 0, "reconciliation missing from Step 0.1");
+  assert.ok(
+    block > recon && resume > block,
+    "reconciliation must precede the flag routing",
+  );
+  assert.match(step0.slice(recon, resume), /`MERGED` → set `merged: true`/);
+  assert.match(
+    step0.slice(recon, resume),
+    /only advances a flag, never clears one/,
+  );
+});
+
+test("Step 3 merge cites develop-next's state verdict instead of restating the rule (obs #197)", () => {
+  assert.match(
+    skill,
+    /judged by the PR's state, never by `gh pr merge`'s exit status — the rule is\s+stated once, in `develop-next` Step 3/,
+  );
+  assert.doesNotMatch(skill, /gh pr merge <PR#> --<mergeStrategy> \|\| exit 1/);
+});
+
+// ── Step 0.3a, executed (TASK-208-BUG-2) ──────────────────────────────────────
+// The block validates the root BEFORE it writes .git/info/exclude, and reads
+// git check-ignore's exit status three ways. Run the block as shipped, with
+// <skillsDir> and <worktreeRoot> substituted, in throwaway repositories.
+function step03aBlock(text) {
+  const from = text.indexOf("3a. **The worktree root must be ignored.**");
+  assert.ok(from > -1, "Step 0.3a heading not found");
+  const open = text.indexOf("```bash\n", from);
+  const close = text.indexOf("\n   ```", open + 8);
+  assert.ok(open > -1 && close > open, "Step 0.3a bash block not found");
+  return text
+    .slice(open + 8, close)
+    .split("\n")
+    .map((l) => l.replace(/^ {3}/, ""))
+    .join("\n");
+}
+
+function runStep03a(cwd, root) {
+  const block = step03aBlock(skill)
+    .replaceAll("<skillsDir>", path.join(REPO_ROOT, "skills"))
+    .replaceAll("<worktreeRoot>", root);
+  return spawnSync("bash", ["-c", block], { cwd, encoding: "utf-8" });
+}
+
+function scratchRepo() {
+  const base = mkdtempSync(path.join(os.tmpdir(), "batch-03a-"));
+  const repo = path.join(base, "repo");
+  mkdirSync(repo);
+  execFileSync("git", ["init", "-q"], { cwd: repo });
+  return { base, repo, exclude: path.join(repo, ".git", "info", "exclude") };
+}
+const excludeText = (f) => (existsSync(f) ? readFileSync(f, "utf-8") : "");
+
+test("Step 0.3a: an unignored root is excluded once, by its normalised name", () => {
+  const { repo, exclude } = scratchRepo();
+  const r = runStep03a(repo, "./.worktrees/");
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  // Later steps substitute this printed value (TASK-208-BUG-3).
+  assert.match(r.stdout, /^worktreeRoot: \.worktrees$/m);
+  assert.match(excludeText(exclude), /^\/\.worktrees\/$/m);
+  const again = runStep03a(repo, ".worktrees");
+  assert.equal(again.status, 0);
+  assert.equal(
+    excludeText(exclude).match(/^\/\.worktrees\/$/gm).length,
+    1,
+    "an ignored root is not appended twice",
+  );
+});
+
+test("Step 0.3a: a refused root halts before anything is written", () => {
+  const { base, repo, exclude } = scratchRepo();
+  const before = excludeText(exclude);
+  mkdirSync(path.join(base, "outside"));
+  symlinkSync(path.join(base, "outside"), path.join(repo, ".wt"));
+  for (const root of ["../outside", ".wt", "wt\nx"]) {
+    const r = runStep03a(repo, root);
+    assert.notEqual(r.status, 0, `${JSON.stringify(root)} must halt`);
+    assert.match(r.stdout, /HALT: worktreeRoot refused/);
+    assert.equal(
+      excludeText(exclude),
+      before,
+      `${JSON.stringify(root)} wrote nothing`,
+    );
+  }
+});
+
+test("Step 0.3a: git unable to answer halts, never reads as not-ignored", () => {
+  // Outside any repository git check-ignore exits 128.
+  const dir = mkdtempSync(path.join(os.tmpdir(), "batch-03a-norepo-"));
+  const r = runStep03a(dir, ".worktrees");
+  assert.notEqual(r.status, 0);
+  assert.match(r.stdout, /HALT: git check-ignore could not evaluate/);
+  assert.equal(existsSync(path.join(dir, ".git")), false);
 });

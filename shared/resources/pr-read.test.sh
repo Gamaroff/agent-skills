@@ -9,6 +9,8 @@
 
 PASS=0
 FAIL=0
+# shellcheck source=undefined-command-guard.sh
+. "$(dirname "$0")/undefined-command-guard.sh"
 LIB="$(cd "$(dirname "$0")" && pwd)/pr-read.sh"
 
 pass() { echo "  PASS  $1"; PASS=$((PASS + 1)); }
@@ -123,6 +125,33 @@ else
   fail "GitHub, no --pr: bound through gh, curl never called" "got $OUT / $(cat "$TMPROOT/curl.log")"
 fi
 
+# ── 8. The head branch (task 175): read on both forges, and its absence alone never fails ──
+# read_head CONFIG STATUS BODY [args...] — prints "rc|number|head-branch"
+read_head() {
+  local cfg="$1" st="$2" body="$3"; shift 3
+  printf '%s' "$body" > "$TMPROOT/body.json"
+  : > "$TMPROOT/curl.log"
+  ( cd "$REPO" && export PATH="$FAKEBIN:$PATH" SKILLS_CONFIG_FILE="$cfg" BITBUCKET_ACCESS_TOKEN=t \
+      FAKE_CURL_LOG="$TMPROOT/curl.log" FAKE_CURL_BODY="$TMPROOT/body.json" FAKE_CURL_STATUS="$st" \
+      FAKE_GH_LINE="${FAKE_GH_LINE:-}"
+    # shellcheck source=pr-read.sh
+    source "$LIB"
+    pr_read "$@"; rc=$?
+    printf '%s|%s|%s' "$rc" "$PR_READ_NUMBER" "$PR_READ_HEAD_BRANCH" )
+}
+OUT=$(read_head "$TMPROOT/bb.yaml" 200 '{"id": 601, "source": {"branch": {"name": "feature/x"}, "commit": {"hash": "abcdef123456"}}, "destination": {"branch": {"name": "develop"}}}' --pr 601)
+[ "$OUT" = "0|601|feature/x" ] && pass "Bitbucket, --pr: head branch read from .source.branch.name" \
+  || fail "Bitbucket, --pr: head branch read from .source.branch.name" "got $OUT"
+OUT=$(read_head "$TMPROOT/bb.yaml" 200 "$(pr_json 601 develop)" --pr 601)
+[ "$OUT" = "0|601|" ] && pass "Bitbucket, --pr: no .source.branch → read succeeds, head branch empty" \
+  || fail "Bitbucket, --pr: no .source.branch → read succeeds, head branch empty" "got $OUT"
+OUT=$(FAKE_GH_LINE="7 $(printf 'a%.0s' $(seq 40)) main feature/y" read_head "$TMPROOT/gh.yaml" 200 '' --pr 7)
+if [ "$OUT" = "0|7|feature/y" ] && grep -q 'headRefName' "$TMPROOT/curl.log"; then
+  pass "GitHub, --pr: head branch read from headRefName"
+else
+  fail "GitHub, --pr: head branch read from headRefName" "got $OUT / $(cat "$TMPROOT/curl.log")"
+fi
+
 # ── 9. zsh: macOS logins are zsh, and Step 8 sources this into the caller's shell. zsh ties `path`
 #    to PATH and reserves `status`; a local named either breaks the read only there. ──
 if command -v zsh >/dev/null 2>&1; then
@@ -137,5 +166,6 @@ else
 fi
 
 echo
+undefined_commands_check || FAIL=$((FAIL + 1))
 echo "  $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] || exit 1

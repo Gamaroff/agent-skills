@@ -1,0 +1,25 @@
+{
+  "sink": "filename",
+  "entry": "fence:skills/review-code/SKILL.md#Step 2b — Check every anchor (always)",
+  "name": null,
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 12,
+  "passed": 12,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": [
+    "bash"
+  ],
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": null,
+  "slot": "{target: worktree | staged | range}",
+  "fixture_setup": null,
+  "ran_at": "2026-10-19T16:01:00.726Z"
+}

@@ -1,0 +1,21 @@
+{
+  "sink": "path",
+  "entry": "shared/resources/security-probe.mjs#resolveEntry",
+  "name": "resolveEntry shell-argv: branch",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 11,
+  "passed": 11,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "escaped": 0,
+  "shells": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-10-13T05:21:10.318Z"
+}

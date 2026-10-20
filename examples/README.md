@@ -2,7 +2,11 @@
 
 Worked examples of the skills in this repository being applied to real work.
 
-This repo dogfoods itself — the story, epic, PRD, and task pipelines have all been run against it. Task artifacts live in [`docs/tasks/`](../docs/tasks/); PRD, epic, and story artifacts live in [`examples/prd-example/`](./prd-example/), [`examples/epic-examples/`](./epic-examples/), and the canonical story directories under [`docs/prd/onboarding/epics/`](../docs/prd/onboarding/epics/).
+This repo dogfoods itself — the story, epic, PRD, and task pipelines have all been run against it. Task artifacts live in [`docs/tasks/`](../docs/tasks/); PRD, epic, and story artifacts live in [`examples/prd-example/`](./prd-example/), [`examples/epic-examples/`](./epic-examples/), and the canonical story directories under [`docs/prd/onboarding/prd.1.onboarding/epics/`](../docs/prd/onboarding/prd.1.onboarding/epics/).
+
+> **Numbering note:** the PRD and epic copies in `prd-example/` and `epic-examples/` are frozen
+> snapshots from 2026-05-12 and keep their original names. Task 203 (2026-10-15) renumbered the live
+> tree to `prd.1.onboarding`, `epic.1.E` and `story.1.E.S`, the names the links below use.
 
 > **Path note:** All links below use this repo's default `PRD_ROOT=docs/prd`. In a project with a custom `prd.prdShardedLocation`, mentally substitute your root for `docs/prd/` in any path. See [Configuration](../docs/reference/configuration.md#configurable-roots-and-fixed-conventions).
 
@@ -21,16 +25,16 @@ This repo dogfoods itself — the story, epic, PRD, and task pipelines have all 
 
 ## Or: one story end-to-end
 
-For the story pipeline, walk [`story.2.3.capture-story-messy-path/`](../docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/stories/story.2.3.capture-story-messy-path/) in this order:
+For the story pipeline, walk [`story.1.2.3.capture-story-messy-path/`](../docs/prd/onboarding/prd.1.onboarding/epics/epic.1.2.worked-prd-epic-story-examples/stories/story.1.2.3.capture-story-messy-path/) in this order:
 
-1. [`story.2.3.capture-story-messy-path.md`](../docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/stories/story.2.3.capture-story-messy-path/story.2.3.capture-story-messy-path.md) — story spec produced by `create-story`.
-2. [`story.2.3.review.1.*.md`](../docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/stories/story.2.3.capture-story-messy-path/story.2.3.review.1.capture-story-messy-path.md) — `review-story` interactive review.
-3. [`story.2.3.plan.*.md`](../docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/stories/story.2.3.capture-story-messy-path/story.2.3.plan.capture-story-messy-path.md) — co-located implementation plan.
-4. [`story.2.3.implementation.1.*.md`](../docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/stories/story.2.3.capture-story-messy-path/story.2.3.implementation.1.capture-story-messy-path.md) — what `develop-story` actually did.
-5. [`story.2.3.qa.1.*.md`](../docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/stories/story.2.3.capture-story-messy-path/story.2.3.qa.1.capture-story-messy-path-descoped.md) — `qa-story` report.
-6. [`story.2.3.gate.1.*.yml`](../docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/stories/story.2.3.capture-story-messy-path/story.2.3.gate.1.capture-story-messy-path-descoped.yml) — `qa-gate` decision (this story was **descoped** rather than passing QA — the gate shows the descope rationale).
-7. [`story.2.3.dod.1.*.md`](../docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/stories/story.2.3.capture-story-messy-path/story.2.3.dod.1.capture-story-messy-path.md) — `finalise` DoD checklist.
-8. [`sprint-review-summary.md`](../docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/stories/story.2.3.capture-story-messy-path/sprint-review-summary.md) — Sprint Review artifact.
+1. [`story.1.2.3.capture-story-messy-path.md`](../docs/prd/onboarding/prd.1.onboarding/epics/epic.1.2.worked-prd-epic-story-examples/stories/story.1.2.3.capture-story-messy-path/story.1.2.3.capture-story-messy-path.md) — story spec produced by `create-story`.
+2. [`story.1.2.3.review.1.*.md`](../docs/prd/onboarding/prd.1.onboarding/epics/epic.1.2.worked-prd-epic-story-examples/stories/story.1.2.3.capture-story-messy-path/story.1.2.3.review.1.capture-story-messy-path.md) — `review-story` interactive review.
+3. [`story.1.2.3.plan.*.md`](../docs/prd/onboarding/prd.1.onboarding/epics/epic.1.2.worked-prd-epic-story-examples/stories/story.1.2.3.capture-story-messy-path/story.1.2.3.plan.capture-story-messy-path.md) — co-located implementation plan.
+4. [`story.1.2.3.implementation.1.*.md`](../docs/prd/onboarding/prd.1.onboarding/epics/epic.1.2.worked-prd-epic-story-examples/stories/story.1.2.3.capture-story-messy-path/story.1.2.3.implementation.1.capture-story-messy-path.md) — what `develop-story` actually did.
+5. [`story.1.2.3.qa.1.*.md`](../docs/prd/onboarding/prd.1.onboarding/epics/epic.1.2.worked-prd-epic-story-examples/stories/story.1.2.3.capture-story-messy-path/story.1.2.3.qa.1.capture-story-messy-path-descoped.md) — `qa-story` report.
+6. [`story.1.2.3.gate.1.*.yml`](../docs/prd/onboarding/prd.1.onboarding/epics/epic.1.2.worked-prd-epic-story-examples/stories/story.1.2.3.capture-story-messy-path/story.1.2.3.gate.1.capture-story-messy-path-descoped.yml) — `qa-gate` decision (this story was **descoped** rather than passing QA — the gate shows the descope rationale).
+7. [`story.1.2.3.dod.1.*.md`](../docs/prd/onboarding/prd.1.onboarding/epics/epic.1.2.worked-prd-epic-story-examples/stories/story.1.2.3.capture-story-messy-path/story.1.2.3.dod.1.capture-story-messy-path.md) — `finalise` DoD checklist.
+8. [`sprint-review-summary.md`](../docs/prd/onboarding/prd.1.onboarding/epics/epic.1.2.worked-prd-epic-story-examples/stories/story.1.2.3.capture-story-messy-path/sprint-review-summary.md) — Sprint Review artifact.
 
 > **Note:** This story was **descoped** during the pipeline run — no `examples/story-messy-path/` directory was produced. The full artifact set (including the descoped gate) lives at the path above and shows what happens when a story is cancelled rather than completed.
 
@@ -62,8 +66,8 @@ Arrived here from a specific skill? Jump straight to a representative output:
 - **Multi-task plan decomposition** → [`index.subagent-pipeline-improvements.md`](../docs/tasks/index.subagent-pipeline-improvements.md) — single plan split into tasks 16–31 with dependency waves.
 - **`create-prd`** → [PRD example](./prd-example/prd.onboarding.md)
 - **`create-epic`** → [Epic examples (×4)](./epic-examples/)
-- **`create-story`** → [Story 2.3 — full lifecycle (descoped)](../docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/stories/story.2.3.capture-story-messy-path/)
-- **`develop-story`** → [Story 2.3 — implementation report + gate + DoD](../docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/stories/story.2.3.capture-story-messy-path/)
+- **`create-story`** → [Story 1.2.3 — full lifecycle (descoped)](../docs/prd/onboarding/prd.1.onboarding/epics/epic.1.2.worked-prd-epic-story-examples/stories/story.1.2.3.capture-story-messy-path/)
+- **`develop-story`** → [Story 1.2.3 — implementation report + gate + DoD](../docs/prd/onboarding/prd.1.onboarding/epics/epic.1.2.worked-prd-epic-story-examples/stories/story.1.2.3.capture-story-messy-path/)
 
 ## Worked PRD example
 
@@ -75,7 +79,7 @@ Arrived here from a specific skill? Jump straight to a representative output:
 
 ## Worked story walkthrough
 
-[`docs/prd/onboarding/epics/.../story.2.3.capture-story-messy-path/`](../docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/stories/story.2.3.capture-story-messy-path/) — a real story that ran through the full `develop-story` pipeline and was **descoped** at QA. Shows the complete lifecycle: spec → review → plan → implement → QA → gate (descoped) → DoD → sprint review.
+[`docs/prd/onboarding/prd.1.onboarding/epics/.../story.1.2.3.capture-story-messy-path/`](../docs/prd/onboarding/prd.1.onboarding/epics/epic.1.2.worked-prd-epic-story-examples/stories/story.1.2.3.capture-story-messy-path/) — a real story that ran through the full `develop-story` pipeline and was **descoped** at QA. Shows the complete lifecycle: spec → review → plan → implement → QA → gate (descoped) → DoD → sprint review.
 
 The story had no copy placed in `examples/story-messy-path/` because the descope decision happened during the pipeline run — the canonical artifact set lives at the path above. This is the messy path: not every story ships.
 

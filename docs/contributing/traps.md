@@ -31,6 +31,9 @@ An earlier handoff said "`npm` is fine". It is not; it was never checked.
 
 Not just one file — **the whole directory**. `.agents/skills/foo/…` and `skills/foo/…` are the same
 file on disk; editing either edits both. Only the `skills/` path is git-tracked.
+`npm install` creates it, plus `.claude/skills -> ../.agents/skills` for Claude Code (the `prepare`
+script runs `scripts/link-skills.sh`), except when `CI` is set — CI's checkout must not have them,
+for the reason below.
 
 The symlink is gitignored, so **a test run in place passes on it where CI fails**: any test that
 reaches `.agents/skills/…` from the repository root resolves it here and nowhere else (obs #149 —
@@ -83,6 +86,19 @@ check had registered yet. Twenty seconds later it was `UNSTABLE` with four check
 The `test` script is 10 `&&`-joined segments — nine explicit `bash …` invocations plus one
 `node --test` call with an explicit list of per-skill globs. **A new `skills/*/tests/` directory runs
 nowhere until someone adds its glob.** This has already silently orphaned 232 tests once.
+
+### A shell test suite must source `undefined-command-guard.sh`
+
+A call to an undefined command in a `*.test.sh` (a helper used above its definition, a typo) prints
+"command not found", returns 127, and no assertion reads it. The case is skipped and the suite stays
+green. Six cases in `reenter-qa-after-finalise.test.sh` never ran this way. Wiring the guard into
+every suite then found a seventh, in `tracker-access.test.sh`, that had been unasserted since
+task.56: it called `pass`/`fail` in a suite that names them `ok`/`bad`. Source
+`shared/resources/undefined-command-guard.sh` before the first case and call
+`undefined_commands_check || FAIL=$((FAIL + 1))` before the summary. A skill's own suite sources its
+bundled copy, `$SKILL/references/undefined-command-guard.sh`. `tests/shell-suite-guard.test.js`
+fails on a tracked `*.test.sh` that skips either line or is missing from `npm test`. The hook needs
+bash 4+, so under macOS `/bin/bash` 3.2 the guard is off.
 
 ### The `.gitignore` negation block must stay at the END of the file
 
@@ -137,6 +153,7 @@ The marker is built by `loadSensitive()` in the shared `spawn-budget.mjs` (task 
 - `evals/shared/tests/consumer-root.test.mjs`
 - `shared/resources/tests/access-config-parity.test.mjs`
 - `shared/resources/tests/call-sites.test.mjs`
+- `shared/resources/tests/doc-id.test.mjs`
 - `shared/resources/tests/ci-tree-equivalence.test.mjs`
 - `shared/resources/tests/qa-diminishing-returns.test.mjs`
 - `shared/resources/tests/qa-execute-snippets.test.mjs`
@@ -182,3 +199,16 @@ pattern matches one nested level and silently misses the rest. On task.108 it ma
 out of 57 and the guard's total floor never noticed. Use the `:(glob)` magic —
 `':(glob)shared/resources/**/*.md'` — or walk the directory with `find`, and give every corpus its
 own non-vacuity floor so the miss is a printed zero rather than a fraction of a total.
+
+### The bundler reads a skill's `tests/` too — a quoted path there is a dependency
+
+`npm run bundle` and `bundle:check` discover a skill's dependencies from **every** `.md` and `.js` file
+under its directory, `tests/` included. So a test that quotes a shared-resource path, or spells out
+an invocation of another skill's `references/` engine, makes `--check` demand a bundled copy the skill
+never uses (`MISSING … has a shared source but no bundled copy`). It has cost two sessions. On
+2026-09-15 (task.110) a fixture quoting a real handoff demanded six copies, and was sidestepped with a
+`.txt` fixture. On 2026-10-10 (PR #629) one test line invoking
+`skills/observe-work/…/observation-log.js` in `session-handoff`'s tests demanded `observation-log.js`
+and `yaml-subset.js`. Assemble such paths from parts in the test, as `handoff-verify.test.js` does
+(`const REFS = "refer" + "ences"`, `const SHARED = "shared/" + "resources"`). The real fix, a `tests/`
+exclusion in `bundle_skill.py`, is not filed.

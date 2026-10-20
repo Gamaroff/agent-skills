@@ -149,12 +149,13 @@ test("step-0/step-1: no mandatory epic-branch machinery returns", async () => {
   }
 });
 
-test("integration branches use the epic/* namespace", async () => {
+test("integration branches use the epic/* namespace, keyed on the PRD and the epic (task 206)", async () => {
   for (const p of [STEP0_PATH, CREATE_BRANCH_PATH]) {
     const content = await readFile(p, "utf-8");
+    // `{p}` is required: E restarts at 1 in every PRD, so `epic/{n}.…` alone collides.
     assert.match(
       content,
-      /`epic\/\{n\}\.\{(name|slug)\}`|`epic\/\d+\./,
+      /`epic\/\{p\}\.\{n\}\.\{(name|slug)\}`|`epic\/\d+\.\d+\./,
       `${path.basename(p)} must name integration branches in the epic/ namespace`,
     );
   }

@@ -34,6 +34,7 @@ if (gate) {
 
 Messages (one per problem):
 
+- `the document has no ## QA Testing Results section — the Step 12 edit did not land`
 - `the QA section has no **Gate Decision** line — the Step 12 edit did not land`
 - `**Gate Decision** is ${gd} but this cycle's gate ${basename(gate)} says ${token} — the Step 12 edit did not land`
 - `no qa-task/qa-story Change Log row — the verdict row did not land`
@@ -64,6 +65,12 @@ const stage = (abs) => {
   …
 };
 ```
+
+**Fixture first (review 1).** The test file's shared `repo()` fixture has `gate: FAIL`, no QA
+section and no `qa-task` row, so the verdict checks HALT it. Add a `## QA Testing Results` section with
+`**Gate Decision**: FAIL` and a `QA gate FAIL` row authored `qa-task` / `qa-story` before writing
+the new cases. The non-lock case uses a gitignored gate (`*.yml` in the fixture's `.gitignore`), not
+a path outside the repository, which `stage()` never receives. `stageAttempts` is `{ path: attempts }`.
 
 **Test for the released lock.** Write `.git/index.lock`, then spawn the CLI as a child process, and
 remove the lock from the parent after about 300 ms with `setTimeout`. The child's `Atomics.wait`

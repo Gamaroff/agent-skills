@@ -1,0 +1,75 @@
+schema: 2
+task: 'task.215.probe-engine-python-cli-entry-form'
+task_title: 'security-probe: run a Python CLI under the cli: entry form'
+gate: CONCERNS
+status_reason: 'Cycle 5 fix verified (the outside-the-main-frame shape is stated and pinned; crash-record precedence tested). The stated limit is not accurate: a crash at shutdown flush exits 120 after the answer record and scores rejected (verdict engages, a measured false pass), and a worker-thread refusal that exits 1 scores errored, not by its exit status as the text says.'
+reviewer: 'QA Engineer'
+head: '46f6c7b38a3efc3d721f4b19a3e34b127be3a841'
+updated: '2026-10-19T13:43:44Z'
+
+top_issues:
+  - id: 'TASK-215-QA6-1'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'A .py CLI whose stdout flush fails at interpreter shutdown exits 120 after the bootstrap wrote its answer record; runCliCase scores it rejected, so a hostile case that crashes this way reads as a refusal (measured: verdict engages, both hostile cases rejected/120). probe-boundary-rule.md, the bootstrap comment and CHANGELOG all say a failure outside the main frame is never a pass. Diff reviewer CR-2 (low/medium), raised to medium on the measured false pass; the trigger is contrived, so not high. Bug report: task.215.bug.10.shutdown-flush-crash-scored-refusal.md'
+    suggested_action: 'Score a .py exit 120 as errored (CPython reserves it for a failed flush at finalisation), with a fixture and test; narrow the limit wording to the shapes Python swallows with the exit status unchanged.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-215-QA6-2'
+    severity: low
+    file: 'shared/resources/probe-boundary-rule.md'
+    finding: 'The sentence "a control that validates in a worker thread is probed through the exit status its main thread chooses" is false for the usual refusal pattern: the thread raises, threading.excepthook prints a traceback with frames, the main thread exits 1, the stderr signal fires and the case is errored (measured). Safe direction; inaccurate text. Diff reviewer CR-1.'
+    suggested_action: 'Qualify it: an exit 1 after a worker-thread traceback is read as a crash (errored); the main thread''s status decides only when it is not 1 or nothing is printed.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-215-QA6-3'
+    severity: low
+    file: 'shared/resources/tests/security-probe.test.mjs'
+    finding: 'The thread-crash test checks only hostile cases found in r.cases (floor of one), so a hostile case moved to r.declined is skipped silently, and nothing shows the worker thread raised — a fixture that accepts every input passes the same way. Diff reviewer CR-3 (cleanup).'
+    suggested_action: 'Look up every hostile case in [...r.cases, ...r.declined] and assert evidence that the thread raised (the case stderr carries "Exception in thread").'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 85
+
+evidence:
+  tests_reviewed: 22
+  phases_verified: 2/2
+  ci: 'not read; CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 10
+    notes: 'Engine run (run record task.215.qa.6.security.run.json, 4 cases x 3 CLIs): a worker-thread refusal that exits 1 is errored (safe); the committed cli-thread-crash fixture reads accepted on hostile cases as the limit states; a shutdown-flush crash reads rejected/120, verdict engages — a false pass (TASK-215-QA6-1).'
+  performance:
+    status: PASS
+    notes: 'No change since gate 5.'
+  reliability:
+    status: PASS
+    notes: 'No change since gate 5.'
+  maintainability:
+    status: PASS
+    notes: 'Limits named by direction (46f6c7b3); bundle in sync.'
+
+recommendations:
+  immediate:
+    - action: 'TASK-215-QA6-1: score a .py exit 120 as errored; fixture and test; narrow the "never a pass" wording.'
+      refs: ['shared/resources/security-probe.mjs', 'shared/resources/probe-boundary-rule.md', 'CHANGELOG.md']
+  future:
+    - action: 'TASK-215-QA6-2 and QA6-3: qualify the worker-thread sentence; tighten the thread-crash test.'
+      refs: ['shared/resources/probe-boundary-rule.md', 'shared/resources/tests/security-probe.test.mjs']
+    - action: 'Carried from gate 5: the signal-kill detail prints a timeout clause for every signal (pre-existing).'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-215-QA6-1 fixed or stated as a limit']

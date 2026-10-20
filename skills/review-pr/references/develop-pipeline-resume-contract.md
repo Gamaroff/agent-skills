@@ -205,8 +205,8 @@ Step 7 halt, on what the fix changed** (task.170):
   change outside the work item is easy to miss by eye, and a missed one would re-run `/finalise`
   over an ungated head. **What follows a refusal is its route in the refusal list below** — the one
   statement of it: a declined offer, or a refusal routed to step 7 (`no-code-moved` among them),
-  takes the next bullet; `uncommitted-fix` is routed back to the operator and never to step 7
-  (task.170).
+  takes the next bullet; a refusal the list routes back to the operator — `uncommitted-fix`,
+  `git-unreadable`, `no-gate` — never reaches step 7 (task.170, task.182).
 - any other `halt_reason`, or a PreCompact `pause_reason`, or **any `develop-bug` snapshot** → run
   `advance-pipeline-lock.sh --restore {doc-directory}` **here**, before Phase 0b, on the
   re-invocation path exactly as the in-session continuation does (QA cycle 2, CR-2; the step-0
@@ -228,6 +228,21 @@ fails at its first transition.
 Pass `recommended_step` to Phase 0b. Phase 0b only verifies artifacts for steps **up to `recommended_step - 1`** (i.e., steps the detector considers completed). Steps at or after `recommended_step` are treated as ⏳ Pending.
 
 ---
+
+### Persisted up-front answers (task.201)
+
+Step 1 writes §0d's resolved answers into the lock (`answers`, `answer_sources`, `waiver`), and §0d's
+answer resolution reads them back through `--persisted-file`, so a resume asks nothing they settle.
+The states the rule holds in, each pinned by a test:
+
+| State | What §0d does | Test |
+| --- | --- | --- |
+| Live lock carrying `answers` | Reuses them (source `persisted`); asks nothing they settle | `pipeline-answers.test.mjs` 7a |
+| Lock rebuilt by `--restore` from a halt snapshot or an orphaned claim | Same — `--restore` deletes only the halt/pause fields and `waiting_on`, so `answers` survives | `advance-pipeline-lock.test.sh` scenario 13 |
+| Legacy lock or snapshot with no `answers` (written before task.201) | Today's rule: questions already in the Decisions Log are not re-asked | `pipeline-answers.test.mjs` 7b |
+| No lock and no snapshot (re-invocation over an existing report) | As the legacy row | `pipeline-answers.test.mjs` 9b |
+| Re-invocation flags that disagree with the persisted answers | A conflict: asked, with both values stated — never silently overwritten either way | `pipeline-answers.test.mjs` 7c |
+| A persisted answer the epic now contradicts | Asked, with the conflict stated | `pipeline-answers.test.mjs` 7d |
 
 ## Phase 0b — Resume Artifact Verification (CRITICAL)
 
@@ -444,11 +459,11 @@ For ✅ steps whose `Subagent summary ref` column points to a `.summaries/step-<
 
 | Step | Artifact to verify | Verification command |
 | ---- | ------------------ | -------------------- |
-| 1. create-branch | Branch exists in git | `git branch --list "feature/story.{epic}.{story}.*"` returns the branch |
+| 1. create-branch | Branch exists in git | `git branch --list "feature/story.{P}.{E}.{S}.*"` returns the branch |
 | 3. develop | All tasks complete | Story file `Status:` field reads `Ready for Review` |
 | 4. create-pr | PR exists | `gh pr view {PR-number} --json state` returns open or merged |
-| 5–6. qa loop | **Both** `story.{epic}.{story}.qa.{N}.*.md` **and** `story.{epic}.{story}.gate.{N}.*.yml` exist **and** PR comment posted. **Conditional — the 5c check reads the implementation report, not the filesystem**: when the latest gate **reached 5c** — read mechanically from the same entry this check already opens: the highest `### QA Cycle {N}` entry's `**Action**` row reads `Proceeding to 5c` (5a writes it on every one of §5c's five accepting routes; do not re-derive the set from the gate's token or queue) — that entry's `**PR Review**` row must hold a **terminal verdict** — `APPROVE` or `CONCERNS`. Any other value (`pending — 5c not yet run`, `REQUEST CHANGES`, `review failed`, `not reached`, blank, or a missing row) means 5c did not clear, and Step 5–6 is **not** complete. A mid-loop resume on a gate that routed to 5b (its entry's `**Action**` row reads `Running qa-fix`) legitimately has no terminal verdict. **A terminal verdict that predates a QA re-entry does not count** — the **Second precedence** under QA Cycle Count Reconstruction decides when (`qa_reentry`); while it applies, Step 5–6 is **not** complete (task.170). | `ls {story-directory}/story.*.qa.*.md` AND `ls {story-directory}/story.*.gate.*.yml` AND `gh pr view {PR} --comments --json comments \| grep -i "QA"` — gate alone is insufficient. Then the 5c check, which is a **read of the implementation report** performed by the resume detector, not a shell command: take the last `### QA Cycle` entry and read its `**PR Review**` row. |
-| 7. finalise | **All three**: `story.{epic}.{story}.dod.{N}.*.md` exists **and** story `status:` reads `accepted` **and** finalise acceptance comment posted to PR | `ls {story-directory}/story.*.dod.*.md` AND `grep -iE "^status:\s*accepted" {story-file}` AND `gh pr view {PR} --comments --json comments \| grep -i "accepted"` |
+| 5–6. qa loop | **Both** `story.{P}.{E}.{S}.qa.{N}.*.md` **and** `story.{P}.{E}.{S}.gate.{N}.*.yml` exist **and** PR comment posted. **Conditional — the 5c check reads the implementation report, not the filesystem**: when the latest gate **reached 5c** — read mechanically from the same entry this check already opens: the highest `### QA Cycle {N}` entry's `**Action**` row reads `Proceeding to 5c` (5a writes it on every one of §5c's five accepting routes; do not re-derive the set from the gate's token or queue) — that entry's `**PR Review**` row must hold a **terminal verdict** — `APPROVE` or `CONCERNS`. Any other value (`pending — 5c not yet run`, `REQUEST CHANGES`, `review failed`, `not reached`, blank, or a missing row) means 5c did not clear, and Step 5–6 is **not** complete. A mid-loop resume on a gate that routed to 5b (its entry's `**Action**` row reads `Running qa-fix`) legitimately has no terminal verdict. **A terminal verdict that predates a QA re-entry does not count** — the **Second precedence** under QA Cycle Count Reconstruction decides when (`qa_reentry`); while it applies, Step 5–6 is **not** complete (task.170). | `ls {story-directory}/story.*.qa.*.md` AND `ls {story-directory}/story.*.gate.*.yml` AND `gh pr view {PR} --comments --json comments \| grep -i "QA"` — gate alone is insufficient. Then the 5c check, which is a **read of the implementation report** performed by the resume detector, not a shell command: take the last `### QA Cycle` entry and read its `**PR Review**` row. |
+| 7. finalise | **All three**: `story.{P}.{E}.{S}.dod.{N}.*.md` exists **and** story `status:` reads `accepted` **and** finalise acceptance comment posted to PR | `ls {story-directory}/story.*.dod.*.md` AND `grep -iE "^status:\s*accepted" {story-file}` AND `gh pr view {PR} --comments --json comments \| grep -i "accepted"` |
 
 ### develop-task artifact table
 
@@ -467,7 +482,7 @@ If the Decisions Log records a plan file from a prior session and Step 3 is bein
 ```bash
 # develop-story (macOS/Linux portable):
 _mtime() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1"; }
-plan=$(find {story-directory} -maxdepth 1 -name "story.{epic}.{story}.plan.*.md" 2>/dev/null | head -1)
+plan=$(find {story-directory} -maxdepth 1 -name "story.{P}.{E}.{S}.plan.*.md" 2>/dev/null | head -1)
 [ -n "$plan" ] && [ "$(_mtime "$plan")" -ge "$(_mtime {story-file})" ]
 
 # develop-task (macOS/Linux portable):
@@ -597,7 +612,7 @@ This convention ensures the cycle budget is respected across resumes.
    bash .agents/skills/{develop-story|develop-task}/references/grant-qa-cycles.sh {doc-directory} {k} {implementation-report-path}
    ```
 
-   Source: `references/grant-qa-cycles.sh`; suite: `grant-qa-cycles.test.sh`. Everything it
+   Source: `grant-qa-cycles.sh`; suite: `grant-qa-cycles.test.sh`. Everything it
    does was a defect when the prose left it to the caller (task.123 QA cycles 2 and 3):
 
    - It **reconstructs the base** as `max(highest gate on disk, `### QA Cycle` entries in the
@@ -616,12 +631,15 @@ This convention ensures the cycle budget is respected across resumes.
    - It **writes three fields atomically** — `extra_cycles_granted = k` (the record),
      `qa_max_cycles = base + k` (the budget) and `qa_phase`, the re-entry point — via `mktemp` +
      `mv`, removing its temp file on every failure, and prints the budget and `reenter_at` back from
-     the written lock. **The re-entry point depends on where the halt stopped** (obs #228): a
-     `loop-limit` halt ran its last 5b, so the grant writes `5a` and the next gate reads that fix; a
-     `not-converging` halt fired at 5a *before* 5b, so the grant writes `5b` and the latest gate's
-     queue goes to `/qa-fix` first. Re-entering a not-converging halt at 5a reviews unchanged code,
+     the written lock. **The re-entry point depends on where the halt stopped** (obs #228) — which
+     value for which halt is the `qa_phase` row of the lock schema in `develop-pipeline-pause.md`.
+     The reason: a `loop-limit` halt ran its last 5b, so the next gate must read that fix, and a
+     `not-converging` halt fired at 5a *before* 5b, so the latest gate's queue must go to `/qa-fix`
+     first. Re-entering a not-converging halt at 5a reviews unchanged code,
      re-raises the same HIGH and trips the check again, spending the grant with no fix attempted
-     (task.140). The script reads `halt_reason` from the candidate before its restore drops it.
+     (task.140). The script reads `halt_reason` from the candidate before its restore drops it, and
+     reads its leading token: the HALT appends detail after a `:` or a space, and an exact compare
+     sent every real not-converging halt to `5a` (obs #17).
 
    The loop then runs with **`QA_MAX_CYCLES` = the lock's `qa_max_cycles`** (absent → 5). The
    budget is **relative to the reconstructed count, not to 5**: a grant of `k` must deliver `k`
@@ -683,14 +701,20 @@ and both SKILL.md Phase 0b paragraphs cite it.
 - `not-a-finalise-halt` — the snapshot's `halt_step` is not 7 (compared as text: the HALT snippet writes it with `jq --arg`). **Route:** the next bullet (an ordinary restore).
 - `no-dod` — no `{stem}.dod.{N}.*.md` beside the document, keyed on the work item's own stem — read from the DoD files whose stem the directory name continues, never from a bug's — so a co-located bug's DoD is never read as its verdict. **Route:** the next bullet.
 - `dod-not-gaps` — the newest DoD file does not read `**Final Status:** ❌ GAPS`. **Route:** the next bullet.
-- `no-gate` — `qa-cycle.sh` found no single current gate. **Route:** the next bullet; resolve the gate files first if the refusal names an ambiguity.
+- `no-gate` — `qa-cycle.sh` found no single current gate. Its own reason is relayed above the refusal as a `reenter-qa:` line — no gate file, gate files with no cycle number, or two files claiming one cycle (task.182). **Route:** back to the operator — resolve the gate files the relayed line names and run the script again; **never** step 7, which would accept a head no gate has read (a step-7 halt had a gate, so a missing or ambiguous one is a state to repair, not a document-only fix).
+- `git-unreadable` — `git status` exited non-zero, so the movement measure cannot run; git's own error is printed with it (task.182). **Route:** back to the operator — repair the repository and run the script again; **never** step 7, which an unread tree would otherwise reach through `no-code-moved`.
 - `uncommitted-fix` — a **tracked** change outside the work item's directory is uncommitted. **Route:** back to the operator — commit the fix and run the script again; **never** step 7, which would accept a head no review has read.
-- `no-code-moved` — no commit outside the work item's directory since the gate's `head:`: a document-only fix. **Route:** the next bullet — `/finalise` re-runs at 7. Untracked files outside the directory are named in this refusal, never a reason of their own: after Step 4 restores the files it held aside, nothing can tell one of those from a new fix file, so the operator who can decides — commit any that belong to the fix and run the script again.
+- `no-code-moved` — no commit outside the work item's directory since the gate's `head:`, or every path those commits changed is documentation under `ci.docsOnly.patterns` (a CHANGELOG entry, a standards page — observation #44): a document-only fix. **Route:** the next bullet — `/finalise` re-runs at 7. Untracked files outside the directory are named in this refusal, never a reason of their own: after Step 4 restores the files it held aside, nothing can tell one of those from a new fix file, so the operator who can decides — commit any that belong to the fix and run the script again.
 <!-- reenter-qa-refusals: end -->
 
 **Movement is measured as committed history**, because that is what the re-entered review reads
 (`qa-task` Step 3b scopes from commits and HALTs on an uncommitted tracked change): commits since the
-gate's `head:` outside the directory. Uncommitted tracked work is refused (`uncommitted-fix`); untracked
+gate's `head:` outside the directory. When there are such commits, the paths they changed are classified
+against `ci.docsOnly.patterns` through `ci-tree-equivalence.js` — the one definition of documentation,
+the same reader the 5c carry rule uses — with the configuration read at `HEAD`, renames split, and
+`skills-config.yaml` and submodule pointers never documentation; documentation alone is not movement.
+A classifier that cannot run, a malformed configuration and `enabled: false` all count every path as
+code. Uncommitted tracked work is refused (`uncommitted-fix`); untracked
 files are named on every outcome and never counted (above). `.claude/state`, the pipeline's own
 scratch, is never counted; a `head:` that is absent, not
 40-hex, not a commit or not an ancestor of `HEAD` counts as moved. It fails toward one extra QA

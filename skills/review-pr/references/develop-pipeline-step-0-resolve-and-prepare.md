@@ -18,9 +18,9 @@ Loaded by `/develop-story` and `/develop-task` during Phase 0. Where story and t
 
 Accept any of:
 
-- **Story file**: `docs/stories/story.8.2.configure-validation-pipe/story.8.2.configure-validation-pipe.md`
-- **Story directory**: `docs/stories/story.8.2.configure-validation-pipe/`
-- **Bare filename**: `story.8.2.configure-validation-pipe.md`
+- **Story file**: `docs/prd/{domain}/prd.1.x/epics/epic.1.8.y/stories/story.1.8.2.configure-validation-pipe/story.1.8.2.configure-validation-pipe.md`
+- **Story directory**: `…/stories/story.1.8.2.configure-validation-pipe/`
+- **Bare filename**: `story.1.8.2.configure-validation-pipe.md`
 - **GitHub issue URL** (direct or project board): `https://github.com/.../issues/297` or URL containing `issue=`
 - **Issue hash notation**: `#297`
 - **Bare issue number**: `297`
@@ -29,33 +29,64 @@ Jira key inline resolution: run [§ Key → document lookup](#key--document-look
 
 GitHub issue inline resolution: extract `ISSUE_NUM`, fetch body, parse `DOC_URL`. Not found → fall back to [§ Key → document lookup](#key--document-lookup) with `KEY_FIELD=github_issue`, `KEY_VALUE=${ISSUE_NUM}`. Still not found → HALT: "No local document found for issue #{N}. Run `/create-story` first, or provide the file path directly."
 
-Explore subagent (file/directory/bare-filename inputs): find file matching `story.{epic}.{story}.*.md` that does NOT contain `.qa.`, `.gate.`, `.bug.`, or `.implementation.` in its name. Return absolute file path and story directory path.
+Explore subagent (file/directory/bare-filename inputs): find the story document under `docs/` whose
+name `doc-id.js parse` reads as kind `story` with no artifact segment — `story.{P}.{E}.{S}{sub?}.{name}.md`,
+not a `.qa.`, `.gate.`, `.bug.` or `.implementation.` sidecar. Return absolute file path and story directory path.
 
-Extract `{epic_number}` and `{story_number}` from the pattern `story.{epic}.{story}.{name}.md`.
-
-**Epic resolution** — immediately after extracting epic_number/story_number:
-
-```bash
-EPIC_REF=$(grep '^epic:' {story-file} | awk '{print $2}')
-```
-
-If `EPIC_REF` is empty or missing: **HALT** — "Story must have an `epic:` frontmatter field referencing a parent epic (e.g. `epic: epic.178.feature-ui`). Add the field and re-run."
+**Story ids and epic resolution** — one block, run as soon as the story file is resolved. Every id is
+read by `doc-id.js` (task 202), never split on `.` positionally: in `story.{P}.{E}.{S}` the second
+field is the PRD, and E restarts at 1 in every PRD, so an epic is found by **(P, E)** and never by
+E alone. Zero matches or two or more is a HALT, never `head -1` (task 206).
 
 ```bash
-EPIC_NUM=$(echo "$EPIC_REF" | grep -oE '[0-9]+' | head -1)
-EPIC_SLUG=$(echo "$EPIC_REF" | sed 's/epic\.[0-9]*\.//')
+# Story ids and epic resolution (task 206). INPUT: {story-file}, the resolved story document.
+# pipefail: the epic listing below pipes find | node | sort, and a crashed node filter must reach the
+# "could not list" HALT, not read as zero epics (task.206 QA cycle 1, CR-10).
+set -o pipefail
+DOC_ID="$PWD/.agents/skills/develop-story/references/doc-id.js"
+STORY_FILE="{story-file}"
+STORY_ID_JSON=$(command node "$DOC_ID" parse "$(basename "$STORY_FILE")" --json) \
+  || { echo "HALT: $(basename "$STORY_FILE") is not a story id doc-id can read (story.P.E.S.slug.md); a legacy story.E.S name is migrated first with migrate-doc-numbering"; exit 1; }
+STORY_KIND=$(printf '%s' "$STORY_ID_JSON" | jq -r '.kind')
+PRD_NUM=$(printf '%s' "$STORY_ID_JSON" | jq -r '.prd')
+EPIC_NUM=$(printf '%s' "$STORY_ID_JSON" | jq -r '.epic')
+STORY_NUM=$(printf '%s' "$STORY_ID_JSON" | jq -r '.story')
+STORY_STEM=$(printf '%s' "$STORY_ID_JSON" | jq -r '.id')
+[ "$STORY_KIND" = "story" ] && [ "$(printf '%s' "$STORY_ID_JSON" | jq -r '.artifact')" = "null" ] \
+  || { echo "HALT: $(basename "$STORY_FILE") is not a story document"; exit 1; }
+
+EPIC_REF=$(grep -m1 '^epic:' "$STORY_FILE" | awk '{print $2}' | tr -d "\"'")
+[ -n "$EPIC_REF" ] \
+  || { echo "HALT: the story has no epic: frontmatter field naming its parent epic (e.g. epic: epic.$PRD_NUM.$EPIC_NUM.feature-ui) — add it and re-run"; exit 1; }
+EPIC_REF_JSON=$(command node "$DOC_ID" parse "$EPIC_REF" --json) \
+  || { echo "HALT: epic: $EPIC_REF is not an epic id doc-id can read (epic.P.E.slug)"; exit 1; }
+[ "$(printf '%s' "$EPIC_REF_JSON" | jq -r '"\(.kind) \(.prd).\(.epic)"')" = "epic $PRD_NUM.$EPIC_NUM" ] \
+  || { echo "HALT: epic: $EPIC_REF disagrees with the story's own id $STORY_STEM (its epic is $PRD_NUM.$EPIC_NUM)"; exit 1; }
+EPIC_SLUG=$(printf '%s' "$EPIC_REF_JSON" | jq -r '.slug')
+
+# The epic document of (P, E): matchesEpic over every epic.*.md under docs/, artifacts excluded.
+# find's own non-zero exit (an unreadable subdirectory) must not trip pipefail: only the node filter's
+# failure is a "could not list" (task.206 QA cycle 2, CR2-6).
+EPIC_FILES=$({ find docs -type f -name 'epic.*.md' 2>/dev/null || true; } | command node -e '
+  const d = require(process.argv[1]);
+  const [P, E] = [Number(process.argv[2]), Number(process.argv[3])];
+  for (const f of require("fs").readFileSync(0, "utf8").split("\n").filter(Boolean)) {
+    const b = f.slice(f.lastIndexOf("/") + 1);
+    const p = d.parse(b);
+    if (p.ok && p.kind === "epic" && p.artifact === null && d.matchesEpic(b, P, E)) console.log(f);
+  }' "$DOC_ID" "$PRD_NUM" "$EPIC_NUM" | sort) \
+  || { echo "HALT: could not list epic documents under docs/"; exit 1; }
+EPIC_COUNT=$(printf '%s' "$EPIC_FILES" | grep -c .)
+case "$EPIC_COUNT" in
+  1) EPIC_FILE="$EPIC_FILES" ;;
+  0) echo "HALT: no epic document epic.$PRD_NUM.$EPIC_NUM.*.md under docs/ — create or migrate it before running develop-story"; exit 1 ;;
+  *) echo "HALT: $EPIC_COUNT epic documents claim epic $PRD_NUM.$EPIC_NUM:"; printf '%s\n' "$EPIC_FILES"; exit 1 ;;
+esac
+echo "story $STORY_STEM — epic $PRD_NUM.$EPIC_NUM: $EPIC_FILE"
 ```
 
-Locate the epic file (required):
-
-```bash
-EPIC_FILE=$(find docs/ -name "epic.${EPIC_NUM}.*.md" 2>/dev/null \
-  | grep -v '\.review\.' | grep -v '\.gate\.' | grep -v '\.implementation\.' | head -1)
-```
-
-If `EPIC_FILE` is empty: **HALT** — "Epic file `epic.{EPIC_NUM}.*` not found in `docs/`. Ensure the epic document exists before running develop-story."
-
-Store `EPIC_NUM`, `EPIC_SLUG`, and `EPIC_FILE` as pipeline-wide variables.
+Store `PRD_NUM`, `EPIC_NUM`, `STORY_NUM`, `STORY_STEM`, `EPIC_SLUG` and `EPIC_FILE` as pipeline-wide
+variables. `{story-stem}` below is `STORY_STEM` (`story.1.8.2`, or `story.1.8.2A` for a sub-story).
 
 #### develop-task
 
@@ -105,14 +136,14 @@ The one lookup from a tracker key to its work-item document. `develop-story`, `d
 
 ```bash
 # KEY_FIELD: jira_key | github_issue.  KEY_VALUE: the Jira key or the issue number.
-# Anchored at both ends, so RAPP-70 does not match RAPP-702 and issue 5 does not match 55.
-# Quote-tolerant: jira_key is written quoted ('RAPP-702' or "RAPP-702") in most consumer docs.
+# Anchored at both ends, so PROJ-70 does not match PROJ-702 and issue 5 does not match 55.
+# Quote-tolerant: jira_key is written quoted ('PROJ-702' or "PROJ-702") in most consumer docs.
 # Recursive grep, not a docs/**/ glob — ** needs globstar in bash and matches one level without it.
 # Which file is the work item: one named after its own directory ({stem}/{stem}.md) is kept
 # whatever its slug says (task.5.request/task.5.request.md); any other file whose BASENAME carries
 # an artifact kind segment — numbered, dated or slug-form (task.12.review.2026-05-06.md) — or is
 # finalise's sprint-review summary is dropped, because artifacts copy the item's key. Only the
-# basename is read, so a directory such as epic.4.qa.tools/ excludes nothing.
+# basename is read, so a directory such as epic.1.4.qa.tools/ excludes nothing.
 # An empty KEY_VALUE would match every blank key field, so both inputs must be bound.
 : "${KEY_FIELD:?bind KEY_FIELD (jira_key or github_issue)}" "${KEY_VALUE:?bind KEY_VALUE (the key or issue number)}"
 # A missing or unreadable docs/ (the wrong cwd) is its own HALT, never "no document has this key".
@@ -142,7 +173,7 @@ esac
 to its next route as if the key named nothing. Two work items carrying one key is a data error a
 human must settle; picking the first anchors the whole run on whichever file `grep` happened to list
 first. The previous form of this lookup was a bare `grep -rl "jira_key: ${JIRA_KEY}"` — a prefix
-match that resolved `RAPP-70` to `RAPP-702`'s document, matched no quoted key at all, and excluded
+match that resolved `PROJ-70` to `PROJ-702`'s document, matched no quoted key at all, and excluded
 only three artifact kinds, so a `.request.` file carrying the same key could win (task.176).
 
 If the Explore subagent cannot find the file, HALT and ask the user to confirm the path.
@@ -166,7 +197,7 @@ Prompt template (pass verbatim to Explore subagent):
 
 ```
 Find the {story/task} file that matches:
-  - develop-story: pattern story.{epic}.{story}.*.md, does NOT contain .qa., .gate., .bug., or .implementation. in the filename
+  - develop-story: a story.{P}.{E}.{S}.*.md document (`doc-id.js parse` reads it as kind story, no artifact) — NOT a .qa., .gate., .bug., or .implementation. sidecar
   - develop-task:  pattern task.{id}.*.md, does NOT contain .qa., .gate., .bug., or .implementation. in the filename
 
 Search under docs/. Return:
@@ -186,7 +217,7 @@ Run the tracker state poller (references/tracker-state-poller-subagent.md).
 Inputs:
   PR_NUMBER=    # empty string (no PR yet in Phase 0)
   ISSUE_KEY={ISSUE_KEY}    # GitHub issue number or Jira key extracted from document frontmatter
-                           # For file/dir inputs: locate the file (pattern task.{id}.*.md or story.{epic}.{story}.*.md under docs/)
+                           # For file/dir inputs: locate the file (pattern task.{id}.*.md or story.{P}.{E}.{S}.*.md under docs/)
                            # and extract github_issue: or jira_key: from its YAML frontmatter.
                            # If not found, use empty string.
 
@@ -199,7 +230,7 @@ Return the compact JSON object only — no prose.
 Prompt template (pass verbatim to Explore subagent):
 
 ```
-Read the document at {file_path} (or for file/dir inputs: find the file matching task.{id}.*.md or story.{epic}.{story}.*.md under docs/).
+Read the document at {file_path} (or for file/dir inputs: find the file matching task.{id}.*.md or story.{P}.{E}.{S}.*.md under docs/).
 
 DETERMINE the lite-mode inputs by reading the document. This is the normal path — evaluate each
 condition from what the document actually says, and report the three inputs as separate fields. Do NOT
@@ -218,7 +249,7 @@ Extract, per references/develop-pipeline-lite-mode.md (the canonical contract):
 Also check skills-config.yaml in the project root:
   - Does it exist?
   - If yes, extract the devLoadAlwaysFiles list (may be absent/empty).
-  - Source `references/resolve-paths.sh` (or its bundled `references/resolve-paths.sh`) to populate `PRD_ROOT` and `ARCH_ROOT` env vars. Defaults: `docs/prd` and `docs/architecture`. Pipeline steps below use these env vars for any path operation that touches the PRD or architecture trees.
+  - Source `resolve-paths.sh` (bundled into each skill that runs this prompt as `references/resolve-paths.sh`) to populate `PRD_ROOT` and `ARCH_ROOT` env vars. Defaults: `docs/prd` and `docs/architecture`. Pipeline steps below use these env vars for any path operation that touches the PRD or architecture trees.
 
 MERGE the document-derived fields with your skills-config discovery into the return shape below — every
 field is required. Omitting `skills_config_exists` / `always_load_files` breaks always-load resolution.
@@ -278,9 +309,9 @@ Before asking any questions, check whether a previous run was started:
 #### develop-story
 
 ```bash
-git branch --list "feature/story.{epic}.{story}.*"
-gh pr list --head "feature/story.{epic}.{story}.*" --json number,url,state 2>/dev/null
-find {story-directory} -maxdepth 1 -name "story.{epic}.{story}.implementation.*.md" 2>/dev/null
+git branch --list "feature/{story-stem}.*"
+gh pr list --head "feature/{story-stem}.*" --json number,url,state 2>/dev/null
+find {story-directory} -maxdepth 1 -name "{story-stem}.implementation.*.md" 2>/dev/null
 ```
 
 **If a previous run is detected**: ask "A previous pipeline run exists for this story. What would you like to do?" Options: "Resume from last completed step" (Recommended) / "Start fresh".
@@ -297,7 +328,7 @@ find {task-directory} -maxdepth 1 -name "task.{id}.implementation.*.md" 2>/dev/n
 
 ### Shared Resume Logic
 
-If resuming: read the existing implementation report, identify the last ✅ step, and verify each completed step's artifact before skipping it. **Except the Step 8 row:** when the resume record (lock, halt snapshot or orphaned claim) is at step 8, that row is not evidence; follow the step-8 rule in `references/develop-pipeline-resume-contract.md` Phase 0b. Skip upfront questions already recorded in the Decisions Log.
+If resuming: read the existing implementation report, identify the last ✅ step, and verify each completed step's artifact before skipping it. **Except the Step 8 row:** when the resume record (lock, halt snapshot or orphaned claim) is at step 8, that row is not evidence; follow the step-8 rule in `references/develop-pipeline-resume-contract.md` Phase 0b. Skip upfront questions already answered: §0d's answer resolution reads the lock's `answers` (via `--persisted-file`) and asks nothing they settle; for a lock or snapshot written before task.201, which carries no `answers`, skip the questions already recorded in the Decisions Log, as before. The restore below keeps `answers`: `--restore` strips only the halt/pause fields and `waiting_on`.
 
 **Restore the lock before anything advances it (task.124 QA cycle 2, CR-2).** A resume skips Step 1, which is the lock's only ordinary writer, and every terminal HALT and PreCompact pause removed the lock and left a superset of it behind. When the resume detector's `source` is `halt_snapshot` or `orphaned_claim`, the operator chooses **Resume**, **and** resume contract § Restore the lock (both resume paths) says the restore runs here — and only then — run the command below, before Phase 0b verification and before any step banner. Which snapshots restore here and which wait for the grant is that section's to say; it is the rule's one statement, and this paragraph carries no copy of it (task.130):
 
@@ -387,7 +418,7 @@ If `TRACKER_ISSUE` is set (extracted in Phase 0c), signal that work has started 
 
 The comment is the same on either tracker, so it is **one** call — `tracker-comment.js` branches on `TRACKER` internally:
 
-> Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
+> Engine source: `tracker-comment.js` (bundled into each skill that runs it as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
 
 
 ```bash
@@ -479,7 +510,7 @@ node .agents/skills/{develop-story|develop-task|develop-bug}/references/gh-stage
   --issue {TRACKER_ISSUE} --stage work-started --add-to-board --json
 ```
 
-Engine source: `references/gh-stage.js` (bundled into each skill as `references/gh-stage.js`).
+Engine source: `gh-stage.js` (bundled into each skill that runs it as `references/gh-stage.js`).
 
 `--add-to-board` is what makes this call, and only this call, ensure board **membership** before setting status — `ensureOnBoard` performs the `gh project item-add`, waits for Projects API propagation, and re-queries once if the first read comes back empty. Board membership is not board status, so no later moment passes this flag.
 
@@ -597,7 +628,7 @@ Check the current branch:
 git branch --show-current
 ```
 
-Use the `AskUserQuestion` tool to ask all applicable questions in a single call. Auto-derived values are presented as the **first (Recommended)** option — selecting it requires only one keypress, but the user retains override capability via "Other".
+Use the `AskUserQuestion` tool to ask, in a single call, the questions [§ Answer resolution](#answer-resolution--ask-only-what-nothing-answers) below leaves open — with no flags and no policy that is every question, as before. Auto-derived values are presented as the **first (Recommended)** option — selecting it requires only one keypress, but the user retains override capability via "Other".
 
 **qa-planning skip is silent** — the pipeline always skips `/qa-planning`. Do **not** prompt for it. Record `"qa-planning: skipped (auto)"` in the Decisions Log.
 
@@ -610,25 +641,30 @@ PRD root) and read its branch-model declaration. Key names are configurable; def
 
 ```yaml
 branch_model: epic-integration
-integration_branch: "epic/178.feature-ui"
+integration_branch: "epic/1.178.feature-ui"
 ```
 
-| Epic declares                                             | `EPIC_BRANCH`                                            | Q1/Q2 recommendation  |
-| --------------------------------------------------------- | -------------------------------------------------------- | --------------------- |
-| `branch_model: epic-integration` + `integration_branch`   | as declared                                              | `EPIC_BRANCH`         |
-| `branch_model: epic-integration`, no `integration_branch` | derived from `branchPattern` (default `epic/{n}.{slug}`) | `EPIC_BRANCH`         |
-| nothing, or `develop-direct`, or epic unreadable          | unset                                                    | `develop` (unchanged) |
+| Epic declares                                             | `EPIC_BRANCH`                                                  | Q1/Q2 recommendation  |
+| --------------------------------------------------------- | -------------------------------------------------------------- | --------------------- |
+| `branch_model: epic-integration` + `integration_branch`   | as declared                                                    | `EPIC_BRANCH`         |
+| `branch_model: epic-integration`, no `integration_branch` | derived from `branchPattern` (default `epic/{p}.{n}.{slug}`)   | `EPIC_BRANCH`         |
+| nothing, or `develop-direct`, or epic unreadable          | unset                                                          | `develop` (unchanged) |
 
 **A declared `integration_branch` is used verbatim** — the epic document is the authority on its own
 branch name. If the epic cannot be resolved, proceed with `EPIC_BRANCH` unset; never guess, never block.
 
-> `epic/{n}.{name}` (integration branch — stories merge into it) is **not** `feature/epic.{n}.{name}`
+**A derived name comes from `/create-branch` Step 2b.4's block, run with `{epic-file}` = `EPIC_FILE`** —
+the one place `branchPattern` is applied. `{p}` is the PRD number: E restarts at 1 in every PRD, so a
+configured `branchPattern` without `{p}` is a **HALT naming `branching.epicIntegration.branchPattern`**,
+never a name that collides across PRDs (task 206). Deriving a name has no side effect, so it is safe here.
+
+> `epic/{p}.{n}.{name}` (integration branch — stories merge into it) is **not** `feature/epic.{p}.{n}.{name}`
 > (an ordinary short-lived branch for editing the epic document, which `/review-epic` creates). Do not
 > substitute one for the other.
 
 #### develop-story Q1 options
 
-Ask "Which branch should `feature/story.{epic}.{story}.{name}` be based on?"
+Ask "Which branch should `feature/{story-stem}.{name}` be based on?"
 
 **When `EPIC_BRANCH` is set** — it leads and is Recommended, because a story in an
 integration-branch epic that lands on `develop` alone defeats the point of the epic delivering as one unit:
@@ -682,14 +718,80 @@ If the user selects "Other" for Q1 or Q2, follow up with a plain text request fo
 
 **No Q3** — qa-planning skip is silent (see paragraph above).
 
+### Answer resolution — ask only what nothing answers
+
+Every answer resolves in one order: **flag → consumer policy → derived recommendation → ask**
+(task.201). The flags come from the skill's own arguments; the policy is the `develop:` block of
+`skills-config.yaml`; the derived recommendation is the **(Recommended)** option the Q1/Q2 sections
+above build. A flag is **validated, never blindly obeyed**: one that contradicts the epic's
+`branch_model`, breaks Q1/Q2 agreement, or disagrees with the answer already recorded for this run is
+asked about with the conflict stated. The rule lives once, in the engine — never read the flags by eye:
+
+> Engine source: `pipeline-answers.js` (bundled into each skill that runs it as `references/pipeline-answers.js`). Speed modes, skips and the floor: `references/develop-pipeline-lite-mode.md#speed-modes-and-skips`.
+
+| Flag | Answers | Policy key |
+| --- | --- | --- |
+| `--base <branch>` | Q1 | — |
+| `--target <branch>` | Q2 | — |
+| `--defaults` | every question still open, with its Recommended option | — |
+| `--mode standard\|lite\|fast` | the speed mode (never asked) | `develop.defaultMode` |
+| `--skip review,qa-depth,review-pr-depth` | skips (never asked) | `develop.skippable` — the allow-list, default empty |
+
+```bash
+# The skill's arguments go in the quoted heredoc at the end, never inside a "…" string:
+# a quote, $ or backtick in them would break the quoting or be expanded (gate 2, CR-2).
+# Every input is a {placeholder} substituted into THIS block — none is a shell variable
+# carried from another block, which would not exist here: the skill's raw arguments,
+# the two Recommended options derived above, the epic pre-check's integration branch
+# (story only — empty for a task, or a story whose epic declares none), and the
+# 0a-parallel aggregation's PIPELINE_MODE (lite or standard).
+source .agents/skills/{develop-story|develop-task}/references/read-config.sh || exit 1
+POLICY_MODE=$(read_nested_config_key develop defaultMode)
+POLICY_SKIPPABLE=$(read_nested_config_key develop skippable)
+mkdir -p .claude/state
+command node .agents/skills/{develop-story|develop-task}/references/pipeline-answers.js resolve \
+  --pipeline {story|task} --args-stdin \
+  --derived-base "{Q1's Recommended option}" --derived-target "{Q2's Recommended option}" \
+  --epic-branch "{EPIC_BRANCH from the epic pre-check, or empty}" \
+  --detector "{PIPELINE_MODE from 0a-parallel: lite or standard}" \
+  --policy-mode "$POLICY_MODE" --policy-skippable "$POLICY_SKIPPABLE" \
+  --persisted-file .claude/state/develop-pipeline.lock \
+  --invoker "$(git config user.name)" --json > .claude/state/pipeline-answers.json <<'ARGS' \
+  || { echo "HALT: pipeline-answers.js could not resolve the up-front answers"; exit 1; }
+{the skill's arguments, verbatim}
+ARGS
+jq -c '{answers, sources, questions: [.questions[].id], refused, effective}' .claude/state/pipeline-answers.json
+```
+
+Act on the result:
+
+- **`questions[]`** is exactly the set to ask — each with its `recommended` option, which leads as
+  **(Recommended)**, and its `reason`. A `reason` naming a conflict is stated in the question text
+  ("`--base develop` was given, but …"). Ask nothing else; ask nothing the result already answers.
+- **On a resume** — a lock already exists, so Step 1, which writes the answers into it, will not run —
+  merge the file into the lock as soon as the questions are settled, with Step 1's "Persist the
+  resolved answers" block. Otherwise an answer asked on resume lives only in this run's memory.
+- **After asking**, record each answer back into the file, so Step 1 persists what was decided, not
+  what was offered:
+  `jq --arg v "{answer}" '.answers.{base|target} = $v | .sources.{base|target} = "asked"' .claude/state/pipeline-answers.json > .claude/state/pipeline-answers.tmp && mv .claude/state/pipeline-answers.tmp .claude/state/pipeline-answers.json`
+- **`answers.mode`** replaces `PIPELINE_MODE` for the rest of the run (`lite` and `fast` shorten QA as
+  the lite-mode contract describes); **`answers.skips`** and **`effective`** are what Step 2 and
+  Steps 5–6 read. A skip that removes a step carries **`waiver`** — the QA gate will read `WAIVED`.
+- **`refused[]`** is never silent: log each entry's flag, value and reason in the Decisions Log, and
+  show it in 0f. The run continues without it — a refused `--skip` runs the step, a refused `--mode`
+  falls through to policy or the detector.
+- **`errors[]`** (an unrecognised flag) is logged, not fatal.
+
+Log one Decisions Log line per answer: `{question}: {value} — source: {flag|policy|persisted|recommended|asked|detector}`.
+
 **Required-question count check (mandatory — prevents silent prompt drops).** Before issuing the `AskUserQuestion` tool call, count the questions you are about to send and verify against this table:
 
-| Scenario        | Required questions in the call    | Count |
-| --------------- | --------------------------------- | ----- |
-| `develop-story` | Q1 (branch base) + Q2 (PR target) | **2** |
-| `develop-task`  | Q1 (branch base) + Q2 (PR target) | **2** |
+| Scenario        | Required questions in the call                                         | Count            |
+| --------------- | ---------------------------------------------------------------------- | ---------------- |
+| `develop-story` | Q1 (branch base) + Q2 (PR target), minus every one the resolver answered | **`questions[]`** |
+| `develop-task`  | Q1 (branch base) + Q2 (PR target), minus every one the resolver answered | **`questions[]`** |
 
-Resume cases skip any question whose answer is already recorded in the Decisions Log (typical resume: 0 questions).
+With no flags and no policy that is **2**, exactly as before. `--defaults` with nothing in conflict is **0** — skip the `AskUserQuestion` call entirely. Resume cases skip any question the lock's `answers` settles (a legacy lock: any already recorded in the Decisions Log) — typical resume: 0 questions.
 
 If your count does not match the required count for the detected scenario, fix the call before invoking the tool. Do NOT invent additional questions ("Run mode?", "Auto-continue?", etc.) — pipeline mode is autonomous (lite-mode detection runs in 0a-parallel Agent 3) and any other policy comes from `references/develop-pipeline-autonomous-defaults.md`. Adding undocumented questions causes UX drift and may suppress the documented ones (observed regression in live-github-test).
 
@@ -709,7 +811,7 @@ Required` marked `<!-- optional -->`. Create the report from the matching varian
 
 #### develop-story
 
-Create `story.{epic}.{story}.implementation.{N}.{descriptive-name}.md` in the story directory from
+Create `{story-stem}.implementation.{N}.{descriptive-name}.md` in the story directory from
 the template's **Story variant**.
 
 #### develop-task
@@ -717,7 +819,7 @@ the template's **Story variant**.
 Create `task.{id}.implementation.{N}.{descriptive-name}.md` in the task directory from the
 template's **Task variant**.
 
-**Why the template is not inlined here.** `references/report-lint.js` derives the sections a
+**Why the template is not inlined here.** `report-lint.js` derives the sections a
 report must carry — exactly once, in order, the optional one at most once — from the same fences,
 and it runs after every report Edit (Step Transition Protocol action 2), before the HALT commit, in
 the PreCompact hook and at Step 8. A second copy of the section list in this file would be a second
@@ -731,7 +833,9 @@ when the journal is empty") a non-finding rather than a `section-missing`.
 
 ## 0f. Pre-flight Summary
 
-Print this to the user before any irreversible action:
+Print this to the user before any irreversible action. Each answer carries its **source** from §0d's
+answer resolution (`flag`, `policy`, `persisted`, `recommended`, `asked`, `detector`), so a run that
+asked nothing still shows where every answer came from:
 
 #### develop-story
 
@@ -739,8 +843,11 @@ Print this to the user before any irreversible action:
 🚀 Starting automated story pipeline
 
 Story:        {story filename}
-Branch:       feature/story.{epic}.{story}.{name} ← {Q1 base branch}
-PR target:    {Q2 answer}
+Branch:       feature/{story-stem}.{name} ← {Q1 base branch}   [{sources.base}]
+PR target:    {Q2 answer}   [{sources.target}]
+Mode:         {answers.mode}   [{sources.mode}]
+Skips:        {answers.skips, or "none"}{ — WAIVED gate, approved by {waiver.approved_by}, when a step is skipped}
+Refused:      {each refused flag and its reason, or omit the line}
 Report:       {report file path}
 
 Pipeline will now run hands-free.
@@ -754,8 +861,11 @@ Press Ctrl+C now to abort before any changes are made.
 🚀 Starting automated task pipeline
 
 Task:         {task filename}
-Branch:       feature/task.{id}.{name} ← {Q1 base branch}
-PR target:    {Q2 answer}
+Branch:       feature/task.{id}.{name} ← {Q1 base branch}   [{sources.base}]
+PR target:    {Q2 answer}   [{sources.target}]
+Mode:         {answers.mode}   [{sources.mode}]
+Skips:        {answers.skips, or "none"}{ — WAIVED gate, approved by {waiver.approved_by}, when a step is skipped}
+Refused:      {each refused flag and its reason, or omit the line}
 Report:       {report file path}
 
 Pipeline will now run hands-free.

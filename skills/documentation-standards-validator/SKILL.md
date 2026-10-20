@@ -1,6 +1,6 @@
 ---
 name: documentation-standards-validator
-description: Validate documentation follows naming conventions with DOTS not underscores, YAML frontmatter requirements, and structural standards. Use when creating PRDs, epics, or stories, validating documentation structure, reviewing doc PRs, or auditing documentation consistency. Enforces epic.163.name.md format and status indicators.
+description: Validate documentation follows naming conventions with DOTS not underscores, YAML frontmatter requirements, and structural standards. Use when creating PRDs, epics, or stories, validating documentation structure, reviewing doc PRs, or auditing documentation consistency. Enforces epic.1.3.name.md (PRD-scoped) format and status indicators.
 ---
 
 # Documentation Standards Validator
@@ -47,13 +47,13 @@ When creating or reviewing a story/epic/task, apply these checks to the affected
 
 \`\`\`
 ✅ CORRECT
-epic.163.module-security.md
-story.163.1.encryption-service.md
+epic.1.3.module-security.md
+story.1.163.1.encryption-service.md
 task.38.authservice-di-failure.md
 
 ❌ INCORRECT
-epic_163_account_security.md // Underscores
-epic-163-module-security.md // Hyphens instead of dots
+epic_1_3_account_security.md // Underscores
+epic-1-3-module-security.md // Hyphens instead of dots
 Epic.163.AccountSecurity.md // Capitalization
 \`\`\`
 
@@ -62,9 +62,9 @@ Epic.163.AccountSecurity.md // Capitalization
 **Pattern**: \`epic.NUMBER.descriptive-name.md\`
 
 \`\`\`
-epic.163.module-security.md
-epic.164.transaction-batching.md
-epic.165.chat-encryption.md
+epic.1.3.module-security.md
+epic.1.164.transaction-batching.md
+epic.1.165.chat-encryption.md
 \`\`\`
 
 ### Story Filename and Directory Format
@@ -80,12 +80,12 @@ epic.165.chat-encryption.md
 **Rule**: The plan file (if present) must be co-located in the story's subdirectory.
 
 ```
-📁 epic.163.module-security/
+📁 epic.1.3.module-security/
   📁 stories/
-    📁 story.163.1.encryption-service/
-      📄 story.163.1.encryption-service.md
-    📁 story.163.2.biometric-auth/
-      📄 story.163.2.biometric-auth.md
+    📁 story.1.163.1.encryption-service/
+      📄 story.1.163.1.encryption-service.md
+    📁 story.1.163.2.biometric-auth/
+      📄 story.1.163.2.biometric-auth.md
 ```
 
 ## YAML Frontmatter Requirements
@@ -117,7 +117,7 @@ target_completion: 2026-01-15
 
 ## \`\`\`yaml
 
-epic: epic.163.module-security
+epic: epic.1.163.module-security
 epic_number: 163
 story_number: 1
 title: Implement Mnemonic Encryption Service
@@ -183,7 +183,7 @@ These icons are for body prose only and are never a frontmatter `status:` value 
 - [ ] Hyphens only within names
 - [ ] Correct pattern (epic.N.name.md or story.E.S.name.md)
 - [ ] .md extension
-- [ ] Stories are placed in self-named subdirectories (e.g., `story.1.1.name/story.1.1.name.md`)
+- [ ] Stories are placed in self-named subdirectories (e.g., `story.1.1.1.name/story.1.1.1.name.md`)
 - [ ] Correct pattern for plan files (story.E.S.plan.name.md) if present
 
 ### YAML Frontmatter

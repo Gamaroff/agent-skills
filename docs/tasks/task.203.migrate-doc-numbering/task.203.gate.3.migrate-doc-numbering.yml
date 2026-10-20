@@ -1,0 +1,50 @@
+schema: 2
+task: 'task.203.migrate-doc-numbering'
+task_title: 'Migrate documents to hierarchical numbering'
+gate: CONCERNS
+status_reason: 'Cycle 2 fixes verified (bugs 2, 5, 6 closed; every fix mutation-proven, 10/10). No high-confidence finding this cycle; two medium/low-confidence edge cases on the revert of untracked files and an apply failure are recorded as advisory, so reliability reads CONCERNS with an empty queue.'
+reviewer: 'QA Engineer (qa-task, develop-task pipeline, cycle 3)'
+head: '954bd33bf3d1fe182cdc027f8078159ec1a94b8a'
+updated: '2026-10-15T08:25:17Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 44
+  phases_verified: 5/5
+  ci: 'not read this cycle (CI is gated at /finalise)'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 11
+    notes: 'checkPrdRoot probed with the path corpus: engages, 11 executed, 0 reproduced, 0 escapes (task.203.qa.3.security.run.json). Repository root, .git and node_modules refused; containment judged on realpaths.'
+  performance:
+    status: PASS
+    notes: 'Dry run on head answers already in 0.3 s; the migration-pending dry run measured 2.248 s (cycle 1). One move per file and one tracked-list read per phase held by a test.'
+  reliability:
+    status: CONCERNS
+    notes: 'Advisory, medium/low confidence: an untracked file the run moves AND rewrites is named for moving back by hand without a note that its text changed (CR-1); a part-way apply failure leaves the new empty directories unnamed (CR-2). Neither occurs in this repository (every moved file is tracked).'
+  maintainability:
+    status: PASS
+    notes: '44 tests; every cycle-1 and cycle-2 fix mutation-proven. Two cleanups advisory (CR-3 dead guard, CR-4 re-parse).'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1: mark untracked moves that also carry an edit as moved-and-rewritten in the revert hint (or refuse them). CR-2: track directories mkdirp creates and name them in a partial revert. CR-3/CR-4 cleanups.'
+      refs: ['shared/resources/migrate-doc-numbering.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions: ['the advisory reliability edge cases above stay advisory: they apply only to untracked move sources and part-way failures']

@@ -22,9 +22,10 @@ import {
   symlinkSync,
 } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
@@ -360,11 +361,13 @@ test("no argument can make the tick conditional on pipeline mode", () => {
   // gates the Status tick: the default invocation still ticks unconditionally,
   // which the run below proves. What this list forbids is a flag that makes
   // the tick itself skippable (a `--lite`, a `--mode`), and a new entry here
-  // needs the same argument made for it.
+  // needs the same argument made for it. `--bug-status` (task 219) selects a
+  // third write to a different registry; a task document still ticks.
   assert.deepEqual(
     flags,
     [
       "--annotate",
+      "--bug-status",
       "--dry-run",
       "--file",
       "--help",
@@ -1099,4 +1102,632 @@ test("annotate: `--annotate` without `--pr` is a usage error (exit 2), and `--pr
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// ── bug.19: a row the parser rejected is not a missing row ───────────────────
+
+/**
+ * A sandbox whose registry is written verbatim, for registry shapes other than
+ * the documented one. Same selector symlink as `sandbox()`.
+ */
+function rawSandbox(lines) {
+  const { dir, registry } = sandbox([]);
+  writeFileSync(registry, [...lines, ""].join("\n"));
+  return { dir, registry };
+}
+
+// The consumer shape from GitHub #643: plain title, path in its own column.
+const DOC_COLUMN_HEADER = [
+  "| # | Title | Category | Priority | Icon | Status | Tracker | Document |",
+  "|---|---|---|---|---|---|---|---|",
+];
+const docColumnRow = (n, slug, status) =>
+  `| ${n} | Plain title ${n} | infrastructure | High | ⚠️ | ${status} | X-${n} | \`docs/tasks/task.${n}.${slug}/task.${n}.${slug}.md\` |`;
+
+test("bug.19: a plain-title registry with a Document column ticks — never `no-row`", () => {
+  const { dir, registry } = rawSandbox([
+    ...DOC_COLUMN_HEADER,
+    docColumnRow(47, "me", "ready-for-review"),
+  ]);
+  try {
+    const f = writeDoc(dir, 47, "me", { status: "accepted" });
+    const res = run(dir, ["--file", path.relative(dir, f)]);
+    assert.equal(res.reason, "ticked");
+    const line = readFileSync(registry, "utf8")
+      .split("\n")
+      .find((l) => l.startsWith("| 47 |"));
+    assert.equal(
+      line,
+      docColumnRow(47, "me", "accepted").replace(
+        "| accepted |",
+        "| accepted         |",
+      ),
+      "only the Status cell changes, width preserved; the path cell is untouched",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("bug.19: a row the parser rejects reports `row-malformed` with the parser's reason and line", () => {
+  // Plain title and no document column: the parser has nowhere to find a path.
+  const { dir, registry } = rawSandbox([
+    "| # | Title | Status | Category | Priority | Created | Issue | Depends on |",
+    "|---|---|---|---|---|---|---|---|",
+    "| 48 | Plain title | ready-for-review | infrastructure | High | 2026-01-01 | — | — |",
+  ]);
+  try {
+    const f = writeDoc(dir, 48, "plain", { status: "accepted" });
+    const before = readFileSync(registry, "utf8");
+    for (const extra of [[], ["--annotate", "--pr", "12"]]) {
+      const res = run(dir, ["--file", path.relative(dir, f), ...extra]);
+      assert.equal(
+        res.reason,
+        "row-malformed",
+        `mode ${extra.join(" ") || "tick"}`,
+      );
+      assert.equal(res.exitCode, 0);
+      assert.equal(res.line, 3);
+      assert.match(res.parserReason, /no \[title\]\(story\|task\|bug/);
+      assert.match(res.message, /line 3 is task 48's row/);
+    }
+    assert.equal(readFileSync(registry, "utf8"), before, "nothing written");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("bug.19: a genuinely absent row is still `no-row` when other rows are malformed", () => {
+  const { dir } = rawSandbox([
+    "| # | Title | Status | Category | Priority | Created | Issue | Depends on |",
+    "|---|---|---|---|---|---|---|---|",
+    "| 48 | Plain title | ready-for-review | infrastructure | High | 2026-01-01 | — | — |",
+  ]);
+  try {
+    const f = writeDoc(dir, 49, "absent", { status: "accepted" });
+    assert.equal(run(dir, ["--file", path.relative(dir, f)]).reason, "no-row");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("bug.19: annotate never writes a note into the Document column", () => {
+  const { dir, registry } = rawSandbox([
+    ...DOC_COLUMN_HEADER,
+    docColumnRow(50, "doc", "accepted"),
+  ]);
+  try {
+    const f = writeDoc(dir, 50, "doc", { status: "accepted" });
+    const before = readFileSync(registry, "utf8");
+    const res = run(dir, [
+      "--annotate",
+      "--file",
+      path.relative(dir, f),
+      "--pr",
+      "12",
+    ]);
+    assert.equal(res.reason, "no-cell");
+    assert.equal(res.lastColumn, "document");
+    assert.equal(readFileSync(registry, "utf8"), before);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ── --bug-status: the general-bug registry row (task 219) ───────────────────
+
+const BUG_REGISTRY_HEADER = [
+  "# Bug Registry",
+  "",
+  "**Last Updated:** 2026-01-01",
+  "**Next Available Bug Number:** **9**",
+  "",
+  "| #   | Title | Status | Severity | Priority | Created | Area |",
+  "| --- | ----- | ------ | -------- | -------- | ------- | ---- |",
+];
+
+function bugRow(n, status) {
+  return `| ${n} | [B${n}](bug.${n}.b${n}/bug.${n}.b${n}.md) | ${status} | Major | High | 2026-01-01 | area |`;
+}
+
+/**
+ * A sandbox with `docs/bugs/bug-registry.md` and the real selector symlinked,
+ * as `sandbox()` does for the task registry. `rows` are the registry's table
+ * rows; `eol` lets a test write a CRLF registry.
+ */
+function bugSandbox(rows, { eol = "\n" } = {}) {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "registry-tick-bug-"));
+  mkdirSync(path.join(dir, "skills", "develop-next", "scripts"), {
+    recursive: true,
+  });
+  symlinkSync(path.join(REPO_ROOT, SELECTOR_REL), path.join(dir, SELECTOR_REL));
+  mkdirSync(path.join(dir, "docs", "bugs"), { recursive: true });
+  const registry = path.join(dir, "docs", "bugs", "bug-registry.md");
+  writeFileSync(registry, [...BUG_REGISTRY_HEADER, ...rows, ""].join(eol));
+  return { dir, registry };
+}
+
+/** Write a general bug file `docs/bugs/bug.N.bN/bug.N.bN.md` with `status`. */
+function writeBug(
+  dir,
+  n,
+  status,
+  { name = `bug.${n}.b${n}`, type = "bug" } = {},
+) {
+  const d = path.join(dir, "docs", "bugs", `bug.${n}.b${n}`);
+  mkdirSync(d, { recursive: true });
+  const f = path.join(d, `${name}.md`);
+  writeFileSync(
+    f,
+    `---\ntype: ${type}\nstatus: ${status} # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened\n---\n\n# Bug\n`,
+  );
+  return path.relative(dir, f);
+}
+
+const rowOf = (registry, n) =>
+  readFileSync(registry, "utf8")
+    .split(/\r?\n/)
+    .find((l) => l.startsWith(`| ${n} |`));
+
+/** Lines of `after` that differ from `before`, by index. */
+function changedLines(before, after) {
+  const a = before.split("\n");
+  const b = after.split("\n");
+  assert.equal(a.length, b.length, "the rewrite must not add or drop lines");
+  return a.map((l, i) => (l === b[i] ? null : i)).filter((i) => i !== null);
+}
+
+const { BUG_STATUS_LABELS, normaliseBugRegistryStatus } = createRequire(
+  import.meta.url,
+)(CLI);
+const { BUG_LIFECYCLE_STATUSES } = await import(
+  pathToFileURL(path.join(REPO_ROOT, SELECTOR_REL)).href
+);
+
+test("--bug-status: the label map covers exactly the bug lifecycle", () => {
+  // The map is this file's; the lifecycle is select-next's. A sixth status
+  // added to one and not the other would write `undefined` into a row.
+  assert.deepEqual(
+    Object.keys(BUG_STATUS_LABELS).sort(),
+    [...BUG_LIFECYCLE_STATUSES].sort(),
+  );
+});
+
+for (const status of Object.keys(BUG_STATUS_LABELS)) {
+  test(`--bug-status: token registry — \`${status}\` is written as the token, one line changed`, () => {
+    const start = status === "new" ? "closed" : "new";
+    const { dir, registry } = bugSandbox([
+      bugRow(1, "closed"),
+      bugRow(2, "closed"),
+      bugRow(3, start),
+    ]);
+    try {
+      const f = writeBug(dir, 3, status);
+      const before = readFileSync(registry, "utf8");
+      const res = run(dir, ["--bug-status", "--file", f]);
+      assert.equal(res.reason, "mirrored");
+      assert.equal(res.vocabulary, "token");
+      assert.equal(res.to, status);
+      assert.equal(res.mirrored, true);
+      assert.equal(
+        res.ticked,
+        undefined,
+        "bug-status payloads carry `mirrored`, not `ticked`",
+      );
+      const after = readFileSync(registry, "utf8");
+      assert.deepEqual(changedLines(before, after), [
+        before.split("\n").findIndex((l) => l.startsWith("| 3 |")),
+      ]);
+      assert.equal(rowOf(registry, 3).split("|")[3].trim(), status);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test(`--bug-status: label registry — \`${status}\` is written as \`${BUG_STATUS_LABELS[status]}\`, one line changed`, () => {
+    const start = status === "new" ? "✅ Closed" : "🆕 New";
+    const { dir, registry } = bugSandbox([
+      bugRow(1, "✅ Closed"),
+      bugRow(2, "🔧 In Progress"),
+      bugRow(3, start),
+    ]);
+    try {
+      const f = writeBug(dir, 3, status);
+      const before = readFileSync(registry, "utf8");
+      const res = run(dir, ["--bug-status", "--file", f]);
+      assert.equal(res.reason, "mirrored");
+      assert.equal(res.vocabulary, "label");
+      assert.equal(res.to, BUG_STATUS_LABELS[status]);
+      const after = readFileSync(registry, "utf8");
+      assert.equal(changedLines(before, after).length, 1);
+      assert.equal(
+        rowOf(registry, 3).split("|")[3].trim(),
+        BUG_STATUS_LABELS[status],
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+}
+
+test("--bug-status: a row already in the file's status and vocabulary answers `already` and writes nothing", () => {
+  for (const [rows, cell] of [
+    [[bugRow(1, "closed"), bugRow(2, "ready-for-qa")], "token"],
+    [[bugRow(1, "✅ Closed"), bugRow(2, "🔍 Ready for QA")], "label"],
+  ]) {
+    const { dir, registry } = bugSandbox(rows);
+    try {
+      const f = writeBug(dir, 2, "ready-for-qa");
+      const before = readFileSync(registry, "utf8");
+      const res = run(dir, ["--bug-status", "--file", f]);
+      assert.equal(res.reason, "already", cell);
+      assert.equal(res.mirrored, false);
+      assert.equal(readFileSync(registry, "utf8"), before);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+});
+
+/**
+ * The control case (obs #176): the target row holds the RIGHT status in the
+ * WRONG vocabulary. The vocabulary comes from the other rows, so the plain token
+ * in an emoji registry is healed to the label — and is not `already`.
+ */
+test("--bug-status: a plain token in a label registry is healed to the label", () => {
+  const { dir, registry } = bugSandbox([
+    bugRow(1, "✅ Closed"),
+    bugRow(2, "✅ Closed"),
+    bugRow(3, "closed"),
+  ]);
+  try {
+    const f = writeBug(dir, 3, "closed");
+    const res = run(dir, ["--bug-status", "--file", f]);
+    assert.equal(res.reason, "mirrored");
+    assert.equal(res.from, "closed");
+    assert.equal(res.to, "✅ Closed");
+    assert.equal(rowOf(registry, 3).split("|")[3].trim(), "✅ Closed");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("--bug-status: a mixed registry writes the label only when labels are a strict majority of the other rows", () => {
+  for (const [others, want] of [
+    [["✅ Closed", "✅ Closed", "closed"], "label"],
+    [["✅ Closed", "closed"], "token"], // a tie writes the token
+    [["closed", "closed", "✅ Closed"], "token"],
+    [[], "token"], // no other rows
+  ]) {
+    const rows = others.map((s, i) => bugRow(i + 1, s));
+    const { dir } = bugSandbox([...rows, bugRow(8, "new")]);
+    try {
+      const f = writeBug(dir, 8, "in-progress");
+      const res = run(dir, ["--bug-status", "--file", f]);
+      assert.equal(res.reason, "mirrored", JSON.stringify(others));
+      assert.equal(res.vocabulary, want, JSON.stringify(others));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+});
+
+test("--bug-status: a CRLF registry keeps CRLF and changes only the target line", () => {
+  const { dir, registry } = bugSandbox(
+    [bugRow(1, "closed"), bugRow(2, "reopened")],
+    { eol: "\r\n" },
+  );
+  try {
+    const f = writeBug(dir, 2, "ready-for-qa");
+    const before = readFileSync(registry, "utf8");
+    const res = run(dir, ["--bug-status", "--file", f]);
+    assert.equal(res.reason, "mirrored");
+    const after = readFileSync(registry, "utf8");
+    assert.equal(
+      after,
+      before.replace("| reopened |", "| ready-for-qa |"),
+      "exactly the one cell changes; every CRLF survives",
+    );
+    assert.equal(after.split("\r\n").length, before.split("\r\n").length);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("--bug-status: a task bug answers `not-a-general-bug` and writes nothing", () => {
+  const { dir, registry } = bugSandbox([bugRow(3, "new")]);
+  try {
+    const d = path.join(dir, "docs", "tasks", "task.67.parent");
+    mkdirSync(d, { recursive: true });
+    const f = path.join(d, "task.67.bug.3.x.md");
+    writeFileSync(f, doc({ type: "bug", status: "in-progress" }));
+    const before = readFileSync(registry, "utf8");
+    const res = run(dir, ["--bug-status", "--file", path.relative(dir, f)]);
+    assert.equal(res.reason, "not-a-general-bug");
+    assert.equal(res.mirrored, false);
+    assert.equal(readFileSync(registry, "utf8"), before);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("--bug-status: a task document answers `not-a-general-bug`", () => {
+  const { dir, registry } = bugSandbox([bugRow(3, "new")]);
+  try {
+    const f = writeDoc(dir, 3, "alpha", { status: "accepted" });
+    const before = readFileSync(registry, "utf8");
+    const res = run(dir, ["--bug-status", "--file", path.relative(dir, f)]);
+    assert.equal(res.reason, "not-a-general-bug");
+    assert.equal(readFileSync(registry, "utf8"), before);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("--bug-status: a `bug.N.` file whose type is not `bug` answers `not-a-general-bug`", () => {
+  const { dir, registry } = bugSandbox([bugRow(3, "new")]);
+  try {
+    const f = writeBug(dir, 3, "in-progress", {
+      type: "implementation-report",
+    });
+    const before = readFileSync(registry, "utf8");
+    const res = run(dir, ["--bug-status", "--file", f]);
+    assert.equal(res.reason, "not-a-general-bug");
+    assert.equal(readFileSync(registry, "utf8"), before);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a general bug WITHOUT --bug-status still answers `not-a-task` (the finalise --bug contract)", () => {
+  const { dir, registry } = bugSandbox([bugRow(4, "ready-for-qa")]);
+  try {
+    const f = writeBug(dir, 4, "closed");
+    const before = readFileSync(registry, "utf8");
+    const res = run(dir, ["--file", f]);
+    assert.equal(res.reason, "not-a-task");
+    assert.equal(readFileSync(registry, "utf8"), before);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("--bug-status: a status outside the lifecycle answers `not-a-lifecycle-status` and writes nothing", () => {
+  const { dir, registry } = bugSandbox([bugRow(5, "new")]);
+  try {
+    const f = writeBug(dir, 5, "fixed");
+    const before = readFileSync(registry, "utf8");
+    const res = run(dir, ["--bug-status", "--file", f]);
+    assert.equal(res.reason, "not-a-lifecycle-status");
+    assert.equal(res.status, "fixed");
+    assert.equal(readFileSync(registry, "utf8"), before);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("--bug-status: no row → `no-row`; a rejected row → `row-malformed`, never `no-row`", () => {
+  const { dir } = bugSandbox([bugRow(1, "closed")]);
+  try {
+    const f = writeBug(dir, 6, "in-progress");
+    assert.equal(run(dir, ["--bug-status", "--file", f]).reason, "no-row");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+  // A row with an empty status cell: the parser keeps it in `malformed`.
+  const { dir: dir2 } = bugSandbox([
+    bugRow(1, "closed"),
+    "| 6 | [B6](bug.6.b6/bug.6.b6.md) |  | Major | High | 2026-01-01 | area |",
+  ]);
+  try {
+    const f = writeBug(dir2, 6, "in-progress");
+    const res = run(dir2, ["--bug-status", "--file", f]);
+    assert.equal(res.reason, "row-malformed");
+    assert.match(res.parserReason, /empty status cell/);
+  } finally {
+    rmSync(dir2, { recursive: true, force: true });
+  }
+});
+
+test("--bug-status: two cells reading the status answer `ambiguous-row` and write nothing", () => {
+  const { dir, registry } = bugSandbox([
+    bugRow(1, "closed"),
+    "| 7 | [B7](bug.7.b7/bug.7.b7.md) | new | Major | High | 2026-01-01 | new |",
+  ]);
+  try {
+    const f = writeBug(dir, 7, "in-progress");
+    const before = readFileSync(registry, "utf8");
+    const res = run(dir, ["--bug-status", "--file", f]);
+    assert.equal(res.reason, "ambiguous-row");
+    assert.equal(readFileSync(registry, "utf8"), before);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("--bug-status: no registry → `no-registry`", () => {
+  const { dir, registry } = bugSandbox([]);
+  try {
+    rmSync(registry);
+    const f = writeBug(dir, 1, "new");
+    assert.equal(run(dir, ["--bug-status", "--file", f]).reason, "no-registry");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("--bug-status --dry-run reports the write and leaves the registry byte-identical", () => {
+  const { dir, registry } = bugSandbox([bugRow(1, "closed"), bugRow(2, "new")]);
+  try {
+    const f = writeBug(dir, 2, "in-progress");
+    const before = readFileSync(registry, "utf8");
+    const res = run(dir, ["--bug-status", "--dry-run", "--file", f]);
+    assert.equal(res.reason, "dry-run");
+    assert.equal(res.to, "in-progress");
+    assert.equal(res.mirrored, false);
+    assert.equal(readFileSync(registry, "utf8"), before);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// Counts every fs read and write of the registry inside the CLI process, so the
+// task's "one registry read, at most one write per call" bound is asserted
+// rather than read off the source. Loaded with `node --require`; the counts are
+// written to $REGISTRY_IO_COUNTS when the process exits.
+const REGISTRY_IO_PRELOAD = `
+const fs = require("fs");
+const path = require("path");
+const counts = { reads: 0, writes: 0 };
+const isRegistry = (p) =>
+  typeof p === "string" &&
+  path.resolve(p).endsWith(path.join("docs", "bugs", "bug-registry.md"));
+for (const [obj, name, kind] of [
+  [fs, "readFileSync", "reads"], [fs, "readFile", "reads"],
+  [fs.promises, "readFile", "reads"], [fs, "writeFileSync", "writes"],
+  [fs, "writeFile", "writes"], [fs.promises, "writeFile", "writes"],
+]) {
+  const orig = obj[name];
+  obj[name] = function (p, ...rest) {
+    if (isRegistry(p)) counts[kind]++;
+    return orig.call(this, p, ...rest);
+  };
+}
+process.on("exit", () => {
+  fs.writeFileSync(process.env.REGISTRY_IO_COUNTS, JSON.stringify(counts));
+});
+`;
+
+function runCounted(cwd, args) {
+  const preload = path.join(cwd, "registry-io-preload.cjs");
+  const countsFile = path.join(cwd, "registry-io-counts.json");
+  writeFileSync(preload, REGISTRY_IO_PRELOAD);
+  const out = execFileSync(
+    process.execPath,
+    ["--require", preload, CLI, ...args, "--json"],
+    {
+      cwd,
+      encoding: "utf8",
+      env: { ...process.env, REGISTRY_IO_COUNTS: countsFile },
+    },
+  );
+  return {
+    res: JSON.parse(out),
+    io: JSON.parse(readFileSync(countsFile, "utf8")),
+  };
+}
+
+test("--bug-status reads the registry once and writes it at most once per call", () => {
+  for (const [label, rows, status, extra, reason, writes] of [
+    [
+      "mirrored",
+      [bugRow(1, "closed"), bugRow(2, "new")],
+      "in-progress",
+      [],
+      "mirrored",
+      1,
+    ],
+    [
+      "already",
+      [bugRow(1, "closed"), bugRow(2, "new")],
+      "new",
+      [],
+      "already",
+      0,
+    ],
+    [
+      "dry-run",
+      [bugRow(1, "closed"), bugRow(2, "new")],
+      "in-progress",
+      ["--dry-run"],
+      "dry-run",
+      0,
+    ],
+  ]) {
+    const { dir } = bugSandbox(rows);
+    try {
+      const f = writeBug(dir, 2, status);
+      const { res, io } = runCounted(dir, [
+        "--bug-status",
+        ...extra,
+        "--file",
+        f,
+      ]);
+      assert.equal(res.reason, reason, label);
+      assert.equal(io.reads, 1, `${label}: registry reads`);
+      assert.equal(io.writes, writes, `${label}: registry writes`);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+});
+
+test("--bug-status with --annotate is a usage error (exit 2) and writes nothing", () => {
+  const { dir, registry } = bugSandbox([bugRow(2, "new")]);
+  try {
+    const f = writeBug(dir, 2, "in-progress");
+    const before = readFileSync(registry, "utf8");
+    let status = 0;
+    try {
+      execFileSync(
+        process.execPath,
+        [CLI, "--bug-status", "--annotate", "--pr", "1", "--file", f],
+        { cwd: dir, encoding: "utf8", stdio: "pipe" },
+      );
+    } catch (e) {
+      status = e.status;
+    }
+    assert.equal(status, 2);
+    assert.equal(readFileSync(registry, "utf8"), before);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+/**
+ * The CLI gained a `require.main === module` guard so the drift test can import
+ * the label map. Two things that guard must not break: requiring the file runs
+ * nothing, and invoking it through a SYMLINKED path still runs it — the shape
+ * every consumer uses (`.agents/skills/…`), and the one bug 16 found an ESM
+ * argv-path guard silently no-op'ing on.
+ */
+test("requiring registry-tick.js prints nothing and writes nothing", () => {
+  const out = execFileSync(
+    process.execPath,
+    ["-e", `require(${JSON.stringify(CLI)})`],
+    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+  );
+  assert.equal(out, "");
+});
+
+test("--bug-status runs when the CLI is invoked through a symlinked path", () => {
+  const { dir, registry } = bugSandbox([bugRow(1, "closed"), bugRow(2, "new")]);
+  try {
+    const link = path.join(dir, "registry-tick-link.js");
+    symlinkSync(CLI, link);
+    const f = writeBug(dir, 2, "in-progress");
+    const res = JSON.parse(
+      execFileSync(
+        process.execPath,
+        [link, "--bug-status", "--file", f, "--json"],
+        {
+          cwd: dir,
+          encoding: "utf8",
+        },
+      ),
+    );
+    assert.equal(res.reason, "mirrored");
+    assert.equal(rowOf(registry, 2).split("|")[3].trim(), "in-progress");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("normaliseBugRegistryStatus reads either vocabulary, any case, and nothing else", () => {
+  assert.equal(normaliseBugRegistryStatus("🔍 ready for qa"), "ready-for-qa");
+  assert.equal(normaliseBugRegistryStatus("  ✅ Closed "), "closed");
+  assert.equal(normaliseBugRegistryStatus("REOPENED"), "reopened");
+  assert.equal(normaliseBugRegistryStatus("accepted"), null);
+  assert.equal(normaliseBugRegistryStatus("🔍 Ready"), null);
+  assert.equal(normaliseBugRegistryStatus(""), null);
 });

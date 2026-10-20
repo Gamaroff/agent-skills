@@ -1,0 +1,76 @@
+schema: 2
+task: 'task.212.qa-next-resolvable-note-findings'
+task_title: 'qa-next: a note finding can be resolved, with evidence'
+gate: CONCERNS
+status_reason: 'All three cycle-1 MEDIUM findings are fixed and mutation-proven, and the --by boundary engages (14 probes). The refute pass found that a resumed run cannot know which earlier run files Step 4.3 edited (MEDIUM), plus two LOW writer/ordering gaps.'
+reviewer: 'QA Engineer'
+head: '8fe3c3c30cecb621d3268611aac4c11e18ecad7c'
+updated: '2026-10-16T15:15:56Z'
+
+top_issues:
+  - id: 'T212-QA2-CR1'
+    severity: medium
+    file: 'skills/qa-next/SKILL.md'
+    finding: 'Step 5 now stages "any earlier run file this run resolved a finding in", but nothing records that set. STATE_FIELDS carries filedBug for exactly this resume case and nothing for resolved run files, so a run that crashes after phase recorded resumes at Step 5 and leaves the edited earlier run files unstaged — the resolution markers stay uncommitted and the next run''s clean-tree preflight trips on them.'
+    suggested_action: 'Make Step 5 derive the set from the tree rather than memory: stage the tracked run files under runs/ that git reports modified (git status --porcelain / git diff --name-only -- <runs dir>), or record each edited run in the state file. Prefer the tree-derived form; hold it with a test or a doc-agreement check.'
+    suggested_owner: dev
+    status: open
+  - id: 'T212-QA2-CR2'
+    severity: low
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: 'cmdResolveFinding writes without reading the row back. Evidence that verifies but contains a pipe or backtick (a run file name runPathFor does not refuse) writes a row that re-parses with no resolution, or splits the table cell, while the command reports success.'
+    suggested_action: 'After building the new line, re-parse it with rowFinding and refuse (writing nothing) unless its resolution reads back as {date, evidence: by}; or refuse evidence containing a pipe, backtick or newline up front.'
+    suggested_owner: dev
+    status: open
+  - id: 'T212-QA2-CR7'
+    severity: low
+    file: 'skills/qa-next/scripts/uat-status.mjs'
+    finding: 'RUN_NAME accepts unreal dates: isLaterRun("runs/A/2026-13-45-lan.md", "runs/A/2026-10-16-lan.md") is true (reproduced), so a run file with an impossible date counts as later evidence.'
+    suggested_action: 'Treat a run name whose date fails isRealDate as undated (never later); add the case to the verifyResolution test.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 79
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 14
+    notes: 'cli: probe of uat-status --resolve-finding --by (sink path, 13 hostile incl. undated run and same-day other-function run, 1 legitimate): verdict engages, 0 escapes.'
+  performance:
+    status: PASS
+    notes: 'OLD_MARK is super-linear on long whitespace runs (113 ms at 10k chars) — advisory cleanup, only on the stale-replacement path.'
+  reliability:
+    status: CONCERNS
+    notes: 'T212-QA2-CR1: resume can lose the set of edited earlier run files.'
+  maintainability:
+    status: PASS
+    notes: 'Cycle-1 fixes are each held by a test that goes red when reverted (4/4 covered).'
+
+recommendations:
+  immediate:
+    - action: 'Fix T212-QA2-CR1 (and the two LOW entries) with tests.'
+      refs: ['skills/qa-next/SKILL.md', 'skills/qa-next/scripts/uat-status.mjs']
+  future:
+    - action: 'CR-3 (low): commit evidence is checked against the local object store only — a sha only in one clone is commit-not-found elsewhere; consider a reachability rule and a timeout / GIT_NO_LAZY_FETCH on the git calls.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+    - action: 'CR-4 (low): SKILL Step 4.3 should say a same-day run of another function/env cannot resolve a note (run-not-later) and to leave it open.'
+      refs: ['skills/qa-next/SKILL.md']
+    - action: 'CR-5/CR-6 (cleanup): strip a stale marker by slicing at the RESOLUTION_MARK match (linear) and drop any dash separator.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['Fix T212-QA2-CR1']

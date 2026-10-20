@@ -19,6 +19,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
+  chmodSync,
   cpSync,
   existsSync,
   mkdirSync,
@@ -32,7 +33,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 
 import {
@@ -44,10 +45,17 @@ import {
   compareExpected,
   computeVerdict,
   defaultRepoRoot,
+  describeBadCase,
+  emitBlock,
   expectedProblem,
+  extractFencedBlock,
+  FENCE_PREFIX,
+  fixtureProblem,
   isLaunchFailure,
+  isPythonCrash,
   main,
   namesGh,
+  ghFreePath,
   parseArgvTemplate,
   probeShells,
   readRecord,
@@ -55,9 +63,12 @@ import {
   recordRun,
   resolveEntry,
   runProbeSpec,
+  SHELL_ARGV_PREFIX,
+  shellArgvSpawnArgs,
   toRecordEntry,
+  validateCases,
 } from "../security-probe.mjs";
-import { corpusFor } from "../security-input-corpus.mjs";
+import { corpusFor, DIRECTIONS, SINKS } from "../security-input-corpus.mjs";
 import { sandboxEnv } from "../qa-execute-snippets.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -855,6 +866,68 @@ test("shell entry: escapes and shells survive the all-errored decline (CR-3)", (
     assert.ok(r.escapes.length > 0, "the escape must survive the collapse");
     assert.deepEqual(r.shells, [...probeShells()]);
     assert.ok(toRecordEntry(r).escaped > 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("record: totals.escaped sums every control's escapes, and the emitted block carries it (obs #73)", () => {
+  // qa-task read totals.executed and totals.reproduced and gated PASS over a record whose one
+  // control had escaped 10 times; /finalise, reading the same record per control, halted on it.
+  // The count lives in totals now, where both readers already look.
+  const dir = mkdtempSync(join(REPO_ROOT, "shared/resources/tests/.obs73-"));
+  try {
+    const leaky = join(dir, "leaky.sh");
+    writeFileSync(
+      leaky,
+      '#!/usr/bin/env bash\ntouch "$HOME/PWNED-$RANDOM"\nprintf \'%s\\n\' "$1"\n',
+      { mode: 0o755 },
+    );
+    const clean = join(dir, "clean.sh");
+    writeFileSync(clean, "#!/usr/bin/env bash\nprintf '%s\\n' \"$1\"\n", {
+      mode: 0o755,
+    });
+    const cases = corpusFor("filename").slice(0, 2);
+    const record = join(dir, "x.security.run.json");
+    const leakyRun = runProbeSpec({
+      sink: "filename",
+      entry: `shell:${relative(REPO_ROOT, leaky)}`,
+      cases,
+    });
+    const cleanRun = runProbeSpec({
+      sink: "filename",
+      entry: `shell:${relative(REPO_ROOT, clean)}`,
+      cases,
+    });
+    assert.ok(
+      leakyRun.escapes.length > 0,
+      "premise: the leaky control escapes",
+    );
+    assert.equal(
+      cleanRun.escapes.length,
+      0,
+      "premise: the clean control does not",
+    );
+    recordRun(record, leakyRun, { name: "leaky" });
+    recordRun(record, cleanRun, { name: "clean" });
+
+    const rec = readRecord(record);
+    const perControl = rec.controls.map((c) => c.escaped);
+    assert.equal(rec.totals.escaped, leakyRun.escapes.length);
+    assert.equal(
+      rec.totals.escaped,
+      perControl.reduce((a, b) => a + b, 0),
+    );
+    // The snapshot a jq reader opens carries the same total.
+    assert.equal(
+      JSON.parse(readFileSync(record, "utf8")).totals.escaped,
+      rec.totals.escaped,
+    );
+
+    const block = emitBlock(rec);
+    assert.match(block, new RegExp(`^  escaped: ${rec.totals.escaped}$`, "m"));
+    assert.match(block, /^ {6}escaped: 0$/m, "the clean control reads 0");
+    assert.match(emitBlock(null), /^ {2}escaped: 0$/m);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -2412,8 +2485,8 @@ test("cli entry: every malformed --argv / cli: combination exits 2 with bad-argv
     // (the parser also refuses a missing --argv) is still proved on its own.
     const NAMED = {
       "cli: without --argv": /needs --argv/,
-      "--argv on a JS entry": /cli: entry form only/,
-      "--argv on a shell: entry": /cli: entry form only/,
+      "--argv on a JS entry": /cli: and shell-argv: entry forms only/,
+      "--argv on a shell: entry": /cli: and shell-argv: entry forms only/,
       "two {input}": /got 2/,
       "an embedded slot": /embeds \{input\}/,
       "non-JSON": /not JSON/,
@@ -2457,7 +2530,10 @@ test("cli entry: runProbeSpec declines bad-argv for a library caller, and never 
     argv: ["{input}"],
   });
   assert.equal(onJs.reason, "bad-argv");
-  assert.match(onJs.declined[0].detail, /cli: entry form only/);
+  assert.match(
+    onJs.declined[0].detail,
+    /cli: and shell-argv: entry forms only/,
+  );
   const bad = runProbeSpec({
     sink: "url-authority",
     entry: CLI("refuser"),
@@ -2759,6 +2835,631 @@ test("cli entry: every cli result path returns the JS form's key set", () => {
     "bad-argv": { entry: CLI("refuser") },
     "not a script": { entry: `cli:${FIXTURES}/eval-names.sh`, argv: HOST_ARGV },
     crashed: { entry: CLI("crasher"), argv: HOST_ARGV },
+  };
+  for (const [name, spec] of Object.entries(paths)) {
+    const r = runProbeSpec({ sink: "url-authority", cases: CASES, ...spec });
+    assert.deepEqual(Object.keys(r).sort(), expected, `${name} key set`);
+  }
+});
+
+// ── The cli entry form, Python (task.215) ────────────────────────────────────
+//
+// `cli:<path>.py` runs the script under `python3 -E -s -B` with the same argv
+// template, sandbox and verdict rules as the Node arm. Two things differ, and
+// each row below holds one: a Python crash exits 1 exactly as a refusal does,
+// so it is told apart by its traceback frame, not by a Node footer; and the
+// interpreter is the host's, so the result says which one ran.
+
+const PY = (name) => `cli:${FIXTURES}/${name}.py`;
+
+test("cli entry (python): a refusing .py CLI engages under python3, one probe per case, and the result names the interpreter", () => {
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-refuser"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+  assert.equal(r.executed, CASES.length);
+  assert.equal(r.shells, null);
+  assert.deepEqual(r.escapes, []);
+  assert.equal(r.interpreter.name, "python3");
+  assert.match(r.interpreter.version, /^Python 3\.\d+/);
+  for (const c of r.cases) {
+    assert.equal(c.exit, c.direction === "hostile" ? 3 : 0, c.id);
+  }
+});
+
+test("cli entry (python): the child runs as python3 -E -s -B, never -I", () => {
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-flags"),
+    cases: CASES.filter((c) => c.direction === "legitimate"),
+    argv: HOST_ARGV,
+  });
+  // A run that declines before spawning has no cases, and the loop below
+  // would then check no flag at all (QA cycle 1, CR-2).
+  assert.equal(r.interpreter?.name, "python3", JSON.stringify(r));
+  assert.equal(
+    r.executed,
+    CASES.filter((c) => c.direction === "legitimate").length,
+  );
+  for (const c of r.cases) {
+    assert.equal(c.outcome, "accepted", `${c.id}: ${c.detail}`);
+  }
+});
+
+test("cli entry (python): a script that imports a sibling module runs, and writes no __pycache__ escape", () => {
+  // A bytecode directory left by a manual run is not this run's; clear it so
+  // the existence check below reads only what the probe wrote.
+  rmSync(join(REPO_ROOT, FIXTURES, "__pycache__"), {
+    recursive: true,
+    force: true,
+  });
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-imports-sibling"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+  assert.deepEqual(r.escapes, []);
+  assert.equal(
+    existsSync(join(REPO_ROOT, FIXTURES, "__pycache__")),
+    false,
+    "python wrote bytecode beside the fixture",
+  );
+});
+
+test("cli entry (python): an uncaught exception and a SyntaxError are errored — never scored as refusals", () => {
+  for (const [name, shape] of [
+    ["cli-crasher", /RuntimeError: cannot start/],
+    ["cli-syntax-error", /SyntaxError/],
+    // The traceback does not end on the exception: a two-line message, then
+    // an atexit line. The detail still names the exception (QA cycle 1).
+    ["cli-crasher-multiline", /ValueError: cannot start/],
+    // No traceback reaches stderr at all: stderr is None, or the traceback is
+    // cut to the bare line a refusal could print (QA cycle 2).
+    ["cli-crasher-stderr-none", /RuntimeError: cannot start/],
+    ["cli-crasher-tracebacklimit", /KeyError: 'no policy/],
+  ]) {
+    const r = runProbeSpec({
+      sink: "url-authority",
+      entry: PY(name),
+      cases: CASES,
+      argv: HOST_ARGV,
+    });
+    // Both exit 1 on every case — what a refusal exits with. Scored, every
+    // case would read `rejected` and the control would look like it refuses.
+    assert.equal(r.verdict, "unverifiable", name);
+    assert.equal(r.reason, "entry-not-probeable", name);
+    assert.equal(r.executed, 0, name);
+    assert.match(r.declined[0].detail, /crashed \(exit 1\)/, name);
+    assert.match(r.declined[0].detail, shape, name);
+  }
+});
+
+test("cli entry (python): a crash behind a replaced excepthook is errored on the inputs it crashes on — never a refusal", () => {
+  // The fixture answers legitimate input and crashes on hostile input after
+  // replacing sys.excepthook (as rich and Typer do): exit 1, no frame on
+  // stderr. Read off stderr, every hostile case scored `rejected` and the
+  // verdict was `engages` — a false pass (QA cycle 2, TASK-215-QA2-1).
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-crasher-excepthook"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.notEqual(r.verdict, "engages", JSON.stringify(r));
+  const hostile = CASES.filter((c) => c.direction === "hostile");
+  assert.ok(hostile.length > 0);
+  for (const c of hostile) {
+    const got = [...r.cases, ...r.declined].find((x) => x.id === c.id);
+    assert.ok(got, `${c.id} missing`);
+    assert.equal(got.outcome, "errored", `${c.id}: ${got.detail}`);
+    assert.match(
+      got.detail,
+      /crashed \(exit 1\).*ValueError: cannot parse host/,
+    );
+  }
+  for (const c of r.cases.filter((x) => x.direction === "legitimate")) {
+    assert.equal(c.outcome, "accepted", c.id);
+  }
+});
+
+test("cli entry (python): a crash whose exception cannot be printed is errored — the signal is not the exception's text", () => {
+  // The replaced excepthook prints nothing: exit 1, empty stderr. A marker
+  // built from the exception's text was lost when formatting it raised, and
+  // every hostile case scored `rejected` (QA cycle 3, TASK-215-QA3-1). Its
+  // str() raises; the second fixture's class name cannot be read at all, so
+  // the detail has nothing to name.
+  for (const [name, detail] of [
+    ["cli-crasher-unprintable", /rather than answering: UnprintableError$/],
+    ["cli-crasher-nameless", /rather than answering: uncaught exception$/],
+  ]) {
+    const r = runProbeSpec({
+      sink: "url-authority",
+      entry: PY(name),
+      cases: CASES,
+      argv: HOST_ARGV,
+    });
+    assert.notEqual(r.verdict, "engages", `${name}: ${JSON.stringify(r)}`);
+    const hostile = CASES.filter((c) => c.direction === "hostile");
+    assert.ok(hostile.length > 0);
+    for (const c of hostile) {
+      const got = [...r.cases, ...r.declined].find((x) => x.id === c.id);
+      assert.ok(got, `${name} ${c.id} missing`);
+      assert.equal(got.outcome, "errored", `${name} ${c.id}: ${got.detail}`);
+      assert.match(got.detail, /crashed \(exit 1\)/, name);
+      assert.match(got.detail, detail, name);
+    }
+    for (const c of r.cases.filter((x) => x.direction === "legitimate")) {
+      assert.equal(c.outcome, "accepted", `${name} ${c.id}`);
+    }
+  }
+});
+
+test("cli entry (python): a forked child that crashes does not override the script's answer", () => {
+  // The child unwinds into the bootstrap with the crash fd still open. Were it
+  // to write the marker, every case — a parent that answered 0 or 3 — would
+  // read `errored` (QA cycle 3, TASK-215-QA3-2).
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-fork-child-crash"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.equal(r.verdict, "engages", JSON.stringify(r));
+  assert.equal(r.executed, CASES.length);
+  for (const c of r.cases) {
+    assert.equal(c.exit, c.direction === "hostile" ? 3 : 0, c.id);
+  }
+});
+
+test("cli entry (python): a forked daemon does not hold the case open past the script's answer", () => {
+  // The daemon outlives the answer by 4 s; the per-case timeout is 2 s. Were
+  // the crash fd left open in the child, every case would wait for the timeout
+  // and read `errored` (QA cycle 3, TASK-215-QA3-3).
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-fork-daemon"),
+    cases: CASES,
+    argv: HOST_ARGV,
+    timeoutMs: 2000,
+  });
+  assert.equal(r.verdict, "engages", JSON.stringify(r));
+  assert.equal(r.executed, CASES.length);
+  for (const c of r.cases) {
+    assert.equal(c.exit, c.direction === "hostile" ? 3 : 0, c.id);
+  }
+});
+
+test("cli entry (python): a case with no exit record is errored — a closed fd 3, a forged line and os._exit never score", () => {
+  // The channel is positive: the bootstrap writes `answer <nonce>` or
+  // `crash <nonce>` on every exit it controls, and a case without one is
+  // errored. cli-closes-record-fd closes fd 3 and opens its own file there,
+  // then crashes behind a quiet excepthook on hostile input; read as "no crash
+  // record, so it answered", every hostile case scored `rejected` and the
+  // verdict was `engages` (QA cycle 4, TASK-215-QA4-1). cli-forged-record
+  // writes nonce-less `answer` / `crash` lines itself and leaves by os._exit.
+  for (const name of ["cli-closes-record-fd", "cli-forged-record"]) {
+    const r = runProbeSpec({
+      sink: "url-authority",
+      entry: PY(name),
+      cases: CASES,
+      argv: HOST_ARGV,
+    });
+    assert.equal(r.verdict, "unverifiable", `${name}: ${JSON.stringify(r)}`);
+    assert.equal(r.reason, "entry-not-probeable", name);
+    assert.equal(r.executed, 0, name);
+    assert.equal(r.cases.length, CASES.length, name);
+    for (const c of r.cases) {
+      assert.equal(c.outcome, "errored", `${name} ${c.id}: ${c.detail}`);
+      assert.match(c.detail, /without the bootstrap's exit record/, name);
+      // Exit 7: the bootstrap wrote into the script's own fd 3.
+      assert.notEqual(
+        c.exit,
+        7,
+        `${name} ${c.id}: record written into the script's file`,
+      );
+    }
+  }
+});
+
+test("cli entry (python): a forged answer record does not outrank the crash that follows it", () => {
+  // cli-forged-answer-crash writes `answer <nonce>` with the real nonce (it is
+  // on sys.orig_argv), then crashes behind a quiet excepthook. Read with the
+  // answer first, every hostile case scored `rejected` (QA cycle 5 mutation:
+  // "answer wins over crash" reddened nothing).
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-forged-answer-crash"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.notEqual(r.verdict, "engages", JSON.stringify(r));
+  const hostile = CASES.filter((c) => c.direction === "hostile");
+  assert.ok(hostile.length > 0);
+  for (const c of hostile) {
+    const got = [...r.cases, ...r.declined].find((x) => x.id === c.id);
+    assert.ok(got, `${c.id} missing`);
+    assert.equal(got.outcome, "errored", `${c.id}: ${got.detail}`);
+    assert.match(
+      got.detail,
+      /crashed \(exit 1\).*ValueError: cannot parse host/,
+    );
+  }
+});
+
+test("cli entry (python): a failed flush at shutdown (exit 120) is errored, never a refusal", () => {
+  // The body answers, then python3 cannot flush stdout and exits 120. Read
+  // as a refusal, every hostile case scored `rejected` and the verdict read
+  // `engages` (QA cycle 6, TASK-215-QA6-1).
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-shutdown-flush-crash"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.notEqual(r.verdict, "engages", JSON.stringify(r));
+  const hostile = CASES.filter((c) => c.direction === "hostile");
+  assert.ok(hostile.length > 0);
+  for (const c of hostile) {
+    const got = [...r.cases, ...r.declined].find((x) => x.id === c.id);
+    assert.ok(got, `${c.id} missing`);
+    assert.equal(got.outcome, "errored", `${c.id}: ${got.detail}`);
+    assert.match(got.detail, /failed at shutdown \(exit 120/);
+  }
+});
+
+test("cli entry (python): a crash outside the main frame is scored by python3's exit status — never a pass", () => {
+  // The stated limit (probe-boundary-rule.md): a worker thread that raises
+  // while the main thread exits 0 is what `python3 <entry>` reports, so a
+  // hostile case reads `accepted` — a reproduction, the false-alarm direction.
+  // What must never happen is a pass (QA cycle 5, TASK-215-QA5-1). Every
+  // hostile case is looked up, and the thread is shown to have raised, so a
+  // fixture that simply accepts every input cannot pass (QA cycle 6, QA6-3).
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-thread-crash"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.notEqual(r.verdict, "engages", JSON.stringify(r));
+  const hostile = CASES.filter((c) => c.direction === "hostile");
+  assert.ok(hostile.length > 0);
+  for (const c of hostile) {
+    const got = [...r.cases, ...r.declined].find((x) => x.id === c.id);
+    assert.ok(got, `${c.id} missing`);
+    assert.equal(got.outcome, "accepted", `${c.id}: ${got.detail}`);
+    assert.equal(got.exit, 0, c.id);
+  }
+  const direct = spawnSync(
+    "python3",
+    [
+      PY("cli-thread-crash").slice("cli:".length),
+      "--mode",
+      "strict",
+      "--host",
+      hostile[0].input,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.equal(direct.status, 0, direct.stderr);
+  assert.match(direct.stderr, /Exception in thread/);
+});
+
+test("cli entry (python): __main__ is still the script's module after the body returns", () => {
+  // cli-main-atexit's atexit handler exits 8 unless __main__ is the script's
+  // module; runpy swapped the bootstrap back in (QA cycle 3, TASK-215-QA3-4).
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-main-atexit"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+  for (const c of r.cases) {
+    assert.equal(c.exit, c.direction === "hostile" ? 3 : 0, c.id);
+  }
+});
+
+test("cli entry (python): the script runs as python3 <path> runs it — __main__, argv[0] and its own directory", () => {
+  // The bootstrap that catches a crash must not change how the script runs:
+  // cli-main-guard exits 9 unless sys.argv[0] is itself, and answers only
+  // under `if __name__ == "__main__"`; cli-imports-sibling needs sys.path[0].
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-main-guard"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+  assert.equal(r.executed, CASES.length);
+  for (const c of r.cases) {
+    assert.equal(c.exit, c.direction === "hostile" ? 3 : 0, c.id);
+  }
+});
+
+test("cli entry (python): a plain sys.exit(1) refusal, and a refusal that prints an exception-shaped line, stay rejected", () => {
+  for (const name of ["cli-exit-one", "cli-refuser-error-text"]) {
+    const r = runProbeSpec({
+      sink: "url-authority",
+      entry: PY(name),
+      cases: CASES,
+      argv: HOST_ARGV,
+    });
+    assert.equal(r.verdict, "engages", `${name}: ${JSON.stringify(r.cases)}`);
+    assert.equal(r.executed, CASES.length, name);
+    for (const c of r.cases) {
+      if (c.direction === "hostile") {
+        assert.equal(c.outcome, "rejected", `${name} ${c.id}`);
+        assert.equal(c.exit, 1, `${name} ${c.id}`);
+      }
+    }
+  }
+});
+
+test("cli entry (python): a traceback on a non-1 exit is not a crash — the exit status still answers", () => {
+  // Python prints an "Exception ignored" traceback from a failing __del__ and
+  // carries on; an uncaught exception always exits 1. So a refusal exiting 3,
+  // and an acceptance exiting 0, are answers even with a traceback on stderr.
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-refuser-unraisable"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+  assert.equal(r.executed, CASES.length);
+  for (const c of r.cases) {
+    assert.equal(c.exit, c.direction === "hostile" ? 3 : 0, c.id);
+  }
+});
+
+test("cli entry (python): isPythonCrash reads the traceback, not the last line", () => {
+  const tb = [
+    "Traceback (most recent call last):",
+    '  File "/x/a.py", line 2, in <module>',
+    '    raise ValueError("x")',
+    "ValueError: x",
+  ].join("\n");
+  const syntax = [
+    '  File "/x/a.py", line 1',
+    "    def f(:",
+    "          ^",
+    "SyntaxError: invalid syntax",
+  ].join("\n");
+  const interrupt = [
+    "Traceback (most recent call last):",
+    '  File "/x/a.py", line 3, in <module>',
+    "    time.sleep(9)",
+    "KeyboardInterrupt",
+  ].join("\n");
+  const dotted = [
+    "Traceback (most recent call last):",
+    '  File "/x/a.py", line 3, in <module>',
+    "json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)",
+  ].join("\n");
+  assert.equal(isPythonCrash(tb), true);
+  assert.equal(isPythonCrash(`${tb}\n\n`), true);
+  assert.equal(isPythonCrash(syntax), true);
+  assert.equal(isPythonCrash(interrupt), true);
+  assert.equal(isPythonCrash(dotted), true);
+  // Real Python 3 crashes whose last stderr line is not the exception
+  // (QA cycle 1, TASK-215-QA1-1 — each was read as a refusal).
+  const multiline = [
+    "Traceback (most recent call last):",
+    '  File "/x/a.py", line 1, in <module>',
+    '    raise ValueError("cannot start\\nsee docs")',
+    "ValueError: cannot start",
+    "see docs at https://example.invalid/policy",
+  ].join("\n");
+  const group = [
+    "  + Exception Group Traceback (most recent call last):",
+    '  |   File "/x/a.py", line 1, in <module>',
+    '  |     raise ExceptionGroup("startup failed", [ValueError("a")])',
+    "  | ExceptionGroup: startup failed (1 sub-exception)",
+    "  +-+---------------- 1 ----------------",
+    "    | ValueError: a",
+    "    +------------------------------------",
+  ].join("\n");
+  const trailing = `${tb}\ncleanup done, bye`;
+  const noted = `${tb}\nhint (set POLICY_PATH)`;
+  const importedSyntax = [
+    "Traceback (most recent call last):",
+    '  File "/x/main.py", line 2, in <module>',
+    "    import helper",
+    '  File "/x/helper.py", line 1',
+    "    def f(:",
+    "          ^",
+    "SyntaxError: invalid syntax",
+  ].join("\n");
+  for (const [name, text] of Object.entries({
+    multiline,
+    group,
+    trailing,
+    noted,
+    importedSyntax,
+  })) {
+    assert.equal(isPythonCrash(text), true, name);
+  }
+  assert.equal(
+    isPythonCrash(
+      [
+        "Traceback (most recent call last):",
+        '  File "/x/a.py", line 9, in <module>',
+        "__main__.Refused: no",
+      ].join("\n"),
+    ),
+    true,
+    "a custom exception class is a crash too",
+  );
+  assert.equal(isPythonCrash("ValueError: refused host 'a/b'"), false);
+  assert.equal(isPythonCrash("refused: 'a/b' is not a bare host"), false);
+  assert.equal(isPythonCrash(""), false);
+  // Each clause is load-bearing on its own: an exception-shaped last line
+  // after a frame-shaped log line but with no Traceback header is not a
+  // runtime crash, and a SyntaxError-shaped refusal with no frame is not a
+  // compile error.
+  assert.equal(
+    isPythonCrash('  File "/etc/policy.cfg", line 4\nPermissionError: refused'),
+    false,
+  );
+  assert.equal(isPythonCrash("SyntaxError: refused input"), false);
+  assert.equal(isPythonCrash(undefined), false);
+  // A frame alone, at column 0, is a log line, not a traceback frame.
+  assert.equal(
+    isPythonCrash(
+      'Traceback (most recent call last):\nFile "/x", line 1\nValueError: x',
+    ),
+    false,
+  );
+  // A traceback followed by a refusal message reads as a crash: the probe
+  // cannot tell a caught-and-printed failure from an uncaught one, and
+  // `errored` ("could not look") is the safe direction — never a false pass.
+  // runCliCase asks only on exit 1, so a refusal exiting 3 is not affected.
+  assert.equal(
+    isPythonCrash(`${tb}\nrecovered — refused: 'a/b' is not a bare host`),
+    true,
+  );
+});
+
+test("cli entry (python): a write to $HOME is an escape inside the sandbox, never the real home", () => {
+  const real = join(
+    process.env.HOME ?? "/nonexistent",
+    "cli-probe-side-effect-py",
+  );
+  const before = existsSync(real);
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-writes-home"),
+    cases: CASES,
+    argv: ["--host", "{input}"],
+  });
+  assert.equal(r.verdict, "engages");
+  assert.equal(r.escapes.length, CASES.length);
+  assert.match(r.escapes[0].path, /home[/\\]cli-probe-side-effect-py$/);
+  assert.equal(existsSync(real), before, "the real HOME was written");
+});
+
+test("cli entry (python): a .py entry with no --argv is bad-argv, and nothing runs", () => {
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-refuser"),
+    cases: CASES,
+  });
+  assert.equal(r.reason, "bad-argv");
+  assert.equal(r.cases.length, 0);
+  assert.equal(r.interpreter, null);
+});
+
+test("cli entry (python): with no python3 on PATH the entry is declined once, by name, and no case spawns", () => {
+  const emptyBin = mkdtempSync(join(tmpdir(), "probe-no-python-"));
+  try {
+    const child = spawnSync(
+      process.execPath,
+      [
+        join(REPO_ROOT, "shared/resources/security-probe.mjs"),
+        "--sink",
+        "url-authority",
+        "--entry",
+        PY("cli-refuser"),
+        "--argv",
+        JSON.stringify(HOST_ARGV),
+        "--json",
+      ],
+      { cwd: REPO_ROOT, encoding: "utf8", env: { PATH: emptyBin } },
+    );
+    const r = JSON.parse(child.stdout);
+    assert.equal(r.verdict, "unverifiable", child.stderr);
+    assert.equal(r.reason, "entry-not-probeable");
+    assert.equal(r.declined.length, 1);
+    assert.match(r.declined[0].detail, /python3/);
+    assert.equal(r.executed, 0);
+    assert.equal(r.cases.length, 0);
+    assert.equal(r.interpreter, null);
+  } finally {
+    rmSync(emptyBin, { recursive: true, force: true });
+  }
+});
+
+test("cli entry (python): a python3 that answers --version but cannot start a case is declined, never scored", () => {
+  // probePython runs under the engine's environment and every case under
+  // caseEnv, so an interpreter that needs the real HOME passes the probe and
+  // then exits 1 on every case before the bootstrap runs. Read off the exit
+  // status, every case scored `rejected` (QA cycle 4, TASK-215-QA4-2); with no
+  // exit record, every case is errored and the entry is declined once.
+  const shimBin = mkdtempSync(join(tmpdir(), "probe-python-shim-"));
+  try {
+    const shim = join(shimBin, "python3");
+    writeFileSync(
+      shim,
+      '#!/bin/sh\nif [ "$1" = --version ]; then echo "Python 3.99.0"; exit 0; fi\necho "Fatal Python error: init_fs_encoding" >&2\nexit 1\n',
+    );
+    chmodSync(shim, 0o755);
+    const child = spawnSync(
+      process.execPath,
+      [
+        join(REPO_ROOT, "shared/resources/security-probe.mjs"),
+        "--sink",
+        "url-authority",
+        "--entry",
+        PY("cli-refuser"),
+        "--argv",
+        JSON.stringify(HOST_ARGV),
+        "--json",
+      ],
+      {
+        cwd: REPO_ROOT,
+        encoding: "utf8",
+        env: { PATH: `${shimBin}:${process.env.PATH}` },
+      },
+    );
+    const r = JSON.parse(child.stdout);
+    assert.equal(r.interpreter?.version, "Python 3.99.0", child.stderr);
+    assert.equal(r.verdict, "unverifiable", JSON.stringify(r));
+    assert.equal(r.reason, "entry-not-probeable");
+    assert.equal(r.declined.length, 1);
+    assert.match(r.declined[0].detail, /without the bootstrap's exit record/);
+    assert.match(r.declined[0].detail, /Fatal Python error/);
+    assert.equal(r.executed, 0);
+  } finally {
+    rmSync(shimBin, { recursive: true, force: true });
+  }
+});
+
+test("cli entry (python): the record entry carries the interpreter, and null for a Node CLI", () => {
+  const py = runProbeSpec({
+    sink: "url-authority",
+    entry: PY("cli-refuser"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.deepEqual(toRecordEntry(py).interpreter, py.interpreter);
+  assert.equal(toRecordEntry(py).interpreter.name, "python3");
+  const node = runProbeSpec({
+    sink: "url-authority",
+    entry: CLI("refuser"),
+    cases: CASES,
+    argv: HOST_ARGV,
+  });
+  assert.equal(node.interpreter, null);
+  assert.equal(toRecordEntry(node).interpreter, null);
+});
+
+test("cli entry (python): every .py result path returns the JS form's key set", () => {
+  const expected = Object.keys(
+    runProbeSpec({
+      sink: "url-authority",
+      entry: entry("engaging-control"),
+      cases: CASES,
+    }),
+  ).sort();
+  const paths = {
+    success: { entry: PY("cli-refuser"), argv: HOST_ARGV },
+    "bad-argv": { entry: PY("cli-refuser") },
+    crashed: { entry: PY("cli-crasher"), argv: HOST_ARGV },
   };
   for (const [name, spec] of Object.entries(paths)) {
     const r = runProbeSpec({ sink: "url-authority", cases: CASES, ...spec });
@@ -3503,5 +4204,2521 @@ test("task.131: a lintReport mutant without the header-block check is caught by 
     assert.equal(r.verdict, "present-but-inert");
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ── The fence: entry form (task.180) ─────────────────────────────────────────
+//
+// `fence:<doc.md>#<heading>` + `--slot` runs the first ```bash block under a
+// heading as a script, per case, with the case's input substituted for the
+// slot's text. The docs are written into a temp ROOT per test and passed as
+// `repoRoot`, so containment is exercised for real and the shipped tree is
+// never edited.
+
+const FENCE_DOC = [
+  "# Fixture doc",
+  "",
+  "### Admit",
+  "",
+  "```bash",
+  'GATE="<slot>"',
+  '[ "$GATE" = "ok" ] || { echo REFUSED; exit 1; }',
+  "```",
+  "",
+  "### Refuse everything",
+  "",
+  "```bash",
+  ': "<slot>"',
+  "echo REFUSED",
+  "exit 1",
+  "```",
+  "",
+].join("\n");
+
+/** A temp root holding `files` ({relpath: text}); returns the root. */
+function fenceRoot(files) {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "probe-fence-")));
+  for (const [rel, text] of Object.entries(files)) {
+    mkdirSync(dirname(join(root, rel)), { recursive: true });
+    writeFileSync(join(root, rel), text);
+  }
+  return root;
+}
+
+const fenceCase = (id, direction, input, extra = {}) => ({
+  id,
+  sink: "filename",
+  input,
+  why: "fence fixture",
+  correct: direction === "hostile" ? "refused" : "admitted",
+  direction,
+  ...extra,
+});
+
+// A hostile fence: case states the guard's refusal (TASK-180-009) as output a
+// stopped shell cannot also produce (TASK-180-012): Admit's guard prints
+// REFUSED and exits 1.
+const ADMIT_CASES = [
+  fenceCase("f.ok", "legitimate", "ok"),
+  fenceCase("f.bad", "hostile", "bad", {
+    expected: { exit: 1, stdout: "REFUSED\n" },
+  }),
+];
+
+test("fence entry: resolveEntry returns kind fence with the heading, and refuses a malformed or escaping spec", () => {
+  const root = fenceRoot({ "doc.md": FENCE_DOC });
+  try {
+    const r = resolveEntry("fence:doc.md#Admit", root);
+    assert.equal(r.ok, true);
+    assert.equal(r.kind, "fence");
+    assert.equal(r.heading, "Admit");
+    assert.equal(r.entryPath, join(root, "doc.md"));
+    assert.equal(FENCE_PREFIX, "fence:");
+    // The FIRST # splits: a heading may carry one, a path may not.
+    assert.equal(
+      resolveEntry("fence:doc.md#C# and F#", root).heading,
+      "C# and F#",
+    );
+    assert.equal(resolveEntry("fence:doc.md", root).reason, "bad-entry");
+    assert.equal(resolveEntry("fence:doc.md#   ", root).reason, "bad-entry");
+    assert.equal(resolveEntry("fence:#H", root).reason, "bad-entry");
+    assert.equal(resolveEntry("fence:x.js#H", root).reason, "bad-entry");
+    assert.equal(
+      resolveEntry("fence:../outside.md#H", root).reason,
+      "outside-repo-root",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: extraction takes the block under THIS heading, and a missing heading or block is a named decline", () => {
+  const root = fenceRoot({ "doc.md": FENCE_DOC });
+  try {
+    // Under "Admit" the block admits ok and refuses bad → engages. Were the
+    // heading ignored, the doc's first block would still be taken here — so the
+    // second heading's block is what pins it (below).
+    const admit = runProbeSpec({
+      entry: "fence:doc.md#Admit",
+      slot: "<slot>",
+      cases: ADMIT_CASES,
+      repoRoot: root,
+    });
+    assert.equal(admit.verdict, "engages", JSON.stringify(admit.cases));
+    assert.deepEqual(admit.escapes, []);
+
+    const refuse = runProbeSpec({
+      entry: "fence:doc.md#Refuse everything",
+      slot: "<slot>",
+      cases: ADMIT_CASES,
+      repoRoot: root,
+    });
+    // Its block is `exit 1`: the ok case is over-blocked, which only the
+    // SECOND heading's block does. Extraction that ignored the heading would
+    // run the first block and admit ok.
+    assert.deepEqual(
+      refuse.overblocked,
+      probeShells().map((s) => `f.ok@${s}`),
+      "the block under the second heading ran",
+    );
+
+    const missing = runProbeSpec({
+      entry: "fence:doc.md#Nope",
+      slot: "<slot>",
+      cases: ADMIT_CASES,
+      repoRoot: root,
+    });
+    assert.equal(missing.verdict, "unverifiable");
+    assert.equal(missing.reason, "entry-not-probeable");
+    assert.match(missing.declined[0].detail, /heading not found: "Nope"/);
+    assert.equal(missing.executed, 0);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: a heading with no bash block under it, or two identical headings, is a named decline", () => {
+  const doc = [
+    "## Prose only",
+    "",
+    "Words, and an sh block — not bash:",
+    "",
+    "```sh",
+    "exit 0",
+    "```",
+    "",
+    "## Twice",
+    "",
+    "```bash",
+    "exit 0",
+    "```",
+    "",
+    "## Twice",
+    "",
+  ].join("\n");
+  const root = fenceRoot({ "doc.md": doc });
+  try {
+    const prose = extractFencedBlock(doc, "Prose only");
+    assert.equal(prose.ok, false);
+    assert.match(prose.detail, /no bash block under heading "Prose only"/);
+    const twice = extractFencedBlock(doc, "Twice");
+    assert.equal(twice.ok, false);
+    assert.match(twice.detail, /ambiguous — it appears at lines 9 and 15/);
+    const r = runProbeSpec({
+      entry: "fence:doc.md#Prose only",
+      slot: "exit",
+      cases: ADMIT_CASES,
+      repoRoot: root,
+    });
+    assert.equal(r.reason, "entry-not-probeable");
+    assert.match(r.declined[0].detail, /no bash block/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: a heading-shaped # comment inside a fence neither ends the section nor matches the heading (review I2)", () => {
+  const doc = [
+    "## Setup",
+    "",
+    "```bash",
+    "# Gate",
+    "exit 0",
+    "```",
+    "",
+    "## Gate",
+    "",
+    "```yaml",
+    "# a yaml comment, heading-shaped",
+    "key: value",
+    "```",
+    "",
+    "```bash",
+    "# Bind the value first.",
+    'GATE="<slot>"',
+    '[ "$GATE" = "ok" ] || exit 1',
+    "```",
+    "",
+  ].join("\n");
+  const got = extractFencedBlock(doc, "Gate");
+  assert.equal(got.ok, true, got.detail);
+  assert.equal(
+    got.headingLine,
+    8,
+    "the real heading, not the comment at line 4",
+  );
+  assert.equal(got.line, 15, "the bash block after the yaml block's comment");
+  assert.match(got.code, /GATE="<slot>"/);
+});
+
+test("fence entry: exit status is the verdict — non-zero with no expected is rejected, a hang is errored", () => {
+  const root = fenceRoot({
+    "doc.md": [
+      "## Three",
+      "",
+      "```bash",
+      ': "<slot>"',
+      "exit 3",
+      "```",
+      "",
+      "## Hang",
+      "",
+      "```bash",
+      ': "<slot>"',
+      "sleep 5",
+      "```",
+      "",
+    ].join("\n"),
+  });
+  try {
+    const three = runProbeSpec({
+      entry: "fence:doc.md#Three",
+      slot: "<slot>",
+      cases: [fenceCase("f.x", "legitimate", "x")],
+      repoRoot: root,
+    });
+    assert.equal(three.cases.length, probeShells().length);
+    assert.ok(
+      three.cases.every((c) => c.outcome === "rejected" && c.exit === 3),
+    );
+    const hang = runProbeSpec({
+      entry: "fence:doc.md#Hang",
+      slot: "<slot>",
+      cases: [fenceCase("f.x", "legitimate", "x")],
+      timeoutMs: 300,
+      repoRoot: root,
+    });
+    assert.equal(hang.cases.length, probeShells().length);
+    assert.ok(hang.cases.every((c) => c.outcome === "errored"));
+    assert.match(hang.cases[0].detail, /timed out/);
+    assert.equal(hang.reason, "entry-not-probeable");
+    assert.equal(hang.executed, 0);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: --slot is required with fence:, refused elsewhere, and must appear in the block", () => {
+  const root = fenceRoot({ "doc.md": FENCE_DOC });
+  try {
+    const none = runProbeSpec({
+      entry: "fence:doc.md#Admit",
+      cases: ADMIT_CASES,
+      repoRoot: root,
+    });
+    assert.equal(none.reason, "bad-slot");
+    const absent = runProbeSpec({
+      entry: "fence:doc.md#Admit",
+      slot: "<absent>",
+      cases: ADMIT_CASES,
+      repoRoot: root,
+    });
+    assert.equal(absent.reason, "bad-slot");
+    assert.match(absent.declined[0].detail, /does not appear in the block/);
+    const onShell = runProbeSpec({
+      entry: FIXED_SCRIPT,
+      slot: "<slot>",
+      sink: "filename",
+    });
+    assert.equal(onShell.reason, "bad-slot");
+    assert.match(onShell.declined[0].detail, /fence: entry form only/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: the slot replacement is a function — $& in the input is text", () => {
+  const root = fenceRoot({
+    "doc.md": ["## Echo", "", "```bash", "printf %s '<slot>'", "```", ""].join(
+      "\n",
+    ),
+  });
+  try {
+    const r = runProbeSpec({
+      entry: "fence:doc.md#Echo",
+      slot: "<slot>",
+      cases: [
+        fenceCase("f.amp", "legitimate", "a$&b", {
+          expected: { stdout: "a$&b", exit: 0 },
+        }),
+      ],
+      repoRoot: root,
+    });
+    assert.equal(r.cases.length, probeShells().length);
+    assert.ok(
+      r.cases.every((c) => c.outcome === "accepted"),
+      JSON.stringify(r.cases),
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: the slot is script source — a $(…) input runs, in the case directory, never outside it (review C1)", () => {
+  const root = fenceRoot({
+    "doc.md": [
+      "## Assign",
+      "",
+      "```bash",
+      'X="<slot>"',
+      "exit 0",
+      "```",
+      "",
+      "## Home",
+      "",
+      "```bash",
+      ': "<slot>"',
+      ': > "$HOME/leak"',
+      "```",
+      "",
+    ].join("\n"),
+  });
+  try {
+    // `absent` looks in the case directory: the substitution ran there, so the
+    // hostile case mismatches (accepted) — and no escape is recorded.
+    const sub = runProbeSpec({
+      entry: "fence:doc.md#Assign",
+      slot: "<slot>",
+      cases: [
+        fenceCase("f.sub", "hostile", "$(touch PWNED)", {
+          expected: { exit: 0, stdout: "REFUSED\n", absent: ["PWNED"] },
+        }),
+      ],
+      repoRoot: root,
+    });
+    assert.equal(sub.cases.length, probeShells().length);
+    assert.ok(
+      sub.cases.every(
+        (c) => c.outcome === "accepted" && /PWNED/.test(c.detail),
+      ),
+      JSON.stringify(sub.cases),
+    );
+    assert.deepEqual(sub.escapes, []);
+    assert.equal(existsSync(join(root, "PWNED")), false);
+    // HOME is the sandbox's, outside the work dir: a write there IS an escape.
+    const home = runProbeSpec({
+      entry: "fence:doc.md#Home",
+      slot: "<slot>",
+      cases: [fenceCase("f.home", "legitimate", "x")],
+      repoRoot: root,
+    });
+    assert.ok(
+      home.escapes.some((e) => e.path === "home/leak"),
+      JSON.stringify(home.escapes),
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: fixture env and files reach the block; a path that leaves the case directory is declined", () => {
+  const root = fenceRoot({
+    "doc.md": [
+      "## Env",
+      "",
+      "```bash",
+      ': "<slot>"',
+      '[ "$X" = 1 ]',
+      "```",
+      "",
+      "## Files",
+      "",
+      "```bash",
+      ': "<slot>"',
+      '[ "$(cat pkg/a.txt)" = hi ]',
+      "```",
+      "",
+    ].join("\n"),
+  });
+  try {
+    const env = runProbeSpec({
+      entry: "fence:doc.md#Env",
+      slot: "<slot>",
+      cases: [
+        fenceCase("f.env", "legitimate", "x", { fixture: { env: { X: "1" } } }),
+      ],
+      repoRoot: root,
+    });
+    assert.equal(env.cases.length, probeShells().length);
+    assert.ok(
+      env.cases.every((c) => c.outcome === "accepted"),
+      JSON.stringify(env.cases),
+    );
+    const files = runProbeSpec({
+      entry: "fence:doc.md#Files",
+      slot: "<slot>",
+      cases: [
+        fenceCase("f.files", "legitimate", "x", {
+          fixture: { files: { "pkg/a.txt": "hi" } },
+        }),
+      ],
+      repoRoot: root,
+    });
+    assert.equal(files.cases.length, probeShells().length);
+    assert.ok(
+      files.cases.every((c) => c.outcome === "accepted"),
+      JSON.stringify(files.cases),
+    );
+    const escape = runProbeSpec({
+      entry: "fence:doc.md#Files",
+      slot: "<slot>",
+      cases: [
+        fenceCase("f.esc", "legitimate", "x", {
+          fixture: { files: { "../escape": "x" } },
+        }),
+      ],
+      repoRoot: root,
+    });
+    assert.equal(escape.cases.length, probeShells().length);
+    assert.ok(escape.cases.every((c) => c.outcome === "errored"));
+    assert.match(escape.cases[0].detail, /leaves the case directory/);
+    assert.equal(escape.executed, 0);
+    // The sandbox owns HOME, TMPDIR and LC_ALL: a fixture may not set them.
+    assert.match(fixtureProblem({ env: { HOME: "/" } }), /sandbox owns it/);
+    assert.match(fixtureProblem({ files: { a: 1 } }), /must be a string/);
+    assert.match(fixtureProblem({ argv: [] }), /unknown keys: argv/);
+    assert.equal(fixtureProblem(undefined), null);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: the block is read on every run — editing it between two runs changes the verdict", () => {
+  const root = fenceRoot({ "doc.md": FENCE_DOC });
+  try {
+    const spec = {
+      entry: "fence:doc.md#Admit",
+      slot: "<slot>",
+      cases: ADMIT_CASES,
+      repoRoot: root,
+    };
+    assert.equal(runProbeSpec(spec).verdict, "engages");
+    writeFileSync(
+      join(root, "doc.md"),
+      FENCE_DOC.replace(
+        '[ "$GATE" = "ok" ] || { echo REFUSED; exit 1; }',
+        "exit 0",
+      ),
+    );
+    const after = runProbeSpec(spec);
+    assert.notEqual(after.verdict, "engages");
+    assert.deepEqual(
+      after.reproduced,
+      probeShells().map((s) => `f.bad@${s}`),
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: --slot missing with fence:, or given with another form, exits 2 with bad-slot", () => {
+  const cases = {
+    missing: ["--entry", "fence:doc.md#Admit"],
+    misplaced: ["--entry", FIXED_SCRIPT, "--slot", "<slot>"],
+  };
+  for (const [name, args] of Object.entries(cases)) {
+    const { rc, err } = runMain(["--sink", "filename", ...args]);
+    assert.equal(rc, 2, name);
+    assert.match(err, /^bad-slot: /, name);
+  }
+  const { rc, err } = runMain([
+    "--sink",
+    "filename",
+    "--entry",
+    "fence:doc.md#Admit",
+    "--slot",
+    "<slot>",
+    "--args-json",
+    "[]",
+  ]);
+  assert.equal(rc, 2);
+  assert.match(err, /^bad-args: /);
+});
+
+test("fence entry: every fence result path returns the JS form's key set", () => {
+  const root = fenceRoot({ "doc.md": FENCE_DOC });
+  try {
+    const expected = Object.keys(
+      runProbeSpec({ entry: entry("engaging-control"), cases: CASES }),
+    ).sort();
+    const paths = {
+      success: {
+        entry: "fence:doc.md#Admit",
+        slot: "<slot>",
+        cases: ADMIT_CASES,
+      },
+      "no slot": { entry: "fence:doc.md#Admit", cases: ADMIT_CASES },
+      "missing heading": {
+        entry: "fence:doc.md#Nope",
+        slot: "<slot>",
+        cases: ADMIT_CASES,
+      },
+      "all errored": {
+        entry: "fence:doc.md#Admit",
+        slot: "<slot>",
+        cases: [fenceCase("f.e", "legitimate", 7)],
+      },
+    };
+    for (const [name, spec] of Object.entries(paths)) {
+      const r = runProbeSpec({ ...spec, repoRoot: root });
+      assert.deepEqual(Object.keys(r).sort(), expected, `${name} key set`);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// task.167's 13 cases, reconstructed from its DoD (lines 123–128) — the original
+// cases file lived under the gitignored .claude/state/ and is not in the repo.
+// Run against the SHIPPED block: the probe its finalise ran through a
+// hand-written wrapper, now through the engine.
+const T167_CASES = JSON.parse(
+  readFileSync(
+    join(
+      REPO_ROOT,
+      "shared/resources/tests/fixtures/fence-probe/t167-cases.json",
+    ),
+    "utf8",
+  ),
+);
+const T167_HEADING =
+  "Precondition — the gate must resolve before the first iteration";
+const T167_DOC = "shared/resources/develop-pipeline-step-3-develop-loop.md";
+
+test("fence entry: task.167's 13 cases against the shipped fast-gate precondition — engages, 0 reproduced, no escape", () => {
+  assert.equal(T167_CASES.length, 13);
+  const r = runProbeSpec({
+    entry: `fence:${T167_DOC}#${T167_HEADING}`,
+    slot: "<fastGateCommand>",
+    sink: "filename",
+    cases: T167_CASES,
+  });
+  assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+  assert.equal(r.executed, 13 * probeShells().length);
+  assert.deepEqual(r.reproduced, []);
+  assert.deepEqual(r.overblocked, []);
+  assert.deepEqual(r.escapes, []);
+});
+
+test("fence entry: without --loglevel=notice the same cases over-block the 4 silent-environment legitimate cases", () => {
+  const text = readFileSync(join(REPO_ROOT, T167_DOC), "utf8");
+  const parts = text.split("npm run --loglevel=notice 2>/dev/null");
+  assert.equal(
+    parts.length,
+    2,
+    "the shipped block carries the flag exactly once",
+  );
+  const root = fenceRoot({ "doc.md": parts.join("npm run 2>/dev/null") });
+  try {
+    const r = runProbeSpec({
+      entry: `fence:doc.md#${T167_HEADING}`,
+      slot: "<fastGateCommand>",
+      sink: "filename",
+      cases: T167_CASES,
+      repoRoot: root,
+    });
+    const silent = [
+      "defined-env-silent",
+      "defined-npmrc-silent",
+      "defined-env-and-npmrc-silent",
+      "defined-compound-silent",
+    ];
+    assert.deepEqual(
+      [...r.overblocked].sort(),
+      silent.flatMap((id) => probeShells().map((s) => `${id}@${s}`)).sort(),
+    );
+    assert.deepEqual(r.reproduced, []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: a substitution that breaks the block's syntax is errored by the parse check, never a refusal — an accept-all block cannot score engages (TASK-180-001)", () => {
+  const root = fenceRoot({
+    "doc.md": [
+      "## Accept all",
+      "",
+      "```bash",
+      'X="<slot>"',
+      "exit 0",
+      "```",
+      "",
+      "## Refuses loudly",
+      "",
+      "```bash",
+      'X="<slot>"',
+      '[ "$X" = ok ] || { echo "syntax error: refused" >&2; exit 2; }',
+      "```",
+      "",
+    ].join("\n"),
+  });
+  const refusal = { exit: 2, stderr: "syntax error: refused\n" };
+  try {
+    const r = runProbeSpec({
+      entry: "fence:doc.md#Accept all",
+      slot: "<slot>",
+      cases: [
+        fenceCase("f.quote", "hostile", 'a"b', { expected: refusal }),
+        fenceCase("f.ok", "legitimate", "ok"),
+      ],
+      repoRoot: root,
+    });
+    const quote = r.cases.filter((c) => c.id === "f.quote");
+    assert.equal(quote.length, probeShells().length);
+    assert.ok(
+      quote.every(
+        (c) => c.outcome === "errored" && /does not parse/.test(c.detail),
+      ),
+      JSON.stringify(quote),
+    );
+    assert.notEqual(r.verdict, "engages", JSON.stringify(r.cases));
+    // Control: a guard that REFUSES with exit 2 and the words "syntax error" on
+    // stderr parses, so it is scored against its stated refusal — and a
+    // legitimate case it over-blocks is rejected with stderr quoted (CR-4).
+    const loud = runProbeSpec({
+      entry: "fence:doc.md#Refuses loudly",
+      slot: "<slot>",
+      cases: [
+        fenceCase("f.bad", "hostile", "bad", { expected: refusal }),
+        fenceCase("f.ok", "legitimate", "ok"),
+        fenceCase("f.near", "legitimate", "ok2"),
+      ],
+      repoRoot: root,
+    });
+    assert.equal(loud.cases.length, 3 * probeShells().length);
+    assert.ok(
+      loud.cases
+        .filter((c) => c.id === "f.bad")
+        .every((c) => c.outcome === "rejected"),
+      JSON.stringify(loud.cases),
+    );
+    assert.ok(
+      loud.cases
+        .filter((c) => c.id === "f.near")
+        .every((c) => c.outcome === "rejected" && /refused/.test(c.detail)),
+      "the rejection detail quotes stderr (CR-4)",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: a hostile case with no `expected` is declined, never scored by exit status (TASK-180-009)", () => {
+  const root = fenceRoot({ "doc.md": FENCE_DOC });
+  try {
+    const r = runProbeSpec({
+      entry: "fence:doc.md#Admit",
+      slot: "<slot>",
+      cases: [
+        fenceCase("f.ok", "legitimate", "ok"),
+        fenceCase("f.bare", "hostile", "bad"),
+      ],
+      repoRoot: root,
+    });
+    const bare = r.cases.filter((c) => c.id === "f.bare");
+    assert.equal(bare.length, probeShells().length);
+    assert.ok(
+      bare.every(
+        (c) =>
+          c.outcome === "errored" &&
+          /hostile fence: case has no `expected`/.test(c.detail),
+      ),
+      JSON.stringify(bare),
+    );
+    assert.notEqual(r.verdict, "engages");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: a hostile `expected` with no non-empty stdout or stderr is declined — an accept-all block never reads engages (TASK-180-012)", () => {
+  const root = fenceRoot({
+    "doc.md": [
+      "## Accept all",
+      "",
+      "```bash",
+      'X="<slot>"',
+      "exit 0",
+      "```",
+      "",
+    ].join("\n"),
+  });
+  try {
+    // The two inputs the finding names, each under the two exit-only shapes —
+    // and a whitespace-only output, which a bare `echo` also produces.
+    for (const expected of [
+      { exit: 1 },
+      { exit: 1, stdout: "" },
+      { exit: 1, stdout: "", stderr: "" },
+      { exit: 1, stderr: " \n" },
+      { exit: 1, absent: ["pwned"] },
+    ]) {
+      const r = runProbeSpec({
+        entry: "fence:doc.md#Accept all",
+        slot: "<slot>",
+        cases: [
+          fenceCase("f.expansion", "hostile", "${x:?boom}", { expected }),
+          fenceCase("f.inject", "hostile", '"; exit 1; "', { expected }),
+          fenceCase("f.ok", "legitimate", "ok"),
+        ],
+        repoRoot: root,
+      });
+      const hostile = r.cases.filter((c) => c.direction === "hostile");
+      assert.equal(hostile.length, 2 * probeShells().length);
+      assert.ok(
+        hostile.every(
+          (c) =>
+            c.outcome === "errored" &&
+            /states no refusal output/.test(c.detail),
+        ),
+        JSON.stringify({ expected, cases: r.cases }),
+      );
+      assert.notEqual(r.verdict, "engages", JSON.stringify(expected));
+    }
+    // The other direction: a non-empty refusal output is admitted and scored —
+    // the same accept-all block reproduces on both inputs.
+    const scored = runProbeSpec({
+      entry: "fence:doc.md#Accept all",
+      slot: "<slot>",
+      cases: [
+        fenceCase("f.expansion", "hostile", "${x:?boom}", {
+          expected: { exit: 1, stderr: "refused\n" },
+        }),
+        fenceCase("f.inject", "hostile", '"; exit 1; "', {
+          expected: { exit: 1, stdout: "refused\n" },
+        }),
+        fenceCase("f.ok", "legitimate", "ok"),
+      ],
+      repoRoot: root,
+    });
+    assert.equal(scored.verdict, "absent", JSON.stringify(scored.cases));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: a runtime error AFTER the guard let the input through is the guard's failure, not errored — the word-split cd case reproduces (TASK-180-009)", () => {
+  const root = fenceRoot({
+    "doc.md": [
+      "## Relative only",
+      "",
+      "```bash",
+      "P='<slot>'",
+      'case "$P" in /*) echo REFUSED; exit 1 ;; esac',
+      "cd $P",
+      "```",
+      "",
+    ].join("\n"),
+  });
+  const refusal = { exit: 1, stdout: "REFUSED\n" };
+  try {
+    const r = runProbeSpec({
+      entry: "fence:doc.md#Relative only",
+      slot: "<slot>",
+      cases: [
+        fenceCase("f.abs", "hostile", "/etc", { expected: refusal }),
+        fenceCase("f.split", "hostile", "x y", { expected: refusal }),
+        fenceCase("f.nodir", "hostile", "nosuchdir", { expected: refusal }),
+        fenceCase("f.ok", "legitimate", "d", {
+          fixture: { files: { "d/k": "" } },
+        }),
+      ],
+      repoRoot: root,
+    });
+    assert.deepEqual(
+      [...r.reproduced].sort(),
+      ["f.nodir", "f.split"]
+        .flatMap((id) => probeShells().map((s) => `${id}@${s}`))
+        .sort(),
+      JSON.stringify(r.cases),
+    );
+    assert.equal(r.verdict, "present-but-inert");
+    assert.ok(r.cases.every((c) => c.outcome !== "errored"));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: a control is keyed on its --name, else its slot — two slots stay two, a re-run stays one (TASK-180-002)", () => {
+  const root = fenceRoot({
+    "doc.md": [
+      "## Two",
+      "",
+      "```bash",
+      'A="<a>"; B="<b>"',
+      '[ "$A" = ok ] && [ "$B" = ok ]',
+      "```",
+      "",
+    ].join("\n"),
+  });
+  const dir = mkdtempSync(join(tmpdir(), "probe-fence-record-"));
+  try {
+    const record = join(dir, "run.json");
+    const run = (slot, name) =>
+      recordRun(
+        record,
+        runProbeSpec({
+          entry: "fence:doc.md#Two",
+          slot,
+          sink: "filename",
+          cases: [fenceCase("f.ok", "legitimate", "ok")],
+          repoRoot: root,
+        }),
+        { name },
+      );
+    run("<a>");
+    run("<b>");
+    let controls = readRecord(record).controls;
+    assert.equal(controls.length, 2, "two slots on one block are two controls");
+    assert.deepEqual(controls.map((c) => c.slot).sort(), ["<a>", "<b>"]);
+    run("<a>");
+    assert.equal(
+      readRecord(record).controls.length,
+      2,
+      "a re-run of one slot replaces only its own entry",
+    );
+    run("<a>", "named");
+    run("<b>", "named");
+    controls = readRecord(record).controls;
+    assert.equal(
+      controls.filter((c) => c.name === "named").length,
+      1,
+      "a --name is the identity: the same name on another slot is one control",
+    );
+    assert.equal(controls.length, 3);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: an empty --slot exits 2 with bad-slot and writes no record (TASK-180-003)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "probe-fence-slot-"));
+  try {
+    const record = join(dir, "run.json");
+    const { rc, err } = runMain([
+      "--sink",
+      "filename",
+      "--entry",
+      "fence:doc.md#Admit",
+      "--slot",
+      "",
+      "--record",
+      record,
+    ]);
+    assert.equal(rc, 2);
+    assert.match(err, /^bad-slot: /);
+    assert.equal(existsSync(recordEntriesDir(record)), false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: an expected.absent name the case's own fixture writes is declined, never scored (TASK-180-004)", () => {
+  const root = fenceRoot({
+    "doc.md": ["## G", "", "```bash", ': "<slot>"', "exit 0", "```", ""].join(
+      "\n",
+    ),
+  });
+  try {
+    for (const [files, absent] of [
+      [{ pwned: "" }, ["pwned"]],
+      [{ "dir/x": "" }, ["dir"]],
+      // Normalised and case-folded (TASK-180-010): each writes `pwned`.
+      [{ "./pwned": "" }, ["pwned"]],
+      [{ "b/../pwned": "" }, ["pwned"]],
+      [{ PWNED: "" }, ["pwned"]],
+    ]) {
+      const r = runProbeSpec({
+        entry: "fence:doc.md#G",
+        slot: "<slot>",
+        cases: [
+          fenceCase("f.collide", "hostile", "x", {
+            fixture: { files },
+            expected: { exit: 0, stdout: "REFUSED\n", absent },
+          }),
+        ],
+        repoRoot: root,
+      });
+      assert.equal(r.cases.length, probeShells().length);
+      assert.ok(
+        r.cases.every(
+          (c) => c.outcome === "errored" && /fixture writes/.test(c.detail),
+        ),
+        JSON.stringify(r.cases),
+      );
+      assert.notEqual(r.verdict, "absent");
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: a fatal expansion or an injected exit against an accept-all block mismatches the stated refusal — reproduced, never errored or rejected (TASK-180-005)", () => {
+  const root = fenceRoot({
+    "doc.md": [
+      "## Accept all",
+      "",
+      "```bash",
+      'X="<slot>"',
+      "exit 0",
+      "```",
+      "",
+    ].join("\n"),
+  });
+  const refusal = { exit: 1, stdout: "REFUSED\n" };
+  try {
+    const r = runProbeSpec({
+      entry: "fence:doc.md#Accept all",
+      slot: "<slot>",
+      cases: [
+        fenceCase("f.expansion", "hostile", "${x:?boom}", {
+          expected: refusal,
+        }),
+        fenceCase("f.unset", "hostile", "${x?}", { expected: refusal }),
+        fenceCase("f.inject", "hostile", '"; exit 1; "', { expected: refusal }),
+        fenceCase("f.ok", "legitimate", "ok"),
+      ],
+      repoRoot: root,
+    });
+    assert.deepEqual(
+      [...r.reproduced].sort(),
+      ["f.expansion", "f.inject", "f.unset"]
+        .flatMap((id) => probeShells().map((s) => `${id}@${s}`))
+        .sort(),
+      JSON.stringify(r.cases),
+    );
+    assert.equal(r.verdict, "absent");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: a write beside the case directory, under the work dir, is an escape (TASK-180-011)", () => {
+  const root = fenceRoot({
+    "doc.md": [
+      "## Beside",
+      "",
+      "```bash",
+      ': "<slot>"',
+      ": > ../pwned",
+      ": > ../.probe-harness/planted",
+      "```",
+      "",
+    ].join("\n"),
+  });
+  try {
+    const r = runProbeSpec({
+      entry: "fence:doc.md#Beside",
+      slot: "<slot>",
+      cases: [fenceCase("f.x", "legitimate", "x")],
+      repoRoot: root,
+    });
+    for (const s of probeShells()) {
+      for (const path of ["work/pwned", "work/.probe-harness/planted"]) {
+        assert.ok(
+          r.escapes.some((e) => e.id === `f.x@${s}` && e.path === path),
+          JSON.stringify(r.escapes),
+        );
+      }
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: a deletion or an empty directory under the work dir is an escape — the gh trip-wire stub cannot be removed unseen (TASK-180-013)", () => {
+  const root = fenceRoot({
+    "doc.md": ["## Echo", "", "```bash", ': "<slot>"', "```", ""].join("\n"),
+  });
+  try {
+    const r = runProbeSpec({
+      entry: "fence:doc.md#Echo",
+      slot: "<slot>",
+      cases: [
+        fenceCase(
+          "f.x",
+          "legitimate",
+          "$(rm -f ../.probe-harness/bin/gh; mkdir ../pwned-dir)",
+        ),
+      ],
+      repoRoot: root,
+    });
+    // The first shell deletes the stub; a later shell finds it already gone,
+    // so the deletion is that first shell's escape. The directory is each
+    // shell's own (mkdir fails on the second, which changes nothing).
+    const first = `f.x@${probeShells()[0]}`;
+    for (const path of ["work/.probe-harness/bin/gh", "work/pwned-dir/"]) {
+      assert.ok(
+        r.escapes.some((e) => e.id === first && e.path === path),
+        JSON.stringify(r.escapes),
+      );
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: a block or an input that names gh is declined needs-fake-gh before anything runs — a path-resolved gh never reaches the host (TASK-180-015)", () => {
+  const root = fenceRoot({
+    "doc.md": [
+      "## Path gh",
+      "",
+      "```bash",
+      'X="<slot>"',
+      'real=$(type -ap gh | tail -1); "$real" --version > ran-gh',
+      '[ "$X" = ok ] || { echo REFUSED; exit 1; }',
+      "```",
+      "",
+      "## Plain",
+      "",
+      "```bash",
+      'X="<slot>"',
+      '[ "$X" = ok ] || { echo REFUSED; exit 1; }',
+      "```",
+      "",
+    ].join("\n"),
+  });
+  const cases = [
+    fenceCase("f.ok", "legitimate", "ok"),
+    fenceCase("f.bad", "hostile", "bad", {
+      expected: { exit: 1, stdout: "REFUSED\n" },
+    }),
+  ];
+  try {
+    const block = runProbeSpec({
+      entry: "fence:doc.md#Path gh",
+      slot: "<slot>",
+      cases,
+      repoRoot: root,
+    });
+    assert.equal(block.reason, "needs-fake-gh", JSON.stringify(block));
+    assert.equal(block.verdict, "unverifiable");
+    // Declined BEFORE any spawn — the run-time trip-wire also declines
+    // needs-fake-gh, but only after cases ran, and it never sees a path-resolved gh.
+    assert.deepEqual(block.cases ?? [], [], JSON.stringify(block.cases));
+    assert.match(block.declined[0].detail, /--fake-gh/);
+    // The slot is source: an input that names gh is the same exposure.
+    const input = runProbeSpec({
+      entry: "fence:doc.md#Plain",
+      slot: "<slot>",
+      cases: [
+        ...cases,
+        fenceCase("f.gh", "hostile", "$(gh --version)", {
+          expected: { exit: 1, stdout: "REFUSED\n" },
+        }),
+      ],
+      repoRoot: root,
+    });
+    assert.equal(input.reason, "needs-fake-gh", JSON.stringify(input));
+    assert.deepEqual(input.cases ?? [], [], JSON.stringify(input.cases));
+    // The other direction: a block and inputs that only CONTAIN the letters
+    // (a path ending in /gh, `ghost`) are probed and scored as usual.
+    const plain = runProbeSpec({
+      entry: "fence:doc.md#Plain",
+      slot: "<slot>",
+      cases: [
+        ...cases,
+        fenceCase("f.ghost", "hostile", "ghost/bin/gh", {
+          expected: { exit: 1, stdout: "REFUSED\n" },
+        }),
+      ],
+      repoRoot: root,
+    });
+    assert.equal(plain.verdict, "engages", JSON.stringify(plain.cases));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: a write to an absolute path outside the sandbox is NOT observed — the stated limit, pinned (TASK-180-016)", () => {
+  const root = fenceRoot({
+    "doc.md": [
+      "## Case guard",
+      "",
+      "```bash",
+      "X='<slot>'",
+      'case "$X" in ok) ;; *) echo REFUSED; exit 1 ;; esac',
+      "```",
+      "",
+    ].join("\n"),
+  });
+  const outside = realpathSync(mkdtempSync(join(tmpdir(), "probe-outside-")));
+  try {
+    const r = runProbeSpec({
+      entry: "fence:doc.md#Case guard",
+      slot: "<slot>",
+      cases: [
+        fenceCase("f.ok", "legitimate", "ok"),
+        fenceCase("f.out", "hostile", `'$(touch ${outside}/pwned)'`, {
+          expected: { exit: 1, stdout: "REFUSED\n" },
+        }),
+      ],
+      repoRoot: root,
+    });
+    // The injection ran, and the engine did not see it: probe-boundary-rule.md
+    // §5 and the engine header state this limit. If this row starts failing,
+    // the limit was closed — update both statements with it.
+    assert.ok(existsSync(join(outside, "pwned")));
+    assert.deepEqual(r.escapes, []);
+    assert.equal(r.verdict, "engages");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("ghFreePath: a PATH directory holding gh is replaced by a copy without it; others, and relative entries, are kept (TASK-180-017)", () => {
+  const base = realpathSync(mkdtempSync(join(tmpdir(), "ghfree-")));
+  try {
+    const withGh = join(base, "with");
+    const without = join(base, "without");
+    mkdirSync(withGh);
+    mkdirSync(without);
+    for (const [dir, name] of [
+      [withGh, "gh"],
+      [withGh, "tool"],
+      [without, "other"],
+    ]) {
+      writeFileSync(join(dir, name), "#!/bin/sh\n");
+      chmodSync(join(dir, name), 0o755);
+    }
+    const farmRoot = join(base, "farm");
+    const out = ghFreePath(`${withGh}:rel:${without}`, farmRoot).split(":");
+    assert.equal(out.length, 3);
+    assert.ok(out[0].startsWith(farmRoot), out[0]);
+    assert.deepEqual(readdirSync(out[0]), ["tool"]);
+    assert.equal(out[1], "rel");
+    assert.equal(out[2], without);
+    // Built once: a second call reuses the same copy.
+    assert.equal(ghFreePath(withGh, farmRoot), out[0]);
+    // With a cwd, a relative entry is resolved there and shadowed like an
+    // absolute one: a fixture PATH of `../with` must not keep gh in reach (CR-2).
+    const cwd = join(base, "case");
+    mkdirSync(cwd);
+    const rel = ghFreePath("../with:../without", farmRoot, cwd).split(":");
+    assert.equal(rel[0], out[0]);
+    assert.equal(rel[1], "../without");
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: no PATH lookup reaches a host gh, whatever runs it — a BASH_ENV fixture script included (TASK-180-017)", () => {
+  const root = fenceRoot({
+    "doc.md": [
+      "## Plain",
+      "",
+      "```bash",
+      "X='<slot>'",
+      'case "$X" in ok) ;; *) echo REFUSED; exit 1 ;; esac',
+      "```",
+      "",
+    ].join("\n"),
+  });
+  // A stand-in for the host's gh, first on the PATH the engine inherits. It
+  // writes a marker OUTSIDE the sandbox when it runs.
+  const host = realpathSync(mkdtempSync(join(tmpdir(), "probe-host-gh-")));
+  const marker = join(host, "host-gh-ran");
+  writeFileSync(join(host, "gh"), `#!/bin/sh\n: > "${marker}"\n`);
+  chmodSync(join(host, "gh"), 0o755);
+  const savedPath = process.env.PATH;
+  process.env.PATH = `${host}:${savedPath}`;
+  try {
+    const fixture = {
+      env: { BASH_ENV: "./init.sh" },
+      files: {
+        // The name is assembled at run time, so the pre-spawn text check cannot
+        // see it and the run reaches ghFreePath (TASK-180-020).
+        "init.sh":
+          'n=g; for g in $(type -ap "${n}h"); do "$g" --version >/dev/null 2>&1; done\n',
+      },
+    };
+    const r = runProbeSpec({
+      entry: "fence:doc.md#Plain",
+      slot: "<slot>",
+      cases: [
+        fenceCase("f.ok", "legitimate", "ok", { fixture }),
+        fenceCase("f.bad", "hostile", "bad", {
+          fixture,
+          expected: { exit: 1, stdout: "REFUSED\n" },
+        }),
+      ],
+      repoRoot: root,
+    });
+    // Cases ran: a pre-spawn decline cannot satisfy this test.
+    assert.ok((r.cases ?? []).length > 0, JSON.stringify(r));
+    assert.equal(existsSync(marker), false, "the host gh ran");
+    // The trip-wire answered at run time, so the run is declined, not scored.
+    assert.equal(r.reason, "needs-fake-gh", JSON.stringify(r));
+  } finally {
+    process.env.PATH = savedPath;
+    rmSync(root, { recursive: true, force: true });
+    rmSync(host, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: a fixture that names gh — a default-path lookup included — is declined before anything runs (TASK-180-019)", () => {
+  const root = fenceRoot({
+    "doc.md": [
+      "## Plain",
+      "",
+      "```bash",
+      "X='<slot>'",
+      'case "$X" in ok) ;; *) echo REFUSED; exit 1 ;; esac',
+      "```",
+      "",
+    ].join("\n"),
+  });
+  try {
+    for (const fixture of [
+      {
+        env: { BASH_ENV: "./init.sh" },
+        files: { "init.sh": "env -u PATH gh --version\n" },
+      },
+      {
+        env: { BASH_ENV: "./init.sh" },
+        files: { "init.sh": "command -p gh --version\n" },
+      },
+      { env: { PROMPT_COMMAND: "gh api user" } },
+    ]) {
+      const r = runProbeSpec({
+        entry: "fence:doc.md#Plain",
+        slot: "<slot>",
+        cases: [
+          fenceCase("f.ok", "legitimate", "ok", { fixture }),
+          fenceCase("f.bad", "hostile", "bad", {
+            expected: { exit: 1, stdout: "REFUSED\n" },
+          }),
+        ],
+        repoRoot: root,
+      });
+      assert.equal(r.reason, "needs-fake-gh", JSON.stringify(fixture));
+      assert.deepEqual(r.cases ?? [], [], JSON.stringify(r.cases));
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("emit-block: two unnamed fence: controls on one block render as two, and a heading with # keeps its name (TASK-180-021)", () => {
+  const root = fenceRoot({
+    "doc.md": [
+      "## C# and F#",
+      "",
+      "```bash",
+      'A="<a>"; B="<b>"',
+      '[ "$A" = ok ] && [ "$B" = ok ] || { echo REFUSED; exit 1; }',
+      "```",
+      "",
+    ].join("\n"),
+  });
+  const record = join(root, "run.json");
+  const cases = [
+    fenceCase("f.ok", "legitimate", "ok"),
+    fenceCase("f.bad", "hostile", "bad", {
+      expected: { exit: 1, stdout: "REFUSED\n" },
+    }),
+  ];
+  try {
+    for (const slot of ["<a>", "<b>"]) {
+      const r = runProbeSpec({
+        entry: "fence:doc.md#C# and F#",
+        slot,
+        cases,
+        repoRoot: root,
+      });
+      recordRun(record, r);
+    }
+    assert.equal(readRecord(record).controls.length, 2);
+    const { out } = runMain(["--emit-block", record]);
+    const names = [...out.matchAll(/- name: (.*)/g)].map((m) => m[1]);
+    assert.equal(names.length, 2, out);
+    assert.notEqual(names[0], names[1], out);
+    assert.ok(
+      names.every((n) => n.includes("C# and F#")),
+      out,
+    );
+    assert.match(out, /slot: "?<a>"?/);
+    assert.match(out, /slot: "?<b>"?/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: a side effect followed by a kill is a reproduction, not errored (TASK-180-018)", () => {
+  const root = fenceRoot({
+    "doc.md": [
+      "## Case guard",
+      "",
+      "```bash",
+      "X='<slot>'",
+      'case "$X" in ok) ;; *) echo REFUSED; exit 1 ;; esac',
+      "```",
+      "",
+    ].join("\n"),
+  });
+  const refusal = { exit: 1, stdout: "REFUSED\n" };
+  try {
+    const r = runProbeSpec({
+      entry: "fence:doc.md#Case guard",
+      slot: "<slot>",
+      cases: [
+        fenceCase("f.ok", "legitimate", "ok"),
+        fenceCase("f.bad", "hostile", "bad", { expected: refusal }),
+        fenceCase("f.kill", "hostile", "'$(touch pwned; kill -9 $$)'", {
+          expected: { ...refusal, absent: ["pwned"] },
+        }),
+      ],
+      repoRoot: root,
+    });
+    assert.deepEqual(
+      r.reproduced,
+      probeShells().map((sh) => `f.kill@${sh}`),
+      JSON.stringify(r.cases),
+    );
+    assert.notEqual(r.verdict, "engages");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: a side effect expected.absent names is a reproduction even when the shell then stops (TASK-180-006)", () => {
+  const root = fenceRoot({
+    "doc.md": [
+      "## Two contexts",
+      "",
+      "```bash",
+      'echo "checking <slot>"',
+      "x='<slot>'",
+      "```",
+      "",
+    ].join("\n"),
+  });
+  try {
+    const r = runProbeSpec({
+      entry: "fence:doc.md#Two contexts",
+      slot: "<slot>",
+      cases: [
+        fenceCase("f.side", "hostile", "$(touch pwned)'", {
+          expected: { exit: 0, stdout: "REFUSED\n", absent: ["pwned"] },
+        }),
+      ],
+      repoRoot: root,
+    });
+    assert.deepEqual(
+      r.reproduced,
+      probeShells().map((s) => `f.side@${s}`),
+      JSON.stringify(r.cases),
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: a declined fence: run keeps its slot, so its record key matches the corrected re-run (TASK-180-007)", () => {
+  const root = fenceRoot({ "doc.md": FENCE_DOC });
+  try {
+    const r = runProbeSpec({
+      entry: "fence:../elsewhere.md#Admit",
+      slot: "<slot>",
+      cases: ADMIT_CASES,
+      repoRoot: root,
+    });
+    assert.equal(r.reason, "outside-repo-root");
+    assert.equal(r.slot, "<slot>");
+    assert.equal(toRecordEntry(r).slot, "<slot>");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fence entry: a CRLF doc resolves its heading and yields an LF block (TASK-180-008)", () => {
+  const doc = FENCE_DOC.split("\n").join("\r\n");
+  const got = extractFencedBlock(doc, "Admit");
+  assert.equal(got.ok, true, got.detail);
+  assert.equal(got.code.includes("\r"), false);
+  assert.match(got.code, /GATE="<slot>"/);
+});
+
+// ── The shell-argv: entry form (task.181) ─────────────────────────────────────
+//
+// `shell-argv:<path>` + `--argv` runs a bash script that takes several
+// arguments or flags, the case's input crossing as ONE element of the template,
+// exactly as `cli:` runs a Node CLI. Each shell from probeShells() is the
+// CALLER and bash the interpreter, as for `shell:`. An optional
+// `--fixture-setup` script builds each (case, shell) directory first; a setup
+// that fails is `errored`, never a verdict. The scripts are written into a temp
+// ROOT per test and passed as `repoRoot`, so containment is exercised for real.
+
+// Refuses (exit 1) unless $1 is a plain lower-case name and $2 a directory.
+// A split input moves $# off 2: exit 7, which no case expects, so it scores as
+// a reproduction. `${1,,}` is bash-only — under a zsh INTERPRETER it is a bad
+// substitution, so a zsh-interpreted run could never accept "alpha".
+const TWO_ARGS_SH = [
+  "#!/usr/bin/env bash",
+  "# Refuses rather than guesses: a name and a directory, nothing else.",
+  '[ "$#" -eq 2 ] || { echo "argc=$#" >&2; exit 7; }',
+  'lower="${1,,}"',
+  '[[ "$1" =~ ^[a-z]+$ ]] && [ "$lower" = "$1" ] || { echo "REFUSED name" >&2; exit 1; }',
+  '[ -d "$2" ] || { echo "REFUSED dir" >&2; exit 1; }',
+  "exit 0",
+  "",
+].join("\n");
+
+const SA_TEMPLATE = ["{input}", "{fixture}"];
+
+// No `sink`: a materialised sink would also write the input as a file name in
+// the case directory (cli:'s rule), which "../x" cannot be.
+const saCase = (id, direction, input, extra = {}) => ({
+  id,
+  input,
+  why: "shell-argv fixture",
+  correct: direction === "hostile" ? "refused" : "admitted",
+  direction,
+  ...extra,
+});
+
+const SA_CASES = [
+  saCase("sa.ok", "legitimate", "alpha"),
+  saCase("sa.space", "hostile", "a b", { expected: { exit: 1 } }),
+  saCase("sa.subst", "hostile", "$(touch PWNED)", {
+    expected: { exit: 1, absent: ["PWNED"] },
+  }),
+  saCase("sa.dash", "hostile", "-n", { expected: { exit: 1 } }),
+  saCase("sa.dotdot", "hostile", "../x", { expected: { exit: 1 } }),
+];
+
+/** A temp root with the two-args script plus `files`; returns the root. */
+function saRoot(files = {}) {
+  return fenceRoot({ "two-args.sh": TWO_ARGS_SH, ...files });
+}
+
+test("shell-argv entry: resolveEntry returns kind shell-argv with shell:'s containment, and refuses a hash or an escape", () => {
+  const root = saRoot();
+  try {
+    assert.equal(SHELL_ARGV_PREFIX, "shell-argv:");
+    const r = resolveEntry("shell-argv:two-args.sh", root);
+    assert.equal(r.ok, true);
+    assert.equal(r.kind, "shell-argv");
+    assert.equal(r.entryPath, join(root, "two-args.sh"));
+    assert.equal(
+      resolveEntry("shell-argv:../outside.sh", root).reason,
+      "outside-repo-root",
+    );
+    assert.equal(
+      resolveEntry("shell-argv:/etc/x.sh", root).reason,
+      "outside-repo-root",
+    );
+    assert.equal(
+      resolveEntry("shell-argv:two-args.sh#f", root).reason,
+      "bad-entry",
+    );
+    assert.equal(resolveEntry("shell-argv:", root).reason, "bad-entry");
+    // The three shell prefixes are disjoint: neither older form claims it.
+    assert.equal(resolveEntry("shell:two-args.sh", root).kind, "shell");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: every malformed flag combination exits 2 by name and writes no record", () => {
+  const root = saRoot({ "setup.sh": "exit 0\n" });
+  const dir = mkdtempSync(join(tmpdir(), "probe-sa-argv-"));
+  try {
+    const record = join(dir, "run.json");
+    const combos = {
+      "shell-argv: without --argv": [
+        ["--entry", "shell-argv:two-args.sh"],
+        /^bad-argv: .*needs --argv/,
+      ],
+      "--argv on a shell: entry": [
+        ["--entry", "shell:two-args.sh", "--argv", '["{input}"]'],
+        /^bad-argv: --argv applies to the cli: and shell-argv: entry forms only/,
+      ],
+      "--args-json with shell-argv:": [
+        [
+          "--entry",
+          "shell-argv:two-args.sh",
+          "--argv",
+          '["{input}"]',
+          "--args-json",
+          "[]",
+        ],
+        /^bad-args: /,
+      ],
+      "--fixture-setup on a cli: entry": [
+        [
+          "--entry",
+          "cli:x.mjs",
+          "--argv",
+          '["{input}"]',
+          "--fixture-setup",
+          "setup.sh",
+        ],
+        /^bad-fixture-setup: --fixture-setup applies to the shell-argv: entry form only/,
+      ],
+      "an embedded slot": [
+        ["--entry", "shell-argv:two-args.sh", "--argv", '["--n={input}"]'],
+        /^bad-argv: .*embeds \{input\}/,
+      ],
+    };
+    for (const [name, [args, re]] of Object.entries(combos)) {
+      const { rc, err } = runMain([
+        "--sink",
+        "filename",
+        "--repo-root",
+        root,
+        ...args,
+        "--record",
+        record,
+      ]);
+      assert.equal(rc, 2, `${name}: exit 2 (stderr: ${err})`);
+      assert.match(err, re, `${name}: names its rule`);
+      assert.equal(existsSync(record), false, `${name}: no record`);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: runProbeSpec declines bad-argv / bad-args for a library caller, and never runs a case", () => {
+  const root = saRoot();
+  try {
+    const noArgv = runProbeSpec({
+      entry: "shell-argv:two-args.sh",
+      cases: SA_CASES,
+      repoRoot: root,
+    });
+    assert.equal(noArgv.reason, "bad-argv");
+    assert.equal(noArgv.executed, 0);
+    const onShell = runProbeSpec({
+      sink: "filename",
+      entry: "shell:two-args.sh",
+      cases: SA_CASES,
+      argv: ["{input}"],
+      repoRoot: root,
+    });
+    assert.equal(onShell.reason, "bad-argv");
+    assert.match(
+      onShell.declined[0].detail,
+      /cli: and shell-argv: entry forms only/,
+    );
+    const withArgs = runProbeSpec({
+      entry: "shell-argv:two-args.sh",
+      cases: SA_CASES,
+      argv: SA_TEMPLATE,
+      args: [],
+      repoRoot: root,
+    });
+    assert.equal(withArgs.reason, "bad-args");
+    const setupOnShell = runProbeSpec({
+      sink: "filename",
+      entry: "shell:two-args.sh",
+      cases: SA_CASES,
+      fixtureSetup: "two-args.sh",
+      repoRoot: root,
+    });
+    assert.equal(setupOnShell.reason, "bad-fixture-setup");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: {input} reaches the script as ONE element under every shell, bash interprets, and exit status is the verdict", () => {
+  const root = saRoot();
+  try {
+    const r = runProbeSpec({
+      entry: "shell-argv:two-args.sh",
+      cases: SA_CASES,
+      argv: SA_TEMPLATE,
+      repoRoot: root,
+    });
+    assert.deepEqual(r.declined, [], JSON.stringify(r.declined));
+    assert.deepEqual(r.shells, probeShells());
+    assert.equal(r.executed, SA_CASES.length * probeShells().length);
+    // A split input would exit 7 and reproduce; a zsh-interpreted run would
+    // reject "alpha" on `${1,,}` and overblock it.
+    assert.deepEqual(r.reproduced, [], JSON.stringify(r.cases));
+    assert.deepEqual(r.overblocked, [], JSON.stringify(r.cases));
+    assert.equal(r.verdict, "engages");
+    assert.deepEqual(r.argv, SA_TEMPLATE);
+    for (const shell of probeShells()) {
+      const ok = r.cases.find((c) => c.id === "sa.ok" && c.shell === shell);
+      assert.equal(ok?.outcome, "accepted", `alpha accepted under ${shell}`);
+    }
+    assert.deepEqual(r.escapes, []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: every shell is the caller and bash the interpreter — held without zsh on the host", () => {
+  const args = ["a b", "/tmp/f"];
+  assert.deepEqual(shellArgvSpawnArgs("zsh", "/r/s.sh", args), [
+    "-f",
+    "-c",
+    'bash "$@"',
+    "zsh",
+    "/r/s.sh",
+    "a b",
+    "/tmp/f",
+  ]);
+  // The body really does run the script under bash with the elements intact:
+  // spawned here under bash as the caller, the script's own $BASH_VERSION and
+  // $# answer.
+  const root = fenceRoot({
+    "who.sh": 'printf "%s|%s|%s" "${BASH_VERSION:+bash}" "$#" "$1"\n',
+  });
+  try {
+    const r = spawnSync(
+      "bash",
+      shellArgvSpawnArgs("bash", join(root, "who.sh"), args),
+      { encoding: "utf8" },
+    );
+    assert.equal(r.stdout, "bash|2|a b");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: a split {input} is caught — the discriminator the one-element rule rests on", () => {
+  // The same script, called with the input spread over TWO elements by a
+  // template that names the fixture twice: $# is 3, the script exits 7, and a
+  // hostile case expecting exit 1 reproduces. Proves exit 7 is visible.
+  const root = saRoot();
+  try {
+    const r = runProbeSpec({
+      entry: "shell-argv:two-args.sh",
+      cases: [saCase("sa.space", "hostile", "a b", { expected: { exit: 1 } })],
+      argv: ["{input}", "{fixture}", "{fixture}"],
+      repoRoot: root,
+    });
+    assert.equal(r.reproduced.length, probeShells().length);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: --fixture-setup runs per (case, shell) before the script, after the case fixture is written", () => {
+  const needsReady = [
+    "#!/usr/bin/env bash",
+    '[ -f "$2/ready" ] || { echo "REFUSED unready" >&2; exit 1; }',
+    '[ "$1" = "alpha" ] || { echo "REFUSED" >&2; exit 1; }',
+    "",
+  ].join("\n");
+  // The setup reads the case's own fixture file (written first) and its env.
+  const setup = [
+    "#!/usr/bin/env bash",
+    'cd "$1" || exit 9',
+    "[ -f seed.txt ] || exit 4",
+    '[ "${PROBE_SEED_ENV:-}" = "yes" ] || exit 5',
+    "touch ready",
+    "",
+  ].join("\n");
+  const root = fenceRoot({ "needs-ready.sh": needsReady, "setup.sh": setup });
+  try {
+    const fixture = {
+      files: { "seed.txt": "x" },
+      env: { PROBE_SEED_ENV: "yes" },
+    };
+    const r = runProbeSpec({
+      entry: "shell-argv:needs-ready.sh",
+      cases: [
+        saCase("sa.ok", "legitimate", "alpha", { fixture }),
+        saCase("sa.bad", "hostile", "beta", { fixture, expected: { exit: 1 } }),
+      ],
+      argv: ["{input}", "{fixture}"],
+      fixtureSetup: "setup.sh",
+      repoRoot: root,
+    });
+    assert.deepEqual(r.declined, [], JSON.stringify(r.cases));
+    assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+    assert.equal(r.fixtureSetup, join(root, "setup.sh"));
+    assert.equal(toRecordEntry(r).fixture_setup, join(root, "setup.sh"));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: a failing setup is errored for every (case, shell), never rejected", () => {
+  const root = saRoot({ "setup-fails.sh": "exit 3\n" });
+  try {
+    const r = runProbeSpec({
+      entry: "shell-argv:two-args.sh",
+      cases: SA_CASES,
+      argv: SA_TEMPLATE,
+      fixtureSetup: "setup-fails.sh",
+      repoRoot: root,
+    });
+    assert.equal(r.executed, 0);
+    assert.equal(r.verdict, "unverifiable");
+    assert.equal(r.reason, "entry-not-probeable");
+    assert.equal(r.cases.length, SA_CASES.length * probeShells().length);
+    for (const c of r.cases) {
+      assert.equal(c.outcome, "errored", JSON.stringify(c));
+      assert.match(c.detail, /fixture setup exited 3/);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: a setup outside the root, missing, or with a malformed case fixture is declined, not scored", () => {
+  const root = saRoot();
+  try {
+    const outside = runProbeSpec({
+      entry: "shell-argv:two-args.sh",
+      cases: SA_CASES,
+      argv: SA_TEMPLATE,
+      fixtureSetup: "../setup.sh",
+      repoRoot: root,
+    });
+    assert.equal(outside.reason, "bad-fixture-setup");
+    assert.match(outside.declined[0].detail, /outside/);
+    const missing = runProbeSpec({
+      entry: "shell-argv:two-args.sh",
+      cases: SA_CASES,
+      argv: SA_TEMPLATE,
+      fixtureSetup: "nope.sh",
+      repoRoot: root,
+    });
+    assert.equal(missing.reason, "bad-fixture-setup");
+    const badFixture = runProbeSpec({
+      entry: "shell-argv:two-args.sh",
+      cases: [saCase("sa.ok", "legitimate", "alpha", { fixture: 3 })],
+      argv: SA_TEMPLATE,
+      repoRoot: root,
+    });
+    assert.equal(badFixture.executed, 0);
+    assert.match(badFixture.cases[0].detail, /fixture/);
+    const leaves = runProbeSpec({
+      entry: "shell-argv:two-args.sh",
+      cases: [
+        saCase("sa.ok", "legitimate", "alpha", {
+          fixture: { files: { "../out.txt": "x" } },
+        }),
+      ],
+      argv: SA_TEMPLATE,
+      repoRoot: root,
+    });
+    assert.equal(leaves.executed, 0);
+    assert.match(leaves.cases[0].detail, /leaves the case directory/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: a script or setup naming gh with no --fake-gh is declined needs-fake-gh", () => {
+  const root = saRoot({
+    "gh-script.sh": '#!/usr/bin/env bash\ngh issue view "$1"\n',
+    // Named on a branch that never runs: only the pre-spawn read of the SETUP
+    // can decline it — the run-time trip-wire never fires.
+    "gh-setup.sh": "#!/usr/bin/env bash\nif false; then gh auth status; fi\n",
+  });
+  try {
+    const script = runProbeSpec({
+      entry: "shell-argv:gh-script.sh",
+      cases: SA_CASES,
+      argv: ["{input}"],
+      repoRoot: root,
+    });
+    assert.equal(script.reason, "needs-fake-gh");
+    const setup = runProbeSpec({
+      entry: "shell-argv:two-args.sh",
+      cases: SA_CASES,
+      argv: SA_TEMPLATE,
+      fixtureSetup: "gh-setup.sh",
+      repoRoot: root,
+    });
+    assert.equal(setup.reason, "needs-fake-gh");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: a timeout is errored, and a write outside the fixture is an escape", () => {
+  const root = saRoot({
+    "slow.sh": "#!/usr/bin/env bash\nsleep 5\n",
+    "escapes.sh": '#!/usr/bin/env bash\ntouch "$HOME/pwned"\nexit 1\n',
+  });
+  try {
+    const slow = runProbeSpec({
+      entry: "shell-argv:slow.sh",
+      cases: [saCase("sa.ok", "legitimate", "alpha")],
+      argv: ["{input}"],
+      timeoutMs: 300,
+      repoRoot: root,
+    });
+    assert.equal(slow.executed, 0);
+    for (const c of slow.cases) assert.equal(c.outcome, "errored");
+    const esc = runProbeSpec({
+      entry: "shell-argv:escapes.sh",
+      cases: [saCase("sa.bad", "hostile", "x")],
+      argv: ["{input}"],
+      repoRoot: root,
+    });
+    assert.ok(esc.escapes.length > 0, JSON.stringify(esc));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: the record carries the argv template and setup, and two templates on one script are two controls", () => {
+  const root = saRoot();
+  const dir = mkdtempSync(join(tmpdir(), "probe-sa-rec-"));
+  try {
+    const record = join(dir, "run.json");
+    for (const argv of [SA_TEMPLATE, ["{input}", "{fixture}", "--x"]]) {
+      const r = runProbeSpec({
+        entry: "shell-argv:two-args.sh",
+        cases: SA_CASES,
+        argv,
+        repoRoot: root,
+      });
+      recordRun(record, r, {});
+    }
+    const controls = readRecord(record).controls;
+    assert.equal(controls.length, 2);
+    for (const c of controls) assert.ok(Array.isArray(c.argv));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: the proof run — reenter-qa-after-finalise.sh is reached by the engine, every case past its usage line (task.181)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "probe-sa-proof-"));
+  try {
+    const record = join(dir, "run.json");
+    const SA = "shared/resources/tests/fixtures/shell-argv";
+    const { rc, out, err } = runMain([
+      "--entry",
+      "shell-argv:shared/resources/reenter-qa-after-finalise.sh",
+      "--argv",
+      '["{input}","docs/tasks/task.42.example/report.md"]',
+      "--fixture-setup",
+      `${SA}/reenter-qa-setup.sh`,
+      "--cases-file",
+      `${SA}/reenter-qa-cases.json`,
+      "--record",
+      record,
+      "--json",
+    ]);
+    const r = JSON.parse(out);
+    const cases = JSON.parse(
+      readFileSync(join(REPO_ROOT, SA, "reenter-qa-cases.json"), "utf8"),
+    );
+    assert.equal(rc, 0, `stderr: ${err}\n${JSON.stringify(r.cases)}`);
+    assert.equal(r.verdict, "engages");
+    assert.deepEqual(r.declined, []);
+    assert.equal(r.executed, cases.length * probeShells().length);
+    // The usage line exits 2; every run here exits 0 (the re-entry) or 1 (a
+    // refusal of the script's own), so none stopped at argument parsing.
+    for (const c of r.cases) {
+      assert.ok(c.exit === 0 || c.exit === 1, JSON.stringify(c));
+    }
+    const totals = readRecord(record);
+    assert.ok(totals.totals.executed > 0);
+    assert.equal(
+      totals.controls[0].fixture_setup,
+      join(REPO_ROOT, SA, "reenter-qa-setup.sh"),
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ── task.181 QA cycle 1 — TASK-181-001: a case fixture must not reach the host gh ──
+//
+// shell-argv: honours a case's fixture as fence: does, so it takes fence:'s two
+// gh hardenings over it: the pre-spawn text check over fixture env values and
+// file contents, and ghFreePath, which hides every PATH directory holding a gh.
+// A fake "host" gh is planted on the test process's PATH, so both rows hold on a
+// host with no real gh as well as one with it.
+
+/** Run fn with a directory holding an executable `gh` first on process PATH. */
+function withPlantedGh(fn) {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), "planted-gh-")));
+  writeFileSync(join(dir, "gh"), "#!/bin/sh\necho planted-gh\n");
+  chmodSync(join(dir, "gh"), 0o755);
+  const saved = process.env.PATH;
+  process.env.PATH = `${dir}:${saved ?? ""}`;
+  try {
+    return fn();
+  } finally {
+    process.env.PATH = saved;
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test("shell-argv entry: a case fixture that names gh is declined needs-fake-gh before anything spawns (TASK-181-001)", () => {
+  const root = saRoot({ "plain.sh": '#!/usr/bin/env bash\n[ -n "$1" ]\n' });
+  try {
+    const helper =
+      'for p in $(type -ap gh); do case $p in *probe-harness*) ;; *) "$p" > ghran.txt 2>&1; break;; esac; done\n';
+    for (const fixture of [
+      { env: { BASH_ENV: "./helper.sh" }, files: { "helper.sh": helper } },
+      { env: { PROBE_CMD: "gh auth status" } },
+    ]) {
+      const r = withPlantedGh(() =>
+        runProbeSpec({
+          entry: "shell-argv:plain.sh",
+          argv: ["{input}"],
+          cases: [
+            saCase("sa.fx", "hostile", "x", {
+              fixture,
+              expected: { exit: 0, absent: ["ghran.txt"] },
+            }),
+          ],
+          repoRoot: root,
+        }),
+      );
+      assert.equal(r.reason, "needs-fake-gh", JSON.stringify(r.cases));
+      assert.equal(r.executed, 0);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: a fixture that spells gh without naming it still finds no host gh on PATH (TASK-181-001, ghFreePath)", () => {
+  const root = saRoot({ "plain.sh": '#!/usr/bin/env bash\n[ -n "$1" ]\n' });
+  try {
+    // `${G}h` with G=g spells gh without the text "gh" — only the PATH
+    // shadowing can stop it.
+    const helper =
+      'for p in $(type -ap "${G}h"); do case $p in *probe-harness*) ;; *) "$p" > ghran.txt 2>&1; break;; esac; done\n';
+    const r = withPlantedGh(() =>
+      runProbeSpec({
+        entry: "shell-argv:plain.sh",
+        argv: ["{input}"],
+        cases: [
+          saCase("sa.fx", "hostile", "x", {
+            fixture: {
+              env: { BASH_ENV: "./helper.sh", G: "g" },
+              files: { "helper.sh": helper },
+            },
+            expected: { exit: 0, absent: ["ghran.txt"] },
+          }),
+        ],
+        repoRoot: root,
+      }),
+    );
+    assert.deepEqual(r.reproduced, [], JSON.stringify(r.cases));
+    assert.equal(r.executed, probeShells().length);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// ── task.181 QA cycle 2 — TASK-181-002 / -003: escape accounting for shell-argv: ──
+//
+// The setup builds its case directory and nothing else: a write elsewhere errors
+// that run, named, and is never charged to the entry under probe (TASK-181-002).
+// The entry's runs are watched beside the case directory as fence:'s are — the
+// sentinel skips the work dir, so only the work-dir snapshot sees a write to a
+// sibling case or a deletion in the harness dir (TASK-181-003).
+
+test("shell-argv entry: a setup that writes outside its case directory errors the run and charges the entry nothing (TASK-181-002)", () => {
+  const root = saRoot({
+    "ok.sh": '#!/usr/bin/env bash\n[ "$1" = alpha ] || exit 1\n',
+    "setup-tmp.sh": "#!/usr/bin/env bash\nmktemp >/dev/null\n",
+    "setup-inside.sh":
+      '#!/usr/bin/env bash\nmktemp "$1/scratch.XXXXXX" >/dev/null\n',
+  });
+  try {
+    const cases = [
+      saCase("a.ok", "legitimate", "alpha"),
+      saCase("a.bad", "hostile", "beta"),
+    ];
+    const outside = runProbeSpec({
+      entry: "shell-argv:ok.sh",
+      argv: ["{input}"],
+      fixtureSetup: "setup-tmp.sh",
+      cases,
+      repoRoot: root,
+    });
+    assert.deepEqual(outside.escapes, [], JSON.stringify(outside.escapes));
+    assert.equal(outside.executed, 0);
+    for (const c of outside.cases) {
+      assert.equal(c.outcome, "errored");
+      assert.match(c.detail, /fixture setup wrote outside the case directory/);
+    }
+    const inside = runProbeSpec({
+      entry: "shell-argv:ok.sh",
+      argv: ["{input}"],
+      fixtureSetup: "setup-inside.sh",
+      cases,
+      repoRoot: root,
+    });
+    assert.deepEqual(inside.escapes, []);
+    assert.equal(inside.verdict, "engages", JSON.stringify(inside.cases));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: a write beside the case directory, or a deletion in the harness, is an escape (TASK-181-003)", () => {
+  const root = saRoot({
+    "writes.sh": '#!/usr/bin/env bash\ntouch "$1"\nexit 1\n',
+    "deletes.sh":
+      "#!/usr/bin/env bash\nrm -f ../.probe-harness/bin/gh\nexit 1\n",
+  });
+  try {
+    const up = runProbeSpec({
+      entry: "shell-argv:writes.sh",
+      argv: ["{input}"],
+      cases: [saCase("w.up", "hostile", "../pwned", { expected: { exit: 1 } })],
+      repoRoot: root,
+    });
+    assert.ok(
+      up.escapes.some((e) => e.path.endsWith("/pwned")),
+      JSON.stringify(up.escapes),
+    );
+    const del = runProbeSpec({
+      entry: "shell-argv:deletes.sh",
+      argv: ["{input}"],
+      cases: [saCase("w.del", "hostile", "x", { expected: { exit: 1 } })],
+      repoRoot: root,
+    });
+    assert.ok(
+      del.escapes.some((e) => e.path.endsWith(".probe-harness/bin/gh")),
+      JSON.stringify(del.escapes),
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: a setup that is killed reports why, not always a timeout (CR-4)", () => {
+  const root = saRoot({
+    "slow-setup.sh": "#!/usr/bin/env bash\nsleep 5\n",
+    "self-kill.sh": "#!/usr/bin/env bash\nkill -TERM $$\n",
+  });
+  try {
+    const slow = runProbeSpec({
+      entry: "shell-argv:two-args.sh",
+      argv: SA_TEMPLATE,
+      fixtureSetup: "slow-setup.sh",
+      cases: [saCase("sa.ok", "legitimate", "alpha")],
+      timeoutMs: 300,
+      repoRoot: root,
+    });
+    for (const c of slow.cases) assert.match(c.detail, /timed out after 300ms/);
+    const killed = runProbeSpec({
+      entry: "shell-argv:two-args.sh",
+      argv: SA_TEMPLATE,
+      fixtureSetup: "self-kill.sh",
+      cases: [saCase("sa.ok", "legitimate", "alpha")],
+      repoRoot: root,
+    });
+    for (const c of killed.cases) {
+      assert.equal(c.outcome, "errored");
+      assert.doesNotMatch(c.detail, /timed out/);
+      assert.match(c.detail, /SIGTERM/);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// ── task.181 /finalise DoD gaps — AC2 and AC6 members held by tests ──────────
+//
+// The DoD's quantifier rule (dod.1): every member of a set criterion needs its
+// own test. AC2 lists `shell-fn:` among the forms `--argv` is still refused for;
+// AC6 lists the run-time trip-wire and `--fake-gh` among the shell forms' `gh`
+// handling `shell-argv:` takes.
+
+test("shell-argv entry: --argv is still refused for a shell-fn: entry — CLI exit 2 and library decline (task.181 AC2)", () => {
+  const root = fenceRoot({ "lib.sh": "f() { printf '%s\\n' \"$1\"; }\n" });
+  const dir = mkdtempSync(join(tmpdir(), "probe-sa-fnargv-"));
+  try {
+    const record = join(dir, "run.json");
+    const { rc, err } = runMain([
+      "--sink",
+      "filename",
+      "--repo-root",
+      root,
+      "--entry",
+      "shell-fn:lib.sh#f",
+      "--argv",
+      '["{input}"]',
+      "--record",
+      record,
+    ]);
+    assert.equal(rc, 2, err);
+    assert.match(
+      err,
+      /^bad-argv: --argv applies to the cli: and shell-argv: entry forms only/,
+    );
+    assert.equal(existsSync(record), false);
+    const r = runProbeSpec({
+      sink: "filename",
+      entry: "shell-fn:lib.sh#f",
+      cases: SA_CASES,
+      argv: ["{input}"],
+      repoRoot: root,
+    });
+    assert.equal(r.reason, "bad-argv");
+    assert.equal(r.executed, 0);
+    assert.match(r.declined[0].detail, /cli: and shell-argv: entry forms only/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: a gh call the text check cannot see is caught by the run-time trip-wire and declined (task.181 AC6)", () => {
+  // `X=gh; "$X"` names no `gh` the pre-spawn detector reads, so only the
+  // trip-wire first on PATH can answer — and then nothing is scored.
+  const root = saRoot({
+    "calls-gh.sh":
+      '#!/usr/bin/env bash\nX=gh\n"$X" auth status >/dev/null 2>&1\n[ "$1" = alpha ]\n',
+  });
+  try {
+    const r = runProbeSpec({
+      entry: "shell-argv:calls-gh.sh",
+      cases: SA_CASES,
+      argv: ["{input}"],
+      repoRoot: root,
+    });
+    assert.equal(r.reason, "needs-fake-gh", JSON.stringify(r.declined));
+    assert.equal(r.executed, 0);
+    assert.match(r.declined[0].detail, /invoked .gh. at run time/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-argv entry: --fake-gh is accepted and its gh answers the run (task.181 AC6)", () => {
+  // The script refuses unless the fake answered — so `alpha` accepted proves
+  // the fake was first on PATH, armed with FAKE_GH=1.
+  const root = saRoot({
+    "fake/gh":
+      '#!/bin/sh\n[ "$FAKE_GH" = 1 ] || { echo "FAKE_GH unset" >&2; exit 2; }\necho fake-gh-answered\n',
+    "asks-gh.sh":
+      '#!/usr/bin/env bash\nout=$(gh api x)\n[ "$out" = fake-gh-answered ] || exit 9\n[ "$1" = alpha ] || exit 1\n',
+  });
+  try {
+    chmodSync(join(root, "fake/gh"), 0o755);
+    const r = runProbeSpec({
+      entry: "shell-argv:asks-gh.sh",
+      cases: [
+        saCase("sa.ok", "legitimate", "alpha"),
+        saCase("sa.bad", "hostile", "beta", { expected: { exit: 1 } }),
+      ],
+      argv: ["{input}"],
+      fakeGh: "fake",
+      repoRoot: root,
+    });
+    assert.deepEqual(r.declined, [], JSON.stringify(r.cases));
+    assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+    assert.equal(r.fakeGh, join(root, "fake"));
+    assert.equal(toRecordEntry(r).fake_gh, join(root, "fake"));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// ── task.190: refuse what the engine cannot score ─────────────────────────────
+
+// runMain (above, with the cli: tests) captures main()'s stdout and stderr.
+
+/** A temp dir holding a record path and a cases file; removed by the caller. */
+function recordFixture(cases) {
+  const dir = mkdtempSync(join(tmpdir(), "probe-t190-"));
+  const record = join(dir, "run.json");
+  const casesFile = join(dir, "cases.json");
+  if (cases !== undefined) writeFileSync(casesFile, JSON.stringify(cases));
+  return { dir, record, casesFile };
+}
+
+const noRecord = (record) =>
+  !existsSync(record) && !existsSync(recordEntriesDir(record));
+
+test("validateCases: an unknown direction is refused, naming the case and the accepted values (obs #201)", () => {
+  const bad = validateCases([
+    CASES[0],
+    { ...CASES[3], id: "t.benign", direction: "benign" },
+  ]);
+  assert.deepEqual(bad, {
+    id: "t.benign",
+    field: "direction",
+    value: "benign",
+    accepted: [...DIRECTIONS],
+  });
+});
+
+test("validateCases: a present sink outside SINKS is refused; an absent sink is not (control)", () => {
+  assert.deepEqual(validateCases([{ ...CASES[0], sink: "nope" }]), {
+    id: CASES[0].id,
+    field: "sink",
+    value: "nope",
+    accepted: [...SINKS],
+  });
+  // Control: sink is optional on a case — the run's sink applies. The check
+  // must not over-fire on an absent optional field.
+  const { sink, ...noSink } = CASES[3];
+  assert.equal(sink, "url-authority");
+  assert.equal(validateCases([{ ...noSink, direction: "legitimate" }]), null);
+  assert.equal(validateCases(CASES), null);
+});
+
+test("validateCases: a null sink is absent, as the readers' `c.sink ?? sink` treat it (CR-3)", () => {
+  assert.equal(validateCases([{ ...CASES[0], sink: null }]), null);
+});
+
+test("describeBadCase never throws: a BigInt or circular value still renders (CR-2)", () => {
+  const circular = {};
+  circular.self = circular;
+  for (const value of [10n, circular]) {
+    const line = describeBadCase({
+      id: "c1",
+      field: "sink",
+      value,
+      accepted: ["a"],
+    });
+    assert.match(line, /^case "c1" has sink .+; accepted: a$/);
+  }
+  // Control: a JSON value renders as before.
+  assert.equal(
+    describeBadCase({
+      id: "c1",
+      field: "sink",
+      value: "nope",
+      accepted: ["a"],
+    }),
+    'case "c1" has sink "nope"; accepted: a',
+  );
+});
+
+test("validateCases: a non-array file and a non-object case are refused; an id-less case is named by index", () => {
+  assert.equal(validateCases({ cases: [] }).field, "cases");
+  assert.deepEqual(validateCases([CASES[0], "x"]), {
+    id: "#1",
+    field: "case",
+    value: "string",
+    accepted: ["object"],
+  });
+  assert.equal(validateCases([null]).value, "null");
+  assert.equal(validateCases([{ direction: "sideways" }]).id, "#0");
+});
+
+test("validateCases: every case of every sink's corpus passes — a failure is a corpus bug", () => {
+  let n = 0;
+  for (const sink of SINKS) {
+    const cases = corpusFor(sink);
+    n += cases.length;
+    assert.equal(validateCases(cases), null, sink);
+  }
+  assert.ok(n > 0, "the corpus loop measured something");
+});
+
+test("CLI: a cases file with an unknown direction exits 2 bad-cases, runs nothing and writes no record", () => {
+  const fx = recordFixture([
+    ...CASES,
+    { ...CASES[3], id: "t.benign", direction: "benign" },
+  ]);
+  try {
+    const r = runMain([
+      "--entry",
+      entry("engaging-control"),
+      "--cases-file",
+      fx.casesFile,
+      "--record",
+      fx.record,
+    ]);
+    assert.equal(r.rc, 2, r.err);
+    assert.match(
+      r.err,
+      /^bad-cases: case "t\.benign" has direction "benign"; accepted: hostile, legitimate\n$/,
+    );
+    assert.equal(r.out, "", "nothing ran: no verdict line");
+    assert.ok(noRecord(fx.record), "no record written");
+  } finally {
+    rmSync(fx.dir, { recursive: true, force: true });
+  }
+});
+
+test("CLI: a case sink outside SINKS exits 2 bad-cases with the sink list; --json prints the reason", () => {
+  const fx = recordFixture([{ ...CASES[0], sink: "nope" }]);
+  try {
+    const r = runMain([
+      "--entry",
+      entry("engaging-control"),
+      "--cases-file",
+      fx.casesFile,
+      "--record",
+      fx.record,
+      "--json",
+    ]);
+    assert.equal(r.rc, 2, r.err);
+    assert.match(
+      r.err,
+      new RegExp(`has sink "nope"; accepted: ${SINKS.join(", ")}`),
+    );
+    const j = JSON.parse(r.out);
+    assert.equal(j.reason, "bad-cases");
+    assert.match(j.detail, /case "t\.slash" has sink "nope"/);
+    assert.ok(noRecord(fx.record));
+  } finally {
+    rmSync(fx.dir, { recursive: true, force: true });
+  }
+});
+
+test("CLI control: a valid cases file runs and records as before", () => {
+  const fx = recordFixture(CASES);
+  try {
+    const r = runMain([
+      "--entry",
+      entry("engaging-control"),
+      "--cases-file",
+      fx.casesFile,
+      "--record",
+      fx.record,
+    ]);
+    assert.equal(r.rc, 0, r.err);
+    assert.match(r.out, /^engages /);
+    const rec = readRecord(fx.record);
+    assert.equal(rec.controls.length, 1);
+    assert.equal(rec.controls[0].executed, CASES.length);
+    assert.deepEqual(rec.controls[0].declined_cases, []);
+  } finally {
+    rmSync(fx.dir, { recursive: true, force: true });
+  }
+});
+
+test("runProbeSpec: supplied cases the scorer cannot place are declined bad-cases before any case runs", () => {
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: entry("engaging-control"),
+    cases: [{ ...CASES[0], direction: "benign" }],
+  });
+  assert.equal(r.verdict, "unverifiable");
+  assert.equal(r.reason, "bad-cases");
+  assert.equal(r.executed, 0);
+  assert.match(
+    r.declined[0].detail,
+    /has direction "benign"; accepted: hostile, legitimate/,
+  );
+});
+
+test("runProbeSpec: a BigInt or circular case value is declined bad-cases, not thrown (CR-2)", () => {
+  const circular = {};
+  circular.self = circular;
+  for (const sink of [10n, circular]) {
+    const r = runProbeSpec({
+      sink: "url-authority",
+      entry: entry("engaging-control"),
+      cases: [{ ...CASES[0], sink }],
+    });
+    assert.equal(r.reason, "bad-cases");
+    assert.equal(r.executed, 0);
+  }
+});
+
+test("CLI: a missing entry exits 2 entry-not-found and writes no record, for every entry form with a path (obs #211)", () => {
+  const missing = `${FIXTURES}/t190-does-not-exist`;
+  const forms = [
+    ["js", [`${missing}.mjs#validateHost`]],
+    ["shell", [`shell:${missing}.sh`]],
+    ["shell-fn", [`shell-fn:${missing}.sh#fn`]],
+    ["cli", [`cli:${missing}.mjs`, "--argv", '["{input}"]']],
+    ["shell-argv", [`shell-argv:${missing}.sh`, "--argv", '["{input}"]']],
+    ["fence", [`fence:${missing}.md#Heading`, "--slot", "<x>"]],
+  ];
+  for (const [form, [ent, ...rest]] of forms) {
+    const fx = recordFixture();
+    try {
+      const r = runMain([
+        "--sink",
+        "filename",
+        "--entry",
+        ent,
+        ...rest,
+        "--record",
+        fx.record,
+        "--json",
+        "--repo-root",
+        REPO_ROOT,
+      ]);
+      assert.equal(r.rc, 2, `${form}: ${r.err}`);
+      assert.ok(r.err.startsWith("entry-not-found: "), `${form}: ${r.err}`);
+      assert.ok(r.err.includes("t190-does-not-exist"), form);
+      assert.ok(r.err.includes(`(repo root ${REPO_ROOT})`), form);
+      assert.equal(JSON.parse(r.out).reason, "entry-not-found", form);
+      assert.ok(noRecord(fx.record), `${form}: no record written`);
+    } finally {
+      rmSync(fx.dir, { recursive: true, force: true });
+    }
+  }
+});
+
+test("CLI: a resolveEntry failure is left to runProbeSpec — an escape is still declined, not refused as missing", () => {
+  const r = runMain([
+    "--sink",
+    "url-authority",
+    "--entry",
+    "../outside.mjs#f",
+    "--json",
+    "--repo-root",
+    REPO_ROOT,
+  ]);
+  assert.equal(r.rc, 1, r.err);
+  assert.equal(JSON.parse(r.out).reason, "outside-repo-root");
+});
+
+test("toRecordEntry carries each declined case's id, reason and detail beside the count (obs #207)", () => {
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: entry("not-a-function"),
+    cases: CASES,
+  });
+  assert.equal(r.declined.length, 1);
+  const fx = recordFixture();
+  try {
+    recordRun(fx.record, r, { name: "t190" });
+    const row = readRecord(fx.record).controls[0];
+    assert.equal(row.declined, 1);
+    assert.deepEqual(row.declined_cases, [
+      {
+        id: r.declined[0].id,
+        reason: r.declined[0].reason,
+        detail: r.declined[0].detail,
+      },
+    ]);
+    assert.match(row.declined_cases[0].detail, /not a function/);
+  } finally {
+    rmSync(fx.dir, { recursive: true, force: true });
+  }
+});
+
+/**
+ * Copy the engine and its sibling imports, walked transitively from the source,
+ * into `dest`. A hand list of the imports goes stale the first time the engine
+ * gains one (review-security.test.js, task.128).
+ */
+function copyEngine(dest) {
+  const src = join(__dirname, "..");
+  const seen = new Set();
+  const walk = (f) => {
+    if (seen.has(f)) return;
+    seen.add(f);
+    const text = readFileSync(join(src, f), "utf8");
+    for (const m of text.matchAll(
+      /(?:from|import)\s+["']\.\/([A-Za-z0-9._-]+\.m?js)["']/g,
+    )) {
+      walk(m[1]);
+    }
+  };
+  walk("security-probe.mjs");
+  mkdirSync(dest, { recursive: true });
+  for (const f of seen) cpSync(join(src, f), join(dest, f));
+  return join(dest, "security-probe.mjs");
+}
+
+/** defaultRepoRoot() as the copy at `engine` computes it, run from `cwd`. */
+function rootFrom(engine, cwd, env = process.env) {
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--input-type=module",
+      "-e",
+      "const m = await import(process.argv[1]); process.stdout.write(m.defaultRepoRoot());",
+      pathToFileURL(engine).href,
+    ],
+    { cwd, encoding: "utf8", env },
+  );
+  assert.equal(r.status, 0, r.stderr);
+  return r.stdout;
+}
+
+test("defaultRepoRoot: a bundled copy defaults to the git top level; a shared/resources copy to two up; no git falls back (obs #211)", () => {
+  const base = realpathSync(mkdtempSync(join(tmpdir(), "probe-t190-root-")));
+  try {
+    const repo = join(base, "repo");
+    mkdirSync(repo);
+    const init = spawnSync("git", ["init", "-q", repo], { encoding: "utf8" });
+    assert.equal(init.status, 0, init.stderr);
+    // A bundled copy: two levels up is <repo>/skills, not the repository.
+    const bundled = copyEngine(join(repo, "skills", "x", "references"));
+    assert.equal(rootFrom(bundled, repo), repo);
+    // A source-tree copy under a nested shared/resources: two levels up, which
+    // here is NOT the git top level — so the result tells the branches apart.
+    const source = copyEngine(join(repo, "sub", "shared", "resources"));
+    assert.equal(rootFrom(source, repo), join(repo, "sub"));
+    // Outside any git checkout: git fails and the copy falls back to two up.
+    const loose = copyEngine(join(base, "loose", "a", "references"));
+    const env = { ...process.env, GIT_CEILING_DIRECTORIES: base };
+    delete env.GIT_DIR;
+    delete env.GIT_WORK_TREE;
+    assert.equal(
+      rootFrom(loose, join(base, "loose"), env),
+      join(base, "loose"),
+    );
+  } finally {
+    rmSync(base, { recursive: true, force: true });
   }
 });

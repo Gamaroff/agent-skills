@@ -7,7 +7,7 @@
  * second run changes nothing.
  *
  * The measured failure this skill exists to fix was invisible from the rendered
- * page. On a live board, bug card RAPP-713 and its siblings RAPP-706/707/708
+ * page. On a live board, a bug card and three of its siblings
  * each had a description whose ADF contained **zero** `link` marks — the bug
  * report was a bare plain-text path — with `parent: null` and an empty
  * `remotelink` list. The card looked fine and linked to nothing.
@@ -43,7 +43,7 @@ status: in-progress
 severity: 'Major'
 priority: 'High'
 created: 2026-09-07
-related: 'story 7.4'
+related: 'story 1.7.4'
 description: 'Tap target below the 44px minimum'
 ---
 
@@ -52,7 +52,7 @@ description: 'Tap target below the 44px minimum'
 ## Bug Description
 
 The primary control renders at 24px, below the 44px minimum. It violates
-[the story](./story.7.4.tap-targets.md) acceptance criteria.
+[the story](./story.1.7.4.tap-targets.md) acceptance criteria.
 
 ## Reproduction Steps
 
@@ -79,15 +79,16 @@ The primary control renders at 24px, below the 44px minimum. It violates
 // ---------------------------------------------------------------------------
 function repoWithStoryBug() {
   const root = gitRepo("bug-e2e-", {
-    "docs/prd/epic.7.checkout.md": "---\ntype: epic\n---\n\n# Epic 7\n",
-    "docs/prd/epic-7/story.7.4.tap-targets.md":
-      "---\ntype: story\njira_key: PROJ-123\nepic_source: ../epic.7.checkout.md\n---\n\n# Story 7.4\n",
-    "docs/prd/epic-7/story.7.4.bug.4.review.1.tap-target.md": "# Bug review\n",
-    "docs/prd/epic-7/story.7.4.bug.4.tap-target.md": BUG_MD,
+    "docs/prd/epic.1.7.checkout.md": "---\ntype: epic\n---\n\n# Epic 1.7\n",
+    "docs/prd/epic-7/story.1.7.4.tap-targets.md":
+      "---\ntype: story\njira_key: PROJ-123\nepic_source: ../epic.1.7.checkout.md\n---\n\n# Story 1.7.4\n",
+    "docs/prd/epic-7/story.1.7.4.bug.4.review.1.tap-target.md":
+      "# Bug review\n",
+    "docs/prd/epic-7/story.1.7.4.bug.4.tap-target.md": BUG_MD,
   });
   return {
     root,
-    bug: path.join(root, "docs/prd/epic-7/story.7.4.bug.4.tap-target.md"),
+    bug: path.join(root, "docs/prd/epic-7/story.1.7.4.bug.4.tap-target.md"),
   };
 }
 
@@ -119,10 +120,10 @@ test("a story bug synced twice produces ONE card, fully linked, and the second r
 
   const relPath = (p) => `${BB}/src/develop/${p}`;
   for (const want of [
-    relPath("docs/prd/epic-7/story.7.4.bug.4.tap-target.md"), // the bug file
-    relPath("docs/prd/epic-7/story.7.4.tap-targets.md"), // the parent story doc
+    relPath("docs/prd/epic-7/story.1.7.4.bug.4.tap-target.md"), // the bug file
+    relPath("docs/prd/epic-7/story.1.7.4.tap-targets.md"), // the parent story doc
     `${BASE}/browse/PROJ-123`, // the parent's CARD
-    relPath("docs/prd/epic.7.checkout.md"), // the epic doc
+    relPath("docs/prd/epic.1.7.checkout.md"), // the epic doc
   ]) {
     assert.ok(
       hrefs.includes(want),
@@ -131,7 +132,7 @@ test("a story bug synced twice produces ONE card, fully linked, and the second r
   }
 
   // Not one relative or plain-text path survived into the published ADF — the
-  // exact defect measured on RAPP-713.
+  // exact defect measured on that bug card.
   assert.ok(
     hrefs.every((h) => /^https?:\/\//.test(h)),
     `a non-absolute href reached the card: ${hrefs.filter((h) => !/^https?:\/\//.test(h))}`,
@@ -341,7 +342,7 @@ Names are obfuscated.
 
 test("a parent with no card links the document only, and the link lands on a later run", async () => {
   const { root, bug } = repoWithStoryBug();
-  const story = path.join(root, "docs/prd/epic-7/story.7.4.tap-targets.md");
+  const story = path.join(root, "docs/prd/epic-7/story.1.7.4.tap-targets.md");
   fs.writeFileSync(
     story,
     fs.readFileSync(story, "utf-8").replace(/^jira_key:.*\n/m, ""),
@@ -359,7 +360,7 @@ test("a parent with no card links the document only, and the link lands on a lat
   const hrefs = hrefsIn(descriptionOf(state, first.result.issueKey));
   assert.ok(
     hrefs.includes(
-      `${BB}/src/develop/docs/prd/epic-7/story.7.4.tap-targets.md`,
+      `${BB}/src/develop/docs/prd/epic-7/story.1.7.4.tap-targets.md`,
     ),
     "the parent document was not linked either",
   );

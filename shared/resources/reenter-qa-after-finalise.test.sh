@@ -15,6 +15,8 @@
 
 PASS=0
 FAIL=0
+# shellcheck source=undefined-command-guard.sh
+. "$(dirname "$0")/undefined-command-guard.sh"
 SCRIPT="$(cd "$(dirname "$0")" && pwd)/reenter-qa-after-finalise.sh"
 
 pass() { echo "  PASS  $1"; PASS=$((PASS + 1)); }
@@ -99,6 +101,49 @@ expect_refusal "newest DoD file accepted (dod.2 outranks dod.1's GAPS)" dod-not-
 mkrepo nogate; codefix; rm -f "$R/$DOC"/*.gate.*
 expect_refusal "no gate" no-gate
 
+# expect_gate_cause NAME FRAGMENT — the no-gate refusal relays qa-cycle.sh's own reason for its
+# cause, rewritten to the reenter-qa: prefix and printed above the refused line (task.182, CR-1).
+# FRAGMENT is a stable piece of qa-cycle.sh's message; none of them occurs in the refused line.
+expect_gate_cause() {
+  local name="$1" frag="$2" err
+  err=$(run 2>&1 >/dev/null)
+  if ! printf '%s\n' "$err" | grep '^reenter-qa: ' | grep -qF "$frag"; then
+    fail "$name" "qa-cycle.sh's reason ('$frag') not relayed as a reenter-qa: line: $err"; return
+  fi
+  if printf '%s\n' "$err" | grep -q 'qa-cycle:'; then fail "$name" "the qa-cycle: prefix was not rewritten: $err"; return; fi
+  if ! printf '%s\n' "$err" | tail -1 | grep -q 'refused (no-gate)'; then fail "$name" "the refused line is not last: $err"; return; fi
+  pass "$name → the refusal names qa-cycle.sh's reason ('$frag')"
+}
+expect_gate_cause "no gate" "no gate file in"
+
+mkrepo unnumbered-gate; codefix; rm -f "$R/$DOC"/*.gate.*; : > "$R/$DOC/task.42.gate.example.yml"
+expect_refusal "an unnumbered gate file only" no-gate
+expect_gate_cause "an unnumbered gate file only" "carry no cycle number"
+
+mkrepo two-gates; codefix; cp "$R/$DOC/task.42.gate.2.example.yml" "$R/$DOC/task.42.gate.2.dup.yml"
+expect_refusal "two gate files claim one cycle" no-gate
+expect_gate_cause "two gate files claim one cycle" "claim cycle 2"
+
+# ── A git status that fails is a refusal, never a clean tree (task.182, CR-3) ─
+# A git that fails only on `status` and passes every other call through to the real one, so the
+# checks before the movement measure behave as on a healthy repository.
+mkrepo gitfail; codefix
+GSTUB="$T/gitstub"; mkdir -p "$GSTUB"
+REAL_GIT=$(command -v git)
+cat > "$GSTUB/git" <<EOF
+#!/usr/bin/env bash
+for a in "\$@"; do [ "\$a" = status ] && { echo "fatal: simulated index failure" >&2; exit 128; }; done
+exec "$REAL_GIT" "\$@"
+EOF
+chmod +x "$GSTUB/git"
+PATH="$GSTUB:$PATH" expect_refusal "git status fails" git-unreadable
+# git's own error reaches the operator — the read no longer sends it to /dev/null (task.182 QA cycle 1, CR-4).
+ERR=$(PATH="$GSTUB:$PATH" run 2>&1 >/dev/null)
+case "$ERR" in
+  *"simulated index failure"*"refused (git-unreadable)"*) pass "git status fails → git's own error is printed above the refusal" ;;
+  *) fail "git status fails — git's error" "the stub's error is not printed above the refusal: $ERR" ;;
+esac
+
 mkrepo docs-only
 echo "re-scoped criterion" >> "$R/$DOC/task.42.example.md"; git -C "$R" commit -qam "doc fix"
 echo "uncommitted doc edit" >> "$R/$DOC/task.42.example.md"
@@ -129,6 +174,59 @@ mkrepo committed; codefix
 WANT_MAX=5; accept "committed code fix (existing budget 5 > base 2 + 2 is kept)"
 [ "$(jq -r '.qa_reentry.gate_head' "$L")" = "$(git -C "$R" rev-parse HEAD~2)" ] && pass "qa_reentry.gate_head is the gate's head" || fail "gate_head recorded" "$(jq -c .qa_reentry "$L")"
 [ "$(jq -r '.branch' "$L")" = "feature/x" ] && pass "pipeline fields carried over from the snapshot" || fail "fields carried" "$(cat "$L")"
+
+# ── Observation #44: documentation OUTSIDE the work item is not movement ──────
+# A DoD gap closed by a CHANGELOG entry or a standards page is a document-only fix. "Documentation"
+# is ci.docsOnly.patterns, read by ci-tree-equivalence.js at HEAD; with no skills-config.yaml the
+# defaults (**/*.md, docs/**) apply. Every doubt counts as code.
+docfix() { # $1 = repo-relative path — a committed change to it, outside the work item
+  mkdir -p "$(dirname "$R/$1")"; echo "entry" >> "$R/$1"; git -C "$R" add -A; git -C "$R" commit -qm "doc fix: $1"
+}
+setcfg() { # $1 = skills-config.yaml body, committed BEFORE the gate is re-recorded at the new head
+  printf '%s' "$1" > "$R/skills-config.yaml"; git -C "$R" add -A; git -C "$R" commit -qm cfg
+  sed -i.bak -E "s/^head: .*/head: $(git -C "$R" rev-parse HEAD)/" "$R/$DOC/task.42.gate.2.example.yml" && rm -f "$R/$DOC/task.42.gate.2.example.yml.bak"
+  git -C "$R" commit -qam "gate re-recorded after the config"
+}
+mkrepo docs-outside; docfix CHANGELOG.md; docfix docs/standards/x.txt
+expect_refusal "a CHANGELOG + docs/ fix outside the work item is document-only" no-code-moved
+rm -f "$L"; ERR=$(run 2>&1 >/dev/null)
+printf '%s' "$ERR" | grep -q 'only documentation changed' && printf '%s' "$ERR" | grep -q 'CHANGELOG.md' \
+  && pass "the document-only refusal names the documentation paths" || fail "docs named" "err=$ERR"
+mkrepo docs-plus-code; docfix CHANGELOG.md; codefix
+WANT_MAX=5; accept "documentation beside a code fix still re-enters"
+rm -f "$L"; mkrepo docs-plus-code-why; docfix CHANGELOG.md; codefix
+ERR=$(run 2>&1 >/dev/null)
+printf '%s' "$ERR" | grep -q 'not documentation under ci.docsOnly: src/code.sh' && ! printf '%s' "$ERR" | grep -q 'CHANGELOG.md' \
+  && pass "the re-entry names the code path, not the documentation" || fail "code named" "err=$ERR"
+mkrepo narrowed; setcfg $'ci:\n  docsOnly:\n    patterns:\n      - "docs/**"\n'; docfix CHANGELOG.md
+WANT_MAX=5; accept "patterns narrowed to docs/** → a root CHANGELOG.md is code and re-enters"
+mkrepo widened; setcfg $'ci:\n  docsOnly:\n    patterns:\n      - "docs/**"\n      - "CHANGELOG.md"\n'; docfix CHANGELOG.md
+expect_refusal "patterns that name CHANGELOG.md → document-only" no-code-moved
+mkrepo disabled; setcfg $'ci:\n  docsOnly:\n    enabled: false\n'; docfix CHANGELOG.md
+WANT_MAX=5; accept "ci.docsOnly.enabled: false → every path counts, the fix re-enters"
+mkrepo cfg-change; docfix README.md; setcfg $'ci:\n  docsOnly:\n    patterns:\n      - "**/*"\n'
+sed -i.bak -E "s/^head: .*/head: $(git -C "$R" rev-parse HEAD~3)/" "$R/$DOC/task.42.gate.2.example.yml" && rm -f "$R/$DOC/task.42.gate.2.example.yml.bak"
+git -C "$R" commit -qam "gate head before the config change"
+WANT_MAX=5; accept "a fix that widens the patterns itself is code (skills-config.yaml never counts as docs)"
+mkrepo moved-under-docs; git -C "$R" mv src/code.sh docs/code.md; git -C "$R" commit -qm "move code under docs"
+WANT_MAX=5; accept "code moved under docs/ is code (renames split; the deletion counts)"
+mkrepo bad-cfg; setcfg $'ci:\n  docsOnly:\n    patterns: "**/*.md"\n'; docfix CHANGELOG.md
+WANT_MAX=5; accept "a malformed ci.docsOnly block → unclassifiable, counted as code"
+# Patterns that do NOT cover the work item's directory, so only the exclusion keeps its record out.
+mkrepo docs-plus-itemfile; setcfg $'ci:\n  docsOnly:\n    patterns:\n      - "CHANGELOG.md"\n'; docfix CHANGELOG.md; echo '{}' > "$R/$DOC/task.42.dod.1.security.run.json"; git -C "$R" add -A; git -C "$R" commit -qm "item record"
+expect_refusal "a non-markdown file INSIDE the work item is not classified (excluded, as the count excludes it)" no-code-moved
+# The configuration is read at HEAD: an untracked skills-config.yaml that widens the patterns must not
+# turn a committed code fix into documentation.
+mkrepo wt-config; codefix; printf 'ci:\n  docsOnly:\n    patterns:\n      - "**/*"\n' > "$R/skills-config.yaml"
+WANT_MAX=5; accept "an untracked working-tree config that widens the patterns does not decide — the fix re-enters"
+mkrepo no-node; docfix CHANGELOG.md
+NSTUB="$T/nonode"; mkdir -p "$NSTUB"; printf '#!/usr/bin/env bash\necho "simulated node failure" >&2; exit 1\n' > "$NSTUB/node"; chmod +x "$NSTUB/node"
+ERR=$(cd "$R" && PATH="$NSTUB:$PATH" PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" "$DOC" "$DOC/report.md" 2>&1 >/dev/null); RC=$?
+if [ "$RC" -eq 0 ] && [ "$(jq -r '.current_step' "$L" 2>/dev/null)" = "5" ] && printf '%s' "$ERR" | grep -q 'could not be classified (simulated node failure) — counted as code'; then
+  pass "a classifier that fails → counted as code, re-entered, the cause named"
+else
+  fail "classifier failure" "rc=$RC lock=$(cat "$L" 2>/dev/null) err=$ERR"
+fi
 
 # Uncommitted work is refused, never accepted and never sent to /finalise: the re-entered review reads
 # committed history and qa-task Step 3b HALTs on an uncommitted tracked change (QA cycle 3, CR-4).
@@ -303,6 +401,18 @@ mkrepo usage
 (cd "$R" && bash "$SCRIPT" >/dev/null 2>&1); [ $? -eq 2 ] && pass "no <doc-dir> → exit 2" || fail "usage" "no doc-dir did not exit 2"
 (cd "$R" && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" "$DOC" >/dev/null 2>&1); [ $? -eq 2 ] && pass "no implementation report → exit 2 (report_entries has no source)" || fail "report required" "missing report did not exit 2"
 (cd "$R" && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" . "$DOC/report.md" >/dev/null 2>&1); [ $? -eq 2 ] && pass "<doc-dir> at the repository root → exit 2" || fail "root doc-dir" "did not exit 2"
+# A cwd that is not <doc-dir>'s repository root is a usage error, not git-unreadable: from another
+# repository `git status` exits 128 on the exclude pathspec (task.182 QA cycle 2, CR-5).
+OTHER="$T/other-repo"; mkdir -p "$OTHER"; git -C "$OTHER" init -q
+ERR=$(cd "$OTHER" && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" "$R/$DOC" "$R/$DOC/report.md" 2>&1 >/dev/null); RC=$?
+if [ "$RC" -eq 2 ] && printf '%s' "$ERR" | grep -q "run from the root of the repository" && ! printf '%s' "$ERR" | grep -q 'git-unreadable'; then
+  pass "a cwd in another repository → exit 2 (usage), never git-unreadable"
+else
+  fail "other-repo cwd" "rc=$RC err=$ERR"
+fi
+ERR=$(cd "$R/src" && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" "../$DOC" "../$DOC/report.md" 2>&1 >/dev/null); RC=$?
+[ "$RC" -eq 2 ] && printf '%s' "$ERR" | grep -q "run from the root of the repository" \
+  && pass "a cwd below the repository root → exit 2 (usage)" || fail "subdirectory cwd" "rc=$RC err=$ERR"
 [ -f "$S" ] && pass "usage errors consume nothing" || fail "usage consumed" "snapshot gone"
 mkdir -p "$R/docs/notes"
 (cd "$R" && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$SCRIPT" docs/notes "$DOC/report.md" >/dev/null 2>&1); RC=$?
@@ -323,5 +433,6 @@ else
 fi
 
 echo ""
+undefined_commands_check || FAIL=$((FAIL + 1))
 echo "Results: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

@@ -1,0 +1,84 @@
+schema: 2
+task: 'task.215.probe-engine-python-cli-entry-form'
+task_title: 'security-probe: run a Python CLI under the cli: entry form'
+gate: FAIL
+status_reason: 'Cycle 2 fixes verified: a replaced excepthook, stderr redirected or None, and tracebacklimit 0 are errored. The safety re-probe found the bootstrap itself can lose its marker: an exception whose str() fails escapes before the marker is written, so with a replaced excepthook the crash is scored rejected (reproduced: verdict engages). Also two fork/fd-3 defects (MEDIUM) and a __main__ restore difference (LOW).'
+reviewer: 'QA Engineer'
+head: '39921d4827935439c6de5dad494d7f823d1e0a9b'
+updated: '2026-10-19T11:26:56Z'
+
+top_issues:
+  - id: 'TASK-215-QA3-1'
+    severity: high
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'PYTHON_BOOTSTRAP formats the marker line (f"{type(e).__name__}: {e}") outside any try, so an exception whose str() raises (a custom __str__, KeyError(10**5000)) throws a second exception before os.write; no marker is written. Behind a replaced excepthook, sys.stderr None or tracebacklimit 0 there is no frame on stderr either, so the crash is scored rejected. Reproduced: a hostile-only crash of this shape gave verdict engages. Diff reviewer CR-1 (high/high). Bug report: task.215.bug.4.unprintable-exception-loses-marker.md'
+    suggested_action: 'Write the marker before formatting anything the script controls (the class name first, the message best-effort inside its own try/except BaseException), and add a fixture with an unprintable exception behind a replaced excepthook.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-215-QA3-2'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'fd 3 survives os.fork(), so a forked child that raises unwinds into the bootstrap and writes the marker; the parent answer is then overridden at any exit status. Reproduced: the parent exits 0 (accepted) directly, the engine scores the case errored, which hides a hostile acceptance. Diff reviewer CR-2 (medium/high). Bug report: task.215.bug.5.forked-child-writes-marker.md'
+    suggested_action: 'Write the marker only from the process that started the bootstrap (compare os.getpid() recorded first), or close fd 3 in children via os.register_at_fork(after_in_child=...).'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-215-QA3-3'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'A forked daemon keeps fd 3 open (non-inheritable closes it on exec, not on fork), so spawnSync waits until the timeout: a case rejected directly in ~100 ms becomes errored (never ran, ETIMEDOUT) and costs the full timeout. Reproduced. The PYTHON_BOOTSTRAP comment claims no started process can hold the pipe. Diff reviewer CR-3 (medium/high). Bug report: task.215.bug.6.forked-daemon-holds-crash-fd.md'
+    suggested_action: 'Close fd 3 in forked children (os.register_at_fork(after_in_child=...)) and correct the comment.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-215-QA3-4'
+    severity: low
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'runpy.run_path restores the bootstrap module as sys.modules["__main__"] when the script body returns, so atexit handlers and outliving threads see a different __main__ than under python3 <entry> (attribute lookups, pickling). Diff reviewer CR-4 (low/high).'
+    suggested_action: 'Exec the entry in the real __main__ module (compile and exec into sys.modules["__main__"].__dict__ with __file__ set) so nothing is restored.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 50
+
+evidence:
+  tests_reviewed: 316
+  phases_verified: 2/2
+  ci: 'not read; CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 17
+    notes: 'isPythonCrash (the second signal) probed with the engine: 17 cases, all as required (run record task.215.qa.3.security.run.json). The cli: arm was also run with the url-authority corpus against cli-crasher-excepthook.py: 9 hostile cases errored, none rejected; those crashes are declined, so that run executes 2 and is not the counted record. The open false pass (TASK-215-QA3-1) was reproduced by hand and is not counted.'
+  performance:
+    status: CONCERNS
+    notes: 'A forked daemon holding fd 3 makes every case wait for the full timeout (TASK-215-QA3-3).'
+  reliability:
+    status: PASS
+    notes: 'SystemExit, KeyboardInterrupt and sibling imports behave as under python3 <entry>; mutation-proven.'
+  maintainability:
+    status: PASS
+    notes: 'One bootstrap constant, one marker reader; rule stated once; bundle in sync.'
+
+recommendations:
+  immediate:
+    - action: 'Make the bootstrap marker unconditional (TASK-215-QA3-1) and scope it to the bootstrap process, closing fd 3 in forked children (TASK-215-QA3-2, QA3-3).'
+      refs: ['shared/resources/security-probe.mjs']
+  future:
+    - action: 'TASK-215-QA3-4: exec the entry in the real __main__ rather than through runpy.run_path.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'CR-5 (advisory, low/medium): fix sys.path[0] before importing runpy, so a fixture file named like a stdlib module in the cwd cannot shadow the bootstrap imports.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'Cycle 2 CR-3 (advisory): probe the interpreter version under the case child environment.'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['TASK-215-QA3-1 fixed and re-reviewed']

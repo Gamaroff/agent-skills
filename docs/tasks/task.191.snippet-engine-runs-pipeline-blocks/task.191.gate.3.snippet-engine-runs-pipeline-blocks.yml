@@ -1,0 +1,68 @@
+schema: 2
+task: 'task.191.snippet-engine-runs-pipeline-blocks'
+task_title: 'Snippet engine runs pipeline blocks'
+gate: FAIL
+status_reason: 'Cycle 2 closed all five gate-2 findings (bugs 1, 2, 7, 8, 9 verified) and CR2-6. The unscoped safety re-probe reproduced one new HIGH fail-open: the cycle-2 inherited-function seeding overwrites a later helper''s redefinition, so its arguments are judged by the wrong commands.'
+reviewer: 'QA Engineer'
+head: '665ae9c760b9ccdc705dfee9606daaaef0a4ce7d'
+updated: '2026-10-19T06:12:09Z'
+
+top_issues:
+  - id: 'CR3-1'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'classifyInternal seeds inherited functions after prepareHelperText names the helper''s own, and overwrites the forwarding entry: with h1.sh f() { echo "$@"; } and h2.sh f() { sed "$@"; }, source ./h1.sh; source ./h2.sh; f ''w victim'' h1.sh classifies runnable while the shell runs sed w. Reproduced; refused without the h1 source.'
+    suggested_action: 'A name the helper defines itself keeps its own reach (or the union with the inherited one); add the h1-then-h2 redefinition test.'
+    suggested_owner: dev
+    bug_ref: 'task.191.bug.10.redefined-sourced-function-keeps-the-earlier-reach.md'
+
+waiver:
+  active: false
+
+quality_score: 40
+
+evidence:
+  tests_reviewed: 179
+  phases_verified: 4/4
+  ci: 'not awaited (QA cycles do not wait on CI); local ci:fast 5877/0 @ 665ae9c760b9'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+  bug_resolution:
+    closed: ['task.191.bug.1', 'task.191.bug.2', 'task.191.bug.7', 'task.191.bug.8', 'task.191.bug.9']
+    reopened: []
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 96
+    notes: 'boundary: true. Run record task.191.qa.3.security.run.json: isRunnableBlock over the shell-exec corpus, the cycle-1 helper cases and 18 cycle-2 shapes (61/61 engage), --diff-base revision refusal (35/35); 0 reproduced. CR3-1 was found by the safety re-probe and reproduced by classification.'
+  performance:
+    status: PASS
+    notes: 'Helper depth bounded at 2; forwarded arguments are classified twice per reached command; shadowsCommand cached.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR2-7 (runBlock timeout kills only the outer shell) and CR2-8 (empty-fence span) remain open, advisory.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Third consecutive gate with a HIGH finding on qa-execute-snippets.mjs''s helper rule (gate 1: 2, gate 2: 5, gate 3: 1). The count is converging. The cycle-2 allow-list moves held under the re-probe, and the one new defect is in the cycle-2 inherited seeding itself.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR3-1: a helper''s own definition must not be replaced by an inherited one.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+  future:
+    - action: 'Observation #67 (pre-existing base scan): a command after a heredoc is hidden by the double prose strip; "$(…)" inside double quotes is collapsed; quoted deny words pass. Each needs its own task with a measured re-run of the real skill docs.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'CR2-7: run each block in its own process group and kill the group on timeout. CR2-8: store the closing-fence line on the block.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'Observation #68: security-probe.mjs keys a JS-entry control by sink+entry, so a second --name replaces the first.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'Carried: --no-textconv has no test (no-red-untested, gate 2).'
+      refs: ['shared/resources/tests/qa-execute-snippets.test.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

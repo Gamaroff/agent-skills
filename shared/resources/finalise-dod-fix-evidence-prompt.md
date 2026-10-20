@@ -31,7 +31,7 @@ header block with no frontmatter — and both must be read. Extract:
 - Every `### Iteration N` under `## Developer Fix Cycle`, and on the **last** one: the
   `#### Fix Implementation` (its `**Files Modified**` and `**Testing**` lists) and the
   `#### QA Verification` (its `**Verification Result**` and `**Notes**`).
-- The PR number from frontmatter (`pr_number:`) or body text (`PR #NNN`, `…/pull/NNN`).
+- The PR number is `<PR_NUMBER>`, resolved by the caller. Do not derive it from the document — a document cites other work's PRs (task 175). An empty `<PR_NUMBER>` means none was resolved: report `pr_status: NOT_FOUND`.
 - The current `status:` (frontmatter) or `**Status**:` (header block).
 
 Read `<IMPL_REPORT>` if it exists. Extract the `## QA Iteration History` — the verify-cycle entries,

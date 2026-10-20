@@ -1,0 +1,86 @@
+[
+  {
+    "id": "rdi.review",
+    "direction": "legitimate",
+    "input": "story.1.2.4.review.1.update-examples.md",
+    "why": "a durable story artifact",
+    "correct": "link it"
+  },
+  {
+    "id": "rdi.substory-qa",
+    "direction": "legitimate",
+    "input": "story.1.2.4A.qa.2.demo.md",
+    "why": "a sub-story's QA report — the case the old regex missed",
+    "correct": "link it"
+  },
+  {
+    "id": "rdi.plan-unnumbered",
+    "direction": "legitimate",
+    "input": "story.1.2.4.plan.demo.md",
+    "why": "plan artifacts carry no number",
+    "correct": "link it"
+  },
+  {
+    "id": "rdi.story-itself",
+    "direction": "hostile",
+    "input": "story.1.2.4.demo.md",
+    "why": "the story document is not an artifact of itself",
+    "correct": "reject"
+  },
+  {
+    "id": "rdi.legacy-flat",
+    "direction": "hostile",
+    "input": "story.2.4.review.1.demo.md",
+    "why": "a flat legacy id is migrated first, never linked",
+    "correct": "reject"
+  },
+  {
+    "id": "rdi.dated-validate",
+    "direction": "hostile",
+    "input": "story.1.2.4.validate.2026-05-13.md",
+    "why": "point-in-time artifacts are not linked",
+    "correct": "reject"
+  },
+  {
+    "id": "rdi.gate-yml",
+    "direction": "hostile",
+    "input": "story.1.2.4.gate.1.demo.yml",
+    "why": "not markdown",
+    "correct": "reject"
+  },
+  {
+    "id": "rdi.traversal",
+    "direction": "hostile",
+    "input": "../story.1.2.4.review.1.demo.md",
+    "why": "a path, not a basename",
+    "correct": "reject"
+  },
+  {
+    "id": "rdi.newline",
+    "direction": "hostile",
+    "input": "story.1.2.4.review.1.demo.md\nx",
+    "why": "a newline in a name",
+    "correct": "reject"
+  },
+  {
+    "id": "rdi.cmdsubst",
+    "direction": "hostile",
+    "input": "story.1.2.4.review.1.$(id).md",
+    "why": "shell metacharacters in the slug",
+    "correct": "reject"
+  },
+  {
+    "id": "rdi.task",
+    "direction": "hostile",
+    "input": "task.9.review.1.demo.md",
+    "why": "another kind's artifact",
+    "correct": "reject"
+  },
+  {
+    "id": "rdi.nul",
+    "direction": "hostile",
+    "input": "story.1.2.4.review.1.demo\u0000.md",
+    "why": "NUL in a name",
+    "correct": "reject"
+  }
+]

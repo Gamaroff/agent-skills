@@ -598,7 +598,7 @@ test("walk — a blocked second hop parks the card and says where", async () => 
 });
 
 test("walk — an unreachable intermediate rung falls through to a directly-reachable target", async () => {
-  // The live regression this exists for (rebirth-wallet RAPP-111, 2026-08-08):
+  // The live regression this exists for (a consumer project, 2026-08-08):
   // `ready-for-merge` from "Ready for Testing" planned a hop through a gate the
   // board does not offer from there, while the DESTINATION was directly
   // available and even appeared in the run's own `available` list. The card

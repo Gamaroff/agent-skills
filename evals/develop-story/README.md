@@ -40,7 +40,7 @@ Each scenario exercises a single pipeline step in replay mode (no model calls, n
 
 | Dir                       | Step                         | Key assertion                            |
 | ------------------------- | ---------------------------- | ---------------------------------------- |
-| `01-create-story-branch/` | Step 1 — create story branch | `branchExists(^feature/story.5.1)`       |
+| `01-create-story-branch/` | Step 1 — create story branch | `branchExists(^feature/story.1.1.1)`       |
 | `02-review-story/`        | Step 2 — review story        | review report exists                     |
 | `03-develop-loop/`        | Step 3 — develop             | story status = ready-for-review          |
 | `04-create-pr/`           | Step 4 — create PR           | **`prTargetsBranch`** (regression guard) |
@@ -49,8 +49,8 @@ Each scenario exercises a single pipeline step in replay mode (no model calls, n
 | `07-finalise/`            | Step 7 — finalise            | DoD file + story accepted                |
 | `08-commit-changes/`      | Step 8 — commit              | `noLockFilesLeft`                        |
 
-Story fixture: `story.5.1.example` at `docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/`.
-Story branch `feature/story.5.1.example` is cut from `develop` and PRs back to `develop`.
+Story fixture: `story.1.1.1.example` at `docs/prd/domain/prd.1.feature/epics/epic.1.1.example/stories/story.1.1.1.example/`.
+Story branch `feature/story.1.1.1.example` is cut from `develop` and PRs back to `develop`.
 
 ## Resume scenario
 

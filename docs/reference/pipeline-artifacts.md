@@ -11,15 +11,15 @@ Filename grammar lives in [File naming](../standards/file-naming.md); this page 
 Everything the pipeline produces is **co-located with the work item** — there is no central `docs/qa/` or `docs/reports/` directory.
 
 ```
-docs/prd/{domain}/{feature}/epics/epic.{N}.{name}/stories/story.{E}.{S}.{name}/
-├── story.{E}.{S}.{name}.md                     # you wrote this
-├── story.{E}.{S}.plan.{name}.md                # you (or /plan) wrote this
-├── story.{E}.{S}.review.{n}.{name}.md          # ← Step 2
-├── story.{E}.{S}.implementation.{n}.{name}.md  # ← Phase 0e, appended to all run
-├── story.{E}.{S}.qa.{n}.{name}.md              # ← Step 5, one per QA cycle
-├── story.{E}.{S}.gate.{n}.{name}.yml           # ← Step 5, one per QA cycle
-├── story.{E}.{S}.pr-review.{n}.{name}.md       # ← Step 5c, on the cycle that exits
-├── story.{E}.{S}.dod.{n}.{name}.md             # ← Step 7
+docs/prd/{domain}/prd.{P}.{feature}/epics/epic.{P}.{E}.{name}/stories/story.{P}.{E}.{S}.{name}/
+├── story.{P}.{E}.{S}.{name}.md                     # you wrote this
+├── story.{P}.{E}.{S}.plan.{name}.md                # you (or /plan) wrote this
+├── story.{P}.{E}.{S}.review.{n}.{name}.md          # ← Step 2
+├── story.{P}.{E}.{S}.implementation.{n}.{name}.md  # ← Phase 0e, appended to all run
+├── story.{P}.{E}.{S}.qa.{n}.{name}.md              # ← Step 5, one per QA cycle
+├── story.{P}.{E}.{S}.gate.{n}.{name}.yml           # ← Step 5, one per QA cycle
+├── story.{P}.{E}.{S}.pr-review.{n}.{name}.md       # ← Step 5c, on the cycle that exits
+├── story.{P}.{E}.{S}.dod.{n}.{name}.md             # ← Step 7
 └── .summaries/                                 # ← runtime only, gitignored
 ```
 
@@ -39,38 +39,39 @@ docs/tasks/task.{N}.{name}/
 └── .summaries/                                 # ← runtime only, gitignored
 ```
 
-The two pipelines are the same shape. Read `story.{E}.{S}` and `task.{N}` as interchangeable prefixes below.
+The two pipelines are the same shape. Read `story.{P}.{E}.{S}` and `task.{N}` as interchangeable prefixes below.
 
 ## Step → artifact
 
 | Step | Skill | Artifact produced | Committed? |
 | --- | --- | --- | --- |
 | Phase 0e | (orchestrator) | **Implementation report** `*.implementation.{n}.{name}.md` | Yes — Step 8 |
-| 1 | `create-branch` | **Feature branch** `feature/story.{E}.{S}.*` / `feature/task.{N}.*`, plus the epic integration branch if you chose one that did not exist | n/a (git ref) |
+| 1 | `create-branch` | **Feature branch** `feature/story.{P}.{E}.{S}.*` / `feature/task.{N}.*`, plus the epic integration branch if you chose one that did not exist | n/a (git ref) |
 | 1 (end) | (orchestrator) | **Pipeline lock** `.claude/state/develop-pipeline.lock` | No |
-| 2 | `review-story` / `review-task` | **Review report** `*.review.{n}.{name}.md` | Yes — Step 8 |
+| 2 | `review-story` / `review-task` | **Review report** `*.review.{n}.{name}.md` | Yes — with Step 4's commit |
 | 3 | `develop` | Source changes, tests, and transient **test logs** `.claude/state/test-output-{ITER}-*.log` | Source yes, logs no |
 | 4 | `create-pr` | **Pull request** against the Q2 base | n/a (remote) |
-| 5 | `qa-story` / `qa-task` | **QA report** `*.qa.{n}.{name}.md` **and gate file** `*.gate.{n}.{name}.yml` — one pair per cycle | Yes — Step 8 |
-| 5c | `review-pr` | **PR review report** `*.pr-review.{n}.{name}.md` — the exit gate of the Steps 5–6 loop; also invocable standalone | Yes — Step 8 |
+| 5 | `qa-story` / `qa-task` | **QA report** `*.qa.{n}.{name}.md` **and gate file** `*.gate.{n}.{name}.yml` — one pair per cycle | Yes — one commit + push per cycle |
+| 5c | `review-pr` | **PR review report** `*.pr-review.{n}.{name}.md` — the exit gate of the Steps 5–6 loop; also invocable standalone | Yes — carried by `/finalise`'s 6a acceptance commit |
 | 6 | `qa-fix` | Fix commits pushed to the branch (no new document) | Yes — immediately |
-| 7 | `finalise` | **DoD summary** `*.dod.{n}.{name}.md`, a PR comment, a tracker-issue comment, a board move, and `status: accepted` on the work item | Yes — Step 8 |
+| 7 | `finalise` | **DoD summary** `*.dod.{n}.{name}.md`, a PR comment, a tracker-issue comment, a board move, and `status: accepted` on the work item (plus `sprint-review-summary.md`, and for a task the registry tick) | Yes — `/finalise` 6a commits and pushes them, then takes a second CI reading |
 | Run end | `handover-render` | **Tracker handover** `*.handover.{n}.{name}.{md,sh,json}` — written only when the run deferred (or failed) a tracker mutation; an empty journal writes nothing | Yes — Step 8 |
-| 8 | `commit-changes` | The commit containing everything above marked "Yes" | — |
+| 8 | `commit-changes` | The final commit — the implementation report, plus any tracker handover files and, on Jira, a `jira_last_*` frontmatter residue. A dirty DoD, sprint review or document body is a Step 7 defect, caught by `/finalise`'s publish-boundary check | — |
 
-Steps 5–6 loop up to 5 cycles. Cycle *n* produces `qa.{n}` **and** `gate.{n}` as a pair — a gate file without its report (or vice versa) means the cycle did not finish, and resume will redo it.
+Steps 5–6 loop up to `QA_MAX_CYCLES` cycles (the lock's `qa_max_cycles`, default 5). Cycle *n* produces `qa.{n}` **and** `gate.{n}` as a pair — a gate file without its report (or vice versa) means the cycle did not finish, and resume will redo it.
 
-**Step 5c is the loop's exit.** A gate reading `PASS` or `WAIVED` does not go straight to Step 7: it
+**Step 5c is the loop's exit.** A gate with no open `top_issues[]` entry (`PASS`, `CONCERNS` or an
+active `WAIVED`), or a Diminishing-returns / Cosmetic-residue exit, does not go straight to Step 7: it
 hands to `review-pr`, which reviews the PR against the work item and returns a verdict. `REQUEST
-CHANGES` routes back to `qa-fix` and consumes a cycle from the same 5-cycle budget; `APPROVE` and
+CHANGES` routes back to `qa-fix` and consumes a cycle from the same budget; `APPROVE` and
 `CONCERNS` exit to Step 7. So a completed run leaves **one report per 5c
 invocation** — usually just one, plus one more for every `REQUEST CHANGES` verdict, since each of
 those sends the run back through 5b and then through 5c again. Do **not** try to infer completeness by comparing those numbers: `gate.{N}` counts QA
-cycles and `pr-review.{n}` counts 5c invocations, and since 5c runs only on a clean gate the two
-diverge on any run whose first gate was not clean. Whether 5c cleared is recorded in the
+cycles and `pr-review.{n}` counts 5c invocations, and since 5c runs only on a gate that left the fix loop the two
+diverge on any run whose first gate went to `qa-fix`. Whether 5c cleared is recorded in the
 implementation report's `**PR Review**` row, not derived from filenames.
 
-## The nine documents, in plain terms
+## The documents, in plain terms
 
 | Document | What it is | Who may edit it |
 | --- | --- | --- |
@@ -94,7 +95,8 @@ These exist only while a pipeline is in flight (or just after a crash). All are 
 | File | Purpose | Lifetime |
 | --- | --- | --- |
 | `.claude/state/develop-pipeline.lock` | Holds `current_step`, work-item path, and `pr_url`. This is what makes resume possible and what stops two pipelines colliding. | Created end of Step 1; deleted at Step 8 success or on HALT |
-| `.claude/state/develop-pipeline.last-halt.json` | Snapshot of the lock at the moment of a terminal HALT, plus `halted_at` / `halt_reason` / `halt_step`. | Written on HALT; persists until you choose "Start fresh" on the next run |
+| `.claude/state/develop-pipeline.last-halt.json` | Snapshot of the lock at a terminal HALT (plus `halted_at` / `halt_reason`) or a PreCompact pause (plus `paused_at` / `pause_reason`), with `halt_step` in both. | Written on a terminal HALT or a PreCompact pause; consumed by `advance-pipeline-lock.sh --restore` when you choose Resume (deleted when you choose "Start fresh") |
+| `.claude/state/develop-pipeline.lock.pausing.<pid>` | The lock as the PreCompact hook claimed it (an atomic `mv`). Normally gone within the hook's run; left behind only when the hook is killed between its claim and its snapshot, in which case it is the other candidate `--restore` rebuilds the lock from. | Swept by the next pause; consumed by `--restore` on Resume |
 | `.claude/state/test-output-{ITER}-*.log` | Raw test output for the triage subagent to read. | Deleted when tests pass; **retained on failure** so you can read it |
 | `{work-item-dir}/.summaries/step-*.json` | Structured subagent results (pre-develop surface map, test-failure triage, QA traceability, post-fix tracker sync). Let the orchestrator drop bulky intermediate content from context and replay it on resume instead of re-running the subagent. | Retained on disk; resume tolerates absence |
 | `{work-item-dir}/.summaries/qa-traceability-matrix.md` | AC → test mapping. `develop-story` only — `develop-task` does not produce one. | Overwritten each QA cycle |

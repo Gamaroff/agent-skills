@@ -1,0 +1,58 @@
+schema: 2
+task: 'task.201.pipeline-upfront-answers-and-speed-modes'
+task_title: 'Pipeline up-front answers and speed modes'
+gate: PASS
+status_reason: 'Gate 5 CR-1 closed by replacing the section reader with a whole-file scan over a derived population; mutation-proven, including the fenced-block case gate 5 found. Two low advisory findings routed to future work.'
+reviewer: 'QA Engineer'
+head: '5508cfe180c0110e0259dc371f7bd8a37b9fa969'
+updated: '2026-10-11T04:53:22Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 5304
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+  ci: 'not read this cycle'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'The change set is a test file and documents; no boundary is delivered (boundary: false).'
+  performance:
+    status: PASS
+    notes: 'The scan reads 23 files once.'
+  reliability:
+    status: PASS
+    notes: 'Fast gate green: 5304 tests, 0 failures.'
+  maintainability:
+    status: PASS
+    notes: 'Whole-file scan; derived population; exemptions keyed by exact line and checked for staleness.'
+
+bug_resolution:
+  previous_gate: 5
+  closed: ['CR-1', 'CR-2', 'CR-3']
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Advisory (low/medium): the population filter reads only .md and .js in shared/resources; widen it or exempt other extensions with reasons.'
+      refs: ['shared/resources/tests/pipeline-answers-generic.test.mjs']
+    - action: 'Advisory (low/low): record how ALSO_CHANGED was enumerated beside the list.'
+      refs: ['shared/resources/tests/pipeline-answers-generic.test.mjs']
+    - action: 'Carried: test 3c leaves its mkdtemp directory behind; develop-bug-step-0-resolve-bug.md:39 pre-existing block failure.'
+      refs: ['shared/resources/tests/pipeline-answers-docs.test.mjs', 'skills/develop-bug/references/develop-bug-step-0-resolve-bug.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

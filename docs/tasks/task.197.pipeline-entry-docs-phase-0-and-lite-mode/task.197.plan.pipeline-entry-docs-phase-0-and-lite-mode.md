@@ -13,6 +13,8 @@ task-ref: task.197.pipeline-entry-docs-phase-0-and-lite-mode.md
 
 16 findings, each with what the doc says, what the source says, the evidence and the fix, copied from the verified audit (`develop` @ `a0e135a6`). Phase 0 re-checks each one before it is edited.
 
+> **Re-worded in review 1 (2026-10-20):** task.201 (merged 2026-10-19) added `--mode standard|lite|fast`, `develop.defaultMode` and the `--defaults`/`--base`/`--target` answer flags after this audit. Every lite-mode and Phase 0 fix below says "no `--lite` flag" rather than "no flag", and cites `shared/resources/develop-pipeline-lite-mode.md` §"Speed Modes and Skips" and `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` §0d "Answer resolution" instead of restating them.
+
 ## Findings by doc
 
 ### `docs/concepts/architecture.md`
@@ -29,7 +31,7 @@ task-ref: task.197.pipeline-entry-docs-phase-0-and-lite-mode.md
   - **Doc says:** 'Both prompts also offer an epic integration branch … as a trailing, unrecommended option'; line 129 also says 'Pick `No`' for lite mode, which line 127 says is not a prompt
   - **Source:** Only Q1 appends the epic-integration option, and only when `branching.epicIntegration.offerWhenUndeclared` is not false. Q2 offers develop / main / Other. Lite mode is auto-detected, so there is nothing to answer 'No' to.
   - **Evidence:** shared/resources/develop-pipeline-step-0-resolve-and-prepare.md:639-642 (Q1 append), :666 (Q2 'Otherwise: develop / main / Other')
-  - **Fix:** Change to 'Q1 also offers an epic integration branch … (unless `offerWhenUndeclared: false`)'. Remove 'Pick `No` for anything…' from the lite-mode note.
+  - **Fix:** Change to 'Q1 also offers an epic integration branch … (unless `offerWhenUndeclared: false`)'. Remove 'Pick `No` for anything…' from the lite-mode note (lite mode is auto-detected; `--mode` can request it but is not a prompt).
 
 ### `docs/reference/anti-patterns.md`
 
@@ -37,7 +39,7 @@ task-ref: task.197.pipeline-entry-docs-phase-0-and-lite-mode.md
   - **Doc says:** "finalise always runs its full side-effects … even in `--lite` mode." / "Lite mode is about skipping context-gathering before development" / "The lite flag is not the right tool."
   - **Source:** No `--lite` flag exists on the develop orchestrators; lite mode is auto-detected in Phase 0. It reduces QA depth rather than pre-develop context-gathering.
   - **Evidence:** git grep -- '--lite' over skills/develop-*/SKILL.md and shared/resources/develop-pipeline-*.md returns nothing; shared/resources/develop-pipeline-step-0-resolve-and-prepare.md:373 (PIPELINE_MODE computed from Agent 3); shared/resources/develop-pipeline-lite-mode.md:19-25
-  - **Fix:** Drop `--lite`/'lite flag'. Say that lite mode, which is auto-detected and trades QA depth, never skips Step 7.
+  - **Fix:** Drop `--lite`/'lite flag'. Say that lite mode — auto-detected, or requested with `--mode lite|fast` — trades QA depth only and never skips Step 7. The 'do this instead' line keeps: no mode or `--skip` can skip Step 7 (it is on the floor).
 
 ### `docs/reference/glossary.md`
 
@@ -45,12 +47,12 @@ task-ref: task.197.pipeline-entry-docs-phase-0-and-lite-mode.md
   - **Doc says:** "Phase 0 … Prompts for story/task path, base branch, lite mode."
   - **Source:** Phase 0d's Upfront Setup asks exactly two questions: Q1, the feature branch base, and Q2, the PR target. Lite mode is computed from the document and never prompted for.
   - **Evidence:** shared/resources/develop-pipeline-step-0-resolve-and-prepare.md:684-690 (required-question count = 2: Q1 + Q2); :373 lite mode detection
-  - **Fix:** Replace with 'Prompts for branch base and PR target; detects lite mode automatically'.
+  - **Fix:** Replace with 'Asks for branch base and PR target, unless `--base`/`--target`/`--defaults` answer them; detects lite mode automatically'.
 - [ ] **REFERENCE-7** (medium, stale) — line 29
   - **Doc says:** "Lite mode: Optional flag that skips pre-develop context-gathering for low-risk stories/tasks."
   - **Source:** Lite mode is not a flag. Phase 0 sets it automatically when risk_level is low or absent, there are fewer than 3 tasks or phases, and the work touches a single module. It changes only QA: Step 5 uses direct tools only and Step 5c runs `/review-pr --effort low`. It does not skip pre-develop context-gathering.
   - **Evidence:** shared/resources/develop-pipeline-lite-mode.md:10-23 (Trigger Conditions; 'Lite mode trades QA depth for speed'); skills/develop-story/SKILL.md 'Lite mode applies to Step 5 only'
-  - **Fix:** Redefine it as an auto-detected mode, triggered when risk_level is low or absent, there are fewer than 3 tasks or phases, and the work touches a single module. In this mode Step 5 QA uses direct tools only and Step 5c runs `/review-pr --effort low` (degraded, never skipped). Every other step, including Step 7's finalise side-effects, runs unchanged. Do not single out 'Steps 4, 7 and 8', because lite-mode.md says all other steps run unchanged.
+  - **Fix:** Redefine it as an auto-detected mode, triggered when risk_level is low or absent, there are fewer than 3 tasks or phases, and the work touches a single module. In this mode Step 5 QA uses direct tools only and Step 5c runs `/review-pr --effort low` (degraded, never skipped). Every other step, including Step 7's finalise side-effects, runs unchanged. It is not a `--lite` flag; `--mode lite` can request it (honoured only when the triggers hold) and `--mode fast` applies the same shortening regardless — link the lite-mode contract rather than restating it. Do not single out 'Steps 4, 7 and 8', because lite-mode.md says all other steps run unchanged.
 
 ### `docs/reference/troubleshooting.md`
 
@@ -58,7 +60,7 @@ task-ref: task.197.pipeline-entry-docs-phase-0-and-lite-mode.md
   - **Doc says:** "You expected `--lite` to skip the PR comment / tracker update." / "Lite mode skips context-gathering before development"
   - **Source:** No --lite flag exists. Lite mode is auto-detected and shortens QA: Step 5 uses direct tools and Step 5c runs at --effort low.
   - **Evidence:** shared/resources/develop-pipeline-lite-mode.md:10-23
-  - **Fix:** Reword the symptom ('the run was in lite mode') and the cause (lite mode shortens QA only; Step 7 always runs in full).
+  - **Fix:** Reword the symptom ('the run was in lite or fast mode') and the cause (those modes shorten QA only; Step 7 always runs in full, and no `--skip` can remove it).
 
 ### `docs/runbooks/create-parallel-stories.md`
 
@@ -90,7 +92,7 @@ task-ref: task.197.pipeline-entry-docs-phase-0-and-lite-mode.md
   - **Doc says:** 'Add `--lite` to skip pre-develop codebase mapping and other context-gathering for low-risk stories.'
   - **Source:** There is no `--lite` flag. Lite mode is set only by Phase 0 detection (risk_level low/absent AND <3 tasks AND single module), and it changes only QA depth: Step 5 uses direct tools, Step 5c runs `--effort low`, all other steps run unchanged (codebase mapping is not skipped).
   - **Evidence:** shared/resources/develop-pipeline-lite-mode.md:10-24 (trigger conditions; 'All other steps run unchanged'); shared/resources/develop-pipeline-step-0-resolve-and-prepare.md:373 ('there is no lite-mode CLI'); skills/develop-story/SKILL.md:242 ('Lite mode applies to Step 5 only')
-  - **Fix:** Replace with: 'Lite mode is auto-detected in Phase 0 (low risk, <3 tasks, one module) — there is no flag. It shortens QA only (direct-tools Step 5, `--effort low` Step 5c); Step 7 still runs in full.'
+  - **Fix:** Replace with: 'Lite mode is auto-detected in Phase 0 (low risk, <3 tasks, one module) — there is no `--lite` flag; `--mode lite` can request it and `--mode fast` forces the same shortening (see the lite-mode contract). It shortens QA only (direct-tools Step 5, `--effort low` Step 5c); Step 7 still runs in full.' Make line 187 ('Lite mode is auto-detected, not asked') agree.
 
 ### `docs/runbooks/task-development.md`
 
@@ -103,7 +105,7 @@ task-ref: task.197.pipeline-entry-docs-phase-0-and-lite-mode.md
   - **Doc says:** Phase 0 prompts for task path, base branch, PR target branch, and 'Lite mode for low-risk tasks (skips pre-develop codebase mapping…)'; line 128: '`--lite` skips context-gathering steps'
   - **Source:** Phase 0d asks exactly Q1 base + Q2 PR target; lite mode is auto-detected, never prompted, has no flag, and affects only Step 5 QA depth and Step 5c effort.
   - **Evidence:** skills/develop-task/SKILL.md:35 ('0d — Q1 base + Q2 PR target … no Q3'); shared/resources/develop-pipeline-step-0-resolve-and-prepare.md:693 ('Do NOT invent additional questions … lite-mode detection runs in 0a-parallel Agent 3'); shared/resources/develop-pipeline-lite-mode.md:10-24
-  - **Fix:** Drop the 'Lite mode' prompt bullet; describe lite mode as auto-detected and QA-only, and remove `--lite` from line 128.
+  - **Fix:** Drop the 'Lite mode' prompt bullet; say Q1/Q2 are asked only where `--base`/`--target`/`--defaults` leave them open; describe lite mode as auto-detected (or `--mode lite|fast`) and QA-only, and remove `--lite` from line 128.
 
 ### `docs/standards/story-documents.md`
 
@@ -143,4 +145,5 @@ task-ref: task.197.pipeline-entry-docs-phase-0-and-lite-mode.md
 ## Testing Approach
 
 - Per finding: re-read the cited source line after editing; grep the doc for the old wording.
-- Per file: `prettier --check` and the CI link checker.
+- Per file: `prettier --check` and the CI link checker run locally (`command npx --yes markdown-link-check@3 --quiet --config .github/markdown-link-check.json <file>`) — CI never checks `skills/` or `.agents/plans/`.
+- After Phases 2–3: `command node --test tests/restricted-access-docs.test.js evals/shared/tests/pr-review-loop-parity.test.mjs`.

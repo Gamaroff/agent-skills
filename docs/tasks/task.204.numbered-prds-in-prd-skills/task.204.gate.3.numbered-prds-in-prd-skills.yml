@@ -1,0 +1,72 @@
+schema: 2
+task: 'task.204.numbered-prds-in-prd-skills'
+task_title: 'Numbered PRDs in the PRD skills'
+gate: CONCERNS
+status_reason: 'Gate 2''s four findings are fixed and verified, and the safety re-probe found the DOMAIN boundary closed (24 probes, both controls engage). One reproduced medium remains: a numbering checker that crashes reports no findings and exits 0.'
+reviewer: 'QA Engineer'
+head: 'eb14a639b657b65ff3afb5ddab402d060c389ea0'
+updated: '2026-10-15T16:08:27Z'
+
+top_issues:
+  - id: CR-1
+    severity: medium
+    file: 'skills/review-prd/SKILL.md'
+    finding: 'The numbering check uses exit 1 for both "findings" and a node crash; a crash (doc-id.js missing) gives empty stdout, jq prints nothing, and the block exits 0 — a broken checker reports zero Critical issues (reproduced).'
+    suggested_action: 'Take the findings branch only when the output parses with reason "findings"; send empty or unparseable output, and any other exit, to the could-not-run branch, as the resolve block does.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 29
+  phases_verified: 5/5
+  ci: 'not read this cycle'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 24
+    notes: 'Two fence: controls on the create-prd allocation block — feature slug (11) and domain (13), both engage (task.204.qa.3.security.run.json). Advisory CR-5 (low confidence): an existing symlinked domain directory is not realpath-checked.'
+  performance:
+    status: PASS
+    notes: 'Row 11: three node processes.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1. Advisory: CR-3 (a migration plan that could not run reads like "no blockers"), CR-4 (an unreadable FOUND_PRD reads as "needs migration").'
+  maintainability:
+    status: PASS
+    notes: 'No new concerns.'
+
+bug_resolution:
+  gate_2_findings: 4
+  fixed_and_verified: 4
+  verification_method: 'Re-ran the cycle-2 reproductions at eb14a639; rows gate-2 CR-1/CR-2, CR-3, CR-5, CR-6, CR-8, each mutation-proven'
+
+recommendations:
+  immediate:
+    - action: 'CR-1: distinguish a crashed numbering checker from findings.'
+      refs: ['skills/review-prd/SKILL.md']
+  future:
+    - action: 'CR-2 (medium confidence): apply the register block layout/containment test to FOUND_PRD in the keep block.'
+      refs: ['skills/create-prd/SKILL.md']
+    - action: 'CR-3 (medium confidence): the migration plan block prints .error and offers Apply only on needs-migration with no blockers.'
+      refs: ['skills/review-prd/SKILL.md']
+    - action: 'CR-4: report an unreadable FOUND_PRD as unreadable, not as needing migration.'
+      refs: ['skills/create-prd/SKILL.md']
+    - action: 'CR-5: realpath-check an existing domain directory.'
+      refs: ['skills/create-prd/SKILL.md']
+    - action: 'Gate-2 CR-4 (still open): the keep path registers a found PRD that has no registry row.'
+      refs: ['skills/create-prd/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 closed']

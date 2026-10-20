@@ -93,20 +93,46 @@ Before loading the task document, resolve the input to a local file path:
 **Step 2 — Extract the issue number / key** from whichever pattern matched:
 
 ```bash
-# Jira key (e.g. PROJ-45): resolve to local file via frontmatter lookup
+# Jira key (e.g. PROJ-45): bind the inputs of the §0a key → document lookup
 if echo "$INPUT" | grep -qE '^[A-Z]+-[0-9]+$'; then
   JIRA_KEY="$INPUT"
-  LOCAL_PATH=$(grep -rl "jira_key: ${JIRA_KEY}" docs/ 2>/dev/null \
-    | grep -E 'task\.[0-9]+\.' \
-    | grep -v -E '\.(qa|gate|bug|implementation)\.' \
-    | head -1)
-  if [ -z "$LOCAL_PATH" ]; then
-    echo "No local document found for Jira key ${JIRA_KEY}. Run /create-task first, or provide the file path directly."
-    exit 1
-  fi
-  # Jump directly to Step 4 with LOCAL_PATH resolved
+  KEY_FIELD=jira_key
+  KEY_VALUE="$JIRA_KEY"
 fi
+```
 
+**On the Jira-key branch**, run [§0a Key → document lookup](references/develop-pipeline-step-0-resolve-and-prepare.md#key--document-lookup)
+with the `KEY_FIELD` / `KEY_VALUE` bound above. It binds `LOCAL_PATH`, and it HALTs (exit 1) on a
+missing `docs/` and on several matching documents. Cited, not restated: one anchored, quote-tolerant
+lookup serves the develop pipelines, `/review-pr` and this skill. Then check its result is a task.
+
+**Run the three as one script, in one shell** — the block above, the §0a block, then the block
+below. Each reads what the one before it binds (`KEY_FIELD` / `KEY_VALUE`, then `LOCAL_PATH`), and a
+fresh shell between them loses it. The check refuses to run on an unbound `JIRA_KEY` or `LOCAL_PATH`
+rather than reading the empty value as "no document":
+
+```bash
+# After §0a, on the Jira-key branch only, in the SAME shell as the bind block and §0a.
+# LOCAL_PATH is §0a's answer ("" when it found none), JIRA_KEY the key the bind block set.
+: "${JIRA_KEY:?run this check in the same shell as the bind block and §0a — JIRA_KEY is unbound}"
+[ "${LOCAL_PATH+set}" = set ] \
+  || { echo "HALT: LOCAL_PATH is unbound — run §0a's block in this shell first"; exit 1; }
+if [ -z "$LOCAL_PATH" ]; then
+  echo "No local document found for Jira key ${JIRA_KEY}. Run /create-task first, or provide the file path directly."
+  exit 1
+fi
+case "${LOCAL_PATH##*/}" in
+  task.[0-9]*) ;; # Jump directly to Step 4 with LOCAL_PATH resolved
+  *)
+    echo "Jira key ${JIRA_KEY} resolves to ${LOCAL_PATH}, which is not a task document. Review it with its own skill (/review-story, /review-epic, /review-bug)."
+    exit 1
+    ;;
+esac
+```
+
+Otherwise extract the issue number:
+
+```bash
 # Direct issue URL:   https://github.com/owner/repo/issues/297
 ISSUE_NUM=$(echo "$INPUT" | grep -oE '(?<=/issues/)[0-9]+')
 
@@ -131,7 +157,7 @@ LOCAL_PATH=$(echo "$DOC_URL" | sed 's|https://github\.com/[^/]*/[^/]*/blob/[^/]*
 ```
 
 - If `LOCAL_PATH` is non-empty and the file exists: use it as `task_file`, skip to Step 4.
-- If no Document link found (older issue without Document section): fall back to `grep -rl "github_issue: {N}" docs/` **or** `grep -rl "jira_key: {KEY}" docs/` and find `task.{N}.*.md` in the result (excluding `.qa.`, `.gate.`, `.bug.`, `.implementation.` files).
+- If no Document link found (older issue without Document section): fall back to [§0a Key → document lookup](references/develop-pipeline-step-0-resolve-and-prepare.md#key--document-lookup) with `KEY_FIELD=github_issue KEY_VALUE={N}` (or `KEY_FIELD=jira_key KEY_VALUE={KEY}`), and check the `LOCAL_PATH` it binds is a `task.{N}.*.md` document. It already excludes artifacts and HALTs on several matches.
 - If still not found: HALT — inform user: "No local document found for issue #{N}. Run `/create-task` first, or provide the file path directly."
 
 **Step 4 — Continue with the resolved `task_file`.**
@@ -669,7 +695,7 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
          3. **Zero matches** → fall through to create block below
          4. **Multiple matches** → log `"⚠️ Dedup: {count} matches found for \"[Task {id}]\": #{n1}, #{n2}, … — proceeding to create"` and fall through to create block below
        Invoke the `ensure-task-github-issue` sub-routine with `TASK_FILE_PATH={resolved task file path}`. The sub-routine handles:
-       - resolving the milestone (frontmatter `milestone:` → epic-registry lookup → `"Technical Tasks (standalone)"` default)
+       - resolving the milestone (frontmatter `milestone:` → epic lookup, see `ensure-task-github-issue` Step T3 → `"Technical Tasks (standalone)"` default)
        - creating the issue (title `[Task {id}] {title}`, `task` + `priority:{priority}` labels)
        - adding it to the GitHub Project board
        - mirroring the priority label onto the board's Priority single-select field
@@ -1951,6 +1977,28 @@ Status Updated: "Planned" → "Ready for Development"
 ↓
 User Can Now: Run `/develop` to begin implementation
 ```
+
+### Step 9a: Record the Reviewed Revision
+
+**Purpose**: stamp the review report with the exact revision of the document it reviewed, so a
+develop pipeline's Step 2 can reuse this review instead of running it again (task.201).
+
+**When to Execute**: always, when a review report file was written — after every edit this review
+makes to the document (fixes, Change Log rows, status), because the hash must include them. Skip it
+only when no report file exists (action plan only).
+
+```bash
+command node .agents/skills/review-task/references/record-reviewed-blob.js \
+  --doc "{task-file-path}" --report "{review report path}" --json
+```
+
+> Engine source: `references/record-reviewed-blob.js` (bundled into each skill as `references/record-reviewed-blob.js`).
+
+It writes `**reviewed_blob:** <git hash-object of the document>` under the report's `**Reviewed:**`
+line, and reads it back. Read `reason`: `written` needs nothing; any other value (`no-doc`,
+`no-report`, `git-failed`, `unreadable-after-write`) is logged and the review continues — the cost of
+a missing stamp is one re-review, never a halt. **Edit the document after this step and the stamp is
+stale by design**: Step 2 then reviews it again.
 
 ---
 

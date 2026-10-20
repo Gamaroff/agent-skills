@@ -1,0 +1,78 @@
+schema: 2
+task: 'task.208.worktree-root-config'
+task_title: 'Worktrees live inside the repo under a configurable root'
+gate: CONCERNS
+status_reason: 'Cycle 1 fixes verified (symlinked root, control characters). The cycle-2 refute pass found develop-batch Step 0.3a writes the exclude line before the root is validated and reads git exit 128 as "not ignored" (TASK-208-BUG-2), and a quadratic regex in the nested-worktree check.'
+reviewer: 'QA Engineer'
+head: '1746fa09e61ed3a180bf9f1a5610b12f7c7b1028'
+updated: '2026-10-14T15:31:51Z'
+
+top_issues:
+  - id: 'QA-208-3'
+    severity: medium
+    file: 'skills/develop-batch/SKILL.md'
+    finding: 'Step 0.3a writes the raw root into .git/info/exclude before Step 1 validates it, so a newline, .. or symlinked root leaves exclude lines behind, one per retry (TASK-208-BUG-2).'
+    suggested_action: 'Validate and normalise the root first (selector --check-root) and write the exclude line from the normalised value.'
+    suggested_owner: dev
+  - id: 'QA-208-4'
+    severity: medium
+    file: 'skills/develop-batch/SKILL.md'
+    finding: 'git check-ignore exit 128 (git cannot answer) is read as exit 1 (not ignored), so a junk pattern is written and the report says the root was ignored (TASK-208-BUG-2).'
+    suggested_action: 'Branch on the exit status: 0 ignored, 1 append, anything else halt with git stderr.'
+    suggested_owner: dev
+  - id: 'QA-208-5'
+    severity: low
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'isLinkedWorktree parses the .git file with a regex that is quadratic in whitespace (40k spaces: 19 s), run on every nested .git file --copy walks.'
+    suggested_action: 'Parse the first line with indexOf/trim, no backtracking regex; add a timing test at growing N.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 5487
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [2, 4]
+  ci: 'not run on the catch-up branch yet'
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 11
+    notes: 'Path-sink probe: NUL now rejected; symlink escape held by the CLI real-path check (committed tests with real links); encoded traversal inert. Step 0.3a side effect precedes validation (QA-208-3).'
+  performance:
+    status: CONCERNS
+    notes: 'Quadratic gitdir regex on a malformed .git file (QA-208-5).'
+  reliability:
+    status: CONCERNS
+    notes: 'git exit 128 misread as not-ignored (QA-208-4).'
+  maintainability:
+    status: PASS
+    notes: 'Real-path check defined once in the selector and tested both directions.'
+
+recommendations:
+  immediate:
+    - action: 'Validate the root before Step 0.3a writes anything, and branch on check-ignore exit status (TASK-208-BUG-2).'
+      refs: ['skills/develop-batch/SKILL.md', 'skills/develop-next/scripts/select-next.mjs']
+  future:
+    - action: 'Refuse a root that is .git or a tracked directory (refute CR-4).'
+      refs: ['skills/develop-next/scripts/select-next.mjs']
+    - action: 'Re-check a recorded worktree dir on resume before creating it (refute CR-3).'
+      refs: ['skills/develop-batch/SKILL.md']
+    - action: 'Find dangling batch worktrees by basename, not only under the current root (refute CR-6).'
+      refs: ['skills/develop-batch/SKILL.md']
+    - action: 'Give each --batch CLI test a tmp cwd so the suite does not depend on the host checkout (refute CR-7).'
+      refs: ['evals/develop-next/unit/select-next.test.mjs']
+    - action: 'Classify linked worktrees by the commondir file, not the gitdir path suffix (refute CR-8).'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-208-BUG-2 fixed']

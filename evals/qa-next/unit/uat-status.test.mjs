@@ -37,10 +37,13 @@ const {
   checkCoverage,
   scoreboard,
   storyIds,
+  scanStories,
+  surfaceKeyWarnings,
   specPaths,
   parseFindings,
   checkFindings,
   isOpenFinding,
+  verifyResolution,
   listRunFiles,
   itemById,
   runPathFor,
@@ -59,16 +62,16 @@ const REGISTRY = `
 ### A. Shell
 
 ${HEAD}
-| A.1 | Open the site signed out | A visitor lands on Home. | / | 7.1 · 40.1 | A.1.1–A.1.3 | apps/portal/e2e/smoke/catalog.smoke.spec.ts | ${STATES.untested} |  |  |
-| A.2 | Use the account menu | A signed-in user opens the menu. | / | [40.6](../prd/s.md) |  | manual only | ${STATES.na} |  | menu is chrome, accepted with A.1 |
+| A.1 | Open the site signed out | A visitor lands on Home. | / | 1.7.1 · 1.40.1 | A.1.1–A.1.3 | apps/portal/e2e/smoke/catalog.smoke.spec.ts | ${STATES.untested} |  |  |
+| A.2 | Use the account menu | A signed-in user opens the menu. | / | [1.40.6](../prd/s.md) |  | manual only | ${STATES.na} |  | menu is chrome, accepted with A.1 |
 
 ### D. Score
 
 ${HEAD}
-| D.1 | Play a game | A visitor plays in the sandboxed iframe. | /games/:slug | 7.5 | D.1.1–D.1.5 | apps/portal/e2e/smoke/play-score.smoke.spec.ts · apps/portal/src/x.spec.ts | ${STATES.accepted} | ${RUN} | accepted 2026-09-21 |
-| D.2 | Submit a score | A game posts SCORE_SUBMIT. | /games/:slug | 7.5 · 31.1 | D.2.1–D.2.9 | \`apps/portal/e2e/smoke/play-score.smoke.spec.ts\` | ${STATES.fail} | ${RUN} | [bug.92.x](../bugs/bug.92.x.md) |
-| D.3 | Theater mode | A player expands the frame. | /games/:slug | 31.2 |  |  | ${STATES.blocked} |  | flag off in test env |
-| D.4 | See the leaderboard | A visitor reads the rail. | /games/:slug | 31.3 |  |  | ${STATES.untested} |  |  |
+| D.1 | Play a game | A visitor plays in the sandboxed iframe. | /games/:slug | 1.7.5 | D.1.1–D.1.5 | apps/portal/e2e/smoke/play-score.smoke.spec.ts · apps/portal/src/x.spec.ts | ${STATES.accepted} | ${RUN} | accepted 2026-09-21 |
+| D.2 | Submit a score | A game posts SCORE_SUBMIT. | /games/:slug | 1.7.5 · 1.31.1 | D.2.1–D.2.9 | \`apps/portal/e2e/smoke/play-score.smoke.spec.ts\` | ${STATES.fail} | ${RUN} | [bug.92.x](../bugs/bug.92.x.md) |
+| D.3 | Theater mode | A player expands the frame. | /games/:slug | 1.31.2 |  |  | ${STATES.blocked} |  | flag off in test env |
+| D.4 | See the leaderboard | A visitor reads the rail. | /games/:slug | 1.31.3 |  |  | ${STATES.untested} |  |  |
 `;
 const cfg = { storyNa: {}, uatSpecPattern: "^apps/portal/e2e/(smoke|uat)/" };
 const story = (id, status = "accepted", surface = "D") => ({
@@ -78,9 +81,15 @@ const story = (id, status = "accepted", surface = "D") => ({
   status,
   surface,
 });
-const stories = ["7.1", "40.1", "40.6", "7.5", "31.1", "31.2", "31.3"].map(
-  (id) => story(id),
-);
+const stories = [
+  "1.7.1",
+  "1.40.1",
+  "1.40.6",
+  "1.7.5",
+  "1.31.1",
+  "1.31.2",
+  "1.31.3",
+].map((id) => story(id));
 
 test("parseRegistry is header-driven: cells are keyed by column name, the separator is skipped", () => {
   const { sections } = parseRegistry(REGISTRY);
@@ -113,7 +122,10 @@ test("parseRegistry is header-driven: cells are keyed by column name, the separa
 });
 
 test("storyIds and specPaths read their cells", () => {
-  assert.deepEqual(storyIds("[7.5](../x.md) · 31.1 · 7.5"), ["7.5", "31.1"]);
+  assert.deepEqual(storyIds("[1.7.5](../x.md) · 1.31.1 · 1.7.5"), [
+    "1.7.5",
+    "1.31.1",
+  ]);
   assert.deepEqual(storyIds(""), []);
   assert.deepEqual(
     specPaths("`apps/portal/e2e/smoke/a.spec.ts` · apps/portal/src/b.spec.ts"),
@@ -195,43 +207,51 @@ test("checkRegistry: state rules — pass/fail/accepted need a run, fail needs a
 });
 
 test("checkRegistry: Stories must name real stories; non-accepted ones and uncovered accepted ones warn", () => {
-  const t = parseRegistry(REGISTRY.replace("| 7.5 · 31.1 |", "| 7.5 · 99.9 |"));
+  const t = parseRegistry(
+    REGISTRY.replace("| 1.7.5 · 1.31.1 |", "| 1.7.5 · 1.99.9 |"),
+  );
   const { errors, warns } = checkRegistry(
     t,
     [
-      ...stories.map((s) => (s.id === "31.3" ? { ...s, status: "draft" } : s)),
-      story("50.1"),
+      ...stories.map((s) =>
+        s.id === "1.31.3" ? { ...s, status: "draft" } : s,
+      ),
+      story("1.50.1"),
     ],
     cfg,
   );
-  assert.ok(errors.includes("D.2: Stories names 99.9, which is not a story"));
-  assert.ok(warns.includes("D.4: story 31.3 is draft, not accepted"));
+  assert.ok(errors.includes("D.2: Stories names 1.99.9, which is not a story"));
+  assert.ok(warns.includes("D.4: story 1.31.3 is draft, not accepted"));
   assert.ok(
     warns.includes(
-      "50.1: accepted story is covered by no function — --coverage",
+      "1.50.1: accepted story is covered by no function — --coverage",
     ),
   );
   assert.ok(
     warns.includes(
-      "31.1: accepted story is covered by no function — --coverage",
+      "1.31.1: accepted story is covered by no function — --coverage",
     ),
-    "31.1 lost its only reference when D.2 was edited",
+    "1.31.1 lost its only reference when D.2 was edited",
   );
 });
 
 test("checkCoverage: unmapped carries a suggested surface; storyNa and non-accepted are excluded; unknown ids listed", () => {
   const c = checkCoverage(
-    parseRegistry(REGISTRY.replace("| 7.5 · 31.1 |", "| 7.5 · 99.9 |")),
-    [...stories, story("50.1", "accepted", "F"), story("50.2", "draft", "F")],
-    { ...cfg, storyNa: { 31.1: "renamed away" } },
+    parseRegistry(REGISTRY.replace("| 1.7.5 · 1.31.1 |", "| 1.7.5 · 1.99.9 |")),
+    [
+      ...stories,
+      story("1.50.1", "accepted", "F"),
+      story("1.50.2", "draft", "F"),
+    ],
+    { ...cfg, storyNa: { "1.31.1": "renamed away" } },
   );
   assert.deepEqual(
     c.unmapped.map((s) => [s.id, s.suggestedSurface]),
-    [["50.1", "F"]],
-    "31.1 is n/a, 50.2 is not accepted",
+    [["1.50.1", "F"]],
+    "1.31.1 is n/a, 1.50.2 is not accepted",
   );
-  assert.deepEqual(c.unknown, ["99.9"]);
-  assert.deepEqual(c.na, [{ id: "31.1", note: "renamed away" }]);
+  assert.deepEqual(c.unknown, ["1.99.9"]);
+  assert.deepEqual(c.na, [{ id: "1.31.1", note: "renamed away" }]);
   assert.deepEqual(c.notAccepted, []);
 });
 
@@ -256,18 +276,18 @@ function corpus() {
       "docs/prd",
       prd,
       "epics",
-      `epic.${epic}.e`,
+      `epic.1.${epic}.e`,
       "stories",
-      `story.${epic}.${n}.s`,
+      `story.1.${epic}.${n}.s`,
     );
     mkdirSync(dir, { recursive: true });
     writeFileSync(
-      path.join(dir, `story.${epic}.${n}.s.md`),
-      `---\ntitle: "Story ${epic}.${n}"\nstatus: ${status}\n${extra}---\n`,
+      path.join(dir, `story.1.${epic}.${n}.s.md`),
+      `---\ntitle: "Story 1.${epic}.${n}"\nstatus: ${status}\n${extra}---\n`,
     );
     // a sidecar that must NOT be read as a story
     writeFileSync(
-      path.join(dir, `story.${epic}.${n}.qa.1.s.md`),
+      path.join(dir, `story.1.${epic}.${n}.qa.1.s.md`),
       `---\ntitle: sidecar\nstatus: accepted\n---\n`,
     );
   };
@@ -287,9 +307,9 @@ function corpus() {
         { letter: "D", title: "Score" },
         { letter: "Z", title: "Unmapped" },
       ],
-      epicSurface: { 7: "D", 31: "D" },
-      storySurface: { 7.1: "A" },
-      storyNa: { 7.1: "monorepo scaffolding — nothing observable" },
+      epicSurface: { 1.7: "D", 1.31: "D" },
+      storySurface: { "1.7.1": "A" },
+      storyNa: { "1.7.1": "monorepo scaffolding — nothing observable" },
     }),
   );
   return root;
@@ -318,8 +338,8 @@ function addRows(root, letter, rows) {
   lines.splice(sep + 1, 0, ...rows.trimEnd().split("\n"));
   writeFileSync(REG(root), lines.join("\n"));
 }
-const D_ROWS = `| D.1 | Play a game | A visitor plays. | /games/:slug | 7.5 |  | apps/portal/e2e/smoke/play-score.smoke.spec.ts · apps/portal/src/x.spec.ts | ⬜ untested |  |  |
-| D.2 | Submit a score | A game posts a score. | /games/:slug | 7.5 · 31.1 | D.2.1–D.2.3, S2 |  | ⬜ untested |  |  |
+const D_ROWS = `| D.1 | Play a game | A visitor plays. | /games/:slug | 1.7.5 |  | apps/portal/e2e/smoke/play-score.smoke.spec.ts · apps/portal/src/x.spec.ts | ⬜ untested |  |  |
+| D.2 | Submit a score | A game posts a score. | /games/:slug | 1.7.5 · 1.31.1 | D.2.1–D.2.3, S2 |  | ⬜ untested |  |  |
 `;
 
 test("CLI: init writes an empty skeleton per surface and refuses to overwrite; rows are authored by hand", () => {
@@ -353,16 +373,16 @@ test("CLI: coverage names accepted stories no function covers, honouring storyNa
   run(root, "--init");
   let { code, out } = run(root, "--coverage");
   assert.equal(code, 0);
-  assert.match(out, /^unmapped {3}7\.5 {2}Story 7\.5 {2}→ surface D$/m);
-  assert.match(out, /^unmapped {3}31\.1 /m);
+  assert.match(out, /^unmapped {3}1\.7\.5 {2}Story 1\.7\.5 {2}→ surface D$/m);
+  assert.match(out, /^unmapped {3}1\.31\.1 /m);
   assert.doesNotMatch(
     out,
-    /^unmapped +(7\.1|1\.1|31\.9) /m,
+    /^unmapped +(1\.7\.1|1\.1\.1|1\.31\.9) /m,
     "n/a, excluded and draft stories are not unmapped",
   );
   assert.match(
     out,
-    /^coverage: 2 accepted stories covered by no function · 1 n\/a · 0 referenced but not accepted · 0 unknown$/m,
+    /^coverage: 2 accepted stories covered by no function · 1 n\/a · 0 referenced but not accepted · 0 unknown · 0 warning\(s\)$/m,
   );
   addRows(root, "D", D_ROWS);
   ({ code, out } = run(root, "--coverage", "--json"));
@@ -397,9 +417,9 @@ test("CLI: next resolves stories, filters UAT-lane specs and finds the checklist
   assert.equal(d1.function, "Play a game");
   assert.deepEqual(d1.stories, [
     {
-      id: "7.5",
-      title: "Story 7.5",
-      path: "docs/prd/prd.live/epics/epic.7.e/stories/story.7.5.s/story.7.5.s.md",
+      id: "1.7.5",
+      title: "Story 1.7.5",
+      path: "docs/prd/prd.live/epics/epic.1.7.e/stories/story.1.7.5.s/story.1.7.5.s.md",
       storyType: "",
     },
   ]);
@@ -418,7 +438,7 @@ test("CLI: next resolves stories, filters UAT-lane specs and finds the checklist
   assert.equal(d2.id, "D.2");
   assert.deepEqual(
     d2.stories.map((s) => s.id),
-    ["7.5", "31.1"],
+    ["1.7.5", "1.31.1"],
   );
   assert.deepEqual(d2.uatSpecs, []);
   assert.deepEqual(
@@ -494,7 +514,7 @@ test("CLI: set → items → automated → accept round-trip; refusals are real;
   const text = readFileSync(REG(root), "utf8");
   assert.match(
     text,
-    /^\| D\.2 \| Submit a score \| A game posts a score\. \| \/games\/:slug \| 7\.5 · 31\.1 \| D\.2\.1–D\.2\.9 \| apps\/portal\/e2e\/uat\/D\.2\.uat\.spec\.ts \| ✅ accepted \| \[r\]\(runs\/D\.2\/r\.md\) \| accepted \d{4}-\d{2}-\d{2} — looks right \|$/m,
+    /^\| D\.2 \| Submit a score \| A game posts a score\. \| \/games\/:slug \| 1\.7\.5 · 1\.31\.1 \| D\.2\.1–D\.2\.9 \| apps\/portal\/e2e\/uat\/D\.2\.uat\.spec\.ts \| ✅ accepted \| \[r\]\(runs\/D\.2\/r\.md\) \| accepted \d{4}-\d{2}-\d{2} — looks right \|$/m,
   );
   assert.match(
     text,
@@ -510,15 +530,18 @@ test("CLI: check reports a ragged hand-edited row and a Stories id with no story
   addRows(
     root,
     "D",
-    "| D.1 | Play | x | / | 7.5 · 8.8 |  | ⬜ untested |  |  |\n",
+    "| D.1 | Play | x | / | 1.7.5 · 1.8.8 |  | ⬜ untested |  |  |\n",
   );
   const { code, out } = run(root, "--check");
   assert.equal(code, 1);
   assert.match(out, /\[ERROR\] D\.1: 9 cells, header has 10/);
-  assert.match(out, /\[ERROR\] D\.1: Stories names 8\.8, which is not a story/);
   assert.match(
     out,
-    /\[warn \] 31\.1: accepted story is covered by no function/,
+    /\[ERROR\] D\.1: Stories names 1\.8\.8, which is not a story/,
+  );
+  assert.match(
+    out,
+    /\[warn \] 1\.31\.1: accepted story is covered by no function/,
   );
 });
 
@@ -529,6 +552,46 @@ test("CLI: a missing surfaces file is scaffolded from the template and the run s
   assert.equal(code, 2);
   assert.match(out, /a template was written there/);
   assert.ok(existsSync(path.join(root, "docs/qa/uat-surfaces.json")));
+});
+
+// obs #57: only --init scaffolds. A read with no surfaces file used to write the template into the
+// tree — found when `--check` was run from a repository root that keeps no UAT registry.
+test("CLI: a missing surfaces file is refused, never scaffolded, by every command but --init", () => {
+  const tree = (root) => {
+    const out = [];
+    const walk = (dir) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const p = path.join(dir, e.name);
+        out.push(path.relative(root, p));
+        if (e.isDirectory()) walk(p);
+      }
+    };
+    walk(root);
+    return out.sort();
+  };
+  const commands = [
+    ["--check"],
+    ["--coverage"],
+    ["--next"],
+    ["--item", "D.1"],
+    [],
+  ];
+  for (const withRegistry of [false, true]) {
+    const root = mkdtempSync(path.join(os.tmpdir(), "qa-next-"));
+    mkdirSync(path.join(root, "docs/prd"), { recursive: true });
+    if (withRegistry) {
+      mkdirSync(path.dirname(REG(root)), { recursive: true });
+      writeFileSync(REG(root), "# UAT registry\n");
+    }
+    const before = tree(root);
+    for (const args of commands) {
+      const label = `${args.join(" ") || "(scoreboard)"}, registry ${withRegistry ? "present" : "absent"}`;
+      const { code, out } = run(root, ...args);
+      assert.equal(code, 2, `${label}: ${out}`);
+      assert.match(out, /uat-surfaces\.json not found — run --init/, label);
+      assert.deepEqual(tree(root), before, `${label} wrote to the tree`);
+    }
+  }
 });
 
 // ---------- findings ----------
@@ -1612,7 +1675,7 @@ test("render and parse are inverses — a pipe does not accumulate backslashes (
   addRows(
     root,
     "D",
-    "| D.9 | Submit a \\| b | It posts a \\| b. | /g | 7.5 |  |  | ⬜ untested |  |  |\n",
+    "| D.9 | Submit a \\| b | It posts a \\| b. | /g | 1.7.5 |  |  | ⬜ untested |  |  |\n",
   );
   mkdirSync(path.join(root, "docs/qa/runs/D.9"), { recursive: true });
   writeFileSync(path.join(root, "docs/qa/runs/D.9/r1.md"), "# run\n");
@@ -1712,7 +1775,7 @@ test("--check validates relative bug links on EVERY row, and leaves prose URLs a
   addRows(
     root,
     "D",
-    "| D.1 | Submit | A game posts. | /g | 7.5 |  |  | ❌ fail | [r](runs/D.1/r.md) | [bug.1.real](../bugs/bug.1.real.md) — see [bug.99 discussion](https://example.com/issues/99) |\n",
+    "| D.1 | Submit | A game posts. | /g | 1.7.5 |  |  | ❌ fail | [r](runs/D.1/r.md) | [bug.1.real](../bugs/bug.1.real.md) — see [bug.99 discussion](https://example.com/issues/99) |\n",
   );
   let check = run(root, "--check");
   assert.equal(
@@ -1726,7 +1789,7 @@ test("--check validates relative bug links on EVERY row, and leaves prose URLs a
   addRows(
     root,
     "D",
-    "| D.2 | Board | A visitor reads. | /g | 7.5 |  |  | ⏸ blocked |  | stale [bug.7.gone](../bugs/bug.7.gone.md) |\n",
+    "| D.2 | Board | A visitor reads. | /g | 1.7.5 |  |  | ⏸ blocked |  | stale [bug.7.gone](../bugs/bug.7.gone.md) |\n",
   );
   assert.equal(
     JSON.parse(run(root, "--item", "D.2", "--json").out).bug,
@@ -1768,7 +1831,7 @@ test("the link --check validates IS the link --item publishes (TASK-141-BUG-16)"
   addRows(
     root,
     "D",
-    "| D.1 | Submit | A game posts. | /g | 7.5 |  |  | ❌ fail | [r](runs/D.1/r.md) | [bug.1.real](../bugs/bug.1.real.md) — see [bug.99 discussion](https://example.com/issues/99) |\n",
+    "| D.1 | Submit | A game posts. | /g | 1.7.5 |  |  | ❌ fail | [r](runs/D.1/r.md) | [bug.1.real](../bugs/bug.1.real.md) — see [bug.99 discussion](https://example.com/issues/99) |\n",
   );
   assert.equal(
     run(root, "--check").code,
@@ -1790,7 +1853,7 @@ test("the link --check validates IS the link --item publishes (TASK-141-BUG-16)"
   addRows(
     root2,
     "D",
-    "| D.1 | Submit | A game posts. | /g | 7.5 |  |  | ❌ fail | [r](runs/D.1/r.md) | see [bug.99 discussion](https://example.com/issues/99) |\n",
+    "| D.1 | Submit | A game posts. | /g | 1.7.5 |  |  | ❌ fail | [r](runs/D.1/r.md) | see [bug.99 discussion](https://example.com/issues/99) |\n",
   );
   const only = run(root2, "--check");
   assert.equal(
@@ -1819,7 +1882,7 @@ test("a #fragment on a relative bug link resolves, and the payload is the path t
   addRows(
     root,
     "D",
-    "| D.1 | Submit | A game posts. | /g | 7.5 |  |  | ❌ fail | [r](runs/D.1/r.md) | [bug.1.real](../bugs/bug.1.real.md#repro) |\n",
+    "| D.1 | Submit | A game posts. | /g | 1.7.5 |  |  | ❌ fail | [r](runs/D.1/r.md) | [bug.1.real](../bugs/bug.1.real.md#repro) |\n",
   );
   assert.equal(
     run(root, "--check").code,
@@ -1964,7 +2027,7 @@ test("each clause of BUG_LINK_RULE is what --check does (TASK-141-BUG-20)", () =
     addRows(
       root,
       "D",
-      `| D.1 | Submit | A game posts. | /g | 7.5 |  |  | ${state} | ${runCell} | ${notes} |\n`,
+      `| D.1 | Submit | A game posts. | /g | 1.7.5 |  |  | ${state} | ${runCell} | ${notes} |\n`,
     );
     assert.equal(run(root, "--check").code, want, clause);
     if (wantBug !== undefined)
@@ -1993,7 +2056,7 @@ test("the payload's bug round-trips through --set fail --bug (TASK-141-BUG-21)",
   addRows(
     root,
     "D",
-    "| D.1 | Submit | A game posts. | /g | 7.5 |  |  | ❌ fail | [r](runs/D.1/r.md) | [bug.1.real](../bugs/bug.1.real.md) |\n",
+    "| D.1 | Submit | A game posts. | /g | 1.7.5 |  |  | ❌ fail | [r](runs/D.1/r.md) | [bug.1.real](../bugs/bug.1.real.md) |\n",
   );
   const { bug } = JSON.parse(run(root, "--item", "D.1", "--json").out);
   assert.equal(
@@ -2287,12 +2350,12 @@ test("a run through the state commands keeps the PRE-run priorRuns and bug (TASK
   addRows(
     root,
     "A",
-    "| A.9 | Placeholder | x | / | 7.5 |  |  | ⬜ untested |  |  |\n",
+    "| A.9 | Placeholder | x | / | 1.7.5 |  |  | ⬜ untested |  |  |\n",
   );
   // D.1 re-shaped as a failed row linking bug.1.old — the re-run the id argument exists for.
   const reg = readFileSync(REG(root), "utf8").replace(
     /^\| D\.1 \|.*$/m,
-    "| D.1 | Play a game | A visitor plays. | /games/:slug | 7.5 |  |  | ❌ fail | [r](runs/D.1/2026-09-01-lan.md) | [bug.1.old](../bugs/bug.1.old.md) |",
+    "| D.1 | Play a game | A visitor plays. | /games/:slug | 1.7.5 |  |  | ❌ fail | [r](runs/D.1/2026-09-01-lan.md) | [bug.1.old](../bugs/bug.1.old.md) |",
   );
   writeFileSync(REG(root), reg);
   assert.equal(run(root, "--check").code, 0, run(root, "--check").out);
@@ -2368,7 +2431,7 @@ test("a v0.51.0-shape state file is answered with targeted, priorRuns, bug and f
     REG(root),
     readFileSync(REG(root), "utf8").replace(
       /^\| D\.1 \|.*$/m,
-      "| D.1 | Play a game | A visitor plays. | /games/:slug | 7.5 |  |  | ❌ fail | [r](runs/D.1/2026-09-01-lan.md) | [bug.1.old](../bugs/bug.1.old.md) |",
+      "| D.1 | Play a game | A visitor plays. | /games/:slug | 1.7.5 |  |  | ❌ fail | [r](runs/D.1/2026-09-01-lan.md) | [bug.1.old](../bugs/bug.1.old.md) |",
     ),
   );
   // Exactly the example object SKILL.md shipped in v0.51.0.
@@ -2380,7 +2443,7 @@ test("a v0.51.0-shape state file is answered with targeted, priorRuns, bug and f
         item: "D.1",
         function: "Play a game",
         surface: "D",
-        stories: ["7.5"],
+        stories: ["1.7.5"],
         uatSpecs: [],
         lane: null,
         runFile: "runs/D.1/2026-09-24-lan.md",
@@ -2445,7 +2508,7 @@ test("a real v0.51.0 file has runFile null: its own file is found by the file-na
         REG(root),
         readFileSync(REG(root), "utf8").replace(
           /^\| D\.1 \|.*$/m,
-          `| D.1 | Play a game | A visitor plays. | /games/:slug | 7.5 |  |  | 🟡 pass | [r](${lastRun}) |  |`,
+          `| D.1 | Play a game | A visitor plays. | /games/:slug | 1.7.5 |  |  | 🟡 pass | [r](${lastRun}) |  |`,
         ),
       );
       mkdirSync(path.dirname(STATE(root)), { recursive: true });
@@ -2455,7 +2518,7 @@ test("a real v0.51.0 file has runFile null: its own file is found by the file-na
           item: "D.1",
           function: "Play a game",
           surface: "D",
-          stories: ["7.5"],
+          stories: ["1.7.5"],
           uatSpecs: [],
           lane: null,
           runFile: null,
@@ -2791,4 +2854,905 @@ test("CLI: --run-path refuses a two-digit or path-steering --env and creates not
     assert.equal(r.code, 2, r.out);
     assert.equal(existsSync(path.join(root, "docs/qa/runs/D.2")), false, env);
   }
+});
+
+// ---------- task 206: hierarchical story ids ----------
+
+test("scanStories reads story.P.E.S through doc-id: id 1.2.3, epicSurface keyed P.E, sorted (P, E, S), and an unparseable story name is REPORTED, not skipped", () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "qa-next-206-"));
+  const put = (rel, title, status = "accepted") => {
+    mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
+    writeFileSync(
+      path.join(root, rel),
+      `---\ntitle: "${title}"\nstatus: ${status}\n---\n`,
+    );
+  };
+  const S = "docs/prd/prd.1.live/epics";
+  put(`${S}/epic.1.2.e/stories/story.1.2.30.s/story.1.2.30.s.md`, "thirty");
+  put(`${S}/epic.1.2.e/stories/story.1.2.3.s/story.1.2.3.s.md`, "three");
+  put(`${S}/epic.1.2.e/stories/story.1.2.3.s/story.1.2.3.qa.1.s.md`, "sidecar");
+  put(`${S}/epic.1.2.e/stories/story.1.2.3A.s/story.1.2.3A.s.md`, "three-a");
+  put(`${S}/epic.1.10.e/stories/story.1.10.1.s/story.1.10.1.s.md`, "ten");
+  put(
+    "docs/prd/prd.2.other/epics/epic.2.2.e/stories/story.2.2.1.s/story.2.2.1.s.md",
+    "other prd",
+  );
+  // A legacy two-number story the old STORY_FILE regex would have read as 5.1,
+  // and doc-id cannot: it must be reported, not dropped.
+  put(`${S}/epic.5.e/stories/story.5.1.s/story.5.1.s.md`, "legacy");
+  const cfg = {
+    excludedPrds: [],
+    defaultSurface: "Z",
+    epicSurface: { 1.2: "D", 2.2: "B" },
+    storySurface: { "1.2.3A": "A" },
+    storyNa: {},
+  };
+  const { stories, warnings } = scanStories({ root, stories: "docs/prd" }, cfg);
+  assert.deepEqual(
+    stories.map((s) => [s.id, s.surface]),
+    [
+      ["1.2.3", "D"],
+      ["1.2.3A", "A"],
+      ["1.2.30", "D"],
+      ["1.10.1", "Z"],
+      ["2.2.1", "B"],
+    ],
+    "P.E.S ids; epic 2 of PRD 2 is not epic 1.2's surface; numeric (P, E, S) order",
+  );
+  assert.equal(warnings.length, 1);
+  assert.match(
+    warnings[0],
+    /story\.5\.1\.s\.md: not a story id doc-id can read/,
+  );
+  assert.match(warnings[0], /migrate-doc-numbering/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+test("surfaceKeyWarnings reports a bare-number epicSurface key and a two-number story key, and accepts P.E / P.E.S (task 206)", () => {
+  assert.deepEqual(
+    surfaceKeyWarnings({
+      epicSurface: { 1.5: "A" },
+      storySurface: { "1.5.2": "B" },
+      storyNa: { "1.5.3A": "n/a" },
+    }),
+    [],
+  );
+  const w = surfaceKeyWarnings({
+    epicSurface: { 5: "A" },
+    storySurface: { 5.2: "B" },
+    storyNa: {},
+  });
+  assert.equal(w.length, 2);
+  assert.match(w[0], /epicSurface key "5" is not an epic id P\.E/);
+  assert.match(w[1], /storySurface key "5\.2" is not a story id P\.E\.S/);
+});
+
+test("storyIds collects P.E.S and sub-story tokens whole, so a Stories cell never splits 1.2.3 into 1.2 (task 206)", () => {
+  assert.deepEqual(storyIds("1.2.3 · [1.2.3A](x.md) · 1.10.1 · 1.2.3"), [
+    "1.2.3",
+    "1.2.3A",
+    "1.10.1",
+  ]);
+});
+
+test("CLI: --check FAILS on, and --coverage COUNTS, an unreadable story and an old-shape surface key in their own output, not only on stderr (task.206 QA cycle 1, CR-9)", () => {
+  const root = corpus();
+  run(root, "--init");
+  const legacy = path.join(
+    root,
+    "docs/prd/prd.live/epics/epic.9.e/stories/story.9.1.s",
+  );
+  mkdirSync(legacy, { recursive: true });
+  writeFileSync(
+    path.join(legacy, "story.9.1.s.md"),
+    "---\ntitle: legacy\nstatus: accepted\n---\n",
+  );
+  const surfaces = path.join(root, "docs/qa/uat-surfaces.json");
+  const cfg = JSON.parse(readFileSync(surfaces, "utf8"));
+  cfg.epicSurface["5"] = "D";
+  writeFileSync(surfaces, JSON.stringify(cfg));
+  const check = run(root, "--check");
+  assert.match(
+    check.out,
+    /\[ERROR\] .*story\.9\.1\.s\.md: not a story id doc-id can read/,
+  );
+  assert.match(
+    check.out,
+    /\[ERROR\] .*epicSurface key "5" is not an epic id P\.E/,
+  );
+  assert.match(check.out, /uat-check: [2-9]\d* error\(s\)/);
+  assert.equal(
+    check.code,
+    1,
+    "an unreadable story fails --check, which qa-next gates on (QA cycle 2, CR2-4)",
+  );
+  const cov = JSON.parse(run(root, "--coverage", "--json").out);
+  assert.equal(cov.warnings.length, 2, JSON.stringify(cov.warnings));
+  const text = run(root, "--coverage").out;
+  assert.match(text, /· 2 warning\(s\)$/m);
+  rmSync(root, { recursive: true, force: true });
+});
+
+// ---------- task 212: a note finding can be resolved, with evidence ----------
+
+const FINDINGS_HEAD =
+  "| # | Where | What was observed | Severity | Filed as |\n| :--- | :--- | :--- | :--- | :--- |";
+const findingsFile = (rows) =>
+  `# run\n\n## Verdict\n\nok\n\n## Findings\n\n${FINDINGS_HEAD}\n${rows.join("\n")}\n\n## Automation candidate\n\n_None._\n`;
+
+// A corpus whose root is a git work tree with one commit; returns { root, sha }.
+function gitCorpus() {
+  const root = corpus();
+  const git = (...a) =>
+    execFileSync(
+      "git",
+      [
+        "-c",
+        "user.email=qa@example.invalid",
+        "-c",
+        "user.name=qa",
+        "-c",
+        "commit.gpgsign=false",
+        ...a,
+      ],
+      { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+    );
+  git("init", "-q");
+  git("commit", "-q", "--allow-empty", "-m", "fixture");
+  return { root, sha: git("rev-parse", "HEAD").trim() };
+}
+const writeRun = (root, rel, rows) => {
+  const p = path.join(root, "docs/qa", rel);
+  mkdirSync(path.dirname(p), { recursive: true });
+  writeFileSync(p, findingsFile(rows));
+  return p;
+};
+const SHA_ABSENT = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
+
+test("parseFindings reads the resolution marker; an unmarked row carries NO resolution key (task 212)", () => {
+  const f = parseFindings(
+    findingsFile([
+      "| 1 | /a | wording | Trivial | note — resolved 2026-10-16 by `96d7948e` |",
+      "| 2 | /b | gone | Minor | note — resolved 2026-10-16 by `runs/A.5/2026-10-16-lan-02.md` |",
+      "| 3 | /c | odd | Minor | note — resolved 2026-13-45 by `abc1234` |",
+      "| 4 | /d | plain | Minor | note |",
+      "| 5 | /e | bug | Major | [bug.3.x](../../bugs/bug.3.x.md) — resolved 2026-10-16 by `abc1234` |",
+    ]),
+  );
+  assert.deepEqual(f[0].resolution, {
+    date: "2026-10-16",
+    evidence: "96d7948e",
+  });
+  assert.equal(
+    f[0].bug,
+    null,
+    "a backticked sha is never read as the bug link",
+  );
+  assert.deepEqual(f[1].resolution, {
+    date: "2026-10-16",
+    evidence: "runs/A.5/2026-10-16-lan-02.md",
+  });
+  assert.equal(
+    f[1].bug,
+    null,
+    "a backticked run path is never read as the bug link",
+  );
+  assert.equal(
+    f[2].resolution.date,
+    "2026-13-45",
+    "a malformed date still parses — verify rejects it",
+  );
+  assert.equal(
+    "resolution" in f[3],
+    false,
+    "unmarked rows are unchanged, key and all",
+  );
+  assert.equal(f[4].bug, "../../bugs/bug.3.x.md");
+  assert.deepEqual(f[4].resolution, {
+    date: "2026-10-16",
+    evidence: "abc1234",
+  });
+  // The fixture that predates task 212: no row grows a key.
+  assert.ok(parseFindings(RUN_FILE).every((x) => !("resolution" in x)));
+});
+
+test("verifyResolution names every reason; it is pure over injected runs and commit lookup (task 212)", () => {
+  const runs = [
+    "runs/A.4/2026-10-15-lan.md",
+    "runs/A.5/2026-10-16-lan.md",
+    "runs/A.5/2026-10-16-lan-02.md",
+    "runs/A.4/2026-10-16-lan-02.md",
+    "runs/A.5/2026-10-16-staging.md",
+    "runs/A.4/2026-10-17-lan.md",
+    "runs/zz.md",
+    "runs/A.5/2026-13-45-lan.md",
+  ];
+  const lookup = (states) => (sha) => states[sha] ?? "absent";
+  const env = { runs, commitState: lookup({ "96d7948e": "commit" }) };
+  const at = (evidence, extra = {}) =>
+    verifyResolution(
+      {
+        run: runs[1],
+        bug: null,
+        resolution: { date: "2026-10-16", evidence },
+        ...extra,
+      },
+      env,
+    );
+  assert.equal(at("96d7948e"), null);
+  assert.equal(at("abcdef0"), "commit-not-found");
+  assert.equal(
+    verifyResolution(
+      {
+        run: runs[1],
+        bug: null,
+        resolution: { date: "2026-10-16", evidence: "96d7948e" },
+      },
+      { runs, commitState: () => "no-repo" },
+    ),
+    "not-a-git-repo",
+  );
+  assert.equal(at(runs[2]), null, "a later run resolves");
+  assert.equal(at(runs[1]), "run-is-self");
+  assert.equal(at(runs[0]), "run-not-later");
+  assert.equal(at("runs/A.5/2026-10-17-lan.md"), "run-not-found");
+  // "Later" is read from the run names, not listRunFiles' order (QA cycle 1, CR-2): same-day runs
+  // of another function or environment cannot be ordered, and an undated file is not a run.
+  assert.equal(
+    at("runs/A.4/2026-10-16-lan-02.md"),
+    "run-not-later",
+    "same day, other function",
+  );
+  assert.equal(
+    at("runs/A.5/2026-10-16-staging.md"),
+    "run-not-later",
+    "same day, other environment",
+  );
+  assert.equal(
+    at("runs/A.4/2026-10-17-lan.md"),
+    null,
+    "a later date resolves across functions",
+  );
+  assert.equal(
+    at("runs/zz.md"),
+    "run-not-later",
+    "a file with no date in its name is never later",
+  );
+  assert.equal(
+    at("runs/A.5/2026-13-45-lan.md"),
+    "run-not-later",
+    "an impossible date is no date (QA cycle 2, CR7)",
+  );
+  assert.equal(
+    at("../../README.md"),
+    "run-not-found",
+    "a path outside runs/ is not a run",
+  );
+  assert.equal(at("PR #12"), "bad-evidence");
+  assert.equal(at("96d7948e", { bug: "../../bugs/b.md" }), "on-a-bug-link");
+  assert.equal(
+    verifyResolution(
+      {
+        run: runs[1],
+        bug: null,
+        resolution: { date: "2026-02-30", evidence: "96d7948e" },
+      },
+      env,
+    ),
+    "bad-date",
+  );
+});
+
+test("isOpenFinding is pure: bug link × resolution validity (task 212)", () => {
+  const rows = [
+    { bug: null, bugStatus: null },
+    { bug: null, bugStatus: null, resolution: { valid: true } },
+    {
+      bug: null,
+      bugStatus: null,
+      resolution: { valid: false, reason: "commit-not-found" },
+    },
+    {
+      bug: "b.md",
+      bugStatus: "closed",
+      resolution: { valid: false, reason: "on-a-bug-link" },
+    },
+    { bug: "b.md", bugStatus: "new", resolution: { valid: true } },
+    { bug: "b.md", bugStatus: "missing" },
+  ];
+  assert.deepEqual(rows.map(isOpenFinding), [
+    true,
+    false,
+    true,
+    false,
+    true,
+    true,
+  ]);
+  assert.deepEqual(
+    checkFindings(
+      rows.map((r, i) => ({
+        ...r,
+        run: "runs/a.md",
+        n: i + 1,
+        ...(r.resolution
+          ? { resolution: { evidence: "x", ...r.resolution } }
+          : {}),
+      })),
+    ),
+    [
+      "runs/a.md finding 3: resolution does not hold (commit-not-found): x",
+      "runs/a.md finding 4: resolution does not hold (on-a-bug-link): x",
+      "runs/a.md finding 6: bug file not found: b.md",
+    ],
+  );
+});
+
+test("CLI: a validly resolved note is closed; an invalid marker stays open and fails --check naming run, n and reason (task 212)", () => {
+  const { root, sha } = gitCorpus();
+  run(root, "--init");
+  assert.equal(run(root, "--check").code, 0, "baseline corpus checks clean");
+  mkdirSync(path.join(root, "docs/bugs"), { recursive: true });
+  writeFileSync(
+    path.join(root, "docs/bugs/bug.1.open.md"),
+    "---\ntype: bug\nstatus: new\n---\n",
+  );
+  writeRun(root, "runs/A.5/2026-10-16-lan.md", [
+    `| 1 | /a | wording | Trivial | note — resolved 2026-10-16 by \`${sha.slice(0, 8)}\` |`,
+    `| 2 | /b | superseded | Minor | note — resolved 2026-10-16 by \`runs/A.5/2026-10-16-lan-02.md\` |`,
+    `| 3 | /c | still there | Minor | note |`,
+  ]);
+  writeRun(root, "runs/A.5/2026-10-16-lan-02.md", [
+    `| 1 | /d | bogus sha | Minor | note — resolved 2026-10-16 by \`${SHA_ABSENT}\` |`,
+    `| 2 | /e | self | Minor | note — resolved 2026-10-16 by \`runs/A.5/2026-10-16-lan-02.md\` |`,
+    `| 3 | /f | earlier | Minor | note — resolved 2026-10-16 by \`runs/A.5/2026-10-16-lan.md\` |`,
+    `| 4 | /g | missing | Minor | note — resolved 2026-10-16 by \`runs/A.5/2026-10-20-lan.md\` |`,
+    `| 5 | /h | bug | Major | [bug.1.open](../../../bugs/bug.1.open.md) — resolved 2026-10-16 by \`${sha}\` |`,
+  ]);
+  const open = JSON.parse(run(root, "--findings", "--json").out);
+  assert.deepEqual(
+    open.map((f) => [f.run.slice(-14), f.n]),
+    [
+      ["2026-10-16-lan.md".slice(-14), 3],
+      ["10-16-lan-02.md".slice(-14), 1],
+      ["10-16-lan-02.md".slice(-14), 2],
+      ["10-16-lan-02.md".slice(-14), 3],
+      ["10-16-lan-02.md".slice(-14), 4],
+      ["10-16-lan-02.md".slice(-14), 5],
+    ],
+    "the sha- and later-run-resolved notes are closed; every invalid marker keeps its row open; the bug governs row 5",
+  );
+  assert.deepEqual(open[1].resolution, {
+    date: "2026-10-16",
+    evidence: SHA_ABSENT,
+    valid: false,
+    reason: "commit-not-found",
+  });
+  const text = run(root, "--findings").out;
+  assert.match(
+    text,
+    /^findings: 6 open \(5 unfiled, 1 in open bugs\) · 2 closed — --all to include them$/m,
+  );
+  const all = run(root, "--findings", "--all").out;
+  assert.match(
+    all,
+    new RegExp(`\\[note — resolved 2026-10-16 by ${sha.slice(0, 8)}\\]`),
+  );
+  assert.match(
+    all,
+    /\[note — resolved 2026-10-16 by runs\/A\.5\/2026-10-16-lan-02\.md\]/,
+  );
+  assert.match(all, /\[note — resolution does not hold: run-is-self\]/);
+  const check = run(root, "--check");
+  assert.equal(check.code, 1);
+  const r2 = "runs/A.5/2026-10-16-lan-02.md";
+  for (const [n, reason, ev] of [
+    [1, "commit-not-found", SHA_ABSENT],
+    [2, "run-is-self", r2],
+    [3, "run-not-later", "runs/A.5/2026-10-16-lan.md"],
+    [4, "run-not-found", "runs/A.5/2026-10-20-lan.md"],
+    [5, "on-a-bug-link", sha],
+  ])
+    assert.ok(
+      check.out.includes(
+        `[ERROR] ${r2} finding ${n}: resolution does not hold (${reason}): ${ev}`,
+      ),
+      `${reason}\n${check.out}`,
+    );
+  assert.doesNotMatch(
+    check.out,
+    /2026-10-16-lan\.md finding [12]:/,
+    "the valid markers raise nothing",
+  );
+  rmSync(root, { recursive: true, force: true });
+});
+
+test("CLI: a commit marker outside a git work tree is not-a-git-repo — open, never accepted unverified (task 212)", () => {
+  const root = corpus();
+  run(root, "--init");
+  writeRun(root, "runs/A.1/2026-10-16-lan.md", [
+    "| 1 | /a | x | Minor | note — resolved 2026-10-16 by `96d7948e` |",
+  ]);
+  // GIT_CEILING_DIRECTORIES stops git's upward search at the corpus, so the case holds wherever
+  // os.tmpdir() lives — including inside some other repository (QA cycle 1, CR-5).
+  const env = { ...process.env, GIT_CEILING_DIRECTORIES: path.dirname(root) };
+  const cli = (...args) => {
+    try {
+      return execFileSync("node", [TOOL, "--root", root, ...args], {
+        encoding: "utf8",
+        env,
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+    } catch (e) {
+      return `${e.stdout ?? ""}${e.stderr ?? ""}`;
+    }
+  };
+  assert.equal(JSON.parse(cli("--findings", "--json")).length, 1);
+  assert.match(
+    cli("--check"),
+    /runs\/A\.1\/2026-10-16-lan\.md finding 1: resolution does not hold \(not-a-git-repo\): 96d7948e/,
+  );
+  rmSync(root, { recursive: true, force: true });
+});
+
+test("CLI: --resolve-finding writes one cell, is idempotent on the same evidence, and every refusal leaves the file byte-identical (task 212)", () => {
+  const { root, sha } = gitCorpus();
+  run(root, "--init");
+  mkdirSync(path.join(root, "docs/bugs"), { recursive: true });
+  writeFileSync(
+    path.join(root, "docs/bugs/bug.1.open.md"),
+    "---\ntype: bug\nstatus: new\n---\n",
+  );
+  const r1 = "runs/A.5/2026-10-16-lan.md";
+  const r2 = "runs/A.5/2026-10-16-lan-02.md";
+  const p1 = writeRun(root, r1, [
+    "| 1 | /a | wording |  Trivial  |   note   |",
+    "| 2 | /b | bug | Major | [bug.1.open](../../../bugs/bug.1.open.md) |",
+    "| 3 | /c | another | Minor | note |",
+  ]);
+  const p2 = writeRun(root, r2, ["| 1 | /d | x | Minor | note |"]);
+  const before = readFileSync(p1, "utf8");
+
+  const ok = run(
+    root,
+    "--resolve-finding",
+    r1,
+    "1",
+    "--by",
+    sha.slice(0, 8),
+    "--date",
+    "2026-10-16",
+  );
+  assert.equal(ok.code, 0, ok.out);
+  const after = readFileSync(p1, "utf8");
+  const want = `| 1 | /a | wording |  Trivial  |   note — resolved 2026-10-16 by \`${sha.slice(0, 8)}\`   |`;
+  assert.equal(
+    after,
+    before.replace("| 1 | /a | wording |  Trivial  |   note   |", want),
+  );
+  assert.equal(
+    after.split("\n").filter((l, i) => l !== before.split("\n")[i]).length,
+    1,
+    "exactly one line changed",
+  );
+  assert.equal(
+    JSON.parse(run(root, "--findings", "--json").out).some(
+      (f) => f.run === r1 && f.n === 1,
+    ),
+    false,
+  );
+
+  // The same evidence again — on another day — is a no-op, exit 0.
+  const again = run(
+    root,
+    "--resolve-finding",
+    r1,
+    "1",
+    "--by",
+    sha.slice(0, 8),
+    "--date",
+    "2026-10-20",
+  );
+  assert.equal(again.code, 0, again.out);
+  assert.match(again.out, /already resolved/);
+  assert.equal(readFileSync(p1, "utf8"), after);
+
+  const refusals = [
+    [["runs/A.5/2026-10-30-lan.md", "1", "--by", sha], 4, "no run file"],
+    [[r1, "9", "--by", sha], 4, "no finding 9"],
+    [[r1, "2", "--by", sha], 2, "links a bug"],
+    [[r1, "1", "--by", r2], 2, "already resolved by"],
+    [[r1, "3", "--by", SHA_ABSENT], 2, "commit-not-found"],
+    [[r1, "3", "--by", r1], 2, "run-is-self"],
+    [[r2, "1", "--by", r1], 2, "run-not-later"],
+    [[r1, "3", "--by", "PR #12"], 2, "bad-evidence"],
+    [[r1, "3", "--by", sha, "--date", "2026-02-30"], 2, "bad-date"],
+    [[r1, "3"], 2, "--by"],
+  ];
+  for (const [args, code, says] of refusals) {
+    const b1 = readFileSync(p1, "utf8");
+    const b2 = readFileSync(p2, "utf8");
+    const r = run(root, "--resolve-finding", ...args);
+    assert.equal(r.code, code, `${args.join(" ")}\n${r.out}`);
+    assert.ok(r.out.includes(says), `${args.join(" ")}: ${r.out}`);
+    assert.equal(
+      readFileSync(p1, "utf8"),
+      b1,
+      `${args.join(" ")} wrote nothing`,
+    );
+    assert.equal(
+      readFileSync(p2, "utf8"),
+      b2,
+      `${args.join(" ")} wrote nothing`,
+    );
+  }
+
+  // A later run as evidence, and the default date is today (UTC).
+  const later = run(root, "--resolve-finding", r1, "3", "--by", r2);
+  assert.equal(later.code, 0, later.out);
+  const today = new Date().toISOString().slice(0, 10);
+  assert.ok(
+    readFileSync(p1, "utf8").includes(
+      `| note — resolved ${today} by \`${r2}\` |`,
+    ),
+  );
+  assert.equal(
+    run(root, "--check").code,
+    0,
+    "everything the writer wrote verifies",
+  );
+  rmSync(root, { recursive: true, force: true });
+});
+
+test("CLI: --resolve-finding keeps a CRLF row's line ending (task 212)", () => {
+  const { root, sha } = gitCorpus();
+  run(root, "--init");
+  const p = path.join(root, "docs/qa/runs/A.1/2026-10-16-lan.md");
+  mkdirSync(path.dirname(p), { recursive: true });
+  const crlf = findingsFile(["| 1 | /a | x | Minor | note |"]).replace(
+    /\n/g,
+    "\r\n",
+  );
+  writeFileSync(p, crlf);
+  assert.equal(
+    run(
+      root,
+      "--resolve-finding",
+      "runs/A.1/2026-10-16-lan.md",
+      "1",
+      "--by",
+      sha,
+      "--date",
+      "2026-10-16",
+    ).code,
+    0,
+  );
+  assert.equal(
+    readFileSync(p, "utf8"),
+    crlf.replace(
+      "| note |\r\n",
+      `| note — resolved 2026-10-16 by \`${sha}\` |\r\n`,
+    ),
+  );
+  rmSync(root, { recursive: true, force: true });
+});
+
+test("a run file with no markers yields the same --findings, --json and --check output as before task 212", () => {
+  const root = corpus();
+  run(root, "--init");
+  writeRun(root, "runs/A.1/2026-09-21-lan.md", [
+    "| 1 | /health | no redis field | Minor | note |",
+  ]);
+  assert.deepEqual(JSON.parse(run(root, "--findings", "--json").out), [
+    {
+      n: 1,
+      where: "/health",
+      what: "no redis field",
+      severity: "Minor",
+      filedAs: "note",
+      bug: null,
+      run: "runs/A.1/2026-09-21-lan.md",
+      bugStatus: null,
+    },
+  ]);
+  assert.equal(
+    run(root, "--findings").out,
+    "runs/A.1/2026-09-21-lan.md\n   1  Minor    /health — no redis field  [note]\nfindings: 1 open (1 unfiled, 0 in open bugs) · 0 closed — --all to include them\n",
+  );
+  const check = run(root, "--check");
+  assert.equal(check.code, 0);
+  assert.doesNotMatch(check.out, /resolution/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+test("the run template, SKILL.md and README define the resolution marker identically and name --resolve-finding its only writer (task 212)", () => {
+  const skillDir = path.resolve(__dirname, "../../../skills/qa-next");
+  const read = (p) => readFileSync(path.join(skillDir, p), "utf8");
+  const GRAMMAR = "— resolved YYYY-MM-DD by `<evidence>`";
+  for (const file of ["assets/run.template.md", "SKILL.md", "README.md"]) {
+    const text = read(file);
+    assert.ok(text.includes(GRAMMAR), `${file} states the grammar verbatim`);
+    assert.match(text, /--resolve-finding/, `${file} names the writer`);
+  }
+  const skill = read("SKILL.md");
+  const never = skill.slice(
+    skill.indexOf("## What this skill never does"),
+    skill.indexOf("## Running as a loop"),
+  );
+  assert.match(
+    never,
+    /Overwrite a previous run file[^\n]*--resolve-finding/,
+    "the one exception is stated where the rule is",
+  );
+  const step5 = skill.slice(
+    skill.indexOf("## Step 5"),
+    skill.indexOf("## Step 6"),
+  );
+  assert.match(
+    step5,
+    /resolv/i,
+    "Step 5 stages the earlier run files a run resolved findings in",
+  );
+});
+
+test("CLI: --resolve-finding replaces a marker that no longer holds, and reports success only over one that does (task 212, QA cycle 1 CR-1)", () => {
+  const { root, sha } = gitCorpus();
+  run(root, "--init");
+  const r1 = "runs/A.5/2026-10-16-lan.md";
+  const p1 = writeRun(root, r1, ["| 1 | /a | wording | Minor | note |"]);
+  const r2 = "runs/A.5/2026-10-16-lan-02.md";
+  const p2 = writeRun(root, r2, ["| 1 | /b | x | Minor | note |"]);
+  assert.equal(
+    run(root, "--resolve-finding", r1, "1", "--by", r2, "--date", "2026-10-16")
+      .code,
+    0,
+  );
+  rmSync(p2);
+  // The marker no longer holds: the same evidence is NOT "already resolved".
+  const same = run(root, "--resolve-finding", r1, "1", "--by", r2);
+  assert.equal(same.code, 2, same.out);
+  assert.match(same.out, /run-not-found/);
+  assert.doesNotMatch(same.out, /already resolved/);
+  assert.match(
+    run(root, "--check").out,
+    /resolution does not hold \(run-not-found\)/,
+  );
+  // New, valid evidence replaces it — one marker, not two.
+  const fixed = run(
+    root,
+    "--resolve-finding",
+    r1,
+    "1",
+    "--by",
+    sha,
+    "--date",
+    "2026-10-17",
+  );
+  assert.equal(fixed.code, 0, fixed.out);
+  assert.match(
+    fixed.out,
+    /replaced a resolution that did not hold \(run-not-found\)/,
+  );
+  const row = readFileSync(p1, "utf8")
+    .split("\n")
+    .find((l) => l.startsWith("| 1 |"));
+  assert.equal(
+    row,
+    `| 1 | /a | wording | Minor | note — resolved 2026-10-17 by \`${sha}\` |`,
+  );
+  assert.equal(run(root, "--check").code, 0);
+  // Once it holds again, other evidence is refused and the same evidence is a no-op.
+  assert.equal(run(root, "--resolve-finding", r1, "1", "--by", r2).code, 2);
+  assert.match(
+    run(root, "--resolve-finding", r1, "1", "--by", sha).out,
+    /already resolved/,
+  );
+  rmSync(root, { recursive: true, force: true });
+});
+
+test("CLI: --resolve-finding refuses a finding number two rows share, writing nothing (task 212, QA cycle 1 CR-3)", () => {
+  const { root, sha } = gitCorpus();
+  run(root, "--init");
+  const r1 = "runs/A.5/2026-10-16-lan.md";
+  const p1 = writeRun(root, r1, [
+    "| 1 | /a | first | Minor | note |",
+    "| 1 | /b | second | Minor | note |",
+  ]);
+  const before = readFileSync(p1, "utf8");
+  const r = run(root, "--resolve-finding", r1, "1", "--by", sha);
+  assert.equal(r.code, 2, r.out);
+  assert.match(r.out, /2 findings numbered 1/);
+  assert.equal(readFileSync(p1, "utf8"), before);
+  rmSync(root, { recursive: true, force: true });
+});
+
+test("CLI: --resolve-finding reads its row back and refuses a marker the table would not hold (task 212, QA cycle 2 CR2)", () => {
+  const { root } = gitCorpus();
+  run(root, "--init");
+  const r1 = "runs/A.5/2026-10-16-lan.md";
+  const p1 = writeRun(root, r1, ["| 1 | /a | x | Minor | note |"]);
+  // Later run files whose names verify but would break the cell: a pipe splits it, a backtick
+  // ends the marker's evidence early. Both are run names runPathFor does not refuse.
+  for (const name of ["2026-10-17-a|b.md", "2026-10-17-a`b.md"]) {
+    writeRun(root, `runs/A.5/${name}`, ["| 1 | /b | y | Minor | note |"]);
+    const before = readFileSync(p1, "utf8");
+    const r = run(
+      root,
+      "--resolve-finding",
+      r1,
+      "1",
+      "--by",
+      `runs/A.5/${name}`,
+    );
+    assert.equal(r.code, 2, `${name}: ${r.out}`);
+    assert.match(r.out, /would not read back/);
+    assert.equal(readFileSync(p1, "utf8"), before, `${name} wrote nothing`);
+  }
+  rmSync(root, { recursive: true, force: true });
+});
+
+test("CLI: replacing a stale marker drops every trailing marker and its dash, whatever the dash (task 212, QA cycle 2 CR-6)", () => {
+  const { root, sha } = gitCorpus();
+  run(root, "--init");
+  const r1 = "runs/A.5/2026-10-16-lan.md";
+  const p1 = writeRun(root, r1, [
+    "| 1 | /a | x | Minor | note - resolved 2026-10-16 by `runs/A.5/gone-1.md` — resolved 2026-10-16 by `runs/A.5/gone-2.md` |",
+  ]);
+  const r = run(
+    root,
+    "--resolve-finding",
+    r1,
+    "1",
+    "--by",
+    sha,
+    "--date",
+    "2026-10-17",
+  );
+  assert.equal(r.code, 0, r.out);
+  assert.equal(
+    readFileSync(p1, "utf8")
+      .split("\n")
+      .find((l) => l.startsWith("| 1 |")),
+    `| 1 | /a | x | Minor | note — resolved 2026-10-17 by \`${sha}\` |`,
+  );
+  rmSync(root, { recursive: true, force: true });
+});
+
+test("SKILL.md Step 5's staging block lists exactly the tracked run files a run edited — executed, not read (task 212, QA cycles 2–3 CR1)", () => {
+  const skill = readFileSync(
+    path.resolve(__dirname, "../../../skills/qa-next/SKILL.md"),
+    "utf8",
+  );
+  const step5 = skill.slice(
+    skill.indexOf("## Step 5"),
+    skill.indexOf("## Step 6"),
+  );
+  const blocks = [...step5.matchAll(/```bash\n([\s\S]*?)```/g)].map(
+    (m) => m[1],
+  );
+  const block = blocks.find((b) => b.includes("--changed-runs"));
+  assert.ok(block, "Step 5 carries the tree-derived staging block");
+  // The registry directory is the tool's to resolve; a shell default ignored qaNext.registryPath (QA cycle 3).
+  assert.doesNotMatch(step5, /REGISTRY_DIR/);
+  const { root } = gitCorpus();
+  const git = (...a) =>
+    execFileSync(
+      "git",
+      [
+        "-c",
+        "user.email=qa@example.invalid",
+        "-c",
+        "user.name=qa",
+        "-c",
+        "commit.gpgsign=false",
+        ...a,
+      ],
+      { cwd: root, encoding: "utf8" },
+    );
+  writeRun(root, "runs/A.4/2026-10-15-lan.md", [
+    "| 1 | /a | x | Minor | note |",
+  ]);
+  writeRun(root, "runs/A.5/2026-10-15-lan.md", [
+    "| 1 | /b | y | Minor | note |",
+  ]);
+  git("add", "-A");
+  git("commit", "-q", "-m", "runs");
+  // This run: a new (untracked) run file, and one earlier run edited by --resolve-finding.
+  writeRun(root, "runs/A.5/2026-10-16-lan.md", [
+    "| 1 | /c | z | Minor | note |",
+  ]);
+  const edited = path.join(root, "docs/qa/runs/A.4/2026-10-15-lan.md");
+  writeFileSync(
+    edited,
+    readFileSync(edited, "utf8").replace(
+      "| note |",
+      "| note — resolved 2026-10-16 by `runs/A.5/2026-10-16-lan.md` |",
+    ),
+  );
+  const out = execFileSync(
+    "bash",
+    [
+      "-c",
+      block.replace(".agents/skills/qa-next/scripts/uat-status.mjs", TOOL),
+    ],
+    { cwd: root, encoding: "utf8" },
+  );
+  assert.equal(out, "docs/qa/runs/A.4/2026-10-15-lan.md\n");
+  rmSync(root, { recursive: true, force: true });
+});
+
+test("CLI: --changed-runs lists the edited run files under the registry it is given, not under docs/qa (task 212, QA cycle 3 CR1)", () => {
+  const { root } = gitCorpus();
+  const git = (...a) =>
+    execFileSync(
+      "git",
+      [
+        "-c",
+        "user.email=qa@example.invalid",
+        "-c",
+        "user.name=qa",
+        "-c",
+        "commit.gpgsign=false",
+        ...a,
+      ],
+      { cwd: root, encoding: "utf8" },
+    );
+  const REGISTRY = "quality/uat/uat-registry.md";
+  const put = (rel, text) => {
+    const p = path.join(root, rel);
+    mkdirSync(path.dirname(p), { recursive: true });
+    writeFileSync(p, text);
+  };
+  put(
+    "quality/uat/runs/A.1/2026-10-15-lan.md",
+    findingsFile(["| 1 | /a | x | Minor | note |"]),
+  );
+  put(
+    "docs/qa/runs/A.1/2026-10-15-lan.md",
+    findingsFile(["| 1 | /a | x | Minor | note |"]),
+  );
+  git("add", "-A");
+  git("commit", "-q", "-m", "runs");
+  put(
+    "quality/uat/runs/A.1/2026-10-16-lan.md",
+    findingsFile(["| 1 | /b | y | Minor | note |"]),
+  );
+  assert.equal(
+    run(
+      root,
+      "--registry",
+      REGISTRY,
+      "--resolve-finding",
+      "runs/A.1/2026-10-15-lan.md",
+      "1",
+      "--by",
+      "runs/A.1/2026-10-16-lan.md",
+    ).code,
+    0,
+  );
+  // A stray edit under the default directory is not this registry's and is not listed.
+  put("docs/qa/runs/A.1/2026-10-15-lan.md", "edited\n");
+  const r = run(root, "--registry", REGISTRY, "--changed-runs");
+  assert.equal(r.code, 0, r.out);
+  assert.equal(r.out, "quality/uat/runs/A.1/2026-10-15-lan.md\n");
+  rmSync(root, { recursive: true, force: true });
+});
+
+test("CLI: --changed-runs outside a git work tree is a refusal, not an empty list (task 212)", () => {
+  const root = corpus();
+  const env = { ...process.env, GIT_CEILING_DIRECTORIES: path.dirname(root) };
+  let code = 0;
+  let out = "";
+  try {
+    out = execFileSync("node", [TOOL, "--root", root, "--changed-runs"], {
+      encoding: "utf8",
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  } catch (e) {
+    code = e.status;
+    out = `${e.stdout ?? ""}${e.stderr ?? ""}`;
+  }
+  assert.equal(code, 2, out);
+  assert.match(out, /--changed-runs needs a git work tree/);
+  rmSync(root, { recursive: true, force: true });
 });

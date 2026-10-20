@@ -1,0 +1,113 @@
+schema: 2
+task: 'task.202.doc-id-engine-and-prd-registry'
+task_title: 'Doc-id engine and PRD registry'
+gate: CONCERNS
+status_reason: 'Every cycle-1 finding is fixed and mutation-proven, and the security probe now engages. The refute pass found three medium defects (the allocator still reads an unreadable directory as empty, the PRD registry reader disagrees with the selector, format() rejects string-number parts) and QA found a fourth (sprint-review-summary artifacts read as documents). No HIGH findings.'
+reviewer: 'QA Engineer'
+head: 'e096933dcdd5e44b4ad24619f8c3d09c3148b6c4'
+updated: '2026-10-15T04:12:00Z'
+
+top_issues:
+  - id: 'QA-1'
+    severity: medium
+    file: 'shared/resources/doc-id.js'
+    finding: 'A sprint-review-summary artifact is a fixed name with no seq or slug, but the single-segment rule reads it as the slug of a document: parse("story.1.2.3.sprint-review-summary") is a document, disagreeing with WORK_ITEM_ARTIFACT_RE, and the cycle-1 CR-10 change made checkCorpus count the five legacy story.N.N.sprint-review-summary.md files in docs/prd as documents (29 → 34).'
+    suggested_action: 'Treat a lone sprint-review-summary segment as a canonical artifact (seq and slug null), format it back, and count it as an artifact in the corpus walk.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/doc-id.js'
+    finding: 'childDirs/allDirs return [] for a directory that exists but cannot be read, so next epic/story allocate epic.1.1 at exit 0 over an unreadable epics/ and next prd misses PRDs in an unreadable subtree.'
+    suggested_action: 'Tell absent from unreadable and make next exit 1 unreadable, naming the directory.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-2'
+    severity: medium
+    file: 'shared/resources/doc-id.js'
+    finding: 'registryNumbers disagrees with the selector parseRegistry: a headless table, a # header and rows after a blank line are registrations to the selector and not to doc-id, so check reports registered PRDs as unregistered and the registry-behind guard misses rows.'
+    suggested_action: 'Read the number column by the selector rules (header aliases, headless default column, fence toggle) and pin the two readers with a parity test.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-3'
+    severity: medium
+    file: 'shared/resources/doc-id.js'
+    finding: 'format() compares parsed numbers to the parts with !==, so string-number parts (prd: "1") that build the right name now throw.'
+    suggested_action: 'Number-coerce numeric parts before the drift comparison; add a string-number case.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-4'
+    severity: low
+    file: 'shared/resources/doc-id.js'
+    finding: 'The PRD counter is read fence-blind, so a fenced example counter ahead of the real one wins.'
+    suggested_action: 'Read the counter in the same fence-aware loop, first match outside a fence.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-5'
+    severity: low
+    file: 'shared/resources/doc-id.js'
+    finding: 'The quoted-value branch is greedy: prd_number: "1" # a "b" reads as 1" # a "b.'
+    suggested_action: 'Match the quoted scalar without its quote character before an optional comment.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-6'
+    severity: low
+    file: 'shared/resources/doc-id.js'
+    finding: 'frontmatterField key regex and comment strip are quadratic on a long whitespace run (7 s at 40k), stalling check --corpus.'
+    suggested_action: 'Split lines and strip the comment with a linear scan.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-8'
+    severity: low
+    file: 'shared/resources/doc-id.js'
+    finding: 'The fence tracker closes a 4-backtick fence on a 3-backtick line, so a fenced example row is counted.'
+    suggested_action: 'Match CommonMark fence lengths, or state the parity rule with the selector.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 43
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1, 2]
+  ci: 'not read — CI is gated at /finalise'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 30
+    notes: 'security-probe.mjs on doc-id.js#parse, doc-id cases file (23 hostile, 7 legitimate): engages — every hostile case rejected (PROBE-1 fixed), every legitimate accepted. One case (unsafe seq) was re-specified as legitimate: it classifies as a non-canonical artifact with seq null, per the documented grammar.'
+  performance:
+    status: CONCERNS
+    notes: 'check --corpus over docs/prd: 0.035 s on head e096933d (uptime load 0.88, 1.05, 1.04). CR-6: frontmatterField is quadratic on a crafted whitespace run.'
+  reliability:
+    status: CONCERNS
+    notes: 'The allocator reads an unreadable directory as empty (CR-1); the registry reader disagrees with the selector (CR-2).'
+  maintainability:
+    status: PASS
+    notes: 'Every cycle-1 fix carries a mutation-proven regression test.'
+
+recommendations:
+  immediate:
+    - action: 'Fix QA-1, CR-1, CR-2, CR-3 (medium) and CR-4, CR-5, CR-6, CR-8 (low).'
+      refs: ['shared/resources/doc-id.js', 'shared/resources/tests/doc-id.test.mjs']
+  future:
+    - action: 'Advisory CR-7 (PRD review full-stem shape not canonical), CR-9 (unreadable document/registry share reasons), CR-10 (malformed counter reads as registry-missing), CR-11 (parseRegistry JSDoc).'
+      refs: ['shared/resources/doc-id.js', 'skills/develop-next/scripts/select-next.mjs', 'docs/standards/file-naming.md']
+
+bug_resolution:
+  previous_gate: 'task.202.gate.1.doc-id-engine-and-prd-registry.yml'
+  fixed: ['PROBE-1', 'CR-1', 'CR-2', 'CR-3', 'CR-5', 'CR-6', 'CR-7', 'CR-8', 'advisory CR-4', 'advisory CR-9', 'advisory CR-10']
+  fix_commit: 'e096933d'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['Medium findings fixed and re-reviewed']

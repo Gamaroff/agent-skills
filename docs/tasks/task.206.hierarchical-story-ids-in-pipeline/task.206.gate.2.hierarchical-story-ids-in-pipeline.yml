@@ -1,0 +1,88 @@
+schema: 2
+task: 'task.206.hierarchical-story-ids-in-pipeline'
+task_title: 'Hierarchical story ids in the pipeline'
+gate: FAIL
+status_reason: 'Refute pass: cycle 1 fixed all five gated findings (bugs 1–4 closed), but the CR-8 fix is half-done — Step 0a.3 still reads CURRENT_BRANCH from 0a.1, so run alone its auto-skip never fires (high, high confidence).'
+reviewer: 'QA Engineer'
+head: 'd58d3944c6884960f56b3c36bd238e8e16cd26d6'
+updated: '2026-10-16T07:28:08Z'
+
+top_issues:
+  - id: 'TASK-206-CR2-1'
+    severity: high
+    file: 'shared/resources/review-pipeline-step-0a-branch-setup.md'
+    finding: '0a.3 derives STORY_STEM itself but still reads CURRENT_BRANCH bound only in 0a.1; run as its own shell the auto-skip never fires, and the test sets CURRENT_BRANCH itself (bug.5).'
+    suggested_action: 'Bind CURRENT_BRANCH=$(git branch --show-current) inside 0a.3 (all four variants); test the block from a real checked-out branch without injecting CURRENT_BRANCH.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-206-QA2-1'
+    severity: low
+    file: 'skills/sync-jira-bug/tests/sync-jira-bug.test.js'
+    finding: 'Mutation no-red-untested: removing the "id.id === prefix / artifact === null" guard in bug-doc storyBugParts reds no test (no case like story.1.2.3.plan.bug.1.y.md).'
+    suggested_action: 'Add a case whose pre-.bug. prefix parses as a story artifact (story.1.2.3.plan.bug.1.y.md) and assert mode unknown.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-206-QA2-2'
+    severity: low
+    file: 'evals/shared/tests/step-0-epic-resolution.test.mjs'
+    finding: 'Mutation no-red-untested: removing the ensure-story dedup block empty-STORY_ID HALT reds no test (only the sync 5b block is run on a non-story file).'
+    suggested_action: 'Run the dedup (and create) prefix on a non-story document and assert exit 1 before any search.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 5755
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+  ci: 'not waited on (QA loop rule); local ci:fast 5755/0 at d58d3944'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 40
+    notes: 'isWorkItemDocument re-probed (path, filename, 15 targeted cases): engages, 0 reproduced. Record: task.206.qa.2.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'No change to hot paths this cycle; npm test wall unchanged within noise.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR2-1 (0a.3 cross-block read); advisory CR2-2/3 (STORY_TITLE etc. unbound in tracker blocks — pre-existing on base), CR2-4 (--check exit ignores scan warnings), CR2-6 (pipefail vs find permission errors).'
+  maintainability:
+    status: PASS
+    notes: 'Cycle 1 fixes are small and each has a test; two test gaps noted (QA2-1, QA2-2).'
+
+bug_resolution:
+  bugs_fixed: 4
+  bugs_remaining: 1
+  fix_date: '2026-10-16'
+  total_iterations: 1
+  verification_method: 'Committed tests (step-0-epic-resolution, sync-jira-bug, create-story) + dev mutation proofs + QA spot checks'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR2-1 (bug.5) and close the two test gaps QA2-1, QA2-2.'
+      refs: ['shared/resources/review-pipeline-step-0a-branch-setup.md', 'skills/sync-jira-bug/tests/sync-jira-bug.test.js', 'evals/shared/tests/step-0-epic-resolution.test.mjs']
+  future:
+    - action: 'CR2-2/CR2-3: STORY_TITLE (and DOC_URL, STORY_RELATIVE_PATH, NEW_BODY, ISSUE_NUM) are read by tracker create/edit blocks that never bind them — pre-existing on base (no block anywhere sets STORY_TITLE); a follow-up should make those blocks self-binding.'
+      refs: ['skills/ensure-story-github-issue/SKILL.md', 'skills/sync-github-story/SKILL.md']
+    - action: 'CR2-4: uat-status --check exits 0 when stories are unreadable or surface keys are legacy; qa-next gates on the exit code — make those errors, or gate on the warning count.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+    - action: 'CR2-5: commands that skip loadStories now drop surface-key warnings silently; print them in requireSurfaces or correct the comment.'
+      refs: ['skills/qa-next/scripts/uat-status.mjs']
+    - action: 'CR2-6: pipefail fails the Step 0 epic lookup on a find permission error; check the node filter status only.'
+      refs: ['shared/resources/develop-pipeline-step-0-resolve-and-prepare.md']
+    - action: 'CR2-7: stale comment in ensure-story Step S4 says MILESTONE_TITLE comes from S1.'
+      refs: ['skills/ensure-story-github-issue/SKILL.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['CR2-1 fixed and re-reviewed']

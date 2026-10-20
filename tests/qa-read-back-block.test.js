@@ -31,6 +31,7 @@ const ENGINES = [
   "qa-read-back.js",
   "doc-links.js",
   "change-log.js",
+  "qa-results.js", // task.192 — the verdict check reads the QA section through it
   "qa-cycle.sh",
 ];
 const DOC_DIR = "docs/tasks/task.9.x";
@@ -108,11 +109,17 @@ function consumerRepo(skill, mutate) {
       "",
       "- [r](./task.9.qa.1.x.md) [g](./task.9.gate.1.x.yml)",
       "",
+      // task.192 — the verdict Step 12 writes, matching the gate below.
+      "## QA Testing Results",
+      "",
+      "**Gate Decision**: FAIL",
+      "",
       "## Change Log",
       "",
       "| Date | Version | Description | Author |",
       "| -- | -- | -- | -- |",
       "| 2026-09-26 | | x | a |",
+      `| 2026-09-26 | | QA gate FAIL (40/100) — 1 finding | ${skill} |`,
       "",
     ].join("\n"),
   );

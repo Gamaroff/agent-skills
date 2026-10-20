@@ -1,0 +1,51 @@
+schema: 2
+task: 'task.203.migrate-doc-numbering'
+task_title: 'Migrate documents to hierarchical numbering'
+gate: CONCERNS
+status_reason: 'Re-entry after the finalise DoD-gaps halt. The doc-only fix (10 pre-existing dead links repointed, 10 healed KNOWN_ARTIFACT_LINKS entries deleted, CHANGELOG entry) is correct and mutation-proven; one low cleanup on CHANGELOG wording. Reliability keeps its cycle-3 advisory CONCERNS: the engine is unchanged.'
+reviewer: 'QA Engineer (qa-task, develop-task pipeline, cycle 4)'
+head: 'acccb8619fee3d834e4289be127373e0743ad92b'
+updated: '2026-10-15T08:53:37Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 24
+  phases_verified: 5/5
+  ci: 'link-check FAILURE @ 70ff65cf (the 10 links this cycle fixes); not yet re-read on acccb861'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'The delta adds no boundary: link targets in four Markdown artifacts, a deletion from a test set, and CHANGELOG prose. The engine is unchanged since the measured probe (task.203.dod.1.security.run.json: engages, 11 executed, 0 reproduced).'
+  performance:
+    status: PASS
+    notes: 'Engine unchanged. 146-file dry run 0.501 s with the head engine.'
+  reliability:
+    status: CONCERNS
+    notes: 'Carried from gate 3, engine unchanged: the revert does not flag untracked moved-and-rewritten files (CR-1), and a part-way failure leaves new empty directories unnamed (CR-2). Advisory and unreachable in this repository.'
+  maintainability:
+    status: PASS
+    notes: 'The ratchet tightened by 10 entries; reverting one link fix turns the artifact-corpus test red (covered).'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CHANGELOG task 203 entry: the blocker list names 8 of the 12 BLOCKER_CODES (missing unplaced-prd, registry-invalid, registry-unwritable, bad-slug); mark it as examples or complete it.'
+      refs: ['CHANGELOG.md']
+    - action: 'Gate 3 future items stand: CR-1/CR-2 reliability edge cases, CR-3/CR-4 cleanups.'
+      refs: ['shared/resources/migrate-doc-numbering.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions: ['CI link-check green on the new head']

@@ -1,0 +1,98 @@
+[
+  {
+    "id": "py-crash.multiline",
+    "sink": "markdown-structure",
+    "input": "Traceback (most recent call last):\n  File \"/x/multiline.py\", line 1, in <module>\n    raise ValueError(\"cannot start: no policy\\nsee docs at https://example.invalid/policy\")\nValueError: cannot start: no policy\nsee docs at https://example.invalid/policy\n",
+    "why": "an uncaught ValueError whose message spans two lines \u2014 the last stderr line is the message's second line; Python exits 1, the status a refusal exits with, so stderr is the only signal",
+    "correct": "isPythonCrash returns true, so the cli: arm scores the case errored, never rejected",
+    "direction": "legitimate"
+  },
+  {
+    "id": "py-crash.group",
+    "sink": "markdown-structure",
+    "input": "  + Exception Group Traceback (most recent call last):\n  |   File \"/x/group.py\", line 1, in <module>\n  |     raise ExceptionGroup(\"startup failed\", [ValueError(\"a\"), KeyError(\"b\")])\n  | ExceptionGroup: startup failed (2 sub-exceptions)\n  +-+---------------- 1 ----------------\n    | ValueError: a\n    +---------------- 2 ----------------\n    | KeyError: 'b'\n    +------------------------------------\n",
+    "why": "an uncaught ExceptionGroup \u2014 Python ends the traceback with a +---- box-drawing line; Python exits 1, the status a refusal exits with, so stderr is the only signal",
+    "correct": "isPythonCrash returns true, so the cli: arm scores the case errored, never rejected",
+    "direction": "legitimate"
+  },
+  {
+    "id": "py-crash.atexit_after",
+    "sink": "markdown-structure",
+    "input": "Traceback (most recent call last):\n  File \"/x/atexit_after.py\", line 3, in <module>\n    raise RuntimeError(\"boom\")\nRuntimeError: boom\ncleanup done, bye\n",
+    "why": "an uncaught RuntimeError followed by an atexit handler's stderr line; Python exits 1, the status a refusal exits with, so stderr is the only signal",
+    "correct": "isPythonCrash returns true, so the cli: arm scores the case errored, never rejected",
+    "direction": "legitimate"
+  },
+  {
+    "id": "py-crash.note",
+    "sink": "markdown-structure",
+    "input": "Traceback (most recent call last):\n  File \"/x/note.py\", line 3, in <module>\n    raise e\nRuntimeError: cannot start\nhint: set POLICY_PATH\n",
+    "why": "an uncaught RuntimeError carrying an add_note() hint printed after the exception line; Python exits 1, the status a refusal exits with, so stderr is the only signal",
+    "correct": "isPythonCrash returns true, so the cli: arm scores the case errored, never rejected",
+    "direction": "legitimate"
+  },
+  {
+    "id": "py-crash.chained",
+    "sink": "markdown-structure",
+    "input": "Traceback (most recent call last):\n  File \"/x/chained.py\", line 2, in <module>\n    {}[\"x\"]\n    ~~^^^^^\nKeyError: 'x'\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"/x/chained.py\", line 4, in <module>\n    raise RuntimeError(\"lookup failed\")\nRuntimeError: lookup failed\n",
+    "why": "an uncaught RuntimeError raised while handling a KeyError; Python exits 1, the status a refusal exits with, so stderr is the only signal",
+    "correct": "isPythonCrash returns true, so the cli: arm scores the case errored, never rejected",
+    "direction": "legitimate"
+  },
+  {
+    "id": "py-crash.empty_msg",
+    "sink": "markdown-structure",
+    "input": "Traceback (most recent call last):\n  File \"/x/empty_msg.py\", line 1, in <module>\n    raise ValueError(\"\")\nValueError\n",
+    "why": "an uncaught ValueError with an empty message (bare class name); Python exits 1, the status a refusal exits with, so stderr is the only signal",
+    "correct": "isPythonCrash returns true, so the cli: arm scores the case errored, never rejected",
+    "direction": "legitimate"
+  },
+  {
+    "id": "py-crash.trailing_ws",
+    "sink": "markdown-structure",
+    "input": "Traceback (most recent call last):\n  File \"/x/trailing_ws.py\", line 1, in <module>\n    raise ValueError(\"bad  \")\nValueError: bad  \n",
+    "why": "an uncaught ValueError whose message ends in spaces; Python exits 1, the status a refusal exits with, so stderr is the only signal",
+    "correct": "isPythonCrash returns true, so the cli: arm scores the case errored, never rejected",
+    "direction": "legitimate"
+  },
+  {
+    "id": "py-refusal.sys-exit-string",
+    "sink": "markdown-structure",
+    "input": "refused: host not allowed\n",
+    "why": "sys.exit('refused: \u2026') \u2014 a deliberate exit, not a crash",
+    "correct": "isPythonCrash returns false, so the refusal stays rejected",
+    "direction": "hostile"
+  },
+  {
+    "id": "py-refusal.exception-shaped-refusal",
+    "sink": "markdown-structure",
+    "input": "ValueError: refused host evil.example.com\n",
+    "why": "a refusal that prints an exception-shaped line with no frame",
+    "correct": "isPythonCrash returns false, so the refusal stays rejected",
+    "direction": "hostile"
+  },
+  {
+    "id": "py-refusal.syntax-shaped-refusal",
+    "sink": "markdown-structure",
+    "input": "SyntaxError: refused input\n",
+    "why": "a refusal whose message starts with SyntaxError, no frame",
+    "correct": "isPythonCrash returns false, so the refusal stays rejected",
+    "direction": "hostile"
+  },
+  {
+    "id": "py-refusal.frame-shaped-log",
+    "sink": "markdown-structure",
+    "input": "  File \"/etc/policy.cfg\", line 4\nPermissionError: refused\n",
+    "why": "a log line shaped like a frame, then an exception-shaped refusal, no Traceback header",
+    "correct": "isPythonCrash returns false, so the refusal stays rejected",
+    "direction": "hostile"
+  },
+  {
+    "id": "py-refusal.empty",
+    "sink": "markdown-structure",
+    "input": "",
+    "why": "a plain sys.exit(1) with empty stderr",
+    "correct": "isPythonCrash returns false, so the refusal stays rejected",
+    "direction": "hostile"
+  }
+]

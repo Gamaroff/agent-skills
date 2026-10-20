@@ -850,23 +850,23 @@ const PARSER_CASES = [
     { kind: "pr", pr: "44", host: "ghe.corp.example", repo: "o/r" },
   ],
   ["feature/task.1.thing", { kind: "branch", branch: "feature/task.1.thing" }],
-  ["RAPP-702", { kind: "jira", jira_key: "RAPP-702" }],
+  ["PROJ-702", { kind: "jira", jira_key: "PROJ-702" }],
   [
-    "https://acme.atlassian.net/browse/RAPP-702",
-    { kind: "jira", jira_key: "RAPP-702", host: "acme.atlassian.net" },
+    "https://acme.atlassian.net/browse/PROJ-702",
+    { kind: "jira", jira_key: "PROJ-702", host: "acme.atlassian.net" },
   ],
   [
-    "https://acme.atlassian.net/browse/RAPP-702?focusedCommentId=1",
-    { kind: "jira", jira_key: "RAPP-702", host: "acme.atlassian.net" },
+    "https://acme.atlassian.net/browse/PROJ-702?focusedCommentId=1",
+    { kind: "jira", jira_key: "PROJ-702", host: "acme.atlassian.net" },
   ],
   [
-    "https://acme.atlassian.net/jira/software/c/projects/RAPP/boards/407?selectedIssue=RAPP-702",
-    { kind: "jira", jira_key: "RAPP-702", host: "acme.atlassian.net" },
+    "https://acme.atlassian.net/jira/software/c/projects/PROJ/boards/12?selectedIssue=PROJ-702",
+    { kind: "jira", jira_key: "PROJ-702", host: "acme.atlassian.net" },
   ],
   // Host first: Jira Cloud's issue view contains /issues/ and must not reach the GitHub arm.
   [
-    "https://acme.atlassian.net/jira/software/c/projects/RAPP/issues/RAPP-702",
-    { kind: "jira", jira_key: "RAPP-702", host: "acme.atlassian.net" },
+    "https://acme.atlassian.net/jira/software/c/projects/PROJ/issues/PROJ-702",
+    { kind: "jira", jira_key: "PROJ-702", host: "acme.atlassian.net" },
   ],
   [
     "https://jira.corp.example/browse/AB-1",
@@ -901,8 +901,8 @@ const PARSER_CASES = [
     { kind: "pr", pr: "12", host: "github.com", repo: "o/r" },
   ],
   [
-    "acme.atlassian.net/browse/RAPP-702",
-    { kind: "jira", jira_key: "RAPP-702", host: "acme.atlassian.net" },
+    "acme.atlassian.net/browse/PROJ-702",
+    { kind: "jira", jira_key: "PROJ-702", host: "acme.atlassian.net" },
   ],
   [
     "bitbucket.org/ws/r/pull-requests/7",
@@ -977,7 +977,7 @@ for (const shell of SHELLS) {
     ["https://acme.atlassian.net/wiki/spaces/X", "url-no-target"],
     ["#abc", "bad-issue-ref"],
     // QA cycle 1, QA-1: output is one key=value per line, so a newline would forge a line.
-    ["RAPP-1\nkind=pr", "control-character"],
+    ["PROJ-1\nkind=pr", "control-character"],
     ["x\npr=5", "control-character"],
     ["feature/a\tb", "control-character"],
   ]) {
@@ -1072,7 +1072,7 @@ function step0b(shell, { REMOTE_URL, ...env }, { ghRepo } = {}) {
 for (const shell of SHELLS) {
   test(`Step 0b (${shell}): a Jira URL binds KIND=jira and the key`, () => {
     const r = step0b(shell, {
-      TARGET: "https://acme.atlassian.net/browse/RAPP-702",
+      TARGET: "https://acme.atlassian.net/browse/PROJ-702",
       REMOTE_URL: "git@bitbucket.org:ws/repo.git",
       TRACKER: "jira",
       JIRA_URL: "https://acme.atlassian.net",
@@ -1080,7 +1080,7 @@ for (const shell of SHELLS) {
     assert.equal(r.status, 0, r.stderr + r.stdout);
     assert.match(
       r.stdout,
-      /BOUND kind=jira pr= branch=\S* key=RAPP-702 issue=/,
+      /BOUND kind=jira pr= branch=\S* key=PROJ-702 issue=/,
     );
     assert.doesNotMatch(r.stdout, /⚠️/, "same Jira host — no warning");
   });
@@ -1123,7 +1123,7 @@ for (const shell of SHELLS) {
 
   test(`Step 0b (${shell}): a Jira URL on another host only warns, and continues with the key`, () => {
     const r = step0b(shell, {
-      TARGET: "https://other.atlassian.net/browse/RAPP-702",
+      TARGET: "https://other.atlassian.net/browse/PROJ-702",
       REMOTE_URL: "git@github.com:o/r.git",
       TRACKER: "jira",
       JIRA_URL: "https://acme.atlassian.net",
@@ -1133,7 +1133,7 @@ for (const shell of SHELLS) {
       r.stdout,
       /⚠️ Jira URL host other\.atlassian\.net differs from JIRA_URL acme\.atlassian\.net/,
     );
-    assert.match(r.stdout, /key=RAPP-702/);
+    assert.match(r.stdout, /key=PROJ-702/);
   });
 
   test(`Step 0b (${shell}): a GitHub issue URL for another repo HALTs, naming both`, () => {
@@ -1368,7 +1368,7 @@ test("Step 2 takes the pre-resolved doc and records the card routes in resolved_
 
 // ---------------------------------------------------------------------------
 // task.176 — the shared §0a key → document lookup, run against a fixture in the copy this
-// skill ships. Anchored (RAPP-70 ≠ RAPP-702), quote-tolerant, excludes .request.
+// skill ships. Anchored (PROJ-70 ≠ PROJ-702), quote-tolerant, excludes .request.
 // ---------------------------------------------------------------------------
 const STEP0 = read("references/develop-pipeline-step-0-resolve-and-prepare.md");
 
@@ -1389,35 +1389,35 @@ function lookupFixture() {
   // The work item, quoted the way consumer docs quote it.
   put(
     "docs/tasks/task.101.thing/task.101.thing.md",
-    "---\njira_key: 'RAPP-702'\ngithub_issue: 55\n---\n",
+    "---\njira_key: 'PROJ-702'\ngithub_issue: 55\n---\n",
   );
   // Its artifacts carry the same key.
   put(
     "docs/tasks/task.101.thing/task.101.request.1.thing.md",
-    '---\njira_key: "RAPP-702"\n---\n',
+    '---\njira_key: "PROJ-702"\n---\n',
   );
   put(
     "docs/tasks/task.101.thing/task.101.review.1.thing.md",
-    "---\njira_key: 'RAPP-702'\n---\n",
+    "---\njira_key: 'PROJ-702'\n---\n",
   );
   put(
     "docs/tasks/task.101.thing/task.101.pr-review.1.thing.md",
-    "---\njira_key: 'RAPP-702'\n---\n",
+    "---\njira_key: 'PROJ-702'\n---\n",
   );
   // finalise writes this beside every accepted item with the item's key, and it has no dotted kind
   // segment (QA cycle 1, CR-1: 125 of them in this repo made every finalised item halt as ambiguous).
   put(
     "docs/tasks/task.101.thing/sprint-review-summary.md",
-    "---\njira_key: 'RAPP-702'\ngithub_issue: 55\n---\n",
+    "---\njira_key: 'PROJ-702'\ngithub_issue: 55\n---\n",
   );
   put(
     "docs/tasks/task.101.thing/task.101.sprint-review-summary.md",
-    "---\njira_key: 'RAPP-702'\n---\n",
+    "---\njira_key: 'PROJ-702'\n---\n",
   );
   // A neighbour whose key extends this one, and an issue number that this one prefixes.
   put(
     "docs/tasks/task.102.other/task.102.other.md",
-    "---\njira_key: RAPP-7020\ngithub_issue: 5\n---\n",
+    "---\njira_key: PROJ-7020\ngithub_issue: 5\n---\n",
   );
   return dir;
 }
@@ -1439,16 +1439,16 @@ for (const shell of SHELLS) {
   };
 
   test(`§0a lookup (${shell}): a quoted key with a .request. sibling and a longer neighbour returns exactly one doc`, () => {
-    const out = run(lookupFixture(), "jira_key", "RAPP-702");
+    const out = run(lookupFixture(), "jira_key", "PROJ-702");
     assert.match(
       out,
       /COUNT=1 PATH=docs\/tasks\/task\.101\.thing\/task\.101\.thing\.md$/m,
     );
   });
 
-  test(`§0a lookup (${shell}): RAPP-70 does not prefix-match RAPP-702`, () => {
+  test(`§0a lookup (${shell}): PROJ-70 does not prefix-match PROJ-702`, () => {
     assert.match(
-      run(lookupFixture(), "jira_key", "RAPP-70"),
+      run(lookupFixture(), "jira_key", "PROJ-70"),
       /COUNT=0 PATH=$/m,
     );
   });
@@ -1472,12 +1472,12 @@ for (const shell of SHELLS) {
     });
     fs.writeFileSync(
       path.join(dir, "docs/tasks/task.103.dup/task.103.dup.md"),
-      "---\njira_key: RAPP-702\n---\n",
+      "---\njira_key: PROJ-702\n---\n",
     );
-    const r = runRaw(dir, "jira_key", "RAPP-702");
+    const r = runRaw(dir, "jira_key", "PROJ-702");
     // Exit 1, never the not-found value (QA cycle 1, CR-5): callers branch on an empty LOCAL_PATH.
     assert.equal(r.status, 1, r.stdout + r.stderr);
-    assert.match(r.stdout, /HALT: jira_key RAPP-702 matches 2 documents:/);
+    assert.match(r.stdout, /HALT: jira_key PROJ-702 matches 2 documents:/);
     assert.doesNotMatch(
       r.stdout,
       /COUNT=/,
@@ -1569,13 +1569,13 @@ for (const shell of SHELLS) {
 
   test(`Step 0b (${shell}): the block prints its bound values for the next block to re-bind`, () => {
     const r = step0b(shell, {
-      TARGET: "RAPP-702",
+      TARGET: "PROJ-702",
       REMOTE_URL: "git@github.com:o/r.git",
     });
     assert.equal(r.status, 0, r.stderr);
     assert.match(
       r.stdout,
-      /^KIND=jira PR= BRANCH=\S* JIRA_KEY=RAPP-702 ISSUE_NUM= TARGET_HOST= TARGET_REPO=$/m,
+      /^KIND=jira PR= BRANCH=\S* JIRA_KEY=PROJ-702 ISSUE_NUM= TARGET_HOST= TARGET_REPO=$/m,
     );
   });
 }
@@ -1631,7 +1631,7 @@ for (const shell of SHELLS) {
     const r = runRungs(
       {
         KIND: "jira",
-        JIRA_KEY: "RAPP-702",
+        JIRA_KEY: "PROJ-702",
         ISSUE_NUM: "",
         DOC_FILE: "docs/tasks/task.101.thing/task.101.thing.md",
       },
@@ -1651,7 +1651,7 @@ for (const shell of SHELLS) {
     const r = runRungs(
       {
         KIND: "jira",
-        JIRA_KEY: "RAPP-702",
+        JIRA_KEY: "PROJ-702",
         ISSUE_NUM: "",
         DOC_FILE: "docs/tasks/task.101.thing/task.101.thing.md",
       },
@@ -1666,13 +1666,13 @@ for (const shell of SHELLS) {
     const hits = JSON.stringify([
       {
         number: 3,
-        title: "RAPP-702 docs",
+        title: "PROJ-702 docs",
         state: "MERGED",
         headRefName: "docs/x",
       },
     ]);
     const r = runRungs(
-      { KIND: "jira", JIRA_KEY: "RAPP-702", ISSUE_NUM: "", DOC_FILE: "" },
+      { KIND: "jira", JIRA_KEY: "PROJ-702", ISSUE_NUM: "", DOC_FILE: "" },
       `echo '${hits}'`,
     );
     assert.equal(r.status, 0, r.stderr);
@@ -1681,7 +1681,7 @@ for (const shell of SHELLS) {
   });
 
   test(`rungs 3–4 (${shell}): an unbound KIND fails loudly`, () => {
-    const r = runRungs({ JIRA_KEY: "RAPP-702", DOC_FILE: "" }, "echo '[]'");
+    const r = runRungs({ JIRA_KEY: "PROJ-702", DOC_FILE: "" }, "echo '[]'");
     assert.notEqual(r.status, 0);
     assert.match(r.stderr, /KIND/);
   });
@@ -1747,7 +1747,7 @@ for (const shell of SHELLS) {
     );
     const script = step0bBlock();
     const env = blockEnv(bin, {
-      TARGET: "https://other.atlassian.net/browse/RAPP-702",
+      TARGET: "https://other.atlassian.net/browse/PROJ-702",
     });
     let r = runScript(shell, script, { cwd: dir, env });
     assert.equal(r.status, 0, r.stderr);
@@ -1783,7 +1783,7 @@ for (const shell of SHELLS) {
     });
     let r = runScript(shell, rungsBlock(), {
       cwd: dir,
-      env: blockEnv(bin, { KIND: "jira", JIRA_KEY: "RAPP-702" }),
+      env: blockEnv(bin, { KIND: "jira", JIRA_KEY: "PROJ-702" }),
     });
     assert.notEqual(r.status, 0);
     assert.match(r.stderr, /DOC_FILE/);
@@ -1805,7 +1805,7 @@ for (const shell of SHELLS) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "review-pr-nodocs-"));
     const r = runScript(shell, `${lookupBlock()}\necho "AFTER"\n`, {
       cwd: dir,
-      env: { ...process.env, KEY_FIELD: "jira_key", KEY_VALUE: "RAPP-702" },
+      env: { ...process.env, KEY_FIELD: "jira_key", KEY_VALUE: "PROJ-702" },
     });
     assert.equal(r.status, 1);
     assert.match(r.stdout, /HALT: docs\/ not found or unreadable/);
@@ -1914,7 +1914,7 @@ for (const shell of SHELLS) {
       const r = runScript(shell, step0bBlock(), {
         cwd: dir,
         env: blockEnv(bin, {
-          TARGET: "https://acme.atlassian.net/browse/RAPP-702",
+          TARGET: "https://acme.atlassian.net/browse/PROJ-702",
         }),
       });
       assert.equal(r.status, 0, r.stderr);
@@ -1954,7 +1954,7 @@ for (const shell of SHELLS) {
     ]) {
       fs.writeFileSync(
         path.join(dir, "docs/tasks/task.101.thing", name),
-        "---\njira_key: 'RAPP-702'\n---\n",
+        "---\njira_key: 'PROJ-702'\n---\n",
       );
     }
     const r = runScript(
@@ -1962,7 +1962,7 @@ for (const shell of SHELLS) {
       `${lookupBlock()}\necho "STATUS=$DOC_STATUS PATH=$LOCAL_PATH"\n`,
       {
         cwd: dir,
-        env: { ...process.env, KEY_FIELD: "jira_key", KEY_VALUE: "RAPP-702" },
+        env: { ...process.env, KEY_FIELD: "jira_key", KEY_VALUE: "PROJ-702" },
       },
     );
     assert.equal(r.status, 0, r.stdout + r.stderr);
@@ -2037,7 +2037,7 @@ const PARSER_PROBE_CASES = [
       absent: ["PWNED3"],
     },
   ],
-  ["pt.newline-forge", "RAPP-1\nkind=pr", "hostile", { stdout: "", exit: 2 }],
+  ["pt.newline-forge", "PROJ-1\nkind=pr", "hostile", { stdout: "", exit: 2 }],
   ["pt.cr-forge", "x\rpr=5", "hostile", { stdout: "", exit: 2 }],
   ["pt.tab", "feature/a\tb", "hostile", { stdout: "", exit: 2 }],
   ["pt.issue-ref-tail", "#12;rm", "hostile", { stdout: "", exit: 2 }],
@@ -2094,12 +2094,12 @@ const PARSER_PROBE_CASES = [
   ],
   [
     "pt.legit-jira-browse",
-    "https://acme.atlassian.net/browse/RAPP-702",
+    "https://acme.atlassian.net/browse/PROJ-702",
     "legitimate",
     {
       stdout: kv({
         kind: "jira",
-        jira_key: "RAPP-702",
+        jira_key: "PROJ-702",
         host: "acme.atlassian.net",
       }),
       exit: 0,
@@ -2117,12 +2117,12 @@ const PARSER_PROBE_CASES = [
   ],
   [
     "pt.legit-schemeless-jira-browse",
-    "acme.atlassian.net/browse/RAPP-702",
+    "acme.atlassian.net/browse/PROJ-702",
     "legitimate",
     {
       stdout: kv({
         kind: "jira",
-        jira_key: "RAPP-702",
+        jira_key: "PROJ-702",
         host: "acme.atlassian.net",
       }),
       exit: 0,
@@ -2251,13 +2251,13 @@ for (const shell of SHELLS) {
         {
           cwd: dir,
           env: blockEnv(bin, {
-            TARGET: "https://acme.atlassian.net/browse/RAPP-702",
+            TARGET: "https://acme.atlassian.net/browse/PROJ-702",
             TRACKER: "jira",
           }),
         },
       );
       assert.equal(r.status, 0, `${line}: ${r.stdout}${r.stderr}`);
-      assert.match(r.stdout, /BOUND key=RAPP-702/);
+      assert.match(r.stdout, /BOUND key=PROJ-702/);
       assert.doesNotMatch(r.stdout, /⚠️/, `${line}: same host — no warning`);
     }
   });
@@ -2272,7 +2272,7 @@ for (const shell of SHELLS) {
     const r = runScript(shell, step0bBlock(), {
       cwd: dir,
       env: blockEnv(bin, {
-        TARGET: "https://acme.atlassian.net/browse/RAPP-702",
+        TARGET: "https://acme.atlassian.net/browse/PROJ-702",
         TRACKER: "jira",
       }),
     });
@@ -2312,7 +2312,7 @@ for (const shell of SHELLS) {
     assert.equal(guard.status, 0, guard.stdout + guard.stderr);
     const docFile = guard.stdout.match(/DOC_FILE=(.*)$/m)[1];
     const hits = JSON.stringify([
-      { number: 3, title: "RAPP-702 fix", state: "OPEN", headRefName: "x" },
+      { number: 3, title: "PROJ-702 fix", state: "OPEN", headRefName: "x" },
     ]);
     fs.writeFileSync(path.join(bin, "gh"), `#!/bin/sh\necho '${hits}'\n`, {
       mode: 0o755,
@@ -2321,7 +2321,7 @@ for (const shell of SHELLS) {
       cwd: dir,
       env: blockEnv(bin, {
         KIND: "jira",
-        JIRA_KEY: "RAPP-702",
+        JIRA_KEY: "PROJ-702",
         ISSUE_NUM: "",
         DOC_FILE: docFile,
       }),
@@ -2487,3 +2487,173 @@ for (const shell of SHELLS) {
     );
   });
 }
+
+// task.195 SC-5: the --inline select keeps only verified anchors, so a findings file the checker never
+// annotated used to yield [] — indistinguishable from "no anchorable findings". The guard before it
+// must refuse such a file, and must let a fully annotated one through (control).
+function extractInlineGuard(skillText) {
+  const m = skillText.match(
+    /^[ \t]*jq -e '[\s\S]*?select\(\(\.anchor_check \| type\) != "string"\)[\s\S]*?exit 1; \}/m,
+  );
+  return m ? m[0] : null;
+}
+
+test("--inline refuses a findings file with an un-annotated finding, and passes an annotated one", (t) => {
+  const { spawnSync: run } = require("child_process");
+  if (run("jq", ["--version"]).error) return t.skip("jq not installed");
+  const guard = extractInlineGuard(read("SKILL.md"));
+  assert.ok(
+    guard,
+    "could not find the --inline anchor_check guard before the jq select",
+  );
+  const dir = fs.mkdtempSync(
+    path.join(require("os").tmpdir(), "inline-guard-"),
+  );
+  try {
+    const file = path.join(dir, "findings.json");
+    const runGuard = (doc) => {
+      fs.writeFileSync(file, JSON.stringify(doc));
+      return run("bash", ["-c", guard], {
+        encoding: "utf8",
+        env: { ...process.env, FINDINGS_JSON: file },
+      });
+    };
+    const never = runGuard({
+      code_review: { findings: [{ file_line: "src/x.ts:4", finding: "f" }] },
+    });
+    assert.equal(
+      never.status,
+      1,
+      "an un-annotated finding must HALT the --inline block",
+    );
+    assert.match(never.stdout, /HALT: .*anchor_check.*Step 6/);
+    // A file with no findings array selects nothing; it must not pass as "all annotated"
+    // (task.195 QA cycle 1, TASK-195-QA1-2). An empty array is a legitimate empty review.
+    // task.195 DoD 1: every lens present must hold an array — a non-array beside a valid lens dropped
+    // that lens unseen — and a null anchor_check is not a checker verdict.
+    for (const notFindings of [
+      {},
+      { code_review: {} },
+      [],
+      {
+        code_review: { findings: "oops" },
+        pr_conformance: {
+          findings: [{ ref: "AC-1", anchor_check: "no-line" }],
+        },
+      },
+      { code_review: { findings: [] }, pr_conformance: {} },
+      {
+        code_review: {
+          findings: [
+            { file_line: "src/x.ts:4", finding: "f", anchor_check: null },
+          ],
+        },
+      },
+    ]) {
+      const r = runGuard(notFindings);
+      assert.equal(r.status, 1, `${JSON.stringify(notFindings)} must HALT`);
+      assert.match(r.stdout, /HALT: /);
+    }
+    assert.equal(runGuard({ code_review: { findings: [] } }).status, 0);
+    assert.equal(
+      runGuard({
+        pr_conformance: {
+          findings: [{ ref: "AC-1", anchor_check: "no-line" }],
+        },
+      }).status,
+      0,
+      "a conformance-only file passes",
+    );
+    assert.equal(
+      runGuard({
+        code_review: null,
+        pr_conformance: {
+          findings: [{ ref: "AC-1", anchor_check: "no-line" }],
+        },
+      }).status,
+      0,
+      "a lens that did not run may be null",
+    );
+    const annotated = runGuard({
+      code_review: {
+        findings: [
+          {
+            file_line: "src/x.ts:4",
+            finding: "f",
+            anchor_check: "text-mismatch",
+          },
+        ],
+      },
+    });
+    assert.equal(
+      annotated.status,
+      0,
+      `an annotated file must pass:\n${annotated.stdout}${annotated.stderr}`,
+    );
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// task.195 DoD 1: the --inline block made its scratch file before the guard and never removed it on a
+// refusal, so every refused input left one in $TMPDIR. Run the whole block: refused or posted,
+// nothing may be left behind.
+test("--inline leaves no scratch file behind, whether it refuses the input or posts it", (t) => {
+  if (spawnSync("jq", ["--version"]).error) return t.skip("jq not installed");
+  const m = SKILL.match(
+    /^FINDINGS_JSON="\{findings-json\}" {3}# Step 6 — the file finding-anchors\.js annotated\n[\s\S]*?^rm -f "\$INLINE_FILE"$/m,
+  );
+  assert.ok(m, "could not find the --inline block");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "inline-block-"));
+  try {
+    const tmp = path.join(dir, "tmp");
+    const work = path.join(dir, "work");
+    const poster = path.join(work, ".agents/skills/review-pr/references");
+    fs.mkdirSync(tmp);
+    fs.mkdirSync(poster, { recursive: true });
+    fs.writeFileSync(
+      path.join(poster, "pr-inline-comment.js"),
+      'process.stdout.write(JSON.stringify({ reason: "posted" }) + "\\n");\n',
+    );
+    const body = path.join(dir, "body.md");
+    fs.writeFileSync(body, "summary\n");
+    const findings = path.join(dir, "findings.json");
+    const runBlock = (doc) => {
+      fs.writeFileSync(findings, JSON.stringify(doc));
+      const script = m[0]
+        .replaceAll("{findings-json}", findings)
+        .replaceAll("{pr-number}", "7")
+        .replaceAll("{body-file}", body);
+      return spawnSync("bash", ["-c", script], {
+        cwd: work,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          TMPDIR: tmp,
+          PATH: `${path.dirname(process.execPath)}:${process.env.PATH}`,
+        },
+      });
+    };
+    const refused = runBlock({
+      code_review: { findings: "oops" },
+      pr_conformance: { findings: [{ ref: "AC-1", anchor_check: "no-line" }] },
+    });
+    assert.equal(refused.status, 1, refused.stdout + refused.stderr);
+    assert.match(refused.stdout, /HALT: /);
+    assert.deepEqual(
+      fs.readdirSync(tmp),
+      [],
+      "a refusal leaves no scratch file",
+    );
+    const posted = runBlock({
+      code_review: {
+        findings: [{ file_line: "a.js:1", finding: "f", anchor_check: "ok" }],
+      },
+    });
+    assert.equal(posted.status, 0, posted.stdout + posted.stderr);
+    assert.match(posted.stdout, /"reason":"posted"/);
+    assert.deepEqual(fs.readdirSync(tmp), [], "a post leaves no scratch file");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

@@ -61,7 +61,7 @@ Pick **one** follow-up story in your working repo. Selection criteria:
 - [ ] `/develop-story` — full chain (Phase 0 recommended defaults are safe)
 - [ ] Confirm second story PR is open on GitHub
 
-> ⚠️ **PR naming matters.** The story branch is named `feature/story.{epic}.{story}.{name}` — do not rename it manually or the pipeline will lose tracking.
+> ⚠️ **PR naming matters.** The story branch is named `feature/story.{P}.{E}.{S}.{name}` — do not rename it manually or the pipeline will lose tracking.
 
 ---
 
@@ -70,7 +70,7 @@ Pick **one** follow-up story in your working repo. Selection criteria:
 Run these checks before calling Day 2 done:
 
 - [ ] ≥ 1 story PR exists on GitHub (check with `gh pr list`)
-- [ ] `docs/development/epic-registry.md` has new epic row(s) for today's work
+- [ ] Each new epic is `epic.{P}.{E}.*` under its PRD, and the PRD has a row in `docs/prd/prd-registry.md`
 - [ ] Each story artifact directory has a full artifact set (≥ 6 files)
 - [ ] `gh auth status` still returns logged-in (confirm session did not expire mid-day)
 
@@ -80,7 +80,7 @@ Run these checks before calling Day 2 done:
 
 - **Story pipeline shape:** PRD → epic → story → branch → review → develop → PR → QA → (qa-fix) → review-pr → finalise → accepted
 - **The full Phase 0 prompt set for `/develop-story`:** what each question means and why the recommended defaults are safe
-- **How epic-registry numbering coordinates with story creation** and why numbers are never reused
+- **How hierarchical numbering works** — `prd.{P}` from the PRD registry, `epic.{P}.{E}` and `story.{P}.{E}.{S}` counted within their parent — and why a PRD number is never reused
 
 ---
 

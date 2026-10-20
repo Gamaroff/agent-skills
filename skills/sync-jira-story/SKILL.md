@@ -55,7 +55,7 @@ Source `references/resolve-paths.sh` to populate `${PRD_ROOT}` (default `docs/pr
 ### Required Files
 
 - A story markdown file at:
-  `${PRD_ROOT}/<domain>/<feature>/epics/epic.<N>.<name>/stories/story.<N>.<M>.<slug>/story.<N>.<M>.<slug>.md`
+  `${PRD_ROOT}/<domain>/prd.<P>.<feature>/epics/epic.<P>.<E>.<name>/stories/story.<P>.<E>.<S>.<slug>/story.<P>.<E>.<S>.<slug>.md`
 - The story **MUST** have `jira_epic` in its frontmatter (e.g. `jira_epic: "PROJ-14"`).
   Run `/sync-jira-epic` on the parent epic first if missing. The script **exits with an error** if absent.
 - Optionally: `epic_source` pointing to the parent epic file for Bitbucket link generation.
@@ -95,7 +95,7 @@ Not supported: nested mappings, anchors, aliases, escape sequences, multi-doc, f
 
 ```yaml
 title: 'Story 1.2: Wire up new auth middleware'
-epic_source: '${PRD_ROOT}/<domain>/<feature>/epics/epic.<N>.<name>/epic.<N>.<name>.md'
+epic_source: '${PRD_ROOT}/<domain>/prd.<P>.<feature>/epics/epic.<P>.<E>.<name>/epic.<P>.<E>.<name>.md'
 jira_epic: "PROJ-14"                 # REQUIRED
 story_type: 'feature_enhancement'
 priority: 'high'
@@ -113,7 +113,7 @@ due_date: '2026-05-15'
 ### 1. Identify the Story File
 
 ```
-${PRD_ROOT}/<domain>/<feature>/epics/epic.<N>.<slug>/stories/story.<N>.<M>.<slug>/story.<N>.<M>.<slug>.md
+${PRD_ROOT}/<domain>/prd.<P>.<feature>/epics/epic.<P>.<E>.<slug>/stories/story.<P>.<E>.<S>.<slug>/story.<P>.<E>.<S>.<slug>.md
 ```
 
 To find stories that have **not yet been synced** (no `jira_key`):
@@ -228,7 +228,7 @@ When creating, the script first runs:
 
 ```
 POST /rest/api/3/search/jql
-Body: { "jql": "project = \"RB\" AND labels = \"synced-from-story.1.2.slug\"", "fields": ["summary","updated"], "maxResults": 5 }
+Body: { "jql": "project = \"RB\" AND labels = \"synced-from-story.1.1.2.slug\"", "fields": ["summary","updated"], "maxResults": 5 }
 ```
 
 > **Note**: this is the modern POST `/search/jql` endpoint. Atlassian deprecated the legacy GET `/rest/api/3/search` form on 1 May 2025 (returns `410 Gone` on migrated Jira Cloud tenants).

@@ -1,0 +1,138 @@
+[
+  {
+    "id": "py-crash.nested_group",
+    "sink": "markdown-structure",
+    "input": "  + Exception Group Traceback (most recent call last):\n  |   File \"/x/nested_group.py\", line 1, in <module>\n  |     raise ExceptionGroup(\"outer\", [ExceptionGroup(\"inner\", [ValueError(\"a\")]), KeyError(\"b\")])\n  | ExceptionGroup: outer (2 sub-exceptions)\n  +-+---------------- 1 ----------------\n    | ExceptionGroup: inner (1 sub-exception)\n    +-+---------------- 1 ----------------\n      | ValueError: a\n      +------------------------------------\n    +---------------- 2 ----------------\n    | KeyError: 'b'\n    +------------------------------------\n",
+    "why": "a real uncaught crash captured from python3 -E -s -B (nested_group), exit 1",
+    "correct": "isPythonCrash returns true, so the cli: arm scores the case errored, never rejected",
+    "direction": "legitimate"
+  },
+  {
+    "id": "py-crash.chained_from",
+    "sink": "markdown-structure",
+    "input": "Traceback (most recent call last):\n  File \"/x/chained_from.py\", line 2, in <module>\n    {}[\"k\"]\n    ~~^^^^^\nKeyError: 'k'\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"/x/chained_from.py\", line 4, in <module>\n    raise RuntimeError(\"no config\") from e\nRuntimeError: no config\n",
+    "why": "a real uncaught crash captured from python3 -E -s -B (chained_from), exit 1",
+    "correct": "isPythonCrash returns true, so the cli: arm scores the case errored, never rejected",
+    "direction": "legitimate"
+  },
+  {
+    "id": "py-crash.chained_during",
+    "sink": "markdown-structure",
+    "input": "Traceback (most recent call last):\n  File \"/x/chained_during.py\", line 2, in <module>\n    1/0\n    ~^~\nZeroDivisionError: division by zero\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"/x/chained_during.py\", line 4, in <module>\n    undefined_name\nNameError: name 'undefined_name' is not defined\n",
+    "why": "a real uncaught crash captured from python3 -E -s -B (chained_during), exit 1",
+    "correct": "isPythonCrash returns true, so the cli: arm scores the case errored, never rejected",
+    "direction": "legitimate"
+  },
+  {
+    "id": "py-crash.recursion",
+    "sink": "markdown-structure",
+    "input": "Traceback (most recent call last):\n  File \"/x/recursion.py\", line 2, in <module>\n    f()\n    ~^^\n  File \"/x/recursion.py\", line 1, in f\n    def f(): f()\n             ~^^\n  File \"/x/recursion.py\", line 1, in f\n    def f(): f()\n             ~^^\n  File \"/x/recursion.py\", line 1, in f\n    def f(): f()\n             ~^^\n  [Previous line repeated 996 more times]\nRecursionError: maximum recursion depth exceeded\n",
+    "why": "a real uncaught crash captured from python3 -E -s -B (recursion), exit 1",
+    "correct": "isPythonCrash returns true, so the cli: arm scores the case errored, never rejected",
+    "direction": "legitimate"
+  },
+  {
+    "id": "py-crash.indentation",
+    "sink": "markdown-structure",
+    "input": "  File \"/x/indentation.py\", line 2\n    print(1)\n    ^^^^^\nIndentationError: expected an indented block after 'if' statement on line 1\n",
+    "why": "a real uncaught crash captured from python3 -E -s -B (indentation), exit 1",
+    "correct": "isPythonCrash returns true, so the cli: arm scores the case errored, never rejected",
+    "direction": "legitimate"
+  },
+  {
+    "id": "py-crash.tab_error",
+    "sink": "markdown-structure",
+    "input": "  File \"/x/tab_error.py\", line 3\n    \ty = 2\n    ^\nTabError: inconsistent use of tabs and spaces in indentation\n",
+    "why": "a real uncaught crash captured from python3 -E -s -B (tab_error), exit 1",
+    "correct": "isPythonCrash returns true, so the cli: arm scores the case errored, never rejected",
+    "direction": "legitimate"
+  },
+  {
+    "id": "py-crash.import_missing",
+    "sink": "markdown-structure",
+    "input": "Traceback (most recent call last):\n  File \"/x/import_missing.py\", line 1, in <module>\n    import no_such_module_xyz\nModuleNotFoundError: No module named 'no_such_module_xyz'\n",
+    "why": "a real uncaught crash captured from python3 -E -s -B (import_missing), exit 1",
+    "correct": "isPythonCrash returns true, so the cli: arm scores the case errored, never rejected",
+    "direction": "legitimate"
+  },
+  {
+    "id": "py-crash.unicode_msg",
+    "sink": "markdown-structure",
+    "input": "Traceback (most recent call last):\n  File \"/x/unicode_msg.py\", line 1, in <module>\n    raise ValueError(\"refus\u00e9: h\u00e9llo \u2717\")\nValueError: refus\u00e9: h\u00e9llo \u2717\n",
+    "why": "a real uncaught crash captured from python3 -E -s -B (unicode_msg), exit 1",
+    "correct": "isPythonCrash returns true, so the cli: arm scores the case errored, never rejected",
+    "direction": "legitimate"
+  },
+  {
+    "id": "py-crash.empty_tb_msg",
+    "sink": "markdown-structure",
+    "input": "Traceback (most recent call last):\n  File \"/x/empty_tb_msg.py\", line 1, in <module>\n    raise SystemError\nSystemError\n",
+    "why": "a real uncaught crash captured from python3 -E -s -B (empty_tb_msg), exit 1",
+    "correct": "isPythonCrash returns true, so the cli: arm scores the case errored, never rejected",
+    "direction": "legitimate"
+  },
+  {
+    "id": "py-crash.note_multi",
+    "sink": "markdown-structure",
+    "input": "Traceback (most recent call last):\n  File \"/x/note_multi.py\", line 3, in <module>\n    raise e\nValueError: x\nline one\nline two\n",
+    "why": "a real uncaught crash captured from python3 -E -s -B (note_multi), exit 1",
+    "correct": "isPythonCrash returns true, so the cli: arm scores the case errored, never rejected",
+    "direction": "legitimate"
+  },
+  {
+    "id": "py-crash.trailing_print_atexit",
+    "sink": "markdown-structure",
+    "input": "Traceback (most recent call last):\n  File \"/x/trailing_print_atexit.py\", line 3, in <module>\n    raise OSError(13, \"denied\")\nPermissionError: [Errno 13] denied\nValueError-looking? no: done\n",
+    "why": "a real uncaught crash captured from python3 -E -s -B (trailing_print_atexit), exit 1",
+    "correct": "isPythonCrash returns true, so the cli: arm scores the case errored, never rejected",
+    "direction": "legitimate"
+  },
+  {
+    "id": "py-refusal.header-no-frame",
+    "sink": "markdown-structure",
+    "input": "Traceback (most recent call last):\nrefused: 'a/b' is not a bare host\n",
+    "why": "a refusal that prints a Traceback-shaped header but no frame",
+    "correct": "isPythonCrash returns false, so the refusal is scored rejected, not errored",
+    "direction": "hostile"
+  },
+  {
+    "id": "py-refusal.col0-frame",
+    "sink": "markdown-structure",
+    "input": "File \"/etc/policy.cfg\", line 4\nValueError: refused\n",
+    "why": "a refusal quoting a config location at column 0, with an exception-shaped line",
+    "correct": "isPythonCrash returns false, so the refusal is scored rejected, not errored",
+    "direction": "hostile"
+  },
+  {
+    "id": "py-refusal.tab-frame",
+    "sink": "markdown-structure",
+    "input": "Traceback (most recent call last):\n\tFile \"a.py\", line 1\nrefused\n",
+    "why": "a header and a tab-indented frame-shaped line \u2014 not Python's two-space frame",
+    "correct": "isPythonCrash returns false, so the refusal is scored rejected, not errored",
+    "direction": "hostile"
+  },
+  {
+    "id": "py-refusal.argparse",
+    "sink": "markdown-structure",
+    "input": "usage: cli.py [-h] --host HOST\ncli.py: error: argument --host: invalid host 'a/b'\n",
+    "why": "an argparse usage error",
+    "correct": "isPythonCrash returns false, so the refusal is scored rejected, not errored",
+    "direction": "hostile"
+  },
+  {
+    "id": "py-refusal.frame-word-no-quote",
+    "sink": "markdown-structure",
+    "input": "  File list, line 3: refused\nValueError: no\n",
+    "why": "an indented 'File' line without a quoted path",
+    "correct": "isPythonCrash returns false, so the refusal is scored rejected, not errored",
+    "direction": "hostile"
+  },
+  {
+    "id": "py-refusal.empty",
+    "sink": "markdown-structure",
+    "input": "",
+    "why": "no stderr at all",
+    "correct": "isPythonCrash returns false, so the refusal is scored rejected, not errored",
+    "direction": "hostile"
+  }
+]

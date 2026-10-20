@@ -1,0 +1,100 @@
+schema: 2
+task: 'task.204.numbered-prds-in-prd-skills'
+task_title: 'Numbered PRDs in the PRD skills'
+gate: CONCERNS
+status_reason: 'Gate 7''s findings are fixed and verified. The cycle-8 re-probe exercised the migration path review-prd now offers end to end and found five reproduced mediums: the apply block hides the engine''s findings and revert command, the plan offers applies that can never pass (no frontmatter), only one --name can be passed, a migrated root-level PRD is refused by create-prd''s layout rule, and links to a moved monolith from outside the PRD tree are left dead. Two are task-203 engine defects present on develop that this branch newly exposes.'
+reviewer: 'QA Engineer'
+head: '80542c82e86e7265b1cb6222486170b3eb0d379f'
+updated: '2026-10-15T20:14:34Z'
+
+top_issues:
+  - id: CR-1
+    severity: medium
+    file: 'skills/review-prd/SKILL.md'
+    finding: 'When the engine has moved files and then answers post-check-failed (or stops part-way), the apply block prints only the reason and blockers and drops the payload''s findings and revert command, leaving a half-migrated, uncommitted tree with no undo shown — contradicting the prose that says the revert is reported.'
+    suggested_action: 'On a non-zero exit, also print .findings[] and .revert from the engine payload.'
+    suggested_owner: dev
+    status: open
+  - id: CR-2
+    severity: medium
+    file: 'shared/resources/migrate-doc-numbering.mjs'
+    finding: 'A legacy PRD with no frontmatter (a bare docs/prd.md, or prd.{slug}/prd.{slug}.md) passes the plan with no blockers, but the frontmatter edit cannot insert prd_number, so every apply moves the files and then fails post-check (reproduced by QA on this branch and on develop''s engine: plan dry-run 0 blockers, apply post-check-failed).'
+    suggested_action: 'Raise a plan blocker for a legacy PRD without frontmatter, or create the block during the edit; regression row.'
+    suggested_owner: dev
+    status: open
+  - id: CR-3
+    severity: medium
+    file: 'skills/review-prd/SKILL.md'
+    finding: 'The plan and apply blocks pass at most one --name, but the engine raises one unplaced-prd blocker per unnamed L3 PRD; the layout develop''s shard-prd produced (docs/prd.md plus docs/prd/index.md) can never clear.'
+    suggested_action: 'Accept several <path>=<slug> pairs in MIG_NAME, each becoming its own --name, and say so in the unplaced-prd instruction.'
+    suggested_owner: dev
+    status: open
+  - id: CR-4
+    severity: medium
+    file: 'skills/create-prd/SKILL.md'
+    finding: 'The migration places a root index.md or root-level legacy PRD at ${PRD_ROOT}/prd.{P}.{slug}/ (Folder .), which check --corpus accepts, but create-prd''s keep block requires {domain}/prd.{P}.{feature}/ and refuses it as off-layout, pointing to /review-prd, whose check reads ok and whose plan answers already — a remedy loop.'
+    suggested_action: 'Make the migration and create-prd agree on the layout: either the migration asks for a domain for a domain-less PRD, or keep/register accept the root placement.'
+    suggested_owner: dev
+    status: open
+  - id: CR-5
+    severity: medium
+    file: 'shared/resources/migrate-doc-numbering.mjs'
+    finding: 'Files outside the PRD tree that link to docs/prd.md contain neither prd/ nor docs/prd/, so the prefilter skips them: README''s [PRD](docs/prd.md) is left dead after the monolith moves, and the run reports ok (reproduced by QA on this branch and on develop''s engine).'
+    suggested_action: 'Add each explicit move source outside the root to the prefilter so the link and literal passes see those files; regression row.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 50
+
+evidence:
+  tests_reviewed: 39
+  phases_verified: 5/5
+  ci: 'not read this cycle'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4]
+    phases_with_issues: [1, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 24
+    notes: 'Allocation controls engage (task.204.qa.8.security.run.json, slug 11 + domain 13). Advisory CR-6 (low, medium confidence): no block checks that PRD_ROOT itself is inside the working tree, so a symlinked docs/prd makes every containment check pass vacuously; the migration engine refuses the same root.'
+  performance:
+    status: PASS
+    notes: 'Row 11: three node processes.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1, CR-2, CR-3, CR-5: the migration review-prd offers can fail half-way without an undo shown, can never pass for frontmatter-less PRDs or two unnamed PRDs, and leaves outside links dead.'
+  maintainability:
+    status: CONCERNS
+    notes: 'CR-4: the migration and create-prd disagree on where a domain-less PRD lives.'
+
+bug_resolution:
+  gate_7_findings: 2
+  fixed_and_verified: 2
+  verification_method: 'gate-7 rows (migration leaves another PRD byte-identical; shard back-link refused; legacy PRD outside the working tree stops review) at 80542c82, mutation-proven in cycle 7'
+
+recommendations:
+  immediate:
+    - action: 'CR-1, CR-3: the review-prd apply/plan blocks show findings and revert, and pass several --name pairs.'
+      refs: ['skills/review-prd/SKILL.md']
+    - action: 'CR-2, CR-5: migration engine — frontmatter-less legacy PRD and outside links to a moved monolith.'
+      refs: ['shared/resources/migrate-doc-numbering.mjs']
+    - action: 'CR-4: one layout rule for a domain-less PRD across the migration and create-prd.'
+      refs: ['skills/create-prd/SKILL.md', 'shared/resources/migrate-doc-numbering.mjs']
+  future:
+    - action: 'CR-6 (advisory, low): refuse a PRD_ROOT outside the working tree in every block, as the engine''s checkPrdRoot does — part of the shared containment predicate.'
+      refs: ['shared/resources/doc-id.js']
+    - action: 'One layout-and-containment predicate in doc-id.js, called by every block (follow-up task).'
+      refs: ['shared/resources/doc-id.js']
+    - action: 'Gate-2 CR-4: register a found PRD that has no registry row.'
+      refs: ['skills/create-prd/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1..CR-5 closed or moved to a follow-up task with review-prd refusing the shapes it cannot migrate']

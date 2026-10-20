@@ -1,0 +1,82 @@
+schema: 2
+task: 'task.198.skill-reference-and-discoverability-docs'
+task_title: 'Skill reference and discoverability docs'
+gate: CONCERNS
+status_reason: 'Gate 1 findings verified fixed. The cycle-2 refute pass over the whole branch found two medium claims the original change carried: qa-next is credited with writing the Automated-by cell, and the B.3 heading still says "auto" over a body that now says on request. A low one says the resolver picks the tracker in create-story, where the user picks.'
+reviewer: 'QA Engineer'
+head: 'b47f076ef258ea95849fb2562344909f24037f06'
+updated: '2026-10-20T05:18:22Z'
+
+top_issues:
+  - id: 'QA2-CR-1'
+    severity: medium
+    file: 'skills/qa-next/README.md'
+    finding: 'Line 43 says /qa-next updates the Automated-by cell with --automated. It never does: skills/qa-next/SKILL.md:237 only prints a hand-off (when the spec lands, --automated <id> "<path>"); the skill writes with --items and --set.'
+    suggested_action: 'Say the cell is filled with uat-status.mjs --automated <id> "<path>" once a spec lands, by hand or by a consumer-side uat-automate; /qa-next only prints that hand-off.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA2-CR-2'
+    severity: medium
+    file: 'docs/runbooks/story-development.md'
+    finding: 'The B.3 heading (line 130) still reads "Tracker issue (auto, flagged for awareness)" while the cycle-1 body says issues are created on request; create-story SKILL.md:38 and :48 make tracker sync opt-in.'
+    suggested_action: 'Rename the heading to "Tracker issue (on request, flagged for awareness)".'
+    suggested_owner: dev
+    status: open
+  - id: 'QA2-CR-3'
+    severity: low
+    file: 'docs/runbooks/story-development.md'
+    finding: 'Line 283 (and :132, architecture.md:120) say the platform resolver picks GitHub or Jira for create-story; create-story SKILL.md:443-458 asks the user (Sync to GitHub / Sync to Jira / Skip), and the resolver only marks one option Recommended. review-story does follow TRACKER.'
+    suggested_action: 'For create-story say the user picks at the Tracker sync prompt (the resolver recommends one); keep "picked by the platform resolver" for review-story. Same change at story-development.md:132 and architecture.md:120.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 5969
+  phases_verified: 4/4
+  ci: 'not read for b47f076e (the fast gate at b47f076e passed 5955/0)'
+  trace:
+    phases_covered: [0, 1, 2, 3]
+    phases_with_issues: [1, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'Documentation only; no boundary.'
+  performance:
+    status: PASS
+    notes: 'N/A — docs only.'
+  reliability:
+    status: PASS
+    notes: 'Links, anchors and the Mermaid map resolve.'
+  maintainability:
+    status: PASS
+    notes: 'Remaining inaccuracies tracked in top_issues.'
+
+recommendations:
+  immediate:
+    - action: 'Fix QA2-CR-1 to QA2-CR-3.'
+      refs: ['skills/qa-next/README.md', 'docs/runbooks/story-development.md', 'docs/concepts/architecture.md']
+  future:
+    - action: 'Advisory (medium confidence): overview.md:127 says finalise reads the caller-resolved TRACKER, but finalise has no source line and says "resolver already sourced above" (SKILL.md:2094) — a gap in finalise itself; reword the doc to "has no source line of its own" and file the finalise gap separately. sync-github-* are user-invocable skills, not sub-routines.'
+      refs: ['docs/concepts/overview.md', 'skills/finalise/SKILL.md']
+    - action: 'Cleanups: architecture.md map draws CE --> EGH unconditionally with no sync-jira-epic edge; CHANGELOG task-198 entry lists 15 of the 16 docs (architecture.md missing).'
+      refs: ['docs/concepts/architecture.md', 'CHANGELOG.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['QA2-CR-1 to QA2-CR-3 fixed']
+
+bug_resolution:
+  gate_1_findings: 7
+  verified_fixed: 6
+  partial: 1   # QA1-CR-6: the B.3 body fix left the heading (QA2-CR-2) and the resolver wording (QA2-CR-3)
+  method: 'Re-read each fixed site at b47f076e against its source; refute pass re-checked the cycle-1 text'

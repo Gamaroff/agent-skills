@@ -1,6 +1,6 @@
 ---
 name: qa-next
-description: "UAT loop orchestrator: selects the next untested user function from the owner's UAT registry (scripts/uat-status.mjs --next) — one row per thing a person does with the app — resolves it to checklist items (authoring them when none exist), runs the function's tagged real-stack Playwright spec when one exists, walks the rest with browser automation and HTTP probes, writes a per-run results file, records 🟡 pass / ❌ fail / ⏸ blocked, files a bug on failure, records every incidental finding in the run file's Findings table and files those too (`--findings` lists open ones), leaves an automation candidate for every pass no spec covers, commits, and reports. `--coverage` names the accepted stories no function covers. Never marks ✅ accepted — that is the owner's `--accept`. Crash-safe via a run-state file. Sibling of develop-next: that loop builds, this one verifies. Invoke with `/qa-next`, `/qa-next D.2` (re-test or regression-test one named row, any state), `/qa-next --dry-run`, or `/loop /qa-next`."
+description: "UAT loop orchestrator: picks the next untested user function from the owner's UAT registry (scripts/uat-status.mjs --next), resolves it to checklist items (authoring any that are missing), runs its tagged Playwright spec when one exists, walks the rest with browser automation and HTTP probes, and records 🟡 pass / ❌ fail / ⏸ blocked in a per-run results file. Files a bug for each failure and incidental finding, commits, and reports. Never marks ✅ accepted — that is the owner's `--accept`. Crash-safe. Sibling of develop-next: that loop builds, this one verifies. Invoke with `/qa-next`, `/qa-next D.2` (one named row, any state), `/qa-next --dry-run`, `--coverage`, `--findings`, or `/loop /qa-next`."
 invokes: [create-bug-report]
 ---
 
@@ -92,7 +92,7 @@ Resume on re-run (Step 0, `--state-get` exit 0), by `phase`: `committed` → Ste
 1. `--state-get --json`. Exit 6: no run in flight, so continue. Exit 1: **HALT** `state-malformed`. Exit 0: if the state names a **different** item and this invocation gave an id, **HALT** `run-in-progress` (finish that run, or `--state-clear`). Otherwise resume as above, or under `--dry-run` report the pending run and stop.
 2. `git status --porcelain` non-empty → **HALT** `dirty-tree`. This skill commits docs; it must not sweep up someone's work.
 3. Check out and fast-forward `baseBranch`.
-4. Registry absent → run `--init`; if that scaffolds `uat-surfaces.json` and stops, **STOP** `surfaces-unmapped` and tell the owner to fill it in. If `--init` wrote the skeleton, **STOP** `registry-empty` — the rows are the owner's to author (one per user function; see README "Authoring the registry"). Registry present → `--check`; a non-zero `--check` is **HALT** `registry-invalid` — never test on top of a registry that is lying. Then `--coverage`: report how many accepted stories no function covers (non-fatal — the owner adds rows or `storyNa` entries in their own time).
+4. Registry absent → run `--init`; if that scaffolds `uat-surfaces.json` and stops, **STOP** `surfaces-unmapped` and tell the owner to fill it in. If `--init` wrote the skeleton, **STOP** `registry-empty` — the rows are the owner's to author (one per user function; see README "Authoring the registry"). Registry present → `--check`. When it exits 2 with `uat-surfaces.json not found`, the surfaces file is missing, not the registry wrong: run `--init`, which scaffolds the file and stops without touching the registry, and **STOP** `surfaces-unmapped`. Any other non-zero `--check` is **HALT** `registry-invalid` — never test on top of a registry that is lying. Then `--coverage`: report how many accepted stories no function covers (non-fatal — the owner adds rows or `storyNa` entries in their own time).
 5. Environment: `curl -fsS --max-time 10 "$baseUrl$healthPath"` and, if `apiUrl` is set, `curl -fsS --max-time 10 "$apiUrl$apiHealthPath"` — never the bare API origin, whose root is a 404 on most frameworks and would read as down while the service is up. Either unreachable → **STOP** `env-unreachable`. Under `--dry-run` this is reported, not fatal.
 6. Browser automation: prefer the Playwright MCP tools when the session exposes them (`browser_navigate` / `browser_snapshot` / `browser_click` …); otherwise the project's own Playwright (`npx playwright` with a throwaway spec under the OS temp dir). Neither available → **STOP** `no-browser`.
 
@@ -180,7 +180,7 @@ Then `--state-set phase executed`.
    Whichever bug this run ends up linking — a new one, or the open one it reuses below — record its repo-relative path with `--state-set filedBug <path>` before Step 4.4. A pass, a block or an n/a leaves it `null`.
 
    **A repeat failure reuses the open bug.** `--state-get`'s `bug` is the repo-relative path of the bug the row linked when this run began, in the form `--bug` takes (`null` when there is none). `--state-init` recorded it. Read it from `--state-get`; never take it from a fresh `--item` and never re-parse the registry. When it is non-null and that bug is not closed, append a dated re-test section to it (what was run, what was observed, which items still fail) and link the same bug again. File a **new** bug only when there is none, or when the existing one is closed — a closed bug failing again is a new fact and deserves its own record. Fixing then re-testing is the main reason the `id` argument exists; filing bug #2, #3 and #4 against one defect is its obvious first-order failure.
-3. File the findings, independently of the verdict. For each row: **story mode** against the story it concerns when one of this function's stories owns it; **general mode** (`docs/bugs/`, no parent) when it belongs to another surface, to the environment or to this harness — never file a foreign defect against the story you happened to be testing. Severity as recorded; reproduction from the row. File only what a stranger could reproduce from the row alone; otherwise `Filed as` stays `note` and the row itself is the record. Put each bug's link (relative to the run file) in its row's `Filed as` cell. A finding that matches an **open** finding on this function from an earlier run (`--findings --all --json`, matched on *Where* + *What was observed*) reuses that bug's link in its `Filed as` cell instead of filing a duplicate.
+3. File the findings, independently of the verdict. For each row: **story mode** against the story it concerns when one of this function's stories owns it; **general mode** (`docs/bugs/`, no parent) when it belongs to another surface, to the environment or to this harness — never file a foreign defect against the story you happened to be testing. Severity as recorded; reproduction from the row. File only what a stranger could reproduce from the row alone; otherwise `Filed as` stays `note` and the row itself is the record. Put each bug's link (relative to the run file) in its row's `Filed as` cell. A finding that matches an **open** finding on this function from an earlier run (`--findings --all --json`, matched on *Where* + *What was observed*) reuses that bug's link in its `Filed as` cell instead of filing a duplicate. And the converse: when this run shows that an earlier run's open `note` no longer holds — the subject is gone or fixed — close it with this run as the evidence: `uat-status.mjs --resolve-finding <earlier run> <n> --by <this run file>` (both paths as `--findings` prints them). It appends `— resolved YYYY-MM-DD by `<evidence>`` to that row's `Filed as` cell; `--resolve-finding` is the marker's only writer, and evidence may also be a commit sha. A note is never closed by absence — only by a run that looked. A `run-not-later` refusal means this run cannot be ordered after that one (a same-day run of another function or environment): leave the note open and carry on — it is not a failed step.
 4. Registry:
    - pass → `--set <id> pass --run runs/<id>/<file>.md`, plus the note flag the table below gives for the row's current state: `--clear-note` on every row except `✅`
    - fail → `--set <id> fail --run runs/<id>/<file>.md --bug <filedBug>` (from `--state-get`)
@@ -202,11 +202,19 @@ Then `--state-set phase recorded`.
 
 ## Step 5 — Commit
 
-Only if `qaNext.commit` is true. Stage **only** the run file, the registry, the surface checklist and the bug reports — the function's and any filed from the Findings table, plus `docs/bugs/bug-registry.md` when a general bug was filed (never `git add -A`, never `uat-surfaces.json` — that file is the owner's), then:
+Only if `qaNext.commit` is true. Stage **only** the run file, any earlier run file this run resolved a finding in (Step 4.3's `--resolve-finding` — listed by the block below), the registry, the surface checklist and the bug reports — the function's and any filed from the Findings table, plus `docs/bugs/bug-registry.md` when a general bug was filed (never `git add -A`, never `uat-surfaces.json` — that file is the owner's), then:
 
 ```
 qa(uat): <id> <pass|fail|blocked> — <Function>
 ```
+
+**The earlier run files to stage are read from the tree, never remembered.** A run that crashed after `phase recorded` resumes here with no record of which run files Step 4.3 edited; the edit itself is the record. The tool lists the tracked run files that differ from `HEAD` — exactly those, since the new run file this run wrote is untracked — under the registry it is pointed at, so pass `--registry` as for every other call when `qaNext.registryPath` is not the default:
+
+```bash
+node .agents/skills/qa-next/scripts/uat-status.mjs --changed-runs
+```
+
+Stage each path it prints with the rest.
 
 For a targeted re-run (`--state-get`'s `priorRuns` is non-empty):
 
@@ -255,11 +263,11 @@ Every stop leaves the registry consistent (`--check` green) — a stop is never 
 - Retry an item until it passes.
 - Mark n/a on anything a user could exercise somewhere.
 - Drop an observation because it failed no item. It goes in the run file's Findings table, filed or `note`.
-- Overwrite a previous run file. The path comes from `--run-path`, which returns the next free one.
+- Overwrite a previous run file. The path comes from `--run-path`, which returns the next free one. The one exception is `--resolve-finding`, which appends a resolution marker to a single `Filed as` cell of an earlier run and changes no other byte.
 - Re-litigate an `✅` on a pass. The only things that move an accepted row are a failure and the owner's explicit `--set <id> untested` demotion — and this skill never sends the latter.
 
 ## Running as a loop
 
-`/loop /qa-next` with no interval: one function per iteration, self-paced. It ends at any stop condition. Because 🟡 rows accumulate without owner action, check the scoreboard between sessions — a loop that has produced forty 🟡s and no ✅s is waiting on you, not on itself. The same goes for findings (`--findings` is the consolidated list of what the loop has seen and nobody has closed) and for coverage (`--coverage` is the list of shipped stories the registry does not yet know about).
+`/loop /qa-next` with no interval: one function per iteration, self-paced. It ends at any stop condition. Because 🟡 rows accumulate without owner action, check the scoreboard between sessions — a loop that has produced forty 🟡s and no ✅s is waiting on you, not on itself. The same goes for findings (`--findings` is the consolidated list of what the loop has seen and nobody has closed — a `note` closes when `--resolve-finding` records evidence that it no longer holds, so the list does not grow forever) and for coverage (`--coverage` is the list of shipped stories the registry does not yet know about).
 
 The registry is the only queue. There is nothing to "start" or "reset": the next ⬜ row is always the next function, and the owner keeps the queue current by adding a row when `--coverage` names a story that built something new.

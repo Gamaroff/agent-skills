@@ -760,32 +760,49 @@ test("parseArgs — --doc-branch absent defaults to null", () => {
 });
 
 // ---------------------------------------------------------------------------
-// normaliseEpicSummary — canonical "[Epic N] {title}" bracket form
+// normaliseEpicSummary — canonical "[Epic P.E] {title}" bracket form (task 205)
+// It IS doc-id.js `epicSummary`: one rule, shared with jira-create-epic.js.
 // ---------------------------------------------------------------------------
+const PE = { prd: 1, epic: 3 };
+
+test("normaliseEpicSummary — is doc-id's epicSummary, not a copy", () => {
+  assert.equal(
+    lib.normaliseEpicSummary,
+    require("../references/doc-id.js").epicSummary,
+  );
+});
+
 test("normaliseEpicSummary — already-bracketed is unchanged (idempotent)", () => {
-  assert.equal(lib.normaliseEpicSummary("[Epic 1] Foo", 1), "[Epic 1] Foo");
+  assert.equal(
+    lib.normaliseEpicSummary("[Epic 1.3] Foo", PE),
+    "[Epic 1.3] Foo",
+  );
 });
 
 test("normaliseEpicSummary — colon-prefixed is rewrapped in brackets", () => {
-  assert.equal(lib.normaliseEpicSummary("Epic 1: Foo", 1), "[Epic 1] Foo");
+  assert.equal(lib.normaliseEpicSummary("Epic 1.3: Foo", PE), "[Epic 1.3] Foo");
 });
 
-test("normaliseEpicSummary — bare title resolves id from epic_number", () => {
-  assert.equal(lib.normaliseEpicSummary("Foo", 1), "[Epic 1] Foo");
+test("normaliseEpicSummary — a legacy one-number title converges on P.E", () => {
+  assert.equal(lib.normaliseEpicSummary("[Epic 3] Foo", PE), "[Epic 1.3] Foo");
+  assert.equal(lib.normaliseEpicSummary("Epic 3: Foo", PE), "[Epic 1.3] Foo");
 });
 
-test("normaliseEpicSummary — no id resolvable leaves the summary unchanged", () => {
-  assert.equal(lib.normaliseEpicSummary("Foo", null), "Foo");
+test("normaliseEpicSummary — bare title resolves id from prd_number + epic_number", () => {
+  assert.equal(lib.normaliseEpicSummary("Foo", PE), "[Epic 1.3] Foo");
+});
+
+test("normaliseEpicSummary — the frontmatter pair wins over a stale prefix id", () => {
+  assert.equal(lib.normaliseEpicSummary("Epic 9.9: Foo", PE), "[Epic 1.3] Foo");
+  assert.equal(lib.normaliseEpicSummary("[Epic 9] Foo", PE), "[Epic 1.3] Foo");
+});
+
+// Inverted by task 205: the title's own id is never a fallback. A missing pair
+// yields the bare title, and review-epic is the gate for the missing number.
+test("normaliseEpicSummary — a missing pair yields the bare title, never a guessed id", () => {
+  assert.equal(lib.normaliseEpicSummary("Epic 7: Foo", {}), "Foo");
+  assert.equal(lib.normaliseEpicSummary("[Epic 7] Foo", { epic: 7 }), "Foo");
   assert.equal(lib.normaliseEpicSummary("Foo", undefined), "Foo");
-});
-
-test("normaliseEpicSummary — epic_number wins over a stale prefix id", () => {
-  assert.equal(lib.normaliseEpicSummary("Epic 9: Foo", 1), "[Epic 1] Foo");
-  assert.equal(lib.normaliseEpicSummary("[Epic 9] Foo", 1), "[Epic 1] Foo");
-});
-
-test("normaliseEpicSummary — falls back to the title's prefix id when epic_number is absent", () => {
-  assert.equal(lib.normaliseEpicSummary("Epic 7: Foo", null), "[Epic 7] Foo");
 });
 
 // ---------------------------------------------------------------------------
@@ -795,9 +812,9 @@ function makeEpicDir(stories, { withStoriesDir = true } = {}) {
   const fs = require("fs"),
     os = require("os");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "child-stories-"));
-  const epicDir = path.join(dir, "epic.2.demo");
+  const epicDir = path.join(dir, "epic.1.2.demo");
   fs.mkdirSync(epicDir);
-  fs.writeFileSync(path.join(epicDir, "epic.2.demo.md"), "# Epic");
+  fs.writeFileSync(path.join(epicDir, "epic.1.2.demo.md"), "# Epic");
   if (withStoriesDir) {
     const storiesDir = path.join(epicDir, "stories");
     fs.mkdirSync(storiesDir);
@@ -808,31 +825,56 @@ function makeEpicDir(stories, { withStoriesDir = true } = {}) {
         fs.writeFileSync(path.join(sd, f), content);
     }
   }
-  return path.join(epicDir, "epic.2.demo.md");
+  return path.join(epicDir, "epic.1.2.demo.md");
 }
 
 test("findChildStories — links each story card and ignores its sibling artifacts", () => {
   const epicFile = makeEpicDir({
-    "story.2.1.alpha": {
-      "story.2.1.alpha.md": "# Alpha story",
-      "story.2.1.plan.alpha.md": "# plan", // artifact — must not be linked
-      "story.2.1.qa.1.alpha.md": "# qa", // artifact — must not be linked
+    "story.1.2.1.alpha": {
+      "story.1.2.1.alpha.md": "# Alpha story",
+      "story.1.2.1.plan.alpha.md": "# plan", // artifact — must not be linked
+      "story.1.2.1.qa.1.alpha.md": "# qa", // artifact — must not be linked
     },
   });
   const found = lib.findChildStories(epicFile);
   assert.equal(found.length, 1);
-  assert.equal(path.basename(found[0].file), "story.2.1.alpha.md");
+  assert.equal(path.basename(found[0].file), "story.1.2.1.alpha.md");
 });
 
 test("findChildStories — orders numerically, not lexicographically", () => {
   const epicFile = makeEpicDir({
-    "story.2.10.j": { "story.2.10.j.md": "# J" },
-    "story.2.2.b": { "story.2.2.b.md": "# B" },
-    "story.2.1.a": { "story.2.1.a.md": "# A" },
+    "story.1.2.10.j": { "story.1.2.10.j.md": "# J" },
+    "story.1.2.2.b": { "story.1.2.2.b.md": "# B" },
+    "story.1.2.1.a": { "story.1.2.1.a.md": "# A" },
   });
   assert.deepEqual(
     lib.findChildStories(epicFile).map((s) => s.label),
-    ["Story 2.1 — A", "Story 2.2 — B", "Story 2.10 — J"],
+    ["Story 1.2.1 — A", "Story 1.2.2 — B", "Story 1.2.10 — J"],
+  );
+});
+
+test("findChildStories — keeps only stories whose (P, E) is the epic's own (task 205)", () => {
+  const epicFile = makeEpicDir({
+    "story.1.2.1.a": { "story.1.2.1.a.md": "# A" },
+    "story.1.3.1.stray": { "story.1.3.1.stray.md": "# Stray" }, // epic 1.3's story
+    "story.2.2.1.other": { "story.2.2.1.other.md": "# Other" }, // PRD 2's epic 2
+    "story.2.1.legacy": { "story.2.1.legacy.md": "# Legacy" }, // pre-205 two-segment id
+  });
+  assert.deepEqual(
+    lib.findChildStories(epicFile).map((s) => s.label),
+    ["Story 1.2.1 — A"],
+  );
+});
+
+test("findChildStories — a sub-story sorts after its parent", () => {
+  const epicFile = makeEpicDir({
+    "story.1.2.3A.sub": { "story.1.2.3A.sub.md": "# Sub" },
+    "story.1.2.3.main": { "story.1.2.3.main.md": "# Main" },
+    "story.1.2.10.ten": { "story.1.2.10.ten.md": "# Ten" },
+  });
+  assert.deepEqual(
+    lib.findChildStories(epicFile).map((s) => s.label),
+    ["Story 1.2.3 — Main", "Story 1.2.3A — Sub", "Story 1.2.10 — Ten"],
   );
 });
 
@@ -845,24 +887,41 @@ test("findChildStories — an epic with no stories/ directory yields no links", 
 
 test("findChildStories — a story dir without its matching card is skipped", () => {
   const epicFile = makeEpicDir({
-    "story.2.1.alpha": { "story.2.1.plan.alpha.md": "# orphan plan" },
+    "story.1.2.1.alpha": { "story.1.2.1.plan.alpha.md": "# orphan plan" },
   });
   assert.deepEqual(lib.findChildStories(epicFile), []);
 });
 
 test("labelForChildStory — an already-prefixed title is not repeated", () => {
   const epicFile = makeEpicDir({
-    "story.2.1.alpha": { "story.2.1.alpha.md": "# [Story 2.1] Alpha thing" },
+    "story.1.2.1.alpha": {
+      "story.1.2.1.alpha.md": "# [Story 1.2.1] Alpha thing",
+    },
   });
   assert.equal(
     lib.findChildStories(epicFile)[0].label,
-    "Story 2.1 — Alpha thing",
+    "Story 1.2.1 — Alpha thing",
+  );
+});
+
+test("labelForChildStory — a dash-separated or sub-story prefix is not repeated (QA cycle 1, CR-6)", () => {
+  const epicFile = makeEpicDir({
+    "story.1.2.1.alpha": {
+      "story.1.2.1.alpha.md": "# Story 1.2.1 — Alpha thing",
+    },
+    "story.1.2.3A.beta": {
+      "story.1.2.3A.beta.md": "# [Story 1.2.3A] Beta thing",
+    },
+  });
+  assert.deepEqual(
+    lib.findChildStories(epicFile).map((s) => s.label),
+    ["Story 1.2.1 — Alpha thing", "Story 1.2.3A — Beta thing"],
   );
 });
 
 test("labelForChildStory — an untitled card still gets a numbered label", () => {
   const epicFile = makeEpicDir({
-    "story.2.1.alpha": { "story.2.1.alpha.md": "no heading here" },
+    "story.1.2.1.alpha": { "story.1.2.1.alpha.md": "no heading here" },
   });
-  assert.equal(lib.findChildStories(epicFile)[0].label, "Story 2.1");
+  assert.equal(lib.findChildStories(epicFile)[0].label, "Story 1.2.1");
 });

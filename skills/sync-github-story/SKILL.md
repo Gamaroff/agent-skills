@@ -42,7 +42,7 @@ Source `references/resolve-paths.sh` to populate `${PRD_ROOT}` (default `docs/pr
 ### Required Files
 
 - A story markdown file at:
-  `${PRD_ROOT}/<domain>/<feature>/epics/epic.<N>.<name>/stories/story.<N>.<M>.<slug>/story.<N>.<M>.<slug>.md`
+  `${PRD_ROOT}/<domain>/prd.<P>.<feature>/epics/epic.<P>.<E>.<name>/stories/story.<P>.<E>.<S>.<slug>/story.<P>.<E>.<S>.<slug>.md`
 - `project.yml` at the repo root with:
   ```yaml
   github:
@@ -62,7 +62,7 @@ Source `references/resolve-paths.sh` to populate `${PRD_ROOT}` (default `docs/pr
 ### 1. Identify the Story File
 
 ```
-${PRD_ROOT}/<domain>/<feature>/epics/epic.<N>.<slug>/stories/story.<N>.<M>.<slug>/story.<N>.<M>.<slug>.md
+${PRD_ROOT}/<domain>/prd.<P>.<feature>/epics/epic.<P>.<E>.<slug>/stories/story.<P>.<E>.<S>.<slug>/story.<P>.<E>.<S>.<slug>.md
 ```
 
 To find stories that have **not yet been synced** (no `github_issue`):
@@ -82,9 +82,21 @@ source references/resolve-platform.sh || exit 1
 
 Extract from frontmatter: `title`, `status`, `priority`, `estimated_effort_hours` (number; absent/empty if not set), `github_issue` (if present), `labels`.
 
-Parse the epic/story numbers from the filename: `story.{E}.{S}.` → `STORY_E`, `STORY_S`.
+Read the story id through `doc-id.js` — never a positional split of the filename (task 206). A story is
+`story.{P}.{E}.{S}{sub?}`; the id in a tracker title is `P.E.S`:
 
-Strip any leading `Story {E}.{S}: ` prefix (or an already-bracketed `[Story {E}.{S}] ` prefix) from `title` to get the bare display title: `STORY_TITLE`. The update path (Step 5b) wraps this once as `[Story {E}.{S}] ${STORY_TITLE}`; stripping first prevents a double prefix like `[Story 1.3] Story 1.3: …`.
+```bash
+# sync-github-story Step 3 — the story id through doc-id (task 206).
+: "${STORY_FILE_PATH:?bind STORY_FILE_PATH to the story document}"
+STORY_JSON=$(command node .agents/skills/sync-github-story/references/doc-id.js parse "$(basename "$STORY_FILE_PATH")" --json) \
+  || { echo "❌ $(basename "$STORY_FILE_PATH") is not a story id doc-id can read (story.P.E.S.slug.md)"; exit 1; }
+[ "$(printf '%s' "$STORY_JSON" | jq -r '"\(.kind) \(.artifact)"')" = "story null" ] \
+  || { echo "❌ $(basename "$STORY_FILE_PATH") is not a story document"; exit 1; }
+STORY_ID=$(printf '%s' "$STORY_JSON" | jq -r '.id | sub("^story\\."; "")')   # 1.2.3, or 1.2.3A
+echo "STORY_ID=$STORY_ID"
+```
+
+Strip any leading `Story {P}.{E}.{S}: ` prefix (or an already-bracketed `[Story {P}.{E}.{S}] ` prefix) from `title` to get the bare display title: `STORY_TITLE`. The update path (Step 5b) wraps this once as `[Story ${STORY_ID}] ${STORY_TITLE}`; stripping first prevents a double prefix like `[Story 1.1.3] Story 1.1.3: …`.
 
 Derive the parent epic file path:
 
@@ -154,6 +166,12 @@ gh issue view ${ISSUE_NUM} --json state,title,labels,body > /tmp/issue-${ISSUE_N
 Diff `title`, `body`, `labels` against current GitHub state. The body is rebuilt to the **same shape** `ensure-story-github-issue` emits on create, including the `## Document` link block (using `DOC_URL` above), so re-syncing from a feature branch refreshes the link to that branch. At acceptance, `finalise` re-points the link to the durable integration branch so the closed issue doesn't link to a deleted feature branch. If anything changed, run:
 
 ```bash
+# sync-github-story Step 5b — the story id is derived HERE, in this block: Step 3's block is
+# another shell, and an unbound STORY_ID retitles the live issue "[Story ] …" (task.206 QA cycle 1, CR-1).
+: "${STORY_FILE_PATH:?bind STORY_FILE_PATH to the story document}"
+STORY_ID=$(command node .agents/skills/sync-github-story/references/doc-id.js parse "$(basename "$STORY_FILE_PATH")" --json \
+  | jq -r 'select(.kind == "story" and .artifact == null) | .id | sub("^story\\."; "")')
+[ -n "$STORY_ID" ] || { echo "❌ $(basename "$STORY_FILE_PATH") is not a story id doc-id can read — not editing the issue title"; exit 1; }
 mkdir -p .claude/state
 printf '%s' "$NEW_BODY" > .claude/state/issue-body.md
 
@@ -175,7 +193,7 @@ REMOVE_ARGS=()
 [ -n "$OLD_PRIORITY" ] && [ -n "$NEW_PRIORITY" ] && REMOVE_ARGS=(--remove-label "$OLD_PRIORITY")
 
 node references/tracker-issue.js --kind edit --issue ${ISSUE_NUM} \
-  --title "[Story ${STORY_E}.${STORY_S}] ${STORY_TITLE}" \
+  --title "[Story ${STORY_ID}] ${STORY_TITLE}" \
   --body-file .claude/state/issue-body.md \
   "${LABEL_ARGS[@]}" \
   "${REMOVE_ARGS[@]}"

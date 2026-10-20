@@ -5,14 +5,19 @@
 #
 # Covers (numbering matches docs/concepts/getting-started.md § "What the wizard does"):
 #   1. Prerequisite checks        (node, git, jq, curl)
-#   2. Platform selection         (GitHub+Issues / GitHub+Jira / Bitbucket+Jira)
+#   2. Platform selection         (GitHub+Issues / GitHub+Jira / Bitbucket+Jira),
+#                                  then tracker access (full / read-only / approve / command / manual)
+#   2b. Skill install profile     (full / pipeline / minimal, plus add-ons)
 #   3. Credential collection      (gh auth check, Bitbucket/Jira API tokens)
-#   4. .env files                 (.env.example always; .env optionally; gitignore)
+#   4. Credentials file           (Bitbucket/Jira only: .env.example; .secrets/tooling.env
+#                                  optionally; .secrets/ and .env gitignored)
 #   5. skills-config.yaml         (PRD path, architecture path, coding-standards path)
-#   6. Registry creation          (docs/development/epic-registry.md, docs/tasks/task-registry.md)
+#   6. Registry creation          (docs/tasks/task-registry.md — epics are numbered within their PRD)
 #   7. docs/ scaffold             (PRD root, architecture/concepts/ stubs)
 #   8. Skills install             (latest release from github.com/Gamaroff/agent-skills;
 #                                  skips the other tracker's skills — see --all-skills)
+#   8a. tracker-workflow.yaml     (board ladder + pipeline moments; never overwritten)
+#   8b. Agent links               (local, gitignored links for the agents you pick)
 #   9. Pipeline hook install      (.claude/settings.json via inline jq)
 #
 # Usage:
@@ -20,6 +25,8 @@
 #   bash scripts/setup-consumer.sh --dry-run     # print actions, write nothing
 #   bash scripts/setup-consumer.sh --update      # re-download skills only (skip wizard)
 #   bash scripts/setup-consumer.sh --all-skills  # install every skill, no platform filter
+#   bash scripts/setup-consumer.sh --links-only  # only link your agents to AGENTS.md and .agents/skills
+#   bash scripts/setup-consumer.sh --link-agents claude,gemini  # pick agents without the list (or: none)
 #
 # Requires: node ≥ 22, git, jq, curl
 
@@ -40,11 +47,18 @@ ask()     { echo -en "${BOLD}$1${NC} "; }
 DRY_RUN=false
 UPDATE_ONLY=false
 ALL_SKILLS=false
+LINK_AGENTS=""
+LINKS_ONLY=false
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dry-run)  DRY_RUN=true;    shift ;;
     --update)   UPDATE_ONLY=true; shift ;;
     --all-skills) ALL_SKILLS=true; shift ;;
+    --link-agents)
+      [[ $# -ge 2 && -n "$2" ]] || { err "--link-agents needs a value, e.g. claude,gemini (or none)"; exit 1; }
+      LINK_AGENTS="$2"; shift 2 ;;
+    --link-agents=*) LINK_AGENTS="${1#*=}"; shift ;;
+    --links-only) LINKS_ONLY=true; shift ;;
     --help|-h)
       sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'
       exit 0 ;;
@@ -80,7 +94,10 @@ append_line() {
   local path="$1"; local line="$2"
   if [[ "$DRY_RUN" == true ]]; then
     echo -e "${YELLOW}[dry-run]${NC} would append to $path: $line"
-  elif ! grep -qF "$line" "$path" 2>/dev/null; then
+  elif ! grep -qxF -- "$line" "$path" 2>/dev/null; then
+    # Whole-line match (-x). A substring match read "!.env.example" as a
+    # ".env" rule already present, so .env was never added: the most common
+    # .gitignore shape left the credentials file unignored, silently.
     # Terminate an unterminated last line first. Without this, appending
     # ".secrets/" to a .gitignore ending in "dist/" (no newline) yields
     # "dist/.secrets/" — a rule that ignores neither path, silently.
@@ -145,6 +162,98 @@ prompt_secret() {
   printf -v "$_var" '%s' "${_input:-${_existing}}"
 }
 
+# ── checkbox list ────────────────────────────────────────────────────────────
+# ↑/↓ (or k/j) move, space toggles, a toggles all, enter confirms.
+#
+# Reads keys from /dev/tty, never stdin: under `curl … | bash` stdin is the
+# script itself, and the numbered `read -r` prompts above cannot work there,
+# but the controlling terminal still can. Draws to /dev/tty too, so nothing
+# lands in a caller's $( ) capture.
+#
+# Bash 3.2 (macOS) has no fractional `read -t`, so an arrow key is read as ESC
+# followed by exactly two more bytes rather than by timing the gap. A lone ESC
+# therefore waits for two more keys; it is not bound to anything.
+#
+# Usage: checklist "Title" label1 label2 …   (CHECKLIST_DEFAULT="0 2" pre-ticks)
+# Sets CHECKLIST_RESULT to the ticked indices, space-separated, in list order.
+# Returns 1 when there is no terminal to draw on; the caller decides what that
+# means. Never prompts in that case.
+CHECKLIST_RESULT=""
+_checklist_has_tty() { { : </dev/tty >/dev/tty; } 2>/dev/null; }
+
+_checklist_restore() {
+  [[ -n "${_CL_STTY:-}" ]] && stty "$_CL_STTY" </dev/tty 2>/dev/null
+  printf '\033[?25h\033[?7h' >/dev/tty 2>/dev/null
+  _CL_STTY=""
+}
+
+checklist() {
+  local title="$1"; shift
+  local -a labels=("$@") ticked=()
+  local n=${#labels[@]} cur=0 i key rest
+  CHECKLIST_RESULT=""
+  _checklist_has_tty || return 1
+  (( n > 0 )) || return 0
+
+  for (( i = 0; i < n; i++ )); do ticked[i]=0; done
+  for i in ${CHECKLIST_DEFAULT:-}; do ticked[i]=1; done
+
+  _CL_STTY=$(stty -g </dev/tty)
+  # Ctrl-C must not leave the terminal with echo off and the cursor hidden.
+  # Movement uses `x=$(( … ))`, never `(( x = … ))`: the latter returns 1
+  # when the result is 0, and under `set -e` wrapping past the end would end
+  # the wizard.
+  trap '_checklist_restore; trap - INT; kill -INT $$' INT
+  stty -echo </dev/tty
+  # Cursor hidden, and autowrap OFF while the list is drawn: the redraw moves
+  # up exactly one row per item, so a line wider than the terminal must be
+  # clipped at the edge, never wrapped onto a second row. A wrapped line made
+  # every redraw land too high and stack frames on top of each other.
+  printf '\033[?25l\033[?7l' >/dev/tty
+
+  {
+    echo -e "${BOLD}${title}${NC}"
+    echo "  ↑/↓ move · space toggles · a toggles all · enter confirms"
+  } >/dev/tty
+
+  local drawn=false
+  while true; do
+    $drawn && printf '\033[%dA' "$n" >/dev/tty
+    drawn=true
+    for (( i = 0; i < n; i++ )); do
+      local box="[ ]" ptr="  "
+      (( ticked[i] )) && box="[${GREEN}x${NC}]"
+      (( i == cur )) && ptr="${BOLD}❯${NC} "
+      printf '\r\033[2K  %b%b %s\n' "$ptr" "$box" "${labels[i]}" >/dev/tty
+    done
+
+    IFS= read -rsn1 key </dev/tty || { _checklist_restore; trap - INT; return 1; }
+    case "$key" in
+      $'\033')
+        IFS= read -rsn2 rest </dev/tty || rest=""
+        case "$rest" in
+          '[A'|'OA') cur=$(( (cur + n - 1) % n )) ;;
+          '[B'|'OB') cur=$(( (cur + 1) % n )) ;;
+        esac ;;
+      k) cur=$(( (cur + n - 1) % n )) ;;
+      j) cur=$(( (cur + 1) % n )) ;;
+      ' ') ticked[cur]=$(( 1 - ticked[cur] )) ;;
+      a)
+        local all=1
+        for (( i = 0; i < n; i++ )); do (( ticked[i] )) || all=0; done
+        for (( i = 0; i < n; i++ )); do ticked[i]=$(( 1 - all )); done ;;
+      '') break ;;
+    esac
+  done
+
+  _checklist_restore
+  trap - INT
+  for (( i = 0; i < n; i++ )); do
+    (( ticked[i] )) && CHECKLIST_RESULT+="${CHECKLIST_RESULT:+ }$i"
+  done
+  return 0
+}
+
 # ── 1. prerequisites ─────────────────────────────────────────────────────────
 check_prereqs() {
   heading "Prerequisites"
@@ -193,7 +302,7 @@ select_platform() {
   select_access
 }
 
-# ── 2a. skill install profile ────────────────────────────────────────────────
+# ── 2b. skill install profile ────────────────────────────────────────────────
 #
 # Every installed skill's `description` sits in the agent's context permanently,
 # on every request, before it reads a single instruction. That metadata tier —
@@ -239,7 +348,7 @@ select_skill_profile() {
   record_step "Skill profile" "ok" "${SKILLS_PROFILE}${SKILLS_INCLUDE:+ +includes}"
 }
 
-# ── 2b. tracker access level ─────────────────────────────────────────────────
+# ── 2. tracker access level ──────────────────────────────────────────────────
 # How much the locally running agent may do to the tracker. Separate from which
 # tracker it is: a restricted run still needs the identity to emit the right
 # URLs and field names. Defaults to `full`, and the block is written only when
@@ -250,7 +359,7 @@ select_access() {
   echo ""
   echo "  1) Full — the agent has write credentials and updates the tracker itself (default)"
   echo "  2) Read-only — the agent may read the tracker but not write to it"
-  echo "  3) Approve — credentials present; writes are still handed over today (ask prompt is not shipped)"
+  echo "  3) Approve — credentials present; writes are deferred, then one batched confirmation at handover"
   echo "  4) Command — the agent prints the commands; you run them"
   echo "  5) Manual — the agent prints instructions; you click through them"
   echo ""
@@ -566,7 +675,7 @@ ${access_block}${skills_block}${tracker_block}"
   record_step "skills-config" "ok" "written"
 }
 
-# ── 5b. tracker-workflow.yaml ────────────────────────────────────────────────
+# ── 8a. tracker-workflow.yaml ────────────────────────────────────────────────
 # The consumer-owned status ladder. Unlike skills-config.yaml above, this one
 # NEVER offers to overwrite: the file encodes a board's real column names, which
 # a consumer has hand-tuned against a live board and the wizard cannot re-derive
@@ -702,14 +811,8 @@ create_registries() {
 
   local _created=0 _kept=0
 
-  if [[ -f "docs/development/epic-registry.md" ]]; then
-    info "docs/development/epic-registry.md exists — skipped"
-    (( _kept++ )) || true
-  else
-    touch_file "docs/development/epic-registry.md"
-    ok "docs/development/epic-registry.md"
-    (( _created++ )) || true
-  fi
+  # No epic registry: epics are numbered within their parent PRD (epic.{P}.{E}),
+  # allocated by doc-id.js, so there is no global counter to scaffold (task 205).
 
   if [[ -f "docs/tasks/task-registry.md" ]]; then
     info "docs/tasks/task-registry.md exists — skipped"
@@ -1081,7 +1184,7 @@ _skill_excluded_for_tracker() {
   return 1
 }
 
-# ── 8b. install profiles (task 84) ───────────────────────────────────────────
+# ── install profile helpers (task 84) ────────────────────────────────────────
 #
 # A profile is a SEED list; the concrete install set is the seeds' transitive
 # closure over the skill call graph, with the tracker filter above applied AFTER
@@ -1574,10 +1677,16 @@ install_skills() {
       # header). This file is vendor-managed — do NOT hand-edit it downstream;
       # change it in agent-skills' shared/resources/ and re-run --update.
       local _gen_src="${_tmpdir}/shared/resources/generate-prd-epic-index.mjs"
-      if [[ -f "$_gen_src" ]]; then
+      # The generator reads ids with doc-id.js, so it travels beside it — as
+      # doc-id.CJS: the engine is CommonJS, and in a consumer whose package.json
+      # says "type": "module" a vendored doc-id.js would be parsed as ESM and fail
+      # on `require`. The generator loads ./doc-id.cjs first (task 205).
+      local _docid_src="${_tmpdir}/shared/resources/doc-id.js"
+      if [[ -f "$_gen_src" && -f "$_docid_src" ]]; then
         mkdir -p scripts
         cp "$_gen_src" scripts/generate-prd-epic-index.mjs
-        info "  vendored scripts/generate-prd-epic-index.mjs (vendor-managed — do not hand-edit)"
+        cp "$_docid_src" scripts/doc-id.cjs
+        info "  vendored scripts/generate-prd-epic-index.mjs + scripts/doc-id.cjs (vendor-managed — do not hand-edit)"
       fi
       rm -rf "$_tmpdir"
       local _detail="${_installed} new, ${_updated} updated"
@@ -1824,6 +1933,222 @@ install_hooks() {
   fi
 }
 
+# ── 8b. agent links ──────────────────────────────────────────────────────────
+# A consumer repo commits one instruction file (AGENTS.md) and one skills
+# directory (.agents/skills/). Each user links the agents they run to those,
+# locally and gitignored — docs/concepts/getting-started.md § 1a.
+#
+# One record per agent: "id|Label|link>target link>target …". A link path is
+# relative to the repo root; its target is written exactly as `ln -s` takes it,
+# relative to the link's own directory. No links means the agent reads
+# AGENTS.md and .agents/skills/ itself, per its own docs (checked 2026-10-14;
+# sources in task 209). Order is rough popularity, which is the order a user
+# scans in.
+AGENT_TABLE=(
+  "claude|Claude Code|CLAUDE.md>AGENTS.md .claude/skills>../.agents/skills"
+  "codex|OpenAI Codex|"
+  "copilot|GitHub Copilot|"
+  "cursor|Cursor|"
+  "gemini|Gemini CLI|GEMINI.md>AGENTS.md"
+  "windsurf|Windsurf (Devin Desktop)|"
+  "cline|Cline|.cline/skills>../.agents/skills"
+  "kiro|Kiro|.kiro/skills>../.agents/skills"
+  "opencode|OpenCode|"
+  "amp|Amp|"
+)
+
+_agent_field() { local IFS='|'; local -a f; read -r -a f <<<"$1"; echo "${f[$2]:-}"; }
+
+# Make one link. Never replaces or deletes anything: an existing file, folder
+# or differently-aimed link is reported and left alone, because it may hold the
+# only copy of someone's instructions (§ 1a says how to migrate one by hand).
+# Prints one status word for the caller: linked, already, kept, missing, failed.
+_make_agent_link() {
+  local link="$1" target="$2"
+  # Resolve the target by text, not through the filesystem: the link's folder
+  # (.claude/) usually does not exist yet, and `.claude/../x` does not resolve
+  # through a missing folder.
+  local base t resolved
+  base=$(dirname "$link"); t="$target"
+  while [[ "$t" == ../* ]]; do t="${t#../}"; base=$(dirname "$base"); done
+  if [[ "$base" == "." ]]; then resolved="$t"; else resolved="$base/$t"; fi
+  if [[ -L "$link" ]]; then
+    local cur; cur=$(readlink "$link")
+    if [[ "$cur" == "$target" ]]; then echo already
+    else warn "$link already links to $cur — left alone" >&2; echo kept; fi
+  elif [[ -e "$link" ]]; then
+    warn "$link is a real file or folder — left alone. To use AGENTS.md instead, see getting-started § 1a" >&2
+    echo kept
+  elif [[ ! -e "$resolved" ]]; then
+    warn "$link not linked: $resolved does not exist yet" >&2
+    echo missing
+  elif [[ "$DRY_RUN" == true ]]; then
+    echo -e "${YELLOW}[dry-run]${NC} would link: $link → $target" >&2
+    echo linked
+  else
+    # Checked explicitly: this runs inside `status=$(...)`, where bash turns
+    # set -e off, so a failed mkdir or ln would otherwise print "linked".
+    if mkdir -p "$(dirname "$link")" && ln -s "$target" "$link"; then
+      echo linked
+    else
+      warn "$link could not be created — see the error above" >&2
+      echo failed
+    fi
+  fi
+}
+
+# Ignore a link so it can never be committed. Anchored (/CLAUDE.md), so a
+# team's committed sub-folder CLAUDE.md files stay tracked. No trailing slash:
+# git sees a symlink as a file, and `.claude/skills/` would not match it.
+_ignore_agent_link() {
+  local link="$1"
+  git check-ignore -q --no-index -- "$link" 2>/dev/null && return 0
+  append_line ".gitignore" "/$link"
+}
+
+# Is every link this agent needs already in place? Used to pre-tick it on a
+# re-run, so pressing enter keeps what the user chose last time.
+_agent_linked() {
+  local links pair
+  links=$(_agent_field "$1" 2)
+  [[ -n "$links" ]] || return 1
+  for pair in $links; do
+    [[ -L "${pair%%>*}" && "$(readlink "${pair%%>*}")" == "${pair#*>}" ]] || return 1
+  done
+}
+
+# Refuse an unknown --link-agents id before any step writes. Found at step 8b,
+# a typo stopped the full wizard after steps 1-8 had already written
+# (TASK-209-BUG-2), so main() calls this first.
+_check_link_agents() {
+  [[ -n "$LINK_AGENTS" ]] || return 0
+  local id rec ids="" want
+  for rec in "${AGENT_TABLE[@]}"; do ids+="${ids:+, }$(_agent_field "$rec" 0)"; done
+  # A command substitution, not `< <(...)`: its exit status is kept, so a
+  # parse that fails stops here instead of reading as "no ids".
+  want=$(_link_agents_ids) || return 1
+  while IFS= read -r id; do
+    [[ -z "$id" ]] && continue
+    [[ -n "$(_agent_index "$id")" ]] || { err "--link-agents: unknown agent '$id'. Known: $ids"; return 1; }
+  done <<<"$want"
+  return 0
+}
+
+# The ids in --link-agents, one per line: split on commas AND newlines, spaces
+# and carriage returns dropped, "none" and empties skipped. The one parse both
+# callers use. `IFS=',' read -a` alone stops at the first newline, so an id
+# after one was never checked and the run exited 0 (finalise run 1).
+_link_agents_ids() {
+  local v="${LINK_AGENTS//$'\r'/}"
+  v="${v//$'\n'/,}"
+  local -a raw
+  local id
+  IFS=',' read -r -a raw <<<"$v"
+  # bash 3.2 (macOS) treats "${raw[@]}" of an empty array as unbound under
+  # set -u, which a value of only separators (e.g. $'\r') produces.
+  (( ${#raw[@]} )) || return 0
+  for id in "${raw[@]}"; do
+    id="${id// /}"
+    [[ -z "$id" || "$id" == none ]] && continue
+    echo "$id"
+  done
+  return 0
+}
+
+# The AGENT_TABLE index of an agent id, or nothing. The one lookup both
+# _check_link_agents and link_agents use.
+_agent_index() {
+  local i
+  for i in "${!AGENT_TABLE[@]}"; do
+    [[ "$(_agent_field "${AGENT_TABLE[i]}" 0)" == "$1" ]] && { echo "$i"; return 0; }
+  done
+  return 0
+}
+
+link_agents() {
+  heading "Agent links"
+
+  local -a chosen=() labels=()
+  local rec i id
+
+  if [[ -n "$LINK_AGENTS" ]]; then
+    # --link-agents a,b: no prompt. main() already refused an unknown id
+    # (_check_link_agents) before any step ran, so every id here resolves.
+    local want
+    want=$(_link_agents_ids) || return 1
+    while IFS= read -r id; do
+      [[ -z "$id" ]] && continue
+      chosen+=("$(_agent_index "$id")")
+    done <<<"$want"
+  else
+    local defaults=""
+    for i in "${!AGENT_TABLE[@]}"; do
+      rec="${AGENT_TABLE[i]}"
+      local label links paths=""
+      label=$(_agent_field "$rec" 1); links=$(_agent_field "$rec" 2)
+      if [[ -n "$links" ]]; then
+        local pair; for pair in $links; do paths+="${paths:+, }${pair%%>*}"; done
+        labels+=("$(printf '%-26s links %s' "$label" "$paths")")
+      else
+        labels+=("$(printf '%-26s nothing to link' "$label")")
+      fi
+      _agent_linked "$rec" && defaults+="${defaults:+ }$i"
+    done
+    echo "  Each agent you tick gets local links to AGENTS.md and .agents/skills,"
+    echo "  added to .gitignore. Nothing is ever replaced or deleted. Agents marked"
+    echo "  \"nothing to link\" already read AGENTS.md and .agents/skills themselves."
+    echo ""
+    if ! CHECKLIST_DEFAULT="$defaults" checklist "Which agents do you use?" "${labels[@]}"; then
+      info "No terminal to show the list on — skipped. Use --link-agents claude,gemini,…"
+      record_step "Agent links" "skipped" "no terminal; use --link-agents"
+      return 0
+    fi
+    for i in $CHECKLIST_RESULT; do chosen+=("$i"); done
+  fi
+
+  if (( ${#chosen[@]} == 0 )); then
+    info "No agents chosen — nothing linked."
+    record_step "Agent links" "skipped" "none chosen"
+    return 0
+  fi
+
+  local done_names="" problems=0 failed=0
+  for i in "${chosen[@]}"; do
+    rec="${AGENT_TABLE[i]}"
+    local name links pair status
+    name=$(_agent_field "$rec" 1); links=$(_agent_field "$rec" 2)
+    if [[ -z "$links" ]]; then
+      ok "$name: nothing to link"
+      done_names+="${done_names:+, }$name"
+      continue
+    fi
+    for pair in $links; do
+      status=$(_make_agent_link "${pair%%>*}" "${pair#*>}")
+      case "$status" in
+        linked)  ok "$name: ${pair%%>*} → ${pair#*>}"; _ignore_agent_link "${pair%%>*}" ;;
+        already) ok "$name: ${pair%%>*} already linked"; _ignore_agent_link "${pair%%>*}" ;;
+        failed)  failed=$(( failed + 1 )) ;;
+        *)       problems=$(( problems + 1 )) ;;
+      esac
+    done
+    done_names+="${done_names:+, }$name"
+  done
+
+  # Kept and missing links are deliberate non-actions: a warning. A link that
+  # could not be made is an error: the step fails, and the run exits 1 at the
+  # end (main), after the remaining steps have run.
+  if (( failed > 0 )); then
+    record_step "Agent links" "fail" "$done_names; $failed link(s) could not be made"
+    record_warning "Agent links: $failed link(s) could not be created — see the errors above"
+  elif (( problems > 0 )); then
+    record_step "Agent links" "warn" "$done_names; $problems link(s) left alone"
+    record_warning "Agent links: $problems link(s) not made — see the messages above and getting-started § 1a"
+  else
+    record_step "Agent links" "ok" "$done_names"
+  fi
+  info "Links are per clone. In a new clone or worktree, run: setup-consumer.sh --links-only"
+}
+
 # ── summary ──────────────────────────────────────────────────────────────────
 
 # Coloured status badge for the status table
@@ -1873,6 +2198,18 @@ print_summary() {
     echo ""
   fi
 
+  if [[ "$LINKS_ONLY" == true ]]; then
+    echo -e "${BOLD}Next steps:${NC}"
+    if $WIZARD_HAS_FAIL; then
+      echo "  Fix the error above and re-run with --links-only."
+    else
+      echo "  Restart your agents in this directory so they pick up the links."
+    fi
+    echo ""
+    [[ "$DRY_RUN" == true ]] && warn "Dry-run mode — no files were written." && echo ""
+    return 0
+  fi
+
   # Verify block
   echo -e "${BOLD}Verify the install:${NC}"
   echo "  ls .agents/skills/ | head                  # should list installed skills"
@@ -1893,9 +2230,14 @@ print_summary() {
     if [[ "${ACCESS_TRACKER:-full}" != "full" ]]; then
       echo ""
       echo -e "${BOLD}Tracker access is ${ACCESS_TRACKER}:${NC}"
-      echo "  Pipeline runs still complete. Tracker writes are recorded, not performed."
-      echo "  After a run, work the committed *.handover.*.md checklist (or *.sh under command)."
-      echo "  /tracker-reconcile is not shipped yet (task.57) — re-check the board by hand."
+      echo "  Pipeline runs still complete. During a run, tracker writes are recorded, not performed."
+      if [[ "$ACCESS_TRACKER" == "approve" ]]; then
+        echo "  At handover you confirm them once, as a batch, and they run. With no tty, or in"
+        echo "  an autonomous run, there is no prompt: work the committed *.sh as under command."
+      else
+        echo "  After a run, work the committed *.handover.*.md checklist (or *.sh under command)."
+      fi
+      echo "  Later, /tracker-reconcile re-reads the board and ticks the committed *.handover.*.md checklist."
       echo "  Limits: enforcement is partial; /develop-next still needs VCS write."
       echo "  Guide: docs/concepts/restricted-access.md"
     fi
@@ -1921,12 +2263,25 @@ _on_exit() {
   exit $rc
 }
 
+# A run whose summary says "Setup failed" exits 1. Steps that record a fail
+# and carry on (so later steps still run) would otherwise end the run with 0,
+# which a calling script reads as success.
+_exit_on_fail() {
+  if $WIZARD_HAS_FAIL; then exit 1; fi
+  return 0
+}
+
 # ── main ─────────────────────────────────────────────────────────────────────
 main() {
   trap '_on_exit' EXIT
+  # Before anything is written: nothing has been recorded yet, so _on_exit
+  # exits without a summary and the project is untouched.
+  _check_link_agents || exit 1
 
   echo ""
-  if [[ "$UPDATE_ONLY" == true ]]; then
+  if [[ "$LINKS_ONLY" == true ]]; then
+    echo -e "${BOLD}agent-skills — agent links${NC}"
+  elif [[ "$UPDATE_ONLY" == true ]]; then
     echo -e "${BOLD}agent-skills — update skills${NC}"
   else
     echo -e "${BOLD}agent-skills setup wizard${NC}"
@@ -1934,11 +2289,21 @@ main() {
   [[ "$DRY_RUN" == true ]] && echo -e "${YELLOW}dry-run mode — no files will be written${NC}"
   echo ""
 
+  if [[ "$LINKS_ONLY" == true ]]; then
+    link_agents
+    print_summary
+    _exit_on_fail
+    return
+  fi
+
   check_prereqs
 
   if [[ "$UPDATE_ONLY" == true ]]; then
     install_skills
+    # --update never prompts; it links only when asked to by flag.
+    [[ -n "$LINK_AGENTS" ]] && link_agents
     print_summary
+    _exit_on_fail
     return
   fi
 
@@ -1953,8 +2318,11 @@ main() {
   # After install_skills on purpose — it prefers probing the live board with a
   # CLI that install_skills is what puts on disk.
   write_tracker_workflow
+  # After install_skills: a skills link needs .agents/skills to exist.
+  link_agents
   install_hooks
   print_summary
+  _exit_on_fail
 }
 
 # Sourcing with SETUP_CONSUMER_NO_MAIN=1 loads the function definitions without

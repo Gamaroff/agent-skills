@@ -34,6 +34,21 @@ Hooks noop outside pipeline runs — zero overhead when no `.claude/state/develo
 
 ---
 
+## Invocation Flags — Answer Up Front
+
+`/develop-bug <path> [--defaults] [--branch-model bugfix|hotfix] [--base <branch>] [--target <branch>]`
+
+- `--defaults` takes §0d's **(Recommended)** option for every question nothing else answers.
+- `--branch-model` answers Q1; `--base` / `--target` must match it, or the question is asked with the
+  conflict stated.
+- `--mode` and `--skip` are refused here with the reason: this pipeline has its own lite rule and no QA
+  gate to record a waiver in.
+
+Resolution order: `references/develop-bug-step-0-resolve-bug.md` §0d. The engine it runs is
+`references/pipeline-answers.js`.
+
+---
+
 ## Phase 0: Resolve & Prepare
 
 See [`references/develop-bug-step-0-resolve-bug.md`](references/develop-bug-step-0-resolve-bug.md) for the full resolve-and-prepare protocol: bug-file resolution across the three modes (0a), pipeline lock state check (0b), upfront context reading — severity/priority/status/related/reproduction, plus lite-mode detection (0c), upfront prompts via AskUserQuestion (0d — **Q1 branch model** bugfix-vs-hotfix, **Q2 base branch**, **Q3 PR target**, each with an auto-derived recommended option), implementation report creation (0e), and pre-flight summary (0f).
@@ -130,7 +145,7 @@ When a step dispatches subagents, persist their summaries per [`references/subag
 Every step ends with the same four actions, executed _in order, with no text output between them_:
 
 1. **Bash tool call** advancing the lock to the next step: `bash .agents/skills/develop-bug/references/advance-pipeline-lock.sh {N+1}`. **This must be the first call** — it anchors the orchestrator into "still working" mode and signals the `Stop` hook that the pipeline advanced. After Step 8, issue `--complete` instead of a number (a numeric advance with no lock is an error): Step 8's Completion Checklist already ran `--complete` as its last action, so this one is a no-op — the helper exits 0 when there is no lock (task 161). Idempotent — a sub-skill normally self-advances the lock, so this re-advance noops.
-2. **Edit the implementation report** Pipeline Progress row for the just-completed step (`✅ Done`), then **read it back**. **After Step 8 this edit is a no-op:** Step 8 set its own row to `✅ Done` before its commit (step-8 doc § Final Implementation Report Update), and the Completion Checklist's check 5 has already required a clean tree, so any change here would be uncommitted dirt. Confirm the row is finished by check 4's own test (its Status cell starts with `✅`, or reads `⏭️ Skipped`) and change nothing (task 160). A row that fails that test after Step 8 is a **HALT, not an edit**: the Completion Checklist should have refused it, so something wrote the report after the checklist ran. The read-back is lint call site (1) of the four the report-lint contract names, and it is a tool call, not prose:
+2. **Edit the implementation report** Pipeline Progress row for the just-completed step (`✅ Done`) — and, when its `Completed (UTC)` cell is empty, write `date -u +%Y-%m-%dT%H:%MZ` into it; a resumed step keeps the time it first finished, so never overwrite a filled cell (task.201) — then **read it back**. **After Step 8 this edit is a no-op:** Step 8 set its own row to `✅ Done` before its commit (step-8 doc § Final Implementation Report Update), and the Completion Checklist's check 5 has already required a clean tree, so any change here would be uncommitted dirt. Confirm the row is finished by check 4's own test (its Status cell starts with `✅`, or reads `⏭️ Skipped`) and change nothing (task 160). A row that fails that test after Step 8 is a **HALT, not an edit**: the Completion Checklist should have refused it, so something wrote the report after the checklist ran. The read-back is lint call site (1) of the four the report-lint contract names, and it is a tool call, not prose:
 
    ```bash
    command node .agents/skills/develop-bug/references/report-lint.js --file "{implementation-report-path}" --json; rc=$?
@@ -190,9 +205,9 @@ After each step: update the Pipeline Progress table (✅ Done / ❌ Failed / ⚠
 
 Follow the generic mechanics in [`references/develop-pipeline-step-1-create-branch.md`](references/develop-pipeline-step-1-create-branch.md) (use the **develop-task variant** for stash/restore, lock-collision, post-branch, and lock-file creation), with these **bug substitutions**:
 
-- **work item** = the bug file; **work-item dir** = the bug directory; **id** = the bug prefix (`story.{e}.{s}.bug.{n}` / `task.{id}.bug.{n}` / `bug.{N}`).
+- **work item** = the bug file; **work-item dir** = the bug directory; **id** = the bug prefix (`story.{P}.{E}.{S}.bug.{n}` / `task.{id}.bug.{n}` / `bug.{N}`).
 - **Branch base and type** come from Phase 0d:
-  - **Bugfix** (default) → invoke `/create-branch` with the bug file; select `develop` as the base when asked (Q2 answer).
+  - **Bugfix** (default) → invoke `/create-branch` with the bug file; select `develop` as the base when asked (Q2 answer). The branch is `bugfix/{bug file stem}` (create-branch's **Bugfix** row, e.g. `bugfix/task.110.bug.1.whitelist-admits-mutating-shapes`): never a shortened or re-separated form.
   - **Hotfix** (Q1 = production hotfix) → invoke `/create-branch --hotfix v{X.Y.Z}` (branch off `main`). The version is the Q-derived next patch; if unknown, ask once during Step 1.
 - **Ensure a tracker issue** (runs *before* the lock is written, so the lock records a real issue rather than an empty field it then contradicts). Branch on `TRACKER`:
   - `TRACKER=jira` → invoke `ensure-bug-jira-issue` with `BUG_FILE_PATH={bug file}`. On return `BUG_JIRA_KEY` is a key or empty.
@@ -216,7 +231,7 @@ See [`references/develop-bug-step-2-review.md`](references/develop-bug-step-2-re
 > in this pipeline appends a Change Log row to a bug file. See
 > [document-change-log.md](references/document-change-log.md) §Exclusions.
 
-See [`references/develop-bug-step-3-investigate-fix.md`](references/develop-bug-step-3-investigate-fix.md): set bug status `new → in-progress` and open `### Iteration 1`; **reproduce** the failure (run the failing test / repro, establishing the fails-without property) and **locate the root cause** via Explore; implement the fix + a **regression test that fails without the fix** → write **Investigation** and **Fix Implementation** into the bug's Developer Fix Cycle → add a Status History row → set bug status `ready-for-qa`. **General bug:** every status write here (`in-progress`, `ready-for-qa`) is mirrored into the `docs/bugs/bug-registry.md` row's Status cell in the same edit — the row is a second copy of the status and a consumer drift guard compares the two on every push, so a file that moves without its row is a red `guards` lane from the first code push to the close commit (three occurrences before this rule). Same rule at `reopened` (Step 5–6) and `closed` (Step 7). Bounded loop + test-failure triage as in [`references/develop-pipeline-step-3-develop-loop.md`](references/develop-pipeline-step-3-develop-loop.md). If the bug proves **not reproducible** here (despite review-bug passing), HALT — do not fabricate a fix.
+See [`references/develop-bug-step-3-investigate-fix.md`](references/develop-bug-step-3-investigate-fix.md): set bug status `new → in-progress` and open `### Iteration 1`; **reproduce** the failure (run the failing test / repro, establishing the fails-without property) and **locate the root cause** via Explore; implement the fix + a **regression test that fails without the fix** → write **Investigation** and **Fix Implementation** into the bug's Developer Fix Cycle → add a Status History row → set bug status `ready-for-qa`. **General bug:** every status write here (`in-progress`, `ready-for-qa`) is mirrored into the `docs/bugs/bug-registry.md` row's Status cell by `node .agents/skills/develop-bug/references/registry-tick.js --bug-status --file "{bug-file}" --json`, which reads the registry's vocabulary and answers `not-a-general-bug` for a story or task bug — the row is a second copy of the status and a consumer drift guard compares the two on every push, so a file that moves without its row is a red `guards` lane from the first code push to the close commit (three occurrences before this rule). Same rule at `reopened` (Step 5–6) and `closed` (Step 7). Bounded loop + test-failure triage as in [`references/develop-pipeline-step-3-develop-loop.md`](references/develop-pipeline-step-3-develop-loop.md). If the bug proves **not reproducible** here (despite review-bug passing), HALT — do not fabricate a fix.
 
 ### Step 4: Create PR
 
@@ -236,7 +251,7 @@ See [`references/develop-bug-step-7-close-bug.md`](references/develop-bug-step-7
 
 - **Story bug** → move the bug to **Closed Bugs** in the parent story's `## Bug Reports`; if it was the parent's only open bug, restore the parent story status from `Reopened`.
 - **Task bug** → mark the bug ✅ Closed in the parent task's Bug Reports list.
-- **General bug** → flip the `docs/bugs/bug-registry.md` row status to `closed` (commit the registry bump atomically with the bug file) — the last of the row's mirrored writes; Steps 3 and 5–6 already moved it through `in-progress` / `ready-for-qa` / `reopened`.
+- **General bug** → set the `docs/bugs/bug-registry.md` row to `closed` with the same `registry-tick.js --bug-status` call (commit the registry bump atomically with the bug file) — the last of the row's mirrored writes; Steps 3 and 5–6 already moved it through `in-progress` / `ready-for-qa` / `reopened`.
 
 **Lite mode applies to Step 5 only.** Step 7 (finalise + Resolution Summary + parent/registry update + any tracker close) runs in full in every mode.
 
@@ -339,7 +354,7 @@ If a situation arises that is not in this table or the shared defaults table and
 
 ## File References
 
-- Story bug: `{story-dir}/story.{epic}.{story}.bug.{n}.{name}.md` (co-located with the story)
+- Story bug: `{story-dir}/story.{P}.{E}.{S}.bug.{n}.{name}.md` (co-located with the story)
 - Task bug: `docs/tasks/task.{id}.{name}/task.{id}.bug.{n}.{name}.md`
 - General bug: `docs/bugs/bug.{N}.{name}/bug.{N}.{name}.md` (+ `docs/bugs/bug-registry.md`)
 - Implementation report: `{bug-directory}/{bug-prefix}.implementation.{N}.{descriptive-name}.md` — `{bug-prefix}` is the **short** id **Step 0 defines** (`bug.14`, `task.67.bug.3`; `bug-doc.js` `bug_id`), never the bug file's full stem, which is `{bug-file-stem}` (TASK-125-BUG-18). Runs before task.125 wrote `{bug-file-stem}.implementation.{N}.*.md` too, so every reader of the report (Step 0's resume lookup above, `finalise` 6a/6b, `bug-doc.js`) accepts both shapes; a writer uses the short id (TASK-125-BUG-13).

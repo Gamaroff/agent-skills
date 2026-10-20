@@ -1,0 +1,72 @@
+schema: 2
+task: 'task.195.finding-anchors-follow-ups'
+task_title: 'finding-anchors follow-ups'
+gate: CONCERNS
+status_reason: 'The three finalise DoD 1 security gaps are fixed, mutation-proven, and the probe now reproduces 0 of 43 with 0 escapes. The safety re-probe found one in-scope medium: a non-string file_line (an array) reads as a clean anchor instead of unparseable.'
+reviewer: 'QA Engineer'
+head: '4d6f7f25693008bdee3d02f1bf2c84a5c07992c1'
+updated: '2026-10-19T17:00:11Z'
+
+top_issues:
+  - id: 'TASK-195-QA3-1'
+    severity: medium
+    file: 'shared/resources/finding-anchors.js'
+    finding: 'anchorOf passes file_line through String(), so a code finding whose file_line is an array (["shared/resources/finding-anchors.js:90"]) is annotated unchecked-text and the run reports ok. Both --inline guards then accept it, and the inline selector''s test() fails on the non-string (jq exit 5), so nothing is posted inline while qa-task/qa-story render the location as verified. Same output on origin/develop, but SC-1 puts "a file_line that is not path:line reads unparseable" in scope, so the task is unfinished rather than the defect pre-existing.'
+    suggested_action: 'A code finding whose file_line is present but not a string reads unparseable; a conformance ref that is not a string reads no-line; a non-string line_text is treated as absent. Add unit and CLI cases (array, number, object, boolean).'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 5963
+  phases_verified: 3/3
+  ci: 'fast gate 5963 tests, 0 failed @ 4d6f7f25 (PR CI queued)'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 43
+    notes: 'Safety re-probe (finalise DoD 1 failed on security). task.195.qa.3.security.run.json: review-pr --inline guard 20/20 engages, 0 escapes (was 2 reproduced + 13 escapes); review-code Step 2b checker 23/23 engages. The Step 2b cases are task.195.qa.3.step2b-checker-cases.json: DoD 1 cases.1 with the usage message updated to the new wording (the old literal reproduced 1 on text alone; the guard still HALTs on usage).'
+  performance:
+    status: PASS
+    notes: 'findingsOf adds one filter over at most two lenses; no new I/O.'
+  reliability:
+    status: CONCERNS
+    notes: 'TASK-195-QA3-1: a non-string file_line is a silent pass. Advisory CR-2..CR-4 recorded in the QA report.'
+  maintainability:
+    status: PASS
+    notes: 'The every-lens rule is stated in the engine and both guards with the same wording.'
+
+recommendations:
+  immediate:
+    - action: 'TASK-195-QA3-1: a non-string file_line reads unparseable (code) / no-line (conformance ref); a non-string line_text is absent.'
+      refs: ['shared/resources/finding-anchors.js']
+  future:
+    - action: 'CR-2 (cycle 3, low/medium): a reviewer-supplied anchor_check string passes both --inline guards; have --annotate write a checker-only marker the guards require, and check anchor_check against the seven verdicts.'
+      refs: ['skills/review-pr/SKILL.md', 'skills/review-code/SKILL.md', 'shared/resources/finding-anchors.js']
+    - action: 'CR-3 (cycle 3, low/medium): a non-object conformance finding reads no-line / ok but --annotate skips it, so the review-pr guard then HALTs with the wrong message; flag non-object findings.'
+      refs: ['shared/resources/finding-anchors.js']
+    - action: 'CR-4 (cycle 3, low/low): the inline selectors split the anchor on the first colon while the checker takes the last; rebuild path/line with capture() using the checker grammar.'
+      refs: ['skills/review-pr/SKILL.md', 'skills/review-code/SKILL.md']
+    - action: 'Carried from gate 2: null finding crash (pre-existing), review-code --staged --fix index/worktree mismatch; plus the review-code --inline block never binds INLINE_FILE/PR_NUMBER/SUMMARY_FILE (pre-existing on develop).'
+      refs: ['docs/tasks/task.195.finding-anchors-follow-ups/task.195.gate.2.finding-anchors-follow-ups.yml']
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 1
+  fix_date: '2026-10-19'
+  total_iterations: 3
+  verification_method: 'finalise DoD 1 gaps: committed tests, 3 QA mutation proofs (covered) in a scratch worktree, fence probe 43/0'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-195-QA3-1 fixed']

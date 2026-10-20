@@ -34,9 +34,15 @@
 //   unclosed-fence           a fence opens and never closes
 //   structural-line:<line>   the line (trimmed, at most 60 chars) the structural guard caught
 //   carried-block:<name>     the render brings its own Bug Reports / Deferred Work block
+//   carried-tail:<line>      a carried block's list continues past a label and a paragraph:
+//                            the first list item or table row after the block's end
+//                            (trimmed, at most 60 chars) — task 184, gate 6 CR6-1
 //   trailing-comment         the render ends in an HTML comment, which a read peels as a separator
 //   multiple:<n>             n sections found
 //   read-back:<n>            the write would read back as n sections, or an unbounded one
+//   (unplaceable also carries structural-line: / carried-tail: when the written section fails
+//    the guard the next write would apply — task.184 QA cycle 2; an unbounded written section
+//    reports as read-back:<n> unbounded)
 //
 // The last two reasons exist because an unclosed fence protects everything after it: every
 // later heading and marker becomes "example text", the span runs to EOF, and a
@@ -165,6 +171,15 @@ const CARRIED_PATTERN = {
   "Bug Reports": "Bug Reports?",
   "Deferred Work": "Deferred Work",
 };
+// A bold label that opens a carried block of its own, under any carried name.
+const RE_CARRIED_LABEL = new RegExp(
+  `^\\*\\*(?:${Object.values(CARRIED_PATTERN).join("|")})\\*\\*:?[ \\t]*$`,
+  "i",
+);
+// A line that opens a list item or a table row — what a carried list is made of. One
+// definition for the stop rule (introducesList) and the tail rule (task.184 QA cycle 1,
+// CR-2: the two copies could drift apart on what counts as a list).
+const RE_LIST_OR_ROW = /^[ \t]*(?:[-*+][ \t]|\d+[.)][ \t]|\|)/;
 
 function collectBlocks(text, name) {
   const ranges = protectedRanges(text);
@@ -184,10 +199,7 @@ function collectBlocks(text, name) {
     const introducesList = (i) => {
       let j = i + 1;
       while (j < lines.length && /^[ \t]*$/.test(bare(j))) j++;
-      return (
-        j < lines.length &&
-        /^[ \t]*(?:[-*+][ \t]|\d+[.)][ \t]|\|)/.test(bare(j))
-      );
+      return j < lines.length && RE_LIST_OR_ROW.test(bare(j));
     };
     const stops = (i) => {
       const l = bare(i);
@@ -202,9 +214,50 @@ function collectBlocks(text, name) {
     };
     let end = text.length;
     let offset = bodyAt;
+    let tail = null;
+    let tailAt = -1;
     for (let i = 0; i < lines.length; i++) {
       if (!insideProtected(ranges, offset) && stops(i)) {
         end = offset;
+        // A bold-label block that stopped at a bold label which does not introduce a
+        // list: if a list or table still follows before the next `#{1,3}` heading or QA
+        // field, the block's content may continue there (gate 6 CR6-1: `**Critical
+        // Issues**` / paragraph / `- [b]`). Record it so the write is refused rather than
+        // guessing which lines are the block's (task 184; operator decision 2026-10-05).
+        // This only ADDS a refusal; it exempts nothing. Not when the stopping label opens
+        // a carried block of its own: that block collects the list after its lead
+        // paragraph, so nothing is cut, and the engine's own write puts two carried blocks
+        // side by side — refusing that shape refused the engine's previous write (task.184
+        // QA cycle 1, CR-1). The other block's own stop is checked when it is collected, so
+        // the scan also ends at the next carried label: one scan per block ran to the end of
+        // the section and made a repeated label cubic (QA cycle 2, CR-3). The tail's offset
+        // is kept so the write can tell a cut line from one another block carries.
+        const l = bare(i);
+        if (
+          !level &&
+          RE_BOLD_LABEL.test(l) &&
+          !RE_QA_FIELD.test(l) &&
+          !RE_CARRIED_LABEL.test(l)
+        ) {
+          let at = offset + lines[i].length + 1;
+          for (let j = i + 1; j < lines.length; j++) {
+            const t = bare(j);
+            if (!insideProtected(ranges, at)) {
+              if (
+                /^#{1,3}[ \t]/.test(t) ||
+                RE_QA_FIELD.test(t) ||
+                RE_CARRIED_LABEL.test(t)
+              )
+                break;
+              if (RE_LIST_OR_ROW.test(t)) {
+                tail = t.trim().slice(0, 60);
+                tailAt = at;
+                break;
+              }
+            }
+            at += lines[j].length + 1;
+          }
+        }
         break;
       }
       offset += lines[i].length + 1;
@@ -213,6 +266,9 @@ function collectBlocks(text, name) {
     blocks.push({
       name,
       start: m.index,
+      labelLen: m[0].length,
+      tail,
+      tailAt,
       whole,
       // A folded block keeps its heading's text as a bold line (CR-4); a bold-label
       // block's first line already is one.
@@ -228,16 +284,34 @@ function collectBlocks(text, name) {
 // Every carried block in `text`, across all names, outermost only: a block whose start
 // lies inside an earlier kept block is part of that block and is not carried again
 // (task 171, REL-028 — a `#### Deferred Work` nested in a Bug Reports block was carried
-// under both names and doubled on every write).
-function carriedBlocks(text) {
-  const all = CARRIED_SUBSECTIONS.flatMap((n) => collectBlocks(text, n)).sort(
-    (a, b) => a.start - b.start,
-  );
+// under both names and doubled on every write). A nested block that runs PAST its outer
+// block — a bold label inside a `####` block that ends at a later `####` — extends the
+// outer block to its own end, or its tail would be carried by no block and deleted (task
+// 184, 5c CR-1). A union of two spans already found: nothing is inferred.
+// Every carried block in `text`, under every carried name, in no particular order.
+function collectAll(text) {
+  return CARRIED_SUBSECTIONS.flatMap((n) => collectBlocks(text, n));
+}
+
+// `all` may be passed in when the caller already collected it — sectionGuard does, so the
+// blocks are collected once per guard, not twice (task.184 QA cycle 3, PERF-1). Kept blocks
+// are copies: the union below must not rewrite a block the caller still reads.
+function carriedBlocks(text, all = collectAll(text)) {
+  const sorted = [...all].sort((a, b) => a.start - b.start);
   const kept = [];
-  for (const b of all) {
+  for (const b of sorted) {
     const outer = kept[kept.length - 1];
-    if (outer && b.start < outer.start + outer.whole.length) continue;
-    kept.push(b);
+    if (outer && b.start < outer.start + outer.whole.length) {
+      const end = b.start + b.whole.length;
+      if (end > outer.start + outer.whole.length) {
+        outer.whole = text.slice(outer.start, end).trimEnd();
+        outer.body = outer.whole
+          .slice(outer.labelLen)
+          .replace(/^(?:\r?\n)+/, "");
+      }
+      continue;
+    }
+    kept.push({ ...b });
   }
   return kept;
 }
@@ -309,9 +383,12 @@ function notParagraph(line) {
 // legacy sync logs' `| Date | Change |` (task.155 QA cycle 2, REL-005) and a Version-first
 // `| Version | Date | … |` log (task 183) all carry a `Date` cell; its position is not fixed.
 // Two questions use it with different reach (task 183 QA cycle 1, CR-1): whether a log
-// table EXISTS — any `Date` column, so a Version-first log is seen and the write refused
-// rather than cut — and where a section may be CUT, which only a Date-first header earns
-// (RE_LOG_HEADER). A cut is the risky direction: cutting at a table the section quotes
+// table EXISTS — any `Date` column — and where a section may be CUT, which only a
+// Date-first header earns (RE_LOG_HEADER). A Version-first log is seen and the write
+// refused rather than cut: inside a marker block, and — since task 184 (5c CR-2) — under
+// a marker-less log too, where a Date table above the section that is not Date-first
+// makes the log ambiguous (a Version-first log and a quoted `| Reviewer | Date |` table
+// look the same), so the section is neither cut nor relocated and the write is refused. A cut is the risky direction: cutting at a table the section quotes
 // leaves its rows in the log (REL-006/007), and QA sections quote `| Cycle | Date | … |`.
 const RE_LOG_HEADER = /^\|[ \t]*Date[ \t]*\|/i;
 // Does a table row have a cell reading `Date`, in any position? The leading pipe opens the
@@ -579,7 +656,17 @@ function findQaResults(content) {
     // refuses the write instead.
     const logAbove =
       block && lastTableStart(content, block.start, start, ranges) !== -1;
-    if ((block && !logAbove) || underTablelessLog) {
+    // The marker-less counterpart of logAbove: a section directly under a marker-less log
+    // whose last Date-column table above it is NOT Date-first. A Version-first log (5c
+    // CR-2) and a quoted `| Reviewer | Date |` table (CR3-2) look the same here, so neither
+    // cut nor relocate — keep the span under the dated-row guard and refuse (task 184;
+    // operator decision 2026-10-05).
+    const aboveTbl =
+      !block && changeLog && !changeLog.hasMarkers && changeLog.end === start
+        ? lastTableStart(content, changeLog.start, start, ranges)
+        : -1;
+    const ambiguousAbove = aboveTbl !== -1 && !dateFirstAt(content, aboveTbl);
+    if ((block && !logAbove) || (underTablelessLog && !ambiguousAbove)) {
       // The last Date-column table is the log's own; cut there only when it is
       // Date-first. Otherwise there is no cut: the span runs on and the guard refuses.
       const tbl = lastTableStart(
@@ -613,9 +700,11 @@ function findQaResults(content) {
       start,
       end: trimSeparator(content, start, rawEnd),
       insideChangeLog,
-      // Inside a marker block, or directly under a change-log heading: dated rows in
-      // this span may be the log's own (REL-007/008).
-      underLog: !!block || !!underTablelessLog || insideChangeLog,
+      // Inside a marker block, or directly under a change-log heading (task 184: a log
+      // above that is not Date-first included): dated rows in this span may be the log's
+      // own (REL-007/008).
+      underLog:
+        !!block || !!underTablelessLog || insideChangeLog || ambiguousAbove,
       unbounded: unclosedFence(content, start, rawEnd),
       heading: m[0].replace(/\r$/, ""),
     });
@@ -702,6 +791,26 @@ function normaliseSection(section) {
   return { body };
 }
 
+// Why this engine would refuse to rewrite section `s` of `content` — a refusal detail — or
+// null. The one definition, applied to the section a write replaces and to the section it
+// writes (task.184 QA cycle 2: two definitions let the engine write what it then refused).
+function sectionGuard(content, s) {
+  if (s.unbounded) return "unclosed-fence";
+  const span = content.slice(s.start, s.end);
+  const line = removesStructure(span, { underLog: s.underLog });
+  if (line !== null) return `structural-line:${line}`;
+  // Every collected block, not only carriedBlocks' kept ones: a nested block is dropped there,
+  // so its tail would never be seen (task.184 review 1, O2). A tail inside a span a kept block
+  // carries is not cut — the nested-block union carries it whole (QA cycle 2, CR-1); a tail no
+  // kept block reaches is (gate 6 CR6-1). Span arithmetic over blocks already found.
+  const all = collectAll(span);
+  const kept = carriedBlocks(span, all);
+  const carried = (at) =>
+    kept.some((k) => at >= k.start && at < k.start + k.whole.length);
+  const cut = all.find((b) => b.tail !== null && !carried(b.tailAt));
+  return cut ? `carried-tail:${cut.tail}` : null;
+}
+
 /**
  * Write the `## QA Testing Results` section: replace, relocate or create it.
  *
@@ -735,29 +844,26 @@ function upsertQaResults(content, section, { docType = "" } = {}) {
     };
   }
   for (const s of sections) {
-    if (s.unbounded) {
-      return { content, reason: "unbounded", detail: "unclosed-fence" };
-    }
-    const line = removesStructure(content.slice(s.start, s.end), {
-      underLog: s.underLog,
-    });
-    if (line !== null) {
-      return {
-        content,
-        reason: "unbounded",
-        detail: `structural-line:${line}`,
-      };
-    }
+    const refusal = sectionGuard(content, s);
+    if (refusal) return { content, reason: "unbounded", detail: refusal };
   }
+  // The write is held to the same guard as the section it replaces: a document this engine
+  // writes is one its next write accepts. Two rules each correct alone — the nested-block union
+  // with the tail rule, and `ambiguousAbove` with a render's own dated rows — wrote a section the
+  // following write refused (task.184 QA cycles 1–2, CR-1, CR-2). Refused here, up front.
   const checked = (out, reason) => {
     const post = findQaResults(out).sections;
-    return post.length === 1 && !post[0].unbounded
-      ? { content: out, reason }
-      : {
-          content,
-          reason: "unplaceable",
-          detail: `read-back:${post.length}${post.some((p) => p.unbounded) ? " unbounded" : ""}`,
-        };
+    if (post.length !== 1 || post[0].unbounded) {
+      return {
+        content,
+        reason: "unplaceable",
+        detail: `read-back:${post.length}${post.some((p) => p.unbounded) ? " unbounded" : ""}`,
+      };
+    }
+    const refusal = sectionGuard(out, post[0]);
+    return refusal
+      ? { content, reason: "unplaceable", detail: refusal }
+      : { content: out, reason };
   };
 
   if (sections.length === 1 && !sections[0].insideChangeLog) {

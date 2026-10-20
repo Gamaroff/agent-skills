@@ -1,0 +1,75 @@
+schema: 2
+task: 'task.199.setup-config-and-process-docs'
+task_title: 'Setup, configuration and process docs'
+gate: CONCERNS
+status_reason: 'Every changed claim matches its source, but three stale copies of claims the diff fixed remain outside it: configuration.md still says three sync skills, three docs still say Node >= 20, and the setup-consumer.sh header no longer matches the wizard table it pins.'
+reviewer: 'QA Engineer'
+head: 'd0c72dab648bb43049e650decc43710c7984f659'
+updated: '2026-10-20T07:34:18Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'docs/reference/configuration.md'
+    finding: 'configuration.md:710 says --probe-workflow works on "any of the three sync skills"; the diff fixed the same count to four in jira-publish.md (RUNBOOKS-23), and sync-jira-bug, -epic, -story and -task all support it.'
+    suggested_action: 'Change to "any of the four sync skills", then grep docs/ for the three-sync-skills count outside dated audits, task/bug records and CHANGELOG.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-1'
+    severity: low
+    file: 'docs/concepts/getting-started.md'
+    finding: 'getting-started.md:11, quickstart-task.md:22 and :59, and quickstart-story.md:22 still give Node >= 20; package.json engines and the setup-consumer.sh header require >= 22, which the diff already corrected in day-1-tasks.md (RUNBOOKS-26). Reviewer CR-2, verified by QA.'
+    suggested_action: 'Change each Node >= 20 prerequisite in the consumer-facing docs to >= 22.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-2'
+    severity: low
+    file: 'scripts/setup-consumer.sh'
+    finding: 'The header says its numbering matches getting-started.md "What the wizard does", but after the diff it lacks step 8a (tracker-workflow.yaml) and still describes step 4 as ".env optionally" rather than .secrets/tooling.env. Reviewer CR-3, verified by QA.'
+    suggested_action: 'Add an 8a line for tracker-workflow.yaml and reword step 4 to .secrets/tooling.env with .secrets/ and .env gitignored.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 5969
+  phases_verified: 6/6
+  ci: 'pass @ d0c72dab (test, link-check, shellcheck)'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'Documentation only. No boundary in the change set. The one new command (source bitbucket-auth.sh) reads credentials from env and prints none.'
+  performance:
+    status: PASS
+    notes: 'N/A — documentation only (SC-4).'
+  reliability:
+    status: PASS
+    notes: 'git revert is a full rollback. The new bitbucket-auth path was re-run by QA in a consumer-shaped directory: rc 0 / bearer with a token, rc 1 with its documented message without one.'
+  maintainability:
+    status: PASS
+    notes: 'Each edit was written from a cited source. The residue is three stale copies outside the diff (top_issues).'
+
+recommendations:
+  immediate:
+    - action: 'Fix the stale "three sync skills" count in configuration.md:710'
+      refs: ['docs/reference/configuration.md']
+  future:
+    - action: 'markdown-link-check@3 does not check cross-file anchors; give CI an anchor-aware check (doc-links.js resolves files, not anchors)'
+      refs: ['.github/workflows/docs-link-check.yml']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CR-1 fixed (QA-1, QA-2 low — fix in the same cycle)'

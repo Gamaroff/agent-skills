@@ -1,0 +1,128 @@
+[
+  {
+    "id": "absolute-code-span",
+    "direction": "hostile",
+    "input": "`/etc/task.1.x.md`",
+    "why": "An absolute path in a code span would be opened as-is; a title link with the same href is joined under the registry.",
+    "correct": "Refuse a leading slash."
+  },
+  {
+    "id": "absolute-link",
+    "direction": "hostile",
+    "input": "[d](/etc/task.1.x.md)",
+    "why": "A Markdown link whose href is absolute.",
+    "correct": "Refuse a leading slash in the link form too."
+  },
+  {
+    "id": "drive-letter",
+    "direction": "hostile",
+    "input": "`C:/repo/docs/tasks/task.1.x/task.1.x.md`",
+    "why": "A Windows drive-absolute path.",
+    "correct": "Refuse a drive prefix."
+  },
+  {
+    "id": "backslash",
+    "direction": "hostile",
+    "input": "`docs\\tasks\\task.1.x\\task.1.x.md`",
+    "why": "A backslash is a separator on one platform and a filename character on another.",
+    "correct": "Refuse any backslash."
+  },
+  {
+    "id": "nul-truncation",
+    "direction": "hostile",
+    "input": "`docs/tasks/task.1.x/task.1.x.md\u0000.png`",
+    "why": "A NUL truncates the path at the syscall.",
+    "correct": "Refuse control characters."
+  },
+  {
+    "id": "dot-dot-deep",
+    "direction": "hostile",
+    "input": "`../../../etc/task.1.x.md`",
+    "why": "Explicitly relative to the registry, enough levels to leave the repo.",
+    "correct": "Normalise, then refuse a result outside the repo root."
+  },
+  {
+    "id": "dot-dot-inner",
+    "direction": "hostile",
+    "input": "`docs/../../etc/task.1.x.md`",
+    "why": "Repo-root-relative but escapes through an inner `..`.",
+    "correct": "Normalise before checking containment."
+  },
+  {
+    "id": "dot-dot-link",
+    "direction": "hostile",
+    "input": "[d](../../../etc/task.1.x.md)",
+    "why": "Link form escaping the repo.",
+    "correct": "Containment applies to the link form."
+  },
+  {
+    "id": "dot-dot-exact",
+    "direction": "hostile",
+    "input": "`../../../task.1.x.md`",
+    "why": "From docs/tasks, normalises to exactly one level above the repo root (`../task.1.x.md`).",
+    "correct": "A result of `../x` is outside."
+  },
+  {
+    "id": "not-a-work-item",
+    "direction": "hostile",
+    "input": "`docs/notes/readme.md`",
+    "why": "A path, but not a work-item document.",
+    "correct": "Refuse anything isWorkItemHref rejects."
+  },
+  {
+    "id": "empty",
+    "direction": "hostile",
+    "input": "",
+    "why": "An empty cell names nothing.",
+    "correct": "Refuse."
+  },
+  {
+    "id": "root-relative",
+    "direction": "legitimate",
+    "input": "`docs/tasks/task.7.x/task.7.x.md`",
+    "why": "The consumer shape from GitHub #643.",
+    "correct": "Resolve unchanged."
+  },
+  {
+    "id": "bare-root-relative",
+    "direction": "legitimate",
+    "input": "docs/tasks/task.7.x/task.7.x.md",
+    "why": "The same path without a code span.",
+    "correct": "Resolve unchanged."
+  },
+  {
+    "id": "dot-relative",
+    "direction": "legitimate",
+    "input": "`./task.9.x/task.9.x.md`",
+    "why": "Relative to the registry directory.",
+    "correct": "Resolve under docs/tasks."
+  },
+  {
+    "id": "dot-dot-inside",
+    "direction": "legitimate",
+    "input": "`../bugs/bug.3.x/bug.3.x.md`",
+    "why": "One level up from docs/tasks stays inside the repo.",
+    "correct": "Resolve to docs/bugs/…"
+  },
+  {
+    "id": "link-relative",
+    "direction": "legitimate",
+    "input": "[doc](task.8.x/task.8.x.md)",
+    "why": "A link resolves against the registry, as links do.",
+    "correct": "Resolve under docs/tasks."
+  },
+  {
+    "id": "double-dot-in-name",
+    "direction": "legitimate",
+    "input": "`docs/tasks/archive..2026/task.6.x.md`",
+    "why": "`..` inside a segment name is not traversal.",
+    "correct": "Resolve unchanged."
+  },
+  {
+    "id": "dot-dot-to-root",
+    "direction": "legitimate",
+    "input": "`../../task.1.x.md`",
+    "why": "From docs/tasks, two levels up is the repo root itself — inside the repo.",
+    "correct": "Resolve to task.1.x.md."
+  }
+]

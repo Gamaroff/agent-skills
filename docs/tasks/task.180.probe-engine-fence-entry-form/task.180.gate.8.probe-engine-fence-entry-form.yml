@@ -1,0 +1,77 @@
+schema: 2
+task: 'task.180.probe-engine-fence-entry-form'
+task_title: 'security-probe: a fence: entry form for a fenced bash block in a step doc'
+gate: CONCERNS
+status_reason: 'The cycle-7 fix holds (TASK-180-019 closed; 2 QA mutations covered). Second consecutive gate with no HIGH. The scoped re-review found two MEDIUMs. Cycle 7 made the TASK-180-017 integration test vacuous: it now passes on a pre-spawn decline and never reaches ghFreePath. emitBlock does not print a fence: control''s slot, so two controls on one block render as one.'
+reviewer: 'QA Engineer'
+head: 'ffaa7c2373a4967bcb6a3b065f23a3adb4be5d68'
+updated: '2026-10-12T17:25:58Z'
+
+top_issues:
+  - id: 'TASK-180-020'
+    severity: medium
+    file: 'shared/resources/tests/security-probe.test.mjs'
+    finding: 'The TASK-180-017 integration test fixture spells out type -ap gh, which the cycle-7 text check now declines before any spawn, so the test passes with the ghFreePath line removed (confirmed on ffaa7c23). Code review CR-1 (medium/high). Bug: task.180.bug.13.ghfreepath-integration-test-vacuous.md'
+    suggested_action: 'Reach gh without spelling it out in the fixture, and assert that cases ran.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-180-021'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'emitBlock prints argv for cli: but not slot for fence:, so two unnamed fence: controls on one block render with the same name, entry and sink; the default name also uses split("#").pop(). Code review CR-2 (medium/high). Bug: task.180.bug.14.emit-block-drops-fence-slot.md'
+    suggested_action: 'Print slot in emitBlock; default the name from the text after the first #.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 5410
+  phases_verified: 3/3
+  ci: 'not read this cycle (CI is gated at /finalise)'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 26
+    notes: 'task.180.qa.8.security.run.json: both controls engage, 0 reproduced, 0 escapes. TASK-180-019 closed. TASK-180-020 is test coverage of the guard, not a gap in it: the ghFreePath unit test still holds the guard.'
+  performance:
+    status: PASS
+    notes: 'ci:fast 5410 tests, 5396 pass, 0 fail at ffaa7c23 (5b).'
+  reliability:
+    status: PASS
+    notes: 'The cycle-7 fixes hold: QA mutations (fixture files unchecked; fixture env unchecked) each red.'
+  maintainability:
+    status: CONCERNS
+    notes: 'TASK-180-020 (a vacuous integration test) and TASK-180-021 (the rendered block merges two controls).'
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 2
+  fix_date: '2026-10-12'
+  total_iterations: 7
+  verification_method: 'Regression tests + QA mutation spot check (2 covered) + ci:fast'
+
+recommendations:
+  immediate:
+    - action: 'TASK-180-020: make the TASK-180-017 integration test reach ghFreePath.'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+    - action: 'TASK-180-021: print slot in emitBlock.'
+      refs: ['shared/resources/security-probe.mjs']
+  future:
+    - action: 'CR-3 (low): the text-check comment overstates absolute-path coverage. CR-4 (low): FENCE_LINE copies the extractBlocks regex instead of importing it. CR-5 (low): stamp the ghFreePath farm with lstat, not stat.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'Carried: the shell forms share the PATH-lookup gap; GIT_CEILING_DIRECTORIES in caseEnv; CR-3 short-slot rewrite (gate 5).'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-180-020 and -021 fixed']

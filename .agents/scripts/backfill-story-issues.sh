@@ -6,6 +6,10 @@
 # Usage: backfill-story-issues.sh <story-file> [<story-file> ...]
 set -euo pipefail
 
+# jq decides which files are story documents below; without it every story would read as
+# "not a story document" — the same message a real epic gets (task.207 QA cycle 3, CR3-5).
+command -v jq >/dev/null || { echo "backfill-story-issues: jq is required" >&2; exit 1; }
+
 OWNER=Gamaroff
 REPO_NAME=agent-skills
 REPO="${OWNER}/${REPO_NAME}"
@@ -13,6 +17,14 @@ PROJECT_NUM=1
 PRIO_SCRIPT="$(git rev-parse --show-toplevel)/skills/ensure-story-github-issue/references/set-github-project-priority.sh"
 
 fm() { awk -v key="$1" 'BEGIN{p=0} /^---$/{p++; next} p==1 && $1==key":" {sub(/^[^:]*: */,""); gsub(/^["'\'']|["'\'']$/,""); print; exit}' "$2"; }
+
+# The title-prefix rule is doc-id.js's (`[Story 1.2.3] `, `Story 1.2.3: `, `Epic 1.2 — `), never a
+# private sed: a sed here stripped only `Story E.S` and left `.3:` on a hierarchical title (task.207
+# QA cycle 1, CR-4/CR-5).
+strip_id_prefix() {
+  command node -e 'process.stdout.write(require(process.argv[1]).stripIdPrefix(process.argv[2], process.argv[3]))' \
+    "$(git rev-parse --show-toplevel)/shared/resources/doc-id.js" "$1" "$2"
+}
 
 extract_section() {
   # $1 = heading name, $2 = file. Prints lines from "## $1" up to next "## " (exclusive).
@@ -34,10 +46,20 @@ for STORY_FILE in "$@"; do
 
   TITLE=$(fm title "$STORY_FILE")
   PRIORITY=$(fm priority "$STORY_FILE")
-  ID=$(fm id "$STORY_FILE")
-  # Parse E.S from id (story.E.S.slug)
-  STORY_E=$(echo "$ID" | awk -F. '{print $2}')
-  STORY_S=$(echo "$ID" | awk -F. '{print $3}')
+  # P.E.S through doc-id, never a positional split: in story.P.E.S the second
+  # field is the PRD (task 207).
+  ID_JSON=$(command node "$(git rev-parse --show-toplevel)/shared/resources/doc-id.js" \
+    parse "$(basename "$STORY_FILE")" --json) \
+    || { echo "skip (not a story id doc-id can read): $STORY_FILE"; continue; }
+  # A story DOCUMENT only: an epic, or a story's artifact (story.1.2.3.bug.1.x.md), parses
+  # too and must not become a story issue (task.207 QA cycle 2, CR-6).
+  [ "$(printf '%s' "$ID_JSON" | jq -r '"\(.kind) \(.artifact)"')" = "story null" ] \
+    || { echo "skip (not a story document): $STORY_FILE"; continue; }
+  STORY_P=$(printf '%s' "$ID_JSON" | jq -r '.prd')
+  STORY_E=$(printf '%s' "$ID_JSON" | jq -r '.epic')
+  # The label is doc-id's id minus `story.`, so a sub-story keeps its letter
+  # (story.1.2.3A → 1.2.3A) and never collides with its parent (task.207 QA cycle 2, CR-3).
+  STORY_LABEL=$(printf '%s' "$ID_JSON" | jq -r '.id | sub("^story\\."; "")')
 
   # Resolve parent epic file + GH issue
   STORY_DIR=$(dirname "$STORY_FILE")
@@ -45,12 +67,12 @@ for STORY_FILE in "$@"; do
   EPIC_FILE="${EPIC_DIR}/$(basename "$EPIC_DIR").md"
   EPIC_GH=$(fm github_issue "$EPIC_FILE")
   EPIC_TITLE_RAW=$(fm title "$EPIC_FILE")
-  EPIC_TITLE_BARE=$(echo "$EPIC_TITLE_RAW" | sed -E "s/^Epic [0-9]+:? *//")
-  MILESTONE="Epic ${STORY_E} — ${EPIC_TITLE_BARE}"
+  EPIC_TITLE_BARE=$(strip_id_prefix epic "$EPIC_TITLE_RAW")
+  MILESTONE="Epic ${STORY_P}.${STORY_E} — ${EPIC_TITLE_BARE}"
 
   # Bare title (strip "Story E.S: " prefix)
-  STORY_TITLE_BARE=$(echo "$TITLE" | sed -E "s/^Story [0-9]+\.[0-9]+:? *//")
-  ISSUE_TITLE="[Story ${STORY_E}.${STORY_S}] ${STORY_TITLE_BARE}"
+  STORY_TITLE_BARE=$(strip_id_prefix story "$TITLE")
+  ISSUE_TITLE="[Story ${STORY_LABEL}] ${STORY_TITLE_BARE}"
 
   REL_PATH=$(git -C "$(git rev-parse --show-toplevel)" ls-files --full-name "$STORY_FILE" 2>/dev/null || echo "$STORY_FILE")
   DOC_URL="https://github.com/${REPO}/blob/develop/${REL_PATH}"

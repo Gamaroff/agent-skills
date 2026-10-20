@@ -47,8 +47,14 @@
 
 import { spawnSync } from "node:child_process";
 import { readFileSync, realpathSync } from "node:fs";
+import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
+// The one definition of a document id (task 202). Every id decision below is a
+// doc-id parse — this file declares no id grammar of its own (task 206).
+const require = createRequire(import.meta.url);
+const docId = require("./doc-id.js");
 
 // bundle-dependency: shared/resources/finalise-fix-and-recheck-preconditions.json
 const TABLE_URL = new URL(
@@ -65,20 +71,39 @@ export const PRECONDITIONS = Object.freeze(
 
 const isList = (v) => Array.isArray(v);
 
-/** A repo-relative path to a task / story / epic / bug document under docs/. */
-const WORK_ITEM_DOC_RE =
-  /^docs\/(?:[^/]+\/)*(?:task\.\d+|story\.\d+\.\d+|epic\.\d+|bug\.\d+)\.[^/]+\.md$/;
+/** The kinds a pipeline work item can be. A PRD is a document, not a work item. */
+const WORK_ITEM_KINDS = Object.freeze(["task", "story", "epic", "bug"]);
+
+/**
+ * A path's basename read as a work-item name — the document or one of its
+ * artifacts — or null. The id is doc-id's, never a local pattern: a hand-written
+ * `story\.\d+\.\d+` stemmed `story.1.2.3.x` as `story.1.2` and admitted every
+ * sibling story's artifacts (task 206). A legacy `story.{E}.{S}` name does not
+ * parse, so it is not a work item here: it is migrated first (task 203).
+ */
+export const parseWorkItemName = (p) => {
+  if (typeof p !== "string") return null;
+  const id = docId.parse(p.slice(p.lastIndexOf("/") + 1));
+  return id.ok && WORK_ITEM_KINDS.includes(id.kind) ? id : null;
+};
+
 // A pipeline artifact beside the document (its QA report, gate, DoD, plan,
 // review, sprint-review summary…) shares the stem and is NOT the document.
 // Exported because it is the ONE definition of the set: the doc-links corpus
 // guards import it rather than restating it, so "what CI checks beside a
 // document" and "what 8a may admit" cannot drift apart (task.152 QA-1 — they had:
-// `sprint-review-summary` was in the guard and not here).
-export const WORK_ITEM_ARTIFACT_RE =
-  /\.(qa|gate|bug|implementation|review|dod|plan|handover|handoff|pr-review|risk|test-design|sprint-review-summary)\./;
+// `sprint-review-summary` was in the guard and not here). The words are doc-id's
+// ARTIFACTS vocabulary, so the two cannot disagree either (task 206).
+export const WORK_ITEM_ARTIFACT_RE = new RegExp(
+  `\\.(${docId.ARTIFACTS.join("|")})\\.`,
+);
+
+/** A repo-relative path to a task / story / epic / bug document under docs/. */
 export const isWorkItemDocument = (p) =>
   typeof p === "string" &&
-  WORK_ITEM_DOC_RE.test(p) &&
+  p.startsWith("docs/") &&
+  p.endsWith(".md") &&
+  parseWorkItemName(p)?.artifact === null &&
   !WORK_ITEM_ARTIFACT_RE.test(p.slice(p.lastIndexOf("/") + 1)) &&
   !p.includes("..") &&
   // A null byte is not `/`, so the regex alone accepts `task.1.x.md\0.md`. A raw
@@ -94,7 +119,9 @@ export const isWorkItemDocument = (p) =>
  *   1. `documentPath` is a work item document (isWorkItemDocument);
  *   2. `p` is in the same directory — not a subdirectory, not a sibling tree;
  *   3. its basename starts with the document's id and a dot (`task.139.`,
- *      `story.2.1.`, `epic.1.`, `bug.14.`) — so `task.1.` never admits `task.10.`;
+ *      `story.1.2.1.`, `epic.1.2.`, `bug.14.`) — the id is doc-id's, so `task.1.`
+ *      never admits `task.10.` and `story.1.2.3.` never admits `story.1.2.30.`,
+ *      `story.1.2.4.` or the sub-story `story.1.2.3A.`;
  *   4. it is a pipeline artifact (WORK_ITEM_ARTIFACT_RE) but not a `.bug.` report,
  *      which is a work item with its own lifecycle and its own `/finalise --bug`;
  *   5. it ends in `.md` (docs-link-check reads nothing else — a gate `.yml` is out);
@@ -118,10 +145,8 @@ export const isCoLocatedArtifact = (documentPath, p) => {
   const base = p.slice(dir.length);
   if (base.includes("/")) return false;
   if (UNPREFIXED_ARTIFACTS.includes(base)) return true;
-  const id = documentPath
-    .slice(dir.length)
-    .match(/^(task\.\d+|story\.\d+\.\d+|epic\.\d+|bug\.\d+)\./);
-  if (!id || !base.startsWith(`${id[1]}.`)) return false;
+  const id = parseWorkItemName(documentPath);
+  if (!id || !base.startsWith(`${id.id}.`)) return false;
   return WORK_ITEM_ARTIFACT_RE.test(base) && !/\.bug\./.test(base);
 };
 

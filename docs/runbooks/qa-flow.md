@@ -47,8 +47,8 @@ that matters.
 
 Outputs (co-located with the story or task):
 
-- `story.{E}.{S}.risk.{N}.{name}.md` / `task.{id}.risk.{N}.{name}.md`
-- `story.{E}.{S}.test-design.{N}.{name}.md` / `task.{id}.test-design.{N}.{name}.md`
+- `story.{P}.{E}.{S}.risk.{N}.{name}.md` / `task.{id}.risk.{N}.{name}.md`
+- `story.{P}.{E}.{S}.test-design.{N}.{name}.md` / `task.{id}.test-design.{N}.{name}.md`
 
 These feed into the gate decision later (risk score ≥9 → FAIL, ≥6 → CONCERNS).
 
@@ -61,8 +61,8 @@ These feed into the gate decision later (risk score ≥9 → FAIL, ≥6 → CONC
 
 Produces (co-located with the story or task):
 
-- QA narrative report (includes NFR + traceability) — `story.{E}.{S}.qa.{N}.{name}.md` / `task.{id}.qa.{N}.{name}.md`
-- Gate file — `story.{E}.{S}.gate.{N}.{name}.yml` / `task.{id}.gate.{N}.{name}.yml` (**owned by QA skills — never edit from dev**)
+- QA narrative report (includes NFR + traceability) — `story.{P}.{E}.{S}.qa.{N}.{name}.md` / `task.{id}.qa.{N}.{name}.md`
+- Gate file — `story.{P}.{E}.{S}.gate.{N}.{name}.yml` / `task.{id}.gate.{N}.{name}.yml` (**owned by QA skills — never edit from dev**)
 
 ## Phase 3 — Fix cycle
 
@@ -140,6 +140,15 @@ The exit gate of the QA loop, and the only way out of it.
 `--no-code` because the QA step has already run the code reviewer over the same diff; 5c runs the
 conformance lens only.
 
+Run standalone, `/review-pr` also takes the work item instead of the PR, and finds the PR itself:
+
+```bash
+/review-pr [PR | branch | JIRA-KEY | Jira URL | #issue | GitHub issue URL] [--effort LEVEL] [--comment]
+```
+
+The report's `resolved_via` names the route it took from the item to the PR. Targets and flags:
+[`review-pr` § Arguments](../../skills/review-pr/SKILL.md#arguments).
+
 `qa-story` / `qa-task` validate the work against its acceptance or success criteria and dispatch the
 code reviewer. `review-pr` asks a different question: does the PR *deliver what the work item
 promised*, did it drift outside that scope, and is the artifact trail behind it complete and honest?
@@ -168,11 +177,11 @@ formal PR review, no code edits. The orchestrator acts on the verdict. Lite mode
 **All QA artifacts are co-located with the story or task they belong to.** There is no central `docs/qa/` directory.
 
 ```
-docs/prd/[domain]/[feature]/epics/epic.{N}.{name}/stories/story.{E}.{S}.{name}/
-├── story.{E}.{S}.{name}.md                       # the story
-├── story.{E}.{S}.qa.{N}.{name}.md                # QA narrative + NFR + traceability
-├── story.{E}.{S}.dod.{N}.{name}.md               # Definition of Done
-└── story.{E}.{S}.gate.{N}.{name}.yml             # gate decision (QA-owned)
+docs/prd/[domain]/prd.[P].[feature]/epics/epic.{P}.{E}.{name}/stories/story.{P}.{E}.{S}.{name}/
+├── story.{P}.{E}.{S}.{name}.md                       # the story
+├── story.{P}.{E}.{S}.qa.{N}.{name}.md                # QA narrative + NFR + traceability
+├── story.{P}.{E}.{S}.dod.{N}.{name}.md               # Definition of Done
+└── story.{P}.{E}.{S}.gate.{N}.{name}.yml             # gate decision (QA-owned)
 ```
 
 Tasks follow the same pattern under `docs/tasks/task.{N}.{name}/`. See [Story documents](../standards/story-documents.md#co-located-artifacts) and [Task documents](../standards/task-documents.md#co-located-artifacts) for the full artifact list.

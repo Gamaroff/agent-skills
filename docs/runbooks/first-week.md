@@ -33,7 +33,7 @@ They cover the core concepts (task pipeline, story pipeline, Phase 0 prompts) yo
 | Day | What you do | Done when… |
 |-----|-------------|------------|
 | [Day 1 — Tasks](first-week/day-1-tasks.md) | Ship three real tasks end-to-end through the task pipeline | 3 tasks accepted; `docs/tasks/` has 3 new artifact sets and task-registry.md is updated |
-| [Day 2 — Stories](first-week/day-2-stories.md) | Ship at least one story through the full PRD → epic → story → develop-story chain | 1 story PR merged to the epic branch; story status `accepted` |
+| [Day 2 — Stories](first-week/day-2-stories.md) | Ship at least one story through the full PRD → epic → story → develop-story chain | 1 story PR open (or merged) against `develop`; story status `accepted` |
 | [Day 3 — Messy path](first-week/day-3-messy-path.md) | Deliberately reproduce a QA-gate failure and recover using `qa-fix` | 1 gate with `FAIL` status and 1 gate with `PASS` status from the same story |
 | [Day 4 — Parallel + change-mgmt](first-week/day-4-parallel.md) | Run parallel stories via git worktrees **or** write a Sprint Change Proposal | Parallel: 1 worktree PR merged; Change-mgmt: Sprint Change Proposal committed |
 

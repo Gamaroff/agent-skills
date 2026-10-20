@@ -12,7 +12,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { writeFileSync, mkdtempSync, symlinkSync } from "node:fs";
+import { writeFileSync, mkdtempSync, mkdirSync, symlinkSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -29,17 +29,24 @@ const SCRIPT = path.join(
 
 const {
   parseRoadmap,
+  epicRef,
   selectNext,
   selectBatch,
   parseTouches,
   parseRegistry,
+  DOC_COLUMN_NAMES,
+  resolveDocCell,
   parseFrontmatterStatus,
+  storyBranchModel,
   registryFrontier,
   parseDepCell,
   TASK_ELIGIBLE_STATUSES,
   BUG_ELIGIBLE_STATUSES,
   TASK_LIFECYCLE_STATUSES,
   BUG_LIFECYCLE_STATUSES,
+  normaliseWorktreeRoot,
+  worktreeRootEscapes,
+  DEFAULT_WORKTREE_ROOT,
 } = await import(pathToFileURL(SCRIPT).href);
 
 function fixture(name) {
@@ -335,7 +342,7 @@ test("10: -NFR suffix ids are distinct from their base id (7.11 ≠ 7.11-NFR2)",
   );
 });
 
-test("10: once 15/17/12/13 clear, the 🚧-gated Epic 25 row stops the run", () => {
+test("10: once 15/17/12/13 clear, the 🚧-gated Epic 1.25 row stops the run", () => {
   let text = fixture("10-real-world.md");
   for (const id of [
     "12.1",
@@ -456,7 +463,37 @@ test("template: the scaffold asset is a valid, lint-clean starter roadmap", () =
   // A scaffold parses and reaches its first item; it won't be "selected" until
   // the placeholder <path> is replaced with a real story/task link.
   assert.notEqual(r.status, "halt");
-  assert.equal(r.item.id, "1.1");
+  assert.equal(r.item.id, "1.1.1");
+});
+
+test("template: the Change Log header is the one the change-log engine writes", async () => {
+  const tmpl = readFileSync(
+    path.join(
+      REPO_ROOT,
+      "skills",
+      "develop-next",
+      "assets",
+      "project-completion-roadmap.template.md",
+    ),
+    "utf-8",
+  );
+  // The engine is the source of the canonical header, so read it from the block
+  // it builds rather than restating the string here.
+  const { createRequire } = await import("node:module");
+  const { buildChangeLogBlock } = createRequire(import.meta.url)(
+    path.join(REPO_ROOT, "shared", "resources", "change-log.js"),
+  );
+  const canonical = buildChangeLogBlock([])
+    .split("\n")
+    .find((l) => l.startsWith("| Date"));
+  const section = tmpl.slice(tmpl.indexOf("## Change Log"));
+  const header = section.split("\n").find((l) => l.startsWith("|"));
+  const cells = (l) =>
+    l
+      .split("|")
+      .map((c) => c.trim())
+      .filter(Boolean);
+  assert.deepEqual(cells(header), cells(canonical));
 });
 
 // ── 11: `T`-prefixed standalone-task ids ─────────────────────────────────────
@@ -503,14 +540,14 @@ test("11: a T-row is excluded from its host epic's section rows", () => {
   // stories of it — counting them would strand the epic forever.
   const m = parseRoadmap(fixture("11-task-ids.md"));
   assert.deepEqual(
-    m.epicSections["28"].rowIds,
+    m.epicSections["1.28"].rowIds,
     ["28.1", "28.2"],
-    "T22 must be excluded from Epic 28",
+    "T22 must be excluded from Epic 1.28",
   );
   assert.deepEqual(
-    m.epicSections["20"].rowIds,
+    m.epicSections["1.20"].rowIds,
     ["20.8"],
-    "T26 must be excluded from Epic 20",
+    "T26 must be excluded from Epic 1.20",
   );
 });
 
@@ -586,7 +623,7 @@ test("12: touches: does not disturb the deps: capture beside it", () => {
   const m = parseRoadmap(
     [
       "# PHASE 1",
-      "## Epic 9",
+      "## Epic 1.9",
       "- [ ] **9.1** A · deps: — · touches: schema~ · /develop-story docs/p/s/story.9.1.a/story.9.1.a.md",
       "- [ ] **9.2** B · deps: 9.1 · touches: leaderboard! · /develop-story docs/p/s/story.9.2.b/story.9.2.b.md",
       "",
@@ -603,7 +640,7 @@ test("12: touches: does not disturb the deps: capture beside it", () => {
 
 const BATCH_ROADMAP = [
   "# PHASE 1 — MVP",
-  "## Epic 8",
+  "## Epic 1.8",
   "- [ ] **8.1** Ready A · deps: — · touches: schema~, +own · /develop-story docs/p/s/story.8.1.a/story.8.1.a.md",
   "- [ ] **8.2** Ready B (soft-shares schema) · deps: — · touches: schema~ · /develop-story docs/p/s/story.8.2.b/story.8.2.b.md",
   "- [ ] **8.3** Ready C (hard leaderboard) · deps: — · touches: leaderboard! · /develop-story docs/p/s/story.8.3.c/story.8.3.c.md",
@@ -658,11 +695,11 @@ test("12: --batch advances past a fully-blocked phase, recording it", () => {
   const m = parseRoadmap(
     [
       "# PHASE 1 — blocked",
-      "## Epic 7",
+      "## Epic 1.7",
       // ⛔ with no parseable blocker id (a legal/ops gate) → never ready, but actionable.
       "- [ ] **7.1** Gated · deps: — · **⛔ legal-gate** — blocked on counsel · touches: +own · /develop-story docs/p/s/story.7.1.g/story.7.1.g.md",
       "# PHASE 2 — ready",
-      "## Epic 8",
+      "## Epic 1.8",
       "- [ ] **8.1** Ready · deps: — · touches: +own · /develop-story docs/p/s/story.8.1.a/story.8.1.a.md",
       "",
     ].join("\n"),
@@ -693,7 +730,7 @@ test("12: selectNext is unchanged by the presence of touches: (parity)", () => {
 
 const UNANNOTATED_ROADMAP = [
   "# PHASE 1 — MVP",
-  "## Epic 9",
+  "## Epic 1.9",
   // 9.1 and 9.2 have no touches: field at all → un-annotated (+own default).
   "- [ ] **9.1** Ready A · deps: — · /develop-story docs/p/s/story.9.1.a/story.9.1.a.md",
   "- [ ] **9.2** Ready B · deps: — · /develop-story docs/p/s/story.9.2.b/story.9.2.b.md",
@@ -747,7 +784,7 @@ test("13: a single un-annotated row does not warn", () => {
   const m = parseRoadmap(
     [
       "# PHASE 1",
-      "## Epic 9",
+      "## Epic 1.9",
       "- [ ] **9.1** Ready A · deps: — · /develop-story docs/p/s/story.9.1.a/story.9.1.a.md",
       "- [ ] **9.3** Ready C · deps: — · touches: +own · /develop-story docs/p/s/story.9.3.c/story.9.3.c.md",
       "",
@@ -807,6 +844,194 @@ test("13: CLI --batch --require-touches defers un-annotated rows", () => {
   );
 });
 
+// ── 13b: worktrees live inside the repository ────────────────────────────────
+//
+// The batch used to emit `../tc-wt-<slug>` — a sibling of the checkout, with a
+// prefix left over from the project the selector was extracted from — while
+// develop-batch's stale check looked for `../wt-*`, so the two never matched.
+// Worktrees now live under a repo-relative root (developBatch.worktreeRoot).
+
+test("13b: --batch worktrees default to .worktrees/batch-<slug>, inside the repo", () => {
+  const b = selectBatch(parseRoadmap(BATCH_ROADMAP));
+  assert.equal(DEFAULT_WORKTREE_ROOT, ".worktrees");
+  const w = b.worktrees.find((x) => x.id === "8.1");
+  assert.equal(w.dir, ".worktrees/batch-8-1");
+  assert.equal(
+    w.shell,
+    "git worktree add .worktrees/batch-8-1 -b story/8-1 develop",
+  );
+  for (const x of b.worktrees) {
+    assert.ok(
+      !x.dir.startsWith(".."),
+      `${x.id} worktree escapes the repo: ${x.dir}`,
+    );
+  }
+});
+
+test("13b: selectBatch honours opts.worktreeRoot", () => {
+  const b = selectBatch(parseRoadmap(BATCH_ROADMAP), {
+    worktreeRoot: "tmp/wt",
+  });
+  assert.ok(b.worktrees.length > 0, "fixture batches at least one row");
+  for (const x of b.worktrees) assert.match(x.dir, /^tmp\/wt\/batch-/);
+});
+
+test("13b: normaliseWorktreeRoot accepts repo-relative roots and refuses escapes", () => {
+  assert.equal(normaliseWorktreeRoot(".worktrees"), ".worktrees");
+  assert.equal(normaliseWorktreeRoot(".worktrees/"), ".worktrees");
+  assert.equal(normaliseWorktreeRoot("./build//wt"), "build/wt");
+  for (const bad of [
+    "../wt",
+    "a/../../b",
+    "/abs/wt",
+    "C:\\wt",
+    "",
+    ".",
+    "  ",
+    undefined,
+    "wt\u0000x",
+    "wt\nx",
+    "wt\tx",
+  ]) {
+    assert.equal(
+      normaliseWorktreeRoot(bad),
+      null,
+      `${JSON.stringify(bad)} must be refused`,
+    );
+  }
+});
+
+test("13b: CLI --worktree-root sets the root; an escaping root exits 1", () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "roadmap-"));
+  const file = path.join(dir, "roadmap.md");
+  writeFileSync(file, BATCH_ROADMAP);
+  const out = execFileSync(
+    process.execPath,
+    [SCRIPT, "--batch", "--worktree-root", "wt-root/", "--roadmap", file],
+    { encoding: "utf-8" },
+  );
+  const r = JSON.parse(out);
+  assert.ok(r.worktrees.length > 0);
+  for (const x of r.worktrees) assert.match(x.dir, /^wt-root\/batch-/);
+  assert.throws(
+    () =>
+      execFileSync(
+        process.execPath,
+        [SCRIPT, "--batch", "--worktree-root", "../outside", "--roadmap", file],
+        { encoding: "utf-8", stdio: "pipe" },
+      ),
+    (e) => e.status === 1 && /inside the repository/.test(String(e.stderr)),
+  );
+});
+
+// TASK-208-BUG-1: the lexical check cannot see a symlink. Both directions:
+// a link that leaves the repo is refused; a real or linked root that stays
+// inside is accepted.
+test("13b: worktreeRootEscapes follows symlinks out of the repo, and only out", () => {
+  const base = mkdtempSync(path.join(os.tmpdir(), "wt-escape-"));
+  const repo = path.join(base, "repo");
+  const outside = path.join(base, "outside");
+  mkdirSync(repo);
+  mkdirSync(outside);
+  mkdirSync(path.join(repo, "real-wt"));
+  mkdirSync(path.join(repo, ".worktrees"));
+  symlinkSync(outside, path.join(repo, ".wt"));
+  symlinkSync(outside, path.join(repo, "build"));
+  symlinkSync(path.join(repo, "real-wt"), path.join(repo, "inside-link"));
+  symlinkSync(path.join(base, "gone"), path.join(repo, "dangling"));
+  symlinkSync(repo, path.join(repo, "self"));
+  const escapes = (r) => worktreeRootEscapes(r, repo);
+  // Leaves the repository → refused.
+  assert.equal(escapes(".wt"), true, "a root that is a link out");
+  assert.equal(
+    escapes("build/wt"),
+    true,
+    "a missing root under a parent link out",
+  );
+  assert.equal(escapes("dangling"), true, "a dangling link cannot be resolved");
+  assert.equal(
+    escapes("self"),
+    true,
+    "a root that resolves to the repo itself",
+  );
+  // Stays inside → accepted.
+  assert.equal(escapes(".worktrees"), false, "an existing real directory");
+  assert.equal(escapes("not-yet/created"), false, "a root not created yet");
+  assert.equal(
+    escapes("inside-link"),
+    false,
+    "a link to a directory inside the repo",
+  );
+  assert.equal(
+    escapes("..foo"),
+    false,
+    "a name that only starts with two dots",
+  );
+});
+
+test("13b: CLI --batch refuses a root that is a symlink out of the repo", () => {
+  const base = mkdtempSync(path.join(os.tmpdir(), "wt-escape-cli-"));
+  const repo = path.join(base, "repo");
+  mkdirSync(repo);
+  mkdirSync(path.join(base, "outside"));
+  writeFileSync(path.join(repo, "roadmap.md"), BATCH_ROADMAP);
+  symlinkSync(path.join(base, "outside"), path.join(repo, ".worktrees"));
+  // The default root, not a flag: `.worktrees` itself can be the link.
+  assert.throws(
+    () =>
+      execFileSync(
+        process.execPath,
+        [SCRIPT, "--batch", "--roadmap", "roadmap.md"],
+        {
+          cwd: repo,
+          encoding: "utf-8",
+          stdio: "pipe",
+        },
+      ),
+    (e) =>
+      e.status === 1 &&
+      /resolves outside the repository/.test(String(e.stderr)),
+  );
+  // Without --batch no worktree is emitted, so the root is not checked.
+  execFileSync(process.execPath, [SCRIPT, "--roadmap", "roadmap.md"], {
+    cwd: repo,
+    encoding: "utf-8",
+    stdio: "pipe",
+  });
+});
+
+test("13b: --check-root prints the normalised root, or refuses with exit 1", () => {
+  const base = mkdtempSync(path.join(os.tmpdir(), "wt-check-root-"));
+  const repo = path.join(base, "repo");
+  mkdirSync(repo);
+  mkdirSync(path.join(base, "outside"));
+  symlinkSync(path.join(base, "outside"), path.join(repo, ".wt"));
+  const run = (root) => {
+    try {
+      const out = execFileSync(
+        process.execPath,
+        [SCRIPT, "--check-root", root],
+        {
+          cwd: repo,
+          encoding: "utf-8",
+          stdio: "pipe",
+        },
+      );
+      return { code: 0, out };
+    } catch (e) {
+      return { code: e.status, out: String(e.stdout), err: String(e.stderr) };
+    }
+  };
+  assert.deepEqual(run("./.worktrees/"), { code: 0, out: ".worktrees\n" });
+  assert.deepEqual(run("build//wt"), { code: 0, out: "build/wt\n" });
+  for (const bad of ["../outside", "/abs", "wt\nx", ".wt", ""]) {
+    const r = run(bad);
+    assert.equal(r.code, 1, `${JSON.stringify(bad)} must be refused`);
+    assert.equal(r.out, "", "a refused root prints nothing on stdout");
+    assert.match(r.err, /refused/);
+  }
+});
+
 // ── 14: /develop-bug rows are first-class runnable work ──────────────────────
 //
 // Before this, the selector reached `/develop-story` and `/develop-task` rows
@@ -816,7 +1041,7 @@ test("13: CLI --batch --require-touches defers un-annotated rows", () => {
 
 const BUG_ROADMAP = [
   "# PHASE 1 — MVP",
-  "## Epic 4",
+  "## Epic 1.4",
   "- [ ] **4.1** Login times out · deps: — · touches: auth! · /develop-bug docs/bugs/bug.7.login-timeout/bug.7.login-timeout.md",
   "",
 ].join("\n");
@@ -840,7 +1065,7 @@ test("14: a general bug resolves via a [bug](…) link, not just an inline arg",
     parseRoadmap(
       [
         "# PHASE 1",
-        "## Epic 4",
+        "## Epic 1.4",
         "- [ ] **4.1** Login times out — [bug](docs/bugs/bug.7.login-timeout/bug.7.login-timeout.md) · deps: — · `/develop-bug`",
         "",
       ].join("\n"),
@@ -861,7 +1086,7 @@ test("14: story and task bug reports resolve via their link too", () => {
   ]) {
     const r = selectNext(
       parseRoadmap(
-        `# PHASE 1\n\n## Epic 4\n\n- [ ] **4.1** Bug — [bug](${href}) · deps: — · \`/develop-bug\`\n`,
+        `# PHASE 1\n\n## Epic 1.4\n\n- [ ] **4.1** Bug — [bug](${href}) · deps: — · \`/develop-bug\`\n`,
       ),
     );
     assert.equal(r.status, "selected", href);
@@ -891,7 +1116,7 @@ test("14: a /develop-bug row participates in --batch and touches: disjointness",
     parseRoadmap(
       [
         "# PHASE 1 — MVP",
-        "## Epic 8",
+        "## Epic 1.8",
         "- [ ] **8.1** Story A · deps: — · touches: schema~ · /develop-story docs/p/s/story.8.1.a/story.8.1.a.md",
         "- [ ] **8.2** Bug B (soft-shares schema) · deps: — · touches: schema~ · /develop-bug docs/bugs/bug.7.x/bug.7.x.md",
         "- [ ] **8.3** Bug C (hard auth) · deps: — · touches: auth! · /develop-bug docs/bugs/bug.8.y/bug.8.y.md",
@@ -922,7 +1147,7 @@ test("14: a /develop-bug row participates in --batch and touches: disjointness",
 test("14: a bug row is dep-blocked and ⛔-blocked like any other row", () => {
   const text = [
     "# PHASE 1",
-    "## Epic 4",
+    "## Epic 1.4",
     "- [ ] **4.1** Prereq story · deps: — · /develop-story docs/p/s/story.4.1.a/story.4.1.a.md",
     "- [ ] **4.2** Bug · deps: 4.1 · /develop-bug docs/bugs/bug.7.x/bug.7.x.md",
     "",
@@ -941,7 +1166,7 @@ test("14: regression — widening the alternation is not 'accept anything'", () 
   // three commands are legal.
   const r = selectNext(
     parseRoadmap(
-      "# PHASE 1\n\n## Epic 4\n\n- [ ] **4.1** Do the epic · deps: — · /develop-epic docs/p/e/epic.4.x.md\n",
+      "# PHASE 1\n\n## Epic 1.4\n\n- [ ] **4.1** Do the epic · deps: — · /develop-epic docs/p/e/epic.4.x.md\n",
     ),
   );
   assert.equal(r.status, "stop");
@@ -962,7 +1187,7 @@ test("14: regression — widening the alternation is not 'accept anything'", () 
 test("14: a /develop-bug row with no resolvable path is a manual-checkpoint stop", () => {
   const r = selectNext(
     parseRoadmap(
-      "# PHASE 1\n\n## Epic 4\n\n- [ ] **4.1** Fix the thing · deps: — · `/develop-bug`\n",
+      "# PHASE 1\n\n## Epic 1.4\n\n- [ ] **4.1** Fix the thing · deps: — · `/develop-bug`\n",
     ),
   );
   assert.equal(r.status, "stop");
@@ -1101,14 +1326,14 @@ test("B: a bug row inside an epic section is excluded from that epic's completio
 
 ## PHASE 1 — build
 
-## Epic 4
+## Epic 1.4
 
 - [x] **4.1** the only actual story · /develop-story docs/stories/story.4.1.x/story.4.1.x.md
 - [ ] **T65** a cross-cutting task · /develop-task docs/tasks/task.65.x/task.65.x.md
 - [ ] **B2** a cross-cutting bug · /develop-bug docs/bugs/bug.2.flake/bug.2.flake.md
 `);
 
-  const rowIds = model.epicSections[4].rowIds;
+  const rowIds = model.epicSections["1.4"].rowIds;
   assert.deepEqual(
     rowIds,
     ["4.1"],
@@ -2882,4 +3107,579 @@ test("B8: the code lifecycles match docs/standards/bug-documents.md", () => {
       `  doc:  ${parsed.sort().join(", ")}\n` +
       `  code: ${[...BUG_LIFECYCLE_STATUSES].sort().join(", ")}`,
   );
+});
+
+// ── bug.18: an epic-integration story never enters a parallel batch ──────────
+//
+// Phase 0d recommends the epic's integration branch for a story whose epic declares
+// `branch_model: epic-integration`. A batch worktree is cut from, and rebased onto,
+// the base branch, so such a story would land on the base branch early and the
+// rebase would replay the epic's earlier commits. The batch excludes it with a
+// logged reason and leaves it to `/develop-next` or an interactive run.
+
+const EPIC_BATCH_ROADMAP = [
+  "# PHASE 1 — MVP",
+  "## Epic 1.8",
+  "- [ ] **8.1** Ordinary story · deps: — · touches: +own · /develop-story docs/p/e8/story.8.1.a/story.8.1.a.md",
+  "- [ ] **8.2** Integration story · deps: — · touches: +own · /develop-story docs/p/e9/story.9.1.b/story.9.1.b.md",
+  "- [ ] **T5** A task · deps: — · touches: +own · /develop-task docs/tasks/task.5.x/task.5.x.md",
+  "",
+].join("\n");
+
+test("bug.18: --batch excludes a story whose epic declares epic-integration, with a reason", () => {
+  const asked = [];
+  const b = selectBatch(parseRoadmap(EPIC_BATCH_ROADMAP), {
+    branchModelOf: (row) => {
+      asked.push(row.id);
+      return {
+        resolved: true,
+        model: row.id === "8.2" ? "epic-integration" : null,
+      };
+    },
+  });
+  assert.deepEqual(
+    b.batch.map((r) => r.id),
+    ["8.1", "T5"],
+  );
+  assert.equal(b.excluded.length, 1);
+  assert.equal(b.excluded[0].id, "8.2");
+  assert.match(b.excluded[0].reason, /^epic-integration:/);
+  assert.match(b.excluded[0].reason, /\/develop-next/);
+  assert.ok(
+    !b.worktrees.some((w) => w.id === "8.2"),
+    "no worktree is planned for the excluded story",
+  );
+  assert.deepEqual(asked, ["8.1", "8.2"], "only /develop-story rows are asked");
+  assert.match(b.detail, /1 held back/);
+});
+
+test("bug.18: a develop-direct or undeclared epic keeps the story in the batch, silently", () => {
+  for (const model of [null, "develop-direct"]) {
+    const b = selectBatch(parseRoadmap(EPIC_BATCH_ROADMAP), {
+      branchModelOf: () => ({ resolved: true, model }),
+    });
+    assert.deepEqual(
+      b.batch.map((r) => r.id),
+      ["8.1", "8.2", "T5"],
+      `branch model ${JSON.stringify(model)} must not exclude`,
+    );
+    assert.deepEqual(b.lint.warnings, [], "a resolved epic is not a warning");
+  }
+});
+
+test("bug.18: an unresolved epic keeps the story in the batch but names it in lint.warnings", () => {
+  const b = selectBatch(parseRoadmap(EPIC_BATCH_ROADMAP), {
+    branchModelOf: (row) =>
+      row.id === "8.2"
+        ? { resolved: false, reason: "epic document not found" }
+        : { resolved: true, model: null },
+  });
+  assert.deepEqual(
+    b.batch.map((r) => r.id),
+    ["8.1", "8.2", "T5"],
+  );
+  assert.equal(b.lint.warnings.length, 1);
+  assert.match(
+    b.lint.warnings[0],
+    /^8\.2: could not resolve its epic \(epic document not found\).*\/develop-next/,
+  );
+});
+
+test("bug.18: with no branchModelOf, selectBatch behaves as before (pure default)", () => {
+  const b = selectBatch(parseRoadmap(EPIC_BATCH_ROADMAP));
+  assert.deepEqual(
+    b.batch.map((r) => r.id),
+    ["8.1", "8.2", "T5"],
+  );
+});
+
+test("bug.18: storyBranchModel reads the epic from epic_source, then the enclosing epic directory", () => {
+  const files = {
+    "/r/docs/p/epics/epic.9.int/epic.9.int.md":
+      "---\ntype: epic\nbranch_model: epic-integration # opt-in\n---\n",
+    "/r/docs/p/epics/epic.9.int/stories/story.9.1.b/story.9.1.b.md":
+      "---\ntype: story\nepic: epic.9.int\n---\n",
+    "/r/docs/p/epics/epic.8.dd/epic.8.dd.md": "---\ntype: epic\n---\n",
+    "/r/docs/p/epics/epic.8.dd/stories/story.8.1.a/story.8.1.a.md":
+      "---\ntype: story\nepic: epic.8.dd\n---\n",
+    "/r/elsewhere/story.9.2.c.md":
+      "---\ntype: story\nepic: epic.9.int\nepic_source: '../docs/p/epics/epic.9.int/epic.9.int.md'\n---\n",
+    "/r/elsewhere/story.9.3.d.md": "---\ntype: story\nepic: epic.9.int\n---\n",
+  };
+  const read = (p) => (p in files ? files[p] : null);
+  assert.deepEqual(
+    storyBranchModel(
+      "/r/docs/p/epics/epic.9.int/stories/story.9.1.b/story.9.1.b.md",
+      read,
+    ),
+    { resolved: true, model: "epic-integration" },
+    "enclosing epic directory named by `epic:`",
+  );
+  assert.deepEqual(
+    storyBranchModel("/r/elsewhere/story.9.2.c.md", read),
+    { resolved: true, model: "epic-integration" },
+    "epic_source, relative to the story file",
+  );
+  assert.deepEqual(
+    storyBranchModel(
+      "/r/docs/p/epics/epic.8.dd/stories/story.8.1.a/story.8.1.a.md",
+      read,
+    ),
+    { resolved: true, model: null },
+    "an epic that declares nothing",
+  );
+  assert.deepEqual(
+    storyBranchModel("/r/elsewhere/story.9.3.d.md", read),
+    { resolved: false, reason: "epic document not found" },
+    "an epic that cannot be found is unresolved, never guessed",
+  );
+  assert.deepEqual(storyBranchModel("/r/missing.md", read), {
+    resolved: false,
+    reason: "story unreadable",
+  });
+});
+
+test("bug.18 CLI: --batch excludes an epic-integration story found on disk", () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "select-next-epic-int-"));
+  const put = (rel, body) => {
+    const p = path.join(root, rel);
+    mkdirSync(path.dirname(p), { recursive: true });
+    writeFileSync(p, body);
+  };
+  put(
+    "docs/p/epics/epic.9.int/epic.9.int.md",
+    "---\ntype: epic\nbranch_model: epic-integration\n---\n",
+  );
+  put(
+    "docs/p/epics/epic.9.int/stories/story.9.1.b/story.9.1.b.md",
+    "---\ntype: story\nepic: epic.9.int\n---\n",
+  );
+  put("docs/p/epics/epic.8.dd/epic.8.dd.md", "---\ntype: epic\n---\n");
+  put(
+    "docs/p/epics/epic.8.dd/stories/story.8.1.a/story.8.1.a.md",
+    "---\ntype: story\nepic: epic.8.dd\n---\n",
+  );
+  put(
+    "roadmap.md",
+    [
+      "# PHASE 1 — MVP",
+      "- [ ] **8.1** Ordinary · deps: — · touches: +own · /develop-story docs/p/epics/epic.8.dd/stories/story.8.1.a/story.8.1.a.md",
+      "- [ ] **9.1** Integration · deps: — · touches: +own · /develop-story docs/p/epics/epic.9.int/stories/story.9.1.b/story.9.1.b.md",
+      "",
+    ].join("\n"),
+  );
+  const out = execFileSync(
+    process.execPath,
+    [SCRIPT, "--batch", "--roadmap", "roadmap.md"],
+    { encoding: "utf-8", cwd: root },
+  );
+  const r = JSON.parse(out);
+  assert.deepEqual(
+    r.batch.map((x) => x.id),
+    ["8.1"],
+  );
+  assert.equal(r.excluded[0].id, "9.1");
+  assert.match(r.excluded[0].reason, /^epic-integration:/);
+});
+
+// ── bug.19: a plain-title registry with a document-path column parses ────────
+
+// The consumer shape from GitHub #643: plain-text title, the path in a column
+// of its own, and columns the parser does not know (`Icon`, `Tracker`).
+function docColumnRegistry(rows) {
+  return [
+    "| # | Title | Category | Priority | Icon | Status | Tracker | Document |",
+    "|---|---|---|---|---|---|---|---|",
+    ...rows,
+    "",
+  ].join("\n");
+}
+const docColumnRow = (n, status, docCell) =>
+  `| ${n} | Plain title ${n} | infrastructure | High | ⚠️ | ${status} | X-${n} | ${docCell} |`;
+
+test("bug.19: a code-span path in a Document column is read from the repo root", () => {
+  const p = parseRegistry(
+    docColumnRegistry([
+      docColumnRow(7, "ready-for-review", "`docs/tasks/task.7.x/task.7.x.md`"),
+    ]),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.deepEqual(p.malformed, []);
+  assert.equal(p.rows.length, 1);
+  assert.equal(p.rows[0].n, 7);
+  assert.equal(p.rows[0].title, "Plain title 7");
+  assert.equal(p.rows[0].path, "docs/tasks/task.7.x/task.7.x.md");
+  assert.equal(p.rows[0].registryStatus, "ready-for-review");
+  assert.equal(p.rows[0].priority, "High");
+});
+
+test("bug.19: a link or a ./-relative path in the Document column resolves against the registry", () => {
+  const p = parseRegistry(
+    docColumnRegistry([
+      docColumnRow(8, "planned", "[doc](task.8.x/task.8.x.md)"),
+      docColumnRow(9, "planned", "`./task.9.x/task.9.x.md`"),
+    ]),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.deepEqual(
+    p.rows.map((r) => r.path),
+    ["docs/tasks/task.8.x/task.8.x.md", "docs/tasks/task.9.x/task.9.x.md"],
+  );
+});
+
+test("bug.19: the title's link wins over the Document column", () => {
+  const p = parseRegistry(
+    [
+      "| # | Title | Status | Priority | Document |",
+      "|---|---|---|---|---|",
+      "| 4 | [T4](task.4.link/task.4.link.md) | planned | High | `docs/tasks/task.4.other/task.4.other.md` |",
+      "",
+    ].join("\n"),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.equal(p.rows[0].path, "docs/tasks/task.4.link/task.4.link.md");
+});
+
+test("bug.19: a Document cell that names no work item is still a malformed row, and says which column it read", () => {
+  const p = parseRegistry(
+    docColumnRegistry([
+      docColumnRow(5, "planned", "`docs/notes/readme.md`"),
+      docColumnRow(6, "planned", "—"),
+    ]),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.deepEqual(p.rows, []);
+  assert.deepEqual(
+    p.malformed.map((m) => m.n),
+    [5, 6],
+  );
+  for (const m of p.malformed) {
+    assert.match(m.reason, /no work-item path in the document column/);
+  }
+});
+
+test("bug.19: a registry with no document column keeps the original malformed reason", () => {
+  const p = parseRegistry(
+    taskRegistry([
+      "| 2 | No link at all | ready-for-development | infra | High | 2026-08-29 | — | — |",
+    ]),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.equal(
+    p.malformed[0].reason,
+    "malformed row — no [title](story|task|bug.….md) link",
+  );
+});
+
+test("bug.19: the registry frontier selects a row from a Document-column registry", () => {
+  const { opts } = registryOpts({
+    tasks: docColumnRegistry([
+      docColumnRow(
+        7,
+        "ready-for-development",
+        "`docs/tasks/task.7.x/task.7.x.md`",
+      ),
+    ]),
+    docs: { "docs/tasks/task.7.x/task.7.x.md": "ready-for-development" },
+  });
+  const sel = registryFrontier(opts.registries);
+  assert.equal(sel.selected?.id, "T7");
+});
+
+test("bug.19: DOC_COLUMN_NAMES lists the header names the parser maps to the document column", () => {
+  assert.deepEqual([...DOC_COLUMN_NAMES].sort(), [
+    "doc",
+    "document",
+    "file",
+    "path",
+  ]);
+  assert.ok(Object.isFrozen(DOC_COLUMN_NAMES));
+});
+
+// ── bug.19 DoD run 1: the document column names a file inside the repo ──────
+
+// Each refusal is a path the selector would otherwise open. A title link cannot
+// name an absolute path (it is joined under the registry directory); the
+// document column must be no laxer than that.
+const DOC_CELL_REFUSED = [
+  ["absolute", "`/etc/task.1.x.md`", /absolute path/],
+  ["absolute link", "[d](/etc/task.1.x.md)", /absolute path/],
+  [
+    "drive letter",
+    "`C:/repo/docs/tasks/task.1.x/task.1.x.md`",
+    /absolute path/,
+  ],
+  ["backslash", "`docs\\tasks\\task.1.x\\task.1.x.md`", /backslash/],
+  ["NUL", "`docs/tasks/task.1.x/task.1.x.md\u0000.png`", /control character/],
+  [
+    "root escape, ../-relative",
+    "`../../../etc/task.1.x.md`",
+    /outside the repository/,
+  ],
+  [
+    "root escape, inner ..",
+    "`docs/../../etc/task.1.x.md`",
+    /outside the repository/,
+  ],
+  [
+    "root escape, link",
+    "[d](../../../etc/task.1.x.md)",
+    /outside the repository/,
+  ],
+  ["not a work item", "`docs/notes/readme.md`", /no work-item path/],
+  ["empty", "", /no work-item path/],
+];
+
+test("bug.19: resolveDocCell refuses a path outside the repo, an absolute path and an ambiguous one", () => {
+  for (const [label, cell, reason] of DOC_CELL_REFUSED) {
+    const v = resolveDocCell(cell, REG_TASK_PATH);
+    assert.equal(
+      v.ok,
+      false,
+      `${label}: ${JSON.stringify(cell)} must be refused`,
+    );
+    assert.match(v.reason, reason, label);
+  }
+});
+
+test("bug.19: resolveDocCell resolves the legitimate spellings to a repo-root-relative path", () => {
+  for (const [cell, want] of [
+    ["`docs/tasks/task.7.x/task.7.x.md`", "docs/tasks/task.7.x/task.7.x.md"],
+    ["docs/tasks/task.7.x/task.7.x.md", "docs/tasks/task.7.x/task.7.x.md"],
+    ["`./task.9.x/task.9.x.md`", "docs/tasks/task.9.x/task.9.x.md"],
+    ["`../bugs/bug.3.x/bug.3.x.md`", "docs/bugs/bug.3.x/bug.3.x.md"],
+    ["[doc](task.8.x/task.8.x.md)", "docs/tasks/task.8.x/task.8.x.md"],
+    [
+      "`docs/tasks/archive..2026/task.6.x.md`",
+      "docs/tasks/archive..2026/task.6.x.md",
+    ],
+  ]) {
+    assert.deepEqual(
+      resolveDocCell(cell, REG_TASK_PATH),
+      { ok: true, path: want },
+      cell,
+    );
+  }
+});
+
+test("bug.19: a refused document cell is a malformed row that names the refusal", () => {
+  const p = parseRegistry(
+    docColumnRegistry([docColumnRow(11, "planned", "`/etc/task.11.x.md`")]),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.deepEqual(p.rows, []);
+  assert.match(
+    p.malformed[0].reason,
+    /^malformed row — document column refused: absolute path/,
+  );
+});
+
+// ── bug.19 PR review (#652): containment does not depend on how the registry
+//    path is spelled, and the title link meets the same rule ─────────────────
+
+test("bug.19 CR-2: an absolute registry path cannot switch containment off", () => {
+  const abs = path.join(process.cwd(), REG_TASK_PATH);
+  for (const cell of [
+    "`../../../etc/task.1.x.md`",
+    "[d](../../../etc/task.1.x.md)",
+  ]) {
+    const v = resolveDocCell(cell, abs);
+    assert.equal(
+      v.ok,
+      false,
+      `${cell} must be refused with an absolute registry path`,
+    );
+    assert.match(v.reason, /outside the repository/);
+  }
+  // …and a legitimate cell still resolves, to the same repo-relative path.
+  assert.deepEqual(resolveDocCell("`./task.9.x/task.9.x.md`", abs), {
+    ok: true,
+    path: "docs/tasks/task.9.x/task.9.x.md",
+  });
+});
+
+test("bug.19 CR-1: a title link that resolves outside the repository is a malformed row", () => {
+  const p = parseRegistry(
+    taskRegistry([
+      "| 12 | [T12](../../../../etc/task.12.x.md) | planned | infra | High | 2026-10-14 | — | — |",
+      taskRow(13, "inside", "planned"),
+    ]),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.deepEqual(
+    p.rows.map((r) => r.n),
+    [13],
+  );
+  assert.equal(p.malformed[0].n, 12);
+  assert.match(
+    p.malformed[0].reason,
+    /^malformed row — title link .* resolves outside the repository$/,
+  );
+});
+
+// --- task.202: the PRD registry kind ---------------------------------------
+// The row measured in task.202 §2, which parsed into `malformed` before the
+// `prd` kind existed. Its href is accepted ONLY for kind "prd": the roadmap
+// reader shares isWorkItemHref, and a roadmap line linking a PRD is a reference.
+const PRD_REGISTRY = [
+  "| PRD # | Title | Folder | Status | Created |",
+  "|---|---|---|---|---|",
+  "| 1 | [Onboarding](onboarding/prd.1.onboarding/prd.1.onboarding.md) | onboarding | accepted | 2026-10-13 |",
+  "",
+].join("\n");
+
+test("task.202: a prd registry row parses into rows, not malformed", () => {
+  const r = parseRegistry(PRD_REGISTRY, "prd", "docs/prd/prd-registry.md");
+  assert.deepEqual(r.malformed, []);
+  assert.equal(r.rows.length, 1);
+  assert.equal(r.rows[0].kind, "prd");
+  assert.equal(r.rows[0].n, 1);
+  assert.equal(r.rows[0].registryStatus, "accepted");
+  assert.equal(
+    r.rows[0].path,
+    "docs/prd/onboarding/prd.1.onboarding/prd.1.onboarding.md",
+  );
+});
+
+test("task.202: a prd registry with no header still reads its documented columns", () => {
+  const headless = PRD_REGISTRY.split("\n").slice(2).join("\n");
+  const r = parseRegistry(headless, "prd", "docs/prd/prd-registry.md");
+  assert.equal(r.rows.length, 1);
+  assert.equal(r.rows[0].registryStatus, "accepted");
+});
+
+test("task.202: the prd href is scoped to kind prd — a task registry still refuses it", () => {
+  const r = parseRegistry(PRD_REGISTRY, "task", "docs/tasks/task-registry.md");
+  assert.equal(r.rows.length, 0);
+  assert.match(r.malformed[0].reason, /story\|task\|bug/);
+  const p = parseRegistry(
+    "| 1 | [X](task.1.x/task.1.x.md) | x | draft | 2026-10-13 |\n",
+    "prd",
+    "docs/prd/prd-registry.md",
+  );
+  assert.equal(p.rows.length, 0, "a prd registry does not accept a task link");
+  assert.match(p.malformed[0].reason, /\[title\]\(prd\./);
+});
+
+test("task.202: a roadmap line linking a PRD is still not a work item", () => {
+  const r = selectNext(
+    parseRoadmap(
+      [
+        "# PHASE 1",
+        "## Epic 1.4",
+        "- [ ] **4.1** Home PRD — [prd](docs/prd/web/prd.1.home/prd.1.home.md) · deps: — · `/develop-story`",
+        "",
+      ].join("\n"),
+    ),
+  );
+  assert.equal(r.status, "stop");
+  assert.equal(r.stopReason, "manual-checkpoint");
+  assert.equal(r.item.commandArg, null, "the PRD link is not a work-item path");
+});
+
+// ---------- task 206: hierarchical epic ids ----------
+
+test('Epic P.E: a heading keys its section on "P.E", deps: Epic P.E blocks until the epic\'s stories are done, and task 12 / epic 1.2 / story 1.2.1 coexist (task 206)', () => {
+  const md = `# Roadmap
+
+## PHASE 1 — build
+
+## Epic 2.2 — another PRD's second epic, listed first
+
+- [ ] **2.2.1** other · deps: Epic 1.2 · /develop-story docs/s/story.2.2.1.x/story.2.2.1.x.md
+- [ ] **T12** a task · deps: 2.2.1 · /develop-task docs/tasks/task.12.x/task.12.x.md
+
+## Epic 1.2 — payments
+
+- [ ] **1.2.1** charge a card · /develop-story docs/s/story.1.2.1.x/story.1.2.1.x.md
+`;
+  const m = parseRoadmap(md);
+  assert.deepEqual(m.errors, []);
+  assert.deepEqual(Object.keys(m.epicSections).sort(), ["1.2", "2.2"]);
+  assert.deepEqual(m.epicSections["1.2"].rowIds, ["1.2.1"]);
+  assert.deepEqual(
+    m.epicSections["2.2"].rowIds,
+    ["2.2.1"],
+    "E alone does not merge PRD 1's and PRD 2's epic 2",
+  );
+  const row = m.byId.get("2.2.1");
+  assert.deepEqual(
+    row.deps.map((d) => d.id),
+    ["1.2"],
+  );
+  const r = selectNext(m);
+  assert.equal(r.status, "selected");
+  assert.equal(
+    r.item.id,
+    "1.2.1",
+    "2.2.1 waits on Epic 1.2 and T12 on 2.2.1, so 1.2.1 is first",
+  );
+  assert.ok(
+    r.skipped.some((s) => s.id === "2.2.1"),
+    "2.2.1 is skipped for its outstanding epic dep",
+  );
+});
+
+test("a legacy `## Epic 8` heading and a legacy `deps: Epic 8` are model ERRORS naming the migration — never an epic silently keyed on E (task 206)", () => {
+  const heading = parseRoadmap(`# Roadmap
+
+## PHASE 1
+
+## Epic 8 — legacy
+
+- [ ] **8.1** x · /develop-story docs/s/story.8.1.x/story.8.1.x.md
+`);
+  assert.equal(heading.errors.length, 1);
+  assert.match(
+    heading.errors[0],
+    /line 5: "Epic 8" predates hierarchical numbering/,
+  );
+  assert.match(heading.errors[0], /migrate-doc-numbering/);
+  assert.equal(selectNext(heading).status, "halt");
+
+  const dep = parseRoadmap(`# Roadmap
+
+## PHASE 1
+
+## Epic 1.9
+
+- [ ] **1.9.1** x · deps: Epic 8 · /develop-story docs/s/story.1.9.1.x/story.1.9.1.x.md
+`);
+  assert.equal(dep.errors.length, 1);
+  assert.match(
+    dep.errors[0],
+    /1\.9\.1 deps: "Epic 8" predates hierarchical numbering/,
+  );
+
+  // An archived legacy heading (inside a Deferred section) is history, not an error.
+  const archived = parseRoadmap(`# Roadmap
+
+## PHASE 1
+
+## Epic 1.1
+
+- [ ] **1.1.1** x · /develop-story docs/s/story.1.1.1.x/story.1.1.1.x.md
+
+## Deferred
+
+### Epic 3 — parked
+
+- [ ] **3.1** parked
+`);
+  assert.deepEqual(archived.errors, []);
+});
+
+test("epicRef reads doc-id's epic grammar: P.E, no leading zero, not a story id", () => {
+  assert.deepEqual(epicRef("## Epic 1.12 — x"), { id: "1.12" });
+  assert.equal(epicRef("no epic here"), null);
+  assert.match(epicRef("Epic 01.2").error, /not an epic id P\.E/);
+  assert.match(epicRef("Epic 1.2.3").error, /not an epic id P\.E/);
+  assert.match(epicRef("Epic 7").error, /predates hierarchical numbering/);
 });

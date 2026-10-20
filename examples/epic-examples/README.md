@@ -12,16 +12,22 @@ created: 2026-05-12
 Four real epic docs produced by `/create-epic` from the same PRD on 2026-05-11.
 Each is frozen at capture time (see `source_sha` in frontmatter).
 
+> **Names predate hierarchical numbering.** These copies keep their captured filenames and text.
+> Task 203 (2026-10-15) later renumbered the live tree: `epic.1` … `epic.4` are now `epic.1.1` …
+> `epic.1.4` under [`prd.1.onboarding`](../../docs/prd/onboarding/prd.1.onboarding/prd.1.onboarding.md),
+> and a story `story.E.S` is now `story.1.E.S`. The "Story list" links below point at the live,
+> renumbered folders.
+
 Parent PRD: [`examples/prd-example/prd.onboarding.md`](../prd-example/prd.onboarding.md).
 
 ## Epic Index
 
 | Epic | Title | Captured copy | Story list |
 |------|-------|---------------|------------|
-| 1 | Quickstart & Decision-Tree Entry Point | [`epic.1.quickstart-and-decision-tree-entry-point.md`](./epic.1.quickstart-and-decision-tree-entry-point.md) | [stories →](../../docs/prd/onboarding/epics/epic.1.quickstart-and-decision-tree-entry-point/stories/) |
-| 2 | Worked PRD/Epic/Story Examples (this very epic) | [`epic.2.worked-prd-epic-story-examples.md`](./epic.2.worked-prd-epic-story-examples.md) | [stories →](../../docs/prd/onboarding/epics/epic.2.worked-prd-epic-story-examples/stories/) |
-| 3 | Runbook Tutorial Wrappers | [`epic.3.runbook-tutorial-wrappers.md`](./epic.3.runbook-tutorial-wrappers.md) | [stories →](../../docs/prd/onboarding/epics/epic.3.runbook-tutorial-wrappers/stories/) |
-| 4 | First-Week Guided Learning Path | [`epic.4.first-week-guided-learning-path.md`](./epic.4.first-week-guided-learning-path.md) | [stories →](../../docs/prd/onboarding/epics/epic.4.first-week-guided-learning-path/stories/) |
+| 1 | Quickstart & Decision-Tree Entry Point | [`epic.1.quickstart-and-decision-tree-entry-point.md`](./epic.1.quickstart-and-decision-tree-entry-point.md) | [stories →](../../docs/prd/onboarding/prd.1.onboarding/epics/epic.1.1.quickstart-and-decision-tree-entry-point/stories/) |
+| 2 | Worked PRD/Epic/Story Examples (this very epic) | [`epic.2.worked-prd-epic-story-examples.md`](./epic.2.worked-prd-epic-story-examples.md) | [stories →](../../docs/prd/onboarding/prd.1.onboarding/epics/epic.1.2.worked-prd-epic-story-examples/stories/) |
+| 3 | Runbook Tutorial Wrappers | [`epic.3.runbook-tutorial-wrappers.md`](./epic.3.runbook-tutorial-wrappers.md) | [stories →](../../docs/prd/onboarding/prd.1.onboarding/epics/epic.1.3.runbook-tutorial-wrappers/stories/) |
+| 4 | First-Week Guided Learning Path | [`epic.4.first-week-guided-learning-path.md`](./epic.4.first-week-guided-learning-path.md) | [stories →](../../docs/prd/onboarding/prd.1.onboarding/epics/epic.1.4.first-week-guided-learning-path/stories/) |
 
 ## How to Read These
 

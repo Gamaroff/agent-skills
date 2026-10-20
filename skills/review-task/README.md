@@ -6,7 +6,7 @@
 
 🎯 **Interactive Review** - Asks clarifying questions rather than making assumptions
 🤝 **User-Aligned** - Recommendations based on your vision and decisions
-🔍 **Comprehensive Analysis** - 7-step review process with anti-hallucination detection
+🔍 **Comprehensive Analysis** - review Steps 0–10 (template, technical accuracy, plan, consistency, Mermaid, risk) with anti-hallucination detection
 📊 **Batched Questions** - 3 question points (max 4 questions each) for efficient clarification
 ✅ **Actionable Output** - Specific fixes aligned with user's intent
 🛠️ **Implementation-Ready** - Verifies task has enough detail for developer handoff
@@ -42,9 +42,9 @@ The skill asks questions when it encounters:
 
 Questions are asked in **3 batched rounds** (max 4 questions per round):
 
-1. **After Step 1**: Structure, scope, and metadata questions
-2. **After Steps 2-3**: Technical accuracy & implementation clarity questions
-3. **After Steps 4-5**: Completeness, risk, and rollback questions
+1. **After Step 2** (Question Point 1): structure, scope and metadata questions
+2. **After Step 4** (Question Point 2): technical accuracy and implementation clarity questions
+3. **After Step 7** (Question Point 3): completeness, risk and rollback questions
 
 This minimizes interruptions while ensuring all issues are clarified.
 
@@ -70,23 +70,33 @@ All recommendations in the final report are based on **your decisions**, not AI 
 
 ## What It Does
 
-The review-task skill performs a 7-step comprehensive analysis:
+The steps follow the headings in [SKILL.md](SKILL.md) (there is no Step 5; its gap analysis is folded into Step 6):
 
-1. **Template Structure Compliance** - Verifies all required sections present
-2. **Technical Accuracy & Anti-Hallucination** - Detects invented technologies
-3. **Implementation Plan Completeness** - Ensures phases are detailed and actionable
-4. **Consistency & Completeness** - Finds contradictions and gaps
-5. **Risk Assessment Review** - Evaluates risk identification and mitigation
-6. **Report Generation** - Creates actionable recommendations with user decisions
-7. **Implementation Readiness Scoring** - GO/NO-GO recommendation (1-10 scale)
+- **Step 0 — Output format**: comprehensive report or action plan only
+- **Step 0a — Branch setup**: makes sure review edits land on a feature branch
+- **Step 1 — Configuration and context**: loads the task, template and architecture docs, then runs the **Phase 1.5** parallel pre-pass (architecture alignment, codebase scan)
+- **Step 2 — Template structure compliance**: required sections, metadata, tracker linkage, card preflight
+- **Step 3 — Technical accuracy and anti-hallucination**
+- **Step 4 — Implementation plan completeness**
+- **Step 6 — Consistency and completeness**
+- **Step 6.5 — Mermaid diagram validation** (via `mermaid-architect`)
+- **Step 7 — Risk assessment and rollback**
+- **Step 8 — Generate output**: the full report (with a 1–10 readiness score and a READY / NEEDS REVISION / REQUIRES REWORK recommendation) or the action plan
+- **Step 8.5 — Offer to implement fixes**
+- **Step 8.6 — Push body changes to Jira** (Jira only, when fixes were applied)
+- **Step 9 — Update document status**
+- **Step 9a — Record the reviewed revision**: stamps the report so `develop-task` Step 2 can reuse the review
+- **Step 10 — Post tracker comment**
 
 ## Output
 
-Generates a comprehensive review report:
+Step 0 asks for the output format. **Comprehensive report** (the default, and what `develop-task` always selects) saves:
 
 ```
-[task-directory]/task.{n}.review.{descriptive-name}.md
+[task-directory]/task.{n}.review.{N}.{descriptive-name}.md
 ```
+
+`{N}` is the highest existing review number plus 1, computed with `next_numbered` (`references/newest-numbered.sh`). **Action plan only** prints a prioritised fix list and saves no file.
 
 Report includes:
 
@@ -205,7 +215,7 @@ The review skill rigorously detects:
 
 ### Standard (30-45 minutes) - DEFAULT
 
-- All 7 steps fully executed
+- Every review step fully executed
 - Comprehensive issue detection
 - Actionable recommendations
 - Full report
@@ -226,7 +236,7 @@ The review skill rigorously detects:
 ### Complements
 
 - `/create-task` - Task creation workflow
-- `/qa-technical-task` - QA review for tasks
+- `/qa-task` - QA review for tasks
 - `/develop` - Implementation guidance
 
 ### Differences from review-story
@@ -267,6 +277,6 @@ A task is ready when review shows:
 ## See Also
 
 - `/create-task` - Create new task documents
-- `/qa-technical-task` - QA review for tasks
+- `/qa-task` - QA review for tasks
 - `/review-story` - Review story documents
 - `/develop` - Implement tasks

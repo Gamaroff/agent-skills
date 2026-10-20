@@ -18,7 +18,7 @@ Re-read the document's `Status:` field (captured in Phase 0). Then check for an 
 
 #### develop-story
 ```bash
-find {story-directory} -maxdepth 1 -name "story.{epic}.{story}.review.*.md" 2>/dev/null | sed -E 's/^(.*\.review\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-
+find {story-directory} -maxdepth 1 -name "story.{P}.{E}.{S}.review.*.md" 2>/dev/null | sed -E 's/^(.*\.review\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-
 ```
 
 #### develop-task
@@ -49,8 +49,12 @@ find {task-directory} -maxdepth 1 -name "task.{id}.review.*.md" 2>/dev/null | se
 | `In Progress`           | Yes                    | **Skip** — review already completed; log and proceed                               |
 | `In Progress`           | No                     | Run `/review-task` — task may have been marked In Progress without a proper review |
 
-**"Current" is defined, not judged.** A report is current when it is not older than the task
-document's last content change. Compute it with the engine — never eyeball the two dates:
+**"Current" is defined, not judged.** A report that records `reviewed_blob:` (every review written
+since task.201) is current exactly when that hash equals `git hash-object` of the task document now —
+the review's own fixes and status edit are already inside the hash, so only a later change makes it
+stale, a same-day one included. A report without the field (written before task.201) is current when
+it is not older than the task document's last content change, as before. Compute it with the engine —
+never eyeball the hashes or the dates:
 
 ```bash
 node -e '
@@ -60,9 +64,10 @@ node -e '
   const r = classifyReviewReport({
     taskContent:   fs.readFileSync(process.argv[1], "utf8"),
     reportContent: process.argv[2] ? fs.readFileSync(process.argv[2], "utf8") : null,
+    taskBlob:      process.argv[3] || null,
   });
   console.log(JSON.stringify({ ...r, message: describeVerdict(r, { reportPath: process.argv[2] }) }));
-' "{task-file}" "{resolved-report-file-or-empty}"
+' "{task-file}" "{resolved-report-file-or-empty}" "$(git hash-object "{task-file}")"
 ```
 
 > Two things about that snippet. **`argv[1]` is the first *argument* only because this is `node -e`** —
@@ -121,7 +126,7 @@ decide differently in CI than on a developer's machine.
 > questioning the gate; and a re-review cannot clear it, because whatever withheld the promotion
 > fires again identically.
 >
-> Reported by a consumer (`rebirth-wallet` task.113 / RAPP-728) that **predicted** the halt from
+> Reported by a consumer project (2026, one of its tasks) that **predicted** the halt from
 > reading these tables and steered around it by hand rather than hitting it — the operator ruled
 > "Skip — already reviewed" at Phase 0d. The consumer's diagnosis, that the two tables contradict
 > each other, does not hold: `/review-task` does promote `planned → ready-for-development`, so the
@@ -139,6 +144,22 @@ decide differently in CI than on a developer's machine.
 > decision stays visible here rather than hiding inside it.
 
 ---
+
+## When `--skip review` Is in Force
+
+§0d's answer resolution may have accepted `--skip review` — only when the consumer's
+`develop.skippable` lists it (task.201). Ask the lock whether its `answers.skips` holds `review`
+(`jq -r '(.answers.skips // []) | index("review") != null' .claude/state/develop-pipeline.lock`). When
+it prints `true`, the table above is **not** consulted and no review skill runs:
+
+- Log in the Decisions Log: "review-task skipped — `--skip review` ({answer_sources.skips}); waiver: {waiver.reason}, approved by {waiver.approved_by}".
+- Update Pipeline Progress: ⏭️ Skipped — `--skip review` (waived).
+- Post the skip notice below with `--slot outcome="skipped by request"`.
+- **The QA gate will read `WAIVED`**, never `PASS` — Steps 5–6 write it through `pipeline-answers.js gate`
+  (see the QA loop's §"Recording a waived step"). A skipped review is a recorded decision, not a pass.
+
+The automatic reuse in the table is a different thing and writes no waiver: a current review **was**
+done, so its verdict is earned.
 
 ## If Skipping
 
@@ -212,11 +233,11 @@ Proceed to Step 3.
 ## If Running the Review Skill
 
 #### develop-story
-Invoke the `/review-story` skill with the story file path in **validate-and-apply** mode (`MODE=validate` + `APPLY=true`). This is non-interactive — no output-format question is asked. The variant scores the story, applies critical + important fixes, and promotes `Draft → Ready for Development` on a GO (HALT on NO-GO), then writes a comprehensive `story.{epic}.{story}.review.{n}.{story-name}.md` report for the pipeline audit trail. Log: "review-story invoked in validate-and-apply mode".
+Invoke the `/review-story` skill with the story file path in **validate-and-apply** mode (`MODE=validate` + `APPLY=true`). This is non-interactive — no output-format question is asked. The variant scores the story, applies critical + important fixes, and promotes `Draft → Ready for Development` on a GO (HALT on NO-GO), then writes a comprehensive `story.{P}.{E}.{S}.review.{n}.{story-name}.md` report for the pipeline audit trail. Log: "review-story invoked in validate-and-apply mode".
 
 After review-story completes, locate the generated review report:
 ```bash
-find {story-directory} -maxdepth 1 -name "story.{epic}.{story}.review.*.md" 2>/dev/null | sed -E 's/^(.*\.review\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-
+find {story-directory} -maxdepth 1 -name "story.{P}.{E}.{S}.review.*.md" 2>/dev/null | sed -E 's/^(.*\.review\.)([0-9]+)(\..*)$/\2 \1\2\3/' | sort -n | tail -1 | cut -d' ' -f2-
 ```
 Record the path in the Decisions Log: "Review report: {path}". If no review report file is found, log a warning in the Issues Log ("review-story did not produce a review report file") but do not halt.
 
@@ -356,7 +377,7 @@ deliverable is executed by a reader; a gap in it is a branch, not an omission.
 - **Draft → Ready for Development**: Log "Draft promoted to Ready for Development by review-story" in Decisions Log. Proceed autonomously.
 - **Non-blocking suggestions**: Log as "Proceeding despite minor review suggestions: {list}" and continue.
 - **Clean pass**: Log "Story review passed" and continue.
-- **Blocking issues** (contradictory specs, missing ACs, status still `Draft`): Log each in Issues Log, invoke `/commit-changes` (message: `docs(story.{epic}.{story}): implementation report — review-story blocking halt`), then HALT: "review-story could not resolve blocking issues — human input required before development can proceed".
+- **Blocking issues** (contradictory specs, missing ACs, status still `Draft`): Log each in Issues Log, invoke `/commit-changes` (message: `docs(story.{P}.{E}.{S}): implementation report — review-story blocking halt`), then HALT: "review-story could not resolve blocking issues — human input required before development can proceed".
 
 #### develop-task
 

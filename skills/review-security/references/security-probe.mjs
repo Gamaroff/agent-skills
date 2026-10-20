@@ -9,6 +9,8 @@
  *   node <this-file> --sink <name> --entry shell:<path>     [options]
  *   node <this-file> --sink <name> --entry shell-fn:<path>#<function> [--fake-gh <dir>] [options]
  *   node <this-file> --sink <name> --entry cli:<path> --argv '<JSON array>' [options]
+ *   node <this-file> --sink <name> --entry shell-argv:<path> --argv '<JSON array>' [--fixture-setup <path>] [options]
+ *   node <this-file> --sink <name> --entry 'fence:<doc.md>#<heading>' --slot '<token>' [options]
  *
  * Options:
  *   --sink <name>        one of the corpus sinks (see security-input-corpus.mjs)
@@ -22,12 +24,31 @@
  *                        with the case's input as its argv, per case under bash
  *                        and (when present) zsh. See "The shell-fn entry form".
  *                        or `cli:relative/path.mjs` — a NODE CLI run with the
- *                        `--argv` template, one probe per case. See "The cli
- *                        entry form".
- *   --argv <json>        the cli: form's argv template — a JSON array of strings
- *                        with exactly one "{input}" element and optionally
- *                        "{fixture}" elements. Required with cli:, refused
- *                        (exit 2, `bad-argv`) with every other form
+ *                        `--argv` template, one probe per case; a `.py` path is
+ *                        a PYTHON CLI, run the same way under python3. See "The
+ *                        cli entry form".
+ *                        or `shell-argv:relative/path.sh` — a SHELL SCRIPT taking
+ *                        several arguments or flags, run with the `--argv`
+ *                        template under bash, called from bash and (when present)
+ *                        zsh. See "The shell-argv entry form".
+ *                        or `fence:relative/doc.md#Heading` — the first ```bash
+ *                        block under that heading of a MARKDOWN STEP DOC, read
+ *                        on every run and run as a script per case under bash
+ *                        and (when present) zsh. See "The fence entry form".
+ *   --slot <token>       the fence: form's placeholder — the literal text in the
+ *                        block that each case's input replaces. Required with
+ *                        fence:, refused (exit 2, `bad-slot`) with every other form
+ *   --argv <json>        the cli: and shell-argv: forms' argv template — a JSON
+ *                        array of strings with exactly one "{input}" element and
+ *                        optionally "{fixture}" elements. Required with cli: and
+ *                        shell-argv:, refused (exit 2, `bad-argv`) with every
+ *                        other form
+ *   --fixture-setup <path> the shell-argv: form's per-run setup — a committed
+ *                        shell script inside the repo root, run as
+ *                        `bash <path> <fixture-dir>` before each (case, shell)
+ *                        run. A non-zero exit makes that run `errored`, never a
+ *                        verdict. Refused (exit 2, `bad-fixture-setup`) with
+ *                        every other form; recorded as `fixture_setup`
  *   --args-json <json>   a JSON ARRAY of fixed extra arguments appended after the
  *                        case's input on every call — `fn(input, ...args)` — so a
  *                        `(text, opts)` validator is probeable (task.131). The JS
@@ -159,10 +180,84 @@
  * SKELETON (flags and positionals kept, flag values dropped — see controlKey),
  * so two different controls on one script
  * (`--env {input}`, `--clear-note {input}`) are two controls, not one.
+ *
+ * A PYTHON CLI (task.215) takes the same form: `cli:<path>.py` runs the script
+ * under `python3 -E -s -B` with the same template, sandbox, timeout and
+ * verdict. The interpreter is chosen by extension (CLI_INTERPRETERS) and the
+ * host's python3 is resolved once per process (probePython); when it does not
+ * run, the entry is declined `entry-not-probeable` once, by name. A Python crash
+ * exits 1 — a refusal's status — and prints no Node footer, so the script runs
+ * inside PYTHON_BOOTSTRAP, which writes an exit record on fd 3 for every exit
+ * it controls — `answer` when the body returns or raises SystemExit, `crash`
+ * when it raises anything else, caught before any excepthook runs. A case
+ * with no record is `errored`, so every way to lose the write fails safe.
+ * A traceback on stderr with exit 1 (isPythonCrash) is read as a crash too. The
+ * result and the record carry `interpreter` ({ name, version }), null for every
+ * other form.
+ *
+ * THE SHELL-ARGV ENTRY FORM (task.181). A boundary delivered as a SHELL SCRIPT
+ * TAKING SEVERAL ARGUMENTS OR FLAGS (`verify-push-state.sh --base … --scope …`,
+ * `reenter-qa-after-finalise.sh <doc-dir> <report>`) matched none of the forms —
+ * `shell:` passes exactly one positional — so every such change tripped the
+ * zero-guard and was probed by hand (task.147, task.170). `--entry
+ * shell-argv:<path> --argv '<JSON array>'` is the cli: contract on a bash script:
+ * the same template grammar, the same verdict (exit status, or `expected` when a
+ * case carries one), the same record key (`--name`, else the argv skeleton).
+ * Each shell from probeShells() is the CALLER and bash the INTERPRETER —
+ * `<shell> -c 'bash "$@"' <shell> <script> ...argv` — as for `shell:`. A case's
+ * `fixture` (`env`, `files`) is honoured as for fence:, and `--fixture-setup
+ * <path>` names a committed script, contained like the entry, run as
+ * `bash <setup> <case-dir>` before each (case, shell) run, after the case's
+ * fixture files are written: it builds the scratch repository these scripts
+ * read. A setup that exits non-zero, times out or never starts makes that run
+ * `errored`, never `rejected`; so does a setup that writes anywhere but the case
+ * directory — its writes are watched in their own list and never charged to the
+ * entry (TASK-181-002). Every run is watched beside the case directory as
+ * fence:'s is (caseWatchedSpawn, TASK-181-003). It is a shell form for `gh`: a script, a setup,
+ * or a case fixture's env values or file contents that name `gh` without
+ * `--fake-gh` are declined `needs-fake-gh`, and every PATH directory holding the
+ * host `gh` is shadowed (ghFreePath), as for fence: (TASK-181-001). The record
+ * carries the setup as `fixture_setup`.
+ *
+ * THE FENCE ENTRY FORM (task.180). Many of this repository's boundaries ship as
+ * a fenced bash block inside a Markdown step doc — a precondition, a refusal, a
+ * guard — and none of the four forms reaches one, so every `/finalise` on such a
+ * change recorded `probes_executed: 0` and hand-wrote a wrapper under the
+ * gitignored `.claude/state/` (task.159, task.167). `--entry
+ * 'fence:<doc.md>#<heading>' --slot '<token>'` reads the doc on EVERY run,
+ * finds the heading (outside fences — a `# comment` inside a block is not a
+ * heading), takes the first ```bash block before the next heading of the same
+ * or a higher level, and replaces every `<token>` in it with the case's input.
+ * THE SLOT IS SOURCE SUBSTITUTION, NOT DATA: the input becomes script text, as
+ * it does for the document's reader, so a `$(…)` in it runs — the probe models
+ * the block as shipped. Its effects land in the case's own directory, which is
+ * the block's cwd, inside the sandbox; a write elsewhere in the sandbox is an
+ * escape, and under the work dir so is a deletion or a new directory. A write
+ * to an absolute path OUTSIDE the sandbox (an injected `$(touch /x)`) is not
+ * observed — a stated limit (TASK-180-016). A
+ * case's optional `fixture` supplies the rest of what the block reads: `env`
+ * (never HOME, TMPDIR or LC_ALL — the sandbox owns them) and `files` written
+ * into the case directory, refused when a path leaves it. The script runs as
+ * `<shell> <script>` per shell, rc files off, with the shell arm's trip-wire
+ * `gh` (or `--fake-gh`) first on PATH, every PATH directory holding the host
+ * `gh` shadowed by a copy without it (ghFreePath), and the shell forms' `gh`
+ * text check over the block, the inputs and the fixtures. A default-path lookup
+ * (`command -p gh`) that no checked text spells out is a stated limit. A HOSTILE case must carry `expected` — the
+ * guard's own refusal OUTPUT, a non-empty stdout or stderr — and is declined
+ * without one: under source
+ * substitution an exit status cannot tell a refusal from a shell that stopped
+ * on the input or from an injected `exit`, and three QA cycles of stderr
+ * classification each let one of them read as a refusal (task.180). A
+ * legitimate case without `expected` is scored by exit status (0 accepted).
+ * A generated script that does not parse (`<shell> -n`) is `errored`. The
+ * order is scoreFenceRun's. A missing heading, an
+ * ambiguous one, a heading with no bash block under it, or a slot the block
+ * does not contain is a named decline, never a verdict. The record names
+ * `fence:<doc>#<heading>`, which resolves in every checkout.
  */
 
 import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import {
   accessSync,
   constants as fsConstants,
@@ -175,6 +270,7 @@ import {
   renameSync,
   rmSync,
   statSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -183,14 +279,25 @@ import {
   dirname,
   isAbsolute,
   join,
+  normalize,
   relative,
   resolve,
   sep,
 } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { isWithin, sandboxEnv, snapshotTree } from "./qa-execute-snippets.mjs";
-import { MATERIALISED_SINKS, corpusFor } from "./security-input-corpus.mjs";
+import {
+  extractBlocks,
+  isWithin,
+  sandboxEnv,
+  snapshotTree,
+} from "./qa-execute-snippets.mjs";
+import {
+  DIRECTIONS,
+  MATERIALISED_SINKS,
+  SINKS,
+  corpusFor,
+} from "./security-input-corpus.mjs";
 import { spawnBudget, neverRan, readInt } from "./spawn-budget.mjs";
 // Re-exported so the signal list ships beside the engine in every bundled copy:
 // the bundler follows sibling imports, and a prompt that cites the module by
@@ -337,12 +444,94 @@ function extractResult(stdout) {
 // ── Entry resolution ─────────────────────────────────────────────────────────
 
 /**
- * The repository root — the directory two levels above this file
- * (it lives in `shared/resources/`, so two levels up is the repo root).
- * Overridable so tests can point the containment check at a fixture tree.
+ * The repository root. In the source tree the engine lives in `shared/resources/`,
+ * so two levels up is the repo root. A bundled copy lives in
+ * `<skills>/<skill>/references/`, where two levels up is the skills directory —
+ * a repo-relative entry then resolved under it, did not exist, and the failed
+ * run reached the record (obs #211). There the root is the git checkout the
+ * caller runs in, falling back to two levels up when git cannot say.
+ * Overridable (`repoRoot`, `--repo-root`) so tests can point the containment
+ * check at a fixture tree; an explicit root always wins.
  */
 export function defaultRepoRoot() {
-  return resolve(__dirname, "..", "..");
+  const twoUp = resolve(__dirname, "..", "..");
+  if (
+    basename(__dirname) === "resources" &&
+    basename(dirname(__dirname)) === "shared"
+  ) {
+    return twoUp;
+  }
+  const r = spawnSync("git", ["rev-parse", "--show-toplevel"], {
+    cwd: process.cwd(),
+    encoding: "utf8",
+  });
+  const top =
+    r.status === 0 && typeof r.stdout === "string" ? r.stdout.trim() : "";
+  return top !== "" ? top : twoUp;
+}
+
+/**
+ * The first supplied case the engine cannot score, or `null` (obs #201).
+ *
+ * Scoring splits cases by `direction`, so a case whose direction is neither
+ * `hostile` nor `legitimate` counted toward neither side: the run executed,
+ * and the verdict was computed over fewer cases than it was given, with no
+ * mention of the value. `sink` is optional on a case (the run's sink applies
+ * when it is absent) but, when present, must name a sink — it selects the
+ * fixture. Checked: not an object, a `direction` outside `DIRECTIONS`, a
+ * present `sink` outside `SINKS`. A `null` sink is absent, as the readers'
+ * `c.sink ?? sink` treat it.
+ *
+ * @returns {null | {id: string, field: string, value: unknown, accepted: string[]}}
+ */
+export function validateCases(cases) {
+  if (!Array.isArray(cases)) {
+    return {
+      id: "(file)",
+      field: "cases",
+      value: cases === null ? "null" : typeof cases,
+      accepted: ["array"],
+    };
+  }
+  for (const [i, c] of cases.entries()) {
+    const isObject = c !== null && typeof c === "object" && !Array.isArray(c);
+    const id = isObject && c.id != null ? String(c.id) : `#${i}`;
+    if (!isObject) {
+      return {
+        id,
+        field: "case",
+        value: c === null ? "null" : Array.isArray(c) ? "array" : typeof c,
+        accepted: ["object"],
+      };
+    }
+    if (!DIRECTIONS.includes(c.direction)) {
+      return {
+        id,
+        field: "direction",
+        value: c.direction,
+        accepted: [...DIRECTIONS],
+      };
+    }
+    if (c.sink != null && !SINKS.includes(c.sink)) {
+      return { id, field: "sink", value: c.sink, accepted: [...SINKS] };
+    }
+  }
+  return null;
+}
+
+/**
+ * The one sentence a `validateCases` finding renders as, for the CLI and the library.
+ * It never throws: a library caller's BigInt or circular value is rendered with
+ * `String`, so `runProbeSpec` declines `bad-cases` rather than throwing.
+ */
+export function describeBadCase(bad) {
+  let value;
+  try {
+    value = bad.value === undefined ? "undefined" : JSON.stringify(bad.value);
+  } catch {
+    value = String(bad.value);
+  }
+  return `case "${bad.id}" has ${bad.field} ${value}; accepted: ${bad.accepted.join(", ")}`;
 }
 
 /**
@@ -361,12 +550,16 @@ export function defaultRepoRoot() {
  * with the function name; the name must be one a shell would accept as a
  * function name, because it is called by name after the source. The
  * `cli:<path>` form (task.144) takes the same containment and returns
- * `kind: "cli"`; its arguments come from `--argv`, never from the entry.
+ * `kind: "cli"`; its arguments come from `--argv`, never from the entry. The `fence:<doc.md>#<heading>` form
+ * (task.180) splits on the FIRST `#` — a heading may contain one, a path may
+ * not — requires a `.md` path, takes the same containment, and returns
+ * `kind: "fence"` with the heading.
  *
  * @returns {{ok: true, kind: "js", entryPath: string, exportName: string}
  *          |{ok: true, kind: "shell", entryPath: string}
  *          |{ok: true, kind: "shell-fn", entryPath: string, fnName: string}
  *          |{ok: true, kind: "cli", entryPath: string}
+ *          |{ok: true, kind: "fence", entryPath: string, heading: string}
  *          |{ok: false, reason: string, detail: string}}
  */
 export function resolveEntry(entry, repoRoot = defaultRepoRoot()) {
@@ -387,11 +580,36 @@ export function resolveEntry(entry, repoRoot = defaultRepoRoot()) {
   // The two prefixes are disjoint (`shell:` vs `shell-fn:` differ at byte 5),
   // so no guard against the other is needed (task.140, PR-review CR-3).
   const isShell = entry.startsWith(SHELL_PREFIX);
+  // `shell-argv:` is disjoint from both: it differs from `shell:` at byte 5 and
+  // from `shell-fn:` at byte 6, so no check order is load-bearing (task.181).
+  const isShellArgv = entry.startsWith(SHELL_ARGV_PREFIX);
   const isCli = entry.startsWith(CLI_PREFIX);
+  // Disjoint from the other three: no prefix shares `fence:`'s first byte.
+  const isFence = entry.startsWith(FENCE_PREFIX);
   let rawPath;
   let exportName = null;
   let fnName = null;
-  if (isCli) {
+  let heading = null;
+  if (isFence) {
+    const body = entry.slice(FENCE_PREFIX.length);
+    const hash = body.indexOf("#");
+    if (hash <= 0 || body.slice(hash + 1).trim() === "") {
+      return {
+        ok: false,
+        reason: "bad-entry",
+        detail: `entry must be "fence:path.md#heading", got "${entry}"`,
+      };
+    }
+    rawPath = body.slice(0, hash);
+    heading = body.slice(hash + 1).trim();
+    if (!rawPath.endsWith(".md")) {
+      return {
+        ok: false,
+        reason: "bad-entry",
+        detail: `fence: names a Markdown file, got "${rawPath}"`,
+      };
+    }
+  } else if (isCli) {
     rawPath = entry.slice(CLI_PREFIX.length);
     if (rawPath.trim() === "" || rawPath.includes("#")) {
       return {
@@ -419,13 +637,14 @@ export function resolveEntry(entry, repoRoot = defaultRepoRoot()) {
         detail: `"${fnName}" is not a shell function name`,
       };
     }
-  } else if (isShell) {
-    rawPath = entry.slice(SHELL_PREFIX.length);
+  } else if (isShell || isShellArgv) {
+    const prefix = isShellArgv ? SHELL_ARGV_PREFIX : SHELL_PREFIX;
+    rawPath = entry.slice(prefix.length);
     if (rawPath.trim() === "" || rawPath.includes("#")) {
       return {
         ok: false,
         reason: "bad-entry",
-        detail: `entry must be "shell:path" with no export name, got "${entry}"`,
+        detail: `entry must be "${prefix}path" with no export name, got "${entry}"`,
       };
     }
   } else {
@@ -471,7 +690,9 @@ export function resolveEntry(entry, repoRoot = defaultRepoRoot()) {
       detail: `${entryPath} is under node_modules`,
     };
   }
+  if (isFence) return { ok: true, kind: "fence", entryPath, heading };
   if (isCli) return { ok: true, kind: "cli", entryPath };
+  if (isShellArgv) return { ok: true, kind: "shell-argv", entryPath };
   if (isShellFn) return { ok: true, kind: "shell-fn", entryPath, fnName };
   return isShell
     ? { ok: true, kind: "shell", entryPath }
@@ -480,10 +701,14 @@ export function resolveEntry(entry, repoRoot = defaultRepoRoot()) {
 
 /** The entry-spec prefix that selects the shell form. */
 export const SHELL_PREFIX = "shell:";
+/** The entry-spec prefix that selects the multi-argument shell form (task.181). */
+export const SHELL_ARGV_PREFIX = "shell-argv:";
 /** The entry-spec prefix that selects the sourced-function form (task.136). */
 export const SHELL_FN_PREFIX = "shell-fn:";
 /** The entry-spec prefix that selects the Node CLI form (task.144). */
 export const CLI_PREFIX = "cli:";
+/** The entry-spec prefix that selects the fenced-block form (task.180). */
+export const FENCE_PREFIX = "fence:";
 /**
  * The slots a `--argv` template may carry. A slot is a WHOLE element: an
  * element that merely contains one (`--env={input}`) is refused, so the case's
@@ -492,8 +717,159 @@ export const CLI_PREFIX = "cli:";
 export const ARGV_SLOTS = Object.freeze(["{input}", "{fixture}"]);
 /** Anything shaped like a slot, known or not — used to refuse unknown and embedded ones. */
 const SLOT_SHAPE = /\{[A-Za-z_][A-Za-z0-9_-]*\}/;
-/** Script extensions the cli: form runs under `process.execPath`. */
-const CLI_EXTENSIONS = Object.freeze([".mjs", ".js"]);
+/**
+ * The interpreter the cli: form runs a script under, by extension. `node` is
+ * `process.execPath`; `python3` is the host's, resolved once per process by
+ * probePython() (task.215).
+ */
+const CLI_INTERPRETERS = Object.freeze({
+  ".mjs": "node",
+  ".js": "node",
+  ".py": "python3",
+});
+const CLI_EXTENSIONS = Object.freeze(Object.keys(CLI_INTERPRETERS));
+/**
+ * How a `.py` entry is run: `python3 -E -s -B -c PYTHON_BOOTSTRAP <entry>
+ * ...argv` (task.215). `-E` ignores every PYTHON* variable (a second line:
+ * caseEnv passes none), `-s` drops user site-packages, and `-B` writes no
+ * bytecode — without it a script that imports a sibling writes __pycache__/
+ * into its own directory, which watchedSpawn reports as an escape on every
+ * case. Never `-I`: it drops the script's directory from sys.path, so a
+ * sibling import fails to start.
+ */
+const PYTHON_FLAGS = Object.freeze(["-E", "-s", "-B"]);
+
+/**
+ * The fd a Python child reports how it ended on: the first after stdin,
+ * stdout and stderr. runCliCase gives a Python child a pipe there; nothing
+ * else writes it.
+ */
+const PYTHON_RECORD_FD = 3;
+
+/**
+ * The two records PYTHON_BOOTSTRAP writes on PYTHON_RECORD_FD, each followed
+ * by the case's nonce: `answer <nonce>` when the body returned or raised
+ * SystemExit, `crash <nonce>` when it raised anything else.
+ */
+const PYTHON_ANSWER = "answer";
+const PYTHON_CRASH = "crash";
+
+/**
+ * The status CPython exits with when flushing sys.stdout or sys.stderr fails
+ * at interpreter shutdown — after the body returned and `answer` was written.
+ * A refusal never needs it, and read as one it scored a crash `rejected`
+ * (QA cycle 6, TASK-215-QA6-1). A script that calls sys.exit(120) itself is
+ * `errored` too: the safe direction.
+ */
+const PYTHON_FINALIZE_STATUS = 120;
+
+/**
+ * Runs the entry as `python3 <entry>` would — sys.argv[0] is the entry,
+ * sys.path[0] its directory, the body executed in a fresh `__main__` module
+ * that stays `sys.modules["__main__"]` after the body returns (atexit handlers
+ * and threads see the script's module, as under `python3 <entry>`; QA cycle 3,
+ * TASK-215-QA3-4) — and reports how the body ended on PYTHON_RECORD_FD.
+ *
+ * THE CHANNEL IS POSITIVE (QA cycle 4, TASK-215-QA4-1). Every exit the
+ * bootstrap controls writes a record: `answer <nonce>` when the body returns
+ * or raises SystemExit (the script's answer, which propagates untouched), and
+ * `crash <nonce>` when it raises anything else — caught BEFORE any excepthook
+ * runs, so a replaced sys.excepthook (rich, Typer), sys.stderr redirected or
+ * None, or sys.tracebacklimit = 0 cannot hide it (QA cycle 2). The crash
+ * record is a constant written before the exception is touched; its
+ * `Class: message` follows on the next line, best-effort, as the detail only
+ * (QA cycle 3). Then the script's own excepthook prints the crash as it would
+ * have (traceback trimmed to the entry's frames) and the child exits 1.
+ *
+ * A child with NO record is `errored`: whatever lost the write — a script
+ * that closed or reopened fd 3, os._exit, an exec, an interpreter that never
+ * reached the bootstrap (TASK-215-QA4-2) — fails safe. Cycles 2–4 wrote a
+ * record only on a crash and read its absence as an answer, so every way to
+ * lose the write was a false `rejected`. A record is written only while fd 3
+ * is still the pipe the bootstrap started with (same st_dev and st_ino), so a
+ * script that closed it and opened a file of its own there never has a record
+ * written into that file. The nonce is the engine's, per case, and comes off
+ * argv before the body runs: nothing else on the fd reads as a record.
+ *
+ * The record speaks for the body's frame only. An exception Python prints and
+ * swallows elsewhere — a joined worker thread, an atexit handler, a finaliser
+ * — leaves `python3 <entry>` exiting 0 after `answer` was written, and the
+ * case is scored by that exit status: a hostile case reads accepted, a false
+ * alarm, never a pass. The one such failure that changes the status, a
+ * failed flush at shutdown (exit 120), is errored (PYTHON_FINALIZE_STATUS,
+ * QA cycle 6). A stated limit in probe-boundary-rule.md (QA cycle 5,
+ * TASK-215-QA5-1).
+ *
+ * Only the process that started the bootstrap writes, and a forked child
+ * closes the fd (QA cycle 3, TASK-215-QA3-2/QA3-3): a child would otherwise
+ * report for the parent, and a daemon holding the pipe kept every case
+ * waiting for the timeout. The fd is also not inherited across exec, so no
+ * process the script starts can hold the pipe open past its exit.
+ */
+const PYTHON_BOOTSTRAP = [
+  "import os, sys",
+  "boot_pid = os.getpid()",
+  "try:",
+  `    boot_st = os.fstat(${PYTHON_RECORD_FD})`,
+  "    boot_id = (boot_st.st_dev, boot_st.st_ino)",
+  `    os.set_inheritable(${PYTHON_RECORD_FD}, False)`,
+  "except OSError:",
+  "    boot_id = None",
+  "def close_record_fd():",
+  "    try:",
+  `        os.close(${PYTHON_RECORD_FD})`,
+  "    except OSError:",
+  "        pass",
+  "os.register_at_fork(after_in_child=close_record_fd)",
+  "def record(data):",
+  "    if boot_id is None or os.getpid() != boot_pid:",
+  "        return",
+  "    try:",
+  `        st = os.fstat(${PYTHON_RECORD_FD})`,
+  "        if (st.st_dev, st.st_ino) == boot_id:",
+  `            os.write(${PYTHON_RECORD_FD}, data)`,
+  "    except BaseException:",
+  "        pass",
+  "nonce = sys.argv[1].encode()",
+  "entry = sys.argv[2]",
+  "sys.argv = sys.argv[2:]",
+  "sys.path[0] = os.path.dirname(os.path.abspath(entry))",
+  "boot_main = sys.modules['__main__']",
+  "main = type(sys)('__main__')",
+  "main.__file__ = entry",
+  "main.__cached__ = None",
+  "sys.modules['__main__'] = main",
+  "try:",
+  "    with open(entry, 'rb') as f:",
+  "        source = f.read()",
+  "    exec(compile(source, entry, 'exec'), main.__dict__)",
+  "except SystemExit:",
+  `    record(b'${PYTHON_ANSWER} ' + nonce + b'\\n')`,
+  "    raise",
+  "except BaseException as e:",
+  `    record(b'${PYTHON_CRASH} ' + nonce + b'\\n')`,
+  "    try:",
+  "        line = type(e).__name__",
+  "        try:",
+  "            text = (str(e).splitlines() or [''])[0]",
+  "            if text:",
+  "                line = line + ': ' + text",
+  "        except BaseException:",
+  "            pass",
+  "        record(line.encode('utf-8', 'replace')[:400] + b'\\n')",
+  "    except BaseException:",
+  "        pass",
+  "    tb = e.__traceback__",
+  "    while tb is not None and tb.tb_frame.f_code.co_filename != entry:",
+  "        tb = tb.tb_next",
+  "    try:",
+  "        sys.excepthook(type(e), e.with_traceback(tb), tb)",
+  "    except BaseException:",
+  "        pass",
+  "    sys.exit(1)",
+  "else:",
+  `    record(b'${PYTHON_ANSWER} ' + nonce + b'\\n')`,
+].join("\n");
 
 /**
  * Validate a `--argv` template (task.144). Accepts the CLI's JSON text or an
@@ -610,9 +986,11 @@ let harnessSeq = 0;
  * that sources `gh-labels.sh`, never a chain. A sourced path is tried against
  * the library's own directory, then the root (the repository's idiom,
  * `source references/gh-labels.sh`, is cwd-relative); a path holding a `$` is
- * not followable, and one outside the root is not ours to read.
+ * not followable, and one outside the root is not ours to read. `text`, when
+ * given, is read in place of the file — the fence: form passes its extracted
+ * block, whose sourced paths still resolve from the doc's directory.
  */
-export function namesGh(entryPath, root) {
+export function namesGh(entryPath, root, text = null) {
   const read = (p) => {
     try {
       return readFileSync(p, "utf8");
@@ -624,7 +1002,7 @@ export function namesGh(entryPath, root) {
   // realpath'd, so a lexical root reached through a symlink would put every one
   // of them "outside" and read as "names no gh" (task.140 QA cycle 1, CR-6).
   root = realpathSafe(root);
-  const first = read(entryPath);
+  const first = text ?? read(entryPath);
   if (first === null) return false;
   const texts = [first];
   const seen = new Set([entryPath]);
@@ -736,6 +1114,31 @@ const SHELL_FN_BODY =
  * Memoised: probing for zsh once per process, not once per case.
  */
 let _shells;
+let _python;
+/**
+ * The host's `python3`, as `{ name, version }`, or null when `python3 --version`
+ * does not run on the engine's PATH — the PATH caseEnv hands the child, so the
+ * resolution and the spawn agree. Memoised like probeShells(): once per process,
+ * never once per case (task.215). It runs under the engine's environment, not
+ * caseEnv, so it can pass for an interpreter that then cannot start inside the
+ * sandbox (a real-HOME dependency); such a child writes no exit record and
+ * every case is `errored`, never scored (QA cycle 4, TASK-215-QA4-2).
+ */
+export function probePython() {
+  if (_python !== undefined) return _python;
+  const r = spawnSync("python3", ["--version"], {
+    encoding: "utf8",
+    timeout: 10_000,
+  });
+  // Python 3.4+ prints the version on stdout; older ones on stderr.
+  const version = `${r.stdout ?? ""}${r.stderr ?? ""}`.trim().split("\n")[0];
+  _python =
+    r.status === 0 && /^Python \d/.test(version)
+      ? Object.freeze({ name: "python3", version })
+      : null;
+  return _python;
+}
+
 export function probeShells() {
   if (_shells) return _shells;
   const hasZsh =
@@ -867,6 +1270,8 @@ export function computeVerdict(caseResults) {
  *                                 required with cli:, a `bad-argv` decline with any other form
  * @param {Array} [spec.args]      fixed extra arguments appended after each case's input
  *                                 (task.131) — the JS form only, a `bad-args` decline otherwise
+ * @param {string} [spec.slot]     the fence: form's placeholder token (task.180) — required
+ *                                 with fence:, a `bad-slot` decline with any other form
  * @param {number} [spec.timeoutMs] per-case timeout; defaults to the shared spawn budget
  * @param {string} [spec.repoRoot] containment root; defaults to the repository root
  * @returns {{sink, entry, verdict, reason, executed, passed, reproduced, overblocked, declined, cases}}
@@ -878,6 +1283,8 @@ export function runProbeSpec({
   fakeGh,
   argv,
   args,
+  slot,
+  fixtureSetup,
   timeoutMs,
   repoRoot = defaultRepoRoot(),
 } = {}) {
@@ -909,6 +1316,9 @@ export function runProbeSpec({
     sink: sink ?? null,
     entry: entry ?? null,
     shells: null,
+    // The interpreter a cli: `.py` entry ran under (task.215), or null for
+    // every other form and for anything declined before a case ran.
+    interpreter: null,
     executed: 0,
     passed: 0,
     reproduced: [],
@@ -925,6 +1335,11 @@ export function runProbeSpec({
     // The fixed extra arguments every JS call received after its input, or null
     // (task.131). Stated so the record says how the export was called.
     args: null,
+    // The fence: form's placeholder token, or null (task.180).
+    slot: null,
+    // The shell-argv: form's per-run setup script (its real path), or null
+    // (task.181). Stated so the record says what built each case directory.
+    fixtureSetup: null,
   };
 
   // `declined` is its own state and is NEVER folded into `executed: 0`. Both
@@ -945,24 +1360,60 @@ export function runProbeSpec({
     // template it was given: the template is part of an unnamed control's key,
     // and without it the corrected re-run keyed differently and left this
     // `unverifiable` entry beside the real verdict (task.144 5c CR-1).
-    if (typeof entry === "string" && entry.startsWith(CLI_PREFIX)) {
+    // Likewise shell-argv:, which keys the same way (task.181).
+    if (
+      typeof entry === "string" &&
+      (entry.startsWith(CLI_PREFIX) || entry.startsWith(SHELL_ARGV_PREFIX))
+    ) {
       const parsed = parseArgvTemplate(argv);
       if (parsed.ok) base.argv = parsed.template;
+    }
+    // Likewise a fence: probe carries its slot, which keys an unnamed fence:
+    // control (task.180 QA cycle 2, TASK-180-007).
+    if (
+      typeof entry === "string" &&
+      entry.startsWith(FENCE_PREFIX) &&
+      typeof slot === "string" &&
+      slot !== ""
+    ) {
+      base.slot = slot;
     }
     return decline(resolved.reason, resolved.detail);
   }
   const isShellForm = resolved.kind === "shell" || resolved.kind === "shell-fn";
   const isCliForm = resolved.kind === "cli";
+  const isFenceForm = resolved.kind === "fence";
+  // `shell-argv:` (task.181): a bash script called with the --argv template. It
+  // takes cli:'s argv contract and the shell forms' PATH handling (`gh`).
+  const isShellArgvForm = resolved.kind === "shell-argv";
+  const takesArgv = isCliForm || isShellArgvForm;
+  // `slot` — validated here, the boundary a library caller crosses, exactly as
+  // `argv` is for cli: (task.180).
+  const slotGiven = slot !== undefined && slot !== null;
+  if (isFenceForm) {
+    if (typeof slot !== "string" || slot === "") {
+      return decline(
+        "bad-slot",
+        "the fence: entry form needs --slot — the placeholder text in the block that each case's input replaces",
+      );
+    }
+    base.slot = slot;
+  } else if (slotGiven) {
+    return decline(
+      "bad-slot",
+      "--slot applies to the fence: entry form only — the other forms take their input from the case",
+    );
+  }
   // `argv` is validated HERE as well as in `main()`: this is the boundary a
   // library caller crosses, and the CLI's exit 2 would otherwise be the only
   // guard. The same validator, so the two cannot disagree (task.144).
   let template = null;
   const argvGiven = argv !== undefined && argv !== null;
-  if (isCliForm) {
+  if (takesArgv) {
     if (!argvGiven) {
       return decline(
         "bad-argv",
-        'the cli: entry form needs --argv — a JSON array with one "{input}" element',
+        `the ${isCliForm ? "cli:" : "shell-argv:"} entry form needs --argv — a JSON array with one "{input}" element`,
       );
     }
     const parsed = parseArgvTemplate(argv);
@@ -971,7 +1422,7 @@ export function runProbeSpec({
   } else if (argvGiven) {
     return decline(
       "bad-argv",
-      "--argv applies to the cli: entry form only — the other forms take their input from the case",
+      "--argv applies to the cli: and shell-argv: entry forms only — the other forms take their input from the case",
     );
   }
   base.argv = template;
@@ -981,10 +1432,10 @@ export function runProbeSpec({
   // an argv element, so args there would be recorded without being used —
   // declined, not ignored, like --fake-gh on the JS form.
   if (args !== undefined && args !== null) {
-    if (isShellForm || isCliForm) {
+    if (isShellForm || isCliForm || isFenceForm || isShellArgvForm) {
       return decline(
         "bad-args",
-        "--args-json applies to the JS entry form (path#export) only — the shell and cli: forms take their input from the case",
+        "--args-json applies to the JS entry form (path#export) only — the shell, cli:, shell-argv: and fence: forms take their input from the case",
       );
     }
     if (!Array.isArray(args)) {
@@ -996,15 +1447,15 @@ export function runProbeSpec({
     isCliForm &&
     !CLI_EXTENSIONS.some((x) => resolved.entryPath.endsWith(x))
   ) {
-    // Run under process.execPath, so a .sh, .py or extensionless file would be
-    // handed to node and fail to parse on every case — declined here, once, by
-    // name, rather than surfacing as N identical crashes.
+    // The interpreter is chosen by extension, so a .sh or extensionless file
+    // has none — declined here, once, by name, rather than handed to node and
+    // surfacing as N identical crashes.
     return decline(
       "entry-not-probeable",
-      `${resolved.entryPath} is not a ${CLI_EXTENSIONS.join(" / ")} script — the cli: form runs it with node`,
+      `${resolved.entryPath} is not a ${CLI_EXTENSIONS.join(" / ")} script — the cli: form runs .mjs / .js with node and .py with python3`,
     );
   }
-  if (isShellForm || isCliForm) {
+  if (isShellForm || isCliForm || isFenceForm || isShellArgvForm) {
     // The script must be a readable regular file BEFORE anything is compared.
     // Without this a missing path made every run exit 127, every case mismatch
     // `expected`, and the verdict read `absent` with executed = cases × shells —
@@ -1023,6 +1474,62 @@ export function runProbeSpec({
       );
     }
   }
+  // The cli: child's interpreter (task.215). A `.py` entry needs the host's
+  // python3; without one it is declined once, by name — every case would
+  // otherwise fail to spawn and read as N identical errors.
+  const cliRuntime = isCliForm
+    ? CLI_INTERPRETERS[
+        CLI_EXTENSIONS.find((x) => resolved.entryPath.endsWith(x))
+      ]
+    : null;
+  let interpreter = null;
+  if (cliRuntime === "python3") {
+    interpreter = probePython();
+    if (interpreter === null) {
+      return decline(
+        "entry-not-probeable",
+        `${resolved.entryPath} is a .py script and \`python3 --version\` does not run on this PATH — the cli: form runs .py with python3`,
+      );
+    }
+  }
+  // `fixtureSetup` (task.181) — the shell-argv: form's per-run setup script.
+  // Validated HERE, the boundary a library caller crosses, as `slot` and `argv`
+  // are; with the entry's own containment, because it is code the engine runs.
+  // Declined, not ignored, on any other form: a caller who passed it meant it.
+  let setupPath = null;
+  if (fixtureSetup !== undefined && fixtureSetup !== null) {
+    if (!isShellArgvForm) {
+      return decline(
+        "bad-fixture-setup",
+        "--fixture-setup applies to the shell-argv: entry form only",
+      );
+    }
+    if (typeof fixtureSetup !== "string" || fixtureSetup.trim() === "") {
+      return decline("bad-fixture-setup", "--fixture-setup must name a script");
+    }
+    const root = realpathSafe(resolve(repoRoot));
+    setupPath = realpathSafe(
+      isAbsolute(fixtureSetup)
+        ? resolve(fixtureSetup)
+        : resolve(root, fixtureSetup),
+    );
+    if (setupPath === root || !isWithin(root, setupPath)) {
+      return decline("bad-fixture-setup", `${setupPath} is outside ${root}`);
+    }
+    if (relative(root, setupPath).split(sep).includes("node_modules")) {
+      return decline("bad-fixture-setup", `${setupPath} is under node_modules`);
+    }
+    try {
+      if (!statSync(setupPath).isFile()) throw new Error("not a regular file");
+      accessSync(setupPath, fsConstants.R_OK);
+    } catch (e) {
+      return decline(
+        "bad-fixture-setup",
+        `setup script is not a readable regular file: ${e.message}`,
+      );
+    }
+  }
+  base.fixtureSetup = setupPath;
   // `--fake-gh` is validated BEFORE anything spawns, like the entry: a
   // directory with no `gh` in it would let the real one answer from further
   // down PATH, which is the exact outcome the flag exists to prevent, with
@@ -1035,12 +1542,12 @@ export function runProbeSpec({
     // reach must not be RECORDED as having answered — `fake_gh: <dir>` on a
     // JS-form record would claim a fixture where the real binary ran
     // (TASK-136-BUG-1). Declined, not ignored: a caller who passed it meant it.
-    if (!isShellForm) {
+    if (!isShellForm && !isFenceForm && !isShellArgvForm) {
       return decline(
         "bad-fake-gh",
         isCliForm
-          ? "--fake-gh applies to the shell entry forms only (shell:, shell-fn:) — a CLI that consults gh is a networked CLI, which the cli: form does not probe"
-          : "--fake-gh applies to the shell entry forms only (shell:, shell-fn:) — a JS export never consults PATH",
+          ? "--fake-gh applies to the shell entry forms only (shell:, shell-fn:, shell-argv:, fence:) — a CLI that consults gh is a networked CLI, which the cli: form does not probe"
+          : "--fake-gh applies to the shell entry forms only (shell:, shell-fn:, shell-argv:, fence:) — a JS export never consults PATH",
       );
     }
     if (typeof fakeGh !== "string" || fakeGh.trim() === "") {
@@ -1081,23 +1588,121 @@ export function runProbeSpec({
   // EVERY shell form, not only shell-fn: a `shell:` script that names `gh` ran
   // the host `gh` — host PATH, host keychain — and was scored (task.140,
   // c3-CR-2). The detector reads the entry and one level of what it sources.
-  if (isShellForm && fakeGhDir === null) {
-    if (namesGh(resolved.entryPath, realpathSafe(resolve(repoRoot)))) {
-      return decline(
-        "needs-fake-gh",
-        `${resolved.entryPath} names \`gh\` — pass --fake-gh <dir> so the fixture answers instead of the real binary`,
-      );
+  // `shell-argv:` is a shell form here too, and its setup script is code the
+  // run executes on the same PATH, so it is read as well (task.181).
+  if ((isShellForm || isShellArgvForm) && fakeGhDir === null) {
+    const root = realpathSafe(resolve(repoRoot));
+    for (const path of [resolved.entryPath, setupPath]) {
+      if (path !== null && namesGh(path, root)) {
+        return decline(
+          "needs-fake-gh",
+          `${path} names \`gh\` — pass --fake-gh <dir> so the fixture answers instead of the real binary`,
+        );
+      }
     }
   }
 
+  // The fence: block is extracted HERE, on every run — never cached — and a doc
+  // the engine cannot read a block from is a named decline, never a verdict.
+  // The pre-spawn `gh` text check runs below, over the extracted block and the
+  // case inputs (never the whole document), once the cases are known.
+  let fenceBlock = null;
+  if (isFenceForm) {
+    let docText;
+    try {
+      docText = readFileSync(resolved.entryPath, "utf8");
+    } catch (e) {
+      return decline(
+        "entry-not-probeable",
+        `cannot read ${resolved.entryPath}: ${e.message}`,
+      );
+    }
+    const extracted = extractFencedBlock(docText, resolved.heading);
+    if (!extracted.ok) return decline("entry-not-probeable", extracted.detail);
+    if (!extracted.code.includes(slot)) {
+      return decline(
+        "bad-slot",
+        `slot "${slot}" does not appear in the block under "${resolved.heading}" (line ${extracted.line}) — a slot that substitutes nothing tests nothing`,
+      );
+    }
+    fenceBlock = extracted.code;
+  }
+
   let probeCases;
-  if (Array.isArray(cases)) {
+  if (cases !== undefined && cases !== null) {
+    // Refused before any case runs: a case the scorer cannot place would
+    // otherwise execute and count toward neither side (obs #201).
+    const bad = validateCases(cases);
+    if (bad) return decline("bad-cases", describeBadCase(bad));
     probeCases = cases;
   } else {
     try {
       probeCases = corpusFor(sink);
     } catch (e) {
       return decline("unknown-sink", String(e && e.message));
+    }
+  }
+
+  // The trip-wire answers only a PATH-resolved `gh`: a block (or an input —
+  // the slot is source) that resolves it to a path (`type -ap gh`) ran the host
+  // binary and was scored. This check catches a lookup spelled out in the text;
+  // an absolute path to `gh` it does not match, and that stays a stated limit. So fence: gets the text check the
+  // shell forms get, over what will actually run (TASK-180-015).
+  if (isFenceForm && fakeGhDir === null) {
+    // Every string a case carries can run: its input (the slot is source), its
+    // fixture's env values and its fixture's files (BASH_ENV, a sourced
+    // fixture script). Spellings that skip PATH — `command -p gh`, `env -u
+    // PATH gh` — are caught here or not at all (TASK-180-019).
+    const strings = (o) =>
+      o && typeof o === "object" && !Array.isArray(o)
+        ? Object.values(o).filter((v) => typeof v === "string")
+        : [];
+    const inputs = probeCases
+      .flatMap((c) => [
+        ...(typeof c?.input === "string" ? [c.input] : []),
+        ...strings(c?.fixture?.env),
+        ...strings(c?.fixture?.files),
+      ])
+      .join("\n");
+    if (
+      namesGh(
+        resolved.entryPath,
+        realpathSafe(resolve(repoRoot)),
+        `${fenceBlock}\n${inputs}`,
+      )
+    ) {
+      return decline(
+        "needs-fake-gh",
+        `the block under "${resolved.heading}" in ${resolved.entryPath}, or a case's input or fixture, names \`gh\` — pass --fake-gh <dir> so the fixture answers instead of the real binary`,
+      );
+    }
+  }
+
+  // shell-argv: honours a case's fixture as fence: does, so the fixture strings
+  // get the same text check (TASK-181-001): `env` values and `files` contents can
+  // run (BASH_ENV, a sourced fixture script). The case's INPUT is not checked —
+  // it crosses as one argv element, data, never source. runShellArgvCase also
+  // shadows every PATH directory holding a gh (ghFreePath), which catches a
+  // lookup this text check cannot spell.
+  if (isShellArgvForm && fakeGhDir === null) {
+    const strings = (o) =>
+      o && typeof o === "object" && !Array.isArray(o)
+        ? Object.values(o).filter((v) => typeof v === "string")
+        : [];
+    const fixtureText = probeCases
+      .flatMap((c) => [
+        ...strings(c?.fixture?.env),
+        ...strings(c?.fixture?.files),
+      ])
+      .join("\n");
+    if (
+      fixtureText !== "" &&
+      namesGh(resolved.entryPath, realpathSafe(resolve(repoRoot)), fixtureText)
+    ) {
+      return decline(
+        "needs-fake-gh",
+        `a case's fixture (env or files) for ${resolved.entryPath} names \`gh\` — pass --fake-gh <dir> so the fixture answers instead of the real binary`,
+      );
     }
   }
 
@@ -1127,7 +1732,7 @@ export function runProbeSpec({
   // The harness's own files — source-completed markers and the trip-wire gh —
   // live under the WORK dir, which the escape sentinel deliberately skips.
   const harnessDir = join(workDir, ".probe-harness");
-  if (isShellForm) {
+  if (isShellForm || isFenceForm || isShellArgvForm) {
     mkdirSync(join(harnessDir, "bin"), { recursive: true });
     if (fakeGhDir === null) {
       writeFileSync(
@@ -1141,13 +1746,54 @@ export function runProbeSpec({
 
   const caseResults = [];
   const escapes = [];
-  const shells = isShellForm ? probeShells() : null;
+  const shells =
+    isShellForm || isFenceForm || isShellArgvForm ? probeShells() : null;
   try {
     for (const c of probeCases) {
+      if (isFenceForm) {
+        runFenceCase(c, {
+          block: fenceBlock,
+          slot,
+          docPath: resolved.entryPath,
+          fakeGhDir,
+          harnessDir,
+          shells,
+          sandboxRoot,
+          sandboxHome,
+          sandboxTmp,
+          workDir,
+          workDirName,
+          timeoutMs: perCaseTimeout,
+          caseResults,
+          escapes,
+        });
+        continue;
+      }
+      if (isShellArgvForm) {
+        runShellArgvCase(c, {
+          sink,
+          entryPath: resolved.entryPath,
+          template,
+          setupPath,
+          fakeGhDir,
+          harnessDir,
+          shells,
+          sandboxRoot,
+          sandboxHome,
+          sandboxTmp,
+          workDir,
+          workDirName,
+          timeoutMs: perCaseTimeout,
+          caseResults,
+          escapes,
+        });
+        continue;
+      }
       if (isCliForm) {
         runCliCase(c, {
           sink,
           entryPath: resolved.entryPath,
+          runtime: cliRuntime,
           template,
           sandboxRoot,
           sandboxHome,
@@ -1243,7 +1889,9 @@ export function runProbeSpec({
         detail: detail ?? null,
       });
     }
-    ghTripped = isShellForm && existsSync(join(harnessDir, GH_TRIPPED));
+    ghTripped =
+      (isShellForm || isFenceForm || isShellArgvForm) &&
+      existsSync(join(harnessDir, GH_TRIPPED));
   } finally {
     rmSync(sandboxRoot, { recursive: true, force: true });
   }
@@ -1270,6 +1918,7 @@ export function runProbeSpec({
       cases: caseResults,
       escapes,
       shells: shells ?? null,
+      interpreter,
       fakeGh: fakeGhDir,
       args: base.args,
     };
@@ -1291,6 +1940,7 @@ export function runProbeSpec({
       // effect; and the record must say which shells ran (cycle 4, CR-3).
       escapes,
       shells: shells ?? null,
+      interpreter,
       fakeGh: fakeGhDir,
       args: base.args,
     };
@@ -1322,6 +1972,8 @@ export function runProbeSpec({
     // form. Stated in the result so a record can say "bash only" on a host
     // without zsh rather than leaving the reader to divide the count.
     shells: shells ?? null,
+    // The interpreter a cli: `.py` entry ran under (task.215), or null.
+    interpreter,
     executed: ran.length,
     passed: ran.length - reproduced.length - overblocked.length,
     // A shell-form case ran once per shell, so its id carries the shell: two
@@ -1337,6 +1989,8 @@ export function runProbeSpec({
     fakeGh: fakeGhDir,
     argv: template,
     args: base.args,
+    slot: base.slot,
+    fixtureSetup: base.fixtureSetup,
   };
 }
 
@@ -1492,11 +2146,12 @@ function caseEnv({ fixtureDir, sandboxHome, sandboxTmp }) {
 function watchedSpawn(
   command,
   argv,
-  { cwd, env, timeoutMs },
+  { cwd, env, timeoutMs, extraFds = 0 },
   { sandboxRoot, workDirName, scriptDir, escapes, escapeId, shell = null },
 ) {
   const before = snapshotTree(sandboxRoot, workDirName);
   const scriptDirBefore = listDirStamps(scriptDir);
+  // extraFds: further pipes after stderr, read back as child.output[3…].
   const child = spawnSync(command, argv, {
     input: "",
     cwd,
@@ -1504,6 +2159,9 @@ function watchedSpawn(
     encoding: "utf8",
     timeout: timeoutMs,
     maxBuffer: 8 * 1024 * 1024,
+    ...(extraFds > 0
+      ? { stdio: ["pipe", "pipe", "pipe", ...Array(extraFds).fill("pipe")] }
+      : {}),
   });
   const tag = shell === null ? {} : { shell };
   const after = snapshotTree(sandboxRoot, workDirName);
@@ -1765,9 +2423,93 @@ const NODE_FATAL_FOOTER = new RegExp(
 );
 
 /**
- * Run one case against a Node CLI through its `--argv` template (task.144).
+ * A frame of a Python traceback: `  File "<path>", line N`, always indented.
+ * An ExceptionGroup prefixes each of its lines with `|` (`  |   File …`).
+ */
+const PY_FRAME = /^(?: *\|)? {2,}File ".*", line \d+/m;
+/**
+ * The header an uncaught runtime exception prints, plain or as an
+ * ExceptionGroup's (`  + Exception Group Traceback (most recent call last):`).
+ */
+const PY_TRACEBACK =
+  /^(?: *[+|] )?(?:Exception Group )?Traceback \(most recent call last\):$/m;
+/** Compile-time errors print a frame and this line, with no Traceback header. */
+const PY_COMPILE_ERROR = /^(?:SyntaxError|IndentationError|TabError)\b/m;
+/** An exception line, after an ExceptionGroup's `|` prefix: a (dotted) class, optionally `: message`. */
+const PY_EXCEPTION_LINE = /^(?: *\| )?([A-Za-z_][\w.]*(?::\s.*)?)$/;
+
+/**
+ * Did a Python child CRASH rather than answer (task.215)? A Python crash exits
+ * 1 — the status a refusal exits with — and prints no footer like Node's, so
+ * the exit code cannot tell them apart. Its stderr can: a `File "…", line N`
+ * frame AND either a `Traceback (most recent call last):` header (an uncaught
+ * runtime exception, an ExceptionGroup's included) or a SyntaxError-family
+ * line (a compile error, which prints the frame with no header).
  *
- * One probe per case — Node is the runtime, so there is no shell multiplicity.
+ * What comes AFTER the traceback does not matter. A multi-line message, an
+ * `add_note()` hint, an ExceptionGroup's box drawing and an atexit handler's
+ * output all put something other than the exception last, and keying on the
+ * last line read each of them as a refusal — a false pass (QA cycle 1,
+ * TASK-215-QA1-1). So a script that catches its failure and prints the
+ * traceback itself, then refuses, also reads as a crash: `errored`, "could not
+ * look" — the safe direction. A refusal that prints an exception-shaped line
+ * with no frame, or a frame-shaped log line with no header, stays a refusal.
+ * The caller asks only on exit 1 (an uncaught exception always exits 1), so an
+ * "Exception ignored" traceback before a refusal that exits 3 is not a crash.
+ */
+export function isPythonCrash(stderr) {
+  if (typeof stderr !== "string") return false;
+  if (!PY_FRAME.test(stderr)) return false;
+  return PY_TRACEBACK.test(stderr) || PY_COMPILE_ERROR.test(stderr);
+}
+
+/**
+ * The record PYTHON_BOOTSTRAP wrote on PYTHON_RECORD_FD for this case's
+ * `nonce`: `{ kind: "crash", line }`, `{ kind: "answer" }`, or null when there
+ * is none — the bootstrap never ran, or the write was lost, and the caller
+ * reads that as "could not look" (QA cycle 4, TASK-215-QA4-1). Only a whole
+ * line `<kind> <nonce>` is a record; a crash wins over an answer. `line` is
+ * the exception's `Class: message` when the bootstrap could format it.
+ */
+function pythonExitRecord(child, nonce) {
+  const text = child.output?.[PYTHON_RECORD_FD];
+  if (typeof text !== "string") return null;
+  const lines = text.split("\n");
+  const crashAt = lines.indexOf(`${PYTHON_CRASH} ${nonce}`);
+  if (crashAt !== -1) {
+    const line = lines[crashAt + 1];
+    return { kind: "crash", line: line && line.trim() !== "" ? line : null };
+  }
+  return lines.includes(`${PYTHON_ANSWER} ${nonce}`)
+    ? { kind: "answer" }
+    : null;
+}
+
+/**
+ * The exception line of a Python crash, for the decline detail: the first
+ * exception-shaped line after the last frame, which skips the frame's source
+ * and caret lines and stops before a message's continuation, a note or an
+ * atexit line. The last non-empty line when none is found.
+ */
+function pythonExceptionLine(stderr) {
+  const lines = stderr.split("\n");
+  let lastFrame = -1;
+  lines.forEach((l, i) => {
+    if (PY_FRAME.test(l)) lastFrame = i;
+  });
+  for (const l of lines.slice(lastFrame + 1)) {
+    const m = PY_EXCEPTION_LINE.exec(l);
+    if (m) return m[1];
+  }
+  return lines.filter((l) => l.trim() !== "").at(-1) ?? "uncaught exception";
+}
+
+/**
+ * Run one case against a Node or Python CLI through its `--argv` template
+ * (task.144; Python, task.215 — `runtime` is "python3" for a `.py` entry).
+ *
+ * One probe per case — the interpreter is the runtime, so there is no shell
+ * multiplicity.
  * The template's `{input}` element becomes the case's input as ONE argv element
  * and each `{fixture}` element becomes this case's fixture directory, which is
  * built by the same helper the shell arm uses: the sink's controls plus the
@@ -1775,10 +2517,15 @@ const NODE_FATAL_FOOTER = new RegExp(
  *
  * Outcome:
  *   killed, timed out, never ran, or crashed      → "errored" (could not look)
+ *   Python, no exit record from the bootstrap      → "errored" (could not look)
  *   no `expected`: exit 0                          → "accepted"
  *   no `expected`: exit non-zero                   → "rejected"
  *   `expected`: compared, mapped through direction → as the shell arm
- * A crash is Node's fatal-error footer on stderr. Scoring it as a refusal
+ * A crash is Node's fatal-error footer on stderr, or for Python the crash
+ * record PYTHON_BOOTSTRAP writes on PYTHON_RECORD_FD, or an exit 1 whose stderr
+ * isPythonCrash reads as a traceback (Python exits 1 on a crash, as a refusal
+ * does, so the exit status alone cannot tell them apart).
+ * Scoring it as a refusal
  * would let a script that fails to LOAD read as a control that rejects every
  * hostile input; errored, every case folds into one `entry-not-probeable`.
  */
@@ -1787,6 +2534,7 @@ function runCliCase(
   {
     sink,
     entryPath,
+    runtime = "node",
     template,
     sandboxRoot,
     sandboxHome,
@@ -1847,13 +2595,18 @@ function runCliCase(
   const args = template.map((a) =>
     a === "{input}" ? c.input : a === "{fixture}" ? fixtureDir : a,
   );
+  const isPython = runtime === "python3";
+  const nonce = isPython ? randomBytes(12).toString("hex") : null;
   const child = watchedSpawn(
-    process.execPath,
-    [entryPath, ...args],
+    isPython ? "python3" : process.execPath,
+    isPython
+      ? [...PYTHON_FLAGS, "-c", PYTHON_BOOTSTRAP, nonce, entryPath, ...args]
+      : [entryPath, ...args],
     {
       cwd: fixtureDir,
       env: caseEnv({ fixtureDir, sandboxHome, sandboxTmp }),
       timeoutMs,
+      extraFds: isPython ? PYTHON_RECORD_FD - 2 : 0,
     },
     {
       sandboxRoot,
@@ -1864,6 +2617,8 @@ function runCliCase(
     },
   );
 
+  // Read once (QA cycle 3, CR-3); null for a Node child, which has no record.
+  const pyRecord = isPython ? pythonExitRecord(child, nonce) : null;
   let outcome;
   let detail = null;
   if (neverRan(child)) {
@@ -1871,7 +2626,33 @@ function runCliCase(
     detail = child.signal
       ? `killed by ${child.signal} (timeout ${timeoutMs}ms)`
       : `never ran: ${child.error?.message ?? "no exit status"}`;
-  } else if (NODE_FATAL_FOOTER.test(child.stderr ?? "")) {
+  } else if (isPython && pyRecord === null) {
+    // No record: the bootstrap did not see the body end — the write was lost
+    // (fd 3 closed or replaced, os._exit, an exec) or python3 never reached
+    // it. Not an answer; the safe direction (QA cycle 4, TASK-215-QA4-1/QA4-2).
+    outcome = "errored";
+    const said = (child.stderr ?? "").trim().split("\n")[0].slice(0, 160);
+    detail = `the CLI exited (exit ${child.status}) without the bootstrap's exit record — could not tell an answer from a crash${said ? `: ${said}` : ""}`;
+  } else if (
+    isPython &&
+    (pyRecord.kind === "crash" ||
+      (child.status === 1 && isPythonCrash(child.stderr)))
+  ) {
+    // The crash record is the signal: it is written whatever the script did
+    // to stderr or its excepthook. A traceback on stderr with exit 1 is read
+    // too — a script that prints its own and exits 1 is not answering. Exit 1
+    // only for that one: an "Exception ignored" traceback on any other status
+    // sits beside an answer.
+    outcome = "errored";
+    const line =
+      (pyRecord.kind === "crash" ? pyRecord.line : null) ??
+      pythonExceptionLine(child.stderr ?? "");
+    detail = `the CLI crashed (exit ${child.status}) rather than answering: ${line.trim().slice(0, 160)}`;
+  } else if (isPython && child.status === PYTHON_FINALIZE_STATUS) {
+    // The body answered, then Python failed at shutdown (QA cycle 6).
+    outcome = "errored";
+    detail = `the CLI answered, then python3 failed at shutdown (exit ${PYTHON_FINALIZE_STATUS}, a failed flush of stdout or stderr) — could not tell an answer from a crash`;
+  } else if (!isPython && NODE_FATAL_FOOTER.test(child.stderr ?? "")) {
     outcome = "errored";
     const first = (child.stderr ?? "")
       .split("\n")
@@ -1903,6 +2684,823 @@ function runCliCase(
     detail,
     exit: child.status,
   });
+}
+
+/**
+ * Write a case's `fixture.files` into its directory. Shared by the fence: and
+ * shell-argv: arms (task.181), so the two cannot drift on what a fixture file
+ * may name. THROWS on a path that leaves the directory; the caller turns that
+ * into an `errored` run.
+ */
+function writeFixtureFiles(caseDir, files) {
+  for (const [rel, content] of files) {
+    const target = resolve(caseDir, rel);
+    if (target === caseDir || !isWithin(caseDir, target)) {
+      throw new Error(
+        `\`fixture.files\` path "${rel}" leaves the case directory`,
+      );
+    }
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, content);
+  }
+}
+
+/**
+ * `caseEnv` with a case's `fixture.env` merged in. The case's env first, the
+ * sandbox's own keys last: fixtureProblem already refuses HOME/TMPDIR/LC_ALL,
+ * and the order holds even if it did not. Shared by the fence: and shell-argv:
+ * arms (task.181).
+ */
+function fixtureCaseEnv(fixture, { fixtureDir, sandboxHome, sandboxTmp }) {
+  const sandbox = caseEnv({ fixtureDir, sandboxHome, sandboxTmp });
+  return {
+    ...sandbox,
+    ...(fixture?.env ?? {}),
+    HOME: sandbox.HOME,
+    TMPDIR: sandbox.TMPDIR,
+    LC_ALL: sandbox.LC_ALL,
+  };
+}
+
+/**
+ * The env one per-case shell run gets: `fixtureCaseEnv`, then every PATH
+ * directory holding the host `gh` shadowed by a copy without it (fixture.env's
+ * PATH included), then the fake `gh` (armed) or the trip-wire first on PATH.
+ * ONE definition for the fence: and shell-argv: arms — the arms whose case
+ * fixture can run — so they cannot drift on it (TASK-181-001 was this
+ * isolation copied into one arm and not the other).
+ */
+function caseShellEnv(
+  fixture,
+  { caseDir, sandboxHome, sandboxTmp, harnessDir, fakeGhDir },
+) {
+  const env = fixtureCaseEnv(fixture, {
+    fixtureDir: caseDir,
+    sandboxHome,
+    sandboxTmp,
+  });
+  env.PATH = ghFreePath(env.PATH, join(harnessDir, "path"), caseDir);
+  if (fakeGhDir !== null) {
+    env.PATH = `${fakeGhDir}:${env.PATH}`;
+    env.FAKE_GH = "1";
+  } else {
+    env.PATH = `${join(harnessDir, "bin")}:${env.PATH}`;
+  }
+  return env;
+}
+
+/**
+ * `watchedSpawn` for a run whose cwd is a case directory inside the work dir,
+ * plus the work-dir snapshot that only such a run needs: the sandbox sentinel
+ * skips the work dir, so a write beside the case directory (`../pwned`, a
+ * sibling case, the harness dir) is an escape only this sees, as is a deletion
+ * or an empty directory there — a deleted trip-wire stub lets later cases reach
+ * the host's real `gh` (TASK-180-011, -013). The trip-wire's own marker is the
+ * harness's write, reported as a gh call, not here. ONE definition for the
+ * fence: and shell-argv: arms (TASK-181-003 was this snapshot missing from one).
+ */
+function caseWatchedSpawn(
+  command,
+  argv,
+  { cwd, env, timeoutMs },
+  {
+    sandboxRoot,
+    workDir,
+    workDirName,
+    harnessDir,
+    scriptDir,
+    escapes,
+    escapeId,
+    shell,
+  },
+) {
+  const caseName = basename(cwd);
+  const ownWrite = `${basename(harnessDir)}/${GH_TRIPPED}`;
+  const workBefore = workDirStamps(workDir, caseName);
+  const child = watchedSpawn(
+    command,
+    argv,
+    { cwd, env, timeoutMs },
+    { sandboxRoot, workDirName, scriptDir, escapes, escapeId, shell },
+  );
+  // Both ways: a path that appeared or changed, and a path that is gone.
+  const workAfter = workDirStamps(workDir, caseName);
+  const changed = [...workAfter]
+    .filter(
+      ([path, stamp]) => path !== ownWrite && workBefore.get(path) !== stamp,
+    )
+    .map(([path]) => path);
+  const gone = [...workBefore.keys()].filter((path) => !workAfter.has(path));
+  for (const path of [...changed, ...gone]) {
+    escapes.push({ id: escapeId, shell, path: `${workDirName}/${path}` });
+  }
+  return child;
+}
+
+/**
+ * Why a child produced no answer — `neverRan` says THAT it did not; this says
+ * which of three things happened, so "could not start" and "killed for another
+ * reason" never read as a timeout (task.181 QA cycle 2, CR-4).
+ */
+function neverRanDetail(child, timeoutMs) {
+  if (child.error?.code === "ETIMEDOUT")
+    return `timed out after ${timeoutMs}ms`;
+  if (child.signal) return `killed by ${child.signal}`;
+  return `never ran: ${child.error?.message ?? "no exit status"}`;
+}
+
+// ── The shell-argv entry form (task.181) ─────────────────────────────────────
+
+/**
+ * The argv one shell-argv: run spawns `shell` with: the shell is the CALLER,
+ * with its rc files off, of a fixed body that hands the script and its
+ * arguments to bash as "$@" — bash is always the interpreter. Exported so the
+ * rule is held on a host without zsh, where the zsh arm never runs.
+ */
+export function shellArgvSpawnArgs(shell, entryPath, args) {
+  return [...noRcFlags(shell), "-c", 'bash "$@"', shell, entryPath, ...args];
+}
+
+/**
+ * Run one case against a multi-argument shell script, once per shell.
+ *
+ * The cli: arm's contract on a bash script: the case's input is ONE element of
+ * the `--argv` template (`{fixture}` elements become the case directory), the
+ * exit status is the verdict (0 accepted, non-zero rejected), and a case's
+ * `expected`, when given, is compared as the shell arm compares it. Each shell
+ * from probeShells() is the CALLER and bash the INTERPRETER —
+ * `<shell> -c 'bash "$@"' <shell> <script> ...argv` — as for `shell:`: the
+ * script's shebang fixes its interpreter, and a bash script interpreted by zsh
+ * would fail on a bash construct and read as a refusal ("could not look" scored
+ * as "refused").
+ *
+ * Before each (case, shell) run: the case's own `fixture` (`files`, `env`) is
+ * written exactly as the fence: arm writes it, then the `--fixture-setup`
+ * script, when given, runs as `bash <setup> <case-dir>` under the same env and
+ * sentinels. A setup that exits non-zero, times out or never starts makes the
+ * run `errored` — the engine could not build what the script needs — never
+ * `rejected`.
+ */
+function runShellArgvCase(
+  c,
+  {
+    sink,
+    entryPath,
+    template,
+    setupPath = null,
+    fakeGhDir = null,
+    harnessDir,
+    shells,
+    sandboxRoot,
+    sandboxHome,
+    sandboxTmp,
+    workDir,
+    workDirName,
+    timeoutMs,
+    caseResults,
+    escapes,
+  },
+) {
+  const sinkFixture = MATERIALISED_SINKS[c.sink ?? sink] ?? null;
+  const errored = (shell, detail) =>
+    caseResults.push({
+      id: c.id,
+      shell,
+      direction: c.direction,
+      outcome: "errored",
+      detail,
+    });
+  const decline = (detail) => {
+    for (const shell of shells) errored(shell, detail);
+  };
+  if (typeof c.input !== "string") {
+    decline(
+      `case input is ${describeType(c.input)}, not a string — an argv element is a string`,
+    );
+    return;
+  }
+  const hasExpected = c.expected !== undefined;
+  if (hasExpected) {
+    // Declined, never scored — the BUG-8 / BUG-11 rule the shell arm applies.
+    const problem = expectedProblem(c.expected);
+    if (problem !== null) {
+      decline(`case's ${problem}`);
+      return;
+    }
+  }
+  const problem = fixtureProblem(c.fixture);
+  if (problem !== null) {
+    decline(`case's ${problem}`);
+    return;
+  }
+  const files = Object.entries(c.fixture?.files ?? {});
+  // An `expected.absent` name the run's own fixture creates mismatches on every
+  // run — declined, as every other arm declines it (task.128 BUG-13).
+  const firstSegment = (rel) => normalize(rel).split(sep)[0].toLowerCase();
+  const collides = (c.expected?.absent ?? []).find(
+    (p) =>
+      (sinkFixture !== null &&
+        (sinkFixture.controls.includes(p) || p === c.input)) ||
+      files.some(([rel]) => firstSegment(rel) === p.toLowerCase()),
+  );
+  if (collides !== undefined) {
+    decline(
+      `case's \`expected.absent\` names "${collides}", which the fixture itself creates`,
+    );
+    return;
+  }
+
+  for (const shell of shells) {
+    // One directory per (case, shell): a side effect from the bash run must not
+    // be read as one from the zsh run, and the setup builds each afresh.
+    let fixtureDir;
+    try {
+      fixtureDir = materialiseFixture(
+        workDir,
+        sinkFixture?.controls ?? [],
+        c.input,
+        { writeInput: sinkFixture !== null },
+      );
+      writeFixtureFiles(fixtureDir, files);
+    } catch (e) {
+      errored(shell, `fixture: ${e.message}`);
+      continue;
+    }
+    // The same isolation as fence: — one definition (caseShellEnv).
+    const env = caseShellEnv(c.fixture, {
+      caseDir: fixtureDir,
+      sandboxHome,
+      sandboxTmp,
+      harnessDir,
+      fakeGhDir,
+    });
+    const watch = {
+      sandboxRoot,
+      workDir,
+      workDirName,
+      harnessDir,
+      escapeId: `${c.id}@${shell}`,
+      shell,
+    };
+
+    if (setupPath !== null) {
+      // The setup builds its case directory and nothing else. Its writes are
+      // watched into their OWN list, never the entry's: a setup write charged
+      // to the entry read as the entry escaping (TASK-181-002). A write
+      // anywhere but the case directory — the sandbox HOME or TMPDIR, a
+      // sibling case, the harness — errors this run, named: it leaves the
+      // entry's escape baseline unknown. A setup that needs scratch space
+      // makes it inside "$1".
+      const setupWrites = [];
+      const setup = caseWatchedSpawn(
+        "bash",
+        [setupPath, fixtureDir],
+        { cwd: fixtureDir, env, timeoutMs },
+        { ...watch, scriptDir: dirname(setupPath), escapes: setupWrites },
+      );
+      if (neverRan(setup)) {
+        errored(shell, `fixture setup ${neverRanDetail(setup, timeoutMs)}`);
+        continue;
+      }
+      if (setupWrites.length > 0) {
+        const paths = [...new Set(setupWrites.map((e) => e.path))];
+        errored(
+          shell,
+          `fixture setup wrote outside the case directory: ${paths.slice(0, 5).join(", ")}${paths.length > 5 ? ` (+${paths.length - 5} more)` : ""} — a setup builds "$1" and nothing else`,
+        );
+        continue;
+      }
+      if (setup.status !== 0) {
+        errored(
+          shell,
+          `fixture setup exited ${setup.status}: ${(setup.stderr ?? "").trim().split("\n")[0].slice(0, 160)}`,
+        );
+        continue;
+      }
+    }
+
+    // Whole-element substitution only — parseArgvTemplate refused any element
+    // that merely CONTAINS a slot, so nothing here builds a string from input.
+    // ARGV, never a string: the shell's body is fixed and the script and its
+    // arguments arrive as "$@".
+    const args = template.map((a) =>
+      a === "{input}" ? c.input : a === "{fixture}" ? fixtureDir : a,
+    );
+    const child = caseWatchedSpawn(
+      shell,
+      shellArgvSpawnArgs(shell, entryPath, args),
+      { cwd: fixtureDir, env, timeoutMs },
+      { ...watch, scriptDir: dirname(entryPath), escapes },
+    );
+
+    let outcome;
+    let detail = null;
+    if (neverRan(child)) {
+      outcome = "errored";
+      detail = neverRanDetail(child, timeoutMs);
+    } else if (hasExpected) {
+      const mismatches = compareExpected(c.expected, child, fixtureDir);
+      const matched = mismatches.length === 0;
+      outcome =
+        c.direction === "hostile"
+          ? matched
+            ? "rejected"
+            : "accepted"
+          : matched
+            ? "accepted"
+            : "rejected";
+      detail = matched ? null : mismatches.join("; ");
+    } else {
+      outcome = child.status === 0 ? "accepted" : "rejected";
+      detail =
+        child.status === 0
+          ? null
+          : `exit ${child.status}: ${(child.stderr ?? "").trim().split("\n")[0].slice(0, 160)}`;
+    }
+    caseResults.push({
+      id: c.id,
+      shell,
+      direction: c.direction,
+      outcome,
+      detail,
+      exit: child.status,
+    });
+  }
+}
+
+// ── The fence entry form (task.180) ──────────────────────────────────────────
+
+/** An opening or closing fence — `extractBlocks`' own pattern, so the two agree. */
+const FENCE_LINE = /^(\s*)(`{3,}|~{3,})\s*([A-Za-z0-9_+-]*)([^`]*)$/;
+/** An ATX heading: level, then its text with any closing `#`s dropped. */
+const ATX_HEADING = /^(#{1,6})[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/;
+
+/**
+ * The first ```bash block under `heading` in a Markdown document.
+ *
+ * Headings are read ONLY from lines outside fences, tracking fence state the
+ * way `extractBlocks` does: a bash `# comment` is heading-shaped, and the
+ * step-3 doc alone carries ten inside fences. A raw line scan read each as a
+ * level-1 heading — ending the section before its block, or matching the
+ * heading a second time (task.180 review I2). The section runs to the next
+ * heading of the same or a higher level; the block is the first `bash` block
+ * `extractBlocks` reports inside it (an `sh` block is not one).
+ *
+ * @returns {{ok: true, code: string, line: number, headingLine: number}
+ *          |{ok: false, detail: string}}
+ */
+export function extractFencedBlock(docText, heading) {
+  const want = String(heading).trim();
+  // A CRLF checkout ends every heading in \r, which no heading matched
+  // (task.180 QA cycle 2, TASK-180-008): normalise before reading anything.
+  const text = String(docText).replace(/\r\n?/g, "\n");
+  const lines = text.split("\n");
+  const headings = [];
+  let open = null;
+  for (let i = 0; i < lines.length; i++) {
+    const fence = FENCE_LINE.exec(lines[i]);
+    if (fence) {
+      const [, , marker, info] = fence;
+      if (open === null) {
+        open = { marker: marker[0], len: marker.length };
+      } else if (
+        marker[0] === open.marker &&
+        marker.length >= open.len &&
+        info === ""
+      ) {
+        open = null;
+      }
+      continue;
+    }
+    if (open !== null) continue;
+    const h = ATX_HEADING.exec(lines[i]);
+    if (h) headings.push({ line: i + 1, level: h[1].length, text: h[2] });
+  }
+  const matches = headings.filter((h) => h.text === want);
+  if (matches.length === 0) {
+    return { ok: false, detail: `heading not found: "${want}"` };
+  }
+  if (matches.length > 1) {
+    return {
+      ok: false,
+      detail: `heading "${want}" is ambiguous — it appears at lines ${matches.map((m) => m.line).join(" and ")}`,
+    };
+  }
+  const [match] = matches;
+  const next = headings.find(
+    (h) => h.line > match.line && h.level <= match.level,
+  );
+  const end = next ? next.line : Number.POSITIVE_INFINITY;
+  const block = extractBlocks(text).find(
+    (b) => b.line > match.line && b.line < end,
+  );
+  if (!block) {
+    return {
+      ok: false,
+      detail: `no bash block under heading "${want}" (line ${match.line})`,
+    };
+  }
+  return {
+    ok: true,
+    code: block.code,
+    line: block.line,
+    headingLine: match.line,
+  };
+}
+
+/** The environment keys the sandbox owns; a case's fixture may not set them. */
+const SANDBOX_OWNED_ENV = Object.freeze(["HOME", "TMPDIR", "LC_ALL"]);
+const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/**
+ * Validate a case's `fixture` (task.180). Returns null when well-formed, else
+ * the reason to decline the case. The SHAPE only — whether a file path stays
+ * inside the case directory is decided against the real directory when the
+ * file is written, by `isWithin`.
+ */
+export function fixtureProblem(fixture) {
+  if (fixture === undefined) return null;
+  if (!fixture || typeof fixture !== "object" || Array.isArray(fixture)) {
+    return "`fixture` is not an object";
+  }
+  const unknown = Object.keys(fixture).filter(
+    (k) => k !== "env" && k !== "files",
+  );
+  if (unknown.length > 0) {
+    return `\`fixture\` carries unknown keys: ${unknown.join(", ")} — only env and files`;
+  }
+  for (const key of ["env", "files"]) {
+    const v = fixture[key];
+    if (v === undefined) continue;
+    if (!v || typeof v !== "object" || Array.isArray(v)) {
+      return `\`fixture.${key}\` is not an object`;
+    }
+    for (const [k, val] of Object.entries(v)) {
+      if (typeof val !== "string") {
+        return `\`fixture.${key}["${k}"]\` must be a string, got ${describeType(val)}`;
+      }
+      if (k.includes("\0") || val.includes("\0")) {
+        return `\`fixture.${key}\` carries a NUL`;
+      }
+    }
+  }
+  for (const k of Object.keys(fixture.env ?? {})) {
+    if (!ENV_NAME.test(k))
+      return `\`fixture.env\` key "${k}" is not a variable name`;
+    if (SANDBOX_OWNED_ENV.includes(k)) {
+      return `\`fixture.env\` may not set ${k} — the sandbox owns it`;
+    }
+  }
+  for (const k of Object.keys(fixture.files ?? {})) {
+    if (k === "") return "`fixture.files` names an empty path";
+  }
+  return null;
+}
+
+/**
+ * Whether the generated script PARSES under `shell`: `<shell> -n`, rc files off,
+ * which reads every command and executes none. Returns null when it parses, else
+ * a one-line reason (task.180 QA cycle 3, TASK-180-009 — the third strike on the
+ * stderr classifier this replaces). A parse failure is a property of the script
+ * text, so it is decided before and apart from the run: no message the block
+ * prints at run time can be mistaken for it, and no runtime error the block hits
+ * after its guard answered can be mistaken for "never answered".
+ */
+export function parseCheck(shell, scriptPath, { cwd, env, timeoutMs }) {
+  const r = spawnSync(shell, [...noRcFlags(shell), "-n", scriptPath], {
+    input: "",
+    cwd,
+    env,
+    encoding: "utf8",
+    timeout: timeoutMs,
+  });
+  if (r.status === 0) return null;
+  if (neverRan(r)) {
+    return `\`${shell} -n\` did not complete: ${r.error?.message ?? r.signal ?? "no exit status"}`;
+  }
+  const first = (r.stderr ?? "").trim().split("\n")[0] ?? "";
+  return `\`${shell} -n\` exit ${r.status}: ${first.slice(0, 160)}`;
+}
+
+/**
+ * Score one fence: run — the ONE ordered decision (task.180 QA cycle 2: two
+ * cycles of HIGH findings were each a branch checked in the wrong order, so the
+ * order is stated here, once):
+ *   1. a path `expected.absent` names exists in the case directory → the side
+ *      effect happened: compared, so a hostile case is reproduced — even when
+ *      the shell then stopped, was killed or timed out (TASK-180-006, -018)
+ *   2. the child never answered (killed, timed out) or the shell could not open
+ *      the script → errored
+ *   3. the generated script does not parse (`parseError`, from parseCheck) →
+ *      errored: the guard never ran (TASK-180-001)
+ *   4. `expected` → compared, mapped through direction. Every hostile case
+ *      reaches this step with a stated refusal OUTPUT: runFenceCase declines
+ *      one with no `expected`, or with one that is only an exit code or an
+ *      empty output (TASK-180-012), so a shell that stopped on the input
+ *      (`${x:?}`, a word-split `cd`) or an injected `exit` mismatches the
+ *      stated refusal instead of passing for it (TASK-180-005, -009)
+ *   5. otherwise (a legitimate case) exit 0 is accepted, any other exit rejected
+ * No step reads the shell's stderr to decide whether the guard answered.
+ *
+ * @returns {{outcome: string, detail: string|null}}
+ */
+export function scoreFenceRun(
+  child,
+  { c, shell, scriptPath, caseDir, timeoutMs, parseError = null },
+) {
+  const compared = () => {
+    const mismatches = compareExpected(c.expected, child, caseDir);
+    const matched = mismatches.length === 0;
+    const good = c.direction === "hostile" ? "rejected" : "accepted";
+    const bad = c.direction === "hostile" ? "accepted" : "rejected";
+    return {
+      outcome: matched ? good : bad,
+      detail: matched ? null : mismatches.join("; "),
+    };
+  };
+  // A side effect that happened is a reproduction whatever the shell then did —
+  // stopped, was killed, or timed out (TASK-180-006, -018).
+  const absent = c.expected?.absent ?? [];
+  if (absent.some((p) => existsSync(join(caseDir, p)))) return compared();
+  if (neverRan(child)) {
+    return {
+      outcome: "errored",
+      detail:
+        child.error?.code === "ETIMEDOUT"
+          ? `timed out after ${timeoutMs}ms`
+          : child.signal
+            ? `killed by ${child.signal}`
+            : `never ran: ${child.error?.message ?? "no exit status"}`,
+    };
+  }
+  if (isLaunchFailure(child, scriptPath)) {
+    return {
+      outcome: "errored",
+      detail: `${shell} could not open the script (exit ${child.status}): ${(child.stderr ?? "").trim().slice(0, 160)}`,
+    };
+  }
+  if (parseError !== null) {
+    return {
+      outcome: "errored",
+      detail: `the substituted block does not parse under ${shell} — the guard never ran: ${parseError}`,
+    };
+  }
+  if (c.expected !== undefined) return compared();
+  return child.status === 0
+    ? { outcome: "accepted", detail: null }
+    : {
+        outcome: "rejected",
+        detail: `exit ${child.status}: ${((child.stderr ?? "").trim() || (child.stdout ?? "").trim()).split("\n")[0].slice(0, 160)}`,
+      };
+}
+
+/** True when `expected` names a non-blank stdout or stderr — the only part of a refusal a stopped shell cannot also produce. */
+const statesRefusalOutput = (expected) =>
+  ["stdout", "stderr"].some(
+    (k) => typeof expected?.[k] === "string" && expected[k].trim() !== "",
+  );
+
+/**
+ * Every entry under `dir` except `skip`: files keyed by path with
+ * snapshotTree's stamp, directories keyed `path/` and stamped `dir` — a
+ * directory's mtime moves whenever anything is written inside it, so it is not
+ * a stamp. Directories are listed so an empty `mkdir` is seen (TASK-180-013).
+ */
+function workDirStamps(dir, skip) {
+  const out = snapshotTree(dir, skip);
+  const walk = (d, prefix) => {
+    let entries;
+    try {
+      entries = readdirSync(d, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      if (!e.isDirectory()) continue;
+      const rel = prefix ? `${prefix}/${e.name}` : e.name;
+      if (rel === skip) continue;
+      out.set(`${rel}/`, "dir");
+      walk(join(d, e.name), rel);
+    }
+  };
+  walk(dir, "");
+  return out;
+}
+
+/**
+ * `path` with every absolute directory that holds an executable `gh` replaced by
+ * a copy of it WITHOUT `gh` — a directory of symlinks under `farmRoot`, one per
+ * entry, built once per directory and reused. A PATH lookup in the child
+ * (`gh`, `type -ap gh`, `command -v gh`) then finds only the trip-wire or the
+ * fixture prepended ahead of it, whatever the block, an input or a fixture
+ * says. Enumerating the text that will run could not do this: under fence:
+ * everything a case carries can run (TASK-180-015, -017). An absolute path to a
+ * real `gh`, and a PATH the block itself prepends, stay the stated limits. A
+ * directory that holds `gh` but cannot be listed is dropped rather than kept.
+ * A relative entry is resolved against `cwd` (the case directory) for the test.
+ * A default-path lookup (`command -p gh`, `env -u PATH gh`) searches
+ * /bin:/usr/bin, not PATH: the text check is what catches it (TASK-180-019).
+ */
+export function ghFreePath(path, farmRoot, cwd = null) {
+  return (path ?? "")
+    .split(":")
+    .flatMap((entry) => {
+      // A relative entry (`""` included) is searched from the child's cwd, so
+      // it is tested there: `../../…/.local/bin` from a fixture's PATH must not
+      // keep a host gh in reach. With no cwd it cannot be tested, and is kept.
+      if (!isAbsolute(entry) && cwd === null) return [entry];
+      const dir = isAbsolute(entry) ? entry : resolve(cwd, entry);
+      try {
+        accessSync(join(dir, "gh"), fsConstants.X_OK);
+      } catch {
+        return [entry];
+      }
+      const farm = join(
+        farmRoot,
+        createHash("sha1").update(dir).digest("hex").slice(0, 16),
+      );
+      if (existsSync(farm)) return [farm];
+      try {
+        const names = readdirSync(dir).filter((n) => n !== "gh");
+        mkdirSync(farm, { recursive: true });
+        for (const n of names) symlinkSync(join(dir, n), join(farm, n));
+        return [farm];
+      } catch {
+        rmSync(farm, { recursive: true, force: true });
+        return [];
+      }
+    })
+    .join(":");
+}
+
+/**
+ * Run one case against a fenced block, once per shell (task.180).
+ *
+ * Per shell: a fresh case directory under the work dir — the fixture's files,
+ * and the block's cwd — then the block with every `slot` replaced by the
+ * case's input, written as a script under the harness dir (which the sentinel
+ * skips) and run as `<shell> <script>`, rc files off. The replacement is a
+ * FUNCTION, so a `$&` in the input is text; the input is still script SOURCE,
+ * so a `$(…)` in it runs — in the case directory, where `expected.absent` can
+ * see it and the escape sentinel does not need to. Outcome: the cli: arm's —
+ * exit status, or `expected` when the case carries one.
+ */
+function runFenceCase(
+  c,
+  {
+    block,
+    slot,
+    docPath,
+    fakeGhDir = null,
+    harnessDir,
+    shells,
+    sandboxRoot,
+    sandboxHome,
+    sandboxTmp,
+    workDir,
+    workDirName,
+    timeoutMs,
+    caseResults,
+    escapes,
+  },
+) {
+  const decline = (detail) => {
+    for (const shell of shells) {
+      caseResults.push({
+        id: c.id,
+        shell,
+        direction: c.direction,
+        outcome: "errored",
+        detail,
+      });
+    }
+  };
+  if (typeof c.input !== "string") {
+    decline(
+      `case input is ${describeType(c.input)}, not a string — it replaces the slot's text`,
+    );
+    return;
+  }
+  if (c.input.includes("\0")) {
+    decline("case input carries a NUL");
+    return;
+  }
+  const hasExpected = c.expected !== undefined;
+  if (hasExpected) {
+    const problem = expectedProblem(c.expected);
+    if (problem !== null) {
+      decline(`case's ${problem}`);
+      return;
+    }
+  }
+  if (!hasExpected && c.direction === "hostile") {
+    decline(
+      "hostile fence: case has no `expected` — state the guard's refusal (its non-empty stdout or stderr); an exit status alone cannot tell a refusal from a shell that stopped on the input",
+    );
+    return;
+  }
+  // An exit code, or an empty output, is also what a shell that stopped on the
+  // input (`${x:?}`) or an injected `exit 1` produces, so an `expected` made only
+  // of those matches the very runs it was required to tell apart (TASK-180-012).
+  // A guard that refuses silently is therefore unprobeable here, by design: a
+  // decline says so, where a score would read a false `engages`.
+  if (c.direction === "hostile" && !statesRefusalOutput(c.expected)) {
+    decline(
+      "hostile fence: case's `expected` states no refusal output — an exit code or an empty stdout/stderr is also what a shell that stopped on the input, or an injected `exit`, produces; state the guard's non-empty stdout or stderr",
+    );
+    return;
+  }
+  const problem = fixtureProblem(c.fixture);
+  if (problem !== null) {
+    decline(`case's ${problem}`);
+    return;
+  }
+  const files = Object.entries(c.fixture?.files ?? {});
+  // An `expected.absent` name the case's own fixture writes mismatches on every
+  // run, so every hostile case would score accepted and the verdict read
+  // `absent` behind a full count — declined, as the shell and cli: arms decline
+  // it (task.128 BUG-13; task.180 QA cycle 2, TASK-180-004).
+  // Compared on the NORMALISED first segment, case-folded: `./pwned` and
+  // `b/../pwned` write `pwned`, and on a case-insensitive filesystem so does
+  // `PWNED` (TASK-180-010). A path that leaves the case directory is refused
+  // below, per shell.
+  const firstSegment = (rel) => normalize(rel).split(sep)[0].toLowerCase();
+  const collides = (c.expected?.absent ?? []).find((p) =>
+    files.some(([rel]) => firstSegment(rel) === p.toLowerCase()),
+  );
+  if (collides !== undefined) {
+    decline(
+      `case's \`expected.absent\` names "${collides}", which the case's own fixture writes`,
+    );
+    return;
+  }
+  const script = block.replaceAll(slot, () => c.input);
+
+  for (const shell of shells) {
+    const caseDir = mkdtempSync(join(workDir, "fixture-"));
+    try {
+      writeFixtureFiles(caseDir, files);
+    } catch (e) {
+      caseResults.push({
+        id: c.id,
+        shell,
+        direction: c.direction,
+        outcome: "errored",
+        detail: `fixture: ${e.message}`,
+      });
+      continue;
+    }
+    const scriptPath = join(harnessDir, `fence-${++harnessSeq}.sh`);
+    writeFileSync(scriptPath, script);
+
+    // The per-case isolation shared with shell-argv: (caseShellEnv).
+    const env = caseShellEnv(c.fixture, {
+      caseDir,
+      sandboxHome,
+      sandboxTmp,
+      harnessDir,
+      fakeGhDir,
+    });
+    const parseError = parseCheck(shell, scriptPath, {
+      cwd: caseDir,
+      env,
+      timeoutMs,
+    });
+    // Watched beside the case directory too (TASK-180-011, -013) — the
+    // snapshot is caseWatchedSpawn's, shared with shell-argv:.
+    const child = caseWatchedSpawn(
+      shell,
+      [...noRcFlags(shell), scriptPath],
+      { cwd: caseDir, env, timeoutMs },
+      {
+        sandboxRoot,
+        workDir,
+        workDirName,
+        harnessDir,
+        scriptDir: dirname(docPath),
+        escapes,
+        escapeId: `${c.id}@${shell}`,
+        shell,
+      },
+    );
+
+    const { outcome, detail } = scoreFenceRun(child, {
+      c,
+      shell,
+      scriptPath,
+      caseDir,
+      timeoutMs,
+      parseError,
+    });
+    caseResults.push({
+      id: c.id,
+      shell,
+      direction: c.direction,
+      outcome,
+      detail,
+      exit: child.status,
+    });
+  }
 }
 
 // ── The run record ───────────────────────────────────────────────────────────
@@ -2002,9 +3600,20 @@ export function cliControlKey(template) {
 // landed in a second entry (task.144 5c CR-1).
 const controlKey = (c) => {
   const base = `${c.sink ?? ""}\u0000${c.entry ?? ""}`;
+  // A fence: entry names a BLOCK, not how it was called: its --name, else its
+  // slot, is what tells two controls on one block apart. Keyed on sink + entry
+  // alone, a second slot or name silently replaced the first (task.180 QA
+  // cycle 1, TASK-180-002) — the cli: precedent, below.
+  if (typeof c.entry === "string" && c.entry.startsWith(FENCE_PREFIX)) {
+    const name = cliControlName(c);
+    if (name !== null) return `${base}\u0000name:${name}`;
+    return typeof c.slot === "string" ? `${base}\u0000slot:${c.slot}` : base;
+  }
   const isCli =
     Array.isArray(c.argv) ||
-    (typeof c.entry === "string" && c.entry.startsWith(CLI_PREFIX));
+    (typeof c.entry === "string" &&
+      (c.entry.startsWith(CLI_PREFIX) ||
+        c.entry.startsWith(SHELL_ARGV_PREFIX)));
   if (!isCli) return base;
   const name = cliControlName(c);
   if (name !== null) return `${base}\u0000name:${name}`;
@@ -2026,7 +3635,8 @@ function cliControlName(c) {
 
 /**
  * Reduce a `runProbeSpec` result to the per-control entry the record stores.
- * Counts only — the per-case detail stays in the engine's own `--json` output.
+ * Counts, plus each declined case's id, reason and detail — the per-case
+ * results of the cases that ran stay in the engine's own `--json` output.
  */
 export function toRecordEntry(result, { name, callSite } = {}) {
   return {
@@ -2041,10 +3651,29 @@ export function toRecordEntry(result, { name, callSite } = {}) {
     reproduced: result.reproduced?.length ?? 0,
     overblocked: result.overblocked?.length ?? 0,
     declined: result.declined?.length ?? 0,
+    // Why each declined case was not run (obs #207). The count alone told a
+    // reader that cases were declined but not why; the reason surfaced only on
+    // a --json re-run. Additive: every reader of the record reads the counts.
+    declined_cases: (Array.isArray(result.declined) ? result.declined : []).map(
+      (d) => ({
+        id: d?.id ?? null,
+        reason: d?.reason ?? null,
+        detail: d?.detail ?? null,
+      }),
+    ),
     escaped: result.escapes?.length ?? 0,
     // Which shells each case ran under (shell form), or null. The count is
     // cases × shells, and a reader must not have to divide (cycle 2, CR-5).
     shells: Array.isArray(result.shells) ? [...result.shells] : null,
+    // The interpreter a cli: `.py` entry ran under (task.215), or null — the
+    // record says which python3 answered, as `shells` says which shells did.
+    interpreter:
+      result.interpreter && typeof result.interpreter === "object"
+        ? {
+            name: result.interpreter.name ?? null,
+            version: result.interpreter.version ?? null,
+          }
+        : null,
     // The directory whose `gh` answered the shell runs (task.136), or null —
     // the record must say what answered, not leave a reader to assume the
     // real one did not.
@@ -2054,17 +3683,28 @@ export function toRecordEntry(result, { name, callSite } = {}) {
     argv: Array.isArray(result.argv) ? [...result.argv] : null,
     // The JS form's fixed extra arguments (task.131), or null.
     args: Array.isArray(result.args) ? [...result.args] : null,
+    // The fence: form's placeholder token (task.180), or null for every other
+    // form. Part of an unnamed fence: control's key — see controlKey.
+    slot: typeof result.slot === "string" ? result.slot : null,
+    // The shell-argv: form's setup script (task.181), or null for every other
+    // form — the record says what built each case directory.
+    fixture_setup:
+      typeof result.fixtureSetup === "string" ? result.fixtureSetup : null,
     ran_at: new Date().toISOString(),
   };
 }
 
+// `escaped` is totalled beside `executed` so every reader of the record sees it at the same depth.
+// It used to live only per control, and qa-task gated PASS over a record whose one control had
+// escaped 10 times while /finalise, reading the same record, halted on it (obs #73).
 function totalsOf(controls) {
   return controls.reduce(
     (t, c) => ({
       executed: t.executed + (c.executed ?? 0),
       reproduced: t.reproduced + (c.reproduced ?? 0),
+      escaped: t.escaped + (c.escaped ?? 0),
     }),
-    { executed: 0, reproduced: 0 },
+    { executed: 0, reproduced: 0, escaped: 0 },
   );
 }
 
@@ -2333,6 +3973,7 @@ export function emitBlock(record, { mode = "diff" } = {}) {
   if (!record) {
     lines.push(
       "  probes_executed: 0    # no run record — the engine did not run",
+      "  escaped: 0",
       `  evidence: ${evidence}    # computed by security-probe.mjs; measured needs a record`,
       "  controls: []",
     );
@@ -2341,6 +3982,8 @@ export function emitBlock(record, { mode = "diff" } = {}) {
   const totals = totalsOf(record.controls);
   lines.push(
     `  probes_executed: ${totals.executed}`,
+    // A non-zero count is a finding whatever the verdicts say (probe-boundary-rule.md).
+    `  escaped: ${totals.escaped}`,
     `  evidence: ${evidence}    # computed by security-probe.mjs from the run record`,
   );
   if (record.controls.length === 0) {
@@ -2349,12 +3992,7 @@ export function emitBlock(record, { mode = "diff" } = {}) {
     lines.push("  controls:");
     for (const c of record.controls) {
       lines.push(
-        `    - name: ${yamlStr(
-          c.name ??
-            `${c.sink}:${String(c.entry ?? "")
-              .split("#")
-              .pop()}`,
-        )}`,
+        `    - name: ${yamlStr(c.name ?? defaultControlName(c))}`,
         `      verdict: ${yamlStr(c.verdict)}`,
         `      severity: ${yamlStr(SEVERITY_BY_VERDICT[c.verdict])}`,
         `      call_site: ${yamlStr(c.call_site)}`,
@@ -2362,18 +4000,42 @@ export function emitBlock(record, { mode = "diff" } = {}) {
         `      sink: ${yamlStr(c.sink)}`,
         `      reason: ${yamlStr(c.reason)}`,
         `      probes_executed: ${c.executed}`,
+        `      escaped: ${c.escaped ?? 0}`,
         ...(Array.isArray(c.shells) && c.shells.length > 0
           ? [`      shells: [${c.shells.join(", ")}]`]
+          : []),
+        // Which python3 ran a cli: `.py` control (task.215).
+        ...(c.interpreter && typeof c.interpreter.version === "string"
+          ? [`      interpreter: ${yamlStr(c.interpreter.version)}`]
           : []),
         // A JSON array of strings is a valid YAML flow sequence. Printed so two
         // cli: controls on one script read as two in the block (task.144).
         ...(Array.isArray(c.argv)
           ? [`      argv: ${JSON.stringify(c.argv)}`]
           : []),
+        // The slot, for the same reason: two fence: controls on one block are
+        // two controls, keyed apart by their slot (TASK-180-002, -021).
+        ...(typeof c.slot === "string"
+          ? [`      slot: ${yamlStr(c.slot)}`]
+          : []),
       );
     }
   }
   return `${lines.join("\n")}\n`;
+}
+
+/**
+ * An unnamed control's display name: `<sink>:<the text after the FIRST #>` — a
+ * fence: heading may itself contain `#` (`C# and F#`) — plus the slot for a
+ * fence: control, so two slots on one block read as two (TASK-180-021).
+ */
+function defaultControlName(c) {
+  const entry = String(c.entry ?? "");
+  const hash = entry.indexOf("#");
+  const tail = hash < 0 ? entry : entry.slice(hash + 1);
+  return typeof c.slot === "string"
+    ? `${c.sink}:${tail} [${c.slot}]`
+    : `${c.sink}:${tail}`;
 }
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
@@ -2386,6 +4048,8 @@ const OPERAND_FLAGS = Object.freeze({
   "--fake-gh": "fakeGh",
   "--argv": "argv",
   "--args-json": "argsJson",
+  "--slot": "slot",
+  "--fixture-setup": "fixtureSetup",
   "--repo-root": "repoRoot",
   "--record": "record",
   "--name": "name",
@@ -2466,7 +4130,7 @@ export function main(argv = process.argv.slice(2)) {
   }
   if (!opts.entry) {
     process.stderr.write(
-      "--entry <path#exportName | shell:path | shell-fn:path#function | cli:path> is required\n",
+      "--entry <path#exportName | shell:path | shell-fn:path#function | cli:path | shell-argv:path | fence:doc.md#heading> is required\n",
     );
     return 2;
   }
@@ -2480,24 +4144,50 @@ export function main(argv = process.argv.slice(2)) {
   // validator and declines `bad-argv` for a library caller; here the flag is
   // wrong, not the probe, and a wrong flag must not write a record entry.
   const isCliEntry = opts.entry.startsWith(CLI_PREFIX);
-  if (isCliEntry && opts.argv === undefined) {
+  const isShellArgvEntry = opts.entry.startsWith(SHELL_ARGV_PREFIX);
+  const takesArgv = isCliEntry || isShellArgvEntry;
+  if (takesArgv && opts.argv === undefined) {
     process.stderr.write(
-      'bad-argv: the cli: entry form needs --argv — a JSON array with one "{input}" element\n',
+      `bad-argv: the ${isCliEntry ? "cli:" : "shell-argv:"} entry form needs --argv — a JSON array with one "{input}" element\n`,
     );
     return 2;
   }
-  if (!isCliEntry && opts.argv !== undefined) {
+  if (!takesArgv && opts.argv !== undefined) {
     process.stderr.write(
-      "bad-argv: --argv applies to the cli: entry form only\n",
+      "bad-argv: --argv applies to the cli: and shell-argv: entry forms only\n",
     );
     return 2;
   }
-  if (isCliEntry) {
+  // `--fixture-setup` is the shell-argv: form's (task.181), as `--slot` is the
+  // fence: form's: given with any other form it is an argument error.
+  if (!isShellArgvEntry && opts.fixtureSetup !== undefined) {
+    process.stderr.write(
+      "bad-fixture-setup: --fixture-setup applies to the shell-argv: entry form only\n",
+    );
+    return 2;
+  }
+  if (takesArgv) {
     const parsed = parseArgvTemplate(opts.argv);
     if (!parsed.ok) {
       process.stderr.write(`bad-argv: ${parsed.detail}\n`);
       return 2;
     }
+  }
+
+  // `--slot` is the fence: form's, as `--argv` is the cli: form's (task.180):
+  // missing with fence: or given with any other form is an argument error.
+  const isFenceEntry = opts.entry.startsWith(FENCE_PREFIX);
+  if (isFenceEntry && (opts.slot === undefined || opts.slot === "")) {
+    process.stderr.write(
+      "bad-slot: the fence: entry form needs --slot <placeholder> — the text in the block each case's input replaces\n",
+    );
+    return 2;
+  }
+  if (!isFenceEntry && opts.slot !== undefined) {
+    process.stderr.write(
+      "bad-slot: --slot applies to the fence: entry form only\n",
+    );
+    return 2;
   }
 
   // `--args-json` shape errors are ARGUMENT errors, like --argv's: exit 2 before
@@ -2506,6 +4196,8 @@ export function main(argv = process.argv.slice(2)) {
   if (opts.argsJson !== undefined) {
     if (
       isCliEntry ||
+      isFenceEntry ||
+      isShellArgvEntry ||
       opts.entry.startsWith(SHELL_PREFIX) ||
       opts.entry.startsWith(SHELL_FN_PREFIX)
     ) {
@@ -2526,6 +4218,18 @@ export function main(argv = process.argv.slice(2)) {
     }
   }
 
+  // The two refusals below are ARGUMENT errors that a `--json` caller must be
+  // able to read: stderr carries the line, and under --json stdout carries
+  // `{reason, detail}`. Both run before preflightRecord, so a run the engine
+  // cannot set up never reaches the record (obs #201, #211).
+  const refuse = (reason, detail) => {
+    process.stderr.write(`${reason}: ${detail}\n`);
+    if (opts.json) {
+      process.stdout.write(`${JSON.stringify({ reason, detail }, null, 2)}\n`);
+    }
+    return 2;
+  };
+
   let cases;
   if (opts.casesFile) {
     try {
@@ -2534,6 +4238,20 @@ export function main(argv = process.argv.slice(2)) {
       process.stderr.write(`cannot read --cases-file: ${e.message}\n`);
       return 2;
     }
+    const bad = validateCases(cases);
+    if (bad) return refuse("bad-cases", describeBadCase(bad));
+  }
+
+  // The entry must exist before anything runs or is recorded. A resolveEntry
+  // failure (bad-entry, outside-repo-root) is left to runProbeSpec, which
+  // declines it as before; only the missing path is refused here.
+  const repoRoot = opts.repoRoot ? resolve(opts.repoRoot) : defaultRepoRoot();
+  const resolvedEntry = resolveEntry(opts.entry, repoRoot);
+  if (resolvedEntry.ok && !existsSync(resolvedEntry.entryPath)) {
+    return refuse(
+      "entry-not-found",
+      `${resolvedEntry.entryPath} (repo root ${repoRoot})`,
+    );
   }
 
   if (opts.record) {
@@ -2552,8 +4270,10 @@ export function main(argv = process.argv.slice(2)) {
     fakeGh: opts.fakeGh,
     argv: opts.argv,
     args: extraArgs,
+    slot: opts.slot,
+    fixtureSetup: opts.fixtureSetup,
     timeoutMs: opts.timeoutMs,
-    ...(opts.repoRoot ? { repoRoot: resolve(opts.repoRoot) } : {}),
+    repoRoot,
   });
 
   const escaped = result.escapes?.length ?? 0;

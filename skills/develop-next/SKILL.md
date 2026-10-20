@@ -15,7 +15,7 @@ Policy baseline (user-ratified 2026-07-11): auto-merge everything green; auto-an
 - User says `/develop-next` (one item) or `/loop /develop-next` (continuous).
 - User says "do the next roadmap item", "keep the roadmap rolling", "what's next — build it".
 - `--dry-run`: report which item would be selected and why, then stop. **Read-only** — no checkout, no pull, no state file, no pipeline actions.
-- `--batch` (planning aid, not a loop mode): `node .agents/skills/develop-next/scripts/select-next.mjs --batch` prints a **maximal set of ready rows that can be developed concurrently in separate git worktrees** — dependency-ready (same predicate as selection) **and** write-disjoint (no two share a `touches:` tag either marks `!`). Emits the batch, the soft overlaps accepted, rows held back by hard conflicts, and `git worktree add … develop` commands. Requires rows to carry `touches:` annotations (see [references/roadmap-selection.md](references/roadmap-selection.md) §Parallel batch). Advisory — runs nothing; the operator fans out worktrees and **merges to `develop` serially**.
+- `--batch` (planning aid, not a loop mode): `node .agents/skills/develop-next/scripts/select-next.mjs --batch` prints a **maximal set of ready rows that can be developed concurrently in separate git worktrees** — dependency-ready (same predicate as selection) **and** write-disjoint (no two share a `touches:` tag either marks `!`). Emits the batch, the soft overlaps accepted, rows held back by hard conflicts or by an `epic-integration` epic (bug.18 — a worktree cut from the base branch cannot honour an integration branch), and `git worktree add … develop` commands. The worktrees go inside the repository, at `.worktrees/batch-<slug>`; `--worktree-root <dir>` names another repo-relative root, and a root that leaves the repository (absolute, `..`, or a symlink out) is refused. Gitignore the root before creating them (`/.worktrees/` in `.gitignore`), or the next run sees them as untracked files. Requires rows to carry `touches:` annotations (see [references/roadmap-selection.md](references/roadmap-selection.md) §Parallel batch). Advisory — runs nothing; the operator fans out worktrees and **merges to `develop` serially**.
 
 ## Configuration
 
@@ -45,19 +45,140 @@ Apply any project-wide command conventions from the consumer project's own CLAUD
   "command": "/develop-story",
   "commandArg": "<path>",
   "dispatched": false,
+  "prNumber": null,
   "merged": false,
   "ticked": false,
+  "halted": false,
+  "haltKind": null,
   "startedAt": "<iso>"
 }
 ```
 
-Written at selection, updated after each of Steps 2–4, **deleted only in Step 5**. `source` is
+Written at selection, updated after each of Steps 2–4, **deleted only in Step 5**. `prNumber`,
+`halted` and `haltKind` mean what they mean on a `develop-batch` item: the item's PR once the
+pipeline has opened one, and a HALT recorded as a fact rather than inferred from the flags around it.
+**A file without them resumes unchanged** — a missing field reads as `false` / `null`, so a file
+written before these fields existed needs no migration. `source` is
 `item.source` from the selector (`roadmap` | `bug-registry` | `task-registry`) and is what Step 4
 reads on a resume — the work-item path alone cannot say which arm applies. This makes the merge→tick sequence recoverable (a crash between merge and tick can never cause the item to be re-selected and re-dispatched) and acts as develop-next's own single-flight lock.
 
 ## Step 0 — Preflight
 
-1. **Run-state check.** If `.claude/state/develop-next.state.json` exists, a prior develop-next run did not finish — do **not** select a new item. Resume from the recorded flags: `merged: true, ticked: false` → go to Step 4; `dispatched: true, merged: false` → go to Step 3 (the pipeline's own lock/resume machinery covers a pipeline that is still mid-flight); otherwise → Step 2. In `--dry-run`: report the pending run and stop.
+1. **Run-state check.** If `.claude/state/develop-next.state.json` exists, a prior develop-next run did not finish — do **not** select a new item. Three things happen, in this order: the halt check, the reconciliation, the routing. In `--dry-run`: report the pending run (and any recorded HALT) and stop, before reconciling — reconciliation writes the run-state file.
+
+   **a. A recorded HALT first.** `halted: true` → surface the HALT and **STOP**: never route a halted run, and never to Step 3. Surface, verbatim: `halt_step` and `halt_reason` from `.claude/state/develop-pipeline.last-halt.json` when it exists; then the implementation report's QA-loop escalation entry when the loop wrote one (only loop-limit and not-converging halts do), otherwise the report's newest Issues Log entry and its `**Final Status**:` line. Send a push notification. **To clear it:** fix the cause, then set `halted: false` in the run-state file to resume this item (routing below sends it back through Step 2, whose pipeline offers its own resume option), or delete the file to drop the item and select afresh.
+
+   **b. Reconcile the flags against the evidence** (obs #180). The flags summarise facts that live on the platform and on `origin`; a crash between an action and its flag write leaves them behind. Reconciliation only ever **advances** a flag — it never clears one, and a PR query that fails leaves the flags as recorded (on GitHub, Step 3's state verdict makes the re-run merge safe; on Bitbucket, Step 3's parsing note requires a `.state` re-query before any retry). The tick check is the exception: its `unknown` is a **HALT**, because Step 4's roadmap arm is not idempotent — a re-tick adds a second Change Log row. Each block below resolves what it needs **itself**: every fenced block runs as its own shell, so item 6's platform binding does not reach it:
+
+   - `merged: false` → read the item's PR state. The PR is `prNumber` when recorded; otherwise bind it from [Find the item's merged PR](#find-the-items-merged-pr) below — **only when the item's document reads `accepted` (bug: `closed`)**, the already-done guard's own precondition, and empty otherwise: a `reopened` bug reuses its branch name, and its earlier fix's merged PR is not this run's merge. `MERGED` → set `merged: true`.
+
+     ```bash
+     # Step 0.1 reconciliation, merge flag. INPUTS: the run-state file, and <mergedPr> — the answer of
+     # "Find the item's merged PR" when prNumber is not recorded and the document reads accepted (bug:
+     # closed); empty otherwise. The platform is resolved HERE, not inherited from item 6: this block is
+     # its own shell, and an inherited VCS is unbound in it (task.188 QA cycle 2, CR2-1).
+     source .agents/skills/develop-next/references/resolve-platform.sh || exit 1
+     if [ "$VCS" = "bitbucket" ]; then
+       BB_PATH=$(git remote get-url origin | sed -E 's|.*bitbucket\.org[:/]||; s|\.git$||')
+       BB_WORKSPACE=${BB_PATH%%/*}
+       BB_REPO=${BB_PATH##*/}
+       BB_API="https://api.bitbucket.org/2.0"
+       source .agents/skills/develop-next/references/bitbucket-auth.sh \
+         || { echo "HALT: no Bitbucket credential resolved — cannot reconcile the merge flag"; exit 1; }
+     fi
+     STATE_FILE=.claude/state/develop-next.state.json
+     PR_NUMBER=$(jq -r '.prNumber // empty' "$STATE_FILE")
+     [ -n "$PR_NUMBER" ] || PR_NUMBER="<mergedPr>"
+     if [ "$(jq -r '.merged // false' "$STATE_FILE")" != "true" ] && [ -n "$PR_NUMBER" ]; then
+       if [ "$VCS" = "bitbucket" ]; then
+         PR_STATE=$(curl -sf "${BB_CURL_AUTH[@]}" \
+           "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_NUMBER}" | jq -r '.state // empty')
+       else
+         PR_STATE=$(gh pr view "$PR_NUMBER" --json state -q .state)
+       fi
+       if [ "$PR_STATE" = "MERGED" ]; then
+         # The record follows the write, never precedes it: a failed write is a HALT, not a reconciled flag.
+         jq --argjson n "$PR_NUMBER" '.merged = true | .prNumber = $n' "$STATE_FILE" > "$STATE_FILE.tmp" \
+           && mv "$STATE_FILE.tmp" "$STATE_FILE" \
+           && echo "reconciled: PR #$PR_NUMBER is MERGED — merged: true" \
+           || { rm -f "$STATE_FILE.tmp"; echo "HALT: PR #$PR_NUMBER is MERGED but merged: true could not be written"; exit 1; }
+       fi
+     fi
+     ```
+
+   - `merged: true, ticked: false`, `source: roadmap` → read the item's row on `origin/<baseBranch>`, and in the `roadmap-history.md` beside the roadmap (a row archived at phase close is gone from the roadmap). The row is matched by the item id the selector recorded, through the selector's own parser — never a loose pattern. A registry source needs nothing here: Step 4's registry arm answers `already` on its own.
+
+     ```bash
+     # Step 0.1 reconciliation, tick flag (roadmap source only). Four answers, never two:
+     #   ticked           — a ticked row with this id is on origin/<baseBranch>          (exit 0)
+     #   ticked-unpushed  — not on origin, but committed on the local <baseBranch>:
+     #                      Step 4 ticked and the push never landed                      (exit 0)
+     #   not-ticked       — on neither                                                   (exit 0)
+     #   uncommitted      — the roadmap has uncommitted edits: Step 4 may have ticked and
+     #                      crashed before its commit, and nothing here can tell           (exit 1, HALT)
+     #   unknown          — a look failed (fetch, a missing roadmap, a read, the parser) (exit 1, HALT)
+     # A failed look must not read as "not ticked", and an unpushed tick must not either: both route to
+     # Step 4, which re-ticks and adds a second Change Log row (task.188 QA cycles 1–2, QA-1, CR2-2).
+     ROW="roadmap row <item> on <baseBranch>"
+     SCRATCH=.claude/state/dn-roadmap-row.md
+     # Uncommitted roadmap edits are not inferred from — they are the operator's to commit or discard
+     # (task.188 QA cycle 3, CR3-1). Staged or not: compare the working tree against HEAD.
+     git diff --quiet HEAD -- "<roadmapPath>" "$(dirname "<roadmapPath>")/roadmap-history.md" 2>/dev/null \
+       || { echo "$ROW: uncommitted (the roadmap has uncommitted edits — commit or discard them, then resume)"; exit 1; }
+     SELECTOR="$PWD/.agents/skills/develop-next/scripts/select-next.mjs"
+     # row_state — reads the ref named by $REF (a variable, not a positional: the harness substitutes
+     # dollar-digit tokens in a delivered SKILL.md). 0 ticked, 3 not ticked, 1 could not look. The history
+     # file beside the roadmap is read too (a row archived at phase close); its absence is normal, an
+     # unreadable one is not.
+     row_state() {
+       git cat-file -e "$REF:<roadmapPath>" 2>/dev/null || return 1
+       for f in "<roadmapPath>" "$(dirname "<roadmapPath>")/roadmap-history.md"; do
+         git cat-file -e "$REF:$f" 2>/dev/null || continue
+         git show "$REF:$f" > "$SCRATCH" || return 1
+         # The script path goes LAST: select-next.mjs runs its CLI when argv[1] is its own path.
+         command node --input-type=module -e '
+           const fs = await import("node:fs");
+           const { parseRoadmap } = await import(process.argv[3]);
+           const rows = parseRoadmap(fs.readFileSync(process.argv[1], "utf8")).rows;
+           process.exit(rows.some((r) => r.id === process.argv[2] && r.ticked) ? 0 : 3);
+         ' "$SCRATCH" "<item>" "$SELECTOR"
+         case $? in 0) return 0 ;; 3) ;; *) return 1 ;; esac
+       done
+       return 3
+     }
+     git fetch -q origin <baseBranch> || { echo "$ROW: unknown (git fetch failed)"; exit 1; }
+     REF="origin/<baseBranch>"; row_state; rc=$?
+     case $rc in
+       0) ROW_TICKED=ticked ;;
+       3) ROW_TICKED=not-ticked
+          if git rev-parse -q --verify "refs/heads/<baseBranch>" >/dev/null; then
+            REF="refs/heads/<baseBranch>"; row_state; rc=$?
+            case $rc in
+              0) ROW_TICKED=ticked-unpushed ;;
+              3) ;;
+              *) rm -f "$SCRATCH"; echo "$ROW: unknown (could not read the local <baseBranch>)"; exit 1 ;;
+            esac
+          fi ;;
+       *) rm -f "$SCRATCH"; echo "$ROW: unknown (could not read origin/<baseBranch>)"; exit 1 ;;
+     esac
+     rm -f "$SCRATCH"
+     echo "$ROW: $ROW_TICKED"
+     ```
+
+     `ticked` → set `ticked: true`. `ticked-unpushed` → push it (`git push origin <baseBranch>`, with Step 4's non-ff rule), then set `ticked: true` — never a second tick. `not-ticked` → leave it. `uncommitted` or `unknown` → **HALT** with that line: route nowhere until the operator has committed or discarded the edits, or the look succeeds.
+
+   **c. Route on the reconciled flags:**
+
+   | Flags after reconciliation | Route |
+   | :-- | :-- |
+   | `merged: true, ticked: true` | Step 5 — everything happened; report and delete the run state |
+   | `merged: true, ticked: false`, `merged` advanced by this reconciliation | Step 3's post-merge items first — delete the remote head branch if it is still there (a failed delete is a warning) and signal `pr-merged` — then Step 4. The crash came between the merge and its flag write, so those items may never have run |
+   | `merged: true, ticked: false` (recorded) | Step 4 |
+   | `dispatched: true, merged: false`, document `accepted` (bug: `closed`) | Step 3 |
+   | `dispatched: true, merged: false`, document not `accepted` (bug: not `closed`) | Step 2 with `--defaults` — the pipeline's Phase 0b offers its own resume option (after a finalise DoD-gaps halt: "Re-enter QA at 5a"); Step 3 would only HALT on "not accepted" (obs #9) |
+   | otherwise | Step 2 |
+
+   The pipeline's own lock/resume machinery (item 2 below) still covers a pipeline that is mid-flight.
 2. **Pipeline lock check.** If `.claude/state/develop-pipeline.lock` exists, a pipeline run is mid-flight: re-enter that run (invoke the locked skill's resume path per its Phase 0b) — do **not** select a new item on top of it.
 3. **Dry-run short-circuit.** In `--dry-run` mode, run `git fetch origin <baseBranch>` (fetch only — never checkout or pull), then go straight to Step 1 against the working tree's roadmap. Skip 4–5.
 4. `git status --porcelain` — if the working tree is dirty: **HALT**, list the dirty paths. Never stash or discard.
@@ -105,7 +226,11 @@ Act on the JSON `status`:
 
 - **`halt` with `missing: true`** (no roadmap file at `roadmapPath`) → this project has no completion roadmap yet. **Do not fabricate one.** In an interactive/one-shot run, offer to scaffold a starter from [`assets/project-completion-roadmap.template.md`](assets/project-completion-roadmap.template.md) at `roadmapPath` (create parent dirs), then **STOP** for the user to populate it with real items — an empty roadmap has nothing to build. In a `/loop` run, **STOP** and notify (no one is present to author it). Never auto-create-and-proceed.
 - **`selected`** → record the `item` (including `item.source`), `rationale`, and `skipped[]` for the run report; write the run-state file. In `--dry-run`: print them and **stop here**.
-  - **Already-done guard:** if the item's document frontmatter is already `status: accepted` and its PR is merged, the roadmap tick was lost — skip straight to **Step 4**. Query per `VCS` (resolved in Step 0), or fall back to the document's own PR link:
+  - **Already-done guard:** if the item's document frontmatter is already `status: accepted` and its PR is merged, the roadmap tick was lost — skip straight to **Step 4**. Query with [Find the item's merged PR](#find-the-items-merged-pr), or fall back to the document's own PR link. Step 0.1's reconciliation runs the same query on a resume.
+
+    #### Find the item's merged PR
+
+    The one query from a work item to its merged PR, cited by this guard and by Step 0.1. `<branch>` is the item's branch: `feature/<document stem>` for a story or task, `bugfix/<document stem>` for a bug (`create-branch`'s naming). Query per `VCS` (resolved in Step 0); an empty answer means no merged PR:
 
     ```bash
     if [ "$VCS" = "bitbucket" ]; then
@@ -121,11 +246,25 @@ Act on the JSON `status`:
 
 ## Step 2 — Dispatch the pipeline
 
-Invoke the item's named command (`/develop-story <path>`, `/develop-task <path>` or `/develop-bug <path>`), prepending this directive to the invocation context (same mechanism as the lite-mode directive in `develop-pipeline-autonomous-defaults.md` — the pipeline's own reference files are AUTO-GENERATED and must not be edited). Mark `dispatched: true` in the run state.
+Invoke the item's named command **with `--defaults`** (`/develop-story <path> --defaults`, `/develop-task <path> --defaults` or `/develop-bug <path> --defaults`), prepending this directive to the invocation context (same mechanism as the lite-mode directive in `develop-pipeline-autonomous-defaults.md` — the pipeline's own reference files are AUTO-GENERATED and must not be edited). Mark `dispatched: true` in the run state.
 
-> **AUTONOMOUS RUN (develop-next):** For the Phase 0d Upfront Setup questions, take the auto-derived recommended option for **every** question without prompting — whatever that pipeline's question set is. For `/develop-story` and `/develop-task` that is Q1 = base branch, `develop` and Q2 = PR target, `develop`. For `/develop-bug` it is Q1 = branch model (**bugfix** unless the bug is explicitly a production regression), with Q2 base branch and Q3 PR target auto-derived from Q1 — do **not** re-map the story/task Q-numbers onto it. For the Phase 0b resume prompt, take the option Phase 0b marks **(Recommended)** — after a finalise DoD-gaps halt that is "Re-enter QA at 5a"; only when no option is marked, choose "Resume from last completed step". Record every auto-answer in the Decisions Log. All existing HALT conditions remain HALTs.
+> **AUTONOMOUS RUN (develop-next):** The command carries `--defaults`, so the Phase 0d Upfront Setup questions resolve to the option Phase 0d marks **(Recommended)** without prompting — whatever that pipeline's question set is, derived per item by Phase 0d's own answer resolution, never restated here. Never substitute an answer of your own. If Phase 0d still has a question to ask (a conflict it states rather than settles), HALT and report it: nobody is present to answer. For the Phase 0b resume prompt, take the option Phase 0b marks **(Recommended)** — after a finalise DoD-gaps halt that is "Re-enter QA at 5a"; only when no option is marked, choose "Resume from last completed step". Record every auto-answer, and the option it took, in the Decisions Log. All existing HALT conditions remain HALTs.
 
-If the pipeline HALTs (review NO-GO, develop stall, 5 QA cycles without PASS, qa-fix with no changes, DoD gaps, unexpected status): **STOP** — surface the pipeline's own HALT report verbatim, send a push notification, do not merge, do not tick. Leave the run-state file in place so the next invocation resumes here.
+The directive names no branch and no question, on purpose. `--defaults` hands the answers to Phase
+0d's answer resolution (`pipeline-answers.js`, task.201), which derives the base and PR target per item:
+an `epic-integration` story's answer is its epic's integration branch, everything else gets `develop`,
+exactly as an interactive run that accepts the recommendations would. A directive that states the
+answer as a constant overrides that derivation for exactly the items it exists for (bug.18), and one
+that restates the question set drifts from it — this one did, until task.201 replaced it with the flag.
+Speed is not chosen here either: `develop-next` takes no `--mode`, and an unattended run is `fast`
+only when the repository owner sets `develop.defaultMode: fast`.
+`evals/shared/tests/orchestrator-directive-branch-literal.test.mjs` fails on any branch literal in this
+directive. (`develop-batch`'s may name the base its worktree was cut from, but only beside a HALT for
+an integration branch.)
+
+If the pipeline HALTs (review NO-GO, develop stall, 5 QA cycles without PASS, qa-fix with no changes, DoD gaps, unexpected status): **STOP** — surface the pipeline's own HALT report verbatim, send a push notification, do not merge, do not tick. **Record the HALT before stopping:** write `halted: true` and `haltKind: "pipeline-halt"` to the run state, and `prNumber` when the pipeline opened a PR — the number in the lock or halt snapshot's `pr_url` (`.claude/state/develop-pipeline.last-halt.json`), else the implementation report's `**PR**:` line; it stays `null` when the halt came before the PR. Leave the run-state file in place: Step 0.1 surfaces the recorded HALT on the next invocation instead of routing it (obs #286).
+
+Whenever the pipeline completes with a PR open, record `prNumber` the same way before Step 3.
 
 ## Step 3 — Merge the green PR
 
@@ -150,7 +289,7 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
      | `accepted`        | `WAIVED`               | no                                 | merge (the waiver is a recorded human decision)           |
      | `accepted`        | `CONCERNS` / `WAIVED`  | **yes**                            | **HALT** — an open finding survived finalise              |
      | `accepted`        | `FAIL`                 | any                                | **HALT**                                                  |
-     | not `accepted`    | any                    | any                                | **HALT** — finalise did not accept                        |
+     | not `accepted`    | any                    | any                                | **HALT** — finalise did not accept (story / task; a bug item takes the table below) |
      | `accepted`        | missing / unparseable  | —                                  | **HALT** — cannot establish the no-open-finding condition |
 
      An entry is open when its `status:` is absent or reads `open`; `resolved`, `fixed`, `closed`,
@@ -161,6 +300,27 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
      waived, not open. Without this clause every waived gate matched the HALT row and the waiver row
      could never fire. The two clauses below are about *this commit* and cannot be inferred from
      `accepted` — they stay regardless of the row matched here.
+
+     **A `/develop-bug` item is gated by its own rows, not the table above.** A bug never reads
+     `accepted`: its lifecycle ends at `closed`, and `/finalise --bug` deliberately skips that write. It
+     also has no gate file, because the develop-bug verify loop writes none. Read literally, the table
+     above HALTs every bug (obs #2). These are the three facts that stand in for `accepted` plus the
+     gate. Read them from the bug's own directory, keyed on its prefix (`bug.18`, `task.67.bug.3`),
+     never its parent's:
+
+     | Bug `status` | Newest `{bug-prefix}.dod.{N}.*.md` reads | Newest implementation report's last `**Verdict**:` | Action |
+     | :----------- | :--------------------------------------- | :------------------------------------------------- | :----- |
+     | `closed`     | `**Final Status:** ✅ ACCEPTED`           | `PASS`                                             | merge  |
+     | `closed`     | `**Final Status:** ✅ ACCEPTED`           | anything else, or none                             | **HALT** — the verify loop did not pass |
+     | `closed`     | anything else, or no DoD file            | any                                                | **HALT** — `/finalise --bug` did not accept |
+     | not `closed` | any                                      | any                                                | **HALT** — develop-bug Step 7 Part B did not close the bug |
+
+     The verdict is read with the exact-token rule `/finalise --bug` Step 7.6b uses: the first word
+     after the colon, with its bold stripped, is exactly `PASS`. A `PASS` cycle already means no
+     blocking review finding stayed open (develop-bug Step 5a), so there is no `top_issues[]` to read.
+     Both report filename shapes count (`{bug-prefix}.implementation.*` and
+     `{bug-prefix}.*.implementation.*`), ordered by the report number. The head-SHA, CI and quality-gate
+     clauses below apply to a bug exactly as to a story or task.
    - **Head-SHA check** — the PR's source commit must equal `git rev-parse HEAD` on the local PR branch. Mismatch means the branch moved since it was tested → **HALT** (never gate one commit and merge another).
 
      ```bash
@@ -309,13 +469,27 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
      # then deletes the head branch of a PR that did not merge (task.147 QA-1, CR-1).
      HEAD_BRANCH=$(gh pr view "$PR_ID" --json headRefName -q .headRefName)
      [ -n "$HEAD_BRANCH" ] || { echo "HALT: cannot bind the head branch of PR #$PR_ID"; exit 1; }
-     if [ -z "$(git status --porcelain)" ]; then
+     DIRTY=$(git status --porcelain)
+     if [ -z "$DIRTY" ]; then
        gh pr merge "$PR_ID" --"$mergeStrategy" --delete-branch
+       MERGE_EXIT=$?
      else
        # Dirty tree (another session's edits): --delete-branch switches the local branch, the
        # switch aborts, and the remote delete is skipped with it (obs #142). Merge without it and
        # delete the remote branch directly — no local checkout is touched.
-       gh pr merge "$PR_ID" --"$mergeStrategy" || { echo "HALT: gh pr merge failed for PR #$PR_ID"; exit 1; }
+       gh pr merge "$PR_ID" --"$mergeStrategy"
+       MERGE_EXIT=$?
+     fi
+     # The verdict is the PR's state, not the exit code: `gh pr merge` also runs local follow-ups
+     # (branch switch, fast-forward, branch delete), and one failing after the server merged exits
+     # non-zero on a merge that landed (obs #197). A command that exits 0 on a PR that did not merge
+     # is a HALT too.
+     PR_STATE=$(gh pr view "$PR_ID" --json state -q .state)
+     [ "$PR_STATE" = "MERGED" ] \
+       || { echo "HALT: PR #$PR_ID is '${PR_STATE}' after gh pr merge (exit $MERGE_EXIT)"; exit 1; }
+     [ "$MERGE_EXIT" -eq 0 ] \
+       || echo "⚠️  PR #$PR_ID merged, but gh pr merge exited $MERGE_EXIT — a local follow-up failed; Step 4 re-syncs"
+     if [ -n "$DIRTY" ] || [ "$MERGE_EXIT" -ne 0 ]; then
        # The merge has happened. A delete that fails here (GitHub's "automatically delete head
        # branches" already removed it) is a warning, never the block's status: a non-zero exit would
        # read as "not merged" (task.147 QA-1, CR-5).
@@ -327,6 +501,13 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
 
    On merge failure (conflict, protection): **HALT** with the platform's output verbatim. Mark `merged: true` in the run state only on success.
 
+   > **The GitHub arm judges the merge by the PR's state, never by `gh pr merge`'s exit status: a
+   > command can fail after the server merged, and claim success on a PR that did not.** It reads
+   > `gh pr view --json state` after the merge. The Bitbucket arm judges the merge response's
+   > `.state`, which can fail to parse on a merge that landed — so on Bitbucket the parsing note below
+   > is the rule: re-query `.state` before any retry. The resume reconciliation in Step 0.1 reads the
+   > PR's state on both platforms. `develop-batch` Step 3 (GitHub only) cites this rule.
+   >
    > **Parsing note (Bitbucket):** the merge response embeds rendered HTML that can contain raw control characters, which makes some `jq` invocations fail on the _response_ even though the merge itself succeeded. **Never retry a merge on a parse error** — re-query `GET …/pullrequests/${PR_ID}` and check `.state` first, or you risk a duplicate merge attempt against an already-merged PR.
 
 3. **Signal the `pr-merged` stage** (only after the merge actually succeeded, and before the Step 4 tick). Skip silently when the item has no linked tracker issue. Read `TRACKER` and the item's issue key from the merged document's frontmatter (`github_issue:` / `jira_key:`):
@@ -363,7 +544,7 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
    > - Step 4 still ticks the roadmap on `<baseBranch>` as each story merges — correct, the roadmap tracks
    >   stories, not branches.
    > - The epic's work accumulates on the integration branch and **stays there**. Raise and merge the final
-   >   `epic/{n}.{name}` → `<baseBranch>` PR **by hand** once every story is in.
+   >   `epic/{P}.{E}.{name}` → `<baseBranch>` PR **by hand** once every story is in.
    > - Do not read "all this epic's rows are ticked" as "the epic has landed on `<baseBranch>`". It has not.
 
 ## Step 4 — Record the acceptance
@@ -445,7 +626,7 @@ and, when the run created a tracker issue, the `Issue` cell — and never a seco
      git push origin <baseBranch>
      ```
      Then log `already` and mark `ticked: true`.
-   - every other exit-0 reason — `no-row`, `no-registry`, `no-cell`, `not-accepted`, `not-a-task`,
+   - every other exit-0 reason — `no-row`, `row-malformed`, `no-registry`, `no-cell`, `not-accepted`, `not-a-task`,
      `engine-unavailable` — log it verbatim, make no commit, mark `ticked: true`. The drift test is
      the backstop, and a missing or unannotatable index line never blocks a merge that has already
      happened. (Exit 2 is a usage error in this step's own invocation — fix the call, do not mark

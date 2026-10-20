@@ -8,7 +8,7 @@ From "I cloned the repo" to "I ran my first command" in under ten minutes.
 
 Before starting, confirm you have:
 
-- **Node ≥ 20** — `node --version`
+- **Node ≥ 22** — `node --version`
 - **git** — `git --version`
 - **jq** — `jq --version` (required by hook installer and Bitbucket scripts — `brew install jq` / `apt install jq`)
 - **curl** — `curl --version` (required by Bitbucket scripts — pre-installed on most systems)
@@ -112,13 +112,16 @@ bash /path/to/agent-skills/scripts/setup-consumer.sh
 # Preview every action without writing anything:
 bash /path/to/agent-skills/scripts/setup-consumer.sh --dry-run
 
+# Link your agents only (a new clone or worktree):
+bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh) --links-only
+
 # Update skills to the latest release (skips the full wizard):
 bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh) --update
 ```
 
 ### What the wizard does
 
-The full wizard runs all 10 steps. The `--update` flag runs only steps 1 and 8 — all others are skipped, so the consumer's config, registries, docs scaffold, and hooks are left untouched.
+The full wizard runs every step below. The `--update` flag runs only steps 1 and 8 — all others are skipped, so the consumer's config, registries, docs scaffold, and hooks are left untouched.
 
 | Step | Action                                                                                                                             | Skippable?                                           |
 | ---- | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
@@ -126,12 +129,14 @@ The full wizard runs all 10 steps. The `--update` flag runs only steps 1 and 8 �
 | 2    | Prompts for platform: GitHub+Issues / GitHub+Jira / Bitbucket+Jira, then **tracker access** (`full` / `read-only` / `approve` / `command` / `manual`) | No                                                   |
 | 2b   | Prompts for the **skill install profile** (`full` / `pipeline` / `minimal`) plus optional per-skill add-ons (see below). Appears in the wizard summary as `Skill profile` | Yes (Enter accepts `full`, today's behaviour)        |
 | 3    | Checks `gh` auth (GitHub), collects Bitbucket/Jira credentials with hidden input                                                   | —                                                    |
-| 4    | Writes `.env.example` (keys only); optionally writes `.env` + adds to `.gitignore`                                                 | Yes                                                  |
+| 4    | Bitbucket or Jira only (nothing on GitHub + GitHub Issues): writes `.env.example` (keys only); optionally writes `.secrets/tooling.env` and adds `.secrets/` and `.env` to `.gitignore` | Yes                                                  |
 | 5    | Scaffolds `skills-config.yaml` — prompts PRD path, story layout, coding-standards path                                             | Yes (skips if file exists and you decline overwrite) |
-| 6    | Creates `docs/development/epic-registry.md` and `docs/tasks/task-registry.md` if absent                                            | Idempotent                                           |
+| 6    | Creates `docs/tasks/task-registry.md` if absent (epics are numbered within their PRD; `create-prd` bootstraps the PRD registry)    | Idempotent                                           |
 | 7    | Scaffolds `docs/prd/`, `docs/architecture/concepts/` (3 required stubs), `docs/tasks/`                                             | Idempotent                                           |
 | 8    | Downloads the latest release from GitHub and extracts skills into `.agents/skills/`, applying **your install profile** (see below) and **skipping the tracker-specific skills your platform can never fire** (see below)                                                | Yes                                                  |
-| 9    | Patches `.claude/settings.json` directly with the three pipeline hooks (inline jq — no dependency on skills being installed first) | Yes                                                  |
+| 8a   | Writes `tracker-workflow.yaml` if absent — generated from your live board when the tracker CLI can read it, otherwise a generic template the wizard warns you to edit before the first pipeline run. An existing file is kept | Idempotent (keeps an existing file) |
+| 8b   | Shows a checkbox list of agents and makes the local links each one needs to `AGENTS.md` and `.agents/skills/`, gitignored. See [1a](#1a-link-your-agent-to-agentsmd-and-agentsskills) | Yes (tick nothing, or no terminal) |
+| 9    | Patches `.claude/settings.json` directly with the two pipeline hooks, `PreCompact` and `Stop` (inline jq — no dependency on skills being installed first) | Yes                                                  |
 
 #### Skill profiles — choosing how much of the library to install
 
@@ -248,7 +253,7 @@ to "sync this story to the tracker".
 .env.example                          # credential keys, no values
 .secrets/tooling.env                  # live credentials (if confirmed)
 skills-config.yaml                    # project configuration
-docs/development/epic-registry.md                 # empty — populated by /create-epic
+tracker-workflow.yaml                 # board status ladder — from your board, or a template to edit
 docs/tasks/task-registry.md           # empty — populated by /create-task
 .agents/skills/                       # installed skills
 .claude/settings.json                 # updated with pipeline hooks
@@ -290,11 +295,63 @@ Each skill is self-contained — shared resources are pre-bundled into `referenc
 
 **Re-running the install is idempotent** — overwrite the existing `.agents/skills/` directory to update to a newer release.
 
-Restart your agent (e.g. Claude Code) in the project dir after install so it picks up `.agents/skills/`.
+Restart your agent (e.g. Claude Code) in the project dir after install so it picks up the skills through the links in [1a](#1a-link-your-agent-to-agentsmd-and-agentsskills).
+
+### 1a. Link your agent to `AGENTS.md` and `.agents/skills`
+
+A consumer repo commits **one** instruction file, `AGENTS.md`, and **one** skills directory,
+`.agents/skills/`. Most agents read both already. The few that look elsewhere get local symlinks,
+made by each user for the agents they run, once per clone and once per worktree. The links are never
+committed: some installers refuse symlinks in a tree, CI must not depend on them, and each user runs
+different agents.
+
+**The wizard makes them for you.** It shows a checkbox list of the agents below (↑/↓ move, space
+ticks, enter confirms) and links the ones you tick. Agents you have already linked start ticked. It
+never replaces or deletes anything: an existing `CLAUDE.md`, or a link aimed elsewhere, is reported
+and left alone.
+
+```bash
+bash setup-consumer.sh --links-only                    # just the list (new clone or worktree)
+bash setup-consumer.sh --links-only --link-agents claude,gemini   # no list (scripts, no terminal)
+```
+
+Without a terminal the list is skipped; use `--link-agents`. An unknown agent name stops the run with an
+error before anything is written, and a link that cannot be created fails the run. By hand, the links are:
+
+| Id | Agent | Instruction file | Skills directory |
+| --- | --- | --- | --- |
+| `claude` | Claude Code | `ln -s AGENTS.md CLAUDE.md` (needed before v2.1.277, harmless after) | `mkdir -p .claude && ln -s ../.agents/skills .claude/skills` |
+| `codex` | OpenAI Codex | reads `AGENTS.md` | reads `.agents/skills/` |
+| `copilot` | GitHub Copilot | reads `AGENTS.md` | reads `.agents/skills/` |
+| `cursor` | Cursor | reads `AGENTS.md` | reads `.agents/skills/` |
+| `gemini` | Gemini CLI | `ln -s AGENTS.md GEMINI.md` | reads `.agents/skills/` |
+| `windsurf` | Windsurf (Devin Desktop) | reads `AGENTS.md` | reads `.agents/skills/` |
+| `cline` | Cline | reads `AGENTS.md` | `mkdir -p .cline && ln -s ../.agents/skills .cline/skills` |
+| `kiro` | Kiro | reads `AGENTS.md` | `mkdir -p .kiro && ln -s ../.agents/skills .kiro/skills` |
+| `opencode` | OpenCode | reads `AGENTS.md` | reads `.agents/skills/` |
+| `amp` | Amp | reads `AGENTS.md` | reads `.agents/skills/` |
+
+Each agent's own docs, checked 2026-10-14, are the source for this table; the links are listed in
+[task 209](../tasks/task.209.setup-consumer-agent-links/task.209.setup-consumer-agent-links.md#3-technical-background).
+Agents change these paths, so if yours stops finding the skills, check its docs first.
+
+Gitignore every link you create, anchored to the root so a committed sub-folder `CLAUDE.md` stays
+tracked, and without a trailing slash, because git sees a symlink as a file:
+
+```gitignore
+# Agent links: each user creates their own
+/CLAUDE.md
+/.claude/skills
+```
+
+**Claude Code reads `AGENTS.md` only when there is no `CLAUDE.md`.** A real `CLAUDE.md`, or a
+`CLAUDE.local.md`, makes it ignore `AGENTS.md`. If a repo already commits `CLAUDE.md` or `.claude/skills`
+as a symlink or a copy, replace it: keep the content in `AGENTS.md`, `git rm --cached` the old path,
+delete it, and re-run `--links-only`.
 
 ### 1b. Install pipeline hooks (one-time per project)
 
-The `develop-task` and `develop-story` pipelines run hands-free when three Claude Code hooks are registered in `.claude/settings.json`. Without the `Stop` hook the orchestrator relies on prose-level rules that fail under context pressure — **strongly recommended**.
+The `develop-task` and `develop-story` pipelines run hands-free when two Claude Code hooks are registered in `.claude/settings.json`. Without the `Stop` hook the orchestrator relies on prose-level rules that fail under context pressure — **strongly recommended**.
 
 ```bash
 bash .agents/skills/develop-task/scripts/install-hooks.sh
@@ -372,15 +429,14 @@ PRD and architecture roots are configurable (defaults shown). The _nested_ layou
 
 ## 3. Create the registries
 
-Stories and tasks need globally unique numbers. If you are working in a **new project** (not a clone of `agent-skills`), create empty registries:
+PRDs and tasks need globally unique numbers. If you are working in a **new project** (not a clone of `agent-skills`), create an empty task registry:
 
 ```bash
 mkdir -p docs/tasks
-touch docs/development/epic-registry.md
 touch docs/tasks/task-registry.md
 ```
 
-The first `/create-epic` and `/create-task` invocations will populate them. See [epic registry](../standards/epic-registry.md) and [task registry](../standards/task-registry.md).
+The first `/create-task` invocation populates it, and the first `/create-prd` bootstraps the [PRD registry](../standards/prd-registry.md). Epics and stories need no registry: an epic is numbered within its PRD and a story within its epic. See [task registry](../standards/task-registry.md).
 
 > If you cloned `agent-skills` to run a quickstart, these registries already exist — skip this step.
 
@@ -396,7 +452,7 @@ Not sure what to run? See [which-path.md](./which-path.md) — a three-question 
 | First refactor / infra task             | [Task Development](../runbooks/task-development.md)                   |
 | Just learning what skills are           | [Overview](./overview.md)                                             |
 
-**Story work introduces one extra concept:** `/develop-story` asks in Phase 0 which branch the story is cut from and which branch its PR targets. The default for both is `develop` — short-lived feature branches, integrated continuously. An epic whose stories are meaningless apart can instead opt into an _integration branch_ (`epic/{N}.{slug}`) that all its stories merge into and that reaches `develop` once, at the end. Both options appear in the prompt every time; see [Story documents § Branch strategy](../standards/story-documents.md#branch-strategy).
+**Story work introduces one extra concept:** `/develop-story` asks in Phase 0 which branch the story is cut from and which branch its PR targets. The default for both is `develop` — short-lived feature branches, integrated continuously. An epic whose stories are meaningless apart can instead opt into an _integration branch_ (`epic/{P}.{E}.{slug}`) that all its stories merge into and that reaches `develop` once, at the end. Both options appear in the prompt every time; see [Story documents § Branch strategy](../standards/story-documents.md#branch-strategy).
 
 ## 5. Run your first command
 

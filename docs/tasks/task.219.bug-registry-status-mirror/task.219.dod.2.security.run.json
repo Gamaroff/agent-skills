@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "filename",
+      "entry": "cli:shared/resources/registry-tick.js",
+      "name": "bug-status-classifier",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 19,
+      "passed": 19,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "--bug-status",
+        "--file",
+        "{input}"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-10-20T14:28:16.982Z"
+    }
+  ],
+  "totals": {
+    "executed": 19,
+    "reproduced": 0,
+    "escaped": 0
+  },
+  "updated_at": "2026-10-20T14:28:16.982Z"
+}

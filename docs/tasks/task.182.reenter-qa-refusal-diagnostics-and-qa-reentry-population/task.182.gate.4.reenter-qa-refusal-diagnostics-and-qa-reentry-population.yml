@@ -1,0 +1,65 @@
+schema: 2
+task: 'task.182.reenter-qa-refusal-diagnostics-and-qa-reentry-population'
+task_title: 'reenter-qa refusal diagnostics and the qa_reentry reader population'
+gate: PASS
+status_reason: 'TASK-182-004 is fixed: the contract cites the pause row, and the guard reads a derived describer population. No MEDIUM or HIGH finding at high confidence remains; one LOW (TASK-182-005, the guard''s match is case-sensitive and narrowly worded) is open.'
+reviewer: 'QA Engineer'
+head: 'f380e8e4317246a98c9adfec018e3d31cf9f2828'
+updated: '2026-10-13T07:09:48Z'
+
+top_issues:
+  - id: 'TASK-182-005'
+    severity: low
+    file: 'evals/shared/tests/qa-loop-lock-fields-parity.test.mjs'
+    finding: 'VALUE_CLAIM and its git grep population are case-sensitive and narrowly worded: "The grant writes `5a`" (sentence-initial), "the re-entry writer" (singular), an unbackticked value, or the verbs re-enters/puts pass the guard. Code review CR-2.'
+    suggested_action: 'Add the i flag (and -i to the git grep), make the plural optional, accept an unbackticked 5[ab] and the verbs re-enters/resumes/puts; mutation-prove each.'
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2)
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 7
+  phases_verified: 3/3
+  ci: 'not read this cycle (gated at /finalise)'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 8
+    notes: 'The script is unchanged since gate 3; task.182.qa.3.security.run.json (8 executed, 0 reproduced, 0 escapes) still describes it.'
+  performance:
+    status: PASS
+    notes: 'Documentation and test changes only this cycle.'
+  reliability:
+    status: PASS
+    notes: 'No behaviour change this cycle.'
+  maintainability:
+    status: PASS
+    notes: 'The qa_phase rule is stated once for the grant and cited; the guard is derived. Advisory: CR-1 (the "Resume at 5a" option label, pre-existing on origin/develop, deferred since cycle 2), CR-3 (VALUE_CLAIM span can cross into a reenter statement), CR-4 (pause-row colon reads the writer list as the describer list).'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'TASK-182-005: VALUE_CLAIM and its git grep population are case-sensitive and narrowly worded ("The grant writes `5a`", "the re-entry writer", an unbackticked value, re-enters/puts pass) — add the i flag and -i, optional plural, unbackticked 5[ab], more verbs; mutation-prove each'
+      refs: ['evals/shared/tests/qa-loop-lock-fields-parity.test.mjs']
+      carried_from: 'top_issues (route 2, cycle 4)'
+    - action: 'CR-1 (= cycle-2 CR-6): relabel "Resume at 5a with {k} more cycles" phase-neutrally in both SKILL.md, resume contract :607 and step-5-6 HALT messages :1947/:1970; guard "Resume at" + a 5[ab] value — a follow-up task (eval replay fixtures pin the label)'
+      refs: ['skills/develop-task/SKILL.md', 'skills/develop-story/SKILL.md', 'shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+    - action: 'CR-3: stop VALUE_CLAIM''s span at a sentence boundary or drop the re-entry (scripts|writers) alternative, so an honest statement of reenter''s 5a after a grant citation is not misnamed'
+      refs: ['evals/shared/tests/qa-loop-lock-fields-parity.test.mjs']
+    - action: 'CR-4: pause-row qa_phase — end the one-statement clause with a full stop and reintroduce the list as "The three writers:"'
+      refs: ['shared/resources/develop-pipeline-pause.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

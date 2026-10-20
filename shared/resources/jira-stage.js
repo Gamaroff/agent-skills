@@ -14,7 +14,7 @@
  * why "no credentials" is a normal exit-0 outcome rather than an error.
  *
  * Usage:
- *   jira-stage.js --issue RAPP-123 --stage in-review [--json] [--dry-run]
+ *   jira-stage.js --issue PROJ-123 --stage in-review [--json] [--dry-run]
  *                 [--strict] [--allow-regress] [--worklog 1m]
  *   jira-stage.js --stage done --print-plan [--from "In Progress"]
  *

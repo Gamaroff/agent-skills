@@ -1,0 +1,72 @@
+schema: 2
+task: 'task.189.read-only-agents-never-write'
+task_title: 'Read-only agents never write'
+gate: CONCERNS
+status_reason: 'Cycle-4 consolidation holds (wait marked with a plan budget and cleared; node validation; boundaries engage, 28 executed, 0 reproduced). One medium introduced by it: the BUDGET abort runs before the stale result is removed.'
+reviewer: 'QA Engineer'
+head: '74f9e5bc3987a1f8412086e2382bbd61b521ba5d'
+updated: '2026-10-16T22:07:24Z'
+
+top_issues:
+  - id: 'CR5-1'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'In the Step 3b.1 block, ${BUDGET:?} aborts before rm -f of the stale result, so a runner that fails to import leaves an earlier run''s probe-plan-result.json in place for item 3 and prints neither the exit line nor the no-result line. Bug: task.189.bug.5 (reopened).'
+    suggested_action: 'Remove the stale result first, and replace the :? abort with a branch that skips the mark but still runs and reports; test a failing import with a stale result present.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 70
+  phases_verified: '4/4'
+  ci: 'not read this cycle'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 28
+    notes: 'planArgvAllowed 20 cases engages; matrix block 8 cases engages (record task.189.qa.5.security.run.json).'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR5-1: a failed import leaves a stale result for item 3.'
+  maintainability:
+    status: PASS
+    notes: 'Advisory cleanups CR5-3, CR5-4.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR5-1 (task.189.bug.5).'
+      refs: ['skills/finalise/SKILL.md']
+  future:
+    - action: 'CR5-2 (low/low): the wait is marked by the background process, not before the agent yields — a brief window where the lock reads unmarked.'
+      refs: ['skills/finalise/SKILL.md']
+    - action: 'CR5-3 (cleanup): the killed-runner test reaches the budget path by accident; write the wait stub and export ENGINE_TIMEOUT_MS from the stand-in.'
+      refs: ['shared/resources/tests/read-only-agent-writes.test.mjs']
+    - action: 'CR5-4 (cleanup): Step 8a.4 says "item 2" inside Step 8a''s own list; write "Step 3b.1 item 2".'
+      refs: ['skills/finalise/SKILL.md']
+    - action: 'CR3-4 (carried, engine scope): SIGKILL on timeout skips the engine sandbox cleanup.'
+      refs: ['shared/resources/security-probe.mjs']
+
+bug_resolution:
+  bugs_fixed: 0
+  bugs_remaining: 1
+  fix_date: '2026-10-16'
+  total_iterations: 4
+  verification_method: 'Committed tests + engine probes'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR5-1 fixed']

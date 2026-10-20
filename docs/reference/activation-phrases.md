@@ -29,7 +29,7 @@ For slash-command form, see [commands](./commands.md). For the three invocation 
 | "Validate story 2.3" / "Is story 2.3 ready?" | `review-story --validate` |
 | "Review this bug report" / "Is this bug ready to fix?" | `review-bug` (the second phrasing picks `--validate`) |
 | "Review my changes" / "Review this diff" / "Review PR 123" | `review-code` |
-| "Review this PR" / "Does this PR match the task?" / "Is the evidence there for this PR?" | `review-pr` (also runs automatically as Step 5c of `/develop-story` and `/develop-task`) |
+| "Review this PR" / "Does this PR match the task?" / "Is the evidence there for this PR?" / "Review the PR for RAPP-702" | `review-pr` (a work item — Jira key, Jira URL or GitHub issue — resolves to its PR) (also runs automatically as Step 5c of `/develop-story` and `/develop-task`) |
 | "Does this control actually work?" / "Prove the TLS is really on" / "Probe this validator" | `review-security` (the repo skill — distinct from the built-in `/security-review`, which reads the diff rather than executing the control) |
 | "Double check that" / "Verify your work" / "Are you sure?" / "Did you actually do that?" | `double-check` |
 
@@ -106,6 +106,7 @@ For slash-command form, see [commands](./commands.md). For the three invocation 
 | "One skill to rule them all" | `observe-work` (the upstream methodology's name) |
 | "Write a handoff" / "Refresh the handoff" / "What should I pick up?" | `session-handoff` (write mode) |
 | "Is the handoff still accurate?" / "Re-measure the handoff" / "Read the handoff first" | `session-handoff` (read mode — `handoff-verify.mjs`) |
+| "Hand off to a fresh session" / "Context is filling up" / "Continue this in a new context" | `session-handoff` (continue mode — a continuation file beside the work item plus a resume prompt) |
 
 ## Architecture
 
@@ -123,6 +124,7 @@ For slash-command form, see [commands](./commands.md). For the three invocation 
 | "Create a low-fidelity mobile wireframe for this layout" / "Design a monochrome outline of this screen" | `wireframe` |
 | "Mock up this settings dialog" / "Sketch the layout of this screen" / "What would this look like?" | `wireframe` |
 | "Wireframe this screen with callouts pointing at each control" | `wireframe` |
+| "Turn this HTML screen into a wireframe" / "Wireframe this hi-fi mockup" | `wireframe` (works from the existing page — `wireframe.js status <file.html>` checks for a current one first) |
 
 ## Tips for reliable activation
 

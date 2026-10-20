@@ -1,0 +1,74 @@
+schema: 2
+task: 'task.189.read-only-agents-never-write'
+task_title: 'Read-only agents never write'
+gate: CONCERNS
+status_reason: 'CR5-1 fixed and mutation-proven (bug.5 closed); boundaries engage (28 executed, 0 reproduced). One medium in test machinery: the 2>/dev/null added by the CR5-1 fix makes the cycle-4 argv-order stderr assertion vacuous.'
+reviewer: 'QA Engineer'
+head: 'ad004b2c11fe654af29b8bf680847ab6d0812837'
+updated: '2026-10-16T22:44:04Z'
+
+top_issues:
+  - id: 'CR6-1'
+    severity: medium
+    file: 'shared/resources/tests/read-only-agent-writes.test.mjs'
+    finding: 'The BUDGET one-liner''s new 2>/dev/null (skills/finalise/SKILL.md:552) discards the only stderr an import-run-as-CLI would print, so the guard at read-only-agent-writes.test.mjs:689 (no "unknown argument" in r.stderr) can no longer fail. Bug: task.189.bug.6.'
+    suggested_action: 'Assert something the redirect cannot hide (a sentinel written by a stand-in runner''s CLI path), or route the import''s stderr to a file the test reads.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 56
+  phases_verified: '4/4'
+  ci: 'not read this cycle'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 28
+    notes: 'planArgvAllowed 20 cases engages; matrix block 8 cases engages (record task.189.qa.6.security.run.json).'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'CR5-1 fixed: stale result removed first, a failed load warns and reports no result (covered). CR6-2 advisory: a runner that loads without a numeric ENGINE_TIMEOUT_MS is reported as not loaded and runs unmarked; the shipped runner exports it.'
+  maintainability:
+    status: CONCERNS
+    notes: 'CR6-1: a vacuous assertion. Advisory cleanups CR6-3..CR6-5.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR6-1 (task.189.bug.6).'
+      refs: ['shared/resources/tests/read-only-agent-writes.test.mjs']
+  future:
+    - action: 'CR6-2 (medium/medium): tell "runner did not load" from "ENGINE_TIMEOUT_MS not a number" in the Step 3b.1 budget branch; the warning and comment claim the run fails in both.'
+      refs: ['skills/finalise/SKILL.md']
+    - action: 'CR6-3 (cleanup): the killed-runner test does not assert the wait log, so the deliberate budget path is unchecked.'
+      refs: ['shared/resources/tests/read-only-agent-writes.test.mjs']
+    - action: 'CR6-4 (cleanup): the CR5-1 test accepts exit 0 and does not assert the wait log holds only --clear.'
+      refs: ['shared/resources/tests/read-only-agent-writes.test.mjs']
+    - action: 'CR6-5 (cleanup): the case pattern accepts 0 and leading zeros that set-waiting-on.sh rejects; use the same pattern.'
+      refs: ['skills/finalise/SKILL.md']
+    - action: 'CR3-4 (carried, engine scope): SIGKILL on timeout skips the engine sandbox cleanup.'
+      refs: ['shared/resources/security-probe.mjs']
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 1
+  fix_date: '2026-10-17'
+  total_iterations: 5
+  verification_method: 'Committed tests + mutation proof + engine probes'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR6-1 fixed']

@@ -667,3 +667,53 @@ test("the scaffolded template ends with a newline", () => {
     "command substitution strips the heredoc's trailing newline",
   );
 });
+
+// ── task.218: the summary names the checklist /tracker-reconcile ticks ──────
+//
+// The `/tracker-reconcile` line is shared by the `approve` and `else` branches
+// of print_summary. Under `approve` the sentence before it is about the *.sh,
+// so "ticks that checklist" had no referent (task.199 gate 4, QA-10).
+
+/** Render print_summary under one tracker access mode, from a scratch dir. */
+function renderSummary(mode) {
+  const dir = mkdtempSync(path.join(tmpdir(), "setup-summary-"));
+  try {
+    return execFileSync("bash", ["-c", `source '${WIZARD}'; print_summary`], {
+      cwd: dir,
+      env: {
+        ...process.env,
+        SETUP_CONSUMER_NO_MAIN: "1",
+        ACCESS_TRACKER: mode,
+      },
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test("rendered summary names the checklist /tracker-reconcile ticks", () => {
+  for (const mode of ["approve", "command"]) {
+    const out = renderSummary(mode);
+    assert.match(out, new RegExp(`Tracker access is ${mode}:`), mode);
+    const reconcile = out
+      .split("\n")
+      .filter((l) => l.includes("/tracker-reconcile"));
+    assert.equal(reconcile.length, 1, `${mode}: one /tracker-reconcile line`);
+    assert.ok(
+      reconcile[0].includes("*.handover.*.md"),
+      `${mode}: the /tracker-reconcile line names the checklist — got: ${reconcile[0]}`,
+    );
+    assert.ok(
+      !out.includes("ticks that checklist"),
+      `${mode}: no dangling "that checklist"`,
+    );
+  }
+  assert.ok(
+    renderSummary("command").includes(
+      "After a run, work the committed *.handover.*.md checklist",
+    ),
+    "command: the branch line is unchanged",
+  );
+});

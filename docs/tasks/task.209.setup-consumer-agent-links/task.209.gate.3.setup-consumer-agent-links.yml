@@ -1,0 +1,59 @@
+schema: 2
+task: 'task.209.setup-consumer-agent-links'
+task_title: "setup-consumer.sh links each user's agents to AGENTS.md and .agents/skills"
+gate: CONCERNS
+status_reason: 'Cycle-2 fixes verified (ids checked before any step; failed link reported). One medium: a failed link is recorded as a warning and the run exits 0 (TASK-209-BUG-4).'
+reviewer: 'QA Engineer'
+head: '8d6627f3866f61c7b4882d0167bc9a350d8b5fd0'
+updated: '2026-10-14T15:42:57Z'
+
+top_issues:
+  - id: 'QA-209-4'
+    severity: medium
+    file: 'scripts/setup-consumer.sh'
+    finding: 'A failed link is counted with kept/missing and recorded as a warn step, so the run exits 0 and says Restart your agents (TASK-209-BUG-4).'
+    suggested_action: 'Count failed separately and record the step as fail.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 5494
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 8
+    notes: 'Probe record task.209.qa.2.security.run.json: 8 executed, 0 reproduced; unchanged code path.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'Failed link exits 0 (QA-209-4).'
+  maintainability:
+    status: PASS
+    notes: 'Advisory: unknown-id check now duplicated in link_agents; stale status-word comment.'
+
+recommendations:
+  immediate:
+    - action: 'Record a failed link as a failed step (TASK-209-BUG-4).'
+      refs: ['scripts/setup-consumer.sh']
+  future:
+    - action: 'Remove the now-unreachable unknown-id branch from link_agents; add failed to the status-word comment; remove a folder mkdir created when ln then fails (cycle-3 CR-2..4).'
+      refs: ['scripts/setup-consumer.sh']
+    - action: 'The owner tries --links-only in a real terminal on Linux and macOS (criterion 6).'
+      refs: ['docs/tasks/task.209.setup-consumer-agent-links/task.209.setup-consumer-agent-links.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-209-BUG-4 fixed', 'real-terminal check on Linux and macOS']

@@ -1,0 +1,50 @@
+[
+  {
+    "id": "py-cli.legit-host",
+    "sink": "url-authority",
+    "direction": "legitimate",
+    "input": "example.com"
+  },
+  {
+    "id": "py-cli.legit-host-port",
+    "sink": "url-authority",
+    "direction": "legitimate",
+    "input": "example.com:8080"
+  },
+  {
+    "id": "py-cli.legit-localhost",
+    "sink": "url-authority",
+    "direction": "legitimate",
+    "input": "localhost"
+  },
+  {
+    "id": "py-cli.hostile-userinfo",
+    "sink": "url-authority",
+    "direction": "hostile",
+    "input": "a@b"
+  },
+  {
+    "id": "py-cli.hostile-userinfo-port",
+    "sink": "url-authority",
+    "direction": "hostile",
+    "input": "user@evil.example:443"
+  },
+  {
+    "id": "py-cli.hostile-path-at",
+    "sink": "url-authority",
+    "direction": "hostile",
+    "input": "evil.example/@good.example"
+  },
+  {
+    "id": "py-cli.hostile-fragment-at",
+    "sink": "url-authority",
+    "direction": "hostile",
+    "input": "good.example:80#@evil.example"
+  },
+  {
+    "id": "py-cli.hostile-homoglyph",
+    "sink": "url-authority",
+    "direction": "hostile",
+    "input": "exаmple.com"
+  }
+]

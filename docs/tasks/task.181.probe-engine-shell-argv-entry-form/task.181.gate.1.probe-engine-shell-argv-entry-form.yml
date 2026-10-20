@@ -1,0 +1,63 @@
+schema: 2
+task: 'task.181.probe-engine-shell-argv-entry-form'
+task_title: 'security-probe: a shell-argv: entry form for a shell script that takes several arguments'
+gate: CONCERNS
+status_reason: 'The form works and is proved (19 probes engage, 0 reproduced; ci:fast green), but a case fixture can reach the host gh: shell-argv: honours fixture env/files without the namesGh check and ghFreePath that fence: applies to them (TASK-181-001, reproduced).'
+reviewer: 'QA Engineer'
+head: '76cd351c07a6e8655c24fbbcb79d2a079928d1d5'
+updated: '2026-10-12T21:13:14Z'
+
+top_issues:
+  - id: 'TASK-181-001'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'A shell-argv: case fixture (BASH_ENV + a fixture file doing type -ap gh) runs the host gh and is scored; fence: declines the same fixture needs-fake-gh. Reproduced: verdict absent, ghran.txt created. Code review CR-1.'
+    suggested_action: 'Apply the fence: arm fixture-string namesGh check and ghFreePath to the shell-argv: arm; add a mutation-proven test (bug report task.181.bug.1).'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 15
+  phases_verified: 3/3
+  ci: 'not read this cycle (gated at /finalise)'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 19
+    notes: 'task.181.qa.1.security.run.json: resolveEntry shell-argv: branch 11 cases engage, reenter-qa via shell-argv: 8 cases engage, 0 reproduced, 0 escapes. TASK-181-001 (fixture reaches host gh) open.'
+  performance:
+    status: PASS
+    notes: 'ci:fast 5415 pass, 0 fail at develop (aa634a99 content); no existing suite changed beyond four pinned-text assertions.'
+  reliability:
+    status: PASS
+    notes: 'Failing setup, timeout and launch failure are errored (tests + mutations); proof run past the usage line on every case.'
+  maintainability:
+    status: PASS
+    notes: 'Form-dispatch table in the task; shared fixture writer extracted; two LOW doc/message cleanups (CR-2, CR-3) and one LOW record-key note.'
+
+recommendations:
+  immediate:
+    - action: 'Close TASK-181-001: fixture-string gh check + ghFreePath for shell-argv:'
+      refs: ['shared/resources/security-probe.mjs']
+  future:
+    - action: 'CR-2: name shell-argv: in the runProbeSpec bad-args decline message (security-probe.mjs:1151)'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'CR-3: probe-boundary-rule.md:394 — name "cli: or shell-argv: without --argv"'
+      refs: ['shared/resources/probe-boundary-rule.md']
+    - action: 'Two unnamed shell-argv: controls with the same argv and different --fixture-setup share a controlKey, and emitBlock does not print fixture_setup — name such controls, or key/print the setup'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-181-001 closed']

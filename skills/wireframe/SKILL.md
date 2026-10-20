@@ -71,24 +71,23 @@ command node .agents/skills/wireframe/scripts/wireframe.js status path/to/screen
 
 Keep the printed `sha256`: it goes into the document's frontmatter.
 
-**2. Pick the format profile.** A profile maps one format's markup to Wireloom primitives. Match the
-file against each profile's detection markers and load the one that fits before reading further:
-
-| Profile | Detect by | Load |
-|---|---|---|
-| Rebirth hi-fi phone screens | `<body class="phone rbt-theme …">` and `s5-*` classes | [`references/html-formats/rbt-hifi.md`](references/html-formats/rbt-hifi.md) |
+**2. Load the project's format profile, if it has one.** A profile maps one format's markup to
+Wireloom primitives. This skill ships none, because a format belongs to a project. A project that
+converts one format repeatedly keeps its profile in its own repository, outside `.agents/skills/`
+(a reinstall overwrites that directory), and names it in its own agent instructions. Load it before
+reading further.
 
 A profile decides **how** markup maps to Wireloom. The rules below decide **what** gets drawn,
 including which states get a block of their own. A profile fills the gaps those rules leave and
 never overrides one. If a profile row contradicts a rule here, the rule wins, and the row is a
 defect to fix.
 
-If no profile matches, use the rules below on their own, and say in the hand-over that no profile
-matched. A format you will convert more than once deserves its own profile: copy the shape of an
-existing one into `references/html-formats/` and add a row here.
+If there is no profile, use the rules below on their own, and say in the hand-over that none
+applied.
 
 **3. Read the body, not the file.** Skip `<head>`, `<script>`, `<style>` and inline SVG sprite sheets.
-They are often most of the file and carry no layout. The profile names the format's own noise.
+They are often most of the file and carry no layout. A profile, when there is one, names the
+format's own noise.
 
 **4. Apply these rules while transcribing:**
 

@@ -149,6 +149,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** A develop-task run also writes the Step 2 review report `task.{N}.review.{n}.{name}.md`, the Step 5c PR review report `task.{N}.pr-review.{n}.{name}.md` (the QA loop's exit gate) and `sprint-review-summary.md`. A user checking against this table would conclude Step 5c never ran.
 - **Evidence:** skills/review-pr/SKILL.md:663-666 (`.pr-review.{n}.` artifact); skills/finalise/SKILL.md:1289 (`sprint-review-summary.md`); docs/tasks/task.194.*/ (review.1, pr-review.1, sprint-review-summary.md present)
 - **Fix:** Add rows for `task.{N}.review.1.{name}.md` (review-task), `task.{N}.pr-review.1.{name}.md` (review-pr, Step 5c) and `sprint-review-summary.md` (finalise).
+- **Resolved:** fixed by task.196 (2026-10-19).
 
 ### OVERVIEW-8 — `docs/concepts/quickstart-story.md:145` (missing)
 
@@ -156,6 +157,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** There is no `story.{N}.1.pr-review.1.add-footer-link.md` row, though Step 5c writes one. The sprint review is a separate `sprint-review-summary.md`, not part of the DoD file. Rows 1-2 (PRD and epic) are not in the story directory the `ls` lists.
 - **Evidence:** skills/review-pr/SKILL.md:663 (`.pr-review.{n}.` kind); skills/finalise/SKILL.md:1287-1289 (`{story-directory}/sprint-review-summary.md`)
 - **Fix:** Add a `story.{N}.1.pr-review.1.add-footer-link.md` row (review-pr, Step 5c) and a separate `sprint-review-summary.md` row. Note that the PRD and epic live in parent directories.
+- **Resolved:** fixed by task.196 (2026-10-19).
 
 ### OVERVIEW-9 — `docs/concepts/quickstart-task.md:53` (broken)
 
@@ -163,6 +165,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** These quickstarts run in a consumer project, which has no `shared/resources/` directory. Installed skills carry the helper as `.agents/skills/<skill>/references/bitbucket-auth.sh`, so the command fails with 'No such file'.
 - **Evidence:** git ls-files: skills/create-pr/references/bitbucket-auth.sh (bundled copy), and only this repo has shared/resources/bitbucket-auth.sh
 - **Fix:** Use `source .agents/skills/create-pr/references/bitbucket-auth.sh` in quickstart-task.md:53 and quickstart-story.md:54 and :196.
+- **Resolved:** fixed by task.199 (2026-10-20). Also fixed the same command at `docs/runbooks/story-development.md:317`, which the audit did not list; quickstart-story.md's second site had moved to :199.
 
 ### OVERVIEW-10 — `docs/concepts/getting-started.md:121` (missing)
 
@@ -170,6 +173,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** After the skills install, the wizard has a `tracker-workflow.yaml` step. It keeps an existing file, generates one from the live board, or writes a template with a warning to edit it before the first run. Neither the table nor 'Files produced' mentions it.
 - **Evidence:** scripts/setup-consumer.sh:580 (`write_tracker_workflow()`), :1955 (called from main after install_skills), :624/:632 (record_step 'generated from board' / 'template (edit before first run)')
 - **Fix:** Add a table row between steps 8 and 9 for scaffolding `tracker-workflow.yaml` (generated from the live board when possible, otherwise a template to edit), and add `tracker-workflow.yaml` to 'Files produced'.
+- **Resolved:** fixed by task.199 (2026-10-20). Added as step 8a (it runs after the skills install and before the agent links, 8b) and in Files produced.
 
 ### OVERVIEW-11 — `docs/concepts/getting-started.md:129` (stale)
 
@@ -177,6 +181,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** The wizard writes live credentials to `.secrets/tooling.env` and adds both `.secrets/` and `.env` to .gitignore. This also contradicts the same page's 'Files produced' list, which says `.secrets/tooling.env`.
 - **Evidence:** scripts/setup-consumer.sh:366 (`CRED_FILE=".secrets/tooling.env"`), :430-455 (write + `.gitignore` append of `.secrets/` and `.env`)
 - **Fix:** Change to 'Writes `.env.example` (keys only); optionally writes `.secrets/tooling.env` and adds `.secrets/` and `.env` to `.gitignore`'.
+- **Resolved:** fixed by task.199 (2026-10-20).
 
 ### OVERVIEW-13 — `docs/concepts/architecture.md:96` (stale)
 
@@ -184,6 +189,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** finalise never invokes ensure-epic-*. It has no `invokes:` key and its only `ensure-` mention is the bug sub-routines. The epic ensure sub-routines are called by create-story, create-epic, review-epic and review-story.
 - **Evidence:** skills/finalise/SKILL.md (no `ensure-epic` match; only :1915 ensure-bug-*); skills/create-story/SKILL.md:4 (`invokes: [ensure-epic-github-issue, ensure-epic-jira-issue, …]`); skills/create-epic/SKILL.md:332
 - **Fix:** Remove the FN→EGH/EGJ edges and the sentence at :111. Draw the ensure-epic edges from create-story (in its `invokes` list) and create-epic (body, :332). Optionally also from review-story and review-epic, which call them too.
+- **Resolved:** fixed by task.198 (2026-10-20).
 
 ### OVERVIEW-14 — `docs/concepts/architecture.md:132` (stale)
 
@@ -191,6 +197,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** Story branches are cut from `develop` and PR back to `develop` by default. An epic branch exists only when the epic opts in to `branch_model: epic-integration`.
 - **Evidence:** skills/develop-story/SKILL.md:3 (description: 'Story branches are cut from `develop` and PR back to `develop` … an epic has no branch of its own unless it opts in'); shared/resources/develop-pipeline-step-0-resolve-and-prepare.md:666
 - **Fix:** Change line 132 to 'story branch ready (from develop, or the epic integration branch when opted in)' and line 136 to 'Step 4 — create PR (--base develop, or the epic integration branch)'.
+- **Resolved:** fixed by task.197 (2026-10-20).
 
 ### OVERVIEW-15 — `docs/concepts/architecture.md:138` (stale)
 
@@ -198,6 +205,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** The loop routes on the gate's queue, not its verdict token. A CONCERNS gate with no open `top_issues[]` entry goes straight to 5c. The Diminishing-returns (route 2) and Cosmetic-residue (route 2b) exits also hand to 5c with open entries. Only FAIL, or a gate with open entries, goes to qa-fix.
 - **Evidence:** shared/resources/develop-pipeline-step-5-6-qa-loop.md:346-350 ('CONCERNS with no open entry … proceed to 5c'), :351-356 (FAIL/open entries → convergence check → route classifier → 5b), :357-362 (route 2b)
 - **Fix:** Change the alt branch to 'gate has open top_issues[] (FAIL, or CONCERNS/PASS with open entries)'. Reword line 153 as: 'a gate with no open entry (PASS, CONCERNS or active WAIVED), or a route-2/2b exit, hands to Step 5c'.
+- **Resolved:** fixed by task.196 (2026-10-19).
 
 ### OVERVIEW-17 — `docs/operations/workflows.md:72` (stale)
 
@@ -205,6 +213,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** develop-next and develop-batch also dispatch `/develop-bug` rows. `/develop-bug` is one of the three runnable commands.
 - **Evidence:** skills/develop-next/SKILL.md:4 (`invokes: [develop-story, develop-task, develop-bug]`), :119 ('only `/develop-story`, `/develop-task` and `/develop-bug` are runnable'); skills/develop-batch SKILL.md description ('/develop-story, /develop-task or /develop-bug')
 - **Fix:** Change workflows.md:72 to `→ /develop-story \| /develop-task \| /develop-bug`. The develop-batch block (:76-79) names no pipeline commands, so there is nothing to change there; optionally add '(/develop-story \| /develop-task \| /develop-bug)' after 'pipelines run concurrently'. Also reword :66-67 'The three pipelines above' if develop-bug is not among them.
+- **Resolved:** fixed by task.198 (2026-10-20).
 
 ### OVERVIEW-18 — `docs/operations/workflows.md:65` (missing)
 
@@ -212,6 +221,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** Shipped siblings are missing. `/qa-next` is the UAT loop (sibling of develop-next) and has gained `/qa-next <id>` and `--coverage` since v0.52. `loop-supervisor` runs the roadmap unattended with a fresh context per iteration, the documented alternative to `/loop` (which the section recommends). Neither is mentioned. README.md:66 already presents qa-next as develop-next's sibling.
 - **Evidence:** skills/qa-next/SKILL.md (description: 'Sibling of develop-next: that loop builds, this one verifies'); skills/loop-supervisor/SKILL.md (description: built-in /loop re-invokes the same conversation …); docs/runbooks/unattended-overnight-runs.md; CHANGELOG.md [Unreleased] '`/qa-next <id>`'
 - **Fix:** Add a short qa-next block (uat-status.mjs --next → walk checklist → record 🟡/❌/⏸, file bugs, never ✅). Add a note that for hours-long runs `loop-supervisor` replaces `/loop`, linking the Unattended Overnight Runs runbook.
+- **Resolved:** fixed by task.198 (2026-10-20).
 
 ### OVERVIEW-19 — `docs/concepts/which-path.md:28` (inconsistent)
 
@@ -219,6 +229,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** The rewritten hotfix runbook says a hotfix is a bug with a different branch model. You file it with `/create-bug-report` (general bug, description says 'production'), then `/develop-bug` takes the hotfix branch model and calls `create-branch --hotfix` itself. Running `/create-branch --hotfix` by hand skips the bug document, review-bug, the regression test and the fix record.
 - **Evidence:** docs/runbooks/hotfix.md:18-20 ('The pipeline is the same one a regular bug uses — /develop-bug'), :36-42, :48-51 (create-bug-report → develop-bug → create-branch --hotfix); skills/develop-bug SKILL.md description ('production hotfix (off main)')
 - **Fix:** Change the 'Yes — urgent fix' leaf to '/create-bug-report (say "production") → /develop-bug, hotfix branch model', in the flowchart, the Question 2 prose and the quick-reference table, still linking hotfix.md.
+- **Resolved:** fixed by task.199 (2026-10-20).
 
 ### OVERVIEW-20 — `docs/concepts/overview.md:127` (stale)
 
@@ -226,6 +237,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** 28 SKILL.md files reference resolve-platform.sh, including create-story and qa-story, which the doc calls platform-agnostic. Also qa-task, review-pr, review-code, review-bug, review-epic, develop-next, all sync-github-* and all ensure-*.
 - **Evidence:** `grep -rl resolve-platform.sh skills/*/SKILL.md` → 28 files incl. skills/create-story/SKILL.md, skills/qa-story/SKILL.md, skills/review-pr/SKILL.md, skills/qa-task/SKILL.md
 - **Fix:** Drop the hard-coded count and lists. Say 'every skill that touches a tracker or PR sources resolve-platform.sh', remove create-story and qa-story from the agnostic list, or generate the list.
+- **Resolved:** fixed by task.198 (2026-10-20). Not as the Fix line words it: "every skill … sources it" is false (create-issue, finalise and the Jira ensure-* routines do not), so overview.md names the sourcing skills and uses the source-only grep from platform-detection.md § Skills migrated to the helper (task.198 QA cycle 1).
 
 ### REFERENCE-1 — `docs/reference/commands.md:62` (stale)
 
@@ -233,6 +245,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** review-pr also takes `--effort low\|medium\|high\|max` and `--inline` (posts each finding inline, implies --comment). Its target can also be a work item: a Jira key, a Jira /browse/ or board or /issues/ URL, `#N`, or a GitHub issue URL, which Step 1a resolves to the PR (task.176). The seed is confirmed.
 - **Evidence:** skills/review-pr/SKILL.md:36 `Invoke as /review-pr [target] [--effort LEVEL] [--comment] [--inline] [--no-code] [--no-docs]`; :40 target values; :41 --effort; :43 --inline
 - **Fix:** Change row 61 to `/review-pr [PR\|branch\|JIRA-KEY\|Jira-URL\|#issue\|issue-URL]` and say that a work item resolves to its PR. Add `--inline` (implies --comment) and `--effort LEVEL` to row 62.
+- **Resolved:** fixed by task.198 (2026-10-20).
 
 ### REFERENCE-5 — `docs/reference/commands.md:143` (missing)
 
@@ -240,6 +253,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** session-handoff gained a third mode, Continue (task.156). It writes a continuation file beside the work item (`task.N.handoff.{k}.slug.md`, story equivalent, else `.agents/handoffs/`) and prints a paste-ready resume prompt. It also ships an opt-in context-pressure installer (task.157).
 - **Evidence:** skills/session-handoff/SKILL.md:3 (Three modes), :36 Modes table Continue row, :196 `## Continue`; CHANGELOG.md [Unreleased] 'session-handoff gains a continue mode'
 - **Fix:** Add a row for `/session-handoff` in continue mode, asked by intent ('hand off to a fresh session', 'context is filling up'). Say that it writes a co-located continuation file plus a resume prompt that re-verifies first.
+- **Resolved:** fixed by task.198 (2026-10-20).
 
 ### REFERENCE-6 — `docs/reference/activation-phrases.md:108` (missing)
 
@@ -247,6 +261,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** The session-handoff description now triggers on 'hand off to a fresh session', 'context is filling up' and 'continue this in a new context' (continue mode). None of these appear here.
 - **Evidence:** skills/session-handoff/SKILL.md:3 description trigger list
 - **Fix:** Add a row: "Hand off to a fresh session" / "Context is filling up" / "Continue this in a new context" → `session-handoff` (continue mode).
+- **Resolved:** fixed by task.198 (2026-10-20).
 
 ### REFERENCE-7 — `docs/reference/glossary.md:29` (stale)
 
@@ -254,6 +269,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** Lite mode is not a flag. Phase 0 sets it automatically when risk_level is low or absent, there are fewer than 3 tasks or phases, and the work touches a single module. It changes only QA: Step 5 uses direct tools only and Step 5c runs `/review-pr --effort low`. It does not skip pre-develop context-gathering.
 - **Evidence:** shared/resources/develop-pipeline-lite-mode.md:10-23 (Trigger Conditions; 'Lite mode trades QA depth for speed'); skills/develop-story/SKILL.md 'Lite mode applies to Step 5 only'
 - **Fix:** Redefine it as an auto-detected mode, triggered when risk_level is low or absent, there are fewer than 3 tasks or phases, and the work touches a single module. In this mode Step 5 QA uses direct tools only and Step 5c runs `/review-pr --effort low` (degraded, never skipped). Every other step, including Step 7's finalise side-effects, runs unchanged. Do not single out 'Steps 4, 7 and 8', because lite-mode.md says all other steps run unchanged.
+- **Resolved:** fixed by task.197 (2026-10-20).
 
 ### REFERENCE-8 — `docs/reference/anti-patterns.md:63` (stale)
 
@@ -261,6 +277,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** No `--lite` flag exists on the develop orchestrators; lite mode is auto-detected in Phase 0. It reduces QA depth rather than pre-develop context-gathering.
 - **Evidence:** git grep -- '--lite' over skills/develop-*/SKILL.md and shared/resources/develop-pipeline-*.md returns nothing; shared/resources/develop-pipeline-step-0-resolve-and-prepare.md:373 (PIPELINE_MODE computed from Agent 3); shared/resources/develop-pipeline-lite-mode.md:19-25
 - **Fix:** Drop `--lite`/'lite flag'. Say that lite mode, which is auto-detected and trades QA depth, never skips Step 7.
+- **Resolved:** fixed by task.197 (2026-10-20).
 
 ### REFERENCE-9 — `docs/reference/troubleshooting.md:168` (stale)
 
@@ -268,6 +285,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** No --lite flag exists. Lite mode is auto-detected and shortens QA: Step 5 uses direct tools and Step 5c runs at --effort low.
 - **Evidence:** shared/resources/develop-pipeline-lite-mode.md:10-23
 - **Fix:** Reword the symptom ('the run was in lite mode') and the cause (lite mode shortens QA only; Step 7 always runs in full).
+- **Resolved:** fixed by task.197 (2026-10-20).
 
 ### REFERENCE-10 — `docs/reference/glossary.md:15` (stale)
 
@@ -275,6 +293,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** Bug reports have three modes. A story bug is co-located with the story, a task bug sits in the task directory, and a general (cross-cutting) bug lives in `docs/bugs/bug.{n}.{name}/` and is numbered from the global bug registry.
 - **Evidence:** skills/create-bug-report/SKILL.md description (three modes); docs/standards/file-naming.md:24-26 general bug
 - **Fix:** Define it as a story, task or general bug and link docs/standards/bug-documents.md. Add a Bug registry row (`docs/bugs/bug-registry.md`) beside the epic and task registries.
+- **Resolved:** fixed by task.199 (2026-10-20).
 
 ### REFERENCE-11 — `docs/reference/troubleshooting.md:192` (missing)
 
@@ -282,6 +301,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** There is a documented resume path after a loop-limit or not-converging escalation. Resume rebuilds the cycle count from disk and offers a grant of extra cycles (`grant-qa-cycles.sh`, which writes `qa_max_cycles` / `extra_cycles_granted` on the lock), so the pipeline can continue rather than be driven by hand.
 - **Evidence:** shared/resources/develop-pipeline-resume-contract.md:521 '### Re-entry after a QA loop escalation'; shared/resources/develop-pipeline-step-5-6-qa-loop.md:16 (QA_MAX_CYCLES from lock `qa_max_cycles`, writer grant-qa-cycles.sh)
 - **Fix:** Add: re-invoke `/develop-*` and choose Resume. It reconstructs the cycle count and offers extra cycles (grant-qa-cycles.sh). Running qa-* standalone is then counted, not repeated.
+- **Resolved:** fixed by task.196 (2026-10-19).
 
 ### REFERENCE-12 — `docs/reference/troubleshooting.md:225` (missing)
 
@@ -289,6 +309,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** New in task.170: after a `/finalise` DoD-gaps halt, a committed code fix past the newest gate's `head:` re-enters the QA loop at step 5 / qa_phase 5a through `reenter-qa-after-finalise.sh` instead of re-running finalise. It sets `qa_max_cycles = max(existing, base+2)`. A docs-only fix resumes at 7, and an uncommitted fix is refused as `uncommitted-fix`.
 - **Evidence:** shared/resources/develop-pipeline-resume-contract.md:606 '### Re-entry after a finalise DoD-gaps halt'; CHANGELOG.md [Unreleased] 'A code fix after a /finalise DoD-gaps halt is gated before acceptance (task.170)'
 - **Fix:** Add a section, 'Finalise halted with DoD gaps and I fixed code'. Commit the fix and re-invoke; the run re-enters QA at 5a. A document-only fix resumes at 7. Mention the `uncommitted-fix` refusal.
+- **Resolved:** fixed by task.196 (2026-10-19).
 
 ### REFERENCE-13 — `docs/reference/configuration.md:1145` (stale)
 
@@ -296,6 +317,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** VCS resolves from config `vcs:` and then the git remote (bitbucket.org → bitbucket, else github). No environment variable selects Bitbucket. Only TRACKER has env and .env rungs (JIRA_URL).
 - **Evidence:** shared/resources/resolve-platform.sh:502-511 (VCS = config value, `auto` → `git remote get-url origin \| grep -qi bitbucket.org`); shared/resources/platform-detection.md:58 'config → env → .env (TRACKER only) → git remote (VCS only) → default'
 - **Fix:** Change step 2 to '`JIRA_URL` in env or `.env` → Jira (tracker only)'. State that VCS comes from config and then the git remote.
+- **Resolved:** fixed by task.199 (2026-10-20).
 
 ### REFERENCE-14 — `docs/reference/configuration.md:558` (inconsistent)
 
@@ -303,6 +325,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** The moment set has eight members: it also includes `changes-requested` (Step 5b, once per cycle) and `pr-merged` (develop-next/develop-batch post-merge). Five are off by default. tracker-workflow.md documents all eight.
 - **Evidence:** shared/resources/tracker-workflow.js:58-67 MOMENTS; docs/reference/tracker-workflow.md:132-143 ('All eight are wired. The five marked ❌…')
 - **Fix:** Add `changes-requested` and `pr-merged` rows to the table. Change 'The three new stages' to 'The five off-by-default stages', or replace the table with a link to tracker-workflow.md § The moments.
+- **Resolved:** fixed by task.199 (2026-10-20).
 
 ### RUNBOOKS-3 — `docs/runbooks/release-and-install.md:50` (missing)
 
@@ -310,6 +333,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** release.sh first reads CI's verdict for HEAD (scripts/release-ci-verdict.mjs) and refuses unless Test/ShellCheck are green (escape: `--skip-ci-check`), warns on branches with commits not on develop, runs `npm run test:clean-checkout`, and syncs develop with main itself (step 9; `--no-sync-develop` to skip). A maintainer running it right after merging the release-prep PR is refused while CI is still pending, with no explanation in this runbook.
 - **Evidence:** scripts/release.sh:13-28 (steps 1b CI verdict, 2 branch warning, 9 'Syncs develop with main'), scripts/release.sh:10-11 (`--no-sync-develop`, `--skip-ci-check`)
 - **Fix:** In §3 list what release.sh does including the CI-verdict gate (wait for CI on main, or `--skip-ci-check` only when CI was confirmed another way) and the automatic develop sync; reword §4 as 'only if you passed --no-sync-develop'.
+- **Resolved:** partly fixed before task.199 by the `release.sh --prepare/--tag` rework (the runbook already said `--tag` checks CI and syncs develop); task.199 (2026-10-20) added the refusal while CI is pending, the `--skip-ci-check` escape, and reworded §4 to 'only if you passed `--no-sync-develop`'.
 
 ### RUNBOOKS-6 — `docs/runbooks/create-parallel-stories.md:50` (broken)
 
@@ -317,6 +341,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** Without `-b`, `git worktree add` requires the branch to already exist; the story branch does not exist until develop-story Step 1 creates it, so the command fails with 'invalid reference'. The create-parallel-stories skill's own setup commands use `-b`.
 - **Evidence:** skills/create-parallel-stories/SKILL.md:249 (`git worktree add ../worktrees/story-1-1 -b feature/story-1-1-1`)
 - **Fix:** Use `git worktree add -b feature/story.{E}.{S}.{name} ../{repo}-story-{E}.{S} develop` (or defer to the commands `/create-parallel-stories` prints). Same fix in docs/runbooks/first-week/day-4-parallel.md:57-58.
+- **Resolved:** fixed by task.197 (2026-10-20). The fix uses a scratch branch (`-b story/{P}.{E}.{S} develop`, as `/develop-batch` does), not `-b feature/story…`: pre-creating the feature branch makes `/develop-story` Step 1 stop on "branch already exists".
 
 ### RUNBOOKS-7 — `docs/runbooks/first-week/day-4-parallel.md:91` (inconsistent)
 
@@ -324,6 +349,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** The same page's steps (lines 62-64) say PRs open against the Phase 0 Q2 base, `develop` by default, which matches develop-story's develop-direct default. The verify checklist and lesson contradict both.
 - **Evidence:** docs/runbooks/first-week/day-4-parallel.md:62-64; skills/develop-story/SKILL.md:3
 - **Fix:** Line 91: 'Two PRs open against `develop` (or the epic integration branch if the epic opted in)'. Line 101: 'PRs target the base chosen at Phase 0 Q2, whatever the parallelism.'
+- **Resolved:** fixed by task.197 (2026-10-20).
 
 ### RUNBOOKS-8 — `docs/runbooks/first-week.md:36` (stale)
 
@@ -331,6 +357,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** Story PRs target `develop` by default (no epic branch unless opted in), and Day 2 itself only asks for a PR open on GitHub (day-2-stories.md:62, 72).
 - **Evidence:** skills/develop-story/SKILL.md:3; docs/runbooks/first-week/day-2-stories.md:72 ('≥ 1 story PR exists on GitHub')
 - **Fix:** Change to '1 story PR open (or merged) against `develop`; story status `accepted`'.
+- **Resolved:** fixed by task.197 (2026-10-20).
 
 ### RUNBOOKS-9 — `docs/runbooks/story-development.md:132` (stale)
 
@@ -338,6 +365,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** finalise never invokes an ensure-epic routine. The epic issue is ensured by `create-story` and `review-story` (both declare `ensure-epic-github-issue`/`ensure-epic-jira-issue` in `invokes:`).
 - **Evidence:** skills/create-story/SKILL.md:4 and skills/review-story/SKILL.md (invokes lists); skills/ensure-epic-github-issue/SKILL.md:3 ('called from create-story and review-story'); `grep ensure-epic skills/finalise/SKILL.md` → no match
 - **Fix:** B.3: 'Epic issues are ensured by `create-story` and `review-story` (via ensure-epic-*)'. Move the two ensure-epic bullets from 'Inside finalise' to the create-story/review-story rows of the upstream map. Same fix for docs/runbooks/jira-publish.md:124 ('ensure-epic-jira-issue — called by finalise').
+- **Resolved:** fixed by task.198 (2026-10-20). `docs/runbooks/jira-publish.md:124` fixed too.
 
 ### RUNBOOKS-10 — `docs/runbooks/story-development.md:249` (stale)
 
@@ -345,6 +373,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** There is no `--lite` flag. Lite mode is set only by Phase 0 detection (risk_level low/absent AND <3 tasks AND single module), and it changes only QA depth: Step 5 uses direct tools, Step 5c runs `--effort low`, all other steps run unchanged (codebase mapping is not skipped).
 - **Evidence:** shared/resources/develop-pipeline-lite-mode.md:10-24 (trigger conditions; 'All other steps run unchanged'); shared/resources/develop-pipeline-step-0-resolve-and-prepare.md:373 ('there is no lite-mode CLI'); skills/develop-story/SKILL.md:242 ('Lite mode applies to Step 5 only')
 - **Fix:** Replace with: 'Lite mode is auto-detected in Phase 0 (low risk, <3 tasks, one module) — there is no flag. It shortens QA only (direct-tools Step 5, `--effort low` Step 5c); Step 7 still runs in full.'
+- **Resolved:** fixed by task.197 (2026-10-20).
 
 ### RUNBOOKS-11 — `docs/runbooks/task-development.md:92` (stale)
 
@@ -352,6 +381,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** Phase 0d asks exactly Q1 base + Q2 PR target; lite mode is auto-detected, never prompted, has no flag, and affects only Step 5 QA depth and Step 5c effort.
 - **Evidence:** skills/develop-task/SKILL.md:35 ('0d — Q1 base + Q2 PR target … no Q3'); shared/resources/develop-pipeline-step-0-resolve-and-prepare.md:693 ('Do NOT invent additional questions … lite-mode detection runs in 0a-parallel Agent 3'); shared/resources/develop-pipeline-lite-mode.md:10-24
 - **Fix:** Drop the 'Lite mode' prompt bullet; describe lite mode as auto-detected and QA-only, and remove `--lite` from line 128.
+- **Resolved:** fixed by task.197 (2026-10-20).
 
 ### RUNBOOKS-12 — `docs/runbooks/story-development.md:89` (stale)
 
@@ -359,6 +389,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** Review reports are sequence-numbered: `prd.review.{N}.{name}.md` and `epic.{N}.review.{n}.{name}.md`. Standalone `review-story --validate` is read-only and never modifies the story; only the orchestrated validate-and-apply variant promotes status.
 - **Evidence:** skills/review-prd/SKILL.md:140 (`prd.review.{N}.{name}.md`); skills/review-epic/SKILL.md:532-536 (`epic.[N].review.[n].[name].md`); skills/review-story/SKILL.md:147 ('Standalone validate … never modifies the story document')
 - **Fix:** Use `prd.review.{N}.{name}.md` and `epic.{N}.review.{n}.{name}.md`; change line 164 to 'Interactive mode updates `status` once resolved; standalone `--validate` is read-only.'
+- **Resolved:** the review-prd part was already fixed on `develop` before task.196 (closed on re-check); the review-epic name and the line-164 validate wording were fixed by task.196 (2026-10-19).
 
 ### RUNBOOKS-14 — `docs/runbooks/story-development.md:146` (missing)
 
@@ -366,6 +397,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** create-story also invokes `wireframe` (§5.4.6, for UI stories; added as wireloom and renamed to wireframe in [Unreleased]) and the ensure-epic/ensure-story issue routines. review-story also invokes `wireframe` and runs its `check` on embedded wireloom blocks.
 - **Evidence:** skills/create-story/SKILL.md:4 (invokes: […, mermaid-architect, wireframe]), :687 ('5.4.6 Check for UI/Wireframe Opportunity (conditional, via `wireframe`)'); CHANGELOG.md [Unreleased] '/wireloom is now /wireframe'
 - **Fix:** Add `wireframe` (UI stories) and `ensure-story-*`/`ensure-epic-*` to the create-story Calls row and to the upstream called-skills table (line 288).
+- **Resolved:** fixed by task.198 (2026-10-20).
 
 ### RUNBOOKS-15 — `docs/runbooks/story-development.md:253` (missing)
 
@@ -373,6 +405,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** New since v0.52.0 (task.170): when a run halted at Step 7 with DoD `❌ GAPS` and the fix was a committed code change, Phase 0b offers 'Re-enter QA at 5a' (Recommended), which re-enters the QA loop through `reenter-qa-after-finalise.sh`, not at Step 7. A document-only fix resumes at 7; an uncommitted fix is refused.
 - **Evidence:** skills/develop-story/SKILL.md:331 and skills/develop-task/SKILL.md:318 ('Re-entry after a finalise DoD-gaps halt fixed by a code change'); shared/resources/develop-pipeline-resume-contract.md:606
 - **Fix:** Add the re-entry sentence to Resume semantics in story-development.md (~line 253) and task-development.md (~line 132). After a Step 7 DoD-gaps halt fixed by a committed code change, pick 'Re-enter QA at 5a' (Recommended) so the new head is gated before acceptance. A document-only fix resumes at 7; an uncommitted fix is refused.
+- **Resolved:** fixed by task.196 (2026-10-19).
 
 ### RUNBOOKS-16 — `docs/runbooks/task-development.md:87` (broken)
 
@@ -380,6 +413,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** A task document lives inside its self-named directory: `docs/tasks/task.{N}.{name}/task.{N}.{name}.md`. The path given does not exist, so the verification grep fails.
 - **Evidence:** docs/runbooks/task-development.md:64 (same runbook: outputs `docs/tasks/task.{N}.{name}/task.{N}.{name}.md`); AGENTS.md Task Registry / task path `docs/tasks/task.{N}.{name}/`
 - **Fix:** Use `docs/tasks/task.{N}.{name}/task.{N}.{name}.md` at lines 87 and 189.
+- **Resolved:** fixed by task.197 (2026-10-20).
 
 ### RUNBOOKS-18 — `docs/runbooks/sprint-cycle.md:64` (missing)
 
@@ -387,6 +421,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** The library ships sprint-ceremony skills: `jira-sprint-manager` (start/close sprints, add/remove issues), `jira-sprint-review-prep` (Sprint Review agenda/DoD compliance), `jira-sprint-retrospective` (retro document from Jira + git), and `jira-standup-auditor`.
 - **Evidence:** skills/jira-sprint-retrospective/SKILL.md, skills/jira-sprint-review-prep/SKILL.md, skills/jira-sprint-manager/SKILL.md, skills/jira-standup-auditor/SKILL.md (all present)
 - **Fix:** Add the Jira-tracker options by phase: jira-sprint-manager in Phase 1 (planning) and Phase 4 (closing the sprint), jira-standup-auditor in Phase 2 (daily standups), jira-sprint-review-prep in Phase 3, and jira-sprint-retrospective in Phase 5.
+- **Resolved:** fixed by task.198 (2026-10-20).
 
 ### SKILL-READMES-STANDARDS-2 — `skills/develop-task/README.md:51` (inconsistent)
 
@@ -394,6 +429,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** develop-story can create and target an epic integration branch (opt-in); only develop-task has no epic-branch concept
 - **Evidence:** shared/resources/develop-pipeline-step-1-create-branch.md:67-90; docs/standards/story-documents.md:124-148 (Branch strategy)
 - **Fix:** Reword: 'develop-task has no epic-branch concept; develop-story offers an opt-in epic integration branch when the parent epic declares branch_model: epic-integration.'
+- **Resolved:** fixed by task.197 (2026-10-20).
 
 ### SKILL-READMES-STANDARDS-3 — `skills/develop-task/README.md:283` (stale)
 
@@ -401,6 +437,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** The latest gate and cycle number come from the qa-cycle.sh helper (highest-numbered cycle, zero-padding normalised, two files claiming one cycle refused); the loop limit is QA_MAX_CYCLES from the lock's qa_max_cycles, default 5
 - **Evidence:** shared/resources/develop-pipeline-step-5-6-qa-loop.md:135-160 (QA_CYCLE=$(bash .../qa-cycle.sh ...), task.158) and :14-20 (QA_MAX_CYCLES=$(jq -r '.qa_max_cycles // 5' ...))
 - **Fix:** Replace the two diagram notes and the artifact-table cell with 'QA_CYCLE / LATEST_GATE from references/qa-cycle.sh'; change 'loop cycle ≤ 5' to 'cycle ≤ QA_MAX_CYCLES (lock qa_max_cycles, default 5)'.
+- **Resolved:** fixed by task.196 (2026-10-19).
 
 ### SKILL-READMES-STANDARDS-4 — `skills/develop-story/README.md:291` (stale)
 
@@ -408,6 +445,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** Gate and cycle are resolved by qa-cycle.sh; the budget is QA_MAX_CYCLES (lock qa_max_cycles, default 5)
 - **Evidence:** shared/resources/develop-pipeline-step-5-6-qa-loop.md:135-160 and :14-20
 - **Fix:** As proposed. Also fix artifact-table L468 'latest gate sorted by -t. -k5 -n' and 'alt cycle > 5' at L357.
+- **Resolved:** fixed by task.196 (2026-10-19).
 
 ### SKILL-READMES-STANDARDS-5 — `skills/develop-task/README.md:114` (stale)
 
@@ -415,6 +453,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** The loop routes on the open top_issues[] queue, not the token: a CONCERNS gate with no open entry goes to 5c (route 3); FAIL/open-queue gates first run the Convergence check (escalates from cycle 3) and the route classifier (Diminishing-returns exit route 2, Cosmetic-residue exit route 2b), plus the Gate-the-last-fix half-cycle (route 2c) at budget; a malformed gate HALTs
 - **Evidence:** shared/resources/develop-pipeline-step-5-6-qa-loop.md:24-60 (five routes, four guards table) and :310-372 (Outcome branching arms); classifyLoopRoute() in shared/resources/qa-diminishing-returns.js
 - **Fix:** Redraw the S5gate fork and Diagram 4's alt block as: no open entry (PASS / active WAIVED / CONCERNS) -> 5c; open entry -> Convergence check -> route classifier -> 5b; add the escalate and half-cycle paths, citing the step-5-6 doc.
+- **Resolved:** fixed by task.196 (2026-10-19).
 
 ### SKILL-READMES-STANDARDS-6 — `skills/develop-story/README.md:121` (stale)
 
@@ -422,6 +461,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** Queue-based routing with route 3 (CONCERNS, empty queue -> 5c), Convergence check, Diminishing-returns/Cosmetic-residue exits and Gate-the-last-fix half-cycle
 - **Evidence:** shared/resources/develop-pipeline-step-5-6-qa-loop.md:24-60, :310-372
 - **Fix:** Same redraw as the develop-task README diagrams.
+- **Resolved:** fixed by task.196 (2026-10-19).
 
 ### SKILL-READMES-STANDARDS-7 — `skills/develop-task/README.md:443` (stale)
 
@@ -429,6 +469,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** review-task writes task.{n}.review.{N}.{descriptive-name}.md with N computed by next_numbered; the plan file is written by create-task
 - **Evidence:** skills/review-task/SKILL.md:1432-1436 (REVIEW_N=$(next_numbered ... review ...)); skills/develop-task/SKILL.md:345 'Review report: task.{id}.review.{N}.{name}.md'; skills/create-task/SKILL.md:372,709 (plan created alongside task)
 - **Fix:** Change the path to `task.{id}.review.{N}.{name}.md` and the plan row's 'Created by' to '/create-task (or relocated from an upstream plan)'.
+- **Resolved:** fixed by task.196 (2026-10-19).
 
 ### SKILL-READMES-STANDARDS-8 — `skills/develop-story/README.md:460` (stale)
 
@@ -436,6 +477,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** review-story writes story.{epic}.{story}.review.{n}.{story-name}.md; create-story writes the plan file
 - **Evidence:** skills/review-story/SKILL.md:421,431; skills/create-story/SKILL.md:607
 - **Fix:** Change to `story.{epic}.{story}.review.{n}.{name}.md` and attribute the plan file to /create-story.
+- **Resolved:** fixed by task.196 (2026-10-19).
 
 ### SKILL-READMES-STANDARDS-9 — `skills/develop-task/README.md:448` (stale)
 
@@ -443,6 +485,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** QA report + gate are committed per cycle; /finalise 6a-6c commits and pushes the accepted document, DoD summary, sprint-review-summary.md and registry tick, asserts them on origin and takes a second CI reading before its PR comment/close. Step 8 commits only the implementation report and HALTs if anything else is dirty
 - **Evidence:** shared/resources/develop-pipeline-step-7-finalise.md:133-176 (publish boundary, CI reading 1/2, HALT on dirty paths); :521-536 Step 7 Completion Checklist
 - **Fix:** Set 'Terminal state' for QA report/gate to 'committed per QA cycle' and for DoD summary to 'committed + pushed by /finalise 6a'; add sprint-review-summary.md and registry rows; mention the two CI readings in the Step 7 node/description.
+- **Resolved:** fixed by task.196 (2026-10-19).
 
 ### SKILL-READMES-STANDARDS-10 — `skills/develop-story/README.md:467` (stale)
 
@@ -450,6 +493,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** Per-cycle QA commits and /finalise's publish boundary (6a commit+push, CI reading 2) carry these; Step 8 commits only the report
 - **Evidence:** shared/resources/develop-pipeline-step-7-finalise.md:133-176
 - **Fix:** Same edit as the develop-task README artifact table.
+- **Resolved:** fixed by task.196 (2026-10-19).
 
 ### SKILL-READMES-STANDARDS-11 — `skills/develop-task/README.md:494` (stale)
 
@@ -457,6 +501,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** The PreCompact hook posts its issue comment through one tracker-comment.js call that resolves the tracker from the lock, so it reaches Jira when JIRA_URL/JIRA_API_TOKEN/JIRA_USER_EMAIL are in the hook's environment; both writes go through the access gate (deferred under restricted access.tracker)
 - **Evidence:** shared/resources/develop-pipeline-on-precompact.sh:16,36-45 (Jira via tracker-comment.js), :322-345 (issue comment, LOCK_TRACKER), :303-307 (ACCESS_TRACKER deferral)
 - **Fix:** Replace the Jira Pause-hook cell with 'tracker-comment.js --stage (best-effort; posts when JIRA_* credentials are in the hook env; deferred under restricted access.tracker)' and change the diagram arrow to 'tracker-comment.js (GitHub or Jira)'.
+- **Resolved:** fixed by task.196 (2026-10-19).
 
 ### SKILL-READMES-STANDARDS-12 — `skills/develop-story/README.md:512` (stale)
 
@@ -464,6 +509,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** The hook posts via tracker-comment.js to either tracker when credentials exist
 - **Evidence:** shared/resources/develop-pipeline-on-precompact.sh:16,36-45,322-345
 - **Fix:** Same edit as the develop-task README.
+- **Resolved:** fixed by task.196 (2026-10-19).
 
 ### SKILL-READMES-STANDARDS-14 — `skills/develop-task/README.md:341` (missing)
 
@@ -471,6 +517,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** Since v0.52 the HALT snapshot supports two QA re-entries: 'Resume at 5a with {k} more cycles' after a loop-limit/not-converging halt (grant-qa-cycles.sh writes extra_cycles_granted/qa_max_cycles) and 'Re-enter QA at 5a' after a finalise DoD-gaps halt fixed by code (reenter-qa-after-finalise.sh, task.170)
 - **Evidence:** skills/develop-task/SKILL.md (Error Recovery: 'Re-entry after a QA loop escalation' -> grant-qa-cycles.sh; 'Re-entry after a finalise DoD-gaps halt fixed by a code change' -> reenter-qa-after-finalise.sh); CHANGELOG.md [Unreleased] task.170 entry
 - **Fix:** As proposed, but do not date it 'since v0.52': the finalise DoD-gaps re-entry (task.170) is unreleased. Add both re-entries to Diagram 5 and to the 'cycle > 5' / 'HALT: DoD gaps' nodes, citing the SKILL Error Recovery sections, and replace the literal 5 with QA_MAX_CYCLES in both READMEs.
+- **Resolved:** fixed by task.196 (2026-10-19).
 
 ### SKILL-READMES-STANDARDS-15 — `skills/develop-next/README.md:20` (stale)
 
@@ -478,6 +525,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** The gate requires document accepted, gate not FAIL, and no open top_issues[] entry: CONCERNS with no open entry and WAIVED (waiver documented) both merge; a PASS-only reading HALTed task.105
 - **Evidence:** skills/develop-next/SKILL.md:137-158 (Verify green table: accepted+CONCERNS no open -> merge; accepted+WAIVED -> merge)
 - **Fix:** Replace the bullet with: 'document `accepted`, gate not `FAIL`, and no `open` entry in the gate's top_issues[] (CONCERNS/WAIVED with no open finding merge)'.
+- **Resolved:** fixed by task.196 (2026-10-19).
 
 ### SKILL-READMES-STANDARDS-16 — `skills/develop-batch/README.md:122` (stale)
 
@@ -485,6 +533,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** Same as develop-next: accepted + gate not FAIL + no open top_issues[] entry
 - **Evidence:** skills/develop-batch/SKILL.md:382-401 (same table and waiver clause as develop-next Step 3)
 - **Fix:** Same wording change as the develop-next README.
+- **Resolved:** fixed by task.196 (2026-10-19).
 
 ### SKILL-READMES-STANDARDS-20 — `skills/review-task/README.md:88` (stale)
 
@@ -492,6 +541,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** Report is `task.{n}.review.{N}.{descriptive-name}.md`, N computed with next_numbered; Step 0 also offers 'Action plan only' (no file)
 - **Evidence:** skills/review-task/SKILL.md:1432-1436, :1674, :1678 (Option B: Action Plan Only)
 - **Fix:** Change to `task.{n}.review.{N}.{descriptive-name}.md` and mention the action-plan-only option.
+- **Resolved:** fixed by task.196 (2026-10-19).
 
 ### SKILL-READMES-STANDARDS-21 — `skills/review-task/README.md:222` (broken)
 
@@ -499,6 +549,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** No such skill; task QA is /qa-task
 - **Evidence:** skills/qa-task/SKILL.md exists; no skills/qa-technical-task directory
 - **Fix:** Replace `/qa-technical-task` with `/qa-task` at skills/review-task/README.md L229 and L270.
+- **Resolved:** fixed by task.198 (2026-10-20).
 
 ### SKILL-READMES-STANDARDS-23 — `skills/review-story/README.md:3` (missing)
 
@@ -506,6 +557,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** review-story has a second mode, Validate (`--validate` or 'is this story ready?'): a non-interactive GO/NO-GO gate with a 1-10 readiness score, plus a validate-and-apply variant used by develop-story
 - **Evidence:** skills/review-story/SKILL.md:3 (description), :36-60 (Validate Mode, /review-story --validate ...), :71 (validate output artifact), :148 (APPLY=true)
 - **Fix:** Add a 'Validate mode' section with the --validate invocations, the GO/NO-GO output and when develop-story uses validate-and-apply.
+- **Resolved:** fixed by task.198 (2026-10-20).
 
 ### SKILL-READMES-STANDARDS-25 — `docs/standards/task-documents.md:64` (stale)
 
@@ -513,6 +565,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** No pipeline step reads the depends_on frontmatter key; develop-task's status gate checks only status, and select-next.mjs reads dependencies from the registry's 'Depends on' column, not frontmatter
 - **Evidence:** shared/resources/develop-pipeline-step-0-resolve-and-prepare.md:355-365 (task status table, no depends_on); grep for depends_on finds only skills/sync-github-task/SKILL.md:66, skills/ensure-task-github-issue/SKILL.md:156 (display) and skills/develop-next/scripts/select-next.mjs:914 (registry column header alias)
 - **Fix:** Mark depends_on as informational (synced to the tracker card); say that ordering is enforced by develop-next via the registry 'Depends on' column / roadmap deps:, or drop the 'blocks pipeline' claim and the checklist line.
+- **Resolved:** fixed by task.197 (2026-10-20).
 
 ### SKILL-READMES-STANDARDS-26 — `docs/standards/task-documents.md:146` (stale)
 
@@ -520,6 +573,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** The doc's own prerequisites are for develop-task, the end-to-end pipeline; /develop is the single implementation step and accepts no issue-number input (only file/dir/epic inputs). Issue forms (#297) are resolved by develop-task's Phase 0a
 - **Evidence:** skills/develop/SKILL.md:25-31 (input forms: story/task file or dir, epic file); shared/resources/develop-pipeline-step-0-resolve-and-prepare.md:24,67 ('Issue hash notation: #297'); skills/develop-task/SKILL.md:3 ('Invoke with /develop-task [task-file-path]')
 - **Fix:** Change the block to `/develop-task docs/tasks/task.17.cache-lib-simplification/`, `/develop-task task.17....md`, `/develop-task #297`.
+- **Resolved:** fixed by task.197 (2026-10-20).
 
 ### SKILL-READMES-STANDARDS-27 — `docs/standards/story-documents.md:163` (stale)
 
@@ -527,6 +581,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** Prerequisites target develop-story; /develop takes no issue number. The pipeline entry point is /develop-story, which resolves #297
 - **Evidence:** skills/develop/SKILL.md:25-31; skills/develop-story/SKILL.md:3 ('Invoke with /develop-story [story-file-path]')
 - **Fix:** Use `/develop-story` in all three invocation lines.
+- **Resolved:** fixed by task.197 (2026-10-20).
 
 ### SKILL-READMES-STANDARDS-28 — `docs/standards/prd-documents.md:16` (inconsistent)
 
@@ -534,6 +589,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** story-documents.md:14-20 and epic-documents.md:16-22 put epics at `docs/prd/{domain}/{feature}/epics/` (no prd. prefix), as do docs/reference/configuration.md:20-22, shared/resources/resolve-paths.sh:19 and create-epic; create-prd alone writes `[domain]/prd.[feature]/prd.[feature].md`. This repo's own tree is docs/prd/onboarding/prd.onboarding.md + docs/prd/onboarding/epics/
 - **Evidence:** skills/create-prd/SKILL.md:45,65 vs skills/create-epic/SKILL.md:46,107-108,349; shared/resources/resolve-paths.sh:19; git ls-files docs/prd
 - **Fix:** Edit only docs/standards/prd-documents.md (the layout tree, the epic locator sentence and the 'Directory: prd.{feature}' naming rule) to use {domain}/{feature}/prd.{feature}.md and {domain}/{feature}/epics/, matching resolve-paths.sh and create-epic. File a follow-up to fix create-prd's output path (`${PRD_ROOT}/[domain]/prd.[feature]/prd.[feature].md` at SKILL L45/L65).
+- **Resolved:** closed by task.199 Phase 0 (2026-10-20), not edited — superseded. Tasks 202–207 adopted `${PRD_ROOT}/{domain}/prd.{P}.{feature}/` in create-prd, create-epic and the tracked tree, and `docs/standards/prd-documents.md` already states it; the Fix line would now regress the standard. No create-prd follow-up needed.
 
 
 ## Low (39)
@@ -551,6 +607,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** The installer registers two hooks, PreCompact and Stop. The page's own table lists two.
 - **Evidence:** shared/resources/develop-pipeline-install-hooks.sh:2 and :326-329 (PreCompact + Stop only); scripts/setup-consumer.sh:1821 ('2 hooks registered')
 - **Fix:** Change 'three' to 'two' at lines 134 and 297.
+- **Resolved:** fixed by task.199 (2026-10-20).
 
 ### OVERVIEW-16 — `docs/operations/workflows.md:111` (inconsistent)
 
@@ -558,6 +615,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** A CONCERNS gate with an empty or all-closed queue also hands to 5c (route 3), as do the Diminishing-returns and Cosmetic-residue exits. 'Fix Cycle (if needed)' reads as if CONCERNS always means qa-fix.
 - **Evidence:** shared/resources/develop-pipeline-step-5-6-qa-loop.md:346-350
 - **Fix:** Change to 'On a gate with no open findings (PASS, CONCERNS or an active WAIVED), or a route-2/2b exit, the loop hands to Step 5c'.
+- **Resolved:** fixed by task.196 (2026-10-19).
 
 ### OVERVIEW-21 — `docs/concepts/overview.md:90` (stale)
 
@@ -565,6 +623,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** Neither skill exists in this library (there is no skills/document-project or skills/simplify). `simplify` is a host built-in, not a shipped skill.
 - **Evidence:** `ls skills/` (129 dirs) has no document-project or simplify; docs/reference/skill-catalog.md:3 ('all 129 skills')
 - **Fix:** Remove `document-project` (document-existing-project is already listed) and `simplify` from the category lists.
+- **Resolved:** fixed by task.198 (2026-10-20).
 
 ### OVERVIEW-22 — `docs/concepts/architecture.md:99` (missing)
 
@@ -572,6 +631,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** create-story now also invokes `wireframe` (renamed from `/wireloom`, shipped since v0.52) for UI stories, plus the ensure-epic-* and ensure-story-* sub-routines. The map shows none of them.
 - **Evidence:** skills/create-story/SKILL.md:4 (`invokes: [ensure-epic-github-issue, ensure-epic-jira-issue, ensure-story-github-issue, ensure-story-jira-issue, mermaid-architect, wireframe]`); CHANGELOG.md [Unreleased] '`/wireloom` is now `/wireframe`'
 - **Fix:** Add `CS --> WF[wireframe]` (UI stories) and the ensure-epic/ensure-story edges to the create-story node.
+- **Resolved:** fixed by task.198 (2026-10-20).
 
 ### OVERVIEW-23 — `docs/concepts/quickstart-story.md:200` (stale)
 
@@ -579,6 +639,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** The pipeline always skips /qa-planning silently. There is no QA-planning pause or prompt.
 - **Evidence:** shared/resources/develop-pipeline-step-0-resolve-and-prepare.md:601 ('the pipeline always skips `/qa-planning`. Do not prompt for it'), :682
 - **Fix:** Delete the row.
+- **Resolved:** fixed by task.196 (2026-10-19).
 
 ### OVERVIEW-24 — `docs/concepts/quickstart-story.md:127` (stale)
 
@@ -586,6 +647,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** Only Q1 appends the epic-integration option, and only when `branching.epicIntegration.offerWhenUndeclared` is not false. Q2 offers develop / main / Other. Lite mode is auto-detected, so there is nothing to answer 'No' to.
 - **Evidence:** shared/resources/develop-pipeline-step-0-resolve-and-prepare.md:639-642 (Q1 append), :666 (Q2 'Otherwise: develop / main / Other')
 - **Fix:** Change to 'Q1 also offers an epic integration branch … (unless `offerWhenUndeclared: false`)'. Remove 'Pick `No` for anything…' from the lite-mode note.
+- **Resolved:** fixed by task.197 (2026-10-20).
 
 ### OVERVIEW-25 — `docs/concepts/quickstart-story.md:210` (inconsistent)
 
@@ -593,6 +655,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** The canonical lifecycle also includes `planned` and `ready-for-review`. quickstart-task.md:160 and getting-started.md:431 state it in full.
 - **Evidence:** shared/resources/document-status-lifecycle.md (draft → planned → ready-for-development → in-progress → ready-for-review → accepted)
 - **Fix:** Change to `draft → ready-for-development → in-progress → ready-for-review → accepted` (story lifecycle; `planned` is task-only per document-status-lifecycle.md:58). Or give the full ladder with a note that `planned` applies to tasks only.
+- **Resolved:** fixed by task.196 (2026-10-19).
 
 ### OVERVIEW-26 — `docs/concepts/which-access.md:36` (inconsistent)
 
@@ -600,6 +663,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** `approve` defers during the run, then asks one batched confirmation at handover and executes the approved records via the committed script. It degrades to `command` only without a tty. The same page's prose (:51) and restricted-access.md:34 already say this, but the leaf reads as if approve were unimplemented.
 - **Evidence:** shared/resources/develop-pipeline-step-7-finalise.md:500-510 ('The approve model at handover' … 'Approved records execute via the committed script')
 - **Fix:** Change the leaf to 'access.tracker: approve — one batched confirmation at handover'.
+- **Resolved:** fixed by task.199 (2026-10-20).
 
 ### OVERVIEW-27 — `README.md:148` (inconsistent)
 
@@ -607,6 +671,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** The catalog is generated and CI diffs it, so a hand edit is overwritten or fails the check. CONTRIBUTING.md:42 says to run `npm run generate-catalog`.
 - **Evidence:** docs/reference/skill-catalog.md:5-6 ('auto-generated … Run `npm run generate-catalog`'); CONTRIBUTING.md:42; .github/workflows/validate.yml:19
 - **Fix:** Change to 'Run `npm run generate-catalog` (regenerates docs/reference/skill-catalog.md and the README badge)'.
+- **Resolved:** fixed by task.198 (2026-10-20).
 
 ### OVERVIEW-28 — `docs/examples/architecture/README.md:19` (stale)
 
@@ -614,6 +679,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** No skill, shared resource or script reads either key. The configuration reference documents only `architecture.architectureShardedLocation`.
 - **Evidence:** `git grep 'architectureVersion\\|architectureSharded:' -- ':!skills/*/references/*'` matches only docs and .agents/plans, with no reader in skills/ or shared/resources/; docs/reference/configuration.md:14, :229
 - **Fix:** Drop the two keys from the snippet and keep `architectureShardedLocation` plus `devLoadAlwaysFiles`, or mark them as informational, not read by any skill.
+- **Resolved:** fixed by task.199 (2026-10-20).
 
 ### REFERENCE-15 — `docs/reference/glossary.md:25` (stale)
 
@@ -621,6 +687,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** Phase 0d's Upfront Setup asks exactly two questions: Q1, the feature branch base, and Q2, the PR target. Lite mode is computed from the document and never prompted for.
 - **Evidence:** shared/resources/develop-pipeline-step-0-resolve-and-prepare.md:684-690 (required-question count = 2: Q1 + Q2); :373 lite mode detection
 - **Fix:** Replace with 'Prompts for branch base and PR target; detects lite mode automatically'.
+- **Resolved:** fixed by task.197 (2026-10-20).
 
 ### REFERENCE-16 — `docs/reference/activation-phrases.md:32` (missing)
 
@@ -628,6 +695,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** review-pr also triggers from a work item, for example 'review the PR for RAPP-702'. It accepts a Jira key, Jira URL or GitHub issue and finds the PR.
 - **Evidence:** skills/review-pr/SKILL.md description ('Accepts a Jira key, Jira URL or GitHub issue and finds its PR… review the PR for RAPP-702')
 - **Fix:** Add "Review the PR for RAPP-702" to the review-pr row.
+- **Resolved:** fixed by task.198 (2026-10-20).
 
 ### REFERENCE-17 — `docs/reference/activation-phrases.md:123` (missing)
 
@@ -635,6 +703,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** wireframe also turns an existing HTML screen or hi-fi mockup into a wireframe (obs #245) and has a `wireframe.js status <file.html>` step.
 - **Evidence:** skills/wireframe/SKILL.md:3 description ('wants an existing HTML screen or hi-fi mockup turned into a wireframe'); :54-62
 - **Fix:** Add "Turn this HTML screen into a wireframe" → `wireframe`.
+- **Resolved:** fixed by task.198 (2026-10-20).
 
 ### REFERENCE-18 — `docs/reference/commands.md:60` (stale)
 
@@ -642,6 +711,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** review-code also takes `--effort LEVEL` and a target of `<PR-number>`, `<base>...<head>` or `--staged`.
 - **Evidence:** skills/review-code/SKILL.md:30 'Invoke as /review-code [target] [--effort LEVEL] [--comment] [--fix]'; :34-35
 - **Fix:** Show `/review-code [PR\|base...head\|--staged]` and add `--effort LEVEL`.
+- **Resolved:** fixed by task.198 (2026-10-20).
 
 ### REFERENCE-19 — `docs/reference/commands.md:42` (missing)
 
@@ -649,6 +719,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** `/create-task --from-observation <id>[,<id>…]` seeds a task from observation-log entries and parks them on it. It shipped in v0.52.0.
 - **Evidence:** skills/create-task/SKILL.md:182 '`/create-task --from-observation 124,127` cuts a task from observation-log entries'
 - **Fix:** Add a row for `/create-task --from-observation <ids>`.
+- **Resolved:** fixed by task.198 (2026-10-20).
 
 ### REFERENCE-20 — `docs/reference/pipeline-artifacts.md:73` (stale)
 
@@ -656,6 +727,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** The table has ten rows: work item, plan, review report, PR review report, security review report, implementation report, QA report, gate file, DoD summary and tracker handover.
 - **Evidence:** docs/reference/pipeline-artifacts.md:77-86
 - **Fix:** Drop the count ('The documents, in plain terms') or change it to ten.
+- **Resolved:** fixed by task.196 (2026-10-19).
 
 ### REFERENCE-21 — `docs/reference/pipeline-artifacts.md:97` (stale)
 
@@ -663,6 +735,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** Choosing Resume runs `advance-pipeline-lock.sh --restore <doc-dir>`, which rebuilds the lock from the snapshot and consumes it. Step 8 also deletes a sole legacy snapshot. An orphaned `.lock.pausing.<pid>` claim is the other restore candidate and isn't listed.
 - **Evidence:** shared/resources/develop-pipeline-pause.md:80 ('--restore … consumes the source'; 'Step 8 deletes such a snapshot')
 - **Fix:** Change the lifetime to 'Written on HALT/pause; consumed by --restore on Resume (or left behind on Start fresh)'. Add a `.lock.pausing.<pid>` row.
+- **Resolved:** fixed by task.196 (2026-10-19).
 
 ### REFERENCE-23 — `docs/reference/faq.md:65` (stale)
 
@@ -670,6 +743,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** The primary install is `setup-consumer.sh`, which extracts a tarball of skill directories that `npm run bundle` (bundle_skill.py) made self-contained in-tree. Zips are a gitignored build artifact used only for the manual offline install.
 - **Evidence:** AGENTS.md § Shared Resources (two distribution paths); scripts/setup-consumer.sh (tarball, no .zip use); docs/concepts/getting-started.md:340 'Option C — manual zip install'
 - **Fix:** Retitle it to 'Why is each skill self-contained?' and describe both in-tree bundling (tarball installs) and zips (offline).
+- **Resolved:** fixed by task.199 (2026-10-20).
 
 ### REFERENCE-24 — `docs/reference/faq.md:93` (stale)
 
@@ -677,6 +751,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** There is also a third hardcoded registry, `docs/bugs/bug-registry.md`, for general bugs.
 - **Evidence:** AGENTS.md § Bug Registry; docs/standards/bug-registry.md
 - **Fix:** List the three registries, including `bugs/bug-registry.md`.
+- **Resolved:** fixed by task.199 (2026-10-20). Re-cited: the epic registry was retired by tasks 202–205, so the three hardcoded registry filenames are now `prd-registry.md` (under the PRD root), `tasks/task-registry.md` and `bugs/bug-registry.md`.
 
 ### REFERENCE-25 — `docs/reference/invocation.md:177` (stale)
 
@@ -684,6 +759,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** create-pr prompts for the target branch and opens the PR with the GitHub CLI or the Bitbucket REST API, depending on the auto-detected platform.
 - **Evidence:** skills/create-pr/SKILL.md description ('Prompts for target branch … using the GitHub CLI (GitHub) or Bitbucket REST API (Bitbucket)')
 - **Fix:** Change to 'prompts for the target … creates via `gh pr create` (GitHub) or the Bitbucket REST API'.
+- **Resolved:** fixed by task.198 (2026-10-20).
 
 ### RUNBOOKS-13 — `docs/runbooks/story-development.md:232` (stale)
 
@@ -691,6 +767,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** The pipeline runs review-story in non-interactive validate-and-apply mode. It skips when a review report exists and status is Ready for Development or In Progress; recency is not a criterion.
 - **Evidence:** skills/develop-story/SKILL.md:291 ('Always validate-and-apply … non-interactive, no questions asked'); shared/resources/develop-pipeline-step-2-review.md:30-38 (skip/run table)
 - **Fix:** 'Runs review-story in validate-and-apply mode (no questions). Skipped when a `story.{E}.{S}.review.*.md` report exists and status is Ready for Development or In Progress.' Same correction for task-development.md:111, where develop-task also skips a `Planned` task whose review report is current.
+- **Resolved:** fixed by task.196 (2026-10-19).
 
 ### RUNBOOKS-17 — `docs/runbooks/task-development.md:74` (stale)
 
@@ -698,6 +775,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** The report carries a sequence number: `task.{n}.review.{N}.{descriptive-name}.md`.
 - **Evidence:** skills/review-task/SKILL.md:326, :1432 (`task.{n}.review.{N}.{descriptive-name}.md`); skills/develop-task/SKILL.md:345 (`task.{id}.review.{N}.{name}.md`)
 - **Fix:** Change to `task.{N}.review.{n}.{name}.md`.
+- **Resolved:** fixed by task.196 (2026-10-19).
 
 ### RUNBOOKS-19 — `docs/runbooks/first-week/day-3-messy-path.md:50` (stale)
 
@@ -705,6 +783,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** Gate files record the verdict under the `gate:` key (`gate: PASS\|CONCERNS\|FAIL\|WAIVED`). There is no `decision:` field, so grepping for it finds nothing.
 - **Evidence:** skills/qa-gate/SKILL.md:87 (`gate: PASS # PASS\|CONCERNS\|FAIL\|WAIVED`); skills/qa-story/SKILL.md:274 (`grep '^gate:'`)
 - **Fix:** Change both expectations to `gate: FAIL` / `gate: PASS`. Also line 58: re-run `qa-story` rather than `qa-gate`, which is the manual-override skill.
+- **Resolved:** fixed by task.196 (2026-10-19).
 
 ### RUNBOOKS-20 — `docs/runbooks/change-management.md:56` (stale)
 
@@ -712,6 +791,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** change-checklist's six sections are: 1 Understand Trigger & Context, 2 Epic Impact Assessment, 3 Artifact Conflict & Impact Analysis, 4 Path Forward Evaluation, 5 Sprint Change Proposal Components, 6 Final Review & Handoff.
 - **Evidence:** skills/change-checklist/SKILL.md:28,49,74,105,137,157 (Section 1–6 headings)
 - **Fix:** Replace the numbered list with the skill's actual section names.
+- **Resolved:** fixed by task.199 (2026-10-20).
 
 ### RUNBOOKS-21 — `docs/runbooks/document-existing-project.md:7` (stale)
 
@@ -719,6 +799,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** `skills/document-project/` was deleted outright, not replaced by a stub. `/document-project` no longer exists.
 - **Evidence:** commit 6510d78e ('Delete legacy skills/document-project/SKILL.md'); no tracked `skills/document-project/` path
 - **Fix:** Change to: 'The former `/document-project` skill was removed; use `/document-existing-project`.' Or delete the note.
+- **Resolved:** fixed by task.198 (2026-10-20).
 
 ### RUNBOOKS-22 — `docs/runbooks/release-and-install.md:92` (missing)
 
@@ -726,6 +807,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** The wizard also asks the tracker access model (`access.tracker`, step 'Tracker access') and writes `tracker-workflow.yaml` (from the live board when it can read it, otherwise a template to edit before the first run).
 - **Evidence:** scripts/setup-consumer.sh:277-278 (record_step "Tracker access"), :583-632 and :693-696 (record_step "tracker-workflow")
 - **Fix:** Add two rows: 'Tracker access — choose full/manual/command/approve/read-only' and 'tracker-workflow — generate `tracker-workflow.yaml` from the board, or a template to edit'.
+- **Resolved:** fixed by task.199 (2026-10-20).
 
 ### RUNBOOKS-23 — `docs/runbooks/jira-publish.md:105` (inconsistent)
 
@@ -733,6 +815,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** The runbook documents four sync skills (Phase 4 adds `sync-jira-bug`), and sync-jira-bug also drives transitions, recording them in Status History.
 - **Evidence:** docs/runbooks/jira-publish.md:74-91 (Phase 4 sync-jira-bug); skills/sync-jira-bug/SKILL.md description ('Writes Status History rows … on issue creation and status transition')
 - **Fix:** Change to 'All four sync skills drive the Jira issue's status from the local status'. Add that sync-jira-bug maps the bug lifecycle (new/in-progress/ready-for-qa/closed/reopened, not the document lifecycle) and records transitions in `## Status History`, not a Change Log.
+- **Resolved:** fixed by task.199 (2026-10-20).
 
 ### RUNBOOKS-24 — `docs/runbooks/qa-flow.md:136` (missing)
 
@@ -740,6 +823,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** Since task.176, a standalone `/review-pr` also accepts a work item as target: a Jira key or URL, a GitHub issue URL or `#N`. It resolves the item to its PR, and `resolved_via` names the route.
 - **Evidence:** skills/review-pr/SKILL.md:36,40 (target: `<PR-number>`\|`<PR-URL>`\|`<branch>`\|`<JIRA-KEY>`\|`<Jira-URL>`\|`#<issue>`\|`<GitHub-issue-URL>`); CHANGELOG.md [Unreleased] '/review-pr starts from the work item'
 - **Fix:** Add a line for standalone use: `/review-pr [PR \| branch \| JIRA-KEY \| Jira URL \| #issue] [--effort …] [--comment]`, linking to the SKILL.md target table.
+- **Resolved:** fixed by task.198 (2026-10-20).
 
 ### RUNBOOKS-25 — `docs/runbooks/bug-fix.md:108` (missing)
 
@@ -747,6 +831,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** For a general bug, every status write (in-progress, ready-for-qa, reopened, closed) is mirrored into the `docs/bugs/bug-registry.md` row in the same edit. A consumer drift guard compares the two on every push.
 - **Evidence:** skills/develop-bug/SKILL.md:219 ('General bug: every status write here … is mirrored into the docs/bugs/bug-registry.md row's Status cell in the same edit'), :241
 - **Fix:** In Step 3 and Steps 5–6 note that a general bug's registry row mirrors each status write, so verifying only the final `closed` row is not sufficient mid-run.
+- **Resolved:** fixed by task.199 (2026-10-20).
 
 ### RUNBOOKS-26 — `docs/runbooks/first-week/day-1-tasks.md:81` (broken)
 
@@ -754,6 +839,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** task-development.md has no 'Phase B — QA loop' section; the QA loop is a row inside 'Phase B — Implementation (develop-task)'. Day 1 works in a clone of this repo, whose package.json requires Node >= 22.
 - **Evidence:** docs/runbooks/task-development.md:80 ('## Phase B — Implementation (`develop-task`)'); package.json:16-17 (`"engines": { "node": ">=22" }`)
 - **Fix:** Link to `../task-development.md#phase-b--implementation-develop-task` (Steps 5–6 row) and change the prerequisite to Node ≥ 22.
+- **Resolved:** fixed by task.199 (2026-10-20).
 
 ### SKILL-READMES-STANDARDS-13 — `skills/develop-task/README.md:25` (stale)
 
@@ -761,6 +847,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** The pipeline installs two hooks: PreCompact (graceful pause) and Stop (on-stop.sh, forced continuation via decision: block); install-hooks.sh registers both
 - **Evidence:** skills/develop-task/SKILL.md:13-19 (two hooks, install-hooks.sh); skills/develop-task/scripts/on-stop.sh; skills/develop-story/SKILL.md:176
 - **Fix:** Add 'Stop -> scripts/on-stop.sh (blocks a premature stop mid-pipeline)' and the install command to the Hooks row; same fix in skills/develop-story/README.md:27.
+- **Resolved:** fixed by task.196 (2026-10-19).
 
 ### SKILL-READMES-STANDARDS-17 — `skills/develop-next/README.md:3` (missing)
 
@@ -768,6 +855,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** Selection also derives a frontier from the task and bug registries; roadmap-complete means the roadmap and both registries are exhausted, and Step 4 annotates the task-registry row (registry-tick.js --annotate)
 - **Evidence:** skills/develop-next/SKILL.md:119 ('roadmap-complete now means the roadmap and both registries are exhausted'), :406 (item.source = task-registry), :422 (registry-tick.js --annotate); commit ef54b2b2
 - **Fix:** Add a sentence: when the roadmap has no runnable row, the selector falls back to docs/tasks/task-registry.md and docs/bugs/bug-registry.md, and a registry-sourced item is recorded by annotating its registry row.
+- **Resolved:** fixed by task.198 (2026-10-20).
 
 ### SKILL-READMES-STANDARDS-18 — `skills/develop-next/README.md:29` (missing)
 
@@ -775,6 +863,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** /develop-batch automates that fan-out (worktrees, concurrent pipelines, serial rebase+merge, ticks)
 - **Evidence:** skills/develop-batch/SKILL.md (frontmatter description); skills/develop-batch/README.md:150-155
 - **Fix:** Point the bullet at /develop-batch (and its README) as the automated path, keeping select-next.mjs --batch as the read-only preview.
+- **Resolved:** fixed by task.198 (2026-10-20).
 
 ### SKILL-READMES-STANDARDS-19 — `skills/qa-next/README.md:80` (broken)
 
@@ -782,6 +871,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** No uat-automate skill ships in this repository; qa-next's own SKILL.md qualifies the hand-off 'until that skill exists in the consumer'
 - **Evidence:** ls skills/ (no uat-automate); skills/qa-next/SKILL.md:229
 - **Fix:** Say uat-automate is a consumer-side skill not shipped here, and give the fallback from SKILL.md:229 (the Automation candidate block is the spec brief; run --automated when the spec lands).
+- **Resolved:** fixed by task.198 (2026-10-20).
 
 ### SKILL-READMES-STANDARDS-22 — `skills/review-task/README.md:73` (stale)
 
@@ -789,6 +879,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** SKILL.md runs 'Review Workflow (8 Sequential Steps)': Step 0 output format, 0a branch setup, 1 config, 1.5 parallel pre-pass, 2 template, 3 technical accuracy, 4 plan, 6 consistency, 6.5 mermaid, 7 risk, 8 output, 8.5 offer fixes, 9 status; QP1 follows Step 2, QP2 Step 4, QP3 Step 7
 - **Evidence:** skills/review-task/SKILL.md:309-1767 headings (Step 0 ... Step 8.5), :750, :1150, :1364 (QUESTION POINTs)
 - **Fix:** Rewrite the list from SKILL headings: 0 output format, 0a branch setup, 1 config/context (with the Phase 1.5 parallel pre-pass), 2 template, 3 technical accuracy, 4 plan completeness, 6 consistency, 6.5 Mermaid validation, 7 risk/rollback, 8 output (full report or action plan only), 8.5 offer fixes, 8.6 Jira body push, 9 status update, 10 tracker comment. Question points come after Steps 2, 4 and 7.
+- **Resolved:** fixed by task.198 (2026-10-20).
 
 ### SKILL-READMES-STANDARDS-24 — `skills/review-story/README.md:75` (stale)
 
@@ -796,6 +887,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** SKILL.md runs Step 0 (mode/output), 0a, 1 (context + parallel pre-pass), 2-8, 6.5 Mermaid validation, 6.6 Wireframe verification (via wireframe, shipped since v0.52), 9 output, 9.5 offer fixes, 9.6 tracker sync, 10 status update, 11 tracker comment
 - **Evidence:** skills/review-story/SKILL.md:412-2450 step headings (Step 6.6: Wireframe Verification (via `wireframe`) at :1376)
 - **Fix:** Update the step list to the SKILL headings, including 6.6 wireframe verification and steps 9.5, 9.6, 10 and 11. Also replace the '3 batched rounds' section (L45-49) and the '3 question points' feature bullet with the single Unified Question Point (one batch of at most 4 questions after Step 8, skipped in validate mode).
+- **Resolved:** fixed by task.198 (2026-10-20).
 
 ### SKILL-READMES-STANDARDS-29 — `docs/standards/task-documents.md:102` (missing)
 
@@ -803,6 +895,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** Pipelines also write sprint-review-summary.md (finalise 6a), continuation handoff task.{n}.handoff.{n}.{name}.md (session-handoff continue), tracker handover task.{n}.handover.{n}.{name}.{md,sh,json} and task bug reports; the layout tree also omits the pr-review file
 - **Evidence:** skills/finalise/SKILL.md:1289,1338 (sprint-review-summary.md committed at 6a); docs/standards/file-naming.md:54-56 (handoff/handover rows); CHANGELOG.md [Unreleased] task.156
 - **Fix:** Add rows for sprint-review-summary.md, handoff, handover and bug reports (or link file-naming.md for the full list), and add the pr-review line to the tree. Same gap in docs/standards/story-documents.md:21-27 and :102-110; file-naming.md has no sprint-review-summary row either.
+- **Resolved:** partially — task-documents.md fixed by task.196 (2026-10-19). The story-documents.md and file-naming.md gaps were deferred out of scope (task.196 review D1) and remain open.
 
 ### SKILL-READMES-STANDARDS-30 — `docs/standards/README.md:7` (missing)
 
@@ -810,6 +903,7 @@ findings the verifier confirmed are listed. The run used 8 agents.
 - **Reality:** docs/standards/ also holds bug-documents.md (general-bug schema) and bug-registry.md, and neither is indexed
 - **Evidence:** git ls-files docs/standards (bug-documents.md, bug-registry.md)
 - **Fix:** Add '- `docs/standards/bug-documents.md`' under Document schemas and '- `docs/standards/bug-registry.md`' under Cross-cutting rules.
+- **Resolved:** fixed by task.199 (2026-10-20).
 
 ## Refuted by the verifier (3)
 

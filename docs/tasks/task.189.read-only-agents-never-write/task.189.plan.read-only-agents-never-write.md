@@ -56,14 +56,23 @@ rm -f "$REPLY_FILE"
 Check the existing tests that lift Step 5 blocks before editing
 (`git grep -ln 'traceability' tests shared/resources/tests evals`).
 
-## Phase 2: Security agent and Step 3c
+## Phase 2: Security agent and Step 3b.1
+
+> **Review 1 (2026-10-16):** `develop` gained the obs #10 fallback after this plan was written —
+> the prompt returns `probe_command:` / `probe_cases:` and finalise runs it "Before Step 3c" when the
+> record is absent (`skills/finalise/SKILL.md:513–537`). Step 3b.1 **replaces** that block; read it
+> and its contract test (`evals/shared/tests/finalise-dod-prompt-contract.test.mjs`, "the probe run
+> falls to /finalise …") first. The task document § 3 and § 6 are authoritative where this section
+> disagrees.
 
 **`finalise-dod-security-prompt.md`**
 
 - Step 3 "Execute them" → "**3. Plan the run.** For each boundary, emit one `probe_plan` entry: the
   engine argv you would run, without `--record` and without `--repo-root`. finalise runs it." Keep
   the entry-form guidance (`#`, `cli:`, `shell-fn:`, `--argv`, `--cases-file`). A cases file the
-  agent would write becomes `cases:` inline in the plan entry; finalise writes it to a temp file.
+  agent would write becomes `cases:` inline in the plan entry; finalise writes it beside the
+  record, `<stem>.dod.<DOD_N>.security.cases[.<i>].json` in the work-item directory (obs #299 —
+  never a temp file). Step 4.2's "write it to …" / "write both … to `$TMPDIR`" sentences go.
 - Replace the five `--record` command blocks with one argv example.
 - Output schema: add
 
@@ -77,7 +86,11 @@ Check the existing tests that lift Step 5 blocks before editing
 
   and mark `probes_executed` / `probes` as "filled by finalise Step 3c — do not emit".
 
-**`skills/finalise/SKILL.md`** — new `#### Step 3c: Run the security probe plan` after Step 3b:
+**`skills/finalise/SKILL.md`** — new `#### Step 3b.1: Run the security probe plan`, replacing the obs
+#10 block between Step 3b and Step 3c (which keeps its name). Build the argument list as an array from
+the JSON entry — `fence:<doc>#<heading text>` and `--argv` templates carry spaces, so the sketch
+below's unquoted `$(cat …)` is **wrong** (review 1, I4) and is kept only to show the record path
+shape it must not use:
 
 ```bash
 # For each entry i in SECURITY_RESULT.probe_plan (the orchestrator writes each entry's argv and,
@@ -85,7 +98,7 @@ Check the existing tests that lift Step 5 blocks before editing
 command node .agents/skills/finalise/references/security-probe.mjs \
   $(cat .claude/state/probe-plan/$i/argv) \
   --repo-root "$(git rev-parse --show-toplevel)" \
-  --record "{story-directory}/{stem}.dod.security.run.$i.json" --json \
+  --record "{story-directory}/{stem}.dod.<DOD_N>.security.run.$i.json" --json \
   > .claude/state/probe-plan/$i/out.json
 echo "exit=$?" >> .claude/state/probe-plan/$i/out.json
 ```
@@ -113,8 +126,11 @@ other command that writes** — you are read-only, and a generator run is a writ
   'skills/*/SKILL.md'`; for each hit, the prompt file named on the line or in the surrounding
   dispatch table (finalise's table names four).
 - Population B: `shared/resources/*prompt*.md` whose text matches `/Explore subagent/`.
-- Write matcher: `/\bwrite (the|a|an) [\w .-]*file\b/i`, `/--record\b/`, `/\bmkdir\b/`,
-  `/>>? *["{$]/`, evaluated outside fenced blocks preceded by `<!-- caller-runs -->`.
+- Population C (review 1, I6): the quoted `prompt="…"` body of each inline
+  `Agent(subagent_type="Explore", prompt="…")` dispatch.
+- Write matcher: `/\bwrite (the|a|an|it|both)\b[^.]*\b(file|to)\b/i`, `/--record\b/`, `/\bmkdir\b/`,
+  `/>>? *["{$<]/`, evaluated outside regions wrapped in `<!-- caller-runs -->` …
+  `<!-- /caller-runs -->`; `code-review-prompt.md` § Scoping gains that marker.
 - Floors: mapper prompt, the four `finalise-dod-*-prompt.md`, both `review-*-prepass-prompts.md`
   present in the population.
 - Control fixtures as in the task's § 8.

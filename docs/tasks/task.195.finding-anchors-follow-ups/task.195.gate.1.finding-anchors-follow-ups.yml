@@ -1,0 +1,72 @@
+schema: 2
+task: 'task.195.finding-anchors-follow-ups'
+task_title: 'Finding-anchors follow-ups'
+gate: CONCERNS
+status_reason: 'All phases and success criteria verified, 43 targeted tests and ci:fast green. Two in-scope defects reproduced: a code_review finding with no file_line key still reads clean no-line (CR-1), and the --inline guard passes a file with no findings array despite its HALT message (CR-3).'
+reviewer: 'QA Engineer'
+head: 'b4cbb43e47bcef3d7ada974a69608ec1c8836bd0'
+updated: '2026-10-19T16:03:17Z'
+
+top_issues:
+  - id: 'TASK-195-QA1-1'
+    severity: medium
+    file: 'shared/resources/finding-anchors.js'
+    finding: 'A finding inside code_review.findings with no file_line key is classed as the conformance lens and reads clean no-line (reproduced: {"code_review":{"findings":[{"id":"CR-9",…}]}} → reason ok, verdict no-line), so a located-nowhere code finding passes as clean — the defect class problem 1 closes (CR-1, anchor ok).'
+    suggested_action: 'Decide the lens from the wrapper when the input is a wrapped document (code_review.findings → code, pr_conformance.findings → conformance), keep key-based lens for a bare array, and read a code finding with no usable file_line as unparseable; test both a wrapped code finding with no file_line and a wrapped conformance AC ref.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-195-QA1-2'
+    severity: low
+    file: 'skills/review-code/SKILL.md'
+    finding: 'The --inline guard passes a file with no findings array ({} → jq -e exits 0), though its HALT text says it also covers "the file is not findings JSON"; same pattern in review-pr (CR-3, anchor ok).'
+    suggested_action: 'Require the findings array to exist (review-pr: at least one of the two) before the has(anchor_check) test, and extend the review-code/review-pr guard tests with a {} case.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 5959
+  phases_verified: 4/4
+  ci: 'not read — CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 12
+    notes: 'fence: probe of review-code Step 2b TARGET guard — 9 hostile rejected, 3 legitimate accepted (bash; zsh absent on host). Record: task.195.qa.1.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'Engine still reads each path once per run (existing counting-readFile test); one extra git cat-file -t per --rev run.'
+  reliability:
+    status: CONCERNS
+    notes: 'Reason-deciding blocks HALT on a missing checker (executed in finding-anchors-blocks.test.mjs); TASK-195-QA1-1 leaves one clean verdict for a code finding with no location.'
+  maintainability:
+    status: PASS
+    notes: 'Tests execute the shipped blocks rather than grep them; population guard has a floor.'
+
+recommendations:
+  immediate:
+    - action: 'TASK-195-QA1-1: wrapper-decided lens; code finding without file_line → unparseable'
+      refs: ['shared/resources/finding-anchors.js']
+    - action: 'TASK-195-QA1-2: guard requires the findings array'
+      refs: ['skills/review-code/SKILL.md', 'skills/review-pr/SKILL.md']
+  future:
+    - action: 'CR-2 (pre-existing on develop, out of scope): review-code Step 4 --inline block reads INLINE_FILE, PR_NUMBER, SUMMARY_FILE with no writer in the block'
+      refs: ['skills/review-code/SKILL.md']
+    - action: 'CR-4 (low, platform-variance): --index bad-root test fails when TMPDIR is inside a git checkout; set GIT_CEILING_DIRECTORIES'
+      refs: ['shared/resources/tests/finding-anchors.test.mjs']
+    - action: 'CR-5 (low): blocks test asserts the four named dispatchers, not that no other executed document runs the checker (measured today: none other)'
+      refs: ['evals/shared/tests/finding-anchors-blocks.test.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-195-QA1-1 and TASK-195-QA1-2 fixed']

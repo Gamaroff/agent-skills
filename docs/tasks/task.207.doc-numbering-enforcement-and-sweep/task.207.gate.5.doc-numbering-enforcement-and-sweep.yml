@@ -1,0 +1,86 @@
+schema: 2
+task: 'task.207.doc-numbering-enforcement-and-sweep'
+task_title: 'Doc numbering enforcement and sweep'
+gate: CONCERNS
+status_reason: 'No HIGH. Three MEDIUM: ~20 layout paths in 12 files omit the prd.{P}.{feature} directory, a bracket-form two-level id ([epic].[story]) survives outside BARE_TWO_LEVEL, and the RELATIVE_TITLES exemption covers whole files rather than the PRD-heading lines.'
+reviewer: 'QA Engineer'
+head: '563b4c0bfc3f609a956811df17cb41554bb1f16f'
+updated: '2026-10-16T17:59:16Z'
+
+top_issues:
+  - id: 'TASK-207-BUG-3'
+    severity: medium
+    file: 'skills/qa-story/SKILL.md'
+    finding: 'Reopened (CR-1): layout paths {domain}/{feature}/epics/ (or [domain]/[feature], <domain>/<feature>) omit the prd.{P}. directory — qa-story:3308, qa-flow:171, develop, develop-story, execute-checklist, review-epic, review-story, review-pr, jira-epic-creator, create-issue (which also keeps a flat epic.180.<name>); §5 has no key for the missing segment.'
+    suggested_action: 'Rewrite to {domain}/prd.{P}.{feature}/epics/ and add the {feature}/epics shape to §5.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-207-CR5-2'
+    severity: medium
+    file: 'skills/qa-story/SKILL.md'
+    finding: 'Line 1579 keeps the two-level [epic].[story] id; BARE_TWO_LEVEL matches only the braced form (CR-2).'
+    suggested_action: 'Write [P].[E].[S]; widen BARE_TWO_LEVEL to bracket and angle forms.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-207-CR5-3'
+    severity: medium
+    file: 'tests/doc-id-chokepoint.test.js'
+    finding: 'RELATIVE_TITLES exempts whole files from the title check, so a new flat title anywhere else in create-prd or prd-template would pass (CR-3, reviewer confidence medium, verified by reading).'
+    suggested_action: 'Anchor each exemption to its exact line text and require each anchored line to exist.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-207-CR5-5'
+    severity: low
+    file: 'tests/ingester-prompt-placeholders.test.js'
+    finding: 'Reading every backticked placeholder on a binding line counts one mentioned only in explanatory text as bound.'
+    suggested_action: 'Bind only the names in the line head; add a must-fail fixture.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 22
+  phases_verified: 5/5
+  ci: 'fast gate exit 0 on 563b4c0b (.agents/skills moved aside); PR checks not read'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4]
+    phases_with_issues: [2, 3]
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_reopened: 1
+  verification_method: 'scoped review of the 12 files cycle 4 changed'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'No boundary changed since gate 1; relatedDocInfo run record (task.207.qa.1.security.run.json, totals.executed 26) stands.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'BUG-6 closed.'
+  maintainability:
+    status: CONCERNS
+    notes: 'BUG-3 reopened (layout-path population); two guard precision gaps.'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-207-BUG-3, CR5-2, CR5-3.'
+      refs: ['skills/qa-story/SKILL.md', 'tests/doc-id-chokepoint.test.js']
+  future:
+    - action: 'story-template.md header and roadmap links use ../epics/ (CR-4); qa-gate-template names {story_slug} and omits the task form (CR-6).'
+      refs: ['skills/documentation-standards-validator/references/story-template.md', 'skills/qa-fix/resources/qa-gate-template.yaml']
+    - action: 'Earlier future items: create-epic milestone override, backfill epic-meta reuse, review-pipeline-step-0a cross-block reads, doc-id.parse hardening, create-parallel-stories scheme, §5 dropped-level check.'
+      refs: ['skills/create-epic/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['BUG-3, CR5-2, CR5-3 fixed']

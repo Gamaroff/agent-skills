@@ -1,6 +1,6 @@
 ---
 name: sync-jira-bug
-description: Sync a local bug report markdown file to Jira — creates the bug if it has no jira_key, updates it if jira_key is already set. Handles all three bug modes (story bug, task bug, general bug), inferred from the file's own path. The card is a sibling, not a child — the parent relationship travels as a Jira issue link plus link-marked entries in a Source Documents section pointing at the bug report, its parent document, its parent's card and (story mode) the epic. Adds the bug to the project backlog (Scrum boards only). Idempotent create via "synced-from-*" label search. Reads bug files with or without YAML frontmatter, and prepends a minimal block to those without one. Writes Status History rows — never a Change Log, which bug reports are barred from carrying — on issue creation and status transition only. Concurrent-edit guard via stored Jira `updated` timestamp. Use when the user says "create this bug in Jira", "update this bug in Jira", "sync bug to Jira", "push bug changes to Jira", or "publish bug to Jira".
+description: Sync a local bug report markdown file to Jira — creates the bug if it has no jira_key, updates it if it has one. Handles story, task and general bugs, inferred from the file's path. The card is a sibling of its parent, not a child, joined by a Jira issue link and a Source Documents section; Scrum boards also get it on the backlog. Idempotent, and guarded against concurrent edits. Writes Status History rows, never a Change Log. Use when the user says "create this bug in Jira", "update this bug in Jira", "sync bug to Jira", "push bug changes to Jira", or "publish bug to Jira".
 ---
 
 # sync-jira-bug
@@ -50,7 +50,7 @@ One-way sync of a local bug report to Jira. Auto-detects create vs update from `
 A bug report in one of the three documented layouts:
 
 ```
-docs/prd/<...>/story.{e}.{s}.bug.{n}.{name}.md     # story bug
+docs/prd/<...>/story.{P}.{E}.{S}.bug.{n}.{name}.md     # story bug
 docs/tasks/task.{id}.{name}/task.{id}.bug.{n}.{name}.md   # task bug
 docs/bugs/bug.{N}.{name}/bug.{N}.{name}.md                # general bug
 ```
@@ -85,8 +85,8 @@ description: 'One-line summary of the bug'
 ```
 
 ```markdown
-**Bug ID**: story.7.4.bug.4
-**Related**: [story 7.4](./story.7.4.tap-targets.md)
+**Bug ID**: story.1.7.4.bug.4
+**Related**: [story 1.7.4](./story.1.7.4.tap-targets.md)
 **Status**: ✅ Closed
 **Priority**: High
 **Severity**: Major
@@ -214,7 +214,7 @@ Diagnose a board with `--probe-workflow`, which is read-only.
 
 ```
 POST /rest/api/3/search/jql
-{"jql": "project = \"RB\" AND labels = \"synced-from-story.7.4.bug.4.tap-target\"", "maxResults": 2}
+{"jql": "project = \"RB\" AND labels = \"synced-from-story.1.7.4.bug.4.tap-target\"", "maxResults": 2}
 ```
 
 If a matching issue exists — because a prior POST succeeded but the write-back did not — the script switches to update mode against that key. Every create appends the `synced-from-<bug stem>` label to enable this on subsequent runs.
@@ -292,12 +292,12 @@ The three violation headings are one spec with an alias array, which is what kee
 ```json
 {
   "action": "create",
-  "file": "/abs/path/story.7.4.bug.4.tap-target.md",
+  "file": "/abs/path/story.1.7.4.bug.4.tap-target.md",
   "bug_mode": "story",
-  "bug_id": "story.7.4.bug.4",
+  "bug_id": "story.1.7.4.bug.4",
   "jira_key": "PROJ-901",
   "jira_url": "https://x.atlassian.net/browse/PROJ-901",
-  "parent_doc": "/abs/path/story.7.4.tap-targets.md",
+  "parent_doc": "/abs/path/story.1.7.4.tap-targets.md",
   "parent_key": "PROJ-123",
   "link_outcome": "linked",
   "change_summary": "Initial Jira bug created",

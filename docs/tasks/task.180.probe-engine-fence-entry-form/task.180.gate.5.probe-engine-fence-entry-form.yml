@@ -1,0 +1,79 @@
+schema: 2
+task: 'task.180.probe-engine-fence-entry-form'
+task_title: 'security-probe: a fence: entry form for a fenced bash block in a step doc'
+gate: FAIL
+status_reason: 'The cycle-4 fixes hold: TASK-180-012, -013 and -014 are closed, and 4 QA mutations are covered. The safety re-probe found a new HIGH in the same file: fence: skips the pre-spawn gh text check, so a block that resolves gh to a path runs the host binary and is scored. Fifth consecutive HIGH in security-probe.mjs, a different mechanism each cycle.'
+reviewer: 'QA Engineer'
+head: 'f21c055297e7b29bca101aca952803b250229b1b'
+updated: '2026-10-12T15:56:20Z'
+
+top_issues:
+  - id: 'TASK-180-015'
+    severity: high
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'runProbeSpec skips the namesGh pre-spawn check for fence: and relies on the PATH trip-wire alone. A block that resolves gh to a path (type -ap gh, command -v gh, an absolute path) runs the host gh and the run is scored, where the shell forms decline needs-fake-gh. Reproduced on f21c0552. Code review CR-1 (high/high). Corpus: 0 shipped docs resolve gh to a path; severity kept as returned. Bug: task.180.bug.8.fence-skips-gh-text-detector.md'
+    suggested_action: 'When fakeGhDir is null, run GH_COMMAND_WORD / GH_VARIABLE over the extracted block text and decline needs-fake-gh on a match; add a regression test with a type -ap gh block.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-180-016'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'A substituted $(…) that writes to an absolute path outside the sandbox root, the work dir and the doc directory is unseen, and expected.absent cannot name it, so the verdict reads engages with no escape. probe-boundary-rule.md §5 (added on this branch) says a write anywhere else is an escape. Reproduced on f21c0552. Code review CR-2 (medium/high). Bug: task.180.bug.9.outside-write-unseen-under-source-substitution.md'
+    suggested_action: 'State the absolute-path limit in the engine header and probe-boundary-rule.md §5, or let a fence: case name an outside path to check after the run.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 5404
+  phases_verified: 3/3
+  ci: 'not read this cycle (CI is gated at /finalise)'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 26
+    notes: 'task.180.qa.5.security.run.json: both controls engage, 0 reproduced, 0 escapes (the shipped fast-gate precondition with the 13 task.167 cases; resolveEntry with the QA cases file). CONCERNS for TASK-180-015 (host gh reachable through a path-resolved spelling) and -016 (outside writes unseen).'
+  performance:
+    status: PASS
+    notes: 'ci:fast 5404 tests, 5390 pass, 0 fail at f21c0552 (5b). workDirStamps adds one directory walk per case per shell over the work dir only.'
+  reliability:
+    status: PASS
+    notes: 'The cycle-4 fixes hold: 4 QA mutations covered (whitespace output, empty output, deletions unseen, directories unseen).'
+  maintainability:
+    status: PASS
+    notes: 'The hostile-expected rule is stated once in runFenceCase (statesRefusalOutput); five docs and CHANGELOG cite it.'
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 2
+  fix_date: '2026-10-12'
+  total_iterations: 4
+  verification_method: 'Regression tests + QA mutation spot check (4 covered) + ci:fast'
+
+recommendations:
+  immediate:
+    - action: 'TASK-180-015: apply the gh text check to the extracted fence: block text; decline needs-fake-gh on a match.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'TASK-180-016: state the absolute-path write limit for fence: (or watch a named outside path).'
+      refs: ['shared/resources/security-probe.mjs', 'shared/resources/probe-boundary-rule.md']
+  future:
+    - action: 'CR-3 (low/low): replaceAll rewrites every occurrence of a short slot, including guard code; record the occurrence count or decline a slot inside a longer identifier.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'Carried from gate 4: set GIT_CEILING_DIRECTORIES in caseEnv for every shell-family form (pre-existing).'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'qa-fix cycle 4 residual: once a case deletes the gh trip-wire stub, later cases in the same run can reach the host gh; the deletion is recorded as an escape but the run is still scored. The sandbox-wide sentinel still sees new or changed files only (pre-existing).'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

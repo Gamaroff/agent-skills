@@ -2,7 +2,7 @@
 
 This file provides guidance to AI agents working with code in this repository.
 
-> **Picking up work here? Read [`.agents/handoff.md`](./.agents/handoff.md) first** — where things stand, what to pick up, the standing decisions, and the traps that cost time. Its state figures each carry the command that produced them: **re-measure them rather than trusting the date at the top** — `command node .agents/skills/session-handoff/scripts/handoff-verify.mjs` (the `session-handoff` skill's read mode) re-runs every one and reports each line as confirmed, stale or unverifiable. State decays within days (branch tip, what is in flight, next available task number); the traps live in [`docs/contributing/traps.md`](./docs/contributing/traps.md) and stay true much longer.
+> **Picking up work here? Read [`.agents/handoff.md`](./.agents/handoff.md) first** — where things stand, what to pick up, the standing decisions, and the traps that cost time. Its state figures each carry the command that produced them: **re-measure them rather than trusting the date at the top** — `command node skills/session-handoff/scripts/handoff-verify.mjs` (the `session-handoff` skill's read mode) re-runs every one and reports each line as confirmed, stale or unverifiable. State decays within days (branch tip, what is in flight, next available task number); the traps live in [`docs/contributing/traps.md`](./docs/contributing/traps.md) and stay true much longer.
 
 ## Repository Purpose
 
@@ -93,7 +93,7 @@ All leaf skills that branch on platform source `shared/resources/resolve-platfor
 
 ## File Naming
 
-Canonical patterns: [`docs/standards/file-naming.md`](./docs/standards/file-naming.md). Document-specific schemas under [`docs/standards/`](./docs/standards/) (epic, story, task, PRD).
+Canonical patterns: [`docs/standards/file-naming.md`](./docs/standards/file-naming.md). Document-specific schemas under [`docs/standards/`](./docs/standards/) (epic, story, task, PRD). TL;DR: PRDs, epics and stories are numbered hierarchically — `prd.{P}.{name}`, `epic.{P}.{E}.{name}`, `story.{P}.{E}.{S}.{name}` (a sub-story is `story.{P}.{E}.{S}A`) — where `P` comes from the PRD registry, `E` counts within its PRD and `S` within its epic. Parse and build every such id with [`shared/resources/doc-id.js`](./shared/resources/doc-id.js) (in a skill, its bundled `references/doc-id.js`), never a hand-written regex or a positional `awk -F.` split — see § PRD Registry for the two tests that hold it. Tasks (`task.{N}`) and general bugs (`bug.{N}`) stay flat.
 
 ## Status Lifecycle
 
@@ -163,9 +163,11 @@ Canonical rules: [`docs/standards/task-registry.md`](./docs/standards/task-regis
 
 **The write never blocks acceptance** — every outcome exits 0, including "no row found", because refusing to finalise genuinely complete work over a human-readable index line would trade a cosmetic defect for a stuck pipeline. The drift test is the loud backstop, so a no-op is caught rather than lost. A **story** run writes nothing here: the guard lives in the writer, which returns `not-a-task` for a story, epic or bug document, rather than in a condition every caller has to remember.
 
-## Epic Registry
+## PRD Registry
 
-Canonical rules: [`docs/standards/epic-registry.md`](./docs/standards/epic-registry.md). Epic numbers are globally unique; the registry at `docs/development/epic-registry.md` is the single source of truth.
+Canonical rules: [`docs/standards/prd-registry.md`](./docs/standards/prd-registry.md). TL;DR: `${PRD_ROOT}/prd-registry.md` (default `docs/prd/prd-registry.md`) owns **PRD** numbering — globally unique, never reused. Epics and stories carry no registry of their own: an epic is `epic.{P}.{E}` with `E` counted within its PRD, and a story is `story.{P}.{E}.{S}` with `S` counted within its epic, both allocated from the documents on disk by [`shared/resources/doc-id.js`](./shared/resources/doc-id.js). The global epic registry is retired ([`docs/standards/epic-registry.md`](./docs/standards/epic-registry.md)).
+
+**One parser, held by two tests.** Every PRD/epic/story id is parsed and built by `doc-id.js` and nowhere else: `tests/doc-id-chokepoint.test.js` fails on an id regex, a string-built id regex or a positional `awk -F.` split outside it, and `evals/shared/tests/doc-numbering-corpus.test.mjs` fails on any unnumbered, mismatched, unregistered or duplicate document under the PRD root (task 207). A site that is genuinely another grammar goes in the chokepoint test's allowlist with a reason.
 
 ## Bug Registry
 
