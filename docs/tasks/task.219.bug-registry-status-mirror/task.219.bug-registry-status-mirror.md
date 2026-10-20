@@ -339,16 +339,45 @@ None.
 ### Key Findings
 No critical issues identified. The diff review raised three low-severity, advisory findings (CR-1 to CR-3), recorded as future recommendations. The security probe ran 7 cases with 0 escaped. Three QA mutations each turned a named test red.
 
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**QA Report**: `task.219.qa.1.bug-registry-status-mirror.md`
+**Gate File**: `task.219.gate.1.bug-registry-status-mirror.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR Review**: `task.219.pr-review.1.bug-registry-status-mirror.md`: ✅ APPROVE
+
+### Missing Criteria:
+
+1. **Success Criteria (Performance):**
+   - [ ] PERF1 "One registry read and at most one write per call" has no test that pins the counts. The code holds the bound (`shared/resources/registry-tick.js:612` is the only read, `:674` the only write), but a per-PR test could assert it, so the DoD rule needs one.
+
+All other criteria pass: 13 of 14 success criteria, docs, security (19 probes, 0 reproduced, 0 escaped), and compliance (not applicable). CI reading 1 is SUCCESS @ `466bfb8e1d23`.
+
+### Next Steps:
+
+- [ ] Add a test in `shared/resources/tests/registry-tick.test.mjs` that counts registry reads and writes on one `--bug-status` call: 1 read and 1 write on `mirrored`, 0 writes on `already` and `--dry-run`. Mutation-prove it by adding a second registry read.
+
+**Estimated Effort:** Small (under 30 minutes). The fix is a code change, so it re-enters QA at 5a before `/finalise` re-runs.
+
+**Gap Report Generated:** 2026-10-20
+
+**Detailed Verification Log:** See `task.219.dod.1.bug-registry-status-mirror.md` for complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-20 | 1.0     | Initial draft — the /qa-fix bug-registry source gap from task.199's QA gate 4 | create-task |
 | 2026-10-20 | 1.1     | Review passed (9/10) — measured site list (2 greps, 4 qa-fix lines added), 5 pinned develop-bug test assertions listed, label map exported behind a `require.main` guard, Last Updated left out of the CLI, qa-fix assertion added | review-task |
 | 2026-10-20 |         | Status → ready-for-development | review-task |
 | 2026-10-20 |         | Implemented — 13 files (engine + 5 bundled copies, develop-bug SKILL + 3 step docs, qa-fix, 3 test files, CHANGELOG), 33 new tests; status → ready-for-review | develop |
 | 2026-10-20 |         | QA gate PASS (100/100) — 0 findings in gate, 3 advisory | qa-task |
+| 2026-10-20 |  | DoD incomplete — 1 gap identified (PERF1 test evidence) | finalise |
 <!-- change-log-end -->
 
 ---
