@@ -327,17 +327,17 @@ None.
 **Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.219.qa.1.bug-registry-status-mirror.md](./task.219.qa.1.bug-registry-status-mirror.md)
-- **Gate File**: [task.219.gate.1.bug-registry-status-mirror.yml](./task.219.gate.1.bug-registry-status-mirror.yml)
+- **Full Report**: [task.219.qa.2.bug-registry-status-mirror.md](./task.219.qa.2.bug-registry-status-mirror.md)
+- **Gate File**: [task.219.gate.2.bug-registry-status-mirror.yml](./task.219.gate.2.bug-registry-status-mirror.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 3 suites (registry-tick 68, develop-bug 24, bug-registry-drift 4), plus full `npm run ci` (5,990 pass / 0 fail)
+- **Tests Executed**: 3 suites (registry-tick 69, develop-bug 24, bug-registry-drift 4), plus `ci:fast` (5,991 pass / 0 fail)
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-No critical issues identified. The diff review raised three low-severity, advisory findings (CR-1 to CR-3), recorded as future recommendations. The security probe ran 7 cases with 0 escaped. Three QA mutations each turned a named test red.
+Cycle 2 closes the finalise DoD gap PERF1 with a mutation-proven test that counts registry reads and writes. The whole-branch refute review raised one low/low bug and one cleanup, both advisory. The classifier probe ran 19 cases with 0 escaped.
 
 ## Definition of Done - Gaps Identified
 
@@ -378,6 +378,7 @@ All other criteria pass: 13 of 14 success criteria, docs, security (19 probes, 0
 | 2026-10-20 |         | Implemented — 13 files (engine + 5 bundled copies, develop-bug SKILL + 3 step docs, qa-fix, 3 test files, CHANGELOG), 33 new tests; status → ready-for-review | develop |
 | 2026-10-20 |         | QA gate PASS (100/100) — 0 findings in gate, 3 advisory | qa-task |
 | 2026-10-20 |  | DoD incomplete — 1 gap identified (PERF1 test evidence) | finalise |
+| 2026-10-20 |  | QA gate PASS (100/100) — cycle 2, PERF1 gap closed; 0 findings in gate, 2 advisory | qa-task |
 <!-- change-log-end -->
 
 ---
