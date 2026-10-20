@@ -941,7 +941,7 @@ access:
 
 ```yaml
 # Credentials present; writes are deferred during the run, then one batched
-# confirmation at handover (no tty → behaves like `command`).
+# confirmation at handover (no tty or an autonomous run → behaves like `command`).
 access:
   tracker: approve
 ```

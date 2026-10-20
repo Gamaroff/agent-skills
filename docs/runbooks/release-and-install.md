@@ -59,12 +59,18 @@ when CI has been confirmed another way. (`scripts/release.sh` header, "What --ta
 
 ### 4. Sync `develop` forward
 
-Only if you passed `--no-sync-develop`, or `--tag` stopped during its **Sync develop** step (a merge conflict or a rejected push — the release is already out, and you are left on `develop`). Otherwise `--tag` has already merged `main` into `develop` and pushed it:
+Otherwise `--tag` has already merged `main` into `develop` and pushed it. Run this step only if you passed `--no-sync-develop`:
 
 ```bash
 git checkout develop && git pull --rebase
 git merge main && git push
 ```
+
+If `--tag` stopped during its **Sync develop** step, the release is already out and you are on `develop`. Do not re-run the block above; finish what the script started:
+
+- **Merge conflict** (the merge is half done): resolve the conflicts, `git commit`, then `git push origin develop`.
+- **Push rejected** (someone pushed to `develop` meanwhile): `git pull --no-rebase`, then `git push origin develop`. A rebasing pull would drop the merge commit.
+- **`git pull --rebase` failed** (before the merge): fix the pull, then run the block above.
 
 ### If the release workflow fails
 

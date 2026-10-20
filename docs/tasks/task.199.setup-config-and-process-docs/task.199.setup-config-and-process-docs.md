@@ -362,6 +362,16 @@ Gate 2 (CONCERNS) came from a full-diff refute pass. All five findings are fixed
 
 Probe (each changed observable, tree-wide, excluding records and dated audits): no `every status write`, `still deferred`, `ask prompt` or `writes are still handed over` remains. The `not shipped` hits are unrelated (macOS python). The approve-deferral class (`approve … defer|today|not shipped`) now reads consistently across restricted-access.md, which-access.md and the wizard. Out of scope and recorded in gate 2's `recommendations.future`: qa-fix's unmirrored writes (a source gap), and setup-consumer.sh's older in-file section banner numbers (cleanup).
 
+### QA Fixes — cycle 3
+
+Gate 3 (CONCERNS) came from a scoped re-review of cycle 2's five files. All three findings are fixed:
+
+- **QA-5** `docs/runbooks/release-and-install.md` §4 — the generic sync block is now for `--no-sync-develop` only. A `--tag` that stopped during Sync develop gets its own recovery: a merge conflict (resolve, commit, push), a rejected push (`git pull --no-rebase`, then push) and a failed pull. This follows `release.sh`'s sync sequence.
+- **QA-6** `scripts/setup-consumer.sh` closing summary — under `approve` it now says writes are confirmed once at handover and then run, and that with no tty or in an autonomous run the committed `.sh` is worked as under `command`. Both branches were rendered and checked.
+- **QA-7** `docs/reference/configuration.md` approve comment — "no tty or an autonomous run", matching `develop-pipeline-step-7-finalise.md`.
+
+Probe: no test pins the summary strings. `restricted-access.md` (lines 34 and 72) also names only "without a tty". It is outside this diff, so it is recorded in gate 3's future recommendations rather than edited here.
+
 ### Deferred Work
 
 None.
@@ -371,12 +381,12 @@ None.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-20
-**Quality Score**: 80/100
+**Quality Score**: 85/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.199.qa.2.setup-config-and-process-docs.md](./task.199.qa.2.setup-config-and-process-docs.md)
-- **Gate File**: [task.199.gate.2.setup-config-and-process-docs.yml](./task.199.gate.2.setup-config-and-process-docs.yml)
+- **Full Report**: [task.199.qa.3.setup-config-and-process-docs.md](./task.199.qa.3.setup-config-and-process-docs.md)
+- **Gate File**: [task.199.gate.3.setup-config-and-process-docs.yml](./task.199.gate.3.setup-config-and-process-docs.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 5969
@@ -385,7 +395,7 @@ None.
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-The cycle 1 fixes hold. The cycle 2 refute pass found five more false claims. Two are medium: bug-fix.md over-promises registry mirroring (CR-1), and the approve and tracker-reconcile wording in the wizard and configuration.md is stale (CR-2). Three are low: `.env.example` "always" (CR-3), a missing agent-links row (QA-3), and the develop-sync error path (QA-4).
+The cycle 2 fixes hold. The scoped re-review found three gaps in the new text. One is medium: release-and-install §4's recovery fails on a half-done Sync develop (QA-5). Two are low: the wizard's closing summary for approve (QA-6), and configuration.md leaving out the autonomous-run fallback (QA-7).
 <!-- change-log-start -->
 ## Change Log
 
@@ -399,6 +409,8 @@ The cycle 1 fixes hold. The cycle 2 refute pass found five more false claims. Tw
 | 2026-10-20 |  | QA findings fixed — cycle 1, 3 findings (CR-1, QA-1, QA-2) | qa-fix |
 | 2026-10-20 |  | QA gate CONCERNS (80/100) — 5 findings | qa-task |
 | 2026-10-20 |  | QA findings fixed — cycle 2, 5 findings (CR-1, CR-2, CR-3, QA-3, QA-4) | qa-fix |
+| 2026-10-20 |  | QA gate CONCERNS (85/100) — 3 findings | qa-task |
+| 2026-10-20 |  | QA findings fixed — cycle 3, 3 findings (QA-5, QA-6, QA-7) | qa-fix |
 <!-- change-log-end -->
 
 ---

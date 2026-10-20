@@ -2228,8 +2228,13 @@ print_summary() {
     if [[ "${ACCESS_TRACKER:-full}" != "full" ]]; then
       echo ""
       echo -e "${BOLD}Tracker access is ${ACCESS_TRACKER}:${NC}"
-      echo "  Pipeline runs still complete. Tracker writes are recorded, not performed."
-      echo "  After a run, work the committed *.handover.*.md checklist (or *.sh under command)."
+      echo "  Pipeline runs still complete. During a run, tracker writes are recorded, not performed."
+      if [[ "$ACCESS_TRACKER" == "approve" ]]; then
+        echo "  At handover you confirm them once, as a batch, and they run. With no tty, or in"
+        echo "  an autonomous run, there is no prompt: work the committed *.sh as under command."
+      else
+        echo "  After a run, work the committed *.handover.*.md checklist (or *.sh under command)."
+      fi
       echo "  Later, /tracker-reconcile re-reads the board and ticks that checklist."
       echo "  Limits: enforcement is partial; /develop-next still needs VCS write."
       echo "  Guide: docs/concepts/restricted-access.md"
