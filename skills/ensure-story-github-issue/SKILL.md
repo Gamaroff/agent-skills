@@ -106,8 +106,9 @@ PROJECT_NAME=$(grep 'project_board_name:' project.yml | sed -E 's/.*: *"?([^"]+)
 # Each block that reads MILESTONE_TITLE derives it itself (`doc-id.js epic-meta`) — `Epic P.E — {title}`, or empty.
 # The link branch (doc-link-branch.js, task.200): the current branch's upstream only when it
 # names this document's work item, else the repo's default branch, then `develop`.
+STORY_RELATIVE_PATH="{path of the story file, relative to the repo root}"
 DOC_BRANCH=$(command node .agents/skills/ensure-story-github-issue/references/doc-link-branch.js --doc "${STORY_RELATIVE_PATH}")
-: "${DOC_BRANCH:?doc-link-branch.js resolved no branch — is the skill's bundled copy of it present?}"
+: "${DOC_BRANCH:?doc-link-branch.js resolved no branch — check the --doc path and that the bundled resolver is present}"
 DOC_URL="https://github.com/$REPO/blob/${DOC_BRANCH}/${STORY_RELATIVE_PATH}"
 ```
 

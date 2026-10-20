@@ -321,6 +321,22 @@ test("the NEEDS DETAIL, DUPLICATE and STALE halts name the local branch and repo
   }
 });
 
+// "nothing was pushed or posted" is only true if the terminal-HALT `blocked` signal skips Step 2:
+// a bug that already carries a jira_key has TRACKER_ISSUE bound from Phase 0c (task.200 QA cycle 1).
+test("the terminal-HALT blocked signal excludes the Step 2 halts", () => {
+  const rule = SKILL.split("\n- **").find((b) =>
+    b.startsWith("Signal `blocked` on a terminal HALT"),
+  );
+  assert.ok(rule, "the terminal-HALT blocked rule");
+  assert.match(rule.split("\n")[0], /the halt comes after Step 2b/);
+  assert.match(rule, /\*\*Never on a halt at or before Step 2\.\*\*/);
+  assert.doesNotMatch(
+    rule,
+    /real blockage[^\n]*fix-readiness gate/,
+    "a failed fix-readiness gate is a Step 2 halt, not a blockage",
+  );
+});
+
 // The Step 2b lock write and the resume contract's probe, run, not grepped.
 const CONTRACT = fs.readFileSync(
   path.join(

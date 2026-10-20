@@ -68,8 +68,9 @@ OWNER=$(grep '^ *owner:' project.yml | head -1 | awk '{print $(2)}')
 PROJECT_NUM=$(grep 'project_board_number:' project.yml | awk '{print $(2)}')
 # The link branch (doc-link-branch.js, task.200): the current branch's upstream only when it
 # names this document's work item, else the repo's default branch, then `develop`.
+EPIC_RELATIVE_PATH="{path of the epic file, relative to the repo root}"
 DOC_BRANCH=$(command node .agents/skills/ensure-epic-github-issue/references/doc-link-branch.js --doc "${EPIC_RELATIVE_PATH}")
-: "${DOC_BRANCH:?doc-link-branch.js resolved no branch — is the skill's bundled copy of it present?}"
+: "${DOC_BRANCH:?doc-link-branch.js resolved no branch — check the --doc path and that the bundled resolver is present}"
 DOC_URL="https://github.com/$REPO/blob/${DOC_BRANCH}/${EPIC_RELATIVE_PATH}"
 
 # Resolve the parent PRD link the same way. Every epic has a parent PRD; PRD_LINE stays

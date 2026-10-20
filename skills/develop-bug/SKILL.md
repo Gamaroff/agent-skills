@@ -357,14 +357,16 @@ If a situation arises that is not in this table or the shared defaults table and
 
   **Two commands, not one `rm` argv.** The lock is a path that must be removed; the logs are a glob that may match nothing. Under zsh — the default shell on every macOS host — an unmatched glob is `nomatch`, which aborts the whole command **before `rm` runs**, so the one-argv form left the lock in place on every HALT that had no test logs to sweep (obs #111). `find -delete` is the glob-free spelling and is a noop on an empty match in every shell. The rule: [`docs/reference/anti-patterns.md`](../../docs/reference/anti-patterns.md) § "Never put a must-succeed path and a glob in one `rm` argv".
 
-- **Signal `blocked` on a terminal HALT** (when `TRACKER=jira` and `TRACKER_ISSUE` is set). After the snapshot above, before surfacing the HALT:
+- **Signal `blocked` on a terminal HALT** (when `TRACKER=jira`, `TRACKER_ISSUE` is set **and the halt comes after Step 2b**). After the snapshot above, before surfacing the HALT:
 
   ```bash
   node .agents/skills/develop-bug/references/jira-stage.js \
     --issue {TRACKER_ISSUE} --stage blocked --json
   ```
 
-  **Only for a real blockage** — a fix-readiness gate that failed, five QA cycles without a clean gate, a merge conflict, a root cause that cannot be reproduced. Do **not** fire it when the halt is an _interruption_: plan mode, a denied permission, a compaction pause, or the user stopping the run. Those are pauses in the operator's attention, not states of the work, and a card parked in Blocked misreports the second as the first to everyone reading the board.
+  **Never on a halt at or before Step 2.** A Step 2 verdict (NEEDS DETAIL, DUPLICATE, STALE) comes before the gate that every tracker write waits for. A bug that already carries a `jira_key` has `TRACKER_ISSUE` bound from Phase 0c, but the run has not touched its card yet, and moving it to Blocked would be the pre-gate write Step 2b exists to prevent. The Step 2 halt messages say "nothing was pushed or posted", and this rule keeps that true (task.200 QA cycle 1).
+
+  **Only for a real blockage after the gate** — five QA cycles without a clean gate, a merge conflict, a root cause that cannot be reproduced. Do **not** fire it when the halt is an _interruption_: plan mode, a denied permission, a compaction pause, or the user stopping the run. Those are pauses in the operator's attention, not states of the work, and a card parked in Blocked misreports the second as the first to everyone reading the board.
 
   `blocked` is **off by default** and opted into per issue type in the workflow record. Expect `reason: "stage-disabled"` until a project turns it on, and `skip (no-transition)` on boards that have the status but do not offer it from where the card currently sits — many workflows only allow Blocked from a testing column. Both are correct outcomes; the CLI exits 0 and the HALT proceeds either way.
 

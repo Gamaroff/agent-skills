@@ -270,11 +270,14 @@ None to any CLI or file format. Behaviour changes a consumer can observe:
 7. ✅ `skills/develop-bug/references/develop-bug-step-2-review.md` (skill-local, not bundled)
 8. ✅ `shared/resources/develop-pipeline-resume-contract.md` (develop-bug Step 2b re-entry)
 9. ✅ `skills/create-bug-report/SKILL.md`
+9a. ✅ `skills/create-epic/SKILL.md` — the PRD link resolves through the CLI (QA cycle 1, TASK-200-004)
 
 ### Tests
 
 10. ➕ `shared/resources/tests/doc-link-branch.test.mjs`
-11. ➕ `tests/doc-link-branch-population.test.js` — the population test for upstream link derivation
+11. ➕ `tests/doc-link-branch-population.test.js` — the population test for upstream link derivation,
+    and for a `blob/${…}` / `src/${…}` link whose branch no resolver call assigns
+11a. ➕ `tests/doc-link-branch-sites-execute.test.js` — runs each site's lines under bash (QA cycle 1)
 12. ✅ `skills/sync-jira-task/tests/sync-jira-task.test.js` — the pinned `resolveDocBranch` tests stay green
     unchanged and gain a `docPath` case. (The `sync-jira-epic` and `sync-jira-story` suites pin only
     `stripRemotePrefix`, which stays green through the re-export; they have no `resolveDocBranch` tests.)
@@ -427,6 +430,22 @@ None to any CLI or file format. Behaviour changes a consumer can observe:
 - The step-order test caught a real defect during development: Step 2b was first inserted before
   Step 2.
 
+**QA fix cycle 1**
+
+- TASK-200-001 (HIGH): the guard message no longer holds an apostrophe, which bash read as an
+  opening quote inside the double-quoted `${DOC_BRANCH:?…}`, so all eight blocks failed to parse.
+  `tests/doc-link-branch-sites-execute.test.js` now runs each site's lines in a scratch repo with
+  `gh` stubbed; restoring the apostrophe in one site turns it red.
+- TASK-200-002: every site binds its `*_RELATIVE_PATH` in the block, before the call (the ensure
+  sites and sync-github-epic bound it in prose only; three sync sites not at all). Deleting one
+  binding turns the execute test red.
+- TASK-200-003: develop-bug's terminal-HALT `blocked` signal now fires only after Step 2b, so a
+  Step 2 halt on a bug that already has a Jira card posts nothing. A develop-bug test holds it
+  (red against the cycle-1 head).
+- TASK-200-004: create-epic's PRD link resolves through `doc-link-branch.js` (GitHub asks `gh`;
+  Bitbucket passes its origin HEAD as `--default`). The population test gained a link scan that
+  flags both of the old block's links, and the execute test runs both VCS arms.
+
 **Deferred Work**
 
 - The integration-branch lookup reads the default frontmatter key `integration_branch` only, not a
@@ -434,6 +453,28 @@ None to any CLI or file format. Behaviour changes a consumer can observe:
   match.
 
 ---
+
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-20
+**Quality Score**: 50/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.200.qa.1.tracker-side-effects-after-their-gate.md](./task.200.qa.1.tracker-side-effects-after-their-gate.md)
+- **Gate File**: [task.200.gate.1.tracker-side-effects-after-their-gate.yml](./task.200.gate.1.tracker-side-effects-after-their-gate.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 6054
+- **Phases Verified**: 5/5 (3 pass)
+- **Critical Issues**: 1
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: CONCERNS
+
+### Key Findings
+- HIGH: bash cannot parse the resolver guard line in all eight GitHub sites, and no test executes them (TASK-200-001).
+- MEDIUM: three sync sites read an unbound relative path (TASK-200-002); a Step 2 halt can still post Jira `blocked` (TASK-200-003); create-epic still links the checked-out branch (TASK-200-004).
 
 <!-- change-log-start -->
 ## Change Log
@@ -444,6 +485,8 @@ None to any CLI or file format. Behaviour changes a consumer can observe:
 | 2026-10-09 | 1.1 | Review 7/10, six Important fixes applied: id-or-parent branch match, halt keeps a local branch, tracker_step and six resume states, structural criteria, derivation-keyed population test, pinned tests listed | review-task |
 | 2026-10-09 |  | Status → ready-for-development | review-task |
 | 2026-10-20 |  | Implemented — resolver + CLI, 8 GitHub sites and jira-sync migrated, develop-bug Step 2b, create-bug-report grep rule; 25 files authored, 3 new test files (+ cases in 3 suites); status → ready-for-review | develop |
+| 2026-10-20 |  | QA gate FAIL (50/100) — 4 findings (1 high, 3 medium); status → in-progress | qa-task |
+| 2026-10-20 |  | QA findings fixed — 4 of 4 (cycle 1), 1 iteration; status → ready-for-review | qa-fix |
 <!-- change-log-end -->
 
 ---

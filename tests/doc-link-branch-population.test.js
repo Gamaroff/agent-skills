@@ -122,6 +122,87 @@ test("no skill source derives a document link from the upstream outside doc-link
   );
 });
 
+// A link need not read the upstream to be wrong: create-epic built its PRD link from the checked-out
+// branch, which the upstream scan cannot see (task.200 QA cycle 1, TASK-200-004). So the second scan
+// is keyed on the link itself: every `blob/${V}` or `src/${V}` link must take V from a line that
+// calls doc-link-branch.js. [file, the link variable, why]
+const LINK_RE = /\b(?:blob|src)\/\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?\//g;
+const LINK_ALLOW = [
+  [
+    "skills/finalise/SKILL.md",
+    "DURABLE_BRANCH",
+    "rewrites accepted links onto the durable branch; resolves no work item",
+  ],
+  [
+    "shared/resources/jira-sync.js",
+    "ref",
+    "buildBitbucketUrl's branch argument comes from resolveDocBranch, which delegates to doc-link-branch.js",
+  ],
+];
+
+// The links in `text` whose branch variable no doc-link-branch.js line assigns.
+function unresolvedLinks(file, text) {
+  if (file === RESOLVER) return [];
+  const lines = text.split("\n");
+  const resolved = new Set(
+    lines
+      .filter((l) => l.includes("doc-link-branch.js"))
+      .map((l) => (l.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)=/) || [])[1])
+      .filter(Boolean),
+  );
+  return lines.flatMap((line, i) =>
+    [...line.matchAll(LINK_RE)]
+      .map((m) => m[1])
+      .filter(
+        (v) =>
+          !resolved.has(v) &&
+          !LINK_ALLOW.some(([f, a]) => f === file && a === v),
+      )
+      .map((v) => `${file}:${i + 1}: ${v} in ${line.trim()}`),
+  );
+}
+
+test("the link scan catches a branch taken from HEAD, under any spelling", () => {
+  // Control case: create-epic's pre-fix shape, reaching the link through an alias.
+  const head = [
+    "CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)",
+    'BRANCH="$CURRENT_BRANCH"',
+    'PRD_URL="https://github.com/${REPO}/blob/${BRANCH}/${PRD_SOURCE_PATH}"',
+  ].join("\n");
+  assert.equal(unresolvedLinks("skills/x/SKILL.md", head).length, 1);
+  assert.equal(
+    unresolvedLinks("skills/x/SKILL.md", 'U="${B}/src/$BR/${P}"').length,
+    1,
+    "a Bitbucket src/ link with an unbraced variable is still a link",
+  );
+  const fixed = [
+    'BRANCH=$(command node .agents/skills/x/references/doc-link-branch.js --doc "${P}")',
+    'PRD_URL="https://github.com/${REPO}/blob/${BRANCH}/${P}"',
+  ].join("\n");
+  assert.equal(unresolvedLinks("skills/x/SKILL.md", fixed).length, 0);
+});
+
+test("every document link takes its branch from doc-link-branch.js", () => {
+  const files = population();
+  const found = files.flatMap((f) =>
+    unresolvedLinks(f, fs.readFileSync(path.join(REPO, f), "utf8")),
+  );
+  assert.deepEqual(
+    found,
+    [],
+    "assign the link's branch from doc-link-branch.js, or allowlist a link that resolves no " +
+      "work item, with a reason:\n" +
+      found.join("\n"),
+  );
+  for (const [file, v, why] of LINK_ALLOW) {
+    const text = fs.readFileSync(path.join(REPO, file), "utf8");
+    assert.ok(
+      [...text.matchAll(LINK_RE)].some((m) => m[1] === v),
+      `${file} no longer builds a link from ${v} — drop it from LINK_ALLOW (${why})`,
+    );
+  }
+});
+
 test("every allowlisted site still exists and still reads the upstream", () => {
   for (const [file, line, why] of ALLOW) {
     const text = fs.readFileSync(path.join(REPO, file), "utf8");

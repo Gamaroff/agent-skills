@@ -107,8 +107,9 @@ REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
 
 # The link branch (doc-link-branch.js, task.200): the current branch's upstream only when it
 # names this document's work item, else the repo's default branch, then `develop`.
+TASK_RELATIVE_PATH="{path of the task file, relative to the repo root}"
 DOC_BRANCH=$(command node .agents/skills/sync-github-task/references/doc-link-branch.js --doc "${TASK_RELATIVE_PATH}")
-: "${DOC_BRANCH:?doc-link-branch.js resolved no branch — is the skill's bundled copy of it present?}"
+: "${DOC_BRANCH:?doc-link-branch.js resolved no branch — check the --doc path and that the bundled resolver is present}"
 DOC_URL="https://github.com/$REPO/blob/${DOC_BRANCH}/${TASK_RELATIVE_PATH}"
 
 # Verify the issue still exists
