@@ -11,10 +11,11 @@
 //
 // The population is derived, not listed: every shipped document or engine that
 // cites `task.201`, plus the files task.201 changed without citing itself
-// (ALSO_CHANGED). Older consumer examples in those files (a RAPP key in §0a's
-// lookup, for one) are not task.201's to remove; each is exempted by its exact
-// line, and an exemption that no longer matches a line is itself a failure, so
-// the list cannot outlive what it excuses. (QA cycle 5: a heading-based section
+// (ALSO_CHANGED). The older consumer examples those files once held were
+// exempted line by line until task.220 removed them; EXEMPT is now empty, and
+// tests/no-consumer-names.test.js guards every shipped file. An exemption that
+// no longer matches a line is itself a failure, so none can outlive what it
+// excuses. (QA cycle 5: a heading-based section
 // reader read a fenced `# comment` as a heading and skipped §0d's resolver block.)
 //
 //   1. The scanner flags each consumer identifier (non-vacuity).
@@ -89,37 +90,10 @@ function population() {
   ].sort();
 }
 
-// Pre-task.201 consumer examples, each by its exact trimmed line.
-const EXEMPT = [
-  [
-    "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md",
-    "# Anchored at both ends, so RAPP-70 does not match RAPP-702 and issue 5 does not match 55.",
-  ],
-  [
-    "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md",
-    `# Quote-tolerant: jira_key is written quoted ('RAPP-702' or "RAPP-702") in most consumer docs.`,
-  ],
-  [
-    "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md",
-    "match that resolved `RAPP-70` to `RAPP-702`'s document, matched no quoted key at all, and excluded",
-  ],
-  [
-    "shared/resources/develop-pipeline-step-2-review.md",
-    "> Reported by a consumer (`rebirth-wallet` task.113 / RAPP-728) that **predicted** the halt from",
-  ],
-  [
-    "skills/finalise/SKILL.md",
-    "> Observed live (rebirth-wallet, stories 3.2 and 3.3, 2026-08-05 and 2026-08-08) — diagnosed",
-  ],
-  [
-    "skills/finalise/SKILL.md",
-    ">   it writes **last** and can walk the card straight off the ladder's target. That is the RAPP-715",
-  ],
-  [
-    "skills/finalise/SKILL.md",
-    "> consumer this bites. Observed on RAPP-715 (2026-09-05): closed to `Done` + `resolution: Done`,",
-  ],
-];
+// Empty since task.220, which removed the older consumer examples these lines
+// excused. tests/no-consumer-names.test.js now guards the whole shipped tree;
+// add nothing here — fix the line instead.
+const EXEMPT = [];
 const isExempt = (rel, text) =>
   EXEMPT.some(([f, line]) => f === rel && line === text);
 
