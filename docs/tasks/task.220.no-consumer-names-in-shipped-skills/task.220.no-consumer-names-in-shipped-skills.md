@@ -5,18 +5,20 @@ type: task
 description: "Remove one consumer's names — its product and repository name, its brand, its Jira key and Jira host — from every shipped skill and shared resource, including the consumer format profile in the wireframe skill, and add tests/no-consumer-names.test.js so they cannot come back."
 tags: [consumer-neutral, guard-test, bundles, provenance-notes, wireframe]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-20
 updated: 2026-10-20
 assignee:
 estimated_effort_hours: 4
 github_issue: 709
+completed_date: 2026-10-20
+pr_number: 710
 ---
 
 # Technical Task: No consumer names in shipped skills
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.220.review.1.no-consumer-names-in-shipped-skills.md` implemented 2026-10-20
 
@@ -427,10 +429,37 @@ Fix the fixture in place; the guard stays wide.
 
 No critical issues identified. Five mutation proofs each turned the predicted committed guard test red. Two advisory items were routed to future work: one shared consumer-name list for both guards, and two out-of-scope files outside the shipped tree.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.220.qa.1.no-consumer-names-in-shipped-skills.md`
+**Gate File**: `task.220.gate.1.no-consumer-names-in-shipped-skills.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR Review (Step 5c)**: `task.220.pr-review.1.no-consumer-names-in-shipped-skills.md`: ✅ APPROVE
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 9/9 met. The performance bound was re-measured on PR head `e2c4063c`: 1.01–1.80 s at load ~11, under 2 s
+✅ **Tests:** guard 4/4; full run 6007 tests, 0 fail; per-file counts unchanged except wireframe −2
+✅ **PR:** #710, all 5 CI checks green (CI reading 1 @ `e2c4063c4ed1`)
+✅ **Documentation:** CHANGELOG [Unreleased] Added entry and BREAKING Removed entry with a migration step
+✅ **Security Review:** PASS, not a boundary deliverable
+⚠️ **Compliance Review:** not applicable
+
+**Task marked as ACCEPTED on:** 2026-10-20
+
+**Detailed Verification Log:** See `task.220.dod.1.no-consumer-names-in-shipped-skills.md` for complete verification evidence and timestamps.
+
+---
+<!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                                              | Author          |
-| ---------- | ------- | ------------------------------------------------------------------------ | --------------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-20 | 1.0     | Initial draft                                                            | create-task     |
 | 2026-10-20 | 1.1     | Create the guard here; add the wireframe skill's consumer profile to scope | Lorien Gamaroff |
 | 2026-10-20 |         | GitHub issue created (#709)                                              | sync-github-task |
@@ -438,8 +467,10 @@ No critical issues identified. Five mutation proofs each turned the predicted co
 | 2026-10-20 |         | Status → ready-for-development                                           | review-task |
 | 2026-10-20 |         | Implemented — 34 files (1 new guard, 10 fixtures renamed, 1 profile deleted) + 126 regenerated copies; guard 4 tests, 2 profile tests removed | develop |
 | 2026-10-20 |         | QA gate PASS (100/100) — 0 blocking findings, 2 advisory | qa-task |
+| 2026-10-20 | 1.3 | DoD passed — accepted (PR #710) | finalise |
 
 ---
+<!-- change-log-end -->
 
 ## Progress Tracking
 
