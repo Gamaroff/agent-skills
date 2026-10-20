@@ -5,10 +5,10 @@ type: task
 description: "develop-bug creates its tracker issue and signals work started only after review-bug says READY TO FIX, and every tracker document link uses the current branch only when that branch is the document's own work item."
 tags: [develop-bug, ensure-github-issue, sync-github, jira-sync, tracker, observation]
 category: refactoring
-status: ready-for-development
+status: ready-for-review
 priority: Medium
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-20
 assignee:
 estimated_effort_hours: 16
 github_issue: 616
@@ -16,7 +16,7 @@ github_issue: 616
 
 # Technical Task: Tracker side effects after their gate
 
-**Status:** Ready for Development
+**Status:** Ready for Review
 **Review**: ✅ All review recommendations from `task.200.review.1.tracker-side-effects-after-their-gate.md` implemented 2026-10-09
 **GitHub Issue**: [#616](https://github.com/Gamaroff/agent-skills/issues/616)
 
@@ -214,8 +214,8 @@ None to any CLI or file format. Behaviour changes a consumer can observe:
 
 **Risk**: Low
 
-- [ ] `shared/resources/doc-link-branch.js`: `workItemOf`, `branchNamesWorkItem`, `resolveDocLinkBranch`, CLI
-- [ ] `shared/resources/tests/doc-link-branch.test.mjs`: every work-item kind, an unrelated branch, an epic
+- [x] `shared/resources/doc-link-branch.js`: `workItemOf`, `branchNamesWorkItem`, `resolveDocLinkBranch`, CLI
+- [x] `shared/resources/tests/doc-link-branch.test.mjs`: every work-item kind, an unrelated branch, an epic
       integration branch for a story, a QA bug on its parent task's branch, `bugfix/task.144-<name>`,
       `hotfix/v1.2.1` for a bug and for a task, detached HEAD, explicit and configured precedence
 
@@ -223,37 +223,37 @@ None to any CLI or file format. Behaviour changes a consumer can observe:
 
 **Risk**: Medium. Depends on Phase 1.
 
-- [ ] The 8 GitHub `SKILL.md` sites call the CLI
-- [ ] `jira-sync.js` `resolveDocBranch` gains a `docPath` argument and delegates the upstream decision;
+- [x] The 8 GitHub `SKILL.md` sites call the CLI
+- [x] `jira-sync.js` `resolveDocBranch` gains a `docPath` argument and delegates the upstream decision;
       the 4 `sync-jira-*` callers pass the document path
-- [ ] Population test, keyed on the derivation not the variable: no `rev-parse` of `@{u}` or `@{upstream}`
+- [x] Population test, keyed on the derivation not the variable: no `rev-parse` of `@{u}` or `@{upstream}`
       in `skills/*/SKILL.md` or `shared/resources/*.{js,sh,md}` outside `doc-link-branch.js`, with
       `develop-pipeline-step-1-create-branch.md:77` (a tracking check, not a link) the one allowlisted site;
       non-vacuity floor of 8 CLI call sites (review I3)
-- [ ] Add a `docPath` case beside the pinned `resolveDocBranch` tests, which stay green unchanged
+- [x] Add a `docPath` case beside the pinned `resolveDocBranch` tests, which stay green unchanged
       (review I2: `git grep -n 'resolveDocBranch\|getCurrentBranchUpstream' -- '*.test.*'`)
-- [ ] `npm run bundle`
+- [x] `npm run bundle`
 
 ### Phase 3: develop-bug gate order
 
 **Risk**: Medium. Independent of Phases 1–2.
 
-- [ ] Move "Ensure a tracker issue" and "Signal Work Started" from Step 1 to a new Step 2b after READY TO FIX
-- [ ] Step 1 declines `create-branch`'s optional push and writes the lock with `tracker_issue: ""`
-- [ ] Step 2b writes `tracker_issue` and `tracker_step: "opened"` in one jq write (mktemp + mv)
-- [ ] HALT table: on NEEDS DETAIL / DUPLICATE / STALE, the message names the local branch and its review report
-- [ ] Resume contract: a `develop-bug` lock with no `tracker_step` and no `tracker_issue` re-enters at 2b
+- [x] Move "Ensure a tracker issue" and "Signal Work Started" from Step 1 to a new Step 2b after READY TO FIX
+- [x] Step 1 declines `create-branch`'s optional push and writes the lock with `tracker_issue: ""`
+- [x] Step 2b writes `tracker_issue` and `tracker_step: "opened"` in one jq write (mktemp + mv)
+- [x] HALT table: on NEEDS DETAIL / DUPLICATE / STALE, the message names the local branch and its review report
+- [x] Resume contract: a `develop-bug` lock with no `tracker_step` and no `tracker_issue` re-enters at 2b
       after a READY TO FIX verdict; the six states in Clarifications
 
 ### Phase 4: create-bug-report grep rule
 
 **Risk**: Low. Independent.
 
-- [ ] A population grep matches the defective primary branch only, and the report records it beside the list
+- [x] A population grep matches the defective primary branch only, and the report records it beside the list
 
 ### Phase 5: Close-out
 
-- [ ] CHANGELOG `[Unreleased]`, `docs/reference/configuration.md` § Document link branch
+- [x] CHANGELOG `[Unreleased]`, `docs/reference/configuration.md` § Document link branch
 
 ---
 
@@ -274,16 +274,19 @@ None to any CLI or file format. Behaviour changes a consumer can observe:
 ### Tests
 
 10. ➕ `shared/resources/tests/doc-link-branch.test.mjs`
-11. ➕ a population test for `@{u}` link derivation (`tests/` or `evals/shared/tests/`)
-12. ✅ `skills/sync-jira-task/tests/sync-jira-task.test.js:2023-2055` and the `resolveDocBranch` tests in
-    the `sync-jira-epic` and `sync-jira-story` suites (pinned; stay green, gain a `docPath` case)
+11. ➕ `tests/doc-link-branch-population.test.js` — the population test for upstream link derivation
+12. ✅ `skills/sync-jira-task/tests/sync-jira-task.test.js` — the pinned `resolveDocBranch` tests stay green
+    unchanged and gain a `docPath` case. (The `sync-jira-epic` and `sync-jira-story` suites pin only
+    `stripRemotePrefix`, which stays green through the re-export; they have no `resolveDocBranch` tests.)
 13. ✅ `skills/develop-bug/tests/develop-bug.test.js` for the step order and the halt message
+14. ✅ `shared/resources/tests/card-preflight.test.mjs` — its isolated-install copy list gains
+    `doc-link-branch.js` and `doc-id.js`, which `jira-sync.js` now requires
 
 ### Documentation
 
-14. ✅ `CHANGELOG.md`
-15. ✅ `docs/reference/configuration.md` § Document link branch
-16. ✅ generated `skills/*/references/` copies (via `npm run bundle`)
+15. ✅ `CHANGELOG.md`
+16. ✅ `docs/reference/configuration.md` § Document link branch
+17. ✅ generated `skills/*/references/` copies (via `npm run bundle`)
 
 ---
 
@@ -317,32 +320,32 @@ None to any CLI or file format. Behaviour changes a consumer can observe:
 
 ### Functional
 
-- [ ] `develop-bug/SKILL.md` Step 1 contains no `ensure-bug-*` invocation, no Signal Work Started and no push,
+- [x] `develop-bug/SKILL.md` Step 1 contains no `ensure-bug-*` invocation, no Signal Work Started and no push,
       and Step 2b, after READY TO FIX, is the only `ensure-bug-*` invocation (step-order test in
       `skills/develop-bug/tests/develop-bug.test.js`)
-- [ ] The HALT rows for NEEDS DETAIL, DUPLICATE and STALE name the local branch and its review report, and
+- [x] The HALT rows for NEEDS DETAIL, DUPLICATE and STALE name the local branch and its review report, and
       none deletes a branch (same test)
-- [ ] Step 2b writes `tracker_issue` and `tracker_step` in one write, and the resume contract states the six
+- [x] Step 2b writes `tracker_issue` and `tracker_step` in one write, and the resume contract states the six
       states (resume-contract test beside the existing develop-bug resume tests)
-- [ ] A card created on an unrelated branch links to the default branch; on its own branch, its parent's
+- [x] A card created on an unrelated branch links to the default branch; on its own branch, its parent's
       branch, or (bug only) a hotfix branch, to that branch (`doc-link-branch.test.mjs`)
-- [ ] `task.20` on branch `feature/task.200.x` does not match (same test)
+- [x] `task.20` on branch `feature/task.200.x` does not match (same test)
 
 ### Performance
 
-- [ ] The resolver makes at most the one `gh repo view` call each site makes today, and none with `--default`
+- [x] The resolver makes at most the one `gh repo view` call each site makes today, and none with `--default`
       (CLI test with a stubbed `gh`)
 
 ### Code Quality
 
-- [ ] `npm test` green with `.agents/skills` moved aside; `npm run bundle:check` and `npm run format:check` clean
-- [ ] Each new test mutation-proved (revert the behaviour, the test goes red)
-- [ ] `npm run validate -- skills/<skill>/` for every changed `SKILL.md`
+- [x] `npm test` green with `.agents/skills` moved aside; `npm run bundle:check` and `npm run format:check` clean
+- [x] Each new test mutation-proved (revert the behaviour, the test goes red)
+- [x] `npm run validate -- skills/<skill>/` for every changed `SKILL.md`
 
 ### Migration
 
-- [ ] CHANGELOG `[Unreleased]` entry
-- [ ] `configuration.md` § Document link branch states the work-item rule
+- [x] CHANGELOG `[Unreleased]` entry
+- [x] `configuration.md` § Document link branch states the work-item rule
 
 ---
 
@@ -392,6 +395,46 @@ None to any CLI or file format. Behaviour changes a consumer can observe:
 
 ---
 
+## Implementation Summary
+
+**Completed**: 2026-10-20 (develop-task pipeline run 1, inline implementation from the co-located plan)
+
+**Approach**
+
+- **Resolver.** `shared/resources/doc-link-branch.js` reads every id through `doc-id.js` (the
+  plan's own id regexes predate the task 202 numbering and would have tripped the chokepoint test).
+  A branch names a work item when its last path segment is the document's id or its parent's id
+  followed by `.`, `-` or the end. A story also matches its epic's integration branch — the
+  epic document's declared `integration_branch`, found by walking up from the story, or a segment
+  starting `{P}.{E}` under any prefix — and a bug matches `hotfix/v*`. The CLI asks `gh` for the
+  default branch only when the default is the answer, and never with `--default`.
+- **One definition of the upstream read.** `stripRemotePrefix` and the `@{u}` read moved into the
+  resolver; `jira-sync.js` re-exports them and `resolveDocBranch(explicit, repoRoot, docPath)`
+  delegates the upstream decision. A call without `docPath` keeps the old rule.
+- **GitHub sites.** Each of the eight calls the CLI and fails loudly (`:?`) when it resolves
+  nothing, instead of building `blob//path`.
+- **develop-bug.** Step 1 declines the push and writes `tracker_issue: ""`; Step 2b (after READY TO
+  FIX) pushes, ensures the issue, writes `tracker_issue` + `tracker_step` in one `jq` write, then
+  signals work started. Halts name the local branch and the review report and delete nothing.
+
+**Testing Results**
+
+- `npm run ci:fast` with `.agents/skills` moved aside: 6054 tests, 0 failures.
+- `npm run bundle:check` clean; `npm run validate` passes for all ten changed skills.
+- Mutation-proved, 7/7 red: upstream used without the work-item check; `.` anchor dropped; `-`
+  separator dropped; hotfix accepted for any document; `ensure-bug-*` back in Step 1; Step 2b
+  writing `tracker_issue` without `tracker_step`; an `@{u}` derivation reintroduced in a SKILL.md.
+- The step-order test caught a real defect during development: Step 2b was first inserted before
+  Step 2.
+
+**Deferred Work**
+
+- The integration-branch lookup reads the default frontmatter key `integration_branch` only, not a
+  renamed `branching.epicIntegration.branchKey`; a renamed key falls back to the `{P}.{E}` segment
+  match.
+
+---
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -400,6 +443,7 @@ None to any CLI or file format. Behaviour changes a consumer can observe:
 | 2026-10-09 | 1.0     | Initial draft — cut from observations #220, #287 | create-task |
 | 2026-10-09 | 1.1 | Review 7/10, six Important fixes applied: id-or-parent branch match, halt keeps a local branch, tracker_step and six resume states, structural criteria, derivation-keyed population test, pinned tests listed | review-task |
 | 2026-10-09 |  | Status → ready-for-development | review-task |
+| 2026-10-20 |  | Implemented — resolver + CLI, 8 GitHub sites and jira-sync migrated, develop-bug Step 2b, create-bug-report grep rule; 25 files authored, 3 new test files (+ cases in 3 suites); status → ready-for-review | develop |
 <!-- change-log-end -->
 
 ---
@@ -408,23 +452,23 @@ None to any CLI or file format. Behaviour changes a consumer can observe:
 
 ### Phase 1: The resolver
 
-- [ ] Complete
+- [x] Complete
 
 ### Phase 2: Migrate the link sites
 
-- [ ] Complete
+- [x] Complete
 
 ### Phase 3: develop-bug gate order
 
-- [ ] Complete
+- [x] Complete
 
 ### Phase 4: create-bug-report grep rule
 
-- [ ] Complete
+- [x] Complete
 
 ### Phase 5: Close-out
 
-- [ ] Complete
+- [x] Complete
 
 ---
 
