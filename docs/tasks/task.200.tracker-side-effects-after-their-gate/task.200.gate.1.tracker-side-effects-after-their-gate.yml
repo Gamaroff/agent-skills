@@ -1,0 +1,111 @@
+schema: 2
+task: "task.200.tracker-side-effects-after-their-gate"
+task_title: "Tracker side effects after their gate"
+gate: FAIL
+status_reason: "All 5 phases implemented, and ci:fast passes 6054/0. One HIGH: bash cannot parse the resolver guard line in any of the eight migrated GitHub sites, so every ensure/sync link block fails before it runs. No committed test executes those lines. Three MEDIUMs: an unbound relative path in three sync sites, a Step 2 halt message that can be false, and create-epic's unmigrated HEAD-derived link."
+reviewer: "QA Engineer"
+head: "4d50bbaa0b6cb40bdf2ca82c54386d790c17705c"
+updated: "2026-10-20T18:38:08Z"
+
+top_issues:
+  - id: "TASK-200-001"
+    severity: high
+    file: "skills/ensure-task-github-issue/SKILL.md"
+    bug_ref: "task.200.bug.1.guard-message-apostrophe-breaks-site-parse.md"
+    finding: >-
+      The guard line `: "${DOC_BRANCH:?… is the skill's bundled copy of it present?}"` in all eight
+      migrated sites (ensure-{bug,epic,story,task}-github-issue, sync-github-{bug,epic,story,task})
+      does not parse under bash. The apostrophe inside the double-quoted `${VAR:?word}` opens a quote
+      that never closes, giving "unexpected EOF while looking for matching `''", exit 2. Reproduced by
+      executing each site's two lines verbatim; a three-line script reproduces it too. Nothing in the
+      suite executes these lines: the population test greps them, and Step 4b skips them as mutating.
+    suggested_action: >-
+      Remove the apostrophe from the guard message. Add a committed test that extracts the two site
+      lines from each of the eight SKILL.md files and executes them under bash (and zsh where
+      installed), asserting each prints a branch. Mutation-prove it by restoring the apostrophe.
+    suggested_owner: dev
+  - id: "TASK-200-002"
+    severity: medium
+    file: "skills/sync-github-task/SKILL.md"
+    bug_ref: "task.200.bug.2.sync-sites-read-an-unbound-relative-path.md"
+    finding: >-
+      The update blocks in sync-github-task (line 110), sync-github-bug (111) and sync-github-story
+      (157) pass `${TASK|BUG|STORY_RELATIVE_PATH}` to the resolver, and no writer exists in the file.
+      The resolver exits 2 on an empty --doc, and the `:?` guard then stops the update path with a
+      message blaming a missing bundled copy. On develop the same unbound read only degraded the URL.
+    suggested_action: >-
+      Bind the repo-relative path inside each block, or substitute a {placeholder}. Word the guard to
+      cover a resolver usage error. Run the blocks in the BUG-1 test with only their named inputs.
+    suggested_owner: dev
+  - id: "TASK-200-003"
+    severity: medium
+    file: "skills/develop-bug/SKILL.md"
+    bug_ref: "task.200.bug.3.step-2-halt-can-still-post-blocked.md"
+    finding: >-
+      The Step 2 halt rows say "nothing was pushed or posted". The terminal-HALT rule (SKILL.md:360)
+      still signals Jira `blocked` whenever TRACKER_ISSUE is set, and Phase 0c binds it from an
+      existing jira_key. A STALE or DUPLICATE bug that already has a card is therefore moved to
+      Blocked before READY TO FIX.
+    suggested_action: >-
+      Exempt Step 2 fix-readiness halts from the `blocked` signal, or make the halt message name the
+      signal when it fires. Pin the choice in develop-bug.test.js.
+    suggested_owner: dev
+  - id: "TASK-200-004"
+    severity: medium
+    file: "skills/create-epic/SKILL.md"
+    bug_ref: "task.200.bug.4.create-epic-links-the-checked-out-branch.md"
+    finding: >-
+      create-epic builds its PRD link from `git rev-parse --abbrev-ref HEAD` with no work-item check.
+      That is the obs #287 defect class the task's success criterion 2 names, and it is unmigrated.
+      The population test cannot see it because it is keyed on the @{u} token. The defect predates
+      this branch, but it is in the task's own scope.
+    suggested_action: >-
+      Route the link through doc-link-branch.js and widen the population test to link construction
+      (`blob/${…}` in skills/*/SKILL.md). Alternatively, defer it to the task's Deferred Work and
+      narrow the criterion's wording.
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 50
+
+evidence:
+  tests_reviewed: 6054
+  phases_verified: "5/5"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [2, 3]
+  ci: "not read at review time — gated once at /finalise"
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 11
+    escaped: 0
+    notes: "security-probe path sink against doc-link-branch.js#integrationBranchOf: 11 executed, 0 escaped, wrote nothing. The function is a read-only lookup that refuses nothing by design. A traversing docPath only reads a frontmatter field from the caller's own path, so the 8 hostile cases recorded as accepted are a lookup returning empty, not a containment failure. No secrets, no injection: the branch reaches URLs and gh arguments quoted."
+  performance:
+    status: PASS
+    notes: "The resolver makes at most one gh repo view call, and none with --default; a git fixture with a stubbed gh in doc-link-branch.test.mjs counts the calls."
+  reliability:
+    status: FAIL
+    notes: "TASK-200-001: the eight GitHub site blocks fail to parse, so every ensure/sync link path errors before running."
+  maintainability:
+    status: CONCERNS
+    notes: "TASK-200-004: the population test keys on one derivation token, not on link construction. TASK-200-002: three blocks read a variable they do not bind."
+
+recommendations:
+  immediate:
+    - action: "Fix the guard message in all eight sites and add an executing test for the site lines (TASK-200-001)."
+      refs: ["skills/ensure-task-github-issue/SKILL.md", "tests/doc-link-branch-population.test.js"]
+    - action: "Bind the relative path in the three sync update blocks (TASK-200-002)."
+      refs: ["skills/sync-github-task/SKILL.md", "skills/sync-github-bug/SKILL.md", "skills/sync-github-story/SKILL.md"]
+  future:
+    - action: "qa-task Step 4b skips a changed block that calls gh as mutating, so a parse error in the block's non-mutating lines is invisible to it. A syntax-only pass (bash -n, zsh -n) over every changed block, mutating or not, would have caught TASK-200-001."
+      refs: ["shared/resources/qa-execute-snippets.mjs"]
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

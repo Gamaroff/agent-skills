@@ -20,6 +20,39 @@ All notable changes to this project will be documented in this file. Format foll
   example keys, hosts and board ids use `PROJ`, `acme.atlassian.net` and `12`. The Jira-board
   replay fixtures under `shared/resources/tests/fixtures/` are renamed to a `proj-` prefix. The
   older task.201 guard keeps its scanner and its exemption list is now empty.
+- **One resolver for a card's document-link branch (task 200).**
+  `shared/resources/doc-link-branch.js` decides the branch every tracker card's document link
+  points at: an explicit branch, then config (Jira), then the current branch's upstream **only
+  when it names the document's own work item**, then the default. A story's epic integration
+  branch counts only under the configured `branching.epicIntegration.branchPattern` prefix, and a
+  bug's hotfix branch only as `hotfix/v<digit>…`, so `release/1.4.0` never names story 1.4.x. The eight `ensure-*-github-issue`
+  and `sync-github-*` skills and `create-epic`'s PRD link call it, and `jira-sync.js`
+  `resolveDocBranch` delegates to it. `tests/doc-link-branch-population.test.js` fails CI on a new
+  upstream (`@{u}` / `@{upstream}`) read anywhere in the skill sources outside the resolver, and on
+  a `blob/${…}` or `src/${…}` link whose branch is assigned anywhere without a resolver call.
+  `tests/doc-link-branch-sites-execute.test.js` runs each site's lines under bash, because a scan
+  of the text passed while a quote in the guard stopped all eight from parsing. It also fails a call
+  that reads a variable its own block never binds, which is how `sync-github-story` dropped the
+  caller's durable-branch pin.
+
+### Changed
+
+- **`develop-bug` opens its tracker issue only after `review-bug` says READY TO FIX (task 200).**
+  The issue create, the card move and the `work-started` comment moved from Step 1 to a new Step
+  2b, and Step 1 no longer pushes the branch. A STALE, DUPLICATE or NEEDS DETAIL verdict now halts
+  with nothing outside the local checkout, naming the local branch and the review report; the halt
+  deletes nothing, and the terminal-HALT `blocked` signal skips it, even for a bug that already
+  has a Jira card. Step 2b records `tracker_issue` and a new `tracker_step: "opened"` on the lock
+  in one write, and the resume contract's § develop-bug Step 2b re-entry states the six resume
+  states. **Behaviour change:** a halted run leaves no tracker issue — key scripts on the READY TO
+  FIX verdict, not on "every run has an issue".
+- **A card created on an unrelated branch links to the default branch (task 200).** Before, a
+  card created while HEAD was another work item's feature branch linked to that branch and 404'd
+  once it was deleted (obs #287). The document's own branch, its parent's (a QA bug), its epic's
+  integration branch (a story) and a hotfix branch (a bug) still count. A bug's branch names that
+  bug alone, not its parent's own card or a sibling bug.
+- **`create-bug-report`: an affected-site grep must match the defective line (task 200),** not a
+  fallback or comment that correct files also carry, and the report records the command.
 
 ### Removed
 

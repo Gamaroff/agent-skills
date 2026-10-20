@@ -1,0 +1,25 @@
+{
+  "sink": "path",
+  "entry": ".agents/skills/ensure-story-github-issue/references/doc-link-branch.js#branchNamesWorkItem",
+  "name": null,
+  "call_site": null,
+  "verdict": "present-but-inert",
+  "reason": "a-hostile-case-passed-a-control-that-rejects-others",
+  "executed": 14,
+  "passed": 11,
+  "reproduced": 3,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": null,
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": [
+    "docs/prd/epic.1.4.feature-ui/story.1.4.2.configure-pipe.md"
+  ],
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-10-20T19:30:04.634Z"
+}

@@ -765,7 +765,9 @@ async function run({
     output.warn(
       "⚠️  Could not detect Bitbucket repo URL. Set BITBUCKET_REPO_URL to enable Bitbucket links.",
     );
-  const branch = bbBase ? lib.resolveDocBranch(args.docBranch) : null;
+  const branch = bbBase
+    ? lib.resolveDocBranch(args.docBranch, repoRoot, filePath)
+    : null;
   const storyBbUrl = bbBase
     ? lib.buildBitbucketUrl(filePath, repoRoot, bbBase, branch)
     : null;

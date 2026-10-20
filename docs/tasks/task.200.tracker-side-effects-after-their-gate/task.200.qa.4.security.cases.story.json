@@ -1,0 +1,58 @@
+[
+ {
+  "id": "story-int-nested",
+  "sink": "path",
+  "input": "epic/1.4.feature-ui/wip",
+  "why": "Two segments after the prefix are not the pattern.",
+  "correct": "Reject (false)",
+  "direction": "hostile"
+ },
+ {
+  "id": "story-int-lookalike-prefix",
+  "sink": "path",
+  "input": "epicx/1.4.feature-ui",
+  "why": "A prefix that merely starts with epic is not epic/.",
+  "correct": "Reject (false)",
+  "direction": "hostile"
+ },
+ {
+  "id": "story-int-case",
+  "sink": "path",
+  "input": "Epic/1.4.feature-ui",
+  "why": "Branch names are case-sensitive.",
+  "correct": "Reject (false)",
+  "direction": "hostile"
+ },
+ {
+  "id": "story-int-double-slash",
+  "sink": "path",
+  "input": "epic//1.4.x",
+  "why": "An empty segment before {P}.{E}.",
+  "correct": "Reject (false)",
+  "direction": "hostile"
+ },
+ {
+  "id": "story-int-dash",
+  "sink": "path",
+  "input": "epic/1.4-feature-ui",
+  "why": "A dash after {P}.{E} is a documented separator.",
+  "correct": "Accept (true)",
+  "direction": "legitimate"
+ },
+ {
+  "id": "story-int-whitespace",
+  "sink": "path",
+  "input": "  epic/1.4.feature-ui  ",
+  "why": "Surrounding whitespace is trimmed before matching.",
+  "correct": "Accept (true)",
+  "direction": "legitimate"
+ },
+ {
+  "id": "story-int-other-prd-suffix",
+  "sink": "path",
+  "input": "epic/1.44.x",
+  "why": "Epic 1.44 starts with 1.4.",
+  "correct": "Reject (false)",
+  "direction": "hostile"
+ }
+]

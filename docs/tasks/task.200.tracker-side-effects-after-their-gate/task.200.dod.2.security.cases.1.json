@@ -1,0 +1,130 @@
+[
+  {
+    "id": "task-own-branch",
+    "sink": "path",
+    "input": "feature/task.200.tracker-side-effects-after-their-gate",
+    "why": "The task's own feature branch carries its document.",
+    "correct": "Accept (true)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "task-bare-id",
+    "sink": "path",
+    "input": "feature/task.200",
+    "why": "A last segment equal to the id names the work item.",
+    "correct": "Accept (true)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "task-dash-separator",
+    "sink": "path",
+    "input": "bugfix/task.200-x",
+    "why": "A '-' after the id is a documented separator.",
+    "correct": "Accept (true)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "task-unprefixed",
+    "sink": "path",
+    "input": "task.200.x",
+    "why": "No slash: the only segment names the item.",
+    "correct": "Accept (true)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "task-shorter-id-prefix",
+    "sink": "path",
+    "input": "feature/task.20.x",
+    "why": "task.20 is a prefix of task.200.",
+    "correct": "Reject (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "task-shorter-id-dash",
+    "sink": "path",
+    "input": "feature/task.20-x",
+    "why": "Prefix collision with '-'.",
+    "correct": "Reject (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "task-longer-id",
+    "sink": "path",
+    "input": "feature/task.2000.x",
+    "why": "A different work item that starts with the id.",
+    "correct": "Reject (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "task-no-separator",
+    "sink": "path",
+    "input": "feature/task.200x",
+    "why": "No separator after the id.",
+    "correct": "Reject (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "task-neighbour-id",
+    "sink": "path",
+    "input": "feature/task.201.x",
+    "why": "Another task.",
+    "correct": "Reject (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "task-own-bug-branch",
+    "sink": "path",
+    "input": "feature/task.200.bug.3.x",
+    "why": "A bug branch of this task does not carry the task document.",
+    "correct": "Reject (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "task-own-bug-branch-bare",
+    "sink": "path",
+    "input": "feature/task.200.bug.3",
+    "why": "Bug branch, end-of-segment form.",
+    "correct": "Reject (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "task-own-bug-branch-dash",
+    "sink": "path",
+    "input": "feature/task.200.bug.3-x",
+    "why": "Bug branch with '-' after the bug number.",
+    "correct": "Reject (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "task-id-in-earlier-segment",
+    "sink": "path",
+    "input": "task.200.x/feature/other",
+    "why": "Only the last segment names the work item.",
+    "correct": "Reject (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "task-id-embedded",
+    "sink": "path",
+    "input": "feature/xtask.200.y",
+    "why": "Id mid-segment.",
+    "correct": "Reject (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "task-hotfix-version",
+    "sink": "path",
+    "input": "hotfix/v1.2.1",
+    "why": "hotfix/v* counts for bug documents only.",
+    "correct": "Reject (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "task-other-kind-same-number",
+    "sink": "path",
+    "input": "feature/bug.200.x",
+    "why": "Same number, different kind.",
+    "correct": "Reject (false)",
+    "direction": "hostile"
+  }
+]

@@ -1,0 +1,164 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "path",
+      "entry": ".agents/skills/ensure-bug-github-issue/references/doc-link-branch.js#branchNamesWorkItem",
+      "name": null,
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 17,
+      "passed": 17,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": [
+        "docs/tasks/task.200.tracker-side-effects-after-their-gate/task.200.bug.3.step-2-halt-can-still-post-blocked.md"
+      ],
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-10-20T21:33:12.990Z"
+    },
+    {
+      "sink": "path",
+      "entry": ".agents/skills/ensure-story-github-issue/references/doc-link-branch.js#branchNamesWorkItem",
+      "name": null,
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 21,
+      "passed": 21,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": [
+        "docs/prd/epic.1.4.feature-ui/story.1.4.2.configure-pipe.md"
+      ],
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-10-20T21:33:13.826Z"
+    },
+    {
+      "sink": "path",
+      "entry": ".agents/skills/develop-story/references/doc-link-branch.js#branchNamesWorkItem",
+      "name": null,
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 8,
+      "passed": 8,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": [
+        "docs/prd/epic.1.4.feature-ui/story.1.4.2.configure-pipe.md",
+        {
+          "integrationPrefix": "integration/"
+        }
+      ],
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-10-20T21:33:15.657Z"
+    },
+    {
+      "sink": "path",
+      "entry": ".agents/skills/sync-github-bug/references/doc-link-branch.js#branchNamesWorkItem",
+      "name": null,
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 17,
+      "passed": 17,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": [
+        "docs/tasks/task.200.tracker-side-effects-after-their-gate/task.200.bug.3.step-2-halt-can-still-post-blocked.md"
+      ],
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-10-20T21:33:14.486Z"
+    },
+    {
+      "sink": "path",
+      "entry": "shared/resources/doc-link-branch.js#branchNamesWorkItem",
+      "name": null,
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 16,
+      "passed": 16,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": [
+        "docs/tasks/task.200.tracker-side-effects-after-their-gate/task.200.tracker-side-effects-after-their-gate.md"
+      ],
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-10-20T21:33:12.322Z"
+    },
+    {
+      "sink": "path",
+      "entry": ".agents/skills/sync-github-story/references/doc-link-branch.js#branchNamesWorkItem",
+      "name": null,
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 21,
+      "passed": 21,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": [
+        "docs/prd/epic.1.4.feature-ui/story.1.4.2.configure-pipe.md"
+      ],
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-10-20T21:33:15.327Z"
+    }
+  ],
+  "totals": {
+    "executed": 100,
+    "reproduced": 0,
+    "escaped": 0
+  },
+  "updated_at": "2026-10-20T21:33:15.657Z"
+}

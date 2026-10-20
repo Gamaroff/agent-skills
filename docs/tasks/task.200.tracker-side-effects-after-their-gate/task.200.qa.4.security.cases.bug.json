@@ -1,0 +1,42 @@
+[
+ {
+  "id": "bug-hotfix-v-digit",
+  "sink": "path",
+  "input": "hotfix/v2",
+  "why": "A bare major version.",
+  "correct": "Accept (true)",
+  "direction": "legitimate"
+ },
+ {
+  "id": "bug-hotfix-v-only",
+  "sink": "path",
+  "input": "hotfix/v",
+  "why": "No version after v.",
+  "correct": "Reject (false)",
+  "direction": "hostile"
+ },
+ {
+  "id": "bug-hotfix-v-letter-digit",
+  "sink": "path",
+  "input": "hotfix/vx1.2",
+  "why": "A letter before the digit.",
+  "correct": "Reject (false)",
+  "direction": "hostile"
+ },
+ {
+  "id": "bug-hotfix-nested",
+  "sink": "path",
+  "input": "feature/hotfix/v1.2.1",
+  "why": "hotfix/ must be the branch root.",
+  "correct": "Reject (false)",
+  "direction": "hostile"
+ },
+ {
+  "id": "bug-hotfix-upper",
+  "sink": "path",
+  "input": "hotfix/V1.2.1",
+  "why": "Case-sensitive v.",
+  "correct": "Reject (false)",
+  "direction": "hostile"
+ }
+]

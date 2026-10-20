@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "path",
+      "entry": "shared/resources/doc-link-branch.js#integrationBranchOf",
+      "name": null,
+      "call_site": null,
+      "verdict": "absent",
+      "reason": "no-hostile-case-was-rejected",
+      "executed": 11,
+      "passed": 3,
+      "reproduced": 8,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-10-20T19:20:24.528Z"
+    }
+  ],
+  "totals": {
+    "executed": 11,
+    "reproduced": 8,
+    "escaped": 0
+  },
+  "updated_at": "2026-10-20T19:20:24.528Z"
+}

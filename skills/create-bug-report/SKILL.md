@@ -470,6 +470,8 @@ After bug reports are created:
 
 **Evidence Quality**: annotated screenshots (highlight issues); relevant log excerpts only; stack traces with context; video for complex workflows.
 
+**Affected-site greps match the defect, not its neighbours**: when a bug lists the sites it affects by searching for them, the search must match the defective line on its primary path — not a line that also appears on correct files (a fallback, a `catch` branch, a comment). Run it and read each hit before listing it, and record the exact command beside the list, so `review-bug`'s stale scan can re-run it and see what is still broken. bug.16's grep (`resolve(process.argv\[1\]) === fileURLToPath`) matched the fallback line of five files whose primary branch already used `realpathSync`, so five of its six listed files were correct when it was filed (obs #220).
+
 **Criteria / Scope Clarity**: quote the specific AC or success criterion (story/task bugs); for general bugs, name the areas the bug cuts across and why no single story/task owns it.
 
 ---

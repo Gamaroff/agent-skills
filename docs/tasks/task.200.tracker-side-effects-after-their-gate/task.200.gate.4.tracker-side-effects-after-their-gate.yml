@@ -1,0 +1,66 @@
+schema: 2
+task: "task.200.tracker-side-effects-after-their-gate"
+task_title: "Tracker side effects after their gate"
+gate: CONCERNS
+status_reason: "Re-entry after the DoD 1 gaps: 655ce648 narrows the story integration fallback to the configured branchPattern prefix and the bug hotfix rule to hotfix/v<digit>. All four /finalise reproductions are now refused, 54 probes ran with 0 reproduced and 0 escaped, and the fast gate passes 6079/0. Nothing open. Maintainability stays CONCERNS: gate 3's advisory guard-breadth items, plus a fallback that only recognises {p}.{n} patterns (behaves the same on gate 3's head)."
+reviewer: "QA Engineer"
+head: "655ce64859f14fc0ad3754e51413f48def98787d"
+updated: "2026-10-20T21:24:16Z"
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 6079
+  phases_verified: "5/5"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+  ci: "not read at review time — gated once at /finalise"
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 54
+    escaped: 0
+    notes: "security-probe path sink against branchNamesWorkItem, 5 controls (task, bug and story documents): the 42 cases from the DoD 1 plan plus 12 new edge cases for the prefix and hotfix rules. 54 executed, 0 reproduced, 0 escaped. The same cases reproduced 4 on fc7e0527, so they can catch this defect."
+  performance:
+    status: PASS
+    notes: "One skills-config.yaml read per CLI run and per Jira resolveDocBranch call; no new process spawns."
+  reliability:
+    status: PASS
+    notes: "An absent or unreadable skills-config.yaml gives the default prefix, the answer an unconfigured repository gets. The bundled resolver now needs yaml-subset.js, which bundle:check confirms is beside every copy; the isolated-install test copies it."
+  maintainability:
+    status: CONCERNS
+    notes: "Gate 3's two guard-breadth gaps and its unreachable clause are unchanged. New, advisory: the fallback only recognises patterns that put {p}.{n} in one segment after a literal prefix (CR-1, behaves the same on gate 3's head). An empty branchPattern turns the fallback off (CR-2, low confidence). No committed row puts a 5-character foreign prefix before {P}.{E}, so a mutant that drops the startsWith but keeps the slice survives (Q2)."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "CR-1: match the whole configured branchPattern ({p}, {n} substituted, {slug} free) instead of prefix + one {P}.{E} segment, or keep the rule and add a row for a non-dot pattern. Behaves the same on gate 3's head (epic/1-4-ui false on both)."
+      refs: ["shared/resources/doc-link-branch.js"]
+    - action: "CR-2: treat an empty branchPattern as unset (default prefix), and say so when skills-config.yaml exists but branching is not a map."
+      refs: ["shared/resources/doc-link-branch.js"]
+    - action: "Q2: add a TABLE row whose foreign prefix is exactly as long as epic/ (hfix/1.4.ui → false), so the startsWith check is held by a test as well as by the slice."
+      refs: ["shared/resources/tests/doc-link-branch.test.mjs"]
+    - action: "CR-3/CR-4 (cleanups): pass integrationPrefix to branchNamesWorkItem without the conditional spread; derive the parameter default from integrationPrefixOf(DEFAULT_BRANCH_PATTERN)."
+      refs: ["shared/resources/doc-link-branch.js"]
+    - action: "Carried from gate 3: LINK_RE ${V:-…} (CR-1), one-hop binding (CR-2), the unreachable own-bug clause, review-story's 'current branch' wording, early return on --explicit, and gate 2's carried items."
+      refs: ["tests/doc-link-branch-population.test.js", "tests/doc-link-branch-sites-execute.test.js", "shared/resources/doc-link-branch.js", "skills/review-story/SKILL.md"]
+
+bug_resolution:
+  bugs_fixed: 0
+  bugs_reopened: 0
+  bugs_new: 0
+  fix_commit: "655ce648"
+  verification_method: "QA re-entry after the finalise DoD gaps. The four DoD 1 probe cases now score as their direction requires, with 12 new edge cases added. QA's own mutants: 3 of 4 red (hotfix prefix, Jira wiring, config not read); the fourth, which drops the startsWith but keeps the slice, is absorbed (Q2). The realistic regression, accepting any prefix, went red on 7 rows in development."
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ["PR conformance review (5c) and finalise DoD"]

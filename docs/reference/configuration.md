@@ -793,8 +793,24 @@ Resolution order:
 2. `JIRA_DOC_BRANCH` in the environment
 3. `jira.docBranch` in `skills-config.yaml`
 4. `developNext.baseBranch` in `skills-config.yaml`
-5. the current branch's upstream
+5. the current branch's upstream — **only when it names the document's own work item**
 6. git's default branch (`origin/HEAD`, else `main`/`master`/`develop`)
+
+**The work-item rule (task.200).** The current branch counts only when its last path
+segment starts with the document's id, or its parent's id for a bug (`task.N` for
+`task.N.bug.M`), followed by `.`, `-` or the end — so `task.20` never matches
+`feature/task.200.x`. A story also counts its epic's integration branch: the epic's
+declared `integration_branch`, or a branch made from `branching.epicIntegration.branchPattern`.
+That means the pattern's literal prefix (`epic/` by default) followed by one segment starting
+`{P}.{E}`. A bug counts a version hotfix, `hotfix/v` followed by a digit, as in `hotfix/v1.2.1`.
+`release/1.4.0`, `hotfix/1.4.1` and `hotfix/vendor-sdk-bump` therefore name nothing. Any other branch — a card created while HEAD was another work
+item's branch — falls through to the default, because that branch never carries the
+document and its link 404s once it is deleted.
+
+GitHub cards (`ensure-*-github-issue`, `sync-github-*`) apply the same rule through
+the same resolver, `shared/resources/doc-link-branch.js`, with an explicit branch
+(`sync-github-story`'s `DOC_BRANCH`) first and the repository's GitHub default branch,
+then `develop`, last. GitHub does not read `jira.docBranch`.
 
 **Set `jira.docBranch` if your documents do not live on the git default branch.**
 On a Gitflow repo, git will correctly report the default branch as `main`, and docs
