@@ -308,8 +308,8 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.197.qa.2.pipeline-entry-docs-phase-0-and-lite-mode.md](./task.197.qa.2.pipeline-entry-docs-phase-0-and-lite-mode.md)
-- **Gate File**: [task.197.gate.2.pipeline-entry-docs-phase-0-and-lite-mode.yml](./task.197.gate.2.pipeline-entry-docs-phase-0-and-lite-mode.yml)
+- **Full Report**: [task.197.qa.3.pipeline-entry-docs-phase-0-and-lite-mode.md](./task.197.qa.3.pipeline-entry-docs-phase-0-and-lite-mode.md)
+- **Gate File**: [task.197.gate.3.pipeline-entry-docs-phase-0-and-lite-mode.yml](./task.197.gate.3.pipeline-entry-docs-phase-0-and-lite-mode.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 5969
@@ -318,7 +318,7 @@ None.
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Cycle 1's fixes hold. `faq.md:33` still says lite mode skips re-reading the codebase — the claim fixed at five other sites (QA2-CR-1, medium).
+Cycle 2's fixes hold. The create-parallel-stories runbook shows a worktree shape that differs from the commands `/create-parallel-stories` prints, with no sentence reconciling them (QA3-CR-1, medium).
 
 <!-- change-log-start -->
 ## Change Log
@@ -333,6 +333,8 @@ Cycle 1's fixes hold. `faq.md:33` still says lite mode skips re-reading the code
 | 2026-10-20 |         | QA findings fixed — QA1-CR-1 (`--mode fast` wording, 4 sites), QA1-CR-2 (Q1 recommendation), advisory CR-4 (worktree base); 1 iteration | qa-fix |
 | 2026-10-20 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-10-20 |         | QA findings fixed — QA2-CR-1 (faq.md lite-mode wording), advisory CR-2 (scratch-branch cleanup) and CR-3 (`Depends on` scope); 2 iterations | qa-fix |
+| 2026-10-20 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-10-20 |         | QA findings fixed — QA3-CR-1 (runbook reconciles its worktree form with the skill's printed commands), advisory CR-2 (`depends_on` card is GitHub-only); 3 iterations | qa-fix |
 <!-- change-log-end -->
 
 ---

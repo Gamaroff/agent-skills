@@ -57,6 +57,8 @@ flowchart TD
 
 `-b` names a **scratch** branch for the worktree. `/develop-story` cuts `feature/story.{P}.{E}.{S}.{name}` itself, from `origin/<Q1 base>` (normally `develop`, or the epic integration branch when the epic opted in), inside the linked worktree (`/create-branch` Step 5, linked-worktree exception). Pre-creating the feature branch there makes Step 1 stop on "branch already exists", and omitting `-b` fails because no such branch exists yet. This is the same shape `/develop-batch` uses.
 
+The setup commands `/create-parallel-stories` prints (`git worktree add .worktrees/story-1-1 -b feature/story-1-1-1`) work too: their `-b` name is also a scratch branch, and it does not collide with the `feature/story.{P}.{E}.{S}.{name}` branch `/develop-story` cuts, because the names differ. They name no base, so the branch is cut from whatever is checked out; run them from `develop`. The form in step 2 is the same command with the base named. Either way, delete the scratch branch after `git worktree remove` (see Pitfalls).
+
 ## Pitfalls
 
 - **Don't share dirty worktrees across agent sessions** — each session needs an isolated checkout.
