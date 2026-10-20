@@ -170,9 +170,9 @@ Before running `develop-story`, verify:
 ## Invocation
 
 ```
-/develop docs/prd/auth/prd.1.login-flow/epics/epic.1.2.feature-ui/stories/story.1.2.1.login-form/
-/develop story.1.2.1.login-form.md
-/develop #297    # GitHub issue number
+/develop-story docs/prd/auth/prd.1.login-flow/epics/epic.1.2.feature-ui/stories/story.1.2.1.login-form/
+/develop-story story.1.2.1.login-form.md
+/develop-story #297    # GitHub issue number
 ```
 
 ## See also

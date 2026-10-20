@@ -165,9 +165,9 @@ See [Status lifecycle](../standards/status-lifecycle.md).
 
 ## Lite mode surprise: side-effects still ran
 
-**Symptom:** You expected `--lite` to skip the PR comment / tracker update.
+**Symptom:** The run was in lite (or fast) mode, and you expected it to skip the PR comment / tracker update.
 
-**Cause:** This is by design. Lite mode skips context-gathering before development; Step 7 (`finalise`) always runs its full side-effects — DoD post to PR, tracker comment, board update.
+**Cause:** This is by design. Lite and fast modes shorten QA only — direct-tools Step 5, `--effort low` Step 5c. Step 7 (`finalise`) always runs its full side-effects — DoD post to PR, tracker comment, board update — and no `--skip` can remove it. See [the lite-mode contract](../../shared/resources/develop-pipeline-lite-mode.md).
 
 **Fix:** Not a bug. If you genuinely need to skip Step 7, bypass `develop-*` and drive the pipeline manually.
 

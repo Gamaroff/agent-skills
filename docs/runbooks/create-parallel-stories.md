@@ -47,13 +47,15 @@ flowchart TD
 ```
 1. /create-parallel-stories <epic-path>     → produces coordination matrix + worktree setup commands
 2. For each parallelisable story:
-   git worktree add .worktrees/story-{E}.{S} feature/story.{P}.{E}.{S}.{name}
+   git worktree add .worktrees/story-{E}.{S} -b story/{P}.{E}.{S} develop   # a scratch branch, not the feature branch
    cd .worktrees/story-{E}.{S}
    /develop-story <story-path>
 3. Merge each story PR to its target as it lands (any order): `develop` by default, or the epic
    integration branch when the epic opted in.
 4. After all parallel stories merge, sequential stories proceed normally.
 ```
+
+`-b` names a **scratch** branch for the worktree. `/develop-story` cuts `feature/story.{P}.{E}.{S}.{name}` itself, from `origin/develop`, inside the linked worktree (`/create-branch` Step 5, linked-worktree exception). Pre-creating the feature branch there makes Step 1 stop on "branch already exists", and omitting `-b` fails because no such branch exists yet. This is the same shape `/develop-batch` uses.
 
 ## Pitfalls
 

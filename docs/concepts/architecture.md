@@ -128,12 +128,12 @@ sequenceDiagram
 
     U->>DS: /develop-story <path>
     DS->>DS: Phase 0 — resolve & prepare
-    DS->>CB: Step 1 — create branches
-    CB-->>DS: epic + story branches ready
+    DS->>CB: Step 1 — create branch
+    CB-->>DS: story branch ready (from develop, or the epic integration branch when opted in)
     DS->>RS: Step 2 — review story
     DS->>DEV: Step 3 — develop loop (MAX_ITER=5)
     DEV-->>DS: status: ready-for-review
-    DS->>CPR: Step 4 — create PR (--base epic branch)
+    DS->>CPR: Step 4 — create PR (--base develop, or the epic integration branch)
     DS->>QS: Step 5a — QA review → gate file
     alt gate has open top_issues[] (FAIL, or CONCERNS / PASS with open entries)
         DS->>QF: Step 5b — qa-fix (shared cycle budget), after the convergence check and route classifier

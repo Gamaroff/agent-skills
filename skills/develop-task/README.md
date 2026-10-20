@@ -48,7 +48,7 @@ This document is structured for two audiences:
 ### Compared to `develop-story`
 
 - **No QA traceability mapper subagent.** `develop-story` runs a traceability mapper before `/qa-story` in standard mode (Step 5 pre-step); `develop-task` invokes `/qa-task` directly.
-- **No epic-branch concept.** Both `develop-task` and `develop-story` Q1 prompt for the base branch with `develop` as the recommended option; neither creates or targets an epic branch.
+- **No epic-branch concept.** `develop-task` has none: its Q1 recommends `develop` (or the current `feature/*` branch). `develop-story` offers an opt-in epic integration branch, recommended when the parent epic declares `branch_model: epic-integration`.
 - All other subagent dispatches and the full 8-step skeleton are identical — both share the same shared/resources protocol files.
 
 ---

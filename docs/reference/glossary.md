@@ -22,11 +22,11 @@ Quick reference. Where a term has a full standards doc or runbook, the entry lin
 | **Pipeline**          | Chained sequence of skills that takes a story or task from `draft` to `accepted`.                                                      |
 | **Orchestrator**      | A skill that drives a multi-step pipeline by calling other skills. Examples: `develop-story`, `develop-task`.                          |
 | **Leaf skill**        | A skill the orchestrator invokes but that doesn't itself orchestrate others. Examples: `create-branch`, `commit-changes`.              |
-| **Phase 0**           | Pre-pipeline resolve & prepare step. Prompts for story/task path, base branch, lite mode. Always idempotent and re-runnable.           |
+| **Phase 0**           | Pre-pipeline resolve & prepare step. Asks for the branch base and PR target, unless `--base`/`--target`/`--defaults` answer them; detects lite mode automatically. Always idempotent and re-runnable.           |
 | **Step N**            | One of the 8 numbered steps inside an orchestrator's Phase 1 pipeline.                                                                 |
 | **Anchor runbook**    | Full-lifecycle runbook (~200–300 lines). Examples: story-development, task-development.                                                |
 | **Satellite runbook** | Focused single-scenario runbook (~80–150 lines). Examples: hotfix, bug-fix, sprint-cycle.                                              |
-| **Lite mode**         | Optional flag that skips pre-develop context-gathering for low-risk stories/tasks. Step 7 (`finalise`) side-effects still run in full. |
+| **Lite mode**         | Shorter QA, auto-detected in Phase 0 when `risk_level` is low or absent, there are fewer than 3 tasks/phases, and the work touches one module (`--mode lite` can request it; `--mode fast` forces it). Step 5 QA uses direct tools only and Step 5c runs `/review-pr --effort low` (degraded, never skipped); every other step, including Step 7's side-effects, runs unchanged. There is no `--lite` flag. See [the lite-mode contract](../../shared/resources/develop-pipeline-lite-mode.md). |
 | **Resume**            | Re-invoking an orchestrator on an interrupted run. Detects per-step artifacts and continues from the first incomplete step.            |
 | **MAX_ITER**          | Bounded-loop cap (5) on develop and qa-fix iterations, to prevent runaway agent costs. The QA loop's 5 cycles are shared with Step 5c — a `review-pr` `REQUEST CHANGES` consumes one. |
 
