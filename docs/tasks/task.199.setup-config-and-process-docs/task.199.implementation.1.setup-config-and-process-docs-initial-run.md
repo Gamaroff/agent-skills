@@ -3,7 +3,7 @@
 **Task**: `task.199.setup-config-and-process-docs.md`
 **Run Number**: 1
 **Started**: 2026-10-20 07:16
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -37,8 +37,8 @@ Fix 20 doc-drift findings in setup, configuration, tracker and release-process d
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | inline, 1 iteration; 6/6 phases; ci:fast 5969/0 fail | —                    | 2026-10-20T07:27Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #704: https://github.com/Gamaroff/agent-skills/pull/704 | —                    | 2026-10-20T07:28Z |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.199.qa.{N}.*.md`; `task.199.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 4 cycles; gate.4 PASS 94; 5c CONCERNS (pr-review.1) | —                    | 2026-10-20 |
-| 7. finalise                | ❌ Gaps    | `task.199.dod.{N}.*.md`; task `status: accepted`                       | dod.1 — NOT ACCEPTED: 1 gap (no CHANGELOG entry); HALT | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 7. finalise                | ✅ Done    | `task.199.dod.{N}.*.md`; task `status: accepted`                       | dod.1 GAPS (CHANGELOG) → fixed 743cd72c → dod.2 ACCEPTED; acceptance commit d4809216 | —                    | 2026-10-20T08:41Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | implementation report committed and pushed | —                    | 2026-10-20T08:41Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -131,6 +131,11 @@ Fix 20 doc-drift findings in setup, configuration, tracker and release-process d
 - The 5c carry (pr-review.1 + PC-1 task-doc fix) rides the halt commit instead of the 6a acceptance commit
 - HALT: DoD gaps. A docs-only fix resumes at Step 7
 - Resume (user approved): CHANGELOG `[Unreleased]` `### Fixed` entry for task 199 added. PC-2 fixed in the task doc: §5 names the setup-consumer.sh text changes and §7 lists the script (item 19). Docs-only, so the run resumes at Step 7 and `/finalise` re-runs
+- `/finalise` dod.2: the four DoD agents were re-run on the refreshed diff at 743cd72c (resumed with their original prompts). AC 8/8 PASS; security PASS (`boundary: false`); compliance N/A; docs PASS (CHANGELOG.md:9)
+- CI reading 1: SUCCESS @ 743cd72c over 4 checks; CI reading 2: SUCCESS (tree-equivalent to bce0ef112aad) @ d4809216 over 4 checks
+- Acceptance commit d4809216 (`status: accepted`, dod.2, sprint review, registry ticked `planned → accepted`); 6b pushed-assertions OK; 6d changelog cited
+- Canonical PR comment posted (issuecomment-6287000928); issue #602: completion comment posted, closed (state CLOSED verified), Document link already durable; board `done`: already
+- Tracker debt: none (`access.tracker: full`, nothing deferred)
 
 ---
 
@@ -138,8 +143,8 @@ Fix 20 doc-drift findings in setup, configuration, tracker and release-process d
 
 _Problems encountered and how they were resolved or escalated._
 
-- **Step 7 DoD gap — CHANGELOG entry missing.** `CHANGELOG.md` `[Unreleased]` has no `(task 199)` entry. Tasks 196–198 each have one, and this PR changes wizard text in `scripts/setup-consumer.sh` that users see. Escalated: pipeline HALTed at Step 7. Fix: add the entry under `### Fixed`, then resume at Step 7 (document-only fix).
-- **5c PC-2 (medium, scope) — recorded, not fixed.** §5 says no script changes and §7 does not list `scripts/setup-consumer.sh`, but the PR changes its prompt and summary text. The 5c doc-only rule could not carry it because its ref names the script. Open for a decision.
+- **Step 7 DoD gap — CHANGELOG entry missing.** _Resolved in 743cd72c; dod.2 accepted._ `CHANGELOG.md` `[Unreleased]` has no `(task 199)` entry. Tasks 196–198 each have one, and this PR changes wizard text in `scripts/setup-consumer.sh` that users see. Escalated: pipeline HALTed at Step 7. Fix: add the entry under `### Fixed`, then resume at Step 7 (document-only fix).
+- **5c PC-2 (medium, scope).** _Resolved in 743cd72c (§5 and §7 of the task doc)._ §5 says no script changes and §7 does not list `scripts/setup-consumer.sh`, but the PR changes its prompt and summary text. The 5c doc-only rule could not carry it because its ref names the script. Open for a decision.
 
 ---
 
@@ -195,10 +200,14 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-10-20T08:41Z
+**Final Status**: Completed
 **Branch**: `feature/task.199.setup-config-and-process-docs`
 **PR**: https://github.com/Gamaroff/agent-skills/pull/704
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 4
+**DoD Summary**: `task.199.dod.2.setup-config-and-process-docs.md` (accepted; run 1 `task.199.dod.1.setup-config-and-process-docs.md` recorded the CHANGELOG gap)
+**Tracker debt**: none
+
+### Completion Summary
+
+Implemented the 20 doc-drift findings in this task's slice of the 2026-10-07 audit: 19 fixed across 16 setup, configuration, tracker and release-process docs, and STANDARDS-28 closed as superseded in Phase 0. Text-only edits were also made in `scripts/setup-consumer.sh`. QA took 4 cycles: cycles 1–3 were CONCERNS with 11 findings, all fixed, and cycle 4 was PASS 94 with three LOWs (QA-8/9/10) carried by the Cosmetic-residue exit. The Step 5c PR review was CONCERNS. PC-1 was fixed at 5c, and PC-2 was fixed after the finalise halt. The first `/finalise` run halted on a missing CHANGELOG entry; the entry was added as a docs-only fix and the second run accepted the task. Notable decisions: the finalise lock cooperation was not run on the gaps path (it would have advanced the lock to 8), and the 5c carry rode the halt commit rather than the acceptance commit.
