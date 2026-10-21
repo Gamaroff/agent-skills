@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **loop-supervisor: an engine registry and `--engine` / `--model` / `--effort` (task 213).**
+  `skills/loop-supervisor/references/engines.js` holds one table row per engine: how to build its
+  argv, parse its result line, and what it supports. `run-loop.mjs` reads the row and has no
+  per-engine branches. `claude` stays the default and its argv is unchanged. `agy` (Antigravity)
+  is the second row. `--model` and `--effort` pass through to the engine, and the new config
+  keys `loopSupervisor.engine`, `.model` and `.effort` fill them when the flag is absent. A flag
+  the selected engine cannot honour is refused before anything is spawned, not silently ignored:
+  `--max-turns` and `--max-cost` exit 1 on `agy`, and `--dangerously-skip-permissions` exits 1 on
+  `claude`. On `agy` that flag is operator-only, never read from config. A non-`SUCCESS` agy result
+  classifies the iteration as an error.
 - **`registry-tick.js --bug-status` (task 219).** Sets a general bug's row in
   `docs/bugs/bug-registry.md` to the bug file's status, in the registry's own vocabulary (the
   lifecycle token, or the emoji labels when most rows use them). develop-bug Steps 3, 5–6 and 7 and
