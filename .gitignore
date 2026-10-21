@@ -75,3 +75,9 @@ secrets.yml
 # the observation-log scratch above.
 .clean-checkout/
 .clean-checkout-test-tmp/
+
+# Per-run library dirs from shared/resources/tests/security-probe.test.mjs (t140Libs and the
+# .t140-symlink-/.t140-fakegh- cases). Each test removes its own in a `finally`; a run killed
+# mid-test (OOM, Ctrl-C) leaves one behind, and it then showed up as untracked dirt in every
+# pipeline's pre-flight and Step 8 scope check.
+tests/fixtures/shell-fn/.t140-*/
