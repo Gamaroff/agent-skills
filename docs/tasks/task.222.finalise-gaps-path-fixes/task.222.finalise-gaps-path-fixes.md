@@ -5,10 +5,12 @@ type: task
 description: "When /finalise stops on DoD gaps, count only the gaps in the plain-language lead, and hold the pipeline lock at Step 7 instead of advancing it to Step 8."
 tags: [finalise, develop-task, pipeline-lock, stakeholder-summary, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-21
 updated: 2026-10-21
+completed_date: 2026-10-21
+pr_number: 718
 assignee:
 estimated_effort_hours: 8
 github_issue: 717
@@ -16,7 +18,7 @@ github_issue: 717
 
 # Technical Task: finalise gaps-path fixes
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.222.review.1.finalise-gaps-path-fixes.md` implemented 2026-10-21
 
@@ -517,11 +519,36 @@ All cycle-3 findings are fixed. One LOW (QA-222-13: `--body` prints the marker f
 
 - **QA-222-13** (LOW) — carried to gate 4 `recommendations.future` (route 2b, cycle 4): `dod-gap-count.sh --body` prints the marker `S` for a gaps section with no lines (masked in Step 8.5 by the count call, which HALTs first)
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.222.qa.4.finalise-gaps-path-fixes.md`
+**Gate File**: `task.222.gate.4.finalise-gaps-path-fixes.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (4 QA cycles; cosmetic-residue exit)
+**PR Review (5c)**: ✅ APPROVE — `task.222.pr-review.1.finalise-gaps-path-fixes.md`
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 15/15. AC8 (≤ 2% `npm test` wall time) was re-measured on the head during this DoD run: +3.05 s, which is 0.84%.
+✅ **Tests:** `finalise-gaps-path.test.mjs`, `finalise-bug-mode.test.mjs`, `step-8-completion-checklist.test.mjs`, `advance-pipeline-lock.test.sh`, `develop-pipeline-on-stop.test.sh`. All run on every PR.
+✅ **PR Review:** PR #718. The host requires no reviews; Step 5c `/review-pr` returned APPROVE.
+✅ **CI:** SUCCESS on `526addfb` (5 checks)
+✅ **Documentation:** CHANGELOG (task 222), finalise SKILL.md, and the shared and orchestrator docs
+✅ **Security Review:** PASS. The boundary is internal and recorded (`advance-pipeline-lock.sh#--dod`).
+⚠️ **Compliance Review:** NOT_APPLICABLE
+
+**Task marked as ACCEPTED on:** 2026-10-21
+
+**Detailed Verification Log:** See `task.222.dod.1.finalise-gaps-path-fixes.md` for the complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                    | Author      |
-| ---------- | ------- | ---------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-21 | 1.0     | Initial draft — cut from observations #24, #79 | create-task |
 | 2026-10-21 | 1.1     | Review passed (8/10) — listed the finalise-bug-mode 8.5 test, recorded the restatement search, added resume states | review-task |
 | 2026-10-21 |         | Status → ready-for-development | review-task |
@@ -533,6 +560,7 @@ All cycle-3 findings are fixed. One LOW (QA-222-13: `--body` prints the marker f
 | 2026-10-21 |  | QA gate CONCERNS (80/100) — 4 findings (3 medium, 1 low) | qa-task |
 | 2026-10-21 |  | QA findings fixed — 4 of 4 (QA-222-9..12), 1 iteration; dod-gap-count.sh --body feeds Step 8.5 | qa-fix |
 | 2026-10-21 |  | QA gate PASS (100/100) — 1 finding (1 low, carried to future by route 2b) | qa-task |
+| 2026-10-21 | 1.2 | DoD verified — accepted (PR #718) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -589,7 +617,7 @@ All cycle-3 findings are fixed. One LOW (QA-222-13: `--body` prints the marker f
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 
