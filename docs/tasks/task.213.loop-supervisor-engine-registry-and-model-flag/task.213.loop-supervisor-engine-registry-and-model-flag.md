@@ -338,6 +338,30 @@ The `agy` result line in this document comes from the handoff, so a parser that 
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-21
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.213.qa.1.loop-supervisor-engine-registry-and-model-flag.md](./task.213.qa.1.loop-supervisor-engine-registry-and-model-flag.md)
+- **Gate File**: [task.213.gate.1.loop-supervisor-engine-registry-and-model-flag.yml](./task.213.gate.1.loop-supervisor-engine-registry-and-model-flag.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 31 new (21 engines, 10 `t213:`), 6,122 repository-wide passing
+- **Phases Verified**: 5/5 (Phase 4 with concerns)
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+- There is one MEDIUM finding (TASK-213-BUG-1). Three `claude -p` lines fail the Migration criterion's own line-level search, because the qualifier is only in the next sentence.
+- Every behaviour criterion is held by a committed test. Mutation: 10 of 10 covered.
+- `resolveEngine` probe: 12 executed, 0 escaped, verdict `engages`.
+- Advisory: CR-1 (agy `init` conversation id fallback), CR-2 (`dryRun` spawn timeout), and a stale comment at `run-loop.mjs:1093`.
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -348,6 +372,8 @@ The `agy` result line in this document comes from the handoff, so a parser that 
 | 2026-10-21 |  | Status → ready-for-development | review-task |
 | 2026-10-21 |  | Implemented — 13 files, 31 tests (21 in engines.test.mjs, 10 `t213:` in run-loop.test.mjs) | develop |
 | 2026-10-21 |  | Status → ready-for-review | develop |
+| 2026-10-21 |  | QA gate CONCERNS (90/100) — 1 finding (TASK-213-BUG-1) | qa-task |
+| 2026-10-21 |  | QA findings fixed — TASK-213-BUG-1 plus 2 advisories (CR-2, stale comment), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

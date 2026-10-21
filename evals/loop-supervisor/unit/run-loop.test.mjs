@@ -34,6 +34,7 @@ import {
 } from "../../../skills/loop-supervisor/scripts/run-loop.mjs";
 import fs from "node:fs";
 import { spawnSync } from "node:child_process";
+import { spawnBudget } from "../../../shared/resources/spawn-budget.mjs";
 
 // ── argv ─────────────────────────────────────────────────────────────────────
 
@@ -753,6 +754,7 @@ function dryRun(extra = []) {
       cwd: work,
       encoding: "utf8",
       env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+      timeout: spawnBudget("LOOP_SUPERVISOR_DRY_RUN").timeoutMs,
     },
   );
   let json = null;

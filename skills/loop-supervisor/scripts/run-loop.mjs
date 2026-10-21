@@ -1090,8 +1090,8 @@ function main() {
   applyConfig(opts, config);
 
   // ── status / watch: pure readers, and they stop here ──────────────────────
-  // Deliberately ahead of resolveAdapter and resolveBinary("claude"). Neither
-  // view spawns anything, and failing to read a heartbeat because `claude` is
+  // Deliberately ahead of resolveAdapter and resolveBinary(engine.binary). Neither
+  // view spawns anything, and failing to read a heartbeat because the engine is
   // off PATH in the second terminal would defeat the point of having a view.
   if (opts.subcommand === "status") return runStatus(cwd, opts);
   if (opts.subcommand === "watch") return runWatch(cwd);

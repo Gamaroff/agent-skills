@@ -60,7 +60,7 @@ caveats and an honest note on per-iteration cost: [`README.md`](README.md).
    never on the exit code: `selected` and every `stop` both exit 0. `stop` ends the loop having spent
    nothing. **Skipped entirely when a run-state file exists** — an unfinished run is resumed, not
    re-selected.
-2. **Spawn** one `claude -p` with a pinned `--session-id`, `--permission-mode acceptEdits`, and a
+2. **Spawn** one `claude -p` by default, with a pinned `--session-id`, `--permission-mode acceptEdits`, and a
    pinned `--settings` file so the run does not inherit local settings drift. `--engine agy` spawns
    the Antigravity CLI instead, and `--model` / `--effort` pass through to either; each engine is one
    row in `references/engines.js`, and a flag an engine cannot honour is refused, not dropped
