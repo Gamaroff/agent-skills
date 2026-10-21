@@ -5,7 +5,7 @@ type: task
 description: "Make migrate-doc-numbering.mjs migrate a frontmatter-less legacy PRD, re-point links to a moved docs/prd.md from outside the PRD root, and ask for a domain for a domain-less PRD — then lift the matching refusals from review-prd's migration guard."
 tags: [doc-numbering, migration, prd, review-prd, follow-up]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-15
 updated: 2026-10-21
@@ -13,11 +13,13 @@ assignee:
 estimated_effort_hours: 8
 depends_on: [task.204]
 github_issue: 676
+completed_date: 2026-10-21
+pr_number: 712
 ---
 
 # Technical Task: Migration engine: monolith and domain-less PRDs
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.211.review.1.migration-engine-monolith-and-domainless-prds.md` implemented 2026-10-21
 **GitHub Issue**: [#676](https://github.com/Gamaroff/agent-skills/issues/676)
 
@@ -268,11 +270,38 @@ Both gate-5 findings are fixed and mutation-proven, and `parseNameValue` still e
 
 - **CR-1** (LOW) — carried to gate 6 `recommendations.future` (route 2b, cycle 6): `outsideReferences` resolves a root-relative path into a dot-directory against the file's directory only
 
-## Change Log
-<!-- change-log-start -->
+## Definition of Done - PASSED ✅
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.211.qa.6.migration-engine-monolith-and-domainless-prds.md`
+**Gate File**: `task.211.gate.6.migration-engine-monolith-and-domainless-prds.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 95/100
+**PR Review**: `task.211.pr-review.1.migration-engine-monolith-and-domainless-prds.md`. The verdict is ✅ APPROVE, with one low conformance finding, PC-1.
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 10/10 met. AC8 ("every new row is mutation-proven") was judged against this document's §8 definition, "revert each fix and name the row that goes red". The DoD summary records that judgement.
+✅ **Tests:** the engine rows in `shared/resources/tests/migrate-doc-numbering.test.mjs` and the eval rows in `evals/shared/tests/prd-skill-numbering.test.mjs` all run per PR. CI is green on 5/5 checks.
+✅ **PR Review:** PR #712. Step 5c `/review-pr` returned APPROVE. The host requires no reviews.
+✅ **Documentation:** the CHANGELOG `[Unreleased]` BREAKING entry cites task 211, and `skills/review-prd/SKILL.md` documents all four blocker codes.
+✅ **Security Review:** ✅ PASS. The `parseNameValue` probe ran 31 cases: 0 reproduced, 0 escaped.
+✅ **Compliance Review:** not applicable. The change touches no personal, payment or health data and no UI.
+
+**Open follow-ups (low):** PC-1 (bring §3 Target in line with the shipped `BLOCKER_CODES`), CR-1 (see Deferred Work) and CR-2 (`editFrontmatter` on a displaced block, direct call only).
+
+**Detailed Verification Log:** See `task.211.dod.1.migration-engine-monolith-and-domainless-prds.md` for the complete verification evidence and timestamps.
+
+**Task marked as ACCEPTED on:** 2026-10-21
+
+<!-- change-log-start -->
+## Change Log
+
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-15 | 1.0     | Initial draft | create-task |
 | 2026-10-21 | 1.1     | Review passed (8/10) — anchors re-pointed to develop; monolith `<domain>/<slug>` placement stated; Performance criterion given a read-count test; gate-9/10 test row named | review-task |
 | 2026-10-21 |         | Status → ready-for-development | review-task |
@@ -288,6 +317,7 @@ Both gate-5 findings are fixed and mutation-proven, and `parseNameValue` still e
 | 2026-10-21 |         | QA gate CONCERNS (85/100) — 2 findings (1 medium, 1 low) | qa-task |
 | 2026-10-21 |         | QA findings fixed — cycle 5, 2 of 2 (CR-1, CR-2), 1 test row added and 1 extended | qa-fix |
 | 2026-10-21 |         | QA gate PASS (95/100) — 2 findings (2 low, 1 promoted) | qa-task |
+| 2026-10-21 | 1.2 | DoD verified — accepted (PR #712) | finalise |
 <!-- change-log-end -->
 
 ---
