@@ -274,6 +274,7 @@ Three medium defects, each reproduced: a BOM or leading blank line gets a second
 | 2026-10-21 |         | Status → ready-for-development | review-task |
 | 2026-10-21 |         | Implemented — 8 files, 13 tests (engine 10 new + 1 updated, eval 2 rewritten) | develop |
 | 2026-10-21 |         | QA gate CONCERNS (70/100) — 4 findings (3 medium, 1 low) | qa-task |
+| 2026-10-21 |         | QA findings fixed — cycle 1, 4 of 4 (CR-1, QA-1, QA-2, CR-3), 5 test rows | qa-fix |
 <!-- change-log-end -->
 
 ---

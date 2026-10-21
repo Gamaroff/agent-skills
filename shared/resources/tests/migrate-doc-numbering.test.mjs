@@ -1357,10 +1357,125 @@ test("task.211 phase 3: a bad domain is bad-slug; a malformed <domain>/<slug> is
     names: new Map([[`${R}/index.md`, "Bad_Dom/core"]]),
   });
   assert.deepEqual(bad.codes, ["bad-slug"]);
-  assert.match(bad.blockers[0].detail, /domain "Bad_Dom"/);
+  assert.match(bad.blockers[0].detail, /"Bad_Dom\/core"/);
   const io = memIo(files);
   for (const v of ["x=a/b/c", "x=/core", "x=main/", "x=a//b"]) {
     const r = m.run(["--name", v], { io });
     assert.deepEqual([r.reason, r.exitCode], ["usage", 2], v);
   }
+});
+
+// ---------------------------------------------------------------------------
+// task.211 QA cycle 1
+// ---------------------------------------------------------------------------
+
+test("task.211 QA-1 CR-1: a fence after a BOM or blank lines is displaced-frontmatter, and --apply moves and writes nothing", () => {
+  assert.equal(m.frontmatterState("﻿---\na: 1\n---\n"), "displaced");
+  assert.equal(m.frontmatterState("\n\n---\na: 1\n---\n"), "displaced");
+  // A thematic break below a heading is body, not a block: the file still gets one.
+  assert.equal(m.frontmatterState("# T\n\n---\n"), "none");
+  assert.equal(m.frontmatterState(""), "none");
+  for (const body of [
+    "﻿---\nname: prd.onb\ntitle: O\n---\n# O\n",
+    "\n---\nname: prd.onb\ntitle: O\n---\n# O\n",
+  ]) {
+    const files = { [`${R}/onb/prd.onb.md`]: body };
+    assert.deepEqual(dry(memIo(files)).codes, ["displaced-frontmatter"]);
+    const io = memIo(files);
+    const r = m.run(["--apply", "--root", R], { io });
+    assert.deepEqual([r.reason, r.exitCode], ["blocked", 1]);
+    assert.deepEqual(io.calls.moves, [], "nothing moved");
+    assert.deepEqual(io.calls.writes, [], "nothing written");
+  }
+  assert.ok(m.BLOCKER_CODES.includes("displaced-frontmatter"));
+});
+
+test("task.211 QA-1 CR-1: editFrontmatter is idempotent — a second write over the block it created is byte-identical", () => {
+  const edits = [
+    { key: "name", value: "prd.1.mono" },
+    { key: "prd_number", value: 1, quote: false, insert: true, after: "name" },
+    { key: "type", value: "prd", createOnly: true },
+  ];
+  for (const text of ["# Mono\n", "", "# T\n\n---\nbody\n"]) {
+    const once = m.editFrontmatter(text, edits);
+    assert.equal(m.frontmatterState(once), "closed", JSON.stringify(text));
+    assert.equal(m.editFrontmatter(once, edits), once, JSON.stringify(text));
+  }
+});
+
+test("task.211 QA-1: a relative or embedded mention of a moved outside source that no pass rewrites is stale-reference, and --apply moves nothing", () => {
+  const files = {
+    ...outsideTree(),
+    "scripts/x.js": 'const prd = "../docs/prd.md";\n',
+    "docs/guide/x.md": "Read `../prd.md` first.\n",
+  };
+  const names = new Map([["docs/prd.md", "mono"]]);
+  const d = dry(memIo(files), { names });
+  assert.deepEqual(d.codes, ["stale-reference", "stale-reference"]);
+  assert.deepEqual(d.blockers.map((b) => b.path).sort(), [
+    "docs/guide/x.md",
+    "scripts/x.js",
+  ]);
+  assert.match(d.blockers[0].detail, /docs\/prd\.md/);
+  const io = memIo(files);
+  const r = m.run(["--apply", "--root", R, "--name", "docs/prd.md=mono"], {
+    io,
+  });
+  assert.deepEqual([r.reason, r.exitCode], ["blocked", 1]);
+  assert.deepEqual(io.calls.moves, [], "nothing moved");
+  // The other direction: what the passes do rewrite, and bare-name prose, raise nothing.
+  assert.deepEqual(dry(memIo(outsideTree()), { names }).codes, []);
+  assert.ok(m.BLOCKER_CODES.includes("stale-reference"));
+});
+
+test("task.211 QA-2: parseNameValue is the one --name check — legitimate names parse, every path escape is refused", () => {
+  assert.deepEqual(m.parseNameValue("core"), { slug: "core", domain: null });
+  assert.deepEqual(m.parseNameValue("main/core"), {
+    slug: "core",
+    domain: "main",
+  });
+  for (const v of [
+    "../core",
+    "main/..",
+    "./core",
+    "/etc/passwd",
+    "%2e%2e/core",
+    "main\u0000/core",
+    "..\\core",
+    "a/b/c",
+    "",
+    "main/",
+    "Main/core",
+    undefined,
+  ])
+    assert.equal(m.parseNameValue(v), null, JSON.stringify(v));
+  // parseArgs and discover both answer through it: a library caller passing a bad
+  // name directly gets bad-slug, and nothing is placed from it.
+  const d = dry(memIo({ [`${R}/prd.y.md`]: "# Y\n" }), {
+    names: new Map([[`${R}/prd.y.md`, "../y"]]),
+  });
+  assert.deepEqual(d.codes, ["bad-slug"]);
+  assert.equal(d.planned.fileMap.size, 0);
+  const r = m.run(["--name", `${R}/prd.y.md=../y`], {
+    io: memIo({ [`${R}/prd.y.md`]: "# Y\n" }),
+  });
+  assert.deepEqual([r.reason, r.exitCode], ["usage", 2]);
+});
+
+test("task.211 CR-3: a named domain for an already-numbered PRD is bad-slug, and --apply moves nothing", () => {
+  const files = {
+    [`${R}/prd.1.x/prd.1.x.md`]:
+      "---\nname: prd.1.x\nprd_number: 1\n---\n# PRD\n",
+  };
+  const names = new Map([[`${R}/prd.1.x/prd.1.x.md`, "main/x"]]);
+  const d = dry(memIo(files), { names });
+  assert.deepEqual(d.codes, ["bad-slug"]);
+  assert.match(d.blockers[0].detail, /already numbered/);
+  const io = memIo(files);
+  const r = m.run(
+    ["--apply", "--root", R, "--name", `${R}/prd.1.x/prd.1.x.md=main/x`],
+    { io },
+  );
+  assert.deepEqual([r.reason, r.exitCode], ["blocked", 1]);
+  assert.deepEqual(io.calls.moves, [], "nothing moved");
 });

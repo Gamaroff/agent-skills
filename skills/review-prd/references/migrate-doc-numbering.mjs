@@ -53,7 +53,9 @@
  * (any tracked path the run would change, not only a move source), id-collision (two
  * documents that would carry one id), link-would-break, registry-behind,
  * registry-missing, unclosed-frontmatter (a document whose opening --- never closes,
- * so its number cannot be written), needs-domain (a legacy PRD that would land directly
+ * so its number cannot be written), displaced-frontmatter (a BOM or blank lines before
+ * the opening ---), stale-reference (a path to a moved file outside the PRD root that
+ * neither the link pass nor the literal pass rewrites), needs-domain (a legacy PRD that would land directly
  * under the root — a layout create-prd refuses; name its domain with
  * --name <path>=<domain>/<slug>) — plus two that doc-id.js can
  * answer and this module passes through rather than guessing past: registry-invalid
@@ -89,7 +91,9 @@ export const BLOCKER_CODES = Object.freeze([
   "id-collision",
   "bad-slug",
   "unclosed-frontmatter",
+  "displaced-frontmatter",
   "needs-domain",
+  "stale-reference",
 ]);
 
 const TERMINAL_STATUSES = Object.freeze(["accepted", "cancelled"]);
@@ -198,6 +202,32 @@ function git(args, cwd) {
   return spawnSync("git", args, { cwd, encoding: "utf8", maxBuffer: 1 << 28 });
 }
 
+/**
+ * A --name value: `<slug>` or `<domain>/<slug>`, each a segment create-prd accepts (the
+ * docId.format slug rule). Both become path segments under the PRD root, so this is the
+ * containment check for a caller-supplied name: `..`, an absolute path, an encoded, empty
+ * or upper-case part, a NUL or a third segment answer null (task.211 QA cycle 1, QA-2).
+ * The one definition — parseArgs and discover both call it. Pure.
+ * @returns {{slug: string, domain: string|null} | null}
+ */
+export function parseNameValue(value) {
+  if (typeof value !== "string") return null;
+  const parts = value.split("/");
+  if (parts.length > 2) return null;
+  const segment = (x) => {
+    try {
+      docId.format({ kind: "prd", prd: 1, slug: x });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  if (!parts.every(segment)) return null;
+  return parts.length === 2
+    ? { slug: parts[1], domain: parts[0] }
+    : { slug: parts[0], domain: null };
+}
+
 export function realIo(repoRoot) {
   const abs = (rel) => path.join(repoRoot, rel);
   let trackedCache = null;
@@ -287,14 +317,13 @@ export function realIo(repoRoot) {
  */
 export function discover(root, io, opts = {}) {
   const given = opts.names || new Map();
-  // A --name value is `<slug>` or `<domain>/<slug>`; parseArgs has refused any other shape.
+  // A --name value through its one validator. parseArgs refuses a bad one as usage; a
+  // library caller passing names directly gets bad-slug from plan() instead (badName).
   const nameOf = (f) => {
     const v = given.get(f);
-    if (!v) return { slug: null, domain: null };
-    const cut = v.indexOf("/");
-    return cut < 0
-      ? { slug: v, domain: null }
-      : { slug: v.slice(cut + 1), domain: v.slice(0, cut) };
+    if (!v) return { slug: null, domain: null, bad: null };
+    const n = parseNameValue(v);
+    return n ? { ...n, bad: null } : { slug: null, domain: null, bad: v };
   };
   const files = [];
   const dirs = [];
@@ -338,6 +367,7 @@ export function discover(root, io, opts = {}) {
       number: c && c.scheme === "new" ? c.prd : null,
       slug: nameOf(f).slug || (c ? c.slug : null),
       namedDomain: nameOf(f).domain,
+      badName: nameOf(f).bad,
       oldStem: stemOf(base),
       epicsDir: P.join(dir, "epics"),
     });
@@ -353,6 +383,7 @@ export function discover(root, io, opts = {}) {
       number: null,
       slug: nameOf(mono).slug,
       namedDomain: nameOf(mono).domain,
+      badName: nameOf(mono).bad,
       oldStem: "prd",
       epicsDir: null,
     });
@@ -457,6 +488,26 @@ export function plan(disc, registryText, io) {
   const prdPlans = [];
   for (const p of [...numbered, ...legacy]) {
     let n = p.number;
+    if (p.badName) {
+      blockers.push(
+        blocker(
+          "bad-slug",
+          p.doc,
+          `--name value "${p.badName}" is not <slug> or <domain>/<slug>, each a lowercase kebab-case segment starting with a letter`,
+        ),
+      );
+      continue;
+    }
+    if (!p.legacy && p.namedDomain) {
+      blockers.push(
+        blocker(
+          "bad-slug",
+          p.doc,
+          `--name gives domain "${p.namedDomain}" for a PRD that is already numbered, and a numbered PRD keeps its place — pass --name ${p.doc}=<slug>`,
+        ),
+      );
+      continue;
+    }
     if (p.legacy) {
       if (!p.slug) {
         blockers.push(
@@ -484,23 +535,13 @@ export function plan(disc, registryText, io) {
       );
       continue;
     }
-    // Where the PRD's directory goes. A named domain wins: it is validated with the call
-    // create-prd's blocks use, so the result is a layout create-prd accepts (task.211).
+    // Where the PRD's directory goes. A named domain wins — parseNameValue validated it with
+    // the call create-prd's blocks use, so the result is a layout create-prd accepts (task.211).
+    // Only a legacy PRD reaches here with one: a numbered PRD keeps its place, or its registry
+    // row's Folder is left behind, and is refused above (task.211 QA cycle 1, CR-3).
     let newDir;
     let domain;
     if (p.namedDomain) {
-      try {
-        docId.format({ kind: "prd", prd: 1, slug: p.namedDomain });
-      } catch {
-        blockers.push(
-          blocker(
-            "bad-slug",
-            p.doc,
-            `domain "${p.namedDomain}" is not a lowercase kebab-case segment starting with a letter — pass --name ${p.doc}=<domain>/<slug>`,
-          ),
-        );
-        continue;
-      }
       domain = p.namedDomain;
       newDir = P.join(root, domain, newStem);
     } else if (p.shape === "L1") {
@@ -780,15 +821,21 @@ export function plan(disc, registryText, io) {
 const isFence = (l) => /^---[ \t]*\r?$/.test(l);
 
 /**
- * The leading frontmatter block of `text`: "closed", "none" (line 0 is no fence) or
- * "unclosed" (an opening fence that never closes). Pure.
+ * The leading frontmatter block of `text`: "closed", "unclosed" (an opening fence that
+ * never closes), "displaced" (the first non-blank line is a fence, but a BOM or blank lines
+ * come before it — a block the readers cannot see and the migration must not stack a second
+ * one over; task.211 QA cycle 1, CR-1) or "none". Pure.
  */
 export function frontmatterState(text) {
   const lines = text.split("\n");
-  if (!isFence(lines[0])) return "none";
-  return lines.findIndex((l, i) => i > 0 && isFence(l)) < 0
-    ? "unclosed"
-    : "closed";
+  if (isFence(lines[0]))
+    return lines.findIndex((l, i) => i > 0 && isFence(l)) < 0
+      ? "unclosed"
+      : "closed";
+  const first = lines.findIndex((l) => l.replace(/^\uFEFF/, "").trim() !== "");
+  return first >= 0 && isFence(lines[first].replace(/^\uFEFF/, ""))
+    ? "displaced"
+    : "none";
 }
 
 /**
@@ -796,7 +843,7 @@ export function frontmatterState(text) {
  * A file with no block gets one holding every edit, inserted or not, in order — a
  * legacy PRD written without frontmatter would otherwise move and then fail the
  * post-check (task.211). A `createOnly` edit is written only into a created block.
- * An unclosed block is left alone: planEdits refuses that file as a blocker.
+ * An unclosed or displaced block is left alone: planEdits refuses that file as a blocker.
  */
 export function editFrontmatter(text, edits) {
   const lines = text.split("\n");
@@ -1144,12 +1191,21 @@ export function planEdits(planned, disc, io) {
     if (docFields.has(file)) {
       // A fence that never closes cannot be edited, so the file must not move: its
       // new name would carry a number its frontmatter never states (task.211).
-      if (frontmatterState(out) === "unclosed")
+      const fm = frontmatterState(out);
+      if (fm === "unclosed")
         blockers.push(
           blocker(
             "unclosed-frontmatter",
             file,
             "the opening --- never closes, so the migration cannot write its number — close the block and plan again",
+          ),
+        );
+      else if (fm === "displaced")
+        blockers.push(
+          blocker(
+            "displaced-frontmatter",
+            file,
+            "a BOM or blank lines come before the opening ---, so no reader sees the block — remove them and plan again",
           ),
         );
       else out = editFrontmatter(out, docFields.get(file));
@@ -1237,6 +1293,25 @@ export function planEdits(planned, disc, io) {
         new RegExp(`${PH}(\\d+)${PH}`, "g"),
         (_, i) => restore[Number(i)],
       );
+    }
+    // A path to an outside move source that neither pass rewrote — a relative one outside a
+    // link, or a repo-relative one inside a longer path — would point at nothing after the
+    // move. Name it rather than answer ok over it (task.211 QA cycle 1, QA-1). A path holds a
+    // `/`: a same-directory bare name is prose, never matched (task.204 gate 7, CR-1).
+    if (litOk && !isExampleCopy(file)) {
+      for (const s of outsideSources) {
+        const hit = [s, P.relative(P.dirname(file), s)].find(
+          (x) => x.includes("/") && out.includes(x),
+        );
+        if (hit)
+          blockers.push(
+            blocker(
+              "stale-reference",
+              file,
+              `"${hit}" still names ${s}, which moves to ${planned.mapPath(s)}, and neither the link pass nor the literal pass rewrites it — edit it by hand and plan again`,
+            ),
+          );
+      }
     }
     if (out !== text) edits.set(file, out);
   }
@@ -1640,11 +1715,10 @@ function parseArgs(argv) {
       const v = val();
       const eq = v.lastIndexOf("=");
       const value = v.slice(eq + 1);
-      // `<slug>` or `<domain>/<slug>`: a slug never held a `/`, so one is unambiguous.
-      const parts = value.split("/");
-      if (eq <= 0 || parts.length > 2 || parts.some((s) => s === ""))
+      // `<slug>` or `<domain>/<slug>`, each a valid segment: parseNameValue is the one check.
+      if (eq <= 0 || !parseNameValue(value))
         throw new Error(
-          `--name wants <path>=<slug> or <path>=<domain>/<slug>, got ${v}`,
+          `--name wants <path>=<slug> or <path>=<domain>/<slug>, each a lowercase kebab-case segment starting with a letter, got ${v}`,
         );
       a.names.set(P.normalize(v.slice(0, eq)), value);
     } else throw new Error(`unknown flag ${x}`);
