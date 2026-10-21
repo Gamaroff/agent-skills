@@ -19,6 +19,8 @@
  */
 
 const { execFileSync } = require("node:child_process");
+const fs = require("node:fs");
+const path = require("node:path");
 
 /** Statuses `select-next.mjs` is contracted to emit. Anything else is a bug. */
 const PROBE_STATUSES = new Set(["selected", "stop", "halt"]);
@@ -206,6 +208,37 @@ const PIPELINE_LOCK = STATE_DIR + "/develop-pipeline.lock";
 const PIPELINE_HALT = STATE_DIR + "/develop-pipeline.last-halt.json";
 
 /**
+ * Where the develop-next selector may be installed, in search order. A consumer
+ * installs the skills under `.agents/skills/` (or `.claude/skills/`); only this
+ * repository has them at `skills/`. The last entry is also the fallback when
+ * none exists, so a missing selector fails with the probe error it always did.
+ */
+const SELECT_NEXT = "develop-next/scripts/select-next.mjs";
+const PROBE_SCRIPT_CANDIDATES = Object.freeze([
+  ".agents/skills/" + SELECT_NEXT,
+  ".claude/skills/" + SELECT_NEXT,
+  "skills/" + SELECT_NEXT,
+]);
+
+/**
+ * The first candidate that exists under `cwd`, else the last candidate.
+ * Stops at the first hit, so at most `candidates.length` calls to `exists`.
+ * Two candidates that are the same file through a symlink need no realpath:
+ * whichever comes first wins, and both name the same selector.
+ *
+ * @param {string} cwd
+ * @param {readonly string[]} candidates relative to `cwd`
+ * @param {(p: string) => boolean} [exists] injectable for tests
+ * @returns {string}
+ */
+function firstExisting(cwd, candidates, exists = fs.existsSync) {
+  for (const c of candidates) {
+    if (exists(path.join(cwd, c))) return c;
+  }
+  return candidates[candidates.length - 1];
+}
+
+/**
  * The adapter table.
  *
  * `probeArgs(ctx)` returns argv AFTER the node binary, or null for "no probe —
@@ -221,6 +254,7 @@ const ADAPTERS = {
     lockFile: PIPELINE_LOCK,
     haltFile: PIPELINE_HALT,
     probeScript: "skills/develop-next/scripts/select-next.mjs",
+    defaultProbe: true, // resolveAdapter searches PROBE_SCRIPT_CANDIDATES
     probeArgs(ctx) {
       const args = [this.probeScript];
       if (ctx && ctx.roadmapPath) args.push("--roadmap", ctx.roadmapPath);
@@ -239,6 +273,7 @@ const ADAPTERS = {
     lockFile: PIPELINE_LOCK,
     haltFile: PIPELINE_HALT,
     probeScript: "skills/develop-next/scripts/select-next.mjs",
+    defaultProbe: true, // resolveAdapter searches PROBE_SCRIPT_CANDIDATES
     probeArgs(ctx) {
       const args = [this.probeScript, "--batch"];
       if (ctx && ctx.roadmapPath) args.push("--roadmap", ctx.roadmapPath);
@@ -273,12 +308,18 @@ const ADAPTERS = {
  * file that can name a module to `require()` is a code-execution surface, and
  * the gain over "probe command + expected JSON shape" is nil.
  *
+ * A table entry marked `defaultProbe` has its `probeScript` replaced by the
+ * first of PROBE_SCRIPT_CANDIDATES that exists under `cwd`. The search runs
+ * BEFORE the overrides, so a configured `probeScript` is used verbatim and is
+ * never searched.
+ *
  * @param {string} name
  * @param {object} [config] parsed skills-config.yaml
+ * @param {{cwd?: string}} [options] `cwd` is the project root the probe runs in
  * @returns {object} adapter
  * @throws {Error} on an unknown name
  */
-function resolveAdapter(name, config) {
+function resolveAdapter(name, config, { cwd = process.cwd() } = {}) {
   const base = ADAPTERS[name];
   if (!base) {
     throw new Error(
@@ -292,6 +333,9 @@ function resolveAdapter(name, config) {
   const ls = (config && config.loopSupervisor) || {};
   const over = (ls.adapters && ls.adapters[name]) || {};
   const merged = Object.assign(Object.create(Object.getPrototypeOf(base)), base);
+  if (merged.defaultProbe) {
+    merged.probeScript = firstExisting(cwd, PROBE_SCRIPT_CANDIDATES);
+  }
   for (const key of ["stateFile", "lockFile", "haltFile", "probeScript", "command"]) {
     if (over[key] != null) merged[key] = over[key];
   }
@@ -300,6 +344,8 @@ function resolveAdapter(name, config) {
 
 module.exports = {
   ADAPTERS,
+  PROBE_SCRIPT_CANDIDATES,
+  firstExisting,
   PROBE_STATUSES,
   interpretProbe,
   tickCommitOracle,

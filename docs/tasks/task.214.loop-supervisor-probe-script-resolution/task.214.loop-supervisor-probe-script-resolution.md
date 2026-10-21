@@ -5,16 +5,19 @@ type: task
 description: "Replace the hardcoded probeScript default in the develop-next and develop-batch adapters with a search across .agents/skills, .claude/skills and skills, so a repo that vendors the skills works without an override."
 tags: [loop-supervisor, adapters, probe]
 category: infrastructure
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-10-18
-updated: 2026-10-18
+updated: 2026-10-21
 estimated_effort_hours: 2
+github_issue: 721
 ---
 
 # Technical Task: loop-supervisor: find select-next.mjs wherever the skills are installed
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.214.review.1.loop-supervisor-probe-script-resolution.md` implemented 2026-10-21
+**GitHub Issue**: [#721](https://github.com/Gamaroff/agent-skills/issues/721)
 
 ---
 
@@ -55,11 +58,15 @@ The `develop-next` and `develop-batch` adapters default `probeScript` to `skills
 
 ### Verified in this repository (2026-10-18)
 
-`ls .agents/skills/develop-next/scripts/select-next.mjs skills/develop-next/scripts/select-next.mjs` finds both, because `.claude/skills` is a symlink to `../.agents/skills`. The candidate search must therefore tolerate two candidates resolving to the same file.
+`ls .agents/skills/develop-next/scripts/select-next.mjs skills/develop-next/scripts/select-next.mjs` finds both. `.agents/skills` is a symlink to `../skills`, and `.claude/skills` is a symlink to `../.agents/skills`. The candidate search must therefore tolerate two candidates resolving to the same file. `select-next.mjs` realpaths both `argv[1]` and its own path (`adapters.js` header), so invoking it through a symlinked candidate still runs its CLI.
+
+**Both symlinks are gitignored, so CI has neither** (`git check-ignore -v .agents/skills .claude/skills`, re-checked 2026-10-21 by the review). From the repository root, a resolve with no `cwd` returns `.agents/skills/…` on a developer machine and `skills/…` in CI. A test that resolves against the real working directory would therefore pass in one place and fail in the other. Every new or changed test passes a temp-directory `cwd`.
 
 ### Target Architecture
 
-`adapters.js` exports `PROBE_SCRIPT_CANDIDATES` for `select-next.mjs`, and `resolveAdapter(name, config, { cwd })` replaces a default `probeScript` with the first candidate for which `fs.existsSync(path.join(cwd, candidate))` holds. When none exists it keeps the `skills/…` default, so the failure message is today's and not a new one. An override from config is never searched.
+`adapters.js` exports `PROBE_SCRIPT_CANDIDATES` for `select-next.mjs` and `firstExisting(cwd, candidates, exists = fs.existsSync)`. `resolveAdapter(name, config, { cwd })` replaces a default `probeScript` with the first candidate for which `exists(path.join(cwd, candidate))` holds. When none exists it keeps the `skills/…` default, so the failure message is today's and not a new one. An override from config is never searched. The `exists` parameter lets a test count the calls (§ 9 Performance).
+
+`.claude/skills/…` is a **read-only** search candidate, for consumers whose installer put the skills there. Nothing in this task writes to that path. The repository's agent-agnostic path rule (`.agents/skills/`) is about where skills are installed and documented, and `.agents/skills/` stays first in the order.
 
 ---
 
@@ -94,17 +101,18 @@ None - API stable. `resolveAdapter(name, config)` keeps working; the new third a
 
 **Risk:** Low. **Dependencies:** none.
 
-- [ ] Add `PROBE_SCRIPT_CANDIDATES` and a `firstExisting(cwd, candidates)` helper to `adapters.js`.
-- [ ] Mark the two adapters' `probeScript` as "resolved by default" (keep the literal as the fallback) so a config override can be told from a default.
-- [ ] Extend `resolveAdapter(name, config, { cwd })`.
+- [x] Add `PROBE_SCRIPT_CANDIDATES` and a `firstExisting(cwd, candidates)` helper to `adapters.js`.
+- [x] Mark the two adapters' `probeScript` as "resolved by default" (keep the literal as the fallback) so a config override can be told from a default.
+- [x] Extend `resolveAdapter(name, config, { cwd })`.
 
 ### Phase 2: Wire-up, tests, docs
 
 **Risk:** Low. **Dependencies:** Phase 1.
 
-- [ ] Pass `{ cwd }` from `main`.
-- [ ] Tests in `evals/loop-supervisor/unit/adapters.test.mjs` using a temp directory per case.
-- [ ] Two documentation sentences; run the loop-supervisor suite and `npm run validate -- skills/loop-supervisor/`.
+- [x] Pass `{ cwd }` from `main`.
+- [x] Tests in `evals/loop-supervisor/unit/adapters.test.mjs` using a temp directory per case.
+- [x] Update the existing test "resolveAdapter applies declarative config overrides without mutating the table" (`adapters.test.mjs:239`). Its `probeArgs({}).includes("skills/develop-next/scripts/select-next.mjs")` assertion (`:252-254`) would resolve against the repository root, and § 3 shows that is `.agents/skills/…` locally and `skills/…` in CI. Pass it a temp `cwd` that holds only the `skills/…` candidate. The `ADAPTERS["develop-next"].probeArgs` test (`:195-201`) reads the table directly and keeps passing, because the table literal is kept as the fallback. Literal search: `git grep -n 'skills/develop-next/scripts/select-next.mjs' -- evals/ skills/loop-supervisor/` (3 test hits, both in this file).
+- [x] Two documentation sentences; run the loop-supervisor suite and `npm run validate -- skills/loop-supervisor/`.
 
 ---
 
@@ -133,11 +141,13 @@ The population of `probeScript` mentions is measured by `grep -rn 'probeScript' 
 
 - **Scope:** `resolveAdapter` against temp directories containing exactly one candidate each, then none, then two.
 - **Command:** `command node --test evals/loop-supervisor/unit/adapters.test.mjs`.
-- **Mutation-prove:** reorder the candidates and confirm the "two present" test goes red; make the resolver search an override and confirm the override test goes red.
+- **Mutation-prove:** reorder the candidates and confirm the "two present" test goes red; make the resolver search an override and confirm the override test goes red; make `firstExisting` keep checking after a hit and confirm the call-count test goes red.
+- **Call count:** a test passes a counting stub as `exists` and asserts it is called at most three times, and only once when the first candidate exists.
+- **No repository-root resolve:** no new or changed test calls `resolveAdapter` without a temp `cwd` and then asserts on `probeScript` (§ 3).
 
 ### Integration Tests
 
-- `dry-run --adapter develop-next` in this repository resolves a path and reports a `probe` result; in a temp project with only `.agents/skills/develop-next/scripts/select-next.mjs` it resolves that path.
+- `dry-run --adapter develop-next` in this repository resolves a path and reports a `probe` result; in a temp project with only `.agents/skills/develop-next/scripts/select-next.mjs` it resolves that path. These are manual checks: record their output in the implementation report. The unit tests above hold the success criteria.
 
 ### Control case
 
@@ -149,24 +159,24 @@ The task's own example is `.agents/skills/…`. The control is a layout the task
 
 ### Functional
 
-- [ ] With only `.agents/skills/develop-next/scripts/select-next.mjs` present, the resolved adapter's `probeScript` is that path.
-- [ ] With only the `.claude/skills/…` or only the `skills/…` copy present, each is selected.
-- [ ] With none present, `probeScript` is the `skills/…` default and the probe error is the one produced today.
-- [ ] A `loopSupervisor.adapters.<name>.probeScript` override is returned verbatim.
+- [x] With only `.agents/skills/develop-next/scripts/select-next.mjs` present, the resolved adapter's `probeScript` is that path.
+- [x] With only the `.claude/skills/…` or only the `skills/…` copy present, each is selected.
+- [x] With none present, `probeScript` is the `skills/…` default and the probe error is the one produced today.
+- [x] A `loopSupervisor.adapters.<name>.probeScript` override is returned verbatim.
 
 ### Performance
 
-- [ ] At most three `existsSync` calls per adapter resolution, once per run.
-- [ ] `dry-run` timing is unchanged within noise.
+- [x] At most three `exists` calls per adapter resolution, held by the call-count unit test (§ 8).
+- Wall-clock timing is not applicable. The only work added is the bounded `exists` calls, and the test above pins them.
 
 ### Code Quality
 
-- [ ] `command node --test 'evals/loop-supervisor/unit/*.test.mjs'` passes.
-- [ ] `npm run validate -- skills/loop-supervisor/` passes.
+- [x] `command node --test 'evals/loop-supervisor/unit/*.test.mjs'` passes, both locally and in CI. No assertion depends on the gitignored `.agents/skills` symlink (§ 3).
+- [x] `npm run validate -- skills/loop-supervisor/` passes.
 
 ### Migration
 
-- [ ] The two documentation sentences state the search order and that an override wins.
+- [x] The two documentation sentences state the search order and that an override wins.
 
 ---
 
@@ -194,7 +204,7 @@ None identified: the change affects a default that is wrong outside this reposit
 ### Immediate Rollback (< 1 hour)
 
 **Triggers**:
-- `dry-run` in this repository selects a different probe than before.
+- `dry-run` in this repository selects a probe path that does not realpath to `skills/develop-next/scripts/select-next.mjs`. Selecting `.agents/skills/…` is expected: it is the same file through the symlink.
 
 **Steps**:
 1. `git revert` the merge commit.
@@ -231,14 +241,53 @@ None identified: the change affects a default that is wrong outside this reposit
 | Date | Version | Description | Author |
 | --- | --- | --- | --- |
 | 2026-10-18 | 1.0 | Initial draft | create-task |
+| 2026-10-21 | 1.1 | Review (8/10, after fixes): the existing override test would resolve to `.agents/skills/…` locally and `skills/…` in CI, so it now gets a temp `cwd`; added a call-count test and an injectable `exists`; dropped the wall-clock criterion; reworded the rollback trigger; linked issue #721 | review-task |
+| 2026-10-21 |  | Status → ready-for-development | review-task |
+| 2026-10-21 |  | Implemented — 5 files, 14 new tests (29 → 43 in the adapters suite) | develop |
 <!-- change-log-end -->
 
 ---
 
+## Implementation Summary
+
+**Completion Date:** 2026-10-21
+
+### Approach
+
+`adapters.js` adds `PROBE_SCRIPT_CANDIDATES` (`.agents/skills/`, `.claude/skills/`, `skills/`, each followed by `develop-next/scripts/select-next.mjs`) and `firstExisting(cwd, candidates, exists = fs.existsSync)`. It returns the first candidate that exists, or the last one. The `develop-next` and `develop-batch` entries carry `defaultProbe: true`. `resolveAdapter(name, config, { cwd = process.cwd() } = {})` runs the search on its copy before the override loop, so a configured `probeScript` still replaces the result verbatim and the shared table keeps its literal. `run-loop.mjs` `main` passes `{ cwd }`, the same directory `runProbe` spawns in.
+
+### Testing Results
+
+- `command node --test evals/loop-supervisor/unit/adapters.test.mjs`: 43/43 pass, 14 of them new.
+- The new tests cover:
+  - each candidate alone, for both adapters
+  - none present
+  - two present
+  - an override set while all three exist
+  - `generic` unaffected
+  - the table literal unchanged
+  - the candidate order
+  - the `exists` call count: 3 with no hit, 1 when the first candidate exists
+- The existing override test now uses a temp `cwd`.
+- **Mutation-proven** (scratch script; the file is restored and checked with `git diff --stat` after each mutation):
+  - Reordering the candidates fails 5 tests.
+  - Moving the search after the override loop fails the override test.
+  - Letting `firstExisting` keep looping fails the call-count test.
+  - Removing the search fails 5 tests.
+- **Manual dry-run in this repository:** the probe returns `selected` T214.
+- **Manual dry-run in a temp project holding only `.agents/skills`** (a symlink to this repo's `skills/`):
+  - Before (develop's `adapters.js`): `probe: error — probe produced no output (exit 1)`.
+  - After: `probe: halt — roadmap could not be parsed`, which is the real selector answering in a project with no roadmap.
+- The fast gate (`npm run ci:fast`) ran with the gitignored `.agents/skills` symlink moved aside, to match CI. Result: recorded in the implementation report.
+
+### Deferred Work
+
+None.
+
 ## Progress Tracking
 
-- [ ] Phase 1: The resolver
-- [ ] Phase 2: Wire-up, tests, docs
+- [x] Phase 1: The resolver
+- [x] Phase 2: Wire-up, tests, docs
 
 ## References
 

@@ -12,11 +12,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
   ADAPTERS,
+  PROBE_SCRIPT_CANDIDATES,
+  firstExisting,
   interpretProbe,
   resolveAdapter,
   tickCommitOracle,
@@ -237,11 +239,20 @@ test("resolveAdapter rejects an unknown name rather than defaulting", () => {
 });
 
 test("resolveAdapter applies declarative config overrides without mutating the table", () => {
-  const a = resolveAdapter("develop-next", {
-    loopSupervisor: {
-      adapters: { "develop-next": { stateFile: ".claude/state/custom.json" } },
+  // A temp cwd, never the repository root: there the gitignored .agents/skills
+  // symlink would resolve the probe to .agents/skills/… locally and skills/… in CI.
+  const cwd = probeProject(["skills/"]);
+  const a = resolveAdapter(
+    "develop-next",
+    {
+      loopSupervisor: {
+        adapters: {
+          "develop-next": { stateFile: ".claude/state/custom.json" },
+        },
+      },
     },
-  });
+    { cwd },
+  );
   assert.equal(a.stateFile, ".claude/state/custom.json");
   assert.equal(
     ADAPTERS["develop-next"].stateFile,
@@ -252,6 +263,107 @@ test("resolveAdapter applies declarative config overrides without mutating the t
   assert.ok(
     a.probeArgs({}).includes("skills/develop-next/scripts/select-next.mjs"),
   );
+});
+
+// ── probeScript default: found wherever the skills are installed (task 214) ──
+
+/** A temp project holding an empty select-next.mjs under each given root. */
+function probeProject(roots) {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "ls-probe-"));
+  for (const root of roots) {
+    const file = path.join(dir, root, "develop-next/scripts/select-next.mjs");
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, "");
+  }
+  return dir;
+}
+
+test("the candidate order is .agents/skills, .claude/skills, skills", () => {
+  assert.deepEqual(PROBE_SCRIPT_CANDIDATES, [
+    ".agents/skills/develop-next/scripts/select-next.mjs",
+    ".claude/skills/develop-next/scripts/select-next.mjs",
+    "skills/develop-next/scripts/select-next.mjs",
+  ]);
+});
+
+for (const name of ["develop-next", "develop-batch"]) {
+  for (const root of [".agents/skills/", ".claude/skills/", "skills/"]) {
+    test(`${name}: only ${root} present → that copy is the probe`, () => {
+      const a = resolveAdapter(name, undefined, { cwd: probeProject([root]) });
+      assert.equal(
+        a.probeScript,
+        root + "develop-next/scripts/select-next.mjs",
+      );
+      assert.equal(a.probeArgs({})[0], a.probeScript);
+    });
+  }
+
+  test(`${name}: none present → the skills/… default, so the probe fails as it always did`, () => {
+    const a = resolveAdapter(name, undefined, { cwd: probeProject([]) });
+    assert.equal(a.probeScript, "skills/develop-next/scripts/select-next.mjs");
+  });
+}
+
+test("two candidates present → the earlier one in the search order wins", () => {
+  const a = resolveAdapter("develop-next", undefined, {
+    cwd: probeProject(["skills/", ".agents/skills/"]),
+  });
+  assert.equal(
+    a.probeScript,
+    ".agents/skills/develop-next/scripts/select-next.mjs",
+  );
+});
+
+test("a configured probeScript is returned verbatim and never searched", () => {
+  const cwd = probeProject([".agents/skills/", ".claude/skills/", "skills/"]);
+  const a = resolveAdapter(
+    "develop-next",
+    {
+      loopSupervisor: {
+        adapters: { "develop-next": { probeScript: "tools/my-probe.mjs" } },
+      },
+    },
+    { cwd },
+  );
+  assert.equal(a.probeScript, "tools/my-probe.mjs");
+  assert.equal(a.probeArgs({})[0], "tools/my-probe.mjs");
+});
+
+test("generic keeps its null probe and is not searched", () => {
+  const a = resolveAdapter("generic", undefined, {
+    cwd: probeProject([".agents/skills/"]),
+  });
+  assert.equal(a.probeScript, null);
+  assert.equal(a.probeArgs({}), null);
+});
+
+test("resolving does not change the table's probeScript literal", () => {
+  resolveAdapter("develop-next", undefined, {
+    cwd: probeProject([".agents/skills/"]),
+  });
+  assert.equal(
+    ADAPTERS["develop-next"].probeScript,
+    "skills/develop-next/scripts/select-next.mjs",
+  );
+});
+
+test("firstExisting checks each candidate at most once and stops at the first hit", () => {
+  const calls = [];
+  const count = (hit) => (p) => {
+    calls.push(p);
+    return p.endsWith(hit);
+  };
+  firstExisting("/proj", PROBE_SCRIPT_CANDIDATES, count("nothing-matches"));
+  assert.equal(calls.length, 3, "no candidate exists: one check each, no more");
+
+  calls.length = 0;
+  const found = firstExisting(
+    "/proj",
+    PROBE_SCRIPT_CANDIDATES,
+    count(path.join(".agents/skills", "develop-next/scripts/select-next.mjs")),
+  );
+  assert.equal(found, PROBE_SCRIPT_CANDIDATES[0]);
+  assert.equal(calls.length, 1, "the first candidate exists: one check only");
 });
 
 // ── progress oracles, against a real throwaway repo ──────────────────────────

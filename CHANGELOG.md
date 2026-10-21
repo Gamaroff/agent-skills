@@ -93,6 +93,14 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **loop-supervisor finds `select-next.mjs` wherever the skills are installed (task 214).** The
+  `develop-next` and `develop-batch` adapters defaulted `probeScript` to
+  `skills/develop-next/scripts/select-next.mjs`, a path that exists only in this repository. In a
+  consumer repo the first probe failed with "probe produced no output" until an override was
+  written. The default is now the first of `.agents/skills/`, `.claude/skills/` and `skills/` that
+  holds the selector under the project root, falling back to `skills/…` when none does. A
+  configured `loopSupervisor.adapters.<name>.probeScript` still wins and is never searched.
+
 - **finalise gap body refuses an empty section (task 223).** `dod-gap-count.sh --body` printed
   its internal `S` marker as the body of a `## Definition of Done - Gaps Identified` section with
   no non-blank line, and exited 0. It now HALTs with the reason on stderr and nothing on stdout,
