@@ -54,10 +54,11 @@
  * documents that would carry one id), link-would-break, registry-behind,
  * registry-missing, unclosed-frontmatter (a document whose opening --- never closes,
  * so its number cannot be written), displaced-frontmatter (a BOM or blank lines before
- * the opening ---), stale-reference (a path to a moved file outside the PRD root that
- * neither the link pass nor the literal pass rewrites), needs-domain (a legacy PRD that would land directly
- * under the root — a layout create-prd refuses; name its domain with
- * --name <path>=<domain>/<slug>) — plus two that doc-id.js can
+ * an opening --- that closes), stale-reference (a path, in any in-scope text file, to a
+ * moved file outside the PRD root that neither the link pass nor the literal pass
+ * rewrites), needs-domain (a PRD that would move to directly under the root — a layout
+ * create-prd refuses; name a legacy PRD's domain with --name <path>=<domain>/<slug>,
+ * move a numbered one by hand) — plus two that doc-id.js can
  * answer and this module passes through rather than guessing past: registry-invalid
  * (a registry with no usable counter), registry-unwritable (appendPrdRow refused a
  * row: no PRD table header it recognises, a duplicate, a malformed cell) and bad-slug
@@ -558,13 +559,18 @@ export function plan(disc, registryText, io) {
       domain = p.slug;
     }
     // A PRD directly under the root is a layout create-prd refuses ({domain}/prd.{P}.{f}/),
-    // so a moved one needs a domain. A numbered PRD that stays where it is is not moved here.
-    if (p.legacy && domain === ".") {
+    // so one that moves there needs a domain — whether or not it is numbered: a numbered L2
+    // PRD at the root moves too (task.211 QA cycle 2, CR-2). A numbered PRD that stays where
+    // it is is not blocked. A numbered one cannot take --name's domain, because its registry
+    // row's Folder is not rewritten, so its remedy is a hand move.
+    if (domain === "." && (p.legacy || newDir !== P.dirname(p.doc))) {
       blockers.push(
         blocker(
           "needs-domain",
           p.doc,
-          `${p.shape} PRD would land directly under ${root}, outside a domain directory — pass --name ${p.doc}=<domain>/<slug>`,
+          p.legacy
+            ? `${p.shape} PRD would land directly under ${root}, outside a domain directory — pass --name ${p.doc}=<domain>/<slug>`
+            : `numbered ${p.shape} PRD would move to ${newDir}, directly under ${root} and outside a domain directory — move it into ${root}/<domain>/ by hand, set its registry row's Folder to <domain>, and plan again`,
         ),
       );
       continue;
@@ -822,8 +828,8 @@ const isFence = (l) => /^---[ \t]*\r?$/.test(l);
 
 /**
  * The leading frontmatter block of `text`: "closed", "unclosed" (an opening fence that
- * never closes), "displaced" (the first non-blank line is a fence, but a BOM or blank lines
- * come before it — a block the readers cannot see and the migration must not stack a second
+ * never closes), "displaced" (the first non-blank line is a fence that closes, but a BOM or
+ * blank lines come before it — a block the readers cannot see and the migration must not stack a second
  * one over; task.211 QA cycle 1, CR-1) or "none". Pure.
  */
 export function frontmatterState(text) {
@@ -832,8 +838,12 @@ export function frontmatterState(text) {
     return lines.findIndex((l, i) => i > 0 && isFence(l)) < 0
       ? "unclosed"
       : "closed";
+  // A late fence is a displaced block only when it closes: a blank line and a thematic
+  // break ("\n---\n# Title") is a body with no block (task.211 QA cycle 2, CR-5).
   const first = lines.findIndex((l) => l.replace(/^\uFEFF/, "").trim() !== "");
-  return first >= 0 && isFence(lines[first].replace(/^\uFEFF/, ""))
+  return first >= 0 &&
+    isFence(lines[first].replace(/^\uFEFF/, "")) &&
+    lines.findIndex((l, i) => i > first && isFence(l)) > first
     ? "displaced"
     : "none";
 }
@@ -1032,6 +1042,40 @@ function replaceTargets(line, from, to) {
   return out + line.slice(i);
 }
 
+// A path-shaped occurrence: it starts at a path boundary (no path character before it) and
+// holds at least one `/`. The lookbehind keeps the scan linear: a long run with no `/` is
+// tried once, from its start, not from every position in it.
+const PATH_TOKEN = /(?<![\w.~\/-])[\w.~-]*(?:\/[\w.~-]+)+/g;
+
+/**
+ * The occurrences in `text` (the content of repo-relative `file`) that name one of
+ * `sources`. Only a path-shaped token is a reference: a bare name is prose (task.204 gate 7,
+ * CR-1), and a token that only ends with a source's text names another file
+ * (apps/web/docs/prd.md, ../../../prd.md). Each token is resolved, never substring-matched:
+ * a `./` or `../` token against the file's directory, any other against both the file's
+ * directory and the repository root. Trailing sentence dots are not part of a path. An
+ * absolute or URL path never matches (task.211 QA cycle 2, CR-3, CR-4). Pure.
+ * @returns {{token: string, source: string}[]}
+ */
+export function outsideReferences(file, text, sources) {
+  const hits = [];
+  if (!sources.some((s) => text.includes(P.basename(s)))) return hits;
+  const want = new Set(sources);
+  const dir = P.dirname(file);
+  for (const [raw] of text.matchAll(PATH_TOKEN)) {
+    const token = raw.replace(/\.+$/, "");
+    // None longer than PATH_MAX: path.join is quadratic on a long `../` chain, and no real
+    // reference is that long.
+    if (token.startsWith("/") || token.length > 4096) continue;
+    const forms = token.startsWith(".")
+      ? [P.join(dir, token)]
+      : [P.join(dir, token), P.normalize(token)];
+    const source = forms.find((f) => want.has(f));
+    if (source) hits.push({ token, source });
+  }
+  return hits;
+}
+
 /**
  * Every text edit, computed in memory. Returns Map<oldPath, newText> for each file
  * whose content changes, plus the link report and link blockers.
@@ -1155,6 +1199,24 @@ export function planEdits(planned, disc, io) {
     outsideSources.some(
       (s) => text.includes(s) || text.includes(P.relative(P.dirname(file), s)),
     );
+  const staleReferences = (file, text) => {
+    const seen = new Set();
+    for (const { token, source } of outsideReferences(
+      file,
+      text,
+      outsideSources,
+    )) {
+      if (seen.has(token)) continue;
+      seen.add(token);
+      blockers.push(
+        blocker(
+          "stale-reference",
+          file,
+          `"${token}" still names ${source}, which moves to ${planned.mapPath(source)}, and neither the link pass nor the literal pass rewrites it — edit it by hand and plan again`,
+        ),
+      );
+    }
+  };
   // Every file the run moves is a candidate, the L3 monolith beside the root
   // included even when it is untracked (task.203 QA cycle 2, CR-6).
   const candidates = new Set([...disc.files, ...planned.fileMap.keys()]);
@@ -1295,26 +1357,22 @@ export function planEdits(planned, disc, io) {
       );
     }
     // A path to an outside move source that neither pass rewrote — a relative one outside a
-    // link, or a repo-relative one inside a longer path — would point at nothing after the
-    // move. Name it rather than answer ok over it (task.211 QA cycle 1, QA-1). A path holds a
-    // `/`: a same-directory bare name is prose, never matched (task.204 gate 7, CR-1).
-    if (litOk && !isExampleCopy(file)) {
-      for (const s of outsideSources) {
-        const hit = [s, P.relative(P.dirname(file), s)].find(
-          (x) => x.includes("/") && out.includes(x),
-        );
-        if (hit)
-          blockers.push(
-            blocker(
-              "stale-reference",
-              file,
-              `"${hit}" still names ${s}, which moves to ${planned.mapPath(s)}, and neither the link pass nor the literal pass rewrites it — edit it by hand and plan again`,
-            ),
-          );
-      }
-    }
+    // link — would point at nothing after the move. Name it rather than answer ok over it
+    // (task.211 QA cycle 1, QA-1).
+    if (litOk && !isExampleCopy(file)) staleReferences(file, out);
     if (out !== text) edits.set(file, out);
   }
+  // The passes rewrite only the literal-pass file types, so every other in-scope tracked
+  // text file that names an outside source is stale after the move. Read only when an
+  // outside source exists (task.211 QA cycle 2, CR-1); a NUL byte marks a binary file.
+  if (outsideSources.length)
+    for (const file of tracked) {
+      if (LITERAL_EXTS.includes(P.extname(file)) || !inRewriteScope(file))
+        continue;
+      if (candidates.has(file)) continue;
+      const text = io.readFile(file);
+      if (text !== null && !text.includes("\0")) staleReferences(file, text);
+    }
   return { edits, blockers, links };
 }
 

@@ -252,17 +252,17 @@ makes, and `migration-guard.mjs` refuses nothing it can carry.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.211.qa.1.migration-engine-monolith-and-domainless-prds.md](./task.211.qa.1.migration-engine-monolith-and-domainless-prds.md)
-- **Gate File**: [task.211.gate.1.migration-engine-monolith-and-domainless-prds.yml](./task.211.gate.1.migration-engine-monolith-and-domainless-prds.yml)
+- **Full Report**: [task.211.qa.2.migration-engine-monolith-and-domainless-prds.md](./task.211.qa.2.migration-engine-monolith-and-domainless-prds.md)
+- **Gate File**: [task.211.gate.2.migration-engine-monolith-and-domainless-prds.yml](./task.211.gate.2.migration-engine-monolith-and-domainless-prds.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 109
+- **Tests Executed**: 100
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Three medium defects, each reproduced: a BOM or leading blank line gets a second frontmatter block (CR-1); a relative non-link mention of the moved monolith stays stale while the run reports ok (QA-1); the `--name` domain boundary has no probeable entry (QA-2). One low: a named domain moves a numbered PRD (CR-3).
+Cycle 1's four findings are fixed, and `parseNameValue` engages under the path probe (20 cases, 0 escaped). The refute pass found five new defects in those fixes. The three medium ones: the stale-reference scan skips non-literal file types (CR-1); a numbered PRD at the root still lands outside a domain and cannot be named one (CR-2); and the substring match blocks correct references (CR-3). The two low ones: `./prd.md` is never flagged (CR-4), and a thematic break after a blank line reads as a displaced block (CR-5).
 
 ## Change Log
 <!-- change-log-start -->
@@ -275,6 +275,8 @@ Three medium defects, each reproduced: a BOM or leading blank line gets a second
 | 2026-10-21 |         | Implemented — 8 files, 13 tests (engine 10 new + 1 updated, eval 2 rewritten) | develop |
 | 2026-10-21 |         | QA gate CONCERNS (70/100) — 4 findings (3 medium, 1 low) | qa-task |
 | 2026-10-21 |         | QA findings fixed — cycle 1, 4 of 4 (CR-1, QA-1, QA-2, CR-3), 5 test rows | qa-fix |
+| 2026-10-21 |         | QA gate CONCERNS (70/100) — 5 findings (3 medium, 2 low) | qa-task |
+| 2026-10-21 |         | QA findings fixed — cycle 2, 5 of 5 (CR-1 to CR-5), stale-reference matcher consolidated, 5 test rows | qa-fix |
 <!-- change-log-end -->
 
 ---

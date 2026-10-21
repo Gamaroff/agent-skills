@@ -24,6 +24,7 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
+import { loadSensitive } from "../spawn-budget.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "..", "..", "..");
@@ -1478,4 +1479,118 @@ test("task.211 CR-3: a named domain for an already-numbered PRD is bad-slug, and
   );
   assert.deepEqual([r.reason, r.exitCode], ["blocked", 1]);
   assert.deepEqual(io.calls.moves, [], "nothing moved");
+});
+
+// ---------------------------------------------------------------------------
+// task.211 QA cycle 2
+// ---------------------------------------------------------------------------
+
+test("task.211 QA-2 CR-3 CR-4: outsideReferences flags each token that resolves to a source, and no token that only ends like one", () => {
+  const S = ["docs/prd.md"];
+  const tokens = (file, text) =>
+    m.outsideReferences(file, text, S).map((h) => h.token);
+  // Must flag: every way a file can name docs/prd.md by path.
+  for (const [file, text, token] of [
+    ["scripts/x.js", 'read("../docs/prd.md")', "../docs/prd.md"],
+    ["docs/guide/x.md", "Read `../prd.md` first.", "../prd.md"],
+    ["docs/build.js", 'read("./prd.md")', "./prd.md"],
+    ["package.json", '{"prd":"docs/prd.md"}', "docs/prd.md"],
+    ["scripts/a.sh", "cat docs/prd.md.", "docs/prd.md"],
+    ["docs/a/b/x.md", "[p](../../prd.md)", "../../prd.md"],
+  ])
+    assert.deepEqual(tokens(file, text), [token], `${file}: ${text}`);
+  // Must not flag: other files whose path ends in the same text, bare names, URLs.
+  for (const [file, text] of [
+    ["README.md", "See apps/web/docs/prd.md"],
+    ["docs/a/b/x.md", "[root](../../../prd.md)"],
+    ["docs/notes.md", "The old prd.md layout is prose."],
+    ["README.md", "https://example.com/docs/prd.md"],
+    ["README.md", "/docs/prd.md is absolute"],
+    ["README.md", "docs/prd.md.bak and docs/prd.mdx"],
+  ])
+    assert.deepEqual(tokens(file, text), [], `${file}: ${text}`);
+});
+
+// Sized so a quadratic matcher takes seconds and fails the bound rather than hanging the
+// suite: without the lookbehind, 60k word characters take ~7s; resolving a 100k `../`
+// chain takes ~4.5s. The shipped matcher does each in milliseconds.
+test("task.211 QA-2 CR-3: outsideReferences stays linear on long path-shaped input", () => {
+  for (const text of [
+    `prd.md ${"../".repeat(100000)}prd.md`,
+    `prd.md ${"a/".repeat(200000)}`,
+    `prd.md ${"a".repeat(60000)}`,
+  ]) {
+    const t0 = performance.now();
+    m.outsideReferences("docs/x.md", text, ["docs/prd.md"]);
+    assert.ok(
+      performance.now() - t0 < 1000,
+      loadSensitive(`${text.slice(7, 12)}… in < 1s`),
+    );
+  }
+});
+
+test("task.211 QA-2 CR-1: a non-literal file naming a moved outside source is stale-reference; none is read when no outside source exists", () => {
+  const files = {
+    ...outsideTree(),
+    "package.json": '{"prd":"docs/prd.md"}\n',
+    "scripts/a.sh": "cat docs/prd.md\n",
+    "logo.png": "\u0000PNG docs/prd.md",
+  };
+  const names = new Map([["docs/prd.md", "mono"]]);
+  const d = dry(memIo(files), { names });
+  assert.deepEqual(d.codes, ["stale-reference", "stale-reference"]);
+  assert.deepEqual(d.blockers.map((b) => b.path).sort(), [
+    "package.json",
+    "scripts/a.sh",
+  ]);
+  const io = memIo(files);
+  const r = m.run(["--apply", "--root", R, "--name", "docs/prd.md=mono"], {
+    io,
+  });
+  assert.deepEqual([r.reason, r.exitCode], ["blocked", 1]);
+  assert.deepEqual(io.calls.moves, [], "nothing moved");
+  // An in-tree migration has no outside source, so no non-literal file is read.
+  const l2 = memIo({ ...l2Tree(), "package.json": '{"x":1}\n' });
+  const reads = [];
+  const readFile = l2.readFile;
+  l2.readFile = (p) => {
+    reads.push(p);
+    return readFile(p);
+  };
+  assert.deepEqual(dry(l2).codes, []);
+  assert.equal(reads.includes("package.json"), false);
+});
+
+test("task.211 QA-2 CR-2: a numbered PRD that would move directly under the root needs a domain; one in a domain moves cleanly", () => {
+  const root = {
+    [`${R}/prd.1.x.md`]: "---\nname: prd.1.x\nprd_number: 1\n---\n# x\n",
+  };
+  const d = dry(memIo(root));
+  assert.deepEqual(d.codes, ["needs-domain"]);
+  assert.match(d.blockers[0].detail, /by hand/);
+  const io = memIo(root);
+  const r = m.run(["--apply", "--root", R], { io });
+  assert.deepEqual([r.reason, r.exitCode], ["blocked", 1]);
+  assert.deepEqual(io.calls.moves, [], "nothing moved");
+  const inDomain = dry(
+    memIo({
+      [`${R}/main/prd.1.x.md`]: "---\nname: prd.1.x\nprd_number: 1\n---\n",
+    }),
+  );
+  assert.deepEqual(inDomain.codes, []);
+  assert.equal(
+    inDomain.planned.fileMap.get(`${R}/main/prd.1.x.md`),
+    `${R}/main/prd.1.x/prd.1.x.md`,
+  );
+});
+
+test("task.211 QA-2 CR-5: a blank line and a thematic break is a body with no block — the migration writes one and keeps the body", () => {
+  assert.equal(m.frontmatterState("\n---\n# Onboarding\n"), "none");
+  assert.equal(m.frontmatterState("\n---\na: 1\n---\n"), "displaced");
+  const io = memIo({ [`${R}/onb/prd.onb.md`]: "\n---\n# Onboarding\n" });
+  const r = m.run(["--apply", "--root", R], { io });
+  assert.equal(r.reason, "ok", JSON.stringify(r.findings || r.blockers));
+  const moved = io.files.get(`${R}/onb/prd.1.onb/prd.1.onb.md`);
+  assert.equal(docId.frontmatterField(moved, "prd_number"), "1");
+  assert.match(moved, /\n---\n\n---\n# Onboarding\n$/, "the body is kept");
 });

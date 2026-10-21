@@ -39,13 +39,15 @@ All notable changes to this project will be documented in this file. Format foll
 
 - **BREAKING — the PRD numbering migration carries the shapes `review-prd` used to refuse (task 211).**
   `migrate-doc-numbering.mjs` now writes a frontmatter block for a PRD that has none (an unclosed
-  `---` is a new `unclosed-frontmatter` blocker, and a BOM or blank lines before it a new
-  `displaced-frontmatter` one), re-points links and paths to a moved `docs/prd.md` from files
-  outside the PRD root (a path neither pass can rewrite is a new `stale-reference` blocker), and
-  accepts `--name <path>=<domain>/<slug>` to place a legacy PRD under a domain directory; each
-  segment is checked by the exported `parseNameValue`. A legacy PRD that would land directly under the root (a
-  root `index.md`, `prd.{feature}.md` or `prd.{feature}/`) is a new `needs-domain` blocker until it
-  is named that way — a bare `--name docs/prd/index.md=<slug>` no longer plans. `review-prd`'s
+  `---` is a new `unclosed-frontmatter` blocker, and a BOM or blank lines before a closing block a
+  new `displaced-frontmatter` one), re-points links and paths to a moved `docs/prd.md` from files
+  outside the PRD root (a path in any in-scope text file that neither pass can rewrite is a new
+  `stale-reference` blocker), and accepts `--name <path>=<domain>/<slug>` to place a legacy PRD
+  under a domain directory; each segment is checked by the exported `parseNameValue`. A PRD that
+  would move to directly under the root (a root `index.md`, `prd.{feature}.md` or `prd.{feature}/`,
+  or a numbered root `prd.{P}.{feature}.md`) is a new `needs-domain` blocker until a legacy one is
+  named that way, or a numbered one is moved into a domain by hand — a bare
+  `--name docs/prd/index.md=<slug>` no longer plans. `review-prd`'s
   `scripts/migration-guard.mjs` and its `no-frontmatter`, `outside-links` and `no-domain` refusals
   are removed; the plan block now asks for `<domain>/<slug>` on `needs-domain`.
 - **`develop-bug` opens its tracker issue only after `review-bug` says READY TO FIX (task 200).**

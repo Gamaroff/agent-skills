@@ -446,15 +446,19 @@ the `reason` alone:
   `prd.{feature}.md` or `prd.{feature}/` directory) — a layout create-prd refuses → ask the user for its
   domain and slug, put a `<path>=<domain>/<slug>` line in `MIG_NAME` (replacing any `<path>=<slug>` line
   for the same path), and run the plan again. The domain is a lowercase kebab-case segment starting with
-  a letter, as create-prd requires; another shape answers `bad-slug`. A domain for a PRD that is
-  already numbered also answers `bad-slug`: a numbered PRD keeps its place.
+  a letter, as create-prd requires; another shape answers `bad-slug`. A **numbered** PRD that would
+  move there (a root `prd.{P}.{feature}.md`) answers `needs-domain` too, but `--name` cannot give it a
+  domain (that answers `bad-slug`, because its registry row's Folder would be left behind) → report it
+  as Critical: the fix is by hand (move it into `${PRD_ROOT}/<domain>/` and set its registry row's
+  Folder), then plan again.
 - **`unclosed-frontmatter`** — the PRD's opening `---` never closes, so the migration cannot write its
-  number. **`displaced-frontmatter`** — a BOM or blank lines come before the opening `---`, so no
-  reader sees the block. Report either as Critical; the fix is by hand (close the block, or delete
-  what precedes it), then plan again.
-- **`stale-reference`** — a file outside the PRD root names a moved PRD by a path neither pass rewrites
-  (a relative path outside a link, such as `"../docs/prd.md"` in a script). Report it as Critical with
-  its detail; the fix is by hand (point it at the new path, or make it a Markdown link), then plan again.
+  number. **`displaced-frontmatter`** — a BOM or blank lines come before an opening `---` that closes,
+  so no reader sees the block. Report either as Critical; the fix is by hand (close the block, or
+  delete what precedes it), then plan again.
+- **`stale-reference`** — a file outside the PRD root names a moved PRD by a path neither pass rewrites:
+  a relative path outside a link, such as `"../docs/prd.md"` in a script, or any path in a file type the
+  passes do not rewrite, such as `package.json` or a `.sh`. Report it as Critical with its detail; the
+  fix is by hand (point it at the new path, or make it a Markdown link), then plan again.
 - **Any other blocker** (`dirty-path`, `in-flight`, `target-exists`, …) → report it as Critical with its
   detail and offer no apply. The blocker names what to fix first.
 - **`already`** or **`post-check-failed`** → nothing to migrate; the numbering findings need a hand
