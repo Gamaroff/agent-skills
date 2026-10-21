@@ -34,10 +34,10 @@ Count only the Missing Criteria items in the finalise gaps lead, and hold the pi
 | 1. create-branch           | ✅ Done    | Branch `feature/task.222.*` exists in git                              | Branch created at `f67e6a8e`; pushed | —                    | 2026-10-21T12:19Z |
 | 2. review-task             | ✅ Done    | `task.222.review.{N}.{name}.md` exists (or skip logged)                | READY TO IMPLEMENT 8/10; 0 critical, 3 important (applied), 2 optional; Planned → Ready for Development | —                    | 2026-10-21T12:24Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; ci:fast on .249: 6135 pass, 1 environmental fail | —                    | 2026-10-21T14:05Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.222.qa.{N}.*.md`; `task.222.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.222.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #718: https://github.com/Gamaroff/agent-skills/pull/718 | —                    | 2026-10-21T14:07Z |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.222.qa.{N}.*.md`; `task.222.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 4 QA cycles (CONCERNS 80 ×3 → PASS 100); cosmetic-residue exit (QA-222-13 deferred); 5c review-pr APPROVE (PC-1 low, recorded) | —                    | 2026-10-21T15:53Z |
+| 7. finalise                | ✅ Done | `task.222.dod.{N}.*.md`; task `status: accepted`                       | ACCEPTED — `task.222.dod.1.finalise-gaps-path-fixes.md`; acceptance commit `1646369e`; CI reading 2 SUCCESS; issue #717 closed | —                    | 2026-10-21T16:10Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | Implementation report committed and pushed | —                    | 2026-10-21T16:10Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -87,6 +87,27 @@ Count only the Missing Criteria items in the finalise gaps lead, and hold the pi
 - Performance: added tests ≈ 2.6 s vs 300.4 s suite ≈ 0.9% (< 2%)
 - Development completion comment posted to github issue 717 (reason: posted)
 
+### Step 4 — create-pr
+
+- Base branch pre-supplied: develop — skipping interactive prompt
+- Commits: bb0e038d fix(finalise) (43 files), 9b2a3d32 docs(task.222) (task doc, review, report — the report's first commit)
+- PR body written inline from the diff and task doc; no Explore summariser dispatched (Explore hangs, see memory)
+- PR created: https://github.com/Gamaroff/agent-skills/pull/718
+- Tracker: in-review comment posted to github issue 717; GitHub board: in-review → stage-disabled
+- Post-PR state check (inline `gh pr view`): PR #718 state = OPEN, MERGEABLE. errors = 0
+
+### Step 5 — QA loop
+
+- Traceability mapper dispatched (standard mode, Success Criteria table): 15 criteria mapped; matrix at .summaries/qa-traceability-matrix.md
+- GitHub board: QA-start re-assert → stage-disabled
+- Gate 1: CONCERNS (80/100), head 9b2a3d32; diff reviewer returned in 221 s; CI green on 9b2a3d32
+- Security: boundary internal for dod-gap-count.sh and the --dod guard; a filename-sink run was attempted and discarded (sink does not model document content)
+- 5c `/review-pr` (conformance only, `--no-code`): APPROVE, 1 low (PC-1 — line 491 "Deferred Work: none" beside the `## Deferred Work` section). Recorded, not fixed: APPROVE carries no doc fixes. ready-for-merge → stage-disabled
+- Step 7 /finalise: DoD agent AC returned PARTIAL on AC8 (≤ 2% `npm test` time) because its evidence predated QA cycles 1–3. Re-measured base vs head, 3 runs each, locally (.249 at load 16.9 gave ~2× spread): +3.05 s on the four changed test files, 0.84% of the 365.1 s fast gate. Recorded in the DoD; AC8 PASS
+- CI reading 1: SUCCESS @ 526addfb0df6 (5 checks); CI reading 2: SUCCESS @ 1646369e0565 (5 checks, 240 s, own CI — no tree-equivalence)
+- Step 7 tracker: issue #717 done comment posted, closed (CLOSED confirmed); board done → already; Document link already on develop
+- Dogfood: `/finalise`'s own cooperation call (`--skill finalise --dod <accepted DoD>`) advanced the lock 7 → 8 — this task's guard, live
+
 ---
 
 ## Issues Log
@@ -102,14 +123,58 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-10-21
+**Gate Result**: CONCERNS
+**Issues Found**: 5 — QA-222-1 Step Transition Protocol advances before Step 7 reads the outcome (medium); QA-222-2 cooperation reference shows finalise without --dod (medium); QA-222-3 `####` ends the Missing Criteria range (low); QA-222-4 nested bullets counted (low); QA-222-5 empty --dod reason (low)
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 1 of 5)
+**Fix Result**: 5 of 5 fixed in `0b404b98` (pushed). 4 tests added; 5 mutations red. Fast gate on .249: 6139 pass, 1 fail — the known npm 9 update-notifier case (`security-probe.test.mjs`), environmental, green in CI. Local SSH session killed for low memory mid-wait; the remote run completed.
+
+### QA Cycle 2 — 2026-10-21
+**Gate Result**: CONCERNS
+**Issues Found**: 3 — QA-222-6 counter reads retitled historical gaps sections (medium); QA-222-7 Stop hook lock-7 reason advances to 8 (medium); QA-222-8 fence parity (low). Refute pass, whole branch; cycle-1 fixes all verified
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 2 of 5)
+**Fix Result**: 3 of 3 fixed in `cbfc3f78` (pushed). Counter: exact current heading, global fence tracking with marker matching (an unreachable `m` reset was deleted as dead). Stop hook: NEXT=7 branch. Mutations: 4 covered (one only after a fixture reorder). .249 fast gate: 6139 pass, 1 environmental (npm 9 notifier).
+
+### QA Cycle 3 — 2026-10-21
+**Gate Result**: CONCERNS
+**Issues Found**: 4 — QA-222-9 fence opener matches inline-span prose (medium); QA-222-10 lock-7 hook text ticks Step 7 on accepted (medium); QA-222-11 8.5 body reads historical sections (medium); QA-222-12 closer length (low). Scoped to files changed since gate 2
+**HIGH findings**: 0
+**MEDIUM findings**: 3
+**Convergence check**: not tripped — HIGH is 0 in every gate
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 3 of 5)
+**Fix Result**: 4 of 4 fixed in `042211a5` (pushed). Structural: dod-gap-count.sh `--body` is now the one reader of the gaps section (Step 8.5 posts it). Mutations: 5 covered (one void mutant replaced). .249 fast gate: 6141 pass, 1 environmental.
+
+### QA Cycle 4 — 2026-10-21
+**Gate Result**: PASS
+**Issues Found**: 1 — QA-222-13 `--body` prints the marker for an empty section (low; carried to recommendations.future). Scoped to files changed since gate 3; cycle-3 findings all verified fixed
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**Convergence check**: not tripped — HIGH is 0 in every gate
+**PR Review**: ✅ APPROVE — [task.222.pr-review.1.finalise-gaps-path-fixes.md](./task.222.pr-review.1.finalise-gaps-path-fixes.md) (conformance lens only, `--no-code`; 1 low: PC-1, line 491 says "Deferred Work: none" beside the `## Deferred Work` section — recorded, not fixed: APPROVE carries no doc fixes)
+**Carried to 6a**: docs/tasks/task.222.finalise-gaps-path-fixes/task.222.pr-review.1.finalise-gaps-path-fixes.md
+**Loop exit**: Cosmetic-residue exit taken — PASS gate at cycle 4 with HIGH 0 for cycles 3 and 4; all 1 open findings are LOW and are carried to the gate's recommendations.future by id (QA-222-13). This is a CLEAN exit, not a stall: nothing is blocked and nothing is being accepted over; a full qa-fix cycle for cosmetic findings is what this route exists to avoid.
+**Action**: Proceeding to 5c (PR conformance review)
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-10-21T16:10Z
+**Final Status**: Completed
 **Branch**: feature/task.222.finalise-gaps-path-fixes
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/718
+**QA Iterations**: 4 QA cycles (3 qa-fix cycles), then 5c APPROVE
+**DoD Summary**: `task.222.dod.1.finalise-gaps-path-fixes.md` — ACCEPTED
+**Tracker debt**: none
+
+**Completion Summary**: Implemented one story/task gap-count definition (`dod-gap-count.sh`: the current gaps section only, CommonMark fences, top-level `### Missing Criteria` items, plus a `--body` mode that Step 8.5 posts) and an `--dod` guard so `advance-pipeline-lock.sh --skill finalise` advances 7 → 8 only on an ACCEPTED DoD. The develop-* orchestrators and the Stop hook now read Step 7's outcome before any advance. QA took 4 cycles (12 findings fixed, each mutation-proven; QA-222-13 deferred by the cosmetic-residue exit), and 5c approved. Notable decisions: `--body` made the counter the one reader of the section rather than syncing two awk scripts (QA-222-11); AC8 was re-measured during the DoD run rather than inherited.
