@@ -264,17 +264,17 @@ None identified. The change adds a check before a spawn that would fail anyway.
 **Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.224.qa.3.loop-supervisor-probe-not-found.md](./task.224.qa.3.loop-supervisor-probe-not-found.md)
-- **Gate File**: [task.224.gate.3.loop-supervisor-probe-not-found.yml](./task.224.gate.3.loop-supervisor-probe-not-found.yml)
+- **Full Report**: [task.224.qa.4.loop-supervisor-probe-not-found.md](./task.224.qa.4.loop-supervisor-probe-not-found.md)
+- **Gate File**: [task.224.gate.4.loop-supervisor-probe-not-found.yml](./task.224.gate.4.loop-supervisor-probe-not-found.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 251
+- **Tests Executed**: 253
 - **Phases Verified**: 2/2
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-QA-2 is fixed and mutation-proven. QA-3 (LOW, open): `require.resolve` caches a hit for the process, so in a long-running loop a probe script deleted after its first probe still reads as present.
+QA-3 is fixed: a script deleted mid-run now reads as missing, and the fix is mutation-proven. No gate entries are open. One advisory finding (CR-1: a stale hit hides a replacement that appears later) is recorded for follow-up.
 
 ## Change Log
 
@@ -291,6 +291,7 @@ QA-2 is fixed and mutation-proven. QA-3 (LOW, open): `require.resolve` caches a 
 | 2026-10-21 |  | QA findings fixed — cycle 2, 1 finding (QA-2: probe existence follows Node resolution) | qa-fix |
 | 2026-10-21 |  | QA gate PASS (100/100) — 1 finding (QA-3, low) | qa-task |
 | 2026-10-21 |  | QA findings fixed — cycle 3, 1 finding (QA-3: resolved probe script re-checked on disk) | qa-fix |
+| 2026-10-21 |  | QA gate PASS (100/100) — 0 gated findings (1 advisory) | qa-task |
 <!-- change-log-end -->
 
 ---

@@ -1,0 +1,64 @@
+schema: 2
+task: 'task.224.loop-supervisor-probe-not-found'
+task_title: 'loop-supervisor: say when the probe script is not found'
+gate: PASS
+status_reason: 'QA-3 is fixed: resolvesAsMain re-checks the resolved file on disk. Two one-process delete/restore tests cover it, and removing the re-check fails both. The scoped review returned one low, medium-confidence bug (CR-1, advisory). It was reproduced and is routed to recommendations.future.'
+reviewer: 'QA Engineer'
+head: '4f9379827317945d069283306ef822c9a82a49b2'
+updated: '2026-10-21T20:42:50Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 253
+  phases_verified: 2/2
+  ci: 'not read this cycle (QA does not wait on CI)'
+  trace:
+    phases_covered: [1, 2]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false, unchanged. The re-check narrows resolvesAsMain toward false. That false gives the same status error a missing script always produced, and probeScript is operator-authored config.'
+  performance:
+    status: PASS
+    notes: 'One require.resolve and one stat per probe.'
+  reliability:
+    status: PASS
+    notes: 'A script deleted mid-run now reads as missing. CR-1 (advisory, reproduced): after a stale hit, a different candidate that appears later (for example tools/select/index.js) is still reported missing for the rest of the process.'
+  maintainability:
+    status: PASS
+    notes: 'Small, commented change. CR-4 from gate 3 still stands (firstExisting has no production caller).'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 (cycle 4): on a stale cached hit, drop the cache entry and resolve once more, so a replacement candidate (a directory with index.js, a .json) is found; add a delete-and-replace test.'
+      refs: ['skills/loop-supervisor/references/adapters.js', 'evals/loop-supervisor/unit/adapters.test.mjs']
+    - action: 'CR-2 (cycle 3): a default-search hit that later vanishes is described as "configured by loopSupervisor.adapters.<name>.probeScript"; record where the path came from.'
+      refs: ['skills/loop-supervisor/references/adapters.js']
+    - action: 'CR-3 (cycle 3): treat only MODULE_NOT_FOUND as missing; let other resolution errors reach the spawn.'
+      refs: ['skills/loop-supervisor/references/adapters.js']
+    - action: 'CR-4/CR-5 (cycle 3): remove firstExisting or mark it export-only; add package.json main, trailing-slash, .mjs-beside and symlink rows to the agreement table.'
+      refs: ['skills/loop-supervisor/references/adapters.js', 'evals/loop-supervisor/unit/adapters.test.mjs']
+
+bug_resolution:
+  fixed:
+    - id: 'QA-3'
+      commit: '4f937982'
+      fixed_date: '2026-10-21'
+      verification: 'probeMissing sees a deletion between probes in one process (tools/select, tools/select.js); mutation-proven'
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
