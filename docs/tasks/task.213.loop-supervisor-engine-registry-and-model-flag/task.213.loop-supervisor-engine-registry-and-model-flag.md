@@ -5,16 +5,19 @@ type: task
 description: "Make loop-supervisor engine- and model-agnostic by moving the claude-specific binary, argv, result envelope and transcript path into an engine registry, then adding --engine, --model and --effort."
 tags: [loop-supervisor, engines, agy, model-selection]
 category: infrastructure
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-10-18
-updated: 2026-10-18
+updated: 2026-10-21
 estimated_effort_hours: 16
+github_issue: 715
 ---
 
 # Technical Task: loop-supervisor: an engine registry (claude, agy) and a --model flag
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.213.review.1.loop-supervisor-engine-registry-and-model-flag.md` implemented 2026-10-21
+**GitHub Issue**: [#715](https://github.com/Gamaroff/agent-skills/issues/715)
 
 ---
 
@@ -68,8 +71,8 @@ estimated_effort_hours: 16
 | --- | --- | --- |
 | Print mode | `-p <prompt>` | `-p` / `--print` |
 | Stream format | `--output-format stream-json` + `--verbose` | `--output-format stream-json`, no verbose flag |
-| Model | none wired | `--model` |
-| Effort | none wired | `--effort low\|medium\|high\|xhigh\|max` |
+| Model | none wired (`claude` 2.1.306 accepts `--model <model>`) | `--model` |
+| Effort | none wired (`claude` 2.1.306 accepts `--effort <level>`) | `--effort low\|medium\|high\|xhigh\|max` |
 | Permissions | `--permission-mode acceptEdits` + `--settings` allow/deny file | `--mode accept-edits\|auto\|plan`; `--dangerously-skip-permissions`; `--sandbox`; no settings file |
 | Session identity | `--session-id <uuid>` pins a **new** id | `--conversation <id>` **resumes an existing** conversation |
 | Turn cap | `--max-turns` | none |
@@ -90,11 +93,14 @@ Model ids on `agy` embed an effort level (`claude-sonnet-5-5-high`, `gemini-3.8-
 
 ```
 { name, binary, buildArgs(ctx), parseResult(obj) -> null | envelope,
+  renderLine(obj) -> string | null,            // optional; human-log formatting
   transcriptPath(cwd, sessionId) -> string | null,
-  supports: { maxTurns, cost, pinnedSession, settingsFile } }
+  supports: { maxTurns, cost, pinnedSession, settingsFile, effort, skipPermissions } }
 ```
 
-`parseResult` returns the normalised envelope `{ subtype, isError, numTurns, costUsd }` or `null` for a non-result line. `run-loop.mjs` calls the engine and never branches on its name. `claude`'s entry reproduces today's behaviour exactly.
+`parseResult` returns the normalised envelope `{ subtype, isError, numTurns, costUsd, sessionId? }` or `null` for a non-result line. `run-loop.mjs` calls the engine and never branches on its name. `claude`'s entry reproduces today's behaviour exactly when `model` and `effort` are unset; it supports `--model` and `--effort` (both accepted by `claude` 2.1.306) and does **not** support `skipPermissions`.
+
+**Ledger identity for an engine without a pinned session.** Today every ledger row's `sessionId` is the uuid passed to `--session-id`. The ledger writes that uuid when `supports.pinnedSession` is `true`; otherwise the `sessionId` the engine's `parseResult` reports from the stream, else `null` — never a supervisor uuid the engine never saw. `transcriptPath` is `null` whenever the engine's `transcriptPath` returns `null`.
 
 ---
 
@@ -105,9 +111,9 @@ Model ids on `agy` embed an effort level (`claude-sonnet-5-5-high`, `gemini-3.8-
 ✅ `references/engines.js` with `claude` and `agy` entries.
 ✅ `--engine`, `--model`, `--effort`; `loopSupervisor.engine`, `.model`, `.effort`; CLI-over-config precedence through `KEY_OF`.
 ✅ Normalised result parsing for both engines, feeding `classify()`, the totals and the ledger.
-✅ A decision, written into the code and the docs, for each engine-unsupported flag (`--max-turns`, `--max-cost`, `--effort` on `claude`).
-✅ The permission-model decision for `agy` (see Risk Assessment, High 1).
-✅ Documentation sweep: `skills/loop-supervisor/README.md`, `SKILL.md`, `docs/reference/configuration.md`, `docs/reference/commands.md`, `docs/runbooks/unattended-overnight-runs.md`, the `run-loop.mjs` header comment.
+✅ A decision, written into the code and the docs, for each engine-unsupported flag: `--max-turns` and `--max-cost` on `agy`, `--effort` on any engine whose `supports.effort` is `false` (none today — `claude` accepts it), and `--dangerously-skip-permissions` on `claude`.
+✅ The permission-model decision for `agy` (see Risk Assessment, High 1): an operator-only `--dangerously-skip-permissions` flag.
+✅ Documentation sweep: `skills/loop-supervisor/README.md`, `SKILL.md`, `docs/reference/configuration.md`, `docs/reference/commands.md`, `docs/runbooks/unattended-overnight-runs.md`, `skills/develop-next/SKILL.md` (the "spawns one `claude -p`" note), `skills/develop-next/README.md`, the `run-loop.mjs` header comment.
 
 ### Out of Scope
 
@@ -144,44 +150,46 @@ Model ids on `agy` embed an effort level (`claude-sonnet-5-5-high`, `gemini-3.8-
 
 **Risk:** Low. **Dependencies:** none.
 
-- [ ] Run one tiny `agy -p "reply with ok" --output-format stream-json --model <cheapest id from agy models>` and save the stream as `evals/loop-supervisor/unit/fixtures/agy-result.ndjson`.
-- [ ] Record the `status` values, the exit code on failure, where the conversation id appears, and whether `--conversation <fresh-uuid>` is accepted.
-- [ ] Run one print-mode `agy --mode accept-edits` prompt that asks for a shell command, and record what happens without `--dangerously-skip-permissions`.
-- [ ] Put the findings in the plan file's "Verified facts" section. If a fact contradicts this document, fix the document first.
+- [x] Run one tiny `agy -p "reply with ok" --output-format stream-json --model <cheapest id from agy models>` and save the stream as `evals/loop-supervisor/unit/fixtures/agy-result.ndjson`.
+- [x] Record the `status` values, the exit code on failure, where the conversation id appears, and whether `--conversation <fresh-uuid>` is accepted.
+- [x] Run one print-mode `agy --mode accept-edits` prompt that asks for a shell command, and record what happens without `--dangerously-skip-permissions`.
+- [x] Put the findings in the plan file's "Verified facts" section. If a fact contradicts this document, fix the document first.
 
 ### Phase 1: The engine registry, with `claude` only
 
 **Risk:** Medium. **Dependencies:** Phase 0.
 
-- [ ] Create `skills/loop-supervisor/references/engines.js` with the `claude` entry, lifted from `buildClaudeArgs`, the `type === "result"` parse and `transcriptPathFor`.
-- [ ] Route `main` and the iteration loop through the registry. Behaviour unchanged.
-- [ ] Add a characterisation test that pins the `claude` argv byte for byte against the current output before the refactor is applied.
+- [x] Create `skills/loop-supervisor/references/engines.js` with the `claude` entry, lifted from `buildClaudeArgs`, the `type === "result"` parse and `transcriptPathFor`.
+- [x] Route `main` and the iteration loop through the registry. Behaviour unchanged.
+- [x] Add a characterisation test that pins the `claude` argv byte for byte against the current output before the refactor is applied. The dry-run `argv` carries a fresh sample session uuid on every run and machine paths in `argv[0]` and `resolved.*`, so the test normalises the value after `--session-id` and compares `argv.slice(1)` and the key set of `resolved`, not their text.
 
 ### Phase 2: `--engine`, `--model`, `--effort`, config keys, unsupported-flag handling
 
 **Risk:** Medium. **Dependencies:** Phase 1.
 
-- [ ] Add the three flags to `parseArgs` and `KEY_OF`; add `engine`, `model` and `effort` to `applyConfig`.
-- [ ] Unknown engine name: exit 1, listing the known engines.
-- [ ] `resolveBinary(engine.binary)`; the dry-run JSON gains `engine` and `model`, and `resolved.<binary>` carries the path.
-- [ ] Refuse `--max-turns`/`--max-cost`/`--effort` where the engine cannot honour them.
+- [x] Add the three flags to `parseArgs` and `KEY_OF`; add `engine`, `model` and `effort` to `applyConfig`.
+- [x] Unknown engine name: exit 1, listing the known engines.
+- [x] `resolveBinary(engine.binary)`; the dry-run JSON gains `engine`, `model`, `effort` and `permissions`, and `resolved.<binary>` carries the path. `resolved.settings` is printed only when `supports.settingsFile`.
+- [x] Refuse `--max-turns`/`--max-cost`/`--effort` where the engine cannot honour them.
+- [x] Add `--dangerously-skip-permissions` to `parseArgs` and `KEY_OF` — **flag only, never a config key**: `skills-config.yaml` is committed, and a committed file must not silently grant an unattended loop no approval boundary (the same reasoning that keeps the dashboard token out of config). Refused (exit 1, naming the flag and the engine) where `supports.skipPermissions` is `false`, which is `claude`'s case — `supervisor-settings.json` records why. `dry-run` prints `permissions: "engine default"` or `"skipped (operator flag)"`.
 
 ### Phase 3: The `agy` entry
 
 **Risk:** High. **Dependencies:** Phase 2, and the Phase 0 findings.
 
-- [ ] `buildArgs` per the Phase 0 findings: `-p`, `--output-format stream-json`, `--mode accept-edits`, the conversation flag only if Phase 0 shows it is valid for a new id, `--model`, `--effort`.
-- [ ] `parseResult` maps `event === "result"` to the envelope. A `status` other than `SUCCESS`, and an unknown `status`, set `isError: true` (fail closed).
-- [ ] Apply the permission decision from Risk Assessment, High 1.
-- [ ] `transcriptPath` returns `null` when `agy` has no transcript path the supervisor can name, and the ledger and `render.js` tolerate it.
+- [x] `buildArgs` per the Phase 0 findings: `-p`, `--output-format stream-json`, `--mode accept-edits`, the conversation flag only if Phase 0 shows it is valid for a new id, `--model`, `--effort`.
+- [x] `parseResult` maps `event === "result"` to the envelope. A `status` other than `SUCCESS`, and an unknown `status`, set `isError: true` (fail closed).
+- [x] Apply the permission decision from Risk Assessment, High 1: emit `--dangerously-skip-permissions` only when the operator passed it; `--sandbox` is recorded by Phase 0 and not emitted by default.
+- [x] `transcriptPath` returns `null` when `agy` has no transcript path the supervisor can name, and the ledger and `render.js` tolerate it.
+- [x] The ledger `sessionId` follows the rule under Target Architecture: the conversation id from the stream (per Phase 0), else `null`.
 
 ### Phase 4: Tests and the documentation sweep
 
 **Risk:** Low. **Dependencies:** Phases 1 to 3.
 
-- [ ] Unit tests for the table, both parsers (against the Phase 0 fixture), the flag precedence and every refusal.
-- [ ] Update every document in Scope; `npm run generate-catalog` if the skill description changes.
-- [ ] `npm run validate -- skills/loop-supervisor/` and the loop-supervisor unit suite.
+- [x] Unit tests for the table, both parsers (against the Phase 0 fixture), the flag precedence and every refusal.
+- [x] Update every document in Scope; `npm run generate-catalog` if the skill description changes.
+- [x] `npm run validate -- skills/loop-supervisor/` and the loop-supervisor unit suite.
 
 ---
 
@@ -205,7 +213,10 @@ The count of call sites to change is measured, not recalled: `grep -rn 'buildCla
 
 7. `skills/loop-supervisor/README.md`, `skills/loop-supervisor/SKILL.md`
 8. `docs/reference/configuration.md`: three `loopSupervisor.*` rows and the example block.
-9. `docs/reference/commands.md`, `docs/runbooks/unattended-overnight-runs.md`
+9. `docs/reference/commands.md` (the dry-run row says "the exact `claude` argv"), `docs/runbooks/unattended-overnight-runs.md`
+10. `skills/develop-next/SKILL.md` (§ Continuous mode note) and `skills/develop-next/README.md` — both say `loop-supervisor` "spawns one `claude -p`".
+
+The sweep's population is a search, not this list: `git grep -n 'claude -p' -- skills/loop-supervisor skills/develop-next docs/reference docs/runbooks`. `CHANGELOG.md` (history) and `evals/loop-supervisor/unit/classify.test.mjs:341` (a comment naming where a fixture was captured) are excluded by name.
 
 ---
 
@@ -234,27 +245,29 @@ The `agy` result line in this document comes from the handoff, so a parser that 
 
 ### Functional
 
-- [ ] `dry-run --engine claude` prints an `argv` array and `resolved.claude` identical to the pre-change output. New dry-run keys are additive.
-- [ ] `dry-run --engine agy --model <id>` prints an argv that contains the model and matches the Phase 0 findings.
-- [ ] A non-`SUCCESS` or unknown `agy` status yields `isError: true` and the iteration classifies as `error`.
-- [ ] `--engine agy` with `--max-cost` or `--max-turns` exits 1 naming the flag and the engine.
-- [ ] CLI flags win over `loopSupervisor.engine|model|effort`, including a value equal to the default.
+- [x] `dry-run --engine claude` prints an `argv` array identical to the pre-change output once the sample `--session-id` value is normalised, and a `resolved` object with the same keys. New dry-run keys are additive. Held by the Phase 1 characterisation test.
+- [x] `dry-run --engine agy --model <id>` prints an argv that contains the model and matches the Phase 0 findings.
+- [x] A non-`SUCCESS` or unknown `agy` status yields `isError: true` and the iteration classifies as `error`.
+- [x] `--engine agy` with `--max-cost` or `--max-turns` exits 1 naming the flag and the engine.
+- [x] `--engine claude --dangerously-skip-permissions` exits 1 naming the flag and the engine; with `--engine agy` the flag reaches the argv, and without it the `agy` argv carries no skip flag.
+- [x] `--engine claude --effort <level>` puts `--effort <level>` in the argv (it is not refused).
+- [x] CLI flags win over `loopSupervisor.engine|model|effort`, including a value equal to the default.
 
 ### Performance
 
-- [ ] The extra table lookup adds no spawn and no I/O: the unit suite's wall time stays within 10% of the pre-change run, measured with the same command.
-- [ ] Dry-run on `claude` makes no additional subprocess call compared with today.
+- [x] The registry adds no measurable cost to the existing tests: the five pre-existing files (`adapters`, `classify`, `dashboard`, `render`, `run-loop` `.test.mjs`) run within 10% of their base-branch wall time, measured on base and head with `uptime; time command node --test evals/loop-supervisor/unit/{adapters,classify,dashboard,render,run-loop}.test.mjs`; on head add `--test-skip-pattern='^t213:'` so the tests this task adds to `run-loop.test.mjs` do not count. Figures are committed in the implementation report with the load line.
+- [x] `dry-run` never executes the engine binary: held by a test that puts a fake `claude` and a fake `agy` on `PATH`, each of which writes a marker file when executed, and asserts no marker after `dry-run`.
 
 ### Code Quality
 
-- [ ] No `if (engine === …)` in `run-loop.mjs`; engine behaviour is read from the table.
-- [ ] The full `npm test` passes, including `evals/loop-supervisor/unit`.
-- [ ] `npm run validate -- skills/loop-supervisor/` passes.
+- [x] No `if (engine === …)` in `run-loop.mjs`; engine behaviour is read from the table.
+- [x] The full `npm test` passes, including `evals/loop-supervisor/unit`.
+- [x] `npm run validate -- skills/loop-supervisor/` passes.
 
 ### Migration
 
-- [ ] Every document in Scope is updated and none still says every iteration is `claude -p`.
-- [ ] `docs/reference/configuration.md` documents the three keys and their CLI flags.
+- [x] Every document in Scope is updated and none still says every iteration is `claude -p`: `git grep -n 'claude -p' -- skills/loop-supervisor skills/develop-next docs/reference docs/runbooks` returns only lines that name `claude -p` as the default engine, not the only one.
+- [x] `docs/reference/configuration.md` documents the three keys and their CLI flags.
 
 ---
 
@@ -266,7 +279,7 @@ The `agy` result line in this document comes from the handoff, so a parser that 
    - Risk: `supervisor-settings.json` records that `--dangerously-skip-permissions` was rejected on purpose, because an unattended loop with no approval boundary is not a trade worth making. The handoff proposes it for `agy`.
    - Probability: High that it is copied in unexamined.
    - Impact: Critical. An overnight loop runs any command with no boundary.
-   - Mitigation: Phase 0 measures what `accept-edits` does alone in print mode. **Needs the author's decision.** The recommended default: never emit the skip flag on its own authority; require an explicit operator flag, print it in `dry-run`, and consider `--sandbox`.
+   - Mitigation: Phase 0 measures what `accept-edits` does alone in print mode. **Decision (review 1, 2026-10-21 — the recommended default, auto-answered in an unattended run):** the supervisor never emits the skip flag on its own authority. An operator-only `--dangerously-skip-permissions` on `run-loop.mjs` passes it through for an engine with `supports.skipPermissions` (`agy`), is refused on `claude`, is never a config key, and `dry-run` prints the posture. `--sandbox` is recorded by Phase 0 and not emitted by default. If Phase 0 shows `accept-edits` cannot run a shell command in print mode, the docs say so: an `agy` loop then needs the operator flag to run a pipeline at all.
    - Rollback: remove the `agy` entry; `claude` is unaffected.
 2. **Result parsing written against a description, not a capture.**
    - Risk: a wrong field name makes every `agy` iteration look successful.
@@ -331,17 +344,21 @@ The `agy` result line in this document comes from the handoff, so a parser that 
 | Date | Version | Description | Author |
 | --- | --- | --- | --- |
 | 2026-10-18 | 1.0 | Initial draft | create-task |
+| 2026-10-21 | 1.1 | Review passed (8/10) — `claude` accepts `--effort` (not refused); one `supports` shape with `effort`/`skipPermissions` and a `renderLine` hook; Risk 1 decided (operator-only `--dangerously-skip-permissions`); ledger `sessionId` rule; normalised characterisation; performance criteria re-stated; develop-next docs added to the sweep with its search; GitHub issue #715 linked | review-task |
+| 2026-10-21 |  | Status → ready-for-development | review-task |
+| 2026-10-21 |  | Implemented — 13 files, 31 tests (21 in engines.test.mjs, 10 `t213:` in run-loop.test.mjs) | develop |
+| 2026-10-21 |  | Status → ready-for-review | develop |
 <!-- change-log-end -->
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 0: Verify `agy` and decide the open points
-- [ ] Phase 1: The engine registry, with `claude` only
-- [ ] Phase 2: Flags, config keys, unsupported-flag handling
-- [ ] Phase 3: The `agy` entry
-- [ ] Phase 4: Tests and the documentation sweep
+- [x] Phase 0: Verify `agy` and decide the open points
+- [x] Phase 1: The engine registry, with `claude` only
+- [x] Phase 2: Flags, config keys, unsupported-flag handling
+- [x] Phase 3: The `agy` entry
+- [x] Phase 4: Tests and the documentation sweep
 
 ## References
 
