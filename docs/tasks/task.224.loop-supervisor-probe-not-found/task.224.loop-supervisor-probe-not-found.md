@@ -5,16 +5,19 @@ type: task
 description: "When no select-next.mjs exists under any searched path, or a configured probeScript is missing, the loop-supervisor probe reports which path it looked for instead of the misleading empty-output error, and the adapter table derives its default probe path from the candidate constant."
 tags: [loop-supervisor, adapters, probe]
 category: infrastructure
-status: planned
+status: ready-for-review
 priority: Medium
 estimated_effort_hours: 8
 created: 2026-10-21
 updated: 2026-10-21
+github_issue: 723
 ---
 
 # Technical Task: loop-supervisor: say when the probe script is not found
 
-**Status:** Planned
+**Status:** Ready for Review
+**GitHub Issue**: [#723](https://github.com/Gamaroff/agent-skills/issues/723)
+**Review**: ✅ All review recommendations from `task.224.review.1.loop-supervisor-probe-not-found.md` implemented 2026-10-21
 
 ---
 
@@ -99,20 +102,20 @@ None - API stable. Every existing export keeps its signature and return value. O
 
 **Risk:** Low. **Dependencies:** task.214 (merged).
 
-- [ ] Add `DEFAULT_PROBE_SCRIPT` and use it for the last candidate and both table entries (CR-2).
-- [ ] Add `findExisting` (first existing candidate, else `null`), and redefine `firstExisting` on top of it.
-- [ ] In `resolveAdapter`, set `probeSearched` to a copy of the candidates on a miss and `null` on a hit, and reset it to `null` when a `probeScript` override is applied.
-- [ ] Add `probeMissing(adapter, cwd, exists)`. It returns `null` for no `probeScript` or an existing file. For a missing file it returns `{ status: "error", reason }`: the reason starts `probe script not found: <probeScript>` and lists every `probeSearched` path when set, else names `loopSupervisor.adapters.<name>.probeScript`.
-- [ ] Export `findExisting`, `probeMissing` and `DEFAULT_PROBE_SCRIPT`.
+- [x] Add `DEFAULT_PROBE_SCRIPT` and use it for the last candidate and both table entries (CR-2).
+- [x] Add `findExisting` (first existing candidate, else `null`), and redefine `firstExisting` on top of it.
+- [x] In `resolveAdapter`, set `probeSearched` to a copy of the candidates on a miss and `null` on a hit, and reset it to `null` when a `probeScript` override is applied.
+- [x] Add `probeMissing(adapter, cwd, exists)`. It returns `null` for no `probeScript` or an existing file. For a missing file it returns `{ status: "error", reason }`: the reason starts `probe script not found: <probeScript>` and lists every `probeSearched` path when set, else names `loopSupervisor.adapters.<name>.probeScript`.
+- [x] Export `findExisting`, `probeMissing` and `DEFAULT_PROBE_SCRIPT`.
 
 ### Phase 2: Wire-up, tests, docs
 
 **Risk:** Low. **Dependencies:** Phase 1.
 
-- [ ] In `runProbe`, return `probeMissing(adapter, cwd)` when it is not `null`, before spawning.
-- [ ] Unit tests for `findExisting`, `probeSearched`, `probeMissing` and the CR-2 equality (§ 8). Rename the test at `adapters.test.mjs:301` ("…so the probe fails as it always did"): the resolved path is still the default, but the probe no longer fails as it did.
-- [ ] One spawned dry-run test with `--adapter develop-next` in an empty project (§ 8).
-- [ ] README and configuration clauses, CHANGELOG entry. Run the loop-supervisor suites and `npm run validate -- skills/loop-supervisor/`.
+- [x] In `runProbe`, return `probeMissing(adapter, cwd)` when it is not `null`, before spawning.
+- [x] Unit tests for `findExisting`, `probeSearched`, `probeMissing` and the CR-2 equality (§ 8). Rename the test at `adapters.test.mjs:301` ("…so the probe fails as it always did"): the resolved path is still the default, but the probe no longer fails as it did.
+- [x] One spawned dry-run test with `--adapter develop-next` in an empty project (§ 8).
+- [x] README and configuration clauses, CHANGELOG entry. Run the loop-supervisor suites and `npm run validate -- skills/loop-supervisor/`.
 
 ---
 
@@ -147,6 +150,7 @@ The default-path literal population is measured by `git grep -n 'skills/develop-
   - `resolveAdapter` in an empty temp `cwd` gives `probeSearched` equal to `PROBE_SCRIPT_CANDIDATES`. With one candidate present it gives `null`. With a `probeScript` override it gives `null` even when nothing exists.
   - `probeMissing` covers the four cases: no `probeScript` (generic adapter), an existing file, a missing searched default, and a missing override.
   - For both adapters, `ADAPTERS[name].probeScript === PROBE_SCRIPT_CANDIDATES[PROBE_SCRIPT_CANDIDATES.length - 1]` (CR-2).
+  - `probeMissing` with a counting injected `exists` makes exactly one call for an adapter with a `probeScript`, and none for the `generic` adapter (holds the Performance criterion).
 - **Command:** `command node --test evals/loop-supervisor/unit/adapters.test.mjs evals/loop-supervisor/unit/run-loop.test.mjs`.
 - **Every test passes a temp `cwd`.** The gitignored `.agents/skills` symlink makes a repository-root resolve differ between a laptop and CI (task.214 § 3).
 - **Mutation-prove:**
@@ -156,7 +160,7 @@ The default-path literal population is measured by `git grep -n 'skills/develop-
 
 ### Integration Tests
 
-- A spawned `dry-run --adapter develop-next` in an empty temp project, extending the `dryRun` helper (`run-loop.test.mjs:739`) to take an adapter. It asserts that the printed probe `status` is `error` and that the `reason` starts `probe script not found:` and contains each of the three candidates. That last part distinguishes the new branch from the spawn branch, whose reason is "probe produced no output".
+- A spawned `dry-run --adapter develop-next` in an empty temp project, extending the `dryRun` helper (`run-loop.test.mjs:739`) to take an adapter. It asserts that the printed JSON has `ok: false`, that the probe `status` is `error`, and that the `reason` starts `probe script not found:` and contains each of the three candidates. That last part distinguishes the new branch from the spawn branch, whose reason is "probe produced no output".
 
 ### Control case
 
@@ -171,27 +175,27 @@ The task's own example is the searched default with nothing installed. The contr
 
 ### Functional
 
-- [ ] In an empty project, `resolveAdapter("develop-next", {}, { cwd })` returns `probeScript` `skills/develop-next/scripts/select-next.mjs` and `probeSearched` equal to the three candidates in order (Phase 1, `resolveAdapter` miss branch).
-- [ ] For that adapter and `cwd`, `probeMissing` returns `status: "error"`, with a `reason` that starts `probe script not found: skills/develop-next/scripts/select-next.mjs` and contains `.agents/skills/develop-next/scripts/select-next.mjs` and `.claude/skills/develop-next/scripts/select-next.mjs` (Phase 1, `probeMissing` searched branch).
-- [ ] With an override `probeScript: "tools/missing.mjs"`, `probeMissing` returns `status: "error"`, with a `reason` that starts `probe script not found: tools/missing.mjs`, names `loopSupervisor.adapters.develop-next.probeScript`, and does not list `.agents/skills/` (Phase 1, override branch).
-- [ ] When the resolved probe script exists, `probeMissing` returns `null` and the probe runs as before; the existing probe tests pass unchanged.
-- [ ] A spawned `dry-run --adapter develop-next` in an empty project prints a probe `reason` starting `probe script not found:` (Phase 2, `runProbe` wire-up).
-- [ ] `interpretProbe`'s empty-stdout message is unchanged (`classify.test.mjs:330` passes).
+- [x] In an empty project, `resolveAdapter("develop-next", {}, { cwd })` returns `probeScript` `skills/develop-next/scripts/select-next.mjs` and `probeSearched` equal to the three candidates in order (Phase 1, `resolveAdapter` miss branch).
+- [x] For that adapter and `cwd`, `probeMissing` returns `status: "error"`, with a `reason` that starts `probe script not found: skills/develop-next/scripts/select-next.mjs` and contains `.agents/skills/develop-next/scripts/select-next.mjs` and `.claude/skills/develop-next/scripts/select-next.mjs` (Phase 1, `probeMissing` searched branch).
+- [x] With an override `probeScript: "tools/missing.mjs"`, `probeMissing` returns `status: "error"`, with a `reason` that starts `probe script not found: tools/missing.mjs`, names `loopSupervisor.adapters.develop-next.probeScript`, and does not list `.agents/skills/` (Phase 1, override branch).
+- [x] When the resolved probe script exists, `probeMissing` returns `null` and the probe runs as before; the existing probe tests pass unchanged.
+- [x] A spawned `dry-run --adapter develop-next` in an empty project prints a probe `reason` starting `probe script not found:` (Phase 2, `runProbe` wire-up).
+- [x] `interpretProbe`'s empty-stdout message is unchanged (`classify.test.mjs:330` passes).
 
 ### Performance
 
-- [ ] Adapter resolution still makes at most three `exists` calls (the existing call-count test, `adapters.test.mjs:350`, passes unchanged). `probeMissing` adds one `exists` call per probe, before a spawn it replaces or precedes.
+- [x] Adapter resolution still makes at most three `exists` calls (the existing call-count test, `adapters.test.mjs:350`, passes unchanged). `probeMissing` adds one `exists` call per probe, before a spawn it replaces or precedes (held by the counting-`exists` unit test in § 8).
 
 ### Code Quality
 
-- [ ] Both table entries' `probeScript` equal the last candidate, held by a unit test (CR-2).
-- [ ] `command node --test 'evals/loop-supervisor/unit/*.test.mjs'` passes locally with the `.agents/skills` symlink moved aside, and in CI.
-- [ ] `npm run validate -- skills/loop-supervisor/` passes.
+- [x] Both table entries' `probeScript` equal the last candidate, held by a unit test (CR-2).
+- [x] `command node --test 'evals/loop-supervisor/unit/*.test.mjs'` passes locally with the `.agents/skills` symlink moved aside, and in CI.
+- [x] `npm run validate -- skills/loop-supervisor/` passes.
 
 ### Migration
 
-- [ ] The README paragraph and the configuration row each say that a missing probe script is reported with the paths searched.
-- [ ] CHANGELOG `[Unreleased]` cites task 224.
+- [x] The README paragraph and the configuration row each say that a missing probe script is reported with the paths searched.
+- [x] CHANGELOG `[Unreleased]` cites task 224.
 
 ---
 
@@ -256,14 +260,43 @@ None identified. The change adds a check before a spawn that would fail anyway.
 | Date | Version | Description | Author |
 | --- | --- | --- | --- |
 | 2026-10-21 | 1.0 | Initial draft — follow-up to task.214 QA CR-1 and CR-2 | create-task |
+| 2026-10-21 | 1.1 | Review (9/10): linked issue #723; added a counting-`exists` unit test so the one-call Performance criterion has a test; the dry-run test also asserts `ok: false` | review-task |
+| 2026-10-21 |  | Status → ready-for-development | review-task |
+| 2026-10-21 |  | Implemented — 7 files, 14 new tests (13 adapters, 1 dry-run) | develop |
 <!-- change-log-end -->
+
+---
+
+## Implementation Summary
+
+**Completion Date:** 2026-10-21
+
+### Approach
+
+`adapters.js` adds `DEFAULT_PROBE_SCRIPT` (`"skills/" + SELECT_NEXT`), which is now the last of `PROBE_SCRIPT_CANDIDATES` and the `probeScript` of both the `develop-next` and `develop-batch` table entries (CR-2). `findExisting` returns the first existing candidate or `null`; `firstExisting` is `findExisting(...) ?? last`, so its signature and results are unchanged. `resolveAdapter` uses `findExisting`: on a miss it keeps the default and sets `probeSearched` to a copy of the candidates, on a hit it sets `null`, and a configured `probeScript` resets it to `null`. The new `probeMissing(adapter, cwd, exists)` checks `path.resolve(cwd, probeScript)` and returns `{ status: "error", reason }` starting `probe script not found: <path>` — listing every searched path and both fixes, or naming the `loopSupervisor.adapters.<name>.probeScript` key for an override. `runProbe` in `run-loop.mjs` returns it before spawning. `interpretProbe` is unchanged.
+
+### Testing Results
+
+- `command node --test evals/loop-supervisor/unit/adapters.test.mjs`: 56/56 pass, 13 of them new (CR-2 equality ×2, `probeSearched` miss/hit/override/fresh-copy, `findExisting`, `probeMissing` × generic / existing / searched miss ×2 / override miss / absolute override / one `exists` call). The `:301` test is renamed and now also asserts `probeSearched`.
+- `evals/loop-supervisor/unit/run-loop.test.mjs`: new spawned `dry-run --adapter develop-next` test in an empty project — `ok: false`, probe `error`, reason starts `probe script not found:` and names all three candidates, no engine spawned. `dryRun` takes an `{ adapter }` option; existing callers unchanged.
+- `command node --test 'evals/loop-supervisor/unit/*.test.mjs'` with the gitignored `.agents/skills` symlink moved aside: 245 tests, 244 pass, 0 fail (1 skipped).
+- **Mutation-proven** (file backed up, mutated, restored, `git diff --stat` checked):
+  - `probeMissing` always returns `null`: 5 tests fail (the four not-found unit tests and the dry-run test).
+  - Dropping the override reset of `probeSearched`: 2 tests fail.
+  - Removing the `probeMissing` call from `runProbe`: the dry-run test fails.
+- **Manual dry-run in this repository:** probe `selected` T224. **In an empty temp directory:** `probe script not found: skills/develop-next/scripts/select-next.mjs (searched .agents/skills/…, .claude/skills/…, skills/…). Install the skills under .agents/skills/, or set loopSupervisor.adapters.develop-next.probeScript.`
+- `npm run validate -- skills/loop-supervisor/`: passes. Fast gate (`npm run ci:fast`): recorded in the implementation report.
+
+### Deferred Work
+
+None.
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 1: The not-found check and the single default
-- [ ] Phase 2: Wire-up, tests, docs
+- [x] Phase 1: The not-found check and the single default
+- [x] Phase 2: Wire-up, tests, docs
 
 ## References
 
