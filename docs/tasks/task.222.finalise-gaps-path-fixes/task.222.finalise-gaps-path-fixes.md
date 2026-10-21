@@ -501,17 +501,17 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.222.qa.1.finalise-gaps-path-fixes.md](./task.222.qa.1.finalise-gaps-path-fixes.md)
-- **Gate File**: [task.222.gate.1.finalise-gaps-path-fixes.yml](./task.222.gate.1.finalise-gaps-path-fixes.yml)
+- **Full Report**: [task.222.qa.2.finalise-gaps-path-fixes.md](./task.222.qa.2.finalise-gaps-path-fixes.md)
+- **Gate File**: [task.222.gate.2.finalise-gaps-path-fixes.yml](./task.222.gate.2.finalise-gaps-path-fixes.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 125
+- **Tests Executed**: 129 targeted (plus the .249 fast gate)
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Both defects are fixed and tested, and CI is green. Medium: the develop-* Step Transition Protocol advances the lock before Step 7 checks the outcome (QA-222-1). Medium: `pipeline-lock-cooperation.md` shows finalise without `--dod` (QA-222-2). Low: QA-222-3 to -5.
+Cycle 1's five findings are fixed. Cycle 2 found QA-222-6 (the counter reads retitled historical gaps sections), QA-222-7 (the Stop hook's lock-7 reason advances to 8) and QA-222-8 (low: fence parity).
 
 <!-- change-log-start -->
 ## Change Log
@@ -524,6 +524,8 @@ Both defects are fixed and tested, and CI is green. Medium: the develop-* Step T
 | 2026-10-21 |         | Implemented — 2 new files (+1 bundled copy), 1 new test file (12 tests), 3 tests added to finalise-bug-mode, 23 files swept/re-bundled | develop |
 | 2026-10-21 |  | QA gate CONCERNS (80/100) — 5 findings (2 medium, 3 low) | qa-task |
 | 2026-10-21 |  | QA findings fixed — 5 of 5 (QA-222-1..5), 1 iteration; 4 tests added | qa-fix |
+| 2026-10-21 |  | QA gate CONCERNS (80/100) — 3 findings (2 medium, 1 low) | qa-task |
+| 2026-10-21 |  | QA findings fixed — 3 of 3 (QA-222-6..8), 1 iteration; 6 fixtures and 1 Stop-hook scenario added | qa-fix |
 <!-- change-log-end -->
 
 ---

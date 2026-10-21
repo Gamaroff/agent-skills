@@ -25,17 +25,16 @@ esac
   echo "HALT: $DOC_FILE is not a file" >&2
   exit 1
 }
-grep -q '^## Definition of Done - Gaps Identified' "$DOC_FILE" || {
-  echo "HALT: $DOC_FILE has no '## Definition of Done - Gaps Identified' section — Step 8.4 writes it" >&2
-  exit 1
-}
-# `s`: inside the gaps section, until the next `## `. `m`: inside a Missing Criteria
-# subsection, until the next level-2 or level-3 heading — so `### Next Steps` ends the range and a
-# `####` category heading does not (QA-222-3). Lines inside a fence are skipped, headings included.
-# A gap is a bullet that is not nested under another bullet: `st` is a stack of open bullet
-# indents, popped by any line at or left of them, so a detail sub-bullet is not a second gap and a
-# numbered category line (`1. **Unit Tests:**`) closes the list above it (QA-222-4). The first line
-# printed is "@" when the subsection exists, then the count.
+# `s`: inside the CURRENT gaps section, matched on the heading exactly so that a
+# `— run N (historical, superseded)` section a re-run left behind is not read (QA-222-6),
+# until the next `## `. `m`: inside its Missing Criteria subsection, until the next level-2 or
+# level-3 heading — so `### Next Steps` ends the range and a `####` category heading does not
+# (QA-222-3). Fences are tracked from line 1 and closed only by their own marker, so a fenced
+# example of the section is never entered and a ``` line inside a ~~~ fence does not end it
+# (QA-222-8). A gap is a bullet that is not nested under another bullet: `st` is a stack of open
+# bullet indents, popped by any line at or left of them, so a detail sub-bullet is not a second gap
+# and a numbered category line (`1. **Unit Tests:**`) closes the list above it (QA-222-4).
+# Printed: "S" when the section exists, "@" when its subsection does, then the count.
 OUT=$(awk '
   function indent(l,   i, c, n) {
     n = 0
@@ -47,9 +46,15 @@ OUT=$(awk '
     }
     return n
   }
-  /^## Definition of Done - Gaps Identified/ { s = 1; next }
-  s && /^[ \t]*(```|~~~)/ { fence = !fence; next }
+  /^[ \t]*(```|~~~)/ {
+    mk = $0
+    sub(/^[ \t]*/, "", mk)
+    mk = substr(mk, 1, 3)
+    if (!fence) { fence = 1; fmk = mk } else if (mk == fmk) fence = 0
+    next
+  }
   fence { next }
+  /^## Definition of Done - Gaps Identified[ \t]*$/ { s = 1; sec = 1; next }
   s && /^## / { s = 0 }
   s && /^### Missing Criteria/ { m = 1; seen = 1; next }
   s && m && /^###?([^#]|$)/ { m = 0 }
@@ -61,10 +66,17 @@ OUT=$(awk '
       st[++n] = ind
     }
   }
-  END { if (seen) print "@"; print count + 0 }
+  END { if (sec) print "S"; if (seen) print "@"; print count + 0 }
 ' "$DOC_FILE")
 case "$OUT" in
-  '@'*) ;;
+  S*) ;;
+  *)
+    echo "HALT: $DOC_FILE has no current '## Definition of Done - Gaps Identified' section (a '— run N (historical, superseded)' one is not read) — Step 8.4 writes it" >&2
+    exit 1
+    ;;
+esac
+case "$OUT" in
+  *@*) ;;
   *)
     echo "HALT: no '### Missing Criteria' under '## Definition of Done - Gaps Identified' in $DOC_FILE — Step 8.4 lists each gap there" >&2
     exit 1

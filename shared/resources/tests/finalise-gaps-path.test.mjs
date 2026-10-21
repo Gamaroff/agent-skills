@@ -238,10 +238,11 @@ for (const shell of SHELLS) {
   // direction: a top-level gap beside categorised ones still counts, so nesting never undercounts.
   test(`[${shell}] dod-gap-count.sh: #### headings, sub-bullets and fences — and nothing undercounted`, () => {
     const dir = tmp("t222-shape-");
-    const section = (lines) =>
+    const section = (lines, before = []) =>
       [
         "# Task",
         "",
+        ...before,
         "## Definition of Done - Gaps Identified",
         "",
         "### Missing Criteria:",
@@ -310,9 +311,58 @@ for (const shell of SHELLS) {
           ],
           want: 4,
         },
+        // QA-222-6: a re-run retitles the earlier section; only the current one is read.
+        {
+          why: "a historical (retitled) section before the current one",
+          before: [
+            "## Definition of Done - Gaps Identified — run 1 (historical, superseded)",
+            "",
+            "### Missing Criteria:",
+            "",
+            "- [x] old one",
+            "- [x] old two",
+            "- [x] old three",
+            "",
+          ],
+          lines: ["- [ ] current"],
+          want: 1,
+        },
+        // QA-222-8: fences are tracked from line 1, and only their own marker closes them.
+        {
+          why: "a fenced example of the section before the real one",
+          before: [
+            "## Plan",
+            "",
+            "```markdown",
+            "## Definition of Done - Gaps Identified",
+            "",
+            "### Missing Criteria:",
+            "",
+            "- [ ] example only",
+            "```",
+            "",
+          ],
+          lines: ["- [ ] a", "- [ ] b"],
+          want: 2,
+        },
+        {
+          why: "a ~~~ fence holding a ``` line",
+          lines: [
+            "- [ ] a",
+            "- [ ] b",
+            "",
+            "~~~text",
+            "```",
+            "- not a gap",
+            "~~~",
+            "",
+            "Closing prose after the fence.",
+          ],
+          want: 2,
+        },
       ];
       for (const c of cases) {
-        const r = count(write(dir, "doc.md", section(c.lines)));
+        const r = count(write(dir, "doc.md", section(c.lines, c.before)));
         assert.equal(r.status, 0, c.why + "\n" + r.stdout + r.stderr);
         assert.equal(r.stdout, `${c.want}\n`, c.why);
       }
@@ -328,7 +378,18 @@ for (const shell of SHELLS) {
         {
           why: "no gaps section",
           doc: "# Task\n\n## Success Criteria\n\n- [ ] one\n",
-          says: /no '## Definition of Done - Gaps Identified' section/,
+          says: /no current '## Definition of Done - Gaps Identified' section/,
+        },
+        // QA-222-6: a re-run retitles the earlier sections; with no current one, nothing is counted.
+        {
+          why: "only historical (retitled) gaps sections",
+          doc: "# Task\n\n## Definition of Done - Gaps Identified — run 1 (historical, superseded)\n\n### Missing Criteria:\n\n- [x] old\n\n## Change Log\n",
+          says: /no current '## Definition of Done - Gaps Identified' section/,
+        },
+        {
+          why: "a historical Missing Criteria beside a current section without one",
+          doc: "# Task\n\n## Definition of Done - Gaps Identified — run 1 (historical, superseded)\n\n### Missing Criteria:\n\n- [x] old\n\n## Definition of Done - Gaps Identified\n\n- [ ] unlisted\n\n## Change Log\n",
+          says: /no '### Missing Criteria'/,
         },
         {
           why: "no Missing Criteria subsection",

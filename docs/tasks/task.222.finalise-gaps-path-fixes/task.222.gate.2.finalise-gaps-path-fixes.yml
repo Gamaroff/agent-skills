@@ -1,0 +1,81 @@
+schema: 2
+task: 'task.222.finalise-gaps-path-fixes'
+task_title: 'finalise gaps path: true gap count, lock held at Step 7'
+gate: CONCERNS
+status_reason: 'All five cycle-1 findings are fixed and mutation-proven. The cycle-2 refute pass found two medium defects: the counter also reads retitled historical gap sections, so a re-run overcounts, and the Stop hook still tells an orchestrator at step 7 to advance to 8 on completion, with no accepted-only condition.'
+reviewer: 'QA Engineer'
+head: '0b404b98d731aa09a0e7802c32a16d476fa289d3'
+updated: '2026-10-21T15:06:23Z'
+
+top_issues:
+  - id: 'QA-222-6'
+    severity: medium
+    file: 'shared/resources/dod-gap-count.sh'
+    finding: 'The section match `/^## Definition of Done - Gaps Identified/` is a prefix match, so it also enters sections retitled `## Definition of Done - Gaps Identified — run N (historical, superseded)` (25 tracked documents carry that shape). Reproduced: a historical section with 3 closed items beside a current one with 1 gap reads 4, want 1; the repository''s task.173 document, which has only historical sections, reads 6 when it should HALT. A historical `### Missing Criteria` also sets `seen`, so the "no Missing Criteria" HALT cannot fire. In scope: the gap count is this task''s subject. The pre-task count had the same prefix match.'
+    suggested_action: 'Match the current heading exactly (`/^## Definition of Done - Gaps Identified[ \t]*$/`), reset `m` when `s` drops, and add a re-run fixture with a historical section beside the current one, plus one with only historical sections (must HALT).'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-222-7'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-on-stop.sh'
+    finding: 'At lock 7 the Stop hook block reason is the generic one (line 269): "Only once finalise has actually completed: mark Step 7 ✅ … and advance the lock to 8", and line 277 adds "advance the lock yourself". A lock held at 7 is now the normal state during the gaps tail, so a stop in that window sends the orchestrator to the numeric 8 that the new Step 7 exception forbids. This is the fourth writer of the instruction; the diff qualified the other three, and no on-stop test covers lock 7.'
+    suggested_action: 'Add a NEXT=7 branch: run Step 7''s completion check first, advance to 8 only when the document reads accepted (develop-bug: when /finalise --bug returned no gaps), otherwise follow the gaps HALT. Pin it with a lock-7 scenario in develop-pipeline-on-stop.test.sh.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-222-8'
+    severity: low
+    file: 'shared/resources/dod-gap-count.sh'
+    finding: 'Fence state is tracked only once the section has started, and a ``` line toggles a ~~~ fence. Reproduced: a fenced example of the gaps section earlier in the document (the shape task.222''s own plan carries) plus a real section with 2 gaps reads 1, want 2.'
+    suggested_action: 'Track fences from line 1 whatever the section state, close a fence only on its own marker, and match headings only outside a fence. Add the fenced-example fixture.'
+    suggested_owner: dev
+    status: open
+
+bug_resolution:
+  prior_cycle: 1
+  verified_fixed: ['QA-222-1', 'QA-222-2', 'QA-222-3', 'QA-222-4', 'QA-222-5']
+  verification_method: 'Committed tests in finalise-gaps-path.test.mjs; QA re-ran 2 of the developer''s 5 mutations (protocol exception, #### range end), both covered'
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 129
+  phases_verified: 4/4
+  ci: 'pending @ 0b404b98 (test); link-check, shellcheck, validate pass — informational'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: internal, unchanged from gate 1. The inputs are the task document gaps section and the DoD summary, both written by this pipeline; no corpus sink models document content (a filename-sink run overblocked all legitimate cases at cycle 1). Cycle 1 changed only the awk body; it still reads one file and writes nothing.'
+  performance:
+    status: PASS
+    notes: 'Four tests added in cycle 1; finalise-gaps-path.test.mjs runs in under 1 s.'
+  reliability:
+    status: CONCERNS
+    notes: 'The Stop hook can still send an orchestrator past the hold at 7 (QA-222-7); a re-run gaps count reads historical sections (QA-222-6).'
+  maintainability:
+    status: PASS
+    notes: 'One count definition; the Step 7 exception is pinned by one test across three SKILL.md files and both Step 7 docs.'
+
+recommendations:
+  immediate:
+    - action: 'Anchor the counter to the current gaps heading (QA-222-6).'
+      refs: ['shared/resources/dod-gap-count.sh']
+    - action: 'Give the Stop hook a lock-7 branch that checks Step 7''s outcome first (QA-222-7).'
+      refs: ['shared/resources/develop-pipeline-on-stop.sh', 'shared/resources/develop-pipeline-on-stop.test.sh']
+  future:
+    - action: 'The .249 test host has npm 9.2.0, whose update-notifier fails security-probe.test.mjs "task.167''s 13 cases" on any commit; pin NO_UPDATE_NOTIFIER in that test or upgrade npm there.'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['QA-222-6 and QA-222-7 fixed']

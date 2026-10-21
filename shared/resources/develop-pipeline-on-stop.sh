@@ -265,13 +265,19 @@ if [ "$NEXT" = "5" ] && [ "$SKILL" != "develop-bug" ]; then
   COMPLETION_LINE="$THEN_WHAT"
 elif [ "$NEXT" = "8" ]; then
   COMPLETION_LINE="Step 8 is NOT finished when /commit-changes returns. Resume by the step-8 rule the resume contract states (Phase 0b): a lock at 8 is not evidence that Step 7 finished, because /finalise, when it accepts, moves it there before Step 7's tail runs. If a Pipeline Progress row at or below Step 7 in \`${REPORT}\` is unfinished, finish that step first (${STEP7_TAIL}). Otherwise run Step 8 from its start; re-running it is safe. Step 8 ends only when its Completion Checklist passes, and the checklist runs \`advance-pipeline-lock.sh --complete\` itself as its last action. Never run \`--complete\` on your own because the commit landed."
+elif [ "$NEXT" = "7" ]; then
+  # A lock at 7 is also the HOLD /finalise keeps on a gaps outcome (task 222, QA-222-7): "advance
+  # once it completed" would send the orchestrator to the 8 the Step 7 exception forbids.
+  COMPLETION_LINE="Step 7 ends on /finalise's outcome, not on its return. Run Step 7's completion check before any advance: only when the document reads \`accepted\` (develop-bug: when \`/finalise --bug\` returned no gaps) advance the lock to 8 and mark Step 7 ✅ in \`${REPORT}\`. On a gaps outcome the lock stays at 7, where /finalise held it: finish the gaps tail and HALT. Never advance to 8 on gaps."
 else
   COMPLETION_LINE="Only once ${NEXT_SKILL} has actually completed: mark Step ${NEXT} ✅ in \`${REPORT}\` and advance the lock to ${ADVANCE_TO}."
 fi
 
 # "Advance the lock yourself" at Step 8 would mean the Completion Checklist's `--complete`,
 # which only that checklist may run (task.161 QA cycle 2, CR-2).
-if [ "$NEXT" = "8" ]; then
+if [ "$NEXT" = "7" ]; then
+  ALREADY_DONE="**If Step 7 has genuinely already finished**, read its outcome before advancing: \`8\` only on an accepted document (develop-bug: no gaps). A lock at 7 after a gaps run is the hold, not a missed advance."
+elif [ "$NEXT" = "8" ]; then
   ALREADY_DONE="**If Step 8 has genuinely already finished**, re-run its Completion Checklist: the checklist, not you, runs \`--complete\`."
 else
   ALREADY_DONE="**If Step ${NEXT} has genuinely already finished, do NOT skip ahead on the strength of this message**: advance the lock yourself and continue from the real next step."

@@ -159,6 +159,28 @@ for SK in develop-story develop-task develop-bug; do
   fi
 done
 
+# ── Scenario 5d: at Step 7 the completion condition is /finalise's outcome ───
+# A lock at 7 is also the hold /finalise keeps on a gaps outcome (task 222). The generic
+# line ("once /finalise has completed … advance the lock to 8") and the generic "advance
+# the lock yourself" would send a stop in the gaps tail to the 8 the Step 7 exception
+# forbids (QA-222-7).
+for SK in develop-story develop-task develop-bug; do
+  d="$TMPDIR_TEST/step7-$SK"
+  mklock "$d" "{\"skill\":\"$SK\",\"current_step\":7,\"report_path\":\"report.md\"}"
+  R=$(reason_of "$(run_hook "$d")")
+  if [ -z "$R" ]; then
+    fail "[$SK] lock=7 advances to 8 only on an accepted outcome" "hook allowed stop"
+  elif echo "$R" | grep -q "has actually completed: mark Step 7"; then
+    fail "[$SK] lock=7 advances to 8 only on an accepted outcome" "still carries the generic 'once /finalise has completed … advance to 8' line"
+  elif echo "$R" | grep -q "advance the lock yourself"; then
+    fail "[$SK] lock=7 advances to 8 only on an accepted outcome" "still tells the orchestrator to advance the lock itself"
+  elif ! echo "$R" | grep -q "only when the document reads \`accepted\`" || ! echo "$R" | grep -q "Never advance to 8 on gaps"; then
+    fail "[$SK] lock=7 advances to 8 only on an accepted outcome" "does not make the advance conditional on accepted. Got: $(echo "$R" | grep -i 'step 7 ends' | head -1)"
+  else
+    pass "[$SK] lock=7 advances to 8 only on an accepted outcome"
+  fi
+done
+
 # ── Scenario 5c: the step-aware text is Step 8 only ─────────────────────────
 # The step-8 wording must not leak into other steps: a step-3 stall still advances the lock
 # itself once the step has genuinely finished.
