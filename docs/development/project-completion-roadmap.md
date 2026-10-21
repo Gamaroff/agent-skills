@@ -20,7 +20,7 @@ finished work. Rules:
 §"Registry fallback frontier".
 
 Add a phase only to express *sequencing* the registries cannot: a deliberate order, a dependency
-chain, a human gate. **No phase is open** (Phase 12 closed 2026-10-20) — selection falls through to the registries.
+chain, a human gate. **Phase 13 is open** (opened 2026-10-21, T224); once it closes, selection falls through to the registries again.
 
 > ⚠️ **A phase costs upkeep that a registry row does not, and the cost is not obvious.** Roadmap rows
 > are matched on the **checkbox alone** — they do **not** consult the target document's frontmatter.
@@ -66,6 +66,15 @@ Read only by `--batch`. Two rows conflict when they share a tag that **either** 
 | `mutation-proving` | `shared/resources/mutation-proving.md`                                  |
 | `docs-pipeline`    | `docs/runbooks/*`, `docs/concepts/*`, `docs/reference/pipeline-artifacts.md`, `docs/operations/workflows.md`, `skills/develop-*/README.md` |
 | `pipeline-lock`    | `shared/resources/advance-pipeline-lock.sh`, `advance-pipeline-lock.test.sh`  |
+
+---
+
+## PHASE 13 — loop-supervisor probe follow-up (opened 2026-10-21)
+
+An **override**: without it the registry fallback selects T216 first, because it takes the
+lowest-numbered task. T224 closes task.214's QA findings CR-1 and CR-2 while that code is fresh.
+
+- [ ] **T224** loop-supervisor: say when the probe script is not found · deps: none · touches: loop-supervisor! · /develop-task docs/tasks/task.224.loop-supervisor-probe-not-found/task.224.loop-supervisor-probe-not-found.md
 
 ---
 
@@ -196,3 +205,4 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-10-20 | **Phase 12 closed and archived** to `roadmap-history.md` (T220 was its only row). No phase is open; selection falls through to the registries. |
 | 2026-10-21 | **T211 accepted + merged — PR #712 merged** (`39f93d64`), selected from the registry with no phase open. `migrate-doc-numbering.mjs` now migrates the three legacy PRD shapes that T204's guard refused: a PRD with no frontmatter, a `docs/prd.md` linked from outside the PRD root, and a domain-less PRD (`--name <path>=<domain>/<slug>`). `skills/review-prd/scripts/migration-guard.mjs` is deleted. Its refusals become four engine blockers: `unclosed-frontmatter`, `displaced-frontmatter`, `stale-reference` and `needs-domain`. QA ran 6 cycles. The loop escalated at its 5-cycle budget, and one operator-granted cycle reached PASS 95/100 on route 2b. 5c APPROVE. DoD accepted 10/10, with AC8 judged per fix as the task defines it. 31 probes, 0 reproduced. CI 5/5. Issue #676 closed. Low follow-ups: CR-1 (dot-directory root-relative path), CR-2 (`editFrontmatter` on a displaced block) and PC-1 (task §3 Target omits two blocker codes). |
 | 2026-10-21 | **T221 accepted + merged — PR #714 merged** (`93d7c00b`), selected from the registry with no phase open. It closes T211's CR-1 and CR-2 in `migrate-doc-numbering.mjs`. CR-1: `outsideReferences` now also resolves a token that does not start with `./` or `../` at the repository root, so a dot-directory path such as `.docs/prd.md` or `${ROOT}/.docs/prd.md` raises the stale-reference blocker. CR-2: `editFrontmatter` leaves a displaced or unclosed block byte-for-byte unchanged. Each fix was test-first and mutation-proven (engine suite 70/70). QA ran 1 cycle: PASS 100. 5c APPROVE. DoD run 1 accepted 12/12; the security pass judged that nothing delivered is a boundary. CI 5/5 on the merged head. Issue #713 closed. Low follow-up: `linkPass` drops the `./` prefix when it rewrites a `./.docs/x.md` link. This was already on develop, and the target still resolves. (T211's PC-1 was fixed separately in `47ddcc92`.) |
+| 2026-10-21 | **Phase 13 opened** with T224 (task.214 QA CR-1 and CR-2), ordered ahead of the registry fallback, which would otherwise select T216 first. |
