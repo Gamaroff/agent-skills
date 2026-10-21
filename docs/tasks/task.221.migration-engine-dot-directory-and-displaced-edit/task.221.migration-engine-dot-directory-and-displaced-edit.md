@@ -5,19 +5,21 @@ type: task
 description: "Fix the two low findings task.211 carried from QA gate 6 in migrate-doc-numbering.mjs: outsideReferences misses a root-relative path into a dot-directory, and editFrontmatter writes above a displaced frontmatter block when called directly."
 tags: [migration-engine, doc-numbering, follow-up, task.211]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Low
 created: 2026-10-21
 updated: 2026-10-21
+completed_date: 2026-10-21
 assignee:
 estimated_effort_hours: 2
 depends_on: task.211
 github_issue: 713
+pr_number: 714
 ---
 
 # Technical Task: Migration engine: dot-directory references and displaced-block edits
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.221.review.1.migration-engine-dot-directory-and-displaced-edit.md` implemented 2026-10-21
 
@@ -419,17 +421,40 @@ test-first and mutation-proven. The bundled copy in `skills/review-prd/reference
 No critical issues identified. Both fixes are mutation-proven. One low-severity finding in
 `linkPass` was already on develop, so it is advisory.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.221.qa.1.migration-engine-dot-directory-and-displaced-edit.md`
+**Gate File**: `task.221.gate.1.migration-engine-dot-directory-and-displaced-edit.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 12/12 met. Each cites code and a test that runs on every PR.
+✅ **Tests:** 2 new rows (CR-1, CR-2), both mutation-proven. Engine suite 70/70.
+✅ **PR Review:** PR #714, with Step 5c review `task.221.pr-review.1.migration-engine-dot-directory-and-displaced-edit.md` APPROVE. CI is green on all 5 checks.
+✅ **Documentation:** CHANGELOG `[Unreleased]` Fixed entry. Bundled copy regenerated.
+✅ **Security Review:** PASS. Nothing delivered is a boundary, and both changes are fail-safe.
+✅ **Compliance Review:** Not applicable (internal engine fix).
+
+**Task marked as ACCEPTED on:** 2026-10-21
+
+**Detailed Verification Log:** See `task.221.dod.1.migration-engine-dot-directory-and-displaced-edit.md` for the full verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-21 | 1.0     | Initial draft | create-task |
 | 2026-10-21 | 1.1     | Review passed (9/10) — both fixes run on a scratch copy and verified; no changes required | review-task |
 | 2026-10-21 |         | Status → ready-for-development | review-task |
 | 2026-10-21 |         | Implemented — 4 files, 2 tests (CR-1, CR-2), both mutation-proven | develop |
 | 2026-10-21 |         | QA gate PASS (100/100) — 0 blocking findings, 1 advisory | qa-task |
-
+| 2026-10-21 | 1.2 | DoD passed — accepted (PR #714) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
