@@ -368,11 +368,42 @@ The `agy` result line in this document comes from the handoff, so a parser that 
 - **TASK-213-QA2-CR4** (LOW): carried to gate 2 `recommendations.future` (route 2b, cycle 2). The loop-supervisor skill description claims a pinned session id for agy too.
 - **TASK-213-QA2-CR5** (LOW): carried to gate 2 `recommendations.future` (route 2b, cycle 2). The develop-next resume sentence names only `claude --resume`, which is false for agy rows.
 
-## Change Log
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**QA Report**: `task.213.qa.2.loop-supervisor-engine-registry-and-model-flag.md`
+**Gate File**: `task.213.gate.2.loop-supervisor-engine-registry-and-model-flag.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR Review (Step 5c)**: ✅ APPROVE
+
+### Missing Criteria:
+
+1. **Acceptance Criteria:**
+   - [ ] AC8 (Performance): the figure was taken before `f982c944` changed `evals/loop-supervisor/unit/run-loop.test.mjs`, one of the measured files, and it names no head SHA. Re-measure on base and on head `4f301bf3` and record both figures, the load line and the SHA.
+
+2. **Documentation:**
+   - [ ] `CHANGELOG.md` `## [Unreleased]` has no `(task 213)` entry for the engine registry, the `--engine`/`--model`/`--effort` flags and keys, and the breaking `--max-turns`/`--max-cost` refusal on agy.
+
+### Next Steps:
+
+- [ ] Re-measure AC8 on the PR head and record it in the implementation report
+- [ ] Add the `(task 213)` CHANGELOG entry
+
+**Estimated Effort:** Small (under 30 minutes). Both fixes are documentation-only, so `/finalise` re-runs directly.
+
+**Gap Report Generated:** 2026-10-21
+
+**Detailed Verification Log:** See `task.213.dod.1.loop-supervisor-engine-registry-and-model-flag.md` for complete verification evidence.
 
 <!-- change-log-start -->
+## Change Log
+
 | Date | Version | Description | Author |
-| --- | --- | --- | --- |
+|------|---------|-------------|--------|
 | 2026-10-18 | 1.0 | Initial draft | create-task |
 | 2026-10-21 | 1.1 | Review passed (8/10) — `claude` accepts `--effort` (not refused); one `supports` shape with `effort`/`skipPermissions` and a `renderLine` hook; Risk 1 decided (operator-only `--dangerously-skip-permissions`); ledger `sessionId` rule; normalised characterisation; performance criteria re-stated; develop-next docs added to the sweep with its search; GitHub issue #715 linked | review-task |
 | 2026-10-21 |  | Status → ready-for-development | review-task |
@@ -381,6 +412,7 @@ The `agy` result line in this document comes from the handoff, so a parser that 
 | 2026-10-21 |  | QA gate CONCERNS (90/100) — 1 finding (TASK-213-BUG-1) | qa-task |
 | 2026-10-21 |  | QA findings fixed — TASK-213-BUG-1 plus 2 advisories (CR-2, stale comment), 1 iteration | qa-fix |
 | 2026-10-21 |  | QA gate PASS (100/100) — 2 LOW findings (CR-4, CR-5) | qa-task |
+| 2026-10-21 |  | DoD incomplete — 2 gaps identified (AC8 perf not measured on head; CHANGELOG entry) | finalise |
 <!-- change-log-end -->
 
 ---
