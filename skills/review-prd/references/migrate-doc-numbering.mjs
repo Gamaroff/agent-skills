@@ -886,7 +886,7 @@ export function frontmatterState(text) {
 // A key may be quoted, or hold spaces and dots ("Last updated", prd.version); it may not
 // open with Markdown (#, -, *, >, [) (task.211 QA cycle 4, CR-2).
 const YAML_KEY =
-  /^(?:"[^"\n]*"|'[^'\n]*'|[A-Za-z0-9_][^:\n]*?)[ \t]*:(?:[ \t]|\r?$)/;
+  /^(?:(?:"[^"\n]*"|'[^'\n]*')[ \t]*|[A-Za-z0-9_][^:\n]*):(?:[ \t]|\r?$)/;
 
 /**
  * Set (or insert) frontmatter fields inside the leading `---` block. Pure.
@@ -1123,13 +1123,16 @@ export function outsideReferences(file, text, sources) {
       variable = token.slice(0, token.indexOf("/"));
       rest = token.slice(variable.length + 1);
     } else if (token.startsWith("/")) {
-      // Absolute unless a variable closes right before it, quoted or not (cycle 4, CR-3).
+      // Absolute unless something closes right before it. After `}` or `)` the path is
+      // rooted in whatever opened it — ${..}, $(..), f"{..}", #{..} — named or not (cycle 3,
+      // CR-1; cycle 5, CR-1). After a quote it is rooted only in a variable the quote closes
+      // ("$ROOT"/…; cycle 4, CR-3). The lookback also names the variable, for the check below.
       if (!"})\"'".includes(before)) continue;
       const v = VARIABLE_BEFORE.exec(
         text.slice(Math.max(0, match.index - 128), match.index),
       );
-      if (!v) continue;
-      variable = v[1] ?? v[2] ?? null;
+      if (!v && (before === '"' || before === "'")) continue;
+      variable = v ? (v[1] ?? v[2] ?? null) : null;
       rest = token.slice(1);
     }
     // A variable that names a place outside the repository is not a reference into it,

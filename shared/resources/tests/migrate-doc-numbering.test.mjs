@@ -1505,6 +1505,15 @@ test("task.211 QA-2 CR-3 CR-4: outsideReferences flags each token that resolves 
     ["scripts/x.sh", 'cat "$ROOT"/docs/prd.md', "/docs/prd.md"],
     ["scripts/x.sh", "cat '${ROOT}'/docs/prd.md", "/docs/prd.md"],
     ["docs/t.md", "{{root}}/docs/prd.md", "/docs/prd.md"],
+    // Any template that closes with } or ), whatever opened it (task.211 QA-5 CR-1).
+    ["scripts/gen.py", 'open(f"{ROOT}/docs/prd.md")', "/docs/prd.md"],
+    ["scripts/x.rb", 'File.read("#{ROOT}/docs/prd.md")', "/docs/prd.md"],
+    [
+      "scripts/x.sh",
+      'cat "$(dirname "$(readlink -f "$0")")/../docs/prd.md"',
+      "/../docs/prd.md",
+    ],
+    ["scripts/x.sh", "cat ${ROOT:-${PWD}}/docs/prd.md", "/docs/prd.md"],
   ])
     assert.deepEqual(tokens(file, text), [token], `${file}: ${text}`);
   // Must not flag: other files whose path ends in the same text, bare names, URLs.
@@ -1522,7 +1531,8 @@ test("task.211 QA-2 CR-3 CR-4: outsideReferences flags each token that resolves 
       'cp $HOME/docs/prd.md ${TMPDIR}/x "$XDG_DATA_HOME"/docs/prd.md',
     ],
     ["scripts/x.sh", "cp ~/docs/prd.md x"],
-    ["README.md", '"x"/docs/prd.md and (y)/docs/prd.md'],
+    ["README.md", "\"x\"/docs/prd.md and 'y'/docs/prd.md"],
+    ["scripts/x.sh", "cat ${HOME}/docs/prd.md"],
   ])
     assert.deepEqual(tokens(file, text), [], `${file}: ${text}`);
 });
@@ -1611,6 +1621,15 @@ test("task.211 QA-2 CR-5: a blank line and a thematic break is a body with no bl
   const moved = io.files.get(`${R}/onb/prd.1.onb/prd.1.onb.md`);
   assert.equal(docId.frontmatterField(moved, "prd_number"), "1");
   assert.match(moved, /\n---\n\n---\n# Onboarding\n$/, "the body is kept");
+});
+
+test("task.211 QA-5 CR-2: frontmatterState stays linear on a long blank line", () => {
+  const t0 = performance.now();
+  m.frontmatterState(`\n---\nname: x\na${" ".repeat(400000)}\n---\n`);
+  assert.ok(
+    performance.now() - t0 < 1000,
+    loadSensitive("400k blanks in < 1s"),
+  );
 });
 
 test("task.211 QA-3 CR-4: a late fence is displaced only when it closes over YAML — two thematic breaks are a body", () => {

@@ -248,21 +248,21 @@ makes, and `migration-guard.mjs` refuses nothing it can carry.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-21
-**Quality Score**: 80/100
+**Quality Score**: 85/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.211.qa.4.migration-engine-monolith-and-domainless-prds.md](./task.211.qa.4.migration-engine-monolith-and-domainless-prds.md)
-- **Gate File**: [task.211.gate.4.migration-engine-monolith-and-domainless-prds.yml](./task.211.gate.4.migration-engine-monolith-and-domainless-prds.yml)
+- **Full Report**: [task.211.qa.5.migration-engine-monolith-and-domainless-prds.md](./task.211.qa.5.migration-engine-monolith-and-domainless-prds.md)
+- **Gate File**: [task.211.gate.5.migration-engine-monolith-and-domainless-prds.yml](./task.211.gate.5.migration-engine-monolith-and-domainless-prds.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 107
+- **Tests Executed**: 108
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Cycle 3's five findings are fixed, and `parseNameValue` still engages under the path probe (20 cases, 0 escaped). The scoped review of that fix found four new defects. The medium one: the two scan loops disagree on extension case, so `README.MD` or `ci.YML` is read by neither (CR-1, a regression). The three low ones: spaced or quoted YAML keys are not read as a displaced block (CR-2, a regression), a quoted variable (`"$ROOT"/docs/prd.md`) is skipped as absolute (CR-3), and `$HOME/docs/prd.md` is refused as stale (CR-4).
+Cycle 4's four findings are fixed, and `parseNameValue` still engages under the path probe (20 cases, 0 escaped). The scoped review of that fix found two new defects. The medium one: a path after a template the new lookback does not know (`f"{ROOT}/…"`, `#{ROOT}`, a nested `$(…)`) is skipped as absolute again (CR-1, a regression). The low one: `YAML_KEY` backtracks quadratically on a long run of spaces (CR-2).
 
 ## Change Log
 <!-- change-log-start -->
@@ -281,6 +281,8 @@ Cycle 3's five findings are fixed, and `parseNameValue` still engages under the 
 | 2026-10-21 |         | QA findings fixed — cycle 3, 5 of 5 (CR-1 to CR-5), one stale-scan predicate for both loops, 2 test rows added and 1 extended | qa-fix |
 | 2026-10-21 |         | QA gate CONCERNS (80/100) — 4 findings (1 medium, 3 low) | qa-task |
 | 2026-10-21 |         | QA findings fixed — cycle 4, 4 of 4 (CR-1 to CR-4), one extension helper for both scan loops, 1 test row added and 3 extended | qa-fix |
+| 2026-10-21 |         | QA gate CONCERNS (85/100) — 2 findings (1 medium, 1 low) | qa-task |
+| 2026-10-21 |         | QA findings fixed — cycle 5, 2 of 2 (CR-1, CR-2), 1 test row added and 1 extended | qa-fix |
 <!-- change-log-end -->
 
 ---
