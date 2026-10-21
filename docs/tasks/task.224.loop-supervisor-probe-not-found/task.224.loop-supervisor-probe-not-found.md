@@ -257,24 +257,24 @@ None identified. The change adds a check before a spawn that would fail anyway.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-21
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.224.qa.2.loop-supervisor-probe-not-found.md](./task.224.qa.2.loop-supervisor-probe-not-found.md)
-- **Gate File**: [task.224.gate.2.loop-supervisor-probe-not-found.yml](./task.224.gate.2.loop-supervisor-probe-not-found.yml)
+- **Full Report**: [task.224.qa.3.loop-supervisor-probe-not-found.md](./task.224.qa.3.loop-supervisor-probe-not-found.md)
+- **Gate File**: [task.224.gate.3.loop-supervisor-probe-not-found.yml](./task.224.gate.3.loop-supervisor-probe-not-found.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 246
+- **Tests Executed**: 251
 - **Phases Verified**: 2/2
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-QA-1 is fixed and mutation-proven. QA-2 (MEDIUM): `probeMissing` checks `fs.existsSync`, but the spawn resolves the script as Node resolves a main module, so a configured extensionless `probeScript` that ran before this change is now refused.
+QA-2 is fixed and mutation-proven. QA-3 (LOW, open): `require.resolve` caches a hit for the process, so in a long-running loop a probe script deleted after its first probe still reads as present.
 
 ## Change Log
 
@@ -289,6 +289,8 @@ QA-1 is fixed and mutation-proven. QA-2 (MEDIUM): `probeMissing` checks `fs.exis
 | 2026-10-21 |  | QA findings fixed — cycle 1, 1 finding (QA-1: present-script dry-run test) | qa-fix |
 | 2026-10-21 |  | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-10-21 |  | QA findings fixed — cycle 2, 1 finding (QA-2: probe existence follows Node resolution) | qa-fix |
+| 2026-10-21 |  | QA gate PASS (100/100) — 1 finding (QA-3, low) | qa-task |
+| 2026-10-21 |  | QA findings fixed — cycle 3, 1 finding (QA-3: resolved probe script re-checked on disk) | qa-fix |
 <!-- change-log-end -->
 
 ---

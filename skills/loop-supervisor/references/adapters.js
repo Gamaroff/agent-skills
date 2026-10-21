@@ -368,19 +368,21 @@ function resolveAdapter(name, config, { cwd = process.cwd() } = {}) {
  * <file>.js/.json/.node, then a directory's package.json main or index.js.
  * existsSync alone refused an extensionless override that runs and accepted a
  * directory that does not (task 224 QA-2). require.resolve caches a hit for
- * the process, so a script deleted after one is reported by the spawn, as it
- * was before this check existed.
+ * the process and returns it without touching the disk, and the loop probes
+ * every iteration, so the hit is re-checked: a script deleted mid-run reads
+ * as missing (QA-3).
  *
  * @param {string} file an absolute path
  * @returns {boolean}
  */
 function resolvesAsMain(file) {
+  let resolved;
   try {
-    require.resolve(file);
-    return true;
+    resolved = require.resolve(file);
   } catch {
     return false;
   }
+  return fs.existsSync(resolved);
 }
 
 /**

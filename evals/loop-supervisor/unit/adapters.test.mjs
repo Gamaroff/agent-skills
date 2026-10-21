@@ -12,7 +12,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, unlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
@@ -561,6 +561,36 @@ for (const c of RESOLUTION_CASES) {
         r.reason.startsWith("probe script not found: " + c.script),
         r && r.reason,
       );
+  });
+}
+
+// QA-3: the loop probes every iteration in one process, and require.resolve
+// caches a hit. A script deleted after a probe must read as missing on the next
+// one, and read as present again once it is back.
+for (const script of ["tools/select", "tools/select.js"]) {
+  test(`probeMissing sees a deletion between probes in one process: ${script}`, () => {
+    const cwd = mkdtempSync(path.join(os.tmpdir(), "ls-stale-"));
+    const file = path.join(cwd, "tools/select.js");
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, "");
+    const a = resolveAdapter(
+      "develop-next",
+      {
+        loopSupervisor: {
+          adapters: { "develop-next": { probeScript: script } },
+        },
+      },
+      { cwd },
+    );
+    assert.equal(probeMissing(a, cwd), null, "present");
+    unlinkSync(file);
+    const r = probeMissing(a, cwd);
+    assert.ok(
+      r && r.reason.startsWith("probe script not found: " + script),
+      r && r.reason,
+    );
+    writeFileSync(file, "");
+    assert.equal(probeMissing(a, cwd), null, "back");
   });
 }
 
