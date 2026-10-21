@@ -243,6 +243,27 @@ makes, and `migration-guard.mjs` refuses nothing it can carry.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-21
+**Quality Score**: 70/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.211.qa.1.migration-engine-monolith-and-domainless-prds.md](./task.211.qa.1.migration-engine-monolith-and-domainless-prds.md)
+- **Gate File**: [task.211.gate.1.migration-engine-monolith-and-domainless-prds.yml](./task.211.gate.1.migration-engine-monolith-and-domainless-prds.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 109
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+Three medium defects, each reproduced: a BOM or leading blank line gets a second frontmatter block (CR-1); a relative non-link mention of the moved monolith stays stale while the run reports ok (QA-1); the `--name` domain boundary has no probeable entry (QA-2). One low: a named domain moves a numbered PRD (CR-3).
+
 ## Change Log
 <!-- change-log-start -->
 
@@ -252,6 +273,7 @@ makes, and `migration-guard.mjs` refuses nothing it can carry.
 | 2026-10-21 | 1.1     | Review passed (8/10) — anchors re-pointed to develop; monolith `<domain>/<slug>` placement stated; Performance criterion given a read-count test; gate-9/10 test row named | review-task |
 | 2026-10-21 |         | Status → ready-for-development | review-task |
 | 2026-10-21 |         | Implemented — 8 files, 13 tests (engine 10 new + 1 updated, eval 2 rewritten) | develop |
+| 2026-10-21 |         | QA gate CONCERNS (70/100) — 4 findings (3 medium, 1 low) | qa-task |
 <!-- change-log-end -->
 
 ---
