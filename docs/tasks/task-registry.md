@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-10-20
-**Next Available Task Number:** **221**
+**Next Available Task Number:** **222**
 
 ## How to use
 
@@ -262,6 +262,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 218 | [Release runbook and setup wizard wording follow-ups](task.218.release-and-wizard-wording-follow-ups/task.218.release-and-wizard-wording-follow-ups.md) | accepted | documentation | Low | 2026-10-20 | [#705](https://github.com/Gamaroff/agent-skills/issues/705) | task.199 — the five wording items task.199's QA gate 4 carried to future work: release runbook §4 (QA-8, QA-9), the wizard summary and banners (QA-10), restricted-access.md's approve fallback · PR #707 merged |
 | 219 | [General-bug registry status: one writer at every transition](task.219.bug-registry-status-mirror/task.219.bug-registry-status-mirror.md) | accepted | infrastructure | Medium | 2026-10-20 | [#706](https://github.com/Gamaroff/agent-skills/issues/706) | task.199 — gate 4's source gap: /qa-fix leaves a general bug's registry row stale after a reopen; adds `registry-tick.js --bug-status`, the call sites and a bug-registry drift test |
 | 220 | [No consumer names in shipped skills](task.220.no-consumer-names-in-shipped-skills/task.220.no-consumer-names-in-shipped-skills.md) | accepted | refactoring | Medium | 2026-10-20 | [#709](https://github.com/Gamaroff/agent-skills/issues/709) | — remove one consumer's names from `skills/` and `shared/`: provenance notes, example keys and hosts, and the wireframe skill's consumer format profile; add `tests/no-consumer-names.test.js` over the whole shipped tree; empty task.201's exemption list |
+| 221 | [Migration engine: dot-directory references and displaced-block edits](task.221.migration-engine-dot-directory-and-displaced-edit/task.221.migration-engine-dot-directory-and-displaced-edit.md) | planned | refactoring | Low | 2026-10-21 | [#713](https://github.com/Gamaroff/agent-skills/issues/713) | task.211 — gate 6 CR-1 (outsideReferences misses a dot-directory root-relative path) and advisory CR-2 (editFrontmatter writes above a displaced block when called directly) |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
