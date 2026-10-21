@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# dod-gap-count.sh — the ONE story/task gap count (/finalise Step 8.5).
+# dod-gap-count.sh — the ONE story/task gap count (/finalise Step 8.5), and the one reader of
+# the section it counts.
 #
-#   bash .agents/skills/finalise/references/dod-gap-count.sh <DOC_FILE>
+#   bash .agents/skills/finalise/references/dod-gap-count.sh <DOC_FILE>          # the count
+#   bash .agents/skills/finalise/references/dod-gap-count.sh <DOC_FILE> --body   # the section body
 #
 # A gap is one list item under `### Missing Criteria` inside the document's
 # `## Definition of Done - Gaps Identified` section. `### Next Steps` lists the
@@ -11,12 +13,22 @@
 # writes 6 of its 7 gaps as `- ⚠️`, nested under numbered categories (obs #212).
 # Bug mode has its own definition (fill-verification-complete.sh count).
 #
-# Prints the number and writes nothing. Every HALT goes to stderr with exit 1, so a
-# command substitution never swallows a reason. A gaps report with no gap in it is a
-# defect, not a zero: the `dod-gaps` lead would read as if nothing were listed.
+# `--body` prints the lines of that same section, so the PR comment's body and its lead's
+# count read one section by one definition (QA-222-11: a prefix-matched body read the
+# historical sections the count had stopped reading).
+#
+# Writes nothing. Every HALT goes to stderr with exit 1, so a command substitution never
+# swallows a reason. A gaps report with no gap in it is a defect, not a zero: the `dod-gaps`
+# lead would read as if nothing were listed.
 DOC_FILE="${1:-}"
+MODE="${2:-count}"
 case "$DOC_FILE" in '' | *'{'*)
   echo "HALT: DOC_FILE must be bound (got '$DOC_FILE')" >&2
+  exit 1
+  ;;
+esac
+case "$MODE" in count | --body) ;; *)
+  echo "HALT: unknown mode '$MODE' — pass nothing for the count, or --body" >&2
   exit 1
   ;;
 esac
@@ -24,17 +36,22 @@ esac
   echo "HALT: $DOC_FILE is not a file" >&2
   exit 1
 }
+# Fences are tracked from line 1, as CommonMark reads them: an opener is a run of 3 or more
+# backticks or tildes (a backtick opener's info string holds no backtick, so a prose line that
+# starts with an inline code span is not one — QA-222-9), and only a run of the same character,
+# at least as long, with nothing after it closes one (QA-222-8, QA-222-12). A fenced example of
+# the section is therefore never entered.
 # `s`: inside the CURRENT gaps section, matched on the heading exactly so that a
 # `— run N (historical, superseded)` section a re-run left behind is not read (QA-222-6),
 # until the next `## `. `m`: inside its Missing Criteria subsection, until the next level-2 or
 # level-3 heading — so `### Next Steps` ends the range and a `####` category heading does not
-# (QA-222-3). Fences are tracked from line 1 and closed only by their own marker, so a fenced
-# example of the section is never entered and a ``` line inside a ~~~ fence does not end it
-# (QA-222-8). A gap is a bullet that is not nested under another bullet: `st` is a stack of open
-# bullet indents, popped by any line at or left of them, so a detail sub-bullet is not a second gap
-# and a numbered category line (`1. **Unit Tests:**`) closes the list above it (QA-222-4).
-# Printed: "S" when the section exists, "@" when its subsection does, then the count.
-OUT=$(awk '
+# (QA-222-3). A gap is a bullet that is not nested under another bullet: `st` is a stack of
+# open bullet indents, popped by any line at or left of them, so a detail sub-bullet is not a
+# second gap and a numbered category line (`1. **Unit Tests:**`) closes the list above it
+# (QA-222-4).
+# Printed: "S" when the section exists, "@" when its subsection does, then the count — or, in
+# --body mode, "S" and then the section's lines.
+OUT=$(awk -v mode="$MODE" '
   function indent(l,   i, c, n) {
     n = 0
     for (i = 1; i <= length(l); i++) {
@@ -45,16 +62,26 @@ OUT=$(awk '
     }
     return n
   }
-  /^[ \t]*(```|~~~)/ {
-    mk = $0
-    sub(/^[ \t]*/, "", mk)
-    mk = substr(mk, 1, 3)
-    if (!fence) { fence = 1; fmk = mk } else if (mk == fmk) fence = 0
-    next
+  {
+    infence = fence
+    l = $0
+    sub(/^[ \t]*/, "", l)
+    c = substr(l, 1, 1)
+    if (c == "`" || c == "~") {
+      r = 0
+      while (substr(l, r + 1, 1) == c) r++
+      rest = substr(l, r + 1)
+      if (!fence && r >= 3 && !(c == "`" && index(rest, "`"))) {
+        fence = 1; fch = c; flen = r; infence = 1
+      } else if (fence && c == fch && r >= flen && rest ~ /^[ \t]*$/) {
+        fence = 0; infence = 1
+      }
+    }
   }
-  fence { next }
-  /^## Definition of Done - Gaps Identified[ \t]*$/ { s = 1; sec = 1; next }
-  s && /^## / { s = 0 }
+  !infence && /^## Definition of Done - Gaps Identified[ \t]*$/ { s = 1; sec = 1; next }
+  !infence && s && /^## / { s = 0 }
+  s { body = body $0 "\n" }
+  infence { next }
   s && /^### Missing Criteria/ { m = 1; seen = 1; next }
   s && m && /^###?([^#]|$)/ { m = 0 }
   s && m && !/^[ \t]*$/ {
@@ -65,7 +92,12 @@ OUT=$(awk '
       st[++n] = ind
     }
   }
-  END { if (sec) print "S"; if (seen) print "@"; print count + 0 }
+  END {
+    if (sec) print "S"
+    if (mode == "--body") { printf "%s", body; exit }
+    if (seen) print "@"
+    print count + 0
+  }
 ' "$DOC_FILE")
 case "$OUT" in
   S*) ;;
@@ -74,6 +106,10 @@ case "$OUT" in
     exit 1
     ;;
 esac
+if [ "$MODE" = "--body" ]; then
+  printf '%s\n' "${OUT#S$'\n'}"
+  exit 0
+fi
 case "$OUT" in
   *@*) ;;
   *)

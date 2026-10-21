@@ -268,7 +268,7 @@ elif [ "$NEXT" = "8" ]; then
 elif [ "$NEXT" = "7" ]; then
   # A lock at 7 is also the HOLD /finalise keeps on a gaps outcome (task 222, QA-222-7): "advance
   # once it completed" would send the orchestrator to the 8 the Step 7 exception forbids.
-  COMPLETION_LINE="Step 7 ends on /finalise's outcome, not on its return. Run Step 7's completion check before any advance: only when the document reads \`accepted\` (develop-bug: when \`/finalise --bug\` returned no gaps) advance the lock to 8 and mark Step 7 ✅ in \`${REPORT}\`. On a gaps outcome the lock stays at 7, where /finalise held it: finish the gaps tail and HALT. Never advance to 8 on gaps."
+  COMPLETION_LINE="Step 7 ends on /finalise's outcome, not on its return. Run Step 7's completion check before any advance: only when the document reads \`accepted\` (develop-bug: when \`/finalise --bug\` returned no gaps) advance the lock to 8, then finish Step 7's tail (${STEP7_TAIL}); mark Step 7 ✅ in \`${REPORT}\` only once the Step 7 Completion Checklist passes. On a gaps outcome the lock stays at 7, where /finalise held it: finish the gaps tail and HALT. Never advance to 8 on gaps."
 else
   COMPLETION_LINE="Only once ${NEXT_SKILL} has actually completed: mark Step ${NEXT} ✅ in \`${REPORT}\` and advance the lock to ${ADVANCE_TO}."
 fi

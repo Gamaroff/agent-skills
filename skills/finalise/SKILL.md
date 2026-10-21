@@ -2651,7 +2651,8 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
      GAP_REPORT_BODY=$(awk '/^## Step 5: Acceptance Decision/{f=1;next} /^## /{f=0} f' "$DOD_PATH")
    else
      case "$DOC_FILE" in *'{'* | '') echo "HALT: DOC_FILE must be bound in this block"; exit 1 ;; esac
-     GAP_REPORT_BODY=$(awk '/^## Definition of Done - Gaps Identified/{f=1;next} /^## /{f=0} f' "$DOC_FILE")
+     # The same helper reads the body and counts it below: one section, one definition (task 222).
+     GAP_REPORT_BODY=$(bash .agents/skills/finalise/references/dod-gap-count.sh "$DOC_FILE" --body) || exit 1
    fi
    # The gap count comes from a helper in both modes, never from a grep here: one
    # definition per mode, so the lead cannot count a different list from the body.

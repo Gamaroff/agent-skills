@@ -176,6 +176,12 @@ for SK in develop-story develop-task develop-bug; do
     fail "[$SK] lock=7 advances to 8 only on an accepted outcome" "still tells the orchestrator to advance the lock itself"
   elif ! echo "$R" | grep -q "only when the document reads \`accepted\`" || ! echo "$R" | grep -q "Never advance to 8 on gaps"; then
     fail "[$SK] lock=7 advances to 8 only on an accepted outcome" "does not make the advance conditional on accepted. Got: $(echo "$R" | grep -i 'step 7 ends' | head -1)"
+  elif echo "$R" | grep -q "advance the lock to 8 and mark Step 7 ✅" \
+    || ! echo "$R" | grep -q "then finish Step 7's tail (for Step 7:" \
+    || ! echo "$R" | grep -q "only once the Step 7 Completion Checklist passes"; then
+    # Accepted is the condition for the ADVANCE, not for the ✅: the row stays ⏳ until the
+    # tail and the Step 7 Completion Checklist pass (QA-222-10, the task.161 CR-1 shape).
+    fail "[$SK] lock=7 advances to 8 only on an accepted outcome" "offers ✅ before Step 7's tail and Completion Checklist"
   else
     pass "[$SK] lock=7 advances to 8 only on an accepted outcome"
   fi

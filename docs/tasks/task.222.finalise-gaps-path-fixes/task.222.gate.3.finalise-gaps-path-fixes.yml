@@ -1,0 +1,90 @@
+schema: 2
+task: 'task.222.finalise-gaps-path-fixes'
+task_title: 'finalise gaps path: true gap count, lock held at Step 7'
+gate: CONCERNS
+status_reason: 'Cycle 2 fixes hold for their own cases. The scoped re-review found that the new line-1 fence tracking opens on a prose line that starts with an inline backtick span, that the Stop hook lock-7 text offers ✅ on accepted before the Step 7 tail and checklist, and that the 8.5 body extractor still reads historical sections while the count no longer does.'
+reviewer: 'QA Engineer'
+head: 'cbfc3f782f24331712a3734177c475ff514fd63a'
+updated: '2026-10-21T15:27:40Z'
+
+top_issues:
+  - id: 'QA-222-9'
+    severity: medium
+    file: 'shared/resources/dod-gap-count.sh'
+    finding: 'The fence opener `/^[ \t]*(```|~~~)/` also matches a prose line that begins with an inline code span (task.42:315, task.85:204 carry one). CommonMark does not treat it as a fence, because a backtick fence''s info string cannot contain a backtick. The fence then stays open to the end of the file, and a valid current section after it HALTs. Reproduced: a prose line followed by a current section with 1 gap HALTs "no current section".'
+    suggested_action: 'Open a fence only on a run of 3 or more backticks or tildes, where the rest of a backtick opener holds no backtick. Add the inline-span prose fixture.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-222-10'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-on-stop.sh'
+    finding: 'The NEXT=7 COMPLETION_LINE says to advance to 8 and mark Step 7 ✅ once the document reads accepted. The Step 7 Completion Checklist (develop-pipeline-step-7-finalise.md "Step 7 Completion Checklist (MUST verify before marking ✅)"; develop-bug-step-7-close-bug.md Part B) keeps the row ⏳ until the tail and checklist pass, so a row ticked early defeats the step-8 resume rule (task.161 CR-1 shape). The reviewer anchored this at shared/resources/dod-gap-count.sh:271 (anchor_check out-of-range); QA located the quoted line at shared/resources/develop-pipeline-on-stop.sh:271.'
+    suggested_action: 'On accepted: advance to 8, then name ${STEP7_TAIL} and the Step 7 Completion Checklist as what must pass before ✅. Extend scenario 5d to assert the tail is named and ✅ is not offered on accepted alone.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-222-11'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'Step 8.5 extracts GAP_REPORT_BODY with the old prefix match and no fence handling (SKILL.md:2654), while the lead''s count now reads only the current section. On a re-run document the PR comment body merges the historical Missing Criteria under the current ones (lead 1, body 4 checkbox lines). This breaks the stated invariant that "the lead cannot count a different list from the body".'
+    suggested_action: 'Make the counter the one reader of the section: a `--body` mode in dod-gap-count.sh that prints the current section''s lines, used by 8.5. Add a re-run fixture asserting the posted body excludes the historical section.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-222-12'
+    severity: low
+    file: 'shared/resources/dod-gap-count.sh'
+    finding: 'The closer is compared on its first 3 characters only, so a ```bash line closes a ```` fence. Reproduced: a ```` fence holding a ```bash line before a valid section HALTs.'
+    suggested_action: 'Record the opener character and run length; close only on a run of that character at least as long, followed by whitespace only. Add a 4-backtick fixture.'
+    suggested_owner: dev
+    status: open
+
+bug_resolution:
+  prior_cycle: 2
+  verified_fixed: ['QA-222-6', 'QA-222-7', 'QA-222-8']
+  verification_method: 'Committed tests (re-run, historical-only, fence fixtures; on-stop scenario 5d); developer mutations reran clean; QA reproduced the cycle-2 probes against cbfc3f78 (cr1 → 1, cr3 → 2, task.173 → HALT)'
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 129
+  phases_verified: 4/4
+  ci: 'pass @ cbfc3f78 (test, shellcheck, validate, link-check) — informational'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: internal, unchanged. Both inputs are artefacts this pipeline writes; no corpus sink models document content. The awk reads one file and writes nothing.'
+  performance:
+    status: PASS
+    notes: 'No change in cost; the counter is one awk pass.'
+  reliability:
+    status: CONCERNS
+    notes: 'A prose line that starts with an inline span makes the counter HALT on a valid document (QA-222-9); the lock-7 hook text can tick Step 7 early (QA-222-10).'
+  maintainability:
+    status: CONCERNS
+    notes: 'Two readers of the gaps section disagree on which section they read (QA-222-11).'
+
+recommendations:
+  immediate:
+    - action: 'Tighten the fence opener (QA-222-9) and closer (QA-222-12).'
+      refs: ['shared/resources/dod-gap-count.sh']
+    - action: 'Name the Step 7 tail and checklist before ✅ in the lock-7 hook text (QA-222-10).'
+      refs: ['shared/resources/develop-pipeline-on-stop.sh']
+    - action: 'One reader of the gaps section for count and body (QA-222-11).'
+      refs: ['skills/finalise/SKILL.md', 'shared/resources/dod-gap-count.sh']
+  future:
+    - action: 'The .249 test host has npm 9.2.0, whose update-notifier fails security-probe.test.mjs "task.167''s 13 cases" on any commit; pin NO_UPDATE_NOTIFIER in that test or upgrade npm there.'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['QA-222-9, QA-222-10 and QA-222-11 fixed']

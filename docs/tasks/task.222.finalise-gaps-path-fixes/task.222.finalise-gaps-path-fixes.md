@@ -501,17 +501,17 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.222.qa.2.finalise-gaps-path-fixes.md](./task.222.qa.2.finalise-gaps-path-fixes.md)
-- **Gate File**: [task.222.gate.2.finalise-gaps-path-fixes.yml](./task.222.gate.2.finalise-gaps-path-fixes.yml)
+- **Full Report**: [task.222.qa.3.finalise-gaps-path-fixes.md](./task.222.qa.3.finalise-gaps-path-fixes.md)
+- **Gate File**: [task.222.gate.3.finalise-gaps-path-fixes.yml](./task.222.gate.3.finalise-gaps-path-fixes.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 129 targeted (plus the .249 fast gate)
+- **Tests Executed**: 129 targeted (CI pass @ cbfc3f78)
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
 
 ### Key Findings
-Cycle 1's five findings are fixed. Cycle 2 found QA-222-6 (the counter reads retitled historical gaps sections), QA-222-7 (the Stop hook's lock-7 reason advances to 8) and QA-222-8 (low: fence parity).
+QA-222-9 (the fence opener matches inline-span prose), QA-222-10 (the lock-7 hook text ticks Step 7 on accepted), QA-222-11 (the 8.5 body reads historical sections) and QA-222-12 (low: closer length).
 
 <!-- change-log-start -->
 ## Change Log
@@ -526,6 +526,8 @@ Cycle 1's five findings are fixed. Cycle 2 found QA-222-6 (the counter reads ret
 | 2026-10-21 |  | QA findings fixed — 5 of 5 (QA-222-1..5), 1 iteration; 4 tests added | qa-fix |
 | 2026-10-21 |  | QA gate CONCERNS (80/100) — 3 findings (2 medium, 1 low) | qa-task |
 | 2026-10-21 |  | QA findings fixed — 3 of 3 (QA-222-6..8), 1 iteration; 6 fixtures and 1 Stop-hook scenario added | qa-fix |
+| 2026-10-21 |  | QA gate CONCERNS (80/100) — 4 findings (3 medium, 1 low) | qa-task |
+| 2026-10-21 |  | QA findings fixed — 4 of 4 (QA-222-9..12), 1 iteration; dod-gap-count.sh --body feeds Step 8.5 | qa-fix |
 <!-- change-log-end -->
 
 ---

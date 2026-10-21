@@ -98,7 +98,8 @@ All notable changes to this project will be documented in this file. Format foll
   the gaps (task.213's two read "4 of them"). A new helper, `dod-gap-count.sh`, is the one
   story/task count: the top-level list items under `### Missing Criteria` of the current section
   (a retitled `— run N (historical, superseded)` one is not read), checkbox or `- ⚠️`. It HALTs on
-  a gap section with none. `advance-pipeline-lock.sh --skill finalise` now needs `--dod <path>` and
+  a gap section with none, and its `--body` mode is what Step 8.5 posts, so the lead and the body
+  read one section. Fences are read as CommonMark reads them. `advance-pipeline-lock.sh --skill finalise` now needs `--dod <path>` and
   advances to Step 8 only when that DoD reads `**Final Status:** ✅ ACCEPTED`; otherwise it holds
   the lock, says why on stderr, and exits 0. The develop-* orchestrators and the Stop hook read Step 7's
   outcome before any advance to 8, so a gaps halt now resumes at `/finalise` instead of reading Step 7

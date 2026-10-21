@@ -1785,6 +1785,27 @@ for (const shell of SHELLS) {
     }
   });
 
+  // QA-222-11: the body and the lead read one section. A re-run retitles the earlier gaps
+  // section; a prefix-matched body posted its items under the current ones while the lead
+  // counted only the current section.
+  test(`[${shell}] 8.5 on a re-run posts only the current gaps section, and its lead counts that section (task 222)`, () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "finalise-85-"));
+    try {
+      const doc = path.join(dir, "task.7.x.md");
+      writeFileSync(
+        doc,
+        "# Task 7\n\n## Definition of Done - Gaps Identified — run 1 (historical, superseded)\n\n### Missing Criteria:\n\n- [x] historical gap one\n- [x] historical gap two\n\n## Definition of Done - Gaps Identified\n\n### Missing Criteria:\n\n- [ ] current gap\n\n### Next Steps:\n\n- [ ] close it\n\n## Change Log\n",
+      );
+      const r = run85({ KIND_IN: "task", DOCF: doc, DOD: "" });
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+      assert.match(r.stdout, /^GAP_COUNT=1$/m);
+      assert.match(r.stdout, /current gap/);
+      assert.doesNotMatch(r.stdout, /historical gap/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test(`[${shell}] 8.5 for a story/task refuses a gap section with no Missing Criteria item (task 222)`, () => {
     const dir = mkdtempSync(path.join(tmpdir(), "finalise-85-"));
     try {

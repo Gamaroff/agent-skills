@@ -360,6 +360,20 @@ for (const shell of SHELLS) {
           ],
           want: 2,
         },
+        // QA-222-9: a prose line that opens with an inline code span is not a fence opener.
+        {
+          why: "a prose line that starts with an inline backtick span",
+          before: ["```` ``` ```` or `~~~` opens a fenced block.", ""],
+          lines: ["- [ ] a"],
+          want: 1,
+        },
+        // QA-222-12: a shorter run, or one with an info string, does not close a longer fence.
+        {
+          why: "a ```` fence holding a ```bash line",
+          before: ["````markdown", "```bash", "- [ ] not a gap", "````", ""],
+          lines: ["- [ ] a"],
+          want: 1,
+        },
       ];
       for (const c of cases) {
         const r = count(write(dir, "doc.md", section(c.lines, c.before)));
@@ -414,6 +428,83 @@ for (const shell of SHELLS) {
         assert.equal(r.stdout, "");
         assert.match(r.stderr, /must be bound/);
       }
+      const doc = write(dir, "doc.md", SHAPES[0].doc);
+      const bad = run(shell, `bash "${GAP_COUNT}" "${doc}" --bogus`, {
+        cwd: ROOT,
+      });
+      assert.equal(bad.status, 1, "an unknown mode");
+      assert.equal(bad.stdout, "");
+      assert.match(bad.stderr, /unknown mode/);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  // QA-222-11: --body prints the section the count reads — the current one, bounded at the next
+  // `## `, with its fences — so Step 8.5's body and lead cannot name different lists.
+  test(`[${shell}] dod-gap-count.sh --body prints only the current section, fences included`, () => {
+    const dir = tmp("t222-body-");
+    try {
+      const doc = [
+        "# Task",
+        "",
+        "## Definition of Done - Gaps Identified — run 1 (historical, superseded)",
+        "",
+        "### Missing Criteria:",
+        "",
+        "- [x] historical gap",
+        "",
+        "## Definition of Done - Gaps Identified",
+        "",
+        "### Missing Criteria:",
+        "",
+        "- [ ] current gap",
+        "",
+        "```text",
+        "## not a heading",
+        "```",
+        "",
+        "### Next Steps:",
+        "",
+        "- [ ] close it",
+        "",
+        "## Change Log",
+        "",
+        "- [ ] not in the section",
+        "",
+      ].join("\n");
+      const file = write(dir, "doc.md", doc);
+      const body = run(shell, `bash "${GAP_COUNT}" "${file}" --body`, {
+        cwd: ROOT,
+      });
+      assert.equal(body.status, 0, body.stdout + body.stderr);
+      assert.match(body.stdout, /current gap/);
+      assert.match(
+        body.stdout,
+        /## not a heading/,
+        "fenced lines are part of the body",
+      );
+      assert.match(body.stdout, /close it/);
+      assert.doesNotMatch(body.stdout, /historical gap/);
+      assert.doesNotMatch(body.stdout, /not in the section/);
+      assert.doesNotMatch(
+        body.stdout,
+        /^S$/m,
+        "the section marker is not printed",
+      );
+      assert.equal(
+        count(file).stdout,
+        "1\n",
+        "the count reads the same section",
+      );
+      const none = run(
+        shell,
+        `bash "${GAP_COUNT}" "${write(dir, "none.md", "# Task\n")}" --body`,
+        { cwd: ROOT },
+      );
+      assert.equal(none.status, 1);
+      assert.equal(none.stdout, "");
+      assert.match(none.stderr, /no current/);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
