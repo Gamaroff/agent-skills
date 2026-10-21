@@ -35,7 +35,9 @@
  * CLI (exit codes: 0 = ok family, 1 = a guard tripped, 2 = usage — the contract of
  * tracker-comment.js and its peers):
  *   node migrate-doc-numbering.mjs [--apply | --check] [--json] [--root <dir>]
- *                                  [--name <path>=<slug>]... [--allow-in-flight]
+ *                                  [--name <path>=[<domain>/]<slug>]... [--allow-in-flight]
+ *     --name names a PRD the plan cannot name, and with `<domain>/` places it under that
+ *     domain directory — required for a PRD that would land directly under the root.
  *     dry-run           0  the plan was printed; nothing was written (the default)
  *     ok                0  --apply wrote everything and checkCorpus is clean
  *     already           0  nothing to migrate and checkCorpus is clean
@@ -49,12 +51,15 @@
  * Blocker codes: prd-less-epic, unplaced-prd, in-flight, target-exists, dirty-path
  * (any tracked path the run would change, not only a move source), id-collision (two
  * documents that would carry one id), link-would-break, registry-behind,
- * registry-missing — plus two that doc-id.js can
+ * registry-missing, unclosed-frontmatter (a document whose opening --- never closes,
+ * so its number cannot be written), needs-domain (a legacy PRD that would land directly
+ * under the root — a layout create-prd refuses; name its domain with
+ * --name <path>=<domain>/<slug>) — plus two that doc-id.js can
  * answer and this module passes through rather than guessing past: registry-invalid
  * (a registry with no usable counter), registry-unwritable (appendPrdRow refused a
  * row: no PRD table header it recognises, a duplicate, a malformed cell) and bad-slug
  * (a legacy slug that no hierarchical name can carry, such as one starting with a
- * digit). Every one of them is raised by the dry run and by --check, before --apply
+ * digit, or a --name domain that is not a lowercase kebab-case segment). Every one of them is raised by the dry run and by --check, before --apply
  * writes anything.
  */
 import { createRequire } from "node:module";
@@ -82,6 +87,8 @@ export const BLOCKER_CODES = Object.freeze([
   "registry-unwritable",
   "id-collision",
   "bad-slug",
+  "unclosed-frontmatter",
+  "needs-domain",
 ]);
 
 const TERMINAL_STATUSES = Object.freeze(["accepted", "cancelled"]);
@@ -145,7 +152,7 @@ const isBundledCopy = (rel) => /^skills\/[^/]+\/references\//.test(rel);
 
 /**
  * Whether the literal pass may rewrite `rel`: not history, a test fixture, a bundled copy or a
- * dependency. Exported so review-prd's migration guard judges the same files the run rewrites.
+ * dependency. Exported so a caller judges the same files the run rewrites.
  */
 export function inRewriteScope(rel) {
   return (
@@ -274,11 +281,20 @@ export function realIo(repoRoot) {
  * Walk `root` once and classify what is there.
  * @param {string} root repo-relative PRD root
  * @param {object} io   { readDir, readFile, exists }
- * @param {object} [opts] { names: Map<docPath, slug> } — the --name answers
+ * @param {object} [opts] { names: Map<docPath, "<slug>" | "<domain>/<slug>"> } — the --name answers
  * @returns {{ root, files, dirs, prds, epics, stories, unreadable }}
  */
 export function discover(root, io, opts = {}) {
-  const names = opts.names || new Map();
+  const given = opts.names || new Map();
+  // A --name value is `<slug>` or `<domain>/<slug>`; parseArgs has refused any other shape.
+  const nameOf = (f) => {
+    const v = given.get(f);
+    if (!v) return { slug: null, domain: null };
+    const cut = v.indexOf("/");
+    return cut < 0
+      ? { slug: v, domain: null }
+      : { slug: v.slice(cut + 1), domain: v.slice(0, cut) };
+  };
   const files = [];
   const dirs = [];
   const unreadable = [];
@@ -319,7 +335,8 @@ export function discover(root, io, opts = {}) {
       shape,
       legacy: c ? c.scheme === "legacy" : true,
       number: c && c.scheme === "new" ? c.prd : null,
-      slug: names.get(f) || (c ? c.slug : null),
+      slug: nameOf(f).slug || (c ? c.slug : null),
+      namedDomain: nameOf(f).domain,
       oldStem: stemOf(base),
       epicsDir: P.join(dir, "epics"),
     });
@@ -333,7 +350,8 @@ export function discover(root, io, opts = {}) {
       shape: "L3",
       legacy: true,
       number: null,
-      slug: names.get(mono) || null,
+      slug: nameOf(mono).slug,
+      namedDomain: nameOf(mono).domain,
       oldStem: "prd",
       epicsDir: null,
     });
@@ -444,7 +462,7 @@ export function plan(disc, registryText, io) {
           blocker(
             "unplaced-prd",
             p.doc,
-            `${p.shape} PRD has no feature slug — pass --name ${p.doc}=<slug>`,
+            `${p.shape} PRD has no feature slug — pass --name ${p.doc}=<slug>, or =<domain>/<slug> to name its domain too`,
           ),
         );
         continue;
@@ -465,10 +483,26 @@ export function plan(disc, registryText, io) {
       );
       continue;
     }
-    // Where the PRD's directory goes.
+    // Where the PRD's directory goes. A named domain wins: it is validated with the call
+    // create-prd's blocks use, so the result is a layout create-prd accepts (task.211).
     let newDir;
     let domain;
-    if (p.shape === "L1") {
+    if (p.namedDomain) {
+      try {
+        docId.format({ kind: "prd", prd: 1, slug: p.namedDomain });
+      } catch {
+        blockers.push(
+          blocker(
+            "bad-slug",
+            p.doc,
+            `domain "${p.namedDomain}" is not a lowercase kebab-case segment starting with a letter — pass --name ${p.doc}=<domain>/<slug>`,
+          ),
+        );
+        continue;
+      }
+      domain = p.namedDomain;
+      newDir = P.join(root, domain, newStem);
+    } else if (p.shape === "L1") {
       newDir = P.join(P.dirname(p.dir), newStem);
       domain = P.relative(root, P.dirname(p.dir)) || ".";
     } else if (p.shape === "L2") {
@@ -480,6 +514,18 @@ export function plan(disc, registryText, io) {
     } else {
       newDir = P.join(root, p.slug, newStem);
       domain = p.slug;
+    }
+    // A PRD directly under the root is a layout create-prd refuses ({domain}/prd.{P}.{f}/),
+    // so a moved one needs a domain. A numbered PRD that stays where it is is not moved here.
+    if (p.legacy && domain === ".") {
+      blockers.push(
+        blocker(
+          "needs-domain",
+          p.doc,
+          `${p.shape} PRD would land directly under ${root}, outside a domain directory — pass --name ${p.doc}=<domain>/<slug>`,
+        ),
+      );
+      continue;
     }
     prdPlans.push({ ...p, n, newStem, newDir, domain });
   }
@@ -730,14 +776,40 @@ export function plan(disc, registryText, io) {
 // Text edits
 // ---------------------------------------------------------------------------
 
-/** Set (or insert) frontmatter fields inside the leading `---` block. Pure. */
+const isFence = (l) => /^---[ \t]*\r?$/.test(l);
+
+/**
+ * The leading frontmatter block of `text`: "closed", "none" (line 0 is no fence) or
+ * "unclosed" (an opening fence that never closes). Pure.
+ */
+export function frontmatterState(text) {
+  const lines = text.split("\n");
+  if (!isFence(lines[0])) return "none";
+  return lines.findIndex((l, i) => i > 0 && isFence(l)) < 0
+    ? "unclosed"
+    : "closed";
+}
+
+/**
+ * Set (or insert) frontmatter fields inside the leading `---` block. Pure.
+ * A file with no block gets one holding every edit, inserted or not, in order — a
+ * legacy PRD written without frontmatter would otherwise move and then fail the
+ * post-check (task.211). A `createOnly` edit is written only into a created block.
+ * An unclosed block is left alone: planEdits refuses that file as a blocker.
+ */
 export function editFrontmatter(text, edits) {
   const lines = text.split("\n");
-  const isFence = (l) => /^---[ \t]*\r?$/.test(l);
-  if (!isFence(lines[0])) return text;
+  if (frontmatterState(text) === "none")
+    return [
+      "---",
+      ...edits.map((e) => `${e.key}: ${e.value}`),
+      "---",
+      text,
+    ].join("\n");
   let close = lines.findIndex((l, i) => i > 0 && isFence(l));
   if (close < 0) return text;
   for (const e of edits) {
+    if (e.createOnly) continue;
     let at = -1;
     for (let i = 1; i < close; i++) {
       if (lines[i].startsWith(`${e.key}:`)) {
@@ -918,7 +990,11 @@ function replaceTargets(line, from, to) {
  */
 export function planEdits(planned, disc, io) {
   const tracked = io.tracked();
-  const liveSet = withDirs([...new Set([...tracked, ...disc.files])]);
+  // A move source is live whether or not it is tracked: an untracked monolith beside the
+  // root still exists, and a link to it must be re-pointed, not counted dead (task.211).
+  const liveSet = withDirs([
+    ...new Set([...tracked, ...disc.files, ...planned.fileMap.keys()]),
+  ]);
   const postSet = withDirs(
     [...liveSet].filter((p) => !p.endsWith("/")).map(planned.mapPath),
   );
@@ -969,6 +1045,7 @@ export function planEdits(planned, disc, io) {
         insert: true,
         after: "name",
       },
+      { key: "type", value: "prd", createOnly: true },
     ]);
   }
   for (const e of planned.epics) {
@@ -1018,6 +1095,18 @@ export function planEdits(planned, disc, io) {
   }
 
   const prefix = `${root}/`;
+  // Move sources outside the root (the L3 monolith, `docs/prd.md`). A file outside the tree
+  // that names one by neither the root's segment nor its prefix is still read for it — by
+  // its repo-relative path, or by the relative path from the file's own directory. Never by
+  // a bare word: as tokens, `prd` and `index` rewrote prose across the tree (task.204 gate 7
+  // CR-1; task.211).
+  const outsideSources = [...planned.fileMap.keys()].filter(
+    (f) => !isUnder(f, root),
+  );
+  const namesOutsideSource = (file, text) =>
+    outsideSources.some(
+      (s) => text.includes(s) || text.includes(P.relative(P.dirname(file), s)),
+    );
   // Every file the run moves is a candidate, the L3 monolith beside the root
   // included even when it is untracked (task.203 QA cycle 2, CR-6).
   const candidates = new Set([...disc.files, ...planned.fileMap.keys()]);
@@ -1045,12 +1134,25 @@ export function planEdits(planned, disc, io) {
       !docFields.has(file) &&
       !gateEdits.has(file) &&
       !text.includes(rootSeg) &&
-      !text.includes(prefix)
+      !text.includes(prefix) &&
+      !namesOutsideSource(file, text)
     )
       continue;
     let out = text;
 
-    if (docFields.has(file)) out = editFrontmatter(out, docFields.get(file));
+    if (docFields.has(file)) {
+      // A fence that never closes cannot be edited, so the file must not move: its
+      // new name would carry a number its frontmatter never states (task.211).
+      if (frontmatterState(out) === "unclosed")
+        blockers.push(
+          blocker(
+            "unclosed-frontmatter",
+            file,
+            "the opening --- never closes, so the migration cannot write its number — close the block and plan again",
+          ),
+        );
+      else out = editFrontmatter(out, docFields.get(file));
+    }
     if (gateEdits.has(file))
       out = editTopLevelYaml(out, "story", gateEdits.get(file));
 
@@ -1094,7 +1196,11 @@ export function planEdits(planned, disc, io) {
     }
 
     // Literal repo-relative paths.
-    if (litOk && litRe && out.includes(prefix)) {
+    if (
+      litOk &&
+      litRe &&
+      (out.includes(prefix) || outsideSources.some((s) => out.includes(s)))
+    ) {
       const rewrite = (seg) =>
         seg.replace(litRe, (m) => {
           const slash = m.endsWith("/") ? "/" : "";
@@ -1499,7 +1605,7 @@ export function revertHint(touch, progress = null) {
 // ---------------------------------------------------------------------------
 
 const USAGE = `Usage: node migrate-doc-numbering.mjs [--apply | --check] [--json] [--root <dir>]
-                                      [--name <path>=<slug>]... [--allow-in-flight]`;
+                                      [--name <path>=[<domain>/]<slug>]... [--allow-in-flight]`;
 
 function parseArgs(argv) {
   const a = {
@@ -1532,9 +1638,14 @@ function parseArgs(argv) {
     } else if (x === "--name") {
       const v = val();
       const eq = v.lastIndexOf("=");
-      if (eq <= 0 || eq === v.length - 1)
-        throw new Error(`--name wants <path>=<slug>, got ${v}`);
-      a.names.set(P.normalize(v.slice(0, eq)), v.slice(eq + 1));
+      const value = v.slice(eq + 1);
+      // `<slug>` or `<domain>/<slug>`: a slug never held a `/`, so one is unambiguous.
+      const parts = value.split("/");
+      if (eq <= 0 || parts.length > 2 || parts.some((s) => s === ""))
+        throw new Error(
+          `--name wants <path>=<slug> or <path>=<domain>/<slug>, got ${v}`,
+        );
+      a.names.set(P.normalize(v.slice(0, eq)), value);
     } else throw new Error(`unknown flag ${x}`);
   }
   if (a.apply && a.check)

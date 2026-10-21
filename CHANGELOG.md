@@ -37,6 +37,15 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **BREAKING — the PRD numbering migration carries the shapes `review-prd` used to refuse (task 211).**
+  `migrate-doc-numbering.mjs` now writes a frontmatter block for a PRD that has none (an unclosed
+  `---` is a new `unclosed-frontmatter` blocker), re-points links and paths to a moved
+  `docs/prd.md` from files outside the PRD root, and accepts `--name <path>=<domain>/<slug>` to
+  place a PRD under a domain directory. A legacy PRD that would land directly under the root (a
+  root `index.md`, `prd.{feature}.md` or `prd.{feature}/`) is a new `needs-domain` blocker until it
+  is named that way — a bare `--name docs/prd/index.md=<slug>` no longer plans. `review-prd`'s
+  `scripts/migration-guard.mjs` and its `no-frontmatter`, `outside-links` and `no-domain` refusals
+  are removed; the plan block now asks for `<domain>/<slug>` on `needs-domain`.
 - **`develop-bug` opens its tracker issue only after `review-bug` says READY TO FIX (task 200).**
   The issue create, the card move and the `work-started` comment moved from Step 1 to a new Step
   2b, and Step 1 no longer pushes the branch. A STALE, DUPLICATE or NEEDS DETAIL verdict now halts

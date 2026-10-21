@@ -409,10 +409,9 @@ the report and every fix would be written through the link. The four classes:
 
 ```bash
 # review-prd — numbering migration plan, read-only (task 204)
-# INPUT: MIG_NAME — empty, or one `<path>=<slug>` per line, one for each PRD the plan cannot name
-# (blocker unplaced-prd).
+# INPUT: MIG_NAME — empty, or one `<path>=<slug>` or `<path>=<domain>/<slug>` per line, one for
+# each PRD the plan cannot name or place (blockers unplaced-prd, needs-domain).
 MIGRATE=.agents/skills/review-prd/references/migrate-doc-numbering.mjs
-GUARD=.agents/skills/review-prd/scripts/migration-guard.mjs
 source .agents/skills/review-prd/references/resolve-paths.sh || exit 1
 NAME_ARGS=()
 while IFS= read -r pair; do [ -n "$pair" ] && NAME_ARGS+=(--name "$pair"); done <<< "${MIG_NAME:-}"
@@ -433,15 +432,6 @@ esac
 printf '%s' "$MIG" | jq -r '"migration: \(.reason)",
   (.blockers[]? | "  ✖ blocker \(.code): \(.path) — \(.detail)"),
   (.mapping[]? | "  \(.kind) \(.oldId) → \(.newId)   \(.old) → \(.new)")'
-# The shapes the migration cannot carry through yet (no frontmatter, no domain, links from outside
-# the PRD root) are refused here, as blockers, so no apply is offered for them.
-[ "$MIG_REASON" = "needs-migration" ] || exit 0
-GUARDED=$(printf '%s' "$MIG" | command node "$GUARD" --root "$PRD_ROOT")
-case "$?:$(printf '%s' "$GUARDED" | jq -r '.reason // empty' 2>/dev/null)" in
-  0:ok) ;;
-  1:blocked) printf '%s' "$GUARDED" | jq -r '.blockers[] | "  ✖ blocker \(.code): \(.path) — \(.detail)"' ;;
-  *) echo "❌ migration guard could not run — offer no apply: $(printf '%s' "$GUARDED" | jq -r '.error // empty' 2>/dev/null)"; exit 1 ;;
-esac
 ```
 
 `--check` answers `needs-migration` **before** it consults its blockers, so read `blockers[]`, never
@@ -450,11 +440,15 @@ the `reason` alone:
 - **No blockers** → fold the planned renames into QUESTION POINT 1 as an apply/skip question.
 - **`unplaced-prd`** on a PRD the plan cannot name (a root-level `docs/prd.md`, a root `index.md`) →
   ask the user for its slug, add a `<path>=<slug>` line to `MIG_NAME` — one line per such PRD, keeping
-  the ones already there — and run the plan again.
-- **`no-frontmatter`**, **`no-domain`**, **`outside-links`** — the migration guard's refusals: a PRD
-  the migration cannot number, would place outside a domain directory, or that files outside the PRD
-  root mention (history and vendored copies aside) — the migration would not re-point them. Report
-  each as Critical with its detail; the detail names the hand fix.
+  the ones already there — and run the plan again. For a root `index.md` ask for `<domain>/<slug>`
+  straight away: it has no domain directory, so a slug alone answers `needs-domain` next.
+- **`needs-domain`** on a PRD that would land directly under `${PRD_ROOT}` (a root `index.md`, a root
+  `prd.{feature}.md` or `prd.{feature}/` directory) — a layout create-prd refuses → ask the user for its
+  domain and slug, put a `<path>=<domain>/<slug>` line in `MIG_NAME` (replacing any `<path>=<slug>` line
+  for the same path), and run the plan again. The domain is a lowercase kebab-case segment starting with
+  a letter, as create-prd requires; another shape answers `bad-slug`.
+- **`unclosed-frontmatter`** — the PRD's opening `---` never closes, so the migration cannot write its
+  number. Report it as Critical; the fix is by hand (close the block), then plan again.
 - **Any other blocker** (`dirty-path`, `in-flight`, `target-exists`, …) → report it as Critical with its
   detail and offer no apply. The blocker names what to fix first.
 - **`already`** or **`post-check-failed`** → nothing to migrate; the numbering findings need a hand
@@ -577,19 +571,11 @@ with options **Apply** and **Skip**. Apply only on an explicit **Apply**, then r
 ```bash
 # review-prd — apply the numbering migration (task 204)
 # Run ONLY after the user chose Apply. INPUT: MIG_NAME, as the plan used it.
+# --apply re-plans and refuses on any blocker (reason blocked) before it moves anything.
 MIGRATE=.agents/skills/review-prd/references/migrate-doc-numbering.mjs
-GUARD=.agents/skills/review-prd/scripts/migration-guard.mjs
 source .agents/skills/review-prd/references/resolve-paths.sh || exit 1
 NAME_ARGS=()
 while IFS= read -r pair; do [ -n "$pair" ] && NAME_ARGS+=(--name "$pair"); done <<< "${MIG_NAME:-}"
-# The guard again, on a fresh plan: nothing is moved for a shape it refuses.
-GUARDED=$(command node "$MIGRATE" --check --json --root "$PRD_ROOT" "${NAME_ARGS[@]}" | command node "$GUARD" --root "$PRD_ROOT")
-case "$?:$(printf '%s' "$GUARDED" | jq -r '.reason // empty' 2>/dev/null)" in
-  0:ok) ;;
-  *) echo "❌ migration not applied — the plan's guard refused it:"
-     printf '%s' "$GUARDED" | jq -r '(.blockers[]? | "  ✖ \(.code): \(.path) — \(.detail)"), (.error // empty)' 2>/dev/null
-     exit 1 ;;
-esac
 MIG=$(command node "$MIGRATE" --apply --json --root "$PRD_ROOT" "${NAME_ARGS[@]}")
 case $? in
   0) echo "migration: $(printf '%s' "$MIG" | jq -r '.reason') — re-run the numbering check" ;;
