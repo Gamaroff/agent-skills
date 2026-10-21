@@ -20,7 +20,8 @@
  *
  * Mutation proofs (task 222 § 8): revert `dod-gap-count.sh` to the whole-section grep → the
  * count tests go red; delete the `--dod` guard → the gaps-lock tests go red; drop `--dod` from
- * the cooperation block → the extracted-block ACCEPTED test goes red.
+ * the cooperation block → the extracted-block ACCEPTED test goes red. Task 223: restore the
+ * one-line `printf '%s\n' "${OUT#S$'\n'}"` in `--body` → the empty-section test goes red.
  *
  * Run via: node --test shared/resources/tests/finalise-gaps-path.test.mjs
  */
@@ -505,6 +506,48 @@ for (const shell of SHELLS) {
       assert.equal(none.status, 1);
       assert.equal(none.stdout, "");
       assert.match(none.stderr, /no current/);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  // QA-222-13 (task 223): an empty current section is a defect, as count mode treats a gaps
+  // report with no gap. `$(…)` strips every trailing newline, so the marker `S` had no newline
+  // after it to strip and was printed as the body, exit 0.
+  test(`[${shell}] dod-gap-count.sh --body refuses an empty section and prints a heading-only one`, () => {
+    const dir = tmp("t223-empty-");
+    try {
+      const head = "# Task\n\n## Definition of Done - Gaps Identified\n";
+      const empty = [
+        { why: "no lines", doc: `${head}## Change Log\n` },
+        { why: "blank lines only", doc: `${head}\n\n## Change Log\n` },
+        { why: "the heading at end of file", doc: head },
+      ];
+      for (const c of empty) {
+        const file = write(dir, "doc.md", c.doc);
+        const r = run(shell, `bash "${GAP_COUNT}" "${file}" --body`, {
+          cwd: ROOT,
+        });
+        assert.equal(r.status, 1, `${c.why}: ${r.stdout}${r.stderr}`);
+        assert.equal(r.stdout, "", `${c.why}: nothing on stdout`);
+        assert.match(r.stderr, /^HALT: .*empty/, c.why);
+      }
+      // Control: a section holding only its subsection heading has a non-blank line, so --body
+      // prints it; count mode keeps its own definition and refuses it as listing no gap.
+      const file = write(
+        dir,
+        "doc.md",
+        `${head}\n### Missing Criteria\n\n## Change Log\n`,
+      );
+      const body = run(shell, `bash "${GAP_COUNT}" "${file}" --body`, {
+        cwd: ROOT,
+      });
+      assert.equal(body.status, 0, body.stdout + body.stderr);
+      assert.match(body.stdout, /### Missing Criteria/);
+      assert.doesNotMatch(body.stdout, /^S$/m, "the marker is not printed");
+      const c = count(file);
+      assert.equal(c.status, 1);
+      assert.match(c.stderr, /lists no gap/);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

@@ -93,6 +93,11 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **finalise gap body refuses an empty section (task 223).** `dod-gap-count.sh --body` printed
+  its internal `S` marker as the body of a `## Definition of Done - Gaps Identified` section with
+  no non-blank line, and exited 0. It now HALTs with the reason on stderr and nothing on stdout,
+  as count mode does for a gaps report with no gap, so Step 8.5 can no longer post `S` as a gap
+  report whatever order its two helper calls run in.
 - **finalise gaps path: the true gap count, and the lock held at Step 7 (task 222).** The
   `dod-gaps` lead counted every `- [ ]` in the gap section, Next Steps included, so it overstated
   the gaps (task.213's two read "4 of them"). A new helper, `dod-gap-count.sh`, is the one

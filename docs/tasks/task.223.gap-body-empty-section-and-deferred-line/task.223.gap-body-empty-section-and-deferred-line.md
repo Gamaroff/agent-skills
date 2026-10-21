@@ -5,7 +5,7 @@ type: task
 description: "Fix the two low findings task.222 carried: dod-gap-count.sh --body prints its internal marker S for an empty gaps section instead of refusing it, and task.222's Implementation Summary says Deferred Work is none beside a Deferred Work section that lists QA-222-13."
 tags: [finalise, dod-gaps, follow-up, task.222]
 category: refactoring
-status: planned
+status: accepted
 priority: Low
 created: 2026-10-21
 updated: 2026-10-21
@@ -13,11 +13,15 @@ assignee:
 estimated_effort_hours: 2
 depends_on: task.222
 github_issue: 719
+completed_date: 2026-10-21
+pr_number: 720
 ---
 
 # Technical Task: Gap body: refuse an empty section; correct task.222's Deferred Work line
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.223.review.1.gap-body-empty-section-and-deferred-line.md` implemented 2026-10-21
 
 **GitHub Issue**: [#719](https://github.com/Gamaroff/agent-skills/issues/719)
 
@@ -87,7 +91,8 @@ section, `$(…)` has removed every trailing newline, so none follows.
 
 Callers (`git grep -n dod-gap-count -- ':!docs/tasks'`, 2026-10-21): `skills/finalise/SKILL.md`
 `:2655` (`--body`) and `:2666` (count). The rest are the helper itself, its bundled copy
-`skills/finalise/references/dod-gap-count.sh`, its tests, and `CHANGELOG.md:98` (prose).
+`skills/finalise/references/dod-gap-count.sh`, its tests, and two prose mentions: Step 8.4's
+`skills/finalise/SKILL.md:2555` and `CHANGELOG.md:98`.
 Bug mode reads its body with its own awk (`SKILL.md:2651`), not this helper, so it is untouched.
 
 The existing `--body` test (`shared/resources/tests/finalise-gaps-path.test.mjs:445`,
@@ -151,22 +156,22 @@ its next call, so its outcome does not change. `|| exit 1` is already on the `--
 
 ### Phase 1: Test first (Low risk)
 
-- [ ] Add a `--body` test for a section with no lines and one with blank lines only. Each must give
+- [x] Add a `--body` test for a section with no lines and one with blank lines only. Each must give
   exit 1, empty stdout, and `HALT` plus "empty" on stderr. Confirm both are red on today's code.
-- [ ] Add a control case: a section holding only `### Missing Criteria` prints that heading, exit 0.
+- [x] Add a control case: a section holding only `### Missing Criteria` prints that heading, exit 0.
 
 ### Phase 2: Fix (Low risk)
 
-- [ ] Add the guard to `--body` mode in `shared/resources/dod-gap-count.sh` (Phase 1 goes green).
-- [ ] Update the header comment at `:52-53` to say `--body` refuses an empty section.
-- [ ] `npm run bundle`, then mutation-prove the guard: restore `printf '%s\n' "${OUT#S$'\n'}"` and
+- [x] Add the guard to `--body` mode in `shared/resources/dod-gap-count.sh` (Phase 1 goes green).
+- [x] Update the header comment at `:52-53` to say `--body` refuses an empty section.
+- [x] `npm run bundle`, then mutation-prove the guard: restore `printf '%s\n' "${OUT#S$'\n'}"` and
   confirm the Phase 1 test goes red. Record the result in the implementation report.
 
 ### Phase 3: Records (Low risk)
 
-- [ ] Correct `task.222.finalise-gaps-path-fixes.md:493` to point at its `## Deferred Work` section,
+- [x] Correct `task.222.finalise-gaps-path-fixes.md:493` to point at its `## Deferred Work` section,
   and add a Change Log row (bump `updated:`).
-- [ ] Add the `CHANGELOG.md` entry citing (task 223).
+- [x] Add the `CHANGELOG.md` entry citing (task 223).
 
 ---
 
@@ -235,30 +240,31 @@ Step 8.5 is the only consumer. The integration tests above cover it.
 
 ### Functional
 
-- [ ] `dod-gap-count.sh <doc> --body` on a current gaps section with no lines exits 1, prints
+- [x] `dod-gap-count.sh <doc> --body` on a current gaps section with no lines exits 1, prints
   nothing on stdout, and prints a `HALT:` line containing "empty" on stderr (Phase 2 adds the guard
   that decides this).
-- [ ] The same holds for a section that holds only blank lines (Phase 2).
-- [ ] A section holding only `### Missing Criteria` still prints that line with exit 0. Count mode
+- [x] The same holds for a section that holds only blank lines (Phase 2).
+- [x] A section holding only `### Missing Criteria` still prints that line with exit 0. Count mode
   still HALTs on it with "lists no gap".
-- [ ] The existing `--body` test at `finalise-gaps-path.test.mjs:445` passes unchanged.
-- [ ] `task.222.finalise-gaps-path-fixes.md` no longer says "Deferred Work: none". Its line names
+- [x] The existing `--body` test at `finalise-gaps-path.test.mjs:445` passes unchanged.
+- [x] `task.222.finalise-gaps-path-fixes.md` no longer says "Deferred Work: none". Its line names
   QA-222-13 and points at `## Deferred Work`.
 
 ### Performance
 
-- [ ] No new pass over the input. The guard reads the captured output only.
+- [x] Not applicable — no per-PR test applies: the change adds one shell `case` on output already
+  captured, with no new pass over the input and no bound to measure.
 
 ### Code Quality
 
-- [ ] The guard is mutation-proven: reverted alone, the Phase 1 test fails; restored, it passes.
+- [x] The guard is mutation-proven: reverted alone, the Phase 1 test fails; restored, it passes.
   Recorded in the implementation report.
-- [ ] `npm run bundle:check` reports 0 problems, and shellcheck is clean on the helper.
-- [ ] `npm test` passes.
+- [x] `npm run bundle:check` reports 0 problems, and shellcheck is clean on the helper.
+- [x] `npm test` passes (one load-sensitive timing test over budget under load; passes alone — see Testing Results).
 
 ### Migration
 
-- [ ] `CHANGELOG.md` `[Unreleased]` has one `Fixed` entry citing (task 223).
+- [x] `CHANGELOG.md` `[Unreleased]` has one `Fixed` entry citing (task 223).
 
 ---
 
@@ -311,13 +317,85 @@ None.
 - **Non-critical**: wording of the HALT message.
 
 ---
+## Implementation Summary
 
+**Completion Date:** 2026-10-21
+
+**Approach:** Test-first, as planned. The new test in `finalise-gaps-path.test.mjs` (three empty
+shapes — no lines, blank lines only, the heading at end of file — plus the heading-only control)
+went red on today's code: `--body` printed `S`, exit 0. The guard in
+`shared/resources/dod-gap-count.sh` strips the marker, then its newline if there is one, and
+refuses a body with no non-whitespace character. A populated section's output is byte-identical to
+before. The header comment says `--body` refuses an empty section. `npm run bundle` regenerated
+`skills/finalise/references/dod-gap-count.sh`. task.222's Deferred Work line now names QA-222-13
+and points at its `## Deferred Work` section, with a Change Log row. The § 3 caller search, re-run,
+finds the same two calls (`SKILL.md:2655` `--body`, `:2666` count).
+
+**Testing Results:** `finalise-gaps-path.test.mjs` + `finalise-bug-mode.test.mjs` 72/72 (bash; zsh variants run in CI only, no zsh on this host). `npm run ci:fast` with `.agents/skills` moved aside: format clean, 6158 tests, 6143 pass, 1 fail — `tests/bundle-missing-source.test.js` over its 20 s timing budget (22.2 s, flagged LOAD-SENSITIVE by the test itself); re-run alone it passed 7/7 in 17.4 s at load average 11.3. `npm run bundle:check`: 128 skills, 0 problems. `shellcheck` clean on the helper. Mutation proof: the one-line `printf '%s\n' "${OUT#S$'\n'}"` restored and bundled → the new empty-section test red, the populated `--body` test still green; guard restored → 18/18.
+
+**Deferred Work:** none.
+
+---
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-21
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Full Report**: [task.223.qa.1.gap-body-empty-section-and-deferred-line.md](./task.223.qa.1.gap-body-empty-section-and-deferred-line.md)
+- **Gate File**: [task.223.gate.1.gap-body-empty-section-and-deferred-line.yml](./task.223.gate.1.gap-body-empty-section-and-deferred-line.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 18
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+No critical issues identified. The diff reviewer found nothing. The `--body` refusal was probed
+(11 cases, 0 escapes, calibrated against the reverted guard) and mutation-proven.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.223.qa.1.gap-body-empty-section-and-deferred-line.md`
+**Gate File**: `task.223.gate.1.gap-body-empty-section-and-deferred-line.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR Review (5c)**: `task.223.pr-review.1.gap-body-empty-section-and-deferred-line.md` gave ✅ APPROVE with 0 findings
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 10/10 met. These cover the empty, blank-only and heading-only `--body` shapes, the unchanged populated test, the task.222 line, mutation proof, bundle and shellcheck, `npm test`, and CHANGELOG.
+✅ **Tests & PR:** PR #720. `finalise-gaps-path.test.mjs` 18/18 locally. CI reading 1 was SUCCESS across 5 checks @ `b4431205`.
+✅ **Documentation:** CHANGELOG `[Unreleased]` Fixed entry, helper header comment, and the regenerated bundled copy.
+✅ **Security Review:** ✅ PASS. The boundary was probed (`shell-argv:` `dod-gap-count.sh --body`): 11 executed, 0 reproduced, 0 escaped.
+✅ **Compliance Review:** Not applicable, since this is internal tooling with no PII, payment, UI or PHI.
+
+**Task marked as ACCEPTED on:** 2026-10-21
+
+**Detailed Verification Log:** See `task.223.dod.1.gap-body-empty-section-and-deferred-line.md` for the full verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                                  | Author      |
-| ---------- | ------- | ------------------------------------------------------------ | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-21 | 1.0     | Initial draft — from task.222's QA-222-13 and PC-1 (5c review) | create-task |
+| 2026-10-21 | 1.1 | Review passed (9/10) — Performance criterion re-scoped as not applicable; § 3 caller list names SKILL.md:2555 | review-task |
+| 2026-10-21 |  | Status → ready-for-development | review-task |
+| 2026-10-21 |  | Implemented — 4 files (+1 bundled copy), 1 test (3 empty shapes + control); mutation-proven | develop |
+| 2026-10-21 |  | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-10-21 | 1.2 | DoD passed — accepted (PR #720) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -326,19 +404,19 @@ None.
 
 ### Phase 1: Test first
 
-- [ ] Empty-section tests red on today's code
-- [ ] Control case added
+- [x] Empty-section tests red on today's code
+- [x] Control case added
 
 ### Phase 2: Fix
 
-- [ ] Guard added; tests green
-- [ ] Header comment updated
-- [ ] Bundled; mutation-proven
+- [x] Guard added; tests green
+- [x] Header comment updated
+- [x] Bundled; mutation-proven
 
 ### Phase 3: Records
 
-- [ ] task.222 Deferred Work line corrected
-- [ ] CHANGELOG entry
+- [x] task.222 Deferred Work line corrected
+- [x] CHANGELOG entry
 
 ---
 
@@ -371,7 +449,7 @@ None.
 
 ---
 
-**Status:** Planned
+**Status:** Accepted
 
 **Next Steps**:
 

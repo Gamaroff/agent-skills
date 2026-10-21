@@ -490,7 +490,7 @@ None.
 
 **Testing Results:** `finalise-gaps-path.test.mjs` 12/12; `finalise-bug-mode.test.mjs` + `step-8-completion-checklist.test.mjs` 113/113; `advance-pipeline-lock.test.sh` 72/72; `npm run ci:fast` on .249: format clean, 6135 pass, 1 environmental failure (see § 9). zsh variants run in CI only (no zsh on this host or .249). Three mutation proofs each turned a test red.
 
-**Deferred Work:** none. Step 8.3's Change Log gap count stays out of scope (§ 4).
+**Deferred Work:** QA-222-13, recorded under `## Deferred Work` below (fixed by task.223). Step 8.3's Change Log gap count stays out of scope (§ 4).
 
 ---
 
@@ -561,6 +561,7 @@ All Definition of Done criteria have been verified:
 | 2026-10-21 |  | QA findings fixed — 4 of 4 (QA-222-9..12), 1 iteration; dod-gap-count.sh --body feeds Step 8.5 | qa-fix |
 | 2026-10-21 |  | QA gate PASS (100/100) — 1 finding (1 low, carried to future by route 2b) | qa-task |
 | 2026-10-21 | 1.2 | DoD verified — accepted (PR #718) | finalise |
+| 2026-10-21 |  | Deferred Work line corrected — points at ## Deferred Work (task.223, PC-1) | develop |
 <!-- change-log-end -->
 
 ---
