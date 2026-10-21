@@ -169,6 +169,11 @@ Adapter overrides are **declarative only** — paths, never JavaScript. A config
 module to `require()` is a code-execution surface, and the gain over "probe command plus expected JSON
 shape" is nil.
 
+The `develop-next` and `develop-batch` probe looks for `develop-next/scripts/select-next.mjs` under
+`.agents/skills/`, then `.claude/skills/`, then `skills/`, relative to the project root. It uses the
+first one that exists, and falls back to `skills/` when none does. A configured `probeScript` always
+wins and is used verbatim.
+
 ## Stopping it
 
 - **First `Ctrl-C`** — finishes the current iteration, then stops. Never mid-merge: an iteration killed

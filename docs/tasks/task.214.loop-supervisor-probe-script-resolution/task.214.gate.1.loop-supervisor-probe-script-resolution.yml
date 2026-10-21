@@ -1,0 +1,53 @@
+schema: 2
+task: 'task.214.loop-supervisor-probe-script-resolution'
+task_title: 'loop-supervisor: find select-next.mjs wherever the skills are installed'
+gate: PASS
+status_reason: 'Both phases are verified and all 9 success criteria are held by committed tests or the validate run. The diff review found no high-confidence bug. Three of four mutations went red; the fourth is an equivalent mutant.'
+reviewer: 'QA Engineer'
+head: '870f6519f535663e90b76f16a950868f1cc1061c'
+updated: '2026-10-21T18:25:58Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 231
+  phases_verified: 2/2
+  ci: 'pending @ 870f6519 (test pending; validate, shellcheck, link-check pass)'
+  trace:
+    phases_covered: [1, 2]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'No boundary. firstExisting chooses a path from three fixed candidates under the caller cwd, and a miss falls back rather than refusing anything. No input crosses a trust boundary, and a configured probeScript was already trusted before this change.'
+  performance:
+    status: PASS
+    notes: 'At most three existsSync calls per resolution. The call-count test pins 3 calls on a miss and 1 on a first-candidate hit.'
+  reliability:
+    status: PASS
+    notes: 'Falls back to the previous default when no candidate exists, so the failure mode is unchanged, and an override still wins. The shared ADAPTERS table is not mutated (tested).'
+  maintainability:
+    status: PASS
+    notes: 'Small, documented change: README and configuration reference each gain one sentence. The CR-2 cleanup is advisory: the fallback string is repeated in the table.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 (advisory, low/medium): report "selector not found under any candidate" separately from "found under skills/", so a consumer with no selector gets a clear error. This criterion deliberately keeps today''s error, so it needs its own task.'
+      refs: ['skills/loop-supervisor/references/adapters.js']
+    - action: 'CR-2 (cleanup): derive the two table probeScript literals from the "skills/" + SELECT_NEXT constant rather than repeating the string.'
+      refs: ['skills/loop-supervisor/references/adapters.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

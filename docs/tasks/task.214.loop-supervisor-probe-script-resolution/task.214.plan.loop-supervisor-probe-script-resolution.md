@@ -29,9 +29,9 @@ const PROBE_SCRIPT_CANDIDATES = [
   "skills/" + SELECT_NEXT, // also the fallback when nothing exists
 ];
 
-function firstExisting(cwd, candidates) {
+function firstExisting(cwd, candidates, exists = fs.existsSync) {
   for (const c of candidates) {
-    if (fs.existsSync(path.join(cwd, c))) return c;
+    if (exists(path.join(cwd, c))) return c;
   }
   return candidates[candidates.length - 1];
 }
@@ -57,8 +57,24 @@ Each test builds a temp project with `fs.mkdtempSync(path.join(os.tmpdir(), "ls-
 
 - Overrides are declarative and verbatim (`resolveAdapter` docstring); do not search or normalise them.
 - `probeArgs` reads `this.probeScript`, so no change is needed there once the merged adapter carries the resolved path.
-- The existing test "resolveAdapter applies declarative config overrides without mutating the table" must keep passing: resolve onto the copy, never the table entry.
+- The existing test "resolveAdapter applies declarative config overrides without mutating the table" keeps its assertions but **needs a temp `cwd`**. Its `probeArgs({}).includes("skills/…")` check resolves against the repository root. There, the gitignored `.agents/skills` symlink makes the result `.agents/skills/…` locally, while CI has no symlink and gets `skills/…`. Give it a temp directory that holds only the `skills/…` candidate. Resolve onto the copy, never the table entry.
 
 ## Testing Approach
 
-Cases: only `.agents`, only `.claude`, only `skills`, none, `.agents` and `skills` both, override set, `develop-batch` with the same layouts, `generic` unaffected. Mutation-prove by reordering the list and by moving the search after the override loop. Run `command node --test evals/loop-supervisor/unit/adapters.test.mjs`.
+Cases:
+
+- only `.agents`
+- only `.claude`
+- only `skills`
+- none
+- both `.agents` and `skills`
+- an override set
+- `develop-batch` with the same layouts
+- `generic` unaffected
+- a call count: a counting `exists` stub must be called at most 3 times, and once when the first candidate exists
+
+Mutation-prove each guard three ways:
+
+- reorder the candidate list
+- move the search after the override loop
+- let `firstExisting` keep looping after a hit Run `command node --test evals/loop-supervisor/unit/adapters.test.mjs`.

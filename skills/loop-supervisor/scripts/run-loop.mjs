@@ -1102,7 +1102,7 @@ function main() {
   try {
     engine = resolveEngine(opts.engine);
     assertSupported(engine, opts);
-    adapter = resolveAdapter(opts.adapter, config);
+    adapter = resolveAdapter(opts.adapter, config, { cwd });
     nodeBin = resolveBinary("node");
     engineBin = resolveBinary(engine.binary);
   } catch (e) {
