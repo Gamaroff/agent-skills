@@ -96,7 +96,7 @@ Rules:
   sub-skill has advanced the lock as its last action and its step's tail then
   halts. Which sub-skills advance it, and to where, is stated once, in the
   `--skill` mapping of `advance-pipeline-lock.sh`; this file does not list
-  them. `/finalise` is one: it moves the lock to 8 before Step 7's tail runs, so
+  them. `/finalise` is one: on an accepted DoD it moves the lock to 8 before Step 7's tail runs, so
   a HALT in Step 7's tail reads `Step 7/8 — {STEP-NAME} ❌ halted`, where
   `{STEP-NAME}` is `FINALISE` on develop-story and develop-task and
   `FINALISE & CLOSE` on develop-bug. This governs the printed block only; the

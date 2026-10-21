@@ -1746,18 +1746,61 @@ for (const shell of SHELLS) {
     }
   });
 
+  // The gap section in Step 8.4's shape (task 222): gaps under `### Missing Criteria:`,
+  // actions under `### Next Steps:`.
   test(`[${shell}] 8.5 for a story/task still reads the document body, bounded at the next ## (task.152)`, () => {
     const dir = mkdtempSync(path.join(tmpdir(), "finalise-85-"));
     try {
       const doc = path.join(dir, "task.7.x.md");
       writeFileSync(
         doc,
-        "# Task 7\n\n## Definition of Done - Gaps Identified\n\n- [ ] one\n- [ ] two\n- [ ] three\n\n## Progress Tracking\n\n- [ ] not a gap\n",
+        "# Task 7\n\n## Definition of Done - Gaps Identified\n\n### Missing Criteria:\n\n1. **Acceptance Criteria:**\n   - [ ] one\n   - [ ] two\n   - ⚠️ three\n\n### Next Steps:\n\n- [ ] close one\n\n## Progress Tracking\n\n- [ ] not a gap\n",
       );
       const r = run85({ KIND_IN: "task", DOCF: doc, DOD: "" });
       assert.equal(r.status, 0, r.stdout + r.stderr);
       assert.match(r.stdout, /^GAP_COUNT=3$/m);
       assert.doesNotMatch(r.stdout, /not a gap/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  // task 222 (obs #24): the lead counted Next Steps boxes as gaps — task.213's two gaps read
+  // "(4 of them)". The rendered lead now states the Missing Criteria count.
+  test(`[${shell}] 8.5's lead for a two-gap report with two Next Steps reads "(2 of them)" (task 222)`, () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "finalise-85-"));
+    try {
+      const doc = path.join(dir, "task.7.x.md");
+      writeFileSync(
+        doc,
+        "# Task 7\n\n## Definition of Done - Gaps Identified\n\n### Missing Criteria:\n\n1. **Acceptance Criteria:**\n   - [ ] AC8 re-measured on the PR head\n\n2. **Documentation:**\n   - [ ] CHANGELOG entry\n\n### Next Steps:\n\n- [ ] Re-measure AC8\n- [ ] Add the CHANGELOG entry\n\n## Change Log\n",
+      );
+      const r = run85({ KIND_IN: "task", DOCF: doc, DOD: "" });
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+      assert.match(r.stdout, /^GAP_COUNT=2$/m);
+      assert.match(r.stdout, /\(2 of them\)/);
+      assert.doesNotMatch(r.stdout, /\(4 of them\)/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test(`[${shell}] 8.5 for a story/task refuses a gap section with no Missing Criteria item (task 222)`, () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "finalise-85-"));
+    try {
+      const doc = path.join(dir, "task.7.x.md");
+      writeFileSync(
+        doc,
+        "# Task 7\n\n## Definition of Done - Gaps Identified\n\n- [ ] one\n\n## Change Log\n",
+      );
+      const r = run85({ KIND_IN: "task", DOCF: doc, DOD: "" });
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+      assert.match(r.stderr, /no '### Missing Criteria'/);
+      assert.doesNotMatch(
+        r.stdout,
+        /^GAP_COUNT=/m,
+        "nothing was built for posting",
+      );
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

@@ -240,7 +240,7 @@ fi
 # checklist. Same for all three orchestrators: develop-bug follows the same step doc.
 #
 # Only the description of Step 7's tail differs by orchestrator. develop-bug's Step 7 is
-# /finalise --bug (Part A, whose lock cooperation advances the lock to 8) and then Part B, the
+# /finalise --bug (Part A, whose lock cooperation advances the lock to 8 on an accepted DoD) and then Part B, the
 # bug-close routine that actually closes the bug (develop-bug-step-7-close-bug.md), then that
 # document's Step 7 Completion Checklist, which decides whether Step 7 finished. The checklist is a
 # section of its own, beside Parts A and B, and covers Part A's items too (task 163). A
@@ -249,7 +249,8 @@ fi
 # together (step-8-completion-checklist.test.mjs). The routing rule is the same
 # for all three; the parenthetical only names the work (task 162; task.161 gate.3 CR-2).
 #
-# The lock reads 8 from the end of /finalise, before Step 7's tail and before Step 8's own
+# On an accepted DoD the lock reads 8 from the end of /finalise (on gaps it holds at 7, task
+# 222), before Step 7's tail and before Step 8's own
 # report update, so the line may not assume either ran (task.161 QA cycle 1, CR-2). It does
 # not invent a finer rule for where to resume: it states the resume contract's one step-8
 # rule (an unfinished row at or below Step 7 wins; otherwise re-run Step 8 from its start).
@@ -263,7 +264,7 @@ fi
 if [ "$NEXT" = "5" ] && [ "$SKILL" != "develop-bug" ]; then
   COMPLETION_LINE="$THEN_WHAT"
 elif [ "$NEXT" = "8" ]; then
-  COMPLETION_LINE="Step 8 is NOT finished when /commit-changes returns. Resume by the step-8 rule the resume contract states (Phase 0b): a lock at 8 is not evidence that Step 7 finished, because /finalise moves it there before Step 7's tail runs. If a Pipeline Progress row at or below Step 7 in \`${REPORT}\` is unfinished, finish that step first (${STEP7_TAIL}). Otherwise run Step 8 from its start; re-running it is safe. Step 8 ends only when its Completion Checklist passes, and the checklist runs \`advance-pipeline-lock.sh --complete\` itself as its last action. Never run \`--complete\` on your own because the commit landed."
+  COMPLETION_LINE="Step 8 is NOT finished when /commit-changes returns. Resume by the step-8 rule the resume contract states (Phase 0b): a lock at 8 is not evidence that Step 7 finished, because /finalise, when it accepts, moves it there before Step 7's tail runs. If a Pipeline Progress row at or below Step 7 in \`${REPORT}\` is unfinished, finish that step first (${STEP7_TAIL}). Otherwise run Step 8 from its start; re-running it is safe. Step 8 ends only when its Completion Checklist passes, and the checklist runs \`advance-pipeline-lock.sh --complete\` itself as its last action. Never run \`--complete\` on your own because the commit landed."
 else
   COMPLETION_LINE="Only once ${NEXT_SKILL} has actually completed: mark Step ${NEXT} ✅ in \`${REPORT}\` and advance the lock to ${ADVANCE_TO}."
 fi
@@ -277,7 +278,7 @@ else
 fi
 
 # The Remaining Work Status position. At Step 8 the lock is not evidence that Step 7 finished
-# (/finalise moves it to 8 before Step 7's tail runs), so the position may not assert "Step 7/8 ✅
+# (/finalise, on an accepted DoD, moves it to 8 before Step 7's tail runs), so the position may not assert "Step 7/8 ✅
 # complete" two lines above the rule that denies it. It names Step 8 as pending, in the banner
 # doc's own "Step N/8 — NAME ⏳ …" form, and Step 7 as unverified (task 162; task.161 gate.3
 # CR-1, pre-existing: develop rendered the same line before task 161).

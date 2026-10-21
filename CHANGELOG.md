@@ -93,6 +93,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **finalise gaps path: the true gap count, and the lock held at Step 7 (task 222).** The
+  `dod-gaps` lead counted every `- [ ]` in the gap section, Next Steps included, so it overstated
+  the gaps (task.213's two read "4 of them"). A new helper, `dod-gap-count.sh`, is the one
+  story/task count: the list items under `### Missing Criteria`, checkbox or `- ⚠️`. It HALTs on a
+  gap section with none. `advance-pipeline-lock.sh --skill finalise` now needs `--dod <path>` and
+  advances to Step 8 only when that DoD reads `**Final Status:** ✅ ACCEPTED`; otherwise it holds
+  the lock, says why on stderr, and exits 0. A gaps halt now resumes at `/finalise` instead of
+  reading Step 7 as done. finalise's lock cooperation passes `--dod`; reinstall the skills together
+  so an older finalise does not call the newer helper without it (it would hold at 7 until the
+  orchestrator's own advance).
 - **Migration engine: dot-directory references and displaced-block edits (task 221).**
   `outsideReferences` in `migrate-doc-numbering.mjs` now compares a dot-directory path
   (`.docs/prd.md`, `${ROOT}/.docs/prd.md`) at the repository root as well as at the file's own

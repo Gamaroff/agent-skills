@@ -2550,6 +2550,9 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
    - Add a "## Definition of Done - Gaps Identified" section
    - Place it the same way as 7.4: immediately before the change-log block, never between the markers
    - List all specific gaps by category
+   - Each gap is one list item (`- [ ] …` or `- ⚠️ …`) under `### Missing Criteria:`. `### Next Steps:`
+     lists the actions that close them and is not counted: Step 8.5's lead counts the first list only,
+     through `dod-gap-count.sh`
    - **If QA reports exist**, include QA gate findings and top issues
    - Provide actionable next steps
    - Estimate effort to close gaps (Small/Medium/Large)
@@ -2650,16 +2653,16 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
      case "$DOC_FILE" in *'{'* | '') echo "HALT: DOC_FILE must be bound in this block"; exit 1 ;; esac
      GAP_REPORT_BODY=$(awk '/^## Definition of Done - Gaps Identified/{f=1;next} /^## /{f=0} f' "$DOC_FILE")
    fi
-   # Unmet criteria across every section of the gap report — an unchecked box,
-   # indented too: 8.4's example nests them under a numbered list (obs #212).
-   # `grep -c` prints 0 and EXITS 1 when it matches nothing, so `|| true` (never
-   # `|| echo 0`, which would append a second zero and make the value "0\n0").
+   # The gap count comes from a helper in both modes, never from a grep here: one
+   # definition per mode, so the lead cannot count a different list from the body.
    if [ "$DOC_KIND" = "bug" ]; then
      # The helper's `count` is the one definition of the bug-mode gap list (8.1, 8.3 and here).
      GAP_COUNT=$(bash .agents/skills/finalise/references/fill-verification-complete.sh "$DOD_PATH" count) || exit 1
    else
-     GAP_COUNT=$(printf '%s' "$GAP_REPORT_BODY" | grep -c '^[[:space:]]*- \[ \]' || true)
-     GAP_COUNT=${GAP_COUNT:-0}
+     # Story/task: the list items under `### Missing Criteria`, indented or not, checkbox or
+     # `- ⚠️` (8.4) — never the `### Next Steps` boxes, which double-counted every report
+     # (obs #24). The helper HALTs on a gap section with no Missing Criteria item in it.
+     GAP_COUNT=$(bash .agents/skills/finalise/references/dod-gap-count.sh "$DOC_FILE") || exit 1
    fi
    # Bug mode: the template always fills Step 5 (Decision, QA record, CI rollup), so the
    # empty-body post-condition below can never fire there. 8.1's helper already refused a DoD
@@ -3120,8 +3123,16 @@ When this skill is invoked as a step in a develop pipeline, advance the pipeline
 
 ```bash
 if [ -f .claude/state/develop-pipeline.lock ]; then
-  bash .agents/skills/finalise/references/advance-pipeline-lock.sh --skill finalise 2>/dev/null || true
+  # The DoD this run wrote (dod.{N}, the newest) — its **Final Status:** line decides the advance.
+  DOD_PATH="{dod-path — the running summary Step 0 created}"
+  case "$DOD_PATH" in *'{'* | '') echo "HALT: DOD_PATH must be bound in this block"; exit 1 ;; esac
+  bash .agents/skills/finalise/references/advance-pipeline-lock.sh --skill finalise --dod "$DOD_PATH" || true
 fi
 ```
+
+**Run it on both paths, accepted and gaps.** The helper decides, not this page: it moves the lock to
+Step 8 only when `$DOD_PATH` reads `**Final Status:** ✅ ACCEPTED`, and on gaps it holds the lock at 7,
+says why on stderr and exits 0. A gaps halt therefore resumes at `/finalise` instead of reading Step 7
+as done (task 222, obs #79). Its stderr is kept, so the hold reason reaches the transcript.
 
 Idempotent in every degraded path: noops when the lock is missing (skill invoked standalone), already advanced past this step, or the helper script is not installed. Full rationale and cooperation order with the `Stop` hook: see [`references/pipeline-lock-cooperation.md`](references/pipeline-lock-cooperation.md).

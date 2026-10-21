@@ -122,11 +122,11 @@ for SK in develop-story develop-task develop-bug; do
   elif echo "$R" | grep -q "has actually completed: mark Step 8"; then
     fail "[$SK] lock=8 names the Completion Checklist as Step 8's completion" "still carries the generic 'once /commit-changes has completed' line"
   elif echo "$R" | grep -q "is already ✅"; then
-    # The lock reads 8 from the end of /finalise, before Step 8's report update, so an
+    # On an accepted DoD the lock reads 8 from the end of /finalise, before Step 8's report update, so an
     # unconditional "the row is already done" is false in that window (task.161 CR-2).
     fail "[$SK] lock=8 names the Completion Checklist as Step 8's completion" "asserts Step 8's row is already done, unconditionally"
   elif ! echo "$R" | grep -q "at or below Step 7" || ! echo "$R" | grep -q "Step 7's tail"; then
-    # A lock at 8 can precede Step 7's tail: /finalise moves it there first. The reason must
+    # A lock at 8 can precede Step 7's tail: /finalise, when it accepts, moves it there first. The reason must
     # send an unfinished row at or below Step 7 back to that step, as the resume contract's
     # step-8 rule does, never straight to Step 8's report update (task.161 QA cycle 2, CR-1).
     fail "[$SK] lock=8 names the Completion Checklist as Step 8's completion" "does not send an unfinished Step 7 back to Step 7's tail"
@@ -182,7 +182,7 @@ else
 fi
 
 # ── Scenario 5d: at Step 8 the status position does not assert Step 7 complete ──
-# /finalise moves the lock to 8 before Step 7's tail runs, so "Step 7/8 ✅ complete" is a claim a
+# /finalise, on an accepted DoD, moves the lock to 8 before Step 7's tail runs, so "Step 7/8 ✅ complete" is a claim a
 # lock at 8 does not support, made two lines above the rule that denies it (task 162; pre-existing,
 # task.161 gate.3 CR-1). The position names Step 8 pending and Step 7 unverified instead.
 for SK in develop-story develop-task develop-bug; do
