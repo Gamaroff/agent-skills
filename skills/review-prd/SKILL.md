@@ -452,12 +452,14 @@ the `reason` alone:
   as Critical: the fix is by hand (move it into `${PRD_ROOT}/<domain>/` and set its registry row's
   Folder), then plan again.
 - **`unclosed-frontmatter`** — the PRD's opening `---` never closes, so the migration cannot write its
-  number. **`displaced-frontmatter`** — a BOM or blank lines come before an opening `---` that closes,
+  number. **`displaced-frontmatter`** — a BOM or blank lines come before a `---` block of YAML keys,
   so no reader sees the block. Report either as Critical; the fix is by hand (close the block, or
   delete what precedes it), then plan again.
-- **`stale-reference`** — a file outside the PRD root names a moved PRD by a path neither pass rewrites:
+- **`stale-reference`** — a file names a moved outside PRD (such as `docs/prd.md`) by a path neither pass rewrites:
   a relative path outside a link, such as `"../docs/prd.md"` in a script, or any path in a file type the
-  passes do not rewrite, such as `package.json` or a `.sh`. Report it as Critical with its detail; the
+  passes do not rewrite, such as `package.json` or a `.sh` (under `${PRD_ROOT}` too), including a path
+  rooted in a variable (`${ROOT}/docs/prd.md`, `$ROOT/docs/prd.md`). Frozen copies under `examples/` are
+  not judged. Report it as Critical with its detail; the
   fix is by hand (point it at the new path, or make it a Markdown link), then plan again.
 - **Any other blocker** (`dirty-path`, `in-flight`, `target-exists`, …) → report it as Critical with its
   detail and offer no apply. The blocker names what to fix first.

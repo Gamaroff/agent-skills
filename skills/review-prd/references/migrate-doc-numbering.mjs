@@ -54,7 +54,8 @@
  * documents that would carry one id), link-would-break, registry-behind,
  * registry-missing, unclosed-frontmatter (a document whose opening --- never closes,
  * so its number cannot be written), displaced-frontmatter (a BOM or blank lines before
- * an opening --- that closes), stale-reference (a path, in any in-scope text file, to a
+ * an opening --- that closes over YAML), stale-reference (a path, in any in-scope text
+ * file but a frozen example copy, to a
  * moved file outside the PRD root that neither the link pass nor the literal pass
  * rewrites), needs-domain (a PRD that would move to directly under the root — a layout
  * create-prd refuses; name a legacy PRD's domain with --name <path>=<domain>/<slug>,
@@ -123,6 +124,28 @@ const LITERAL_EXTS = Object.freeze([
   ".cjs",
 ]);
 const EXAMPLE_FRONTMATTER_KEYS = Object.freeze(["prd_source", "source_path"]);
+// Types the stale-reference scan never reads: no path in them is a reference it could name.
+const BINARY_EXTS = Object.freeze([
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".webp",
+  ".ico",
+  ".pdf",
+  ".zip",
+  ".gz",
+  ".tgz",
+  ".tar",
+  ".woff",
+  ".woff2",
+  ".ttf",
+  ".otf",
+  ".mp4",
+  ".mov",
+  ".mp3",
+  ".wasm",
+]);
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -155,6 +178,10 @@ function isTestFixture(rel) {
 
 const isExampleCopy = (rel) => rel.startsWith("examples/");
 const isBundledCopy = (rel) => /^skills\/[^/]+\/references\//.test(rel);
+// Which files the stale-reference scan judges: what the run may rewrite, less the frozen
+// example copies, which the literal pass rewrites only through their frontmatter. One
+// predicate for both scan loops (task.211 QA cycle 3, CR-3).
+const scansForStale = (rel) => inRewriteScope(rel) && !isExampleCopy(rel);
 
 /**
  * Whether the literal pass may rewrite `rel`: not history, a test fixture, a bundled copy or a
@@ -838,15 +865,22 @@ export function frontmatterState(text) {
     return lines.findIndex((l, i) => i > 0 && isFence(l)) < 0
       ? "unclosed"
       : "closed";
-  // A late fence is a displaced block only when it closes: a blank line and a thematic
-  // break ("\n---\n# Title") is a body with no block (task.211 QA cycle 2, CR-5).
+  // A late fence is a displaced block only when it closes over YAML: a blank line and a
+  // thematic break ("\n---\n# Title"), with or without a later break, is a body with no
+  // block (task.211 QA cycle 2, CR-5; cycle 3, CR-4).
   const first = lines.findIndex((l) => l.replace(/^\uFEFF/, "").trim() !== "");
-  return first >= 0 &&
-    isFence(lines[first].replace(/^\uFEFF/, "")) &&
-    lines.findIndex((l, i) => i > first && isFence(l)) > first
+  if (first < 0 || !isFence(lines[first].replace(/^\uFEFF/, ""))) return "none";
+  const close = lines.findIndex((l, i) => i > first && isFence(l));
+  if (close < 0) return "none";
+  const inner = lines.slice(first + 1, close).filter((l) => l.trim() !== "");
+  return inner.some((l) => YAML_KEY.test(l)) &&
+    inner.every((l) => YAML_KEY.test(l) || /^(?:\s|#|-\s)/.test(l))
     ? "displaced"
     : "none";
 }
+
+// A top-level YAML mapping key: what a frontmatter line looks like and a body line does not.
+const YAML_KEY = /^[A-Za-z_][\w-]*[ \t]*:(?:[ \t]|\r?$)/;
 
 /**
  * Set (or insert) frontmatter fields inside the leading `---` block. Pure.
@@ -1054,7 +1088,10 @@ const PATH_TOKEN = /(?<![\w.~\/-])[\w.~-]*(?:\/[\w.~-]+)+/g;
  * (apps/web/docs/prd.md, ../../../prd.md). Each token is resolved, never substring-matched:
  * a `./` or `../` token against the file's directory, any other against both the file's
  * directory and the repository root. Trailing sentence dots are not part of a path. An
- * absolute or URL path never matches (task.211 QA cycle 2, CR-3, CR-4). Pure.
+ * absolute or URL path never matches (task.211 QA cycle 2, CR-3, CR-4). A path rooted in a
+ * variable (`${ROOT}/docs/prd.md`, `$ROOT/docs/prd.md`, `$(dirname "$0")/../prd.md`) is not
+ * absolute: its variable is dropped and the rest resolved as a relative token (cycle 3,
+ * CR-1). Pure.
  * @returns {{token: string, source: string}[]}
  */
 export function outsideReferences(file, text, sources) {
@@ -1062,14 +1099,21 @@ export function outsideReferences(file, text, sources) {
   if (!sources.some((s) => text.includes(P.basename(s)))) return hits;
   const want = new Set(sources);
   const dir = P.dirname(file);
-  for (const [raw] of text.matchAll(PATH_TOKEN)) {
-    const token = raw.replace(/\.+$/, "");
+  for (const match of text.matchAll(PATH_TOKEN)) {
+    const token = match[0].replace(/\.+$/, "");
     // None longer than PATH_MAX: path.join is quadratic on a long `../` chain, and no real
     // reference is that long.
-    if (token.startsWith("/") || token.length > 4096) continue;
-    const forms = token.startsWith(".")
-      ? [P.join(dir, token)]
-      : [P.join(dir, token), P.normalize(token)];
+    if (token.length > 4096) continue;
+    const before = text[match.index - 1];
+    let rest = token;
+    if (before === "$") rest = token.slice(token.indexOf("/") + 1);
+    else if (token.startsWith("/")) {
+      if (before !== "}" && before !== ")") continue;
+      rest = token.slice(1);
+    }
+    const forms = rest.startsWith(".")
+      ? [P.join(dir, rest)]
+      : [P.join(dir, rest), P.normalize(rest)];
     const source = forms.find((f) => want.has(f));
     if (source) hits.push({ token, source });
   }
@@ -1359,17 +1403,20 @@ export function planEdits(planned, disc, io) {
     // A path to an outside move source that neither pass rewrote — a relative one outside a
     // link — would point at nothing after the move. Name it rather than answer ok over it
     // (task.211 QA cycle 1, QA-1).
-    if (litOk && !isExampleCopy(file)) staleReferences(file, out);
+    if (scansForStale(file)) staleReferences(file, out);
     if (out !== text) edits.set(file, out);
   }
-  // The passes rewrite only the literal-pass file types, so every other in-scope tracked
-  // text file that names an outside source is stale after the move. Read only when an
-  // outside source exists (task.211 QA cycle 2, CR-1); a NUL byte marks a binary file.
+  // The passes rewrite only the literal-pass file types, so every other tracked text file
+  // the scan covers is stale after the move if it names an outside source — under the PRD
+  // root or outside it. The loop above reads exactly the literal-pass types, so this one
+  // reads exactly the rest: each file once, by one predicate (task.211 QA cycle 3, CR-2,
+  // CR-3). Read only when an outside source exists (cycle 2, CR-1); a known binary type is
+  // never read, and a NUL byte marks any other.
   if (outsideSources.length)
     for (const file of tracked) {
-      if (LITERAL_EXTS.includes(P.extname(file)) || !inRewriteScope(file))
-        continue;
-      if (candidates.has(file)) continue;
+      const ext = P.extname(file).toLowerCase();
+      if (LITERAL_EXTS.includes(ext) || BINARY_EXTS.includes(ext)) continue;
+      if (!scansForStale(file)) continue;
       const text = io.readFile(file);
       if (text !== null && !text.includes("\0")) staleReferences(file, text);
     }

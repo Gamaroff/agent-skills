@@ -248,21 +248,21 @@ makes, and `migration-guard.mjs` refuses nothing it can carry.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-21
-**Quality Score**: 70/100
+**Quality Score**: 75/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.211.qa.2.migration-engine-monolith-and-domainless-prds.md](./task.211.qa.2.migration-engine-monolith-and-domainless-prds.md)
-- **Gate File**: [task.211.gate.2.migration-engine-monolith-and-domainless-prds.yml](./task.211.gate.2.migration-engine-monolith-and-domainless-prds.yml)
+- **Full Report**: [task.211.qa.3.migration-engine-monolith-and-domainless-prds.md](./task.211.qa.3.migration-engine-monolith-and-domainless-prds.md)
+- **Gate File**: [task.211.gate.3.migration-engine-monolith-and-domainless-prds.yml](./task.211.gate.3.migration-engine-monolith-and-domainless-prds.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 100
+- **Tests Executed**: 105
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Cycle 1's four findings are fixed, and `parseNameValue` engages under the path probe (20 cases, 0 escaped). The refute pass found five new defects in those fixes. The three medium ones: the stale-reference scan skips non-literal file types (CR-1); a numbered PRD at the root still lands outside a domain and cannot be named one (CR-2); and the substring match blocks correct references (CR-3). The two low ones: `./prd.md` is never flagged (CR-4), and a thematic break after a blank line reads as a displaced block (CR-5).
+Cycle 2's five findings are fixed, and `parseNameValue` still engages under the path probe (20 cases, 0 escaped). The scoped review of that fix found five new defects. The two medium ones: a path that starts with a variable (`${ROOT}/docs/prd.md`) is skipped as absolute (CR-1, a regression for `.mjs`), and a non-literal file inside the PRD root is read by neither loop (CR-2). The three low ones: frozen example copies are not exempt in the non-literal loop (CR-3), a body with two thematic breaks still reads as displaced (CR-4), and binaries are read in full before being discarded (CR-5).
 
 ## Change Log
 <!-- change-log-start -->
@@ -277,6 +277,8 @@ Cycle 1's four findings are fixed, and `parseNameValue` engages under the path p
 | 2026-10-21 |         | QA findings fixed — cycle 1, 4 of 4 (CR-1, QA-1, QA-2, CR-3), 5 test rows | qa-fix |
 | 2026-10-21 |         | QA gate CONCERNS (70/100) — 5 findings (3 medium, 2 low) | qa-task |
 | 2026-10-21 |         | QA findings fixed — cycle 2, 5 of 5 (CR-1 to CR-5), stale-reference matcher consolidated, 5 test rows | qa-fix |
+| 2026-10-21 |         | QA gate CONCERNS (75/100) — 5 findings (2 medium, 3 low) | qa-task |
+| 2026-10-21 |         | QA findings fixed — cycle 3, 5 of 5 (CR-1 to CR-5), one stale-scan predicate for both loops, 2 test rows added and 1 extended | qa-fix |
 <!-- change-log-end -->
 
 ---

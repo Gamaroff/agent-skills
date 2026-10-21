@@ -39,9 +39,10 @@ All notable changes to this project will be documented in this file. Format foll
 
 - **BREAKING — the PRD numbering migration carries the shapes `review-prd` used to refuse (task 211).**
   `migrate-doc-numbering.mjs` now writes a frontmatter block for a PRD that has none (an unclosed
-  `---` is a new `unclosed-frontmatter` blocker, and a BOM or blank lines before a closing block a
+  `---` is a new `unclosed-frontmatter` blocker, and a BOM or blank lines before a YAML block a
   new `displaced-frontmatter` one), re-points links and paths to a moved `docs/prd.md` from files
-  outside the PRD root (a path in any in-scope text file that neither pass can rewrite is a new
+  outside the PRD root (a path, `${ROOT}/`-style variable-rooted ones included, in any in-scope text file but a
+  frozen example copy, that neither pass can rewrite is a new
   `stale-reference` blocker), and accepts `--name <path>=<domain>/<slug>` to place a legacy PRD
   under a domain directory; each segment is checked by the exported `parseNameValue`. A PRD that
   would move to directly under the root (a root `index.md`, `prd.{feature}.md` or `prd.{feature}/`,

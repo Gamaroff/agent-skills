@@ -1,0 +1,86 @@
+schema: 2
+task: 'task.211.migration-engine-monolith-and-domainless-prds'
+task_title: 'Migration engine: monolith and domain-less PRDs'
+gate: CONCERNS
+status_reason: 'Cycle 2 fixed its five findings, each held by a mutation-proven row, and parseNameValue still engages (20 cases, 0 escapes). The scoped review of the fix found five new defects. Two are medium: a path that starts with a variable is skipped as absolute, and a non-literal file inside the PRD root is read by neither loop. Three are low.'
+reviewer: 'QA Engineer'
+head: '02d65ff4b9172ee1120e2edf6785032ed45b3bf8'
+updated: '2026-10-21T01:39:42Z'
+
+top_issues:
+  - id: CR-1
+    severity: medium
+    file: 'shared/resources/migrate-doc-numbering.mjs'
+    finding: 'outsideReferences skips any token that starts with "/", so a path built from a variable (`${ROOT}/docs/prd.md` in a .mjs, `$ROOT/docs/prd.md` in a .sh) is dropped as absolute: it is neither rewritten nor flagged and --apply answers ok (reproduced). For the .mjs case this is a regression: the substring test before 02d65ff4 blocked it with stale-reference.'
+    suggested_action: 'Treat a token as absolute only when its "/" opens the text or follows whitespace, a quote, "(" or "="; resolve a "/" that follows "}", ")" or a $VAR against the repository root. Add both forms to the must-flag list.'
+    suggested_owner: dev
+  - id: CR-2
+    severity: medium
+    file: 'shared/resources/migrate-doc-numbering.mjs'
+    finding: 'The non-literal loop skips every file in candidates, but candidates also holds non-literal files under the PRD root, which the main loop skips by extension; docs/prd/tools/cfg.json naming docs/prd.md is read by neither loop and the plan answers ok (reproduced).'
+    suggested_action: 'Skip in the non-literal loop only the files the main loop actually scanned, so every in-scope tracked text file is read exactly once.'
+    suggested_owner: dev
+  - id: CR-3
+    severity: low
+    file: 'shared/resources/migrate-doc-numbering.mjs'
+    finding: 'The main loop exempts frozen example copies from stale-reference, the non-literal loop does not: examples/demo/package.json naming docs/prd.md blocks the run and asks for a hand edit of a frozen copy, while examples/demo/README.md with the same text passes (reproduced).'
+    suggested_action: 'Apply the isExampleCopy exemption in both loops, ideally through one shared predicate.'
+    suggested_owner: dev
+  - id: CR-4
+    severity: low
+    file: 'shared/resources/migrate-doc-numbering.mjs'
+    finding: 'A body that opens with a blank line and a thematic break and has a second thematic break later ("\n---\n# Onb\n\nIntro\n\n---\n## Goals") is still displaced, so the cycle-2 CR-5 fix holds only for a document with one break; the advised remedy would make its body a bogus frontmatter block (reproduced).'
+    suggested_action: 'Call a late fence displaced only when the lines up to the closing fence read as YAML (every non-blank line key-shaped); add the two-break case to the CR-5 row.'
+    suggested_owner: dev
+  - id: CR-5
+    severity: low
+    file: 'shared/resources/migrate-doc-numbering.mjs'
+    finding: 'When an outside source exists, the non-literal loop reads every tracked non-literal file in full, images and archives included, before the NUL check discards a binary.'
+    suggested_action: 'Skip known binary extensions or files above a size cap before the full read.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 75
+
+evidence:
+  tests_reviewed: 105
+  phases_verified: 3/3
+  ci: 'SUCCESS (5 checks) @ 02d65ff4 — informational; gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 20
+    escaped: 0
+    notes: 'parseNameValue re-probed with --sink path and task.211.qa-fix.1.security.cases.json: verdict engages, 20 executed, 0 escaped. Run record task.211.qa.3.security.run.json.'
+  performance:
+    status: CONCERNS
+    notes: 'outsideReferences is linear and the linearity row is mutation-proven; the non-literal loop reads binaries in full before discarding them (CR-5).'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1 and CR-2 answer ok over a stale result; CR-3 and CR-4 refuse inputs that should pass.'
+  maintainability:
+    status: PASS
+    notes: 'One exported resolver replaces the substring test; header comment, SKILL.md, CHANGELOG and traps.md updated together.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1 and CR-2 in qa-fix cycle 3, each with a mutation-proven engine row; CR-3, CR-4 and CR-5 with them.'
+      refs: ['shared/resources/migrate-doc-numbering.mjs', 'shared/resources/tests/migrate-doc-numbering.test.mjs']
+    - action: 'CR-1, CR-2, CR-3 and CR-5 are in the stale-reference scan for the third cycle running. Consider one file walk that decides scope, exemption and binary-ness once, and feeds the link pass, the literal pass and outsideReferences, instead of a second loop that restates the first loop''s filters.'
+      refs: ['shared/resources/migrate-doc-numbering.mjs']
+  future:
+    - action: 'Step 4b cannot execute the review-prd plan/apply blocks (classified mutating); the eval gate-8 and gate-9/10 rows execute them instead.'
+      refs: ['skills/review-prd/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CR-1 and CR-2 fixed and re-reviewed'

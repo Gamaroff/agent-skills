@@ -1497,6 +1497,10 @@ test("task.211 QA-2 CR-3 CR-4: outsideReferences flags each token that resolves 
     ["package.json", '{"prd":"docs/prd.md"}', "docs/prd.md"],
     ["scripts/a.sh", "cat docs/prd.md.", "docs/prd.md"],
     ["docs/a/b/x.md", "[p](../../prd.md)", "../../prd.md"],
+    // A path rooted in a variable is relative, not absolute (task.211 QA-3 CR-1).
+    ["scripts/x.mjs", "const p = `${ROOT}/docs/prd.md`;", "/docs/prd.md"],
+    ["scripts/x.sh", "cat $ROOT/docs/prd.md", "ROOT/docs/prd.md"],
+    ["scripts/x.sh", 'cat "$(dirname "$0")/../docs/prd.md"', "/../docs/prd.md"],
   ])
     assert.deepEqual(tokens(file, text), [token], `${file}: ${text}`);
   // Must not flag: other files whose path ends in the same text, bare names, URLs.
@@ -1506,6 +1510,7 @@ test("task.211 QA-2 CR-3 CR-4: outsideReferences flags each token that resolves 
     ["docs/notes.md", "The old prd.md layout is prose."],
     ["README.md", "https://example.com/docs/prd.md"],
     ["README.md", "/docs/prd.md is absolute"],
+    ["README.md", '[abs](/docs/prd.md) and "/docs/prd.md" and x=/docs/prd.md'],
     ["README.md", "docs/prd.md.bak and docs/prd.mdx"],
   ])
     assert.deepEqual(tokens(file, text), [], `${file}: ${text}`);
@@ -1593,4 +1598,60 @@ test("task.211 QA-2 CR-5: a blank line and a thematic break is a body with no bl
   const moved = io.files.get(`${R}/onb/prd.1.onb/prd.1.onb.md`);
   assert.equal(docId.frontmatterField(moved, "prd_number"), "1");
   assert.match(moved, /\n---\n\n---\n# Onboarding\n$/, "the body is kept");
+});
+
+test("task.211 QA-3 CR-4: a late fence is displaced only when it closes over YAML — two thematic breaks are a body", () => {
+  const body = "\n---\n# Onb\n\nIntro\n\n---\n## Goals\n";
+  assert.equal(m.frontmatterState(body), "none");
+  assert.equal(m.frontmatterState("\n---\n# Title\n---\n"), "none");
+  assert.equal(
+    m.frontmatterState("\n---\ntitle: x\ntags:\n  - a\n---\n# x\n"),
+    "displaced",
+  );
+  assert.equal(m.frontmatterState("\uFEFF---\nname: x\n---\n"), "displaced");
+  const io = memIo({ [`${R}/onb/prd.onb.md`]: body });
+  const r = m.run(["--apply", "--root", R], { io });
+  assert.equal(r.reason, "ok", JSON.stringify(r.findings || r.blockers));
+  assert.ok(
+    io.files.get(`${R}/onb/prd.1.onb/prd.1.onb.md`).endsWith(body),
+    "the body is kept",
+  );
+});
+
+test("task.211 QA-3 CR-2 CR-3 CR-5: the scan reads every in-scope non-literal file once — under the root too — and no example copy or known binary", () => {
+  const files = {
+    ...outsideTree(),
+    [`${R}/tools/cfg.json`]: '{"p":"docs/prd.md"}\n',
+    "examples/demo/package.json": '{"p":"docs/prd.md"}\n',
+    "examples/demo/README.md": "docs/prd.md\n",
+    "assets/logo.png": "docs/prd.md",
+    "data/blob.bin": "\u0000 docs/prd.md",
+  };
+  const io = memIo(files);
+  const reads = [];
+  const readFile = io.readFile;
+  io.readFile = (p) => {
+    reads.push(p);
+    return readFile(p);
+  };
+  const d = dry(io, { names: new Map([["docs/prd.md", "mono"]]) });
+  assert.deepEqual(
+    d.blockers.map((b) => [b.code, b.path]),
+    [["stale-reference", `${R}/tools/cfg.json`]],
+  );
+  assert.equal(
+    reads.includes("assets/logo.png"),
+    false,
+    "a known binary type is never read",
+  );
+  assert.equal(
+    reads.includes("data/blob.bin"),
+    true,
+    "an unknown type is read, then refused on NUL",
+  );
+  assert.equal(
+    reads.filter((p) => p === `${R}/tools/cfg.json`).length,
+    1,
+    "read once",
+  );
 });
