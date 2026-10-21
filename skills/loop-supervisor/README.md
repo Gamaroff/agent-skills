@@ -1,21 +1,23 @@
 # loop-supervisor — operator guide
 
-A host process that runs one **fresh** `claude -p` per loop iteration and classifies each outcome from
-files on disk. Launch it from a terminal; it spawns Claude, never the reverse.
+A host process that runs one **fresh** agent process per loop iteration — `claude -p` by default, or
+another engine with `--engine` — and classifies each outcome from files on disk. Launch it from a
+terminal; it spawns the engine, never the reverse.
 
 Start with [`SKILL.md`](SKILL.md) for what it is and why it differs from the built-in `/loop`. This file
 is the operational detail.
 
 ## Setup
 
-Requirements: Node ≥ 22, the `claude` CLI on the machine, and a git repo. No npm dependencies.
+Requirements: Node ≥ 22, the engine's CLI on the machine (`claude`, or `agy` for `--engine agy`), and a
+git repo. No npm dependencies.
 
 ```bash
 node .agents/skills/loop-supervisor/scripts/run-loop.mjs dry-run --adapter develop-next
 ```
 
 Run that first, every time, in a repo you have not used it in before. It probes, prints the plan and
-the **exact** `claude` argv, and spawns nothing. If the argv looks wrong for your `claude` version,
+the **exact** engine argv, and spawns nothing. If the argv looks wrong for your engine's version,
 that is the moment to find out — flags move between versions, and printing them is how drift becomes
 visible instead of becoming an empty log file at 4am.
 
@@ -69,15 +71,19 @@ node .agents/skills/loop-supervisor/scripts/run-loop.mjs run \
 
 | Option                    | Default        | Meaning                                                        |
 | ------------------------- | -------------- | -------------------------------------------------------------- |
+| `--engine <name>`         | `claude`       | `claude` \| `agy` — the agent CLI each iteration runs ([engines](#engines-and-models)) |
+| `--model <id>`            | unset          | passed to the engine unvalidated; the engine lists its own ids |
+| `--effort <level>`        | unset          | passed to the engine unvalidated (`low` … `max`)               |
+| `--dangerously-skip-permissions` | off     | `agy` only, and only as a flag (never config): the engine runs with no approval boundary. Refused on `claude` |
 | `--adapter <name>`        | `develop-next` | `develop-next` \| `develop-batch` \| `generic`                 |
 | `--command <prompt>`      | adapter's      | the prompt each iteration runs; **required** for `generic`     |
 | `--roadmap <path>`        | adapter's      | passed to the probe                                            |
 | `--base <ref>`            | `develop`      | the ref the progress oracle watches                            |
 | `--max-iterations <N>`    | unlimited      | budget cap                                                     |
-| `--max-cost <USD>`        | unlimited      | cumulative `total_cost_usd` from the result envelopes          |
+| `--max-cost <USD>`        | unlimited      | cumulative cost from the result envelopes; `claude` only — refused on `agy`, which reports none |
 | `--max-duration <8h\|90m>` | unlimited     | wall clock                                                      |
 | `--max-idle <K>`          | `2`            | consecutive no-progress iterations before stopping             |
-| `--max-turns <N>`         | unset          | passed to `claude`; `error_max_turns` is a distinguishable subtype so this is cheap to use |
+| `--max-turns <N>`         | unset          | passed to `claude`; `error_max_turns` is a distinguishable subtype so this is cheap to use. Refused on `agy`, which has no turn cap |
 | `--max-resume-attempts <N>` | `2`          | consecutive `incomplete` retries before giving up              |
 | `--on-error <stop\|continue>` | `stop`     | what a `halt` or `error` outcome does                          |
 | `--cooldown <sec>`        | `10`           | pause between iterations                                       |
@@ -87,6 +93,36 @@ node .agents/skills/loop-supervisor/scripts/run-loop.mjs run \
 
 Every budget ceiling is checked **before** a spawn, not after. A `--max-cost` that only stops once it
 has been exceeded is not a ceiling.
+
+`--engine`, `--model` and `--effort` also read from `loopSupervisor.engine`, `.model` and `.effort` in
+`skills-config.yaml`; a flag always wins, including one equal to the default.
+
+### Engines and models
+
+Each engine is one entry in [`references/engines.js`](references/engines.js): its binary, argv, how its
+result line is read, how its stream is rendered into the human log, where its transcript lives, and
+which supervisor flags it can honour. A flag an engine cannot honour **exits 1 naming the flag and the
+engine** instead of being dropped — a budget ceiling that is silently inert is worse than none.
+
+|                    | `claude` (default)                               | `agy` (Antigravity CLI)                                         |
+| ------------------ | ------------------------------------------------ | --------------------------------------------------------------- |
+| argv               | `-p … --output-format stream-json --verbose --session-id <uuid> --permission-mode acceptEdits --settings …` | `-p … --output-format stream-json --mode accept-edits` |
+| `--model`, `--effort` | passed through                                | passed through                                                   |
+| `--max-turns`, `--max-cost` | honoured                                | **refused** — no turn cap, no cost in the result                |
+| Permission boundary | `supervisor-settings.json` allow/deny list      | **none** — `accept-edits` runs shell commands unprompted        |
+| `--dangerously-skip-permissions` | **refused**                        | passed through only from the operator flag                       |
+| Ledger `sessionId` | the pinned uuid; `claude --resume <id>`          | the `conversation_id` from the result line; `agy --conversation <id>` |
+| Ledger `transcriptPath`, `costUsd` | set                              | `null` (shown as `—`)                                            |
+
+**Models.** `--model` is not validated here — `agy models` (Gemini, Claude and GPT-OSS ids) and
+`claude --help` are the authority. An `agy` id carries its own effort suffix (`claude-sonnet-5-5-high`);
+passing `--effort` beside one that disagrees is the engine's to resolve, not the supervisor's.
+
+**Read the permission row before running `agy` unattended.** Measured on `agy` 1.4.2: in print mode,
+`--mode accept-edits` ran a shell command without prompting, and `--sandbox` did not hold — the agent
+re-ran the refused command outside it. There is no deny list to pin. An `agy` loop already runs
+commands with no boundary; `--dangerously-skip-permissions` removes the approval step for everything
+else too.
 
 #### Notification on stop
 
@@ -256,6 +292,10 @@ claude --resume "$(jq -r 'select(.iteration==3) | .sessionId' \
 You get the whole iteration back — every tool call, every file read — in an interactive session, days
 later.
 
+On `--engine agy` the `sessionId` is the conversation id `agy` reported (a fresh `--conversation`
+id cannot be pinned), and the resume is `agy --conversation <id>`. A row whose run produced no result
+line carries `sessionId: null`.
+
 ## Publishing the run to a dashboard
 
 ```bash
@@ -330,7 +370,7 @@ line. It travels only in the header, and a test drives the real push path to ass
 free of it while the header carries it.
 
 It is also **stripped from the environment of every spawned iteration**. Without that, `--dashboard-token`
-read from `$LOOP_SUPERVISOR_DASHBOARD_TOKEN` would be inherited by each `claude -p` child and by anything
+read from `$LOOP_SUPERVISOR_DASHBOARD_TOKEN` would be inherited by each engine child and by anything
 that child shells out to — and the child is an agent with a Bash tool writing `iter-NNN.txt` to disk, so
 a single `env` in a tool call would put the credential in a log file.
 
