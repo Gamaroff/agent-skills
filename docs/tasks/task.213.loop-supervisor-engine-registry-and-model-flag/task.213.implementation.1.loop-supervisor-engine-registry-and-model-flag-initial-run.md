@@ -36,8 +36,8 @@ Move loop-supervisor's claude-specific argv, result envelope and transcript path
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan names every hunk); 13 files, 31 tests; ci:fast green; 10/10 mutations killed | —                    | 2026-10-21T07:03Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #716: https://github.com/Gamaroff/agent-skills/pull/716 | —                    | 2026-10-21T07:05Z |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.213.qa.{N}.*.md`; `task.213.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 2 cycles: gate 1 CONCERNS 90 → qa-fix `f982c944` → gate 2 PASS 100 (route 2b); PR review APPROVE (`pr-review.1`) | `.summaries/step-5-post-fix-tracker-1.json` | 2026-10-21T07:27Z |
-| 7. finalise                | ❌ Gaps    | `task.213.dod.{N}.*.md`; task `status: accepted`                       | `task.213.dod.1.*.md` — GAPS: AC8 perf not measured on head; no CHANGELOG `(task 213)` entry. Both documentation-only | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 7. finalise                | ✅ Done    | `task.213.dod.{N}.*.md`; task `status: accepted`                       | `task.213.dod.1.*.md` GAPS (AC8, CHANGELOG), fixed doc-only; `task.213.dod.2.*.md` ACCEPTED; acceptance `772cd233` | —                    | 2026-10-21T07:39Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Implementation report committed and pushed | —                    | 2026-10-21T07:46Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -113,6 +113,10 @@ Move loop-supervisor's claude-specific argv, result envelope and transcript path
 - Observed: the `qa-gate-2` stakeholder lead for PASS says "The checks found no problems" while the gate carried two open LOW entries. The lead reads only the verdict, not the open queue.
 - Step 5c: `/review-pr --effort medium --comment --no-code` ran with the conformance lens only (Explore, 46 s). It returned one finding, PC-1 (coverage, low/medium): no render test passes a null `costUsd` or `transcriptPath`. The orchestrator confirmed it; the only `costUsd: null` in `evals/loop-supervisor/` is in `engines.test.mjs`. Verdict APPROVE. Anchors checked (1, `no-line`). The report is `task.213.pr-review.1.*.md`, staged and carried to 6a. A PR comment was posted. `ready-for-merge` returned `stage-disabled`. PC-1 is not fixed: it is a test addition, not doc-only, and it joins CR-4 and CR-5 as follow-up work.
 - Step 7 (`/finalise`, DoD 1). The 4 DoD agents ran in parallel. AC: PARTIAL (13/14; AC8). Security: PASS; the probe plan was run by /finalise on `resolveEngine` (12 executed, 0 reproduced, 0 escaped; `task.213.dod.1.security.run.json`). Compliance: NOT_APPLICABLE. Docs: FAIL (CHANGELOG). CI reading 1: SUCCESS @ `4f301bf3` over 5 checks. Decision: GAPS. Fix-and-recheck evaluator exit 1 (`inside-files-summary`, `mutation-proved`). Task status unchanged (ready-for-review). Gaps Change Log row and gap section written. PR gaps comment posted (its lead says "4 of them": the `dod-gaps` count also counts the Next Steps checkboxes, so it double-counts the 2 gaps). The lock was left at step 7 and `advance-pipeline-lock.sh --skill finalise` was not run: it maps finalise → 8 unconditionally, which on a gaps halt would point a resume past Step 7.
+- DoD 1 gap fixes (documentation-only, so the resume is at Step 7 and QA is not re-entered):
+  - **AC8 re-measured on the PR head.** The five pre-existing files were run 5 times each, base and head interleaved so both see the same load. Wall clock was taken around the whole `command node --test …` call, so the figures include node start-up and are not comparable with the earlier per-run figures. Base `a721d28d` (a detached worktree) gave 1.460 / 1.496 / 1.662 / 1.415 / 1.645 s, median **1.496 s**. Head `570c3f6a` (`--test-skip-pattern=^t213:`) gave 1.588 / 1.382 / 1.520 / 1.534 / 1.537 s, median **1.534 s**: **+2.5%**, within 10%. Load was 8.27–8.41 (1-min) during the runs, and every run passed 185 tests. `570c3f6a` has the same `evals/` and `skills/` tree as PR head `4f301bf3` (`git diff --stat` empty), so this measures the code under review.
+  - **CHANGELOG.** Added a `(task 213)` entry under `[Unreleased]` → Added.
+- Step 7 (`/finalise`, DoD 2): the commits since DoD 1 changed only documentation (`CHANGELOG.md` `5742a9ac` and this task directory), so the four agents and the probe were not re-dispatched. Security, compliance and AC1–7/9–14 were carried forward from DoD 1, AC8 and the CHANGELOG were re-verified directly, and the deviation is recorded in `dod.2`. CI reading 1: SUCCESS @ `5742a9ac` over 5 checks. Decision ACCEPTED. Status → accepted, Change Log 1.2, registry ticked (`planned` → `accepted`), sprint review written. Acceptance commit `772cd233`, pushed and asserted on origin. 6d: `(task 213)` is cited. CI reading 1: SUCCESS @ `5742a9ac`; CI reading 2: SUCCESS @ `772cd233` over 5 checks after 270s. Canonical PR comment issuecomment-6310819702. Issue #715: Document link re-pointed to `develop`, `done` comment posted, closed (state CLOSED confirmed). Board `done`: `already`.
 - qa-fix cycle 1 CR-2 is not mutation-proven: it bounds a hang, and no committed test can turn red on the bound's absence without staging a hang.
 
 ---
@@ -158,10 +162,10 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-10-21
+**Final Status**: Completed
 **Branch**: `feature/task.213.loop-supervisor-engine-registry-and-model-flag`
 **PR**: [#716](https://github.com/Gamaroff/agent-skills/pull/716)
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 2
+**DoD Summary**: `task.213.dod.2.loop-supervisor-engine-registry-and-model-flag.md` (ACCEPTED; `dod.1` recorded the 2 gaps)
+**Tracker debt**: none
