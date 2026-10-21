@@ -736,7 +736,7 @@ const RUN_LOOP = path.resolve(
   "../../../skills/loop-supervisor/scripts/run-loop.mjs",
 );
 
-function dryRun(extra = []) {
+function dryRun(extra = [], { adapter = "generic" } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ls-dry-"));
   const bin = path.join(root, "bin");
   const work = path.join(root, "work");
@@ -749,7 +749,14 @@ function dryRun(extra = []) {
   }
   const r = spawnSync(
     process.execPath,
-    [RUN_LOOP, "dry-run", "--adapter", "generic", "--command", "x", ...extra],
+    [
+      RUN_LOOP,
+      "dry-run",
+      ...(adapter === "generic"
+        ? ["--adapter", "generic", "--command", "x"]
+        : ["--adapter", adapter]),
+      ...extra,
+    ],
     {
       cwd: work,
       encoding: "utf8",
@@ -947,4 +954,23 @@ test("t213: the agy skip flag reaches the argv only from the operator flag", () 
   assert.equal(on.json.permissions, "skipped (operator flag)");
   const off = dryRun(["--engine", "agy"]);
   assert.ok(!off.json.argv.includes("--dangerously-skip-permissions"));
+});
+
+test("t224: dry-run --adapter develop-next in an empty project reports the missing probe script", () => {
+  const r = dryRun([], { adapter: "develop-next" });
+  assert.ok(r.json, "dry-run printed JSON");
+  assert.equal(r.json.ok, false);
+  assert.equal(r.json.probe.status, "error");
+  assert.ok(
+    r.json.probe.reason.startsWith("probe script not found:"),
+    r.json.probe.reason,
+  );
+  for (const c of [
+    ".agents/skills/develop-next/scripts/select-next.mjs",
+    ".claude/skills/develop-next/scripts/select-next.mjs",
+    "skills/develop-next/scripts/select-next.mjs",
+  ]) {
+    assert.ok(r.json.probe.reason.includes(c), c);
+  }
+  assert.deepEqual(r.ran, [], "no engine spawned");
 });

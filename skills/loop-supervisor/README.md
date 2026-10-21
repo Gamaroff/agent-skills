@@ -171,8 +171,9 @@ shape" is nil.
 
 The `develop-next` and `develop-batch` probe looks for `develop-next/scripts/select-next.mjs` under
 `.agents/skills/`, then `.claude/skills/`, then `skills/`, relative to the project root. It uses the
-first one that exists, and falls back to `skills/` when none does. A configured `probeScript` always
-wins and is used verbatim.
+first one that exists. When none does, the probe stops with `probe script not found`, listing the
+three paths it searched, before anything is spawned. A configured `probeScript` always wins and is used
+verbatim; when it names a missing file, the same error names the configured path.
 
 ## Stopping it
 
