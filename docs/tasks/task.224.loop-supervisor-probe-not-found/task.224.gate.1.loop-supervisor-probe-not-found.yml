@@ -1,0 +1,64 @@
+schema: 2
+task: 'task.224.loop-supervisor-probe-not-found'
+task_title: 'loop-supervisor: say when the probe script is not found'
+gate: CONCERNS
+status_reason: 'Implementation matches the plan and every test passes, but no committed test spawns runProbe with the probe script present, so the "probe runs as before" half of Success Criterion 4 is held by a code read and a hand run only.'
+reviewer: 'QA Engineer'
+head: '7f2ed4ad85c232d53daa9773b742120ecafbe64e'
+updated: '2026-10-21T20:13:22Z'
+
+top_issues:
+  - id: 'QA-1'
+    severity: medium
+    file: 'evals/loop-supervisor/unit/run-loop.test.mjs'
+    finding: 'No spawned test runs dry-run --adapter develop-next with a probe script present; a runProbe that returned probeMissing unconditionally (null when the script exists) would break every develop-next run and no test goes red.'
+    suggested_action: 'Add a dry-run test in a temp project with a stub .agents/skills/develop-next/scripts/select-next.mjs that prints a selection, asserting the probe status is selected (not error) and the reason is the stub''s; mutation-prove it against an unconditional return in runProbe.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 245
+  phases_verified: 2/2
+  ci: 'pending @ 7f2ed4ad (test job); link-check, shellcheck, validate pass'
+  trace:
+    phases_covered: [1, 2]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false. probeMissing and findExisting are the predicate-shaped additions; neither changes the set of actions taken (a missing script failed before, with status error, and still does; an existing one runs exactly as before). probeScript is operator-authored config that was already executed verbatim.'
+  performance:
+    status: PASS
+    notes: 'Resolution stays at <= 3 exists calls; probeMissing adds exactly 1 per probe, 0 for generic (counting-exists unit test).'
+  reliability:
+    status: PASS
+    notes: 'CR-1 (advisory, low/low): existsSync also reads false on EACCES, so an unreadable install is reported as not found.'
+  maintainability:
+    status: PASS
+    notes: 'One default-path constant (CR-2 of task.214 closed); README, configuration reference and CHANGELOG updated.'
+
+recommendations:
+  immediate:
+    - action: 'QA-1: add a spawned dry-run test with the probe script present.'
+      refs: ['evals/loop-supervisor/unit/run-loop.test.mjs', 'skills/loop-supervisor/scripts/run-loop.mjs']
+  future:
+    - action: 'CR-1: distinguish ENOENT from other stat errors in probeMissing.'
+      refs: ['skills/loop-supervisor/references/adapters.js']
+    - action: 'CR-2: the t224 test''s ran: [] assertion is vacuous in dry-run; replace it with a check that the old "probe produced no output" text is absent.'
+      refs: ['evals/loop-supervisor/unit/run-loop.test.mjs']
+    - action: 'CR-3: firstExisting has no production caller; mark it export-compatibility only.'
+      refs: ['skills/loop-supervisor/references/adapters.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['QA-1 fixed']

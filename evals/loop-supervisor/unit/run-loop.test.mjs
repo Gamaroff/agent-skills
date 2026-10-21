@@ -736,12 +736,13 @@ const RUN_LOOP = path.resolve(
   "../../../skills/loop-supervisor/scripts/run-loop.mjs",
 );
 
-function dryRun(extra = [], { adapter = "generic" } = {}) {
+function dryRun(extra = [], { adapter = "generic", setup = null } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ls-dry-"));
   const bin = path.join(root, "bin");
   const work = path.join(root, "work");
   fs.mkdirSync(bin);
   fs.mkdirSync(work);
+  if (setup) setup(work);
   for (const name of ["claude", "agy"]) {
     const p = path.join(bin, name);
     fs.writeFileSync(p, `#!/bin/sh\necho ran > "${root}/${name}.ran"\n`);
@@ -972,5 +973,30 @@ test("t224: dry-run --adapter develop-next in an empty project reports the missi
   ]) {
     assert.ok(r.json.probe.reason.includes(c), c);
   }
-  assert.deepEqual(r.ran, [], "no engine spawned");
+  assert.ok(
+    !r.json.probe.reason.includes("probe produced no output"),
+    r.json.probe.reason,
+  );
+});
+
+test("t224: dry-run --adapter develop-next with the probe script installed runs it", () => {
+  // The control for the not-found test: runProbe must fall through to the spawn
+  // when the script exists, and report what the script printed.
+  const r = dryRun([], {
+    adapter: "develop-next",
+    setup(work) {
+      const dir = path.join(work, ".agents/skills/develop-next/scripts");
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(
+        path.join(dir, "select-next.mjs"),
+        'console.log(JSON.stringify({ status: "selected", rationale: "stub probe", ' +
+          'item: { id: "T1", command: "/develop-task", commandArg: "docs/tasks/t1.md" } }));\n',
+      );
+    },
+  });
+  assert.ok(r.json, "dry-run printed JSON");
+  assert.equal(r.json.ok, true);
+  assert.equal(r.json.probe.status, "selected", r.json.probe.reason);
+  assert.equal(r.json.probe.reason, "stub probe");
+  assert.equal(r.json.probe.itemId, "T1");
 });

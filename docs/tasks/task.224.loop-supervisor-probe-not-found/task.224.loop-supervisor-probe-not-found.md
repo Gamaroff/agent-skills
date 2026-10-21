@@ -161,6 +161,7 @@ The default-path literal population is measured by `git grep -n 'skills/develop-
 ### Integration Tests
 
 - A spawned `dry-run --adapter develop-next` in an empty temp project, extending the `dryRun` helper (`run-loop.test.mjs:739`) to take an adapter. It asserts that the printed JSON has `ok: false`, that the probe `status` is `error`, and that the `reason` starts `probe script not found:` and contains each of the three candidates. That last part distinguishes the new branch from the spawn branch, whose reason is "probe produced no output".
+- Its control: the same dry-run with a stub `.agents/skills/develop-next/scripts/select-next.mjs` installed reports `ok: true` and the stub's selection, so `runProbe` still spawns an existing script (QA cycle 1, QA-1).
 
 ### Control case
 
@@ -178,7 +179,7 @@ The task's own example is the searched default with nothing installed. The contr
 - [x] In an empty project, `resolveAdapter("develop-next", {}, { cwd })` returns `probeScript` `skills/develop-next/scripts/select-next.mjs` and `probeSearched` equal to the three candidates in order (Phase 1, `resolveAdapter` miss branch).
 - [x] For that adapter and `cwd`, `probeMissing` returns `status: "error"`, with a `reason` that starts `probe script not found: skills/develop-next/scripts/select-next.mjs` and contains `.agents/skills/develop-next/scripts/select-next.mjs` and `.claude/skills/develop-next/scripts/select-next.mjs` (Phase 1, `probeMissing` searched branch).
 - [x] With an override `probeScript: "tools/missing.mjs"`, `probeMissing` returns `status: "error"`, with a `reason` that starts `probe script not found: tools/missing.mjs`, names `loopSupervisor.adapters.develop-next.probeScript`, and does not list `.agents/skills/` (Phase 1, override branch).
-- [x] When the resolved probe script exists, `probeMissing` returns `null` and the probe runs as before; the existing probe tests pass unchanged.
+- [x] When the resolved probe script exists, `probeMissing` returns `null` and the probe runs as before; the existing probe tests pass unchanged (held by the spawned present-script dry-run test, `run-loop.test.mjs`, added in QA cycle 1).
 - [x] A spawned `dry-run --adapter develop-next` in an empty project prints a probe `reason` starting `probe script not found:` (Phase 2, `runProbe` wire-up).
 - [x] `interpretProbe`'s empty-stdout message is unchanged (`classify.test.mjs:330` passes).
 
@@ -254,6 +255,27 @@ None identified. The change adds a check before a spawn that would fail anyway.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-21
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.224.qa.1.loop-supervisor-probe-not-found.md](./task.224.qa.1.loop-supervisor-probe-not-found.md)
+- **Gate File**: [task.224.gate.1.loop-supervisor-probe-not-found.yml](./task.224.gate.1.loop-supervisor-probe-not-found.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 245
+- **Phases Verified**: 2/2
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+QA-1 (MEDIUM): no committed test spawns the probe with the script present, so "the probe runs as before" is unguarded. Three advisory code-review findings (CR-1 to CR-3) are recorded in the report.
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -263,6 +285,8 @@ None identified. The change adds a check before a spawn that would fail anyway.
 | 2026-10-21 | 1.1 | Review (9/10): linked issue #723; added a counting-`exists` unit test so the one-call Performance criterion has a test; the dry-run test also asserts `ok: false` | review-task |
 | 2026-10-21 |  | Status → ready-for-development | review-task |
 | 2026-10-21 |  | Implemented — 7 files, 14 new tests (13 adapters, 1 dry-run) | develop |
+| 2026-10-21 |  | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-10-21 |  | QA findings fixed — cycle 1, 1 finding (QA-1: present-script dry-run test) | qa-fix |
 <!-- change-log-end -->
 
 ---
@@ -278,12 +302,13 @@ None identified. The change adds a check before a spawn that would fail anyway.
 ### Testing Results
 
 - `command node --test evals/loop-supervisor/unit/adapters.test.mjs`: 56/56 pass, 13 of them new (CR-2 equality ×2, `probeSearched` miss/hit/override/fresh-copy, `findExisting`, `probeMissing` × generic / existing / searched miss ×2 / override miss / absolute override / one `exists` call). The `:301` test is renamed and now also asserts `probeSearched`.
-- `evals/loop-supervisor/unit/run-loop.test.mjs`: new spawned `dry-run --adapter develop-next` test in an empty project — `ok: false`, probe `error`, reason starts `probe script not found:` and names all three candidates, no engine spawned. `dryRun` takes an `{ adapter }` option; existing callers unchanged.
+- `evals/loop-supervisor/unit/run-loop.test.mjs`: new spawned `dry-run --adapter develop-next` test in an empty project — `ok: false`, probe `error`, reason starts `probe script not found:`, names all three candidates, and lacks the old "probe produced no output" text. QA cycle 1 added its control: with a stub probe script installed, the probe reports `selected` and the stub's item. `dryRun` takes `{ adapter, setup }` options; existing callers unchanged.
 - `command node --test 'evals/loop-supervisor/unit/*.test.mjs'` with the gitignored `.agents/skills` symlink moved aside: 245 tests, 244 pass, 0 fail (1 skipped).
 - **Mutation-proven** (file backed up, mutated, restored, `git diff --stat` checked):
   - `probeMissing` always returns `null`: 5 tests fail (the four not-found unit tests and the dry-run test).
   - Dropping the override reset of `probeSearched`: 2 tests fail.
   - Removing the `probeMissing` call from `runProbe`: the dry-run test fails.
+  - QA cycle 1 (QA-1): `runProbe` returning `probeMissing`'s value unconditionally fails the new present-script dry-run test, and only that test.
 - **Manual dry-run in this repository:** probe `selected` T224. **In an empty temp directory:** `probe script not found: skills/develop-next/scripts/select-next.mjs (searched .agents/skills/…, .claude/skills/…, skills/…). Install the skills under .agents/skills/, or set loopSupervisor.adapters.develop-next.probeScript.`
 - `npm run validate -- skills/loop-supervisor/`: passes. Fast gate (`npm run ci:fast`): recorded in the implementation report.
 
