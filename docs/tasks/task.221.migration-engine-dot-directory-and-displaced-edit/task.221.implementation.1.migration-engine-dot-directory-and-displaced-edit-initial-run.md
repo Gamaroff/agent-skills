@@ -3,7 +3,7 @@
 **Task**: `task.221.migration-engine-dot-directory-and-displaced-edit.md`
 **Run Number**: 1
 **Started**: 2026-10-21
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -34,10 +34,10 @@ Fix the two task.211 gate-6 findings in `migrate-doc-numbering.mjs` (CR-1 dot-di
 | 1. create-branch           | ✅ Done    | Branch `feature/task.221.*` exists in git                             | Branch created at `7619df82`; pushed | —                    | 2026-10-21T04:22Z |
 | 2. review-task             | ✅ Done    | `task.221.review.{N}.{name}.md` exists (or skip logged)               | review.1 — READY TO IMPLEMENT 9/10; Planned → Ready for Development | —                    | 2026-10-21T04:24Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration, inline; 9/9 phase boxes; CI green | —                    | 2026-10-21T04:34Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.221.qa.{N}.*.md`; `task.221.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.221.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #714: https://github.com/Gamaroff/agent-skills/pull/714 | —                    | 2026-10-21T04:36Z |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.221.qa.{N}.*.md`; `task.221.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 1 cycle; gate 1 PASS 100; PR review APPROVE (pr-review.1) | —                    | 2026-10-21T04:44Z |
+| 7. finalise                | ✅ Done    | `task.221.dod.{N}.*.md`; task `status: accepted`                      | dod.1 ACCEPTED; acceptance commit `98d3a3e1`; issue #713 closed | —                    | 2026-10-21T04:52Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | report-only docs commit | —                    | 2026-10-21T04:52Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -90,6 +90,42 @@ Fix the two task.211 gate-6 findings in `migrate-doc-numbering.mjs` (CR-1 dot-di
 
 - SCOPE_PATHS: docs/tasks/task.221.migration-engine-dot-directory-and-displaced-edit, CHANGELOG.md, shared/resources, shared/resources/tests, skills/review-prd/references.
 - Pre-flight guard: no untracked file outside the scope — nothing held.
+- Commits: `f6ee9839` fix(migrate-doc-numbering) (engine, tests, bundled copy, CHANGELOG) and `18e1b36b` docs(task.221) (review, task record, this report). Leak check: OK.
+- PR body written by hand from the 6-file diff (no summariser subagent).
+- PR created: https://github.com/Gamaroff/agent-skills/pull/714 (base develop, Closes #713). Issue comment: posted. Lock `pr_url` set.
+- GitHub board: in-review → stage-disabled (this board's `tracker-workflow.yaml` does not fire the moment).
+- Post-PR state check (inline `gh pr view`): PR #714 state = OPEN, MERGEABLE; errors = 0.
+
+### Steps 5–6 — QA loop, cycle 1
+
+- GitHub board: QA-start re-assert → stage-disabled.
+- Traceability mapper: skipped. Success Criteria is a checklist, not a table (`HAS_SUCCESS_CRITERIA_TABLE=false`).
+- `/qa-task` invoked with `code_review_blocking=true`. Step 3b reviewer: one Explore subagent, returned in 53,512 ms; anchor check `ok`.
+- Security: `boundary: false`, with the candidates named in the QA report. This follows task.211, whose accepted run probed only `parseNameValue` on this engine.
+- Mutation proofs re-run by QA on the committed engine: both `covered`.
+- Gate 1: PASS 100/100, no open entry → 5c.
+- 5c: `/review-pr --effort medium --comment --no-code` → APPROVE, 0 findings. Report `task.221.pr-review.1.migration-engine-dot-directory-and-displaced-edit.md`; PR summary comment posted. The bundled copy was kept in diff scope because the Files Summary names it. The lens returned an empty list, so the caller re-ran the mechanical trail checks: change log append-only `ok`, gate head an ancestor, `updated:` after the head author time. `pr_number:` is absent; `/finalise` writes it.
+- Board: ready-for-merge → stage-disabled.
+
+### Step 7 — finalise
+
+- `/finalise` invoked via the Skill tool. Four DoD agents ran in one message. AC PASS (12/12), security PASS (`boundary: false`, probe plan not run), compliance NOT_APPLICABLE, docs PASS.
+- The "Tests & PR Approved?" column was satisfied by `task.221.pr-review.1.migration-engine-dot-directory-and-displaced-edit.md` (APPROVE): the host requires no reviews, so `reviewDecision` is `null`.
+- DoD summary: docs/tasks/task.221.migration-engine-dot-directory-and-displaced-edit/task.221.dod.1.migration-engine-dot-directory-and-displaced-edit.md
+- Registry tick: `ticked` (row 265, planned → accepted). Change Log row `1.2 DoD passed — accepted (PR #714)`.
+- Acceptance commit `98d3a3e1` (`docs(task.221): accept — DoD, sprint review; registry ticked; 5c review carried`), pushed. The 5c review report was carried into it. 6b tracked-and-pushed assertions passed. 6d CHANGELOG citation present.
+- CI reading 1: SUCCESS @ 4c8cd808 (5 checks); CI reading 2: SUCCESS (tree-equivalent to 18e1b36beba9) @ 98d3a3e1 (5 checks, 30 s). The `test` lane on 98d3a3e1 was still running; the docs-only rule satisfied the reading.
+- Canonical summary posted to the PR: https://github.com/Gamaroff/agent-skills/pull/714#issuecomment-6308345635
+- DoD body posted to PR — comment URL: https://github.com/Gamaroff/agent-skills/pull/714#issuecomment-6308351571
+- Document link already pointed at `develop`, so no re-point was needed. Tracker `done` comment: posted.
+- GitHub Issue #713 — close: CLOSED ✅ (read back with `gh issue view`; the poller subagent was not dispatched).
+- GitHub Issue #713 — board: done → already.
+- Accept gap: `.claude/state/tracker-actions.jsonl` is absent, so there is no tracker debt.
+- Task completed.
+
+### Step 8 — commit-changes
+
+- Report finalised, then committed by `/commit-changes --scope` on the work-item directory (report only).
 
 ---
 
@@ -105,14 +141,26 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-10-21
+**Gate Result**: PASS
+**Issues Found**: 1 advisory (low/medium, pre-existing on develop): `linkPass` drops the `./` from a `./.docs/x.md` link on rewrite; routed to `recommendations.future`
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: APPROVE
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+**Carried to 6a**: docs/tasks/task.221.migration-engine-dot-directory-and-displaced-edit/task.221.pr-review.1.migration-engine-dot-directory-and-displaced-edit.md
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-10-21T04:52Z
+**Final Status**: Completed
 **Branch**: feature/task.221.migration-engine-dot-directory-and-displaced-edit
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/714
+**QA Iterations**: 1
+**DoD Summary**: docs/tasks/task.221.migration-engine-dot-directory-and-displaced-edit/task.221.dod.1.migration-engine-dot-directory-and-displaced-edit.md
+**Tracker debt**: none
+
+**Completion Summary**: Implemented both task.211 gate-6 findings in `migrate-doc-numbering.mjs`. CR-1: `outsideReferences` now also resolves a non-`./` token at the repository root, so a dot-directory path is detected. CR-2: `editFrontmatter` leaves a displaced or unclosed block untouched. Each fix was test-first and mutation-proven, and the bundled copy and CHANGELOG were updated. One QA cycle (PASS 100/100) and a 5c APPROVE. The DoD accepted on its first run. One pre-existing advisory, the `linkPass` `./` prefix, is carried to future work.
