@@ -5,7 +5,7 @@ type: task
 description: "When /finalise stops on DoD gaps, count only the gaps in the plain-language lead, and hold the pipeline lock at Step 7 instead of advancing it to Step 8."
 tags: [finalise, develop-task, pipeline-lock, stakeholder-summary, observation]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-10-21
 updated: 2026-10-21
@@ -16,7 +16,9 @@ github_issue: 717
 
 # Technical Task: finalise gaps-path fixes
 
-**Status:** Planned
+**Status:** Ready for Review
+
+**Review**: ✅ All review recommendations from `task.222.review.1.finalise-gaps-path-fixes.md` implemented 2026-10-21
 
 **GitHub Issue**: [#717](https://github.com/Gamaroff/agent-skills/issues/717)
 
@@ -106,6 +108,23 @@ This task fixes both. It changes only the gaps path. The accepted path behaves a
 - `shared/resources/develop-pipeline-on-stop.sh` (the comments near `COMPLETION_LINE`, and the `COMPLETION_LINE` text itself);
 - `skills/develop-task/SKILL.md`, `skills/develop-story/SKILL.md` and `skills/develop-bug/SKILL.md` (the "Exception — a record at step 8" paragraph).
 
+The search that defines this population (run from the repository root; bundled `references/` copies are regenerated, not edited):
+
+```bash
+git grep -nE "finalise[^|]{0,60}(moves|advances|move|advance)[^|]{0,30}(lock|it)( there| to 8)|lock reads 8 from the end of /finalise|finalise +→ 8" \
+  -- 'shared/resources' 'skills/*/SKILL.md' 'skills/*/scripts' ':!skills/*/references/*'
+```
+
+On 2026-10-21 it returns the sites above plus these, which the literal `moves the lock to 8` misses:
+
+- `shared/resources/develop-pipeline-on-stop.sh` lines 243 ("advances the lock to 8"), 252 ("The lock reads 8 from the end of /finalise"), 266 (`COMPLETION_LINE`, "/finalise moves it there") and 280 ("/finalise moves it to 8");
+- `shared/resources/advance-pipeline-lock.sh` line 54 (the header mapping, Phase 3);
+- test comments: `shared/resources/develop-pipeline-on-stop.test.sh` lines 125, 129, 185, and `shared/resources/tests/step-8-completion-checklist.test.mjs` lines 472, 764, 862.
+
+**Wording two tests pin.** `step-8-completion-checklist.test.mjs` (`"the Stop hook and the resume contract describe Step 7's tail in the same words"`) and `develop-pipeline-on-stop.test.sh` (greps `at or below Step 7` and `Step 7's tail`) hold the Step 7 tail description. The qualifier goes on the lock clause ("on an accepted DoD, `/finalise` moves the lock to 8"), never inside the tail list.
+
+**A second test pins today's gap count.** `evals/shared/tests/finalise-bug-mode.test.mjs`, test `"8.5 for a story/task still reads the document body, bounded at the next ## (task.152)"`, runs Step 8.5's extracted block on a gap section of bare `- [ ]` lines with no `### Missing Criteria` subsection and expects `GAP_COUNT=3`. After Phase 2 the helper HALTs on that fixture. Found with `git grep -ln "GAP_REPORT_BODY\|Gaps Identified\|GAP_COUNT" -- '*.test.*'`. The same file's `gapsCommentBlock()` extracts Step 8.5 and runs it from a consumer-shaped root; § 8's integration test reuses it rather than writing a second extractor.
+
 ### Target Architecture
 
 **New helper `shared/resources/dod-gap-count.sh <doc-file>`.**
@@ -132,6 +151,19 @@ This task fixes both. It changes only the gaps path. The accepted path behaves a
 - **Why a missing `--dod` holds rather than advances.** An unproven acceptance should fail toward re-running Step 7. That costs one `/finalise` re-run. Failing the other way skips Step 7, which is the defect.
 - **The accepted path's timing does not change.** On acceptance the lock still reaches 8 before Step 7's tail runs. That is why the swept docs keep their "an unfinished Step 7 row still wins" rule.
 - **Step 8.3's Change Log row** ("DoD incomplete — N gaps identified") is written before 8.4 writes the body. Deriving it from the helper would reorder Steps 8.3 and 8.4. That is out of scope; see § 4.
+- **The mapping floor's regex spans more than the arm.** `step-8-completion-checklist.test.mjs` captures `/\n {2}--skill\)\n([\s\S]*?)\n {4}esac/`. The first `  --skill)` in the helper is the pre-jq `commit-changes` block, so the capture runs from there to the first 4-space `esac`. Place the guard so that no 4-space `esac` comes before the `finalise)` arm (for example, set a flag in the arm and check it after `CURRENT` is read).
+
+### Resume states the lock rule must hold in
+
+The resume contract (`develop-pipeline-resume-contract.md`, Phase 0b) reads the lock's `current_step`, the halt snapshot's `halt_step` and an orphaned claim. After this task:
+
+| State | Lock / record | Resume |
+| --- | --- | --- |
+| `/finalise` accepted, Step 7's tail unfinished | 8 (unchanged) | The step-8 rule: the first unfinished row at or below Step 7 wins |
+| `/finalise` found gaps, orchestrator HALTed at Step 7 | 7 (was 8); snapshot `halt_step` 7 | Resume at 7; task.170's "Re-enter QA at 5a" offer keys on `halt_step` 7 and a `❌ GAPS` DoD, so it now fires from the record as well as from the orchestrator's `halt_step` argument |
+| Step 8a fix-and-recheck accepted on its second pass | DoD reads `✅ ACCEPTED`, so 7 → 8 | As the accepted row |
+| PreCompact pause during Step 7, before the cooperation block | 7 either way | Resume at 7 (unchanged) |
+| `/finalise` re-run after a gaps halt writes `dod.{N+1}` | The cooperation block must name the **newest** DoD; an older `dod.{N}` reading GAPS holds at 7 | Holds at 7 at worst; the orchestrator's own `advance-pipeline-lock.sh 8` recovers (§ 10, Medium risk 1) |
 
 ---
 
@@ -142,7 +174,7 @@ This task fixes both. It changes only the gaps path. The accepted path behaves a
 ✅ **Gap count**: `shared/resources/dod-gap-count.sh`, the Step 8.5 story/task arm, the Step 8.4 rule sentence and its bundled copy.
 ✅ **Lock hold**: the `--dod` guard on `--skill finalise`, the helper header's mapping line, finalise's cooperation block.
 ✅ **Tests**: new unit tests for both; the task.160 premise test updated to pass an accepted DoD; a gaps-shaped DoD test asserting the lock stays at 7.
-✅ **Doc sweep**: the seven restatements listed in § 3, qualified "on acceptance".
+✅ **Doc sweep**: every site the § 3 restatement search returns, qualified "on acceptance".
 ✅ **CHANGELOG**: a `(task 222)` entry under `[Unreleased]` → `### Fixed`.
 
 ### Out of Scope
@@ -192,8 +224,8 @@ bash .agents/skills/finalise/references/advance-pipeline-lock.sh --skill finalis
 
 **Changes**:
 
-- [ ] Gap count fixtures, using the 8.4 template's shape: the task.213 shape (2 gaps, 2 Next Steps), the task.181 shape (3 and 2), the task.199 shape (1 and 2), and the 8.4 example (7 list items, 6 of them `- ⚠️`, plus 7 Next Steps). Assert today's Step 8.5 grep returns 4, 5, 3 and 8 against these fixtures. That is the known failure the new check must reproduce first.
-- [ ] Lock fixture: a lock at `current_step: 7` plus a DoD whose `**Final Status:**` reads `❌ GAPS IDENTIFIED - NOT ACCEPTED`. Assert that today `--skill finalise` moves it to 8 (red against the target behaviour).
+- [x] Gap count fixtures, using the 8.4 template's shape: the task.213 shape (2 gaps, 2 Next Steps), the task.181 shape (3 and 2), the task.199 shape (1 and 2), and the 8.4 example (7 list items, 6 of them `- ⚠️`, plus 7 Next Steps). Assert today's Step 8.5 grep returns 4, 5, 3 and 8 against these fixtures. That is the known failure the new check must reproduce first.
+- [x] Lock fixture: a lock at `current_step: 7` plus a DoD whose `**Final Status:**` reads `❌ GAPS IDENTIFIED - NOT ACCEPTED`. Assert that today `--skill finalise` moves it to 8 (red against the target behaviour).
 
 **Dependencies**: None
 
@@ -210,10 +242,10 @@ bash .agents/skills/finalise/references/advance-pipeline-lock.sh --skill finalis
 
 **Changes**:
 
-- [ ] Write `dod-gap-count.sh <doc-file>`: list items under `### Missing Criteria` inside the gaps section; HALT to stderr (exit 1) on a missing section, a missing subsection or a zero count.
-- [ ] Step 8.5's story/task arm calls it as `GAP_COUNT=$(bash .agents/skills/finalise/references/dod-gap-count.sh "$DOC_FILE") || exit 1`, and its comment is rewritten to say what it counts.
-- [ ] Step 8.4 gains the one-sentence rule: each gap is one list item under `### Missing Criteria:`; Next Steps are actions, not gaps.
-- [ ] Phase 1's fixtures now return 2, 3, 1 and 7.
+- [x] Write `dod-gap-count.sh <doc-file>`: list items under `### Missing Criteria` inside the gaps section; HALT to stderr (exit 1) on a missing section, a missing subsection or a zero count.
+- [x] Step 8.5's story/task arm calls it as `GAP_COUNT=$(bash .agents/skills/finalise/references/dod-gap-count.sh "$DOC_FILE") || exit 1`, and its comment is rewritten to say what it counts.
+- [x] Step 8.4 gains the one-sentence rule: each gap is one list item under `### Missing Criteria:`; Next Steps are actions, not gaps.
+- [x] Phase 1's fixtures now return 2, 3, 1 and 7.
 
 **Dependencies**: Phase 1
 
@@ -230,10 +262,10 @@ bash .agents/skills/finalise/references/advance-pipeline-lock.sh --skill finalis
 
 **Changes**:
 
-- [ ] Parse an optional `--dod <path>` after `--skill <name>`. The finalise arm keeps `finalise) NEXT=8 ;;` (the step-8 checklist test's mapping floor parses it), followed by a guard that holds the lock unless the DoD has the ACCEPTED line.
-- [ ] Update the header: the mapping line reads `finalise → 8 (Step 7 done; only with --dod on a ✅ ACCEPTED DoD, else hold)`, and the usage line shows `--dod`.
-- [ ] Rewrite the cooperation block: bind `DOD_PATH`, refuse a `{…}` placeholder, and pass `--dod "$DOD_PATH"`. Add one sentence: on a gaps outcome the helper holds the lock at 7, so the block runs on both paths.
-- [ ] Phase 1's lock fixture now stays at 7; an ACCEPTED DoD still moves 7 → 8.
+- [x] Parse an optional `--dod <path>` after `--skill <name>`. The finalise arm keeps `finalise) NEXT=8 ;;` (the step-8 checklist test's mapping floor parses it), followed by a guard that holds the lock unless the DoD has the ACCEPTED line.
+- [x] Update the header: the mapping line reads `finalise → 8 (Step 7 done; only with --dod on a ✅ ACCEPTED DoD, else hold)`, and the usage line shows `--dod`.
+- [x] Rewrite the cooperation block: bind `DOD_PATH`, refuse a `{…}` placeholder, and pass `--dod "$DOD_PATH"`. Add one sentence: on a gaps outcome the helper holds the lock at 7, so the block runs on both paths.
+- [x] Phase 1's lock fixture now stays at 7; an ACCEPTED DoD still moves 7 → 8.
 
 **Dependencies**: Phase 1
 
@@ -246,15 +278,17 @@ bash .agents/skills/finalise/references/advance-pipeline-lock.sh --skill finalis
 **Files**:
 
 - `shared/resources/tests/step-8-completion-checklist.test.mjs`
-- the seven restatements in § 3
+- every site the § 3 restatement search returns
+- `evals/shared/tests/finalise-bug-mode.test.mjs`
 - `CHANGELOG.md`
 
 **Changes**:
 
-- [ ] The task.160 premise test writes an ACCEPTED DoD and passes `--dod`. Add a sibling assertion that the same call without `--dod` holds at 7.
-- [ ] Qualify each of the seven restatements with "when it accepts" (or "on an accepted DoD"). Leave the "unfinished Step 7 row still wins" rule as it is.
-- [ ] `npm run bundle`, then `npm run bundle:check`: `dod-gap-count.sh` lands in `skills/finalise/references/`, and the updated helper reaches every skill that bundles it.
-- [ ] CHANGELOG `[Unreleased]` → `### Fixed`, citing `(task 222)`.
+- [x] The task.160 premise test writes an ACCEPTED DoD and passes `--dod`. Add a sibling assertion that the same call without `--dod` holds at 7.
+- [x] `evals/shared/tests/finalise-bug-mode.test.mjs`: move the story/task 8.5 test's fixture to the 8.4 shape (`### Missing Criteria:` items, then `### Next Steps:` boxes) and keep its `GAP_COUNT=3` and "not a gap" assertions.
+- [x] Qualify every site the § 3 restatement search returns with "when it accepts" (or "on an accepted DoD"), comments included. Put the qualifier on the lock clause, not in the Step 7 tail wording two tests pin. Leave the "unfinished Step 7 row still wins" rule as it is.
+- [x] `npm run bundle`, then `npm run bundle:check`: `dod-gap-count.sh` lands in `skills/finalise/references/`, and the updated helper reaches every skill that bundles it.
+- [x] CHANGELOG `[Unreleased]` → `### Fixed`, citing `(task 222)`.
 
 **Dependencies**: Phases 2 and 3
 
@@ -274,7 +308,9 @@ bash .agents/skills/finalise/references/advance-pipeline-lock.sh --skill finalis
 
 ### Files to Modify (Tests)
 
-5. ✅ `shared/resources/tests/step-8-completion-checklist.test.mjs` — the premise test passes an ACCEPTED DoD; a no-`--dod` hold assertion
+5. ✅ `shared/resources/tests/step-8-completion-checklist.test.mjs` — the premise test passes an ACCEPTED DoD; a no-`--dod` hold assertion; comment wording
+5a. ✅ `evals/shared/tests/finalise-bug-mode.test.mjs` — the story/task 8.5 fixture moves to the 8.4 shape; its `gapsCommentBlock()` hosts the § 8 integration test
+5b. ✅ `shared/resources/develop-pipeline-on-stop.test.sh` — comment wording (lines 125, 129, 185)
 
 ### Files to Modify (Documentation)
 
@@ -301,11 +337,11 @@ bash .agents/skills/finalise/references/advance-pipeline-lock.sh --skill finalis
 
 **Actions**:
 
-- [ ] Gap count: the four fixtures from Phase 1 return 2, 3, 1 and 7.
-- [ ] Gap count refusals: no gaps section, no `### Missing Criteria`, and zero items each exit 1 with the reason on stderr and nothing on stdout.
-- [ ] **Control case** (obs #176): a Missing Criteria list whose items are `- ⚠️` and `- [x]` (none are `- [ ]`), with Next Steps that do have `- [ ]`. It must count the Missing Criteria items, not the Next Steps boxes. No fixture is copied from the three incidents.
-- [ ] Lock: lock at 7 + ACCEPTED DoD → 8. Lock at 7 + GAPS DoD → 7, stderr names the reason. Lock at 7 + DoD with the template's unfilled `{✅ ACCEPTED | ❌ …}` placeholder → 7. Lock at 7 + no `--dod` → 7. Lock at 7 + `--dod` naming a missing file → 7. Every case exits 0.
-- [ ] Lock, bug-mode shape: a DoD built from `skills/finalise/assets/bug-dod-template.md` and filled by `fill-verification-complete.sh … accepted` → 8; filled with `gaps` → 7.
+- [x] Gap count: the four fixtures from Phase 1 return 2, 3, 1 and 7.
+- [x] Gap count refusals: no gaps section, no `### Missing Criteria`, and zero items each exit 1 with the reason on stderr and nothing on stdout.
+- [x] **Control case** (obs #176): a Missing Criteria list whose items are `- ⚠️` and `- [x]` (none are `- [x]`), with Next Steps that do have `- [x]`. It must count the Missing Criteria items, not the Next Steps boxes. No fixture is copied from the three incidents.
+- [x] Lock: lock at 7 + ACCEPTED DoD → 8. Lock at 7 + GAPS DoD → 7, stderr names the reason. Lock at 7 + DoD with the template's unfilled `{✅ ACCEPTED | ❌ …}` placeholder → 7. Lock at 7 + no `--dod` → 7. Lock at 7 + `--dod` naming a missing file → 7. Every case exits 0.
+- [x] Lock, bug-mode shape: a DoD built from `skills/finalise/assets/bug-dod-template.md` and filled by `fill-verification-complete.sh … accepted` → 8; filled with `gaps` → 7.
 
 **Command**: `node --test shared/resources/tests/finalise-gaps-path.test.mjs shared/resources/tests/step-8-completion-checklist.test.mjs && bash shared/resources/advance-pipeline-lock.test.sh`
 
@@ -315,14 +351,14 @@ bash .agents/skills/finalise/references/advance-pipeline-lock.sh --skill finalis
 
 **Actions**:
 
-- [ ] Extract Step 8.5's story/task arm from `skills/finalise/SKILL.md` and run it against the task.213-shaped fixture. Assert the rendered lead says "(2 of them)".
-- [ ] Extract the cooperation block, substitute `DOD_PATH`, and run it in a temp repo with a lock at 7: a GAPS DoD stays at 7, an ACCEPTED DoD moves to 8.
+- [x] Extract Step 8.5's story/task arm from `skills/finalise/SKILL.md` with `finalise-bug-mode.test.mjs`'s `gapsCommentBlock()` and run it against the task.213-shaped fixture. Assert the rendered lead says "(2 of them)".
+- [x] Extract the cooperation block, substitute `DOD_PATH`, and run it in a temp repo with a lock at 7: a GAPS DoD stays at 7, an ACCEPTED DoD moves to 8.
 
 ### Mutation proof
 
-- [ ] Revert `dod-gap-count.sh` to the old whole-section grep: the count tests go red.
-- [ ] Delete the `--dod` guard: the gaps-lock test goes red.
-- [ ] Restore `--skill finalise` without `--dod` in the cooperation block: the extracted-block test goes red (it holds at 7 on an ACCEPTED DoD).
+- [x] Revert `dod-gap-count.sh` to the old whole-section grep: the count tests go red.
+- [x] Delete the `--dod` guard: the gaps-lock test goes red.
+- [x] Restore `--skill finalise` without `--dod` in the cooperation block: the extracted-block test goes red (it holds at 7 on an ACCEPTED DoD).
 
 ### Performance Tests
 
@@ -334,30 +370,30 @@ Not applicable. Both helpers read one small file.
 
 ### Functional
 
-- [ ] `dod-gap-count.sh` returns 2 for the task.213 shape, 3 for task.181, 1 for task.199 and 7 for the Step 8.4 example.
-- [ ] Step 8.5's rendered `dod-gaps` lead for a two-gap report reads "(2 of them)".
-- [ ] `--skill finalise --dod <GAPS DoD>` leaves `current_step` at 7 and exits 0.
-- [ ] `--skill finalise --dod <ACCEPTED DoD>` moves `current_step` from 7 to 8.
-- [ ] `--skill finalise` with no `--dod`, a missing file, or an unfilled status holds at 7 and exits 0.
-- [ ] A bug-mode DoD filled `accepted` advances; filled `gaps`, it holds.
-- [ ] `run_no_lock_split`'s three `--skill finalise` cases pass unchanged.
+- [x] `dod-gap-count.sh` returns 2 for the task.213 shape, 3 for task.181, 1 for task.199 and 7 for the Step 8.4 example. — `finalise-gaps-path.test.mjs` ("counts only the Missing Criteria items: 2, 3, 1 and 7"; the 8.4 example is read out of SKILL.md).
+- [x] Step 8.5's rendered `dod-gaps` lead for a two-gap report reads "(2 of them)". — `finalise-bug-mode.test.mjs` ("8.5's lead for a two-gap report with two Next Steps reads \"(2 of them)\""), Step 8.5 extracted and run.
+- [x] `--skill finalise --dod <GAPS DoD>` leaves `current_step` at 7 and exits 0. — `finalise-gaps-path.test.mjs` ("holds the lock at 7, exit 0, on a GAPS DoD").
+- [x] `--skill finalise --dod <ACCEPTED DoD>` moves `current_step` from 7 to 8. — `finalise-gaps-path.test.mjs` and the updated task.160 premise test in `step-8-completion-checklist.test.mjs`.
+- [x] `--skill finalise` with no `--dod`, a missing file, or an unfilled status holds at 7 and exits 0. — `finalise-gaps-path.test.mjs`, one test per case.
+- [x] A bug-mode DoD filled `accepted` advances; filled `gaps`, it holds. — `finalise-gaps-path.test.mjs` (template filled by `fill-verification-complete.sh`).
+- [x] `run_no_lock_split`'s three `--skill finalise` cases pass unchanged. — `advance-pipeline-lock.test.sh`: 72 passed, 0 failed (bash; zsh runs in CI).
 
 ### Performance
 
-- [ ] `npm test` wall time does not rise by more than 2% (the new file is unit-sized).
+- [x] `npm test` wall time does not rise by more than 2% (the new file is unit-sized). — measured: the new file 1851 ms plus the three new `finalise-bug-mode` tests 797 ms (file load included) ≈ 2.6 s, against a 300.4 s `npm test` on .249 (`# duration_ms 300402`) ≈ 0.9%. Command: a `date +%s%N` wrapper around `node --test` on each, load average 9.43 (`/proc/loadavg`), working tree on base `f67e6a8e`.
 
 ### Code Quality
 
-- [ ] `npm test` passes, with 0 failures.
-- [ ] `npm run bundle:check` is clean, with no `UNREACHED` copy.
-- [ ] `npm run validate -- skills/finalise/` passes (and for `develop-task`, `develop-story`, `develop-bug`).
-- [ ] `shellcheck` is clean on `dod-gap-count.sh` and `advance-pipeline-lock.sh`.
-- [ ] Each mutation in § 8 turns a test red.
+- [x] `npm test` passes, with 0 failures. — on .249 (`npm run ci:fast`, local memory too low): 6135 pass, 1 fail. The one failure, `security-probe.test.mjs` "task.167's 13 cases against the shipped fast-gate precondition", is environmental: .249 has npm 9.2.0, whose update-notifier writes `home/.npm/_update-notifier-last-checked`; it fails identically on the untouched base `f67e6a8e` there and passes locally (npm 11.19.1). CI confirms on the PR.
+- [x] `npm run bundle:check` is clean, with no `UNREACHED` copy. — exit 0.
+- [x] `npm run validate -- skills/finalise/` passes (and for `develop-task`, `develop-story`, `develop-bug`). — all four ✓.
+- [x] `shellcheck` is clean on `dod-gap-count.sh` and `advance-pipeline-lock.sh`. — `--severity=warning`, also `develop-pipeline-on-stop.sh`.
+- [x] Each mutation in § 8 turns a test red. — M1 whole-section grep → 3 red; M2 guard removed → 5 red; M3 cooperation block without `--dod` → 1 red (`finalise-gaps-path.test.mjs`).
 
 ### Migration
 
-- [ ] CHANGELOG `[Unreleased]` → `### Fixed` cites `(task 222)` and names the `--dod` requirement.
-- [ ] All seven restatements in § 3 carry the "on acceptance" qualifier. `git grep -n "moves the lock to 8"` shows no unqualified hit outside `docs/tasks/`.
+- [x] CHANGELOG `[Unreleased]` → `### Fixed` cites `(task 222)` and names the `--dod` requirement.
+- [x] Every site the § 3 restatement search returns carries the "on acceptance" qualifier (or, for the helper's header, the `--dod` condition). Re-running the search shows no unqualified hit. — re-run 2026-10-21: every hit qualified; the remaining `finalise → 8` match is the mapping-floor test's assertion message, which states the arm.
 
 ---
 
@@ -444,12 +480,27 @@ None.
 
 ---
 
+## Implementation Summary
+
+**Completion Date:** 2026-10-21
+
+**Approach:** Test-first, as planned. Phase 1's suite went red on today's code (9 of 12; `--skill finalise --dod X` ignored the extra arguments and moved the lock 7 → 8). `dod-gap-count.sh` is now the one story/task gap count, called by Step 8.5; Step 8.4 states the rule. The `--dod` guard sits after the lock parse (a corrupt lock is still exit 1) and after the idempotency check (a lock already at 8 stays a silent noop), and the arm literal `finalise) NEXT=8 ;;` is unchanged. finalise's cooperation block binds `DOD_PATH` and passes `--dod`. The doc sweep followed the § 3 search, not the literal.
+
+**Testing Results:** `finalise-gaps-path.test.mjs` 12/12; `finalise-bug-mode.test.mjs` + `step-8-completion-checklist.test.mjs` 113/113; `advance-pipeline-lock.test.sh` 72/72; `npm run ci:fast` on .249: format clean, 6135 pass, 1 environmental failure (see § 9). zsh variants run in CI only (no zsh on this host or .249). Three mutation proofs each turned a test red.
+
+**Deferred Work:** none. Step 8.3's Change Log gap count stays out of scope (§ 4).
+
+---
+
 <!-- change-log-start -->
 ## Change Log
 
 | Date       | Version | Description                                    | Author      |
 | ---------- | ------- | ---------------------------------------------- | ----------- |
 | 2026-10-21 | 1.0     | Initial draft — cut from observations #24, #79 | create-task |
+| 2026-10-21 | 1.1     | Review passed (8/10) — listed the finalise-bug-mode 8.5 test, recorded the restatement search, added resume states | review-task |
+| 2026-10-21 |         | Status → ready-for-development | review-task |
+| 2026-10-21 |         | Implemented — 2 new files (+1 bundled copy), 1 new test file (12 tests), 3 tests added to finalise-bug-mode, 23 files swept/re-bundled | develop |
 <!-- change-log-end -->
 
 ---
@@ -458,24 +509,25 @@ None.
 
 ### Phase 1: Reproduce both defects in tests (red)
 
-- [ ] Gap-count fixtures reproduce 4 / 5 / 3 / 8
-- [ ] Lock fixture reproduces 7 → 8 on a GAPS DoD
+- [x] Gap-count fixtures reproduce 4 / 5 / 3 / 8
+- [x] Lock fixture reproduces 7 → 8 on a GAPS DoD
 
 ### Phase 2: One gap-count definition
 
-- [ ] `dod-gap-count.sh`
-- [ ] Step 8.5 arm and Step 8.4 rule
+- [x] `dod-gap-count.sh`
+- [x] Step 8.5 arm and Step 8.4 rule
 
 ### Phase 3: Hold the lock unless the DoD reads ACCEPTED
 
-- [ ] `--dod` guard and header
-- [ ] Cooperation block
+- [x] `--dod` guard and header
+- [x] Cooperation block
 
 ### Phase 4: Existing tests, doc sweep, bundle
 
-- [ ] Premise test updated
-- [ ] Seven restatements qualified
-- [ ] Bundle, CHANGELOG
+- [x] Premise test updated
+- [x] Restatements qualified (§ 3 search)
+- [x] `finalise-bug-mode.test.mjs` 8.5 fixture in the 8.4 shape
+- [x] Bundle, CHANGELOG
 
 ---
 
@@ -505,9 +557,9 @@ None.
 
 ---
 
-**Status:** Planned
+**Status:** Ready for Review
 
 **Next Steps**:
 
-1. Review with `/review-task`, or run `/develop-task` on this document.
+1. QA (`/qa-task`) through the develop-task pipeline.
 2. QA will create `task.222.qa.{N}.finalise-gaps-path-fixes.md`, `task.222.gate.{N}.finalise-gaps-path-fixes.yml` and any `task.222.bug.{N}.*.md` in this directory.
