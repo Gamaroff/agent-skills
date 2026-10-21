@@ -5,7 +5,7 @@ type: task
 description: "Fix the two low findings task.222 carried: dod-gap-count.sh --body prints its internal marker S for an empty gaps section instead of refusing it, and task.222's Implementation Summary says Deferred Work is none beside a Deferred Work section that lists QA-222-13."
 tags: [finalise, dod-gaps, follow-up, task.222]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Low
 created: 2026-10-21
 updated: 2026-10-21
@@ -13,11 +13,13 @@ assignee:
 estimated_effort_hours: 2
 depends_on: task.222
 github_issue: 719
+completed_date: 2026-10-21
+pr_number: 720
 ---
 
 # Technical Task: Gap body: refuse an empty section; correct task.222's Deferred Work line
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.223.review.1.gap-body-empty-section-and-deferred-line.md` implemented 2026-10-21
 
@@ -359,6 +361,30 @@ finds the same two calls (`SKILL.md:2655` `--body`, `:2666` count).
 
 No critical issues identified. The diff reviewer found nothing. The `--body` refusal was probed
 (11 cases, 0 escapes, calibrated against the reverted guard) and mutation-proven.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.223.qa.1.gap-body-empty-section-and-deferred-line.md`
+**Gate File**: `task.223.gate.1.gap-body-empty-section-and-deferred-line.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR Review (5c)**: `task.223.pr-review.1.gap-body-empty-section-and-deferred-line.md` gave ✅ APPROVE with 0 findings
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 10/10 met. These cover the empty, blank-only and heading-only `--body` shapes, the unchanged populated test, the task.222 line, mutation proof, bundle and shellcheck, `npm test`, and CHANGELOG.
+✅ **Tests & PR:** PR #720. `finalise-gaps-path.test.mjs` 18/18 locally. CI reading 1 was SUCCESS across 5 checks @ `b4431205`.
+✅ **Documentation:** CHANGELOG `[Unreleased]` Fixed entry, helper header comment, and the regenerated bundled copy.
+✅ **Security Review:** ✅ PASS. The boundary was probed (`shell-argv:` `dod-gap-count.sh --body`): 11 executed, 0 reproduced, 0 escaped.
+✅ **Compliance Review:** Not applicable, since this is internal tooling with no PII, payment, UI or PHI.
+
+**Task marked as ACCEPTED on:** 2026-10-21
+
+**Detailed Verification Log:** See `task.223.dod.1.gap-body-empty-section-and-deferred-line.md` for the full verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
@@ -369,6 +395,7 @@ No critical issues identified. The diff reviewer found nothing. The `--body` ref
 | 2026-10-21 |  | Status → ready-for-development | review-task |
 | 2026-10-21 |  | Implemented — 4 files (+1 bundled copy), 1 test (3 empty shapes + control); mutation-proven | develop |
 | 2026-10-21 |  | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-10-21 | 1.2 | DoD passed — accepted (PR #720) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -422,7 +449,7 @@ None.
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 

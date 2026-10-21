@@ -1,0 +1,28 @@
+{
+  "sink": null,
+  "entry": "shell-argv:shared/resources/dod-gap-count.sh",
+  "name": "dod-gap-count-body",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 11,
+  "passed": 11,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": [
+    "bash"
+  ],
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": [
+    "{input}",
+    "--body"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-10-21T17:42:09.955Z"
+}
