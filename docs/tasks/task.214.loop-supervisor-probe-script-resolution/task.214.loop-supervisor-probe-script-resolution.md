@@ -5,17 +5,19 @@ type: task
 description: "Replace the hardcoded probeScript default in the develop-next and develop-batch adapters with a search across .agents/skills, .claude/skills and skills, so a repo that vendors the skills works without an override."
 tags: [loop-supervisor, adapters, probe]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-18
 updated: 2026-10-21
 estimated_effort_hours: 2
 github_issue: 721
+completed_date: 2026-10-21
+pr_number: 722
 ---
 
 # Technical Task: loop-supervisor: find select-next.mjs wherever the skills are installed
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.214.review.1.loop-supervisor-probe-script-resolution.md` implemented 2026-10-21
 **GitHub Issue**: [#721](https://github.com/Gamaroff/agent-skills/issues/721)
 
@@ -260,16 +262,42 @@ No critical issues identified. Two advisory code-review findings came back, both
 
 Three of four mutations went red; the fourth is an equivalent mutant.
 
-## Change Log
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.214.qa.1.loop-supervisor-probe-script-resolution.md`
+**Gate File**: `task.214.gate.1.loop-supervisor-probe-script-resolution.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR Review**: ✅ APPROVE (`task.214.pr-review.1.loop-supervisor-probe-script-resolution.md`)
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** All 8 success criteria met. 7 are held by tests that run on every PR, and 1 is a documentation criterion that was read and verified.
+✅ **Unit Tests:** 14 new tests in `evals/loop-supervisor/unit/adapters.test.mjs` (43 in the suite). The loop-supervisor suites ran 231 tests with 0 failures.
+✅ **PR Review:** PR #722. The repo requires no human reviews, so the Step 5c `/review-pr` APPROVE satisfies this. CI is green on all 5 checks.
+✅ **Documentation:** `skills/loop-supervisor/README.md:172`, `docs/reference/configuration.md:301`, and a CHANGELOG `[Unreleased]` entry.
+✅ **Security Review:** PASS. Not a boundary deliverable, because the change picks among three fixed paths and refuses nothing. No secrets, no eval or exec, no new dependencies.
+✅ **Compliance Review:** Not applicable. This is internal tooling with no PII, payment, UI or PHI.
+
+**Task marked as ACCEPTED on:** 2026-10-21
+
+**Detailed Verification Log:** See `task.214.dod.1.loop-supervisor-probe-script-resolution.md` for complete verification evidence and timestamps.
 
 <!-- change-log-start -->
+## Change Log
+
 | Date | Version | Description | Author |
-| --- | --- | --- | --- |
+|------|---------|-------------|--------|
 | 2026-10-18 | 1.0 | Initial draft | create-task |
 | 2026-10-21 | 1.1 | Review (8/10, after fixes): the existing override test would resolve to `.agents/skills/…` locally and `skills/…` in CI, so it now gets a temp `cwd`; added a call-count test and an injectable `exists`; dropped the wall-clock criterion; reworded the rollback trigger; linked issue #721 | review-task |
 | 2026-10-21 |  | Status → ready-for-development | review-task |
 | 2026-10-21 |  | Implemented — 5 files, 14 new tests (29 → 43 in the adapters suite) | develop |
 | 2026-10-21 |  | QA gate PASS (100/100) — 0 gating findings, 2 advisory | qa-task |
+| 2026-10-21 | 1.2 | DoD verified — accepted (PR #722) | finalise |
 <!-- change-log-end -->
 
 ---
