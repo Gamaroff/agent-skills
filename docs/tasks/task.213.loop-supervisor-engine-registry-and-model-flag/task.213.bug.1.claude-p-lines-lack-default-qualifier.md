@@ -4,7 +4,7 @@
 **Bug ID**: TASK-213-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-10-21
 
@@ -76,3 +76,4 @@ Add "by default" (or the `--engine agy` alternative) to each of the three matche
 | 2026-10-21 | New | qa-task | Filed in QA cycle 1 |
 | 2026-10-21 | In Progress | qa-fix | Investigation started |
 | 2026-10-21 | Ready for QA | qa-fix | Qualifier on all three lines |
+| 2026-10-21 | Closed | qa-task | Verified by task.213.qa.2.loop-supervisor-engine-registry-and-model-flag.md |

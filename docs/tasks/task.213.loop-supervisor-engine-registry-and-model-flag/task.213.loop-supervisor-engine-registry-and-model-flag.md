@@ -340,27 +340,33 @@ The `agy` result line in this document comes from the handoff, so a parser that 
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-21
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.213.qa.1.loop-supervisor-engine-registry-and-model-flag.md](./task.213.qa.1.loop-supervisor-engine-registry-and-model-flag.md)
-- **Gate File**: [task.213.gate.1.loop-supervisor-engine-registry-and-model-flag.yml](./task.213.gate.1.loop-supervisor-engine-registry-and-model-flag.yml)
+- **Full Report**: [task.213.qa.2.loop-supervisor-engine-registry-and-model-flag.md](./task.213.qa.2.loop-supervisor-engine-registry-and-model-flag.md)
+- **Gate File**: [task.213.gate.2.loop-supervisor-engine-registry-and-model-flag.yml](./task.213.gate.2.loop-supervisor-engine-registry-and-model-flag.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 31 new (21 engines, 10 `t213:`), 6,122 repository-wide passing
-- **Phases Verified**: 5/5 (Phase 4 with concerns)
+- **Tests Executed**: 31 new; 6,122 repository-wide passing
+- **Phases Verified**: 5/5
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-- There is one MEDIUM finding (TASK-213-BUG-1). Three `claude -p` lines fail the Migration criterion's own line-level search, because the qualifier is only in the next sentence.
-- Every behaviour criterion is held by a committed test. Mutation: 10 of 10 covered.
-- `resolveEngine` probe: 12 executed, 0 escaped, verdict `engages`.
-- Advisory: CR-1 (agy `init` conversation id fallback), CR-2 (`dryRun` spawn timeout), and a stale comment at `run-loop.mjs:1093`.
+- TASK-213-BUG-1 is fixed and closed.
+- The cycle-2 refute pass found two LOW, high-confidence doc claims that are false for agy:
+  - CR-4: the skill description's pinned-session claim.
+  - CR-5: the develop-next `claude --resume` sentence.
+- Advisory follow-ups: CR-1 (per-engine config model and effort), CR-2 (agy `init`-line session id), CR-3 (agy slash-command handling).
+
+## Deferred Work
+
+- **TASK-213-QA2-CR4** (LOW): carried to gate 2 `recommendations.future` (route 2b, cycle 2). The loop-supervisor skill description claims a pinned session id for agy too.
+- **TASK-213-QA2-CR5** (LOW): carried to gate 2 `recommendations.future` (route 2b, cycle 2). The develop-next resume sentence names only `claude --resume`, which is false for agy rows.
 
 ## Change Log
 
@@ -374,6 +380,7 @@ The `agy` result line in this document comes from the handoff, so a parser that 
 | 2026-10-21 |  | Status → ready-for-review | develop |
 | 2026-10-21 |  | QA gate CONCERNS (90/100) — 1 finding (TASK-213-BUG-1) | qa-task |
 | 2026-10-21 |  | QA findings fixed — TASK-213-BUG-1 plus 2 advisories (CR-2, stale comment), 1 iteration | qa-fix |
+| 2026-10-21 |  | QA gate PASS (100/100) — 2 LOW findings (CR-4, CR-5) | qa-task |
 <!-- change-log-end -->
 
 ---
