@@ -179,7 +179,7 @@ The task's own example is the searched default with nothing installed. The contr
 - [x] In an empty project, `resolveAdapter("develop-next", {}, { cwd })` returns `probeScript` `skills/develop-next/scripts/select-next.mjs` and `probeSearched` equal to the three candidates in order (Phase 1, `resolveAdapter` miss branch).
 - [x] For that adapter and `cwd`, `probeMissing` returns `status: "error"`, with a `reason` that starts `probe script not found: skills/develop-next/scripts/select-next.mjs` and contains `.agents/skills/develop-next/scripts/select-next.mjs` and `.claude/skills/develop-next/scripts/select-next.mjs` (Phase 1, `probeMissing` searched branch).
 - [x] With an override `probeScript: "tools/missing.mjs"`, `probeMissing` returns `status: "error"`, with a `reason` that starts `probe script not found: tools/missing.mjs`, names `loopSupervisor.adapters.develop-next.probeScript`, and does not list `.agents/skills/` (Phase 1, override branch).
-- [x] When the resolved probe script exists, `probeMissing` returns `null` and the probe runs as before; the existing probe tests pass unchanged (held by the spawned present-script dry-run test, `run-loop.test.mjs`, added in QA cycle 1).
+- [x] When the resolved probe script exists, `probeMissing` returns `null` and the probe runs as before; the existing probe tests pass unchanged (held by the spawned present-script dry-run test, `run-loop.test.mjs`, added in QA cycle 1). "Exists" means Node would run it: an extensionless override with a `.js` beside it, or a directory with an `index.js`, counts as present (held by the `probeMissing agrees with node on: …` tests, `adapters.test.mjs`, added in QA cycle 2).
 - [x] A spawned `dry-run --adapter develop-next` in an empty project prints a probe `reason` starting `probe script not found:` (Phase 2, `runProbe` wire-up).
 - [x] `interpretProbe`'s empty-stdout message is unchanged (`classify.test.mjs:330` passes).
 
@@ -264,17 +264,17 @@ None identified. The change adds a check before a spawn that would fail anyway.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.224.qa.1.loop-supervisor-probe-not-found.md](./task.224.qa.1.loop-supervisor-probe-not-found.md)
-- **Gate File**: [task.224.gate.1.loop-supervisor-probe-not-found.yml](./task.224.gate.1.loop-supervisor-probe-not-found.yml)
+- **Full Report**: [task.224.qa.2.loop-supervisor-probe-not-found.md](./task.224.qa.2.loop-supervisor-probe-not-found.md)
+- **Gate File**: [task.224.gate.2.loop-supervisor-probe-not-found.yml](./task.224.gate.2.loop-supervisor-probe-not-found.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 245
+- **Tests Executed**: 246
 - **Phases Verified**: 2/2
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-QA-1 (MEDIUM): no committed test spawns the probe with the script present, so "the probe runs as before" is unguarded. Three advisory code-review findings (CR-1 to CR-3) are recorded in the report.
+QA-1 is fixed and mutation-proven. QA-2 (MEDIUM): `probeMissing` checks `fs.existsSync`, but the spawn resolves the script as Node resolves a main module, so a configured extensionless `probeScript` that ran before this change is now refused.
 
 ## Change Log
 
@@ -287,6 +287,8 @@ QA-1 (MEDIUM): no committed test spawns the probe with the script present, so "t
 | 2026-10-21 |  | Implemented — 7 files, 14 new tests (13 adapters, 1 dry-run) | develop |
 | 2026-10-21 |  | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-10-21 |  | QA findings fixed — cycle 1, 1 finding (QA-1: present-script dry-run test) | qa-fix |
+| 2026-10-21 |  | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-10-21 |  | QA findings fixed — cycle 2, 1 finding (QA-2: probe existence follows Node resolution) | qa-fix |
 <!-- change-log-end -->
 
 ---

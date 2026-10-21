@@ -363,18 +363,41 @@ function resolveAdapter(name, config, { cwd = process.cwd() } = {}) {
 }
 
 /**
+ * True when `node <file>` would find a module to run. The spawn resolves its
+ * main module the way require.resolve does: the exact file, then
+ * <file>.js/.json/.node, then a directory's package.json main or index.js.
+ * existsSync alone refused an extensionless override that runs and accepted a
+ * directory that does not (task 224 QA-2). require.resolve caches a hit for
+ * the process, so a script deleted after one is reported by the spawn, as it
+ * was before this check existed.
+ *
+ * @param {string} file an absolute path
+ * @returns {boolean}
+ */
+function resolvesAsMain(file) {
+  try {
+    require.resolve(file);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * The probe-not-found error for `adapter` under `cwd`, or null when there is
  * no probe or its script exists. Runs before the spawn: a missing script would
  * otherwise reach interpretProbe as empty stdout, whose message is about a
  * symlink problem this is not. `path.resolve`, not `path.join`, so an absolute
  * override stays absolute — the same path the spawn, run in `cwd`, would use.
+ * "Exists" means Node would run it (resolvesAsMain), not that the exact path
+ * is on disk.
  *
  * @param {object} adapter a resolved adapter (resolveAdapter)
  * @param {string} cwd the project root the probe runs in
  * @param {(p: string) => boolean} [exists] injectable for tests
  * @returns {{status: "error", reason: string} | null}
  */
-function probeMissing(adapter, cwd, exists = fs.existsSync) {
+function probeMissing(adapter, cwd, exists = resolvesAsMain) {
   const script = adapter && adapter.probeScript;
   if (!script) return null;
   if (exists(path.resolve(cwd, script))) return null;

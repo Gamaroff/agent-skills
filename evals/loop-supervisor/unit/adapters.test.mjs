@@ -494,6 +494,76 @@ test("probeMissing: an absolute override that exists → null (resolved, not joi
   assert.equal(probeMissing(a, cwd), null);
 });
 
+// QA-2: the check must agree with the spawn. Each case writes a project,
+// configures probeScript, and compares probeMissing with what `node <script>`
+// does in that project: runs it (exit 0) or cannot find it (MODULE_NOT_FOUND).
+const RESOLUTION_CASES = [
+  {
+    name: "exact file",
+    files: { "tools/select.mjs": "" },
+    script: "tools/select.mjs",
+    runs: true,
+  },
+  {
+    name: "extensionless, .js beside it",
+    files: { "tools/select.js": "" },
+    script: "tools/select",
+    runs: true,
+  },
+  {
+    name: "extensionless, nothing beside it",
+    files: { "tools/other.js": "" },
+    script: "tools/select",
+    runs: false,
+  },
+  {
+    name: "directory with index.js",
+    files: { "tools/sel/index.js": "" },
+    script: "tools/sel",
+    runs: true,
+  },
+  {
+    name: "directory without an index",
+    files: { "tools/sel/x.txt": "" },
+    script: "tools/sel",
+    runs: false,
+  },
+];
+
+for (const c of RESOLUTION_CASES) {
+  test(`probeMissing agrees with node on: ${c.name}`, () => {
+    const cwd = mkdtempSync(path.join(os.tmpdir(), "ls-resolve-"));
+    for (const [rel, body] of Object.entries(c.files)) {
+      mkdirSync(path.dirname(path.join(cwd, rel)), { recursive: true });
+      writeFileSync(path.join(cwd, rel), body);
+    }
+    let ran = true;
+    try {
+      execFileSync(process.execPath, [c.script], { cwd, stdio: "pipe" });
+    } catch (e) {
+      assert.match(String(e.stderr), /Cannot find module/);
+      ran = false;
+    }
+    assert.equal(ran, c.runs, "the fixture itself");
+    const a = resolveAdapter(
+      "develop-next",
+      {
+        loopSupervisor: {
+          adapters: { "develop-next": { probeScript: c.script } },
+        },
+      },
+      { cwd },
+    );
+    const r = probeMissing(a, cwd);
+    if (c.runs) assert.equal(r, null);
+    else
+      assert.ok(
+        r.reason.startsWith("probe script not found: " + c.script),
+        r && r.reason,
+      );
+  });
+}
+
 test("probeMissing makes one exists call for a probe, none without one", () => {
   const calls = [];
   const exists = (p) => {
