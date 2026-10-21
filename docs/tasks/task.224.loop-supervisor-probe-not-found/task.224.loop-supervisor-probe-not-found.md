@@ -5,17 +5,19 @@ type: task
 description: "When no select-next.mjs exists under any searched path, or a configured probeScript is missing, the loop-supervisor probe reports which path it looked for instead of the misleading empty-output error, and the adapter table derives its default probe path from the candidate constant."
 tags: [loop-supervisor, adapters, probe]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 estimated_effort_hours: 8
 created: 2026-10-21
 updated: 2026-10-21
 github_issue: 723
+completed_date: 2026-10-21
+pr_number: 724
 ---
 
 # Technical Task: loop-supervisor: say when the probe script is not found
 
-**Status:** Ready for Review
+**Status:** Accepted
 **GitHub Issue**: [#723](https://github.com/Gamaroff/agent-skills/issues/723)
 **Review**: ✅ All review recommendations from `task.224.review.1.loop-supervisor-probe-not-found.md` implemented 2026-10-21
 
@@ -276,11 +278,36 @@ None identified. The change adds a check before a spawn that would fail anyway.
 ### Key Findings
 QA-3 is fixed: a script deleted mid-run now reads as missing, and the fix is mutation-proven. No gate entries are open. One advisory finding (CR-1: a stale hit hides a replacement that appears later) is recorded for follow-up.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.224.qa.4.loop-supervisor-probe-not-found.md`
+**Gate File**: `task.224.gate.4.loop-supervisor-probe-not-found.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (4 QA cycles)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 12 of 12 met, each cited to code and to a test or document
+✅ **Unit Tests:** 253 run in the loop-supervisor suite (252 pass, 0 fail, 1 skipped). The `test` check is green on PR #724.
+✅ **PR Review:** PR #724. No reviewer is required (single-maintainer repo). Step 5c `/review-pr` returned CONCERNS, non-blocking, and both trail findings are fixed.
+✅ **Documentation:** the loop-supervisor README, the `docs/reference/configuration.md` row and CHANGELOG [Unreleased] are updated
+✅ **Security Review:** PASS. There are no secrets, no shell or eval, and no dependency changes. `boundary: false` is reasoned: `probeMissing` is a diagnostic and adds no refusal.
+✅ **Compliance Review:** NOT_APPLICABLE (internal tooling)
+
+**Deployment Readiness:** APPROVED (gate 4)
+
+**Task marked as ACCEPTED on:** 2026-10-21
+
+**Detailed Verification Log:** See `task.224.dod.1.loop-supervisor-probe-not-found.md` for the full verification evidence.
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
 | Date | Version | Description | Author |
-| --- | --- | --- | --- |
+|------|---------|-------------|--------|
 | 2026-10-21 | 1.0 | Initial draft — follow-up to task.214 QA CR-1 and CR-2 | create-task |
 | 2026-10-21 | 1.1 | Review (9/10): linked issue #723; added a counting-`exists` unit test so the one-call Performance criterion has a test; the dry-run test also asserts `ok: false` | review-task |
 | 2026-10-21 |  | Status → ready-for-development | review-task |
@@ -292,6 +319,7 @@ QA-3 is fixed: a script deleted mid-run now reads as missing, and the fix is mut
 | 2026-10-21 |  | QA gate PASS (100/100) — 1 finding (QA-3, low) | qa-task |
 | 2026-10-21 |  | QA findings fixed — cycle 3, 1 finding (QA-3: resolved probe script re-checked on disk) | qa-fix |
 | 2026-10-21 |  | QA gate PASS (100/100) — 0 gated findings (1 advisory) | qa-task |
+| 2026-10-21 | 1.2 | DoD verified — accepted (PR #724) | finalise |
 <!-- change-log-end -->
 
 ---
