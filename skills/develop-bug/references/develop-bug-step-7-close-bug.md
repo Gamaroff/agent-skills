@@ -27,7 +27,7 @@ Do NOT write a DoD file directly or set any accepted/closed status without runni
 
 After finalise returns, read its output:
 - DoD satisfied → continue to Part B.
-- DoD gaps found → log each gap in the Issues Log, commit the report via `/commit-changes` (`docs({bug-prefix}): implementation report — finalise gaps identified`), push, and **HALT**:
+- DoD gaps found → do **not** advance the lock (it stays at 7, where `/finalise` held it — task 222); log each gap in the Issues Log, commit the report via `/commit-changes` (`docs({bug-prefix}): implementation report — finalise gaps identified`), push, and **HALT**:
   ```
   ⚠️ Finalise identified Definition of Done gaps.
   Address the gaps in {report path} before re-running /develop-bug.

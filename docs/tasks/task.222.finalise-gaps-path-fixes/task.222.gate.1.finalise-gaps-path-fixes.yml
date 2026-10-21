@@ -1,0 +1,90 @@
+schema: 2
+task: 'task.222.finalise-gaps-path-fixes'
+task_title: 'finalise gaps path: true gap count, lock held at Step 7'
+gate: CONCERNS
+status_reason: 'Both defects are fixed and tested (125/125 targeted, CI green). Two medium sites still tell an orchestrator or caller to advance past the new hold: the Step Transition Protocol advances first and checks later, and the shared cooperation reference drops --dod. Three low items in the counter and the hold message.'
+reviewer: 'QA Engineer'
+head: '9b2a3d3261596b55db83e9beca0c86c6e3519b8b'
+updated: '2026-10-21T14:15:06Z'
+
+top_issues:
+  - id: 'QA-222-1'
+    severity: medium
+    file: 'skills/develop-task/SKILL.md'
+    finding: 'The Step Transition Protocol (develop-task SKILL.md:152, develop-story :159, develop-bug :147) makes the numeric lock advance the FIRST call after any sub-skill returns, before step-7 Detecting Completion reads the status. On a gaps return the orchestrator moves the lock to 8 itself, so the "halt_step 7" resume state in task § 3 is not reached end to end.'
+    suggested_action: 'State a Step 7 exception in all three protocols (and in develop-pipeline-step-7-finalise.md Detecting Completion): after /finalise, read the status first; advance to 8 only on accepted, and on gaps HALT with the lock at 7. Pin it with a test over the three SKILL.md files.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-222-2'
+    severity: medium
+    file: 'shared/resources/pipeline-lock-cooperation.md'
+    finding: 'The shared cooperation reference, which finalise links to for the rationale, still gives `--skill <this-skill-name> 2>/dev/null` with finalise as an example. Followed as written it always holds the lock at 7 and discards the stderr reason. The § 3 restatement search did not reach it.'
+    suggested_action: 'Add a finalise exception there: `--skill finalise --dod <dod-path>`, stderr kept; name the hold-on-gaps rule.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-222-3'
+    severity: low
+    file: 'shared/resources/dod-gap-count.sh'
+    finding: '`s && m && /^##/` also matches `####`, so a `####` category heading under Missing Criteria ends the subsection. Reproduced: a section with items only under `#### Tests` / `#### Docs` HALTs "lists no gap" (want 3). Corpus: 0 of 27 gap sections carry `####`.'
+    suggested_action: 'End the subsection only on a level-2 or level-3 heading; add a `####` fixture.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-222-4'
+    severity: low
+    file: 'shared/resources/dod-gap-count.sh'
+    finding: 'Every `- ` line at any indent counts, so nested detail sub-bullets overcount. Reproduced: two gaps with two sub-bullets under the first read 4 (want 2). Corpus: 0 of 27 gap sections carry nested sub-bullets.'
+    suggested_action: 'Count only items at the shallowest bullet indent in the subsection and skip fenced lines; the Step 8.4 example (6 indented `- ⚠️` + 1 `- [ ]`) must still read 7. Add a nested-bullet fixture.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-222-5'
+    severity: low
+    file: 'shared/resources/advance-pipeline-lock.sh'
+    finding: '`--dod` with an empty value (an unset $DOD_PATH) reports "no --dod given", the same as no flag at all, pointing the operator at the wrong caller defect.'
+    suggested_action: 'Report "--dod given an empty path" separately.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 125
+  phases_verified: 4/4
+  ci: 'pass @ 9b2a3d32 (test, shellcheck, validate, link-check)'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: internal for dod-gap-count.sh and the --dod guard (inputs are the task DoD gaps section and the DoD summary finalise writes). A filename-sink run was attempted and discarded: the sink does not model document content (all 5 legitimate cases overblocked).'
+  performance:
+    status: PASS
+    notes: 'Added tests ≈2.6 s of a 300 s suite (≈0.9%, under the 2% bound).'
+  reliability:
+    status: CONCERNS
+    notes: 'The helper holds correctly; the orchestrator protocol can still advance past it on gaps (QA-222-1).'
+  maintainability:
+    status: PASS
+    notes: 'One count definition; restatements qualified; one shared reference missed (QA-222-2).'
+
+recommendations:
+  immediate:
+    - action: 'Add the Step 7 status-first exception to the three Step Transition Protocols and the step-7 doc (QA-222-1).'
+      refs: ['skills/develop-task/SKILL.md', 'skills/develop-story/SKILL.md', 'skills/develop-bug/SKILL.md', 'shared/resources/develop-pipeline-step-7-finalise.md']
+    - action: 'Add the finalise --dod exception to the cooperation reference (QA-222-2).'
+      refs: ['shared/resources/pipeline-lock-cooperation.md']
+  future:
+    - action: 'The .249 test host has npm 9.2.0, whose update-notifier fails security-probe.test.mjs "task.167''s 13 cases" on any commit; pin NO_UPDATE_NOTIFIER in that test or upgrade npm there.'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['QA-222-1 and QA-222-2 fixed']

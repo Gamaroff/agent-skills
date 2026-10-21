@@ -423,6 +423,7 @@ require_parsable_lock() {
 
 NEXT=""
 DOD_ARG=""
+DOD_FLAG=""
 case "$1" in
   # --complete and `--skill commit-changes` are handled above the jq gate.
   --restore)
@@ -458,7 +459,7 @@ case "$1" in
     [ $# -ge 2 ] || usage
     SKILL_NAME="$2"
     # finalise only: the DoD whose **Final Status:** decides the advance (task 222).
-    [ "${3:-}" = "--dod" ] && DOD_ARG="${4:-}"
+    [ "${3:-}" = "--dod" ] && { DOD_FLAG=1; DOD_ARG="${4:-}"; }
     case "$SKILL_NAME" in
       create-branch)              NEXT=2 ;;
       review-story|review-task)   NEXT=3 ;;
@@ -510,8 +511,10 @@ fi
 # idempotency check, so a lock already at 8 stays a silent noop.
 if [ "${SKILL_NAME:-}" = "finalise" ]; then
   HOLD=""
-  if [ -z "$DOD_ARG" ]; then
+  if [ -z "$DOD_FLAG" ]; then
     HOLD="no --dod given"
+  elif [ -z "$DOD_ARG" ]; then
+    HOLD="--dod given an empty path"
   elif [ ! -f "$DOD_ARG" ]; then
     HOLD="$DOD_ARG is not a file"
   elif ! grep -q '^\*\*Final Status:\*\* ✅ ACCEPTED' "$DOD_ARG"; then

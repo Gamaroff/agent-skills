@@ -144,7 +144,7 @@ When a step dispatches subagents, persist their summaries per [`references/subag
 
 Every step ends with the same four actions, executed _in order, with no text output between them_:
 
-1. **Bash tool call** advancing the lock to the next step: `bash .agents/skills/develop-bug/references/advance-pipeline-lock.sh {N+1}`. **This must be the first call** — it anchors the orchestrator into "still working" mode and signals the `Stop` hook that the pipeline advanced. After Step 8, issue `--complete` instead of a number (a numeric advance with no lock is an error): Step 8's Completion Checklist already ran `--complete` as its last action, so this one is a no-op — the helper exits 0 when there is no lock (task 161). Idempotent — a sub-skill normally self-advances the lock, so this re-advance noops.
+1. **Bash tool call** advancing the lock to the next step: `bash .agents/skills/develop-bug/references/advance-pipeline-lock.sh {N+1}`. **This must be the first call** — it anchors the orchestrator into "still working" mode and signals the `Stop` hook that the pipeline advanced. After Step 8, issue `--complete` instead of a number (a numeric advance with no lock is an error): Step 8's Completion Checklist already ran `--complete` as its last action, so this one is a no-op — the helper exits 0 when there is no lock (task 161). Idempotent — a sub-skill normally self-advances the lock, so this re-advance noops. **Except after Step 7: read its outcome first.** Run Step 7's completion check before this call, and issue `8` only when `/finalise --bug` returned no gaps. On a gaps outcome the step HALTs with the lock at 7, where `/finalise` held it; a numeric `8` here would undo that hold and the resume would read Step 7 as done (task 222).
 2. **Edit the implementation report** Pipeline Progress row for the just-completed step (`✅ Done`) — and, when its `Completed (UTC)` cell is empty, write `date -u +%Y-%m-%dT%H:%MZ` into it; a resumed step keeps the time it first finished, so never overwrite a filled cell (task.201) — then **read it back**. **After Step 8 this edit is a no-op:** Step 8 set its own row to `✅ Done` before its commit (step-8 doc § Final Implementation Report Update), and the Completion Checklist's check 5 has already required a clean tree, so any change here would be uncommitted dirt. Confirm the row is finished by check 4's own test (its Status cell starts with `✅`, or reads `⏭️ Skipped`) and change nothing (task 160). A row that fails that test after Step 8 is a **HALT, not an edit**: the Completion Checklist should have refused it, so something wrote the report after the checklist ran. The read-back is lint call site (1) of the four the report-lint contract names, and it is a tool call, not prose:
 
    ```bash
@@ -179,7 +179,7 @@ Two structural defences back this up: each pipeline sub-skill self-advances the 
 
 **Step banners (required).** Before starting each step, output: `═══ DEVELOP-BUG PIPELINE: STEP {N}/8 — {STEP-NAME} ═══`
 
-**Lock file `current_step` update (required, Steps 2–8).** Per the Step Transition Protocol, this is **action #1** — the first tool call after a sub-skill returns:
+**Lock file `current_step` update (required, Steps 2–8).** Per the Step Transition Protocol, this is **action #1** — the first tool call after a sub-skill returns (after Step 7, only once `/finalise --bug` returned no gaps; see action 1):
 
 ```bash
 bash .agents/skills/develop-bug/references/advance-pipeline-lock.sh {N+1}

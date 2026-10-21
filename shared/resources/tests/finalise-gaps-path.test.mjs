@@ -233,6 +233,94 @@ for (const shell of SHELLS) {
     }
   });
 
+  // QA-222-3 and QA-222-4: a `####` category heading does not end the subsection, a detail
+  // sub-bullet is not a second gap, and a fenced line is not a gap. The last case is the other
+  // direction: a top-level gap beside categorised ones still counts, so nesting never undercounts.
+  test(`[${shell}] dod-gap-count.sh: #### headings, sub-bullets and fences — and nothing undercounted`, () => {
+    const dir = tmp("t222-shape-");
+    const section = (lines) =>
+      [
+        "# Task",
+        "",
+        "## Definition of Done - Gaps Identified",
+        "",
+        "### Missing Criteria:",
+        "",
+        ...lines,
+        "",
+        "### Next Steps:",
+        "",
+        "- [ ] act",
+        "",
+        "## Change Log",
+        "",
+      ].join("\n");
+    try {
+      const cases = [
+        {
+          why: "#### category headings",
+          lines: [
+            "#### Tests",
+            "",
+            "- [ ] a",
+            "- [ ] b",
+            "",
+            "#### Docs",
+            "",
+            "- [ ] c",
+          ],
+          want: 3,
+        },
+        {
+          why: "nested detail sub-bullets",
+          lines: [
+            "- [ ] a",
+            "  - detail one",
+            "  - detail two",
+            "    wrapped text of detail two",
+            "- [ ] b",
+          ],
+          want: 2,
+        },
+        {
+          why: "a fenced block holding list lines and a heading",
+          lines: [
+            "- [ ] a",
+            "",
+            "```text",
+            "- not a gap",
+            "### Not a heading",
+            "```",
+            "",
+            "- [ ] b",
+          ],
+          want: 2,
+        },
+        {
+          why: "a top-level gap beside numbered categories",
+          lines: [
+            "- [ ] a top-level gap",
+            "",
+            "1. **Unit Tests:**",
+            "   - ⚠️ b",
+            "   - ⚠️ c",
+            "",
+            "2. **Docs:**",
+            "   - [ ] d",
+          ],
+          want: 4,
+        },
+      ];
+      for (const c of cases) {
+        const r = count(write(dir, "doc.md", section(c.lines)));
+        assert.equal(r.status, 0, c.why + "\n" + r.stdout + r.stderr);
+        assert.equal(r.stdout, `${c.want}\n`, c.why);
+      }
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test(`[${shell}] dod-gap-count.sh refuses — exit 1, reason on stderr, nothing on stdout`, () => {
     const dir = tmp("t222-refuse-");
     try {
@@ -319,6 +407,12 @@ for (const shell of SHELLS) {
       says: /does not read/,
     },
     { why: "no --dod", extra: () => "", says: /no --dod given/ },
+    // An unset $DOD_PATH reaches the helper as an empty value: a different caller defect (QA-222-5).
+    {
+      why: "an empty --dod value",
+      extra: () => `--dod ""`,
+      says: /--dod given an empty path/,
+    },
     {
       why: "a missing DoD file",
       extra: (d) => `--dod "${path.join(d, "absent.md")}"`,
@@ -412,4 +506,72 @@ for (const shell of SHELLS) {
       }
     }
   });
+
+  // QA-222-2: the shared cooperation reference shows finalise's call too. Run as written, it
+  // must hold on GAPS and advance on ACCEPTED, and it must not discard the hold's reason.
+  test(`[${shell}] the cooperation reference's finalise block holds on GAPS, advances on ACCEPTED, keeps stderr`, () => {
+    const block = blockBy(
+      readDoc("shared/resources/pipeline-lock-cooperation.md"),
+      "--skill finalise",
+    );
+    assert.doesNotMatch(block, /2>\/dev\/null/, "the hold's reason is kept");
+    for (const [line, want] of [
+      [GAPS_LINE, 7],
+      [ACCEPTED_LINE, 8],
+    ]) {
+      const dir = lockRepo();
+      try {
+        fs.mkdirSync(path.join(dir, ".agents"));
+        fs.symlinkSync(
+          path.join(ROOT, "skills"),
+          path.join(dir, ".agents/skills"),
+        );
+        const code = bind(block, { "<dod-path>": dodWith(dir, line) });
+        const r = run(shell, code, { cwd: dir });
+        assert.equal(r.status, 0, r.stdout + r.stderr);
+        assert.equal(stepOf(dir), want, `DoD reading ${line}`);
+        if (want === 7) assert.match(r.stderr, /lock held at step 7/);
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    }
+  });
 }
+
+// ── QA-222-1: the orchestrators read Step 7's outcome before they advance to 8 ──────────────
+// The Step Transition Protocol puts the lock advance first after any sub-skill returns. After
+// Step 7 that would write 8 over the hold /finalise kept on a gaps outcome, so each protocol,
+// its lock-update paragraph and both Step 7 documents state the exception.
+test("each develop-* Step Transition Protocol reads Step 7's outcome before advancing to 8", () => {
+  for (const sk of ["develop-task", "develop-story", "develop-bug"]) {
+    const doc = readDoc(`skills/${sk}/SKILL.md`);
+    const action1 = doc.match(
+      /^1\. \*\*Bash tool call\*\* advancing the lock[^\n]*/m,
+    );
+    assert.ok(action1, `${sk}: the protocol's action 1 is present`);
+    assert.match(
+      action1[0],
+      /\*\*Except after Step 7: read its outcome first\.\*\*[^\n]*HALTs with the lock at 7/,
+      `${sk}: action 1 states the Step 7 exception`,
+    );
+    const lockPara = doc.match(
+      /this is \*\*action #1\*\* — the first tool call[^\n]*/,
+    );
+    assert.ok(lockPara, `${sk}: the lock-update paragraph is present`);
+    assert.match(
+      lockPara[0],
+      /after Step 7, only once/,
+      `${sk}: lock-update paragraph`,
+    );
+  }
+  const step7 = readDoc("shared/resources/develop-pipeline-step-7-finalise.md");
+  const detecting = step7.slice(step7.indexOf("## Detecting Completion"));
+  assert.match(
+    detecting.slice(0, 600),
+    /runs \*\*before\*\* the Step Transition Protocol's lock advance/,
+  );
+  assert.match(
+    readDoc("skills/develop-bug/references/develop-bug-step-7-close-bug.md"),
+    /DoD gaps found → do \*\*not\*\* advance the lock \(it stays at 7/,
+  );
+});

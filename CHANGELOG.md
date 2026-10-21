@@ -99,8 +99,9 @@ All notable changes to this project will be documented in this file. Format foll
   story/task count: the list items under `### Missing Criteria`, checkbox or `- ⚠️`. It HALTs on a
   gap section with none. `advance-pipeline-lock.sh --skill finalise` now needs `--dod <path>` and
   advances to Step 8 only when that DoD reads `**Final Status:** ✅ ACCEPTED`; otherwise it holds
-  the lock, says why on stderr, and exits 0. A gaps halt now resumes at `/finalise` instead of
-  reading Step 7 as done. finalise's lock cooperation passes `--dod`; reinstall the skills together
+  the lock, says why on stderr, and exits 0. The develop-* orchestrators read Step 7's outcome
+  before their own advance to 8, so a gaps halt now resumes at `/finalise` instead of reading Step 7
+  as done. finalise's lock cooperation passes `--dod`; reinstall the skills together
   so an older finalise does not call the newer helper without it (it would hold at 7 until the
   orchestrator's own advance).
 - **Migration engine: dot-directory references and displaced-block edits (task 221).**

@@ -29,22 +29,47 @@ grep -q '^## Definition of Done - Gaps Identified' "$DOC_FILE" || {
   exit 1
 }
 # `s`: inside the gaps section, until the next `## `. `m`: inside a Missing Criteria
-# subsection, until the next `###` or `##` — so `### Next Steps` ends the range. The `@`
-# marker records that the subsection exists, apart from whether it lists anything.
-SUB=$(awk '/^## Definition of Done - Gaps Identified/ { s = 1; next }
+# subsection, until the next level-2 or level-3 heading — so `### Next Steps` ends the range and a
+# `####` category heading does not (QA-222-3). Lines inside a fence are skipped, headings included.
+# A gap is a bullet that is not nested under another bullet: `st` is a stack of open bullet
+# indents, popped by any line at or left of them, so a detail sub-bullet is not a second gap and a
+# numbered category line (`1. **Unit Tests:**`) closes the list above it (QA-222-4). The first line
+# printed is "@" when the subsection exists, then the count.
+OUT=$(awk '
+  function indent(l,   i, c, n) {
+    n = 0
+    for (i = 1; i <= length(l); i++) {
+      c = substr(l, i, 1)
+      if (c == " ") n++
+      else if (c == "\t") n += 4
+      else break
+    }
+    return n
+  }
+  /^## Definition of Done - Gaps Identified/ { s = 1; next }
+  s && /^[ \t]*(```|~~~)/ { fence = !fence; next }
+  fence { next }
   s && /^## / { s = 0 }
-  s && /^### Missing Criteria/ { m = 1; print "@"; next }
-  s && m && /^##/ { m = 0 }
-  s && m' "$DOC_FILE")
-case "$SUB" in
+  s && /^### Missing Criteria/ { m = 1; seen = 1; next }
+  s && m && /^###?([^#]|$)/ { m = 0 }
+  s && m && !/^[ \t]*$/ {
+    ind = indent($0)
+    while (n > 0 && st[n] >= ind) n--
+    if ($0 ~ /^[ \t]*- /) {
+      if (n == 0) count++
+      st[++n] = ind
+    }
+  }
+  END { if (seen) print "@"; print count + 0 }
+' "$DOC_FILE")
+case "$OUT" in
   '@'*) ;;
   *)
     echo "HALT: no '### Missing Criteria' under '## Definition of Done - Gaps Identified' in $DOC_FILE — Step 8.4 lists each gap there" >&2
     exit 1
     ;;
 esac
-# `grep -c` prints 0 and EXITS 1 when nothing matches, so `|| true` (never `|| echo 0`).
-N=$(printf '%s\n' "$SUB" | grep -c '^[[:space:]]*- ' || true)
+N=${OUT##*$'\n'}
 [ "${N:-0}" -gt 0 ] || {
   echo "HALT: '### Missing Criteria' in $DOC_FILE lists no gap — Step 8.4 writes one list item per gap" >&2
   exit 1

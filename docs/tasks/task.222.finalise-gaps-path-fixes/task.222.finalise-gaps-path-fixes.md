@@ -492,6 +492,27 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-21
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.222.qa.1.finalise-gaps-path-fixes.md](./task.222.qa.1.finalise-gaps-path-fixes.md)
+- **Gate File**: [task.222.gate.1.finalise-gaps-path-fixes.yml](./task.222.gate.1.finalise-gaps-path-fixes.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 125
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+Both defects are fixed and tested, and CI is green. Medium: the develop-* Step Transition Protocol advances the lock before Step 7 checks the outcome (QA-222-1). Medium: `pipeline-lock-cooperation.md` shows finalise without `--dod` (QA-222-2). Low: QA-222-3 to -5.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -501,6 +522,8 @@ None.
 | 2026-10-21 | 1.1     | Review passed (8/10) — listed the finalise-bug-mode 8.5 test, recorded the restatement search, added resume states | review-task |
 | 2026-10-21 |         | Status → ready-for-development | review-task |
 | 2026-10-21 |         | Implemented — 2 new files (+1 bundled copy), 1 new test file (12 tests), 3 tests added to finalise-bug-mode, 23 files swept/re-bundled | develop |
+| 2026-10-21 |  | QA gate CONCERNS (80/100) — 5 findings (2 medium, 3 low) | qa-task |
+| 2026-10-21 |  | QA findings fixed — 5 of 5 (QA-222-1..5), 1 iteration; 4 tests added | qa-fix |
 <!-- change-log-end -->
 
 ---
