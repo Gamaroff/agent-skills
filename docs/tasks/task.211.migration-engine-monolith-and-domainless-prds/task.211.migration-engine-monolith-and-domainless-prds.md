@@ -248,21 +248,21 @@ makes, and `migration-guard.mjs` refuses nothing it can carry.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-21
-**Quality Score**: 75/100
+**Quality Score**: 80/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.211.qa.3.migration-engine-monolith-and-domainless-prds.md](./task.211.qa.3.migration-engine-monolith-and-domainless-prds.md)
-- **Gate File**: [task.211.gate.3.migration-engine-monolith-and-domainless-prds.yml](./task.211.gate.3.migration-engine-monolith-and-domainless-prds.yml)
+- **Full Report**: [task.211.qa.4.migration-engine-monolith-and-domainless-prds.md](./task.211.qa.4.migration-engine-monolith-and-domainless-prds.md)
+- **Gate File**: [task.211.gate.4.migration-engine-monolith-and-domainless-prds.yml](./task.211.gate.4.migration-engine-monolith-and-domainless-prds.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 105
+- **Tests Executed**: 107
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Cycle 2's five findings are fixed, and `parseNameValue` still engages under the path probe (20 cases, 0 escaped). The scoped review of that fix found five new defects. The two medium ones: a path that starts with a variable (`${ROOT}/docs/prd.md`) is skipped as absolute (CR-1, a regression for `.mjs`), and a non-literal file inside the PRD root is read by neither loop (CR-2). The three low ones: frozen example copies are not exempt in the non-literal loop (CR-3), a body with two thematic breaks still reads as displaced (CR-4), and binaries are read in full before being discarded (CR-5).
+Cycle 3's five findings are fixed, and `parseNameValue` still engages under the path probe (20 cases, 0 escaped). The scoped review of that fix found four new defects. The medium one: the two scan loops disagree on extension case, so `README.MD` or `ci.YML` is read by neither (CR-1, a regression). The three low ones: spaced or quoted YAML keys are not read as a displaced block (CR-2, a regression), a quoted variable (`"$ROOT"/docs/prd.md`) is skipped as absolute (CR-3), and `$HOME/docs/prd.md` is refused as stale (CR-4).
 
 ## Change Log
 <!-- change-log-start -->
@@ -279,6 +279,8 @@ Cycle 2's five findings are fixed, and `parseNameValue` still engages under the 
 | 2026-10-21 |         | QA findings fixed — cycle 2, 5 of 5 (CR-1 to CR-5), stale-reference matcher consolidated, 5 test rows | qa-fix |
 | 2026-10-21 |         | QA gate CONCERNS (75/100) — 5 findings (2 medium, 3 low) | qa-task |
 | 2026-10-21 |         | QA findings fixed — cycle 3, 5 of 5 (CR-1 to CR-5), one stale-scan predicate for both loops, 2 test rows added and 1 extended | qa-fix |
+| 2026-10-21 |         | QA gate CONCERNS (80/100) — 4 findings (1 medium, 3 low) | qa-task |
+| 2026-10-21 |         | QA findings fixed — cycle 4, 4 of 4 (CR-1 to CR-4), one extension helper for both scan loops, 1 test row added and 3 extended | qa-fix |
 <!-- change-log-end -->
 
 ---

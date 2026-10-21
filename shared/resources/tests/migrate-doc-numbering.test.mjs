@@ -1501,6 +1501,10 @@ test("task.211 QA-2 CR-3 CR-4: outsideReferences flags each token that resolves 
     ["scripts/x.mjs", "const p = `${ROOT}/docs/prd.md`;", "/docs/prd.md"],
     ["scripts/x.sh", "cat $ROOT/docs/prd.md", "ROOT/docs/prd.md"],
     ["scripts/x.sh", 'cat "$(dirname "$0")/../docs/prd.md"', "/../docs/prd.md"],
+    // Quoted on its own, or a template (task.211 QA-4 CR-3).
+    ["scripts/x.sh", 'cat "$ROOT"/docs/prd.md', "/docs/prd.md"],
+    ["scripts/x.sh", "cat '${ROOT}'/docs/prd.md", "/docs/prd.md"],
+    ["docs/t.md", "{{root}}/docs/prd.md", "/docs/prd.md"],
   ])
     assert.deepEqual(tokens(file, text), [token], `${file}: ${text}`);
   // Must not flag: other files whose path ends in the same text, bare names, URLs.
@@ -1512,6 +1516,13 @@ test("task.211 QA-2 CR-3 CR-4: outsideReferences flags each token that resolves 
     ["README.md", "/docs/prd.md is absolute"],
     ["README.md", '[abs](/docs/prd.md) and "/docs/prd.md" and x=/docs/prd.md'],
     ["README.md", "docs/prd.md.bak and docs/prd.mdx"],
+    // A variable naming a place outside the repository, like ~ (task.211 QA-4 CR-4).
+    [
+      "scripts/x.sh",
+      'cp $HOME/docs/prd.md ${TMPDIR}/x "$XDG_DATA_HOME"/docs/prd.md',
+    ],
+    ["scripts/x.sh", "cp ~/docs/prd.md x"],
+    ["README.md", '"x"/docs/prd.md and (y)/docs/prd.md'],
   ])
     assert.deepEqual(tokens(file, text), [], `${file}: ${text}`);
 });
@@ -1524,6 +1535,8 @@ test("task.211 QA-2 CR-3: outsideReferences stays linear on long path-shaped inp
     `prd.md ${"../".repeat(100000)}prd.md`,
     `prd.md ${"a/".repeat(200000)}`,
     `prd.md ${"a".repeat(60000)}`,
+    `prd.md ${'"/a'.repeat(150000)}`,
+    `prd.md ${"$(x)/a ".repeat(80000)}`,
   ]) {
     const t0 = performance.now();
     m.outsideReferences("docs/x.md", text, ["docs/prd.md"]);
@@ -1609,6 +1622,29 @@ test("task.211 QA-3 CR-4: a late fence is displaced only when it closes over YAM
     "displaced",
   );
   assert.equal(m.frontmatterState("\uFEFF---\nname: x\n---\n"), "displaced");
+  // A real block keyed in any YAML spelling is still displaced (task.211 QA-4 CR-2).
+  for (const key of [
+    "Last updated: 2024",
+    '"title": x',
+    "prd.version: 2",
+    "'a b': c",
+  ])
+    assert.equal(
+      m.frontmatterState(`\n---\n${key}\nname: x\n---\n# x\n`),
+      "displaced",
+      key,
+    );
+  for (const line of [
+    "**Status**: Draft",
+    "> Note: x",
+    "[a]: http://x",
+    "- item: x",
+  ])
+    assert.equal(
+      m.frontmatterState(`\n---\n${line}\n---\n# x\n`),
+      "none",
+      line,
+    );
   const io = memIo({ [`${R}/onb/prd.onb.md`]: body });
   const r = m.run(["--apply", "--root", R], { io });
   assert.equal(r.reason, "ok", JSON.stringify(r.findings || r.blockers));
@@ -1616,6 +1652,28 @@ test("task.211 QA-3 CR-4: a late fence is displaced only when it closes over YAM
     io.files.get(`${R}/onb/prd.1.onb/prd.1.onb.md`).endsWith(body),
     "the body is kept",
   );
+});
+
+test("task.211 QA-4 CR-1: a file whose extension differs only in case is read by exactly one loop", () => {
+  const files = {
+    ...outsideTree(),
+    "notes/README.MD": "see ../docs/prd.md\n",
+    ".github/workflows/ci.YML": "run: cat ../../docs/prd.md\n",
+  };
+  const io = memIo(files);
+  const reads = [];
+  const readFile = io.readFile;
+  io.readFile = (p) => {
+    reads.push(p);
+    return readFile(p);
+  };
+  const d = dry(io, { names: new Map([["docs/prd.md", "mono"]]) });
+  assert.deepEqual(d.blockers.map((b) => [b.code, b.path]).sort(), [
+    ["stale-reference", ".github/workflows/ci.YML"],
+    ["stale-reference", "notes/README.MD"],
+  ]);
+  for (const f of ["notes/README.MD", ".github/workflows/ci.YML"])
+    assert.equal(reads.filter((p) => p === f).length, 1, `${f} read once`);
 });
 
 test("task.211 QA-3 CR-2 CR-3 CR-5: the scan reads every in-scope non-literal file once — under the root too — and no example copy or known binary", () => {

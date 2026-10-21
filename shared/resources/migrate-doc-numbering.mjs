@@ -181,6 +181,9 @@ const isBundledCopy = (rel) => /^skills\/[^/]+\/references\//.test(rel);
 // example copies, which the literal pass rewrites only through their frontmatter. One
 // predicate for both scan loops (task.211 QA cycle 3, CR-3).
 const scansForStale = (rel) => inRewriteScope(rel) && !isExampleCopy(rel);
+// Whether the literal pass reads `rel`, by its exact extension. Both scan loops ask this one
+// question, so each tracked file falls into exactly one of them (task.211 QA cycle 4, CR-1).
+const isLiteralType = (rel) => LITERAL_EXTS.includes(P.extname(rel));
 
 /**
  * Whether the literal pass may rewrite `rel`: not history, a test fixture, a bundled copy or a
@@ -879,7 +882,10 @@ export function frontmatterState(text) {
 }
 
 // A top-level YAML mapping key: what a frontmatter line looks like and a body line does not.
-const YAML_KEY = /^[A-Za-z_][\w-]*[ \t]*:(?:[ \t]|\r?$)/;
+// A key may be quoted, or hold spaces and dots ("Last updated", prd.version); it may not
+// open with Markdown (#, -, *, >, [) (task.211 QA cycle 4, CR-2).
+const YAML_KEY =
+  /^(?:"[^"\n]*"|'[^'\n]*'|[A-Za-z0-9_][^:\n]*?)[ \t]*:(?:[ \t]|\r?$)/;
 
 /**
  * Set (or insert) frontmatter fields inside the leading `---` block. Pure.
@@ -1079,6 +1085,12 @@ function replaceTargets(line, from, to) {
 // holds at least one `/`. The lookbehind keeps the scan linear: a long run with no `/` is
 // tried once, from its start, not from every position in it.
 const PATH_TOKEN = /(?<![\w.~\/-])[\w.~-]*(?:\/[\w.~-]+)+/g;
+// A variable ending right before a `/`: $VAR, ${VAR...}, $(command) or {{template}}, each
+// optionally closed by a quote. Group 1 or 2 is the variable name, when it has one.
+const VARIABLE_BEFORE =
+  /(?:\$(\w+)|\$\{(\w+)[^}]*\}|\$\([^)]*\)|\{\{[^}]*\}\})["']?$/;
+const NON_REPO_VARIABLE =
+  /^(?:HOME|TMPDIR|TMP|TEMP|USERPROFILE|APPDATA|LOCALAPPDATA|XDG_\w+)$/;
 
 /**
  * The occurrences in `text` (the content of repo-relative `file`) that name one of
@@ -1105,11 +1117,23 @@ export function outsideReferences(file, text, sources) {
     if (token.length > 4096) continue;
     const before = text[match.index - 1];
     let rest = token;
-    if (before === "$") rest = token.slice(token.indexOf("/") + 1);
-    else if (token.startsWith("/")) {
-      if (before !== "}" && before !== ")") continue;
+    let variable = null;
+    if (before === "$") {
+      variable = token.slice(0, token.indexOf("/"));
+      rest = token.slice(variable.length + 1);
+    } else if (token.startsWith("/")) {
+      // Absolute unless a variable closes right before it, quoted or not (cycle 4, CR-3).
+      if (!"})\"'".includes(before)) continue;
+      const v = VARIABLE_BEFORE.exec(
+        text.slice(Math.max(0, match.index - 128), match.index),
+      );
+      if (!v) continue;
+      variable = v[1] ?? v[2] ?? null;
       rest = token.slice(1);
     }
+    // A variable that names a place outside the repository is not a reference into it,
+    // as `~` is not (cycle 4, CR-4).
+    if (variable && NON_REPO_VARIABLE.test(variable)) continue;
     const forms = rest.startsWith(".")
       ? [P.join(dir, rest)]
       : [P.join(dir, rest), P.normalize(rest)];
@@ -1263,15 +1287,13 @@ export function planEdits(planned, disc, io) {
   // Every file the run moves is a candidate, the L3 monolith beside the root
   // included even when it is untracked (task.203 QA cycle 2, CR-6).
   const candidates = new Set([...disc.files, ...planned.fileMap.keys()]);
-  for (const f of tracked)
-    if (LITERAL_EXTS.includes(P.extname(f))) candidates.add(f);
+  for (const f of tracked) if (isLiteralType(f)) candidates.add(f);
   for (const file of candidates) {
     // Text only: a binary file under the tree moves, but is never rewritten.
-    if (!LITERAL_EXTS.includes(P.extname(file))) continue;
+    if (!isLiteralType(file)) continue;
     const inTree = isUnder(file, root);
     const isMd = file.endsWith(".md");
-    const litOk =
-      LITERAL_EXTS.includes(P.extname(file)) && inRewriteScope(file);
+    const litOk = isLiteralType(file) && inRewriteScope(file);
     // Cheap prefilters: a file outside the tree can only point into it by naming
     // the root's last segment, and can only hold a literal by naming the root.
     const rootSeg = `${P.basename(root)}/`;
@@ -1413,8 +1435,8 @@ export function planEdits(planned, disc, io) {
   // never read, and a NUL byte marks any other.
   if (outsideSources.length)
     for (const file of tracked) {
-      const ext = P.extname(file).toLowerCase();
-      if (LITERAL_EXTS.includes(ext) || BINARY_EXTS.includes(ext)) continue;
+      if (isLiteralType(file)) continue;
+      if (BINARY_EXTS.includes(P.extname(file).toLowerCase())) continue;
       if (!scansForStale(file)) continue;
       const text = io.readFile(file);
       if (text !== null && !text.includes("\0")) staleReferences(file, text);
