@@ -2,15 +2,16 @@
 /**
  * run-loop.mjs — fresh-context sequential loop runner.
  *
- * Spawns ONE `claude -p` per iteration, with a pinned `--session-id`, and
- * classifies each outcome from filesystem post-conditions. The point is the
+ * Spawns ONE agent process per iteration — `claude -p` by default, or another
+ * engine from references/engines.js (`--engine agy`) — and classifies each
+ * outcome from filesystem post-conditions. The point is the
  * process boundary: `/loop /develop-next` re-invokes the SAME conversation
  * every iteration, so item five is worked through a context mostly consumed by
  * items one to four, and the degradation is invisible from outside. A skill
  * cannot clear its own context — the loop has to move outside the session.
  *
  * This is a HOST process, not something Claude invokes. It is launched from a
- * terminal and spawns Claude; never the reverse.
+ * terminal and spawns the engine; never the reverse.
  *
  * Safe against these pipelines specifically because they are already crash-safe:
  * `/develop-next` persists `develop-next.state.json` and resumes from its flags,
@@ -27,20 +28,26 @@
  *
  * `status` and `watch` are PURE READERS. They take no lock, spawn nothing and
  * write nothing, so they are safe from a second terminal, over SSH, twice
- * concurrently, and mid-iteration. They also short-circuit before `claude` is
+ * concurrently, and mid-iteration. They also short-circuit before the engine is
  * resolved — a view that dies because the binary it never invokes is off PATH
  * is not much of a view.
  *
  * Options:
+ *   --engine <claude|agy>       the agent CLI each iteration runs (default claude)
+ *   --model <id>                passed to the engine unvalidated; unset by default
+ *   --effort <level>            passed to the engine unvalidated; unset by default
+ *   --dangerously-skip-permissions
+ *                               agy only, and only from this flag (never config):
+ *                               the engine runs with no approval boundary
  *   --adapter <develop-next|develop-batch|generic>   default develop-next
  *   --command <prompt>          the prompt to run (required for `generic`)
  *   --roadmap <path>            passed to the probe
  *   --base <ref>                base branch the progress oracle watches (default develop)
  *   --max-iterations <N>        default unlimited
- *   --max-cost <USD>            cumulative total_cost_usd ceiling
+ *   --max-cost <USD>            cumulative cost ceiling (claude only — agy reports no cost)
  *   --max-duration <8h|90m|30s> wall-clock ceiling
  *   --max-idle <K>              consecutive no-progress iterations (default 2)
- *   --max-turns <N>             passed to claude; unset by default
+ *   --max-turns <N>             passed to claude; unset by default (agy has no turn cap)
  *   --max-resume-attempts <N>   consecutive `incomplete` retries (default 2)
  *   --on-error <stop|continue>  default stop
  *   --cooldown <sec>            between iterations (default 10)
@@ -69,6 +76,11 @@ import { classify, shouldStop } from "../references/classify.js";
 import { interpretProbe, resolveAdapter } from "../references/adapters.js";
 import { parseYamlSubset } from "../references/yaml-subset.js";
 import {
+  ENGINES,
+  resolveEngine,
+  assertSupported,
+} from "../references/engines.js";
+import {
   renderLines,
   statusView,
   notificationText,
@@ -85,6 +97,7 @@ const DASHBOARD_RECENT_LIMIT = 10;
 const STATE_ROOT = ".claude/state/loop-supervisor";
 const PID_LOCK = ".claude/state/loop-supervisor.lock";
 const DEFAULTS = {
+  engine: "claude",
   adapter: "develop-next",
   base: "develop",
   maxIdle: 2,
@@ -164,6 +177,10 @@ export function parseDuration(v) {
 export function parseArgs(argv) {
   const out = {
     subcommand: "run",
+    engine: DEFAULTS.engine,
+    model: null,
+    effort: null,
+    skipPermissions: false,
     adapter: DEFAULTS.adapter,
     command: null,
     roadmap: null,
@@ -205,6 +222,10 @@ export function parseArgs(argv) {
   // Long-flag name -> the option key it sets, so the switch below can record
   // presence in one place rather than at 14 call sites.
   const KEY_OF = {
+    "--engine": "engine",
+    "--model": "model",
+    "--effort": "effort",
+    "--dangerously-skip-permissions": "skipPermissions",
     "--adapter": "adapter",
     "--command": "command",
     "--roadmap": "roadmap",
@@ -228,6 +249,21 @@ export function parseArgs(argv) {
     const a = rest[i];
     if (KEY_OF[a]) out.explicit.add(KEY_OF[a]);
     switch (a) {
+      case "--engine":
+        out.engine = need(i, a);
+        i++;
+        break;
+      case "--model":
+        out.model = need(i, a);
+        i++;
+        break;
+      case "--effort":
+        out.effort = need(i, a);
+        i++;
+        break;
+      case "--dangerously-skip-permissions":
+        out.skipPermissions = true;
+        break;
       case "--adapter":
         out.adapter = need(i, a);
         i++;
@@ -330,6 +366,12 @@ export function parseArgs(argv) {
 export function applyConfig(opts, config) {
   const ls = (config && config.loopSupervisor) || {};
   const explicit = opts.explicit || new Set();
+  if (ls.engine && !explicit.has("engine")) opts.engine = String(ls.engine);
+  if (ls.model && !explicit.has("model")) opts.model = String(ls.model);
+  if (ls.effort && !explicit.has("effort")) opts.effort = String(ls.effort);
+  // `--dangerously-skip-permissions` is deliberately NOT a config key: a
+  // committed file must not silently grant an unattended loop no approval
+  // boundary. Same reasoning as the dashboard token below.
   if (ls.baseBranch && !explicit.has("base")) opts.base = ls.baseBranch;
   if (ls.roadmapPath && !explicit.has("roadmap")) opts.roadmap = ls.roadmapPath;
   if (ls.cooldownSeconds != null && !explicit.has("cooldown")) {
@@ -353,43 +395,31 @@ export function applyConfig(opts, config) {
   return opts;
 }
 
-// ── the claude argv ──────────────────────────────────────────────────────────
+// ── the engine argv ──────────────────────────────────────────────────────────
 
 /**
- * Build the exact argv for one iteration.
- *
- * Exported and printed by `dry-run` on purpose: CLI flags move between `claude`
- * versions, and a plan that prints its own argv makes that drift visible on the
- * first run rather than on the first silent failure.
- *
- * Verified against claude 2.1.250: `--output-format stream-json` REQUIRES
- * `--verbose`; `--session-id` pins the transcript path so every iteration stays
- * reopenable with `claude --resume <uuid>` afterwards.
+ * Build the exact `claude` argv for one iteration — a thin delegate to the
+ * claude entry in references/engines.js, kept exported so existing callers and
+ * tests keep working (task 213, Breaking Change 1). The argv an iteration
+ * actually runs comes from `engine.buildArgs` and is printed by `dry-run`: CLI
+ * flags move between engine versions, and a plan that prints its own argv makes
+ * that drift visible on the first run rather than on the first silent failure.
  */
-export function buildClaudeArgs({
-  prompt,
-  sessionId,
-  settingsPath,
-  maxTurns = null,
-}) {
-  const args = [
-    "-p",
+export function buildClaudeArgs(ctx) {
+  return ENGINES.claude.buildArgs(ctx);
+}
+
+/** The argv context every engine's `buildArgs` reads. */
+function engineArgsCtx(opts, { prompt, sessionId, settingsPath }) {
+  return {
     prompt,
-    "--output-format",
-    "stream-json",
-    "--verbose",
-    "--include-partial-messages",
-    "--session-id",
     sessionId,
-    "--permission-mode",
-    "acceptEdits",
-    "--settings",
     settingsPath,
-  ];
-  if (maxTurns != null && Number.isFinite(maxTurns)) {
-    args.push("--max-turns", String(maxTurns));
-  }
-  return args;
+    maxTurns: opts.maxTurns,
+    model: opts.model,
+    effort: opts.effort,
+    skipPermissions: opts.skipPermissions,
+  };
 }
 
 /** The prompt one iteration runs, for a given adapter + options. */
@@ -454,32 +484,13 @@ const gitOut = (cwd, args) => {
   }
 };
 
-/** Render one stream-json line into the human-readable log, or null to skip. */
+/**
+ * Render one claude stream-json line into the human-readable log, or null to
+ * skip. A delegate to the claude entry's `renderLine`; each engine renders its
+ * own stream through the table.
+ */
 export function renderStreamLine(obj) {
-  if (!obj || typeof obj !== "object") return null;
-  if (
-    obj.type === "assistant" &&
-    obj.message &&
-    Array.isArray(obj.message.content)
-  ) {
-    const parts = [];
-    for (const c of obj.message.content) {
-      if (c.type === "text" && c.text && c.text.trim())
-        parts.push(c.text.trim());
-      // Tool-call NAMES only — never inputs. A tool input can be a whole file,
-      // and this log exists to be read by a human at 3am, not to be complete.
-      else if (c.type === "tool_use") parts.push(`  → ${c.name}`);
-    }
-    return parts.length ? parts.join("\n") : null;
-  }
-  if (obj.type === "result") {
-    return `--- result: subtype=${obj.subtype} turns=${obj.num_turns} cost=$${
-      typeof obj.total_cost_usd === "number"
-        ? obj.total_cost_usd.toFixed(4)
-        : "?"
-    } ---`;
-  }
-  return null;
+  return ENGINES.claude.renderLine(obj);
 }
 
 // ── the read side: status, watch, notify ─────────────────────────────────────
@@ -1085,11 +1096,15 @@ function main() {
   if (opts.subcommand === "status") return runStatus(cwd, opts);
   if (opts.subcommand === "watch") return runWatch(cwd);
 
-  let adapter, nodeBin, claudeBin;
+  // The engine is resolved, and every flag it cannot honour refused, BEFORE any
+  // binary is resolved: a refused run spawns nothing and needs no engine on PATH.
+  let engine, adapter, nodeBin, engineBin;
   try {
+    engine = resolveEngine(opts.engine);
+    assertSupported(engine, opts);
     adapter = resolveAdapter(opts.adapter, config);
     nodeBin = resolveBinary("node");
-    claudeBin = resolveBinary("claude");
+    engineBin = resolveBinary(engine.binary);
   } catch (e) {
     process.stdout.write(
       JSON.stringify({ ok: false, error: e.message }, null, 2) + "\n",
@@ -1099,12 +1114,11 @@ function main() {
 
   const prompt = buildPrompt(adapter, opts);
   const sampleSession = randomUUID();
-  const sampleArgs = buildClaudeArgs({
-    prompt,
-    sessionId: sampleSession,
-    settingsPath,
-    maxTurns: opts.maxTurns,
-  });
+  const sampleArgs = engine.buildArgs(
+    engineArgsCtx(opts, { prompt, sessionId: sampleSession, settingsPath }),
+  );
+  const resolvedBins = { node: nodeBin, [engine.binary]: engineBin };
+  if (engine.supports.settingsFile) resolvedBins.settings = settingsPath;
 
   // ── dry-run: probe, print the plan and the exact argv, spawn nothing ───────
   if (opts.subcommand === "dry-run") {
@@ -1117,19 +1131,22 @@ function main() {
           ok: probe.status !== "error",
           subcommand: "dry-run",
           adapter: adapter.name,
+          engine: engine.name,
+          model: opts.model,
+          effort: opts.effort,
+          permissions: opts.skipPermissions
+            ? "skipped (operator flag)"
+            : "engine default",
           prompt,
-          resolved: {
-            node: nodeBin,
-            claude: claudeBin,
-            settings: settingsPath,
-          },
+          resolved: resolvedBins,
           probe,
           resumePending: Boolean(resumePending),
           wouldSpawn: Boolean(resumePending) || probe.status === "selected",
-          argv: [claudeBin, ...sampleArgs],
+          argv: [engineBin, ...sampleArgs],
           note:
-            "session-id shown is a sample; each iteration gets a fresh uuid. " +
-            "Nothing was spawned.",
+            (engine.supports.pinnedSession
+              ? "session-id shown is a sample; each iteration gets a fresh uuid. "
+              : "") + "Nothing was spawned.",
           budget: {
             maxIterations: opts.maxIterations,
             maxCost: opts.maxCost,
@@ -1172,7 +1189,9 @@ function main() {
   const ledgerPath = path.join(cwd, STATE_ROOT, "runs.jsonl");
   const totals = {
     iterations: 0,
-    costUsd: 0,
+    // null, not 0, for an engine that reports no cost: "$0.0000" would read as
+    // a free night rather than an unknown one.
+    costUsd: engine.supports.cost ? 0 : null,
     turns: 0,
     consecutiveIdle: 0,
     startedAtMs: Date.now(),
@@ -1321,7 +1340,10 @@ function main() {
 
       const iteration = totals.iterations + 1;
       const iterationStartMs = Date.now();
-      const sessionId = randomUUID();
+      // Only an engine that can PIN a session gets a supervisor-chosen id. For any
+      // other, an id the engine never saw would name nothing; the ledger takes the
+      // id the engine reports in its result line instead (task 213).
+      const sessionId = engine.supports.pinnedSession ? randomUUID() : null;
       const nnn = String(iteration).padStart(3, "0");
       const rawPath = path.join(runDir, `iter-${nnn}.jsonl`);
       const txtPath = path.join(runDir, `iter-${nnn}.txt`);
@@ -1369,19 +1391,16 @@ function main() {
       });
       await pushFrame({ elapsedSec: 0 });
 
-      const args = buildClaudeArgs({
-        prompt,
-        sessionId,
-        settingsPath,
-        maxTurns: opts.maxTurns,
-      });
+      const args = engine.buildArgs(
+        engineArgsCtx(opts, { prompt, sessionId, settingsPath }),
+      );
       const result = await new Promise((resolve) => {
         const raw = fs.createWriteStream(rawPath, { flags: "a" });
         const txt = fs.createWriteStream(txtPath, { flags: "a" });
         // `childEnvFor` rather than an inline delete: see its docstring. The
         // strip is a credential boundary, and a credential boundary that no test
         // can reach is one a refactor removes without anything going red.
-        const child = spawn(claudeBin, args, {
+        const child = spawn(engineBin, args, {
           cwd,
           stdio: ["ignore", "pipe", "pipe"],
           env: childEnvFor(),
@@ -1403,8 +1422,9 @@ function main() {
             } catch {
               continue;
             }
-            if (obj.type === "result") envelope = obj;
-            const r = renderStreamLine(obj);
+            const parsed = engine.parseResult(obj);
+            if (parsed) envelope = parsed;
+            const r = engine.renderLine(obj);
             if (r) txt.write(r + "\n");
           }
         });
@@ -1433,9 +1453,10 @@ function main() {
 
       const env = result.envelope || {};
       totals.iterations = iteration;
-      if (typeof env.total_cost_usd === "number")
-        totals.costUsd += env.total_cost_usd;
-      if (typeof env.num_turns === "number") totals.turns += env.num_turns;
+      if (typeof env.costUsd === "number" && typeof totals.costUsd === "number")
+        totals.costUsd += env.costUsd;
+      if (typeof env.numTurns === "number") totals.turns += env.numTurns;
+      const rowSessionId = sessionId ?? env.sessionId ?? null;
 
       const outcome = classify({
         probeStatus: probe.status,
@@ -1450,7 +1471,7 @@ function main() {
         iterationStartMs,
         exitCode: result.spawnError ? null : result.code,
         subtype: env.subtype || null,
-        isError: env.is_error === true || Boolean(result.spawnError),
+        isError: env.isError === true || Boolean(result.spawnError),
         progressed: adapter.progressOracle({
           cwd,
           baseRef: oracleRef,
@@ -1474,13 +1495,14 @@ function main() {
         exitCode: result.code,
         subtype: env.subtype || null,
         durationMs: Date.now() - iterationStartMs,
-        costUsd:
-          typeof env.total_cost_usd === "number" ? env.total_cost_usd : null,
-        turns: typeof env.num_turns === "number" ? env.num_turns : null,
-        sessionId,
+        costUsd: typeof env.costUsd === "number" ? env.costUsd : null,
+        turns: typeof env.numTurns === "number" ? env.numTurns : null,
+        sessionId: rowSessionId,
         logPath: path.relative(cwd, txtPath),
         rawPath: path.relative(cwd, rawPath),
-        transcriptPath: transcriptPathFor(cwd, sessionId),
+        transcriptPath: rowSessionId
+          ? engine.transcriptPath(cwd, rowSessionId)
+          : null,
       });
 
       await pushFrame({
@@ -1541,8 +1563,12 @@ function main() {
           ok: !terminal,
           runId,
           adapter: adapter.name,
+          engine: engine.name,
           iterations: totals.iterations,
-          costUsd: Number(totals.costUsd.toFixed(4)),
+          costUsd:
+            typeof totals.costUsd === "number"
+              ? Number(totals.costUsd.toFixed(4))
+              : null,
           turns: totals.turns,
           stoppedBecause: finalStop,
           logs: path.relative(cwd, runDir),
@@ -1558,8 +1584,7 @@ function main() {
 
 /** Where `claude --resume <sessionId>` will find this iteration's transcript. */
 export function transcriptPathFor(cwd, sessionId, home = os.homedir()) {
-  const slug = cwd.replace(/[/.]/g, "-");
-  return path.join(home, ".claude", "projects", slug, `${sessionId}.jsonl`);
+  return ENGINES.claude.transcriptPath(cwd, sessionId, home);
 }
 
 function appendLedger(p, row) {

@@ -33,6 +33,7 @@ import {
   UNREADABLE,
 } from "../../../skills/loop-supervisor/scripts/run-loop.mjs";
 import fs from "node:fs";
+import { spawnSync } from "node:child_process";
 
 // ── argv ─────────────────────────────────────────────────────────────────────
 
@@ -721,4 +722,227 @@ test("TASK-63-BUG-1: a heartbeat that cannot be opened is unreadable, not absent
     fs.mkdirSync(path.join(root, "current.json")),
   );
   assert.equal(readCurrent(dir), UNREADABLE);
+});
+
+// ── dry-run, spawned against fake engine binaries (task 213) ─────────────────
+//
+// Each fake engine writes a marker when executed, so the same harness proves
+// what dry-run prints AND that it never runs the engine. `resolveBinary` asks
+// the shell (`command -v`), so the fakes must be first on PATH for the child.
+
+const RUN_LOOP = path.resolve(
+  path.dirname(new URL(import.meta.url).pathname),
+  "../../../skills/loop-supervisor/scripts/run-loop.mjs",
+);
+
+function dryRun(extra = []) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ls-dry-"));
+  const bin = path.join(root, "bin");
+  const work = path.join(root, "work");
+  fs.mkdirSync(bin);
+  fs.mkdirSync(work);
+  for (const name of ["claude", "agy"]) {
+    const p = path.join(bin, name);
+    fs.writeFileSync(p, `#!/bin/sh\necho ran > "${root}/${name}.ran"\n`);
+    fs.chmodSync(p, 0o755);
+  }
+  const r = spawnSync(
+    process.execPath,
+    [RUN_LOOP, "dry-run", "--adapter", "generic", "--command", "x", ...extra],
+    {
+      cwd: work,
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+    },
+  );
+  let json = null;
+  try {
+    json = JSON.parse(r.stdout);
+  } catch {
+    json = null;
+  }
+  const ran = ["claude", "agy"].filter((n) =>
+    fs.existsSync(path.join(root, `${n}.ran`)),
+  );
+  fs.rmSync(root, { recursive: true, force: true });
+  return { status: r.status, json, ran, bin };
+}
+
+/** The sample session id is fresh per run; compare the argv with it replaced. */
+function normalisedArgv(json) {
+  const a = json.argv.slice(1);
+  const i = a.indexOf("--session-id");
+  if (i >= 0) a[i + 1] = "<session>";
+  const s = a.indexOf("--settings");
+  if (s >= 0) a[s + 1] = path.basename(a[s + 1]);
+  return a;
+}
+
+test("t213: characterisation: the claude dry-run argv is unchanged by the engine registry", () => {
+  // Captured from `dry-run --adapter generic --command x` on develop at a721d28d,
+  // before engines.js existed. The session id and the settings directory are the
+  // only per-run / per-machine values, and both are normalised.
+  const r = dryRun();
+  assert.equal(r.status, 0, JSON.stringify(r.json));
+  assert.deepEqual(normalisedArgv(r.json), [
+    "-p",
+    "x",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--include-partial-messages",
+    "--session-id",
+    "<session>",
+    "--permission-mode",
+    "acceptEdits",
+    "--settings",
+    "supervisor-settings.json",
+  ]);
+  assert.equal(r.json.argv[0], path.join(r.bin, "claude"));
+  assert.equal(r.json.resolved.claude, path.join(r.bin, "claude"));
+  for (const k of ["node", "claude", "settings"]) {
+    assert.ok(k in r.json.resolved, `resolved.${k} must stay`);
+  }
+});
+
+test("t213: characterisation: --max-turns stays the last pair of the claude argv", () => {
+  const a = normalisedArgv(dryRun(["--max-turns", "40"]).json);
+  assert.deepEqual(a.slice(-2), ["--max-turns", "40"]);
+  assert.equal(a.length, 14);
+});
+
+test("t213: dry-run never executes the engine binary", () => {
+  for (const extra of [[], ["--engine", "agy"]]) {
+    const r = dryRun(extra);
+    assert.equal(r.status, 0, extra.join(" "));
+    assert.deepEqual(
+      r.ran,
+      [],
+      `dry-run ${extra.join(" ")} must spawn nothing`,
+    );
+  }
+});
+
+test("t213: --engine, --model, --effort and --dangerously-skip-permissions parse and are tracked", () => {
+  const o = parseArgs([
+    "dry-run",
+    "--engine",
+    "agy",
+    "--model",
+    "m",
+    "--effort",
+    "low",
+    "--dangerously-skip-permissions",
+  ]);
+  assert.equal(o.engine, "agy");
+  assert.equal(o.model, "m");
+  assert.equal(o.effort, "low");
+  assert.equal(o.skipPermissions, true);
+  for (const k of ["engine", "model", "effort", "skipPermissions"]) {
+    assert.ok(o.explicit.has(k), k);
+  }
+  const d = parseArgs(["dry-run"]);
+  assert.equal(d.engine, "claude");
+  assert.equal(d.model, null);
+  assert.equal(d.effort, null);
+  assert.equal(d.skipPermissions, false);
+});
+
+test("t213: loopSupervisor.engine|model|effort fill only what the flags did not name", () => {
+  const cfg = {
+    loopSupervisor: { engine: "agy", model: "cfg-model", effort: "max" },
+  };
+  const filled = applyConfig(parseArgs(["dry-run"]), cfg);
+  assert.equal(filled.engine, "agy");
+  assert.equal(filled.model, "cfg-model");
+  assert.equal(filled.effort, "max");
+  // A flag equal to the DEFAULT still wins: presence is tracked, not inferred.
+  const flagged = applyConfig(
+    parseArgs([
+      "dry-run",
+      "--engine",
+      "claude",
+      "--model",
+      "m",
+      "--effort",
+      "low",
+    ]),
+    cfg,
+  );
+  assert.equal(flagged.engine, "claude");
+  assert.equal(flagged.model, "m");
+  assert.equal(flagged.effort, "low");
+});
+
+test("t213: skipping permissions is never read from config", () => {
+  for (const key of [
+    "skipPermissions",
+    "dangerouslySkipPermissions",
+    "dangerously-skip-permissions",
+  ]) {
+    const o = applyConfig(parseArgs(["dry-run"]), {
+      loopSupervisor: { engine: "agy", [key]: true },
+    });
+    assert.equal(o.skipPermissions, false, key);
+  }
+});
+
+test("t213: dry-run --engine agy prints the agy argv and resolves agy, with no settings file", () => {
+  const r = dryRun(["--engine", "agy", "--model", "gemini-3.8-flash-low"]);
+  assert.equal(r.status, 0, JSON.stringify(r.json));
+  assert.equal(r.json.engine, "agy");
+  assert.equal(r.json.model, "gemini-3.8-flash-low");
+  assert.equal(r.json.permissions, "engine default");
+  assert.equal(r.json.resolved.agy, path.join(r.bin, "agy"));
+  assert.ok(!("settings" in r.json.resolved));
+  assert.deepEqual(r.json.argv.slice(1), [
+    "-p",
+    "x",
+    "--output-format",
+    "stream-json",
+    "--mode",
+    "accept-edits",
+    "--model",
+    "gemini-3.8-flash-low",
+  ]);
+});
+
+test("t213: --engine claude --effort is honoured, not refused", () => {
+  const r = dryRun(["--effort", "high"]);
+  assert.equal(r.status, 0, JSON.stringify(r.json));
+  const a = r.json.argv;
+  assert.equal(a[a.indexOf("--effort") + 1], "high");
+});
+
+test("t213: an engine-unsupported flag exits 1 naming the flag and the engine, spawning nothing", () => {
+  for (const [extra, re] of [
+    [
+      ["--engine", "agy", "--max-cost", "5"],
+      /--max-cost is not supported by the agy engine/,
+    ],
+    [
+      ["--engine", "agy", "--max-turns", "5"],
+      /--max-turns is not supported by the agy engine/,
+    ],
+    [
+      ["--dangerously-skip-permissions"],
+      /--dangerously-skip-permissions is not supported by the claude engine/,
+    ],
+    [["--engine", "gpt"], /unknown engine "gpt" \(known: claude, agy\)/],
+  ]) {
+    const r = dryRun(extra);
+    assert.equal(r.status, 1, extra.join(" "));
+    assert.equal(r.json.ok, false);
+    assert.match(r.json.error, re);
+    assert.deepEqual(r.ran, []);
+  }
+});
+
+test("t213: the agy skip flag reaches the argv only from the operator flag", () => {
+  const on = dryRun(["--engine", "agy", "--dangerously-skip-permissions"]);
+  assert.equal(on.status, 0);
+  assert.ok(on.json.argv.includes("--dangerously-skip-permissions"));
+  assert.equal(on.json.permissions, "skipped (operator flag)");
+  const off = dryRun(["--engine", "agy"]);
+  assert.ok(!off.json.argv.includes("--dangerously-skip-permissions"));
 });
