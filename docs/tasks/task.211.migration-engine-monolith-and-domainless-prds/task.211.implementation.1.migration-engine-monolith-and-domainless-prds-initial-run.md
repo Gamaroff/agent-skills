@@ -3,7 +3,7 @@
 **Task**: `task.211.migration-engine-monolith-and-domainless-prds.md`
 **Run Number**: 1
 **Started**: 2026-10-21 00:25
-**Status**: In Progress
+**Status**: Escalated
 
 ---
 
@@ -35,7 +35,7 @@ Fix the three migrate-doc-numbering.mjs engine defects found in task.204 gate 8 
 | 1. create-branch           | ✅ Done    | Branch `feature/task.211.*` exists in git                              | Branch created at `27725e92` | —                    | 2026-10-21T00:21Z |
 | 2. review-task             | ✅ Done    | `task.211.review.{N}.{name}.md` exists (or skip logged)                | `task.211.review.1.…` — READY TO IMPLEMENT 8/10; Planned → Ready for Development | —                    | 2026-10-21T00:24Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline; 12/12 phases; ci:fast 6075 pass / 0 fail; 10 mutations red | `.summaries/step-3-iteration-audit.json` | 2026-10-21T00:40Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #712: https://github.com/Gamaroff/agent-skills/pull/712 | —                    | 2026-10-21T00:42Z |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.211.qa.{N}.*.md`; `task.211.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.211.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
@@ -81,17 +81,129 @@ Fix the three migrate-doc-numbering.mjs engine defects found in task.204 gate 8 
 - Loop audit (iter 1): ready-for-review, 12/12 — loop exited.
 - Development completion comment posted to github issue 676 (`posted`).
 
+### Step 4 — Create PR — 2026-10-21
+
+- Scope: the task's 8 files (engine, its test, bundled copy, review-prd SKILL.md, deleted guard, eval test, CHANGELOG) plus the task directory. No out-of-scope files in the tree.
+- Two commits: `b2cc4831` feat (code, tests, CHANGELOG, guard deletion), `0c4d6852` docs (task doc, review report, implementation report). Pushed.
+- PR body written by the orchestrator from its own record, not by the summariser subagent — the change set was already fully described in this report.
+- PR created: https://github.com/Gamaroff/agent-skills/pull/712 (base develop).
+- Tracker comment in-review on #676: `posted`.
+- GitHub board: in-review → stage-disabled (no `pipeline.in-review` moment configured).
+- Post-PR state check: PR #712 state = OPEN (checked inline with `gh pr view`). errors = 0.
+
+### Steps 5–6 — QA loop — 2026-10-21
+
+- QA cycle 1: qa-task with `code_review_blocking=true`. Diff reviewer (Explore) returned 3 findings in 219744 ms; QA reproduced all three in memory. Gate CONCERNS 70/100.
+- Convergence check: not applicable at cycle 1. Route classifier: no exit at cycle 1 (diminishing-returns needs cycle 3+; cosmetic-residue is PASS-only) → 5b.
+- QA Cycle 1 — changes-requested: stage-disabled.
+- QA cycle 2: qa-task refute pass over the whole branch diff, `code_review_blocking=true`. Diff reviewer (Explore) returned 5 findings in 266090 ms; QA reproduced all five on HEAD. Security probe recorded (`task.211.qa.2.security.run.json`, 20 executed, 0 escaped). Gate CONCERNS 70/100.
+- Convergence check: not applicable at cycle 2. Route classifier: no exit at cycle 2 → 5b.
+- Narrowing residue — every MEDIUM on gates 1 and 2 names shared/resources/migrate-doc-numbering.mjs (CR-1, QA-1, QA-2, CR-1, CR-2, CR-3); HIGH 0 on both. This is an OFFER to qa-fix Step 2.6, not a route and not an escalation.
+- QA Cycle 2 — changes-requested: stage-disabled.
+- QA cycle 3: qa-task scoped to the 11 files changed since gate 2 head 0379eb73 (safety re-probe not triggered), `code_review_blocking=true`. Diff reviewer (Explore) returned 5 findings in 232718 ms; QA reproduced the four bugs on HEAD and ran them at 0379eb73 (CR-1 `.mjs` is a regression). Security probe recorded (`task.211.qa.3.security.run.json`, 20 executed, 0 escaped). Gate CONCERNS 75/100.
+- Convergence check: HIGH 0, 0, 0 — does not trip (HIGH_N = 0). Route classifier: continue (not-a-pass-gate; route 2 declined: product-defect-signal) → 5b.
+- Narrowing residue — every MEDIUM on gates 2 and 3 names shared/resources/migrate-doc-numbering.mjs (CR-1, CR-2, CR-3, CR-1, CR-2); HIGH 0 on both. This is an OFFER to qa-fix Step 2.6, not a route and not an escalation.
+- QA Cycle 3 — changes-requested: stage-disabled.
+- QA cycle 4: qa-task scoped to the 10 files changed since gate 3 head 02d65ff4 (safety re-probe not triggered), `code_review_blocking=true`. Diff reviewer (Explore) returned 4 findings in 180005 ms; QA reproduced all four on HEAD and at 02d65ff4 (CR-1 and CR-2 are regressions from cycle 3). Security probe recorded (`task.211.qa.4.security.run.json`, 20 executed, 0 escaped). Gate CONCERNS 80/100.
+- Convergence check: HIGH 0, 0, 0, 0 — does not trip. Route classifier: continue (not-a-pass-gate) → 5b.
+- Narrowing residue — every MEDIUM on gates 3 and 4 names shared/resources/migrate-doc-numbering.mjs (CR-1, CR-2, CR-1); HIGH 0 on both. This is an OFFER to qa-fix Step 2.6, not a route and not an escalation.
+- QA Cycle 4 — changes-requested: stage-disabled.
+- QA cycle 5: qa-task scoped to the 9 files changed since gate 4 head 3e6f00cb (safety re-probe not triggered), `code_review_blocking=true`. Diff reviewer (Explore) returned 2 findings in 195150 ms; QA reproduced both on HEAD (CR-1 a regression from cycle 4). Security probe recorded (`task.211.qa.5.security.run.json`, 20 executed, 0 escaped). Gate CONCERNS 85/100.
+- Convergence check: HIGH 0 ×5 — does not trip. Route classifier: continue (not-a-pass-gate) → 5b.
+- Narrowing residue — every MEDIUM on gates 4 and 5 names shared/resources/migrate-doc-numbering.mjs; HIGH 0 on both. This is an OFFER to qa-fix Step 2.6, not a route and not an escalation.
+- QA Cycle 5 — changes-requested: stage-disabled.
+- Loop limit: budget spent after the cycle-5 fix `bce90253`. Gate-the-last-fix half-cycle (route 2c) evaluated with budgetSpent: continue (medium-not-falling) — MEDIUM reads 2, 1, 1 over cycles 3–5. Escalated.
+
 ---
 
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
 
+- 2026-10-21 — Cycle 1's gate and QA report were committed (`f6932cc1`) and pushed before 5b, instead of riding in the cycle's `fix(...)` commit. Cycle 1 therefore pushes twice. Later cycles follow the one-commit, one-push rule.
+
+
+### QA Loop Limit Reached — 2026-10-21
+
+The pipeline completed 5 qa-task/qa-fix cycles without a clean PASS. The gate-the-last-fix half-cycle was considered and declined: `medium-not-falling` (MEDIUM 2, 1, 1 over cycles 3–5), so the cycle-5 fix (`bce90253`) has not been gated.
+
+**Final gate status**: CONCERNS (85/100), gate 5 at `ca1c5bf5`
+**HIGH findings per cycle**: 0, 0, 0, 0, 0 — none at any cycle
+**MEDIUM findings per cycle**: 3, 3, 2, 1, 1
+**Remaining issues** (from final gate file; both fixed in `bce90253`, not yet re-gated):
+- CR-1 (medium, `shared/resources/migrate-doc-numbering.mjs`): a path after an unrecognised template (`f"{ROOT}/…"`, `#{ROOT}`, a nested `$(…)`) was skipped as absolute — a regression from cycle 4. Fixed in `bce90253` by restoring the cycle-3 rule for `}` and `)`.
+- CR-2 (low, `shared/resources/migrate-doc-numbering.mjs`): `YAML_KEY` backtracked on a long blank run. Fixed in `bce90253`.
+
+**What was attempted per cycle**:
+- Cycle 1: displaced-frontmatter blocker, a stale-reference residual scan (substring), one exported `parseNameValue`, a numbered-PRD domain refusal (`0379eb73`).
+- Cycle 2: consolidated the scan into `outsideReferences` (tokenise and resolve) plus a non-literal file loop; `needs-domain` for a numbered PRD moving to the root; closing-fence condition for `displaced` (`02d65ff4`).
+- Cycle 3: one predicate `scansForStale` for both loops, binary-extension skip, variable-rooted paths, YAML-key rule for `displaced` (`3e6f00cb`).
+- Cycle 4: one extension helper `isLiteralType`, broader `YAML_KEY`, a quoted-variable lookback, non-repository variables skipped (`ca1c5bf5`).
+- Cycle 5: restored the cycle-3 `}`/`)` rule (CR-1), linear `YAML_KEY` (CR-2) (`bce90253`).
+- Route 2c: declined, `medium-not-falling`.
+
+**Likely root cause**: The deliverable (phases 1–3) has been sound since cycle 2. Every finding from cycle 2 on sits in one place: the `stale-reference` scan in `shared/resources/migrate-doc-numbering.mjs`, which guesses which text in an arbitrary file is a path. That set is open (any language, any templating), so each fix narrowed or widened a closed list of shapes and the next review found a spelling on the other side; cycles 4 and 5 each found a regression from the previous fix. The loop was working (HIGH 0 throughout, MEDIUM falling 3 to 1), but it was refining a heuristic whose remaining errors are edge spellings, not a defect the gate can close.
+
+**Recommended next steps**:
+1. Grant the cycle-5 fix its gate by hand: re-run `/develop-task` and take Phase 0b's "Resume at 5a with 1 more cycle". If that gate is clean or LOW-only, the run exits through 5c and `/finalise`.
+2. Or decide the model for the scan first: keep the shape list and document the residual as a known limitation, or make the scan refuse any path-shaped token whose basename matches a moved source unless it is provably elsewhere.
+3. Or accept gate 5 as is: run Step 5c (`/review-pr --effort medium --comment --no-code`), then `/finalise`.
+
 ---
 
 ## QA Iteration History
 
 _Track each QA review/fix cycle._
+
+### QA Cycle 1 — 2026-10-21
+**Gate Result**: CONCERNS (70/100)
+**Issues Found**: 4 — CR-1 BOM/leading blank line gets a second frontmatter block (medium); QA-1 relative non-link mention of the moved monolith left stale, run reports ok (medium); QA-2 `--name` domain boundary has no probeable entry, 0 probes (medium); CR-3 named domain moves a numbered PRD (low)
+**HIGH findings**: 0
+**MEDIUM findings**: 3
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 1 of 5)
+**Fix result**: 4 of 4 fixed in one engine change. CR-1 → `frontmatterState` gains `displaced` (a BOM or blank lines before the fence) and a `displaced-frontmatter` blocker. QA-1 → a residual repo-relative or self-relative path (one holding a `/`) to an outside move source is a `stale-reference` blocker. QA-2 → exported `parseNameValue(value)`, the one check used by `parseArgs` and `discover`; a bad name passed straight to the library is `bad-slug`. CR-3 → a domain for a numbered PRD is `bad-slug`, and the redundant `p.legacy &&` guard below it was dropped (mutation showed it unreachable). 5 new engine rows, 1 updated; 9 mutations, each red except the unreachable guard, which was then removed. Security probe on `parseNameValue` with `task.211.qa-fix.1.security.cases.json` (20 cases): `engages`, 16/16 hostile rejected, 4/4 legitimate accepted; calibrated on a mutant without the segment check (`present-but-inert`, 10 escaped). ci:fast 6094 tests 0 fail (`.agents/skills` aside), eval:all 0, bundle:check 0 problems, validate review-prd ok.
+
+### QA Cycle 2 — 2026-10-21
+**Gate Result**: CONCERNS (70/100)
+**Issues Found**: 5. CR-1: the stale-reference scan skips non-literal file types (medium). CR-2: a numbered root PRD lands outside a domain and cannot be given one (medium). CR-3: the unbounded substring match blocks correct references (medium). CR-4: `./prd.md` is never flagged (low). CR-5: a thematic break after a blank line reads as displaced (low)
+**HIGH findings**: 0
+**MEDIUM findings**: 3
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 2 of 5)
+**Fix result**: 5 of 5 fixed. Step 2.6 answered the narrowing-residue offer. **Consolidate** for CR-1, CR-3 and CR-4: the substring test became one exported `outsideReferences(file, text, sources)`. It tokenises path-shaped occurrences (a path boundary, at least one `/`) and resolves each against the file's directory and the root, and it now runs over every in-scope tracked text file when an outside source exists (a NUL byte skips binaries). **Scope the claim** for CR-2: `needs-domain` fires for any PRD that moves to directly under the root, and a numbered one gets a hand-move remedy because its registry Folder is not rewritten. CR-5: `displaced` applies only when the late fence closes. A timing probe found `path.join` quadratic on a long `../` chain, so tokens are capped at PATH_MAX (4096). 5 new engine rows; 11 mutations, all red. One redundant filter that a mutation left unheld was removed. `tests/load-sensitive-marker.test.js` caught the new timing row without the marker; fixed, and the file was added to traps.md. ci:fast 6099 tests 0 fail (`.agents/skills` aside), eval:all 0, bundle:check 0 problems, validate review-prd ok.
+
+### QA Cycle 3 — 2026-10-21
+**Gate Result**: CONCERNS (75/100)
+**Issues Found**: 5. CR-1: a variable-rooted path is skipped as absolute (medium). CR-2: a non-literal file under the PRD root is read by neither loop (medium). CR-3: example copies not exempt in the non-literal loop (low). CR-4: two thematic breaks still read as displaced (low). CR-5: binaries read in full (low).
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 3 of 5)
+**Fix result**: 5 of 5 fixed. Step 2.6 answered the narrowing-residue offer with **consolidate**: the two scan loops now share one predicate (`scansForStale`: in rewrite scope, not an example copy), and the non-literal loop reads exactly the tracked files the literal loop does not, under the PRD root too, so each file is read once (CR-2, CR-3). Known binary types are skipped before the read (CR-5). CR-1: `outsideReferences` drops a leading variable (`$VAR/`, `}/`, `)/`) and resolves the rest; only a bare `/` is absolute. CR-4: a late fence is `displaced` only when it closes over YAML keys. 2 new rows and 4 must-flag/must-not cases; 9 mutations, all red. ci:fast 6101 tests 0 fail (`.agents/skills` aside), eval:all 0, bundle:check 0 problems, validate review-prd ok.
+
+### QA Cycle 4 — 2026-10-21
+**Gate Result**: CONCERNS (80/100)
+**Issues Found**: 4. CR-1: the scan loops disagree on extension case, so README.MD is read by neither (medium, regression). CR-2: spaced/quoted YAML keys not read as a displaced block (low, regression). CR-3: a quoted variable is skipped as absolute (low). CR-4: $HOME paths refused as stale (low).
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 4 of 5)
+**Fix result**: 4 of 4 fixed. Step 2.6 answered the narrowing-residue offer with **consolidate** for CR-1: both scan loops ask one helper, `isLiteralType` (exact extension), so every tracked file falls into exactly one loop. CR-2, CR-3 and CR-4 were patched with a stated reason (one condition each in an already-consolidated function). CR-2: `YAML_KEY` accepts quoted, spaced and dotted keys but not Markdown openers. CR-3: a variable closing right before the `/`, quoted or not, is read through one bounded lookback (`VARIABLE_BEFORE`, 128 chars). CR-4: `HOME`, `TMPDIR`, `XDG_*` and the like are skipped as `~` is. 1 new row and 3 extended; 7 mutations, all red (the unbounded-lookback mutant fails the linearity row). ci:fast 6102 tests 0 fail (`.agents/skills` aside), eval:all 0, bundle:check 0 problems, validate review-prd ok.
+
+### QA Cycle 5 — 2026-10-21
+**Gate Result**: CONCERNS (85/100)
+**Issues Found**: 2. CR-1: a path after an unrecognised template (f-string, #{}, nested $(...)) is skipped as absolute (medium, regression). CR-2: YAML_KEY backtracks on a long blank run (low).
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Escalating — loop limit reached
+**Fix result**: 2 of 2 fixed. Step 2.6 narrowing offer answered with **patch**, with a stated reason: CR-1 reverts the cycle-4 over-reach rather than adding a shape. A path after `}` or `)` is rooted whatever opened it, as in cycle 3; `VARIABLE_BEFORE` now decides only the quoted case and names the variable for the non-repository check. CR-2: `[ \t]*` kept only after the quoted keys, so `YAML_KEY` is linear. 1 new row (YAML linearity) and 1 extended (4 must-flag, 1 must-not); 3 mutations, all red. ci:fast 6103 tests 0 fail (`.agents/skills` aside), eval:all 0, bundle:check 0 problems, validate review-prd ok.
 
 ---
 
@@ -100,7 +212,7 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: feature/task.211.migration-engine-monolith-and-domainless-prds
-**PR**: {populated after Step 4}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/712
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
