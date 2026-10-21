@@ -5,19 +5,23 @@ type: task
 description: "Fix the two low findings task.211 carried from QA gate 6 in migrate-doc-numbering.mjs: outsideReferences misses a root-relative path into a dot-directory, and editFrontmatter writes above a displaced frontmatter block when called directly."
 tags: [migration-engine, doc-numbering, follow-up, task.211]
 category: refactoring
-status: planned
+status: accepted
 priority: Low
 created: 2026-10-21
 updated: 2026-10-21
+completed_date: 2026-10-21
 assignee:
 estimated_effort_hours: 2
 depends_on: task.211
 github_issue: 713
+pr_number: 714
 ---
 
 # Technical Task: Migration engine: dot-directory references and displaced-block edits
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.221.review.1.migration-engine-dot-directory-and-displaced-edit.md` implemented 2026-10-21
 
 **GitHub Issue**: [#713](https://github.com/Gamaroff/agent-skills/issues/713)
 
@@ -161,29 +165,29 @@ mention at the new path, or make it a Markdown link, then plan again.
 
 ### Phase 1: CR-1, dot-directory references (Low risk)
 
-- [ ] Add must-flag rows to the `outsideReferences` test (`:1488` block, or a new test beside it)
+- [x] Add must-flag rows to the `outsideReferences` test (`:1488` block, or a new test beside it)
   with sources `[".docs/prd.md"]`: `scripts/run.sh` naming `.docs/prd.md` and
   `${ROOT}/.docs/prd.md`. Add a must-not-flag row: `scripts/run.sh` naming `docs/prd.md`. Run it
   and confirm the must-flag rows fail on today's code.
-- [ ] Change the `forms` predicate (`:1140`) to `/^\.\.?\//.test(rest)`.
-- [ ] Update the `outsideReferences` docstring, which already says "a `./` or `../` token against
+- [x] Change the `forms` predicate (`:1140`) to `/^\.\.?\//.test(rest)`.
+- [x] Update the `outsideReferences` docstring, which already says "a `./` or `../` token against
   the file's directory": no wording change unless the code now disagrees with it.
 
 ### Phase 2: CR-2, displaced-block edit (Low risk)
 
-- [ ] Add a row that calls `editFrontmatter` directly on a displaced document
+- [x] Add a row that calls `editFrontmatter` directly on a displaced document
   (`"\n---\na: 1\n---\nbody\n"`) and on an unclosed one (`"---\na: 1\nbody\n"`), and asserts each
   output equals its input. Confirm the displaced case fails on today's code.
-- [ ] Guard `editFrontmatter` (`:897`) on `frontmatterState`: unchanged for `unclosed` and
+- [x] Guard `editFrontmatter` (`:897`) on `frontmatterState`: unchanged for `unclosed` and
   `displaced`.
 
 ### Phase 3: Bundle, mutation-prove, record (Low risk)
 
-- [ ] `npm run bundle`; `npm run bundle:check` clean.
-- [ ] Mutation-prove each fix: revert it alone, confirm its row goes red, restore it. Record both in
+- [x] `npm run bundle`; `npm run bundle:check` clean.
+- [x] Mutation-prove each fix: revert it alone, confirm its row goes red, restore it. Record both in
   the implementation report.
-- [ ] `CHANGELOG.md` `[Unreleased]` → `Fixed` entry.
-- [ ] `npm run ci` green.
+- [x] `CHANGELOG.md` `[Unreleased]` → `Fixed` entry.
+- [x] `npm run ci` green.
 
 ---
 
@@ -253,31 +257,31 @@ None.
 
 ### Functional
 
-- [ ] `outsideReferences("scripts/run.sh", "cat .docs/prd.md", [".docs/prd.md"])` returns one hit
+- [x] `outsideReferences("scripts/run.sh", "cat .docs/prd.md", [".docs/prd.md"])` returns one hit
   with source `.docs/prd.md` (Phase 1 changes the `forms` branch that decides this).
-- [ ] `outsideReferences("scripts/run.sh", "cat ${ROOT}/.docs/prd.md", [".docs/prd.md"])` returns
+- [x] `outsideReferences("scripts/run.sh", "cat ${ROOT}/.docs/prd.md", [".docs/prd.md"])` returns
   one hit (Phase 1).
-- [ ] `outsideReferences("scripts/run.sh", "cat docs/prd.md", [".docs/prd.md"])` returns `[]`.
-- [ ] `editFrontmatter` returns its input byte-for-byte for a displaced and for an unclosed document
+- [x] `outsideReferences("scripts/run.sh", "cat docs/prd.md", [".docs/prd.md"])` returns `[]`.
+- [x] `editFrontmatter` returns its input byte-for-byte for a displaced and for an unclosed document
   (Phase 2 adds the guard that decides this).
-- [ ] Every existing row in `migrate-doc-numbering.test.mjs` passes.
+- [x] Every existing row in `migrate-doc-numbering.test.mjs` passes.
 
 ### Performance
 
-- [ ] The linearity row (`:1543`) passes unchanged.
-- [ ] No new pass over the input in either function.
+- [x] The linearity row (`:1543`) passes unchanged.
+- [x] No new pass over the input in either function.
 
 ### Code Quality
 
-- [ ] Each fix is mutation-proven: reverted alone, its row fails; restored, it passes. Both recorded
+- [x] Each fix is mutation-proven: reverted alone, its row fails; restored, it passes. Both recorded
   in the implementation report.
-- [ ] `npm run bundle:check` reports 0 problems.
-- [ ] `npm run ci` passes.
+- [x] `npm run bundle:check` reports 0 problems.
+- [x] `npm run ci` passes.
 
 ### Migration
 
-- [ ] `CHANGELOG.md` `[Unreleased]` has one `Fixed` entry naming both findings.
-- [ ] No consumer action needed beyond the existing `stale-reference` fix instructions.
+- [x] `CHANGELOG.md` `[Unreleased]` has one `Fixed` entry naming both findings.
+- [x] No consumer action needed beyond the existing `stale-reference` fix instructions.
 
 ---
 
@@ -357,20 +361,107 @@ None.
 
 ---
 
+## Implementation Summary
+
+**Completed**: 2026-10-21
+
+Both gate-6 findings from task.211 are fixed in `shared/resources/migrate-doc-numbering.mjs`, each
+test-first and mutation-proven. The bundled copy in `skills/review-prd/references/` is regenerated.
+
+### Approach
+
+- **Phase 1 (CR-1)**: the `forms` predicate in `outsideReferences` is now `/^\.\.?\//.test(rest)`.
+  Only a `./` or `../` token is resolved against the file's directory alone; a dot-directory token
+  such as `.docs/prd.md` is compared at the root too, like `docs/prd.md`. The docstring already
+  said this, so it is unchanged.
+- **Phase 2 (CR-2)**: `editFrontmatter` reads `frontmatterState` once and returns the text unchanged
+  for `unclosed` and `displaced`. The `if (close < 0) return text;` line became unreachable and is
+  removed. `close` stays `let`.
+- **Phase 3**: `npm run bundle`, one `CHANGELOG.md` `Fixed` entry, mutation proofs, full `npm run ci`.
+
+### Testing Results
+
+- New rows in `shared/resources/tests/migrate-doc-numbering.test.mjs`: `task.221 CR-1` (four
+  must-flag tokens, including the `$ROOT/.docs/prd.md` form from review O-1, and two controls) and
+  `task.221 CR-2` (blank-line displaced, BOM displaced, unclosed). Both were red on the unfixed code.
+- Engine suite: 70/70 (68 before, plus the two new rows).
+- Mutation proofs: predicate reverted alone → only `task.221 CR-1` fails (69/70); guard reverted
+  alone → only `task.221 CR-2` fails (69/70); restored → 70/70.
+- `npm run ci:fast`: 6105 tests, 0 failed. `eval:all`, `validate:all`, `check:generated`,
+  `bundle:check` (128 skills, 0 problems) and `lint:shell` each exit 0.
+
+### Deferred Work
+
+- None from this task's scope. Review O-2 (a variable-rooted `./` or `../`, e.g.
+  `${ROOT}/./docs/prd.md`, still resolves only against the file's directory) is pre-existing and
+  out of scope per §4; recorded in the review report only.
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-21
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Full Report**: [task.221.qa.1.migration-engine-dot-directory-and-displaced-edit.md](./task.221.qa.1.migration-engine-dot-directory-and-displaced-edit.md)
+- **Gate File**: [task.221.gate.1.migration-engine-dot-directory-and-displaced-edit.yml](./task.221.gate.1.migration-engine-dot-directory-and-displaced-edit.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 70
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+No critical issues identified. Both fixes are mutation-proven. One low-severity finding in
+`linkPass` was already on develop, so it is advisory.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.221.qa.1.migration-engine-dot-directory-and-displaced-edit.md`
+**Gate File**: `task.221.gate.1.migration-engine-dot-directory-and-displaced-edit.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 12/12 met. Each cites code and a test that runs on every PR.
+✅ **Tests:** 2 new rows (CR-1, CR-2), both mutation-proven. Engine suite 70/70.
+✅ **PR Review:** PR #714, with Step 5c review `task.221.pr-review.1.migration-engine-dot-directory-and-displaced-edit.md` APPROVE. CI is green on all 5 checks.
+✅ **Documentation:** CHANGELOG `[Unreleased]` Fixed entry. Bundled copy regenerated.
+✅ **Security Review:** PASS. Nothing delivered is a boundary, and both changes are fail-safe.
+✅ **Compliance Review:** Not applicable (internal engine fix).
+
+**Task marked as ACCEPTED on:** 2026-10-21
+
+**Detailed Verification Log:** See `task.221.dod.1.migration-engine-dot-directory-and-displaced-edit.md` for the full verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-21 | 1.0     | Initial draft | create-task |
-
+| 2026-10-21 | 1.1     | Review passed (9/10) — both fixes run on a scratch copy and verified; no changes required | review-task |
+| 2026-10-21 |         | Status → ready-for-development | review-task |
+| 2026-10-21 |         | Implemented — 4 files, 2 tests (CR-1, CR-2), both mutation-proven | develop |
+| 2026-10-21 |         | QA gate PASS (100/100) — 0 blocking findings, 1 advisory | qa-task |
+| 2026-10-21 | 1.2 | DoD passed — accepted (PR #714) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
 
-- [ ] Phase 1: CR-1, dot-directory references
-- [ ] Phase 2: CR-2, displaced-block edit
-- [ ] Phase 3: Bundle, mutation-prove, record
+- [x] Phase 1: CR-1, dot-directory references
+- [x] Phase 2: CR-2, displaced-block edit
+- [x] Phase 3: Bundle, mutation-prove, record
 
 ## References
 

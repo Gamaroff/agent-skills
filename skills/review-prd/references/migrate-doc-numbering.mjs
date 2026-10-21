@@ -897,7 +897,11 @@ const YAML_KEY =
  */
 export function editFrontmatter(text, edits) {
   const lines = text.split("\n");
-  if (frontmatterState(text) === "none")
+  const state = frontmatterState(text);
+  // Read the state, never the first fence: a displaced block's blank line 0 would be taken
+  // as the opening fence and the edit written above the real block (task.221, CR-2).
+  if (state === "unclosed" || state === "displaced") return text;
+  if (state === "none")
     return [
       "---",
       ...edits.map((e) => `${e.key}: ${e.value}`),
@@ -905,7 +909,6 @@ export function editFrontmatter(text, edits) {
       text,
     ].join("\n");
   let close = lines.findIndex((l, i) => i > 0 && isFence(l));
-  if (close < 0) return text;
   for (const e of edits) {
     if (e.createOnly) continue;
     let at = -1;
@@ -1138,7 +1141,9 @@ export function outsideReferences(file, text, sources) {
     // A variable that names a place outside the repository is not a reference into it,
     // as `~` is not (cycle 4, CR-4).
     if (variable && NON_REPO_VARIABLE.test(variable)) continue;
-    const forms = rest.startsWith(".")
+    // Only ./ and ../ are relative-only; a dot-directory (.docs/prd.md) is a name and is
+    // compared at the root too (task.221, CR-1).
+    const forms = /^\.\.?\//.test(rest)
       ? [P.join(dir, rest)]
       : [P.join(dir, rest), P.normalize(rest)];
     const source = forms.find((f) => want.has(f));

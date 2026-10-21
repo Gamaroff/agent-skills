@@ -1179,6 +1179,18 @@ test("task.211 phase 1: editFrontmatter creates a block when there is none, and 
   assert.equal(m.frontmatterState("---\na: 1\n# never closed\n"), "unclosed");
 });
 
+test("task.221 CR-2: editFrontmatter leaves a displaced or unclosed block alone", () => {
+  const edits = [{ key: "prd_number", value: 1, quote: false, insert: true }];
+  // Displaced by a blank line, displaced by a BOM, and unclosed: planEdits refuses each as a
+  // blocker, and a direct call must not edit it either.
+  for (const text of [
+    "\n---\na: 1\n---\nbody\n",
+    "\uFEFF---\na: 1\n---\n",
+    "---\na: 1\nbody\n",
+  ])
+    assert.equal(m.editFrontmatter(text, edits), text, JSON.stringify(text));
+});
+
 test("task.211 phase 1: a frontmatter-less monolith and a frontmatter-less L1 PRD migrate and pass the post-check", () => {
   const mono = memIo({
     "docs/prd.md": "# Mono, no frontmatter\n",
@@ -1535,6 +1547,23 @@ test("task.211 QA-2 CR-3 CR-4: outsideReferences flags each token that resolves 
     ["scripts/x.sh", "cat ${HOME}/docs/prd.md"],
   ])
     assert.deepEqual(tokens(file, text), [], `${file}: ${text}`);
+});
+
+test("task.221 CR-1: outsideReferences compares a dot-directory path at the root", () => {
+  const S = [".docs/prd.md"];
+  const tokens = (file, text) =>
+    m.outsideReferences(file, text, S).map((h) => h.token);
+  // Must flag: a dot-directory named from another directory, bare or rooted in a variable.
+  for (const [text, token] of [
+    ["cat .docs/prd.md", ".docs/prd.md"],
+    ["cat ${ROOT}/.docs/prd.md", "/.docs/prd.md"],
+    ["cat $ROOT/.docs/prd.md", "ROOT/.docs/prd.md"],
+    ["cat ../.docs/prd.md", "../.docs/prd.md"],
+  ])
+    assert.deepEqual(tokens("scripts/run.sh", text), [token], text);
+  // Must not flag: ./ stays relative to the file's directory, and a different file.
+  for (const text of ["cat ./.docs/prd.md", "cat docs/prd.md"])
+    assert.deepEqual(tokens("scripts/run.sh", text), [], text);
 });
 
 // Sized so a quadratic matcher takes seconds and fails the bound rather than hanging the

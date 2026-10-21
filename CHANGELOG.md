@@ -83,6 +83,13 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **Migration engine: dot-directory references and displaced-block edits (task 221).**
+  `outsideReferences` in `migrate-doc-numbering.mjs` now compares a dot-directory path
+  (`.docs/prd.md`, `${ROOT}/.docs/prd.md`) at the repository root as well as at the file's own
+  directory, so `review-prd` reports a `stale-reference` for it; only a `./` or `../` token stays
+  relative to the file. A repository that names an outside move source this way now sees that
+  blocker, with the usual fix. `editFrontmatter` returns a displaced or unclosed block unchanged, as
+  its docstring says; the CLI already refused both, so its output does not change.
 - **Release runbook and setup wizard wording (task 218).** The release runbook's develop-sync
   section opens with its condition, and its manual block and recoveries end on `main` as
   `release.sh` does. The setup wizard's summary names the `*.handover.*.md` checklist
