@@ -1,0 +1,68 @@
+schema: 2
+task: 'task.211.migration-engine-monolith-and-domainless-prds'
+task_title: 'Migration engine: monolith and domain-less PRDs'
+gate: CONCERNS
+status_reason: 'Cycle 4 fixed its four findings, each held by a mutation-proven row, and parseNameValue still engages (20 cases, 0 escapes). The scoped review of the fix found two new defects, both from the cycle-4 lookback and key rule. One is medium and a regression: a path after a template the lookback does not know (a Python f-string, Ruby #{}, a nested $(...)) is skipped as absolute again. One is low: YAML_KEY backtracks quadratically on a long run of spaces.'
+reviewer: 'QA Engineer'
+head: 'ca1c5bf5b955ba771400390fdb25b7833068e4f9'
+updated: '2026-10-21T02:01:32Z'
+
+top_issues:
+  - id: CR-1
+    severity: medium
+    file: 'shared/resources/migrate-doc-numbering.mjs'
+    finding: 'VARIABLE_BEFORE now decides every path after "}" or ")", and it knows only ${..}, a flat $(..) and {{..}}; open(f"{ROOT}/docs/prd.md") in a .py, "#{ROOT}/docs/prd.md" in a .rb, a nested $(dirname "$(readlink -f "$0")")/.. and ${ROOT:-${PWD}}/.. are skipped as absolute and --apply answers ok, where 3e6f00cb raised stale-reference (reproduced). A regression from cycle 4.'
+    suggested_action: 'Keep the cycle-3 rule for "}" and ")": a path right after either is variable-rooted whatever opened it. Use the lookback only after a quote, and to name the variable for the non-repository check. Add the f-string, #{} and nested $(...) spellings to the must-flag list.'
+    suggested_owner: dev
+  - id: CR-2
+    severity: low
+    file: 'shared/resources/migrate-doc-numbering.mjs'
+    finding: 'YAML_KEY puts [ \t]* after a lazy [^:\n]*? that already matches blanks, so a long line of spaces with no colon backtracks quadratically: frontmatterState takes 2.1 s on 40k spaces (0 ms at 3e6f00cb). Contrived, and only for a document whose first non-blank line is a fence (reproduced).'
+    suggested_action: 'Keep [ \t]* only after the quoted alternatives, and add a long-blank line to a linear-time row.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 85
+
+evidence:
+  tests_reviewed: 108
+  phases_verified: 3/3
+  ci: 'SUCCESS (4 checks, 1 pending) @ ca1c5bf5 — informational; gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 20
+    escaped: 0
+    notes: 'parseNameValue re-probed with --sink path and task.211.qa-fix.1.security.cases.json: verdict engages, 20 executed, 0 escaped. Run record task.211.qa.5.security.run.json.'
+  performance:
+    status: CONCERNS
+    notes: 'YAML_KEY is quadratic on a long blank run (CR-2); the outsideReferences linearity row holds.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1 answers ok over a stale reference in common template spellings.'
+  maintainability:
+    status: PASS
+    notes: 'One extension helper and one predicate for both scan loops.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1 in qa-fix cycle 5 with a mutation-proven row; CR-2 with it.'
+      refs: ['shared/resources/migrate-doc-numbering.mjs', 'shared/resources/tests/migrate-doc-numbering.test.mjs']
+    - action: 'Cycles 3 to 5 each narrowed the same occurrence classifier, and each fix created the next finding. Decide whether a closed list of reference shapes is the right model, or whether the scan should refuse any path whose basename matches a moved source unless it is provably elsewhere.'
+      refs: ['shared/resources/migrate-doc-numbering.mjs']
+  future:
+    - action: 'Step 4b cannot execute the review-prd plan/apply blocks (classified mutating); the eval gate-8 and gate-9/10 rows execute them instead.'
+      refs: ['skills/review-prd/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CR-1 fixed and re-reviewed'

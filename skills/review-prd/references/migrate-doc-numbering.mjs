@@ -36,7 +36,9 @@
  * CLI (exit codes: 0 = ok family, 1 = a guard tripped, 2 = usage — the contract of
  * tracker-comment.js and its peers):
  *   node migrate-doc-numbering.mjs [--apply | --check] [--json] [--root <dir>]
- *                                  [--name <path>=<slug>]... [--allow-in-flight]
+ *                                  [--name <path>=[<domain>/]<slug>]... [--allow-in-flight]
+ *     --name names a PRD the plan cannot name, and with `<domain>/` places it under that
+ *     domain directory — required for a PRD that would land directly under the root.
  *     dry-run           0  the plan was printed; nothing was written (the default)
  *     ok                0  --apply wrote everything and checkCorpus is clean
  *     already           0  nothing to migrate and checkCorpus is clean
@@ -50,12 +52,19 @@
  * Blocker codes: prd-less-epic, unplaced-prd, in-flight, target-exists, dirty-path
  * (any tracked path the run would change, not only a move source), id-collision (two
  * documents that would carry one id), link-would-break, registry-behind,
- * registry-missing — plus two that doc-id.js can
+ * registry-missing, unclosed-frontmatter (a document whose opening --- never closes,
+ * so its number cannot be written), displaced-frontmatter (a BOM or blank lines before
+ * an opening --- that closes over YAML), stale-reference (a path, in any in-scope text
+ * file but a frozen example copy, to a
+ * moved file outside the PRD root that neither the link pass nor the literal pass
+ * rewrites), needs-domain (a PRD that would move to directly under the root — a layout
+ * create-prd refuses; name a legacy PRD's domain with --name <path>=<domain>/<slug>,
+ * move a numbered one by hand) — plus two that doc-id.js can
  * answer and this module passes through rather than guessing past: registry-invalid
  * (a registry with no usable counter), registry-unwritable (appendPrdRow refused a
  * row: no PRD table header it recognises, a duplicate, a malformed cell) and bad-slug
  * (a legacy slug that no hierarchical name can carry, such as one starting with a
- * digit). Every one of them is raised by the dry run and by --check, before --apply
+ * digit, or a --name domain that is not a lowercase kebab-case segment). Every one of them is raised by the dry run and by --check, before --apply
  * writes anything.
  */
 import { createRequire } from "node:module";
@@ -83,6 +92,10 @@ export const BLOCKER_CODES = Object.freeze([
   "registry-unwritable",
   "id-collision",
   "bad-slug",
+  "unclosed-frontmatter",
+  "displaced-frontmatter",
+  "needs-domain",
+  "stale-reference",
 ]);
 
 const TERMINAL_STATUSES = Object.freeze(["accepted", "cancelled"]);
@@ -111,6 +124,28 @@ const LITERAL_EXTS = Object.freeze([
   ".cjs",
 ]);
 const EXAMPLE_FRONTMATTER_KEYS = Object.freeze(["prd_source", "source_path"]);
+// Types the stale-reference scan never reads: no path in them is a reference it could name.
+const BINARY_EXTS = Object.freeze([
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".webp",
+  ".ico",
+  ".pdf",
+  ".zip",
+  ".gz",
+  ".tgz",
+  ".tar",
+  ".woff",
+  ".woff2",
+  ".ttf",
+  ".otf",
+  ".mp4",
+  ".mov",
+  ".mp3",
+  ".wasm",
+]);
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -143,10 +178,17 @@ function isTestFixture(rel) {
 
 const isExampleCopy = (rel) => rel.startsWith("examples/");
 const isBundledCopy = (rel) => /^skills\/[^/]+\/references\//.test(rel);
+// Which files the stale-reference scan judges: what the run may rewrite, less the frozen
+// example copies, which the literal pass rewrites only through their frontmatter. One
+// predicate for both scan loops (task.211 QA cycle 3, CR-3).
+const scansForStale = (rel) => inRewriteScope(rel) && !isExampleCopy(rel);
+// Whether the literal pass reads `rel`, by its exact extension. Both scan loops ask this one
+// question, so each tracked file falls into exactly one of them (task.211 QA cycle 4, CR-1).
+const isLiteralType = (rel) => LITERAL_EXTS.includes(P.extname(rel));
 
 /**
  * Whether the literal pass may rewrite `rel`: not history, a test fixture, a bundled copy or a
- * dependency. Exported so review-prd's migration guard judges the same files the run rewrites.
+ * dependency. Exported so a caller judges the same files the run rewrites.
  */
 export function inRewriteScope(rel) {
   return (
@@ -189,6 +231,32 @@ function renameBase(base, rule) {
 
 function git(args, cwd) {
   return spawnSync("git", args, { cwd, encoding: "utf8", maxBuffer: 1 << 28 });
+}
+
+/**
+ * A --name value: `<slug>` or `<domain>/<slug>`, each a segment create-prd accepts (the
+ * docId.format slug rule). Both become path segments under the PRD root, so this is the
+ * containment check for a caller-supplied name: `..`, an absolute path, an encoded, empty
+ * or upper-case part, a NUL or a third segment answer null (task.211 QA cycle 1, QA-2).
+ * The one definition — parseArgs and discover both call it. Pure.
+ * @returns {{slug: string, domain: string|null} | null}
+ */
+export function parseNameValue(value) {
+  if (typeof value !== "string") return null;
+  const parts = value.split("/");
+  if (parts.length > 2) return null;
+  const segment = (x) => {
+    try {
+      docId.format({ kind: "prd", prd: 1, slug: x });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  if (!parts.every(segment)) return null;
+  return parts.length === 2
+    ? { slug: parts[1], domain: parts[0] }
+    : { slug: parts[0], domain: null };
 }
 
 export function realIo(repoRoot) {
@@ -275,11 +343,19 @@ export function realIo(repoRoot) {
  * Walk `root` once and classify what is there.
  * @param {string} root repo-relative PRD root
  * @param {object} io   { readDir, readFile, exists }
- * @param {object} [opts] { names: Map<docPath, slug> } — the --name answers
+ * @param {object} [opts] { names: Map<docPath, "<slug>" | "<domain>/<slug>"> } — the --name answers
  * @returns {{ root, files, dirs, prds, epics, stories, unreadable }}
  */
 export function discover(root, io, opts = {}) {
-  const names = opts.names || new Map();
+  const given = opts.names || new Map();
+  // A --name value through its one validator. parseArgs refuses a bad one as usage; a
+  // library caller passing names directly gets bad-slug from plan() instead (badName).
+  const nameOf = (f) => {
+    const v = given.get(f);
+    if (!v) return { slug: null, domain: null, bad: null };
+    const n = parseNameValue(v);
+    return n ? { ...n, bad: null } : { slug: null, domain: null, bad: v };
+  };
   const files = [];
   const dirs = [];
   const unreadable = [];
@@ -320,7 +396,9 @@ export function discover(root, io, opts = {}) {
       shape,
       legacy: c ? c.scheme === "legacy" : true,
       number: c && c.scheme === "new" ? c.prd : null,
-      slug: names.get(f) || (c ? c.slug : null),
+      slug: nameOf(f).slug || (c ? c.slug : null),
+      namedDomain: nameOf(f).domain,
+      badName: nameOf(f).bad,
       oldStem: stemOf(base),
       epicsDir: P.join(dir, "epics"),
     });
@@ -334,7 +412,9 @@ export function discover(root, io, opts = {}) {
       shape: "L3",
       legacy: true,
       number: null,
-      slug: names.get(mono) || null,
+      slug: nameOf(mono).slug,
+      namedDomain: nameOf(mono).domain,
+      badName: nameOf(mono).bad,
       oldStem: "prd",
       epicsDir: null,
     });
@@ -439,13 +519,33 @@ export function plan(disc, registryText, io) {
   const prdPlans = [];
   for (const p of [...numbered, ...legacy]) {
     let n = p.number;
+    if (p.badName) {
+      blockers.push(
+        blocker(
+          "bad-slug",
+          p.doc,
+          `--name value "${p.badName}" is not <slug> or <domain>/<slug>, each a lowercase kebab-case segment starting with a letter`,
+        ),
+      );
+      continue;
+    }
+    if (!p.legacy && p.namedDomain) {
+      blockers.push(
+        blocker(
+          "bad-slug",
+          p.doc,
+          `--name gives domain "${p.namedDomain}" for a PRD that is already numbered, and a numbered PRD keeps its place — pass --name ${p.doc}=<slug>`,
+        ),
+      );
+      continue;
+    }
     if (p.legacy) {
       if (!p.slug) {
         blockers.push(
           blocker(
             "unplaced-prd",
             p.doc,
-            `${p.shape} PRD has no feature slug — pass --name ${p.doc}=<slug>`,
+            `${p.shape} PRD has no feature slug — pass --name ${p.doc}=<slug>, or =<domain>/<slug> to name its domain too`,
           ),
         );
         continue;
@@ -466,10 +566,16 @@ export function plan(disc, registryText, io) {
       );
       continue;
     }
-    // Where the PRD's directory goes.
+    // Where the PRD's directory goes. A named domain wins — parseNameValue validated it with
+    // the call create-prd's blocks use, so the result is a layout create-prd accepts (task.211).
+    // Only a legacy PRD reaches here with one: a numbered PRD keeps its place, or its registry
+    // row's Folder is left behind, and is refused above (task.211 QA cycle 1, CR-3).
     let newDir;
     let domain;
-    if (p.shape === "L1") {
+    if (p.namedDomain) {
+      domain = p.namedDomain;
+      newDir = P.join(root, domain, newStem);
+    } else if (p.shape === "L1") {
       newDir = P.join(P.dirname(p.dir), newStem);
       domain = P.relative(root, P.dirname(p.dir)) || ".";
     } else if (p.shape === "L2") {
@@ -481,6 +587,23 @@ export function plan(disc, registryText, io) {
     } else {
       newDir = P.join(root, p.slug, newStem);
       domain = p.slug;
+    }
+    // A PRD directly under the root is a layout create-prd refuses ({domain}/prd.{P}.{f}/),
+    // so one that moves there needs a domain — whether or not it is numbered: a numbered L2
+    // PRD at the root moves too (task.211 QA cycle 2, CR-2). A numbered PRD that stays where
+    // it is is not blocked. A numbered one cannot take --name's domain, because its registry
+    // row's Folder is not rewritten, so its remedy is a hand move.
+    if (domain === "." && (p.legacy || newDir !== P.dirname(p.doc))) {
+      blockers.push(
+        blocker(
+          "needs-domain",
+          p.doc,
+          p.legacy
+            ? `${p.shape} PRD would land directly under ${root}, outside a domain directory — pass --name ${p.doc}=<domain>/<slug>`
+            : `numbered ${p.shape} PRD would move to ${newDir}, directly under ${root} and outside a domain directory — move it into ${root}/<domain>/ by hand, set its registry row's Folder to <domain>, and plan again`,
+        ),
+      );
+      continue;
     }
     prdPlans.push({ ...p, n, newStem, newDir, domain });
   }
@@ -731,14 +854,60 @@ export function plan(disc, registryText, io) {
 // Text edits
 // ---------------------------------------------------------------------------
 
-/** Set (or insert) frontmatter fields inside the leading `---` block. Pure. */
+const isFence = (l) => /^---[ \t]*\r?$/.test(l);
+
+/**
+ * The leading frontmatter block of `text`: "closed", "unclosed" (an opening fence that
+ * never closes), "displaced" (the first non-blank line is a fence that closes, but a BOM or
+ * blank lines come before it — a block the readers cannot see and the migration must not stack a second
+ * one over; task.211 QA cycle 1, CR-1) or "none". Pure.
+ */
+export function frontmatterState(text) {
+  const lines = text.split("\n");
+  if (isFence(lines[0]))
+    return lines.findIndex((l, i) => i > 0 && isFence(l)) < 0
+      ? "unclosed"
+      : "closed";
+  // A late fence is a displaced block only when it closes over YAML: a blank line and a
+  // thematic break ("\n---\n# Title"), with or without a later break, is a body with no
+  // block (task.211 QA cycle 2, CR-5; cycle 3, CR-4).
+  const first = lines.findIndex((l) => l.replace(/^\uFEFF/, "").trim() !== "");
+  if (first < 0 || !isFence(lines[first].replace(/^\uFEFF/, ""))) return "none";
+  const close = lines.findIndex((l, i) => i > first && isFence(l));
+  if (close < 0) return "none";
+  const inner = lines.slice(first + 1, close).filter((l) => l.trim() !== "");
+  return inner.some((l) => YAML_KEY.test(l)) &&
+    inner.every((l) => YAML_KEY.test(l) || /^(?:\s|#|-\s)/.test(l))
+    ? "displaced"
+    : "none";
+}
+
+// A top-level YAML mapping key: what a frontmatter line looks like and a body line does not.
+// A key may be quoted, or hold spaces and dots ("Last updated", prd.version); it may not
+// open with Markdown (#, -, *, >, [) (task.211 QA cycle 4, CR-2).
+const YAML_KEY =
+  /^(?:(?:"[^"\n]*"|'[^'\n]*')[ \t]*|[A-Za-z0-9_][^:\n]*):(?:[ \t]|\r?$)/;
+
+/**
+ * Set (or insert) frontmatter fields inside the leading `---` block. Pure.
+ * A file with no block gets one holding every edit, inserted or not, in order — a
+ * legacy PRD written without frontmatter would otherwise move and then fail the
+ * post-check (task.211). A `createOnly` edit is written only into a created block.
+ * An unclosed or displaced block is left alone: planEdits refuses that file as a blocker.
+ */
 export function editFrontmatter(text, edits) {
   const lines = text.split("\n");
-  const isFence = (l) => /^---[ \t]*\r?$/.test(l);
-  if (!isFence(lines[0])) return text;
+  if (frontmatterState(text) === "none")
+    return [
+      "---",
+      ...edits.map((e) => `${e.key}: ${e.value}`),
+      "---",
+      text,
+    ].join("\n");
   let close = lines.findIndex((l, i) => i > 0 && isFence(l));
   if (close < 0) return text;
   for (const e of edits) {
+    if (e.createOnly) continue;
     let at = -1;
     for (let i = 1; i < close; i++) {
       if (lines[i].startsWith(`${e.key}:`)) {
@@ -913,13 +1082,82 @@ function replaceTargets(line, from, to) {
   return out + line.slice(i);
 }
 
+// A path-shaped occurrence: it starts at a path boundary (no path character before it) and
+// holds at least one `/`. The lookbehind keeps the scan linear: a long run with no `/` is
+// tried once, from its start, not from every position in it.
+const PATH_TOKEN = /(?<![\w.~\/-])[\w.~-]*(?:\/[\w.~-]+)+/g;
+// A variable ending right before a `/`: $VAR, ${VAR...}, $(command) or {{template}}, each
+// optionally closed by a quote. Group 1 or 2 is the variable name, when it has one.
+const VARIABLE_BEFORE =
+  /(?:\$(\w+)|\$\{(\w+)[^}]*\}|\$\([^)]*\)|\{\{[^}]*\}\})["']?$/;
+const NON_REPO_VARIABLE =
+  /^(?:HOME|TMPDIR|TMP|TEMP|USERPROFILE|APPDATA|LOCALAPPDATA|XDG_\w+)$/;
+
+/**
+ * The occurrences in `text` (the content of repo-relative `file`) that name one of
+ * `sources`. Only a path-shaped token is a reference: a bare name is prose (task.204 gate 7,
+ * CR-1), and a token that only ends with a source's text names another file
+ * (apps/web/docs/prd.md, ../../../prd.md). Each token is resolved, never substring-matched:
+ * a `./` or `../` token against the file's directory, any other against both the file's
+ * directory and the repository root. Trailing sentence dots are not part of a path. An
+ * absolute or URL path never matches (task.211 QA cycle 2, CR-3, CR-4). A path rooted in a
+ * variable (`${ROOT}/docs/prd.md`, `$ROOT/docs/prd.md`, `$(dirname "$0")/../prd.md`) is not
+ * absolute: its variable is dropped and the rest resolved as a relative token (cycle 3,
+ * CR-1). Pure.
+ * @returns {{token: string, source: string}[]}
+ */
+export function outsideReferences(file, text, sources) {
+  const hits = [];
+  if (!sources.some((s) => text.includes(P.basename(s)))) return hits;
+  const want = new Set(sources);
+  const dir = P.dirname(file);
+  for (const match of text.matchAll(PATH_TOKEN)) {
+    const token = match[0].replace(/\.+$/, "");
+    // None longer than PATH_MAX: path.join is quadratic on a long `../` chain, and no real
+    // reference is that long.
+    if (token.length > 4096) continue;
+    const before = text[match.index - 1];
+    let rest = token;
+    let variable = null;
+    if (before === "$") {
+      variable = token.slice(0, token.indexOf("/"));
+      rest = token.slice(variable.length + 1);
+    } else if (token.startsWith("/")) {
+      // Absolute unless something closes right before it. After `}` or `)` the path is
+      // rooted in whatever opened it — ${..}, $(..), f"{..}", #{..} — named or not (cycle 3,
+      // CR-1; cycle 5, CR-1). After a quote it is rooted only in a variable the quote closes
+      // ("$ROOT"/…; cycle 4, CR-3). The lookback also names the variable, for the check below.
+      if (!"})\"'".includes(before)) continue;
+      const v = VARIABLE_BEFORE.exec(
+        text.slice(Math.max(0, match.index - 128), match.index),
+      );
+      if (!v && (before === '"' || before === "'")) continue;
+      variable = v ? (v[1] ?? v[2] ?? null) : null;
+      rest = token.slice(1);
+    }
+    // A variable that names a place outside the repository is not a reference into it,
+    // as `~` is not (cycle 4, CR-4).
+    if (variable && NON_REPO_VARIABLE.test(variable)) continue;
+    const forms = rest.startsWith(".")
+      ? [P.join(dir, rest)]
+      : [P.join(dir, rest), P.normalize(rest)];
+    const source = forms.find((f) => want.has(f));
+    if (source) hits.push({ token, source });
+  }
+  return hits;
+}
+
 /**
  * Every text edit, computed in memory. Returns Map<oldPath, newText> for each file
  * whose content changes, plus the link report and link blockers.
  */
 export function planEdits(planned, disc, io) {
   const tracked = io.tracked();
-  const liveSet = withDirs([...new Set([...tracked, ...disc.files])]);
+  // A move source is live whether or not it is tracked: an untracked monolith beside the
+  // root still exists, and a link to it must be re-pointed, not counted dead (task.211).
+  const liveSet = withDirs([
+    ...new Set([...tracked, ...disc.files, ...planned.fileMap.keys()]),
+  ]);
   const postSet = withDirs(
     [...liveSet].filter((p) => !p.endsWith("/")).map(planned.mapPath),
   );
@@ -970,6 +1208,7 @@ export function planEdits(planned, disc, io) {
         insert: true,
         after: "name",
       },
+      { key: "type", value: "prd", createOnly: true },
     ]);
   }
   for (const e of planned.epics) {
@@ -1019,18 +1258,46 @@ export function planEdits(planned, disc, io) {
   }
 
   const prefix = `${root}/`;
+  // Move sources outside the root (the L3 monolith, `docs/prd.md`). A file outside the tree
+  // that names one by neither the root's segment nor its prefix is still read for it — by
+  // its repo-relative path, or by the relative path from the file's own directory. Never by
+  // a bare word: as tokens, `prd` and `index` rewrote prose across the tree (task.204 gate 7
+  // CR-1; task.211).
+  const outsideSources = [...planned.fileMap.keys()].filter(
+    (f) => !isUnder(f, root),
+  );
+  const namesOutsideSource = (file, text) =>
+    outsideSources.some(
+      (s) => text.includes(s) || text.includes(P.relative(P.dirname(file), s)),
+    );
+  const staleReferences = (file, text) => {
+    const seen = new Set();
+    for (const { token, source } of outsideReferences(
+      file,
+      text,
+      outsideSources,
+    )) {
+      if (seen.has(token)) continue;
+      seen.add(token);
+      blockers.push(
+        blocker(
+          "stale-reference",
+          file,
+          `"${token}" still names ${source}, which moves to ${planned.mapPath(source)}, and neither the link pass nor the literal pass rewrites it — edit it by hand and plan again`,
+        ),
+      );
+    }
+  };
   // Every file the run moves is a candidate, the L3 monolith beside the root
   // included even when it is untracked (task.203 QA cycle 2, CR-6).
   const candidates = new Set([...disc.files, ...planned.fileMap.keys()]);
-  for (const f of tracked)
-    if (LITERAL_EXTS.includes(P.extname(f))) candidates.add(f);
+  for (const f of tracked) if (isLiteralType(f)) candidates.add(f);
   for (const file of candidates) {
     // Text only: a binary file under the tree moves, but is never rewritten.
-    if (!LITERAL_EXTS.includes(P.extname(file))) continue;
+    if (!isLiteralType(file)) continue;
     const inTree = isUnder(file, root);
     const isMd = file.endsWith(".md");
-    const litOk =
-      LITERAL_EXTS.includes(P.extname(file)) && inRewriteScope(file);
+    const litOk = isLiteralType(file) && inRewriteScope(file);
     // Cheap prefilters: a file outside the tree can only point into it by naming
     // the root's last segment, and can only hold a literal by naming the root.
     const rootSeg = `${P.basename(root)}/`;
@@ -1046,12 +1313,34 @@ export function planEdits(planned, disc, io) {
       !docFields.has(file) &&
       !gateEdits.has(file) &&
       !text.includes(rootSeg) &&
-      !text.includes(prefix)
+      !text.includes(prefix) &&
+      !namesOutsideSource(file, text)
     )
       continue;
     let out = text;
 
-    if (docFields.has(file)) out = editFrontmatter(out, docFields.get(file));
+    if (docFields.has(file)) {
+      // A fence that never closes cannot be edited, so the file must not move: its
+      // new name would carry a number its frontmatter never states (task.211).
+      const fm = frontmatterState(out);
+      if (fm === "unclosed")
+        blockers.push(
+          blocker(
+            "unclosed-frontmatter",
+            file,
+            "the opening --- never closes, so the migration cannot write its number — close the block and plan again",
+          ),
+        );
+      else if (fm === "displaced")
+        blockers.push(
+          blocker(
+            "displaced-frontmatter",
+            file,
+            "a BOM or blank lines come before the opening ---, so no reader sees the block — remove them and plan again",
+          ),
+        );
+      else out = editFrontmatter(out, docFields.get(file));
+    }
     if (gateEdits.has(file))
       out = editTopLevelYaml(out, "story", gateEdits.get(file));
 
@@ -1095,7 +1384,11 @@ export function planEdits(planned, disc, io) {
     }
 
     // Literal repo-relative paths.
-    if (litOk && litRe && out.includes(prefix)) {
+    if (
+      litOk &&
+      litRe &&
+      (out.includes(prefix) || outsideSources.some((s) => out.includes(s)))
+    ) {
       const rewrite = (seg) =>
         seg.replace(litRe, (m) => {
           const slash = m.endsWith("/") ? "/" : "";
@@ -1132,8 +1425,26 @@ export function planEdits(planned, disc, io) {
         (_, i) => restore[Number(i)],
       );
     }
+    // A path to an outside move source that neither pass rewrote — a relative one outside a
+    // link — would point at nothing after the move. Name it rather than answer ok over it
+    // (task.211 QA cycle 1, QA-1).
+    if (scansForStale(file)) staleReferences(file, out);
     if (out !== text) edits.set(file, out);
   }
+  // The passes rewrite only the literal-pass file types, so every other tracked text file
+  // the scan covers is stale after the move if it names an outside source — under the PRD
+  // root or outside it. The loop above reads exactly the literal-pass types, so this one
+  // reads exactly the rest: each file once, by one predicate (task.211 QA cycle 3, CR-2,
+  // CR-3). Read only when an outside source exists (cycle 2, CR-1); a known binary type is
+  // never read, and a NUL byte marks any other.
+  if (outsideSources.length)
+    for (const file of tracked) {
+      if (isLiteralType(file)) continue;
+      if (BINARY_EXTS.includes(P.extname(file).toLowerCase())) continue;
+      if (!scansForStale(file)) continue;
+      const text = io.readFile(file);
+      if (text !== null && !text.includes("\0")) staleReferences(file, text);
+    }
   return { edits, blockers, links };
 }
 
@@ -1500,7 +1811,7 @@ export function revertHint(touch, progress = null) {
 // ---------------------------------------------------------------------------
 
 const USAGE = `Usage: node migrate-doc-numbering.mjs [--apply | --check] [--json] [--root <dir>]
-                                      [--name <path>=<slug>]... [--allow-in-flight]`;
+                                      [--name <path>=[<domain>/]<slug>]... [--allow-in-flight]`;
 
 function parseArgs(argv) {
   const a = {
@@ -1533,9 +1844,13 @@ function parseArgs(argv) {
     } else if (x === "--name") {
       const v = val();
       const eq = v.lastIndexOf("=");
-      if (eq <= 0 || eq === v.length - 1)
-        throw new Error(`--name wants <path>=<slug>, got ${v}`);
-      a.names.set(P.normalize(v.slice(0, eq)), v.slice(eq + 1));
+      const value = v.slice(eq + 1);
+      // `<slug>` or `<domain>/<slug>`, each a valid segment: parseNameValue is the one check.
+      if (eq <= 0 || !parseNameValue(value))
+        throw new Error(
+          `--name wants <path>=<slug> or <path>=<domain>/<slug>, each a lowercase kebab-case segment starting with a letter, got ${v}`,
+        );
+      a.names.set(P.normalize(v.slice(0, eq)), value);
     } else throw new Error(`unknown flag ${x}`);
   }
   if (a.apply && a.check)

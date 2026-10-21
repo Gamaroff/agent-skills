@@ -155,6 +155,7 @@ The marker is built by `loadSensitive()` in the shared `spawn-budget.mjs` (task 
 - `shared/resources/tests/call-sites.test.mjs`
 - `shared/resources/tests/doc-id.test.mjs`
 - `shared/resources/tests/ci-tree-equivalence.test.mjs`
+- `shared/resources/tests/migrate-doc-numbering.test.mjs`
 - `shared/resources/tests/qa-diminishing-returns.test.mjs`
 - `shared/resources/tests/qa-execute-snippets.test.mjs`
 - `skills/session-handoff/tests/handoff-verify.test.js`
