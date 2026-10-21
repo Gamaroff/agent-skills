@@ -494,24 +494,28 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-21
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.222.qa.3.finalise-gaps-path-fixes.md](./task.222.qa.3.finalise-gaps-path-fixes.md)
-- **Gate File**: [task.222.gate.3.finalise-gaps-path-fixes.yml](./task.222.gate.3.finalise-gaps-path-fixes.yml)
+- **Full Report**: [task.222.qa.4.finalise-gaps-path-fixes.md](./task.222.qa.4.finalise-gaps-path-fixes.md)
+- **Gate File**: [task.222.gate.4.finalise-gaps-path-fixes.yml](./task.222.gate.4.finalise-gaps-path-fixes.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 129 targeted (CI pass @ cbfc3f78)
+- **Tests Executed**: 131 targeted (plus the .249 fast gate)
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-QA-222-9 (the fence opener matches inline-span prose), QA-222-10 (the lock-7 hook text ticks Step 7 on accepted), QA-222-11 (the 8.5 body reads historical sections) and QA-222-12 (low: closer length).
+All cycle-3 findings are fixed. One LOW (QA-222-13: `--body` prints the marker for an empty section) was carried to the gate's `recommendations.future` by the cosmetic-residue exit.
+
+## Deferred Work
+
+- **QA-222-13** (LOW) — carried to gate 4 `recommendations.future` (route 2b, cycle 4): `dod-gap-count.sh --body` prints the marker `S` for a gaps section with no lines (masked in Step 8.5 by the count call, which HALTs first)
 
 <!-- change-log-start -->
 ## Change Log
@@ -528,6 +532,7 @@ QA-222-9 (the fence opener matches inline-span prose), QA-222-10 (the lock-7 hoo
 | 2026-10-21 |  | QA findings fixed — 3 of 3 (QA-222-6..8), 1 iteration; 6 fixtures and 1 Stop-hook scenario added | qa-fix |
 | 2026-10-21 |  | QA gate CONCERNS (80/100) — 4 findings (3 medium, 1 low) | qa-task |
 | 2026-10-21 |  | QA findings fixed — 4 of 4 (QA-222-9..12), 1 iteration; dod-gap-count.sh --body feeds Step 8.5 | qa-fix |
+| 2026-10-21 |  | QA gate PASS (100/100) — 1 finding (1 low, carried to future by route 2b) | qa-task |
 <!-- change-log-end -->
 
 ---
