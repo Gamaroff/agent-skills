@@ -93,6 +93,15 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **loop-supervisor: a missing probe script says so (task 224).** When no `select-next.mjs` exists
+  under `.agents/skills/`, `.claude/skills/` or `skills/`, the `develop-next` / `develop-batch` probe
+  now stops with `probe script not found: …`, listing the paths searched, instead of "probe produced
+  no output" and a symlink hint that did not apply. A configured `probeScript` that Node cannot
+  resolve is reported by its configured path; an extensionless name or a directory Node would run
+  counts as present. The check runs before the spawn (`probeMissing` in
+  `adapters.js`). The adapter table's default probe path is now one constant,
+  `DEFAULT_PROBE_SCRIPT`.
+
 - **loop-supervisor finds `select-next.mjs` wherever the skills are installed (task 214).** The
   `develop-next` and `develop-batch` adapters defaulted `probeScript` to
   `skills/develop-next/scripts/select-next.mjs`, a path that exists only in this repository. In a

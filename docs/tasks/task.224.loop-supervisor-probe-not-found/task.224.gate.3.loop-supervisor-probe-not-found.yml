@@ -1,0 +1,64 @@
+schema: 2
+task: 'task.224.loop-supervisor-probe-not-found'
+task_title: 'loop-supervisor: say when the probe script is not found'
+gate: PASS
+status_reason: 'QA-2 is fixed and mutation-proven. One low-severity, high-confidence bug was promoted (QA-3): require.resolve caches a hit for the process, so in a long-running loop a probe script deleted after its first probe is still reported present and the spawn gives the old "probe produced no output" message. Reproduced at c67d9dc0.'
+reviewer: 'QA Engineer'
+head: 'c67d9dc0e2d8a9353f827bed8fa9552f15450bd9'
+updated: '2026-10-21T20:35:19Z'
+
+top_issues:
+  - id: 'QA-3'
+    severity: low
+    file: 'skills/loop-supervisor/references/adapters.js'
+    finding: 'resolvesAsMain calls require.resolve, which keeps a hit in Module._pathCache and returns it later without touching the disk. runProbe runs on every loop iteration with the same adapter, so a probe script deleted mid-run (a branch checkout, a reinstall) still reads as present, and the spawn falls back to the "probe produced no output" message this task replaced. Reproduced at c67d9dc0 for both tools/select and tools/select.js; cycle 1 (existsSync) reported the deletion.'
+    suggested_action: 'Confirm the resolved filename still exists on disk (fs.existsSync on what require.resolve returns), and add a test that resolves, deletes and probes again in one process.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 251
+  phases_verified: 2/2
+  ci: 'not read this cycle (QA does not wait on CI)'
+  trace:
+    phases_covered: [1, 2]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false, unchanged. resolvesAsMain is a new predicate; its false leads to the same status error a missing script always produced, and probeScript is operator-authored config.'
+  performance:
+    status: PASS
+    notes: 'One require.resolve per probe; at most four stat calls for an extensionless name.'
+  reliability:
+    status: PASS
+    notes: 'QA-3 (low) is carried in top_issues; CR-3 (advisory): the bare catch also maps a broken package.json to "not found".'
+  maintainability:
+    status: PASS
+    notes: 'CR-4 (advisory): firstExisting has no production caller.'
+
+recommendations:
+  immediate:
+    - action: 'QA-3: re-check the resolved filename on disk so a deleted script is reported as missing.'
+      refs: ['skills/loop-supervisor/references/adapters.js', 'evals/loop-supervisor/unit/adapters.test.mjs']
+  future:
+    - action: 'CR-2: a default-search hit that later vanishes is described as "configured by loopSupervisor.adapters.<name>.probeScript"; record where the path came from.'
+      refs: ['skills/loop-supervisor/references/adapters.js']
+    - action: 'CR-3: treat only MODULE_NOT_FOUND as missing; let other resolution errors reach the spawn.'
+      refs: ['skills/loop-supervisor/references/adapters.js']
+    - action: 'CR-4: remove firstExisting or mark it export-only; CR-5: add package.json main, trailing-slash, .mjs-beside and symlink rows to the agreement table.'
+      refs: ['skills/loop-supervisor/references/adapters.js', 'evals/loop-supervisor/unit/adapters.test.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['QA-3 fixed']

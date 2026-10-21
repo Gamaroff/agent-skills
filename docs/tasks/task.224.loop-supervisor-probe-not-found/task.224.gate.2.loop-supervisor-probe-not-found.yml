@@ -1,0 +1,62 @@
+schema: 2
+task: 'task.224.loop-supervisor-probe-not-found'
+task_title: 'loop-supervisor: say when the probe script is not found'
+gate: CONCERNS
+status_reason: 'QA-1 is fixed and mutation-proven. The cycle-2 refute pass found that probeMissing checks fs.existsSync while the spawn uses Node main-module resolution, so a configured extensionless probeScript that Node runs (tools/select -> tools/select.js) is now refused. Reproduced at a7e0c197; on base the same config ran.'
+reviewer: 'QA Engineer'
+head: 'a7e0c19750f12e40aee00ea783cbd661295650cd'
+updated: '2026-10-21T20:23:50Z'
+
+top_issues:
+  - id: 'QA-2'
+    severity: medium
+    file: 'skills/loop-supervisor/references/adapters.js'
+    finding: 'probeMissing tests fs.existsSync(path.resolve(cwd, script)), but runProbe spawns `node <script>`, which resolves the main module (extension and directory-index fallback). A configured probeScript "tools/select" with tools/select.js present ran before this change and now stops with "probe script not found: tools/select" (reproduced at a7e0c197). A directory override passes the check and spawns as before. This contradicts SC4 ("the probe runs as before") and the PR''s "no breaking change" claim.'
+    suggested_action: 'Decide existence the way the spawn does: try require.resolve(path.resolve(cwd, script)) and treat only a resolution failure as missing, keeping the injectable exists seam for the unit tests; add unit tests for an extensionless override that resolves and for one that does not.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 246
+  phases_verified: 2/2
+  ci: 'not read this cycle (QA does not wait on CI)'
+  trace:
+    phases_covered: [1, 2]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false, unchanged from gate 1. probeMissing and findExisting gate no new action; probeScript is operator-authored config that was already executed verbatim.'
+  performance:
+    status: PASS
+    notes: 'Unchanged: <= 3 exists calls in resolution, 1 per probe.'
+  reliability:
+    status: PASS
+    notes: 'QA-2 is a correctness regression in one config shape and is carried in top_issues; the missing-script path itself is reliable.'
+  maintainability:
+    status: PASS
+    notes: 'CR-2 (advisory): dryRun has no try/finally, so a throwing setup leaks its temp dir.'
+
+recommendations:
+  immediate:
+    - action: 'QA-2: align probeMissing with Node main-module resolution.'
+      refs: ['skills/loop-supervisor/references/adapters.js', 'evals/loop-supervisor/unit/adapters.test.mjs']
+  future:
+    - action: 'CR-2: wrap the dryRun helper body in try/finally so its temp dir is always removed.'
+      refs: ['evals/loop-supervisor/unit/run-loop.test.mjs']
+    - action: 'Gate 1 CR-1 (EACCES reads as not found) and CR-3 (firstExisting has no production caller) remain advisory.'
+      refs: ['skills/loop-supervisor/references/adapters.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['QA-2 fixed']

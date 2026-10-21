@@ -73,7 +73,11 @@ import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 
 import { classify, shouldStop } from "../references/classify.js";
-import { interpretProbe, resolveAdapter } from "../references/adapters.js";
+import {
+  interpretProbe,
+  probeMissing,
+  resolveAdapter,
+} from "../references/adapters.js";
 import { parseYamlSubset } from "../references/yaml-subset.js";
 import {
   ENGINES,
@@ -1039,6 +1043,8 @@ function runProbe(adapter, opts, cwd, nodeBin) {
     opts.roadmap ? { roadmapPath: opts.roadmap } : {},
   );
   if (!args) return { status: "selected", reason: "no probe for this adapter" };
+  const missing = probeMissing(adapter, cwd);
+  if (missing) return missing;
   const res = spawnSyncCapture(nodeBin, args, cwd, 30000);
   return interpretProbe(res);
 }
