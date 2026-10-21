@@ -50,7 +50,8 @@ esac
 # second gap and a numbered category line (`1. **Unit Tests:**`) closes the list above it
 # (QA-222-4).
 # Printed: "S" when the section exists, "@" when its subsection does, then the count — or, in
-# --body mode, "S" and then the section's lines.
+# --body mode, "S" and then the section's lines. `--body` refuses a section with no non-blank
+# line, as the count refuses one with no gap: the marker is internal and never reaches stdout.
 OUT=$(awk -v mode="$MODE" '
   function indent(l,   i, c, n) {
     n = 0
@@ -106,8 +107,19 @@ case "$OUT" in
     exit 1
     ;;
 esac
+# Strip the marker, then its newline if there is one: `$(…)` strips every trailing newline, so an
+# empty section leaves "S" alone and a one-pattern `${OUT#S$'\n'}` matches nothing (QA-222-13).
 if [ "$MODE" = "--body" ]; then
-  printf '%s\n' "${OUT#S$'\n'}"
+  BODY=${OUT#S}
+  BODY=${BODY#$'\n'}
+  case "$BODY" in
+    *[![:space:]]*) ;;
+    *)
+      echo "HALT: '## Definition of Done - Gaps Identified' in $DOC_FILE is empty — Step 8.4 writes the gap report there" >&2
+      exit 1
+      ;;
+  esac
+  printf '%s\n' "$BODY"
   exit 0
 fi
 case "$OUT" in
