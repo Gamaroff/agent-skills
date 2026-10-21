@@ -5,17 +5,19 @@ type: task
 description: "Make loop-supervisor engine- and model-agnostic by moving the claude-specific binary, argv, result envelope and transcript path into an engine registry, then adding --engine, --model and --effort."
 tags: [loop-supervisor, engines, agy, model-selection]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-18
 updated: 2026-10-21
 estimated_effort_hours: 16
 github_issue: 715
+completed_date: 2026-10-21
+pr_number: 716
 ---
 
 # Technical Task: loop-supervisor: an engine registry (claude, agy) and a --model flag
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.213.review.1.loop-supervisor-engine-registry-and-model-flag.md` implemented 2026-10-21
 **GitHub Issue**: [#715](https://github.com/Gamaroff/agent-skills/issues/715)
 
@@ -368,9 +370,9 @@ The `agy` result line in this document comes from the handoff, so a parser that 
 - **TASK-213-QA2-CR4** (LOW): carried to gate 2 `recommendations.future` (route 2b, cycle 2). The loop-supervisor skill description claims a pinned session id for agy too.
 - **TASK-213-QA2-CR5** (LOW): carried to gate 2 `recommendations.future` (route 2b, cycle 2). The develop-next resume sentence names only `claude --resume`, which is false for agy rows.
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified (DoD 1, closed by DoD 2)
 
-**Status:** IN PROGRESS
+**Status:** CLOSED. Both gaps were fixed. This section is historical; see DoD 2 below.
 
 ### QA Gate Status
 
@@ -399,6 +401,33 @@ The `agy` result line in this document comes from the handoff, so a parser that 
 
 **Detailed Verification Log:** See `task.213.dod.1.loop-supervisor-engine-registry-and-model-flag.md` for complete verification evidence.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.213.qa.2.loop-supervisor-engine-registry-and-model-flag.md`
+**Gate File**: `task.213.gate.2.loop-supervisor-engine-registry-and-model-flag.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 14/14. AC8 was re-measured on the PR head at +2.5% of base wall time.
+✅ **PR Review:** PR #716. The Step 5c `/review-pr` gave APPROVE with 1 LOW (PC-1). This is a
+single-maintainer repo, so no reviewer approval is required.
+✅ **Tests:** 31 new tests. CI is green on `5742a9ac` (test, link-check, shellcheck, validate,
+branch rule).
+✅ **Documentation:** The loop-supervisor README and SKILL.md, `configuration.md`, `commands.md`,
+the runbook and the CHANGELOG `(task 213)` entry are updated.
+✅ **Security Review:** PASS. `resolveEngine` was probed with 12 candidates, and none reproduced.
+⚠️ **Compliance Review:** Not applicable (internal tooling).
+
+**Task marked as ACCEPTED on:** 2026-10-21
+
+**Detailed Verification Log:** See `task.213.dod.2.loop-supervisor-engine-registry-and-model-flag.md`.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -413,6 +442,7 @@ The `agy` result line in this document comes from the handoff, so a parser that 
 | 2026-10-21 |  | QA findings fixed — TASK-213-BUG-1 plus 2 advisories (CR-2, stale comment), 1 iteration | qa-fix |
 | 2026-10-21 |  | QA gate PASS (100/100) — 2 LOW findings (CR-4, CR-5) | qa-task |
 | 2026-10-21 |  | DoD incomplete — 2 gaps identified (AC8 perf not measured on head; CHANGELOG entry) | finalise |
+| 2026-10-21 | 1.2 | DoD passed — accepted (PR #716) | finalise |
 <!-- change-log-end -->
 
 ---
