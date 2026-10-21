@@ -1,0 +1,14 @@
+[
+  { "id": "engine.proto", "sink": "filename", "input": "__proto__", "why": "A bracket lookup on a plain object returns Object.prototype for __proto__; an engine table read that way would hand back a non-engine.", "correct": "Refused: not an own key of ENGINES.", "direction": "hostile" },
+  { "id": "engine.constructor", "sink": "filename", "input": "constructor", "why": "Inherited key on every object; `name in ENGINES` would accept it.", "correct": "Refused.", "direction": "hostile" },
+  { "id": "engine.tostring", "sink": "filename", "input": "toString", "why": "Inherited function; a truthy lookup would accept it and the loop would call .buildArgs on a function.", "correct": "Refused.", "direction": "hostile" },
+  { "id": "engine.hasownproperty", "sink": "filename", "input": "hasOwnProperty", "why": "Inherited key, and the name of the guard itself.", "correct": "Refused.", "direction": "hostile" },
+  { "id": "engine.empty", "sink": "filename", "input": "", "why": "An empty --engine value (config key present but blank) must not fall through to a default silently.", "correct": "Refused.", "direction": "hostile" },
+  { "id": "engine.case", "sink": "filename", "input": "Claude", "why": "Case-folding would let a config typo select an engine the operator did not name.", "correct": "Refused: names are exact.", "direction": "hostile" },
+  { "id": "engine.trailing-space", "sink": "filename", "input": "agy ", "why": "A YAML value with trailing whitespace must not resolve to a different engine by trimming.", "correct": "Refused.", "direction": "hostile" },
+  { "id": "engine.nul", "sink": "filename", "input": "agy\u0000", "why": "A NUL-suffixed name compares unequal but could be truncated by a C-level consumer downstream.", "correct": "Refused.", "direction": "hostile" },
+  { "id": "engine.path", "sink": "filename", "input": "../claude", "why": "The name selects a table row, never a path; a path-shaped value must not resolve.", "correct": "Refused.", "direction": "hostile" },
+  { "id": "engine.unknown", "sink": "filename", "input": "gpt", "why": "An engine with no row.", "correct": "Refused, listing the known engines.", "direction": "hostile" },
+  { "id": "engine.claude", "sink": "filename", "input": "claude", "why": "The default engine.", "correct": "Accepted.", "direction": "legitimate" },
+  { "id": "engine.agy", "sink": "filename", "input": "agy", "why": "The second engine.", "correct": "Accepted.", "direction": "legitimate" }
+]

@@ -30,10 +30,12 @@ One model call, deliberately tiny. Record in this section, once measured: the re
 
 **Verified facts (fill in; the task's table is from `agy --help` only):**
 
-- result line shape: _unmeasured_
-- statuses and failure exit code: _unmeasured_
-- fresh `--conversation` id: _unmeasured_
-- `accept-edits` and a shell command, no skip flag: _unmeasured_
+Measured 2026-10-21 on `agy` 1.4.2, model `gemini-3.8-flash-low` (captures: `evals/loop-supervisor/unit/fixtures/agy-result.ndjson`, `agy-result-error.ndjson`; the only edit is the `init.cwd` value, replaced with `/tmp/agy-capture`):
+
+- result line shape: `{"event":"result","result":{"conversation_id":"<uuid>","status":"SUCCESS","response":"ok\n","duration_seconds":4.16,"num_turns":1,"usage":{"input_tokens":…,"output_tokens":…,"thinking_tokens":…,"cache_read_tokens":…,"total_tokens":…}}}` — the handoff's description holds. Other lines are `event: "init"` (carries `conversation_id` and `init.model`, `init.permission_mode`) and `event: "step_update"` (`step_type` `user_input` / `agent_response` with `text_delta` / `tool` with `tool_name` and `tool_info`). No cost field anywhere.
+- statuses and failure exit code: `SUCCESS` (exit 0); an invalid `--model` gives `status: "ERROR"`, `conversation_id: ""`, an `error` string, and **exit 1**, with the same text on stderr. No other status was observed; any non-`SUCCESS` status is treated as an error (fail closed).
+- fresh `--conversation` id: **not pinned.** `--conversation <fresh-uuid>` prints `warning: conversation "<uuid>" not found` on stderr, exits 0, and runs under a *different* new id. The flag is therefore omitted; the id is taken from the stream's `conversation_id`.
+- `accept-edits` and a shell command, no skip flag: **allowed, no prompt, no hang.** `--mode accept-edits` in print mode ran `run_command` (`echo agy-probe > probe.txt`) and wrote the file, although `init.permission_mode` reads `request-review`. `agy` has no deny list, so an `agy` loop has no command boundary at all; the operator skip flag is not needed to run a pipeline. Under `--sandbox` the first attempt failed with a sandbox error and the agent re-ran the same command outside it, which succeeded — `--sandbox` is not a hard boundary in print mode and is not emitted by default.
 
 ### Phase 1: Registry with `claude` only
 
@@ -55,10 +57,14 @@ const ENGINES = {
   claude: {
     name: "claude",
     binary: "claude",
-    supports: { maxTurns: true, cost: true, pinnedSession: true, settingsFile: true },
-    buildArgs({ prompt, sessionId, settingsPath, maxTurns = null, model = null }) {
+    // claude 2.1.306 accepts --model and --effort (review 1); skipPermissions stays false
+    // on purpose — supervisor-settings.json records why.
+    supports: { maxTurns: true, cost: true, pinnedSession: true, settingsFile: true,
+                effort: true, skipPermissions: false },
+    buildArgs({ prompt, sessionId, settingsPath, maxTurns = null, model = null, effort = null }) {
       const args = [ /* exactly buildClaudeArgs's array today */ ];
       if (model) args.push("--model", model);
+      if (effort) args.push("--effort", effort);
       if (maxTurns != null && Number.isFinite(maxTurns)) args.push("--max-turns", String(maxTurns));
       return args;
     },
@@ -89,7 +95,11 @@ if (!engine) throw new Error(`unknown engine ${JSON.stringify(opts.engine)} (kno
 if (opts.maxTurns != null && !engine.supports.maxTurns) refuse("--max-turns", engine);
 if (opts.maxCost  != null && !engine.supports.cost)     refuse("--max-cost", engine);
 if (opts.effort && !engine.supports.effort)             refuse("--effort", engine);
+if (opts.skipPermissions && !engine.supports.skipPermissions)
+  refuse("--dangerously-skip-permissions", engine);
 ```
+
+`--dangerously-skip-permissions` is a flag only: `applyConfig` reads no key for it.
 
 `status` and `watch` stay ahead of all of this: they must not fail because an engine binary is missing.
 
@@ -100,10 +110,12 @@ Base shape, to be corrected by Phase 0:
 ```js
 agy: {
   name: "agy", binary: "agy",
-  supports: { maxTurns: false, cost: false, pinnedSession: false, settingsFile: false, effort: true },
-  buildArgs({ prompt, model = null, effort = null /* , conversation per Phase 0 */ }) {
+  supports: { maxTurns: false, cost: false, pinnedSession: false, settingsFile: false,
+              effort: true, skipPermissions: true },
+  buildArgs({ prompt, model = null, effort = null, skipPermissions = false /* , conversation per Phase 0 */ }) {
     const args = ["-p", prompt, "--output-format", "stream-json", "--mode", "accept-edits"];
-    // permissions: per the author's decision (task Risk 1). No unconditional skip flag.
+    // permissions: task Risk 1 decision — only when the OPERATOR passed --dangerously-skip-permissions.
+    if (skipPermissions) args.push("--dangerously-skip-permissions");
     if (model) args.push("--model", model);
     if (effort) args.push("--effort", effort);
     return args;

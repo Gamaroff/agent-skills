@@ -674,9 +674,10 @@ Delete the run-state file, then end every run with a report: item id + title, PR
 > **For a long or overnight queue, prefer `loop-supervisor`.** `/loop` re-invokes **this** conversation
 > every iteration, so item five is worked through a context mostly consumed by items one to four — and a
 > skill cannot clear its own context, so the loop has to move outside the session to fix it.
-> `loop-supervisor` spawns one `claude -p` per iteration with a fresh context and a pinned session id,
+> `loop-supervisor` spawns one `claude -p` per iteration by default, with a fresh context and a pinned session id,
 > classifies each outcome from filesystem post-conditions rather than from prose, and writes a
 > per-iteration ledger every line of which is reopenable with `claude --resume <sessionId>`.
+> (`--engine agy` runs the Antigravity CLI instead; `--model` and `--effort` pass through to either.)
 >
 > It is not free: every iteration re-primes `CLAUDE.md`, the skill files and the roadmap. That should be
 > largely prompt-cache-served since the prefix is identical across iterations, but it is a real

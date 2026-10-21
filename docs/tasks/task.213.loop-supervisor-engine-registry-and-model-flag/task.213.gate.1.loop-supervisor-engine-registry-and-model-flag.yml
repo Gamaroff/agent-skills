@@ -1,0 +1,65 @@
+schema: 2
+task: 'task.213.loop-supervisor-engine-registry-and-model-flag'
+task_title: 'loop-supervisor: an engine registry (claude, agy) and a --model flag'
+gate: CONCERNS
+status_reason: 'Code, tests and refusals hold: 10/10 mutations killed, resolveEngine probe engages (12 executed, 0 escaped), ci:fast green. One stated criterion fails as measured: three claude -p lines carry the default-engine qualifier only in the next sentence (TASK-213-BUG-1).'
+reviewer: 'QA Engineer'
+head: 'a31d73cee86f481098e9f7b931013fbd9006cb58'
+updated: '2026-10-21T07:10:23Z'
+
+top_issues:
+  - id: 'TASK-213-QA1-1'
+    severity: medium
+    file: 'skills/loop-supervisor/SKILL.md'
+    finding: 'The Migration criterion search (git grep -n "claude -p" over skills/loop-supervisor, skills/develop-next, docs/reference, docs/runbooks) returns three lines that name claude -p with no default qualifier on the line: skills/loop-supervisor/SKILL.md:63, skills/develop-next/SKILL.md:677, docs/runbooks/unattended-overnight-runs.md:28.'
+    suggested_action: 'Put "by default" (or the --engine agy alternative) on each of the three matched lines, re-run the search, and record its output in the implementation report.'
+    suggested_owner: dev
+    bug_ref: 'task.213.bug.1.claude-p-lines-lack-default-qualifier.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 31
+  phases_verified: 5/5
+  ci: 'npm run ci:fast rc 0 on the tree committed as a31d73ce (6136 tests, 6122 pass, 0 fail, 14 skipped)'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4]
+    phases_with_issues: [4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 12
+    escaped: 0
+    notes: 'boundary: true (engines.js self-declares refusal). resolveEngine probed with 10 hostile names (prototype keys, empty, case, trailing space, NUL, path, unknown) and 2 legitimate: engages. assertSupported and parseAgyResult are not single-input reject-shaped exports; held by refusal tests and mutations M1/M2. --dangerously-skip-permissions is operator-flag only, never config, refused on claude (M5 covered).'
+  performance:
+    status: PASS
+    notes: 'Five pre-existing loop-supervisor test files: median 0.282 s at head vs 0.292 s at base (-3%), at roughly twice the load; 185 pass each.'
+  reliability:
+    status: PASS
+    notes: 'agy parser fails closed on any non-SUCCESS or missing status; refusals happen before any binary is resolved; unknown cost reads null, not $0. Advisory CR-1: an agy run that dies before its result line records sessionId null although init carried conversation_id.'
+  maintainability:
+    status: PASS
+    notes: 'One table, no engine-name branch in run-loop.mjs; delegates keep the exported API. Advisory: stale comment at run-loop.mjs:1093 still names resolveBinary("claude"); CR-2 dryRun helper spawn has no timeout.'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-213-BUG-1: put the default-engine qualifier on the three matched claude -p lines.'
+      refs: ['skills/loop-supervisor/SKILL.md', 'skills/develop-next/SKILL.md', 'docs/runbooks/unattended-overnight-runs.md']
+  future:
+    - action: 'CR-1: take agy conversation_id from the init event as a fallback so a run killed before its result line still records a reopenable session id.'
+      refs: ['skills/loop-supervisor/references/engines.js']
+    - action: 'CR-2: bound the dryRun helper spawnSync with spawnBudget, as runOnce does.'
+      refs: ['evals/loop-supervisor/unit/run-loop.test.mjs']
+    - action: 'Refresh the run-loop.mjs:1093 comment that still says resolveBinary("claude").'
+      refs: ['skills/loop-supervisor/scripts/run-loop.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-213-BUG-1 fixed']

@@ -1,0 +1,79 @@
+schema: 2
+task: 'task.213.loop-supervisor-engine-registry-and-model-flag'
+task_title: 'loop-supervisor: an engine registry (claude, agy) and a --model flag'
+gate: PASS
+status_reason: 'TASK-213-BUG-1 verified fixed (the Migration criterion search is clean). The cycle-2 refute pass found two low-severity, high-confidence doc claims that are false for agy (promoted under code_review_blocking); no medium or high entry, every NFR PASS.'
+reviewer: 'QA Engineer'
+head: 'f982c94431f1552bee10e9c4af2cdba392f37894'
+updated: '2026-10-21T07:21:30Z'
+
+top_issues:
+  - id: 'TASK-213-QA2-CR4'
+    severity: low
+    file: 'skills/loop-supervisor/SKILL.md'
+    finding: 'The description (line 3) says the agy path also runs with a pinned session id, but agy has pinnedSession false and no session id is passed to it.'
+    suggested_action: 'Limit the pinned-session claim in the description to the claude engine.'
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+  - id: 'TASK-213-QA2-CR5'
+    severity: low
+    file: 'skills/develop-next/SKILL.md'
+    finding: 'Line 679 says every ledger line is reopenable with claude --resume, which is false for agy rows (an agy conversation id, or null when no result line arrived).'
+    suggested_action: 'Name the agy reopen path (agy --conversation <id>) and the null case for agy rows in that sentence.'
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 31
+  phases_verified: 5/5
+  ci: 'npm run ci:fast exit 0 on the tree committed as f982c944 (6136 tests, 6122 pass, 0 fail, 14 skipped)'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4]
+    phases_with_issues: [4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 12
+    escaped: 0
+    notes: 'boundary: true. resolveEngine re-probed this cycle (task.213.qa.2.security.run.json): 10 hostile names refused, 2 legitimate accepted, verdict engages. engines.js unchanged since gate 1.'
+  performance:
+    status: PASS
+    notes: 'No runtime change since gate 1 (cycle-1 fix was docs, a comment and a test timeout); the -3% measurement stands.'
+  reliability:
+    status: PASS
+    notes: 'Fail-closed agy parser and pre-spawn refusals unchanged. Advisory CR-1 (config model/effort reach a different engine) and CR-2 (agy init conversation_id fallback) recorded as follow-ups.'
+  maintainability:
+    status: PASS
+    notes: 'Two low doc claims about agy (CR-4, CR-5) are in top_issues; the cycle-1 stale comment and test timeout are fixed.'
+
+recommendations:
+  immediate: []
+  future:
+    - id: 'TASK-213-QA2-CR4'
+      action: 'Limit the pinned-session claim in the skill description to the claude engine (agy is pinnedSession false).'
+      refs: ['skills/loop-supervisor/SKILL.md']
+      carried_from: 'top_issues (route 2b, cycle 2)'
+    - id: 'TASK-213-QA2-CR5'
+      action: 'Name the agy reopen path (agy --conversation <id>) and the null case beside claude --resume at develop-next SKILL.md:679.'
+      refs: ['skills/develop-next/SKILL.md']
+      carried_from: 'top_issues (route 2b, cycle 2)'
+    - action: 'CR-1: keep config loopSupervisor.model/effort from reaching an engine other than loopSupervisor.engine (or key them by engine).'
+      refs: ['skills/loop-supervisor/scripts/run-loop.mjs']
+    - action: 'CR-2: capture the agy conversation_id from the init line as the heartbeat and ledger fallback.'
+      refs: ['skills/loop-supervisor/references/engines.js']
+    - action: 'CR-3: measure whether agy resolves /develop-next in print mode; refuse slash-command adapters on agy if not.'
+      refs: ['skills/loop-supervisor/references/engines.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
