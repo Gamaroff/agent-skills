@@ -394,6 +394,31 @@ test-first and mutation-proven. The bundled copy in `skills/review-prd/reference
   `${ROOT}/./docs/prd.md`, still resolves only against the file's directory) is pre-existing and
   out of scope per §4; recorded in the review report only.
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-21
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Full Report**: [task.221.qa.1.migration-engine-dot-directory-and-displaced-edit.md](./task.221.qa.1.migration-engine-dot-directory-and-displaced-edit.md)
+- **Gate File**: [task.221.gate.1.migration-engine-dot-directory-and-displaced-edit.yml](./task.221.gate.1.migration-engine-dot-directory-and-displaced-edit.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 70
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+No critical issues identified. Both fixes are mutation-proven. One low-severity finding in
+`linkPass` was already on develop, so it is advisory.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -403,6 +428,7 @@ test-first and mutation-proven. The bundled copy in `skills/review-prd/reference
 | 2026-10-21 | 1.1     | Review passed (9/10) — both fixes run on a scratch copy and verified; no changes required | review-task |
 | 2026-10-21 |         | Status → ready-for-development | review-task |
 | 2026-10-21 |         | Implemented — 4 files, 2 tests (CR-1, CR-2), both mutation-proven | develop |
+| 2026-10-21 |         | QA gate PASS (100/100) — 0 blocking findings, 1 advisory | qa-task |
 
 <!-- change-log-end -->
 
