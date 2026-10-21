@@ -38,6 +38,10 @@ Invoke the `/finalise` skill with the task file path.
 
 ## Detecting Completion
 
+This check runs **before** the Step Transition Protocol's lock advance, not after it. `/finalise`
+leaves the lock at 7 on a gaps outcome (task 222); advancing to 8 first and halting second would undo
+that hold, so the orchestrator issues `advance-pipeline-lock.sh 8` only once this check reads `accepted`.
+
 #### develop-story
 
 After finalise returns, read the story file and check the `status:` frontmatter field:

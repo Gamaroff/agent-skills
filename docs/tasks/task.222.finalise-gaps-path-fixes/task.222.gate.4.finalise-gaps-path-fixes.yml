@@ -1,0 +1,69 @@
+schema: 2
+task: 'task.222.finalise-gaps-path-fixes'
+task_title: 'finalise gaps path: true gap count, lock held at Step 7'
+gate: PASS
+status_reason: 'All four cycle-3 findings are fixed and mutation-proven, and the count and the 8.5 body now share one reader. The scoped re-review found one low: --body prints the marker "S" for a section with no lines, which Step 8.5 never posts because its count call HALTs on that document first.'
+reviewer: 'QA Engineer'
+head: '042211a51859f5be2e508f9574432611df984608'
+updated: '2026-10-21T15:48:12Z'
+
+top_issues:
+  - id: 'QA-222-13'
+    severity: low
+    file: 'shared/resources/dod-gap-count.sh'
+    finding: 'For a current gaps section with no lines, awk prints only "S"; the command substitution strips its newline, so `${OUT#S$''\n''}` does not match and `--body` prints "S" with exit 0. Reproduced on a heading followed directly by `## Change Log`. Step 8.5 is unaffected in practice: its count call HALTs on the same document ("no Missing Criteria") before anything is posted. But the 8.5 empty-body post-condition cannot fire for a story/task.'
+    suggested_action: 'Treat a bare "S" as an empty body (or have awk print the marker on its own line and strip it with an optional newline), and add a --body test for an empty section.'
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+
+bug_resolution:
+  prior_cycle: 3
+  verified_fixed: ['QA-222-9', 'QA-222-10', 'QA-222-11', 'QA-222-12']
+  verification_method: 'Committed tests (inline-span, 4-backtick, --body, re-run 8.5, scenario 5d); developer mutations 5 covered; QA re-ran the cycle-3 probes against 042211a5 (inline-span → 1, 4-backtick → 1)'
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 131
+  phases_verified: 4/4
+  ci: 'pending @ 042211a5 (test); link-check, shellcheck, validate pass — informational'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: internal, unchanged. The --body mode adds an output, not an input; the script still reads one file and writes nothing.'
+  performance:
+    status: PASS
+    notes: 'One awk pass, unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Count, body and lock hold agree on one section and one outcome. QA-222-13 is masked by the count call that precedes the post.'
+  maintainability:
+    status: PASS
+    notes: 'One reader of the gaps section; one writer of each hook instruction.'
+
+recommendations:
+  immediate: []
+  future:
+    - id: 'QA-222-13'
+      action: 'Make --body return an empty body (not "S") for a current gaps section with no lines; add a --body test for an empty section.'
+      finding: 'For a current gaps section with no lines, --body prints the marker "S" with exit 0. Masked in Step 8.5 by the count call, which HALTs on the same document first.'
+      refs: ['shared/resources/dod-gap-count.sh']
+      carried_from: 'top_issues (route 2b, cycle 4)'
+    - action: 'The .249 test host has npm 9.2.0, whose update-notifier fails security-probe.test.mjs "task.167''s 13 cases" on any commit; pin NO_UPDATE_NOTIFIER in that test or upgrade npm there.'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

@@ -469,27 +469,41 @@ test("the step document names the resume record, not the row or git, as Step 8's
   );
 });
 
-// The premise CR5-1 rests on, executed: /finalise's lock cooperation moves the lock from 7 to 8 as
-// its last action — before the orchestrator runs Step 7's tail — so a record at step 8 can mean an
-// unfinished Step 7.
-test("finalise's lock cooperation moves the record to step 8 before Step 7's tail runs", () => {
+// The premise CR5-1 rests on, executed: on an accepted DoD, /finalise's lock cooperation moves the
+// lock from 7 to 8 as its last action — before the orchestrator runs Step 7's tail — so a record at
+// step 8 can mean an unfinished Step 7. Without an accepted DoD it holds at 7 (task 222, obs #79).
+test("finalise's lock cooperation moves the record to step 8 before Step 7's tail runs, on an accepted DoD", () => {
   const dir = fs.mkdtempSync(
     path.join(fs.realpathSync(os.tmpdir()), "t160-finalise-"),
   );
+  const stepOf = () =>
+    String(
+      JSON.parse(fs.readFileSync(path.join(dir, LOCK), "utf8")).current_step,
+    );
   try {
     fs.mkdirSync(path.join(dir, ".claude/state"), { recursive: true });
+    const atSeven = () =>
+      fs.writeFileSync(
+        path.join(dir, LOCK),
+        JSON.stringify({ skill: "develop-task", current_step: 7 }) + "\n",
+      );
+    atSeven();
+    const held = run("bash", `bash "${RESTORE}" --skill finalise`, {
+      cwd: dir,
+    });
+    assert.equal(held.status, 0, held.stdout + held.stderr);
+    assert.equal(stepOf(), "7", "no --dod: the lock holds at 7");
+    const dod = path.join(dir, "task.9.dod.1.fx.md");
     fs.writeFileSync(
-      path.join(dir, LOCK),
-      JSON.stringify({ skill: "develop-task", current_step: 7 }) + "\n",
+      dod,
+      "## Verification Complete\n\n**Final Status:** ✅ ACCEPTED\n",
     );
-    const r = run("bash", `bash "${RESTORE}" --skill finalise`, { cwd: dir });
+    atSeven();
+    const r = run("bash", `bash "${RESTORE}" --skill finalise --dod "${dod}"`, {
+      cwd: dir,
+    });
     assert.equal(r.status, 0, r.stdout + r.stderr);
-    assert.equal(
-      String(
-        JSON.parse(fs.readFileSync(path.join(dir, LOCK), "utf8")).current_step,
-      ),
-      "8",
-    );
+    assert.equal(stepOf(), "8");
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -761,7 +775,7 @@ test("the Stop hook and the resume contract describe Step 7's tail in the same w
 
 // The Remaining Work Status block's position and steps-ahead list come from current_step at every
 // firing point but one: when the Stop hook re-prompts, its reason names both, and at lock 8 they
-// differ from the derivation (/finalise moves the lock there before Step 7's tail runs). The banner
+// differ from the derivation (/finalise, when it accepts, moves the lock there before Step 7's tail runs). The banner
 // doc defers to the reason there and nowhere else — scoping the exception by the lock's value made it
 // fire on the ordinary Step 7 → 8 transition too, which advances the lock before printing the block
 // (task 163, QA cycle 2 CR-1, CR-4). The doc defers without restating: its restatement had already
@@ -859,7 +873,7 @@ test("the banner doc defers to the Stop hook at a re-prompt without restating it
 });
 
 // A HALT block's position is the step that halted, not current_step. They differ at lock 8, where
-// /finalise has moved the lock before Step 7's tail runs, so a Step 7-tail HALT rendered by the
+// On an accepted DoD /finalise has moved the lock before Step 7's tail runs, so a Step 7-tail HALT rendered by the
 // current_step rule named Step 8 — the step that had not run (task 164; task.163 gate.3
 // recommendations.future). The rule is scoped to the printed block; halt_step is not its subject.
 // The Step 7 names are read off the hook, which is their one statement, so the example cannot name

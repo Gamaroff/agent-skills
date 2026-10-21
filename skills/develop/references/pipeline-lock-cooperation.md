@@ -18,7 +18,21 @@ if [ -f .claude/state/develop-pipeline.lock ]; then
 fi
 ```
 
-Replace `<this-skill-name>` with the unprefixed skill name (e.g. `create-pr`, `review-story`, `develop`, `finalise`, `commit-changes`, `create-branch`).
+Replace `<this-skill-name>` with the unprefixed skill name (e.g. `create-pr`, `review-story`, `develop`, `commit-changes`, `create-branch`).
+
+**`finalise` is the exception: it passes the DoD it just wrote, and keeps stderr.** Without `--dod`
+the helper holds the lock at 7, because a gaps outcome must not read as Step 7 done (task 222):
+
+```bash
+if [ -f .claude/state/develop-pipeline.lock ]; then
+  bash .agents/skills/finalise/references/advance-pipeline-lock.sh --skill finalise --dod "<dod-path>" || true
+fi
+```
+
+The helper advances 7 → 8 only when that DoD reads `**Final Status:** ✅ ACCEPTED`. On any other
+DoD, a missing file or no `--dod`, it holds the lock, prints the reason on stderr and exits 0. Do not
+add `2>/dev/null`: the reason is how a held lock gets explained. finalise's own block (its SKILL.md
+§ Pipeline Lock Cooperation) is the one that runs.
 
 The helper's `--skill` mode looks up the next step in its built-in mapping. Iterative loop skills (`qa-story`, `qa-task`, `qa-fix`, `review-pr`) are intentionally noops in `--skill` mode — the orchestrator manages the QA loop and advances the lock `5 → 7` itself when it transitions out of the loop. Inside the loop `current_step` stays `5` and the sub-position is the lock's `qa_phase` field (`5a|5b|5c`), which the orchestrator writes through the same `mktemp` + `mv` pattern and which the Stop hook reads (task.123). The helper never writes `qa_phase` and never moves `current_step` backwards.
 
