@@ -235,6 +235,31 @@ None identified: the change affects a default that is wrong outside this reposit
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-21
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.214.qa.1.loop-supervisor-probe-script-resolution.md](./task.214.qa.1.loop-supervisor-probe-script-resolution.md)
+- **Gate File**: [task.214.gate.1.loop-supervisor-probe-script-resolution.yml](./task.214.gate.1.loop-supervisor-probe-script-resolution.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 231 (loop-supervisor suites; adapters 43/43)
+- **Phases Verified**: 2/2
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No critical issues identified. Two advisory code-review findings came back, both routed to future work:
+- CR-1: a distinct "selector not found" error.
+- CR-2: derive the fallback literal from the constant.
+
+Three of four mutations went red; the fourth is an equivalent mutant.
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -244,6 +269,7 @@ None identified: the change affects a default that is wrong outside this reposit
 | 2026-10-21 | 1.1 | Review (8/10, after fixes): the existing override test would resolve to `.agents/skills/…` locally and `skills/…` in CI, so it now gets a temp `cwd`; added a call-count test and an injectable `exists`; dropped the wall-clock criterion; reworded the rollback trigger; linked issue #721 | review-task |
 | 2026-10-21 |  | Status → ready-for-development | review-task |
 | 2026-10-21 |  | Implemented — 5 files, 14 new tests (29 → 43 in the adapters suite) | develop |
+| 2026-10-21 |  | QA gate PASS (100/100) — 0 gating findings, 2 advisory | qa-task |
 <!-- change-log-end -->
 
 ---
