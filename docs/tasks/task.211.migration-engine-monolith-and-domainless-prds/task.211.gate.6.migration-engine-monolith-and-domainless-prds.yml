@@ -1,0 +1,65 @@
+schema: 2
+task: 'task.211.migration-engine-monolith-and-domainless-prds'
+task_title: 'Migration engine: monolith and domain-less PRDs'
+gate: PASS
+status_reason: 'Cycle 5 fixed both gate-5 findings, and a reverted fix turns a committed test red for each. The parseNameValue probe still engages (20 cases, 0 escapes). The scoped review found two low findings and no medium or high. One is promoted: a root-relative path into a dot-directory is resolved only against the file''s directory. It needs a PRD root inside a dot-directory, and the repository has none (0 hits). The other has medium confidence and stays advisory.'
+reviewer: 'QA Engineer'
+head: 'efc34f08c3322c0d781b3295eba6ad3d45a4c62b'
+updated: '2026-10-21T02:55:34Z'
+
+top_issues:
+  - id: CR-1
+    severity: low
+    file: 'shared/resources/migrate-doc-numbering.mjs'
+    finding: 'outsideReferences resolves every token that starts with "." against the file''s directory only, though its docstring limits that to ./ and ../ tokens. A root-relative path into a dot-directory is never compared at the repository root: outsideReferences("sub/notes.txt", "see .docs/prd.md", [".docs/prd.md"]) and the ${ROOT}/.docs/prd.md spelling both return [], where docs/prd.md is flagged (reproduced). Introduced in 3e6f00cb (cycle 3).'
+    suggested_action: 'Take the relative-only branch only when rest is "." or "..", or starts with "./" or "../" (/^\.\.?(?:\/|$)/). Add a must-flag row with a dot-directory source, and keep a "./prd.md" must-not row.'
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 68
+  phases_verified: 3/3
+  ci: 'SUCCESS (5 checks) @ efc34f08 — informational; gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 20
+    escaped: 0
+    notes: 'parseNameValue re-probed with --sink path and task.211.qa-fix.1.security.cases.json: verdict engages, 20 executed, 0 escaped. Run record task.211.qa.6.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'Gate-5 CR-2 fixed: frontmatterState takes 0-1 ms on 10k to 160k blanks before a fence (measured). Both linearity rows hold.'
+  reliability:
+    status: PASS
+    notes: 'Every gate-5 template spelling is flagged again (f-string, #{}, nested $(...), ${ROOT:-${PWD}}). CR-1 (low) misses a reference only under a PRD root inside a dot-directory. The default root is docs/prd, and no config, template or test in the repository uses a dot root (0 hits).'
+  maintainability:
+    status: PASS
+    notes: 'The cycle-5 fix restores the cycle-3 rule rather than adding a shape. CR-1 is a docstring/code disagreement on one condition.'
+
+recommendations:
+  immediate: []
+  future:
+    - id: CR-1
+      action: 'outsideReferences resolves every token that starts with "." against the file''s directory only, though its docstring limits that to ./ and ../ tokens, so a root-relative path into a dot-directory (.docs/prd.md, ${ROOT}/.docs/prd.md) is never compared at the repository root. Fix: take the relative-only branch only when rest is "." or "..", or starts with "./" or "../" (/^\.\.?(?:\/|$)/). Add a must-flag row with a dot-directory source, and keep a "./prd.md" must-not row.'
+      refs: ['shared/resources/migrate-doc-numbering.mjs', 'shared/resources/tests/migrate-doc-numbering.test.mjs']
+      carried_from: 'top_issues (route 2b, cycle 6)'
+    - action: 'Advisory CR-2 (medium confidence): editFrontmatter writes above a displaced block when called directly, though its docstring says it leaves one alone. planEdits refuses displaced files before calling it, so the CLI cannot reach this. Return the text unchanged unless frontmatterState is "closed".'
+      refs: ['shared/resources/migrate-doc-numbering.mjs']
+    - action: 'Step 4b cannot execute the review-prd plan/apply blocks (classified mutating); the eval gate-8 and gate-9/10 rows execute them instead.'
+      refs: ['skills/review-prd/SKILL.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

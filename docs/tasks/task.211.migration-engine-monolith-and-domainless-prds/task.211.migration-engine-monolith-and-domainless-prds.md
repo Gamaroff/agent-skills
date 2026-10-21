@@ -245,24 +245,28 @@ makes, and `migration-guard.mjs` refuses nothing it can carry.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-21
-**Quality Score**: 85/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 95/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.211.qa.5.migration-engine-monolith-and-domainless-prds.md](./task.211.qa.5.migration-engine-monolith-and-domainless-prds.md)
-- **Gate File**: [task.211.gate.5.migration-engine-monolith-and-domainless-prds.yml](./task.211.gate.5.migration-engine-monolith-and-domainless-prds.yml)
+- **Full Report**: [task.211.qa.6.migration-engine-monolith-and-domainless-prds.md](./task.211.qa.6.migration-engine-monolith-and-domainless-prds.md)
+- **Gate File**: [task.211.gate.6.migration-engine-monolith-and-domainless-prds.yml](./task.211.gate.6.migration-engine-monolith-and-domainless-prds.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 108
+- **Tests Executed**: 68
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Cycle 4's four findings are fixed, and `parseNameValue` still engages under the path probe (20 cases, 0 escaped). The scoped review of that fix found two new defects. The medium one: a path after a template the new lookback does not know (`f"{ROOT}/…"`, `#{ROOT}`, a nested `$(…)`) is skipped as absolute again (CR-1, a regression). The low one: `YAML_KEY` backtracks quadratically on a long run of spaces (CR-2).
+Both gate-5 findings are fixed and mutation-proven, and `parseNameValue` still engages under the path probe (20 cases, 0 escaped). The scoped review found two low findings. The promoted one (CR-1): a root-relative path into a dot-directory is resolved only against the file's directory, which matters only for a PRD root inside a dot-directory. The advisory one (CR-2, medium confidence): `editFrontmatter` writes above a displaced block on a direct call, which the CLI never makes.
+
+## Deferred Work
+
+- **CR-1** (LOW) — carried to gate 6 `recommendations.future` (route 2b, cycle 6): `outsideReferences` resolves a root-relative path into a dot-directory against the file's directory only
 
 ## Change Log
 <!-- change-log-start -->
@@ -283,6 +287,7 @@ Cycle 4's four findings are fixed, and `parseNameValue` still engages under the 
 | 2026-10-21 |         | QA findings fixed — cycle 4, 4 of 4 (CR-1 to CR-4), one extension helper for both scan loops, 1 test row added and 3 extended | qa-fix |
 | 2026-10-21 |         | QA gate CONCERNS (85/100) — 2 findings (1 medium, 1 low) | qa-task |
 | 2026-10-21 |         | QA findings fixed — cycle 5, 2 of 2 (CR-1, CR-2), 1 test row added and 1 extended | qa-fix |
+| 2026-10-21 |         | QA gate PASS (95/100) — 2 findings (2 low, 1 promoted) | qa-task |
 <!-- change-log-end -->
 
 ---
