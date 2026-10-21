@@ -267,3 +267,12 @@ row `[x]` the moment its task is accepted** — a phase row is matched on its ch
 The library names one consumer in what it ships: provenance notes, example Jira keys and hosts, and a format profile in the wireframe skill. This phase removes them and adds a guard so they cannot return.
 
 - [x] **T220** No consumer names in shipped skills · deps: none · touches: bundles!, jira-sync~, pipeline-steps~, finalise~, test-harness~, review-skills~ · /develop-task docs/tasks/task.220.no-consumer-names-in-shipped-skills/task.220.no-consumer-names-in-shipped-skills.md — ✅ **accepted + merged** ([PR #710](https://github.com/Gamaroff/agent-skills/pull/710), `20a95cd4`; QA PASS 100/100 after 1 cycle, DoD accepted on run 1, CI 5/5). Shipped skills and shared resources name no consumer: neutral examples and fixtures, the wireframe skill ships no format profile, and `tests/no-consumer-names.test.js` guards paths and contents over the whole shipped tree
+
+---
+
+## PHASE 13 — loop-supervisor probe follow-up (opened 2026-10-21, closed 2026-10-21)
+
+An **override**: without it the registry fallback selects T216 first, because it takes the
+lowest-numbered task. T224 closes task.214's QA findings CR-1 and CR-2 while that code is fresh.
+
+- [x] **T224** loop-supervisor: say when the probe script is not found · deps: none · touches: loop-supervisor! · /develop-task docs/tasks/task.224.loop-supervisor-probe-not-found/task.224.loop-supervisor-probe-not-found.md — ✅ **accepted + merged** ([PR #724](https://github.com/Gamaroff/agent-skills/pull/724), `2c7bb8a4`; QA PASS 100/100 after 4 cycles, DoD accepted on run 1, CI 5/5). A missing probe script now reports the paths searched, or a missing configured `probeScript` by its config key, instead of "probe produced no output"; existence follows Node main-module resolution, re-checked on disk at each probe; the adapter table derives its default from `DEFAULT_PROBE_SCRIPT`

@@ -5,7 +5,7 @@ How to use this document: work top to bottom. Only `[ ]` rows are candidates; `[
 [`roadmap-history.md`](./roadmap-history.md), so a `deps:` entry naming no current row means
 _already shipped_, not an error. Resolve any such reference there.
 
-**Phases 1 through 12 are complete and archived** to
+**Phases 1 through 13 are complete and archived** to
 [`roadmap-history.md`](./roadmap-history.md) — resolve any `deps:` naming a row you cannot find here
 against that file. The rows under "Deferred / human-gated" remain invisible to selection.
 
@@ -20,7 +20,7 @@ finished work. Rules:
 §"Registry fallback frontier".
 
 Add a phase only to express *sequencing* the registries cannot: a deliberate order, a dependency
-chain, a human gate. **Phase 13 is open** (opened 2026-10-21, T224); once it closes, selection falls through to the registries again.
+chain, a human gate. No phase is open (Phase 13 closed 2026-10-21); selection falls through to the registries.
 
 > ⚠️ **A phase costs upkeep that a registry row does not, and the cost is not obvious.** Roadmap rows
 > are matched on the **checkbox alone** — they do **not** consult the target document's frontmatter.
@@ -69,15 +69,6 @@ Read only by `--batch`. Two rows conflict when they share a tag that **either** 
 
 ---
 
-## PHASE 13 — loop-supervisor probe follow-up (opened 2026-10-21)
-
-An **override**: without it the registry fallback selects T216 first, because it takes the
-lowest-numbered task. T224 closes task.214's QA findings CR-1 and CR-2 while that code is fresh.
-
-- [ ] **T224** loop-supervisor: say when the probe script is not found · deps: none · touches: loop-supervisor! · /develop-task docs/tasks/task.224.loop-supervisor-probe-not-found/task.224.loop-supervisor-probe-not-found.md
-
----
-
 ## Deferred / human-gated
 
 Rows here are invisible to selection. Move a row up into a phase when it becomes actionable.
@@ -89,7 +80,7 @@ Rows here are invisible to selection. Move a row up into a phase when it becomes
 
 ## Housekeeping
 
-- [x] Archive accepted rows to `roadmap-history.md` at each phase close — Phase 5 archived 2026-09-12; Phases 6, 7 and 8 archived 2026-10-06; Phases 9 and 10 archived 2026-10-11; Phase 11 archived 2026-10-16; Phase 12 archived 2026-10-20
+- [x] Archive accepted rows to `roadmap-history.md` at each phase close — Phase 5 archived 2026-09-12; Phases 6, 7 and 8 archived 2026-10-06; Phases 9 and 10 archived 2026-10-11; Phase 11 archived 2026-10-16; Phase 12 archived 2026-10-20; Phase 13 archived 2026-10-21
 - [ ] If a phase is ever re-opened: tick its rows `[x]` as each item is accepted — an unticked row for an accepted item is still selected and stalls the loop
 
 **Registry-selected items need no row here.** When selection falls through to the registries (the
@@ -206,3 +197,5 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-10-21 | **T211 accepted + merged — PR #712 merged** (`39f93d64`), selected from the registry with no phase open. `migrate-doc-numbering.mjs` now migrates the three legacy PRD shapes that T204's guard refused: a PRD with no frontmatter, a `docs/prd.md` linked from outside the PRD root, and a domain-less PRD (`--name <path>=<domain>/<slug>`). `skills/review-prd/scripts/migration-guard.mjs` is deleted. Its refusals become four engine blockers: `unclosed-frontmatter`, `displaced-frontmatter`, `stale-reference` and `needs-domain`. QA ran 6 cycles. The loop escalated at its 5-cycle budget, and one operator-granted cycle reached PASS 95/100 on route 2b. 5c APPROVE. DoD accepted 10/10, with AC8 judged per fix as the task defines it. 31 probes, 0 reproduced. CI 5/5. Issue #676 closed. Low follow-ups: CR-1 (dot-directory root-relative path), CR-2 (`editFrontmatter` on a displaced block) and PC-1 (task §3 Target omits two blocker codes). |
 | 2026-10-21 | **T221 accepted + merged — PR #714 merged** (`93d7c00b`), selected from the registry with no phase open. It closes T211's CR-1 and CR-2 in `migrate-doc-numbering.mjs`. CR-1: `outsideReferences` now also resolves a token that does not start with `./` or `../` at the repository root, so a dot-directory path such as `.docs/prd.md` or `${ROOT}/.docs/prd.md` raises the stale-reference blocker. CR-2: `editFrontmatter` leaves a displaced or unclosed block byte-for-byte unchanged. Each fix was test-first and mutation-proven (engine suite 70/70). QA ran 1 cycle: PASS 100. 5c APPROVE. DoD run 1 accepted 12/12; the security pass judged that nothing delivered is a boundary. CI 5/5 on the merged head. Issue #713 closed. Low follow-up: `linkPass` drops the `./` prefix when it rewrites a `./.docs/x.md` link. This was already on develop, and the target still resolves. (T211's PC-1 was fixed separately in `47ddcc92`.) |
 | 2026-10-21 | **Phase 13 opened** with T224 (task.214 QA CR-1 and CR-2), ordered ahead of the registry fallback, which would otherwise select T216 first. |
+| 2026-10-21 | **T224 accepted + merged — PR #724 merged** (`2c7bb8a4`). The loop-supervisor probe says when its script is missing. `probeMissing()` in `adapters.js` reports `probe script not found:` with the three paths searched, or names a missing configured `probeScript` and its config key; `runProbe` checks it before spawning. Existence follows Node main-module resolution (`require.resolve` then a fresh `fs.existsSync`, so a script deleted mid-run reads as missing), and the adapter table derives both defaults from `DEFAULT_PROBE_SCRIPT`. QA ran 4 cycles: CONCERNS 90 (no spawned present-script test), CONCERNS 90 (existence stricter than Node), PASS 100 with QA-3 open (stale `require.resolve` cache), then PASS 100. 5c CONCERNS (two implementation-report trail findings, fixed). DoD run 1 accepted 12/12; the security pass judged nothing delivered a boundary. Merge gate `npm run ci` green (6193 tests); CI satisfied as tree-equivalent to `0111e31e`. Issue #723 closed. Advisory follow-up: CR-1 (a stale hit hides a replacement candidate that appears later). |
+| 2026-10-21 | **Phase 13 closed and archived** to `roadmap-history.md` (T224 was its only row). No phase is open; selection falls through to the registries (next: T216). |
