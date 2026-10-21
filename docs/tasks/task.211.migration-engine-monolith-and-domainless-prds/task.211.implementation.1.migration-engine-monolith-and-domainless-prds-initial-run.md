@@ -3,7 +3,7 @@
 **Task**: `task.211.migration-engine-monolith-and-domainless-prds.md`
 **Run Number**: 1
 **Started**: 2026-10-21 00:25
-**Status**: Escalated
+**Status**: Completed
 
 ---
 
@@ -36,9 +36,9 @@ Fix the three migrate-doc-numbering.mjs engine defects found in task.204 gate 8 
 | 2. review-task             | ✅ Done    | `task.211.review.{N}.{name}.md` exists (or skip logged)                | `task.211.review.1.…` — READY TO IMPLEMENT 8/10; Planned → Ready for Development | —                    | 2026-10-21T00:24Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline; 12/12 phases; ci:fast 6075 pass / 0 fail; 10 mutations red | `.summaries/step-3-iteration-audit.json` | 2026-10-21T00:40Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #712: https://github.com/Gamaroff/agent-skills/pull/712 | —                    | 2026-10-21T00:42Z |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.211.qa.{N}.*.md`; `task.211.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.211.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.211.qa.{N}.*.md`; `task.211.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 6 cycles (cycle 6 granted after loop limit); gate 6 PASS 95, route 2b; 5c APPROVE | —                    | 2026-10-21T03:01Z |
+| 7. finalise                | ✅ Done    | `task.211.dod.{N}.*.md`; task `status: accepted`                       | `task.211.dod.1.…` ACCEPTED; acceptance commit `8e93c47d`; CI reading 2 SUCCESS; #676 closed | —                    | 2026-10-21T03:16Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Implementation report committed and pushed | —                    | 2026-10-21T03:17Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -113,6 +113,25 @@ Fix the three migrate-doc-numbering.mjs engine defects found in task.204 gate 8 
 - Narrowing residue — every MEDIUM on gates 4 and 5 names shared/resources/migrate-doc-numbering.mjs; HIGH 0 on both. This is an OFFER to qa-fix Step 2.6, not a route and not an escalation.
 - QA Cycle 5 — changes-requested: stage-disabled.
 - Loop limit: budget spent after the cycle-5 fix `bce90253`. Gate-the-last-fix half-cycle (route 2c) evaluated with budgetSpent: continue (medium-not-falling) — MEDIUM reads 2, 1, 1 over cycles 3–5. Escalated.
+- QA loop re-entry: 1 extra cycle granted; 0 cycle(s) run outside the loop back-filled from disk. Operator chose "Resume at 5a with 1 more cycle" on re-invocation. The lock survived the escalation (no halt snapshot on disk); `grant-qa-cycles.sh` wrote `qa_max_cycles` 6, `qa_phase` 5a.
+- QA cycle 6 (granted): qa-task scoped to the 9 files changed since gate 5 head ca1c5bf5 (safety re-probe not triggered), `code_review_blocking=true`. No traceability matrix (the task's Success Criteria is a list, not a table — as in cycles 1–5). Diff reviewer (Explore) returned 2 low findings in 134169 ms; QA reproduced both on HEAD. Security probe recorded (`task.211.qa.6.security.run.json`, 20 executed, 0 escaped). Both cycle-5 fixes mutation-proven (covered). Gate PASS 95/100.
+- Convergence check: HIGH 0 ×6 — does not trip. Route classifier: cosmetic-residue (route 2b) — CR-1 (LOW) carried to gate 6 `recommendations.future` and to the task's `## Deferred Work` → 5c.
+- QA Cycle 6 — 5c: `/review-pr --effort medium --comment --no-code` → APPROVE (`task.211.pr-review.1.migration-engine-monolith-and-domainless-prds.md`; PR summary comment posted). One LOW conformance finding (PC-1) recorded, not fixed — the verdict is APPROVE, so nothing is fixed at 5c. GitHub #676 — ready-for-merge: stage-disabled.
+
+### Step 7 — Finalise — 2026-10-21
+
+- `/finalise` invoked. Four DoD agents were dispatched in parallel. Results: AC PARTIAL (9/10), security PASS, compliance NOT_APPLICABLE, docs PASS.
+- AC8 ("every new row is mutation-proven"): the agent returned FAIL on a per-row reading. The orchestrator judged it met under the task's §8 definition ("revert each fix and name the row that goes red"), backed by the per-cycle mutation records (develop 10, cycles 1–6: 9, 11, 9, 7, 3, 2; all red or acted on). The DoD summary records this as a deviation, not as the agent's verdict.
+- Security probe run by /finalise from the agent's plan: `parseNameValue`, `--sink path`, 31 cases. Result: engages, 0 reproduced, 0 escaped. Record: `task.211.dod.1.security.run.json`.
+- DoD summary: `docs/tasks/task.211.migration-engine-monolith-and-domainless-prds/task.211.dod.1.migration-engine-monolith-and-domainless-prds.md` (ACCEPTED). Task `status: accepted`, Change Log row 1.2. Registry row 211 `ticked` (planned → accepted). Sprint review summary written.
+- Acceptance commit `8e93c47d` (`docs(task.211): accept — DoD, sprint review; registry ticked; 5c review carried (#676)`). It carried the 5c PR review report and the DoD probe record. Pushed. 6b assertions passed (tracked, on origin, `status: accepted` on origin). 6d: CHANGELOG `[Unreleased]` cites task 211.
+- CI reading 1: SUCCESS @ ee713f35c8eb (5 checks); CI reading 2: SUCCESS (tree-equivalent to ee713f35c8eb) @ 8e93c47d23a3 (5 checks, after 30s). The head's own rollup also read 5/5 SUCCESS once its run finished.
+- The first CI-poll waiter exited early because the orchestrator wrote the wrong PID to the pidfile (pgrep matched the wrapper shell, not the poll). The poll itself was still running. The pidfile was corrected and the result was read from the poll's own file.
+- DoD body posted to PR: https://github.com/Gamaroff/agent-skills/pull/712#issuecomment-6307127805 (canonical summary, marker comment, new).
+- GitHub issue #676: Document link already on `develop` (no re-point needed). Comment `posted`. Close: CLOSED ✅ (confirmed with `gh issue view`).
+- Board transition: `gh-stage.js --stage done` returned `already` (card in Done).
+- Accept gap: the tracker journal is empty, so there is no tracker debt.
+- Task completed: task.211 accepted.
 
 ---
 
@@ -124,6 +143,8 @@ _Problems encountered and how they were resolved or escalated._
 
 
 ### QA Loop Limit Reached — 2026-10-21
+
+> **Superseded (history).** On re-entry the operator granted 1 extra cycle. Gate 6 at `efc34f08` passed (95/100) and the loop left on route 2b. The record below describes the escalation as it stood then.
 
 The pipeline completed 5 qa-task/qa-fix cycles without a clean PASS. The gate-the-last-fix half-cycle was considered and declined: `medium-not-falling` (MEDIUM 2, 1, 1 over cycles 3–5), so the cycle-5 fix (`bce90253`) has not been gated.
 
@@ -205,14 +226,26 @@ _Track each QA review/fix cycle._
 **Action**: Escalating — loop limit reached
 **Fix result**: 2 of 2 fixed. Step 2.6 narrowing offer answered with **patch**, with a stated reason: CR-1 reverts the cycle-4 over-reach rather than adding a shape. A path after `}` or `)` is rooted whatever opened it, as in cycle 3; `VARIABLE_BEFORE` now decides only the quoted case and names the variable for the non-repository check. CR-2: `[ \t]*` kept only after the quoted keys, so `YAML_KEY` is linear. 1 new row (YAML linearity) and 1 extended (4 must-flag, 1 must-not); 3 mutations, all red. ci:fast 6103 tests 0 fail (`.agents/skills` aside), eval:all 0, bundle:check 0 problems, validate review-prd ok.
 
+### QA Cycle 6 — 2026-10-21
+**Gate Result**: PASS (95/100)
+**Issues Found**: 2. CR-1: a root-relative path into a dot-directory is resolved against the file's directory only (low, promoted). CR-2: editFrontmatter writes above a displaced block on a direct call (low, medium confidence, advisory).
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: APPROVE — `task.211.pr-review.1.migration-engine-monolith-and-domainless-prds.md` (conformance lens only, `--no-code`); 1 finding recorded, not fixed: PC-1 (scope, low, medium confidence) — the task's §3 Target names only `unclosed-frontmatter` and `needs-domain`, not the shipped `displaced-frontmatter` and `stale-reference` blocker codes
+**Carried to 6a**: docs/tasks/task.211.migration-engine-monolith-and-domainless-prds/task.211.pr-review.1.migration-engine-monolith-and-domainless-prds.md
+**Loop exit**: Cosmetic-residue exit taken — PASS gate at cycle 6 with HIGH 0 for cycles 5 and 6; all 1 open findings are LOW and are carried to the gate's recommendations.future by id (CR-1). This is a CLEAN exit, not a stall: nothing is blocked and nothing is being accepted over; a full qa-fix cycle for cosmetic findings is what this route exists to avoid.
+**Action**: Proceeding to 5c (PR conformance review)
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-10-21 03:17 UTC
+**Final Status**: Completed
 **Branch**: feature/task.211.migration-engine-monolith-and-domainless-prds
 **PR**: https://github.com/Gamaroff/agent-skills/pull/712
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 6 (5 within the loop limit, plus 1 granted on re-entry)
+**DoD Summary**: `docs/tasks/task.211.migration-engine-monolith-and-domainless-prds/task.211.dod.1.migration-engine-monolith-and-domainless-prds.md` (ACCEPTED)
+**Tracker debt**: none
+
+**Completion Summary**: The task changed `migrate-doc-numbering.mjs` so that it migrates three legacy PRD shapes review-prd's guard used to refuse: a PRD with no frontmatter, a `docs/prd.md` that files outside the PRD root link to, and a PRD with no domain. `migration-guard.mjs` is deleted. Its refusals are now four engine blockers (`unclosed-frontmatter`, `displaced-frontmatter`, `stale-reference` and `needs-domain`) and one `--name <path>=<domain>/<slug>` check, `parseNameValue`. The QA loop took six cycles. HIGH was 0 every cycle, and MEDIUM went 3, 3, 2, 1, 1, 0. Cycles 2–5 refined the stale-reference path heuristic. Cycle 5 hit the loop limit and the run escalated. The operator granted one more cycle, which gated the cycle-5 fix at PASS 95/100 and left on the cosmetic-residue route. Notable decisions: QA findings were consolidated rather than patched (one `outsideReferences` tokeniser, one stale-scan predicate, one extension test). The orchestrator judged AC8 met per fix rather than per row, and recorded that in the DoD. Three low follow-ups are open: CR-1, CR-2 and PC-1.
