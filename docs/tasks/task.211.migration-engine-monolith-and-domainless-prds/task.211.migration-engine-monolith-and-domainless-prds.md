@@ -102,8 +102,11 @@ makes, and `migration-guard.mjs` refuses nothing it can carry.
 - The L3 monolith (`docs/prd.md`) is never domain-less: today its slug doubles as its domain
   (`${PRD_ROOT}/<slug>/prd.{P}.<slug>/`), and the bare `<path>=<slug>` form keeps that. Given
   `<path>=<domain>/<slug>`, it is placed at `${PRD_ROOT}/<domain>/prd.{P}.<slug>/` like any other PRD.
-- `unclosed-frontmatter` and `needs-domain` join the exported `BLOCKER_CODES` and the module's
-  blocker-code comment.
+- `unclosed-frontmatter`, `displaced-frontmatter`, `needs-domain` and `stale-reference` join the
+  exported `BLOCKER_CODES` and the module's blocker-code comment. `displaced-frontmatter` covers a
+  `---` block of YAML keys after a BOM or blank lines, which no reader sees. `stale-reference` covers
+  an outside move source named by a path neither pass rewrites: a relative path outside a link, any
+  path in a file type the passes skip, or a variable-rooted path. QA cycles 1–5 added both codes.
 - review-prd's plan block asks for `<domain>/<slug>` on `needs-domain`, and `migration-guard.mjs`
   drops each code as its shape is carried.
 
@@ -146,6 +149,7 @@ makes, and `migration-guard.mjs` refuses nothing it can carry.
 
 - [x] `editFrontmatter` creates a block when the file has none; an unclosed fence is a plan blocker.
 - [x] Engine rows: a frontmatter-less monolith and a frontmatter-less L1 PRD migrate and pass post-check; an unclosed fence blocks.
+- [x] A closed `---` block of YAML keys after a BOM or blank lines is a `displaced-frontmatter` plan blocker, and `--apply` moves and writes nothing (QA cycles 1, 3 and 4).
 - [x] Remove `no-frontmatter` from `migration-guard.mjs`; update task.204's gate-8 row.
 
 ### Phase 2: Outside links (Medium risk)
@@ -155,6 +159,7 @@ makes, and `migration-guard.mjs` refuses nothing it can carry.
 - [x] Engine rows: both links re-pointed; a file that names neither is untouched; `links.rewritten` counts them.
 - [x] Engine row (holds the Performance criterion): with a counting `io.readFile`, an outside `.md` that names
   `docs/prd.md` is read and an outside `.md` that names neither the root nor the source is not.
+- [x] A mention of an outside move source that neither pass rewrites is a `stale-reference` plan blocker, and `--apply` moves nothing. The mention can be a relative path outside a link, a path in a file type the passes skip, or a variable-rooted path. `outsideReferences` decides, over every in-scope tracked text file (QA cycles 1–5).
 - [x] Remove `outside-links` from `migration-guard.mjs`.
 
 ### Phase 3: Domain (Medium risk)
@@ -296,7 +301,6 @@ All Definition of Done criteria have been verified:
 **Detailed Verification Log:** See `task.211.dod.1.migration-engine-monolith-and-domainless-prds.md` for the complete verification evidence and timestamps.
 
 **Task marked as ACCEPTED on:** 2026-10-21
-
 <!-- change-log-start -->
 ## Change Log
 
@@ -318,6 +322,7 @@ All Definition of Done criteria have been verified:
 | 2026-10-21 |         | QA findings fixed — cycle 5, 2 of 2 (CR-1, CR-2), 1 test row added and 1 extended | qa-fix |
 | 2026-10-21 |         | QA gate PASS (95/100) — 2 findings (2 low, 1 promoted) | qa-task |
 | 2026-10-21 | 1.2 | DoD verified — accepted (PR #712) | finalise |
+| 2026-10-21 | 1.3 | §3 Target and Phase 1/2 checklists name the shipped displaced-frontmatter and stale-reference blockers (PR review PC-1) | manual |
 <!-- change-log-end -->
 
 ---
