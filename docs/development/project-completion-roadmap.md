@@ -20,7 +20,7 @@ finished work. Rules:
 §"Registry fallback frontier".
 
 Add a phase only to express *sequencing* the registries cannot: a deliberate order, a dependency
-chain, a human gate. No phase is open (Phase 15 closed 2026-10-22); selection falls through to the registries.
+chain, a human gate. Phase 16 is open (opened 2026-10-22); once it closes, selection falls through to the registries.
 
 > ⚠️ **A phase costs upkeep that a registry row does not, and the cost is not obvious.** Roadmap rows
 > are matched on the **checkbox alone** — they do **not** consult the target document's frontmatter.
@@ -66,6 +66,15 @@ Read only by `--batch`. Two rows conflict when they share a tag that **either** 
 | `mutation-proving` | `shared/resources/mutation-proving.md`                                  |
 | `docs-pipeline`    | `docs/runbooks/*`, `docs/concepts/*`, `docs/reference/pipeline-artifacts.md`, `docs/operations/workflows.md`, `skills/develop-*/README.md` |
 | `pipeline-lock`    | `shared/resources/advance-pipeline-lock.sh`, `advance-pipeline-lock.test.sh`  |
+
+## PHASE 16 — change-log block holds only the log (opened 2026-10-22)
+
+An **override**: without it the registry fallback selects T217 first, because it takes the
+lowest-numbered task. T230 fixes observation #91 while the T229 run that found it is fresh:
+`change-log.js` folds a sibling section written inside the change-log markers into the log, and
+task.166, 170, 175 and 203 already carry a DoD section there.
+
+- [ ] **T230** Keep foreign sections out of the change-log block · deps: none · touches: change-log!, pipeline-steps~, bundles~ · /develop-task docs/tasks/task.230.change-log-block-foreign-sections/task.230.change-log-block-foreign-sections.md
 
 ## Deferred / human-gated
 
@@ -204,3 +213,4 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-10-22 | **T228 accepted + merged — PR #732 merged** (`74d12118`). The testing guide’s two sample tokens became a `<header>.<payload>.<signature>` placeholder; a comment in `scripts/setup-consumer.sh` and one line of the task.60 review were reworded. `gitleaks dir .` (8.30.1, `--redact`) now finds nothing in a tracked file; the only hits are scratch files under the gitignored `.claude/`. QA ran 1 cycle: PASS 100, 0 bugs, 1 advisory (CR-1). 5c APPROVE. DoD run 1 found 2 gaps (the scan criteria had no per-PR lane); the owner moved that guard to T229, which now also scans commit messages and PR text. DoD run 2 accepted 11/11. Merge gate `npm run ci` green (6187 pass). CI 5/5. Issue #730 closed. |
 | 2026-10-22 | **T229 accepted + merged — PR #733 merged** (`9cd7f1a6`). A `Secret scan` CI lane and its local twin `npm run lint:secrets` (`scripts/lint-secrets.sh`, pinned gitleaks 8.30.1) now run on every PR. They scan the tracked tree, the PR range's commit messages and the PR body, run a planted-token self-check first, tell a scanner error from a leak, and print file, line and rule only (`--redact`). Rules are pinned with `--config`, the ignore list is pinned empty, and the stdin scans run outside the repository, so a PR cannot silence them with a tracked `.gitleaks.toml` or `.gitleaksignore`. The threat model is accidental commits: a PR runs its own workflow. QA ran 4 cycles: CONCERNS 80, FAIL 70, CONCERNS 90, PASS 96 (route 2b). 5c APPROVE. DoD run 1 accepted 15/15; the DoD probe ran 11 candidates with 0 reproduced and 0 escaped. Merge gate `npm run ci` green (6221 tests, 0 failed). CI 5/5. Issue #731 closed. Low follow-ups: CR-1/CR-2 (the tree-scan copy can still read a tracked `.gitleaksignore`; not exploitable), PC-2/PC-3 (task planning sections lag the pins and the `edited` trigger). |
 | 2026-10-22 | **Phase 15 closed and archived** to `roadmap-history.md` (T228 and T229). No phase is open; selection falls through to the registries (next: T217). |
+| 2026-10-22 | **Phase 16 opened** with T230 (keep foreign sections out of the change-log block, cut from observation #91), ordered ahead of the registry fallback at the owner's request; without it T217 is selected first. |

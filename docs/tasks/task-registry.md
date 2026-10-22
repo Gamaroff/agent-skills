@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-10-22
-**Next Available Task Number:** **230**
+**Next Available Task Number:** **231**
 
 ## How to use
 
@@ -271,6 +271,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 227 | [Step 8: move the state-file removals out of the Completion Checklist](task.227.step-8-checklist-no-rm/task.227.step-8-checklist-no-rm.md) | planned | infrastructure | Medium | 2026-10-22 | [#728](https://github.com/Gamaroff/agent-skills/issues/728) | — cut from observation #87 (T216 run: the host refused the checklist block over its `rm` lines) |
 | 228 | [Replace the sample tokens gitleaks flags in tracked files](task.228.fake-sample-tokens-gitleaks/task.228.fake-sample-tokens-gitleaks.md) | accepted | documentation | High | 2026-10-22 | [#730](https://github.com/Gamaroff/agent-skills/issues/730) | — downstream handoff: a consumer's gitleaks scan fails on the vendored testing guide |
 | 229 | [Secret-scan CI lane over tracked files](task.229.secret-scan-ci-lane/task.229.secret-scan-ci-lane.md) | accepted | infrastructure | Medium | 2026-10-22 | [#731](https://github.com/Gamaroff/agent-skills/issues/731) | task.228 |
+| 230 | [Keep foreign sections out of the change-log block](task.230.change-log-block-foreign-sections/task.230.change-log-block-foreign-sections.md) | planned | refactoring | Medium | 2026-10-22 | [#734](https://github.com/Gamaroff/agent-skills/issues/734) | — cut from observation #91 (T229 run: Deferred Work landed inside the change-log markers and change-log.js absorbed it) |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
