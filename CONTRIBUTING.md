@@ -127,7 +127,7 @@ needs one each.
 `.github/workflows/secret-scan.yml`) over the tracked files, the PR's commit messages and its body, and
 fails on a secret-shaped string. `npm run lint:secrets` (`scripts/lint-secrets.sh`) is its local twin —
 the workflow calls it, so the file set is the same — and skips loudly when no `gitleaks` binary is
-installed. Before scanning it plants a token generated at runtime and fails if the scanner misses it,
+installed. Before scanning it plants a token generated at runtime and fails if the scanner misses three of them,
 so a green result is never the scanner's silence. A sample value that trips it is reworded (task 228),
 or carries `gitleaks:allow` with a reason on the same line; there is no path allowlist. A local binary
 of another version may disagree with CI; CI's pin is the authority.

@@ -30,6 +30,12 @@
  *   7. Every scanner invocation carries `--redact`.
  *   8. A range whose base is all zeros (a new-branch push) skips the
  *      commit-message scan and still passes.
+ *   9. One missed self-check plant is retried; a scanner that misses all
+ *      three plants fails (QA cycle 1, QA-1).
+ *  10. A scanner error (exit 1, as gitleaks exits on a fatal error) is never
+ *      read as a caught plant or a found secret (QA cycle 1, CR-1).
+ *  11. A range base missing from the checkout (a force-push) skips the
+ *      message scan loudly (CR-2).
  *
  * PATH is replaced, not amended: a temp bin directory holding symlinks to the
  * externals the script calls and, where a case needs it, the stub. `command -v`
@@ -42,7 +48,9 @@
  * Run: node --test evals/shared/tests/lint-secrets.test.mjs
  * Mutations that must go red: delete the self-check block in
  * scripts/lint-secrets.sh → case 2 fails; drop `--redact` from GL_FLAGS →
- * case 7 fails; delete the empty-list guard → case 6 fails.
+ * case 7 fails; delete the empty-list guard → case 6 fails; set LEAK_RC=1 →
+ * the scanner-error cases fail; drop the retry loop → the second-plant case
+ * fails; delete the cat-file guard → the force-push case fails.
  */
 
 import { test } from "node:test";
@@ -82,6 +90,7 @@ const TOOLS = [
   "sed",
   "cat",
   "find",
+  "grep",
 ];
 
 function which(name) {
@@ -96,24 +105,38 @@ function which(name) {
 
 /**
  * The stub: logs every invocation's arguments to $STUB_LOG, lists the files of
- * a tree scan to $STUB_TREE, copies stdin to $STUB_STDIN, and exits per mode:
- *   STUB_CATCH_SELFCHECK=1  exit 1 for the self-check dir (a working scanner)
- *   STUB_FAIL_TREE=1        exit 1 for the tree scan
- *   STUB_FAIL_STDIN=1       exit 1 for every stdin scan
+ * a tree scan to $STUB_TREE, copies stdin to $STUB_STDIN, and exits per mode.
+ * A "leak" exits with the value the script passed as --exit-code, as the real
+ * binary does; a scanner ERROR exits 1, as the real binary does on a fatal
+ * error — so a script that used 1 for leaks could not tell the two apart.
+ *   STUB_CATCH_SELFCHECK=1      leak for every self-check dir (a working scanner)
+ *   STUB_CATCH_SELFCHECK=second clean for the first self-check, leak after (one unlucky plant)
+ *   STUB_FAIL_TREE=1            leak for the tree scan
+ *   STUB_FAIL_STDIN=1           leak for every stdin scan
+ *   STUB_ERROR=selfcheck|tree   exit 1 (a scanner error) for that scan
  */
 const STUB = `#!/usr/bin/env bash
 printf '%s\\n' "$*" >> "$STUB_LOG"
+leak=1; prev=""
+for a in "$@"; do [ "$prev" = --exit-code ] && leak=$a; prev=$a; done
 case "$1" in
   version) echo "0.0.0-stub"; exit 0 ;;
   dir)
     case "$2" in
-      */selfcheck) [ "\${STUB_CATCH_SELFCHECK:-}" = 1 ] && exit 1; exit 0 ;;
+      */selfcheck)
+        [ "\${STUB_ERROR:-}" = selfcheck ] && { echo "stub: fatal" >&2; exit 1; }
+        case "\${STUB_CATCH_SELFCHECK:-}" in
+          1) exit "$leak" ;;
+          second) [ "$(grep -c '^dir .*/selfcheck' "$STUB_LOG")" -ge 2 ] && exit "$leak"; exit 0 ;;
+        esac
+        exit 0 ;;
       *) (cd "$2" && find . -type f) > "$STUB_TREE"
-         [ "\${STUB_FAIL_TREE:-}" = 1 ] && exit 1; exit 0 ;;
+         [ "\${STUB_ERROR:-}" = tree ] && { echo "stub: fatal" >&2; exit 1; }
+         [ "\${STUB_FAIL_TREE:-}" = 1 ] && exit "$leak"; exit 0 ;;
     esac ;;
   stdin)
     cat >> "$STUB_STDIN"; printf '\\n--\\n' >> "$STUB_STDIN"
-    [ "\${STUB_FAIL_STDIN:-}" = 1 ] && exit 1; exit 0 ;;
+    [ "\${STUB_FAIL_STDIN:-}" = 1 ] && exit "$leak"; exit 0 ;;
 esac
 exit 0
 `;
@@ -307,6 +330,91 @@ test("lint-secrets.sh — every scanner invocation carries --redact", () => {
     );
     for (const c of calls)
       assert.match(c, /(^| )--redact( |$)/, `missing --redact: ${c}`);
+  } finally {
+    sb.cleanup();
+  }
+});
+
+test("lint-secrets.sh — one missed plant is retried: a scanner that catches the second plant passes", () => {
+  const sb = sandbox();
+  try {
+    const r = run(sb, { STUB_CATCH_SELFCHECK: "second" });
+    assert.equal(r.status, 0, show(r));
+    assert.match(r.stdout, /self-check: planted token caught/, show(r));
+    const selfchecks = scans(sb).filter((l) => /^dir .*\/selfcheck /.test(l));
+    assert.equal(
+      selfchecks.length,
+      2,
+      `expected 2 plants:\n${selfchecks.join("\n")}`,
+    );
+  } finally {
+    sb.cleanup();
+  }
+});
+
+test("lint-secrets.sh — a scanner that misses every plant is scanned three times, then fails", () => {
+  const sb = sandbox();
+  try {
+    const r = run(sb);
+    assert.equal(r.status, 1, show(r));
+    const selfchecks = scans(sb).filter((l) => /^dir .*\/selfcheck /.test(l));
+    assert.equal(
+      selfchecks.length,
+      3,
+      `expected 3 plants:\n${selfchecks.join("\n")}`,
+    );
+  } finally {
+    sb.cleanup();
+  }
+});
+
+test("lint-secrets.sh — a scanner error in the self-check is an error, never a caught plant", () => {
+  const sb = sandbox();
+  try {
+    const r = run(sb, { STUB_ERROR: "selfcheck" });
+    assert.equal(r.status, 1, show(r));
+    assert.match(
+      r.stderr,
+      /gitleaks failed \(exit 1\) during the self-check/,
+      show(r),
+    );
+    assert.doesNotMatch(r.stdout, /planted token caught/, show(r));
+    assert.equal(
+      read(sb.tree),
+      "",
+      "the tree must not be scanned after a scanner error",
+    );
+  } finally {
+    sb.cleanup();
+  }
+});
+
+test("lint-secrets.sh — a scanner error in the tree scan is reported as an error, not a found secret", () => {
+  const sb = sandbox();
+  try {
+    const r = run(sb, { STUB_CATCH_SELFCHECK: "1", STUB_ERROR: "tree" });
+    assert.equal(r.status, 1, show(r));
+    assert.match(
+      r.stderr,
+      /gitleaks failed \(exit 1\) during the tracked-file scan/,
+      show(r),
+    );
+    assert.doesNotMatch(r.stderr, /secret-shaped string/, show(r));
+  } finally {
+    sb.cleanup();
+  }
+});
+
+test("lint-secrets.sh — a range base missing from the checkout (force-push) skips the message scan loudly", () => {
+  const sb = sandbox();
+  try {
+    const r = run(sb, {
+      STUB_CATCH_SELFCHECK: "1",
+      STUB_FAIL_STDIN: "1", // would fail if the message scan ran
+      SECRET_SCAN_RANGE: `${"ab".repeat(20)}..HEAD`,
+    });
+    assert.equal(r.status, 0, show(r));
+    assert.match(r.stdout, /base of .* is not in this checkout/, show(r));
   } finally {
     sb.cleanup();
   }

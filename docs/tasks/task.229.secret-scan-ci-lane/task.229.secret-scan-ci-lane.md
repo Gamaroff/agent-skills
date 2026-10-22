@@ -409,6 +409,30 @@ test would then fail on the orphaned `lint:secrets`. Revert as a whole.
 **Critical**: the lane blocks every PR. **Non-critical**: one false positive.
 
 ---
+
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-22
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.229.qa.1.secret-scan-ci-lane.md](./task.229.qa.1.secret-scan-ci-lane.md)
+- **Gate File**: [task.229.gate.1.secret-scan-ci-lane.yml](./task.229.gate.1.secret-scan-ci-lane.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 6210 (`ci:fast`), plus 11 probe cases
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+- CR-1 (medium): gitleaks' error exit equals the leak exit, so a crash reads as a leak and passes the self-check.
+- QA-1 (medium): the random self-check plant is missed ~1 run in 100 and fails clean trees.
+- Advisory: CR-2 (force-pushed base absent), CR-3 (PR body edits not rescanned).
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -419,6 +443,8 @@ test would then fail on the orphaned `lint:secrets`. Revert as a whole.
 | 2026-10-22 | 1.2 | Review passed (8/10) — specified the PR text scan inputs (env-only, fetch-depth 0), added lint-secrets.test.mjs for the exit paths, widened the doc sweep (SECURITY.md, tech-stack.md, coding-standards.md), acknowledged the pre-commit hook pin, filtered deleted tracked files | review-task |
 | 2026-10-22 |  | Status → ready-for-development | review-task |
 | 2026-10-22 |  | Implemented — 15 files (3 new), 9 new tests (8 lint-secrets, 1 release-ci-verdict) | develop |
+| 2026-10-22 |  | QA gate CONCERNS (80/100) — 2 findings | qa-task |
+| 2026-10-22 |  | QA findings fixed — cycle 1, 4 findings (CR-1 leak exit 99, QA-1 self-check retries 3 plants, CR-2 force-push skip, CR-3 edited trigger) | qa-fix |
 <!-- change-log-end -->
 
 ---

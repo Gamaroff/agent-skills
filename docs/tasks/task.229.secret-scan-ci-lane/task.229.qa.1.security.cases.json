@@ -1,0 +1,99 @@
+[
+  {
+    "id": "secrets.clean",
+    "input": "clean",
+    "why": "a repository whose only tracked file is clean — the lane must pass",
+    "correct": "accept",
+    "direction": "legitimate"
+  },
+  {
+    "id": "secrets.tracked",
+    "input": "tracked",
+    "why": "a committed file carrying a secret-shaped string",
+    "correct": "reject",
+    "direction": "hostile",
+    "fixture": { "files": { "PLANT": "tracked:src/config.ts\n" } },
+    "expected": { "exit": 1 }
+  },
+  {
+    "id": "secrets.staged",
+    "input": "staged",
+    "why": "a staged, uncommitted file is tracked and must be scanned",
+    "correct": "reject",
+    "direction": "hostile",
+    "fixture": { "files": { "PLANT": "staged:src/new.ts\n" } },
+    "expected": { "exit": 1 }
+  },
+  {
+    "id": "secrets.leading-dash",
+    "input": "leading-dash",
+    "why": "a tracked file whose name starts with a dash must stay a file name, not a flag",
+    "correct": "reject",
+    "direction": "hostile",
+    "fixture": { "files": { "PLANT": "tracked:-n.ts\n" } },
+    "expected": { "exit": 1 }
+  },
+  {
+    "id": "secrets.space-name",
+    "input": "space-name",
+    "why": "a tracked file whose name holds spaces must not split into two paths",
+    "correct": "reject",
+    "direction": "hostile",
+    "fixture": { "files": { "PLANT": "tracked:a b/c d.ts\n" } },
+    "expected": { "exit": 1 }
+  },
+  {
+    "id": "secrets.substitution-name",
+    "input": "substitution-name",
+    "why": "a tracked file NAMED as a command substitution must stay a name and still be scanned",
+    "correct": "reject",
+    "direction": "hostile",
+    "fixture": { "files": { "PLANT": "tracked:$(touch PWNED).ts\n" } },
+    "expected": { "exit": 1, "absent": ["PWNED"] }
+  },
+  {
+    "id": "secrets.message",
+    "input": "message",
+    "why": "a secret-shaped string in a commit message inside the scanned range",
+    "correct": "reject",
+    "direction": "hostile",
+    "fixture": {
+      "files": { "PLANT": "message:probe\n" },
+      "env": { "SECRET_SCAN_RANGE": "HEAD~1..HEAD" }
+    },
+    "expected": { "exit": 1 }
+  },
+  {
+    "id": "secrets.untracked",
+    "input": "untracked",
+    "why": "a file git does not track is outside the lane's file set — it must not fail the scan",
+    "correct": "accept",
+    "direction": "legitimate",
+    "fixture": { "files": { "PLANT": "untracked:scratch.ts\n" } }
+  },
+  {
+    "id": "secrets.deleted",
+    "input": "deleted",
+    "why": "a tracked file deleted from the working tree is not in the tree the PR would merge; history is out of scope",
+    "correct": "accept",
+    "direction": "legitimate",
+    "fixture": { "files": { "PLANT": "deleted:old.ts\n" } }
+  },
+  {
+    "id": "secrets.allow",
+    "input": "allow",
+    "why": "a line carrying gitleaks:allow is the documented exception and must pass",
+    "correct": "accept",
+    "direction": "legitimate",
+    "fixture": { "files": { "PLANT": "allow:sample.ts\n" } }
+  },
+  {
+    "id": "secrets.flag-input",
+    "input": "--exit-code=0",
+    "why": "the script takes no arguments; a flag-shaped argument must not change the verdict on a dirty tree",
+    "correct": "reject",
+    "direction": "hostile",
+    "fixture": { "files": { "PLANT": "tracked:leak.ts\n" } },
+    "expected": { "exit": 1 }
+  }
+]

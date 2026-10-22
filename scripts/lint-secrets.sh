@@ -54,15 +54,43 @@ trap 'rm -rf "$tmp"' EXIT
 # Hits as `file:line rule`, never the value. The template is gitleaks' own
 # report format; File is empty for a stdin scan.
 printf '{{range .}}  {{.File}}:{{.StartLine}} {{.RuleID}}\n{{end}}' >"$tmp/report.tmpl"
-GL_FLAGS=(--no-banner --redact --exit-code 1 --log-level error
+# A leak exits LEAK_RC, never 1: gitleaks exits 1 on its own fatal errors (a
+# missing dir, a bad report template), and with --exit-code 1 a scanner that
+# crashed read as a found secret — and as a caught self-check plant.
+LEAK_RC=99
+GL_FLAGS=(--no-banner --redact --exit-code "$LEAK_RC" --log-level error
   --report-format template --report-template "$tmp/report.tmpl" --report-path -)
 
+# scanner_ran <rc> <output> <what>: exit 1 unless <rc> is clean (0) or a leak
+# (LEAK_RC). Anything else is a scanner error, which says nothing was checked.
+scanner_ran() {
+  if [ "$1" -ne 0 ] && [ "$1" -ne "$LEAK_RC" ]; then
+    echo "error: gitleaks failed (exit $1) during $3 — nothing was checked:" >&2
+    printf '%s\n' "$2" | sed "s|$tmp/||g" >&2
+    exit 1
+  fi
+}
+
 # ── Self-check: a planted runtime token must be caught ──────────────────────
+# Up to three fresh plants. gitleaks' generic rule misses about 1 random value
+# in 100 (3 of 300 measured in task 229 QA), so one plant failed clean trees
+# about one run in a hundred; a scanner that misses three independent plants
+# is broken, not unlucky.
 mkdir "$tmp/selfcheck"
-plant=$(head -c 24 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=')
-printf "const api_key = '%s';\n" "$plant" >"$tmp/selfcheck/plant.ts"
-if gitleaks dir "$tmp/selfcheck" "${GL_FLAGS[@]}" >/dev/null 2>&1; then
-  echo "error: self-check failed: the scanner caught nothing in a planted token — the lane would pass anything." >&2
+caught=0
+for _ in 1 2 3; do
+  plant=$(head -c 24 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=')
+  printf "const api_key = '%s';\n" "$plant" >"$tmp/selfcheck/plant.ts"
+  rc=0
+  out=$(gitleaks dir "$tmp/selfcheck" "${GL_FLAGS[@]}" 2>&1) || rc=$?
+  scanner_ran "$rc" "$out" "the self-check"
+  if [ "$rc" -eq "$LEAK_RC" ]; then
+    caught=1
+    break
+  fi
+done
+if [ "$caught" -ne 1 ]; then
+  echo "error: self-check failed: the scanner caught nothing in three planted tokens — the lane would pass anything." >&2
   exit 1
 fi
 echo "self-check: planted token caught"
@@ -89,7 +117,10 @@ mkdir "$tmp/tree"
 printf '%s\0' "${FILES[@]}" | tar --null -T - -cf - | tar -xf - -C "$tmp/tree"
 echo "scanning ${#FILES[@]} tracked files"
 
-if ! hits=$(gitleaks dir "$tmp/tree" "${GL_FLAGS[@]}" 2>&1); then
+rc=0
+hits=$(gitleaks dir "$tmp/tree" "${GL_FLAGS[@]}" 2>&1) || rc=$?
+scanner_ran "$rc" "$hits" "the tracked-file scan"
+if [ "$rc" -eq "$LEAK_RC" ]; then
   echo "error: gitleaks found a secret-shaped string in a tracked file:" >&2
   printf '%s\n' "$hits" | sed "s|$tmp/tree/||" >&2
   echo "A placeholder: reword it, or add 'gitleaks:allow' with a reason on the same line (see task 228). A real secret: remove it and rotate it." >&2
@@ -106,13 +137,21 @@ if [ -z "$range" ]; then
   echo "commit-message scan skipped — no range (set SECRET_SCAN_RANGE, or fetch origin/develop)"
 elif [ -z "${range_base//0/}" ]; then
   echo "commit-message scan skipped — $range has no base commit (a new-branch push)"
+elif ! git cat-file -e "${range_base}^{commit}" 2>/dev/null; then
+  # A force-push: the push event's `before` was rewritten away and is not in
+  # the checkout. The new commits cannot be told apart from the old ones, so the
+  # message scan is skipped loudly; the tree scan above still ran.
+  echo "commit-message scan skipped — the base of $range is not in this checkout (a force-push?)"
 else
   msgs=$(git log --format=%B "$range") || {
     echo "error: cannot read the commit range $range (a shallow clone? the workflow checks out with fetch-depth: 0)" >&2
     exit 1
   }
   echo "scanning the commit messages of $range"
-  if ! hits=$(printf '%s' "$msgs" | gitleaks stdin "${GL_FLAGS[@]}" 2>&1); then
+  rc=0
+  hits=$(printf '%s' "$msgs" | gitleaks stdin "${GL_FLAGS[@]}" 2>&1) || rc=$?
+  scanner_ran "$rc" "$hits" "the commit-message scan"
+  if [ "$rc" -eq "$LEAK_RC" ]; then
     echo "error: gitleaks found a secret-shaped string in the PR's commit messages (line numbers count from the first message of $range):" >&2
     printf '%s\n' "$hits" >&2
     fail=1
@@ -122,7 +161,10 @@ fi
 # ── PR text: body ───────────────────────────────────────────────────────────
 if [ -n "${SECRET_SCAN_PR_BODY:-}" ]; then
   echo "scanning the PR body"
-  if ! hits=$(printf '%s' "$SECRET_SCAN_PR_BODY" | gitleaks stdin "${GL_FLAGS[@]}" 2>&1); then
+  rc=0
+  hits=$(printf '%s' "$SECRET_SCAN_PR_BODY" | gitleaks stdin "${GL_FLAGS[@]}" 2>&1) || rc=$?
+  scanner_ran "$rc" "$hits" "the PR body scan"
+  if [ "$rc" -eq "$LEAK_RC" ]; then
     echo "error: gitleaks found a secret-shaped string in the PR body:" >&2
     printf '%s\n' "$hits" >&2
     fail=1
