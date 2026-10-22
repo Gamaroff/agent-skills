@@ -500,27 +500,32 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-22
-**Quality Score**: 70/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 95/100
+**Gate Decision**: PASS
 
 ### QA Report
 
-- **Full Report**: [task.230.qa.3.change-log-block-foreign-sections.md](./task.230.qa.3.change-log-block-foreign-sections.md)
-- **Gate File**: [task.230.gate.3.change-log-block-foreign-sections.yml](./task.230.gate.3.change-log-block-foreign-sections.yml)
+- **Full Report**: [task.230.qa.4.change-log-block-foreign-sections.md](./task.230.qa.4.change-log-block-foreign-sections.md)
+- **Gate File**: [task.230.gate.4.change-log-block-foreign-sections.yml](./task.230.gate.4.change-log-block-foreign-sections.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 6246
+- **Tests Executed**: 6251
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 high, 2 medium
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-Cycle 2's fixes hold. The log-shaped test is too loose: a header with Date plus Author alone qualifies, so a sign-off table can still be taken as the log (CR3-1, CR3-2, medium). A deeper `### Change Log` heading is dropped by the repeat-heading rule (CR3-4, low).
+No medium or high finding remains after four QA cycles. Two low residuals, on shapes no writer here produces, were carried to the gate's `recommendations.future` (route 2b) and recorded under Deferred Work.
+
+## Deferred Work
+
+- **TASK-230-CR4-1** (LOW): carried to gate 4 `recommendations.future` (route 2b, cycle 4). A log-shaped foreign table outranks a non-log, undated own-section table (position versus shape).
+- **TASK-230-CR4-2** (LOW): carried to gate 4 `recommendations.future` (route 2b, cycle 4). A deeper Change Log heading inside a before-side foreign section does not converge on the first write.
 <!-- change-log-start -->
 ## Change Log
 
@@ -536,6 +541,7 @@ Cycle 2's fixes hold. The log-shaped test is too loose: a header with Date plus 
 | 2026-10-22 |  | QA findings fixed — log table chosen from its own section first, log-shaped past a foreign heading (CR2-1, CR2-2, CR2-3) + doubled heading converges (CR2-4); 6 new tests, 1 iteration | qa-fix |
 | 2026-10-22 |  | QA gate CONCERNS (70/100) — 3 findings (2 medium, 1 low) | qa-task |
 | 2026-10-22 |  | QA findings fixed — Date plus Author no longer log-shaped, own-section log-like runs judged first, repeat-heading drop limited to the log level (CR3-1, CR3-2, CR3-4; CR3-3 too); 5 new tests, 1 iteration | qa-fix |
+| 2026-10-22 |  | QA gate PASS (95/100) — 2 low findings carried (route 2b) | qa-task |
 <!-- change-log-end -->
 
 ---
