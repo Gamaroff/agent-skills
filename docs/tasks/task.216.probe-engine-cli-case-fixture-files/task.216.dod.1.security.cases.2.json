@@ -1,0 +1,561 @@
+[
+  {
+    "id": "cli-fixture.files-legit",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "files": {
+        "items.json": "[\"MARKER\"]"
+      }
+    },
+    "why": "the populated directory a merge-back CLI needs; without the case fixture every input, this one too, ended in a refusal",
+    "correct": "the file is written into the case directory (the CLI's cwd) before the spawn, the CLI exits 0, the case is accepted",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.files-nested-legit",
+    "sink": "markdown-structure",
+    "input": "data",
+    "fixture": {
+      "files": {
+        "data/items.json": "[\"MARKER\"]"
+      }
+    },
+    "why": "a nested relative path inside the case directory",
+    "correct": "the parent directory is created and the file written, the case is accepted",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.env-legit",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "env": {
+        "PROBE_MARKER": "MARKER"
+      }
+    },
+    "why": "a CLI that reads its data source from the environment",
+    "correct": "fixture.env is merged into the child's env, the CLI exits 0, the case is accepted",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.dotdot-inside-legit",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "files": {
+        "sub/../items.json": "[\"MARKER\"]"
+      }
+    },
+    "why": "a fixture path spelled with .. that still resolves inside the case directory",
+    "correct": "containment is decided on the resolved path, so the file lands at ./items.json, the CLI exits 0, the case is accepted",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.dotslash-input-legit",
+    "sink": "markdown-structure",
+    "input": "./data/",
+    "fixture": {
+      "files": {
+        "data/items.json": "[\"MARKER\"]"
+      }
+    },
+    "why": "the data directory named with a leading ./ and a trailing slash",
+    "correct": "the CLI resolves ./data/items.json in its cwd, exits 0, the case is accepted",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.lowercase-path-env-legit",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "env": {
+        "path": "/nonexistent"
+      },
+      "files": {
+        "items.json": "[\"MARKER\"]"
+      }
+    },
+    "why": "a lowercase 'path' is a different variable on POSIX and does not select the interpreter",
+    "correct": "not refused (the refusal is for PATH by exact name); the interpreter is still found, the CLI exits 0, the case is accepted",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.no-files-hostile",
+    "sink": "markdown-structure",
+    "input": ".",
+    "why": "the same input with no fixture: an empty directory must still be refused",
+    "correct": "the CLI exits 1 (no items.json), the case is rejected",
+    "direction": "hostile"
+  },
+  {
+    "id": "cli-fixture.wrong-content-hostile",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "files": {
+        "items.json": "[\"other\"]"
+      }
+    },
+    "why": "a populated directory whose content the CLI refuses",
+    "correct": "the CLI exits 1 (no marker), the case is rejected",
+    "direction": "hostile"
+  },
+  {
+    "id": "cli-fixture.parent-dir-hostile",
+    "sink": "markdown-structure",
+    "input": "..",
+    "fixture": {
+      "files": {
+        "items.json": "[\"MARKER\"]"
+      }
+    },
+    "why": "an input pointing above the case directory, where the fixture file is not",
+    "correct": "the CLI finds no items.json above the case directory and exits 1, the case is rejected",
+    "direction": "hostile"
+  },
+  {
+    "id": "cli-fixture.misplaced-file-hostile",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "files": {
+        "data/items.json": "[\"MARKER\"]"
+      }
+    },
+    "why": "the marker file exists in the case directory but not in the directory the input names",
+    "correct": "the CLI finds no ./items.json and exits 1, the case is rejected",
+    "direction": "hostile"
+  },
+  {
+    "id": "cli-fixture.wrong-dir-hostile",
+    "sink": "markdown-structure",
+    "input": "sub",
+    "fixture": {
+      "files": {
+        "items.json": "[\"MARKER\"]"
+      }
+    },
+    "why": "an input naming a directory the fixture never created",
+    "correct": "the CLI finds no sub/items.json and exits 1, the case is rejected",
+    "direction": "hostile"
+  },
+  {
+    "id": "cli-fixture.env-wrong-marker-hostile",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "env": {
+        "PROBE_MARKER": "marker"
+      }
+    },
+    "why": "an env value differing only in case from the one the CLI accepts",
+    "correct": "the env override does not fire, there is no items.json, the CLI exits 1, the case is rejected",
+    "direction": "hostile"
+  },
+  {
+    "id": "cli-fixture.site-hook-hostile",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "files": {
+        "sitecustomize.py": "open('items.json','w').write('MARKER')\n",
+        "usercustomize.py": "open('items.json','w').write('MARKER')\n"
+      }
+    },
+    "why": "fixture files in the cwd that, if the interpreter loaded them at startup, would plant the data the CLI checks: a fixture steering the interpreter, not the CLI",
+    "correct": "neither interpreter imports startup hooks from its cwd (Python runs -E -s -B and the bootstrap sets sys.path[0] to the entry's directory), so there is no items.json, the CLI exits 1, the case is rejected",
+    "direction": "hostile"
+  },
+  {
+    "id": "cli-fixture.escape-path-declined",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "files": {
+        "../escaped.json": "[\"MARKER\"]"
+      }
+    },
+    "why": "a fixture file path that leaves the case directory",
+    "correct": "declined by name before anything spawns; nothing is written outside the case directory",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.absolute-path-declined",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "files": {
+        "/tmp/task216-escaped.json": "[\"MARKER\"]"
+      }
+    },
+    "why": "an absolute fixture file path",
+    "correct": "declined by name before anything spawns; nothing is written",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.escape-nested-declined",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "files": {
+        "sub/../../escaped-nested.json": "x"
+      }
+    },
+    "why": "an escape spelled through a subdirectory first, so a prefix check on the raw string would pass it",
+    "correct": "declined by name (the resolved path leaves the case directory); nothing is written outside",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.escape-dotslash-declined",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "files": {
+        "./../escaped-dotslash.json": "x"
+      }
+    },
+    "why": "an escape behind a leading ./",
+    "correct": "declined by name; nothing is written outside the case directory",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.case-dir-itself-declined",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "files": {
+        ".": "x"
+      }
+    },
+    "why": "a fixture path that is the case directory itself",
+    "correct": "declined (the target equals the case directory) before anything spawns",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.case-dir-via-dotdot-declined",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "files": {
+        "sub/..": "x"
+      }
+    },
+    "why": "the case directory itself, spelled through a subdirectory",
+    "correct": "declined (the resolved target equals the case directory) before anything spawns",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.empty-path-declined",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "files": {
+        "": "x"
+      }
+    },
+    "why": "an empty fixture file path",
+    "correct": "declined as an empty path by fixtureProblem",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.env-path-declined",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "env": {
+        "PATH": "/nonexistent"
+      }
+    },
+    "why": "PATH selects the python3 binary the form spawns",
+    "correct": "declined naming PATH before anything spawns",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.env-node-options-declined",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "env": {
+        "NODE_OPTIONS": "--require=/nonexistent.js"
+      }
+    },
+    "why": "NODE_OPTIONS loads code into the Node child before the entry",
+    "correct": "declined naming NODE_OPTIONS before anything spawns",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.env-ld-preload-declined",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "env": {
+        "LD_PRELOAD": "/nonexistent.so"
+      }
+    },
+    "why": "the dynamic loader injects a library into either interpreter before it starts",
+    "correct": "declined naming LD_PRELOAD before anything spawns",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.env-ld-library-path-declined",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "env": {
+        "LD_LIBRARY_PATH": "/nonexistent"
+      }
+    },
+    "why": "redirects the interpreter's shared-library resolution",
+    "correct": "declined naming LD_LIBRARY_PATH before anything spawns",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.env-dyld-insert-declined",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "env": {
+        "DYLD_INSERT_LIBRARIES": "/nonexistent.dylib"
+      }
+    },
+    "why": "the macOS loader's library injection",
+    "correct": "declined naming DYLD_INSERT_LIBRARIES before anything spawns",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.env-dyld-library-path-declined",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "env": {
+        "DYLD_LIBRARY_PATH": "/nonexistent"
+      }
+    },
+    "why": "the macOS loader's library search path",
+    "correct": "declined naming DYLD_LIBRARY_PATH before anything spawns",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.env-home-declined",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "env": {
+        "HOME": "/root"
+      }
+    },
+    "why": "HOME is sandbox-owned",
+    "correct": "declined naming HOME before anything spawns",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.env-tmpdir-declined",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "env": {
+        "TMPDIR": "/tmp"
+      }
+    },
+    "why": "TMPDIR is sandbox-owned; overriding it moves temp writes outside the watched sandbox",
+    "correct": "declined naming TMPDIR before anything spawns",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.env-lc-all-declined",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "env": {
+        "LC_ALL": "en_US.UTF-8"
+      }
+    },
+    "why": "LC_ALL is sandbox-owned",
+    "correct": "declined naming LC_ALL before anything spawns",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.env-bad-name-declined",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "env": {
+        "A=B": "x"
+      }
+    },
+    "why": "an env key containing '=' would split into a different variable",
+    "correct": "declined as not a variable name",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.env-empty-name-declined",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "env": {
+        "": "x"
+      }
+    },
+    "why": "an empty env key",
+    "correct": "declined as not a variable name",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.env-nul-value-declined",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "env": {
+        "PROBE_X": "a\u0000b"
+      }
+    },
+    "why": "a NUL in an env value truncates it at the OS boundary",
+    "correct": "declined as carrying a NUL",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.files-nul-content-declined",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "files": {
+        "items.json": "a\u0000b"
+      }
+    },
+    "why": "a NUL in fixture file content",
+    "correct": "declined as carrying a NUL",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.files-non-string-declined",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "files": {
+        "items.json": 3
+      }
+    },
+    "why": "a fixture file whose content is not a string",
+    "correct": "declined as must be a string",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.unknown-key-declined",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "setup": "touch items.json"
+    },
+    "why": "a fixture key the cli: form does not honour (a smuggled setup step)",
+    "correct": "declined as carrying unknown keys",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.null-fixture-declined",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": null,
+    "why": "a null fixture",
+    "correct": "declined as not an object",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.files-array-declined",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "files": [
+        "items.json"
+      ]
+    },
+    "why": "fixture.files given as an array",
+    "correct": "declined as fixture.files is not an object",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.malformed-declined",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": 3,
+    "why": "a fixture that is not an object",
+    "correct": "declined as malformed before anything spawns",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.absent-collision-declined",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "files": {
+        "items.json": "[\"MARKER\"]"
+      }
+    },
+    "expected": {
+      "stdout": "ok\n",
+      "absent": [
+        "items.json"
+      ]
+    },
+    "why": "an expected.absent name the case's own fixture files create",
+    "correct": "declined as a collision rather than run and mismatched on every run",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.absent-dir-collision-declined",
+    "sink": "markdown-structure",
+    "input": "data",
+    "fixture": {
+      "files": {
+        "data/items.json": "[\"MARKER\"]"
+      }
+    },
+    "expected": {
+      "stdout": "ok\n",
+      "absent": [
+        "data"
+      ]
+    },
+    "why": "an expected.absent name equal to the first segment of a nested fixture path",
+    "correct": "declined as a collision (first-segment rule)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.absent-dotslash-collision-declined",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "files": {
+        "./items.json": "[\"MARKER\"]"
+      }
+    },
+    "expected": {
+      "stdout": "ok\n",
+      "absent": [
+        "items.json"
+      ]
+    },
+    "why": "a collision hidden behind a ./ prefix on the fixture path",
+    "correct": "declined as a collision (the path is normalised before comparing)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.absent-case-collision-declined",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "files": {
+        "items.json": "[\"MARKER\"]"
+      }
+    },
+    "expected": {
+      "stdout": "ok\n",
+      "absent": [
+        "ITEMS.JSON"
+      ]
+    },
+    "why": "a collision spelled in a different letter case (one file on case-insensitive filesystems)",
+    "correct": "declined as a collision (the comparison ignores case)",
+    "direction": "legitimate"
+  }
+]

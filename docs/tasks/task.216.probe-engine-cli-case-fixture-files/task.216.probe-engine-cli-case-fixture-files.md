@@ -5,17 +5,19 @@ type: task
 description: "Let a cli: probe case carry fixture.files and fixture.env, written into the case directory before the run exactly as the fence: and shell-argv: arms write them, so a CLI that reads a populated data directory can have a legitimate case that is accepted."
 tags: [security-probe, finalise, qa-task, qa-story, review-security, observation]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-19
 updated: 2026-10-22
+completed_date: 2026-10-22
+pr_number: 726
 estimated_effort_hours: 4
 github_issue: 696
 ---
 
 # Technical Task: security-probe — `cli:` cases carry `fixture.files`
 
-**Status**: Ready for Review
+**Status**: Accepted
 **Review**: ✅ All review recommendations from `task.216.review.1.probe-engine-cli-case-fixture-files.md` implemented 2026-10-22
 **GitHub Issue**: [#696](https://github.com/Gamaroff/agent-skills/issues/696)
 
@@ -126,6 +128,31 @@ Cycle 2's TASK-216-QA2-1 and TASK-216-QA2-2 are fixed. TASK-216-QA3-1 (LOW): the
 ## Deferred Work
 
 - **TASK-216-QA3-1** (LOW) — carried to gate 3 `recommendations.future` (route 2b, cycle 3): the docs say every `LD_*`/`DYLD_*` loader variable is refused in a `cli:` case's `fixture.env`, but `CLI_INTERPRETER_ENV` matches four exact names, so `LD_AUDIT`, `DYLD_FRAMEWORK_PATH` and `DYLD_FALLBACK_LIBRARY_PATH` still reach the interpreter. Fix: refuse by prefix and test one missed name per prefix.
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.216.qa.3.probe-engine-cli-case-fixture-files.md`
+**Gate File**: `task.216.gate.3.probe-engine-cli-case-fixture-files.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 95/100 (3 QA cycles)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** all 3 met, each traced to code and to a test that runs on every PR
+✅ **Tests:** 8 new tests in `shared/resources/tests/security-probe.test.mjs` (Node and Python), mutation-proven; full suite green
+✅ **PR Review:** PR #726, Step 5c conformance review APPROVE (`task.216.pr-review.1.probe-engine-cli-case-fixture-files.md`); CI 5/5 green
+✅ **Documentation:** `probe-boundary-rule.md` §5, `finalise-dod-security-prompt.md`, CHANGELOG [Unreleased]
+✅ **Security Review:** PASS — measured: 26 probes executed, 0 reproduced, 0 escaped
+⚠️ **Compliance Review:** not applicable (developer tool; no user data, UI or payments)
+
+**Open follow-up:** TASK-216-QA3-1 (LOW, see Deferred Work).
+
+**Detailed Verification Log:** See `task.216.dod.1.probe-engine-cli-case-fixture-files.md` for complete verification evidence and timestamps.
+
+**Task marked as ACCEPTED on:** 2026-10-22
 <!-- change-log-start -->
 ## Change Log
 
@@ -140,5 +167,6 @@ Cycle 2's TASK-216-QA2-1 and TASK-216-QA2-2 are fixed. TASK-216-QA3-1 (LOW): the
 | 2026-10-22 |  | QA gate CONCERNS (90/100) — 2 findings | qa-task |
 | 2026-10-22 |  | QA findings fixed — TASK-216-QA2-1 (repository reach scoped out), TASK-216-QA2-2 (loader variables refused), 1 iteration | qa-fix |
 | 2026-10-22 |  | QA gate PASS (95/100) — 1 LOW carried to Deferred Work (route 2b) | qa-task |
+| 2026-10-22 | 1.2 | DoD passed — accepted (PR #726) | finalise |
 <!-- change-log-end -->
 

@@ -1,0 +1,175 @@
+{
+  "sink": "markdown-structure",
+  "entry": "cli:shared/resources/tests/fixtures/security-probe/cli-needs-data.py",
+  "name": "cli-needs-data.py merge-back (case fixture boundary)",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 13,
+  "passed": 13,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 29,
+  "declined_cases": [
+    {
+      "id": "cli-fixture.escape-path-declined",
+      "reason": "case-errored",
+      "detail": "fixture: `fixture.files` path \"../escaped.json\" leaves the case directory"
+    },
+    {
+      "id": "cli-fixture.absolute-path-declined",
+      "reason": "case-errored",
+      "detail": "fixture: `fixture.files` path \"/tmp/task216-escaped.json\" leaves the case directory"
+    },
+    {
+      "id": "cli-fixture.escape-nested-declined",
+      "reason": "case-errored",
+      "detail": "fixture: `fixture.files` path \"sub/../../escaped-nested.json\" leaves the case directory"
+    },
+    {
+      "id": "cli-fixture.escape-dotslash-declined",
+      "reason": "case-errored",
+      "detail": "fixture: `fixture.files` path \"./../escaped-dotslash.json\" leaves the case directory"
+    },
+    {
+      "id": "cli-fixture.case-dir-itself-declined",
+      "reason": "case-errored",
+      "detail": "fixture: `fixture.files` path \".\" leaves the case directory"
+    },
+    {
+      "id": "cli-fixture.case-dir-via-dotdot-declined",
+      "reason": "case-errored",
+      "detail": "fixture: `fixture.files` path \"sub/..\" leaves the case directory"
+    },
+    {
+      "id": "cli-fixture.empty-path-declined",
+      "reason": "case-errored",
+      "detail": "case's `fixture.files` names an empty path"
+    },
+    {
+      "id": "cli-fixture.env-path-declined",
+      "reason": "case-errored",
+      "detail": "case's `fixture.env` may not set PATH on the cli: form — it steers the interpreter the form runs, not the CLI under probe"
+    },
+    {
+      "id": "cli-fixture.env-node-options-declined",
+      "reason": "case-errored",
+      "detail": "case's `fixture.env` may not set NODE_OPTIONS on the cli: form — it steers the interpreter the form runs, not the CLI under probe"
+    },
+    {
+      "id": "cli-fixture.env-ld-preload-declined",
+      "reason": "case-errored",
+      "detail": "case's `fixture.env` may not set LD_PRELOAD on the cli: form — it steers the interpreter the form runs, not the CLI under probe"
+    },
+    {
+      "id": "cli-fixture.env-ld-library-path-declined",
+      "reason": "case-errored",
+      "detail": "case's `fixture.env` may not set LD_LIBRARY_PATH on the cli: form — it steers the interpreter the form runs, not the CLI under probe"
+    },
+    {
+      "id": "cli-fixture.env-dyld-insert-declined",
+      "reason": "case-errored",
+      "detail": "case's `fixture.env` may not set DYLD_INSERT_LIBRARIES on the cli: form — it steers the interpreter the form runs, not the CLI under probe"
+    },
+    {
+      "id": "cli-fixture.env-dyld-library-path-declined",
+      "reason": "case-errored",
+      "detail": "case's `fixture.env` may not set DYLD_LIBRARY_PATH on the cli: form — it steers the interpreter the form runs, not the CLI under probe"
+    },
+    {
+      "id": "cli-fixture.env-home-declined",
+      "reason": "case-errored",
+      "detail": "case's `fixture.env` may not set HOME — the sandbox owns it"
+    },
+    {
+      "id": "cli-fixture.env-tmpdir-declined",
+      "reason": "case-errored",
+      "detail": "case's `fixture.env` may not set TMPDIR — the sandbox owns it"
+    },
+    {
+      "id": "cli-fixture.env-lc-all-declined",
+      "reason": "case-errored",
+      "detail": "case's `fixture.env` may not set LC_ALL — the sandbox owns it"
+    },
+    {
+      "id": "cli-fixture.env-bad-name-declined",
+      "reason": "case-errored",
+      "detail": "case's `fixture.env` key \"A=B\" is not a variable name"
+    },
+    {
+      "id": "cli-fixture.env-empty-name-declined",
+      "reason": "case-errored",
+      "detail": "case's `fixture.env` key \"\" is not a variable name"
+    },
+    {
+      "id": "cli-fixture.env-nul-value-declined",
+      "reason": "case-errored",
+      "detail": "case's `fixture.env` carries a NUL"
+    },
+    {
+      "id": "cli-fixture.files-nul-content-declined",
+      "reason": "case-errored",
+      "detail": "case's `fixture.files` carries a NUL"
+    },
+    {
+      "id": "cli-fixture.files-non-string-declined",
+      "reason": "case-errored",
+      "detail": "case's `fixture.files[\"items.json\"]` must be a string, got number"
+    },
+    {
+      "id": "cli-fixture.unknown-key-declined",
+      "reason": "case-errored",
+      "detail": "case's `fixture` carries unknown keys: setup — only env and files"
+    },
+    {
+      "id": "cli-fixture.null-fixture-declined",
+      "reason": "case-errored",
+      "detail": "case's `fixture` is not an object"
+    },
+    {
+      "id": "cli-fixture.files-array-declined",
+      "reason": "case-errored",
+      "detail": "case's `fixture.files` is not an object"
+    },
+    {
+      "id": "cli-fixture.malformed-declined",
+      "reason": "case-errored",
+      "detail": "case's `fixture` is not an object"
+    },
+    {
+      "id": "cli-fixture.absent-collision-declined",
+      "reason": "case-errored",
+      "detail": "case's `expected.absent` names \"items.json\", which the fixture itself creates"
+    },
+    {
+      "id": "cli-fixture.absent-dir-collision-declined",
+      "reason": "case-errored",
+      "detail": "case's `expected.absent` names \"data\", which the fixture itself creates"
+    },
+    {
+      "id": "cli-fixture.absent-dotslash-collision-declined",
+      "reason": "case-errored",
+      "detail": "case's `expected.absent` names \"items.json\", which the fixture itself creates"
+    },
+    {
+      "id": "cli-fixture.absent-case-collision-declined",
+      "reason": "case-errored",
+      "detail": "case's `expected.absent` names \"ITEMS.JSON\", which the fixture itself creates"
+    }
+  ],
+  "escaped": 0,
+  "shells": null,
+  "interpreter": {
+    "name": "python3",
+    "version": "Python 3.14.8"
+  },
+  "fake_gh": null,
+  "argv": [
+    "merge-back",
+    "{input}"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-10-22T06:51:58.967Z"
+}
