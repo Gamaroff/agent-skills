@@ -199,8 +199,8 @@
  * (task.216): its files are written into the case directory — the child's cwd —
  * before the spawn, its env merged over the sandbox's, with the same refusals
  * (a path that leaves the directory, HOME, TMPDIR, LC_ALL) and more of the
- * form's own, PATH, NODE_OPTIONS and the dynamic-loader variables, which steer
- * the interpreter rather than the CLI (CLI_INTERPRETER_ENV). It is how a CLI
+ * form's own, PATH, NODE_OPTIONS and any `LD_*` or `DYLD_*` dynamic-loader
+ * variable, which steer the interpreter rather than the CLI (steersInterpreter). It is how a CLI
  * that refuses on what it finds in a data directory gets a legitimate case that
  * is accepted; without it every input reads as overblocked and the verdict is
  * `rejects-every-input`. Repository state is not reachable this way: fixture
@@ -2588,9 +2588,7 @@ function runCliCase(
     decline(`case's ${fixtureProblemText}`);
     return;
   }
-  const steers = Object.keys(c.fixture?.env ?? {}).find((k) =>
-    CLI_INTERPRETER_ENV.includes(k),
-  );
+  const steers = Object.keys(c.fixture?.env ?? {}).find(steersInterpreter);
   if (steers !== undefined) {
     decline(
       `case's \`fixture.env\` may not set ${steers} on the cli: form — it steers the interpreter the form runs, not the CLI under probe`,
@@ -3155,18 +3153,19 @@ const SANDBOX_OWNED_ENV = Object.freeze(["HOME", "TMPDIR", "LC_ALL"]);
  * steer the interpreter the form runs rather than the CLI under probe. `PATH`
  * selects the `python3` binary (spawned by name), whose crash record the
  * verdict reads; `NODE_OPTIONS` loads code into a Node child before the entry
- * and can hide the fatal-error footer; the dynamic-loader variables load a
- * library into either interpreter before it starts (QA cycle 2). Python's own
- * variables need no entry: `-E` already ignores them.
+ * and can hide the fatal-error footer; the dynamic-loader variables (any
+ * `LD_*` or `DYLD_*` name, CLI_LOADER_ENV_PREFIXES) load or redirect a library
+ * into either interpreter before it starts (QA cycle 2; by prefix since
+ * task.226). Python's own variables need no entry: `-E` already ignores them.
  */
-const CLI_INTERPRETER_ENV = Object.freeze([
-  "PATH",
-  "NODE_OPTIONS",
-  "LD_PRELOAD",
-  "LD_LIBRARY_PATH",
-  "DYLD_INSERT_LIBRARIES",
-  "DYLD_LIBRARY_PATH",
-]);
+const CLI_INTERPRETER_ENV = Object.freeze(["PATH", "NODE_OPTIONS"]);
+/** The dynamic loaders' namespaces (glibc `LD_*`, macOS dyld `DYLD_*`): every
+ * name in them can load or redirect code before the interpreter starts. The
+ * match is case-sensitive, as POSIX environment names are. */
+const CLI_LOADER_ENV_PREFIXES = Object.freeze(["LD_", "DYLD_"]);
+const steersInterpreter = (k) =>
+  CLI_INTERPRETER_ENV.includes(k) ||
+  CLI_LOADER_ENV_PREFIXES.some((p) => k.startsWith(p));
 const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 /**
