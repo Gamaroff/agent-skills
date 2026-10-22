@@ -1,0 +1,65 @@
+schema: 2
+task: 'task.216.probe-engine-cli-case-fixture-files'
+task_title: 'security-probe: the cli: form honours a case''s fixture.files (and env)'
+gate: PASS
+status_reason: 'Both cycle 2 findings fixed (cli: fixture reach scoped to data directories, no stale restatement left; loader variables refused, LD_PRELOAD row mutation-proven). One LOW: the docs say every LD_*/DYLD_* variable is refused, but CLI_INTERPRETER_ENV matches four exact names, so LD_AUDIT still reaches the interpreter.'
+reviewer: 'QA Engineer'
+head: '596d262d45af5b50a5103c40e846b90aca808c49'
+updated: '2026-10-22T06:42:10Z'
+
+top_issues:
+  - id: 'TASK-216-QA3-1'
+    severity: low
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'finalise-dod-security-prompt.md:235 and CHANGELOG say the LD_*/DYLD_* loader variables are refused, but CLI_INTERPRETER_ENV is an exact-match list (PATH, NODE_OPTIONS, LD_PRELOAD, LD_LIBRARY_PATH, DYLD_INSERT_LIBRARIES, DYLD_LIBRARY_PATH) checked with .includes at security-probe.mjs:2591, so LD_AUDIT, DYLD_FRAMEWORK_PATH and DYLD_FALLBACK_LIBRARY_PATH pass. Only LD_PRELOAD has a decline test row. Code reviewer CR-1 (low/high) and CR-2 (cleanup), verified by QA against the source.'
+    suggested_action: 'Refuse the loader variables by prefix (LD_, DYLD_) so the code matches the wording, and test one name from each prefix that the old exact list missed.'
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 96
+  phases_verified: 4/4
+  ci: 'see PR #726 checks @ 596d262d (not waited on)'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 12
+    escaped: 0
+    notes: 'Engine re-run on cli-needs-data.mjs and .py (record task.216.qa.3.security.run.json): 12 executed, 0 reproduced, 0 escaped. TASK-216-QA3-1 is a gap in a fail-closed refusal list, not an escape.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Unchanged.'
+  maintainability:
+    status: PASS
+    notes: 'Bundle check clean; validate passes for finalise, qa-story, qa-task, review-security.'
+
+recommendations:
+  immediate: []
+  future:
+    - id: 'TASK-216-QA3-1'
+      action: 'Refuse the loader variables by prefix (LD_, DYLD_) so the code matches the wording, and test one name from each prefix that the old exact list missed. Finding: the docs say the LD_*/DYLD_* loader variables are refused, but CLI_INTERPRETER_ENV matches four exact names, so LD_AUDIT, DYLD_FRAMEWORK_PATH and DYLD_FALLBACK_LIBRARY_PATH pass.'
+      refs: ['shared/resources/security-probe.mjs', 'shared/resources/tests/security-probe.test.mjs', 'shared/resources/finalise-dod-security-prompt.md']
+      carried_from: 'top_issues (route 2b, cycle 3)'
+    - action: 'Extract the case-fixture prelude into one helper for the cli:, shell-argv: and fence: arms (carried from cycle 2).'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'shell:/shell-fn: and the in-process forms ignore a case fixture without a decline (pre-existing, carried from cycle 2).'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: []

@@ -104,15 +104,15 @@ Revert the `runCliCase` change and re-bundle; a `cli:` case's `fixture` is ignor
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-22
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 95/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.216.qa.2.probe-engine-cli-case-fixture-files.md](./task.216.qa.2.probe-engine-cli-case-fixture-files.md)
-- **Gate File**: [task.216.gate.2.probe-engine-cli-case-fixture-files.yml](./task.216.gate.2.probe-engine-cli-case-fixture-files.yml)
+- **Full Report**: [task.216.qa.3.probe-engine-cli-case-fixture-files.md](./task.216.qa.3.probe-engine-cli-case-fixture-files.md)
+- **Gate File**: [task.216.gate.3.probe-engine-cli-case-fixture-files.yml](./task.216.gate.3.probe-engine-cli-case-fixture-files.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 96 (`cli` tests; full suite 6201, 0 fail)
@@ -121,7 +121,11 @@ Revert the `runCliCase` change and re-bundle; a `cli:` case's `fixture` is ignor
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-TASK-216-QA2-1 (MEDIUM): the docs claim a `cli:` case fixture serves a CLI reading "a repository"; text files cannot make a commit and `cli:` has no `--fixture-setup` (reproduced). TASK-216-QA2-2 (LOW): the loader variables are missing from the interpreter-steering refusal. Cycle 1's TASK-216-QA1-1 is fixed.
+Cycle 2's TASK-216-QA2-1 and TASK-216-QA2-2 are fixed. TASK-216-QA3-1 (LOW): the docs say every `LD_*`/`DYLD_*` variable is refused, but the code matches four exact names. Carried to Deferred Work by the cosmetic-residue exit.
+
+## Deferred Work
+
+- **TASK-216-QA3-1** (LOW) — carried to gate 3 `recommendations.future` (route 2b, cycle 3): the docs say every `LD_*`/`DYLD_*` loader variable is refused in a `cli:` case's `fixture.env`, but `CLI_INTERPRETER_ENV` matches four exact names, so `LD_AUDIT`, `DYLD_FRAMEWORK_PATH` and `DYLD_FALLBACK_LIBRARY_PATH` still reach the interpreter. Fix: refuse by prefix and test one missed name per prefix.
 <!-- change-log-start -->
 ## Change Log
 
@@ -135,5 +139,6 @@ TASK-216-QA2-1 (MEDIUM): the docs claim a `cli:` case fixture serves a CLI readi
 | 2026-10-22 |  | QA findings fixed — TASK-216-QA1-1 (filename-sink caveat in two docs), 1 iteration | qa-fix |
 | 2026-10-22 |  | QA gate CONCERNS (90/100) — 2 findings | qa-task |
 | 2026-10-22 |  | QA findings fixed — TASK-216-QA2-1 (repository reach scoped out), TASK-216-QA2-2 (loader variables refused), 1 iteration | qa-fix |
+| 2026-10-22 |  | QA gate PASS (95/100) — 1 LOW carried to Deferred Work (route 2b) | qa-task |
 <!-- change-log-end -->
 
