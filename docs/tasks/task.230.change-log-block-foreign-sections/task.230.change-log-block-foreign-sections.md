@@ -5,18 +5,20 @@ type: task
 description: "change-log.js lifts any sibling section it finds inside the change-log markers back above them, the placement rules anchor on the marker, and a corpus guard holds the tree clean."
 tags: [develop-task, finalise, observation, change-log]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-22
-updated: 2026-10-22
+updated: 2026-10-23
 assignee:
 estimated_effort_hours: 16
 github_issue: 734
+pr_number: 735
+completed_date: 2026-10-23
 ---
 
 # Technical Task: Keep foreign sections out of the change-log block
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.230.review.1.change-log-block-foreign-sections.md` implemented 2026-10-22
 **GitHub Issue**: [#734](https://github.com/Gamaroff/agent-skills/issues/734)
 
@@ -387,45 +389,45 @@ None.
 
 ### Functional
 
-- [ ] Given the observation #91 document (Deferred Work between `<!-- change-log-start -->` and
+- [x] Given the observation #91 document (Deferred Work between `<!-- change-log-start -->` and
       `## Change Log`), `upsertChangeLog` returns a document where `## Deferred Work` and its body
       sit directly above the start marker, and the block holds only the heading and the table
       (Phase 1 states the lift)
-- [ ] Given the task.203 shape (a DoD section between the heading and the table), the DoD section
+- [x] Given the task.203 shape (a DoD section between the heading and the table), the DoD section
       ends up above the start marker
-- [ ] A sibling section after the table ends up directly below the end marker
-- [ ] Nested `###` subsections under an H2 log, an authoring note under the heading, and a fenced
+- [x] A sibling section after the table ends up directly below the end marker
+- [x] Nested `###` subsections under an H2 log, an authoring note under the heading, and a fenced
       `## Example` stay inside the block, unchanged
-- [ ] A second `upsertChangeLog` on the output lifts nothing and changes only the appended row
-- [ ] No non-blank line is lost: input lines plus the new row equal output lines as multisets
-- [ ] The Deferred Work placement rule names the marker, in the same words as finalise 7.4 (held by
+- [x] A second `upsertChangeLog` on the output lifts nothing and changes only the appended row
+- [x] No non-blank line is lost: input lines plus the new row equal output lines as multisets
+- [x] The Deferred Work placement rule names the marker, in the same words as finalise 7.4 (held by
       `tests/deferred-work-placement.test.js`, which asserts "never between the markers")
 
 ### Performance
 
-- [ ] The corpus guard completes in under 5 s, measured on the PR head with
+- [x] The corpus guard completes in under 5 s, measured on the PR head with
       `uptime; time command node --test evals/shared/tests/change-log-foreign-section-corpus.test.mjs`
       (load recorded beside the figure in the implementation report)
-- [ ] `upsertChangeLog` on a document with no foreign section produces byte-identical output to
+- [x] `upsertChangeLog` on a document with no foreign section produces byte-identical output to
       today (the existing suite passes unchanged)
 
 ### Code Quality
 
-- [ ] One definition of "foreign": `upsertChangeLog`, `foreignSections` and the corpus guard all
+- [x] One definition of "foreign": `upsertChangeLog`, `foreignSections` and the corpus guard all
       read the same partition. Held by two tests: the corpus guard imports `foreignSections` from
       `shared/resources/change-log.js` (no predicate of its own), and a unit test asserts
       `foreignSections(upsertChangeLog(x, row)) === []` for every lifting case, binding the write
       path to the read predicate
-- [ ] Reverting the lift turns the Phase 1 tests red, and re-planting a section turns the corpus
+- [x] Reverting the lift turns the Phase 1 tests red, and re-planting a section turns the corpus
       guard red (mutation-proven, recorded in the implementation report)
-- [ ] `npm run ci` passes, including `bundle:check` and `npm run validate`
+- [x] `npm run ci` passes, including `bundle:check` and `npm run validate`
 
 ### Migration
 
-- [ ] task.166, task.170, task.175 and task.203 each have their DoD section above the start marker,
+- [x] task.166, task.170, task.175 and task.203 each have their DoD section above the start marker,
       with one repair row and `updated:` bumped
-- [ ] The corpus guard is green on the PR head
-- [ ] CHANGELOG states the new lift behaviour
+- [x] The corpus guard is green on the PR head
+- [x] CHANGELOG states the new lift behaviour
 
 ---
 
@@ -526,6 +528,30 @@ No medium or high finding remains after four QA cycles. Two low residuals, on sh
 
 - **TASK-230-CR4-1** (LOW): carried to gate 4 `recommendations.future` (route 2b, cycle 4). A log-shaped foreign table outranks a non-log, undated own-section table (position versus shape).
 - **TASK-230-CR4-2** (LOW): carried to gate 4 `recommendations.future` (route 2b, cycle 4). A deeper Change Log heading inside a before-side foreign section does not converge on the first write.
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.230.qa.4.change-log-block-foreign-sections.md`
+**Gate File**: `task.230.gate.4.change-log-block-foreign-sections.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 95/100 (4 QA cycles)
+**PR Review (Step 5c)**: ✅ APPROVE — `task.230.pr-review.1.change-log-block-foreign-sections.md`
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** All 15 Success Criteria met. Each one cites code and a test that runs per PR, and AC8 was re-measured on the PR head (0.941 s at load 2.35).
+✅ **Tests:** `change-log.test.mjs` passes 113/113. The corpus guard passes 2/2 over 120 blocks. A full `npm run ci` is green on d40f6552.
+✅ **PR Review:** PR #735. The host requires no reviews, and the Step 5c conformance review returned APPROVE.
+✅ **Documentation:** CHANGELOG, the change-log spec's Markers section and the Deferred Work placement rule are all updated.
+✅ **Security Review:** PASS. `boundary: internal`, with a valid reason: a pure string engine over pipeline-written documents.
+✅ **Compliance Review:** NOT_APPLICABLE (internal tooling).
+
+**Task marked as ACCEPTED on:** 2026-10-23
+
+**Detailed Verification Log:** See `task.230.dod.1.change-log-block-foreign-sections.md` for the complete verification evidence.
 <!-- change-log-start -->
 ## Change Log
 
@@ -542,6 +568,7 @@ No medium or high finding remains after four QA cycles. Two low residuals, on sh
 | 2026-10-22 |  | QA gate CONCERNS (70/100) — 3 findings (2 medium, 1 low) | qa-task |
 | 2026-10-22 |  | QA findings fixed — Date plus Author no longer log-shaped, own-section log-like runs judged first, repeat-heading drop limited to the log level (CR3-1, CR3-2, CR3-4; CR3-3 too); 5 new tests, 1 iteration | qa-fix |
 | 2026-10-22 |  | QA gate PASS (95/100) — 2 low findings carried (route 2b) | qa-task |
+| 2026-10-23 | 1.2 | DoD verified — accepted (PR #735) | finalise |
 <!-- change-log-end -->
 
 ---
