@@ -5,7 +5,7 @@ type: task
 description: "Swap the testing guide's sample tokens for a placeholder gitleaks does not flag, and reword two prose lines it misreads."
 tags: [gitleaks, secret-scan, test-co-location-enforcer, consumer]
 category: documentation
-status: planned
+status: ready-for-review
 priority: High
 created: 2026-10-22
 updated: 2026-10-22
@@ -16,7 +16,8 @@ github_issue: 730
 
 # Technical Task: Replace the sample tokens gitleaks flags in tracked files
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.228.review.1.fake-sample-tokens-gitleaks.md` implemented 2026-10-22
 **GitHub Issue**: [#730](https://github.com/Gamaroff/agent-skills/issues/730)
 
 ---
@@ -80,7 +81,7 @@ The matched values are never printed: `--redact` is always on.
 | `skills/test-co-location-enforcer/references/testing-framework-guide.md` | 142 (`it('should decode JWT tokens client-side'` → `const token = '…'`) | generic-api-key | single-quoted sample value, entropy 4.42 |
 | same file | 1023 (`it("should decode token for display"` → `const token = "…"`) | generic-api-key | double-quoted sample value, entropy 4.42 |
 | `scripts/setup-consumer.sh` | 11 (`#   3. Credential collection      (gh auth check, …`) | generic-api-key | prose after `auth check, ` |
-| `docs/tasks/task.60.config-reader-strict-subset/task.60.review.1.config-reader-strict-subset.md` | 57 (`… merge keys, quoted/explicit keys, multi-line flow mappings, tags,`) | generic-api-key | prose after `keys, ` |
+| `docs/tasks/task.60.config-reader-strict-subset/task.60.review.1.config-reader-strict-subset.md` | 57 (the YAML-features list that begins `resolves to — anchors, aliases`) | generic-api-key | the words after the comma that follows `explicit keys` |
 
 Three more hits are under `.claude/state/` (`t205-*.diff`, `t205-*.patch`). That directory is
 gitignored (`.gitignore:19:.claude/`), so those files are out of scope.
@@ -151,9 +152,9 @@ None. Documentation text and one shell comment change. No interface, output or b
 - `skills/test-co-location-enforcer/references/testing-framework-guide.md`
 
 **Changes**:
-- [ ] Replace the value on the line `const token = '…';` under `it('should decode JWT tokens client-side'` with `<header>.<payload>.<signature>`.
-- [ ] Replace the value on the line `const token = "…";` under `it("should decode token for display"` the same way, keeping the double quotes.
-- [ ] `gitleaks dir <that file> --no-banner --redact --exit-code 1` exits 0.
+- [x] Replace the value on the line `const token = '…';` under `it('should decode JWT tokens client-side'` with `<header>.<payload>.<signature>`.
+- [x] Replace the value on the line `const token = "…";` under `it("should decode token for display"` the same way, keeping the double quotes.
+- [x] `gitleaks dir <that file> --no-banner --redact --exit-code 1` exits 0.
 
 **Dependencies**: none
 
@@ -168,9 +169,9 @@ None. Documentation text and one shell comment change. No interface, output or b
 - `docs/tasks/task.60.config-reader-strict-subset/task.60.review.1.config-reader-strict-subset.md`
 
 **Changes**:
-- [ ] `setup-consumer.sh` header comment, step 3: `(gh auth check, Bitbucket/Jira API tokens)` → `(gh auth check; Bitbucket and Jira API tokens)`.
-- [ ] task.60 review line 57: `quoted/explicit keys, ` → `quoted or explicit keys; `.
-- [ ] Re-scan each file and confirm no leaks.
+- [x] `setup-consumer.sh` header comment, step 3: the parenthesis becomes `(gh auth check; Bitbucket and Jira API tokens)` — the comma after `check` becomes a semicolon, and the slash pair becomes `Bitbucket and Jira`.
+- [x] task.60 review line 57: `quoted/explicit keys, ` → `quoted or explicit keys; `.
+- [x] Re-scan each file and confirm no leaks.
 
 **Dependencies**: none (independent of Phase 1)
 
@@ -184,9 +185,9 @@ None. Documentation text and one shell comment change. No interface, output or b
 - `CHANGELOG.md`
 
 **Changes**:
-- [ ] Add one entry under `## [Unreleased]` → `### Fixed`, citing task 228. It says the testing guide's sample tokens now use a placeholder, so a consumer's secret scan passes without an allowlist.
-- [ ] Full-tree scan: the only remaining hits are under `.claude/state/`.
-- [ ] `npm test` and `npm run bundle:check` are green.
+- [x] Add one entry under `## [Unreleased]` → `### Fixed`, citing task 228. It says the testing guide's sample tokens now use a placeholder, so a consumer's secret scan passes without an allowlist.
+- [x] Full-tree scan: the only remaining hits are under `.claude/state/`.
+- [x] `npm test` and `npm run bundle:check` are green.
 
 **Dependencies**: Phases 1 and 2
 
@@ -245,9 +246,9 @@ Not applicable.
 ### Functional
 
 - [ ] `gitleaks dir skills/test-co-location-enforcer/references/testing-framework-guide.md --no-banner --redact --exit-code 1` exits 0.
-- [ ] `gitleaks dir . --no-banner --redact` reports no hit on a tracked file. Any remaining hit is under `.claude/`.
+- [ ] `gitleaks dir . --no-banner --redact` reports no hit on a tracked file. Any remaining hit is under `.claude/`. This includes this task's own directory, so the scan runs **after** finalise has written its artefacts.
 - [ ] The guide's two examples still read as JWT-decoding examples. Only the literal changed.
-- [ ] No matched value appears in a commit message, PR text, QA report or tracker comment.
+- [ ] No matched value appears in a commit message, PR text, QA report or tracker comment. Checked by the full-tree scan above (it covers the task directory's reports), by `git log --format=%B develop..HEAD | gitleaks stdin --no-banner --redact --exit-code 1` (commit messages), and by `gh pr view --json body -q .body | gitleaks stdin --no-banner --redact --exit-code 1` (PR text). Each exits 0.
 
 ### Performance
 
@@ -258,6 +259,7 @@ Not applicable.
 - [ ] `npm test` passes.
 - [ ] `npm run bundle:check` passes.
 - [ ] `bash -n scripts/setup-consumer.sh` passes (comment-only edit).
+- [ ] `npm run lint:shell` passes (ShellCheck over every tracked `.sh` source, including `scripts/setup-consumer.sh`).
 
 ### Migration
 
@@ -278,7 +280,7 @@ None.
 - **Risk**: an unredacted `gitleaks` run or a `git diff` pasted into a report prints the old value.
 - **Probability**: Medium
 - **Impact**: Minor. The values are fake, but printing them defeats the task's purpose and feeds the leak guard.
-- **Mitigation**: always pass `--redact`. Describe hits by file, line and rule only. Never paste the guide diff into a report.
+- **Mitigation**: always pass `--redact`. Describe hits by file, line and rule only. Never paste the guide diff into a report. The two **prose** lines trip the rule too: an artefact that quotes them verbatim (this task document did, at review) is itself a hit. Describe the old prose, never reproduce it, in every report, PR body and commit message.
 - **Rollback**: none needed. Edit the text that carries the value.
 
 ### Low Risk Areas
@@ -287,7 +289,7 @@ None.
 - **Risk**: gitleaks' rule set differs between versions, so a reword clean on one version may match on another.
 - **Probability**: Low
 - **Impact**: Minor
-- **Mitigation**: re-run the calibration with the version used here, and record that version in the implementation report.
+- **Mitigation**: re-run the calibration with the version used here, and record that version in the implementation report. Read it with `pacman -Q gitleaks` (8.30.1 at review): this build's `gitleaks version` prints no version.
 
 ---
 
@@ -319,12 +321,27 @@ clean.
 
 ---
 
+## Implementation Record
+
+**Started**: 2026-10-22 · **Completed**: 2026-10-22 · implemented inline by the `/develop-task` orchestrator (run 1; plan file and surface map in hand, `/develop` not invoked).
+
+**Summary.** The testing guide's two `const token = …` samples now read `<header>.<payload>.<signature>` (single and double quotes kept). The `setup-consumer.sh` step-3 comment and the task.60 review's YAML-features line are reworded exactly as Phase 2 states. CHANGELOG `[Unreleased]` → `### Fixed` carries the task 228 entry.
+
+**Approach.** The guide's two values were replaced by a script that matched each `const token = <quote>…<quote>;` line and rewrote it, so the old value never appeared in a command line or in output. The two prose lines were replaced by exact-string substitution, each asserted to occur once.
+
+**Testing.** gitleaks 8.30.1 (`pacman -Q gitleaks`). Calibration first: the original lines, saved to scratch files, gave 2 leaks (guide), 1 (`setup-consumer.sh:11`) and 1 (task.60 :57). After the change, each changed file and the task directory scan with `--exit-code 1` → exit 0. Full tree (`gitleaks dir . --redact`): 3 hits, all under `.claude/state/` (gitignored), none on a tracked file. `bash -n scripts/setup-consumer.sh` ok; `npm run lint:shell` clean (93 scripts); `npm run bundle:check` 128 skills, 0 problems; `npm run ci:fast`: format check passed, 6187/6202 tests passed (the rest skipped), 1 failed — `tests/bundle-missing-source.test.js`, its LOAD-SENSITIVE budget (20313 ms against 20000 ms, load average 19.5). Re-run alone: 7/7 pass in 17.4 s.
+
+**Deferred Work.** None in scope. The pre-commit hook pins gitleaks v8.21.2 (`.pre-commit-config.yaml`), and this task calibrated on 8.30.1. Aligning the versions belongs with task.229's scan lane.
+
 <!-- change-log-start -->
 ## Change Log
 
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-10-22 | 1.0     | Initial draft | create-task |
+| 2026-10-22 | 1.1     | Review 9/10 after fixes — ready to build: reworded the document's own quotations of the two prose lines (they tripped gitleaks), named the commit/PR-text check, added `npm run lint:shell`, recorded the gitleaks version | review-task |
+| 2026-10-22 |         | Status → ready-for-development | review-task |
+| 2026-10-22 |         | Implemented — 4 files (guide samples, 2 prose rewords, CHANGELOG); tracked tree scans clean | develop |
 <!-- change-log-end -->
 
 ---
@@ -332,18 +349,18 @@ clean.
 ## Progress Tracking
 
 ### Phase 1: Replace the guide's sample tokens
-- [ ] Line 142 value
-- [ ] Line 1023 value
-- [ ] File scan clean
+- [x] Line 142 value
+- [x] Line 1023 value
+- [x] File scan clean
 
 ### Phase 2: Reword the two prose false positives
-- [ ] `setup-consumer.sh:11`
-- [ ] task.60 review line 57
+- [x] `setup-consumer.sh:11`
+- [x] task.60 review line 57
 
 ### Phase 3: CHANGELOG and full verification
-- [ ] CHANGELOG entry
-- [ ] Full-tree scan
-- [ ] `npm test`, `bundle:check`
+- [x] CHANGELOG entry
+- [x] Full-tree scan
+- [x] `npm test`, `bundle:check`
 
 ---
 
@@ -366,7 +383,7 @@ clean.
 
 ---
 
-**Status:** Planned
+**Status:** Ready for Review
 
 **Next Steps**:
 1. `/develop-task docs/tasks/task.228.fake-sample-tokens-gitleaks/task.228.fake-sample-tokens-gitleaks.md`
