@@ -5,7 +5,7 @@ How to use this document: work top to bottom. Only `[ ]` rows are candidates; `[
 [`roadmap-history.md`](./roadmap-history.md), so a `deps:` entry naming no current row means
 _already shipped_, not an error. Resolve any such reference there.
 
-**Phases 1 through 14 are complete and archived** to
+**Phases 1 through 15 are complete and archived** to
 [`roadmap-history.md`](./roadmap-history.md) — resolve any `deps:` naming a row you cannot find here
 against that file. The rows under "Deferred / human-gated" remain invisible to selection.
 
@@ -20,7 +20,7 @@ finished work. Rules:
 §"Registry fallback frontier".
 
 Add a phase only to express *sequencing* the registries cannot: a deliberate order, a dependency
-chain, a human gate. Phase 15 is open (opened 2026-10-22); once it closes, selection falls through to the registries.
+chain, a human gate. No phase is open (Phase 15 closed 2026-10-22); selection falls through to the registries.
 
 > ⚠️ **A phase costs upkeep that a registry row does not, and the cost is not obvious.** Roadmap rows
 > are matched on the **checkbox alone** — they do **not** consult the target document's frontmatter.
@@ -67,16 +67,6 @@ Read only by `--batch`. Two rows conflict when they share a tag that **either** 
 | `docs-pipeline`    | `docs/runbooks/*`, `docs/concepts/*`, `docs/reference/pipeline-artifacts.md`, `docs/operations/workflows.md`, `skills/develop-*/README.md` |
 | `pipeline-lock`    | `shared/resources/advance-pipeline-lock.sh`, `advance-pipeline-lock.test.sh`  |
 
-## PHASE 15 — secret-scan clean tree and guard (opened 2026-10-22)
-
-An **override**: without it the registry fallback selects T217 first, because it takes the
-lowest-numbered task. The owner asked for these two ahead of every other story and task. T228
-makes `gitleaks dir .` clean on tracked files, so a downstream consumer can drop its allowlist for
-the vendored testing guide. T229 adds the CI lane that keeps it clean, and is red until T228 merges.
-
-- [x] **T228** Replace the sample tokens gitleaks flags in tracked files · deps: none · touches: setup-consumer~ · /develop-task docs/tasks/task.228.fake-sample-tokens-gitleaks/task.228.fake-sample-tokens-gitleaks.md — ✅ **accepted + merged** ([PR #732](https://github.com/Gamaroff/agent-skills/pull/732), `74d12118`; QA PASS 100/100 after 1 cycle, DoD accepted on run 2, CI 5/5). The testing guide’s two sample tokens are now a `<header>.<payload>.<signature>` placeholder and two prose false positives are reworded; the tracked tree scans clean
-- [ ] **T229** Secret-scan CI lane over tracked files · deps: T228 · touches: test-harness~ · /develop-task docs/tasks/task.229.secret-scan-ci-lane/task.229.secret-scan-ci-lane.md
-
 ## Deferred / human-gated
 
 Rows here are invisible to selection. Move a row up into a phase when it becomes actionable.
@@ -88,7 +78,7 @@ Rows here are invisible to selection. Move a row up into a phase when it becomes
 
 ## Housekeeping
 
-- [x] Archive accepted rows to `roadmap-history.md` at each phase close — Phase 5 archived 2026-09-12; Phases 6, 7 and 8 archived 2026-10-06; Phases 9 and 10 archived 2026-10-11; Phase 11 archived 2026-10-16; Phase 12 archived 2026-10-20; Phase 13 archived 2026-10-21; Phase 14 archived 2026-10-22
+- [x] Archive accepted rows to `roadmap-history.md` at each phase close — Phase 5 archived 2026-09-12; Phases 6, 7 and 8 archived 2026-10-06; Phases 9 and 10 archived 2026-10-11; Phase 11 archived 2026-10-16; Phase 12 archived 2026-10-20; Phase 13 archived 2026-10-21; Phases 14 and 15 archived 2026-10-22
 - [ ] If a phase is ever re-opened: tick its rows `[x]` as each item is accepted — an unticked row for an accepted item is still selected and stalls the loop
 
 **Registry-selected items need no row here.** When selection falls through to the registries (the
@@ -212,3 +202,5 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-10-22 | **Phase 14 closed and archived** to `roadmap-history.md` (T226 was its only row). No phase is open; selection falls through to the registries (next: T217). |
 | 2026-10-22 | **Phase 15 opened** with T228 (sample tokens that trip gitleaks) and T229 (the secret-scan CI lane, deps T228), ordered ahead of the registry fallback at the owner's request; without it T217 is selected first. |
 | 2026-10-22 | **T228 accepted + merged — PR #732 merged** (`74d12118`). The testing guide’s two sample tokens became a `<header>.<payload>.<signature>` placeholder; a comment in `scripts/setup-consumer.sh` and one line of the task.60 review were reworded. `gitleaks dir .` (8.30.1, `--redact`) now finds nothing in a tracked file; the only hits are scratch files under the gitignored `.claude/`. QA ran 1 cycle: PASS 100, 0 bugs, 1 advisory (CR-1). 5c APPROVE. DoD run 1 found 2 gaps (the scan criteria had no per-PR lane); the owner moved that guard to T229, which now also scans commit messages and PR text. DoD run 2 accepted 11/11. Merge gate `npm run ci` green (6187 pass). CI 5/5. Issue #730 closed. |
+| 2026-10-22 | **T229 accepted + merged — PR #733 merged** (`9cd7f1a6`). A `Secret scan` CI lane and its local twin `npm run lint:secrets` (`scripts/lint-secrets.sh`, pinned gitleaks 8.30.1) now run on every PR. They scan the tracked tree, the PR range's commit messages and the PR body, run a planted-token self-check first, tell a scanner error from a leak, and print file, line and rule only (`--redact`). Rules are pinned with `--config`, the ignore list is pinned empty, and the stdin scans run outside the repository, so a PR cannot silence them with a tracked `.gitleaks.toml` or `.gitleaksignore`. The threat model is accidental commits: a PR runs its own workflow. QA ran 4 cycles: CONCERNS 80, FAIL 70, CONCERNS 90, PASS 96 (route 2b). 5c APPROVE. DoD run 1 accepted 15/15; the DoD probe ran 11 candidates with 0 reproduced and 0 escaped. Merge gate `npm run ci` green (6221 tests, 0 failed). CI 5/5. Issue #731 closed. Low follow-ups: CR-1/CR-2 (the tree-scan copy can still read a tracked `.gitleaksignore`; not exploitable), PC-2/PC-3 (task planning sections lag the pins and the `edited` trigger). |
+| 2026-10-22 | **Phase 15 closed and archived** to `roadmap-history.md` (T228 and T229). No phase is open; selection falls through to the registries (next: T217). |

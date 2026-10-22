@@ -284,3 +284,13 @@ lowest-numbered task. T226 closes task.216's carried finding TASK-216-QA3-1 whil
 the docs say every `LD_*`/`DYLD_*` variable is refused on a `cli:` case, and the code refuses four.
 
 - [x] **T226** security-probe: refuse every LD_* and DYLD_* variable on cli: case fixtures · deps: none · touches: test-harness~, bundles~ · /develop-task docs/tasks/task.226.probe-cli-loader-env-prefix-refusal/task.226.probe-cli-loader-env-prefix-refusal.md — ✅ **accepted + merged** ([PR #729](https://github.com/Gamaroff/agent-skills/pull/729), `ca958146`; QA PASS 100/100 after 1 cycle, DoD accepted on run 1, CI 5/5). A `cli:` case’s `fixture.env` now refuses any key starting `LD_` or `DYLD_` by name, before any spawn, through one predicate (`steersInterpreter`); `MY_LD_FLAG`, `ld_audit` and `LDFLAGS` still run
+
+## PHASE 15 — secret-scan clean tree and guard (opened 2026-10-22, closed 2026-10-22)
+
+An **override**: without it the registry fallback selects T217 first, because it takes the
+lowest-numbered task. The owner asked for these two ahead of every other story and task. T228
+makes `gitleaks dir .` clean on tracked files, so a downstream consumer can drop its allowlist for
+the vendored testing guide. T229 adds the CI lane that keeps it clean, and is red until T228 merges.
+
+- [x] **T228** Replace the sample tokens gitleaks flags in tracked files · deps: none · touches: setup-consumer~ · /develop-task docs/tasks/task.228.fake-sample-tokens-gitleaks/task.228.fake-sample-tokens-gitleaks.md — ✅ **accepted + merged** ([PR #732](https://github.com/Gamaroff/agent-skills/pull/732), `74d12118`; QA PASS 100/100 after 1 cycle, DoD accepted on run 2, CI 5/5). The testing guide’s two sample tokens are now a `<header>.<payload>.<signature>` placeholder and two prose false positives are reworded; the tracked tree scans clean
+- [x] **T229** Secret-scan CI lane over tracked files · deps: T228 · touches: test-harness~ · /develop-task docs/tasks/task.229.secret-scan-ci-lane/task.229.secret-scan-ci-lane.md — ✅ **accepted + merged** ([PR #733](https://github.com/Gamaroff/agent-skills/pull/733), `9cd7f1a6`; QA PASS 96/100 after 4 cycles, DoD accepted on run 1, CI 5/5). Every PR now runs a `Secret scan` lane (gitleaks 8.30.1, pinned rules and an empty ignore list) over the tracked tree, the PR's commit messages and its body, with a planted-token self-check and redacted output; `npm run lint:secrets` is its local twin
