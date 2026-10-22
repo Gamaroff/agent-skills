@@ -54,7 +54,7 @@ ready — four of them are specification errors that cost hours now and days if 
 and sequences-of-mappings. How should the subset be scoped?
 
 - **User Decision:** **Refuse only aliasing constructs.** Refuse only what can change what a key
-  resolves to — anchors, aliases, merge keys, quoted/explicit keys, multi-line flow mappings, tags,
+  resolves to — anchors, aliases, merge keys, quoted or explicit keys; multi-line flow mappings, tags,
   BOM, document separators. Arbitrary nesting depth, block and flow sequences, and sequences-of-mappings
   become *ignorable*. The file-wide blast radius stays.
 - **Impact:** The Phase 1 accept/refuse tables are rewritten around "cannot mislead" rather than

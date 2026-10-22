@@ -8,7 +8,7 @@
 #   2. Platform selection         (GitHub+Issues / GitHub+Jira / Bitbucket+Jira),
 #                                  then tracker access (full / read-only / approve / command / manual)
 #   2b. Skill install profile     (full / pipeline / minimal, plus add-ons)
-#   3. Credential collection      (gh auth check, Bitbucket/Jira API tokens)
+#   3. Credential collection      (gh auth check; Bitbucket and Jira API tokens)
 #   4. Credentials file           (Bitbucket/Jira only: .env.example; .secrets/tooling.env
 #                                  optionally; .secrets/ and .env gitignored)
 #   5. skills-config.yaml         (PRD path, architecture path, coding-standards path)

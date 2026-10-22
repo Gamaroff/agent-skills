@@ -106,6 +106,12 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **test-co-location-enforcer: the testing guide's sample tokens no longer trip a secret scan
+  (task 228).** The two `const token = …` examples in
+  `references/testing-framework-guide.md` now use `<header>.<payload>.<signature>`, so a project
+  that vendors the skill passes `gitleaks` without a path allowlist for that file. Two prose
+  lines that gitleaks misread as key assignments (`scripts/setup-consumer.sh`, a task.60 review)
+  are reworded. Text only; no behaviour changes.
 - **security-probe: a `cli:` case refuses every `LD_*` and `DYLD_*` variable (task 226).** A
   `cli:` case's `fixture.env` declined four loader variables by exact name, so `LD_AUDIT`,
   `DYLD_FRAMEWORK_PATH`, `DYLD_FALLBACK_LIBRARY_PATH` and the rest reached the interpreter. It now
