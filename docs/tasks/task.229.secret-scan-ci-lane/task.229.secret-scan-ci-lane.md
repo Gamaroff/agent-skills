@@ -5,10 +5,12 @@ type: task
 description: "Add a pinned-gitleaks CI lane and its local twin so a secret-shaped string in a tracked file fails the build."
 tags: [gitleaks, secret-scan, ci, guard]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-22
 updated: 2026-10-22
+completed_date: 2026-10-22
+pr_number: 733
 assignee:
 estimated_effort_hours: 4
 github_issue: 731
@@ -16,7 +18,7 @@ github_issue: 731
 
 # Technical Task: Secret-scan CI lane over tracked files
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.229.review.1.secret-scan-ci-lane.md` implemented 2026-10-22
 **GitHub Issue**: [#731](https://github.com/Gamaroff/agent-skills/issues/731)
 
@@ -326,30 +328,30 @@ in the same order as ShellCheck's.
 
 ### Functional
 
-- [ ] On the post-task.228 tree, `npm run lint:secrets` exits 0 (the `Secret scan` lane on the PR head, and `lint-secrets.test.mjs` case 3).
-- [ ] With a runtime-generated token in a staged scratch file, `npm run lint:secrets` exits 1 (Phase 1's scan mutation, recorded; `lint-secrets.test.mjs` case 4 holds the exit path).
-- [ ] With the self-check plant replaced by a low-entropy value, the script exits 1 before the real scan (Phase 1's self-check mutation, recorded; `lint-secrets.test.mjs` case 2 holds it).
-- [ ] With gitleaks off `PATH`, the script exits 0 and prints the skip message (`lint-secrets.test.mjs` case 1).
-- [ ] With no tracked files, the script exits 1 (`lint-secrets.test.mjs` case 6).
-- [ ] The `Secret scan` workflow is green on the PR head.
-- [ ] With a runtime-generated token in a scratch commit message, the PR text scan exits 1 (recorded; `lint-secrets.test.mjs` case 5 holds the exit path); on the real PR range and body it exits 0 (the lane on the PR head).
-- [ ] This lane is the per-PR guard for task.228's three scan criteria (the testing guide, the tracked tree, commit messages / PR text). Each runs on every PR.
+- [x] On the post-task.228 tree, `npm run lint:secrets` exits 0 (the `Secret scan` lane on the PR head, and `lint-secrets.test.mjs` case 3).
+- [x] With a runtime-generated token in a staged scratch file, `npm run lint:secrets` exits 1 (Phase 1's scan mutation, recorded; `lint-secrets.test.mjs` case 4 holds the exit path).
+- [x] With the self-check plant replaced by a low-entropy value, the script exits 1 before the real scan (Phase 1's self-check mutation, recorded; `lint-secrets.test.mjs` case 2 holds it).
+- [x] With gitleaks off `PATH`, the script exits 0 and prints the skip message (`lint-secrets.test.mjs` case 1).
+- [x] With no tracked files, the script exits 1 (`lint-secrets.test.mjs` case 6).
+- [x] The `Secret scan` workflow is green on the PR head.
+- [x] With a runtime-generated token in a scratch commit message, the PR text scan exits 1 (recorded; `lint-secrets.test.mjs` case 5 holds the exit path); on the real PR range and body it exits 0 (the lane on the PR head).
+- [x] This lane is the per-PR guard for task.228's three scan criteria (the testing guide, the tracked tree, commit messages / PR text). Each runs on every PR.
 
 ### Performance
 
-- [ ] The lane's CI wall time is recorded in the implementation report.
+- [x] The lane's CI wall time is recorded in the implementation report.
 
 ### Code Quality
 
-- [ ] `npm test` passes, including `ci-gate-parity.test.mjs`.
-- [ ] `npm run lint:shell` passes with the new script in its file set.
-- [ ] `npm run format:check` passes.
-- [ ] No matched value is printed anywhere: lane output, reports or PR text (every `gitleaks` call carries `--redact`, held by `lint-secrets.test.mjs` case 7).
+- [x] `npm test` passes, including `ci-gate-parity.test.mjs`.
+- [x] `npm run lint:shell` passes with the new script in its file set.
+- [x] `npm run format:check` passes.
+- [x] No matched value is printed anywhere: lane output, reports or PR text (every `gitleaks` call carries `--redact`, held by `lint-secrets.test.mjs` case 7).
 
 ### Migration
 
-- [ ] CHANGELOG `### Added` entry cites task 229.
-- [ ] CONTRIBUTING.md and releases.md list `lint:secrets` wherever they list `lint:shell`.
+- [x] CHANGELOG `### Added` entry cites task 229.
+- [x] CONTRIBUTING.md and releases.md list `lint:secrets` wherever they list `lint:shell`.
 
 ---
 
@@ -432,12 +434,36 @@ test would then fail on the orphaned `lint:secrets`. Revert as a whole.
 - Cycle 3's fixes verified: a tracked `.gitleaksignore` no longer silences the PR-text scans (real binary), and the threat model and path allowlist are stated.
 - Two low findings (CR-1, CR-2: the tree scan still loads a tracked `.gitleaksignore` from its copy, which is not exploitable today, and the test cannot see it) were carried by the cosmetic-residue exit. See Deferred Work.
 
-<!-- change-log-start -->
 ## Deferred Work
 
 - CR-1 (low, QA cycle 4, route 2b): the tree scan still loads a tracked `.gitleaksignore` from its `$tmp/tree` copy (gitleaks reads `<source>/.gitleaksignore`). It is not exploitable today, because a dir-scan fingerprint embeds the random mktemp path. Rename the copy before the scan, and correct the comment and docs. See gate 4 `recommendations.future`.
 - CR-2 (low, QA cycle 4, route 2b): the pinned-rules test should assert that no dir-scan source holds a `.gitleaksignore`.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.229.qa.4.secret-scan-ci-lane.md`
+**Gate File**: `task.229.gate.4.secret-scan-ci-lane.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 96/100 (4 QA cycles)
+**PR Review (5c)**: `task.229.pr-review.1.secret-scan-ci-lane.md`: ✅ APPROVE
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 15/15 Success Criteria met (8 functional, 1 performance, 4 code quality, 2 migration)
+✅ **Tests & CI:** PR #733, all 5 checks SUCCESS on `58347138`; `lint-secrets.test.mjs` holds every exit path per PR
+✅ **Documentation:** CHANGELOG cites (task 229); CONTRIBUTING, SECURITY, releases.md, tech-stack.md, coding-standards.md, traps.md and evals README updated
+✅ **Security Review:** PASS. Output redacted, PR text passed via `env:`, no new dependencies. The boundary probe ran 11 candidates, reproduced 0 and escaped 0 (`task.229.dod.1.security.run.json`)
+⚠️ **Compliance Review:** NOT_APPLICABLE (internal CI lane, no personal, payment, UI or health data)
+
+**Task marked as ACCEPTED on:** 2026-10-22
+
+**Detailed Verification Log:** See `task.229.dod.1.secret-scan-ci-lane.md` for the full evidence and timestamps.
+
+<!-- change-log-start -->
 ## Change Log
 
 | Date | Version | Description | Author |
@@ -454,6 +480,7 @@ test would then fail on the orphaned `lint:secrets`. Revert as a whole.
 | 2026-10-22 |  | QA gate CONCERNS (90/100) — 3 findings | qa-task |
 | 2026-10-22 |  | QA findings fixed — cycle 3, 3 findings (CR-1 ignore list pinned and stdin scans run outside the repo, CR-3 accidental-leak threat model stated, CR-4 default path allowlist documented) | qa-fix |
 | 2026-10-22 |  | QA gate PASS (96/100) — 2 low findings carried (route 2b) | qa-task |
+| 2026-10-22 | 1.3 | DoD passed — accepted (PR #733) | finalise |
 <!-- change-log-end -->
 
 ---
