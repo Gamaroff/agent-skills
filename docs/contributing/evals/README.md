@@ -21,8 +21,8 @@ npm run eval:develop-story       # develop-story protocol + step-isolation (no c
 npm run eval:develop-story:smoke # develop-story full smoke (needs ANTHROPIC_API_KEY)
 ```
 
-If `npm run ci` is green, every push will stay green in CI — it mirrors `test.yml`, `validate.yml`
-and `shellcheck.yml` lane for lane, and a parity test fails `npm test` if the two drift. `npm test`
+If `npm run ci` is green, every push will stay green in CI — it mirrors `test.yml`, `validate.yml`,
+`shellcheck.yml` and `secret-scan.yml` lane for lane, and a parity test fails `npm test` if the two drift. `npm test`
 alone is the hermetic suite (one of the lanes); it predicts `test.yml`'s middle step, not CI. Live
 drivers are opt-in.
 

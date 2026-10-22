@@ -162,6 +162,20 @@ test("verdict: workflows outside the table (Release, Branch Policy) are ignored"
   assert.equal(v.reason, "green");
 });
 
+test("verdict: a notGating workflow (Secret scan) is never read — red or absent, the verdict ignores it", () => {
+  assert.ok(
+    mod.WORKFLOWS.notGating.includes("Secret scan"),
+    "non-vacuity: Secret scan is the notGating lane this case exercises",
+  );
+  const red = mod.ciVerdict([...GREEN_REQUIRED, run("Secret scan", "failure")]);
+  assert.equal(red.reason, "green");
+  assert.ok(
+    !red.workflows.some((w) => w.name === "Secret scan"),
+    "a notGating lane must not appear in the verdict at all",
+  );
+  assert.equal(mod.ciVerdict(GREEN_REQUIRED).reason, "green");
+});
+
 test("verdict: a non-array input is unverifiable", () => {
   assert.equal(mod.ciVerdict(null).reason, "unverifiable");
   assert.equal(mod.ciVerdict({}).reason, "unverifiable");
@@ -456,6 +470,17 @@ test("parity: every WORKFLOWS name is a workflow's name:, with the push shape it
       `whenPresent workflow "${n}" must be push.paths-filtered — else move it to required`,
     );
   }
+  for (const n of mod.WORKFLOWS.notGating) {
+    const w = byName.get(n);
+    assert.ok(
+      w,
+      `notGating workflow "${n}" is not the name: of any file in .github/workflows`,
+    );
+    assert.ok(
+      w.push,
+      `notGating workflow "${n}" does not run on push — it needs no entry; remove it`,
+    );
+  }
 });
 
 test("parity: every push-triggered branch workflow is in the table (a new one is a decision, not a default)", () => {
@@ -463,6 +488,7 @@ test("parity: every push-triggered branch workflow is in the table (a new one is
   const listed = new Set([
     ...mod.WORKFLOWS.required,
     ...mod.WORKFLOWS.whenPresent,
+    ...mod.WORKFLOWS.notGating,
   ]);
   for (const f of files) {
     const text = fs.readFileSync(path.join(WORKFLOW_DIR, f), "utf8");

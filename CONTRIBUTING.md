@@ -61,7 +61,7 @@ Full model: [`docs/contributing/releases.md`](./docs/contributing/releases.md#br
 Run the gates locally — CI runs the same ones and rejects regressions. See [`docs/contributing/evals/README.md`](./docs/contributing/evals/README.md) for the full reference. One command runs every lane CI runs:
 
 ```bash
-npm run ci                            # every CI lane: format:check, npm test, eval:all, validate:all, check:generated, bundle:check, lint:shell
+npm run ci                            # every CI lane: format:check, npm test, eval:all, validate:all, check:generated, bundle:check, lint:shell, lint:secrets
 ```
 
 It is slow (the replay evals dominate). The minimum on every push, and what the develop loop runs per iteration, is the fast tier:
@@ -122,6 +122,20 @@ ahead of it and report findings CI does not. If a finding is a genuine false pos
 `# shellcheck disable=SCxxxx` **with a one-line reason on the same line** — a bare disable is a
 suppression, and a directive covers only the command immediately after it, so a block of assignments
 needs one each.
+
+**Every PR is secret-scanned.** The `Secret scan` workflow runs a pinned gitleaks (**8.30.1**, see
+`.github/workflows/secret-scan.yml`) over the tracked files, the PR's commit messages and its body, and
+fails on a secret-shaped string. `npm run lint:secrets` (`scripts/lint-secrets.sh`) is its local twin —
+the workflow calls it, so the file set is the same — and skips loudly when no `gitleaks` binary is
+installed. Before scanning it plants a token generated at runtime and fails if the scanner misses three of them,
+so a green result is never the scanner's silence. A sample value that trips it is reworded (task 228),
+or carries `gitleaks:allow` with a reason on the same line. The lane pins gitleaks' default rules and
+an empty ignore list, so a `.gitleaks.toml` or `.gitleaksignore` in the tree has no effect on it. The
+default rules keep gitleaks' own path allowlist (lockfiles, vendored `node_modules/`, images, fonts,
+PDFs and similar), and tracked files on it are not scanned. The lane catches a secret committed by
+accident; a PR runs its own copy of the workflow and the script, so it is no control against a
+deliberate bypass — branch review is. A local binary
+of another version may disagree with CI; CI's pin is the authority.
 
 `prettier` is already a devDependency, so `npm ci` provides it. Prettier covers **JavaScript only** — Markdown, YAML and JSON are excluded on purpose in `.prettierignore`, because this repo's documents are hand-wrapped.
 
