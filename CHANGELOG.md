@@ -6,6 +6,17 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **A `Secret scan` CI lane and its local twin, `npm run lint:secrets` (task 229).** A new
+  workflow, `.github/workflows/secret-scan.yml`, runs a pinned gitleaks (8.30.1) on every PR and
+  every push to `main`/`develop`, over the tracked files, the commit messages of the PR or push,
+  and the PR body. A secret-shaped string fails the build, reported by file, line and rule, never
+  by value. `scripts/lint-secrets.sh` is the one definition of the file set; the workflow calls it,
+  and `npm run ci` runs it, skipping loudly when `gitleaks` is not installed. Before scanning, the
+  script plants a token generated at runtime and fails if the scanner misses it, so a green result
+  is never the scanner's silence. History is not scanned. The lane is not yet a release gate:
+  `scripts/release-ci-verdict.mjs` lists it under a new `WORKFLOWS.notGating` until it has a green
+  record. `evals/shared/tests/lint-secrets.test.mjs` holds the script's exit paths with a stub
+  scanner.
 - **security-probe: a `cli:` case carries `fixture.files` and `fixture.env` (task 216).** The
   `cli:` form (Node and Python) now writes a case's `fixture.files` into its case directory, the
   CLI's cwd, and merges `fixture.env` before the spawn, as `shell-argv:` already did. A CLI that

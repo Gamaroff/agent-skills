@@ -30,6 +30,17 @@ Out of scope: skills that intentionally run privileged operations when used as d
 
 ## Secret scanning
 
+The `Secret scan` CI workflow (`.github/workflows/secret-scan.yml`) runs a pinned gitleaks over every
+PR and every push to `main`/`develop`: the tracked files, the commit messages of the PR or push, and
+the PR body. A secret-shaped string fails the build. Run the same scan locally before pushing:
+
+```bash
+npm run lint:secrets
+```
+
+It skips with a message when `gitleaks` is not installed. The CI pin is the authority; the pre-commit
+hook below pins an older version, so the two can disagree on a new rule.
+
 A pre-commit hook (`.pre-commit-config.yaml`) runs [gitleaks](https://github.com/gitleaks/gitleaks) on staged changes. To enable in your clone:
 
 ```bash
