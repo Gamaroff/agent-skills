@@ -13,7 +13,8 @@ All notable changes to this project will be documented in this file. Format foll
   by value. `scripts/lint-secrets.sh` is the one definition of the file set; the workflow calls it,
   and `npm run ci` runs it, skipping loudly when `gitleaks` is not installed. Before scanning, the
   script plants a token generated at runtime and fails if the scanner misses three of them, so a green result
-  is never the scanner's silence. History is not scanned. The lane is not yet a release gate:
+  is never the scanner's silence. Every call pins gitleaks' default rules with `--config`, so a
+  `.gitleaks.toml` committed in a PR cannot switch the scan off. History is not scanned. The lane is not yet a release gate:
   `scripts/release-ci-verdict.mjs` lists it under a new `WORKFLOWS.notGating` until it has a green
   record. `evals/shared/tests/lint-secrets.test.mjs` holds the script's exit paths with a stub
   scanner.

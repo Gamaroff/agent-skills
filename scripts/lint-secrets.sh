@@ -26,7 +26,17 @@
 #                        the merge-base with origin/develop up to HEAD, or skipped
 #                        when origin/develop does not resolve. A base of all
 #                        zeros (a new-branch push) has no range and is skipped.
+#                        Any other value not shaped <base>..<head> is an error.
+#   SECRET_SCAN_EVENT    the GitHub event name. Only on `push` may the range's
+#                        base be missing from the checkout (a force-push rewrote
+#                        it away); anywhere else that is a broken checkout, and
+#                        an error rather than a skipped scan.
 #   SECRET_SCAN_PR_BODY  the PR body; scanned when non-empty.
+#
+# The rules are pinned: every call passes --config with gitleaks' default rules,
+# written here, outside the scanned tree. Without it gitleaks would load a
+# .gitleaks.toml from the tree, and the change being scanned could switch the
+# scan off while the self-check still passed (task 229 QA cycle 2).
 #
 # History is NOT scanned (`gitleaks git` would find values task 228 removed):
 # the lane guards the tree and the PR in front of it, not the past.
@@ -58,7 +68,11 @@ printf '{{range .}}  {{.File}}:{{.StartLine}} {{.RuleID}}\n{{end}}' >"$tmp/repor
 # missing dir, a bad report template), and with --exit-code 1 a scanner that
 # crashed read as a found secret — and as a caught self-check plant.
 LEAK_RC=99
+# The default rules, from a file the scanned change cannot touch. --config
+# outranks the GITLEAKS_CONFIG* variables and the tree's own .gitleaks.toml.
+printf '[extend]\nuseDefault = true\n' >"$tmp/gitleaks.toml"
 GL_FLAGS=(--no-banner --redact --exit-code "$LEAK_RC" --log-level error
+  --config "$tmp/gitleaks.toml"
   --report-format template --report-template "$tmp/report.tmpl" --report-path -)
 
 # scanner_ran <rc> <output> <what>: exit 1 unless <rc> is clean (0) or a leak
@@ -133,15 +147,24 @@ if [ -z "$range" ] && base=$(git merge-base origin/develop HEAD 2>/dev/null); th
   range="$base..HEAD"
 fi
 range_base=${range%%..*}
+range_head=${range#*..}
 if [ -z "$range" ]; then
   echo "commit-message scan skipped — no range (set SECRET_SCAN_RANGE, or fetch origin/develop)"
+elif [ "$range" = "$range_base" ] || [ -z "$range_base" ] || [ -z "$range_head" ]; then
+  # No `..`, or an empty side: `git log HEAD` would read all of history.
+  echo "error: SECRET_SCAN_RANGE '$range' is not a <base>..<head> range." >&2
+  exit 1
 elif [ -z "${range_base//0/}" ]; then
   echo "commit-message scan skipped — $range has no base commit (a new-branch push)"
 elif ! git cat-file -e "${range_base}^{commit}" 2>/dev/null; then
-  # A force-push: the push event's `before` was rewritten away and is not in
-  # the checkout. The new commits cannot be told apart from the old ones, so the
-  # message scan is skipped loudly; the tree scan above still ran.
-  echo "commit-message scan skipped — the base of $range is not in this checkout (a force-push?)"
+  if [ "${SECRET_SCAN_EVENT:-}" != push ]; then
+    echo "error: the base of $range is not in this checkout (a shallow clone? the workflow checks out with fetch-depth: 0)" >&2
+    exit 1
+  fi
+  # A force-push: the push event's `before` was rewritten away. The new commits
+  # cannot be told apart from the old ones, so the message scan is skipped
+  # loudly; the tree scan above still ran.
+  echo "commit-message scan skipped — the base of $range is not in this checkout (a force-push)"
 else
   msgs=$(git log --format=%B "$range") || {
     echo "error: cannot read the commit range $range (a shallow clone? the workflow checks out with fetch-depth: 0)" >&2

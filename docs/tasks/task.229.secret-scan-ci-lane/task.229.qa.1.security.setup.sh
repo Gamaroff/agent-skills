@@ -23,10 +23,14 @@ g() { git -c user.email=probe@example.invalid -c user.name=probe -c commit.gpgsi
 # in QA cycle 1), so a hostile case planted with an unlucky value would read as a pass. Keep only a
 # value the scanner is shown to catch, so a case measures the script, not the draw.
 token() {
-  local t i
-  for i in 1 2 3 4 5 6 7 8; do
+  # A leak exits 99, never 1: gitleaks exits 1 on its own errors, which must not
+  # read as a caught value (the script's own LEAK_RC rule).
+  local t rc
+  for _ in 1 2 3 4 5 6 7 8; do
     t=$(head -c 24 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=')
-    if ! printf "const api_key = '%s';\n" "$t" | gitleaks stdin --no-banner --exit-code 1 --log-level error >/dev/null 2>&1; then
+    rc=0
+    printf "const api_key = '%s';\n" "$t" | gitleaks stdin --no-banner --exit-code 99 --log-level error >/dev/null 2>&1 || rc=$?
+    if [ "$rc" -eq 99 ]; then
       printf '%s' "$t"
       return 0
     fi

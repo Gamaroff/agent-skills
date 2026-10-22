@@ -34,8 +34,13 @@
  *      three plants fails (QA cycle 1, QA-1).
  *  10. A scanner error (exit 1, as gitleaks exits on a fatal error) is never
  *      read as a caught plant or a found secret (QA cycle 1, CR-1).
- *  11. A range base missing from the checkout (a force-push) skips the
- *      message scan loudly (CR-2).
+ *  11. A range base missing from the checkout skips the message scan loudly
+ *      on a push (a force-push), and is an error on any other event (QA
+ *      cycle 1 CR-2, cycle 2 CR-2).
+ *  12. A SECRET_SCAN_RANGE not shaped <base>..<head> is an error (cycle 2 CR-3).
+ *  13. Every scan passes --config with the default rules from outside the
+ *      scanned repository (cycle 2 CR-1: a committed .gitleaks.toml switched
+ *      the real scan off; with gitleaks 8.30.1, --config outranks it).
  *
  * PATH is replaced, not amended: a temp bin directory holding symlinks to the
  * externals the script calls and, where a case needs it, the stub. `command -v`
@@ -50,7 +55,10 @@
  * scripts/lint-secrets.sh → case 2 fails; drop `--redact` from GL_FLAGS →
  * case 7 fails; delete the empty-list guard → case 6 fails; set LEAK_RC=1 →
  * the scanner-error cases fail; drop the retry loop → the second-plant case
- * fails; delete the cat-file guard → the force-push case fails.
+ * fails; delete the cat-file guard → the force-push case fails; drop the
+ * SECRET_SCAN_EVENT check → the outside-a-push cases fail; drop --config from
+ * GL_FLAGS → the pinned-rules case fails; drop the range-shape check → the
+ * malformed-range cases fail.
  */
 
 import { test } from "node:test";
@@ -108,8 +116,9 @@ function which(name) {
  * a tree scan to $STUB_TREE, copies stdin to $STUB_STDIN, and exits per mode.
  * A "leak" exits with the value the script passed as --exit-code, as the real
  * binary does; a scanner ERROR exits 1, as the real binary does on a fatal
- * error — so a script that used 1 for leaks could not tell the two apart.
- *   STUB_CATCH_SELFCHECK=1      leak for every self-check dir (a working scanner)
+ * error — so a script that used 1 for leaks could not tell the two apart. The
+ * content of each --config file is appended to $STUB_CONFIG.
+ *   STUB_CATCH_SELFCHECK=1     leak for every self-check dir (a working scanner)
  *   STUB_CATCH_SELFCHECK=second clean for the first self-check, leak after (one unlucky plant)
  *   STUB_FAIL_TREE=1            leak for the tree scan
  *   STUB_FAIL_STDIN=1           leak for every stdin scan
@@ -117,8 +126,13 @@ function which(name) {
  */
 const STUB = `#!/usr/bin/env bash
 printf '%s\\n' "$*" >> "$STUB_LOG"
-leak=1; prev=""
-for a in "$@"; do [ "$prev" = --exit-code ] && leak=$a; prev=$a; done
+leak=1; prev=""; config=""
+for a in "$@"; do
+  [ "$prev" = --exit-code ] && leak=$a
+  [ "$prev" = --config ] && config=$a
+  prev=$a
+done
+if [ -n "$config" ]; then { cat "$config" 2>/dev/null || echo "<unreadable>"; echo "--"; } >> "$STUB_CONFIG"; fi
 case "$1" in
   version) echo "0.0.0-stub"; exit 0 ;;
   dir)
@@ -175,6 +189,7 @@ function sandbox({ stub = true, files = { "a.txt": "hello\n" } } = {}) {
     log: path.join(dir, "stub.log"),
     tree: path.join(dir, "stub.tree"),
     stdin: path.join(dir, "stub.stdin"),
+    config: path.join(dir, "stub.config"),
     cleanup: () => rmSync(dir, { recursive: true, force: true }),
   };
 }
@@ -190,6 +205,7 @@ function run(sb, env = {}) {
       STUB_LOG: sb.log,
       STUB_TREE: sb.tree,
       STUB_STDIN: sb.stdin,
+      STUB_CONFIG: sb.config,
       ...env,
     },
   });
@@ -405,16 +421,94 @@ test("lint-secrets.sh — a scanner error in the tree scan is reported as an err
   }
 });
 
-test("lint-secrets.sh — a range base missing from the checkout (force-push) skips the message scan loudly", () => {
+test("lint-secrets.sh — a range base missing from the checkout on a push (force-push) skips the message scan loudly", () => {
   const sb = sandbox();
   try {
     const r = run(sb, {
       STUB_CATCH_SELFCHECK: "1",
       STUB_FAIL_STDIN: "1", // would fail if the message scan ran
       SECRET_SCAN_RANGE: `${"ab".repeat(20)}..HEAD`,
+      SECRET_SCAN_EVENT: "push",
     });
     assert.equal(r.status, 0, show(r));
     assert.match(r.stdout, /base of .* is not in this checkout/, show(r));
+  } finally {
+    sb.cleanup();
+  }
+});
+
+for (const event of ["pull_request", ""]) {
+  test(`lint-secrets.sh — a range base missing from the checkout outside a push (${event || "no event"}) is an error`, () => {
+    const sb = sandbox();
+    try {
+      const r = run(sb, {
+        STUB_CATCH_SELFCHECK: "1",
+        SECRET_SCAN_RANGE: `${"ab".repeat(20)}..HEAD`,
+        SECRET_SCAN_EVENT: event,
+      });
+      assert.equal(r.status, 1, show(r));
+      assert.match(
+        r.stderr,
+        /error: the base of .* is not in this checkout/,
+        show(r),
+      );
+    } finally {
+      sb.cleanup();
+    }
+  });
+}
+
+for (const range of ["HEAD", "..HEAD", "HEAD.."]) {
+  test(`lint-secrets.sh — SECRET_SCAN_RANGE '${range}' is not a <base>..<head> range: error, history never read`, () => {
+    const sb = sandbox();
+    try {
+      const r = run(sb, {
+        STUB_CATCH_SELFCHECK: "1",
+        SECRET_SCAN_RANGE: range,
+      });
+      assert.equal(r.status, 1, show(r));
+      assert.match(r.stderr, /is not a <base>\.\.<head> range/, show(r));
+      assert.equal(read(sb.stdin), "", "no commit messages were scanned");
+    } finally {
+      sb.cleanup();
+    }
+  });
+}
+
+test("lint-secrets.sh — every scan pins the default rules with --config, so the tree's .gitleaks.toml cannot change them", () => {
+  const sb = sandbox({
+    files: {
+      "a.txt": "a\n",
+      // What a PR could commit to switch the scan off; --config must outrank it.
+      ".gitleaks.toml": "[allowlist]\npaths = ['''.*''']\n",
+    },
+  });
+  try {
+    sb.git("commit", "-q", "--allow-empty", "-m", "second");
+    const r = run(sb, {
+      STUB_CATCH_SELFCHECK: "1",
+      SECRET_SCAN_RANGE: `${sb.git("rev-parse", "HEAD~1")}..HEAD`,
+      SECRET_SCAN_PR_BODY: "a body",
+    });
+    assert.equal(r.status, 0, show(r));
+    const calls = scans(sb);
+    assert.equal(
+      calls.length,
+      4,
+      `non-vacuity: expected 4 scans, saw:\n${calls.join("\n")}`,
+    );
+    for (const c of calls) {
+      const m = c.match(/(?:^| )--config (\S+)/);
+      assert.ok(m, `missing --config: ${c}`);
+      assert.ok(
+        !m[1].startsWith(sb.repo),
+        `--config must not come from the scanned repository: ${m[1]}`,
+      );
+    }
+    const configs = read(sb.config).split("--\n").filter(Boolean);
+    assert.equal(configs.length, 4, `one config per scan:\n${read(sb.config)}`);
+    for (const c of configs)
+      assert.equal(c, "[extend]\nuseDefault = true\n", `config content: ${c}`);
   } finally {
     sb.cleanup();
   }

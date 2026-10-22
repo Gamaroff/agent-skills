@@ -412,26 +412,27 @@ test would then fail on the orphaned `lint:secrets`. Revert as a whole.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-22
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 70/100
+**Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.229.qa.1.secret-scan-ci-lane.md](./task.229.qa.1.secret-scan-ci-lane.md)
-- **Gate File**: [task.229.gate.1.secret-scan-ci-lane.yml](./task.229.gate.1.secret-scan-ci-lane.yml)
+- **Full Report**: [task.229.qa.2.secret-scan-ci-lane.md](./task.229.qa.2.secret-scan-ci-lane.md)
+- **Gate File**: [task.229.gate.2.secret-scan-ci-lane.yml](./task.229.gate.2.secret-scan-ci-lane.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 6210 (`ci:fast`), plus 11 probe cases
+- **Tests Executed**: 6215 (`ci:fast`), plus 11 probe cases
 - **Phases Verified**: 3/3
-- **Critical Issues**: 0
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 1
+- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- CR-1 (medium): gitleaks' error exit equals the leak exit, so a crash reads as a leak and passes the self-check.
-- QA-1 (medium): the random self-check plant is missed ~1 run in 100 and fails clean trees.
-- Advisory: CR-2 (force-pushed base absent), CR-3 (PR body edits not rescanned).
+- CR-1 (high): a `.gitleaks.toml` committed in the PR replaces the scan rules, so the tree scan passes a planted leak while the self-check still passes.
+- CR-2 (medium): a missing range base skips the commit-message scan on PR events, not only after a force-push.
+- QA2-1 (medium): the tracked QA probe fixture trips ShellCheck SC2034; the shellcheck lane is red.
+- Cycle 1's CR-1 and QA-1 verified fixed. Advisory: CR-3 (malformed range not rejected).
 
 <!-- change-log-start -->
 ## Change Log
@@ -445,6 +446,8 @@ test would then fail on the orphaned `lint:secrets`. Revert as a whole.
 | 2026-10-22 |  | Implemented — 15 files (3 new), 9 new tests (8 lint-secrets, 1 release-ci-verdict) | develop |
 | 2026-10-22 |  | QA gate CONCERNS (80/100) — 2 findings | qa-task |
 | 2026-10-22 |  | QA findings fixed — cycle 1, 4 findings (CR-1 leak exit 99, QA-1 self-check retries 3 plants, CR-2 force-push skip, CR-3 edited trigger) | qa-fix |
+| 2026-10-22 |  | QA gate FAIL (70/100) — 3 findings | qa-task |
+| 2026-10-22 |  | QA findings fixed — cycle 2, 3 findings (CR-1 rules pinned with --config, CR-2 missing base fatal outside a push, QA2-1 fixture SC2034) plus advisory CR-3 range shape | qa-fix |
 <!-- change-log-end -->
 
 ---
