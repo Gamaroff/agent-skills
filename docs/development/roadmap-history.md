@@ -294,3 +294,12 @@ the vendored testing guide. T229 adds the CI lane that keeps it clean, and is re
 
 - [x] **T228** Replace the sample tokens gitleaks flags in tracked files · deps: none · touches: setup-consumer~ · /develop-task docs/tasks/task.228.fake-sample-tokens-gitleaks/task.228.fake-sample-tokens-gitleaks.md — ✅ **accepted + merged** ([PR #732](https://github.com/Gamaroff/agent-skills/pull/732), `74d12118`; QA PASS 100/100 after 1 cycle, DoD accepted on run 2, CI 5/5). The testing guide’s two sample tokens are now a `<header>.<payload>.<signature>` placeholder and two prose false positives are reworded; the tracked tree scans clean
 - [x] **T229** Secret-scan CI lane over tracked files · deps: T228 · touches: test-harness~ · /develop-task docs/tasks/task.229.secret-scan-ci-lane/task.229.secret-scan-ci-lane.md — ✅ **accepted + merged** ([PR #733](https://github.com/Gamaroff/agent-skills/pull/733), `9cd7f1a6`; QA PASS 96/100 after 4 cycles, DoD accepted on run 1, CI 5/5). Every PR now runs a `Secret scan` lane (gitleaks 8.30.1, pinned rules and an empty ignore list) over the tracked tree, the PR's commit messages and its body, with a planted-token self-check and redacted output; `npm run lint:secrets` is its local twin
+
+## PHASE 16 — change-log block holds only the log (opened 2026-10-22, closed 2026-10-23)
+
+An **override**: without it the registry fallback selects T217 first, because it takes the
+lowest-numbered task. T230 fixes observation #91 while the T229 run that found it is fresh:
+`change-log.js` folds a sibling section written inside the change-log markers into the log, and
+task.166, 170, 175 and 203 already carry a DoD section there.
+
+- [x] **T230** Keep foreign sections out of the change-log block · deps: none · touches: change-log!, pipeline-steps~, bundles~ · /develop-task docs/tasks/task.230.change-log-block-foreign-sections/task.230.change-log-block-foreign-sections.md — ✅ **accepted + merged** ([PR #735](https://github.com/Gamaroff/agent-skills/pull/735), `31643ca4`; QA PASS 95/100 after 4 cycles, DoD accepted on run 1, CI 6/6). `change-log.js` lifts a sibling section written inside the change-log markers back out — above them if it sat before the log, below them if after — through one partition the writer and a new corpus guard share; task.166, 170, 175 and 203 repaired

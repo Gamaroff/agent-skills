@@ -5,7 +5,7 @@ How to use this document: work top to bottom. Only `[ ]` rows are candidates; `[
 [`roadmap-history.md`](./roadmap-history.md), so a `deps:` entry naming no current row means
 _already shipped_, not an error. Resolve any such reference there.
 
-**Phases 1 through 15 are complete and archived** to
+**Phases 1 through 16 are complete and archived** to
 [`roadmap-history.md`](./roadmap-history.md) — resolve any `deps:` naming a row you cannot find here
 against that file. The rows under "Deferred / human-gated" remain invisible to selection.
 
@@ -20,7 +20,7 @@ finished work. Rules:
 §"Registry fallback frontier".
 
 Add a phase only to express *sequencing* the registries cannot: a deliberate order, a dependency
-chain, a human gate. Phase 16 is open (opened 2026-10-22); once it closes, selection falls through to the registries.
+chain, a human gate. No phase is open (Phase 16 closed 2026-10-23); selection falls through to the registries.
 
 > ⚠️ **A phase costs upkeep that a registry row does not, and the cost is not obvious.** Roadmap rows
 > are matched on the **checkbox alone** — they do **not** consult the target document's frontmatter.
@@ -67,15 +67,6 @@ Read only by `--batch`. Two rows conflict when they share a tag that **either** 
 | `docs-pipeline`    | `docs/runbooks/*`, `docs/concepts/*`, `docs/reference/pipeline-artifacts.md`, `docs/operations/workflows.md`, `skills/develop-*/README.md` |
 | `pipeline-lock`    | `shared/resources/advance-pipeline-lock.sh`, `advance-pipeline-lock.test.sh`  |
 
-## PHASE 16 — change-log block holds only the log (opened 2026-10-22)
-
-An **override**: without it the registry fallback selects T217 first, because it takes the
-lowest-numbered task. T230 fixes observation #91 while the T229 run that found it is fresh:
-`change-log.js` folds a sibling section written inside the change-log markers into the log, and
-task.166, 170, 175 and 203 already carry a DoD section there.
-
-- [ ] **T230** Keep foreign sections out of the change-log block · deps: none · touches: change-log!, pipeline-steps~, bundles~ · /develop-task docs/tasks/task.230.change-log-block-foreign-sections/task.230.change-log-block-foreign-sections.md
-
 ## Deferred / human-gated
 
 Rows here are invisible to selection. Move a row up into a phase when it becomes actionable.
@@ -87,7 +78,7 @@ Rows here are invisible to selection. Move a row up into a phase when it becomes
 
 ## Housekeeping
 
-- [x] Archive accepted rows to `roadmap-history.md` at each phase close — Phase 5 archived 2026-09-12; Phases 6, 7 and 8 archived 2026-10-06; Phases 9 and 10 archived 2026-10-11; Phase 11 archived 2026-10-16; Phase 12 archived 2026-10-20; Phase 13 archived 2026-10-21; Phases 14 and 15 archived 2026-10-22
+- [x] Archive accepted rows to `roadmap-history.md` at each phase close — Phase 5 archived 2026-09-12; Phases 6, 7 and 8 archived 2026-10-06; Phases 9 and 10 archived 2026-10-11; Phase 11 archived 2026-10-16; Phase 12 archived 2026-10-20; Phase 13 archived 2026-10-21; Phases 14 and 15 archived 2026-10-22; Phase 16 archived 2026-10-23
 - [ ] If a phase is ever re-opened: tick its rows `[x]` as each item is accepted — an unticked row for an accepted item is still selected and stalls the loop
 
 **Registry-selected items need no row here.** When selection falls through to the registries (the
@@ -214,3 +205,5 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-10-22 | **T229 accepted + merged — PR #733 merged** (`9cd7f1a6`). A `Secret scan` CI lane and its local twin `npm run lint:secrets` (`scripts/lint-secrets.sh`, pinned gitleaks 8.30.1) now run on every PR. They scan the tracked tree, the PR range's commit messages and the PR body, run a planted-token self-check first, tell a scanner error from a leak, and print file, line and rule only (`--redact`). Rules are pinned with `--config`, the ignore list is pinned empty, and the stdin scans run outside the repository, so a PR cannot silence them with a tracked `.gitleaks.toml` or `.gitleaksignore`. The threat model is accidental commits: a PR runs its own workflow. QA ran 4 cycles: CONCERNS 80, FAIL 70, CONCERNS 90, PASS 96 (route 2b). 5c APPROVE. DoD run 1 accepted 15/15; the DoD probe ran 11 candidates with 0 reproduced and 0 escaped. Merge gate `npm run ci` green (6221 tests, 0 failed). CI 5/5. Issue #731 closed. Low follow-ups: CR-1/CR-2 (the tree-scan copy can still read a tracked `.gitleaksignore`; not exploitable), PC-2/PC-3 (task planning sections lag the pins and the `edited` trigger). |
 | 2026-10-22 | **Phase 15 closed and archived** to `roadmap-history.md` (T228 and T229). No phase is open; selection falls through to the registries (next: T217). |
 | 2026-10-22 | **Phase 16 opened** with T230 (keep foreign sections out of the change-log block, cut from observation #91), ordered ahead of the registry fallback at the owner's request; without it T217 is selected first. |
+| 2026-10-23 | **T230 accepted + merged — PR #735 merged** (`31643ca4`). `change-log.js` no longer absorbs a section written inside the change-log markers: `partitionForeign` lifts it above the start marker (if it sat before the log) or below the end marker (if after), and `upsertChangeLog`, the new `foreignSections`/`liftForeignSections` exports and a new corpus guard (`change-log-foreign-section-corpus.test.mjs`, floor 100 blocks, 120 today) all read that one partition. The Deferred Work placement rule now anchors on the marker in finalise 7.4's words, and task.166, 170, 175 and 203 had their DoD sections moved out. Four QA cycles (FAIL 60 → CONCERNS 70 → CONCERNS 70 → PASS 95); cycles 1–3 each hardened how the log's own table is chosen (heading-anchored, own section first, a sign-off table is not a log), with 16 engine mutations proven. Two lows carried to Deferred Work (route 2b); 5c APPROVE; DoD 15/15, with AC8 re-measured on the PR head (0.941 s at load 2.35); merge gate `npm run ci` green (6237 pass, 0 fail). Issue #734 closed. |
+| 2026-10-23 | **Phase 16 closed and archived** to `roadmap-history.md` (T230). No phase is open; selection falls through to the registries (next: T217). |
