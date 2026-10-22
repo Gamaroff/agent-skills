@@ -276,3 +276,11 @@ An **override**: without it the registry fallback selects T216 first, because it
 lowest-numbered task. T224 closes task.214's QA findings CR-1 and CR-2 while that code is fresh.
 
 - [x] **T224** loop-supervisor: say when the probe script is not found · deps: none · touches: loop-supervisor! · /develop-task docs/tasks/task.224.loop-supervisor-probe-not-found/task.224.loop-supervisor-probe-not-found.md — ✅ **accepted + merged** ([PR #724](https://github.com/Gamaroff/agent-skills/pull/724), `2c7bb8a4`; QA PASS 100/100 after 4 cycles, DoD accepted on run 1, CI 5/5). A missing probe script now reports the paths searched, or a missing configured `probeScript` by its config key, instead of "probe produced no output"; existence follows Node main-module resolution, re-checked on disk at each probe; the adapter table derives its default from `DEFAULT_PROBE_SCRIPT`
+
+## PHASE 14 — security-probe loader refusal (opened 2026-10-22, closed 2026-10-22)
+
+An **override**: without it the registry fallback selects T217 first, because it takes the
+lowest-numbered task. T226 closes task.216's carried finding TASK-216-QA3-1 while that code is fresh:
+the docs say every `LD_*`/`DYLD_*` variable is refused on a `cli:` case, and the code refuses four.
+
+- [x] **T226** security-probe: refuse every LD_* and DYLD_* variable on cli: case fixtures · deps: none · touches: test-harness~, bundles~ · /develop-task docs/tasks/task.226.probe-cli-loader-env-prefix-refusal/task.226.probe-cli-loader-env-prefix-refusal.md — ✅ **accepted + merged** ([PR #729](https://github.com/Gamaroff/agent-skills/pull/729), `ca958146`; QA PASS 100/100 after 1 cycle, DoD accepted on run 1, CI 5/5). A `cli:` case’s `fixture.env` now refuses any key starting `LD_` or `DYLD_` by name, before any spawn, through one predicate (`steersInterpreter`); `MY_LD_FLAG`, `ld_audit` and `LDFLAGS` still run
