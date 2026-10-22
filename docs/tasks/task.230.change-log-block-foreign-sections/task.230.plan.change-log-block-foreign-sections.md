@@ -45,12 +45,16 @@ definition.
    }
    ```
 
-   `splitCarriedLines` already removes fenced lines from heading recognition: fenced lines are
-   pushed as `[line, true]` and only unfenced lines reach `before` / `after` classification. Apply
-   `splitForeign` to unprotected lines only. A fenced `## Example` is carried with `prot === true`
-   and must never match. Check `before` / `after` hold strings at that point. If they lose the
-   protection flag, do the split inside `splitCarriedLines`, where the `[line, prot]` pairs still
-   exist, and return `beforeForeign` / `afterForeign` beside `before` / `after`.
+   **Do the split inside `splitCarriedLines`, before `flags` is computed** (review 1, verified):
+   `before` / `after` are built through `text()`, which drops the protection flag, and table
+   classification takes every unfenced pipe-line from the first one on as the log's table — so a
+   foreign section holding its own pipe table before the log table would have its rows absorbed
+   into `tableLines` before any later split could see them. Run the partition over the
+   `[line, prot]` pairs, match headings on unprotected lines only (a fenced `## Example` has
+   `prot === true` and must never match), and return `beforeForeign` / `afterForeign` beside
+   `before` / `after`. Extent: stated once, in `partitionForeign`'s header comment (QA cycle 1
+   replaced the first-entry-row rule with a table chosen at or after the log's heading). Classify
+   the table over the remaining own lines.
 
    `RE_HEADING` must not be restated: import the module's own constant. A `Change Log` heading is
    never foreign; the obs #104 absorption owns the doubled-heading case.
@@ -92,6 +96,8 @@ definition.
 | task.203 | marker, `## Change Log`, `## Definition of Done - PASSED ✅`, `### QA Report Summary`, body, table | the whole DoD section, `###` included, above the marker |
 | after-side | marker, heading, table, `## Notes` + prose | `## Notes` below the end marker |
 | two sections | `## A`, `## B` before the table | both above, A then B |
+| foreign table | `## Change Log`, `## DoD` + a `| Criterion | Status |` table, then the log table | the DoD section, its table included, above the marker; the log table keeps only its own rows |
+| one definition | each lifting case | `foreignSections(upsertChangeLog(x, row))` is `[]` |
 | legacy pair | the same inside `<!-- jira-sync-changelog-start/end -->` | lifted on the migrating write |
 | H3 log | `### Change Log`, `### Foo`, `#### Bar` | `### Foo` (with its `#### Bar`) lifted. Control: `#### Note` directly under the heading stays |
 | control: nested | H2 log, `### Nested` + its table after the log table | unchanged (section I) |
@@ -125,6 +131,9 @@ cases go red, then restore. Record the red run in the implementation report.
   inside the markers; a sibling section found there is lifted out on the next write, above the
   start marker (or below the end marker for one after the table); deeper subsections stay.
   Cite obs #91 and task.230.
+- `tests/deferred-work-placement.test.js`: the comment above `place()` (`:61`) restates the old
+  wording — reword it to the marker-anchored one, and add an assertion that `statement()` contains
+  "never between the markers" (holds the placement-rule success criterion; review 1, check 15).
 
 Then `npm run bundle` and commit the regenerated copies with the sources. The bundler prints each
 skill's closure delta; expect no new closure members, since both files are already bundled
@@ -190,4 +199,6 @@ Load the source, never a bundled copy: `shared/resources/change-log.js`, reached
 - Unit: `command node --test shared/resources/tests/change-log.test.mjs`.
 - Callers: `command node --test skills/sync-jira-task/tests skills/sync-jira-story/tests skills/sync-jira-epic/tests shared/resources/tests/jira-sync-publishing-fidelity.test.mjs`.
 - Corpus: `command node --test evals/shared/tests/change-log-foreign-section-corpus.test.mjs`.
+  Wall time: `uptime; time command node --test evals/shared/tests/change-log-foreign-section-corpus.test.mjs`
+  on the PR head; record figure and load.
 - Full: `npm run ci` with the symlink moved aside.

@@ -75,6 +75,19 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **`change-log.js` lifts a foreign section out of the change-log markers instead of absorbing
+  it (task 230, obs #91).** Only the log lives between `<!-- change-log-start -->` and
+  `<!-- change-log-end -->`. A sibling section written there — a heading at or above the log's own
+  level that is not a Change Log heading, such as the QA loop's `## Deferred Work` or finalise's
+  `## Definition of Done - PASSED ✅` — used to be carried as prose inside the regenerated block on
+  every append, silently. `upsertChangeLog` now moves it out on the next write: above the start
+  marker when it sat before the table, below the end marker when it sat after, text and order
+  unchanged, a pipe table it holds included. **A document in that shape gets a larger diff on its
+  next write than the one row it earned.** Two new exports read and apply the one partition:
+  `foreignSections(content)` and `liftForeignSections(content)` (a repair with no row). A new
+  corpus guard, `evals/shared/tests/change-log-foreign-section-corpus.test.mjs`, fails on any
+  tracked document whose block holds one; task.166, 170, 175 and 203 were repaired. The QA loop's
+  Deferred Work placement rule now names the marker, in finalise 7.4's words.
 - **BREAKING — the PRD numbering migration carries the shapes `review-prd` used to refuse (task 211).**
   `migrate-doc-numbering.mjs` now writes a frontmatter block for a PRD that has none (an unclosed
   `---` is a new `unclosed-frontmatter` blocker, and a BOM or blank lines before a YAML block a

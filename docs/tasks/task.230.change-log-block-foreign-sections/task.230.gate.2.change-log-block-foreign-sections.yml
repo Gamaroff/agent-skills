@@ -1,0 +1,79 @@
+schema: 2
+task: 'task.230.change-log-block-foreign-sections'
+task_title: 'Keep foreign sections out of the change-log block'
+gate: CONCERNS
+status_reason: 'Cycle 1 fixes hold (all four guards mutation-proven), but the cycle-2 refute pass found three more shapes where the log-table choice in partitionForeign picks the wrong table (CR-1 to CR-3, medium) and a doubled-heading block that does not converge on the first write (CR-4, low). All four reproduced on the PR head and new to this change.'
+reviewer: 'QA Engineer'
+head: '2b36cf52ae4cb255661e88680a5cbadb10efec63'
+updated: '2026-10-22T22:18:08Z'
+
+top_issues:
+  - id: 'TASK-230-CR2-1'
+    severity: medium
+    file: 'shared/resources/change-log.js'
+    finding: 'A log whose table has neither a "| Date | Version |" header nor date-first rows (the "| Version | Date | Change | Author |" layout), with a foreign section between the heading and the table (the task.203 shape), gets no candidate, so the log starts at the heading and the whole log table leaves the markers with the DoD (reproduced: "| 1.0 | 2026-01-01 | first | me |" ends up below the end marker; the base engine kept it in the log).'
+    suggested_action: 'When the heading''s own section holds no table, accept a log-shaped table past a foreign heading by its header (Date plus Version, Description, Change or Author, in any order) or its entry rows, before falling back to the heading.'
+    suggested_owner: dev
+  - id: 'TASK-230-CR2-2'
+    severity: medium
+    file: 'shared/resources/change-log.js'
+    finding: 'The "| Date | Version |" lookup searches every run, including runs below a foreign heading, so a log headed "| Date | Description | Author |" loses to an after-side section''s own Date/Version table: "## Release Matrix" is lifted bare and its row "| 2026-02-01 | 2.0 | ios |" stays in the log (reproduced).'
+    suggested_action: 'Prefer any table run in the heading''s own section (before the first foreign heading) under every signal; look past a foreign heading only when the own section holds no table.'
+    suggested_owner: dev
+  - id: 'TASK-230-CR2-3'
+    severity: medium
+    file: 'shared/resources/change-log.js'
+    finding: 'In a block with no Change Log heading inside (the obs #104 heading-above-marker shape) whose log lacks a "| Date | Version |" header, the first table run becomes the log even when it belongs to a foreign section: "## Definition of Done" is lifted bare and "| tests | pass |" stays in the log, and foreignSections(out) is [] so the corpus guard cannot see it (reproduced).'
+    suggested_action: 'With no heading, never choose a run that sits inside a foreign heading''s span; keep the foreign section and its table together.'
+    suggested_owner: dev
+  - id: 'TASK-230-CR2-4'
+    severity: low
+    file: 'shared/resources/change-log.js'
+    finding: 'Only the first Change Log heading ends a before-side foreign run, so in a doubled-heading block ("## Change Log", "## DoD", "## Change Log", table) the second heading is lifted with the DoD above the start marker and absorbed by the next write: the first write is not a fixed point (reproduced; the base engine was idempotent on this shape).'
+    suggested_action: 'End a before-side foreign run at any unfenced Change Log heading and drop a repeated Change Log heading inside the block, so the first write converges.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 6240
+  phases_verified: 4/4
+  ci: 'not read — CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: internal — shared/resources/change-log.js#foreignSections reads only work-item documents this repository''s pipeline writes; markdown-structure models the implementation report, not a change-log block. No external input, no shell, no network.'
+  performance:
+    status: PASS
+    notes: 'Corpus guard 0.808 s wall (load 2.08) on the PR head, against a 5 s bound.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR2-1 to CR2-3 still misfile a table on less common shapes (one drops the real log out of the markers); CR2-4 breaks first-write convergence on a doubled heading.'
+  maintainability:
+    status: PASS
+    notes: 'One partition read by every consumer; the rule is stated once in partitionForeign''s header comment and cited by the task and plan.'
+
+recommendations:
+  immediate:
+    - action: 'Restructure the table choice around the heading''s own section: any table there is the log''s; only when it has none, accept a log-shaped table past a foreign heading; with no heading, never take a run inside a foreign span; end before-side runs at any Change Log heading. Closes CR2-1 to CR2-4 together.'
+      refs: ['shared/resources/change-log.js']
+    - action: 'Add K cases for the four reproduced shapes: Version|Date log behind a DoD; Date|Description log above a Release Matrix with Date|Version; headingless block with a DoD table first; doubled Change Log heading.'
+      refs: ['shared/resources/tests/change-log.test.mjs']
+  future:
+    - action: 'Tick the section 9 Success Criteria boxes from evidence (finalise will verify them).'
+      refs: ['docs/tasks/task.230.change-log-block-foreign-sections/task.230.change-log-block-foreign-sections.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR2-1 to CR2-3 fixed and covered by tests']

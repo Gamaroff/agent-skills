@@ -9,7 +9,7 @@ status: accepted
 priority: Medium
 risk_level: high
 created: 2026-10-13
-updated: 2026-10-15
+updated: 2026-10-22
 completed_date: 2026-10-15
 pr_number: 671
 assignee:
@@ -715,8 +715,6 @@ Both fixes touch only documentation, so `/finalise` re-runs directly with no QA 
 **QA Gate Reference**: See `task.203.gate.3.migrate-doc-numbering.yml`
 
 **Detailed Verification Log:** See `task.203.dod.1.migrate-doc-numbering.md` for the complete verification evidence.
-<!-- change-log-start -->
-## Change Log
 
 ## Definition of Done - PASSED ✅
 
@@ -743,6 +741,8 @@ All Definition of Done criteria have been verified (run 2):
 **Task marked as ACCEPTED on:** 2026-10-15
 
 **Detailed Verification Log:** See `task.203.dod.2.migrate-doc-numbering.md` (run 2) and `task.203.dod.1.migrate-doc-numbering.md` (run 1, gaps).
+<!-- change-log-start -->
+## Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
@@ -758,6 +758,7 @@ All Definition of Done criteria have been verified (run 2):
 | 2026-10-15 |  | DoD incomplete — 2 gaps identified (CI link-check, CHANGELOG) | finalise |
 | 2026-10-15 |  | QA gate CONCERNS (90/100) — 0 open findings; 1 low cleanup (cycle 4, after finalise re-entry) | qa-task |
 | 2026-10-15 | 1.2 | DoD passed — accepted (PR #671) | finalise |
+| 2026-10-22 |  | Change-log block repaired — DoD section moved above the markers (task.230) | develop-task |
 
 ---
 <!-- change-log-end -->

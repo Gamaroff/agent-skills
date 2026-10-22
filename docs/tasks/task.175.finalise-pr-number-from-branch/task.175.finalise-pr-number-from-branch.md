@@ -8,7 +8,7 @@ category: infrastructure
 status: accepted
 priority: Medium
 created: 2026-10-02
-updated: 2026-10-12
+updated: 2026-10-22
 completed_date: 2026-10-12
 pr_number: 635
 assignee:
@@ -353,8 +353,6 @@ All eight success criteria, documentation, compliance (not applicable) and CI re
 **Gap Report Generated:** 2026-10-12
 
 **Detailed Verification Log:** See `task.175.dod.1.finalise-pr-number-from-branch.md` for complete verification evidence and timestamps.
-<!-- change-log-start -->
-## Change Log
 
 ## Definition of Done - PASSED ✅
 
@@ -380,6 +378,8 @@ All Definition of Done criteria have been verified:
 **Task marked as ACCEPTED on:** 2026-10-12
 
 **Detailed Verification Log:** See `task.175.dod.2.finalise-pr-number-from-branch.md` (run 2, with the override block) and `task.175.dod.1.finalise-pr-number-from-branch.md` (run 1) for complete verification evidence and timestamps.
+<!-- change-log-start -->
+## Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
@@ -390,6 +390,7 @@ All Definition of Done criteria have been verified:
 | 2026-10-12 |         | QA gate PASS (100/100) — 0 findings; 2 advisory code-review notes | qa-task |
 | 2026-10-12 |  | DoD incomplete — 1 gap identified (security probe zero-guard) | finalise |
 | 2026-10-12 | 1.2 | DoD verified — accepted (PR #635); security zero-guard closed by a recorded human override | finalise |
+| 2026-10-22 |  | Change-log block repaired — DoD section moved above the markers (task.230) | develop-task |
 
 ---
 <!-- change-log-end -->

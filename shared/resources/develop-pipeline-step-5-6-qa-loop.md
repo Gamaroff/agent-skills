@@ -768,8 +768,9 @@ where that record lives; both *On exit* lists point here and do not restate it (
   An H2 ends that section's span, so no QA Step 12 write can reach the record. A bold
   `**Deferred Work**` label or a `### Deferred Work` written into the QA section is inside the span
   a replace removes (task.155 REL-030).
-- **Absent → create it** immediately before the change-log block (before the `## Change Log`
-  heading when one sits directly above the marker block). With no change log, create it before
+- **Absent → create it** immediately before the change-log block: before a `## Change Log` heading
+  that sits directly above `<!-- change-log-start -->`, else before the marker itself — never between
+  the markers, where every later append would carry it inside the log (obs #91). With no change log, create it before
   `## Progress Tracking` (task) or `## Dev Agent Record` (story); with neither, at the end of the
   document.
 - **Present → append** the new ids as list items under the existing section. Never open a second one.
