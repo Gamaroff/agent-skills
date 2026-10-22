@@ -5,7 +5,9 @@ type: task
 description: "Swap the testing guide's sample tokens for a placeholder gitleaks does not flag, and reword two prose lines it misreads."
 tags: [gitleaks, secret-scan, test-co-location-enforcer, consumer]
 category: documentation
-status: ready-for-review
+status: accepted
+completed_date: 2026-10-22
+pr_number: 732
 priority: High
 created: 2026-10-22
 updated: 2026-10-22
@@ -16,7 +18,7 @@ github_issue: 730
 
 # Technical Task: Replace the sample tokens gitleaks flags in tracked files
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.228.review.1.fake-sample-tokens-gitleaks.md` implemented 2026-10-22
 **GitHub Issue**: [#730](https://github.com/Gamaroff/agent-skills/issues/730)
 
@@ -247,26 +249,26 @@ Not applicable.
 
 **Per-PR guard: re-scoped to task.229 (human decision, 2026-10-22).** The three scan criteria below (the guide scan, the full-tree scan and the commit-message / PR-text scan) are measurements taken at finalise. No unit tests applicable in this task: the guard that asserts them on every PR is task.229's deliverable. Its `Secret scan` lane covers the guide and the tracked tree, and its commit-message and PR-text scan covers the last one. Finalise run 1 (`task.228.dod.1.fake-sample-tokens-gitleaks.md`) found every measurement green and halted only on the missing lane.
 
-- [ ] `gitleaks dir skills/test-co-location-enforcer/references/testing-framework-guide.md --no-banner --redact --exit-code 1` exits 0.
-- [ ] `gitleaks dir . --no-banner --redact` reports no hit on a tracked file. Any remaining hit is under `.claude/`. This includes this task's own directory, so the scan runs **after** finalise has written its artefacts.
-- [ ] The guide's two examples still read as JWT-decoding examples. Only the literal changed.
-- [ ] No matched value appears in a commit message, PR text, QA report or tracker comment. Checked by the full-tree scan above (it covers the task directory's reports), by `git log --format=%B develop..HEAD | gitleaks stdin --no-banner --redact --exit-code 1` (commit messages), and by `gh pr view --json body -q .body | gitleaks stdin --no-banner --redact --exit-code 1` (PR text). Each exits 0.
+- [x] `gitleaks dir skills/test-co-location-enforcer/references/testing-framework-guide.md --no-banner --redact --exit-code 1` exits 0.
+- [x] `gitleaks dir . --no-banner --redact` reports no hit on a tracked file. Any remaining hit is under `.claude/`. This includes this task's own directory, so the scan runs **after** finalise has written its artefacts.
+- [x] The guide's two examples still read as JWT-decoding examples. Only the literal changed.
+- [x] No matched value appears in a commit message, PR text, QA report or tracker comment. Checked by the full-tree scan above (it covers the task directory's reports), by `git log --format=%B develop..HEAD | gitleaks stdin --no-banner --redact --exit-code 1` (commit messages), and by `gh pr view --json body -q .body | gitleaks stdin --no-banner --redact --exit-code 1` (PR text). Each exits 0.
 
 ### Performance
 
-- [ ] Not applicable: text-only change.
+- [x] Not applicable: text-only change.
 
 ### Code Quality
 
-- [ ] `npm test` passes.
-- [ ] `npm run bundle:check` passes.
-- [ ] `bash -n scripts/setup-consumer.sh` passes (comment-only edit).
-- [ ] `npm run lint:shell` passes (ShellCheck over every tracked `.sh` source, including `scripts/setup-consumer.sh`).
+- [x] `npm test` passes.
+- [x] `npm run bundle:check` passes.
+- [x] `bash -n scripts/setup-consumer.sh` passes (comment-only edit).
+- [x] `npm run lint:shell` passes (ShellCheck over every tracked `.sh` source, including `scripts/setup-consumer.sh`).
 
 ### Migration
 
-- [ ] CHANGELOG `[Unreleased]` → `### Fixed` entry cites task 228.
-- [ ] No version bump in this task.
+- [x] CHANGELOG `[Unreleased]` → `### Fixed` entry cites task 228.
+- [x] No version bump in this task.
 
 ---
 
@@ -385,6 +387,29 @@ No critical issues identified. Redacted gitleaks scans of each changed file, the
 **QA Gate Reference**: See `task.228.gate.1.fake-sample-tokens-gitleaks.yml`
 
 **Detailed Verification Log:** See `task.228.dod.1.fake-sample-tokens-gitleaks.md` for complete verification evidence and timestamps.
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.228.qa.1.fake-sample-tokens-gitleaks.md`
+**Gate File**: `task.228.gate.1.fake-sample-tokens-gitleaks.yml`
+**PR Review**: `task.228.pr-review.1.fake-sample-tokens-gitleaks.md` (✅ APPROVE)
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+Every Definition of Done criterion is verified (DoD run 2; run 1 found gaps that were closed by a re-scope):
+
+✅ **Acceptance Criteria:** 11/11. The three scan criteria are finalise-time measurements, and each re-run is clean. Their per-PR guard is task.229's (§ 9 Functional note).
+✅ **PR Review:** PR #732. Step 5c `/review-pr` APPROVE; CI green over 5 checks.
+✅ **Documentation:** CHANGELOG `[Unreleased]` → `### Fixed` cites task 228. The guide is updated at its source.
+✅ **Security Review:** PASS. Redacted gitleaks scans of every changed file are clean. Not a boundary.
+⚠️ **Compliance Review:** not applicable (text-only change).
+
+**Task marked as ACCEPTED on:** 2026-10-22
+
+**Detailed Verification Log:** see `task.228.dod.2.fake-sample-tokens-gitleaks.md` for the full evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
@@ -397,6 +422,7 @@ No critical issues identified. Redacted gitleaks scans of each changed file, the
 | 2026-10-22 |         | QA gate PASS (100/100) — 0 blocking findings, 1 advisory cleanup | qa-task |
 | 2026-10-22 |  | DoD incomplete — 2 gaps identified (SC1, SC4: no per-PR gitleaks lane) | finalise |
 | 2026-10-22 | 1.2 | Re-scoped the per-PR guard for the three scan criteria (SC1, SC2, SC4) to task.229 by human decision; the criteria stay as finalise-time measurements. Run-1 gap section marked historical | Claude |
+| 2026-10-22 | 1.3 | DoD run 2 — accepted (PR #732); run-1 gaps closed by the task.229 re-scope | finalise |
 <!-- change-log-end -->
 
 ---
@@ -438,7 +464,7 @@ No critical issues identified. Redacted gitleaks scans of each changed file, the
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 1. `/develop-task docs/tasks/task.228.fake-sample-tokens-gitleaks/task.228.fake-sample-tokens-gitleaks.md`
