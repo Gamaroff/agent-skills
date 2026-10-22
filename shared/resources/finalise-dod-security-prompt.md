@@ -58,8 +58,9 @@ security-adjacent they look. Probe mode must **not** fire on them.
 make it `false`. Probe it through the `shell-argv:` form (task.181): each case's `fixture.files`
 carries the state, a `--fixture-setup` stages it (a commit, a `git add`) before the run, and the
 template's one `{input}` element reaches a script that may ignore it. A Node or Python CLI that
-refuses on a directory's contents takes the `cli:` form with the same per-case `fixture.files`
-(task.216). Record `boundary: true`; where
+refuses on a data directory's contents takes the `cli:` form with the same per-case `fixture.files`
+(task.216); one that reads committed or staged repository state is not reachable on `cli:` yet,
+because fixture files are text and `--fixture-setup` is `shell-argv:`'s. Record `boundary: true`; where
 no form reaches the guard, the zero-guard fires and closing it takes a recorded override (obs #221).
 
 **Test code is not exempt by location.** A test double whose refusal backs an assertion — a fake
@@ -227,12 +228,14 @@ cases: [ … ]
 # needs more carries `expected`; a crash is errored, never a refusal. A --argv shape error is refused
 # and records nothing. Probe each guarded flag as its own control, and NAME it: a cli: control's
 # identity in the record is its --name (unnamed, the engine derives one from the template and warns
-# on a collision). A CLI that reads a POPULATED DIRECTORY (a data dir, a repository) needs a
+# on a collision). A CLI that reads a POPULATED DATA DIRECTORY needs a
 # legitimate case that carries it: give that case `fixture: { files: { "items.json": "…" } }` (and
 # `env` if it reads one) with input "." — the files land in the case directory, the CLI's cwd
-# (task.216). Without it every input is refused and the verdict is `rejects-every-input`. PATH and
-# NODE_OPTIONS are refused in a cli: case's env. Use a sink that is not materialised: --sink
-# filename writes each input as an empty file of that name, so input "." is declined (EISDIR).
+# (task.216). Without it every input is refused and the verdict is `rejects-every-input`. PATH,
+# NODE_OPTIONS and the LD_*/DYLD_* loader variables are refused in a cli: case's env. Use a sink
+# that is not materialised: --sink filename writes each input as an empty file of that name, so
+# input "." is declined (EISDIR). Repository state (a commit, a staged index) is not reachable on
+# cli: — fixture files are text and there is no --fixture-setup here.
 argv: ["--sink", "<sink>", "--entry", "cli:<path-from-repo-root>",
        "--argv", "[\"--flag-before\",\"value\",\"--guarded-flag\",\"{input}\"]",
        "--name", "<control name>"]

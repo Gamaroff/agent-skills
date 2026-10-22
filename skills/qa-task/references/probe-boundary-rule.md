@@ -484,7 +484,7 @@ takes it.
   for `shell-argv:`: its files are written into the case directory — the CLI's
   cwd — before the spawn, and its env is merged over the sandbox's. It is what
   a CLI that refuses on what it finds in a directory (a data dir with no
-  `items.json`, a repository) needs for a legitimate case to be **accepted**:
+  `items.json`) needs for a legitimate case to be **accepted**:
   without it every input, the legitimate ones too, is refused, and the verdict
   is `unverifiable` / `rejects-every-input`. Give the legitimate case
   `"input": "."` (or a relative path inside the case directory) and the files
@@ -493,11 +493,15 @@ takes it.
   directory, so `.` is declined `cannot materialise` (EISDIR) and a directory
   the fixture would create collides with that file. The refusals are `shell-argv:`'s — a path that leaves
   the case directory, `HOME`, `TMPDIR`, `LC_ALL`, an `expected.absent` name the
-  files create, each declined by name — plus two of the form's own: **`PATH`
-  and `NODE_OPTIONS`**, which steer the interpreter the form runs (`PATH`
-  selects the `python3` binary, `NODE_OPTIONS` loads code before the entry)
-  rather than the CLI under probe. `--fixture-setup` stays `shell-argv:`'s; a
-  directory too large to inline is not yet reachable on `cli:`.
+  files create, each declined by name — plus the form's own: **`PATH`,
+  `NODE_OPTIONS` and the dynamic-loader variables** (`LD_PRELOAD`,
+  `LD_LIBRARY_PATH`, `DYLD_INSERT_LIBRARIES`, `DYLD_LIBRARY_PATH`), which steer
+  the interpreter the form runs (`PATH` selects the `python3` binary; the others
+  load code before the entry) rather than the CLI under probe. `--fixture-setup`
+  stays `shell-argv:`'s, so two things are not yet reachable on `cli:`: a
+  directory too large to inline, and **repository state** — `fixture.files`
+  writes text files, which make no commit and no staged index, so a CLI that
+  reads committed or staged state still refuses every case.
 
   **`shell-argv:path --argv '<JSON array>'` runs a bash script that takes
   several arguments or flags** (task.181) — `verify-push-state.sh --base …

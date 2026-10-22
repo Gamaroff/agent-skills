@@ -2,7 +2,7 @@
 id: task.216
 title: "[Task 216] security-probe: the cli: form honours a case's fixture.files (and env)"
 type: task
-description: "Let a cli: probe case carry fixture.files and fixture.env, written into the case directory before the run exactly as the fence: and shell-argv: arms write them, so a CLI that reads a populated directory (a data dir, a repository) can have a legitimate case that is accepted."
+description: "Let a cli: probe case carry fixture.files and fixture.env, written into the case directory before the run exactly as the fence: and shell-argv: arms write them, so a CLI that reads a populated data directory can have a legitimate case that is accepted."
 tags: [security-probe, finalise, qa-task, qa-story, review-security, observation]
 category: infrastructure
 status: ready-for-review
@@ -46,7 +46,7 @@ Found by omarchy-leak-radar, the first consumer of task 215 (the Python `cli:` f
 
 **In.** The `cli:` arm (Node and Python) writes a case's `fixture.files` into its case directory, and merges `fixture.env`, before the child starts, exactly as the `shell-argv:` arm does: same path containment, same refusal of `HOME`, `TMPDIR` and `LC_ALL` in `env`, same `errored` (never a verdict) when a file cannot be written, same decline of an `expected.absent` name the fixture files create. Reuse `writeFixtureFiles`, `fixtureProblem` and `fixtureCaseEnv`; do not write a second implementation. Because the child's cwd is the case directory, `{input}` can name `.` or a relative path inside it (when the sink is not materialised — the `filename` sink writes the input as a file).
 
-One addition the other arms do not need: the `cli:` arm also refuses `PATH` and `NODE_OPTIONS` in `fixture.env`, declined by name. Both steer the interpreter the arm spawns rather than the CLI under probe (`PATH` selects the `python3` binary; `NODE_OPTIONS` loads code before the entry), and the verdict depends on that interpreter's own crash signals. Fail closed; documented as a limit of the form. (Review Q2.)
+One addition the other arms do not need: the `cli:` arm also refuses `PATH` and `NODE_OPTIONS` in `fixture.env`, declined by name. Both steer the interpreter the arm spawns rather than the CLI under probe (`PATH` selects the `python3` binary; `NODE_OPTIONS` loads code before the entry), and the verdict depends on that interpreter's own crash signals. Fail closed; documented as a limit of the form. (Review Q2; QA cycle 2 added the dynamic-loader variables `LD_PRELOAD`, `LD_LIBRARY_PATH`, `DYLD_INSERT_LIBRARIES` and `DYLD_LIBRARY_PATH`, and scoped the reach to data directories: repository state needs `--fixture-setup`, which stays `shell-argv:`'s.)
 
 **Decision (confirmed in review, Q1).** Per-case `fixture.files` rather than `--fixture-setup` on `cli:`: a case states what it needs, no extra script, and the field is already defined. If a CLI needs a directory too large to inline, `--fixture-setup` can be a later task.
 
@@ -104,15 +104,15 @@ Revert the `runCliCase` change and re-bundle; a `cli:` case's `fixture` is ignor
 
 ## QA Testing Results
 
-**QA Status**: PASS
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-22
-**Quality Score**: 100/100
-**Gate Decision**: PASS
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.216.qa.1.probe-engine-cli-case-fixture-files.md](./task.216.qa.1.probe-engine-cli-case-fixture-files.md)
-- **Gate File**: [task.216.gate.1.probe-engine-cli-case-fixture-files.yml](./task.216.gate.1.probe-engine-cli-case-fixture-files.yml)
+- **Full Report**: [task.216.qa.2.probe-engine-cli-case-fixture-files.md](./task.216.qa.2.probe-engine-cli-case-fixture-files.md)
+- **Gate File**: [task.216.gate.2.probe-engine-cli-case-fixture-files.yml](./task.216.gate.2.probe-engine-cli-case-fixture-files.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 96 (`cli` tests; full suite 6201, 0 fail)
@@ -121,7 +121,7 @@ Revert the `runCliCase` change and re-bundle; a `cli:` case's `fixture` is ignor
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-No critical issues. One LOW (TASK-216-QA1-1): the new docs recommend input `.` for a legitimate `cli:` case without saying it is declined under the `filename` sink.
+TASK-216-QA2-1 (MEDIUM): the docs claim a `cli:` case fixture serves a CLI reading "a repository"; text files cannot make a commit and `cli:` has no `--fixture-setup` (reproduced). TASK-216-QA2-2 (LOW): the loader variables are missing from the interpreter-steering refusal. Cycle 1's TASK-216-QA1-1 is fixed.
 <!-- change-log-start -->
 ## Change Log
 
@@ -133,5 +133,7 @@ No critical issues. One LOW (TASK-216-QA1-1): the new docs recommend input `.` f
 | 2026-10-22 |  | Implemented — 9 source files (+16 bundled copies), 8 tests | develop |
 | 2026-10-22 |  | QA gate PASS (100/100) — 1 LOW finding | qa-task |
 | 2026-10-22 |  | QA findings fixed — TASK-216-QA1-1 (filename-sink caveat in two docs), 1 iteration | qa-fix |
+| 2026-10-22 |  | QA gate CONCERNS (90/100) — 2 findings | qa-task |
+| 2026-10-22 |  | QA findings fixed — TASK-216-QA2-1 (repository reach scoped out), TASK-216-QA2-2 (loader variables refused), 1 iteration | qa-fix |
 <!-- change-log-end -->
 

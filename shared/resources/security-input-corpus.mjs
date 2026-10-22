@@ -71,8 +71,8 @@ export const CASE_FIELDS = Object.freeze([
  *   { env: { npm_config_loglevel: "silent" }, files: { ".npmrc": "loglevel=silent\n" } }
  *
  * `env` is merged into the case's environment (it may not set HOME, TMPDIR or
- * LC_ALL, which the sandbox owns, nor — on `cli:` — PATH or NODE_OPTIONS, which
- * steer the interpreter); `files` are written into the case's own directory,
+ * LC_ALL, which the sandbox owns, nor — on `cli:` — PATH, NODE_OPTIONS or a
+ * dynamic-loader variable, which steer the interpreter); `files` are written into the case's own directory,
  * which is the block's (or the CLI's) cwd. No corpus case carries it.
  */
 export const OPTIONAL_CASE_FIELDS = Object.freeze(["expected", "fixture"]);

@@ -9,11 +9,14 @@ All notable changes to this project will be documented in this file. Format foll
 - **security-probe: a `cli:` case carries `fixture.files` and `fixture.env` (task 216).** The
   `cli:` form (Node and Python) now writes a case's `fixture.files` into its case directory, the
   CLI's cwd, and merges `fixture.env` before the spawn, as `shell-argv:` already did. A CLI that
-  refuses on what it finds in a directory (a data dir, a repository) can now have a legitimate case
+  refuses on what it finds in a data directory can now have a legitimate case
   that is accepted, where before every input ended in a refusal and the verdict read
   `rejects-every-input`. The refusals are `shell-argv:`'s (a path leaving the case directory,
   `HOME`/`TMPDIR`/`LC_ALL`, an `expected.absent` name the files create), each declined by name,
-  plus `PATH` and `NODE_OPTIONS`, which steer the interpreter rather than the CLI. A `cli:` case
+  plus `PATH`, `NODE_OPTIONS` and the dynamic-loader variables (`LD_PRELOAD`, `LD_LIBRARY_PATH`,
+  `DYLD_*`), which steer the interpreter rather than the CLI. Repository state (a commit, a staged
+  index) is not reachable this way: fixture files are text, and `--fixture-setup` stays
+  `shell-argv:`'s. A `cli:` case
   with no `fixture` runs as before; one that carried `fixture` had it silently ignored and now has
   it honoured.
 - **loop-supervisor: an engine registry and `--engine` / `--model` / `--effort` (task 213).**

@@ -3969,7 +3969,7 @@ test("shell-fn entry: a --fake-gh directory named `..name` inside the repo root 
 
 // ── task.216: a cli: case carries fixture.files and fixture.env ─────────────
 //
-// A CLI that refuses on what it finds in a directory (a data dir, a repository)
+// A CLI that refuses on what it finds in a data directory (no items.json)
 // had no legitimate case that could be accepted: the cli: arm built the case
 // directory from the sink's controls alone and ignored the case's `fixture`, so
 // every input read as overblocked. Each row runs under Node and Python.
@@ -4024,7 +4024,7 @@ for (const [lang, ENTRY] of NEEDS_DATA) {
     assert.equal(nested.cases[0].outcome, "accepted", JSON.stringify(nested));
   });
 
-  test(`cli entry (${lang}): fixture.env reaches the child; HOME, PATH and NODE_OPTIONS in it are declined by name`, () => {
+  test(`cli entry (${lang}): fixture.env reaches the child; HOME, PATH, NODE_OPTIONS and LD_PRELOAD in it are declined by name`, () => {
     const env = runProbeSpec({
       sink: "url-authority",
       entry: ENTRY,
@@ -4038,6 +4038,10 @@ for (const [lang, ENTRY] of NEEDS_DATA) {
       [
         "NODE_OPTIONS",
         /may not set NODE_OPTIONS on the cli: form — it steers the interpreter/,
+      ],
+      [
+        "LD_PRELOAD",
+        /may not set LD_PRELOAD on the cli: form — it steers the interpreter/,
       ],
     ]) {
       const r = runProbeSpec({

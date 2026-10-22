@@ -198,12 +198,14 @@
  * A `cli:` case's `fixture` (`env`, `files`) is honoured as for shell-argv:
  * (task.216): its files are written into the case directory — the child's cwd —
  * before the spawn, its env merged over the sandbox's, with the same refusals
- * (a path that leaves the directory, HOME, TMPDIR, LC_ALL) and two more of the
- * form's own, PATH and NODE_OPTIONS, which steer the interpreter rather than the
- * CLI (CLI_INTERPRETER_ENV). It is how a CLI that refuses on what it finds in a
- * directory (a data dir, a repository) gets a legitimate case that is accepted;
- * without it every input reads as overblocked and the verdict is
- * `rejects-every-input`.
+ * (a path that leaves the directory, HOME, TMPDIR, LC_ALL) and more of the
+ * form's own, PATH, NODE_OPTIONS and the dynamic-loader variables, which steer
+ * the interpreter rather than the CLI (CLI_INTERPRETER_ENV). It is how a CLI
+ * that refuses on what it finds in a data directory gets a legitimate case that
+ * is accepted; without it every input reads as overblocked and the verdict is
+ * `rejects-every-input`. Repository state is not reachable this way: fixture
+ * files are text, which make no commit and no staged index, and
+ * `--fixture-setup` stays shell-argv:'s.
  *
  * THE SHELL-ARGV ENTRY FORM (task.181). A boundary delivered as a SHELL SCRIPT
  * TAKING SEVERAL ARGUMENTS OR FLAGS (`verify-push-state.sh --base … --scope …`,
@@ -2724,8 +2726,8 @@ function runCliCase(
 }
 
 /**
- * Write a case's `fixture.files` into its directory. Shared by the fence: and
- * shell-argv: arms (task.181), so the two cannot drift on what a fixture file
+ * Write a case's `fixture.files` into its directory. Shared by the fence:,
+ * shell-argv: (task.181) and cli: (task.216) arms, so they cannot drift on what a fixture file
  * may name. THROWS on a path that leaves the directory; the caller turns that
  * into an `errored` run.
  */
@@ -2745,8 +2747,8 @@ function writeFixtureFiles(caseDir, files) {
 /**
  * `caseEnv` with a case's `fixture.env` merged in. The case's env first, the
  * sandbox's own keys last: fixtureProblem already refuses HOME/TMPDIR/LC_ALL,
- * and the order holds even if it did not. Shared by the fence: and shell-argv:
- * arms (task.181).
+ * and the order holds even if it did not. Shared by the fence:, shell-argv:
+ * (task.181) and cli: (task.216) arms.
  */
 function fixtureCaseEnv(fixture, { fixtureDir, sandboxHome, sandboxTmp }) {
   const sandbox = caseEnv({ fixtureDir, sandboxHome, sandboxTmp });
@@ -3153,10 +3155,18 @@ const SANDBOX_OWNED_ENV = Object.freeze(["HOME", "TMPDIR", "LC_ALL"]);
  * steer the interpreter the form runs rather than the CLI under probe. `PATH`
  * selects the `python3` binary (spawned by name), whose crash record the
  * verdict reads; `NODE_OPTIONS` loads code into a Node child before the entry
- * and can hide the fatal-error footer. Python's own variables need no entry:
- * `-E` already ignores them.
+ * and can hide the fatal-error footer; the dynamic-loader variables load a
+ * library into either interpreter before it starts (QA cycle 2). Python's own
+ * variables need no entry: `-E` already ignores them.
  */
-const CLI_INTERPRETER_ENV = Object.freeze(["PATH", "NODE_OPTIONS"]);
+const CLI_INTERPRETER_ENV = Object.freeze([
+  "PATH",
+  "NODE_OPTIONS",
+  "LD_PRELOAD",
+  "LD_LIBRARY_PATH",
+  "DYLD_INSERT_LIBRARIES",
+  "DYLD_LIBRARY_PATH",
+]);
 const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 /**
