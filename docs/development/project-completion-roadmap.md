@@ -20,7 +20,7 @@ finished work. Rules:
 §"Registry fallback frontier".
 
 Add a phase only to express *sequencing* the registries cannot: a deliberate order, a dependency
-chain, a human gate. No phase is open (Phase 13 closed 2026-10-21); selection falls through to the registries.
+chain, a human gate. Phase 14 is open (opened 2026-10-22); once it closes, selection falls through to the registries.
 
 > ⚠️ **A phase costs upkeep that a registry row does not, and the cost is not obvious.** Roadmap rows
 > are matched on the **checkbox alone** — they do **not** consult the target document's frontmatter.
@@ -66,6 +66,14 @@ Read only by `--batch`. Two rows conflict when they share a tag that **either** 
 | `mutation-proving` | `shared/resources/mutation-proving.md`                                  |
 | `docs-pipeline`    | `docs/runbooks/*`, `docs/concepts/*`, `docs/reference/pipeline-artifacts.md`, `docs/operations/workflows.md`, `skills/develop-*/README.md` |
 | `pipeline-lock`    | `shared/resources/advance-pipeline-lock.sh`, `advance-pipeline-lock.test.sh`  |
+
+## PHASE 14 — security-probe loader refusal (opened 2026-10-22)
+
+An **override**: without it the registry fallback selects T217 first, because it takes the
+lowest-numbered task. T226 closes task.216's carried finding TASK-216-QA3-1 while that code is fresh:
+the docs say every `LD_*`/`DYLD_*` variable is refused on a `cli:` case, and the code refuses four.
+
+- [ ] **T226** security-probe: refuse every LD_* and DYLD_* variable on cli: case fixtures · deps: none · touches: test-harness~, bundles~ · /develop-task docs/tasks/task.226.probe-cli-loader-env-prefix-refusal/task.226.probe-cli-loader-env-prefix-refusal.md
 
 ---
 
@@ -199,3 +207,4 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-10-21 | **Phase 13 opened** with T224 (task.214 QA CR-1 and CR-2), ordered ahead of the registry fallback, which would otherwise select T216 first. |
 | 2026-10-21 | **T224 accepted + merged — PR #724 merged** (`2c7bb8a4`). The loop-supervisor probe says when its script is missing. `probeMissing()` in `adapters.js` reports `probe script not found:` with the three paths searched, or names a missing configured `probeScript` and its config key; `runProbe` checks it before spawning. Existence follows Node main-module resolution (`require.resolve` then a fresh `fs.existsSync`, so a script deleted mid-run reads as missing), and the adapter table derives both defaults from `DEFAULT_PROBE_SCRIPT`. QA ran 4 cycles: CONCERNS 90 (no spawned present-script test), CONCERNS 90 (existence stricter than Node), PASS 100 with QA-3 open (stale `require.resolve` cache), then PASS 100. 5c CONCERNS (two implementation-report trail findings, fixed). DoD run 1 accepted 12/12; the security pass judged nothing delivered a boundary. Merge gate `npm run ci` green (6193 tests); CI satisfied as tree-equivalent to `0111e31e`. Issue #723 closed. Advisory follow-up: CR-1 (a stale hit hides a replacement candidate that appears later). |
 | 2026-10-21 | **Phase 13 closed and archived** to `roadmap-history.md` (T224 was its only row). No phase is open; selection falls through to the registries (next: T216). |
+| 2026-10-22 | **T216 accepted + merged — PR #726 merged** (`d92e5693`), selected from the registry with no phase open. A `cli:` probe case carries `fixture.files` and `fixture.env`. QA ran 3 cycles and reached PASS 95; one LOW (TASK-216-QA3-1) was carried. DoD accepted, with 26 probes and 0 escaped. Issue #696 closed. **Phase 14 opened** with T226 to close TASK-216-QA3-1, ordered ahead of the registry fallback, which would otherwise select T217 first. |

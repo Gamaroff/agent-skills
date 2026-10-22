@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-10-22
-**Next Available Task Number:** **226**
+**Next Available Task Number:** **227**
 
 ## How to use
 
@@ -267,6 +267,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 223 | [Gap body: refuse an empty section; correct task.222's Deferred Work line](task.223.gap-body-empty-section-and-deferred-line/task.223.gap-body-empty-section-and-deferred-line.md) | accepted | refactoring | Low | 2026-10-21 | [#719](https://github.com/Gamaroff/agent-skills/issues/719) | task.222 — QA-222-13 (`dod-gap-count.sh --body` prints `S` for an empty gaps section) and PC-1 (task.222's Deferred Work line) |
 | 224 | [loop-supervisor: say when the probe script is not found](task.224.loop-supervisor-probe-not-found/task.224.loop-supervisor-probe-not-found.md) | accepted | infrastructure | Medium | 2026-10-21 | — | task.214 — CR-1 and CR-2 from task.214's QA report: a missing `select-next.mjs` is reported with the paths searched, not as "probe produced no output"; the adapter table's default probe path is derived from one constant |
 | 225 | [loop-supervisor: find a replacement probe script after a stale hit](task.225.loop-supervisor-probe-stale-hit-replacement/task.225.loop-supervisor-probe-stale-hit-replacement.md) | planned | infrastructure | Low | 2026-10-22 | [#725](https://github.com/Gamaroff/agent-skills/issues/725) | task.224 — CR-1 from task.224 QA gate 4: a stale `require.resolve` hit falls back to a fresh-process resolve, so a replacement probe script in another shape is found without a restart |
+| 226 | [security-probe: refuse every LD_* and DYLD_* variable on cli: case fixtures](task.226.probe-cli-loader-env-prefix-refusal/task.226.probe-cli-loader-env-prefix-refusal.md) | planned | infrastructure | Medium | 2026-10-22 | [#727](https://github.com/Gamaroff/agent-skills/issues/727) | task.216 — TASK-216-QA3-1 from task.216 QA gate 3: the cli: loader refusal matches four exact names; refuse the LD_/DYLD_ prefixes, as the docs already say |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
