@@ -412,29 +412,32 @@ test would then fail on the orphaned `lint:secrets`. Revert as a whole.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-22
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 96/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.229.qa.3.secret-scan-ci-lane.md](./task.229.qa.3.secret-scan-ci-lane.md)
-- **Gate File**: [task.229.gate.3.secret-scan-ci-lane.yml](./task.229.gate.3.secret-scan-ci-lane.yml)
+- **Full Report**: [task.229.qa.4.secret-scan-ci-lane.md](./task.229.qa.4.secret-scan-ci-lane.md)
+- **Gate File**: [task.229.gate.4.secret-scan-ci-lane.yml](./task.229.gate.4.secret-scan-ci-lane.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 6221 (`ci:fast`), plus 11 probe cases
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-- Cycle 2's fixes verified: rules pinned with `--config`, missing base fatal outside a push, shellcheck green.
-- CR-1 (medium, re-rated from high): a tracked `.gitleaksignore` silences the PR-body and commit-message scans.
-- CR-3 (medium): a PR runs its own workflow and script, so the lane guards accidental leaks only; the docs do not say so.
-- CR-4 (medium): gitleaks' default path allowlist skips some tracked paths without saying so.
+- Cycle 3's fixes verified: a tracked `.gitleaksignore` no longer silences the PR-text scans (real binary), and the threat model and path allowlist are stated.
+- Two low findings (CR-1, CR-2: the tree scan still loads a tracked `.gitleaksignore` from its copy, which is not exploitable today, and the test cannot see it) were carried by the cosmetic-residue exit. See Deferred Work.
 
 <!-- change-log-start -->
+## Deferred Work
+
+- CR-1 (low, QA cycle 4, route 2b): the tree scan still loads a tracked `.gitleaksignore` from its `$tmp/tree` copy (gitleaks reads `<source>/.gitleaksignore`). It is not exploitable today, because a dir-scan fingerprint embeds the random mktemp path. Rename the copy before the scan, and correct the comment and docs. See gate 4 `recommendations.future`.
+- CR-2 (low, QA cycle 4, route 2b): the pinned-rules test should assert that no dir-scan source holds a `.gitleaksignore`.
+
 ## Change Log
 
 | Date | Version | Description | Author |
@@ -450,6 +453,7 @@ test would then fail on the orphaned `lint:secrets`. Revert as a whole.
 | 2026-10-22 |  | QA findings fixed — cycle 2, 3 findings (CR-1 rules pinned with --config, CR-2 missing base fatal outside a push, QA2-1 fixture SC2034) plus advisory CR-3 range shape | qa-fix |
 | 2026-10-22 |  | QA gate CONCERNS (90/100) — 3 findings | qa-task |
 | 2026-10-22 |  | QA findings fixed — cycle 3, 3 findings (CR-1 ignore list pinned and stdin scans run outside the repo, CR-3 accidental-leak threat model stated, CR-4 default path allowlist documented) | qa-fix |
+| 2026-10-22 |  | QA gate PASS (96/100) — 2 low findings carried (route 2b) | qa-task |
 <!-- change-log-end -->
 
 ---
