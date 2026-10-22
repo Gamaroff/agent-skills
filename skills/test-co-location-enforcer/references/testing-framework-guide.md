@@ -139,7 +139,7 @@ describe('LoginForm Component', () => {
   });
 
   it('should decode JWT tokens client-side', () => {
-    const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
+    const token = '<header>.<payload>.<signature>';
     const payload = decodeToken(token); // Only parsing, no verification
     expect(payload).toBeDefined();
   });
@@ -1020,7 +1020,7 @@ import { decodeToken, isTokenExpired } from "@your-org/auth-lib/client";
 
 describe("Token Display Tests", () => {
   it("should decode token for display", () => {
-    const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...";
+    const token = "<header>.<payload>.<signature>";
     const payload = decodeToken(token);
     expect(payload).toBeDefined();
   });
