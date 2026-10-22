@@ -1,0 +1,85 @@
+{
+  "sink": "markdown-structure",
+  "entry": "cli:shared/resources/tests/fixtures/security-probe/cli-needs-data.py",
+  "name": "cli-needs-data.py merge-back",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 8,
+  "passed": 8,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 11,
+  "declined_cases": [
+    {
+      "id": "cli-fixture.escape-path-declined",
+      "reason": "case-errored",
+      "detail": "fixture: `fixture.files` path \"../escaped.json\" leaves the case directory"
+    },
+    {
+      "id": "cli-fixture.absolute-path-declined",
+      "reason": "case-errored",
+      "detail": "fixture: `fixture.files` path \"/tmp/task216-escaped.json\" leaves the case directory"
+    },
+    {
+      "id": "cli-fixture.env-path-declined",
+      "reason": "case-errored",
+      "detail": "case's `fixture.env` may not set PATH on the cli: form — it steers the interpreter the form runs, not the CLI under probe"
+    },
+    {
+      "id": "cli-fixture.env-node-options-declined",
+      "reason": "case-errored",
+      "detail": "case's `fixture.env` may not set NODE_OPTIONS on the cli: form — it steers the interpreter the form runs, not the CLI under probe"
+    },
+    {
+      "id": "cli-fixture.env-home-declined",
+      "reason": "case-errored",
+      "detail": "case's `fixture.env` may not set HOME — the sandbox owns it"
+    },
+    {
+      "id": "cli-fixture.absent-collision-declined",
+      "reason": "case-errored",
+      "detail": "case's `expected.absent` names \"items.json\", which the fixture itself creates"
+    },
+    {
+      "id": "cli-fixture.malformed-declined",
+      "reason": "case-errored",
+      "detail": "case's `fixture` is not an object"
+    },
+    {
+      "id": "cli-fixture.env-ld-audit-declined",
+      "reason": "case-errored",
+      "detail": "case's `fixture.env` may not set LD_AUDIT on the cli: form — it steers the interpreter the form runs, not the CLI under probe"
+    },
+    {
+      "id": "cli-fixture.env-ld-preload-declined",
+      "reason": "case-errored",
+      "detail": "case's `fixture.env` may not set LD_PRELOAD on the cli: form — it steers the interpreter the form runs, not the CLI under probe"
+    },
+    {
+      "id": "cli-fixture.env-dyld-framework-declined",
+      "reason": "case-errored",
+      "detail": "case's `fixture.env` may not set DYLD_FRAMEWORK_PATH on the cli: form — it steers the interpreter the form runs, not the CLI under probe"
+    },
+    {
+      "id": "cli-fixture.env-dyld-fallback-declined",
+      "reason": "case-errored",
+      "detail": "case's `fixture.env` may not set DYLD_FALLBACK_LIBRARY_PATH on the cli: form — it steers the interpreter the form runs, not the CLI under probe"
+    }
+  ],
+  "escaped": 0,
+  "shells": null,
+  "interpreter": {
+    "name": "python3",
+    "version": "Python 3.14.8"
+  },
+  "fake_gh": null,
+  "argv": [
+    "merge-back",
+    "{input}"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-10-22T12:54:07.817Z"
+}
