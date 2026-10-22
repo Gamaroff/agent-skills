@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-10-22
-**Next Available Task Number:** **228**
+**Next Available Task Number:** **230**
 
 ## How to use
 
@@ -269,6 +269,8 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 225 | [loop-supervisor: find a replacement probe script after a stale hit](task.225.loop-supervisor-probe-stale-hit-replacement/task.225.loop-supervisor-probe-stale-hit-replacement.md) | planned | infrastructure | Low | 2026-10-22 | [#725](https://github.com/Gamaroff/agent-skills/issues/725) | task.224 — CR-1 from task.224 QA gate 4: a stale `require.resolve` hit falls back to a fresh-process resolve, so a replacement probe script in another shape is found without a restart |
 | 226 | [security-probe: refuse every LD_* and DYLD_* variable on cli: case fixtures](task.226.probe-cli-loader-env-prefix-refusal/task.226.probe-cli-loader-env-prefix-refusal.md) | accepted | infrastructure | Medium | 2026-10-22 | [#727](https://github.com/Gamaroff/agent-skills/issues/727) | task.216 — TASK-216-QA3-1 from task.216 QA gate 3: the cli: loader refusal matches four exact names; refuse the LD_/DYLD_ prefixes, as the docs already say |
 | 227 | [Step 8: move the state-file removals out of the Completion Checklist](task.227.step-8-checklist-no-rm/task.227.step-8-checklist-no-rm.md) | planned | infrastructure | Medium | 2026-10-22 | [#728](https://github.com/Gamaroff/agent-skills/issues/728) | — cut from observation #87 (T216 run: the host refused the checklist block over its `rm` lines) |
+| 228 | [Replace the sample tokens gitleaks flags in tracked files](task.228.fake-sample-tokens-gitleaks/task.228.fake-sample-tokens-gitleaks.md) | planned | documentation | High | 2026-10-22 | [#730](https://github.com/Gamaroff/agent-skills/issues/730) | — downstream handoff: a consumer's gitleaks scan fails on the vendored testing guide |
+| 229 | [Secret-scan CI lane over tracked files](task.229.secret-scan-ci-lane/task.229.secret-scan-ci-lane.md) | planned | infrastructure | Medium | 2026-10-22 | [#731](https://github.com/Gamaroff/agent-skills/issues/731) | task.228 |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
@@ -319,5 +321,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 - **Tasks 180–181 each add an entry form to `security-probe.mjs`** — independent in outcome (180: `fence:` for a fenced block; 181: `shell-argv:` for a multi-argument shell script), but both edit the engine and the same six routing documents: land one, rebase the other, never in one worktree. 181's Phase 3 proof targets `reenter-qa-after-finalise.sh`, which ships with task.170.
 
 - **Tasks 218–219 were cut from task.199's QA gate 4 `recommendations.future`** — one shippable unit each, independent of each other. 218 is wording only (two docs, comment lines and one `echo` in `setup-consumer.sh`); 219 adds `registry-tick.js --bug-status` and changes qa-fix and develop-bug step prose. They share no file; either may land first. The gate's cross-file anchor item is observation #80, not a task.
+
+- **Tasks 228–229 are a fix and its guard (substantive → cleanup)**, filed 2026-10-22 — one shippable unit each, in dependency order: 228 replaces the testing guide's sample tokens and rewords two prose lines so `gitleaks dir .` is clean on tracked files; 229 adds the pinned-gitleaks CI lane and `npm run lint:secrets`, which is red on the tree until 228 merges. Both are ordered ahead of the registry fallback by roadmap Phase 15.
 
 - Filenames follow `task.[N].[kebab-case-name].md` per [AGENTS.md](../../AGENTS.md#file-naming).

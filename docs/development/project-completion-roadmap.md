@@ -20,7 +20,7 @@ finished work. Rules:
 §"Registry fallback frontier".
 
 Add a phase only to express *sequencing* the registries cannot: a deliberate order, a dependency
-chain, a human gate. No phase is open (Phase 14 closed 2026-10-22); selection falls through to the registries.
+chain, a human gate. Phase 15 is open (opened 2026-10-22); once it closes, selection falls through to the registries.
 
 > ⚠️ **A phase costs upkeep that a registry row does not, and the cost is not obvious.** Roadmap rows
 > are matched on the **checkbox alone** — they do **not** consult the target document's frontmatter.
@@ -66,6 +66,16 @@ Read only by `--batch`. Two rows conflict when they share a tag that **either** 
 | `mutation-proving` | `shared/resources/mutation-proving.md`                                  |
 | `docs-pipeline`    | `docs/runbooks/*`, `docs/concepts/*`, `docs/reference/pipeline-artifacts.md`, `docs/operations/workflows.md`, `skills/develop-*/README.md` |
 | `pipeline-lock`    | `shared/resources/advance-pipeline-lock.sh`, `advance-pipeline-lock.test.sh`  |
+
+## PHASE 15 — secret-scan clean tree and guard (opened 2026-10-22)
+
+An **override**: without it the registry fallback selects T217 first, because it takes the
+lowest-numbered task. The owner asked for these two ahead of every other story and task. T228
+makes `gitleaks dir .` clean on tracked files, so a downstream consumer can drop its allowlist for
+the vendored testing guide. T229 adds the CI lane that keeps it clean, and is red until T228 merges.
+
+- [ ] **T228** Replace the sample tokens gitleaks flags in tracked files · deps: none · touches: setup-consumer~ · /develop-task docs/tasks/task.228.fake-sample-tokens-gitleaks/task.228.fake-sample-tokens-gitleaks.md
+- [ ] **T229** Secret-scan CI lane over tracked files · deps: T228 · touches: test-harness~ · /develop-task docs/tasks/task.229.secret-scan-ci-lane/task.229.secret-scan-ci-lane.md
 
 ## Deferred / human-gated
 
@@ -200,3 +210,4 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-10-22 | **T216 accepted + merged — PR #726 merged** (`d92e5693`), selected from the registry with no phase open. A `cli:` probe case carries `fixture.files` and `fixture.env`. QA ran 3 cycles and reached PASS 95; one LOW (TASK-216-QA3-1) was carried. DoD accepted, with 26 probes and 0 escaped. Issue #696 closed. **Phase 14 opened** with T226 to close TASK-216-QA3-1, ordered ahead of the registry fallback, which would otherwise select T217 first. |
 | 2026-10-22 | **T226 accepted + merged — PR #729 merged** (`ca958146`). A `cli:` probe case’s `fixture.env` now refuses every dynamic-loader variable by prefix, not four exact names: `CLI_LOADER_ENV_PREFIXES` (`LD_`, `DYLD_`) beside `CLI_INTERPRETER_ENV` (`PATH`, `NODE_OPTIONS`), read through one predicate, `steersInterpreter`, in `runCliCase`. Case-sensitive `startsWith`, so `MY_LD_FLAG` and `ld_audit` still run. `probe-boundary-rule.md` §5 and both CHANGELOG entries state the one rule. QA ran 1 cycle: PASS 100, 0 findings, three mutants covered. 5c APPROVE. DoD run 1 accepted 10/10; the DoD probe run executed 22 candidates on Node and Python with 0 reproduced, every loader canary declined by name. Merge gate `npm run ci` green after a re-run of the load-sensitive `bundle-missing-source.test.js` (20064 ms on a 20000 ms budget; 7/7 alone). CI 5/5. Issue #727 closed. |
 | 2026-10-22 | **Phase 14 closed and archived** to `roadmap-history.md` (T226 was its only row). No phase is open; selection falls through to the registries (next: T217). |
+| 2026-10-22 | **Phase 15 opened** with T228 (sample tokens that trip gitleaks) and T229 (the secret-scan CI lane, deps T228), ordered ahead of the registry fallback at the owner's request; without it T217 is selected first. |

@@ -1,0 +1,403 @@
+---
+id: task.229
+title: "Secret-scan CI lane over tracked files"
+type: task
+description: "Add a pinned-gitleaks CI lane and its local twin so a secret-shaped string in a tracked file fails the build."
+tags: [gitleaks, secret-scan, ci, guard]
+category: infrastructure
+status: planned
+priority: Medium
+created: 2026-10-22
+updated: 2026-10-22
+assignee:
+estimated_effort_hours: 4
+github_issue: 731
+---
+
+# Technical Task: Secret-scan CI lane over tracked files
+
+**Status:** Planned
+**GitHub Issue**: [#731](https://github.com/Gamaroff/agent-skills/issues/731)
+
+---
+
+## 1. Overview
+
+Nothing in CI runs a secret scanner, so the false positive task.228 removes could come back
+unnoticed, and so could a real credential. This task adds a `Secret scan` workflow that runs a
+pinned gitleaks over the **tracked** tree on every PR and push. It also adds the local twin,
+`npm run lint:secrets`, which joins `npm run ci` the way `lint:shell` mirrors `shellcheck.yml`.
+Before trusting a green result, the lane proves it can catch a token planted at runtime.
+
+**Scope:** a new workflow, a new script, `package.json`, the CI-parity test's lane tables, and the
+contributor docs that list the CI lanes.
+
+**Key deliverables:**
+
+- `.github/workflows/secret-scan.yml`: pinned gitleaks, unfiltered, same triggers as `shellcheck.yml`.
+- `scripts/lint-secrets.sh` (`npm run lint:secrets`): the local twin. It scans the same file set and
+  skips loudly when the binary is absent.
+- A self-check in the script: a token generated at runtime must make the scan fail, or the lane exits
+  non-zero, whatever the real scan says.
+
+**Expected outcome:** a PR that adds a secret-shaped string to a tracked file goes red, and a
+contributor can see that before pushing.
+
+---
+
+## 2. Motivation
+
+### Current Problems
+
+1. **No guard.** `.github/workflows/` holds `branch-policy.yml`, `docs-link-check.yml`,
+   `release.yml`, `shellcheck.yml`, `test.yml` and `validate.yml` (`ls .github/workflows/`). None
+   calls gitleaks (`grep -rln gitleaks .github scripts package.json` returns nothing).
+2. **Consumers find out first.** The testing-guide hit was found by a downstream repository's scan,
+   not here. Every vendored skill directory is a place this can happen again.
+3. **A fix without a guard decays.** task.228 makes the tree clean once. Nothing keeps it clean.
+
+### Benefits
+
+1. **Caught at the PR**, not in a consumer's pre-publish scan.
+2. **Real credentials are caught too**, not only sample values.
+3. **Same answer locally and in CI**: one file-set definition, one pinned version.
+4. **The guard proves itself**: the planted-token self-check fails the lane if the scanner, its
+   config or the file list ever stops catching anything.
+
+---
+
+## 3. Technical Background
+
+### Current Architecture
+
+- The CI lanes that must be green for a PR into develop are listed in `GREEN_JOBS`,
+  `evals/shared/tests/ci-gate-parity.test.mjs:94` (`const GREEN_JOBS = [`). It holds `test.yml`,
+  `validate.yml` and `shellcheck.yml`.
+- That test asserts set equality between what the green jobs run and the `ci` composite in
+  `package.json` (`"ci": "npm run ci:fast && … && npm run lint:shell"`). A step that is not an
+  `npm run` call must be named in `LANE_TWINS` (`ci-gate-parity.test.mjs:105`), which maps the
+  step name to the npm script that reproduces it. Today that includes
+  `"Lint source shell scripts": "lint:shell"`.
+- `shellcheck.yml` is the pattern to copy. It is a separate, unfiltered workflow. It installs a
+  **pinned** binary from the release tarball, builds its file list from `git ls-files`, and fails on
+  an empty list. Its local twin, `scripts/lint-shell.sh`, skips loudly with exit 0 when the binary is
+  absent. The header comments of both files explain why: a path-filtered workflow would never fire
+  for `scripts/`, and adding a step to `test.yml` would force the binary install into `npm run ci`.
+- `docs/contributing/releases.md` § "`npm run ci` is the local form…" and `CONTRIBUTING.md`
+  § "Before you open a PR" both list every lane in the composite.
+
+### Target Architecture
+
+- **`secret-scan.yml`**: job `secret-scan`. Steps: `actions/checkout@v7`, `Install gitleaks
+  (pinned)`, `Scan tracked files for secrets`. The last step runs `bash scripts/lint-secrets.sh`,
+  so the lane and the twin share one file-set definition instead of two copies kept in step.
+- **`scripts/lint-secrets.sh`**:
+  1. `cd "$(git rev-parse --show-toplevel)"`.
+  2. Binary absent → print `gitleaks not installed — lane skipped (CI runs it)` and exit 0.
+  3. **Self-check.** Write a scratch file holding `const api_key = '<value>';`, where `<value>` is
+     generated at runtime from `/dev/urandom` (32 base64url characters). Scan it, and require exit
+     non-zero. If the scan passes, print `self-check failed: the scanner caught nothing` and exit 1.
+     The value is generated, never committed, so the repository never holds a string the lane
+     would flag.
+  4. **Tracked files only.** Copy the tracked set into a scratch directory with
+     `git ls-files -z | tar --null -T - -cf - | tar -xf - -C "$tmp"`. This works with GNU and BSD
+     tar, and with a working tree that has uncommitted edits. Fail when the list is empty.
+     `gitleaks dir .` cannot be used: on a contributor's machine it also reads untracked,
+     gitignored files (`.claude/state/` gave three hits on 2026-10-22) and `node_modules/`.
+  5. `gitleaks dir "$tmp" --no-banner --redact --exit-code 1`. Report hits by file, line and rule
+     only; never print a value.
+- **`package.json`**: `"lint:secrets": "bash scripts/lint-secrets.sh"`, appended to `ci`.
+- **`ci-gate-parity.test.mjs`**: add `{ workflow: ".github/workflows/secret-scan.yml", job: "secret-scan" }`
+  to `GREEN_JOBS`. If the step calls `npm run lint:secrets`, no `LANE_TWINS` entry is needed;
+  otherwise add `"Scan tracked files for secrets": "lint:secrets"`. Add `Install gitleaks (pinned)`
+  to `SETUP_STEPS` (`ci-gate-parity.test.mjs:131`), beside `"Install ShellCheck (pinned)"`.
+
+### Important Clarifications
+
+- **The binary is installed in CI, never in `npm run ci`.** That mirrors the ShellCheck decision.
+- **A false positive is reworded**, as task.228 does, or carries an inline `gitleaks:allow` with
+  a reason in the same comment. A path allowlist is not added: it hides everything in that path.
+- **History is not scanned.** `gitleaks git` would find the values task.228 removed. The lane
+  guards the tree, not the past.
+- **(unverified)** Whether `release.sh`'s CI-verdict check (`scripts/release-ci-verdict.mjs`, task
+  153) should also require this lane. See Out of Scope.
+
+---
+
+## 4. Scope
+
+### In Scope
+
+✅ **Workflow**: `.github/workflows/secret-scan.yml`, with a pinned gitleaks version.
+✅ **Local twin**: `scripts/lint-secrets.sh`, plus the `package.json` `lint:secrets` script and its place in `ci`.
+✅ **Self-check**: a planted runtime token must trip the scan.
+✅ **Parity**: `GREEN_JOBS`, plus a `LANE_TWINS` entry if needed, in `ci-gate-parity.test.mjs`.
+✅ **Docs**: `CONTRIBUTING.md` "Before you open a PR", the `releases.md` lane list and CI checklist, and `CHANGELOG.md` `### Added`.
+
+### Out of Scope
+
+❌ **Fixing the current hits**: task.228, which must merge first.
+❌ **Scanning git history.**
+❌ **Making `release.sh` require the lane.** It is a follow-up once the lane has a green record;
+changing the release gate in the same PR that creates the lane would gate releases on a lane with
+no history.
+❌ **A repository `.gitleaks.toml`** with path allowlists. Add one only if a real false positive
+appears that cannot be reworded, and say why.
+
+---
+
+## 5. Breaking Changes
+
+None for consumers. For contributors, `npm run ci` gains a lane, which skips when gitleaks is not
+installed.
+
+---
+
+## 6. Implementation Plan
+
+> Detailed implementation guide: [task.229.plan.secret-scan-ci-lane.md](task.229.plan.secret-scan-ci-lane.md)
+
+### Phase 0: Precondition
+
+**Risk Level**: Low
+
+**Changes**:
+- [ ] Confirm task.228 is `accepted` and merged to `develop`. Otherwise HALT: the lane is red on the current tree.
+
+**Dependencies**: task.228
+
+---
+
+### Phase 1: Local twin script
+
+**Risk Level**: Medium
+
+**Files**:
+- `scripts/lint-secrets.sh` (new)
+- `package.json`
+
+**Changes**:
+- [ ] Write the script: root cd, absent-binary skip, self-check, tracked-file copy, empty-list guard, scan.
+- [ ] Add `lint:secrets` and append it to `ci`.
+- [ ] Mutation-prove the self-check: replace the planted value with a low-entropy one and confirm the script exits 1 with the self-check message.
+- [ ] Mutation-prove the scan: add a scratch tracked file with a runtime-generated token (staged, never committed) and confirm the script exits 1. Then remove it.
+
+**Dependencies**: Phase 0
+
+---
+
+### Phase 2: CI workflow and parity
+
+**Risk Level**: Medium
+
+**Files**:
+- `.github/workflows/secret-scan.yml` (new)
+- `evals/shared/tests/ci-gate-parity.test.mjs`
+
+**Changes**:
+- [ ] Workflow: same `on:` as `shellcheck.yml`, pinned install step that prints `gitleaks version`, scan step calling the twin.
+- [ ] Add the job to `GREEN_JOBS`, and to `LANE_TWINS` if the step is not an `npm run` call.
+- [ ] Confirm the parity test goes red before the `GREEN_JOBS` edit or before the `ci` composite edit, then green after both.
+
+**Dependencies**: Phase 1
+
+---
+
+### Phase 3: Docs and CHANGELOG
+
+**Risk Level**: Low
+
+**Files**:
+- `CONTRIBUTING.md`, `docs/contributing/releases.md`, `CHANGELOG.md`
+
+**Changes**:
+- [ ] Add `lint:secrets` to every lane list that names `lint:shell`.
+- [ ] Add a `Secret scan` line to the releases.md CI checklist.
+- [ ] CHANGELOG `[Unreleased]` → `### Added` entry citing task 229.
+
+**Dependencies**: Phase 2
+
+---
+
+## 7. Files Summary
+
+### New Files
+
+1. ✅ `.github/workflows/secret-scan.yml`: the CI lane.
+2. ✅ `scripts/lint-secrets.sh`: the local twin and the single file-set definition.
+
+### Files to Modify
+
+3. ✅ `package.json`: `lint:secrets` script, appended to `ci`.
+4. ✅ `evals/shared/tests/ci-gate-parity.test.mjs`: `GREEN_JOBS`, plus `LANE_TWINS` if needed.
+5. ✅ `CONTRIBUTING.md`: the "Before you open a PR" lane list.
+6. ✅ `docs/contributing/releases.md`: the lane list and the CI checklist.
+7. ✅ `CHANGELOG.md`: `### Added`.
+
+---
+
+## 8. Testing Strategy
+
+### Unit / lane tests
+
+**Scope**: the twin script's three outcomes.
+
+**Actions**:
+- [ ] Clean tree (after task.228): exit 0.
+- [ ] Planted tracked token: exit 1, hit reported by file and rule, value redacted.
+- [ ] Self-check broken (low-entropy plant): exit 1 with the self-check message.
+- [ ] Binary absent (`PATH` without gitleaks): exit 0 with the skip message.
+- [ ] Empty file list (run outside a git work tree or with a forced-empty list): exit 1.
+
+**Command**: `npm run lint:secrets`. ShellCheck lints the new script through `npm run lint:shell`.
+
+### Integration
+
+**Scope**: CI parity and the workflow itself.
+
+**Actions**:
+- [ ] `npm test` (includes `ci-gate-parity.test.mjs`) is green.
+- [ ] The PR's `Secret scan` check runs and is green on the PR head.
+
+### Performance Tests
+
+**Metrics**: lane wall time in CI. A full-tree local scan with untracked files took 2m22s
+(138 MB, 2026-10-22). The tracked set is much smaller, but record the CI time and keep the lane
+in the same order as ShellCheck's.
+
+---
+
+## 9. Success Criteria
+
+### Functional
+
+- [ ] On the post-task.228 tree, `npm run lint:secrets` exits 0.
+- [ ] With a runtime-generated token in a staged scratch file, `npm run lint:secrets` exits 1 (Phase 1's scan mutation).
+- [ ] With the self-check plant replaced by a low-entropy value, the script exits 1 before the real scan (Phase 1's self-check mutation).
+- [ ] With gitleaks off `PATH`, the script exits 0 and prints the skip message.
+- [ ] The `Secret scan` workflow is green on the PR head.
+
+### Performance
+
+- [ ] The lane's CI wall time is recorded in the implementation report.
+
+### Code Quality
+
+- [ ] `npm test` passes, including `ci-gate-parity.test.mjs`.
+- [ ] `npm run lint:shell` passes with the new script in its file set.
+- [ ] `npm run format:check` passes.
+- [ ] No matched value is printed anywhere: lane output, reports or PR text.
+
+### Migration
+
+- [ ] CHANGELOG `### Added` entry cites task 229.
+- [ ] CONTRIBUTING.md and releases.md list `lint:secrets` wherever they list `lint:shell`.
+
+---
+
+## 10. Risk Assessment
+
+### High Risk Areas
+
+None.
+
+### Medium Risk Areas
+
+**1. Pinned version drift**
+- **Risk**: a new gitleaks rule fires on untouched text after a bump.
+- **Probability**: Medium (on each bump)
+- **Impact**: Major. Every PR goes red for a reason unrelated to the PR.
+- **Mitigation**: pin the version, as ShellCheck is pinned. Bump in its own commit along with whatever the bump flags.
+- **Rollback**: revert the bump commit.
+
+**2. Local and CI disagree**
+- **Risk**: the local binary version (8.30.1 on the owner's machine, `pacman -Q gitleaks`) differs from the CI pin, so the twin passes and CI fails, or the reverse.
+- **Probability**: Medium
+- **Impact**: Minor
+- **Mitigation**: the script prints the version it ran. The docs say CI's pin is the authority.
+
+### Low Risk Areas
+
+**1. A false positive in a future PR**
+- **Mitigation**: reword it, or add `gitleaks:allow` with a reason. The docs state this rule.
+
+---
+
+## 11. Rollback Plan
+
+### Immediate Rollback (< 1 hour)
+
+**Triggers**:
+- The lane is red on PRs that add nothing secret-shaped, and a reword is not quick.
+
+**Steps**:
+1. `git revert` the task's merge commit on `develop`. This removes the workflow, the script, the `ci` entry and the parity rows together, so the parity test stays consistent.
+
+**Verification**: `npm test` green. The `Secret scan` check no longer appears on new PRs.
+
+### Partial Rollback
+
+**When to Use**: only the CI workflow is the problem. Do not remove the workflow alone: the parity
+test would then fail on the orphaned `lint:secrets`. Revert as a whole.
+
+### Forward Fix
+
+**When to Use**: a single false positive. Reword it in the PR that introduced it.
+
+### Rollback Triggers
+
+**Critical**: the lane blocks every PR. **Non-critical**: one false positive.
+
+---
+
+<!-- change-log-start -->
+## Change Log
+
+| Date       | Version | Description   | Author      |
+| ---------- | ------- | ------------- | ----------- |
+| 2026-10-22 | 1.0     | Initial draft | create-task |
+<!-- change-log-end -->
+
+---
+
+## Progress Tracking
+
+### Phase 0: Precondition
+- [ ] task.228 merged
+
+### Phase 1: Local twin script
+- [ ] Script
+- [ ] `package.json`
+- [ ] Two mutations proven
+
+### Phase 2: CI workflow and parity
+- [ ] Workflow
+- [ ] Parity tables
+
+### Phase 3: Docs and CHANGELOG
+- [ ] Lane lists
+- [ ] CHANGELOG
+
+---
+
+## References
+
+- **Depends on**: task.228 (clean baseline)
+- **Pattern**: `.github/workflows/shellcheck.yml`, `scripts/lint-shell.sh`
+- **Parity rules**: `evals/shared/tests/ci-gate-parity.test.mjs` (task 111)
+
+---
+
+## Notes
+
+### Future Improvements
+
+- Have `release.sh` require a green `Secret scan` once the lane has a record.
+
+---
+
+**Status:** Planned
+
+**Next Steps**:
+1. After task.228 merges: `/develop-task docs/tasks/task.229.secret-scan-ci-lane/task.229.secret-scan-ci-lane.md`
+2. QA artifacts land beside this file.
