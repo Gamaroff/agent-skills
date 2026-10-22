@@ -5,7 +5,7 @@ type: task
 description: "change-log.js lifts any sibling section it finds inside the change-log markers back above them, the placement rules anchor on the marker, and a corpus guard holds the tree clean."
 tags: [develop-task, finalise, observation, change-log]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-10-22
 updated: 2026-10-22
@@ -16,7 +16,8 @@ github_issue: 734
 
 # Technical Task: Keep foreign sections out of the change-log block
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.230.review.1.change-log-block-foreign-sections.md` implemented 2026-10-22
 **GitHub Issue**: [#734](https://github.com/Gamaroff/agent-skills/issues/734)
 
 ---
@@ -128,6 +129,14 @@ one write. The corpus guard turns red on any document that holds one.
   the heading to the last `before` line, or from the heading to the last `after` line. A nested
   heading deeper than the log's level is the log's own subsection and stays. That is section I's
   behaviour today (`shared/resources/tests/change-log.test.mjs:1289`).
+- **The partition runs before table classification.** `splitCarriedLines` classifies every
+  unfenced pipe-line from the first one on as the log's table, so a foreign section that holds its
+  own pipe table *before* the log table would have its rows taken into the log (today they are
+  emitted as unparsed rows inside it). The split therefore runs inside `splitCarriedLines`, over
+  the `[line, fenced]` pairs, before `flags` is computed. A `before`-side foreign section ends
+  at the first line that is a change-log entry row (`RE_ENTRY_ROW`) or the table header directly
+  above one; a pipe table before that line belongs to the section and moves with it. An
+  `after`-side foreign section runs to the end of the block.
 - **`foreignSections(content)`** returns the foreign sections of the document's change-log block,
   each with its heading line and side (`before` / `after`), or `[]`. It is read-only, and is what
   the guard and the tests call.
@@ -226,7 +235,9 @@ the first write.
 ```
 
 **Impact:** every caller of `upsertChangeLog`, including `jira-sync.js`, `status-history.js`, the
-three `sync-jira-*` scripts, `tracker-reconcile.js` and finalise 7.3's one-liner. A document in the
+three `sync-jira-*` scripts, `tracker-reconcile.js` and finalise 7.3's one-liner. (Search:
+`git grep -ln upsertChangeLog -- ':!**/references/**' ':!docs/**' ':!*.md'`, which also lists the
+engine itself and four test files; finalise 7.3 calls it from a Markdown one-liner.) A document in the
 affected shape gets a larger diff on its next write than the one row it earned.
 
 **Migration path:** none required. The output is the documented canonical layout. The four known
@@ -243,43 +254,46 @@ diff. CHANGELOG names the behaviour.
 
 **Files:** `shared/resources/change-log.js`, `shared/resources/tests/change-log.test.mjs`
 
-- [ ] Write the failing tests first: the observation #91 repro (Deferred Work between the marker
+- [x] Write the failing tests first: the observation #91 repro (Deferred Work between the marker
       and the heading) and the task.203 shape (a DoD section between the heading and the table)
       both come out above the start marker
-- [ ] Add `foreignSections(content)` and `liftForeignSections(content)` with the predicate from §3,
+- [x] Add `foreignSections(content)` and `liftForeignSections(content)` with the predicate from §3,
       built on the existing protected ranges and `RE_HEADING`, and export both
-- [ ] Route `upsertChangeLog`'s marker path through the same partition, so the rebuilt block never
+- [x] Route `upsertChangeLog`'s marker path through the same partition, so the rebuilt block never
       contains a foreign section; compose with the obs #104 absorption
-- [ ] Add control cases that must stay put: nested `###` under an H2 log, authoring prose under the
+- [x] Add control cases that must stay put: nested `###` under an H2 log, authoring prose under the
       heading, a fenced `## Example`, a `####` under an H3 log
-- [ ] Mutation-prove: revert the lift and confirm the Phase 1 tests go red
+- [x] Mutation-prove: revert the lift and confirm the Phase 1 tests go red
 
 ### Phase 2: Placement rule and spec (Risk: Low)
 
-**Files:** `shared/resources/develop-pipeline-step-5-6-qa-loop.md`, `shared/resources/document-change-log.md`
+**Files:** `shared/resources/develop-pipeline-step-5-6-qa-loop.md`, `shared/resources/document-change-log.md`,
+`tests/deferred-work-placement.test.js`
 
-- [ ] Reword "Absent → create it" to the marker-anchored wording finalise 7.4 uses
-- [ ] State in the Markers section that only the log lives inside the markers, and that the engine
+- [x] Reword "Absent → create it" to the marker-anchored wording finalise 7.4 uses
+- [x] State in the Markers section that only the log lives inside the markers, and that the engine
       lifts a sibling section on the next write (obs #91)
-- [ ] `npm run bundle` and commit the regenerated `references/` copies
+- [x] Update `tests/deferred-work-placement.test.js`: its `place()` comment (`:61`) restates the
+      old wording; reword it, and assert the statement contains "never between the markers"
+- [x] `npm run bundle` and commit the regenerated `references/` copies
 
 ### Phase 3: Repair and corpus guard (Risk: Low)
 
 **Files:** the four task documents, `evals/shared/tests/change-log-foreign-section-corpus.test.mjs`
 
-- [ ] Write the guard: every tracked `.md` file with a change-log block returns `[]` from
+- [x] Write the guard: every tracked `.md` file with a change-log block returns `[]` from
       `foreignSections`, with a non-vacuity floor on the number of blocks scanned
-- [ ] Confirm the guard is red on `develop` and names all four documents
-- [ ] Repair each document through `upsertChangeLog` with one row
+- [x] Confirm the guard is red on `develop` and names all four documents
+- [x] Repair each document through `upsertChangeLog` with one row
       (`Change-log block repaired — DoD section moved above the markers (task.230)`), bumping `updated:`
-- [ ] Confirm the guard is green, then re-plant one section and confirm it goes red again
+- [x] Confirm the guard is green, then re-plant one section and confirm it goes red again
 
 ### Phase 4: Documentation and validation (Risk: Low)
 
 **Files:** `CHANGELOG.md`
 
-- [ ] CHANGELOG entry under Unreleased naming the lift and the guard (task 230)
-- [ ] `npm run ci` green, with the `.agents/skills` symlink moved aside first
+- [x] CHANGELOG entry under Unreleased naming the lift and the guard (task 230)
+- [x] `npm run ci` green, with the `.agents/skills` symlink moved aside first
 
 ---
 
@@ -303,6 +317,7 @@ None. No package changes.
 
 4. ✅ `shared/resources/develop-pipeline-step-5-6-qa-loop.md` — the Deferred Work placement rule
 5. ✅ `shared/resources/document-change-log.md` — the Markers section
+5a. ✅ `tests/deferred-work-placement.test.js` — the restated wording, plus an assertion on the new one
 6. ✅ `CHANGELOG.md` — Unreleased entry
 7. ✅ `docs/tasks/task.166.measured-non-functional-criteria/task.166.measured-non-functional-criteria.md` — repaired
 8. ✅ `docs/tasks/task.170.qa-reentry-after-finalise-gaps/task.170.qa-reentry-after-finalise-gaps.md` — repaired
@@ -324,8 +339,9 @@ None.
 - **Scope:** `foreignSections`, `liftForeignSections` and `upsertChangeLog` in
   `shared/resources/tests/change-log.test.mjs`.
 - **Cases that must lift:** Deferred Work between the marker and the heading (obs #91); a DoD
-  section between the heading and the table (task.203); a sibling section after the table (lifted
-  below the end marker); two foreign sections, order kept; a foreign section inside a legacy
+  section between the heading and the table (task.203); a foreign section that holds its own pipe
+  table before the log table (its table moves with it, and the log keeps only its own rows); a
+  sibling section after the table (lifted below the end marker); two foreign sections, order kept; a foreign section inside a legacy
   `jira-sync-changelog` block; a sibling `###` inside an H3 log.
 - **Controls that must stay (obs #176):** nested `###` under an H2 log with its own table; an
   authoring note directly under the heading; a fenced `## Example` inside the block; a `####`
@@ -355,8 +371,9 @@ None.
 
 ### Performance Tests
 
-- The corpus guard runs over every tracked `.md` file. Its wall time must stay under 5 s on the CI
-  runner. Measure it at implementation and record the figure in the implementation report.
+- The corpus guard runs over every tracked `.md` file. Its wall time must stay under 5 s. Measure
+  it on the PR head with `uptime; time command node --test evals/shared/tests/change-log-foreign-section-corpus.test.mjs`
+  and record the figure and the load in the implementation report.
 
 ### Consumer Tests
 
@@ -380,18 +397,24 @@ None.
       `## Example` stay inside the block, unchanged
 - [ ] A second `upsertChangeLog` on the output lifts nothing and changes only the appended row
 - [ ] No non-blank line is lost: input lines plus the new row equal output lines as multisets
-- [ ] The Deferred Work placement rule names the marker, in the same words as finalise 7.4
+- [ ] The Deferred Work placement rule names the marker, in the same words as finalise 7.4 (held by
+      `tests/deferred-work-placement.test.js`, which asserts "never between the markers")
 
 ### Performance
 
-- [ ] The corpus guard completes in under 5 s on the CI runner
+- [ ] The corpus guard completes in under 5 s, measured on the PR head with
+      `uptime; time command node --test evals/shared/tests/change-log-foreign-section-corpus.test.mjs`
+      (load recorded beside the figure in the implementation report)
 - [ ] `upsertChangeLog` on a document with no foreign section produces byte-identical output to
       today (the existing suite passes unchanged)
 
 ### Code Quality
 
 - [ ] One definition of "foreign": `upsertChangeLog`, `foreignSections` and the corpus guard all
-      read the same partition, and no second predicate exists in the tree
+      read the same partition. Held by two tests: the corpus guard imports `foreignSections` from
+      `shared/resources/change-log.js` (no predicate of its own), and a unit test asserts
+      `foreignSections(upsertChangeLog(x, row)) === []` for every lifting case, binding the write
+      path to the read predicate
 - [ ] Reverting the lift turns the Phase 1 tests red, and re-planting a section turns the corpus
       guard red (mutation-proven, recorded in the implementation report)
 - [ ] `npm run ci` passes, including `bundle:check` and `npm run validate`
@@ -400,7 +423,7 @@ None.
 
 - [ ] task.166, task.170, task.175 and task.203 each have their DoD section above the start marker,
       with one repair row and `updated:` bumped
-- [ ] The corpus guard is green on the merged tree
+- [ ] The corpus guard is green on the PR head
 - [ ] CHANGELOG states the new lift behaviour
 
 ---
@@ -473,13 +496,15 @@ None.
 - **Non-critical:** blank-line churn; a foreign shape the predicate misses (fix forward).
 
 ---
-
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                              | Author      |
-| ---------- | ------- | ---------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-22 | 1.0     | Initial draft — cut from observation #91 | create-task |
+| 2026-10-22 | 1.1 | Review passed (8/10) — 6 important fixes applied: partition before table classification, measured bound command, two tests named, PR-head wording, caller search, placement test update | review-task |
+| 2026-10-22 |  | Status → ready-for-development | review-task |
+| 2026-10-22 |  | Implemented — 12 files, 13 tests (11 engine, 2 corpus guard) plus 1 placement assertion | develop |
 <!-- change-log-end -->
 
 ---
@@ -487,25 +512,25 @@ None.
 ## Progress Tracking
 
 ### Phase 1: Engine — partition, lift, test first
-- [ ] Red tests (obs #91 repro, task.203 shape)
-- [ ] `foreignSections` / `liftForeignSections`
-- [ ] `upsertChangeLog` lifts; composes with obs #104
-- [ ] Control cases
-- [ ] Mutation proof
+- [x] Red tests (obs #91 repro, task.203 shape)
+- [x] `foreignSections` / `liftForeignSections`
+- [x] `upsertChangeLog` lifts; composes with obs #104
+- [x] Control cases
+- [x] Mutation proof
 
 ### Phase 2: Placement rule and spec
-- [ ] Deferred Work rule anchored on the marker
-- [ ] Markers section updated
-- [ ] Bundle
+- [x] Deferred Work rule anchored on the marker
+- [x] Markers section updated
+- [x] Bundle
 
 ### Phase 3: Repair and corpus guard
-- [ ] Guard red on develop
-- [ ] Four documents repaired
-- [ ] Guard green; re-plant red
+- [x] Guard red on develop
+- [x] Four documents repaired
+- [x] Guard green; re-plant red
 
 ### Phase 4: Documentation and validation
-- [ ] CHANGELOG
-- [ ] `npm run ci` green
+- [x] CHANGELOG
+- [x] `npm run ci` green
 
 ---
 
