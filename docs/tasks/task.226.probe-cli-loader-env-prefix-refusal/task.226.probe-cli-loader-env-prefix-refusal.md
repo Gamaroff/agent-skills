@@ -5,17 +5,20 @@ type: task
 description: "A cli: case's fixture.env refuses dynamic-loader variables by prefix, not by four exact names, so LD_AUDIT, DYLD_FRAMEWORK_PATH and the rest are declined as the docs already say."
 tags: [security-probe, cli-entry, fixture, finalise, qa-task, qa-story, review-security]
 category: infrastructure
-status: planned
+status: accepted
 priority: Medium
 estimated_effort_hours: 2
 created: 2026-10-22
 updated: 2026-10-22
+completed_date: 2026-10-22
+pr_number: 729
 github_issue: 727
 ---
 
 # Technical Task: security-probe — refuse every `LD_*` and `DYLD_*` variable on `cli:` case fixtures
 
-**Status:** Planned
+**Status:** Accepted
+**Review**: ✅ All review recommendations from `task.226.review.1.probe-cli-loader-env-prefix-refusal.md` implemented 2026-10-22
 **GitHub Issue**: [#727](https://github.com/Gamaroff/agent-skills/issues/727)
 
 ---
@@ -87,7 +90,7 @@ A `cli:` probe case may carry `fixture.env` (task.216). The engine refuses the k
 ✅ New test rows in `shared/resources/tests/security-probe.test.mjs` (Node and Python)
 ✅ `probe-boundary-rule.md` §5 wording, and the `security-probe.mjs` header and constant comments
 ✅ The bundled copies, regenerated with `npm run bundle`
-✅ A CHANGELOG `[Unreleased]` entry
+✅ A CHANGELOG `[Unreleased]` entry, and the task 216 `[Unreleased]` entry's loader parenthetical
 
 ### Out of Scope
 
@@ -116,26 +119,27 @@ A `cli:` probe case may carry `fixture.env` (task.216). The engine refuses the k
 
 **Files:** `shared/resources/tests/security-probe.test.mjs`
 
-- [ ] Add `LD_AUDIT` and `DYLD_FRAMEWORK_PATH` rows to the env-decline test at `security-probe.test.mjs:4027`, and update its title
-- [ ] Run the test and confirm both new rows are red against the current engine (they execute instead of declining)
+- [x] Add `LD_AUDIT` and `DYLD_FRAMEWORK_PATH` rows to the env-decline test at `security-probe.test.mjs:4027`, and update its title
+- [x] Run the test and confirm both new rows are red against the current engine (they execute instead of declining)
 
 ### Phase 2: The prefix refusal (Risk: Low)
 
 **Files:** `shared/resources/security-probe.mjs`
 
-- [ ] Split the constant: exact names `PATH`, `NODE_OPTIONS`; prefixes `LD_`, `DYLD_`
-- [ ] Add `steersInterpreter(k)` and call it at the `runCliCase` check
-- [ ] Update the constant's comment and the `cli:` header paragraph
-- [ ] Phase 1 rows go green; the existing `LD_PRELOAD` row stays green
+- [x] Split the constant: exact names `PATH`, `NODE_OPTIONS`; prefixes `LD_`, `DYLD_`
+- [x] Add `steersInterpreter(k)` and call it at the `runCliCase` check
+- [x] Update the constant's comment and the `cli:` header paragraph
+- [x] Phase 1 rows go green; the existing `LD_PRELOAD` row stays green
 
 ### Phase 3: Docs, bundle, changelog (Risk: Low)
 
 **Files:** `shared/resources/probe-boundary-rule.md`, `CHANGELOG.md`, bundled copies
 
-- [ ] §5: replace the four-name list with "any `LD_*` or `DYLD_*` variable (the dynamic loader's)"
-- [ ] CHANGELOG `[Unreleased]` → `### Fixed` entry citing task 226
-- [ ] `npm run bundle`, then `npm run bundle:check` exits 0
-- [ ] Mutation-prove: revert the predicate to `.includes` and confirm the new rows go red
+- [x] §5: replace the four-name list with "any `LD_*` or `DYLD_*` variable (the dynamic loader's)"
+- [x] CHANGELOG `[Unreleased]` → `### Fixed` entry citing task 226
+- [x] CHANGELOG task 216 `[Unreleased]` entry (`CHANGELOG.md:16`): replace `(`LD_PRELOAD`, `LD_LIBRARY_PATH`, `DYLD_*`)` with `(any `LD_*` or `DYLD_*` variable)`. Task 216 is unreleased, so its entry must not describe the narrower list this task removes
+- [x] `npm run bundle`, then `npm run bundle:check` exits 0
+- [x] Mutation-prove: revert the predicate to `.includes` and confirm the new rows go red
 
 ---
 
@@ -152,8 +156,10 @@ A `cli:` probe case may carry `fixture.env` (task.216). The engine refuses the k
 ### Documentation
 
 3. ✅ `shared/resources/probe-boundary-rule.md`: §5 wording
-4. ✅ `CHANGELOG.md`: `[Unreleased]` entry
-5. ✅ Bundled copies under `skills/{finalise,qa-story,qa-task,review-security}/references/` (generated; `probe-boundary-rule.md` reaches `qa-story` and `qa-task`, `security-probe.mjs` reaches all four)
+4. ✅ `CHANGELOG.md`: `[Unreleased]` `### Fixed` entry, and the task 216 entry's loader parenthetical
+5. ✅ Bundled copies under `skills/{finalise,qa-story,qa-task,review-security}/references/` (generated; `probe-boundary-rule.md` reaches `qa-story` and `qa-task`, `security-probe.mjs` reaches all four — measured with `git ls-files 'skills/*/references/security-probe.mjs' 'skills/*/references/probe-boundary-rule.md'`)
+
+Removed-literal search: `git grep -n 'LD_PRELOAD\|LD_LIBRARY_PATH\|DYLD_INSERT_LIBRARIES' -- '*.test.*' tests/ evals/` finds only `security-probe.test.mjs:4027` (the title) and `:4043-4044` (the `LD_PRELOAD` row), both updated in Phase 1.
 
 `finalise-dod-security-prompt.md` needs no edit: its sentence becomes true.
 
@@ -182,25 +188,25 @@ A name that only looks similar must still pass. Lowercase `ld_audit` and a name 
 
 ### Functional
 
-- [ ] A `cli:` case whose `fixture.env` sets `LD_AUDIT` or `DYLD_FRAMEWORK_PATH` is declined by name, with nothing executed, on Node and Python (Phase 2)
-- [ ] A `cli:` case setting `MY_LD_FLAG` (prefix not at the start) still runs and is scored
-- [ ] `HOME`, `PATH`, `NODE_OPTIONS` and `LD_PRELOAD` are still declined with their existing messages
-- [ ] `fence:` and `shell-argv:` behaviour is unchanged (their existing tests pass untouched)
+- [x] A `cli:` case whose `fixture.env` sets `LD_AUDIT` or `DYLD_FRAMEWORK_PATH` is declined by name, with nothing executed, on Node and Python (Phase 2)
+- [x] A `cli:` case setting `MY_LD_FLAG` (prefix not at the start) still runs and is scored
+- [x] `HOME`, `PATH`, `NODE_OPTIONS` and `LD_PRELOAD` are still declined with their existing messages
+- [x] `fence:` and `shell-argv:` behaviour is unchanged (their existing tests pass untouched)
 
 ### Performance
 
-- [ ] No measurable change: one string-prefix test per env key, before any spawn
+- [x] Not applicable — no performance criterion: the change adds one prefix comparison per `fixture.env` key, before any spawn (no unit tests applicable)
 
 ### Code Quality
 
-- [ ] The new rows are red before Phase 2 and green after (test first)
-- [ ] Mutation-proved: reverting the predicate to an exact match turns the new rows red
-- [ ] `npm run ci:fast` green; `npm run bundle:check` exits 0; `npm run validate -- skills/finalise/ skills/qa-story/ skills/qa-task/ skills/review-security/` passes
+- [x] The new rows are red before Phase 2 and green after (test first)
+- [x] Mutation-proved: reverting the predicate to an exact match turns the new rows red
+- [x] `npm run ci:fast` green; `npm run bundle:check` exits 0; `npm run validate -- skills/finalise/ skills/qa-story/ skills/qa-task/ skills/review-security/` passes
 
 ### Migration
 
-- [ ] CHANGELOG `[Unreleased]` cites task 226 and names the newly refused variables
-- [ ] `probe-boundary-rule.md` §5, `finalise-dod-security-prompt.md` and the CHANGELOG describe the same rule
+- [x] CHANGELOG `[Unreleased]` cites task 226 and names the newly refused variables
+- [x] `probe-boundary-rule.md` §5, `finalise-dod-security-prompt.md` and both CHANGELOG entries (task 216, task 226) describe the same rule
 
 ---
 
@@ -248,21 +254,82 @@ For a wording problem or one over-matching name, fix it forward in the predicate
 
 ---
 
+## Implementation Record
+
+**Started**: 2026-10-22 · **Completed**: 2026-10-22 · implemented inline by the `/develop-task` orchestrator (run 1; plan file and surface map in hand, `/develop` not invoked).
+
+**Summary.** `CLI_INTERPRETER_ENV` now holds only `PATH` and `NODE_OPTIONS`. A new frozen `CLI_LOADER_ENV_PREFIXES` (`LD_`, `DYLD_`) covers the dynamic loaders, and one predicate, `steersInterpreter(k)`, answers both. `runCliCase` calls it in place of the exact-name `.includes`. The decline message is unchanged and still names the key.
+
+**Approach.** The predicate sits beside its constants after `runCliCase`, as the plan said; the call is at run time, so declaration order does not matter. The match is `startsWith`, case-sensitive. The constant's comment and the `cli:` header paragraph now say "any `LD_*` or `DYLD_*`". `probe-boundary-rule.md` §5 replaces the four-name list with the prefix rule, and the task 216 `[Unreleased]` CHANGELOG entry drops its narrower list. Bundled copies regenerated with `npm run bundle` (the seven files the Files Summary names).
+
+**Testing.** The env-decline test (`security-probe.test.mjs`, Node and Python) gains `LD_AUDIT` and `DYLD_FRAMEWORK_PATH` rows and a `MY_LD_FLAG` control that must run and be accepted. Before Phase 2 the test was red on both languages at `LD_AUDIT` (`executed: 1`). After: `cli entry` 52/52; `npm run ci:fast` 6201 tests, 0 fail, 14 skipped, run with the gitignored `.agents/skills` symlink moved aside. Mutation-proved: restoring the old four-name list turns the `LD_AUDIT` row red on both languages; widening the match to `k.includes(p)` turns the `MY_LD_FLAG` control red on both. `bundle:check` 0 problems; `validate` passes for finalise, qa-story, qa-task and review-security.
+
+**Deferred Work.** None.
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-22
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.226.qa.1.probe-cli-loader-env-prefix-refusal.md](./task.226.qa.1.probe-cli-loader-env-prefix-refusal.md)
+- **Gate File**: [task.226.gate.1.probe-cli-loader-env-prefix-refusal.yml](./task.226.gate.1.probe-cli-loader-env-prefix-refusal.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 217
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No issues found. The probe engine declined every new loader name on Node and Python and accepted `MY_LD_FLAG` and `ld_audit`: 16 executed, 0 escaped. All three mutants turn the committed test red.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.226.qa.1.probe-cli-loader-env-prefix-refusal.md`
+**Gate File**: `task.226.gate.1.probe-cli-loader-env-prefix-refusal.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 10/10 met — the prefix refusal, the `MY_LD_FLAG` control, the unchanged declines, `fence:`/`shell-argv:` untouched, mutation proof, docs agreement
+✅ **Tests & PR Review:** `security-probe.test.mjs` 217/217; PR #729 reviewed at Step 5c (`/review-pr` APPROVE, 0 findings); CI green over 5 checks
+✅ **Documentation:** `probe-boundary-rule.md` §5, both CHANGELOG entries, bundled copies regenerated
+✅ **Security Review:** ✅ PASS — the DoD probe run executed 22 candidates on Node and Python, 0 reproduced, 0 escaped; all 9 loader canaries declined by name
+⚠️ **Compliance Review:** NOT_APPLICABLE — internal tooling, no data, payment, UI or health surface
+
+**Task marked as ACCEPTED on:** 2026-10-22
+
+**Detailed Verification Log:** See `task.226.dod.1.probe-cli-loader-env-prefix-refusal.md` for complete verification evidence and timestamps.
+
 <!-- change-log-start -->
 ## Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-10-22 | 1.0 | Initial draft — follow-up to task.216 QA gate 3 TASK-216-QA3-1 | create-task |
+| 2026-10-22 | 1.1 | Review passed (9/10) — performance criterion restated as not applicable; task 216 CHANGELOG entry added to scope; bundled-copy list and removed-literal search recorded | review-task |
+| 2026-10-22 |  | Status → ready-for-development | review-task |
+| 2026-10-22 |  | Implemented — 11 files (4 source, 7 bundled), 2 decline rows + 1 control × Node and Python | develop |
+| 2026-10-22 |  | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-10-22 | 1.2 | DoD passed — accepted (PR #729) | finalise |
 <!-- change-log-end -->
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 1: Test first
-- [ ] Phase 2: The prefix refusal
-- [ ] Phase 3: Docs, bundle, changelog
+- [x] Phase 1: Test first
+- [x] Phase 2: The prefix refusal
+- [x] Phase 3: Docs, bundle, changelog
 
 ## References
 

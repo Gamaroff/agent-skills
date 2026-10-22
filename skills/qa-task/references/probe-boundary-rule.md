@@ -494,9 +494,8 @@ takes it.
   the fixture would create collides with that file. The refusals are `shell-argv:`'s — a path that leaves
   the case directory, `HOME`, `TMPDIR`, `LC_ALL`, an `expected.absent` name the
   files create, each declined by name — plus the form's own: **`PATH`,
-  `NODE_OPTIONS` and the dynamic-loader variables** (`LD_PRELOAD`,
-  `LD_LIBRARY_PATH`, `DYLD_INSERT_LIBRARIES`, `DYLD_LIBRARY_PATH`), which steer
-  the interpreter the form runs (`PATH` selects the `python3` binary; the others
+  `NODE_OPTIONS` and any `LD_*` or `DYLD_*` variable** (the dynamic loader's,
+  matched by prefix and case-sensitively), which steer the interpreter the form runs (`PATH` selects the `python3` binary; the others
   load code before the entry) rather than the CLI under probe. `--fixture-setup`
   stays `shell-argv:`'s, so two things are not yet reachable on `cli:`: a
   directory too large to inline, and **repository state** — `fixture.files`

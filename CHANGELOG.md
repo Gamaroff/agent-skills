@@ -13,8 +13,8 @@ All notable changes to this project will be documented in this file. Format foll
   that is accepted, where before every input ended in a refusal and the verdict read
   `rejects-every-input`. The refusals are `shell-argv:`'s (a path leaving the case directory,
   `HOME`/`TMPDIR`/`LC_ALL`, an `expected.absent` name the files create), each declined by name,
-  plus `PATH`, `NODE_OPTIONS` and the dynamic-loader variables (`LD_PRELOAD`, `LD_LIBRARY_PATH`,
-  `DYLD_*`), which steer the interpreter rather than the CLI. Repository state (a commit, a staged
+  plus `PATH`, `NODE_OPTIONS` and any `LD_*` or `DYLD_*` dynamic-loader variable, which steer
+  the interpreter rather than the CLI. Repository state (a commit, a staged
   index) is not reachable this way: fixture files are text, and `--fixture-setup` stays
   `shell-argv:`'s. A `cli:` case
   with no `fixture` runs as before; one that carried `fixture` had it silently ignored and now has
@@ -106,6 +106,13 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **security-probe: a `cli:` case refuses every `LD_*` and `DYLD_*` variable (task 226).** A
+  `cli:` case's `fixture.env` declined four loader variables by exact name, so `LD_AUDIT`,
+  `DYLD_FRAMEWORK_PATH`, `DYLD_FALLBACK_LIBRARY_PATH` and the rest reached the interpreter. It now
+  declines any key that starts `LD_` or `DYLD_`, by name and before anything spawns, which is what
+  the task 216 entry and the DoD security prompt already said. A name that only contains the prefix
+  (`MY_LD_FLAG`) still runs. A case that set such a variable is now declined; drop it, or use
+  `shell-argv:` if it really must be set.
 - **loop-supervisor: a missing probe script says so (task 224).** When no `select-next.mjs` exists
   under `.agents/skills/`, `.claude/skills/` or `skills/`, the `develop-next` / `develop-batch` probe
   now stops with `probe script not found: …`, listing the paths searched, instead of "probe produced

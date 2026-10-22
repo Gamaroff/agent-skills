@@ -4024,7 +4024,7 @@ for (const [lang, ENTRY] of NEEDS_DATA) {
     assert.equal(nested.cases[0].outcome, "accepted", JSON.stringify(nested));
   });
 
-  test(`cli entry (${lang}): fixture.env reaches the child; HOME, PATH, NODE_OPTIONS and LD_PRELOAD in it are declined by name`, () => {
+  test(`cli entry (${lang}): fixture.env reaches the child; HOME, PATH, NODE_OPTIONS and any LD_*/DYLD_* variable in it are declined by name`, () => {
     const env = runProbeSpec({
       sink: "url-authority",
       entry: ENTRY,
@@ -4043,6 +4043,14 @@ for (const [lang, ENTRY] of NEEDS_DATA) {
         "LD_PRELOAD",
         /may not set LD_PRELOAD on the cli: form — it steers the interpreter/,
       ],
+      [
+        "LD_AUDIT",
+        /may not set LD_AUDIT on the cli: form — it steers the interpreter/,
+      ],
+      [
+        "DYLD_FRAMEWORK_PATH",
+        /may not set DYLD_FRAMEWORK_PATH on the cli: form — it steers the interpreter/,
+      ],
     ]) {
       const r = runProbeSpec({
         sink: "url-authority",
@@ -4053,6 +4061,23 @@ for (const [lang, ENTRY] of NEEDS_DATA) {
       assert.equal(r.executed, 0, `${key}: ${JSON.stringify(r.cases)}`);
       assert.match(r.declined[0].detail, detail);
     }
+    // The control (task.226): a name that only contains a loader prefix is not
+    // a loader variable, so a predicate that matches too much is red here.
+    const control = runProbeSpec({
+      sink: "url-authority",
+      entry: ENTRY,
+      cases: [
+        dataCase({
+          fixture: {
+            env: { MY_LD_FLAG: "x" },
+            files: { "items.json": "MARKER" },
+          },
+        }),
+      ],
+      argv: DATA_ARGV,
+    });
+    assert.equal(control.executed, 1, JSON.stringify(control));
+    assert.equal(control.cases[0].outcome, "accepted", JSON.stringify(control));
   });
 
   test(`cli entry (${lang}): a malformed fixture, a path that leaves the case directory, or an expected.absent name the fixture writes is declined, never scored`, () => {
