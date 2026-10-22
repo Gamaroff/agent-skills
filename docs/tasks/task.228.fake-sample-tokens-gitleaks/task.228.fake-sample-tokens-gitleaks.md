@@ -354,16 +354,46 @@ clean.
 ### Key Findings
 No critical issues identified. Redacted gitleaks scans of each changed file, the task directory, the commit messages and the PR body all exit 0. One advisory cleanup (CR-1: the placeholder is not a decodable JWT if copied verbatim). The full-tree scan runs at finalise.
 
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**QA Report**: `task.228.qa.1.fake-sample-tokens-gitleaks.md`
+**Gate File**: `task.228.gate.1.fake-sample-tokens-gitleaks.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+### Missing Criteria:
+
+1. **Acceptance Criteria:**
+   - [ ] SC1 (Functional 1): the guide's gitleaks-clean state has no per-PR test or lane. Measured green at `2b51ed36`; a zero-hit bound a per-PR test could assert is a behaviour criterion.
+   - [ ] SC4 (Functional 4): the commit-message / PR-text / report check has no per-PR test or lane. Measured green at `2b51ed36`; tracker comments are not scanned by any command.
+
+### Next Steps:
+
+- Add a committed per-PR test that asserts the changed files carry no token-shaped literal (re-enters QA at 5a), **or**
+- Pull task.229's gitleaks CI lane forward and cite it, **or**
+- Record a human decision to re-scope SC1/SC4 to task.229 (a document-only fix; resumes at Step 7).
+
+**Estimated Effort:** Small (1–2 hours)
+
+**Gap Report Generated:** 2026-10-22
+**QA Gate Reference**: See `task.228.gate.1.fake-sample-tokens-gitleaks.yml`
+
+**Detailed Verification Log:** See `task.228.dod.1.fake-sample-tokens-gitleaks.md` for complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-22 | 1.0     | Initial draft | create-task |
 | 2026-10-22 | 1.1     | Review 9/10 after fixes — ready to build: reworded the document's own quotations of the two prose lines (they tripped gitleaks), named the commit/PR-text check, added `npm run lint:shell`, recorded the gitleaks version | review-task |
 | 2026-10-22 |         | Status → ready-for-development | review-task |
 | 2026-10-22 |         | Implemented — 4 files (guide samples, 2 prose rewords, CHANGELOG); tracked tree scans clean | develop |
 | 2026-10-22 |         | QA gate PASS (100/100) — 0 blocking findings, 1 advisory cleanup | qa-task |
+| 2026-10-22 |  | DoD incomplete — 2 gaps identified (SC1, SC4: no per-PR gitleaks lane) | finalise |
 <!-- change-log-end -->
 
 ---
