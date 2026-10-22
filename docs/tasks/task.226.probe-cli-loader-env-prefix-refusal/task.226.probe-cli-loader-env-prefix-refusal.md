@@ -5,17 +5,19 @@ type: task
 description: "A cli: case's fixture.env refuses dynamic-loader variables by prefix, not by four exact names, so LD_AUDIT, DYLD_FRAMEWORK_PATH and the rest are declined as the docs already say."
 tags: [security-probe, cli-entry, fixture, finalise, qa-task, qa-story, review-security]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 estimated_effort_hours: 2
 created: 2026-10-22
 updated: 2026-10-22
+completed_date: 2026-10-22
+pr_number: 729
 github_issue: 727
 ---
 
 # Technical Task: security-probe — refuse every `LD_*` and `DYLD_*` variable on `cli:` case fixtures
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.226.review.1.probe-cli-loader-env-prefix-refusal.md` implemented 2026-10-22
 **GitHub Issue**: [#727](https://github.com/Gamaroff/agent-skills/issues/727)
 
@@ -285,6 +287,29 @@ For a wording problem or one over-matching name, fix it forward in the predicate
 ### Key Findings
 No issues found. The probe engine declined every new loader name on Node and Python and accepted `MY_LD_FLAG` and `ld_audit`: 16 executed, 0 escaped. All three mutants turn the committed test red.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.226.qa.1.probe-cli-loader-env-prefix-refusal.md`
+**Gate File**: `task.226.gate.1.probe-cli-loader-env-prefix-refusal.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 10/10 met — the prefix refusal, the `MY_LD_FLAG` control, the unchanged declines, `fence:`/`shell-argv:` untouched, mutation proof, docs agreement
+✅ **Tests & PR Review:** `security-probe.test.mjs` 217/217; PR #729 reviewed at Step 5c (`/review-pr` APPROVE, 0 findings); CI green over 5 checks
+✅ **Documentation:** `probe-boundary-rule.md` §5, both CHANGELOG entries, bundled copies regenerated
+✅ **Security Review:** ✅ PASS — the DoD probe run executed 22 candidates on Node and Python, 0 reproduced, 0 escaped; all 9 loader canaries declined by name
+⚠️ **Compliance Review:** NOT_APPLICABLE — internal tooling, no data, payment, UI or health surface
+
+**Task marked as ACCEPTED on:** 2026-10-22
+
+**Detailed Verification Log:** See `task.226.dod.1.probe-cli-loader-env-prefix-refusal.md` for complete verification evidence and timestamps.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -295,6 +320,7 @@ No issues found. The probe engine declined every new loader name on Node and Pyt
 | 2026-10-22 |  | Status → ready-for-development | review-task |
 | 2026-10-22 |  | Implemented — 11 files (4 source, 7 bundled), 2 decline rows + 1 control × Node and Python | develop |
 | 2026-10-22 |  | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-10-22 | 1.2 | DoD passed — accepted (PR #729) | finalise |
 <!-- change-log-end -->
 
 ---

@@ -1,0 +1,97 @@
+{
+  "sink": "markdown-structure",
+  "entry": "cli:shared/resources/tests/fixtures/security-probe/cli-needs-data.mjs",
+  "name": "cli-needs-data.mjs merge-back",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 11,
+  "passed": 11,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 14,
+  "declined_cases": [
+    {
+      "id": "cli-fixture.escape-path-declined",
+      "reason": "case-errored",
+      "detail": "fixture: `fixture.files` path \"../escaped.json\" leaves the case directory"
+    },
+    {
+      "id": "cli-fixture.absolute-path-declined",
+      "reason": "case-errored",
+      "detail": "fixture: `fixture.files` path \"/tmp/task226-dod-escaped.json\" leaves the case directory"
+    },
+    {
+      "id": "cli-fixture.env-path-declined",
+      "reason": "case-errored",
+      "detail": "case's `fixture.env` may not set PATH on the cli: form — it steers the interpreter the form runs, not the CLI under probe"
+    },
+    {
+      "id": "cli-fixture.env-node-options-declined",
+      "reason": "case-errored",
+      "detail": "case's `fixture.env` may not set NODE_OPTIONS on the cli: form — it steers the interpreter the form runs, not the CLI under probe"
+    },
+    {
+      "id": "cli-fixture.env-home-declined",
+      "reason": "case-errored",
+      "detail": "case's `fixture.env` may not set HOME — the sandbox owns it"
+    },
+    {
+      "id": "cli-fixture.env-ld-audit-canary-hostile",
+      "reason": "case-errored",
+      "detail": "case's `fixture.env` may not set LD_AUDIT on the cli: form — it steers the interpreter the form runs, not the CLI under probe"
+    },
+    {
+      "id": "cli-fixture.env-ld-preload-canary-hostile",
+      "reason": "case-errored",
+      "detail": "case's `fixture.env` may not set LD_PRELOAD on the cli: form — it steers the interpreter the form runs, not the CLI under probe"
+    },
+    {
+      "id": "cli-fixture.env-ld-library-path-canary-hostile",
+      "reason": "case-errored",
+      "detail": "case's `fixture.env` may not set LD_LIBRARY_PATH on the cli: form — it steers the interpreter the form runs, not the CLI under probe"
+    },
+    {
+      "id": "cli-fixture.env-ld-bind-now-canary-hostile",
+      "reason": "case-errored",
+      "detail": "case's `fixture.env` may not set LD_BIND_NOW on the cli: form — it steers the interpreter the form runs, not the CLI under probe"
+    },
+    {
+      "id": "cli-fixture.env-ld-bare-prefix-canary-hostile",
+      "reason": "case-errored",
+      "detail": "case's `fixture.env` may not set LD_ on the cli: form — it steers the interpreter the form runs, not the CLI under probe"
+    },
+    {
+      "id": "cli-fixture.env-dyld-insert-canary-hostile",
+      "reason": "case-errored",
+      "detail": "case's `fixture.env` may not set DYLD_INSERT_LIBRARIES on the cli: form — it steers the interpreter the form runs, not the CLI under probe"
+    },
+    {
+      "id": "cli-fixture.env-dyld-framework-canary-hostile",
+      "reason": "case-errored",
+      "detail": "case's `fixture.env` may not set DYLD_FRAMEWORK_PATH on the cli: form — it steers the interpreter the form runs, not the CLI under probe"
+    },
+    {
+      "id": "cli-fixture.env-dyld-fallback-canary-hostile",
+      "reason": "case-errored",
+      "detail": "case's `fixture.env` may not set DYLD_FALLBACK_LIBRARY_PATH on the cli: form — it steers the interpreter the form runs, not the CLI under probe"
+    },
+    {
+      "id": "cli-fixture.env-loader-second-key-canary-hostile",
+      "reason": "case-errored",
+      "detail": "case's `fixture.env` may not set LD_AUDIT on the cli: form — it steers the interpreter the form runs, not the CLI under probe"
+    }
+  ],
+  "escaped": 0,
+  "shells": null,
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": [
+    "merge-back",
+    "{input}"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-10-22T13:07:09.081Z"
+}

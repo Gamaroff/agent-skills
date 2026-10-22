@@ -1,0 +1,366 @@
+[
+  {
+    "id": "cli-fixture.files-legit",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "files": {
+        "items.json": "[\"MARKER\"]"
+      }
+    },
+    "why": "the populated directory a merge-back CLI needs",
+    "correct": "the file is written into the case directory before the spawn, the CLI exits 0, the case is accepted",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.files-nested-legit",
+    "sink": "markdown-structure",
+    "input": "data",
+    "fixture": {
+      "files": {
+        "data/items.json": "[\"MARKER\"]"
+      }
+    },
+    "why": "a nested relative path inside the case directory",
+    "correct": "the parent directory is created and the file written, the case is accepted",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.env-legit",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "env": {
+        "PROBE_MARKER": "MARKER"
+      }
+    },
+    "why": "a CLI that reads its data source from the environment",
+    "correct": "fixture.env is merged into the child's env, the CLI exits 0, the case is accepted",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.no-files-hostile",
+    "sink": "markdown-structure",
+    "input": ".",
+    "why": "the same input with no fixture: an empty directory must still be refused",
+    "correct": "the CLI exits 1 (no items.json), the case is rejected",
+    "direction": "hostile"
+  },
+  {
+    "id": "cli-fixture.wrong-content-hostile",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "files": {
+        "items.json": "[\"other\"]"
+      }
+    },
+    "why": "a populated directory whose content the CLI refuses",
+    "correct": "the CLI exits 1 (no marker), the case is rejected",
+    "direction": "hostile"
+  },
+  {
+    "id": "cli-fixture.parent-dir-hostile",
+    "sink": "markdown-structure",
+    "input": "..",
+    "fixture": {
+      "files": {
+        "items.json": "[\"MARKER\"]"
+      }
+    },
+    "why": "an input pointing above the case directory, where the fixture file is not",
+    "correct": "the CLI exits 1, the case is rejected",
+    "direction": "hostile"
+  },
+  {
+    "id": "cli-fixture.escape-path-declined",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "files": {
+        "../escaped.json": "[\"MARKER\"]"
+      }
+    },
+    "why": "a fixture file path that leaves the case directory",
+    "correct": "declined by name before anything spawns",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.absolute-path-declined",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "files": {
+        "/tmp/task226-dod-escaped.json": "[\"MARKER\"]"
+      }
+    },
+    "why": "an absolute fixture file path",
+    "correct": "declined by name before anything spawns; nothing is written",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.env-path-declined",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "env": {
+        "PATH": "/nonexistent"
+      }
+    },
+    "why": "PATH selects the interpreter binary the form spawns",
+    "correct": "declined naming PATH before anything spawns",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.env-node-options-declined",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "env": {
+        "NODE_OPTIONS": "--require=/nonexistent.js"
+      }
+    },
+    "why": "NODE_OPTIONS loads code into the Node child before the entry",
+    "correct": "declined naming NODE_OPTIONS before anything spawns",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.env-home-declined",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "env": {
+        "HOME": "/root"
+      }
+    },
+    "why": "HOME is sandbox-owned",
+    "correct": "declined naming HOME before anything spawns",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.env-ld-audit-canary-hostile",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "env": {
+        "LD_AUDIT": "/tmp/task226-nonexistent.so"
+      },
+      "files": {
+        "items.json": "[\"MARKER\"]"
+      }
+    },
+    "why": "LD_AUDIT loads an audit library before main and was missed by the old exact list",
+    "correct": "declined naming LD_AUDIT before any spawn; never executed",
+    "direction": "hostile"
+  },
+  {
+    "id": "cli-fixture.env-ld-preload-canary-hostile",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "env": {
+        "LD_PRELOAD": "/tmp/task226-nonexistent.so"
+      },
+      "files": {
+        "items.json": "[\"MARKER\"]"
+      }
+    },
+    "why": "a name the old list refused; it must still be refused through the prefix",
+    "correct": "declined naming LD_PRELOAD before any spawn",
+    "direction": "hostile"
+  },
+  {
+    "id": "cli-fixture.env-ld-library-path-canary-hostile",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "env": {
+        "LD_LIBRARY_PATH": "/tmp"
+      },
+      "files": {
+        "items.json": "[\"MARKER\"]"
+      }
+    },
+    "why": "a name the old list refused; it must still be refused through the prefix",
+    "correct": "declined naming LD_LIBRARY_PATH before any spawn",
+    "direction": "hostile"
+  },
+  {
+    "id": "cli-fixture.env-ld-bind-now-canary-hostile",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "env": {
+        "LD_BIND_NOW": "1"
+      },
+      "files": {
+        "items.json": "[\"MARKER\"]"
+      }
+    },
+    "why": "a glibc loader variable no list ever named; only the prefix rule covers it",
+    "correct": "declined naming LD_BIND_NOW before any spawn",
+    "direction": "hostile"
+  },
+  {
+    "id": "cli-fixture.env-ld-bare-prefix-canary-hostile",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "env": {
+        "LD_": "x"
+      },
+      "files": {
+        "items.json": "[\"MARKER\"]"
+      }
+    },
+    "why": "the bare prefix is the edge of startsWith",
+    "correct": "declined naming LD_ before any spawn",
+    "direction": "hostile"
+  },
+  {
+    "id": "cli-fixture.env-dyld-insert-canary-hostile",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "env": {
+        "DYLD_INSERT_LIBRARIES": "/tmp/x.dylib"
+      },
+      "files": {
+        "items.json": "[\"MARKER\"]"
+      }
+    },
+    "why": "a name the old list refused; it must still be refused through the prefix",
+    "correct": "declined naming DYLD_INSERT_LIBRARIES before any spawn",
+    "direction": "hostile"
+  },
+  {
+    "id": "cli-fixture.env-dyld-framework-canary-hostile",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "env": {
+        "DYLD_FRAMEWORK_PATH": "/tmp"
+      },
+      "files": {
+        "items.json": "[\"MARKER\"]"
+      }
+    },
+    "why": "a macOS dyld redirect missed by the old list",
+    "correct": "declined naming DYLD_FRAMEWORK_PATH before any spawn",
+    "direction": "hostile"
+  },
+  {
+    "id": "cli-fixture.env-dyld-fallback-canary-hostile",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "env": {
+        "DYLD_FALLBACK_LIBRARY_PATH": "/tmp"
+      },
+      "files": {
+        "items.json": "[\"MARKER\"]"
+      }
+    },
+    "why": "a macOS dyld fallback search path missed by the old list",
+    "correct": "declined naming DYLD_FALLBACK_LIBRARY_PATH before any spawn",
+    "direction": "hostile"
+  },
+  {
+    "id": "cli-fixture.env-loader-second-key-canary-hostile",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "env": {
+        "PROBE_MARKER": "MARKER",
+        "LD_AUDIT": "/tmp/task226-nonexistent.so"
+      },
+      "files": {
+        "items.json": "[\"MARKER\"]"
+      }
+    },
+    "why": "a loader key after a harmless key; a first-key-only check would let this run",
+    "correct": "declined naming LD_AUDIT before any spawn",
+    "direction": "hostile"
+  },
+  {
+    "id": "cli-fixture.env-mid-prefix-legit",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "env": {
+        "MY_LD_FLAG": "x"
+      },
+      "files": {
+        "items.json": "[\"MARKER\"]"
+      }
+    },
+    "why": "LD_ inside the name, not at its start: an includes() match would decline it",
+    "correct": "the CLI runs and exits 0; the case is accepted",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.env-lowercase-legit",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "env": {
+        "ld_audit": "x"
+      },
+      "files": {
+        "items.json": "[\"MARKER\"]"
+      }
+    },
+    "why": "environment names are case-sensitive; ld_audit is not a loader variable",
+    "correct": "the CLI runs and exits 0; the case is accepted",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.env-mixed-case-legit",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "env": {
+        "Ld_AUDIT": "x"
+      },
+      "files": {
+        "items.json": "[\"MARKER\"]"
+      }
+    },
+    "why": "a mixed-case spelling the loader does not read",
+    "correct": "the CLI runs and exits 0; the case is accepted",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.env-ldflags-legit",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "env": {
+        "LDFLAGS": "-L/tmp"
+      },
+      "files": {
+        "items.json": "[\"MARKER\"]"
+      }
+    },
+    "why": "a build variable starting LD but not LD_, read by no loader",
+    "correct": "the CLI runs and exits 0; the case is accepted",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cli-fixture.env-path-suffix-legit",
+    "sink": "markdown-structure",
+    "input": ".",
+    "fixture": {
+      "env": {
+        "PATHEXT": ".X",
+        "NODE_OPTIONS_EXTRA": "x"
+      },
+      "files": {
+        "items.json": "[\"MARKER\"]"
+      }
+    },
+    "why": "names that only extend the exact names PATH and NODE_OPTIONS",
+    "correct": "the CLI runs and exits 0; the case is accepted",
+    "direction": "legitimate"
+  }
+]
