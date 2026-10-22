@@ -1,0 +1,58 @@
+schema: 2
+task: 'task.216.probe-engine-cli-case-fixture-files'
+task_title: 'security-probe: the cli: form honours a case''s fixture.files (and env)'
+gate: PASS
+status_reason: 'The cli: arm writes fixture.files, merges fixture.env and declines every refusal by name before spawning; 8 new tests pass under two TMPDIRs, 5 mutants each go red, and the engine probe ran 12 cases on Node and Python with 0 reproduced and 0 escaped. One LOW: the new docs recommend input "." without saying it fails under the filename sink.'
+reviewer: 'QA Engineer'
+head: '0f3d2c9963cab8a4aee5cfe672056a2eba9da70f'
+updated: '2026-10-22T06:17:28Z'
+
+top_issues:
+  - id: 'TASK-216-QA1-1'
+    severity: low
+    file: 'shared/resources/finalise-dod-security-prompt.md'
+    finding: 'The new guidance (finalise-dod-security-prompt.md Step 4 cli: note, and probe-boundary-rule.md §5) tells the author to give the legitimate cli: case input "." with no caveat; under --sink filename, the one materialised sink, materialiseFixture writes the input as a file and the case is declined "cannot materialise \".\": EISDIR" instead of accepted. Reproduced with the engine. Diff reviewer CR-1 (low/medium); also review-task optional item 2.'
+    suggested_action: 'In both docs, say that input "." (or a relative path inside the case directory) works only with a sink that is not materialised, and that a filename-sink case names a plain file and carries the data elsewhere.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 96
+  phases_verified: 4/4
+  ci: 'pending @ 0f3d2c99 (test job running; validate, link-check, shellcheck pass)'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 12
+    escaped: 0
+    notes: 'Engine run on cli-needs-data.mjs and .py (record task.216.qa.1.security.run.json): 6 executed per language, every case scored as its direction requires; 7 hostile fixtures (escaping and absolute paths, PATH, NODE_OPTIONS, HOME, expected.absent collision, malformed fixture) declined by name with nothing written outside the case directory.'
+  performance:
+    status: PASS
+    notes: 'One extra fixture write per case that carries files; no change for a case without fixture.'
+  reliability:
+    status: PASS
+    notes: 'Every refusal returns before the spawn; a write failure is a named decline; case without fixture unchanged (96 cli tests pass).'
+  maintainability:
+    status: PASS
+    notes: 'Reuses fixtureProblem, writeFixtureFiles and fixtureCaseEnv. The expected.absent collision block is now in three arms (CR-2, advisory).'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Extract the expected.absent / fixture-files collision check into one helper shared by the cli:, shell-argv: and fence: arms (CR-2).'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

@@ -487,7 +487,10 @@ takes it.
   without it every input, the legitimate ones too, is refused, and the verdict
   is `unverifiable` / `rejects-every-input`. Give the legitimate case
   `"input": "."` (or a relative path inside the case directory) and the files
-  that make it legitimate. The refusals are `shell-argv:`'s — a path that leaves
+  that make it legitimate, under a sink that is **not materialised**:
+  `--sink filename` writes each input as an empty file of that name in the case
+  directory, so `.` is declined `cannot materialise` (EISDIR) and a directory
+  the fixture would create collides with that file. The refusals are `shell-argv:`'s — a path that leaves
   the case directory, `HOME`, `TMPDIR`, `LC_ALL`, an `expected.absent` name the
   files create, each declined by name — plus two of the form's own: **`PATH`
   and `NODE_OPTIONS`**, which steer the interpreter the form runs (`PATH`

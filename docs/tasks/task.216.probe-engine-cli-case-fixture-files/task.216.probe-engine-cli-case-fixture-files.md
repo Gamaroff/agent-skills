@@ -101,6 +101,27 @@ Revert the `runCliCase` change and re-bundle; a `cli:` case's `fixture` is ignor
 **Testing.** Eight new tests in `shared/resources/tests/security-probe.test.mjs` (four rows × Node and Python, fixture CLIs `cli-needs-data.mjs` / `cli-needs-data.py`): files accepted / absent rejected / nested path; env delivered, `HOME` / `PATH` / `NODE_OPTIONS` declined; malformed fixture, escaping path, `expected.absent` collision declined; `expected` still compared. Mutation-proved: removing the file write, the env merge, the interpreter-env refusal, the collision clause or the `fixtureProblem` call each turns its tests red. Existing `cli:` tests unchanged.
 
 **Deferred Work.** Release, re-vendor, and the omarchy-leak-radar consumer proof (§9).
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-22
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.216.qa.1.probe-engine-cli-case-fixture-files.md](./task.216.qa.1.probe-engine-cli-case-fixture-files.md)
+- **Gate File**: [task.216.gate.1.probe-engine-cli-case-fixture-files.yml](./task.216.gate.1.probe-engine-cli-case-fixture-files.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 96 (`cli` tests; full suite 6201, 0 fail)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No critical issues. One LOW (TASK-216-QA1-1): the new docs recommend input `.` for a legitimate `cli:` case without saying it is declined under the `filename` sink.
 <!-- change-log-start -->
 ## Change Log
 
@@ -110,5 +131,7 @@ Revert the `runCliCase` change and re-bundle; a `cli:` case's `fixture` is ignor
 | 2026-10-22 | 1.1     | Review passed (8/10) — corrected file/line references, added expected.absent and PATH/NODE_OPTIONS handling, moved release and consumer proof to Deferred Work | review-task |
 | 2026-10-22 |         | Status → ready-for-development                                                                               | review-task |
 | 2026-10-22 |  | Implemented — 9 source files (+16 bundled copies), 8 tests | develop |
+| 2026-10-22 |  | QA gate PASS (100/100) — 1 LOW finding | qa-task |
+| 2026-10-22 |  | QA findings fixed — TASK-216-QA1-1 (filename-sink caveat in two docs), 1 iteration | qa-fix |
 <!-- change-log-end -->
 

@@ -232,7 +232,8 @@ cases: [ … ]
 # legitimate case that carries it: give that case `fixture: { files: { "items.json": "…" } }` (and
 # `env` if it reads one) with input "." — the files land in the case directory, the CLI's cwd
 # (task.216). Without it every input is refused and the verdict is `rejects-every-input`. PATH and
-# NODE_OPTIONS are refused in a cli: case's env.
+# NODE_OPTIONS are refused in a cli: case's env. Use a sink that is not materialised: --sink
+# filename writes each input as an empty file of that name, so input "." is declined (EISDIR).
 argv: ["--sink", "<sink>", "--entry", "cli:<path-from-repo-root>",
        "--argv", "[\"--flag-before\",\"value\",\"--guarded-flag\",\"{input}\"]",
        "--name", "<control name>"]
