@@ -34,10 +34,10 @@ Make a `cli:` case's `fixture.env` refuse every dynamic-loader variable by prefi
 | 1. create-branch           | ✅ Done    | Branch `feature/task.226.*` exists in git                              | Branch created at `921cb2c6` | —                    | 2026-10-22T08:48Z |
 | 2. review-task             | ✅ Done    | `task.226.review.{N}.{name}.md` exists (or skip logged)                | READY TO IMPLEMENT 9/10; Planned → Ready for Development | —                    | 2026-10-22T08:54Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; ci:fast 6201/0 fail; mutation-proved | —                    | 2026-10-22T09:20Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.226.qa.{N}.*.md`; `task.226.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.226.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #729: https://github.com/Gamaroff/agent-skills/pull/729 | —                    | 2026-10-22T12:46Z |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.226.qa.{N}.*.md`; `task.226.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 1 cycle, gate 1 PASS (100); PR review APPROVE (`task.226.pr-review.1.probe-cli-loader-env-prefix-refusal.md`) | — | 2026-10-22T13:01Z |
+| 7. finalise                | ✅ Done    | `task.226.dod.{N}.*.md`; task `status: accepted`                       | DoD 1 ACCEPTED; acceptance commit `36f134f6`; CI reading 2 SUCCESS; #727 closed | —                    | 2026-10-22T13:25Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Implementation report committed and pushed | —                    | 2026-10-22T13:25Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -81,6 +81,31 @@ Make a `cli:` case's `fixture.env` refuse every dynamic-loader variable by prefi
 - Loop audit run inline (no Explore dispatch): status Ready for Review, 3/3 phases, 0 unchecked boxes → exit after iteration 1.
 - Development completion comment posted to github issue 727.
 
+### Step 4 — create-pr
+
+- SCOPE_PATHS: docs/tasks/task.226.probe-cli-loader-env-prefix-refusal, CHANGELOG.md, shared/resources, shared/resources/tests, skills/{finalise,qa-story,qa-task,review-security}/references. Pre-flight guard held nothing (no out-of-scope untracked files).
+- Two commits: `2d718e61` fix(security-probe) and `7d0b7d7a` docs(task.226). The report was staged by the link check and first landed in the fix commit; both were local, so they were re-split before the push. Leak check OK.
+- PR body written by the orchestrator from the known diff (pr-body-summariser subagent not dispatched).
+- PR created: https://github.com/Gamaroff/agent-skills/pull/729 (state OPEN). Lock `pr_url` written. Issue #727 PR-opened comment `posted`.
+- GitHub board: in-review → stage-disabled.
+
+### Steps 5–6 — QA loop
+
+- Traceability mapper skipped: the Success Criteria are checkbox lists, not a table (`HAS_SUCCESS_CRITERIA_TABLE=false`).
+- GitHub board: QA-start re-assert → stage-disabled.
+- Gate 1: PASS (100/100), no open entry → route 1 → 5c. Diff reviewer (Explore) returned 0 findings in 84.9 s. Probe engine: 16 executed, 0 escaped (`task.226.qa.1.security.run.json`). Pre-5c commits `315af183` and `d0574594`, pushed.
+- 5c: `/review-pr --effort medium --comment --no-code` → ✅ APPROVE, 0 conformance findings (lens 43.3 s). Report `task.226.pr-review.1.probe-cli-loader-env-prefix-refusal.md` staged for the 6a acceptance commit. PR comment posted. GitHub board: ready-for-merge → stage-disabled.
+
+### Step 7 — finalise
+
+- `/finalise` ran (standard). Four DoD agents: AC 10/10 PASS, security PASS, compliance N/A, docs PASS. The security agent marked `boundary: true` and returned a 2-entry probe plan (Node and Python, 25 inline cases each). Step 3b.1 ran it: 22 executed, 0 reproduced, 0 escaped, 0 refusals. Each control had 14 declined (5 task-216 declines and 9 loader canaries) and 11 executed (including 5 near-miss controls, all accepted). Record `task.226.dod.1.security.run.json`.
+- PR review column: host requires no reviews (`reviewDecision` null), so the column is satisfied by the 5c report (APPROVE).
+- CI reading 1: SUCCESS @ d05745940f51 (5 checks); CI reading 2: SUCCESS @ 36f134f6968d (5 checks, 60 s, no tree-equivalence).
+- 6a commit `36f134f6` `docs(task.226): accept — DoD, sprint review; registry ticked; 5c review carried (#727)`, pushed; 6b assertions ok; registry-tick `ticked` (planned → accepted); 6d CHANGELOG cites task 226.
+- Canonical PR comment: https://github.com/Gamaroff/agent-skills/pull/729#issuecomment-6341841102. DoD body posted to PR: https://github.com/Gamaroff/agent-skills/pull/729#issuecomment-6341862310.
+- Tracker: Document link already on `develop`; `done` comment `posted`; #727 closed and confirmed `CLOSED`; board `done` → `already` (Done).
+- Task completed — `status: accepted`. Lock 7 → 8.
+
 ---
 
 ## Issues Log
@@ -88,6 +113,7 @@ Make a `cli:` case's `fixture.env` refuse every dynamic-loader variable by prefi
 _Problems encountered and how they were resolved or escalated._
 
 - Step 3, fast gate run 1: `prettier --check` failed on `security-probe.test.mjs` (the new control case exceeded the line width), so `npm test` never ran. Fixed with `prettier --write`; run 2 green (6201 tests, 0 fail). Both runs had `.agents/skills` moved aside.
+- QA cycle 1: the first probe run wrote one record per language (`…run.mjs.json`, `…run.py.json`). It was re-run into one record, `task.226.qa.1.security.run.json`, with both controls, as task 216 had done; the two stray records and their `.d/` directories were deleted. The record entries (`run.json.d/`) went in a second commit after the pre-5c commit, so the cycle pushed twice instead of once.
 
 ---
 
@@ -95,14 +121,26 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-10-22
+**Gate Result**: PASS
+**Issues Found**: none
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: APPROVE
+**Carried to 6a**: docs/tasks/task.226.probe-cli-loader-env-prefix-refusal/task.226.pr-review.1.probe-cli-loader-env-prefix-refusal.md
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-10-22T13:25Z
+**Final Status**: Completed
 **Branch**: feature/task.226.probe-cli-loader-env-prefix-refusal
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/729
+**QA Iterations**: 1
+**DoD Summary**: docs/tasks/task.226.probe-cli-loader-env-prefix-refusal/task.226.dod.1.probe-cli-loader-env-prefix-refusal.md
+**Tracker debt**: none
+
+**Completion Summary**: Implemented the prefix refusal: a `cli:` case's `fixture.env` now declines any `LD_*` or `DYLD_*` key by name, through one predicate (`steersInterpreter`), with docs, both CHANGELOG entries and the bundled copies aligned. One QA cycle: gate PASS 100/100, 0 findings, three mutants covered; the 5c PR review was APPROVE. At /finalise the DoD probe run executed 22 candidates on Node and Python, with 0 reproduced. The plan added canaries that would reproduce on a missed decline (including `LD_BIND_NOW`, the bare `LD_` and a second-position key) and near-miss controls. The task was accepted at `36f134f6`; CI was green on both readings.
