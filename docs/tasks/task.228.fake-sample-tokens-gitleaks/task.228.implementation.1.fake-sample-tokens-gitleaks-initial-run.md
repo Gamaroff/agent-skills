@@ -113,6 +113,13 @@ Replace the testing guide's two gitleaks-flagged sample tokens with a placeholde
 - Decision: GAPS — SC1 and SC4 are behaviour criteria (zero-hit bounds a per-PR test could assert) with no per-PR lane. Measurements green. Step 8a not applicable (no severity on the finding; the remedy is a new per-PR test, a code change).
 - Status kept `ready-for-review`; gap section and `DoD incomplete` Change Log row written; gaps comment posted on PR #732; lock held at 7.
 
+### Step 7 HALT resolution — human decision (2026-10-22)
+
+- The user chose to move the per-PR guard for the scan criteria to task.229 (option 1 of three: re-scope, a per-PR test here, or task.229 first).
+- task.228 § 9 Functional now states the three scan criteria (SC1, SC2, SC4) are finalise-time measurements with no unit tests applicable here; the run-1 gap section is marked historical.
+- task.229 takes the guard: its scope, Phase 1 and Success Criteria now include the PR text scan (commit messages and PR body of the PR range).
+- Documentation-only fix under `ci.docsOnly.patterns` (`docs/**`), so the run resumes at Step 7, not QA.
+
 ---
 
 ## Issues Log

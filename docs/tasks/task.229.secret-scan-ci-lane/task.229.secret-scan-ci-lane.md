@@ -131,6 +131,7 @@ contributor can see that before pushing.
 ✅ **Workflow**: `.github/workflows/secret-scan.yml`, with a pinned gitleaks version.
 ✅ **Local twin**: `scripts/lint-secrets.sh`, plus the `package.json` `lint:secrets` script and its place in `ci`.
 ✅ **Self-check**: a planted runtime token must trip the scan.
+✅ **PR text scan** (from task.228, re-scoped 2026-10-22): the PR's own commit messages (`git log --format=%B <base>..<head>`) and its PR body, each piped to `gitleaks stdin --redact`. Only the PR's range, which is not a history scan. This is the per-PR guard for task.228's commit-message / PR-text criterion.
 ✅ **Parity**: `GREEN_JOBS`, plus a `LANE_TWINS` entry if needed, in `ci-gate-parity.test.mjs`.
 ✅ **Docs**: `CONTRIBUTING.md` "Before you open a PR", the `releases.md` lane list and CI checklist, and `CHANGELOG.md` `### Added`.
 
@@ -181,6 +182,7 @@ installed.
 - [ ] Add `lint:secrets` and append it to `ci`.
 - [ ] Mutation-prove the self-check: replace the planted value with a low-entropy one and confirm the script exits 1 with the self-check message.
 - [ ] Mutation-prove the scan: add a scratch tracked file with a runtime-generated token (staged, never committed) and confirm the script exits 1. Then remove it.
+- [ ] Add the PR text scan: commit messages of `<base>..<head>` and, when a PR body is available (CI event payload), the body, each through `gitleaks stdin --redact`. Mutation-prove it with a runtime-generated token in a scratch message.
 
 **Dependencies**: Phase 0
 
@@ -276,6 +278,8 @@ in the same order as ShellCheck's.
 - [ ] With the self-check plant replaced by a low-entropy value, the script exits 1 before the real scan (Phase 1's self-check mutation).
 - [ ] With gitleaks off `PATH`, the script exits 0 and prints the skip message.
 - [ ] The `Secret scan` workflow is green on the PR head.
+- [ ] With a runtime-generated token in a scratch commit message, the PR text scan exits 1; on the real PR range and body it exits 0.
+- [ ] This lane is the per-PR guard for task.228's three scan criteria (the testing guide, the tracked tree, commit messages / PR text). Each runs on every PR.
 
 ### Performance
 
@@ -349,13 +353,13 @@ test would then fail on the orphaned `lint:secrets`. Revert as a whole.
 **Critical**: the lane blocks every PR. **Non-critical**: one false positive.
 
 ---
-
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-22 | 1.0     | Initial draft | create-task |
+| 2026-10-22 | 1.1 | Took over the per-PR guard for task.228's scan criteria (human decision): added the PR text scan (commit messages and PR body of the PR range) to scope, Phase 1 and Success Criteria | Claude |
 <!-- change-log-end -->
 
 ---

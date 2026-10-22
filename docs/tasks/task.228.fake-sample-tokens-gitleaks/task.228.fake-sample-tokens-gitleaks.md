@@ -245,6 +245,8 @@ Not applicable.
 
 ### Functional
 
+**Per-PR guard: re-scoped to task.229 (human decision, 2026-10-22).** The three scan criteria below (the guide scan, the full-tree scan and the commit-message / PR-text scan) are measurements taken at finalise. No unit tests applicable in this task: the guard that asserts them on every PR is task.229's deliverable. Its `Secret scan` lane covers the guide and the tracked tree, and its commit-message and PR-text scan covers the last one. Finalise run 1 (`task.228.dod.1.fake-sample-tokens-gitleaks.md`) found every measurement green and halted only on the missing lane.
+
 - [ ] `gitleaks dir skills/test-co-location-enforcer/references/testing-framework-guide.md --no-banner --redact --exit-code 1` exits 0.
 - [ ] `gitleaks dir . --no-banner --redact` reports no hit on a tracked file. Any remaining hit is under `.claude/`. This includes this task's own directory, so the scan runs **after** finalise has written its artefacts.
 - [ ] The guide's two examples still read as JWT-decoding examples. Only the literal changed.
@@ -354,9 +356,9 @@ clean.
 ### Key Findings
 No critical issues identified. Redacted gitleaks scans of each changed file, the task directory, the commit messages and the PR body all exit 0. One advisory cleanup (CR-1: the placeholder is not a decodable JWT if copied verbatim). The full-tree scan runs at finalise.
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 1 (historical, superseded)
 
-**Status:** IN PROGRESS
+**Status:** RESOLVED — SC1 and SC4 per-PR guard re-scoped to task.229 by human decision (2026-10-22); see § 9 Functional
 
 ### QA Gate Status
 
@@ -394,6 +396,7 @@ No critical issues identified. Redacted gitleaks scans of each changed file, the
 | 2026-10-22 |         | Implemented — 4 files (guide samples, 2 prose rewords, CHANGELOG); tracked tree scans clean | develop |
 | 2026-10-22 |         | QA gate PASS (100/100) — 0 blocking findings, 1 advisory cleanup | qa-task |
 | 2026-10-22 |  | DoD incomplete — 2 gaps identified (SC1, SC4: no per-PR gitleaks lane) | finalise |
+| 2026-10-22 | 1.2 | Re-scoped the per-PR guard for the three scan criteria (SC1, SC2, SC4) to task.229 by human decision; the criteria stay as finalise-time measurements. Run-1 gap section marked historical | Claude |
 <!-- change-log-end -->
 
 ---
