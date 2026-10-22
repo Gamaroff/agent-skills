@@ -10,11 +10,13 @@ priority: Low
 estimated_effort_hours: 2
 created: 2026-10-22
 updated: 2026-10-22
+github_issue: 725
 ---
 
 # Technical Task: loop-supervisor: find a replacement probe script after a stale hit
 
 **Status:** Planned
+**GitHub Issue**: [#725](https://github.com/Gamaroff/agent-skills/issues/725)
 
 ---
 
