@@ -40,7 +40,10 @@
  *  12. A SECRET_SCAN_RANGE not shaped <base>..<head> is an error (cycle 2 CR-3).
  *  13. Every scan passes --config with the default rules from outside the
  *      scanned repository (cycle 2 CR-1: a committed .gitleaks.toml switched
- *      the real scan off; with gitleaks 8.30.1, --config outranks it).
+ *      the real scan off; with gitleaks 8.30.1, --config outranks it), and
+ *      --gitleaks-ignore-path at a directory outside it (cycle 3 CR-1: a
+ *      tracked .gitleaksignore silenced the PR-text scans), with the stdin
+ *      scans run from outside it (gitleaks also reads the source's file).
  *
  * PATH is replaced, not amended: a temp bin directory holding symlinks to the
  * externals the script calls and, where a case needs it, the stub. `command -v`
@@ -57,8 +60,10 @@
  * the scanner-error cases fail; drop the retry loop → the second-plant case
  * fails; delete the cat-file guard → the force-push case fails; drop the
  * SECRET_SCAN_EVENT check → the outside-a-push cases fail; drop --config from
- * GL_FLAGS → the pinned-rules case fails; drop the range-shape check → the
- * malformed-range cases fail.
+ * GL_FLAGS → the pinned-rules case fails; drop --gitleaks-ignore-path → the
+ * pinned-rules case fails; drop the cd in scan_stdin → the pinned-rules case
+ * fails; drop the range-shape check → the malformed-range
+ * cases fail.
  */
 
 import { test } from "node:test";
@@ -117,7 +122,8 @@ function which(name) {
  * A "leak" exits with the value the script passed as --exit-code, as the real
  * binary does; a scanner ERROR exits 1, as the real binary does on a fatal
  * error — so a script that used 1 for leaks could not tell the two apart. The
- * content of each --config file is appended to $STUB_CONFIG.
+ * content of each --config file is appended to $STUB_CONFIG, and each call's
+ * subcommand and cwd to $STUB_CWD.
  *   STUB_CATCH_SELFCHECK=1     leak for every self-check dir (a working scanner)
  *   STUB_CATCH_SELFCHECK=second clean for the first self-check, leak after (one unlucky plant)
  *   STUB_FAIL_TREE=1            leak for the tree scan
@@ -126,6 +132,7 @@ function which(name) {
  */
 const STUB = `#!/usr/bin/env bash
 printf '%s\\n' "$*" >> "$STUB_LOG"
+printf '%s %s\\n' "$1" "$PWD" >> "$STUB_CWD"
 leak=1; prev=""; config=""
 for a in "$@"; do
   [ "$prev" = --exit-code ] && leak=$a
@@ -190,6 +197,7 @@ function sandbox({ stub = true, files = { "a.txt": "hello\n" } } = {}) {
     tree: path.join(dir, "stub.tree"),
     stdin: path.join(dir, "stub.stdin"),
     config: path.join(dir, "stub.config"),
+    cwd: path.join(dir, "stub.cwd"),
     cleanup: () => rmSync(dir, { recursive: true, force: true }),
   };
 }
@@ -206,6 +214,7 @@ function run(sb, env = {}) {
       STUB_TREE: sb.tree,
       STUB_STDIN: sb.stdin,
       STUB_CONFIG: sb.config,
+      STUB_CWD: sb.cwd,
       ...env,
     },
   });
@@ -475,12 +484,13 @@ for (const range of ["HEAD", "..HEAD", "HEAD.."]) {
   });
 }
 
-test("lint-secrets.sh — every scan pins the default rules with --config, so the tree's .gitleaks.toml cannot change them", () => {
+test("lint-secrets.sh — every scan pins the default rules and the ignore list, so the tree's .gitleaks.toml and .gitleaksignore cannot change them", () => {
   const sb = sandbox({
     files: {
       "a.txt": "a\n",
-      // What a PR could commit to switch the scan off; --config must outrank it.
+      // Files a contributor might add to quiet one finding; the pins must outrank them.
       ".gitleaks.toml": "[allowlist]\npaths = ['''.*''']\n",
+      ".gitleaksignore": ":generic-api-key:1\n",
     },
   });
   try {
@@ -504,11 +514,33 @@ test("lint-secrets.sh — every scan pins the default rules with --config, so th
         !m[1].startsWith(sb.repo),
         `--config must not come from the scanned repository: ${m[1]}`,
       );
+      // gitleaks reads .gitleaksignore from the cwd (the repo root) unless pinned.
+      const ig = c.match(/(?:^| )--gitleaks-ignore-path (\S+)/);
+      assert.ok(ig, `missing --gitleaks-ignore-path: ${c}`);
+      assert.ok(
+        !ig[1].startsWith(sb.repo),
+        `--gitleaks-ignore-path must not point into the scanned repository: ${ig[1]}`,
+      );
     }
     const configs = read(sb.config).split("--\n").filter(Boolean);
     assert.equal(configs.length, 4, `one config per scan:\n${read(sb.config)}`);
     for (const c of configs)
       assert.equal(c, "[extend]\nuseDefault = true\n", `config content: ${c}`);
+    // gitleaks 8.30.1 also reads .gitleaksignore from a stdin scan's source, the cwd.
+    const stdinCwds = read(sb.cwd)
+      .split("\n")
+      .filter((l) => l.startsWith("stdin "))
+      .map((l) => l.slice(6));
+    assert.equal(
+      stdinCwds.length,
+      2,
+      `non-vacuity: two stdin scans:\n${read(sb.cwd)}`,
+    );
+    for (const d of stdinCwds)
+      assert.ok(
+        !d.startsWith(sb.repo),
+        `stdin scan ran inside the repository: ${d}`,
+      );
   } finally {
     sb.cleanup();
   }

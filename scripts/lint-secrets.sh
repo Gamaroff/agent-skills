@@ -8,6 +8,16 @@
 # Runs gitleaks over the TRACKED files and over the PR's own text (its commit
 # messages and, in CI, its body). The workflow's scan step calls this script, so
 # the file set is defined once, here — there is no second copy to keep in step.
+# gitleaks' default rules carry its own global path allowlist (lockfiles,
+# vendored node_modules/, images, fonts, PDFs and similar), and tracked files on
+# it are not scanned.
+#
+# WHAT THIS GUARDS: a secret-shaped string committed BY ACCIDENT. It is not a
+# control against a deliberate bypass: on a pull_request event the PR's own
+# workflow and its own copy of this script run, so a PR can change the code
+# that judges it. The pins below keep a well-meant repository file — a
+# .gitleaks.toml or .gitleaksignore added to quiet one finding — from silently
+# changing what every scan checks.
 #
 # When the `gitleaks` binary is absent the lane is SKIPPED LOUDLY and exits 0,
 # as lint-shell.sh does for shellcheck: CI installs a pinned binary regardless,
@@ -33,10 +43,13 @@
 #                        an error rather than a skipped scan.
 #   SECRET_SCAN_PR_BODY  the PR body; scanned when non-empty.
 #
-# The rules are pinned: every call passes --config with gitleaks' default rules,
-# written here, outside the scanned tree. Without it gitleaks would load a
-# .gitleaks.toml from the tree, and the change being scanned could switch the
-# scan off while the self-check still passed (task 229 QA cycle 2).
+# The rules and the ignore list are pinned: every call passes --config with
+# gitleaks' default rules and --gitleaks-ignore-path at an empty directory, both
+# outside the scanned tree, and the stdin scans run from that directory. Without
+# them gitleaks would read a .gitleaks.toml from the tree and a .gitleaksignore
+# from the repository root, and a tracked
+# file could switch a scan off while the self-check still passed (task 229 QA
+# cycles 2 and 3).
 #
 # History is NOT scanned (`gitleaks git` would find values task 228 removed):
 # the lane guards the tree and the PR in front of it, not the past.
@@ -68,12 +81,23 @@ printf '{{range .}}  {{.File}}:{{.StartLine}} {{.RuleID}}\n{{end}}' >"$tmp/repor
 # missing dir, a bad report template), and with --exit-code 1 a scanner that
 # crashed read as a found secret — and as a caught self-check plant.
 LEAK_RC=99
-# The default rules, from a file the scanned change cannot touch. --config
-# outranks the GITLEAKS_CONFIG* variables and the tree's own .gitleaks.toml.
+# The default rules, from a file outside the scanned tree. --config outranks
+# the GITLEAKS_CONFIG* variables and the tree's own .gitleaks.toml. The ignore
+# list is an empty directory: gitleaks otherwise reads .gitleaksignore from the
+# cwd, the repository root, and a stdin fingerprint (":generic-api-key:1") in it
+# silences the PR-text scans. gitleaks 8.30.1 ALSO reads one from the scan's
+# source, which for stdin is the cwd, so scan_stdin runs from that empty
+# directory too.
 printf '[extend]\nuseDefault = true\n' >"$tmp/gitleaks.toml"
+mkdir "$tmp/no-ignore"
 GL_FLAGS=(--no-banner --redact --exit-code "$LEAK_RC" --log-level error
-  --config "$tmp/gitleaks.toml"
+  --config "$tmp/gitleaks.toml" --gitleaks-ignore-path "$tmp/no-ignore"
   --report-format template --report-template "$tmp/report.tmpl" --report-path -)
+
+# scan_stdin: gitleaks over stdin, run from a directory holding no ignore file.
+scan_stdin() {
+  (cd "$tmp/no-ignore" && gitleaks stdin "${GL_FLAGS[@]}")
+}
 
 # scanner_ran <rc> <output> <what>: exit 1 unless <rc> is clean (0) or a leak
 # (LEAK_RC). Anything else is a scanner error, which says nothing was checked.
@@ -172,7 +196,7 @@ else
   }
   echo "scanning the commit messages of $range"
   rc=0
-  hits=$(printf '%s' "$msgs" | gitleaks stdin "${GL_FLAGS[@]}" 2>&1) || rc=$?
+  hits=$(printf '%s' "$msgs" | scan_stdin 2>&1) || rc=$?
   scanner_ran "$rc" "$hits" "the commit-message scan"
   if [ "$rc" -eq "$LEAK_RC" ]; then
     echo "error: gitleaks found a secret-shaped string in the PR's commit messages (line numbers count from the first message of $range):" >&2
@@ -185,7 +209,7 @@ fi
 if [ -n "${SECRET_SCAN_PR_BODY:-}" ]; then
   echo "scanning the PR body"
   rc=0
-  hits=$(printf '%s' "$SECRET_SCAN_PR_BODY" | gitleaks stdin "${GL_FLAGS[@]}" 2>&1) || rc=$?
+  hits=$(printf '%s' "$SECRET_SCAN_PR_BODY" | scan_stdin 2>&1) || rc=$?
   scanner_ran "$rc" "$hits" "the PR body scan"
   if [ "$rc" -eq "$LEAK_RC" ]; then
     echo "error: gitleaks found a secret-shaped string in the PR body:" >&2

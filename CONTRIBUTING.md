@@ -129,8 +129,12 @@ fails on a secret-shaped string. `npm run lint:secrets` (`scripts/lint-secrets.s
 the workflow calls it, so the file set is the same — and skips loudly when no `gitleaks` binary is
 installed. Before scanning it plants a token generated at runtime and fails if the scanner misses three of them,
 so a green result is never the scanner's silence. A sample value that trips it is reworded (task 228),
-or carries `gitleaks:allow` with a reason on the same line; there is no path allowlist, and the lane
-pins gitleaks' default rules, so a `.gitleaks.toml` in the tree has no effect on it. A local binary
+or carries `gitleaks:allow` with a reason on the same line. The lane pins gitleaks' default rules and
+an empty ignore list, so a `.gitleaks.toml` or `.gitleaksignore` in the tree has no effect on it. The
+default rules keep gitleaks' own path allowlist (lockfiles, vendored `node_modules/`, images, fonts,
+PDFs and similar), and tracked files on it are not scanned. The lane catches a secret committed by
+accident; a PR runs its own copy of the workflow and the script, so it is no control against a
+deliberate bypass — branch review is. A local binary
 of another version may disagree with CI; CI's pin is the authority.
 
 `prettier` is already a devDependency, so `npm ci` provides it. Prettier covers **JavaScript only** — Markdown, YAML and JSON are excluded on purpose in `.prettierignore`, because this repo's documents are hand-wrapped.
