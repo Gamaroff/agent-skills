@@ -264,6 +264,27 @@ For a wording problem or one over-matching name, fix it forward in the predicate
 
 **Deferred Work.** None.
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-22
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.226.qa.1.probe-cli-loader-env-prefix-refusal.md](./task.226.qa.1.probe-cli-loader-env-prefix-refusal.md)
+- **Gate File**: [task.226.gate.1.probe-cli-loader-env-prefix-refusal.yml](./task.226.gate.1.probe-cli-loader-env-prefix-refusal.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 217
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No issues found. The probe engine declined every new loader name on Node and Python and accepted `MY_LD_FLAG` and `ld_audit`: 16 executed, 0 escaped. All three mutants turn the committed test red.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -273,6 +294,7 @@ For a wording problem or one over-matching name, fix it forward in the predicate
 | 2026-10-22 | 1.1 | Review passed (9/10) — performance criterion restated as not applicable; task 216 CHANGELOG entry added to scope; bundled-copy list and removed-literal search recorded | review-task |
 | 2026-10-22 |  | Status → ready-for-development | review-task |
 | 2026-10-22 |  | Implemented — 11 files (4 source, 7 bundled), 2 decline rows + 1 control × Node and Python | develop |
+| 2026-10-22 |  | QA gate PASS (100/100) — 0 findings | qa-task |
 <!-- change-log-end -->
 
 ---
