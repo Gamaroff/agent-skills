@@ -3,7 +3,7 @@
 **Task**: `task.228.fake-sample-tokens-gitleaks.md`
 **Run Number**: 1
 **Started**: 2026-10-22 16:10
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -36,8 +36,8 @@ Replace the testing guide's two gitleaks-flagged sample tokens with a placeholde
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; audit 9/9, `ready-for-review`; commits `ee32237d`, `8b5e3b28` | —                    | 2026-10-22T16:35Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #732: https://github.com/Gamaroff/agent-skills/pull/732 | —                    | 2026-10-22T16:40Z |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.228.qa.{N}.*.md`; `task.228.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 1 cycle, gate PASS 100; PR review APPROVE (`task.228.pr-review.1.fake-sample-tokens-gitleaks.md`) | —                    | 2026-10-22T16:55Z |
-| 7. finalise                | ❌ Halted  | `task.228.dod.{N}.*.md`; task `status: accepted`                       | DoD gaps: SC1, SC4 (no per-PR gitleaks lane); `task.228.dod.1.fake-sample-tokens-gitleaks.md` | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 7. finalise                | ✅ Done    | `task.228.dod.{N}.*.md`; task `status: accepted`                       | Run 1 halted on DoD gaps (SC1, SC4; `task.228.dod.1…`); re-scoped to task.229 by owner decision; run 2 ACCEPTED 11/11 (`task.228.dod.2.fake-sample-tokens-gitleaks.md`) | —                    | 2026-10-22T17:58Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Final report commit + push | —                    | 2026-10-22T17:58Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -120,6 +120,18 @@ Replace the testing guide's two gitleaks-flagged sample tokens with a placeholde
 - task.229 takes the guard: its scope, Phase 1 and Success Criteria now include the PR text scan (commit messages and PR body of the PR range).
 - Documentation-only fix under `ci.docsOnly.patterns` (`docs/**`), so the run resumes at Step 7, not QA.
 
+### Resume after Step 7 halt (develop-next, autonomous)
+
+- Phase 0b auto-answer: "Re-enter QA at 5a" (Recommended). `reenter-qa-after-finalise.sh` refused it with `no-code-moved`: only documentation changed since the gate head `bab9ad6b` (task.229 doc under `docs/**`). Routed per the resume contract: `--restore` the lock at step 7 and re-run `/finalise`.
+
+### Step 7 — finalise, run 2
+
+- DoD agents: AC ✅ PASS 11/11 (scan criteria under the task.229 re-scope; re-runs on head clean), security ✅ PASS (`boundary: false`, empty probe plan), compliance ⚠️ NOT_APPLICABLE, docs ✅ PASS.
+- SC2 final measurement after the DoD and sprint-review artefacts existed: `gitleaks dir . --redact` found 3 hits, all in untracked scratch files under the gitignored `.claude/state/`, and 0 in tracked files.
+- CI reading 1: SUCCESS @ `ad89ab1e` over 5 checks. CI reading 2: SUCCESS @ `6b2e773e` over 5 checks (acceptance commit; all five runs completed, `test` at 17:51Z).
+- Acceptance commit `6b2e773e` (registry ticked); canonical PR comment posted (issuecomment-6347589728); #730 `done` comment posted and the issue closed (CLOSED confirmed); board `done` → `already`; Document link already on `develop`.
+- CHANGELOG cites task 228 (6d).
+
 ---
 
 ## Issues Log
@@ -150,10 +162,12 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-10-22T17:58Z
+**Final Status**: Completed
 **Branch**: feature/task.228.fake-sample-tokens-gitleaks
 **PR**: https://github.com/Gamaroff/agent-skills/pull/732
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 1
+**DoD Summary**: docs/tasks/task.228.fake-sample-tokens-gitleaks/task.228.dod.2.fake-sample-tokens-gitleaks.md
+**Tracker debt**: none
+
+**Completion Summary**: Implemented the gitleaks clean-up. The testing guide's two sample tokens became a `<header>.<payload>.<signature>` placeholder, and two prose lines were reworded. The tracked tree now scans clean; the only remaining hits are scratch files under the gitignored `.claude/`. One QA cycle: gate PASS 100/100, 0 bugs, 1 advisory cleanup (CR-1); the 5c PR review was APPROVE. Finalise run 1 halted because the three scan criteria had no per-PR lane. The owner moved that guard to task.229, which now includes a PR-text scan. Run 2 accepted 11/11 at `6b2e773e`; CI was green on both readings. Every scan and report described old values by file, line and rule only.
