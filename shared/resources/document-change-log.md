@@ -93,6 +93,18 @@ block already carries its own heading or not (obs #104, task.127). Only the near
 counts: a heading with prose between it and the markers is another section and is left alone. Author
 new blocks with the heading inside the markers; do not rely on the absorb.
 
+**Only the log lives inside the markers** — its heading, an authoring note, its table and any
+subsection deeper than its heading. A sibling section written there (a heading at or above the
+log's own level that is not a Change Log heading — the QA loop's `## Deferred Work`, finalise's
+`## Definition of Done - PASSED ✅`) used to be carried as prose inside the regenerated block, so it
+became part of the log and nothing warned. The engine now **lifts** it on the next write: above the
+start marker when it sat before the table, below the end marker when it sat after, text and order
+unchanged, and a pipe table it holds moves with it. `foreignSections(content)` reports what a write
+would lift, `liftForeignSections(content)` repairs without appending a row, and
+`evals/shared/tests/change-log-foreign-section-corpus.test.mjs` fails on any tracked document whose
+block holds one (obs #91, task.230). Place a section before the marker in the first place; do not
+rely on the lift.
+
 **Migration is a side effect of writing a row, never a write of its own.** It happens inside
 `upsertChangeLog`, so a sync that earns no row never passes the document through the engine and
 never rewrites it. This is load-bearing rather than incidental: migrating unconditionally would
