@@ -195,6 +195,16 @@
  * result and the record carry `interpreter` ({ name, version }), null for every
  * other form.
  *
+ * A `cli:` case's `fixture` (`env`, `files`) is honoured as for shell-argv:
+ * (task.216): its files are written into the case directory — the child's cwd —
+ * before the spawn, its env merged over the sandbox's, with the same refusals
+ * (a path that leaves the directory, HOME, TMPDIR, LC_ALL) and two more of the
+ * form's own, PATH and NODE_OPTIONS, which steer the interpreter rather than the
+ * CLI (CLI_INTERPRETER_ENV). It is how a CLI that refuses on what it finds in a
+ * directory (a data dir, a repository) gets a legitimate case that is accepted;
+ * without it every input reads as overblocked and the verdict is
+ * `rejects-every-input`.
+ *
  * THE SHELL-ARGV ENTRY FORM (task.181). A boundary delivered as a SHELL SCRIPT
  * TAKING SEVERAL ARGUMENTS OR FLAGS (`verify-push-state.sh --base … --scope …`,
  * `reenter-qa-after-finalise.sh <doc-dir> <report>`) matched none of the forms —
@@ -2568,16 +2578,37 @@ function runCliCase(
       decline(`case's ${problem}`);
       return;
     }
-    const collides = (c.expected.absent ?? []).find(
-      (p) =>
-        fixture !== null && (fixture.controls.includes(p) || p === c.input),
+  }
+  // The case's own `fixture` (task.216), validated as the fence: and
+  // shell-argv: arms validate it. `fixture` above is the SINK's; this is c's.
+  const fixtureProblemText = fixtureProblem(c.fixture);
+  if (fixtureProblemText !== null) {
+    decline(`case's ${fixtureProblemText}`);
+    return;
+  }
+  const steers = Object.keys(c.fixture?.env ?? {}).find((k) =>
+    CLI_INTERPRETER_ENV.includes(k),
+  );
+  if (steers !== undefined) {
+    decline(
+      `case's \`fixture.env\` may not set ${steers} on the cli: form — it steers the interpreter the form runs, not the CLI under probe`,
     );
-    if (collides !== undefined) {
-      decline(
-        `case's \`expected.absent\` names "${collides}", which the fixture itself creates`,
-      );
-      return;
-    }
+    return;
+  }
+  const files = Object.entries(c.fixture?.files ?? {});
+  // An `expected.absent` name the run's own fixture creates mismatches on
+  // every run — declined, as every other arm declines it (task.128 BUG-13).
+  const firstSegment = (rel) => normalize(rel).split(sep)[0].toLowerCase();
+  const collides = (c.expected?.absent ?? []).find(
+    (p) =>
+      (fixture !== null && (fixture.controls.includes(p) || p === c.input)) ||
+      files.some(([rel]) => firstSegment(rel) === p.toLowerCase()),
+  );
+  if (collides !== undefined) {
+    decline(
+      `case's \`expected.absent\` names "${collides}", which the fixture itself creates`,
+    );
+    return;
   }
 
   let fixtureDir;
@@ -2587,6 +2618,12 @@ function runCliCase(
     });
   } catch (e) {
     decline(`fixture: cannot materialise "${c.input}": ${e.message}`);
+    return;
+  }
+  try {
+    writeFixtureFiles(fixtureDir, files);
+  } catch (e) {
+    decline(`fixture: ${e.message}`);
     return;
   }
 
@@ -2604,7 +2641,7 @@ function runCliCase(
       : [entryPath, ...args],
     {
       cwd: fixtureDir,
-      env: caseEnv({ fixtureDir, sandboxHome, sandboxTmp }),
+      env: fixtureCaseEnv(c.fixture, { fixtureDir, sandboxHome, sandboxTmp }),
       timeoutMs,
       extraFds: isPython ? PYTHON_RECORD_FD - 2 : 0,
     },
@@ -3110,6 +3147,16 @@ export function extractFencedBlock(docText, heading) {
 
 /** The environment keys the sandbox owns; a case's fixture may not set them. */
 const SANDBOX_OWNED_ENV = Object.freeze(["HOME", "TMPDIR", "LC_ALL"]);
+
+/**
+ * The keys a `cli:` case's `fixture.env` may not set either (task.216): they
+ * steer the interpreter the form runs rather than the CLI under probe. `PATH`
+ * selects the `python3` binary (spawned by name), whose crash record the
+ * verdict reads; `NODE_OPTIONS` loads code into a Node child before the entry
+ * and can hide the fatal-error footer. Python's own variables need no entry:
+ * `-E` already ignores them.
+ */
+const CLI_INTERPRETER_ENV = Object.freeze(["PATH", "NODE_OPTIONS"]);
 const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 /**

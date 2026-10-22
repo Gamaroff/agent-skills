@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **security-probe: a `cli:` case carries `fixture.files` and `fixture.env` (task 216).** The
+  `cli:` form (Node and Python) now writes a case's `fixture.files` into its case directory, the
+  CLI's cwd, and merges `fixture.env` before the spawn, as `shell-argv:` already did. A CLI that
+  refuses on what it finds in a directory (a data dir, a repository) can now have a legitimate case
+  that is accepted, where before every input ended in a refusal and the verdict read
+  `rejects-every-input`. The refusals are `shell-argv:`'s (a path leaving the case directory,
+  `HOME`/`TMPDIR`/`LC_ALL`, an `expected.absent` name the files create), each declined by name,
+  plus `PATH` and `NODE_OPTIONS`, which steer the interpreter rather than the CLI. A `cli:` case
+  with no `fixture` runs as before; one that carried `fixture` had it silently ignored and now has
+  it honoured.
 - **loop-supervisor: an engine registry and `--engine` / `--model` / `--effort` (task 213).**
   `skills/loop-supervisor/references/engines.js` holds one table row per engine: how to build its
   argv, parse its result line, and what it supports. `run-loop.mjs` reads the row and has no

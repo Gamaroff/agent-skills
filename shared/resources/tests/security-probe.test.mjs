@@ -3967,6 +3967,133 @@ test("shell-fn entry: a --fake-gh directory named `..name` inside the repo root 
   }
 });
 
+// ── task.216: a cli: case carries fixture.files and fixture.env ─────────────
+//
+// A CLI that refuses on what it finds in a directory (a data dir, a repository)
+// had no legitimate case that could be accepted: the cli: arm built the case
+// directory from the sink's controls alone and ignored the case's `fixture`, so
+// every input read as overblocked. Each row runs under Node and Python.
+
+const NEEDS_DATA = [
+  ["node", `cli:${FIXTURES}/cli-needs-data.mjs`],
+  ["python", `cli:${FIXTURES}/cli-needs-data.py`],
+];
+const DATA_ARGV = ["merge-back", "{input}"];
+const dataCase = (extra = {}) => ({
+  id: "d.legit",
+  input: ".",
+  direction: "legitimate",
+  ...extra,
+});
+
+for (const [lang, ENTRY] of NEEDS_DATA) {
+  test(`cli entry (${lang}): a case's fixture.files is written into its cwd before the run — with it accepted, without it rejected`, () => {
+    const withFiles = runProbeSpec({
+      sink: "url-authority",
+      entry: ENTRY,
+      cases: [dataCase({ fixture: { files: { "items.json": '["MARKER"]' } } })],
+      argv: DATA_ARGV,
+    });
+    assert.equal(withFiles.executed, 1, JSON.stringify(withFiles.declined));
+    assert.equal(
+      withFiles.cases[0].outcome,
+      "accepted",
+      JSON.stringify(withFiles.cases),
+    );
+    // The same case with no fixture: the file is what made it pass.
+    const without = runProbeSpec({
+      sink: "url-authority",
+      entry: ENTRY,
+      cases: [dataCase()],
+      argv: DATA_ARGV,
+    });
+    assert.equal(without.cases[0].outcome, "rejected");
+    assert.match(without.cases[0].detail, /no items\.json/);
+    // A nested path lands inside the case directory too.
+    const nested = runProbeSpec({
+      sink: "url-authority",
+      entry: ENTRY,
+      cases: [
+        dataCase({
+          input: "data",
+          fixture: { files: { "data/items.json": "MARKER" } },
+        }),
+      ],
+      argv: DATA_ARGV,
+    });
+    assert.equal(nested.cases[0].outcome, "accepted", JSON.stringify(nested));
+  });
+
+  test(`cli entry (${lang}): fixture.env reaches the child; HOME, PATH and NODE_OPTIONS in it are declined by name`, () => {
+    const env = runProbeSpec({
+      sink: "url-authority",
+      entry: ENTRY,
+      cases: [dataCase({ fixture: { env: { PROBE_MARKER: "MARKER" } } })],
+      argv: DATA_ARGV,
+    });
+    assert.equal(env.cases[0].outcome, "accepted", JSON.stringify(env));
+    for (const [key, detail] of [
+      ["HOME", /may not set HOME — the sandbox owns it/],
+      ["PATH", /may not set PATH on the cli: form — it steers the interpreter/],
+      [
+        "NODE_OPTIONS",
+        /may not set NODE_OPTIONS on the cli: form — it steers the interpreter/,
+      ],
+    ]) {
+      const r = runProbeSpec({
+        sink: "url-authority",
+        entry: ENTRY,
+        cases: [dataCase({ fixture: { env: { [key]: "/tmp/x" } } })],
+        argv: DATA_ARGV,
+      });
+      assert.equal(r.executed, 0, `${key}: ${JSON.stringify(r.cases)}`);
+      assert.match(r.declined[0].detail, detail);
+    }
+  });
+
+  test(`cli entry (${lang}): a malformed fixture, a path that leaves the case directory, or an expected.absent name the fixture writes is declined, never scored`, () => {
+    for (const [fixture, extra, detail] of [
+      [3, {}, /`fixture` is not an object/],
+      [{ files: { "../out.json": "MARKER" } }, {}, /leaves the case directory/],
+      [
+        { files: { "items.json": "MARKER" } },
+        { expected: { exit: 0, absent: ["items.json"] } },
+        /which the fixture itself creates/,
+      ],
+    ]) {
+      const r = runProbeSpec({
+        sink: "url-authority",
+        entry: ENTRY,
+        cases: [dataCase({ fixture, ...extra })],
+        argv: DATA_ARGV,
+      });
+      assert.equal(r.executed, 0, JSON.stringify(r.cases));
+      assert.match(r.declined[0].detail, detail);
+    }
+  });
+
+  test(`cli entry (${lang}): a fixture case carrying \`expected\` is still compared, not exit-scored`, () => {
+    const files = { "items.json": "MARKER" };
+    const met = runProbeSpec({
+      sink: "url-authority",
+      entry: ENTRY,
+      cases: [dataCase({ fixture: { files }, expected: { stdout: "ok\n" } })],
+      argv: DATA_ARGV,
+    });
+    assert.equal(met.cases[0].outcome, "accepted", JSON.stringify(met.cases));
+    const missed = runProbeSpec({
+      sink: "url-authority",
+      entry: ENTRY,
+      cases: [
+        dataCase({ fixture: { files }, expected: { stdout: "other\n" } }),
+      ],
+      argv: DATA_ARGV,
+    });
+    assert.equal(missed.cases[0].outcome, "rejected");
+    assert.match(missed.cases[0].detail, /stdout/);
+  });
+}
+
 // ── task.131: --args-json, the { ok: false } rule, and markdown-structure ────
 
 const requireCjs = createRequire(import.meta.url);
