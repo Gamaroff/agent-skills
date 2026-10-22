@@ -133,10 +133,11 @@ one write. The corpus guard turns red on any document that holds one.
   unfenced pipe-line from the first one on as the log's table, so a foreign section that holds its
   own pipe table *before* the log table would have its rows taken into the log (today they are
   emitted as unparsed rows inside it). The split therefore runs inside `splitCarriedLines`, over
-  the `[line, fenced]` pairs, before `flags` is computed. A `before`-side foreign section ends
-  at the first line that is a change-log entry row (`RE_ENTRY_ROW`) or the table header directly
-  above one; a pipe table before that line belongs to the section and moves with it. An
-  `after`-side foreign section runs to the end of the block.
+  the `[line, fenced]` pairs, before `flags` is computed. Where a foreign section ends, and which
+  table is the log's, is stated once, in the header comment of `partitionForeign` in
+  `shared/resources/change-log.js`. QA cycle 1 revised it: a document-wide first entry row let a
+  foreign dated table win, so the log's table is now chosen among the tables at or after its
+  heading, by its header or its entry rows. A pipe table a foreign section holds moves with it.
 - **`foreignSections(content)`** returns the foreign sections of the document's change-log block,
   each with its heading line and side (`before` / `after`), or `[]`. It is read-only, and is what
   the guard and the tests call.
@@ -496,6 +497,27 @@ None.
 - **Non-critical:** blank-line churn; a foreign shape the predicate misses (fix forward).
 
 ---
+
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-22
+**Quality Score**: 60/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.230.qa.1.change-log-block-foreign-sections.md](./task.230.qa.1.change-log-block-foreign-sections.md)
+- **Gate File**: [task.230.gate.1.change-log-block-foreign-sections.yml](./task.230.gate.1.change-log-block-foreign-sections.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 6235
+- **Phases Verified**: 4/4
+- **Critical Issues**: 1
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+The log-table start is a document-wide first match, so a foreign section's own dated or `| Date |` table is split, with its rows kept in the log (TASK-230-CR-1 high, TASK-230-CR-2 medium; CR-3 advisory, same root cause).
 <!-- change-log-start -->
 ## Change Log
 
@@ -505,6 +527,8 @@ None.
 | 2026-10-22 | 1.1 | Review passed (8/10) — 6 important fixes applied: partition before table classification, measured bound command, two tests named, PR-head wording, caller search, placement test update | review-task |
 | 2026-10-22 |  | Status → ready-for-development | review-task |
 | 2026-10-22 |  | Implemented — 12 files, 13 tests (11 engine, 2 corpus guard) plus 1 placement assertion | develop |
+| 2026-10-22 |  | QA gate FAIL (60/100) — 2 findings (1 high, 1 medium) | qa-task |
+| 2026-10-22 |  | QA findings fixed — log table chosen at or after its heading (CR-1, CR-2, CR-3) + JSDoc; 5 new tests, 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

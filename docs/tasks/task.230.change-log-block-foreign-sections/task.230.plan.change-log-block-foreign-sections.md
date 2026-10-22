@@ -52,9 +52,9 @@ definition.
    into `tableLines` before any later split could see them. Run the partition over the
    `[line, prot]` pairs, match headings on unprotected lines only (a fenced `## Example` has
    `prot === true` and must never match), and return `beforeForeign` / `afterForeign` beside
-   `before` / `after`. Extent: a `before`-side foreign section ends at the first line that is a
-   change-log entry row (`RE_ENTRY_ROW`, or the header/separator directly above the first one); an
-   `after`-side one runs to the end of the block. Classify the table over the remaining own lines.
+   `before` / `after`. Extent: stated once, in `partitionForeign`'s header comment (QA cycle 1
+   replaced the first-entry-row rule with a table chosen at or after the log's heading). Classify
+   the table over the remaining own lines.
 
    `RE_HEADING` must not be restated: import the module's own constant. A `Change Log` heading is
    never foreign; the obs #104 absorption owns the doubled-heading case.

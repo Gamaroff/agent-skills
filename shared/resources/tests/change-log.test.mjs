@@ -2730,3 +2730,156 @@ test("K11 liftForeignSections repairs without a row: same rows, sections outside
     content.replace(`${K_TABLE[2]}\n`, `${K_TABLE[2]}\n${K_ROW}\n`),
   );
 });
+
+// --- task.230 QA cycle 1: the log's table starts under its own heading ------
+// The log's table was the first date-first row anywhere in the block, then the
+// first `| Date |` header, then the first pipe line — document-wide matches
+// that a foreign section's own table could win. Its heading moved out and its
+// rows stayed in the log as history (CR-1, CR-2), and the header back-up could
+// walk into a foreign table written directly above the heading (CR-3).
+
+const K_CR_CASES = {
+  "CR-1 a before-side foreign section with a date-first table": kDoc([
+    "## Definition of Done",
+    "",
+    "| Date | Run | Result |",
+    "|---|---|---|",
+    "| 2026-10-02 | run 1 | gaps |",
+    "",
+    "## Change Log",
+    "",
+    ...K_TABLE,
+  ]),
+  "CR-3 a foreign table directly above the heading, no blank line": kDoc([
+    "## Checks",
+    "",
+    "| Check | Result |",
+    "|---|---|",
+    "| a | ok |",
+    "## Change Log",
+    ...K_TABLE,
+  ]),
+};
+
+test("K12 a foreign section's dated or adjacent table moves with it, whole", () => {
+  const stray = {
+    "CR-1 a before-side foreign section with a date-first table":
+      "| 2026-10-02 | run 1 | gaps |",
+    "CR-3 a foreign table directly above the heading, no blank line":
+      "| a | ok |",
+  };
+  for (const [name, doc] of Object.entries(K_CR_CASES)) {
+    for (const out of [
+      CL.upsertChangeLog(doc, K_ENTRY, { docType: "task" }),
+      CL.liftForeignSections(doc).content,
+    ]) {
+      assert.ok(
+        !kBlock(out).includes(stray[name]),
+        `${name}: row left in the log`,
+      );
+      assert.ok(
+        out.indexOf(stray[name]) < out.indexOf(CL.CL_START),
+        `${name}: row not above the start marker`,
+      );
+      assert.deepEqual(
+        CL.extractEntries(out).filter((row) => row !== K_ROW),
+        CL.extractEntries(kDoc(["## Change Log", "", ...K_TABLE])),
+        `${name}: log history changed`,
+      );
+      assert.deepEqual(
+        CL.foreignSections(out),
+        [],
+        `${name}: foreign after write`,
+      );
+    }
+  }
+});
+
+test("K13 a block with no log table: a foreign section's table leaves whole", () => {
+  const doc = kDoc([
+    "## Change Log",
+    "",
+    "## Deferred Work",
+    "",
+    "| Item | Owner |",
+    "|---|---|",
+    "| thing | dev |",
+  ]);
+  assert.deepEqual(
+    CL.foreignSections(doc).map(({ side, heading }) => ({ side, heading })),
+    [{ side: "after", heading: "## Deferred Work" }],
+  );
+  const { content } = CL.liftForeignSections(doc);
+  assert.ok(
+    !kBlock(content).includes("| thing | dev |"),
+    "row left in the log",
+  );
+  assert.ok(
+    !kBlock(content).includes("| Item | Owner |"),
+    "header left in the log",
+  );
+  assert.ok(
+    content.indexOf("| thing | dev |") > content.indexOf(CL.CL_END),
+    "row not below the end marker",
+  );
+  const out = CL.upsertChangeLog(doc, K_ENTRY, { docType: "task" });
+  assert.deepEqual(CL.extractEntries(out), [K_ROW]);
+  assert.deepEqual(CL.foreignSections(out), []);
+});
+
+test("K14 a log whose rows the parser cannot read: an after-side dated table stays out", () => {
+  const doc = kDoc([
+    "## Change Log",
+    "",
+    "| Version | Date | Notes |",
+    "|---|---|---|",
+    "| 1.0 | 2026-01-01 | first |",
+    "",
+    "## DoD",
+    "",
+    "| Date | Check |",
+    "|---|---|",
+    "| 2026-02-02 | verified |",
+  ]);
+  assert.deepEqual(
+    CL.foreignSections(doc).map(({ side, heading }) => ({ side, heading })),
+    [{ side: "after", heading: "## DoD" }],
+  );
+  const { content } = CL.liftForeignSections(doc);
+  assert.ok(!kBlock(content).includes("| 2026-02-02 | verified |"));
+  assert.ok(kBlock(content).includes("| 1.0 | 2026-01-01 | first |"));
+});
+
+test("K15 an authoring note under the heading stays when a section above is lifted", () => {
+  const doc = kDoc([
+    "## Deferred Work",
+    "",
+    "- carried",
+    "",
+    "## Change Log",
+    "",
+    "_Append-only; newest at the bottom._",
+    "",
+    ...K_TABLE,
+  ]);
+  for (const out of [
+    CL.upsertChangeLog(doc, K_ENTRY, { docType: "task" }),
+    CL.liftForeignSections(doc).content,
+  ]) {
+    assert.ok(kBlock(out).includes("_Append-only; newest at the bottom._"));
+    assert.ok(!kBlock(out).includes("- carried"));
+  }
+});
+
+test("K16 properties hold on the cycle-1 shapes: one definition, idempotent, a move", () => {
+  for (const [name, doc] of Object.entries(K_CR_CASES)) {
+    const out = CL.upsertChangeLog(doc, K_ENTRY, { docType: "task" });
+    assert.deepEqual(kNonBlank(out), [...kNonBlank(doc), K_ROW].sort(), name);
+    const twice = CL.upsertChangeLog(out, K_ENTRY_2, { docType: "task" });
+    assert.equal(
+      twice,
+      out.replace(`${K_ROW}\n`, `${K_ROW}\n${K_ROW_2}\n`),
+      name,
+    );
+  }
+});

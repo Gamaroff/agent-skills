@@ -289,6 +289,9 @@ function splitCarriedLines(content, found) {
   const raw = content.slice(found.start, found.end).split("\n");
   const lines = [];
   let headingSeen = false;
+  // Where the removed Change Log heading stood, as an index into `lines`: the
+  // log is what follows it (task.230 QA cycle 1). -1 when the block has none.
+  let headingAt = -1;
   let offset = found.start;
   for (let i = 0; i < raw.length; i++) {
     let line = raw[i];
@@ -333,6 +336,7 @@ function splitCarriedLines(content, found) {
     if (markers.has(line.trim())) continue;
     if (!headingSeen && RE_HEADING.test(line)) {
       headingSeen = true;
+      headingAt = lines.length;
       continue;
     }
     lines.push([line, false]);
@@ -353,7 +357,7 @@ function splitCarriedLines(content, found) {
   // `findChangeLog` supplies; a block being discarded carries none.
   const { own, beforeForeign, afterForeign, sections } =
     found.hasMarkers && found.level
-      ? partitionForeign(lines, found.level)
+      ? partitionForeign(lines, found.level, headingAt)
       : { own: lines, beforeForeign: [], afterForeign: [], sections: [] };
 
   // A table line is an unfenced pipe-line. A nested heading that comes AFTER
@@ -428,52 +432,99 @@ function splitCarriedLines(content, found) {
 // A deeper heading is the log's own subsection and stays (section I).
 //
 // `lines` are `splitCarriedLines`' `[line, fenced]` pairs, markers and the first
-// Change Log heading already removed. The log's table starts at its first entry
-// row, backed up over the header and separator directly above it; with no entry
-// row, at the first `| Date |` header; with neither, at the first unfenced pipe
-// line (a log whose rows the parser cannot read — the same table today's
-// classification would take). A foreign section on the `before` side runs from
-// its heading to that start, so a pipe table it holds moves with it; one on the
-// `after` side runs to the end of the block. `foreignSections` reads this
-// partition, `upsertChangeLog` and `liftForeignSections` apply it.
-function partitionForeign(lines, level) {
+// Change Log heading already removed; `headingAt` is where that heading stood
+// (-1 when the block has none).
+//
+// The log's table is chosen by what it is, among the table runs (contiguous
+// unfenced pipe lines) at or after its heading: the first whose header reads
+// `| Date | Version |`, else the first holding an entry row, else the first
+// headed `| Date |`. A run never starts before the heading, so a foreign table
+// written flush against it cannot be joined to the log's (CR-3), and a foreign
+// table above the heading is never a candidate, dated rows or not (CR-1). With
+// no candidate and a heading, the log has no table and starts at the heading
+// (CR-2); with neither, at the first run, else the end of the block. The
+// cycle-1 rule — a document-wide first entry row, then first `| Date |`, then
+// first pipe line — let a foreign table win, so its heading moved out and its
+// rows stayed in the log as history (task.230 QA cycle 1).
+//
+// Before the log's table, a foreign section runs from its heading to the next
+// foreign heading, the log's heading or the table, whichever comes first: a
+// DoD section above the heading and one between the heading and the table
+// (task.203) both leave, and an authoring note under the log's heading stays.
+// After the table, a foreign section runs to the end of the block.
+// `foreignSections` reads this partition, `upsertChangeLog` and
+// `liftForeignSections` apply it.
+function partitionForeign(lines, level, headingAt = -1) {
   const isSibling = ([l, prot]) => {
     if (prot) return false;
     const m = l.match(/^(#{1,6})[ \t]/);
     return !!m && m[1].length <= level && !RE_HEADING.test(l);
   };
-  const unfenced = (pred) => (i) => !lines[i][1] && pred(lines[i][0]);
-  const findFirst = (pred) => lines.findIndex((_, i) => unfenced(pred)(i));
+  const isTable = (i) => !lines[i][1] && isTableLine(lines[i][0]);
 
-  let logStart = findFirst(isEntryRow);
-  if (logStart !== -1) {
-    while (logStart > 0 && unfenced(isTableLine)(logStart - 1)) logStart--;
-  } else {
-    logStart = findFirst((l) => /^\s*\|\s*Date\s*\|/i.test(l));
-    if (logStart === -1) logStart = findFirst(isTableLine);
-    if (logStart === -1) logStart = lines.length;
+  const runs = [];
+  for (let i = Math.max(headingAt, 0); i < lines.length; i++) {
+    if (!isTable(i)) continue;
+    const start = i;
+    while (i + 1 < lines.length && isTable(i + 1)) i++;
+    runs.push({ start, end: i + 1 });
+  }
+  const header = (r) => lines[r.start][0];
+  // The two weaker signals count only before the first foreign heading at or
+  // after the log's heading: a dated table under `## DoD` is the DoD's, not a
+  // log whose rows the parser cannot read (CR-1, after side). Only the log's
+  // own header reaches past a foreign heading — the task.203 shape, a DoD
+  // section between the heading and the table.
+  const next = lines.findIndex(
+    (p, i) => i >= Math.max(headingAt, 0) && isSibling(p),
+  );
+  const unclaimed = runs.filter((r) => next === -1 || r.start < next);
+  const pick =
+    runs.find((r) => /^\s*\|\s*Date\s*\|\s*Version\s*\|/i.test(header(r))) ??
+    unclaimed.find((r) =>
+      lines.slice(r.start, r.end).some(([l]) => isEntryRow(l)),
+    ) ??
+    unclaimed.find((r) => /^\s*\|\s*Date\s*\|/i.test(header(r)));
+  let logStart;
+  if (pick) logStart = pick.start;
+  else if (headingAt !== -1) logStart = headingAt;
+  else logStart = runs.length ? runs[0].start : lines.length;
+
+  // One entry per foreign heading, through the same predicate.
+  const own = [];
+  const beforeForeign = [];
+  const sections = [];
+  let inForeign = false;
+  for (let i = 0; i < logStart; i++) {
+    if (i === headingAt) inForeign = false;
+    if (isSibling(lines[i])) {
+      // A second foreign run, after own lines, starts on a fresh paragraph.
+      const last = beforeForeign[beforeForeign.length - 1];
+      if (!inForeign && last && last[0].trim()) beforeForeign.push(["", false]);
+      inForeign = true;
+      sections.push({ side: "before", heading: lines[i][0], lines: [] });
+    }
+    if (inForeign) {
+      beforeForeign.push(lines[i]);
+      sections[sections.length - 1].lines.push(lines[i][0]);
+    } else {
+      own.push(lines[i]);
+    }
   }
 
-  const sb = lines.slice(0, logStart).findIndex(isSibling);
-  const beforeEnd = sb === -1 ? logStart : sb;
   const sa = lines.slice(logStart).findIndex(isSibling);
   const afterStart = sa === -1 ? lines.length : logStart + sa;
-
-  // One entry per foreign heading, through the same predicate: a side that is
-  // non-empty starts at a foreign heading by construction.
-  const sections = [];
-  const group = (pairs, side) => {
-    for (const pair of pairs) {
-      if (isSibling(pair)) sections.push({ side, heading: pair[0], lines: [] });
-      sections[sections.length - 1].lines.push(pair[0]);
+  own.push(...lines.slice(logStart, afterStart));
+  for (const pair of lines.slice(afterStart)) {
+    if (isSibling(pair)) {
+      sections.push({ side: "after", heading: pair[0], lines: [] });
     }
-  };
-  group(lines.slice(beforeEnd, logStart), "before");
-  group(lines.slice(afterStart), "after");
+    sections[sections.length - 1].lines.push(pair[0]);
+  }
 
   return {
-    own: [...lines.slice(0, beforeEnd), ...lines.slice(logStart, afterStart)],
-    beforeForeign: lines.slice(beforeEnd, logStart),
+    own,
+    beforeForeign,
     afterForeign: lines.slice(afterStart),
     sections,
   };
@@ -681,15 +732,6 @@ const ANCHORS = {
 // The write path
 // ---------------------------------------------------------------------------
 
-/**
- * Append an entry to the document's Change Log, creating the section if absent.
- *
- * @param {string} content            full document text
- * @param {object} entry              { date, version?, description, author }
- * @param {object} [opts]
- * @param {string} [opts.docType]     story | task | epic | prd — picks the anchor
- * @returns {string}                  the updated document
- */
 // Rebuild the located section — the one assembly path for a write
 // (`upsertChangeLog`, with a row) and a repair (`liftForeignSections`, with
 // `newRow === null`), so the two cannot drift.
@@ -805,6 +847,15 @@ function rebuildChangeLog(content, found, newRow, docType) {
   );
 }
 
+/**
+ * Append an entry to the document's Change Log, creating the section if absent.
+ *
+ * @param {string} content            full document text
+ * @param {object} entry              { date, version?, description, author }
+ * @param {object} [opts]
+ * @param {string} [opts.docType]     story | task | epic | prd — picks the anchor
+ * @returns {string}                  the updated document
+ */
 function upsertChangeLog(content, entry, { docType = "" } = {}) {
   const newRow = fmtEntry(entry);
   const found = findChangeLog(content);
