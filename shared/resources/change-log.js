@@ -80,6 +80,15 @@ const RE_HEADING =
 const RE_ENTRY_ROW = /^\|\s*\d{4}-\d{2}-\d{2}(?:\s+\d{2}:\d{2})?\s*\|/;
 
 const isEntryRow = (line) => RE_ENTRY_ROW.test(line);
+// A change-log table's header names Date and one of these, in any order — the
+// canonical four columns and the `| Version | Date | Change | Author |` layout.
+const LOG_HEADER_CELLS = new Set([
+  "version",
+  "description",
+  "change",
+  "changes",
+  "author",
+]);
 
 // A table data row the parser does not recognise — not an entry row, not a separator, not a
 // header. The writer PRESERVES these (a `| Version | Date | … |` log has one in every row), so any
@@ -435,20 +444,29 @@ function splitCarriedLines(content, found) {
 // Change Log heading already removed; `headingAt` is where that heading stood
 // (-1 when the block has none).
 //
-// The log's table is chosen by what it is, among the table runs (contiguous
-// unfenced pipe lines) at or after its heading: the first whose header reads
-// `| Date | Version |`, else the first holding an entry row, else the first
-// headed `| Date |`. A run never starts before the heading, so a foreign table
-// written flush against it cannot be joined to the log's (CR-3), and a foreign
-// table above the heading is never a candidate, dated rows or not (CR-1). With
-// no candidate and a heading, the log has no table and starts at the heading
-// (CR-2); with neither, at the first run, else the end of the block. The
-// cycle-1 rule — a document-wide first entry row, then first `| Date |`, then
-// first pipe line — let a foreign table win, so its heading moved out and its
-// rows stayed in the log as history (task.230 QA cycle 1).
+// The log's table is one of the table runs (contiguous unfenced pipe lines) at
+// or after its heading. A run never starts before the heading, so a foreign
+// table above it, or written flush against it, is never a candidate (QA cycle
+// 1, CR-1 and CR-3). Position decides first, then shape:
+//
+//   - With a heading, the first run in the log's own section (before the next
+//     foreign heading) is the log's, whatever its header (CR2-2). Only when
+//     that section holds no table does the search look past a foreign heading,
+//     for a log-shaped run (a header naming Date and one of
+//     `LOG_HEADER_CELLS`, in any order), else one holding an entry row: the
+//     task.203 shape, a DoD section between the heading and the table (CR2-1).
+//     With none, the log has no table and starts at the heading (CR-2).
+//   - With no heading inside the block (the obs #104 heading-above-marker
+//     shape), a log-shaped run anywhere, else an own-section run holding an
+//     entry row, else the first own-section run; a non-log table under a
+//     foreign heading is never taken (CR2-3). With none, the end of the block.
+//
+// A document-wide first match (the cycle-1 rule) and then a header test that
+// reached past foreign headings (the cycle-2 rule) each let a foreign table
+// win: its heading moved out and its rows stayed in the log as history.
 //
 // Before the log's table, a foreign section runs from its heading to the next
-// foreign heading, the log's heading or the table, whichever comes first: a
+// foreign heading, a Change Log heading or the table, whichever comes first: a
 // DoD section above the heading and one between the heading and the table
 // (task.203) both leave, and an authoring note under the log's heading stays.
 // After the table, a foreign section runs to the end of the block.
@@ -469,26 +487,31 @@ function partitionForeign(lines, level, headingAt = -1) {
     while (i + 1 < lines.length && isTable(i + 1)) i++;
     runs.push({ start, end: i + 1 });
   }
-  const header = (r) => lines[r.start][0];
-  // The two weaker signals count only before the first foreign heading at or
-  // after the log's heading: a dated table under `## DoD` is the DoD's, not a
-  // log whose rows the parser cannot read (CR-1, after side). Only the log's
-  // own header reaches past a foreign heading — the task.203 shape, a DoD
-  // section between the heading and the table.
+  // A run before the first foreign heading at or after the log's heading sits
+  // in the log's own section; one after it sits under a foreign heading.
   const next = lines.findIndex(
     (p, i) => i >= Math.max(headingAt, 0) && isSibling(p),
   );
-  const unclaimed = runs.filter((r) => next === -1 || r.start < next);
+  const ownRuns = runs.filter((r) => next === -1 || r.start < next);
+  const cells = (r) =>
+    lines[r.start][0]
+      .split("|")
+      .map((c) => c.trim().toLowerCase())
+      .filter(Boolean);
+  const logShaped = (r) => {
+    const c = cells(r);
+    return c.includes("date") && c.some((x) => LOG_HEADER_CELLS.has(x));
+  };
+  const hasEntry = (r) =>
+    lines.slice(r.start, r.end).some(([l]) => isEntryRow(l));
   const pick =
-    runs.find((r) => /^\s*\|\s*Date\s*\|\s*Version\s*\|/i.test(header(r))) ??
-    unclaimed.find((r) =>
-      lines.slice(r.start, r.end).some(([l]) => isEntryRow(l)),
-    ) ??
-    unclaimed.find((r) => /^\s*\|\s*Date\s*\|/i.test(header(r)));
+    headingAt !== -1
+      ? (ownRuns[0] ?? runs.find(logShaped) ?? runs.find(hasEntry))
+      : (runs.find(logShaped) ?? ownRuns.find(hasEntry) ?? ownRuns[0]);
   let logStart;
   if (pick) logStart = pick.start;
   else if (headingAt !== -1) logStart = headingAt;
-  else logStart = runs.length ? runs[0].start : lines.length;
+  else logStart = lines.length;
 
   // One entry per foreign heading, through the same predicate.
   const own = [];
@@ -496,7 +519,14 @@ function partitionForeign(lines, level, headingAt = -1) {
   const sections = [];
   let inForeign = false;
   for (let i = 0; i < logStart; i++) {
+    // Any Change Log heading ends a foreign run; a repeated one is dropped
+    // here, so the first write converges instead of lifting it above the
+    // marker for the next write's obs #104 absorb (QA cycle 2, CR2-4).
     if (i === headingAt) inForeign = false;
+    if (!lines[i][1] && RE_HEADING.test(lines[i][0])) {
+      inForeign = false;
+      continue;
+    }
     if (isSibling(lines[i])) {
       // A second foreign run, after own lines, starts on a fresh paragraph.
       const last = beforeForeign[beforeForeign.length - 1];

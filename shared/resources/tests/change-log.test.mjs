@@ -2883,3 +2883,192 @@ test("K16 properties hold on the cycle-1 shapes: one definition, idempotent, a m
     );
   }
 });
+
+// --- task.230 QA cycle 2: the log's own section decides --------------------
+// Any table under the log's heading, before the next foreign heading, is the
+// log's. Only when that section holds none does the search look past a foreign
+// heading, and then only for a log-shaped table: a header naming Date and one
+// of Version, Description, Change or Author, else entry rows. A block with no
+// heading inside takes no table that sits under a foreign heading unless it is
+// log-shaped.
+
+const K_VD_LOG = [
+  "| Version | Date | Change | Author |",
+  "|---|---|---|---|",
+  "| 1.0 | 2026-01-01 | first | me |",
+];
+const K_C2_CASES = {
+  "CR2-1 a Version|Date log behind a DoD section": kDoc([
+    "## Change Log",
+    "",
+    "## DoD",
+    "",
+    "done",
+    "",
+    ...K_VD_LOG,
+  ]),
+  "CR2-2 a Date|Description log above a Release Matrix with Date|Version": kDoc(
+    [
+      "## Change Log",
+      "",
+      "| Date | Description | Author |",
+      "|---|---|---|",
+      "| 2026-01-01 | first | me |",
+      "",
+      "## Release Matrix",
+      "",
+      "| Date | Version | Platform |",
+      "|---|---|---|",
+      "| 2026-02-01 | 2.0 | ios |",
+    ],
+  ),
+  "CR2-3 a headingless block whose DoD table comes first": kDoc(
+    [
+      "## Definition of Done",
+      "",
+      "| Check | Result |",
+      "|---|---|",
+      "| tests | pass |",
+      "",
+      ...K_VD_LOG,
+    ],
+    [...K_HEAD, "## Change Log", ""],
+  ),
+};
+
+test("K17 a Version|Date log behind a DoD section stays in the log", () => {
+  const doc = K_C2_CASES["CR2-1 a Version|Date log behind a DoD section"];
+  for (const out of [
+    CL.upsertChangeLog(doc, K_ENTRY, { docType: "task" }),
+    CL.liftForeignSections(doc).content,
+  ]) {
+    assert.ok(kBlock(out).includes(K_VD_LOG[2]), "log row left the markers");
+    assert.ok(!kBlock(out).includes("## DoD"), "DoD left in the block");
+    assert.ok(out.indexOf("## DoD") < out.indexOf(CL.CL_START));
+    assert.deepEqual(CL.foreignSections(out), []);
+  }
+});
+
+test("K18 a foreign Date|Version table never beats a table under the log's heading", () => {
+  const doc =
+    K_C2_CASES[
+      "CR2-2 a Date|Description log above a Release Matrix with Date|Version"
+    ];
+  assert.deepEqual(
+    CL.foreignSections(doc).map(({ side, heading }) => ({ side, heading })),
+    [{ side: "after", heading: "## Release Matrix" }],
+  );
+  const { content } = CL.liftForeignSections(doc);
+  assert.ok(!kBlock(content).includes("| 2026-02-01 | 2.0 | ios |"));
+  assert.ok(kBlock(content).includes("| 2026-01-01 | first | me |"));
+  assert.ok(
+    content.indexOf("| 2026-02-01 | 2.0 | ios |") > content.indexOf(CL.CL_END),
+  );
+});
+
+test("K19 a headingless block: the DoD keeps its table, the log keeps its own", () => {
+  const doc =
+    K_C2_CASES["CR2-3 a headingless block whose DoD table comes first"];
+  assert.deepEqual(
+    CL.foreignSections(doc).map(({ side, heading }) => ({ side, heading })),
+    [{ side: "before", heading: "## Definition of Done" }],
+  );
+  const { content } = CL.liftForeignSections(doc);
+  assert.ok(
+    !kBlock(content).includes("| tests | pass |"),
+    "DoD row in the log",
+  );
+  assert.ok(content.indexOf("| tests | pass |") < content.indexOf(CL.CL_START));
+  assert.ok(kBlock(content).includes(K_VD_LOG[2]), "log row left the markers");
+});
+
+test("K20 a doubled Change Log heading converges on the first write", () => {
+  const doc = kDoc([
+    "## Change Log",
+    "",
+    "## DoD",
+    "",
+    "done",
+    "",
+    "## Change Log",
+    "",
+    ...K_TABLE,
+  ]);
+  const out = CL.upsertChangeLog(doc, K_ENTRY, { docType: "task" });
+  assert.ok(!kBlock(out).includes("## DoD"));
+  assert.equal(
+    out.split("\n").filter((l) => /^#{1,6}\s+Change Log\s*$/.test(l)).length,
+    1,
+    "one Change Log heading after the write",
+  );
+  assert.deepEqual(CL.extractEntries(out), [K_TABLE[2], K_ROW]);
+  const twice = CL.upsertChangeLog(out, K_ENTRY_2, { docType: "task" });
+  assert.equal(twice, out.replace(`${K_ROW}\n`, `${K_ROW}\n${K_ROW_2}\n`));
+});
+
+test("K21 properties hold on the cycle-2 shapes: one definition, idempotent, a move", () => {
+  for (const [name, doc] of Object.entries(K_C2_CASES)) {
+    const out = CL.upsertChangeLog(doc, K_ENTRY, { docType: "task" });
+    assert.deepEqual(
+      CL.foreignSections(out),
+      [],
+      `${name}: foreign after write`,
+    );
+    // The writer renders the log's header in the canonical form (as the base
+    // engine does), so the log's own header and separator are compared out;
+    // every other line, the DoD's table included, must survive.
+    const without = (lines, drop) => {
+      const rest = [...lines];
+      for (const d of drop) rest.splice(rest.indexOf(d), 1);
+      return rest;
+    };
+    // The log's own header row (Version|Date or Date|Description; the CR2-2
+    // foreign table is Date|Version, so it does not match) and its separator,
+    // the row below it.
+    const blockLines = kBlock(doc).split("\n");
+    const at = blockLines.findIndex((l) =>
+      /^\|\s*(Version\s*\|\s*Date|Date\s*\|\s*Description)\s*\|/.test(l),
+    );
+    assert.ok(at !== -1, `${name}: log header not found`);
+    assert.deepEqual(
+      without(kNonBlank(out), [K_TABLE[0], K_TABLE[1]]),
+      [
+        ...without(kNonBlank(doc), [blockLines[at], blockLines[at + 1]]),
+        K_ROW,
+      ].sort(),
+      name,
+    );
+    const twice = CL.upsertChangeLog(out, K_ENTRY_2, { docType: "task" });
+    assert.equal(
+      twice,
+      out.replace(`${K_ROW}\n`, `${K_ROW}\n${K_ROW_2}\n`),
+      name,
+    );
+  }
+});
+
+test("K22 position beats shape: a table under the log's heading wins over a log-shaped one under a foreign heading", () => {
+  const doc = kDoc([
+    "## Change Log",
+    "",
+    "| Rev | When | What |",
+    "|---|---|---|",
+    "| r1 | Jan | first |",
+    "",
+    "## Audit",
+    "",
+    "| Date | Author |",
+    "|---|---|",
+    "| 2026-02-02 | auditor |",
+  ]);
+  assert.deepEqual(
+    CL.foreignSections(doc).map(({ side, heading }) => ({ side, heading })),
+    [{ side: "after", heading: "## Audit" }],
+  );
+  const { content } = CL.liftForeignSections(doc);
+  assert.ok(kBlock(content).includes("| r1 | Jan | first |"));
+  assert.ok(!kBlock(content).includes("| 2026-02-02 | auditor |"));
+  assert.ok(
+    content.indexOf("| 2026-02-02 | auditor |") > content.indexOf(CL.CL_END),
+  );
+});

@@ -500,24 +500,27 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-22
-**Quality Score**: 60/100
-**Gate Decision**: FAIL
+**Quality Score**: 70/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.230.qa.1.change-log-block-foreign-sections.md](./task.230.qa.1.change-log-block-foreign-sections.md)
-- **Gate File**: [task.230.gate.1.change-log-block-foreign-sections.yml](./task.230.gate.1.change-log-block-foreign-sections.yml)
+
+- **Full Report**: [task.230.qa.2.change-log-block-foreign-sections.md](./task.230.qa.2.change-log-block-foreign-sections.md)
+- **Gate File**: [task.230.gate.2.change-log-block-foreign-sections.yml](./task.230.gate.2.change-log-block-foreign-sections.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 6235
+
+- **Tests Executed**: 6240
 - **Phases Verified**: 4/4
-- **Critical Issues**: 1
+- **Critical Issues**: 0 high, 3 medium
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-The log-table start is a document-wide first match, so a foreign section's own dated or `| Date |` table is split, with its rows kept in the log (TASK-230-CR-1 high, TASK-230-CR-2 medium; CR-3 advisory, same root cause).
+
+Cycle 1's fixes hold. The cycle-2 refute pass found three more table-choice shapes in `partitionForeign` (CR2-1 to CR2-3, medium; CR2-1 is a regression for a `Version | Date` log behind a DoD section) and a doubled-heading convergence gap (CR2-4, low).
 <!-- change-log-start -->
 ## Change Log
 
@@ -529,6 +532,8 @@ The log-table start is a document-wide first match, so a foreign section's own d
 | 2026-10-22 |  | Implemented — 12 files, 13 tests (11 engine, 2 corpus guard) plus 1 placement assertion | develop |
 | 2026-10-22 |  | QA gate FAIL (60/100) — 2 findings (1 high, 1 medium) | qa-task |
 | 2026-10-22 |  | QA findings fixed — log table chosen at or after its heading (CR-1, CR-2, CR-3) + JSDoc; 5 new tests, 1 iteration | qa-fix |
+| 2026-10-22 |  | QA gate CONCERNS (70/100) — 4 findings (3 medium, 1 low) | qa-task |
+| 2026-10-22 |  | QA findings fixed — log table chosen from its own section first, log-shaped past a foreign heading (CR2-1, CR2-2, CR2-3) + doubled heading converges (CR2-4); 6 new tests, 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---
