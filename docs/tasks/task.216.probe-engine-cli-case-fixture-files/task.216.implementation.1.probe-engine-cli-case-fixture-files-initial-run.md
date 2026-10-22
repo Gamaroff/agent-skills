@@ -3,7 +3,7 @@
 **Task**: `task.216.probe-engine-cli-case-fixture-files.md`
 **Run Number**: 1
 **Started**: 2026-10-22 04:45
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -34,10 +34,10 @@ Make the `cli:` probe arm write a case's `fixture.files` and merge `fixture.env`
 | 1. create-branch           | ✅ Done | Branch `feature/task.216.*` exists in git                             | Branch created at `77300ab0` | —                    | 2026-10-22T04:44Z |
 | 2. review-task             | ✅ Done | `task.216.review.{N}.{name}.md` exists (or skip logged)               | READY TO IMPLEMENT 8/10; draft → ready-for-development | —                    | 2026-10-22T04:48Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | 1 iteration; ci:fast 6201/0 fail; 8 new tests, 5 mutants red | .summaries/step-3-iteration-audit-1.json | 2026-10-22T06:11Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.216.qa.{N}.*.md`; `task.216.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.216.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #726: https://github.com/Gamaroff/agent-skills/pull/726 | — | 2026-10-22T06:14Z |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.216.qa.{N}.*.md`; `task.216.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 3 cycles: gate.1 PASS (1 LOW, fixed), gate.2 CONCERNS (fixed), gate.3 PASS 95 (1 LOW carried, route 2b); 5c APPROVE | —                    | 2026-10-22T06:50Z |
+| 7. finalise                | ✅ Done | `task.216.dod.{N}.*.md`; task `status: accepted`                      | ACCEPTED; dod.1; security probe 26 executed, 0 escaped; CI reading 2 SUCCESS (tree-equivalent) | —                    | 2026-10-22T06:58Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | Implementation report committed and pushed | —                    | 2026-10-22T06:58Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -81,6 +81,23 @@ Make the `cli:` probe arm write a case's `fixture.files` and merge `fixture.env`
 - Fast gate iter 1: `npm run ci:fast` → TEST_EXIT=0 (6201 tests, 0 fail, 14 skipped).
 - Loop audit iter 1: status ready-for-review → exit loop. Development completion comment posted to github issue 696.
 
+### Step 4 — create-pr
+
+- SCOPE_PATHS: work-item dir, CHANGELOG.md, shared/resources, shared/resources/tests, skills/{finalise,qa-story,qa-task,review-security}/references. Pre-flight held nothing.
+- Commit `0f3d2c99` (scoped); pushed. Leak check OK.
+- PR created: https://github.com/Gamaroff/agent-skills/pull/726 (base develop). PR body written in-session from the diff rather than by the summariser subagent (full context already held).
+- Post-PR state check: PR #726 state = OPEN, mergeable. errors = 0 (checked with `gh pr view`, not the poller subagent).
+- Issue #696: in-review comment posted. GitHub board: in-review → stage-disabled (no `pipeline.in-review` moment configured).
+
+### Step 7 — finalise — 2026-10-22
+
+- DoD agents (4, parallel): success criteria PASS 3/3; security PASS; compliance NOT_APPLICABLE; docs PASS.
+- Probe plan run by /finalise: 2 controls (cli-needs-data.mjs and .py), 42 cases each; 26 executed, 0 reproduced, 0 escaped, 0 refusals. The agent's two case lists differed only in four prose fields, so one list was used for both entries.
+- DoD security evidence (`task.216.dod.1.security.*`) was committed with the acceptance commit, following the QA cycles' convention of tracking run records.
+- CI reading 1: SUCCESS @ 481f08431103 (5/5 checks); CI reading 2: SUCCESS (tree-equivalent to 481f08431103) @ d8bc42ca69ca.
+- Acceptance commit `d8bc42ca` (registry ticked; 5c review carried); pushed; 6b assertions OK; 6d CHANGELOG cites task 216.
+- Canonical PR comment posted. Issue #696: done comment posted, closed (verified CLOSED), board `done` → transitioned. Document link already durable (no re-point needed).
+
 ---
 
 ## Issues Log
@@ -93,14 +110,49 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-10-22
+**Gate Result**: PASS
+**Issues Found**: 1 LOW — TASK-216-QA1-1: the new docs recommend input `.` for a legitimate `cli:` case without the filename-sink caveat (declined EISDIR under `--sink filename`)
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 1 of 5)
+**Fixes Applied**: filename-sink caveat added to probe-boundary-rule.md §5 and finalise-dod-security-prompt.md Step 4 (doc probe population 2, both updated); bundled. Fast gate 6201/0 fail. changes-requested: stage-disabled. PR state after push: OPEN.
+**Commit**: `458d79e3`
+
+### QA Cycle 2 — 2026-10-22
+**Gate Result**: CONCERNS
+**Issues Found**: 2 — TASK-216-QA2-1 (MEDIUM): docs overclaim cli: fixture reach to "a repository"; TASK-216-QA2-2 (LOW): loader variables missing from CLI_INTERPRETER_ENV. Cycle 1's QA1-1 fixed.
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 2 of 5)
+**Fixes Applied**: QA2-1 cli: fixture reach scoped to data directories in 6 places (doc probe: 4 stale phrases → 0 hits); QA2-2 loader variables added to CLI_INTERPRETER_ENV with an LD_PRELOAD decline test (mutation: 2 red); CR-5 comments. Fast gate 6201/0 fail. PR state after push: OPEN.
+**Commit**: `596d262d`
+
+### QA Cycle 3 — 2026-10-22
+**Gate Result**: PASS
+**Issues Found**: 1 — TASK-216-QA3-1 (LOW): docs say LD_*/DYLD_* are refused; the code matches four exact names (LD_AUDIT passes). Cycle 2's QA2-1 and QA2-2 fixed.
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: ✅ APPROVE — 0 conformance findings (code lens skipped, --no-code); report task.216.pr-review.1.probe-engine-cli-case-fixture-files.md; ready-for-merge: stage-disabled
+**Loop exit**: Cosmetic-residue exit taken — PASS gate at cycle 3 with HIGH 0 for cycles 2 and 3; all 1 open findings are LOW and are carried to the gate's recommendations.future by id (TASK-216-QA3-1). This is a CLEAN exit, not a stall: nothing is blocked and nothing is being accepted over; a full qa-fix cycle for cosmetic findings is what this route exists to avoid.
+**Action**: Proceeding to 5c (PR conformance review)
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-10-22T06:58Z
+**Final Status**: Completed
 **Branch**: feature/task.216.probe-engine-cli-case-fixture-files
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/726
+**QA Iterations**: 3
+**DoD Summary**: `task.216.dod.1.probe-engine-cli-case-fixture-files.md` — ACCEPTED
+**Tracker debt**: none
+
+### Completion Summary
+
+Implemented `fixture.files` and `fixture.env` support on the security-probe engine's `cli:` form, reusing the `shell-argv:` helpers. A malformed fixture is declined by name before any spawn. QA took 3 cycles: cycle 1 added a filename-sink caveat; cycle 2, a full-diff refute pass, scoped out repository state and refused the loader variables; cycle 3 passed at 95 with one LOW carried to Deferred Work (TASK-216-QA3-1: the loader refusal matches exact names, not the `LD_*`/`DYLD_*` prefix). Accepted after a measured DoD probe run (26 executed, 0 escaped).
