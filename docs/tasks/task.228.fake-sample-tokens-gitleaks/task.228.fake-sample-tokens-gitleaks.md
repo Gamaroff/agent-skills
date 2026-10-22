@@ -333,6 +333,27 @@ clean.
 
 **Deferred Work.** None in scope. The pre-commit hook pins gitleaks v8.21.2 (`.pre-commit-config.yaml`), and this task calibrated on 8.30.1. Aligning the versions belongs with task.229's scan lane.
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-22
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.228.qa.1.fake-sample-tokens-gitleaks.md](./task.228.qa.1.fake-sample-tokens-gitleaks.md)
+- **Gate File**: [task.228.gate.1.fake-sample-tokens-gitleaks.yml](./task.228.gate.1.fake-sample-tokens-gitleaks.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 6201 (6187 pass, 0 fail, 14 skipped)
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No critical issues identified. Redacted gitleaks scans of each changed file, the task directory, the commit messages and the PR body all exit 0. One advisory cleanup (CR-1: the placeholder is not a decodable JWT if copied verbatim). The full-tree scan runs at finalise.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -342,6 +363,7 @@ clean.
 | 2026-10-22 | 1.1     | Review 9/10 after fixes — ready to build: reworded the document's own quotations of the two prose lines (they tripped gitleaks), named the commit/PR-text check, added `npm run lint:shell`, recorded the gitleaks version | review-task |
 | 2026-10-22 |         | Status → ready-for-development | review-task |
 | 2026-10-22 |         | Implemented — 4 files (guide samples, 2 prose rewords, CHANGELOG); tracked tree scans clean | develop |
+| 2026-10-22 |         | QA gate PASS (100/100) — 0 blocking findings, 1 advisory cleanup | qa-task |
 <!-- change-log-end -->
 
 ---

@@ -1,0 +1,52 @@
+schema: 2
+task: 'task.228.fake-sample-tokens-gitleaks'
+task_title: 'Replace the sample tokens gitleaks flags in tracked files'
+gate: PASS
+status_reason: 'Every changed file, the task directory, the commit messages and the PR body scan clean under gitleaks 8.30.1 (redacted, calibrated). npm test, bundle:check, lint:shell, validate and bash -n all pass. The one code-review finding is an advisory low cleanup.'
+reviewer: 'QA Engineer'
+head: 'bab9ad6b79139fce71a6b0b298ef93b6ba779476'
+updated: '2026-10-22T16:51:54Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 6201
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'Text-only change; no boundary added (boundary: false). Redacted gitleaks scans of each changed file, the task directory, commit messages and PR body exit 0; a known-bad stdin probe exits 1 (calibrated). No matched value appears in any artefact.'
+  performance:
+    status: PASS
+    notes: 'Not applicable: text-only change.'
+  reliability:
+    status: PASS
+    notes: 'bash -n and lint:shell pass on scripts/setup-consumer.sh (comment-only edit). No behaviour change.'
+  maintainability:
+    status: PASS
+    notes: 'Examples keep their structure and quote style; CHANGELOG entry under [Unreleased] Fixed cites task 228.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 (advisory): the placeholder is not a decodable JWT, so an example copied verbatim would fail at decodeToken. Consider an inline note at both sites to substitute a real unsigned test token.'
+      refs: ['skills/test-co-location-enforcer/references/testing-framework-guide.md']
+    - action: 'Run the final full-tree scan after finalise writes its artefacts (success criterion 2).'
+      refs: ['docs/tasks/task.228.fake-sample-tokens-gitleaks/task.228.fake-sample-tokens-gitleaks.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
