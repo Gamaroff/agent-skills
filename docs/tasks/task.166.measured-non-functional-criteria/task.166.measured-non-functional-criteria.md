@@ -8,7 +8,7 @@ category: infrastructure
 status: accepted
 priority: Medium
 created: 2026-09-28
-updated: 2026-10-02
+updated: 2026-10-22
 assignee:
 estimated_effort_hours: 6
 github_issue: 510
@@ -330,7 +330,7 @@ None identified.
 ### Key Findings
 
 No review-vs-finalise disagreement across every criterion shape probed. Four low, advisory findings are named in the gate's recommendations for a follow-up.
-<!-- change-log-start -->
+
 ## Definition of Done - PASSED ✅
 
 **Status:** ACCEPTED
@@ -354,7 +354,7 @@ All Definition of Done criteria have been verified:
 **Task marked as ACCEPTED on:** 2026-10-02
 
 **Detailed Verification Log:** See `task.166.dod.1.measured-non-functional-criteria.md` for complete verification evidence and timestamps.
-
+<!-- change-log-start -->
 ## Change Log
 
 | Date | Version | Description | Author |
@@ -373,7 +373,7 @@ All Definition of Done criteria have been verified:
 | 2026-10-02 |         | QA gate PASS (100/100) — 0 gating findings, 4 advisory (gate-the-last-fix half-cycle) | qa-task |
 | 2026-10-02 |         | Files Summary: add `tests/lib/count-of-kinds.js` (PR review 1, PC-3) | develop-task |
 | 2026-10-02 | 1.3 | DoD passed — accepted (PR #550) | finalise |
-
+| 2026-10-22 |  | Change-log block repaired — DoD section moved above the markers (task.230) | develop-task |
 <!-- change-log-end -->
 
 ---
