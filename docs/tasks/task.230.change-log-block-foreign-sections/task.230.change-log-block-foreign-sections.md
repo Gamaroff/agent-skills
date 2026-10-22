@@ -508,19 +508,19 @@ None.
 
 ### QA Report
 
-- **Full Report**: [task.230.qa.2.change-log-block-foreign-sections.md](./task.230.qa.2.change-log-block-foreign-sections.md)
-- **Gate File**: [task.230.gate.2.change-log-block-foreign-sections.yml](./task.230.gate.2.change-log-block-foreign-sections.yml)
+- **Full Report**: [task.230.qa.3.change-log-block-foreign-sections.md](./task.230.qa.3.change-log-block-foreign-sections.md)
+- **Gate File**: [task.230.gate.3.change-log-block-foreign-sections.yml](./task.230.gate.3.change-log-block-foreign-sections.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 6240
+- **Tests Executed**: 6246
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 high, 3 medium
+- **Critical Issues**: 0 high, 2 medium
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
 
-Cycle 1's fixes hold. The cycle-2 refute pass found three more table-choice shapes in `partitionForeign` (CR2-1 to CR2-3, medium; CR2-1 is a regression for a `Version | Date` log behind a DoD section) and a doubled-heading convergence gap (CR2-4, low).
+Cycle 2's fixes hold. The log-shaped test is too loose: a header with Date plus Author alone qualifies, so a sign-off table can still be taken as the log (CR3-1, CR3-2, medium). A deeper `### Change Log` heading is dropped by the repeat-heading rule (CR3-4, low).
 <!-- change-log-start -->
 ## Change Log
 
@@ -534,6 +534,8 @@ Cycle 1's fixes hold. The cycle-2 refute pass found three more table-choice shap
 | 2026-10-22 |  | QA findings fixed — log table chosen at or after its heading (CR-1, CR-2, CR-3) + JSDoc; 5 new tests, 1 iteration | qa-fix |
 | 2026-10-22 |  | QA gate CONCERNS (70/100) — 4 findings (3 medium, 1 low) | qa-task |
 | 2026-10-22 |  | QA findings fixed — log table chosen from its own section first, log-shaped past a foreign heading (CR2-1, CR2-2, CR2-3) + doubled heading converges (CR2-4); 6 new tests, 1 iteration | qa-fix |
+| 2026-10-22 |  | QA gate CONCERNS (70/100) — 3 findings (2 medium, 1 low) | qa-task |
+| 2026-10-22 |  | QA findings fixed — Date plus Author no longer log-shaped, own-section log-like runs judged first, repeat-heading drop limited to the log level (CR3-1, CR3-2, CR3-4; CR3-3 too); 5 new tests, 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

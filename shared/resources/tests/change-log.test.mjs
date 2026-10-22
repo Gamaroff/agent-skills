@@ -3072,3 +3072,123 @@ test("K22 position beats shape: a table under the log's heading wins over a log-
     content.indexOf("| 2026-02-02 | auditor |") > content.indexOf(CL.CL_END),
   );
 });
+
+// --- task.230 QA cycle 3: a sign-off table is not a log ----------------------
+// Log-shaped means Date plus Version, Description or Change(s): Date plus
+// Author alone is a sign-off table's header too. A table under the log's own
+// heading wins when it looks like a log (log-shaped or dated rows); a
+// log-shaped table past a foreign heading beats an own-section table that
+// does not; only then does the first own-section table win.
+
+const K_SIGNOFF = [
+  "| Date | Reviewer | Author | Result |",
+  "|---|---|---|---|",
+  "| 2026-05-05 | qa | dev | PASS |",
+];
+
+test("K23 a Date/Author sign-off table under a DoD is the DoD's, not the log", () => {
+  const doc = kDoc([
+    "## Change Log",
+    "",
+    "## Definition of Done - PASSED",
+    "",
+    ...K_SIGNOFF,
+    "",
+    ...K_TABLE,
+  ]);
+  for (const out of [
+    CL.upsertChangeLog(doc, K_ENTRY, { docType: "task" }),
+    CL.liftForeignSections(doc).content,
+  ]) {
+    assert.ok(!kBlock(out).includes(K_SIGNOFF[2]), "sign-off row in the log");
+    assert.ok(out.indexOf(K_SIGNOFF[2]) < out.indexOf(CL.CL_START));
+    assert.ok(kBlock(out).includes(K_TABLE[2]), "log row left the log");
+    assert.deepEqual(CL.foreignSections(out), []);
+  }
+});
+
+test("K24 a headingless block: an own-section dated log beats a foreign sign-off table", () => {
+  const doc = kDoc(
+    [
+      "| When | Version | What | Who |",
+      "|---|---|---|---|",
+      "| 2026-01-01 | 1 | a | me |",
+      "",
+      "## QA Sign-off",
+      "",
+      "| Date | Author | Verdict |",
+      "|---|---|---|",
+      "| 2026-02-02 | qa | PASS |",
+    ],
+    [...K_HEAD, "## Change Log", ""],
+  );
+  assert.deepEqual(
+    CL.foreignSections(doc).map(({ side, heading }) => ({ side, heading })),
+    [{ side: "after", heading: "## QA Sign-off" }],
+  );
+  const { content } = CL.liftForeignSections(doc);
+  assert.ok(!kBlock(content).includes("| 2026-02-02 | qa | PASS |"));
+  assert.ok(kBlock(content).includes("| 2026-01-01 | 1 | a | me |"));
+});
+
+test("K25 a legend under the heading does not beat a dated log past a foreign heading", () => {
+  const doc = kDoc([
+    "## Change Log",
+    "",
+    "| Key | Meaning |",
+    "|---|---|",
+    "| v | version |",
+    "",
+    "## DoD",
+    "",
+    "done",
+    "",
+    ...K_TABLE,
+  ]);
+  const { content } = CL.liftForeignSections(doc);
+  assert.ok(kBlock(content).includes(K_TABLE[2]), "log row left the log");
+  assert.ok(kBlock(content).includes("| v | version |"), "legend left the log");
+  assert.ok(!kBlock(content).includes("## DoD"));
+  assert.deepEqual(CL.extractEntries(content), [K_TABLE[2]]);
+});
+
+test("K26 a deeper ### Change Log heading is kept, not dropped as a repeat", () => {
+  const doc = kDoc([
+    "## Change Log",
+    "",
+    "### Change Log",
+    "",
+    "nested note",
+    "",
+    ...K_TABLE,
+  ]);
+  const out = CL.upsertChangeLog(doc, K_ENTRY, { docType: "task" });
+  assert.ok(out.includes("### Change Log"), "deeper heading dropped");
+  assert.deepEqual(kNonBlank(out), [...kNonBlank(doc), K_ROW].sort());
+});
+
+test("K27 an own-section dated log beats a log-shaped foreign table, with or without a heading", () => {
+  const inner = [
+    "| When | Notes |",
+    "|---|---|",
+    "| 2026-01-01 | first |",
+    "",
+    "## Release Matrix",
+    "",
+    "| Date | Version | Platform |",
+    "|---|---|---|",
+    "| 2026-02-01 | 2.0 | ios |",
+  ];
+  for (const doc of [
+    kDoc(["## Change Log", "", ...inner]),
+    kDoc(inner, [...K_HEAD, "## Change Log", ""]),
+  ]) {
+    assert.deepEqual(
+      CL.foreignSections(doc).map(({ side, heading }) => ({ side, heading })),
+      [{ side: "after", heading: "## Release Matrix" }],
+    );
+    const { content } = CL.liftForeignSections(doc);
+    assert.ok(kBlock(content).includes("| 2026-01-01 | first |"));
+    assert.ok(!kBlock(content).includes("| 2026-02-01 | 2.0 | ios |"));
+  }
+});

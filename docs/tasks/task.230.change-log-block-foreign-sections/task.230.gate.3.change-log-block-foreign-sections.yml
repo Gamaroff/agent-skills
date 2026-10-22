@@ -1,0 +1,75 @@
+schema: 2
+task: 'task.230.change-log-block-foreign-sections'
+task_title: 'Keep foreign sections out of the change-log block'
+gate: CONCERNS
+status_reason: 'Cycle 2 fixes hold (the four cycle-2 guards are mutation-proven), but the scoped cycle-3 review found two more table-choice shapes where a foreign sign-off table headed Date plus Author is taken as the log (CR3-1, CR3-2, medium; CR3-2 is a regression against the cycle-2 head) and a deeper "### Change Log" heading dropped by the repeat-heading rule (CR3-4, low). All reproduced and new to this change.'
+reviewer: 'QA Engineer'
+head: '49f25478aa9831cd1e0044b8ffec52d8f50e5866'
+updated: '2026-10-22T22:33:55Z'
+
+top_issues:
+  - id: 'TASK-230-CR3-1'
+    severity: medium
+    file: 'shared/resources/change-log.js'
+    finding: 'With a heading and no table in the log''s own section, runs.find(logShaped) takes the first run whose header has Date plus any one LOG_HEADER_CELLS entry, so a DoD sign-off table headed "| Date | Reviewer | Author | Result |" becomes the log: its row "| 2026-05-05 | qa | dev | PASS |" is written as history and the DoD heading is lifted bare (reproduced).'
+    suggested_action: 'Rank candidates rather than take the first log-shaped run: prefer a header naming Date and Version or Description, so Date plus Author alone no longer qualifies; add a K-test with a Date/Author sign-off table under the DoD section.'
+    suggested_owner: dev
+  - id: 'TASK-230-CR3-2'
+    severity: medium
+    file: 'shared/resources/change-log.js'
+    finding: 'In a headingless block, a log-shaped table under a foreign heading beats an own-section table that holds entry rows: an own "| When | Version | What | Who |" log loses to a "## QA Sign-off" table headed "| Date | Author | Verdict |", whose PASS row is written as history (reproduced; the cycle-2 head 2b36cf52 chose the own-section run).'
+    suggested_action: 'In the headingless branch, consider own-section runs (log-shaped, then entry rows) before any run under a foreign heading.'
+    suggested_owner: dev
+  - id: 'TASK-230-CR3-4'
+    severity: low
+    file: 'shared/resources/change-log.js'
+    finding: 'The repeated-heading drop matches a Change Log heading at any level, so a deeper "### Change Log" subsection under an H2 log loses its heading line on the first write (reproduced), against the module rule that a machine write never deletes human text.'
+    suggested_action: 'Drop only a repeated Change Log heading at the log''s own level; keep a deeper one as a nested heading.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 6246
+  phases_verified: 4/4
+  ci: 'not read — CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: internal — shared/resources/change-log.js#foreignSections reads only work-item documents this repository''s pipeline writes; no corpus sink models a change-log block. No external input, no shell, no network.'
+  performance:
+    status: PASS
+    notes: 'Corpus guard 0.744 s wall (load 1.78) on the PR head, against a 5 s bound.'
+  reliability:
+    status: CONCERNS
+    notes: 'A Date-plus-Author sign-off table under a foreign heading can still be taken as the log (CR3-1, CR3-2); a deeper Change Log heading is dropped (CR3-4).'
+  maintainability:
+    status: PASS
+    notes: 'One partition, one header-cell list, the rule stated once in partitionForeign''s header comment.'
+
+recommendations:
+  immediate:
+    - action: 'Tighten log-shaped to Date plus Version or Description, look at own-section runs before foreign ones in the headingless branch, and limit the repeat-heading drop to the log''s own level (CR3-1, CR3-2, CR3-4).'
+      refs: ['shared/resources/change-log.js']
+  future:
+    - action: 'CR3-3 (medium, confidence medium, advisory): a non-log table first in the log''s own section beats a canonical log past a foreign heading; consider requiring the own-section run to be log-shaped or dated before it wins.'
+      refs: ['shared/resources/change-log.js']
+    - action: 'CR3-5 (low, confidence medium, advisory): a Change Log heading inside an after-side foreign run is lifted below the end marker; state the asymmetry or apply the same boundary on the after side.'
+      refs: ['shared/resources/change-log.js']
+    - action: 'Tick the section 9 Success Criteria boxes from evidence (finalise will verify them).'
+      refs: ['docs/tasks/task.230.change-log-block-foreign-sections/task.230.change-log-block-foreign-sections.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR3-1 and CR3-2 fixed and covered by tests']

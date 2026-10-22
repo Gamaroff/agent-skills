@@ -82,12 +82,13 @@ const RE_ENTRY_ROW = /^\|\s*\d{4}-\d{2}-\d{2}(?:\s+\d{2}:\d{2})?\s*\|/;
 const isEntryRow = (line) => RE_ENTRY_ROW.test(line);
 // A change-log table's header names Date and one of these, in any order — the
 // canonical four columns and the `| Version | Date | Change | Author |` layout.
+// Author is not one: Date plus Author is a sign-off table's header too (QA
+// cycle 3, CR3-1).
 const LOG_HEADER_CELLS = new Set([
   "version",
   "description",
   "change",
   "changes",
-  "author",
 ]);
 
 // A table data row the parser does not recognise — not an entry row, not a separator, not a
@@ -447,28 +448,32 @@ function splitCarriedLines(content, found) {
 // The log's table is one of the table runs (contiguous unfenced pipe lines) at
 // or after its heading. A run never starts before the heading, so a foreign
 // table above it, or written flush against it, is never a candidate (QA cycle
-// 1, CR-1 and CR-3). Position decides first, then shape:
+// 1, CR-1 and CR-3). A run in the log's own section — before the first
+// foreign heading at or after the heading — is judged before any past one:
 //
-//   - With a heading, the first run in the log's own section (before the next
-//     foreign heading) is the log's, whatever its header (CR2-2). Only when
-//     that section holds no table does the search look past a foreign heading,
-//     for a log-shaped run (a header naming Date and one of
-//     `LOG_HEADER_CELLS`, in any order), else one holding an entry row: the
-//     task.203 shape, a DoD section between the heading and the table (CR2-1).
-//     With none, the log has no table and starts at the heading (CR-2).
-//   - With no heading inside the block (the obs #104 heading-above-marker
-//     shape), a log-shaped run anywhere, else an own-section run holding an
-//     entry row, else the first own-section run; a non-log table under a
-//     foreign heading is never taken (CR2-3). With none, the end of the block.
+//   1. the first own-section run that looks like a log: log-shaped (a header
+//      naming Date and one of `LOG_HEADER_CELLS`, in any order) or holding an
+//      entry row;
+//   2. else the first log-shaped run anywhere — the task.203 shape, a DoD
+//      section between the heading and the table (CR2-1), and a legend under
+//      the heading that is not the log (CR3-3);
+//   3. else the first own-section run, whatever its header (CR2-2, K22);
+//   4. else, with a heading, a run past a foreign heading holding an entry row.
 //
-// A document-wide first match (the cycle-1 rule) and then a header test that
-// reached past foreign headings (the cycle-2 rule) each let a foreign table
-// win: its heading moved out and its rows stayed in the log as history.
+// With no candidate the log has no table and starts at the heading (CR-2), or
+// at the end of a block with no heading inside it (the obs #104 shape). A
+// table under a foreign heading that is neither log-shaped nor dated is never
+// taken, and a dated one only by rule 4 (CR2-3, CR3-2). Each
+// earlier rule — a document-wide first match (cycle 1), a header test reaching
+// past foreign headings (cycle 2), Date plus Author counted as log-shaped
+// (cycle 3) — let a foreign table win: its heading moved out and its rows
+// stayed in the log as history.
 //
 // Before the log's table, a foreign section runs from its heading to the next
-// foreign heading, a Change Log heading or the table, whichever comes first: a
-// DoD section above the heading and one between the heading and the table
-// (task.203) both leave, and an authoring note under the log's heading stays.
+// foreign heading, a Change Log heading at the log's level or the table,
+// whichever comes first: a DoD section above the heading and one between the
+// heading and the table (task.203) both leave, and an authoring note under the
+// log's heading stays.
 // After the table, a foreign section runs to the end of the block.
 // `foreignSections` reads this partition, `upsertChangeLog` and
 // `liftForeignSections` apply it.
@@ -504,10 +509,12 @@ function partitionForeign(lines, level, headingAt = -1) {
   };
   const hasEntry = (r) =>
     lines.slice(r.start, r.end).some(([l]) => isEntryRow(l));
+  const logLike = (r) => logShaped(r) || hasEntry(r);
   const pick =
-    headingAt !== -1
-      ? (ownRuns[0] ?? runs.find(logShaped) ?? runs.find(hasEntry))
-      : (runs.find(logShaped) ?? ownRuns.find(hasEntry) ?? ownRuns[0]);
+    ownRuns.find(logLike) ??
+    runs.find(logShaped) ??
+    ownRuns[0] ??
+    (headingAt !== -1 ? runs.find(hasEntry) : undefined);
   let logStart;
   if (pick) logStart = pick.start;
   else if (headingAt !== -1) logStart = headingAt;
@@ -519,11 +526,18 @@ function partitionForeign(lines, level, headingAt = -1) {
   const sections = [];
   let inForeign = false;
   for (let i = 0; i < logStart; i++) {
-    // Any Change Log heading ends a foreign run; a repeated one is dropped
-    // here, so the first write converges instead of lifting it above the
-    // marker for the next write's obs #104 absorb (QA cycle 2, CR2-4).
+    // A Change Log heading at the log's own level ends a foreign run, and as
+    // a repeat it is dropped, so the first write converges instead of lifting
+    // it above the marker for the next write's obs #104 absorb (QA cycle 2,
+    // CR2-4). A deeper one is a nested heading and stays (QA cycle 3, CR3-4).
     if (i === headingAt) inForeign = false;
-    if (!lines[i][1] && RE_HEADING.test(lines[i][0])) {
+    const depth = (lines[i][0].match(/^(#{1,6})[ \t]/) || [, ""])[1].length;
+    if (
+      !lines[i][1] &&
+      RE_HEADING.test(lines[i][0]) &&
+      depth &&
+      depth <= level
+    ) {
       inForeign = false;
       continue;
     }
