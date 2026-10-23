@@ -4,6 +4,34 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **Migrate one PRD at a time: `migrate-doc-numbering.mjs --prd <path-to-prd-doc>`.** The flag
+  can be repeated. Until now the migration was all-or-nothing. It planned every legacy PRD, its
+  post-check failed on any legacy document left behind, it retired the epic registry while
+  unmigrated epics still needed it, and stories in other PRDs could block it. With `--prd`, only
+  the named PRDs and their epics, stories and artifacts move. Links and path literals anywhere in
+  the repository that point into a moved PRD are still re-pointed. Blockers and the post-check
+  consider only the moved set, plus duplicate ids across every numbered document, so a scoped
+  `--apply` ends `ok` with other legacy PRDs untouched. `--check --prd` reports only the named
+  PRDs. The epic registry keeps the rows of epics still legacy, moves migrated rows to a
+  "Migrated epics" table (old id → new id, PRD), and is retired only by the run that moves the
+  last legacy epic. PRD numbers still come from the PRD registry, so a PRD created with
+  `create-prd` between scoped runs is never collided with. **Consumers can now upgrade before
+  migrating, then move one PRD at a time**, for example as `review-prd` reviews each one
+  (`MIG_PRD` scopes its migration offer). Without `--prd` the whole-tree behaviour is unchanged.
+  The epic registry reader also accepts an `Epic Number` header. With that header the historical
+  mapping used to come out empty.
+
+### Fixed
+
+- **`/finalise` 6d no longer halts a repository that has no `CHANGELOG.md`.** The CHANGELOG
+  citation check read the file unconditionally, so in a consumer repository without one, every
+  task stopped at `no-changelog-entry`. With no `CHANGELOG.md` the step now prints
+  `6d: no CHANGELOG.md — not applicable` and continues. A `CHANGELOG.md` that exists but does
+  not cite the task still halts. `finalise-publish-boundary.test.mjs` runs the shipped block
+  against both cases.
+
 ## [v0.59.2] - 2026-10-23
 
 ### Fixed

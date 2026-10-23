@@ -25,7 +25,7 @@ number needs no global counter, so nothing allocates one.
 | The epics of one PRD | that PRD's generated `<!-- epics-index -->` block |
 | Every epic, and any id defect across the tree | `doc-id.js check --corpus` |
 | A PRD number | the [PRD registry](./prd-registry.md) |
-| An old epic number's new id | the historical mapping that `migrate-doc-numbering.mjs` (task 203) leaves in a project's `docs/development/epic-registry.md` |
+| An old epic number's new id | the historical mapping that `migrate-doc-numbering.mjs` (task 203) leaves in a project's `docs/development/epic-registry.md` — or, while an incremental `--prd` migration is under way, that registry's "Migrated epics" table; the registry is retired by the run that moves the last legacy epic |
 
 ## See also
 

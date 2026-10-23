@@ -925,6 +925,42 @@ test("gate-7 CR-1: migrating a root-level docs/prd.md leaves every other PRD's t
   );
 });
 
+test("MIG_PRD scopes the plan and the apply to one PRD: the other legacy PRD stays, unblocking and unmoved", () => {
+  const beta =
+    "---\nname: prd.beta\n---\n# Beta\n\nSee [Alpha](../alpha/prd.alpha.md).\n";
+  const root = tree({
+    "docs/prd/alpha/prd.alpha.md": "---\nname: prd.alpha\n---\n# Alpha\n",
+    "docs/prd/beta/prd.beta.md": beta,
+    // An in-flight story under B: it blocks the whole tree, never a run scoped to A.
+    "docs/prd/beta/epics/epic.2.two/epic.2.two.md":
+      "---\nepic_number: 2\n---\n",
+    "docs/prd/beta/epics/epic.2.two/stories/story.2.1.s/story.2.1.s.md":
+      "---\nid: story.2.1.s\nstatus: in-progress\nepic: 2\n---\n",
+  });
+  writeFileSync(path.join(root, ".gitignore"), ".agents/\n");
+  gitInit(root);
+  const whole = run(MIG_PLAN(), root);
+  assert.match(whole.out, /✖ blocker in-flight: docs\/prd\/beta\//);
+  const env = { MIG_PRD: "docs/prd/alpha/prd.alpha.md" };
+  const plan = run(MIG_PLAN(), root, env);
+  assert.doesNotMatch(plan.out, /blocker/, plan.out);
+  assert.match(plan.out, /prd prd\.alpha → 1 /);
+  assert.doesNotMatch(plan.out, /prd\.beta →/);
+  const a = run(MIG_APPLY(), root, env);
+  assert.equal(a.code, 0, a.out);
+  assert.match(a.out, /migration: ok/);
+  assert.ok(existsSync(path.join(root, prdPath(1, "alpha"))), "A moved");
+  assert.ok(
+    existsSync(path.join(root, "docs/prd/beta/epics/epic.2.two/epic.2.two.md")),
+    "B stayed",
+  );
+  assert.match(
+    readFileSync(path.join(root, "docs/prd/beta/prd.beta.md"), "utf8"),
+    /\(\.\.\/alpha\/prd\.1\.alpha\/prd\.1\.alpha\.md\)/,
+    "B's link into A is re-pointed",
+  );
+});
+
 test("gate-7 CR-3: a legacy PRD above the root that links out of the working tree stops the review", () => {
   const outside = mkdtempSync(path.join(os.tmpdir(), "prd-204-outside-"));
   writeFileSync(path.join(outside, "victim.md"), "# not ours\n");

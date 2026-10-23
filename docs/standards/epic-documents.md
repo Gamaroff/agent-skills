@@ -26,7 +26,7 @@ docs/prd/
 by a deleted epic is never refilled, but no registry or counter allocates `E`, so deleting the
 highest-numbered epic frees its number again.
 
-> **Adopted (2026-10-16, tasks 202–207).** Every skill writes and reads this scheme through `doc-id.js` (tasks 204–206), and two CI tests hold it (task 207): `doc-numbering-corpus.test.mjs` fails on any unnumbered, mismatched, unregistered or duplicate document under the PRD root, and `doc-id-chokepoint.test.js` fails on an id parsed anywhere but `doc-id.js`. A legacy flat-numbered tree is migrated with `migrate-doc-numbering.mjs`; `doc-id.js parseLegacy` reads the old shapes only for that migration.
+> **Adopted (2026-10-16, tasks 202–207).** Every skill writes and reads this scheme through `doc-id.js` (tasks 204–206), and two CI tests hold it (task 207): `doc-numbering-corpus.test.mjs` fails on any unnumbered, mismatched, unregistered or duplicate document under the PRD root, and `doc-id-chokepoint.test.js` fails on an id parsed anywhere but `doc-id.js`. A legacy flat-numbered tree is migrated with `migrate-doc-numbering.mjs` — whole, or incrementally one PRD at a time with `--prd <path-to-prd-doc>` (repeatable), so a project can upgrade before it migrates; `doc-id.js parseLegacy` reads the old shapes only for that migration.
 
 
 ## File naming
