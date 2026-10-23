@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.59.2] - 2026-10-23
+
+### Fixed
+
+- **A task registry headed `Task Number` now parses.** `select-next.mjs` read a header's id column
+  only under `#`, `no`, `num`, `number` or `id`. A consumer registry headed
+  `| Task Number | Title | … | File |` failed the header match, fell back to fixed column
+  positions, and every row was rejected for want of a `[title](task….md)` link. `registry-tick.js`
+  then ticked nothing on `/finalise`, and `/develop-next` saw no task rows. `task number` is now an
+  id alias in the selector and in `doc-id.js`'s mirror of its list. Tests in `select-next.test.mjs`
+  and `registry-tick.test.mjs` cover the header shape and fail without the alias.
+
 ## [v0.59.1] - 2026-10-23
 
 ### Changed
