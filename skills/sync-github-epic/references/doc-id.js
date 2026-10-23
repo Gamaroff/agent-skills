@@ -1048,7 +1048,7 @@ function argValue(argv, flag) {
 function resolvePrdRoot(argv = [], cwd = process.cwd()) {
   const flag = argValue(argv, "--prd-root");
   if (flag) return flag;
-  let text = "";
+  let text;
   try {
     text = fs.readFileSync(path.join(cwd, "skills-config.yaml"), "utf8");
   } catch {
