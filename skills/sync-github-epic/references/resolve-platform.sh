@@ -18,7 +18,7 @@
 #   ACCESS_VCS     — full                        (only `full` is supported today; see below)
 #
 # Identity and access are separate axes. Knowing the tracker is Jira is what lets a restricted run
-# still emit "move RAPP-605 to In Review" with the right URL and field names, so `manual` is a
+# still emit "move PROJ-605 to In Review" with the right URL and field names, so `manual` is a
 # value of `access.tracker`, never of `tracker`.
 #
 # Resolver order for identity (per shared/resources/platform-detection.md):

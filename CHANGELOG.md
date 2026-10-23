@@ -4,6 +4,285 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.59.0] - 2026-10-23
+
+### Added
+
+- **A `Secret scan` CI lane and its local twin, `npm run lint:secrets` (task 229).** A new
+  workflow, `.github/workflows/secret-scan.yml`, runs a pinned gitleaks (8.30.1) on every PR and
+  every push to `main`/`develop`, over the tracked files, the commit messages of the PR or push,
+  and the PR body. A secret-shaped string fails the build, reported by file, line and rule, never
+  by value. `scripts/lint-secrets.sh` is the one definition of the file set; the workflow calls it,
+  and `npm run ci` runs it, skipping loudly when `gitleaks` is not installed. Before scanning, the
+  script plants a token generated at runtime and fails if the scanner misses three of them, so a green result
+  is never the scanner's silence. Every call pins gitleaks' default rules (`--config`) and an empty
+  ignore list, so a `.gitleaks.toml` or `.gitleaksignore` added to quiet one finding cannot switch a
+  scan off by accident; gitleaks' own path allowlist (lockfiles, vendored `node_modules/`, images)
+  still applies. The lane guards against accidents, not a deliberate bypass: a PR runs its own copy
+  of the workflow and the script. History is not scanned. The lane is not yet a release gate:
+  `scripts/release-ci-verdict.mjs` lists it under a new `WORKFLOWS.notGating` until it has a green
+  record. `evals/shared/tests/lint-secrets.test.mjs` holds the script's exit paths with a stub
+  scanner.
+- **security-probe: a `cli:` case carries `fixture.files` and `fixture.env` (task 216).** The
+  `cli:` form (Node and Python) now writes a case's `fixture.files` into its case directory, the
+  CLI's cwd, and merges `fixture.env` before the spawn, as `shell-argv:` already did. A CLI that
+  refuses on what it finds in a data directory can now have a legitimate case
+  that is accepted, where before every input ended in a refusal and the verdict read
+  `rejects-every-input`. The refusals are `shell-argv:`'s (a path leaving the case directory,
+  `HOME`/`TMPDIR`/`LC_ALL`, an `expected.absent` name the files create), each declined by name,
+  plus `PATH`, `NODE_OPTIONS` and any `LD_*` or `DYLD_*` dynamic-loader variable, which steer
+  the interpreter rather than the CLI. Repository state (a commit, a staged
+  index) is not reachable this way: fixture files are text, and `--fixture-setup` stays
+  `shell-argv:`'s. A `cli:` case
+  with no `fixture` runs as before; one that carried `fixture` had it silently ignored and now has
+  it honoured.
+- **loop-supervisor: an engine registry and `--engine` / `--model` / `--effort` (task 213).**
+  `skills/loop-supervisor/references/engines.js` holds one table row per engine: how to build its
+  argv, parse its result line, and what it supports. `run-loop.mjs` reads the row and has no
+  per-engine branches. `claude` stays the default and its argv is unchanged. `agy` (Antigravity)
+  is the second row. `--model` and `--effort` pass through to the engine, and the new config
+  keys `loopSupervisor.engine`, `.model` and `.effort` fill them when the flag is absent. A flag
+  the selected engine cannot honour is refused before anything is spawned, not silently ignored:
+  `--max-turns` and `--max-cost` exit 1 on `agy`, and `--dangerously-skip-permissions` exits 1 on
+  `claude`. On `agy` that flag is operator-only, never read from config. A non-`SUCCESS` agy result
+  classifies the iteration as an error.
+- **`registry-tick.js --bug-status` (task 219).** Sets a general bug's row in
+  `docs/bugs/bug-registry.md` to the bug file's status, in the registry's own vocabulary (the
+  lifecycle token, or the emoji labels when most rows use them). develop-bug Steps 3, 5–6 and 7 and
+  `/qa-fix` call it at every status change, so the row no longer goes stale after a reopen; qa-fix
+  now also writes the bug's frontmatter `status:`, which the call reads. A new drift test,
+  `evals/shared/tests/bug-registry-drift.test.mjs`, fails CI when a bug file and its row disagree.
+  The default mode still answers `not-a-task` for a bug, so `finalise --bug` is unchanged.
+- **No consumer names in shipped skills (task 220).** A new guard,
+  `tests/no-consumer-names.test.js`, fails CI when any tracked file under `skills/` or `shared/` —
+  bundled `references/` copies included — names the consumer project the library was first built
+  against, in a file's contents or its path. Provenance notes now say "a consumer project", and
+  example keys, hosts and board ids use `PROJ`, `acme.atlassian.net` and `12`. The Jira-board
+  replay fixtures under `shared/resources/tests/fixtures/` are renamed to a `proj-` prefix. The
+  older task.201 guard keeps its scanner and its exemption list is now empty.
+- **One resolver for a card's document-link branch (task 200).**
+  `shared/resources/doc-link-branch.js` decides the branch every tracker card's document link
+  points at: an explicit branch, then config (Jira), then the current branch's upstream **only
+  when it names the document's own work item**, then the default. A story's epic integration
+  branch counts only under the configured `branching.epicIntegration.branchPattern` prefix, and a
+  bug's hotfix branch only as `hotfix/v<digit>…`, so `release/1.4.0` never names story 1.4.x. The eight `ensure-*-github-issue`
+  and `sync-github-*` skills and `create-epic`'s PRD link call it, and `jira-sync.js`
+  `resolveDocBranch` delegates to it. `tests/doc-link-branch-population.test.js` fails CI on a new
+  upstream (`@{u}` / `@{upstream}`) read anywhere in the skill sources outside the resolver, and on
+  a `blob/${…}` or `src/${…}` link whose branch is assigned anywhere without a resolver call.
+  `tests/doc-link-branch-sites-execute.test.js` runs each site's lines under bash, because a scan
+  of the text passed while a quote in the guard stopped all eight from parsing. It also fails a call
+  that reads a variable its own block never binds, which is how `sync-github-story` dropped the
+  caller's durable-branch pin.
+
+### Changed
+
+- **`change-log.js` lifts a foreign section out of the change-log markers instead of absorbing
+  it (task 230, obs #91).** Only the log lives between `<!-- change-log-start -->` and
+  `<!-- change-log-end -->`. A sibling section written there — a heading at or above the log's own
+  level that is not a Change Log heading, such as the QA loop's `## Deferred Work` or finalise's
+  `## Definition of Done - PASSED ✅` — used to be carried as prose inside the regenerated block on
+  every append, silently. `upsertChangeLog` now moves it out on the next write: above the start
+  marker when it sat before the table, below the end marker when it sat after, text and order
+  unchanged, a pipe table it holds included. **A document in that shape gets a larger diff on its
+  next write than the one row it earned.** Two new exports read and apply the one partition:
+  `foreignSections(content)` and `liftForeignSections(content)` (a repair with no row). A new
+  corpus guard, `evals/shared/tests/change-log-foreign-section-corpus.test.mjs`, fails on any
+  tracked document whose block holds one; task.166, 170, 175 and 203 were repaired. The QA loop's
+  Deferred Work placement rule now names the marker, in finalise 7.4's words.
+- **BREAKING — the PRD numbering migration carries the shapes `review-prd` used to refuse (task 211).**
+  `migrate-doc-numbering.mjs` now writes a frontmatter block for a PRD that has none (an unclosed
+  `---` is a new `unclosed-frontmatter` blocker, and a BOM or blank lines before a YAML block a
+  new `displaced-frontmatter` one), re-points links and paths to a moved `docs/prd.md` from files
+  outside the PRD root (a path, `${ROOT}/`-style variable-rooted ones included, in any in-scope text file but a
+  frozen example copy, that neither pass can rewrite is a new
+  `stale-reference` blocker), and accepts `--name <path>=<domain>/<slug>` to place a legacy PRD
+  under a domain directory; each segment is checked by the exported `parseNameValue`. A PRD that
+  would move to directly under the root (a root `index.md`, `prd.{feature}.md` or `prd.{feature}/`,
+  or a numbered root `prd.{P}.{feature}.md`) is a new `needs-domain` blocker until a legacy one is
+  named that way, or a numbered one is moved into a domain by hand — a bare
+  `--name docs/prd/index.md=<slug>` no longer plans. `review-prd`'s
+  `scripts/migration-guard.mjs` and its `no-frontmatter`, `outside-links` and `no-domain` refusals
+  are removed; the plan block now asks for `<domain>/<slug>` on `needs-domain`.
+- **`develop-bug` opens its tracker issue only after `review-bug` says READY TO FIX (task 200).**
+  The issue create, the card move and the `work-started` comment moved from Step 1 to a new Step
+  2b, and Step 1 no longer pushes the branch. A STALE, DUPLICATE or NEEDS DETAIL verdict now halts
+  with nothing outside the local checkout, naming the local branch and the review report; the halt
+  deletes nothing, and the terminal-HALT `blocked` signal skips it, even for a bug that already
+  has a Jira card. Step 2b records `tracker_issue` and a new `tracker_step: "opened"` on the lock
+  in one write, and the resume contract's § develop-bug Step 2b re-entry states the six resume
+  states. **Behaviour change:** a halted run leaves no tracker issue — key scripts on the READY TO
+  FIX verdict, not on "every run has an issue".
+- **A card created on an unrelated branch links to the default branch (task 200).** Before, a
+  card created while HEAD was another work item's feature branch linked to that branch and 404'd
+  once it was deleted (obs #287). The document's own branch, its parent's (a QA bug), its epic's
+  integration branch (a story) and a hotfix branch (a bug) still count. A bug's branch names that
+  bug alone, not its parent's own card or a sibling bug.
+- **`create-bug-report`: an affected-site grep must match the defective line (task 200),** not a
+  fallback or comment that correct files also carry, and the report records the command.
+
+### Removed
+
+- **BREAKING — the wireframe skill no longer ships a format profile (task 220).**
+  `skills/wireframe/references/html-formats/` held a single profile, for one consumer's hi-fi
+  phone screens, and `SKILL.md`'s profile table linked it. Both are gone, with the two tests that
+  held the directory to account. The skill's conversion rules are unchanged. Step 2 of "Working
+  from an existing UI" now says a format belongs to a project: a project that converts one format
+  repeatedly keeps its profile in its own repository, outside `.agents/skills/`, and names it in
+  its own agent instructions. **Migration:** a consumer that used the profile copies it out of
+  `.agents/skills/wireframe/references/html-formats/` into its own tree **before** running
+  `setup-consumer.sh --update`, which removes it; it is also recoverable from this repository's
+  history.
+
+### Fixed
+
+- **test-co-location-enforcer: the testing guide's sample tokens no longer trip a secret scan
+  (task 228).** The two `const token = …` examples in
+  `references/testing-framework-guide.md` now use `<header>.<payload>.<signature>`, so a project
+  that vendors the skill passes `gitleaks` without a path allowlist for that file. Two prose
+  lines that gitleaks misread as key assignments (`scripts/setup-consumer.sh`, a task.60 review)
+  are reworded. Text only; no behaviour changes.
+- **security-probe: a `cli:` case refuses every `LD_*` and `DYLD_*` variable (task 226).** A
+  `cli:` case's `fixture.env` declined four loader variables by exact name, so `LD_AUDIT`,
+  `DYLD_FRAMEWORK_PATH`, `DYLD_FALLBACK_LIBRARY_PATH` and the rest reached the interpreter. It now
+  declines any key that starts `LD_` or `DYLD_`, by name and before anything spawns, which is what
+  the task 216 entry and the DoD security prompt already said. A name that only contains the prefix
+  (`MY_LD_FLAG`) still runs. A case that set such a variable is now declined; drop it, or use
+  `shell-argv:` if it really must be set.
+- **loop-supervisor: a missing probe script says so (task 224).** When no `select-next.mjs` exists
+  under `.agents/skills/`, `.claude/skills/` or `skills/`, the `develop-next` / `develop-batch` probe
+  now stops with `probe script not found: …`, listing the paths searched, instead of "probe produced
+  no output" and a symlink hint that did not apply. A configured `probeScript` that Node cannot
+  resolve is reported by its configured path; an extensionless name or a directory Node would run
+  counts as present. The check runs before the spawn (`probeMissing` in
+  `adapters.js`). The adapter table's default probe path is now one constant,
+  `DEFAULT_PROBE_SCRIPT`.
+
+- **loop-supervisor finds `select-next.mjs` wherever the skills are installed (task 214).** The
+  `develop-next` and `develop-batch` adapters defaulted `probeScript` to
+  `skills/develop-next/scripts/select-next.mjs`, a path that exists only in this repository. In a
+  consumer repo the first probe failed with "probe produced no output" until an override was
+  written. The default is now the first of `.agents/skills/`, `.claude/skills/` and `skills/` that
+  holds the selector under the project root, falling back to `skills/…` when none does. A
+  configured `loopSupervisor.adapters.<name>.probeScript` still wins and is never searched.
+
+- **finalise gap body refuses an empty section (task 223).** `dod-gap-count.sh --body` printed
+  its internal `S` marker as the body of a `## Definition of Done - Gaps Identified` section with
+  no non-blank line, and exited 0. It now HALTs with the reason on stderr and nothing on stdout,
+  as count mode does for a gaps report with no gap, so Step 8.5 can no longer post `S` as a gap
+  report whatever order its two helper calls run in.
+- **finalise gaps path: the true gap count, and the lock held at Step 7 (task 222).** The
+  `dod-gaps` lead counted every `- [ ]` in the gap section, Next Steps included, so it overstated
+  the gaps (task.213's two read "4 of them"). A new helper, `dod-gap-count.sh`, is the one
+  story/task count: the top-level list items under `### Missing Criteria` of the current section
+  (a retitled `— run N (historical, superseded)` one is not read), checkbox or `- ⚠️`. It HALTs on
+  a gap section with none, and its `--body` mode is what Step 8.5 posts, so the lead and the body
+  read one section. Fences are read as CommonMark reads them. `advance-pipeline-lock.sh --skill finalise` now needs `--dod <path>` and
+  advances to Step 8 only when that DoD reads `**Final Status:** ✅ ACCEPTED`; otherwise it holds
+  the lock, says why on stderr, and exits 0. The develop-* orchestrators and the Stop hook read Step 7's
+  outcome before any advance to 8, so a gaps halt now resumes at `/finalise` instead of reading Step 7
+  as done. finalise's lock cooperation passes `--dod`; reinstall the skills together
+  so an older finalise does not call the newer helper without it (it would hold at 7 until the
+  orchestrator's own advance).
+- **Migration engine: dot-directory references and displaced-block edits (task 221).**
+  `outsideReferences` in `migrate-doc-numbering.mjs` now compares a dot-directory path
+  (`.docs/prd.md`, `${ROOT}/.docs/prd.md`) at the repository root as well as at the file's own
+  directory, so `review-prd` reports a `stale-reference` for it; only a `./` or `../` token stays
+  relative to the file. A repository that names an outside move source this way now sees that
+  blocker, with the usual fix. `editFrontmatter` returns a displaced or unclosed block unchanged, as
+  its docstring says; the CLI already refused both, so its output does not change.
+- **Release runbook and setup wizard wording (task 218).** The release runbook's develop-sync
+  section opens with its condition, and its manual block and recoveries end on `main` as
+  `release.sh` does. The setup wizard's summary names the `*.handover.*.md` checklist
+  `/tracker-reconcile` ticks, and its section banners use the step numbers in getting-started.
+  restricted-access.md names the autonomous-run fallback for `approve`.
+- **The setup, configuration and process docs match the scripts (task 199).** 20 findings from the
+  2026-10-07 doc-drift audit are fixed or closed across 16 docs: getting-started, both quickstarts,
+  which-access, which-path, configuration, faq, glossary, six runbooks, and the architecture-example
+  and standards READMEs. One finding was closed as superseded by the PRD-numbering work.
+  - **Install wizard.** The docs follow the wizard as it runs today: the tracker-workflow and access
+    steps, `.secrets/tooling.env` for Bitbucket or Jira credentials, and two hooks.
+  - **Configuration.** All eight pipeline moments are listed, and VCS resolution no longer shows an
+    env-var step it does not have.
+  - **Release.** The runbook covers `release.sh`'s CI-verdict check and how to recover when the
+    Sync develop step stops.
+  - **Bugs.** A general bug's status writes are mirrored into the bug registry, and all four Jira
+    sync skills are named.
+  - **Wizard text.** In `setup-consumer.sh`, the Approve option and the end-of-run summary now say
+    that approve defers tracker writes to one batched confirmation at handover.
+
+- **The skill reference and discovery docs list what ships (task 198).** 27 findings from the
+  2026-10-07 doc-drift audit are fixed across 16 docs: commands, activation phrases and invocation,
+  the concepts architecture and overview, the operations workflows, five runbooks, the README, and
+  the develop-next, qa-next, review-story and review-task READMEs.
+  - **Missing flags and modes.** `/review-pr` takes a work item (Jira key or URL, `#N`, issue URL)
+    and `--effort`/`--inline`; `/review-code` takes a PR, a `base...head` range or `--staged`;
+    `/create-task --from-observation`; session-handoff's continue mode; wireframe from an existing
+    HTML screen; review-story's validate mode.
+  - **Skills that do not exist.** `document-project`, `simplify`, `qa-technical-task` and a shipped
+    `uat-automate` are gone from the docs.
+  - **Skills absent from the maps.** `qa-next`, `loop-supervisor`, `/develop-bug` dispatch, the
+    jira-sprint ceremony skills, `wireframe` and the `ensure-*` routines. Epic issues are ensured by
+    `create-story` and `review-story`, not `finalise`.
+
+- **The pipeline entry docs match how a run starts (task 197).** 16 findings from the 2026-10-07
+  doc-drift audit are fixed across 13 docs: architecture, quickstart-story, anti-patterns, glossary,
+  troubleshooting, five runbooks, story-documents, task-documents and the develop-task README.
+  - **Lite mode.** It is auto-detected and shortens QA only (direct-tools Step 5, `--effort low`
+    Step 5c). There is no `--lite` flag; `--mode lite|fast` (task 201) is named instead, and Step 7
+    still runs in full.
+  - **Phase 0.** It asks two questions, base and PR target, and only where `--base`, `--target` or
+    `--defaults` has not answered them.
+  - **Branches and invocation.** Story PRs target `develop` unless the epic opted in to an
+    integration branch. The standards invoke `/develop-story` and `/develop-task`, not `/develop`.
+    `depends_on` is informational. The parallel-story worktree commands use a scratch branch, so
+    they no longer fail with `invalid reference` and do not collide with the branch `/develop-story`
+    creates.
+
+- **The develop-pipeline docs match how the QA loop routes, resumes and commits (task 196).**
+  31 findings from the 2026-10-07 doc-drift audit are fixed across 15 docs: the concepts and
+  operations overviews, pipeline-artifacts, troubleshooting, the runbooks, task-documents, and the
+  develop-task, develop-story, develop-next, develop-batch and review-task READMEs.
+  - **QA-loop routing.** A gate with no open findings hands to Step 5c. The docs now cover the
+    Diminishing-returns, Cosmetic-residue and Gate-the-last-fix routes and use `QA_MAX_CYCLES`
+    instead of a literal 5.
+  - **Resume paths.** A not-converging grant re-enters at 5b. A `/finalise` DoD-gaps halt
+    followed by a committed code fix re-enters QA at 5a.
+  - **Artifacts and commit timing.** Review reports are numbered. The docs now cover `pr-review`
+    and `sprint-review-summary.md`, and say that QA reports, gates and the DoD are committed when
+    they are written, not at Step 8.
+  - **Merge gate and hooks.** The `develop-next`/`develop-batch` merge-gate wording is
+    corrected, and the `Stop` hook is listed.
+- **A QA gate no longer passes over probe escapes that `/finalise` halts on (obs #73).** The probe
+  run record now totals `escaped` beside `executed` and `reproduced`, and `--emit-block` prints it
+  for the whole record and for each control. `/qa-task` and `/qa-story` copy `totals.escaped` into
+  the gate as `nfr_validation.security.escaped`. A non-zero count is a `top_issues[]` finding,
+  never a future-work item and never a `PASS`: the same rule `/finalise` Step 3b.1 applies to the
+  same record. Before this, task 195's QA cycle 2 gated PASS over 10 escapes, and the DoD found
+  them after the full QA loop.
+- **The finding-anchors checker no longer has a state its callers misread (task 195).** Seven
+  advisory findings left by task 194 are closed. **A code finding whose `file_line` is not
+  `path:line`** — a bare path, a range, empty, a value that is not a string, or no `file_line` at
+  all — now reads `unparseable`, a new verdict in the malformed set (exit 1), instead of the clean
+  `no-line`. A `line_text` that is not a string is a `text-mismatch`; only an absent or blank
+  one leaves the text unchecked. The lens comes from the
+  wrapper (`code_review` or `pr_conformance`), or from the key in a bare array, so a conformance
+  `ref` such as `AC-3` stays `no-line`. **`--rev` with a `--root` missing
+  from that commit** exits 2 `bad-root` instead of reading every finding `no-such-file`. **`--index`**
+  (new) reads the staged content, so `/review-code --staged` is checked against the tree it reviewed;
+  it is a usage error together with `--rev`. **The four dispatcher blocks** (`/review-pr`,
+  `/review-code`, `/qa-task`, `/qa-story`) decide on the checker's JSON `reason`, never its exit
+  code — `node` also exits 1 when the script cannot load — and HALT as "checker not runnable" when
+  there is no reason at all. **Both `--inline` blocks** refuse a findings file with an un-annotated
+  finding (a missing or null `anchor_check`) instead of posting `[]`. The review-pr block and the
+  checker also refuse a file where any lens present has no findings array, which used to drop that
+  lens's findings silently. The review-pr block no longer leaves a scratch file in `$TMPDIR` when it
+  refuses. **The develop-bug verify loop** carries a blocking finding with a
+  malformed anchor as `(location unverified: {file_line})`, and the population guard now covers every
+  executed document that consumes code-review findings, not only the dispatchers.
+  **Consumer upgrade:** re-vendor (`setup-consumer.sh --update`). An external caller that branched on
+  `no-line` for code findings treats `unparseable` like `out-of-range`.
+
 ## [v0.58.0] - 2026-10-19
 
 ### Added

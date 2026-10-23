@@ -1,6 +1,6 @@
 ---
 name: review-pr
-description: 'Reviews a pull request as a claim — does this change deliver what its story or task promised, and is the evidence behind it real? Resolves the PR back to its work item (branch stem, pr_number, gate URL, tracker issue), collects the co-located pipeline artifacts (implementation report, review report, QA reports, gate, DoD, sprint-review, bugs, handover), pulls the linked GitHub issue or Jira card, then runs two read-only lenses over the PR diff: the shared adversarial code reviewer and a conformance reviewer checking coverage, scope, trail and consistency. Accepts a Jira key, Jira URL or GitHub issue and finds its PR. Works on GitHub and Bitbucket. Advisory — writes a co-located report and optionally posts one summary PR comment; never approves, never writes a gate, never edits code. Triggers: review this PR, review pull request 123, does this PR match the task, review the PR for RAPP-702, /review-pr.'
+description: 'Reviews a pull request as a claim — does this change deliver what its story or task promised, and is the evidence behind it real? Resolves the PR back to its work item (branch stem, pr_number, gate URL, tracker issue), collects the co-located pipeline artifacts (implementation report, review report, QA reports, gate, DoD, sprint-review, bugs, handover), pulls the linked GitHub issue or Jira card, then runs two read-only lenses over the PR diff: the shared adversarial code reviewer and a conformance reviewer checking coverage, scope, trail and consistency. Accepts a Jira key, Jira URL or GitHub issue and finds its PR. Works on GitHub and Bitbucket. Advisory — writes a co-located report and optionally posts one summary PR comment; never approves, never writes a gate, never edits code. Triggers: review this PR, review pull request 123, does this PR match the task, review the PR for PROJ-702, /review-pr.'
 ---
 
 > **Platform detection**: see [`references/platform-detection.md`](references/platform-detection.md) and [`references/resolve-platform.sh`](references/resolve-platform.sh)
@@ -37,7 +37,7 @@ Invoke as `/review-pr [target] [--effort LEVEL] [--comment] [--inline] [--no-cod
 
 | Arg | Values | Default | Meaning |
 | --- | --- | --- | --- |
-| `target` | _(none)_ \| `<PR-number>` \| `<PR-URL>` \| `<branch>` \| `<JIRA-KEY>` \| `<Jira-URL>` \| `#<issue>` \| `<GitHub-issue-URL>` | open PR for the current branch | Which PR to review. A Jira key (`RAPP-702`), a Jira `/browse/` URL, a Jira board URL carrying `?selectedIssue=`, a Jira Cloud `…/issues/KEY` URL, a GitHub issue URL or `#N` names the **work item**; Step 1a resolves it to its PR |
+| `target` | _(none)_ \| `<PR-number>` \| `<PR-URL>` \| `<branch>` \| `<JIRA-KEY>` \| `<Jira-URL>` \| `#<issue>` \| `<GitHub-issue-URL>` | open PR for the current branch | Which PR to review. A Jira key (`PROJ-702`), a Jira `/browse/` URL, a Jira board URL carrying `?selectedIssue=`, a Jira Cloud `…/issues/KEY` URL, a GitHub issue URL or `#N` names the **work item**; Step 1a resolves it to its PR |
 | `--effort` | `low` \| `medium` \| `high` \| `max` | `medium` | Breadth vs. precision, for **both** lenses |
 | `--comment` | flag | off | Post one summary comment to the PR |
 | `--inline` | flag | off | Additionally post each finding as an inline comment on its own line. Implies `--comment` |
@@ -202,11 +202,11 @@ printf 'KIND=%s PR=%s BRANCH=%s JIRA_KEY=%s ISSUE_NUM=%s TARGET_HOST=%s TARGET_R
 | `pr-for-current-branch` | no argument | Step 1b, PR for `$BRANCH` |
 | `pr` | a bare number; a GitHub `/pull/N`, Bitbucket web `/pull-requests/N` or API `/pullrequests/N` URL (`…/pull/12/files` is PR 12) | Step 1b |
 | `branch` | anything else that is not a URL | Step 1b |
-| `jira` | a bare key (`RAPP-702`), `/browse/KEY`, a board URL's `selectedIssue=KEY`, Jira Cloud `…/issues/KEY` | Step 1a |
+| `jira` | a bare key (`PROJ-702`), `/browse/KEY`, a board URL's `selectedIssue=KEY`, Jira Cloud `…/issues/KEY` | Step 1a |
 | `github-issue` | `#N`, a GitHub `/issues/N` URL | Step 1a |
 
 **The URL's host picks the platform before any path arm is tried.** Jira Cloud's issue view
-`…/projects/RAPP/issues/RAPP-702` contains `/issues/` and must not be read as a GitHub issue. The
+`…/projects/PROJ/issues/PROJ-702` contains `/issues/` and must not be read as a GitHub issue. The
 parser never decides a key's issue type — a story key and an epic key look alike — so an epic is
 caught after the document resolves (Step 1a, rung 1), not here.
 
@@ -241,7 +241,7 @@ A first-hit-wins ladder. Record the rung as `resolved_via` (`jira key → <rung>
 | 2 | doc's `pr_number:` | `sed -nE "s/^pr_number:[[:space:]]*['\"]?([0-9]+)['\"]?[[:space:]]*$/\1/p" "$DOC_FILE"` → `PR` |
 | 3 | **branch stem** | `STEM=$(basename "$DOC_FILE" .md)`; a PR whose source branch is `STEM` or ends in `/STEM` — the rungs 3–4 block below |
 | 4 | key / closing PR | Jira: a PR whose title or description names `JIRA_KEY` — **candidates only**. GitHub issue: `gh issue view "$ISSUE_NUM" --json closedByPullRequestsReferences` — **`VCS=github` only** |
-| 5 | branch fallback | `KIND=jira` and still nothing → `BRANCH="$JIRA_KEY"`, Step 1b; `resolved_via: jira key → branch fallback` (a branch may be named `RAPP-702`) |
+| 5 | branch fallback | `KIND=jira` and still nothing → `BRANCH="$JIRA_KEY"`, Step 1b; `resolved_via: jira key → branch fallback` (a branch may be named `PROJ-702`) |
 | 6 | none | **HALT** naming every rung tried: `"No pull request found for {target}: tried work item doc, pr_number, branch stem, key search, branch fallback."` |
 
 **Rung 1 — no doc, or an epic.** No document → skip rungs 2–3 and continue at rung 4; the review that
@@ -611,17 +611,26 @@ HEAD=$(bash .agents/skills/review-pr/scripts/resolve-head-rev.sh --vcs "$VCS" \
 HEAD_REV=$(printf '%s\n' "$HEAD" | sed -n 's/^rev=//p')
 HEAD_VIA=$(printf '%s\n' "$HEAD" | sed -n 's/^via=//p')
 printf 'HEAD_REV=%s HEAD_VIA=%s\n' "$HEAD_REV" "$HEAD_VIA"
-command node .agents/skills/review-pr/references/finding-anchors.js \
+# Decide on the checker's `reason`, never on its exit code: `node` also exits 1 when the script
+# cannot load, and that must not read as "malformed anchors — mark and continue" (task.195).
+CHECK_OUT=$(command node .agents/skills/review-pr/references/finding-anchors.js \
   --findings-file "$FINDINGS_JSON" --root "$(git rev-parse --show-toplevel)" \
-  --rev "$HEAD_REV" --annotate "$FINDINGS_JSON" --json
-# exit 1 = malformed anchors exist. NOT a halt: every finding now carries anchor_check — mark, continue.
-# exit 2 = the call is wrong: usage (the findings file), bad-root (--root is not a directory), or bad-rev
-#   (--rev names no commit here — fetch it).
-#   Fix the call; never render unchecked anchors as verified.
+  --rev "$HEAD_REV" --annotate "$FINDINGS_JSON" --json)
+REASON=$(printf '%s' "$CHECK_OUT" | jq -r '.reason // empty' 2>/dev/null)
+case "$REASON" in
+  ok|malformed-anchors)   # every finding now carries anchor_check — mark the malformed ones, continue
+    echo "finding-anchors: $REASON" ;;
+  bad-root|bad-rev|usage) # the call is wrong (the findings file, --root, or an unfetched --rev)
+    echo "HALT: finding-anchors refused the call ($REASON): $(printf '%s' "$CHECK_OUT" | jq -r '.message // empty')"
+    echo "  Fix the call; never render unchecked anchors as verified."; exit 1 ;;
+  *)                      # no JSON reason at all: the checker did not run
+    echo "HALT: finding-anchors checker not runnable (no JSON reason) — check .agents/skills/review-pr/references/finding-anchors.js; never render unchecked anchors as verified"; exit 1 ;;
+esac
 ```
 
 Every finding now carries `anchor_check`: `ok`, `unchecked-text` and `no-line` are clean;
-`no-such-file`, `out-of-range` and `text-mismatch` mean the reviewer named a line that is not the
+`no-such-file`, `out-of-range`, `text-mismatch` and `unparseable` (a code finding whose `file_line` is absent or is not
+`path:line`) mean the reviewer named a line that is not the
 line it meant. **A malformed anchor is never dropped.** It renders with `⚠️ unverified anchor`
 after its `ref`, keeps the reviewer's value in the machine-readable block with its `anchor_check`
 beside it, and is left out of `--inline` (Step 8), so it reaches the PR only through the summary
@@ -778,7 +787,7 @@ findings:
     severity: {low|medium|high}
     confidence: {low|medium|high}
     ref: {the same ref rendered after the em-dash, quoted}
-    anchor_check: {ok|unchecked-text|no-line|no-such-file|out-of-range|text-mismatch}
+    anchor_check: {ok|unchecked-text|no-line|no-such-file|out-of-range|text-mismatch|unparseable}
     finding: {one sentence: what is wrong}
     suggested_action: {one sentence: the fix approach}
 truncated_count: {integer — the two lenses' counts summed}
@@ -939,7 +948,6 @@ BODY_FILE="{body-file}"           # the BODY_FILE= line the summary block printe
 [ -s "$FINDINGS_JSON" ] || { echo "HALT: FINDINGS_JSON ($FINDINGS_JSON) is missing or empty"; exit 1; }
 [ -s "$BODY_FILE" ] || { echo "HALT: BODY_FILE ($BODY_FILE) is missing — run the summary block first"; exit 1; }
 : "${PR_NUMBER:?re-bind PR_NUMBER from Step 1b}"
-INLINE_FILE="$(mktemp -t review-pr-inline.XXXXXX.json)"
 
 # Findings from both lenses, reshaped into the CLI's input contract.
 # `.code_review.findings[]`, NOT `.code_review[]` — the latter iterates the
@@ -957,6 +965,19 @@ INLINE_FILE="$(mktemp -t review-pr-inline.XXXXXX.json)"
 # `anchor_check` is Step 6's verdict (finding-anchors.js --annotate). Only a verified
 # anchor posts inline: a malformed one would land on the wrong line, or on none, and
 # report `posted` — it reaches the PR through the summary comment instead.
+# Refuse un-annotated input first: that select keeps only verified anchors, so a file Step 6 never
+# annotated yields [] — the same output as "no anchorable findings" (task.195).
+# At least one lens must be present, and EVERY lens present must hold a findings array: `{}` would
+# otherwise select nothing and pass, and a non-array beside a valid lens would drop that lens's
+# findings unseen (task.195 DoD 1). A lens that did not run is absent or null. `anchor_check` must
+# be a string — the checker always writes one, so a null is an un-annotated finding.
+jq -e '([.code_review, .pr_conformance] | map(select(. != null)) | length > 0)
+       and all(.code_review, .pr_conformance | select(. != null); .findings | type == "array")
+       and ([ (.code_review.findings[]?, .pr_conformance.findings[]?) | select((.anchor_check | type) != "string") ] | length == 0)' \
+   "$FINDINGS_JSON" >/dev/null || {
+  echo "HALT: a finding in $FINDINGS_JSON carries no anchor_check (or the file is not findings JSON) — run Step 6's anchor check first; nothing posted inline"; exit 1; }
+# The scratch file is made only once the input is accepted, so no refusal leaves one behind.
+INLINE_FILE="$(mktemp -t review-pr-inline.XXXXXX.json)"
 jq '[ (.code_review.findings[]? | select(.anchor_check == "ok" or .anchor_check == "unchecked-text")
        | . + {anchor: .file_line}),
       (.pr_conformance.findings[]? | select(.anchor_check == "ok" or .anchor_check == "unchecked-text")
@@ -967,7 +988,7 @@ jq '[ (.code_review.findings[]? | select(.anchor_check == "ok" or .anchor_check 
          body: (.finding
                 + (if .suggested_action then "\n\n→ " + .suggested_action else "" end))} ]' \
    "$FINDINGS_JSON" > "$INLINE_FILE" || {
-  echo "findings JSON did not match the schema — not posting inline"; exit 1; }
+  rm -f "$INLINE_FILE"; echo "findings JSON did not match the schema — not posting inline"; exit 1; }
 
 command node .agents/skills/review-pr/references/pr-inline-comment.js \
   --pr "$PR_NUMBER" --findings-file "$INLINE_FILE" \

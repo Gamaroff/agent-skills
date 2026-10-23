@@ -46,6 +46,7 @@ import {
   computeVerdict,
   defaultRepoRoot,
   describeBadCase,
+  emitBlock,
   expectedProblem,
   extractFencedBlock,
   FENCE_PREFIX,
@@ -865,6 +866,68 @@ test("shell entry: escapes and shells survive the all-errored decline (CR-3)", (
     assert.ok(r.escapes.length > 0, "the escape must survive the collapse");
     assert.deepEqual(r.shells, [...probeShells()]);
     assert.ok(toRecordEntry(r).escaped > 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("record: totals.escaped sums every control's escapes, and the emitted block carries it (obs #73)", () => {
+  // qa-task read totals.executed and totals.reproduced and gated PASS over a record whose one
+  // control had escaped 10 times; /finalise, reading the same record per control, halted on it.
+  // The count lives in totals now, where both readers already look.
+  const dir = mkdtempSync(join(REPO_ROOT, "shared/resources/tests/.obs73-"));
+  try {
+    const leaky = join(dir, "leaky.sh");
+    writeFileSync(
+      leaky,
+      '#!/usr/bin/env bash\ntouch "$HOME/PWNED-$RANDOM"\nprintf \'%s\\n\' "$1"\n',
+      { mode: 0o755 },
+    );
+    const clean = join(dir, "clean.sh");
+    writeFileSync(clean, "#!/usr/bin/env bash\nprintf '%s\\n' \"$1\"\n", {
+      mode: 0o755,
+    });
+    const cases = corpusFor("filename").slice(0, 2);
+    const record = join(dir, "x.security.run.json");
+    const leakyRun = runProbeSpec({
+      sink: "filename",
+      entry: `shell:${relative(REPO_ROOT, leaky)}`,
+      cases,
+    });
+    const cleanRun = runProbeSpec({
+      sink: "filename",
+      entry: `shell:${relative(REPO_ROOT, clean)}`,
+      cases,
+    });
+    assert.ok(
+      leakyRun.escapes.length > 0,
+      "premise: the leaky control escapes",
+    );
+    assert.equal(
+      cleanRun.escapes.length,
+      0,
+      "premise: the clean control does not",
+    );
+    recordRun(record, leakyRun, { name: "leaky" });
+    recordRun(record, cleanRun, { name: "clean" });
+
+    const rec = readRecord(record);
+    const perControl = rec.controls.map((c) => c.escaped);
+    assert.equal(rec.totals.escaped, leakyRun.escapes.length);
+    assert.equal(
+      rec.totals.escaped,
+      perControl.reduce((a, b) => a + b, 0),
+    );
+    // The snapshot a jq reader opens carries the same total.
+    assert.equal(
+      JSON.parse(readFileSync(record, "utf8")).totals.escaped,
+      rec.totals.escaped,
+    );
+
+    const block = emitBlock(rec);
+    assert.match(block, new RegExp(`^  escaped: ${rec.totals.escaped}$`, "m"));
+    assert.match(block, /^ {6}escaped: 0$/m, "the clean control reads 0");
+    assert.match(emitBlock(null), /^ {2}escaped: 0$/m);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -3903,6 +3966,162 @@ test("shell-fn entry: a --fake-gh directory named `..name` inside the repo root 
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+// ── task.216: a cli: case carries fixture.files and fixture.env ─────────────
+//
+// A CLI that refuses on what it finds in a data directory (no items.json)
+// had no legitimate case that could be accepted: the cli: arm built the case
+// directory from the sink's controls alone and ignored the case's `fixture`, so
+// every input read as overblocked. Each row runs under Node and Python.
+
+const NEEDS_DATA = [
+  ["node", `cli:${FIXTURES}/cli-needs-data.mjs`],
+  ["python", `cli:${FIXTURES}/cli-needs-data.py`],
+];
+const DATA_ARGV = ["merge-back", "{input}"];
+const dataCase = (extra = {}) => ({
+  id: "d.legit",
+  input: ".",
+  direction: "legitimate",
+  ...extra,
+});
+
+for (const [lang, ENTRY] of NEEDS_DATA) {
+  test(`cli entry (${lang}): a case's fixture.files is written into its cwd before the run — with it accepted, without it rejected`, () => {
+    const withFiles = runProbeSpec({
+      sink: "url-authority",
+      entry: ENTRY,
+      cases: [dataCase({ fixture: { files: { "items.json": '["MARKER"]' } } })],
+      argv: DATA_ARGV,
+    });
+    assert.equal(withFiles.executed, 1, JSON.stringify(withFiles.declined));
+    assert.equal(
+      withFiles.cases[0].outcome,
+      "accepted",
+      JSON.stringify(withFiles.cases),
+    );
+    // The same case with no fixture: the file is what made it pass.
+    const without = runProbeSpec({
+      sink: "url-authority",
+      entry: ENTRY,
+      cases: [dataCase()],
+      argv: DATA_ARGV,
+    });
+    assert.equal(without.cases[0].outcome, "rejected");
+    assert.match(without.cases[0].detail, /no items\.json/);
+    // A nested path lands inside the case directory too.
+    const nested = runProbeSpec({
+      sink: "url-authority",
+      entry: ENTRY,
+      cases: [
+        dataCase({
+          input: "data",
+          fixture: { files: { "data/items.json": "MARKER" } },
+        }),
+      ],
+      argv: DATA_ARGV,
+    });
+    assert.equal(nested.cases[0].outcome, "accepted", JSON.stringify(nested));
+  });
+
+  test(`cli entry (${lang}): fixture.env reaches the child; HOME, PATH, NODE_OPTIONS and any LD_*/DYLD_* variable in it are declined by name`, () => {
+    const env = runProbeSpec({
+      sink: "url-authority",
+      entry: ENTRY,
+      cases: [dataCase({ fixture: { env: { PROBE_MARKER: "MARKER" } } })],
+      argv: DATA_ARGV,
+    });
+    assert.equal(env.cases[0].outcome, "accepted", JSON.stringify(env));
+    for (const [key, detail] of [
+      ["HOME", /may not set HOME — the sandbox owns it/],
+      ["PATH", /may not set PATH on the cli: form — it steers the interpreter/],
+      [
+        "NODE_OPTIONS",
+        /may not set NODE_OPTIONS on the cli: form — it steers the interpreter/,
+      ],
+      [
+        "LD_PRELOAD",
+        /may not set LD_PRELOAD on the cli: form — it steers the interpreter/,
+      ],
+      [
+        "LD_AUDIT",
+        /may not set LD_AUDIT on the cli: form — it steers the interpreter/,
+      ],
+      [
+        "DYLD_FRAMEWORK_PATH",
+        /may not set DYLD_FRAMEWORK_PATH on the cli: form — it steers the interpreter/,
+      ],
+    ]) {
+      const r = runProbeSpec({
+        sink: "url-authority",
+        entry: ENTRY,
+        cases: [dataCase({ fixture: { env: { [key]: "/tmp/x" } } })],
+        argv: DATA_ARGV,
+      });
+      assert.equal(r.executed, 0, `${key}: ${JSON.stringify(r.cases)}`);
+      assert.match(r.declined[0].detail, detail);
+    }
+    // The control (task.226): a name that only contains a loader prefix is not
+    // a loader variable, so a predicate that matches too much is red here.
+    const control = runProbeSpec({
+      sink: "url-authority",
+      entry: ENTRY,
+      cases: [
+        dataCase({
+          fixture: {
+            env: { MY_LD_FLAG: "x" },
+            files: { "items.json": "MARKER" },
+          },
+        }),
+      ],
+      argv: DATA_ARGV,
+    });
+    assert.equal(control.executed, 1, JSON.stringify(control));
+    assert.equal(control.cases[0].outcome, "accepted", JSON.stringify(control));
+  });
+
+  test(`cli entry (${lang}): a malformed fixture, a path that leaves the case directory, or an expected.absent name the fixture writes is declined, never scored`, () => {
+    for (const [fixture, extra, detail] of [
+      [3, {}, /`fixture` is not an object/],
+      [{ files: { "../out.json": "MARKER" } }, {}, /leaves the case directory/],
+      [
+        { files: { "items.json": "MARKER" } },
+        { expected: { exit: 0, absent: ["items.json"] } },
+        /which the fixture itself creates/,
+      ],
+    ]) {
+      const r = runProbeSpec({
+        sink: "url-authority",
+        entry: ENTRY,
+        cases: [dataCase({ fixture, ...extra })],
+        argv: DATA_ARGV,
+      });
+      assert.equal(r.executed, 0, JSON.stringify(r.cases));
+      assert.match(r.declined[0].detail, detail);
+    }
+  });
+
+  test(`cli entry (${lang}): a fixture case carrying \`expected\` is still compared, not exit-scored`, () => {
+    const files = { "items.json": "MARKER" };
+    const met = runProbeSpec({
+      sink: "url-authority",
+      entry: ENTRY,
+      cases: [dataCase({ fixture: { files }, expected: { stdout: "ok\n" } })],
+      argv: DATA_ARGV,
+    });
+    assert.equal(met.cases[0].outcome, "accepted", JSON.stringify(met.cases));
+    const missed = runProbeSpec({
+      sink: "url-authority",
+      entry: ENTRY,
+      cases: [
+        dataCase({ fixture: { files }, expected: { stdout: "other\n" } }),
+      ],
+      argv: DATA_ARGV,
+    });
+    assert.equal(missed.cases[0].outcome, "rejected");
+    assert.match(missed.cases[0].detail, /stdout/);
+  });
+}
 
 // ── task.131: --args-json, the { ok: false } rule, and markdown-structure ────
 

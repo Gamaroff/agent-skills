@@ -1,0 +1,86 @@
+schema: 2
+task: 'task.211.migration-engine-monolith-and-domainless-prds'
+task_title: 'Migration engine: monolith and domain-less PRDs'
+gate: CONCERNS
+status_reason: 'Cycle 1 fixed its four findings, and parseNameValue now engages under the path probe (20 cases, 0 escapes). The refute pass found five new defects in the fixes. Three are medium: the stale-reference scan skips non-literal file types, a numbered PRD at the root still lands outside a domain, and the substring match blocks correct references. Two are low.'
+reviewer: 'QA Engineer'
+head: '0379eb7399a46b804246829b5f832be0ab26ed20'
+updated: '2026-10-21T01:05:36Z'
+
+top_issues:
+  - id: CR-1
+    severity: medium
+    file: 'shared/resources/migrate-doc-numbering.mjs'
+    finding: 'The stale-reference scan runs only on LITERAL_EXTS files (.md/.yml/.yaml/.js/.mjs/.cjs), while the deleted guard refused any in-scope file naming an outside source: a package.json or .sh naming docs/prd.md is left pointing at nothing and --apply answers ok, and a re-run answers already (reproduced).'
+    suggested_action: 'Scan every tracked in-scope text file for outside move sources, not only the literal-pass extensions, or narrow the stale-reference claim in the header, SKILL.md and CHANGELOG and name the file types it covers.'
+    suggested_owner: dev
+  - id: CR-2
+    severity: medium
+    file: 'shared/resources/migrate-doc-numbering.mjs'
+    finding: 'needs-domain fires only for a legacy PRD, and the cycle-1 CR-3 blocker refuses a domain for any numbered PRD; a numbered L2 PRD at docs/prd/prd.1.x.md is still moved to docs/prd/prd.1.x/prd.1.x.md, a root-level layout create-prd refuses, --apply answers ok, and --name <doc>=main/x is refused, so it cannot be placed (reproduced). The two fixes combine badly.'
+    suggested_action: 'Decide placement by whether the PRD moves, not by legacy: raise needs-domain for any PRD whose planned directory changes and lands directly under the root, and accept a named domain for a numbered PRD that is moving anyway (refuse it only for one that stays).'
+    suggested_owner: dev
+  - id: CR-3
+    severity: medium
+    file: 'shared/resources/migrate-doc-numbering.mjs'
+    finding: 'The stale-reference match is an unbounded substring test, so a reference to a different file ending in the same text is blocked: apps/web/docs/prd.md in README.md, or a correct ../../../prd.md (repo-root prd.md) in docs/a/b/x.md, which contains ../../prd.md; the blocker has no override and its advice can be met only by breaking a correct reference (reproduced).'
+    suggested_action: 'Match whole path occurrences only, with the literal pass''s path-boundary rule (no /, . or word character before the match), and resolve each relative occurrence against the file''s directory before calling it stale.'
+    suggested_owner: dev
+  - id: CR-4
+    severity: low
+    file: 'shared/resources/migrate-doc-numbering.mjs'
+    finding: 'The "a path holds a /" rule is tested on the computed relative form, not on the occurrence, so a same-directory reference written ./prd.md (docs/build.js read("./prd.md")) is never flagged and --apply answers ok while it goes stale (reproduced).'
+    suggested_action: 'Also test the ./-prefixed relative form, so the slash rule excludes only a bare name.'
+    suggested_owner: dev
+  - id: CR-5
+    severity: low
+    file: 'shared/resources/migrate-doc-numbering.mjs'
+    finding: 'frontmatterState classes a frontmatter-less PRD that opens with a blank line and a thematic break ("\n---\n# Onboarding") as displaced, the same as a real displaced block; removing the blank line as advised turns it into unclosed-frontmatter, so the file cannot migrate (reproduced).'
+    suggested_action: 'Report displaced only when the late fence is followed by a closing fence; otherwise the file has no block and is "none".'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 100
+  phases_verified: 3/3
+  ci: 'SUCCESS (5 checks) @ 0379eb73 — informational; gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1, 2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 20
+    escaped: 0
+    notes: 'parseNameValue (the --name containment check) probed with --sink path and task.211.qa-fix.1.security.cases.json: verdict engages, 16/16 hostile rejected, 4/4 legitimate accepted, 0 escaped. Run record task.211.qa.2.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'The residual scan loops over outside move sources only for files already read; the read-count row still holds.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1, CR-2 and CR-4 answer ok over a stale or wrongly placed result; CR-3 and CR-5 refuse valid inputs with no way through.'
+  maintainability:
+    status: PASS
+    notes: 'One --name validator, one frontmatter-state function; BLOCKER_CODES, header comment, SKILL.md and CHANGELOG updated together.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1, CR-2 and CR-3 in qa-fix cycle 2, each with a mutation-proven engine row; CR-4 and CR-5 with them.'
+      refs: ['shared/resources/migrate-doc-numbering.mjs', 'shared/resources/tests/migrate-doc-numbering.test.mjs']
+    - action: 'CR-1, CR-3 and CR-4 all sit in the stale-reference matcher, which cycle 1 added. Before patching it again, consider the Step 2.6 structural move: make the scan an allow-list of the occurrence shapes that are path references, with a path boundary.'
+      refs: ['shared/resources/migrate-doc-numbering.mjs']
+  future:
+    - action: 'Step 4b cannot execute the review-prd plan/apply blocks (classified mutating); the eval gate-8 and gate-9/10 rows execute them instead.'
+      refs: ['skills/review-prd/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CR-1, CR-2 and CR-3 fixed and re-reviewed'

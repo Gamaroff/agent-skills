@@ -64,14 +64,16 @@ export const CASE_FIELDS = Object.freeze([
  * must NOT create: it is how a command-substitution name is caught when the
  * substitution ran but the number still came out right.
  *
- * `fixture` is read only by the `fence:` (task.180) and `shell-argv:` (task.181)
- * entry forms — for `shell-argv:`, written before its `--fixture-setup` runs:
+ * `fixture` is read only by the `fence:` (task.180), `shell-argv:` (task.181)
+ * and `cli:` (task.216) entry forms — for `shell-argv:`, written before its
+ * `--fixture-setup` runs:
  *
  *   { env: { npm_config_loglevel: "silent" }, files: { ".npmrc": "loglevel=silent\n" } }
  *
  * `env` is merged into the case's environment (it may not set HOME, TMPDIR or
- * LC_ALL, which the sandbox owns); `files` are written into the case's own
- * directory, which is the block's cwd. No corpus case carries it.
+ * LC_ALL, which the sandbox owns, nor — on `cli:` — PATH, NODE_OPTIONS or a
+ * dynamic-loader variable, which steer the interpreter); `files` are written into the case's own directory,
+ * which is the block's (or the CLI's) cwd. No corpus case carries it.
  */
 export const OPTIONAL_CASE_FIELDS = Object.freeze(["expected", "fixture"]);
 

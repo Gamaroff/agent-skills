@@ -140,6 +140,15 @@ The exit gate of the QA loop, and the only way out of it.
 `--no-code` because the QA step has already run the code reviewer over the same diff; 5c runs the
 conformance lens only.
 
+Run standalone, `/review-pr` also takes the work item instead of the PR, and finds the PR itself:
+
+```bash
+/review-pr [PR | branch | JIRA-KEY | Jira URL | #issue | GitHub issue URL] [--effort LEVEL] [--comment]
+```
+
+The report's `resolved_via` names the route it took from the item to the PR. Targets and flags:
+[`review-pr` § Arguments](../../skills/review-pr/SKILL.md#arguments).
+
 `qa-story` / `qa-task` validate the work against its acceptance or success criteria and dispatch the
 code reviewer. `review-pr` asks a different question: does the PR *deliver what the work item
 promised*, did it drift outside that scope, and is the artifact trail behind it complete and honest?

@@ -1,0 +1,188 @@
+[
+  {
+    "id": "name.slug",
+    "input": "core",
+    "direction": "legitimate",
+    "why": "a bare --name slug, the pre-task.211 form"
+  },
+  {
+    "id": "name.domain-slug",
+    "input": "main/core",
+    "direction": "legitimate",
+    "why": "the <domain>/<slug> form task.211 adds"
+  },
+  {
+    "id": "name.kebab",
+    "input": "self-service/sign-up-flow",
+    "direction": "legitimate",
+    "why": "kebab-case in both segments"
+  },
+  {
+    "id": "name.digits",
+    "input": "v2/core2",
+    "direction": "legitimate",
+    "why": "a digit after the leading letter"
+  },
+  {
+    "id": "name.single-letter",
+    "input": "a/b",
+    "direction": "legitimate",
+    "why": "the shortest segments the slug rule accepts"
+  },
+  {
+    "id": "path.dot-dot-relative",
+    "input": "../core",
+    "direction": "hostile",
+    "why": "a domain of .. lands the PRD outside the root"
+  },
+  {
+    "id": "path.dot-dot-bare",
+    "input": "../..",
+    "direction": "hostile",
+    "why": "both segments climb"
+  },
+  {
+    "id": "path.dot-dot-slug",
+    "input": "main/..",
+    "direction": "hostile",
+    "why": "a slug of .. climbs out of the domain"
+  },
+  {
+    "id": "path.dot",
+    "input": "./core",
+    "direction": "hostile",
+    "why": "a . domain is the root itself, the layout needs-domain refuses"
+  },
+  {
+    "id": "path.absolute",
+    "input": "/etc/passwd",
+    "direction": "hostile",
+    "why": "an absolute path ignores the root"
+  },
+  {
+    "id": "path.absolute-short",
+    "input": "/core",
+    "direction": "hostile",
+    "why": "an empty domain before the slash"
+  },
+  {
+    "id": "path.encoded-traversal",
+    "input": "%2e%2e/core",
+    "direction": "hostile",
+    "why": "an encoded .. a later decoder could expand"
+  },
+  {
+    "id": "path.encoded-slash",
+    "input": "main%2fcore",
+    "direction": "hostile",
+    "why": "an encoded separator a later decoder could split into a third segment"
+  },
+  {
+    "id": "path.null-byte",
+    "input": "main\u0000/core",
+    "direction": "hostile",
+    "why": "a NUL truncates the path at the syscall"
+  },
+  {
+    "id": "path.null-byte-tail",
+    "input": "main/core\u0000",
+    "direction": "hostile",
+    "why": "a trailing NUL after an otherwise valid slug"
+  },
+  {
+    "id": "path.backslash",
+    "input": "..\\core",
+    "direction": "hostile",
+    "why": "a Windows separator smuggles traversal past a / split"
+  },
+  {
+    "id": "path.three-segments",
+    "input": "a/b/c",
+    "direction": "hostile",
+    "why": "a nested domain is a layout create-prd refuses"
+  },
+  {
+    "id": "path.trailing-slash-pair",
+    "input": "main/core/",
+    "direction": "hostile",
+    "why": "a trailing slash adds an empty third segment"
+  },
+  {
+    "id": "path.empty",
+    "input": "",
+    "direction": "hostile",
+    "why": "an empty name"
+  },
+  {
+    "id": "path.trailing-slash",
+    "input": "main/",
+    "direction": "hostile",
+    "why": "an empty slug"
+  },
+  {
+    "id": "path.double-slash",
+    "input": "a//b",
+    "direction": "hostile",
+    "why": "an empty middle segment"
+  },
+  {
+    "id": "path.upper-case",
+    "input": "Main/core",
+    "direction": "hostile",
+    "why": "a segment create-prd's slug rule refuses"
+  },
+  {
+    "id": "path.leading-digit",
+    "input": "1main/core",
+    "direction": "hostile",
+    "why": "a segment must start with a letter"
+  },
+  {
+    "id": "path.space",
+    "input": "main dom/core",
+    "direction": "hostile",
+    "why": "whitespace in a path segment"
+  },
+  {
+    "id": "path.trailing-newline",
+    "input": "core\n",
+    "direction": "hostile",
+    "why": "a $ anchor under the m flag would accept a trailing newline into a directory name"
+  },
+  {
+    "id": "path.trailing-cr",
+    "input": "main/core\r",
+    "direction": "hostile",
+    "why": "a carriage return carried into a path segment"
+  },
+  {
+    "id": "path.leading-hyphen",
+    "input": "-core",
+    "direction": "hostile",
+    "why": "a leading hyphen reads as a flag to any tool the path later reaches"
+  },
+  {
+    "id": "path.trailing-hyphen",
+    "input": "main/core-",
+    "direction": "hostile",
+    "why": "a segment the slug rule refuses"
+  },
+  {
+    "id": "path.double-hyphen",
+    "input": "main/core--x",
+    "direction": "hostile",
+    "why": "an empty kebab part"
+  },
+  {
+    "id": "path.homoglyph",
+    "input": "mаin/core",
+    "direction": "hostile",
+    "why": "a Cyrillic a makes a lookalike domain directory"
+  },
+  {
+    "id": "path.unicode-slash",
+    "input": "main∕core",
+    "direction": "hostile",
+    "why": "a division-slash lookalike separator in one segment"
+  }
+]

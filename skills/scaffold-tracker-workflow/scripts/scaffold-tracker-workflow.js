@@ -103,7 +103,7 @@ function normaliseName(s) {
 // Moments whose column is an INTERRUPTION rather than a position, and which
 // therefore belong off the ladder entirely.
 //
-// This is not cosmetic. A board routinely puts its Blocked column early — RAPP's
+// This is not cosmetic. A board routinely puts its Blocked column early — one consumer's
 // sits at index 1, before In Progress — and a rung's index is its rank, so
 // laddering it would rank a blocked card BELOW a card being worked on. Two things
 // then go wrong at once: the backward-move guard starts refusing legitimate

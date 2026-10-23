@@ -1,0 +1,104 @@
+schema: 2
+task: 'task.196.pipeline-docs-qa-loop-and-artifacts'
+task_title: 'Pipeline docs: QA loop, resume and artifacts'
+gate: CONCERNS
+status_reason: 'Cycle 2 refute pass over the whole branch diff: all 11 gate-1 findings are fixed, and every probed claim holds (convergence from cycle 3, the not-converging 5b re-entry, the finalise 6a registry tick, the Step 8 rows). Two new mediums are in the troubleshooting tables: the route 2c trigger misses MEDIUM 0 and the 5a-to-5b condition, and the no-code-moved row says "Nothing" where an untracked fix file needs the operator. Five low findings.'
+reviewer: 'QA Engineer'
+head: 'bbc1a4e0a4f4e2c3a5b236fa613ca984e5847794'
+updated: '2026-10-19T19:27:47Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'docs/reference/troubleshooting.md'
+    finding: 'The "Gate the last fix" row (:201) gives an incomplete route 2c trigger. It omits MEDIUM 0 on the last gate (obs #300: MEDIUM 0,0,0 qualifies) and the requirement that cycle N went 5a to 5b, not back from a 5c REQUEST CHANGES (step-5-6 doc :1808-1829; qa-diminishing-returns.js).'
+    suggested_action: 'Reword: the budget is spent, the last cycle ran qa-fix from 5a (not after a 5c REQUEST CHANGES), the last gate raised no HIGH, and MEDIUM fell strictly over the last three gates or is 0 on the last gate.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-2'
+    severity: medium
+    file: 'docs/reference/troubleshooting.md'
+    finding: 'The no-code-moved row (:252) says "Nothing". The refusal names untracked files outside the work item, and the operator must commit any that belong to the fix and re-run the script (resume contract :706; reenter-qa-after-finalise.sh:258-265). Doing nothing re-runs /finalise over a fix no gate has read.'
+    suggested_action: 'Say: check the untracked files the refusal names, commit any that belong to the fix and re-invoke; otherwise the run resumes at Step 7 and /finalise re-runs.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-3'
+    severity: low
+    file: 'skills/develop-task/README.md'
+    finding: 'Diagram 1 node S6half reads "Route 2c: last fix ungated?" (:131; develop-story/README.md:138). That is one of three conditions, so read literally almost every loop-limit run would take the half-cycle.'
+    suggested_action: 'Relabel to name all three: last 5a-to-5b fix ungated, HIGH 0, MEDIUM falling or 0.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-4'
+    severity: low
+    file: 'skills/develop-task/README.md'
+    finding: 'The fork label "on a non-waived gate" (:114; develop-story/README.md:121) can read as "any token but WAIVED". A WAIVED gate with an inactive waiver and open entries goes to the fix road (step-5-6 doc :426-434).'
+    suggested_action: 'Use "yes: FAIL, or open entries (no active waiver)".'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-5'
+    severity: low
+    file: 'skills/develop-task/README.md'
+    finding: 'The Halt snapshot rows (:461; develop-story/README.md:478) and pipeline-artifacts.md:98 now name the PreCompact pause writer but still list only halted_at/halt_reason. A pause snapshot carries paused_at/pause_reason (develop-pipeline-pause.md:139).'
+    suggested_action: 'List both field sets: halted_at/halt_reason (HALT) or paused_at/pause_reason (pause), plus halt_step.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-6'
+    severity: low
+    file: 'docs/runbooks/first-week/day-3-messy-path.md'
+    finding: 'Line 58 (cycle-1 fix) says qa-gate only writes the gate file. Unchanged lines 41 and 77 of the same file say qa-gate checks ACs, and qa-gate/SKILL.md says it decides the status from findings.'
+    suggested_action: 'Make the three lines agree: qa-gate records the decision from review findings, qa-story runs the review that checks ACs (lines 41 and 77 too).'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-7'
+    severity: low
+    file: '.agents/plans/doc-drift-audit-2026-10-07.md'
+    finding: 'Line 836 marks SKILL-READMES-STANDARDS-29 fixed, but its story-documents.md and file-naming.md parts were deferred out of scope (review D1).'
+    suggested_action: 'Mark it partially resolved and name the deferred follow-up.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 5969
+  phases_verified: 7/7
+  ci: 'link-check, validate, shellcheck pass @ bbc1a4e0; test pending'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5, 6]
+    phases_with_issues: [2, 3, 5, 6]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'Documentation only; no predicate, script or prompt added (boundary: false — the diff adds no function).'
+  performance:
+    status: PASS
+    notes: 'No runtime change.'
+  reliability:
+    status: PASS
+    notes: 'Docs only; rollback is git revert.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Two troubleshooting rows misstate operator action (CR-1, CR-2).'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1 and CR-2 in docs/reference/troubleshooting.md.'
+      refs: ['docs/reference/troubleshooting.md']
+  future:
+    - action: 'Gap deferred by the review: story-documents.md / file-naming.md lack the sprint-review-summary row (follow-up named in the task Notes).'
+      refs: ['docs/standards/story-documents.md', 'docs/standards/file-naming.md']
+    - action: 'The step-5-6 doc summary table (:55) carries the same incomplete route 2c wording as CR-1; out of this task''s file list.'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 and CR-2 fixed']

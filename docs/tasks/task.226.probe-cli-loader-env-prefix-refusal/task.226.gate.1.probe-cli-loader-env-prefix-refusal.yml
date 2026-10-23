@@ -1,0 +1,49 @@
+schema: 2
+task: 'task.226.probe-cli-loader-env-prefix-refusal'
+task_title: 'security-probe: refuse every LD_* and DYLD_* variable on cli: case fixtures'
+gate: PASS
+status_reason: 'The prefix refusal works as specified on Node and Python: the engine declined LD_AUDIT, LD_PRELOAD, DYLD_FRAMEWORK_PATH and DYLD_FALLBACK_LIBRARY_PATH by name and accepted MY_LD_FLAG and ld_audit. The diff review found nothing, and all three mutants turn the committed test red.'
+reviewer: 'QA Engineer'
+head: '7d0b7d7a18e97ce6e12cbbf7cc71bfd1286d9426'
+updated: '2026-10-22T12:54:14Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 217
+  phases_verified: 3/3
+  ci: 'not waited on (gated at /finalise)'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 16
+    escaped: 0
+    notes: 'Engine run on cli-needs-data.mjs and .py (record task.226.qa.1.security.run.json, 19 cases, of which 6 are new): 16 executed, 0 reproduced, 0 overblocked, 0 escaped, and 22 declined by name. Every new loader name is declined before any spawn. Under the old exact-name list (mutant), LD_AUDIT reached ld.so, which then tried to load /tmp/x as an audit interface.'
+  performance:
+    status: PASS
+    notes: 'One prefix comparison per fixture.env key, before any spawn. Not measured, as the task records.'
+  reliability:
+    status: PASS
+    notes: 'The decline path and its message are unchanged from task 216. fence: and shell-argv: tests pass untouched (54 of 54).'
+  maintainability:
+    status: PASS
+    notes: 'bundle:check clean (128 skills). validate passes for finalise, qa-story, qa-task and review-security. Prettier clean. The docs, both CHANGELOG entries and the finalise prompt state one rule.'
+
+recommendations:
+  immediate: []
+  future: []
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: []

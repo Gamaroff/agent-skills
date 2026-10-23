@@ -1,0 +1,114 @@
+[
+  {
+    "id": "story-epic-integration",
+    "sink": "path",
+    "input": "epic/1.4.feature-ui",
+    "why": "The epic integration branch.",
+    "correct": "Accept (true)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "story-epic-integration-bare",
+    "sink": "path",
+    "input": "epic/1.4",
+    "why": "Integration branch, no slug.",
+    "correct": "Accept (true)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "story-own-branch",
+    "sink": "path",
+    "input": "feature/story.1.4.2.configure-pipe",
+    "why": "The story's own branch.",
+    "correct": "Accept (true)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "story-own-dash",
+    "sink": "path",
+    "input": "bugfix/story.1.4.2-x",
+    "why": "Story id with '-'.",
+    "correct": "Accept (true)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "story-other-epic-prefix",
+    "sink": "path",
+    "input": "epic/1.40.other",
+    "why": "Epic 1.40 starts with 1.4.",
+    "correct": "Reject (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "story-other-prd",
+    "sink": "path",
+    "input": "epic/11.4.x",
+    "why": "PRD 11.",
+    "correct": "Reject (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "story-unprefixed-epic-segment",
+    "sink": "path",
+    "input": "1.4.feature-ui",
+    "why": "A bare segment is not an integration branch.",
+    "correct": "Reject (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "story-longer-story-id",
+    "sink": "path",
+    "input": "feature/story.1.4.20.x",
+    "why": "story.1.4.20 starts with story.1.4.2.",
+    "correct": "Reject (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "story-own-bug-branch",
+    "sink": "path",
+    "input": "feature/story.1.4.2.bug.1.x",
+    "why": "The story's bug branch.",
+    "correct": "Reject (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "story-hotfix-version",
+    "sink": "path",
+    "input": "hotfix/v1.4.1",
+    "why": "hotfix/v* is bug-only.",
+    "correct": "Reject (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "story-release-branch",
+    "sink": "path",
+    "input": "release/1.4.0",
+    "why": "A release branch whose version starts with {P}.{E}.",
+    "correct": "Reject (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "story-hotfix-unversioned",
+    "sink": "path",
+    "input": "hotfix/1.4.1",
+    "why": "A hotfix branch whose last segment starts with 1.4.",
+    "correct": "Reject (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "story-arbitrary-prefix",
+    "sink": "path",
+    "input": "feature/1.4.x",
+    "why": "Any prefix plus a {P}.{E} segment.",
+    "correct": "Reject (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "story-epic-doc-branch",
+    "sink": "path",
+    "input": "feature/epic.1.4.feature-ui",
+    "why": "The epic doc's own branch.",
+    "correct": "Reject (false)",
+    "direction": "hostile"
+  }
+]

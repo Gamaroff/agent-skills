@@ -1,0 +1,78 @@
+schema: 2
+task: 'task.211.migration-engine-monolith-and-domainless-prds'
+task_title: 'Migration engine: monolith and domain-less PRDs'
+gate: CONCERNS
+status_reason: 'All phases delivered and every test green, but three medium defects reproduce: a BOM or a leading blank line gets a second frontmatter block, a relative non-link mention of the moved monolith is left stale while the run reports ok, and the new --name domain path boundary has no probeable entry. Each shape was refused by the deleted guard, so each is new to this change.'
+reviewer: 'QA Engineer'
+head: '0c4d6852d02c0988a4430673419a18c976d25ba8'
+updated: '2026-10-21T00:47:40Z'
+
+top_issues:
+  - id: CR-1
+    severity: medium
+    file: 'shared/resources/migrate-doc-numbering.mjs'
+    finding: 'frontmatterState classes a file whose fence follows a BOM or a leading blank line as "none", so editFrontmatter prepends a second block in front of the real one and --apply reports ok (reproduced: "﻿---\nname: prd.onb..." and "\n---\nname: prd.onb..." both migrate to two stacked blocks).'
+    suggested_action: 'Treat a leading BOM as part of line 0 (or strip it before the fence test), and return a distinct state for a fence that appears after leading blank lines, raised as a blocker, so a block is created only for a file that truly has none.'
+    suggested_owner: dev
+  - id: QA-1
+    severity: medium
+    file: 'shared/resources/migrate-doc-numbering.mjs'
+    finding: 'The prefilter admits a file that names an outside move source by a self-relative path, but only the link pass acts on it: a relative mention outside a link (scripts/x.js holding "../docs/prd.md", docs/guide/x.md holding `../prd.md`) is left stale while --apply answers ok. Re-pointed and left-stale reach the same result. Reviewer CR-2 (medium/medium), reproduced by QA.'
+    suggested_action: 'After the link and literal passes, re-scan each file the prefilter admitted for a repo-relative or self-relative path to an outside move source and report each residual as a blocker (link-would-break or a new code) rather than passing silently.'
+    suggested_owner: dev
+  - id: QA-2
+    severity: medium
+    file: 'shared/resources/migrate-doc-numbering.mjs'
+    finding: 'The --name <domain>/<slug> value is a caller-supplied path segment (P.join(root, domain, newStem)) whose only validation is an inline docId.format call in plan(); no exported predicate reaches it, so the boundary probe ran 0 cases and finalise''s zero-guard will fail the same record.'
+    suggested_action: 'Extract the shape-and-validity check into one exported function (for example parseNameValue(value) returning {slug, domain} or a refusal) used by parseArgs and plan, and probe it with security-probe.mjs --sink path.'
+    suggested_owner: dev
+  - id: CR-3
+    severity: low
+    file: 'shared/resources/migrate-doc-numbering.mjs'
+    finding: 'A named domain is honoured for an already-numbered PRD, so --name docs/prd/prd.1.x/prd.1.x.md=main/x moves it while its registry row keeps Folder "." and the post-check answers ok (reproduced).'
+    suggested_action: 'Apply namedDomain only to a legacy PRD; for a numbered one, ignore it or raise a blocker.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 109
+  phases_verified: 3/3
+  ci: 'not read — gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1, 2, 3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'The --name domain becomes a path segment. Read: parseArgs refuses a value with more than one "/" or an empty part, and plan() validates the domain with docId.format, so ".." is bad-slug. Not executed: no exported entry reaches the check (QA-2).'
+  performance:
+    status: PASS
+    notes: 'Each outside candidate is read once (read-count row); a file naming no move source gets no link pass.'
+  reliability:
+    status: CONCERNS
+    notes: 'Two silent wrong outcomes reported as ok: a doubled frontmatter block (CR-1) and a stale relative mention (QA-1).'
+  maintainability:
+    status: PASS
+    notes: 'One frontmatter-state function; guard script deleted; header comment, USAGE and BLOCKER_CODES updated.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1, QA-1 and QA-2 in the qa-fix loop; each needs an engine test row that is mutation-proven.'
+      refs: ['shared/resources/migrate-doc-numbering.mjs', 'shared/resources/tests/migrate-doc-numbering.test.mjs']
+  future:
+    - action: 'Step 4b cannot execute the review-prd plan/apply blocks (classified mutating); they are executed by the eval gate-8 and gate-9/10 rows instead.'
+      refs: ['skills/review-prd/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CR-1, QA-1 and QA-2 fixed and re-reviewed'

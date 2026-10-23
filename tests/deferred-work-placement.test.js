@@ -57,8 +57,9 @@ function workedExample() {
   return fences[0][1];
 }
 
-// The documented placement: immediately before the change-log block, or before the
-// `## Change Log` heading when one sits directly above the marker block.
+// The documented placement: before a `## Change Log` heading that sits directly above
+// `<!-- change-log-start -->`, else before the marker itself — never between the markers
+// (obs #91, task.230).
 function place(doc, record) {
   const marker = doc.indexOf("<!-- change-log-start -->");
   assert.ok(marker !== -1, "fixture has a change-log block");
@@ -76,6 +77,14 @@ const LOG =
 const qa = (n) =>
   `## QA Testing Results\n\n**QA Status**: PASS\n**Gate File**: [gate.${n}](./x.gate.${n}.yml)\n\n### Key Findings\nNone (cycle ${n}).`;
 const fixture = `${FM}## 11. Rollback Plan\n\nRevert.\n\n---\n\n${qa(1)}\n\n${LOG}\n---\n\n## Progress Tracking\n\n- [ ] Phase 1\n`;
+
+test("the placement rule is anchored on the marker, in finalise 7.4's words (task.230)", () => {
+  const s = statement().replace(/\s+/g, " ");
+  assert.match(
+    s,
+    /before a `## Change Log` heading that sits directly above `<!-- change-log-start -->`, else before the marker itself — never between the markers/,
+  );
+});
 
 test("the worked example is a ## Deferred Work H2, the heading the statement names", () => {
   const record = workedExample();

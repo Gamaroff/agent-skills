@@ -154,19 +154,22 @@ echo "PRD_SOURCE_PATH=${PRD_SOURCE_PATH} P=${P} E=${E}"
 Then build `PRD_URL` — a full web URL for the body link that works in any markdown renderer (GitHub, Bitbucket, VS Code preview):
 
 ```bash
-source references/resolve-platform.sh || exit 1   # sets VCS=github|bitbucket
+source .agents/skills/create-epic/references/resolve-platform.sh || exit 1   # sets VCS=github|bitbucket
+# The parent PRD, as the parent-PRD block above resolved it. That block is another shell, so the path
+# is bound here too (task.200 QA cycle 2, TASK-200-005).
+PRD_SOURCE_PATH="{PRD_SOURCE_PATH from the parent-PRD block}"
 
-# Resolve current branch; fall back to the repo default when HEAD is detached
-CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
-if [ "$CURRENT_BRANCH" = "HEAD" ] || [ -z "$CURRENT_BRANCH" ]; then
-  if [ "$VCS" = "github" ]; then
-    BRANCH=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name' 2>/dev/null || echo develop)
-  else
-    BRANCH=$(git remote show origin 2>/dev/null | awk '/HEAD branch/{print $NF}' || echo main)
-  fi
+# The link branch (doc-link-branch.js, task.200): the current branch's upstream only when it
+# names the PRD's work item, else the repo's default branch. The checked-out branch is never
+# used on its own: an epic written on another work item's branch would link to a branch that
+# is deleted when it merges. Bitbucket has no `gh`, so its default branch is passed in.
+if [ "$VCS" = "github" ]; then
+  BRANCH=$(command node .agents/skills/create-epic/references/doc-link-branch.js --doc "${PRD_SOURCE_PATH}")
 else
-  BRANCH="$CURRENT_BRANCH"
+  BB_DEFAULT=$(git remote show origin 2>/dev/null | awk '/HEAD branch/{print $NF}')
+  BRANCH=$(command node .agents/skills/create-epic/references/doc-link-branch.js --doc "${PRD_SOURCE_PATH}" --default "${BB_DEFAULT:-main}")
 fi
+: "${BRANCH:?doc-link-branch.js resolved no branch — check the --doc path and that the bundled resolver is present}"
 
 # Build the full URL
 if [ "$VCS" = "github" ]; then

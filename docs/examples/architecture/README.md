@@ -16,9 +16,7 @@ It is *not* real architecture for the agent-skills repo itself — for that, see
 4. Add the matching block to your project's `skills-config.yaml`:
    ```yaml
    architecture:
-     architectureSharded: true
      architectureShardedLocation: docs/architecture
-     architectureVersion: v4
 
    devLoadAlwaysFiles:
      - docs/architecture/concepts/coding-standards.md

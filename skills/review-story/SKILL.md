@@ -2333,7 +2333,7 @@ On non-zero exit → log warning `⚠️ sync-jira-story failed — Jira descrip
 
 **GitHub path** (`TRACKER=github`):
 
-Invoke the `sync-github-story` sub-skill with `STORY_FILE_PATH={resolved story file path}` and `DOC_BRANCH={PIN_BRANCH}` (may be empty — the sub-skill then falls back to its current-branch default). The sub-skill updates the GitHub issue body, re-points the `## Document` link to `DOC_BRANCH`, and appends a Change Log entry to match the edited story.
+Invoke the `sync-github-story` sub-skill with `STORY_FILE_PATH={resolved story file path}` and `DOC_BRANCH={PIN_BRANCH}` (may be empty — the sub-skill then resolves the branch with `doc-link-branch.js`: the current branch's upstream only when it names this story, else the repository's default branch). The sub-skill updates the GitHub issue body, re-points the `## Document` link to `DOC_BRANCH`, and appends a Change Log entry to match the edited story.
 
 On success → confirm: `✅ Pushed description + doc URL to GitHub issue #{github_issue} (link pinned to ${PIN_BRANCH:-current branch})`.
 On failure → log warning `⚠️ sync-github-story failed — GitHub issue body may be stale` and continue to Step 10 (do not halt).

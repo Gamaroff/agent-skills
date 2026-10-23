@@ -195,6 +195,18 @@
  * result and the record carry `interpreter` ({ name, version }), null for every
  * other form.
  *
+ * A `cli:` case's `fixture` (`env`, `files`) is honoured as for shell-argv:
+ * (task.216): its files are written into the case directory — the child's cwd —
+ * before the spawn, its env merged over the sandbox's, with the same refusals
+ * (a path that leaves the directory, HOME, TMPDIR, LC_ALL) and more of the
+ * form's own, PATH, NODE_OPTIONS and any `LD_*` or `DYLD_*` dynamic-loader
+ * variable, which steer the interpreter rather than the CLI (steersInterpreter). It is how a CLI
+ * that refuses on what it finds in a data directory gets a legitimate case that
+ * is accepted; without it every input reads as overblocked and the verdict is
+ * `rejects-every-input`. Repository state is not reachable this way: fixture
+ * files are text, which make no commit and no staged index, and
+ * `--fixture-setup` stays shell-argv:'s.
+ *
  * THE SHELL-ARGV ENTRY FORM (task.181). A boundary delivered as a SHELL SCRIPT
  * TAKING SEVERAL ARGUMENTS OR FLAGS (`verify-push-state.sh --base … --scope …`,
  * `reenter-qa-after-finalise.sh <doc-dir> <report>`) matched none of the forms —
@@ -2568,16 +2580,35 @@ function runCliCase(
       decline(`case's ${problem}`);
       return;
     }
-    const collides = (c.expected.absent ?? []).find(
-      (p) =>
-        fixture !== null && (fixture.controls.includes(p) || p === c.input),
+  }
+  // The case's own `fixture` (task.216), validated as the fence: and
+  // shell-argv: arms validate it. `fixture` above is the SINK's; this is c's.
+  const fixtureProblemText = fixtureProblem(c.fixture);
+  if (fixtureProblemText !== null) {
+    decline(`case's ${fixtureProblemText}`);
+    return;
+  }
+  const steers = Object.keys(c.fixture?.env ?? {}).find(steersInterpreter);
+  if (steers !== undefined) {
+    decline(
+      `case's \`fixture.env\` may not set ${steers} on the cli: form — it steers the interpreter the form runs, not the CLI under probe`,
     );
-    if (collides !== undefined) {
-      decline(
-        `case's \`expected.absent\` names "${collides}", which the fixture itself creates`,
-      );
-      return;
-    }
+    return;
+  }
+  const files = Object.entries(c.fixture?.files ?? {});
+  // An `expected.absent` name the run's own fixture creates mismatches on
+  // every run — declined, as every other arm declines it (task.128 BUG-13).
+  const firstSegment = (rel) => normalize(rel).split(sep)[0].toLowerCase();
+  const collides = (c.expected?.absent ?? []).find(
+    (p) =>
+      (fixture !== null && (fixture.controls.includes(p) || p === c.input)) ||
+      files.some(([rel]) => firstSegment(rel) === p.toLowerCase()),
+  );
+  if (collides !== undefined) {
+    decline(
+      `case's \`expected.absent\` names "${collides}", which the fixture itself creates`,
+    );
+    return;
   }
 
   let fixtureDir;
@@ -2587,6 +2618,12 @@ function runCliCase(
     });
   } catch (e) {
     decline(`fixture: cannot materialise "${c.input}": ${e.message}`);
+    return;
+  }
+  try {
+    writeFixtureFiles(fixtureDir, files);
+  } catch (e) {
+    decline(`fixture: ${e.message}`);
     return;
   }
 
@@ -2604,7 +2641,7 @@ function runCliCase(
       : [entryPath, ...args],
     {
       cwd: fixtureDir,
-      env: caseEnv({ fixtureDir, sandboxHome, sandboxTmp }),
+      env: fixtureCaseEnv(c.fixture, { fixtureDir, sandboxHome, sandboxTmp }),
       timeoutMs,
       extraFds: isPython ? PYTHON_RECORD_FD - 2 : 0,
     },
@@ -2687,8 +2724,8 @@ function runCliCase(
 }
 
 /**
- * Write a case's `fixture.files` into its directory. Shared by the fence: and
- * shell-argv: arms (task.181), so the two cannot drift on what a fixture file
+ * Write a case's `fixture.files` into its directory. Shared by the fence:,
+ * shell-argv: (task.181) and cli: (task.216) arms, so they cannot drift on what a fixture file
  * may name. THROWS on a path that leaves the directory; the caller turns that
  * into an `errored` run.
  */
@@ -2708,8 +2745,8 @@ function writeFixtureFiles(caseDir, files) {
 /**
  * `caseEnv` with a case's `fixture.env` merged in. The case's env first, the
  * sandbox's own keys last: fixtureProblem already refuses HOME/TMPDIR/LC_ALL,
- * and the order holds even if it did not. Shared by the fence: and shell-argv:
- * arms (task.181).
+ * and the order holds even if it did not. Shared by the fence:, shell-argv:
+ * (task.181) and cli: (task.216) arms.
  */
 function fixtureCaseEnv(fixture, { fixtureDir, sandboxHome, sandboxTmp }) {
   const sandbox = caseEnv({ fixtureDir, sandboxHome, sandboxTmp });
@@ -3110,6 +3147,25 @@ export function extractFencedBlock(docText, heading) {
 
 /** The environment keys the sandbox owns; a case's fixture may not set them. */
 const SANDBOX_OWNED_ENV = Object.freeze(["HOME", "TMPDIR", "LC_ALL"]);
+
+/**
+ * The keys a `cli:` case's `fixture.env` may not set either (task.216): they
+ * steer the interpreter the form runs rather than the CLI under probe. `PATH`
+ * selects the `python3` binary (spawned by name), whose crash record the
+ * verdict reads; `NODE_OPTIONS` loads code into a Node child before the entry
+ * and can hide the fatal-error footer; the dynamic-loader variables (any
+ * `LD_*` or `DYLD_*` name, CLI_LOADER_ENV_PREFIXES) load or redirect a library
+ * into either interpreter before it starts (QA cycle 2; by prefix since
+ * task.226). Python's own variables need no entry: `-E` already ignores them.
+ */
+const CLI_INTERPRETER_ENV = Object.freeze(["PATH", "NODE_OPTIONS"]);
+/** The dynamic loaders' namespaces (glibc `LD_*`, macOS dyld `DYLD_*`): every
+ * name in them can load or redirect code before the interpreter starts. The
+ * match is case-sensitive, as POSIX environment names are. */
+const CLI_LOADER_ENV_PREFIXES = Object.freeze(["LD_", "DYLD_"]);
+const steersInterpreter = (k) =>
+  CLI_INTERPRETER_ENV.includes(k) ||
+  CLI_LOADER_ENV_PREFIXES.some((p) => k.startsWith(p));
 const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 /**
@@ -3694,13 +3750,17 @@ export function toRecordEntry(result, { name, callSite } = {}) {
   };
 }
 
+// `escaped` is totalled beside `executed` so every reader of the record sees it at the same depth.
+// It used to live only per control, and qa-task gated PASS over a record whose one control had
+// escaped 10 times while /finalise, reading the same record, halted on it (obs #73).
 function totalsOf(controls) {
   return controls.reduce(
     (t, c) => ({
       executed: t.executed + (c.executed ?? 0),
       reproduced: t.reproduced + (c.reproduced ?? 0),
+      escaped: t.escaped + (c.escaped ?? 0),
     }),
-    { executed: 0, reproduced: 0 },
+    { executed: 0, reproduced: 0, escaped: 0 },
   );
 }
 
@@ -3969,6 +4029,7 @@ export function emitBlock(record, { mode = "diff" } = {}) {
   if (!record) {
     lines.push(
       "  probes_executed: 0    # no run record — the engine did not run",
+      "  escaped: 0",
       `  evidence: ${evidence}    # computed by security-probe.mjs; measured needs a record`,
       "  controls: []",
     );
@@ -3977,6 +4038,8 @@ export function emitBlock(record, { mode = "diff" } = {}) {
   const totals = totalsOf(record.controls);
   lines.push(
     `  probes_executed: ${totals.executed}`,
+    // A non-zero count is a finding whatever the verdicts say (probe-boundary-rule.md).
+    `  escaped: ${totals.escaped}`,
     `  evidence: ${evidence}    # computed by security-probe.mjs from the run record`,
   );
   if (record.controls.length === 0) {
@@ -3993,6 +4056,7 @@ export function emitBlock(record, { mode = "diff" } = {}) {
         `      sink: ${yamlStr(c.sink)}`,
         `      reason: ${yamlStr(c.reason)}`,
         `      probes_executed: ${c.executed}`,
+        `      escaped: ${c.escaped ?? 0}`,
         ...(Array.isArray(c.shells) && c.shells.length > 0
           ? [`      shells: [${c.shells.join(", ")}]`]
           : []),

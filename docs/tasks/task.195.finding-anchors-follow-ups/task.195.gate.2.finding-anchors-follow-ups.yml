@@ -1,0 +1,63 @@
+schema: 2
+task: 'task.195.finding-anchors-follow-ups'
+task_title: 'finding-anchors follow-ups'
+gate: PASS
+status_reason: 'Both cycle 1 findings are fixed and mutation-proven. The full-branch refute pass returned 3 bugs, all medium or low confidence, so none enters top_issues. The fence probe of the review-pr --inline guard ran 14 cases and reproduced 0.'
+reviewer: 'QA Engineer'
+head: 'bdd4b66e11c6f83e0e982a669e0aac8739a9dc99'
+updated: '2026-10-19T16:14:54Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 5961
+  phases_verified: 3/3
+  ci: 'fast gate 5961 tests, 0 failed @ bdd4b66e'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 14
+    notes: 'fence:skills/review-pr/SKILL.md --inline guard, slot {findings-json}: 10 hostile file shapes refused with the HALT text, 4 legitimate accepted; 0 reproduced (task.195.qa.2.security.run.json). The review-code --inline guard is the second block under its heading, out of fence reach; its committed test runs the extracted block.'
+  performance:
+    status: PASS
+    notes: 'lensesOf is one pass over the input; no new I/O.'
+  reliability:
+    status: PASS
+    notes: 'TASK-195-QA1-1 fixed: a wrapped code finding with no file_line reads unparseable. Advisory CR-1 (medium/medium): the review-pr guard passes a file where one lens has a non-array findings value and the other is valid; routed to future.'
+  maintainability:
+    status: PASS
+    notes: 'One lens rule, defined in the engine; the four enumeration sites describe the unparseable verdict the same way.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 (cycle 2): the review-pr --inline guard must require an array for every wrapper key present, not one of the two; add the mixed {code_review:{findings:"x"}, pr_conformance:{findings:[annotated]}} case. findingsOf has the same leniency.'
+      refs: ['skills/review-pr/SKILL.md', 'shared/resources/finding-anchors.js']
+    - action: 'CR-2 (cycle 2, pre-existing: same TypeError on origin/develop): a null finding entry crashes checkAnchors, and the dispatcher then reports "checker not runnable"; give a non-object finding its own verdict or a usage reason.'
+      refs: ['shared/resources/finding-anchors.js']
+    - action: 'CR-3 (cycle 2): review-code --staged --fix checks anchors against the index but edits the working tree; refuse or re-check when they differ for a named file.'
+      refs: ['skills/review-code/SKILL.md']
+    - action: 'Carried from gate 1: CR-2, CR-4, CR-5 follow-ups as recorded there.'
+      refs: ['docs/tasks/task.195.finding-anchors-follow-ups/task.195.gate.1.finding-anchors-follow-ups.yml']
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-10-19'
+  total_iterations: 1
+  verification_method: 'committed tests + 4 mutation proofs (covered) + fence probe'
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

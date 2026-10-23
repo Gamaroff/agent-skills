@@ -6,8 +6,8 @@
  * is deliberately separated from the ladder-building, inference and emitting so
  * that the parts most likely to be wrong can be tested without one.
  *
- * The board shapes below are real ones, reduced. The Jira fixture is the RAPP
- * board (id 407) as read on 2026-08-06, and it earns its place by being awkward
+ * The board shapes below are real ones, reduced. The Jira fixture is a
+ * consumer's board as read on 2026-08-06, and it earns its place by being awkward
  * in three different ways at once: its Blocked column sits at index 1, its QA
  * columns come BEFORE its review columns, and its leftmost column aggregates
  * three statuses. A board that only ever appeared in a design document would
@@ -25,8 +25,8 @@ const s = require("../scripts/scaffold-tracker-workflow.js");
 // Fixtures
 // ---------------------------------------------------------------------------
 
-// RAPP board 407, verbatim column order.
-const RAPP_COLUMNS = [
+// A consumer's board, verbatim column order.
+const BOARD_COLUMNS = [
   { name: "To Do", statuses: ["Open", "Selected for Development", "Reopened"] },
   { name: "Blocked", statuses: ["Blocked"] },
   { name: "In Progress", statuses: ["In Progress"] },
@@ -82,7 +82,7 @@ test("normaliseName keeps a slash-separated issue type readable", () => {
 // ---------------------------------------------------------------------------
 
 test("a Blocked column is lifted off the ladder, wherever the board puts it", () => {
-  const { ladderColumns, sideStates } = s.partitionColumns(RAPP_COLUMNS);
+  const { ladderColumns, sideStates } = s.partitionColumns(BOARD_COLUMNS);
   assert.deepEqual(
     sideStates.map((x) => x.name),
     ["Blocked"],
@@ -94,7 +94,7 @@ test("a Blocked column is lifted off the ladder, wherever the board puts it", ()
 });
 
 test("the lifted side-state is still targeted by its moment", () => {
-  const { ladderColumns, sideStates } = s.partitionColumns(RAPP_COLUMNS);
+  const { ladderColumns, sideStates } = s.partitionColumns(BOARD_COLUMNS);
   const { moments } = s.inferMoments(s.buildLadderFromColumns(ladderColumns), {
     sideStates,
   });
@@ -105,7 +105,7 @@ test("laddering Blocked would have ranked it below In Progress — the bug this 
   // Guards the reasoning, not just the behaviour: on this board Blocked is
   // column 1 and In Progress column 2, so a naive ladder ranks a blocked card
   // BELOW one being worked on and leaving Blocked becomes a backward move.
-  const naive = s.buildLadderFromColumns(RAPP_COLUMNS);
+  const naive = s.buildLadderFromColumns(BOARD_COLUMNS);
   const blockedRank = naive.findIndex((r) => r.names.includes("Blocked"));
   const progressRank = naive.findIndex((r) => r.names.includes("In Progress"));
   assert.ok(blockedRank >= 0 && progressRank >= 0);
@@ -114,7 +114,7 @@ test("laddering Blocked would have ranked it below In Progress — the bug this 
     "fixture must reproduce the early-Blocked shape",
   );
 
-  const partitioned = ladderOf(RAPP_COLUMNS);
+  const partitioned = ladderOf(BOARD_COLUMNS);
   assert.equal(
     partitioned.findIndex((r) => r.names.includes("Blocked")),
     -1,
@@ -127,7 +127,7 @@ test("laddering Blocked would have ranked it below In Progress — the bug this 
 // ---------------------------------------------------------------------------
 
 test("a column holding several statuses becomes one rung with alternatives", () => {
-  const ladder = ladderOf(RAPP_COLUMNS);
+  const ladder = ladderOf(BOARD_COLUMNS);
   assert.deepEqual(ladder[0].names, [
     "Open",
     "Selected for Development",
@@ -153,7 +153,7 @@ test("a status appearing on two columns is ranked once, at its first position", 
 // ---------------------------------------------------------------------------
 
 test("a moment lands at the ENTRY of a phase, not its exit", () => {
-  const ladder = ladderOf(RAPP_COLUMNS);
+  const ladder = ladderOf(BOARD_COLUMNS);
   const { moments } = s.inferMoments(ladder);
   // Ready for Testing precedes Testing; Waiting for Review precedes In Review.
   assert.equal(moments["in-qa"], "Ready for Testing");
@@ -161,7 +161,7 @@ test("a moment lands at the ENTRY of a phase, not its exit", () => {
 });
 
 test("the losing candidate is reported, not silently dropped", () => {
-  const ladder = ladderOf(RAPP_COLUMNS);
+  const ladder = ladderOf(BOARD_COLUMNS);
   const { notes } = s.inferMoments(ladder);
   const qa = notes.find((n) => n.moment === "in-qa");
   assert.deepEqual(qa.alternatives, ["Testing"]);
@@ -182,7 +182,7 @@ test("a column matching two rules is recorded as ambiguous", () => {
 });
 
 test("an unmatched column is left alone rather than forced onto a moment", () => {
-  const ladder = ladderOf(RAPP_COLUMNS);
+  const ladder = ladderOf(BOARD_COLUMNS);
   const { moments } = s.inferMoments(ladder);
   assert.ok(
     !Object.values(moments).includes("READY FOR SHOWCASE"),
@@ -195,7 +195,7 @@ test("an unmatched column is left alone rather than forced onto a moment", () =>
 // ---------------------------------------------------------------------------
 
 test("done is suppressed when a merge queue sits below the terminal column", () => {
-  const ladder = ladderOf(RAPP_COLUMNS);
+  const ladder = ladderOf(BOARD_COLUMNS);
   const r = s.inferMoments(ladder);
   assert.equal(r.doneSuppressed, true);
   assert.ok(!("done" in r.moments), "done must not be mapped");
@@ -209,13 +209,13 @@ test("done is mapped normally on a board with no merge queue", () => {
 });
 
 test("--enable-done overrides the suppression", () => {
-  const r = s.inferMoments(ladderOf(RAPP_COLUMNS), { enableDone: true });
+  const r = s.inferMoments(ladderOf(BOARD_COLUMNS), { enableDone: true });
   assert.equal(r.doneSuppressed, false);
   assert.equal(r.moments.done, "Done");
 });
 
 test("an explicit override beats every inference, including the done rule", () => {
-  const r = s.inferMoments(ladderOf(RAPP_COLUMNS), {
+  const r = s.inferMoments(ladderOf(BOARD_COLUMNS), {
     overrides: { done: "Waiting for merge", "in-qa": null },
   });
   assert.equal(r.moments.done, "Waiting for merge");
@@ -227,7 +227,7 @@ test("an explicit override beats every inference, including the done rule", () =
 // ---------------------------------------------------------------------------
 
 test("an out-of-order board is reported, not silently reordered", () => {
-  const ladder = ladderOf(RAPP_COLUMNS);
+  const ladder = ladderOf(BOARD_COLUMNS);
   const { moments } = s.inferMoments(ladder);
   const inversions = s.checkMomentOrder(ladder, moments);
   assert.equal(inversions.length, 1);
@@ -257,7 +257,7 @@ test("a board in pipeline order reports no inversions", () => {
 });
 
 test("an off-ladder side-state never counts as an inversion", () => {
-  const ladder = ladderOf(RAPP_COLUMNS);
+  const ladder = ladderOf(BOARD_COLUMNS);
   const { moments } = s.inferMoments(ladder, {
     sideStates: [{ moment: "blocked", name: "Blocked", column: "Blocked" }],
   });
@@ -274,7 +274,7 @@ test("an off-ladder side-state never counts as an inversion", () => {
 // Overlays
 // ---------------------------------------------------------------------------
 
-const RAPP_TYPES = {
+const BOARD_TYPES = {
   Epic: ["Open", "Done"],
   Story: [
     "Selected for Development",
@@ -314,15 +314,15 @@ const RAPP_TYPES = {
 };
 
 function overlaysFor(types) {
-  const ladder = ladderOf(RAPP_COLUMNS);
+  const ladder = ladderOf(BOARD_COLUMNS);
   const { moments } = s.inferMoments(ladder, {
-    sideStates: s.partitionColumns(RAPP_COLUMNS).sideStates,
+    sideStates: s.partitionColumns(BOARD_COLUMNS).sideStates,
   });
   return s.buildOverlays(ladder, types, moments);
 }
 
 test("a type missing whole rungs gets an overlay", () => {
-  const o = overlaysFor(RAPP_TYPES);
+  const o = overlaysFor(BOARD_TYPES);
   assert.ok(o.Epic, "Epic has only Open and Done");
   assert.deepEqual(
     o.Epic.statuses.flatMap((r) => r.names),
@@ -335,7 +335,7 @@ test("a type missing whole rungs gets an overlay", () => {
 test("a type differing only in one rung's alternatives gets NO overlay", () => {
   // Feature has every rung the base ladder has; it merely lacks "Open" from the
   // first rung, which changes nothing because names are tried in order.
-  const o = overlaysFor(RAPP_TYPES);
+  const o = overlaysFor(BOARD_TYPES);
   assert.ok(
     !("Feature" in o),
     "an inert overlay is a second copy to keep in step",
@@ -343,7 +343,7 @@ test("a type differing only in one rung's alternatives gets NO overlay", () => {
 });
 
 test("an overlay disables only the moments that type genuinely cannot reach", () => {
-  const o = overlaysFor(RAPP_TYPES);
+  const o = overlaysFor(BOARD_TYPES);
   const it = o["IT / DevOps Task"];
   assert.ok(it, "this type has no testing or merge rung");
   assert.ok(it.disable.includes("in-qa"));
@@ -380,7 +380,7 @@ function emitFor(columns, types = {}, opts = {}) {
 }
 
 test("multi-word issue type keys are quoted", () => {
-  const yaml = emitFor(RAPP_COLUMNS, RAPP_TYPES);
+  const yaml = emitFor(BOARD_COLUMNS, BOARD_TYPES);
   assert.match(yaml, /'IT \/ DevOps Task':/);
   // An unquoted key matches nothing and drops the whole overlay silently, which
   // is the failure mode with no error attached.
@@ -388,12 +388,12 @@ test("multi-word issue type keys are quoted", () => {
 });
 
 test("a single-word issue type key is left bare", () => {
-  const yaml = emitFor(RAPP_COLUMNS, RAPP_TYPES);
+  const yaml = emitFor(BOARD_COLUMNS, BOARD_TYPES);
   assert.match(yaml, /^ {2}Epic:/m);
 });
 
 test("the emitted file uses block sequences only", () => {
-  const yaml = emitFor(RAPP_COLUMNS, RAPP_TYPES);
+  const yaml = emitFor(BOARD_COLUMNS, BOARD_TYPES);
   assert.doesNotMatch(
     yaml,
     /^\s*(statuses|names):\s*\[/m,
@@ -402,14 +402,14 @@ test("the emitted file uses block sequences only", () => {
 });
 
 test("suppressing done emits the reasoning, not just the absence", () => {
-  const yaml = emitFor(RAPP_COLUMNS);
+  const yaml = emitFor(BOARD_COLUMNS);
   assert.doesNotMatch(yaml, /^\s{2}done:/m, "done must not be mapped");
   assert.match(yaml, /merge queue/i);
   assert.match(yaml, /--enable-done/);
 });
 
 test("an inversion is emitted at the top of the file, where it will be read", () => {
-  const yaml = emitFor(RAPP_COLUMNS);
+  const yaml = emitFor(BOARD_COLUMNS);
   const warn = yaml.indexOf("out of order");
   const ladder = yaml.indexOf("statuses:");
   assert.ok(warn > -1, "the inversion must be stated");

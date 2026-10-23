@@ -1,0 +1,22 @@
+[
+  { "id": "name.slug", "input": "core", "direction": "legitimate", "why": "a bare --name slug, the pre-task.211 form" },
+  { "id": "name.domain-slug", "input": "main/core", "direction": "legitimate", "why": "the <domain>/<slug> form task.211 adds" },
+  { "id": "name.kebab", "input": "self-service/sign-up-flow", "direction": "legitimate", "why": "kebab-case in both segments" },
+  { "id": "name.digits", "input": "v2/core2", "direction": "legitimate", "why": "a digit after the leading letter" },
+  { "id": "path.dot-dot-relative", "input": "../core", "direction": "hostile", "why": "a domain of .. lands the PRD outside the root" },
+  { "id": "path.dot-dot-bare", "input": "../..", "direction": "hostile", "why": "both segments climb" },
+  { "id": "path.dot-dot-slug", "input": "main/..", "direction": "hostile", "why": "a slug of .. climbs out of the domain" },
+  { "id": "path.dot", "input": "./core", "direction": "hostile", "why": "a . domain is the root itself, the layout needs-domain refuses" },
+  { "id": "path.absolute", "input": "/etc/passwd", "direction": "hostile", "why": "an absolute path ignores the root" },
+  { "id": "path.absolute-short", "input": "/core", "direction": "hostile", "why": "an empty domain before the slash" },
+  { "id": "path.encoded-traversal", "input": "%2e%2e/core", "direction": "hostile", "why": "an encoded .. a later decoder could expand" },
+  { "id": "path.null-byte", "input": "main\u0000/core", "direction": "hostile", "why": "a NUL truncates the path at the syscall" },
+  { "id": "path.backslash", "input": "..\\core", "direction": "hostile", "why": "a Windows separator smuggles traversal past a / split" },
+  { "id": "path.three-segments", "input": "a/b/c", "direction": "hostile", "why": "a nested domain is a layout create-prd refuses" },
+  { "id": "path.empty", "input": "", "direction": "hostile", "why": "an empty name" },
+  { "id": "path.trailing-slash", "input": "main/", "direction": "hostile", "why": "an empty slug" },
+  { "id": "path.double-slash", "input": "a//b", "direction": "hostile", "why": "an empty middle segment" },
+  { "id": "path.upper-case", "input": "Main/core", "direction": "hostile", "why": "a segment create-prd's slug rule refuses" },
+  { "id": "path.leading-digit", "input": "1main/core", "direction": "hostile", "why": "a segment must start with a letter" },
+  { "id": "path.space", "input": "main dom/core", "direction": "hostile", "why": "whitespace in a path segment" }
+]

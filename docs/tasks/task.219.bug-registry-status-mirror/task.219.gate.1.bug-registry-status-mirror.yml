@@ -1,0 +1,55 @@
+schema: 2
+task: 'task.219.bug-registry-status-mirror'
+task_title: 'General-bug registry status: one writer at every transition'
+gate: PASS
+status_reason: 'All 3 phases and every success criterion are verified from evidence, and full npm run ci passes. The diff review returned three low-severity findings, none promoted. The new classifier refused all 5 hostile probes and wrote nothing outside its sandbox.'
+reviewer: 'QA Engineer'
+head: '7980a2529f03455b048b5a26cc4c20c1e19680f6'
+updated: '2026-10-20T13:48:35Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 3
+  phases_verified: 3/3
+  ci: 'local npm run ci exit 0 @ 7980a252 (symlink aside); PR CI not read'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 7
+    escaped: 0
+    notes: 'boundary: true (general-bug classifier in bugStatus). cli: probe, filename sink, 5 hostile rejected, 2 legitimate accepted, verdict engages. Type-based arms held by registry-tick.test.mjs:1454/:1467 (cli: cannot supply file content, obs #58).'
+  performance:
+    status: PASS
+    notes: 'One registry read (registry-tick.js:612) and at most one write (:674) per call.'
+  reliability:
+    status: PASS
+    notes: 'Every outcome is a named reason; dry-run is byte-identical; CRLF preserved; a missing --file is a usage error, not a crash.'
+  maintainability:
+    status: PASS
+    notes: 'The call and reason table are written once in develop-bug, and the label map has one exported definition. CR-3 is a wording cleanup.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1: give a bug.{N}. file whose type: is not bug its own reason (fix-the-call), separate from not-a-general-bug.'
+      refs: ['shared/resources/registry-tick.js']
+    - action: 'CR-2: split no-registry out of the hand-edit row in both reason tables (log only).'
+      refs: ['skills/develop-bug/references/develop-bug-step-3-investigate-fix.md', 'skills/qa-fix/SKILL.md']
+    - action: 'CR-3: phrase step 7 references to earlier writes in both registry vocabularies.'
+      refs: ['skills/develop-bug/references/develop-bug-step-7-close-bug.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

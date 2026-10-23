@@ -1,0 +1,69 @@
+schema: 2
+task: 'task.230.change-log-block-foreign-sections'
+task_title: 'Keep foreign sections out of the change-log block'
+gate: FAIL
+status_reason: 'The log-table start in partitionForeign is a document-wide first match, so a foreign section holding a dated or Date-headed table is split: its heading moves out and its rows stay in the log as history (CR-1 high, CR-2 medium; both reproduced on the PR head).'
+reviewer: 'QA Engineer'
+head: '46794bb92d39316e8bb19948197e0ff9ca8fd3a0'
+updated: '2026-10-22T21:59:51Z'
+
+top_issues:
+  - id: 'TASK-230-CR-1'
+    severity: high
+    file: 'shared/resources/change-log.js'
+    finding: 'logStart is the first date-first row anywhere in the block, so a before-side foreign section with a date-first table (a DoD run table) is taken as the log: its heading is lifted and its rows stay inside the regenerated log as fake history (reproduced: "| 2026-10-02 | run 1 | gaps |" stays in the block after liftForeignSections).'
+    suggested_action: 'Anchor the log table on the index of the Change Log heading splitCarriedLines removes: the log starts at the first table line at or after it, so no table under a foreign heading can be chosen.'
+    suggested_owner: dev
+  - id: 'TASK-230-CR-2'
+    severity: medium
+    file: 'shared/resources/change-log.js'
+    finding: 'With no log entry rows, the fallbacks (first "| Date |" header, then first pipe line) can land on a foreign section''s own table, splitting it: liftForeignSections on a Change Log heading followed by a Deferred Work table keeps "| thing | dev |" inside the log (reproduced).'
+    suggested_action: 'Use the same heading-anchored start as CR-1 (first table line after the Change Log heading and before the next sibling heading, else the heading position) and add a K case for a block with no log table.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 6235
+  phases_verified: 4/4
+  ci: 'not read — CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: internal — shared/resources/change-log.js#foreignSections reads only work-item documents this repository''s pipeline writes; markdown-structure models the implementation report, not a change-log block. No external input, no shell, no network.'
+  performance:
+    status: PASS
+    notes: 'Corpus guard 0.714 s wall (load 1.70) on the PR head, against a 5 s bound.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1/CR-2/CR-3 move foreign table rows into the log as history; the defect is silent and persists across later writes.'
+  maintainability:
+    status: PASS
+    notes: 'One partition read by upsertChangeLog, foreignSections and the corpus guard; JSDoc for upsertChangeLog displaced (CR-4, cleanup).'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1 and CR-2 with a heading-anchored log start; the same anchor bounds the header back-up and closes CR-3 (advisory, confidence medium, reproduced).'
+      refs: ['shared/resources/change-log.js']
+    - action: 'Add K cases: a before-side foreign section with a date-first table; a block with no log table; a foreign table written directly above the Change Log heading with no blank line.'
+      refs: ['shared/resources/tests/change-log.test.mjs']
+  future:
+    - action: 'Move the upsertChangeLog JSDoc back above upsertChangeLog (CR-4).'
+      refs: ['shared/resources/change-log.js']
+    - action: 'Tick the section 9 Success Criteria boxes from evidence (finalise will verify them).'
+      refs: ['docs/tasks/task.230.change-log-block-foreign-sections/task.230.change-log-block-foreign-sections.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

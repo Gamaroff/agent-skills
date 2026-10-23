@@ -24,6 +24,7 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
+import { loadSensitive } from "../spawn-budget.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "..", "..", "..");
@@ -279,16 +280,25 @@ test("partially migrated: a numbered PRD and epic keep their numbers; a legacy e
   assert.equal(planned.fileMap.has(`${R}/dom/prd.4.feat/prd.4.feat.md`), false);
 });
 
-test("L3: an index PRD without --name is unplaced-prd; with --name it is planned", () => {
+test("L3: an index PRD without --name is unplaced-prd; a slug alone is needs-domain; <domain>/<slug> is planned", () => {
   const files = { [`${R}/index.md`]: "# PRD\n", [`${R}/goals.md`]: "shard\n" };
   assert.deepEqual(dry(memIo(files)).codes, ["unplaced-prd"]);
-  const named = dry(memIo(files), {
+  // task.211: a root index has no domain directory, and create-prd refuses a PRD without one.
+  const slugOnly = dry(memIo(files), {
     names: new Map([[`${R}/index.md`, "core"]]),
+  });
+  assert.deepEqual(slugOnly.codes, ["needs-domain"]);
+  assert.match(
+    slugOnly.blockers[0].detail,
+    /--name docs\/prd\/index\.md=<domain>\/<slug>/,
+  );
+  const named = dry(memIo(files), {
+    names: new Map([[`${R}/index.md`, "main/core"]]),
   });
   assert.deepEqual(named.codes, []);
   assert.equal(
     named.planned.fileMap.get(`${R}/index.md`),
-    `${R}/prd.1.core/prd.1.core.md`,
+    `${R}/main/prd.1.core/prd.1.core.md`,
   );
 });
 
@@ -1137,5 +1147,617 @@ test("cycle 2 CR-6: an untracked monolith still gets its frontmatter edit", () =
       "prd_number",
     ),
     "1",
+  );
+});
+
+// ---------------------------------------------------------------------------
+// task.211 — frontmatter-less PRDs, links from outside the root, domain-less PRDs
+// ---------------------------------------------------------------------------
+
+test("task.211 phase 1: editFrontmatter creates a block when there is none, and frontmatterState tells the three shapes apart", () => {
+  const edits = [
+    { key: "name", value: "prd.1.mono" },
+    { key: "prd_number", value: 1, quote: false, insert: true, after: "name" },
+    { key: "type", value: "prd", createOnly: true },
+  ];
+  assert.equal(
+    m.editFrontmatter("# Mono\n", edits),
+    "---\nname: prd.1.mono\nprd_number: 1\ntype: prd\n---\n# Mono\n",
+  );
+  // An existing block: edited in place; a createOnly key is never inserted into it.
+  assert.equal(
+    m.editFrontmatter("---\nname: old\ntitle: T\n---\n# x\n", edits),
+    "---\nname: prd.1.mono\nprd_number: 1\ntitle: T\n---\n# x\n",
+  );
+  // createOnly never overwrites: a PRD whose block already states a type keeps it.
+  assert.equal(
+    m.editFrontmatter("---\ntype: spec\n---\n", edits),
+    "---\nprd_number: 1\ntype: spec\n---\n",
+  );
+  assert.equal(m.frontmatterState("# x\n"), "none");
+  assert.equal(m.frontmatterState("---\na: 1\n---\n"), "closed");
+  assert.equal(m.frontmatterState("---\na: 1\n# never closed\n"), "unclosed");
+});
+
+test("task.221 CR-2: editFrontmatter leaves a displaced or unclosed block alone", () => {
+  const edits = [{ key: "prd_number", value: 1, quote: false, insert: true }];
+  // Displaced by a blank line, displaced by a BOM, and unclosed: planEdits refuses each as a
+  // blocker, and a direct call must not edit it either.
+  for (const text of [
+    "\n---\na: 1\n---\nbody\n",
+    "\uFEFF---\na: 1\n---\n",
+    "---\na: 1\nbody\n",
+  ])
+    assert.equal(m.editFrontmatter(text, edits), text, JSON.stringify(text));
+});
+
+test("task.211 phase 1: a frontmatter-less monolith and a frontmatter-less L1 PRD migrate and pass the post-check", () => {
+  const mono = memIo({
+    "docs/prd.md": "# Mono, no frontmatter\n",
+    [`${R}/.keep`]: "",
+  });
+  const r = m.run(["--apply", "--root", R, "--name", "docs/prd.md=mono"], {
+    io: mono,
+  });
+  assert.equal(r.reason, "ok", JSON.stringify(r.findings || r.blockers));
+  const moved = mono.files.get(`${R}/mono/prd.1.mono/prd.1.mono.md`);
+  assert.equal(docId.frontmatterField(moved, "prd_number"), "1");
+  assert.equal(docId.frontmatterField(moved, "name"), "prd.1.mono");
+  assert.equal(docId.frontmatterField(moved, "type"), "prd");
+  assert.match(moved, /\n---\n# Mono, no frontmatter\n$/, "the body is kept");
+  const l1 = memIo({ [`${R}/onb/prd.onb/prd.onb.md`]: "# Onboarding\n" });
+  const r1 = m.run(["--apply", "--root", R], { io: l1 });
+  assert.equal(r1.reason, "ok", JSON.stringify(r1.findings || r1.blockers));
+  assert.equal(
+    docId.frontmatterField(
+      l1.files.get(`${R}/onb/prd.1.onb/prd.1.onb.md`),
+      "prd_number",
+    ),
+    "1",
+  );
+});
+
+test("task.211 phase 1: an unclosed frontmatter fence is a blocker, and --apply moves nothing", () => {
+  const files = {
+    "docs/prd.md": "---\ntype: prd\n# Mono, fence never closed\n",
+    [`${R}/.keep`]: "",
+  };
+  const names = new Map([["docs/prd.md", "mono"]]);
+  assert.deepEqual(dry(memIo(files), { names }).codes, [
+    "unclosed-frontmatter",
+  ]);
+  const io = memIo(files);
+  const r = m.run(["--apply", "--root", R, "--name", "docs/prd.md=mono"], {
+    io,
+  });
+  assert.deepEqual([r.reason, r.exitCode], ["blocked", 1]);
+  assert.deepEqual(io.calls.moves, [], "nothing moved");
+  assert.deepEqual(io.calls.writes, [], "nothing written");
+  assert.ok(m.BLOCKER_CODES.includes("unclosed-frontmatter"));
+});
+
+/** A monolith, the files outside the root that name it, and two that do not. */
+function outsideTree() {
+  return {
+    "docs/prd.md": "---\ntitle: Mono\nstatus: draft\n---\n# PRD\n",
+    [`${R}/.keep`]: "",
+    "README.md": "[PRD](docs/prd.md)\nSee `docs/prd.md`.\n",
+    "docs/architecture.md": "See [the PRD](prd.md).\n",
+    "docs/notes.md": "The old prd.md layout is prose.\n",
+    "docs/other.md": "[contributing](../CONTRIBUTING.md)\n",
+    "CONTRIBUTING.md": "# Contributing\n",
+  };
+}
+const MONO_NEW = `${R}/mono/prd.1.mono/prd.1.mono.md`;
+
+test("task.211 phase 2: links and literals naming a moved docs/prd.md from outside the root are re-pointed; files naming it in prose or not at all are untouched", () => {
+  const files = outsideTree();
+  const io = memIo(files);
+  const r = m.run(["--apply", "--root", R, "--name", "docs/prd.md=mono"], {
+    io,
+  });
+  assert.equal(r.reason, "ok", JSON.stringify(r.findings || r.blockers));
+  assert.equal(
+    io.files.get("README.md"),
+    `[PRD](${MONO_NEW})\nSee \`${MONO_NEW}\`.\n`,
+    "the repository-root link and the literal path both follow the move",
+  );
+  assert.equal(
+    io.files.get("docs/architecture.md"),
+    "See [the PRD](prd/mono/prd.1.mono/prd.1.mono.md).\n",
+    "a relative link from docs/ follows the move",
+  );
+  for (const f of ["docs/notes.md", "docs/other.md", "CONTRIBUTING.md"])
+    assert.equal(io.files.get(f), files[f], `${f} is byte-identical`);
+  assert.equal(r.links.rewritten, 2, "links.rewritten counts both links");
+  // Every re-pointed link resolves after the move.
+  for (const f of ["README.md", "docs/architecture.md"])
+    for (const { target } of extractRelativeLinks(io.files.get(f)))
+      assert.ok(
+        io.files.has(join(dirname(f), target).replace(/^\.\//, "")),
+        `${f} → ${target}`,
+      );
+});
+
+test("task.211 phase 2: a link to an untracked monolith is live, so it is re-pointed rather than left dead", () => {
+  const files = outsideTree();
+  const io = memIo(files, {
+    tracked: Object.keys(files).filter((f) => f !== "docs/prd.md"),
+  });
+  const r = m.run(["--apply", "--root", R, "--name", "docs/prd.md=mono"], {
+    io,
+  });
+  assert.equal(r.reason, "ok", JSON.stringify(r.findings || r.blockers));
+  assert.equal(io.files.get("README.md").split("\n")[0], `[PRD](${MONO_NEW})`);
+  assert.equal(r.links.dead, 0);
+});
+
+test("task.211 phase 2 (performance): the widened prefilter adds no reads, and a file naming no move source gets no link pass", () => {
+  const files = outsideTree();
+  const io = memIo(files);
+  const reads = new Map();
+  const readFile = io.readFile;
+  io.readFile = (p) => {
+    reads.set(p, (reads.get(p) || 0) + 1);
+    return readFile(p);
+  };
+  const { edits } = dry(io, { names: new Map([["docs/prd.md", "mono"]]) });
+  // Each outside candidate is read once, by the candidate loop — the prefilter decides what
+  // is processed after that read, so naming a move source costs no extra read.
+  for (const f of [
+    "README.md",
+    "docs/architecture.md",
+    "docs/notes.md",
+    "docs/other.md",
+  ])
+    assert.equal(reads.get(f), 1, `${f} read once`);
+  // docs/other.md holds a live link to CONTRIBUTING.md; it names no move source, so the link
+  // pass never sees it. Only the two links to the monolith are counted.
+  assert.equal(edits.links.live, 2);
+  assert.equal(edits.edits.has("docs/other.md"), false);
+});
+
+test("task.211 phase 3: root L1 and L2 PRDs and a root index need a domain; <domain>/<slug> places them under it", () => {
+  const cases = [
+    [`${R}/prd.x/prd.x.md`, "main/x", `${R}/main/prd.1.x/prd.1.x.md`],
+    [`${R}/prd.y.md`, "main/y", `${R}/main/prd.1.y/prd.1.y.md`],
+    [`${R}/index.md`, "main/core", `${R}/main/prd.1.core/prd.1.core.md`],
+  ];
+  for (const [doc, name, to] of cases) {
+    const files = { [doc]: "---\ntype: prd\n---\n# PRD\n" };
+    const slug = name.split("/")[1];
+    const bare = dry(memIo(files), { names: new Map([[doc, slug]]) });
+    assert.deepEqual(bare.codes, ["needs-domain"], doc);
+    assert.match(bare.blockers[0].detail, /=<domain>\/<slug>/, doc);
+    const named = dry(memIo(files), { names: new Map([[doc, name]]) });
+    assert.deepEqual(named.codes, [], doc);
+    assert.equal(named.planned.fileMap.get(doc), to, doc);
+    assert.equal(named.planned.prds[0].domain, "main", doc);
+  }
+  assert.ok(m.BLOCKER_CODES.includes("needs-domain"));
+});
+
+test("task.211 phase 3: --apply with <domain>/<slug> writes Folder <domain> and a clean corpus; the monolith takes a named domain too", () => {
+  const io = memIo({ [`${R}/prd.y.md`]: "---\ntitle: Why\n---\n# PRD\n" });
+  const r = m.run(["--apply", "--root", R, "--name", `${R}/prd.y.md=main/y`], {
+    io,
+  });
+  assert.equal(r.reason, "ok", JSON.stringify(r.findings || r.blockers));
+  assert.ok(io.files.has(`${R}/main/prd.1.y/prd.1.y.md`));
+  assert.match(io.files.get(`${R}/prd-registry.md`), /\| main \|/);
+  const mono = dry(
+    memIo({ "docs/prd.md": "---\ntype: prd\n---\n", [`${R}/.keep`]: "" }),
+    { names: new Map([["docs/prd.md", "dom/mono"]]) },
+  );
+  assert.deepEqual(mono.codes, []);
+  assert.equal(
+    mono.planned.fileMap.get("docs/prd.md"),
+    `${R}/dom/prd.1.mono/prd.1.mono.md`,
+  );
+});
+
+test("task.211 phase 3: a numbered PRD already under the root is not moved, so it is not blocked", () => {
+  const files = {
+    [`${R}/prd.1.x/prd.1.x.md`]:
+      "---\nname: prd.1.x\nprd_number: 1\n---\n# PRD\n",
+  };
+  assert.deepEqual(dry(memIo(files)).codes, []);
+});
+
+test("task.211 phase 3: a bad domain is bad-slug; a malformed <domain>/<slug> is a usage error", () => {
+  const files = { [`${R}/index.md`]: "---\ntype: prd\n---\n# PRD\n" };
+  const bad = dry(memIo(files), {
+    names: new Map([[`${R}/index.md`, "Bad_Dom/core"]]),
+  });
+  assert.deepEqual(bad.codes, ["bad-slug"]);
+  assert.match(bad.blockers[0].detail, /"Bad_Dom\/core"/);
+  const io = memIo(files);
+  for (const v of ["x=a/b/c", "x=/core", "x=main/", "x=a//b"]) {
+    const r = m.run(["--name", v], { io });
+    assert.deepEqual([r.reason, r.exitCode], ["usage", 2], v);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// task.211 QA cycle 1
+// ---------------------------------------------------------------------------
+
+test("task.211 QA-1 CR-1: a fence after a BOM or blank lines is displaced-frontmatter, and --apply moves and writes nothing", () => {
+  assert.equal(m.frontmatterState("﻿---\na: 1\n---\n"), "displaced");
+  assert.equal(m.frontmatterState("\n\n---\na: 1\n---\n"), "displaced");
+  // A thematic break below a heading is body, not a block: the file still gets one.
+  assert.equal(m.frontmatterState("# T\n\n---\n"), "none");
+  assert.equal(m.frontmatterState(""), "none");
+  for (const body of [
+    "﻿---\nname: prd.onb\ntitle: O\n---\n# O\n",
+    "\n---\nname: prd.onb\ntitle: O\n---\n# O\n",
+  ]) {
+    const files = { [`${R}/onb/prd.onb.md`]: body };
+    assert.deepEqual(dry(memIo(files)).codes, ["displaced-frontmatter"]);
+    const io = memIo(files);
+    const r = m.run(["--apply", "--root", R], { io });
+    assert.deepEqual([r.reason, r.exitCode], ["blocked", 1]);
+    assert.deepEqual(io.calls.moves, [], "nothing moved");
+    assert.deepEqual(io.calls.writes, [], "nothing written");
+  }
+  assert.ok(m.BLOCKER_CODES.includes("displaced-frontmatter"));
+});
+
+test("task.211 QA-1 CR-1: editFrontmatter is idempotent — a second write over the block it created is byte-identical", () => {
+  const edits = [
+    { key: "name", value: "prd.1.mono" },
+    { key: "prd_number", value: 1, quote: false, insert: true, after: "name" },
+    { key: "type", value: "prd", createOnly: true },
+  ];
+  for (const text of ["# Mono\n", "", "# T\n\n---\nbody\n"]) {
+    const once = m.editFrontmatter(text, edits);
+    assert.equal(m.frontmatterState(once), "closed", JSON.stringify(text));
+    assert.equal(m.editFrontmatter(once, edits), once, JSON.stringify(text));
+  }
+});
+
+test("task.211 QA-1: a relative or embedded mention of a moved outside source that no pass rewrites is stale-reference, and --apply moves nothing", () => {
+  const files = {
+    ...outsideTree(),
+    "scripts/x.js": 'const prd = "../docs/prd.md";\n',
+    "docs/guide/x.md": "Read `../prd.md` first.\n",
+  };
+  const names = new Map([["docs/prd.md", "mono"]]);
+  const d = dry(memIo(files), { names });
+  assert.deepEqual(d.codes, ["stale-reference", "stale-reference"]);
+  assert.deepEqual(d.blockers.map((b) => b.path).sort(), [
+    "docs/guide/x.md",
+    "scripts/x.js",
+  ]);
+  assert.match(d.blockers[0].detail, /docs\/prd\.md/);
+  const io = memIo(files);
+  const r = m.run(["--apply", "--root", R, "--name", "docs/prd.md=mono"], {
+    io,
+  });
+  assert.deepEqual([r.reason, r.exitCode], ["blocked", 1]);
+  assert.deepEqual(io.calls.moves, [], "nothing moved");
+  // The other direction: what the passes do rewrite, and bare-name prose, raise nothing.
+  assert.deepEqual(dry(memIo(outsideTree()), { names }).codes, []);
+  assert.ok(m.BLOCKER_CODES.includes("stale-reference"));
+});
+
+test("task.211 QA-2: parseNameValue is the one --name check — legitimate names parse, every path escape is refused", () => {
+  assert.deepEqual(m.parseNameValue("core"), { slug: "core", domain: null });
+  assert.deepEqual(m.parseNameValue("main/core"), {
+    slug: "core",
+    domain: "main",
+  });
+  for (const v of [
+    "../core",
+    "main/..",
+    "./core",
+    "/etc/passwd",
+    "%2e%2e/core",
+    "main\u0000/core",
+    "..\\core",
+    "a/b/c",
+    "",
+    "main/",
+    "Main/core",
+    undefined,
+  ])
+    assert.equal(m.parseNameValue(v), null, JSON.stringify(v));
+  // parseArgs and discover both answer through it: a library caller passing a bad
+  // name directly gets bad-slug, and nothing is placed from it.
+  const d = dry(memIo({ [`${R}/prd.y.md`]: "# Y\n" }), {
+    names: new Map([[`${R}/prd.y.md`, "../y"]]),
+  });
+  assert.deepEqual(d.codes, ["bad-slug"]);
+  assert.equal(d.planned.fileMap.size, 0);
+  const r = m.run(["--name", `${R}/prd.y.md=../y`], {
+    io: memIo({ [`${R}/prd.y.md`]: "# Y\n" }),
+  });
+  assert.deepEqual([r.reason, r.exitCode], ["usage", 2]);
+});
+
+test("task.211 CR-3: a named domain for an already-numbered PRD is bad-slug, and --apply moves nothing", () => {
+  const files = {
+    [`${R}/prd.1.x/prd.1.x.md`]:
+      "---\nname: prd.1.x\nprd_number: 1\n---\n# PRD\n",
+  };
+  const names = new Map([[`${R}/prd.1.x/prd.1.x.md`, "main/x"]]);
+  const d = dry(memIo(files), { names });
+  assert.deepEqual(d.codes, ["bad-slug"]);
+  assert.match(d.blockers[0].detail, /already numbered/);
+  const io = memIo(files);
+  const r = m.run(
+    ["--apply", "--root", R, "--name", `${R}/prd.1.x/prd.1.x.md=main/x`],
+    { io },
+  );
+  assert.deepEqual([r.reason, r.exitCode], ["blocked", 1]);
+  assert.deepEqual(io.calls.moves, [], "nothing moved");
+});
+
+// ---------------------------------------------------------------------------
+// task.211 QA cycle 2
+// ---------------------------------------------------------------------------
+
+test("task.211 QA-2 CR-3 CR-4: outsideReferences flags each token that resolves to a source, and no token that only ends like one", () => {
+  const S = ["docs/prd.md"];
+  const tokens = (file, text) =>
+    m.outsideReferences(file, text, S).map((h) => h.token);
+  // Must flag: every way a file can name docs/prd.md by path.
+  for (const [file, text, token] of [
+    ["scripts/x.js", 'read("../docs/prd.md")', "../docs/prd.md"],
+    ["docs/guide/x.md", "Read `../prd.md` first.", "../prd.md"],
+    ["docs/build.js", 'read("./prd.md")', "./prd.md"],
+    ["package.json", '{"prd":"docs/prd.md"}', "docs/prd.md"],
+    ["scripts/a.sh", "cat docs/prd.md.", "docs/prd.md"],
+    ["docs/a/b/x.md", "[p](../../prd.md)", "../../prd.md"],
+    // A path rooted in a variable is relative, not absolute (task.211 QA-3 CR-1).
+    ["scripts/x.mjs", "const p = `${ROOT}/docs/prd.md`;", "/docs/prd.md"],
+    ["scripts/x.sh", "cat $ROOT/docs/prd.md", "ROOT/docs/prd.md"],
+    ["scripts/x.sh", 'cat "$(dirname "$0")/../docs/prd.md"', "/../docs/prd.md"],
+    // Quoted on its own, or a template (task.211 QA-4 CR-3).
+    ["scripts/x.sh", 'cat "$ROOT"/docs/prd.md', "/docs/prd.md"],
+    ["scripts/x.sh", "cat '${ROOT}'/docs/prd.md", "/docs/prd.md"],
+    ["docs/t.md", "{{root}}/docs/prd.md", "/docs/prd.md"],
+    // Any template that closes with } or ), whatever opened it (task.211 QA-5 CR-1).
+    ["scripts/gen.py", 'open(f"{ROOT}/docs/prd.md")', "/docs/prd.md"],
+    ["scripts/x.rb", 'File.read("#{ROOT}/docs/prd.md")', "/docs/prd.md"],
+    [
+      "scripts/x.sh",
+      'cat "$(dirname "$(readlink -f "$0")")/../docs/prd.md"',
+      "/../docs/prd.md",
+    ],
+    ["scripts/x.sh", "cat ${ROOT:-${PWD}}/docs/prd.md", "/docs/prd.md"],
+  ])
+    assert.deepEqual(tokens(file, text), [token], `${file}: ${text}`);
+  // Must not flag: other files whose path ends in the same text, bare names, URLs.
+  for (const [file, text] of [
+    ["README.md", "See apps/web/docs/prd.md"],
+    ["docs/a/b/x.md", "[root](../../../prd.md)"],
+    ["docs/notes.md", "The old prd.md layout is prose."],
+    ["README.md", "https://example.com/docs/prd.md"],
+    ["README.md", "/docs/prd.md is absolute"],
+    ["README.md", '[abs](/docs/prd.md) and "/docs/prd.md" and x=/docs/prd.md'],
+    ["README.md", "docs/prd.md.bak and docs/prd.mdx"],
+    // A variable naming a place outside the repository, like ~ (task.211 QA-4 CR-4).
+    [
+      "scripts/x.sh",
+      'cp $HOME/docs/prd.md ${TMPDIR}/x "$XDG_DATA_HOME"/docs/prd.md',
+    ],
+    ["scripts/x.sh", "cp ~/docs/prd.md x"],
+    ["README.md", "\"x\"/docs/prd.md and 'y'/docs/prd.md"],
+    ["scripts/x.sh", "cat ${HOME}/docs/prd.md"],
+  ])
+    assert.deepEqual(tokens(file, text), [], `${file}: ${text}`);
+});
+
+test("task.221 CR-1: outsideReferences compares a dot-directory path at the root", () => {
+  const S = [".docs/prd.md"];
+  const tokens = (file, text) =>
+    m.outsideReferences(file, text, S).map((h) => h.token);
+  // Must flag: a dot-directory named from another directory, bare or rooted in a variable.
+  for (const [text, token] of [
+    ["cat .docs/prd.md", ".docs/prd.md"],
+    ["cat ${ROOT}/.docs/prd.md", "/.docs/prd.md"],
+    ["cat $ROOT/.docs/prd.md", "ROOT/.docs/prd.md"],
+    ["cat ../.docs/prd.md", "../.docs/prd.md"],
+  ])
+    assert.deepEqual(tokens("scripts/run.sh", text), [token], text);
+  // Must not flag: ./ stays relative to the file's directory, and a different file.
+  for (const text of ["cat ./.docs/prd.md", "cat docs/prd.md"])
+    assert.deepEqual(tokens("scripts/run.sh", text), [], text);
+});
+
+// Sized so a quadratic matcher takes seconds and fails the bound rather than hanging the
+// suite: without the lookbehind, 60k word characters take ~7s; resolving a 100k `../`
+// chain takes ~4.5s. The shipped matcher does each in milliseconds.
+test("task.211 QA-2 CR-3: outsideReferences stays linear on long path-shaped input", () => {
+  for (const text of [
+    `prd.md ${"../".repeat(100000)}prd.md`,
+    `prd.md ${"a/".repeat(200000)}`,
+    `prd.md ${"a".repeat(60000)}`,
+    `prd.md ${'"/a'.repeat(150000)}`,
+    `prd.md ${"$(x)/a ".repeat(80000)}`,
+  ]) {
+    const t0 = performance.now();
+    m.outsideReferences("docs/x.md", text, ["docs/prd.md"]);
+    assert.ok(
+      performance.now() - t0 < 1000,
+      loadSensitive(`${text.slice(7, 12)}… in < 1s`),
+    );
+  }
+});
+
+test("task.211 QA-2 CR-1: a non-literal file naming a moved outside source is stale-reference; none is read when no outside source exists", () => {
+  const files = {
+    ...outsideTree(),
+    "package.json": '{"prd":"docs/prd.md"}\n',
+    "scripts/a.sh": "cat docs/prd.md\n",
+    "logo.png": "\u0000PNG docs/prd.md",
+  };
+  const names = new Map([["docs/prd.md", "mono"]]);
+  const d = dry(memIo(files), { names });
+  assert.deepEqual(d.codes, ["stale-reference", "stale-reference"]);
+  assert.deepEqual(d.blockers.map((b) => b.path).sort(), [
+    "package.json",
+    "scripts/a.sh",
+  ]);
+  const io = memIo(files);
+  const r = m.run(["--apply", "--root", R, "--name", "docs/prd.md=mono"], {
+    io,
+  });
+  assert.deepEqual([r.reason, r.exitCode], ["blocked", 1]);
+  assert.deepEqual(io.calls.moves, [], "nothing moved");
+  // An in-tree migration has no outside source, so no non-literal file is read.
+  const l2 = memIo({ ...l2Tree(), "package.json": '{"x":1}\n' });
+  const reads = [];
+  const readFile = l2.readFile;
+  l2.readFile = (p) => {
+    reads.push(p);
+    return readFile(p);
+  };
+  assert.deepEqual(dry(l2).codes, []);
+  assert.equal(reads.includes("package.json"), false);
+});
+
+test("task.211 QA-2 CR-2: a numbered PRD that would move directly under the root needs a domain; one in a domain moves cleanly", () => {
+  const root = {
+    [`${R}/prd.1.x.md`]: "---\nname: prd.1.x\nprd_number: 1\n---\n# x\n",
+  };
+  const d = dry(memIo(root));
+  assert.deepEqual(d.codes, ["needs-domain"]);
+  assert.match(d.blockers[0].detail, /by hand/);
+  const io = memIo(root);
+  const r = m.run(["--apply", "--root", R], { io });
+  assert.deepEqual([r.reason, r.exitCode], ["blocked", 1]);
+  assert.deepEqual(io.calls.moves, [], "nothing moved");
+  const inDomain = dry(
+    memIo({
+      [`${R}/main/prd.1.x.md`]: "---\nname: prd.1.x\nprd_number: 1\n---\n",
+    }),
+  );
+  assert.deepEqual(inDomain.codes, []);
+  assert.equal(
+    inDomain.planned.fileMap.get(`${R}/main/prd.1.x.md`),
+    `${R}/main/prd.1.x/prd.1.x.md`,
+  );
+});
+
+test("task.211 QA-2 CR-5: a blank line and a thematic break is a body with no block — the migration writes one and keeps the body", () => {
+  assert.equal(m.frontmatterState("\n---\n# Onboarding\n"), "none");
+  assert.equal(m.frontmatterState("\n---\na: 1\n---\n"), "displaced");
+  const io = memIo({ [`${R}/onb/prd.onb.md`]: "\n---\n# Onboarding\n" });
+  const r = m.run(["--apply", "--root", R], { io });
+  assert.equal(r.reason, "ok", JSON.stringify(r.findings || r.blockers));
+  const moved = io.files.get(`${R}/onb/prd.1.onb/prd.1.onb.md`);
+  assert.equal(docId.frontmatterField(moved, "prd_number"), "1");
+  assert.match(moved, /\n---\n\n---\n# Onboarding\n$/, "the body is kept");
+});
+
+test("task.211 QA-5 CR-2: frontmatterState stays linear on a long blank line", () => {
+  const t0 = performance.now();
+  m.frontmatterState(`\n---\nname: x\na${" ".repeat(400000)}\n---\n`);
+  assert.ok(
+    performance.now() - t0 < 1000,
+    loadSensitive("400k blanks in < 1s"),
+  );
+});
+
+test("task.211 QA-3 CR-4: a late fence is displaced only when it closes over YAML — two thematic breaks are a body", () => {
+  const body = "\n---\n# Onb\n\nIntro\n\n---\n## Goals\n";
+  assert.equal(m.frontmatterState(body), "none");
+  assert.equal(m.frontmatterState("\n---\n# Title\n---\n"), "none");
+  assert.equal(
+    m.frontmatterState("\n---\ntitle: x\ntags:\n  - a\n---\n# x\n"),
+    "displaced",
+  );
+  assert.equal(m.frontmatterState("\uFEFF---\nname: x\n---\n"), "displaced");
+  // A real block keyed in any YAML spelling is still displaced (task.211 QA-4 CR-2).
+  for (const key of [
+    "Last updated: 2024",
+    '"title": x',
+    "prd.version: 2",
+    "'a b': c",
+  ])
+    assert.equal(
+      m.frontmatterState(`\n---\n${key}\nname: x\n---\n# x\n`),
+      "displaced",
+      key,
+    );
+  for (const line of [
+    "**Status**: Draft",
+    "> Note: x",
+    "[a]: http://x",
+    "- item: x",
+  ])
+    assert.equal(
+      m.frontmatterState(`\n---\n${line}\n---\n# x\n`),
+      "none",
+      line,
+    );
+  const io = memIo({ [`${R}/onb/prd.onb.md`]: body });
+  const r = m.run(["--apply", "--root", R], { io });
+  assert.equal(r.reason, "ok", JSON.stringify(r.findings || r.blockers));
+  assert.ok(
+    io.files.get(`${R}/onb/prd.1.onb/prd.1.onb.md`).endsWith(body),
+    "the body is kept",
+  );
+});
+
+test("task.211 QA-4 CR-1: a file whose extension differs only in case is read by exactly one loop", () => {
+  const files = {
+    ...outsideTree(),
+    "notes/README.MD": "see ../docs/prd.md\n",
+    ".github/workflows/ci.YML": "run: cat ../../docs/prd.md\n",
+  };
+  const io = memIo(files);
+  const reads = [];
+  const readFile = io.readFile;
+  io.readFile = (p) => {
+    reads.push(p);
+    return readFile(p);
+  };
+  const d = dry(io, { names: new Map([["docs/prd.md", "mono"]]) });
+  assert.deepEqual(d.blockers.map((b) => [b.code, b.path]).sort(), [
+    ["stale-reference", ".github/workflows/ci.YML"],
+    ["stale-reference", "notes/README.MD"],
+  ]);
+  for (const f of ["notes/README.MD", ".github/workflows/ci.YML"])
+    assert.equal(reads.filter((p) => p === f).length, 1, `${f} read once`);
+});
+
+test("task.211 QA-3 CR-2 CR-3 CR-5: the scan reads every in-scope non-literal file once — under the root too — and no example copy or known binary", () => {
+  const files = {
+    ...outsideTree(),
+    [`${R}/tools/cfg.json`]: '{"p":"docs/prd.md"}\n',
+    "examples/demo/package.json": '{"p":"docs/prd.md"}\n',
+    "examples/demo/README.md": "docs/prd.md\n",
+    "assets/logo.png": "docs/prd.md",
+    "data/blob.bin": "\u0000 docs/prd.md",
+  };
+  const io = memIo(files);
+  const reads = [];
+  const readFile = io.readFile;
+  io.readFile = (p) => {
+    reads.push(p);
+    return readFile(p);
+  };
+  const d = dry(io, { names: new Map([["docs/prd.md", "mono"]]) });
+  assert.deepEqual(
+    d.blockers.map((b) => [b.code, b.path]),
+    [["stale-reference", `${R}/tools/cfg.json`]],
+  );
+  assert.equal(
+    reads.includes("assets/logo.png"),
+    false,
+    "a known binary type is never read",
+  );
+  assert.equal(
+    reads.includes("data/blob.bin"),
+    true,
+    "an unknown type is read, then refused on NUL",
+  );
+  assert.equal(
+    reads.filter((p) => p === `${R}/tools/cfg.json`).length,
+    1,
+    "read once",
   );
 });

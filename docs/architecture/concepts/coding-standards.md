@@ -81,6 +81,7 @@ Run these locally when you touch a skill or shared resource:
   ```
 
   Every `# shellcheck disable=SCxxxx` must carry a stated reason. A directive covers only the next command.
+- `npm run lint:secrets` — the `Secret scan` workflow gates every PR on a pinned gitleaks over the tracked files and the PR text; this is its local twin (skips when `gitleaks` is absent). A sample value that trips it is reworded, or carries `gitleaks:allow` with a reason; never a path allowlist.
 
 ## Do not
 

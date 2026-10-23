@@ -1,0 +1,133 @@
+[
+  {
+    "id": "body.populated",
+    "input": "doc.md",
+    "why": "a gaps section with a Missing Criteria list: the body Step 8.5 posts",
+    "correct": "accept",
+    "direction": "legitimate",
+    "fixture": {
+      "files": {
+        "doc.md": "# T\n\n## Definition of Done - Gaps Identified\n\n### Missing Criteria\n\n- a gap\n\n## Change Log\n"
+      }
+    }
+  },
+  {
+    "id": "body.heading-only",
+    "input": "doc.md",
+    "why": "a section holding only a subsection heading is not empty; the count refuses it, the body does not",
+    "correct": "accept",
+    "direction": "legitimate",
+    "fixture": {
+      "files": {
+        "doc.md": "# T\n\n## Definition of Done - Gaps Identified\n### Missing Criteria\n"
+      }
+    }
+  },
+  {
+    "id": "body.empty-next-heading",
+    "input": "doc.md",
+    "why": "the heading followed directly by the next level-2 heading: no lines",
+    "correct": "reject",
+    "direction": "hostile",
+    "expected": { "exit": 1 },
+    "fixture": {
+      "files": {
+        "doc.md": "# T\n\n## Definition of Done - Gaps Identified\n## Change Log\n"
+      }
+    }
+  },
+  {
+    "id": "body.empty-eof",
+    "input": "doc.md",
+    "why": "the heading at end of file: no lines",
+    "correct": "reject",
+    "direction": "hostile",
+    "expected": { "exit": 1 },
+    "fixture": {
+      "files": {
+        "doc.md": "# T\n\n## Definition of Done - Gaps Identified\n"
+      }
+    }
+  },
+  {
+    "id": "body.blank-lines",
+    "input": "doc.md",
+    "why": "blank lines only",
+    "correct": "reject",
+    "direction": "hostile",
+    "expected": { "exit": 1 },
+    "fixture": {
+      "files": {
+        "doc.md": "# T\n\n## Definition of Done - Gaps Identified\n\n\n\n## Change Log\n"
+      }
+    }
+  },
+  {
+    "id": "body.whitespace-lines",
+    "input": "doc.md",
+    "why": "spaces and tabs only: no non-blank line",
+    "correct": "reject",
+    "direction": "hostile",
+    "expected": { "exit": 1 },
+    "fixture": {
+      "files": {
+        "doc.md": "# T\n\n## Definition of Done - Gaps Identified\n   \n\t\n \t \n## Change Log\n"
+      }
+    }
+  },
+  {
+    "id": "body.crlf-blank",
+    "input": "doc.md",
+    "why": "CRLF line endings with blank lines only",
+    "correct": "reject",
+    "direction": "hostile",
+    "expected": { "exit": 1 },
+    "fixture": {
+      "files": {
+        "doc.md": "# T\r\n\r\n## Definition of Done - Gaps Identified\r\n\r\n\r\n## Change Log\r\n"
+      }
+    }
+  },
+  {
+    "id": "body.fenced-only",
+    "input": "doc.md",
+    "why": "the section exists only inside a fenced example, which is never entered",
+    "correct": "reject",
+    "direction": "hostile",
+    "expected": { "exit": 1 },
+    "fixture": {
+      "files": {
+        "doc.md": "# T\n\n```\n## Definition of Done - Gaps Identified\n\n- a gap\n```\n"
+      }
+    }
+  },
+  {
+    "id": "body.no-section",
+    "input": "doc.md",
+    "why": "no gaps section at all",
+    "correct": "reject",
+    "direction": "hostile",
+    "expected": { "exit": 1 },
+    "fixture": {
+      "files": {
+        "doc.md": "# T\n\n## Change Log\n"
+      }
+    }
+  },
+  {
+    "id": "body.substitution-path",
+    "input": "$(touch PWNED).md",
+    "why": "a document path NAMED as a command substitution must stay a name",
+    "correct": "reject",
+    "direction": "hostile",
+    "expected": { "exit": 1, "absent": ["PWNED"] }
+  },
+  {
+    "id": "body.placeholder-path",
+    "input": "{task-file}",
+    "why": "an unsubstituted placeholder is refused before any read",
+    "correct": "reject",
+    "direction": "hostile",
+    "expected": { "exit": 1 }
+  }
+]

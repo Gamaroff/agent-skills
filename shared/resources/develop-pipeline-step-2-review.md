@@ -125,7 +125,7 @@ decide differently in CI than on a developer's machine.
 > questioning the gate; and a re-review cannot clear it, because whatever withheld the promotion
 > fires again identically.
 >
-> Reported by a consumer (`rebirth-wallet` task.113 / RAPP-728) that **predicted** the halt from
+> Reported by a consumer project (2026, one of its tasks) that **predicted** the halt from
 > reading these tables and steered around it by hand rather than hitting it — the operator ruled
 > "Skip — already reviewed" at Phase 0d. The consumer's diagnosis, that the two tables contradict
 > each other, does not hold: `/review-task` does promote `planned → ready-for-development`, so the

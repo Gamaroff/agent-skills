@@ -7,7 +7,7 @@
  * second run changes nothing.
  *
  * The measured failure this skill exists to fix was invisible from the rendered
- * page. On a live board, bug card RAPP-713 and its siblings RAPP-706/707/708
+ * page. On a live board, a bug card and three of its siblings
  * each had a description whose ADF contained **zero** `link` marks — the bug
  * report was a bare plain-text path — with `parent: null` and an empty
  * `remotelink` list. The card looked fine and linked to nothing.
@@ -132,7 +132,7 @@ test("a story bug synced twice produces ONE card, fully linked, and the second r
   }
 
   // Not one relative or plain-text path survived into the published ADF — the
-  // exact defect measured on RAPP-713.
+  // exact defect measured on that bug card.
   assert.ok(
     hrefs.every((h) => /^https?:\/\//.test(h)),
     `a non-absolute href reached the card: ${hrefs.filter((h) => !/^https?:\/\//.test(h))}`,

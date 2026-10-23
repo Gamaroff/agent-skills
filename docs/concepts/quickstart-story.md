@@ -19,7 +19,7 @@ created: 2026-05-12
 
 Universal:
 
-- Node ≥ 20 (`node --version`)
+- Node ≥ 22 (`node --version`)
 - `git` (`git --version`)
 - Skills installed in your project. First-time setup runs the full wizard (skills + config + hooks + registries + docs scaffold):
   ```bash
@@ -51,7 +51,7 @@ Pick the check that matches your platform:
 gh auth status
 
 # Bitbucket VCS
-source shared/resources/bitbucket-auth.sh && echo "bitbucket auth ok ($BB_AUTH_SCHEME)"
+source .agents/skills/create-pr/references/bitbucket-auth.sh && echo "bitbucket auth ok ($BB_AUTH_SCHEME)"
 
 # Jira tracker (run in addition to VCS check above)
 [ -n "$JIRA_URL" ] && [ -n "$JIRA_API_TOKEN" ] && echo "jira auth ok"
@@ -125,9 +125,9 @@ Phase 0 of `/develop-story` asks two questions. Recommended answers for a practi
 | Q1 — Feature branch base | `develop` (or `main` if your repo has no `develop` branch) |
 | Q2 — PR target           | `develop` (same as Q1)                                     |
 
-Both prompts also offer an epic integration branch (`epic/{P}.{E}.footer-link`) as a trailing, unrecommended option. Ignore it for a practice run — it exists for epics whose stories must land as one unit, and it adds a manual promotion step at the end. Lite mode is auto-detected for a story this small; it is not a prompt.
+Q1 also offers an epic integration branch (`epic/{P}.{E}.footer-link`) as a trailing, unrecommended option, unless `branching.epicIntegration.offerWhenUndeclared` is `false`; Q2 offers `develop`, `main` or another branch. Ignore the epic option for a practice run — it exists for epics whose stories must land as one unit, and it adds a manual promotion step at the end. Lite mode is auto-detected for a story this small; it is not a prompt.
 
-> **What is lite mode?** A shorter pipeline mode that trades QA depth for speed on low-risk stories (single-file changes, docs edits, trivial refactors). It skips the parallel QA agents and the traceability matrix step, but **still runs every Step 7 side-effect** — PR comment, tracker update, board move, DoD post — so the audit trail is unchanged. See [`develop-pipeline-lite-mode.md`](../../shared/resources/develop-pipeline-lite-mode.md) for trigger conditions and exact behaviour. Pick `No` for anything with cross-file impact, security implications, or unclear acceptance criteria.
+> **What is lite mode?** A shorter pipeline mode that trades QA depth for speed on low-risk stories (single-file changes, docs edits, trivial refactors). QA (Step 5) uses direct tools instead of parallel agents and the PR review (Step 5c) runs at `--effort low` — traceability and the gate decision still run — and it **still runs every Step 7 side-effect** — PR comment, tracker update, board move, DoD post — so the audit trail is unchanged. See [`develop-pipeline-lite-mode.md`](../../shared/resources/develop-pipeline-lite-mode.md) for trigger conditions and exact behaviour, including `--mode`: `--mode lite` can request the shorter QA, and `--mode fast` applies it regardless of the detector when `develop.skippable` allows it. There is nothing to answer: Phase 0 decides it from the story.
 
 The agent then chains: **create-branch → review-story → develop → create-pr → qa-story → qa-fix → review-pr → finalise → commit**. Sit back — the chain completes automatically. A PASS gate is not the end of the QA loop: it hands to `review-pr` (Step 5c), which checks the PR against the story and can send the run back into `qa-fix` before `finalise` runs.
 
@@ -143,7 +143,7 @@ If QA loops more than once it is working as intended; a one-line README change s
 ls docs/prd/footer-link/prd.{P}.footer-link/epics/epic.{P}.{E}.footer-link/stories/story.{P}.{E}.1.add-footer-link/
 ```
 
-You should have all 10 artifact types:
+The story directory holds rows 3–6 and 8–12; the PRD and epic (rows 1–2) live in its parent directories, and the PR (row 7) is on your VCS host. You should have all 12 artifact types:
 
 | #   | Artifact                                          | What it is                                                                 |
 | --- | ------------------------------------------------- | -------------------------------------------------------------------------- |
@@ -156,7 +156,9 @@ You should have all 10 artifact types:
 | 7   | PR URL                                            | Pull Request opened by `/develop-story` (GitHub or Bitbucket per your VCS) |
 | 8   | `story.{P}.{E}.1.qa.1.add-footer-link.md`             | QA findings + traceability matrix                                          |
 | 9   | `story.{P}.{E}.1.gate.1.add-footer-link.yml`          | PASS / CONCERNS / FAIL gate                                                |
-| 10  | `story.{P}.{E}.1.dod.1.add-footer-link.md`            | Definition-of-Done checklist + sprint review summary                       |
+| 10  | `story.{P}.{E}.1.pr-review.1.add-footer-link.md`      | PR conformance review (`/review-pr`, Step 5c — the QA loop's exit gate)    |
+| 11  | `story.{P}.{E}.1.dod.1.add-footer-link.md`            | Definition-of-Done checklist                                               |
+| 12  | `sprint-review-summary.md`                        | Sprint review summary (`/finalise`, accepted path only)                    |
 
 For annotated worked examples of the upstream artifacts, see [`examples/prd-example/`](../../examples/prd-example/) (the PRD that drove this onboarding effort) and [`examples/epic-examples/`](../../examples/epic-examples/) (its four epics). For a deliberate FAIL → PASS walkthrough, see [Day 3 — Messy Path](../runbooks/first-week/day-3-messy-path.md).
 
@@ -194,11 +196,10 @@ If a practice GitHub milestone or Jira sprint/version was created: delete it onc
 | Symptom                                 | Likely cause                                  | Fix                                                                                       |
 | --------------------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | `gh auth status` not logged in          | `gh` not configured                           | Run `gh auth login`                                                                       |
-| Bitbucket calls return empty / 404      | `BITBUCKET_API_TOKEN` missing, expired, or created without Bitbucket scopes | Regenerate the Atlassian API token **with Bitbucket scopes ticked**; probe with `source shared/resources/bitbucket-auth.sh && curl -s -o /dev/null -w '%{http_code}' "${BB_CURL_AUTH[@]}" https://api.bitbucket.org/2.0/user` (expect 200) |
+| Bitbucket calls return empty / 404      | `BITBUCKET_API_TOKEN` missing, expired, or created without Bitbucket scopes | Regenerate the Atlassian API token **with Bitbucket scopes ticked**; probe with `source .agents/skills/create-pr/references/bitbucket-auth.sh && curl -s -o /dev/null -w '%{http_code}' "${BB_CURL_AUTH[@]}" https://api.bitbucket.org/2.0/user` (expect 200) |
 | Jira issue creation fails               | Wrong `JIRA_URL` or token                     | Verify `curl -u $JIRA_USER_EMAIL:$JIRA_API_TOKEN $JIRA_URL/rest/api/3/myself` returns 200 |
 | Skill picked wrong platform             | Auto-detect mis-fired                         | Set explicit `tracker:` / `vcs:` in `skills-config.yaml`                                  |
 | Phase 0 prompts differ from table above | Skill version drift                           | Check `.agents/skills/develop-story/` version                                             |
-| `/develop-story` pauses at QA planning  | Expected — test plan generation               | Wait 30–60 s                                                                              |
 | QA loop ran more than once              | Practice change touched something non-trivial | Use a simpler story (one-line file change)                                                |
 | Elapsed > 60 min                        | VCS/tracker API latency                       | API round-trips are out-of-scope; timer pauses while waiting                              |
 | Epic registry conflict on merge         | Two branches appended the same row            | Resolve conflict: increment the number in your branch                                     |
@@ -208,7 +209,7 @@ If a practice GitHub milestone or Jira sprint/version was created: delete it onc
 
 ## See also
 
-- `docs/standards/status-lifecycle.md` — lifecycle states (`draft → ready-for-development → in-progress → accepted`)
+- `docs/standards/status-lifecycle.md` — lifecycle states (`draft → ready-for-development → in-progress → ready-for-review → accepted` for a story; tasks add `planned` after `draft`)
 - `docs/standards/file-naming.md` — naming conventions for story artifacts
 - `docs/runbooks/story-development.md` — deep-dive on the full story development workflow (Phase A–D)
 - `examples/README.md` — annotated full-lifecycle artifact set (`task.6` worked task example)

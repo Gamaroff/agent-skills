@@ -190,6 +190,9 @@ developBatch: # optional — develop-batch parallel fan-out
         timeoutSec: 10
 
 loopSupervisor: # optional — fresh-context sequential loop runner
+  engine: claude # claude | agy — the agent CLI each iteration runs; --engine overrides
+  model: claude-sonnet-5-5 # optional; passed to the engine unvalidated; --model overrides
+  effort: high # optional; passed to the engine unvalidated; --effort overrides
   baseBranch: develop # ref the progress oracle watches for tick commits
   roadmapPath: docs/development/project-completion-roadmap.md
   cooldownSeconds: 10 # pause between iterations
@@ -288,11 +291,14 @@ gate, and strategy — single-item and batch runs never diverge) and adds
 | `developBatch.worktreeRoot`                     | path (repo-relative)            | `.worktrees`                                     | Directory that holds `develop-batch`'s worktrees, one per item at `<worktreeRoot>/batch-<slug>`. **Inside the repository, never beside it**: the selector refuses an absolute path, a `..` segment, a control character, or a root that a symlink takes outside the repository. Before creating any worktree, `develop-batch` checks that the root is gitignored and, if not, adds it to `.git/info/exclude` and says so in the run report. Commit `<worktreeRoot>/` to `.gitignore` yourself, and add it to any test-runner or linter ignore list that does not read `.gitignore` (for example Jest's `testPathIgnorePatterns` or a `tsconfig` `exclude`). Otherwise those tools find whole duplicate checkouts. `create-parallel-stories` uses the same root for the worktrees it tells you to create. |
 | `developBatch.maxResumeAttempts`                 | integer                         | `2`                                              | How many times an **externally interrupted** item (plan mode, permission denial, compaction) may be re-dispatched before it becomes `haltKind: "interrupted-exhausted"`. Does not apply to genuine pipeline HALTs, which are never re-dispatched.                                                                                                                                                                                                                                         |
 | `developBatch.maxRebatches`                      | integer                         | `3`                                              | Cap on Step 5.5 re-selections within one invocation. Re-batching also requires that the previous batch ticked at least one roadmap row, which is the real anti-spin guard.                                                                                                                                                                                                                                                                                                                |
+| `loopSupervisor.engine`                          | `claude` \| `agy`               | `claude`                                         | The agent CLI each `loop-supervisor` iteration runs. `--engine` overrides. A flag the engine cannot honour (`--max-turns`/`--max-cost` on `agy`) exits 1 rather than being dropped; table in [`skills/loop-supervisor/README.md`](../../skills/loop-supervisor/README.md#engines-and-models). |
+| `loopSupervisor.model`                           | model id                        | unset (engine default)                           | Passed to the engine as `--model`, unvalidated — the engine lists its own ids. `--model` overrides. |
+| `loopSupervisor.effort`                          | effort level                    | unset (engine default)                           | Passed to the engine as `--effort`, unvalidated. `--effort` overrides. **Skipping permissions is deliberately not a config key** — `--dangerously-skip-permissions` is an operator flag only, and refused on `claude`. |
 | `loopSupervisor.baseBranch`                      | branch name                     | `develop`                                        | Ref `loop-supervisor`'s progress oracle watches for a new `docs(roadmap): tick` commit. Every CLI flag overrides its config key.                                                                                                                                                                                                                                                                                                                                                          |
 | `loopSupervisor.roadmapPath`                     | path                            | (adapter default)                                | Roadmap passed to the supervisor's probe. Falls back to the adapter's own default when unset.                                                                                                                                                                                                                                                                                                                                                                                            |
 | `loopSupervisor.cooldownSeconds`                 | integer                         | `10`                                             | Pause between iterations.                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `loopSupervisor.dashboardUrl`                    | URL                             | unset                                            | Where `loop-supervisor` POSTs a status frame on each iteration boundary. Inert when unset. `--dashboard` overrides. The payload contract is in [`skills/loop-supervisor/README.md`](../../skills/loop-supervisor/README.md#publishing-the-run-to-a-dashboard); a failed push warns once and never affects the run. **The token is deliberately not a config key** — this file is committed, so it comes from `--dashboard-token` or `$LOOP_SUPERVISOR_DASHBOARD_TOKEN` instead. |
-| `loopSupervisor.adapters.<name>`                 | map of paths                    | (adapter defaults)                               | Per-adapter overrides for `stateFile`, `lockFile`, `haltFile`, `probeScript` and `command`. **Declarative only** — a config key that could name a module to `require()` would be a code-execution surface, so JavaScript adapters are deliberately not supported.                                                                                                                                                                                                                          |
+| `loopSupervisor.adapters.<name>`                 | map of paths                    | (adapter defaults)                               | Per-adapter overrides for `stateFile`, `lockFile`, `haltFile`, `probeScript` and `command`. **Declarative only** — a config key that could name a module to `require()` would be a code-execution surface, so JavaScript adapters are deliberately not supported. Without an override, the `develop-next` and `develop-batch` `probeScript` is the first of `.agents/skills/`, `.claude/skills/` and `skills/` (each followed by `develop-next/scripts/select-next.mjs`) that exists under the project root. When none exists, the probe stops with `probe script not found`, listing the paths searched. A configured `probeScript` wins and is never searched; one Node cannot resolve as a script to run is reported by its configured path. |
 | `observations.workspace`                         | path (absolute or `~`-relative) | `~/.claude/projects/<project-path with / → ->`   | Root of the `observe-work` observation workspace — the anchor holding `skill-observations/` (the log, the families registry, the review date) and `skill-updates/` (staged skill updates). **Highest-precedence source**; `$OBS_WORKSPACE` is second and the project-identity path is the default, so an absent key is a working default rather than a disabled feature. That default is the project's absolute path with every `/` replaced by `-`, under `~/.claude/projects/` — so `/Users/ada/Projects/app` resolves to `~/.claude/projects/-Users-ada-Projects-app`. Note it is `.claude/`, not `.agents/`: this one path is fixed by the agent home, not by this repository's agent-agnostic-path convention. Must be one stable path that outlives a session: a resolved value inside `/tmp`, `.claude/worktrees/`, or a linked git worktree is **refused outright**, not warned about and not silently defaulted. Set it to a shared user-scope path when the skills being observed are installed at user scope — see [Observation workspace](#observation-workspace). There is deliberately **no `observations.enabled` and no `observations.review_interval_days`**: nothing reads either, and the review-staleness threshold is the `OBS_STALE_DAYS` environment variable instead. |
 
 ## QA artifacts are co-located
@@ -568,19 +574,22 @@ file. They overlap but are not the same vocabulary — the pipeline passes throu
 no document status names, and a document can sit in a status the pipeline never visits. `jira.statusMap`
 configures the second; the workflow record configures the first.
 
-| Stage             | Fired at                                    | Default |
-| ----------------- | ------------------------------------------- | ------- |
-| `work-started`    | Step 1, once the branch and lock exist      | on      |
-| `in-review`       | Step 4, once the PR URL is confirmed        | on      |
-| `in-qa`           | Step 5, once, on entering the QA loop       | **off** |
-| `ready-for-merge` | Step 5c, on APPROVE / CONCERNS              | **off** |
-| `blocked`         | before a terminal HALT, real blockages only | **off** |
-| `done`            | Step 7, by `/finalise`                      | on      |
+| Stage               | Fired at                                                    | Default |
+| ------------------- | ----------------------------------------------------------- | ------- |
+| `work-started`      | Step 1, once the branch and lock exist                      | on      |
+| `in-review`         | Step 4, once the PR URL is confirmed                        | on      |
+| `changes-requested` | Step 5b, before `/qa-fix` — once per cycle                  | **off** |
+| `in-qa`             | Step 5, once, on entering the QA loop                       | **off** |
+| `ready-for-merge`   | Step 5c, on APPROVE / CONCERNS                              | **off** |
+| `pr-merged`         | `/develop-next` and `/develop-batch`, after the PR merges   | **off** |
+| `blocked`           | before a terminal HALT, real blockages only                 | **off** |
+| `done`              | Step 7, by `/finalise`                                      | on      |
 
-The three new stages default **off**. Consumers upgrade by replacing a skill directory wholesale, and
-a stage that defaulted on would start moving cards into columns that project has never used, with no
-one having asked for it. `work-started`, `in-review` and `done` behave exactly as they did before this
-existed.
+The five off-by-default stages stay **off** until a project enables them. Consumers upgrade by
+replacing a skill directory wholesale, and a stage that defaulted on would start moving cards into
+columns that project has never used, with no one having asked for it. `work-started`, `in-review` and
+`done` behave exactly as they did before this existed. What each moment means:
+[Tracker workflow § The moments](./tracker-workflow.md#the-moments).
 
 Turn one on in the workflow record:
 
@@ -704,7 +713,7 @@ workflow per type — an Epic with only `Open`/`Done` beside a Story with a full
 required field is reported and the transition is skipped rather than sent — a request the workflow has
 already declared incomplete would only return HTTP 400.
 
-**Inspecting a board.** `--probe-workflow` on any of the three sync skills prints the project's statuses
+**Inspecting a board.** `--probe-workflow` on any of the four sync skills prints the project's statuses
 per issue type, the live transitions from a sampled issue, and exactly which transition each local
 status would take and by which rule. Read-only; it transitions nothing:
 
@@ -790,8 +799,24 @@ Resolution order:
 2. `JIRA_DOC_BRANCH` in the environment
 3. `jira.docBranch` in `skills-config.yaml`
 4. `developNext.baseBranch` in `skills-config.yaml`
-5. the current branch's upstream
+5. the current branch's upstream — **only when it names the document's own work item**
 6. git's default branch (`origin/HEAD`, else `main`/`master`/`develop`)
+
+**The work-item rule (task.200).** The current branch counts only when its last path
+segment starts with the document's id, or its parent's id for a bug (`task.N` for
+`task.N.bug.M`), followed by `.`, `-` or the end — so `task.20` never matches
+`feature/task.200.x`. A story also counts its epic's integration branch: the epic's
+declared `integration_branch`, or a branch made from `branching.epicIntegration.branchPattern`.
+That means the pattern's literal prefix (`epic/` by default) followed by one segment starting
+`{P}.{E}`. A bug counts a version hotfix, `hotfix/v` followed by a digit, as in `hotfix/v1.2.1`.
+`release/1.4.0`, `hotfix/1.4.1` and `hotfix/vendor-sdk-bump` therefore name nothing. Any other branch — a card created while HEAD was another work
+item's branch — falls through to the default, because that branch never carries the
+document and its link 404s once it is deleted.
+
+GitHub cards (`ensure-*-github-issue`, `sync-github-*`) apply the same rule through
+the same resolver, `shared/resources/doc-link-branch.js`, with an explicit branch
+(`sync-github-story`'s `DOC_BRANCH`) first and the repository's GitHub default branch,
+then `develop`, last. GitHub does not read `jira.docBranch`.
 
 **Set `jira.docBranch` if your documents do not live on the git default branch.**
 On a Gitflow repo, git will correctly report the default branch as `main`, and docs
@@ -937,7 +962,8 @@ access:
 ```
 
 ```yaml
-# Credentials present; writes still deferred today (ask prompt is task.57).
+# Credentials present; writes are deferred during the run, then one batched
+# confirmation at handover (no tty or an autonomous run → behaves like `command`).
 access:
   tracker: approve
 ```
@@ -1155,8 +1181,9 @@ a knob with no reader.
 Skills resolve tracker and VCS in this order:
 
 1. Explicit `tracker:` / `vcs:` in `skills-config.yaml`
-2. Environment variables (`JIRA_URL` present → Jira; `BITBUCKET_USERNAME` present → Bitbucket)
-3. Git remote URL pattern
+2. `JIRA_URL` in the environment, then in `.env` at the repo root → Jira (**tracker only** — no
+   environment variable selects the VCS)
+3. Git remote URL — `bitbucket.org` → Bitbucket (**VCS only**)
 4. Default: GitHub
 
 Full spec: [`shared/resources/platform-detection.md`](../../shared/resources/platform-detection.md).

@@ -25,8 +25,10 @@ without a person present. Concretely:
 `/loop` re-invokes the **same conversation** every iteration. Item five is therefore worked through a
 context mostly consumed by items one to four, and the degradation is invisible from the outside — the
 output keeps looking like output. A skill cannot clear its own context, so the loop has to move outside
-the session. `loop-supervisor` spawns **one `claude -p` process per iteration**, each with a fresh
-context and a pinned session id.
+the session. `loop-supervisor` spawns **one `claude -p` process per iteration** by default, each with a fresh
+context and a pinned session id. (`--engine agy` runs the Antigravity CLI instead; it has no cost
+ceiling, no turn cap and no permission boundary — read the
+[engines table](../../skills/loop-supervisor/README.md#engines-and-models) before using it overnight.)
 
 That is not free — see [Cost](#cost-and-what-it-actually-buys-you) — and for a short queue on a machine
 you are watching, `/loop` is the right tool. This runbook is for the eight-hour case.

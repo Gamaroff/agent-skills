@@ -31,6 +31,7 @@ const tw = require("./tracker-workflow.js");
 // ships defer-mutation.js — and, transitively, the roster doc it parses — into
 // every skill that carries this file.
 const dm = require("./defer-mutation.js");
+const dlb = require("./doc-link-branch.js");
 
 // The access mode captured at require time, BEFORE anything can call
 // loadDotEnv(). A dot-env file must not be able to escalate a restriction the
@@ -444,28 +445,37 @@ function getDefaultBranch() {
 
 // Resolve the branch a document link should point at, in the documented order:
 //
-//   explicit --doc-branch  →  config  →  current branch's upstream  →  git default
+//   explicit --doc-branch  →  config  →  current branch's upstream, if it names
+//   the document's work item  →  git default
 //
 // Config sits AHEAD of the branch upstream deliberately. A feature branch does
 // contain the document, so linking to it resolves today — and 404s the moment
 // the branch is deleted after merge. The configured branch is the durable one,
 // which is the whole point of emitting a permanent link.
-function resolveDocBranch(explicit, repoRoot) {
+//
+// The upstream decision is doc-link-branch.js's, the rule every GitHub card uses
+// too (task.200): an upstream for another work item is not the document's branch.
+// A call that names no document keeps the older rule (any upstream), so a caller
+// not yet passing `docPath` cannot regress.
+function resolveDocBranch(explicit, repoRoot, docPath) {
   if (explicit && String(explicit).trim()) return String(explicit).trim();
   const configured = loadDocBranchSetting(repoRoot);
   if (configured) return configured;
-  return getCurrentBranchUpstream() || gitDefaultBranch();
+  const upstream = getCurrentBranchUpstream();
+  if (docPath === undefined) return upstream || gitDefaultBranch();
+  return dlb.resolveDocLinkBranch({
+    upstream,
+    defaultBranch: gitDefaultBranch(),
+    docPath,
+    integrationBranch: dlb.integrationBranchOf(docPath),
+    integrationPrefix: dlb.configuredIntegrationPrefix(repoRoot),
+  });
 }
 
 // Pure: strip the remote name (first path segment) from an upstream ref.
-// "origin/feature/foo" -> "feature/foo"; "" / "noref" -> null. Remote names
-// cannot contain "/", but branch names can (feature/...), so strip only up to
-// and including the FIRST slash.
-function stripRemotePrefix(upstreamRef) {
-  if (!upstreamRef) return null;
-  const slash = upstreamRef.indexOf("/");
-  return slash === -1 ? null : upstreamRef.slice(slash + 1);
-}
+// "origin/feature/foo" -> "feature/foo"; "" / "noref" -> null. Defined once, in
+// doc-link-branch.js.
+const stripRemotePrefix = dlb.stripRemotePrefix;
 
 // Resolve the current branch's remote-tracking branch name WITHOUT the remote
 // prefix. E.g. when on `feature/story.5.1.foo` tracking
@@ -475,15 +485,7 @@ function stripRemotePrefix(upstreamRef) {
 // callers fall back to getDefaultBranch(). Remote-name agnostic (works for
 // non-"origin" remotes) and safe for branch names containing "/".
 function getCurrentBranchUpstream() {
-  try {
-    const upstream = execSync(
-      "git rev-parse --abbrev-ref --symbolic-full-name @{u}",
-      { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] },
-    ).trim();
-    return stripRemotePrefix(upstream);
-  } catch (_) {
-    return null; // detached HEAD, no upstream, or git not available
-  }
+  return dlb.currentUpstream(); // null on a detached HEAD, no upstream, or no git
 }
 
 function getBitbucketRepoBase() {
@@ -3975,7 +3977,7 @@ function loadWorklogTimeSpent(repoRoot) {
 //
 // Keyed on the LIVE Jira issue type name ("IT / DevOps Task"), not the docKind
 // ("task") that loadStatusMap uses. One board routinely gives several task
-// types genuinely different workflows — RAPP has six across three — and a
+// types genuinely different workflows — one consumer's has six across three — and a
 // story|task|epic layer cannot express that.
 function resolveStage({ stage, issueType, record } = {}) {
   const key = String(stage || "")
@@ -4435,8 +4437,8 @@ async function transitionToStatus({
       from: current,
     };
 
-  // Monotonicity guard. Boards routinely offer backward transitions — RAPP
-  // offers "Waiting for merge -> In Progress" — so a resumed pipeline
+  // Monotonicity guard. Boards routinely offer backward transitions — one
+  // consumer's offers "Waiting for merge -> In Progress" — so a resumed pipeline
   // re-running an earlier step would happily drag a card backwards. Refuse when
   // the caller declares the rank it is moving TO and the card already sits
   // higher. Unranked either side means no opinion: allow.
@@ -4618,7 +4620,7 @@ async function transitionToStatus({
   // transition whose screen has no Log Work field is REJECTED
   // ("Field 'worklog' cannot be set. It is not on the appropriate screen"), so
   // attaching one pre-emptively breaks transitions that would otherwise have
-  // succeeded. Observed on RAPP: two transitions succeed bare and 400 with a
+  // succeeded. Observed on a consumer's board: two transitions succeed bare and 400 with a
   // worklog, while three others 400 bare and succeed with one.
   //
   // Safe to retry because a failed validator is atomic — Jira applies nothing,
@@ -4910,7 +4912,7 @@ async function walkLadder({
     // the ladder's intermediate rung is simply not on this board's path from
     // here, and insisting on it invents a requirement the board never stated.
     //
-    // Observed live (rebirth-wallet RAPP-111, 2026-08-08): `ready-for-merge` from
+    // Observed live (a consumer project, 2026-08-08): `ready-for-merge` from
     // "Ready for Testing" planned a hop through "Ready for Showcase", which that
     // board does not offer from there — while "Waiting for merge", the actual
     // destination, WAS directly available and appeared in the run's own

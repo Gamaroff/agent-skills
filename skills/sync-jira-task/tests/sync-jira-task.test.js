@@ -1364,11 +1364,8 @@ test("resolveRelativeLink — leaves absolute URLs, mailto:, and in-page anchors
     branch: "HEAD",
   };
   assert.equal(
-    lib.resolveRelativeLink(
-      "https://mediastreamag.atlassian.net/browse/RAPP-540",
-      ctx,
-    ),
-    "https://mediastreamag.atlassian.net/browse/RAPP-540",
+    lib.resolveRelativeLink("https://acme.atlassian.net/browse/PROJ-540", ctx),
+    "https://acme.atlassian.net/browse/PROJ-540",
   );
   assert.equal(
     lib.resolveRelativeLink("mailto:someone@example.com", ctx),
@@ -2048,6 +2045,56 @@ test("resolveDocBranch — with no config set, behaviour is unchanged (git decid
     const expected = lib.getCurrentBranchUpstream() || lib.gitDefaultBranch();
     assert.equal(resolved, expected);
   });
+});
+
+test("resolveDocBranch — with a docPath, an upstream for another work item is not the link (task.200)", () => {
+  // No branch this suite can run on names task.999999, so whatever the upstream
+  // is, it is unrelated to the document and the link falls back to git's default.
+  withConfig(null, (dir) => {
+    assert.equal(
+      lib.resolveDocBranch(
+        null,
+        dir,
+        "docs/tasks/task.999999.unrelated/task.999999.unrelated.md",
+      ),
+      lib.gitDefaultBranch(),
+    );
+    // explicit and configured still win over the work-item check
+    assert.equal(
+      lib.resolveDocBranch("hotfix/x", dir, "task.999999.x.md"),
+      "hotfix/x",
+    );
+  });
+  withConfig("jira:\n  docBranch: develop\n", (dir) => {
+    assert.equal(
+      lib.resolveDocBranch(null, dir, "task.999999.x.md"),
+      "develop",
+    );
+  });
+});
+
+test("resolveDocBranch — a story's integration branch is read from the configured branchPattern", () => {
+  // The upstream is stubbed on the shared resolver module, which jira-sync reads through.
+  const dlb = require("../references/doc-link-branch.js");
+  const real = dlb.currentUpstream;
+  dlb.currentUpstream = () => "int/1.4.ui";
+  try {
+    const story = "story.1.4.2.x.md";
+    const cfg =
+      'branching:\n  epicIntegration:\n    branchPattern: "int/{p}.{n}.{slug}"\n';
+    withConfig(cfg, (dir) => {
+      assert.equal(lib.resolveDocBranch(null, dir, story), "int/1.4.ui");
+    });
+    // the default pattern's prefix is epic/, so int/ is not the epic's branch
+    withConfig(null, (dir) => {
+      assert.equal(
+        lib.resolveDocBranch(null, dir, story),
+        lib.gitDefaultBranch(),
+      );
+    });
+  } finally {
+    dlb.currentUpstream = real;
+  }
 });
 
 test("getDefaultBranch — stays git-only; config must NOT leak into it", () => {

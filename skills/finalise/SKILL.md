@@ -1018,7 +1018,7 @@ The same `NONE`/`CANCELLED`/`UNKNOWN` re-sampling loop below applies unchanged.
 > pull-request endpoints keep answering `200` on the same credential, so the token looks entirely
 > healthy. The result is indistinguishable from a repository that simply has no CI configured.
 >
-> Observed live (rebirth-wallet, stories 3.2 and 3.3, 2026-08-05 and 2026-08-08) — diagnosed
+> Observed live (a consumer project, two stories, 2026-08-05 and 2026-08-08) — diagnosed
 > independently both times, because nothing in the output says "scope". **Never infer CI presence
 > from an empty list; infer it from the status code.** On `UNKNOWN`, record the reason in the DoD
 > summary — "unverified: token lacks `read:pipeline:bitbucket`" is actionable, "no CI found" sends
@@ -2135,7 +2135,7 @@ POLLEOF
    >   never runs, in either order.
    > - *"It protects a consumer on an older **finalise** whose step 3 omits the flag."* Also no — and
    >   this one is backwards. In that pairing the sync runs **second** with status resolution live, so
-   >   it writes **last** and can walk the card straight off the ladder's target. That is the RAPP-715
+   >   it writes **last** and can walk the card straight off the ladder's target. That is the
    >   sequence recorded above, not a case ordering prevents.
    >
    > **What actually protects the close is block 4** — reading the status back and re-asserting it.
@@ -2154,7 +2154,7 @@ POLLEOF
    > This is not an exotic configuration — **it is the one this very step recommends**. See the
    > `stage-disabled` row below: *"a board that wants a card to sit in a merge queue until the PR
    > actually lands should leave `done` to a human"*. A consumer that took that advice is exactly the
-   > consumer this bites. Observed on RAPP-715 (2026-09-05): closed to `Done` + `resolution: Done`,
+   > consumer this bites. Observed on a consumer's card (2026-09-05): closed to `Done` + `resolution: Done`,
    > then the re-link returned it to `Waiting for Review` still carrying `resolution: Done` — matched
    > by *name*, because that workflow offers a transition literally called `Waiting for Review` and
    > that name was in the project's `accepted` candidate list.
@@ -2550,6 +2550,9 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
    - Add a "## Definition of Done - Gaps Identified" section
    - Place it the same way as 7.4: immediately before the change-log block, never between the markers
    - List all specific gaps by category
+   - Each gap is one list item (`- [ ] …` or `- ⚠️ …`) under `### Missing Criteria:`. `### Next Steps:`
+     lists the actions that close them and is not counted: Step 8.5's lead counts the first list only,
+     through `dod-gap-count.sh`
    - **If QA reports exist**, include QA gate findings and top issues
    - Provide actionable next steps
    - Estimate effort to close gaps (Small/Medium/Large)
@@ -2648,18 +2651,19 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
      GAP_REPORT_BODY=$(awk '/^## Step 5: Acceptance Decision/{f=1;next} /^## /{f=0} f' "$DOD_PATH")
    else
      case "$DOC_FILE" in *'{'* | '') echo "HALT: DOC_FILE must be bound in this block"; exit 1 ;; esac
-     GAP_REPORT_BODY=$(awk '/^## Definition of Done - Gaps Identified/{f=1;next} /^## /{f=0} f' "$DOC_FILE")
+     # The same helper reads the body and counts it below: one section, one definition (task 222).
+     GAP_REPORT_BODY=$(bash .agents/skills/finalise/references/dod-gap-count.sh "$DOC_FILE" --body) || exit 1
    fi
-   # Unmet criteria across every section of the gap report — an unchecked box,
-   # indented too: 8.4's example nests them under a numbered list (obs #212).
-   # `grep -c` prints 0 and EXITS 1 when it matches nothing, so `|| true` (never
-   # `|| echo 0`, which would append a second zero and make the value "0\n0").
+   # The gap count comes from a helper in both modes, never from a grep here: one
+   # definition per mode, so the lead cannot count a different list from the body.
    if [ "$DOC_KIND" = "bug" ]; then
      # The helper's `count` is the one definition of the bug-mode gap list (8.1, 8.3 and here).
      GAP_COUNT=$(bash .agents/skills/finalise/references/fill-verification-complete.sh "$DOD_PATH" count) || exit 1
    else
-     GAP_COUNT=$(printf '%s' "$GAP_REPORT_BODY" | grep -c '^[[:space:]]*- \[ \]' || true)
-     GAP_COUNT=${GAP_COUNT:-0}
+     # Story/task: the list items under `### Missing Criteria`, indented or not, checkbox or
+     # `- ⚠️` (8.4) — never the `### Next Steps` boxes, which double-counted every report
+     # (obs #24). The helper HALTs on a gap section with no Missing Criteria item in it.
+     GAP_COUNT=$(bash .agents/skills/finalise/references/dod-gap-count.sh "$DOC_FILE") || exit 1
    fi
    # Bug mode: the template always fills Step 5 (Decision, QA record, CI rollup), so the
    # empty-body post-condition below can never fire there. 8.1's helper already refused a DoD
@@ -3120,8 +3124,16 @@ When this skill is invoked as a step in a develop pipeline, advance the pipeline
 
 ```bash
 if [ -f .claude/state/develop-pipeline.lock ]; then
-  bash .agents/skills/finalise/references/advance-pipeline-lock.sh --skill finalise 2>/dev/null || true
+  # The DoD this run wrote (dod.{N}, the newest) — its **Final Status:** line decides the advance.
+  DOD_PATH="{dod-path — the running summary Step 0 created}"
+  case "$DOD_PATH" in *'{'* | '') echo "HALT: DOD_PATH must be bound in this block"; exit 1 ;; esac
+  bash .agents/skills/finalise/references/advance-pipeline-lock.sh --skill finalise --dod "$DOD_PATH" || true
 fi
 ```
+
+**Run it on both paths, accepted and gaps.** The helper decides, not this page: it moves the lock to
+Step 8 only when `$DOD_PATH` reads `**Final Status:** ✅ ACCEPTED`, and on gaps it holds the lock at 7,
+says why on stderr and exits 0. A gaps halt therefore resumes at `/finalise` instead of reading Step 7
+as done (task 222, obs #79). Its stderr is kept, so the hold reason reaches the transcript.
 
 Idempotent in every degraded path: noops when the lock is missing (skill invoked standalone), already advanced past this step, or the helper script is not installed. Full rationale and cooperation order with the `Stop` hook: see [`references/pipeline-lock-cooperation.md`](references/pipeline-lock-cooperation.md).

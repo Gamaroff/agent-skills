@@ -67,6 +67,8 @@ const SHARED = {
   boundary:
     "**Apply the boundary rule — execute, do not only read.** When the reviewer has returned, apply\n   `references/probe-boundary-rule.md`",
   probesExecuted: "**`probes_executed: N`**",
+  escapeIsAFinding:
+    "**An escape is a finding, whatever the verdict.** Copy the run record's `totals.escaped` beside\n   it as **`escaped: N`**. A non-zero count is a gate finding in `top_issues[]`, never a\n   `recommendations.future` item",
   platformVariance: "**Platform variance — run the other value.**",
   reproduction: "TMPDIR=/tmp node --test 'skills/<skill>/tests/*.test.js'",
   sizeNotLiveness: "**output-file size is not a liveness signal**",
@@ -128,6 +130,11 @@ test("Step 3b / Phase 1.6 apply the boundary rule by pointer and report probes_e
     assert.ok(
       sec.includes(SHARED.probesExecuted),
       `${name} must report probes_executed on the finding block`,
+    );
+    // obs #73: the gate read executed and reproduced and passed over escapes finalise halts on.
+    assert.ok(
+      sec.includes(SHARED.escapeIsAFinding),
+      `${name} must make the record's escape count a gate finding, as /finalise does`,
     );
     assert.match(
       sec,

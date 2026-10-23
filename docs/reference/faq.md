@@ -30,7 +30,7 @@ If dev skills could write gate files, the pipeline guarantee — "merged code ha
 
 ### Why does `finalise` run full side-effects in lite mode?
 
-Lite mode is about skipping work that's *recoverable* (re-reading the codebase, regenerating context). Step 7 side-effects (PR comment, tracker update, board move) are *not* recoverable — they update external state collaborators rely on. Skipping them silently would create drift between what's merged and what's tracked.
+Lite mode trades *QA depth* for speed — direct-tools Step 5 and `--effort low` Step 5c — which changes only how hard the work is checked, and a later review can always check it harder. Pre-develop codebase mapping still runs. Step 7 side-effects (PR comment, tracker update, board move) are *not* recoverable — they update external state collaborators rely on. Skipping them silently would create drift between what's merged and what's tracked.
 
 One deliberate exception in shape, not in spirit: under a restricted `access.tracker` mode the tracker mutations are **deferred, not skipped** — each one becomes a record in the committed handover checklist, the implementation report carries a `**Tracker debt:**` line and a populated `## Tracker Actions Required` section, and the PR gets a comment naming the outstanding actions. The rule above prohibits *silent* drift; a deferral this loud, committed and reviewable — and later reconciled by `/tracker-reconcile` — is the rule being honoured under a policy that forbids the write, not the skip it prohibits.
 
@@ -64,9 +64,9 @@ Composition. An orchestrator is a skill that calls other skills as steps. Leaf s
 
 Defensive: stories sometimes get edited between review and development. Step 2 is a fast revalidation, not a full re-review — it's skipped if the story is recently reviewed and `ready-for-development`.
 
-### Why are skills distributed as zips?
+### Why is each skill self-contained?
 
-To make them self-contained at installation time. The packager bundles shared resources and rewrites paths so a skill installed in a target project doesn't depend on the layout of *this* repo. Without bundling, consumers would need to install `shared/resources/` separately and keep it in sync.
+So a skill installed in a target project doesn't depend on the layout of *this* repo. `npm run bundle` (`bundle_skill.py`) copies every shared resource a skill references into that skill's own `references/` directory and rewrites the paths, and the result is committed. `setup-consumer.sh` — the normal install — extracts a release tarball of those skill directories, so each one works as copied. A zip from `package_skill.py` carries the same bundled files; it is a gitignored build artifact, used only for the manual offline install ([Option C](../concepts/getting-started.md#option-c--manual-zip-install-offline--locked-down-ci)). Without bundling, consumers would need to install `shared/resources/` separately and keep it in sync.
 
 ## Document model
 
@@ -92,13 +92,13 @@ Same reason as epic numbers — task references travel out of context. `task.44.
 
 Two root paths are configurable: `prd.prdShardedLocation` (default `docs/prd`) and `architecture.architectureShardedLocation` (default `docs/architecture`). See [Configurable roots and fixed conventions](./configuration.md#configurable-roots-and-fixed-conventions).
 
-The *nested* structure under each root is fixed — epics, stories, QA artifacts, and tasks all follow conventions skills won't bend on. `docs/tasks/` and the two registry filenames (`epic-registry.md`, `tasks/task-registry.md`) are also hardcoded. This removes a configuration burden for the common case; if you need a different nested layout, you are off the supported path.
+The *nested* structure under each root is fixed — epics, stories, QA artifacts, and tasks all follow conventions skills won't bend on. `docs/tasks/`, `docs/bugs/` and the three registry filenames (`prd-registry.md` under the PRD root, `tasks/task-registry.md`, `bugs/bug-registry.md`) are also hardcoded. This removes a configuration burden for the common case; if you need a different nested layout, you are off the supported path.
 
 ## Repo design
 
 ### Why a `shared/resources/` directory if every skill is meant to be self-contained?
 
-Self-contained at *install* time, not at *authoring* time. The packager pulls from `shared/resources/` and bundles into each skill's zip. This avoids duplicating cross-skill docs in 124 skill directories during development — there's one canonical copy that the packager fans out.
+Self-contained at *install* time, not at *authoring* time. `npm run bundle` copies what each skill references from `shared/resources/` into its `references/` directory (and the packager does the same for a zip). Authors edit one canonical copy; the bundler fans it out to every skill that uses it.
 
 ### Why audience-driven docs subdirectories?
 

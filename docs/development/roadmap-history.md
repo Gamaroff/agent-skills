@@ -259,3 +259,47 @@ row `[x]` the moment its task is accepted** — a phase row is matched on its ch
 - [x] **T206** Hierarchical story ids in the pipeline · deps: T202, T203, T205 · touches: pipeline-steps!, selection!, bundles!, finalise~, templates~ · /develop-task docs/tasks/task.206.hierarchical-story-ids-in-pipeline/task.206.hierarchical-story-ids-in-pipeline.md — ✅ **accepted + merged** ([PR #677](https://github.com/Gamaroff/agent-skills/pull/677), `864673b7`; QA PASS 100/100 after 3 cycles, DoD accepted on run 1, CI 5/5). Every story-side reader and writer of a story or epic id (`finalise-fix-and-recheck.mjs`, `bug-doc.js`, `create-story`, the Step 0/0a blocks, `create-branch`, the GitHub story ensure/sync skills, `continuation.mjs`, `uat-status.mjs`, `select-next.mjs`) goes through `doc-id.js`; an epic is found by (P, E) and Step 0 HALTs on zero or several matches; story branches are `feature/story.{P}.{E}.{S}` and `branchPattern` requires `{p}`
 - [x] **T212** qa-next: a note finding can be resolved, with evidence · deps: none · touches: +own · /develop-task docs/tasks/task.212.qa-next-resolvable-note-findings/task.212.qa-next-resolvable-note-findings.md — ✅ **accepted + merged** ([PR #680](https://github.com/Gamaroff/agent-skills/pull/680), `879ac337`; QA PASS 100/100 after 4 cycles, DoD accepted on run 1, CI 5/5). A note finding closes on a verified `— resolved YYYY-MM-DD by \`<evidence>\`` marker (a real commit or a later run file), written only by `uat-status.mjs --resolve-finding`; `--check` re-verifies every marker and `--changed-runs` drives Step 5 staging. Placed ahead of T207 by owner request (2026-10-16)
 - [x] **T207** Doc numbering enforcement and sweep · deps: T204, T205, T206 · touches: test-harness!, docs-pipeline!, bundles!, review-skills~, templates~ · /develop-task docs/tasks/task.207.doc-numbering-enforcement-and-sweep/task.207.doc-numbering-enforcement-and-sweep.md — ✅ **accepted + merged** ([PR #682](https://github.com/Gamaroff/agent-skills/pull/682), `cb57127e`; QA PASS 90/100 after 8 cycles — 5 budgeted, escalated on the loop limit, 3 further approved by the owner; DoD accepted on run 1 after a Step 8a fix, CI 5/5). `doc-numbering-corpus.test.mjs` and `doc-id-chokepoint.test.js` hold the hierarchical scheme: one id parser (`doc-id.js`), and a §5 prose guard over every tracked Markdown/YAML file for placeholders, titles, two-level ids, flat layouts, tree diagrams and literal flat ids
+
+---
+
+## PHASE 12 — consumer-neutral library (opened 2026-10-20, closed 2026-10-20)
+
+The library names one consumer in what it ships: provenance notes, example Jira keys and hosts, and a format profile in the wireframe skill. This phase removes them and adds a guard so they cannot return.
+
+- [x] **T220** No consumer names in shipped skills · deps: none · touches: bundles!, jira-sync~, pipeline-steps~, finalise~, test-harness~, review-skills~ · /develop-task docs/tasks/task.220.no-consumer-names-in-shipped-skills/task.220.no-consumer-names-in-shipped-skills.md — ✅ **accepted + merged** ([PR #710](https://github.com/Gamaroff/agent-skills/pull/710), `20a95cd4`; QA PASS 100/100 after 1 cycle, DoD accepted on run 1, CI 5/5). Shipped skills and shared resources name no consumer: neutral examples and fixtures, the wireframe skill ships no format profile, and `tests/no-consumer-names.test.js` guards paths and contents over the whole shipped tree
+
+---
+
+## PHASE 13 — loop-supervisor probe follow-up (opened 2026-10-21, closed 2026-10-21)
+
+An **override**: without it the registry fallback selects T216 first, because it takes the
+lowest-numbered task. T224 closes task.214's QA findings CR-1 and CR-2 while that code is fresh.
+
+- [x] **T224** loop-supervisor: say when the probe script is not found · deps: none · touches: loop-supervisor! · /develop-task docs/tasks/task.224.loop-supervisor-probe-not-found/task.224.loop-supervisor-probe-not-found.md — ✅ **accepted + merged** ([PR #724](https://github.com/Gamaroff/agent-skills/pull/724), `2c7bb8a4`; QA PASS 100/100 after 4 cycles, DoD accepted on run 1, CI 5/5). A missing probe script now reports the paths searched, or a missing configured `probeScript` by its config key, instead of "probe produced no output"; existence follows Node main-module resolution, re-checked on disk at each probe; the adapter table derives its default from `DEFAULT_PROBE_SCRIPT`
+
+## PHASE 14 — security-probe loader refusal (opened 2026-10-22, closed 2026-10-22)
+
+An **override**: without it the registry fallback selects T217 first, because it takes the
+lowest-numbered task. T226 closes task.216's carried finding TASK-216-QA3-1 while that code is fresh:
+the docs say every `LD_*`/`DYLD_*` variable is refused on a `cli:` case, and the code refuses four.
+
+- [x] **T226** security-probe: refuse every LD_* and DYLD_* variable on cli: case fixtures · deps: none · touches: test-harness~, bundles~ · /develop-task docs/tasks/task.226.probe-cli-loader-env-prefix-refusal/task.226.probe-cli-loader-env-prefix-refusal.md — ✅ **accepted + merged** ([PR #729](https://github.com/Gamaroff/agent-skills/pull/729), `ca958146`; QA PASS 100/100 after 1 cycle, DoD accepted on run 1, CI 5/5). A `cli:` case’s `fixture.env` now refuses any key starting `LD_` or `DYLD_` by name, before any spawn, through one predicate (`steersInterpreter`); `MY_LD_FLAG`, `ld_audit` and `LDFLAGS` still run
+
+## PHASE 15 — secret-scan clean tree and guard (opened 2026-10-22, closed 2026-10-22)
+
+An **override**: without it the registry fallback selects T217 first, because it takes the
+lowest-numbered task. The owner asked for these two ahead of every other story and task. T228
+makes `gitleaks dir .` clean on tracked files, so a downstream consumer can drop its allowlist for
+the vendored testing guide. T229 adds the CI lane that keeps it clean, and is red until T228 merges.
+
+- [x] **T228** Replace the sample tokens gitleaks flags in tracked files · deps: none · touches: setup-consumer~ · /develop-task docs/tasks/task.228.fake-sample-tokens-gitleaks/task.228.fake-sample-tokens-gitleaks.md — ✅ **accepted + merged** ([PR #732](https://github.com/Gamaroff/agent-skills/pull/732), `74d12118`; QA PASS 100/100 after 1 cycle, DoD accepted on run 2, CI 5/5). The testing guide’s two sample tokens are now a `<header>.<payload>.<signature>` placeholder and two prose false positives are reworded; the tracked tree scans clean
+- [x] **T229** Secret-scan CI lane over tracked files · deps: T228 · touches: test-harness~ · /develop-task docs/tasks/task.229.secret-scan-ci-lane/task.229.secret-scan-ci-lane.md — ✅ **accepted + merged** ([PR #733](https://github.com/Gamaroff/agent-skills/pull/733), `9cd7f1a6`; QA PASS 96/100 after 4 cycles, DoD accepted on run 1, CI 5/5). Every PR now runs a `Secret scan` lane (gitleaks 8.30.1, pinned rules and an empty ignore list) over the tracked tree, the PR's commit messages and its body, with a planted-token self-check and redacted output; `npm run lint:secrets` is its local twin
+
+## PHASE 16 — change-log block holds only the log (opened 2026-10-22, closed 2026-10-23)
+
+An **override**: without it the registry fallback selects T217 first, because it takes the
+lowest-numbered task. T230 fixes observation #91 while the T229 run that found it is fresh:
+`change-log.js` folds a sibling section written inside the change-log markers into the log, and
+task.166, 170, 175 and 203 already carry a DoD section there.
+
+- [x] **T230** Keep foreign sections out of the change-log block · deps: none · touches: change-log!, pipeline-steps~, bundles~ · /develop-task docs/tasks/task.230.change-log-block-foreign-sections/task.230.change-log-block-foreign-sections.md — ✅ **accepted + merged** ([PR #735](https://github.com/Gamaroff/agent-skills/pull/735), `31643ca4`; QA PASS 95/100 after 4 cycles, DoD accepted on run 1, CI 6/6). `change-log.js` lifts a sibling section written inside the change-log markers back out — above them if it sat before the log, below them if after — through one partition the writer and a new corpus guard share; task.166, 170, 175 and 203 repaired

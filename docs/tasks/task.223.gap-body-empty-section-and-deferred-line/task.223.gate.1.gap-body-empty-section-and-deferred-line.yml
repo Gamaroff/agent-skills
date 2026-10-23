@@ -1,0 +1,49 @@
+schema: 2
+task: 'task.223.gap-body-empty-section-and-deferred-line'
+task_title: "Gap body: refuse an empty section; correct task.222's Deferred Work line"
+gate: PASS
+status_reason: 'All 3 phases verified and every success criterion holds. The diff reviewer found nothing, and the new --body refusal was probed (11 cases, 0 escapes) and mutation-proven.'
+reviewer: 'QA Engineer'
+head: '8e3c226a4b719d9342cf78202f0c4c766c05190c'
+updated: '2026-10-21T17:35:50Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 18
+  phases_verified: 3/3
+  ci: 'pending @ 8e3c226a (test job); link-check, validate, shellcheck pass'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 11
+    escaped: 0
+    notes: 'boundary: true. shell-argv:shared/resources/dod-gap-count.sh with argv ["{input}","--body"] and task.223.qa.1.security.cases.json: 2 legitimate cases accepted, 9 hostile cases rejected. Calibrated: with the guard reverted, 4 empty-section cases scored as accepted.'
+  performance:
+    status: PASS
+    notes: 'One shell case on output already captured. No new pass over the input.'
+  reliability:
+    status: PASS
+    notes: 'The empty-section refusal is a HALT on stderr with exit 1. Both callers (finalise SKILL.md:2655, :2666) already use || exit 1.'
+  maintainability:
+    status: PASS
+    notes: 'The header comment states the refusal. The bundled copy matches its source (bundle:check 0 problems). shellcheck is clean.'
+
+recommendations:
+  immediate: []
+  future: []
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

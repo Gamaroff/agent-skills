@@ -1,0 +1,59 @@
+schema: 2
+task: 'task.219.bug-registry-status-mirror'
+task_title: 'General-bug registry status: one writer at every transition'
+gate: PASS
+status_reason: 'Cycle 2 (re-entered after the finalise PERF1 gap). The new count-pinning test holds PERF1 and two mutations each turn it red. The whole-branch refute review returned one low/low bug and one cleanup, neither promoted. The classifier refused all 15 hostile probes and wrote nothing outside its sandbox.'
+reviewer: 'QA Engineer'
+head: '3f98c7b794f1ebbb3b0fb620f2c4521a5151c496'
+updated: '2026-10-20T14:20:17Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 3
+  phases_verified: 3/3
+  ci: 'local ci:fast exit 0 @ 3f98c7b7 (symlink aside, 5,991 pass); PR CI at 3f98c7b7: link-check, shellcheck, validate pass, test pending'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 19
+    escaped: 0
+    notes: 'boundary: true (general-bug classifier in bugStatus), unchanged since gate 1. cli: probe, filename sink, 19 cases (the finalise DoD plan): 15 hostile rejected, 4 legitimate accepted. Record task.219.qa.2.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'PERF1 now held by a committed test: one registry read and at most one write per --bug-status call (registry-tick.test.mjs, preload I/O counter), mutation-proven.'
+  reliability:
+    status: PASS
+    notes: 'Unchanged since gate 1. CR-1 (a select-next.mjs older than the BUG_LIFECYCLE_STATUSES export throws rather than answering engine-unavailable) is low/low and advisory.'
+  maintainability:
+    status: PASS
+    notes: 'CR-2 notes the preload counts only the readFile family and string paths; advisory.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 (gate 2): after the dynamic import of select-next.mjs, check parseRegistry and BUG_LIFECYCLE_STATUSES exist and answer engine-unavailable when either is missing.'
+      refs: ['shared/resources/registry-tick.js']
+    - action: 'CR-2 (gate 2): widen the test preload to count fs.openSync and createReadStream and to normalise URL/Buffer paths.'
+      refs: ['shared/resources/tests/registry-tick.test.mjs']
+    - action: 'Gate 1 CR-1: give a bug.{N}. file whose type: is not bug its own reason (fix-the-call), separate from not-a-general-bug.'
+      refs: ['shared/resources/registry-tick.js']
+    - action: 'Gate 1 CR-2: split no-registry out of the hand-edit row in both reason tables (log only).'
+      refs: ['skills/develop-bug/references/develop-bug-step-3-investigate-fix.md', 'skills/qa-fix/SKILL.md']
+    - action: 'Gate 1 CR-3: phrase step 7 references to earlier writes in both registry vocabularies.'
+      refs: ['skills/develop-bug/references/develop-bug-step-7-close-bug.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

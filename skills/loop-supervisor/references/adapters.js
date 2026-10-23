@@ -19,6 +19,8 @@
  */
 
 const { execFileSync } = require("node:child_process");
+const fs = require("node:fs");
+const path = require("node:path");
 
 /** Statuses `select-next.mjs` is contracted to emit. Anything else is a bug. */
 const PROBE_STATUSES = new Set(["selected", "stop", "halt"]);
@@ -206,6 +208,51 @@ const PIPELINE_LOCK = STATE_DIR + "/develop-pipeline.lock";
 const PIPELINE_HALT = STATE_DIR + "/develop-pipeline.last-halt.json";
 
 /**
+ * Where the develop-next selector may be installed, in search order. A consumer
+ * installs the skills under `.agents/skills/` (or `.claude/skills/`); only this
+ * repository has them at `skills/`. The last entry, DEFAULT_PROBE_SCRIPT, is
+ * also the path kept when none exists; `probeMissing` then reports the miss,
+ * listing every path searched, before anything is spawned.
+ */
+const SELECT_NEXT = "develop-next/scripts/select-next.mjs";
+const DEFAULT_PROBE_SCRIPT = "skills/" + SELECT_NEXT;
+const PROBE_SCRIPT_CANDIDATES = Object.freeze([
+  ".agents/skills/" + SELECT_NEXT,
+  ".claude/skills/" + SELECT_NEXT,
+  DEFAULT_PROBE_SCRIPT,
+]);
+
+/**
+ * The first candidate that exists under `cwd`, or null when none does.
+ * Stops at the first hit, so at most `candidates.length` calls to `exists`.
+ * Two candidates that are the same file through a symlink need no realpath:
+ * whichever comes first wins, and both name the same selector.
+ *
+ * @param {string} cwd
+ * @param {readonly string[]} candidates relative to `cwd`
+ * @param {(p: string) => boolean} [exists] injectable for tests
+ * @returns {string | null}
+ */
+function findExisting(cwd, candidates, exists = fs.existsSync) {
+  for (const c of candidates) {
+    if (exists(path.join(cwd, c))) return c;
+  }
+  return null;
+}
+
+/**
+ * The first candidate that exists under `cwd`, else the last candidate.
+ *
+ * @param {string} cwd
+ * @param {readonly string[]} candidates relative to `cwd`
+ * @param {(p: string) => boolean} [exists] injectable for tests
+ * @returns {string}
+ */
+function firstExisting(cwd, candidates, exists = fs.existsSync) {
+  return findExisting(cwd, candidates, exists) ?? candidates[candidates.length - 1];
+}
+
+/**
  * The adapter table.
  *
  * `probeArgs(ctx)` returns argv AFTER the node binary, or null for "no probe —
@@ -220,7 +267,8 @@ const ADAPTERS = {
     stateFile: STATE_DIR + "/develop-next.state.json",
     lockFile: PIPELINE_LOCK,
     haltFile: PIPELINE_HALT,
-    probeScript: "skills/develop-next/scripts/select-next.mjs",
+    probeScript: DEFAULT_PROBE_SCRIPT,
+    defaultProbe: true, // resolveAdapter searches PROBE_SCRIPT_CANDIDATES
     probeArgs(ctx) {
       const args = [this.probeScript];
       if (ctx && ctx.roadmapPath) args.push("--roadmap", ctx.roadmapPath);
@@ -238,7 +286,8 @@ const ADAPTERS = {
     stateFile: STATE_DIR + "/develop-batch.state.json",
     lockFile: PIPELINE_LOCK,
     haltFile: PIPELINE_HALT,
-    probeScript: "skills/develop-next/scripts/select-next.mjs",
+    probeScript: DEFAULT_PROBE_SCRIPT,
+    defaultProbe: true, // resolveAdapter searches PROBE_SCRIPT_CANDIDATES
     probeArgs(ctx) {
       const args = [this.probeScript, "--batch"];
       if (ctx && ctx.roadmapPath) args.push("--roadmap", ctx.roadmapPath);
@@ -273,12 +322,21 @@ const ADAPTERS = {
  * file that can name a module to `require()` is a code-execution surface, and
  * the gain over "probe command + expected JSON shape" is nil.
  *
+ * A table entry marked `defaultProbe` has its `probeScript` replaced by the
+ * first of PROBE_SCRIPT_CANDIDATES that exists under `cwd`. When none exists it
+ * keeps DEFAULT_PROBE_SCRIPT and records the search in `probeSearched` (a copy
+ * of the candidates), so `probeMissing` can name every path it looked for; on a
+ * hit `probeSearched` is null. The search runs BEFORE the overrides, so a
+ * configured `probeScript` is used verbatim, is never searched, and resets
+ * `probeSearched` to null.
+ *
  * @param {string} name
  * @param {object} [config] parsed skills-config.yaml
+ * @param {{cwd?: string}} [options] `cwd` is the project root the probe runs in
  * @returns {object} adapter
  * @throws {Error} on an unknown name
  */
-function resolveAdapter(name, config) {
+function resolveAdapter(name, config, { cwd = process.cwd() } = {}) {
   const base = ADAPTERS[name];
   if (!base) {
     throw new Error(
@@ -292,14 +350,83 @@ function resolveAdapter(name, config) {
   const ls = (config && config.loopSupervisor) || {};
   const over = (ls.adapters && ls.adapters[name]) || {};
   const merged = Object.assign(Object.create(Object.getPrototypeOf(base)), base);
+  if (merged.defaultProbe) {
+    const hit = findExisting(cwd, PROBE_SCRIPT_CANDIDATES);
+    merged.probeScript = hit ?? DEFAULT_PROBE_SCRIPT;
+    merged.probeSearched = hit ? null : PROBE_SCRIPT_CANDIDATES.slice();
+  }
   for (const key of ["stateFile", "lockFile", "haltFile", "probeScript", "command"]) {
     if (over[key] != null) merged[key] = over[key];
   }
+  if (over.probeScript != null) merged.probeSearched = null;
   return merged;
+}
+
+/**
+ * True when `node <file>` would find a module to run. The spawn resolves its
+ * main module the way require.resolve does: the exact file, then
+ * <file>.js/.json/.node, then a directory's package.json main or index.js.
+ * existsSync alone refused an extensionless override that runs and accepted a
+ * directory that does not (task 224 QA-2). require.resolve caches a hit for
+ * the process and returns it without touching the disk, and the loop probes
+ * every iteration, so the hit is re-checked: a script deleted mid-run reads
+ * as missing (QA-3).
+ *
+ * @param {string} file an absolute path
+ * @returns {boolean}
+ */
+function resolvesAsMain(file) {
+  let resolved;
+  try {
+    resolved = require.resolve(file);
+  } catch {
+    return false;
+  }
+  return fs.existsSync(resolved);
+}
+
+/**
+ * The probe-not-found error for `adapter` under `cwd`, or null when there is
+ * no probe or its script exists. Runs before the spawn: a missing script would
+ * otherwise reach interpretProbe as empty stdout, whose message is about a
+ * symlink problem this is not. `path.resolve`, not `path.join`, so an absolute
+ * override stays absolute — the same path the spawn, run in `cwd`, would use.
+ * "Exists" means Node would run it (resolvesAsMain), not that the exact path
+ * is on disk.
+ *
+ * @param {object} adapter a resolved adapter (resolveAdapter)
+ * @param {string} cwd the project root the probe runs in
+ * @param {(p: string) => boolean} [exists] injectable for tests
+ * @returns {{status: "error", reason: string} | null}
+ */
+function probeMissing(adapter, cwd, exists = resolvesAsMain) {
+  const script = adapter && adapter.probeScript;
+  if (!script) return null;
+  if (exists(path.resolve(cwd, script))) return null;
+  const searched = adapter.probeSearched;
+  const reason = searched
+    ? "probe script not found: " +
+      script +
+      " (searched " +
+      searched.join(", ") +
+      "). Install the skills under .agents/skills/, or set loopSupervisor.adapters." +
+      adapter.name +
+      ".probeScript."
+    : "probe script not found: " +
+      script +
+      " (configured by loopSupervisor.adapters." +
+      adapter.name +
+      ".probeScript).";
+  return { status: "error", reason };
 }
 
 module.exports = {
   ADAPTERS,
+  DEFAULT_PROBE_SCRIPT,
+  PROBE_SCRIPT_CANDIDATES,
+  findExisting,
+  firstExisting,
+  probeMissing,
   PROBE_STATUSES,
   interpretProbe,
   tickCommitOracle,

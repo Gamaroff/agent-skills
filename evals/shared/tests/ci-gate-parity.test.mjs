@@ -95,6 +95,7 @@ const GREEN_JOBS = [
   { workflow: ".github/workflows/test.yml", job: "test" },
   { workflow: ".github/workflows/validate.yml", job: "validate" },
   { workflow: ".github/workflows/shellcheck.yml", job: "shellcheck" },
+  { workflow: ".github/workflows/secret-scan.yml", job: "secret-scan" },
 ];
 
 /**
@@ -135,6 +136,7 @@ const SETUP_STEPS = [
   "Install awk variants and zsh",
   "Install dependencies",
   "Install ShellCheck (pinned)",
+  "Install gitleaks (pinned)",
 ];
 
 /**

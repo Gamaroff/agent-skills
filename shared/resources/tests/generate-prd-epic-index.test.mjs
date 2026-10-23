@@ -332,7 +332,7 @@ test("missing PRD root is a graceful no-op (exit 0)", () => {
 // rendered as `Anna''s wallet` — the doubling visible to every reader of the
 // generated index.
 //
-// Found in a consumer repo (rebirth-wallet) which had patched this locally. The
+// Found in a consumer repo which had patched this locally. The
 // installer vendors this file over `scripts/`, so the local fix was silently
 // reverted on every `setup-consumer.sh --update` — twice before anyone noticed.
 // Fixing it here is what makes it survive.

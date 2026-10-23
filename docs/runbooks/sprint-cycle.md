@@ -32,6 +32,8 @@ For each story going into the sprint:
 
 Validate the whole backlog before development starts. A story that scores below the readiness threshold should be deferred or reworked.
 
+On Jira, [`jira-sprint-manager`](../../skills/jira-sprint-manager/SKILL.md) starts the sprint, adds or removes issues, and checks for unestimated ones.
+
 ## Phase 2 — Development
 
 For each story:
@@ -44,6 +46,8 @@ Or, if you need manual control: see [Story Development Runbook — Phase D](./st
 
 Run testing skills appropriate to your stack as part of the loop (e.g. `testing-setup-react-native`, `testing-setup-nestjs`).
 
+On Jira, [`jira-standup-auditor`](../../skills/jira-standup-auditor/SKILL.md) compiles each day's async standup update from recent Jira activity and git history.
+
 ## Phase 3 — Review
 
 ```
@@ -53,6 +57,8 @@ Run testing skills appropriate to your stack as part of the loop (e.g. `testing-
 
 `develop-story` runs `qa-story` and DoD validation automatically — invoke separately only for stories developed outside the orchestrator.
 
+On Jira, [`jira-sprint-review-prep`](../../skills/jira-sprint-review-prep/SKILL.md) collects the completed increments, checks them against the Definition of Done, flags scope creep and unfinished items, and formats the Sprint Review agenda or release notes.
+
 ## Phase 4 — Completion
 
 ```
@@ -61,7 +67,11 @@ Run testing skills appropriate to your stack as part of the loop (e.g. `testing-
 8. /sync-jira-story       → if Jira is the tracker and develop-story didn't already sync
 ```
 
+On Jira, [`jira-sprint-manager`](../../skills/jira-sprint-manager/SKILL.md) closes the sprint and moves leftover scope to the backlog or the next sprint.
+
 ## Phase 5 — Retrospective
+
+On Jira, [`jira-sprint-retrospective`](../../skills/jira-sprint-retrospective/SKILL.md) writes the retrospective document from Jira and git: committed work against work found mid-sprint, and carry-over in both directions.
 
 Use [`autoskill`](../../skills/autoskill/SKILL.md) to extract lessons from the sprint's transcripts and update relevant skills, and [`remember-insight`](../../skills/remember-insight/SKILL.md) to record durable preferences.
 

@@ -12,12 +12,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, unlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
   ADAPTERS,
+  DEFAULT_PROBE_SCRIPT,
+  PROBE_SCRIPT_CANDIDATES,
+  findExisting,
+  firstExisting,
   interpretProbe,
+  probeMissing,
   resolveAdapter,
   tickCommitOracle,
   anyCommitOracle,
@@ -237,11 +242,20 @@ test("resolveAdapter rejects an unknown name rather than defaulting", () => {
 });
 
 test("resolveAdapter applies declarative config overrides without mutating the table", () => {
-  const a = resolveAdapter("develop-next", {
-    loopSupervisor: {
-      adapters: { "develop-next": { stateFile: ".claude/state/custom.json" } },
+  // A temp cwd, never the repository root: there the gitignored .agents/skills
+  // symlink would resolve the probe to .agents/skills/… locally and skills/… in CI.
+  const cwd = probeProject(["skills/"]);
+  const a = resolveAdapter(
+    "develop-next",
+    {
+      loopSupervisor: {
+        adapters: {
+          "develop-next": { stateFile: ".claude/state/custom.json" },
+        },
+      },
     },
-  });
+    { cwd },
+  );
   assert.equal(a.stateFile, ".claude/state/custom.json");
   assert.equal(
     ADAPTERS["develop-next"].stateFile,
@@ -252,6 +266,354 @@ test("resolveAdapter applies declarative config overrides without mutating the t
   assert.ok(
     a.probeArgs({}).includes("skills/develop-next/scripts/select-next.mjs"),
   );
+});
+
+// ── probeScript default: found wherever the skills are installed (task 214) ──
+
+/** A temp project holding an empty select-next.mjs under each given root. */
+function probeProject(roots) {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "ls-probe-"));
+  for (const root of roots) {
+    const file = path.join(dir, root, "develop-next/scripts/select-next.mjs");
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, "");
+  }
+  return dir;
+}
+
+test("the candidate order is .agents/skills, .claude/skills, skills", () => {
+  assert.deepEqual(PROBE_SCRIPT_CANDIDATES, [
+    ".agents/skills/develop-next/scripts/select-next.mjs",
+    ".claude/skills/develop-next/scripts/select-next.mjs",
+    "skills/develop-next/scripts/select-next.mjs",
+  ]);
+});
+
+for (const name of ["develop-next", "develop-batch"]) {
+  for (const root of [".agents/skills/", ".claude/skills/", "skills/"]) {
+    test(`${name}: only ${root} present → that copy is the probe`, () => {
+      const a = resolveAdapter(name, undefined, { cwd: probeProject([root]) });
+      assert.equal(
+        a.probeScript,
+        root + "develop-next/scripts/select-next.mjs",
+      );
+      assert.equal(a.probeArgs({})[0], a.probeScript);
+    });
+  }
+
+  test(`${name}: none present → the skills/… default is kept and the miss is recorded in probeSearched`, () => {
+    const a = resolveAdapter(name, undefined, { cwd: probeProject([]) });
+    assert.equal(a.probeScript, "skills/develop-next/scripts/select-next.mjs");
+    assert.deepEqual(a.probeSearched, [...PROBE_SCRIPT_CANDIDATES]);
+  });
+
+  test(`${name}: the table default is the last candidate (one definition, CR-2)`, () => {
+    assert.equal(
+      ADAPTERS[name].probeScript,
+      PROBE_SCRIPT_CANDIDATES[PROBE_SCRIPT_CANDIDATES.length - 1],
+    );
+    assert.equal(ADAPTERS[name].probeScript, DEFAULT_PROBE_SCRIPT);
+  });
+}
+
+test("two candidates present → the earlier one in the search order wins", () => {
+  const a = resolveAdapter("develop-next", undefined, {
+    cwd: probeProject(["skills/", ".agents/skills/"]),
+  });
+  assert.equal(
+    a.probeScript,
+    ".agents/skills/develop-next/scripts/select-next.mjs",
+  );
+});
+
+test("a configured probeScript is returned verbatim and never searched", () => {
+  const cwd = probeProject([".agents/skills/", ".claude/skills/", "skills/"]);
+  const a = resolveAdapter(
+    "develop-next",
+    {
+      loopSupervisor: {
+        adapters: { "develop-next": { probeScript: "tools/my-probe.mjs" } },
+      },
+    },
+    { cwd },
+  );
+  assert.equal(a.probeScript, "tools/my-probe.mjs");
+  assert.equal(a.probeArgs({})[0], "tools/my-probe.mjs");
+});
+
+test("a configured probeScript resets probeSearched, even when nothing exists", () => {
+  const a = resolveAdapter(
+    "develop-next",
+    {
+      loopSupervisor: {
+        adapters: { "develop-next": { probeScript: "tools/missing.mjs" } },
+      },
+    },
+    { cwd: probeProject([]) },
+  );
+  assert.equal(a.probeScript, "tools/missing.mjs");
+  assert.equal(a.probeSearched, null);
+});
+
+test("probeSearched is a fresh copy, not the frozen candidate list", () => {
+  const a = resolveAdapter("develop-next", undefined, {
+    cwd: probeProject([]),
+  });
+  assert.notEqual(a.probeSearched, PROBE_SCRIPT_CANDIDATES);
+  a.probeSearched.push("x");
+  assert.equal(PROBE_SCRIPT_CANDIDATES.length, 3);
+});
+
+test("one candidate present → probeSearched is null", () => {
+  const a = resolveAdapter("develop-next", undefined, {
+    cwd: probeProject([".claude/skills/"]),
+  });
+  assert.equal(a.probeSearched, null);
+});
+
+test("generic keeps its null probe and is not searched", () => {
+  const a = resolveAdapter("generic", undefined, {
+    cwd: probeProject([".agents/skills/"]),
+  });
+  assert.equal(a.probeScript, null);
+  assert.equal(a.probeArgs({}), null);
+});
+
+test("resolving does not change the table's probeScript literal", () => {
+  resolveAdapter("develop-next", undefined, {
+    cwd: probeProject([".agents/skills/"]),
+  });
+  assert.equal(
+    ADAPTERS["develop-next"].probeScript,
+    "skills/develop-next/scripts/select-next.mjs",
+  );
+});
+
+test("firstExisting checks each candidate at most once and stops at the first hit", () => {
+  const calls = [];
+  const count = (hit) => (p) => {
+    calls.push(p);
+    return p.endsWith(hit);
+  };
+  firstExisting("/proj", PROBE_SCRIPT_CANDIDATES, count("nothing-matches"));
+  assert.equal(calls.length, 3, "no candidate exists: one check each, no more");
+
+  calls.length = 0;
+  const found = firstExisting(
+    "/proj",
+    PROBE_SCRIPT_CANDIDATES,
+    count(path.join(".agents/skills", "develop-next/scripts/select-next.mjs")),
+  );
+  assert.equal(found, PROBE_SCRIPT_CANDIDATES[0]);
+  assert.equal(calls.length, 1, "the first candidate exists: one check only");
+});
+
+test("findExisting returns null when no candidate exists, else the first that does", () => {
+  assert.equal(findExisting(probeProject([]), PROBE_SCRIPT_CANDIDATES), null);
+  assert.equal(
+    findExisting(
+      probeProject(["skills/", ".claude/skills/"]),
+      PROBE_SCRIPT_CANDIDATES,
+    ),
+    ".claude/skills/develop-next/scripts/select-next.mjs",
+  );
+});
+
+// ── probeMissing: a missing probe script is its own error (task 224) ─────────
+
+test("probeMissing: the generic adapter has no probe → null", () => {
+  const cwd = probeProject([]);
+  assert.equal(
+    probeMissing(resolveAdapter("generic", undefined, { cwd }), cwd),
+    null,
+  );
+});
+
+test("probeMissing: the resolved script exists → null", () => {
+  const cwd = probeProject([".claude/skills/"]);
+  const a = resolveAdapter("develop-next", undefined, { cwd });
+  assert.equal(probeMissing(a, cwd), null);
+});
+
+for (const name of ["develop-next", "develop-batch"]) {
+  test(`probeMissing: ${name}, nothing installed → names the default and every path searched`, () => {
+    const cwd = probeProject([]);
+    const r = probeMissing(resolveAdapter(name, undefined, { cwd }), cwd);
+    assert.equal(r.status, "error");
+    assert.ok(
+      r.reason.startsWith(
+        "probe script not found: skills/develop-next/scripts/select-next.mjs",
+      ),
+      r.reason,
+    );
+    for (const c of PROBE_SCRIPT_CANDIDATES) assert.ok(r.reason.includes(c), c);
+    assert.ok(
+      r.reason.includes("loopSupervisor.adapters." + name + ".probeScript"),
+      r.reason,
+    );
+    assert.doesNotMatch(r.reason, /realpath|symlink/);
+  });
+}
+
+test("probeMissing: a missing override names its config key, not the search", () => {
+  const cwd = probeProject([]);
+  const a = resolveAdapter(
+    "develop-next",
+    {
+      loopSupervisor: {
+        adapters: { "develop-next": { probeScript: "tools/missing.mjs" } },
+      },
+    },
+    { cwd },
+  );
+  const r = probeMissing(a, cwd);
+  assert.equal(r.status, "error");
+  assert.ok(
+    r.reason.startsWith("probe script not found: tools/missing.mjs"),
+    r.reason,
+  );
+  assert.ok(
+    r.reason.includes("loopSupervisor.adapters.develop-next.probeScript"),
+    r.reason,
+  );
+  assert.ok(!r.reason.includes(".agents/skills/"), r.reason);
+});
+
+test("probeMissing: an absolute override that exists → null (resolved, not joined)", () => {
+  const cwd = probeProject([]);
+  const elsewhere = probeProject(["skills/"]);
+  const abs = path.join(
+    elsewhere,
+    "skills/develop-next/scripts/select-next.mjs",
+  );
+  const a = resolveAdapter(
+    "develop-next",
+    { loopSupervisor: { adapters: { "develop-next": { probeScript: abs } } } },
+    { cwd },
+  );
+  assert.equal(probeMissing(a, cwd), null);
+});
+
+// QA-2: the check must agree with the spawn. Each case writes a project,
+// configures probeScript, and compares probeMissing with what `node <script>`
+// does in that project: runs it (exit 0) or cannot find it (MODULE_NOT_FOUND).
+const RESOLUTION_CASES = [
+  {
+    name: "exact file",
+    files: { "tools/select.mjs": "" },
+    script: "tools/select.mjs",
+    runs: true,
+  },
+  {
+    name: "extensionless, .js beside it",
+    files: { "tools/select.js": "" },
+    script: "tools/select",
+    runs: true,
+  },
+  {
+    name: "extensionless, nothing beside it",
+    files: { "tools/other.js": "" },
+    script: "tools/select",
+    runs: false,
+  },
+  {
+    name: "directory with index.js",
+    files: { "tools/sel/index.js": "" },
+    script: "tools/sel",
+    runs: true,
+  },
+  {
+    name: "directory without an index",
+    files: { "tools/sel/x.txt": "" },
+    script: "tools/sel",
+    runs: false,
+  },
+];
+
+for (const c of RESOLUTION_CASES) {
+  test(`probeMissing agrees with node on: ${c.name}`, () => {
+    const cwd = mkdtempSync(path.join(os.tmpdir(), "ls-resolve-"));
+    for (const [rel, body] of Object.entries(c.files)) {
+      mkdirSync(path.dirname(path.join(cwd, rel)), { recursive: true });
+      writeFileSync(path.join(cwd, rel), body);
+    }
+    let ran = true;
+    try {
+      execFileSync(process.execPath, [c.script], { cwd, stdio: "pipe" });
+    } catch (e) {
+      assert.match(String(e.stderr), /Cannot find module/);
+      ran = false;
+    }
+    assert.equal(ran, c.runs, "the fixture itself");
+    const a = resolveAdapter(
+      "develop-next",
+      {
+        loopSupervisor: {
+          adapters: { "develop-next": { probeScript: c.script } },
+        },
+      },
+      { cwd },
+    );
+    const r = probeMissing(a, cwd);
+    if (c.runs) assert.equal(r, null);
+    else
+      assert.ok(
+        r.reason.startsWith("probe script not found: " + c.script),
+        r && r.reason,
+      );
+  });
+}
+
+// QA-3: the loop probes every iteration in one process, and require.resolve
+// caches a hit. A script deleted after a probe must read as missing on the next
+// one, and read as present again once it is back.
+for (const script of ["tools/select", "tools/select.js"]) {
+  test(`probeMissing sees a deletion between probes in one process: ${script}`, () => {
+    const cwd = mkdtempSync(path.join(os.tmpdir(), "ls-stale-"));
+    const file = path.join(cwd, "tools/select.js");
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, "");
+    const a = resolveAdapter(
+      "develop-next",
+      {
+        loopSupervisor: {
+          adapters: { "develop-next": { probeScript: script } },
+        },
+      },
+      { cwd },
+    );
+    assert.equal(probeMissing(a, cwd), null, "present");
+    unlinkSync(file);
+    const r = probeMissing(a, cwd);
+    assert.ok(
+      r && r.reason.startsWith("probe script not found: " + script),
+      r && r.reason,
+    );
+    writeFileSync(file, "");
+    assert.equal(probeMissing(a, cwd), null, "back");
+  });
+}
+
+test("probeMissing makes one exists call for a probe, none without one", () => {
+  const calls = [];
+  const exists = (p) => {
+    calls.push(p);
+    return true;
+  };
+  const a = resolveAdapter("develop-next", undefined, {
+    cwd: probeProject([]),
+  });
+  probeMissing(a, "/proj", exists);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0], path.resolve("/proj", a.probeScript));
+
+  calls.length = 0;
+  probeMissing(
+    resolveAdapter("generic", undefined, { cwd: "/proj" }),
+    "/proj",
+    exists,
+  );
+  assert.equal(calls.length, 0);
 });
 
 // ── progress oracles, against a real throwaway repo ──────────────────────────

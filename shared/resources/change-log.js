@@ -80,6 +80,16 @@ const RE_HEADING =
 const RE_ENTRY_ROW = /^\|\s*\d{4}-\d{2}-\d{2}(?:\s+\d{2}:\d{2})?\s*\|/;
 
 const isEntryRow = (line) => RE_ENTRY_ROW.test(line);
+// A change-log table's header names Date and one of these, in any order — the
+// canonical four columns and the `| Version | Date | Change | Author |` layout.
+// Author is not one: Date plus Author is a sign-off table's header too (QA
+// cycle 3, CR3-1).
+const LOG_HEADER_CELLS = new Set([
+  "version",
+  "description",
+  "change",
+  "changes",
+]);
 
 // A table data row the parser does not recognise — not an entry row, not a separator, not a
 // header. The writer PRESERVES these (a `| Version | Date | … |` log has one in every row), so any
@@ -289,6 +299,9 @@ function splitCarriedLines(content, found) {
   const raw = content.slice(found.start, found.end).split("\n");
   const lines = [];
   let headingSeen = false;
+  // Where the removed Change Log heading stood, as an index into `lines`: the
+  // log is what follows it (task.230 QA cycle 1). -1 when the block has none.
+  let headingAt = -1;
   let offset = found.start;
   for (let i = 0; i < raw.length; i++) {
     let line = raw[i];
@@ -333,10 +346,29 @@ function splitCarriedLines(content, found) {
     if (markers.has(line.trim())) continue;
     if (!headingSeen && RE_HEADING.test(line)) {
       headingSeen = true;
+      headingAt = lines.length;
       continue;
     }
     lines.push([line, false]);
   }
+
+  const trimBlank = (arr) => {
+    let a = 0;
+    let b = arr.length;
+    while (a < b && !arr[a].trim()) a++;
+    while (b > a && !arr[b - 1].trim()) b--;
+    return arr.slice(a, b);
+  };
+  const text = (pairs) => pairs.map(([l]) => l);
+
+  // Foreign sections leave BEFORE the table is classified (task.230): a foreign
+  // section's own pipe table would otherwise be taken as the log's. Only the
+  // primary block of a marker path is partitioned — `found.level` is what
+  // `findChangeLog` supplies; a block being discarded carries none.
+  const { own, beforeForeign, afterForeign, sections } =
+    found.hasMarkers && found.level
+      ? partitionForeign(lines, found.level, headingAt)
+      : { own: lines, beforeForeign: [], afterForeign: [], sections: [] };
 
   // A table line is an unfenced pipe-line. A nested heading that comes AFTER
   // the first table line closes the table — what follows belongs to the
@@ -354,50 +386,207 @@ function splitCarriedLines(content, found) {
     if (is) seenTable = true;
     return is;
   };
-  const flags = lines.map(isTable);
+  const flags = own.map(isTable);
 
   // Every unfenced line, markers and heading removed, in order — for a caller
   // that is about to DISCARD the whole block and must therefore harvest every
   // real row from it wherever it sat, nesting included (verify cycle 3).
   const unfencedLines = lines.filter(([, prot]) => !prot).map(([l]) => l);
 
-  const trimBlank = (arr) => {
-    let a = 0;
-    let b = arr.length;
-    while (a < b && !arr[a].trim()) a++;
-    while (b > a && !arr[b - 1].trim()) b--;
-    return arr.slice(a, b);
+  const foreign = {
+    beforeForeign: trimBlank(text(beforeForeign)),
+    afterForeign: trimBlank(text(afterForeign)),
+    foreignSections: sections.map((sec) => ({
+      ...sec,
+      lines: trimBlank(sec.lines),
+    })),
   };
-  const text = (pairs) => pairs.map(([l]) => l);
 
   const first = flags.indexOf(true);
   if (first === -1) {
     // No table at all: prose goes above the new table, and anything from the
     // first nested heading on goes below it — a subsection is never hoisted
     // above the log it sits under.
-    const cut = lines.findIndex(([l, prot]) => !prot && isNestedHeading(l));
-    const head = cut === -1 ? lines : lines.slice(0, cut);
-    const rest = cut === -1 ? [] : lines.slice(cut);
+    const cut = own.findIndex(([l, prot]) => !prot && isNestedHeading(l));
+    const head = cut === -1 ? own : own.slice(0, cut);
+    const rest = cut === -1 ? [] : own.slice(cut);
     return {
       before: trimBlank(text(head)),
       after: trimBlank(text(rest)),
       tableLines: [],
       unfencedLines,
+      ...foreign,
     };
   }
   const last = flags.lastIndexOf(true);
 
-  const tableLines = text(lines.filter((_, i) => flags[i]));
-  const before = trimBlank(text(lines.slice(0, first)));
+  const tableLines = text(own.filter((_, i) => flags[i]));
+  const before = trimBlank(text(own.slice(0, first)));
   const between = trimBlank(
-    text(lines.slice(first, last + 1).filter((_, i) => !flags[first + i])),
+    text(own.slice(first, last + 1).filter((_, i) => !flags[first + i])),
   );
-  const tail = trimBlank(text(lines.slice(last + 1)));
+  const tail = trimBlank(text(own.slice(last + 1)));
   const after =
     between.length && tail.length
       ? [...between, "", ...tail]
       : [...between, ...tail];
-  return { before, after, tableLines, unfencedLines };
+  return { before, after, tableLines, unfencedLines, ...foreign };
+}
+
+// The one definition of a FOREIGN section inside a marker block (task.230, obs
+// #91, obs #229): an unfenced ATX heading at or above the log's own level that
+// is not a Change Log heading. Only the heading and the table live inside the
+// markers; a sibling section written there — the QA loop's `## Deferred Work`,
+// finalise's `## Definition of Done - PASSED ✅` — was carried as prose INSIDE
+// the regenerated block, so it became part of the log and nothing warned.
+// A deeper heading is the log's own subsection and stays (section I).
+//
+// `lines` are `splitCarriedLines`' `[line, fenced]` pairs, markers and the first
+// Change Log heading already removed; `headingAt` is where that heading stood
+// (-1 when the block has none).
+//
+// The log's table is one of the table runs (contiguous unfenced pipe lines) at
+// or after its heading. A run never starts before the heading, so a foreign
+// table above it, or written flush against it, is never a candidate (QA cycle
+// 1, CR-1 and CR-3). A run in the log's own section — before the first
+// foreign heading at or after the heading — is judged before any past one:
+//
+//   1. the first own-section run that looks like a log: log-shaped (a header
+//      naming Date and one of `LOG_HEADER_CELLS`, in any order) or holding an
+//      entry row;
+//   2. else the first log-shaped run anywhere — the task.203 shape, a DoD
+//      section between the heading and the table (CR2-1), and a legend under
+//      the heading that is not the log (CR3-3);
+//   3. else the first own-section run, whatever its header (CR2-2, K22);
+//   4. else, with a heading, a run past a foreign heading holding an entry row.
+//
+// With no candidate the log has no table and starts at the heading (CR-2), or
+// at the end of a block with no heading inside it (the obs #104 shape). A
+// table under a foreign heading that is neither log-shaped nor dated is never
+// taken, and a dated one only by rule 4 (CR2-3, CR3-2). Each
+// earlier rule — a document-wide first match (cycle 1), a header test reaching
+// past foreign headings (cycle 2), Date plus Author counted as log-shaped
+// (cycle 3) — let a foreign table win: its heading moved out and its rows
+// stayed in the log as history.
+//
+// Before the log's table, a foreign section runs from its heading to the next
+// foreign heading, a Change Log heading at the log's level or the table,
+// whichever comes first: a DoD section above the heading and one between the
+// heading and the table (task.203) both leave, and an authoring note under the
+// log's heading stays.
+// After the table, a foreign section runs to the end of the block.
+// `foreignSections` reads this partition, `upsertChangeLog` and
+// `liftForeignSections` apply it.
+function partitionForeign(lines, level, headingAt = -1) {
+  const isSibling = ([l, prot]) => {
+    if (prot) return false;
+    const m = l.match(/^(#{1,6})[ \t]/);
+    return !!m && m[1].length <= level && !RE_HEADING.test(l);
+  };
+  const isTable = (i) => !lines[i][1] && isTableLine(lines[i][0]);
+
+  const runs = [];
+  for (let i = Math.max(headingAt, 0); i < lines.length; i++) {
+    if (!isTable(i)) continue;
+    const start = i;
+    while (i + 1 < lines.length && isTable(i + 1)) i++;
+    runs.push({ start, end: i + 1 });
+  }
+  // A run before the first foreign heading at or after the log's heading sits
+  // in the log's own section; one after it sits under a foreign heading.
+  const next = lines.findIndex(
+    (p, i) => i >= Math.max(headingAt, 0) && isSibling(p),
+  );
+  const ownRuns = runs.filter((r) => next === -1 || r.start < next);
+  const cells = (r) =>
+    lines[r.start][0]
+      .split("|")
+      .map((c) => c.trim().toLowerCase())
+      .filter(Boolean);
+  const logShaped = (r) => {
+    const c = cells(r);
+    return c.includes("date") && c.some((x) => LOG_HEADER_CELLS.has(x));
+  };
+  const hasEntry = (r) =>
+    lines.slice(r.start, r.end).some(([l]) => isEntryRow(l));
+  const logLike = (r) => logShaped(r) || hasEntry(r);
+  const pick =
+    ownRuns.find(logLike) ??
+    runs.find(logShaped) ??
+    ownRuns[0] ??
+    (headingAt !== -1 ? runs.find(hasEntry) : undefined);
+  let logStart;
+  if (pick) logStart = pick.start;
+  else if (headingAt !== -1) logStart = headingAt;
+  else logStart = lines.length;
+
+  // One entry per foreign heading, through the same predicate.
+  const own = [];
+  const beforeForeign = [];
+  const sections = [];
+  let inForeign = false;
+  for (let i = 0; i < logStart; i++) {
+    // A Change Log heading at the log's own level ends a foreign run, and as
+    // a repeat it is dropped, so the first write converges instead of lifting
+    // it above the marker for the next write's obs #104 absorb (QA cycle 2,
+    // CR2-4). A deeper one is a nested heading and stays (QA cycle 3, CR3-4).
+    if (i === headingAt) inForeign = false;
+    const depth = (lines[i][0].match(/^(#{1,6})[ \t]/) || [, ""])[1].length;
+    if (
+      !lines[i][1] &&
+      RE_HEADING.test(lines[i][0]) &&
+      depth &&
+      depth <= level
+    ) {
+      inForeign = false;
+      continue;
+    }
+    if (isSibling(lines[i])) {
+      // A second foreign run, after own lines, starts on a fresh paragraph.
+      const last = beforeForeign[beforeForeign.length - 1];
+      if (!inForeign && last && last[0].trim()) beforeForeign.push(["", false]);
+      inForeign = true;
+      sections.push({ side: "before", heading: lines[i][0], lines: [] });
+    }
+    if (inForeign) {
+      beforeForeign.push(lines[i]);
+      sections[sections.length - 1].lines.push(lines[i][0]);
+    } else {
+      own.push(lines[i]);
+    }
+  }
+
+  const sa = lines.slice(logStart).findIndex(isSibling);
+  const afterStart = sa === -1 ? lines.length : logStart + sa;
+  own.push(...lines.slice(logStart, afterStart));
+  for (const pair of lines.slice(afterStart)) {
+    if (isSibling(pair)) {
+      sections.push({ side: "after", heading: pair[0], lines: [] });
+    }
+    sections[sections.length - 1].lines.push(pair[0]);
+  }
+
+  return {
+    own,
+    beforeForeign,
+    afterForeign: lines.slice(afterStart),
+    sections,
+  };
+}
+
+/**
+ * The foreign sections of the document's change-log block, in order — what the
+ * next write would lift out of the markers. Read-only. `[]` when the document
+ * has no marker block (an unmarked log ends at the next sibling heading, so it
+ * cannot hold one) or nothing to lift.
+ *
+ * @param {string} content
+ * @returns {{side: "before"|"after", heading: string, lines: string[]}[]}
+ */
+function foreignSections(content) {
+  const found = findChangeLog(content);
+  if (!found || !found.hasMarkers) return [];
+  return splitCarriedLines(content, found).foreignSections;
 }
 
 // Split a table row into trimmed cells, dropping the empty strings that a leading
@@ -587,6 +776,121 @@ const ANCHORS = {
 // The write path
 // ---------------------------------------------------------------------------
 
+// Rebuild the located section — the one assembly path for a write
+// (`upsertChangeLog`, with a row) and a repair (`liftForeignSections`, with
+// `newRow === null`), so the two cannot drift.
+function rebuildChangeLog(content, found, newRow, docType) {
+  // One classifier for the whole span: rows, unparsed pipe-lines and carried
+  // prose are all read from the same partition, so a fenced example row
+  // cannot be carried as prose AND absorbed as history (bug.13, cycle 1).
+  const { before, after, tableLines, beforeForeign, afterForeign } =
+    splitCarriedLines(content, found);
+  const existing = tableLines.filter(isEntryRow);
+
+  // Rows the parser does not recognise are PRESERVED, not dropped.
+  //
+  // The block is regenerated from `existing`, so anything `isEntryRow` rejects
+  // would otherwise vanish silently. That is not hypothetical: a log written
+  // `| Version | Date | Change | Author |` — the column order this repo's own
+  // roadmap template shipped with — has a non-date first cell in every row, so
+  // every historical row failed the test and the regenerated block contained
+  // only the new one. Losing history is the single worst outcome for this
+  // module, and it is worse than emitting a slightly irregular table.
+  //
+  // Header and separator lines are excluded because the regenerated block
+  // supplies its own.
+  const unparsed = tableLines.filter(isUnparsedRow);
+  const migrated = found.legacyAuthor
+    ? migrateLegacyEntries(existing, {
+        legacyAuthor: found.legacyAuthor,
+        docType,
+      })
+    : existing;
+
+  // A document synced to both trackers carries a second legacy block. Collapse
+  // it into this one rather than leaving two logs behind.
+  //
+  // Scan BOTH sides of the chosen block. Scanning only the tail assumed the
+  // chosen block was always the earliest, which stopped being true the moment
+  // the other pair appeared first in the document (TASK-42-BUG-2). `findChangeLog`
+  // now picks the earliest block, so in practice `head` is usually clean — but
+  // sweeping both sides is what makes that an optimisation rather than a
+  // correctness dependency.
+  const head = collapseOtherLegacyBlocks(
+    content.slice(0, found.start),
+    docType,
+    found.legacyAuthor,
+  );
+  const tail = collapseOtherLegacyBlocks(
+    content.slice(found.end),
+    docType,
+    found.legacyAuthor,
+  );
+  const merged = [...head.entries, ...tail.entries];
+
+  // A hand-authored heading DIRECTLY above the marker block is the same section
+  // written twice: the rebuild always emits its own heading inside the markers,
+  // so task.120's first machine write left two consecutive `## Change Log`
+  // lines, and tasks 122/124/128 shipped that way (obs #104). Absorb it — the
+  // same convergence shape as collapseOtherLegacyBlocks, one line up — whether
+  // the block already carries its own heading (the doubled state) or not yet
+  // (the authored state). Only the nearest non-blank line counts: a heading
+  // with prose between it and the markers is somebody else's section and stays.
+  let headContent = head.content;
+  if (found.hasMarkers) {
+    const lines = headContent.replace(/\s+$/, "").split("\n");
+    if (lines.length && RE_HEADING.test(lines[lines.length - 1])) {
+      lines.pop();
+      headContent = lines.join("\n") + "\n";
+    }
+  }
+
+  // Only when rows from a second block are being merged in do the historical
+  // rows get sorted — otherwise the two blocks' histories would interleave
+  // wrongly. In the ordinary single-block case the existing order is preserved
+  // untouched, because the log is append-only and its order is its history.
+  const history = merged.length
+    ? [...migrated, ...merged].sort(byDate)
+    : migrated;
+
+  // Unparsed rows lead: they are older history the parser could not read, and
+  // the log is append-only, so nothing may be emitted above them that would
+  // reorder them relative to what follows.
+  //
+  // Everything else the section held is carried through on the side of the
+  // table it came from — see `splitCarriedLines`.
+  const rows =
+    newRow === null
+      ? [...unparsed, ...history]
+      : [...unparsed, ...history, newRow];
+  const block = buildChangeLogBlock(rows, {
+    level: found.level,
+    before,
+    after,
+  });
+  // Normalise both seams: the head may now end in blank lines where a swept
+  // block used to be, and the tail may begin with them. Without this the
+  // separators stack up (up to three blank lines observed) and accumulate
+  // across writes.
+  //
+  // Foreign sections (task.230) go back outside the markers on the side they
+  // sat: `before` ones between the head (after the obs #104 absorption above)
+  // and the block, `after` ones directly below the end marker. Their seams
+  // match what the next write produces, so a second write lifts nothing and
+  // changes only its own row.
+  const trailing = found.end < content.length ? "\n\n" : "\n";
+  const headText = headContent.replace(/\n+$/, "\n");
+  const liftedBefore = beforeForeign.length
+    ? (headText ? "\n" : "") + beforeForeign.join("\n") + "\n"
+    : "";
+  const liftedAfter = afterForeign.length
+    ? "\n\n" + afterForeign.join("\n")
+    : "";
+  return trimSeam(
+    headText + liftedBefore + block + liftedAfter + trailing + tail.content,
+  );
+}
+
 /**
  * Append an entry to the document's Change Log, creating the section if absent.
  *
@@ -600,99 +904,7 @@ function upsertChangeLog(content, entry, { docType = "" } = {}) {
   const newRow = fmtEntry(entry);
   const found = findChangeLog(content);
 
-  if (found) {
-    // One classifier for the whole span: rows, unparsed pipe-lines and carried
-    // prose are all read from the same partition, so a fenced example row
-    // cannot be carried as prose AND absorbed as history (bug.13, cycle 1).
-    const { before, after, tableLines } = splitCarriedLines(content, found);
-    const existing = tableLines.filter(isEntryRow);
-
-    // Rows the parser does not recognise are PRESERVED, not dropped.
-    //
-    // The block is regenerated from `existing`, so anything `isEntryRow` rejects
-    // would otherwise vanish silently. That is not hypothetical: a log written
-    // `| Version | Date | Change | Author |` — the column order this repo's own
-    // roadmap template shipped with — has a non-date first cell in every row, so
-    // every historical row failed the test and the regenerated block contained
-    // only the new one. Losing history is the single worst outcome for this
-    // module, and it is worse than emitting a slightly irregular table.
-    //
-    // Header and separator lines are excluded because the regenerated block
-    // supplies its own.
-    const unparsed = tableLines.filter(isUnparsedRow);
-    const migrated = found.legacyAuthor
-      ? migrateLegacyEntries(existing, {
-          legacyAuthor: found.legacyAuthor,
-          docType,
-        })
-      : existing;
-
-    // A document synced to both trackers carries a second legacy block. Collapse
-    // it into this one rather than leaving two logs behind.
-    //
-    // Scan BOTH sides of the chosen block. Scanning only the tail assumed the
-    // chosen block was always the earliest, which stopped being true the moment
-    // the other pair appeared first in the document (TASK-42-BUG-2). `findChangeLog`
-    // now picks the earliest block, so in practice `head` is usually clean — but
-    // sweeping both sides is what makes that an optimisation rather than a
-    // correctness dependency.
-    const head = collapseOtherLegacyBlocks(
-      content.slice(0, found.start),
-      docType,
-      found.legacyAuthor,
-    );
-    const tail = collapseOtherLegacyBlocks(
-      content.slice(found.end),
-      docType,
-      found.legacyAuthor,
-    );
-    const merged = [...head.entries, ...tail.entries];
-
-    // A hand-authored heading DIRECTLY above the marker block is the same section
-    // written twice: the rebuild always emits its own heading inside the markers,
-    // so task.120's first machine write left two consecutive `## Change Log`
-    // lines, and tasks 122/124/128 shipped that way (obs #104). Absorb it — the
-    // same convergence shape as collapseOtherLegacyBlocks, one line up — whether
-    // the block already carries its own heading (the doubled state) or not yet
-    // (the authored state). Only the nearest non-blank line counts: a heading
-    // with prose between it and the markers is somebody else's section and stays.
-    let headContent = head.content;
-    if (found.hasMarkers) {
-      const lines = headContent.replace(/\s+$/, "").split("\n");
-      if (lines.length && RE_HEADING.test(lines[lines.length - 1])) {
-        lines.pop();
-        headContent = lines.join("\n") + "\n";
-      }
-    }
-
-    // Only when rows from a second block are being merged in do the historical
-    // rows get sorted — otherwise the two blocks' histories would interleave
-    // wrongly. In the ordinary single-block case the existing order is preserved
-    // untouched, because the log is append-only and its order is its history.
-    const history = merged.length
-      ? [...migrated, ...merged].sort(byDate)
-      : migrated;
-
-    // Unparsed rows lead: they are older history the parser could not read, and
-    // the log is append-only, so nothing may be emitted above them that would
-    // reorder them relative to what follows.
-    //
-    // Everything else the section held is carried through on the side of the
-    // table it came from — see `splitCarriedLines`.
-    const block = buildChangeLogBlock([...unparsed, ...history, newRow], {
-      level: found.level,
-      before,
-      after,
-    });
-    // Normalise both seams: the head may now end in blank lines where a swept
-    // block used to be, and the tail may begin with them. Without this the
-    // separators stack up (up to three blank lines observed) and accumulate
-    // across writes.
-    const trailing = found.end < content.length ? "\n\n" : "\n";
-    return trimSeam(
-      headContent.replace(/\n+$/, "\n") + block + trailing + tail.content,
-    );
-  }
+  if (found) return rebuildChangeLog(content, found, newRow, docType);
 
   const anchor = ANCHORS[docType];
   if (anchor) {
@@ -712,6 +924,26 @@ function upsertChangeLog(content, entry, { docType = "" } = {}) {
   }
 
   return content.trimEnd() + "\n\n" + buildChangeLogBlock([newRow]) + "\n";
+}
+
+/**
+ * Move every foreign section out of the change-log markers without appending a
+ * row (task.230) — the repair for a document whose block already holds one.
+ * Same assembly as `upsertChangeLog`, so a repair and a write agree. A document
+ * with nothing to lift is returned unchanged, byte for byte.
+ *
+ * @param {string} content
+ * @param {object} [opts]
+ * @param {string} [opts.docType]  passed through to legacy-row migration
+ * @returns {{content: string, lifted: string[]}}  lifted = the moved headings
+ */
+function liftForeignSections(content, { docType = "" } = {}) {
+  const lifted = foreignSections(content).map((sec) => sec.heading);
+  if (!lifted.length) return { content, lifted };
+  return {
+    content: rebuildChangeLog(content, findChangeLog(content), null, docType),
+    lifted,
+  };
 }
 
 // Sort comparator on the leading date cell. `Array.prototype.sort` is stable, so
@@ -972,9 +1204,11 @@ module.exports = {
   // read
   findChangeLog,
   extractEntries,
+  foreignSections,
   // write
   ANCHORS,
   upsertChangeLog,
+  liftForeignSections,
   bumpUpdated,
   // check
   checkUpdatedCoherence,

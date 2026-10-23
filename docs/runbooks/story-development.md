@@ -114,7 +114,7 @@ Produces one file per section under the same directory. See [`../../skills/shard
 | **Inputs**    | PRD path; the section/sections this epic covers.                                                                                                                                          |
 | **Outputs**   | `docs/prd/{domain}/prd.{P}.{feature}/epics/epic.{P}.{E}.{name}/epic.{P}.{E}.{name}.md` plus a stories/ subdir (empty at first). `{E}` is allocated within PRD `{P}`.                      |
 | **Pitfalls**  | Never invent an epic number — `create-epic` allocates `E` within the PRD from the epics on disk. Two branches that both take the next `E` collide at merge (`duplicate-id`).          |
-| **Calls**     | `documentation-standards-validator`, optionally `mermaid-architect`.                                                                                                                      |
+| **Calls**     | `documentation-standards-validator`, optionally `mermaid-architect`; when you choose to sync the new epic, `ensure-epic-github-issue` (GitHub) or `sync-jira-epic` (Jira).                |
 | **Reference** | [`../../skills/create-epic/SKILL.md`](../../skills/create-epic/SKILL.md)                                                                                                                  |
 
 ### B.2 `review-epic`
@@ -123,13 +123,13 @@ Produces one file per section under the same directory. See [`../../skills/shard
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Invoke**       | `"review epic <path>"` · `/review-epic <path>`                                                                                                |
 | **What it does** | Template compliance, scope-overlap detection with existing epics, architecture-doc alignment, codebase scan for already-implemented features. |
-| **Outputs**      | Co-located review report `epic.{P}.{E}.review.{YYYY-MM-DD}.md`.                                                                                   |
+| **Outputs**      | Co-located review report `epic.{P}.{E}.review.{n}.{name}.md`.                                                                                   |
 | **Pitfalls**     | The codebase scan often reveals duplicate work — don't ignore it. Resolve scope overlaps before writing stories.                              |
 | **Reference**    | [`../../skills/review-epic/SKILL.md`](../../skills/review-epic/SKILL.md)                                                                      |
 
-### B.3 Tracker issue (auto, flagged for awareness)
+### B.3 Tracker issue (on request, flagged for awareness)
 
-Epic GitHub/Jira issues are created automatically downstream by `develop-story` → `finalise`, via `ensure-epic-github-issue` or `ensure-epic-jira-issue` (chosen by the platform resolver). You generally don't invoke these directly — but if you want the tracker issue _before_ story development, run the appropriate skill manually.
+Epic GitHub/Jira issues are created on request, not unprompted. `create-epic` and `review-epic` offer to sync the epic itself. `create-story` and `review-story` ensure the epic's issue, via `ensure-epic-github-issue` or `ensure-epic-jira-issue`, when you accept their tracker sync: `create-story` asks which tracker to sync to (the platform resolver recommends one), and `review-story` uses the tracker the resolver detected. You generally don't invoke the `ensure-*` sub-routines directly.
 
 ---
 
@@ -143,7 +143,7 @@ Epic GitHub/Jira issues are created automatically downstream by `develop-story` 
 | **What it does** | 10-step process that identifies the next logical story, extracts technical context from architecture docs and the codebase, and writes a story with anti-hallucination safeguards. |
 | **Outputs**      | `docs/prd/.../prd.{P}.{feature}/epics/epic.{P}.{E}.{name}/stories/story.{P}.{E}.{S}.{name}/story.{P}.{E}.{S}.{name}.md`. Story directory is created with the same stem as the file.                              |
 | **Pitfalls**     | Don't hand-edit story numbering — the skill computes the next `{S}` from existing siblings. Story acceptance criteria must be testable; vague criteria block `review-story`.       |
-| **Calls**        | `documentation-standards-validator`, optionally `mermaid-architect`.                                                                                                               |
+| **Calls**        | `documentation-standards-validator`, optionally `mermaid-architect`, `wireframe` for UI stories, and the `ensure-epic-*` / `ensure-story-*` issue routines.                         |
 | **Reference**    | [`../../skills/create-story/SKILL.md`](../../skills/create-story/SKILL.md)                                                                                                         |
 
 ### C.2 Review the story
@@ -161,7 +161,7 @@ Two options depending on how much human input you want:
 /review-story --validate <story-path>
 ```
 
-`review-story` produces a co-located review report `story.{P}.{E}.{S}.review.{n}.{name}.md`. Validate mode produces `story.{P}.{E}.{S}.validate.{YYYY-MM-DD}.md`. Both update the story's `status` once it's `ready-for-development`.
+`review-story` produces a co-located review report `story.{P}.{E}.{S}.review.{n}.{name}.md`. Standalone validate mode (`--validate`) produces `story.{P}.{E}.{S}.validate.{YYYY-MM-DD}.md` and is read-only — it never modifies the story. Interactive mode updates the story's `status` once the review is resolved; so does the validate-and-apply variant `develop-story` runs at Step 2.
 
 Reference: [`../../skills/review-story/SKILL.md`](../../skills/review-story/SKILL.md).
 
@@ -229,12 +229,12 @@ Three things to know if you pick it:
 | Step | Skill                 | What happens                                                                                                                                                        |
 | ---- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1    | `create-branch`       | Cuts the story branch from the Q1 base. If that base is an epic integration branch that does not exist yet, creates and pushes it from `develop` first.             |
-| 2    | `review-story`        | Runs the interactive review (skipped if the story was reviewed recently and is still `ready-for-development`).                                                      |
+| 2    | `review-story`        | Runs `review-story` in validate-and-apply mode (no questions). Skipped when a `story.{P}.{E}.{S}.review.*.md` report exists and the status is Ready for Development or In Progress. |
 | 3    | `develop`             | Implements the story. Bounded loop, `MAX_ITER=5`. Each iteration: plan → code → test → DoD check.                                                                   |
 | 4    | `create-pr`           | Pushes the branch, opens a PR with auto-generated description. `--base` is the Q2 answer, pre-supplied from Phase 0.                                                |
-| 5–6  | `qa-story` → `qa-fix` → `review-pr` | QA review produces a gate file (`PASS` / `CONCERNS` / `FAIL` / `WAIVED`). `qa-fix` runs on `FAIL`, or on an open `top_issues[]` entry that no active waiver covers; a gate in the accepting-route set (any of the QA loop's §5c five routes) hands to `review-pr`. Up to 5 cycles. **Step 5c is the loop's exit gate**: a gate in the accepting-route set hands to `review-pr`, which reviews the PR against the story. `REQUEST CHANGES` returns to `qa-fix` and consumes a cycle from the same 5-cycle budget; `APPROVE`/`CONCERNS` exit to Step 7. Leaves `story.{P}.{E}.{S}.pr-review.{n}.{name}.md`. |
+| 5–6  | `qa-story` → `qa-fix` → `review-pr` | QA review produces a gate file (`PASS` / `CONCERNS` / `FAIL` / `WAIVED`). `qa-fix` runs on `FAIL`, or on an open `top_issues[]` entry that no active waiver covers; a gate in the accepting-route set (any of the QA loop's §5c five routes) hands to `review-pr`. Up to `QA_MAX_CYCLES` cycles (default 5). **Step 5c is the loop's exit gate**: a gate in the accepting-route set hands to `review-pr`, which reviews the PR against the story. `REQUEST CHANGES` returns to `qa-fix` and consumes a cycle from the same cycle budget; `APPROVE`/`CONCERNS` exit to Step 7. Leaves `story.{P}.{E}.{S}.pr-review.{n}.{name}.md`. |
 | 7    | `finalise`            | Validates against the Definition of Done, posts DoD summary to the PR, comments the tracker issue, updates the board. **Runs full side-effects even in lite mode.** |
-| 8    | `commit-changes`      | Stages and commits any final artifacts (implementation report, DoD summary, status updates).                                                                        |
+| 8    | `commit-changes`      | Commits the final implementation report and pushes. The DoD summary and `status: accepted` were already committed by `/finalise` (6a). |
 
 Throughout, `develop-story` records every decision in a co-located implementation report: `story.{P}.{E}.{S}.implementation.{N}.{name}.md`.
 
@@ -246,11 +246,11 @@ Story `status` advances to `accepted`. The PR is left for human merge. If the st
 
 ### Lite mode
 
-Add `--lite` to skip pre-develop codebase mapping and other context-gathering for low-risk stories. Lite mode is otherwise auto-detected in Phase 0a — it is not a prompt. Side-effects in Step 7 (`finalise`) **still run in full** — that's not a corner you can cut.
+Lite mode is auto-detected in Phase 0 (low or absent `risk_level`, fewer than 3 tasks, one module) — it is not a prompt, and there is no `--lite` flag. `--mode lite` can request it (honoured only when those conditions hold), and `--mode fast` applies the same shortening regardless of the detector, but only when `develop.skippable` lists `qa-depth` and `review-pr-depth` (or `develop.defaultMode` is `fast`); otherwise it is refused with a reason. See [the lite-mode contract](../../shared/resources/develop-pipeline-lite-mode.md#speed-modes-and-skips). It shortens QA only — direct-tools Step 5, `--effort low` Step 5c — and pre-develop codebase mapping still runs. Side-effects in Step 7 (`finalise`) **still run in full** — that's not a corner you can cut.
 
 ### Resume semantics
 
-If the pipeline is interrupted, re-invoke `/develop-story <same-path>`. The skill verifies per-step artifacts (branch exists? PR open? gate file present?) and resumes at the first incomplete step. It will not redo completed work.
+If the pipeline is interrupted, re-invoke `/develop-story <same-path>`. The skill verifies per-step artifacts (branch exists? PR open? gate file present?) and resumes at the first incomplete step. It will not redo completed work. After a Step 7 HALT with DoD `❌ GAPS` that you fixed with a **committed code change**, pick **"Re-enter QA at 5a"** (Recommended) when `/develop-story` offers it, so a QA gate reads the new head before acceptance; a document-only fix resumes at Step 7, and an uncommitted fix is refused (`uncommitted-fix`). See [Troubleshooting → Finalise halted with DoD gaps](../reference/troubleshooting.md#finalise-halted-with-dod-gaps-and-i-fixed-code).
 
 **Reference:** [`../../skills/develop-story/SKILL.md`](../../skills/develop-story/SKILL.md). See also: [`../../skills/develop-story/README.md`](../../skills/develop-story/README.md).
 
@@ -269,23 +269,19 @@ What the orchestrator invokes internally, top-down.
 | [`develop`](../../skills/develop/SKILL.md)               | Actual implementation loop (plan → code → test → DoD).             |
 | [`create-pr`](../../skills/create-pr/SKILL.md)           | Pushes branch, opens PR with `--base` = the Q2 answer.             |
 | [`qa-story`](../../skills/qa-story/SKILL.md)             | Produces QA gate file. Dev skills must not edit gate files.        |
-| [`qa-fix`](../../skills/qa-fix/SKILL.md)                 | Applies fixes for `FAIL` gates and for open `top_issues[]` entries no active waiver covers, and for `review-pr`'s `REQUEST CHANGES`. Up to 5 cycles. |
+| [`qa-fix`](../../skills/qa-fix/SKILL.md)                 | Applies fixes for `FAIL` gates and for open `top_issues[]` entries no active waiver covers, and for `review-pr`'s `REQUEST CHANGES`. Up to `QA_MAX_CYCLES` cycles (default 5). |
 | [`review-pr`](../../skills/review-pr/SKILL.md)           | Step 5c — the QA loop's exit gate. Reviews the PR against the story (conformance + code). Advisory: writes no gate file; the orchestrator acts on its verdict. |
 | [`finalise`](../../skills/finalise/SKILL.md)             | DoD check, PR comment, tracker comment, board update.              |
-| [`commit-changes`](../../skills/commit-changes/SKILL.md) | Final commit of artifacts and status updates.                      |
-
-Inside `finalise`, the platform resolver picks one of:
-
-- [`ensure-epic-github-issue`](../../skills/ensure-epic-github-issue/SKILL.md) — GitHub projects
-- [`ensure-epic-jira-issue`](../../skills/ensure-epic-jira-issue/SKILL.md) — Jira
+| [`commit-changes`](../../skills/commit-changes/SKILL.md) | Final commit of the implementation report (`/finalise` committed the acceptance artifacts). |
 
 **Upstream skills also call others:**
 
 | Parent         | Calls                                                                                        |
 | -------------- | -------------------------------------------------------------------------------------------- |
 | `create-prd`   | `create-doc`, `(brownfield-)prd-template`, `pm-checklist`, optionally `mermaid-architect`    |
-| `create-epic`  | `documentation-standards-validator`, optionally `mermaid-architect`                          |
-| `create-story` | `documentation-standards-validator`, optionally `mermaid-architect`                          |
+| `create-epic`  | `documentation-standards-validator`, optionally `mermaid-architect`; when you choose to sync, `ensure-epic-github-issue` (GitHub) or `sync-jira-epic` (Jira) |
+| `create-story` | `documentation-standards-validator`, optionally `mermaid-architect`, `wireframe` (UI stories), `ensure-epic-*` and `ensure-story-*` (GitHub or Jira, whichever you pick at its tracker-sync prompt) |
+| `review-story` | `create-branch` (Step 0a), `ensure-epic-*` and `ensure-story-*` (GitHub or Jira, picked by the platform resolver), `wireframe` (UI stories), `mermaid-architect` |
 
 ---
 
@@ -318,7 +314,7 @@ gh pr view --json baseRefName,statusCheckRollup
 gh pr view --json comments | jq '.comments[].body' | grep -i 'definition of done'
 
 # Bitbucket — view PR in the web UI, or:
-source shared/resources/bitbucket-auth.sh && curl "${BB_CURL_AUTH[@]}" \
+source .agents/skills/create-pr/references/bitbucket-auth.sh && curl "${BB_CURL_AUTH[@]}" \
   "https://api.bitbucket.org/2.0/repositories/{workspace}/{repo}/pullrequests/{id}"
 ```
 

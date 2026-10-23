@@ -1,0 +1,102 @@
+schema: 2
+task: 'task.198.skill-reference-and-discoverability-docs'
+task_title: 'Skill reference and discoverability docs'
+gate: CONCERNS
+status_reason: 'All 27 findings are fixed; links, anchors, prettier, validate, the Mermaid map and ci:fast are clean. The fact-check found that the new resolve-platform wording in overview.md over-claims and its grep does not list the sourcing skills (medium), plus six low call-graph and step-list gaps the new text introduced or left contradictory.'
+reviewer: 'QA Engineer'
+head: '8a1e7f65ada2e0d5972e18a8937ebf6636e6e31b'
+updated: '2026-10-20T05:06:12Z'
+
+top_issues:
+  - id: 'QA1-CR-1'
+    severity: medium
+    file: 'docs/concepts/overview.md'
+    finding: 'Line 127 says every skill that touches a tracker or a PR sources resolve-platform.sh, lists finalise and all ensure-* routines among them, and says grep -l resolve-platform.sh skills/*/SKILL.md lists them all. False: create-issue does its own detection (skills/create-issue/SKILL.md:133-150, no resolve-platform mention); finalise and the ensure-*-jira-issue routines only read TRACKER set by the caller (finalise/SKILL.md:912-913, ensure-epic-jira-issue/SKILL.md:17); the bare grep matches mentions, not source lines, and misses the develop-* pipelines that source it from references. The canonical source-only grep is shared/resources/platform-detection.md:540 (22 SKILL.md files).'
+    suggested_action: 'Describe the set as the skills that source the resolver, say finalise and the Jira ensure-* routines read TRACKER from their caller, note the develop-* pipelines source it from their references, and use the platform-detection.md:540 grep.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA1-CR-2'
+    severity: low
+    file: 'docs/concepts/overview.md'
+    finding: 'Line 114 table row "sourced by every platform-aware skill" repeats the CR-1 over-claim (create-issue is platform-aware and does not source it).'
+    suggested_action: 'Reword to "sourced by the platform-aware skills" and point at platform-detection.md.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA1-CR-3'
+    severity: low
+    file: 'skills/review-story/README.md'
+    finding: 'The step list claims to follow the SKILL.md headings but omits "### Step 10a: Record the Reviewed Revision" (skills/review-story/SKILL.md:2456).'
+    suggested_action: 'Add Step 10a (stamps the reviewed revision so develop-story Step 2 can reuse the review) between Step 10 and Step 11.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA1-CR-4'
+    severity: low
+    file: 'skills/review-task/README.md'
+    finding: 'The step list claims to follow the SKILL.md headings but omits "### Step 9a: Record the Reviewed Revision" (skills/review-task/SKILL.md:1981).'
+    suggested_action: 'Add Step 9a between Step 9 and Step 10.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA1-CR-5'
+    severity: low
+    file: 'docs/runbooks/jira-publish.md'
+    finding: 'Line 124 now says ensure-epic-jira-issue is called by create-story and review-story; review-epic also invokes it (skills/review-epic/SKILL.md:850, Step 11.6 at :812).'
+    suggested_action: 'Say "called by create-story, review-story and review-epic".'
+    suggested_owner: dev
+    status: open
+  - id: 'QA1-CR-6'
+    severity: low
+    file: 'docs/runbooks/story-development.md'
+    finding: 'Line 132 (B.3) names only create-story/review-story as ensuring the epic issue and says to run the skill manually before any story exists; create-epic and review-epic offer that sync themselves (create-epic/SKILL.md:362-372, review-epic/SKILL.md:850-851), and architecture.md:120 in the same diff says so. "Exists by the time its first story is written" is too strong: the create-story/review-story sync is opt-in.'
+    suggested_action: 'Say create-epic and review-epic offer the epic sync and create-story/review-story ensure it when their tracker sync is accepted; drop the guarantee.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA1-CR-7'
+    severity: low
+    file: 'docs/runbooks/story-development.md'
+    finding: 'The create-epic rows in the upstream-calls table (line 282) and the B.1 Calls row (line 117) omit ensure-epic-github-issue / sync-jira-epic, contradicting the new CE --> EGH edge and architecture.md:120 (create-epic/SKILL.md:362-372).'
+    suggested_action: 'Append "optionally ensure-epic-github-issue (GitHub) or sync-jira-epic (Jira) when you choose to sync" to both rows.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 5969
+  phases_verified: 4/4
+  ci: 'pass @ 8a1e7f65 (validate, shellcheck, link-check, test)'
+  trace:
+    phases_covered: [0, 1, 2, 3]
+    phases_with_issues: [1, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'Documentation only; no boundary (no predicate, script, SKILL.md or shared/resources prose changed).'
+  performance:
+    status: PASS
+    notes: 'N/A — docs only.'
+  reliability:
+    status: PASS
+    notes: 'Every changed link and the four new anchors resolve; the Mermaid map renders.'
+  maintainability:
+    status: PASS
+    notes: 'Fixes point at canonical sources; the call-graph inaccuracies are tracked in top_issues.'
+
+recommendations:
+  immediate:
+    - action: 'Fix QA1-CR-1 to QA1-CR-7.'
+      refs: ['docs/concepts/overview.md', 'skills/review-story/README.md', 'skills/review-task/README.md', 'docs/runbooks/jira-publish.md', 'docs/runbooks/story-development.md']
+  future:
+    - action: 'Cleanups (advisory): review-story row at story-development.md:284 omits create-branch (review-story invokes: list, Step 0a); architecture.md:120 credits only create-story with ensure-story-* while the map draws RS --> ESGH/ESGJ.'
+      refs: ['docs/runbooks/story-development.md', 'docs/concepts/architecture.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['QA1-CR-1 to QA1-CR-7 fixed']

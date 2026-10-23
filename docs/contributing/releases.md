@@ -18,10 +18,11 @@ Before cutting a repo release:
 
 > **`npm run ci` is the local form of the first three boxes.** It runs `format:check`, `npm test`,
 > `eval:all` (= `test.yml`), `validate:all`, `check:generated` and `bundle:check` (= `validate.yml`,
-> all but its regenerate-and-diff bundle step, which the pre-commit hook covers) and `lint:shell`
-> (= `shellcheck.yml`; skips loudly when the binary is absent). `docs-link-check` and
+> all but its regenerate-and-diff bundle step, which the pre-commit hook covers), `lint:shell`
+> (= `shellcheck.yml`; skips loudly when the binary is absent) and `lint:secrets` (= `secret-scan.yml`;
+> skips loudly when `gitleaks` is absent). `docs-link-check` and
 > `branch-policy` have no local form. `evals/shared/tests/ci-gate-parity.test.mjs` asserts the
-> composite and the three workflows run the same set, so a lane added to one and not the other
+> composite and the four workflows run the same set, so a lane added to one and not the other
 > fails `npm test` (task 111).
 
 > **The CI boxes below are enforced by `release.sh`, not only read by you.** Step 2 of `--tag`
@@ -40,6 +41,7 @@ Before cutting a repo release:
 - [ ] `test.yml` CI workflow is green on the release commit — covers `npm run format:check`, `npm test` (L1–L4 hermetic) and `npm run eval:all` (L4 replay)
 - [ ] `validate.yml` CI workflow is green on the release commit — per-skill `quick_validate.py` plus the bundle-freshness check
 - [ ] `ShellCheck` workflow (`shellcheck.yml`) is green on the release commit — lints tracked shell **sources** only, i.e. `git ls-files '*.sh'` minus `skills/*/references/`, which is roughly a fifth of the files and excludes every bundled copy. It is a separate lane rather than a step in the two above; the header comment explains why, and the short version is that neither could have fired for the change that motivated it
+- [ ] `Secret scan` workflow (`secret-scan.yml`) is green on the release commit — pinned gitleaks over the tracked files and the commit messages pushed. Not yet enforced by `release.sh` (it is `WORKFLOWS.notGating` in `scripts/release-ci-verdict.mjs` until the lane has a green record, task 229), so this box is read by you
 - [ ] `Docs link check` workflow (`docs-link-check.yml`) is green — path-filtered to `docs/**/*.md`, `README.md`, `AGENTS.md`, `CONTRIBUTING.md`, so **it does not run on every PR**. A release that touched none of those has no run to be green; check that it is absent-not-failing rather than ticking it blind
 - [ ] CHANGELOG `[Unreleased]` has entries for everything user-facing since last release — and every accepted task merged since the last tag is **cited** there (see the convention below). `evals/shared/tests/changelog-entry-drift.test.mjs` fails CI on a missing task citation, so a green `test.yml` already covers the task half; bugs are still read by hand until the follow-on below lands
 - [ ] **Flip the CHANGELOG check from advisory to blocking** — *for the release after the one that ships task.115*: in `skills/finalise/SKILL.md` Step 7 action 6d, change the `no-changelog-entry` warning to a HALT, and delete this line. Until then `/finalise` warns and the drift test is the backstop

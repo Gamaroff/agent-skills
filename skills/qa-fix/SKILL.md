@@ -850,7 +850,7 @@ Iterate until:
 **Bug Report Update Workflow**:
 
 1. **Starting Investigation** (New/Reopened → In Progress):
-   - Change bug status to "In Progress"
+   - Change bug status to "In Progress" — frontmatter `status: in-progress` and the body header — then mirror it into the bug registry (§ "Mirroring a General Bug's Status into the Bug Registry")
    - Add investigation notes to Developer Fix Cycle section
    - Document root cause analysis
    - Add status history entry
@@ -859,14 +859,14 @@ Iterate until:
    - Document fix description
    - List all files modified
    - Describe testing performed
-   - Change bug status to "Ready for QA"
+   - Change bug status to "Ready for QA" — frontmatter `status: ready-for-qa` and the body header — then mirror it into the bug registry (§ "Mirroring a General Bug's Status into the Bug Registry")
    - Add status history entry
 
 3. **Iteration Handling** (if bug was Reopened):
    - Add new "Iteration N" section in Developer Fix Cycle
    - Document what was re-investigated
    - Describe revised fix approach
-   - Change status to "Ready for QA" when complete
+   - Change status to "Ready for QA" when complete, as in item 2 — frontmatter, header and the registry mirror
 
 **Story Status Rule**:
 
@@ -1316,11 +1316,38 @@ New → In Progress → Ready for QA → Closed
 - **Reopened**: QA verified fix still failing, needs re-investigation
 - **Closed**: QA verified fix working, bug resolved
 
+### Mirroring a General Bug's Status into the Bug Registry
+
+A general bug (`docs/bugs/bug.{N}.{name}/bug.{N}.{name}.md`) carries its status twice: in its
+frontmatter `status:` and in the Status cell of its row in `docs/bugs/bug-registry.md`. Consumer drift
+guards fail CI when the two disagree, so **every status write below is followed by one call**, after
+the frontmatter is written (the CLI reads frontmatter, not the body header):
+
+```bash
+node .agents/skills/qa-fix/references/registry-tick.js --bug-status --file "{bug-file}" --json
+```
+
+It reads the registry's vocabulary from the other rows (the lifecycle token, or `🆕 New` /
+`🔧 In Progress` / `🔍 Ready for QA` / `⚠️ Reopened` / `✅ Closed`) and writes the Status cell only.
+Run it for every bug, whatever its mode: a story or task bug has no registry row, and the CLI answers
+`not-a-general-bug` for it. Act on `reason`:
+
+| `reason` | Do this |
+| --- | --- |
+| `mirrored`, `already`, `not-a-general-bug` | Nothing |
+| `no-registry`, `no-row`, `row-malformed`, `ambiguous-row`, `engine-unavailable` | Note it in the fix summary and edit the row's Status cell by hand, in the registry's vocabulary |
+| `not-a-lifecycle-status` | Fix the frontmatter status you just wrote — it is outside the bug lifecycle — and run the call again |
+
+Before this call existed, qa-fix moved a reopened bug to In Progress and Ready for QA without touching
+the row, so the row read `⚠️ Reopened` while the file read `ready-for-qa` until the bug closed
+(task 219).
+
 ### Updating Bug Reports
 
 #### Starting Investigation (New/Reopened → In Progress)
 
-**Update Bug Header**:
+**Update Bug Status** — frontmatter `status: in-progress` and the header, then run the registry mirror
+(§ "Mirroring a General Bug's Status into the Bug Registry"):
 
 ```markdown
 **Status**: 🔄 In Progress
@@ -1359,7 +1386,8 @@ New → In Progress → Ready for QA → Closed
 
 #### Implementing Fix (In Progress → Ready for QA)
 
-**Update Bug Header**:
+**Update Bug Status** — frontmatter `status: ready-for-qa` and the header, then run the registry mirror
+(§ "Mirroring a General Bug's Status into the Bug Registry"):
 
 ```markdown
 **Status**: ✅ Ready for QA

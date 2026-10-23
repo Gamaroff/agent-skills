@@ -1,6 +1,6 @@
 ---
 name: loop-supervisor
-description: Run an unattended sequential loop where every iteration gets a fresh Claude process and a fresh context, and each outcome is classified from filesystem post-conditions rather than from the assistant's prose. Use when a roadmap loop must run for hours or overnight without quality decaying — the built-in /loop re-invokes the same conversation each time, so late iterations work through a context consumed by the early ones, and a skill cannot clear its own context. Spawns one `claude -p` per iteration with a pinned session id, probes for work before spending a model invocation, writes a per-iteration ledger and log, and stops on an empty frontier, a halt, a budget cap, or repeated no-progress. Triggers — run the roadmap overnight, fresh context each iteration, unattended loop, why does the loop get worse over time.
+description: Run an unattended sequential loop where every iteration gets a fresh Claude process and a fresh context, and each outcome is classified from filesystem post-conditions rather than from the assistant's prose. Use when a roadmap loop must run for hours or overnight without quality decaying — the built-in /loop re-invokes the same conversation each time, so late iterations work through a context consumed by the early ones, and a skill cannot clear its own context. Spawns one `claude -p` (or, with --engine agy, `agy -p`) per iteration with a pinned session id, probes for work before spending a model invocation, writes a per-iteration ledger and log, and stops on an empty frontier, a halt, a budget cap, or repeated no-progress. Triggers — run the roadmap overnight, fresh context each iteration, unattended loop, why does the loop get worse over time.
 invokes: [develop-next]
 ---
 
@@ -12,7 +12,7 @@ invokes: [develop-next]
 
 |                    | built-in `/loop`                              | `loop-supervisor`                                       |
 | ------------------ | --------------------------------------------- | -------------------------------------------------------- |
-| Where an iteration runs | the **same** conversation, re-invoked      | a **new** `claude -p` process                            |
+| Where an iteration runs | the **same** conversation, re-invoked      | a **new** engine process (`claude -p` by default)        |
 | Context at iteration 5 | items 1–4 still in it (auto-compacted)     | empty                                                     |
 | Who decides the outcome | the model, in prose                       | a pure classifier, from files on disk                     |
 | Record of the run  | the transcript                                 | `runs.jsonl` + one log pair per iteration                 |
@@ -60,8 +60,11 @@ caveats and an honest note on per-iteration cost: [`README.md`](README.md).
    never on the exit code: `selected` and every `stop` both exit 0. `stop` ends the loop having spent
    nothing. **Skipped entirely when a run-state file exists** — an unfinished run is resumed, not
    re-selected.
-2. **Spawn** one `claude -p` with a pinned `--session-id`, `--permission-mode acceptEdits`, and a
-   pinned `--settings` file so the run does not inherit local settings drift.
+2. **Spawn** one `claude -p` by default, with a pinned `--session-id`, `--permission-mode acceptEdits`, and a
+   pinned `--settings` file so the run does not inherit local settings drift. `--engine agy` spawns
+   the Antigravity CLI instead, and `--model` / `--effort` pass through to either; each engine is one
+   row in `references/engines.js`, and a flag an engine cannot honour is refused, not dropped
+   ([README](README.md#engines-and-models)).
 3. **Watch** — poll `develop-pipeline.lock` every ~5s for `current_step` / `branch` / `pr_url`, and
    write `current.json`. This is the only source of *sub-step* granularity; a run-state file's booleans
    cannot express "QA cycle 3 of 5".
@@ -142,7 +145,8 @@ contract, field semantics and consumer-side warnings: [`README.md`](README.md#pu
 
 Because `--session-id` is pinned, **every iteration is reopenable afterwards** with
 `claude --resume <sessionId>` (the id is in each `runs.jsonl` line). That is the strongest debugging
-affordance here.
+affordance here. On `--engine agy` the id is the conversation id agy reports, reopened with
+`agy --conversation <id>`.
 
 ## Adapters
 

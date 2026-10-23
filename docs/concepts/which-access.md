@@ -33,7 +33,7 @@ flowchart TD
     Q3 -->|Click the tracker UI| Manual["manual"]
 
     Full --> FullLink["Leave access unset, or access.tracker: full"]
-    Approve --> ApproveLink["access.tracker: approve — today this still defers; see limits"]
+    Approve --> ApproveLink["access.tracker: approve — one batched confirmation at handover"]
     RO --> RoLink["access.tracker: read-only"]
     Command --> CmdLink["access.tracker: command — work the .sh"]
     Manual --> ManLink["access.tracker: manual — work the .md checklist"]

@@ -1,0 +1,66 @@
+[
+  {
+    "id": "cfg-prefix-integration",
+    "sink": "path",
+    "input": "integration/1.4.feature-ui",
+    "why": "The configured prefix then one {P}.{E} segment.",
+    "correct": "Accept (true)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cfg-prefix-integration-bare",
+    "sink": "path",
+    "input": "integration/1.4",
+    "why": "Configured prefix, segment equal to {P}.{E}.",
+    "correct": "Accept (true)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cfg-prefix-own-branch",
+    "sink": "path",
+    "input": "feature/story.1.4.2.configure-pipe",
+    "why": "The story's own branch is named whatever the prefix.",
+    "correct": "Accept (true)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "cfg-prefix-default-epic",
+    "sink": "path",
+    "input": "epic/1.4.feature-ui",
+    "why": "epic/ is not the configured prefix once branchPattern changes it.",
+    "correct": "Reject (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "cfg-prefix-release",
+    "sink": "path",
+    "input": "release/1.4.0",
+    "why": "Any other prefix names nothing.",
+    "correct": "Reject (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "cfg-prefix-nested",
+    "sink": "path",
+    "input": "integration/1.4.x/wip",
+    "why": "A further '/' after the {P}.{E} segment.",
+    "correct": "Reject (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "cfg-prefix-other-epic",
+    "sink": "path",
+    "input": "integration/1.40.x",
+    "why": "Epic 1.40 starts with 1.4.",
+    "correct": "Reject (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "cfg-prefix-lookalike",
+    "sink": "path",
+    "input": "integrationx/1.4.x",
+    "why": "A prefix that merely starts with the configured text.",
+    "correct": "Reject (false)",
+    "direction": "hostile"
+  }
+]

@@ -1,0 +1,25 @@
+{
+  "sink": "path",
+  "entry": ".agents/skills/sync-github-story/references/doc-link-branch.js#branchNamesWorkItem",
+  "name": null,
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 7,
+  "passed": 7,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": null,
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": [
+    "docs/prd/epic.1.4.feature-ui/story.1.4.2.configure-pipe.md"
+  ],
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-10-20T21:21:28.561Z"
+}

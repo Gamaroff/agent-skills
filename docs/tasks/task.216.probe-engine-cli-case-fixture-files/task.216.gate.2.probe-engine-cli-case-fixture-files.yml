@@ -1,0 +1,69 @@
+schema: 2
+task: 'task.216.probe-engine-cli-case-fixture-files'
+task_title: 'security-probe: the cli: form honours a case''s fixture.files (and env)'
+gate: CONCERNS
+status_reason: 'Cycle 1 fix verified (the filename-sink caveat holds: "." is declined EISDIR, a directory input EEXIST). Refute pass found the docs overclaim: they say a cli: case fixture can supply "a repository", but fixture.files writes text only and cli: has no --fixture-setup, so a CLI reading committed state still refuses every input (reproduced). One LOW: CLI_INTERPRETER_ENV omits the dynamic-loader variables.'
+reviewer: 'QA Engineer'
+head: '458d79e393ef96be40b787c1455cf5009a0eb065'
+updated: '2026-10-22T06:32:44Z'
+
+top_issues:
+  - id: 'TASK-216-QA2-1'
+    severity: medium
+    file: 'shared/resources/finalise-dod-security-prompt.md'
+    finding: 'The new docs say a cli: case fixture serves a CLI that reads "a repository" (finalise-dod-security-prompt.md Step 4 cli: note and the repository-state paragraph after Step 1b''s list, probe-boundary-rule.md §5, the security-probe.mjs header, CHANGELOG), but fixture.files writes UTF-8 files only and cli: refuses --fixture-setup, so no commit or staged index can exist; a CLI that runs git log against fixture files .git/HEAD, config, objects and refs was still rejected (QA cycle 2 reproduction). Refute reviewer CR-1 (medium/medium), verified by QA.'
+    suggested_action: 'Limit the cli: fixture claim to plain data directories in all five places, and state that a CLI reading committed or staged repository state is not yet reachable on cli: (shell-argv: with --fixture-setup is), beside the existing "directory too large to inline" caveat.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-216-QA2-2'
+    severity: low
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'CLI_INTERPRETER_ENV refuses PATH and NODE_OPTIONS as interpreter-steering, but fixture.env extends the sandbox allow-list freely, so LD_PRELOAD, LD_LIBRARY_PATH and the macOS DYLD_INSERT_LIBRARIES / DYLD_LIBRARY_PATH still reach node or python3 and can change how it loads or crashes. Refute reviewer CR-3 (low/low).'
+    suggested_action: 'Add the dynamic-loader variables to CLI_INTERPRETER_ENV with a test that one of them is declined by name, and keep the docs'' wording in step.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 96
+  phases_verified: 4/4
+  ci: 'see PR #726 checks @ 458d79e3 (not waited on)'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 12
+    escaped: 0
+    notes: 'Engine re-run on cli-needs-data.mjs and .py (record task.216.qa.2.security.run.json): 12 executed, 0 reproduced, 0 escaped; the 7 hostile fixtures declined by name. Loader variables (TASK-216-QA2-2) are a hardening gap in the steering refusal, not an escape.'
+  performance:
+    status: PASS
+    notes: 'Unchanged from cycle 1.'
+  reliability:
+    status: PASS
+    notes: 'Every refusal returns before the spawn.'
+  maintainability:
+    status: PASS
+    notes: 'The collision prelude is copied in three arms (CR-4, future); the writeFixtureFiles / fixtureCaseEnv "Shared by" comments omit cli: (CR-5, folded into this cycle''s fix).'
+
+recommendations:
+  immediate:
+    - action: 'TASK-216-QA2-1: scope the cli: fixture claim to data directories in all five places.'
+      refs: ['shared/resources/finalise-dod-security-prompt.md', 'shared/resources/probe-boundary-rule.md', 'shared/resources/security-probe.mjs', 'CHANGELOG.md']
+  future:
+    - action: 'Extract the case-fixture prelude (fixtureProblem plus the expected.absent collision) into one helper for the cli:, shell-argv: and fence: arms (cycle 1 CR-2, cycle 2 CR-4).'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'runShellCase (shell:, shell-fn:) and the in-process forms ignore a case''s fixture without a decline; decline it by name or honour it (cycle 2 CR-2). Pre-existing: runShellCase is unchanged by this branch and reads no c.fixture on origin/develop.'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-216-QA2-1 fixed']

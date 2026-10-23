@@ -1,0 +1,67 @@
+schema: 2
+task: 'task.196.pipeline-docs-qa-loop-and-artifacts'
+task_title: 'Pipeline docs: QA loop, resume and artifacts'
+gate: PASS
+status_reason: 'Cycle 4 scoped re-review of the cycle-3 fix: all 3 gate-3 findings are fixed. The no-code-moved row now matches what the run does, and route 2c carries its cycle floor. One low remains: the day-3 runbook says qa-story runs the command an AC names, when it verifies from cited evidence.'
+reviewer: 'QA Engineer'
+head: '6225e0eea1b1c0635aebc8241e6843cf844cc46c'
+updated: '2026-10-19T19:40:00Z'
+
+top_issues:
+  - id: 'CR4-1'
+    severity: low
+    file: 'docs/runbooks/first-week/day-3-messy-path.md'
+    finding: 'Lines 41 and 77 say qa-story "can run the command an AC names". qa-story Phase 5 verifies each AC from evidence, and a measured AC cites its command; no step runs it (qa-story/SKILL.md:1522-1531).'
+    suggested_action: 'Say qa-story verifies each AC from evidence, and a measured AC such as a line count cites its command (wc -l), so the FAIL is reproducible.'
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 5969
+  phases_verified: 7/7
+  ci: 'see PR #701 checks @ 6225e0ee'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5, 6]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'Documentation only (boundary: false — the diff adds no function).'
+  performance:
+    status: PASS
+    notes: 'No runtime change.'
+  reliability:
+    status: PASS
+    notes: 'Docs only; rollback is git revert.'
+  maintainability:
+    status: PASS
+    notes: 'One low wording finding (CR4-1).'
+
+recommendations:
+  immediate: []
+  future:
+    - id: 'CR4-1'
+      action: 'Lines 41 and 77 of day-3-messy-path.md say qa-story "can run the command an AC names"; qa-story verifies each AC from evidence, and a measured AC cites its command (qa-story/SKILL.md:1522-1531). Say so: a measured AC such as a line count cites its command (wc -l), so the FAIL is reproducible.'
+      refs: ['docs/runbooks/first-week/day-3-messy-path.md']
+      carried_from: top_issues (route 2b, cycle 4)
+    - action: 'reenter-qa-after-finalise.sh:258 and the resume contract (:701-706) tell the operator to commit an untracked fix and run the script again after no-code-moved, but the orchestrator has already restored at Step 7 by then, so the script refuses with lock-present. troubleshooting.md:252 now states the working remedy; the sources still give the old one (CR4-2).'
+      refs: ['shared/resources/reenter-qa-after-finalise.sh', 'shared/resources/develop-pipeline-resume-contract.md']
+    - action: 'docs/runbooks/qa-flow.md:91 and the step-5-6 doc summary table (:55) carry the older, incomplete route 2c trigger.'
+      refs: ['docs/runbooks/qa-flow.md', 'shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+    - action: 'Gap deferred by the review: story-documents.md / file-naming.md lack the sprint-review-summary row.'
+      refs: ['docs/standards/story-documents.md', 'docs/standards/file-naming.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

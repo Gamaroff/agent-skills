@@ -39,7 +39,7 @@ task-ref: task.199.setup-config-and-process-docs.md
   - **Doc says:** Verify Bitbucket auth with `source shared/resources/bitbucket-auth.sh` (same in quickstart-story.md:54 and :196)
   - **Source:** These quickstarts run in a consumer project, which has no `shared/resources/` directory. Installed skills carry the helper as `.agents/skills/<skill>/references/bitbucket-auth.sh`, so the command fails with 'No such file'.
   - **Evidence:** git ls-files: skills/create-pr/references/bitbucket-auth.sh (bundled copy), and only this repo has shared/resources/bitbucket-auth.sh
-  - **Fix:** Use `source .agents/skills/create-pr/references/bitbucket-auth.sh` in quickstart-task.md:53 and quickstart-story.md:54 and :196.
+  - **Fix:** Use `source .agents/skills/create-pr/references/bitbucket-auth.sh` in quickstart-task.md:53 and quickstart-story.md:54 and :199 (was :196 at the audit).
 
 ### `docs/concepts/which-access.md`
 
@@ -133,7 +133,7 @@ task-ref: task.199.setup-config-and-process-docs.md
 
 ### `docs/runbooks/release-and-install.md`
 
-- [ ] **RUNBOOKS-3** (medium, missing) — line 50
+- [ ] **RUNBOOKS-3** (medium, missing) — line 50 — partly fixed since the audit (review 1): §3 now says the script checks CI's verdict and §4 says `--tag` syncs develop. Phase 0 narrows the fix to what is still unstated — the refusal while CI is pending and the `--skip-ci-check` escape.
   - **Doc says:** 'The script: bumps version, updates CHANGELOG, commits chore(release), creates an annotated tag, pushes.' followed by a manual §4 'Sync develop forward'
   - **Source:** release.sh first reads CI's verdict for HEAD (scripts/release-ci-verdict.mjs) and refuses unless Test/ShellCheck are green (escape: `--skip-ci-check`), warns on branches with commits not on develop, runs `npm run test:clean-checkout`, and syncs develop with main itself (step 9; `--no-sync-develop` to skip). A maintainer running it right after merging the release-prep PR is refused while CI is still pending, with no explanation in this runbook.
   - **Evidence:** scripts/release.sh:13-28 (steps 1b CI verdict, 2 branch warning, 9 'Syncs develop with main'), scripts/release.sh:10-11 (`--no-sync-develop`, `--skip-ci-check`)
@@ -146,7 +146,7 @@ task-ref: task.199.setup-config-and-process-docs.md
 
 ### `docs/standards/prd-documents.md`
 
-- [ ] **SKILL-READMES-STANDARDS-28** (medium, inconsistent) — line 16
+- [ ] **SKILL-READMES-STANDARDS-28** (medium, inconsistent) — line 16 — ⚠️ **Superseded (review 1, 2026-10-20): expected closed in Phase 0 — do not apply the fix below.** Tasks 202–207 adopted `${PRD_ROOT}/{domain}/prd.{P}.{feature}/` (create-prd SKILL.md:45,70; create-epic SKILL.md:46,86; tracked tree `docs/prd/onboarding/prd.1.onboarding/epics/`), and prd-documents.md:16-25 already states it. The follow-up against create-prd is not needed.
   - **Doc says:** Layout `docs/prd/{domain}/prd.{feature}/prd.{feature}.md` with epics at `${PRD_ROOT}/{domain}/prd.{feature}/epics/epic.{N}.{name}/` (L22)
   - **Source:** story-documents.md:14-20 and epic-documents.md:16-22 put epics at `docs/prd/{domain}/{feature}/epics/` (no prd. prefix), as do docs/reference/configuration.md:20-22, shared/resources/resolve-paths.sh:19 and create-epic; create-prd alone writes `[domain]/prd.[feature]/prd.[feature].md`. This repo's own tree is docs/prd/onboarding/prd.onboarding.md + docs/prd/onboarding/epics/
   - **Evidence:** skills/create-prd/SKILL.md:45,65 vs skills/create-epic/SKILL.md:46,107-108,349; shared/resources/resolve-paths.sh:19; git ls-files docs/prd

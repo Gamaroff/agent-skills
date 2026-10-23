@@ -1,0 +1,60 @@
+schema: 2
+task: 'task.197.pipeline-entry-docs-phase-0-and-lite-mode'
+task_title: 'Pipeline entry docs: Phase 0, lite mode and invocation'
+gate: PASS
+status_reason: 'Cycle 3 fixes verified: the runbook now reconciles its worktree form with the skill''s printed commands, and the depends_on card claim matches the code. The scoped review raised two low-severity cleanups only; neither is a correctness bug.'
+reviewer: 'QA Engineer'
+head: '96ea5415d88b536c7144b6b1cb7266fb49a33671'
+updated: '2026-10-20T04:19:02Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 5969
+  phases_verified: 5/5
+  ci: 'informational — not awaited'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'Documentation only; no boundary.'
+  performance:
+    status: PASS
+    notes: 'N/A — docs only.'
+  reliability:
+    status: PASS
+    notes: 'No change.'
+  maintainability:
+    status: PASS
+    notes: 'Two advisory wording cleanups recorded below.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'create-parallel-stories.md:60 says the step-2 form "is the same command with the base named"; the scratch name and directory differ too, so "does the same job" is more exact. The printed form also leaves the worktree on a feature/* branch, which Phase 0 Q1 then offers as a base (unpushed, so choosing it fails). Cleanup (CR-1, low/medium).'
+      refs: ['docs/runbooks/create-parallel-stories.md']
+    - action: 'tracker-card-summary.md:67 lists depends-on in the Task Metadata row for every writer, but sync-jira-task writes only Category, Estimated Hours and Status; align the contract or the Jira writer (follow-up, out of scope).'
+      refs: ['shared/resources/tracker-card-summary.md', 'skills/sync-jira-task/scripts/sync-jira-task.js']
+    - action: 'Align skills/create-parallel-stories/SKILL.md worktree examples with the scratch-branch-from-base form and branch cleanup (follow-up task; carried from gate 1).'
+      refs: ['skills/create-parallel-stories/SKILL.md']
+
+bug_resolution:
+  previous_gate: 3
+  fixed: ['QA3-CR-1']
+  verification_method: 'Scoped reviewer re-read create-parallel-stories.md:60 against create-branch Step 2/5 and step-0 §0d; only a low cleanup raised'
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

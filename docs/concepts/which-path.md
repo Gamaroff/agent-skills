@@ -1,6 +1,6 @@
 ---
 name: which-path
-description: Decision tree routing new users to the right skill — /create-bug-report, /create-task, /create-story, /create-branch --hotfix, or /create-parallel-stories — based on four questions about their intent.
+description: Decision tree routing new users to the right skill — /create-bug-report (production hotfixes included), /create-task, /create-story, or /create-parallel-stories — based on four questions about their intent.
 type: guide
 status: draft
 version: 1.1
@@ -10,7 +10,7 @@ updated: 2026-09-11
 
 # Which path? — Decision tree
 
-Not sure whether to run `/create-bug-report`, `/create-task`, `/create-story`, `/create-branch --hotfix`, or `/create-parallel-stories`? Answer up to four questions.
+Not sure whether to run `/create-bug-report`, `/create-task`, `/create-story`, or `/create-parallel-stories` — or how a production hotfix starts? Answer up to four questions.
 
 > **Defects come first.** A bug — anything already built that behaves wrong — has its own document type,
 > its own numbering and its own orchestrator (`/develop-bug`). Ask Question 1 before anything else, or a
@@ -25,7 +25,7 @@ flowchart TD
     Q1 -->|Yes| Q2{Is it broken in\nproduction right now?}
     Q1 -->|No — new or\nchanged behaviour| Q3{Is the work user-facing?\ne.g. feature, UX change}
 
-    Q2 -->|Yes — urgent fix| Hotfix["/create-branch --hotfix"]
+    Q2 -->|Yes — urgent fix| Hotfix["/create-bug-report (say 'production')\n→ /develop-bug, hotfix branch model"]
     Q2 -->|No| Bug["/create-bug-report"]
 
     Q3 -->|No — internal work\nrefactor / infra / cleanup| Task["/create-task"]
@@ -57,7 +57,7 @@ a cross-cutting problem a sweep turned up. New or changed behaviour is not a def
 
 **Question 2 — Is it broken in production right now?**
 
-- **Yes** (urgent fix needed immediately) → use [/create-branch --hotfix](../runbooks/hotfix.md)
+- **Yes** (urgent fix needed immediately) → file it with `/create-bug-report` and write "production" in the description, then run `/develop-bug` and take the **hotfix branch model** — it cuts the branch from `main` (`/create-branch --hotfix`) itself. See the [hotfix runbook](../runbooks/hotfix.md). Running `/create-branch --hotfix` by hand skips the bug document, the review, the regression test and the fix record
 - **No** → use [/create-bug-report](../runbooks/bug-fix.md), then `/develop-bug` to fix it end to end
   - The runbook picks the mode for you: a **story bug** beside its story, a **task bug** inside its task
     directory, or a **general bug** in `docs/bugs/` with a globally-numbered registry row
@@ -90,7 +90,7 @@ For example: several developers are each shipping separate pieces of a larger fe
 |-----------|-------|
 | QA finding or reported bug against a story or task | `/create-bug-report` → `/develop-bug` |
 | Cross-cutting defect with no story or task owner (lint, deps, drift) | `/create-bug-report` (general mode) → `/develop-bug` |
-| Production system broken right now | `/create-branch --hotfix` |
+| Production system broken right now | `/create-bug-report` (say "production") → `/develop-bug`, hotfix branch model — [hotfix.md](../runbooks/hotfix.md) |
 | Feature or UX change — non-urgent, solo | `/create-story` |
 | Feature or UX change — parallel teams | `/create-parallel-stories` |
 | Refactor, infra, cleanup, tech debt | `/create-task` |

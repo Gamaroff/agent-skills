@@ -1,0 +1,68 @@
+schema: 2
+task: 'task.195.finding-anchors-follow-ups'
+task_title: 'finding-anchors follow-ups'
+gate: CONCERNS
+status_reason: 'TASK-195-QA3-1 is fixed and mutation-proven: a non-string anchor now reads unparseable or no-line. The same fix created a regression: a non-string line_text is now treated as absent (unchecked-text, clean), where it used to be compared and read text-mismatch.'
+reviewer: 'QA Engineer'
+head: '882b26431bed6b134bb8c9996f0d44eaa3c25e64'
+updated: '2026-10-19T17:09:23Z'
+
+top_issues:
+  - id: 'TASK-195-QA4-1'
+    severity: medium
+    file: 'shared/resources/finding-anchors.js'
+    finding: 'checkAnchors treats any non-string line_text as absent. A finding at f.js:2 with line_text ["return y;"], where line 2 is "const x = 1;", read text-mismatch at 4d6f7f25 and now reads unchecked-text, which is clean. The --inline selectors then post it at the wrong line, and review-code --fix no longer skips it. Introduced by 882b2643, which followed gate 3''s own suggested_action.'
+    suggested_action: 'Keep unchecked-text only for a null, absent or empty-string line_text. Any other non-string line_text gets a malformed verdict (text-mismatch, with expected set to the raw value). Flip the unit-test assertion that locks in the clean verdict, and add a CLI case.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 5965
+  phases_verified: 3/3
+  ci: 'fast gate 5965 tests, 0 failed @ 882b2643 (PR CI not read)'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 43
+    notes: 'task.195.qa.4.security.run.json: review-pr --inline guard 20/20 engages, review-code Step 2b checker 23/23 engages, 0 reproduced, 0 escapes.'
+  performance:
+    status: PASS
+    notes: 'Two typeof checks; no new I/O.'
+  reliability:
+    status: CONCERNS
+    notes: 'TASK-195-QA4-1: a non-string line_text is a silent clean verdict.'
+  maintainability:
+    status: PASS
+    notes: 'The string rule is stated at the one parse site, with the reason in a comment.'
+
+recommendations:
+  immediate:
+    - action: 'TASK-195-QA4-1: a non-string, non-empty line_text reads text-mismatch; only null, absent or empty reads unchecked-text.'
+      refs: ['shared/resources/finding-anchors.js', 'shared/resources/tests/finding-anchors.test.mjs']
+  future:
+    - action: 'Pre-existing (seen in cycle 4): a file_line with leading whitespace passes the checker, which trims it, but reaches the inline selector untrimmed, so the posted path starts with a space.'
+      refs: ['skills/review-pr/SKILL.md', 'skills/review-code/SKILL.md']
+    - action: 'Carried from gate 3: CR-2 (reviewer-supplied anchor_check passes the guards), CR-3 (non-object conformance finding not annotated), CR-4 (selector colon split), null finding crash, --staged --fix, and the review-code --inline unbound variables.'
+      refs: ['docs/tasks/task.195.finding-anchors-follow-ups/task.195.gate.3.finding-anchors-follow-ups.yml']
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 1
+  fix_date: '2026-10-19'
+  total_iterations: 4
+  verification_method: 'committed tests, mutation proof (partial revert that admits arrays: 2 tests red), probe 43/0'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-195-QA4-1 fixed']

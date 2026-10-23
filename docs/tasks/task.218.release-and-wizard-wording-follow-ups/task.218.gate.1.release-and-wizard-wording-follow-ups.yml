@@ -1,0 +1,49 @@
+schema: 2
+task: 'task.218.release-and-wizard-wording-follow-ups'
+task_title: 'Release runbook and setup wizard wording follow-ups'
+gate: PASS
+status_reason: 'All 3 phases and every success criterion are verified from evidence. The diff review returned no findings, and the one behaviour change is held by a committed test that two mutations turn red.'
+reviewer: 'QA Engineer'
+head: '5ad101deecb4ef38ed1cade967bc895a3f979dee'
+updated: '2026-10-20T10:26:53Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 1
+  phases_verified: 3/3
+  ci: 'pending @ 5ad101de (test job); link-check, shellcheck, validate pass'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false. Wording, comments and one echo change; no input handling, credential or external call.'
+  performance:
+    status: PASS
+    notes: 'No runtime path change.'
+  reliability:
+    status: PASS
+    notes: 'Summary control flow unchanged; the command branch line is pinned by a test.'
+  maintainability:
+    status: PASS
+    notes: 'Banner numbers now match the header; summary wording is held by a test.'
+
+recommendations:
+  immediate: []
+  future: []
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

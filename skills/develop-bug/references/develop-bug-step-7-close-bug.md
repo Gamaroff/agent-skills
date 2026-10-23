@@ -27,7 +27,7 @@ Do NOT write a DoD file directly or set any accepted/closed status without runni
 
 After finalise returns, read its output:
 - DoD satisfied → continue to Part B.
-- DoD gaps found → log each gap in the Issues Log, commit the report via `/commit-changes` (`docs({bug-prefix}): implementation report — finalise gaps identified`), push, and **HALT**:
+- DoD gaps found → do **not** advance the lock (it stays at 7, where `/finalise` held it — task 222); log each gap in the Issues Log, commit the report via `/commit-changes` (`docs({bug-prefix}): implementation report — finalise gaps identified`), push, and **HALT**:
   ```
   ⚠️ Finalise identified Definition of Done gaps.
   Address the gaps in {report path} before re-running /develop-bug.
@@ -80,13 +80,19 @@ In the **parent task file**'s Bug Reports list, mark this bug ✅ Closed:
 Tasks do not use the `Reopened` status — no parent-status change needed.
 
 #### General bug
-Update the row for this bug in `docs/bugs/bug-registry.md` — set the `Status` column to `closed` (registry vocabulary: `✅ Closed`) and refresh **Last Updated**. Do **not** change the registry's Next Available Bug Number (numbers are never reused). The registry edit is committed atomically with the bug file in Step 8, which carries it as `{extra-scope-paths}` — Step 8 stages only the paths it is told, so this file must be named there, not swept in (task.147). This is the **last** of the row's mirrored writes, not the first: Step 3 wrote `🔧 In Progress` and `🔍 Ready for QA`, and Step 5–6 wrote `⚠️ Reopened` on every failed cycle (Step 3 callout). If the row still reads `🆕 New` here, an earlier step skipped its mirror — note it in the Issues Log; the close still corrects it.
+After writing the bug file's `status: closed`, set its row in `docs/bugs/bug-registry.md` with the one writer, and act on its `reason` per the Step 3 callout:
+
+```bash
+node .agents/skills/develop-bug/references/registry-tick.js --bug-status --file "{bug-file}" --json
+```
+
+It writes `closed`, or `✅ Closed` when the registry's other rows use the labels, into the Status cell only. Then refresh the registry's **Last Updated** by hand — the CLI does not write it. Do **not** change the registry's Next Available Bug Number (numbers are never reused). The registry edit is committed atomically with the bug file in Step 8, which carries it as `{extra-scope-paths}` — Step 8 stages only the paths it is told, so this file must be named there, not swept in (task.147). This is the **last** of the row's mirrored writes, not the first: Step 3 wrote `🔧 In Progress` and `🔍 Ready for QA`, and Step 5–6 wrote `⚠️ Reopened` on every failed cycle (Step 3 callout). If the row still reads `🆕 New` here, an earlier step skipped its mirror — note it in the Issues Log; the close still corrects it.
 
 ### B4. Tracker close (only if linked)
 
 `/finalise --bug` is the **one writer** for the tracker close: its Step 7.8 (`tracker-done`) posted the completion comment, closed / transitioned the issue and signalled the board `done` stage before Part B began. This step **verifies** rather than repeats. If the bug has `github_issue`/`jira_key` (`TRACKER_ISSUE` non-empty), read the state back — `gh issue view $TRACKER_ISSUE --json state -q .state` → `CLOSED`, or the Jira status → the ladder's `done` target — and record it in the Decisions Log. Only when the read-back shows the close did **not** land (finalise reported it, or the state is still open) repeat that one step, following the GitHub close / Jira Done-transition mechanics in [`references/develop-pipeline-step-7-finalise.md`](develop-pipeline-step-7-finalise.md) (Tracker Issue Update), substituting bug terminology.
 
-Step 1 ensures the issue via `ensure-bug-{jira,github}-issue`, so a bug normally **has** one — an empty `TRACKER_ISSUE` here means that create failed or was deferred, not that bugs go untracked. Skip the close when it is empty, and say so in the report rather than silently: a deferred create leaves the card uncreated *and* unclosed, and the handover checklist is what carries both actions.
+Step 2b ensures the issue via `ensure-bug-{jira,github}-issue`, so a bug normally **has** one — an empty `TRACKER_ISSUE` here means that create failed or was deferred, not that bugs go untracked. Skip the close when it is empty, and say so in the report rather than silently: a deferred create leaves the card uncreated *and* unclosed, and the handover checklist is what carries both actions.
 
 Then re-sync the bug document so the card's `Source Documents` links point at the durable integration branch rather than the feature branch that is about to be deleted:
 

@@ -1,0 +1,27 @@
+{
+  "sink": null,
+  "entry": "shell-argv:scripts/lint-secrets.sh",
+  "name": "lint-secrets",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 11,
+  "passed": 11,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": [
+    "bash"
+  ],
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": [
+    "{input}"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": "/home/gamaroff/Development/agent-skills/docs/tasks/task.229.secret-scan-ci-lane/task.229.qa.1.security.setup.sh",
+  "ran_at": "2026-10-22T19:52:06.756Z"
+}

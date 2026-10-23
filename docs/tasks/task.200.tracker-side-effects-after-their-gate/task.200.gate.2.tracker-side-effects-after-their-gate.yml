@@ -1,0 +1,94 @@
+schema: 2
+task: "task.200.tracker-side-effects-after-their-gate"
+task_title: "Tracker side effects after their gate"
+gate: FAIL
+status_reason: "Cycle 1 fixed TASK-200-001 to 003; the fast gate passes 6060/0. TASK-200-004 is partial. The cycle-2 refute pass found one HIGH: create-epic's new PRD-link block reads a path it never binds, so the block aborts. It also found three MEDIUMs: sync-github-story drops the caller's pin, a sibling bug's branch names the wrong work item, and the link scan misses a reassigned branch variable."
+reviewer: "QA Engineer"
+head: "fe0121c0e224a315ed5a6bf9ee5f5f99be27177a"
+updated: "2026-10-20T19:04:44Z"
+
+top_issues:
+  - id: "TASK-200-005"
+    severity: high
+    file: "skills/create-epic/SKILL.md"
+    finding: "The PRD-link block passes --doc \"${PRD_SOURCE_PATH}\" (lines 164 and 167), but only the earlier parent-PRD block (line 131) assigns PRD_SOURCE_PATH. In a fresh shell the resolver exits 2 and the guard aborts the block on both VCS arms. The execute test supplies the binding itself, so it cannot see this (code review CR-1)."
+    suggested_action: "Bind PRD_SOURCE_PATH in the block with a {placeholder} line before the if, and make the create-epic execute test take that binding from the block."
+    suggested_owner: dev
+    bug_ref: "task.200.bug.5.create-epic-prd-link-reads-an-unbound-path.md"
+  - id: "TASK-200-006"
+    severity: medium
+    file: "skills/sync-github-story/SKILL.md"
+    finding: "--explicit \"${DOC_BRANCH:-}\" (line 158) has no writer in the block. review-story and finalise pass DOC_BRANCH as a sub-skill input, so the durable-branch pin is always empty and is silently dropped. The read predates this branch, but its class (TASK-200-002) is in scope (code review CR-2)."
+    suggested_action: "Bind the pin from a {placeholder} line (empty when none was passed), pass that to --explicit, and add an execute-test case with the pin set."
+    suggested_owner: dev
+    bug_ref: "task.200.bug.6.sync-github-story-pin-is-never-bound.md"
+  - id: "TASK-200-007"
+    severity: medium
+    file: "shared/resources/doc-link-branch.js"
+    finding: "branchNamesWorkItem (line 80) accepts {parent}.bug.{N} branches for every document of the parent. bugfix/task.67.bug.4.x names task.67.bug.3 and task.67 itself; bugfix/story.1.8.2.bug.1.x names story.1.8.2.bug.2 (reproduced; code review CR-3)."
+    suggested_action: "After matching an id, reject a remainder starting .bug.<n> unless it is the document's own bug, and add sibling-bug and parent-card must-differ rows to the table."
+    suggested_owner: dev
+    bug_ref: "task.200.bug.7.a-sibling-bug-branch-names-the-wrong-work-item.md"
+  - id: "TASK-200-008"
+    severity: medium
+    file: "tests/doc-link-branch-population.test.js"
+    finding: "unresolvedLinks accepts a blob/${V} link when any resolver line assigns V, so a second assignment of V from the checked-out branch passes. A QA mutation adding DOC_BRANCH=$(git branch --show-current) before DOC_URL= in sync-github-task turned no test red (no-red-untested). TASK-200-004 asked for a link built 'any other way' to be caught."
+    suggested_action: "Flag a link when any line assigns its variable without calling doc-link-branch.js, and add the reassignment shape to the control test."
+    suggested_owner: dev
+    bug_ref: "task.200.bug.8.link-scan-misses-a-reassigned-branch.md"
+
+waiver:
+  active: false
+
+quality_score: 50
+
+evidence:
+  tests_reviewed: 6060
+  phases_verified: "5/5"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [2, 3]
+  ci: "not read at review time — gated once at /finalise"
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 11
+    escaped: 0
+    notes: "security-probe path sink against doc-link-branch.js#integrationBranchOf, re-run for this cycle (the file is unchanged since gate 1): 11 executed, 0 escaped. A read-only lookup that refuses nothing by design. The branch reaches URLs and gh arguments quoted. CR-3 is an identity defect, not an injection."
+  performance:
+    status: PASS
+    notes: "At most one gh repo view per resolution, none with --default (CLI test). jira-sync now computes the git default branch eagerly on each docPath call (CR-6, a cleanup)."
+  reliability:
+    status: FAIL
+    notes: "create-epic's PRD-link block aborts on an unbound path (TASK-200-005), and the sync-github-story pin is dropped (TASK-200-006)."
+  maintainability:
+    status: CONCERNS
+    notes: "The link scan can be bypassed by reassigning the variable (TASK-200-008). The execute test injects create-epic's binding, which hid TASK-200-005."
+
+recommendations:
+  immediate:
+    - action: "Fix TASK-200-005 to 008."
+      refs: ["skills/create-epic/SKILL.md", "skills/sync-github-story/SKILL.md", "shared/resources/doc-link-branch.js", "tests/doc-link-branch-population.test.js"]
+  future:
+    - action: "CR-4 (medium confidence, advisory): on a Gitflow repo whose GitHub default branch is main, a GitHub card created on develop now links to main. Jira has a configured step, but the GitHub CLI path does not. Consider a configured or durable-branch step for the CLI."
+      refs: ["shared/resources/doc-link-branch.js"]
+    - action: "CR-5 (low): the Step 2 halt says no tracker issue was commented on, but review-bug Step 7 comments when the bug already has an issue. Make the message conditional."
+      refs: ["skills/develop-bug/references/develop-bug-step-2-review.md"]
+    - action: "CR-6 (cleanup): fall back to gitDefaultBranch() lazily in resolveDocBranch."
+      refs: ["shared/resources/jira-sync.js"]
+    - action: "Step 4b refuses blocks that call gh, node or rm as mutating and never syntax-checks them. A bash -n pass over refused blocks would have caught TASK-200-001 at cycle 1's engine run."
+      refs: ["shared/resources/qa-execute-snippets.mjs"]
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_reopened: 1
+  bugs_new: 4
+  fix_commit: "fe0121c0"
+  verification_method: "Executed tests and a by-hand reproduction in a scratch worktree. Mutation proofs: 4 of 5 covered, 1 no-red-untested (TASK-200-008)."
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

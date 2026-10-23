@@ -61,15 +61,15 @@ until you do.
 
 ### CI check counts differ per PR — legitimately
 
-Two of the five workflows are `paths:`-filtered:
+Two of the six workflows are `paths:`-filtered:
 
 | Workflow | Filter |
 | --- | --- |
 | `docs-link-check.yml` | `docs/**/*.md`, `README.md`, `AGENTS.md`, `CONTRIBUTING.md` |
 | `validate.yml` | `skills/**`, `shared/resources/**`, `scripts/generate-skill-dependencies.mjs`, … |
-| `test.yml`, `shellcheck.yml`, `branch-policy.yml` | unfiltered |
+| `test.yml`, `shellcheck.yml`, `secret-scan.yml`, `branch-policy.yml` | unfiltered |
 
-A docs-only PR shows 4 checks; a skills PR shows 5. **A skipped check and a check that failed to
+A docs-only PR shows 5 checks; a skills PR shows 6. **A skipped check and a check that failed to
 start look identical in `gh pr checks`** — confirm via the rollup. Note `docs-link-check` does *not*
 fire on `skills/**/*.md` or `shared/resources/**/*.md`.
 
@@ -155,6 +155,7 @@ The marker is built by `loadSensitive()` in the shared `spawn-budget.mjs` (task 
 - `shared/resources/tests/call-sites.test.mjs`
 - `shared/resources/tests/doc-id.test.mjs`
 - `shared/resources/tests/ci-tree-equivalence.test.mjs`
+- `shared/resources/tests/migrate-doc-numbering.test.mjs`
 - `shared/resources/tests/qa-diminishing-returns.test.mjs`
 - `shared/resources/tests/qa-execute-snippets.test.mjs`
 - `skills/session-handoff/tests/handoff-verify.test.js`

@@ -15,6 +15,8 @@
 #   advance-pipeline-lock.sh <next_step_number>     # advance to specific step (1..8)
 #   advance-pipeline-lock.sh --complete             # remove lock (Step 8's Completion Checklist passed)
 #   advance-pipeline-lock.sh --skill <skill-name>   # advance based on sub-skill that just returned
+#   advance-pipeline-lock.sh --skill finalise --dod <dod-path>
+#                                                   # finalise advances only on an ACCEPTED DoD (task 222)
 #   advance-pipeline-lock.sh --restore <doc-dir>    # rebuild the lock from the halt snapshot or an
 #                                                   # orphaned PreCompact claim (task.124, Phase 4)
 #
@@ -52,7 +54,13 @@
 #   qa-task         → noop (loop)
 #   qa-fix          → noop (loop)
 #   review-pr       → noop (loop — Step 5c, the loop's exit gate)
-#   finalise        → 8   (Step 7 done)
+#   finalise        → 8   (Step 7 done) — only with --dod naming a DoD that reads
+#                     `**Final Status:** ✅ ACCEPTED`. No --dod, a missing file, a GAPS or an
+#                     unfilled status HOLDS the lock, prints `finalise not accepted (<reason>)`
+#                     to stderr and exits 0: a gaps halt is not "Step 7 done", and a resume
+#                     that read 8 skipped Step 7 (task 222, obs #79). Exit 0 because a
+#                     self-advance never fails its sub-skill; an unproven acceptance fails
+#                     toward re-running /finalise, never toward skipping it.
 #   commit-changes  → noop at every step, the Step 8 commit included (task 161);
 #                     --complete, after Step 8's Completion Checklist, is the one terminal remover
 #
@@ -120,6 +128,8 @@ Usage:
   $0 <next_step_number>     # 1..8
   $0 --complete             # remove lock (Step 8's Completion Checklist passed)
   $0 --skill <skill-name>   # advance based on returning sub-skill name
+  $0 --skill finalise --dod <dod-path>
+                            # advance to 8 only when the DoD reads **Final Status:** ✅ ACCEPTED
   $0 --paused-here          # print a halt snapshot / claim for the current branch, if any
   $0 --restore [--which] [--accept-legacy] <doc-dir>
                             # rebuild the lock from the halt snapshot / orphaned claim
@@ -413,6 +423,8 @@ require_parsable_lock() {
 }
 
 NEXT=""
+DOD_ARG=""
+DOD_FLAG=""
 case "$1" in
   # --complete and `--skill commit-changes` are handled above the jq gate.
   --restore)
@@ -447,6 +459,8 @@ case "$1" in
   --skill)
     [ $# -ge 2 ] || usage
     SKILL_NAME="$2"
+    # finalise only: the DoD whose **Final Status:** decides the advance (task 222).
+    [ "${3:-}" = "--dod" ] && { DOD_FLAG=1; DOD_ARG="${4:-}"; }
     case "$SKILL_NAME" in
       create-branch)              NEXT=2 ;;
       review-story|review-task)   NEXT=3 ;;
@@ -490,6 +504,27 @@ fi
 # Idempotent: already at or past the target step
 if [ "$NEXT" -le "$CURRENT" ] 2>/dev/null; then
   exit 0
+fi
+
+# finalise reaches 8 only on an accepted DoD (task 222, obs #79). On gaps, the develop
+# pipelines HALT at Step 7; a lock at 8 then made the resume read Step 7 as done. The
+# guard sits after the parse, so a corrupt lock is still exit 1, and after the
+# idempotency check, so a lock already at 8 stays a silent noop.
+if [ "${SKILL_NAME:-}" = "finalise" ]; then
+  HOLD=""
+  if [ -z "$DOD_FLAG" ]; then
+    HOLD="no --dod given"
+  elif [ -z "$DOD_ARG" ]; then
+    HOLD="--dod given an empty path"
+  elif [ ! -f "$DOD_ARG" ]; then
+    HOLD="$DOD_ARG is not a file"
+  elif ! grep -q '^\*\*Final Status:\*\* ✅ ACCEPTED' "$DOD_ARG"; then
+    HOLD="$DOD_ARG does not read **Final Status:** ✅ ACCEPTED"
+  fi
+  if [ -n "$HOLD" ]; then
+    echo "advance-pipeline-lock: finalise not accepted ($HOLD) — lock held at step $CURRENT" >&2
+    exit 0
+  fi
 fi
 
 # Write through a `mktemp` file in the lock's own directory, not `$LOCK.tmp`.

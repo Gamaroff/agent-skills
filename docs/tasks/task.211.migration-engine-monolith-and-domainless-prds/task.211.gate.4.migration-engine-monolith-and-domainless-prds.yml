@@ -1,0 +1,80 @@
+schema: 2
+task: 'task.211.migration-engine-monolith-and-domainless-prds'
+task_title: 'Migration engine: monolith and domain-less PRDs'
+gate: CONCERNS
+status_reason: 'Cycle 3 fixed its five findings, each held by a mutation-proven row, and parseNameValue still engages (20 cases, 0 escapes). The scoped review of the fix found four new defects. One is medium: the two scan loops disagree on extension case, so an upper-case .MD or .YML file is read by neither. Three are low, one of them also a regression from the cycle-3 YAML rule.'
+reviewer: 'QA Engineer'
+head: '3e6f00cba44198f7092dbd75555c6a6dbf4a65ad'
+updated: '2026-10-21T01:51:26Z'
+
+top_issues:
+  - id: CR-1
+    severity: medium
+    file: 'shared/resources/migrate-doc-numbering.mjs'
+    finding: 'The non-literal loop skips a file whose lower-cased extension is a literal-pass type, but the literal loop selects by exact case, so notes/README.MD or .github/workflows/ci.YML holding ../docs/prd.md is read by neither and --apply answers ok; at 02d65ff4 both were stale-reference (reproduced). A regression from cycle 3.'
+    suggested_action: 'Decide the extension the same way in both loops, through one helper, so every tracked file falls into exactly one; add an upper-case-extension case.'
+    suggested_owner: dev
+  - id: CR-2
+    severity: low
+    file: 'shared/resources/migrate-doc-numbering.mjs'
+    finding: 'YAML_KEY accepts only bare word keys, so a real displaced block keyed "Last updated: 2024" or "\"title\": x" is now none and the migration stacks a second block over it; at 02d65ff4 it was displaced-frontmatter (reproduced). A regression from cycle 3.'
+    suggested_action: 'Accept any key: line whose key is not a Markdown heading or list item, quoted, spaced and dotted keys included; add the shapes to the CR-4 row.'
+    suggested_owner: dev
+  - id: CR-3
+    severity: low
+    file: 'shared/resources/migrate-doc-numbering.mjs'
+    finding: 'A variable quoted on its own (cat "$ROOT"/docs/prd.md) leaves a quote before the leading /, so the path is skipped as absolute and --apply answers ok over it (reproduced).'
+    suggested_action: 'When a closing quote precedes the leading /, look back past the quoted span for $VAR, ${...} or $(...); add both spellings to the must-flag list.'
+    suggested_owner: dev
+  - id: CR-4
+    severity: low
+    file: 'shared/resources/migrate-doc-numbering.mjs'
+    finding: 'Every dropped variable is read as the repository root or the file directory, so cp $HOME/docs/prd.md /tmp in a script is refused as stale-reference, a correct path with no remedy, while ~/docs/prd.md is not flagged (reproduced).'
+    suggested_action: 'Treat well-known non-repository variables (HOME, TMPDIR, XDG_*, USERPROFILE) like ~ and add them to the must-not-flag list.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 107
+  phases_verified: 3/3
+  ci: 'SUCCESS (4 checks, 1 pending) @ 3e6f00cb — informational; gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 20
+    escaped: 0
+    notes: 'parseNameValue re-probed with --sink path and task.211.qa-fix.1.security.cases.json: verdict engages, 20 executed, 0 escaped. Run record task.211.qa.4.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'Known binary types are skipped before the read; outsideReferences linearity row holds.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1 and CR-3 answer ok over a stale reference; CR-2 stacks a second block; CR-4 refuses a correct path.'
+  maintainability:
+    status: PASS
+    notes: 'One stale-scan predicate for both loops; docs updated together.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1 in qa-fix cycle 4 with a mutation-proven row; CR-2, CR-3 and CR-4 with it.'
+      refs: ['shared/resources/migrate-doc-numbering.mjs', 'shared/resources/tests/migrate-doc-numbering.test.mjs']
+    - action: 'CR-1 is the loop split again: the second loop restates the first loop''s extension test. Derive both from one extension helper.'
+      refs: ['shared/resources/migrate-doc-numbering.mjs']
+  future:
+    - action: 'Step 4b cannot execute the review-prd plan/apply blocks (classified mutating); the eval gate-8 and gate-9/10 rows execute them instead.'
+      refs: ['skills/review-prd/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CR-1 fixed and re-reviewed'

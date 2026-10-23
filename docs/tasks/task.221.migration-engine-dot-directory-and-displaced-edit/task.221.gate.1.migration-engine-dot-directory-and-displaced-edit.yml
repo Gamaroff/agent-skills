@@ -1,0 +1,51 @@
+schema: 2
+task: 'task.221.migration-engine-dot-directory-and-displaced-edit'
+task_title: 'Migration engine: dot-directory references and displaced-block edits'
+gate: PASS
+status_reason: 'Both fixes behave as the success criteria state and are mutation-proven against committed tests. The one code-review finding is low severity, medium confidence and pre-existing on develop, so it is advisory.'
+reviewer: 'QA Engineer'
+head: '18e1b36beba925f81095c48a64a2c0ad51a7f3b1'
+updated: '2026-10-21T04:39:16Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 70
+  phases_verified: 3/3
+  ci: 'pending @ 18e1b36b (link-check, shellcheck, validate pass; test pending)'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false. outsideReferences is a scanner that returns hits, and editFrontmatter is a writer; neither returns a verdict on its input. The change widens detection, so a stale-reference block now fires on more inputs, never fewer. parseNameValue, the engine boundary task.211 probed, is not in this diff.'
+  performance:
+    status: PASS
+    notes: 'No new pass over the input. The outsideReferences linearity row passes unchanged.'
+  reliability:
+    status: PASS
+    notes: 'editFrontmatter now returns a displaced or unclosed document unchanged instead of writing above the real block.'
+  maintainability:
+    status: PASS
+    notes: 'Two one-line fixes, each with a comment naming the finding and a test that holds it.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'linkPass keeps a ./ prefix only when the new relative path does not start with ".", so a ./.docs/x.md link is rewritten as .docs/x.md. The target still resolves, so only the style changes. Pre-existing on develop (same line); 0 migrated-target links of that shape in the repository. Follow-up: switch the test to /^\.\.?(\/|$)/ if a consumer reports it.'
+      refs: ['shared/resources/migrate-doc-numbering.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

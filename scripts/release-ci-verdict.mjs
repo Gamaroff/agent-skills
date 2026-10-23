@@ -47,6 +47,10 @@ export const WORKFLOWS = Object.freeze({
   required: Object.freeze(["Test", "ShellCheck"]),
   // push.paths-filtered — absent is fine, present-and-not-green is not
   whenPresent: Object.freeze(["Validate Skills", "Docs link check"]),
+  // push-triggered, and deliberately NOT read by ciVerdict: a lane too new to gate a release.
+  // "Secret scan" (task 229) is promoted to `required` once it has a green record — changing the
+  // release gate in the PR that creates the lane would gate releases on a lane with no history.
+  notGating: Object.freeze(["Secret scan"]),
 });
 
 const RED_CONCLUSIONS = new Set([

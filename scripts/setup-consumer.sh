@@ -5,14 +5,18 @@
 #
 # Covers (numbering matches docs/concepts/getting-started.md § "What the wizard does"):
 #   1. Prerequisite checks        (node, git, jq, curl)
-#   2. Platform selection         (GitHub+Issues / GitHub+Jira / Bitbucket+Jira)
-#   3. Credential collection      (gh auth check, Bitbucket/Jira API tokens)
-#   4. .env files                 (.env.example always; .env optionally; gitignore)
+#   2. Platform selection         (GitHub+Issues / GitHub+Jira / Bitbucket+Jira),
+#                                  then tracker access (full / read-only / approve / command / manual)
+#   2b. Skill install profile     (full / pipeline / minimal, plus add-ons)
+#   3. Credential collection      (gh auth check; Bitbucket and Jira API tokens)
+#   4. Credentials file           (Bitbucket/Jira only: .env.example; .secrets/tooling.env
+#                                  optionally; .secrets/ and .env gitignored)
 #   5. skills-config.yaml         (PRD path, architecture path, coding-standards path)
 #   6. Registry creation          (docs/tasks/task-registry.md — epics are numbered within their PRD)
 #   7. docs/ scaffold             (PRD root, architecture/concepts/ stubs)
 #   8. Skills install             (latest release from github.com/Gamaroff/agent-skills;
 #                                  skips the other tracker's skills — see --all-skills)
+#   8a. tracker-workflow.yaml     (board ladder + pipeline moments; never overwritten)
 #   8b. Agent links               (local, gitignored links for the agents you pick)
 #   9. Pipeline hook install      (.claude/settings.json via inline jq)
 #
@@ -298,7 +302,7 @@ select_platform() {
   select_access
 }
 
-# ── 2a. skill install profile ────────────────────────────────────────────────
+# ── 2b. skill install profile ────────────────────────────────────────────────
 #
 # Every installed skill's `description` sits in the agent's context permanently,
 # on every request, before it reads a single instruction. That metadata tier —
@@ -344,7 +348,7 @@ select_skill_profile() {
   record_step "Skill profile" "ok" "${SKILLS_PROFILE}${SKILLS_INCLUDE:+ +includes}"
 }
 
-# ── 2b. tracker access level ─────────────────────────────────────────────────
+# ── 2. tracker access level ──────────────────────────────────────────────────
 # How much the locally running agent may do to the tracker. Separate from which
 # tracker it is: a restricted run still needs the identity to emit the right
 # URLs and field names. Defaults to `full`, and the block is written only when
@@ -355,7 +359,7 @@ select_access() {
   echo ""
   echo "  1) Full — the agent has write credentials and updates the tracker itself (default)"
   echo "  2) Read-only — the agent may read the tracker but not write to it"
-  echo "  3) Approve — credentials present; writes are still handed over today (ask prompt is not shipped)"
+  echo "  3) Approve — credentials present; writes are deferred, then one batched confirmation at handover"
   echo "  4) Command — the agent prints the commands; you run them"
   echo "  5) Manual — the agent prints instructions; you click through them"
   echo ""
@@ -671,7 +675,7 @@ ${access_block}${skills_block}${tracker_block}"
   record_step "skills-config" "ok" "written"
 }
 
-# ── 5b. tracker-workflow.yaml ────────────────────────────────────────────────
+# ── 8a. tracker-workflow.yaml ────────────────────────────────────────────────
 # The consumer-owned status ladder. Unlike skills-config.yaml above, this one
 # NEVER offers to overwrite: the file encodes a board's real column names, which
 # a consumer has hand-tuned against a live board and the wizard cannot re-derive
@@ -1180,7 +1184,7 @@ _skill_excluded_for_tracker() {
   return 1
 }
 
-# ── 8b. install profiles (task 84) ───────────────────────────────────────────
+# ── install profile helpers (task 84) ────────────────────────────────────────
 #
 # A profile is a SEED list; the concrete install set is the seeds' transitive
 # closure over the skill call graph, with the tracker filter above applied AFTER
@@ -1929,7 +1933,7 @@ install_hooks() {
   fi
 }
 
-# ── agent links ──────────────────────────────────────────────────────────────
+# ── 8b. agent links ──────────────────────────────────────────────────────────
 # A consumer repo commits one instruction file (AGENTS.md) and one skills
 # directory (.agents/skills/). Each user links the agents they run to those,
 # locally and gitignored — docs/concepts/getting-started.md § 1a.
@@ -2226,9 +2230,14 @@ print_summary() {
     if [[ "${ACCESS_TRACKER:-full}" != "full" ]]; then
       echo ""
       echo -e "${BOLD}Tracker access is ${ACCESS_TRACKER}:${NC}"
-      echo "  Pipeline runs still complete. Tracker writes are recorded, not performed."
-      echo "  After a run, work the committed *.handover.*.md checklist (or *.sh under command)."
-      echo "  /tracker-reconcile is not shipped yet (task.57) — re-check the board by hand."
+      echo "  Pipeline runs still complete. During a run, tracker writes are recorded, not performed."
+      if [[ "$ACCESS_TRACKER" == "approve" ]]; then
+        echo "  At handover you confirm them once, as a batch, and they run. With no tty, or in"
+        echo "  an autonomous run, there is no prompt: work the committed *.sh as under command."
+      else
+        echo "  After a run, work the committed *.handover.*.md checklist (or *.sh under command)."
+      fi
+      echo "  Later, /tracker-reconcile re-reads the board and ticks the committed *.handover.*.md checklist."
       echo "  Limits: enforcement is partial; /develop-next still needs VCS write."
       echo "  Guide: docs/concepts/restricted-access.md"
     fi

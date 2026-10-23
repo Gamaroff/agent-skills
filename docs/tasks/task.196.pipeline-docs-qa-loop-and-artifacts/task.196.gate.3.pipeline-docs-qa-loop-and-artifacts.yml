@@ -1,0 +1,78 @@
+schema: 2
+task: 'task.196.pipeline-docs-qa-loop-and-artifacts'
+task_title: 'Pipeline docs: QA loop, resume and artifacts'
+gate: CONCERNS
+status_reason: 'Cycle 3 scoped re-review of the cycle-2 fix: all 7 gate-2 findings are fixed, and the gate fork, snapshot fields and audit status check out. One new medium: the no-code-moved row tells the operator to commit an untracked fix and re-invoke, but the orchestrator has already restored at Step 7, so a plain re-invoke no longer offers re-entry. Two low.'
+reviewer: 'QA Engineer'
+head: '7f8294ab848f553bfc509eebd6747337c9495264'
+updated: '2026-10-19T19:34:52Z'
+
+top_issues:
+  - id: 'CR3-1'
+    severity: medium
+    file: 'docs/reference/troubleshooting.md'
+    finding: 'The no-code-moved row (:252) says to commit an untracked fix and re-invoke. On no-code-moved the orchestrator restores the lock at Step 7 and runs /finalise straight away (resume contract :206-208). By then a re-invoke offers no "Re-enter QA at 5a", so a fix committed then is never gated.'
+    suggested_action: 'State that the run continues to Step 7 by itself. If the refusal names an untracked file that belongs to the fix, stop the run before /finalise accepts, commit the file, and run a QA cycle on it, because a plain re-invoke will not re-enter QA.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR3-2'
+    severity: low
+    file: 'docs/reference/troubleshooting.md'
+    finding: 'The route 2c row (:201) and the S6half labels (develop-task/README.md:131, develop-story/README.md:138) omit the cycle floor. The engine declines below cycle 3 (qa-diminishing-returns.js:618-624).'
+    suggested_action: 'Add "cycle 3 or later" to the row and to both labels.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR3-3'
+    severity: low
+    file: 'docs/runbooks/first-week/day-3-messy-path.md'
+    finding: 'Lines 41 and 77 now call qa-story mechanical. qa-story is a judgement-based review (SKILL.md:3,12); only Phase 1.7, which runs commands, is deterministic.'
+    suggested_action: 'Say qa-story checks each AC and can run the command an AC names (Phase 1.7), so a wc -l AC gives a reproducible FAIL. Drop "mechanical" and "literally".'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 5969
+  phases_verified: 7/7
+  ci: 'see PR #701 checks @ 7f8294ab'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5, 6]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'Documentation only (boundary: false — the diff adds no function).'
+  performance:
+    status: PASS
+    notes: 'No runtime change.'
+  reliability:
+    status: PASS
+    notes: 'Docs only; rollback is git revert.'
+  maintainability:
+    status: CONCERNS
+    notes: 'The no-code-moved operator action is wrong in timing (CR3-1).'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR3-1 in docs/reference/troubleshooting.md.'
+      refs: ['docs/reference/troubleshooting.md']
+  future:
+    - action: 'The resume contract contradicts itself: :706 says commit an untracked fix and re-run the script, but :206-208 routes no-code-moved straight to the Step 7 restore. Either pause on no-code-moved when untracked files are named, or drop the advice at :706.'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/reenter-qa-after-finalise.sh']
+    - action: 'docs/runbooks/qa-flow.md:91 and the step-5-6 doc summary table (:55) carry the older, incomplete route 2c trigger. Both are outside this task.'
+      refs: ['docs/runbooks/qa-flow.md', 'shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+    - action: 'Gap deferred by the review: story-documents.md / file-naming.md lack the sprint-review-summary row.'
+      refs: ['docs/standards/story-documents.md', 'docs/standards/file-naming.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR3-1 fixed']

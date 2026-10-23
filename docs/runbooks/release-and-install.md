@@ -43,6 +43,12 @@ The script reads the version from the `[vX.Y.Z]` section the PR brought in, chec
 runs the local gate, then creates an annotated tag on `main`'s tip and pushes the tag alone. GitHub
 Actions then creates the release and attaches the source tarball automatically.
 
+**CI's verdict comes first, and it refuses anything but green.** Run right after merging the
+release-prep PR, `--tag` usually finds CI still running on the merge commit and stops with "CI is
+still running … re-run when it finishes" — wait for CI on `main`, then run it again. A red or
+unreadable verdict refuses the same way. `--skip-ci-check` tags anyway, with a warning; use it only
+when CI has been confirmed another way. (`scripts/release.sh` header, "What --tag does", step 2.)
+
 **Bump type guide** (passed to `--prepare`):
 
 | Bump      | When                                                                    |
@@ -53,12 +59,19 @@ Actions then creates the release and attaches the source tarball automatically.
 
 ### 4. Sync `develop` forward
 
-`--tag` does this itself unless you pass `--no-sync-develop`:
+Run this step only if you passed `--no-sync-develop`; otherwise `--tag` has already merged `main` into `develop` and pushed it:
 
 ```bash
 git checkout develop && git pull --rebase
 git merge main && git push
+git checkout main
 ```
+
+If `--tag` stopped during its **Sync develop** step, the release is already out and you are on `develop`. Do not re-run the block above; finish what the script started:
+
+- **Merge conflict** (the merge is half done): resolve the conflicts, `git commit`, `git push origin develop`, then `git checkout main`.
+- **Push rejected** (someone pushed to `develop` meanwhile): `git pull --no-rebase`, `git push origin develop`, then `git checkout main`. A rebasing pull would drop the merge commit.
+- **`git pull --rebase` failed** (before the merge): fix the pull, then run the block above.
 
 ### If the release workflow fails
 
@@ -88,12 +101,15 @@ The wizard sets up:
 | Step          | What it does                                                                      |
 | ------------- | --------------------------------------------------------------------------------- |
 | Platform      | Choose GitHub Issues, GitHub+Jira, or Bitbucket+Jira                              |
-| Credentials   | Writes `.env` + `.env.example`; adds `.env` to `.gitignore`                       |
+| Tracker access | Choose `access.tracker`: `full`, `read-only`, `approve`, `command` or `manual` — see [Which access model?](../concepts/which-access.md) |
+| Credentials   | Bitbucket or Jira only: writes `.env.example`; optionally writes `.secrets/tooling.env` and adds `.secrets/` and `.env` to `.gitignore` |
 | Config        | Creates `skills-config.yaml` (PRD path, architecture path, coding-standards path) |
 | Registries    | Creates `docs/tasks/task-registry.md` (epics are numbered within their PRD)        |
 | Docs scaffold | Creates `docs/prd/` and `docs/architecture/concepts/` stub files                  |
 | Skill profile | Asks which install profile you want — `full`, `pipeline` or `minimal` (see below)  |
 | Skills        | Downloads latest tagged release → `.agents/skills/`                               |
+| tracker-workflow | Writes `tracker-workflow.yaml` if absent — from your live board when it can read it, otherwise a template to edit before the first run |
+| Agent links   | Links the agents you tick to `AGENTS.md` and `.agents/skills/` (local, gitignored) |
 | Hooks         | Patches `PreCompact`, `Stop` into `.claude/settings.json`          |
 
 ### Choosing an install profile

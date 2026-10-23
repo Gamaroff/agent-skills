@@ -5,18 +5,21 @@ type: task
 description: "Close the seven advisory items task.194 left in its gate 3 and PR review: an unparseable code file_line gets its own malformed verdict, a --root missing from the --rev tree is bad-root, a new --index read for staged reviews, dispatchers read the checker's reason instead of its exit code, the --inline blocks refuse un-annotated input, /review-pr binds the head SHA on both platforms, and the population guard covers every consumer of findings."
 tags: [review-pr, review-code, qa-task, qa-story, develop-bug, finding-anchors, follow-up]
 category: refactoring
-status: planned
+status: accepted
 priority: Medium
 created: 2026-10-07
-updated: 2026-10-07
+updated: 2026-10-19
 assignee:
 estimated_effort_hours: 8
 github_issue: 597
+completed_date: 2026-10-19
+pr_number: 695
 ---
 
 # Technical Task: Finding-anchors follow-ups
 
-**Status:** Planned
+**Status:** Accepted
+**Review**: ✅ All review recommendations from `task.195.review.1.finding-anchors-follow-ups.md` implemented 2026-10-19
 **GitHub Issue**: [#597](https://github.com/Gamaroff/agent-skills/issues/597)
 
 ---
@@ -49,8 +52,8 @@ Sources: `task.194.gate.3.code-review-anchors-name-source-lines.yml` `recommenda
 CR-1 to CR-4. Cycle 1 CR-3 and PR review CR-3 are the same defect, so seven are distinct.
 
 1. **Exit 1 has two meanings at every dispatcher.** The four blocks say
-   `# exit 1 = malformed anchors exist. NOT a halt` (`skills/qa-task/SKILL.md:637`,
-   `skills/qa-story/SKILL.md:1104`, `skills/review-code/SKILL.md:93`, `skills/review-pr/SKILL.md:598`).
+   `# exit 1 = malformed anchors exist. NOT a halt` (`skills/qa-task/SKILL.md:645`,
+   `skills/qa-story/SKILL.md:1135`, `skills/review-code/SKILL.md:93`, `skills/review-pr/SKILL.md:617`).
    `node` also exits 1 when the script cannot load. Reproduced in task.194 QA cycle 3: run from a
    non-root cwd, the call exits 1 and annotates nothing, and the caller is told to mark and continue.
 2. **A `--root` missing from the `--rev` tree passes the preflight.** `checkTree()`
@@ -66,18 +69,20 @@ CR-1 to CR-4. Cycle 1 CR-3 and PR review CR-3 are the same defect, so seven are 
    (`skills/review-code/SKILL.md:59`, `git diff --staged`), and its checker block tells the reader to
    omit `--rev` for that target (`:88`), so the checker reads the files on disk. An unstaged edit on top
    shifts lines and gives false `out-of-range` or `text-mismatch` verdicts.
-5. **`/review-pr`'s head recovery is GitHub-only.** Step 6 recovers the head on the API-diff route with
-   `pull/<n>/head` (`skills/review-pr/SKILL.md:593`). Bitbucket has no such ref, so on a merged or
-   cross-fork Bitbucket PR the checker exits `bad-rev` every time. Step 1b's `gh pr view` field list
-   (`:390`) does not request `headRefOid`.
+5. **`/review-pr`'s head recovery was GitHub-only — closed before this task started.** Commit
+   `319bf779` (2026-10-07, after this task was written) added `skills/review-pr/scripts/resolve-head-rev.sh`,
+   which Step 6 now runs (`skills/review-pr/SKILL.md:601-616`): `origin/<head-branch>`, GitHub
+   `pull/<n>/head`, a Bitbucket fork's branch, the Bitbucket source commit and, for a squash merge,
+   the merge commit, tested by `skills/review-pr/tests/resolve-head-rev.test.js` under bash and zsh.
+   No work remains here; Phase 2's `reason` decision still applies to that block (review 1, I1).
 6. **The `--inline` jq silently drops un-annotated findings.** Both blocks read `"$FINDINGS_JSON"`
-   (`skills/review-pr/SKILL.md:890`, `skills/review-code/SKILL.md:156`) and keep only `anchor_check`
+   (`skills/review-pr/SKILL.md:936`, `skills/review-code/SKILL.md:156`) and keep only `anchor_check`
    `ok` or `unchecked-text`. A findings file that was never annotated yields `[]`, which looks the same
    as "no anchorable findings".
 7. **The population guard counts dispatchers, not consumers.**
    `evals/shared/tests/finding-anchors-callers.test.mjs` takes every `SKILL.md` that mentions
    `code-review-prompt.md`. The develop-bug verify loop
-   (`skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md:48`) runs `/review-code` and
+   (`skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md:50`) runs `/review-code` and
    blocks on `category: bug` and `confidence: high`, with no word on `anchor_check`. A mislocated
    high-confidence bug there is reported as located.
 
@@ -100,8 +105,8 @@ CR-1 to CR-4. Cycle 1 CR-3 and PR review CR-3 are the same defect, so seven are 
   (`:83`) does not know which lens a finding came from.
 - **Dispatchers.** The four checker blocks run the CLI with `--json` and branch on the exit code in a
   comment, not in code.
-- **`/review-pr` head.** Step 6 binds `HEAD_REV` as a placeholder:
-  `origin/<head-branch>`, or `FETCH_HEAD` after `git fetch origin pull/{pr-number}/head`.
+- **`/review-pr` head.** Step 6 binds `HEAD_REV` from `scripts/resolve-head-rev.sh` (five routes,
+  both platforms; commit `319bf779`).
 - **Population guard.** Keyed on the bare filename `code-review-prompt.md` in `skills/*/SKILL.md`
   (4 members), empty `CITE_ONLY`, floor 4.
 
@@ -136,10 +141,13 @@ to `makeReader` beside `--rev` and the working tree, using the same root-relativ
 - **`--inline` refuses un-annotated input.** Before the jq, the block checks that every finding carries
   `anchor_check` and HALTs with "run Step 6's anchor check first" when one does not. It binds
   `FINDINGS_JSON` to the same `{findings-json}` placeholder as Step 6.
-- **`/review-pr` binds `HEAD_REV` from the PR's own head SHA** on both routes: GitHub `headRefOid`
-  (added to Step 1b's field list), Bitbucket `source.commit.hash`. When the commit is not local, the
-  block fetches it (GitHub `pull/<n>/head`, Bitbucket the source branch by name), and verifies the SHA
-  resolves before calling the checker.
+- **`/review-pr` head binding is unchanged.** `resolve-head-rev.sh` already hands the checker a local
+  commit on both platforms; only the block's exit-code comment is replaced by the `reason` decision.
+- **Every prose enumeration of the malformed set gains `unparseable`.** The dispatchers do not key on
+  the set: each names the verdicts. Search: `git grep -n 'text-mismatch' -- 'skills/*/SKILL.md'` →
+  `qa-task/SKILL.md:652,786`, `qa-story/SKILL.md:1142,1272`, `review-code/SKILL.md:100,120,213`,
+  `review-pr/SKILL.md:624,781` (2026-10-19). qa-task / qa-story's `file: null` rule (today
+  `no-such-file` only) also covers `unparseable`, which has no path.
 - **develop-bug verify loop** keeps its blocking predicate unchanged. A blocking finding whose
   `anchor_check` is malformed is reported with `(location unverified: {file_line})` in the
   Re-Investigation note and the `/qa-fix` input, the same wording `/qa-task` uses for `top_issues[]`.
@@ -172,9 +180,9 @@ to `makeReader` beside `--rev` and the working tree, using the same root-relativ
 ### Important Clarifications
 
 - **Not repairing anchors.** As in task.194, the checker reports and never guesses the intended line.
-- **`unparseable` is new and additive.** It joins `no-such-file`, `out-of-range` and `text-mismatch`
-  in the malformed set, so every caller that already marks malformed anchors marks it with no further
-  change.
+- **`unparseable` joins the malformed set**, beside `no-such-file`, `out-of-range` and
+  `text-mismatch`. The engine's `MALFORMED` set changes in one place, but the dispatcher prose names
+  the verdicts, so each enumeration site is updated (Target Architecture; review 1, I2).
 
 ---
 
@@ -185,7 +193,7 @@ to `makeReader` beside `--rev` and the working tree, using the same root-relativ
 ✅ `shared/resources/finding-anchors.js`: `unparseable`, root-in-rev, `--index`
 ✅ `shared/resources/tests/finding-anchors.test.mjs`
 ✅ The checker block and `--inline` block in `skills/{review-pr,review-code,qa-task,qa-story}/SKILL.md`
-✅ `/review-pr` Step 1b field list and Step 6 `HEAD_REV` binding
+✅ Every prose enumeration of the malformed verdicts in the four dispatcher `SKILL.md` files
 ✅ `skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md`
 ✅ `evals/shared/tests/finding-anchors-callers.test.mjs` population widening
 ✅ `npm run bundle`; CHANGELOG `[Unreleased]` entry
@@ -195,6 +203,7 @@ to `makeReader` beside `--rev` and the working tree, using the same root-relativ
 ❌ Re-mapping a wrong line to the right one
 ❌ `/qa-fix` ingester behaviour on `anchor_check` (task.194's recorded future improvement)
 ❌ A Bitbucket CI lane: the Bitbucket arm is verified by inspection, as task.70 did for inline comments
+❌ `/review-pr` head binding: shipped by `319bf779` (`resolve-head-rev.sh`) before this task started
 
 ---
 
@@ -203,10 +212,13 @@ to `makeReader` beside `--rev` and the working tree, using the same root-relativ
 **`unparseable` is a new verdict in the malformed set.** A code finding whose `file_line` does not
 parse used to exit 0 as `no-line`; it now exits 1 as `unparseable`.
 
-- **Who is affected**: the four dispatchers, which already mark any malformed verdict (they key on the
-  set, not on the names), and any external caller that branched on `no-line` for code findings. No
-  such caller exists in the tree (`git grep -n '"no-line"' -- 'skills/*/SKILL.md'` returns nothing).
-- **Migration**: none needed in the tree. An external caller treats `unparseable` like `out-of-range`.
+- **Who is affected**: the four dispatchers, whose prose names the malformed verdicts (nine sites,
+  listed in §3 Target Architecture — each gains `unparseable`), the unit test that pins a range
+  `file_line` to `no-line` (`shared/resources/tests/finding-anchors.test.mjs:145`), and any external
+  caller that branched on `no-line` for code findings. No such caller exists in the tree
+  (`git grep -n '"no-line"' -- 'skills/*/SKILL.md'` returns nothing).
+- **Migration**: in the tree, the enumeration sweep and the test update above. An external caller
+  treats `unparseable` like `out-of-range`.
 
 `--index` and the root-in-rev check are additive.
 
@@ -220,10 +232,11 @@ parse used to exit 0 as `no-line`; it now exits 1 as `unparseable`.
 
 **Files**: `shared/resources/finding-anchors.js`, `shared/resources/tests/finding-anchors.test.mjs`
 
-- [ ] `anchorOf` lens by key; `checkAnchors` returns `unparseable` for a code `file_line` that does not parse; `MALFORMED` gains it
-- [ ] `checkTree` with `--rev` requires `git cat-file -t <sha>:./` = `tree` from the root, else `bad-root`
-- [ ] `--index` CLI flag and reader (`git cat-file blob :./<rel>`); usage error with `--rev`; `checkTree` requires a git work tree
-- [ ] Unit tests for each, both directions (an AC-id `ref` stays `no-line`; an in-tree sub-root still reads)
+- [x] `anchorOf` lens by key; `checkAnchors` returns `unparseable` for a code `file_line` that does not parse; `MALFORMED` gains it
+- [x] `checkTree` with `--rev` requires `git cat-file -t <sha>:./` = `tree` from the root, else `bad-root`
+- [x] `--index` CLI flag and reader (`git cat-file blob :./<rel>`); usage error with `--rev`; `checkTree` requires a git work tree
+- [x] Unit tests for each, both directions (an AC-id `ref` stays `no-line`; an in-tree sub-root still reads)
+- [x] Update the existing `no-line` test (`finding-anchors.test.mjs:142-150`): its range `file_line` case (`:145`) now reads `unparseable`
 
 **Dependencies**: none.
 
@@ -231,32 +244,30 @@ parse used to exit 0 as `no-line`; it now exits 1 as `unparseable`.
 
 **Files**: the four dispatcher `SKILL.md` files, their tests
 
-- [ ] Each checker block captures `--json` stdout and decides on `.reason`; no parseable JSON → HALT "checker not runnable"
-- [ ] Both `--inline` blocks bind `FINDINGS_JSON` and refuse a finding with no `anchor_check`
-- [ ] `/review-code`: `--staged` passes `--index`
-- [ ] New `evals/shared/tests/finding-anchors-blocks.test.mjs`: extracts each dispatcher's checker block and runs it (checker missing → HALT; findings present → continues)
+- [x] Each checker block captures `--json` stdout and decides on `.reason`; no parseable JSON → HALT "checker not runnable"
+- [x] Both `--inline` blocks bind `FINDINGS_JSON` and refuse a finding with no `anchor_check`
+- [x] `/review-code`: `--staged` passes `--index`
+- [x] Add `unparseable` to every prose enumeration of the malformed verdicts (the nine sites in §3); qa-task / qa-story `file: null` covers it
+- [x] New `evals/shared/tests/finding-anchors-blocks.test.mjs`: extracts each dispatcher's checker block and runs it (checker missing → HALT; findings present → continues)
 
 **Dependencies**: Phase 1 (`--index`, `unparseable`).
 
-### Phase 3: `/review-pr` head SHA (Risk: Medium)
+### Phase 3: `/review-pr` head SHA — superseded (no work)
 
-**Files**: `skills/review-pr/SKILL.md`, `skills/review-pr/tests/review-pr.test.js`
-
-- [ ] Step 1b requests `headRefOid` (GitHub); the Bitbucket call already returns `source.commit.hash`
-- [ ] Step 6 binds `HEAD_REV` to the head SHA, fetches it when absent, and verifies it resolves
-- [ ] Test: the Step 6 block, run with a stub `gh` and a repository holding the SHA, calls the checker with `--rev <sha>`
-
-**Dependencies**: Phase 2 (the block's `reason` handling).
+Shipped by commit `319bf779` (`skills/review-pr/scripts/resolve-head-rev.sh`, tested by
+`skills/review-pr/tests/resolve-head-rev.test.js`) before this task started. Phase 2 replaces the
+block's exit-code comment with the `reason` decision; the `HEAD_REV` binding is left as it is
+(review 1, I1).
 
 ### Phase 4: Consumers, population, release notes (Risk: Low)
 
 **Files**: `skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md`, `evals/shared/tests/finding-anchors-callers.test.mjs`, `CHANGELOG.md`
 
-- [ ] develop-bug verify loop: `(location unverified: {file_line})` for a blocking finding with a malformed `anchor_check`
-- [ ] Population widened to executed documents mentioning `/review-code` or `code-review-prompt.md`; `CITE_ONLY` with reasons; floor 5
-- [ ] `npm run bundle`, `npm run bundle:check`; CHANGELOG `[Unreleased]` › Fixed
+- [x] develop-bug verify loop: `(location unverified: {file_line})` for a blocking finding with a malformed `anchor_check`
+- [x] Population widened to executed documents mentioning `/review-code` or `code-review-prompt.md`; `CITE_ONLY` with reasons; floor 5
+- [x] `npm run bundle`, `npm run bundle:check`; CHANGELOG `[Unreleased]` › Fixed
 
-**Dependencies**: Phases 1–3.
+**Dependencies**: Phases 1–2.
 
 ---
 
@@ -276,7 +287,7 @@ parse used to exit 0 as `no-line`; it now exits 1 as `unparseable`.
 7. ✅ `shared/resources/tests/finding-anchors.test.mjs` (glob `shared/resources/tests/*.test.mjs`)
 8. ✅ `evals/shared/tests/finding-anchors-callers.test.mjs` (glob `evals/shared/tests/*.test.mjs`)
 9. 🆕 `evals/shared/tests/finding-anchors-blocks.test.mjs` (same glob)
-10. ✅ `skills/review-pr/tests/review-pr.test.js`, `skills/review-code/tests/review-code.test.js` (globs `skills/review-pr/tests/*.test.js`, `skills/review-code/tests/*.test.js`)
+10. ✅ `skills/review-pr/tests/review-pr.test.js`, `skills/review-code/tests/review-code.test.js` (globs `skills/review-pr/tests/*.test.js`, `skills/review-code/tests/*.test.js`) — the `--inline` refusal
 
 ### Files to Modify (Dependencies)
 
@@ -286,6 +297,7 @@ None. Node built-ins only.
 
 11. ✅ `CHANGELOG.md`
 12. Generated: the four skills' `references/finding-anchors.js`, via `npm run bundle`. Never hand-edited.
+13. Task artefacts: `task.195.review.1.finding-anchors-follow-ups.md`, `task.195.implementation.1.finding-anchors-follow-ups-initial-run.md`; `task.195.plan.finding-anchors-follow-ups.md` (Phase 3 rescoped by review 1)
 
 ### Files to Delete
 
@@ -312,8 +324,6 @@ None.
 - `finding-anchors-blocks.test.mjs`: each dispatcher's checker block is extracted and run in a scratch
   repository twice — with the bundled checker path absent (HALT, "not runnable") and present with a
   malformed finding (continues, finding annotated).
-- review-pr Step 6 block with a stub `gh` (`headRefOid` set) and the commit present → the checker is
-  called with `--rev <sha>`.
 - **Control case** (create-task § 8): the blocks test also feeds a finding set with no malformed anchor
   (must continue, exit path `ok`) so a block that HALTs on every run fails.
 
@@ -341,7 +351,7 @@ Not applicable: one extra `git cat-file -t` per run.
 - [ ] **SC-3** `--index` reads the staged content relative to `--root`; `--index` with `--rev` exits 2. Held by `finding-anchors.test.mjs`.
 - [ ] **SC-4** Each dispatcher's checker block HALTs as "checker not runnable" when the checker cannot load, and continues on `malformed-anchors`. Held by `finding-anchors-blocks.test.mjs`.
 - [ ] **SC-5** Both `--inline` blocks refuse a findings file with an un-annotated finding instead of posting `[]`. Held by the extended jq-run tests in `review-pr.test.js` and `review-code.test.js`.
-- [ ] **SC-6** `/review-pr` Step 6 calls the checker with `--rev` set to the PR's head SHA. Held by `review-pr.test.js` (stub `gh`). The Bitbucket arm (`source.commit.hash`) is verified by inspection; no Bitbucket lane exists in CI.
+- [ ] **SC-6** `/review-pr` Step 6 calls the checker with `--rev` set to a PR head commit that exists locally, on both platforms. Already held by `skills/review-pr/tests/resolve-head-rev.test.js` (commit `319bf779`); this task adds only the `reason` decision to that block, held by `finding-anchors-blocks.test.mjs` (SC-4).
 - [ ] **SC-7** (documentation) The develop-bug verify loop states the `(location unverified: …)` rule for a blocking finding with a malformed `anchor_check`. Held by `finding-anchors-callers.test.mjs`.
 
 ### Performance
@@ -391,7 +401,7 @@ None.
 
 ### Partial Rollback (1-2 hours)
 
-- **When to use**: one phase misbehaves (most likely Phase 3's head binding).
+- **When to use**: one phase misbehaves (most likely Phase 2's dispatcher blocks).
 - **Steps**: revert that phase's hunks; the other phases stand alone.
 
 ### Forward Fix (< 4 hours)
@@ -404,14 +414,114 @@ None.
 - **Critical**: a finding dropped, or a block that continues after the checker failed to load.
 - **Non-critical**: noisy `unparseable` markers.
 
+## Deferred Work
+
+- **Release and re-vendor.** The fix reaches consumers only after a tagged release and `setup-consumer.sh --update`;
+  `/finalise` runs before merge, so this is not a success criterion here.
+- **`/qa-fix` reading `anchor_check`** stays out of scope, as task.194 recorded: the `(location unverified: …)` wording
+  is what the fixer sees.
+
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-19
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Full Report**: [task.195.qa.5.finding-anchors-follow-ups.md](./task.195.qa.5.finding-anchors-follow-ups.md)
+- **Gate File**: [task.195.gate.5.finding-anchors-follow-ups.yml](./task.195.gate.5.finding-anchors-follow-ups.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 5968
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+TASK-195-QA4-1 is fixed. One field reader, `fieldOf`, now decides `file_line`, `ref` and `line_text`. A non-string `line_text` reads `text-mismatch`, and only an absent or blank one is unchecked. The cycle 5 review found nothing. The security probe measured 43 cases with 0 reproduced and 0 escapes. Advisory items are carried to future work in the gate.
+
+## Definition of Done - Gaps Identified — run 1 (historical, superseded by run 2)
+
+**Status:** SUPERSEDED — every gap below was closed in QA cycles 3–5; see the run 2 section that follows
+
+### QA Gate Status
+
+**QA Report**: `task.195.qa.2.finding-anchors-follow-ups.md`
+**Gate File**: `task.195.gate.2.finding-anchors-follow-ups.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+### Missing Criteria:
+
+1. **Security Review** (the /finalise probe of the review-pr `--inline` guard ran 43 cases: 2 reproduced and 13 escaped):
+   - [ ] **Medium.** `skills/review-pr/SKILL.md:971-975`: the guard must require an array for every wrapper key present. `{"code_review":{"findings":"oops"},"pr_conformance":{"findings":[annotated]}}` passes, and the code findings are dropped silently. This is QA 2's CR-1, now reproduced. `findingsOf` has the same leniency.
+   - [ ] **Low.** The same guard must treat `anchor_check: null` as absent (`.anchor_check | type == "string"`).
+   - [ ] **Escape.** `skills/review-pr/SKILL.md:951` runs `mktemp -t review-pr-inline.XXXXXX.json` before the guard and never removes it on HALT. 13 refused inputs leave a scratch file in `$TMPDIR`.
+
+2. **CI:**
+   - [ ] Reading 1 is PENDING on `faec9ea4`. Acceptance needs a green run on the head carrying the final code.
+
+### Next Steps:
+
+- [ ] **BLOCKING**: fix the three review-pr `--inline` gaps and add the reproducing cases to `skills/review-pr/tests/review-pr.test.js`, with a mutation proof for each
+- [ ] Re-enter QA at 5a (this is a code change), then re-run `/finalise`
+
+**Estimated Effort:** Small (≈1 hour)
+
+**Gap Report Generated:** 2026-10-19
+**QA Gate Reference**: See `task.195.gate.2.finding-anchors-follow-ups.yml`
+
+**Detailed Verification Log:** See `task.195.dod.1.finding-anchors-follow-ups.md` for the complete verification evidence and the probe record `task.195.dod.1.security.run.json`.
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.195.qa.5.finding-anchors-follow-ups.md`
+**Gate File**: `task.195.gate.5.finding-anchors-follow-ups.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100. Five QA cycles: CONCERNS 90, PASS 100, CONCERNS 90, CONCERNS 90, PASS 100.
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 11 of 11 met. Each has a code citation and a test that runs on every PR.
+✅ **PR Review:** PR #695. The 5c `/review-pr` gave APPROVE with 0 findings. The repository requires no reviews.
+✅ **CI:** SUCCESS on `05f97433` across 5 checks (test, validate, link-check, shellcheck, branch policy).
+✅ **Documentation:** The CHANGELOG `[Unreleased]` › Fixed entry covers the new verdict, `--index` and the reason-deciding dispatchers. Four dispatcher SKILL.md files and the develop-bug verify loop document the behaviour.
+✅ **Security Review:** PASS. A probe of 57 candidates against two boundary controls (the review-pr `--inline` guard and the review-code Step 2b checker) reproduced 0 with 0 escapes. All of run 1's gaps are closed.
+⚠️ **Compliance Review:** Not applicable. This is internal tooling, with no personal, payment or health data and no UI.
+
+**Task marked as ACCEPTED on:** 2026-10-19
+
+**Detailed Verification Log:** See `task.195.dod.2.finding-anchors-follow-ups.md` for the complete verification evidence and the probe record `task.195.dod.2.security.run.json`.
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                                                 | Author      |
-| ---------- | ------- | --------------------------------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-07 | 1.0     | Initial draft — cut from task.194's gate 3 and PR review advisory findings | create-task |
+| 2026-10-19 | 1.1     | Review passed (8/10) — Phase 3 rescoped (superseded by `319bf779`), malformed-set enumeration sweep and the pinned `no-line` test added, anchors corrected | review-task |
+| 2026-10-19 |         | Status → ready-for-development | review-task |
+| 2026-10-19 |         | Implemented — 12 files (engine, 4 dispatcher blocks, develop-bug loop, 5 test files, CHANGELOG), 29 engine + 14 block + 16 guard tests | develop |
+| 2026-10-19 |         | Status → ready-for-review | develop |
+| 2026-10-19 |         | QA gate CONCERNS (90/100) — 2 findings | qa-task |
+| 2026-10-19 |         | QA findings fixed — 2 of 2 (TASK-195-QA1-1, -2), 1 iteration | qa-fix |
+| 2026-10-19 |         | QA gate PASS (100/100) — 0 findings (3 advisory) | qa-task |
+| 2026-10-19 |  | DoD incomplete — 4 gaps identified (3 security on the review-pr --inline guard, CI pending) | finalise |
+| 2026-10-19 |  | QA gate CONCERNS (90/100) — 1 finding (TASK-195-QA3-1; 3 advisory) | qa-task |
+| 2026-10-19 |  | QA findings fixed — 1 of 1 (TASK-195-QA3-1: a non-string anchor reads unparseable / no-line), 1 iteration | qa-fix |
+| 2026-10-19 |  | QA gate CONCERNS (90/100) — 1 finding (TASK-195-QA4-1) | qa-task |
+| 2026-10-19 |  | QA findings fixed — 1 of 1 (TASK-195-QA4-1: a non-string line_text is a text-mismatch; one field reader for file_line, ref and line_text), 1 iteration | qa-fix |
+| 2026-10-19 |  | QA gate PASS (100/100) | qa-task |
+| 2026-10-19 | 1.2 | DoD passed — accepted (PR #695) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -420,19 +530,19 @@ None.
 
 ### Phase 1: Engine
 
-- [ ] Complete
+- [x] Complete
 
 ### Phase 2: Dispatcher blocks
 
-- [ ] Complete
+- [x] Complete
 
 ### Phase 3: `/review-pr` head SHA
 
-- [ ] Complete
+- [x] Superseded by `319bf779` — no work
 
 ### Phase 4: Consumers, population, release notes
 
-- [ ] Complete
+- [x] Complete
 
 ---
 
@@ -455,3 +565,46 @@ None.
 ### Dependencies
 
 - Lands after PR #596 merges: every file this task changes is new or rewritten there.
+
+### Implementation Summary (2026-10-19)
+
+- **Engine** (`shared/resources/finding-anchors.js`): `anchorOf` returns `{lens, path, line}` with the lens decided by the
+  key (`file_line` → code, `ref` alone → conformance); a code value that does not parse is `unparseable`, which joins
+  `MALFORMED`. `checkTree` gained the root-in-rev check (`git cat-file -t <sha>:./` must read `tree`) and the `--index`
+  work-tree check; `makeReader` gained the `:./<rel>` index route. `--index` with `--rev` is `usage`. The text output
+  prints a malformed `unparseable` finding by its raw `file_line`.
+- **Dispatchers**: each checker block captures `--json` stdout and branches on `.reason` (`ok`/`malformed-anchors`
+  continue; `bad-root`/`bad-rev`/`usage` HALT with the message; nothing parseable → HALT "checker not runnable").
+  `/review-code` maps its target to the route through `set --` (worktree → none, staged → `--index`, range → `--rev HEAD`)
+  so the arguments survive zsh. Both `--inline` blocks run a `jq -e` guard that refuses an un-annotated finding before the
+  existing select, which is unchanged byte-for-byte. `unparseable` added at the nine enumeration sites; qa-task/qa-story
+  `file: null` covers it.
+- **develop-bug verify loop**: a blocking finding with a malformed `anchor_check` still blocks and is carried as
+  `(location unverified: {file_line})`.
+- **Population guard**: a second population over executed documents (`/review-code` or `code-review-prompt.md`; generated
+  copies excluded by marker): 11 members, 6 `CONSUMER_CITE_ONLY` with reasons, floor 5 acting.
+- **Phase 3**: no work — superseded by `319bf779` (review 1, I1).
+- **Mutation proofs** (each red, restored with `cmp`): lens-by-key; root-in-rev; the `--index` reader; the qa-task `reason`
+  decision; review-code staged → `--index`; the develop-bug `anchor_check` mention (full removal; removing one of its two
+  mentions stays green by design); the review-pr `--inline` guard.
+
+### QA Fix — cycle 1 (2026-10-19)
+
+- **TASK-195-QA1-1** (MEDIUM): the lens now comes from the wrapper when the input has one (`lensesOf(doc)`,
+  passed to `checkAnchors` by `run`), and from the key only for a bare array. A `code_review` finding that has
+  lost its `file_line` reads `unparseable`, not `no-line`. **Deviation from §3 Target Architecture, recorded:**
+  §3 says the lens is decided by the key alone; that rule produced this finding, so the wrapper now wins. Tests:
+  the wrapped keyless unit case with a bare-array control, and a CLI case annotating both lenses.
+- **TASK-195-QA1-2** (LOW): both `--inline` guards require a findings array (review-pr: at least one of the two)
+  before testing `anchor_check`; `{}`, `{code_review:{}}` and `[]` HALT, and an empty array still passes.
+- Mutation proofs, each red and restored with `cmp`: `run` passing no lenses; `anchorOf` ignoring its lens;
+  each guard without its array check. The review-code proof first stayed green, because the guard iterated
+  with `[]` and jq's error refused `{}` before the type check could; it now iterates with `[]?`, so the type
+  check is the one mechanism and the proof goes red.
+- Probe (Step 3.5): the population command from qa-fix Step 3.5, phrase ``path:line` at all`` (the old
+  observable), over `skills/*/SKILL.md`, hand-authored `skills/*/references/*.md` and `shared/resources/*`
+  — qa-task, qa-story, review-code, review-pr: updated ("a code finding whose `file_line` is absent or is not
+  `path:line`"); `CHANGELOG.md`: updated; §3 of this document: left as written, deviation recorded above.
+  Population 4 + 2; the restatement is the nine-site enumeration task.195 already swept, so the move is patch,
+  not consolidate: each site names the verdict for its own reader.
+

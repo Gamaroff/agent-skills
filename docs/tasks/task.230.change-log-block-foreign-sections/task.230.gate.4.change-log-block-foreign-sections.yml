@@ -1,0 +1,79 @@
+schema: 2
+task: 'task.230.change-log-block-foreign-sections'
+task_title: 'Keep foreign sections out of the change-log block'
+gate: PASS
+status_reason: 'Cycle 3 fixes hold (all four cycle-3 guards mutation-proven) and no medium or high finding remains. The scoped review found two low-severity residuals on shapes no writer or template in this repository produces (CR4-1 position versus shape for a non-log own table; CR4-2 a deeper Change Log heading inside a foreign run does not converge), both promoted at low severity, plus one advisory.'
+reviewer: 'QA Engineer'
+head: 'b2b0d4bbed701314a35a891a3be9df78a5445d1c'
+updated: '2026-10-22T22:50:08Z'
+
+top_issues:
+  - id: 'TASK-230-CR4-1'
+    severity: low
+    file: 'shared/resources/change-log.js'
+    finding: 'Rule 2 ranks a log-shaped table under a foreign heading above a non-log, undated table in the log''s own section, so an own "| Rev | When | What |" log loses to a "## Release Matrix" "| Date | Version | Platform |" table, whose row stays in the log (reproduced); no writer or template here produces such a log header, and K22 holds only because its foreign table is "| Date | Author |", which is no longer log-shaped.'
+    suggested_action: 'Record position-versus-shape for a non-log own table as a decision in the header comment and retitle K22, or pin it with a K22 variant whose foreign table is log-shaped.'
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+  - id: 'TASK-230-CR4-2'
+    severity: low
+    file: 'shared/resources/change-log.js'
+    finding: 'A deeper "### Change Log" inside a foreign section before the table no longer ends the run, so the first write lifts it directly above the start marker and the second write''s depth-agnostic obs #104 absorption deletes it: the document does not converge on the first write (reproduced).'
+    suggested_action: 'Use one depth rule at both sites: limit the obs #104 absorption to a heading at the log''s level, or let a deeper Change Log heading end a foreign run.'
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 6251
+  phases_verified: 4/4
+  ci: 'not read — CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: internal — shared/resources/change-log.js#foreignSections reads only work-item documents this repository''s pipeline writes; no corpus sink models a change-log block. No external input, no shell, no network.'
+  performance:
+    status: PASS
+    notes: 'Corpus guard 0.726 s wall (load 1.32) on the PR head, against a 5 s bound.'
+  reliability:
+    status: PASS
+    notes: 'Every shape a writer or template here produces is handled and covered (K1-K27; 120-block corpus property check: 0 problems). The two residuals are low-severity shapes no writer produces.'
+  maintainability:
+    status: PASS
+    notes: 'One partition, one header-cell list, the rule stated once in partitionForeign''s header comment; K22''s title lags the rule (CR4-5, cleanup).'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'TASK-230-CR4-1 (low): a log-shaped foreign table outranks a non-log, undated own-section table (position versus shape); record the decision in the header comment and retitle K22, or pin it with a log-shaped foreign variant.'
+      refs: ['shared/resources/change-log.js']
+      carried_from: top_issues (route 2b, cycle 4)
+    - action: 'TASK-230-CR4-2 (low): a deeper Change Log heading inside a before-side foreign section does not converge on the first write; use one depth rule for the foreign-run boundary and the obs #104 absorption.'
+      refs: ['shared/resources/change-log.js']
+      carried_from: top_issues (route 2b, cycle 4)
+    - action: 'CR4-3 (low, confidence medium, advisory): when the pick lands past an own-section non-log table, its rows are carried into the rendered log table as unparsed rows; classify from the picked run and let K25 assert the legend survives as its own table.'
+      refs: ['shared/resources/change-log.js', 'shared/resources/tests/change-log.test.mjs']
+    - action: 'Cleanups: take the heading depth from one helper shared with isSibling (CR4-4); retitle K22 (CR4-5).'
+      refs: ['shared/resources/change-log.js', 'shared/resources/tests/change-log.test.mjs']
+    - action: 'CR3-5 (advisory, carried): a Change Log heading inside an after-side foreign run leaves with it.'
+      refs: ['shared/resources/change-log.js']
+    - action: 'Tick the section 9 Success Criteria boxes from evidence (finalise will verify them).'
+      refs: ['docs/tasks/task.230.change-log-block-foreign-sections/task.230.change-log-block-foreign-sections.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

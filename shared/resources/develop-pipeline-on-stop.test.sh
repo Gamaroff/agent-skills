@@ -122,11 +122,11 @@ for SK in develop-story develop-task develop-bug; do
   elif echo "$R" | grep -q "has actually completed: mark Step 8"; then
     fail "[$SK] lock=8 names the Completion Checklist as Step 8's completion" "still carries the generic 'once /commit-changes has completed' line"
   elif echo "$R" | grep -q "is already ✅"; then
-    # The lock reads 8 from the end of /finalise, before Step 8's report update, so an
+    # On an accepted DoD the lock reads 8 from the end of /finalise, before Step 8's report update, so an
     # unconditional "the row is already done" is false in that window (task.161 CR-2).
     fail "[$SK] lock=8 names the Completion Checklist as Step 8's completion" "asserts Step 8's row is already done, unconditionally"
   elif ! echo "$R" | grep -q "at or below Step 7" || ! echo "$R" | grep -q "Step 7's tail"; then
-    # A lock at 8 can precede Step 7's tail: /finalise moves it there first. The reason must
+    # A lock at 8 can precede Step 7's tail: /finalise, when it accepts, moves it there first. The reason must
     # send an unfinished row at or below Step 7 back to that step, as the resume contract's
     # step-8 rule does, never straight to Step 8's report update (task.161 QA cycle 2, CR-1).
     fail "[$SK] lock=8 names the Completion Checklist as Step 8's completion" "does not send an unfinished Step 7 back to Step 7's tail"
@@ -159,6 +159,34 @@ for SK in develop-story develop-task develop-bug; do
   fi
 done
 
+# ── Scenario 5d: at Step 7 the completion condition is /finalise's outcome ───
+# A lock at 7 is also the hold /finalise keeps on a gaps outcome (task 222). The generic
+# line ("once /finalise has completed … advance the lock to 8") and the generic "advance
+# the lock yourself" would send a stop in the gaps tail to the 8 the Step 7 exception
+# forbids (QA-222-7).
+for SK in develop-story develop-task develop-bug; do
+  d="$TMPDIR_TEST/step7-$SK"
+  mklock "$d" "{\"skill\":\"$SK\",\"current_step\":7,\"report_path\":\"report.md\"}"
+  R=$(reason_of "$(run_hook "$d")")
+  if [ -z "$R" ]; then
+    fail "[$SK] lock=7 advances to 8 only on an accepted outcome" "hook allowed stop"
+  elif echo "$R" | grep -q "has actually completed: mark Step 7"; then
+    fail "[$SK] lock=7 advances to 8 only on an accepted outcome" "still carries the generic 'once /finalise has completed … advance to 8' line"
+  elif echo "$R" | grep -q "advance the lock yourself"; then
+    fail "[$SK] lock=7 advances to 8 only on an accepted outcome" "still tells the orchestrator to advance the lock itself"
+  elif ! echo "$R" | grep -q "only when the document reads \`accepted\`" || ! echo "$R" | grep -q "Never advance to 8 on gaps"; then
+    fail "[$SK] lock=7 advances to 8 only on an accepted outcome" "does not make the advance conditional on accepted. Got: $(echo "$R" | grep -i 'step 7 ends' | head -1)"
+  elif echo "$R" | grep -q "advance the lock to 8 and mark Step 7 ✅" \
+    || ! echo "$R" | grep -q "then finish Step 7's tail (for Step 7:" \
+    || ! echo "$R" | grep -q "only once the Step 7 Completion Checklist passes"; then
+    # Accepted is the condition for the ADVANCE, not for the ✅: the row stays ⏳ until the
+    # tail and the Step 7 Completion Checklist pass (QA-222-10, the task.161 CR-1 shape).
+    fail "[$SK] lock=7 advances to 8 only on an accepted outcome" "offers ✅ before Step 7's tail and Completion Checklist"
+  else
+    pass "[$SK] lock=7 advances to 8 only on an accepted outcome"
+  fi
+done
+
 # ── Scenario 5c: the step-aware text is Step 8 only ─────────────────────────
 # The step-8 wording must not leak into other steps: a step-3 stall still advances the lock
 # itself once the step has genuinely finished.
@@ -182,7 +210,7 @@ else
 fi
 
 # ── Scenario 5d: at Step 8 the status position does not assert Step 7 complete ──
-# /finalise moves the lock to 8 before Step 7's tail runs, so "Step 7/8 ✅ complete" is a claim a
+# /finalise, on an accepted DoD, moves the lock to 8 before Step 7's tail runs, so "Step 7/8 ✅ complete" is a claim a
 # lock at 8 does not support, made two lines above the rule that denies it (task 162; pre-existing,
 # task.161 gate.3 CR-1). The position names Step 8 pending and Step 7 unverified instead.
 for SK in develop-story develop-task develop-bug; do

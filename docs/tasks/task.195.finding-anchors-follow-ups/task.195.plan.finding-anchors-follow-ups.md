@@ -11,8 +11,8 @@ task-ref: task.195.finding-anchors-follow-ups.md
 
 ## Overview
 
-Engine first (three additive changes), then the dispatcher blocks that consume it, then `/review-pr`'s
-head binding, then the consumers and the guard. Every behaviour change lands in a fenced block a test
+Engine first (three changes), then the dispatcher blocks that consume it, then the consumers and the
+guard. `/review-pr`'s head binding shipped separately (`319bf779`). Every behaviour change lands in a fenced block a test
 extracts and runs (obs #258).
 
 ## Phase-by-Phase Implementation Guide
@@ -69,7 +69,7 @@ if (index) {
 Verified 2026-10-07: `git cat-file blob :./a.js` from the subdirectory returns the staged content
 while the working tree holds another.
 
-**Tests** (`shared/resources/tests/finding-anchors.test.mjs`): the three Unit cases in the task's §8;
+**Tests** (`shared/resources/tests/finding-anchors.test.mjs`): the existing `no-line` test (`:142-150`) moves its range `file_line` case (`:145`) to `unparseable`; then the three Unit cases in the task's §8;
 reuse the file's `gitRepo()` helper (added in task.194 QA cycle 2) for the rev and index fixtures.
 
 ### Phase 2: Dispatcher blocks
@@ -89,9 +89,14 @@ case "$REASON" in
 esac
 ```
 
-`<route flag>` per caller: review-pr `--rev "$HEAD_REV"` (Phase 3 binds it); qa-task / qa-story
+`<route flag>` per caller: review-pr `--rev "$HEAD_REV"` (bound by `resolve-head-rev.sh`, unchanged); qa-task / qa-story
 `--rev HEAD`; review-code none for a working tree, `--index` for `--staged`, `--rev HEAD` for a range
 or PR target.
+
+**Malformed-set sweep.** Add `unparseable` wherever the prose names the malformed verdicts —
+`git grep -n 'text-mismatch' -- 'skills/*/SKILL.md'` (2026-10-19: `qa-task:652,786`,
+`qa-story:1142,1272`, `review-code:100,120,213`, `review-pr:624,781`). At qa-task / qa-story `:786` /
+`:1272`, `file` is `null` for `unparseable` as for `no-such-file` (no path to name).
 
 **`--inline` guard**, before each jq (review-pr and review-code):
 
@@ -112,26 +117,12 @@ repository: (a) no `.agents/skills/<skill>/references/finding-anchors.js` → ex
 "did not run"; (b) the checker present (symlink the live engine) and one malformed finding → exit 0;
 (c) control: one clean finding → exit 0.
 
-### Phase 3: `/review-pr` head SHA
+### Phase 3: `/review-pr` head SHA — superseded
 
-- Step 1b's `gh pr view` field list gains `headRefOid`; bind `HEAD_SHA` from it (GitHub) or from the
-  Bitbucket PR JSON's `source.commit.hash`.
-- Step 6's block replaces the `HEAD_REV` placeholder:
-
-```bash
-HEAD_SHA="{the PR head SHA bound in Step 1b}"
-if ! git cat-file -e "${HEAD_SHA}^{commit}" 2>/dev/null; then
-  git fetch -q origin "pull/{pr-number}/head" 2>/dev/null \
-    || git fetch -q origin "{head-branch}" 2>/dev/null || true   # GitHub ref, else Bitbucket branch
-fi
-HEAD_REV="$HEAD_SHA"   # the checker exits 2 bad-rev if it still does not resolve
-```
-
-- Test (`skills/review-pr/tests/review-pr.test.js`): extract the Step 6 block, substitute the
-  placeholders with a SHA that exists in a scratch repository, put a stub `finding-anchors.js` that
-  echoes its argv as JSON (`{"reason":"ok","argv":[…]}`), and assert `--rev <sha>` reached it.
-- Remove the "pull/<n>/head as above" wording in the paragraph after the block (obs #293: grep the old
-  behaviour, `pull/<n>/head`, before calling the edit done).
+No work. Commit `319bf779` added `skills/review-pr/scripts/resolve-head-rev.sh` (five routes, both
+platforms, tested by `skills/review-pr/tests/resolve-head-rev.test.js`), which Step 6 already runs to
+bind `HEAD_REV`. Phase 2's `reason` decision replaces only the exit-code comment in that block; the
+`resolve-head-rev.sh` call and `--rev "$HEAD_REV"` stay (review 1, I1).
 
 ### Phase 4: Consumers, population, release notes
 
@@ -150,7 +141,7 @@ HEAD_REV="$HEAD_SHA"   # the checker exits 2 bad-rev if it still does not resolv
 - `command node`, never bare `node`.
 - Never hand-edit a `skills/*/references/` copy.
 - Documentation probe (qa-fix Step 3.5): search for the **old behaviour** (`exit 1 = malformed`,
-  `pull/<n>/head`, `no-line` for code findings), not only the edited text (obs #293).
+  `no-line` for code findings), not only the edited text (obs #293).
 
 ## Testing Approach
 

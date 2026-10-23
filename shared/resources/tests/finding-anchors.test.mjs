@@ -28,9 +28,15 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ENGINE = path.join(__dirname, "..", "finding-anchors.js");
-const { checkAnchors, anchorOf, makeReader } = createRequire(import.meta.url)(
-  ENGINE,
-);
+const {
+  checkAnchors,
+  anchorOf,
+  fieldOf,
+  makeReader,
+  findingsOf,
+  lensesOf,
+  MALFORMED,
+} = createRequire(import.meta.url)(ENGINE);
 
 // The PR #594 fixture file: 11 lines, the real line of the defect is 8.
 const SLUGIFY =
@@ -139,17 +145,158 @@ test("line 0 and a negative line are out-of-range; the last line is in range", (
   );
 });
 
-test("no-line: an AC id, a bare path, a range and a compound conformance ref", () => {
+test("no-line: an AC id, a bare path and a compound conformance ref", () => {
   assert.equal(verdictOf({ ref: "AC-3" }), "no-line");
   assert.equal(verdictOf({ ref: "docs/tasks/task.9/task.9.md" }), "no-line");
-  assert.equal(verdictOf({ file_line: "src/long.js:42-58" }), "no-line");
   // What the conformance lens actually emitted on PR #594. A lazy `^(.+?):` parsed this as a
   // path called "AC-3 / scripts/smoke/slugify.js" and reported no-such-file (task.194 review 1).
   assert.equal(
     verdictOf({ ref: "AC-3 / scripts/smoke/slugify.js:8" }),
     "no-line",
   );
-  assert.equal(anchorOf({ ref: "AC-3 / scripts/smoke/slugify.js:8" }), null);
+  assert.equal(
+    anchorOf({ ref: "AC-3 / scripts/smoke/slugify.js:8" }).path,
+    null,
+  );
+});
+
+// task.195 SC-1. The lens is the KEY the finding carries. A conformance `ref` may name a criterion;
+// a code `file_line` that does not parse is the reviewer breaking its one-line contract, and must
+// not read as clean.
+test("unparseable: a code file_line that is a bare path, a range or empty is malformed", () => {
+  for (const file_line of ["src/x.ts", "src/long.js:42-58", "", null]) {
+    assert.equal(
+      verdictOf({ file_line }),
+      "unparseable",
+      JSON.stringify(file_line),
+    );
+  }
+  assert.ok(MALFORMED.has("unparseable"));
+});
+
+test("unparseable vs no-line is decided by the key, in a bare array and a wrapped doc alike", () => {
+  const pair = [
+    { id: "code", file_line: "src/long.js:42-58" },
+    { id: "conf", ref: "AC-3" },
+  ];
+  const bare = checkAnchors(pair, reader()).map((r) => r.verdict);
+  assert.deepEqual(bare, ["unparseable", "no-line"]);
+  const wrapped = findingsOf({
+    code_review: { findings: [pair[0]] },
+    pr_conformance: { findings: [pair[1]] },
+  });
+  assert.deepEqual(
+    checkAnchors(wrapped, reader()).map((r) => r.verdict),
+    ["unparseable", "no-line"],
+  );
+  // A compound conformance ref stays clean; the same text as a file_line does not.
+  assert.equal(verdictOf({ ref: "AC-3 / x.js:8" }), "no-line");
+  assert.equal(verdictOf({ file_line: "AC-3 / x.js:8" }), "unparseable");
+});
+
+// task.195 QA cycle 1 (TASK-195-QA1-1): a code finding that has LOST its file_line key read as a
+// clean conformance no-line, because the lens was decided by the key alone. Under a wrapper the
+// wrapper decides; only a bare array, which has none, falls back to the key.
+test("under a wrapper the wrapper decides the lens: a code finding with no file_line is unparseable", () => {
+  const doc = {
+    code_review: { findings: [{ id: "CR-9", finding: "no location at all" }] },
+    pr_conformance: { findings: [{ id: "PC-1", ref: "AC-3" }] },
+  };
+  const findings = findingsOf(doc);
+  assert.deepEqual(lensesOf(doc), ["code", "conformance"]);
+  assert.deepEqual(
+    checkAnchors(findings, { ...reader(), lenses: lensesOf(doc) }).map(
+      (r) => r.verdict,
+    ),
+    ["unparseable", "no-line"],
+  );
+  // Control: the same keyless finding in a bare array has no wrapper — the key decides, as before.
+  assert.equal(lensesOf([{ id: "x" }]), null);
+  assert.equal(verdictOf({ id: "CR-9" }), "no-line");
+});
+
+// task.195 QA cycle 3 (TASK-195-QA3-1). A non-string anchor was stringified before matching, so
+// ["x.js:8"] read as x.js:8 and verified, and the inline selector later failed on the non-string.
+test("a non-string anchor is never matched: code reads unparseable, conformance no-line", () => {
+  const anchor = "scripts/smoke/slugify.js:8";
+  for (const raw of [[anchor], { file: anchor }, 8, true]) {
+    assert.equal(
+      verdictOf({ file_line: raw }),
+      "unparseable",
+      JSON.stringify(raw),
+    );
+    assert.equal(verdictOf({ ref: raw }), "no-line", JSON.stringify(raw));
+  }
+  // A non-string line_text is checked further in "line_text: only absent is unchecked …" below.
+  // Controls: the same anchor and quote as strings still verify.
+  assert.equal(verdictOf({ file_line: anchor }), "unchecked-text");
+  assert.equal(
+    verdictOf({
+      file_line: anchor,
+      line_text: ".replace(/[^a-z0-9]+/g, '-');",
+    }),
+    "ok",
+  );
+});
+
+// task.195 QA cycle 4 (TASK-195-QA4-1). The QA3-1 fix read a non-string line_text as absent, so
+// a wrong quote became the clean unchecked-text. One field reader decides absent / string / invalid
+// for every field; across the input class, only absent is unchecked, and invalid is a mismatch.
+test("line_text: only absent is unchecked; every other non-string is a text-mismatch", () => {
+  const anchor = "scripts/smoke/slugify.js:8";
+  const real = ".replace(/[^a-z0-9]+/g, '-');";
+  // Should merge: every absent spelling reads the same, unchecked.
+  for (const q of [undefined, null, "", "   ", "\t\n"]) {
+    assert.equal(
+      verdictOf({ file_line: anchor, line_text: q }),
+      "unchecked-text",
+      JSON.stringify(q),
+    );
+  }
+  // Should not merge with absent: an invalid quote, including one that holds the right text, an
+  // empty array and a falsy scalar, is a mismatch on both lenses.
+  for (const q of [
+    [real],
+    ["return y;"],
+    [],
+    {},
+    { text: real },
+    0,
+    8,
+    false,
+    true,
+  ]) {
+    assert.equal(
+      verdictOf({ file_line: anchor, line_text: q }),
+      "text-mismatch",
+      JSON.stringify(q),
+    );
+    assert.equal(
+      verdictOf({ ref: anchor, line_text: q }),
+      "text-mismatch",
+      `ref ${JSON.stringify(q)}`,
+    );
+  }
+  // The mismatch reports the quote as given, not a stringified one.
+  const [r] = checkAnchors([{ file_line: anchor, line_text: [real] }], {
+    readFile: () => SLUGIFY,
+  });
+  assert.deepEqual(r.expected, [real]);
+  // Controls: the string quote matches; a wrong string quote is still a mismatch.
+  assert.equal(verdictOf({ file_line: anchor, line_text: real }), "ok");
+  assert.equal(
+    verdictOf({ file_line: anchor, line_text: "return y;" }),
+    "text-mismatch",
+  );
+});
+
+test("fieldOf: the one reader of every finding field", () => {
+  for (const v of [undefined, null, "", "  "])
+    assert.equal(fieldOf(v).kind, "absent");
+  assert.deepEqual(fieldOf("a.js:1"), { kind: "string", value: "a.js:1" });
+  for (const v of [[], ["a.js:1"], {}, 0, 1, false, true]) {
+    assert.equal(fieldOf(v).kind, "invalid", JSON.stringify(v));
+  }
 });
 
 test("a conformance ref of the path:line form is checked like a file_line", () => {
@@ -310,6 +457,52 @@ test("CLI exits 2 on a findings file with no findings array", () => {
   try {
     const f = path.join(dir, "findings.json");
     writeFileSync(f, JSON.stringify({ something: [] }));
+    const r = cli(["--findings-file", f, "--json"], dir);
+    assert.equal(r.code, 2);
+    assert.equal(r.json().reason, "usage");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// task.195 DoD 1: one lens's findings that is not an array, beside a valid other lens, used to be
+// skipped — its findings vanished and the run read `ok`. Every lens present must hold an array.
+test("every lens present must hold a findings array; a lens that did not run may be absent or null", () => {
+  const conformance = { findings: [{ id: "PC-1", ref: "AC-3" }] };
+  assert.equal(
+    findingsOf({
+      code_review: { findings: "oops" },
+      pr_conformance: conformance,
+    }),
+    null,
+  );
+  assert.equal(
+    findingsOf({ code_review: { findings: [] }, pr_conformance: {} }),
+    null,
+  );
+  assert.equal(
+    findingsOf({ code_review: "x", pr_conformance: conformance }),
+    null,
+  );
+  // Controls: an absent or null lens is a lens that did not run.
+  assert.deepEqual(
+    findingsOf({ pr_conformance: conformance }),
+    conformance.findings,
+  );
+  assert.deepEqual(
+    findingsOf({ code_review: null, pr_conformance: conformance }),
+    conformance.findings,
+  );
+  const dir = scratch();
+  try {
+    const f = path.join(dir, "findings.json");
+    writeFileSync(
+      f,
+      JSON.stringify({
+        code_review: { findings: "oops" },
+        pr_conformance: conformance,
+      }),
+    );
     const r = cli(["--findings-file", f, "--json"], dir);
     assert.equal(r.code, 2);
     assert.equal(r.json().reason, "usage");
@@ -580,5 +773,258 @@ test("a --root that is not a directory exits 2 bad-root and annotates nothing, b
     );
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("unparseable exits 1 malformed-anchors through the CLI and annotates the finding", () => {
+  const dir = gitRepo();
+  try {
+    const f = path.join(dir, "f.json");
+    writeFileSync(
+      f,
+      JSON.stringify({
+        code_review: { findings: [{ id: "CR-1", file_line: "top.js" }] },
+      }),
+    );
+    const r = cli(
+      ["--findings-file", f, "--root", dir, "--annotate", f, "--json"],
+      dir,
+    );
+    assert.equal(r.code, 1);
+    assert.equal(r.json().reason, "malformed-anchors");
+    assert.equal(
+      JSON.parse(readFileSync(f, "utf8")).code_review.findings[0].anchor_check,
+      "unparseable",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("CLI: a wrapped code finding with no file_line exits 1 and is annotated unparseable", () => {
+  const dir = gitRepo();
+  try {
+    const f = path.join(dir, "f.json");
+    writeFileSync(
+      f,
+      JSON.stringify({
+        code_review: { findings: [{ id: "CR-1", finding: "x" }] },
+        pr_conformance: { findings: [{ id: "PC-1", ref: "AC-3" }] },
+      }),
+    );
+    const r = cli(
+      ["--findings-file", f, "--root", dir, "--annotate", f, "--json"],
+      dir,
+    );
+    assert.equal(r.code, 1);
+    assert.equal(r.json().reason, "malformed-anchors");
+    const out = JSON.parse(readFileSync(f, "utf8"));
+    assert.equal(out.code_review.findings[0].anchor_check, "unparseable");
+    assert.equal(out.pr_conformance.findings[0].anchor_check, "no-line");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("CLI: an array file_line exits 1 malformed-anchors and is annotated unparseable", () => {
+  const dir = gitRepo();
+  try {
+    const f = path.join(dir, "f.json");
+    writeFileSync(
+      f,
+      JSON.stringify({
+        code_review: { findings: [{ id: "CR-1", file_line: ["top.js:1"] }] },
+      }),
+    );
+    const r = cli(
+      [
+        "--findings-file",
+        f,
+        "--root",
+        dir,
+        "--rev",
+        "HEAD",
+        "--annotate",
+        f,
+        "--json",
+      ],
+      dir,
+    );
+    assert.equal(r.code, 1);
+    assert.equal(r.json().reason, "malformed-anchors");
+    assert.equal(
+      JSON.parse(readFileSync(f, "utf8")).code_review.findings[0].anchor_check,
+      "unparseable",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("CLI: an array line_text exits 1 malformed-anchors and is annotated text-mismatch", () => {
+  const dir = gitRepo();
+  try {
+    const f = path.join(dir, "f.json");
+    const bad = { id: "CR-1", file_line: "top.js:1", line_text: ["return y;"] };
+    writeFileSync(f, JSON.stringify({ code_review: { findings: [bad] } }));
+    const r = cli(
+      [
+        "--findings-file",
+        f,
+        "--root",
+        dir,
+        "--rev",
+        "HEAD",
+        "--annotate",
+        f,
+        "--json",
+      ],
+      dir,
+    );
+    assert.equal(r.code, 1);
+    assert.equal(r.json().reason, "malformed-anchors");
+    assert.equal(
+      JSON.parse(readFileSync(f, "utf8")).code_review.findings[0].anchor_check,
+      "text-mismatch",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// task.195 SC-2. A --root that exists on disk but not in the --rev tree read every finding as
+// no-such-file — the reviewer blamed for the caller's root.
+test("--rev with a --root absent from that commit exits 2 bad-root; an in-tree sub-root still reads", () => {
+  const dir = gitRepo();
+  try {
+    mkdirSync(path.join(dir, "newdir"));
+    writeFileSync(path.join(dir, "newdir", "n.js"), "n\n");
+    const f = path.join(dir, "f.json");
+    writeFileSync(f, JSON.stringify([{ id: "x", file_line: "n.js:1" }]));
+    const bad = cli(
+      [
+        "--findings-file",
+        f,
+        "--root",
+        path.join(dir, "newdir"),
+        "--rev",
+        "HEAD",
+        "--annotate",
+        f,
+        "--json",
+      ],
+      dir,
+    );
+    assert.equal(bad.code, 2);
+    assert.equal(bad.json().reason, "bad-root");
+    assert.match(bad.json().message, /is not in HEAD/);
+    assert.equal(bad.json().results, undefined);
+    assert.equal(
+      JSON.parse(readFileSync(f, "utf8"))[0].anchor_check,
+      undefined,
+    );
+
+    // Control: the same check from a root that IS in HEAD reads normally.
+    writeFileSync(
+      f,
+      JSON.stringify([
+        { id: "y", file_line: "sub/a.js:1", line_text: "first" },
+      ]),
+    );
+    const ok = cli(
+      [
+        "--findings-file",
+        f,
+        "--root",
+        path.join(dir, "pkg"),
+        "--rev",
+        "HEAD",
+        "--json",
+      ],
+      dir,
+    );
+    assert.equal(ok.code, 0, ok.out + ok.err);
+    assert.equal(ok.json().results[0].verdict, "ok");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// task.195 SC-3. `/review-code --staged` diffs the index; the anchors must be checked against it.
+test("--index reads the staged content relative to --root, not the working tree", () => {
+  const dir = gitRepo();
+  try {
+    const file = path.join(dir, "pkg", "sub", "a.js");
+    writeFileSync(file, "staged\n");
+    execFileSync("git", ["add", "pkg/sub/a.js"], { cwd: dir, stdio: "ignore" });
+    writeFileSync(file, "worktree\n");
+    const f = path.join(dir, "f.json");
+    writeFileSync(
+      f,
+      JSON.stringify([
+        { id: "staged", file_line: "sub/a.js:1", line_text: "staged" },
+        { id: "worktree", file_line: "sub/a.js:1", line_text: "worktree" },
+      ]),
+    );
+    const r = cli(
+      [
+        "--findings-file",
+        f,
+        "--root",
+        path.join(dir, "pkg"),
+        "--index",
+        "--json",
+      ],
+      dir,
+    );
+    const v = Object.fromEntries(
+      r.json().results.map((x) => [x.id, x.verdict]),
+    );
+    assert.deepEqual(v, { staged: "ok", worktree: "text-mismatch" });
+    assert.equal(r.json().index, true);
+    // Control: without --index the working tree is read and the verdicts swap.
+    const w = cli(
+      ["--findings-file", f, "--root", path.join(dir, "pkg"), "--json"],
+      dir,
+    );
+    const vw = Object.fromEntries(
+      w.json().results.map((x) => [x.id, x.verdict]),
+    );
+    assert.deepEqual(vw, { staged: "text-mismatch", worktree: "ok" });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("--index with --rev exits 2 usage; --index outside a git work tree exits 2 bad-root", () => {
+  const dir = gitRepo();
+  const plain = mkdtempSync(path.join(os.tmpdir(), "finding-anchors-plain-"));
+  try {
+    const f = path.join(dir, "f.json");
+    writeFileSync(f, JSON.stringify([{ id: "x", file_line: "top.js:1" }]));
+    const both = cli(
+      [
+        "--findings-file",
+        f,
+        "--root",
+        dir,
+        "--index",
+        "--rev",
+        "HEAD",
+        "--json",
+      ],
+      dir,
+    );
+    assert.equal(both.code, 2);
+    assert.equal(both.json().reason, "usage");
+    const outside = cli(
+      ["--findings-file", f, "--root", plain, "--index", "--json"],
+      plain,
+    );
+    assert.equal(outside.code, 2);
+    assert.equal(outside.json().reason, "bad-root");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(plain, { recursive: true, force: true });
   }
 });

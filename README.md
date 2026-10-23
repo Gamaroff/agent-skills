@@ -145,7 +145,7 @@ See [`CONTRIBUTING.md`](./CONTRIBUTING.md). Short version:
 1. Scaffold: `python3 skills/create-skill/scripts/init_skill.py <name> --path skills/`
 2. Write a sharp `description` in frontmatter (this is what activates the skill)
 3. Validate: `python3 skills/create-skill/scripts/quick_validate.py skills/<name>`
-4. Update [`docs/reference/skill-catalog.md`](./docs/reference/skill-catalog.md)
+4. Run `npm run generate-catalog` (regenerates [`docs/reference/skill-catalog.md`](./docs/reference/skill-catalog.md) and the README skills badge; CI fails on a stale catalog)
 5. Open a PR — one skill per PR
 
 No hardcoded project names, server addresses, or credentials.

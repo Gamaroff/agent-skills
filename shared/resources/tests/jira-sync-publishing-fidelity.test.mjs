@@ -1,7 +1,7 @@
 "use strict";
 /**
  * Unit tests for the four publishing-fidelity defects closed in
- * jira-sync.js, a shared resource (rebirth-wallet task.33 / RAPP-575).
+ * jira-sync.js, a shared resource (reported by a consumer project).
  *
  * Every one of them FAILED SILENTLY. That is the property under test here, and
  * it is why each test asserts on observable output rather than on "no throw":
@@ -255,7 +255,7 @@ test("E: singleQuote repos get single-quoted scalars", () => {
   const prev = process.env.JIRA_SYNC_QUOTE_STYLE;
   process.env.JIRA_SYNC_QUOTE_STYLE = "single";
   try {
-    assert.equal(formatYamlScalar("RAPP-573"), "'RAPP-573'");
+    assert.equal(formatYamlScalar("PROJ-573"), "'PROJ-573'");
     assert.equal(formatYamlScalar(["a", "b"]), "['a', 'b']");
     // YAML escapes an embedded single quote by DOUBLING it — a backslash is
     // literal inside single quotes and would corrupt the value.
@@ -270,7 +270,7 @@ test("E: default stays double-quoted, matching Prettier's own default", () => {
   const prev = process.env.JIRA_SYNC_QUOTE_STYLE;
   process.env.JIRA_SYNC_QUOTE_STYLE = "double";
   try {
-    assert.equal(formatYamlScalar("RAPP-573"), '"RAPP-573"');
+    assert.equal(formatYamlScalar("PROJ-573"), '"PROJ-573"');
     assert.equal(formatYamlScalar('say "hi"'), '"say \\"hi\\""');
   } finally {
     if (prev === undefined) delete process.env.JIRA_SYNC_QUOTE_STYLE;

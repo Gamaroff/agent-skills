@@ -1,0 +1,98 @@
+[
+  {
+    "id": "bug-own-branch",
+    "sink": "path",
+    "input": "bugfix/task.200.bug.3.step-2-halt",
+    "why": "The bug's own branch.",
+    "correct": "Accept (true)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "bug-own-branch-bare",
+    "sink": "path",
+    "input": "bugfix/task.200.bug.3",
+    "why": "The bug's own id with no slug.",
+    "correct": "Accept (true)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "bug-parent-branch",
+    "sink": "path",
+    "input": "feature/task.200.tracker-side-effects",
+    "why": "A QA bug is filed on its parent's branch.",
+    "correct": "Accept (true)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "bug-parent-dash",
+    "sink": "path",
+    "input": "bugfix/task.200-x",
+    "why": "Parent id with '-'.",
+    "correct": "Accept (true)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "bug-hotfix-version",
+    "sink": "path",
+    "input": "hotfix/v1.2.1",
+    "why": "A bug document on hotfix/v<version>.",
+    "correct": "Accept (true)",
+    "direction": "legitimate"
+  },
+  {
+    "id": "bug-sibling",
+    "sink": "path",
+    "input": "bugfix/task.200.bug.4.x",
+    "why": "A sibling bug's branch.",
+    "correct": "Reject (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "bug-sibling-longer-number",
+    "sink": "path",
+    "input": "bugfix/task.200.bug.30.x",
+    "why": "bug.30 starts with bug.3.",
+    "correct": "Reject (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "bug-parent-prefix-collision",
+    "sink": "path",
+    "input": "bugfix/task.20.bug.3.x",
+    "why": "A bug of task.20.",
+    "correct": "Reject (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "bug-parent-longer-id",
+    "sink": "path",
+    "input": "feature/task.2000.x",
+    "why": "A different work item.",
+    "correct": "Reject (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "bug-hotfix-unversioned",
+    "sink": "path",
+    "input": "hotfix/1.2.1",
+    "why": "Not the hotfix/v* shape.",
+    "correct": "Reject (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "bug-hotfix-v-not-version",
+    "sink": "path",
+    "input": "hotfix/vendor-sdk-bump",
+    "why": "hotfix/v but not a version marker.",
+    "correct": "Reject (false)",
+    "direction": "hostile"
+  },
+  {
+    "id": "bug-general-bug-same-number",
+    "sink": "path",
+    "input": "bugfix/bug.3.x",
+    "why": "General bug.3 is a different document.",
+    "correct": "Reject (false)",
+    "direction": "hostile"
+  }
+]

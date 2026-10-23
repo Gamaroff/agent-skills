@@ -1,0 +1,86 @@
+schema: 2
+task: 'task.199.setup-config-and-process-docs'
+task_title: 'Setup, configuration and process docs'
+gate: CONCERNS
+status_reason: 'Cycle 2 fixes hold. The scoped re-review found three gaps in the new text: release-and-install §4 sends a failed Sync develop to a recipe that fails mid-merge (medium), the wizard summary still tells approve users writes are not performed (low), and the configuration.md approve comment omits the autonomous-run fallback (low).'
+reviewer: 'QA Engineer'
+head: '732649dab50d7e4dc9fa46203e51562aeeb6c1d1'
+updated: '2026-10-20T07:54:27Z'
+
+top_issues:
+  - id: 'QA-5'
+    severity: medium
+    file: 'docs/runbooks/release-and-install.md'
+    finding: 'release-and-install.md:62 now routes a failed --tag Sync develop to the block `git checkout develop && git pull --rebase; git merge main && git push`, but release.sh (set -euo pipefail, lines 600-604) stops mid-merge on a conflict, where `git pull --rebase` refuses with unmerged paths, and after a rejected push `git pull --rebase` would rebase away the local merge commit. Reviewer CR-1 (medium confidence), verified by QA against release.sh.'
+    suggested_action: 'Give the failed-sync case its own recovery (conflict: resolve, commit, `git push origin develop`; rejected push: `git pull --no-rebase`, then push) and keep the existing block for --no-sync-develop only.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-6'
+    severity: low
+    file: 'scripts/setup-consumer.sh'
+    finding: 'The end-of-wizard summary (setup-consumer.sh:2229-2235) prints for every mode except full, approve included, and says writes are "recorded, not performed" and the checklist is worked by hand, contradicting the corrected approve prompt (line 360) and develop-pipeline-step-7-finalise.md "The approve model at handover". Reviewer CR-2, verified by QA.'
+    suggested_action: 'Add an approve line: writes are deferred, then applied after one batched confirmation at handover; with no tty or in an autonomous run the command checklist applies.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-7'
+    severity: low
+    file: 'docs/reference/configuration.md'
+    finding: 'configuration.md:944 says approve behaves like command with "no tty"; develop-pipeline-step-7-finalise.md:514 says "no tty (or an autonomous pipeline run)". Reviewer CR-3, verified by QA.'
+    suggested_action: 'Say "no tty or an autonomous run → behaves like `command`".'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 85
+
+evidence:
+  tests_reviewed: 5969
+  phases_verified: 6/6
+  ci: 'link-check and shellcheck pass @ 732649da; test pending at gate time'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5]
+    phases_with_issues: [1, 2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'Documentation and two echo strings; no boundary in the change set.'
+  performance:
+    status: PASS
+    notes: 'N/A — documentation only.'
+  reliability:
+    status: PASS
+    notes: 'git revert is a full rollback; no behaviour change.'
+  maintainability:
+    status: PASS
+    notes: 'Residue is wording gaps in text the previous cycle added.'
+
+bug_resolution:
+  cycle_2_findings: 5
+  fixed: 5
+  verified: 'CR-1 bug-fix.md names the four writes; CR-2 wizard prompt + configuration.md comment; CR-3 Bitbucket/Jira only at 3 sites; QA-3 Agent links row; QA-4 §4 condition (its recipe is QA-5)'
+
+recommendations:
+  immediate:
+    - action: 'Give the failed Sync develop case its own recovery in release-and-install §4 (QA-5)'
+      refs: ['docs/runbooks/release-and-install.md']
+  future:
+    - action: 'Source gap: /qa-fix does not mirror a general bug''s in-cycle status writes into the bug registry after a reopen'
+      refs: ['skills/qa-fix/SKILL.md', 'skills/develop-bug/SKILL.md']
+    - action: 'setup-consumer.sh section banners use older numbering than the header'
+      refs: ['scripts/setup-consumer.sh']
+    - action: 'restricted-access.md (Limits 2, mode table) names only "without a tty" as the approve fallback; the step-7 finalise doc also names an autonomous run'
+      refs: ['docs/concepts/restricted-access.md']
+    - action: 'markdown-link-check@3 does not check cross-file anchors'
+      refs: ['.github/workflows/docs-link-check.yml']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'QA-5 fixed; QA-6 and QA-7 in the same cycle'

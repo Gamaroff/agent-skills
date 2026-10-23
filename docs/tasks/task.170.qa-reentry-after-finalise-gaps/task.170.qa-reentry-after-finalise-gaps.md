@@ -8,7 +8,7 @@ category: infrastructure
 status: accepted
 priority: Medium
 created: 2026-09-30
-updated: 2026-10-04
+updated: 2026-10-22
 assignee:
 estimated_effort_hours: 8
 risk_level: medium
@@ -468,8 +468,6 @@ parity test.
 - **Gap 2 (probe zero-guard)** — **operator decision, 2026-10-04: record the probe as "unverified by the engine"**, as task.130 did. The engine has no form that reaches a two-argument shell script; the eight hostile `head:` cases in `reenter-qa-after-finalise.test.sh` are the executed evidence (they run per PR, but are not an engine count). Follow-up that closes the engine gap: task.181, a `shell-argv:` entry form ([#564](https://github.com/Gamaroff/agent-skills/issues/564)).
 
 **Detailed Verification Log:** See `task.170.dod.1.qa-reentry-after-finalise-gaps.md` for complete verification evidence and timestamps.
-<!-- change-log-start -->
-## Change Log
 
 ## Definition of Done - PASSED ✅
 
@@ -494,6 +492,8 @@ All Definition of Done criteria have been verified (run 2):
 **Task marked as ACCEPTED on:** 2026-10-04
 
 **Detailed Verification Log:** See `task.170.dod.2.qa-reentry-after-finalise-gaps.md` for complete verification evidence and timestamps.
+<!-- change-log-start -->
+## Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
@@ -510,6 +510,7 @@ All Definition of Done criteria have been verified (run 2):
 | 2026-10-03 |         | DoD incomplete — 2 gaps identified (security: bash 3.2 parse, probe zero-guard) | finalise |
 | 2026-10-04 |  | QA gate PASS (100/100) — 0 findings (cycle 7, re-entry after finalise DoD gaps) | qa-task |
 | 2026-10-04 | 1.2 | DoD passed — accepted (PR #563); security probe unverified by the engine (operator decision) | finalise |
+| 2026-10-22 |  | Change-log block repaired — DoD section moved above the markers (task.230) | develop-task |
 <!-- change-log-end -->
 
 ---

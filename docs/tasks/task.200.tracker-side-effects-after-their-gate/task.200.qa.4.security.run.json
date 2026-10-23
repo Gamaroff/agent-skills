@@ -1,0 +1,136 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "path",
+      "entry": ".agents/skills/ensure-bug-github-issue/references/doc-link-branch.js#branchNamesWorkItem",
+      "name": null,
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 12,
+      "passed": 12,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": [
+        "docs/tasks/task.200.tracker-side-effects-after-their-gate/task.200.bug.3.step-2-halt-can-still-post-blocked.md"
+      ],
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-10-20T21:21:10.927Z"
+    },
+    {
+      "sink": "path",
+      "entry": ".agents/skills/ensure-story-github-issue/references/doc-link-branch.js#branchNamesWorkItem",
+      "name": null,
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 14,
+      "passed": 14,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": [
+        "docs/prd/epic.1.4.feature-ui/story.1.4.2.configure-pipe.md"
+      ],
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-10-20T21:21:11.509Z"
+    },
+    {
+      "sink": "path",
+      "entry": ".agents/skills/sync-github-bug/references/doc-link-branch.js#branchNamesWorkItem",
+      "name": null,
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 5,
+      "passed": 5,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": [
+        "docs/tasks/task.200.tracker-side-effects-after-their-gate/task.200.bug.3.step-2-halt-can-still-post-blocked.md"
+      ],
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-10-20T21:21:28.776Z"
+    },
+    {
+      "sink": "path",
+      "entry": "shared/resources/doc-link-branch.js#branchNamesWorkItem",
+      "name": null,
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 16,
+      "passed": 16,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": [
+        "docs/tasks/task.200.tracker-side-effects-after-their-gate/task.200.tracker-side-effects-after-their-gate.md"
+      ],
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-10-20T21:21:10.457Z"
+    },
+    {
+      "sink": "path",
+      "entry": ".agents/skills/sync-github-story/references/doc-link-branch.js#branchNamesWorkItem",
+      "name": null,
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 7,
+      "passed": 7,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": [
+        "docs/prd/epic.1.4.feature-ui/story.1.4.2.configure-pipe.md"
+      ],
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-10-20T21:21:28.561Z"
+    }
+  ],
+  "totals": {
+    "executed": 54,
+    "reproduced": 0,
+    "escaped": 0
+  },
+  "updated_at": "2026-10-20T21:21:28.776Z"
+}

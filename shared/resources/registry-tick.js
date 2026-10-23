@@ -77,6 +77,43 @@
  *   ambiguous-row      (tick) the row's status cell could not be identified unambiguously
  *   engine-unavailable the shared registry parser could not be located
  * Exit 2: usage error (including `--annotate` without `--pr`).
+ *
+ * ## `--bug-status` — the general-bug registry row (task 219)
+ *
+ *   node registry-tick.js --bug-status --file <bug.md> [--registry <path>] [--dry-run] [--json]
+ *
+ * A general bug's status lives twice: in the bug file's frontmatter and in the
+ * Status cell of its row in `docs/bugs/bug-registry.md`. develop-bug and qa-fix
+ * call this after every write of the file's `status:`, so the row follows the
+ * file through the whole lifecycle, reopens included. Before it, four prose
+ * steps each edited the row by hand and `/qa-fix` — the fifth writer — did not,
+ * leaving the row at `⚠️ Reopened` while the file read `ready-for-qa`.
+ *
+ * It is an explicit flag, not auto-detection, because `finalise --bug` calls
+ * the default mode unconditionally and relies on `not-a-task` for a bug: a
+ * default mode that began writing bug rows would write the row before
+ * develop-bug Step 7 decides to close it.
+ *
+ * The VOCABULARY is read from the registry, never assumed. Two exist: the
+ * lifecycle token (`closed`, this repository) and the emoji label (`✅ Closed`,
+ * some consumers). When most of the OTHER rows read a label, the label is
+ * written; otherwise the token. `BUG_STATUS_LABELS` below is the one definition
+ * of the labels, exported for the drift test rather than restated there.
+ *
+ * It writes the Status cell and nothing else — not Last Updated, not the
+ * next-number line.
+ *
+ * Reasons (all exit 0):
+ *   mirrored               the Status cell was rewritten to the file's status
+ *   already                the cell already reads the file's status, in the
+ *                          registry's vocabulary
+ *   dry-run                `--dry-run`: what `mirrored` would have written
+ *   not-a-general-bug      the file is not `bug.{N}.…` — a task or story bug,
+ *                          or not a bug at all. No registry row exists for it
+ *   not-a-lifecycle-status the file's `status:` is outside the bug lifecycle
+ *   no-registry, no-row, row-malformed, ambiguous-row, engine-unavailable
+ *                          as for the tick
+ * Exit 2: usage error, including `--bug-status` with `--annotate`.
  */
 
 "use strict";
@@ -85,10 +122,54 @@ const fs = require("fs");
 const path = require("path");
 
 const DEFAULT_REGISTRY = "docs/tasks/task-registry.md";
+const DEFAULT_BUG_REGISTRY = "docs/bugs/bug-registry.md";
+
+/**
+ * The emoji vocabulary, keyed by lifecycle token. A consumer registry writes
+ * these where this repository writes the bare token. One definition: the CLI
+ * writes from it and the drift test normalises through it.
+ */
+const BUG_STATUS_LABELS = Object.freeze({
+  new: "🆕 New",
+  "in-progress": "🔧 In Progress",
+  "ready-for-qa": "🔍 Ready for QA",
+  reopened: "⚠️ Reopened",
+  closed: "✅ Closed",
+});
+
+const LABEL_TO_TOKEN = new Map(
+  Object.entries(BUG_STATUS_LABELS).map(([token, label]) => [
+    label.toLowerCase(),
+    token,
+  ]),
+);
+
+/** True when `cell` is one of the five labels, compared case-insensitively. */
+function isBugStatusLabel(cell) {
+  return LABEL_TO_TOKEN.has(
+    String(cell || "")
+      .trim()
+      .toLowerCase(),
+  );
+}
+
+/**
+ * A registry Status cell in either vocabulary → its lifecycle token, or null
+ * when it is neither a label nor a token. `parseRegistry` lowercases the cell,
+ * so the comparison is case-insensitive.
+ */
+function normaliseBugRegistryStatus(cell) {
+  const v = String(cell || "")
+    .trim()
+    .toLowerCase();
+  if (!v) return null;
+  if (LABEL_TO_TOKEN.has(v)) return LABEL_TO_TOKEN.get(v);
+  return Object.prototype.hasOwnProperty.call(BUG_STATUS_LABELS, v) ? v : null;
+}
 
 function usage(msg) {
   process.stderr.write(
-    `registry-tick: ${msg}\n\nUsage:\n  node registry-tick.js --file <document.md> [--registry <path>] [--dry-run] [--json]\n  node registry-tick.js --annotate --file <document.md> --pr <n> [--issue <ref>] [--registry <path>] [--dry-run] [--json]\n`,
+    `registry-tick: ${msg}\n\nUsage:\n  node registry-tick.js --file <document.md> [--registry <path>] [--dry-run] [--json]\n  node registry-tick.js --annotate --file <document.md> --pr <n> [--issue <ref>] [--registry <path>] [--dry-run] [--json]\n  node registry-tick.js --bug-status --file <bug.md> [--registry <path>] [--dry-run] [--json]\n`,
   );
   process.exitCode = 2;
 }
@@ -100,6 +181,7 @@ function parseArgs(argv) {
     dryRun: false,
     json: false,
     annotate: false,
+    bugStatus: false,
     pr: null,
     issue: null,
   };
@@ -120,6 +202,7 @@ function parseArgs(argv) {
       if (a === "--file") out.file = takeValue(a, i++);
       else if (a === "--registry") out.registry = takeValue(a, i++);
       else if (a === "--annotate") out.annotate = true;
+      else if (a === "--bug-status") out.bugStatus = true;
       else if (a === "--pr") out.pr = takeValue(a, i++);
       else if (a === "--issue") out.issue = takeValue(a, i++);
       else if (a === "--dry-run") out.dryRun = true;
@@ -193,7 +276,10 @@ function emit(opts, payload) {
   // `annotated`, every tick-mode outcome carries `ticked` — including the early
   // exits shared by both modes, which would otherwise report the other mode's
   // key and leave a `--json` consumer reading `undefined`.
-  if (opts.annotate) {
+  if (opts.bugStatus) {
+    if (payload.mirrored === undefined) payload.mirrored = false;
+    delete payload.ticked;
+  } else if (opts.annotate) {
     if (payload.annotated === undefined) payload.annotated = false;
     delete payload.ticked;
   } else if (payload.ticked === undefined) {
@@ -210,6 +296,16 @@ async function main() {
   if (opts.help) return usage("help");
   if (!opts.file) return usage("--file is required");
   if (!fs.existsSync(opts.file)) return usage(`--file not found: ${opts.file}`);
+  if (opts.bugStatus) {
+    // Two different writes to two different registries; one call cannot be both.
+    if (opts.annotate) {
+      return usage("--bug-status and --annotate select different writes");
+    }
+    if (opts.pr !== null || opts.issue !== null) {
+      return usage("--pr and --issue are only meaningful with --annotate");
+    }
+    return bugStatus(opts);
+  }
   if (opts.annotate) {
     // The PR number is the one fact the annotate write exists to record; an
     // annotate call without it has nothing to write and is a caller bug, not a
@@ -381,38 +477,12 @@ async function main() {
     });
   }
 
-  // Rewrite the one cell, in the one line the parser identified. The status
-  // cell is found by matching the value the parser reported rather than by a
-  // column index, so this never needs its own copy of the header mapping. When
-  // more than one cell carries that value the column is genuinely ambiguous —
-  // refuse rather than guess, because guessing here corrupts the registry, and a
-  // wrong row is worse than a stale one.
-  // Split KEEPING the separators, so every byte this call does not deliberately
-  // change survives untouched.
-  //
-  // The obvious form — `split(/\r?\n/)` then `join("\n")` — silently rewrites a
-  // CRLF registry as LF: every line changes, turning a one-cell tick into a
-  // whole-file diff, and invisible in a rendered diff view. Guessing the file's
-  // ending instead (`includes("\r\n") ? … : …`) fixes the common case and gets a
-  // MIXED-ending file exactly backwards, converting its LF lines to CRLF.
-  //
-  // Keeping the separators removes the question rather than answering it: only
-  // one line is ever rewritten, so nothing else can be reflowed by accident.
-  // `parts[i * 2]` is line `i`; `parts[i * 2 + 1]` is the separator that followed
-  // it.
-  const parts = registryText.split(/(\r?\n)/);
-  const idx = (row.line - 1) * 2;
-  const original = parts[idx];
-  const cells = original.split("|");
-  const hits = [];
-  for (let i = 0; i < cells.length; i++) {
-    if (cells[i].trim().toLowerCase() === row.registryStatus) hits.push(i);
-  }
-  if (hits.length !== 1) {
+  const rewrite = rewriteStatusCell(registryText, row, "accepted");
+  if (!rewrite.ok) {
     return emit(opts, {
       reason: "ambiguous-row",
       message:
-        `line ${row.line} has ${hits.length} cells reading \`${row.registryStatus}\` — ` +
+        `line ${row.line} has ${rewrite.hits} cells reading \`${row.registryStatus}\` — ` +
         `cannot tell which is the Status column. Tick it by hand.`,
       taskId,
       line: row.line,
@@ -421,23 +491,8 @@ async function main() {
     });
   }
 
-  // Preserve the cell's total WIDTH, not merely its padding, so a column-aligned
-  // table keeps its alignment and the diff stays one visible change rather than a
-  // whole reflowed row. The length delta is absorbed by the TRAILING padding —
-  // the leading run is kept verbatim because it is what separates the value from
-  // the pipe.
-  //
-  // Two boundaries, both deliberate:
-  //   - a cell with no trailing whitespace at all (`|planned|`) gets none back,
-  //     rather than acquiring a space it never had;
-  //   - a cell too narrow to hold `accepted` keeps one separating space and the
-  //     row widens. Alignment is worth preserving, never worth corrupting a value
-  //     to achieve.
-  setCell(cells, hits[0], "accepted");
-  parts[idx] = cells.join("|");
-
   if (!opts.dryRun) {
-    fs.writeFileSync(registryRel, parts.join(""), "utf8");
+    fs.writeFileSync(registryRel, rewrite.text, "utf8");
   }
 
   return emit(opts, {
@@ -448,6 +503,186 @@ async function main() {
     from: row.registryStatus,
     to: "accepted",
     ticked: !opts.dryRun,
+    exitCode: 0,
+  });
+}
+
+/**
+ * Rewrite the Status cell of `row` in `registryText` to `value`, and return the
+ * whole new text — `{ok: true, text}` — or `{ok: false, hits}` when the cell
+ * cannot be identified. The one implementation of the row rewrite: the tick and
+ * `--bug-status` both call it.
+ *
+ * The status cell is found by matching the value the parser reported rather
+ * than by a column index, so this never needs its own copy of the header
+ * mapping. When more than one cell carries that value the column is genuinely
+ * ambiguous — refuse rather than guess, because guessing here corrupts the
+ * registry, and a wrong row is worse than a stale one.
+ *
+ * Split KEEPING the separators, so every byte this call does not deliberately
+ * change survives untouched. The obvious form — `split(/\r?\n/)` then
+ * `join("\n")` — silently rewrites a CRLF registry as LF: every line changes,
+ * turning a one-cell tick into a whole-file diff, and invisible in a rendered
+ * diff view. Guessing the file's ending instead (`includes("\r\n") ? … : …`)
+ * fixes the common case and gets a MIXED-ending file exactly backwards,
+ * converting its LF lines to CRLF. Keeping the separators removes the question
+ * rather than answering it: only one line is ever rewritten, so nothing else
+ * can be reflowed by accident. `parts[i * 2]` is line `i`; `parts[i * 2 + 1]` is
+ * the separator that followed it.
+ *
+ * The cell keeps its total WIDTH where the new value fits (`setCell`), so a
+ * column-aligned table keeps its alignment and the diff stays one visible
+ * change rather than a whole reflowed row.
+ */
+function rewriteStatusCell(registryText, row, value) {
+  const parts = registryText.split(/(\r?\n)/);
+  const idx = (row.line - 1) * 2;
+  const cells = parts[idx].split("|");
+  const hits = [];
+  for (let i = 0; i < cells.length; i++) {
+    if (cells[i].trim().toLowerCase() === row.registryStatus) hits.push(i);
+  }
+  if (hits.length !== 1) return { ok: false, hits: hits.length };
+  setCell(cells, hits[0], value);
+  parts[idx] = cells.join("|");
+  return { ok: true, text: parts.join("") };
+}
+
+/**
+ * The `--bug-status` write: mirror a general bug file's `status:` into its
+ * registry row, in the registry's own vocabulary. See the header.
+ */
+async function bugStatus(opts) {
+  const base = path.basename(opts.file);
+  // A GENERAL bug's basename starts with `bug.{N}.`; a task or story bug
+  // (`task.67.bug.3.…`) carries its parent's stem first and has no registry
+  // row — its parent's Bug Reports list is its index. The guard lives in the
+  // writer, so a caller never has to branch on the bug's mode.
+  const general = base.match(/^bug\.(\d+)\./);
+  const docText = fs.readFileSync(opts.file, "utf8");
+  const docType = (frontmatterField(docText, "type") || "").toLowerCase();
+  if (!general || (docType && docType !== "bug")) {
+    return emit(opts, {
+      reason: "not-a-general-bug",
+      message: `${base} is not a general bug (bug.{N}.…, type=${docType || "unset"}) — no bug-registry row applies`,
+      exitCode: 0,
+    });
+  }
+  const bugId = Number(general[1]);
+
+  const registryRel = opts.registry || DEFAULT_BUG_REGISTRY;
+  if (!fs.existsSync(registryRel)) {
+    return emit(opts, {
+      reason: "no-registry",
+      message: `no registry at ${registryRel} — this project does not keep one`,
+      bugId,
+      exitCode: 0,
+    });
+  }
+
+  const selector = locateSelector(path.dirname(path.resolve(registryRel)));
+  if (!selector) {
+    return emit(opts, {
+      reason: "engine-unavailable",
+      message:
+        "could not locate skills/develop-next/scripts/select-next.mjs — the registry parser is imported, never reimplemented, so the row is not written. Edit its Status cell by hand.",
+      bugId,
+      exitCode: 0,
+    });
+  }
+
+  const { pathToFileURL } = require("url");
+  const { parseRegistry, BUG_LIFECYCLE_STATUSES } = await import(
+    pathToFileURL(selector).href
+  );
+
+  // `frontmatterField` already drops a trailing `# comment`, which every bug
+  // file carries on this line (`status: closed # bug lifecycle: …`).
+  const status = (frontmatterField(docText, "status") || "").toLowerCase();
+  if (!BUG_LIFECYCLE_STATUSES.has(status)) {
+    return emit(opts, {
+      reason: "not-a-lifecycle-status",
+      message: `bug ${bugId} reads \`${status || "(no status)"}\` — outside the bug lifecycle (${[...BUG_LIFECYCLE_STATUSES].join(", ")}). Fix the file's status`,
+      bugId,
+      status: status || null,
+      exitCode: 0,
+    });
+  }
+
+  const registryText = fs.readFileSync(registryRel, "utf8");
+  const { rows, malformed } = parseRegistry(registryText, "bug", registryRel);
+  const row = rows.find((r) => r.n === bugId);
+  if (!row) {
+    const rejected = (malformed || []).find((m) => m.n === bugId);
+    if (rejected) {
+      return emit(opts, {
+        reason: "row-malformed",
+        message: `registry ${registryRel} line ${rejected.line} is bug ${bugId}'s row, but the parser rejected it: ${rejected.reason}`,
+        bugId,
+        line: rejected.line,
+        parserReason: rejected.reason,
+        exitCode: 0,
+      });
+    }
+    return emit(opts, {
+      reason: "no-row",
+      message: `registry ${registryRel} has no row for bug ${bugId}`,
+      bugId,
+      exitCode: 0,
+    });
+  }
+
+  // The vocabulary comes from the OTHER rows: the target row is the one that
+  // may be stale or hand-written in the wrong form, so it gets no vote. A
+  // strict majority of labels is needed for a label; a tie or an empty
+  // registry writes the token.
+  const others = rows.filter((r) => r.n !== bugId);
+  const labelled = others.filter((r) => isBugStatusLabel(r.registryStatus));
+  const vocabulary =
+    others.length > 0 && labelled.length * 2 > others.length
+      ? "label"
+      : "token";
+  const to = vocabulary === "label" ? BUG_STATUS_LABELS[status] : status;
+
+  const current = normaliseBugRegistryStatus(row.registryStatus);
+  const inVocabulary =
+    (vocabulary === "label") === isBugStatusLabel(row.registryStatus);
+  if (current === status && inVocabulary) {
+    return emit(opts, {
+      reason: "already",
+      message: `bug ${bugId} row (line ${row.line}) already reads \`${to}\``,
+      bugId,
+      line: row.line,
+      status,
+      vocabulary,
+      exitCode: 0,
+    });
+  }
+
+  const rewrite = rewriteStatusCell(registryText, row, to);
+  if (!rewrite.ok) {
+    return emit(opts, {
+      reason: "ambiguous-row",
+      message:
+        `line ${row.line} has ${rewrite.hits} cells reading \`${row.registryStatus}\` — ` +
+        `cannot tell which is the Status column. Edit it by hand.`,
+      bugId,
+      line: row.line,
+      exitCode: 0,
+    });
+  }
+  if (!opts.dryRun) fs.writeFileSync(registryRel, rewrite.text, "utf8");
+
+  return emit(opts, {
+    reason: opts.dryRun ? "dry-run" : "mirrored",
+    message: `bug ${bugId} row (line ${row.line}): \`${row.registryStatus}\` → \`${to}\`${opts.dryRun ? " (dry run — not written)" : ""}`,
+    bugId,
+    line: row.line,
+    from: row.registryStatus,
+    to,
+    status,
+    vocabulary,
+    mirrored: !opts.dryRun,
     exitCode: 0,
   });
 }
@@ -664,9 +899,17 @@ function annotate(
   });
 }
 
-main().catch((err) => {
-  process.stderr.write(
-    `registry-tick: ${err && err.stack ? err.stack : err}\n`,
-  );
-  process.exitCode = 2;
-});
+// Run only as a CLI. The drift test requires this file for the label map, and
+// requiring it must neither print nor write. `require.main === module` compares
+// module objects, so it holds however the file is reached — a symlinked
+// `.agents/skills` path included (bug 16 was the ESM argv-path guard).
+if (require.main === module) {
+  main().catch((err) => {
+    process.stderr.write(
+      `registry-tick: ${err && err.stack ? err.stack : err}\n`,
+    );
+    process.exitCode = 2;
+  });
+}
+
+module.exports = { BUG_STATUS_LABELS, normaliseBugRegistryStatus };
