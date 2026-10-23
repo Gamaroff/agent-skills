@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Changed
+
+- **`/finalise` halts when `[Unreleased]` does not cite the task.** Step 7 action 6d used to warn
+  `no-changelog-entry` and carry on. It now HALTs with that token, after the acceptance commit and
+  push and before the PR comment and tracker close. Add the `(task N)` entry, commit, push and
+  re-run `/finalise`; it picks up from 6a. Stories and bugs are not checked. The release checklist
+  line that scheduled this flip is gone, and `docs/contributing/releases.md` now states the
+  pre-1.0 rule: a breaking change takes a minor bump until v1.0.0.
+
 ## [v0.59.0] - 2026-10-23
 
 ### Added
