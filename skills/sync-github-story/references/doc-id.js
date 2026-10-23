@@ -483,7 +483,15 @@ const PRD_COUNTER_RE =
   /\*\*Next Available PRD Number:?\*\*:?\s*\*\*([^*]*)\*\*/;
 
 // The selector's id-column aliases (select-next.mjs COLUMN_ALIASES → "n" / "title").
-const N_ALIASES = Object.freeze(["#", "prd #", "no", "num", "number", "id"]);
+const N_ALIASES = Object.freeze([
+  "#",
+  "prd #",
+  "no",
+  "num",
+  "number",
+  "task number",
+  "id",
+]);
 const TITLE_ALIASES = Object.freeze(["title", "name"]);
 
 /**

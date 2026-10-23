@@ -1149,6 +1149,27 @@ test("bug.19: a plain-title registry with a Document column ticks — never `no-
   }
 });
 
+test("a `Task Number … File` registry ticks — the id header is read by name", () => {
+  // Same shape as the Document-column registry above, headed `Task Number` and `File`.
+  // Before `task number` was an id alias, every row here was `row-malformed`.
+  const { dir, registry } = rawSandbox([
+    "| Task Number | Title | Category | Priority | Icon | Status | Tracker | File |",
+    "|---|---|---|---|---|---|---|---|",
+    docColumnRow(49, "tn", "ready-for-review"),
+  ]);
+  try {
+    const f = writeDoc(dir, 49, "tn", { status: "accepted" });
+    const res = run(dir, ["--file", path.relative(dir, f)]);
+    assert.equal(res.reason, "ticked");
+    const line = readFileSync(registry, "utf8")
+      .split("\n")
+      .find((l) => l.startsWith("| 49 |"));
+    assert.match(line, /\| accepted +\|/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("bug.19: a row the parser rejects reports `row-malformed` with the parser's reason and line", () => {
   // Plain title and no document column: the parser has nowhere to find a path.
   const { dir, registry } = rawSandbox([

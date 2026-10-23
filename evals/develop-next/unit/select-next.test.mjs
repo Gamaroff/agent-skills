@@ -3314,6 +3314,30 @@ test("bug.19: a code-span path in a Document column is read from the repo root",
   assert.equal(p.rows[0].priority, "High");
 });
 
+test("a `Task Number` header names the id column, so a File-column registry parses", () => {
+  // A consumer registry headed `| Task Number | … | File |`. Without the alias the
+  // header failed `mapHeader`, the positional defaults applied, and every row was
+  // malformed for want of a title link, so `registry-tick.js` answered `no-row`
+  // for a row that was there.
+  const p = parseRegistry(
+    [
+      "| Task Number | Title | Category | Priority |      | Status   | Jira  | File |",
+      "| ----------- | ----- | -------- | -------- | ---- | -------- | ----- | ---- |",
+      "| 12          | Plain title 12 | documentation | Medium | ✅ | accepted | X-12 | `docs/tasks/task.12.x/task.12.x.md` |",
+      "",
+    ].join("\n"),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.deepEqual(p.malformed, []);
+  assert.deepEqual(p.warnings, []);
+  assert.equal(p.rows.length, 1);
+  assert.equal(p.rows[0].n, 12);
+  assert.equal(p.rows[0].path, "docs/tasks/task.12.x/task.12.x.md");
+  assert.equal(p.rows[0].registryStatus, "accepted");
+  assert.equal(p.rows[0].priority, "Medium");
+});
+
 test("bug.19: a link or a ./-relative path in the Document column resolves against the registry", () => {
   const p = parseRegistry(
     docColumnRegistry([
