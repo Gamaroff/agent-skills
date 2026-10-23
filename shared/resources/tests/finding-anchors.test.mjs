@@ -35,6 +35,7 @@ const {
   makeReader,
   findingsOf,
   lensesOf,
+  run,
   MALFORMED,
 } = createRequire(import.meta.url)(ENGINE);
 
@@ -364,10 +365,11 @@ test("SC-7: each distinct path is read once per run", () => {
 
 // ---------------------------------------------------------------- CLI
 
-function cli(args, cwd) {
+function cli(args, cwd, env) {
   const r = spawnSync(process.execPath, [ENGINE, ...args], {
     cwd,
     encoding: "utf8",
+    env: env ? { ...process.env, ...env } : process.env,
   });
   return {
     code: r.status,
@@ -1017,14 +1019,170 @@ test("--index with --rev exits 2 usage; --index outside a git work tree exits 2 
     );
     assert.equal(both.code, 2);
     assert.equal(both.json().reason, "usage");
+    // GIT_CEILING_DIRECTORIES: when TMPDIR sits inside a git checkout, git would otherwise find
+    // that checkout above `plain` and the call would not be "outside a work tree" (task.217).
     const outside = cli(
       ["--findings-file", f, "--root", plain, "--index", "--json"],
       plain,
+      { GIT_CEILING_DIRECTORIES: path.dirname(plain) },
     );
     assert.equal(outside.code, 2);
     assert.equal(outside.json().reason, "bad-root");
   } finally {
     rmSync(dir, { recursive: true, force: true });
     rmSync(plain, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------- task.217
+
+/** `run` in-process with a counting `exec`, capturing what it writes. */
+function runCounted(args) {
+  const calls = [];
+  const exec = (...a) => {
+    calls.push(a);
+    return execFileSync(...a);
+  };
+  const out = [];
+  const write = process.stdout.write;
+  const errWrite = process.stderr.write;
+  process.stdout.write = (c) => (out.push(String(c)), true);
+  process.stderr.write = (c) => (out.push(String(c)), true);
+  const saved = process.exitCode;
+  let code;
+  try {
+    run(args, { exec });
+    code = process.exitCode;
+  } finally {
+    process.stdout.write = write;
+    process.stderr.write = errWrite;
+    process.exitCode = saved;
+  }
+  return { code, calls, json: () => JSON.parse(out.join("")) };
+}
+
+const NON_OBJECTS = [null, "x", 1, true, []];
+
+test("task.217: a non-object finding on either lens exits 2 usage naming lens and index, reads no file, annotates nothing", () => {
+  const dir = scratch();
+  try {
+    for (const lens of ["code_review", "pr_conformance"]) {
+      for (const bad of NON_OBJECTS) {
+        const f = path.join(dir, "f.json");
+        const out = path.join(dir, "annotated.json");
+        rmSync(out, { force: true });
+        writeFileSync(f, JSON.stringify({ [lens]: { findings: [bad] } }));
+        // --index makes checkTree call exec, so a refusal that ran after it would count a call.
+        const r = runCounted([
+          "--findings-file",
+          f,
+          "--root",
+          dir,
+          "--index",
+          "--annotate",
+          out,
+          "--json",
+        ]);
+        const label = `${lens} ${JSON.stringify(bad)}`;
+        assert.equal(r.code, 2, label);
+        assert.equal(r.json().reason, "usage", label);
+        assert.match(
+          r.json().message,
+          new RegExp(`^${lens}\\.findings\\[0\\] is not an object`),
+          label,
+        );
+        assert.equal(r.calls.length, 0, `${label}: no exec before the refusal`);
+        assert.throws(
+          () => readFileSync(out),
+          /ENOENT/,
+          `${label}: nothing annotated`,
+        );
+      }
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("task.217: a null finding through the CLI is usage, not a crash read as 'not runnable'", () => {
+  const dir = scratch();
+  try {
+    const f = path.join(dir, "f.json");
+    writeFileSync(f, JSON.stringify({ code_review: { findings: [null] } }));
+    const r = cli(["--findings-file", f, "--root", dir, "--json"], dir);
+    assert.equal(r.code, 2);
+    assert.equal(r.json().reason, "usage");
+    assert.equal(r.err, "", "no stack trace");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("task.217: a valid finding before the bad one does not mask it; the index is within the lens", () => {
+  const dir = scratch();
+  try {
+    const f = path.join(dir, "f.json");
+    writeFileSync(
+      f,
+      JSON.stringify({
+        code_review: {
+          findings: [{ id: "CR-1", file_line: "scripts/smoke/slugify.js:8" }],
+        },
+        pr_conformance: { findings: [{ id: "PC-1", ref: "AC-1" }, "x"] },
+      }),
+    );
+    const r = cli(["--findings-file", f, "--root", dir, "--json"], dir);
+    assert.equal(r.code, 2);
+    assert.match(
+      r.json().message,
+      /^pr_conformance\.findings\[1\] is not an object/,
+    );
+    const bare = path.join(dir, "bare.json");
+    writeFileSync(bare, JSON.stringify([{ id: "x", file_line: "a.js:1" }, 7]));
+    const b = cli(["--findings-file", bare, "--root", dir, "--json"], dir);
+    assert.equal(b.code, 2);
+    assert.match(b.json().message, /^\[1\] is not an object/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("task.217: --annotate stamps a wrapped document with the total finding count; a bare array gets none", () => {
+  const dir = scratch();
+  try {
+    const f = path.join(dir, "f.json");
+    writeFileSync(
+      f,
+      JSON.stringify({
+        code_review: {
+          findings: [
+            { id: "CR-1", file_line: "scripts/smoke/slugify.js:8" },
+            { id: "CR-2", file_line: "scripts/smoke/slugify.js:77" },
+          ],
+        },
+        pr_conformance: { findings: [{ id: "PC-1", ref: "AC-3" }] },
+      }),
+    );
+    cli(["--findings-file", f, "--root", dir, "--annotate", f, "--json"], dir);
+    assert.deepEqual(JSON.parse(readFileSync(f, "utf8")).anchor_checked, {
+      by: "finding-anchors",
+      findings: 3,
+    });
+    const bare = path.join(dir, "bare.json");
+    writeFileSync(
+      bare,
+      JSON.stringify([{ id: "x", file_line: "scripts/smoke/slugify.js:8" }]),
+    );
+    const b = cli(
+      ["--findings-file", bare, "--root", dir, "--annotate", bare, "--json"],
+      dir,
+    );
+    assert.equal(b.code, 0);
+    const doc = JSON.parse(readFileSync(bare, "utf8"));
+    assert.ok(Array.isArray(doc), "a bare array stays a bare array");
+    assert.equal(doc[0].anchor_check, "unchecked-text");
+    assert.equal(doc.anchor_checked, undefined);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });

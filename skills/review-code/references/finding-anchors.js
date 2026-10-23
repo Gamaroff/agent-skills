@@ -41,7 +41,7 @@
  *                   (`x.ts:42-58`), empty, absent. The code lens's contract is one line, so a
  *                   value that does not parse is the reviewer breaking it (task.195)
  *
- * The first three are clean; the last four are malformed — "the reviewer is
+ * The first three are clean (`CLEAN`); the last four are malformed (`MALFORMED`) — "the reviewer is
  * wrong" — and are kept apart from `no-line` ("nothing to verify") on purpose.
  *
  * ## Which lens — the wrapper when there is one, else the key
@@ -79,7 +79,15 @@
  * both together, or a bare array of findings. `--annotate` writes the same JSON back
  * to `<out-file>` (which may be the input) with each finding carrying
  * `anchor_check: <verdict>`. The key is `anchor_check`, not `anchor`: `/review-pr`'s
- * `--inline` jq already uses `anchor` for the `path:line`.
+ * `--inline` jq already uses `anchor` for the `path:line`. A wrapped document also gains a
+ * top-level `anchor_checked: {by: "finding-anchors", findings: <count>}` stamp, which only this
+ * engine writes: the `--inline` guards require it, so a reviewer that writes `anchor_check` itself,
+ * with no checker run, is refused (task.217). A bare array has no top level and gets no stamp;
+ * neither `--inline` guard reads a bare array.
+ *
+ * Every finding is an object. A findings array holding anything else (null, a string, a number, a
+ * boolean, an array) is a malformed review, refused as `usage` naming the lens and the index,
+ * before any file is read and with nothing annotated (task.217).
  *
  * Exit codes: 0 every anchor is ok / unchecked-text / no-line (`reason: ok`);
  * 1 any is malformed (`reason: malformed-anchors`) — a caller marks and continues,
@@ -100,6 +108,9 @@ const MALFORMED = new Set([
   "text-mismatch",
   "unparseable",
 ]);
+
+/** The three clean verdicts. With `MALFORMED`, the whole verdict set: a test derives it from here. */
+const CLEAN = new Set(["ok", "unchecked-text", "no-line"]);
 
 /**
  * How every finding field the checker reads is read, in one place (task.195 QA4): `absent`
@@ -420,6 +431,24 @@ function run(argv, deps = {}) {
       "--findings-file holds no findings array for every lens present (code_review.findings, pr_conformance.findings, or a bare array)",
     );
   }
+  // A finding is an object. null crashed checkAnchors on `f.id` and read as "not runnable"; a
+  // string read no-line/unparseable and --annotate skipped it, so the --inline guard then HALTed
+  // naming the wrong cause (task.195 gates 2–3). Refused here, before any file is read (task.217).
+  const lenses = lensesOf(doc);
+  const bad = findings.findIndex(
+    (f) => f === null || typeof f !== "object" || Array.isArray(f),
+  );
+  if (bad !== -1) {
+    let where = `[${bad}]`;
+    if (lenses) {
+      const wrapper = lenses[bad] === "code" ? "code_review" : "pr_conformance";
+      where = `${wrapper}.findings[${bad - lenses.indexOf(lenses[bad])}]`;
+    }
+    return usage(
+      opts,
+      `${where} is not an object (${JSON.stringify(findings[bad])}) — every finding is an object`,
+    );
+  }
   const tree = checkTree(
     { root: opts.root, rev: opts.rev, index: opts.index },
     deps.exec,
@@ -440,16 +469,17 @@ function run(argv, deps = {}) {
     index: opts.index,
     exec: deps.exec,
   });
-  const results = checkAnchors(findings, {
-    readFile,
-    lenses: lensesOf(doc),
-  });
+  const results = checkAnchors(findings, { readFile, lenses });
   const malformed = results.filter((r) => MALFORMED.has(r.verdict));
 
   if (opts.annotate) {
     findings.forEach((f, i) => {
-      if (f && typeof f === "object") f.anchor_check = results[i].verdict;
+      f.anchor_check = results[i].verdict; // every finding is an object: refused above otherwise
     });
+    // Only the checker writes this; the --inline guards require it and its count (task.217). A bare
+    // array has no top level to stamp, and neither --inline guard reads one.
+    if (!Array.isArray(doc))
+      doc.anchor_checked = { by: "finding-anchors", findings: results.length };
     fs.writeFileSync(opts.annotate, JSON.stringify(doc, null, 2) + "\n");
   }
 
@@ -476,6 +506,7 @@ module.exports = {
   parseArgs,
   run,
   MALFORMED,
+  CLEAN,
   resolveRev,
   checkTree,
 };

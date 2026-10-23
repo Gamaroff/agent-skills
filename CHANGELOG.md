@@ -4,6 +4,34 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+
+- **An inline review comment now posts only an anchor the checker verified (task 217).** Nine
+  follow-ups from task.195's QA gates:
+  - **Breaking: the `--inline` guards of `/review-pr` and `/review-code` require the checker's
+    stamp.** `finding-anchors.js --annotate` now writes
+    `anchor_checked: {by: "finding-anchors", findings: N}` beside the lens wrappers. The guards
+    require that stamp, a count equal to the findings present, and an `anchor_check` from the
+    checker's seven verdicts. A reviewer that wrote `anchor_check: "ok"` itself, with no checker
+    run, used to get its findings posted inline as verified. A findings file annotated by an older
+    engine now HALTs the inline post with the existing "run the anchor check first" message;
+    re-run the checker step. The summary comment still posts.
+  - **Breaking: a non-object finding is refused as `usage`.** A `null` finding crashed the checker,
+    which the dispatcher reported as "not runnable". A string finding read `no-line` but was never
+    annotated, so the guard then named the wrong cause. Both now exit 2 with `reason: usage`, naming
+    the lens and the index, before any file is read and with nothing annotated.
+  - The inline selectors parse an anchor as the checker does: trimmed, split at the **last**
+    colon. A path containing a colon used to post to the wrong file, and a padded `file_line`
+    posted a path starting with spaces.
+  - `/review-code --staged --fix` skips a finding whose file differs between the working tree and
+    the index. The anchor was checked against the staged content, and the fix lands on the working
+    tree.
+  - `/review-code`'s `--inline` block binds `PR_NUMBER` and `SUMMARY_FILE`, makes its scratch file
+    after the guard and removes it. As written it read three variables nothing bound.
+  - The checker-blocks test derives the dispatcher population from the tree, and a test holds every
+    restated verdict list to the engine's own set. The `--index` outside-a-work-tree test passes when
+    `TMPDIR` sits inside a git checkout.
+
 ## [v0.60.0] - 2026-10-23
 
 ### Added

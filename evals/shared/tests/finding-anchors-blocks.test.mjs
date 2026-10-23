@@ -29,8 +29,11 @@ import {
   rmSync,
   symlinkSync,
   chmodSync,
+  readdirSync,
+  existsSync,
 } from "node:fs";
 import { spawnSync, execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -170,6 +173,96 @@ const verdict = (annotated) =>
 
 test("the dispatcher population is the four skills that run the checker", () => {
   for (const skill of DISPATCHERS) checkerBlock(skill);
+});
+
+/**
+ * Does this fenced block INVOKE the checker? Only a command line counts: a `#` comment naming
+ * `finding-anchors.js` — as every `--inline` block's does — is a mention, not a dispatch, and the
+ * key is shared with prose (obs #135). `node` or `command node`, any path prefix.
+ */
+const invokesChecker = (block) =>
+  block
+    .split("\n")
+    .some(
+      (l) =>
+        !/^\s*#/.test(l) &&
+        /(?:^|[\s;&|(])node\s+\S*finding-anchors\.js\b/.test(l),
+    );
+
+test("invokesChecker: a command line counts; a comment-only mention does not (control)", () => {
+  assert.equal(
+    invokesChecker(
+      "command node .agents/skills/x/references/finding-anchors.js --json\n",
+    ),
+    true,
+  );
+  assert.equal(
+    invokesChecker("node finding-anchors.js --findings-file f\n"),
+    true,
+  );
+  assert.equal(
+    invokesChecker(
+      '# Step 6 — the file finding-anchors.js annotated; run `node finding-anchors.js` first\nFINDINGS_JSON="{findings-json}"\n',
+    ),
+    false,
+  );
+  assert.equal(invokesChecker("echo finding-anchors.js\n"), false);
+});
+
+// task.217 (task.195 gate 1 CR-5): DISPATCHERS was a hand-written list, so a fifth document that runs
+// the checker would never be tested. The population is derived from the tree and must equal it.
+test("the dispatcher population is derived from the tree and equals DISPATCHERS", () => {
+  const sources = [
+    ...readdirSync(path.join(ROOT, "skills"), { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map((d) => path.join("skills", d.name, "SKILL.md")),
+    ...readdirSync(path.join(ROOT, "shared", "resources"))
+      .filter((f) => f.endsWith(".md"))
+      .map((f) => path.join("shared", "resources", f)),
+  ].filter((rel) => existsSync(path.join(ROOT, rel)));
+  const derived = sources.filter((rel) =>
+    fencedBlocks(readFileSync(path.join(ROOT, rel), "utf8")).some(
+      invokesChecker,
+    ),
+  );
+  assert.ok(derived.length >= 4, `non-vacuity floor: found ${derived.length}`);
+  const asSkills = derived.map((rel) =>
+    rel.startsWith("skills/") ? rel.split("/")[1] : rel,
+  );
+  assert.deepEqual(new Set(asSkills), new Set(DISPATCHERS));
+});
+
+// task.217: the `--inline` guards and review-pr's schema restate the seven verdicts. Each copy must
+// equal the engine's own set — derived from its exports, never a third literal list here.
+test("every restated verdict list equals the engine's MALFORMED ∪ CLEAN", () => {
+  const { MALFORMED, CLEAN } = createRequire(import.meta.url)(ENGINE);
+  const engine = [...MALFORMED, ...CLEAN].sort();
+  assert.equal(engine.length, 7);
+  const copies = [];
+  for (const skill of ["review-pr", "review-code"]) {
+    const text = readFileSync(
+      path.join(ROOT, "skills", skill, "SKILL.md"),
+      "utf8",
+    );
+    for (const [, list] of text.matchAll(/\.anchor_check \| IN\(([^)]*)\)/g))
+      copies.push([
+        `${skill} --inline guard`,
+        list.match(/"([^"]+)"/g).map((q) => q.slice(1, -1)),
+      ]);
+    for (const [, list] of text.matchAll(/^\s*anchor_check: \{([^}]*)\}/gm))
+      copies.push([`${skill} schema`, list.split("|")]);
+  }
+  assert.deepEqual(
+    copies.map(([w]) => w).sort(),
+    [
+      "review-code --inline guard",
+      "review-pr --inline guard",
+      "review-pr schema",
+    ],
+    "the restatements this test holds",
+  );
+  for (const [where, list] of copies)
+    assert.deepEqual([...list].sort(), engine, where);
 });
 
 for (const skill of DISPATCHERS) {
