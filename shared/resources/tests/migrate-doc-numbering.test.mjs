@@ -1761,3 +1761,367 @@ test("task.211 QA-3 CR-2 CR-3 CR-5: the scan reads every in-scope non-literal fi
     "read once",
   );
 });
+
+// ---------------------------------------------------------------------------
+// --prd: one PRD at a time
+// ---------------------------------------------------------------------------
+
+const A_DOC = `${R}/alpha/prd.alpha.md`;
+const B_DOC = `${R}/beta/prd.beta.md`;
+const A_E = `${R}/alpha/epics/epic.1.one`;
+const A_S = `${A_E}/stories/story.1.1.first`;
+const B_E = `${R}/beta/epics/epic.2.two`;
+const B_S = `${B_E}/stories/story.2.1.second`;
+const NEW_A_DOC = `${R}/alpha/prd.1.alpha/prd.1.alpha.md`;
+const NEW_A_S = `${R}/alpha/prd.1.alpha/epics/epic.1.1.one/stories/story.1.1.1.first`;
+const EPIC_REG = "docs/development/epic-registry.md";
+
+function storyDoc(id, epicNumber, epicFile, prdSource, status = "accepted") {
+  return [
+    "---",
+    `id: ${id}`,
+    `status: ${status}`,
+    `epic: ${epicNumber}`,
+    `epic_file: ${epicFile}`,
+    `prd_source: ${prdSource}`,
+    "---",
+    `# ${id}`,
+    "",
+  ].join("\n");
+}
+
+/** Two legacy L2 PRDs, A and B, each with one epic and one story; B links into A. */
+function twoPrdTree({ header = "Epic #", extra = {} } = {}) {
+  return {
+    [A_DOC]:
+      "---\nname: prd.alpha\ntitle: Alpha\nstatus: draft\ncreated: 2026-01-01\n---\n# Alpha\n",
+    [B_DOC]: [
+      "---",
+      "name: prd.beta",
+      "title: Beta",
+      "status: draft",
+      "created: 2026-01-02",
+      "---",
+      "# Beta",
+      "",
+      "Builds on [Alpha](../alpha/prd.alpha.md) and [its first story](../alpha/epics/epic.1.one/stories/story.1.1.first/story.1.1.first.md).",
+      "",
+    ].join("\n"),
+    [`${A_E}/epic.1.one.md`]: `---\nepic_number: 1\ntitle: "One"\nprd_source: "${A_DOC}"\n---\n# One\n`,
+    [`${A_S}/story.1.1.first.md`]: storyDoc(
+      "story.1.1.first",
+      1,
+      "../../epic.1.one.md",
+      A_DOC,
+    ),
+    [`${B_E}/epic.2.two.md`]: `---\nepic_number: 2\ntitle: "Two"\nprd_source: "${B_DOC}"\n---\n# Two\n`,
+    [`${B_S}/story.2.1.second.md`]: storyDoc(
+      "story.2.1.second",
+      2,
+      "../../epic.2.two.md",
+      B_DOC,
+    ),
+    [EPIC_REG]: [
+      "---",
+      "name: epic-registry",
+      "type: registry",
+      "---",
+      "",
+      "# Epic Registry",
+      "",
+      `| ${header} | Tracker key | Folder | Title | Status |`,
+      "|---:|---|---|---|---|",
+      "| 1 | gh#1 | epic.1.one | One | Accepted |",
+      "| 2 | gh#2 | epic.2.two | Two | Accepted |",
+      "",
+    ].join("\n"),
+    ...extra,
+  };
+}
+
+test("--prd A: --apply moves A only and ends ok; B is byte-identical except its link into A, which is re-pointed", () => {
+  const before = twoPrdTree();
+  const io = memIo(before);
+  const r = m.run(["--apply", "--root", R, "--prd", A_DOC], { io });
+  assert.deepEqual(
+    [r.reason, r.exitCode],
+    ["ok", 0],
+    JSON.stringify(r.findings || r.blockers),
+  );
+  assert.deepEqual(r.scope, [A_DOC]);
+  assert.deepEqual(
+    r.mapping.map((x) => [x.kind, x.oldId, x.newId]),
+    [
+      ["prd", "prd.alpha", "1"],
+      ["epic", "1", "1.1"],
+      ["story", "story.1.1", "story.1.1.1"],
+    ],
+  );
+  assert.ok(io.files.has(NEW_A_DOC), "A moved");
+  assert.ok(io.files.has(`${NEW_A_S}/story.1.1.1.first.md`), "A's story moved");
+  for (const p of [`${B_E}/epic.2.two.md`, `${B_S}/story.2.1.second.md`])
+    assert.equal(io.files.get(p), before[p], `${p} is untouched`);
+  const b = io.files.get(B_DOC);
+  assert.match(b, /\[Alpha\]\(\.\.\/alpha\/prd\.1\.alpha\/prd\.1\.alpha\.md\)/);
+  assert.match(
+    b,
+    /\(\.\.\/alpha\/prd\.1\.alpha\/epics\/epic\.1\.1\.one\/stories\/story\.1\.1\.1\.first\/story\.1\.1\.1\.first\.md\)/,
+  );
+  assert.equal(
+    b.replace(/\]\([^)]*\)/g, "]()"),
+    before[B_DOC].replace(/\]\([^)]*\)/g, "]()"),
+    "only B's link targets changed",
+  );
+  // The re-pointed links resolve.
+  for (const { target } of extractRelativeLinks(b))
+    assert.ok(io.files.has(join(dirname(B_DOC), target)), target);
+  assert.deepEqual(
+    docId.registryNumbers(io.files.get(`${R}/prd-registry.md`)),
+    [1],
+  );
+});
+
+test("--prd A: the epic registry keeps B's row, records A's mapping, and is not retired", () => {
+  const io = memIo(twoPrdTree());
+  assert.equal(
+    m.run(["--apply", "--root", R, "--prd", A_DOC], { io }).reason,
+    "ok",
+  );
+  const reg = io.files.get(EPIC_REG);
+  assert.notEqual(docId.frontmatterField(reg, "status"), "retired");
+  const { rows, migrated } = m.epicRegistryRows(reg);
+  assert.deepEqual(
+    rows.map((x) => [x.n, x.folder]),
+    [["2", "epic.2.two"]],
+    "B's row stays in the epic table",
+  );
+  assert.deepEqual(
+    migrated.map((x) => [x.n, x.newId, x.prd, x.folder, x.tracker]),
+    [["1", "1.1", "prd.1.alpha", "epic.1.1.one", "gh#1"]],
+  );
+});
+
+test("--prd B after --prd A: ok, and the run that moves the last legacy epic retires the registry with both mappings", () => {
+  const io = memIo(twoPrdTree());
+  assert.equal(
+    m.run(["--apply", "--root", R, "--prd", A_DOC], { io }).reason,
+    "ok",
+  );
+  const r = m.run(["--apply", "--root", R, "--prd", B_DOC], { io });
+  assert.deepEqual(
+    [r.reason, r.exitCode],
+    ["ok", 0],
+    JSON.stringify(r.findings || r.blockers),
+  );
+  assert.deepEqual(
+    r.mapping.map((x) => [x.kind, x.oldId, x.newId]),
+    [
+      ["prd", "prd.beta", "2"],
+      ["epic", "2", "2.1"],
+      ["story", "story.2.1", "story.2.1.1"],
+    ],
+  );
+  const reg = io.files.get(EPIC_REG);
+  assert.equal(docId.frontmatterField(reg, "status"), "retired");
+  assert.match(
+    reg,
+    /\| 1 \| 1\.1 \| epic\.1\.1\.one \| gh#1 \| One \| Accepted \|/,
+  );
+  assert.match(
+    reg,
+    /\| 2 \| 2\.1 \| epic\.2\.1\.two \| gh#2 \| Two \| Accepted \|/,
+  );
+  assert.deepEqual(
+    docId.registryNumbers(io.files.get(`${R}/prd-registry.md`)),
+    [1, 2],
+  );
+  // The whole tree is migrated now: an unscoped check agrees.
+  assert.equal(m.run(["--check", "--root", R], { io }).reason, "already");
+});
+
+test("--prd: in-flight and dirty files in B do not block a run scoped to A; the same tree unscoped is blocked by them", () => {
+  const tree = twoPrdTree();
+  tree[`${B_S}/story.2.1.second.md`] = tree[
+    `${B_S}/story.2.1.second.md`
+  ].replace("status: accepted", "status: in-progress");
+  const dirty = [`${B_E}/epic.2.two.md`];
+  // Calibration: unscoped, the same B files are blockers — so the scoped pass below is not vacuous.
+  const whole = m.run(["--root", R], { io: memIo(tree, { dirty }) });
+  assert.deepEqual(whole.blockers.map((b) => [b.code, b.path]).sort(), [
+    ["dirty-path", `${B_E}/epic.2.two.md`],
+    ["in-flight", `${B_S}/story.2.1.second.md`],
+  ]);
+  const io = memIo(tree, { dirty });
+  const r = m.run(["--apply", "--root", R, "--prd", A_DOC], { io });
+  assert.deepEqual(
+    [r.reason, r.exitCode],
+    ["ok", 0],
+    JSON.stringify(r.blockers),
+  );
+  assert.ok(
+    !io.calls.dirtyAsked.some((p) => p.startsWith(`${R}/beta/epics/`)),
+    "nothing of B's epic is asked about",
+  );
+});
+
+test("--prd: blockers outside the scope — a PRD-less epic and a root PRD needing a domain — do not block it", () => {
+  const tree = twoPrdTree({
+    extra: {
+      [`${R}/prd.gamma.md`]: "---\nname: prd.gamma\n---\n# Gamma\n",
+      [`${R}/orphan/epics/epic.9.lost/epic.9.lost.md`]:
+        "---\nepic_number: 9\n---\n",
+    },
+  });
+  const whole = m.run(["--root", R], { io: memIo(tree) });
+  assert.deepEqual(whole.blockers.map((b) => b.code).sort(), [
+    "needs-domain",
+    "prd-less-epic",
+  ]);
+  const io = memIo(tree);
+  const r = m.run(["--apply", "--root", R, "--prd", A_DOC], { io });
+  assert.deepEqual(
+    [r.reason, r.exitCode],
+    ["ok", 0],
+    JSON.stringify(r.blockers || r.findings),
+  );
+  // A legacy epic remains (B's and the orphan), so the registry is not retired.
+  const reg = io.files.get(EPIC_REG);
+  assert.notEqual(docId.frontmatterField(reg, "status"), "retired");
+  assert.equal(m.epicRegistryRows(reg).migrated.length, 1);
+});
+
+test("--prd: --check reports needs-migration for the named PRD only, then already; unscoped still sees B", () => {
+  const io = memIo(twoPrdTree());
+  const c = m.run(["--check", "--root", R, "--prd", A_DOC], { io });
+  assert.deepEqual([c.reason, c.exitCode], ["needs-migration", 1]);
+  assert.deepEqual(
+    c.mapping.map((x) => x.old),
+    [A_DOC, A_E, A_S],
+  );
+  m.run(["--apply", "--root", R, "--prd", A_DOC], { io });
+  const after = m.run(["--check", "--root", R, "--prd", NEW_A_DOC], { io });
+  assert.deepEqual(
+    [after.reason, after.exitCode],
+    ["already", 0],
+    JSON.stringify(after.findings),
+  );
+  assert.equal(
+    m.run(["--check", "--root", R], { io }).reason,
+    "needs-migration",
+  );
+});
+
+test("--prd: a PRD create-prd made between scoped runs is not collided with", () => {
+  const io = memIo(twoPrdTree());
+  m.run(["--apply", "--root", R, "--prd", A_DOC], { io });
+  // create-prd allocates 2 from the registry the first scoped run bootstrapped.
+  const reg = io.files.get(`${R}/prd-registry.md`);
+  const n = docId.next("prd", ["prd.1.alpha"], reg).next;
+  assert.equal(n, 2);
+  io.files.set(
+    `${R}/prd-registry.md`,
+    docId.appendPrdRow(reg, {
+      n,
+      title: "Fresh",
+      href: "fresh/prd.2.fresh/prd.2.fresh.md",
+      folder: "fresh",
+      status: "draft",
+      created: "2026-02-01",
+    }),
+  );
+  io.files.set(
+    `${R}/fresh/prd.2.fresh/prd.2.fresh.md`,
+    "---\nname: prd.2.fresh\nprd_number: 2\ntype: prd\n---\n# Fresh\n",
+  );
+  const r = m.run(["--apply", "--root", R, "--prd", B_DOC], { io });
+  assert.deepEqual(
+    [r.reason, r.exitCode],
+    ["ok", 0],
+    JSON.stringify(r.findings || r.blockers),
+  );
+  assert.equal(r.mapping[0].newId, "3", "B takes the next free number, not 2");
+  assert.deepEqual(
+    docId.registryNumbers(io.files.get(`${R}/prd-registry.md`)),
+    [1, 2, 3],
+  );
+});
+
+test("--prd: a value naming no PRD document is usage; --prd= with nothing is usage", () => {
+  const io = memIo(twoPrdTree());
+  for (const argv of [
+    ["--prd", `${R}/alpha/nope.md`],
+    ["--prd", `${A_E}/epic.1.one.md`],
+    ["--prd="],
+    ["--prd"],
+  ]) {
+    const r = m.run(["--root", R, ...argv], { io });
+    assert.deepEqual([r.reason, r.exitCode], ["usage", 2], argv.join(" "));
+  }
+  assert.equal(io.calls.moves.length + io.calls.writes.length, 0);
+});
+
+test("--prd is repeatable: naming both PRDs is the whole-tree migration", () => {
+  const scoped = memIo(twoPrdTree());
+  const whole = memIo(twoPrdTree());
+  const a = m.run(["--apply", "--root", R, "--prd", B_DOC, "--prd", A_DOC], {
+    io: scoped,
+  });
+  const b = m.run(["--apply", "--root", R], { io: whole });
+  assert.deepEqual([a.reason, b.reason], ["ok", "ok"]);
+  assert.deepEqual([...scoped.files].sort(), [...whole.files].sort());
+});
+
+test("without --prd: two legacy PRDs migrate together and the epic registry is retired in one run", () => {
+  const io = memIo(twoPrdTree());
+  const r = m.run(["--apply", "--root", R], { io });
+  assert.deepEqual([r.reason, r.exitCode], ["ok", 0]);
+  assert.equal(r.scope, undefined, "no scope field without --prd");
+  assert.equal(r.counts.prds, 2);
+  assert.equal(
+    docId.frontmatterField(io.files.get(EPIC_REG), "status"),
+    "retired",
+  );
+});
+
+test("the epic registry's `Epic Number` header is read like `Epic #`", () => {
+  for (const header of ["Epic #", "Epic Number"]) {
+    const io = memIo(twoPrdTree({ header }));
+    assert.equal(m.run(["--apply", "--root", R], { io }).reason, "ok", header);
+    const reg = io.files.get(EPIC_REG);
+    assert.match(reg, /\| 1 \| 1\.1 \| epic\.1\.1\.one \| gh#1 \|/, header);
+    assert.match(reg, /\| 2 \| 2\.1 \| epic\.2\.1\.two \| gh#2 \|/, header);
+  }
+  const io = memIo(twoPrdTree({ header: "Epic Number" }));
+  m.run(["--apply", "--root", R, "--prd", A_DOC], { io });
+  const { rows, migrated } = m.epicRegistryRows(io.files.get(EPIC_REG));
+  assert.deepEqual([rows.length, migrated.length], [1, 1]);
+});
+
+test("--prd A in a real git repository: ok, B's tree untouched on disk, and the post-check judges A only", () => {
+  const { dir, g } = gitRepo(twoPrdTree());
+  try {
+    const r = m.run(["--apply", "--json", "--root", R, "--prd", A_DOC], {
+      cwd: dir,
+    });
+    assert.deepEqual(
+      [r.reason, r.exitCode],
+      ["ok", 0],
+      JSON.stringify(r.findings || r.blockers),
+    );
+    assert.equal(r.corpus.reason, "ok");
+    const status = g("status", "--porcelain");
+    assert.doesNotMatch(
+      status,
+      /beta\/epics/,
+      "nothing under B's epics changed",
+    );
+    assert.match(
+      status,
+      / M docs\/prd\/beta\/prd\.beta\.md/,
+      "B's link into A was re-pointed",
+    );
+    assert.ok(existsSync(join(dir, NEW_A_DOC)));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

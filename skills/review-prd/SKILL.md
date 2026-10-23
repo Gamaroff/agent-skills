@@ -411,10 +411,13 @@ the report and every fix would be written through the link. The four classes:
 # review-prd — numbering migration plan, read-only (task 204)
 # INPUT: MIG_NAME — empty, or one `<path>=<slug>` or `<path>=<domain>/<slug>` per line, one for
 # each PRD the plan cannot name or place (blockers unplaced-prd, needs-domain).
+# INPUT: MIG_PRD — empty (the whole tree), or one repo-relative PRD document per line (`--prd`):
+# only those PRDs, their epics and stories are planned — an incremental, one-PRD-at-a-time migration.
 MIGRATE=.agents/skills/review-prd/references/migrate-doc-numbering.mjs
 source .agents/skills/review-prd/references/resolve-paths.sh || exit 1
 NAME_ARGS=()
 while IFS= read -r pair; do [ -n "$pair" ] && NAME_ARGS+=(--name "$pair"); done <<< "${MIG_NAME:-}"
+while IFS= read -r doc; do [ -n "$doc" ] && NAME_ARGS+=(--prd "$doc"); done <<< "${MIG_PRD:-}"
 MIG=$(command node "$MIGRATE" --check --json --root "$PRD_ROOT" "${NAME_ARGS[@]}")
 MIG_RC=$?
 MIG_REASON=$(printf '%s' "$MIG" | jq -r '.reason // empty' 2>/dev/null)
@@ -438,6 +441,12 @@ printf '%s' "$MIG" | jq -r '"migration: \(.reason)",
 the `reason` alone:
 
 - **No blockers** → fold the planned renames into QUESTION POINT 1 as an apply/skip question.
+- **Every blocker belongs to another PRD** (its `path` is outside the directory of the PRD under review),
+  or the user wants to move one PRD at a time → plan again with `MIG_PRD` set to `$PRD_FILE`. A
+  `--prd` plan moves only that PRD, its epics and stories; links from other documents into it are still
+  re-pointed; blockers, the post-check and `needs-domain` judge only the moved set, so legacy PRDs left
+  behind block nothing and are not findings. The epic registry keeps the rows of epics still legacy and
+  is retired only by the run that moves the last one. Offer the apply with the same `MIG_PRD`.
 - **`unplaced-prd`** on a PRD the plan cannot name (a root-level `docs/prd.md`, a root `index.md`) →
   ask the user for its slug, add a `<path>=<slug>` line to `MIG_NAME` — one line per such PRD, keeping
   the ones already there — and run the plan again. For a root `index.md` ask for `<domain>/<slug>`
@@ -577,18 +586,20 @@ Report: `[PASS] CRs complete and specific` or `[FAIL] N CRs missing or vague: [l
 **Format**: Use `AskUserQuestion` with max 4 questions in one call. Use `multiSelect: true` for "which of these are intentional?" type questions.
 
 **Numbering migration** — when Step 2's numbering check fired and the migration plan has no
-blockers, one of the questions is *"Apply the numbering migration now?"*, showing the planned renames,
-with options **Apply** and **Skip**. Apply only on an explicit **Apply**, then run the
+blockers, one of the questions is *"Apply the numbering migration now?"*, showing the planned renames —
+and, when the plan was scoped with `MIG_PRD`, saying that only this PRD moves and the other legacy PRDs
+stay for later runs — with options **Apply** and **Skip**. Apply only on an explicit **Apply**, then run the
 [numbering check](#numbering-check) again — its results replace the numbering findings:
 
 ```bash
 # review-prd — apply the numbering migration (task 204)
-# Run ONLY after the user chose Apply. INPUT: MIG_NAME, as the plan used it.
+# Run ONLY after the user chose Apply. INPUT: MIG_NAME and MIG_PRD, as the plan used them.
 # --apply re-plans and refuses on any blocker (reason blocked) before it moves anything.
 MIGRATE=.agents/skills/review-prd/references/migrate-doc-numbering.mjs
 source .agents/skills/review-prd/references/resolve-paths.sh || exit 1
 NAME_ARGS=()
 while IFS= read -r pair; do [ -n "$pair" ] && NAME_ARGS+=(--name "$pair"); done <<< "${MIG_NAME:-}"
+while IFS= read -r doc; do [ -n "$doc" ] && NAME_ARGS+=(--prd "$doc"); done <<< "${MIG_PRD:-}"
 MIG=$(command node "$MIGRATE" --apply --json --root "$PRD_ROOT" "${NAME_ARGS[@]}")
 case $? in
   0) echo "migration: $(printf '%s' "$MIG" | jq -r '.reason') — re-run the numbering check" ;;

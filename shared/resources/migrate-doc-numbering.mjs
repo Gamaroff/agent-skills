@@ -35,9 +35,18 @@
  * CLI (exit codes: 0 = ok family, 1 = a guard tripped, 2 = usage — the contract of
  * tracker-comment.js and its peers):
  *   node migrate-doc-numbering.mjs [--apply | --check] [--json] [--root <dir>]
+ *                                  [--prd <path-to-prd-doc>]...
  *                                  [--name <path>=[<domain>/]<slug>]... [--allow-in-flight]
  *     --name names a PRD the plan cannot name, and with `<domain>/` places it under that
  *     domain directory — required for a PRD that would land directly under the root.
+ *     --prd (repeatable) migrates only the named PRDs, their epics, stories and artifacts,
+ *     so a large legacy tree can move one PRD at a time. The link and literal rewrite stays
+ *     repo-wide but covers only the paths that move; every blocker considers only the moved
+ *     set; the post-check counts findings under the migrated PRDs plus any duplicate-id, so
+ *     legacy documents left for a later run are not findings. The epic registry keeps the
+ *     rows of epics still legacy, moves the migrated ones to a "Migrated epics" table, and
+ *     is retired only by the run that moves the last legacy epic. A --prd value that names
+ *     no PRD document under the root is usage. Without --prd the whole tree is migrated.
  *     dry-run           0  the plan was printed; nothing was written (the default)
  *     ok                0  --apply wrote everything and checkCorpus is clean
  *     already           0  nothing to migrate and checkCorpus is clean
@@ -477,14 +486,18 @@ export function discover(root, io, opts = {}) {
  * @returns {object} { prds, epics, stories, fileMap, dirMap, docRules, mapping,
  *   blockers, registryText, newPrds }
  */
-export function plan(disc, registryText, io) {
+export function plan(disc, registryText, io, opts = {}) {
   const blockers = [];
   const root = disc.root;
+  // --prd: only the named PRDs (and so only their epics and stories) are planned. Every
+  // numbered PRD still feeds the P counter, so a scoped run never reuses a number.
+  const scope = opts.scope || null;
+  const inScope = (p) => !scope || scope.has(p.doc);
 
   // PRD numbers: a numbered PRD keeps P; the rest take the counter in path order.
   const numbered = disc.prds.filter((p) => !p.legacy);
   const legacy = disc.prds
-    .filter((p) => p.legacy)
+    .filter((p) => p.legacy && inScope(p))
     .sort((a, b) => a.doc.localeCompare(b.doc));
   let nextP = null;
   if (legacy.length) {
@@ -516,7 +529,7 @@ export function plan(disc, registryText, io) {
     }
   }
   const prdPlans = [];
-  for (const p of [...numbered, ...legacy]) {
+  for (const p of [...numbered.filter(inScope), ...legacy]) {
     let n = p.number;
     if (p.badName) {
       blockers.push(
@@ -614,7 +627,8 @@ export function plan(disc, registryText, io) {
   for (const e of disc.epics) {
     const owner = e.owner ? prdByEpicsDir.get(e.owner.epicsDir) : null;
     if (!e.owner) {
-      if (e.legacy)
+      // A PRD-less epic is outside every --prd scope, so it blocks only a whole-tree run.
+      if (e.legacy && !scope)
         blockers.push(
           blocker(
             "prd-less-epic",
@@ -624,7 +638,7 @@ export function plan(disc, registryText, io) {
         );
       continue;
     }
-    if (!owner) continue; // its PRD is blocked
+    if (!owner) continue; // its PRD is blocked, or outside the --prd scope
     if (!epicsByPrd.has(owner)) epicsByPrd.set(owner, []);
     epicsByPrd.get(owner).push(e);
   }
@@ -1520,38 +1534,143 @@ export function verify(planned, disc, io, opts = {}) {
 // 4. Apply
 // ---------------------------------------------------------------------------
 
-/** The epic-registry pointer, keeping the old table as a historical mapping. */
-export function epicRegistryPointer(oldText, planned, { rel, repoPath }) {
-  const lines = String(oldText || "").split("\n");
+const MIGRATED_EPICS_HEADING = "## Migrated epics";
+const MIGRATED_EPICS_HEADER = [
+  "| Old epic # | New id | PRD | Folder | Tracker key | Title | Status |",
+  "|---:|---|---|---|---|---|---|",
+];
+
+// A header cell naming the epic number: `Epic #` or `Epic Number`, read as one column.
+const epicNumberHeader = (c) =>
+  /^epic\s*#$/i.test(c) || /^epic\s+number$/i.test(c);
+
+/**
+ * The rows of an epic registry: `rows` from its epic table (header `Epic #` or `Epic
+ * Number`), `migrated` from the "Migrated epics" table a --prd run writes. Each row carries
+ * its line index, so a scoped run can lift it out. Pure.
+ */
+export function epicRegistryRows(text) {
+  const lines = String(text || "").split("\n");
   const rows = [];
+  const migrated = [];
   let header = null;
-  for (const l of lines) {
+  let kind = null;
+  lines.forEach((l, idx) => {
     const t = l.trim();
     if (!t.startsWith("|")) {
       header = null;
-      continue;
+      return;
     }
     const cells = t
       .replace(/^\|/, "")
       .replace(/\|\s*$/, "")
       .split("|")
       .map((c) => c.trim());
-    if (/^[\s:|-]+$/.test(t.replace(/\|/g, ""))) continue;
+    if (/^[\s:|-]+$/.test(t.replace(/\|/g, ""))) return;
     if (!header) {
-      if (cells.some((c) => /^epic\s*#$/i.test(c)))
+      if (cells.some(epicNumberHeader)) {
+        kind = "rows";
+        header = cells.map((c) =>
+          epicNumberHeader(c) ? "epic #" : c.toLowerCase(),
+        );
+      } else if (cells.some((c) => /^old\s+epic\s*#$/i.test(c))) {
+        kind = "migrated";
         header = cells.map((c) => c.toLowerCase());
-      continue;
+      }
+      return;
     }
     const get = (name) => cells[header.findIndex((h) => h === name)] || "—";
-    rows.push({
-      n: get("epic #"),
-      tracker: get("tracker key"),
-      folder: get("folder"),
-      title: get("title"),
-      status: get("status"),
-    });
+    if (kind === "migrated")
+      migrated.push({
+        idx,
+        n: get("old epic #"),
+        newId: get("new id"),
+        prd: get("prd"),
+        folder: get("folder"),
+        tracker: get("tracker key"),
+        title: get("title"),
+        status: get("status"),
+      });
+    else
+      rows.push({
+        idx,
+        n: get("epic #"),
+        tracker: get("tracker key"),
+        folder: get("folder"),
+        title: get("title"),
+        status: get("status"),
+      });
+  });
+  return { lines, rows, migrated };
+}
+
+/**
+ * The planned epic a registry row names: by folder, or for a legacy epic by its number —
+ * legacy epic numbers are global, so the number alone identifies one. A numbered epic is
+ * matched by folder only: its E counts within its PRD and can equal any legacy number.
+ */
+function epicOfRow(row, planned) {
+  const byFolder = planned.epics.find((e) => e.oldStem === row.folder);
+  if (byFolder) return byFolder;
+  const digits = String(row.n).match(/\d+/);
+  if (!digits) return null;
+  return (
+    planned.epics.find((e) => e.legacy && e.oldNumber === Number(digits[0])) ||
+    null
+  );
+}
+
+/**
+ * The epic registry after a --prd run that leaves legacy epics behind: it is NOT retired,
+ * because those epics still read their numbers from it. The moved epics' rows leave the
+ * epic table and are appended to a "Migrated epics" table (old id → new id, PRD), created
+ * the first time. Every other line is kept as it is. Pure.
+ */
+export function epicRegistryMigrated(oldText, planned) {
+  const { lines, rows } = epicRegistryRows(oldText);
+  const lift = new Set();
+  const added = [];
+  for (const r of rows) {
+    const e = epicOfRow(r, planned);
+    if (!e || e.dir === e.newDir) continue;
+    lift.add(r.idx);
+    added.push(
+      `| ${r.n} | ${e.prdPlan.n}.${e.E} | ${e.prdPlan.newStem} | ${e.newStem} | ${r.tracker} | ${r.title} | ${r.status} |`,
+    );
   }
-  const byOldStem = new Map(planned.epics.map((e) => [e.oldStem, e]));
+  const kept = lines.filter((_, i) => !lift.has(i));
+  if (!added.length) return kept.join("\n");
+  const at = kept.findIndex((l) => l.trim() === MIGRATED_EPICS_HEADING);
+  if (at >= 0) {
+    // Append after the last row of the table that follows the heading.
+    let end = at + 1;
+    while (end < kept.length && !kept[end].trim().startsWith("|")) end++;
+    while (end < kept.length && kept[end].trim().startsWith("|")) end++;
+    kept.splice(end, 0, ...added);
+    return kept.join("\n");
+  }
+  while (kept.length && kept[kept.length - 1].trim() === "") kept.pop();
+  kept.push(
+    "",
+    MIGRATED_EPICS_HEADING,
+    "",
+    "Epics moved to the hierarchical scheme one PRD at a time (`migrate-doc-numbering.mjs --prd`).",
+    "Their rows left the table above; each now counts within its PRD. This registry is retired",
+    "when the last legacy epic has moved.",
+    "",
+    ...MIGRATED_EPICS_HEADER,
+    ...added,
+    "",
+  );
+  return kept.join("\n");
+}
+
+/**
+ * The epic-registry pointer, keeping the old table as a historical mapping — and, after
+ * earlier --prd runs, the rows of their "Migrated epics" table after it.
+ */
+export function epicRegistryPointer(oldText, planned, { rel, repoPath }) {
+  const { rows, migrated } = epicRegistryRows(oldText);
   const out = [
     "---",
     "name: epic-registry",
@@ -1575,13 +1694,17 @@ export function epicRegistryPointer(oldText, planned, { rel, repoPath }) {
     "|---:|---|---|---|---|---|",
   ];
   for (const r of rows) {
-    const e = byOldStem.get(r.folder);
+    const e = epicOfRow(r, planned);
     const newId = e ? `${e.prdPlan.n}.${e.E}` : "—";
     const folder = e ? e.newStem : r.folder;
     out.push(
       `| ${r.n} | ${newId} | ${folder} | ${r.tracker} | ${r.title} | ${r.status} |`,
     );
   }
+  for (const r of migrated)
+    out.push(
+      `| ${r.n} | ${r.newId} | ${r.folder} | ${r.tracker} | ${r.title} | ${r.status} |`,
+    );
   out.push("");
   return out.join("\n");
 }
@@ -1815,6 +1938,7 @@ export function revertHint(touch, progress = null) {
 // ---------------------------------------------------------------------------
 
 const USAGE = `Usage: node migrate-doc-numbering.mjs [--apply | --check] [--json] [--root <dir>]
+                                      [--prd <path-to-prd-doc>]...
                                       [--name <path>=[<domain>/]<slug>]... [--allow-in-flight]`;
 
 function parseArgs(argv) {
@@ -1824,6 +1948,7 @@ function parseArgs(argv) {
     json: false,
     root: "",
     names: new Map(),
+    prds: [],
     allowInFlight: false,
     help: false,
   };
@@ -1845,6 +1970,11 @@ function parseArgs(argv) {
       a.root = x.slice(x.indexOf("=") + 1);
       if (a.root === "")
         throw new Error(`${x.slice(0, x.indexOf("="))} needs a value`);
+    } else if (x === "--prd") a.prds.push(P.normalize(val()));
+    else if (x.startsWith("--prd=")) {
+      const v = x.slice("--prd=".length);
+      if (v === "") throw new Error("--prd needs a value");
+      a.prds.push(P.normalize(v));
     } else if (x === "--name") {
       const v = val();
       const eq = v.lastIndexOf("=");
@@ -1921,11 +2051,31 @@ export function run(argv, ctx = {}) {
       exitCode: 2,
       error: `cannot read ${disc.unreadable.join(", ")}`,
     };
+  // --prd: each value must be a PRD document the walk found, as a repo-relative path.
+  let scope = null;
+  if (args.prds.length) {
+    const docs = new Set(disc.prds.map((p) => p.doc));
+    const rel = (v) =>
+      repoRoot && path.isAbsolute(v)
+        ? path.relative(repoRoot, v).split(path.sep).join("/")
+        : v;
+    scope = new Set(args.prds.map(rel));
+    const unknown = [...scope].filter((d) => !docs.has(d));
+    if (unknown.length)
+      return {
+        reason: "usage",
+        exitCode: 2,
+        error: `--prd ${unknown.join(", ")} names no PRD document under ${root} — pass the PRD's own .md file, repo-relative`,
+      };
+  }
   const registryPath = P.join(root, "prd-registry.md");
   const registryText = io.readFile(registryPath);
-  const planned = plan(disc, registryText, io);
+  const planned = plan(disc, registryText, io, { scope });
+  // The post-check of a scoped run judges the PRDs it moved, plus duplicate ids anywhere.
+  const scopeDirs = scope ? planned.prds.map((p) => p.newDir) : null;
   const base = {
     root,
+    ...(scope ? { scope: [...scope].sort() } : {}),
     mapping: planned.mapping,
     counts: {
       prds: planned.mapping.filter((m) => m.kind === "prd").length,
@@ -1936,7 +2086,7 @@ export function run(argv, ctx = {}) {
   };
 
   if (planned.fileMap.size === 0 && !planned.blockers.length) {
-    const corpus = postCheck(root, io, repoRoot);
+    const corpus = postCheck(root, io, repoRoot, scopeDirs);
     if (corpus.clean)
       return {
         ...base,
@@ -1979,10 +2129,22 @@ export function run(argv, ctx = {}) {
     const old = io.readFile(EPIC_REGISTRY) || "";
     if (docId.frontmatterField(old, "status") !== "retired") {
       const rel = P.relative(P.dirname(EPIC_REGISTRY), registryPath);
+      // A scoped run retires the registry only with the last legacy epic: until then the
+      // epics left behind still read their numbers from it.
+      const moving = new Set(
+        planned.epics.filter((x) => x.dir !== x.newDir).map((x) => x.dir),
+      );
+      const remaining =
+        scope && disc.epics.some((x) => x.legacy && !moving.has(x.dir));
+      const current = e.edits.has(EPIC_REGISTRY)
+        ? e.edits.get(EPIC_REGISTRY)
+        : old;
       e.edits.delete(EPIC_REGISTRY);
       writes.push([
         EPIC_REGISTRY,
-        epicRegistryPointer(old, planned, { rel, repoPath: registryPath }),
+        remaining
+          ? epicRegistryMigrated(current, planned)
+          : epicRegistryPointer(old, planned, { rel, repoPath: registryPath }),
       ]);
     }
   }
@@ -2028,7 +2190,7 @@ export function run(argv, ctx = {}) {
       revert: revertHint(touch, progress),
     };
   }
-  const corpus = postCheck(root, io, repoRoot);
+  const corpus = postCheck(root, io, repoRoot, scopeDirs);
   if (!corpus.clean)
     return {
       ...report,
@@ -2050,7 +2212,12 @@ export function run(argv, ctx = {}) {
   };
 }
 
-function postCheck(root, io, repoRoot) {
+/**
+ * checkCorpus over the PRD root. With `scopeDirs` (a --prd run) only findings under those
+ * directories count, plus every duplicate-id: a legacy document the run was not asked to
+ * move is not a finding.
+ */
+function postCheck(root, io, repoRoot, scopeDirs = null) {
   const ioAbs = repoRoot
     ? undefined
     : {
@@ -2064,11 +2231,20 @@ function postCheck(root, io, repoRoot) {
       })
     : docId.checkCorpus(root, { io: ioAbs, prdRoot: root });
   const rel = (p) => (repoRoot ? path.relative(repoRoot, p) : p);
-  const findings = (r.findings || []).map((f) => ({ ...f, path: rel(f.path) }));
+  let findings = (r.findings || []).map((f) => ({ ...f, path: rel(f.path) }));
+  let reason = r.reason;
+  if (scopeDirs) {
+    findings = findings.filter(
+      (f) =>
+        f.reason === "duplicate-id" ||
+        scopeDirs.some((d) => isUnder(f.path, d)),
+    );
+    if (reason === "findings" && !findings.length) reason = "ok";
+  }
   return {
-    clean: r.reason === "ok" || r.reason === "empty",
+    clean: reason === "ok" || reason === "empty",
     summary: {
-      reason: r.reason,
+      reason,
       documents: r.documents,
       findings: findings.length,
     },
@@ -2080,6 +2256,7 @@ function render(p) {
   const out = [];
   if (p.error) out.push(`migrate-doc-numbering: ${p.error}`);
   if (p.usage && p.reason === "usage") out.push(p.usage);
+  if (p.scope) out.push(`scope: ${p.scope.join(", ")}`);
   if (p.counts) {
     out.push(
       `${p.reason}: ${p.counts.prds} PRD, ${p.counts.epics} epic(s), ${p.counts.stories} story(ies), ${p.counts.files} file(s) under ${p.root}`,

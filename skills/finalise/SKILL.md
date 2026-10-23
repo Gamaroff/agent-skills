@@ -1792,7 +1792,10 @@ POLLEOF
 
 6d. **CHANGELOG citation check (blocking — HALT `no-changelog-entry`).** Every accepted work item
    must be cited in `CHANGELOG.md` under `## [Unreleased]` as `(task N)` / `(bug N)` — the
-   convention in `docs/contributing/releases.md`. Until task.115 this was the one release-checklist
+   convention in `docs/contributing/releases.md`. **A repository with no `CHANGELOG.md` is not
+   applicable**: the block prints `6d: no CHANGELOG.md — not applicable` and continues, because a
+   project that keeps no changelog cannot cite anything in one, and halting there would stop every
+   task in it. A `CHANGELOG.md` that exists but does not cite the task still HALTs. Until task.115 this was the one release-checklist
    item with no mechanism behind it, and it drifted on five consecutive merges (obs #59).
 
    ```bash
@@ -1804,7 +1807,9 @@ POLLEOF
    # zsh, and nothing said so (task.115 QA cycle 1, CR-1). A capture-free `=~` is fine in both.
    N=""
    case "$STEM" in task.*) N="${STEM#task.}" ;; esac
-   if [ -n "$N" ] && [[ "$N" =~ ^[0-9]+$ ]]; then
+   if [ ! -f CHANGELOG.md ]; then
+     echo "6d: no CHANGELOG.md — not applicable"
+   elif [ -n "$N" ] && [[ "$N" =~ ^[0-9]+$ ]]; then
      awk '/^## \[Unreleased\]/{p=1;next} /^## \[/{p=0} p' CHANGELOG.md \
        | grep -qiE "\btask[ .]${N}\b" \
        || { echo "HALT: no-changelog-entry — CHANGELOG.md [Unreleased] does not cite (task ${N}). Add the entry, commit and push it, then re-run /finalise: 6a skips the acceptance commit it already made and 6c re-reads CI on the new head"; exit 1; }
@@ -2431,7 +2436,7 @@ EOF
 - [ ] Sprint Review summary file created at `{story-directory}/sprint-review-summary.md`
 - [ ] **Publish boundary (6a–6c) crossed before any side-effect**: acceptance commit made with output and exit status read (never suppressed), pushed; document, DoD summary and sprint review asserted **tracked and on `origin/<branch>`** (`git ls-files --error-unmatch` + `git show origin/<branch>:<path>`), not merely present; PR head equals the pushed head; **CI reading 2 read `SUCCESS` on that head** — anything else is HALT `ci-not-green-on-acceptance-head`, with no comment, close or board move issued
 - [ ] Both CI readings recorded with their heads — reading 1 in the running summary (Step 6), reading 2 on the PR canonical comment and in the implementation report
-- [ ] CHANGELOG citation checked (6d) — `(task N)` present under `[Unreleased]`; otherwise HALT `no-changelog-entry` before the PR comment
+- [ ] CHANGELOG citation checked (6d) — `(task N)` present under `[Unreleased]`, or `6d: no CHANGELOG.md — not applicable` when the repository has no `CHANGELOG.md`; otherwise HALT `no-changelog-entry` before the PR comment
 - [ ] PR comment posted (GitHub: `gh pr comment`, Bitbucket: REST API) — **after** 6a–6c
 - [ ] Tracker issue closed: Jira issue transitioned via MCP (`transitionJiraIssue`) **OR** GitHub issue closed via `gh issue close` + closure confirmed with `gh issue view --json state` **OR** warning comment posted (if close failed after retry)
 - [ ] **Jira only — terminal status RE-READ after the Document-link re-point**, and re-asserted if the
