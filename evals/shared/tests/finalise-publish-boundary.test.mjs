@@ -555,7 +555,8 @@ function sixDBlock() {
 
 function runSixD(shell, stem, changelog) {
   const dir = mkdtempSync(path.join(tmpdir(), "finalise-6d-"));
-  writeFileSync(path.join(dir, "CHANGELOG.md"), changelog);
+  if (changelog !== null)
+    writeFileSync(path.join(dir, "CHANGELOG.md"), changelog);
   return spawnSync(shell, ["-c", `STEM='${stem}'\n${sixDBlock()}`], {
     cwd: dir,
     encoding: "utf8",
@@ -599,6 +600,17 @@ for (const shell of SHELLS) {
 
     const story = runSixD(shell, "story.1.2.3", CHANGELOG_FIXTURE);
     assert.equal(story.status, 0, "a story stem is not checked");
+  });
+
+  test(`[${shell}] 6d is not applicable, and does not HALT, when the repository has no CHANGELOG.md`, () => {
+    const absent = runSixD(shell, "task.303", null);
+    assert.equal(
+      absent.status,
+      0,
+      `a repository with no CHANGELOG.md must pass: ${absent.stdout}${absent.stderr}`,
+    );
+    assert.match(absent.stdout, /^6d: no CHANGELOG\.md — not applicable$/m);
+    assert.doesNotMatch(absent.stdout, /HALT/);
   });
 }
 
