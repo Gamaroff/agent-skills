@@ -20,7 +20,7 @@ Canonical filename patterns used across the library. Skills enforce these patter
 `P` is the PRD number, `E` counts epics within that PRD and `S` counts stories within that epic. A
 sub-story carries a capital-letter suffix on `S`: `story.1.2.3A.core-ui.md`.
 
-> **Adopted (2026-10-16, tasks 202–207).** Every skill writes and reads this scheme through `doc-id.js` (tasks 204–206), and two CI tests hold it (task 207): `doc-numbering-corpus.test.mjs` fails on any unnumbered, mismatched, unregistered or duplicate document under the PRD root, and `doc-id-chokepoint.test.js` fails on an id parsed anywhere but `doc-id.js`. A legacy flat-numbered tree is migrated with `migrate-doc-numbering.mjs`; `doc-id.js parseLegacy` reads the old shapes only for that migration.
+> **Adopted (2026-10-16, tasks 202–207).** Every skill writes and reads this scheme through `doc-id.js` (tasks 204–206), and two CI tests hold it (task 207): `doc-numbering-corpus.test.mjs` fails on any unnumbered, mismatched, unregistered or duplicate document under the PRD root, and `doc-id-chokepoint.test.js` fails on an id parsed anywhere but `doc-id.js`. A legacy flat-numbered tree is migrated with `migrate-doc-numbering.mjs` — whole, or incrementally one PRD at a time with `--prd <path-to-prd-doc>` (repeatable), so a project can upgrade before it migrates; `doc-id.js parseLegacy` reads the old shapes only for that migration.
 
 | Artifact | Pattern | Example |
 |---|---|---|

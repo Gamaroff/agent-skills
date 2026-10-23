@@ -36,7 +36,7 @@ sub-story carries a capital-letter suffix on `S` (`story.1.2.3A.core-ui`).
 docs/prd/auth/prd.1.login-flow/epics/epic.1.2.feature-ui/stories/story.1.2.1.login-form/story.1.2.1.login-form.md
 ```
 
-> **Adopted (2026-10-16, tasks 202–207).** Every skill writes and reads this scheme through `doc-id.js` (tasks 204–206), and two CI tests hold it (task 207): `doc-numbering-corpus.test.mjs` fails on any unnumbered, mismatched, unregistered or duplicate document under the PRD root, and `doc-id-chokepoint.test.js` fails on an id parsed anywhere but `doc-id.js`. A legacy flat-numbered tree is migrated with `migrate-doc-numbering.mjs`; `doc-id.js parseLegacy` reads the old shapes only for that migration.
+> **Adopted (2026-10-16, tasks 202–207).** Every skill writes and reads this scheme through `doc-id.js` (tasks 204–206), and two CI tests hold it (task 207): `doc-numbering-corpus.test.mjs` fails on any unnumbered, mismatched, unregistered or duplicate document under the PRD root, and `doc-id-chokepoint.test.js` fails on an id parsed anywhere but `doc-id.js`. A legacy flat-numbered tree is migrated with `migrate-doc-numbering.mjs` — whole, or incrementally one PRD at a time with `--prd <path-to-prd-doc>` (repeatable), so a project can upgrade before it migrates; `doc-id.js parseLegacy` reads the old shapes only for that migration.
 
 Nested story layout under `${PRD_ROOT}` is a [fixed convention](../reference/configuration.md#configurable-roots-and-fixed-conventions) — flat layouts are not supported. The PRD root itself is configurable (default `docs/prd`).
 

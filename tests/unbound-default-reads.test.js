@@ -81,6 +81,10 @@ const INPUTS = new Map([
     "skills/review-prd/SKILL.md#MIG_NAME",
     "optional input of the migration blocks — empty unless the plan blocked on unplaced-prd and the user named the slug",
   ],
+  [
+    "skills/review-prd/SKILL.md#MIG_PRD",
+    "optional input of the migration blocks — empty (the whole tree) unless the migration is scoped to one PRD with --prd",
+  ],
   // task.205: the Discover Parent PRD and Input Resolution blocks each run as their own shell, so
   // their inputs are bound by the agent from the steps before them; each `${NAME:?}` is the guard.
   [
