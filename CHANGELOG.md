@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.59.0] - 2026-10-23
+
 ### Added
 
 - **A `Secret scan` CI lane and its local twin, `npm run lint:secrets` (task 229).** A new
