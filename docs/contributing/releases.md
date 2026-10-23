@@ -44,7 +44,6 @@ Before cutting a repo release:
 - [ ] `Secret scan` workflow (`secret-scan.yml`) is green on the release commit — pinned gitleaks over the tracked files and the commit messages pushed. Not yet enforced by `release.sh` (it is `WORKFLOWS.notGating` in `scripts/release-ci-verdict.mjs` until the lane has a green record, task 229), so this box is read by you
 - [ ] `Docs link check` workflow (`docs-link-check.yml`) is green — path-filtered to `docs/**/*.md`, `README.md`, `AGENTS.md`, `CONTRIBUTING.md`, so **it does not run on every PR**. A release that touched none of those has no run to be green; check that it is absent-not-failing rather than ticking it blind
 - [ ] CHANGELOG `[Unreleased]` has entries for everything user-facing since last release — and every accepted task merged since the last tag is **cited** there (see the convention below). `evals/shared/tests/changelog-entry-drift.test.mjs` fails CI on a missing task citation, so a green `test.yml` already covers the task half; bugs are still read by hand until the follow-on below lands
-- [ ] **Flip the CHANGELOG check from advisory to blocking** — *for the release after the one that ships task.115*: in `skills/finalise/SKILL.md` Step 7 action 6d, change the `no-changelog-entry` warning to a HALT, and delete this line. Until then `/finalise` warns and the drift test is the backstop
 
 > **This box used to be the one with no mechanism, and it was the one that drifted.** Every
 > generated artefact here is machine-checked — the catalog diffs in CI, `bundle --check` is a lane,
@@ -65,9 +64,10 @@ Before cutting a repo release:
 >   version: `[Unreleased]` cites bug 14 but not bugs 13 and 15 (all three merged since v0.46.0), so a
 >   `(bug N)` walk would be red on work the test did not introduce — backfill those two lines, then
 >   widen the walk.
-> - **The owner** — `/finalise` Step 7 action 6d greps the same section at acceptance and warns
->   `no-changelog-entry` when the task is not cited. Advisory in the release this ships in; the box
->   above flips it. Write the entry when the work is *accepted*, not when the release is cut — at
+> - **The owner** — `/finalise` Step 7 action 6d greps the same section at acceptance and HALTs
+>   `no-changelog-entry` when the task is not cited, before the PR comment and the tracker close.
+>   It was advisory from task.115 (v0.47.0) and became blocking after v0.59.0; the checklist line
+>   that carried the flip was deleted then. Write the entry when the work is *accepted*, not when the release is cut — at
 >   acceptance the author knows what changed and why it matters; at release time someone reconstructs
 >   it from commit subjects.
 >
@@ -231,7 +231,14 @@ If `main` has diverged from `develop` for unrelated reasons (e.g. a hotfix lande
 
 ## What changes are breaking?
 
-A change is **breaking** (MAJOR bump) if it would silently break a consuming project:
+> **Before v1.0.0, a breaking change takes a MINOR bump, not a MAJOR one.** This follows semver's
+> rule for `0.y.z`, where anything may change. So `--prepare --minor` is right for a release whose
+> `[Unreleased]` holds a `BREAKING` entry, and `--major` is kept for the deliberate move to
+> v1.0.0. Still mark each breaking entry `BREAKING` and give it a **Migration** note, because that
+> is what a consumer reads before running `setup-consumer.sh --update`. v0.59.0 was the first
+> release under this rule; it shipped two `BREAKING` entries (task 211, task 220).
+
+A change is **breaking** (MAJOR bump from v1.0.0 on; MINOR before it, see above) if it would silently break a consuming project:
 
 - A skill's required frontmatter changes
 - The slash command name changes

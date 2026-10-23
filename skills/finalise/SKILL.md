@@ -1790,8 +1790,8 @@ POLLEOF
    recorded in the implementation report's Decisions Log (`CI reading 1: … @ …; CI reading 2: … @
    …`) and in the PR comment body below — both outside the verified commit.
 
-6d. **CHANGELOG citation check (advisory — warns, does not halt).** Every accepted work item
-   should be cited in `CHANGELOG.md` under `## [Unreleased]` as `(task N)` / `(bug N)` — the
+6d. **CHANGELOG citation check (blocking — HALT `no-changelog-entry`).** Every accepted work item
+   must be cited in `CHANGELOG.md` under `## [Unreleased]` as `(task N)` / `(bug N)` — the
    convention in `docs/contributing/releases.md`. Until task.115 this was the one release-checklist
    item with no mechanism behind it, and it drifted on five consecutive merges (obs #59).
 
@@ -1807,15 +1807,17 @@ POLLEOF
    if [ -n "$N" ] && [[ "$N" =~ ^[0-9]+$ ]]; then
      awk '/^## \[Unreleased\]/{p=1;next} /^## \[/{p=0} p' CHANGELOG.md \
        | grep -qiE "\btask[ .]${N}\b" \
-       || echo "⚠️  no-changelog-entry: CHANGELOG.md [Unreleased] does not cite (task ${N}) — add the entry before release; evals/shared/tests/changelog-entry-drift.test.mjs fails CI on this once the PR merges"
+       || { echo "HALT: no-changelog-entry — CHANGELOG.md [Unreleased] does not cite (task ${N}). Add the entry, commit and push it, then re-run /finalise: 6a skips the acceptance commit it already made and 6c re-reads CI on the new head"; exit 1; }
    fi
    ```
 
-   **Advisory now, blocking later — and the flip is a release decision, not a memory.** This warns
-   in the release this ships in; `docs/contributing/releases.md` carries the checklist line that
-   flips it to a HALT (`no-changelog-entry`) in the release *after* that. A gate at authoring pushes
-   an author toward a filler entry, and a filler entry is worse than a missing one because it looks
-   deliberate; the drift test is the loud backstop in the meantime.
+   **Blocking from the first release after v0.59.0; advisory from task.115 (v0.47.0) until then.** The HALT comes
+   after 6a–6c, so the acceptance is already committed and pushed, and nothing outward has happened:
+   no PR comment, no tracker close. The re-run picks up from there. A CHANGELOG entry is a
+   documentation-only change, so it does not re-enter QA. Write a real entry, not a filler; a
+   filler looks deliberate and is worse than a missing one.
+   `evals/shared/tests/changelog-entry-drift.test.mjs` is still the CI backstop for any task that
+   skips `/finalise`.
 
 ---
 
@@ -2429,7 +2431,7 @@ EOF
 - [ ] Sprint Review summary file created at `{story-directory}/sprint-review-summary.md`
 - [ ] **Publish boundary (6a–6c) crossed before any side-effect**: acceptance commit made with output and exit status read (never suppressed), pushed; document, DoD summary and sprint review asserted **tracked and on `origin/<branch>`** (`git ls-files --error-unmatch` + `git show origin/<branch>:<path>`), not merely present; PR head equals the pushed head; **CI reading 2 read `SUCCESS` on that head** — anything else is HALT `ci-not-green-on-acceptance-head`, with no comment, close or board move issued
 - [ ] Both CI readings recorded with their heads — reading 1 in the running summary (Step 6), reading 2 on the PR canonical comment and in the implementation report
-- [ ] CHANGELOG citation checked (6d) — `(task N)` present under `[Unreleased]`, or the `no-changelog-entry` warning surfaced
+- [ ] CHANGELOG citation checked (6d) — `(task N)` present under `[Unreleased]`; otherwise HALT `no-changelog-entry` before the PR comment
 - [ ] PR comment posted (GitHub: `gh pr comment`, Bitbucket: REST API) — **after** 6a–6c
 - [ ] Tracker issue closed: Jira issue transitioned via MCP (`transitionJiraIssue`) **OR** GitHub issue closed via `gh issue close` + closure confirmed with `gh issue view --json state` **OR** warning comment posted (if close failed after retry)
 - [ ] **Jira only — terminal status RE-READ after the Document-link re-point**, and re-asserted if the
