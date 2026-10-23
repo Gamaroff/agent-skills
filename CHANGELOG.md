@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.59.1] - 2026-10-23
+
 ### Changed
 
 - **`/finalise` halts when `[Unreleased]` does not cite the task.** Step 7 action 6d used to warn
