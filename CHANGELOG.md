@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.60.0] - 2026-10-23
+
 ### Added
 
 - **Migrate one PRD at a time: `migrate-doc-numbering.mjs --prd <path-to-prd-doc>`.** The flag
