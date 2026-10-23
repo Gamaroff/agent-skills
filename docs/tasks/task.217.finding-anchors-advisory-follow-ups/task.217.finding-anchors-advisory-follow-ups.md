@@ -5,10 +5,10 @@ type: task
 description: "Close the nine advisory items task.195's QA gates carried to future work: the --inline guards trust any anchor_check string, a non-object finding crashes the checker or is never annotated, the inline selectors split anchors differently from the checker and post untrimmed paths, review-code --staged --fix edits a tree it did not check, review-code's --inline block reads three unbound variables, and two test-hygiene gaps."
 tags: [finding-anchors, review-pr, review-code, follow-up, hardening]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-10-19
-updated: 2026-10-19
+updated: 2026-10-23
 assignee:
 estimated_effort_hours: 16
 github_issue: 698
@@ -16,7 +16,8 @@ github_issue: 698
 
 # Technical Task: Finding-anchors advisory follow-ups
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.217.review.1.finding-anchors-advisory-follow-ups.md` implemented 2026-10-23
 
 **GitHub Issue**: [#698](https://github.com/Gamaroff/agent-skills/issues/698)
 
@@ -144,11 +145,11 @@ task.195 (PR #695, merged 2026-10-19) made the finding-anchors checker the one j
 **Risk**: Medium (the engine is bundled into four skills)
 **Files**: `shared/resources/finding-anchors.js`, `shared/resources/tests/finding-anchors.test.mjs`
 
-- [ ] A findings array holding a non-object (null, string, number, boolean or array) exits 2 with `reason: usage` and a message naming the lens and the index. Nothing is annotated, and no file is read (items 2 and 5)
-- [ ] `--annotate` writes `anchor_checked: {by: "finding-anchors", findings: N}` at the top level of a wrapped document. For a bare array, which has no top level to stamp, the guard keeps today's behaviour and the plan states that explicitly (item 1)
-- [ ] Unit and CLI tests for both, including `[null]` on each lens, and the stamp's count on a two-lens file
-- [ ] `GIT_CEILING_DIRECTORIES` is set for the outside-a-work-tree call in the `--index` test (item 8)
-- [ ] `npm run bundle`
+- [x] A findings array holding a non-object (null, string, number, boolean or array) exits 2 with `reason: usage` and a message naming the lens and the index. Nothing is annotated, and no file is read (items 2 and 5)
+- [x] `--annotate` writes `anchor_checked: {by: "finding-anchors", findings: N}` at the top level of a wrapped document. For a bare array, which has no top level to stamp, the guard keeps today's behaviour and the plan states that explicitly (item 1)
+- [x] Unit and CLI tests for both, including `[null]` on each lens, and the stamp's count on a two-lens file
+- [x] `GIT_CEILING_DIRECTORIES` is set for the outside-a-work-tree call in the `--index` test (item 8)
+- [x] `npm run bundle`
 
 ### Phase 2: `--inline` blocks — the checker's grammar, its stamp and its verdicts
 
@@ -156,19 +157,21 @@ task.195 (PR #695, merged 2026-10-19) made the finding-anchors checker the one j
 **Files**: `skills/review-pr/SKILL.md`, `skills/review-code/SKILL.md`, `skills/review-pr/tests/review-pr.test.js`, `skills/review-code/tests/review-code.test.js`
 **Depends on**: Phase 1 (the stamp)
 
-- [ ] Both guards require the stamp, the matching count and the seven-verdict enumeration (item 1)
-- [ ] Both selectors trim the anchor and parse it with `capture()` in the checker's grammar (items 3 and 4)
-- [ ] review-code's block binds `PR_NUMBER` and `SUMMARY_FILE`, makes `INLINE_FILE` after the guard, and removes it (item 7)
-- [ ] Guard tests: a reviewer-written `anchor_check` with no stamp HALTs; a stale count HALTs; `"verified"` HALTs; `"src/a:b.js:3"` posts path `src/a:b.js` line 3; `"  a.js:1"` posts path `a.js`
+- [x] Both guards require the stamp, the matching count and the seven-verdict enumeration (item 1)
+- [x] Both selectors trim the anchor and parse it with `capture()` in the checker's grammar (items 3 and 4)
+- [x] review-code's block binds `PR_NUMBER` and `SUMMARY_FILE`, makes `INLINE_FILE` after the guard, and removes it (item 7)
+- [x] Guard tests: a reviewer-written `anchor_check` with no stamp HALTs; a stale count HALTs; `"verified"` HALTs; `"src/a:b.js:3"` posts path `src/a:b.js` line 3; `"  a.js:1"` posts path `a.js`
+- [x] **Removed-literal sweep** (`git grep -n 'anchor_check | type' -- '*.test.*'`, run 2026-10-23): `extractInlineGuard` in `skills/review-pr/tests/review-pr.test.js` (`:2495`) and the guard extractor in `skills/review-code/tests/review-code.test.js` (`:379`) both locate the guard by the literal `select((.anchor_check | type) != "string")`, which 2a replaces. Re-key both extractors on a literal the new guard keeps (e.g. `anchor_checked.by`), and add the stamp to each guard test's annotated **control** fixture, which otherwise HALTs
+- [x] Probe re-run: write the re-run's cases as a **new** `task.217` cases file. task.195's `dod.2.security.cases.1.json` pins the old HALT message verbatim in its expected `stdout`; it is a historical record and is not edited
 
 ### Phase 3: review-code `--staged --fix`, the population guard, and the changelog
 
 **Risk**: Low
 **Files**: `skills/review-code/SKILL.md`, `skills/review-code/tests/review-code.test.js`, `evals/shared/tests/finding-anchors-blocks.test.mjs`, `CHANGELOG.md`
 
-- [ ] Step 5 skips a finding whose path differs between the working tree and the index under `--staged`, and lists it with its reason (item 6)
-- [ ] The blocks test derives the dispatcher population from the tree: every fenced block in `skills/*/SKILL.md` and `shared/resources/*.md` that invokes `finding-anchors.js`. It asserts that the population equals `DISPATCHERS`, with a floor of four (item 9)
-- [ ] CHANGELOG entry
+- [x] Step 5 skips a finding whose path differs between the working tree and the index under `--staged`, and lists it with its reason (item 6). The check lands as a **fenced `bash` block** in Step 5, and the test extracts that block and runs it against a temp repo, so reverting the block turns the test red (a prose sentence would leave the test green with the fix reverted)
+- [x] The blocks test derives the dispatcher population from the tree: every fenced block in `skills/*/SKILL.md` and `shared/resources/*.md` that invokes `finding-anchors.js`. It asserts that the population equals `DISPATCHERS`, with a floor of four (item 9)
+- [x] CHANGELOG entry
 
 ---
 
@@ -240,30 +243,30 @@ Not applicable: no new I/O. The stamp is one key, and the refusal runs before an
 
 ### Functional
 
-- [ ] `{"code_review":{"findings":[null]}}` exits 2 with `reason: usage` naming `code_review.findings[0]` (Phase 1's non-object branch)
-- [ ] `{"pr_conformance":{"findings":["x"]}}` exits 2 with `reason: usage`, and `--annotate` writes no file (Phase 1's non-object branch)
-- [ ] An `--annotate` run on a two-lens file writes `anchor_checked.findings` equal to the total finding count (Phase 1's stamp)
-- [ ] Both `--inline` guards HALT on reviewer-written `anchor_check` with no stamp, on a count mismatch, and on an unknown verdict (Phase 2)
-- [ ] `file_line: "src/a:b.js:3"` posts path `src/a:b.js` line 3; `"  a.js:1"` posts path `a.js` (Phase 2's selector)
-- [ ] review-code's `--inline` block runs with only its documented placeholders substituted (Phase 2)
-- [ ] `--staged --fix` skips a finding whose file differs between the working tree and the index, with the stated reason (Phase 3)
-- [ ] The blocks test fails when a fifth document runs the checker and is not in `DISPATCHERS` (Phase 3)
+- [x] `{"code_review":{"findings":[null]}}` exits 2 with `reason: usage` naming `code_review.findings[0]` (Phase 1's non-object branch)
+- [x] `{"pr_conformance":{"findings":["x"]}}` exits 2 with `reason: usage`, and `--annotate` writes no file (Phase 1's non-object branch)
+- [x] An `--annotate` run on a two-lens file writes `anchor_checked.findings` equal to the total finding count (Phase 1's stamp)
+- [x] Both `--inline` guards HALT on reviewer-written `anchor_check` with no stamp, on a count mismatch, and on an unknown verdict (Phase 2)
+- [x] `file_line: "src/a:b.js:3"` posts path `src/a:b.js` line 3; `"  a.js:1"` posts path `a.js` (Phase 2's selector)
+- [x] review-code's `--inline` block runs with only its documented placeholders substituted (Phase 2)
+- [x] `--staged --fix` skips a finding whose file differs between the working tree and the index, with the stated reason (Phase 3)
+- [x] The blocks test fails when a fifth document runs the checker and is not in `DISPATCHERS` (Phase 3)
 
 ### Performance
 
-- [ ] No measurable change in `finding-anchors.js` run time: the refusal and the stamp add no file reads
-- [ ] Each distinct path is still read once per run (task.195 SC-8 test stays green)
+- [x] The refusal adds no file reads: a non-object input exits `usage` with zero calls to the injected `deps.exec` and no `--annotate` output (asserted by the Phase 1 refusal test with a counting `exec` stub)
+- [x] Each distinct path is still read once per run (task.195 SC-8 test stays green)
 
 ### Code Quality
 
-- [ ] `npm run ci` passes (format, tests, evals, bundle:check, shellcheck)
-- [ ] `python skills/create-skill/scripts/quick_validate.py skills/<skill>` passes for review-pr, review-code, qa-task and qa-story
-- [ ] Every fix is mutation-proven: revert it and a named test goes red
+- [x] `npm run ci` passes (format, tests, evals, bundle:check, shellcheck)
+- [x] `python skills/create-skill/scripts/quick_validate.py skills/<skill>` passes for review-pr, review-code, qa-task and qa-story
+- [x] Every fix is mutation-proven: revert it and a named test goes red
 
 ### Migration
 
-- [ ] CHANGELOG `[Unreleased]` › Fixed cites `(task 217)` and names both breaking changes
-- [ ] Bundled copies regenerated in the same commit as the source
+- [x] CHANGELOG `[Unreleased]` › Fixed cites `(task 217)` and names both breaking changes
+- [x] Bundled copies regenerated in the same commit as the source
 
 ---
 
@@ -326,6 +329,9 @@ None.
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-10-19 | 1.0     | Initial draft — the nine advisory items task.195's QA gates 1–5 carried to future work | create-task |
+| 2026-10-23 | 1.1     | Review passed (8/10) — added the removed-literal sweep (two guard extractors keyed on the replaced clause, control fixtures need the stamp), a new task.217 probe cases file, a fenced block for the `--staged` skip, and a test-held bound for the performance criterion | review-task |
+| 2026-10-23 |         | Status → ready-for-development | review-task |
+| 2026-10-23 |         | Implemented — 12 files (engine + 4 bundled copies, 2 SKILL.md, 4 test files, CHANGELOG), 13 new tests; probe re-run 31/31 | develop |
 <!-- change-log-end -->
 
 ---
@@ -333,20 +339,20 @@ None.
 ## Progress Tracking
 
 ### Phase 1: Engine
-- [ ] Non-object refusal (usage)
-- [ ] `anchor_checked` stamp
-- [ ] `GIT_CEILING_DIRECTORIES` in the `--index` test
-- [ ] Bundle
+- [x] Non-object refusal (usage)
+- [x] `anchor_checked` stamp
+- [x] `GIT_CEILING_DIRECTORIES` in the `--index` test
+- [x] Bundle
 
 ### Phase 2: `--inline` blocks
-- [ ] Guards: stamp, count, verdict enumeration
-- [ ] Selectors: trim + checker grammar
-- [ ] review-code bindings
+- [x] Guards: stamp, count, verdict enumeration
+- [x] Selectors: trim + checker grammar
+- [x] review-code bindings
 
 ### Phase 3: `--staged --fix`, population, changelog
-- [ ] `--staged --fix` skip
-- [ ] Derived dispatcher population
-- [ ] CHANGELOG
+- [x] `--staged --fix` skip
+- [x] Derived dispatcher population
+- [x] CHANGELOG
 
 ---
 
