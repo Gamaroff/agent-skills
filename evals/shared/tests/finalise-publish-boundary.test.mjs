@@ -29,9 +29,11 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
@@ -527,20 +529,92 @@ test("6c head-binds the second reading: the poll records the sampled PR head and
 // ---------------------------------------------------------------------------
 // 4. The CHANGELOG box has a mechanism (obs #59)
 
-test("/finalise warns `no-changelog-entry`, and the release checklist names the test and the flip", () => {
+const SHELLS = [
+  "bash",
+  ...(spawnSync("zsh", ["-c", "true"], { stdio: "ignore" }).status === 0
+    ? ["zsh"]
+    : []),
+];
+
+/** The 6d ```bash block as shipped, dedented — the test runs what the skill says. */
+function sixDBlock() {
   const sixD = between(
     finalise,
     "6d. **CHANGELOG citation check",
     "7. **Add Canonical PR Comment",
     FINALISE,
   );
-  assert.match(sixD, /no-changelog-entry/, "6d names its reason token");
-  assert.match(sixD, /\[Unreleased\]/, "6d reads the [Unreleased] section");
+  const m = sixD.match(/```bash\n([\s\S]*?)\n[ \t]*```/);
+  assert.ok(m, `${FINALISE} 6d: no bash block`);
+  const lines = m[1].split("\n");
+  const indent = Math.min(
+    ...lines.filter((l) => l.trim()).map((l) => l.match(/^ */)[0].length),
+  );
+  return lines.map((l) => l.slice(indent)).join("\n");
+}
+
+function runSixD(shell, stem, changelog) {
+  const dir = mkdtempSync(path.join(tmpdir(), "finalise-6d-"));
+  writeFileSync(path.join(dir, "CHANGELOG.md"), changelog);
+  return spawnSync(shell, ["-c", `STEM='${stem}'\n${sixDBlock()}`], {
+    cwd: dir,
+    encoding: "utf8",
+  });
+}
+
+const CHANGELOG_FIXTURE = [
+  "# Changelog",
+  "",
+  "## [Unreleased]",
+  "",
+  "- **Something new (task 301).** Body.",
+  "",
+  "## [v0.1.0] - 2026-01-01",
+  "",
+  "- **Older work (task 302).** Body.",
+  "",
+].join("\n");
+
+for (const shell of SHELLS) {
+  test(`[${shell}] 6d HALTs \`no-changelog-entry\` when [Unreleased] does not cite the task`, () => {
+    const cited = runSixD(shell, "task.301", CHANGELOG_FIXTURE);
+    assert.equal(
+      cited.status,
+      0,
+      `cited task must pass: ${cited.stdout}${cited.stderr}`,
+    );
+    assert.doesNotMatch(cited.stdout, /HALT/);
+
+    const missing = runSixD(shell, "task.303", CHANGELOG_FIXTURE);
+    assert.equal(missing.status, 1, "an uncited task must exit 1");
+    assert.match(missing.stdout, /^HALT: no-changelog-entry .*\(task 303\)/m);
+
+    // Cited only under a released version is not cited under [Unreleased].
+    const released = runSixD(shell, "task.302", CHANGELOG_FIXTURE);
+    assert.equal(
+      released.status,
+      1,
+      "a citation under a released version must not count",
+    );
+
+    const story = runSixD(shell, "story.1.2.3", CHANGELOG_FIXTURE);
+    assert.equal(story.status, 0, "a story stem is not checked");
+  });
+}
+
+test("/finalise 6d names `no-changelog-entry` as a HALT, and the release docs name the test", () => {
+  const sixD = between(
+    finalise,
+    "6d. **CHANGELOG citation check",
+    "7. **Add Canonical PR Comment",
+    FINALISE,
+  );
   assert.match(
     sixD,
-    /advisory/i,
-    "6d is advisory in this release — the flip is a release decision",
+    /HALT `no-changelog-entry`/,
+    "6d's heading names it blocking",
   );
+  assert.match(sixD, /\[Unreleased\]/, "6d reads the [Unreleased] section");
 
   const releases = read(RELEASES);
   assert.ok(
@@ -557,9 +631,9 @@ test("/finalise warns `no-changelog-entry`, and the release checklist names the 
     /\(task 115\)/,
     `${RELEASES} must show the citation convention with a real example`,
   );
-  assert.match(
+  assert.doesNotMatch(
     releases,
     /Flip the CHANGELOG check from advisory to blocking/,
-    `${RELEASES} must carry the flip as a checklist line`,
+    `${RELEASES}: the flip has happened, so its checklist line goes`,
   );
 });

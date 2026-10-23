@@ -257,6 +257,17 @@ _Provenance: `docs/prd/onboarding/prd.1.onboarding/epics/epic.1.1.quickstart-and
 
 _Provenance: `docs/prd/onboarding/prd.1.onboarding/epics/epic.1.1.quickstart-and-decision-tree-entry-point/stories/story.1.1.5.readme-start-here-callout/story.1.1.5.implementation.1.readme-start-here-callout-initial-run.md` (same DoD check)_
 
+### `/finalise` halts with `no-changelog-entry`
+
+**You see:** `HALT: no-changelog-entry — CHANGELOG.md [Unreleased] does not cite (task N)` after
+the acceptance commit is pushed, with no PR comment posted and no tracker close.
+**Cause:** Step 7 action 6d found no `(task N)` citation under `## [Unreleased]`.
+**Fix:**
+1. Add a real entry under `## [Unreleased]` that names `(task N)` (convention:
+   [`docs/contributing/releases.md`](../contributing/releases.md)). Commit and push it.
+2. Re-invoke `/finalise`. 6a skips the acceptance commit it already made, 6c re-reads CI on the new
+   head, and the PR comment and tracker close follow.
+
 ### Task registry shows a duplicate "Next Available" number
 
 **You see:** Two tasks share the same number; `/create-task` used the same counter value twice.
