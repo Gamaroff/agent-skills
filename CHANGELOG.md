@@ -31,6 +31,10 @@ All notable changes to this project will be documented in this file. Format foll
   - The checker-blocks test derives the dispatcher population from the tree, and a test holds every
     restated verdict list to the engine's own set. The `--index` outside-a-work-tree test passes when
     `TMPDIR` sits inside a git checkout.
+- **`doc-id.js` no longer trips ESLint's `no-useless-assignment`.** `resolvePrdRoot` initialised
+  `text` to `""`, but every path either overwrote it or returned first. A consumer that lints the
+  `scripts/doc-id.cjs` copy `setup-consumer.sh` installs saw one error it could not fix locally,
+  because the next update overwrites the file. The initialiser is gone, and behaviour is unchanged.
 
 ## [v0.60.0] - 2026-10-23
 
