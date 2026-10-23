@@ -33,7 +33,7 @@ Close the nine advisory items task.195's QA gates carried to future work: engine
 | -------------------------- | ---------- | ---------------------------------------------------------------------- | ----- | -------------------- | --------------- |
 | 1. create-branch           | ✅ Done    | Branch `feature/task.217.*` exists in git                              | Branch created at `30ece59c` | —                    | 2026-10-23T18:05Z |
 | 2. review-task             | ✅ Done    | `task.217.review.{N}.{name}.md` exists (or skip logged)                | READY TO IMPLEMENT 8/10; `task.217.review.1.finding-anchors-advisory-follow-ups.md`; Planned → Ready for Development | —                    | 2026-10-23T18:08Z |
-| 3. develop                 | ⏳ Pending | Task status == `Ready for Review`                                      |       | —                    |                 |
+| 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline; 3/3 phases; `ab2c64be`, `5f15d6c9`; ci:fast 6267 pass / 0 fail | —                    | 2026-10-23T20:21Z |
 | 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.217.qa.{N}.*.md`; `task.217.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.217.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
@@ -86,6 +86,9 @@ Close the nine advisory items task.195's QA gates carried to future work: engine
 - Removed-literal sweep: both guard extractors re-keyed on `.anchor_checked.by`; control fixtures stamped.
 - Probe re-run: docs/tasks/task.217.finding-anchors-advisory-follow-ups/task.217.dod.1.security.cases.1.json (task.195's 25 cases updated for the new message/stamp + 6 stamp cases) → verdict `engages`, 31/31 passed, 0 escaped, 0 over-blocked.
 - `npm run bundle` regenerated the four `references/finding-anchors.js` copies. quick_validate: review-pr, review-code, qa-task, qa-story ✓.
+- Fast gate (`npm run ci:fast`, `.agents/skills` symlink moved aside): TEST_EXIT=0, 6267 pass, 0 fail. bundle:check, check:generated, validate:all, lint:shell clean.
+- Committed `ab2c64be` (fix) and `5f15d6c9` (docs), pushed.
+- Development completion comment posted to github issue 698.
 
 ## Issues Log
 
