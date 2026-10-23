@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.59.2] - 2026-10-23
+
 ### Fixed
 
 - **A task registry headed `Task Number` now parses.** `select-next.mjs` read a header's id column
