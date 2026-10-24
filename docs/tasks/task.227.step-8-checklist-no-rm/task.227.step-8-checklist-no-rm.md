@@ -68,7 +68,7 @@ Step 8's Completion Checklist is one fenced block. It runs the must-pass checks,
 
 ### Target Architecture
 
-- `advance-pipeline-lock.sh --complete` removes the five records from the lock's own directory (`$(dirname "$LOCK")`), **before** it decides which arm to take, so both arms remove them. Then it removes the lock as today. The records are removed by literal name: no glob and no variable path from outside the script. The exception, stated once in the script header (`advance-pipeline-lock.sh:15`): `step4-hold-dir.txt` and `step4-held-paths.txt` are kept, with a warning, while the hold directory still holds files or cannot be listed.
+- `advance-pipeline-lock.sh --complete` removes the five records from the lock's own directory (`$(dirname "$LOCK")`), **before** it decides which arm to take, so both arms remove them. Then it removes the lock as today. The records are removed by literal name: no glob and no variable path from outside the script. The exception, stated once in the script header (`advance-pipeline-lock.sh:15`): `step4-hold-dir.txt` and `step4-held-paths.txt` are kept, with a warning, while `--hold-state` reads pending: the hold directory holds files, or the record or directory cannot be read.
 - The checklist block keeps its checks and its `--complete` call, and loses both `rm` lines. Its comment says the records are removed by `--complete`.
 - A new test in `step-8-completion-checklist.test.mjs` scans every fenced block in the files `developPipelineDocs()` returns (`:573` — the shared `develop-pipeline-*.md` docs **and** the `skills/develop-*/SKILL.md` orchestrators) that calls `advance-pipeline-lock.sh --complete`, and fails on an `rm` invocation in it. Blocks come from `fencedRanges()` (`shared/resources/change-log.js`, already imported by the test at `:42`), which returns every fence whatever its info string — `extractBlocks()` returns only `bash` fences and would miss an `sh` or unlabelled block — never a new fence parser. It carries a non-vacuity floor: it must find at least one such block.
 
@@ -99,7 +99,7 @@ A separate block of literal `rm -f` lines would also pass the safety check when 
 
 `advance-pipeline-lock.sh --complete` now also removes five files beside the lock. Its only caller is Step 8's Completion Checklist (`every orchestrator mention of --complete names the Step 8 Completion Checklist`, `step-8-completion-checklist.test.mjs:626`), which removed the same five files one line earlier. No caller sees a different end state.
 
-Migration: none. A consumer that runs `--complete` by hand outside Step 8 loses those five files, which are records of a run that `--complete` declares finished. The one exception is the hold records: `step4-hold-dir.txt` and `step4-held-paths.txt` are kept, with a warning on stderr, while the directory the first names still holds files or cannot be listed, because they are the only pointer to those files and the list of them (QA1-2, QA2-1, QA2-2). Step 8 refuses to reach `--complete` in that state, so a pipeline run never sees the exception.
+Migration: none. A consumer that runs `--complete` by hand outside Step 8 loses those five files, which are records of a run that `--complete` declares finished. The one exception is the hold records: `step4-hold-dir.txt` and `step4-held-paths.txt` are kept, with a warning on stderr, while `--hold-state` reads pending (the directory the first names holds files, or the record or directory cannot be read), because they are the only pointer to those files and the list of them (QA1-2, QA2-1, QA2-2, QA3-2). Step 8 reads the same answer and refuses to finish (QA3-1). Step 8 refuses to reach `--complete` in that state, so a pipeline run never sees the exception.
 
 ---
 
@@ -258,6 +258,7 @@ None.
 - **Deferred work.** None.
 - **QA cycle 1 fixes (qa-fix).** QA1-1: the guard's matcher became `lineRunsNoRm` in `tests/lib/rm-invocation.mjs`. It counts `rm` as a word after quote and escape removal, and the guard also requires that it read the Step 8 doc's own `--complete` block. Probed with `security-probe.mjs` (rm-specific cases): `present-but-inert`, then `engages` after quote removal. QA1-2: `--complete` keeps `step4-hold-dir.txt`, with a stderr warning, while its directory holds files; three cases per arm were added to scenario 15 (82/82). Both fixes were mutation-proven. Bugs 1 and 2 are now Ready for QA.
 - **QA cycle 2 fixes (qa-fix).** QA2-1/QA2-2: `--complete` keeps `step4-held-paths.txt` along with the hold-dir record, and treats a hold directory it cannot list as one that holds files (84/84, including an unlistable case per arm). QA2-3: `lineRunsNoRm` is now one word test, `(?<![\w-])rm(?![\w-])`, instead of a list of what may precede and follow `rm`. Redirections count, and the pattern is linear (0.05 ms at 64k characters). QA2-4: §3, §4, §5 and criteria 1–2 state the exception. All three code fixes were mutation-proven.
+- **QA cycle 3 fixes (qa-fix).** QA3-1/QA3-2: the hold-record rule is now stated once, as `hold_state` in `advance-pipeline-lock.sh`, and exposed read-only as `--hold-state` (`clear` / `pending: <why>`). `--complete` keeps the two hold records by its answer. Step 8's held-files check calls it instead of its own `ls -A` copy, so the two can no longer disagree. A record that cannot be read, a directory that cannot be listed and a path that is not a directory all read `pending`. Lock suite 102/102 (six hold cases per arm, each asserting both modes); checklist suite 64/64 (unlistable dir and unreadable record fail Step 8). Four mutations proven.
 
 ---
 
@@ -266,26 +267,26 @@ None.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-24
-**Quality Score**: 90/100
+**Quality Score**: 85/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
 
-- **Full Report**: [task.227.qa.2.step-8-checklist-no-rm.md](./task.227.qa.2.step-8-checklist-no-rm.md)
-- **Gate File**: [task.227.gate.2.step-8-checklist-no-rm.yml](./task.227.gate.2.step-8-checklist-no-rm.yml)
+- **Full Report**: [task.227.qa.3.step-8-checklist-no-rm.md](./task.227.qa.3.step-8-checklist-no-rm.md)
+- **Gate File**: [task.227.gate.3.step-8-checklist-no-rm.yml](./task.227.gate.3.step-8-checklist-no-rm.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 144 (lock suite 82, checklist suite 62); `npm run ci:fast` 6289/0
+- **Tests Executed**: 146 (lock suite 84, checklist suite 62); `npm run ci:fast` 6289/0
 - **Phases Verified**: 3/3
-- **Critical Issues**: 0 high, 0 medium, 4 low
+- **Critical Issues**: 0 high, 1 medium, 1 low
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
 
-- Cycle 1's QA1-1 and QA1-2 are fixed and mutation-proven; bugs 1 and 2 are closed.
-- TASK-227-QA2-1 and QA2-2 (low, reliability): on the hand-run `--complete` path, held-paths is deleted while the hold-dir record is kept, and an unlistable hold dir reads as empty.
-- TASK-227-QA2-3 (low): `lineRunsNoRm` accepts `rm>` and `rm<` forms (0 corpus occurrences). TASK-227-QA2-4 (low): §3, §4 and criteria 1–2 still describe unconditional hold-dir removal.
+- The four cycle-2 findings are fixed, and the three code fixes are mutation-proven.
+- TASK-227-QA3-1 (medium, bug 3): Step 8's hold-dir check passes an unlistable directory, and `--complete` then keeps the records. Two definitions of one rule disagree.
+- TASK-227-QA3-2 (low): `--complete` deletes a hold-dir record that exists but cannot be read, with no warning.
 
 ## Change Log
 
@@ -300,6 +301,7 @@ None.
 | 2026-10-24 |  | QA findings fixed — QA1-1, QA1-2 (2 MEDIUM), 1 iteration | qa-fix |
 | 2026-10-24 |  | QA gate CONCERNS (90/100) — 4 findings | qa-task |
 | 2026-10-24 |  | QA findings fixed — QA2-1..QA2-4 (4 LOW), 1 iteration | qa-fix |
+| 2026-10-24 |  | QA gate CONCERNS (85/100) — 2 findings | qa-task |
 <!-- change-log-end -->
 
 ---

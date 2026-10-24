@@ -1746,6 +1746,60 @@ describe("executed against fixtures", { concurrency: true }, () => {
       }
     });
 
+    // The states `--complete` keeps the hold records for must also stop Step 8, because both read
+    // `--hold-state`. Step 8 once kept its own copy of the rule and passed an unlistable hold dir
+    // that `--complete` then kept (task 227, QA3-1). Root reads mode-000 files, so these skip there.
+    const asRoot = process.getuid?.() === 0;
+    for (const [what, lock] of [
+      ["an unlistable hold dir", "dir"],
+      ["an unreadable hold-dir record", "record"],
+    ]) {
+      test(
+        `[${sh}] ${what} fails Step 8, and both hold records survive`,
+        { skip: asRoot },
+        async () => {
+          const fx = await setup(finished("Task"));
+          const hold = path.join(fx.dir, "hold-locked");
+          const rec = path.join(fx.work, ".claude/state/step4-hold-dir.txt");
+          try {
+            fs.mkdirSync(hold);
+            fs.writeFileSync(path.join(hold, "held.txt"), "held\n");
+            write(fx.work, ".claude/state/step4-hold-dir.txt", `${hold}\n`);
+            write(
+              fx.work,
+              ".claude/state/step4-held-paths.txt",
+              `${WORK_ITEM}\nheld.txt\n`,
+            );
+            fs.chmodSync(lock === "dir" ? hold : rec, 0o000);
+            const r = await runChecklist(sh, fx);
+            fs.chmodSync(
+              lock === "dir" ? hold : rec,
+              lock === "dir" ? 0o755 : 0o644,
+            );
+            assert.equal(r.status, 1, r.stdout);
+            assert.match(r.stdout, /never restored/);
+            assert.match(
+              r.stdout,
+              lock === "dir" ? /cannot be listed/ : /cannot be read/,
+            );
+            for (const kept of ["step4-hold-dir.txt", "step4-held-paths.txt"]) {
+              assert.ok(
+                fs.existsSync(path.join(fx.work, ".claude/state", kept)),
+                `${kept} was deleted`,
+              );
+            }
+          } finally {
+            for (const p of [hold, rec]) {
+              try {
+                fs.chmodSync(p, 0o755);
+              } catch {}
+            }
+            cleanup(fx.dir);
+          }
+        },
+      );
+    }
+
     test(`[${sh}] a held record for another work item is named, not applied silently`, async () => {
       const fx = await setup(finished("Task"));
       try {

@@ -17,8 +17,12 @@ All notable changes to this project will be documented in this file. Format foll
     one. Its only caller, the Step 8 Completion Checklist, removed the same five files one line
     earlier, so a pipeline run ends in the same state. A hand-run `--complete` outside Step 8 now
     loses those records too, with one exception: `step4-hold-dir.txt` and `step4-held-paths.txt`
-    are kept, with a warning on stderr, while the hold directory still holds files or cannot be
-    listed, because they are the only pointer to those files and the list of them.
+    are kept, with a warning on stderr, while they are still the only pointer to held files, that
+    is, while the hold directory holds files or the record or directory cannot be read.
+  - **New: `advance-pipeline-lock.sh --hold-state`** prints `clear` or `pending: <why>` for those
+    two records, and reads nothing else. `--complete` keeps them by its answer, and Step 8's
+    held-files check now reads it too instead of carrying its own copy of the rule, so Step 8
+    refuses to finish in every state in which `--complete` would keep them.
   - The guard's matcher (`shared/resources/tests/lib/rm-invocation.mjs`) counts `rm` as a word,
     after quote and escape removal, so `then rm`, `xargs rm`, `/bin/rm`, `\rm` and `rm>/dev/null`
     are all caught.

@@ -269,14 +269,15 @@ elif [ -s "$HELD_REC" ]; then
   # Named, never silent: a record for another work item is not applied here (task.147 QA-3, CR-2).
   echo "⚠️  $HELD_REC names $(head -1 "$HELD_REC"), not {work-item-dir} — its held paths are not checked"
 fi
-# Restore deletes the hold-dir record, so a record that still names a non-empty directory means
-# held files were never restored. Absent from the tree, they would slip past the scope above
-# (task.147 QA-3, CR-3). `--complete` below keeps both hold records in this case, but a run whose files
-# are still in /tmp is not finished, so the check stays.
-HOLD_REC_DIR=$(cat .claude/state/step4-hold-dir.txt 2>/dev/null)
-if [ -n "$HOLD_REC_DIR" ] && [ -n "$(ls -A "$HOLD_REC_DIR" 2>/dev/null)" ]; then
-  echo "❌ Step 8 incomplete: Step 4 held files were never restored — run the Restore Held Files block (they are in $HOLD_REC_DIR)"; exit 1
-fi
+# Restore deletes the hold-dir record, so a record that is still pending means held files were
+# never restored. Absent from the tree, they would slip past the scope above (task.147 QA-3,
+# CR-3). The rule is the script's own (`--hold-state`), the one `--complete` below keeps the hold
+# records by, so this check refuses exactly the states in which they would be kept. A copy of the
+# rule here once passed an unlistable hold dir that `--complete` then kept (task 227, QA3-1).
+HOLD_STATE=$(bash .agents/skills/{develop-story|develop-task|develop-bug}/references/advance-pipeline-lock.sh --hold-state) \
+  || { echo "❌ Step 8 incomplete: advance-pipeline-lock.sh --hold-state failed — re-run the bundler"; exit 1; }
+[ "$HOLD_STATE" = clear ] \
+  || { echo "❌ Step 8 incomplete: Step 4 held files were never restored — run the Restore Held Files block (${HOLD_STATE#pending: })"; exit 1; }
 bash .agents/skills/{develop-story|develop-task|develop-bug}/references/verify-push-state.sh --base "$BASE_BRANCH" "${SCOPE_ARGS[@]}" "${PR_ARGS[@]}"
 VERIFY_EXIT=$?
 [ "$VERIFY_EXIT" -eq 0 ] || { echo "❌ Step 8 incomplete: verify-push-state failed (exit $VERIFY_EXIT)"; exit 1; }
@@ -286,7 +287,7 @@ VERIFY_EXIT=$?
 # failed check above exits with the lock still at 8, which is what keeps a resume possible.
 # It also removes Step 4's three records (task.147 QA-2, CR-7) and the two 5c carry records
 # (task.173 QA-3, CR-1), which a later run would read as current — all but the two hold records while
-# the hold directory still holds files, which the check above has already refused. This block removes nothing
+# `--hold-state` reads pending, which the check above has already refused. This block removes nothing
 # itself, so a host's removal check has nothing in it to refuse (task 227).
 bash .agents/skills/{develop-story|develop-task|develop-bug}/references/advance-pipeline-lock.sh --complete
 
