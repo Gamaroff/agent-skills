@@ -653,16 +653,20 @@ test("task.217: Step 5 skips a finding whose working tree differs from the tree 
     /^([ \t]*)# Which findings Step 5 may edit\.[^\n]*\n[\s\S]*?(?=^\1```)/m,
   );
   assert.ok(m, "could not find the Step 5 apply-list block");
-  // The shipped copy of the checker, at the path the block runs it by.
+  // The shipped copy of the checker. The block runs it by its root-relative path, unchanged: the
+  // fixture installs the copy at that path, so the test runs the block exactly as shipped (QA3-1 —
+  // swapping in an absolute path hid that the block cannot load the checker from a subdirectory).
   const engine = path.join(ROOT, "references", "finding-anchors.js");
+  const CHECKER_PATH =
+    ".agents/skills/review-code/references/finding-anchors.js";
   const block = m[0]
     .split("\n")
     .map((l) => (l.startsWith(m[1]) ? l.slice(m[1].length) : l))
-    .join("\n")
-    .replaceAll(
-      ".agents/skills/review-code/references/finding-anchors.js",
-      engine,
-    );
+    .join("\n");
+  assert.ok(
+    block.includes(CHECKER_PATH),
+    "Step 5 runs the checker by its root-relative bundled path",
+  );
   assert.match(
     block,
     /--fix-list/,
@@ -690,6 +694,11 @@ test("task.217: Step 5 skips a finding whose working tree differs from the tree 
     fs.writeFileSync(path.join(dir, "b.js"), "staged\n");
     git("add", ".");
     fs.writeFileSync(path.join(dir, "a.js"), "worktree\n");
+    // The checker where a consumer has it, untracked, after the commits the trees are read from.
+    fs.mkdirSync(path.join(dir, path.dirname(CHECKER_PATH)), {
+      recursive: true,
+    });
+    fs.copyFileSync(engine, path.join(dir, CHECKER_PATH));
     const findings = path.join(dir, "findings.json");
     const review = {
       code_review: {
@@ -739,16 +748,29 @@ test("task.217: Step 5 skips a finding whose working tree differs from the tree 
       "skipped — unverified anchor: CR-3",
       "skipped — unverified anchor: CR-4",
     ];
-    // --staged: the index was checked. From the root and from a subdirectory alike (QA2-2), and the
-    // U+FEFF-led anchor names the file the checker checked (QA2-3).
+    // --staged: the index was checked, and the U+FEFF-led anchor names the file the checker checked
+    // (QA2-3).
     check("--index");
-    for (const cwd of [dir, path.join(dir, "sub")]) {
-      assert.deepEqual(runFrom(cwd), [
-        "skipped — working tree differs from the staged content that was reviewed: CR-1 (a.js)",
-        "apply: CR-2 (b.js)",
-        ...unverified,
-      ]);
-    }
+    const stagedList = [
+      "skipped — working tree differs from the staged content that was reviewed: CR-1 (a.js)",
+      "apply: CR-2 (b.js)",
+      ...unverified,
+    ];
+    assert.deepEqual(runFrom(dir), stagedList);
+    // The checker's answer does not depend on the cwd (QA2-2): the same list from a subdirectory.
+    const fromSub = spawnSync(
+      process.execPath,
+      [path.join(dir, CHECKER_PATH), "--fix-list", "--findings-file", findings],
+      { cwd: path.join(dir, "sub"), encoding: "utf8" },
+    );
+    assert.equal(fromSub.status, 0, fromSub.stderr);
+    assert.deepEqual(fromSub.stdout.trim().split("\n"), stagedList);
+    // The block runs from the root (QA3-1): from a subdirectory it cannot load the checker by its
+    // root-relative path, so it HALTs and lists nothing to apply — closed, never a guess.
+    const sub = runRaw(findings, path.join(dir, "sub"));
+    assert.notEqual(sub.status, 0, sub.stdout);
+    assert.match(sub.stdout, /HALT: finding-anchors produced no apply list/);
+    assert.doesNotMatch(sub.stdout, /apply:/);
     // Control: a working-tree review checked the working tree, so a.js is applied.
     check();
     assert.deepEqual(runFrom(dir), [
@@ -758,7 +780,7 @@ test("task.217: Step 5 skips a finding whose working tree differs from the tree 
     ]);
     // QA1-3: a range/PR review checked a commit; a.js and b.js both differ from it on disk.
     check("--rev", "HEAD");
-    assert.deepEqual(runFrom(path.join(dir, "sub")), [
+    assert.deepEqual(runFrom(dir), [
       `skipped — working tree differs from commit ${head}, the content that was reviewed: CR-1 (a.js)`,
       `skipped — working tree differs from commit ${head}, the content that was reviewed: CR-2 (b.js)`,
       ...unverified,

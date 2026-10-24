@@ -4,7 +4,7 @@
 **Bug ID**: TASK-217-BUG-3
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 2 refute pass, CR-1)
 **Date Found**: 2026-10-24
 
@@ -90,3 +90,4 @@ case-level fill. Do not drop the check to keep the probe reachable.
 | 2026-10-24 | New | qa-task | Found by task.217.qa.2.finding-anchors-advisory-follow-ups.md |
 | 2026-10-24 | In Progress | qa-fix | Investigation started (qa-fix cycle 2) |
 | 2026-10-24 | Ready for QA | qa-fix | Fix implemented — finding-anchors.js --fix-list (qa-fix cycle 2) |
+| 2026-10-24 | Closed | qa-task | Verified by task.217.qa.3.finding-anchors-advisory-follow-ups.md |

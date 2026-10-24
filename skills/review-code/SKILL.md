@@ -272,16 +272,17 @@ Only if `--fix` is set:
 1. Apply each finding's `suggested_action` to the working tree. **Do not commit** — leave changes for the user to review.
    **Skip every finding whose `anchor_check` is `no-such-file`, `out-of-range`, `text-mismatch` or `unparseable`** (Step 2b) and list it as "skipped — unverified anchor". Editing a line the reviewer mislocated is the one outcome worse than not fixing it.
    **Under `--staged`, a range or a PR target, also skip every finding whose file on disk differs from the content Step 2b checked**: the index under `--staged`, the commit under a range or PR. The edit lands on the working tree, so on such a file it would land on a line nobody checked (task.217). A file that cannot be read on either side is skipped too.
-   **The checker decides, from its own stamp.** `finding-anchors.js --fix-list` reads which tree Step 2b checked and from which root out of the `anchor_checked` stamp `--annotate` wrote, and parses each anchor with the parse that checked it. Nothing here re-binds the target, so an unfilled or misspelled one cannot turn the comparison off, and the block gives the same answer from any directory (task.217 QA cycle 2). **A findings file the checker never annotated applies nothing**: no stamp, a stale count, a verdict that is not the checker's, or a stamp from an older checker that does not say which tree it checked is refused, and the block HALTs. Decide which findings to apply with this block before editing anything:
+   **The checker decides, from its own stamp.** `finding-anchors.js --fix-list` reads which tree Step 2b checked and from which root out of the `anchor_checked` stamp `--annotate` wrote, and parses each anchor with the parse that checked it. Nothing here re-binds the target, so an unfilled or misspelled one cannot turn the comparison off, and the checker gives the same answer from any directory (task.217 QA cycle 2). The block itself runs from the repository root, like every block in this skill: it names the checker by a root-relative path, so from anywhere else node cannot load it and the block HALTs, applying nothing (task.217 QA cycle 3). **A findings file the checker never annotated applies nothing**: no stamp, a stale count, a verdict that is not the checker's, or a stamp from an older checker that does not say which tree it checked is refused, and the block HALTs. Decide which findings to apply with this block before editing anything:
 
    ```bash
    # Which findings Step 5 may edit. Every input is bound here: a fresh shell carries nothing over.
    FINDINGS_JSON="{findings-json}"   # Step 2b — the file finding-anchors.js annotated
    [ -s "$FINDINGS_JSON" ] || { echo "HALT: FINDINGS_JSON ($FINDINGS_JSON) is missing or empty"; exit 1; }
    # The checker's own stamp says which tree it checked (working tree, index or commit) and from
-   # which root, so no target is bound here and the cwd does not matter (task.217 QA cycle 2). It
-   # refuses a file it never annotated, on stderr. Any non-zero exit — a refusal, or a checker that
-   # did not load — applies nothing.
+   # which root, so no target is bound here and its answer does not depend on the cwd (task.217 QA
+   # cycle 2). Run this block from the repository root: the path below is relative to it, and from
+   # anywhere else the checker does not load. It refuses a file it never annotated, on stderr. Any
+   # non-zero exit — a refusal, or a checker that did not load — applies nothing.
    LIST=$(command node .agents/skills/review-code/references/finding-anchors.js \
      --fix-list --findings-file "$FINDINGS_JSON") || {
      echo "HALT: finding-anchors produced no apply list for $FINDINGS_JSON (its reason is above) — run Step 2b's anchor check first; nothing applied"; exit 1; }

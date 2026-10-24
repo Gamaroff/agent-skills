@@ -31,8 +31,9 @@ All notable changes to this project will be documented in this file. Format foll
     differs from the staged content that was checked; under a range or PR target, one whose file
     differs from the commit that was checked. The fix lands on the working tree, where it would hit
     a line nobody checked. Nothing re-binds the target, so an unfilled one cannot turn the skip off,
-    and the answer is the same from any directory. A path led by U+FEFF is parsed as the checker
-    parsed it.
+    and the checker's answer does not depend on the cwd; the block runs from the repository root,
+    and from anywhere else it HALTs and applies nothing. A path led by U+FEFF is parsed as the
+    checker parsed it.
   - `/review-code`'s `--inline` block binds `PR_NUMBER` and `SUMMARY_FILE`, makes its scratch file
     after the guard and removes it. As written it read three variables nothing bound. It now exits
     with the poster's status, which the cleanup used to mask, and sits under its own heading so the

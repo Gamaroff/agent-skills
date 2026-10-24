@@ -1,0 +1,71 @@
+schema: 2
+task: 'task.217.finding-anchors-advisory-follow-ups'
+task_title: 'Finding-anchors advisory follow-ups'
+gate: CONCERNS
+status_reason: 'All four cycle-2 findings are fixed, and every probe control engages (73 executed, 0 escaped). One new medium remains: the Step 5 block says it gives the same answer from any directory, but it runs the checker by a cwd-relative path, so from a subdirectory it HALTs. The block test replaces that path with an absolute one, so it cannot see this.'
+reviewer: 'QA Engineer'
+head: '0e350ce2ffec81e18c7e50a58fe1df26781d7b4e'
+updated: '2026-10-24T05:50:52Z'
+
+top_issues:
+  - id: 'TASK-217-QA3-1'
+    severity: medium
+    file: 'skills/review-code/SKILL.md'
+    finding: 'CR-1 (reproduced): Step 5 runs `.agents/skills/review-code/references/finding-anchors.js` by a cwd-relative path. From skills/ node exits 1 with "Cannot find module", and the block HALTs. That contradicts the prose at SKILL.md:275 ("the block gives the same answer from any directory") and BUG-4 verification step 1. The block test (review-code.test.js:657) swaps the path for an absolute engine path, so its run from sub/ cannot see the problem. The failure is closed: nothing is applied.'
+    suggested_action: 'Either resolve the script from `git rev-parse --show-toplevel` (HALT if that fails) or scope the claim to the checker and say the block runs from the repository root like every block; then make the block test run the real relative path from a subdirectory, so the test and the claim agree.'
+    suggested_owner: dev
+    bug_ref: 'task.217.bug.5.step5-relative-checker-path.md'
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 255
+  phases_verified: 3/3
+  ci: 'pass @ 0e350ce2 (link-check, secret-scan, shellcheck, test, validate)'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 73
+    escaped: 0
+    notes: 'All three controls engage: review-code --inline (Step 4.2) 19/19, review-pr --inline 31/31, review-code Step 5 23/23. The Step 5 TARGET and cwd fail-open paths are gone (QA2-1, QA2-2). The remaining Step 5 defect (QA3-1) fails closed.'
+  performance:
+    status: PASS
+    notes: '--fix-list reads each checked path once (cached per path), one git cat-file per path under index or rev.'
+  reliability:
+    status: CONCERNS
+    notes: 'QA3-1: run from a subdirectory, Step 5 HALTs instead of giving the documented same answer. It fails closed, but the claim and its test are both wrong. TMPDIR=/tmp 47/47; TMPDIR in the scratchpad 65/65.'
+  maintainability:
+    status: PASS
+    notes: 'The Step 5 decision moved into the engine that writes the stamp; the shell skip list and the restated stamp guard are gone; restatements held drop from 5 to 3.'
+
+recommendations:
+  immediate:
+    - action: 'Make the Step 5 claim and its test agree with the block (QA3-1).'
+      refs: ['skills/review-code/SKILL.md', 'skills/review-code/tests/review-code.test.js']
+  future:
+    - action: 'CR-2 (medium/medium, advisory; the same class as gate 1 CR-3): --fix-list trusts the stored anchor_check and the stamp count rather than re-checking, so a file_line edited after --annotate still lists as apply, and a worktree stamp compares nothing. Re-run checkAnchors against the stamped tree, or bind a digest of each anchor in the stamp.'
+      refs: ['shared/resources/finding-anchors.js']
+    - action: 'CR-3 (cleanup): the review-code --inline guard `: "${PR_NUMBER:?…}"` cannot fire, because PR_NUMBER is assigned the literal placeholder on the line above. Use a digits check, or rely on pr-inline-comment.js.'
+      refs: ['skills/review-code/SKILL.md']
+    - action: 'Carried from gate 2: CR-4 (Step 4.3 $SUMMARY_FILE unbound, pre-existing), CR-6 (dispatcher population scan width), CR-7 (Step 4 heading layout), and multi-slot fence: probes.'
+      refs: ['skills/review-code/SKILL.md', 'evals/shared/tests/finding-anchors-blocks.test.mjs', 'shared/resources/security-probe.mjs']
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 1
+  fix_date: '2026-10-24'
+  total_iterations: 1
+  verification_method: 'Committed tests re-proven by mutation in a scratch worktree (5 covered) and the probe record task.217.qa.3.security.run.json'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['QA3-1 fixed']

@@ -328,25 +328,21 @@ None.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-24
-**Quality Score**: 80/100
+**Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.217.qa.2.finding-anchors-advisory-follow-ups.md](./task.217.qa.2.finding-anchors-advisory-follow-ups.md)
-- **Gate File**: [task.217.gate.2.finding-anchors-advisory-follow-ups.yml](./task.217.gate.2.finding-anchors-advisory-follow-ups.yml)
+- **Full Report**: [task.217.qa.3.finding-anchors-advisory-follow-ups.md](./task.217.qa.3.finding-anchors-advisory-follow-ups.md)
+- **Gate File**: [task.217.gate.3.finding-anchors-advisory-follow-ups.yml](./task.217.gate.3.finding-anchors-advisory-follow-ups.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 6281 (`ci:fast`: 6267 pass, 0 fail, 14 skipped); 69 security probes, 0 escaped
+- **Tests Executed**: 255 (targeted suites, 0 fail); 73 security probes, 0 escaped; 5 mutation proofs covered
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-All six cycle-1 findings are fixed and mutation-proven, and TASK-217-BUG-1 and BUG-2 are closed. The cycle-2 refute pass found two medium defects. Both are reproduced, and both make the Step 5 tree-diff skips fail open:
-- An unfilled or misspelled `TARGET` disables them ([TASK-217-BUG-3](./task.217.bug.3.step5-target-unchecked.md)).
-- A run from a subdirectory makes every path look clean ([TASK-217-BUG-4](./task.217.bug.4.step5-cwd-fails-open.md)).
-
-There are two low findings. The first is a BOM trim mismatch between the jq selectors and JS `trim()`. The second is a CHANGELOG claim that holds only for `/review-pr`.
+All four cycle-2 findings are fixed, and TASK-217-BUG-3 and BUG-4 are closed. One new medium remains: the Step 5 block says it gives the same answer from any directory, but it runs the checker by a cwd-relative path, so from a subdirectory it HALTs. The block test swaps that path for an absolute one, so it cannot see this. The failure is closed and nothing is applied ([TASK-217-BUG-5](./task.217.bug.5.step5-relative-checker-path.md)).
 
 <!-- change-log-start -->
 ## Change Log
@@ -361,6 +357,8 @@ There are two low findings. The first is a BOM trim mismatch between the jq sele
 | 2026-10-24 |         | QA findings fixed — 6 of 6 (QA1-1..QA1-6), 1 iteration; gate re-review pending | qa-fix |
 | 2026-10-24 |         | QA gate CONCERNS (80/100) — 4 findings (2 medium, 2 low) | qa-task |
 | 2026-10-24 |         | QA findings fixed — 4 of 4 (QA2-1..QA2-4), 1 iteration; Step 5's apply list moved into finding-anchors.js --fix-list; gate re-review pending | qa-fix |
+| 2026-10-24 |         | QA gate CONCERNS (90/100) — 1 finding (1 medium) | qa-task |
+| 2026-10-24 |         | QA findings fixed — 1 of 1 (QA3-1), 1 iteration; the Step 5 cwd claim scoped to the checker, and the block test runs the shipped path; gate re-review pending | qa-fix |
 <!-- change-log-end -->
 
 ---
