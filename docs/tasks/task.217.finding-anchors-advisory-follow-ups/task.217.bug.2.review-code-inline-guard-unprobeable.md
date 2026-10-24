@@ -4,7 +4,7 @@
 **Bug ID**: TASK-217-BUG-2
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 1 boundary probe)
 **Date Found**: 2026-10-23
 
@@ -80,3 +80,4 @@ the run in the security record is QA cycle 2's step.
 | 2026-10-23 | New | qa-task | Found by task.217.qa.1.finding-anchors-advisory-follow-ups.md |
 | 2026-10-24 | In Progress | qa-fix | Fix cycle 1 started |
 | 2026-10-24 | Ready for QA | qa-fix | --inline block under its own heading; probe 19/19 engages |
+| 2026-10-24 | Closed | qa-task | Verified by task.217.qa.2.finding-anchors-advisory-follow-ups.md |

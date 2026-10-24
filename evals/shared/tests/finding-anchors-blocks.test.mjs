@@ -60,14 +60,19 @@ function fencedBlocks(text) {
   return out;
 }
 
-/** The one block that INVOKES the checker (another may only mention it in a comment). */
+/**
+ * The one block that INVOKES the check (another may only mention it in a comment). review-code's
+ * Step 5 runs the engine too, in its `--fix-list` mode, which reads a file the check wrote and is
+ * not a check (task.217 QA cycle 2).
+ */
 function checkerBlock(skill) {
   const text = readFileSync(
     path.join(ROOT, "skills", skill, "SKILL.md"),
     "utf8",
   );
-  const hits = fencedBlocks(text).filter((b) =>
-    /command node \S*finding-anchors\.js/.test(b),
+  const hits = fencedBlocks(text).filter(
+    (b) =>
+      /command node \S*finding-anchors\.js/.test(b) && !/--fix-list/.test(b),
   );
   assert.equal(
     hits.length,
@@ -234,8 +239,9 @@ test("the dispatcher population is derived from the tree and equals DISPATCHERS"
 
 // task.217: the `--inline` guards and review-pr's schema restate the seven verdicts. Each copy must
 // equal the engine's own set — derived from its exports, never a third literal list here.
-// The guards and the schema restate all seven verdicts; review-code's Step 5 skip restates the four
-// MALFORMED ones (task.217 QA1-5). Each is held to the engine's own set.
+// The guards and the schema restate all seven verdicts. review-code's Step 5 restated the four
+// MALFORMED ones and the stamp guard (QA1-5) until QA cycle 2 moved its decision into the engine's
+// `--fix-list`; the skip-list matcher stays, so a shell copy that comes back is held too.
 test("every restated verdict list equals the engine's MALFORMED ∪ CLEAN, or MALFORMED", () => {
   const { MALFORMED, CLEAN } = createRequire(import.meta.url)(ENGINE);
   const engine = [...MALFORMED, ...CLEAN].sort();
@@ -263,13 +269,7 @@ test("every restated verdict list equals the engine's MALFORMED ∪ CLEAN, or MA
   }
   assert.deepEqual(
     copies.map(([w]) => w).sort(),
-    [
-      "review-code skip list",
-      "review-code stamp guard",
-      "review-code stamp guard",
-      "review-pr schema",
-      "review-pr stamp guard",
-    ],
+    ["review-code stamp guard", "review-pr schema", "review-pr stamp guard"],
     "the restatements this test holds",
   );
   for (const [where, list, want] of copies)

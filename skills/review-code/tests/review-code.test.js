@@ -643,18 +643,32 @@ test("task.217: the --inline block runs with only its placeholders substituted, 
   }
 });
 
-// task.217 (task.195 gate 2 CR-3): with --staged, Step 2b checks anchors against the index, but Step 5
-// edits the working tree. A finding whose file differs between the two must be skipped, not applied.
-test("task.217: Step 5 under --staged skips a finding whose working tree differs from the index", (t) => {
-  if (spawnSync("jq", ["--version"]).error) return t.skip("jq not installed");
+// task.217 (task.195 gate 2 CR-3; QA cycle 2): Step 2b checks anchors against the tree that was
+// reviewed — the index under --staged, the commit under a range or PR — but Step 5 edits the working
+// tree. A finding whose file differs between the two must be skipped, not applied. QA cycle 2 found
+// the shell copy of that decision failed open on an unfilled TARGET and on a cwd below the root, so
+// the block now asks the checker, which reads the tree and the root from its own stamp.
+test("task.217: Step 5 skips a finding whose working tree differs from the tree Step 2b checked", () => {
   const m = read("SKILL.md").match(
-    /^([ \t]*)# Which findings Step 5 may edit\.[^\n]*\n[\s\S]*?^\1done$/m,
+    /^([ \t]*)# Which findings Step 5 may edit\.[^\n]*\n[\s\S]*?(?=^\1```)/m,
   );
   assert.ok(m, "could not find the Step 5 apply-list block");
+  // The shipped copy of the checker, at the path the block runs it by.
+  const engine = path.join(ROOT, "references", "finding-anchors.js");
   const block = m[0]
     .split("\n")
     .map((l) => (l.startsWith(m[1]) ? l.slice(m[1].length) : l))
-    .join("\n");
+    .join("\n")
+    .replaceAll(
+      ".agents/skills/review-code/references/finding-anchors.js",
+      engine,
+    );
+  assert.match(
+    block,
+    /--fix-list/,
+    "Step 5 asks the checker for its apply list",
+  );
+  assert.doesNotMatch(block, /\{target:/, "Step 5 binds no target of its own");
   const os = require("os");
   const { execFileSync } = require("child_process");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "staged-fix-"));
@@ -665,6 +679,8 @@ test("task.217: Step 5 under --staged skips a finding whose working tree differs
         stdio: "ignore",
       });
     git("init", "-q");
+    fs.mkdirSync(path.join(dir, "sub"));
+    fs.writeFileSync(path.join(dir, "sub", "keep"), "");
     fs.writeFileSync(path.join(dir, "a.js"), "one\n");
     fs.writeFileSync(path.join(dir, "b.js"), "one\n");
     git("add", ".");
@@ -675,110 +691,131 @@ test("task.217: Step 5 under --staged skips a finding whose working tree differs
     git("add", ".");
     fs.writeFileSync(path.join(dir, "a.js"), "worktree\n");
     const findings = path.join(dir, "findings.json");
-    const good = stamped({
+    const review = {
       code_review: {
         findings: [
-          { id: "CR-1", file_line: "a.js:1", anchor_check: "ok" },
-          {
-            id: "CR-2",
-            file_line: " b.js:1",
-            anchor_check: "unchecked-text",
-          },
-          { id: "CR-3", file_line: "b.js:9", anchor_check: "out-of-range" },
-          { id: "CR-4", file_line: "b.js", anchor_check: "unparseable" },
+          { id: "CR-1", file_line: "a.js:1" },
+          { id: "CR-2", file_line: " ﻿b.js:1" },
+          { id: "CR-3", file_line: "b.js:9" },
+          { id: "CR-4", file_line: "b.js" },
         ],
       },
-    });
-    fs.writeFileSync(findings, JSON.stringify(good));
-    const runRaw = (target, file = findings) =>
+    };
+    // Step 2b, for real: the checker annotates and stamps the file with the tree it read.
+    const check = (...extra) => {
+      fs.writeFileSync(findings, JSON.stringify(review));
       spawnSync(
-        "bash",
+        process.execPath,
         [
-          "-c",
-          block
-            .replaceAll("{findings-json}", file)
-            .replace(/\{target:[^}]*\}/, target),
+          engine,
+          "--findings-file",
+          findings,
+          "--root",
+          dir,
+          ...extra,
+          "--annotate",
+          findings,
         ],
         { cwd: dir, encoding: "utf8" },
       );
-    const runFor = (target) => {
-      const r = runRaw(target);
+    };
+    const runRaw = (file = findings, cwd = dir) =>
+      spawnSync("bash", ["-c", block.replaceAll("{findings-json}", file)], {
+        cwd,
+        encoding: "utf8",
+      });
+    const runFrom = (cwd) => {
+      const r = runRaw(findings, cwd);
       assert.equal(r.status, 0, r.stdout + r.stderr);
       return r.stdout.trim().split("\n");
     };
-    assert.deepEqual(runFor("staged"), [
-      "skipped — working tree differs from the staged content that was reviewed: CR-1 (a.js)",
-      "apply: CR-2 (b.js)",
+    const head = execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: dir,
+      encoding: "utf8",
+    })
+      .trim()
+      .slice(0, 12);
+    const unverified = [
       "skipped — unverified anchor: CR-3",
       "skipped — unverified anchor: CR-4",
-    ]);
-    // A findings file jq cannot read is a HALT, never an empty apply list.
-    fs.writeFileSync(path.join(dir, "bad.json"), "not json");
-    const bad = spawnSync(
-      "bash",
-      [
-        "-c",
-        block
-          .replaceAll("{findings-json}", path.join(dir, "bad.json"))
-          .replace(/\{target:[^}]*\}/, "staged"),
-      ],
-      { cwd: dir, encoding: "utf8" },
-    );
-    assert.equal(bad.status, 1);
-    assert.match(bad.stdout, /HALT: .*nothing applied/);
+    ];
+    // --staged: the index was checked. From the root and from a subdirectory alike (QA2-2), and the
+    // U+FEFF-led anchor names the file the checker checked (QA2-3).
+    check("--index");
+    for (const cwd of [dir, path.join(dir, "sub")]) {
+      assert.deepEqual(runFrom(cwd), [
+        "skipped — working tree differs from the staged content that was reviewed: CR-1 (a.js)",
+        "apply: CR-2 (b.js)",
+        ...unverified,
+      ]);
+    }
     // Control: a working-tree review checked the working tree, so a.js is applied.
-    assert.deepEqual(runFor("worktree").slice(0, 2), [
+    check();
+    assert.deepEqual(runFrom(dir), [
       "apply: CR-1 (a.js)",
       "apply: CR-2 (b.js)",
+      ...unverified,
     ]);
-    // QA1-3: a range/PR review checked HEAD; a.js and b.js both differ from HEAD on disk.
-    assert.deepEqual(runFor("range"), [
-      "skipped — working tree differs from HEAD, the content that was reviewed: CR-1 (a.js)",
-      "skipped — working tree differs from HEAD, the content that was reviewed: CR-2 (b.js)",
-      "skipped — unverified anchor: CR-3",
-      "skipped — unverified anchor: CR-4",
+    // QA1-3: a range/PR review checked a commit; a.js and b.js both differ from it on disk.
+    check("--rev", "HEAD");
+    assert.deepEqual(runFrom(path.join(dir, "sub")), [
+      `skipped — working tree differs from commit ${head}, the content that was reviewed: CR-1 (a.js)`,
+      `skipped — working tree differs from commit ${head}, the content that was reviewed: CR-2 (b.js)`,
+      ...unverified,
     ]);
-    // QA1-1: input the checker never annotated applies nothing — the --inline guard's contract.
+    // QA1-1: input the checker never annotated applies nothing; a missing file HALTs too.
+    check("--index");
+    const good = JSON.parse(fs.readFileSync(findings, "utf8"));
     const { anchor_checked, ...unstamped } = good;
     const hostile = {
       "no stamp": unstamped,
       "stale count": {
         ...good,
-        anchor_checked: { by: "finding-anchors", findings: 3 },
+        anchor_checked: { ...anchor_checked, findings: 3 },
       },
       "foreign stamp": {
         ...good,
-        anchor_checked: { by: "someone-else", findings: 4 },
+        anchor_checked: { ...anchor_checked, by: "someone-else" },
       },
-      "unknown verdict": stamped({
+      "an older checker's stamp": {
+        ...good,
+        anchor_checked: { by: "finding-anchors", findings: 4 },
+      },
+      "unknown verdict": {
+        ...good,
         code_review: {
-          findings: [{ id: "CR-1", file_line: "b.js:1", anchor_check: "fine" }],
+          findings: good.code_review.findings.map((f) => ({
+            ...f,
+            anchor_check: "fine",
+          })),
         },
-      }),
-      "missing verdict": stamped({
-        code_review: { findings: [{ id: "CR-1", file_line: "b.js:1" }] },
-      }),
-      "no findings array": stamped({ code_review: {} }),
+      },
+      "missing verdict": { ...review, anchor_checked },
+      "no findings array": {
+        code_review: {},
+        anchor_checked: { ...anchor_checked, findings: 0 },
+      },
       "empty object": {},
       "top-level array": [],
+      "not JSON": "not json",
     };
     for (const [name, doc] of Object.entries(hostile)) {
       const f = path.join(dir, "hostile.json");
-      fs.writeFileSync(f, JSON.stringify(doc));
-      const r = runRaw("worktree", f);
+      fs.writeFileSync(f, typeof doc === "string" ? doc : JSON.stringify(doc));
+      const r = runRaw(f);
       assert.equal(r.status, 1, `${name}: ${r.stdout}`);
       assert.match(r.stdout, /HALT: .*nothing applied/, name);
       assert.doesNotMatch(r.stdout, /^apply:/m, name);
     }
-    // Control for the guard: an annotated file with no findings is an empty list, not a HALT.
-    const none = path.join(dir, "none.json");
-    fs.writeFileSync(
-      none,
-      JSON.stringify(stamped({ code_review: { findings: [] } })),
-    );
-    const empty = runRaw("worktree", none);
-    assert.equal(empty.status, 0, empty.stdout);
-    assert.equal(empty.stdout.trim(), "");
+    const missing = runRaw(path.join(dir, "absent.json"));
+    assert.equal(missing.status, 1);
+    assert.match(missing.stdout, /HALT: FINDINGS_JSON .* is missing or empty/);
+    // Control for the refusals: an annotated file with no findings is an empty list, not a HALT.
+    review.code_review.findings = [];
+    check("--index");
+    const empty = runRaw();
+    assert.equal(empty.status, 0, empty.stdout + empty.stderr);
+    assert.equal(empty.stdout, "");
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

@@ -193,7 +193,11 @@ Only if `--comment` is set and a PR exists for the current branch (or `target` n
    # The scratch file is made only once the input is accepted, so no refusal leaves one behind.
    # The anchor is parsed in the checker's grammar — trimmed, then `(\S+):(-?\d+)` — so the LAST
    # colon splits path from line and the posted path is the trimmed one the checker verified
-   # (task.217). The `?` on capture yields empty on a non-match, never an abort.
+   # (task.217). The `?` on capture yields empty on a non-match, never an abort. jq's trim is not
+   # JS trim(): a path led by U+FEFF is verified without it and posted with it. That path names no
+   # file in the diff. GitHub rejects it (422), so the post reports `anchor-failed` and the finding
+   # lands in the summary, never on another line (task.217 QA2-3). Bitbucket's answer to such a
+   # path is untested.
    INLINE_FILE="$(mktemp -t review-code-inline.XXXXXX.json)"
    jq '[ .code_review.findings[]?
          | select(.anchor_check == "ok" or .anchor_check == "unchecked-text")
@@ -267,50 +271,21 @@ Only if `--fix` is set:
 
 1. Apply each finding's `suggested_action` to the working tree. **Do not commit** — leave changes for the user to review.
    **Skip every finding whose `anchor_check` is `no-such-file`, `out-of-range`, `text-mismatch` or `unparseable`** (Step 2b) and list it as "skipped — unverified anchor". Editing a line the reviewer mislocated is the one outcome worse than not fixing it.
-   **Under `--staged`, also skip every finding whose file differs between the working tree and the index**, and list it as "skipped — working tree differs from the staged content that was reviewed". Step 2b checked the anchor against the index (`--index`), and the edit lands on the working tree, so on such a file it would land on a line nobody checked (task.217). **Under a range or PR target, skip every finding whose file differs between the working tree and `HEAD`** for the same reason: Step 2b checked it at `--rev HEAD`.
-   **A findings file the checker never annotated applies nothing.** The block runs the `--inline` guard of Step 4.2 first — the array, the checker's stamp, a count equal to the findings present, and only the checker's seven verdicts — and HALTs when it fails, because an un-annotated finding carries no `anchor_check` and would otherwise read as applicable. Decide which findings to apply with this block, from the repository root, before editing anything:
+   **Under `--staged`, a range or a PR target, also skip every finding whose file on disk differs from the content Step 2b checked**: the index under `--staged`, the commit under a range or PR. The edit lands on the working tree, so on such a file it would land on a line nobody checked (task.217). A file that cannot be read on either side is skipped too.
+   **The checker decides, from its own stamp.** `finding-anchors.js --fix-list` reads which tree Step 2b checked and from which root out of the `anchor_checked` stamp `--annotate` wrote, and parses each anchor with the parse that checked it. Nothing here re-binds the target, so an unfilled or misspelled one cannot turn the comparison off, and the block gives the same answer from any directory (task.217 QA cycle 2). **A findings file the checker never annotated applies nothing**: no stamp, a stale count, a verdict that is not the checker's, or a stamp from an older checker that does not say which tree it checked is refused, and the block HALTs. Decide which findings to apply with this block before editing anything:
 
    ```bash
    # Which findings Step 5 may edit. Every input is bound here: a fresh shell carries nothing over.
    FINDINGS_JSON="{findings-json}"   # Step 2b — the file finding-anchors.js annotated
-   TARGET="{target: worktree | staged | range}"
    [ -s "$FINDINGS_JSON" ] || { echo "HALT: FINDINGS_JSON ($FINDINGS_JSON) is missing or empty"; exit 1; }
-   # The same guard as Step 4.2: without it, a file the checker never annotated has an empty
-   # anchor_check on every finding, falls through the skip below and is applied (task.217).
-   jq -e '(.code_review.findings | type == "array")
-          and (.anchor_checked.by == "finding-anchors")
-          and (.anchor_checked.findings == (.code_review.findings | length))
-          and ([ .code_review.findings[]?
-                 | select(.anchor_check | IN("ok","unchecked-text","no-line","no-such-file","out-of-range","text-mismatch","unparseable") | not) ]
-               | length == 0)' \
-      "$FINDINGS_JSON" >/dev/null || {
-     echo "HALT: a finding in $FINDINGS_JSON carries no anchor_check (or the file is not findings JSON, has no checker stamp, a stale count, or an unknown verdict) — run Step 2b's anchor check first; nothing applied"; exit 1; }
-   # The path is parsed in the checker's grammar (trimmed, last colon), so it is the file it checked.
-   # A finding whose anchor does not parse is kept with an empty path, never dropped. Fields are
-   # joined with \x1f, not a tab: a tab is whitespace to `read`, and an empty field would collapse.
-   # Read into a variable first: a jq failure piped into `while` would read as an empty list.
-   LIST=$(jq -r '.code_review.findings[]?
-     | (((.file_line | if type == "string" then . else "" end)
-          | capture("^\\s*(?<path>\\S+):(?<line>-?[0-9]+)\\s*$")?) // {}) as $m
-     | [(.id // "?" | tostring), (.anchor_check // "" | tostring), ($m.path // "")] | join("\u001f")' \
-     "$FINDINGS_JSON") || { echo "HALT: $FINDINGS_JSON is not findings JSON — nothing applied"; exit 1; }
-   printf '%s\n' "$LIST" | while IFS=$'\x1f' read -r ID CHECK P; do
-     [ -n "$ID" ] || continue   # an empty list prints one empty line
-     case "$CHECK" in
-       no-such-file|out-of-range|text-mismatch|unparseable)
-         echo "skipped — unverified anchor: $ID"; continue ;;
-     esac
-     # `git diff --quiet` is non-zero when the working tree differs from the tree that was checked
-     # (the index under --staged, HEAD under a range) — and when git cannot answer, which skips too:
-     # an edit nobody can check is not made.
-     if [ "$TARGET" = staged ] && [ -n "$P" ] && ! git diff --quiet -- "$P" 2>/dev/null; then
-       echo "skipped — working tree differs from the staged content that was reviewed: $ID ($P)"; continue
-     fi
-     if [ "$TARGET" = range ] && [ -n "$P" ] && ! git diff --quiet HEAD -- "$P" 2>/dev/null; then
-       echo "skipped — working tree differs from HEAD, the content that was reviewed: $ID ($P)"; continue
-     fi
-     echo "apply: $ID${P:+ ($P)}"
-   done
+   # The checker's own stamp says which tree it checked (working tree, index or commit) and from
+   # which root, so no target is bound here and the cwd does not matter (task.217 QA cycle 2). It
+   # refuses a file it never annotated, on stderr. Any non-zero exit — a refusal, or a checker that
+   # did not load — applies nothing.
+   LIST=$(command node .agents/skills/review-code/references/finding-anchors.js \
+     --fix-list --findings-file "$FINDINGS_JSON") || {
+     echo "HALT: finding-anchors produced no apply list for $FINDINGS_JSON (its reason is above) — run Step 2b's anchor check first; nothing applied"; exit 1; }
+   [ -z "$LIST" ] || printf '%s\n' "$LIST"
    ```
 
    Apply only the `apply:` findings, and carry every `skipped —` line into the item-3 report.

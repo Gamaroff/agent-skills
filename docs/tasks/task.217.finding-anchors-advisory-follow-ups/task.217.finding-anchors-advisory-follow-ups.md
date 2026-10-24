@@ -281,7 +281,7 @@ None.
 1. **The stamp could HALT a legitimate inline post.**
    - Risk: a findings file annotated before this change carries no stamp.
    - Probability: Low, because engine and guard ship together in every bundled skill.
-   - Impact: Medium. The inline post HALTs, and the summary comment still posts.
+   - Impact: Medium. The inline post HALTs. `/review-pr` has already posted its summary comment; `/review-code` posts nothing until the checker is re-run.
    - Mitigation: the HALT message already says to re-run the checker step. Breaking Change 2 documents it.
 2. **The guard's `jq` expression grows.**
    - Risk: task.195's DoD 1 escapes came from exactly this block (`mktemp` before the guard).
@@ -327,22 +327,26 @@ None.
 
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
-**Testing Date**: 2026-10-23
+**Testing Date**: 2026-10-24
 **Quality Score**: 80/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.217.qa.1.finding-anchors-advisory-follow-ups.md](./task.217.qa.1.finding-anchors-advisory-follow-ups.md)
-- **Gate File**: [task.217.gate.1.finding-anchors-advisory-follow-ups.yml](./task.217.gate.1.finding-anchors-advisory-follow-ups.yml)
+- **Full Report**: [task.217.qa.2.finding-anchors-advisory-follow-ups.md](./task.217.qa.2.finding-anchors-advisory-follow-ups.md)
+- **Gate File**: [task.217.gate.2.finding-anchors-advisory-follow-ups.yml](./task.217.gate.2.finding-anchors-advisory-follow-ups.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 6267
+- **Tests Executed**: 6281 (`ci:fast`: 6267 pass, 0 fail, 14 skipped); 69 security probes, 0 escaped
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
 - **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Two medium findings. The new Step 5 apply-list block trusts a findings file the checker never annotated ([TASK-217-BUG-1](./task.217.bug.1.step5-apply-list-unguarded.md)). The review-code `--inline` guard cannot be reached by the probe engine ([TASK-217-BUG-2](./task.217.bug.2.review-code-inline-guard-unprobeable.md)). There are four low findings, one of which is a `CHANGELOG.md` conflict with `develop`.
+All six cycle-1 findings are fixed and mutation-proven, and TASK-217-BUG-1 and BUG-2 are closed. The cycle-2 refute pass found two medium defects. Both are reproduced, and both make the Step 5 tree-diff skips fail open:
+- An unfilled or misspelled `TARGET` disables them ([TASK-217-BUG-3](./task.217.bug.3.step5-target-unchecked.md)).
+- A run from a subdirectory makes every path look clean ([TASK-217-BUG-4](./task.217.bug.4.step5-cwd-fails-open.md)).
+
+There are two low findings. The first is a BOM trim mismatch between the jq selectors and JS `trim()`. The second is a CHANGELOG claim that holds only for `/review-pr`.
 
 <!-- change-log-start -->
 ## Change Log
@@ -355,6 +359,8 @@ Two medium findings. The new Step 5 apply-list block trusts a findings file the 
 | 2026-10-23 |         | Implemented — 12 files (engine + 4 bundled copies, 2 SKILL.md, 4 test files, CHANGELOG), 13 new tests; probe re-run 31/31 | develop |
 | 2026-10-23 |         | QA gate CONCERNS (80/100) — 6 findings (2 medium, 4 low) | qa-task |
 | 2026-10-24 |         | QA findings fixed — 6 of 6 (QA1-1..QA1-6), 1 iteration; gate re-review pending | qa-fix |
+| 2026-10-24 |         | QA gate CONCERNS (80/100) — 4 findings (2 medium, 2 low) | qa-task |
+| 2026-10-24 |         | QA findings fixed — 4 of 4 (QA2-1..QA2-4), 1 iteration; Step 5's apply list moved into finding-anchors.js --fix-list; gate re-review pending | qa-fix |
 <!-- change-log-end -->
 
 ---

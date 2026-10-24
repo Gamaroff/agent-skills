@@ -4,7 +4,7 @@
 **Bug ID**: TASK-217-BUG-1
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 1 diff review, CR-1)
 **Date Found**: 2026-10-23
 
@@ -83,3 +83,4 @@ guards had already been given the stamp contract in the same task; this third co
 | 2026-10-23 | New | qa-task | Found by task.217.qa.1.finding-anchors-advisory-follow-ups.md |
 | 2026-10-24 | In Progress | qa-fix | Fix cycle 1 started |
 | 2026-10-24 | Ready for QA | qa-fix | Step 5 runs the stamp guard; 8 hostile inputs HALT; probe 19/19 |
+| 2026-10-24 | Closed | qa-task | Verified by task.217.qa.2.finding-anchors-advisory-follow-ups.md |

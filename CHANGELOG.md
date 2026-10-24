@@ -10,13 +10,15 @@ All notable changes to this project will be documented in this file. Format foll
   follow-ups from task.195's QA gates:
   - **Breaking: the `--inline` guards of `/review-pr` and `/review-code` require the checker's
     stamp.** `finding-anchors.js --annotate` now writes
-    `anchor_checked: {by: "finding-anchors", findings: N}` beside the lens wrappers. The guards
+    `anchor_checked: {by: "finding-anchors", findings: N, tree, root}` beside the lens wrappers,
+    where `tree` and `root` record what was checked. The guards
     require that stamp, a count equal to the findings present, and an `anchor_check` from the
     checker's seven verdicts. A reviewer that wrote `anchor_check: "ok"` itself, with no checker
     run, used to get its findings posted inline as verified. A findings file annotated by an older
     engine now HALTs the inline post with the existing "run the anchor check first" message;
-    re-run the checker step. The summary comment still posts. `/review-code --fix` applies the
-    same guard before it edits anything, and HALTs with "nothing applied" when it fails.
+    re-run the checker step. `/review-pr` has already posted its summary comment by then;
+    `/review-code` posts nothing until the checker is re-run. `/review-code --fix` refuses the same
+    files before it edits anything, and HALTs with "nothing applied".
   - **Breaking: a non-object finding is refused as `usage`.** A `null` finding crashed the checker,
     which the dispatcher reported as "not runnable". A string finding read `no-line` but was never
     annotated, so the guard then named the wrong cause. Both now exit 2 with `reason: usage`, naming
@@ -24,10 +26,13 @@ All notable changes to this project will be documented in this file. Format foll
   - The inline selectors parse an anchor as the checker does: trimmed, split at the **last**
     colon. A path containing a colon used to post to the wrong file, and a padded `file_line`
     posted a path starting with spaces.
-  - `/review-code --staged --fix` skips a finding whose file differs between the working tree and
-    the index. The anchor was checked against the staged content, and the fix lands on the working
-    tree. A range or PR target skips a finding whose file differs from `HEAD`, the tree its anchor
-    was checked against.
+  - `/review-code --fix` decides what to apply with `finding-anchors.js --fix-list`, which reads
+    the tree and the root from the stamp. Under `--staged` it skips a finding whose file on disk
+    differs from the staged content that was checked; under a range or PR target, one whose file
+    differs from the commit that was checked. The fix lands on the working tree, where it would hit
+    a line nobody checked. Nothing re-binds the target, so an unfilled one cannot turn the skip off,
+    and the answer is the same from any directory. A path led by U+FEFF is parsed as the checker
+    parsed it.
   - `/review-code`'s `--inline` block binds `PR_NUMBER` and `SUMMARY_FILE`, makes its scratch file
     after the guard and removes it. As written it read three variables nothing bound. It now exits
     with the poster's status, which the cleanup used to mask, and sits under its own heading so the

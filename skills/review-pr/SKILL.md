@@ -987,6 +987,10 @@ jq -e '([.code_review, .pr_conformance] | map(select(. != null)) | length > 0)
 # The anchor is parsed in the checker's grammar — trimmed, then `(\S+):(-?\d+)` — so the LAST colon
 # splits path from line and the posted path is the trimmed one the checker verified (task.217). The
 # `?` on capture yields empty on a non-match, never an abort: jq is all-or-nothing inside `[ … ]`.
+# jq's trim is not JS trim(): a path led by U+FEFF is verified without it and posted with it. That
+# path names no file in the diff. GitHub rejects it (422), so the post reports `anchor-failed`
+# and the finding lands in the summary, never on another line (task.217 QA2-3). Bitbucket's
+# answer to such a path is untested.
 INLINE_FILE="$(mktemp -t review-pr-inline.XXXXXX.json)"
 jq '[ (.code_review.findings[]? | select(.anchor_check == "ok" or .anchor_check == "unchecked-text")
        | . + {anchor: .file_line}),
