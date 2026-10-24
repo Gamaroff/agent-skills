@@ -29,7 +29,9 @@ Widen the path grammar in `expectedProblem`, add `removed`, move the four inline
 - `non-remover.sh`: prints and removes nothing. The `removed` mismatch case.
 - `symlink-out.sh`: `ln -s "$OUTSIDE" out` where `OUTSIDE` comes from the case's `fixture.env`. The containment case with `absent: ["out/x"]`.
 
-For `shell-argv:`, `cli:` and `fence:` reuse the same behaviour in the form each needs (an `--argv` template; a `.mjs` CLI; a fenced block in a fixture doc). Copy the shape of the nearest existing fixture of that form rather than inventing one: `cli-echo.mjs` for `cli:`, and the existing `fence:` fixture doc used by the fence tests.
+For `shell-argv:`, `cli:` and `fence:` reuse the same behaviour in the form each needs (an `--argv` template; a `.mjs` CLI; a fenced block in a fixture doc). Copy the shape of the nearest existing fixture of that form rather than inventing one: `cli-echo.mjs` for `cli:`. The `fence:` tests write no fixture file; they build each doc inline with `fenceRoot({ "doc.md": … })` (`security-probe.test.mjs:5234`), so do the same.
+
+**The differential grammar test (review 1, I4).** One table, two columns: the input and whether base refuses it. Base refuses `""`, `"."`, `".."`, NUL, a non-array, a non-string and `5`, and head must still refuse every one. Base accepts bare names (`pwned`, `PWNED2`), and head must still accept them. The only row whose answer flips is an in-directory nested path (`a/b`, `.claude/state/x`). New refusals (`../a`, `/abs`, `a/../../b`) are additional rows.
 
 **The `:943` row.** Today:
 
@@ -80,23 +82,29 @@ Keep the BUG-13 comment about `.` and `..`; it still explains why those two are 
  * runner (task.232); they differ only in what they pass as `created`.
  */
 export function pathAssertionProblem(expected, created) {
-  const fold = (p) => normalize(p).toLowerCase();
-  const made = created.map(fold);             // every created path is a file
-  const absent = (expected?.absent ?? []).map((p) => [p, fold(p)]);
-  const removed = (expected?.removed ?? []).map((p) => [p, fold(p)]);
+  const made = created.map((p) => normalize(p));       // every created path is a file
+  const madeFolded = made.map((p) => p.toLowerCase());
+  const absent = (expected?.absent ?? []).map((p) => [p, normalize(p).toLowerCase()]);
+  const removed = (expected?.removed ?? []).map((p) => [p, normalize(p)]);
+  // absent: case-FOLDED — a fold can only decline more (TASK-180-010).
   for (const [p, f] of absent) {
-    if (made.some((m) => m === f || m.startsWith(f + sep))) return `\`expected.absent\` names "${p}", which the fixture itself creates`;
-    if (made.some((m) => f.startsWith(m + sep))) return `\`expected.absent\` names "${p}", beneath a file the fixture creates — it can never exist`;
+    if (madeFolded.some((m) => m === f || m.startsWith(f + sep))) return `\`expected.absent\` names "${p}", which the fixture itself creates`;
+    if (madeFolded.some((m) => f.startsWith(m + sep))) return `\`expected.absent\` names "${p}", beneath a file the fixture creates — it can never exist`;
   }
-  for (const [p, f] of removed) {
-    if (!made.includes(f)) return `\`expected.removed\` names "${p}", which the fixture does not create — it would pass with nothing removed`;
-    if (absent.some(([, a]) => a === f)) return `"${p}" is in both \`expected.absent\` and \`expected.removed\``;
+  // removed: EXACT — a fold would accept "foo" against a fixture "Foo", and on a
+  // case-sensitive filesystem the case would pass with nothing removed (review 1, C1).
+  // A path in BOTH lists needs no rule: created → the first absent rule fires;
+  // not created → this one does (review 1, I5).
+  for (const [p, n] of removed) {
+    if (!made.includes(n)) return `\`expected.removed\` names "${p}", which the fixture does not create — it would pass with nothing removed`;
   }
   return null;
 }
 ```
 
-Keep the existing decline wording "which the fixture itself creates" for the first rule. Existing tests match on it (`security-probe.test.mjs:2370` and `:4090`; the BUG-13 test that starts at `:800` asserts on the count). The fence arm's variant "which the case's own fixture writes" has no test matching it (`grep` returns none), so it can converge on the shared wording.
+Checked by running it on 2026-10-24 (review 1): the earlier, all-folded version returned `null` for `removed: ["foo"]` against `["Foo"]`. The version above must return the "does not create" reason for that input, and it is the first unit test to write.
+
+Keep the existing decline wording "which the fixture itself creates" for the first rule. Existing tests match on it (`security-probe.test.mjs:2370` and `:4090`; the BUG-13 test that starts at `:800` asserts on the count). The fence arm's variant "which the case's own fixture writes" converges on the shared wording, and **one test pins it**: `security-probe.test.mjs:5233` asserts `/fixture writes/` at `:5262`. Change that regex to `/fixture itself creates/` in the same commit. Its five rows (`pwned`; `dir/x` against `dir`; `./pwned`; `b/../pwned`; `PWNED`) are also the helper's ready-made matrix for normalising and folding `absent`.
 
 **The four runners.** Replace each `collides` block with:
 
@@ -128,13 +136,27 @@ for (const [k, wantGone] of [["absent", "was created"], ["removed", "was not rem
 }
 ```
 
-`casePathState(dir, rel)` returns `"outside"`, `"present"` or `"missing"`. Walk from `resolve(dir, rel)` up to the deepest ancestor that `lstatSync` finds, take its `realpathSync`, and return `"outside"` unless `isWithin(realpathSync(dir), thatRealpath)` holds or it equals the dir. Otherwise `lstatSync(target)` decides present or missing, catching `ENOENT` and `ENOTDIR` as missing. `lstat` at the leaf means a symlink named by the assertion counts as present without being followed.
+`casePathState(dir, rel)` returns `"outside"`, `"present"` or `"missing"`. Do not write a new ancestor walk: `realpathSafe(p)` (`:965`) already returns the realpath of the deepest existing ancestor with the missing segments re-joined.
+
+```js
+function casePathState(dir, rel) {
+  const root = realpathSafe(dir);
+  const target = resolve(dir, rel);
+  const real = realpathSafe(target);
+  if (real !== root && !isWithin(root, real)) return "outside";
+  try { lstatSync(target); return "present"; }
+  catch (e) { if (e.code === "ENOENT" || e.code === "ENOTDIR") return "missing"; throw e; }
+}
+```
+
+Add `lstatSync` to the `node:fs` import (`:272-286`); it is not imported today. `lstatSync` at the leaf means a symlink named by the assertion counts as present without being followed.
 
 **Mutation proofs** (record each in the implementation report: the edit, the red test, the `cmp`-checked revert):
 
-1. Drop the `made.some(m === f || …)` rule → the per-form "fixture creates it" tests go red.
+1. Drop the `madeFolded.some(m === f || …)` rule → the "fixture creates it" test of **every** form goes red (`shell:`, `shell-fn:`, `cli:`, `shell-argv:`, `fence:`). This is what proves every runner routes through the helper; a runner that kept its own copy would stay green (review 1, I3).
+1a. Fold the `removed` comparison (`made` → `madeFolded`) → the `foo` against `Foo` test goes red (review 1, C1).
 2. Drop the `removed`-not-created rule → the vacuous-`removed` test goes red.
-3. Drop the both-lists rule → its unit test goes red.
+3. (No both-lists rule exists to mutate; add a unit test that `{ absent: ["a"], removed: ["a"] }` is declined both with `a` created and without it, which pins the claim that the two other rules cover it.)
 4. Make `casePathState` skip the realpath check → the containment test goes red.
 5. Pass `firstSegment(rel)` instead of `rel` in one runner → that form's nested-collision test goes red.
 
