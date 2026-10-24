@@ -818,30 +818,41 @@ run_complete_records() {
     else
       fail "[$SH] --complete ($ARM arm) keeps unrelated files" "keep-me=$([ -f "$D/keep-me.txt" ] && echo kept || echo removed) snapshot=$([ -f "$D/develop-pipeline.last-halt.json" ] && echo kept || echo removed)"
     fi
-    # The hold-dir record is the one pointer to files Step 4 moved aside: kept, with a warning,
-    # while its directory still holds files; removed when the directory is empty or gone (QA1-2).
+    # The hold-dir record is the one pointer to files Step 4 moved aside, and held-paths lists them:
+    # both kept, with a warning, while the directory still holds files or cannot be listed; both
+    # removed when the directory is empty or gone (QA1-2, QA2-1, QA2-2). `unlistable` needs a user
+    # whose permissions bind — root lists a mode-000 directory — so it is skipped as root.
     local HOLD
-    for HOLD in full empty missing; do
+    for HOLD in full unlistable empty missing; do
+      if [ "$HOLD" = unlistable ] && [ "$(id -u)" -eq 0 ]; then
+        echo "  SKIP  [$SH] --complete ($ARM arm) unlistable hold dir (running as root)"; continue
+      fi
       D="$TMPDIR_TEST/hold-$HOLD-$ARM-$SH"
       mkdir -p "$D/hold"
       L="$D/develop-pipeline.lock"
-      [ "$HOLD" = full ] && : > "$D/hold/held.txt"
+      case "$HOLD" in full|unlistable) : > "$D/hold/held.txt" ;; esac
       [ "$HOLD" = missing ] && rmdir "$D/hold"
       printf '%s\n' "$D/hold" > "$D/step4-hold-dir.txt"
+      printf '%s\n%s\n' "docs/tasks/task.9.demo" "held.txt" > "$D/step4-held-paths.txt"
       [ "$ARM" = lock ] && printf '{"current_step": 8, "story": "demo"}\n' > "$L"
+      [ "$HOLD" = unlistable ] && chmod 000 "$D/hold"
       OUT=$(PIPELINE_LOCK="$L" "$SH" "$SCRIPT" --complete 2>&1 >/dev/null); RC=$?
-      if [ "$HOLD" = full ]; then
-        if [ "$RC" -eq 0 ] && [ ! -f "$L" ] && [ -f "$D/step4-hold-dir.txt" ] && [ -f "$D/hold/held.txt" ] \
-           && printf '%s' "$OUT" | grep -qF "$D/hold"; then
-          pass "[$SH] --complete ($ARM arm) keeps the hold-dir record while its directory holds files, and says so"
-        else
-          fail "[$SH] --complete ($ARM arm) keeps a live hold-dir record" "rc=$RC record=$([ -f "$D/step4-hold-dir.txt" ] && echo kept || echo gone) stderr=$OUT"
-        fi
-      elif [ "$RC" -eq 0 ] && [ ! -f "$L" ] && [ ! -e "$D/step4-hold-dir.txt" ] && [ -z "$OUT" ]; then
-        pass "[$SH] --complete ($ARM arm) removes the hold-dir record when its directory is $HOLD, silently"
-      else
-        fail "[$SH] --complete ($ARM arm) removes a $HOLD hold-dir record" "rc=$RC record=$([ -e "$D/step4-hold-dir.txt" ] && echo kept || echo gone) stderr=$OUT"
-      fi
+      [ "$HOLD" = unlistable ] && chmod 755 "$D/hold"
+      case "$HOLD" in
+        full|unlistable)
+          if [ "$RC" -eq 0 ] && [ ! -f "$L" ] && [ -f "$D/step4-hold-dir.txt" ] && [ -f "$D/step4-held-paths.txt" ] \
+             && [ -f "$D/hold/held.txt" ] && printf '%s' "$OUT" | grep -qF "$D/hold"; then
+            pass "[$SH] --complete ($ARM arm) keeps both hold records while the hold dir is $HOLD, and says so"
+          else
+            fail "[$SH] --complete ($ARM arm) keeps both hold records ($HOLD hold dir)" "rc=$RC hold-dir=$([ -f "$D/step4-hold-dir.txt" ] && echo kept || echo gone) held-paths=$([ -f "$D/step4-held-paths.txt" ] && echo kept || echo gone) stderr=$OUT"
+          fi ;;
+        *)
+          if [ "$RC" -eq 0 ] && [ ! -f "$L" ] && [ ! -e "$D/step4-hold-dir.txt" ] && [ ! -e "$D/step4-held-paths.txt" ] && [ -z "$OUT" ]; then
+            pass "[$SH] --complete ($ARM arm) removes both hold records when the hold dir is $HOLD, silently"
+          else
+            fail "[$SH] --complete ($ARM arm) removes both hold records ($HOLD hold dir)" "rc=$RC hold-dir=$([ -e "$D/step4-hold-dir.txt" ] && echo kept || echo gone) held-paths=$([ -e "$D/step4-held-paths.txt" ] && echo kept || echo gone) stderr=$OUT"
+          fi ;;
+      esac
     done
   done
 }

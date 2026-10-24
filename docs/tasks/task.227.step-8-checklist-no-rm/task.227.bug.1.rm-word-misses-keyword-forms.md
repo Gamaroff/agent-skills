@@ -4,7 +4,7 @@
 **Bug ID**: TASK-227-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 1; diff review CR-2, measured by QA)
 **Date Found**: 2026-10-24
 
@@ -86,3 +86,4 @@ The guard is what keeps the Completion Checklist block free of removals that a h
 | 2026-10-24 | New | qa-task | Found by task.227.qa.1.step-8-checklist-no-rm.md |
 | 2026-10-24 | In Progress | qa-fix | Investigation started (QA cycle 1 fix) |
 | 2026-10-24 | Ready for QA | qa-fix | Fix implemented; mutation-proven |
+| 2026-10-24 | Closed | qa-task | Verified by task.227.qa.2.step-8-checklist-no-rm.md |

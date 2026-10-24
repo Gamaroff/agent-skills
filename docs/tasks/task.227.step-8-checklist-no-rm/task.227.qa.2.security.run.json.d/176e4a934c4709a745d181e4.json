@@ -1,0 +1,23 @@
+{
+  "sink": "shell-exec",
+  "entry": "shared/resources/tests/lib/rm-invocation.mjs#lineRunsNoRm",
+  "name": "lineRunsNoRm",
+  "call_site": "shared/resources/tests/lib/rm-invocation.mjs:22",
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 17,
+  "passed": 17,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": null,
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-10-24T07:54:20.179Z"
+}

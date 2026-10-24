@@ -16,8 +16,9 @@
 #                                                   # and the run's records beside it: step4-scope-paths.txt,
 #                                                   # step4-held-paths.txt, step4-hold-dir.txt,
 #                                                   # 5c-carry-eligible.txt, 5c-carry-classified.txt (task 227);
-#                                                   # step4-hold-dir.txt is kept, with a warning, while
-#                                                   # the directory it names still holds files
+#                                                   # step4-hold-dir.txt and step4-held-paths.txt are
+#                                                   # kept, with a warning, while the hold directory
+#                                                   # still holds files or cannot be listed
 #   advance-pipeline-lock.sh --skill <skill-name>   # advance based on sub-skill that just returned
 #   advance-pipeline-lock.sh --skill finalise --dod <dod-path>
 #                                                   # finalise advances only on an ACCEPTED DoD (task 222)
@@ -34,8 +35,8 @@
 #                      sub-skills that legitimately run outside any pipeline (a standalone
 #                      /review-task is one).
 #       --complete   → exit 0. It must stay able to clear a corrupt or absent lock. It removes
-#                      the five run records in this arm too, before the exit (task 227), except a
-#                      hold-dir record whose directory still holds files.
+#                      the five run records in this arm too, before the exit (task 227), except the
+#                      two hold records while the hold directory still holds files.
 #       --restore    → rebuilds the lock (below).
 #   • jq missing    → exit 0, warn to stderr (degraded mode, same as on-stop.sh). Exempt:
 #                     --complete and --skill commit-changes parse nothing and run first,
@@ -136,7 +137,7 @@ Usage:
                             #   and the run's records beside it: step4-scope-paths.txt,
                             #   step4-held-paths.txt, step4-hold-dir.txt,
                             #   5c-carry-eligible.txt, 5c-carry-classified.txt
-                            #   (step4-hold-dir.txt is kept while its directory holds files)
+                            #   (the two hold records are kept while the hold dir holds files)
   $0 --skill <skill-name>   # advance based on returning sub-skill name
   $0 --skill finalise --dod <dod-path>
                             # advance to 8 only when the DoD reads **Final Status:** ✅ ACCEPTED
@@ -174,19 +175,24 @@ fi
 # and this call never ran (obs #87). Literal names in the lock's own directory — no glob, no path
 # from outside. A record left behind is read as current by the next run in this checkout
 # (task.147 QA-2, CR-7; task.173 QA-3, CR-1).
-# One exception: step4-hold-dir.txt is kept while the directory it names still holds files. It is
-# the only pointer to files Step 4's Pre-flight Guard moved to /tmp, and a run that HALTed before
-# Restore Held Files and was then cleared by hand would strand them (task 227, QA cycle 1, QA1-2).
-# Step 8 HALTs on the same condition before it gets here, so a pipeline run never takes this branch.
+# One exception: step4-hold-dir.txt and step4-held-paths.txt are kept while the directory the
+# first names still holds files, or exists and cannot be listed. They are the only pointer to
+# files Step 4's Pre-flight Guard moved to /tmp and the list of them, and a run that HALTed before
+# Restore Held Files and was then cleared by hand would strand them (task 227, QA1-2, QA2-1). A
+# directory that cannot be listed counts as holding files: "empty" must be seen, never assumed
+# (QA2-2). Step 8 HALTs on a non-empty hold dir before it gets here, so a pipeline run never keeps.
 if [ "$1" = "--complete" ]; then
   STATE_DIR=$(dirname "$LOCK")
-  rm -f "$STATE_DIR/step4-scope-paths.txt" "$STATE_DIR/step4-held-paths.txt" \
-        "$STATE_DIR/5c-carry-eligible.txt" "$STATE_DIR/5c-carry-classified.txt"
+  rm -f "$STATE_DIR/step4-scope-paths.txt" "$STATE_DIR/5c-carry-eligible.txt" "$STATE_DIR/5c-carry-classified.txt"
   HOLD_REC_DIR=$(cat "$STATE_DIR/step4-hold-dir.txt" 2>/dev/null)
-  if [ -n "$HOLD_REC_DIR" ] && [ -d "$HOLD_REC_DIR" ] && [ -n "$(ls -A "$HOLD_REC_DIR" 2>/dev/null)" ]; then
-    echo "advance-pipeline-lock: kept $STATE_DIR/step4-hold-dir.txt — $HOLD_REC_DIR still holds files Step 4 moved aside; restore them (develop-pipeline-step-4-create-pr.md, Restore Held Files) before removing it" >&2
+  HOLD_KEEP=false
+  if [ -n "$HOLD_REC_DIR" ] && [ -d "$HOLD_REC_DIR" ]; then
+    if ! HOLD_LS=$(ls -A "$HOLD_REC_DIR" 2>/dev/null) || [ -n "$HOLD_LS" ]; then HOLD_KEEP=true; fi
+  fi
+  if [ "$HOLD_KEEP" = true ]; then
+    echo "advance-pipeline-lock: kept $STATE_DIR/step4-hold-dir.txt and step4-held-paths.txt — $HOLD_REC_DIR still holds files Step 4 moved aside, or cannot be listed; restore them (develop-pipeline-step-4-create-pr.md, Restore Held Files) before removing the records" >&2
   else
-    rm -f "$STATE_DIR/step4-hold-dir.txt"
+    rm -f "$STATE_DIR/step4-hold-dir.txt" "$STATE_DIR/step4-held-paths.txt"
   fi
 fi
 

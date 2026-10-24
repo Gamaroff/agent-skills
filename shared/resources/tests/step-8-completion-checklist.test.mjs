@@ -672,8 +672,8 @@ test("every orchestrator mention of --complete names the Step 8 Completion Check
 //           Step 8 doc with no such block at all — the floor names the block the guard exists for.
 //   text, not behaviour: the property is what the host's check reads, which is the block's text.
 test("lineRunsNoRm refuses every way a line runs rm and nothing else", () => {
-  // The shapes the first matcher missed (QA cycle 1, QA1-1) are the point of this list: a keyword
-  // before `rm`, a prefix command, and `rm` by path.
+  // The shapes earlier matchers missed are the point of this list: a keyword before `rm`, a prefix
+  // command and `rm` by path (QA1-1), quote and escape forms, and a redirection after it (QA2-3).
   for (const hit of [
     "rm -f a",
     "x && rm -f a",
@@ -694,6 +694,9 @@ test("lineRunsNoRm refuses every way a line runs rm and nothing else", () => {
     '"rm" -f a',
     "\\rm -f a",
     'echo " # " ; rm a',
+    "rm>/dev/null a",
+    "rm<<EOF",
+    "rm 2>/dev/null a",
   ]) {
     assert.equal(lineRunsNoRm(hit), false, `missed: ${hit}`);
   }
