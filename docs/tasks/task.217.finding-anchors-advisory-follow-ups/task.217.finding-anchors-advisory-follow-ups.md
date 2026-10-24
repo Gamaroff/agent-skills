@@ -5,18 +5,20 @@ type: task
 description: "Close the nine advisory items task.195's QA gates carried to future work: the --inline guards trust any anchor_check string, a non-object finding crashes the checker or is never annotated, the inline selectors split anchors differently from the checker and post untrimmed paths, review-code --staged --fix edits a tree it did not check, review-code's --inline block reads three unbound variables, and two test-hygiene gaps."
 tags: [finding-anchors, review-pr, review-code, follow-up, hardening]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-19
 updated: 2026-10-24
 assignee:
 estimated_effort_hours: 16
 github_issue: 698
+completed_date: 2026-10-24
+pr_number: 745
 ---
 
 # Technical Task: Finding-anchors advisory follow-ups
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.217.review.1.finding-anchors-advisory-follow-ups.md` implemented 2026-10-23
 
 **GitHub Issue**: [#698](https://github.com/Gamaroff/agent-skills/issues/698)
@@ -344,11 +346,34 @@ None.
 ### Key Findings
 No critical issues identified. QA3-1 is fixed, and [TASK-217-BUG-5](./task.217.bug.5.step5-relative-checker-path.md) is closed. Three advisory review findings are recorded for follow-up: one pre-existing unbound `$SUMMARY_FILE` in Step 4.3, and two cleanups.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.217.qa.4.finding-anchors-advisory-follow-ups.md`
+**Gate File**: `task.217.gate.4.finding-anchors-advisory-follow-ups.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 15/15 met, each with a code citation and a test that runs per PR
+✅ **PR Review:** PR #745. The repository requires no reviews; the Step 5c PR review is APPROVE (`task.217.pr-review.1.finding-anchors-advisory-follow-ups.md`)
+✅ **CI:** SUCCESS on `11fd2d2e` over 6 checks (CI reading 1)
+✅ **Documentation:** CHANGELOG [Unreleased] › Fixed cites (task 217); both SKILL.md bodies updated
+✅ **Security Review:** PASS — 3 boundary controls probed, 73 executed, 0 reproduced (`task.217.dod.1.security.run.json`)
+⚠️ **Compliance Review:** Not applicable (internal tooling)
+
+**Task marked as ACCEPTED on:** 2026-10-24
+
+**Detailed Verification Log:** See `task.217.dod.1.finding-anchors-advisory-follow-ups.md` for complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-19 | 1.0     | Initial draft — the nine advisory items task.195's QA gates 1–5 carried to future work | create-task |
 | 2026-10-23 | 1.1     | Review passed (8/10) — added the removed-literal sweep (two guard extractors keyed on the replaced clause, control fixtures need the stamp), a new task.217 probe cases file, a fenced block for the `--staged` skip, and a test-held bound for the performance criterion | review-task |
 | 2026-10-23 |         | Status → ready-for-development | review-task |
@@ -360,6 +385,7 @@ No critical issues identified. QA3-1 is fixed, and [TASK-217-BUG-5](./task.217.b
 | 2026-10-24 |         | QA gate CONCERNS (90/100) — 1 finding (1 medium) | qa-task |
 | 2026-10-24 |         | QA findings fixed — 1 of 1 (QA3-1), 1 iteration; the Step 5 cwd claim scoped to the checker, and the block test runs the shipped path; gate re-review pending | qa-fix |
 | 2026-10-24 |         | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-10-24 | 1.2 | DoD passed — accepted (PR #745) | finalise |
 <!-- change-log-end -->
 
 ---
