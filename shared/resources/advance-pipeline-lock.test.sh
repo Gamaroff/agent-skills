@@ -56,6 +56,11 @@
 #        stay able to clear an absent lock.
 #        `--skill` with no lock but a halt snapshot or orphaned claim on disk
 #        still exits 0 and names --restore on stderr; silent without either (obs #280).
+#   15.  --complete removes Step 4's three records and the two 5c carry records beside the
+#        lock, in BOTH arms (lock present, and no lock), and keeps every other file there
+#        (task 227). Step 8's Completion Checklist used to remove them with its own `rm -f`
+#        lines, and a host that could not inspect an `rm` inside the wrapped block refused
+#        the whole block (obs #87).
 #
 # Scenarios 8–11 run under BOTH bash and zsh. macOS logins are zsh and task 51
 # found a real bash/zsh divergence in a sibling shared resource, so the
@@ -788,13 +793,43 @@ run_no_lock_split() {
   fi
 }
 
+# ── Scenario 15: --complete removes the run's records, in both arms ─────────
+# The removal sits before the no-lock exit, so a run with no lock on disk (the checklist
+# test's fixture is one) loses its records too. The arm under test is named in each line.
+COMPLETE_RECORDS="step4-scope-paths.txt step4-held-paths.txt step4-hold-dir.txt 5c-carry-eligible.txt 5c-carry-classified.txt"
+run_complete_records() {
+  local SH="$1" ARM D L RC OUT r left
+  for ARM in lock no-lock; do
+    D="$TMPDIR_TEST/records-$ARM-$SH"
+    mkdir -p "$D"
+    L="$D/develop-pipeline.lock"
+    for r in $COMPLETE_RECORDS keep-me.txt develop-pipeline.last-halt.json; do : > "$D/$r"; done
+    [ "$ARM" = lock ] && printf '{"current_step": 8, "story": "demo"}\n' > "$L"
+    OUT=$(PIPELINE_LOCK="$L" "$SH" "$SCRIPT" --complete 2>&1); RC=$?
+    left=""
+    for r in $COMPLETE_RECORDS; do [ -e "$D/$r" ] && left="$left $r"; done
+    if [ "$RC" -eq 0 ] && [ ! -f "$L" ] && [ -z "$left" ]; then
+      pass "[$SH] --complete ($ARM arm) removes the five records and leaves no lock"
+    else
+      fail "[$SH] --complete ($ARM arm) removes the five records" "rc=$RC lock=$([ -f "$L" ] && echo present || echo gone) left:${left:- none} out=$OUT"
+    fi
+    if [ -f "$D/keep-me.txt" ] && [ -f "$D/develop-pipeline.last-halt.json" ]; then
+      pass "[$SH] --complete ($ARM arm) keeps an unrelated file and the halt snapshot"
+    else
+      fail "[$SH] --complete ($ARM arm) keeps unrelated files" "keep-me=$([ -f "$D/keep-me.txt" ] && echo kept || echo removed) snapshot=$([ -f "$D/develop-pipeline.last-halt.json" ] && echo kept || echo removed)"
+    fi
+  done
+}
+
 run_restore_scenarios bash
 run_no_lock_split bash
+run_complete_records bash
 if command -v zsh >/dev/null 2>&1; then
   run_restore_scenarios zsh
   run_no_lock_split zsh
+  run_complete_records zsh
 else
-  echo "  SKIP  zsh interpreter pass for scenarios 13-14 (zsh not on this host)"
+  echo "  SKIP  zsh interpreter pass for scenarios 13-15 (zsh not on this host)"
 fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────

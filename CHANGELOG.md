@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Changed
+
+- **`advance-pipeline-lock.sh --complete` now removes Step 4's and 5c's records; Step 8's Completion
+  Checklist removes nothing directly, so a host's removal check cannot refuse it (task 227).**
+  The checklist block used to end with two `rm -f` lines beside its must-pass checks. On an
+  unattended run a host that could not inspect an `rm` inside the wrapped block refused the whole
+  block, so the checks and `--complete` never ran and the run stopped at Step 8 (obs #87).
+  - **Breaking (small): `--complete` also removes five files beside the lock** —
+    `step4-scope-paths.txt`, `step4-held-paths.txt`, `step4-hold-dir.txt`,
+    `5c-carry-eligible.txt` and `5c-carry-classified.txt` — in both arms, with a lock and without
+    one. Its only caller, the Step 8 Completion Checklist, removed the same five files one line
+    earlier, so a pipeline run ends in the same state. A hand-run `--complete` outside Step 8 now
+    loses those records too.
+  - A guard in `step-8-completion-checklist.test.mjs` fails when any fenced block in the develop
+    pipeline docs that calls `--complete` carries an `rm` invocation.
+
 ### Fixed
 
 - **An inline review comment now posts only an anchor the checker verified (task 217).** Nine

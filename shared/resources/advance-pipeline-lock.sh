@@ -12,7 +12,10 @@
 #
 # Usage:
 #   advance-pipeline-lock.sh <next_step_number>     # advance to specific step (1..8)
-#   advance-pipeline-lock.sh --complete             # remove lock (Step 8's Completion Checklist passed)
+#   advance-pipeline-lock.sh --complete             # remove lock (Step 8's Completion Checklist passed),
+#                                                   # and the run's records beside it: step4-scope-paths.txt,
+#                                                   # step4-held-paths.txt, step4-hold-dir.txt,
+#                                                   # 5c-carry-eligible.txt, 5c-carry-classified.txt (task 227)
 #   advance-pipeline-lock.sh --skill <skill-name>   # advance based on sub-skill that just returned
 #   advance-pipeline-lock.sh --skill finalise --dod <dod-path>
 #                                                   # finalise advances only on an ACCEPTED DoD (task 222)
@@ -28,7 +31,8 @@
 #       --skill      → exit 0, silent noop. The self-advance is the last action of nine
 #                      sub-skills that legitimately run outside any pipeline (a standalone
 #                      /review-task is one).
-#       --complete   → exit 0. It must stay able to clear a corrupt or absent lock.
+#       --complete   → exit 0. It must stay able to clear a corrupt or absent lock. It removes
+#                      the five run records in this arm too, before the exit (task 227).
 #       --restore    → rebuilds the lock (below).
 #   • jq missing    → exit 0, warn to stderr (degraded mode, same as on-stop.sh). Exempt:
 #                     --complete and --skill commit-changes parse nothing and run first,
@@ -126,6 +130,9 @@ usage() {
 Usage:
   $0 <next_step_number>     # 1..8
   $0 --complete             # remove lock (Step 8's Completion Checklist passed)
+                            #   and the run's records beside it: step4-scope-paths.txt,
+                            #   step4-held-paths.txt, step4-hold-dir.txt,
+                            #   5c-carry-eligible.txt, 5c-carry-classified.txt
   $0 --skill <skill-name>   # advance based on returning sub-skill name
   $0 --skill finalise --dod <dod-path>
                             # advance to 8 only when the DoD reads **Final Status:** ✅ ACCEPTED
@@ -154,6 +161,19 @@ if [ "$1" = "--paused-here" ]; then
       [ "$(jq -r 'if type == "object" then (.branch // "") else "" end' "$c" 2>/dev/null)" = "$HERE" ] && printf '%s\n' "$c"
     done | head -1
   exit 0
+fi
+
+# --complete clears the run's records with the lock, in BOTH arms: here, before the no-lock exit
+# below, so a run with no lock on disk loses them too (task 227). Step 4's three records and 5c's
+# two carry records used to be removed by `rm -f` lines in Step 8's Completion Checklist block; a
+# host that cannot inspect an `rm` inside a wrapped script refuses the whole block, so the checks
+# and this call never ran (obs #87). Literal names in the lock's own directory — no glob, no path
+# from outside. A record left behind is read as current by the next run in this checkout
+# (task.147 QA-2, CR-7; task.173 QA-3, CR-1).
+if [ "$1" = "--complete" ]; then
+  STATE_DIR=$(dirname "$LOCK")
+  rm -f "$STATE_DIR/step4-scope-paths.txt" "$STATE_DIR/step4-held-paths.txt" "$STATE_DIR/step4-hold-dir.txt" \
+        "$STATE_DIR/5c-carry-eligible.txt" "$STATE_DIR/5c-carry-classified.txt"
 fi
 
 # The no-lock behaviour is decided PER MODE below, not here. A single `|| exit 0`

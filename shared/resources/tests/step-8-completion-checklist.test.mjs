@@ -660,6 +660,59 @@ test("every orchestrator mention of --complete names the Step 8 Completion Check
   assert.ok(seen >= 6, `expected at least 6 mentions, found ${seen}`);
 });
 
+// A block that ends the run removes nothing directly (task 227, obs #87). A host's removal safety
+// check reads the command text: shown an `rm` inside a wrapped script it cannot inspect, it refuses
+// the WHOLE block, so the checks and `--complete` beside it never run and an unattended run stops
+// at Step 8. The removals live in `advance-pipeline-lock.sh --complete` instead.
+//   reads:  every fence `fencedRanges` returns — any info string, so an `sh` or unlabelled block
+//           counts — in every file `developPipelineDocs()` lists, when a non-comment line of it
+//           calls `advance-pipeline-lock.sh --complete`.
+//   fails:  a non-comment line in such a block with `rm` as a command word.
+//   text, not behaviour: the property is what the host's check reads, which is the block's text.
+const RM_WORD = /(^|[;&|({]\s*)rm\s/;
+test("RM_WORD finds rm as a command word and nowhere else", () => {
+  for (const hit of [
+    "rm -f a",
+    "x && rm -f a",
+    "x || rm a",
+    "x; rm a",
+    "{ rm a; }",
+    "(rm a)",
+  ]) {
+    assert.match(hit, RM_WORD, `missed: ${hit}`);
+  }
+  for (const miss of [
+    "# rm -f of a name",
+    "confirm x",
+    "docker run --rm x",
+    "echo farm x",
+  ]) {
+    assert.doesNotMatch(miss, RM_WORD, `false hit: ${miss}`);
+  }
+});
+test("no fenced block that calls --complete carries an rm invocation", () => {
+  let seen = 0;
+  for (const file of developPipelineDocs()) {
+    const text = readDoc(file);
+    for (const [a, b] of fencedRanges(text)) {
+      const lines = text
+        .slice(a, b)
+        .split("\n")
+        .filter((l) => !/^\s*#/.test(l));
+      if (!lines.some((l) => l.includes("advance-pipeline-lock.sh --complete")))
+        continue;
+      seen++;
+      const hits = lines.filter((l) => RM_WORD.test(l.trim()));
+      assert.deepEqual(
+        hits,
+        [],
+        `${file}: a block that ends the run removes files directly`,
+      );
+    }
+  }
+  assert.ok(seen >= 1, "no block calls --complete — the guard read nothing");
+});
+
 // The Stop hook's step-8 line and the resume contract's Phase 0b sentence each describe Step 7's
 // tail per orchestrator. Two copies of one description drift silently, so this renders the hook's
 // reason at lock 8 and requires each tail to read the same in both (task 163; task.162 gate.1
@@ -1697,12 +1750,27 @@ describe("executed against fixtures", { concurrency: true }, () => {
           ".claude/state/step4-hold-dir.txt",
           `${path.join(fx.dir, "hold-empty")}\n`,
         );
+        // The 5c carry records too (task.173 QA-3, CR-1). Since task 227 the checklist removes
+        // none of these itself: its `--complete` call does, before its no-lock exit — this
+        // fixture has no lock, so the test holds that arm.
+        write(
+          fx.work,
+          ".claude/state/5c-carry-eligible.txt",
+          `${WORK_ITEM}/x.md\n`,
+        );
+        write(
+          fx.work,
+          ".claude/state/5c-carry-classified.txt",
+          `${WORK_ITEM}/x.md\n`,
+        );
         const r = await runChecklist(sh, fx);
         assert.equal(r.status, 0, r.stdout);
         for (const rec of [
           "step4-scope-paths.txt",
           "step4-held-paths.txt",
           "step4-hold-dir.txt",
+          "5c-carry-eligible.txt",
+          "5c-carry-classified.txt",
         ]) {
           assert.equal(
             fs.existsSync(path.join(fx.work, ".claude/state", rec)),
