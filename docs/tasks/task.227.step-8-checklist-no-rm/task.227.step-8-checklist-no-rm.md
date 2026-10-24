@@ -99,7 +99,7 @@ A separate block of literal `rm -f` lines would also pass the safety check when 
 
 `advance-pipeline-lock.sh --complete` now also removes five files beside the lock. Its only caller is Step 8's Completion Checklist (`every orchestrator mention of --complete names the Step 8 Completion Checklist`, `step-8-completion-checklist.test.mjs:626`), which removed the same five files one line earlier. No caller sees a different end state.
 
-Migration: none. A consumer that runs `--complete` by hand outside Step 8 loses those five files, which are records of a run that `--complete` declares finished.
+Migration: none. A consumer that runs `--complete` by hand outside Step 8 loses those five files, which are records of a run that `--complete` declares finished. The one exception is `step4-hold-dir.txt`: it is kept, with a warning on stderr, while the directory it names still holds files, because it is the only pointer to them (QA cycle 1, QA1-2). Step 8 refuses to reach `--complete` in that state, so a pipeline run never sees the exception.
 
 ---
 
@@ -142,6 +142,7 @@ Migration: none. A consumer that runs `--complete` by hand outside Step 8 loses 
 
 3. ✅ `shared/resources/advance-pipeline-lock.test.sh`: two new cases.
 4. ✅ `shared/resources/tests/step-8-completion-checklist.test.mjs`: the guard, and the 5c records in the existing records test.
+4a. ✅ `shared/resources/tests/lib/rm-invocation.mjs` (QA cycle 1): the guard's matcher, `lineRunsNoRm`, as its own module.
 
 ### Generated (by `npm run bundle`)
 
@@ -255,8 +256,34 @@ None.
 - **Approach.** Phase 1 added scenario 15 to `advance-pipeline-lock.test.sh` (both arms, bash and zsh; an unrelated file and the halt snapshot kept), the 5c records to `a passing checklist removes Step 4's records`, and the guard plus an `RM_WORD` control test to `step-8-completion-checklist.test.mjs`. Red as planned: the two script cases and the guard failed, the records test passed. Phase 2 moved the removals; Phase 3 updated the header comment and `usage()`, bundled (13 copies of the script, 3 of the step doc) and added the CHANGELOG entry.
 - **Testing.** `advance-pipeline-lock.test.sh` 76/76; the three new or extended checklist tests pass; `npm run ci:fast` 6289 tests, 0 failed (zsh arms skip: no zsh on this host). Mutations: an `rm -f` line put back in the block turns the guard red; the removal moved into the lock-present arm only turns the no-lock case red. Both reverted.
 - **Deferred work.** None.
+- **QA cycle 1 fixes (qa-fix).** QA1-1: the guard's matcher became `lineRunsNoRm` in `tests/lib/rm-invocation.mjs`. It counts `rm` as a word after quote and escape removal, and the guard also requires that it read the Step 8 doc's own `--complete` block. Probed with `security-probe.mjs` (rm-specific cases): `present-but-inert`, then `engages` after quote removal. QA1-2: `--complete` keeps `step4-hold-dir.txt`, with a stderr warning, while its directory holds files; three cases per arm were added to scenario 15 (82/82). Both fixes were mutation-proven. Bugs 1 and 2 are now Ready for QA.
 
 ---
+
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-24
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.227.qa.1.step-8-checklist-no-rm.md](./task.227.qa.1.step-8-checklist-no-rm.md)
+- **Gate File**: [task.227.gate.1.step-8-checklist-no-rm.yml](./task.227.gate.1.step-8-checklist-no-rm.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 138 (lock suite 76, checklist suite 62); `npm run ci` exit 0
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0 high, 2 medium
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+
+- TASK-227-QA1-1 (medium): the no-rm guard misses `then rm`, `do rm`, `! rm`, `command`/`xargs`/`sudo rm` and `/bin/rm`, so criterion 4 does not fully hold.
+- TASK-227-QA1-2 (medium): `--complete` deletes `step4-hold-dir.txt` while the hold directory still holds files.
 
 ## Change Log
 
@@ -267,6 +294,8 @@ None.
 | 2026-10-24 | 1.1 | Review passed (8/10) — guard helpers named (`developPipelineDocs`, `extractBlocks`), Performance criteria replaced by a not-applicable line, mutation criterion re-scoped to the implementation report, header comment added to Phase 3, two anchors corrected | review-task |
 | 2026-10-24 |  | Status → ready-for-development | review-task |
 | 2026-10-24 |  | Implemented — 5 source files and 16 bundled copies; 3 tests added (lock scenario 15, the guard, its RM_WORD control), 1 extended | develop |
+| 2026-10-24 |  | QA gate CONCERNS (80/100) — 2 findings | qa-task |
+| 2026-10-24 |  | QA findings fixed — QA1-1, QA1-2 (2 MEDIUM), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

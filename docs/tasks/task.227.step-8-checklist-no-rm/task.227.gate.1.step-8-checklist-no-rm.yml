@@ -1,0 +1,70 @@
+schema: 2
+task: 'task.227.step-8-checklist-no-rm'
+task_title: 'Step 8 checklist block mixes rm with must-pass checks; host refuses the whole block'
+gate: CONCERNS
+status_reason: 'All 3 phases are delivered, CI is green and both mutations go red on committed tests. Two medium findings remain: the no-rm guard misses rm after then/do/!/command/xargs/sudo and by path, so criterion 4 does not fully hold (BUG-1); and --complete now drops the hold-dir record while held files are still held (BUG-2).'
+reviewer: 'QA Engineer'
+head: '9236848618d9b90f10cc1e21485c73619b4296cb'
+updated: '2026-10-24T07:36:25Z'
+
+top_issues:
+  - id: 'TASK-227-QA1-1'
+    severity: medium
+    file: 'shared/resources/tests/step-8-completion-checklist.test.mjs'
+    finding: 'RM_WORD (/(^|[;&|({]\s*)rm\s/) misses `then rm`, `do rm`, `! rm`, `command rm`, `xargs rm`, `sudo rm` and `/bin/rm` (measured with node), so a checklist block written `if …; then rm -f x; fi` passes the guard and criterion 4 ("the guard test fails if one is added") does not hold. RM_WORD is module-private, so the probe cannot reach it (probes_executed 0). From CR-2.'
+    suggested_action: 'Match rm as a command word after then/do/else/! and command/xargs/sudo/exec and as a path ending in /rm; add those forms to the RM_WORD control hits; export the matcher as a function and probe it (shell-exec sink) or record why the sink does not fit.'
+    suggested_owner: dev
+    bug_ref: 'task.227.bug.1.rm-word-misses-keyword-forms.md'
+  - id: 'TASK-227-QA1-2'
+    severity: medium
+    file: 'shared/resources/advance-pipeline-lock.sh'
+    finding: '--complete removes step4-hold-dir.txt in both arms with no condition; a no-lock --complete with the record naming a non-empty hold directory leaves held.txt in /tmp and deletes its only pointer (reproduced; the no-lock arm used to remove nothing), contradicting "No caller sees a different end state". From CR-1.'
+    suggested_action: 'Keep step4-hold-dir.txt and warn on stderr when the directory it names exists and is not empty; add scenario 15 cases for both arms; correct the Breaking Changes and CHANGELOG wording.'
+    suggested_owner: dev
+    bug_ref: 'task.227.bug.2.complete-drops-hold-dir-pointer.md'
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 138
+  phases_verified: 3/3
+  ci: 'npm run ci exit 0 @ 92368486 (local, .agents/skills symlink moved aside); PR #746 checks not read'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: true — RM_WORD is a deny matcher whose input is agent-edited step docs and whose verdict backs a guard assertion (test code is not exempt by location). It is a module-private const, so no engine form reaches it; QA1-1 names the remedy. The --complete removal itself decides nothing: literal names in dirname(LOCK), no glob.'
+  performance:
+    status: PASS
+    notes: 'Five rm -f calls move between shells; one doc scan added to the test suite.'
+  reliability:
+    status: CONCERNS
+    notes: 'QA1-2: a no-lock --complete can strand Step 4 held files by deleting the hold-dir record.'
+  maintainability:
+    status: PASS
+    notes: 'Header, usage() and the checklist comment name the records; bundled copies match (bundle:check clean).'
+
+recommendations:
+  immediate:
+    - action: 'Widen RM_WORD and export it as a probe-reachable function (QA1-1)'
+      refs: ['shared/resources/tests/step-8-completion-checklist.test.mjs']
+    - action: 'Keep the hold-dir record while the hold directory is non-empty (QA1-2)'
+      refs: ['shared/resources/advance-pipeline-lock.sh']
+  future:
+    - action: 'CR-3 (cleanup): pin the guard floor to the Step 8 checklist block rather than >= 1 block anywhere'
+      refs: ['shared/resources/tests/step-8-completion-checklist.test.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'QA1-1 and QA1-2 fixed and re-reviewed'

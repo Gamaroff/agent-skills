@@ -37,6 +37,7 @@ import {
   runAsync,
   cleanup,
 } from "./lib/executed-prose.mjs";
+import { lineRunsNoRm } from "./lib/rm-invocation.mjs";
 
 const require = createRequire(import.meta.url);
 const { fencedRanges } = require("../change-log.js");
@@ -667,10 +668,12 @@ test("every orchestrator mention of --complete names the Step 8 Completion Check
 //   reads:  every fence `fencedRanges` returns — any info string, so an `sh` or unlabelled block
 //           counts — in every file `developPipelineDocs()` lists, when a non-comment line of it
 //           calls `advance-pipeline-lock.sh --complete`.
-//   fails:  a non-comment line in such a block with `rm` as a command word.
+//   fails:  a line in such a block that runs `rm` (lineRunsNoRm, ./lib/rm-invocation.mjs), and a
+//           Step 8 doc with no such block at all — the floor names the block the guard exists for.
 //   text, not behaviour: the property is what the host's check reads, which is the block's text.
-const RM_WORD = /(^|[;&|({]\s*)rm\s/;
-test("RM_WORD finds rm as a command word and nowhere else", () => {
+test("lineRunsNoRm refuses every way a line runs rm and nothing else", () => {
+  // The shapes the first matcher missed (QA cycle 1, QA1-1) are the point of this list: a keyword
+  // before `rm`, a prefix command, and `rm` by path.
   for (const hit of [
     "rm -f a",
     "x && rm -f a",
@@ -678,20 +681,36 @@ test("RM_WORD finds rm as a command word and nowhere else", () => {
     "x; rm a",
     "{ rm a; }",
     "(rm a)",
+    "if true; then rm -f a; fi",
+    "do rm a; done",
+    "else rm a",
+    "! rm a",
+    "command rm -f a",
+    "xargs rm -f",
+    "sudo rm a",
+    "/bin/rm a",
+    "`rm a`",
+    "r'm' -f a",
+    '"rm" -f a',
+    "\\rm -f a",
+    'echo " # " ; rm a',
   ]) {
-    assert.match(hit, RM_WORD, `missed: ${hit}`);
+    assert.equal(lineRunsNoRm(hit), false, `missed: ${hit}`);
   }
   for (const miss of [
     "# rm -f of a name",
+    "  # rm -f of an indented name",
     "confirm x",
     "docker run --rm x",
     "echo farm x",
+    "rmdir a",
   ]) {
-    assert.doesNotMatch(miss, RM_WORD, `false hit: ${miss}`);
+    assert.equal(lineRunsNoRm(miss), true, `false hit: ${miss}`);
   }
 });
 test("no fenced block that calls --complete carries an rm invocation", () => {
   let seen = 0;
+  const seenIn = new Set();
   for (const file of developPipelineDocs()) {
     const text = readDoc(file);
     for (const [a, b] of fencedRanges(text)) {
@@ -702,7 +721,8 @@ test("no fenced block that calls --complete carries an rm invocation", () => {
       if (!lines.some((l) => l.includes("advance-pipeline-lock.sh --complete")))
         continue;
       seen++;
-      const hits = lines.filter((l) => RM_WORD.test(l.trim()));
+      seenIn.add(file);
+      const hits = lines.filter((l) => !lineRunsNoRm(l));
       assert.deepEqual(
         hits,
         [],
@@ -711,6 +731,10 @@ test("no fenced block that calls --complete carries an rm invocation", () => {
     }
   }
   assert.ok(seen >= 1, "no block calls --complete — the guard read nothing");
+  assert.ok(
+    seenIn.has(STEP8),
+    `${STEP8} has no block calling --complete — the guard did not read the Completion Checklist`,
+  );
 });
 
 // The Stop hook's step-8 line and the resume contract's Phase 0b sentence each describe Step 7's

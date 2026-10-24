@@ -269,8 +269,9 @@ elif [ -s "$HELD_REC" ]; then
   echo "⚠️  $HELD_REC names $(head -1 "$HELD_REC"), not {work-item-dir} — its held paths are not checked"
 fi
 # Restore deletes the hold-dir record, so a record that still names a non-empty directory means
-# held files were never restored. Absent from the tree, they would slip past the scope above, and
-# the cleanup below would delete the only pointer to them (task.147 QA-3, CR-3).
+# held files were never restored. Absent from the tree, they would slip past the scope above
+# (task.147 QA-3, CR-3). `--complete` below keeps the record in this case, but a run whose files
+# are still in /tmp is not finished, so the check stays.
 HOLD_REC_DIR=$(cat .claude/state/step4-hold-dir.txt 2>/dev/null)
 if [ -n "$HOLD_REC_DIR" ] && [ -n "$(ls -A "$HOLD_REC_DIR" 2>/dev/null)" ]; then
   echo "❌ Step 8 incomplete: Step 4 held files were never restored — run the Restore Held Files block (they are in $HOLD_REC_DIR)"; exit 1
@@ -283,7 +284,8 @@ VERIFY_EXIT=$?
 # left the lock in place at step 8 (task 161). It runs HERE, after every check, never earlier: a
 # failed check above exits with the lock still at 8, which is what keeps a resume possible.
 # It also removes Step 4's three records (task.147 QA-2, CR-7) and the two 5c carry records
-# (task.173 QA-3, CR-1), which a later run would read as current. This block removes nothing
+# (task.173 QA-3, CR-1), which a later run would read as current — all but a hold-dir record whose
+# directory still holds files, which the check above has already refused. This block removes nothing
 # itself, so a host's removal check has nothing in it to refuse (task 227).
 bash .agents/skills/{develop-story|develop-task|develop-bug}/references/advance-pipeline-lock.sh --complete
 

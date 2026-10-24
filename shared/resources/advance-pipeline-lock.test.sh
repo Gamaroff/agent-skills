@@ -818,6 +818,31 @@ run_complete_records() {
     else
       fail "[$SH] --complete ($ARM arm) keeps unrelated files" "keep-me=$([ -f "$D/keep-me.txt" ] && echo kept || echo removed) snapshot=$([ -f "$D/develop-pipeline.last-halt.json" ] && echo kept || echo removed)"
     fi
+    # The hold-dir record is the one pointer to files Step 4 moved aside: kept, with a warning,
+    # while its directory still holds files; removed when the directory is empty or gone (QA1-2).
+    local HOLD
+    for HOLD in full empty missing; do
+      D="$TMPDIR_TEST/hold-$HOLD-$ARM-$SH"
+      mkdir -p "$D/hold"
+      L="$D/develop-pipeline.lock"
+      [ "$HOLD" = full ] && : > "$D/hold/held.txt"
+      [ "$HOLD" = missing ] && rmdir "$D/hold"
+      printf '%s\n' "$D/hold" > "$D/step4-hold-dir.txt"
+      [ "$ARM" = lock ] && printf '{"current_step": 8, "story": "demo"}\n' > "$L"
+      OUT=$(PIPELINE_LOCK="$L" "$SH" "$SCRIPT" --complete 2>&1 >/dev/null); RC=$?
+      if [ "$HOLD" = full ]; then
+        if [ "$RC" -eq 0 ] && [ ! -f "$L" ] && [ -f "$D/step4-hold-dir.txt" ] && [ -f "$D/hold/held.txt" ] \
+           && printf '%s' "$OUT" | grep -qF "$D/hold"; then
+          pass "[$SH] --complete ($ARM arm) keeps the hold-dir record while its directory holds files, and says so"
+        else
+          fail "[$SH] --complete ($ARM arm) keeps a live hold-dir record" "rc=$RC record=$([ -f "$D/step4-hold-dir.txt" ] && echo kept || echo gone) stderr=$OUT"
+        fi
+      elif [ "$RC" -eq 0 ] && [ ! -f "$L" ] && [ ! -e "$D/step4-hold-dir.txt" ] && [ -z "$OUT" ]; then
+        pass "[$SH] --complete ($ARM arm) removes the hold-dir record when its directory is $HOLD, silently"
+      else
+        fail "[$SH] --complete ($ARM arm) removes a $HOLD hold-dir record" "rc=$RC record=$([ -e "$D/step4-hold-dir.txt" ] && echo kept || echo gone) stderr=$OUT"
+      fi
+    done
   done
 }
 

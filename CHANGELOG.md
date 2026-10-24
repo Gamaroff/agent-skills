@@ -16,7 +16,11 @@ All notable changes to this project will be documented in this file. Format foll
     `5c-carry-eligible.txt` and `5c-carry-classified.txt` — in both arms, with a lock and without
     one. Its only caller, the Step 8 Completion Checklist, removed the same five files one line
     earlier, so a pipeline run ends in the same state. A hand-run `--complete` outside Step 8 now
-    loses those records too.
+    loses those records too, with one exception: `step4-hold-dir.txt` is kept, with a warning on
+    stderr, while the directory it names still holds files, because it is the only pointer to
+    them.
+  - The guard's matcher (`shared/resources/tests/lib/rm-invocation.mjs`) counts `rm` as a word,
+    after quote and escape removal, so `then rm`, `xargs rm`, `/bin/rm` and `\rm` are all caught.
   - A guard in `step-8-completion-checklist.test.mjs` fails when any fenced block in the develop
     pipeline docs that calls `--complete` carries an `rm` invocation.
 
