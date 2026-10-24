@@ -1,0 +1,99 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "shell-exec",
+      "entry": "shared/resources/tests/lib/rm-invocation.mjs#lineRunsNoRm",
+      "name": null,
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 20,
+      "passed": 20,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-10-24T09:08:46.787Z"
+    },
+    {
+      "sink": "path",
+      "entry": "shell-argv:shared/resources/advance-pipeline-lock.sh",
+      "name": "hold_state via --hold-state",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 7,
+      "passed": 7,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": [
+        "bash"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "{input}"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-10-24T09:08:46.903Z"
+    },
+    {
+      "sink": "path",
+      "entry": "shell-argv:shared/resources/advance-pipeline-lock.sh",
+      "name": "hold_state via --complete",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 3,
+      "passed": 3,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 2,
+      "declined_cases": [
+        {
+          "id": "complete.ok-clear-no-lock@bash",
+          "reason": "case-errored",
+          "detail": "case's `expected.absent` must be an array of separator-free, non-empty names other than . and .."
+        },
+        {
+          "id": "complete.ok-clear-with-lock@bash",
+          "reason": "case-errored",
+          "detail": "case's `expected.absent` must be an array of separator-free, non-empty names other than . and .."
+        }
+      ],
+      "escaped": 0,
+      "shells": [
+        "bash"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "{input}"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-10-24T09:08:46.990Z"
+    }
+  ],
+  "totals": {
+    "executed": 30,
+    "reproduced": 0,
+    "escaped": 0
+  },
+  "updated_at": "2026-10-24T09:08:46.990Z"
+}

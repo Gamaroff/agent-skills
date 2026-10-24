@@ -1,0 +1,77 @@
+schema: 2
+task: 'task.227.step-8-checklist-no-rm'
+task_title: 'Step 8 checklist block mixes rm with must-pass checks; host refuses the whole block'
+gate: PASS
+status_reason: 'Both cycle-3 findings are fixed, and bug 3 is closed. The hold-record rule is one function, hold_state; --complete and Step 8 both read it through --hold-state, and four mutations are covered in a clean worktree at 2510287e. The narrowed cycle-4 review raised two LOW items. Its medium finding was rated LOW after a provenance check: the behaviour it names is in Step 4''s Restore Held Files block, which this branch does not change and which acts the same on base. What the diff adds is a comment claiming the rule is stated once. The other item needs the hold dir''s parent to be unsearchable, and Step 4 always creates the dir under /tmp.'
+reviewer: 'QA Engineer'
+head: '2510287edffef4349f91db285dd26fe2df0bb1ff'
+updated: '2026-10-24T08:53:13Z'
+
+top_issues:
+  - id: 'TASK-227-QA4-1'
+    severity: low
+    file: 'shared/resources/advance-pipeline-lock.sh'
+    finding: 'The hold_state header says the rule is "stated once", but Step 4''s Restore Held Files block (develop-pipeline-step-4-create-pr.md:247) decides by its own ls -A test. When the hold dir cannot be listed it skips the restore and still deletes the record, so hold_state then reads clear (diff review CR-1). Provenance: that block is unchanged on this branch and does the same on base, where Step 8''s ls -A check also passed the unlistable dir. The diff''s own contribution is the overclaiming comment.'
+    suggested_action: 'Scope the comment to the keep/refuse decision and name Restore Held Files as a separate reader; have Restore read --hold-state as a follow-up.'
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+  - id: 'TASK-227-QA4-2'
+    severity: low
+    file: 'shared/resources/advance-pipeline-lock.sh'
+    finding: 'hold_state reads clear when [ -e "$dir" ] is false, which is also the result for a dir whose parent cannot be searched (diff review CR-2, reproduced with chmod 000 on the parent: clear). Step 4 always creates the dir with mktemp -d /tmp/pipeline-hold-XXXXXX, so the parent is /tmp.'
+    suggested_action: 'Read pending when the parent exists but cannot be searched.'
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 166
+  phases_verified: 3/3
+  ci: 'npm run ci:fast @ 2510287e tree: 6290/1, the one failure the link corpus flagging the then-untracked gate 3 and QA report 3; doc-links 24/24 once staged (local, .agents/skills symlink moved aside); lint:shell and bundle exit 0; PR #746 checks not read'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 20
+    escaped: 0
+    notes: 'boundary: true — lineRunsNoRm, rm-specific cases (record task.227.qa.4.security.run.json): verdict engages, 0 escaped. hold_state is not a trust boundary; it reads local state the pipeline wrote.'
+  performance:
+    status: PASS
+    notes: 'No change this cycle to the matcher; hold_state runs one cat and one ls.'
+  reliability:
+    status: PASS
+    notes: 'The check and the removal now read one rule (102/102, 64/64, 4 mutations covered). The Restore behaviour behind QA4-1 is pre-existing; QA4-2 needs an unsearchable /tmp.'
+  maintainability:
+    status: PASS
+    notes: 'One definition of the hold-record rule; QA4-1 is an overclaim in its comment.'
+
+recommendations:
+  immediate: []
+  future:
+    - id: TASK-227-QA4-1
+      action: 'Scope the hold_state comment to the keep/refuse decision and name Restore Held Files as a separate reader (the overclaim: Restore decides by its own ls -A test)'
+      refs: ['shared/resources/advance-pipeline-lock.sh']
+      carried_from: 'top_issues (route 2b, cycle 4)'
+    - id: TASK-227-QA4-2
+      action: 'hold_state: read pending when the parent of the hold dir exists but cannot be searched'
+      refs: ['shared/resources/advance-pipeline-lock.sh']
+      carried_from: 'top_issues (route 2b, cycle 4)'
+    - action: 'Step 4 Restore Held Files: decide from --hold-state, keep the record while pending, and run rm -rf on the hold dir only after cp succeeds (today cp -r and rm -rf are separate statements). Pre-existing; not changed by task 227.'
+      refs: ['shared/resources/develop-pipeline-step-4-create-pr.md']
+    - action: 'Gate 2 CR-1, carried over: a no-lock --complete during a pause or HALT clears records a later --restore would read. Consider a halt-snapshot check in the no-lock arm.'
+      refs: ['shared/resources/advance-pipeline-lock.sh']
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: []

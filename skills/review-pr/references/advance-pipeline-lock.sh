@@ -13,7 +13,14 @@
 #
 # Usage:
 #   advance-pipeline-lock.sh <next_step_number>     # advance to specific step (1..8)
-#   advance-pipeline-lock.sh --complete             # remove lock (Step 8's Completion Checklist passed)
+#   advance-pipeline-lock.sh --complete             # remove lock (Step 8's Completion Checklist passed),
+#                                                   # and the run's records beside it: step4-scope-paths.txt,
+#                                                   # step4-held-paths.txt, step4-hold-dir.txt,
+#                                                   # 5c-carry-eligible.txt, 5c-carry-classified.txt (task 227);
+#                                                   # the two hold records are kept, with a warning,
+#                                                   # while --hold-state reads pending
+#   advance-pipeline-lock.sh --hold-state           # print `clear` or `pending: <why>` for Step 4's hold
+#                                                   # records; read-only. Step 8 refuses on pending (QA3-1)
 #   advance-pipeline-lock.sh --skill <skill-name>   # advance based on sub-skill that just returned
 #   advance-pipeline-lock.sh --skill finalise --dod <dod-path>
 #                                                   # finalise advances only on an ACCEPTED DoD (task 222)
@@ -29,7 +36,10 @@
 #       --skill      → exit 0, silent noop. The self-advance is the last action of nine
 #                      sub-skills that legitimately run outside any pipeline (a standalone
 #                      /review-task is one).
-#       --complete   → exit 0. It must stay able to clear a corrupt or absent lock.
+#       --complete   → exit 0. It must stay able to clear a corrupt or absent lock. It removes
+#                      the five run records in this arm too, before the exit (task 227), except the
+#                      two hold records while --hold-state reads pending.
+#       --hold-state → exit 0, reads no lock.
 #       --restore    → rebuilds the lock (below).
 #   • jq missing    → exit 0, warn to stderr (degraded mode, same as on-stop.sh). Exempt:
 #                     --complete and --skill commit-changes parse nothing and run first,
@@ -127,6 +137,11 @@ usage() {
 Usage:
   $0 <next_step_number>     # 1..8
   $0 --complete             # remove lock (Step 8's Completion Checklist passed)
+                            #   and the run's records beside it: step4-scope-paths.txt,
+                            #   step4-held-paths.txt, step4-hold-dir.txt,
+                            #   5c-carry-eligible.txt, 5c-carry-classified.txt
+                            #   (the two hold records are kept while --hold-state reads pending)
+  $0 --hold-state           # print clear or pending: <why> for Step 4's hold records (read-only)
   $0 --skill <skill-name>   # advance based on returning sub-skill name
   $0 --skill finalise --dod <dod-path>
                             # advance to 8 only when the DoD reads **Final Status:** ✅ ACCEPTED
@@ -155,6 +170,52 @@ if [ "$1" = "--paused-here" ]; then
       [ "$(jq -r 'if type == "object" then (.branch // "") else "" end' "$c" 2>/dev/null)" = "$HERE" ] && printf '%s\n' "$c"
     done | head -1
   exit 0
+fi
+
+# --complete clears the run's records with the lock, in BOTH arms: here, before the no-lock exit
+# below, so a run with no lock on disk loses them too (task 227). Step 4's three records and 5c's
+# two carry records used to be removed by `rm -f` lines in Step 8's Completion Checklist block; a
+# host that cannot inspect an `rm` inside a wrapped script refuses the whole block, so the checks
+# and this call never ran (obs #87). Literal names in the lock's own directory — no glob, no path
+# from outside. A record left behind is read as current by the next run in this checkout
+# (task.147 QA-2, CR-7; task.173 QA-3, CR-1).
+# One exception: the two hold records, while hold_state (below) reads pending.
+#
+# The hold-record rule, stated once (task 227, QA3-1). Step 4's Pre-flight Guard moves files to a
+# /tmp directory, names it in step4-hold-dir.txt and lists what it moved in step4-held-paths.txt;
+# Restore Held Files deletes the first. The two are the only pointer to those files, so they are
+# "pending" while the named directory holds files, or while the record or the directory cannot be
+# read, because "empty" must be seen, never assumed (QA2-2, QA3-2). A record that is absent or
+# empty, or that names a path which is gone, is "clear". --complete keeps both records while
+# pending (QA1-2, QA2-1). Step 8's Completion Checklist reads the same answer through --hold-state
+# and refuses to finish, so the check and the removal cannot disagree. They did disagree for one
+# cycle, when each carried its own copy of the rule.
+hold_state() {
+  local rec="$1" dir listing
+  [ -e "$rec" ] || { echo clear; return; }
+  dir=$(cat "$rec" 2>/dev/null) || { echo "pending: $rec cannot be read"; return; }
+  { [ -n "$dir" ] && [ -e "$dir" ]; } || { echo clear; return; }
+  [ -d "$dir" ] || { echo "pending: $dir is not a directory"; return; }
+  listing=$(ls -A "$dir" 2>/dev/null) || { echo "pending: $dir cannot be listed"; return; }
+  [ -z "$listing" ] || { echo "pending: $dir still holds files Step 4 moved aside"; return; }
+  echo clear
+}
+
+if [ "$1" = "--hold-state" ]; then
+  [ $# -eq 1 ] || usage
+  hold_state "$(dirname "$LOCK")/step4-hold-dir.txt"
+  exit 0
+fi
+
+if [ "$1" = "--complete" ]; then
+  STATE_DIR=$(dirname "$LOCK")
+  rm -f "$STATE_DIR/step4-scope-paths.txt" "$STATE_DIR/5c-carry-eligible.txt" "$STATE_DIR/5c-carry-classified.txt"
+  HOLD_STATE=$(hold_state "$STATE_DIR/step4-hold-dir.txt")
+  if [ "$HOLD_STATE" = clear ]; then
+    rm -f "$STATE_DIR/step4-hold-dir.txt" "$STATE_DIR/step4-held-paths.txt"
+  else
+    echo "advance-pipeline-lock: kept $STATE_DIR/step4-hold-dir.txt and step4-held-paths.txt — ${HOLD_STATE#pending: }; restore the held files (develop-pipeline-step-4-create-pr.md, Restore Held Files) before removing the records" >&2
+  fi
 fi
 
 # The no-lock behaviour is decided PER MODE below, not here. A single `|| exit 0`
