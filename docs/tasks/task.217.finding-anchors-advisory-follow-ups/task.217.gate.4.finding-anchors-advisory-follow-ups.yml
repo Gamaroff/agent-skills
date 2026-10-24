@@ -1,0 +1,64 @@
+schema: 2
+task: 'task.217.finding-anchors-advisory-follow-ups'
+task_title: 'Finding-anchors advisory follow-ups'
+gate: PASS
+status_reason: 'QA3-1 is fixed: the Step 5 claim now says the checker answers the same from any directory and the block runs from the repository root, and the block test runs the shipped path. Mutations are covered 3/3, every probe control engages (73 executed, 0 escaped), and the diff review raised no high-confidence bug.'
+reviewer: 'QA Engineer'
+head: 'd44191a8a831b74321708cf1f70a9b918552969d'
+updated: '2026-10-24T06:05:23Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 255
+  phases_verified: 3/3
+  ci: 'pending @ d44191a8 (informational); 0e350ce2 passed link-check, secret-scan, shellcheck, test, validate'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 73
+    escaped: 0
+    notes: 'All three controls engage: review-code --inline (Step 4.2) 19/19, review-pr --inline 31/31, review-code Step 5 23/23 on the edited block.'
+  performance:
+    status: PASS
+    notes: 'No change on the hot path this cycle (prose, comment and test only).'
+  reliability:
+    status: PASS
+    notes: 'QA3-1 fixed: the block fails closed from a subdirectory, as documented, and the test pins it. TMPDIR=/tmp 18/18.'
+  maintainability:
+    status: PASS
+    notes: 'The block test runs the block exactly as shipped, with no path rewriting.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 (medium/medium, advisory, pre-existing: `cat "$SUMMARY_FILE"` is unbound on the merge base too, gate 2 CR-4): bind SUMMARY_FILE="{summary-file}" in Step 4.3 with a [ -s ] HALT; Step 6 reads $DIFF_FILE the same way.'
+      refs: ['skills/review-code/SKILL.md']
+    - action: 'CR-2 (cleanup): `select($m != null)` in the Step 4.2 selector never filters, because jq capture yields nothing on a non-match; drop it and fix the comment.'
+      refs: ['skills/review-code/SKILL.md']
+    - action: 'CR-3 (cleanup, carried from gate 3): the `${PR_NUMBER:?…}` guard cannot fire on the literal placeholder; use a digits check before mktemp.'
+      refs: ['skills/review-code/SKILL.md']
+    - action: 'Carried from gate 3: --fix-list trusts the stored anchor_check (bind anchor content in the stamp); dispatcher population scan width; Step 4 heading layout; multi-slot fence: probes.'
+      refs: ['shared/resources/finding-anchors.js', 'evals/shared/tests/finding-anchors-blocks.test.mjs', 'shared/resources/security-probe.mjs']
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: '2026-10-24'
+  total_iterations: 1
+  verification_method: 'BUG-5 verification steps run by hand (block HALTs from skills/; checker list from skills/ equals root); committed Step 5 block test; probe record task.217.qa.4.security.run.json'
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

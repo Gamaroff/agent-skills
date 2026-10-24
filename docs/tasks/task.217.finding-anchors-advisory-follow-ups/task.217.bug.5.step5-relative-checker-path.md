@@ -4,7 +4,7 @@
 **Bug ID**: TASK-217-BUG-5
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 3 diff review, CR-1)
 **Date Found**: 2026-10-24
 
@@ -89,3 +89,4 @@ to the checker. Then make the block test run the shipped relative path from `sub
 | 2026-10-24 | New | qa-task | Found by task.217.qa.3.finding-anchors-advisory-follow-ups.md (CR-1) |
 | 2026-10-24 | In Progress | qa-fix | Investigation started |
 | 2026-10-24 | Ready for QA | qa-fix | Fix implemented — Step 5 cwd claim scoped, block test runs the shipped path |
+| 2026-10-24 | Closed | qa-task | Verified by task.217.qa.4.finding-anchors-advisory-follow-ups.md |
