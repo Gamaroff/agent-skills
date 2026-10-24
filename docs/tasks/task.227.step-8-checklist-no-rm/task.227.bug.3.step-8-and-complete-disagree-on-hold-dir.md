@@ -4,7 +4,7 @@
 **Bug ID**: TASK-227-BUG-3
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 3; diff review CR-1, reproduced by QA)
 **Date Found**: 2026-10-24
 
@@ -84,3 +84,4 @@ A pipeline run can print `✅ Step 8 post-conditions verified` while files Step 
 | 2026-10-24 | New | qa-task | Found by task.227.qa.3.step-8-checklist-no-rm.md |
 | 2026-10-24 | In Progress | qa-fix | Investigation started (QA cycle 3 fix) |
 | 2026-10-24 | Ready for QA | qa-fix | Fix implemented; mutation-proven |
+| 2026-10-24 | Closed | qa-task | Verified by task.227.qa.4.step-8-checklist-no-rm.md |

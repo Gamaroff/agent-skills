@@ -264,29 +264,33 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-24
-**Quality Score**: 85/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 95/100
+**Gate Decision**: PASS
 
 ### QA Report
 
-- **Full Report**: [task.227.qa.3.step-8-checklist-no-rm.md](./task.227.qa.3.step-8-checklist-no-rm.md)
-- **Gate File**: [task.227.gate.3.step-8-checklist-no-rm.yml](./task.227.gate.3.step-8-checklist-no-rm.yml)
+- **Full Report**: [task.227.qa.4.step-8-checklist-no-rm.md](./task.227.qa.4.step-8-checklist-no-rm.md)
+- **Gate File**: [task.227.gate.4.step-8-checklist-no-rm.yml](./task.227.gate.4.step-8-checklist-no-rm.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 146 (lock suite 84, checklist suite 62); `npm run ci:fast` 6289/0
+- **Tests Executed**: 166 (lock suite 102, checklist suite 64)
 - **Phases Verified**: 3/3
-- **Critical Issues**: 0 high, 1 medium, 1 low
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 0 high, 0 medium, 2 low (carried, route 2b)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-- The four cycle-2 findings are fixed, and the three code fixes are mutation-proven.
-- TASK-227-QA3-1 (medium, bug 3): Step 8's hold-dir check passes an unlistable directory, and `--complete` then keeps the records. Two definitions of one rule disagree.
-- TASK-227-QA3-2 (low): `--complete` deletes a hold-dir record that exists but cannot be read, with no warning.
+- QA3-1 and QA3-2 are fixed: the hold-record rule is one function, read by `--complete` and Step 8. Bug 3 is closed.
+- TASK-227-QA4-1 and QA4-2 (low) are carried to the gate's `recommendations.future` (see Deferred Work).
+
+## Deferred Work
+
+- **TASK-227-QA4-1** (LOW) — carried to gate 4 `recommendations.future` (route 2b, cycle 4): the `hold_state` comment says the rule is stated once, but Step 4's Restore Held Files decides by its own `ls -A` test (its behaviour is pre-existing)
+- **TASK-227-QA4-2** (LOW) — carried to gate 4 `recommendations.future` (route 2b, cycle 4): a hold dir whose parent cannot be searched reads `clear`
 
 ## Change Log
 
@@ -302,6 +306,8 @@ None.
 | 2026-10-24 |  | QA gate CONCERNS (90/100) — 4 findings | qa-task |
 | 2026-10-24 |  | QA findings fixed — QA2-1..QA2-4 (4 LOW), 1 iteration | qa-fix |
 | 2026-10-24 |  | QA gate CONCERNS (85/100) — 2 findings | qa-task |
+| 2026-10-24 |  | QA findings fixed — QA3-1 (MEDIUM), QA3-2 (LOW), 1 iteration | qa-fix |
+| 2026-10-24 |  | QA gate PASS (95/100) — 2 LOW carried (route 2b) | qa-task |
 <!-- change-log-end -->
 
 ---
