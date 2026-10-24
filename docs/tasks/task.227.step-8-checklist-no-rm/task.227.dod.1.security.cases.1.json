@@ -1,0 +1,162 @@
+[
+  {
+    "id": "rm.then",
+    "sink": "shell-exec",
+    "input": "if x; then rm -f a; fi",
+    "why": "runs rm",
+    "correct": "refuse",
+    "direction": "hostile"
+  },
+  {
+    "id": "rm.do",
+    "sink": "shell-exec",
+    "input": "for f in a; do rm \"$f\"; done",
+    "why": "runs rm",
+    "correct": "refuse",
+    "direction": "hostile"
+  },
+  {
+    "id": "rm.bang",
+    "sink": "shell-exec",
+    "input": "! rm a",
+    "why": "runs rm",
+    "correct": "refuse",
+    "direction": "hostile"
+  },
+  {
+    "id": "rm.command",
+    "sink": "shell-exec",
+    "input": "command rm -f a",
+    "why": "runs rm",
+    "correct": "refuse",
+    "direction": "hostile"
+  },
+  {
+    "id": "rm.xargs",
+    "sink": "shell-exec",
+    "input": "ls | xargs rm -f",
+    "why": "runs rm",
+    "correct": "refuse",
+    "direction": "hostile"
+  },
+  {
+    "id": "rm.sudo",
+    "sink": "shell-exec",
+    "input": "sudo rm a",
+    "why": "runs rm",
+    "correct": "refuse",
+    "direction": "hostile"
+  },
+  {
+    "id": "rm.abs-path",
+    "sink": "shell-exec",
+    "input": "/bin/rm a",
+    "why": "runs rm",
+    "correct": "refuse",
+    "direction": "hostile"
+  },
+  {
+    "id": "rm.backtick",
+    "sink": "shell-exec",
+    "input": "`rm a`",
+    "why": "runs rm",
+    "correct": "refuse",
+    "direction": "hostile"
+  },
+  {
+    "id": "rm.quote-single",
+    "sink": "shell-exec",
+    "input": "r'm' -f a",
+    "why": "runs rm",
+    "correct": "refuse",
+    "direction": "hostile"
+  },
+  {
+    "id": "rm.quote-double",
+    "sink": "shell-exec",
+    "input": "\"rm\" -f a",
+    "why": "runs rm",
+    "correct": "refuse",
+    "direction": "hostile"
+  },
+  {
+    "id": "rm.backslash",
+    "sink": "shell-exec",
+    "input": "\\rm -f a",
+    "why": "runs rm",
+    "correct": "refuse",
+    "direction": "hostile"
+  },
+  {
+    "id": "rm.subshell",
+    "sink": "shell-exec",
+    "input": "(cd x && rm a)",
+    "why": "runs rm",
+    "correct": "refuse",
+    "direction": "hostile"
+  },
+  {
+    "id": "rm.ok-docker-rm",
+    "sink": "shell-exec",
+    "input": "docker run --rm img",
+    "why": "runs no rm",
+    "correct": "accept",
+    "direction": "legitimate"
+  },
+  {
+    "id": "rm.ok-rmdir",
+    "sink": "shell-exec",
+    "input": "rmdir empty",
+    "why": "runs no rm",
+    "correct": "accept",
+    "direction": "legitimate"
+  },
+  {
+    "id": "rm.ok-word",
+    "sink": "shell-exec",
+    "input": "echo farm",
+    "why": "runs no rm",
+    "correct": "accept",
+    "direction": "legitimate"
+  },
+  {
+    "id": "rm.ok-lock-complete",
+    "sink": "shell-exec",
+    "input": "bash .agents/skills/develop-task/references/advance-pipeline-lock.sh --complete",
+    "why": "runs no rm",
+    "correct": "accept",
+    "direction": "legitimate"
+  },
+  {
+    "id": "rm.quoted-hash",
+    "sink": "shell-exec",
+    "input": "echo \" # \" ; rm a",
+    "why": "a # inside quotes hides nothing",
+    "correct": "refuse",
+    "direction": "hostile"
+  },
+  {
+    "id": "rm.redirect-out",
+    "sink": "shell-exec",
+    "input": "rm>/dev/null a",
+    "why": "runs rm",
+    "correct": "refuse",
+    "direction": "hostile"
+  },
+  {
+    "id": "rm.heredoc",
+    "sink": "shell-exec",
+    "input": "rm<<EOF",
+    "why": "runs rm",
+    "correct": "refuse",
+    "direction": "hostile"
+  },
+  {
+    "id": "rm.ok-git-flag",
+    "sink": "shell-exec",
+    "input": "git log --format=%h",
+    "why": "runs no rm",
+    "correct": "accept",
+    "direction": "legitimate"
+  }
+]

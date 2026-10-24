@@ -5,17 +5,19 @@ type: task
 description: "Keep removals out of any block that also carries a must-pass check or a terminal action."
 tags: [develop-task, develop-story, develop-bug, observation, pipeline-lock]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 estimated_effort_hours: 16
 created: 2026-10-22
 updated: 2026-10-24
+completed_date: 2026-10-24
+pr_number: 746
 github_issue: 728
 ---
 
 # Technical Task: Step 8 — move the state-file removals out of the Completion Checklist
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.227.review.1.step-8-checklist-no-rm.md` implemented 2026-10-24
 **GitHub Issue**: [#728](https://github.com/Gamaroff/agent-skills/issues/728)
 
@@ -292,9 +294,35 @@ None.
 - **TASK-227-QA4-1** (LOW) — carried to gate 4 `recommendations.future` (route 2b, cycle 4): the `hold_state` comment says the rule is stated once, but Step 4's Restore Held Files decides by its own `ls -A` test (its behaviour is pre-existing)
 - **TASK-227-QA4-2** (LOW) — carried to gate 4 `recommendations.future` (route 2b, cycle 4): a hold dir whose parent cannot be searched reads `clear`
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.227.qa.4.step-8-checklist-no-rm.md`
+**Gate File**: `task.227.gate.4.step-8-checklist-no-rm.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 95/100 (4 QA cycles)
+**PR Review (5c)**: `task.227.pr-review.1.step-8-checklist-no-rm.md`. Verdict: ✅ APPROVE.
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 10/10 met. Each is traced to code and to a per-PR test (lock scenario 15, the Step 8 checklist guard, the changelog corpus guard) or to a committed artifact.
+✅ **PR Review:** PR #746. The host requires no reviews; 5c `/review-pr` APPROVE, 0 findings.
+✅ **CI:** reading 1 SUCCESS at `0d43d5d2` over 6 checks.
+✅ **Documentation:** the CHANGELOG `[Unreleased]` entry (task 227), the `advance-pipeline-lock.sh` header and usage, and the Step 8 doc are updated, with bundled copies regenerated.
+✅ **Security Review:** PASS. 3 controls probed (`lineRunsNoRm`, `hold_state` via `--hold-state` and via `--complete`): 30 executed, 0 reproduced, 0 escaped.
+⚠️ **Compliance Review:** not applicable (internal pipeline tooling).
+
+**Carried, non-blocking:** TASK-227-QA4-1 and QA4-2. See Deferred Work.
+
+**Task marked as ACCEPTED on:** 2026-10-24
+
+**Detailed Verification Log:** See `task.227.dod.1.step-8-checklist-no-rm.md` for complete verification evidence and timestamps.
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-10-22 | 1.0 | Initial draft — cut from observation #87 | create-task |
@@ -308,6 +336,7 @@ None.
 | 2026-10-24 |  | QA gate CONCERNS (85/100) — 2 findings | qa-task |
 | 2026-10-24 |  | QA findings fixed — QA3-1 (MEDIUM), QA3-2 (LOW), 1 iteration | qa-fix |
 | 2026-10-24 |  | QA gate PASS (95/100) — 2 LOW carried (route 2b) | qa-task |
+| 2026-10-24 | 1.2 | DoD verified — accepted (PR #746) | finalise |
 <!-- change-log-end -->
 
 ---
