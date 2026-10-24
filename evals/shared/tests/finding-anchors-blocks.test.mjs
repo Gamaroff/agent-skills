@@ -234,7 +234,9 @@ test("the dispatcher population is derived from the tree and equals DISPATCHERS"
 
 // task.217: the `--inline` guards and review-pr's schema restate the seven verdicts. Each copy must
 // equal the engine's own set — derived from its exports, never a third literal list here.
-test("every restated verdict list equals the engine's MALFORMED ∪ CLEAN", () => {
+// The guards and the schema restate all seven verdicts; review-code's Step 5 skip restates the four
+// MALFORMED ones (task.217 QA1-5). Each is held to the engine's own set.
+test("every restated verdict list equals the engine's MALFORMED ∪ CLEAN, or MALFORMED", () => {
   const { MALFORMED, CLEAN } = createRequire(import.meta.url)(ENGINE);
   const engine = [...MALFORMED, ...CLEAN].sort();
   assert.equal(engine.length, 7);
@@ -246,23 +248,32 @@ test("every restated verdict list equals the engine's MALFORMED ∪ CLEAN", () =
     );
     for (const [, list] of text.matchAll(/\.anchor_check \| IN\(([^)]*)\)/g))
       copies.push([
-        `${skill} --inline guard`,
+        `${skill} stamp guard`,
         list.match(/"([^"]+)"/g).map((q) => q.slice(1, -1)),
+        engine,
       ]);
     for (const [, list] of text.matchAll(/^\s*anchor_check: \{([^}]*)\}/gm))
-      copies.push([`${skill} schema`, list.split("|")]);
+      copies.push([`${skill} schema`, list.split("|"), engine]);
+    for (const [, list] of text.matchAll(/case "\$CHECK" in\n\s*([a-z|-]+)\)/g))
+      copies.push([
+        `${skill} skip list`,
+        list.split("|"),
+        [...MALFORMED].sort(),
+      ]);
   }
   assert.deepEqual(
     copies.map(([w]) => w).sort(),
     [
-      "review-code --inline guard",
-      "review-pr --inline guard",
+      "review-code skip list",
+      "review-code stamp guard",
+      "review-code stamp guard",
       "review-pr schema",
+      "review-pr stamp guard",
     ],
     "the restatements this test holds",
   );
-  for (const [where, list] of copies)
-    assert.deepEqual([...list].sort(), engine, where);
+  for (const [where, list, want] of copies)
+    assert.deepEqual([...list].sort(), want, where);
 });
 
 for (const skill of DISPATCHERS) {

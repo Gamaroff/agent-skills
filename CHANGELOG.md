@@ -15,7 +15,8 @@ All notable changes to this project will be documented in this file. Format foll
     checker's seven verdicts. A reviewer that wrote `anchor_check: "ok"` itself, with no checker
     run, used to get its findings posted inline as verified. A findings file annotated by an older
     engine now HALTs the inline post with the existing "run the anchor check first" message;
-    re-run the checker step. The summary comment still posts.
+    re-run the checker step. The summary comment still posts. `/review-code --fix` applies the
+    same guard before it edits anything, and HALTs with "nothing applied" when it fails.
   - **Breaking: a non-object finding is refused as `usage`.** A `null` finding crashed the checker,
     which the dispatcher reported as "not runnable". A string finding read `no-line` but was never
     annotated, so the guard then named the wrong cause. Both now exit 2 with `reason: usage`, naming
@@ -25,9 +26,12 @@ All notable changes to this project will be documented in this file. Format foll
     posted a path starting with spaces.
   - `/review-code --staged --fix` skips a finding whose file differs between the working tree and
     the index. The anchor was checked against the staged content, and the fix lands on the working
-    tree.
+    tree. A range or PR target skips a finding whose file differs from `HEAD`, the tree its anchor
+    was checked against.
   - `/review-code`'s `--inline` block binds `PR_NUMBER` and `SUMMARY_FILE`, makes its scratch file
-    after the guard and removes it. As written it read three variables nothing bound.
+    after the guard and removes it. As written it read three variables nothing bound. It now exits
+    with the poster's status, which the cleanup used to mask, and sits under its own heading so the
+    probe engine's `fence:` form reaches it.
   - The checker-blocks test derives the dispatcher population from the tree, and a test holds every
     restated verdict list to the engine's own set. The `--index` outside-a-work-tree test passes when
     `TMPDIR` sits inside a git checkout.

@@ -564,7 +564,7 @@ test("task.217: the --inline selector parses anchors in the checker's grammar", 
 test("task.217: the --inline block runs with only its placeholders substituted, and leaves no scratch file", (t) => {
   if (spawnSync("jq", ["--version"]).error) return t.skip("jq not installed");
   const m = read("SKILL.md").match(
-    /^([ \t]*)# Every input is bound here: a fresh shell carries nothing from another block \(task\.217\)\.\n[\s\S]*?^\1rm -f "\$INLINE_FILE"$/m,
+    /^([ \t]*)# Every input is bound here: a fresh shell carries nothing from another block \(task\.217\)\.\n[\s\S]*?^\1exit "\$POST_RC"$/m,
   );
   assert.ok(m, "could not find the --inline block");
   const block = m[0]
@@ -579,13 +579,14 @@ test("task.217: the --inline block runs with only its placeholders substituted, 
     const poster = path.join(work, ".agents/skills/review-code/references");
     fs.mkdirSync(tmp);
     fs.mkdirSync(poster, { recursive: true });
+    // The stub exits with $POSTER_RC, so a failed post can be told from a successful one.
     fs.writeFileSync(
       path.join(poster, "pr-inline-comment.js"),
-      'process.stdout.write(JSON.stringify({ reason: "posted", argv: process.argv.slice(2) }) + "\\n");\n',
+      'process.stdout.write(JSON.stringify({ reason: "posted", argv: process.argv.slice(2) }) + "\\n");\nprocess.exitCode = Number(process.env.POSTER_RC || 0);\n',
     );
     const summary = path.join(dir, "summary.md");
     const findings = path.join(dir, "findings.json");
-    const runBlock = (doc, { summaryExists = true } = {}) => {
+    const runBlock = (doc, { summaryExists = true, posterRc = 0 } = {}) => {
       fs.rmSync(summary, { force: true });
       if (summaryExists) fs.writeFileSync(summary, "summary\n");
       fs.writeFileSync(findings, JSON.stringify(doc));
@@ -600,6 +601,7 @@ test("task.217: the --inline block runs with only its placeholders substituted, 
         env: {
           ...process.env,
           TMPDIR: tmp,
+          POSTER_RC: String(posterRc),
           PATH: `${path.dirname(process.execPath)}:${process.env.PATH}`,
         },
       });
@@ -628,6 +630,14 @@ test("task.217: the --inline block runs with only its placeholders substituted, 
     const noSummary = runBlock(doc, { summaryExists: false });
     assert.equal(noSummary.status, 1);
     assert.match(noSummary.stdout, /HALT: SUMMARY_FILE/);
+    // QA1-4: the poster's exit status is the block's — `rm -f` after it used to report 0.
+    const failed = runBlock(doc, { posterRc: 3 });
+    assert.equal(failed.status, 3, "a failed post is not reported as success");
+    assert.deepEqual(
+      fs.readdirSync(tmp),
+      [],
+      "a failed post leaves no scratch file",
+    );
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -665,35 +675,35 @@ test("task.217: Step 5 under --staged skips a finding whose working tree differs
     git("add", ".");
     fs.writeFileSync(path.join(dir, "a.js"), "worktree\n");
     const findings = path.join(dir, "findings.json");
-    fs.writeFileSync(
-      findings,
-      JSON.stringify({
-        code_review: {
-          findings: [
-            { id: "CR-1", file_line: "a.js:1", anchor_check: "ok" },
-            {
-              id: "CR-2",
-              file_line: " b.js:1",
-              anchor_check: "unchecked-text",
-            },
-            { id: "CR-3", file_line: "b.js:9", anchor_check: "out-of-range" },
-            { id: "CR-4", file_line: "b.js", anchor_check: "unparseable" },
-          ],
-        },
-      }),
-    );
-    const runFor = (target) => {
-      const r = spawnSync(
+    const good = stamped({
+      code_review: {
+        findings: [
+          { id: "CR-1", file_line: "a.js:1", anchor_check: "ok" },
+          {
+            id: "CR-2",
+            file_line: " b.js:1",
+            anchor_check: "unchecked-text",
+          },
+          { id: "CR-3", file_line: "b.js:9", anchor_check: "out-of-range" },
+          { id: "CR-4", file_line: "b.js", anchor_check: "unparseable" },
+        ],
+      },
+    });
+    fs.writeFileSync(findings, JSON.stringify(good));
+    const runRaw = (target, file = findings) =>
+      spawnSync(
         "bash",
         [
           "-c",
           block
-            .replaceAll("{findings-json}", findings)
+            .replaceAll("{findings-json}", file)
             .replace(/\{target:[^}]*\}/, target),
         ],
         { cwd: dir, encoding: "utf8" },
       );
-      assert.equal(r.status, 0, r.stderr);
+    const runFor = (target) => {
+      const r = runRaw(target);
+      assert.equal(r.status, 0, r.stdout + r.stderr);
       return r.stdout.trim().split("\n");
     };
     assert.deepEqual(runFor("staged"), [
@@ -721,6 +731,54 @@ test("task.217: Step 5 under --staged skips a finding whose working tree differs
       "apply: CR-1 (a.js)",
       "apply: CR-2 (b.js)",
     ]);
+    // QA1-3: a range/PR review checked HEAD; a.js and b.js both differ from HEAD on disk.
+    assert.deepEqual(runFor("range"), [
+      "skipped — working tree differs from HEAD, the content that was reviewed: CR-1 (a.js)",
+      "skipped — working tree differs from HEAD, the content that was reviewed: CR-2 (b.js)",
+      "skipped — unverified anchor: CR-3",
+      "skipped — unverified anchor: CR-4",
+    ]);
+    // QA1-1: input the checker never annotated applies nothing — the --inline guard's contract.
+    const { anchor_checked, ...unstamped } = good;
+    const hostile = {
+      "no stamp": unstamped,
+      "stale count": {
+        ...good,
+        anchor_checked: { by: "finding-anchors", findings: 3 },
+      },
+      "foreign stamp": {
+        ...good,
+        anchor_checked: { by: "someone-else", findings: 4 },
+      },
+      "unknown verdict": stamped({
+        code_review: {
+          findings: [{ id: "CR-1", file_line: "b.js:1", anchor_check: "fine" }],
+        },
+      }),
+      "missing verdict": stamped({
+        code_review: { findings: [{ id: "CR-1", file_line: "b.js:1" }] },
+      }),
+      "no findings array": stamped({ code_review: {} }),
+      "empty object": {},
+      "top-level array": [],
+    };
+    for (const [name, doc] of Object.entries(hostile)) {
+      const f = path.join(dir, "hostile.json");
+      fs.writeFileSync(f, JSON.stringify(doc));
+      const r = runRaw("worktree", f);
+      assert.equal(r.status, 1, `${name}: ${r.stdout}`);
+      assert.match(r.stdout, /HALT: .*nothing applied/, name);
+      assert.doesNotMatch(r.stdout, /^apply:/m, name);
+    }
+    // Control for the guard: an annotated file with no findings is an empty list, not a HALT.
+    const none = path.join(dir, "none.json");
+    fs.writeFileSync(
+      none,
+      JSON.stringify(stamped({ code_review: { findings: [] } })),
+    );
+    const empty = runRaw("worktree", none);
+    assert.equal(empty.status, 0, empty.stdout);
+    assert.equal(empty.stdout.trim(), "");
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

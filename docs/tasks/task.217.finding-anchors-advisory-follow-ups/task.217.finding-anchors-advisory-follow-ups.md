@@ -8,7 +8,7 @@ category: refactoring
 status: ready-for-review
 priority: Medium
 created: 2026-10-19
-updated: 2026-10-23
+updated: 2026-10-24
 assignee:
 estimated_effort_hours: 16
 github_issue: 698
@@ -323,6 +323,27 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-23
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.217.qa.1.finding-anchors-advisory-follow-ups.md](./task.217.qa.1.finding-anchors-advisory-follow-ups.md)
+- **Gate File**: [task.217.gate.1.finding-anchors-advisory-follow-ups.yml](./task.217.gate.1.finding-anchors-advisory-follow-ups.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 6267
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+Two medium findings. The new Step 5 apply-list block trusts a findings file the checker never annotated ([TASK-217-BUG-1](./task.217.bug.1.step5-apply-list-unguarded.md)). The review-code `--inline` guard cannot be reached by the probe engine ([TASK-217-BUG-2](./task.217.bug.2.review-code-inline-guard-unprobeable.md)). There are four low findings, one of which is a `CHANGELOG.md` conflict with `develop`.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -332,6 +353,8 @@ None.
 | 2026-10-23 | 1.1     | Review passed (8/10) — added the removed-literal sweep (two guard extractors keyed on the replaced clause, control fixtures need the stamp), a new task.217 probe cases file, a fenced block for the `--staged` skip, and a test-held bound for the performance criterion | review-task |
 | 2026-10-23 |         | Status → ready-for-development | review-task |
 | 2026-10-23 |         | Implemented — 12 files (engine + 4 bundled copies, 2 SKILL.md, 4 test files, CHANGELOG), 13 new tests; probe re-run 31/31 | develop |
+| 2026-10-23 |         | QA gate CONCERNS (80/100) — 6 findings (2 medium, 4 low) | qa-task |
+| 2026-10-24 |         | QA findings fixed — 6 of 6 (QA1-1..QA1-6), 1 iteration; gate re-review pending | qa-fix |
 <!-- change-log-end -->
 
 ---
