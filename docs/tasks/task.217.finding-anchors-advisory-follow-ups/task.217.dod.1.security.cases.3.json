@@ -1,0 +1,382 @@
+[
+  {
+    "id": "empty-object",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1: no findings array",
+    "correct": "HALT, nothing posted inline",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{}",
+        "{summary-file}": "summary\n",
+        ".agents/skills/review-code/references/pr-inline-comment.js": "#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({reason:\"posted\"})+\"\\n\");\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: a finding in f.json carries no anchor_check (or the file is not findings JSON, has no checker stamp, a stale count, or an unknown verdict) — run Step 2b's anchor check first; nothing posted inline\n"
+    }
+  },
+  {
+    "id": "wrapper-no-findings",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1: wrapper without its array",
+    "correct": "HALT, nothing posted inline",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{\"code_review\":{}}",
+        "{summary-file}": "summary\n",
+        ".agents/skills/review-code/references/pr-inline-comment.js": "#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({reason:\"posted\"})+\"\\n\");\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: a finding in f.json carries no anchor_check (or the file is not findings JSON, has no checker stamp, a stale count, or an unknown verdict) — run Step 2b's anchor check first; nothing posted inline\n"
+    }
+  },
+  {
+    "id": "bare-array",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1: a bare array",
+    "correct": "HALT, nothing posted inline",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "[]",
+        "{summary-file}": "summary\n",
+        ".agents/skills/review-code/references/pr-inline-comment.js": "#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({reason:\"posted\"})+\"\\n\");\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: a finding in f.json carries no anchor_check (or the file is not findings JSON, has no checker stamp, a stale count, or an unknown verdict) — run Step 2b's anchor check first; nothing posted inline\n"
+    }
+  },
+  {
+    "id": "null",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1: null document",
+    "correct": "HALT, nothing posted inline",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "null",
+        "{summary-file}": "summary\n",
+        ".agents/skills/review-code/references/pr-inline-comment.js": "#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({reason:\"posted\"})+\"\\n\");\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: a finding in f.json carries no anchor_check (or the file is not findings JSON, has no checker stamp, a stale count, or an unknown verdict) — run Step 2b's anchor check first; nothing posted inline\n"
+    }
+  },
+  {
+    "id": "not-json",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1: not JSON at all",
+    "correct": "HALT, nothing posted inline",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "not json",
+        "{summary-file}": "summary\n",
+        ".agents/skills/review-code/references/pr-inline-comment.js": "#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({reason:\"posted\"})+\"\\n\");\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: a finding in f.json carries no anchor_check (or the file is not findings JSON, has no checker stamp, a stale count, or an unknown verdict) — run Step 2b's anchor check first; nothing posted inline\n"
+    }
+  },
+  {
+    "id": "findings-not-array",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1: findings is a string",
+    "correct": "HALT, nothing posted inline",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{\"code_review\":{\"findings\":\"x\"}}",
+        "{summary-file}": "summary\n",
+        ".agents/skills/review-code/references/pr-inline-comment.js": "#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({reason:\"posted\"})+\"\\n\");\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: a finding in f.json carries no anchor_check (or the file is not findings JSON, has no checker stamp, a stale count, or an unknown verdict) — run Step 2b's anchor check first; nothing posted inline\n"
+    }
+  },
+  {
+    "id": "unannotated",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1: no anchor_check, stamped",
+    "correct": "HALT, nothing posted inline",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js:1\",\"finding\":\"f\"}]},\"anchor_checked\":{\"by\":\"finding-anchors\",\"findings\":1}}",
+        "{summary-file}": "summary\n",
+        ".agents/skills/review-code/references/pr-inline-comment.js": "#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({reason:\"posted\"})+\"\\n\");\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: a finding in f.json carries no anchor_check (or the file is not findings JSON, has no checker stamp, a stale count, or an unknown verdict) — run Step 2b's anchor check first; nothing posted inline\n"
+    }
+  },
+  {
+    "id": "reviewer-ok-no-stamp",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1: reviewer-written ok, no checker run",
+    "correct": "HALT, nothing posted inline",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js:1\",\"finding\":\"f\",\"anchor_check\":\"ok\"}]}}",
+        "{summary-file}": "summary\n",
+        ".agents/skills/review-code/references/pr-inline-comment.js": "#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({reason:\"posted\"})+\"\\n\");\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: a finding in f.json carries no anchor_check (or the file is not findings JSON, has no checker stamp, a stale count, or an unknown verdict) — run Step 2b's anchor check first; nothing posted inline\n"
+    }
+  },
+  {
+    "id": "stamp-other-tool",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1: stamp by another writer",
+    "correct": "HALT, nothing posted inline",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js:1\",\"finding\":\"f\",\"anchor_check\":\"ok\"}]},\"anchor_checked\":{\"by\":\"reviewer\",\"findings\":1}}",
+        "{summary-file}": "summary\n",
+        ".agents/skills/review-code/references/pr-inline-comment.js": "#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({reason:\"posted\"})+\"\\n\");\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: a finding in f.json carries no anchor_check (or the file is not findings JSON, has no checker stamp, a stale count, or an unknown verdict) — run Step 2b's anchor check first; nothing posted inline\n"
+    }
+  },
+  {
+    "id": "stamp-stale-count",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1: stamp count lower than findings",
+    "correct": "HALT, nothing posted inline",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js:1\",\"finding\":\"f\",\"anchor_check\":\"ok\"},{\"id\":\"CR-2\",\"file_line\":\"a.js:1\",\"finding\":\"f\",\"anchor_check\":\"ok\"}]},\"anchor_checked\":{\"by\":\"finding-anchors\",\"findings\":1}}",
+        "{summary-file}": "summary\n",
+        ".agents/skills/review-code/references/pr-inline-comment.js": "#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({reason:\"posted\"})+\"\\n\");\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: a finding in f.json carries no anchor_check (or the file is not findings JSON, has no checker stamp, a stale count, or an unknown verdict) — run Step 2b's anchor check first; nothing posted inline\n"
+    }
+  },
+  {
+    "id": "stamp-count-string",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1: count as a string",
+    "correct": "HALT, nothing posted inline",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js:1\",\"finding\":\"f\",\"anchor_check\":\"ok\"}]},\"anchor_checked\":{\"by\":\"finding-anchors\",\"findings\":\"1\"}}",
+        "{summary-file}": "summary\n",
+        ".agents/skills/review-code/references/pr-inline-comment.js": "#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({reason:\"posted\"})+\"\\n\");\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: a finding in f.json carries no anchor_check (or the file is not findings JSON, has no checker stamp, a stale count, or an unknown verdict) — run Step 2b's anchor check first; nothing posted inline\n"
+    }
+  },
+  {
+    "id": "unknown-verdict",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1: verdict not one of the seven",
+    "correct": "HALT, nothing posted inline",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js:1\",\"finding\":\"f\",\"anchor_check\":\"verified\"}]},\"anchor_checked\":{\"by\":\"finding-anchors\",\"findings\":1}}",
+        "{summary-file}": "summary\n",
+        ".agents/skills/review-code/references/pr-inline-comment.js": "#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({reason:\"posted\"})+\"\\n\");\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: a finding in f.json carries no anchor_check (or the file is not findings JSON, has no checker stamp, a stale count, or an unknown verdict) — run Step 2b's anchor check first; nothing posted inline\n"
+    }
+  },
+  {
+    "id": "verdict-number",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1: verdict a number",
+    "correct": "HALT, nothing posted inline",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js:1\",\"finding\":\"f\",\"anchor_check\":0}]},\"anchor_checked\":{\"by\":\"finding-anchors\",\"findings\":1}}",
+        "{summary-file}": "summary\n",
+        ".agents/skills/review-code/references/pr-inline-comment.js": "#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({reason:\"posted\"})+\"\\n\");\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: a finding in f.json carries no anchor_check (or the file is not findings JSON, has no checker stamp, a stale count, or an unknown verdict) — run Step 2b's anchor check first; nothing posted inline\n"
+    }
+  },
+  {
+    "id": "null-finding",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1: a null finding",
+    "correct": "HALT, nothing posted inline",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{\"code_review\":{\"findings\":[null]},\"anchor_checked\":{\"by\":\"finding-anchors\",\"findings\":1}}",
+        "{summary-file}": "summary\n",
+        ".agents/skills/review-code/references/pr-inline-comment.js": "#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({reason:\"posted\"})+\"\\n\");\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: a finding in f.json carries no anchor_check (or the file is not findings JSON, has no checker stamp, a stale count, or an unknown verdict) — run Step 2b's anchor check first; nothing posted inline\n"
+    }
+  },
+  {
+    "id": "conformance-only",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1: only the PR lens — review-code reads code_review",
+    "correct": "HALT, nothing posted inline",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{\"pr_conformance\":{\"findings\":[{\"id\":\"PC-1\",\"ref\":\"AC-1\",\"finding\":\"f\",\"anchor_check\":\"no-line\"}]},\"anchor_checked\":{\"by\":\"finding-anchors\",\"findings\":1}}",
+        "{summary-file}": "summary\n",
+        ".agents/skills/review-code/references/pr-inline-comment.js": "#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({reason:\"posted\"})+\"\\n\");\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: a finding in f.json carries no anchor_check (or the file is not findings JSON, has no checker stamp, a stale count, or an unknown verdict) — run Step 2b's anchor check first; nothing posted inline\n"
+    }
+  },
+  {
+    "id": "stamped-ok",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1: a checker-stamped ok finding",
+    "correct": "posted inline",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js:1\",\"finding\":\"f\",\"anchor_check\":\"ok\"}]},\"anchor_checked\":{\"by\":\"finding-anchors\",\"findings\":1}}",
+        "{summary-file}": "summary\n",
+        ".agents/skills/review-code/references/pr-inline-comment.js": "#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({reason:\"posted\"})+\"\\n\");\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "{\"reason\":\"posted\"}\n"
+    }
+  },
+  {
+    "id": "stamped-empty",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1: a stamped empty review",
+    "correct": "posted inline",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{\"code_review\":{\"findings\":[]},\"anchor_checked\":{\"by\":\"finding-anchors\",\"findings\":0}}",
+        "{summary-file}": "summary\n",
+        ".agents/skills/review-code/references/pr-inline-comment.js": "#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({reason:\"posted\"})+\"\\n\");\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "{\"reason\":\"posted\"}\n"
+    }
+  },
+  {
+    "id": "stamped-malformed",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1: a stamped malformed anchor still passes the guard (it is excluded by the selector)",
+    "correct": "posted inline",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js\",\"finding\":\"f\",\"anchor_check\":\"unparseable\"}]},\"anchor_checked\":{\"by\":\"finding-anchors\",\"findings\":1}}",
+        "{summary-file}": "summary\n",
+        ".agents/skills/review-code/references/pr-inline-comment.js": "#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({reason:\"posted\"})+\"\\n\");\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "{\"reason\":\"posted\"}\n"
+    }
+  },
+  {
+    "id": "stamped-colon-path",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1: a path holding a colon",
+    "correct": "posted inline",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"src/a:b.js:3\",\"finding\":\"f\",\"anchor_check\":\"ok\"}]},\"anchor_checked\":{\"by\":\"finding-anchors\",\"findings\":1}}",
+        "{summary-file}": "summary\n",
+        ".agents/skills/review-code/references/pr-inline-comment.js": "#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({reason:\"posted\"})+\"\\n\");\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "{\"reason\":\"posted\"}\n"
+    }
+  }
+]

@@ -1,0 +1,25 @@
+{
+  "sink": "filename",
+  "entry": "fence:skills/review-code/SKILL.md#Step 5 — `--fix` (optional)",
+  "name": "review-code Step 5 apply-list",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 23,
+  "passed": 23,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": [
+    "bash"
+  ],
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": null,
+  "slot": "{findings-json}",
+  "fixture_setup": null,
+  "ran_at": "2026-10-24T06:03:12.505Z"
+}

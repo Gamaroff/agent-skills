@@ -374,11 +374,21 @@ test("the inline-comment jq snippet executes against a schema-shaped fixture", (
 // task.195 SC-5: the --inline select keeps only verified anchors, so a findings file the checker never
 // annotated used to yield [] — indistinguishable from "no anchorable findings". The guard before it
 // must refuse such a file, and must let a fully annotated one through (control).
+// task.217: keyed on the stamp clause, which the guard keeps; the `(.anchor_check | type)` clause it
+// was keyed on before was replaced by the verdict enumeration.
 function extractInlineGuard(skillText) {
   const m = skillText.match(
-    /^[ \t]*jq -e '[\s\S]*?select\(\(\.anchor_check \| type\) != "string"\)[\s\S]*?exit 1; \}/m,
+    /^[ \t]*jq -e '[\s\S]*?\.anchor_checked\.by == "finding-anchors"[\s\S]*?exit 1; \}/m,
   );
   return m ? m[0] : null;
+}
+
+/** `doc` with the stamp `finding-anchors.js --annotate` writes, counting the code lens's findings. */
+function stamped(doc) {
+  const n = Array.isArray(doc.code_review?.findings)
+    ? doc.code_review.findings.length
+    : 0;
+  return { ...doc, anchor_checked: { by: "finding-anchors", findings: n } };
 }
 
 test("--inline refuses a findings file with an un-annotated finding, and passes an annotated one", (t) => {
@@ -429,23 +439,405 @@ test("--inline refuses a findings file with an un-annotated finding, and passes 
       assert.equal(r.status, 1, `${JSON.stringify(notFindings)} must HALT`);
       assert.match(r.stdout, /HALT: /);
     }
-    assert.equal(runGuard({ code_review: { findings: [] } }).status, 0);
-    const annotated = runGuard({
-      code_review: {
-        findings: [
-          {
-            file_line: "src/x.ts:4",
-            finding: "f",
-            anchor_check: "text-mismatch",
-          },
-        ],
-      },
-    });
+    assert.equal(
+      runGuard(stamped({ code_review: { findings: [] } })).status,
+      0,
+    );
+    const annotated = runGuard(
+      stamped({
+        code_review: {
+          findings: [
+            {
+              file_line: "src/x.ts:4",
+              finding: "f",
+              anchor_check: "text-mismatch",
+            },
+          ],
+        },
+      }),
+    );
     assert.equal(
       annotated.status,
       0,
       `an annotated file must pass:\n${annotated.stdout}${annotated.stderr}`,
     );
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// task.217 (task.195 gate 3 CR-2): the guard trusted any string. A reviewer that writes
+// `anchor_check: "ok"` itself, with no checker run, must not get its findings posted inline.
+test("task.217: --inline requires the checker's stamp, a matching count and a known verdict", (t) => {
+  const { spawnSync: run } = require("child_process");
+  if (run("jq", ["--version"]).error) return t.skip("jq not installed");
+  const guard = extractInlineGuard(read("SKILL.md"));
+  assert.ok(guard, "could not find the --inline anchor_check guard");
+  const dir = fs.mkdtempSync(
+    path.join(require("os").tmpdir(), "inline-stamp-"),
+  );
+  try {
+    const file = path.join(dir, "findings.json");
+    const runGuard = (doc) => {
+      fs.writeFileSync(file, JSON.stringify(doc));
+      return run("bash", ["-c", guard], {
+        encoding: "utf8",
+        env: { ...process.env, FINDINGS_JSON: file },
+      });
+    };
+    const two = {
+      code_review: {
+        findings: [
+          { file_line: "a.js:1", finding: "f", anchor_check: "ok" },
+          { file_line: "b.js:2", finding: "g", anchor_check: "unchecked-text" },
+        ],
+      },
+    };
+    const refused = {
+      "no stamp (reviewer-written anchor_check)": two,
+      "a stamp another tool wrote": {
+        ...two,
+        anchor_checked: { by: "reviewer", findings: 2 },
+      },
+      "a stale count": {
+        ...two,
+        anchor_checked: { by: "finding-anchors", findings: 1 },
+      },
+      "an unknown verdict": stamped({
+        code_review: {
+          findings: [
+            { file_line: "a.js:1", finding: "f", anchor_check: "verified" },
+          ],
+        },
+      }),
+    };
+    for (const [label, doc] of Object.entries(refused)) {
+      const r = runGuard(doc);
+      assert.equal(r.status, 1, `${label} must HALT`);
+      assert.match(r.stdout, /HALT: .*stamp.*Step 2b/, label);
+    }
+    const ok = runGuard(stamped(two));
+    assert.equal(
+      ok.status,
+      0,
+      `a stamped file passes:\n${ok.stdout}${ok.stderr}`,
+    );
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// task.217 (task.195 gates 3–4): the selector split on the FIRST colon and posted the untrimmed path;
+// the checker trims and takes the LAST colon. The posted anchor must be the one the checker verified.
+test("task.217: the --inline selector parses anchors in the checker's grammar", (t) => {
+  if (spawnSync("jq", ["--version"]).error) return t.skip("jq not installed");
+  const prog = extractJqProgram(read("SKILL.md"));
+  assert.ok(prog, "could not find the jq program feeding --findings-file");
+  const r = spawnSync("jq", ["-c", prog], {
+    input: JSON.stringify({
+      code_review: {
+        findings: [
+          { file_line: "src/a:b.js:3", finding: "colon", anchor_check: "ok" },
+          {
+            file_line: "  a.js:1",
+            finding: "padded",
+            anchor_check: "unchecked-text",
+          },
+          { file_line: "a.js:1-4", finding: "range", anchor_check: "ok" },
+        ],
+      },
+    }),
+    encoding: "utf8",
+  });
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(
+    JSON.parse(r.stdout).map((f) => [f.path, f.line]),
+    [
+      ["src/a:b.js", 3],
+      ["a.js", 1],
+    ],
+  );
+});
+
+// task.217 (task.195 gate 1 CR-2): the block read $PR_NUMBER, $SUMMARY_FILE and wrote $INLINE_FILE,
+// and bound none of them. Run it with ONLY its documented placeholders substituted.
+test("task.217: the --inline block runs with only its placeholders substituted, and leaves no scratch file", (t) => {
+  if (spawnSync("jq", ["--version"]).error) return t.skip("jq not installed");
+  const m = read("SKILL.md").match(
+    /^([ \t]*)# Every input is bound here: a fresh shell carries nothing from another block \(task\.217\)\.\n[\s\S]*?^\1exit "\$POST_RC"$/m,
+  );
+  assert.ok(m, "could not find the --inline block");
+  const block = m[0]
+    .split("\n")
+    .map((l) => (l.startsWith(m[1]) ? l.slice(m[1].length) : l))
+    .join("\n");
+  const os = require("os");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "inline-block-"));
+  try {
+    const tmp = path.join(dir, "tmp");
+    const work = path.join(dir, "work");
+    const poster = path.join(work, ".agents/skills/review-code/references");
+    fs.mkdirSync(tmp);
+    fs.mkdirSync(poster, { recursive: true });
+    // The stub exits with $POSTER_RC, so a failed post can be told from a successful one.
+    fs.writeFileSync(
+      path.join(poster, "pr-inline-comment.js"),
+      'process.stdout.write(JSON.stringify({ reason: "posted", argv: process.argv.slice(2) }) + "\\n");\nprocess.exitCode = Number(process.env.POSTER_RC || 0);\n',
+    );
+    const summary = path.join(dir, "summary.md");
+    const findings = path.join(dir, "findings.json");
+    const runBlock = (doc, { summaryExists = true, posterRc = 0 } = {}) => {
+      fs.rmSync(summary, { force: true });
+      if (summaryExists) fs.writeFileSync(summary, "summary\n");
+      fs.writeFileSync(findings, JSON.stringify(doc));
+      const script = block
+        .replaceAll("{findings-json}", findings)
+        .replaceAll("{pr-number}", "7")
+        .replaceAll("{summary-file}", summary);
+      // `set -u`: an input the block reads but never binds is an error, not an empty string.
+      return spawnSync("bash", ["-uc", script], {
+        cwd: work,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          TMPDIR: tmp,
+          POSTER_RC: String(posterRc),
+          PATH: `${path.dirname(process.execPath)}:${process.env.PATH}`,
+        },
+      });
+    };
+    const doc = stamped({
+      code_review: {
+        findings: [{ file_line: "a.js:1", finding: "f", anchor_check: "ok" }],
+      },
+    });
+    const posted = runBlock(doc);
+    assert.equal(posted.status, 0, posted.stdout + posted.stderr);
+    const out = JSON.parse(posted.stdout.trim().split("\n").pop());
+    assert.equal(out.reason, "posted");
+    assert.deepEqual(out.argv.slice(0, 2), ["--pr", "7"]);
+    assert.ok(out.argv.includes(summary), "the summary file is passed through");
+    assert.deepEqual(fs.readdirSync(tmp), [], "a post leaves no scratch file");
+    const refused = runBlock({
+      code_review: { findings: [{ file_line: "a.js:1", anchor_check: "ok" }] },
+    });
+    assert.equal(refused.status, 1);
+    assert.deepEqual(
+      fs.readdirSync(tmp),
+      [],
+      "a refusal leaves no scratch file",
+    );
+    const noSummary = runBlock(doc, { summaryExists: false });
+    assert.equal(noSummary.status, 1);
+    assert.match(noSummary.stdout, /HALT: SUMMARY_FILE/);
+    // QA1-4: the poster's exit status is the block's — `rm -f` after it used to report 0.
+    const failed = runBlock(doc, { posterRc: 3 });
+    assert.equal(failed.status, 3, "a failed post is not reported as success");
+    assert.deepEqual(
+      fs.readdirSync(tmp),
+      [],
+      "a failed post leaves no scratch file",
+    );
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// task.217 (task.195 gate 2 CR-3; QA cycle 2): Step 2b checks anchors against the tree that was
+// reviewed — the index under --staged, the commit under a range or PR — but Step 5 edits the working
+// tree. A finding whose file differs between the two must be skipped, not applied. QA cycle 2 found
+// the shell copy of that decision failed open on an unfilled TARGET and on a cwd below the root, so
+// the block now asks the checker, which reads the tree and the root from its own stamp.
+test("task.217: Step 5 skips a finding whose working tree differs from the tree Step 2b checked", () => {
+  const m = read("SKILL.md").match(
+    /^([ \t]*)# Which findings Step 5 may edit\.[^\n]*\n[\s\S]*?(?=^\1```)/m,
+  );
+  assert.ok(m, "could not find the Step 5 apply-list block");
+  // The shipped copy of the checker. The block runs it by its root-relative path, unchanged: the
+  // fixture installs the copy at that path, so the test runs the block exactly as shipped (QA3-1 —
+  // swapping in an absolute path hid that the block cannot load the checker from a subdirectory).
+  const engine = path.join(ROOT, "references", "finding-anchors.js");
+  const CHECKER_PATH =
+    ".agents/skills/review-code/references/finding-anchors.js";
+  const block = m[0]
+    .split("\n")
+    .map((l) => (l.startsWith(m[1]) ? l.slice(m[1].length) : l))
+    .join("\n");
+  assert.ok(
+    block.includes(CHECKER_PATH),
+    "Step 5 runs the checker by its root-relative bundled path",
+  );
+  assert.match(
+    block,
+    /--fix-list/,
+    "Step 5 asks the checker for its apply list",
+  );
+  assert.doesNotMatch(block, /\{target:/, "Step 5 binds no target of its own");
+  const os = require("os");
+  const { execFileSync } = require("child_process");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "staged-fix-"));
+  try {
+    const git = (...a) =>
+      execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", ...a], {
+        cwd: dir,
+        stdio: "ignore",
+      });
+    git("init", "-q");
+    fs.mkdirSync(path.join(dir, "sub"));
+    fs.writeFileSync(path.join(dir, "sub", "keep"), "");
+    fs.writeFileSync(path.join(dir, "a.js"), "one\n");
+    fs.writeFileSync(path.join(dir, "b.js"), "one\n");
+    git("add", ".");
+    git("commit", "-q", "-m", "c");
+    // a.js: staged, then edited on top (working tree ≠ index). b.js: staged only (clean).
+    fs.writeFileSync(path.join(dir, "a.js"), "staged\n");
+    fs.writeFileSync(path.join(dir, "b.js"), "staged\n");
+    git("add", ".");
+    fs.writeFileSync(path.join(dir, "a.js"), "worktree\n");
+    // The checker where a consumer has it, untracked, after the commits the trees are read from.
+    fs.mkdirSync(path.join(dir, path.dirname(CHECKER_PATH)), {
+      recursive: true,
+    });
+    fs.copyFileSync(engine, path.join(dir, CHECKER_PATH));
+    const findings = path.join(dir, "findings.json");
+    const review = {
+      code_review: {
+        findings: [
+          { id: "CR-1", file_line: "a.js:1" },
+          { id: "CR-2", file_line: " ﻿b.js:1" },
+          { id: "CR-3", file_line: "b.js:9" },
+          { id: "CR-4", file_line: "b.js" },
+        ],
+      },
+    };
+    // Step 2b, for real: the checker annotates and stamps the file with the tree it read.
+    const check = (...extra) => {
+      fs.writeFileSync(findings, JSON.stringify(review));
+      spawnSync(
+        process.execPath,
+        [
+          engine,
+          "--findings-file",
+          findings,
+          "--root",
+          dir,
+          ...extra,
+          "--annotate",
+          findings,
+        ],
+        { cwd: dir, encoding: "utf8" },
+      );
+    };
+    const runRaw = (file = findings, cwd = dir) =>
+      spawnSync("bash", ["-c", block.replaceAll("{findings-json}", file)], {
+        cwd,
+        encoding: "utf8",
+      });
+    const runFrom = (cwd) => {
+      const r = runRaw(findings, cwd);
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+      return r.stdout.trim().split("\n");
+    };
+    const head = execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: dir,
+      encoding: "utf8",
+    })
+      .trim()
+      .slice(0, 12);
+    const unverified = [
+      "skipped — unverified anchor: CR-3",
+      "skipped — unverified anchor: CR-4",
+    ];
+    // --staged: the index was checked, and the U+FEFF-led anchor names the file the checker checked
+    // (QA2-3).
+    check("--index");
+    const stagedList = [
+      "skipped — working tree differs from the staged content that was reviewed: CR-1 (a.js)",
+      "apply: CR-2 (b.js)",
+      ...unverified,
+    ];
+    assert.deepEqual(runFrom(dir), stagedList);
+    // The checker's answer does not depend on the cwd (QA2-2): the same list from a subdirectory.
+    const fromSub = spawnSync(
+      process.execPath,
+      [path.join(dir, CHECKER_PATH), "--fix-list", "--findings-file", findings],
+      { cwd: path.join(dir, "sub"), encoding: "utf8" },
+    );
+    assert.equal(fromSub.status, 0, fromSub.stderr);
+    assert.deepEqual(fromSub.stdout.trim().split("\n"), stagedList);
+    // The block runs from the root (QA3-1): from a subdirectory it cannot load the checker by its
+    // root-relative path, so it HALTs and lists nothing to apply — closed, never a guess.
+    const sub = runRaw(findings, path.join(dir, "sub"));
+    assert.notEqual(sub.status, 0, sub.stdout);
+    assert.match(sub.stdout, /HALT: finding-anchors produced no apply list/);
+    assert.doesNotMatch(sub.stdout, /apply:/);
+    // Control: a working-tree review checked the working tree, so a.js is applied.
+    check();
+    assert.deepEqual(runFrom(dir), [
+      "apply: CR-1 (a.js)",
+      "apply: CR-2 (b.js)",
+      ...unverified,
+    ]);
+    // QA1-3: a range/PR review checked a commit; a.js and b.js both differ from it on disk.
+    check("--rev", "HEAD");
+    assert.deepEqual(runFrom(dir), [
+      `skipped — working tree differs from commit ${head}, the content that was reviewed: CR-1 (a.js)`,
+      `skipped — working tree differs from commit ${head}, the content that was reviewed: CR-2 (b.js)`,
+      ...unverified,
+    ]);
+    // QA1-1: input the checker never annotated applies nothing; a missing file HALTs too.
+    check("--index");
+    const good = JSON.parse(fs.readFileSync(findings, "utf8"));
+    const { anchor_checked, ...unstamped } = good;
+    const hostile = {
+      "no stamp": unstamped,
+      "stale count": {
+        ...good,
+        anchor_checked: { ...anchor_checked, findings: 3 },
+      },
+      "foreign stamp": {
+        ...good,
+        anchor_checked: { ...anchor_checked, by: "someone-else" },
+      },
+      "an older checker's stamp": {
+        ...good,
+        anchor_checked: { by: "finding-anchors", findings: 4 },
+      },
+      "unknown verdict": {
+        ...good,
+        code_review: {
+          findings: good.code_review.findings.map((f) => ({
+            ...f,
+            anchor_check: "fine",
+          })),
+        },
+      },
+      "missing verdict": { ...review, anchor_checked },
+      "no findings array": {
+        code_review: {},
+        anchor_checked: { ...anchor_checked, findings: 0 },
+      },
+      "empty object": {},
+      "top-level array": [],
+      "not JSON": "not json",
+    };
+    for (const [name, doc] of Object.entries(hostile)) {
+      const f = path.join(dir, "hostile.json");
+      fs.writeFileSync(f, typeof doc === "string" ? doc : JSON.stringify(doc));
+      const r = runRaw(f);
+      assert.equal(r.status, 1, `${name}: ${r.stdout}`);
+      assert.match(r.stdout, /HALT: .*nothing applied/, name);
+      assert.doesNotMatch(r.stdout, /^apply:/m, name);
+    }
+    const missing = runRaw(path.join(dir, "absent.json"));
+    assert.equal(missing.status, 1);
+    assert.match(missing.stdout, /HALT: FINDINGS_JSON .* is missing or empty/);
+    // Control for the refusals: an annotated file with no findings is an empty list, not a HALT.
+    review.code_review.findings = [];
+    check("--index");
+    const empty = runRaw();
+    assert.equal(empty.status, 0, empty.stdout + empty.stderr);
+    assert.equal(empty.stdout, "");
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

@@ -35,6 +35,7 @@ const {
   makeReader,
   findingsOf,
   lensesOf,
+  run,
   MALFORMED,
 } = createRequire(import.meta.url)(ENGINE);
 
@@ -364,10 +365,11 @@ test("SC-7: each distinct path is read once per run", () => {
 
 // ---------------------------------------------------------------- CLI
 
-function cli(args, cwd) {
+function cli(args, cwd, env) {
   const r = spawnSync(process.execPath, [ENGINE, ...args], {
     cwd,
     encoding: "utf8",
+    env: env ? { ...process.env, ...env } : process.env,
   });
   return {
     code: r.status,
@@ -1017,14 +1019,462 @@ test("--index with --rev exits 2 usage; --index outside a git work tree exits 2 
     );
     assert.equal(both.code, 2);
     assert.equal(both.json().reason, "usage");
+    // GIT_CEILING_DIRECTORIES: when TMPDIR sits inside a git checkout, git would otherwise find
+    // that checkout above `plain` and the call would not be "outside a work tree" (task.217).
     const outside = cli(
       ["--findings-file", f, "--root", plain, "--index", "--json"],
       plain,
+      { GIT_CEILING_DIRECTORIES: path.dirname(plain) },
     );
     assert.equal(outside.code, 2);
     assert.equal(outside.json().reason, "bad-root");
   } finally {
     rmSync(dir, { recursive: true, force: true });
     rmSync(plain, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------- task.217
+
+/** `run` in-process with a counting `exec`, capturing what it writes. */
+function runCounted(args) {
+  const calls = [];
+  const exec = (...a) => {
+    calls.push(a);
+    return execFileSync(...a);
+  };
+  const out = [];
+  const write = process.stdout.write;
+  const errWrite = process.stderr.write;
+  process.stdout.write = (c) => (out.push(String(c)), true);
+  process.stderr.write = (c) => (out.push(String(c)), true);
+  const saved = process.exitCode;
+  let code;
+  try {
+    run(args, { exec });
+    code = process.exitCode;
+  } finally {
+    process.stdout.write = write;
+    process.stderr.write = errWrite;
+    process.exitCode = saved;
+  }
+  return { code, calls, json: () => JSON.parse(out.join("")) };
+}
+
+const NON_OBJECTS = [null, "x", 1, true, []];
+
+test("task.217: a non-object finding on either lens exits 2 usage naming lens and index, reads no file, annotates nothing", () => {
+  const dir = scratch();
+  try {
+    for (const lens of ["code_review", "pr_conformance"]) {
+      for (const bad of NON_OBJECTS) {
+        const f = path.join(dir, "f.json");
+        const out = path.join(dir, "annotated.json");
+        rmSync(out, { force: true });
+        writeFileSync(f, JSON.stringify({ [lens]: { findings: [bad] } }));
+        // --index makes checkTree call exec, so a refusal that ran after it would count a call.
+        const r = runCounted([
+          "--findings-file",
+          f,
+          "--root",
+          dir,
+          "--index",
+          "--annotate",
+          out,
+          "--json",
+        ]);
+        const label = `${lens} ${JSON.stringify(bad)}`;
+        assert.equal(r.code, 2, label);
+        assert.equal(r.json().reason, "usage", label);
+        assert.match(
+          r.json().message,
+          new RegExp(`^${lens}\\.findings\\[0\\] is not an object`),
+          label,
+        );
+        assert.equal(r.calls.length, 0, `${label}: no exec before the refusal`);
+        assert.throws(
+          () => readFileSync(out),
+          /ENOENT/,
+          `${label}: nothing annotated`,
+        );
+      }
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("task.217: a null finding through the CLI is usage, not a crash read as 'not runnable'", () => {
+  const dir = scratch();
+  try {
+    const f = path.join(dir, "f.json");
+    writeFileSync(f, JSON.stringify({ code_review: { findings: [null] } }));
+    const r = cli(["--findings-file", f, "--root", dir, "--json"], dir);
+    assert.equal(r.code, 2);
+    assert.equal(r.json().reason, "usage");
+    assert.equal(r.err, "", "no stack trace");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("task.217: a valid finding before the bad one does not mask it; the index is within the lens", () => {
+  const dir = scratch();
+  try {
+    const f = path.join(dir, "f.json");
+    writeFileSync(
+      f,
+      JSON.stringify({
+        code_review: {
+          findings: [{ id: "CR-1", file_line: "scripts/smoke/slugify.js:8" }],
+        },
+        pr_conformance: { findings: [{ id: "PC-1", ref: "AC-1" }, "x"] },
+      }),
+    );
+    const r = cli(["--findings-file", f, "--root", dir, "--json"], dir);
+    assert.equal(r.code, 2);
+    assert.match(
+      r.json().message,
+      /^pr_conformance\.findings\[1\] is not an object/,
+    );
+    const bare = path.join(dir, "bare.json");
+    writeFileSync(bare, JSON.stringify([{ id: "x", file_line: "a.js:1" }, 7]));
+    const b = cli(["--findings-file", bare, "--root", dir, "--json"], dir);
+    assert.equal(b.code, 2);
+    assert.match(b.json().message, /^\[1\] is not an object/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("task.217: --annotate stamps a wrapped document with the total finding count; a bare array gets none", () => {
+  const dir = scratch();
+  try {
+    const f = path.join(dir, "f.json");
+    writeFileSync(
+      f,
+      JSON.stringify({
+        code_review: {
+          findings: [
+            { id: "CR-1", file_line: "scripts/smoke/slugify.js:8" },
+            { id: "CR-2", file_line: "scripts/smoke/slugify.js:77" },
+          ],
+        },
+        pr_conformance: { findings: [{ id: "PC-1", ref: "AC-3" }] },
+      }),
+    );
+    cli(["--findings-file", f, "--root", dir, "--annotate", f, "--json"], dir);
+    assert.deepEqual(JSON.parse(readFileSync(f, "utf8")).anchor_checked, {
+      by: "finding-anchors",
+      findings: 3,
+      tree: { kind: "worktree" },
+      root: path.resolve(dir),
+    });
+    const bare = path.join(dir, "bare.json");
+    writeFileSync(
+      bare,
+      JSON.stringify([{ id: "x", file_line: "scripts/smoke/slugify.js:8" }]),
+    );
+    const b = cli(
+      ["--findings-file", bare, "--root", dir, "--annotate", bare, "--json"],
+      dir,
+    );
+    assert.equal(b.code, 0);
+    const doc = JSON.parse(readFileSync(bare, "utf8"));
+    assert.ok(Array.isArray(doc), "a bare array stays a bare array");
+    assert.equal(doc[0].anchor_check, "unchecked-text");
+    assert.equal(doc.anchor_checked, undefined);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ------------------------------------------------------------- --fix-list (task.217 QA cycle 2)
+//
+// `/review-code --fix` used to decide what to apply in shell, from a TARGET it re-bound and a
+// `git diff --quiet` run from the cwd: an unfilled TARGET turned the tree comparison off (QA2-1), a
+// run from a subdirectory made every path look clean (QA2-2), and jq's trim kept a U+FEFF the
+// checker had stripped (QA2-3). The stamp now records what was checked and --fix-list reads it.
+
+/** A repo where a.js is staged and then edited on top, b.js is staged only, c.js is untouched. */
+function stagedRepo() {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "finding-anchors-fix-"));
+  const git = (...a) =>
+    execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", ...a], {
+      cwd: dir,
+      stdio: "ignore",
+    });
+  git("init", "-q");
+  mkdirSync(path.join(dir, "sub"));
+  for (const f of ["a.js", "b.js", "c.js"])
+    writeFileSync(path.join(dir, f), "one\n");
+  writeFileSync(path.join(dir, "sub", "keep"), "");
+  git("add", ".");
+  git("commit", "-q", "-m", "c");
+  writeFileSync(path.join(dir, "a.js"), "staged\n");
+  writeFileSync(path.join(dir, "b.js"), "staged\n");
+  git("add", "a.js", "b.js");
+  writeFileSync(path.join(dir, "a.js"), "worktree\n");
+  return dir;
+}
+
+const FIX_FINDINGS = [
+  { id: "CR-1", file_line: "a.js:1" },
+  { id: "CR-2", file_line: "﻿b.js:1" }, // the checker trims U+FEFF; so must the fix list
+  { id: "CR-3", file_line: "c.js:1" },
+  { id: "CR-4", file_line: "c.js:9" }, // out-of-range
+  { id: "CR-5", file_line: "AC-1" }, // a code finding that is not path:line — unparseable
+  { id: "CR-6", file_line: "a.js:1" }, // a second finding on a file already compared
+];
+
+/** Annotate FIX_FINDINGS in `dir` with `extra` (none, --index, --rev HEAD) and return the file. */
+function annotated(dir, extra) {
+  const f = path.join(dir, "findings.json");
+  writeFileSync(f, JSON.stringify({ code_review: { findings: FIX_FINDINGS } }));
+  const r = cli(
+    ["--findings-file", f, "--root", dir, ...extra, "--annotate", f, "--json"],
+    dir,
+  );
+  assert.ok(r.code === 0 || r.code === 1, r.out + r.err);
+  return f;
+}
+
+const lines = (r) => r.out.trim().split("\n");
+
+test("task.217 QA2: --annotate records the tree it checked and the absolute root", () => {
+  const dir = stagedRepo();
+  try {
+    const head = execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: dir,
+      encoding: "utf8",
+    }).trim();
+    for (const [extra, tree] of [
+      [[], { kind: "worktree" }],
+      [["--index"], { kind: "index" }],
+      [["--rev", "HEAD"], { kind: "rev", rev: head }],
+    ]) {
+      const st = JSON.parse(
+        readFileSync(annotated(dir, extra), "utf8"),
+      ).anchor_checked;
+      assert.deepEqual(st, {
+        by: "finding-anchors",
+        findings: 6,
+        tree,
+        root: path.resolve(dir),
+      });
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("task.217 QA2: --fix-list reads the tree from the stamp, and answers the same from a subdirectory", () => {
+  const dir = stagedRepo();
+  try {
+    const head = execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: dir,
+      encoding: "utf8",
+    })
+      .trim()
+      .slice(0, 12);
+    const expect = {
+      worktree: [
+        "apply: CR-1 (a.js)",
+        "apply: CR-2 (b.js)",
+        "apply: CR-3 (c.js)",
+        "skipped — unverified anchor: CR-4",
+        "skipped — unverified anchor: CR-5",
+        "apply: CR-6 (a.js)",
+      ],
+      index: [
+        "skipped — working tree differs from the staged content that was reviewed: CR-1 (a.js)",
+        "apply: CR-2 (b.js)",
+        "apply: CR-3 (c.js)",
+        "skipped — unverified anchor: CR-4",
+        "skipped — unverified anchor: CR-5",
+        "skipped — working tree differs from the staged content that was reviewed: CR-6 (a.js)",
+      ],
+      rev: [
+        `skipped — working tree differs from commit ${head}, the content that was reviewed: CR-1 (a.js)`,
+        `skipped — working tree differs from commit ${head}, the content that was reviewed: CR-2 (b.js)`,
+        "apply: CR-3 (c.js)",
+        "skipped — unverified anchor: CR-4",
+        "skipped — unverified anchor: CR-5",
+        `skipped — working tree differs from commit ${head}, the content that was reviewed: CR-6 (a.js)`,
+      ],
+    };
+    for (const [kind, extra] of [
+      ["worktree", []],
+      ["index", ["--index"]],
+      ["rev", ["--rev", "HEAD"]],
+    ]) {
+      const f = annotated(dir, extra);
+      // From the root, from a subdirectory, and from outside the repository altogether.
+      for (const cwd of [dir, path.join(dir, "sub"), os.tmpdir()]) {
+        const r = cli(["--fix-list", "--findings-file", f], cwd);
+        assert.equal(r.code, 0, `${kind} from ${cwd}: ${r.err}`);
+        assert.deepEqual(lines(r), expect[kind], `${kind} from ${cwd}`);
+      }
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("task.217 QA2: a file that cannot be read on either side is skipped, never applied", () => {
+  const dir = stagedRepo();
+  try {
+    const f = annotated(dir, ["--index"]);
+    rmSync(path.join(dir, "c.js")); // checked in the index, now gone from the working tree
+    const r = cli(["--fix-list", "--findings-file", f], dir);
+    assert.equal(r.code, 0, r.err);
+    assert.equal(
+      lines(r)[2],
+      "skipped — could not compare the working tree with the staged content that was reviewed: CR-3 (c.js)",
+    );
+    assert.doesNotMatch(r.out, /^apply: CR-3/m);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("task.217 QA2: --fix-list refuses every file the checker did not annotate, and applies nothing", () => {
+  const dir = stagedRepo();
+  try {
+    const good = JSON.parse(readFileSync(annotated(dir, ["--index"]), "utf8"));
+    const st = good.anchor_checked;
+    const { anchor_checked, ...unstamped } = good;
+    const withStamp = (s) => ({ ...good, anchor_checked: { ...st, ...s } });
+    const hostile = {
+      "no stamp": unstamped,
+      "stale count": withStamp({ findings: 5 }),
+      "foreign stamp": withStamp({ by: "reviewer" }),
+      "stamp from an older checker (no tree)": {
+        ...good,
+        anchor_checked: { by: st.by, findings: st.findings },
+      },
+      "unknown tree kind": withStamp({ tree: { kind: "staged" } }),
+      "rev kind with no commit": withStamp({
+        tree: { kind: "rev", rev: "HEAD" },
+      }),
+      "index kind with a relative root": withStamp({ root: "." }),
+      "unknown verdict": {
+        ...good,
+        code_review: {
+          findings: good.code_review.findings.map((f, i) =>
+            i ? f : { ...f, anchor_check: "fine" },
+          ),
+        },
+      },
+      "missing verdict": {
+        ...good,
+        code_review: {
+          findings: good.code_review.findings.map(
+            ({ anchor_check, ...f }) => f,
+          ),
+        },
+      },
+      "no findings array": {
+        code_review: {},
+        anchor_checked: { ...st, findings: 0 },
+      },
+      "empty object": {},
+      "top-level array": good.code_review.findings,
+      "a null finding": {
+        code_review: { findings: [null] },
+        anchor_checked: { ...st, findings: 1 },
+      },
+    };
+    const f = path.join(dir, "hostile.json");
+    for (const [name, doc] of Object.entries(hostile)) {
+      writeFileSync(f, JSON.stringify(doc));
+      const r = cli(["--fix-list", "--findings-file", f], dir);
+      assert.equal(r.code, 2, `${name}: ${r.out}${r.err}`);
+      assert.equal(r.out, "", `${name}: a refusal prints no list`);
+      assert.match(r.err, /nothing applied/, name);
+      const j = cli(["--fix-list", "--findings-file", f, "--json"], dir);
+      assert.equal(j.json().reason, "not-annotated", name);
+    }
+    writeFileSync(f, "not json");
+    assert.equal(
+      cli(["--fix-list", "--findings-file", f, "--json"], dir).json().reason,
+      "usage",
+    );
+    // An index stamp whose root is no longer a work tree could not look: bad-root, not a list.
+    const outside = mkdtempSync(
+      path.join(os.tmpdir(), "finding-anchors-notrepo-"),
+    );
+    try {
+      writeFileSync(f, JSON.stringify(withStamp({ root: outside })));
+      const r = cli(["--fix-list", "--findings-file", f, "--json"], dir);
+      assert.equal(r.code, 2);
+      assert.equal(r.json().reason, "bad-root");
+      assert.match(r.json().message, /nothing applied/);
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+    }
+    // Control: a stamped review with no findings is an empty list, not a refusal.
+    writeFileSync(
+      f,
+      JSON.stringify({
+        code_review: { findings: [] },
+        anchor_checked: { ...st, findings: 0 },
+      }),
+    );
+    const empty = cli(["--fix-list", "--findings-file", f], dir);
+    assert.equal(empty.code, 0, empty.err);
+    assert.equal(empty.out, "");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("task.217 QA2: --fix-list takes its tree from the stamp only — --root, --rev, --index and --annotate are usage", () => {
+  const dir = stagedRepo();
+  try {
+    const f = annotated(dir, []);
+    for (const extra of [
+      ["--root", dir],
+      ["--rev", "HEAD"],
+      ["--index"],
+      ["--annotate", f],
+    ]) {
+      const r = cli(
+        ["--fix-list", "--findings-file", f, ...extra, "--json"],
+        dir,
+      );
+      assert.equal(r.code, 2, extra.join(" "));
+      assert.equal(r.json().reason, "usage", extra.join(" "));
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("task.217 QA2: --fix-list --json carries the tree, the root and one result per finding", () => {
+  const dir = stagedRepo();
+  try {
+    const r = cli(
+      ["--fix-list", "--findings-file", annotated(dir, ["--index"]), "--json"],
+      dir,
+    );
+    assert.equal(r.code, 0, r.err);
+    const j = r.json();
+    assert.equal(j.reason, "ok");
+    assert.deepEqual(j.tree, { kind: "index" });
+    assert.equal(j.root, path.resolve(dir));
+    assert.deepEqual(
+      j.results.map((x) => [x.id, x.action, x.path]),
+      [
+        ["CR-1", "skip", "a.js"],
+        ["CR-2", "apply", "b.js"],
+        ["CR-3", "apply", "c.js"],
+        ["CR-4", "skip", null],
+        ["CR-5", "skip", null],
+        ["CR-6", "skip", "a.js"],
+      ],
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });

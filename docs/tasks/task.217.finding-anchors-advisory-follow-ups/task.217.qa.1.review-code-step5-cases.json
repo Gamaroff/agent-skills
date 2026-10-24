@@ -1,0 +1,344 @@
+[
+  {
+    "id": "no-such-file",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1 (qa-fix 1): Step 5 apply-list — no-such-file",
+    "correct": "skipped or HALT, never applied",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js:1\",\"finding\":\"f\",\"anchor_check\":\"no-such-file\"}]},\"anchor_checked\":{\"by\":\"finding-anchors\",\"findings\":1}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "skipped — unverified anchor: CR-1\n"
+    }
+  },
+  {
+    "id": "out-of-range",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1 (qa-fix 1): Step 5 apply-list — out-of-range",
+    "correct": "skipped or HALT, never applied",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js:1\",\"finding\":\"f\",\"anchor_check\":\"out-of-range\"}]},\"anchor_checked\":{\"by\":\"finding-anchors\",\"findings\":1}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "skipped — unverified anchor: CR-1\n"
+    }
+  },
+  {
+    "id": "text-mismatch",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1 (qa-fix 1): Step 5 apply-list — text-mismatch",
+    "correct": "skipped or HALT, never applied",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js:1\",\"finding\":\"f\",\"anchor_check\":\"text-mismatch\"}]},\"anchor_checked\":{\"by\":\"finding-anchors\",\"findings\":1}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "skipped — unverified anchor: CR-1\n"
+    }
+  },
+  {
+    "id": "unparseable",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1 (qa-fix 1): Step 5 apply-list — unparseable",
+    "correct": "skipped or HALT, never applied",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js\",\"finding\":\"f\",\"anchor_check\":\"unparseable\"}]},\"anchor_checked\":{\"by\":\"finding-anchors\",\"findings\":1}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "skipped — unverified anchor: CR-1\n"
+    }
+  },
+  {
+    "id": "not-json",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1 (qa-fix 1): Step 5 apply-list — not-json",
+    "correct": "skipped or HALT, never applied",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "not json"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: a finding in f.json carries no anchor_check (or the file is not findings JSON, has no checker stamp, a stale count, or an unknown verdict) — run Step 2b's anchor check first; nothing applied\n"
+    }
+  },
+  {
+    "id": "empty-file",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1 (qa-fix 1): Step 5 apply-list — empty-file",
+    "correct": "skipped or HALT, never applied",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": ""
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: FINDINGS_JSON (f.json) is missing or empty\n"
+    }
+  },
+  {
+    "id": "no-stamp",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1 (qa-fix 1): Step 5 apply-list — no-stamp",
+    "correct": "skipped or HALT, never applied",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js:1\",\"finding\":\"f\",\"anchor_check\":\"ok\"}]}}"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: a finding in f.json carries no anchor_check (or the file is not findings JSON, has no checker stamp, a stale count, or an unknown verdict) — run Step 2b's anchor check first; nothing applied\n"
+    }
+  },
+  {
+    "id": "stale-count",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1 (qa-fix 1): Step 5 apply-list — stale-count",
+    "correct": "skipped or HALT, never applied",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js:1\",\"finding\":\"f\",\"anchor_check\":\"ok\"},{\"id\":\"CR-2\",\"file_line\":\"a.js:1\",\"finding\":\"f\",\"anchor_check\":\"ok\"}]},\"anchor_checked\":{\"by\":\"finding-anchors\",\"findings\":1}}"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: a finding in f.json carries no anchor_check (or the file is not findings JSON, has no checker stamp, a stale count, or an unknown verdict) — run Step 2b's anchor check first; nothing applied\n"
+    }
+  },
+  {
+    "id": "foreign-stamp",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1 (qa-fix 1): Step 5 apply-list — foreign-stamp",
+    "correct": "skipped or HALT, never applied",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js:1\",\"finding\":\"f\",\"anchor_check\":\"ok\"}]},\"anchor_checked\":{\"by\":\"reviewer\",\"findings\":1}}"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: a finding in f.json carries no anchor_check (or the file is not findings JSON, has no checker stamp, a stale count, or an unknown verdict) — run Step 2b's anchor check first; nothing applied\n"
+    }
+  },
+  {
+    "id": "missing-verdict",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1 (qa-fix 1): Step 5 apply-list — missing-verdict",
+    "correct": "skipped or HALT, never applied",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js:1\",\"finding\":\"f\"}]},\"anchor_checked\":{\"by\":\"finding-anchors\",\"findings\":1}}"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: a finding in f.json carries no anchor_check (or the file is not findings JSON, has no checker stamp, a stale count, or an unknown verdict) — run Step 2b's anchor check first; nothing applied\n"
+    }
+  },
+  {
+    "id": "unknown-verdict",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1 (qa-fix 1): Step 5 apply-list — unknown-verdict",
+    "correct": "skipped or HALT, never applied",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js:1\",\"finding\":\"f\",\"anchor_check\":\"fine\"}]},\"anchor_checked\":{\"by\":\"finding-anchors\",\"findings\":1}}"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: a finding in f.json carries no anchor_check (or the file is not findings JSON, has no checker stamp, a stale count, or an unknown verdict) — run Step 2b's anchor check first; nothing applied\n"
+    }
+  },
+  {
+    "id": "no-findings-array",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1 (qa-fix 1): Step 5 apply-list — no-findings-array",
+    "correct": "skipped or HALT, never applied",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{\"code_review\":{},\"anchor_checked\":{\"by\":\"finding-anchors\",\"findings\":0}}"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: a finding in f.json carries no anchor_check (or the file is not findings JSON, has no checker stamp, a stale count, or an unknown verdict) — run Step 2b's anchor check first; nothing applied\n"
+    }
+  },
+  {
+    "id": "empty-object",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1 (qa-fix 1): Step 5 apply-list — empty-object",
+    "correct": "skipped or HALT, never applied",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{}"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: a finding in f.json carries no anchor_check (or the file is not findings JSON, has no checker stamp, a stale count, or an unknown verdict) — run Step 2b's anchor check first; nothing applied\n"
+    }
+  },
+  {
+    "id": "top-level-array",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1 (qa-fix 1): Step 5 apply-list — top-level-array",
+    "correct": "skipped or HALT, never applied",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "[]"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: a finding in f.json carries no anchor_check (or the file is not findings JSON, has no checker stamp, a stale count, or an unknown verdict) — run Step 2b's anchor check first; nothing applied\n"
+    }
+  },
+  {
+    "id": "ok",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1 (qa-fix 1): Step 5 apply-list — ok",
+    "correct": "applied",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"a.js:1\",\"finding\":\"f\",\"anchor_check\":\"ok\"}]},\"anchor_checked\":{\"by\":\"finding-anchors\",\"findings\":1}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "apply: CR-1 (a.js)\n"
+    }
+  },
+  {
+    "id": "unchecked-text-padded",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1 (qa-fix 1): Step 5 apply-list — unchecked-text-padded",
+    "correct": "applied",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\" b.js:2\",\"finding\":\"f\",\"anchor_check\":\"unchecked-text\"}]},\"anchor_checked\":{\"by\":\"finding-anchors\",\"findings\":1}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "apply: CR-1 (b.js)\n"
+    }
+  },
+  {
+    "id": "colon-path",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1 (qa-fix 1): Step 5 apply-list — colon-path",
+    "correct": "applied",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"src/a:b.js:3\",\"finding\":\"f\",\"anchor_check\":\"ok\"}]},\"anchor_checked\":{\"by\":\"finding-anchors\",\"findings\":1}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "apply: CR-1 (src/a:b.js)\n"
+    }
+  },
+  {
+    "id": "no-line-cleanup",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1 (qa-fix 1): Step 5 apply-list — no-line-cleanup",
+    "correct": "applied",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{\"code_review\":{\"findings\":[{\"id\":\"CR-1\",\"file_line\":\"AC-3\",\"finding\":\"f\",\"anchor_check\":\"no-line\"}]},\"anchor_checked\":{\"by\":\"finding-anchors\",\"findings\":1}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "apply: CR-1\n"
+    }
+  },
+  {
+    "id": "empty-review",
+    "sink": "filename",
+    "input": "f.json",
+    "why": "task.217 QA 1 (qa-fix 1): Step 5 apply-list — empty-review",
+    "correct": "applied",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {},
+      "files": {
+        "f.json": "{\"code_review\":{\"findings\":[]},\"anchor_checked\":{\"by\":\"finding-anchors\",\"findings\":0}}"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": ""
+    }
+  }
+]

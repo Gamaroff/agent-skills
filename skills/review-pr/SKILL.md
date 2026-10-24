@@ -969,22 +969,38 @@ BODY_FILE="{body-file}"           # the BODY_FILE= line the summary block printe
 # annotated yields [] — the same output as "no anchorable findings" (task.195).
 # At least one lens must be present, and EVERY lens present must hold a findings array: `{}` would
 # otherwise select nothing and pass, and a non-array beside a valid lens would drop that lens's
-# findings unseen (task.195 DoD 1). A lens that did not run is absent or null. `anchor_check` must
-# be a string — the checker always writes one, so a null is an un-annotated finding.
+# findings unseen (task.195 DoD 1). A lens that did not run is absent or null. `anchor_check` was
+# only required to be a string (task.195); it must now be one of the checker's seven verdicts, and
+# the file must carry the stamp only `--annotate` writes, with a count equal to the findings present
+# — so a reviewer-written `anchor_check` with no checker run, or a stamp left from an earlier run on
+# a file that has gained findings since, is refused (task.217).
 jq -e '([.code_review, .pr_conformance] | map(select(. != null)) | length > 0)
        and all(.code_review, .pr_conformance | select(. != null); .findings | type == "array")
-       and ([ (.code_review.findings[]?, .pr_conformance.findings[]?) | select((.anchor_check | type) != "string") ] | length == 0)' \
+       and (.anchor_checked.by == "finding-anchors")
+       and (.anchor_checked.findings == ([.code_review.findings[]?, .pr_conformance.findings[]?] | length))
+       and ([ (.code_review.findings[]?, .pr_conformance.findings[]?)
+              | select(.anchor_check | IN("ok","unchecked-text","no-line","no-such-file","out-of-range","text-mismatch","unparseable") | not) ]
+            | length == 0)' \
    "$FINDINGS_JSON" >/dev/null || {
-  echo "HALT: a finding in $FINDINGS_JSON carries no anchor_check (or the file is not findings JSON) — run Step 6's anchor check first; nothing posted inline"; exit 1; }
+  echo "HALT: a finding in $FINDINGS_JSON carries no anchor_check (or the file is not findings JSON, has no checker stamp, a stale count, or an unknown verdict) — run Step 6's anchor check first; nothing posted inline"; exit 1; }
 # The scratch file is made only once the input is accepted, so no refusal leaves one behind.
+# The anchor is parsed in the checker's grammar — trimmed, then `(\S+):(-?\d+)` — so the LAST colon
+# splits path from line and the posted path is the trimmed one the checker verified (task.217). The
+# `?` on capture yields empty on a non-match, never an abort: jq is all-or-nothing inside `[ … ]`.
+# jq's trim is not JS trim(): a path led by U+FEFF is verified without it and posted with it. That
+# path names no file in the diff. GitHub rejects it (422), so the post reports `anchor-failed`
+# and the finding lands in the summary, never on another line (task.217 QA2-3). Bitbucket's
+# answer to such a path is untested.
 INLINE_FILE="$(mktemp -t review-pr-inline.XXXXXX.json)"
 jq '[ (.code_review.findings[]? | select(.anchor_check == "ok" or .anchor_check == "unchecked-text")
        | . + {anchor: .file_line}),
       (.pr_conformance.findings[]? | select(.anchor_check == "ok" or .anchor_check == "unchecked-text")
        | . + {anchor: .ref})
-      | select((.anchor? // "") | test("^.+:[0-9]+$"))
-      | {path: (.anchor | split(":")[0]),
-         line: (.anchor | split(":")[1] | tonumber),
+      | ((.anchor | if type == "string" then . else "" end)
+         | capture("^\\s*(?<path>\\S+):(?<line>-?[0-9]+)\\s*$")?) as $m
+      | select($m != null)
+      | {path: $m.path,
+         line: ($m.line | tonumber),
          body: (.finding
                 + (if .suggested_action then "\n\n→ " + .suggested_action else "" end))} ]' \
    "$FINDINGS_JSON" > "$INLINE_FILE" || {

@@ -1,0 +1,92 @@
+schema: 2
+task: 'task.217.finding-anchors-advisory-follow-ups'
+task_title: 'Finding-anchors advisory follow-ups'
+gate: CONCERNS
+status_reason: 'All six cycle-1 findings are fixed and mutation-proven, and every probe control engages (69 executed, 0 escaped). The refute pass found that the Step 5 apply-list skips still fail open: an unfilled or misspelled TARGET, or a run from outside the repository root, applies a finding on a line nobody checked.'
+reviewer: 'QA Engineer'
+head: '9d888cec067abbe6c260d082a54c2a4ce58c50ac'
+updated: '2026-10-24T05:08:27Z'
+
+top_issues:
+  - id: 'TASK-217-QA2-1'
+    severity: medium
+    file: 'skills/review-code/SKILL.md'
+    finding: 'CR-1 (reproduced): the Step 5 apply-list block never checks TARGET, so the unfilled placeholder or a value such as `--staged` or `pr` disables both tree-diff skips — a staged file edited on top printed `apply: CR-1 (a.js)` where TARGET=staged prints `skipped`.'
+    suggested_action: 'HALT on a TARGET outside worktree|staged|range as Step 2b does, with a block-test case; the fence: probe fills one slot, so keep the Step 5 control reachable another way (a second probe slot, or a case-level fill) rather than dropping the check.'
+    suggested_owner: dev
+  - id: 'TASK-217-QA2-2'
+    severity: medium
+    file: 'skills/review-code/SKILL.md'
+    finding: 'CR-2 (reproduced): `git diff --quiet [HEAD] -- "$P"` exits 0 for a path that matches nothing, so the block run from a subdirectory treats every root-relative path as clean — TARGET=staged from sub/ printed `apply: CR-1 (a.js)` for a file whose working tree differs from the index; the comment says a git that cannot answer skips.'
+    suggested_action: 'cd to `git rev-parse --show-toplevel` (HALT if that fails) at the top of the block, and skip a path that is not in the checked tree instead of trusting the diff exit code.'
+    suggested_owner: dev
+  - id: 'TASK-217-QA2-3'
+    severity: low
+    file: 'skills/review-code/SKILL.md'
+    finding: 'CR-5 (reproduced): the shell selectors trim with jq `\s`, which does not strip U+FEFF, while the checker trims with JS trim(), which does — a BOM-prefixed `a.js:1` is verified as a.js but parsed as `﻿a.js`, so Step 5 skipped no tree check (`apply: CR-1 (﻿a.js)` on a dirty file) and the inline selectors would post to a path that does not exist.'
+    suggested_action: 'Strip what JS trim() strips before the capture in all three selectors (review-code Step 4.2, Step 5, review-pr), or have the checker write the parsed path into the annotated finding so the shell never re-parses it.'
+    suggested_owner: dev
+  - id: 'TASK-217-QA2-4'
+    severity: low
+    file: 'CHANGELOG.md'
+    finding: 'CR-3 (verified by reading): the task 217 entry says "The summary comment still posts" when the stamp guard HALTs, which holds for /review-pr (summary first) but not /review-code, whose Step 4.3 fallback fires only on no file_line or no-credentials; the task document Risk table repeats the claim.'
+    suggested_action: 'Either add "or the Step 4.2 guard HALTs" to the Step 4.3 triggers, or scope both claims to /review-pr.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 6281
+  phases_verified: 3/3
+  ci: 'pass @ 9d888cec (link-check, secret-scan, shellcheck, test, validate)'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 69
+    escaped: 0
+    notes: 'All three controls engage: review-code --inline (Step 4.2) 19/19, review-pr --inline 31/31, review-code Step 5 19/19. The Step 5 tree-diff skips fail open on TARGET and on cwd (QA2-1, QA2-2); both were reproduced by hand and are not reachable by the one-slot fence: probe.'
+  performance:
+    status: PASS
+    notes: 'No new work on the hot path; one jq -e guard per Step 5 run.'
+  reliability:
+    status: PASS
+    notes: 'The --inline block now exits with the poster status; every refusal leaves no scratch file; TMPDIR=/tmp and TMPDIR-in-checkout runs both 249/249.'
+  maintainability:
+    status: PASS
+    notes: 'Five verdict restatements held to the engine exports; Step 4.2/4.3 sub-headings make each block reachable by name.'
+
+recommendations:
+  immediate:
+    - action: 'Make the Step 5 skips fail closed on TARGET and on cwd (QA2-1, QA2-2).'
+      refs: ['skills/review-code/SKILL.md']
+  future:
+    - action: 'CR-4, pre-existing (identical on the merge base): the Step 4.3 summary-only block reads $SUMMARY_FILE with no writer in the block; bind SUMMARY_FILE="{summary-file}" with a [ -s ] HALT.'
+      refs: ['skills/review-code/SKILL.md']
+    - action: 'CR-6: the derived dispatcher population scans skills/*/SKILL.md and shared/resources/*.md only, and invokesChecker matches a single-line node call; widen to hand-authored skills/*/references/*.md and join continued lines.'
+      refs: ['evals/shared/tests/finding-anchors-blocks.test.mjs']
+    - action: 'CR-7 (cleanup): Step 4 item 1 has no 4.1 heading, and the Step-4-wide retry paragraph now sits under the 4.3 heading.'
+      refs: ['skills/review-code/SKILL.md']
+    - action: 'Give the security probe engine a way to fill more than one fence: placeholder, so a block with two inputs (Step 5 FINDINGS_JSON and TARGET) can be probed on both.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'Carried from gate 1: CR-3 (the stamp counts findings but does not bind their content), and the pre-existing qa-task/qa-story Step 3b mktemp leak.'
+      refs: ['shared/resources/finding-anchors.js', 'skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-10-24'
+  total_iterations: 1
+  verification_method: 'Committed tests re-proven by mutation (4 covered) and the probe record task.217.qa.2.security.run.json'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['QA2-1 and QA2-2 fixed']
