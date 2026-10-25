@@ -5,17 +5,19 @@ type: task
 description: "Let a probe case's expected.absent name a nested path, add expected.removed for cleanup controls, and state both rules where case authors read them."
 tags: [finalise, observation, security-probe, review-security]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 estimated_effort_hours: 16
 created: 2026-10-24
 updated: 2026-10-25
+completed_date: 2026-10-25
+pr_number: 748
 github_issue: 747
 ---
 
 # Technical Task: Probe path assertions — nested `absent` and a new `removed`
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.232.review.1.probe-expected-path-assertions.md` implemented 2026-10-24
 **GitHub Issue**: [#747](https://github.com/Gamaroff/agent-skills/issues/747)
 
@@ -327,6 +329,32 @@ None identified.
 - All findings from cycles 1 and 2 are fixed and verified; bugs 1–7 are closed. `isCasePath` is probed: 11 executed, 0 escaped.
 - Four low, advisory code-review findings remain (permission-walk depth, a chmod race, two test hardenings).
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.232.qa.3.probe-expected-path-assertions.md`
+**Gate File**: `task.232.gate.3.probe-expected-path-assertions.yml`
+**Gate Status**: ✅ PASS (cycles: FAIL 30 → CONCERNS 80 → PASS 100)
+**Quality Score**: 100/100
+**PR Review**: `task.232.pr-review.1.probe-expected-path-assertions.md` — ✅ APPROVE, 0 findings
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 13/13 success criteria traced to engine lines and to tests that run on every PR
+✅ **Unit Tests:** 265 tests in `security-probe.test.mjs`; full `npm run ci` 6339 tests, 0 failed, with `.agents/skills` moved aside
+✅ **PR Review:** PR #748; no reviews required on this repo, and the Step 5c `/review-pr` APPROVEd; CI reading 1 SUCCESS @ `b0e8864a59fb` (6 checks)
+✅ **Documentation:** CHANGELOG `[Unreleased]` names task 232; the four case-author docs state the grammar and `removed`
+✅ **Security Review:** ✅ PASS — the `isCasePath` boundary probed by `/finalise`, 31 executed, 0 reproduced, 0 escapes (`task.232.dod.1.security.run.json`)
+✅ **Compliance Review:** not applicable (internal test engine; no PII, payments, UI or health data)
+
+**Follow-ups (non-blocking):** gate 3 `recommendations.future` — permission-walk depth, chmod-through-swap, two QA2-1 test hardenings, and gate 2's pre-existing process-group reap.
+
+**Task marked as ACCEPTED on:** 2026-10-25
+
+**Detailed Verification Log:** See `task.232.dod.1.probe-expected-path-assertions.md` for complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
@@ -343,6 +371,7 @@ None identified.
 | 2026-10-25 |  | QA gate CONCERNS (80/100) — 2 findings; cycle 1 bugs closed | qa-task |
 | 2026-10-25 |  | QA findings fixed — 2 bugs ready for QA, 2 iterations | qa-fix |
 | 2026-10-25 |  | QA gate PASS (100/100) — cycle 2 bugs closed, 4 low advisory | qa-task |
+| 2026-10-25 | 1.2 | DoD passed — accepted (PR #748) | finalise |
 <!-- change-log-end -->
 
 ---
