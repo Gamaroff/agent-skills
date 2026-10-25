@@ -307,26 +307,26 @@ None identified.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-25
-**Quality Score**: 30/100
-**Gate Decision**: FAIL
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.232.qa.1.probe-expected-path-assertions.md](./task.232.qa.1.probe-expected-path-assertions.md)
-- **Gate File**: [task.232.gate.1.probe-expected-path-assertions.yml](./task.232.gate.1.probe-expected-path-assertions.yml)
+- **Full Report**: [task.232.qa.2.probe-expected-path-assertions.md](./task.232.qa.2.probe-expected-path-assertions.md)
+- **Gate File**: [task.232.gate.2.probe-expected-path-assertions.yml](./task.232.gate.2.probe-expected-path-assertions.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 260
+- **Tests Executed**: 263
 - **Phases Verified**: 3/3
-- **Critical Issues**: 2
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- HIGH: PR shellcheck check red — `path-actions-lib.sh` has no shell directive (QA1-1).
-- HIGH: the path grammar accepts `./` and `a/../`, which name the case directory itself (QA1-2).
-- MEDIUM: a trailing slash skips the collision decline (QA1-3); lstat ELOOP/EACCES crash the probe (QA1-4); the grammar is unreachable by the probe, so `probes_executed` is 0 (QA1-5).
+- Cycle 1's five findings are fixed and verified; bugs 1–5 closed. `isCasePath` probed: 11 executed, 0 escaped.
+- MEDIUM: a run that leaves a mode-000 directory crashes the sandbox teardown, though the docs now say it cannot (QA2-1).
+- MEDIUM: the fence scorer's unreadable-is-a-side-effect rule has no test; mutation Q5 survives (QA2-2).
 
 <!-- change-log-start -->
 ## Change Log
@@ -341,6 +341,8 @@ None identified.
 | 2026-10-25 |  | Status → in-progress | qa-task |
 | 2026-10-25 |  | QA findings fixed — 5 bugs ready for QA, 1 iteration | qa-fix |
 | 2026-10-25 |  | Status → ready-for-review | qa-fix |
+| 2026-10-25 |  | QA gate CONCERNS (80/100) — 2 findings; cycle 1 bugs closed | qa-task |
+| 2026-10-25 |  | QA findings fixed — 2 bugs ready for QA, 2 iterations | qa-fix |
 <!-- change-log-end -->
 
 ---

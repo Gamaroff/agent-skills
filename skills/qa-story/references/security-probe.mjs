@@ -274,6 +274,7 @@ import { spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import {
   accessSync,
+  chmodSync,
   constants as fsConstants,
   mkdtempSync,
   mkdirSync,
@@ -959,6 +960,31 @@ const GH_VARIABLE = /\$\{?GH(?![A-Za-z0-9_])/;
  */
 const SOURCE_LINE =
   /(?:^|[;&|]|\b(?:then|do)\b)[ \t]*(?:source|\.)[ \t]+["']?([^"'\s;|&)]+)["']?/gm;
+/**
+ * Remove a probe sandbox, including one a case left unreadable. A case
+ * controls its directory, so it can leave a mode-000 directory that `rmSync`
+ * cannot list. On EACCES or EPERM every directory gets owner rwx back and the
+ * removal is retried. The walk uses `lstat`, so a symlink is never followed
+ * out of the sandbox (task.232 QA2-1).
+ */
+function removeSandbox(root) {
+  try {
+    rmSync(root, { recursive: true, force: true });
+    return;
+  } catch (e) {
+    if (e.code !== "EACCES" && e.code !== "EPERM") throw e;
+  }
+  const open = (dir) => {
+    chmodSync(dir, 0o700);
+    for (const name of readdirSync(dir)) {
+      const p = join(dir, name);
+      if (lstatSync(p).isDirectory()) open(p);
+    }
+  };
+  open(root);
+  rmSync(root, { recursive: true, force: true });
+}
+
 /**
  * The real path of `p`, or — when `p` does not exist — the real path of its
  * deepest existing ancestor with the missing segments re-joined. So a missing
@@ -1946,7 +1972,7 @@ export function runProbeSpec({
       (isShellForm || isFenceForm || isShellArgvForm) &&
       existsSync(join(harnessDir, GH_TRIPPED));
   } finally {
-    rmSync(sandboxRoot, { recursive: true, force: true });
+    removeSandbox(sandboxRoot);
   }
 
   // The run reached `gh` with no fixture: the trip-wire answered instead of the

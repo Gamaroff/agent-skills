@@ -4,7 +4,7 @@
 **Bug ID**: TASK-232-BUG-4
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 1; diff review CR-3, measured by QA)
 **Date Found**: 2026-10-25
 
@@ -57,7 +57,8 @@ Map any other `lstat` error to a reported state rather than throwing. For exampl
 
 ## Status History
 
-| Date | Status | Notes |
-| ---- | ------ | ----- |
-| 2026-10-25 | New | Found in QA cycle 1 |
-| 2026-10-25 | Ready for QA | qa-fix cycle 1 |
+| Date | Status | Changed By | Notes |
+| ---- | ------ | ---------- | ----- |
+| 2026-10-25 | New | qa-task | Found in QA cycle 1 |
+| 2026-10-25 | Ready for QA | qa-fix | qa-fix cycle 1 |
+| 2026-10-25 | Closed | qa-task | Verified by task.232.qa.2.probe-expected-path-assertions.md |

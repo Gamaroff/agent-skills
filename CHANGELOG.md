@@ -23,7 +23,8 @@ All notable changes to this project will be documented in this file. Format foll
   directory above one, or a path beneath a created file is declined. Existence is read with
   `lstat`; a path whose ancestor resolves outside the case directory is a mismatch that is never
   read through, and one the run left unreadable (a symlink loop, a mode-000 directory) is a
-  mismatch rather than a crash. `isCasePath` and `caseKey` are exported, so the probe's JS entry
+  mismatch rather than a crash. The probe's sandbox teardown restores directory permissions
+  first, so a case that leaves a mode-000 directory no longer ends the run. `isCasePath` and `caseKey` are exported, so the probe's JS entry
   form reaches the grammar.
   - **Narrowing:** `shell:` and `shell-fn:` now compare `absent` case-folded, as `cli:`,
     `shell-argv:` and `fence:` already did. A name that differs from a control or input only by

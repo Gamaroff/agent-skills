@@ -4,7 +4,7 @@
 **Bug ID**: TASK-232-BUG-1
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 1, PR #748 checks)
 **Date Found**: 2026-10-25
 
@@ -53,7 +53,8 @@ Added `# shellcheck shell=bash` as line 1, the convention `undefined-command-gua
 
 ## Status History
 
-| Date | Status | Notes |
-| ---- | ------ | ----- |
-| 2026-10-25 | New | Found in QA cycle 1 |
-| 2026-10-25 | Ready for QA | qa-fix cycle 1 |
+| Date | Status | Changed By | Notes |
+| ---- | ------ | ---------- | ----- |
+| 2026-10-25 | New | qa-task | Found in QA cycle 1 |
+| 2026-10-25 | Ready for QA | qa-fix | qa-fix cycle 1 |
+| 2026-10-25 | Closed | qa-task | Verified by task.232.qa.2.probe-expected-path-assertions.md |

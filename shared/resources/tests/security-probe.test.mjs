@@ -7418,6 +7418,75 @@ test("caseKey: one spelling per case path — normalised, trailing separators dr
   }
 });
 
+test("fence entry: an absent path the run left unreadable is a reproduction even when the shell then stops (QA2-2)", () => {
+  // The run plants loop -> loop, so lstat of loop/x is ELOOP: neither present
+  // nor missing. It is still a side effect, and it outranks the stopped shell.
+  const root = fenceRoot({
+    "doc.md": [
+      "## Two contexts",
+      "",
+      "```bash",
+      'echo "checking <slot>"',
+      "x='<slot>'",
+      "```",
+      "",
+    ].join("\n"),
+  });
+  try {
+    const r = runProbeSpec({
+      entry: "fence:doc.md#Two contexts",
+      slot: "<slot>",
+      cases: [
+        fenceCase("f.loop", "hostile", "$(ln -s loop loop)'", {
+          expected: { exit: 0, stdout: "REFUSED\n", absent: ["loop/x"] },
+        }),
+      ],
+      repoRoot: root,
+    });
+    assert.deepEqual(
+      r.reproduced,
+      probeShells().map((s) => `f.loop@${s}`),
+      JSON.stringify(r.cases),
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("runProbeSpec: a case that leaves a mode-000 directory still returns its results — the sandbox teardown restores permissions (QA2-1)", () => {
+  // Root reads through mode 000, so rmSync never fails there.
+  if (process.getuid?.() === 0) return;
+  const root = fenceRoot({
+    "doc.md": [
+      "## Block",
+      "",
+      "```bash",
+      "<slot>",
+      'echo "ok"',
+      "```",
+      "",
+    ].join("\n"),
+  });
+  try {
+    const r = runProbeSpec({
+      entry: "fence:doc.md#Block",
+      slot: "<slot>",
+      cases: [
+        fenceCase("f.lock", "hostile", "mkdir -p locked && chmod 000 locked", {
+          expected: { exit: 0, stdout: "ok\n", absent: ["pwned"] },
+        }),
+      ],
+      repoRoot: root,
+    });
+    assert.equal(r.cases.length, probeShells().length, JSON.stringify(r.cases));
+    for (const row of r.cases) {
+      assert.equal(row.outcome, "rejected", JSON.stringify(row));
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("compareExpected: a path the run left unreadable — a symlink loop, a mode-000 ancestor — is a mismatch, never a throw (QA1-4)", () => {
   const run = { stdout: "", stderr: "", status: 0 };
   const loop = mkdtempSync(join(tmpdir(), "t232-eloop-"));
