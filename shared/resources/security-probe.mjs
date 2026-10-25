@@ -1194,11 +1194,13 @@ export function compareExpected(expected, run, fixtureDir) {
   ]) {
     for (const rel of expected[k] ?? []) {
       const where = casePathState(fixtureDir, rel);
-      if (where === "outside") {
+      if (where.state === "outside") {
         mismatches.push(
           `${rel}: an ancestor resolves outside the case directory`,
         );
-      } else if (where === "present") {
+      } else if (where.state === "unreadable") {
+        mismatches.push(`${rel} could not be read (${where.code})`);
+      } else if (where.state === "present") {
         mismatches.push(`${rel} ${present}`);
       }
     }
@@ -1207,23 +1209,27 @@ export function compareExpected(expected, run, fixtureDir) {
 }
 
 /**
- * Where one `absent` / `removed` path stands after the run: "outside" when an
- * ancestor resolves out of the case directory (the run planted a symlink),
- * else "present" or "missing". The ancestors are resolved and the leaf is
- * not: `lstatSync` counts a symlink at the leaf as present without following
- * it, so nothing outside the directory is ever read (task.232).
+ * Where one `absent` / `removed` path stands after the run, as `{ state }`:
+ * "outside" when an ancestor resolves out of the case directory (the run
+ * planted a symlink), else "present" or "missing". The ancestors are resolved
+ * and the leaf is not: `lstatSync` counts a symlink at the leaf as present
+ * without following it, so nothing outside the directory is ever read
+ * (task.232). Any other lstat failure — a loop, an unreadable ancestor, both
+ * left by the run — is "unreadable" with its `code`, never a throw: the run
+ * controls the directory, and one case's path must not end the probe (QA1-4).
  */
 function casePathState(dir, rel) {
   const root = realpathSafe(dir);
   const target = resolve(dir, rel);
   const real = join(realpathSafe(dirname(target)), basename(target));
-  if (real !== root && !isWithin(root, real)) return "outside";
+  if (real !== root && !isWithin(root, real)) return { state: "outside" };
   try {
     lstatSync(target);
-    return "present";
+    return { state: "present" };
   } catch (e) {
-    if (e.code === "ENOENT" || e.code === "ENOTDIR") return "missing";
-    throw e;
+    if (e.code === "ENOENT" || e.code === "ENOTDIR")
+      return { state: "missing" };
+    return { state: "unreadable", code: e.code ?? String(e) };
   }
 }
 
@@ -2110,13 +2116,28 @@ export function expectedProblem(expected) {
  * ALWAYS exist, so a case naming one would score every run as a side effect
  * and the fixed script as absent with a full count (task.128 QA cycle 4,
  * BUG-13); "a/.." normalises to ".", so it is refused for the same reason.
+ * Compared by `caseKey`, so "./" and "a/../" are "." too (QA1-2). Exported so
+ * the probe can reach it (`--sink path`, QA1-5).
  */
-function isCasePath(p) {
+export function isCasePath(p) {
   if (typeof p !== "string" || p === "" || p.includes("\0") || isAbsolute(p)) {
     return false;
   }
-  const n = normalize(p);
+  const n = caseKey(p);
   return n !== "." && !n.split(sep).includes("..");
+}
+
+/**
+ * The one spelling of a case path every comparison uses: `normalize`, then
+ * any trailing separator dropped. `normalize` keeps a trailing separator, and
+ * the scorer's `resolve` does not, so "sub/" and "sub" are one directory to
+ * the scorer and were two to every comparison — "./" passed the "." test and
+ * "sub/" passed the collision rule (task.232 QA1-2, QA1-3).
+ */
+export function caseKey(p) {
+  let n = normalize(p);
+  while (n.length > 1 && n.endsWith(sep)) n = n.slice(0, -1);
+  return n;
 }
 
 /**
@@ -2134,10 +2155,10 @@ function isCasePath(p) {
  * `removed` rule does (review 1, I5).
  */
 export function pathAssertionProblem(expected, created) {
-  const made = created.map((p) => normalize(p));
+  const made = created.map((p) => caseKey(p));
   const madeFolded = made.map((p) => p.toLowerCase());
   for (const p of expected?.absent ?? []) {
-    const f = normalize(p).toLowerCase();
+    const f = caseKey(p).toLowerCase();
     // Exists before the script runs, so it would score every run as a side
     // effect (BUG-13's second shape) — the path itself, or a directory above.
     if (madeFolded.some((m) => m === f || m.startsWith(f + sep))) {
@@ -2148,7 +2169,7 @@ export function pathAssertionProblem(expected, created) {
     }
   }
   for (const p of expected?.removed ?? []) {
-    if (!made.includes(normalize(p))) {
+    if (!made.includes(caseKey(p))) {
       return `\`expected.removed\` names "${p}", which the fixture does not create — it would pass with nothing removed`;
     }
   }
@@ -3339,8 +3360,9 @@ export function scoreFenceRun(
   // stopped, was killed, or timed out (TASK-180-006, -018). Read through
   // casePathState, as compareExpected reads it: a planted symlink out of the
   // case directory is itself the side effect, and is never followed (task.232).
+  // An unreadable path counts too: the run left something there.
   const absent = c.expected?.absent ?? [];
-  if (absent.some((p) => casePathState(caseDir, p) !== "missing")) {
+  if (absent.some((p) => casePathState(caseDir, p).state !== "missing")) {
     return compared();
   }
   if (neverRan(child)) {

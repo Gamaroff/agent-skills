@@ -16,12 +16,15 @@ All notable changes to this project will be documented in this file. Format foll
 ### Changed
 
 - **Security probe: `expected.absent` takes nested paths relative to the case directory (task
-  232).** `.claude/state/x` is valid; `..` segments, absolute paths, `.` and NUL are still
-  refused. One helper, `pathAssertionProblem`, now decides for all four runners whether a case's
-  paths can be scored, where four inline copies compared first segments. An `absent` path the
-  fixture creates, a directory above one, or a path beneath a created file is declined. Existence
-  is read with `lstat`, and a path whose ancestor resolves outside the case directory is a
-  mismatch that is never read through.
+  232).** `.claude/state/x` is valid, and a trailing `/` is ignored; `..` segments, absolute
+  paths, `.` in any spelling (`./`, `a/..`) and NUL are still refused. One helper,
+  `pathAssertionProblem`, now decides for all four runners whether a case's paths can be scored,
+  where four inline copies compared first segments. An `absent` path the fixture creates, a
+  directory above one, or a path beneath a created file is declined. Existence is read with
+  `lstat`; a path whose ancestor resolves outside the case directory is a mismatch that is never
+  read through, and one the run left unreadable (a symlink loop, a mode-000 directory) is a
+  mismatch rather than a crash. `isCasePath` and `caseKey` are exported, so the probe's JS entry
+  form reaches the grammar.
   - **Narrowing:** `shell:` and `shell-fn:` now compare `absent` case-folded, as `cli:`,
     `shell-argv:` and `fence:` already did. A name that differs from a control or input only by
     case is declined. The committed corpus has none.

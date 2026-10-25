@@ -305,6 +305,29 @@ None identified.
 - **Critical:** any existing case changes verdict; any read outside the case directory.
 - **Non-critical:** doc wording; a decline message that could name the rule more clearly.
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-25
+**Quality Score**: 30/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.232.qa.1.probe-expected-path-assertions.md](./task.232.qa.1.probe-expected-path-assertions.md)
+- **Gate File**: [task.232.gate.1.probe-expected-path-assertions.yml](./task.232.gate.1.probe-expected-path-assertions.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 260
+- **Phases Verified**: 3/3
+- **Critical Issues**: 2
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+
+### Key Findings
+- HIGH: PR shellcheck check red — `path-actions-lib.sh` has no shell directive (QA1-1).
+- HIGH: the path grammar accepts `./` and `a/../`, which name the case directory itself (QA1-2).
+- MEDIUM: a trailing slash skips the collision decline (QA1-3); lstat ELOOP/EACCES crash the probe (QA1-4); the grammar is unreachable by the probe, so `probes_executed` is 0 (QA1-5).
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -314,6 +337,10 @@ None identified.
 | 2026-10-24 | 1.1 | Review needed revision (8/10 after fixes): `removed` matched exactly, not case-folded; containment reuses `realpathSafe`; unreachable both-lists rule removed; grep criterion replaced by an all-forms mutation; head-vs-base grammar test added; the `:5233` regex and the `shell:` case-fold narrowing stated | review-task |
 | 2026-10-24 |  | Status → ready-for-development | review-task |
 | 2026-10-25 |  | Implemented — 28 files (7 new fixtures, 14 bundled copies), 44 new tests, 11 mutations proved | develop |
+| 2026-10-25 |  | QA gate FAIL (30/100) — 5 findings | qa-task |
+| 2026-10-25 |  | Status → in-progress | qa-task |
+| 2026-10-25 |  | QA findings fixed — 5 bugs ready for QA, 1 iteration | qa-fix |
+| 2026-10-25 |  | Status → ready-for-review | qa-fix |
 <!-- change-log-end -->
 
 ---

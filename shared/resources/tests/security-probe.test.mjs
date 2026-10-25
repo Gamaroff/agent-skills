@@ -58,6 +58,8 @@ import {
   ghFreePath,
   parseArgvTemplate,
   pathAssertionProblem,
+  caseKey,
+  isCasePath,
   probeShells,
   readRecord,
   recordEntriesDir,
@@ -6899,12 +6901,19 @@ test("defaultRepoRoot: a bundled copy defaults to the git top level; a shared/re
 // rule held on one form says nothing about another (TASK-181-001).
 
 test("expectedProblem: absent and removed take relative paths inside the case directory, and refuse the rest", () => {
-  const valid = ["pwned", "a/b", ".claude/state/x", "./a", "a//b"];
+  const valid = ["pwned", "a/b", ".claude/state/x", "./a", "a//b", "a/"];
   const refused = [
     "",
     ".",
     "..",
     "a/..",
+    // normalize keeps a trailing separator: each of these is the case
+    // directory itself, which always exists (QA1-2)
+    "./",
+    ".//",
+    "a/../",
+    "a/./..//",
+    "../",
     "../a",
     "/abs",
     "a/../../b",
@@ -6958,6 +6967,11 @@ test("expectedProblem: against the engine before task.232, the only absent shape
     [".claude/state/x", "refuse", "accept"],
     ["./a", "refuse", "accept"],
     ["a//b", "refuse", "accept"],
+    ["a/", "refuse", "accept"],
+    // The case directory spelled with a trailing separator (QA1-2): base
+    // refused every "/", and head must too.
+    ["./", "refuse", "refuse"],
+    ["a/../", "refuse", "refuse"],
   ];
   for (const [v, base, head] of rows) {
     const got =
@@ -6965,12 +6979,18 @@ test("expectedProblem: against the engine before task.232, the only absent shape
     assert.equal(got, head, JSON.stringify(v));
     if (base !== head) {
       assert.equal(base, "refuse", `${JSON.stringify(v)} may only widen`);
+      // A flip names a path strictly inside the case directory: resolved
+      // against a root, it is neither the root nor outside it. A syntactic
+      // "has a slash, no .. segment" test passed "./" (QA1-2).
+      const root = join(sep, "case-root");
+      const at = join(root, String(v));
       assert.ok(
         typeof v === "string" &&
-          v.includes("/") &&
           !v.startsWith("/") &&
-          !v.split("/").includes(".."),
-        `${JSON.stringify(v)} flips but is not an in-directory nested path`,
+          at !== root &&
+          at.replace(/\/+$/, "") !== root &&
+          at.startsWith(root + sep),
+        `${JSON.stringify(v)} flips but is not a path strictly inside the case directory`,
       );
     }
   }
@@ -6990,6 +7010,11 @@ test("pathAssertionProblem: an absent path the fixture creates, or an ancestor o
     [["PWNED"], ["pwned"]],
     [["sub/marker"], ["sub/marker"]],
     [["sub/marker"], ["./sub//marker"]],
+    // A trailing separator is the same path to the scorer (QA1-3).
+    [["sub/marker"], ["sub/"]],
+    [["sub/marker"], ["./sub//"]],
+    [["sub/marker"], ["sub/marker/"]],
+    [["pwned"], ["pwned/"]],
   ]) {
     assert.match(
       pathAssertionProblem({ exit: 0, absent }, created),
@@ -7182,15 +7207,23 @@ for (const form of PATH_FORMS) {
   });
 
   test(`${form.name} path assertions: an absent path the fixture creates is declined`, () => {
-    const r = form.run(
-      "keep",
-      { stdout: "ok\n", absent: [form.made] },
-      "hostile",
-    );
-    assert.equal(r.executed, 0, JSON.stringify(r.cases));
-    for (const row of paRows(r)) {
-      assert.equal(row.outcome, "errored", JSON.stringify(row));
-      assert.match(row.detail, /which the fixture itself creates/, row.detail);
+    // Spelled as the fixture writes it, and with a trailing separator, which
+    // the scorer resolves to the same path (QA1-3).
+    for (const spelling of [form.made, `${form.made}/`]) {
+      const r = form.run(
+        "keep",
+        { stdout: "ok\n", absent: [spelling] },
+        "hostile",
+      );
+      assert.equal(r.executed, 0, `${spelling}: ${JSON.stringify(r.cases)}`);
+      for (const row of paRows(r)) {
+        assert.equal(row.outcome, "errored", JSON.stringify(row));
+        assert.match(
+          row.detail,
+          /which the fixture itself creates/,
+          row.detail,
+        );
+      }
     }
   });
 
@@ -7361,5 +7394,58 @@ test("fence entry: a dangling symlink expected.absent names is a reproduction ev
     );
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("caseKey: one spelling per case path — normalised, trailing separators dropped; isCasePath compares by it (QA1-2, QA1-3)", () => {
+  for (const [p, key] of [
+    ["sub/", "sub"],
+    ["./sub//", "sub"],
+    ["a//b/", "a/b"],
+    ["./", "."],
+    ["a/../", "."],
+    ["a/./..//", "."],
+    ["pwned", "pwned"],
+  ]) {
+    assert.equal(caseKey(p), key, JSON.stringify(p));
+  }
+  // Exported, so the probe's JS entry form reaches the boundary (QA1-5).
+  for (const p of ["./", ".//", "a/../", "../", "", "/abs", "a\0b"]) {
+    assert.equal(isCasePath(p), false, JSON.stringify(p));
+  }
+  for (const p of ["sub/", "a/b", ".claude/state/x", "./a"]) {
+    assert.equal(isCasePath(p), true, JSON.stringify(p));
+  }
+});
+
+test("compareExpected: a path the run left unreadable — a symlink loop, a mode-000 ancestor — is a mismatch, never a throw (QA1-4)", () => {
+  const run = { stdout: "", stderr: "", status: 0 };
+  const loop = mkdtempSync(join(tmpdir(), "t232-eloop-"));
+  try {
+    symlinkSync("loop", join(loop, "loop"));
+    assert.deepEqual(
+      compareExpected({ exit: 0, absent: ["loop/x"] }, run, loop),
+      ["loop/x could not be read (ELOOP)"],
+    );
+    assert.deepEqual(
+      compareExpected({ exit: 0, removed: ["loop/x"] }, run, loop),
+      ["loop/x could not be read (ELOOP)"],
+    );
+  } finally {
+    rmSync(loop, { recursive: true, force: true });
+  }
+  // Root reads through mode 000, so the EACCES half has nothing to measure there.
+  if (process.getuid?.() === 0) return;
+  const locked = mkdtempSync(join(tmpdir(), "t232-eacces-"));
+  try {
+    mkdirSync(join(locked, "locked"));
+    chmodSync(join(locked, "locked"), 0o000);
+    assert.deepEqual(
+      compareExpected({ exit: 0, absent: ["locked/x"] }, run, locked),
+      ["locked/x could not be read (EACCES)"],
+    );
+  } finally {
+    chmodSync(join(locked, "locked"), 0o700);
+    rmSync(locked, { recursive: true, force: true });
   }
 });

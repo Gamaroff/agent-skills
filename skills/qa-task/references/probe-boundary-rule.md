@@ -250,7 +250,8 @@ takes it.
 
   **`expected.absent` and `expected.removed` take paths relative to the case
   directory**, on every form that reads `expected` (task.232). `/` separates
-  segments; an empty path, `.`, a `..` segment, an absolute path and NUL are
+  segments, and a trailing `/` is ignored (`sub/` is `sub`); an empty path, `.`
+  in any spelling (`./`, `a/..`), a `..` segment, an absolute path and NUL are
   refused. `absent` names a path that must not exist after the run — a side
   effect. `removed` names a path the case's own fixture creates and the run must
   delete — a cleanup; a run that leaves it mismatches as `<path> was not removed`.
@@ -263,7 +264,8 @@ takes it.
   compared case-folded, because a fold can only decline more; `removed` is
   compared exactly, because a fold would accept `foo` against a fixture `Foo`.
   A path whose ancestor resolves outside the case directory — a planted symlink —
-  is a mismatch, and nothing is read through it.
+  is a mismatch, and nothing is read through it. A path the run left unreadable
+  (a symlink loop, a mode-000 directory) is a mismatch too, never a probe crash.
 
   **`shell-fn:path#function` sources a library and calls the function** with the
   case's input as its argv, per case under the same shells, with rc files off

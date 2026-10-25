@@ -1,0 +1,86 @@
+schema: 2
+task: 'task.232.probe-expected-path-assertions'
+task_title: 'Probe expected.absent takes bare names; the rule doc says paths'
+gate: FAIL
+status_reason: 'All 3 phases are delivered and 3 spot mutations go red on committed tests, but there are two high findings. The PR shellcheck check is red on a fixture with no shell directive (BUG-1). The path grammar accepts ./ and a/../, which resolve to the case directory and read as "was created" on every run (BUG-2). Three medium findings: a trailing slash skips the collision decline, lstat errors other than ENOENT/ENOTDIR crash the probe, and the grammar is unreachable by the probe.'
+reviewer: 'QA Engineer'
+head: '8ac125883edb8fc1ad56063939f92e53bcb0f329'
+updated: '2026-10-25T19:24:32Z'
+
+top_issues:
+  - id: 'TASK-232-QA1-1'
+    severity: high
+    file: 'shared/resources/tests/fixtures/security-probe/path-actions-lib.sh'
+    finding: 'The sourced library has no shebang or shell directive. ShellCheck SC2148 (error) fails the PR #748 shellcheck job and `bash scripts/lint-shell.sh` locally. The Step 3 local `npm run ci` green missed it because lint-shell reads `git ls-files` and the fixtures were untracked then.'
+    suggested_action: 'Add `# shellcheck shell=bash` as line 1; re-run scripts/lint-shell.sh with the fixtures staged.'
+    suggested_owner: dev
+    bug_ref: 'task.232.bug.1.path-actions-lib-no-shell-directive.md'
+  - id: 'TASK-232-QA1-2'
+    severity: high
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'isCasePath accepts "./" and "a/../" because path.normalize keeps the trailing separator ("./" is not "." and has no ".." segment). casePathState resolves both to the case directory, so the assertion reads "./ was created" on every run (the BUG-13 shape). Base refused both. From CR-1, reproduced with expectedProblem.'
+    suggested_action: 'Strip trailing separators before the . and .. tests (empty means .); add ./, a/../, .// and a/./..// to the grammar test refused rows.'
+    suggested_owner: dev
+    bug_ref: 'task.232.bug.2.case-path-trailing-dot-slash-accepted.md'
+  - id: 'TASK-232-QA1-3'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'pathAssertionProblem compares normalize(p), which keeps a trailing slash, so absent ["sub/"] against a fixture that creates sub/target is not declined; reproduced end to end through runProbeSpec (shell-argv: non-remover.sh): "sub" is declined, "sub/" executes and scores "sub/ was created". From QA and CR-2.'
+    suggested_action: 'Normalise both sides the way the scorer resolves them (strip trailing separators, one shared helper with isCasePath); add sub/ and ./sub/ rows to the per-form created-path tests.'
+    suggested_owner: dev
+    bug_ref: 'task.232.bug.3.trailing-slash-skips-collision-decline.md'
+  - id: 'TASK-232-QA1-4'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'casePathState rethrows every lstat error other than ENOENT/ENOTDIR; a run that leaves loop -> loop or a mode-000 ancestor on an asserted path throws ELOOP / EACCES out of compareExpected (reproduced; base existsSync returned a result), and runProbeSpec has no catch around the case loop. From CR-3.'
+    suggested_action: 'Map any other lstat error to a reported state (for example "unreadable" → "<path> could not be read (<code>)") in compareExpected and scoreFenceRun; add ELOOP and EACCES tests.'
+    suggested_owner: dev
+    bug_ref: 'task.232.bug.4.case-path-state-throws-on-eloop-eacces.md'
+  - id: 'TASK-232-QA1-5'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'isCasePath is a boundary (its false stops a path being read) and is module-private, so probes_executed is 0 for this change and the DoD zero-guard will fail. A development-only probe (export added in a scratch worktree, --sink path) executed 11: 6 hostiles rejected, encoded-traversal and symlink-escape accepted (handled downstream: no decode anywhere; ancestor realpath in casePathState).'
+    suggested_action: 'Export isCasePath (or the shared normaliser plus predicate); cycle 2 probes it with --sink path and a cases file that declines encoded-traversal and symlink-escape with their downstream reason.'
+    suggested_owner: dev
+    bug_ref: 'task.232.bug.5.case-path-grammar-not-probeable.md'
+
+waiver:
+  active: false
+
+quality_score: 30
+
+evidence:
+  tests_reviewed: 260
+  phases_verified: 3/3
+  ci: 'PR #748 @ 8ac12588: shellcheck FAIL (SC2148, path-actions-lib.sh); link-check, secret-scan, test, validate pass. Local npm run ci exit 0 was against untracked fixtures.'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'The path grammar is a boundary with no reachable entry (QA1-5); a scratch-only probe is not counted. The grammar admits ./ and a/../ (QA1-2). Containment through a planted symlink holds on all five forms (mutation Q2 reds 10 tests).'
+  performance:
+    status: PASS
+    notes: 'One lstat and one realpath per asserted path; no change to the per-case spawn budget.'
+  reliability:
+    status: CONCERNS
+    notes: 'ELOOP / EACCES from a probed run escape casePathState and end the probe (QA1-4).'
+  maintainability:
+    status: CONCERNS
+    notes: 'PR shellcheck check red (QA1-1). One helper replaces four collision copies, as intended.'
+
+recommendations:
+  immediate:
+    - action: 'Fix QA1-1 to QA1-5; re-run scripts/lint-shell.sh and npm run ci with the fixtures tracked.'
+      refs: ['shared/resources/security-probe.mjs', 'shared/resources/tests/fixtures/security-probe/path-actions-lib.sh']
+  future: []
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

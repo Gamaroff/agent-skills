@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # A sourced library for the shell-fn form's task.232 tests. `path_action ACTION`
 # does in its cwd (the case directory) what the shell: fixtures of the same
 # name do, then prints ok. The shell-fn form writes no file for its input, so
