@@ -5,17 +5,17 @@ type: task
 description: "Let a probe case's expected.absent name a nested path, add expected.removed for cleanup controls, and state both rules where case authors read them."
 tags: [finalise, observation, security-probe, review-security]
 category: infrastructure
-status: ready-for-development
+status: ready-for-review
 priority: Medium
 estimated_effort_hours: 16
 created: 2026-10-24
-updated: 2026-10-24
+updated: 2026-10-25
 github_issue: 747
 ---
 
 # Technical Task: Probe path assertions — nested `absent` and a new `removed`
 
-**Status:** Ready for Development
+**Status:** Ready for Review
 **Review**: ✅ All review recommendations from `task.232.review.1.probe-expected-path-assertions.md` implemented 2026-10-24
 **GitHub Issue**: [#747](https://github.com/Gamaroff/agent-skills/issues/747)
 
@@ -149,30 +149,30 @@ Two tests change on purpose:
 
 ### Phase 1: Tests first (Risk: Low)
 
-- [ ] Grammar tests for `expectedProblem`: valid `a/b`, `.claude/state/x`, `./a`; refused `../a`, `/abs`, `a/../../b`, `""`, `"."`, NUL, a non-array, a non-string; the same set for `removed`.
-- [ ] A head-vs-base differential grammar test (review 1, I4). Every shape the base engine refuses (`""`, `"."`, `".."`, NUL, a non-array, a non-string, `5`) is still refused. Every bare name it accepts is still accepted. The only class that flips is a `/`-containing path that stays inside the case directory.
-- [ ] Unit tests for `pathAssertionProblem`, one per rule in § 3 Target Architecture. The `absent` rules are tested case-folded, reusing the five rows of `security-probe.test.mjs:5233`. The `removed` rule is tested exactly: `removed: ["foo"]` against fixture `Foo` is declined.
-- [ ] Runner tests per form (`shell:`, `shell-fn:`, `cli:`, `shell-argv:`, `fence:`): a nested `absent` side effect is caught; a nested `absent` the fixture creates is declined; a `removed` path the script deletes is accepted; one it leaves is a mismatch; a `removed` path the fixture does not create is declined.
-- [ ] A containment test: a script that plants `out -> <outside dir>` with `absent: ["out/x"]` reports the "resolves outside" mismatch and never reads the target.
-- [ ] A regression test that runs task.227's `complete.ok-clear-no-lock` and `complete.ok-clear-with-lock` cases, rewritten with `removed`, against `shared/resources/advance-pipeline-lock.sh`, and asserts both are executed and accepted under every shell.
-- [ ] Confirm the new tests fail on the current engine before changing it.
+- [x] Grammar tests for `expectedProblem`: valid `a/b`, `.claude/state/x`, `./a`; refused `../a`, `/abs`, `a/../../b`, `""`, `"."`, NUL, a non-array, a non-string; the same set for `removed`.
+- [x] A head-vs-base differential grammar test (review 1, I4). Every shape the base engine refuses (`""`, `"."`, `".."`, NUL, a non-array, a non-string, `5`) is still refused. Every bare name it accepts is still accepted. The only class that flips is a `/`-containing path that stays inside the case directory.
+- [x] Unit tests for `pathAssertionProblem`, one per rule in § 3 Target Architecture. The `absent` rules are tested case-folded, reusing the five rows of `security-probe.test.mjs:5233`. The `removed` rule is tested exactly: `removed: ["foo"]` against fixture `Foo` is declined.
+- [x] Runner tests per form (`shell:`, `shell-fn:`, `cli:`, `shell-argv:`, `fence:`): a nested `absent` side effect is caught; a nested `absent` the fixture creates is declined; a `removed` path the script deletes is accepted; one it leaves is a mismatch; a `removed` path the fixture does not create is declined.
+- [x] A containment test: a script that plants `out -> <outside dir>` with `absent: ["out/x"]` reports the "resolves outside" mismatch and never reads the target.
+- [x] A regression test that runs task.227's `complete.ok-clear-no-lock` and `complete.ok-clear-with-lock` cases, rewritten with `removed`, against `shared/resources/advance-pipeline-lock.sh`, and asserts both are executed and accepted under every shell.
+- [x] Confirm the new tests fail on the current engine before changing it.
 
 ### Phase 2: Engine (Risk: Medium)
 
-- [ ] One path-grammar predicate, used by `expectedProblem` for `absent` and `removed`.
-- [ ] `pathAssertionProblem(expected, created)`, exported, with the four rules.
-- [ ] Replace the four `collides` blocks with calls to the helper. Each runner passes the full relative paths its fixture writes, not their first segments.
-- [ ] Extend `compareExpected` with `removed`, containment through `realpathSafe` + `isWithin`, and `lstatSync` existence (added to the `node:fs` import).
-- [ ] Mutation-prove: remove each helper rule in turn and the ancestor check, and record the test that goes red for each in the implementation report.
+- [x] One path-grammar predicate, used by `expectedProblem` for `absent` and `removed`.
+- [x] `pathAssertionProblem(expected, created)`, exported, with the four rules.
+- [x] Replace the four `collides` blocks with calls to the helper. Each runner passes the full relative paths its fixture writes, not their first segments.
+- [x] Extend `compareExpected` with `removed`, containment through `realpathSafe` + `isWithin`, and `lstatSync` existence (added to the `node:fs` import).
+- [x] Mutation-prove: remove each helper rule in turn and the ancestor check, and record the test that goes red for each in the implementation report.
 
 ### Phase 3: Docs, bundle, changelog (Risk: Low)
 
-- [ ] `probe-boundary-rule.md` § 5: state the grammar, `removed`, and the collision rules.
-- [ ] `security-input-corpus.md` § "Materialised sinks": the `expected` shape gains `removed`, with the grammar.
-- [ ] `finalise-dod-security-prompt.md` and `security-review-prompt.md`: one note at the `shell-argv:` / `fence:` / `cli:` case guidance saying how to assert a side effect (`absent`) and a cleanup (`removed`).
-- [ ] The header comment of `security-probe.mjs` (`:112`) names `removed`.
-- [ ] `npm run bundle`, then `npm run bundle:check` clean with no `UNREACHED`.
-- [ ] CHANGELOG `[Unreleased]` entry naming task 232.
+- [x] `probe-boundary-rule.md` § 5: state the grammar, `removed`, and the collision rules.
+- [x] `security-input-corpus.md` § "Materialised sinks": the `expected` shape gains `removed`, with the grammar.
+- [x] `finalise-dod-security-prompt.md` and `security-review-prompt.md`: one note at the `shell-argv:` / `fence:` / `cli:` case guidance saying how to assert a side effect (`absent`) and a cleanup (`removed`).
+- [x] The header comment of `security-probe.mjs` (`:112`) names `removed`.
+- [x] `npm run bundle`, then `npm run bundle:check` clean with no `UNREACHED`.
+- [x] CHANGELOG `[Unreleased]` entry naming task 232.
 
 ## 7. Files Summary
 
@@ -230,28 +230,28 @@ Not applicable. The change adds an `lstat` and a realpath per assertion path, wi
 
 ### Functional
 
-- [ ] `expectedProblem` accepts `absent` and `removed` entries that are relative paths inside the case directory, and refuses `..`, absolute paths, `.`, empty strings and NUL (Phase 2, path grammar).
-- [ ] A nested `absent` side effect is caught as a mismatch on all five forms.
-- [ ] An `absent` path the fixture creates, or an ancestor of one, is declined on all five forms.
-- [ ] A `removed` path the run deletes produces no mismatch; one it leaves produces `"<rel> was not removed"`; one the fixture does not create is declined, including one that differs from a created path only by case.
-- [ ] A path whose ancestor resolves outside the case directory is a mismatch and is never read through (Phase 2, `compareExpected`).
-- [ ] task.227's two cleanup cases, rewritten with `removed`, are executed and accepted against `advance-pipeline-lock.sh` under every shell.
+- [x] `expectedProblem` accepts `absent` and `removed` entries that are relative paths inside the case directory, and refuses `..`, absolute paths, `.`, empty strings and NUL (Phase 2, path grammar).
+- [x] A nested `absent` side effect is caught as a mismatch on all five forms.
+- [x] An `absent` path the fixture creates, or an ancestor of one, is declined on all five forms.
+- [x] A `removed` path the run deletes produces no mismatch; one it leaves produces `"<rel> was not removed"`; one the fixture does not create is declined, including one that differs from a created path only by case.
+- [x] A path whose ancestor resolves outside the case directory is a mismatch and is never read through (Phase 2, `compareExpected`).
+- [x] task.227's two cleanup cases, rewritten with `removed`, are executed and accepted against `advance-pipeline-lock.sh` under every shell.
 
 ### Performance
 
-- [ ] Not applicable (see § 8).
+- [x] Not applicable (see § 8).
 
 ### Code Quality
 
-- [ ] Every runner routes through `pathAssertionProblem`. Proved by mutation: removing the helper's first rule turns the "fixture creates it" test of **every** form red (`shell:`, `shell-fn:`, `cli:`, `shell-argv:`, `fence:`), and a runner that kept its own copy would stay green. Recorded in the implementation report (review 1, I3).
-- [ ] Each helper rule and the ancestor check is mutation-proved, with the red test recorded in the implementation report.
-- [ ] `npm run ci` passes, with `.agents/skills` moved aside.
-- [ ] `npm run bundle:check` is clean with no `UNREACHED`.
+- [x] Every runner routes through `pathAssertionProblem`. Proved by mutation: removing the helper's first rule turns the "fixture creates it" test of **every** form red (`shell:`, `shell-fn:`, `cli:`, `shell-argv:`, `fence:`), and a runner that kept its own copy would stay green. Recorded in the implementation report (review 1, I3).
+- [x] Each helper rule and the ancestor check is mutation-proved, with the red test recorded in the implementation report.
+- [x] `npm run ci` passes, with `.agents/skills` moved aside.
+- [x] `npm run bundle:check` is clean with no `UNREACHED`.
 
 ### Migration
 
-- [ ] The four docs state the grammar and `removed`, and `probe-boundary-rule.md:242` no longer promises something the engine refuses.
-- [ ] CHANGELOG names task 232 and the new field.
+- [x] The four docs state the grammar and `removed`, and `probe-boundary-rule.md:242` no longer promises something the engine refuses.
+- [x] CHANGELOG names task 232 and the new field.
 
 ## 10. Risk Assessment
 
@@ -313,15 +313,16 @@ None identified.
 | 2026-10-24 | 1.0 | Initial draft — cut from observation #97 | create-task |
 | 2026-10-24 | 1.1 | Review needed revision (8/10 after fixes): `removed` matched exactly, not case-folded; containment reuses `realpathSafe`; unreachable both-lists rule removed; grep criterion replaced by an all-forms mutation; head-vs-base grammar test added; the `:5233` regex and the `shell:` case-fold narrowing stated | review-task |
 | 2026-10-24 |  | Status → ready-for-development | review-task |
+| 2026-10-25 |  | Implemented — 28 files (7 new fixtures, 14 bundled copies), 44 new tests, 11 mutations proved | develop |
 <!-- change-log-end -->
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 1: Tests first
-- [ ] Phase 2: Engine
-- [ ] Phase 3: Docs, bundle, changelog
+- [x] Phase 1: Tests first
+- [x] Phase 2: Engine
+- [x] Phase 3: Docs, bundle, changelog
 
 ## References
 
