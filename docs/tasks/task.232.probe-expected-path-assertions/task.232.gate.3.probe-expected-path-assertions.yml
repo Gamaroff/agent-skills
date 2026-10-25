@@ -1,0 +1,65 @@
+schema: 2
+task: 'task.232.probe-expected-path-assertions'
+task_title: 'Probe expected.absent takes bare names; the rule doc says paths'
+gate: PASS
+status_reason: 'Both cycle 2 findings are fixed and verified. The sandbox teardown survives a mode-000 directory (the QA2 repro returns its row and leaks no sandbox), and the fence unreadable-side-effect rule is held by a test. The scoped review found 4 low, advisory findings. isCasePath re-probed: 11 executed, 0 escaped.'
+reviewer: 'QA Engineer'
+head: 'dda2cbd24f05d19971ced64f841602f6d5b154b8'
+updated: '2026-10-25T20:15:19Z'
+
+top_issues: []
+
+bug_resolution:
+  - bug: 'task.232.bug.6.sandbox-teardown-throws-on-mode-000-dir.md'
+    status: closed
+    verified: 'QA2 repro: runProbeSpec returns cr1:rejected, no /tmp/security-probe-* left; the runner test goes red with the plain rmSync (F1)'
+  - bug: 'task.232.bug.7.fence-unreadable-side-effect-untested.md'
+    status: closed
+    verified: 'the fence loop test passes and goes red under Q5 (F2)'
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 265
+  phases_verified: 3/3
+  ci: 'PR #748 @ dda2cbd2 not read this cycle (no cycle waits on CI); local npm run ci exit 0 with the symlink aside, 6339 tests, 0 failed'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 11
+    escaped: 0
+    notes: 'isCasePath re-probed with --sink path (record task.232.qa.3.security.run.json): 6 hostiles rejected, 3 legitimates accepted. encoded-traversal and symlink-escape are accepted at the lexical layer and contained downstream, as verified in cycle 2. The reviewer checked that the new teardown never chmods or follows an outward symlink (outlink -> /etc untouched).'
+  performance:
+    status: PASS
+    notes: 'The permission walk runs only when the first rmSync fails.'
+  reliability:
+    status: PASS
+    notes: 'The teardown survives mode-000 directories. Advisory: a tree deeper than PATH_MAX still ends the run (CR-1, no regression), and a race can chmod through a swapped symlink (CR-2, low confidence).'
+  maintainability:
+    status: PASS
+    notes: 'One helper owns sandbox removal.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 (low): make the permission walk best-effort so only the final rmSync can throw.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'CR-2 (low): re-lstat after chmod and compare dev/ino, or list the race with the detached-grandchild limit.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'CR-3, CR-4 (low): assert the QA2-1 test leaves no sandbox, and t.skip it under root instead of returning.'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+    - action: 'Gate 2 CR-2 (pre-existing): reap each case process group before absent/removed are read.'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

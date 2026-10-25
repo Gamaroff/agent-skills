@@ -4,7 +4,33 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **Security probe: `expected.removed` asserts a cleanup (task 232).** A case lists paths its own
+  fixture creates that the run must delete; a run that leaves one mismatches as
+  `<path> was not removed`. A `removed` path the fixture does not create is declined, matched
+  exactly, because it would pass with nothing removed. task.227's two `--complete` cleanup cases
+  could not be written before this: they were the only cases that checked the removal half, and
+  the engine declined both (obs #97).
+
 ### Changed
+
+- **Security probe: `expected.absent` takes nested paths relative to the case directory (task
+  232).** `.claude/state/x` is valid, and a trailing `/` is ignored; `..` segments, absolute
+  paths, `.` in any spelling (`./`, `a/..`) and NUL are still refused. One helper,
+  `pathAssertionProblem`, now decides for all four runners whether a case's paths can be scored,
+  where four inline copies compared first segments. An `absent` path the fixture creates, a
+  directory above one, or a path beneath a created file is declined. Existence is read with
+  `lstat`; a path whose ancestor resolves outside the case directory is a mismatch that is never
+  read through, and one the run left unreadable (a symlink loop, a mode-000 directory) is a
+  mismatch rather than a crash. The probe's sandbox teardown restores directory permissions
+  first, so a case that leaves a mode-000 directory no longer ends the run. `isCasePath` and `caseKey` are exported, so the probe's JS entry
+  form reaches the grammar.
+  - **Narrowing:** `shell:` and `shell-fn:` now compare `absent` case-folded, as `cli:`,
+    `shell-argv:` and `fence:` already did. A name that differs from a control or input only by
+    case is declined. The committed corpus has none.
+  - The `fence:` arm's decline text changes from "which the case's own fixture writes" to the
+    shared "which the fixture itself creates".
 
 - **`advance-pipeline-lock.sh --complete` now removes Step 4's and 5c's records; Step 8's Completion
   Checklist removes nothing directly, so a host's removal check cannot refuse it (task 227).**

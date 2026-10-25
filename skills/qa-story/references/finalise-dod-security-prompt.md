@@ -232,7 +232,8 @@ cases: [ … ]
 # on a collision). A CLI that reads a POPULATED DATA DIRECTORY needs a
 # legitimate case that carries it: give that case `fixture: { files: { "items.json": "…" } }` (and
 # `env` if it reads one) with input "." — the files land in the case directory, the CLI's cwd
-# (task.216). Without it every input is refused and the verdict is `rejects-every-input`. PATH,
+# (task.216). Without it every input is refused and the verdict is `rejects-every-input`. A side
+# effect or a cleanup is asserted with `absent` / `removed`, as in the shell-argv block below. PATH,
 # NODE_OPTIONS and the LD_*/DYLD_* loader variables are refused in a cli: case's env. Use a sink
 # that is not materialised: --sink filename writes each input as an empty file of that name, so
 # input "." is declined (EISDIR). Repository state (a commit, a staged index) is not reachable on
@@ -249,6 +250,9 @@ cases: [ … ]
 # script: it runs as `bash <setup> <case-dir>` before each (case, shell) run, and a setup that fails
 # is errored, never a refusal. A setup builds "$1" and nothing else: a write anywhere else errors the
 # run. A script, setup or case fixture that names `gh` needs --fake-gh. NAME each control.
+# A side effect is asserted with `expected.absent: ["dir/file"]`; a cleanup with `expected.removed`,
+# naming paths the case's `fixture.files` creates. Both are relative to the case directory, no ".."
+# (task.232). The cli: and fence: forms take both the same way.
 argv: ["--entry", "shell-argv:<path-from-repo-root>",
        "--argv", "[\"{input}\",\"<second-argument>\"]",
        "--fixture-setup", "<setup-script-from-repo-root>", "--name", "<control name>"]
@@ -261,7 +265,8 @@ cases: [ … ]
 # `expected` with the guard's own refusal OUTPUT (a non-empty stdout or stderr; an exit code alone is
 # declined) — or is declined; a legitimate case is scored by exit status (order: scoreFenceRun). What
 # the block reads besides the slot — env, files such as a package.json — comes from each case's
-# `fixture: {env, files}`. Return `cases`; the record's entry resolves in every checkout.
+# `fixture: {env, files}`. A side effect or a cleanup is asserted with `absent` / `removed`, as in
+# the shell-argv block above. Return `cases`; the record's entry resolves in every checkout.
 argv: ["--sink", "filename", "--entry", "fence:<doc-path-from-repo-root>#<heading text>",
        "--slot", "<placeholder>", "--name", "<control name>"]
 cases: [ … ]

@@ -57,6 +57,9 @@ import {
   namesGh,
   ghFreePath,
   parseArgvTemplate,
+  pathAssertionProblem,
+  caseKey,
+  isCasePath,
   probeShells,
   readRecord,
   recordEntriesDir,
@@ -940,7 +943,16 @@ test("shell entry: a malformed expected is declined with its reason, never score
     [{ stdout: null }, /expected\.stdout.*must be a string/],
     [{ exit: "0" }, /expected\.exit.*must be an integer/],
     [{ exit: 0, absent: 5 }, /expected\.absent.*must be an array/],
-    [{ exit: 0, absent: ["a/b"] }, /expected\.absent.*must be an array/],
+    [{ exit: 0, absent: ["../a"] }, /expected\.absent.*must be an array/],
+    [{ exit: 0, absent: ["/abs"] }, /expected\.absent.*must be an array/],
+    [{ exit: 0, absent: ["a/../../b"] }, /expected\.absent.*must be an array/],
+    [{ exit: 0, removed: ["../a"] }, /expected\.removed.*must be an array/],
+    [{ exit: 0, removed: ["/abs"] }, /expected\.removed.*must be an array/],
+    [
+      { exit: 0, removed: ["a/../../b"] },
+      /expected\.removed.*must be an array/,
+    ],
+    [{ exit: 0, removed: 5 }, /expected\.removed.*must be an array/],
     [{ exit: 0, stderr: 7 }, /expected\.stderr.*must be a string/],
   ];
   for (const [expected, re] of bad) {
@@ -5259,7 +5271,8 @@ test("fence entry: an expected.absent name the case's own fixture writes is decl
       assert.equal(r.cases.length, probeShells().length);
       assert.ok(
         r.cases.every(
-          (c) => c.outcome === "errored" && /fixture writes/.test(c.detail),
+          (c) =>
+            c.outcome === "errored" && /fixture itself creates/.test(c.detail),
         ),
         JSON.stringify(r.cases),
       );
@@ -6876,5 +6889,632 @@ test("defaultRepoRoot: a bundled copy defaults to the git top level; a shared/re
     );
   } finally {
     rmSync(base, { recursive: true, force: true });
+  }
+});
+
+// ── Path assertions: nested `absent` and `removed` (task.232) ───────────────
+//
+// `absent` and `removed` take a path relative to the case directory, and one
+// helper, pathAssertionProblem, decides for every runner whether the paths
+// can be scored. The runner rows run on all five forms that read `expected`,
+// because each builds the list of what its fixture creates in its own way: a
+// rule held on one form says nothing about another (TASK-181-001).
+
+test("expectedProblem: absent and removed take relative paths inside the case directory, and refuse the rest", () => {
+  const valid = ["pwned", "a/b", ".claude/state/x", "./a", "a//b", "a/"];
+  const refused = [
+    "",
+    ".",
+    "..",
+    "a/..",
+    // normalize keeps a trailing separator: each of these is the case
+    // directory itself, which always exists (QA1-2)
+    "./",
+    ".//",
+    "a/../",
+    "a/./..//",
+    "../",
+    "../a",
+    "/abs",
+    "a/../../b",
+    "a\0b",
+    5,
+  ];
+  for (const k of ["absent", "removed"]) {
+    for (const p of valid) {
+      assert.equal(expectedProblem({ exit: 0, [k]: [p] }), null, `${k} ${p}`);
+    }
+    for (const p of refused) {
+      assert.match(
+        expectedProblem({ exit: 0, [k]: [p] }),
+        new RegExp(`expected\\.${k}.*must be an array of relative paths`),
+        `${k} ${JSON.stringify(p)}`,
+      );
+    }
+    for (const v of [5, "x", null, {}]) {
+      assert.match(
+        expectedProblem({ exit: 0, [k]: v }),
+        new RegExp(`expected\\.${k}.*must be an array`),
+        `${k} ${JSON.stringify(v)}`,
+      );
+    }
+  }
+  // `removed` compares nothing on its own, as `absent` does not: a script that
+  // deletes everything satisfies it.
+  assert.match(expectedProblem({ removed: ["a"] }), /compares nothing/);
+});
+
+test("expectedProblem: against the engine before task.232, the only absent shape that flips is an in-directory nested path (review 1, I4)", () => {
+  // `base` is what the engine at develop 0b714103 returned for `absent: [v]`,
+  // measured on 2026-10-25 before the change (implementation report, Step 3).
+  // Every base refusal still refuses, every base acceptance still accepts, and
+  // a row may flip only refuse → accept, and only when it stays in the case
+  // directory.
+  const rows = [
+    ["", "refuse", "refuse"],
+    [".", "refuse", "refuse"],
+    ["..", "refuse", "refuse"],
+    ["a\0b", "refuse", "refuse"],
+    [5, "refuse", "refuse"],
+    ["pwned", "accept", "accept"],
+    ["PWNED2", "accept", "accept"],
+    [".hidden", "accept", "accept"],
+    ["../a", "refuse", "refuse"],
+    ["/abs", "refuse", "refuse"],
+    ["a/../../b", "refuse", "refuse"],
+    ["a/..", "refuse", "refuse"],
+    ["a/b", "refuse", "accept"],
+    [".claude/state/x", "refuse", "accept"],
+    ["./a", "refuse", "accept"],
+    ["a//b", "refuse", "accept"],
+    ["a/", "refuse", "accept"],
+    // The case directory spelled with a trailing separator (QA1-2): base
+    // refused every "/", and head must too.
+    ["./", "refuse", "refuse"],
+    ["a/../", "refuse", "refuse"],
+  ];
+  for (const [v, base, head] of rows) {
+    const got =
+      expectedProblem({ exit: 0, absent: [v] }) === null ? "accept" : "refuse";
+    assert.equal(got, head, JSON.stringify(v));
+    if (base !== head) {
+      assert.equal(base, "refuse", `${JSON.stringify(v)} may only widen`);
+      // A flip names a path strictly inside the case directory: resolved
+      // against a root, it is neither the root nor outside it. A syntactic
+      // "has a slash, no .. segment" test passed "./" (QA1-2).
+      const root = join(sep, "case-root");
+      const at = join(root, String(v));
+      assert.ok(
+        typeof v === "string" &&
+          !v.startsWith("/") &&
+          at !== root &&
+          at.replace(/\/+$/, "") !== root &&
+          at.startsWith(root + sep),
+        `${JSON.stringify(v)} flips but is not a path strictly inside the case directory`,
+      );
+    }
+  }
+  // The non-array shapes base refused are still refused.
+  for (const v of [5, "x", null, {}]) {
+    assert.notEqual(expectedProblem({ exit: 0, absent: v }), null);
+  }
+});
+
+test("pathAssertionProblem: an absent path the fixture creates, or an ancestor of one, is declined — normalised and case-folded", () => {
+  // The five rows of the fence arm's TASK-180-004 test, now on every form.
+  for (const [created, absent] of [
+    [["pwned"], ["pwned"]],
+    [["dir/x"], ["dir"]],
+    [["./pwned"], ["pwned"]],
+    [["b/../pwned"], ["pwned"]],
+    [["PWNED"], ["pwned"]],
+    [["sub/marker"], ["sub/marker"]],
+    [["sub/marker"], ["./sub//marker"]],
+    // A trailing separator is the same path to the scorer (QA1-3).
+    [["sub/marker"], ["sub/"]],
+    [["sub/marker"], ["./sub//"]],
+    [["sub/marker"], ["sub/marker/"]],
+    [["pwned"], ["pwned/"]],
+  ]) {
+    assert.match(
+      pathAssertionProblem({ exit: 0, absent }, created),
+      /names "[^"]+", which the fixture itself creates/,
+      JSON.stringify([created, absent]),
+    );
+  }
+});
+
+test("pathAssertionProblem: an absent path beneath a file the fixture creates is declined — it can never exist", () => {
+  for (const [created, absent] of [
+    [["f"], ["f/x"]],
+    [["F"], ["f/x"]],
+    [["a/b"], ["a/b/c/d"]],
+  ]) {
+    assert.match(
+      pathAssertionProblem({ exit: 0, absent }, created),
+      /beneath a file the fixture creates — it can never exist/,
+      JSON.stringify([created, absent]),
+    );
+  }
+});
+
+test("pathAssertionProblem: removed must name a path the fixture creates, matched exactly — never case-folded (review 1, C1)", () => {
+  assert.match(
+    pathAssertionProblem({ exit: 0, removed: ["nothere"] }, ["a"]),
+    /names "nothere", which the fixture does not create — it would pass with nothing removed/,
+  );
+  // On a case-sensitive filesystem `foo` never exists beside a fixture `Foo`,
+  // so a folded match would pass with nothing removed.
+  assert.match(
+    pathAssertionProblem({ exit: 0, removed: ["foo"] }, ["Foo"]),
+    /which the fixture does not create/,
+  );
+  // An ancestor directory of a created file is not a created path.
+  assert.match(
+    pathAssertionProblem({ exit: 0, removed: ["sub"] }, ["sub/t"]),
+    /which the fixture does not create/,
+  );
+  assert.equal(
+    pathAssertionProblem({ exit: 0, removed: ["foo"] }, ["foo"]),
+    null,
+  );
+  assert.equal(
+    pathAssertionProblem({ exit: 0, removed: ["./sub//t"] }, ["sub/t"]),
+    null,
+  );
+});
+
+test("pathAssertionProblem: a path in both lists is declined by the other two rules; one in neither, or no paths at all, passes (review 1, I5)", () => {
+  const both = { exit: 0, absent: ["a"], removed: ["a"] };
+  assert.match(pathAssertionProblem(both, ["a"]), /fixture itself creates/);
+  assert.match(pathAssertionProblem(both, []), /fixture does not create/);
+  // Prefixes are not ancestors.
+  assert.equal(pathAssertionProblem({ exit: 0, absent: ["a"] }, ["ab"]), null);
+  assert.equal(pathAssertionProblem({ exit: 0, absent: ["ab"] }, ["a"]), null);
+  assert.equal(pathAssertionProblem({ exit: 0, absent: ["b/c"] }, ["a"]), null);
+  assert.equal(pathAssertionProblem({ exit: 0 }, ["a"]), null);
+  assert.equal(pathAssertionProblem(undefined, ["a"]), null);
+});
+
+// The five forms. Each runs one case that performs `action` in its case
+// directory — `nested-write` writes sub/marker, `remove` deletes the form's
+// `made` path, `keep` does nothing, `symlink-out` plants out -> / — and prints
+// ok. `made` is a path the form's own fixture creates: the input file for
+// shell:, a sink control for shell-fn: (which writes no input file), and a
+// nested `fixture.files` key for the three forms that take one.
+const PA_SCRIPT = {
+  "nested-write": "nested-write",
+  remove: "remover",
+  keep: "non-remover",
+  "symlink-out": "symlink-out",
+};
+const PA_FENCE_DOC = [
+  "## P",
+  "",
+  "```bash",
+  'case "<slot>" in',
+  "  nested-write) mkdir -p sub && : > sub/marker ;;",
+  "  remove) rm -f target sub/target ;;",
+  "  symlink-out) ln -s / out ;;",
+  "esac",
+  "printf 'ok\\n'",
+  "```",
+  "",
+].join("\n");
+const paCase = (action, expected, direction) => ({
+  id: `pa.${action}`,
+  why: "task.232 path assertion",
+  correct: direction === "hostile" ? "refused" : "admitted",
+  direction,
+  expected,
+});
+const PA_FILES = { "sub/target": "" };
+const PATH_FORMS = [
+  {
+    name: "shell:",
+    made: "target",
+    run: (action, expected, direction) =>
+      runProbeSpec({
+        sink: "filename",
+        entry: `shell:${SHELL_FIXTURES}/${PA_SCRIPT[action]}.sh`,
+        cases: [{ ...paCase(action, expected, direction), input: "target" }],
+      }),
+  },
+  {
+    name: "shell-fn:",
+    made: "~.gate.12.control.yml",
+    run: (action, expected, direction) =>
+      runProbeSpec({
+        sink: "filename",
+        entry: `shell-fn:${SHELL_FIXTURES}/path-actions-lib.sh#path_action`,
+        cases: [{ ...paCase(action, expected, direction), input: action }],
+      }),
+  },
+  {
+    name: "cli:",
+    made: "sub/target",
+    run: (action, expected, direction) =>
+      runProbeSpec({
+        sink: "url-authority",
+        entry: CLI("path-actions"),
+        argv: ["{input}"],
+        cases: [
+          {
+            ...paCase(action, expected, direction),
+            input: action,
+            fixture: { files: PA_FILES },
+          },
+        ],
+      }),
+  },
+  {
+    name: "shell-argv:",
+    made: "sub/target",
+    run: (action, expected, direction) =>
+      runProbeSpec({
+        entry: `shell-argv:${SHELL_FIXTURES}/${PA_SCRIPT[action]}.sh`,
+        argv: ["{input}"],
+        cases: [
+          {
+            ...paCase(action, expected, direction),
+            input: action,
+            fixture: { files: PA_FILES },
+          },
+        ],
+      }),
+  },
+  {
+    name: "fence:",
+    made: "sub/target",
+    run: (action, expected, direction) => {
+      const root = fenceRoot({ "doc.md": PA_FENCE_DOC });
+      try {
+        return runProbeSpec({
+          entry: "fence:doc.md#P",
+          slot: "<slot>",
+          cases: [
+            fenceCase(`pa.${action}`, direction, action, {
+              fixture: { files: PA_FILES },
+              expected,
+            }),
+          ],
+          repoRoot: root,
+        });
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    },
+  },
+];
+
+/** Every result row of a one-case run: one per shell, or one for cli:. */
+function paRows(r) {
+  assert.ok(r.cases.length >= 1, JSON.stringify(r));
+  return r.cases;
+}
+
+for (const form of PATH_FORMS) {
+  test(`${form.name} path assertions: a nested absent side effect is caught`, () => {
+    const r = form.run(
+      "nested-write",
+      { stdout: "ok\n", absent: ["sub/marker"] },
+      "hostile",
+    );
+    for (const row of paRows(r)) {
+      assert.equal(row.outcome, "accepted", JSON.stringify(row));
+      assert.match(row.detail, /sub\/marker was created/, row.detail);
+    }
+  });
+
+  test(`${form.name} path assertions: an absent path the fixture creates is declined`, () => {
+    // Spelled as the fixture writes it, and with a trailing separator, which
+    // the scorer resolves to the same path (QA1-3).
+    for (const spelling of [form.made, `${form.made}/`]) {
+      const r = form.run(
+        "keep",
+        { stdout: "ok\n", absent: [spelling] },
+        "hostile",
+      );
+      assert.equal(r.executed, 0, `${spelling}: ${JSON.stringify(r.cases)}`);
+      for (const row of paRows(r)) {
+        assert.equal(row.outcome, "errored", JSON.stringify(row));
+        assert.match(
+          row.detail,
+          /which the fixture itself creates/,
+          row.detail,
+        );
+      }
+    }
+  });
+
+  test(`${form.name} path assertions: an absent path beneath a file the fixture creates is declined`, () => {
+    const r = form.run(
+      "keep",
+      { stdout: "ok\n", absent: [`${form.made}/x`] },
+      "hostile",
+    );
+    assert.equal(r.executed, 0, JSON.stringify(r.cases));
+    for (const row of paRows(r)) {
+      assert.match(
+        row.detail,
+        /beneath a file the fixture creates/,
+        row.detail,
+      );
+    }
+  });
+
+  test(`${form.name} path assertions: a removed path the run deletes passes`, () => {
+    const r = form.run(
+      "remove",
+      { stdout: "ok\n", removed: [form.made] },
+      "legitimate",
+    );
+    assert.deepEqual(r.declined, [], JSON.stringify(r.declined));
+    for (const row of paRows(r)) {
+      assert.equal(row.outcome, "accepted", JSON.stringify(row));
+    }
+  });
+
+  test(`${form.name} path assertions: a removed path the run leaves is a mismatch`, () => {
+    const r = form.run(
+      "keep",
+      { stdout: "ok\n", removed: [form.made] },
+      "legitimate",
+    );
+    assert.deepEqual(r.declined, [], JSON.stringify(r.declined));
+    for (const row of paRows(r)) {
+      assert.equal(row.outcome, "rejected", JSON.stringify(row));
+      assert.match(row.detail, / was not removed/, row.detail);
+    }
+  });
+
+  test(`${form.name} path assertions: a removed path the fixture does not create is declined`, () => {
+    for (const removed of [["nothere"], [form.made.toUpperCase()]]) {
+      const r = form.run("remove", { stdout: "ok\n", removed }, "legitimate");
+      assert.equal(r.executed, 0, JSON.stringify(r.cases));
+      for (const row of paRows(r)) {
+        assert.match(
+          row.detail,
+          /which the fixture does not create/,
+          row.detail,
+        );
+      }
+    }
+  });
+
+  test(`${form.name} path assertions: a path whose ancestor resolves outside the case directory is a mismatch, never read through`, () => {
+    // out -> /, so out/tmp is the host's /tmp, which exists: an existence
+    // check that followed the link would report "out/tmp was created".
+    const r = form.run(
+      "symlink-out",
+      { stdout: "ok\n", absent: ["out/tmp"] },
+      "hostile",
+    );
+    for (const row of paRows(r)) {
+      assert.equal(row.outcome, "accepted", JSON.stringify(row));
+      assert.match(
+        row.detail,
+        /out\/tmp: an ancestor resolves outside the case directory/,
+        row.detail,
+      );
+      assert.doesNotMatch(row.detail, /was created/, row.detail);
+    }
+  });
+}
+
+test("shell-argv path assertions: a recursive cleanup the change never mentions is scored by removed (obs #176 control)", () => {
+  const files = { "tmp/a": "", "tmp/b": "" };
+  const cases = [
+    saCase("rt.clean", "legitimate", "tmp", {
+      fixture: { files },
+      expected: { stdout: "ok\n", exit: 0, removed: ["tmp/a", "tmp/b"] },
+    }),
+    saCase("rt.dry", "legitimate", "--dry-run", {
+      fixture: { files },
+      expected: { stdout: "ok\n", exit: 0, removed: ["tmp/a", "tmp/b"] },
+    }),
+  ];
+  const r = runProbeSpec({
+    entry: `shell-argv:${SHELL_FIXTURES}/rm-tree.sh`,
+    argv: ["{input}"],
+    cases,
+  });
+  assert.deepEqual(r.declined, [], JSON.stringify(r.declined));
+  for (const shell of probeShells()) {
+    const clean = r.cases.find((c) => c.id === "rt.clean" && c.shell === shell);
+    assert.equal(clean?.outcome, "accepted", JSON.stringify(clean));
+    const dry = r.cases.find((c) => c.id === "rt.dry" && c.shell === shell);
+    assert.equal(dry?.outcome, "rejected", JSON.stringify(dry));
+    assert.match(dry.detail, /tmp\/a was not removed/);
+  }
+});
+
+test("task.227 regression: the two --complete cleanup cases, rewritten with removed, are executed and accepted under every shell", () => {
+  const all = JSON.parse(
+    readFileSync(
+      join(
+        REPO_ROOT,
+        "docs/tasks/task.227.step-8-checklist-no-rm/task.227.dod.1.security.cases.3.json",
+      ),
+      "utf8",
+    ),
+  );
+  const ids = ["complete.ok-clear-no-lock", "complete.ok-clear-with-lock"];
+  const cases = all
+    .filter((c) => ids.includes(c.id))
+    .map(({ expected: { absent, ...rest }, ...c }) => ({
+      ...c,
+      expected: { ...rest, removed: absent },
+    }));
+  assert.equal(cases.length, 2);
+  const r = runProbeSpec({
+    entry: "shell-argv:shared/resources/advance-pipeline-lock.sh",
+    argv: ["{input}"],
+    cases,
+  });
+  assert.deepEqual(r.declined, [], JSON.stringify(r.declined));
+  assert.equal(r.executed, ids.length * probeShells().length);
+  for (const shell of probeShells()) {
+    for (const id of ids) {
+      const row = r.cases.find((c) => c.id === id && c.shell === shell);
+      assert.equal(row?.outcome, "accepted", JSON.stringify(row));
+    }
+  }
+});
+
+test("fence entry: a dangling symlink expected.absent names is a reproduction even when the shell then stops — the leaf is lstat'd, not followed (task.232)", () => {
+  // TASK-180-006's shape with the side effect a link to nowhere: existsSync
+  // follows it, finds nothing, and the stopped shell read as errored.
+  const root = fenceRoot({
+    "doc.md": [
+      "## Two contexts",
+      "",
+      "```bash",
+      'echo "checking <slot>"',
+      "x='<slot>'",
+      "```",
+      "",
+    ].join("\n"),
+  });
+  try {
+    const r = runProbeSpec({
+      entry: "fence:doc.md#Two contexts",
+      slot: "<slot>",
+      cases: [
+        fenceCase("f.link", "hostile", "$(ln -s /nonexistent-t232 pwned)'", {
+          expected: { exit: 0, stdout: "REFUSED\n", absent: ["pwned"] },
+        }),
+      ],
+      repoRoot: root,
+    });
+    assert.deepEqual(
+      r.reproduced,
+      probeShells().map((s) => `f.link@${s}`),
+      JSON.stringify(r.cases),
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("caseKey: one spelling per case path — normalised, trailing separators dropped; isCasePath compares by it (QA1-2, QA1-3)", () => {
+  for (const [p, key] of [
+    ["sub/", "sub"],
+    ["./sub//", "sub"],
+    ["a//b/", "a/b"],
+    ["./", "."],
+    ["a/../", "."],
+    ["a/./..//", "."],
+    ["pwned", "pwned"],
+  ]) {
+    assert.equal(caseKey(p), key, JSON.stringify(p));
+  }
+  // Exported, so the probe's JS entry form reaches the boundary (QA1-5).
+  for (const p of ["./", ".//", "a/../", "../", "", "/abs", "a\0b"]) {
+    assert.equal(isCasePath(p), false, JSON.stringify(p));
+  }
+  for (const p of ["sub/", "a/b", ".claude/state/x", "./a"]) {
+    assert.equal(isCasePath(p), true, JSON.stringify(p));
+  }
+});
+
+test("fence entry: an absent path the run left unreadable is a reproduction even when the shell then stops (QA2-2)", () => {
+  // The run plants loop -> loop, so lstat of loop/x is ELOOP: neither present
+  // nor missing. It is still a side effect, and it outranks the stopped shell.
+  const root = fenceRoot({
+    "doc.md": [
+      "## Two contexts",
+      "",
+      "```bash",
+      'echo "checking <slot>"',
+      "x='<slot>'",
+      "```",
+      "",
+    ].join("\n"),
+  });
+  try {
+    const r = runProbeSpec({
+      entry: "fence:doc.md#Two contexts",
+      slot: "<slot>",
+      cases: [
+        fenceCase("f.loop", "hostile", "$(ln -s loop loop)'", {
+          expected: { exit: 0, stdout: "REFUSED\n", absent: ["loop/x"] },
+        }),
+      ],
+      repoRoot: root,
+    });
+    assert.deepEqual(
+      r.reproduced,
+      probeShells().map((s) => `f.loop@${s}`),
+      JSON.stringify(r.cases),
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("runProbeSpec: a case that leaves a mode-000 directory still returns its results — the sandbox teardown restores permissions (QA2-1)", () => {
+  // Root reads through mode 000, so rmSync never fails there.
+  if (process.getuid?.() === 0) return;
+  const root = fenceRoot({
+    "doc.md": [
+      "## Block",
+      "",
+      "```bash",
+      "<slot>",
+      'echo "ok"',
+      "```",
+      "",
+    ].join("\n"),
+  });
+  try {
+    const r = runProbeSpec({
+      entry: "fence:doc.md#Block",
+      slot: "<slot>",
+      cases: [
+        fenceCase("f.lock", "hostile", "mkdir -p locked && chmod 000 locked", {
+          expected: { exit: 0, stdout: "ok\n", absent: ["pwned"] },
+        }),
+      ],
+      repoRoot: root,
+    });
+    assert.equal(r.cases.length, probeShells().length, JSON.stringify(r.cases));
+    for (const row of r.cases) {
+      assert.equal(row.outcome, "rejected", JSON.stringify(row));
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("compareExpected: a path the run left unreadable — a symlink loop, a mode-000 ancestor — is a mismatch, never a throw (QA1-4)", () => {
+  const run = { stdout: "", stderr: "", status: 0 };
+  const loop = mkdtempSync(join(tmpdir(), "t232-eloop-"));
+  try {
+    symlinkSync("loop", join(loop, "loop"));
+    assert.deepEqual(
+      compareExpected({ exit: 0, absent: ["loop/x"] }, run, loop),
+      ["loop/x could not be read (ELOOP)"],
+    );
+    assert.deepEqual(
+      compareExpected({ exit: 0, removed: ["loop/x"] }, run, loop),
+      ["loop/x could not be read (ELOOP)"],
+    );
+  } finally {
+    rmSync(loop, { recursive: true, force: true });
+  }
+  // Root reads through mode 000, so the EACCES half has nothing to measure there.
+  if (process.getuid?.() === 0) return;
+  const locked = mkdtempSync(join(tmpdir(), "t232-eacces-"));
+  try {
+    mkdirSync(join(locked, "locked"));
+    chmodSync(join(locked, "locked"), 0o000);
+    assert.deepEqual(
+      compareExpected({ exit: 0, absent: ["locked/x"] }, run, locked),
+      ["locked/x could not be read (EACCES)"],
+    );
+  } finally {
+    chmodSync(join(locked, "locked"), 0o700);
+    rmSync(locked, { recursive: true, force: true });
   }
 });
