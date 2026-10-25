@@ -240,13 +240,30 @@ takes it.
   argv, never as a string, stdin closed, `sandboxEnv()` plus `LC_ALL=C`. A sink
   the corpus marks *materialised* (`MATERIALISED_SINKS`; today `filename`) is
   written to a fixture directory beside its bracketing controls, and the case's
-  `expected` — stdout, exit, stderr, paths that must be absent — is what the run
-  is compared against. Same case loop, same verdict, same record, and each
+  `expected` — stdout, exit, stderr, and the `absent` and `removed` path lists
+  below — is what the run is compared against. Same case loop, same verdict, same record, and each
   (case, shell) run is one executed probe. **A bash boundary that was recorded
   `boundary: false` because it had no export was the task.121 failure** (five
   gates at `probes_executed: 0` against a script that says it refuses rather
   than guesses); the shell form is what removes that reason for zero. It does
   not soften the guard: zero executed is still `unverifiable`.
+
+  **`expected.absent` and `expected.removed` take paths relative to the case
+  directory**, on every form that reads `expected` (task.232). `/` separates
+  segments; an empty path, `.`, a `..` segment, an absolute path and NUL are
+  refused. `absent` names a path that must not exist after the run — a side
+  effect. `removed` names a path the case's own fixture creates and the run must
+  delete — a cleanup; a run that leaves it mismatches as `<path> was not removed`.
+  Neither compares anything alone (a script that deletes everything satisfies
+  both), so a case still states stdout, exit or stderr. A case is **declined,
+  never scored**, when an `absent` path is one the fixture creates or a directory
+  above one (it exists before the run: BUG-13's shape), when it lies beneath a
+  file the fixture creates (it can never exist), or when a `removed` path is not
+  one the fixture creates (it would pass with nothing removed). `absent` is
+  compared case-folded, because a fold can only decline more; `removed` is
+  compared exactly, because a fold would accept `foo` against a fixture `Foo`.
+  A path whose ancestor resolves outside the case directory — a planted symlink —
+  is a mismatch, and nothing is read through it.
 
   **`shell-fn:path#function` sources a library and calls the function** with the
   case's input as its argv, per case under the same shells, with rc files off

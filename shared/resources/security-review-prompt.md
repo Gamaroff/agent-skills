@@ -103,7 +103,9 @@ answer to a question nobody asked.
   `--entry 'shell:<path>'` (and a materialised sink such as `filename`); a bash script taking
   **several arguments or flags** with `--entry 'shell-argv:<path>' --argv '["--flag","{input}"]'`,
   plus `--fixture-setup <setup.sh>` when it needs a scratch repository (a setup that fails is
-  `errored`, never a refusal); a **sourced library** — a
+  `errored`, never a refusal), asserting a side effect with `expected.absent: ["dir/file"]` and a
+  cleanup with `expected.removed` (paths the case's `fixture.files` creates, relative to the case
+  directory, no `..`; the same on `cli:` and `fence:`, task.232); a **sourced library** — a
   header that says *source it*, or functions with no top-level call (the signal is stated once in
   `probe-boundary-rule.md` §5) — with `--entry 'shell-fn:<path>#<function>' --cases-file
   <cases.json>`, plus `--fake-gh <dir>` when the function's body names `gh`. "It is not JS" is
