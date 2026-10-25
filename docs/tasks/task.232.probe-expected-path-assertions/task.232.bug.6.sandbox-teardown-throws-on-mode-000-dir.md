@@ -4,7 +4,7 @@
 **Bug ID**: TASK-232-BUG-6
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 2; diff review CR-1, reproduced by QA)
 **Date Found**: 2026-10-25
 
@@ -58,3 +58,4 @@ New `removeSandbox(root)`: on EACCES/EPERM it walks the sandbox with `lstat` (ne
 | ---- | ------ | ---------- | ----- |
 | 2026-10-25 | New | qa-task | Found in QA cycle 2 |
 | 2026-10-25 | Ready for QA | qa-fix | qa-fix cycle 2 |
+| 2026-10-25 | Closed | qa-task | Verified by task.232.qa.3.probe-expected-path-assertions.md |
