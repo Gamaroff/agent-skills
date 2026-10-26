@@ -342,17 +342,17 @@ None identified.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.165.qa.1.task-164-deferred-follow-ups.md](./task.165.qa.1.task-164-deferred-follow-ups.md)
-- **Gate File**: [task.165.gate.1.task-164-deferred-follow-ups.yml](./task.165.gate.1.task-164-deferred-follow-ups.yml)
+- **Full Report**: [task.165.qa.2.task-164-deferred-follow-ups.md](./task.165.qa.2.task-164-deferred-follow-ups.md)
+- **Gate File**: [task.165.gate.2.task-164-deferred-follow-ups.yml](./task.165.gate.2.task-164-deferred-follow-ups.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 6392
-- **Phases Verified**: 5/5
+- **Phases Verified**: 4/5
 - **Critical Issues**: 0
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-One MEDIUM finding (QA-1): the two review-skill gates are boundaries that refuse silently, so the `fence:` probe declined every hostile case and no probe executed. Two LOW prose findings (QA-2, QA-3). 8/8 mutation proofs re-run and red.
+Cycle 1's findings are all fixed, and the `fence:` probe now executes 20 cases with 0 escapes. The cycle-2 refute pass found two MEDIUM findings in the review-task gate. QA2-1: the prose says the orchestrator HALTs on a failed verdict, but it decides on status. QA2-2: a helper failure on the pass branch holds the lock without the refusal line. Four LOW findings are advisory.
 
 ## Change Log
 
@@ -364,6 +364,8 @@ One MEDIUM finding (QA-1): the two review-skill gates are boundaries that refuse
 | 2026-10-26 |         | Implemented — 9 authored files (+ bundled copies), 1 new test file; 8 mutations proven red | develop-task (inline) |
 | 2026-10-26 |         | QA gate CONCERNS (90/100) — 3 findings (1 medium, 2 low) | qa-task |
 | 2026-10-26 |         | QA findings fixed — cycle 1, 3 findings (refusal line + fence: probe fixtures, in-progress wording, heading) | qa-fix |
+| 2026-10-26 |         | QA gate CONCERNS (90/100) — 2 findings (2 medium) | qa-task |
+| 2026-10-26 |         | QA findings fixed — cycle 2, 2 findings (held lock read off the lock after the call; gate prose scoped to what the verdict can tell) | qa-fix |
 
 <!-- change-log-end -->
 

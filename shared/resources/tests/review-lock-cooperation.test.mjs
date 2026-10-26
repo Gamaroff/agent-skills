@@ -32,6 +32,9 @@ const SKILLS = [
       ["READY TO IMPLEMENT", "ready-for-development", 3],
       ["NEEDS REVISION", "planned", 2],
       ["REQUIRES REWORK", "planned", 2],
+      // A NEEDS REVISION task Step 9 promoted: the orchestrator proceeds and advances it itself, but
+      // the verdict alone cannot tell it from a task review-task is about to HALT on (QA2-1).
+      ["NEEDS REVISION", "ready-for-development", 2],
       // A READY review that a blocking sign-off or Change Log kept at planned.
       ["READY TO IMPLEMENT", "planned", 2],
       // A READY review of a task already in progress: the orchestrator's own advance moves it.
@@ -45,6 +48,7 @@ const SKILLS = [
       ["GO", "ready-for-development", 3],
       ["NO-GO (Revision)", "draft", 2],
       ["NO-GO (Rework)", "draft", 2],
+      ["NO-GO (Revision)", "ready-for-development", 2],
       // A GO that a blocking sign-off kept at draft: develop-story Step 2 HALTs on it.
       ["GO", "draft", 2],
       // A GO on a story already in progress: develop-story proceeds and advances the lock itself.
@@ -53,7 +57,7 @@ const SKILLS = [
   },
 ];
 
-function consumerRoot(status) {
+function consumerRoot(status, { skills = path.join(ROOT, "skills") } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "t165-review-lock-"));
   fs.mkdirSync(path.join(dir, ".claude/state"), { recursive: true });
   fs.writeFileSync(
@@ -61,7 +65,7 @@ function consumerRoot(status) {
     JSON.stringify({ skill: "develop-task", current_step: 2 }) + "\n",
   );
   fs.mkdirSync(path.join(dir, ".agents"));
-  fs.symlinkSync(path.join(ROOT, "skills"), path.join(dir, ".agents/skills"));
+  fs.symlinkSync(skills, path.join(dir, ".agents/skills"));
   const doc = path.join(dir, "work-item.md");
   fs.writeFileSync(
     doc,
@@ -133,5 +137,49 @@ test("each review skill's block is a no-op without a lock", () => {
         fs.rmSync(dir, { recursive: true, force: true });
       }
     }
+  }
+});
+
+// A passing review whose advance the helper itself cannot make holds the lock, and that held lock
+// prints the refusal line too: it is read off the lock after the call, not off the branch (QA2-2).
+test("each review skill's block prints the refusal line when the helper cannot advance the lock", () => {
+  const empty = fs.mkdtempSync(path.join(os.tmpdir(), "t165-no-skills-"));
+  try {
+    for (const { skill, doc: docSlot, cases } of SKILLS) {
+      const block = blockBy(
+        readDoc(`skills/${skill}/SKILL.md`),
+        `--skill ${skill}`,
+      );
+      const [pass] = cases[0];
+      for (const [why, opts, corrupt] of [
+        ["helper missing", { skills: empty }, false],
+        ["corrupt lock", {}, true],
+      ]) {
+        const { dir, doc } = consumerRoot("ready-for-development", opts);
+        try {
+          if (corrupt) fs.writeFileSync(path.join(dir, LOCK), "{not json\n");
+          const before = fs.readFileSync(path.join(dir, LOCK), "utf8");
+          const r = run(
+            "bash",
+            bind(block, { "{outcome}": pass, [docSlot]: doc }),
+            { cwd: dir },
+          );
+          assert.equal(r.status, 0, r.stdout + r.stderr);
+          assert.equal(
+            fs.readFileSync(path.join(dir, LOCK), "utf8"),
+            before,
+            `${skill} (${why}): the lock changed`,
+          );
+          assert.ok(
+            refusal(skill).test(r.stdout),
+            `${skill} (${why}): refusal line missing (stdout: ${JSON.stringify(r.stdout)})`,
+          );
+        } finally {
+          fs.rmSync(dir, { recursive: true, force: true });
+        }
+      }
+    }
+  } finally {
+    fs.rmSync(empty, { recursive: true, force: true });
   }
 });

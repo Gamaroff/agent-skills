@@ -2879,23 +2879,27 @@ This skill uses:
 
 When this skill is invoked as a step in a develop pipeline, advance the pipeline lock as the **last
 action** before returning, so the orchestrator's next turn does not depend on model discipline —
-**only when the review passed**: the verdict is GO and Step 10 promoted the story to
-`ready-for-development`. On NO-GO, leave the lock where it is: `/develop-story` Step 2 HALTs on a
-story left at Draft, and a lock already at 3 would let the Stop hook or a resume send the run to
-Step 3 (develop) on a story that failed review. A GO that did not promote leaves the lock as well:
-on a story a blocking sign-off kept at Draft, `/develop-story` Step 2 HALTs; on a story already
-`in-progress` it proceeds, and its own Step 2 → 3 advance moves the lock (task 165). When a lock
-exists and the block does not advance it, it says so in one line, so the refusal is visible in the
-transcript and a probe can tell it from a block that never ran.
+**only on a GO whose story now reads `ready-for-development`**. That is the one case this block
+can tell will proceed. `/develop-story` Step 2 decides on the post-review status, not the verdict: a
+story left at Draft HALTs, and one already `in-progress` proceeds. A lock already at 3 on a HALT
+would let the Stop hook or a resume send the run to Step 3 (develop). So every other case, a NO-GO
+or a GO a blocking sign-off kept at Draft, leaves the lock where it is, and the orchestrator's own
+Step 2 → 3 advance moves it on the runs that proceed (task 165). Whenever a lock exists and is still
+below 3 after the block, the block says so in one line, whatever the reason. The refusal is visible
+in the transcript, and a probe can tell it from a block that never ran.
 
 ```bash
 # {outcome}: this review's verdict (GO / NO-GO (Revision) / NO-GO (Rework)).
 # {story-file}: the story document this review just updated.
-if [ -f .claude/state/develop-pipeline.lock ] && [ "{outcome}" = "GO" ] \
-  && grep -qE '^status:[[:space:]]*ready-for-development[[:space:]]*$' "{story-file}"; then
-  bash .agents/skills/review-story/references/advance-pipeline-lock.sh --skill review-story 2>/dev/null || true
-elif [ -f .claude/state/develop-pipeline.lock ]; then
-  echo "review-story: pipeline lock not advanced — the review did not pass (GO) or did not promote the story to ready-for-development"
+if [ -f .claude/state/develop-pipeline.lock ]; then
+  if [ "{outcome}" = "GO" ] \
+    && grep -qE '^status:[[:space:]]*ready-for-development[[:space:]]*$' "{story-file}"; then
+    bash .agents/skills/review-story/references/advance-pipeline-lock.sh --skill review-story || true
+  fi
+  # Held is read off the lock itself, after the call, not off the branch taken: a helper that is
+  # missing, finds no jq, or meets a corrupt lock holds it too, and says why on stderr.
+  grep -qE '"current_step"[[:space:]]*:[[:space:]]*([3-9]|[1-9][0-9]+)' .claude/state/develop-pipeline.lock \
+    || echo "review-story: pipeline lock not advanced — the verdict is not a pass, the story is not ready-for-development, or the helper could not advance it; the orchestrator's Step 2 decides whether the run proceeds"
 fi
 ```
 

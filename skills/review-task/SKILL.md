@@ -2325,23 +2325,29 @@ This skill uses:
 ## Pipeline Lock Cooperation (when invoked by `/develop-task`)
 
 When this skill is invoked as a step in a develop pipeline, advance the pipeline lock as the **last
-action** before returning — **only when the review passed**: the recommendation is READY TO
-IMPLEMENT and Step 9 promoted the task to `ready-for-development`. On NEEDS REVISION or REQUIRES
-REWORK, leave the lock where it is: the orchestrator's Step 2 HALTs on those outcomes, and a lock
-already at 3 would let the Stop hook or a resume send the run to Step 3 (develop) on a task that
-failed review. A READY review that did not promote (a blocking sign-off or Change Log withheld it)
-leaves the lock too; the orchestrator's own Step 2 → 3 advance covers the case it proceeds on.
-When a lock exists and the block does not advance it, it says so in one line, so the refusal is
-visible in the transcript and a probe can tell it from a block that never ran.
+action** before returning — **only on a READY TO IMPLEMENT review whose task now reads
+`ready-for-development`**. That is the one case this block can tell will proceed. The orchestrator's
+Step 2 decides on the post-review status, not the verdict, so a NEEDS REVISION task that Step 9
+promoted once the Step 8.5 fixes were enough proceeds too. But from the verdict alone this block
+cannot tell that task from one review-task is about to HALT on, and a lock already at 3 on a HALT
+would let the Stop hook or a resume send the run to Step 3 (develop). So every other case leaves the
+lock where it is, and the orchestrator's own Step 2 → 3 advance moves it on the runs that proceed.
+Whenever a lock exists and is still below 3 after the block, the block says so in one line, whatever
+the reason. The refusal is visible in the transcript, and a probe can tell it from a block that
+never ran.
 
 ```bash
 # {outcome}: this review's recommendation (READY TO IMPLEMENT / NEEDS REVISION / REQUIRES REWORK).
 # {task-file}: the task document this review just updated.
-if [ -f .claude/state/develop-pipeline.lock ] && [ "{outcome}" = "READY TO IMPLEMENT" ] \
-  && grep -qE '^status:[[:space:]]*ready-for-development[[:space:]]*$' "{task-file}"; then
-  bash .agents/skills/review-task/references/advance-pipeline-lock.sh --skill review-task 2>/dev/null || true
-elif [ -f .claude/state/develop-pipeline.lock ]; then
-  echo "review-task: pipeline lock not advanced — the review did not pass (READY TO IMPLEMENT) or did not promote the task to ready-for-development"
+if [ -f .claude/state/develop-pipeline.lock ]; then
+  if [ "{outcome}" = "READY TO IMPLEMENT" ] \
+    && grep -qE '^status:[[:space:]]*ready-for-development[[:space:]]*$' "{task-file}"; then
+    bash .agents/skills/review-task/references/advance-pipeline-lock.sh --skill review-task || true
+  fi
+  # Held is read off the lock itself, after the call, not off the branch taken: a helper that is
+  # missing, finds no jq, or meets a corrupt lock holds it too, and says why on stderr.
+  grep -qE '"current_step"[[:space:]]*:[[:space:]]*([3-9]|[1-9][0-9]+)' .claude/state/develop-pipeline.lock \
+    || echo "review-task: pipeline lock not advanced — the verdict is not a pass, the task is not ready-for-development, or the helper could not advance it; the orchestrator's Step 2 decides whether the run proceeds"
 fi
 ```
 
