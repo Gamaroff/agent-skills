@@ -34,7 +34,7 @@ Contain and ratchet test temp-dir leaks, make the observation-log resolver tests
 | 1. create-branch           | ✅ Done    | Branch `feature/task.231.*` exists in git                              | Branch created at `d44cd59f` | —                    | 2026-10-26T05:38Z |
 | 2. review-task             | ✅ Done    | `task.231.review.{N}.{name}.md` exists (or skip logged)                | `task.231.review.1.test-infrastructure-hygiene.md` — READY TO IMPLEMENT 8/10; 3 Important fixed | —                    | 2026-10-26T05:40Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; 22/22; npm test 0 fail, ratchet ok; 5 mutation proofs held | —                    | 2026-10-26T06:21Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #752: https://github.com/Gamaroff/agent-skills/pull/752 | —                    | 2026-10-26T06:22Z |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.231.qa.{N}.*.md`; `task.231.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.231.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
@@ -84,7 +84,7 @@ Contain and ratchet test temp-dir leaks, make the observation-log resolver tests
   - The `{ prefix: count }` maps were identical except one name, `eval-repeat-hang-<6>`: `evals/shared/runner.mjs:87` names its dir `eval-${scenarioName}-` after a scenario whose own name carries `repeat.test.mjs:317`'s `repeat-hang-` suffix. Decision: key the ratchet on **counts**, and strip that inner six-character `mkdtemp`-shaped suffix in `prefixOf` (unit-tested, with `carry-5c-remote` as the real-word control).
   - Both runs' rc 1 was one test, `skills/session-handoff/tests/handoff-verify.test.js:1843` ("obs #1: resolveObservationWorkspace … refusal"). It assumes `os.tmpdir()` is ephemeral, and the measurement's `~/.cache` TMPDIR is not. That is an artefact of the measurement, not a base failure: the wrapper's per-run dir sits under the system tmpdir (`/tmp`), as review O2 predicted. Confirmed by the full wrapper run below.
   - **Escapes traced** (`comm -13` of `/tmp` listings around each run): `pipeline-hold-*` ×2 per run comes from `shared/resources/tests/step-4-leak-check.test.mjs` running Step 4's guard block, which does `mktemp -d /tmp/pipeline-hold-XXXXXX`, a fixed `/tmp` that no TMPDIR reaches. `review-pr-comment.*.md` ×1 comes from `skills/review-pr/tests/review-pr.test.js` Step 8 sandbox, whose `env` omits TMPDIR, so `mktemp -t` fell back to `/tmp`. Both are fixed in the tests: the hold dir is read back from `step4-hold-dir.txt` and removed after the file's tests, and the sandbox passes `TMPDIR: dir`. The shipped blocks are unchanged.
-  - **markdown-link-check@3.15.0 does not detect a dead cross-file fragment** (fixture `other.md#nope` reads ✓); it does catch a same-file `#nope-here`. So the `doc-links.js` CI step is not redundant.
+  - **`markdown-link-check@3.15.0` does not detect a dead cross-file fragment** (fixture `other.md#nope` reads ✓); it does catch a same-file `#nope-here`. So the `doc-links.js` CI step is not redundant.
   - `/tmp` before the work: 13% inodes (129,799 / 1,048,576), 5,520 entries (`df -i /tmp`, `ls /tmp | wc -l`).
 - **Anchor corpus**: 3,795 tracked `.md` files; 381 fragments checked; **0 dead**. A first pass reported 2, both `skills/develop-next/SKILL.md` → `#find-the-items-merged-pr`. That heading sits inside a list item (`    #### …`), which GitHub renders and anchors, so a 0–3-space ATX rule was a false positive. Decision: accept any indent and blockquoted headings. Over-reading can only let a dead fragment pass; under-reading fails a live one. `KNOWN_ANCHORS` and `KNOWN_ARTIFACT_ANCHORS` are seeded empty from that measurement.
 - **Anchor walk scope** — decision: repo-wide, not `docs/` only. Only 6 of the 381 fragments are under `docs/`, so a docs-only walk would hold a non-vacuity floor of six. Floor set at 300.
@@ -111,7 +111,15 @@ Contain and ratchet test temp-dir leaks, make the observation-log resolver tests
 - `traps.md`: the suite-list trap now names `test:suite`.
 - Step 3 inline — /develop not invoked: the plan file named every mechanism's shape and the surface map located every hunk, so `/develop` would only re-read them. The Task Completion Checklist was satisfied inline: boxes ticked, status set, one `develop` Change Log row, tests run.
 - Loop audit iter 1 (Explore): `{"status":"ready-for-review","completed":22,"total":22}`. Loop exited after 1 iteration.
-- Development completion comment posted to GitHub issue #741 (`develop-complete`, count=22): `posted`. Its segment count was stale (it said 10; measured 17: 16 `bash` + 1 `node`, with the command quoted in the trap). A new `df -i /tmp` triage trap was added.
+- Development completion comment posted to GitHub issue #741 (`develop-complete`, count=22): `posted`.
+
+### Step 4 — create-pr — 2026-10-26
+
+- SCOPE_PATHS: 26 dirs and files from the scope-derivation block, plus `scripts/test-tmpdir.mjs` added by hand. `scripts/` had no tracked change, so the guard would otherwise have held the new wrapper out of the commit (the block's documented "pass its directory as an extra `--scope`" case).
+- Pre-flight guard: nothing held. Report and review link-checked (`doc-links.js`: ok).
+- Base pre-supplied: develop. Committed as four logical commits (`1d396d41` wrapper and leak fixes, `38f3bec6` anchors, `34572036` parity and worktree, `ef826cee` docs), with the scope honoured by explicit paths. The leak check over all four commits found no LEAK lines. Pushed.
+- PR body written from the run's own evidence (the summariser subagent was not dispatched: every figure is already in this report).
+- PR created: https://github.com/Gamaroff/agent-skills/pull/752 (state OPEN). Issue #741 `in-review` comment: `posted`. Board in-review: `stage-disabled`. Lock `pr_url` and develop-next `prNumber` are recorded. Its segment count was stale (it said 10; measured 17: 16 `bash` + 1 `node`, with the command quoted in the trap). A new `df -i /tmp` triage trap was added.
 
 ---
 
@@ -134,7 +142,7 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: feature/task.231.test-infrastructure-hygiene
-**PR**: {populated after Step 4}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/752
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
