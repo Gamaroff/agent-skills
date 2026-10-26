@@ -1,0 +1,64 @@
+schema: 2
+task: 'task.165.task-164-deferred-follow-ups'
+task_title: "Close task.164's deferred follow-ups"
+gate: PASS
+status_reason: 'QA4-1 is fixed: the decoy-arm test asserts on the parsed mapping arms, the relationship-assertion lint passes, and ci:fast is green (6394 tests, 0 fail). The decoy test is mutation-proven. The scoped review returned the same three advisory findings as cycle 4, none high-confidence.'
+reviewer: 'QA Engineer'
+head: '800f721913f1e9cfb4dc463eb44007dd35189601'
+updated: '2026-10-26T16:37:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 6394
+  phases_verified: 5/5
+  ci: 'SUCCESS @ 800f7219 (6 checks)'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false this cycle. The only code change since gate 3 is a test file. The review-skill gates are unchanged since gate 3 (22 probes, 0 escaped) and dod.1 (22 probes, 0 reproduced).'
+  performance:
+    status: PASS
+    notes: '4b meta-test re-measured at the DoD on d774d71a: 11.230s at base, 0.397s at head. No runtime change since.'
+  reliability:
+    status: PASS
+    notes: 'No runtime code changed.'
+  maintainability:
+    status: PASS
+    notes: 'The decoy test holds AC3/AC8 with a loose-anchor control and is lint-clean.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 (cycles 4-5, medium/medium; was cycle-2 CR-6): give namesSkill positive controls so the HALT-pin refusal loop cannot pass vacuously.'
+      refs: ['shared/resources/tests/step-8-completion-checklist.test.mjs']
+    - action: 'CR-2 (cycles 4-5, low/low): anchor the hook-floor check to the NEXT=8 branch of develop-pipeline-on-stop.sh.'
+      refs: ['shared/resources/tests/step-8-completion-checklist.test.mjs', 'shared/resources/develop-pipeline-on-stop.sh']
+    - action: 'CR-3 (cleanup): the `/?` and the hyphen escape in namesSkill are redundant; drop them or comment why.'
+      refs: ['shared/resources/tests/step-8-completion-checklist.test.mjs']
+    - action: 'Carried from gate 3: frontmatter-only status read in both review gates (0/632 corpus hits); review-story Step 10 field; unset ADVANCE_LOCK_TEST_4B_ONLY for test:suite.'
+      refs: ['skills/review-task/SKILL.md', 'skills/review-story/SKILL.md', 'package.json']
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: '2026-10-26'
+  total_iterations: 1
+  verification_method: 'relationship-assertion lint 31/31, ci:fast green, decoy mutation red, CI SUCCESS on 800f7219'
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

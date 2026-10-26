@@ -335,24 +335,24 @@ None identified.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-26
-**Quality Score**: 80/100
-**Gate Decision**: FAIL
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.165.qa.4.task-164-deferred-follow-ups.md](./task.165.qa.4.task-164-deferred-follow-ups.md)
-- **Gate File**: [task.165.gate.4.task-164-deferred-follow-ups.yml](./task.165.gate.4.task-164-deferred-follow-ups.yml)
+- **Full Report**: [task.165.qa.5.task-164-deferred-follow-ups.md](./task.165.qa.5.task-164-deferred-follow-ups.md)
+- **Gate File**: [task.165.gate.5.task-164-deferred-follow-ups.yml](./task.165.gate.5.task-164-deferred-follow-ups.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 6394
 - **Phases Verified**: 5/5
-- **Critical Issues**: 1
+- **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-The DoD-gap fix closes AC3 and AC8 and is mutation-proven. However, its assertion fails the repository's relationship-assertion lint, so the suite is red (QA4-1, high). Three advisory review findings are routed to future work.
+DoD gaps AC3 and AC8 are closed by the decoy-arm test, which is mutation-proven and lint-clean. `ci:fast` and CI are green. Three advisory findings are routed to future work: positive controls for `namesSkill`, anchoring the hook-floor check to its branch, and a redundant `/?`.
 
 ## Definition of Done - Gaps Identified
 
@@ -401,6 +401,7 @@ The DoD-gap fix closes AC3 and AC8 and is mutation-proven. However, its assertio
 | 2026-10-26 |  | Status → in-progress | qa-task |
 | 2026-10-26 |  | QA findings fixed — cycle 4, 1 finding (the decoy test asserts on the parsed mapping arms; relationship-assertion lint green) | qa-fix |
 | 2026-10-26 |  | Status → ready-for-review | qa-fix |
+| 2026-10-26 |  | QA gate PASS (100/100) — 0 findings (3 advisory) | qa-task |
 
 ---
 <!-- change-log-end -->
