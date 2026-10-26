@@ -852,14 +852,36 @@ function isEmptyCell(cell) {
  * where the new value fits — the cell's total width. The one implementation of
  * the width rule: the tick path and the annotate path both call it.
  * A cell that grows keeps one trailing space so the pipe stays separated.
+ * Width is DISPLAY width (`displayWidth`), not `.length`: `⚠️` is two UTF-16
+ * code units and `✅` one, but both show two columns wide, so a `.length` pad
+ * shifted the pipe by a column on every icon swap.
  */
 function setCell(cells, i, value) {
   const cell = cells[i];
   const lead = cell.match(/^\s*/)[0];
   const trailLen = cell.match(/\s*$/)[0].length;
   const core = `${lead}${value}`;
-  const pad = trailLen === 0 ? 0 : Math.max(1, cell.length - core.length);
+  const pad =
+    trailLen === 0 ? 0 : Math.max(1, displayWidth(cell) - displayWidth(core));
   cells[i] = core + " ".repeat(pad);
+}
+
+/**
+ * The columns `s` occupies in a monospace view: 2 for an emoji-presentation
+ * grapheme cluster (an `Emoji_Presentation` code point, or an
+ * `Extended_Pictographic` one followed by VS16), 1 for any other cluster.
+ * Joiners and marks belong to their cluster, so they add nothing. ASCII is one
+ * column per character, exactly `.length`. East Asian Wide/Fullwidth is not
+ * counted as 2: V8's regex has no `East_Asian_Width` property.
+ */
+const GRAPHEMES = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+const WIDE_CLUSTER_RE = /\p{Emoji_Presentation}|\p{Extended_Pictographic}️/u;
+function displayWidth(s) {
+  let width = 0;
+  for (const { segment } of GRAPHEMES.segment(s)) {
+    width += WIDE_CLUSTER_RE.test(segment) ? 2 : 1;
+  }
+  return width;
 }
 
 /**
