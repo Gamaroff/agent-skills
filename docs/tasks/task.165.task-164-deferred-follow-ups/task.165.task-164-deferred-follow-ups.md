@@ -5,10 +5,12 @@ type: task
 description: "Close the eight LOW items task.164 carried: tighten the banner doc's Exception 2 wording (mapping citation, Step {N+1} contrast, grammar, Steps 5–6 HALT), make the HALT pin and hook floor match what they claim, cut the 4b meta-test's cost, give review-task the lock-cooperation block its --skill mapping assumes, and gate both review skills' advance on a passing review."
 tags: [develop-pipeline, remaining-work-banner, stop-hook, advance-pipeline-lock, review-task, follow-up]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Low
 created: 2026-09-28
 updated: 2026-10-26
+completed_date: 2026-10-26
+pr_number: 757
 assignee:
 estimated_effort_hours: 8
 github_issue: 509
@@ -16,7 +18,7 @@ github_issue: 509
 
 # Technical Task: Close task.164's deferred follow-ups
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.165.review.1.task-164-deferred-follow-ups.md` implemented 2026-10-26
 
@@ -354,9 +356,9 @@ None identified.
 ### Key Findings
 DoD gaps AC3 and AC8 are closed by the decoy-arm test, which is mutation-proven and lint-clean. `ci:fast` and CI are green. Three advisory findings are routed to future work: positive controls for `namesSkill`, anchoring the hook-floor check to its branch, and a redundant `/?`.
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 1 (historical, superseded)
 
-**Status:** IN PROGRESS
+**Status:** SUPERSEDED. Both gaps were closed by `9dd5d892` and `800f7219` (the decoy-arm test), re-gated PASS at gate 5 and accepted by DoD run 2 (`task.165.dod.2.task-164-deferred-follow-ups.md`). Kept as history.
 
 ### QA Gate Status
 
@@ -367,14 +369,14 @@ DoD gaps AC3 and AC8 are closed by the decoy-arm test, which is mutation-proven 
 
 ### Missing Criteria:
 
-- [ ] AC3 (Functional, "a decoy `NEXT=` arm elsewhere in the script is not read"): no per-PR test holds it. The live pin asserts only ≥ 5 entries and `finalise → 8`, which the old first-`--skill)` anchor would also pass. The decoy clause was proven only by the one-off mutation M4 in an uncommitted scratch script.
-- [ ] AC8 (Code Quality, "each Phase 5 mutation behaves as stated"): mutation M4 (the decoy `x) NEXT=9` arm) has no lasting test. It shares AC3's root cause.
+- [x] AC3 (Functional, "a decoy `NEXT=` arm elsewhere in the script is not read"): no per-PR test holds it. The live pin asserts only ≥ 5 entries and `finalise → 8`, which the old first-`--skill)` anchor would also pass. The decoy clause was proven only by the one-off mutation M4 in an uncommitted scratch script.
+- [x] AC8 (Code Quality, "each Phase 5 mutation behaves as stated"): mutation M4 (the decoy `x) NEXT=9` arm) has no lasting test. It shares AC3's root cause.
 
 ### Next Steps:
 
-- [ ] Add a test to `shared/resources/tests/step-8-completion-checklist.test.mjs` that runs `SKILL_MAPPING` against a scratch copy of `advance-pipeline-lock.sh` with a decoy `x) NEXT=9` arm in the early-exit `--skill)` branch. Assert that the decoy is not read, and that the old first-`--skill)` anchor would read it.
-- [ ] Mutation-prove it: revert the anchor and confirm the test goes red, with a `cmp`-checked restore
-- [ ] The fix changes code, so the resume re-enters QA at 5a. Then re-run `/finalise`
+- [x] Add a test to `shared/resources/tests/step-8-completion-checklist.test.mjs` that runs `SKILL_MAPPING` against a scratch copy of `advance-pipeline-lock.sh` with a decoy `x) NEXT=9` arm in the early-exit `--skill)` branch. Assert that the decoy is not read, and that the old first-`--skill)` anchor would read it.
+- [x] Mutation-prove it: revert the anchor and confirm the test goes red, with a `cmp`-checked restore
+- [x] The fix changes code, so the resume re-enters QA at 5a. Then re-run `/finalise`
 
 **Estimated Effort:** Small: one test of about 30 lines, plus one QA cycle
 
@@ -382,6 +384,28 @@ DoD gaps AC3 and AC8 are closed by the decoy-arm test, which is mutation-proven 
 **QA Gate Reference**: See `task.165.gate.3.task-164-deferred-follow-ups.yml`
 
 **Detailed Verification Log:** See `task.165.dod.1.task-164-deferred-follow-ups.md` for the complete verification evidence, including the AC6 re-measure on the PR head (base 11.2s → head 0.40s).
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.165.qa.5.task-164-deferred-follow-ups.md`
+**Gate File**: `task.165.gate.5.task-164-deferred-follow-ups.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (5 QA cycles; cycles 4–5 followed the run-1 DoD gaps re-entry)
+
+All Definition of Done criteria have been verified (DoD run 2):
+
+✅ **Acceptance Criteria:** 9/9 met. AC3 and AC8, run 1's gaps, are closed by the mutation-proven decoy-arm test. AC6 was re-measured on PR head `9e1bcbc9`: base 3.729s, head 0.251s.
+✅ **Tests & PR:** PR #757. All 6 CI checks are green. The Step 5c `/review-pr` verdict is APPROVE (`task.165.pr-review.2.task-164-deferred-follow-ups.md`).
+✅ **Documentation:** the CHANGELOG [Unreleased] entry cites (task 165). The shared resources and bundled copies are updated.
+✅ **Security Review:** PASS. The review-skill lock gates were probed with 22 cases: 0 reproduced, 0 escaped.
+⚠️ **Compliance Review:** NOT_APPLICABLE. This is internal tooling.
+
+**Task marked as ACCEPTED on:** 2026-10-26
+
+**Detailed Verification Log:** See `task.165.dod.2.task-164-deferred-follow-ups.md` for the complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
@@ -402,6 +426,7 @@ DoD gaps AC3 and AC8 are closed by the decoy-arm test, which is mutation-proven 
 | 2026-10-26 |  | QA findings fixed — cycle 4, 1 finding (the decoy test asserts on the parsed mapping arms; relationship-assertion lint green) | qa-fix |
 | 2026-10-26 |  | Status → ready-for-review | qa-fix |
 | 2026-10-26 |  | QA gate PASS (100/100) — 0 findings (3 advisory) | qa-task |
+| 2026-10-26 | 1.2 | DoD passed — accepted (PR #757); run 2, run-1 gaps closed | finalise |
 
 ---
 <!-- change-log-end -->
@@ -453,7 +478,7 @@ DoD gaps AC3 and AC8 are closed by the decoy-arm test, which is mutation-proven 
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 
