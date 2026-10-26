@@ -5,10 +5,12 @@ type: task
 description: "The done lead says the change is now part of the product and nothing more is needed, but every caller posts it before the pull request is merged; reword it to claim only acceptance, and hold the wording with a test."
 tags: [finalise, observation, stakeholder-summary]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-26
 updated: 2026-10-26
+completed_date: 2026-10-26
+pr_number: 751
 assignee:
 estimated_effort_hours: 8
 github_issue: 749
@@ -16,7 +18,7 @@ github_issue: 749
 
 # Technical Task: Done lead claims a merge that has not happened
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.233.review.1.done-lead-claims-merge.md` implemented 2026-10-26
 **GitHub Issue**: [#749](https://github.com/Gamaroff/agent-skills/issues/749)
 
@@ -339,6 +341,32 @@ None.
 ### Key Findings
 No critical issues identified. The new test is mutation-proved. One low, advisory cleanup (CR-1): the test could also assert acceptance and deny a past-tense release.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.233.qa.1.done-lead-claims-merge.md`
+**Gate File**: `task.233.gate.1.done-lead-claims-merge.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR Review**: `task.233.pr-review.1.done-lead-claims-merge.md` — APPROVE
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 7/7 met
+✅ **Tests:** new test in `shared/resources/tests/stakeholder-summary.test.mjs:134`, mutation-proved; runs per PR
+✅ **PR Review:** PR #751, Step 5c review APPROVE (the host requires no reviews)
+✅ **CI:** SUCCESS over 6 checks on `b9486d02`
+✅ **Documentation:** `stakeholder-summary.md` quotes the new lead in both places; CHANGELOG `[Unreleased]` entry
+✅ **Security Review:** PASS — no secrets, no unsafe patterns, not a boundary
+⚠️ **Compliance Review:** not applicable
+
+**Task marked as ACCEPTED on:** 2026-10-26
+
+**Detailed Verification Log:** See `task.233.dod.1.done-lead-claims-merge.md` for complete verification evidence and timestamps.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -349,6 +377,7 @@ No critical issues identified. The new test is mutation-proved. One low, advisor
 | 2026-10-26 |  | Status → ready-for-development | review-task |
 | 2026-10-26 |  | Implemented — 4 source files (template, test, spec, CHANGELOG), 1 new test; 27 bundled copies regenerated | develop |
 | 2026-10-26 |  | QA gate PASS (100/100) — 0 blocking findings, 1 advisory cleanup | qa-task |
+| 2026-10-26 | 1.2 | DoD passed — accepted (PR #751) | finalise |
 <!-- change-log-end -->
 
 ---
