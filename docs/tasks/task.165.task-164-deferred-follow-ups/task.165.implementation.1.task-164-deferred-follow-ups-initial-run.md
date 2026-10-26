@@ -3,7 +3,7 @@
 **Task**: `task.165.task-164-deferred-follow-ups.md`
 **Run Number**: 1
 **Started**: 2026-10-26 15:00
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -35,9 +35,9 @@ Close the eight LOW items task.164 carried: Exception 2 wording, the HALT pin an
 | 2. review-task             | ✅ Done    | `task.165.review.{N}.{name}.md` exists (or skip logged)                | review.1: READY TO IMPLEMENT 8/10; 0 critical, 4 important fixed | —                    | 2026-10-26T15:03Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | inline from plan; audit 20/20, ready-for-review | —                    | 2026-10-26T15:23Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #757: https://github.com/Gamaroff/agent-skills/pull/757 | —                    | 2026-10-26T15:27Z |
-| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.165.qa.{N}.*.md`; `task.165.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 3 cycles; gate.3 PASS 100; PR review APPROVE (pr-review.1) | —                    | 2026-10-26T16:12Z |
-| 7. finalise                | ⚠️ Needs Attention | `task.165.dod.{N}.*.md`; task `status: accepted`                       | dod.1: GAPS — AC3, AC8 (decoy-arm clause has no lasting test); status unchanged (ready-for-review) | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.165.qa.{N}.*.md`; `task.165.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 5 cycles (4–5 after the finalise DoD-gaps re-entry); gate.5 PASS 100; PR review APPROVE (pr-review.2) | —                    | 2026-10-26T16:45Z |
+| 7. finalise                | ✅ Done    | `task.165.dod.{N}.*.md`; task `status: accepted`                       | dod.1: GAPS (AC3, AC8), closed by QA cycles 4–5; dod.2: ACCEPTED 9/9; status accepted; acceptance commit d97ebb77 | —                    | 2026-10-26T16:52Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | final implementation report committed and pushed | —                    | 2026-10-26T16:53Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -116,7 +116,9 @@ Close the eight LOW items task.164 carried: Exception 2 wording, the HALT pin an
 - QA cycle 2: refute pass reviewer dispatched 15:47:16Z, duration_ms 277529; loop route: continue (not-a-pass-gate; route 2 below-cycle-floor)
 - Narrowing residue — every MEDIUM on gates 1 and 2 names skills/review-task/SKILL.md (QA-1, QA2-1, QA2-2); HIGH 0 on both. Offer passed to qa-fix Step 2.6
 - Cycle 2 qa-fix: findings ingester and pre-fix mapping not dispatched — gate 2 written this session (2 entries), files read this session (independence loss recorded). Post-fix PR state: OPEN
+- QA re-entry after finalise DoD gaps: reenter-qa: re-entered QA at step 5 / qa_phase 5a — qa_max_cycles=5 (base 3), gate_head=239b2eb4aa64. Fix 9dd5d892 adds the decoy-arm test (AC3/AC8), mutation-proven red on the old first-`--skill)` anchor, cmp-checked restore
 - Step 7 finalise: CI reading 1: SUCCESS @ d774d71a (6 checks). Security probe plan run by /finalise: 22 executed, 0 reproduced, 0 escaped (dod.1.security.run.json); the inline cases came from the committed fence-probe fixtures. Decision: GAPS (AC3, AC8). Gaps PR comment issuecomment-6421104715. Lock held at 7 by advance-pipeline-lock --dod
+- Step 7 finalise (run 2): CI reading 1: SUCCESS @ 9e1bcbc90b87 (6 checks); CI reading 2: SUCCESS (tree-equivalent to 9e1bcbc90b87) @ d97ebb77cd1a over 6 checks after 30s. DoD agents: AC PARTIAL (AC6 timing last measured on d774d71a), so AC6 was re-measured on the head: base 54636ed0 3.729s, head 9e1bcbc9 0.251s, load 1.43 (bound ≤ 0.5×, met). Security probe plan: 22 executed, 0 reproduced, 0 escaped (dod.2.security.run.json; cases loaded from the committed fixtures). Compliance N/A, docs PASS. Decision: ACCEPTED. Acceptance commit d97ebb77 carries pr-review.2 (5c review carried) and ticks the registry. Canonical PR comment issuecomment-6421943032. Issue #509: done comment posted, closed and confirmed CLOSED, board `already` Done, doc link already on develop
 - QA cycle 3: scoped re-review (files since gate 2 head accaa295, 19 files); reviewer dispatched 16:03:50Z, duration_ms 114422; qa-task run per the skill text loaded this session (not re-invoked)
 
 ---
@@ -170,14 +172,35 @@ _Track each QA review/fix cycle._
 **Action**: Proceeding to 5c (PR conformance review)
 **Carried to 6a**: docs/tasks/task.165.task-164-deferred-follow-ups/task.165.pr-review.1.task-164-deferred-follow-ups.md
 
+### QA Cycle 4 — 2026-10-26 (re-entry after finalise DoD gaps)
+**Gate Result**: FAIL (80/100)
+**Issues Found**: 1 in the gate. QA4-1 (high): the decoy-arm test from 9dd5d892 failed the relationship-assertion lint (rule A), and ci:fast failed 1 of 6394. There are 3 advisory review findings (namesSkill positive controls, hook-floor branch anchoring, a redundant `/?`), all routed to recommendations.future
+**HIGH findings**: 1
+**MEDIUM findings**: 0
+**Fixes Applied**: the decoy test asserts on the parsed {name, next} arms (`some(isDecoy)`, `some(finalise→8)`). The lint passes 31/31 and the file 65/65. Mutation: SKILL_MAPPING reverted to the first `--skill)` anchor turns the test red; restore checked with cmp
+**Action**: proceeding to 5a (QA cycle 5)
+**Commit**: 800f7219
+
+### QA Cycle 5 — 2026-10-26
+**Gate Result**: PASS (100/100)
+**Issues Found**: 0 in the gate. QA4-1 is fixed (lint 31/31, ci:fast 6394/0 fail, CI 6/6 SUCCESS @ 800f7219). The same 3 advisory findings are routed to recommendations.future
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**Loop exit**: n/a — this exit not taken
+**PR Review**: APPROVE — task.165.pr-review.2.task-164-deferred-follow-ups.md (conformance lens, 1 low finding: PC-1, the stale run-1 gaps section, which /finalise supersedes)
+**Action**: Proceeding to 5c (PR conformance review)
+**Carried to 6a**: docs/tasks/task.165.task-164-deferred-follow-ups/task.165.pr-review.2.task-164-deferred-follow-ups.md
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-10-26T16:53Z
+**Final Status**: Completed
 **Branch**: `feature/task.165.task-164-deferred-follow-ups`
 **PR**: https://github.com/Gamaroff/agent-skills/pull/757
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 5 (cycles 1–3, then 4–5 after the finalise DoD-gaps re-entry)
+**DoD Summary**: `task.165.dod.2.task-164-deferred-follow-ups.md`: ACCEPTED 9/9 (run 1, `task.165.dod.1.*`, found gaps AC3 and AC8)
+**Tracker debt**: none. Issue #509 is closed and confirmed CLOSED, and the board reads Done.
+
+**Completion Summary**: This run implemented all eight of task.164's deferred LOW items. Exception 2 of the remaining-work banner is reworded. The HALT pin now refuses plain-prose relisting and reads the mapping from its own `case`. The hook `--complete` floor checks its bindings by name. The 4b meta-test has an early exit, taking it from 3.7s at base to 0.25s at head. `review-task` now has lock cooperation, and both review skills advance the lock only on a passing review, held by an executed-prose test. QA took five cycles. Gate 3 passed, but the first `/finalise` found that the decoy-arm clause (AC3/AC8) was held only by a one-off mutation. The resume added a lasting test. That test tripped the relationship-assertion lint (gate 4 FAIL), which cycle 4's fix cleared, and gate 5 passed at 100. DoD run 2 accepted, re-measuring AC6 on the PR head. A decision worth noting: the acceptance commit reached CI reading 2 by tree-equivalence (docs-only on a green `9e1bcbc9`), not by its own `test` lane finishing.
