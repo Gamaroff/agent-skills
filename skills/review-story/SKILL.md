@@ -2882,8 +2882,11 @@ action** before returning, so the orchestrator's next turn does not depend on mo
 **only when the review passed**: the verdict is GO and Step 10 promoted the story to
 `ready-for-development`. On NO-GO, leave the lock where it is: `/develop-story` Step 2 HALTs on a
 story left at Draft, and a lock already at 3 would let the Stop hook or a resume send the run to
-Step 3 (develop) on a story that failed review. A GO that did not promote (a blocking sign-off
-withheld it) HALTs there too, so it leaves the lock as well (task 165).
+Step 3 (develop) on a story that failed review. A GO that did not promote leaves the lock as well:
+on a story a blocking sign-off kept at Draft, `/develop-story` Step 2 HALTs; on a story already
+`in-progress` it proceeds, and its own Step 2 → 3 advance moves the lock (task 165). When a lock
+exists and the block does not advance it, it says so in one line, so the refusal is visible in the
+transcript and a probe can tell it from a block that never ran.
 
 ```bash
 # {outcome}: this review's verdict (GO / NO-GO (Revision) / NO-GO (Rework)).
@@ -2891,6 +2894,8 @@ withheld it) HALTs there too, so it leaves the lock as well (task 165).
 if [ -f .claude/state/develop-pipeline.lock ] && [ "{outcome}" = "GO" ] \
   && grep -qE '^status:[[:space:]]*ready-for-development[[:space:]]*$' "{story-file}"; then
   bash .agents/skills/review-story/references/advance-pipeline-lock.sh --skill review-story 2>/dev/null || true
+elif [ -f .claude/state/develop-pipeline.lock ]; then
+  echo "review-story: pipeline lock not advanced — the review did not pass (GO) or did not promote the story to ready-for-development"
 fi
 ```
 

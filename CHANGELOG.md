@@ -11,7 +11,9 @@ All notable changes to this project will be documented in this file. Format foll
   even on a NO-GO, after which `/develop-story` Step 2 HALTed with the lock already pointing at
   develop. `review-task` had no block, so the `review-story|review-task → 3` arm of the `--skill`
   mapping was half true. Both now advance only when the review passed and promoted the document to
-  `ready-for-development`. The new `review-lock-cooperation.test.mjs` runs both blocks as written,
+  `ready-for-development`, and print one line when they hold the lock. The new
+  `review-lock-cooperation.test.mjs` runs both blocks as written, the `fence:` probe scores them
+  (fixtures `t165-review-{task,story}-cases.json`),
   and `pipeline-lock-cooperation.md` names them as gated. Exception 2 of the remaining-work banner
   now says what is true: "not `current_step`", a QA-loop HALT lists `- Steps 5–6:` first, its
   contrast is limited to blocks derived from `current_step`, and the mapping states *where* a

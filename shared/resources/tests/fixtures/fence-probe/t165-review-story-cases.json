@@ -1,0 +1,191 @@
+[
+  {
+    "id": "pass-promoted",
+    "sink": "filename",
+    "input": "GO",
+    "direction": "legitimate",
+    "why": "a passing review that promoted the document",
+    "correct": "the gate calls the advance helper",
+    "fixture": {
+      "files": {
+        ".claude/state/develop-pipeline.lock": "{\"skill\":\"develop-task\",\"current_step\":2}\n",
+        "{story-file}": "---\ntype: task\nstatus: ready-for-development\n---\n",
+        ".agents/skills/review-story/references/advance-pipeline-lock.sh": "#!/usr/bin/env bash\necho ADVANCED\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "ADVANCED\n"
+    }
+  },
+  {
+    "id": "no-lock-standalone",
+    "sink": "filename",
+    "input": "GO",
+    "direction": "legitimate",
+    "why": "standalone run, no pipeline lock",
+    "correct": "nothing runs and nothing prints",
+    "fixture": {
+      "files": {
+        "{story-file}": "---\ntype: task\nstatus: ready-for-development\n---\n",
+        ".agents/skills/review-story/references/advance-pipeline-lock.sh": "#!/usr/bin/env bash\necho ADVANCED\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": ""
+    }
+  },
+  {
+    "id": "fail-outcome",
+    "sink": "filename",
+    "input": "NO-GO (Revision)",
+    "direction": "hostile",
+    "why": "a failing verdict on a document whose status already reads ready-for-development",
+    "correct": "the gate holds the lock and prints its refusal line",
+    "fixture": {
+      "files": {
+        ".claude/state/develop-pipeline.lock": "{\"skill\":\"develop-task\",\"current_step\":2}\n",
+        "{story-file}": "---\ntype: task\nstatus: ready-for-development\n---\n",
+        ".agents/skills/review-story/references/advance-pipeline-lock.sh": "#!/usr/bin/env bash\necho ADVANCED\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "review-story: pipeline lock not advanced — the review did not pass (GO) or did not promote the story to ready-for-development\n"
+    }
+  },
+  {
+    "id": "pass-unpromoted",
+    "sink": "filename",
+    "input": "GO",
+    "direction": "hostile",
+    "why": "a passing verdict the document status does not carry",
+    "correct": "the gate holds the lock and prints its refusal line",
+    "fixture": {
+      "files": {
+        ".claude/state/develop-pipeline.lock": "{\"skill\":\"develop-task\",\"current_step\":2}\n",
+        "{story-file}": "---\ntype: task\nstatus: planned\n---\n",
+        ".agents/skills/review-story/references/advance-pipeline-lock.sh": "#!/usr/bin/env bash\necho ADVANCED\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "review-story: pipeline lock not advanced — the review did not pass (GO) or did not promote the story to ready-for-development\n"
+    }
+  },
+  {
+    "id": "pass-in-progress",
+    "sink": "filename",
+    "input": "GO",
+    "direction": "hostile",
+    "why": "a passing verdict on a document already in progress — the orchestrator advances, not this block",
+    "correct": "the gate holds the lock and prints its refusal line",
+    "fixture": {
+      "files": {
+        ".claude/state/develop-pipeline.lock": "{\"skill\":\"develop-task\",\"current_step\":2}\n",
+        "{story-file}": "---\ntype: task\nstatus: in-progress\n---\n",
+        ".agents/skills/review-story/references/advance-pipeline-lock.sh": "#!/usr/bin/env bash\necho ADVANCED\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "review-story: pipeline lock not advanced — the review did not pass (GO) or did not promote the story to ready-for-development\n"
+    }
+  },
+  {
+    "id": "status-quoted",
+    "sink": "filename",
+    "input": "GO",
+    "direction": "hostile",
+    "why": "a quoted status value",
+    "correct": "the gate holds the lock and prints its refusal line",
+    "fixture": {
+      "files": {
+        ".claude/state/develop-pipeline.lock": "{\"skill\":\"develop-task\",\"current_step\":2}\n",
+        "{story-file}": "---\ntype: task\nstatus: \"ready-for-development\"\n---\n",
+        ".agents/skills/review-story/references/advance-pipeline-lock.sh": "#!/usr/bin/env bash\necho ADVANCED\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "review-story: pipeline lock not advanced — the review did not pass (GO) or did not promote the story to ready-for-development\n"
+    }
+  },
+  {
+    "id": "status-suffixed",
+    "sink": "filename",
+    "input": "GO",
+    "direction": "hostile",
+    "why": "a status that only starts with the promoted token",
+    "correct": "the gate holds the lock and prints its refusal line",
+    "fixture": {
+      "files": {
+        ".claude/state/develop-pipeline.lock": "{\"skill\":\"develop-task\",\"current_step\":2}\n",
+        "{story-file}": "---\ntype: task\nstatus: ready-for-development-ish\n---\n",
+        ".agents/skills/review-story/references/advance-pipeline-lock.sh": "#!/usr/bin/env bash\necho ADVANCED\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "review-story: pipeline lock not advanced — the review did not pass (GO) or did not promote the story to ready-for-development\n"
+    }
+  },
+  {
+    "id": "outcome-lowercase",
+    "sink": "filename",
+    "input": "go",
+    "direction": "hostile",
+    "why": "the verdict in the wrong case",
+    "correct": "the gate holds the lock and prints its refusal line",
+    "fixture": {
+      "files": {
+        ".claude/state/develop-pipeline.lock": "{\"skill\":\"develop-task\",\"current_step\":2}\n",
+        "{story-file}": "---\ntype: task\nstatus: ready-for-development\n---\n",
+        ".agents/skills/review-story/references/advance-pipeline-lock.sh": "#!/usr/bin/env bash\necho ADVANCED\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "review-story: pipeline lock not advanced — the review did not pass (GO) or did not promote the story to ready-for-development\n"
+    }
+  },
+  {
+    "id": "outcome-trailing-space",
+    "sink": "filename",
+    "input": "GO ",
+    "direction": "hostile",
+    "why": "the verdict with a trailing space",
+    "correct": "the gate holds the lock and prints its refusal line",
+    "fixture": {
+      "files": {
+        ".claude/state/develop-pipeline.lock": "{\"skill\":\"develop-task\",\"current_step\":2}\n",
+        "{story-file}": "---\ntype: task\nstatus: ready-for-development\n---\n",
+        ".agents/skills/review-story/references/advance-pipeline-lock.sh": "#!/usr/bin/env bash\necho ADVANCED\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "review-story: pipeline lock not advanced — the review did not pass (GO) or did not promote the story to ready-for-development\n"
+    }
+  },
+  {
+    "id": "outcome-prefix",
+    "sink": "filename",
+    "input": "G",
+    "direction": "hostile",
+    "why": "a truncated verdict",
+    "correct": "the gate holds the lock and prints its refusal line",
+    "fixture": {
+      "files": {
+        ".claude/state/develop-pipeline.lock": "{\"skill\":\"develop-task\",\"current_step\":2}\n",
+        "{story-file}": "---\ntype: task\nstatus: ready-for-development\n---\n",
+        ".agents/skills/review-story/references/advance-pipeline-lock.sh": "#!/usr/bin/env bash\necho ADVANCED\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "review-story: pipeline lock not advanced — the review did not pass (GO) or did not promote the story to ready-for-development\n"
+    }
+  }
+]

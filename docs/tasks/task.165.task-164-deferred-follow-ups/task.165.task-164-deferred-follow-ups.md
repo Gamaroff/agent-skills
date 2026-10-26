@@ -333,6 +333,27 @@ None identified.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-26
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.165.qa.1.task-164-deferred-follow-ups.md](./task.165.qa.1.task-164-deferred-follow-ups.md)
+- **Gate File**: [task.165.gate.1.task-164-deferred-follow-ups.yml](./task.165.gate.1.task-164-deferred-follow-ups.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 6392
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+One MEDIUM finding (QA-1): the two review-skill gates are boundaries that refuse silently, so the `fence:` probe declined every hostile case and no probe executed. Two LOW prose findings (QA-2, QA-3). 8/8 mutation proofs re-run and red.
+
 ## Change Log
 
 | Date       | Version | Description   | Author      |
@@ -341,6 +362,8 @@ None identified.
 | 2026-10-26 | 1.1     | Review passed (8/10): gap-tolerant mapping anchor, executed-prose test for both gated review blocks, load and commit recorded with each wall-clock figure, cooperation reference brought into scope, 95/0 replaced with the measured form | review-task |
 | 2026-10-26 |         | Status → ready-for-development | review-task |
 | 2026-10-26 |         | Implemented — 9 authored files (+ bundled copies), 1 new test file; 8 mutations proven red | develop-task (inline) |
+| 2026-10-26 |         | QA gate CONCERNS (90/100) — 3 findings (1 medium, 2 low) | qa-task |
+| 2026-10-26 |         | QA findings fixed — cycle 1, 3 findings (refusal line + fence: probe fixtures, in-progress wording, heading) | qa-fix |
 
 <!-- change-log-end -->
 

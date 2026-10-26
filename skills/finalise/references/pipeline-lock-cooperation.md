@@ -23,7 +23,8 @@ Replace `<this-skill-name>` with the unprefixed skill name (e.g. `create-pr`, `d
 **The review skills gate the advance on their outcome.** `review-story` and `review-task` advance
 only when the review passed and promoted the document to `ready-for-development`; on a failed review
 the orchestrator's Step 2 HALTs, and a lock already at 3 would send a resume to Step 3 on work that
-failed review. Each skill's own `## Pipeline Lock Cooperation` block carries the gate (task 165).
+failed review. Each skill's own `## Pipeline Lock Cooperation` block carries the gate, and prints
+one line when it holds a lock rather than advancing it (task 165).
 
 **`finalise` is the exception: it passes the DoD it just wrote, and keeps stderr.** Without `--dod`
 the helper holds the lock at 7, because a gaps outcome must not read as Step 7 done (task 222):
