@@ -1348,6 +1348,20 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    | `ambiguous-row` | The Status column could not be identified | **Log it and tick by hand** |
    | `engine-unavailable` | The registry parser could not be located | **Log it and tick by hand** |
 
+   **The `icon` field** appears only when the consumer sets `registry.task.statusIcons` in
+   `skills-config.yaml` (see the configuration reference). The registry's status-icon cell is then
+   written in the same one-line write as Status, and `already` repairs a stale icon on a re-run.
+   Without the key there is no `icon` field and no icon is touched.
+
+   | `icon` | What it means | What to do |
+   |---|---|---|
+   | `written` | The icon cell now holds the icon mapped to `accepted` | Nothing |
+   | `repaired` | (`already`) Status was right; the stale icon was rewritten | Nothing — this heals a row an earlier tick left behind |
+   | `unchanged` | The icon cell already holds the mapped icon | Nothing |
+   | `unmapped` | `statusIcons` has no icon for `accepted` (the cell is left alone) | **Log it.** Add `accepted` to the map |
+   | `no-column` | No header cell matches `iconColumn` (or, for `""`, no empty header cell beside Status) | **Log it and fix the icon by hand** |
+   | `ambiguous` | More than one header cell matches — nothing is guessed | **Log it and fix the icon by hand.** Name the column with `iconColumn` |
+
    **Every outcome exits 0 — never block acceptance on it.** The work is finished by the time this
    runs, and refusing to finalise a complete task because its index line could not be found trades a
    cosmetic defect for a stuck pipeline. The loud backstop is
@@ -2430,7 +2444,7 @@ EOF
 
 - [ ] Running summary file finalized — `## Verification Complete` appended with `**Final Status:** ✅ ACCEPTED`, and that is the file's only status line (the header carries none)
 - [ ] Story frontmatter updated: `status: accepted`, `updated`, `completed_date`, `pr_number`
-- [ ] Task only: registry row ticked — `registry-tick.js` reported `ticked` / `already` / `no-registry` (a `no-row`, `row-malformed`, `ambiguous-row` or `engine-unavailable` needs a manual tick before merge, or CI's drift check fails)
+- [ ] Task only: registry row ticked — `registry-tick.js` reported `ticked` / `already` / `no-registry` (a `no-row`, `row-malformed`, `ambiguous-row` or `engine-unavailable` needs a manual tick before merge, or CI's drift check fails); with `statusIcons` configured, an `icon` of `unmapped`, `no-column` or `ambiguous` needs the icon fixed by hand
 - [ ] DoD PASSED section added to story document body
 - [ ] Running summary referenced in DoD section
 - [ ] Sprint Review summary file created at `{story-directory}/sprint-review-summary.md`
