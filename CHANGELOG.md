@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+
+- **`registry-tick` pads a rewritten cell by display width, not UTF-16 length.** `setCell` kept a
+  cell's width with `.length`, which counts code units: `⚠️` is two and `✅` one, but both show two
+  columns wide. A v0.61.0 icon repair turned `| ⚠️   |` into `| ✅    |`, one column wider than the
+  hand-aligned rows around it, and `✅` → `⚠️` lost a column. A new `displayWidth` helper splits
+  into grapheme clusters with `Intl.Segmenter` and counts an emoji-presentation cluster as 2 and any
+  other as 1. ASCII cells are unchanged byte for byte. East Asian Wide/Fullwidth is not counted as
+  2, because V8's regex has no `East_Asian_Width` property.
+
 ## [v0.61.0] - 2026-10-26
 
 ### Added
