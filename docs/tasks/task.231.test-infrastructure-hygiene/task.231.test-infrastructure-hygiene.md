@@ -355,25 +355,25 @@ Clearing today's backlog is a manual step. Remove the entries whose prefixes app
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-26
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 95/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.231.qa.4.test-infrastructure-hygiene.md](./task.231.qa.4.test-infrastructure-hygiene.md)
-- **Gate File**: [task.231.gate.4.test-infrastructure-hygiene.yml](./task.231.gate.4.test-infrastructure-hygiene.yml)
+- **Full Report**: [task.231.qa.5.test-infrastructure-hygiene.md](./task.231.qa.5.test-infrastructure-hygiene.md)
+- **Gate File**: [task.231.gate.5.test-infrastructure-hygiene.yml](./task.231.gate.5.test-infrastructure-hygiene.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 6372 (local `npm run ci:fast`; CI green @ `d6e33392`)
+- **Tests Executed**: 6373 (local `npm run ci:fast` @ `190375ff`)
 - **Phases Verified**: 6/6
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-- Cycle 3 fixes (SIGHUP/SIGQUIT forwarding, job control, EPERM) are verified and mutation-proven; the wrapper is clean on every forwarded signal.
-- TASK-231-CR4-1 (medium, test-only): the cycle-3 test safety net reads a pid file the scratch cleanup has already removed, so it never fires.
+- Every gated finding from QA cycles 1–4 is fixed and mutation-proven: symlinked anchors, prototype-key prefixes, process-group signalling, terminal signals and job control, producer-keyed prefixes, and the test safety net.
+- Two low advisory test-robustness points (CR5-1, CR5-2) and the earlier advisory items are carried in the gate's `recommendations.future`.
 <!-- change-log-start -->
 ## Change Log
 
@@ -392,6 +392,7 @@ Clearing today's backlog is a manual step. Remove the entries whose prefixes app
 | 2026-10-26 |  | QA findings fixed — cycle 3: CR3-1 (forward SIGHUP/SIGQUIT, group job control), CR3-2 to CR3-4 folded in; 1 iteration | qa-fix |
 | 2026-10-26 |  | QA gate CONCERNS (90/100) — 1 finding (CR4-1 medium, test-only: inert safety net); cycle-3 fixes verified | qa-task |
 | 2026-10-26 |  | QA findings fixed — cycle 4: CR4-1 (test safety net holds the suite pid in memory), CR4-2 (reap report wording); 1 iteration | qa-fix |
+| 2026-10-26 |  | QA gate PASS (95/100) — cycle-4 fix verified; 2 low advisory findings carried | qa-task |
 <!-- change-log-end -->
 
 ---
