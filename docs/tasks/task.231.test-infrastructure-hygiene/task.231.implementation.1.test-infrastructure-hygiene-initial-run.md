@@ -3,7 +3,7 @@
 **Task**: `task.231.test-infrastructure-hygiene.md`
 **Run Number**: 1
 **Started**: 2026-10-26 05:37
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -35,9 +35,9 @@ Contain and ratchet test temp-dir leaks, make the observation-log resolver tests
 | 2. review-task             | ✅ Done    | `task.231.review.{N}.{name}.md` exists (or skip logged)                | `task.231.review.1.test-infrastructure-hygiene.md` — READY TO IMPLEMENT 8/10; 3 Important fixed | —                    | 2026-10-26T05:40Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; 22/22; npm test 0 fail, ratchet ok; 5 mutation proofs held | —                    | 2026-10-26T06:21Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #752: https://github.com/Gamaroff/agent-skills/pull/752 | —                    | 2026-10-26T06:22Z |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.231.qa.{N}.*.md`; `task.231.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.231.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.231.qa.{N}.*.md`; `task.231.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 5 QA cycles; gate 5 PASS 95/100; 5c review-pr ✅ APPROVE (`task.231.pr-review.1.test-infrastructure-hygiene.md`) | —                    | 2026-10-26T08:22Z |
+| 7. finalise                | ✅ Done    | `task.231.dod.{N}.*.md`; task `status: accepted`                       | `task.231.dod.1.test-infrastructure-hygiene.md` — ACCEPTED; acceptance commit `987f7dcb`; issue #741 closed | —                    | 2026-10-26T08:26Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Implementation report committed and pushed | —                    | 2026-10-26T08:31Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -123,10 +123,39 @@ Contain and ratchet test temp-dir leaks, make the observation-log resolver tests
 
 ---
 
+- QA Cycle 1 — changes-requested: disabled (`gh-stage.js` reason `stage-disabled`).
+- QA Cycle 1 — qa-fix ingested gate.1 inline rather than through the findings-ingester subagent: the same session wrote the gate, so its findings were already in context, and `pr-review-current.js` returned `none`. Independence loss: none beyond the gate's own.
+- QA Cycle 1 — fix plan: CR-1 (medium) and QA-1 (low) fixed; CR-3 cleanup taken because it is one line; CR-2 (advisory, confidence medium) left in `recommendations.future`, since an engine-only PR without a doc change is rare and the repo-wide corpus test already exercises the engine in `npm test`.
+- QA Cycle 1 — CR-1 fix: `symlinkSet()` (index mode 120000, from one `git ls-files -s -z` per tracked set, WeakMap-memoised and read lazily). `anchorsFor` follows a tracked symlink's blob to its in-repository target, at most 8 links deep. An absolute or repository-escaping target answers null, the same as an unreadable one. Test: a tracked symlink, a chain of two, and a dead fragment through the symlink (both directions). Mutation proof: symlink branch disabled → the new test goes red → covered.
+- QA Cycle 1 — QA-1 fix: `groupByPrefix` counts in a Map and returns `Object.fromEntries`, so `__proto__`, `constructor` and `toString` are ordinary own keys. Mutation proof: old plain-object counter → the new test goes red → covered.
+- QA Cycle 1 — fast gate (`ci:fast` = `format:check` + `npm test`; no `develop.fastGateCommand` key): `format:check` clean, `bundle:check` clean, `npm test` rc 0 with 6,364 tests, 0 failures and 14 skipped. `tmp-leak: 442 … ratchet ok`.
+- QA Cycle 2 — qa-task ran from the skill text already loaded in this session, not a fresh Skill invocation. The refute reviewer was a separate read-only Explore subagent, so independence for the code review is kept.
+- QA Cycle 2 — route classifier: `continue (not-a-pass-gate)`. Gate 1's medium was in `doc-links.js`, gate 2's is in `test-tmpdir.mjs`, so the findings are not narrowing in one place; no residue offer.
+- QA Cycle 2 — fix plan: CR2-1 (medium) and CR2-2 (low, gated) fixed. CR2-3 (advisory) folded in because it is a three-line guard. CR2-4 (quadratic matchers), CR2-5 (Step 12b prose) and CR2-6 (Bitbucket slugs, confidence low) are left in `recommendations.future`.
+- QA Cycle 2 — CR2-1 fix: the suite is spawned `detached` (its own process group). Signals go to the group (`signalGroup`), and once the leader exits `reapGroup` ends what is left (SIGTERM, 2 s grace, SIGKILL) before the directory is read and removed. Tests: a waiting leader whose grandchild must be signalled, and a leader that exits and leaves a background process. Mutation proofs: `detached:false`, direct-child-only forwarding, and no reap each turn a test red → covered.
+- QA Cycle 2 — CR2-2 fix: `eval-` names strip their inner six-character segment whatever its case (`EVAL_INNER_RE`, keyed on the producer `evals/shared/runner.mjs`). Every committed ratchet key is asserted to be a fixed point of `prefixOf`. Mutation proof: rule off → the `prefixOf` test goes red → covered.
+- QA Cycle 2 — CR2-3 fix: the retry `rmSync` is guarded, and `removeDir` reports failure through its return value. Test: a victim under a read-only parent. Mutation proof: guard removed → red → covered.
+- QA Cycle 3 — scoped re-review of the two files changed since gate 2's head. The route classifier said `continue (not-a-pass-gate; route 2 declined: product-defect-signal)`. CR3-1 is a regression the CR2-1 fix introduced (`detached` → new session).
+- QA Cycle 3 — fix plan: CR3-1 (medium) fixed; CR3-2, CR3-3 and CR3-4 folded in because each is a few lines.
+- QA Cycle 3 — CR3-1 fix: `FORWARDED_SIGNALS` = INT, TERM, HUP, QUIT, all forwarded to the suite's group. On SIGTSTP the wrapper SIGSTOPs the group and then itself; on SIGCONT it continues the group. The group is orphaned in its new session, so a SIGTSTP sent to it would be discarded. Tests: a parametrised SIGTERM/SIGHUP test and a Ctrl-Z test that reads `/proc` states. SIGQUIT is checked by probe only, because its re-raise core-dumps the wrapper. Mutation proofs: SIGHUP dropped, no suspend and no resume each turn a test red → covered.
+- QA Cycle 3 — CR3-3 fix: `signalGroup` reads only ESRCH as gone. Test: a group led by another user's process (EPERM premise asserted). Mutation proof: catch returns false → red → covered.
+- QA Cycle 3 — CR3-4: a group that survives the reap is reported on stderr. Not tested: making a process survive SIGKILL needs an uninterruptible sleep.
+- QA Cycle 3 — CR3-2: the test safety net also kills the suite's own group, read from a pid file the fake suite writes.
+- QA Cycle 4 — the route classifier said `continue (not-a-pass-gate; route 2 declined: product-defect-signal)`. Gate 4 records maintainability CONCERNS for the inert safety net, and any non-pass NFR declines route 2. I kept that assessment rather than re-scoring the gate to reach an exit.
+- QA Cycle 4 — CR4-1 fix: `spawnWrapper` captures the suite pid while the test runs (`child.suitePid()`, which the tests call when they read it, plus a 20 ms poll as a backstop), so the hook no longer depends on a file the scratch cleanup has already deleted. My first version relied on the poll alone; it lost a race with a subtest's end and failed in the full file, which is why the synchronous read was added. Test: a subtest that leaves its suite running, with the parent asserting the suite is gone after the subtest's hooks. Mutation proofs: the cycle-3 read-in-hook code, and a wrapper-group-only kill, each turn it red → covered.
+- QA Cycle 4 — CR4-2: the reap report now says the group "could not be ended (it survived SIGKILL or refused the signal)", and the `signalGroup` docstring states what EPERM changes.
+- QA Cycle 2 — test hygiene: the signal tests spawn the wrapper in its own group and kill that group afterwards, so a regression fails the test instead of hanging the file. The first mutation run hung on `detached:false` until this was added.
+- Step 5c — `/review-pr --no-code`: ✅ APPROVE with 2 low conformance findings. PC-1 (SC-6 unticked) was doc-only, so it was fixed and carried to 6a. PC-2 (`pr_number` missing) was recorded at 5c and closed by `/finalise`'s `pr_number: 752` write.
+- Step 7 — `/finalise`: DoD ACCEPTED (AC, docs and security PASS; compliance NOT_APPLICABLE). Step 3b.1 re-probed the `compareRatchet` boundary: 8 executed, 0 reproduced, 0 escaped (`task.231.dod.1.security.run.json`). Registry row ticked.
+- Step 7 — CI reading 1: SUCCESS @ `d423566fdb27` (6 checks; the test lane finished before the decision). CI reading 2: SUCCESS (tree-equivalent to `190375ffb4ba`) @ `987f7dcb62ca`, across 6 checks after 30 s. The acceptance commit is docs-only, and the docs-only rule resolved its pending test lane.
+- Step 7 — side-effects: PR canonical comment posted; issue #741 commented (`done`) and closed (state CLOSED confirmed); Document link already durable; board `done` → `already`.
+
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
 
+- **Step 4/5 (pre-QA)** — PR #752's first CI run: `link-check` red on `mailto:markdown-link-check@3.15.0`. GFM autolinks a bare `name@version` as an email address. Fixed with a code span (`977e550d`), and a scan of every changed `.md` (code spans and fences stripped) found no other bare `@`-addresses.
+- **Step 4/5 (pre-QA)** — CI `test` (run 40279465736): 6,851 tests, 0 fail, and `tmp-leak` was the only red. Nine prefixes were over (`carry-5c-gh` 16>8, `carry-5c-remote` 24>12, `finalise-6d` 10>5, `next-numbered` 30>15, `qa-code-review` 4>2, `review-pr-0a` 12>6, `review-pr-kindword` 2>1, `review-pr-nodocs` 2>1, `review-pr-prnum` 6>3): exactly ×2, the zsh variant the local run skips. This was the case carried from Step 3. Counts were raised to the per-prefix maximum (495 entries in all), in commit `test(infra): raise nine ratchet counts…`.
 - **Step 3** — `test-runner-reach.test.js:112`: a first `sed` produced `scripts["test:suite"]` inside a double-quoted JS string. Caught on read-back before any run, and reworded to `` `test:suite` ``.
 
 ---
@@ -135,14 +164,71 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-10-26
+**Gate Result**: CONCERNS
+**Issues Found**: 2. TASK-231-CR-1 (medium): the anchor check reads a tracked symlink's index blob, so fragment links to a symlinked `.md` are false `[no-anchor]`. TASK-231-QA-1 (low): `groupByPrefix` drops a `__proto__` prefix. Advisory: CR-2 (an engine-only PR runs an empty anchor step), CR-3 (cleanup).
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 1 of 5)
+**Fixes Applied**: CR-1: `anchorsFor` follows tracked symlinks (`symlinkSet`), with a test. QA-1: `groupByPrefix` counts in a Map, with a test. CR-3: `blocksOf` hoisted. Fast gate green (`npm test` 6,364 tests / 0 fail, ratchet ok). PR state after the push: OPEN @ `e1a76d6b` (read with `gh pr view`).
+**Commit**: `e1a76d6b`
+
+### QA Cycle 2 — 2026-10-26
+**Gate Result**: CONCERNS
+**Issues Found**: 2 gated. TASK-231-CR2-1 (medium): SIGTERM reaches only the wrapper's direct child, so grandchildren outlive their TMPDIR. TASK-231-CR2-2 (low): an all-lowercase inner suffix splits the `eval-repeat-hang` prefix. Plus 4 advisory: unguarded retry `rmSync`, quadratic heading matchers, Step 12b prose omits `no-anchor`, Bitbucket slugs. Cycle-1 fixes verified and mutation-proven.
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 2 of 5)
+**Fixes Applied**: CR2-1: process-group spawn, signalling and reaping, with two tests. CR2-2: producer-keyed `eval-` inner-suffix rule, with a ratchet fixed-point test. CR2-3: guarded retry `rmSync`, with a test. All five mutation proofs covered. Fast gate green (`npm test` 6,368 tests / 0 fail, ratchet ok, bundle clean).
+**Commit**: `1bd49777`
+
+### QA Cycle 3 — 2026-10-26
+**Gate Result**: CONCERNS
+**Issues Found**: 1 gated. TASK-231-CR3-1 (medium): the new session cut the suite off from SIGHUP and SIGQUIT, so those signals orphan it and its directory. Plus 2 advisory (CR3-2 test safety net, CR3-3 EPERM) and 1 cleanup (CR3-4). Cycle-2 fixes verified and mutation-proven; CI green @ `1bd49777`.
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 3 of 5)
+**Fixes Applied**: CR3-1: HUP and QUIT forwarded, plus SIGTSTP/SIGCONT job control for the group; CR3-2 to CR3-4 folded in. Four mutation proofs covered.
+**Commit**: `d6e33392`
+
+### QA Cycle 4 — 2026-10-26
+**Gate Result**: CONCERNS
+**Issues Found**: 1 gated. TASK-231-CR4-1 (medium, test-only): the CR3-2 safety net read a pid file that the scratch cleanup had already deleted (`node:test` after hooks run FIFO). Plus 1 cleanup (CR4-2, reap report wording). Cycle-3 fixes verified and mutation-proven; CI green @ `d6e33392`.
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 4 of 5)
+**Fixes Applied**: CR4-1: the suite pid is captured in memory (`child.suitePid()` plus a poll), with a subtest-based test; CR4-2 wording. Two mutation proofs covered.
+**Commit**: `190375ff`
+
+### QA Cycle 5 — 2026-10-26
+**Gate Result**: PASS
+**Issues Found**: 0 gated. 2 low advisory: CR5-1, `alive(null)` reads as dead; CR5-2, a zombie reads as alive under a non-reaping PID 1. Both are carried in `recommendations.future`. Cycle-4 fix verified and mutation-proven; CI green @ `190375ff`.
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: ✅ APPROVE — task.231.pr-review.1.test-infrastructure-hygiene.md (conformance lens only, `--no-code`; 2 low findings)
+**Loop exit**: PASS gate → 5c APPROVE → Step 7
+**Action**: Proceeding to 5c
+**Carried to 6a**: docs/tasks/task.231.test-infrastructure-hygiene/task.231.pr-review.1.test-infrastructure-hygiene.md docs/tasks/task.231.test-infrastructure-hygiene/task.231.test-infrastructure-hygiene.md (PC-1 fixed: SC-6 ticked with run 40291489233)
+**Not fixed at 5c**: PC-2 `pr_number` (ref is not a docs path; recorded)
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-10-26T08:31Z
+**Final Status**: Completed
 **Branch**: feature/task.231.test-infrastructure-hygiene
 **PR**: https://github.com/Gamaroff/agent-skills/pull/752
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 5
+**DoD Summary**: `task.231.dod.1.test-infrastructure-hygiene.md`
+**Tracker debt**: none
+
+**Completion Summary**: Implemented per-run TMPDIR containment for `npm test`: a wrapper that signals and reaps the suite's process group, plus a leak ratchet that names new or over-count temp prefixes. Also implemented `#fragment` anchor checking in `doc-links.js` (wired into the docs link-check workflow), a worktree-safe scratch root for the observation-log tests, and a parity-test rule that accepts a block that marks its own wait. QA took 5 cycles: gates 1–4 were CONCERNS, each with a mutation-proven fix (symlinked anchors, prototype-key prefixes, process-group signalling, SIGHUP/SIGQUIT and job control, an inert test safety net), and gate 5 passed at 95/100. The Step 5c review approved. `/finalise` accepted with the security boundary re-probed. Notable decision: gate 4's maintainability CONCERNS was kept rather than re-scored to force a loop exit.
