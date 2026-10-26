@@ -3,7 +3,7 @@
 **Task**: `task.233.done-lead-claims-merge.md`
 **Run Number**: 1
 **Started**: 2026-10-26 04:42
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -35,10 +35,10 @@ Reword the `done` stakeholder lead so it claims acceptance, not release, and hol
 | 1. create-branch           | ✅ Done    | Branch `feature/task.233.*` exists in git                             | Branch created at `e144328f` | —                    | 2026-10-26T04:43Z |
 | 2. review-task             | ✅ Done    | `task.233.review.{N}.{name}.md` exists (or skip logged)               | `task.233.review.1.done-lead-claims-merge.md` — 8/10 READY; Planned → Ready for Development | —                    | 2026-10-26T04:46Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; 9/9 phases; `npm run ci` 6,340 tests, 0 fail | `.summaries/step-3-iteration-audit-1.json` | 2026-10-26T04:57Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.233.qa.{N}.*.md`; `task.233.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.233.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #751: https://github.com/Gamaroff/agent-skills/pull/751 | —                    | 2026-10-26T05:02Z |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.233.qa.{N}.*.md`; `task.233.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 1 cycle; gate 1 PASS (100); PR review 1 APPROVE | —                    | 2026-10-26T05:11Z |
+| 7. finalise                | ✅ Done    | `task.233.dod.{N}.*.md`; task `status: accepted`                      | `task.233.dod.1.done-lead-claims-merge.md` — ACCEPTED; #749 closed | —                    | 2026-10-26T05:20Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Implementation report committed and pushed | —                    | 2026-10-26T05:20Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -83,6 +83,15 @@ Reword the `done` stakeholder lead so it claims acceptance, not release, and hol
 - Loop audit iter 1: `{"status":"ready-for-review","completed":9,"total":9}` → exit loop.
 - Development completion comment posted to github issue 749 (`posted`).
 
+### Step 4 — create-pr
+
+- SCOPE_PATHS: `docs/tasks/task.233.done-lead-claims-merge`, `CHANGELOG.md`, `shared/resources`, `shared/resources/tests`, and 14 `skills/*/references` dirs. No out-of-scope untracked files held.
+- Report links checked (`doc-links.js`: 0 relative links). Two commits via /commit-changes: `251b10e4` fix, `8e974240` docs. Leak check OK.
+- PR body written in-line from the small diff (no Explore summariser dispatched).
+- PR created: https://github.com/Gamaroff/agent-skills/pull/751 (base develop, `Closes #749`). Lock `pr_url` set.
+- In-review comment on #749: `posted`. GitHub board: in-review → stage-disabled (this repo's `tracker-workflow.yaml` does not enable it).
+- Post-PR state check: PR #751 state = OPEN, MERGEABLE. errors = 0 (read with `gh pr view` directly, not the poller subagent).
+
 ---
 
 ## Issues Log
@@ -97,14 +106,47 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-10-26
+**Gate Result**: PASS
+**Issues Found**: 1 advisory cleanup (CR-1: the new test could also assert acceptance and deny a past-tense release); 0 in `top_issues[]`
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: APPROVE
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+
+- Traceability mapper skipped: Success Criteria are a checklist, not a table (`HAS_SUCCESS_CRITERIA_TABLE=false`).
+- QA-start board re-assert: in-review → stage-disabled.
+- `/qa-task` with `code_review_blocking=true`. Gate `task.233.gate.1.done-lead-claims-merge.yml` (100/100), report `task.233.qa.1.done-lead-claims-merge.md`. Diff reviewer returned in 86.5 s; anchor check `ok`. Mutation proof: `covered`. Step 4b not applicable. Security `reasoned`, `boundary: false`.
+- PR QA comment posted; tracker comment `qa-gate-1` on #749: `posted`.
+- Gate + QA report committed and pushed before 5c: `b9486d02` (path 1, one push). Trail asserted on `origin/feature/task.233.done-lead-claims-merge`.
+- 5c `/review-pr --effort medium --comment --no-code`: **APPROVE**. Report `task.233.pr-review.1.done-lead-claims-merge.md`, summary PR comment posted. Lens returned in 45.5 s. 2 low/low findings, both recorded, not fixed at 5c: PC-1 (test does not assert acceptance; same gap as CR-1; anchor `text-mismatch`, quoted text is line 135) and PC-2 (`pr_number` absent; /finalise writes it).
+- **Carried to 6a**: docs/tasks/task.233.done-lead-claims-merge/task.233.pr-review.1.done-lead-claims-merge.md (staged; APPROVE, nothing doc-only to fix).
+- GitHub board: ready-for-merge → stage-disabled.
+
+### Step 7 — finalise
+
+- `/finalise` invoked via the Skill tool. 4 DoD agents in one message: AC 7/7 PASS, security PASS (`boundary: false`, probe step skipped), compliance NOT_APPLICABLE, docs PASS. `pr_review_decision` null (no reviews required) → satisfied by the 5c report (APPROVE).
+- DoD summary: docs/tasks/task.233.done-lead-claims-merge/task.233.dod.1.done-lead-claims-merge.md
+- CI reading 1: SUCCESS @ b9486d02ffc1 (6 checks); CI reading 2: SUCCESS (tree-equivalent to 8e974240b79a) @ 4bc8c1d7bca1 (6 checks, after 30s — the docs-only rule; everything since 8e974240 is under `docs/tasks/`).
+- Acceptance commit `4bc8c1d7` (`docs(task.233): accept — DoD, sprint review; registry ticked; 5c review carried`), pushed; 6b tracked-and-pushed assertions OK; 6d CHANGELOG cites task 233. Registry tick: `ticked` (`planned` → `accepted`). `pr_number: 751` written (resolves PC-2).
+- DoD body posted to PR: https://github.com/Gamaroff/agent-skills/pull/751#issuecomment-6408830685
+- Tracker `done` comment on #749: `posted`. Document link already pointed at `develop` (no change).
+- GitHub issue #749 close: CLOSED ✅
+- Board transition: done → `already` (card reads Done).
+- Accept gap: journal empty — tracker debt none.
+- Task completed — `status: accepted` confirmed in frontmatter and body.
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-10-26 05:20
+**Final Status**: Completed
 **Branch**: feature/task.233.done-lead-claims-merge
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/751
+**QA Iterations**: 1
+**DoD Summary**: docs/tasks/task.233.done-lead-claims-merge/task.233.dod.1.done-lead-claims-merge.md
+**Tracker debt**: none
+
+**Completion Summary**: Implemented the reworded `done` stakeholder lead. It now claims acceptance only and names the merge as the last step. A new mutation-proved test holds the wording, and the spec quotes and bundled copies are updated. One QA cycle: gate PASS 100/100, Step 5c review APPROVE. /finalise accepted the task on CI reading 2 via the docs-only rule (tree-equivalent to `8e974240`), closed #749 and posted the canonical summary. This run's own acceptance comments use the new wording. Not merged: the merge is left to a person or `/develop-next`.
