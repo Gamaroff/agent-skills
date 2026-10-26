@@ -44,6 +44,21 @@ const { fencedRanges } = require("../change-log.js");
 
 const STEP8 = "shared/resources/develop-pipeline-step-8-commit.md";
 const STEP4 = "shared/resources/develop-pipeline-step-4-create-pr.md";
+
+// Step 4's guard block makes its hold directory with `mktemp -d /tmp/pipeline-hold-XXXXXX`, a fixed
+// /tmp no TMPDIR reaches, and nothing here removed it (task 231: one escaped per `npm test`). Read
+// each one from the record the guard writes, before Restore or the checklist deletes the record, and
+// remove them once this file's tests finish. The shipped block is unchanged.
+const HOLD_DIRS = new Set();
+test.after(() => {
+  for (const d of HOLD_DIRS) fs.rmSync(d, { recursive: true, force: true });
+});
+function noteHoldDir(work) {
+  const record = path.join(work, ".claude/state/step4-hold-dir.txt");
+  if (!fs.existsSync(record)) return;
+  const d = fs.readFileSync(record, "utf8").trim();
+  if (d) HOLD_DIRS.add(d);
+}
 const TEMPLATE = "shared/resources/implementation-report-template.md";
 const WORK_ITEM = "docs/tasks/task.9.fx";
 const REPORT = `${WORK_ITEM}/task.9.implementation.1.fx.md`;
@@ -1695,6 +1710,7 @@ describe("executed against fixtures", { concurrency: true }, () => {
           const r = await runAsync(sh, bind(blockBy(s4, anchor), p4), {
             cwd: fx.work,
           });
+          noteHoldDir(fx.work);
           assert.equal(
             r.status,
             0,
@@ -1731,6 +1747,7 @@ describe("executed against fixtures", { concurrency: true }, () => {
           const r = await runAsync(sh, bind(blockBy(s4, anchor), p4), {
             cwd: fx.work,
           });
+          noteHoldDir(fx.work);
           assert.equal(r.status, 0, r.stdout + r.stderr);
         }
         // Restore is skipped.

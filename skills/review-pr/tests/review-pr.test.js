@@ -1011,8 +1011,16 @@ test("the parser is executable and declared in Step 0b", () => {
 // ---------------------------------------------------------------------------
 // A consumer-shaped repository: Step 0b binds REMOTE_URL itself from `git remote get-url origin`,
 // so the fixture is a git repo whose origin is the remote under test.
+// Each one is removed once this file's tests finish: about ten tests build one and none had a
+// cleanup, which left 40 `review-pr-repo-*` directories per `npm test` (task 231, obs #83).
+const CONSUMER_REPOS = new Set();
+test.after(() => {
+  for (const dir of CONSUMER_REPOS)
+    fs.rmSync(dir, { recursive: true, force: true });
+});
 function consumerRepo(remote) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "review-pr-repo-"));
+  CONSUMER_REPOS.add(dir);
   spawnSync("git", ["init", "-q", dir]);
   if (remote) spawnSync("git", ["-C", dir, "remote", "add", "origin", remote]);
   const bin = path.join(dir, ".bin");
@@ -2457,9 +2465,12 @@ for (const shell of SHELLS) {
       .replaceAll("{pr-url}", "https://github.com/acme/widgets/pull/7")
       .replaceAll("{pr-number}", "7")
       .replaceAll("{report-file}", report);
+    // TMPDIR is passed through: the block's `mktemp -t review-pr-comment.XXXXXX.md` lands in the
+    // sandbox the test removes, not in the system /tmp (task 231 — it escaped every run).
     const env = {
       PATH: `${bin}:${process.env.PATH}`,
       HOME: process.env.HOME,
+      TMPDIR: dir,
       GH_LOG: path.join(dir, "gh.log"),
       GH_BODY: path.join(dir, "posted.md"),
     };
