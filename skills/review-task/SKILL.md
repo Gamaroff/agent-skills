@@ -2319,3 +2319,28 @@ This skill uses:
 - Can be used at any stage: planned, in progress, completed
 - Designed to find problems through collaborative user input
 - Questions are batched for efficient clarification
+
+---
+
+## Pipeline Lock Cooperation (when invoked by `/develop-story` or `/develop-task`)
+
+When this skill is invoked as a step in a develop pipeline, advance the pipeline lock as the **last
+action** before returning — **only when the review passed**: the recommendation is READY TO
+IMPLEMENT and Step 9 promoted the task to `ready-for-development`. On NEEDS REVISION or REQUIRES
+REWORK, leave the lock where it is: the orchestrator's Step 2 HALTs on those outcomes, and a lock
+already at 3 would let the Stop hook or a resume send the run to Step 3 (develop) on a task that
+failed review. A READY review that did not promote (a blocking sign-off or Change Log withheld it)
+leaves the lock too; the orchestrator's own Step 2 → 3 advance covers the case it proceeds on.
+
+```bash
+# {outcome}: this review's recommendation (READY TO IMPLEMENT / NEEDS REVISION / REQUIRES REWORK).
+# {task-file}: the task document this review just updated.
+if [ -f .claude/state/develop-pipeline.lock ] && [ "{outcome}" = "READY TO IMPLEMENT" ] \
+  && grep -qE '^status:[[:space:]]*ready-for-development[[:space:]]*$' "{task-file}"; then
+  bash .agents/skills/review-task/references/advance-pipeline-lock.sh --skill review-task 2>/dev/null || true
+fi
+```
+
+Idempotent in every degraded path: noops when the lock is missing (skill invoked standalone), already
+advanced past this step, or the helper script is not installed. Full rationale and cooperation order
+with the `Stop` hook: see [`references/pipeline-lock-cooperation.md`](references/pipeline-lock-cooperation.md).

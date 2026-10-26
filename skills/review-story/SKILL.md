@@ -2877,10 +2877,19 @@ This skill uses:
 
 ## Pipeline Lock Cooperation (when invoked by `/develop-story` or `/develop-task`)
 
-When this skill is invoked as a step in a develop pipeline, advance the pipeline lock as the **last action** before returning, so the orchestrator's next turn does not depend on model discipline:
+When this skill is invoked as a step in a develop pipeline, advance the pipeline lock as the **last
+action** before returning, so the orchestrator's next turn does not depend on model discipline —
+**only when the review passed**: the verdict is GO and Step 10 promoted the story to
+`ready-for-development`. On NO-GO, leave the lock where it is: `/develop-story` Step 2 HALTs on a
+story left at Draft, and a lock already at 3 would let the Stop hook or a resume send the run to
+Step 3 (develop) on a story that failed review. A GO that did not promote (a blocking sign-off
+withheld it) HALTs there too, so it leaves the lock as well (task 165).
 
 ```bash
-if [ -f .claude/state/develop-pipeline.lock ]; then
+# {outcome}: this review's verdict (GO / NO-GO (Revision) / NO-GO (Rework)).
+# {story-file}: the story document this review just updated.
+if [ -f .claude/state/develop-pipeline.lock ] && [ "{outcome}" = "GO" ] \
+  && grep -qE '^status:[[:space:]]*ready-for-development[[:space:]]*$' "{story-file}"; then
   bash .agents/skills/review-story/references/advance-pipeline-lock.sh --skill review-story 2>/dev/null || true
 fi
 ```

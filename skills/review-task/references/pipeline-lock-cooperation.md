@@ -1,0 +1,67 @@
+---
+name: pipeline-lock-cooperation
+description: Snippet shared by all develop-{story,task} pipeline sub-skills. Each sub-skill, on successful completion, advances the develop-pipeline lock so the orchestrator's next turn doesn't have to rely on model discipline. Defence-in-depth alongside the Stop hook.
+---
+<!-- AUTO-GENERATED — DO NOT EDIT. Source: shared/resources/pipeline-lock-cooperation.md. Regenerate via `npm run bundle`. -->
+
+# Pipeline Lock Cooperation (sub-skill responsibility)
+
+Add this block as the **last action** before this skill returns control to its caller, after all primary work is committed/persisted but before the final user-facing summary.
+
+## What to do
+
+If `.claude/state/develop-pipeline.lock` exists, invoke the lock-advance helper with this skill's own name:
+
+```bash
+if [ -f .claude/state/develop-pipeline.lock ]; then
+  bash .agents/skills/develop-{story,task}/references/advance-pipeline-lock.sh --skill <this-skill-name> 2>/dev/null || true
+fi
+```
+
+Replace `<this-skill-name>` with the unprefixed skill name (e.g. `create-pr`, `develop`, `commit-changes`, `create-branch`).
+
+**The review skills gate the advance on their outcome.** `review-story` and `review-task` advance
+only when the review passed and promoted the document to `ready-for-development`; on a failed review
+the orchestrator's Step 2 HALTs, and a lock already at 3 would send a resume to Step 3 on work that
+failed review. Each skill's own `## Pipeline Lock Cooperation` block carries the gate (task 165).
+
+**`finalise` is the exception: it passes the DoD it just wrote, and keeps stderr.** Without `--dod`
+the helper holds the lock at 7, because a gaps outcome must not read as Step 7 done (task 222):
+
+```bash
+if [ -f .claude/state/develop-pipeline.lock ]; then
+  bash .agents/skills/finalise/references/advance-pipeline-lock.sh --skill finalise --dod "<dod-path>" || true
+fi
+```
+
+The helper advances 7 → 8 only when that DoD reads `**Final Status:** ✅ ACCEPTED`. On any other
+DoD, a missing file or no `--dod`, it holds the lock, prints the reason on stderr and exits 0. Do not
+add `2>/dev/null`: the reason is how a held lock gets explained. finalise's own block (its SKILL.md
+§ Pipeline Lock Cooperation) is the one that runs.
+
+The helper's `--skill` mode looks up the next step in its built-in mapping. Iterative loop skills (`qa-story`, `qa-task`, `qa-fix`, `review-pr`) are intentionally noops in `--skill` mode — the orchestrator manages the QA loop and advances the lock `5 → 7` itself when it transitions out of the loop. Inside the loop `current_step` stays `5` and the sub-position is the lock's `qa_phase` field (`5a|5b|5c`), which the orchestrator writes through the same `mktemp` + `mv` pattern and which the Stop hook reads (task.123). The helper never writes `qa_phase` and never moves `current_step` backwards.
+
+`commit-changes` is special: it is invoked at multiple steps in one run (Step 4 by `create-pr`, Steps 5–6 by each `qa-fix` cycle, and the terminal Step 8 commit). Its `--skill` branch **never removes the lock** — not even at `current_step` 8. The Step 8 commit is followed by a push, Cleanup and a blocking Completion Checklist, and Step 8's own `advance-pipeline-lock.sh --complete`, run once that checklist passes, is the lock's one terminal remover (task 161). So callers can run `commit-changes`' lock cooperation unconditionally at every step, and the lock stays intact for the PreCompact/Stop hooks and for a HALT's snapshot.
+
+## Why this exists
+
+When this sub-skill is invoked by `/develop-story` or `/develop-task`, the orchestrator's "Step Transition Protocol" requires a Bash lock-advance call as its first action when control returns. Under context pressure (long sub-skill output, deeply nested chains) the model may skip that Bash call and yield. Self-advancing here makes the lock advance regardless of orchestrator discipline.
+
+The action is harmless when:
+- the lock doesn't exist (this skill was invoked standalone, not via the pipeline) — the helper exits 0 silently
+- the lock is already advanced past this step (idempotent) — the helper exits 0 silently
+- the helper script is missing (older install) — `|| true` swallows the error
+
+## Helper resolution
+
+The helper lives in `references/advance-pipeline-lock.sh` of the develop-story / develop-task skill. Path is well-known and stable. If both pipelines are installed, either path works — the helper script is byte-identical.
+
+## Cooperation order
+
+The lock is advanced by **whichever defence runs first**:
+
+1. The sub-skill itself (this snippet) — most reliable, runs inline as the skill's last action.
+2. The orchestrator's manual Bash call — the Step Transition Protocol's action #1; idempotent with #1.
+3. The `Stop` hook (`on-stop.sh`) — reactive backstop with re-prompt instructions if both of the above missed.
+
+Idempotency at every layer means double-advance is safe: the helper noops when target step ≤ current step.

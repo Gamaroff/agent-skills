@@ -665,16 +665,33 @@ test("every orchestrator mention of --complete names the Step 8 Completion Check
   // mentioning --complete would pass its half of this check on nothing (task 163; task.162
   // pr-review.1 CR-3). It counts code lines only: three of the hook's --complete lines are `#`
   // comments, so a floor over every line stayed green with neither instruction left in it (task 164;
-  // task.163 pr-review.1 CR-1). The two it measures are COMPLETION_LINE and ALREADY_DONE.
-  const hookCode = readDoc(STOP_HOOK)
-    .split("\n")
-    .filter((l) => l.includes("--complete") && !/^\s*#/.test(l)).length;
-  assert.ok(
-    hookCode >= 2,
-    `${STOP_HOOK}: expected --complete in COMPLETION_LINE and ALREADY_DONE (2 non-comment lines), found ${hookCode}`,
-  );
+  // task.163 pr-review.1 CR-1). It checks the two bindings by name, not a count of lines: a new
+  // `echo` carrying --complete could otherwise stand in for either (task 165; task.164 pr-review.1
+  // CR-2). Each is assigned once per NEXT, so `some` is the quantifier: the step-8 branch carries it.
+  const hook = readDoc(STOP_HOOK).split("\n");
+  for (const binding of ["COMPLETION_LINE", "ALREADY_DONE"]) {
+    assert.ok(
+      hook.some((l) => new RegExp(`^\\s*${binding}=.*--complete`).test(l)),
+      `${STOP_HOOK}: no ${binding}= assignment carries --complete`,
+    );
+  }
   assert.ok(seen >= 6, `expected at least 6 mentions, found ${seen}`);
 });
+
+// The --skill mapping, read from its own `case "$SKILL_NAME" in` block. The first `  --skill)` arm
+// in the script is the commit-changes early exit, and anchoring there spanned ~280 lines to the
+// mapping's esac (task 165, QA-164-12). Lines may sit between SKILL_NAME="$2" and the case: task 222
+// put the --dod parse there.
+const SKILL_MAPPING =
+  /SKILL_NAME="\$2"\n[\s\S]*?\n\s*case "\$SKILL_NAME" in\n([\s\S]*?)\n\s*esac/;
+const mappedSkills = (body) =>
+  [...body.matchAll(/^\s*([a-z|-]+)\)\s+NEXT=(\d+)/gm)].flatMap((m) =>
+    m[1].split("|").map((name) => ({ name, next: Number(m[2]) })),
+  );
+// A skill name in any formatting — backticked, slash-prefixed or plain — bounded so `develop` does
+// not match develop-story, develop-task or develop-bug.
+const namesSkill = (name) =>
+  new RegExp(`(^|[^A-Za-z0-9-])/?${name.replace(/-/g, "\\-")}(?![A-Za-z0-9-])`);
 
 // A block that ends the run removes nothing directly (task 227, obs #87). A host's removal safety
 // check reads the command text: shown an `rm` inside a wrapped script it cannot inspect, it refuses
@@ -976,20 +993,24 @@ test("the banner doc defers to the Stop hook at a re-prompt without restating it
 // sub-skills advance the lock before their step's tail is advance-pipeline-lock.sh's --skill mapping:
 // the rule cites it and names only /finalise, as the example. Explaining the difference at lock 8
 // alone left develop (→ 4) and create-pr (→ 5) out (QA-164-5), so the rule may not list the mapping
-// either — every skill in it but the example is read off the script and refused here.
+// either — every skill in it but the example is read off the script and refused here, in any
+// formatting: a backtick-only refusal let a plain-prose relisting through (task 165, QA-164-10).
 test("a HALT status block names the step that halted, not current_step", () => {
   const banner = readDoc(BANNER).replace(/\s+/g, " ");
   const rule = banner.match(
-    /\*\*Exception 2: a HALT names the step that halted\.\*\*(.+?)\(task 164\)\./,
+    /\*\*Exception 2: a HALT names the step that halted\.\*\*(.+?)\(task 164, task 165\)\./,
   );
   assert.ok(
     rule,
     `${BANNER}: no "Exception 2: a HALT names the step that halted" rule`,
   );
   for (const phrase of [
-    "not at `current_step`",
+    "not `current_step`",
     "the first line of the steps-ahead list",
     "a HALT in Step N lists `- Step N:` first",
+    "a HALT inside the QA loop lists `- Steps 5–6:` first",
+    "a block derived from `current_step` starts at",
+    "Where a sub-skill that advances the lock moves it",
     "`--skill` mapping of `advance-pipeline-lock.sh`",
     "Step 7/8 — {STEP-NAME} ❌ halted",
     "`halt_step`",
@@ -1017,24 +1038,28 @@ test("a HALT status block names the step that halted, not current_step", () => {
     );
   }
   const mapping = readDoc("shared/resources/advance-pipeline-lock.sh").match(
-    /\n {2}--skill\)\n([\s\S]*?)\n {4}esac/,
+    SKILL_MAPPING,
   );
-  assert.ok(mapping, "advance-pipeline-lock.sh: no --skill case");
-  const advancing = [
-    ...mapping[1].matchAll(/^\s*([a-z|-]+)\)\s+NEXT=(\d+)/gm),
-  ].flatMap((m) =>
-    m[1].split("|").map((name) => ({ name, next: Number(m[2]) })),
+  assert.ok(
+    mapping,
+    'advance-pipeline-lock.sh: no `case "$SKILL_NAME" in` block after SKILL_NAME="$2"',
   );
+  const advancing = mappedSkills(mapping[1]);
   assert.ok(
     advancing.length >= 5 &&
       advancing.some((a) => a.name === "finalise" && a.next === 8),
-    `advance-pipeline-lock.sh: expected the --skill mapping to include finalise → 8, found ${JSON.stringify(advancing)}`,
+    `advance-pipeline-lock.sh: expected the mapping read from the \`case "$SKILL_NAME" in\` block after SKILL_NAME="$2" to include finalise → 8, found ${JSON.stringify(advancing)}`,
+  );
+  // The boundary cannot rot silently: `develop` must not match the pipeline names around it.
+  assert.ok(
+    !namesSkill("develop").test("develop-story and develop-task"),
+    "the boundary-aware match reads `develop` inside develop-story / develop-task",
   );
   for (const { name } of advancing) {
     if (name === "finalise") continue;
     assert.ok(
-      !rule[1].includes(`\`${name}\``) && !rule[1].includes(`\`/${name}\``),
-      `${BANNER}: the HALT rule lists "${name}" from the --skill mapping; cite the mapping instead`,
+      !namesSkill(name).test(rule[1]),
+      `${BANNER}: the HALT rule names "${name}" from the --skill mapping; cite the mapping instead`,
     );
   }
   const row = readDoc(BANNER)
