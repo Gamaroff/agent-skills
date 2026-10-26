@@ -83,6 +83,18 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The task-registry tick can write a status-icon column (opt-in).** Some consumer registries
+  carry an icon beside Status and gate on the two agreeing. `/finalise` wrote `accepted`, left `⚠️`,
+  and the consumer's CI went red after a correct acceptance. The new `registry.task.statusIcons` key
+  in `skills-config.yaml` maps a status to its icon; `registry.task.iconColumn` names the column by
+  header text, and `""` (the default) means the empty header cell beside Status. The tick then
+  writes the icon in the same one-line write as Status, and a re-run on an `accepted` row repairs a
+  stale icon (`reason: already`, `icon: repaired`). The column is found by the header, never by
+  position: no match or two matches tick Status alone and report `icon: no-column` / `ambiguous`.
+  A status missing from the map leaves the cell alone (`icon: unmapped`). Without the key the
+  output is byte-identical to before, checked against the previous CLI on LF and CRLF registries.
+  The skill ships no icons; the set is the consumer's.
+
 - **An inline review comment now posts only an anchor the checker verified (task 217).** Nine
   follow-ups from task.195's QA gates:
   - **Breaking: the `--inline` guards of `/review-pr` and `/review-code` require the checker's
