@@ -181,8 +181,9 @@ export function removeDir(dir) {
 
 /**
  * Signal a whole process group. False only when there is no pid or the group is gone (ESRCH): an
- * EPERM means it exists but cannot be signalled, and reading that as "gone" would remove the
- * directory under processes still running (TASK-231-CR3-3).
+ * EPERM means it exists but cannot be signalled. Read as "gone", the reap would report a clean end
+ * for processes still running; read as present, it reports the group it could not end
+ * (TASK-231-CR3-3).
  */
 export function signalGroup(pid, sig) {
   if (!pid) return false;
@@ -291,7 +292,7 @@ export async function main(argv) {
   // to be removed. Ask it to stop, then make it stop.
   if (!(await reapGroup(child.pid)))
     say(
-      `test-tmpdir: processes in the suite's group ${child.pid} survived SIGKILL — they may still write to ${dir}`,
+      `test-tmpdir: the suite's process group ${child.pid} could not be ended (it survived SIGKILL or refused the signal) — it may still write to ${dir}`,
     );
 
   let names = [];

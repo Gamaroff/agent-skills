@@ -362,18 +362,18 @@ Clearing today's backlog is a manual step. Remove the entries whose prefixes app
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.231.qa.3.test-infrastructure-hygiene.md](./task.231.qa.3.test-infrastructure-hygiene.md)
-- **Gate File**: [task.231.gate.3.test-infrastructure-hygiene.yml](./task.231.gate.3.test-infrastructure-hygiene.yml)
+- **Full Report**: [task.231.qa.4.test-infrastructure-hygiene.md](./task.231.qa.4.test-infrastructure-hygiene.md)
+- **Gate File**: [task.231.gate.4.test-infrastructure-hygiene.yml](./task.231.gate.4.test-infrastructure-hygiene.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 6368 (local `npm run ci:fast`; CI green @ `1bd49777`)
+- **Tests Executed**: 6372 (local `npm run ci:fast`; CI green @ `d6e33392`)
 - **Phases Verified**: 6/6
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-- Cycle 2 fixes (process-group signalling, producer-keyed `eval-` prefixes, guarded retry) are verified and mutation-proven.
-- TASK-231-CR3-1 (medium): the suite's new session cuts it off from SIGHUP and SIGQUIT, which the wrapper does not forward, so those signals orphan the suite and its directory.
+- Cycle 3 fixes (SIGHUP/SIGQUIT forwarding, job control, EPERM) are verified and mutation-proven; the wrapper is clean on every forwarded signal.
+- TASK-231-CR4-1 (medium, test-only): the cycle-3 test safety net reads a pid file the scratch cleanup has already removed, so it never fires.
 <!-- change-log-start -->
 ## Change Log
 
@@ -390,6 +390,8 @@ Clearing today's backlog is a manual step. Remove the entries whose prefixes app
 | 2026-10-26 |  | QA findings fixed — cycle 2: CR2-1 (signal the suite process group, reap leftovers), CR2-2 (eval- inner suffix by producer), CR2-3 (guarded retry rmSync); 1 iteration | qa-fix |
 | 2026-10-26 |  | QA gate CONCERNS (90/100) — 1 finding (CR3-1 medium: SIGHUP/SIGQUIT orphan the suite); cycle-2 fixes verified | qa-task |
 | 2026-10-26 |  | QA findings fixed — cycle 3: CR3-1 (forward SIGHUP/SIGQUIT, group job control), CR3-2 to CR3-4 folded in; 1 iteration | qa-fix |
+| 2026-10-26 |  | QA gate CONCERNS (90/100) — 1 finding (CR4-1 medium, test-only: inert safety net); cycle-3 fixes verified | qa-task |
+| 2026-10-26 |  | QA findings fixed — cycle 4: CR4-1 (test safety net holds the suite pid in memory), CR4-2 (reap report wording); 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

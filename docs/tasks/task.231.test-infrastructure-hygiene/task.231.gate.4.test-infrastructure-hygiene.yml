@@ -1,0 +1,65 @@
+schema: 2
+task: 'task.231.test-infrastructure-hygiene'
+task_title: 'Test infrastructure hygiene'
+gate: CONCERNS
+status_reason: 'Cycle 3 fixes hold (four mutation proofs covered), but the test safety net added for CR3-2 never fires: node:test runs after hooks in registration order, so the scratch directory holding suite.pid is removed before the hook reads it (CR4-1, test-only).'
+reviewer: 'QA Engineer'
+head: 'd6e33392626fb4848365fca1ed2f8d788ab25d13'
+updated: '2026-10-26T08:05:11Z'
+
+top_issues:
+  - id: 'TASK-231-CR4-1'
+    severity: medium
+    file: 'tests/test-tmpdir.test.js'
+    finding: 'spawnWrapper''s safety net reads suite.pid in a t.after hook, but scratch(t) registered its rmSync first and node:test runs after hooks FIFO, so the file is gone and only the wrapper''s group is killed. A failing signal test would orphan the suite in its own session, stopped indefinitely after a failed Ctrl-Z test. The FIFO order was also observed in this session (the removeDir test''s chmod restore ran after the scratch removal).'
+    suggested_action: 'Capture the suite pid in memory when the test reads it, and have the hook kill that group.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 6372
+  phases_verified: 6/6
+  ci: 'pass @ d6e33392 — test, link-check, validate, shellcheck, secret-scan; local ci:fast: 6,372 tests, 1 failure, the LOAD-SENSITIVE timing budget in bundle-missing-source.test.js (20,413 ms against 20,000), which passes alone (7/7)'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 8
+    escaped: 0
+    notes: 'compareRatchet unchanged since its cycle-2 probe (task.231.qa.2.security.run.json, 8 cases, escaped 0); this cycle touched signal handling only.'
+  performance:
+    status: PASS
+    notes: 'CR4-2 (cleanup): an EPERM group would make the reap wait its full 2 s grace; no such group arises from a suite the wrapper itself started.'
+  reliability:
+    status: PASS
+    notes: 'The wrapper''s runtime behaviour is clean on every forwarded signal and on Ctrl-Z/resume; the open finding is in test cleanup on a failure path.'
+  maintainability:
+    status: CONCERNS
+    notes: 'CR4-1: the test safety net is inert. CR4-2 (cleanup): the reap report says "survived SIGKILL" for a group that could not be signalled at all.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR4-1: hold the suite pid in memory for the safety net.'
+      refs: ['tests/test-tmpdir.test.js']
+  future:
+    - action: 'CR4-2: word the reap report and signalGroup docstring for the EPERM case.'
+      refs: ['scripts/test-tmpdir.mjs']
+    - action: 'Carried: CR2-4 (quadratic heading matchers), CR2-5 (Step 12b prose), CR2-6 (Bitbucket slugs), gate-1 CR-2 (empty anchor step).'
+      refs: ['shared/resources/doc-links.js', 'skills/qa-task/SKILL.md']
+
+bug_resolution:
+  fixed_this_cycle: ['TASK-231-CR3-1', 'CR3-2', 'CR3-3', 'CR3-4']
+  verification: 'mutation-proven against the committed tests at d6e33392 (CR3-1, CR3-3); CR3-2 found inert (CR4-1); CR3-4 untested by design'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR4-1 fixed']

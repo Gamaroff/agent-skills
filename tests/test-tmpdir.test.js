@@ -180,12 +180,30 @@ function spawnWrapper(t, args, suitePidFile) {
     stdio: ["ignore", "ignore", "pipe"],
     detached: true,
   });
+  // Read the suite's pid as soon as it is written, not in the hook: node:test runs after hooks in
+  // registration order, so scratch(t)'s removal has deleted the file before this hook runs
+  // (TASK-231-CR4-1).
+  let suite = null;
+  const capture = () => {
+    if (suite === null && suitePidFile && fs.existsSync(suitePidFile)) {
+      const pid = Number(fs.readFileSync(suitePidFile, "utf8"));
+      if (pid > 0) suite = pid;
+    }
+    return suite;
+  };
+  // Tests read the pid through this, so the net holds it before the test can end; the poll is
+  // the backstop for a test that never reads it.
+  child.suitePid = capture;
+  const watch = setInterval(
+    () => capture() !== null && clearInterval(watch),
+    20,
+  );
+  watch.unref();
   t.after(() => {
+    clearInterval(watch);
     // The wrapper's group, and the suite's own: the wrapper starts the suite in a session of its
     // own, so killing the wrapper's group alone misses it (TASK-231-CR3-2).
-    const groups = [child.pid];
-    if (suitePidFile && fs.existsSync(suitePidFile))
-      groups.push(Number(fs.readFileSync(suitePidFile, "utf8")));
+    const groups = suite === null ? [child.pid] : [child.pid, suite];
     for (const g of groups) {
       try {
         process.kill(-g, "SIGKILL");
@@ -235,7 +253,7 @@ for (const sig of ["SIGTERM", "SIGHUP"]) {
     for (let i = 0; i < 100 && !fs.existsSync(marker); i++)
       await new Promise((r) => setTimeout(r, 50));
     assert.ok(fs.existsSync(marker), "the fake suite never started");
-    const suite = Number(fs.readFileSync(suitePid, "utf8"));
+    const suite = child.suitePid();
     child.kill(sig);
     const [code, signal] = await closeWithin(child);
     assert.equal(signal, sig, `exit code ${code}, stderr: ${stderr}`);
@@ -283,7 +301,7 @@ test("Ctrl-Z stops the suite with the wrapper, and resuming the wrapper resumes 
     await until(() => fs.existsSync(marker)),
     "the fake suite never started",
   );
-  const suite = Number(fs.readFileSync(suitePid, "utf8"));
+  const suite = child.suitePid();
   child.kill("SIGTSTP");
   assert.ok(
     await until(() => procState(child.pid) === "T"),
@@ -301,6 +319,41 @@ test("Ctrl-Z stops the suite with the wrapper, and resuming the wrapper resumes 
   child.kill("SIGTERM");
   const [, signal] = await closeWithin(child);
   assert.equal(signal, "SIGTERM");
+});
+
+test("the safety net ends a suite the test left running, in its own session (TASK-231-CR4-1)", async (t) => {
+  let suite;
+  let inner;
+  await t.test("a test that never signals the wrapper", async (st) => {
+    const dir = scratch(st);
+    const marker = path.join(dir, "tmpdir.txt");
+    const suitePid = path.join(dir, "suite.pid");
+    const ratchetFile = path.join(dir, "ratchet.json");
+    fs.writeFileSync(ratchetFile, "{}");
+    const body = `
+      require("fs").writeFileSync(${JSON.stringify(suitePid)}, String(process.pid));
+      require("fs").writeFileSync(${JSON.stringify(marker)}, process.env.TMPDIR);
+      setInterval(() => {}, 1000);
+    `;
+    const child = spawnWrapper(
+      st,
+      ["--ratchet", ratchetFile, "--", process.execPath, "-e", body],
+      suitePid,
+    );
+    assert.ok(
+      await until(() => fs.existsSync(marker)),
+      "the fake suite never started",
+    );
+    suite = child.suitePid();
+    inner = fs.readFileSync(marker, "utf8");
+  });
+  // The wrapper was SIGKILLed by the net and could not clean up after itself.
+  t.after(() => inner && fs.rmSync(inner, { recursive: true, force: true }));
+  t.after(() => alive(suite) && process.kill(suite, "SIGKILL"));
+  assert.ok(
+    await until(() => !alive(suite)),
+    `suite ${suite} outlived the safety net`,
+  );
 });
 
 test("signalGroup reads EPERM as a group that still exists, not one that is gone (TASK-231-CR3-3)", (t) => {
