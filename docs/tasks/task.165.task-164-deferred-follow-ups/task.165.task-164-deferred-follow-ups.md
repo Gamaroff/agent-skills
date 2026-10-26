@@ -5,10 +5,10 @@ type: task
 description: "Close the eight LOW items task.164 carried: tighten the banner doc's Exception 2 wording (mapping citation, Step {N+1} contrast, grammar, Steps 5–6 HALT), make the HALT pin and hook floor match what they claim, cut the 4b meta-test's cost, give review-task the lock-cooperation block its --skill mapping assumes, and gate both review skills' advance on a passing review."
 tags: [develop-pipeline, remaining-work-banner, stop-hook, advance-pipeline-lock, review-task, follow-up]
 category: infrastructure
-status: planned
+status: ready-for-review
 priority: Low
 created: 2026-09-28
-updated: 2026-09-28
+updated: 2026-10-26
 assignee:
 estimated_effort_hours: 8
 github_issue: 509
@@ -16,7 +16,9 @@ github_issue: 509
 
 # Technical Task: Close task.164's deferred follow-ups
 
-**Status:** Planned
+**Status:** Ready for Review
+
+**Review**: ✅ All review recommendations from `task.165.review.1.task-164-deferred-follow-ups.md` implemented 2026-10-26
 
 **GitHub Issue**: [#509](https://github.com/Gamaroff/agent-skills/issues/509)
 
@@ -33,6 +35,8 @@ Six items are wording or guard-reach gaps in what task.164 shipped. The seventh 
 - The HALT pin and the hook `--complete` floor in `shared/resources/tests/step-8-completion-checklist.test.mjs`
 - Scenario 4b's early exit in `shared/resources/advance-pipeline-lock.test.sh`, and `shared/resources/tests/advance-pipeline-lock-4b-setup.test.mjs`
 - `skills/review-task/SKILL.md` § Pipeline Lock Cooperation (new), and `skills/review-story/SKILL.md` § Pipeline Lock Cooperation (gated)
+- `shared/resources/pipeline-lock-cooperation.md`: names the review skills as outcome-gated, like `finalise`
+- `shared/resources/tests/review-lock-cooperation.test.mjs` (new): runs both gated blocks as written
 
 **Key deliverables**:
 
@@ -87,10 +91,12 @@ Six items are wording or guard-reach gaps in what task.164 shipped. The seventh 
   - It contrasts with blocks **derived from `current_step`**, which start at `Step {N+1}`; Exception 1 is excluded.
   - The halting step and `current_step` differ when a sub-skill has advanced the lock as its last action and its step's tail then halts. **Where** such a sub-skill moves the lock is the `--skill` mapping of `advance-pipeline-lock.sh`.
 - The HALT pin:
-  - reads the mapping from the `case "$SKILL_NAME" in` block that follows `SKILL_NAME="$2"`;
+  - reads the mapping from the `case "$SKILL_NAME" in` block that follows `SKILL_NAME="$2"`, tolerating the lines between them (task 222 put a comment and the `--dod` parse there);
   - refuses each mapped name except `finalise` in any form: backticked, slash-prefixed, or plain;
   - uses a boundary so `develop` does not match `develop-story`, `develop-task` or `develop-bug`.
 - `skills/review-story/SKILL.md`'s existing block is gated the same way: it advances only on a GO outcome (story promoted to Ready for Development).
+- `shared/resources/pipeline-lock-cooperation.md` no longer offers `review-story` as an example of the unconditional block. It says the review skills gate the advance on their outcome, as `finalise` does.
+- `shared/resources/tests/review-lock-cooperation.test.mjs` extracts each review skill's cooperation block with `blockBy` from `shared/resources/tests/lib/executed-prose.mjs`, binds `{outcome}`, and runs it against a fixture lock at 2. A passing outcome moves the lock to 3; a failing one leaves it at 2.
 - The hook floor requires a `COMPLETION_LINE=` assignment and an `ALREADY_DONE=` assignment that each carry `--complete`, and names whichever is missing.
 - The lock test file honours a second test-only seam, `ADVANCE_LOCK_TEST_4B_ONLY`. When set, it prints a `NOTE`, prints the summary, and exits after scenario 4b. The meta-test sets it in all three cases. The unset case keeps asserting the default `rm dirname` list.
 - `skills/review-task/SKILL.md` gains the same `## Pipeline Lock Cooperation` section `review-story` carries, gated on the review outcome. It advances only when the outcome is READY TO IMPLEMENT and the task was promoted, and never on NEEDS REVISION or REQUIRES REWORK, which HALT the pipeline at Step 2.
@@ -113,6 +119,8 @@ Six items are wording or guard-reach gaps in what task.164 shipped. The seventh 
 ✅ `shared/resources/tests/advance-pipeline-lock-4b-setup.test.mjs`: sets the early-exit seam; asserts the NOTE
 ✅ `skills/review-task/SKILL.md`: `## Pipeline Lock Cooperation`, outcome-gated
 ✅ `skills/review-story/SKILL.md`: gate the existing `## Pipeline Lock Cooperation` block on a GO outcome
+✅ `shared/resources/pipeline-lock-cooperation.md`: the review skills are outcome-gated
+✅ `shared/resources/tests/review-lock-cooperation.test.mjs` (new): executed-prose test of both gated blocks
 ✅ Bundled `references/` copies regenerated; CHANGELOG `[Unreleased]` entry citing (task 165)
 
 ### Out of Scope
@@ -141,10 +149,10 @@ None to any interface. With `review-task`'s cooperation block, a `/develop-task`
 
 **Files**: `shared/resources/develop-pipeline-remaining-work-banner.md`
 
-- [ ] Replace "not at `current_step`" with "not `current_step`".
-- [ ] Replace "where every other block starts at `Step {N+1}`" with a contrast limited to blocks derived from `current_step`.
-- [ ] State that a HALT inside the QA loop lists `- Steps 5–6:` first.
-- [ ] Reword the mapping citation: "Where a sub-skill that advances the lock moves it is stated once, in the `--skill` mapping…". Keep "this file does not list them" and the `/finalise` example.
+- [x] Replace "not at `current_step`" with "not `current_step`".
+- [x] Replace "where every other block starts at `Step {N+1}`" with a contrast limited to blocks derived from `current_step`.
+- [x] State that a HALT inside the QA loop lists `- Steps 5–6:` first.
+- [x] Reword the mapping citation: "Where a sub-skill that advances the lock moves it is stated once, in the `--skill` mapping…". Keep "this file does not list them" and the `/finalise` example.
 
 ### Phase 2: The pins measure what they claim
 
@@ -152,10 +160,10 @@ None to any interface. With `review-task`'s cooperation block, a `/develop-task`
 
 **Files**: `shared/resources/tests/step-8-completion-checklist.test.mjs`
 
-- [ ] Anchor the mapping parse on `SKILL_NAME="$2"` followed by `case "$SKILL_NAME" in`, up to its `esac`. Keep the ≥ 5 / `finalise → 8` floor, and make its message name the anchor.
-- [ ] Refuse each mapped name except `finalise` in any form, with a boundary-aware match: `(^|[^A-Za-z0-9-])/?name(?![A-Za-z0-9-])`. The negative lookahead keeps `develop` from matching `develop-story`, `develop-task` or `develop-bug`.
-- [ ] Update the HALT pin's phrases: "not `current_step`", the Steps 5–6 sentence, and the "blocks derived from `current_step`" contrast.
-- [ ] Hook floor: require a line matching `^\s*COMPLETION_LINE=.*--complete` and a line matching `^\s*ALREADY_DONE=.*--complete`, each named in its failure message. Keep the population test's other checks.
+- [x] Anchor the mapping parse on `SKILL_NAME="$2"`, then the first `case "$SKILL_NAME" in` after it, up to its `esac`. Lines between the two are allowed: today they hold task 222's `--dod` parse, and an adjacency-only anchor returns no match. Keep the ≥ 5 / `finalise → 8` floor, and make its message name the anchor.
+- [x] Refuse each mapped name except `finalise` in any form, with a boundary-aware match: `(^|[^A-Za-z0-9-])/?name(?![A-Za-z0-9-])`. The negative lookahead keeps `develop` from matching `develop-story`, `develop-task` or `develop-bug`.
+- [x] Update the HALT pin's phrases: "not `current_step`", the Steps 5–6 sentence, and the "blocks derived from `current_step`" contrast.
+- [x] Hook floor: require a line matching `^\s*COMPLETION_LINE=.*--complete` and a line matching `^\s*ALREADY_DONE=.*--complete`, each named in its failure message. Keep the population test's other checks.
 
 ### Phase 3: The 4b meta-test runs only 4b
 
@@ -163,9 +171,9 @@ None to any interface. With `review-task`'s cooperation block, a `/develop-task`
 
 **Files**: `shared/resources/advance-pipeline-lock.test.sh`, `shared/resources/tests/advance-pipeline-lock-4b-setup.test.mjs`
 
-- [ ] After scenario 4b's block, when `ADVANCE_LOCK_TEST_4B_ONLY` is set: print `NOTE  4b-only: …`, print the `Results:` line, and exit with the file's usual 0/1 rule.
-- [ ] The meta-test sets `ADVANCE_LOCK_TEST_4B_ONLY=1` in all three cases, asserts the `4b-only` NOTE, and keeps its current assertions. The unset-seam case deletes only `ADVANCE_LOCK_TEST_4B_CMDS`.
-- [ ] Measure the meta-test before and after with `time node --test` on the file, and record both in the implementation report.
+- [x] After scenario 4b's block, when `ADVANCE_LOCK_TEST_4B_ONLY` is set: print `NOTE  4b-only: …`, print the `Results:` line, and exit with the file's usual 0/1 rule.
+- [x] The meta-test sets `ADVANCE_LOCK_TEST_4B_ONLY=1` in all three cases, asserts the `4b-only` NOTE, and keeps its current assertions. The unset-seam case deletes only `ADVANCE_LOCK_TEST_4B_CMDS`.
+- [x] Measure the meta-test before (on the base commit) and after (on the PR head commit) with `time node --test` on the file, each with `uptime` beside it. Record both figures, both loads and both commits in the implementation report.
 
 ### Phase 4: Both review skills cooperate with the lock, on a passing review only
 
@@ -173,23 +181,26 @@ None to any interface. With `review-task`'s cooperation block, a `/develop-task`
 
 **Files**: `skills/review-task/SKILL.md`, `skills/review-story/SKILL.md`
 
-- [ ] Add `## Pipeline Lock Cooperation (when invoked by /develop-story or /develop-task)` at the end, in `review-story`'s shape.
-- [ ] Gate the advance on the outcome: advance only when the recommendation is READY TO IMPLEMENT and Step 9 promoted the task; otherwise leave the lock alone, and say why.
-- [ ] Gate `review-story`'s existing block the same way: advance only on a GO outcome (Draft → Ready for Development); never on NO-GO.
-- [ ] Confirm the bundler ships `references/advance-pipeline-lock.sh` and `references/pipeline-lock-cooperation.md` into `skills/review-task/references/` (`npm run bundle`, `bundle:check`).
+- [x] Add `## Pipeline Lock Cooperation (when invoked by /develop-story or /develop-task)` at the end, in `review-story`'s shape.
+- [x] Gate the advance on the outcome: advance only when the recommendation is READY TO IMPLEMENT and Step 9 promoted the task; otherwise leave the lock alone, and say why.
+- [x] Gate `review-story`'s existing block the same way: advance only on a GO outcome (Draft → Ready for Development); never on NO-GO.
+- [x] In `shared/resources/pipeline-lock-cooperation.md`, drop `review-story` from the unconditional block's examples, and state that the review skills gate the advance on their outcome, as `finalise` does.
+- [x] Add `shared/resources/tests/review-lock-cooperation.test.mjs`. For each review skill, extract the cooperation block (`blockBy(readDoc(SKILL), "--skill review-…")`), bind `{outcome}` to the passing value and to each failing one, and run it in a consumer-shaped temp root (`.agents/skills` → this repo's `skills/`) holding a lock at `current_step: 2`. Pass → 3; fail → 2. Run it under each shell in `SHELLS`.
+- [x] Confirm the bundler ships `references/advance-pipeline-lock.sh` and `references/pipeline-lock-cooperation.md` into `skills/review-task/references/` (`npm run bundle`, `bundle:check`).
 
 ### Phase 5: Proof and gates
 
 **Risk**: Low.
 
-- [ ] Mutation-prove under bash, with `cp` snapshots and `cmp`-checked restore:
+- [x] Mutation-prove under bash, with `cp` snapshots and `cmp`-checked restore:
   - Exception 2 relists `develop` and `create-pr` in plain prose → HALT pin red;
   - Exception 2 reverts to "every other block" → HALT pin red;
   - `ALREADY_DONE` drops `--complete` while a new `echo "… --complete"` line is added → hook floor red;
   - the mapping regex reverts to the first-`--skill)` anchor, with a decoy `x) NEXT=9` line in the early-exit arm of a scratch copy → the anchored parse ignores the decoy and the old one reads it;
-  - the 4b early exit is removed → the meta-test's `4b-only` NOTE assertion goes red.
-- [ ] `npm run bundle`, `npm run ci:fast` with `.agents/skills` moved aside, `npm run lint:shell`, `npm run bundle:check`, `npm run validate -- skills/review-task/`.
-- [ ] CHANGELOG `[Unreleased]` entry citing (task 165).
+  - the 4b early exit is removed → the meta-test's `4b-only` NOTE assertion goes red;
+  - either review skill's cooperation block loses its outcome gate → `review-lock-cooperation.test.mjs`'s failing-outcome case goes red.
+- [x] `npm run bundle`, `npm run ci:fast` with `.agents/skills` moved aside, `npm run lint:shell`, `npm run bundle:check`, `npm run validate -- skills/review-task/`.
+- [x] CHANGELOG `[Unreleased]` entry citing (task 165).
 
 ---
 
@@ -200,12 +211,14 @@ None to any interface. With `review-task`'s cooperation block, a `/develop-task`
 1. ✅ `shared/resources/develop-pipeline-remaining-work-banner.md`: Exception 2 wording
 2. ✅ `skills/review-task/SKILL.md`: `## Pipeline Lock Cooperation`, outcome-gated
 3. ✅ `skills/review-story/SKILL.md`: existing block gated on a GO outcome
+4. ✅ `shared/resources/pipeline-lock-cooperation.md`: the review skills are outcome-gated
 
 ### Files to Modify (Tests)
 
-4. ✅ `shared/resources/tests/step-8-completion-checklist.test.mjs`: HALT pin and hook floor
-5. ✅ `shared/resources/advance-pipeline-lock.test.sh`: the `ADVANCE_LOCK_TEST_4B_ONLY` early exit
-6. ✅ `shared/resources/tests/advance-pipeline-lock-4b-setup.test.mjs`: uses the early exit
+5. ✅ `shared/resources/tests/step-8-completion-checklist.test.mjs`: HALT pin and hook floor
+6. ✅ `shared/resources/advance-pipeline-lock.test.sh`: the `ADVANCE_LOCK_TEST_4B_ONLY` early exit
+7. ✅ `shared/resources/tests/advance-pipeline-lock-4b-setup.test.mjs`: uses the early exit
+8. ✅ `shared/resources/tests/review-lock-cooperation.test.mjs` (new; reached by `package.json`'s `shared/resources/tests/*.test.mjs` glob): both gated blocks, executed
 
 ### Files to Modify (Dependencies)
 
@@ -213,8 +226,8 @@ None.
 
 ### Files to Modify (Documentation)
 
-7. ✅ `CHANGELOG.md`: `[Unreleased]` entry
-8. ✅ Bundled `references/` copies (banner doc in develop-bug/story/task; `advance-pipeline-lock.sh` and `pipeline-lock-cooperation.md` in review-task), regenerated by `npm run bundle`
+9. ✅ `CHANGELOG.md`: `[Unreleased]` entry
+10. ✅ Bundled `references/` copies (banner doc in develop-bug/story/task; `advance-pipeline-lock.sh` and `pipeline-lock-cooperation.md` in review-task), regenerated by `npm run bundle`
 
 ### Files to Delete
 
@@ -238,11 +251,12 @@ None.
 
 ### Performance Tests
 
-- **Metric**: the 4b meta-test's wall-clock, before and after, measured with `time node --test shared/resources/tests/advance-pipeline-lock-4b-setup.test.mjs` on the same host in one session. The bound is below in Success Criteria.
+- **Metric**: the 4b meta-test's wall-clock, before (base commit) and after (PR head commit), measured with `uptime; time node --test shared/resources/tests/advance-pipeline-lock-4b-setup.test.mjs` on the same host in one session. The bound is below in Success Criteria. Review baseline, 2026-10-26: 17.9s real at load 4.8–5.1; the whole lock test file alone took 5.8s.
 
 ### Consumer Tests
 
-- `bash shared/resources/advance-pipeline-lock.test.sh` with no seam set still runs every scenario and reports 95/0.
+- `bash shared/resources/advance-pipeline-lock.test.sh` with no seam set still runs every scenario, prints no `4b-only` NOTE, and reports 0 failed (102 passed on 2026-10-26; the count is the test file's own, not a target).
+- `node --test shared/resources/tests/review-lock-cooperation.test.mjs`: each review skill's block moves a lock at 2 to 3 on a passing outcome and leaves it at 2 on a failing one.
 - `bash shared/resources/develop-pipeline-on-stop.test.sh` is unaffected.
 - `review-task` and `review-story` standalone (no lock): the cooperation blocks are no-ops.
 
@@ -252,24 +266,24 @@ None.
 
 ### Functional
 
-- [ ] Exception 2 contains "not `current_step`", limits its `Step {N+1}` contrast to blocks derived from `current_step`, states the Steps 5–6 HALT, and cites the mapping as *where* a sub-skill moves the lock. The HALT pin pins each (Phases 1–2).
-- [ ] The HALT pin goes red when Exception 2 relists a mapped skill other than `finalise` in plain prose, and does not go red on `develop-story`, `develop-task` or `develop-bug` (Phase 2).
-- [ ] The HALT pin parses the mapping from the `case "$SKILL_NAME" in` block. A decoy `NEXT=` arm elsewhere in the script is not read (Phase 2).
-- [ ] The hook floor fails, naming the binding, when `COMPLETION_LINE` or `ALREADY_DONE` stops carrying `--complete`, even if another line in the hook does (Phase 2).
-- [ ] `skills/review-task/SKILL.md` advances the lock with `--skill review-task` on a READY outcome only, and `skills/review-story/SKILL.md` with `--skill review-story` on a GO outcome only. Each says why it does not advance on a failed review (Phase 4).
+- [x] Exception 2 contains "not `current_step`", limits its `Step {N+1}` contrast to blocks derived from `current_step`, states the Steps 5–6 HALT, and cites the mapping as *where* a sub-skill moves the lock. The HALT pin pins each (Phases 1–2).
+- [x] The HALT pin goes red when Exception 2 relists a mapped skill other than `finalise` in plain prose, and does not go red on `develop-story`, `develop-task` or `develop-bug` (Phase 2).
+- [x] The HALT pin parses the mapping from the `case "$SKILL_NAME" in` block. A decoy `NEXT=` arm elsewhere in the script is not read (Phase 2).
+- [x] The hook floor fails, naming the binding, when `COMPLETION_LINE` or `ALREADY_DONE` stops carrying `--complete`, even if another line in the hook does (Phase 2).
+- [x] `skills/review-task/SKILL.md` advances the lock with `--skill review-task` on a READY outcome only, and `skills/review-story/SKILL.md` with `--skill review-story` on a GO outcome only. Each says why it does not advance on a failed review. Held by `review-lock-cooperation.test.mjs`, which runs both blocks as written (Phase 4).
 
 ### Performance
 
-- [ ] The 4b meta-test's wall-clock is at most half its pre-change value, measured on the same host in one session with `time node --test` on the file. Both figures are recorded in the implementation report.
+- [x] The 4b meta-test's wall-clock is at most half its pre-change value, measured on the same host in one session with `time node --test` on the file: before on the base commit, after on the PR head commit, each with `uptime` beside it. Both figures, loads and commits are recorded in the implementation report.
 
 ### Code Quality
 
-- [ ] `npm run ci:fast` passes with `.agents/skills` moved aside; `lint:shell`, `bundle:check` and `npm run validate -- skills/review-task/` pass
-- [ ] Each Phase 5 mutation behaves as stated under bash, with restore checked by `cmp`
+- [x] `npm run ci:fast` passes with `.agents/skills` moved aside; `lint:shell`, `bundle:check` and `npm run validate -- skills/review-task/` pass
+- [x] Each Phase 5 mutation behaves as stated under bash, with restore checked by `cmp`
 
 ### Migration
 
-- [ ] CHANGELOG `[Unreleased]` entry cites (task 165)
+- [x] CHANGELOG `[Unreleased]` entry cites (task 165)
 
 ---
 
@@ -324,6 +338,9 @@ None identified.
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-09-28 | 1.0     | Initial draft | create-task |
+| 2026-10-26 | 1.1     | Review passed (8/10): gap-tolerant mapping anchor, executed-prose test for both gated review blocks, load and commit recorded with each wall-clock figure, cooperation reference brought into scope, 95/0 replaced with the measured form | review-task |
+| 2026-10-26 |         | Status → ready-for-development | review-task |
+| 2026-10-26 |         | Implemented — 9 authored files (+ bundled copies), 1 new test file; 8 mutations proven red | develop-task (inline) |
 
 <!-- change-log-end -->
 
@@ -333,26 +350,26 @@ None identified.
 
 ### Phase 1: Exception 2 says only what is true
 
-- [ ] Grammar, contrast, Steps 5–6 HALT, mapping citation
+- [x] Grammar, contrast, Steps 5–6 HALT, mapping citation
 
 ### Phase 2: The pins measure what they claim
 
-- [ ] Anchored mapping parse; plain-prose refusal; phrases
-- [ ] Hook floor by binding name
+- [x] Anchored mapping parse; plain-prose refusal; phrases
+- [x] Hook floor by binding name
 
 ### Phase 3: The 4b meta-test runs only 4b
 
-- [ ] Early-exit seam and NOTE
-- [ ] Meta-test uses it; runtime before/after recorded
+- [x] Early-exit seam and NOTE
+- [x] Meta-test uses it; runtime before/after recorded
 
 ### Phase 4: Both review skills cooperate with the lock, on a passing review only
 
-- [ ] review-task block (outcome-gated); review-story block gated; bundle ships the references
+- [x] review-task block (outcome-gated); review-story block gated; cooperation reference updated; executed-prose test; bundle ships the references
 
 ### Phase 5: Proof and gates
 
-- [ ] Mutation proofs
-- [ ] Gates and CHANGELOG
+- [x] Mutation proofs
+- [x] Gates and CHANGELOG
 
 ---
 
@@ -376,7 +393,7 @@ None identified.
 
 ---
 
-**Status:** Planned
+**Status:** Ready for Review
 
 **Next Steps**:
 

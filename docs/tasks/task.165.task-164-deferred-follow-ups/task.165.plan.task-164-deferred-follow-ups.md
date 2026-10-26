@@ -37,11 +37,11 @@ The Exception 2 regex in the HALT pin anchors on `\(task 164\)\.`. If the closin
 **`shared/resources/tests/step-8-completion-checklist.test.mjs`**
 
 1. **Mapping parse.** Replace
-   `/\n {2}--skill\)\n([\s\S]*?)\n {4}esac/` with an anchor on the mapping's own case:
+   `/\n {2}--skill\)\n([\s\S]*?)\n {4}esac/` with an anchor on the mapping's own case. Lines may sit between `SKILL_NAME="$2"` and the `case`: task 222 put a comment and the `--dod` parse there, and an adjacency-only anchor returns `null` on today's script (review.1, I1):
 
    ```js
    const mapping = readDoc("shared/resources/advance-pipeline-lock.sh").match(
-     /SKILL_NAME="\$2"\n\s*case "\$SKILL_NAME" in\n([\s\S]*?)\n\s*esac/,
+     /SKILL_NAME="\$2"\n[\s\S]*?\n\s*case "\$SKILL_NAME" in\n([\s\S]*?)\n\s*esac/,
    );
    assert.ok(mapping, 'advance-pipeline-lock.sh: no `case "$SKILL_NAME" in` block after SKILL_NAME="$2"');
    ```
@@ -93,7 +93,7 @@ Check first that nothing between 4b and the summary is needed for 4b's own verdi
 
 **`shared/resources/tests/advance-pipeline-lock-4b-setup.test.mjs`**: `runLockTests(cmds)` sets `env.ADVANCE_LOCK_TEST_4B_ONLY = "1"` for every case. Each case asserts `/NOTE {2}4b-only:/`. The unset case still deletes `ADVANCE_LOCK_TEST_4B_CMDS` and asserts the default list, but now also requires the 4b-only NOTE, which proves the early exit fired.
 
-Measure `time node --test shared/resources/tests/advance-pipeline-lock-4b-setup.test.mjs` before the change and after, on the same host in one session, and record both in the implementation report.
+Measure `uptime; time node --test shared/resources/tests/advance-pipeline-lock-4b-setup.test.mjs` before the change (base commit) and after (PR head commit), on the same host in one session, and record both figures, loads and commits in the implementation report. Review baseline, 2026-10-26: 17.9s real at load 4.8–5.1, with the whole lock test file at 5.8s.
 
 ### Phase 4: Both review skills cooperate with the lock, on a passing review only
 
@@ -119,6 +119,10 @@ Then gate `skills/review-story/SKILL.md`'s existing block the same way on its GO
 
 `{outcome}` is a placeholder the agent substitutes, consistent with how other blocks in these skills bind values. Do not introduce a shell variable that no block sets (step-3 doc, "A plan's shell-variable names are claims about a file").
 
+**`shared/resources/pipeline-lock-cooperation.md`**: its generic block names `review-story` among the examples of the unconditional advance (line 20). Drop it there, and add a sentence saying the review skills gate the advance on their outcome, as `finalise` does (review.1, I4).
+
+**`shared/resources/tests/review-lock-cooperation.test.mjs`** (new; `package.json` reaches it through `shared/resources/tests/*.test.mjs`): copy the shape of `finalise-gaps-path.test.mjs`'s "the cooperation block, as written in SKILL.md" test. For each of `review-task` (`READY TO IMPLEMENT` passes; `NEEDS REVISION`, `REQUIRES REWORK` fail) and `review-story` (its GO value passes; its NO-GO value fails): `blockBy(readDoc(SKILL), "--skill <name>")`, `bind(block, { "{outcome}": value })`, and run under each of `SHELLS` in a temp root with `.agents/skills` → this repo's `skills/` and a lock at `current_step: 2`. Assert 3 on a pass and 2 on a fail (review.1, I2).
+
 Run `npm run bundle`, then confirm `skills/review-task/references/advance-pipeline-lock.sh` and `skills/review-task/references/pipeline-lock-cooperation.md` exist and `npm run bundle:check` is clean.
 
 ### Phase 5: Proof and gates
@@ -132,6 +136,7 @@ The mutation table, with each mutation applied to a `cp` snapshot and restored w
 | The step-8 `ALREADY_DONE=` loses `--complete`, and a new `echo "--complete"` line is added | hook floor red |
 | A decoy `x) NEXT=9 ;;` is added inside the commit-changes early-exit arm (scratch copy), with the old regex vs the new | new parse ignores it, old parse reads it (record both) |
 | The 4b early exit is removed | the meta-test's 4b-only NOTE assertion goes red |
+| Either review skill's cooperation block loses its outcome gate | `review-lock-cooperation.test.mjs`'s failing-outcome case goes red |
 
 Then run `npm run bundle`, `npm run ci:fast` (with `.agents/skills` moved aside), `npm run lint:shell`, `npm run bundle:check` and `npm run validate -- skills/review-task/ skills/review-story/`. Add a CHANGELOG `[Unreleased]` › Fixed entry citing (task 165).
 
@@ -145,4 +150,5 @@ Then run `npm run bundle`, `npm run ci:fast` (with `.agents/skills` moved aside)
 
 - `node --test shared/resources/tests/step-8-completion-checklist.test.mjs --test-name-pattern "halted|complete names|defers"`
 - `node --test shared/resources/tests/advance-pipeline-lock-4b-setup.test.mjs`, timed before and after
-- `bash shared/resources/advance-pipeline-lock.test.sh` with no seam set: 95/0 and every scenario run
+- `bash shared/resources/advance-pipeline-lock.test.sh` with no seam set: 0 failed, every scenario run (102 passed on 2026-10-26)
+- `node --test shared/resources/tests/review-lock-cooperation.test.mjs`
