@@ -18,7 +18,16 @@ if [ -f .claude/state/develop-pipeline.lock ]; then
 fi
 ```
 
-Replace `<this-skill-name>` with the unprefixed skill name (e.g. `create-pr`, `review-story`, `develop`, `commit-changes`, `create-branch`).
+Replace `<this-skill-name>` with the unprefixed skill name (e.g. `create-pr`, `develop`, `commit-changes`, `create-branch`).
+
+**The review skills advance only on a case they can tell will proceed.** `review-story` and
+`review-task` advance only on a passing verdict (GO, READY TO IMPLEMENT) whose document now reads
+`ready-for-development`. The orchestrators' Step 2 decides on the post-review status, so some other
+runs proceed too. The review skill cannot tell those runs from a HALT, and a lock already at 3 on a
+HALT would send a resume to Step 3, so on those runs the orchestrator's own Step 2 → 3 advance moves
+the lock. Each skill's own `## Pipeline Lock Cooperation` block carries the gate. It also prints one
+line whenever the lock is still below 3 afterwards, including when the helper itself could not advance
+it (task 165).
 
 **`finalise` is the exception: it passes the DoD it just wrote, and keeps stderr.** Without `--dod`
 the helper holds the lock at 7, because a gaps outcome must not read as Step 7 done (task 222):

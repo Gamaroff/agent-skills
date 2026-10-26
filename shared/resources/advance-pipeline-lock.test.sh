@@ -15,6 +15,7 @@
 #   4.   commit-changes at current_step 8 leaves the lock; --complete removes it (task 161)
 #   4b.  Without jq: commit-changes leaves the lock and --complete removes it; a corrupt
 #        lock does not make the no-op commit-changes call fail
+#        (ADVANCE_LOCK_TEST_4B_ONLY, a test-only seam, stops the file here — task 165)
 #   5.   Explicit --complete removes lock unconditionally (current_step 4)
 #   6.   No lock file → exit 0, noop
 #   7.   Every Steps 5–6 loop member (qa-story, qa-task, qa-fix, review-pr)
@@ -188,6 +189,19 @@ if [ "$RC" -ne 0 ] || [ "$(cat "$LOCK_FILE")" != "not json{" ]; then
   fail "commit-changes on a corrupt lock is a no-op (exit 0, untouched)" "rc=$RC"
 else
   pass "commit-changes on a corrupt lock is a no-op (exit 0, untouched)"
+fi
+
+# Test-only early exit (task 165): advance-pipeline-lock-4b-setup.test.mjs needs scenario 4b and
+# nothing after it, and the rest of the file — the zsh passes of 13–15 included — ran three times
+# per `npm test` for it. Unset in every normal run. When it is set the file says so, so a value
+# exported in a developer's shell shows in the direct `npm test` run instead of silently shortening
+# it. The summary is the file's own, so the 0/1 rule is unchanged.
+if [ -n "${ADVANCE_LOCK_TEST_4B_ONLY:-}" ]; then
+  echo "  NOTE  4b-only: ADVANCE_LOCK_TEST_4B_ONLY is set — stopping after scenario 4b (test-only seam)"
+  echo ""
+  undefined_commands_check || FAIL=$((FAIL + 1))
+  echo "Results: $PASS passed, $FAIL failed"
+  [ "$FAIL" -eq 0 ] && exit 0 || exit 1
 fi
 
 # ── Scenario 5: explicit --complete removes lock unconditionally ─────────────
