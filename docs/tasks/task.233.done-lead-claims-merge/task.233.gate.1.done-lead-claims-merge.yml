@@ -1,0 +1,51 @@
+schema: 2
+task: 'task.233.done-lead-claims-merge'
+task_title: 'Done lead claims a merge that has not happened'
+gate: PASS
+status_reason: 'The done lead now claims acceptance and names the merge as the step left, in both renderings. The new test is held by a mutation (old phrasing restored: red). The diff review found one low, advisory cleanup on the test; nothing gates.'
+reviewer: 'QA Engineer'
+head: '8e974240b79a7b9c64f8c23ebeed4168ca9a3340'
+updated: '2026-10-26T05:07:08Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 147
+  phases_verified: 3/3
+  ci: 'PR #751 @ 8e974240: validate, shellcheck, secret-scan, link-check pass; test pending (informational; no cycle waits on CI)'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false. The diff changes one template string and adds a test; it adds no function that accepts or rejects input. Slot values are interpolated as before, and the lead posts through the same tracker-comment.js path.'
+  performance:
+    status: PASS
+    notes: 'Not applicable: a template string.'
+  reliability:
+    status: PASS
+    notes: 'Stage, pr slot and marker unchanged, so idempotency still finds an existing done comment. The lead reads correctly with no slots filled.'
+  maintainability:
+    status: PASS
+    notes: 'Spec quotes (stakeholder-summary.md:201, :376) match the rendered text; bundle:check 0 problems; a code comment states why the lead claims acceptance only.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 (low, cleanup): also assert the lead says accepted and denies a past-tense release (has been merged, is now live), so the test holds the rule and not only the absence of the old phrases.'
+      refs: ['shared/resources/tests/stakeholder-summary.test.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

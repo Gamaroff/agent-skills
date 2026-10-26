@@ -15,6 +15,12 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **The `done` lead claims acceptance, not release (task 233).** Every caller posts it at
+  `/finalise`, before the pull request is merged, but it said the change "is now part of the
+  product" and "no further action is needed". It now says the work is checked and accepted, that it
+  becomes part of the product once merged, and that nothing is needed from the reader. The stage,
+  its `pr` slot and the comment marker are unchanged, so an existing `done` comment is still found
+  as `already`. A test in `stakeholder-summary.test.mjs`, red on the old text, holds the rule.
 - **Security probe: `expected.absent` takes nested paths relative to the case directory (task
   232).** `.claude/state/x` is valid, and a trailing `/` is ignored; `..` segments, absolute
   paths, `.` in any spelling (`./`, `a/..`) and NUL are still refused. One helper,

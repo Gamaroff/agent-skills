@@ -19,7 +19,7 @@ quotes into line and re-bundle.
 ### Phase 1: Test first
 
 **File:** `shared/resources/tests/stakeholder-summary.test.mjs`. Put the test after the deny-list
-loop (`:121`), so it sits with the other wording rules.
+loop (`:120`–`:130`), so it sits with the other wording rules.
 
 ```js
 // task.233 (obs #98): every caller posts `done` before the pull request is
@@ -59,11 +59,13 @@ After (proposed):
   done: (s) =>
     `This work has been checked and accepted. Everything it set out to do was confirmed ` +
     `working${s.pr ? ` (${s.pr})` : ""}. It becomes part of the product once the change is ` +
-    `merged, which is the last step for this item.`,
+    `merged, which is the last step for this item. No action is needed from anyone reading this.`,
 ```
 
-Check the sentence split: the no-slots test splits on `(?<=\.)\s+`. The proposed text gives 3
-sentences. A `pr` value such as a URL contains `.` with no space after it, so it does not add one.
+Check the sentence split: the no-slots test splits on `(?<=\.)\s+`. The proposed text gives 4
+sentences, the test's upper bound. A `pr` value such as a URL contains `.` with no space after it,
+so it does not add one (run at review on `{}`, `{pr:"#748"}` and a PR URL: 3 sentences before the
+fourth was added, no deny-list hit slot-free).
 
 **Mutation proof:** put the Before text back, run the file, confirm the new test is red, restore.
 

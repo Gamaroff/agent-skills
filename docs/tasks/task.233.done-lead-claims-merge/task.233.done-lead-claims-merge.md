@@ -5,10 +5,12 @@ type: task
 description: "The done lead says the change is now part of the product and nothing more is needed, but every caller posts it before the pull request is merged; reword it to claim only acceptance, and hold the wording with a test."
 tags: [finalise, observation, stakeholder-summary]
 category: refactoring
-status: planned
+status: accepted
 priority: Medium
 created: 2026-10-26
 updated: 2026-10-26
+completed_date: 2026-10-26
+pr_number: 751
 assignee:
 estimated_effort_hours: 8
 github_issue: 749
@@ -16,7 +18,8 @@ github_issue: 749
 
 # Technical Task: Done lead claims a merge that has not happened
 
-**Status:** Planned
+**Status:** Accepted
+**Review**: ✅ All review recommendations from `task.233.review.1.done-lead-claims-merge.md` implemented 2026-10-26
 **GitHub Issue**: [#749](https://github.com/Gamaroff/agent-skills/issues/749)
 
 ---
@@ -79,8 +82,13 @@ places the spec quotes it, and adds a test that the lead makes no claim of a lat
 - **The callers.** All post before merge:
   - Canonical PR summary: `skills/finalise/SKILL.md:1990` (`stakeholder-summary-cli.js --stage done`).
   - DoD PR comment: `shared/resources/develop-pipeline-step-7-finalise.md:206`.
-  - Tracker `done` comments: `skills/finalise/SKILL.md:2221`, `:2318`; and
-    `develop-pipeline-step-7-finalise.md:290`, `:313` (story and task arms, `--slot pr=`).
+  - Tracker `done` comments: `skills/finalise/SKILL.md:2219`, `:2317`; and
+    `develop-pipeline-step-7-finalise.md:288`, `:311` (story and task arms) and `:387` (the Jira
+    arm, `--slot pr=`).
+  - Search that defines this list:
+    `command node .agents/skills/review-task/references/call-sites.js --engine tracker-comment.js --json`
+    and the same with `--engine stakeholder-summary-cli.js`, filtered to `stage == "done"` (7 sites on
+    2026-10-26).
 - **The tests that read the lead.** `shared/resources/tests/stakeholder-summary.test.mjs:72`
   (every stage renders with no slots, 2–4 sentences) and `:102` (the jargon deny-list: no `PR`,
   `commit`, `branch`, `/`, backticks). `tracker-comment.test.mjs:199`, `:1672`, `:1717`, `:1873` call
@@ -91,15 +99,19 @@ places the spec quotes it, and adds a test that the lead makes no claim of a lat
 
 ### Target Architecture
 
-Reword the template. A proposed text (3 sentences, deny-list clean):
+Reword the template. A proposed text (4 sentences, deny-list clean):
 
 > This work has been checked and accepted. Everything it set out to do was confirmed working
 > {pr}. It becomes part of the product once the change is merged, which is the last step for this
-> item.
+> item. No action is needed from anyone reading this.
+
+The last sentence keeps the job the old "No further action is needed" did
+(`stakeholder-summary.md:389`): naming the merge must not read as a task handed to the reader. It
+reuses the `pipeline-paused` lead's wording, so the catalogue says it one way.
 
 The implementer may improve the wording within these rules: it claims acceptance, not release; it
-names the merge as the remaining step in plain words; and it stays within the 2–4 sentence and
-deny-list tests.
+names the merge as the remaining step in plain words; it tells the reader nothing is expected of
+them; and it stays within the 2–4 sentence and deny-list tests.
 
 ### Rejected Alternative
 
@@ -142,24 +154,24 @@ as `already`.
 
 ### Phase 1: Test first (Risk: Low)
 
-- [ ] Add a test: the rendered `done` lead, with no slots and with `pr` set, does not claim the
+- [x] Add a test: the rendered `done` lead, with no slots and with `pr` set, does not claim the
       change is part of the product now, does not say no further action is needed, and names the
       merge as the remaining step.
-- [ ] Run it on the current template and confirm it is red.
+- [x] Run it on the current template and confirm it is red.
 
 ### Phase 2: Reword (Risk: Low)
 
-- [ ] Rewrite `LEAD_TEMPLATES.done` per § 3 Target Architecture.
-- [ ] Confirm the new test, the no-slots test and the deny-list test are green.
-- [ ] Mutation-prove: restore the old text and confirm the new test goes red; restore the new text.
+- [x] Rewrite `LEAD_TEMPLATES.done` per § 3 Target Architecture.
+- [x] Confirm the new test, the no-slots test and the deny-list test are green.
+- [x] Mutation-prove: restore the old text and confirm the new test goes red; restore the new text.
 
 ### Phase 3: Spec and bundle (Risk: Low)
 
-- [ ] Update both quoted copies in `stakeholder-summary.md` and rewrite the `:389` paragraph so it
+- [x] Update both quoted copies in `stakeholder-summary.md` and rewrite the `:389` paragraph so it
       explains why the lead names the merge.
-- [ ] `npm run bundle`, then `npm run bundle:check`.
-- [ ] CHANGELOG `[Unreleased]` → Changed.
-- [ ] `npm run ci` with `.agents/skills` moved aside.
+- [x] `npm run bundle`, then `npm run bundle:check`.
+- [x] CHANGELOG `[Unreleased]` → Changed.
+- [x] `npm run ci` with `.agents/skills` moved aside.
 
 ---
 
@@ -208,24 +220,24 @@ as `already`.
 
 ### Functional
 
-- [ ] `renderLead("done", {})` and `renderLead("done", { pr: "#1" })` claim acceptance and name the
+- [x] `renderLead("done", {})` and `renderLead("done", { pr: "#1" })` claim acceptance and name the
       merge as the remaining step. Neither says the change is part of the product now, and neither
-      says no further action is needed.
-- [ ] The new test is red on the old template and green on the new one.
+      says no further action is needed. Held by the new test in `stakeholder-summary.test.mjs`.
+- [x] The new test is red on the old template and green on the new one.
 
 ### Performance
 
-- [ ] Not applicable: a template string.
+- [x] Not applicable: a template string.
 
 ### Code Quality
 
-- [ ] The no-slots, deny-list and slot-coverage tests pass unchanged.
-- [ ] `npm run ci` (with `.agents/skills` aside) and `npm run bundle:check` pass.
+- [x] The no-slots, deny-list and slot-coverage tests pass unchanged.
+- [x] `npm run ci` (with `.agents/skills` aside) and `npm run bundle:check` pass.
 
 ### Migration
 
-- [ ] `stakeholder-summary.md` quotes the new text in both places.
-- [ ] CHANGELOG `[Unreleased]` records the change.
+- [x] `stakeholder-summary.md` quotes the new text in both places.
+- [x] CHANGELOG `[Unreleased]` records the change.
 
 ---
 
@@ -270,12 +282,102 @@ Reword again; the test states the rule, not the text.
 
 ---
 
+## Implementation Summary
+
+**Completed**: 2026-10-26 (develop-task pipeline run 1, inline implementation from the co-located plan)
+
+**Approach**
+
+- **Test first.** `stakeholder-summary.test.mjs` gained "done lead claims acceptance, not release",
+  after the deny-list loop. It renders `done` with `{}` and `{ pr: "#748" }` and asserts no
+  `now part of the product`, no `no further action`, and a `merged`. Red on the old template (1 of
+  56 failing), green on the new.
+- **Template.** `LEAD_TEMPLATES.done` now reads: "This work has been checked and accepted.
+  Everything it set out to do was confirmed working ({pr}). It becomes part of the product once the
+  change is merged, which is the last step for this item. No action is needed from anyone reading
+  this." Four sentences, the test's upper bound. The last sentence reuses the `pipeline-paused`
+  lead's wording. A comment above the template names why it claims acceptance only.
+- **Spec.** Both quotes in `stakeholder-summary.md` (§ `done` and the Before/After example) carry the
+  new text. The rationale paragraph now covers both halves: the comment is posted before the merge,
+  and naming a step left must not read as a step handed to the reader.
+- **Bundle.** `npm run bundle` refreshed the `references/` copies (14 `.js`, 13 `.md`).
+
+**Testing Results**
+
+- `stakeholder-summary.test.mjs`: 56/56. `tracker-comment.test.mjs` + `comment-slot-coverage.test.mjs`: 91/91.
+- Mutation proof: old text restored → the new test red (1 fail); new text restored → 56/56.
+- `npm run ci` with `.agents/skills` moved aside: 6,340 tests, 6,326 pass, 0 fail, 14 skipped. The
+  first run had 1 failure, `tests/bundle-comment-origin.test.js` §2 reading a `.t131-mutant-*`
+  directory that `security-probe.test.mjs` creates in `shared/resources/tests/` and deletes. It
+  passes alone and on the re-run. A pre-existing race, not this change (observation #102).
+- `npm run bundle:check`: 128 skills, 0 problems.
+- Old-text sweep: `grep -rn "part of the product" shared skills evals` finds only the rationale
+  paragraph quoting the old claim, the new test's pattern, and an unrelated `qa-next` asset string.
+
+**Deferred Work**
+
+None.
+
+---
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-26
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.233.qa.1.done-lead-claims-merge.md](./task.233.qa.1.done-lead-claims-merge.md)
+- **Gate File**: [task.233.gate.1.done-lead-claims-merge.yml](./task.233.gate.1.done-lead-claims-merge.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 147
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No critical issues identified. The new test is mutation-proved. One low, advisory cleanup (CR-1): the test could also assert acceptance and deny a past-tense release.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.233.qa.1.done-lead-claims-merge.md`
+**Gate File**: `task.233.gate.1.done-lead-claims-merge.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR Review**: `task.233.pr-review.1.done-lead-claims-merge.md` — APPROVE
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 7/7 met
+✅ **Tests:** new test in `shared/resources/tests/stakeholder-summary.test.mjs:134`, mutation-proved; runs per PR
+✅ **PR Review:** PR #751, Step 5c review APPROVE (the host requires no reviews)
+✅ **CI:** SUCCESS over 6 checks on `b9486d02`
+✅ **Documentation:** `stakeholder-summary.md` quotes the new lead in both places; CHANGELOG `[Unreleased]` entry
+✅ **Security Review:** PASS — no secrets, no unsafe patterns, not a boundary
+⚠️ **Compliance Review:** not applicable
+
+**Task marked as ACCEPTED on:** 2026-10-26
+
+**Detailed Verification Log:** See `task.233.dod.1.done-lead-claims-merge.md` for complete verification evidence and timestamps.
+
 <!-- change-log-start -->
 ## Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-10-26 | 1.0 | Initial draft — cut from observation #98 | create-task |
+| 2026-10-26 | 1.1 | Review passed (8/10) — call-site list corrected (Jira arm added, anchors re-measured, search recorded); proposed lead keeps a no-action sentence | review-task |
+| 2026-10-26 |  | Status → ready-for-development | review-task |
+| 2026-10-26 |  | Implemented — 4 source files (template, test, spec, CHANGELOG), 1 new test; 27 bundled copies regenerated | develop |
+| 2026-10-26 |  | QA gate PASS (100/100) — 0 blocking findings, 1 advisory cleanup | qa-task |
+| 2026-10-26 | 1.2 | DoD passed — accepted (PR #751) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -283,15 +385,15 @@ Reword again; the test states the rule, not the text.
 ## Progress Tracking
 
 ### Phase 1: Test first
-- [ ] Red test
+- [x] Red test
 
 ### Phase 2: Reword
-- [ ] Template
-- [ ] Mutation proof
+- [x] Template
+- [x] Mutation proof
 
 ### Phase 3: Spec and bundle
-- [ ] Spec quotes
-- [ ] Bundle, CHANGELOG, `npm run ci`
+- [x] Spec quotes
+- [x] Bundle, CHANGELOG, `npm run ci`
 
 ---
 
