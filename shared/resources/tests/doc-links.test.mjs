@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import {
@@ -22,9 +22,14 @@ const require = createRequire(import.meta.url);
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "..", "..", "..");
 const ENGINE = path.join(REPO_ROOT, "shared", "resources", "doc-links.js");
-const { extractRelativeLinks, checkDocument, repoRoot, trackedSet } = require(
-  ENGINE,
-);
+const {
+  extractRelativeLinks,
+  checkDocument,
+  repoRoot,
+  trackedSet,
+  anchorsOf,
+  githubSlug,
+} = require(ENGINE);
 
 const targets = (text) => extractRelativeLinks(text).map((l) => l.target);
 
@@ -374,7 +379,9 @@ test("corpus: every work-item document's relative links resolve and every fence 
   for (const f of docs) {
     const r = checkDocument(f, { root: REPO_ROOT, tracked, repo });
     links += r.links;
-    for (const b of r.broken) dead.push(`${f} → ${b.target}`);
+    // A dead fragment is the anchor walk's (below), with its own ratchet.
+    for (const b of r.broken)
+      if (b.state !== "no-anchor") dead.push(`${f} → ${b.target}`);
     if (r.unterminatedFence) openFences.push(`${f}:${r.unterminatedFence}`);
   }
   assert.ok(
@@ -462,7 +469,8 @@ test("corpus: every co-located pipeline artifact's relative links resolve and ev
   for (const f of docs) {
     const r = checkDocument(f, { root: REPO_ROOT, tracked, repo });
     links += r.links;
-    for (const b of r.broken) dead.push(`${f} → ${b.target}`);
+    for (const b of r.broken)
+      if (b.state !== "no-anchor") dead.push(`${f} → ${b.target}`);
     if (r.unterminatedFence) openFences.push(f);
   }
   assert.ok(
@@ -495,6 +503,179 @@ test("corpus: every co-located pipeline artifact's relative links resolve and ev
     [],
     `KNOWN_ARTIFACT_FENCES entries now close — delete them so the ratchet tightens:\n  ${closedFences.join("\n  ")}`,
   );
+});
+
+// ---------------------------------------------------------------------------
+// Corpus guard: anchors (task 231, obs #80). Every tracked Markdown file, not
+// only docs/: the fragments live mostly in skills/ and shared/ (381 checked on
+// 2026-10-26, 6 of them under docs/), so a docs-only walk would hold a floor of
+// six. Two ratchets, as for paths: pipeline artifacts shrink their own list at
+// their own pace. Both were empty when measured — every fragment in the tree
+// named a heading — so any entry here is a regression pinned on purpose.
+// Pinned by file → target; delete an entry with its fix.
+const KNOWN_ANCHORS = new Set([]);
+const KNOWN_ARTIFACT_ANCHORS = new Set([]);
+
+test("corpus: every fragment in a tracked Markdown file names a heading or explicit anchor (KNOWN_ANCHORS / KNOWN_ARTIFACT_ANCHORS, ratchet only tightens)", () => {
+  const files = execFileSync("git", ["ls-files", "-z", "--", "*.md"], {
+    cwd: REPO_ROOT,
+    encoding: "utf8",
+  })
+    .split("\0")
+    .filter(Boolean);
+  assert.ok(files.length >= 3000, `only ${files.length} Markdown files walked`);
+  const artifacts = new Set(artifactDocs());
+  const repo = repoRoot(REPO_ROOT);
+  const tracked = trackedSet(REPO_ROOT);
+  const dead = [];
+  const deadArtifacts = [];
+  let checked = 0;
+  for (const f of files) {
+    const r = checkDocument(f, { root: REPO_ROOT, tracked, repo });
+    checked += r.anchorsChecked;
+    for (const b of r.broken)
+      if (b.state === "no-anchor")
+        (artifacts.has(f) ? deadArtifacts : dead).push(`${f} → ${b.target}`);
+  }
+  // Zero dead fragments is also what a blind check reports.
+  assert.ok(
+    checked >= 300,
+    `only ${checked} fragments checked against an anchor set — the anchor check is blind, not the corpus clean`,
+  );
+  for (const [found, known, name] of [
+    [dead, KNOWN_ANCHORS, "KNOWN_ANCHORS"],
+    [deadArtifacts, KNOWN_ARTIFACT_ANCHORS, "KNOWN_ARTIFACT_ANCHORS"],
+  ]) {
+    assert.deepEqual(
+      found.filter((d) => !known.has(d)),
+      [],
+      `fragment(s) naming no heading — rename the fragment to the heading's slug, or the heading back:\n  ${found.join("\n  ")}`,
+    );
+    const healed = [...known].filter((k) => !found.includes(k));
+    assert.deepEqual(
+      healed,
+      [],
+      `${name} entries now resolve — delete them so the ratchet tightens:\n  ${healed.join("\n  ")}`,
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Anchors (task 231, obs #80): a fragment on a link to a .md file, and a
+// same-file fragment, must name a GitHub heading slug or an explicit anchor.
+test("anchors: githubSlug matches GitHub on the repository's own headings", () => {
+  assert.equal(githubSlug("A — B"), "a--b");
+  assert.equal(githubSlug("Key → document lookup"), "key--document-lookup");
+  assert.equal(githubSlug("Step 0.1 reconciliation"), "step-01-reconciliation");
+  assert.equal(
+    githubSlug("Find the item's merged PR"),
+    "find-the-items-merged-pr",
+  );
+  assert.equal(githubSlug("snake_case and Ünïcode"), "snake_case-and-ünïcode");
+});
+
+test("anchors: anchorsOf reads ATX, setext, nested and explicit anchors, suffixes duplicates, and skips fenced headings", () => {
+  const a = anchorsOf(
+    [
+      "# Real heading",
+      "## A — B",
+      "## A — B",
+      "```",
+      "# not a heading",
+      "```",
+      "<a id=\"Explicit\"></a> <a name='named'></a>",
+      "## `set-waiting-on.sh` rule and [a link](x.md) **bold**",
+      "Setext title",
+      "===",
+      "- item",
+      "    #### Nested in a list",
+      "> ## Quoted",
+    ].join("\n"),
+  );
+  for (const want of [
+    "real-heading",
+    "a--b",
+    "a--b-1",
+    "explicit",
+    "named",
+    "set-waiting-onsh-rule-and-a-link-bold",
+    "setext-title",
+    "nested-in-a-list",
+    "quoted",
+  ])
+    assert.ok(a.has(want), `missing ${want}: ${[...a].join(", ")}`);
+  assert.equal(
+    a.has("not-a-heading"),
+    false,
+    "a heading inside a fence is not an anchor",
+  );
+});
+
+test("anchors: a dead cross-file or same-file fragment is [no-anchor]; a live one, and a fragment on a non-.md target, pass", () => {
+  withNonRepoFixture((dir) => {
+    fs.writeFileSync(
+      path.join(dir, "other.md"),
+      '# Real heading\n\n## A — B\n\n## A — B\n\n<a id="x"></a>\n',
+    );
+    fs.writeFileSync(path.join(dir, "data.yml"), "k: v\n");
+    fs.writeFileSync(
+      path.join(dir, "doc.md"),
+      [
+        "# Here",
+        "",
+        "[ok](other.md#real-heading) [dash](other.md#a--b) [dup](other.md#a--b-1)",
+        "[explicit](other.md#x) [case](other.md#Real-Heading)",
+        "[yml](data.yml#anything) [self](#here)",
+        "[nope](other.md#nope)",
+        "[gone](#gone)",
+        "`[code](other.md#in-code)`",
+      ].join("\n"),
+    );
+    const r = checkDocument("doc.md", { root: dir });
+    assert.deepEqual(
+      r.broken.map((b) => [b.line, b.target, b.state]),
+      [
+        [6, "other.md#nope", "no-anchor"],
+        [7, "#gone", "no-anchor"],
+      ],
+    );
+    // Six cross-file .md fragments (the .yml one is not checked) and two same-file; the code span is no link.
+    assert.equal(r.anchorsChecked, 8);
+  });
+});
+
+test("anchors: in a repository the target's TRACKED text is read — a heading renamed on disk but not staged still answers", () => {
+  withRepoFixture((dir) => {
+    fs.writeFileSync(path.join(dir, "t.md"), "# Old name\n");
+    fs.writeFileSync(
+      path.join(dir, "a.md"),
+      "[x](t.md#old-name) [y](t.md#new-name)\n",
+    );
+    execFileSync("git", ["add", "t.md", "a.md"], { cwd: dir });
+    fs.writeFileSync(path.join(dir, "t.md"), "# New name\n");
+    const r = checkDocument("a.md", { root: dir });
+    assert.deepEqual(
+      r.broken.map((b) => b.target),
+      ["t.md#new-name"],
+      "the index blob, not the disk, decides — the same tree the path check reads",
+    );
+  });
+});
+
+test("anchors: the CLI prints [no-anchor] and exits 1", () => {
+  withNonRepoFixture((dir) => {
+    fs.writeFileSync(path.join(dir, "doc.md"), "# Here\n\n[x](#nope)\n");
+    const r = spawnSync(
+      process.execPath,
+      [ENGINE, "--file", "doc.md", "--root", dir],
+      {
+        encoding: "utf8",
+        env: { ...process.env, GIT_CEILING_DIRECTORIES: path.dirname(dir) },
+      },
+    );
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stdout + r.stderr, /#nope .*\[no-anchor\]/);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -733,7 +914,9 @@ test("resolver: `resolved[]` lists every link's repository-relative path, resolv
     fs.writeFileSync(path.join(dir, "docs", "t", "g.yml"), "x\n");
     fs.writeFileSync(
       path.join(dir, "docs", "t", "t.md"),
-      "[g](./g.yml) [q](q.md#part) [up](../u.md) [a](#only)\n",
+      // `# Only` makes `#only` a live same-file anchor (task 231 checks them), so
+      // every broken entry below is a path, as this test is about.
+      "# Only\n\n[g](./g.yml) [q](q.md#part) [up](../u.md) [a](#only)\n",
     );
     const r = checkDocument("docs/t/t.md", { root: dir });
     assert.deepEqual(r.resolved, ["docs/t/g.yml", "docs/t/q.md", "docs/u.md"]);

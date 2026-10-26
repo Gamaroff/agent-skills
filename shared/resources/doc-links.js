@@ -24,8 +24,11 @@
  *                                disk, not in the tracked tree: commit it),
  *                                `[ignored]` (on disk but gitignored: it can
  *                                never be committed), `[outside-repo]`,
- *                                `[unverifiable]` or `[missing]` (not on disk
- *                                under that exact name: write it) — and
+ *                                `[unverifiable]`, `[missing]` (not on disk
+ *                                under that exact name: write it) or
+ *                                `[no-anchor]` (the file is there, the
+ *                                `#fragment` names no heading or explicit
+ *                                anchor in it: fix the fragment) — and
  *                                carries the same `state` in `--json` `broken[]`
  *                                and the summary reads
  *                                `FAIL doc-links: N finding(s) in <file>` — the
@@ -63,8 +66,20 @@
  * (nested brackets one level deep, `<target with spaces>`, balanced parentheses
  * in the target, "double" / 'single' / (paren) titles), reference definitions
  * (`[x]: target`) and HTML `href=` / `src=` attributes are all extracted;
- * `#anchor`, `mailto:`, absolute URLs and protocol-relative targets are not
- * relative links.
+ * `mailto:`, absolute URLs and protocol-relative targets are not relative
+ * links.
+ *
+ * Anchors (task 231, obs #80). A `#fragment` on a link to a `.md` file, and a
+ * same-file `#fragment`, must name an anchor in that file: a GitHub heading
+ * slug (anchorsOf) or an explicit `<a id=…>` / `<a name=…>`. A renamed heading
+ * used to break every inbound link silently — the path check skipped the
+ * fragment, and `markdown-link-check@3` passes a dead cross-file fragment
+ * (measured: `other.md#nope` reads ✓). A fragment on any other target is not
+ * checked. The target's text is its tracked (index) blob when the tracked tree
+ * is in use, so the anchor check answers the same question as the path check;
+ * outside a repository, or for a target not in the index, the disk is read.
+ * Same-file fragments are not relative links — extractRelativeLinks still
+ * leaves them out, and `resolved[]` never lists them.
  */
 
 const fs = require("fs");
@@ -152,18 +167,19 @@ function lineOf(text, index) {
 }
 
 /**
- * [{ target, line }] for every relative link outside fences and code spans,
- * plus `unterminatedFence` (1-based line, or null).
+ * The one link scanner: [{ target, line }] for every link target outside
+ * fences and code spans that `keep(target)` accepts, plus `unterminatedFence`
+ * (1-based line, or null). extractRelativeLinks and sameFileFragments are its
+ * two filters — one extraction rule, two questions.
  */
-function extractRelativeLinks(text) {
+function scanLinks(text, keep) {
   // CRLF → LF once: every regex below anchors on \n, and with a \r on each
   // line no fence opened and no paragraph split (QA cycle 4, CR-1).
   const fenced = blankFences(text.replace(/\r\n?/g, "\n"));
   const clean = blankCodeSpans(fenced.text);
   const out = [];
   const push = (target, index) => {
-    if (target === undefined || target === "" || NOT_RELATIVE_RE.test(target))
-      return;
+    if (target === undefined || target === "" || !keep(target)) return;
     out.push({ target, line: lineOf(clean, index) });
   };
   let m;
@@ -179,6 +195,95 @@ function extractRelativeLinks(text) {
   }
   out.sort((a, b) => a.line - b.line);
   return Object.assign(out, { unterminatedFence: fenced.unterminatedFence });
+}
+
+/**
+ * [{ target, line }] for every relative link outside fences and code spans,
+ * plus `unterminatedFence` (1-based line, or null).
+ */
+function extractRelativeLinks(text) {
+  return scanLinks(text, (t) => !NOT_RELATIVE_RE.test(t));
+}
+
+/** [{ target, line }] for every same-file `#fragment` link (a bare `#` is not one). */
+function sameFileFragments(text) {
+  return scanLinks(text, (t) => t.startsWith("#") && t.length > 1);
+}
+
+// Any indent, and inside a blockquote: a heading nested in a list item (`    #### Find …`) or a
+// quote renders, and gets an anchor, on GitHub. Reading too many lines as headings can only make
+// a dead fragment pass; reading too few fails a live one, which is the error this file must not make.
+const ATX_HEADING_RE =
+  /^[ \t]*(?:>[ \t]?)*[ \t]*(#{1,6})(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$/;
+const SETEXT_UNDERLINE_RE = /^ {0,3}(?:=+|-+)[ \t]*$/;
+const EXPLICIT_ANCHOR_RE =
+  /<a\s[^>]*?\b(?:id|name)\s*=\s*(?:"([^"]*)"|'([^']*)')/gi;
+
+/**
+ * GitHub's heading slug: lower-case, inline HTML removed, punctuation dropped
+ * (an em dash is punctuation), each space a hyphen — so "A — B" is `a--b` and
+ * "Key → document lookup" is `key--document-lookup`. Letters, digits, `_` and
+ * `-` of any script survive. The caller strips inline markup first.
+ */
+function githubSlug(text) {
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/<[^>]+>/g, "")
+    .replace(/[^\p{L}\p{N}\p{M}\s_-]/gu, "")
+    .replace(/ /g, "-");
+}
+
+/** A heading's rendered text: code spans, links, images and emphasis unwrapped. */
+function headingText(raw) {
+  return raw
+    .replace(/(`+)([\s\S]*?)\1/g, (_, __, code) => code)
+    .replace(/!?\[((?:[^\[\]]|\[[^\]]*\])*)\]\([^)]*\)/g, "$1")
+    .replace(/(\*\*|__)(?=\S)([\s\S]*?\S)\1/g, "$2")
+    .replace(/(^|[^\w*])\*(?=\S)([^*]*?\S)\*(?!\w)/g, "$1$2")
+    .replace(/(^|[^\w])_(?=\S)([^_]*?\S)_(?!\w)/g, "$1$2");
+}
+
+/**
+ * Every anchor a document defines: the GitHub slug of each heading outside a
+ * fence (ATX, and setext under a non-blank line), a repeated slug suffixed
+ * `-1`, `-2`… in document order, plus each explicit `<a id=…>` / `<a name=…>`
+ * outside a fence. A heading inside a fenced block is not an anchor.
+ */
+function anchorsOf(text) {
+  const fenced = blankFences(text.replace(/\r\n?/g, "\n")).text;
+  const lines = fenced.split("\n");
+  const anchors = new Set();
+  const seen = new Map();
+  const add = (slug) => {
+    const n = seen.get(slug) || 0;
+    seen.set(slug, n + 1);
+    anchors.add(n === 0 ? slug : `${slug}-${n}`);
+  };
+  for (let i = 0; i < lines.length; i += 1) {
+    const atx = ATX_HEADING_RE.exec(lines[i]);
+    if (atx) {
+      add(githubSlug(headingText(atx[2] ?? "")));
+      continue;
+    }
+    const next = lines[i + 1];
+    if (
+      next !== undefined &&
+      lines[i].trim() !== "" &&
+      SETEXT_UNDERLINE_RE.test(next) &&
+      !/^ {0,3}(?:[-*+]|\d+[.)])[ \t]/.test(lines[i]) &&
+      !/^ {0,3}>/.test(lines[i]) &&
+      !/^ {0,3}\|/.test(lines[i])
+    ) {
+      add(githubSlug(headingText(lines[i])));
+      i += 1;
+    }
+  }
+  let m;
+  EXPLICIT_ANCHOR_RE.lastIndex = 0;
+  while ((m = EXPLICIT_ANCHOR_RE.exec(fenced)) !== null)
+    anchors.add((m[1] ?? m[2]).toLowerCase());
+  return anchors;
 }
 
 function decodeSafe(s) {
@@ -266,7 +371,14 @@ function existsExactly(base, rel) {
   return true;
 }
 
+// One directory set per tracked set: a caller walking thousands of documents
+// passes the same `tracked` to each call, and rebuilding this per call was most
+// of a repository-wide walk's time (task 231 measured 8.7 s of 9.2 s). Keyed on
+// the Set object — a fresh trackedSet() is a fresh key, so nothing goes stale.
+const DIR_SETS = new WeakMap();
 function dirSet(tracked) {
+  const cached = DIR_SETS.get(tracked);
+  if (cached) return cached;
   const dirs = new Set();
   for (const f of tracked) {
     let d = path.posix.dirname(f);
@@ -275,6 +387,7 @@ function dirSet(tracked) {
       d = path.posix.dirname(d);
     }
   }
+  DIR_SETS.set(tracked, dirs);
   return dirs;
 }
 
@@ -303,8 +416,9 @@ function isWithin(parent, child) {
  * `trackedSet(repoRoot)`) so `git ls-files` runs once; `null` means "not a
  * repo" and is honoured, not re-derived.
  *
- * Returns { file, root, links, broken: [{ line, target, resolved }],
- *           unterminatedFence, tracked }.
+ * Returns { file, root, links, anchorsChecked, resolved,
+ *           broken: [{ line, target, resolved, state }], unterminatedFence,
+ *           tracked }.
  */
 function checkDocument(
   file,
@@ -344,10 +458,37 @@ function checkDocument(
     trackedIn === undefined ? (repo ? trackedSet(repo) : null) : trackedIn;
   const dirs = tracked ? dirSet(tracked) : null;
   const broken = [];
+  // Anchors per target file, read once per call (a document links one target
+  // many times). The index blob when tracked; the disk otherwise.
+  const anchorCache = new Map();
+  const anchorsFor = (relPath) => {
+    if (anchorCache.has(relPath)) return anchorCache.get(relPath);
+    let body =
+      tracked && tracked.has(relPath)
+        ? git(["show", `:${relPath}`], base)
+        : null;
+    if (body === null) {
+      try {
+        body = fs.readFileSync(path.join(base, relPath), "utf8");
+      } catch {
+        body = null;
+      }
+    }
+    const set = body === null ? null : anchorsOf(body);
+    anchorCache.set(relPath, set);
+    return set;
+  };
+  const fragmentOf = (target) => {
+    const i = target.indexOf("#");
+    return i < 0 ? "" : decodeSafe(target.slice(i + 1)).toLowerCase();
+  };
   // Every link's repository-relative resolved path, resolved or not — so a
   // caller can ask "does this document link X?" with the one resolution rule
   // below rather than a second one (task.158: qa-read-back's this-cycle check).
   const resolvedAll = [];
+  // How many fragments were checked against an anchor set — a caller's
+  // non-vacuity floor, since zero `no-anchor` is also what a blind check reports.
+  let anchorsChecked = 0;
   for (const { target, line } of links) {
     const noFragment = target.split("#")[0];
     if (noFragment === "") continue;
@@ -360,18 +501,36 @@ function checkDocument(
     const exists = tracked
       ? tracked.has(resolved) || dirs.has(resolved)
       : fs.existsSync(path.join(base, resolved));
-    if (!exists)
+    if (!exists) {
       broken.push({
         line,
         target,
         resolved,
         state: linkState(tracked, base, resolved),
       });
+      continue;
+    }
+    const fragment = fragmentOf(target);
+    if (fragment && resolved.endsWith(".md")) {
+      const anchors = anchorsFor(resolved);
+      if (anchors) anchorsChecked += 1;
+      if (anchors && !anchors.has(fragment))
+        broken.push({ line, target, resolved, state: "no-anchor" });
+    }
   }
+  let own = null;
+  for (const { target, line } of sameFileFragments(text)) {
+    anchorsChecked += 1;
+    own ??= anchorsOf(text);
+    if (!own.has(fragmentOf(target)))
+      broken.push({ line, target, resolved: rel, state: "no-anchor" });
+  }
+  broken.sort((a, b) => a.line - b.line);
   return {
     file: rel,
     root: base,
     links: links.length,
+    anchorsChecked,
     resolved: resolvedAll,
     broken,
     unterminatedFence: links.unterminatedFence,
@@ -448,6 +607,9 @@ function main(argv) {
 
 module.exports = {
   extractRelativeLinks,
+  sameFileFragments,
+  anchorsOf,
+  githubSlug,
   checkDocument,
   repoRoot,
   trackedSet,

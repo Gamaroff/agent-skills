@@ -224,6 +224,9 @@ const REMEDY = {
     "is outside-repo — link to a path inside the repository",
   unverifiable: () =>
     "is unverifiable — git answered neither yes nor no for this path (a link through a symlinked directory?); it is not a missing artifact, so link to the real path",
+  // task 231 — the file is there; the #fragment names no heading in it.
+  "no-anchor": () =>
+    "is no-anchor — the file exists but its #fragment names no heading or explicit anchor in it; fix the fragment to the heading's slug",
 };
 
 function readBack(docArg, opts = {}) {
