@@ -1086,22 +1086,23 @@ test("the mapping parse does not read a decoy NEXT= arm in the early-exit --skil
   const scratch = parts.join(
     anchor + "      case x in\n      x) NEXT=9 ;;\n      esac\n",
   );
-  const names = (m) =>
-    m ? mappedSkills(m[1]).map((a) => `${a.name}→${a.next}`) : null;
+  // Each entry is a parsed {name, next} arm, so a match is on the arm itself, not on text.
+  const arms = (m) => (m ? mappedSkills(m[1]) : null);
+  const isDecoy = (a) => a.name === "x" && a.next === 9;
   // Control: a parse anchored on the first `--skill)` reads the decoy, so the fixture puts it
   // where a looser anchor would see it.
-  const loose = names(scratch.match(/\n {2}--skill\)\n([\s\S]*?)\n {4}esac/));
+  const loose = arms(scratch.match(/\n {2}--skill\)\n([\s\S]*?)\n {4}esac/));
   assert.ok(
-    loose && loose.includes("x→9"),
+    loose && loose.some(isDecoy),
     `fixture: the decoy is not where a first-\`--skill)\` anchor reads, found ${JSON.stringify(loose)}`,
   );
-  const anchored = names(scratch.match(SKILL_MAPPING));
+  const anchored = arms(scratch.match(SKILL_MAPPING));
   assert.ok(
-    anchored && anchored.includes("finalise→8"),
+    anchored && anchored.some((a) => a.name === "finalise" && a.next === 8),
     `SKILL_MAPPING: the scratch copy's mapping lost finalise → 8, found ${JSON.stringify(anchored)}`,
   );
   assert.ok(
-    !anchored.includes("x→9"),
+    !anchored.some(isDecoy),
     `SKILL_MAPPING: read the decoy x) NEXT=9 from the early-exit arm, found ${JSON.stringify(anchored)}`,
   );
 });

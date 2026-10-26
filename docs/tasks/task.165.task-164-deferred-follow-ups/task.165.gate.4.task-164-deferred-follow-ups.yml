@@ -1,0 +1,66 @@
+schema: 2
+task: 'task.165.task-164-deferred-follow-ups'
+task_title: "Close task.164's deferred follow-ups"
+gate: FAIL
+status_reason: 'The DoD-gap fix (9dd5d892) holds the decoy-arm clause and is mutation-proven, but it turns the suite red: tests/relationship-assertion-lint.test.js flags its substring-style `.includes("finalise→8")` assertion (rule A). The scoped diff review returned three advisory findings, none high-confidence.'
+reviewer: 'QA Engineer'
+head: '9dd5d8927624b93d16d5a9de0153d5f1ba0f070c'
+updated: '2026-10-26T16:28:46Z'
+
+top_issues:
+  - id: 'QA4-1'
+    severity: high
+    file: 'shared/resources/tests/step-8-completion-checklist.test.mjs'
+    finding: 'The new decoy-arm test asserts `anchored && anchored.includes("finalise→8")` on a joined name→step string list, which the relationship-assertion lint (rule A) refuses; `npm run ci:fast` fails 1 of 6394 tests (tests/relationship-assertion-lint.test.js:424), so the PR head is red.'
+    suggested_action: 'Assert on the parsed mapping objects instead, the way the live pin does (`mappedSkills(m[1]).some((a) => a.name === "finalise" && a.next === 8)`, and `!…some((a) => a.name === "x")` for the decoy), keeping the loose-anchor control; re-run the lint test and the decoy mutation.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 6394
+  phases_verified: 5/5
+  ci: 'test in progress @ 9dd5d892 (other checks SUCCESS)'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false this cycle. The only change since gate 3 is a test file. The review-skill gates are unchanged since gate 3 (22 probes, 0 escaped) and dod.1 (22 probes, 0 reproduced).'
+  performance:
+    status: PASS
+    notes: '4b meta-test re-measured at the DoD on d774d71a: 11.230s at base, 0.397s at head.'
+  reliability:
+    status: PASS
+    notes: 'No runtime code changed this cycle.'
+  maintainability:
+    status: PASS
+    notes: 'The new test closes AC3/AC8 (mutation-proven, covered). Its red lint result is QA4-1.'
+
+recommendations:
+  immediate:
+    - action: 'QA4-1: rewrite the decoy test assertions on the parsed mapping objects so the relationship-assertion lint passes.'
+      refs: ['shared/resources/tests/step-8-completion-checklist.test.mjs']
+  future:
+    - action: 'CR-1 (cycle 4, medium/medium; was cycle-2 CR-6): give namesSkill positive controls (it must match `develop`, /develop and plain develop) so the refusal loop cannot pass vacuously.'
+      refs: ['shared/resources/tests/step-8-completion-checklist.test.mjs']
+    - action: 'CR-2 (cycle 4, low/low): anchor the hook-floor check to the NEXT=8 branch of develop-pipeline-on-stop.sh rather than any COMPLETION_LINE=/ALREADY_DONE= assignment.'
+      refs: ['shared/resources/tests/step-8-completion-checklist.test.mjs', 'shared/resources/develop-pipeline-on-stop.sh']
+    - action: 'CR-3 (cycle 4, cleanup): the `/?` in namesSkill is redundant except at string start; drop it or comment why.'
+      refs: ['shared/resources/tests/step-8-completion-checklist.test.mjs']
+    - action: 'Carried from gate 3: frontmatter-only status read in both review gates (0/632 corpus hits); review-story Step 10 field; unset ADVANCE_LOCK_TEST_4B_ONLY for test:suite.'
+      refs: ['skills/review-task/SKILL.md', 'skills/review-story/SKILL.md', 'package.json']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['QA4-1 fixed and the suite green']

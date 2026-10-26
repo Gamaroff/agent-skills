@@ -335,24 +335,24 @@ None identified.
 
 ## QA Testing Results
 
-**QA Status**: PASS
+**QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-26
-**Quality Score**: 100/100
-**Gate Decision**: PASS
+**Quality Score**: 80/100
+**Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.165.qa.3.task-164-deferred-follow-ups.md](./task.165.qa.3.task-164-deferred-follow-ups.md)
-- **Gate File**: [task.165.gate.3.task-164-deferred-follow-ups.yml](./task.165.gate.3.task-164-deferred-follow-ups.yml)
+- **Full Report**: [task.165.qa.4.task-164-deferred-follow-ups.md](./task.165.qa.4.task-164-deferred-follow-ups.md)
+- **Gate File**: [task.165.gate.4.task-164-deferred-follow-ups.yml](./task.165.gate.4.task-164-deferred-follow-ups.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 6393
+- **Tests Executed**: 6394
 - **Phases Verified**: 5/5
-- **Critical Issues**: 0
+- **Critical Issues**: 1
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-All five gate findings from cycles 1 and 2 are fixed and mutation-proven. The review-skill gates are probed with `fence:`: 22 cases executed, 0 escaped. Three advisory findings are routed to future work: the whole-file status match (0 of 632 documents affected) and the body/frontmatter status field.
+The DoD-gap fix closes AC3 and AC8 and is mutation-proven. However, its assertion fails the repository's relationship-assertion lint, so the suite is red (QA4-1, high). Three advisory review findings are routed to future work.
 
 ## Definition of Done - Gaps Identified
 
@@ -397,6 +397,10 @@ All five gate findings from cycles 1 and 2 are fixed and mutation-proven. The re
 | 2026-10-26 |         | QA findings fixed — cycle 2, 2 findings (held lock read off the lock after the call; gate prose scoped to what the verdict can tell) | qa-fix |
 | 2026-10-26 |         | QA gate PASS (100/100) — 0 findings (3 advisory) | qa-task |
 | 2026-10-26 |  | DoD incomplete — 2 gaps identified | finalise |
+| 2026-10-26 |  | QA gate FAIL (80/100) — 1 finding (1 high: the decoy test fails the relationship-assertion lint) | qa-task |
+| 2026-10-26 |  | Status → in-progress | qa-task |
+| 2026-10-26 |  | QA findings fixed — cycle 4, 1 finding (the decoy test asserts on the parsed mapping arms; relationship-assertion lint green) | qa-fix |
+| 2026-10-26 |  | Status → ready-for-review | qa-fix |
 
 ---
 <!-- change-log-end -->
