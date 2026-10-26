@@ -1,0 +1,68 @@
+schema: 2
+task: 'task.227.step-8-checklist-no-rm'
+task_title: 'Step 8 checklist block mixes rm with must-pass checks; host refuses the whole block'
+gate: CONCERNS
+status_reason: 'All four cycle-2 findings are fixed, and the three code fixes are mutation-proven in a clean worktree at b479f628. The narrowed cycle-3 review found that cycle 2 made --complete stricter than the Step 8 check that guards it, and both reviewer findings reproduce. The Step 8 check passes an unlistable hold dir while --complete keeps the records with a warning (MEDIUM). An unreadable hold-dir record is deleted silently (LOW).'
+reviewer: 'QA Engineer'
+head: 'b479f6280e64576ce0313d876f55b64b209b0ead'
+updated: '2026-10-24T08:31:40Z'
+
+top_issues:
+  - id: 'TASK-227-QA3-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-8-commit.md'
+    finding: 'Two definitions of "the hold directory still holds files" now disagree. The Step 8 check (:276) reads ls -A output with stderr discarded, so an unlistable hold dir passes. --complete (advance-pipeline-lock.sh:190) treats the same directory as holding files and keeps both records. A pipeline run therefore prints "Step 8 post-conditions verified" with held files possibly still in /tmp, and the comments at :288 and in the script header say this cannot happen (diff review CR-1, reproduced: step8 passes, --complete keeps the record).'
+    suggested_action: 'State the rule once: give advance-pipeline-lock.sh a read-only mode that reports clear or pending, have --complete and the Step 8 check both read it, and add an unlistable case to the Step 8 fixtures.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-227-QA3-2'
+    severity: low
+    file: 'shared/resources/advance-pipeline-lock.sh'
+    finding: 'HOLD_REC_DIR comes from cat with stderr discarded, so a hold-dir record that exists but cannot be read gives the same empty value as no record. --complete then deletes both hold records without a warning (diff review CR-2, reproduced with chmod 000 on the record: both records gone, held.txt still in the hold dir).'
+    suggested_action: 'In the same read-only rule, treat a record that exists but cannot be read as pending.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 85
+
+evidence:
+  tests_reviewed: 146
+  phases_verified: 3/3
+  ci: 'npm run ci:fast 6289/0 @ b479f628 tree, twice (local, .agents/skills symlink moved aside); lint:shell and bundle exit 0; PR #746 checks not read'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 20
+    escaped: 0
+    notes: 'boundary: true — lineRunsNoRm probed with security-probe.mjs, sink shell-exec and rm-specific cases, including the cycle-2 redirection forms (record task.227.qa.3.security.run.json): verdict engages, 0 escaped.'
+  performance:
+    status: PASS
+    notes: 'The word-test matcher is linear: 0.05 ms at 64k characters, against 264 ms at 16k for the cycle-1 form.'
+  reliability:
+    status: CONCERNS
+    notes: 'QA3-1: Step 8 and --complete disagree about an unlistable hold dir. QA3-2: an unreadable record is deleted silently. Both need a hold dir or record the run owner cannot read.'
+  maintainability:
+    status: PASS
+    notes: 'The rm matcher is one word test and states its history. QA3-1 is also a maintainability signal: one rule in two places drifted within one cycle.'
+
+recommendations:
+  immediate:
+    - action: 'One definition of the hold-record rule, read by --complete and by the Step 8 check (QA3-1), covering an unreadable record (QA3-2)'
+      refs: ['shared/resources/advance-pipeline-lock.sh', 'shared/resources/develop-pipeline-step-8-commit.md']
+  future:
+    - action: 'Gate 2 CR-1, carried over: a no-lock --complete during a pause or HALT clears records a later --restore would read. Consider a halt-snapshot check in the no-lock arm.'
+      refs: ['shared/resources/advance-pipeline-lock.sh']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'QA3-1 fixed, or waived with a reason'

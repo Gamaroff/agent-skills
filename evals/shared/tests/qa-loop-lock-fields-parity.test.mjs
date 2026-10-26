@@ -50,9 +50,30 @@ import fs, { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { extractBlocks } from "../../../shared/resources/qa-execute-snippets.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const read = (p) => readFileSync(join(ROOT, p), "utf8");
+const blocksOf = (p) => extractBlocks(read(p));
+
+// The SET form with a quoted label — a mention of the script (`--clear`, a citation) is not a mark.
+const WAIT_SET = /set-waiting-on\.sh "[^"]+"/;
+
+/**
+ * Is the dispatch on line `i` (0-based) marked? Two ways, either enough (task 231, obs #62):
+ *   - the SET form within 12 lines either side (the proximity window), or
+ *   - the first bash block that opens within the 12 lines AFTER the dispatch carries it, however
+ *     deep inside the block — a block that marks and clears its own wait (task.189's design).
+ * A mark in a block that opened before the dispatch does not count beyond the window. `blocks` is
+ * the repository's one fence reader's answer (qa-execute-snippets.mjs extractBlocks, 1-based
+ * `line` of the opening fence), not a second fence parser.
+ */
+function isWaitMarked(lines, i, blocks) {
+  if (WAIT_SET.test(lines.slice(Math.max(0, i - 12), i + 12).join("\n")))
+    return true;
+  const next = blocks.find((b) => b.line - 1 > i && b.line - 1 <= i + 12);
+  return next ? WAIT_SET.test(next.code) : false;
+}
 
 const FILES = {
   loopDoc: "shared/resources/develop-pipeline-step-5-6-qa-loop.md",
@@ -361,15 +382,12 @@ test("waiting_on: one writer, one reader, and every describer spells the field a
   let sites = 0;
   for (const rel of population) {
     const lines = read(rel).split(/\r?\n/);
+    const blocks = blocksOf(rel);
     lines.forEach((l, i) => {
       if (!DISPATCH.test(l) || EXEMPT.test(l)) return;
       sites += 1;
-      const window = lines.slice(Math.max(0, i - 12), i + 12).join("\n");
-      // The SET form with a quoted label — a mention of the script (`--clear`, a citation)
-      // is not a mark.
-      assert.match(
-        window,
-        /set-waiting-on\.sh "[^"]+"/,
+      assert.ok(
+        isWaitMarked(lines, i, blocks),
         `${rel}:${i + 1} dispatches without marking the wait: ${l.trim().slice(0, 80)}`,
       );
     });
@@ -410,6 +428,69 @@ test("waiting_on: one writer, one reader, and every describer spells the field a
       `${rel} must mark its own 5a dispatch`,
     );
   }
+});
+
+test("isWaitMarked: a block that marks its own wait counts; an unmarked block and an earlier block do not (task 231)", () => {
+  const FENCE = "```";
+  const filler = (n) => Array.from({ length: n }, (_, k) => `prose ${k}`);
+  const check = (lines, i) =>
+    isWaitMarked(lines, i, extractBlocks(lines.join("\n")));
+
+  // The block opens 2 lines after the dispatch and marks its wait 20 lines in — past the window.
+  const owned = [
+    "Dispatch the probe plan in the background.",
+    "",
+    `${FENCE}bash`,
+    ...filler(20),
+    'bash set-waiting-on.sh "step-7 probe plan" --kind task',
+    FENCE,
+  ];
+  assert.equal(
+    check(owned, 0),
+    true,
+    "a block-owned mark beyond the window must count",
+  );
+
+  // The same shape with no mark in the block.
+  const unmarked = owned.filter((l) => !l.includes("set-waiting-on"));
+  assert.equal(
+    check(unmarked, 0),
+    false,
+    "a following block with no mark must not count",
+  );
+
+  // The mark sits in a block that closed before the dispatch, more than 12 lines earlier.
+  const earlier = [
+    `${FENCE}bash`,
+    'bash set-waiting-on.sh "earlier" --kind task',
+    ...filler(14),
+    FENCE,
+    "Dispatch the probe plan in the background.",
+    "",
+    `${FENCE}bash`,
+    "echo nothing",
+    FENCE,
+  ];
+  assert.equal(
+    check(earlier, 17),
+    false,
+    "a mark only in an earlier block must not count",
+  );
+
+  // The proximity window still counts on its own.
+  assert.equal(
+    check(['Mark it: set-waiting-on.sh "x"', "Dispatch the agent."], 1),
+    true,
+  );
+  // A block that opens more than 12 lines after the dispatch is not this dispatch's block.
+  const far = [
+    "Dispatch the agent.",
+    ...filler(13),
+    `${FENCE}bash`,
+    'set-waiting-on.sh "far"',
+    FENCE,
+  ];
+  assert.equal(check(far, 0), false);
 });
 
 test("qa_phase has exactly the three values, and the writer and the reader agree on them", () => {

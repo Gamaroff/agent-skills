@@ -1011,8 +1011,16 @@ test("the parser is executable and declared in Step 0b", () => {
 // ---------------------------------------------------------------------------
 // A consumer-shaped repository: Step 0b binds REMOTE_URL itself from `git remote get-url origin`,
 // so the fixture is a git repo whose origin is the remote under test.
+// Each one is removed once this file's tests finish: about ten tests build one and none had a
+// cleanup, which left 40 `review-pr-repo-*` directories per `npm test` (task 231, obs #83).
+const CONSUMER_REPOS = new Set();
+test.after(() => {
+  for (const dir of CONSUMER_REPOS)
+    fs.rmSync(dir, { recursive: true, force: true });
+});
 function consumerRepo(remote) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "review-pr-repo-"));
+  CONSUMER_REPOS.add(dir);
   spawnSync("git", ["init", "-q", dir]);
   if (remote) spawnSync("git", ["-C", dir, "remote", "add", "origin", remote]);
   const bin = path.join(dir, ".bin");
@@ -2457,9 +2465,12 @@ for (const shell of SHELLS) {
       .replaceAll("{pr-url}", "https://github.com/acme/widgets/pull/7")
       .replaceAll("{pr-number}", "7")
       .replaceAll("{report-file}", report);
+    // TMPDIR is passed through: the block's `mktemp -t review-pr-comment.XXXXXX.md` lands in the
+    // sandbox the test removes, not in the system /tmp (task 231 — it escaped every run).
     const env = {
       PATH: `${bin}:${process.env.PATH}`,
       HOME: process.env.HOME,
+      TMPDIR: dir,
       GH_LOG: path.join(dir, "gh.log"),
       GH_BODY: path.join(dir, "posted.md"),
     };
@@ -2491,11 +2502,21 @@ for (const shell of SHELLS) {
 // task.195 SC-5: the --inline select keeps only verified anchors, so a findings file the checker never
 // annotated used to yield [] — indistinguishable from "no anchorable findings". The guard before it
 // must refuse such a file, and must let a fully annotated one through (control).
+// task.217: keyed on the stamp clause, which the guard keeps; the `(.anchor_check | type)` clause it
+// was keyed on before was replaced by the verdict enumeration.
 function extractInlineGuard(skillText) {
   const m = skillText.match(
-    /^[ \t]*jq -e '[\s\S]*?select\(\(\.anchor_check \| type\) != "string"\)[\s\S]*?exit 1; \}/m,
+    /^[ \t]*jq -e '[\s\S]*?\.anchor_checked\.by == "finding-anchors"[\s\S]*?exit 1; \}/m,
   );
   return m ? m[0] : null;
+}
+
+/** `doc` with the stamp `finding-anchors.js --annotate` writes, counting every finding present. */
+function stamped(doc) {
+  const n = [doc.code_review, doc.pr_conformance]
+    .filter((w) => w && Array.isArray(w.findings))
+    .reduce((a, w) => a + w.findings.length, 0);
+  return { ...doc, anchor_checked: { by: "finding-anchors", findings: n } };
 }
 
 test("--inline refuses a findings file with an un-annotated finding, and passes an annotated one", (t) => {
@@ -2554,37 +2575,46 @@ test("--inline refuses a findings file with an un-annotated finding, and passes 
       assert.equal(r.status, 1, `${JSON.stringify(notFindings)} must HALT`);
       assert.match(r.stdout, /HALT: /);
     }
-    assert.equal(runGuard({ code_review: { findings: [] } }).status, 0);
     assert.equal(
-      runGuard({
-        pr_conformance: {
-          findings: [{ ref: "AC-1", anchor_check: "no-line" }],
-        },
-      }).status,
+      runGuard(stamped({ code_review: { findings: [] } })).status,
+      0,
+    );
+    assert.equal(
+      runGuard(
+        stamped({
+          pr_conformance: {
+            findings: [{ ref: "AC-1", anchor_check: "no-line" }],
+          },
+        }),
+      ).status,
       0,
       "a conformance-only file passes",
     );
     assert.equal(
-      runGuard({
-        code_review: null,
-        pr_conformance: {
-          findings: [{ ref: "AC-1", anchor_check: "no-line" }],
-        },
-      }).status,
+      runGuard(
+        stamped({
+          code_review: null,
+          pr_conformance: {
+            findings: [{ ref: "AC-1", anchor_check: "no-line" }],
+          },
+        }),
+      ).status,
       0,
       "a lens that did not run may be null",
     );
-    const annotated = runGuard({
-      code_review: {
-        findings: [
-          {
-            file_line: "src/x.ts:4",
-            finding: "f",
-            anchor_check: "text-mismatch",
-          },
-        ],
-      },
-    });
+    const annotated = runGuard(
+      stamped({
+        code_review: {
+          findings: [
+            {
+              file_line: "src/x.ts:4",
+              finding: "f",
+              anchor_check: "text-mismatch",
+            },
+          ],
+        },
+      }),
+    );
     assert.equal(
       annotated.status,
       0,
@@ -2645,15 +2675,112 @@ test("--inline leaves no scratch file behind, whether it refuses the input or po
       [],
       "a refusal leaves no scratch file",
     );
-    const posted = runBlock({
-      code_review: {
-        findings: [{ file_line: "a.js:1", finding: "f", anchor_check: "ok" }],
-      },
-    });
+    const posted = runBlock(
+      stamped({
+        code_review: {
+          findings: [{ file_line: "a.js:1", finding: "f", anchor_check: "ok" }],
+        },
+      }),
+    );
     assert.equal(posted.status, 0, posted.stdout + posted.stderr);
     assert.match(posted.stdout, /"reason":"posted"/);
     assert.deepEqual(fs.readdirSync(tmp), [], "a post leaves no scratch file");
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// task.217 (task.195 gate 3 CR-2): the guard trusted any string. A reviewer that writes
+// `anchor_check: "ok"` itself, with no checker run, must not get its findings posted inline.
+test("task.217: --inline requires the checker's stamp, a matching count and a known verdict", (t) => {
+  if (spawnSync("jq", ["--version"]).error) return t.skip("jq not installed");
+  const guard = extractInlineGuard(SKILL);
+  assert.ok(guard, "could not find the --inline anchor_check guard");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "inline-stamp-"));
+  try {
+    const file = path.join(dir, "findings.json");
+    const runGuard = (doc) => {
+      fs.writeFileSync(file, JSON.stringify(doc));
+      return spawnSync("bash", ["-c", guard], {
+        encoding: "utf8",
+        env: { ...process.env, FINDINGS_JSON: file },
+      });
+    };
+    const two = {
+      code_review: {
+        findings: [{ file_line: "a.js:1", finding: "f", anchor_check: "ok" }],
+      },
+      pr_conformance: {
+        findings: [{ ref: "AC-1", finding: "g", anchor_check: "no-line" }],
+      },
+    };
+    const refused = {
+      "no stamp (reviewer-written anchor_check)": two,
+      "a stamp another tool wrote": {
+        ...two,
+        anchor_checked: { by: "reviewer", findings: 2 },
+      },
+      "a stale count": {
+        ...two,
+        anchor_checked: { by: "finding-anchors", findings: 1 },
+      },
+      "an unknown verdict": stamped({
+        code_review: {
+          findings: [
+            { file_line: "a.js:1", finding: "f", anchor_check: "verified" },
+          ],
+        },
+      }),
+    };
+    for (const [label, doc] of Object.entries(refused)) {
+      const r = runGuard(doc);
+      assert.equal(r.status, 1, `${label} must HALT`);
+      assert.match(r.stdout, /HALT: .*stamp.*Step 6/, label);
+    }
+    const ok = runGuard(stamped(two));
+    assert.equal(
+      ok.status,
+      0,
+      `a stamped file passes:\n${ok.stdout}${ok.stderr}`,
+    );
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// task.217 (task.195 gates 3–4): the selector split on the FIRST colon and posted the untrimmed path;
+// the checker trims and takes the LAST colon. The posted anchor must be the one the checker verified.
+test("task.217: the --inline selector parses anchors in the checker's grammar", (t) => {
+  if (spawnSync("jq", ["--version"]).error) return t.skip("jq not installed");
+  const prog = extractJqProgram(SKILL);
+  assert.ok(prog, "could not find the jq program feeding --findings-file");
+  const fixture = {
+    code_review: {
+      findings: [
+        { file_line: "src/a:b.js:3", finding: "colon", anchor_check: "ok" },
+        {
+          file_line: "  a.js:1",
+          finding: "padded",
+          anchor_check: "unchecked-text",
+        },
+        { file_line: "a.js:1-4", finding: "range", anchor_check: "ok" },
+      ],
+    },
+    pr_conformance: {
+      findings: [
+        { ref: " docs/x:y.md:7 ", finding: "ref", anchor_check: "ok" },
+      ],
+    },
+  };
+  const r = spawnSync("jq", ["-c", prog], {
+    input: JSON.stringify(fixture),
+    encoding: "utf8",
+  });
+  assert.equal(r.status, 0, r.stderr);
+  const got = JSON.parse(r.stdout).map((f) => [f.path, f.line]);
+  assert.deepEqual(got, [
+    ["src/a:b.js", 3],
+    ["a.js", 1],
+    ["docs/x:y.md", 7],
+  ]);
 });

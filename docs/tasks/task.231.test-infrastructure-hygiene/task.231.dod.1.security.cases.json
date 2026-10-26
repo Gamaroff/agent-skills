@@ -1,0 +1,64 @@
+[
+  {
+    "id": "new-prefix",
+    "direction": "hostile",
+    "input": {
+      "fresh": 1
+    },
+    "why": "A prefix the ratchet has never seen is a new leak and must fail the run."
+  },
+  {
+    "id": "over-count",
+    "direction": "hostile",
+    "input": {
+      "known": 3
+    },
+    "why": "A ratcheted prefix above its recorded count is a regression and must fail the run."
+  },
+  {
+    "id": "proto-key",
+    "direction": "hostile",
+    "input": {
+      "__proto__": 1
+    },
+    "why": "A prefix spelled like a prototype key must still be a new prefix, not an inherited ratchet entry."
+  },
+  {
+    "id": "constructor-key",
+    "direction": "hostile",
+    "input": {
+      "constructor": 1
+    },
+    "why": "An inherited Object property name must not read as a known prefix with an unbounded count."
+  },
+  {
+    "id": "string-count",
+    "direction": "hostile",
+    "input": {
+      "known": "3"
+    },
+    "why": "A count that arrives as a string must still compare as over, not slip through a type mismatch."
+  },
+  {
+    "id": "within-count",
+    "direction": "legitimate",
+    "input": {
+      "known": 2
+    },
+    "why": "A ratcheted prefix at its recorded count is the steady state and must pass."
+  },
+  {
+    "id": "below-count",
+    "direction": "legitimate",
+    "input": {
+      "known": 1
+    },
+    "why": "Leaking fewer than recorded is an improvement and must pass."
+  },
+  {
+    "id": "healed",
+    "direction": "legitimate",
+    "input": {},
+    "why": "A ratchet entry that leaked nothing is a notice, not a failure (environment variance between hosts)."
+  }
+]

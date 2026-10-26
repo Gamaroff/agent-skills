@@ -1,0 +1,84 @@
+schema: 2
+task: 'task.227.step-8-checklist-no-rm'
+task_title: 'Step 8 checklist block mixes rm with must-pass checks; host refuses the whole block'
+gate: CONCERNS
+status_reason: 'Both cycle-1 findings are fixed. The fixes were mutation-proven in a clean worktree and the guard matcher probes as engages (17 cases). The cycle-2 refute pass found four LOW items, all reproduced. Two are reliability gaps on the hand-run --complete path: when the hold-dir record is kept, held-paths is still deleted; and an unlistable hold dir reads as empty. With those, reliability is CONCERNS.'
+reviewer: 'QA Engineer'
+head: '8d21d218494356c91fcdb9f1cb911e21c89523e5'
+updated: '2026-10-24T07:59:03Z'
+
+top_issues:
+  - id: 'TASK-227-QA2-1'
+    severity: low
+    file: 'shared/resources/advance-pipeline-lock.sh'
+    finding: 'When --complete keeps step4-hold-dir.txt because its directory still holds files, it still deletes step4-held-paths.txt, the list of those same files (diff review CR-2, reproduced: hold-dir kept, held-paths gone). This combines the cycle-1 fix with the original removal.'
+    suggested_action: 'Keep step4-held-paths.txt whenever step4-hold-dir.txt is kept, and assert it in the scenario-15 full case for both arms.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-227-QA2-2'
+    severity: low
+    file: 'shared/resources/advance-pipeline-lock.sh'
+    finding: 'The keep test reads ls -A output with stderr discarded, so a hold directory that exists but cannot be listed reads as empty and its record is deleted (diff review CR-3, reproduced with chmod 000: record gone).'
+    suggested_action: 'Keep the record, with the same warning, unless ls -A succeeds and prints nothing; add an unlistable-directory case.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-227-QA2-3'
+    severity: low
+    file: 'shared/resources/tests/lib/rm-invocation.mjs'
+    finding: 'lineRunsNoRm accepts rm followed directly by a redirection (rm>/dev/null a, rm<<EOF), because the lookahead omits < and >. The control test is named "refuses every way a line runs rm". The reviewer rated this a cleanup. QA counts it as a residual miss of the guard: 0 occurrences of the shape across about 41 rm call sites in the shipped docs.'
+    suggested_action: 'Add < and > to the lookahead class and both shapes to the control test hit list; optionally replace (?:\S*\/)? with a non-backtracking path form.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-227-QA2-4'
+    severity: low
+    file: 'docs/tasks/task.227.step-8-checklist-no-rm/task.227.step-8-checklist-no-rm.md'
+    finding: 'Technical Background (:71), Scope (:85) and Success Criteria 1-2 (:183, :184) still say --complete removes step4-hold-dir.txt unconditionally; since cycle 1 it is kept while its directory holds files (only §5, the CHANGELOG and the script say so).'
+    suggested_action: 'Amend those four lines to state the exception, citing the script header rather than restating it.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 144
+  phases_verified: 3/3
+  ci: 'npm run ci:fast 6289/0 @ 8d21d218 tree (local, .agents/skills symlink moved aside); validate:all, bundle:check, check:generated, lint:shell exit 0; PR #746 checks not read'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 17
+    escaped: 0
+    notes: 'boundary: true — lineRunsNoRm (now an export) probed with security-probe.mjs, sink shell-exec and rm-specific cases (record task.227.qa.2.security.run.json): verdict engages, 13 hostile refused, 4 legitimate accepted. Residual QA2-3 (rm immediately followed by < or >) has 0 corpus occurrences. The generic shell-exec corpus probes command-name allow-lists and does not fit this control.'
+  performance:
+    status: PASS
+    notes: 'The matcher is quadratic on a long run of separators (263 ms at 16k chars). The longest line in the scanned docs is 1017 chars.'
+  reliability:
+    status: CONCERNS
+    notes: 'QA2-1 and QA2-2: two unhandled cases on the hand-run --complete path. Step 8 HALTs earlier on a non-empty hold dir, so a pipeline run does not reach either.'
+  maintainability:
+    status: PASS
+    notes: 'The matcher moved to its own module and its header states what it does not see; bundled copies match. QA2-4 is doc drift in the work item.'
+
+recommendations:
+  immediate:
+    - action: 'Keep step4-held-paths.txt with a kept hold-dir record (QA2-1), and treat an unlistable hold dir as non-empty (QA2-2)'
+      refs: ['shared/resources/advance-pipeline-lock.sh', 'shared/resources/advance-pipeline-lock.test.sh']
+  future:
+    - action: 'Diff review CR-1 (medium/medium, not promoted): a no-lock --complete during a pause or HALT clears the scope, held-paths and 5c carry records while the halt snapshot stays. The only shipped caller (Step 8) removed the same records in the same states before this branch, and the hand-run case is documented in task §5. Consider a snapshot check in the no-lock arm as a follow-up.'
+      refs: ['shared/resources/advance-pipeline-lock.sh']
+    - action: 'QA2-3: close the redirection gap in lineRunsNoRm, or scope the claim in the control test name'
+      refs: ['shared/resources/tests/lib/rm-invocation.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'QA2-1 and QA2-2 fixed, or waived with a reason'

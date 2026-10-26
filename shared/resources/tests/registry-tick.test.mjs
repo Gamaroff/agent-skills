@@ -1752,3 +1752,278 @@ test("normaliseBugRegistryStatus reads either vocabulary, any case, and nothing 
   assert.equal(normaliseBugRegistryStatus("🔍 Ready"), null);
   assert.equal(normaliseBugRegistryStatus(""), null);
 });
+
+// ── status-icon column: `registry.task.statusIcons` ──────────────────────────
+
+/**
+ * The observed consumer shape: a presentational icon column immediately left
+ * of Status, with an EMPTY header cell. Before `statusIcons`, the tick wrote
+ * `accepted` and left `⚠️`, and the consumer's own drift gate went red.
+ */
+const ICON_HEADER = [
+  "| Task Number | Title | Category | Priority |      | Status           | Jira | File |",
+  "| ----------- | ----- | -------- | -------- | ---- | ---------------- | ---- | ---- |",
+];
+const iconRow = (n, slug, icon, status) =>
+  `| ${n} | Plain title ${n} | infrastructure | High | ${icon} | ${status} | X-${n} | \`docs/tasks/task.${n}.${slug}/task.${n}.${slug}.md\` |`;
+const ICON_CONFIG = [
+  "registry:",
+  "  task:",
+  "    statusIcons:",
+  '      accepted: "✅"',
+  '      ready-for-review: "⚠️"',
+  '    iconColumn: ""',
+  "",
+].join("\n");
+
+function iconSandbox(lines, config = ICON_CONFIG) {
+  const sb = rawSandbox(lines);
+  if (config !== null) {
+    writeFileSync(path.join(sb.dir, "skills-config.yaml"), config);
+  }
+  return sb;
+}
+
+/** The cells of task `n`'s row, trimmed — `[icon, status]` for ICON_HEADER. */
+function iconAndStatus(registry, n) {
+  const line = readFileSync(registry, "utf8")
+    .split(/\r?\n/)
+    .find((l) => l.startsWith(`| ${n} |`));
+  const cells = line.split("|").map((c) => c.trim());
+  return [cells[5], cells[6]];
+}
+
+test("statusIcons: an unnamed icon column beside Status is written with the status", () => {
+  const { dir, registry } = iconSandbox([
+    ...ICON_HEADER,
+    iconRow(154, "ic", "⚠️", "ready-for-review"),
+  ]);
+  try {
+    const f = writeDoc(dir, 154, "ic", { status: "accepted" });
+    const res = run(dir, ["--file", path.relative(dir, f)]);
+    assert.equal(res.reason, "ticked");
+    assert.equal(res.icon, "written");
+    assert.deepEqual(iconAndStatus(registry, 154), ["✅", "accepted"]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("statusIcons: a re-run on an `accepted` row with a stale icon repairs the icon", () => {
+  // The state the bug leaves behind. Without the repair, `already` can never heal it.
+  const { dir, registry } = iconSandbox([
+    ...ICON_HEADER,
+    iconRow(155, "rr", "⚠️", "accepted"),
+  ]);
+  try {
+    const f = writeDoc(dir, 155, "rr", { status: "accepted" });
+    const res = run(dir, ["--file", path.relative(dir, f)]);
+    assert.equal(res.reason, "already");
+    assert.equal(res.icon, "repaired");
+    assert.deepEqual(iconAndStatus(registry, 155), ["✅", "accepted"]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("statusIcons: no config → the icon is untouched, the bytes are today's, the payload has no `icon`", () => {
+  // Two configs that both mean "no icon handling": no file, and a file without the key.
+  for (const config of [null, "developNext:\n  baseBranch: develop\n"]) {
+    const { dir, registry } = iconSandbox(
+      [...ICON_HEADER, iconRow(156, "nc", "⚠️", "ready-for-review")],
+      config,
+    );
+    try {
+      const before = readFileSync(registry, "utf8");
+      const f = writeDoc(dir, 156, "nc", { status: "accepted" });
+      const res = run(dir, ["--file", path.relative(dir, f)]);
+      assert.equal(res.reason, "ticked");
+      assert.equal("icon" in res, false, "no config, no `icon` field");
+      // Exactly the pre-icon behaviour: the Status cell, width kept, and nothing else.
+      assert.equal(
+        readFileSync(registry, "utf8"),
+        before.replace("| ready-for-review |", "| accepted         |"),
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+});
+
+test("statusIcons: two empty header cells beside Status → `ambiguous`, Status ticked, icon not written", () => {
+  const { dir, registry } = iconSandbox([
+    "| Task Number | Title | Category | Priority |      | Status           |      | File |",
+    "| ----------- | ----- | -------- | -------- | ---- | ---------------- | ---- | ---- |",
+    iconRow(157, "am", "⚠️", "ready-for-review"),
+  ]);
+  try {
+    const f = writeDoc(dir, 157, "am", { status: "accepted" });
+    const res = run(dir, ["--file", path.relative(dir, f)]);
+    assert.equal(res.reason, "ticked");
+    assert.equal(res.icon, "ambiguous");
+    assert.deepEqual(iconAndStatus(registry, 157), ["⚠️", "accepted"]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("statusIcons: a CRLF registry keeps CRLF and changes only the one line", () => {
+  const { dir, registry } = iconSandbox([
+    ...ICON_HEADER,
+    iconRow(158, "cr", "⚠️", "ready-for-review"),
+    iconRow(159, "cs", "⚠️", "ready-for-review"),
+  ]);
+  try {
+    const crlf = readFileSync(registry, "utf8").replace(/\n/g, "\r\n");
+    writeFileSync(registry, crlf);
+    const f = writeDoc(dir, 158, "cr", { status: "accepted" });
+    const res = run(dir, ["--file", path.relative(dir, f)]);
+    assert.equal(res.icon, "written");
+    const after = readFileSync(registry, "utf8");
+    assert.equal(
+      (after.match(/\r\n/g) || []).length,
+      (crlf.match(/\r\n/g) || []).length,
+    );
+    const a = after.split("\r\n");
+    const b = crlf.split("\r\n");
+    assert.equal(a.length, b.length);
+    const changed = a.filter((l, i) => l !== b[i]);
+    assert.equal(changed.length, 1, "exactly one line changes");
+    assert.match(changed[0], /^\| 158 \|.*\| ✅ +\| accepted +\|/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("statusIcons: a status absent from the map → `unmapped`, the icon cell is left alone (never blanked)", () => {
+  const { dir, registry } = iconSandbox(
+    [...ICON_HEADER, iconRow(160, "um", "⚠️", "ready-for-review")],
+    'registry:\n  task:\n    statusIcons:\n      ready-for-review: "⚠️"\n      accepted: ""\n',
+  );
+  try {
+    const f = writeDoc(dir, 160, "um", { status: "accepted" });
+    const res = run(dir, ["--file", path.relative(dir, f)]);
+    assert.equal(res.reason, "ticked");
+    assert.equal(res.icon, "unmapped");
+    assert.deepEqual(iconAndStatus(registry, 160), ["⚠️", "accepted"]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("statusIcons: a named `iconColumn` is found by its header text, anywhere in the row", () => {
+  const { dir, registry } = iconSandbox(
+    [
+      "| Task Number | Title | Category | Priority | Icon | Status           | Jira | File |",
+      "|---|---|---|---|---|---|---|---|",
+      iconRow(161, "nm", "⚠️", "ready-for-review"),
+    ],
+    'registry:\n  task:\n    statusIcons:\n      accepted: "✅"\n    iconColumn: icon\n',
+  );
+  try {
+    const f = writeDoc(dir, 161, "nm", { status: "accepted" });
+    assert.equal(run(dir, ["--file", path.relative(dir, f)]).icon, "written");
+    assert.deepEqual(iconAndStatus(registry, 161), ["✅", "accepted"]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("statusIcons: no empty header cell beside Status → `no-column`, only Status is ticked", () => {
+  // The documented header: Status sits between Title and Category, both named.
+  const { dir, registry } = sandbox([row(162, "nc2", "planned")]);
+  writeFileSync(path.join(dir, "skills-config.yaml"), ICON_CONFIG);
+  try {
+    const before = readFileSync(registry, "utf8");
+    const f = writeDoc(dir, 162, "nc2", { status: "accepted" });
+    const res = run(dir, ["--file", path.relative(dir, f)]);
+    assert.equal(res.reason, "ticked");
+    assert.equal(res.icon, "no-column");
+    assert.equal(
+      readFileSync(registry, "utf8"),
+      before.replace("| planned |", "| accepted |"),
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("statusIcons: `--dry-run` on a stale icon reports the repair and writes nothing", () => {
+  const { dir, registry } = iconSandbox([
+    ...ICON_HEADER,
+    iconRow(163, "dr", "⚠️", "accepted"),
+  ]);
+  try {
+    const before = readFileSync(registry, "utf8");
+    const f = writeDoc(dir, 163, "dr", { status: "accepted" });
+    const res = run(dir, ["--file", path.relative(dir, f), "--dry-run"]);
+    assert.equal(res.reason, "dry-run");
+    assert.equal(res.icon, "repaired");
+    assert.equal(readFileSync(registry, "utf8"), before);
+    // And the matching icon is left as it is: `unchanged`, no write.
+    writeFileSync(
+      registry,
+      before.replace("| ⚠️ | accepted", "| ✅ | accepted"),
+    );
+    const settled = readFileSync(registry, "utf8");
+    const again = run(dir, ["--file", path.relative(dir, f)]);
+    assert.equal(again.reason, "already");
+    assert.equal(again.icon, "unchanged");
+    assert.equal(readFileSync(registry, "utf8"), settled);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("statusIcons: an icon holding a pipe is dropped from the map — `unmapped`, the table is not broken", () => {
+  const { dir, registry } = iconSandbox(
+    [...ICON_HEADER, iconRow(164, "pp", "⚠️", "ready-for-review")],
+    'registry:\n  task:\n    statusIcons:\n      accepted: "✅|"\n',
+  );
+  try {
+    const f = writeDoc(dir, 164, "pp", { status: "accepted" });
+    assert.equal(run(dir, ["--file", path.relative(dir, f)]).icon, "unmapped");
+    assert.deepEqual(iconAndStatus(registry, 164), ["⚠️", "accepted"]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("statusIcons: Status in the FIRST column — the empty text before the leading pipe is not a column", () => {
+  // `| Status | … |` splits to ["", " Status ", …]: element 0 is empty and sits
+  // beside Status, so an unbounded search would write the icon outside the table.
+  const { dir, registry } = iconSandbox([
+    "| Status           | Task Number | Title | Category | Priority | Jira | File |",
+    "|---|---|---|---|---|---|---|",
+    `| ready-for-review | 165 | Plain title 165 | infrastructure | High | X-165 | \`docs/tasks/task.165.fc/task.165.fc.md\` |`,
+  ]);
+  try {
+    const before = readFileSync(registry, "utf8");
+    const f = writeDoc(dir, 165, "fc", { status: "accepted" });
+    const res = run(dir, ["--file", path.relative(dir, f)]);
+    assert.equal(res.reason, "ticked");
+    assert.equal(res.icon, "no-column");
+    assert.equal(
+      readFileSync(registry, "utf8"),
+      before.replace("| ready-for-review | 165", "| accepted         | 165"),
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("statusIcons: `iconColumn` naming Status itself → `no-column`; the tick is never overwritten", () => {
+  const { dir, registry } = iconSandbox(
+    [...ICON_HEADER, iconRow(166, "st", "⚠️", "ready-for-review")],
+    'registry:\n  task:\n    statusIcons:\n      accepted: "✅"\n    iconColumn: Status\n',
+  );
+  try {
+    const f = writeDoc(dir, 166, "st", { status: "accepted" });
+    const res = run(dir, ["--file", path.relative(dir, f)]);
+    assert.equal(res.reason, "ticked");
+    assert.equal(res.icon, "no-column");
+    assert.deepEqual(iconAndStatus(registry, 166), ["⚠️", "accepted"]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

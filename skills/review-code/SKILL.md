@@ -148,7 +148,12 @@ Only if `--comment` is set and a PR exists for the current branch (or `target` n
    . "$(dirname "${0}")/references/resolve-platform.sh" || exit 1   # adjust to the bundled path in this install
    # VCS = github | bitbucket   ← the axis this step branches on
    ```
-2. **Both platforms**: post the findings inline with the shared primitive. It resolves `$VCS` itself, so this call does not branch — and it is real code rather than the prose that used to sit here describing behaviour no file implemented:
+#### Step 4.2 — Post the findings inline (both platforms)
+
+   The block below is this heading's only fenced block, so the probe engine's `fence:` form reaches
+   it by this heading (task.217).
+
+   Post the findings inline with the shared primitive. It resolves `$VCS` itself, so this call does not branch — and it is real code rather than the prose that used to sit here describing behaviour no file implemented:
 
    ```bash
    # `.findings[]`, NOT `.[]` — the latter iterates the `code_review:` wrapper's
@@ -156,35 +161,62 @@ Only if `--comment` is set and a PR exists for the current branch (or `target` n
    # indexes a string and jq aborts. `.finding` is the schema's key, not
    # `.summary`; see `references/code-review-prompt.md` § Output contract.
    #
-   # The `test()` guard is load-bearing: jq is all-or-nothing inside `[ … ]`, so a
+   # The `capture(…)?` filter is load-bearing: jq is all-or-nothing inside `[ … ]`, so a
    # single `file_line` of `src/x.ts:42-58` (a range) or `src/x.ts` (no line) would
    # abort the WHOLE program, leave `$INLINE_FILE` empty, and drop every finding —
    # not degrade them, drop them. `suggested_action` is likewise made optional.
    # A finding excluded here has no line to anchor to; carry it in your summary.
    # `anchor_check` is Step 2b's verdict: only a verified anchor posts inline. A
    # malformed one would land on the wrong line, or on none, and report `posted`.
+   # Every input is bound here: a fresh shell carries nothing from another block (task.217).
    FINDINGS_JSON="{findings-json}"   # Step 2b — the file finding-anchors.js annotated
+   PR_NUMBER="{pr-number}"           # the PR under review (Step 1's target)
+   SUMMARY_FILE="{summary-file}"     # the summary comment body you wrote for this run
+   [ -s "$FINDINGS_JSON" ] || { echo "HALT: FINDINGS_JSON ($FINDINGS_JSON) is missing or empty"; exit 1; }
+   [ -s "$SUMMARY_FILE" ] || { echo "HALT: SUMMARY_FILE ($SUMMARY_FILE) is missing — write the summary first"; exit 1; }
+   : "${PR_NUMBER:?bind PR_NUMBER from the Step 1 target}"
    # Refuse un-annotated input first. The select below keeps only verified anchors, so a file
    # the checker never annotated yields [] — the same output as "no anchorable findings" (task.195).
    # The array must exist: `{}` would otherwise select nothing and pass as "every finding annotated".
-   # `anchor_check` must be a string — the checker always writes one, so a null is un-annotated.
+   # `anchor_check` was only required to be a string (task.195); it must now be one of the checker's
+   # seven verdicts, and the file must carry the stamp only `--annotate` writes, with a count equal
+   # to the findings present — so a reviewer-written `anchor_check` with no checker run, or a stamp
+   # left from an earlier run on a file that has gained findings since, is refused (task.217).
    jq -e '(.code_review.findings | type == "array")
-          and ([ .code_review.findings[]? | select((.anchor_check | type) != "string") ] | length == 0)' \
+          and (.anchor_checked.by == "finding-anchors")
+          and (.anchor_checked.findings == (.code_review.findings | length))
+          and ([ .code_review.findings[]?
+                 | select(.anchor_check | IN("ok","unchecked-text","no-line","no-such-file","out-of-range","text-mismatch","unparseable") | not) ]
+               | length == 0)' \
       "$FINDINGS_JSON" >/dev/null || {
-     echo "HALT: a finding in $FINDINGS_JSON carries no anchor_check (or the file is not findings JSON) — run Step 2b's anchor check first; nothing posted inline"; exit 1; }
+     echo "HALT: a finding in $FINDINGS_JSON carries no anchor_check (or the file is not findings JSON, has no checker stamp, a stale count, or an unknown verdict) — run Step 2b's anchor check first; nothing posted inline"; exit 1; }
+   # The scratch file is made only once the input is accepted, so no refusal leaves one behind.
+   # The anchor is parsed in the checker's grammar — trimmed, then `(\S+):(-?\d+)` — so the LAST
+   # colon splits path from line and the posted path is the trimmed one the checker verified
+   # (task.217). The `?` on capture yields empty on a non-match, never an abort. jq's trim is not
+   # JS trim(): a path led by U+FEFF is verified without it and posted with it. That path names no
+   # file in the diff. GitHub rejects it (422), so the post reports `anchor-failed` and the finding
+   # lands in the summary, never on another line (task.217 QA2-3). Bitbucket's answer to such a
+   # path is untested.
+   INLINE_FILE="$(mktemp -t review-code-inline.XXXXXX.json)"
    jq '[ .code_review.findings[]?
          | select(.anchor_check == "ok" or .anchor_check == "unchecked-text")
-         | select((.file_line? // "") | test("^.+:[0-9]+$"))
-         | {path: (.file_line | split(":")[0]),
-            line: (.file_line | split(":")[1] | tonumber),
+         | ((.file_line | if type == "string" then . else "" end)
+            | capture("^\\s*(?<path>\\S+):(?<line>-?[0-9]+)\\s*$")?) as $m
+         | select($m != null)
+         | {path: $m.path,
+            line: ($m.line | tonumber),
             body: (.finding
                    + (if .suggested_action then "\n\n→ " + .suggested_action else "" end))} ]' \
       "$FINDINGS_JSON" > "$INLINE_FILE" || {
-     echo "findings JSON did not match the schema — not posting inline"; exit 1; }
+     rm -f "$INLINE_FILE"; echo "findings JSON did not match the schema — not posting inline"; exit 1; }
 
-   node .agents/skills/review-code/references/pr-inline-comment.js \
+   command node .agents/skills/review-code/references/pr-inline-comment.js \
      --pr "$PR_NUMBER" --findings-file "$INLINE_FILE" \
      --summary-file "$SUMMARY_FILE" --json
+   POST_RC=$?   # saved first: `rm -f` exits 0 and would otherwise report a failed post as success
+   rm -f "$INLINE_FILE"
+   exit "$POST_RC"
    ```
 
    **Anchoring failure degrades to the summary comment; it never drops a finding.** A line outside the diff hunk is rejected — routinely — and that finding is appended to the summary instead, reporting `anchor-failed` rather than `posted`. Pass `--summary-file` so the degraded findings land under your own summary rather than in a bare comment of their own. Read the per-finding `reason`s: a `partial` run delivered everything, just not all of it inline.
@@ -196,7 +228,9 @@ Only if `--comment` is set and a PR exists for the current branch (or `target` n
    actually offers.
 
    Contract, `reason` vocabulary and the re-run rule (marker + update-in-place): [`references/pr-inline-comment-contract.md`](references/pr-inline-comment-contract.md).
-3. **Summary-only fallback** — when no finding carries a `file_line`, or the CLI reports `no-credentials`. This step still branches, because the two platforms have no common transport for a conversation comment.
+#### Step 4.3 — Summary-only fallback
+
+   When no finding carries a `file_line`, or the CLI reports `no-credentials`. This step still branches, because the two platforms have no common transport for a conversation comment.
 
    Build the body **once**, with the lead above the branch, so the two arms post the same bytes.
    `$SUMMARY_FILE` is the summary you wrote for the inline path; reuse it rather than composing a
@@ -237,6 +271,25 @@ Only if `--fix` is set:
 
 1. Apply each finding's `suggested_action` to the working tree. **Do not commit** — leave changes for the user to review.
    **Skip every finding whose `anchor_check` is `no-such-file`, `out-of-range`, `text-mismatch` or `unparseable`** (Step 2b) and list it as "skipped — unverified anchor". Editing a line the reviewer mislocated is the one outcome worse than not fixing it.
+   **Under `--staged`, a range or a PR target, also skip every finding whose file on disk differs from the content Step 2b checked**: the index under `--staged`, the commit under a range or PR. The edit lands on the working tree, so on such a file it would land on a line nobody checked (task.217). A file that cannot be read on either side is skipped too.
+   **The checker decides, from its own stamp.** `finding-anchors.js --fix-list` reads which tree Step 2b checked and from which root out of the `anchor_checked` stamp `--annotate` wrote, and parses each anchor with the parse that checked it. Nothing here re-binds the target, so an unfilled or misspelled one cannot turn the comparison off, and the checker gives the same answer from any directory (task.217 QA cycle 2). The block itself runs from the repository root, like every block in this skill: it names the checker by a root-relative path, so from anywhere else node cannot load it and the block HALTs, applying nothing (task.217 QA cycle 3). **A findings file the checker never annotated applies nothing**: no stamp, a stale count, a verdict that is not the checker's, or a stamp from an older checker that does not say which tree it checked is refused, and the block HALTs. Decide which findings to apply with this block before editing anything:
+
+   ```bash
+   # Which findings Step 5 may edit. Every input is bound here: a fresh shell carries nothing over.
+   FINDINGS_JSON="{findings-json}"   # Step 2b — the file finding-anchors.js annotated
+   [ -s "$FINDINGS_JSON" ] || { echo "HALT: FINDINGS_JSON ($FINDINGS_JSON) is missing or empty"; exit 1; }
+   # The checker's own stamp says which tree it checked (working tree, index or commit) and from
+   # which root, so no target is bound here and its answer does not depend on the cwd (task.217 QA
+   # cycle 2). Run this block from the repository root: the path below is relative to it, and from
+   # anywhere else the checker does not load. It refuses a file it never annotated, on stderr. Any
+   # non-zero exit — a refusal, or a checker that did not load — applies nothing.
+   LIST=$(command node .agents/skills/review-code/references/finding-anchors.js \
+     --fix-list --findings-file "$FINDINGS_JSON") || {
+     echo "HALT: finding-anchors produced no apply list for $FINDINGS_JSON (its reason is above) — run Step 2b's anchor check first; nothing applied"; exit 1; }
+   [ -z "$LIST" ] || printf '%s\n' "$LIST"
+   ```
+
+   Apply only the `apply:` findings, and carry every `skipped —` line into the item-3 report.
 2. Apply **bugs** by default; apply **cleanups** only when the user explicitly opts in (e.g. `--fix=all`), since cleanups are quality-of-life and may be subjective.
 3. After applying, re-render which findings were applied vs. skipped (and why), so the user can audit the edits against the diff.
 

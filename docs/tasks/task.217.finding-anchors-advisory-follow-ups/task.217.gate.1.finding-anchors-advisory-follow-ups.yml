@@ -1,0 +1,95 @@
+schema: 2
+task: 'task.217.finding-anchors-advisory-follow-ups'
+task_title: 'Finding-anchors advisory follow-ups'
+gate: CONCERNS
+status_reason: 'All 3 phases delivered and every success criterion holds, but the new review-code Step 5 apply-list block trusts an unchecked findings file (CR-1), and the review-code --inline guard cannot be reached by the probe engine (0 executed for that control).'
+reviewer: 'QA Engineer'
+head: 'aa2f19cd76570d3d60f48d1437b74b362085f16b'
+updated: '2026-10-23T20:36:14Z'
+
+top_issues:
+  - id: 'TASK-217-QA1-1'
+    severity: medium
+    file: 'skills/review-code/SKILL.md'
+    finding: 'CR-1: the Step 5 apply-list block (LIST=$(jq …), line 272) checks neither the checker stamp nor a known verdict, so an un-annotated findings file prints apply: for every finding, and a {} or lens-less file prints an empty list at exit 0 — the same inputs both --inline guards were hardened against.'
+    suggested_action: 'Put the --inline guard (array present, anchor_checked.by and count match, verdict in the seven) in front of LIST and HALT when it fails; add hostile cases (no stamp, {}, unknown verdict) to the Step 5 block test and the probe cases.'
+    suggested_owner: dev
+  - id: 'TASK-217-QA1-2'
+    severity: medium
+    file: 'skills/review-code/SKILL.md'
+    finding: 'The review-code --inline guard is a boundary the probe engine cannot reach: it is not the first bash block under "Step 4 — `--comment` (optional)", so the fence: form reads the GitHub block instead and declines bad-slot (control recorded unverifiable, 0 executed).'
+    suggested_action: 'Give the --inline block its own heading so fence: resolves to it, then run task.217.qa.1.review-code-inline-cases.json (19 cases) against it and record the run.'
+    suggested_owner: dev
+  - id: 'TASK-217-QA1-3'
+    severity: low
+    file: 'skills/review-code/SKILL.md'
+    finding: 'CR-2 (verified by reading line 95): the Step 5 skip covers only --staged, but a range or PR target is checked at --rev HEAD while --fix edits the working tree, so an uncommitted change to the file is edited on an unchecked line.'
+    suggested_action: 'Skip on `git diff --quiet HEAD -- "$P"` for every target checked at --rev HEAD, with a test case for it.'
+    suggested_owner: dev
+  - id: 'TASK-217-QA1-4'
+    severity: low
+    file: 'skills/review-code/SKILL.md'
+    finding: 'CR-4: the trailing rm -f "$INLINE_FILE" (line 208) makes the --inline block exit 0 whether pr-inline-comment.js succeeded or failed.'
+    suggested_action: 'Save the poster status before the cleanup and exit with it.'
+    suggested_owner: dev
+  - id: 'TASK-217-QA1-5'
+    severity: low
+    file: 'evals/shared/tests/finding-anchors-blocks.test.mjs'
+    finding: 'CR-5: the Step 5 case pattern (no-such-file|out-of-range|text-mismatch|unparseable) restates MALFORMED, but the restated-verdict test enumerates only IN(...) lists and the schema line.'
+    suggested_action: 'Add the Step 5 case pattern to the restatements the test holds, compared against MALFORMED.'
+    suggested_owner: dev
+  - id: 'TASK-217-QA1-6'
+    severity: low
+    file: 'CHANGELOG.md'
+    finding: 'PR #745 is CONFLICTING with develop: PR #744 added its own [Unreleased] entry after the branch was cut, so CHANGELOG.md conflicts.'
+    suggested_action: 'Merge origin/develop into the branch and keep both [Unreleased] entries.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 6267
+  phases_verified: 3/3
+  ci: 'no checks: PR CONFLICTING with develop @ aa2f19cd'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 42
+    escaped: 0
+    notes: 'review-pr --inline guard 31/31 and review-code Step 5 apply-list 11/11 engage; review-code --inline guard unreachable by fence: (QA1-2); Step 5 accepts an unchecked file (QA1-1).'
+  performance:
+    status: PASS
+    notes: 'Refusal test asserts zero deps.exec calls and no annotate output; one-read-per-path test green.'
+  reliability:
+    status: PASS
+    notes: 'Every new block HALTs on unreadable input; scratch files removed on every path; TMPDIR-in-checkout run green.'
+  maintainability:
+    status: PASS
+    notes: 'Verdict restatements held to engine exports; dispatcher population derived from the tree with a non-vacuity floor and a comment-only control.'
+
+recommendations:
+  immediate:
+    - action: 'Guard the Step 5 apply-list block as the --inline guards are (QA1-1).'
+      refs: ['skills/review-code/SKILL.md']
+    - action: 'Make the review-code --inline block reachable by fence: and probe it (QA1-2).'
+      refs: ['skills/review-code/SKILL.md']
+    - action: 'Resolve the CHANGELOG.md conflict with develop (QA1-6).'
+      refs: ['CHANGELOG.md']
+  future:
+    - action: 'CR-3: the stamp counts findings but does not bind their content; a finding edited after --annotate with the count unchanged still passes. Bind a hash of the anchor fields, or document the limit.'
+      refs: ['shared/resources/finding-anchors.js']
+    - action: 'Pre-existing (not this diff): the qa-task/qa-story Step 3b blocks mktemp a FINDINGS_JSON they never remove — six qa-findings.* files left in TMPDIR by one blocks-test run.'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['QA1-1 and QA1-2 fixed', 'conflict with develop resolved']

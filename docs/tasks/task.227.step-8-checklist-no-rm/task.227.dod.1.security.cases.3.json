@@ -1,0 +1,136 @@
+[
+  {
+    "id": "complete.keeps-hold-no-lock",
+    "sink": "path",
+    "input": "--complete",
+    "why": "the no-lock arm must keep both hold records while the hold dir holds files",
+    "correct": "keep the two hold records and warn",
+    "direction": "hostile",
+    "fixture": {
+      "env": {
+        "PIPELINE_LOCK": ".claude/state/develop-pipeline.lock"
+      },
+      "files": {
+        ".claude/state/step4-hold-dir.txt": "held\n",
+        ".claude/state/step4-held-paths.txt": "moved.txt\n",
+        "held/moved.txt": "x"
+      }
+    },
+    "expected": {
+      "stdout": "",
+      "stderr": "advance-pipeline-lock: kept .claude/state/step4-hold-dir.txt and step4-held-paths.txt — held still holds files Step 4 moved aside; restore the held files (develop-pipeline-step-4-create-pr.md, Restore Held Files) before removing the records\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "complete.keeps-hold-with-lock",
+    "sink": "path",
+    "input": "--complete",
+    "why": "the lock-present arm must keep both hold records while the hold dir holds files",
+    "correct": "keep the two hold records, warn, remove the lock",
+    "direction": "hostile",
+    "fixture": {
+      "env": {
+        "PIPELINE_LOCK": ".claude/state/develop-pipeline.lock"
+      },
+      "files": {
+        ".claude/state/develop-pipeline.lock": "{}",
+        ".claude/state/step4-hold-dir.txt": "held\n",
+        ".claude/state/step4-held-paths.txt": "moved.txt\n",
+        "held/.hidden": "x"
+      }
+    },
+    "expected": {
+      "stdout": "advance-pipeline-lock: pipeline complete, lock removed\n",
+      "stderr": "advance-pipeline-lock: kept .claude/state/step4-hold-dir.txt and step4-held-paths.txt — held still holds files Step 4 moved aside; restore the held files (develop-pipeline-step-4-create-pr.md, Restore Held Files) before removing the records\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "complete.ok-clear-no-lock",
+    "sink": "path",
+    "input": "--complete",
+    "why": "with hold state clear, the no-lock arm removes all five records",
+    "correct": "remove the five records",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {
+        "PIPELINE_LOCK": ".claude/state/develop-pipeline.lock"
+      },
+      "files": {
+        ".claude/state/step4-scope-paths.txt": "a\n",
+        ".claude/state/step4-held-paths.txt": "a\n",
+        ".claude/state/step4-hold-dir.txt": "held-gone\n",
+        ".claude/state/5c-carry-eligible.txt": "a\n",
+        ".claude/state/5c-carry-classified.txt": "a\n"
+      }
+    },
+    "expected": {
+      "stdout": "",
+      "stderr": "",
+      "exit": 0,
+      "absent": [
+        ".claude/state/step4-scope-paths.txt",
+        ".claude/state/step4-held-paths.txt",
+        ".claude/state/step4-hold-dir.txt",
+        ".claude/state/5c-carry-eligible.txt",
+        ".claude/state/5c-carry-classified.txt"
+      ]
+    }
+  },
+  {
+    "id": "complete.ok-clear-with-lock",
+    "sink": "path",
+    "input": "--complete",
+    "why": "with hold state clear, the lock-present arm removes all five records and the lock",
+    "correct": "remove the five records and the lock",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {
+        "PIPELINE_LOCK": ".claude/state/develop-pipeline.lock"
+      },
+      "files": {
+        ".claude/state/develop-pipeline.lock": "{}",
+        ".claude/state/step4-scope-paths.txt": "a\n",
+        ".claude/state/step4-held-paths.txt": "a\n",
+        ".claude/state/step4-hold-dir.txt": "",
+        ".claude/state/5c-carry-eligible.txt": "a\n",
+        ".claude/state/5c-carry-classified.txt": "a\n"
+      }
+    },
+    "expected": {
+      "stdout": "advance-pipeline-lock: pipeline complete, lock removed\n",
+      "stderr": "",
+      "exit": 0,
+      "absent": [
+        ".claude/state/develop-pipeline.lock",
+        ".claude/state/step4-scope-paths.txt",
+        ".claude/state/step4-held-paths.txt",
+        ".claude/state/step4-hold-dir.txt",
+        ".claude/state/5c-carry-eligible.txt",
+        ".claude/state/5c-carry-classified.txt"
+      ]
+    }
+  },
+  {
+    "id": "complete.ok-nothing-on-disk",
+    "sink": "path",
+    "input": "--complete",
+    "why": "no lock and no records: --complete must still exit 0 silently",
+    "correct": "exit 0, no output",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {
+        "PIPELINE_LOCK": ".claude/state/develop-pipeline.lock"
+      },
+      "files": {
+        ".claude/state/unrelated.txt": "x"
+      }
+    },
+    "expected": {
+      "stdout": "",
+      "stderr": "",
+      "exit": 0
+    }
+  }
+]

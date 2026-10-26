@@ -1,0 +1,59 @@
+schema: 2
+task: 'task.231.test-infrastructure-hygiene'
+task_title: 'Test infrastructure hygiene'
+gate: PASS
+status_reason: 'Cycle 4 fix holds (mutation-proven). The scoped re-review found two low, non-gating test-robustness findings and no product defect; every gated finding from cycles 1-4 is fixed and covered.'
+reviewer: 'QA Engineer'
+head: '190375ffb4baa662801e73bc52c6eff13d6487c4'
+updated: '2026-10-26T08:16:41Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 6373
+  phases_verified: 6/6
+  ci: 'pass @ 190375ff — test, link-check, validate, shellcheck, secret-scan; local ci:fast 6,373 tests, 0 fail, ratchet ok, bundle clean'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 8
+    escaped: 0
+    notes: 'compareRatchet unchanged since its cycle-2 probe (task.231.qa.2.security.run.json, 8 cases, escaped 0); this cycle touched tests and report wording only.'
+  performance:
+    status: PASS
+    notes: 'No change to hot paths this cycle.'
+  reliability:
+    status: PASS
+    notes: 'Wrapper clean on INT, TERM, HUP and QUIT, and on stop and resume; leftover processes are reaped before the directory is removed.'
+  maintainability:
+    status: PASS
+    notes: 'CR5-1 and CR5-2 (advisory): two test assertions can pass vacuously on a lost pid, or fail under a non-reaping PID 1.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR5-1 (low, confidence medium): assert each captured suite pid is a positive integer before alive() checks it, since alive(null) reads as dead.'
+      refs: ['tests/test-tmpdir.test.js']
+    - action: 'CR5-2 (low, confidence low, platform-variance): treat a zombie (/proc state Z) as gone in the safety-net check, for a container whose PID 1 does not reap.'
+      refs: ['tests/test-tmpdir.test.js']
+    - action: 'Carried: CR2-4 (quadratic heading matchers), CR2-5 (Step 12b prose omits no-anchor), CR2-6 (Bitbucket slugs), gate-1 CR-2 (empty anchor step on engine-only PRs).'
+      refs: ['shared/resources/doc-links.js', 'skills/qa-task/SKILL.md', '.github/workflows/docs-link-check.yml']
+
+bug_resolution:
+  fixed_this_cycle: ['TASK-231-CR4-1', 'CR4-2']
+  verification: 'mutation-proven against the committed tests at 190375ff'
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: []

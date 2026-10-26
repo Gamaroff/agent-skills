@@ -34,7 +34,7 @@ const suites = execFileSync("git", ["ls-files", "*.test.sh"], {
 })
   .split("\n")
   .filter(Boolean);
-const npmTest = require(path.join(REPO, "package.json")).scripts.test;
+const npmTest = require(path.join(REPO, "package.json")).scripts["test:suite"];
 
 test("the population is not vacuous", () => {
   assert.ok(

@@ -143,10 +143,13 @@ const LEAD_TEMPLATES = Object.freeze({
     `saved, and the work will carry on from that point once it is restarted. ` +
     `No action is needed from anyone reading this.`,
 
+  // Every caller posts this before the pull request is merged (develop-pipeline
+  // Step 7 runs /finalise first), so it claims acceptance, never release
+  // (task.233, obs #98).
   done: (s) =>
-    `This work is finished and has been accepted. Everything it set out to do was checked and ` +
-    `confirmed working, and the change is now part of the product${s.pr ? ` (${s.pr})` : ""}. ` +
-    `No further action is needed on this item.`,
+    `This work has been checked and accepted. Everything it set out to do was confirmed ` +
+    `working${s.pr ? ` (${s.pr})` : ""}. It becomes part of the product once the change is ` +
+    `merged, which is the last step for this item. No action is needed from anyone reading this.`,
 
   // ── Pull-request stages ──────────────────────────────────────────────────
   // These three open comments on a pull REQUEST, not on a tracker issue, and

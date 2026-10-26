@@ -37,12 +37,28 @@ import {
   runAsync,
   cleanup,
 } from "./lib/executed-prose.mjs";
+import { lineRunsNoRm } from "./lib/rm-invocation.mjs";
 
 const require = createRequire(import.meta.url);
 const { fencedRanges } = require("../change-log.js");
 
 const STEP8 = "shared/resources/develop-pipeline-step-8-commit.md";
 const STEP4 = "shared/resources/develop-pipeline-step-4-create-pr.md";
+
+// Step 4's guard block makes its hold directory with `mktemp -d /tmp/pipeline-hold-XXXXXX`, a fixed
+// /tmp no TMPDIR reaches, and nothing here removed it (task 231: one escaped per `npm test`). Read
+// each one from the record the guard writes, before Restore or the checklist deletes the record, and
+// remove them once this file's tests finish. The shipped block is unchanged.
+const HOLD_DIRS = new Set();
+test.after(() => {
+  for (const d of HOLD_DIRS) fs.rmSync(d, { recursive: true, force: true });
+});
+function noteHoldDir(work) {
+  const record = path.join(work, ".claude/state/step4-hold-dir.txt");
+  if (!fs.existsSync(record)) return;
+  const d = fs.readFileSync(record, "utf8").trim();
+  if (d) HOLD_DIRS.add(d);
+}
 const TEMPLATE = "shared/resources/implementation-report-template.md";
 const WORK_ITEM = "docs/tasks/task.9.fx";
 const REPORT = `${WORK_ITEM}/task.9.implementation.1.fx.md`;
@@ -658,6 +674,85 @@ test("every orchestrator mention of --complete names the Step 8 Completion Check
     `${STOP_HOOK}: expected --complete in COMPLETION_LINE and ALREADY_DONE (2 non-comment lines), found ${hookCode}`,
   );
   assert.ok(seen >= 6, `expected at least 6 mentions, found ${seen}`);
+});
+
+// A block that ends the run removes nothing directly (task 227, obs #87). A host's removal safety
+// check reads the command text: shown an `rm` inside a wrapped script it cannot inspect, it refuses
+// the WHOLE block, so the checks and `--complete` beside it never run and an unattended run stops
+// at Step 8. The removals live in `advance-pipeline-lock.sh --complete` instead.
+//   reads:  every fence `fencedRanges` returns — any info string, so an `sh` or unlabelled block
+//           counts — in every file `developPipelineDocs()` lists, when a non-comment line of it
+//           calls `advance-pipeline-lock.sh --complete`.
+//   fails:  a line in such a block that runs `rm` (lineRunsNoRm, ./lib/rm-invocation.mjs), and a
+//           Step 8 doc with no such block at all — the floor names the block the guard exists for.
+//   text, not behaviour: the property is what the host's check reads, which is the block's text.
+test("lineRunsNoRm refuses every way a line runs rm and nothing else", () => {
+  // The shapes earlier matchers missed are the point of this list: a keyword before `rm`, a prefix
+  // command and `rm` by path (QA1-1), quote and escape forms, and a redirection after it (QA2-3).
+  for (const hit of [
+    "rm -f a",
+    "x && rm -f a",
+    "x || rm a",
+    "x; rm a",
+    "{ rm a; }",
+    "(rm a)",
+    "if true; then rm -f a; fi",
+    "do rm a; done",
+    "else rm a",
+    "! rm a",
+    "command rm -f a",
+    "xargs rm -f",
+    "sudo rm a",
+    "/bin/rm a",
+    "`rm a`",
+    "r'm' -f a",
+    '"rm" -f a',
+    "\\rm -f a",
+    'echo " # " ; rm a',
+    "rm>/dev/null a",
+    "rm<<EOF",
+    "rm 2>/dev/null a",
+  ]) {
+    assert.equal(lineRunsNoRm(hit), false, `missed: ${hit}`);
+  }
+  for (const miss of [
+    "# rm -f of a name",
+    "  # rm -f of an indented name",
+    "confirm x",
+    "docker run --rm x",
+    "echo farm x",
+    "rmdir a",
+  ]) {
+    assert.equal(lineRunsNoRm(miss), true, `false hit: ${miss}`);
+  }
+});
+test("no fenced block that calls --complete carries an rm invocation", () => {
+  let seen = 0;
+  const seenIn = new Set();
+  for (const file of developPipelineDocs()) {
+    const text = readDoc(file);
+    for (const [a, b] of fencedRanges(text)) {
+      const lines = text
+        .slice(a, b)
+        .split("\n")
+        .filter((l) => !/^\s*#/.test(l));
+      if (!lines.some((l) => l.includes("advance-pipeline-lock.sh --complete")))
+        continue;
+      seen++;
+      seenIn.add(file);
+      const hits = lines.filter((l) => !lineRunsNoRm(l));
+      assert.deepEqual(
+        hits,
+        [],
+        `${file}: a block that ends the run removes files directly`,
+      );
+    }
+  }
+  assert.ok(seen >= 1, "no block calls --complete — the guard read nothing");
+  assert.ok(
+    seenIn.has(STEP8),
+    `${STEP8} has no block calling --complete — the guard did not read the Completion Checklist`,
+  );
 });
 
 // The Stop hook's step-8 line and the resume contract's Phase 0b sentence each describe Step 7's
@@ -1615,6 +1710,7 @@ describe("executed against fixtures", { concurrency: true }, () => {
           const r = await runAsync(sh, bind(blockBy(s4, anchor), p4), {
             cwd: fx.work,
           });
+          noteHoldDir(fx.work);
           assert.equal(
             r.status,
             0,
@@ -1651,6 +1747,7 @@ describe("executed against fixtures", { concurrency: true }, () => {
           const r = await runAsync(sh, bind(blockBy(s4, anchor), p4), {
             cwd: fx.work,
           });
+          noteHoldDir(fx.work);
           assert.equal(r.status, 0, r.stdout + r.stderr);
         }
         // Restore is skipped.
@@ -1665,6 +1762,60 @@ describe("executed against fixtures", { concurrency: true }, () => {
         cleanup(fx.dir);
       }
     });
+
+    // The states `--complete` keeps the hold records for must also stop Step 8, because both read
+    // `--hold-state`. Step 8 once kept its own copy of the rule and passed an unlistable hold dir
+    // that `--complete` then kept (task 227, QA3-1). Root reads mode-000 files, so these skip there.
+    const asRoot = process.getuid?.() === 0;
+    for (const [what, lock] of [
+      ["an unlistable hold dir", "dir"],
+      ["an unreadable hold-dir record", "record"],
+    ]) {
+      test(
+        `[${sh}] ${what} fails Step 8, and both hold records survive`,
+        { skip: asRoot },
+        async () => {
+          const fx = await setup(finished("Task"));
+          const hold = path.join(fx.dir, "hold-locked");
+          const rec = path.join(fx.work, ".claude/state/step4-hold-dir.txt");
+          try {
+            fs.mkdirSync(hold);
+            fs.writeFileSync(path.join(hold, "held.txt"), "held\n");
+            write(fx.work, ".claude/state/step4-hold-dir.txt", `${hold}\n`);
+            write(
+              fx.work,
+              ".claude/state/step4-held-paths.txt",
+              `${WORK_ITEM}\nheld.txt\n`,
+            );
+            fs.chmodSync(lock === "dir" ? hold : rec, 0o000);
+            const r = await runChecklist(sh, fx);
+            fs.chmodSync(
+              lock === "dir" ? hold : rec,
+              lock === "dir" ? 0o755 : 0o644,
+            );
+            assert.equal(r.status, 1, r.stdout);
+            assert.match(r.stdout, /never restored/);
+            assert.match(
+              r.stdout,
+              lock === "dir" ? /cannot be listed/ : /cannot be read/,
+            );
+            for (const kept of ["step4-hold-dir.txt", "step4-held-paths.txt"]) {
+              assert.ok(
+                fs.existsSync(path.join(fx.work, ".claude/state", kept)),
+                `${kept} was deleted`,
+              );
+            }
+          } finally {
+            for (const p of [hold, rec]) {
+              try {
+                fs.chmodSync(p, 0o755);
+              } catch {}
+            }
+            cleanup(fx.dir);
+          }
+        },
+      );
+    }
 
     test(`[${sh}] a held record for another work item is named, not applied silently`, async () => {
       const fx = await setup(finished("Task"));
@@ -1697,12 +1848,27 @@ describe("executed against fixtures", { concurrency: true }, () => {
           ".claude/state/step4-hold-dir.txt",
           `${path.join(fx.dir, "hold-empty")}\n`,
         );
+        // The 5c carry records too (task.173 QA-3, CR-1). Since task 227 the checklist removes
+        // none of these itself: its `--complete` call does, before its no-lock exit — this
+        // fixture has no lock, so the test holds that arm.
+        write(
+          fx.work,
+          ".claude/state/5c-carry-eligible.txt",
+          `${WORK_ITEM}/x.md\n`,
+        );
+        write(
+          fx.work,
+          ".claude/state/5c-carry-classified.txt",
+          `${WORK_ITEM}/x.md\n`,
+        );
         const r = await runChecklist(sh, fx);
         assert.equal(r.status, 0, r.stdout);
         for (const rec of [
           "step4-scope-paths.txt",
           "step4-held-paths.txt",
           "step4-hold-dir.txt",
+          "5c-carry-eligible.txt",
+          "5c-carry-classified.txt",
         ]) {
           assert.equal(
             fs.existsSync(path.join(fx.work, ".claude/state", rec)),

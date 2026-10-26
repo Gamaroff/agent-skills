@@ -5,17 +5,20 @@ type: task
 description: "Keep removals out of any block that also carries a must-pass check or a terminal action."
 tags: [develop-task, develop-story, develop-bug, observation, pipeline-lock]
 category: infrastructure
-status: planned
+status: accepted
 priority: Medium
 estimated_effort_hours: 16
 created: 2026-10-22
-updated: 2026-10-22
+updated: 2026-10-24
+completed_date: 2026-10-24
+pr_number: 746
 github_issue: 728
 ---
 
 # Technical Task: Step 8 — move the state-file removals out of the Completion Checklist
 
-**Status:** Planned
+**Status:** Accepted
+**Review**: ✅ All review recommendations from `task.227.review.1.step-8-checklist-no-rm.md` implemented 2026-10-24
 **GitHub Issue**: [#728](https://github.com/Gamaroff/agent-skills/issues/728)
 
 ---
@@ -61,15 +64,15 @@ Step 8's Completion Checklist is one fenced block. It runs the must-pass checks,
   - `develop-pipeline-step-8-commit.md:287`: `rm -f .claude/state/5c-carry-eligible.txt .claude/state/5c-carry-classified.txt`
   - `develop-pipeline-step-8-commit.md:292`: `bash .agents/skills/{develop-story|develop-task|develop-bug}/references/advance-pipeline-lock.sh --complete`
 - **`--complete` has two arms.** `shared/resources/advance-pipeline-lock.sh:120` sets `LOCK="${PIPELINE_LOCK:-.claude/state/develop-pipeline.lock}"`. With no lock on disk, the no-lock `case` exits at `advance-pipeline-lock.sh:174` (`--complete) exit 0 ;;`). With a lock, the arm at `advance-pipeline-lock.sh:190` runs `rm -f "$LOCK"` and prints `pipeline complete, lock removed`. A change that touches only the second arm misses every run that has no lock. The checklist test fixture is one of those: `setup()` creates no lock (`step-8-completion-checklist.test.mjs`, comment above `async function setup`).
-- **Who reads the records.** The 5c carry records are written and read by the Step 5c classify and stage blocks (`develop-pipeline-step-5-6-qa-loop.md:1516`, `CLASSIFIED=.claude/state/5c-carry-classified.txt`; `:1517`, `ELIGIBLE=.claude/state/5c-carry-eligible.txt`) and named by the resume contract (`develop-pipeline-resume-contract.md:266`). Step 4's records are read by the Step 4 leak check and the Step 8 held-files check (`shared/resources/tests/step-4-leak-check.test.mjs:90`). None of them is read after `--complete`.
-- **The tests that pin the removal.** `step-8-completion-checklist.test.mjs`, `a passing checklist removes Step 4's records` (`:1687`), runs the extracted block and asserts the three Step 4 records are gone. `advance-pipeline-lock.test.sh` cases 4, 5 and 11 pin `--complete` removing the lock.
+- **Who reads the records.** The 5c carry records are written and read by the Step 5c classify and stage blocks (`develop-pipeline-step-5-6-qa-loop.md:1517`, `CLASSIFIED=.claude/state/5c-carry-classified.txt`; `:1518`, `ELIGIBLE=.claude/state/5c-carry-eligible.txt`) and named by the resume contract (`develop-pipeline-resume-contract.md:266`). Step 4's records are read by the Step 4 leak check and the Step 8 held-files check (`shared/resources/tests/step-4-leak-check.test.mjs:90`). None of them is read after `--complete`.
+- **The tests that pin the removal.** `step-8-completion-checklist.test.mjs`, `a passing checklist removes Step 4's records` (`:1688`), runs the extracted block and asserts the three Step 4 records are gone. `advance-pipeline-lock.test.sh` cases 4, 5 and 11 pin `--complete` removing the lock.
 - **The other `rm` sites, measured.** A scan of fenced `bash`/`sh` blocks in `shared/resources/develop-pipeline-*.md` for an `rm` invocation (the command is in the plan, § Measuring the population) finds 8 blocks. Only one also calls `--complete`: the checklist. The other seven are listed under Out of Scope with a reason each.
 
 ### Target Architecture
 
-- `advance-pipeline-lock.sh --complete` removes the five records from the lock's own directory (`$(dirname "$LOCK")`), **before** it decides which arm to take, so both arms remove them. Then it removes the lock as today. The records are removed by literal name: no glob and no variable path from outside the script.
+- `advance-pipeline-lock.sh --complete` removes the five records from the lock's own directory (`$(dirname "$LOCK")`), **before** it decides which arm to take, so both arms remove them. Then it removes the lock as today. The records are removed by literal name: no glob and no variable path from outside the script. The exception, stated once in the script header (`advance-pipeline-lock.sh:15`): `step4-hold-dir.txt` and `step4-held-paths.txt` are kept, with a warning, while `--hold-state` reads pending: the hold directory holds files, or the record or directory cannot be read.
 - The checklist block keeps its checks and its `--complete` call, and loses both `rm` lines. Its comment says the records are removed by `--complete`.
-- A new test in `step-8-completion-checklist.test.mjs` scans every fenced block in `shared/resources/develop-pipeline-*.md` that calls `advance-pipeline-lock.sh --complete` and fails on an `rm` invocation in it. It carries a non-vacuity floor: it must find at least one such block.
+- A new test in `step-8-completion-checklist.test.mjs` scans every fenced block in the files `developPipelineDocs()` returns (`:573` — the shared `develop-pipeline-*.md` docs **and** the `skills/develop-*/SKILL.md` orchestrators) that calls `advance-pipeline-lock.sh --complete`, and fails on an `rm` invocation in it. Blocks come from `fencedRanges()` (`shared/resources/change-log.js`, already imported by the test at `:42`), which returns every fence whatever its info string — `extractBlocks()` returns only `bash` fences and would miss an `sh` or unlabelled block — never a new fence parser. It carries a non-vacuity floor: it must find at least one such block.
 
 ### Why a script and not a separate block
 
@@ -81,7 +84,7 @@ A separate block of literal `rm -f` lines would also pass the safety check when 
 
 ### In Scope
 
-- ✅ `shared/resources/advance-pipeline-lock.sh`: `--complete` removes the five records in both arms.
+- ✅ `shared/resources/advance-pipeline-lock.sh`: `--complete` removes the five records in both arms, except the two hold records while the hold directory holds files (QA1-2, QA2-1, QA2-2).
 - ✅ `shared/resources/develop-pipeline-step-8-commit.md`: the checklist block loses its two `rm` lines.
 - ✅ Tests: `advance-pipeline-lock.test.sh` (records removed with and without a lock; an unrelated file in the same directory kept), and `step-8-completion-checklist.test.mjs` (the guard, and the existing records test extended to the 5c records).
 - ✅ `npm run bundle` for the three skills that bundle both files, and a CHANGELOG entry.
@@ -98,7 +101,7 @@ A separate block of literal `rm -f` lines would also pass the safety check when 
 
 `advance-pipeline-lock.sh --complete` now also removes five files beside the lock. Its only caller is Step 8's Completion Checklist (`every orchestrator mention of --complete names the Step 8 Completion Checklist`, `step-8-completion-checklist.test.mjs:626`), which removed the same five files one line earlier. No caller sees a different end state.
 
-Migration: none. A consumer that runs `--complete` by hand outside Step 8 loses those five files, which are records of a run that `--complete` declares finished.
+Migration: none. A consumer that runs `--complete` by hand outside Step 8 loses those five files, which are records of a run that `--complete` declares finished. The one exception is the hold records: `step4-hold-dir.txt` and `step4-held-paths.txt` are kept, with a warning on stderr, while `--hold-state` reads pending (the directory the first names holds files, or the record or directory cannot be read), because they are the only pointer to those files and the list of them (QA1-2, QA2-1, QA2-2, QA3-2). Step 8 reads the same answer and refuses to finish (QA3-1). Step 8 refuses to reach `--complete` in that state, so a pipeline run never sees the exception.
 
 ---
 
@@ -108,25 +111,25 @@ Migration: none. A consumer that runs `--complete` by hand outside Step 8 loses 
 
 ### Phase 1: Tests first (Risk: Low)
 
-- [ ] `advance-pipeline-lock.test.sh`: a case where `--complete` with a lock removes the five records and the lock, and keeps an unrelated file in the same directory.
-- [ ] The same with no lock on disk (the `:174` arm).
-- [ ] `step-8-completion-checklist.test.mjs`: extend `a passing checklist removes Step 4's records` to write and assert the two 5c records too.
-- [ ] Add the guard test: no fenced block that calls `--complete` carries an `rm` invocation, with a floor of at least one such block.
-- [ ] Run them: the new script cases and the guard are red, and the extended checklist test is green (today's block still removes the records itself).
+- [x] `advance-pipeline-lock.test.sh`: a case where `--complete` with a lock removes the five records and the lock, and keeps an unrelated file in the same directory.
+- [x] The same with no lock on disk (the `:174` arm).
+- [x] `step-8-completion-checklist.test.mjs`: extend `a passing checklist removes Step 4's records` to write and assert the two 5c records too.
+- [x] Add the guard test: no fenced block that calls `--complete` carries an `rm` invocation, with a floor of at least one such block.
+- [x] Run them: the new script cases and the guard are red, and the extended checklist test is green (today's block still removes the records itself).
 
 ### Phase 2: Move the removals (Risk: Low)
 
-- [ ] In `advance-pipeline-lock.sh`, remove the five records by literal name in the lock's directory before the no-lock `case`, for `--complete` only.
-- [ ] Delete the two `rm -f` lines and their comments from the checklist block. Say in the comment above `--complete` that it removes the records.
-- [ ] Re-run: every Phase 1 test is green.
-- [ ] Mutation-prove: put one `rm -f` line back in the block and watch the guard go red; drop the removal from the no-lock arm and watch the no-lock case go red.
+- [x] In `advance-pipeline-lock.sh`, remove the five records by literal name in the lock's directory before the no-lock `case`, for `--complete` only.
+- [x] Delete the two `rm -f` lines and their comments from the checklist block. Say in the comment above `--complete` that it removes the records.
+- [x] Re-run: every Phase 1 test is green.
+- [x] Mutation-prove: put one `rm -f` line back in the block and watch the guard go red; drop the removal from the no-lock arm and watch the no-lock case go red.
 
 ### Phase 3: Bundle, docs, changelog (Risk: Low)
 
-- [ ] `npm run bundle`, then `npm run bundle:check`: the copies under `skills/develop-{task,story,bug}/references/` match.
-- [ ] Update the `advance-pipeline-lock.sh` usage text for `--complete`.
-- [ ] CHANGELOG entry under Unreleased.
-- [ ] `npm run ci` green.
+- [x] `npm run bundle`, then `npm run bundle:check`: the copies under `skills/develop-{task,story,bug}/references/` match.
+- [x] Update the `advance-pipeline-lock.sh` usage text for `--complete` (`usage()`, `:128`) and the header comment that also describes it (`:15`, `:31`).
+- [x] CHANGELOG entry under Unreleased.
+- [x] `npm run ci` green.
 
 ---
 
@@ -141,6 +144,7 @@ Migration: none. A consumer that runs `--complete` by hand outside Step 8 loses 
 
 3. ✅ `shared/resources/advance-pipeline-lock.test.sh`: two new cases.
 4. ✅ `shared/resources/tests/step-8-completion-checklist.test.mjs`: the guard, and the 5c records in the existing records test.
+4a. ✅ `shared/resources/tests/lib/rm-invocation.mjs` (QA cycle 1): the guard's matcher, `lineRunsNoRm`, as its own module.
 
 ### Generated (by `npm run bundle`)
 
@@ -162,7 +166,7 @@ Migration: none. A consumer that runs `--complete` by hand outside Step 8 loses 
 
 ### The guard
 
-- **What it reads.** Every fenced `bash`/`sh` block in `shared/resources/develop-pipeline-*.md` whose text contains `advance-pipeline-lock.sh --complete` on a non-comment line.
+- **What it reads.** Every fenced block `fencedRanges()` returns from the files `developPipelineDocs()` lists (the shared `develop-pipeline-*.md` docs and the `skills/develop-*/SKILL.md` orchestrators) whose text contains `advance-pipeline-lock.sh --complete` on a non-comment line.
 - **What it fails on.** A non-comment line in such a block with `rm` as a command word: at line start or after `;`, `&&`, `||`, `|`, `(` or `{`.
 - **Why text and not behaviour.** The host's safety check reads the command text, not what the command does. The property under test is the text of the block.
 - **Control.** The guard must not fire on `rm` inside a word or a comment (`# … rm -f of a name …`, `confirm`, `--rm`). Add one fixture string of each to the test and assert no match.
@@ -178,26 +182,25 @@ Migration: none. A consumer that runs `--complete` by hand outside Step 8 loses 
 
 ### Functional
 
-- [ ] `advance-pipeline-lock.sh --complete` with a lock removes `step4-scope-paths.txt`, `step4-held-paths.txt`, `step4-hold-dir.txt`, `5c-carry-eligible.txt`, `5c-carry-classified.txt` and the lock (Phase 2).
-- [ ] With no lock, `--complete` removes the same five records and exits 0 (Phase 2, the arm at `advance-pipeline-lock.sh:174`).
-- [ ] An unrelated file in `.claude/state/` survives `--complete`.
-- [ ] The Completion Checklist block contains no `rm` invocation, and the guard test fails if one is added.
+- [x] `advance-pipeline-lock.sh --complete` with a lock removes `step4-scope-paths.txt`, `step4-held-paths.txt`, `step4-hold-dir.txt`, `5c-carry-eligible.txt`, `5c-carry-classified.txt` and the lock (Phase 2), except the two hold records while the hold directory holds files (see §3).
+- [x] With no lock, `--complete` removes the same five records, with the same exception, and exits 0 (Phase 2, the no-lock arm).
+- [x] An unrelated file in `.claude/state/` survives `--complete`.
+- [x] The Completion Checklist block contains no `rm` invocation, and the guard test fails if one is added.
 
 ### Performance
 
-- [ ] No measurable change: five `rm -f` calls move from the block into the script.
-- [ ] The checklist test file's run time is unchanged within normal variance.
+- [x] Not applicable — no unit tests applicable: the change moves five `rm -f` calls from one shell to another and adds one file-scan test; no performance-sensitive path changes.
 
 ### Code Quality
 
-- [ ] `npm run ci` passes.
-- [ ] `npm run bundle:check` reports no drift and no `UNREACHED` copy.
-- [ ] Both mutations in Phase 2 turn a test red.
+- [x] `npm run ci` passes.
+- [x] `npm run bundle:check` reports no drift and no `UNREACHED` copy.
+- [x] The implementation report records both Phase 2 mutations, the test that went red for each, and the revert.
 
 ### Migration
 
-- [ ] CHANGELOG entry names the behaviour change to `--complete`.
-- [ ] The `--complete` usage text lists the five records.
+- [x] CHANGELOG entry names the behaviour change to `--complete`.
+- [x] The `--complete` usage text lists the five records.
 
 ---
 
@@ -247,21 +250,102 @@ None.
 
 ---
 
+## Implementation Summary
+
+**Completed:** 2026-10-24 (develop-task pipeline, Step 3 inline — implementation report `task.227.implementation.1.step-8-checklist-no-rm-initial-run.md`).
+
+- **Summary.** `advance-pipeline-lock.sh --complete` now removes the five run records (`step4-scope-paths.txt`, `step4-held-paths.txt`, `step4-hold-dir.txt`, `5c-carry-eligible.txt`, `5c-carry-classified.txt`) from the lock's directory, before the no-lock exit, so both arms remove them. The Completion Checklist block lost its two `rm -f` lines; its comment says `--complete` removes the records. A guard test keeps `rm` out of any fenced block that calls `--complete`.
+- **Approach.** Phase 1 added scenario 15 to `advance-pipeline-lock.test.sh` (both arms, bash and zsh; an unrelated file and the halt snapshot kept), the 5c records to `a passing checklist removes Step 4's records`, and the guard plus an `RM_WORD` control test to `step-8-completion-checklist.test.mjs`. Red as planned: the two script cases and the guard failed, the records test passed. Phase 2 moved the removals; Phase 3 updated the header comment and `usage()`, bundled (13 copies of the script, 3 of the step doc) and added the CHANGELOG entry.
+- **Testing.** `advance-pipeline-lock.test.sh` 76/76; the three new or extended checklist tests pass; `npm run ci:fast` 6289 tests, 0 failed (zsh arms skip: no zsh on this host). Mutations: an `rm -f` line put back in the block turns the guard red; the removal moved into the lock-present arm only turns the no-lock case red. Both reverted.
+- **Deferred work.** None.
+- **QA cycle 1 fixes (qa-fix).** QA1-1: the guard's matcher became `lineRunsNoRm` in `tests/lib/rm-invocation.mjs`. It counts `rm` as a word after quote and escape removal, and the guard also requires that it read the Step 8 doc's own `--complete` block. Probed with `security-probe.mjs` (rm-specific cases): `present-but-inert`, then `engages` after quote removal. QA1-2: `--complete` keeps `step4-hold-dir.txt`, with a stderr warning, while its directory holds files; three cases per arm were added to scenario 15 (82/82). Both fixes were mutation-proven. Bugs 1 and 2 are now Ready for QA.
+- **QA cycle 2 fixes (qa-fix).** QA2-1/QA2-2: `--complete` keeps `step4-held-paths.txt` along with the hold-dir record, and treats a hold directory it cannot list as one that holds files (84/84, including an unlistable case per arm). QA2-3: `lineRunsNoRm` is now one word test, `(?<![\w-])rm(?![\w-])`, instead of a list of what may precede and follow `rm`. Redirections count, and the pattern is linear (0.05 ms at 64k characters). QA2-4: §3, §4, §5 and criteria 1–2 state the exception. All three code fixes were mutation-proven.
+- **QA cycle 3 fixes (qa-fix).** QA3-1/QA3-2: the hold-record rule is now stated once, as `hold_state` in `advance-pipeline-lock.sh`, and exposed read-only as `--hold-state` (`clear` / `pending: <why>`). `--complete` keeps the two hold records by its answer. Step 8's held-files check calls it instead of its own `ls -A` copy, so the two can no longer disagree. A record that cannot be read, a directory that cannot be listed and a path that is not a directory all read `pending`. Lock suite 102/102 (six hold cases per arm, each asserting both modes); checklist suite 64/64 (unlistable dir and unreadable record fail Step 8). Four mutations proven.
+
+---
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-24
+**Quality Score**: 95/100
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Full Report**: [task.227.qa.4.step-8-checklist-no-rm.md](./task.227.qa.4.step-8-checklist-no-rm.md)
+- **Gate File**: [task.227.gate.4.step-8-checklist-no-rm.yml](./task.227.gate.4.step-8-checklist-no-rm.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 166 (lock suite 102, checklist suite 64)
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0 high, 0 medium, 2 low (carried, route 2b)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+- QA3-1 and QA3-2 are fixed: the hold-record rule is one function, read by `--complete` and Step 8. Bug 3 is closed.
+- TASK-227-QA4-1 and QA4-2 (low) are carried to the gate's `recommendations.future` (see Deferred Work).
+
+## Deferred Work
+
+- **TASK-227-QA4-1** (LOW) — carried to gate 4 `recommendations.future` (route 2b, cycle 4): the `hold_state` comment says the rule is stated once, but Step 4's Restore Held Files decides by its own `ls -A` test (its behaviour is pre-existing)
+- **TASK-227-QA4-2** (LOW) — carried to gate 4 `recommendations.future` (route 2b, cycle 4): a hold dir whose parent cannot be searched reads `clear`
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.227.qa.4.step-8-checklist-no-rm.md`
+**Gate File**: `task.227.gate.4.step-8-checklist-no-rm.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 95/100 (4 QA cycles)
+**PR Review (5c)**: `task.227.pr-review.1.step-8-checklist-no-rm.md`. Verdict: ✅ APPROVE.
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 10/10 met. Each is traced to code and to a per-PR test (lock scenario 15, the Step 8 checklist guard, the changelog corpus guard) or to a committed artifact.
+✅ **PR Review:** PR #746. The host requires no reviews; 5c `/review-pr` APPROVE, 0 findings.
+✅ **CI:** reading 1 SUCCESS at `0d43d5d2` over 6 checks.
+✅ **Documentation:** the CHANGELOG `[Unreleased]` entry (task 227), the `advance-pipeline-lock.sh` header and usage, and the Step 8 doc are updated, with bundled copies regenerated.
+✅ **Security Review:** PASS. 3 controls probed (`lineRunsNoRm`, `hold_state` via `--hold-state` and via `--complete`): 30 executed, 0 reproduced, 0 escaped.
+⚠️ **Compliance Review:** not applicable (internal pipeline tooling).
+
+**Carried, non-blocking:** TASK-227-QA4-1 and QA4-2. See Deferred Work.
+
+**Task marked as ACCEPTED on:** 2026-10-24
+
+**Detailed Verification Log:** See `task.227.dod.1.step-8-checklist-no-rm.md` for complete verification evidence and timestamps.
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-10-22 | 1.0 | Initial draft — cut from observation #87 | create-task |
+| 2026-10-24 | 1.1 | Review passed (8/10) — guard helpers named (`developPipelineDocs`, `extractBlocks`), Performance criteria replaced by a not-applicable line, mutation criterion re-scoped to the implementation report, header comment added to Phase 3, two anchors corrected | review-task |
+| 2026-10-24 |  | Status → ready-for-development | review-task |
+| 2026-10-24 |  | Implemented — 5 source files and 16 bundled copies; 3 tests added (lock scenario 15, the guard, its RM_WORD control), 1 extended | develop |
+| 2026-10-24 |  | QA gate CONCERNS (80/100) — 2 findings | qa-task |
+| 2026-10-24 |  | QA findings fixed — QA1-1, QA1-2 (2 MEDIUM), 1 iteration | qa-fix |
+| 2026-10-24 |  | QA gate CONCERNS (90/100) — 4 findings | qa-task |
+| 2026-10-24 |  | QA findings fixed — QA2-1..QA2-4 (4 LOW), 1 iteration | qa-fix |
+| 2026-10-24 |  | QA gate CONCERNS (85/100) — 2 findings | qa-task |
+| 2026-10-24 |  | QA findings fixed — QA3-1 (MEDIUM), QA3-2 (LOW), 1 iteration | qa-fix |
+| 2026-10-24 |  | QA gate PASS (95/100) — 2 LOW carried (route 2b) | qa-task |
+| 2026-10-24 | 1.2 | DoD verified — accepted (PR #746) | finalise |
 <!-- change-log-end -->
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 1: Tests first
-- [ ] Phase 2: Move the removals
-- [ ] Phase 3: Bundle, docs, changelog
+- [x] Phase 1: Tests first
+- [x] Phase 2: Move the removals
+- [x] Phase 3: Bundle, docs, changelog
 
 ## References
 

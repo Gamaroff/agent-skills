@@ -1,0 +1,88 @@
+schema: 2
+task: 'task.232.probe-expected-path-assertions'
+task_title: 'Probe expected.absent takes bare names; the rule doc says paths'
+gate: CONCERNS
+status_reason: 'All five cycle 1 findings are fixed and verified: lint-shell is green, the grammar refuses every spelling of the case directory, trailing slashes collide, and isCasePath is probed (11 executed, 0 escaped). Two medium findings remain. Cycle 1 documented "never a probe crash", but a run that leaves a mode-000 directory still crashes the sandbox teardown (BUG-6). The fence scorer counting an unreadable path as a side effect is untested; mutation Q5 survives (BUG-7).'
+reviewer: 'QA Engineer'
+head: '07227d874af07da7633062c2d33729b915f89165'
+updated: '2026-10-25T19:49:18Z'
+
+top_issues:
+  - id: 'TASK-232-QA2-1'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'Cycle 1 wrote "a path the run left unreadable ... is a mismatch too, never a probe crash" into probe-boundary-rule.md and CHANGELOG, but a fence case whose input is `mkdir -p locked && chmod 000 locked` still ends runProbeSpec: the finally-block `rmSync(sandboxRoot, { recursive: true, force: true })` throws EACCES and every case result is lost. Reproduced on head; the teardown is unchanged from base, which crashes the same way. The defect predates this change, but the claim is new and false. The new test calls compareExpected directly and restores the mode itself, so it cannot see the runner. From diff review CR-1.'
+    suggested_action: 'Make the sandbox teardown restore owner permissions on directories the run left unreadable (lstat walk, never following symlinks) before removing it. Add a runProbeSpec-level test whose case leaves a mode-000 directory and still returns its results.'
+    suggested_owner: dev
+    bug_ref: 'task.232.bug.6.sandbox-teardown-throws-on-mode-000-dir.md'
+  - id: 'TASK-232-QA2-2'
+    severity: medium
+    file: 'shared/resources/tests/security-probe.test.mjs'
+    finding: 'Cycle 1 made the fence scorer count an unreadable `absent` path as a side effect (`casePathState(...).state !== "missing"`, security-probe.mjs:3364). No test holds it: mutation Q5 (`!== "missing"` changed to `=== "present"`) leaves the suite green. A hostile fence case that plants a loop and then stops would score errored instead of reproduced, unseen.'
+    suggested_action: 'Add a fence test: a hostile case that plants `ln -s loop loop` and then stops, with absent ["loop/x"], scores as reproduced on every shell. Confirm it goes red under Q5.'
+    suggested_owner: dev
+    bug_ref: 'task.232.bug.7.fence-unreadable-side-effect-untested.md'
+
+bug_resolution:
+  - bug: 'task.232.bug.1.path-actions-lib-no-shell-directive.md'
+    status: closed
+    verified: 'bash scripts/lint-shell.sh green with the fixture tracked'
+  - bug: 'task.232.bug.2.case-path-trailing-dot-slash-accepted.md'
+    status: closed
+    verified: 'grammar test refuses ./ .// a/../ a/./..// ../; mutation Q6 reds 9 tests'
+  - bug: 'task.232.bug.3.trailing-slash-skips-collision-decline.md'
+    status: closed
+    verified: 'per-form trailing-slash rows decline on all five forms; Q6 reds them'
+  - bug: 'task.232.bug.4.case-path-state-throws-on-eloop-eacces.md'
+    status: closed
+    verified: 'compareExpected returns "could not be read (ELOOP|EACCES)"; Q4 reds the test. The runner teardown is BUG-6.'
+  - bug: 'task.232.bug.5.case-path-grammar-not-probeable.md'
+    status: closed
+    verified: 'isCasePath exported and probed: --sink path executed 11, 0 escaped'
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 263
+  phases_verified: 3/3
+  ci: 'PR #748 @ 07227d87 not read this cycle (no cycle waits on CI); local npm run ci exit 0 with the symlink aside, 6337 tests, 0 failed'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 11
+    escaped: 0
+    notes: 'isCasePath probed with --sink path (record task.232.qa.2.security.run.json). 6 hostiles rejected, 3 legitimates accepted. encoded-traversal and symlink-escape are accepted at this lexical layer by design, and both are contained, as verified through compareExpected: the engine never decodes a path, so the encoded name is a literal file inside the case directory, and a symlinked ancestor reads as "an ancestor resolves outside the case directory" and is never followed.'
+  performance:
+    status: PASS
+    notes: 'One lstat and one realpath per asserted path; caseKey is linear in the path length.'
+  reliability:
+    status: CONCERNS
+    notes: 'A run that leaves a mode-000 directory crashes the sandbox teardown (QA2-1, pre-existing, now contradicted by the docs). A detached grandchild can write after the check (CR-2, pre-existing on base, advisory).'
+  maintainability:
+    status: PASS
+    notes: 'One case-path key (caseKey) for the grammar and the collision rule.'
+
+recommendations:
+  immediate:
+    - action: 'Fix QA2-1 and QA2-2.'
+      refs: ['shared/resources/security-probe.mjs', 'shared/resources/tests/security-probe.test.mjs']
+  future:
+    - action: 'CR-2 (pre-existing): run each case in its own process group and reap it before absent/removed are read, so a detached grandchild cannot write after the check.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'CR-3 (low): a dangling outward ancestor symlink reads as missing, not outside; check ancestors with readlink rather than realpath.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'CR-4 (low): let removed name a directory the fixture creates implicitly, so a cleanup that leaves tmp/ behind can be caught.'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['QA2-1 and QA2-2 fixed']

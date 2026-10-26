@@ -25,8 +25,17 @@ const { extractBlocks, PINNED_VERSION } = require(SCRIPT);
 // The package exports no ./package.json subpath, so address its directory directly.
 const WIRELOOM = path.join(REPO_ROOT, "node_modules", "wireloom");
 
+// Every directory tmpdir() makes is removed once this file's tests finish; there was no cleanup at
+// all, and `npm test` left 37 `wireloom-test-*` directories behind (task 231, obs #83).
+const MADE = new Set();
+test.after(() => {
+  for (const dir of MADE) fs.rmSync(dir, { recursive: true, force: true });
+});
+
 function tmpdir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), "wireloom-test-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "wireloom-test-"));
+  MADE.add(dir);
+  return dir;
 }
 
 function run(args, { input, env = {}, cwd } = {}) {

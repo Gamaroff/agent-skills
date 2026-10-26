@@ -1,0 +1,79 @@
+schema: 2
+task: 'task.231.test-infrastructure-hygiene'
+task_title: 'Test infrastructure hygiene'
+gate: CONCERNS
+status_reason: 'Cycle 1 fixes verified (both mutation-proven), but the refute pass found that a SIGTERM to the wrapper reaches only its direct child: the suite''s grandchildren keep running after their TMPDIR is deleted (CR2-1 medium, reproduced).'
+reviewer: 'QA Engineer'
+head: 'e1a76d6b08e9ee68cc3426fb04d738bc3f600b97'
+updated: '2026-10-26T06:53:47Z'
+
+top_issues:
+  - id: 'TASK-231-CR2-1'
+    severity: medium
+    file: 'scripts/test-tmpdir.mjs'
+    finding: 'The signal handler forwards SIGTERM with child.kill(sig) to the direct child only (npm, then sh -c), so node --test and its workers keep running as orphans while the wrapper deletes their TMPDIR and reports "per-run directory removed" (reproduced: kill -TERM on the wrapper around sh -c ''node -e setInterval''; wrapper exit 143, grandchild still alive).'
+    suggested_action: 'Spawn the suite detached (its own process group), forward each signal to the group with process.kill(-child.pid, sig), and remove the directory only after the child has exited; add a test whose fake suite spawns a grandchild and assert it is gone after the signal.'
+    suggested_owner: dev
+  - id: 'TASK-231-CR2-2'
+    severity: low
+    file: 'scripts/test-tmpdir.mjs'
+    finding: 'INNER_RE requires an uppercase letter or digit, so an all-lowercase inner mkdtemp suffix is kept: prefixOf("eval-repeat-hang-qwerty-Ab12Cd") is "eval-repeat-hang-qwerty", a new prefix that trips the ratchet in roughly (26/62)^6 = 0.55% of runs that leak that directory.'
+    suggested_action: 'Strip the inner six-character suffix for the known producer (the eval-repeat-hang scenario directory) regardless of case, with a prefixOf case using an all-lowercase inner suffix.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 6364
+  phases_verified: 6/6
+  ci: 'pass @ e1a76d6b — test, link-check, validate, shellcheck, secret-scan'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 8
+    escaped: 0
+    notes: 'boundary: true — scripts/test-tmpdir.mjs#compareRatchet re-probed at e1a76d6b with task.231.qa.1.ratchet-cases.json: 5 hostile rejected, 3 legitimate accepted (record task.231.qa.2.security.run.json). groupByPrefix (changed this cycle) is a counter, not a verdict; its prototype-key cases are held by tests/test-tmpdir.test.js.'
+  performance:
+    status: PASS
+    notes: 'CR2-4 (advisory, confidence medium): heading matchers grow quadratically on long unclosed emphasis or whitespace runs (about 1.9 s at 16k characters on one line); real headings are short and the repo-wide corpus test stays near 3 s.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR2-1: orphaned suite processes after a signal; CR2-2: a 0.55% ratchet flake on a lowercase inner suffix; CR2-3 (advisory): an unguarded retry rmSync can escape the finally.'
+  maintainability:
+    status: PASS
+    notes: 'CR2-5 (advisory): qa-task/qa-story SKILL.md Step 12b prose names the halting doc-links states without no-anchor.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR2-1: process-group signal forwarding, with a grandchild test.'
+      refs: ['scripts/test-tmpdir.mjs', 'tests/test-tmpdir.test.js']
+  future:
+    - action: 'CR2-2: strip the eval-repeat-hang inner suffix regardless of case (low; cheap to fold in).'
+      refs: ['scripts/test-tmpdir.mjs']
+    - action: 'CR2-3: guard the retry rmSync in removeDir.'
+      refs: ['scripts/test-tmpdir.mjs']
+    - action: 'CR2-4: make the heading matchers linear or cap the scanned line length.'
+      refs: ['shared/resources/doc-links.js']
+    - action: 'CR2-5: add no-anchor to the halting states named in qa-task and qa-story Step 12b.'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+    - action: 'CR2-6 (confidence low): Bitbucket consumers use markdown-header- heading anchors; choose the slug rule by platform.'
+      refs: ['shared/resources/doc-links.js']
+    - action: 'Carried from gate 1: CR-2 (engine-only PR runs an empty anchor step).'
+      refs: ['.github/workflows/docs-link-check.yml']
+
+bug_resolution:
+  fixed_this_cycle: ['TASK-231-CR-1', 'TASK-231-QA-1', 'CR-3 (cleanup)']
+  verification: 'mutation-proven against the committed tests at e1a76d6b'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR2-1 fixed and covered by a test']

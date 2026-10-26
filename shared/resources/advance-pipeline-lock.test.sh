@@ -56,6 +56,11 @@
 #        stay able to clear an absent lock.
 #        `--skill` with no lock but a halt snapshot or orphaned claim on disk
 #        still exits 0 and names --restore on stderr; silent without either (obs #280).
+#   15.  --complete removes Step 4's three records and the two 5c carry records beside the
+#        lock, in BOTH arms (lock present, and no lock), and keeps every other file there
+#        (task 227). Step 8's Completion Checklist used to remove them with its own `rm -f`
+#        lines, and a host that could not inspect an `rm` inside the wrapped block refused
+#        the whole block (obs #87).
 #
 # Scenarios 8–11 run under BOTH bash and zsh. macOS logins are zsh and task 51
 # found a real bash/zsh divergence in a sibling shared resource, so the
@@ -788,13 +793,107 @@ run_no_lock_split() {
   fi
 }
 
+# ── Scenario 15: --complete removes the run's records, in both arms ─────────
+# The removal sits before the no-lock exit, so a run with no lock on disk (the checklist
+# test's fixture is one) loses its records too. The arm under test is named in each line.
+COMPLETE_RECORDS="step4-scope-paths.txt step4-held-paths.txt step4-hold-dir.txt 5c-carry-eligible.txt 5c-carry-classified.txt"
+run_complete_records() {
+  local SH="$1" ARM D L RC OUT r left
+  for ARM in lock no-lock; do
+    D="$TMPDIR_TEST/records-$ARM-$SH"
+    mkdir -p "$D"
+    L="$D/develop-pipeline.lock"
+    for r in $COMPLETE_RECORDS keep-me.txt develop-pipeline.last-halt.json; do : > "$D/$r"; done
+    [ "$ARM" = lock ] && printf '{"current_step": 8, "story": "demo"}\n' > "$L"
+    OUT=$(PIPELINE_LOCK="$L" "$SH" "$SCRIPT" --complete 2>&1); RC=$?
+    left=""
+    for r in $COMPLETE_RECORDS; do [ -e "$D/$r" ] && left="$left $r"; done
+    if [ "$RC" -eq 0 ] && [ ! -f "$L" ] && [ -z "$left" ]; then
+      pass "[$SH] --complete ($ARM arm) removes the five records and leaves no lock"
+    else
+      fail "[$SH] --complete ($ARM arm) removes the five records" "rc=$RC lock=$([ -f "$L" ] && echo present || echo gone) left:${left:- none} out=$OUT"
+    fi
+    if [ -f "$D/keep-me.txt" ] && [ -f "$D/develop-pipeline.last-halt.json" ]; then
+      pass "[$SH] --complete ($ARM arm) keeps an unrelated file and the halt snapshot"
+    else
+      fail "[$SH] --complete ($ARM arm) keeps unrelated files" "keep-me=$([ -f "$D/keep-me.txt" ] && echo kept || echo removed) snapshot=$([ -f "$D/develop-pipeline.last-halt.json" ] && echo kept || echo removed)"
+    fi
+    # The hold-dir record is the one pointer to files Step 4 moved aside, and held-paths lists them.
+    # --hold-state is the rule, stated once; --complete keeps both records, with a warning, while it
+    # reads pending, and removes both, silently, while it reads clear (QA1-2, QA2-1, QA2-2, QA3-1,
+    # QA3-2). Each case asserts both modes, so the two cannot drift apart. `unlistable` and
+    # `unreadable` need a user whose permissions bind — root reads mode-000 files — so they are
+    # skipped as root.
+    local HOLD STATE WANT NAMED
+    for HOLD in full unlistable unreadable notdir empty missing; do
+      case "$HOLD" in unlistable|unreadable)
+        if [ "$(id -u)" -eq 0 ]; then
+          echo "  SKIP  [$SH] --complete ($ARM arm) $HOLD hold record (running as root)"; continue
+        fi ;;
+      esac
+      D="$TMPDIR_TEST/hold-$HOLD-$ARM-$SH"
+      mkdir -p "$D/hold"
+      L="$D/develop-pipeline.lock"
+      case "$HOLD" in full|unlistable|unreadable) : > "$D/hold/held.txt" ;; esac
+      case "$HOLD" in missing|notdir) rmdir "$D/hold" ;; esac
+      [ "$HOLD" = notdir ] && : > "$D/hold"
+      printf '%s\n' "$D/hold" > "$D/step4-hold-dir.txt"
+      printf '%s\n%s\n' "docs/tasks/task.9.demo" "held.txt" > "$D/step4-held-paths.txt"
+      [ "$ARM" = lock ] && printf '{"current_step": 8, "story": "demo"}\n' > "$L"
+      [ "$HOLD" = unlistable ] && chmod 000 "$D/hold"
+      [ "$HOLD" = unreadable ] && chmod 000 "$D/step4-hold-dir.txt"
+      STATE=$(PIPELINE_LOCK="$L" "$SH" "$SCRIPT" --hold-state 2>/dev/null)
+      OUT=$(PIPELINE_LOCK="$L" "$SH" "$SCRIPT" --complete 2>&1 >/dev/null); RC=$?
+      [ "$HOLD" = unlistable ] && chmod 755 "$D/hold"
+      [ "$HOLD" = unreadable ] && [ -e "$D/step4-hold-dir.txt" ] && chmod 644 "$D/step4-hold-dir.txt"
+      case "$HOLD" in
+        empty|missing) WANT=clear ;;
+        *) WANT=pending ;;
+      esac
+      NAMED="$D/hold"; [ "$HOLD" = unreadable ] && NAMED="$D/step4-hold-dir.txt"
+      case "$STATE" in
+        "$WANT"|"$WANT: "*) pass "[$SH] --hold-state ($ARM arm) reads $WANT for a $HOLD hold record" ;;
+        *) fail "[$SH] --hold-state ($ARM arm) reads $WANT for a $HOLD hold record" "got: $STATE" ;;
+      esac
+      if [ "$WANT" = pending ]; then
+        if [ "$RC" -eq 0 ] && [ ! -f "$L" ] && [ -f "$D/step4-hold-dir.txt" ] && [ -f "$D/step4-held-paths.txt" ] \
+           && printf '%s' "$OUT" | grep -qF "$NAMED"; then
+          pass "[$SH] --complete ($ARM arm) keeps both hold records for a $HOLD hold record, and says so"
+        else
+          fail "[$SH] --complete ($ARM arm) keeps both hold records ($HOLD)" "rc=$RC hold-dir=$([ -f "$D/step4-hold-dir.txt" ] && echo kept || echo gone) held-paths=$([ -f "$D/step4-held-paths.txt" ] && echo kept || echo gone) stderr=$OUT"
+        fi
+      elif [ "$RC" -eq 0 ] && [ ! -f "$L" ] && [ ! -e "$D/step4-hold-dir.txt" ] && [ ! -e "$D/step4-held-paths.txt" ] && [ -z "$OUT" ]; then
+        pass "[$SH] --complete ($ARM arm) removes both hold records when the hold dir is $HOLD, silently"
+      else
+        fail "[$SH] --complete ($ARM arm) removes both hold records ($HOLD)" "rc=$RC hold-dir=$([ -e "$D/step4-hold-dir.txt" ] && echo kept || echo gone) held-paths=$([ -e "$D/step4-held-paths.txt" ] && echo kept || echo gone) stderr=$OUT"
+      fi
+    done
+  done
+  # No record at all reads clear; an extra argument is a usage error, never a silent answer.
+  D="$TMPDIR_TEST/hold-none-$SH"; mkdir -p "$D"
+  STATE=$(PIPELINE_LOCK="$D/develop-pipeline.lock" "$SH" "$SCRIPT" --hold-state); RC=$?
+  if [ "$RC" -eq 0 ] && [ "$STATE" = clear ]; then
+    pass "[$SH] --hold-state reads clear with no hold record"
+  else
+    fail "[$SH] --hold-state with no hold record" "rc=$RC out=$STATE"
+  fi
+  PIPELINE_LOCK="$D/develop-pipeline.lock" "$SH" "$SCRIPT" --hold-state extra >/dev/null 2>&1; RC=$?
+  if [ "$RC" -eq 1 ]; then
+    pass "[$SH] --hold-state with an extra argument is a usage error"
+  else
+    fail "[$SH] --hold-state with an extra argument" "rc=$RC"
+  fi
+}
+
 run_restore_scenarios bash
 run_no_lock_split bash
+run_complete_records bash
 if command -v zsh >/dev/null 2>&1; then
   run_restore_scenarios zsh
   run_no_lock_split zsh
+  run_complete_records zsh
 else
-  echo "  SKIP  zsh interpreter pass for scenarios 13-14 (zsh not on this host)"
+  echo "  SKIP  zsh interpreter pass for scenarios 13-15 (zsh not on this host)"
 fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────

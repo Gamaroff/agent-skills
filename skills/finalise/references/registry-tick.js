@@ -79,6 +79,30 @@
  *   engine-unavailable the shared registry parser could not be located
  * Exit 2: usage error (including `--annotate` without `--pr`).
  *
+ * ## The status-icon cell — `registry.task.statusIcons` (opt-in)
+ *
+ * Some consumer registries carry a presentational icon beside Status, and gate
+ * on the two agreeing. The tick once wrote `accepted` and left `⚠️`, and the
+ * consumer's CI went red after a correct acceptance. The icon set is the
+ * consumer's, so it comes from `skills-config.yaml`, never from here:
+ *
+ *   registry:
+ *     task:
+ *       statusIcons:     # status token → icon; absent = no icon handling at all
+ *         accepted: "✅"
+ *       iconColumn: ""   # header text; "" = the empty header cell beside Status
+ *
+ * When configured, the tick (and the `already` path, which can otherwise never
+ * heal a stale icon) adds an `icon` field:
+ *   written    the icon cell was rewritten in the same one-line write as Status
+ *   repaired   (`already`) Status was right, the stale icon was rewritten
+ *   unchanged  the icon cell already reads the mapped icon
+ *   unmapped   the map has no icon for the status — the cell is left alone
+ *   no-column  no header cell matches — Status is ticked, the icon is not
+ *   ambiguous  more than one header cell matches — nothing is guessed
+ * Every outcome exits 0. Without the key the payload carries no `icon` field
+ * and the registry bytes are exactly what they were before the key existed.
+ *
  * ## `--bug-status` — the general-bug registry row (task 219)
  *
  *   node registry-tick.js --bug-status --file <bug.md> [--registry <path>] [--dry-run] [--json]
@@ -121,6 +145,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { parseYamlSubset } = require("./yaml-subset.js");
 
 const DEFAULT_REGISTRY = "docs/tasks/task-registry.md";
 const DEFAULT_BUG_REGISTRY = "docs/bugs/bug-registry.md";
@@ -467,18 +492,45 @@ async function main() {
     });
   }
 
+  const icons = loadStatusIcons();
+
   if (row.registryStatus === "accepted") {
+    // A row the tick already wrote can still carry a stale icon — the exact
+    // state this column's handling was added to stop. Without a repair here,
+    // `already` could never heal it: every re-run would leave the icon alone.
+    let icon;
+    if (icons) {
+      const repair = rewriteStatusCell(registryText, row, null, {
+        ...icons,
+        status: "accepted",
+      });
+      icon = repair.ok ? repair.icon : { outcome: "ambiguous" };
+      if (icon.outcome === "written") {
+        icon = { ...icon, outcome: "repaired" };
+        if (!opts.dryRun) fs.writeFileSync(registryRel, repair.text, "utf8");
+      }
+    }
+    const repaired = icon && icon.outcome === "repaired";
     return emit(opts, {
-      reason: "already",
-      message: `task ${taskId} row (line ${row.line}) already reads \`accepted\``,
+      reason: repaired && opts.dryRun ? "dry-run" : "already",
+      message:
+        `task ${taskId} row (line ${row.line}) already reads \`accepted\`` +
+        iconMessage(icon) +
+        (repaired && opts.dryRun ? " (dry run — not written)" : ""),
       taskId,
       line: row.line,
+      ...(icon ? { icon: icon.outcome } : {}),
       ticked: false,
       exitCode: 0,
     });
   }
 
-  const rewrite = rewriteStatusCell(registryText, row, "accepted");
+  const rewrite = rewriteStatusCell(
+    registryText,
+    row,
+    "accepted",
+    icons && { ...icons, status: "accepted" },
+  );
   if (!rewrite.ok) {
     return emit(opts, {
       reason: "ambiguous-row",
@@ -498,11 +550,12 @@ async function main() {
 
   return emit(opts, {
     reason: opts.dryRun ? "dry-run" : "ticked",
-    message: `task ${taskId} row (line ${row.line}): \`${row.registryStatus}\` → \`accepted\`${opts.dryRun ? " (dry run — not written)" : ""}`,
+    message: `task ${taskId} row (line ${row.line}): \`${row.registryStatus}\` → \`accepted\`${iconMessage(rewrite.icon)}${opts.dryRun ? " (dry run — not written)" : ""}`,
     taskId,
     line: row.line,
     from: row.registryStatus,
     to: "accepted",
+    ...(rewrite.icon ? { icon: rewrite.icon.outcome } : {}),
     ticked: !opts.dryRun,
     exitCode: 0,
   });
@@ -534,8 +587,13 @@ async function main() {
  * The cell keeps its total WIDTH where the new value fits (`setCell`), so a
  * column-aligned table keeps its alignment and the diff stays one visible
  * change rather than a whole reflowed row.
+ *
+ * `icons` (from `loadStatusIcons`, plus the target `status`) also rewrites the
+ * row's status-icon cell, in the same line and the same write; the result then
+ * carries `icon: {outcome, from, to}`. A `value` of null leaves the Status cell
+ * as it is — the `already` path, which repairs only the icon.
  */
-function rewriteStatusCell(registryText, row, value) {
+function rewriteStatusCell(registryText, row, value, icons = null) {
   const parts = registryText.split(/(\r?\n)/);
   const idx = (row.line - 1) * 2;
   const cells = parts[idx].split("|");
@@ -544,9 +602,97 @@ function rewriteStatusCell(registryText, row, value) {
     if (cells[i].trim().toLowerCase() === row.registryStatus) hits.push(i);
   }
   if (hits.length !== 1) return { ok: false, hits: hits.length };
-  setCell(cells, hits[0], value);
+  if (value !== null) setCell(cells, hits[0], value);
+  const icon = icons
+    ? setIconCell(parts, row.line, cells, hits[0], icons)
+    : undefined;
   parts[idx] = cells.join("|");
-  return { ok: true, text: parts.join("") };
+  return { ok: true, text: parts.join(""), icon };
+}
+
+/**
+ * `registry.task.statusIcons` from `skills-config.yaml` in the cwd — the same
+ * place the registry path resolves from — as `{map, column}`, or null when the
+ * key is absent. Null means no icon handling at all: not a default icon set,
+ * because the vocabulary is the consumer's and this skill has none of its own.
+ *
+ * An icon that is empty, or holds a pipe or a line break, is dropped — the
+ * first would blank the cell, the others would break the table — so its
+ * status reads as `unmapped` and the cell is left alone.
+ */
+function loadStatusIcons(root = process.cwd()) {
+  let cfg;
+  try {
+    cfg = parseYamlSubset(
+      fs.readFileSync(path.join(root, "skills-config.yaml"), "utf8"),
+    );
+  } catch (_) {
+    return null;
+  }
+  const task = cfg && cfg.registry && cfg.registry.task;
+  const raw = task && task.statusIcons;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const map = {};
+  for (const [status, icon] of Object.entries(raw)) {
+    const v = typeof icon === "string" ? icon.trim() : "";
+    if (v && !/[|\r\n]/.test(v)) map[status.toLowerCase()] = v;
+  }
+  const column = typeof task.iconColumn === "string" ? task.iconColumn : "";
+  return { map, column: column.trim().toLowerCase() };
+}
+
+/**
+ * Write the icon for `status` into the row's icon cell, found by the HEADER,
+ * never by an index: the cell whose header reads `column`, or — when `column`
+ * is "" — the header cell beside Status whose text is empty. No such cell, or
+ * more than one, is reported and nothing is written; guessing would put an
+ * emoji into a data cell. Returns `{outcome, from?, to?}` with outcome one of
+ * `written`, `unchanged`, `unmapped`, `no-column`, `ambiguous`.
+ */
+function setIconCell(
+  parts,
+  rowLine,
+  cells,
+  statusIdx,
+  { map, column, status },
+) {
+  const to = map[status];
+  if (!to) return { outcome: "unmapped" };
+  const header = findHeader(parts, rowLine);
+  if (!header || header.length !== cells.length)
+    return { outcome: "no-column" };
+  // `| a | b |` splits to ["", " a ", " b ", ""]: the outer elements are not
+  // columns, and they are empty, so they must never be read as the unnamed one.
+  // Nor is Status itself: `iconColumn: Status` would overwrite the tick.
+  const first = header[0].trim() === "" ? 1 : 0;
+  const last =
+    header[header.length - 1].trim() === ""
+      ? header.length - 2
+      : header.length - 1;
+  const candidates = (
+    column === "" ? [statusIdx - 1, statusIdx + 1] : header.map((_, i) => i)
+  ).filter(
+    (i) =>
+      i >= first &&
+      i <= last &&
+      i !== statusIdx &&
+      header[i].trim().toLowerCase() === column,
+  );
+  if (candidates.length === 0) return { outcome: "no-column" };
+  if (candidates.length > 1) return { outcome: "ambiguous" };
+  const from = cells[candidates[0]].trim();
+  if (from === to) return { outcome: "unchanged", from, to };
+  setCell(cells, candidates[0], to);
+  return { outcome: "written", from, to };
+}
+
+/** The message suffix for an icon outcome; "" when icons are not configured. */
+function iconMessage(icon) {
+  if (!icon) return "";
+  if (icon.outcome === "written" || icon.outcome === "repaired") {
+    return `; icon \`${icon.from || "(empty)"}\` → \`${icon.to}\``;
+  }
+  return `; icon ${icon.outcome}`;
 }
 
 /**

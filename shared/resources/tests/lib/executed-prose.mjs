@@ -121,9 +121,23 @@ function buildTemplate() {
   return dir;
 }
 
+// Every copy is removed when the process exits, whether or not the caller ran cleanup(): a caller
+// that destructures only `work` cannot, and read-only-agent-writes.test.mjs left 23
+// `executed-prose-*` directories per `npm test` that way (task 231, obs #83). cleanup() still
+// removes a copy early; the exit pass then finds nothing to do.
+const copies = new Set();
+let exitHook = false;
+
 export function fixtureRepo() {
   template ??= buildTemplate();
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "executed-prose-"));
+  copies.add(dir);
+  if (!exitHook) {
+    exitHook = true;
+    process.on("exit", () => {
+      for (const d of copies) fs.rmSync(d, { recursive: true, force: true });
+    });
+  }
   fs.cpSync(template, dir, { recursive: true });
   return {
     dir,

@@ -1,0 +1,147 @@
+[
+  {
+    "id": "hold.files",
+    "sink": "path",
+    "input": "--hold-state",
+    "why": "the hold dir still holds a moved file; reading clear would let --complete drop the only pointer to it",
+    "correct": "pending",
+    "direction": "hostile",
+    "fixture": {
+      "env": {
+        "PIPELINE_LOCK": ".claude/state/develop-pipeline.lock"
+      },
+      "files": {
+        ".claude/state/step4-hold-dir.txt": "held\n",
+        "held/moved.txt": "x"
+      }
+    },
+    "expected": {
+      "stdout": "pending: held still holds files Step 4 moved aside\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "hold.dotfile-only",
+    "sink": "path",
+    "input": "--hold-state",
+    "why": "a dir whose only entry is a dotfile is not empty; ls without -A would read it as clear",
+    "correct": "pending",
+    "direction": "hostile",
+    "fixture": {
+      "env": {
+        "PIPELINE_LOCK": ".claude/state/develop-pipeline.lock"
+      },
+      "files": {
+        ".claude/state/step4-hold-dir.txt": "held\n",
+        "held/.env": "x"
+      }
+    },
+    "expected": {
+      "stdout": "pending: held still holds files Step 4 moved aside\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "hold.nested",
+    "sink": "path",
+    "input": "--hold-state",
+    "why": "a moved file in a subdirectory is still held",
+    "correct": "pending",
+    "direction": "hostile",
+    "fixture": {
+      "env": {
+        "PIPELINE_LOCK": ".claude/state/develop-pipeline.lock"
+      },
+      "files": {
+        ".claude/state/step4-hold-dir.txt": "held\n",
+        "held/sub/deep.txt": "x"
+      }
+    },
+    "expected": {
+      "stdout": "pending: held still holds files Step 4 moved aside\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "hold.not-a-dir",
+    "sink": "path",
+    "input": "--hold-state",
+    "why": "the record names a path that exists but is not a directory, so empty cannot be seen",
+    "correct": "pending",
+    "direction": "hostile",
+    "fixture": {
+      "env": {
+        "PIPELINE_LOCK": ".claude/state/develop-pipeline.lock"
+      },
+      "files": {
+        ".claude/state/step4-hold-dir.txt": "held\n",
+        "held": "x"
+      }
+    },
+    "expected": {
+      "stdout": "pending: held is not a directory\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "hold.ok-no-record",
+    "sink": "path",
+    "input": "--hold-state",
+    "why": "no hold record means nothing was moved aside",
+    "correct": "clear",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {
+        "PIPELINE_LOCK": ".claude/state/develop-pipeline.lock"
+      },
+      "files": {
+        ".claude/state/other.txt": "x"
+      }
+    },
+    "expected": {
+      "stdout": "clear\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "hold.ok-empty-record",
+    "sink": "path",
+    "input": "--hold-state",
+    "why": "an empty record names nothing",
+    "correct": "clear",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {
+        "PIPELINE_LOCK": ".claude/state/develop-pipeline.lock"
+      },
+      "files": {
+        ".claude/state/step4-hold-dir.txt": ""
+      }
+    },
+    "expected": {
+      "stdout": "clear\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "hold.ok-gone-path",
+    "sink": "path",
+    "input": "--hold-state",
+    "why": "Restore Held Files deleted the hold dir; the record names a path that is gone",
+    "correct": "clear",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {
+        "PIPELINE_LOCK": ".claude/state/develop-pipeline.lock"
+      },
+      "files": {
+        ".claude/state/step4-hold-dir.txt": "held-gone\n",
+        ".claude/state/step4-held-paths.txt": "a.txt\n"
+      }
+    },
+    "expected": {
+      "stdout": "clear\n",
+      "exit": 0
+    }
+  }
+]

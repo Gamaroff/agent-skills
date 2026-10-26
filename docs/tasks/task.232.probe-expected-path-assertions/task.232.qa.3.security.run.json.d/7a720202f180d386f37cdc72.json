@@ -1,0 +1,23 @@
+{
+  "sink": "path",
+  "entry": "shared/resources/security-probe.mjs#isCasePath",
+  "name": null,
+  "call_site": null,
+  "verdict": "present-but-inert",
+  "reason": "a-hostile-case-passed-a-control-that-rejects-others",
+  "executed": 11,
+  "passed": 9,
+  "reproduced": 2,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": null,
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-10-25T20:15:19.883Z"
+}

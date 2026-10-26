@@ -199,8 +199,9 @@ the suffix is the step the pipeline paused at, so each distinct pause point post
 
 Slots: `{pr}`.
 
-> This work is finished and has been accepted. Everything it set out to do was checked and confirmed
-> working, and the change is now part of the product. No further action is needed on this item.
+> This work has been checked and accepted. Everything it set out to do was confirmed working. It
+> becomes part of the product once the change is merged, which is the last step for this item. No
+> action is needed from anyone reading this.
 
 ---
 
@@ -373,8 +374,9 @@ number on a scale this reader has never been shown.
 
 ```
 <!-- agent-skills-comment:done -->
-This work is finished and has been accepted. Everything it set out to do was checked and confirmed
-working, and the change is now part of the product. No further action is needed on this item.
+This work has been checked and accepted. Everything it set out to do was confirmed working. It
+becomes part of the product once the change is merged, which is the last step for this item. No
+action is needed from anyone reading this.
 
 ---
 
@@ -387,10 +389,14 @@ working, and the change is now part of the product. No further action is needed 
 ...
 ```
 
-The last sentence is doing real work. A `done` comment is the one a stakeholder is most likely to read
-and most likely to misread as "something is expected of me" — five rows of ticks look like a checklist
-addressed to the reader. Saying plainly that nothing is needed is the difference between a comment
-that closes a loop and one that opens a question.
+The last two sentences are doing real work. Every caller posts this comment at acceptance, before
+the pull request is merged — the develop pipelines run `/finalise` at Step 7 and merge later — so
+"the change is now part of the product" would claim an event that has not happened yet (task.233).
+The lead claims what acceptance establishes and names the merge as the step left. And a `done`
+comment is the one a stakeholder is most likely to read and most likely to misread as "something is
+expected of me" — five rows of ticks look like a checklist addressed to the reader, and a step left
+reads like a step handed to them. Saying plainly that nothing is needed is the difference between a
+comment that closes a loop and one that opens a question.
 
 ---
 

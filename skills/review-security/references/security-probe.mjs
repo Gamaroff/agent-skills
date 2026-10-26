@@ -110,7 +110,9 @@
  * against the directory: `bash "$1" "$2"` with the script and directory as
  * ARGV, never a string; stdin closed; the engine's `sandboxEnv()` plus
  * `LC_ALL=C` so glob order is byte order. The case's `expected` — stdout,
- * exit, stderr, paths that must be absent — is what the run is compared
+ * exit, stderr, paths that must be absent after the run (`absent`), paths the
+ * fixture creates that the run must delete (`removed`; both relative to the
+ * case directory, task.232) — is what the run is compared
  * against; `direction` then says whether a match is the good outcome. Each
  * (case, shell) run is one executed probe, so the count is cases × shells and
  * the record says which shells ran. A script that cannot take its input this
@@ -272,10 +274,12 @@ import { spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import {
   accessSync,
+  chmodSync,
   constants as fsConstants,
   mkdtempSync,
   mkdirSync,
   existsSync,
+  lstatSync,
   readdirSync,
   readFileSync,
   realpathSync,
@@ -957,6 +961,31 @@ const GH_VARIABLE = /\$\{?GH(?![A-Za-z0-9_])/;
 const SOURCE_LINE =
   /(?:^|[;&|]|\b(?:then|do)\b)[ \t]*(?:source|\.)[ \t]+["']?([^"'\s;|&)]+)["']?/gm;
 /**
+ * Remove a probe sandbox, including one a case left unreadable. A case
+ * controls its directory, so it can leave a mode-000 directory that `rmSync`
+ * cannot list. On EACCES or EPERM every directory gets owner rwx back and the
+ * removal is retried. The walk uses `lstat`, so a symlink is never followed
+ * out of the sandbox (task.232 QA2-1).
+ */
+function removeSandbox(root) {
+  try {
+    rmSync(root, { recursive: true, force: true });
+    return;
+  } catch (e) {
+    if (e.code !== "EACCES" && e.code !== "EPERM") throw e;
+  }
+  const open = (dir) => {
+    chmodSync(dir, 0o700);
+    for (const name of readdirSync(dir)) {
+      const p = join(dir, name);
+      if (lstatSync(p).isDirectory()) open(p);
+    }
+  };
+  open(root);
+  rmSync(root, { recursive: true, force: true });
+}
+
+/**
  * The real path of `p`, or — when `p` does not exist — the real path of its
  * deepest existing ancestor with the missing segments re-joined. So a missing
  * leaf under a symlinked intermediate is contained by where the link really
@@ -1166,7 +1195,8 @@ export function probeShells() {
  * reader of the case result sees WHICH signal moved — the pre-fix qa-cycle.sh
  * fails on stdout only when the fixture brackets the hostile name, and on
  * stderr on every ordering; reporting only a boolean would hide which one
- * caught it. `absent` paths are checked against the fixture directory.
+ * caught it. `absent` and `removed` paths are checked against the fixture
+ * directory, through casePathState, which never reads past it (task.232).
  *
  * @returns {string[]} mismatches; empty means the run matched `expected`
  */
@@ -1185,12 +1215,49 @@ export function compareExpected(expected, run, fixtureDir) {
       `stderr ${JSON.stringify(run.stderr.slice(0, 120))} ≠ ${JSON.stringify(expected.stderr)}`,
     );
   }
-  for (const rel of expected.absent ?? []) {
-    if (existsSync(join(fixtureDir, rel))) {
-      mismatches.push(`${rel} was created`);
+  for (const [k, present] of [
+    ["absent", "was created"],
+    ["removed", "was not removed"],
+  ]) {
+    for (const rel of expected[k] ?? []) {
+      const where = casePathState(fixtureDir, rel);
+      if (where.state === "outside") {
+        mismatches.push(
+          `${rel}: an ancestor resolves outside the case directory`,
+        );
+      } else if (where.state === "unreadable") {
+        mismatches.push(`${rel} could not be read (${where.code})`);
+      } else if (where.state === "present") {
+        mismatches.push(`${rel} ${present}`);
+      }
     }
   }
   return mismatches;
+}
+
+/**
+ * Where one `absent` / `removed` path stands after the run, as `{ state }`:
+ * "outside" when an ancestor resolves out of the case directory (the run
+ * planted a symlink), else "present" or "missing". The ancestors are resolved
+ * and the leaf is not: `lstatSync` counts a symlink at the leaf as present
+ * without following it, so nothing outside the directory is ever read
+ * (task.232). Any other lstat failure — a loop, an unreadable ancestor, both
+ * left by the run — is "unreadable" with its `code`, never a throw: the run
+ * controls the directory, and one case's path must not end the probe (QA1-4).
+ */
+function casePathState(dir, rel) {
+  const root = realpathSafe(dir);
+  const target = resolve(dir, rel);
+  const real = join(realpathSafe(dirname(target)), basename(target));
+  if (real !== root && !isWithin(root, real)) return { state: "outside" };
+  try {
+    lstatSync(target);
+    return { state: "present" };
+  } catch (e) {
+    if (e.code === "ENOENT" || e.code === "ENOTDIR")
+      return { state: "missing" };
+    return { state: "unreadable", code: e.code ?? String(e) };
+  }
 }
 
 // ── Verdict computation ──────────────────────────────────────────────────────
@@ -1905,7 +1972,7 @@ export function runProbeSpec({
       (isShellForm || isFenceForm || isShellArgvForm) &&
       existsSync(join(harnessDir, GH_TRIPPED));
   } finally {
-    rmSync(sandboxRoot, { recursive: true, force: true });
+    removeSandbox(sandboxRoot);
   }
 
   // The run reached `gh` with no fixture: the trip-wire answered instead of the
@@ -2060,23 +2127,77 @@ export function expectedProblem(expected) {
   if (expected.exit !== undefined && !Number.isInteger(expected.exit)) {
     return `\`expected.exit\` must be an integer, got ${describeType(expected.exit)}`;
   }
-  if (expected.absent !== undefined) {
-    if (
-      !Array.isArray(expected.absent) ||
-      expected.absent.some(
-        (p) =>
-          typeof p !== "string" ||
-          p === "" ||
-          p === "." ||
-          p === ".." ||
-          p.includes("/") ||
-          p.includes("\0"),
-      )
-    ) {
-      // "." and ".." carry no separator and ALWAYS exist, so a case naming
-      // one would score every run as a side effect and the fixed script as
-      // absent with a full count (task.128 QA cycle 4, BUG-13).
-      return "`expected.absent` must be an array of separator-free, non-empty names other than . and ..";
+  for (const k of ["absent", "removed"]) {
+    if (expected[k] === undefined) continue;
+    if (!Array.isArray(expected[k]) || !expected[k].every(isCasePath)) {
+      return `\`expected.${k}\` must be an array of relative paths inside the case directory, other than . and .. — no ".." segment, not absolute, no NUL`;
+    }
+  }
+  return null;
+}
+
+/**
+ * The grammar of an `absent` or `removed` entry (task.232): a non-empty
+ * string with no NUL, not absolute, whose normalised form is not "." and has
+ * no ".." segment — a path that stays inside the case directory. "." and ".."
+ * ALWAYS exist, so a case naming one would score every run as a side effect
+ * and the fixed script as absent with a full count (task.128 QA cycle 4,
+ * BUG-13); "a/.." normalises to ".", so it is refused for the same reason.
+ * Compared by `caseKey`, so "./" and "a/../" are "." too (QA1-2). Exported so
+ * the probe can reach it (`--sink path`, QA1-5).
+ */
+export function isCasePath(p) {
+  if (typeof p !== "string" || p === "" || p.includes("\0") || isAbsolute(p)) {
+    return false;
+  }
+  const n = caseKey(p);
+  return n !== "." && !n.split(sep).includes("..");
+}
+
+/**
+ * The one spelling of a case path every comparison uses: `normalize`, then
+ * any trailing separator dropped. `normalize` keeps a trailing separator, and
+ * the scorer's `resolve` does not, so "sub/" and "sub" are one directory to
+ * the scorer and were two to every comparison — "./" passed the "." test and
+ * "sub/" passed the collision rule (task.232 QA1-2, QA1-3).
+ */
+export function caseKey(p) {
+  let n = normalize(p);
+  while (n.length > 1 && n.endsWith(sep)) n = n.slice(0, -1);
+  return n;
+}
+
+/**
+ * Whether a case's path assertions can be scored, given the relative paths
+ * its own fixture creates (every one a file). Null, or the reason to decline.
+ * One definition for every runner (task.232): they differ only in what they
+ * pass as `created`.
+ *
+ * `absent` is compared case-folded — on a case-insensitive filesystem PWNED
+ * and pwned are one file (TASK-180-010), and a fold here can only decline
+ * more. `removed` is compared exactly: a fold would accept "foo" against a
+ * fixture "Foo", and on a case-sensitive filesystem the case would pass with
+ * nothing removed (task.232 review 1, C1). A path in both lists needs no rule
+ * of its own: created, the first `absent` rule declines it; not created, the
+ * `removed` rule does (review 1, I5).
+ */
+export function pathAssertionProblem(expected, created) {
+  const made = created.map((p) => caseKey(p));
+  const madeFolded = made.map((p) => p.toLowerCase());
+  for (const p of expected?.absent ?? []) {
+    const f = caseKey(p).toLowerCase();
+    // Exists before the script runs, so it would score every run as a side
+    // effect (BUG-13's second shape) — the path itself, or a directory above.
+    if (madeFolded.some((m) => m === f || m.startsWith(f + sep))) {
+      return `\`expected.absent\` names "${p}", which the fixture itself creates`;
+    }
+    if (madeFolded.some((m) => f.startsWith(m + sep))) {
+      return `\`expected.absent\` names "${p}", beneath a file the fixture creates — it can never exist`;
+    }
+  }
+  for (const p of expected?.removed ?? []) {
+    if (!made.includes(caseKey(p))) {
+      return `\`expected.removed\` names "${p}", which the fixture does not create — it would pass with nothing removed`;
     }
   }
   return null;
@@ -2263,19 +2384,16 @@ function runShellCase(
     decline(`case's ${problem}`);
     return;
   }
-  // An `absent` name that the fixture itself creates — a control, or the
-  // case's own input — exists before the script runs, so it too would score
-  // every run as a side effect (BUG-13's second shape).
-  // The shell-fn form writes no per-case file (CR-3), so its input is not a
-  // name the fixture creates and may legitimately be an `absent` path
-  // (QA cycle 2, CR-4).
-  const collides = (c.expected.absent ?? []).find(
-    (p) => fixture.controls.includes(p) || (fnName === null && p === c.input),
-  );
-  if (collides !== undefined) {
-    decline(
-      `case's \`expected.absent\` names "${collides}", which the fixture itself creates`,
-    );
+  // What the fixture creates: the controls, and the case's own input. The
+  // shell-fn form writes no per-case file (CR-3), so its input is not a name
+  // the fixture creates and may legitimately be an `absent` path (QA cycle 2,
+  // CR-4).
+  const paths = pathAssertionProblem(c.expected, [
+    ...fixture.controls,
+    ...(fnName === null ? [c.input] : []),
+  ]);
+  if (paths !== null) {
+    decline(`case's ${paths}`);
     return;
   }
 
@@ -2596,18 +2714,14 @@ function runCliCase(
     return;
   }
   const files = Object.entries(c.fixture?.files ?? {});
-  // An `expected.absent` name the run's own fixture creates mismatches on
-  // every run — declined, as every other arm declines it (task.128 BUG-13).
-  const firstSegment = (rel) => normalize(rel).split(sep)[0].toLowerCase();
-  const collides = (c.expected?.absent ?? []).find(
-    (p) =>
-      (fixture !== null && (fixture.controls.includes(p) || p === c.input)) ||
-      files.some(([rel]) => firstSegment(rel) === p.toLowerCase()),
-  );
-  if (collides !== undefined) {
-    decline(
-      `case's \`expected.absent\` names "${collides}", which the fixture itself creates`,
-    );
+  // What the fixture creates: the sink's controls and input, when there is a
+  // sink, and every `fixture.files` path (task.128 BUG-13; task.232).
+  const paths = pathAssertionProblem(c.expected, [
+    ...(fixture !== null ? [...fixture.controls, c.input] : []),
+    ...files.map(([rel]) => rel),
+  ]);
+  if (paths !== null) {
+    decline(`case's ${paths}`);
     return;
   }
 
@@ -2931,19 +3045,14 @@ function runShellArgvCase(
     return;
   }
   const files = Object.entries(c.fixture?.files ?? {});
-  // An `expected.absent` name the run's own fixture creates mismatches on every
-  // run — declined, as every other arm declines it (task.128 BUG-13).
-  const firstSegment = (rel) => normalize(rel).split(sep)[0].toLowerCase();
-  const collides = (c.expected?.absent ?? []).find(
-    (p) =>
-      (sinkFixture !== null &&
-        (sinkFixture.controls.includes(p) || p === c.input)) ||
-      files.some(([rel]) => firstSegment(rel) === p.toLowerCase()),
-  );
-  if (collides !== undefined) {
-    decline(
-      `case's \`expected.absent\` names "${collides}", which the fixture itself creates`,
-    );
+  // What the fixture creates: the sink's controls and input, when there is a
+  // sink, and every `fixture.files` path (task.128 BUG-13; task.232).
+  const paths = pathAssertionProblem(c.expected, [
+    ...(sinkFixture !== null ? [...sinkFixture.controls, c.input] : []),
+    ...files.map(([rel]) => rel),
+  ]);
+  if (paths !== null) {
+    decline(`case's ${paths}`);
     return;
   }
 
@@ -3275,9 +3384,14 @@ export function scoreFenceRun(
     };
   };
   // A side effect that happened is a reproduction whatever the shell then did —
-  // stopped, was killed, or timed out (TASK-180-006, -018).
+  // stopped, was killed, or timed out (TASK-180-006, -018). Read through
+  // casePathState, as compareExpected reads it: a planted symlink out of the
+  // case directory is itself the side effect, and is never followed (task.232).
+  // An unreadable path counts too: the run left something there.
   const absent = c.expected?.absent ?? [];
-  if (absent.some((p) => existsSync(join(caseDir, p)))) return compared();
+  if (absent.some((p) => casePathState(caseDir, p).state !== "missing")) {
+    return compared();
+  }
   if (neverRan(child)) {
     return {
       outcome: "errored",
@@ -3472,22 +3586,18 @@ function runFenceCase(
     return;
   }
   const files = Object.entries(c.fixture?.files ?? {});
-  // An `expected.absent` name the case's own fixture writes mismatches on every
-  // run, so every hostile case would score accepted and the verdict read
-  // `absent` behind a full count — declined, as the shell and cli: arms decline
-  // it (task.128 BUG-13; task.180 QA cycle 2, TASK-180-004).
-  // Compared on the NORMALISED first segment, case-folded: `./pwned` and
-  // `b/../pwned` write `pwned`, and on a case-insensitive filesystem so does
-  // `PWNED` (TASK-180-010). A path that leaves the case directory is refused
-  // below, per shell.
-  const firstSegment = (rel) => normalize(rel).split(sep)[0].toLowerCase();
-  const collides = (c.expected?.absent ?? []).find((p) =>
-    files.some(([rel]) => firstSegment(rel) === p.toLowerCase()),
+  // What the fixture creates: every `fixture.files` path. An `absent` path it
+  // writes would make every hostile case score accepted and the verdict read
+  // `absent` behind a full count (task.128 BUG-13; task.180 QA cycle 2,
+  // TASK-180-004). The helper normalises and case-folds (`./pwned`,
+  // `b/../pwned` and `PWNED` all write `pwned`, TASK-180-010). A path that
+  // leaves the case directory is refused below, per shell.
+  const paths = pathAssertionProblem(
+    c.expected,
+    files.map(([rel]) => rel),
   );
-  if (collides !== undefined) {
-    decline(
-      `case's \`expected.absent\` names "${collides}", which the case's own fixture writes`,
-    );
+  if (paths !== null) {
+    decline(`case's ${paths}`);
     return;
   }
   const script = block.replaceAll(slot, () => c.input);

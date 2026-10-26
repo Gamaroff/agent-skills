@@ -1,0 +1,190 @@
+[
+  {
+    "id": "t232.dot-dot-relative",
+    "direction": "hostile",
+    "input": "../secrets.env",
+    "why": "One level of traversal leaves the case directory."
+  },
+  {
+    "id": "t232.dot-dot-deep",
+    "direction": "hostile",
+    "input": "../../../../etc/passwd",
+    "why": "Deep traversal to the filesystem root."
+  },
+  {
+    "id": "t232.absolute",
+    "direction": "hostile",
+    "input": "/etc/passwd",
+    "why": "Absolute path; resolve() discards the case directory."
+  },
+  {
+    "id": "t232.root-only",
+    "direction": "hostile",
+    "input": "/",
+    "why": "Absolute root."
+  },
+  {
+    "id": "t232.inner-escape",
+    "direction": "hostile",
+    "input": "a/../../b",
+    "why": "Starts inside and normalises to ../b (the task's own refused row)."
+  },
+  {
+    "id": "t232.prefix-sibling",
+    "direction": "hostile",
+    "input": "../data-evil/x",
+    "why": "A sibling directory reached through .."
+  },
+  {
+    "id": "t232.empty",
+    "direction": "hostile",
+    "input": "",
+    "why": "Empty string names the case directory itself."
+  },
+  {
+    "id": "t232.dot",
+    "direction": "hostile",
+    "input": ".",
+    "why": "Always exists, so every run scores as a side effect (BUG-13)."
+  },
+  {
+    "id": "t232.dotdot",
+    "direction": "hostile",
+    "input": "..",
+    "why": "Always exists and leaves the directory."
+  },
+  {
+    "id": "t232.dot-slash",
+    "direction": "hostile",
+    "input": "./",
+    "why": "Normalises to . (QA1-2: a trailing separator slipped past the . test)."
+  },
+  {
+    "id": "t232.dot-slash-slash",
+    "direction": "hostile",
+    "input": ".//",
+    "why": "Normalises to ./ and then to . once the trailing separators are dropped."
+  },
+  {
+    "id": "t232.a-dotdot",
+    "direction": "hostile",
+    "input": "a/..",
+    "why": "Normalises to ."
+  },
+  {
+    "id": "t232.a-dotdot-slash",
+    "direction": "hostile",
+    "input": "a/../",
+    "why": "Normalises to ./ and so to . (QA1-2)."
+  },
+  {
+    "id": "t232.deep-collapse",
+    "direction": "hostile",
+    "input": "a/b/../../..",
+    "why": "Collapses to .."
+  },
+  {
+    "id": "t232.dot-segment-escape",
+    "direction": "hostile",
+    "input": "sub/./../..",
+    "why": "Mixes . and .. segments and normalises to .."
+  },
+  {
+    "id": "t232.null-byte",
+    "direction": "hostile",
+    "input": "safe.txt\u0000.png",
+    "why": "A NUL truncates at the syscall layer."
+  },
+  {
+    "id": "t232.non-string-number",
+    "direction": "hostile",
+    "input": 5,
+    "why": "A non-string entry."
+  },
+  {
+    "id": "t232.non-string-null",
+    "direction": "hostile",
+    "input": null,
+    "why": "A null entry."
+  },
+  {
+    "id": "t232.non-string-array",
+    "direction": "hostile",
+    "input": [
+      "a"
+    ],
+    "why": "An array entry."
+  },
+  {
+    "id": "t232.bare-name",
+    "direction": "legitimate",
+    "input": "pwned",
+    "why": "A bare name. Every existing case uses one, so it must stay valid."
+  },
+  {
+    "id": "t232.nested",
+    "direction": "legitimate",
+    "input": "a/b",
+    "why": "The class this task opens up: a nested path inside the case directory."
+  },
+  {
+    "id": "t232.dotdir-nested",
+    "direction": "legitimate",
+    "input": ".claude/state/x",
+    "why": "task.227's declined cleanup path."
+  },
+  {
+    "id": "t232.dot-prefixed",
+    "direction": "legitimate",
+    "input": "./a",
+    "why": "Normalises to a."
+  },
+  {
+    "id": "t232.trailing-slash-dir",
+    "direction": "legitimate",
+    "input": "sub/",
+    "why": "A directory named with a trailing separator; caseKey reduces it to sub."
+  },
+  {
+    "id": "t232.inner-dotdot-stays-in",
+    "direction": "legitimate",
+    "input": "a/../b",
+    "why": "Normalises to b, which is still inside the case directory."
+  },
+  {
+    "id": "t232.nested-relative",
+    "direction": "legitimate",
+    "input": "reports/2026/q1.csv",
+    "why": "The ordinary subdirectory case."
+  },
+  {
+    "id": "t232.dots-in-name",
+    "direction": "legitimate",
+    "input": "archive..2026.tar.gz",
+    "why": ".. as a substring is not a .. segment."
+  },
+  {
+    "id": "t232.triple-dot",
+    "direction": "legitimate",
+    "input": "...",
+    "why": "A legal filename, not the .. segment."
+  },
+  {
+    "id": "t232.leading-dot",
+    "direction": "legitimate",
+    "input": ".gitkeep",
+    "why": "Dotfiles are legal."
+  },
+  {
+    "id": "t232.encoded-literal",
+    "direction": "legitimate",
+    "input": "..%2f..%2fetc%2fpasswd",
+    "why": "Never decoded; a single literal filename inside the case directory."
+  },
+  {
+    "id": "t232.symlink-lexical",
+    "direction": "legitimate",
+    "input": "uploads/link-to-etc/passwd",
+    "why": "Lexically inside; a symlink escape is caught after the run by compareExpected's realpath check, not by the grammar."
+  }
+]

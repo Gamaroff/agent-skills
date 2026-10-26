@@ -4,6 +4,139 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.61.0] - 2026-10-26
+
+### Added
+
+- **`npm test` runs in a per-run TMPDIR, and a leak ratchet names new leaks (task 231).**
+  `scripts/test-tmpdir.mjs` runs the suite (now `test:suite`) with `TMPDIR` set to a fresh directory
+  and always removes it: on a pass, a red suite or a signal. It keeps the suite's own exit code. It
+  groups the leftovers by prefix and fails on a prefix missing from `tests/tmp-leak-ratchet.json`, or
+  on one over its count. One run used to leave 608 entries and about 10,000 inodes, and `/tmp` once
+  filled until 1,576 unrelated tests failed (obs #83). The four worst helpers (`qa-next`,
+  `review-pr-repo`, `wireloom-test`, `executed-prose`) and the two tests that wrote straight to
+  `/tmp` now clean up: 442 entries under 97 prefixes remain, all ratcheted.
+- **`doc-links.js` checks `#fragment` anchors (task 231).** A fragment on a link to a `.md` file,
+  and a same-file `#x`, must name a GitHub heading slug or an explicit `<a id>`. A fragment that
+  names neither is the new `[no-anchor]` state, and `qa-read-back` halts on it with its own remedy.
+  `markdown-link-check@3` passes a dead cross-file fragment, so `docs-link-check.yml` now also runs
+  `doc-links.js` on each changed file. A corpus test walks every tracked Markdown file: 381
+  fragments, none dead (obs #80).
+
+- **Security probe: `expected.removed` asserts a cleanup (task 232).** A case lists paths its own
+  fixture creates that the run must delete; a run that leaves one mismatches as
+  `<path> was not removed`. A `removed` path the fixture does not create is declined, matched
+  exactly, because it would pass with nothing removed. task.227's two `--complete` cleanup cases
+  could not be written before this: they were the only cases that checked the removal half, and
+  the engine declined both (obs #97).
+
+### Changed
+
+- **Two test guards accept what was already right (task 231).** The dispatch-wait parity test
+  accepts a bash block that marks its own wait, not only a mark within 12 lines (obs #62). The
+  observation-log suite roots its scratch, and names the project, at the main checkout, so it passes
+  inside a linked worktree: 4 failures there before, 0 now (obs #39).
+
+- **The `done` lead claims acceptance, not release (task 233).** Every caller posts it at
+  `/finalise`, before the pull request is merged, but it said the change "is now part of the
+  product" and "no further action is needed". It now says the work is checked and accepted, that it
+  becomes part of the product once merged, and that nothing is needed from the reader. The stage,
+  its `pr` slot and the comment marker are unchanged, so an existing `done` comment is still found
+  as `already`. A test in `stakeholder-summary.test.mjs`, red on the old text, holds the rule.
+- **Security probe: `expected.absent` takes nested paths relative to the case directory (task
+  232).** `.claude/state/x` is valid, and a trailing `/` is ignored; `..` segments, absolute
+  paths, `.` in any spelling (`./`, `a/..`) and NUL are still refused. One helper,
+  `pathAssertionProblem`, now decides for all four runners whether a case's paths can be scored,
+  where four inline copies compared first segments. An `absent` path the fixture creates, a
+  directory above one, or a path beneath a created file is declined. Existence is read with
+  `lstat`; a path whose ancestor resolves outside the case directory is a mismatch that is never
+  read through, and one the run left unreadable (a symlink loop, a mode-000 directory) is a
+  mismatch rather than a crash. The probe's sandbox teardown restores directory permissions
+  first, so a case that leaves a mode-000 directory no longer ends the run. `isCasePath` and `caseKey` are exported, so the probe's JS entry
+  form reaches the grammar.
+  - **Narrowing:** `shell:` and `shell-fn:` now compare `absent` case-folded, as `cli:`,
+    `shell-argv:` and `fence:` already did. A name that differs from a control or input only by
+    case is declined. The committed corpus has none.
+  - The `fence:` arm's decline text changes from "which the case's own fixture writes" to the
+    shared "which the fixture itself creates".
+
+- **`advance-pipeline-lock.sh --complete` now removes Step 4's and 5c's records; Step 8's Completion
+  Checklist removes nothing directly, so a host's removal check cannot refuse it (task 227).**
+  The checklist block used to end with two `rm -f` lines beside its must-pass checks. On an
+  unattended run a host that could not inspect an `rm` inside the wrapped block refused the whole
+  block, so the checks and `--complete` never ran and the run stopped at Step 8 (obs #87).
+  - **Breaking (small): `--complete` also removes five files beside the lock** —
+    `step4-scope-paths.txt`, `step4-held-paths.txt`, `step4-hold-dir.txt`,
+    `5c-carry-eligible.txt` and `5c-carry-classified.txt` — in both arms, with a lock and without
+    one. Its only caller, the Step 8 Completion Checklist, removed the same five files one line
+    earlier, so a pipeline run ends in the same state. A hand-run `--complete` outside Step 8 now
+    loses those records too, with one exception: `step4-hold-dir.txt` and `step4-held-paths.txt`
+    are kept, with a warning on stderr, while they are still the only pointer to held files, that
+    is, while the hold directory holds files or the record or directory cannot be read.
+  - **New: `advance-pipeline-lock.sh --hold-state`** prints `clear` or `pending: <why>` for those
+    two records, and reads nothing else. `--complete` keeps them by its answer, and Step 8's
+    held-files check now reads it too instead of carrying its own copy of the rule, so Step 8
+    refuses to finish in every state in which `--complete` would keep them.
+  - The guard's matcher (`shared/resources/tests/lib/rm-invocation.mjs`) counts `rm` as a word,
+    after quote and escape removal, so `then rm`, `xargs rm`, `/bin/rm`, `\rm` and `rm>/dev/null`
+    are all caught.
+  - A guard in `step-8-completion-checklist.test.mjs` fails when any fenced block in the develop
+    pipeline docs that calls `--complete` carries an `rm` invocation.
+
+### Fixed
+
+- **The task-registry tick can write a status-icon column (opt-in).** Some consumer registries
+  carry an icon beside Status and gate on the two agreeing. `/finalise` wrote `accepted`, left `⚠️`,
+  and the consumer's CI went red after a correct acceptance. The new `registry.task.statusIcons` key
+  in `skills-config.yaml` maps a status to its icon; `registry.task.iconColumn` names the column by
+  header text, and `""` (the default) means the empty header cell beside Status. The tick then
+  writes the icon in the same one-line write as Status, and a re-run on an `accepted` row repairs a
+  stale icon (`reason: already`, `icon: repaired`). The column is found by the header, never by
+  position: no match or two matches tick Status alone and report `icon: no-column` / `ambiguous`.
+  A status missing from the map leaves the cell alone (`icon: unmapped`). Without the key the
+  output is byte-identical to before, checked against the previous CLI on LF and CRLF registries.
+  The skill ships no icons; the set is the consumer's.
+
+- **An inline review comment now posts only an anchor the checker verified (task 217).** Nine
+  follow-ups from task.195's QA gates:
+  - **Breaking: the `--inline` guards of `/review-pr` and `/review-code` require the checker's
+    stamp.** `finding-anchors.js --annotate` now writes
+    `anchor_checked: {by: "finding-anchors", findings: N, tree, root}` beside the lens wrappers,
+    where `tree` and `root` record what was checked. The guards
+    require that stamp, a count equal to the findings present, and an `anchor_check` from the
+    checker's seven verdicts. A reviewer that wrote `anchor_check: "ok"` itself, with no checker
+    run, used to get its findings posted inline as verified. A findings file annotated by an older
+    engine now HALTs the inline post with the existing "run the anchor check first" message;
+    re-run the checker step. `/review-pr` has already posted its summary comment by then;
+    `/review-code` posts nothing until the checker is re-run. `/review-code --fix` refuses the same
+    files before it edits anything, and HALTs with "nothing applied".
+  - **Breaking: a non-object finding is refused as `usage`.** A `null` finding crashed the checker,
+    which the dispatcher reported as "not runnable". A string finding read `no-line` but was never
+    annotated, so the guard then named the wrong cause. Both now exit 2 with `reason: usage`, naming
+    the lens and the index, before any file is read and with nothing annotated.
+  - The inline selectors parse an anchor as the checker does: trimmed, split at the **last**
+    colon. A path containing a colon used to post to the wrong file, and a padded `file_line`
+    posted a path starting with spaces.
+  - `/review-code --fix` decides what to apply with `finding-anchors.js --fix-list`, which reads
+    the tree and the root from the stamp. Under `--staged` it skips a finding whose file on disk
+    differs from the staged content that was checked; under a range or PR target, one whose file
+    differs from the commit that was checked. The fix lands on the working tree, where it would hit
+    a line nobody checked. Nothing re-binds the target, so an unfilled one cannot turn the skip off,
+    and the checker's answer does not depend on the cwd; the block runs from the repository root,
+    and from anywhere else it HALTs and applies nothing. A path led by U+FEFF is parsed as the
+    checker parsed it.
+  - `/review-code`'s `--inline` block binds `PR_NUMBER` and `SUMMARY_FILE`, makes its scratch file
+    after the guard and removes it. As written it read three variables nothing bound. It now exits
+    with the poster's status, which the cleanup used to mask, and sits under its own heading so the
+    probe engine's `fence:` form reaches it.
+  - The checker-blocks test derives the dispatcher population from the tree, and a test holds every
+    restated verdict list to the engine's own set. The `--index` outside-a-work-tree test passes when
+    `TMPDIR` sits inside a git checkout.
+- **`doc-id.js` no longer trips ESLint's `no-useless-assignment`.** `resolvePrdRoot` initialised
+  `text` to `""`, but every path either overwrote it or returned first. A consumer that lints the
+  `scripts/doc-id.cjs` copy `setup-consumer.sh` installs saw one error it could not fix locally,
+  because the next update overwrites the file. The initialiser is gone, and behaviour is unchanged.
+
 ## [v0.60.0] - 2026-10-23
 
 ### Added

@@ -66,9 +66,9 @@ Use the file's own assertion helpers. Read its header for them; do not invent ne
 const RM_WORD = /(^|[;&|({]\s*|\s&&\s*|\s\|\|\s*)rm\s/;
 test("no fenced block that calls --complete carries an rm invocation", () => {
   let seen = 0;
-  for (const file of pipelineDocs()) {           // the develop-pipeline-*.md list the file already builds
+  for (const file of developPipelineDocs()) {    // :573 — shared develop-pipeline-*.md + skills/develop-*/SKILL.md
     const text = readDoc(file);
-    for (const [a, b] of fencedRanges(text)) {
+    for (const [a, b] of fencedRanges(text)) {   // change-log.js, already imported at :42 — every fence
       const lines = text.slice(a, b).split("\n").filter((l) => !/^\s*#/.test(l));
       if (!lines.some((l) => l.includes("advance-pipeline-lock.sh --complete"))) continue;
       seen++;
@@ -80,7 +80,7 @@ test("no fenced block that calls --complete carries an rm invocation", () => {
 });
 ```
 
-Check which helper builds the `develop-pipeline-*.md` list (the file has one near `:581`, `.filter((f) => /^develop-pipeline-.*\.md$/.test(f))`) and reuse it. Add the control from the task's Testing Strategy: assert `RM_WORD` does not match `# rm -f of a name`, `confirm x` or `docker run --rm x`, and does match `rm -f a` and `x && rm -f a`.
+The list helper is `developPipelineDocs()` (`:573`); it also returns the `skills/develop-*/SKILL.md` orchestrators, which widens the scan (neither has a fenced `--complete` block today). `fencedRanges` is the one from `../change-log.js` the file already imports (`:42`); it returns every fence, where `extractBlocks` returns `bash` fences only (review 1, I1, corrected in Step 3). Add the control from the task's Testing Strategy: assert `RM_WORD` does not match `# rm -f of a name`, `confirm x` or `docker run --rm x`, and does match `rm -f a` and `x && rm -f a`.
 
 Red before Phase 2: the two script cases (records survive) and the guard (the block has two `rm` lines).
 

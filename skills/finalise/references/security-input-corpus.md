@@ -115,11 +115,14 @@ characters are shown with a visible glyph: `␊` newline, `␍` carriage return,
 `filename`) is not passed to a function as a value — each case is written into a
 fixture directory beside the sink's bracketing controls and a script is run against
 the directory (the engine's `shell:<path>` entry form). Those cases carry a
-fourth field the tables do not show, `expected` — `{stdout, exit, stderr, absent}`,
+fourth field the tables do not show, `expected` — `{stdout, exit, stderr, absent, removed}`,
 the machine-readable pass condition — because for a script `correct` is prose and
 `direction` alone cannot say what a right run *prints*. `stderr: ""` is part of it:
 a script that leaks an arithmetic error and still prints the right value has not
-handled the name. The controls bracket every hostile name in byte order
+handled the name. `absent` lists paths that must not exist after the run (a side
+effect); `removed` lists paths the case's fixture creates that the run must delete
+(a cleanup). Both are paths relative to the case directory, with no `..` segment —
+the collision rules are in probe-boundary-rule.md §5 (task.232). The controls bracket every hostile name in byte order
 (`LC_ALL=C`), which is what makes the task.121 defect show on **stdout** rather than
 only on stderr — verified against the pre-fix script, which prints the same value
 as the fixed one on every ordering that does not bracket.

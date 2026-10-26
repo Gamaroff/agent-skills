@@ -12,6 +12,11 @@ name: Docs link check
 # (examples/prd-example/prd.*.md, examples/epic-examples/epic.*.md). Their bodies are kept
 # exactly as captured on 2026-05-12, with links relative to their original docs/prd location,
 # so they are never edited to make a link resolve. The READMEs around them are live and checked.
+#
+# Anchors (task 231, obs #80): markdown-link-check@3 passes a dead cross-file fragment
+# (`other.md#nope` reads ✓ — measured on 3.15.0), so each changed file is also run through
+# shared/resources/doc-links.js, the engine the corpus tests use. It fails on a fragment that
+# names no heading or explicit anchor ([no-anchor]), and on the path states it already reports.
 
 on:
   pull_request:
@@ -23,6 +28,7 @@ on:
       - 'examples/**/*.md'
       - '.github/markdown-link-check.json'
       - '.github/workflows/docs-link-check.yml'
+      - 'shared/resources/doc-links.js'
   push:
     branches: [main, develop]
     paths:
@@ -67,6 +73,10 @@ jobs:
           echo "Changed markdown files:"
           cat changed.txt || true
 
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
       - name: Check links in changed files
         run: |
           set -uo pipefail
@@ -85,5 +95,23 @@ jobs:
           done < changed.txt
           if [ "$status" -ne 0 ]; then
             echo "::error::Dead links found in changed markdown files."
+          fi
+          exit $status
+
+      - name: Check anchors and tracked-tree links in changed files
+        run: |
+          set -uo pipefail
+          if [ ! -s changed.txt ]; then
+            echo "No changed markdown files — nothing to anchor-check."
+            exit 0
+          fi
+          status=0
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            [ -f "$f" ] || continue
+            node shared/resources/doc-links.js --file "$f" || status=1
+          done < changed.txt
+          if [ "$status" -ne 0 ]; then
+            echo "::error::doc-links.js found a dead fragment or link in changed markdown files."
           fi
           exit $status

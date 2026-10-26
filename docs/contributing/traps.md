@@ -83,9 +83,24 @@ check had registered yet. Twenty seconds later it was `UNSTABLE` with four check
 
 ### `npm test`'s suite list is hand-maintained
 
-The `test` script is 10 `&&`-joined segments — nine explicit `bash …` invocations plus one
-`node --test` call with an explicit list of per-skill globs. **A new `skills/*/tests/` directory runs
-nowhere until someone adds its glob.** This has already silently orphaned 232 tests once.
+The hand-maintained list is the `test:suite` script, not `test`: `test` is the per-run TMPDIR
+wrapper (`node scripts/test-tmpdir.mjs -- npm run test:suite`, task 231), and adding a suite to the
+wrapper line runs it outside the containment. `test:suite` is 17 `&&`-joined segments — sixteen
+explicit `bash …` invocations plus one `node --test` call with an explicit list of per-skill globs
+(counted 2026-10-26: `jq -r '.scripts["test:suite"]' package.json | sed 's/ && /\n/g' | awk '{print
+$1}' | sort | uniq -c`). **A new `skills/*/tests/` directory runs nowhere until someone adds its
+glob.** This has already silently orphaned 232 tests once.
+
+### `ci:fast` fails en masse with unrelated errors — run `df -i /tmp` first
+
+When hundreds of unrelated tests fail at once with `ENOSPC`, `EMFILE` or `mkdtemp` errors, check
+inodes before reading a single failure: `df -i /tmp`. On 2026-10-21, `/tmp` sat at 1,048,575 of
+1,048,576 inodes and `ci:fast` reported 1,576 of 6,129 tests failing, none related to the change
+(obs #83). `npm test` now runs inside a per-run TMPDIR that is always removed, and
+`tests/tmp-leak-ratchet.json` fails the run on a new leaking prefix (task 231). `ci:fast` and `ci`
+reach it through `npm test`; a suite run any other way (`node --test <file>`, `npm run test:suite`)
+is outside that containment and still leaks wherever its helpers do. Clear the leftovers with `find /tmp -maxdepth 1 -user "$USER" -mtime +1`
+reviewed before you delete anything, never a blanket `rm`.
 
 ### A shell test suite must source `undefined-command-guard.sh`
 

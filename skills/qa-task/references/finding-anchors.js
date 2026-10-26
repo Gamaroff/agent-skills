@@ -41,7 +41,7 @@
  *                   (`x.ts:42-58`), empty, absent. The code lens's contract is one line, so a
  *                   value that does not parse is the reviewer breaking it (task.195)
  *
- * The first three are clean; the last four are malformed — "the reviewer is
+ * The first three are clean (`CLEAN`); the last four are malformed (`MALFORMED`) — "the reviewer is
  * wrong" — and are kept apart from `no-line` ("nothing to verify") on purpose.
  *
  * ## Which lens — the wrapper when there is one, else the key
@@ -74,14 +74,40 @@
  * Usage:
  *   node finding-anchors.js --findings-file <json> [--root <dir>] [--rev <git-rev> | --index]
  *                           [--annotate <out-file>] [--json]
+ *   node finding-anchors.js --fix-list --findings-file <annotated-json> [--json]
  *
  * The findings file is `{code_review:{findings:[…]}}`, `{pr_conformance:{findings:[…]}}`,
  * both together, or a bare array of findings. `--annotate` writes the same JSON back
  * to `<out-file>` (which may be the input) with each finding carrying
  * `anchor_check: <verdict>`. The key is `anchor_check`, not `anchor`: `/review-pr`'s
- * `--inline` jq already uses `anchor` for the `path:line`.
+ * `--inline` jq already uses `anchor` for the `path:line`. A wrapped document also gains a
+ * top-level `anchor_checked: {by: "finding-anchors", findings: <count>, tree, root}` stamp, which
+ * only this engine writes: the `--inline` guards require it, so a reviewer that writes
+ * `anchor_check` itself, with no checker run, is refused (task.217). `tree` is the tree the anchors
+ * were checked against — `{kind: "worktree"}`, `{kind: "index"}` or `{kind: "rev", rev: <sha>}` —
+ * and `root` the absolute `--root`. A bare array has no top level and gets no stamp; neither
+ * `--inline` guard reads a bare array.
  *
- * Exit codes: 0 every anchor is ok / unchecked-text / no-line (`reason: ok`);
+ * ## --fix-list: which findings `/review-code --fix` may edit
+ *
+ * `--fix-list` reads an annotated file and prints one line per finding: `apply: <id> (<path>)`, or
+ * `skipped — <why>: <id> (<path>)`. A malformed anchor is skipped. Under an `index` or `rev` stamp,
+ * so is a finding whose file on disk differs from the content that was checked, or that cannot be
+ * read on either side: the edit lands on the working tree, and there it would land on a line nobody
+ * checked. The tree and the root come from the stamp, not from the caller, so a mis-bound target or
+ * a cwd below the root cannot turn the comparison off (task.217 QA cycle 2: an unfilled `TARGET`
+ * and a run from a subdirectory each applied a finding on a dirty file). The anchor is parsed by
+ * `anchorOf`, the parse that checked it. A file the checker never annotated is refused
+ * (`not-annotated`, exit 2): no stamp, a count that is not the number of findings, a verdict outside
+ * `CLEAN` and `MALFORMED`, or a stamp with no `tree`. `--fix-list` takes no `--root`, `--rev`,
+ * `--index` or `--annotate`: the stamp is the one statement of what was checked.
+ *
+ * Every finding is an object. A findings array holding anything else (null, a string, a number, a
+ * boolean, an array) is a malformed review, refused as `usage` naming the lens and the index,
+ * before any file is read and with nothing annotated (task.217).
+ *
+ * Exit codes (`--fix-list`: 0 the list was produced, whatever it holds; 2 refused):
+ * 0 every anchor is ok / unchecked-text / no-line (`reason: ok`);
  * 1 any is malformed (`reason: malformed-anchors`) — a caller marks and continues,
  * it does not halt; 2 the call is wrong — usage (`reason: usage`), a `--root` that is not a
  * directory, is not in the `--rev` tree, or (with `--index`) is not in a git work tree
@@ -100,6 +126,9 @@ const MALFORMED = new Set([
   "text-mismatch",
   "unparseable",
 ]);
+
+/** The three clean verdicts. With `MALFORMED`, the whole verdict set: a test derives it from here. */
+const CLEAN = new Set(["ok", "unchecked-text", "no-line"]);
 
 /**
  * How every finding field the checker reads is read, in one place (task.195 QA4): `absent`
@@ -339,8 +368,179 @@ function makeReader({ root, rev, index, exec = execFileSync }) {
   };
 }
 
+/**
+ * Why an annotated document cannot drive `--fix-list`, or null when it can. The same conditions as
+ * the `--inline` guards' jq, plus the stamp's `tree` (and `root`, for the two kinds that read git),
+ * with the verdict set taken from `CLEAN` and `MALFORMED` rather than restated.
+ */
+function notAnnotated(doc) {
+  if (Array.isArray(doc) || !doc || typeof doc !== "object")
+    return "it is not a wrapped findings document (a bare array carries no stamp)";
+  const findings = findingsOf(doc);
+  if (!findings) return "it holds no findings array for every lens present";
+  const st = doc.anchor_checked;
+  if (!st || typeof st !== "object" || st.by !== "finding-anchors")
+    return "it carries no finding-anchors stamp";
+  if (st.findings !== findings.length)
+    return `its stamp counts ${JSON.stringify(st.findings)} finding(s) but it holds ${findings.length}`;
+  const bad = findings.findIndex(
+    (f) =>
+      f === null ||
+      typeof f !== "object" ||
+      Array.isArray(f) ||
+      !(CLEAN.has(f.anchor_check) || MALFORMED.has(f.anchor_check)),
+  );
+  if (bad !== -1)
+    return `finding ${bad} carries no checker verdict (${JSON.stringify(findings[bad]?.anchor_check ?? null)})`;
+  const t = st.tree;
+  const kind = t && typeof t === "object" ? t.kind : undefined;
+  if (kind !== "worktree" && kind !== "index" && kind !== "rev")
+    return "its stamp does not say which tree was checked (written by an older checker)";
+  if (
+    kind === "rev" &&
+    !(typeof t.rev === "string" && /^[0-9a-f]{40,64}$/.test(t.rev))
+  )
+    return "its stamp names no commit";
+  if (
+    kind !== "worktree" &&
+    !(typeof st.root === "string" && path.isAbsolute(st.root))
+  )
+    return "its stamp names no absolute root";
+  return null;
+}
+
+/**
+ * Pure apart from the readers: one `{id, action, why, path}` per finding, in input order. `reviewed`
+ * reads the checked tree and `current` the working tree; both return text or null.
+ */
+function fixListOf(doc, { tree, reviewed, current }) {
+  const findings = findingsOf(doc);
+  const lenses = lensesOf(doc);
+  const cache = new Map();
+  return findings.map((f, i) => {
+    const id = f.id == null ? "?" : String(f.id);
+    if (MALFORMED.has(f.anchor_check))
+      return { id, action: "skip", why: "unverified anchor", path: null };
+    const a = anchorOf(f, lenses?.[i]);
+    if (a.path === null || tree.kind === "worktree")
+      return { id, action: "apply", why: null, path: a.path };
+    if (!cache.has(a.path)) {
+      const was = reviewed(a.path);
+      const now = current(a.path);
+      cache.set(
+        a.path,
+        was == null || now == null
+          ? "unreadable"
+          : was === now
+            ? "same"
+            : "differs",
+      );
+    }
+    const state = cache.get(a.path);
+    if (state === "same")
+      return { id, action: "apply", why: null, path: a.path };
+    const what =
+      tree.kind === "index"
+        ? "the staged content that was reviewed"
+        : `commit ${tree.rev.slice(0, 12)}, the content that was reviewed`;
+    return {
+      id,
+      action: "skip",
+      why:
+        state === "differs"
+          ? `working tree differs from ${what}`
+          : `could not compare the working tree with ${what}`,
+      path: a.path,
+    };
+  });
+}
+
+function runFixList(opts, argv, deps) {
+  const conflicting = ["--root", "--rev", "--index", "--annotate"].filter((f) =>
+    argv.includes(f),
+  );
+  if (conflicting.length) {
+    return usage(
+      opts,
+      `--fix-list reads the tree and the root from the checker's stamp — drop ${conflicting.join(", ")}`,
+    );
+  }
+  const refuse = (reason, message) => {
+    if (opts.json) return emit(opts, { reason, message, exitCode: 2 });
+    process.stderr.write(`finding-anchors: ${message}\n`);
+    process.exitCode = 2;
+  };
+  let doc;
+  try {
+    doc = JSON.parse(fs.readFileSync(opts.findingsFile, "utf8"));
+  } catch (err) {
+    return refuse(
+      "usage",
+      `--findings-file could not be read as JSON: ${err.message}`,
+    );
+  }
+  const why = notAnnotated(doc);
+  if (why) {
+    return refuse(
+      "not-annotated",
+      `${opts.findingsFile} cannot drive --fix-list: ${why} — run the anchor check with --annotate first; nothing applied`,
+    );
+  }
+  const st = doc.anchor_checked;
+  const tree = st.tree;
+  let reviewed = () => null;
+  let current = () => null;
+  if (tree.kind !== "worktree") {
+    const ok = checkTree(
+      {
+        root: st.root,
+        rev: tree.kind === "rev" ? tree.rev : undefined,
+        index: tree.kind === "index",
+      },
+      deps.exec,
+    );
+    if (!ok.ok)
+      return refuse(
+        ok.reason,
+        ok.message.replace("no anchor was checked", "nothing applied"),
+      );
+    reviewed = makeReader({
+      root: st.root,
+      rev: ok.rev,
+      index: tree.kind === "index",
+      exec: deps.exec,
+    });
+    current = makeReader({ root: st.root, exec: deps.exec });
+  }
+  const results = fixListOf(doc, { tree, reviewed, current });
+  if (opts.json) {
+    return emit(opts, {
+      reason: "ok",
+      message: `${results.filter((r) => r.action === "apply").length} of ${results.length} finding(s) may be applied`,
+      tree,
+      root: st.root ?? null,
+      results,
+      exitCode: 0,
+    });
+  }
+  for (const r of results) {
+    const where = r.path ? ` (${r.path})` : "";
+    process.stdout.write(
+      r.action === "apply"
+        ? `apply: ${r.id}${where}\n`
+        : `skipped — ${r.why}: ${r.id}${where}\n`,
+    );
+  }
+  process.exitCode = 0;
+}
+
 function parseArgs(argv) {
-  const opts = { root: process.cwd(), json: false, index: false };
+  const opts = {
+    root: process.cwd(),
+    json: false,
+    index: false,
+    fixList: false,
+  };
   const takes = {
     "--findings-file": "findingsFile",
     "--root": "root",
@@ -351,6 +551,7 @@ function parseArgs(argv) {
     const a = argv[i];
     if (a === "--json") opts.json = true;
     else if (a === "--index") opts.index = true;
+    else if (a === "--fix-list") opts.fixList = true;
     else if (a === "--help" || a === "-h") opts.help = true;
     else if (takes[a]) {
       const v = argv[++i];
@@ -382,7 +583,7 @@ function usage(opts, message) {
     reason: "usage",
     message:
       message === "help"
-        ? "node finding-anchors.js --findings-file <json> [--root <dir>] [--rev <git-rev> | --index] [--annotate <out-file>] [--json]"
+        ? "node finding-anchors.js --findings-file <json> [--root <dir>] [--rev <git-rev> | --index] [--annotate <out-file>] [--json] | --fix-list --findings-file <annotated-json> [--json]"
         : message,
     exitCode: 2,
   };
@@ -398,6 +599,7 @@ function run(argv, deps = {}) {
   if (opts.error) return usage({ json: argv.includes("--json") }, opts.error);
   if (opts.help) return usage(opts, "help");
   if (!opts.findingsFile) return usage(opts, "--findings-file is required");
+  if (opts.fixList) return runFixList(opts, argv, deps);
   if (opts.index && opts.rev) {
     return usage(
       opts,
@@ -420,6 +622,24 @@ function run(argv, deps = {}) {
       "--findings-file holds no findings array for every lens present (code_review.findings, pr_conformance.findings, or a bare array)",
     );
   }
+  // A finding is an object. null crashed checkAnchors on `f.id` and read as "not runnable"; a
+  // string read no-line/unparseable and --annotate skipped it, so the --inline guard then HALTed
+  // naming the wrong cause (task.195 gates 2–3). Refused here, before any file is read (task.217).
+  const lenses = lensesOf(doc);
+  const bad = findings.findIndex(
+    (f) => f === null || typeof f !== "object" || Array.isArray(f),
+  );
+  if (bad !== -1) {
+    let where = `[${bad}]`;
+    if (lenses) {
+      const wrapper = lenses[bad] === "code" ? "code_review" : "pr_conformance";
+      where = `${wrapper}.findings[${bad - lenses.indexOf(lenses[bad])}]`;
+    }
+    return usage(
+      opts,
+      `${where} is not an object (${JSON.stringify(findings[bad])}) — every finding is an object`,
+    );
+  }
   const tree = checkTree(
     { root: opts.root, rev: opts.rev, index: opts.index },
     deps.exec,
@@ -440,16 +660,28 @@ function run(argv, deps = {}) {
     index: opts.index,
     exec: deps.exec,
   });
-  const results = checkAnchors(findings, {
-    readFile,
-    lenses: lensesOf(doc),
-  });
+  const results = checkAnchors(findings, { readFile, lenses });
   const malformed = results.filter((r) => MALFORMED.has(r.verdict));
 
   if (opts.annotate) {
     findings.forEach((f, i) => {
-      if (f && typeof f === "object") f.anchor_check = results[i].verdict;
+      f.anchor_check = results[i].verdict; // every finding is an object: refused above otherwise
     });
+    // Only the checker writes this; the --inline guards require it and its count (task.217). A bare
+    // array has no top level to stamp, and neither --inline guard reads one.
+    if (!Array.isArray(doc)) {
+      doc.anchor_checked = {
+        by: "finding-anchors",
+        findings: results.length,
+        // What was checked, so --fix-list compares against the same tree from the same root.
+        tree: opts.index
+          ? { kind: "index" }
+          : tree.rev
+            ? { kind: "rev", rev: tree.rev }
+            : { kind: "worktree" },
+        root: path.resolve(opts.root),
+      };
+    }
     fs.writeFileSync(opts.annotate, JSON.stringify(doc, null, 2) + "\n");
   }
 
@@ -470,12 +702,15 @@ module.exports = {
   anchorOf,
   checkAnchors,
   fieldOf,
+  fixListOf,
+  notAnnotated,
   findingsOf,
   lensesOf,
   makeReader,
   parseArgs,
   run,
   MALFORMED,
+  CLEAN,
   resolveRev,
   checkTree,
 };

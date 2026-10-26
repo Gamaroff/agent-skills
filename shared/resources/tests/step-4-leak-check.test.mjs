@@ -41,6 +41,24 @@ const derivation = () => bind(blockBy(md, "Scope-derivation"), PLACEHOLDERS);
 const guard = () => bind(blockBy(md, "HOLD_DIR=$(mktemp -d"), PLACEHOLDERS);
 const restore = () => bind(blockBy(md, 'cp -r "$HOLD_DIR"/. .'), PLACEHOLDERS);
 
+// The guard block makes its hold directory with `mktemp -d /tmp/pipeline-hold-XXXXXX` — a fixed
+// /tmp, not $TMPDIR — and the Restore block leaves it there. Read the directory from the record the
+// guard writes and remove it once the file's tests finish; it escaped to /tmp on every `npm test`
+// (task 231, obs #83). The block itself is unchanged: this is the test's own debris.
+const HOLD_DIRS = new Set();
+test.after(() => {
+  for (const d of HOLD_DIRS) fs.rmSync(d, { recursive: true, force: true });
+});
+function runGuard(sh, cwd) {
+  const r = run(sh, guard(), { cwd });
+  const record = path.join(cwd, ".claude/state/step4-hold-dir.txt");
+  if (fs.existsSync(record)) {
+    const d = fs.readFileSync(record, "utf8").trim();
+    if (d) HOLD_DIRS.add(d);
+  }
+  return r;
+}
+
 function leakBlock() {
   const code = bind(blockBy(md, "LEAK DETECTED"), PLACEHOLDERS);
   assert.ok(
@@ -155,7 +173,7 @@ for (const sh of SHELLS) {
     try {
       assert.equal(run(sh, derivation(), { cwd: fx.work }).status, 0);
       write(fx.work, "stray/notes.txt", "another session\n");
-      const g = run(sh, guard(), { cwd: fx.work });
+      const g = runGuard(sh, fx.work);
       assert.equal(g.status, 0, g.stderr);
       assert.equal(
         fs.existsSync(path.join(fx.work, "stray/notes.txt")),
@@ -179,10 +197,10 @@ for (const sh of SHELLS) {
     try {
       assert.equal(run(sh, derivation(), { cwd: fx.work }).status, 0);
       write(fx.work, "stray/first.txt", "first\n");
-      assert.equal(run(sh, guard(), { cwd: fx.work }).status, 0);
+      assert.equal(runGuard(sh, fx.work).status, 0);
       // The retry: the first file is already held; a second arrives.
       write(fx.work, "stray2/second.txt", "second\n");
-      assert.equal(run(sh, guard(), { cwd: fx.work }).status, 0);
+      assert.equal(runGuard(sh, fx.work).status, 0);
       assert.equal(run(sh, restore(), { cwd: fx.work }).status, 0);
       for (const [p, v] of [
         ["stray/first.txt", "first\n"],
@@ -225,7 +243,7 @@ for (const sh of SHELLS) {
       git(fx.work, "commit", "-q", "-m", "no .claude ignore");
       git(fx.work, "update-ref", "refs/heads/develop", "HEAD");
       assert.equal(run(sh, derivation(), { cwd: fx.work }).status, 0);
-      assert.equal(run(sh, guard(), { cwd: fx.work }).status, 0);
+      assert.equal(runGuard(sh, fx.work).status, 0);
       assert.ok(
         fs.existsSync(
           path.join(fx.work, ".claude/state/step4-scope-paths.txt"),
@@ -247,7 +265,7 @@ for (const sh of SHELLS) {
         ".claude/state/step4-scope-paths.txt",
         "docs/tasks/task.1.other\nsrc\n",
       );
-      const g = run(sh, guard(), { cwd: fx.work });
+      const g = runGuard(sh, fx.work);
       assert.equal(g.status, 1);
       assert.match(g.stdout, /stale record/);
       git(fx.work, "commit", "-q", "-am", "work");

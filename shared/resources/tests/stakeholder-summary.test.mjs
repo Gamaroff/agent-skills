@@ -129,6 +129,17 @@ for (const stage of ALL_STAGES) {
   });
 }
 
+// task.233 (obs #98): every caller posts `done` before the pull request is
+// merged, so the lead may claim acceptance but not release.
+test("done lead claims acceptance, not release — the merge is named as the step left", () => {
+  for (const slots of [{}, { pr: "#748" }]) {
+    const lead = renderLead("done", slots);
+    assert.doesNotMatch(lead, /now part of the product/i, JSON.stringify(lead));
+    assert.doesNotMatch(lead, /no further action/i, JSON.stringify(lead));
+    assert.match(lead, /merged/i, JSON.stringify(lead));
+  }
+});
+
 test("a cycle suffix resolves to the unsuffixed template", () => {
   assert.equal(renderLead("qa-cycle-3", {}), renderLead("qa-cycle", {}));
   assert.equal(renderLead("qa-fix-2", {}), renderLead("qa-fix", {}));

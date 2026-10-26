@@ -36,6 +36,11 @@ Two things follow from that, and both matter more than they look:
    the same file precisely so the two writes share one row locator rather than drifting apart. A
    re-run answers `already`; a bug document answers `not-a-task` — the bug registry has no such
    cells and `develop-bug` closes its row itself.
+- **A status-icon column is written only when configured.** A registry that carries an icon beside
+  Status (`✅` for `accepted`) sets `registry.task.statusIcons` in `skills-config.yaml`, and the tick
+  then writes the icon in the same line as Status, found by the header, never by position. Without
+  the key the icon is never touched. See the
+  [configuration reference](../reference/configuration.md#key-reference).
 - **The tick never blocks acceptance.** `registry-tick.js` exits 0 on every outcome, including
   "no row found". A registry row is a human-readable index; refusing to finalise finished work over
   one would trade a cosmetic defect for a stuck pipeline.
