@@ -2027,3 +2027,101 @@ test("statusIcons: `iconColumn` naming Status itself → `no-column`; the tick i
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ── cell width is DISPLAY width, not UTF-16 length ──────────────────────────
+
+/**
+ * `⚠️` is two code units and `✅` one, but both show two columns wide. Padding
+ * by `.length` turned `| ⚠️   |` into `| ✅    |` — one column wider than the
+ * hand-aligned rows around it — and the reverse swap lost a column.
+ */
+const iconLine = (registry, n) =>
+  readFileSync(registry, "utf8")
+    .split(/\r?\n/)
+    .find((l) => l.startsWith(`| ${n} |`));
+const oneIcon = (icon) =>
+  `registry:\n  task:\n    statusIcons:\n      accepted: "${icon}"\n    iconColumn: ""\n`;
+
+test("display width: repairing `| ⚠️   |` to ✅ gives the bytes of a hand-aligned ✅ row", () => {
+  const { dir, registry } = iconSandbox([
+    ...ICON_HEADER,
+    iconRow(170, "dw", "⚠️  ", "accepted        "),
+  ]);
+  try {
+    const f = writeDoc(dir, 170, "dw", { status: "accepted" });
+    const res = run(dir, ["--file", path.relative(dir, f)]);
+    assert.equal(res.icon, "repaired");
+    assert.equal(
+      iconLine(registry, 170),
+      iconRow(170, "dw", "✅  ", "accepted        "),
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("display width: an icon swap keeps the cell's display width, whatever the code-unit lengths", () => {
+  // [from, to]: 2→1 units, 1→2 units, 2→2 units (VS16 and astral), all 2 columns.
+  for (const [from, to] of [
+    ["☑️", "✅"],
+    ["✅", "⚠️"],
+    ["📋", "🔄"],
+  ]) {
+    const { dir, registry } = iconSandbox(
+      [...ICON_HEADER, iconRow(171, "sw", `${from}  `, "accepted        ")],
+      oneIcon(to),
+    );
+    try {
+      const f = writeDoc(dir, 171, "sw", { status: "accepted" });
+      assert.equal(
+        run(dir, ["--file", path.relative(dir, f)]).icon,
+        "repaired",
+      );
+      assert.equal(
+        iconLine(registry, 171),
+        iconRow(171, "sw", `${to}  `, "accepted        "),
+        `${from} → ${to}`,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+});
+
+test("display width: an ASCII status rewrite is byte-identical to the `.length` rule", () => {
+  // Pinned bytes, not a recomputation. No icon config, so only Status rewrites.
+  const { dir, registry } = iconSandbox(
+    [...ICON_HEADER, iconRow(172, "as", "⚠️  ", "ready-for-review")],
+    null,
+  );
+  try {
+    const f = writeDoc(dir, 172, "as", { status: "accepted" });
+    const res = run(dir, ["--file", path.relative(dir, f)]);
+    assert.equal(res.reason, "ticked");
+    assert.equal("icon" in res, false);
+    assert.equal(
+      iconLine(registry, 172),
+      "| 172 | Plain title 172 | infrastructure | High | ⚠️   | accepted         | X-172 | `docs/tasks/task.172.as/task.172.as.md` |",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("display width: a cell with no trailing space still gets no padding", () => {
+  const { dir, registry } = iconSandbox([
+    "| Task Number | Title | Category | Priority || Status | Jira | File |",
+    "| ----------- | ----- | -------- | -------- || ------ | ---- | ---- |",
+    "| 173 | Plain title 173 | infrastructure | High |⚠️| ready-for-review | X-173 | `docs/tasks/task.173.nt/task.173.nt.md` |",
+  ]);
+  try {
+    const f = writeDoc(dir, 173, "nt", { status: "accepted" });
+    assert.equal(run(dir, ["--file", path.relative(dir, f)]).icon, "written");
+    assert.equal(
+      iconLine(registry, 173),
+      "| 173 | Plain title 173 | infrastructure | High |✅| accepted         | X-173 | `docs/tasks/task.173.nt/task.173.nt.md` |",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
