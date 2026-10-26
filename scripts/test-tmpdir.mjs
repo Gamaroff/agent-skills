@@ -61,6 +61,15 @@ const EXT_RE = /\.[A-Za-z0-9]{1,5}$/;
  * word such as `-remote` in `carry-5c-remote` is never taken for one.
  */
 const INNER_RE = /[-_.](?=[A-Za-z0-9]*[A-Z0-9])[A-Za-z0-9]{6}$/;
+/**
+ * The eval runner's sandboxes, by producer: `evals/shared/runner.mjs` names each
+ * `eval-<scenario dir basename>-XXXXXX`, and a scenario dir made by `mkdtemp` carries its own
+ * six-character suffix of ANY case. Keyed on the case-free shape, a suffix that happened to be all
+ * lowercase (`qwerty`, about 0.55% of draws) split the prefix and tripped the ratchet
+ * (TASK-231-CR2-2). For `eval-` names the inner segment is stripped whatever its case, which is
+ * deterministic for a fixed scenario name too.
+ */
+const EVAL_INNER_RE = /^(eval-.+)[-_.][A-Za-z0-9]{6}$/;
 
 /**
  * The one prefix rule. The report, the ratchet and the tests all call this; there is no second
@@ -69,7 +78,10 @@ const INNER_RE = /[-_.](?=[A-Za-z0-9]*[A-Z0-9])[A-Za-z0-9]{6}$/;
  */
 export function prefixOf(name) {
   const bare = SUFFIX_RE.test(name) ? name : name.replace(EXT_RE, "");
-  return bare.replace(SUFFIX_RE, "").replace(INNER_RE, "");
+  const outer = bare.replace(SUFFIX_RE, "");
+  return outer.startsWith("eval-")
+    ? outer.replace(EVAL_INNER_RE, "$1")
+    : outer.replace(INNER_RE, "");
 }
 
 /**
@@ -158,9 +170,40 @@ export function removeDir(dir) {
     fs.rmSync(dir, { recursive: true, force: true });
   } catch {
     spawnSync("chmod", ["-R", "u+rwX", dir]);
-    fs.rmSync(dir, { recursive: true, force: true });
+    try {
+      fs.rmSync(dir, { recursive: true, force: true });
+    } catch {
+      // Reported by the return value below; a throw here would skip main's report and exit.
+    }
   }
   return !fs.existsSync(dir);
+}
+
+/** Signal a whole process group; false when it no longer exists (ESRCH) or has no pid. */
+export function signalGroup(pid, sig) {
+  if (!pid) return false;
+  try {
+    process.kill(-pid, sig);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * After the suite's leader exits, end what is left of its group: SIGTERM, up to `graceMs` for it
+ * to go, then SIGKILL. Resolves true when the group is gone.
+ */
+export async function reapGroup(pid, graceMs = 2000) {
+  if (!signalGroup(pid, 0)) return true;
+  signalGroup(pid, "SIGTERM");
+  for (let waited = 0; waited < graceMs; waited += 50) {
+    await new Promise((r) => setTimeout(r, 50));
+    if (!signalGroup(pid, 0)) return true;
+  }
+  signalGroup(pid, "SIGKILL");
+  await new Promise((r) => setTimeout(r, 50));
+  return !signalGroup(pid, 0);
 }
 
 function parseArgs(argv) {
@@ -197,14 +240,21 @@ export async function main(argv) {
 
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agent-skills-test-"));
   const env = { ...process.env, TMPDIR: dir, TMP: dir, TEMP: dir };
-  const child = spawn(parsed.command, parsed.args, { stdio: "inherit", env });
+  // The suite runs in its own process group so a signal reaches all of it. `npm test` is
+  // npm → sh -c → node --test → workers; signalling only the direct child left the rest running
+  // with their TMPDIR deleted under them (TASK-231-CR2-1).
+  const child = spawn(parsed.command, parsed.args, {
+    stdio: "inherit",
+    env,
+    detached: true,
+  });
 
-  // Forward a signal to the suite and let its exit run the cleanup below; the signal is
+  // Forward a signal to the suite's group and let its exit run the cleanup below; the signal is
   // re-raised once the directory is gone, so the caller still sees how the run ended.
   let received = null;
   const forward = (sig) => {
     received = sig;
-    child.kill(sig);
+    signalGroup(child.pid, sig);
   };
   process.on("SIGINT", forward);
   process.on("SIGTERM", forward);
@@ -215,6 +265,10 @@ export async function main(argv) {
     );
     child.on("close", (c, s) => resolveExit({ code: c, signal: s }));
   });
+
+  // The direct child has exited; anything left in its group would write into a directory about
+  // to be removed. Ask it to stop, then make it stop.
+  await reapGroup(child.pid);
 
   let names = [];
   try {

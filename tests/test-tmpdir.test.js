@@ -22,13 +22,21 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { spawn, spawnSync } = require("node:child_process");
+const { pathToFileURL } = require("node:url");
 
 const SCRIPT = path.join(__dirname, "..", "scripts", "test-tmpdir.mjs");
 const RATCHET = path.join(__dirname, "tmp-leak-ratchet.json");
 
 let mod;
+let budget;
 test.before(async () => {
   mod = await import(SCRIPT);
+  const { spawnBudget } = await import(
+    pathToFileURL(
+      path.join(__dirname, "..", "shared", "resources", "spawn-budget.mjs"),
+    ).href
+  );
+  budget = spawnBudget("TEST_TMPDIR");
 });
 
 function scratch(t) {
@@ -162,6 +170,42 @@ test("a read-only fixture left behind is still removed", (t) => {
   );
 });
 
+/**
+ * Spawn the wrapper in a process group of its own and, after the test, kill that group. A
+ * regression that stops the signal reaching the suite would otherwise leave the suite holding the
+ * stderr pipe open, and the test file would hang instead of failing.
+ */
+function spawnWrapper(t, args) {
+  const child = spawn(process.execPath, [SCRIPT, ...args], {
+    stdio: ["ignore", "ignore", "pipe"],
+    detached: true,
+  });
+  t.after(() => {
+    try {
+      process.kill(-child.pid, "SIGKILL");
+    } catch {
+      // already gone
+    }
+    child.stderr.destroy();
+  });
+  return child;
+}
+
+/** The wrapper's [code, signal], or a rejection once the spawn budget runs out. */
+function closeWithin(child) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () =>
+        reject(new Error(`wrapper still running after ${budget.timeoutMs} ms`)),
+      budget.timeoutMs,
+    );
+    child.on("close", (c, s) => {
+      clearTimeout(timer);
+      resolve([c, s]);
+    });
+  });
+}
+
 test("a signal to the wrapper reaches the suite, removes the directory, and is re-raised", async (t) => {
   const dir = scratch(t);
   const marker = path.join(dir, "tmpdir.txt");
@@ -171,24 +215,107 @@ test("a signal to the wrapper reaches the suite, removes the directory, and is r
     require("fs").writeFileSync(${JSON.stringify(marker)}, process.env.TMPDIR);
     setInterval(() => {}, 1000);
   `;
-  const child = spawn(
+  const child = spawnWrapper(t, [
+    "--ratchet",
+    ratchetFile,
+    "--",
     process.execPath,
-    [SCRIPT, "--ratchet", ratchetFile, "--", process.execPath, "-e", body],
-    {
-      stdio: ["ignore", "ignore", "pipe"],
-    },
-  );
+    "-e",
+    body,
+  ]);
   let stderr = "";
   child.stderr.on("data", (b) => (stderr += b));
   for (let i = 0; i < 100 && !fs.existsSync(marker); i++)
     await new Promise((r) => setTimeout(r, 50));
   assert.ok(fs.existsSync(marker), "the fake suite never started");
   child.kill("SIGTERM");
-  const [code, signal] = await new Promise((r) =>
-    child.on("close", (c, s) => r([c, s])),
-  );
+  const [code, signal] = await closeWithin(child);
   assert.equal(signal, "SIGTERM", `exit code ${code}, stderr: ${stderr}`);
   assert.match(stderr, /interrupted by SIGTERM/);
+  assert.equal(fs.existsSync(fs.readFileSync(marker, "utf8")), false);
+});
+
+/** True while a process with this pid exists. */
+function alive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * A fake suite that starts a grandchild (recording its pid), then: "exit" — exits 0 and leaves it
+ * running; "wait-on-child" — on SIGTERM waits for the grandchild to exit before exiting itself,
+ * as a test runner waits for its workers, so only a signal that reaches the grandchild ends it.
+ */
+function grandchildSuite(gcPidFile, marker, mode) {
+  return `
+    const { spawn } = require("child_process");
+    const fs = require("fs");
+    const gc = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
+    fs.writeFileSync(${JSON.stringify(gcPidFile)}, String(gc.pid));
+    fs.writeFileSync(${JSON.stringify(marker)}, process.env.TMPDIR);
+    ${
+      mode === "exit"
+        ? "gc.unref(); process.exit(0);"
+        : 'process.on("SIGTERM", () => {}); gc.on("exit", () => process.exit(0)); setInterval(() => {}, 1000);'
+    }
+  `;
+}
+
+test("a signal reaches the suite's grandchildren too — none outlives the per-run directory (TASK-231-CR2-1)", async (t) => {
+  const dir = scratch(t);
+  const marker = path.join(dir, "tmpdir.txt");
+  const gcPidFile = path.join(dir, "gc.pid");
+  const ratchetFile = path.join(dir, "ratchet.json");
+  fs.writeFileSync(ratchetFile, "{}");
+  const child = spawnWrapper(t, [
+    "--ratchet",
+    ratchetFile,
+    "--",
+    process.execPath,
+    "-e",
+    grandchildSuite(gcPidFile, marker, "wait-on-child"),
+  ]);
+  let stderr = "";
+  child.stderr.on("data", (b) => (stderr += b));
+  for (let i = 0; i < 100 && !fs.existsSync(marker); i++)
+    await new Promise((r) => setTimeout(r, 50));
+  assert.ok(fs.existsSync(marker), "the fake suite never started");
+  const gc = Number(fs.readFileSync(gcPidFile, "utf8"));
+  t.after(() => alive(gc) && process.kill(gc, "SIGKILL"));
+  child.kill("SIGTERM");
+  const [, signal] = await closeWithin(child);
+  assert.equal(signal, "SIGTERM", stderr);
+  assert.equal(alive(gc), false, `grandchild ${gc} outlived the wrapper`);
+  assert.equal(fs.existsSync(fs.readFileSync(marker, "utf8")), false);
+});
+
+test("a background process the suite leaves behind is ended before the directory is removed (TASK-231-CR2-1)", async (t) => {
+  const dir = scratch(t);
+  const marker = path.join(dir, "tmpdir.txt");
+  const gcPidFile = path.join(dir, "gc.pid");
+  const ratchetFile = path.join(dir, "ratchet.json");
+  fs.writeFileSync(ratchetFile, "{}");
+  const r = spawnSync(
+    process.execPath,
+    [
+      SCRIPT,
+      "--ratchet",
+      ratchetFile,
+      "--",
+      process.execPath,
+      "-e",
+      grandchildSuite(gcPidFile, marker, "exit"),
+    ],
+    { encoding: "utf8", timeout: budget.timeoutMs },
+  );
+  const gc = Number(fs.readFileSync(gcPidFile, "utf8"));
+  t.after(() => alive(gc) && process.kill(gc, "SIGKILL"));
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(alive(gc), false, `background process ${gc} outlived the run`);
   assert.equal(fs.existsSync(fs.readFileSync(marker, "utf8")), false);
 });
 
@@ -226,6 +353,12 @@ test("prefixOf strips the random suffix, and an extension that follows it", () =
     "eval-repeat-hang",
   );
   assert.equal(mod.prefixOf("carry-5c-remote-Ab12Cd"), "carry-5c-remote");
+  // TASK-231-CR2-2: an eval sandbox's inner mkdtemp suffix folds whatever its case.
+  assert.equal(
+    mod.prefixOf("eval-repeat-hang-qwerty-Ab12Cd"),
+    "eval-repeat-hang",
+  );
+  assert.equal(mod.prefixOf("eval-sc-Ab12Cd"), "eval-sc");
   assert.deepEqual(mod.groupByPrefix(["a-Ab12Cd", "a-Ef34Gh", "b-Ij56Kl"]), {
     a: 2,
     b: 1,
@@ -287,6 +420,30 @@ test("compareRatchet sorts each finding into exactly one bucket", () => {
     true,
     "healed alone is not a failure",
   );
+});
+
+test("removeDir reports a directory it cannot remove instead of throwing (TASK-231-CR2-3)", (t) => {
+  const dir = scratch(t);
+  const parent = path.join(dir, "ro-parent");
+  const victim = path.join(parent, "victim");
+  fs.mkdirSync(victim, { recursive: true });
+  if (process.getuid?.() === 0)
+    return t.skip("root ignores directory permissions");
+  fs.chmodSync(parent, 0o555); // the retry's chmod -R reaches victim, never its parent
+  let result;
+  try {
+    assert.doesNotThrow(() => (result = mod.removeDir(victim)));
+  } finally {
+    fs.chmodSync(parent, 0o755);
+  }
+  assert.equal(result, false);
+});
+
+test("every committed ratchet key is a fixed point of prefixOf, so the ratchet keys what the rule produces", () => {
+  const r = mod.readRatchet(RATCHET);
+  const moved = Object.keys(r).filter((k) => mod.prefixOf(`${k}-Ab12Cd`) !== k);
+  assert.deepEqual(moved, []);
+  assert.ok(Object.keys(r).length >= 50, "non-vacuity: the ratchet was read");
 });
 
 test("the committed ratchet is well-formed and holds none of the fixed prefixes", () => {

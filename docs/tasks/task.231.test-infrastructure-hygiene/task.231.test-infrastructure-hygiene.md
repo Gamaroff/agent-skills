@@ -362,18 +362,19 @@ Clearing today's backlog is a manual step. Remove the entries whose prefixes app
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.231.qa.1.test-infrastructure-hygiene.md](./task.231.qa.1.test-infrastructure-hygiene.md)
-- **Gate File**: [task.231.gate.1.test-infrastructure-hygiene.yml](./task.231.gate.1.test-infrastructure-hygiene.yml)
+- **Full Report**: [task.231.qa.2.test-infrastructure-hygiene.md](./task.231.qa.2.test-infrastructure-hygiene.md)
+- **Gate File**: [task.231.gate.2.test-infrastructure-hygiene.yml](./task.231.gate.2.test-infrastructure-hygiene.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 6851 (CI `test` @ `0963c9e8`)
+- **Tests Executed**: 6364 (local `npm test` after cycle-1 fixes; CI green @ `e1a76d6b`)
 - **Phases Verified**: 6/6
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- TASK-231-CR-1 (medium): the anchor check reads a tracked symlink's index blob (its target path), so fragment links to a symlinked Markdown file are false `[no-anchor]`.
-- TASK-231-QA-1 (low): `groupByPrefix` drops a `__proto__`-prefixed leak.
+- Cycle 1 fixes (CR-1 symlink anchors, QA-1 prototype-key prefixes) are verified and mutation-proven.
+- TASK-231-CR2-1 (medium): a SIGTERM to the wrapper reaches only its direct child, so suite grandchildren outlive their TMPDIR.
+- TASK-231-CR2-2 (low): an all-lowercase inner mkdtemp suffix splits the `eval-repeat-hang` prefix (a ratchet flake).
 <!-- change-log-start -->
 ## Change Log
 
@@ -386,6 +387,8 @@ Clearing today's backlog is a manual step. Remove the entries whose prefixes app
 | 2026-10-26 |         | Status → ready-for-review | develop |
 | 2026-10-26 |  | QA gate CONCERNS (80/100) — 2 findings (CR-1 medium, QA-1 low) | qa-task |
 | 2026-10-26 |  | QA findings fixed — cycle 1: CR-1 (symlinked anchor targets), QA-1 (prototype-key prefixes), CR-3 cleanup; 1 iteration | qa-fix |
+| 2026-10-26 |  | QA gate CONCERNS (80/100) — 2 findings (CR2-1 medium, CR2-2 low); cycle-1 fixes verified | qa-task |
+| 2026-10-26 |  | QA findings fixed — cycle 2: CR2-1 (signal the suite process group, reap leftovers), CR2-2 (eval- inner suffix by producer), CR2-3 (guarded retry rmSync); 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---
