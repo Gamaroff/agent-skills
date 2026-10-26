@@ -232,6 +232,33 @@ test("prefixOf strips the random suffix, and an extension that follows it", () =
   });
 });
 
+test("groupByPrefix counts a prefix spelled like an Object.prototype key as an ordinary prefix (TASK-231-QA-1)", () => {
+  const g = mod.groupByPrefix([
+    "__proto__-Ab12Cd",
+    "__proto__-Ef34Gh",
+    "constructor-Ab12Cd",
+    "toString-Ab12Cd",
+  ]);
+  assert.deepEqual(Object.keys(g).sort(), [
+    "__proto__",
+    "constructor",
+    "toString",
+  ]);
+  assert.equal(g["__proto__"], 2);
+  assert.equal(g.constructor, 1);
+  // …and so it trips the ratchet like any new prefix, with a numeric count.
+  const v = mod.compareRatchet(g, {});
+  assert.equal(v.ok, false);
+  assert.deepEqual(
+    v.newPrefixes.map((x) => [x.prefix, x.count]),
+    [
+      ["__proto__", 2],
+      ["constructor", 1],
+      ["toString", 1],
+    ],
+  );
+});
+
 test("compareRatchet sorts each finding into exactly one bucket", () => {
   const v = mod.compareRatchet(
     { fresh: 1, known: 3, held: 1 },

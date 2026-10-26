@@ -391,6 +391,28 @@ function dirSet(tracked) {
   return dirs;
 }
 
+// The tracked paths whose index entry is a symlink (mode 120000), per tracked
+// set, read lazily — only a document with a cross-file fragment pays for it.
+// A symlink's index blob is its target PATH, not the file's text, so reading
+// it for anchors finds none (TASK-231-CR-1: `git show :CLAUDE.md` is
+// "AGENTS.md"). null when git cannot answer.
+const SYMLINK_SETS = new WeakMap();
+function symlinkSet(tracked, base) {
+  if (SYMLINK_SETS.has(tracked)) return SYMLINK_SETS.get(tracked);
+  const out = git(["ls-files", "-s", "-z", "--full-name"], base);
+  const links =
+    out === null
+      ? null
+      : new Set(
+          out
+            .split("\0")
+            .filter((e) => e.startsWith("120000 "))
+            .map((e) => e.slice(e.indexOf("\t") + 1)),
+        );
+  SYMLINK_SETS.set(tracked, links);
+  return links;
+}
+
 const toPosix = (p) => p.split(path.sep).join("/");
 
 /**
@@ -459,14 +481,30 @@ function checkDocument(
   const dirs = tracked ? dirSet(tracked) : null;
   const broken = [];
   // Anchors per target file, read once per call (a document links one target
-  // many times). The index blob when tracked; the disk otherwise.
+  // many times). The index blob when tracked; the disk otherwise. A tracked
+  // symlink is followed to the file it names, inside the repository and at
+  // most 8 links deep; one that leaves the repository or loops answers null,
+  // as an unreadable target does (TASK-231-CR-1).
   const anchorCache = new Map();
-  const anchorsFor = (relPath) => {
+  const anchorsFor = (relPath, depth = 0) => {
     if (anchorCache.has(relPath)) return anchorCache.get(relPath);
-    let body =
-      tracked && tracked.has(relPath)
-        ? git(["show", `:${relPath}`], base)
-        : null;
+    const isTracked = tracked && tracked.has(relPath);
+    if (isTracked && symlinkSet(tracked, base)?.has(relPath)) {
+      const to = git(["show", `:${relPath}`], base);
+      const next =
+        to === null || path.posix.isAbsolute(to)
+          ? null
+          : path.posix.normalize(
+              path.posix.join(path.posix.dirname(relPath), to),
+            );
+      const set =
+        next === null || next === ".." || next.startsWith("../") || depth >= 8
+          ? null
+          : anchorsFor(next, depth + 1);
+      anchorCache.set(relPath, set);
+      return set;
+    }
+    let body = isTracked ? git(["show", `:${relPath}`], base) : null;
     if (body === null) {
       try {
         body = fs.readFileSync(path.join(base, relPath), "utf8");

@@ -72,14 +72,18 @@ export function prefixOf(name) {
   return bare.replace(SUFFIX_RE, "").replace(INNER_RE, "");
 }
 
-/** { prefix: count } over a list of top-level entry names. */
+/**
+ * { prefix: count } over a list of top-level entry names. Counted in a Map: on a plain object a
+ * `__proto__` prefix set the prototype and vanished, and `constructor` counted from the inherited
+ * function (TASK-231-QA-1). Object.fromEntries defines each key as an own property.
+ */
 export function groupByPrefix(names) {
-  const out = {};
+  const counts = new Map();
   for (const n of names) {
     const p = prefixOf(n);
-    out[p] = (out[p] || 0) + 1;
+    counts.set(p, (counts.get(p) ?? 0) + 1);
   }
-  return out;
+  return Object.fromEntries(counts);
 }
 
 /**

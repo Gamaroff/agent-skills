@@ -353,16 +353,39 @@ Clearing today's backlog is a manual step. Remove the entries whose prefixes app
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-26
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.231.qa.1.test-infrastructure-hygiene.md](./task.231.qa.1.test-infrastructure-hygiene.md)
+- **Gate File**: [task.231.gate.1.test-infrastructure-hygiene.yml](./task.231.gate.1.test-infrastructure-hygiene.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 6851 (CI `test` @ `0963c9e8`)
+- **Phases Verified**: 6/6
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+- TASK-231-CR-1 (medium): the anchor check reads a tracked symlink's index blob (its target path), so fragment links to a symlinked Markdown file are false `[no-anchor]`.
+- TASK-231-QA-1 (low): `groupByPrefix` drops a `__proto__`-prefixed leak.
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                               | Author      |
-| ---------- | ------- | --------------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-23 | 1.0     | Initial draft — cut from observations #39, #62, #80, #83 | create-task |
 | 2026-10-26 | 1.1     | Review passed (8/10). Added the two tests that read `scripts.test`, the same-file `#x` extraction gap, and the traps/tech-stack doc sweep | review-task |
 | 2026-10-26 |         | Status → ready-for-development | review-task |
 | 2026-10-26 |         | Implemented — 36 files (12 bundled copies), 22 new tests (wrapper 13, anchors 6, parity 1, worktree 1, qa-read-back 1); healed made a notice (environment-dependent leaks) | develop |
 | 2026-10-26 |         | Status → ready-for-review | develop |
+| 2026-10-26 |  | QA gate CONCERNS (80/100) — 2 findings (CR-1 medium, QA-1 low) | qa-task |
+| 2026-10-26 |  | QA findings fixed — cycle 1: CR-1 (symlinked anchor targets), QA-1 (prototype-key prefixes), CR-3 cleanup; 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

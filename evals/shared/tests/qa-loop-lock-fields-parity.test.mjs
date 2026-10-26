@@ -382,11 +382,12 @@ test("waiting_on: one writer, one reader, and every describer spells the field a
   let sites = 0;
   for (const rel of population) {
     const lines = read(rel).split(/\r?\n/);
+    const blocks = blocksOf(rel);
     lines.forEach((l, i) => {
       if (!DISPATCH.test(l) || EXEMPT.test(l)) return;
       sites += 1;
       assert.ok(
-        isWaitMarked(lines, i, blocksOf(rel)),
+        isWaitMarked(lines, i, blocks),
         `${rel}:${i + 1} dispatches without marking the wait: ${l.trim().slice(0, 80)}`,
       );
     });

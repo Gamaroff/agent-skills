@@ -662,6 +662,35 @@ test("anchors: in a repository the target's TRACKED text is read — a heading r
   });
 });
 
+test("anchors: a tracked symlink is read through to its target — a live fragment passes, a dead one is still [no-anchor] (TASK-231-CR-1)", () => {
+  withRepoFixture((dir) => {
+    fs.mkdirSync(path.join(dir, "sub"));
+    fs.writeFileSync(
+      path.join(dir, "sub", "real.md"),
+      "# Real\n\n## Testing\n",
+    );
+    fs.symlinkSync("sub/real.md", path.join(dir, "link.md"));
+    fs.symlinkSync("link.md", path.join(dir, "chain.md"));
+    fs.writeFileSync(
+      path.join(dir, "a.md"),
+      "[x](link.md#testing) [y](chain.md#testing) [z](link.md#nope)\n",
+    );
+    execFileSync("git", ["add", "-A"], { cwd: dir });
+    // The premise: the index blob of a symlink is its target path, not text.
+    assert.equal(
+      execFileSync("git", ["show", ":link.md"], { cwd: dir, encoding: "utf8" }),
+      "sub/real.md",
+    );
+    const r = checkDocument("a.md", { root: dir });
+    assert.deepEqual(
+      r.broken.map((b) => `${b.target} ${b.state}`),
+      ["link.md#nope no-anchor"],
+      "a symlink and a chain of them answer with their target's anchors",
+    );
+    assert.equal(r.anchorsChecked, 3);
+  });
+});
+
 test("anchors: the CLI prints [no-anchor] and exits 1", () => {
   withNonRepoFixture((dir) => {
     fs.writeFileSync(path.join(dir, "doc.md"), "# Here\n\n[x](#nope)\n");

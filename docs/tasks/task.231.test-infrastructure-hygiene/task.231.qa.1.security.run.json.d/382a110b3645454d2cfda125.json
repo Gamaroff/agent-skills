@@ -1,0 +1,27 @@
+{
+  "sink": "path",
+  "entry": "scripts/test-tmpdir.mjs#compareRatchet",
+  "name": "compareRatchet",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 8,
+  "passed": 8,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": null,
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": [
+    {
+      "known": 2
+    }
+  ],
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-10-26T06:38:36.282Z"
+}
