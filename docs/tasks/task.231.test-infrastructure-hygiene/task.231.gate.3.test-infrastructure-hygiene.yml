@@ -1,0 +1,67 @@
+schema: 2
+task: 'task.231.test-infrastructure-hygiene'
+task_title: 'Test infrastructure hygiene'
+gate: CONCERNS
+status_reason: 'Cycle 2 fixes hold (all five mutation-proven), but the process-group change moved the suite into a new session: SIGHUP and SIGQUIT now kill only the wrapper and leave the suite and its directory behind (CR3-1 medium, reproduced).'
+reviewer: 'QA Engineer'
+head: '1bd497776d95ac59fbfc58837c220d639f0a1c51'
+updated: '2026-10-26T07:43:52Z'
+
+top_issues:
+  - id: 'TASK-231-CR3-1'
+    severity: medium
+    file: 'scripts/test-tmpdir.mjs'
+    finding: 'detached: true calls setsid(), so the suite no longer receives terminal signals, and the wrapper forwards only SIGINT and SIGTERM. A SIGHUP or SIGQUIT kills the wrapper and orphans the suite with its per-run directory still in place (reproduced: SIGHUP → wrapper signal SIGHUP, suiteAlive true, tmpdirLeft true; same for SIGQUIT). Ctrl-Z stops only the wrapper.'
+    suggested_action: 'Forward SIGHUP and SIGQUIT the same way as SIGINT and SIGTERM, and on SIGTSTP stop the group before stopping the wrapper, continuing the group on SIGCONT; test each forwarded signal.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 6368
+  phases_verified: 6/6
+  ci: 'pass @ 1bd49777 — test, link-check, validate, shellcheck, secret-scan; local ci:fast 6,368 tests, 0 fail, ratchet ok'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 8
+    escaped: 0
+    notes: 'compareRatchet unchanged since its cycle-2 probe (task.231.qa.2.security.run.json, 8 cases, escaped 0); this cycle changed signal handling and the prefix rule, neither a verdict boundary.'
+  performance:
+    status: PASS
+    notes: 'reapGroup adds at most a 2 s grace only when the suite leaves processes behind.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR3-1: SIGHUP/SIGQUIT orphan the suite. CR3-3 (advisory, confidence low): EPERM from a group probe reads as gone. CR3-4 (cleanup): reapGroup''s result is discarded, so a surviving group goes unreported.'
+  maintainability:
+    status: PASS
+    notes: 'CR3-2 (advisory): the test safety net kills the wrapper''s group but not the suite''s own group.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR3-1: forward SIGHUP and SIGQUIT, handle SIGTSTP/SIGCONT for the group, with tests.'
+      refs: ['scripts/test-tmpdir.mjs', 'tests/test-tmpdir.test.js']
+  future:
+    - action: 'CR3-2: test safety net also kills the suite group (cheap to fold in).'
+      refs: ['tests/test-tmpdir.test.js']
+    - action: 'CR3-3/CR3-4: treat only ESRCH as gone, and report a group that survives the reap.'
+      refs: ['scripts/test-tmpdir.mjs']
+    - action: 'Carried from gate 2: CR2-4 (quadratic heading matchers), CR2-5 (Step 12b prose), CR2-6 (Bitbucket slugs); from gate 1: CR-2 (empty anchor step).'
+      refs: ['shared/resources/doc-links.js', 'skills/qa-task/SKILL.md']
+
+bug_resolution:
+  fixed_this_cycle: ['TASK-231-CR2-1', 'TASK-231-CR2-2', 'CR2-3 (advisory)']
+  verification: 'mutation-proven against the committed tests at 1bd49777'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR3-1 fixed and covered by a test']

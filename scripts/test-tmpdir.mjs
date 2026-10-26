@@ -179,16 +179,28 @@ export function removeDir(dir) {
   return !fs.existsSync(dir);
 }
 
-/** Signal a whole process group; false when it no longer exists (ESRCH) or has no pid. */
+/**
+ * Signal a whole process group. False only when there is no pid or the group is gone (ESRCH): an
+ * EPERM means it exists but cannot be signalled, and reading that as "gone" would remove the
+ * directory under processes still running (TASK-231-CR3-3).
+ */
 export function signalGroup(pid, sig) {
   if (!pid) return false;
   try {
     process.kill(-pid, sig);
     return true;
-  } catch {
-    return false;
+  } catch (e) {
+    return e.code !== "ESRCH";
   }
 }
+
+/**
+ * The signals forwarded to the suite's group. `detached` puts the suite in a session of its own,
+ * so it no longer receives anything the terminal sends: every terminating signal a terminal or a
+ * supervisor can deliver has to be passed on, or it kills the wrapper and orphans the suite with
+ * its directory (TASK-231-CR3-1).
+ */
+export const FORWARDED_SIGNALS = ["SIGINT", "SIGTERM", "SIGHUP", "SIGQUIT"];
 
 /**
  * After the suite's leader exits, end what is left of its group: SIGTERM, up to `graceMs` for it
@@ -256,8 +268,17 @@ export async function main(argv) {
     received = sig;
     signalGroup(child.pid, sig);
   };
-  process.on("SIGINT", forward);
-  process.on("SIGTERM", forward);
+  for (const sig of FORWARDED_SIGNALS) process.on(sig, forward);
+  // Job control: Ctrl-Z reaches only the wrapper now. Stop the suite's group, then the wrapper
+  // itself; on resume, continue the group. The group is in a new session, so a SIGTSTP sent to it
+  // would be discarded as orphaned — SIGSTOP is the one that stops it.
+  const suspend = () => {
+    signalGroup(child.pid, "SIGSTOP");
+    process.kill(process.pid, "SIGSTOP");
+  };
+  const resume = () => signalGroup(child.pid, "SIGCONT");
+  process.on("SIGTSTP", suspend);
+  process.on("SIGCONT", resume);
 
   const { code, signal, spawnError } = await new Promise((resolveExit) => {
     child.on("error", (err) =>
@@ -268,7 +289,10 @@ export async function main(argv) {
 
   // The direct child has exited; anything left in its group would write into a directory about
   // to be removed. Ask it to stop, then make it stop.
-  await reapGroup(child.pid);
+  if (!(await reapGroup(child.pid)))
+    say(
+      `test-tmpdir: processes in the suite's group ${child.pid} survived SIGKILL — they may still write to ${dir}`,
+    );
 
   let names = [];
   try {
@@ -276,8 +300,9 @@ export async function main(argv) {
   } finally {
     if (!removeDir(dir)) say(`test-tmpdir: could not remove ${dir}`);
   }
-  process.off("SIGINT", forward);
-  process.off("SIGTERM", forward);
+  for (const sig of FORWARDED_SIGNALS) process.off(sig, forward);
+  process.off("SIGTSTP", suspend);
+  process.off("SIGCONT", resume);
 
   if (received) {
     say(`test-tmpdir: interrupted by ${received} — per-run directory removed`);

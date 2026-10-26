@@ -175,16 +175,23 @@ test("a read-only fixture left behind is still removed", (t) => {
  * regression that stops the signal reaching the suite would otherwise leave the suite holding the
  * stderr pipe open, and the test file would hang instead of failing.
  */
-function spawnWrapper(t, args) {
+function spawnWrapper(t, args, suitePidFile) {
   const child = spawn(process.execPath, [SCRIPT, ...args], {
     stdio: ["ignore", "ignore", "pipe"],
     detached: true,
   });
   t.after(() => {
-    try {
-      process.kill(-child.pid, "SIGKILL");
-    } catch {
-      // already gone
+    // The wrapper's group, and the suite's own: the wrapper starts the suite in a session of its
+    // own, so killing the wrapper's group alone misses it (TASK-231-CR3-2).
+    const groups = [child.pid];
+    if (suitePidFile && fs.existsSync(suitePidFile))
+      groups.push(Number(fs.readFileSync(suitePidFile, "utf8")));
+    for (const g of groups) {
+      try {
+        process.kill(-g, "SIGKILL");
+      } catch {
+        // already gone
+      }
     }
     child.stderr.destroy();
   });
@@ -206,33 +213,126 @@ function closeWithin(child) {
   });
 }
 
-test("a signal to the wrapper reaches the suite, removes the directory, and is re-raised", async (t) => {
+for (const sig of ["SIGTERM", "SIGHUP"]) {
+  test(`a ${sig} to the wrapper reaches the suite, removes the directory, and is re-raised (SIGHUP: TASK-231-CR3-1)`, async (t) => {
+    const dir = scratch(t);
+    const marker = path.join(dir, "tmpdir.txt");
+    const suitePid = path.join(dir, "suite.pid");
+    const ratchetFile = path.join(dir, "ratchet.json");
+    fs.writeFileSync(ratchetFile, "{}");
+    const body = `
+      require("fs").writeFileSync(${JSON.stringify(suitePid)}, String(process.pid));
+      require("fs").writeFileSync(${JSON.stringify(marker)}, process.env.TMPDIR);
+      setInterval(() => {}, 1000);
+    `;
+    const child = spawnWrapper(
+      t,
+      ["--ratchet", ratchetFile, "--", process.execPath, "-e", body],
+      suitePid,
+    );
+    let stderr = "";
+    child.stderr.on("data", (b) => (stderr += b));
+    for (let i = 0; i < 100 && !fs.existsSync(marker); i++)
+      await new Promise((r) => setTimeout(r, 50));
+    assert.ok(fs.existsSync(marker), "the fake suite never started");
+    const suite = Number(fs.readFileSync(suitePid, "utf8"));
+    child.kill(sig);
+    const [code, signal] = await closeWithin(child);
+    assert.equal(signal, sig, `exit code ${code}, stderr: ${stderr}`);
+    assert.match(stderr, new RegExp(`interrupted by ${sig}`));
+    assert.equal(alive(suite), false, `suite ${suite} outlived a ${sig}`);
+    assert.equal(fs.existsSync(fs.readFileSync(marker, "utf8")), false);
+  });
+}
+
+/** The single-letter process state from /proc (R, S, T, …), or null where /proc is absent. */
+function procState(pid) {
+  try {
+    const stat = fs.readFileSync(`/proc/${pid}/stat`, "utf8");
+    return stat.slice(stat.lastIndexOf(")") + 2, stat.lastIndexOf(")") + 3);
+  } catch {
+    return null;
+  }
+}
+
+async function until(pred) {
+  for (let i = 0; i < 100 && !pred(); i++)
+    await new Promise((r) => setTimeout(r, 50));
+  return pred();
+}
+
+test("Ctrl-Z stops the suite with the wrapper, and resuming the wrapper resumes it (TASK-231-CR3-1)", async (t) => {
+  if (!fs.existsSync("/proc/self/stat"))
+    return t.skip("needs /proc to read process states");
   const dir = scratch(t);
   const marker = path.join(dir, "tmpdir.txt");
+  const suitePid = path.join(dir, "suite.pid");
   const ratchetFile = path.join(dir, "ratchet.json");
   fs.writeFileSync(ratchetFile, "{}");
   const body = `
+    require("fs").writeFileSync(${JSON.stringify(suitePid)}, String(process.pid));
     require("fs").writeFileSync(${JSON.stringify(marker)}, process.env.TMPDIR);
     setInterval(() => {}, 1000);
   `;
-  const child = spawnWrapper(t, [
-    "--ratchet",
-    ratchetFile,
-    "--",
-    process.execPath,
-    "-e",
-    body,
-  ]);
-  let stderr = "";
-  child.stderr.on("data", (b) => (stderr += b));
-  for (let i = 0; i < 100 && !fs.existsSync(marker); i++)
-    await new Promise((r) => setTimeout(r, 50));
-  assert.ok(fs.existsSync(marker), "the fake suite never started");
+  const child = spawnWrapper(
+    t,
+    ["--ratchet", ratchetFile, "--", process.execPath, "-e", body],
+    suitePid,
+  );
+  assert.ok(
+    await until(() => fs.existsSync(marker)),
+    "the fake suite never started",
+  );
+  const suite = Number(fs.readFileSync(suitePid, "utf8"));
+  child.kill("SIGTSTP");
+  assert.ok(
+    await until(() => procState(child.pid) === "T"),
+    "the wrapper did not stop",
+  );
+  assert.ok(
+    await until(() => procState(suite) === "T"),
+    "the suite kept running while the wrapper was stopped",
+  );
+  child.kill("SIGCONT");
+  assert.ok(
+    await until(() => procState(suite) !== "T"),
+    "the suite was not resumed",
+  );
   child.kill("SIGTERM");
-  const [code, signal] = await closeWithin(child);
-  assert.equal(signal, "SIGTERM", `exit code ${code}, stderr: ${stderr}`);
-  assert.match(stderr, /interrupted by SIGTERM/);
-  assert.equal(fs.existsSync(fs.readFileSync(marker, "utf8")), false);
+  const [, signal] = await closeWithin(child);
+  assert.equal(signal, "SIGTERM");
+});
+
+test("signalGroup reads EPERM as a group that still exists, not one that is gone (TASK-231-CR3-3)", (t) => {
+  if (process.getuid?.() === 0 || !fs.existsSync("/proc"))
+    return t.skip("needs /proc and a non-root user");
+  // A process group led by another user's process: it exists, and we may not signal it.
+  const leader = fs
+    .readdirSync("/proc")
+    .filter((d) => /^[0-9]+$/.test(d) && Number(d) > 1)
+    .map(Number)
+    .find((pid) => {
+      try {
+        const st = fs.statSync(`/proc/${pid}`);
+        const stat = fs.readFileSync(`/proc/${pid}/stat`, "utf8");
+        const fields = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
+        return st.uid !== process.getuid() && Number(fields[2]) === pid;
+      } catch {
+        return false;
+      }
+    });
+  if (!leader) return t.skip("no group led by another user's process");
+  assert.throws(
+    () => process.kill(-leader, 0),
+    { code: "EPERM" },
+    "premise: the probe is refused, not missing",
+  );
+  assert.equal(mod.signalGroup(leader, 0), true);
+  assert.equal(
+    mod.signalGroup(2 ** 22 + 12345, 0),
+    false,
+    "a group that does not exist is gone",
+  );
 });
 
 /** True while a process with this pid exists. */
@@ -254,6 +354,7 @@ function grandchildSuite(gcPidFile, marker, mode) {
   return `
     const { spawn } = require("child_process");
     const fs = require("fs");
+    fs.writeFileSync(${JSON.stringify(gcPidFile + ".leader")}, String(process.pid));
     const gc = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
     fs.writeFileSync(${JSON.stringify(gcPidFile)}, String(gc.pid));
     fs.writeFileSync(${JSON.stringify(marker)}, process.env.TMPDIR);
@@ -271,14 +372,18 @@ test("a signal reaches the suite's grandchildren too — none outlives the per-r
   const gcPidFile = path.join(dir, "gc.pid");
   const ratchetFile = path.join(dir, "ratchet.json");
   fs.writeFileSync(ratchetFile, "{}");
-  const child = spawnWrapper(t, [
-    "--ratchet",
-    ratchetFile,
-    "--",
-    process.execPath,
-    "-e",
-    grandchildSuite(gcPidFile, marker, "wait-on-child"),
-  ]);
+  const child = spawnWrapper(
+    t,
+    [
+      "--ratchet",
+      ratchetFile,
+      "--",
+      process.execPath,
+      "-e",
+      grandchildSuite(gcPidFile, marker, "wait-on-child"),
+    ],
+    `${gcPidFile}.leader`,
+  );
   let stderr = "";
   child.stderr.on("data", (b) => (stderr += b));
   for (let i = 0; i < 100 && !fs.existsSync(marker); i++)

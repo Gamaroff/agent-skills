@@ -358,23 +358,22 @@ Clearing today's backlog is a manual step. Remove the entries whose prefixes app
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-26
-**Quality Score**: 80/100
+**Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.231.qa.2.test-infrastructure-hygiene.md](./task.231.qa.2.test-infrastructure-hygiene.md)
-- **Gate File**: [task.231.gate.2.test-infrastructure-hygiene.yml](./task.231.gate.2.test-infrastructure-hygiene.yml)
+- **Full Report**: [task.231.qa.3.test-infrastructure-hygiene.md](./task.231.qa.3.test-infrastructure-hygiene.md)
+- **Gate File**: [task.231.gate.3.test-infrastructure-hygiene.yml](./task.231.gate.3.test-infrastructure-hygiene.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 6364 (local `npm test` after cycle-1 fixes; CI green @ `e1a76d6b`)
+- **Tests Executed**: 6368 (local `npm run ci:fast`; CI green @ `1bd49777`)
 - **Phases Verified**: 6/6
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- Cycle 1 fixes (CR-1 symlink anchors, QA-1 prototype-key prefixes) are verified and mutation-proven.
-- TASK-231-CR2-1 (medium): a SIGTERM to the wrapper reaches only its direct child, so suite grandchildren outlive their TMPDIR.
-- TASK-231-CR2-2 (low): an all-lowercase inner mkdtemp suffix splits the `eval-repeat-hang` prefix (a ratchet flake).
+- Cycle 2 fixes (process-group signalling, producer-keyed `eval-` prefixes, guarded retry) are verified and mutation-proven.
+- TASK-231-CR3-1 (medium): the suite's new session cuts it off from SIGHUP and SIGQUIT, which the wrapper does not forward, so those signals orphan the suite and its directory.
 <!-- change-log-start -->
 ## Change Log
 
@@ -389,6 +388,8 @@ Clearing today's backlog is a manual step. Remove the entries whose prefixes app
 | 2026-10-26 |  | QA findings fixed — cycle 1: CR-1 (symlinked anchor targets), QA-1 (prototype-key prefixes), CR-3 cleanup; 1 iteration | qa-fix |
 | 2026-10-26 |  | QA gate CONCERNS (80/100) — 2 findings (CR2-1 medium, CR2-2 low); cycle-1 fixes verified | qa-task |
 | 2026-10-26 |  | QA findings fixed — cycle 2: CR2-1 (signal the suite process group, reap leftovers), CR2-2 (eval- inner suffix by producer), CR2-3 (guarded retry rmSync); 1 iteration | qa-fix |
+| 2026-10-26 |  | QA gate CONCERNS (90/100) — 1 finding (CR3-1 medium: SIGHUP/SIGQUIT orphan the suite); cycle-2 fixes verified | qa-task |
+| 2026-10-26 |  | QA findings fixed — cycle 3: CR3-1 (forward SIGHUP/SIGQUIT, group job control), CR3-2 to CR3-4 folded in; 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---
