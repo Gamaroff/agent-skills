@@ -5,18 +5,20 @@ type: task
 description: "Tests stop leaking temp dirs into /tmp, the observation-log resolver tests pass inside a linked worktree, doc-links.js checks #anchors, and the dispatch-wait parity test accepts a block that marks its own wait."
 tags: [observe-work, create-skill, finalise, qa-task, develop-task, observation, tests]
 category: testing
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-23
 updated: 2026-10-26
 assignee:
 estimated_effort_hours: 16
 github_issue: 741
+completed_date: 2026-10-26
+pr_number: 752
 ---
 
 # Technical Task: Test infrastructure hygiene
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.231.review.1.test-infrastructure-hygiene.md` implemented 2026-10-26
 **GitHub Issue**: [#741](https://github.com/Gamaroff/agent-skills/issues/741)
 
@@ -270,7 +272,7 @@ Each one is recorded in the implementation report with its red run:
 - [x] SC-3: `tests/tmp-leak-ratchet.json` has no entry for `qa-next`, `review-pr-repo`, `wireloom-test` or `executed-prose`. The full run's leftover count is recorded in the implementation report § Phase 5 and is lower than Phase 0's by at least those prefixes' counts.
 - [x] SC-4: `observation-log.test.mjs` passes when run from a linked worktree. The run is recorded in the implementation report, and the new worktree case in the file holds it.
 - [x] SC-5: `doc-links.js` reports `other.md#nope` as `[no-anchor]` and accepts each anchor shape listed in Section 8. Held by `doc-links.test.mjs`.
-- [ ] SC-6: The docs link-check workflow runs `doc-links.js` on each changed Markdown file. Shown by the workflow diff and by one CI run on the PR whose log contains the `doc-links` step.
+- [x] SC-6: The docs link-check workflow runs `doc-links.js` on each changed Markdown file. Shown by the workflow diff and by one CI run on the PR whose log contains the `doc-links` step. Evidence: "Docs link check" run 40291489233 on PR #752 @ `d423566f`, whose step "Check anchors and tracked-tree links in changed files" logs `ok doc-links: …` lines.
 - [x] SC-7: The parity test accepts a dispatch whose following fence marks its own wait, and still fails a dispatch with no mark. Held by the Phase 4 unit cases.
 
 ### Code Quality
@@ -374,6 +376,29 @@ Clearing today's backlog is a manual step. Remove the entries whose prefixes app
 ### Key Findings
 - Every gated finding from QA cycles 1–4 is fixed and mutation-proven: symlinked anchors, prototype-key prefixes, process-group signalling, terminal signals and job control, producer-keyed prefixes, and the test safety net.
 - Two low advisory test-robustness points (CR5-1, CR5-2) and the earlier advisory items are carried in the gate's `recommendations.future`.
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.231.qa.5.test-infrastructure-hygiene.md`
+**Gate File**: `task.231.gate.5.test-infrastructure-hygiene.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 95/100
+**PR Review (Step 5c)**: ✅ APPROVE — `task.231.pr-review.1.test-infrastructure-hygiene.md`
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 7/7 (SC-1 to SC-7), plus 5/5 code-quality and migration criteria
+✅ **Tests & PR:** PR #752; five mutation proofs recorded red-then-green; CI green on `d423566f` (test, link-check, validate, shellcheck, secret-scan)
+✅ **Documentation:** CHANGELOG (task 231), `traps.md` `df -i` triage, `tech-stack.md` anchor check
+✅ **Security Review:** PASS — `compareRatchet` boundary probed (8 executed, 0 reproduced, 0 escaped; `task.231.dod.1.security.run.json`)
+⚠️ **Compliance Review:** NOT_APPLICABLE — test and link-check infrastructure only
+
+**Task marked as ACCEPTED on:** 2026-10-26
+
+**Detailed Verification Log:** See `task.231.dod.1.test-infrastructure-hygiene.md` for complete verification evidence.
 <!-- change-log-start -->
 ## Change Log
 
@@ -393,6 +418,7 @@ Clearing today's backlog is a manual step. Remove the entries whose prefixes app
 | 2026-10-26 |  | QA gate CONCERNS (90/100) — 1 finding (CR4-1 medium, test-only: inert safety net); cycle-3 fixes verified | qa-task |
 | 2026-10-26 |  | QA findings fixed — cycle 4: CR4-1 (test safety net holds the suite pid in memory), CR4-2 (reap report wording); 1 iteration | qa-fix |
 | 2026-10-26 |  | QA gate PASS (95/100) — cycle-4 fix verified; 2 low advisory findings carried | qa-task |
+| 2026-10-26 | 1.2 | DoD passed — accepted (PR #752) | finalise |
 <!-- change-log-end -->
 
 ---
