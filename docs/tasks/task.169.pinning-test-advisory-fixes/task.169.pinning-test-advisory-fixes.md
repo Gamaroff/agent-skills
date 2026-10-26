@@ -5,10 +5,12 @@ type: task
 description: "Follow-up to task.142: tests/reference-doc-skill-pinning.test.js matches flags by substring, never checks activation-table flags, reports an empty SKILL.md as missing, and resolves the corpus twice — fix all four, each pinned by a test."
 tags: [testing, guard, reference-docs, follow-up, task-142]
 category: testing
-status: ready-for-review
+status: accepted
 priority: Low
 created: 2026-09-30
 updated: 2026-10-26
+completed_date: 2026-10-26
+pr_number: 758
 assignee:
 estimated_effort_hours: 2
 risk_level: low
@@ -17,7 +19,7 @@ github_issue: 535
 
 # Technical Task: Close the four advisory findings on the reference-doc pinning test
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.169.review.1.pinning-test-advisory-fixes.md` implemented 2026-10-26
 
@@ -403,18 +405,40 @@ page changed: the live corpus passes the stricter checks as measured.
 No critical issues identified. 8/8 QA mutation proofs are covered by committed tests. Two low
 diff-review points (CR-1, CR-2) are advisory follow-ups in the gate's `recommendations.future`.
 
-<!-- change-log-start -->
+## Definition of Done - PASSED ✅
 
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.169.qa.1.pinning-test-advisory-fixes.md`
+**Gate File**: `task.169.gate.1.pinning-test-advisory-fixes.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 9/9 met, each with a committed per-PR test or a cited document line
+✅ **Unit Tests:** 29 tests in `tests/reference-doc-skill-pinning.test.js` (was 18); 8/8 QA mutation proofs covered
+✅ **PR Review:** PR #758; Step 5c review APPROVE (`task.169.pr-review.1.pinning-test-advisory-fixes.md`); CI SUCCESS on `9ac0f7a0`
+✅ **Documentation:** `CHANGELOG.md` `[Unreleased]` entry (task 169)
+✅ **Security Review:** PASS — test-only change, no secrets or unsafe patterns, `boundary: false`
+— **Compliance Review:** NOT_APPLICABLE — no data, payment, UI or health scope
+
+**Task marked as ACCEPTED on:** 2026-10-26
+
+**Detailed Verification Log:** See `task.169.dod.1.pinning-test-advisory-fixes.md` for complete verification evidence and timestamps.
+<!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-30 | 1.0     | Initial draft | create-task |
 | 2026-10-26 | 1.1     | Review passed (9/10) — empty-vs-missing split on both pages; call-site prefix fixture added; flag figure re-measured (24); skill-span dedupe made explicit | review-task |
 | 2026-10-26 |         | Status → ready-for-development | review-task |
 | 2026-10-26 |         | Implemented — 2 files (test + CHANGELOG), 11 tests added, 6 mutation proofs | develop |
 | 2026-10-26 |         | QA gate PASS (100/100) — 0 findings in queue, 2 advisory | qa-task |
-
+| 2026-10-26 | 1.2 | DoD passed — accepted (PR #758) | finalise |
 <!-- change-log-end -->
 
 ---
