@@ -378,6 +378,31 @@ page changed: the live corpus passes the stricter checks as measured.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-26
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Full Report**: [task.169.qa.1.pinning-test-advisory-fixes.md](./task.169.qa.1.pinning-test-advisory-fixes.md)
+- **Gate File**: [task.169.gate.1.pinning-test-advisory-fixes.yml](./task.169.gate.1.pinning-test-advisory-fixes.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 29 in the target file; 6,406 in `npm run ci:fast` (6,392 pass, 0 fail)
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+No critical issues identified. 8/8 QA mutation proofs are covered by committed tests. Two low
+diff-review points (CR-1, CR-2) are advisory follow-ups in the gate's `recommendations.future`.
+
 <!-- change-log-start -->
 
 ## Change Log
@@ -388,6 +413,7 @@ page changed: the live corpus passes the stricter checks as measured.
 | 2026-10-26 | 1.1     | Review passed (9/10) — empty-vs-missing split on both pages; call-site prefix fixture added; flag figure re-measured (24); skill-span dedupe made explicit | review-task |
 | 2026-10-26 |         | Status → ready-for-development | review-task |
 | 2026-10-26 |         | Implemented — 2 files (test + CHANGELOG), 11 tests added, 6 mutation proofs | develop |
+| 2026-10-26 |         | QA gate PASS (100/100) — 0 findings in queue, 2 advisory | qa-task |
 
 <!-- change-log-end -->
 
