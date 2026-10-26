@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.61.1] - 2026-10-26
+
 ### Fixed
 
 - **`registry-tick` pads a rewritten cell by display width, not UTF-16 length.** `setCell` kept a
