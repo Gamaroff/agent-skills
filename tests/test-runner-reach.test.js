@@ -3,7 +3,7 @@
 /**
  * Every tracked test file is reached by `npm test` (task.187, obs #255).
  *
- * `package.json` `scripts.test` names its suites by hand: one `bash <file>.test.sh` per shell suite and
+ * `package.json` `scripts["test:suite"]` names its suites by hand (`test` is the task 231 TMPDIR wrapper around it): one `bash <file>.test.sh` per shell suite and
  * a quoted glob per `node --test` directory. A new suite outside every glob runs nowhere, and a
  * success criterion it holds passes by not running. task.176 planned
  * `skills/review-pr/tests/parse-target.test.sh` into exactly that gap; project memory records 232
@@ -20,7 +20,7 @@ const { execFileSync } = require("node:child_process");
 const path = require("node:path");
 
 const ROOT = path.join(__dirname, "..");
-const SCRIPT = require(path.join(ROOT, "package.json")).scripts.test;
+const SCRIPT = require(path.join(ROOT, "package.json")).scripts["test:suite"];
 
 function globToRegExp(glob) {
   const body = glob
@@ -109,7 +109,7 @@ test("every tracked test file is reached by npm test", () => {
   assert.deepEqual(
     unreached,
     [],
-    "these suites run nowhere — add a glob or a `bash <file>` entry to package.json scripts.test, " +
+    "these suites run nowhere — add a glob or a `bash <file>` entry to package.json `test:suite`, " +
       "or move the cases into a reached suite:\n  " +
       unreached.join("\n  "),
   );

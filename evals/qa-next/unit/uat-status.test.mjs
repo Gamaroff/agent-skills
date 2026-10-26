@@ -8,7 +8,7 @@
  *
  * Run via: node --test evals/qa-next/unit/uat-status.test.mjs
  */
-import { test } from "node:test";
+import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, execFile } from "node:child_process";
 import {
@@ -268,8 +268,21 @@ test("scoreboard counts per surface and in total", () => {
 
 // ---------- CLI end-to-end on a throwaway corpus ----------
 
+// Every scratch directory this file creates is removed once its tests finish. corpus() and the
+// one-off roots below have no test context to hang a cleanup on, and left 60 `qa-next-*`
+// directories per `npm test` (task 231, obs #83).
+const SCRATCH = new Set();
+function scratchDir(prefix) {
+  const dir = mkdtempSync(path.join(os.tmpdir(), prefix));
+  SCRATCH.add(dir);
+  return dir;
+}
+after(() => {
+  for (const dir of SCRATCH) rmSync(dir, { recursive: true, force: true });
+});
+
 function corpus() {
-  const root = mkdtempSync(path.join(os.tmpdir(), "qa-next-"));
+  const root = scratchDir("qa-next-");
   const story = (prd, epic, n, status, extra = "") => {
     const dir = path.join(
       root,
@@ -546,7 +559,7 @@ test("CLI: check reports a ragged hand-edited row and a Stories id with no story
 });
 
 test("CLI: a missing surfaces file is scaffolded from the template and the run stops", () => {
-  const root = mkdtempSync(path.join(os.tmpdir(), "qa-next-"));
+  const root = scratchDir("qa-next-");
   mkdirSync(path.join(root, "docs/prd"), { recursive: true });
   const { code, out } = run(root, "--init");
   assert.equal(code, 2);
@@ -577,7 +590,7 @@ test("CLI: a missing surfaces file is refused, never scaffolded, by every comman
     [],
   ];
   for (const withRegistry of [false, true]) {
-    const root = mkdtempSync(path.join(os.tmpdir(), "qa-next-"));
+    const root = scratchDir("qa-next-");
     mkdirSync(path.join(root, "docs/prd"), { recursive: true });
     if (withRegistry) {
       mkdirSync(path.dirname(REG(root)), { recursive: true });
@@ -827,7 +840,7 @@ test("listRunFiles puts the day's unsuffixed first run BEFORE its sequenced re-r
   // after "-", so ["…-lan.md","…-lan-02.md"].sort() yields ["…-lan-02.md","…-lan.md"] and the
   // day's FIRST run reads as its last. The ordering test above at "CLI: --findings walks runs/…"
   // uses two DIFFERENT dates and passes either way — it is not cover for this case.
-  const root = mkdtempSync(path.join(os.tmpdir(), "qa-next-runs-"));
+  const root = scratchDir("qa-next-runs-");
   const runs = path.join(root, "runs");
   mkdirSync(path.join(runs, "D.2"), { recursive: true });
   for (const name of [
@@ -2246,7 +2259,7 @@ test("eight concurrent --state-init calls: exactly one wins, the rest exit 5 run
 test("the lock is created exclusively: a state file that appears after the check is not overwritten (CR-3)", () => {
   // --state-init checks, then creates. The create is link(), which fails if the file exists, so a
   // second init that passed the check in the same instant loses instead of replacing the winner.
-  const dir = mkdtempSync(path.join(os.tmpdir(), "qa-next-lock-"));
+  const dir = scratchDir("qa-next-lock-");
   const p = path.join(dir, "qa-next.state.json");
   writeStateFile(p, { item: "D.1", phase: "selected" }, { exclusive: true });
   const winner = readFileSync(p, "utf8");
@@ -2836,7 +2849,7 @@ test("runPathFor judges the BUILT name: a two-digit label, an empty one and a pa
     assert.equal(name, `2026-09-22-${env}.md`);
     // The built name must sort as its own day's FIRST run, ahead of a re-run.
     const re = runPathFor([name], "2026-09-22", env);
-    const dir = mkdtempSync(path.join(os.tmpdir(), "qa-next-seq-"));
+    const dir = scratchDir("qa-next-seq-");
     mkdirSync(path.join(dir, "runs"));
     for (const f of [re, name]) writeFileSync(path.join(dir, "runs", f), "");
     assert.deepEqual(
@@ -2859,7 +2872,7 @@ test("CLI: --run-path refuses a two-digit or path-steering --env and creates not
 // ---------- task 206: hierarchical story ids ----------
 
 test("scanStories reads story.P.E.S through doc-id: id 1.2.3, epicSurface keyed P.E, sorted (P, E, S), and an unparseable story name is REPORTED, not skipped", () => {
-  const root = mkdtempSync(path.join(os.tmpdir(), "qa-next-206-"));
+  const root = scratchDir("qa-next-206-");
   const put = (rel, title, status = "accepted") => {
     mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
     writeFileSync(

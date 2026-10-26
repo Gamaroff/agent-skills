@@ -464,7 +464,10 @@ function cycleTwo({ root, dir, doc, stem, qa }, relink) {
     { cwd: root },
   );
   fs.writeFileSync(path.join(dir, `${stem}.gate.2.x.yml`), "gate: PASS\n");
-  fs.writeFileSync(path.join(dir, `${stem}.qa.2.x.md`), "# r2\n");
+  fs.writeFileSync(
+    path.join(dir, `${stem}.qa.2.x.md`),
+    "# r2\n\n## Findings\n",
+  );
   // Cycle 2's verdict lands; these cases isolate the links (task.192 checks the verdict).
   edit(doc, "**Gate Decision**: FAIL", "**Gate Decision**: PASS");
   append(
@@ -525,6 +528,26 @@ test("a link with a #fragment to this cycle's gate counts as linked", () => {
     }),
   );
   assert.equal(r.exitCode, 0, JSON.stringify(r.problems));
+});
+
+// task 231 — the fragment is checked too: one that names no heading in this
+// cycle's report halts with its own remedy, not "write the artifact".
+test("a link whose #fragment names no heading in this cycle's report halts as no-anchor", () => {
+  const r = verdict("task", (w) =>
+    cycleTwo(w, () => {
+      edit(
+        w.doc,
+        `./${w.stem}.qa.1.x.md`,
+        `./${w.stem}.qa.2.x.md#no-such-section`,
+      );
+      edit(w.doc, `./${w.stem}.gate.1.x.yml`, `./${w.stem}.gate.2.x.yml`);
+    }),
+  );
+  assert.equal(r.exitCode, 1, JSON.stringify(r));
+  assert.match(
+    JSON.stringify(r.problems),
+    /#no-such-section \(line \d+\) is no-anchor — the file exists but its #fragment names no heading/,
+  );
 });
 
 // task.192 (obs #205) — the verdict is the claim too. A document whose links name

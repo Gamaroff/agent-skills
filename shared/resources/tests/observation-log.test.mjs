@@ -63,7 +63,25 @@ const engine = require(CLI);
 // using the engine's own predicate, so this can never silently become
 // platform-dependent again — it fails loudly on any host where the base would
 // be refused, instead of 30 tests failing for a reason none of them names.
-const SCRATCH_ROOT = join(SHARED, "..", "..", ".observation-log-test-tmp");
+// In a linked worktree the repository root is the worktree, which the resolver refuses as
+// ephemeral (`path is inside a linked git worktree`), so the scratch base is the MAIN checkout's:
+// the parent of `--git-common-dir`. In the main checkout that is the same directory as before.
+// Worktree development made `npm test` red here until this derivation existed (task 231, obs #39).
+// The main checkout containing `here`: the parent of git's common dir, which is the repository root
+// in the main checkout and the main checkout's root from inside a linked worktree.
+function mainCheckout(here) {
+  const r = spawnSync(
+    "git",
+    ["rev-parse", "--path-format=absolute", "--git-common-dir"],
+    { cwd: here, encoding: "utf8" },
+  );
+  const common = r.status === 0 ? r.stdout.trim() : "";
+  return common ? dirname(common) : here;
+}
+function scratchRoot(here) {
+  return join(mainCheckout(here), ".observation-log-test-tmp");
+}
+const SCRATCH_ROOT = scratchRoot(join(SHARED, "..", ".."));
 mkdirSync(SCRATCH_ROOT, { recursive: true });
 
 const SCRATCH_REFUSAL = engine.ephemeralReason(realpathSync(SCRATCH_ROOT));
@@ -1467,10 +1485,9 @@ test("the project-identity default encodes separators as hyphens", () => {
   );
   assert.equal(r.status, 0, r.stderr);
   const out = r.stdout.trim();
-  const repoRoot = spawnSync("git", ["rev-parse", "--show-toplevel"], {
-    encoding: "utf8",
-    cwd: SHARED,
-  }).stdout.trim();
+  // The project is the MAIN checkout: from a linked worktree the resolver names the main checkout's
+  // identity, not the worktree's (`--show-toplevel` here made a worktree run red — task 231).
+  const repoRoot = mainCheckout(SHARED);
   const encoded = repoRoot.split("/").join("-");
   assert.ok(
     out.endsWith(`/.claude/projects/${encoded}`),
@@ -2020,5 +2037,40 @@ test("--audit-root is still the override, taken verbatim", () => {
     cleanup(home);
     cleanup(dir);
     cleanup(repo);
+  }
+});
+
+// task 231 (obs #39): run from a linked worktree, the scratch base must be the main checkout's.
+// A scratch repo with one linked worktree: scratchRoot() from inside the worktree names the main
+// repo's `.observation-log-test-tmp`, never one inside the worktree, which the resolver refuses.
+test("scratchRoot: a linked worktree's scratch base is the main checkout's, not the worktree's", () => {
+  const base = realpathSync(mkdtempSync(join(tmpdir(), "obs-scratch-root-")));
+  try {
+    const main = join(base, "main");
+    const g = (cwd, ...args) => {
+      const r = spawnSync("git", args, { cwd, encoding: "utf8" });
+      assert.equal(r.status, 0, `git ${args.join(" ")}: ${r.stderr}`);
+    };
+    mkdirSync(main);
+    g(main, "init", "-q");
+    g(
+      main,
+      "-c",
+      "user.email=t@example.com",
+      "-c",
+      "user.name=t",
+      "commit",
+      "-q",
+      "--allow-empty",
+      "-m",
+      "base",
+    );
+    g(main, "worktree", "add", "-q", join(base, "wt"));
+    const fromWorktree = scratchRoot(join(base, "wt"));
+    assert.equal(fromWorktree, join(main, ".observation-log-test-tmp"));
+    assert.ok(!fromWorktree.startsWith(join(base, "wt")), fromWorktree);
+    assert.equal(scratchRoot(main), join(main, ".observation-log-test-tmp"));
+  } finally {
+    rmSync(base, { recursive: true, force: true });
   }
 });

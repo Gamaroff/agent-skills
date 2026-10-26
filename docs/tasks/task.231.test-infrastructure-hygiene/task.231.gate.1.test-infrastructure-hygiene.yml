@@ -1,0 +1,71 @@
+schema: 2
+task: 'task.231.test-infrastructure-hygiene'
+task_title: 'Test infrastructure hygiene'
+gate: CONCERNS
+status_reason: 'All phases delivered and CI is green on the head, but the new anchor check reads a tracked symlink''s index blob, which is the link target path rather than the Markdown, so every fragment link to a symlinked file is a false [no-anchor] (CR-1 medium, reproduced in a scratch repository).'
+reviewer: 'QA Engineer'
+head: '0963c9e8399113772ce54a89f26261a2544988d9'
+updated: '2026-10-26T06:38:56Z'
+
+top_issues:
+  - id: 'TASK-231-CR-1'
+    severity: medium
+    file: 'shared/resources/doc-links.js'
+    finding: 'anchorsFor reads a tracked target with git show :<path>; for a symlink (index mode 120000) that blob is the link target path, so its anchor set is empty and every fragment link to it is reported [no-anchor] (reproduced: LINK.md -> REAL.md with "## Testing", [a](LINK.md#testing) fails while [b](REAL.md#testing) passes; this repository''s own CLAUDE.md is such a symlink).'
+    suggested_action: 'Detect a symlink before reading (git ls-files -s mode 120000, or lstat when untracked), resolve it to its in-repository target and read that target''s index blob or disk text; add a doc-links.test.mjs case with a tracked symlinked target.'
+    suggested_owner: dev
+  - id: 'TASK-231-QA-1'
+    severity: low
+    file: 'scripts/test-tmpdir.mjs'
+    finding: 'groupByPrefix counts into a plain {} object, so a leaked directory whose prefix is __proto__ vanishes from the count and one whose prefix is constructor counts as the string "function Object() { [native code] }1" (reproduced by calling groupByPrefix directly).'
+    suggested_action: 'Count into Object.create(null) (or a Map converted with Object.fromEntries) and add a groupByPrefix case for __proto__ and constructor prefixes.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 6851
+  phases_verified: 6/6
+  ci: 'pass @ 0963c9e8 — test (4m0s, zsh-inclusive, ratchet ok), link-check incl. the new anchor step, validate, shellcheck, secret-scan'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5]
+    phases_with_issues: [1, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 8
+    escaped: 0
+    notes: 'boundary: true — scripts/test-tmpdir.mjs#compareRatchet (an exported verdict, {ok}) probed with task.231.qa.1.ratchet-cases.json, 5 hostile rejected and 3 legitimate accepted (record task.231.qa.1.security.run.json). doc-links.js anchor check judged a lint over repository Markdown, not a security boundary (the task.139 DoD judgement of doc-links.js); it reads only tracked blobs or in-repository files and runs git with an argument array.'
+  performance:
+    status: PASS
+    notes: 'dirSet memoised per tracked set: the repo-wide anchor corpus test 9.2 s -> 2.7 s; CI test job 4m0s.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1: false [no-anchor] for any fragment link to a tracked symlinked Markdown file; qa-read-back halts on it. QA-1: a __proto__-prefixed leak escapes the ratchet (contrived name, low).'
+  maintainability:
+    status: PASS
+    notes: 'One shared scanner (scanLinks) behind extractRelativeLinks and sameFileFragments; traps.md and tech-stack.md updated; CR-3 (blocksOf recomputed per dispatch line) is an advisory cleanup.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1: resolve a tracked symlink to its in-repository target before reading anchors, with a doc-links.test.mjs case.'
+      refs: ['shared/resources/doc-links.js', 'shared/resources/tests/doc-links.test.mjs']
+  future:
+    - action: 'QA-1: count prefixes in a null-prototype object (low; fold into the CR-1 fix cycle if cheap).'
+      refs: ['scripts/test-tmpdir.mjs']
+    - action: 'CR-2 (advisory, confidence medium): a PR that changes only doc-links.js triggers the workflow but the anchor step checks nothing; run it over a fixed sample when the engine changes, or drop the path trigger.'
+      refs: ['.github/workflows/docs-link-check.yml']
+    - action: 'CR-3 (cleanup): compute blocksOf(rel) once per file in the parity test.'
+      refs: ['evals/shared/tests/qa-loop-lock-fields-parity.test.mjs']
+    - action: 'SC-6 is now evidenced by run 40279891591 (step "Check anchors and tracked-tree links in changed files", success, 5 files checked); tick it from that evidence.'
+      refs: ['docs/tasks/task.231.test-infrastructure-hygiene/task.231.test-infrastructure-hygiene.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 fixed and covered by a test']
