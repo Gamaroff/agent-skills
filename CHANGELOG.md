@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.61.0] - 2026-10-26
+
 ### Added
 
 - **`npm test` runs in a per-run TMPDIR, and a leak ratchet names new leaks (task 231).**
