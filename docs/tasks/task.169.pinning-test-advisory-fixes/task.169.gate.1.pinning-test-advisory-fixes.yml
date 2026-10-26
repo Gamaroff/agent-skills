@@ -1,0 +1,53 @@
+schema: 2
+task: 'task.169.pinning-test-advisory-fixes'
+task_title: 'Close the four advisory findings on the reference-doc pinning test'
+gate: PASS
+status_reason: 'All four advisory fixes are in, each held by a committed test that QA mutation-proved (8/8 covered); ci:fast green with skills symlinks aside. Two low diff-review points are advisory follow-ups.'
+reviewer: 'QA Engineer'
+head: '6bbde7d95f5af923304522e0139ed8c8263572de'
+updated: '2026-10-26T17:33:22Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 29
+  phases_verified: 3/3
+  ci: 'not read — CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'Test-only change; boundary: false. Candidates documentsFlag, extractActivationSkills, resolveCorpus empty/missing split classify tracked repository documents for assertions; none gates an action on external input.'
+  performance:
+    status: PASS
+    notes: 'Cost tests green (no spawn/network; one SKILL.md read per skill); memo halves page reads.'
+  reliability:
+    status: PASS
+    notes: 'Non-vacuity floors on every new check (activation flags >= 2, 3 measured; call-site fixture requires all flag checks to fail).'
+  maintainability:
+    status: PASS
+    notes: 'Rules commented with task refs; fixtures independent of the live corpus; withSpies hoisted.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 (low/medium): reset `last` on a non-skill span in extractActivationSkills so a standalone --flag after a command or script is not charged to an earlier skill; add a fixture. No live row triggers it.'
+      refs: ['tests/reference-doc-skill-pinning.test.js']
+    - action: 'CR-2 (low/low): attach every -- token of a standalone flag span, not only its head. No live span holds two flags.'
+      refs: ['tests/reference-doc-skill-pinning.test.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

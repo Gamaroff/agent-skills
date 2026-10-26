@@ -23,6 +23,15 @@ All notable changes to this project will be documented in this file. Format foll
   hook floor checks the `COMPLETION_LINE=` and `ALREADY_DONE=` bindings by name. A test-only
   `ADVANCE_LOCK_TEST_4B_ONLY` seam stops the lock test file after scenario 4b. The 4b meta-test
   sets it and requires its NOTE, which takes the meta-test from 17.9s to 1.2s.
+- **The reference-doc pinning test closes task.142's four advisory findings (task 169).** A flag
+  now counts as documented only as a whole token, so a row advertising `--read` no longer passes
+  on a `SKILL.md` that documents only `--read-only`. `activation-phrases.md` flags are checked
+  against their skill — including a flag written as its own span after the skill, which used to be
+  dropped (3 checked, floor 2). An empty `SKILL.md` reports "is empty" instead of "does not
+  exist", on both pages. The two live groups share one memoised `getCorpus()`, so the pages are
+  read once per run. A call-site fixture lengthens every flag in every `SKILL.md` and requires
+  every check to fail, which holds `resolveCorpus` and not only the helper. Each fix was
+  mutation-proven: reverting it turns a named test red.
 
 ## [v0.61.1] - 2026-10-26
 
