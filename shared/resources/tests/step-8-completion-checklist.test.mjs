@@ -1071,6 +1071,41 @@ test("a HALT status block names the step that halted, not current_step", () => {
   );
 });
 
+// The live pin above cannot tell the anchors apart: the real early-exit `--skill)` arm holds no
+// `NEXT=` line, so the old first-`--skill)` anchor also read finalise → 8 (task 165 DoD, AC3).
+// A scratch copy with a decoy arm in that early exit is what separates them.
+test("the mapping parse does not read a decoy NEXT= arm in the early-exit --skill) branch", () => {
+  const src = readDoc("shared/resources/advance-pipeline-lock.sh");
+  const anchor = '    if [ "${2:-}" = "commit-changes" ]; then\n';
+  const parts = src.split(anchor);
+  assert.equal(
+    parts.length,
+    2,
+    "advance-pipeline-lock.sh: expected one commit-changes early exit to plant the decoy in",
+  );
+  const scratch = parts.join(
+    anchor + "      case x in\n      x) NEXT=9 ;;\n      esac\n",
+  );
+  const names = (m) =>
+    m ? mappedSkills(m[1]).map((a) => `${a.name}→${a.next}`) : null;
+  // Control: a parse anchored on the first `--skill)` reads the decoy, so the fixture puts it
+  // where a looser anchor would see it.
+  const loose = names(scratch.match(/\n {2}--skill\)\n([\s\S]*?)\n {4}esac/));
+  assert.ok(
+    loose && loose.includes("x→9"),
+    `fixture: the decoy is not where a first-\`--skill)\` anchor reads, found ${JSON.stringify(loose)}`,
+  );
+  const anchored = names(scratch.match(SKILL_MAPPING));
+  assert.ok(
+    anchored && anchored.includes("finalise→8"),
+    `SKILL_MAPPING: the scratch copy's mapping lost finalise → 8, found ${JSON.stringify(anchored)}`,
+  );
+  assert.ok(
+    !anchored.includes("x→9"),
+    `SKILL_MAPPING: read the decoy x) NEXT=9 from the early-exit arm, found ${JSON.stringify(anchored)}`,
+  );
+});
+
 // A lock at step 8 for this work item, as the orchestrator holds it while Step 8 runs.
 function writeStep8Lock(fx) {
   write(
