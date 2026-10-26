@@ -354,10 +354,39 @@ None identified.
 ### Key Findings
 All five gate findings from cycles 1 and 2 are fixed and mutation-proven. The review-skill gates are probed with `fence:`: 22 cases executed, 0 escaped. Three advisory findings are routed to future work: the whole-file status match (0 of 632 documents affected) and the body/frontmatter status field.
 
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**QA Report**: `task.165.qa.3.task-164-deferred-follow-ups.md`
+**Gate File**: `task.165.gate.3.task-164-deferred-follow-ups.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+### Missing Criteria:
+
+- [ ] AC3 (Functional, "a decoy `NEXT=` arm elsewhere in the script is not read"): no per-PR test holds it. The live pin asserts only ≥ 5 entries and `finalise → 8`, which the old first-`--skill)` anchor would also pass. The decoy clause was proven only by the one-off mutation M4 in an uncommitted scratch script.
+- [ ] AC8 (Code Quality, "each Phase 5 mutation behaves as stated"): mutation M4 (the decoy `x) NEXT=9` arm) has no lasting test. It shares AC3's root cause.
+
+### Next Steps:
+
+- [ ] Add a test to `shared/resources/tests/step-8-completion-checklist.test.mjs` that runs `SKILL_MAPPING` against a scratch copy of `advance-pipeline-lock.sh` with a decoy `x) NEXT=9` arm in the early-exit `--skill)` branch. Assert that the decoy is not read, and that the old first-`--skill)` anchor would read it.
+- [ ] Mutation-prove it: revert the anchor and confirm the test goes red, with a `cmp`-checked restore
+- [ ] The fix changes code, so the resume re-enters QA at 5a. Then re-run `/finalise`
+
+**Estimated Effort:** Small: one test of about 30 lines, plus one QA cycle
+
+**Gap Report Generated:** 2026-10-26
+**QA Gate Reference**: See `task.165.gate.3.task-164-deferred-follow-ups.yml`
+
+**Detailed Verification Log:** See `task.165.dod.1.task-164-deferred-follow-ups.md` for the complete verification evidence, including the AC6 re-measure on the PR head (base 11.2s → head 0.40s).
+<!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-28 | 1.0     | Initial draft | create-task |
 | 2026-10-26 | 1.1     | Review passed (8/10): gap-tolerant mapping anchor, executed-prose test for both gated review blocks, load and commit recorded with each wall-clock figure, cooperation reference brought into scope, 95/0 replaced with the measured form | review-task |
 | 2026-10-26 |         | Status → ready-for-development | review-task |
@@ -367,10 +396,10 @@ All five gate findings from cycles 1 and 2 are fixed and mutation-proven. The re
 | 2026-10-26 |         | QA gate CONCERNS (90/100) — 2 findings (2 medium) | qa-task |
 | 2026-10-26 |         | QA findings fixed — cycle 2, 2 findings (held lock read off the lock after the call; gate prose scoped to what the verdict can tell) | qa-fix |
 | 2026-10-26 |         | QA gate PASS (100/100) — 0 findings (3 advisory) | qa-task |
-
-<!-- change-log-end -->
+| 2026-10-26 |  | DoD incomplete — 2 gaps identified | finalise |
 
 ---
+<!-- change-log-end -->
 
 ## Progress Tracking
 
