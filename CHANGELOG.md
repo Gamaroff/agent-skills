@@ -6,6 +6,21 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **`npm test` runs in a per-run TMPDIR, and a leak ratchet names new leaks (task 231).**
+  `scripts/test-tmpdir.mjs` runs the suite (now `test:suite`) with `TMPDIR` set to a fresh directory
+  and always removes it: on a pass, a red suite or a signal. It keeps the suite's own exit code. It
+  groups the leftovers by prefix and fails on a prefix missing from `tests/tmp-leak-ratchet.json`, or
+  on one over its count. One run used to leave 608 entries and about 10,000 inodes, and `/tmp` once
+  filled until 1,576 unrelated tests failed (obs #83). The four worst helpers (`qa-next`,
+  `review-pr-repo`, `wireloom-test`, `executed-prose`) and the two tests that wrote straight to
+  `/tmp` now clean up: 442 entries under 97 prefixes remain, all ratcheted.
+- **`doc-links.js` checks `#fragment` anchors (task 231).** A fragment on a link to a `.md` file,
+  and a same-file `#x`, must name a GitHub heading slug or an explicit `<a id>`. A fragment that
+  names neither is the new `[no-anchor]` state, and `qa-read-back` halts on it with its own remedy.
+  `markdown-link-check@3` passes a dead cross-file fragment, so `docs-link-check.yml` now also runs
+  `doc-links.js` on each changed file. A corpus test walks every tracked Markdown file: 381
+  fragments, none dead (obs #80).
+
 - **Security probe: `expected.removed` asserts a cleanup (task 232).** A case lists paths its own
   fixture creates that the run must delete; a run that leaves one mismatches as
   `<path> was not removed`. A `removed` path the fixture does not create is declined, matched
@@ -14,6 +29,11 @@ All notable changes to this project will be documented in this file. Format foll
   the engine declined both (obs #97).
 
 ### Changed
+
+- **Two test guards accept what was already right (task 231).** The dispatch-wait parity test
+  accepts a bash block that marks its own wait, not only a mark within 12 lines (obs #62). The
+  observation-log suite roots its scratch, and names the project, at the main checkout, so it passes
+  inside a linked worktree: 4 failures there before, 0 now (obs #39).
 
 - **The `done` lead claims acceptance, not release (task 233).** Every caller posts it at
   `/finalise`, before the pull request is merged, but it said the change "is now part of the

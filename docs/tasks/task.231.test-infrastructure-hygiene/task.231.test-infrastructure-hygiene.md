@@ -5,10 +5,10 @@ type: task
 description: "Tests stop leaking temp dirs into /tmp, the observation-log resolver tests pass inside a linked worktree, doc-links.js checks #anchors, and the dispatch-wait parity test accepts a block that marks its own wait."
 tags: [observe-work, create-skill, finalise, qa-task, develop-task, observation, tests]
 category: testing
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-10-23
-updated: 2026-10-23
+updated: 2026-10-26
 assignee:
 estimated_effort_hours: 16
 github_issue: 741
@@ -16,7 +16,8 @@ github_issue: 741
 
 # Technical Task: Test infrastructure hygiene
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.231.review.1.test-infrastructure-hygiene.md` implemented 2026-10-26
 **GitHub Issue**: [#741](https://github.com/Gamaroff/agent-skills/issues/741)
 
 ---
@@ -125,10 +126,10 @@ Four defects in this repository's test and link-check infrastructure, each logge
 **Risk Level**: Low
 
 **Changes**:
-- [ ] Run `TMPDIR=<fresh> npm test` **twice** on the branch base and diff the per-prefix counts. Identical counts mean the ratchet keys on `{prefix: count}`. Unequal counts mean it keys on the prefix set, with the variance recorded. Record both runs in the implementation report.
-- [ ] Trace the 3 escaped entries (`pipeline-hold*`, `review-pr-comment.*.md`) to a test or rule them out: snapshot `/tmp` around a run and grep the prefixes. Record the result.
-- [ ] Measure the dead-anchor population. With fragment resolution applied in a scratch copy, count `[no-anchor]` findings over each corpus test's population. Record the command and the count.
-- [ ] Measure whether `markdown-link-check@3` reports a dead cross-file fragment: a two-file fixture, one dead `other.md#nope`. Record the result.
+- [x] Run `TMPDIR=<fresh> npm test` **twice** on the branch base and diff the per-prefix counts. Identical counts mean the ratchet keys on `{prefix: count}`. Unequal counts mean it keys on the prefix set, with the variance recorded. Record both runs in the implementation report.
+- [x] Trace the 3 escaped entries (`pipeline-hold*`, `review-pr-comment.*.md`) to a test or rule them out: snapshot `/tmp` around a run and grep the prefixes. Record the result.
+- [x] Measure the dead-anchor population. With fragment resolution applied in a scratch copy, count `[no-anchor]` findings over each corpus test's population. Record the command and the count.
+- [x] Measure whether `markdown-link-check@3` reports a dead cross-file fragment: a two-file fixture, one dead `other.md#nope`. Record the result.
 
 **Dependencies**: none.
 
@@ -137,11 +138,12 @@ Four defects in this repository's test and link-check infrastructure, each logge
 **Risk Level**: Medium. It rewires `npm test`.
 
 **Changes**:
-- [ ] `scripts/test-tmpdir.mjs` (see the plan). The finally-removal runs on suite failure and on a signal too.
-- [ ] `tests/tmp-leak-ratchet.json`, seeded from Phase 0's measurement.
-- [ ] `package.json`: `test` → wrapper, chain → `test:suite`.
-- [ ] Fix the leaking helpers for `qa-next`, `review-pr-repo`, `wireloom-test` and `executed-prose`. Delete each one's ratchet entry.
-- [ ] `docs/contributing/traps.md`: when `ci:fast` fails en masse with ENOSPC/EMFILE shapes, run `df -i /tmp` before reading the failures.
+- [x] `scripts/test-tmpdir.mjs` (see the plan). The finally-removal runs on suite failure and on a signal too.
+- [x] `tests/tmp-leak-ratchet.json`, seeded from Phase 0's measurement.
+- [x] `package.json`: `test` → wrapper, chain → `test:suite`.
+- [x] Point the two tests that read the suite list at `test:suite`. `tests/shell-suite-guard.test.js:37` and `tests/test-runner-reach.test.js:23` both bind `package.json` `scripts.test` and assert that suites appear in it. After the rewiring that string is the wrapper line, so both read `scripts["test:suite"]` instead. Search: `git grep -nE 'scripts\.test\b' -- '*.js' '*.mjs'`.
+- [x] Fix the leaking helpers for `qa-next`, `review-pr-repo`, `wireloom-test` and `executed-prose`. Delete each one's ratchet entry.
+- [x] `docs/contributing/traps.md`: when `ci:fast` fails en masse with ENOSPC/EMFILE shapes, run `df -i /tmp` before reading the failures. Also update the "`npm test`'s suite list is hand-maintained" trap (`:86`): the hand-maintained list is now `test:suite`, and `test` is the wrapper.
 
 **Dependencies**: Phase 0.
 
@@ -150,8 +152,8 @@ Four defects in this repository's test and link-check infrastructure, each logge
 **Risk Level**: Low
 
 **Changes**:
-- [ ] `observation-log.test.mjs`: derive `SCRATCH_ROOT` from the main checkout when the cwd is a linked worktree. Keep the `:69-72` ephemeral pre-check.
-- [ ] A test that creates a linked worktree in a scratch repo and asserts the derived root is outside it.
+- [x] `observation-log.test.mjs`: derive `SCRATCH_ROOT` from the main checkout when the cwd is a linked worktree. Keep the `:69-72` ephemeral pre-check.
+- [x] A test that creates a linked worktree in a scratch repo and asserts the derived root is outside it.
 
 **Dependencies**: none.
 
@@ -160,10 +162,12 @@ Four defects in this repository's test and link-check infrastructure, each logge
 **Risk Level**: Medium. It adds new findings across the corpus.
 
 **Changes**:
-- [ ] `doc-links.js`: `anchorsOf(text)` (GitHub slug rules plus explicit anchors) and fragment resolution for `.md` targets and same-file `#x`. Add the `[no-anchor]` state and update the header contract (`:66`).
-- [ ] `doc-links.test.mjs`: unit cases (below), plus `KNOWN_ANCHORS` / `KNOWN_ARTIFACT_ANCHORS` ratchets seeded from Phase 0.
-- [ ] `.github/workflows/docs-link-check.yml`: run `command node shared/resources/doc-links.js --file "$f"` per changed file beside `markdown-link-check`.
-- [ ] `npm run bundle`, because `doc-links.js` is bundled into skills.
+- [x] `doc-links.js`: `anchorsOf(text)` (GitHub slug rules plus explicit anchors) and fragment resolution for `.md` targets and same-file `#x`. Add the `[no-anchor]` state and update the header contract (`:66`).
+- [x] Extract same-file `#x` targets separately. `NOT_RELATIVE_RE` (`doc-links.js:84`) drops every `#`-prefixed target inside `extractRelativeLinks`, so a same-file fragment never reaches `checkFile` and the `noFragment === ""` branch (`:353`) never sees one. Leave `NOT_RELATIVE_RE` and `extractRelativeLinks` as they are, because other callers (`resolvedAll`, used by `qa-read-back`) rely on "not a relative link". Add a second pass for same-file fragments, using the same fence and code-span blanking.
+- [x] `docs/architecture/concepts/tech-stack.md:56`: `docs-link-check.yml` now also checks anchors through `doc-links.js`.
+- [x] `doc-links.test.mjs`: unit cases (below), plus `KNOWN_ANCHORS` / `KNOWN_ARTIFACT_ANCHORS` ratchets seeded from Phase 0.
+- [x] `.github/workflows/docs-link-check.yml`: run `command node shared/resources/doc-links.js --file "$f"` per changed file beside `markdown-link-check`.
+- [x] `npm run bundle`, because `doc-links.js` is bundled into skills.
 
 **Dependencies**: Phase 0.
 
@@ -172,8 +176,8 @@ Four defects in this repository's test and link-check infrastructure, each logge
 **Risk Level**: Low
 
 **Changes**:
-- [ ] Extract `isWaitMarked(lines, i)` in the parity test: the ±12 window **or** the first fence opening within 12 lines after `i` contains the set form.
-- [ ] Unit cases: a block-owned mark beyond the window passes, a following fence without a mark fails, and a mark in a fence *before* the dispatch does not count.
+- [x] Extract `isWaitMarked(lines, i)` in the parity test: the ±12 window **or** the first fence opening within 12 lines after `i` contains the set form.
+- [x] Unit cases: a block-owned mark beyond the window passes, a following fence without a mark fails, and a mark in a fence *before* the dispatch does not count.
 
 **Dependencies**: none.
 
@@ -182,8 +186,8 @@ Four defects in this repository's test and link-check infrastructure, each logge
 **Risk Level**: Low
 
 **Changes**:
-- [ ] CHANGELOG `[Unreleased]` entry citing `(task 231)`.
-- [ ] Full `npm test` (now the wrapper) green, with the ratchet output recorded in the implementation report.
+- [x] CHANGELOG `[Unreleased]` entry citing `(task 231)`.
+- [x] Full `npm test` (now the wrapper) green, with the ratchet output recorded in the implementation report.
 
 **Dependencies**: Phases 1-4.
 
@@ -214,8 +218,14 @@ Four defects in this repository's test and link-check infrastructure, each logge
 
 ### Files to Modify (Documentation)
 
-13. ✅ `docs/contributing/traps.md` - `df -i` triage line
+13. ✅ `docs/contributing/traps.md` - `df -i` triage line; the suite-list trap (`:86`) names `test:suite`
 14. ✅ `CHANGELOG.md` - `[Unreleased]` entry
+15. ✅ `docs/architecture/concepts/tech-stack.md` - the docs link-check workflow checks anchors
+
+### Files to Modify (Tests that read the suite list)
+
+16. ✅ `tests/shell-suite-guard.test.js` - read `scripts["test:suite"]`
+17. ✅ `tests/test-runner-reach.test.js` - read `scripts["test:suite"]`
 
 ---
 
@@ -224,12 +234,12 @@ Four defects in this repository's test and link-check infrastructure, each logge
 ### Unit Tests
 
 **`tests/test-tmpdir.test.js`**. Each case drives the wrapper with a tiny fake suite command:
-- [ ] A suite that leaks nothing exits 0, and the per-run directory is gone afterwards.
-- [ ] A suite that leaks a **new** prefix exits non-zero, names the prefix, and the directory is still gone.
-- [ ] A suite that leaks a ratcheted prefix **within** its count exits 0. Above its count, it exits non-zero.
-- [ ] A ratchet entry whose prefix leaked nothing is reported as healed: the run fails so the entry gets deleted, matching the `doc-links` ratchet's "only tightens" rule.
-- [ ] A failing suite with no leaks keeps the suite's non-zero exit, and the directory is still gone.
-- [ ] The child sees `TMPDIR` set to the per-run directory, asserted from inside the fake suite.
+- [x] A suite that leaks nothing exits 0, and the per-run directory is gone afterwards.
+- [x] A suite that leaks a **new** prefix exits non-zero, names the prefix, and the directory is still gone.
+- [x] A suite that leaks a ratcheted prefix **within** its count exits 0. Above its count, it exits non-zero.
+- [x] A ratchet entry whose prefix leaked nothing is reported as healed, as a notice that names the entry to delete. It does not fail the run. *Changed in develop (2026-10-26)*: leaks depend on the environment. CI installs zsh, so every shell-matrix suite runs a zsh variant that a machine without zsh skips. A prefix absent from one run therefore does not prove the leak is fixed, and failing on it would make every machine without CI's toolset red. SC-2 (new prefix or over count fails) is unchanged.
+- [x] A failing suite with no leaks keeps the suite's non-zero exit, and the directory is still gone.
+- [x] The child sees `TMPDIR` set to the per-run directory, asserted from inside the fake suite.
 
 **`doc-links.test.mjs` anchor cases**: `other.md#real-heading` passes; `other.md#nope` fails with `[no-anchor]`; a heading with an em dash (`## A — B`) resolves as `a--b`; duplicate headings resolve `-1`; an explicit `<a id="x">` resolves; a fragment on a non-`.md` target is not checked; a heading inside a fenced block is **not** an anchor; same-file `#x` is checked.
 
@@ -238,16 +248,16 @@ Four defects in this repository's test and link-check infrastructure, each logge
 ### Mutation Proofs
 
 Each one is recorded in the implementation report with its red run:
-- [ ] Remove the wrapper's finally-removal → the "directory is gone" cases go red.
-- [ ] Make the ratchet compare prefix presence only → the over-count case goes red.
-- [ ] Revert the fragment branch in `doc-links.js` → the `#nope` case goes red.
-- [ ] Revert `isWaitMarked` to window-only → the block-owned case goes red.
-- [ ] Revert `SCRATCH_ROOT` derivation → the worktree case goes red.
+- [x] Remove the wrapper's finally-removal → the "directory is gone" cases go red.
+- [x] Make the ratchet compare prefix presence only → the over-count case goes red.
+- [x] Revert the fragment branch in `doc-links.js` → the `#nope` case goes red.
+- [x] Revert `isWaitMarked` to window-only → the block-owned case goes red.
+- [x] Revert `SCRATCH_ROOT` derivation → the worktree case goes red.
 
 ### Integration
 
-- [ ] Full `npm test` through the wrapper on the branch. Record the ratchet report and the leftover count, which must not exceed Phase 0's minus the fixed prefixes.
-- [ ] `node --test shared/resources/tests/observation-log.test.mjs` run **from inside a linked worktree**: 0 failures.
+- [x] Full `npm test` through the wrapper on the branch. Record the ratchet report and the leftover count, which must not exceed Phase 0's minus the fixed prefixes.
+- [x] `node --test shared/resources/tests/observation-log.test.mjs` run **from inside a linked worktree**: 0 failures.
 
 ---
 
@@ -255,24 +265,24 @@ Each one is recorded in the implementation report with its red run:
 
 ### Functional
 
-- [ ] SC-1: After `npm test` exits, pass or fail, no per-run directory it created remains. Held by `tests/test-tmpdir.test.js` and by its mutation proof.
-- [ ] SC-2: A new leaking prefix, or a ratcheted prefix over its count, makes `npm test` exit non-zero and names the prefix. Held by `tests/test-tmpdir.test.js`.
-- [ ] SC-3: `tests/tmp-leak-ratchet.json` has no entry for `qa-next`, `review-pr-repo`, `wireloom-test` or `executed-prose`. The full run's leftover count is recorded in the implementation report § Phase 5 and is lower than Phase 0's by at least those prefixes' counts.
-- [ ] SC-4: `observation-log.test.mjs` passes when run from a linked worktree. The run is recorded in the implementation report, and the new worktree case in the file holds it.
-- [ ] SC-5: `doc-links.js` reports `other.md#nope` as `[no-anchor]` and accepts each anchor shape listed in Section 8. Held by `doc-links.test.mjs`.
+- [x] SC-1: After `npm test` exits, pass or fail, no per-run directory it created remains. Held by `tests/test-tmpdir.test.js` and by its mutation proof.
+- [x] SC-2: A new leaking prefix, or a ratcheted prefix over its count, makes `npm test` exit non-zero and names the prefix. Held by `tests/test-tmpdir.test.js`.
+- [x] SC-3: `tests/tmp-leak-ratchet.json` has no entry for `qa-next`, `review-pr-repo`, `wireloom-test` or `executed-prose`. The full run's leftover count is recorded in the implementation report § Phase 5 and is lower than Phase 0's by at least those prefixes' counts.
+- [x] SC-4: `observation-log.test.mjs` passes when run from a linked worktree. The run is recorded in the implementation report, and the new worktree case in the file holds it.
+- [x] SC-5: `doc-links.js` reports `other.md#nope` as `[no-anchor]` and accepts each anchor shape listed in Section 8. Held by `doc-links.test.mjs`.
 - [ ] SC-6: The docs link-check workflow runs `doc-links.js` on each changed Markdown file. Shown by the workflow diff and by one CI run on the PR whose log contains the `doc-links` step.
-- [ ] SC-7: The parity test accepts a dispatch whose following fence marks its own wait, and still fails a dispatch with no mark. Held by the Phase 4 unit cases.
+- [x] SC-7: The parity test accepts a dispatch whose following fence marks its own wait, and still fails a dispatch with no mark. Held by the Phase 4 unit cases.
 
 ### Code Quality
 
-- [ ] All five mutation proofs in Section 8 are recorded red-then-green in the implementation report.
-- [ ] `npm run bundle:check` is clean after the `doc-links.js` change.
-- [ ] `npm run format:check` and `npm run lint:shell` pass.
+- [x] All five mutation proofs in Section 8 are recorded red-then-green in the implementation report.
+- [x] `npm run bundle:check` is clean after the `doc-links.js` change.
+- [x] `npm run format:check` and `npm run lint:shell` pass.
 
 ### Migration
 
-- [ ] `CHANGELOG.md` `[Unreleased]` has an entry citing `(task 231)`.
-- [ ] `docs/contributing/traps.md` carries the `df -i` triage line.
+- [x] `CHANGELOG.md` `[Unreleased]` has an entry citing `(task 231)`.
+- [x] `docs/contributing/traps.md` carries the `df -i` triage line.
 
 ---
 
@@ -349,18 +359,22 @@ Clearing today's backlog is a manual step. Remove the entries whose prefixes app
 | Date       | Version | Description                                               | Author      |
 | ---------- | ------- | --------------------------------------------------------- | ----------- |
 | 2026-10-23 | 1.0     | Initial draft — cut from observations #39, #62, #80, #83 | create-task |
+| 2026-10-26 | 1.1     | Review passed (8/10). Added the two tests that read `scripts.test`, the same-file `#x` extraction gap, and the traps/tech-stack doc sweep | review-task |
+| 2026-10-26 |         | Status → ready-for-development | review-task |
+| 2026-10-26 |         | Implemented — 36 files (12 bundled copies), 22 new tests (wrapper 13, anchors 6, parity 1, worktree 1, qa-read-back 1); healed made a notice (environment-dependent leaks) | develop |
+| 2026-10-26 |         | Status → ready-for-review | develop |
 <!-- change-log-end -->
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 0: Measure
-- [ ] Phase 1: Contain and ratchet temp dirs
-- [ ] Phase 2: Worktree-safe scratch root
-- [ ] Phase 3: Anchor checking
-- [ ] Phase 4: Block-owned wait rule
-- [ ] Phase 5: Close-out
+- [x] Phase 0: Measure
+- [x] Phase 1: Contain and ratchet temp dirs
+- [x] Phase 2: Worktree-safe scratch root
+- [x] Phase 3: Anchor checking
+- [x] Phase 4: Block-owned wait rule
+- [x] Phase 5: Close-out
 
 ---
 
