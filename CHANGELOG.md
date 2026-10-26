@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+
+- **The review skills advance the pipeline lock only on a passing review, and task.164's
+  follow-ups are closed (task 165).** `review-story`'s cooperation block advanced the lock to 3
+  even on a NO-GO, after which `/develop-story` Step 2 HALTed with the lock already pointing at
+  develop. `review-task` had no block, so the `review-story|review-task → 3` arm of the `--skill`
+  mapping was half true. Both now advance only when the review passed and promoted the document to
+  `ready-for-development`, and print one line when they hold the lock. The new
+  `review-lock-cooperation.test.mjs` runs both blocks as written, the `fence:` probe scores them
+  (fixtures `t165-review-{task,story}-cases.json`),
+  and `pipeline-lock-cooperation.md` names them as gated. Exception 2 of the remaining-work banner
+  now says what is true: "not `current_step`", a QA-loop HALT lists `- Steps 5–6:` first, its
+  contrast is limited to blocks derived from `current_step`, and the mapping states *where* a
+  sub-skill moves the lock. The HALT pin refuses a mapped name in plain prose too, with a boundary
+  so `develop` does not match `develop-task`. It reads the mapping from its own
+  `case "$SKILL_NAME" in` block rather than spanning ~280 lines from the first `--skill)` arm. The
+  hook floor checks the `COMPLETION_LINE=` and `ALREADY_DONE=` bindings by name. A test-only
+  `ADVANCE_LOCK_TEST_4B_ONLY` seam stops the lock test file after scenario 4b. The 4b meta-test
+  sets it and requires its NOTE, which takes the meta-test from 17.9s to 1.2s.
+
 ## [v0.61.1] - 2026-10-26
 
 ### Fixed
