@@ -5,10 +5,12 @@ type: task
 description: "In § 1.1 step 3, name the second argument: `seedFromObservations(entries, { taskId: <Next Available Task Number> })`, and say the id must be read from the registry first."
 tags: [create-task, observation]
 category: documentation
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-27
 updated: 2026-10-27
+completed_date: 2026-10-27
+pr_number: 763
 assignee:
 estimated_effort_hours: 8
 github_issue: 760
@@ -16,7 +18,7 @@ github_issue: 760
 
 # Technical Task: create-task 1.1 omits the required taskId argument to seedFromObservations
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.236.review.1.create-task-seed-step-call.md` implemented 2026-10-27
 
 **GitHub Issue**: [#760](https://github.com/Gamaroff/agent-skills/issues/760)
@@ -242,7 +244,9 @@ motivated it. One fixture's frontmatter id disagrees with its file prefix, a cas
 
 - [x] The new test runs in under 5 seconds, measured on the PR head with
       `uptime; time command node --test skills/create-task/tests/seed-step-block.test.js` and the
-      figure and load recorded in the implementation report.
+      figure and load recorded in the implementation report. The bound is a local, single-shell
+      figure (this host has no zsh). In CI the probe test runs under bash and zsh and takes about
+      12 s; that is carried as a gate 4 future item.
 - [x] The existing create-task suite is untouched:
       `git diff develop -- skills/create-task/tests/from-observation.test.js` is empty.
 
@@ -328,9 +332,9 @@ None identified.
 ### Key Findings
 Cycle 4 closes the finalise DoD gap. The probe count is now asserted per shell, and is mutation-proven against a two-shell run (the CI failure, `36 !== 18`, reproduced locally). The scoped review found nothing new. Future work: the thin performance margin (4.5 s against 5 s locally; about 12 s for the probe test under two shells in CI).
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 1 (historical, superseded)
 
-**Status:** IN PROGRESS
+**Status:** SUPERSEDED by DoD run 2 (accepted, below)
 
 ### QA Gate Status
 
@@ -342,12 +346,13 @@ Cycle 4 closes the finalise DoD gap. The probe count is now asserted per shell, 
 ### Missing Criteria:
 
 1. **CI green on the PR head:**
-   - [ ] CI `test` is red on `f525123a`: `seed-step-block.test.js:355` asserts 18 probe cases executed, but CI has zsh and the engine runs each case under bash and zsh (36). The zsh run itself scored every case correctly.
+   - [x] CI `test` is red on `f525123a`: `seed-step-block.test.js:355` asserts 18 probe cases executed, but CI has zsh and the engine runs each case under bash and zsh (36). The zsh run itself scored every case correctly. **Fixed by `1689d7cb`**; gate 4 PASS. CI green on `c00b86fc` (DoD run 2).
 
 ### Next Steps:
 
-- [ ] Assert `executed === caseCount × shells.length` and that `shells` includes `bash`; mutation-prove it with a two-shell count
-- [ ] Re-enter QA at 5a, then re-run `/finalise` once CI is green on the fix head
+- [x] Assert `executed === caseCount × shells.length` and that `shells` includes `bash`; mutation-prove it with a two-shell count (`1689d7cb`)
+- [x] Re-enter QA at 5a (QA cycle 4, gate 4 PASS)
+- [x] Re-run `/finalise` once CI is green on the fix head (DoD run 2, accepted)
 
 **Estimated Effort:** Small
 
@@ -355,6 +360,30 @@ Cycle 4 closes the finalise DoD gap. The probe count is now asserted per shell, 
 **QA Gate Reference**: See `task.236.gate.3.create-task-seed-step-call.yml` for full details
 
 **Detailed Verification Log:** See `task.236.dod.1.create-task-seed-step-call.md` for complete verification evidence and timestamps.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.236.qa.4.create-task-seed-step-call.md`
+**Gate File**: `task.236.gate.4.create-task-seed-step-call.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 11/11 success criteria met, 8 held by per-PR tests or CI lanes
+✅ **PR Review:** PR #763; Step 5c `/review-pr` APPROVE (`task.236.pr-review.2.create-task-seed-step-call.md`)
+✅ **CI:** SUCCESS on `c00b86fc` over 6 checks; the run-1 red (`36 !== 18`) closed by `1689d7cb`
+✅ **Documentation:** CHANGELOG `[Unreleased]` cites task 236; § 1.1 step 3 rewritten
+✅ **Security Review:** PASS. Fence probe of the seed guard: 18 executed, 0 reproduced, 0 escaped
+✅ **Compliance Review:** not applicable (internal skill docs and tests)
+
+**Task marked as ACCEPTED on:** 2026-10-27
+
+**Detailed Verification Log:** See `task.236.dod.2.create-task-seed-step-call.md` for complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
@@ -371,6 +400,8 @@ Cycle 4 closes the finalise DoD gap. The probe count is now asserted per shell, 
 | 2026-10-27 |         | QA gate PASS (100/100) — 0 findings        | qa-task     |
 | 2026-10-27 |  | DoD incomplete — 1 gap identified (CI test red) | finalise |
 | 2026-10-27 |  | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-10-27 |  | Probe count asserted per shell (1689d7cb) — closes the DoD gap; 5c review notes applied | develop-task |
+| 2026-10-27 | 1.2 | DoD passed — accepted (PR #763) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -432,6 +463,15 @@ After the two qa-fix cycles (PR head):
 - `npm run ci:fast` with both moved aside: 6422 tests, 6408 pass, 0 fail, 14 skipped.
 - `npm run validate -- skills/create-task/` ✓; `npm run bundle:check`: 128 skills, 0 problems.
 
+After the finalise DoD gap (`1689d7cb`, QA cycle 4):
+
+- The probe test asserted 18 executed, and CI's zsh gave 36. It now asserts
+  `executed === caseCount × shells.length`, and that `shells` includes `bash`.
+- Mutation proof with a stand-in `zsh` on PATH: the old assertion goes red with `36 !== 18` (the CI
+  failure, reproduced locally). The new one passes under one shell and under two.
+- `seed-step-block.test.js`: 6/6, real 4.504 s at load 5.15 (gate 4). `npm run ci:fast` with both
+  symlinks moved aside: 6422 tests, 0 fail.
+
 ### Deferred Work
 
 None.
@@ -461,7 +501,7 @@ None.
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 
