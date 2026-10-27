@@ -6,6 +6,13 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`/create-task --from-observation` no longer seeds a fragment as the description (obs #101, #109).**
+  The sentence splitter ended on the dot of `e.g.`, `i.e.`, `vs.` and `cf.`, and on a list marker
+  partway through the section, so "…acceptance establishes, e.g." and "Choose one, or both: 1." both
+  cleared the 20-character floor and were seeded as complete descriptions. Those dots no longer end a
+  sentence, and `etc.` ends one only when a capital follows. An Improvement that opens with a lead-in
+  ending in `:` and then lists options now seeds `description: null` with
+  `descriptionReason: list-lead-in`. Step 4 then asks the author which option the task takes.
 - **`/review-pr` reads a target's host once, for both parser arms (task 179).** The scheme-less arm
   matched the known-host list against the raw first segment while the URL arm stripped `?…`, `#…`,
   `user@` and `:port` first, so `ghe.corp#.atlassian.net/o/r/pull/7` passed the check and parsed as

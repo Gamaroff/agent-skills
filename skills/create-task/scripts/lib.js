@@ -281,15 +281,38 @@ function frontmatterId(raw) {
 // "non-empty" and is worse than no value (obs #291).
 const DESCRIPTION_MIN = 20;
 
+const LIST_MARKER = /^\s*(?:\d+[.)]|[-*+])\s+/;
+// A dot that closes one of these is not a sentence end. "etc." can be, so it
+// ends one only when a capital follows (obs #101: "e.g." cut a description).
+const NEVER_ENDS = /(?:^|[\s("'`])(?:e\.g|i\.e|vs|cf)\.$/i;
+const ETC = /(?:^|[\s(])etc\.$/i;
+
+// True when the section opens with prose ending in ":" and then a list: its
+// first sentence introduces the options and describes none of them (obs #109).
+function leadsIntoList(text) {
+  const lines = String(text || "").split("\n");
+  const at = lines.findIndex((l) => LIST_MARKER.test(l));
+  return at > 0 && lines.slice(0, at).join(" ").trim().endsWith(":");
+}
+
 function firstSentence(text) {
   const flat = String(text || "")
+    .split("\n")
+    // A list marker's own dot is not the end of a sentence, whether it opens
+    // the section (obs #291) or a later line (obs #109).
+    .map((l) => l.replace(LIST_MARKER, ""))
+    .join(" ")
     .replace(/\s+/g, " ")
-    .trim()
-    // An Improvement section that opens with a list starts with its marker;
-    // the marker's own dot is not the end of a sentence (obs #291).
-    .replace(/^(?:\d+[.)]|[-*+])\s+/, "");
-  const m = /^(.+?[.!?])(?=\s|$)/.exec(flat);
-  return m ? m[1] : flat;
+    .trim();
+  const end = /[.!?](?=\s|$)/g;
+  for (let m; (m = end.exec(flat));) {
+    const sentence = flat.slice(0, m.index + 1);
+    const rest = flat.slice(m.index + 1).trimStart();
+    if (rest && NEVER_ENDS.test(sentence)) continue;
+    if (rest && ETC.test(sentence) && !/^[A-Z]/.test(rest)) continue;
+    return sentence;
+  }
+  return flat;
 }
 
 /**
@@ -402,7 +425,10 @@ function seedFromObservations(entries, { taskId } = {}) {
     .filter(Boolean)
     .join(" ");
   let descriptionReason = null;
-  if (description.length < DESCRIPTION_MIN) {
+  if (rows.some((r) => leadsIntoList(r.sections.improvement))) {
+    description = null;
+    descriptionReason = "list-lead-in";
+  } else if (description.length < DESCRIPTION_MIN) {
     description = null;
     descriptionReason = "too-short";
   }
