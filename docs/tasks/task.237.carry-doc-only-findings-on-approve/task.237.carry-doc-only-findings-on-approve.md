@@ -312,8 +312,8 @@ None identified.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.237.qa.1.carry-doc-only-findings-on-approve.md](./task.237.qa.1.carry-doc-only-findings-on-approve.md)
-- **Gate File**: [task.237.gate.1.carry-doc-only-findings-on-approve.yml](./task.237.gate.1.carry-doc-only-findings-on-approve.yml)
+- **Full Report**: [task.237.qa.2.carry-doc-only-findings-on-approve.md](./task.237.qa.2.carry-doc-only-findings-on-approve.md)
+- **Gate File**: [task.237.gate.2.carry-doc-only-findings-on-approve.yml](./task.237.gate.2.carry-doc-only-findings-on-approve.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 57
@@ -322,7 +322,7 @@ None identified.
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-QA-1 (MEDIUM): the classify-keyed `CARRY_FIXED` sentence is not pinned. Deleting it, or reverting it with a period before "leave", leaves the suite green ([TASK-237-BUG-1](./task.237.bug.1.carry-fixed-sentence-not-pinned.md)).
+TASK-237-BUG-1 is verified fixed and closed. QA-2 (MEDIUM): the `CARRY_FIXED` negative guard is not scoped to the sentence it judges. M7 and M8 are missed, and M9 is a false positive ([TASK-237-BUG-2](./task.237.bug.2.carry-fixed-negative-guard-sentence-scope.md)). QA-3 (LOW): the empty-`CARRY_FIXED` sentence keys on the classify input, not on the edit set.
 
 <!-- change-log-start -->
 ## Change Log
@@ -335,6 +335,8 @@ QA-1 (MEDIUM): the classify-keyed `CARRY_FIXED` sentence is not pinned. Deleting
 | 2026-10-27 |  | Implemented — 6 source files (+ 9 bundled copies), 2 parity tests, 3 mutations | develop |
 | 2026-10-27 |  | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-10-27 |  | QA findings fixed — TASK-237-BUG-1, 1 iteration | qa-fix |
+| 2026-10-27 |  | QA gate CONCERNS (90/100) — 2 findings | qa-task |
+| 2026-10-27 |  | QA findings fixed — TASK-237-BUG-2 and QA-3, 2 iterations | qa-fix |
 <!-- change-log-end -->
 
 ---
@@ -402,6 +404,18 @@ with no verdict. Two parity tests pin both rows and both carry-prose sentences.
    - that sentence added beside the kept classify-keyed one (M6), so only the negative can fail → red.
      The old pattern reads this text as no match, and the new one as a match.
    - M1–M3 stay red, and the restored suite is 33/33.
+5. **QA cycle 2 fix (TASK-237-BUG-2, QA-3)**. The negative pattern is replaced by a clause-scoped
+   check:
+   - The Carry section is read through `sectionBetween`, then split at `;` or at a period followed by
+     a capital, a backtick, `*` or `(`.
+   - Every clause holding "leave `CARRY_FIXED` empty" must name no verdict, and at least one such
+     clause must exist.
+   - The shipped sentence now reads "When the classify block cleared no path, or no fix changed a
+     cleared path, leave `CARRY_FIXED` empty" (QA-3), and the 2 bundled copies were regenerated.
+
+   M7 (CONCERNS), M8 ("e.g."), M10 (reversed word order), M11 (QA-3 wording reverted) and M12 (no
+   deciding clause) all go red. M9 (an APPROVE clause before the correct sentence) stays green.
+   M1–M5 stay red.
 
 ### Testing Results
 

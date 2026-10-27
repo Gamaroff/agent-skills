@@ -4,7 +4,7 @@
 **Bug ID**: TASK-237-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-10-27
 
@@ -91,3 +91,4 @@ test 14 to go red for each.
 | 2026-10-27 | New | qa-task | Found in QA cycle 1 (CR-1, CR-2) |
 | 2026-10-27 | In Progress | qa-fix | Investigation started |
 | 2026-10-27 | Ready for QA | qa-fix | Positive pin + widened negative; M4–M6 red |
+| 2026-10-27 | Closed | qa-task | Verified by task.237.qa.2.carry-doc-only-findings-on-approve.md (M4, M5 red) |

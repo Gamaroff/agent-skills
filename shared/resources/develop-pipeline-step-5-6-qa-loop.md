@@ -1603,8 +1603,9 @@ report (`/review-pr` already staged it; staging again is a no-op) and each chang
 cleared, once it passes `doc-links.js`. A cleared path that fails the link check is restored to
 `HEAD`, which undoes only the 5c edit because the path was clean when cleared; its finding is
 recorded, not fixed. A path the classifier did **not** clear is a HALT and is left untouched: this
-block never discards work it cannot prove is its own. When the classify block cleared no path, leave
-`CARRY_FIXED` empty: the block then only asserts the report is staged.
+block never discards work it cannot prove is its own. When the classify block cleared no path, or no
+fix changed a cleared path, leave `CARRY_FIXED` empty: the block then only asserts the report is
+staged.
 
 ```bash
 # INPUTS, bound in THIS block: the report, and every path the doc-only fixes changed (repo-relative).

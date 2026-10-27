@@ -791,8 +791,10 @@ test("the carry prose names no verdict where it decides whether to fix (task.237
     start > -1,
     "the Carry section heading moved — acceptance-commit-carries-5c.test.mjs locates its blocks by it",
   );
-  const end = s5c.indexOf("\n#### ", start + 1);
-  const carry = s5c.slice(start, end < 0 ? undefined : end);
+  const carry = sectionBetween(
+    "#### Carry the review into the acceptance commit",
+    "\n#### ",
+  );
   assert.match(
     carry,
     /Classify on `APPROVE` or `CONCERNS`/,
@@ -800,16 +802,26 @@ test("the carry prose names no verdict where it decides whether to fix (task.237
   );
   assert.match(
     carry,
-    /When the classify block cleared no path, leave\s+`CARRY_FIXED`\s+empty/,
-    "the Carry section must key an empty CARRY_FIXED on what the classify block cleared, not on a verdict",
+    /[Ww]hen the classify block cleared no path, or no\s+fix changed a cleared path, leave\s+`CARRY_FIXED`\s+empty/,
+    "the Carry section must key an empty CARRY_FIXED on what was cleared and changed, not on a verdict",
   );
-  // A sentence ends at a period followed by whitespace, so "task.179" inside a reverted sentence
-  // does not end it and hide the APPROVE key from the pattern (TASK-237-BUG-1).
-  assert.doesNotMatch(
-    carry,
-    /`APPROVE`(?:[^.]|\.(?!\s))*leave\s+`CARRY_FIXED`\s+empty/,
-    "no Carry-section sentence may key an empty CARRY_FIXED on APPROVE — that sentence is what left task.179's doc-only finding unfixed",
+  // Judge the clause that decides, not a span scanned from a verdict (TASK-237-BUG-2). A clause
+  // ends at a semicolon, or at a period followed by a capital, backtick, `*` or `(` — so "task.179"
+  // and "e.g. a" do not end one, and a verdict in a neighbouring clause is not read as this one's.
+  const deciding = carry
+    .split(/;\s+|\.\s+(?=[A-Z`*(])/)
+    .filter((clause) => /leave\s+`CARRY_FIXED`\s+empty/i.test(clause));
+  assert.ok(
+    deciding.length > 0,
+    "no clause says when to leave CARRY_FIXED empty, so the verdict check below reads nothing",
   );
+  for (const clause of deciding) {
+    assert.doesNotMatch(
+      clause,
+      /APPROVE|CONCERNS/,
+      `a clause that decides an empty CARRY_FIXED names a verdict — that is what left task.179's doc-only finding unfixed: ${clause.replace(/\s+/g, " ")}`,
+    );
+  }
 });
 
 test("the 5-cycle bound covers 5c rather than being extended by it", () => {
