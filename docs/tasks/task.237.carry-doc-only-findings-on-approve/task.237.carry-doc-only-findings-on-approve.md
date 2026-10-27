@@ -305,24 +305,24 @@ None identified.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-27
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.237.qa.2.carry-doc-only-findings-on-approve.md](./task.237.qa.2.carry-doc-only-findings-on-approve.md)
-- **Gate File**: [task.237.gate.2.carry-doc-only-findings-on-approve.yml](./task.237.gate.2.carry-doc-only-findings-on-approve.yml)
+- **Full Report**: [task.237.qa.3.carry-doc-only-findings-on-approve.md](./task.237.qa.3.carry-doc-only-findings-on-approve.md)
+- **Gate File**: [task.237.gate.3.carry-doc-only-findings-on-approve.yml](./task.237.gate.3.carry-doc-only-findings-on-approve.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 57
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-TASK-237-BUG-1 is verified fixed and closed. QA-2 (MEDIUM): the `CARRY_FIXED` negative guard is not scoped to the sentence it judges. M7 and M8 are missed, and M9 is a false positive ([TASK-237-BUG-2](./task.237.bug.2.carry-fixed-negative-guard-sentence-scope.md)). QA-3 (LOW): the empty-`CARRY_FIXED` sentence keys on the classify input, not on the edit set.
+TASK-237-BUG-2 and QA-3 are verified fixed. [TASK-237-BUG-2](./task.237.bug.2.carry-fixed-negative-guard-sentence-scope.md) is closed. The guard now judges the deciding clause: M7, M8, M10 and M11 are red, and M9 is green. One low-confidence advisory (a case-sensitive verdict check) is recorded as future.
 
 <!-- change-log-start -->
 ## Change Log
@@ -337,6 +337,7 @@ TASK-237-BUG-1 is verified fixed and closed. QA-2 (MEDIUM): the `CARRY_FIXED` ne
 | 2026-10-27 |  | QA findings fixed — TASK-237-BUG-1, 1 iteration | qa-fix |
 | 2026-10-27 |  | QA gate CONCERNS (90/100) — 2 findings | qa-task |
 | 2026-10-27 |  | QA findings fixed — TASK-237-BUG-2 and QA-3, 2 iterations | qa-fix |
+| 2026-10-27 |  | QA gate PASS (100/100) — 0 findings | qa-task |
 <!-- change-log-end -->
 
 ---

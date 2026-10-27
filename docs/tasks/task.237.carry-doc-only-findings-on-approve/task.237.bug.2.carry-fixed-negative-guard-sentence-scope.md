@@ -4,7 +4,7 @@
 **Bug ID**: TASK-237-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-10-27
 
@@ -119,3 +119,4 @@ longer a false positive. Results: parity 33/33, carries-5c 24/24, `bundle:check`
 | 2026-10-27 | New | qa-task | Found in QA cycle 2, refute pass (CR-1, CR-4) |
 | 2026-10-27 | In Progress | qa-fix | Investigation started |
 | 2026-10-27 | Ready for QA | qa-fix | Clause-scoped verdict check; M7, M8, M10 red, M9 green |
+| 2026-10-27 | Closed | qa-task | Verified by task.237.qa.3.carry-doc-only-findings-on-approve.md |
