@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-10-27
-**Next Available Task Number:** **238**
+**Next Available Task Number:** **240**
 
 ## How to use
 
@@ -279,6 +279,8 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 235 | [select-next registry fallback selects an item blocked on another repository](task.235.select-next-external-precondition/task.235.select-next-external-precondition.md) | accepted | infrastructure | Medium | 2026-10-26 | [#759](https://github.com/Gamaroff/agent-skills/issues/759) | — cut from observation #103 (T169 run: the fallback selected T174, blocked on tinker-city task.127) |
 | 236 | [create-task 1.1 omits the required taskId argument to seedFromObservations](task.236.create-task-seed-step-call/task.236.create-task-seed-step-call.md) | accepted | documentation | Medium | 2026-10-27 | [#760](https://github.com/Gamaroff/agent-skills/issues/760) | — cut from observation #104 (task.235 run: § 1.1 step 3's call threw without `taskId`) |
 | 237 | [Apply 5c doc-only findings on APPROVE](task.237.carry-doc-only-findings-on-approve/task.237.carry-doc-only-findings-on-approve.md) | accepted | refactoring | Medium | 2026-10-27 | [#765](https://github.com/Gamaroff/agent-skills/issues/765) | — cut from observation #109, option 1 (T179 run: 5c APPROVE recorded PC-1, a CHANGELOG miscount, and /finalise halted on it) |
+| 238 | [QA loop acts on the signals it already has](task.238.qa-loop-acts-on-signals-it-has/task.238.qa-loop-acts-on-signals-it-has.md) | planned | refactoring | Medium | 2026-10-27 | [#768](https://github.com/Gamaroff/agent-skills/issues/768) | — cut from observations #8, #14, #41, #45 (2026-10-27 review, cluster 4) |
+| 239 | [QA escalation and grant say what will run](task.239.qa-escalation-and-grant-say-what-runs/task.239.qa-escalation-and-grant-say-what-runs.md) | planned | refactoring | Medium | 2026-10-27 | [#769](https://github.com/Gamaroff/agent-skills/issues/769) | — cut from observations #19, #70, #71, #72 (2026-10-27 review, cluster 4) |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
@@ -331,5 +333,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 - **Tasks 218–219 were cut from task.199's QA gate 4 `recommendations.future`** — one shippable unit each, independent of each other. 218 is wording only (two docs, comment lines and one `echo` in `setup-consumer.sh`); 219 adds `registry-tick.js --bug-status` and changes qa-fix and develop-bug step prose. They share no file; either may land first. The gate's cross-file anchor item is observation #80, not a task.
 
 - **Tasks 228–229 are a fix and its guard (substantive → cleanup)**, filed 2026-10-22 — one shippable unit each, in dependency order: 228 replaces the testing guide's sample tokens and rewords two prose lines so `gitleaks dir .` is clean on tracked files; 229 adds the pinned-gitleaks CI lane and `npm run lint:secrets`, which is red on the tree until 228 merges. Both are ordered ahead of the registry fallback by roadmap Phase 15.
+
+- **Tasks 238–239 were cut from the 2026-10-27 observation review (cluster 4, the QA loop)**. Each is one shippable unit, and they are independent in outcome. 238 makes the loop act on the signals it holds: the 5a CI read, three fast-gate outcomes, gated log cleanup, and 5c coverage → 5b. 239 makes the escalation and the grant match what the resumed run will do: the label, the third-strike recommendation, the flat-count reading, and a convergence window reset at a grant. Both edit `develop-pipeline-step-5-6-qa-loop.md`, in different sections. Whichever lands second rebases and re-runs `npm run bundle`. Obs #11 from the same cluster was already fixed by the `fence:` probe form (PR #560) and was closed, not cut.
 
 - Filenames follow `task.[N].[kebab-case-name].md` per [AGENTS.md](../../AGENTS.md#file-naming).
