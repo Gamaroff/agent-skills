@@ -352,7 +352,13 @@ test("the probe engine scores every seed-block case as its direction requires", 
       .map((c) => `${c.id}: ${c.outcome} — ${c.detail}`);
     assert.deepEqual(wrong, [], "every case scores as its direction requires");
     assert.deepEqual(out.declined, [], "no case was declined");
-    assert.equal(out.executed, probe.caseCount, "every case executed");
+    // A shell-form case runs once per shell: bash always, zsh when the host has it (CI does).
+    assert.ok(out.shells.includes("bash"), "the cases ran under bash");
+    assert.equal(
+      out.executed,
+      probe.caseCount * out.shells.length,
+      "every case executed under every shell",
+    );
     assert.deepEqual(out.escapes, [], "no case wrote outside its sandbox");
     assert.equal(r.status, 0, `probe exited ${r.status}: ${r.stderr}`);
   } finally {
