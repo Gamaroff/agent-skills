@@ -28,7 +28,8 @@
 #   target would forge a line (`PROJ-1<LF>kind=pr`); such a target is refused.
 # - `host` is reported, never judged. The skill compares it per kind.
 # - No issue-type judgement: an epic key looks like any other key. Only malformed
-#   input is refused — a URL never falls through to the branch arm.
+#   input is refused — a URL with a scheme, or a scheme-less URL on a known platform
+#   host, never falls through to the branch arm; a scheme-less self-hosted URL is a branch.
 #
 # Must behave identically under bash and zsh: every expansion is quoted, no arrays,
 # no variable-held glob patterns, no `[[ ]]`.
@@ -44,6 +45,17 @@ KEY_RE='^[A-Z][A-Z0-9]+-[0-9]+$'
 refuse() {
   printf 'parse-target: refused (%s): %s\n' "$1" "$2" >&2
   exit 2
+}
+
+# The host of "<host>[/…]": ?… and #… cut, userinfo@ dropped, :port dropped, lowercased.
+# ONE reading, used by both arms — two readings let ghe.corp#.atlassian.net pass the known-host
+# check on its raw text and parse as host ghe.corp (task.177 PR review CR-1).
+host_of() {
+  _h="${1%%/*}"
+  _h="${_h%%\?*}"
+  _h="${_h%%\#*}"
+  _h="${_h##*@}"
+  printf '%s' "${_h%%:*}" | tr '[:upper:]' '[:lower:]'
 }
 
 is_num() {
@@ -172,15 +184,15 @@ esac
 
 # A URL pasted without its scheme: re-parse it as https://<target>, or it falls to
 # the final branch arm and the run ends in "no pull request found for github.com/…".
-# Only the FIRST segment is read as a host, and only a known platform host counts (its
-# port stripped, case folded), so feature/foo.atlassian.net/x stays a branch. A self-hosted
+# Only the FIRST segment is read as a host — by host_of, the URL arm's own reading, so
+# ghe.corp#.atlassian.net reads as ghe.corp here too — and only a known platform host
+# counts, so feature/foo.atlassian.net/x stays a branch. A self-hosted
 # URL keeps its scheme: any rule that guesses at an unknown dotted segment reads some real
 # branch-naming convention as a host — v2.0/browse/x, jane.doe/fix/issues/123 (task.177 QA).
 case "$TARGET" in
   *://*) ;;
   ?*/*)
-    _host=$(printf '%s' "${TARGET%%/*}" | tr '[:upper:]' '[:lower:]')
-    case "${_host%%:*}" in
+    case "$(host_of "$TARGET")" in
       github.com | www.github.com | bitbucket.org | www.bitbucket.org | api.bitbucket.org | ?*.atlassian.net)
         TARGET="https://$TARGET" ;;
     esac ;;
@@ -193,11 +205,7 @@ case "$TARGET" in
     ;;
   *://*)
     REST="${TARGET#*://}"
-    HOSTPORT="${REST%%/*}"
-    HOSTPORT="${HOSTPORT%%\?*}"
-    HOSTPORT="${HOSTPORT%%\#*}"
-    HOSTPORT="${HOSTPORT##*@}"
-    HOST=$(printf '%s' "${HOSTPORT%%:*}" | tr '[:upper:]' '[:lower:]')
+    HOST=$(host_of "$REST")
     case "$REST" in
       */*) URLPATH="/${REST#*/}" ;;
       *) URLPATH="" ;;
