@@ -503,7 +503,7 @@ direct invocation (Notes § Future Improvements). Not in scope.
 Cycle 2 refute pass: cycle 1 CR-1 is fixed. One promoted LOW, TASK-235-CR2-1: an escaped or doubled quote ends a quoted value early. Two findings stay advisory: CR-2 (`false`/`no` as a value) and CR-3 (rationale count is a remainder).
 ## Deferred Work
 
-- **TASK-235-CR2-1** (LOW) — carried to gate 2 `recommendations.future` (route 2b, cycle 2): `frontmatterScalar` ends a quoted value at an escaped (`\"`) or doubled (`''`) quote; 0 of 522 tracked frontmatter values carry the shape.
+- **TASK-235-CR2-1** (LOW) — carried to gate 2 `recommendations.future` (route 2b, cycle 2): `frontmatterScalar` ends a quoted value at an escaped (`\"`) or doubled (`''`) quote; 0 of 522 tracked frontmatter values carry the shape. **Resolved** 2026-10-27 in a follow-up fix, alongside advisory CR-2 (`false` / `no` now read as not blocked).
 
 ## Definition of Done - PASSED ✅
 
@@ -542,6 +542,7 @@ All Definition of Done criteria have been verified:
 | 2026-10-27 |  | QA findings fixed — cycle 1, 1 finding (CR-1 quoted ` #`) | qa-fix |
 | 2026-10-27 |  | QA gate PASS (100/100) — 1 finding | qa-task |
 | 2026-10-27 | 1.2 | DoD passed — accepted (PR #761) | finalise |
+| 2026-10-27 |  | Deferred CR2-1 and advisory CR-2 resolved in a follow-up fix | Claude |
 <!-- change-log-end -->
 
 ---

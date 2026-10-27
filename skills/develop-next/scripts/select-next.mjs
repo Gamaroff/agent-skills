@@ -1009,10 +1009,11 @@ export function parseFrontmatterStatus(text) {
  * this repository that no in-repo action can clear (task.235). Null when the
  * field is absent or holds a placeholder.
  *
- * The YAML nulls are checked separately from `DEP_EMPTY_RE` because this
- * repository writes an unset key as `null`, and `frontmatterScalar` returns the
- * string "null" for it: without the check, house style would hold the row on a
- * condition literally named "null". `DEP_EMPTY_RE` itself is not widened — it
+ * The YAML nulls and `false` / `no` are checked separately from `DEP_EMPTY_RE`.
+ * This repository writes an unset key as `null`, and `frontmatterScalar`
+ * returns the string "null" for it; a writer who means "not blocked" may write
+ * `false` or `no`. Without the check each would hold the row on a condition
+ * literally named "null" or "false". `DEP_EMPTY_RE` itself is not widened — it
  * also reads the `Depends on` cell.
  *
  * @param {string} text
@@ -1020,10 +1021,10 @@ export function parseFrontmatterStatus(text) {
  */
 export function externalBlockOf(text) {
   const v = frontmatterScalar(text, "blocked_on_external");
-  return v && !DEP_EMPTY_RE.test(v) && !YAML_NULL_RE.test(v) ? v : null;
+  return v && !DEP_EMPTY_RE.test(v) && !YAML_UNSET_RE.test(v) ? v : null;
 }
 
-const YAML_NULL_RE = /^(?:null|~)$/i;
+const YAML_UNSET_RE = /^(?:null|~|false|no)$/i;
 
 /**
  * The registry loader `main` hands to `registryFrontier`. Each document's text
@@ -1064,6 +1065,10 @@ export function makeRegistryLoader(paths, readFile) {
  * condition, not `billing-service PR` (task.235 CR-1). Outside quotes ` #` starts a
  * comment, as YAML has it. An unbalanced quote falls through to the plain rule.
  *
+ * An escaped quote does not close the value: `\"` and `\\` inside double quotes,
+ * `''` inside single quotes, each read back as the one character YAML means
+ * (task.235 CR2-1). Other backslash sequences are kept as written.
+ *
  * @param {string} text
  * @param {string} key
  * @returns {string|null}
@@ -1078,12 +1083,38 @@ function frontmatterScalar(text, key) {
   let v = line.replace(keyRe, "").trim();
   const quote = v[0];
   if (quote === '"' || quote === "'") {
-    const end = v.indexOf(quote, 1);
-    if (end > 0) return v.slice(1, end).trim() || null;
+    const end = closingQuote(v, quote);
+    if (end > 0) {
+      const inner = v.slice(1, end);
+      const unescaped =
+        quote === '"'
+          ? inner.replace(/\\(["\\])/g, "$1")
+          : inner.replace(/''/g, "'");
+      return unescaped.trim() || null;
+    }
   }
   v = v.replace(/\s+#.*$/, "").trim(); // strip a trailing comment
   v = v.replace(/^['"]|['"]$/g, "").trim();
   return v || null;
+}
+
+/**
+ * Index of the quote that closes the quoted scalar opening at `v[0]`, or -1.
+ * Skips `\x` inside double quotes and a doubled `''` inside single quotes.
+ *
+ * @param {string} v
+ * @param {'"' | "'"} quote
+ * @returns {number}
+ */
+function closingQuote(v, quote) {
+  for (let i = 1; i < v.length; i++) {
+    if (quote === '"' && v[i] === "\\") i++;
+    else if (v[i] === quote) {
+      if (quote === "'" && v[i + 1] === "'") i++;
+      else return i;
+    }
+  }
+  return -1;
 }
 
 /** A markdown table separator row (`| --- | :--: |`). */

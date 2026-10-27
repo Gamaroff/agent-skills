@@ -6,6 +6,14 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`develop-next` reads an escaped quote and `false` / `no` correctly in frontmatter (task 235
+  follow-up).** The shared frontmatter reader ended a quoted value at the first matching quote, so
+  `"billing \"v2\" live"` read as `billing \` and `'billing-service''s PR merged'` as
+  `billing-service`; it now skips `\"` and `\\` inside double quotes and `''` inside single quotes,
+  and reads each back as the one character YAML means (TASK-235-CR2-1). `blocked_on_external:
+  false` or `no` now means not blocked, as `none` and `null` already did, instead of holding the
+  row on a condition named "false". Old and new readings agree on all 522 tracked values.
+
 - **`develop-next`'s registry fallback passes over a task blocked on another repository
   (task 235).** A cross-repository blocker could only be written as free text, which the selector
   never reads, so it selected T174 while T174 waited on tinker-city task.127 — and each run then
